@@ -15,6 +15,7 @@ import {
 import { expandContourAliases, strayAliases, strayPlatformLabels } from './tool-shim/aliases.ts';
 import { claimedWithoutCall } from './tool-shim/claims.ts';
 import type { ShimCall } from './tool-shim/parse.ts';
+import { RESULT_CLOSE, resultOpen } from './tool-shim/protocol.ts';
 import { strictObject } from './tool-shim/repair.ts';
 import { ThinkSplitter, withoutThink, type ThinkMode } from './think-tail.ts';
 import { parseToolCalls, ToolStreamParser, type ShimEvent } from './tool-shim/stream.ts';
@@ -147,6 +148,16 @@ export interface FrameFacts {
   /** Блоки, которые вызовом не стали, — по причине на блок, без повторов. */
   toolFlaws: string[];
   /**
+   * Имена вызовов, которые не пропустил хук `PreToolUse` (П4.1), — по вызову, с
+   * повторами: два отказа одному и тому же инструменту это два остановленных
+   * действия, и свести их в одно значило бы соврать о числе.
+   *
+   * Отдельно от `maskStop`: там ход остановила защита данных панели, здесь —
+   * правило человека, и отличать их обязательно. Первое чинится настройкой
+   * подмены, второе только его же скриптом.
+   */
+  toolsBlocked: string[];
+  /**
    * Метки защиты данных, которые доехали до аргументов вызова и не
    * развернулись (Р11, Т5.7). Непусто — ход остановлен НАМИ, а не контуром:
    * выполненный вызов записал бы метку в файл вместо значения.
@@ -243,6 +254,16 @@ export interface TranslatorOptions {
      * почти на каждом УСПЕШНОМ прогоне и обесценилась бы за день.
      */
     priorCalls?: boolean;
+    /**
+     * Провод событий инструментов (П4.1): у `PreToolUse` владелец — панель, и
+     * каждый вызов обязан дождаться решения хука ПРЕЖДЕ, чем уедет клиенту.
+     *
+     * Нет ключа — прослойка работает как работала: вызовы уезжают сразу.
+     * Решение приезжает не отсюда: хук — процесс, а перевод кадров синхронный,
+     * поэтому вызов кладётся в очередь (`pendingToolCalls`), решение принимает
+     * асинхронный слой конвейера и возвращает его сюда (`resolveToolCall`).
+     */
+    toolEvents?: boolean;
   };
   /**
    * Метки, которыми подменяет данные САМА платформа (`driver.placeholderPattern`),
@@ -326,6 +347,34 @@ export function maskStopMessage(names: string): string {
   return serverText('gateway-mask-unrestorable', { names });
 }
 
+/** Вызов, который ждёт решения события инструмента, — и кадр, в котором он приехал. */
+export interface PendingToolCall {
+  readonly call: ShimCall;
+  /** Кадр контура, из которого вызов вынут: в нём же уедет решение по нему. */
+  readonly payload: Record<string, unknown>;
+}
+
+/**
+ * Отказ хука — текстом РЕЗУЛЬТАТА инструмента, в той же грамматике, которой
+ * результаты и так ездят наверх (`tool-shim/protocol.ts`).
+ *
+ * Не обрыв и не пустой ответ. Вызова клиент не видел вовсе, поэтому пары
+ * «вызов без результата» не возникает ни у него, ни в переписке: на следующем
+ * ходу модель читает отказ ровно там, где ждала результат, — и с причиной,
+ * написанной скриптом человека, а не общей фразой.
+ *
+ * Грамматика берётся из протокола, а не пишется здесь второй раз: разойдясь с
+ * ним на один знак, отказ стал бы для модели обычным текстом ответа, и она
+ * повторила бы вызов, считая, что его просто не заметили.
+ */
+export function toolRefusalText(name: string, reason?: string): string {
+  const said = reason?.trim();
+  const message = said
+    ? serverText('gateway-tool-blocked-why', { name, reason: said })
+    : serverText('gateway-tool-blocked', { name });
+  return `${resultOpen(name)}${message}${RESULT_CLOSE}`;
+}
+
 /**
  * Вид кадра по его телу. Порядок проверок — от вендорного к обычному.
  *
@@ -402,6 +451,24 @@ export class StreamTranslator {
   readonly #contourAliases = new Map<string, string>();
   /** Хвост разбора уже отдан: второй раз он отдал бы только лишнюю пометку. */
   #flushed = false;
+  /**
+   * Вызовы, ждущие решения хука `PreToolUse` (П4.1). Перевод кадров синхронный,
+   * а хук — процесс: вызов кладётся сюда, решение принимает асинхронный слой
+   * конвейера и возвращает его обратно (`resolveToolCall`).
+   */
+  #pending: PendingToolCall[] = [];
+  /**
+   * Всё, что приехало ПОСЛЕ ждущего вызова. Уехав вперёд него, текст перевернул
+   * бы ответ местами, а второй вызов ушёл бы клиенту без своего хука — то есть
+   * запрет сработал бы через вызов после того, на который его поставили.
+   */
+  #queue: { event: ShimEvent; payload: Record<string, unknown> }[] = [];
+  /**
+   * Закрытие ответа придержано до решения по последнему вызову: `[DONE]`
+   * приехал, а вызов из хвоста разбора решения ещё ждёт. После этого кадра
+   * клиент читать перестаёт, и отказ, отданный за ним, не увидел бы никто.
+   */
+  #closeHeld = false;
   /** Номер текущего блока содержимого в диалекте Anthropic. */
   #index = 0;
   #textOpen = false;
@@ -435,6 +502,7 @@ export class StreamTranslator {
     toolCalls: 0,
     contourCalls: 0,
     toolFlaws: [],
+    toolsBlocked: [],
     maskStop: [],
     claimedWithoutCall: false,
     promptTokens: 0,
@@ -485,7 +553,12 @@ export class StreamTranslator {
       // бы прочитанную половину ответа, и терять её из-за того, что разборщик
       // держал блок, — регресс, который платит человек.
       out += this.#releaseThink();
-      return out + this.#abortShim() + this.#terminal(this.truncationMessage(), 'api_error');
+      return (
+        out +
+        this.#dropPending() +
+        this.#abortShim() +
+        this.#terminal(this.truncationMessage(), 'api_error')
+      );
     }
 
     if (this.#finished) return out;
@@ -516,7 +589,12 @@ export class StreamTranslator {
   fail(message: string): string {
     if (this.#closed) return '';
     this.facts.truncated = true;
-    return this.#releaseThink() + this.#abortShim() + this.#terminal(message, 'api_error');
+    return (
+      this.#releaseThink() +
+      this.#dropPending() +
+      this.#abortShim() +
+      this.#terminal(message, 'api_error')
+    );
   }
 
   /** Ответ целиком — для клиента, который просил не поток. */
@@ -841,8 +919,25 @@ export class StreamTranslator {
    * ответе служебный блок; отдать кадр как есть — значит не отдать вызов вовсе.
    */
   #shimDelta(payload: Record<string, unknown>, events: readonly ShimEvent[]): string {
+    // Решения ждёт вызов — значит ждёт и всё, что за ним: текст, обогнавший
+    // вызов, перевернул бы ответ местами, а второй вызов ушёл бы клиенту без
+    // своего хука.
+    if (this.#pending.length > 0) {
+      for (const event of events) this.#queue.push({ event, payload });
+      return '';
+    }
+    return this.#drainEvents(events, payload);
+  }
+
+  /**
+   * Разбор событий прослойки по одному. Вынесено из `#shimDelta`, потому что тем
+   * же путём разбирается очередь, скопившаяся за вызовом, — и разбираться она
+   * обязана ТАК ЖЕ: второй вызов в очереди тоже ждёт своего решения.
+   */
+  #drainEvents(events: readonly ShimEvent[], payload: Record<string, unknown>): string {
     let out = '';
-    for (const event of events) {
+    for (let index = 0; index < events.length; index += 1) {
+      const event = events[index] as ShimEvent;
       if (event.type === 'text') {
         this.#text += event.text;
         out += this.#renderText(event.text, payload);
@@ -850,15 +945,85 @@ export class StreamTranslator {
       }
       const prepared = this.#prepareCall(event.call);
       if ('stray' in prepared) return out + this.#maskStop(prepared.stray);
+      if (this.#options.shim?.toolEvents) {
+        this.#pending.push({ call: prepared.call, payload });
+        for (const rest of events.slice(index + 1)) this.#queue.push({ event: rest, payload });
+        return out;
+      }
       this.#calls.push(prepared.call);
       this.#noteCalls();
       out += this.#renderCall(prepared.call, payload);
     }
-    // Причина остановки здесь НЕ отдаётся и хвост разбора не сбрасывается —
-    // оба ждут `[DONE]` (или конца потока). Платформа с гейтом проверок вывода
-    // шлёт придержанный хвост ответа ПОСЛЕ чанка с `finish_reason`
-    // (так устроен её маршрут чата): сброшенный на причине разборщик терял вызов,
-    // закрывающий тег которого ехал в этом хвосте.
+    return out;
+  }
+
+  /**
+   * Вызовы, ждущие решения события инструмента, — в том порядке, в каком их
+   * написала модель. Пусто — ждать нечего, ответ течёт как течёт.
+   */
+  pendingToolCalls(): readonly PendingToolCall[] {
+    return this.#pending;
+  }
+
+  /**
+   * Решение по вызову: пропустить его клиенту или подменить отказом.
+   *
+   * ОТКАЗ НЕ ОБРЫВ. Клиент не получает блок вызова вовсе, а на его место встаёт
+   * результат инструмента с причиной — в форме того же текстового протокола,
+   * которым результаты и так ездят. Пары «вызов без ответа» при этом не
+   * возникает: отвечать клиенту нечего, потому что вызова он не видел, а модель
+   * на следующем ходу читает отказ ровно там, где ждала результат.
+   *
+   * Отдать вызов И отказ разом было бы хуже всего: клиент исполнил бы вызов
+   * прежде, чем дочитал до запрета, — то есть запрет сработал бы после действия.
+   */
+  resolveToolCall(id: string, decision: { allow: boolean; reason?: string }): string {
+    const index = this.#pending.findIndex((item) => item.call.id === id);
+    if (index < 0) return '';
+    const [waiting] = this.#pending.splice(index, 1) as [PendingToolCall];
+
+    let out = '';
+    if (decision.allow) {
+      this.#calls.push(waiting.call);
+      this.#noteCalls();
+      out += this.#renderCall(waiting.call, waiting.payload);
+    } else {
+      const text = toolRefusalText(waiting.call.name, decision.reason);
+      this.facts.toolsBlocked.push(waiting.call.name);
+      this.#text += text;
+      out += this.#renderText(text, waiting.payload);
+    }
+
+    // Очередь разбирается по одному событию и только пока ждать некого: второй
+    // вызов в ней тоже ждёт своего решения, и разбор обязан встать на нём —
+    // иначе хвост очереди уехал бы вперёд него.
+    while (this.#pending.length === 0 && this.#queue.length > 0) {
+      const item = this.#queue.shift() as { event: ShimEvent; payload: Record<string, unknown> };
+      out += this.#drainEvents([item.event], item.payload);
+    }
+
+    // Закрытие, придержанное ради этого вызова, — здесь и только когда ждать
+    // больше некого: ответ закончился, и последним его знаком должен быть конец.
+    if (this.#closeHeld && this.#pending.length === 0 && this.#queue.length === 0) {
+      this.#closeHeld = false;
+      out += this.#options.dialect === 'anthropic' ? this.#closeAnthropic() : this.#closeOpenAi();
+    }
+    return out;
+  }
+
+  /**
+   * Вызовы, оставшиеся без решения к концу ответа, — пропускаются.
+   *
+   * Такого быть не должно: конвейер разбирает очередь после каждого куска и
+   * после хвоста. Но потерять вызов молча нельзя ни при какой поломке выше:
+   * человек увидел бы ответ без половины и без объяснения.
+   */
+  flushPendingToolCalls(): string {
+    let out = '';
+    while (this.#pending.length > 0) {
+      const waiting = this.#pending[0] as PendingToolCall;
+      out += this.resolveToolCall(waiting.call.id, { allow: true });
+    }
     return out;
   }
 
@@ -1067,6 +1232,12 @@ export class StreamTranslator {
     let out = this.#flushShim();
     // Сброс хвоста мог остановить ход по метке — ошибка с `[DONE]` уже ушла.
     if (this.#closed) return out;
+    // Вызов из хвоста разбора ждёт решения своего хука (П4.1): после `[DONE]`
+    // клиент читать перестаёт, и отказ за ним уехал бы в никуда.
+    if (this.#pending.length > 0) {
+      this.#closeHeld = true;
+      return out;
+    }
     if (this.#parser) {
       // Саму причину нельзя ни потерять, ни оставить прежней: клиент, получивший
       // вызов при `finish_reason: "stop"`, выполняет его и на этом заканчивает
@@ -1121,6 +1292,14 @@ export class StreamTranslator {
         this.#noteCalls();
         return out + this.#maskStop(prepared.stray);
       }
+      // Вызов из хвоста — тот же вызов, и хук на нём тот же (П4.1). Здесь это не
+      // редкость, а самый частый случай: ответ, целиком состоящий из вызова,
+      // становится вызовом ровно тут, и пропустить его мимо `PreToolUse` значило
+      // бы не ставить запрет вообще.
+      if (this.#options.shim?.toolEvents) {
+        this.#pending.push({ call: prepared.call, payload: {} });
+        continue;
+      }
       this.#calls.push(prepared.call);
       out += this.#renderCall(prepared.call, {});
     }
@@ -1128,8 +1307,11 @@ export class StreamTranslator {
     // compromise: tool-shim — модель вправе описать действие словами вместо вызова; панель это только помечает
     // Ход, в котором вызовы уже были, пометкой не красится: «файл создан» в
     // итоговой реплике после состоявшегося вызова — правда, а не заявка.
+    // Ждущий вызов считается за вызов: решения по нему ещё нет, но «описала
+    // действие и не вызвала ничего» про ход, в котором вызов есть, — неправда.
     this.facts.claimedWithoutCall =
-      this.#options.shim?.priorCalls !== true && claimedWithoutCall(this.#text, this.#calls.length);
+      this.#options.shim?.priorCalls !== true &&
+      claimedWithoutCall(this.#text, this.#calls.length + this.#pending.length);
     return out;
   }
 
@@ -1143,6 +1325,28 @@ export class StreamTranslator {
    * потока, который панель сама объявила негодным. А вот текст терять нельзя:
    * без прослойки человек увидел бы прочитанную половину ответа.
    */
+  /**
+   * Обрыв застал вызовы без решения хука (П4.1). Вызовы пропадают — по той же
+   * причине, что и в `#abortShim`: клиент в тот же миг получит терминальную
+   * ошибку, а вызов рядом с ней это действие над файлами человека, собранное из
+   * потока, который панель сама объявила негодным. Текст, скопившийся за ними,
+   * наоборот отдаётся: без прослойки человек увидел бы прочитанную половину.
+   */
+  #dropPending(): string {
+    const queued = this.#queue;
+    this.#pending = [];
+    this.#queue = [];
+    this.#closeHeld = false;
+
+    let out = '';
+    for (const item of queued) {
+      if (item.event.type !== 'text') continue;
+      this.#text += item.event.text;
+      out += this.#renderText(item.event.text, item.payload);
+    }
+    return out;
+  }
+
   #abortShim(): string {
     const parser = this.#parser;
     if (!parser || this.#flushed) return '';
@@ -1492,6 +1696,14 @@ export class StreamTranslator {
     // Сброс хвоста остановил ход по метке: `event: error` уже ушёл, и
     // `message_stop` после него клиент прочёл бы удачным концом.
     if (this.#closed) return out;
+    // Вызов из хвоста разбора ждёт решения своего хука (П4.1). Закрытие
+    // придерживается ЗДЕСЬ, а не выносится раньше: `message_start` обязан уехать
+    // прежде любого содержимого, а `message_stop` — после него, и отказ, отданный
+    // за концом сообщения, не прочитал бы никто.
+    if (this.#pending.length > 0) {
+      this.#closeHeld = true;
+      return out;
+    }
     // Вызовы контура — после текста и до причины остановки: клиент, увидевший
     // `stop_reason: tool_use` раньше блока, считает ответ испорченным. Блок
     // текста закрывает первый же вызов, поэтому второй раз его закрывать нельзя.

@@ -781,7 +781,14 @@ export const platformEn: typeof platformRu = {
       'writes its thinking straight into the answer text and closes it with a bare “</think>” ' +
       'is remembered on the first such answer (usually the check at connection) and from then ' +
       'on the client gets only the answer itself: the thinking goes to the trace as the ' +
-      '“reasoning” stage, and a tool call sketched inside it is never executed. A refusal can ' +
+      '“reasoning” stage, and a tool call sketched inside it is never executed. A real tool call ' +
+      'is visible to the gateway in that same answer body, and if you have a hook on it, the ' +
+      'call is held until the hook decides: allowed — it goes to the client as usual; refused — ' +
+      'what goes to the client in its place is a result of that tool carrying the refusal ' +
+      'reason, the very one your script printed. The answer is never cut off in either case, and ' +
+      'refused calls are named in the request trace by name. This works only for a CLI whose ' +
+      'traffic goes through the gateway, and only on calls marked up by the protocol: a quoted ' +
+      'call inside a code block is neither executed nor refused. A refusal can ' +
       'arrive at any of three ' +
       'places: content checks — 451, the key budget — 402, request frequency — 429.',
 

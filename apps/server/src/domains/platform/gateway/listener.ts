@@ -10,7 +10,7 @@ import { violationReport } from '../violations.ts';
 import type { PricingLookup } from '../../analytics/pricing.ts';
 import { driverOf } from '../drivers/index.ts';
 import { nativeMessagesPath } from './anthropic-native.ts';
-import { GATEWAY_ROUTES, handleGatewayRequest } from './pipeline.ts';
+import { GATEWAY_ROUTES, handleGatewayRequest, type ToolCallGate } from './pipeline.ts';
 import { SpendFlusher, type BudgetCrossingNotice } from './spend-flush.ts';
 import { summarizedReport } from './summarized-ledger.ts';
 import { GatewayJournal } from './usage.ts';
@@ -119,6 +119,18 @@ export class PlatformGateway {
     this.#onRightsRefusal = notify;
   }
 
+  /**
+   * Ворота вызовов инструментов по метке прогона (П4.1). Ставятся снаружи и той
+   * же расстановкой, и по той же причине: реестр открытых прогонов — свойство
+   * панели, а не слушателя, и терять его на смене порта значило бы снять хуки с
+   * прогонов, которые в этот момент идут.
+   */
+  #toolGate?: (runTag: string) => ToolCallGate | undefined;
+
+  setToolGate(resolve: (runTag: string) => ToolCallGate | undefined): void {
+    this.#toolGate = resolve;
+  }
+
   #enqueue(task: () => Promise<void>): Promise<void> {
     const next = this.#queue.then(task, task);
     this.#queue = next.catch(() => undefined);
@@ -210,6 +222,7 @@ export class PlatformGateway {
         journal: this.#journal,
         spend: this.#spend,
         onRightsRefusal: (platformId) => this.#onRightsRefusal?.(platformId),
+        toolGate: (runTag) => this.#toolGate?.(runTag),
         fetchImpl: runtime.fetchImpl,
         ...(runtime.now ? { now: runtime.now } : {}),
       }).catch(() => {

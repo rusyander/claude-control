@@ -141,6 +141,14 @@ export const serverTextTemplates = {
     ru: 'Проверки контента контура остановили ответ: {{names}}',
     en: "The contour's content checks stopped the answer: {{names}}",
   },
+  'gateway-tool-blocked': {
+    ru: 'Вызов «{{name}}» остановлен хуком PreToolUse',
+    en: 'The “{{name}}” call was stopped by the PreToolUse hook',
+  },
+  'gateway-tool-blocked-why': {
+    ru: 'Вызов «{{name}}» остановлен хуком PreToolUse: {{reason}}',
+    en: 'The “{{name}}” call was stopped by the PreToolUse hook: {{reason}}',
+  },
   'gateway-answer-too-large': {
     ru: 'Ответ контура больше 8 МБ — шлюз не собирает его целиком. Тот же запрос потоком приходит без этого потолка',
     en: "The contour's answer is over 8 MB — the gateway does not assemble it whole. The same request as a stream comes without this ceiling",

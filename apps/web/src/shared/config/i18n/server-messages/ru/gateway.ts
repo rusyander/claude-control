@@ -43,6 +43,8 @@ export const gatewayRu: Record<GatewayMessageCode, string> = {
   'gateway-upstream-unnamed-error': 'та сторона закончила ответ ошибкой и не назвала её',
   'gateway-checks-stopped': 'Проверки контента контура остановили ответ',
   'gateway-checks-stopped-named': 'Проверки контента контура остановили ответ: {{names}}',
+  'gateway-tool-blocked': 'Вызов «{{name}}» остановлен хуком PreToolUse',
+  'gateway-tool-blocked-why': 'Вызов «{{name}}» остановлен хуком PreToolUse: {{reason}}',
   'gateway-answer-too-large':
     'Ответ контура больше 8 МБ — шлюз не собирает его целиком. Тот же запрос потоком приходит без этого потолка',
   'gateway-not-anthropic': 'Платформа ответила не сообщением диалекта Anthropic',

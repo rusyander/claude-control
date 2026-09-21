@@ -4,7 +4,7 @@
     {
       "topic": "platform",
       "document": "apps/web/src/pages/Help/topics/PlatformTopic.tsx",
-      "confirmedAt": "2026-09-21T07:42:05.033Z",
+      "confirmedAt": "2026-09-21T10:10:03.873Z",
       "sources": [
         {
           "path": "packages/contracts/src/compromises.ts",
@@ -29,12 +29,12 @@
         {
           "path": "apps/server/src/domains/platform/gateway/listener.ts",
           "why": "«Путь одного запроса»: адрес шлюза, три маршрута, занятый порт",
-          "sha": "0532211b8140dbc8"
+          "sha": "ef00f46459dc82a1"
         },
         {
           "path": "apps/server/src/domains/platform/gateway/pipeline.ts",
           "why": "«Путь одного запроса»: что панель делает с запросом между CLI и контуром",
-          "sha": "d725e9bb5bd66eef"
+          "sha": "47a42208e336a691"
         },
         {
           "path": "apps/server/src/domains/platform/gateway/status.ts",

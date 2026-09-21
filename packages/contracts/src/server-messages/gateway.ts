@@ -36,6 +36,8 @@ export const gatewayMessageParams = {
   'gateway-upstream-unnamed-error': [],
   'gateway-checks-stopped': [],
   'gateway-checks-stopped-named': ['names'],
+  'gateway-tool-blocked': ['name'],
+  'gateway-tool-blocked-why': ['name', 'reason'],
   'gateway-answer-too-large': [],
   'gateway-not-anthropic': [],
   'gateway-mask-rules-broken': ['error'],

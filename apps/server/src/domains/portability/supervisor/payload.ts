@@ -31,6 +31,13 @@ export const SUPERVISOR_EVENTS = [
   'Notification',
   'SessionEnd',
   'PreCompact',
+  // События инструментов (П4.1). Отыгрываются НЕ вокруг прогона, а на проводе:
+  // вызов инструмента виден в теле ответа, когда трафик чужого CLI идёт через
+  // контур панели. Владелец у них считается своей функцией
+  // (`wire/tool-events.ts` → `toolEventOwner`), потому что у них есть третье
+  // состояние, которого нет у остальных: контур выключен — отыгрывать НЕЧЕМ.
+  'PreToolUse',
+  'PostToolUse',
 ] as const;
 
 export type SupervisorEvent = (typeof SUPERVISOR_EVENTS)[number];
@@ -94,6 +101,18 @@ export interface SupervisorEventInput {
   readonly customInstructions?: string;
   /** `Stop` / `SubagentStop`: прогон уже продолжен решением хука. */
   readonly stopHookActive?: boolean;
+  /** `PreToolUse` / `PostToolUse`: имя инструмента, как его назвала модель. */
+  readonly toolName?: string;
+  /**
+   * `PreToolUse` / `PostToolUse`: аргументы вызова РАЗОБРАННЫМ объектом.
+   *
+   * Объект, а не строка: у Claude это поле — объект, и скрипт, снятый с него,
+   * читает `.tool_input.command`. Прислать сюда текст JSON значило бы заставить
+   * его разбирать строку второй раз — и молча промолчать, когда он этого не делает.
+   */
+  readonly toolInput?: unknown;
+  /** `PostToolUse`: что инструмент ответил. */
+  readonly toolResponse?: unknown;
 }
 
 /**
@@ -115,6 +134,12 @@ const EVENT_FIELDS = {
   Notification: { message: 'message' },
   SessionEnd: { reason: 'reason' },
   PreCompact: { trigger: 'trigger', customInstructions: 'custom_instructions' },
+  // `tool_response` — имя поля у Claude. В каноне тот же факт называется
+  // `tool_result` (`needs.ts`), и это разные словари: канон описывает, ЧТО хуку
+  // нужно, нагрузка — как это поле зовут в JSON. Сводить их в одно имя значило бы
+  // менять либо форму нагрузки, либо матрицу верности.
+  PreToolUse: { toolName: 'tool_name', toolInput: 'tool_input' },
+  PostToolUse: { toolName: 'tool_name', toolInput: 'tool_input', toolResponse: 'tool_response' },
 } as const satisfies Record<SupervisorEvent, Readonly<Record<string, string>>>;
 
 /** Общие поля — есть у каждого события, всегда заполнены описанием прогона. */

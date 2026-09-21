@@ -280,7 +280,10 @@ describe('поля переходника — объявлением канон�
   });
 
   it('событие вне таблицы канона получает общие поля и пропуск остального', () => {
-    const config = hookShimConfig({ event: 'PostToolUse', command: 'x' });
+    // Имя выдуманное намеренно: подставить сюда настоящее событие значит
+    // однажды проверять им обратное — так и случилось, когда `PostToolUse`
+    // стоял здесь примером «вне таблицы», а провод П4 внёс его в таблицу.
+    const config = hookShimConfig({ event: 'SomeFutureEvent', command: 'x' });
     expect(config.passthrough).toBe(true);
     expect(config.fields.map((field) => field.name)).toEqual([
       'hook_event_name',
@@ -288,6 +291,18 @@ describe('поля переходника — объявлением канон�
       'cwd',
       'transcript_path',
     ]);
+  });
+
+  it('события инструментов в таблице ЕСТЬ, и переходник несёт их поля', () => {
+    // Иначе перенесённый хук вызова получил бы общие четыре поля и судил бы о
+    // вызове, не зная ни имени инструмента, ни аргументов.
+    const pre = hookShimConfig({ event: 'PreToolUse', command: 'x' });
+    expect(pre.passthrough).toBe(false);
+    expect(pre.fields.map((field) => field.name)).toContain('tool_name');
+    expect(pre.fields.map((field) => field.name)).toContain('tool_input');
+
+    const post = hookShimConfig({ event: 'PostToolUse', command: 'x' });
+    expect(post.fields.map((field) => field.name)).toContain('tool_response');
   });
 
   it('в тексте переходника нет ни импорта панели, ни её путей', () => {

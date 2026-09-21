@@ -70,6 +70,8 @@ describe('нагрузка события: набор полей зафикси�
     Notification: ['message'],
     SessionEnd: ['reason'],
     PreCompact: ['trigger', 'custom_instructions'],
+    PreToolUse: ['tool_name', 'tool_input'],
+    PostToolUse: ['tool_name', 'tool_input', 'tool_response'],
   };
 
   it('у каждого события ровно свои поля сверх общих четырёх', () => {
@@ -104,6 +106,8 @@ describe('нагрузка события: набор полей зафикси�
       Notification: { message: 'нужно решение' },
       SessionEnd: { reason: 'clear' },
       PreCompact: { trigger: 'manual', customInstructions: 'сохрани пути' },
+      PreToolUse: { toolName: 'Bash', toolInput: { command: 'ls' } },
+      PostToolUse: { toolName: 'Bash', toolInput: { command: 'ls' }, toolResponse: { stdout: '' } },
     } as const;
 
     for (const event of SUPERVISOR_EVENTS) {

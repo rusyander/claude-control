@@ -30,6 +30,7 @@ import { gatewayPricing } from '../domains/platform/spend.ts';
 import { GatewayAutoStart } from '../domains/platform/gateway/auto-start.ts';
 import { PlatformWatch } from '../domains/platform/watch.ts';
 import { summarizedInRun } from '../domains/platform/gateway/summarized-ledger.ts';
+import { ToolGateRegistry } from '../domains/portability/wire/tool-gate.ts';
 import {
   resolveRunRoute,
   runRouteOf,
@@ -568,6 +569,20 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   providerChats.setContourSummarized((runTag) =>
     summarizedInRun(ctx.location.paths.appData, runTag),
   );
+  // Хуки вызовов инструментов на проводе (П4.1): шлюз спрашивает по метке
+  // прогона, реестр отвечает воротами того прогона. Реестр держится ЗДЕСЬ, а не
+  // в слушателе, — он переживает перезапуск шлюза, а прогоны в этот момент идут.
+  // Прогон, не открывший ворота, придерживать вызовы не заставляет: пустой
+  // реестр означает прежнее поведение прослойки, а не ожидание решения, которое
+  // никто не примет.
+  //
+  // Ворота ОТКРЫВАЕТ прогон, и делает это тот, кто знает набор скриптов прогона.
+  // Такого места в панели пока нет: `ProviderChatRun` принимает `supervisor`
+  // параметром, а заполнить его некому — набор хуков на прогон решается там же,
+  // где решается подписка разделов (П5.1). До той врезки реестр пуст, и провод
+  // ничего не меняет ни в одном прогоне; сказано это здесь, а не подразумевается.
+  const toolGates = new ToolGateRegistry();
+  platformGateway.setToolGate((runTag) => toolGates.gateOf(runTag));
   const events = createEventHub();
   const panelPending = new PanelPendingActions(PANEL_ACTION_CONFIRM_TIMEOUT_MS);
 

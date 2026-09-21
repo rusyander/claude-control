@@ -36,6 +36,7 @@ import {
 } from './anthropic-native.ts';
 import { NativeThinkFilter, withoutThinkMessage } from './native-think.ts';
 import { historyHasToolUse } from './tool-shim/encode.ts';
+import type { ShimCall } from './tool-shim/parse.ts';
 import { imagesRequest } from './images.ts';
 import { bridgeUpstreamStatus } from './status.ts';
 import {
@@ -115,9 +116,32 @@ export interface PipelineDeps {
    * хорошо». Зовётся с пути запроса, поэтому обязан возвращаться немедленно.
    */
   onRightsRefusal?: (platformId: string) => void;
+  /**
+   * Провод событий инструментов (П4.1): решение по вызову, вынутому прослойкой
+   * из ответа, — до того, как вызов уедет клиенту.
+   *
+   * Спрашивается по МЕТКЕ ПРОГОНА: другого канала от процесса чужого CLI к
+   * панели нет, а знать, чьи хуки исполнять, обязательно — набор скриптов
+   * принадлежит разговору, а не шлюзу. Метки нет (обычный запрос человека, не
+   * прогон панели) или ворот не выдали — прослойка работает как работала.
+   *
+   * Сам шлюз про хуки не знает ничего: он спрашивает «можно ли этот вызов» и
+   * получает ответ. Кто его принимает и по каким скриптам — забота
+   * `portability/wire`.
+   */
+  toolGate?: (runTag: string) => ToolCallGate | undefined;
   /** Подстановка транспорта для тестов. */
   fetchImpl?: PlatformFetch;
   now?: () => Date;
+}
+
+/**
+ * Ворота вызова инструмента. Шлюз держит их структурно, а не импортом из
+ * `portability`: связь между двумя доменами — это ОДИН вопрос и ОДИН ответ, и
+ * тянуть ради них надзиратель хуков в путь запроса незачем.
+ */
+export interface ToolCallGate {
+  decide(call: ShimCall): Promise<{ allow: boolean; reason?: string }>;
 }
 
 /** Какой из маршрутов просят. Хвост `/v1` может отсутствовать у клиента. */
@@ -568,6 +592,10 @@ async function chat(
   // Суффикс id сообщения ЭТОГО запроса: id контура у разных ответов бывает
   // одинаковым, а лента Claude находит ответ со сжатием истории именно по id.
   const messageIdSuffix = randomBytes(6).toString('hex');
+  // Ворота вызовов — по метке прогона, до первого кадра: включённость провода
+  // решает, придерживать ли вызов, и узнать её позже значило бы отдать первый
+  // вызов мимо хука, а остальные через него.
+  const gate = runTag ? deps.toolGate?.(runTag) : undefined;
   const translator = new StreamTranslator({
     dialect,
     model,
@@ -593,6 +621,10 @@ async function chat(
             // Ход уже идёт с инструментами — итоговая реплика «файл создан»
             // пометкой не красится: она правда.
             priorCalls: historyHasToolUse(clientBody),
+            // Вызов ждёт решения хука только когда ворота этого прогона есть
+            // (П4.1). Нет их — придерживать вызов незачем: ждать нечего, и
+            // задержка стала бы чистой платой ни за что.
+            ...(gate ? { toolEvents: true } : {}),
           }
         : undefined,
     // Тело — то, что УШЛО наверх, уже с нашими метками: метка платформы, которой
@@ -622,9 +654,18 @@ async function chat(
   // единственного места, где эту беду видно.
   let failure: string | undefined;
   try {
-    if (wantsStream) await streamToClient(response, source, translator, restore);
+    if (wantsStream) await streamToClient(response, source, translator, restore, gate);
     else {
-      await collectForClient(response, source, translator, vault, dialect, model, messageIdSuffix);
+      await collectForClient(
+        response,
+        source,
+        translator,
+        vault,
+        dialect,
+        model,
+        messageIdSuffix,
+        gate,
+      );
     }
   } catch (error) {
     failure = response.destroyed
@@ -706,6 +747,10 @@ async function chat(
       ? { nativeCalls: facts.contourCalls }
       : {}),
     toolFlaws: facts.toolFlaws,
+    // Отказ хука — в след ВСЕГДА, когда он был: остановленное действие это
+    // единственное место, где человек увидит, что его правило сработало на чужом
+    // CLI. Отказов не было — поля нет, и нуль не выдаёт провод за работавший.
+    ...(facts.toolsBlocked.length > 0 ? { toolsBlocked: facts.toolsBlocked } : {}),
     claimedWithoutCall: facts.claimedWithoutCall,
     // Размер картинок — и только размер: содержимое в журнал панели не попадает
     // ни байтом (Т9). Ноль означает «картинок не было», и поля тогда нет вовсе.
@@ -1139,12 +1184,41 @@ function finishBroken(
   response.end(restore.push(translator.fail(`AgentDeck: ${message}`)) + restore.end());
 }
 
+/**
+ * Решения по вызовам, которые прослойка придержала (П4.1).
+ *
+ * Зовётся после КАЖДОГО куска, а не один раз в конце: клиент должен получить
+ * вызов сразу, как только хук его пропустил, — иначе провод превратил бы поток в
+ * цельное тело, и человек смотрел бы в тишину до конца ответа.
+ *
+ * Разбор идёт по одному вызову за раз и в порядке, в каком их написала модель:
+ * решение по второму вызову законно зависит от первого (скрипт человека вправе
+ * посмотреть, что уже сделано), а параллельный запуск сделал бы этот порядок
+ * случайным.
+ *
+ * Ворот нет — работы нет: прослойка в этом случае вызовы не придерживает вовсе.
+ */
+async function settleToolCalls(
+  translator: StreamTranslator,
+  gate: ToolCallGate | undefined,
+): Promise<string> {
+  if (!gate) return '';
+  let out = '';
+  for (;;) {
+    const waiting = translator.pendingToolCalls()[0];
+    if (!waiting) return out;
+    const decision = await gate.decide(waiting.call);
+    out += translator.resolveToolCall(waiting.call.id, decision);
+  }
+}
+
 /** Поток наружу: заголовки уходят сразу, тело — кусками, без буфера целиком. */
 async function streamToClient(
   response: ServerResponse,
   source: UpstreamSource,
   translator: StreamTranslator,
   restore: ResponseStreamFilter,
+  gate?: ToolCallGate,
 ): Promise<void> {
   response.writeHead(200, {
     'content-type': 'text/event-stream',
@@ -1158,12 +1232,18 @@ async function streamToClient(
     source,
     async (text) => {
       await write(response, restore.push(translator.push(text)));
+      await write(response, restore.push(await settleToolCalls(translator, gate)));
     },
     () => response.destroyed,
   );
 
-  const tail = restore.push(translator.end()) + restore.end();
-  response.end(tail);
+  // Решения по вызовам из ХВОСТА спрашиваются ПОСЛЕ `end()`: ответ, состоящий из
+  // одного вызова, становится вызовом ровно там, и без этого он уехал бы клиенту,
+  // не спросив хука. Оборванный поток сюда не доходит с вызовами вовсе — их
+  // синтез на обрыве запрещён, и придержанное там снимается само.
+  const tail = restore.push(translator.end());
+  const settled = restore.push(await settleToolCalls(translator, gate));
+  response.end(tail + settled + restore.end());
 }
 
 /**
@@ -1199,6 +1279,7 @@ async function collectForClient(
   dialect: Dialect,
   model: string,
   messageIdSuffix = '',
+  gate?: ToolCallGate,
 ): Promise<void> {
   const language = translator.language;
   // Счёт идёт по кускам, а не по собранному телу: смысл потолка в том, чтобы
@@ -1208,17 +1289,23 @@ async function collectForClient(
 
   await pump(
     source,
-    (text) => {
+    async (text) => {
       collected += Buffer.byteLength(text, 'utf8');
       if (collected > MAX_ANSWER_BYTES) {
         overflow = true;
         return;
       }
       translator.push(text);
+      // Кадры решения здесь никуда не уезжают — цельное тело собирается из
+      // `assembled()`. Спросить хук всё равно обязательно: без этого вызов попал
+      // бы в тело неспрошенным, и запрет действовал бы только у клиента, просившего
+      // поток. Отказ ложится в текст ответа тем же путём, что и в потоке.
+      await settleToolCalls(translator, gate);
     },
     () => response.destroyed || overflow,
   );
   translator.end();
+  await settleToolCalls(translator, gate);
 
   if (overflow) {
     // 413 и здесь: клиент разбирает его тем же кодом, что и слишком большой
@@ -1492,6 +1579,7 @@ function record(deps: PipelineDeps, event: Partial<PlatformGatewayEvent>): void 
     contourCalls: event.contourCalls ?? 0,
     ...(event.nativeCalls ? { nativeCalls: event.nativeCalls } : {}),
     toolFlaws: event.toolFlaws ?? [],
+    ...(event.toolsBlocked?.length ? { toolsBlocked: event.toolsBlocked } : {}),
     claimedWithoutCall: event.claimedWithoutCall ?? false,
     // Картинок не было — поля нет вовсе: ноль в каждом следе читался бы как
     // «панель что-то умеет про картинки» в ответе, где их и не ждали.

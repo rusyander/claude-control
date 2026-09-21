@@ -33,6 +33,13 @@ import {
  */
 export const SUPERVISOR_HOOK_TIMEOUT_MS = 60_000;
 
+/**
+ * Сколько знаков причины берётся из stderr скрипта. Причина уезжает и человеку в
+ * заметку, и модели в ответ (провод П4.1 ставит её на место запрещённого вызова),
+ * а скрипт волен напечатать туда весь свой отладочный вывод.
+ */
+const MAX_REASON_CHARS = 1_000;
+
 /** Один скрипт, который панель отыгрывает на событии. */
 export interface SupervisorHook {
   readonly event: SupervisorEvent;
@@ -220,9 +227,16 @@ export async function runSupervisorEvent(
       ? true
       : verdict.decision === 'block' || verdict.decision === 'ask' || verdict.decision === 'error';
 
+    // Причина отказа по коду 2 — это STDERR скрипта: так устроен канал у Claude,
+    // и перенесённый скрипт пишет объяснение именно туда. Без этой строки отказ
+    // доезжал до человека и до модели словами панели («хук вышел с кодом 2»), то
+    // есть правило оставалось без объяснения ровно там, где объяснение и нужно.
+    // Явный JSON сильнее: он — осознанный канал, а stderr пишут и ради отладки.
+    const said = script.stderr.trim().slice(0, MAX_REASON_CHARS);
     const hookReason = script.timedOut
       ? `Хук события ${event} не ответил за ${hook.timeoutMs ?? defaultTimeout} мс и был снят`
-      : verdict.reason;
+      : ((parsed === undefined && script.exitCode === 2 && said ? said : undefined) ??
+        verdict.reason);
 
     results.push({
       event,

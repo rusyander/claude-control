@@ -119,6 +119,19 @@ export function claimTargetFile(
   return true;
 }
 
+/**
+ * Копию ЭТОЙ записи у цели написала панель — значит, разница с каноном не
+ * столкновение, а устаревшая проекция (П5.1, `EmitDeps.owned`).
+ *
+ * Спрашивается ровно там, где эмиттер собрался вернуть `collision_needs_choice`
+ * из-за уже лежащей у цели записи. Столкновение ВНУТРИ одного плана
+ * (`claimTargetFile`) этим не снимается: две записи одного паспорта в один файл
+ * — не «своё поверх своего», а два разных ответа на один вопрос.
+ */
+export function ownedByPanel(context: EmitContext, item: EnvItem): boolean {
+  return context.deps.owned?.has(item.id) ?? false;
+}
+
 /** Приговор записи: он уже вынесен: карта строится вместе с контекстом. */
 export function verdictOf(context: EmitContext, item: EnvItem): FidelityVerdict {
   const verdict = context.verdicts.get(item.id);

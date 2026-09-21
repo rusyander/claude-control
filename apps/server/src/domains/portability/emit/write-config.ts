@@ -13,6 +13,7 @@ import { hookShimCommand, hookShimPath, installHookShim } from './hook-shim.ts';
 import {
   EmitMechanismMissingError,
   emitEntry,
+  ownedByPanel,
   verdictOf,
   type EmitContext,
   type StageResult,
@@ -213,7 +214,7 @@ function emitMcp(context: EmitContext): StageResult {
     };
 
     const already = existing.find((server) => server.name === item.name);
-    if (already && !sameServer(already, draft)) {
+    if (already && !sameServer(already, draft) && !ownedByPanel(context, item)) {
       result.entries.push(emitEntry(item, verdict, 'collision_needs_choice', target.filePath));
       continue;
     }
@@ -273,7 +274,7 @@ function emitEnvVars(context: EmitContext): StageResult {
     if (!target) throw new EmitMechanismMissingError(context.deps.target.id, 'envVar');
 
     const already = vars.find((variable) => variable.key === item.name);
-    if (already && already.value !== item.value) {
+    if (already && already.value !== item.value && !ownedByPanel(context, item)) {
       result.entries.push(emitEntry(item, verdict, 'collision_needs_choice', target.filePath));
       continue;
     }

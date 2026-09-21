@@ -1,5 +1,6 @@
 import { join } from 'node:path';
 import type { FidelityMark } from '@agentdeck/contracts/portable-fidelity';
+import type { EnvSubscription } from '@agentdeck/contracts/portable-subscribe';
 import type { TransferRecord } from '@agentdeck/contracts/portable-transfer';
 import type {
   AppSettings,
@@ -91,6 +92,12 @@ import {
   getPortabilityFidelity as readPortabilityFidelity,
   savePortabilityFidelity as writePortabilityFidelity,
 } from './portability-fidelity.ts';
+import {
+  forgetPortabilitySubscription as dropPortabilitySubscription,
+  getPortabilitySubscription as readPortabilitySubscription,
+  getPortabilitySubscriptions as readPortabilitySubscriptions,
+  savePortabilitySubscription as writePortabilitySubscription,
+} from './portability-subscriptions.ts';
 import {
   forgetPortabilityTransfer as dropPortabilityTransfer,
   getPortabilityTransfer as readPortabilityTransfer,
@@ -707,6 +714,33 @@ export class AppStore {
   /** Забыть след: перенос отменён целиком и возвращать больше нечего. */
   forgetPortabilityTransfer(key: string): void {
     dropPortabilityTransfer(this.state, key);
+    this.persist();
+  }
+
+  // --- Перенос: подписки целей на канон (П5.1) ---
+
+  /** Все подписки: «цель:уровень» → слои и память о спроецированном (копия). */
+  getPortabilitySubscriptions(): Record<string, EnvSubscription> {
+    return readPortabilitySubscriptions(this.state);
+  }
+
+  /** Подписка одной цели; её нет — `undefined`, а не пустая (копия). */
+  getPortabilitySubscription(key: string): EnvSubscription | undefined {
+    return readPortabilitySubscription(this.state, key);
+  }
+
+  /**
+   * Запомнить подписку. Пишется всегда: и подписка, и пересборка — события, а
+   * не пересчёт, и «мы это уже писали» здесь ничего не экономит.
+   */
+  savePortabilitySubscription(key: string, subscription: EnvSubscription): void {
+    writePortabilitySubscription(this.state, key, subscription);
+    this.persist();
+  }
+
+  /** Забыть подписку целиком. У цели при этом не удаляется ничего. */
+  forgetPortabilitySubscription(key: string): void {
+    dropPortabilitySubscription(this.state, key);
     this.persist();
   }
 

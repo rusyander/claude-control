@@ -58,6 +58,10 @@ export const configRu: Record<ConfigMessageCode, string> = {
   'portability-apply-rollback-failed':
     'Запись не удалась, и откат тоже: часть файлов осталась изменённой. Копии лежат в каталоге резервных копий.',
   'portability-transfer-not-found': 'Отменять нечего: переноса к этой цели панель не делала.',
+  'portability-subscription-unknown': 'Подписки на эту цель нет.',
+  'portability-subscription-layer-unknown': 'Такого слоя в каноне нет.',
+  'portability-subscription-held':
+    'Пересборка удержана: либо проекцию строила другая версия канона, либо ни один слой не подписан.',
   'resource-file-unspecified': 'Не указан файл',
   'resource-template-not-found': 'Шаблон не найден',
   'resource-kind-unknown': 'Неизвестный вид ресурса',

@@ -1,7 +1,8 @@
 import { basename } from 'node:path';
 import type { AppSettings, ClaudePaths } from '@agentdeck/contracts';
-import { getActiveProvider } from '../providers/registry.ts';
-import { providerBackupName } from '../lib/safe-io.ts';
+import type { EnvSubscription } from '@agentdeck/contracts/portable-subscribe';
+import { getProvider, getActiveProvider, isKnownProviderId } from '../providers/registry.ts';
+import { providerBackupName, transferBackupName } from '../lib/safe-io.ts';
 
 /**
  * Какие файлы конфигурации показывает история изменений.
@@ -11,7 +12,9 @@ import { providerBackupName } from '../lib/safe-io.ts';
  * settings.json, mcp.json, opencode.json, ~/.aider.conf.yml), а их правки в
  * ленту не попадали. Здесь список собирается честно: файлы Claude ВСЕГДА
  * (регресс-ноль: тот же набор и те же имена копий) плюс файлы АКТИВНОГО
- * провайдера, если он не Claude.
+ * провайдера, если он не Claude, плюс файлы ПОДПИСАННЫХ целей (П5.1) — цель
+ * подписки активной не бывает почти никогда, а её файлы панель переписывает
+ * сама, и лента изменений — единственное место, где это видно.
  *
  * КЛЮЧЕВОЕ ОТЛИЧИЕ ФАЙЛОВ ПРОВАЙДЕРА (закреплено Ф9-10): их копии называются
  * `<id>-<basename>` (`safe-io/providerBackupName`), потому что каталог копий один
@@ -59,6 +62,11 @@ export function isSecretFile(path: string): boolean {
 /** Минимум настроек, нужный сборщику (без импорта AppStore). */
 export interface TrackedFilesSettingsSource {
   getSettings(): Pick<AppSettings, 'provider' | 'claudeDirOverride'>;
+  /**
+   * Подписки целей на канон (П5.1). Необязателен: сборщик старше подписок, и
+   * источник настроек без них — законный (так его зовут тесты разделов).
+   */
+  getPortabilitySubscriptions?(): Record<string, EnvSubscription>;
 }
 
 /**
@@ -139,7 +147,69 @@ export function providerTrackedFiles(store: TrackedFilesSettingsSource): Tracked
   }));
 }
 
-/** Полный список отслеживаемых файлов: Claude + активный провайдер. */
+/**
+ * Файлы ПОДПИСАННЫХ целей: пересборка подписки видна в ленте тем же механизмом,
+ * что и любая правка панели (П5.1).
+ *
+ * Пути НЕ выводятся из каталога возможностей, как у активного провайдера, а
+ * берутся из самой подписки — из списка файлов, которые панель туда записала.
+ * Вывод дал бы сегодняшний набор разделов, а копии лежат от тех файлов, что
+ * писались вчера; лента показывала бы дифф не того файла или не показывала
+ * ничего. Подписка, которая ещё ни разу не собиралась, не даёт ни одной строки:
+ * копий от неё нет.
+ *
+ * Имя копии — `transferBackupName` (`<id>-<путь от корня>`), потому что писал
+ * эти файлы перенос, и других копий у них не существует. Восстановление
+ * запрещено, как у всех чужих файлов: цель по basename не находится.
+ */
+export function subscriptionTrackedFiles(store: TrackedFilesSettingsSource): TrackedFile[] {
+  const subscriptions = store.getPortabilitySubscriptions?.() ?? {};
+  const files: TrackedFile[] = [];
+
+  for (const subscription of Object.values(subscriptions)) {
+    const { root } = subscription;
+    // `null` — подписка ни разу не собиралась, копий от неё нет. Пустая строка
+    // — законный корень: у CLI, чьи разделы живут по разным каталогам, общего
+    // корня нет вовсе, и имя копии тогда строится от basename.
+    if (root === null || !isKnownProviderId(subscription.target)) continue;
+    const provider = getProvider(subscription.target);
+
+    for (const path of Object.keys(subscription.files)) {
+      if (isSecretFile(path)) continue;
+      files.push({
+        backupBase: transferBackupName(provider.id, root, path),
+        path,
+        file: basename(path),
+        canRevert: false,
+        providerId: provider.id,
+        providerName: provider.name,
+      });
+    }
+  }
+
+  return files;
+}
+
+/**
+ * Полный список отслеживаемых файлов: Claude + активный провайдер + файлы
+ * подписанных целей.
+ *
+ * Дубли отсеиваются по ИМЕНИ КОПИИ, а не по пути: у одного и того же файла
+ * активного провайдера и его же подписки имена копий разные
+ * (`gemini-settings.json` против `gemini-<путь от корня>`), значит и копии
+ * разные, и обе заслуживают строки. А вот две подписки, пишущие в один файл,
+ * дали бы одно имя дважды — и одну правку двумя строками.
+ */
 export function trackedFiles(paths: ClaudePaths, store: TrackedFilesSettingsSource): TrackedFile[] {
-  return [...claudeTrackedFiles(paths), ...providerTrackedFiles(store)];
+  const all = [
+    ...claudeTrackedFiles(paths),
+    ...providerTrackedFiles(store),
+    ...subscriptionTrackedFiles(store),
+  ];
+  const seen = new Set<string>();
+  return all.filter((file) => {
+    if (seen.has(file.backupBase)) return false;
+    seen.add(file.backupBase);
+    return true;
+  });
 }

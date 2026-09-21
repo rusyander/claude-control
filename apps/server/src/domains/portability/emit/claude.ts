@@ -33,6 +33,7 @@ import {
   emitEntry,
   isSafeSegment,
   sharesLocation,
+  ownedByPanel,
   verdictOf,
   type EmitContext,
   type StageResult,
@@ -177,7 +178,7 @@ function emitClaudeSkills(context: EmitContext): StageResult {
     // Столкновение бывает и с тем, что лежит у цели, и с записью ЭТОГО ЖЕ
     // паспорта: свой скилл и скилл из плагина носят одно имя (П2.6).
     if (
-      (exists && differsFromSkill(filePath, item)) ||
+      (exists && differsFromSkill(filePath, item) && !ownedByPanel(context, item)) ||
       !claimTargetFile(context, 'skill', filePath)
     ) {
       result.entries.push(emitEntry(item, verdict, 'collision_needs_choice', filePath));
@@ -248,7 +249,7 @@ function emitClaudeCommands(context: EmitContext): StageResult {
     const filePath = `${join(commandsDir, ...segments)}.md`;
     const text = commandMarkdown(item);
     if (
-      (existsSync(filePath) && readTextFile(filePath) !== text) ||
+      (existsSync(filePath) && readTextFile(filePath) !== text && !ownedByPanel(context, item)) ||
       !claimTargetFile(context, 'command', filePath)
     ) {
       result.entries.push(emitEntry(item, verdict, 'collision_needs_choice', filePath));
@@ -293,7 +294,10 @@ function emitClaudeSubagents(context: EmitContext): StageResult {
     const body = bodyAfterFrontmatter(item.raw);
     const text = subagentMarkdown(item, body);
     const found = already.subagents.find((parsed) => parsed.name === item.name);
-    if ((found && found.body !== body.trim()) || !claimTargetFile(context, 'subagent', filePath)) {
+    if (
+      (found && found.body !== body.trim() && !ownedByPanel(context, item)) ||
+      !claimTargetFile(context, 'subagent', filePath)
+    ) {
       result.entries.push(emitEntry(item, verdict, 'collision_needs_choice', filePath));
       continue;
     }
@@ -437,7 +441,7 @@ function emitClaudeMcp(context: EmitContext): StageResult {
     }
 
     const already = existing.get(item.name);
-    if (already && !sameServer(already, draft)) {
+    if (already && !sameServer(already, draft) && !ownedByPanel(context, item)) {
       result.entries.push(emitEntry(item, verdict, 'collision_needs_choice', configPath));
       continue;
     }
@@ -497,7 +501,7 @@ function emitClaudeEnvVars(context: EmitContext): StageResult {
     if (verdict.level !== 'native') continue;
 
     const already = current[item.name];
-    if (already !== undefined && already !== item.value) {
+    if (already !== undefined && already !== item.value && !ownedByPanel(context, item)) {
       result.entries.push(emitEntry(item, verdict, 'collision_needs_choice', settings));
       continue;
     }
@@ -564,7 +568,7 @@ function emitClaudePermissions(context: EmitContext): StageResult {
     const clash = [...current, ...drafts].find(
       (rule) => rule.pattern === translated.rule && rule.decision !== translated.decision,
     );
-    if (clash) {
+    if (clash && !ownedByPanel(context, item)) {
       result.entries.push(emitEntry(item, verdict, 'collision_needs_choice', settings));
       continue;
     }

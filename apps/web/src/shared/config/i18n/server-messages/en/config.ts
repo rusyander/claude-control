@@ -60,6 +60,10 @@ export const configEn: Record<ConfigMessageCode, string> = {
     'The write failed, and so did the rollback: some files stayed changed. The copies are in the backups folder.',
   'portability-transfer-not-found':
     'There is nothing to undo: the panel has not transferred anything to this target.',
+  'portability-subscription-unknown': 'There is no subscription for this target.',
+  'portability-subscription-layer-unknown': 'The canon has no such layer.',
+  'portability-subscription-held':
+    'The rebuild is on hold: either the projection was built by another canon version, or no layer is subscribed.',
   'resource-file-unspecified': 'No file specified',
   'resource-template-not-found': 'Template not found',
   'resource-kind-unknown': 'Unknown resource kind',

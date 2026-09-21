@@ -1,4 +1,5 @@
 import type { FidelityMark } from '@agentdeck/contracts/portable-fidelity';
+import type { EnvSubscription } from '@agentdeck/contracts/portable-subscribe';
 import type { TransferRecord } from '@agentdeck/contracts/portable-transfer';
 import type {
   AppSettings,
@@ -500,6 +501,13 @@ export interface AppState {
    * какие копии сделал один перенос, каталог копий не помнит.
    */
   portabilityTransfers?: Record<string, TransferRecord>;
+  /**
+   * Подписки целей на канон панели: «цель:уровень» → подписанные слои плюс
+   * память о спроецированном, запись за записью (П5.1). Память пофайловая не
+   * годится: у цели записи сливаются в один файл, и хеш файла не умеет сказать,
+   * КАКАЯ запись разошлась, — пересборка по нему переписывала бы файл целиком.
+   */
+  portabilitySubscriptions?: Record<string, EnvSubscription>;
   /**
    * Расход через контур по дням (Т8): id контура → запись. Здесь, а не в
    * счётчике шлюза: тот считает от запуска процесса, и перезапуск панели

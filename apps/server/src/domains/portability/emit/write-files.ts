@@ -13,6 +13,7 @@ import {
   emitEntry,
   isSafeSegment,
   sharesLocation,
+  ownedByPanel,
   verdictOf,
   type EmitContext,
   type StageResult,
@@ -81,7 +82,7 @@ function emitSkills(context: EmitContext): StageResult {
     // Столкновение бывает и с тем, что лежит у цели, и с записью ЭТОГО ЖЕ
     // паспорта: свой скилл и скилл из плагина носят одно имя (П2.6).
     if (
-      (already && differsFromSkill(already, item)) ||
+      (already && differsFromSkill(already, item) && !ownedByPanel(context, item)) ||
       !claimTargetFile(context, 'skill', filePath)
     ) {
       result.entries.push(emitEntry(item, verdict, 'collision_needs_choice', filePath));
@@ -157,7 +158,7 @@ function emitCommands(context: EmitContext): StageResult {
     const text = config.format === 'toml-prompt' ? commandToml(item) : commandMarkdown(item);
 
     if (
-      (existsSync(filePath) && readTextFile(filePath) !== text) ||
+      (existsSync(filePath) && readTextFile(filePath) !== text && !ownedByPanel(context, item)) ||
       !claimTargetFile(context, 'command', filePath)
     ) {
       result.entries.push(emitEntry(item, verdict, 'collision_needs_choice', filePath));

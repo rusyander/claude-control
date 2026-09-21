@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
-import { checkCanonVersion } from '@agentdeck/contracts/portable-env';
-import type { AgentEnvironment, EnvScope } from '@agentdeck/contracts/portable-env';
+import { CANON_VERSION, checkCanonVersion, isEnvItemKind } from '@agentdeck/contracts/portable-env';
+import type { AgentEnvironment, EnvItemKind, EnvScope } from '@agentdeck/contracts/portable-env';
 import { fidelityMark } from '@agentdeck/contracts/portable-fidelity';
 import type {
   FidelityAnswer,
@@ -8,6 +8,12 @@ import type {
   PreviousFidelity,
 } from '@agentdeck/contracts/portable-fidelity';
 import type { ProbeAnswer } from '@agentdeck/contracts/portable-probe';
+import type {
+  EnvSubscription,
+  SubscriptionApplyAnswer,
+  SubscriptionSyncPlan,
+  SubscriptionsAnswer,
+} from '@agentdeck/contracts/portable-subscribe';
 import type {
   TransferApplyAnswer,
   TransferPlan,
@@ -35,6 +41,13 @@ import {
   TransferRolledBackError,
   TransferTargetNotWritableError,
 } from '../domains/portability/apply.ts';
+import {
+  emptySubscription,
+  markProjection,
+  planSubscriptionSync,
+  subscriptionKey,
+} from '../domains/portability/subscribe.ts';
+import type { EmitWrite } from '../domains/portability/emit/types.ts';
 import { runProbe } from '../domains/portability/probe.ts';
 import { fidelityReportKey } from '../lib/app-store/portability-fidelity.ts';
 import { transferRecordKey } from '../lib/app-store/portability-transfer.ts';
@@ -368,6 +381,294 @@ export function registerPortabilityRoutes(app: FastifyInstance, ctx: ServerConte
 
     return answer satisfies TransferRevertAnswer;
   });
+
+  /**
+   * Подписки: канон панели — источник, подписанные CLI — его проекции (П5.1).
+   *
+   * Источник ни одному из четырёх маршрутов не передаётся и передан быть не
+   * может: канон подписки — собственная среда панели, и выбирать его человеку
+   * не предлагается. Подписка с выбором источника была бы вторым переносом, у
+   * которого истин столько же, сколько CLI на машине, — а весь смысл режима в
+   * том, что владелец истины один.
+   */
+  app.get('/api/portability/subscriptions', () => {
+    return {
+      items: Object.values(ctx.store.getPortabilitySubscriptions()),
+    } satisfies SubscriptionsAnswer;
+  });
+
+  /**
+   * Подписать цель на слои — и отписать тем же маршрутом (пустой список).
+   *
+   * Отписка НИЧЕГО не удаляет у цели: подписка никогда не владела её файлами,
+   * она обещала их обновлять. Память о спроецированном при этом сохраняется —
+   * иначе повторная подписка объявила бы новым каждый файл, который панель уже
+   * писала, и предложила бы человеку переписать цель с нуля.
+   */
+  app.put<{
+    Body: { target?: string; scope?: string; project?: string; layers?: unknown };
+  }>('/api/portability/subscription', (request, reply) => {
+    const body = request.body ?? {};
+    const resolved = resolveSubscription(ctx, body);
+    if (isRefusal(resolved)) return send(reply, resolved);
+
+    const raw = Array.isArray(body.layers) ? body.layers : [];
+    const layers: EnvItemKind[] = [];
+    for (const value of raw) {
+      // Незнакомый слой — отказ, а не пропуск. Пропущенный слой человек прочитал
+      // бы как подписанный, а панель не проецировала бы его никогда.
+      if (typeof value !== 'string' || !isEnvItemKind(value))
+        return send(
+          reply,
+          refuse(
+            400,
+            'layer_unknown',
+            'Такого слоя в каноне нет.',
+            'portability-subscription-layer-unknown',
+          ),
+        );
+      if (!layers.includes(value)) layers.push(value);
+    }
+
+    const subscription = { ...resolved.subscription, layers };
+    ctx.store.savePortabilitySubscription(resolved.key, subscription);
+    return { subscription };
+  });
+
+  /** Забыть подписку целиком. Файлы цели остаются такими, какими их оставили. */
+  app.delete<{ Querystring: { target?: string; scope?: string; project?: string } }>(
+    '/api/portability/subscription',
+    (request, reply) => {
+      const resolved = resolveSubscription(ctx, request.query ?? {});
+      if (isRefusal(resolved)) return send(reply, resolved);
+      ctx.store.forgetPortabilitySubscription(resolved.key);
+      return { ok: true };
+    },
+  );
+
+  /**
+   * Что разошлось с каноном и что из-за этого будет переписано.
+   *
+   * Только чтение, как и предпросмотр переноса, и тем же механизмом: дифф
+   * считает настоящая запись по временной копии файла. Отпечаток запоминается —
+   * без показанного плана пересборка не применяется.
+   */
+  app.post<{ Body: { target?: string; scope?: string; project?: string } }>(
+    '/api/portability/subscription/plan',
+    (request, reply) => {
+      const planned = planSubscription(ctx, request.body ?? {});
+      if (isRefusal(planned)) return send(reply, planned);
+      if (planned.plan.transfer) rememberShownPlan(planned.plan.transfer.fingerprint);
+      return { plan: planned.plan };
+    },
+  );
+
+  /**
+   * Пересобрать разошедшееся. Записывает `applyTransfer` — тот же путь, что у
+   * разового переноса, с теми же резервными копиями и тем же откатом при
+   * провале. Своего пути записи у подписки нет намеренно.
+   */
+  app.post<{
+    Body: { target?: string; scope?: string; project?: string; fingerprint?: string };
+  }>('/api/portability/subscription/apply', (request, reply) => {
+    const body = request.body ?? {};
+    const planned = planSubscription(ctx, body);
+    if (isRefusal(planned)) return send(reply, planned);
+    const { plan } = planned;
+
+    // Удержание — это ответ «не буду и вот почему», а не пустая пересборка:
+    // сменившаяся версия канона молча не пересобирается (инвариант П0.1).
+    if (plan.hold)
+      return send(
+        reply,
+        refuse(
+          409,
+          `subscription_${plan.hold}`,
+          plan.hold === 'canon_version'
+            ? 'Проекцию строила другая версия канона — пересоберите её заново, показав план.'
+            : 'Ни один слой не подписан: пересобирать нечего.',
+          'portability-subscription-held',
+        ),
+      );
+
+    // Писать нечего — 200 и ноль файлов. Это не ошибка и не пустой ответ: «цель
+    // уже согласована» — самый частый исход подписки, а «у цели нет механизма
+    // под этот слой» — второй по частоте. Память при этом обновляется: запись,
+    // доступную у цели без записи, незачем объявлять разошедшейся вечно.
+    if (!plan.transfer) {
+      const subscription = planned.root
+        ? markProjection(
+            planned.subscription,
+            planned.env,
+            planned.landed,
+            [],
+            planned.root,
+            new Date().toISOString(),
+          )
+        : planned.subscription;
+      ctx.store.savePortabilitySubscription(planned.key, subscription);
+      return { subscription, rows: plan.rows } satisfies SubscriptionApplyAnswer;
+    }
+
+    const fingerprint = typeof body.fingerprint === 'string' ? body.fingerprint : '';
+    if (!fingerprint || !wasPlanShown(fingerprint))
+      return reply.code(409).send({
+        error: 'plan_not_shown',
+        message: 'Сначала предпросмотр: панель не пишет то, чего вам не показала.',
+        messageCode: 'portability-plan-not-shown',
+      });
+    if (fingerprint !== plan.transfer.fingerprint)
+      return reply.code(409).send({
+        error: 'plan_stale',
+        message: 'С момента предпросмотра файлы изменились — посмотрите план заново.',
+        messageCode: 'portability-plan-stale',
+        plan,
+      });
+
+    try {
+      const files = applyTransfer(
+        plan.transfer.target,
+        plan.transfer.root,
+        planned.writes,
+        ctx.backupDir,
+      );
+      const subscription = markProjection(
+        planned.subscription,
+        planned.env,
+        planned.landed,
+        files,
+        plan.transfer.root,
+        new Date().toISOString(),
+      );
+      ctx.store.savePortabilitySubscription(planned.key, subscription);
+      return { subscription, rows: plan.rows } satisfies SubscriptionApplyAnswer;
+    } catch (error) {
+      if (error instanceof TransferBackupsDisabledError)
+        return reply
+          .code(409)
+          .send({ error: 'backups_off', message: error.message, ...codeOf(error) });
+      if (error instanceof TransferTargetNotWritableError)
+        return reply
+          .code(409)
+          .send({ error: 'target_not_writable', message: error.message, ...codeOf(error) });
+      if (error instanceof TransferRolledBackError) {
+        reply.log.warn({ err: error }, 'portability: пересборка подписки откачена');
+        return reply.code(500).send({
+          error: error.rolledBack ? 'apply_rolled_back' : 'apply_rollback_failed',
+          message: error.message,
+          filePath: error.filePath,
+          ...codeOf(error),
+        });
+      }
+      throw error;
+    }
+  });
+}
+
+/**
+ * Чья среда служит каноном подписки.
+ *
+ * Панель — это оболочка над Claude: его файлы она читает и пишет сама, и «канон
+ * панели» означает ровно их. Константа существует, чтобы решение читалось в
+ * одном месте, а не выглядело подставленным по умолчанию провайдером в двух
+ * вызовах резолвера.
+ */
+const PANEL_CANON_PROVIDER = 'claude';
+
+/** Подписка, её ключ и разрешённый уровень — общее у четырёх маршрутов. */
+interface ResolvedSubscription extends ResolvedLevel {
+  key: string;
+  subscription: EnvSubscription;
+  target: ConfigProvider;
+}
+
+/**
+ * Найти подписку или завести пустую.
+ *
+ * Пустая заводится молча и на чтении тоже: «подписки ещё нет» — это состояние
+ * экрана до первого нажатия, а не ошибка. Отказом отвечает только незнакомая
+ * цель, невыразимый уровень и CLI, писать в который панель не умеет.
+ */
+function resolveSubscription(
+  ctx: ServerContext,
+  input: { target?: string; scope?: string; project?: string },
+): ResolvedSubscription | Refusal {
+  const targetId = input.target ?? '';
+  if (!isKnownProviderId(targetId)) return unknownTarget();
+  if (!hasEmitter(targetId))
+    return refuse(
+      400,
+      'emitter_missing',
+      'Панель пока не умеет писать среду этого CLI.',
+      'portability-emitter-missing',
+    );
+
+  // Уровень и проект разрешает тот же резолвер, что у переноса: подписка на
+  // проект и подписка на дом — разные подписки, и корень второй не годится
+  // первой. Источником назван КАНОН ПАНЕЛИ, и другого здесь быть не может.
+  const base = resolveSource(ctx, PANEL_CANON_PROVIDER, input.scope, input.project);
+  if (isRefusal(base)) return base;
+
+  const target = getProvider(targetId);
+  const support = projectSupport(target);
+  if (base.scope === 'project' && !support.supported)
+    return refuse(
+      400,
+      'project_unsupported',
+      support.why ?? 'Уровень проекта у этого CLI не задокументирован.',
+      'portability-project-unsupported',
+    );
+
+  const key = subscriptionKey(target.id, base.scope, base.projectId);
+  const stored = ctx.store.getPortabilitySubscription(key);
+  const subscription =
+    stored ?? emptySubscription(target.id, base.scope, CANON_VERSION, base.projectId);
+
+  const { source: _source, ...level } = base;
+  return { key, subscription, target, ...level };
+}
+
+/** План пересборки плюс всё, что нужно её применению. */
+interface PlannedSubscription extends ResolvedSubscription {
+  plan: SubscriptionSyncPlan;
+  writes: readonly EmitWrite[];
+  landed: readonly string[];
+  root: string | null;
+  env: AgentEnvironment;
+}
+
+function planSubscription(
+  ctx: ServerContext,
+  input: { target?: string; scope?: string; project?: string },
+): PlannedSubscription | Refusal {
+  const resolved = resolveSubscription(ctx, input);
+  if (isRefusal(resolved)) return resolved;
+
+  let env: AgentEnvironment;
+  try {
+    env = readEnvironment(ctx, getProvider(PANEL_CANON_PROVIDER), resolved);
+  } catch {
+    return refuse(
+      400,
+      'source_not_readable',
+      'Файлы этого CLI не читаются: проверьте, что его настройки не испорчены.',
+      'portability-source-not-readable',
+    );
+  }
+
+  const { plan, writes, landed, root } = planSubscriptionSync(
+    env,
+    resolved.subscription,
+    resolved.target,
+    {
+      scope: resolved.scope,
+      projectRoot: resolved.projectRoot,
+      override: ctx.store.getSettings().claudeDirOverride,
+    },
+    new Date().toISOString(),
+  );
+
+  return { ...resolved, plan, writes, landed, root, env };
 }
 
 /** Источник, цель и уровень — всё, что общего у трёх шагов переноса. */

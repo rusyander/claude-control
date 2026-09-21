@@ -634,6 +634,23 @@ function stableString(value: unknown): string {
 }
 
 /**
+ * Детерминированный вход отпечатка ОДНОЙ записи канона.
+ *
+ * Отдельно от отпечатка всей среды, потому что отвечает на другой вопрос: не
+ * «тот же это дом или уже нет», а «эта запись та же самая». Подписка (П5.1)
+ * пересобирает цель по РАЗОШЕДШИМСЯ записям, и отпечаток на весь паспорт для
+ * этого не годится — он меняется от любой правки в любом слое, то есть
+ * объявлял бы устаревшим всё сразу.
+ *
+ * Версии канона в строке НЕТ намеренно: она стоит в голове отпечатка среды и
+ * решается на уровне подписки целиком (смена версии — повод пометить проекцию
+ * устаревшей, а не переписать каждую запись как «изменившуюся»).
+ */
+export function envItemFingerprintInput(item: EnvItem): string {
+  return `${item.kind}\t${item.id}\t${item.blocking}\t${needsSignature(item.needs)}\t${[...item.sideEffects].sort().join(',')}\t${contentSignature(item)}`;
+}
+
+/**
  * Детерминированный вход отпечатка среды. Хеш считает вызывающий (здесь нет
  * импортов, значит нет и crypto) — этому модулю принадлежит ровно одно:
  * ВЕРСИЯ КАНОНА стоит первой строкой, поэтому её смена меняет отпечаток любого
@@ -644,12 +661,7 @@ function stableString(value: unknown): string {
  */
 export function canonFingerprintInput(env: AgentEnvironment): string {
   const head = `canon:${env.canonVersion}\nprovider:${env.provider}\nscope:${env.scope}\nroot:${env.root}`;
-  const lines = env.items
-    .map(
-      (item) =>
-        `${item.kind}\t${item.id}\t${item.blocking}\t${needsSignature(item.needs)}\t${[...item.sideEffects].sort().join(',')}\t${contentSignature(item)}`,
-    )
-    .sort();
+  const lines = env.items.map(envItemFingerprintInput).sort();
   const skipped = env.skipped.map((skip) => `skip\t${skip.kind}\t${skip.reason}`).sort();
   // Рубильник раздела — часть среды: дом, у которого хуки выключены целиком, и
   // дом, у которого они работают, различаются в том числе этим, а отпечаток

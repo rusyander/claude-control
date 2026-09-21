@@ -840,7 +840,7 @@
     "why": "fallback RU table of panel-agent codes: each line is addressed by PanelTextCode and translated by the window; +11 note codes of the preview card"
   },
   "routes/portability-routes.ts": {
-    "n": 2,
-    "why": "server log line about an unreadable source; the reply itself carries messageCode (the parser text is deliberately kept out of the body)"
+    "n": 3,
+    "why": "server log lines only — unreadable source, rolled-back transfer, rolled-back subscription rebuild; every reply carries messageCode (the parser text is deliberately kept out of the body)"
   }
 }

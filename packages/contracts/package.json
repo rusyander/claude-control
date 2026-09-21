@@ -37,6 +37,7 @@
     "./portable-env-schema": "./src/portable-env-schema.ts",
     "./portable-fidelity": "./src/portable-fidelity.ts",
     "./portable-probe": "./src/portable-probe.ts",
+    "./portable-subscribe": "./src/portable-subscribe.ts",
     "./portable-transfer": "./src/portable-transfer.ts",
     "./project-code": "./src/project-code.ts",
     "./prompts": "./src/prompts.ts",

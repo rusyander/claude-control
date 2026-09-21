@@ -13,6 +13,11 @@ export const configRu: Record<ConfigMessageCode, string> = {
   'instructions-global-missing': 'У активного провайдера нет раздела глобальных инструкций.',
   'rule-not-found': 'Правило не найдено',
   'content-must-be-string': 'Поле content обязано быть строкой (пустая строка допустима).',
+  'instructions-file-name-must-be-string': 'Имя файла инструкций обязано быть строкой.',
+  'instructions-file-name-unknown':
+    'Имя «{{requested}}» не из тех, что читает CLI при текущем режиме instructionFiles.',
+  'instructions-file-exists':
+    'Файл инструкций уже есть ({{current}}) — панель не переименовывает его и не заводит второй.',
   'group-cycle': 'Вложение групп образует цикл',
   'group-not-found': 'Группа не найдена',
   'group-state-unspecified': 'Не указано состояние группы',
@@ -30,6 +35,29 @@ export const configRu: Record<ConfigMessageCode, string> = {
   'provider-unknown-to-panel': 'Такого провайдера панель не знает.',
   'compare-target-format-unrecognized':
     'Формат файла приёмника не распознан — панель в него не пишет.',
+  'portability-importer-missing': 'Панель пока не умеет читать среду этого CLI.',
+  'portability-scope-unknown': 'Уровень паспорта — «global» или «project».',
+  'portability-project-required': 'Уровень проекта требует названного проекта.',
+  'portability-project-unknown': 'Такого проекта в панели нет.',
+  'portability-project-unsupported':
+    'У этого CLI настроек уровня проекта не задокументировано — переносить их некуда.',
+  'portability-target-unknown': 'Такой цели переноса панель не знает.',
+  'portability-source-not-readable':
+    'Файлы этого CLI не читаются: проверьте, что его настройки не испорчены.',
+  'portability-emitter-missing': 'Панель пока не умеет писать среду этого CLI.',
+  'portability-plan-not-shown':
+    'Сначала предпросмотр: панель не пишет то, чего вам не показала. Откройте план переноса заново.',
+  'portability-plan-stale':
+    'С момента предпросмотра файлы изменились — план пересчитан. Посмотрите его заново и примените.',
+  'portability-backups-off':
+    'Перенос не начат: резервные копии выключены, а без них отменить его будет нечем.',
+  'portability-target-not-writable':
+    'Перенос не начат: файл цели недоступен для записи — он занят, только для чтения, или на диске нет места.',
+  'portability-apply-rolled-back':
+    'Запись не удалась — перенос отменён целиком, файлы вернулись к состоянию до него.',
+  'portability-apply-rollback-failed':
+    'Запись не удалась, и откат тоже: часть файлов осталась изменённой. Копии лежат в каталоге резервных копий.',
+  'portability-transfer-not-found': 'Отменять нечего: переноса к этой цели панель не делала.',
   'resource-file-unspecified': 'Не указан файл',
   'resource-template-not-found': 'Шаблон не найден',
   'resource-kind-unknown': 'Неизвестный вид ресурса',

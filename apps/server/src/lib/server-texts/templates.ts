@@ -1,6 +1,13 @@
 /**
  * Шаблоны текстов, которые сервер собирает строкой (`../server-texts.ts`).
- * Генерируются из того же манифеста, что и словари клиентов, — правится манифест, не этот файл.
+ *
+ * Первая тысяча кодов приехала сюда генератором по манифесту, но ни манифеста, ни
+ * генератора в дереве нет: они жили во временной папке волны и удалены намеренно
+ * (повторный прогон переписал бы уже расходящиеся словари). Новый код добавляется
+ * РУКАМИ и сразу в четырёх местах, иначе сборка или тест краснеют: таблица кодов
+ * `packages/contracts/src/server-messages/<раздел>.ts`, шаблон здесь и обе копии
+ * словаря `apps/web/src/shared/config/i18n/server-messages/{ru,en}/<раздел>.ts`.
+ * Счётчик русских литералов этого файла закреплён в `server-ru-literals.pins.json`.
  */
 export const serverTextTemplates = {
   'gateway-prefixed': { ru: 'AgentDeck: {{message}}', en: 'AgentDeck: {{message}}' },
@@ -148,6 +155,26 @@ export const serverTextTemplates = {
   'gateway-tool-blocked-why': {
     ru: 'Вызов «{{name}}» остановлен хуком PreToolUse: {{reason}}',
     en: 'The “{{name}}” call was stopped by the PreToolUse hook: {{reason}}',
+  },
+  'wire-permission-denied': {
+    ru: 'Правило прав «{{rule}}» запрещает этот вызов',
+    en: 'The permission rule “{{rule}}” forbids this call',
+  },
+  'wire-permission-unmatchable': {
+    ru: 'Правило прав «{{rule}}» уточняет аргумент, которого у вызова нет: сравнить нечем, и вызов отклонён',
+    en: 'The permission rule “{{rule}}” names an argument the call does not have: there is nothing to compare, so the call is refused',
+  },
+  'wire-permission-ask-denied': {
+    ru: 'Человек отказал по правилу прав «{{rule}}»',
+    en: 'A human refused under the permission rule “{{rule}}”',
+  },
+  'wire-permission-ask-timeout': {
+    ru: 'Правило прав «{{rule}}» требует подтверждения человека, а ответа не было',
+    en: 'The permission rule “{{rule}}” needs a human confirmation, and no answer came',
+  },
+  'wire-permission-ask-nobody': {
+    ru: 'Правило прав «{{rule}}» требует подтверждения человека, а спросить некому',
+    en: 'The permission rule “{{rule}}” needs a human confirmation, and there is nobody to ask',
   },
   'gateway-answer-too-large': {
     ru: 'Ответ контура больше 8 МБ — шлюз не собирает его целиком. Тот же запрос потоком приходит без этого потолка',

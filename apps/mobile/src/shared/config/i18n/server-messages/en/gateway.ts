@@ -45,6 +45,16 @@ export const gatewayEn: Record<GatewayMessageCode, string> = {
     'the other side ended the answer with an error and did not name it',
   'gateway-checks-stopped': "The contour's content checks stopped the answer",
   'gateway-checks-stopped-named': "The contour's content checks stopped the answer: {{names}}",
+  'gateway-tool-blocked': 'The “{{name}}” call was stopped by the PreToolUse hook',
+  'gateway-tool-blocked-why': 'The “{{name}}” call was stopped by the PreToolUse hook: {{reason}}',
+  'wire-permission-denied': 'The permission rule “{{rule}}” forbids this call',
+  'wire-permission-unmatchable':
+    'The permission rule “{{rule}}” names an argument the call does not have: there is nothing to compare, so the call is refused',
+  'wire-permission-ask-denied': 'A human refused under the permission rule “{{rule}}”',
+  'wire-permission-ask-timeout':
+    'The permission rule “{{rule}}” needs a human confirmation, and no answer came',
+  'wire-permission-ask-nobody':
+    'The permission rule “{{rule}}” needs a human confirmation, and there is nobody to ask',
   'gateway-answer-too-large':
     "The contour's answer is over 8 MB — the gateway does not assemble it whole. The same request as a stream comes without this ceiling",
   'gateway-not-anthropic': 'The platform did not answer with an Anthropic dialect message',

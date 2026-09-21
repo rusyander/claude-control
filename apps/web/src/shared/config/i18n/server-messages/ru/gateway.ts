@@ -45,6 +45,14 @@ export const gatewayRu: Record<GatewayMessageCode, string> = {
   'gateway-checks-stopped-named': 'Проверки контента контура остановили ответ: {{names}}',
   'gateway-tool-blocked': 'Вызов «{{name}}» остановлен хуком PreToolUse',
   'gateway-tool-blocked-why': 'Вызов «{{name}}» остановлен хуком PreToolUse: {{reason}}',
+  'wire-permission-denied': 'Правило прав «{{rule}}» запрещает этот вызов',
+  'wire-permission-unmatchable':
+    'Правило прав «{{rule}}» уточняет аргумент, которого у вызова нет: сравнить нечем, и вызов отклонён',
+  'wire-permission-ask-denied': 'Человек отказал по правилу прав «{{rule}}»',
+  'wire-permission-ask-timeout':
+    'Правило прав «{{rule}}» требует подтверждения человека, а ответа не было',
+  'wire-permission-ask-nobody':
+    'Правило прав «{{rule}}» требует подтверждения человека, а спросить некому',
   'gateway-answer-too-large':
     'Ответ контура больше 8 МБ — шлюз не собирает его целиком. Тот же запрос потоком приходит без этого потолка',
   'gateway-not-anthropic': 'Платформа ответила не сообщением диалекта Anthropic',

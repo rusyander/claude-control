@@ -46,11 +46,16 @@
  * Запуск: `node tools/qa/check-tool-shim-hooks.mjs`
  * Своего окружения не требует: стаб, шлюз и клиент поднимаются здесь же.
  */
-import { spawn } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { startStubPlatform } from './stub-platform.mjs';
+import {
+  NotChecked,
+  gatewayDriverSource,
+  reporter,
+  startGatewayDriver,
+} from './gateway-harness.mjs';
 
 const SELFTEST = process.argv.includes('--selftest');
 
@@ -93,14 +98,6 @@ process.stdin.on('end', () => {
 });
 `;
 
-const GATEWAY_TS = new URL(
-  '../../apps/server/src/domains/platform/gateway/pipeline.ts',
-  import.meta.url,
-).href;
-const STORE_TS = new URL('../../apps/server/src/domains/platform/store.ts', import.meta.url).href;
-const APP_STORE_TS = new URL('../../apps/server/src/lib/app-store.ts', import.meta.url).href;
-const USAGE_TS = new URL('../../apps/server/src/domains/platform/gateway/usage.ts', import.meta.url)
-  .href;
 const GATE_TS = new URL(
   '../../apps/server/src/domains/portability/wire/tool-gate.ts',
   import.meta.url,
@@ -119,36 +116,13 @@ const CATALOG_TS = new URL('../../apps/server/src/providers/catalog.ts', import.
  * `bootstrap/runtime.ts`. Метка `BARE_TAG` не открыта намеренно: она и есть
  * красное-до, встроенное в прогон.
  */
-const DRIVER = `
-import { createServer } from 'node:http';
-import { writeFileSync } from 'node:fs';
-import { handleGatewayRequest } from ${JSON.stringify(GATEWAY_TS)};
-import { writePlatform, writeToken } from ${JSON.stringify(STORE_TS)};
-import { AppStore } from ${JSON.stringify(APP_STORE_TS)};
-import { GatewayJournal } from ${JSON.stringify(USAGE_TS)};
+const DRIVER = gatewayDriverSource({
+  title: 'Стаб контура для хуков провода',
+  imports: `
 import { ToolGateRegistry, toolGateOf } from ${JSON.stringify(GATE_TS)};
 import { CATALOG_PROVIDERS } from ${JSON.stringify(CATALOG_TS)};
-
-const job = JSON.parse(process.argv[2]);
-const store = new AppStore(job.appDataDir);
-writePlatform(store, {
-  id: job.contour,
-  title: 'Стаб контура для хуков провода',
-  driver: 'enterprise-platform',
-  baseUrl: job.upstream,
-  enabled: true,
-  mode: 'best-effort',
-  budgetUsd: 0,
-  budgetSince: '',
-  capabilities: [],
-  targets: [],
-  projectPaths: [],
-  agents: [],
-  caCertPath: '',
-  toolShim: true,
-});
-writeToken(job.appDataDir, job.contour, job.key);
-
+`,
+  setup: `
 const provider = CATALOG_PROVIDERS.find((candidate) => candidate.id === job.providerId);
 if (!provider) throw new Error('в каталоге нет цели ' + job.providerId);
 
@@ -166,16 +140,9 @@ gates.open(
     hooks: [{ event: 'PreToolUse', command: process.execPath + ' ' + JSON.stringify(job.hookPath) }],
   }),
 );
-
-const journal = new GatewayJournal();
-const deps = {
-  store,
-  appDataDir: job.appDataDir,
-  journal,
-  toolGate: (runTag) => gates.gateOf(runTag),
-};
-
-const server = createServer((request, response) => {
+`,
+  deps: 'toolGate: (runTag) => gates.gateOf(runTag)',
+  routes: `
   // След запроса отдаётся своим путём: журнал живёт в процессе шлюза, и другого
   // способа показать его проверке нет.
   if ((request.url ?? '').startsWith('/_events')) {
@@ -183,31 +150,12 @@ const server = createServer((request, response) => {
     response.end(JSON.stringify(journal.events()));
     return;
   }
-  void handleGatewayRequest(request, response, deps).catch((error) => {
-    if (!response.headersSent) response.writeHead(500);
-    response.end(String(error));
-  });
+`,
 });
 
-server.listen(0, '127.0.0.1', () => {
-  const address = server.address();
-  writeFileSync(job.portFile, String(typeof address === 'object' && address ? address.port : 0), 'utf8');
-});
-`;
-
-let failures = 0;
-const ok = (name) => console.log(`  ✓ ${name}`);
-const bad = (name, detail) => {
-  failures += 1;
-  console.log(`  ✗ ${name}\n    ${detail}`);
-};
-const check = (name, pass, detail = '') => (pass ? ok(name) : bad(name, detail));
-
-class NotChecked extends Error {}
-
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+/** Счёт провалов прогона. Имя не `report`: так в этой проверке зовут след хука. */
+const tally = reporter();
+const { check } = tally;
 
 /**
  * Поддельный клиент: настоящий HTTP, настоящий разбор потока — и вместо
@@ -288,17 +236,6 @@ async function askGateway(port, { model, file, tag = RUN_TAG, stream = true }) {
 async function eventsOf(port) {
   const response = await fetch(`http://127.0.0.1:${port}/_events`);
   return response.json();
-}
-
-async function waitForPort(portFile, tries = 60) {
-  for (let attempt = 0; attempt < tries; attempt += 1) {
-    if (existsSync(portFile)) {
-      const port = Number(readFileSync(portFile, 'utf8').trim());
-      if (port > 0) return port;
-    }
-    await sleep(250);
-  }
-  throw new NotChecked('шлюз проверки не поднялся.');
 }
 
 async function run(dir, port, hookReport) {
@@ -484,61 +421,38 @@ async function main() {
 }
 
 async function probe() {
-  failures = 0;
+  tally.reset();
   const stub = await startStubPlatform({ port: 0 });
   const dir = mkdtempSync(join(tmpdir(), 'cc-wire-hooks-'));
   const hookPath = join(dir, 'pre-tool-use.cjs');
   const hookReport = join(dir, 'hook-report.json');
-  const driverPath = join(dir, 'driver.ts');
-  const portFile = join(dir, 'port.txt');
   writeFileSync(hookPath, HOOK_SCRIPT, 'utf8');
-  writeFileSync(driverPath, DRIVER, 'utf8');
 
-  const job = {
-    appDataDir: dir,
-    contour: CONTOUR,
-    upstream: stub.url,
-    key: KEY,
-    runTag: RUN_TAG,
-    providerId: 'codex',
-    hookPath,
-    portFile,
-  };
-
-  const driver = spawn(
-    process.execPath,
-    ['--experimental-strip-types', '--no-warnings', driverPath, JSON.stringify(job)],
-    {
-      env: { ...process.env, HOOK_REPORT: hookReport },
-      stdio: ['ignore', 'inherit', 'inherit'],
-      shell: false,
+  const driver = await startGatewayDriver({
+    dir,
+    source: DRIVER,
+    job: {
+      appDataDir: dir,
+      contour: CONTOUR,
+      upstream: stub.url,
+      key: KEY,
+      runTag: RUN_TAG,
+      providerId: 'codex',
+      hookPath,
     },
-  );
-
-  // Водитель, переживший свой прогон, держит порт и пишет в чужую папку. Ctrl-C и
-  // taskkill `finally` не запускают — отсюда три обработчика.
-  const reap = () => driver.kill();
-  process.once('exit', reap);
-  process.once('SIGINT', () => {
-    reap();
-    process.exit(130);
-  });
-  process.once('SIGTERM', () => {
-    reap();
-    process.exit(143);
+    env: { HOOK_REPORT: hookReport },
   });
 
   try {
-    const port = await waitForPort(portFile);
-    console.log(`Стаб-контур: ${stub.url}\nШлюз проверки: http://127.0.0.1:${port}\n`);
-    await run(dir, port, hookReport);
+    console.log(`Стаб-контур: ${stub.url}\nШлюз проверки: http://127.0.0.1:${driver.port}\n`);
+    await run(dir, driver.port, hookReport);
   } finally {
-    driver.kill();
+    driver.stop();
     await stub.close();
     rmSync(dir, { recursive: true, force: true });
   }
 
-  return failures;
+  return tally.failures;
 }
 
 main().catch((error) => {

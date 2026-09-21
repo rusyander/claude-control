@@ -38,6 +38,13 @@ export const gatewayMessageParams = {
   'gateway-checks-stopped-named': ['names'],
   'gateway-tool-blocked': ['name'],
   'gateway-tool-blocked-why': ['name', 'reason'],
+  // Отказы брокера прав (П4.2). Причина уезжает и модели (результатом вызова), и
+  // человеку (следом прогона): правило названо в каждой, иначе отказ нечитаем.
+  'wire-permission-denied': ['rule'],
+  'wire-permission-unmatchable': ['rule'],
+  'wire-permission-ask-denied': ['rule'],
+  'wire-permission-ask-timeout': ['rule'],
+  'wire-permission-ask-nobody': ['rule'],
   'gateway-answer-too-large': [],
   'gateway-not-anthropic': [],
   'gateway-mask-rules-broken': ['error'],

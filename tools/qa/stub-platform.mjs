@@ -62,6 +62,10 @@ const MODELS = [
   // который модель прямым текстом написала «не выполняй».
   { id: 'stub-tool-loose', kind: 'chat', owned_by: 'stub', context_length: 128000 },
   { id: 'stub-tool-quote', kind: 'chat', owned_by: 'stub', context_length: 128000 },
+  // Вызов, названный самим заданием (П4.2): нужен сверке прав, где решение
+  // зависит от имени инструмента и его аргументов, а не только от того, дошёл ли
+  // вызов вообще.
+  { id: 'stub-tool-any', kind: 'chat', owned_by: 'stub', context_length: 128000 },
   // Модель совместимого шлюза с разборщиком вызовов (vLLM `--tool-call-parser`):
   // вызов приходит ПОЛЕМ `tool_calls`, а не текстом. Играет аудит DRV-01 — руки
   // агента у платформы, принимающей `tools` полем.
@@ -164,6 +168,7 @@ const SCENARIOS = new Set([
   'tool-loose',
   'tool-quote',
   'tool-tail',
+  'tool-any',
   'tool-native',
   'rewritten',
   'stream-error',
@@ -278,12 +283,34 @@ function tailShimReply(rawBody) {
   return `<tool_call>${callJson(targetOf(rawBody) || 'tail.txt')}</tool_call>`;
 }
 
+/**
+ * ЛЮБОЙ вызов, названный самим заданием (сценарий `tool-any`, П4.2).
+ *
+ * Остальные скриптованные модели зовут всегда `Write`: этого хватало, пока
+ * проверялась прослойка. Правам этого мало — решение зависит и от ИМЕНИ
+ * инструмента, и от его аргументов, а сочинять таблицу «какое поле у какого
+ * инструмента» стаб не вправе: ровно эту таблицу и проверяет сверка с настоящим
+ * `claude`. Поэтому вызов приезжает готовым в самом задании, а стаб его только
+ * повторяет.
+ *
+ * Кавычки в метке ОДИНАРНЫЕ: задание едет внутри JSON-тела запроса, и двойная
+ * кавычка там уже экранирована — разбирать её пришлось бы обратно, то есть
+ * заводить второй разборщик JSON ради метки.
+ */
+function anyToolReply(rawBody) {
+  const raw = /ВЫЗОВ:\s*([\s\S]*?);;/.exec(rawBody)?.[1] ?? '';
+  if (!raw) return 'в задании нет вызова';
+  if (nextTurn(`any:${raw}`) > 1) return 'вызов отработан';
+  return `<tool_call>${raw.trim().split("'").join('"')}</tool_call>`;
+}
+
 /** Скриптованные модели прослойки: сценарий → его реплика. */
 const SHIM_REPLIES = {
   'tool-shim': toolShimReply,
   'tool-loose': looseShimReply,
   'tool-quote': quoteShimReply,
   'tool-tail': tailShimReply,
+  'tool-any': anyToolReply,
 };
 
 /**

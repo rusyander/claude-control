@@ -13,6 +13,11 @@ export const configEn: Record<ConfigMessageCode, string> = {
   'instructions-global-missing': 'The active provider has no global instructions section.',
   'rule-not-found': 'Rule not found',
   'content-must-be-string': 'The content field must be a string (an empty string is allowed).',
+  'instructions-file-name-must-be-string': 'The instructions file name must be a string.',
+  'instructions-file-name-unknown':
+    'The name “{{requested}}” is not one the CLI reads under the current instructionFiles mode.',
+  'instructions-file-exists':
+    'An instructions file already exists ({{current}}) — the panel neither renames it nor creates a second one.',
   'group-cycle': 'Group nesting forms a cycle',
   'group-not-found': 'Group not found',
   'group-state-unspecified': 'No group state specified',
@@ -31,6 +36,30 @@ export const configEn: Record<ConfigMessageCode, string> = {
   'provider-unknown-to-panel': 'The panel does not know this provider.',
   'compare-target-format-unrecognized':
     'The target file format is not recognized — the panel does not write to it.',
+  'portability-importer-missing': 'The panel cannot read this CLI environment yet.',
+  'portability-scope-unknown': 'The passport level is either «global» or «project».',
+  'portability-project-required': 'The project level needs a named project.',
+  'portability-project-unknown': 'The panel does not know this project.',
+  'portability-project-unsupported':
+    'This CLI documents no project-level settings — there is nowhere to carry them.',
+  'portability-target-unknown': 'The panel does not know this transfer target.',
+  'portability-source-not-readable':
+    'This CLI files could not be read: check that its settings are not broken.',
+  'portability-emitter-missing': 'The panel cannot write this CLI environment yet.',
+  'portability-plan-not-shown':
+    'Preview first: the panel does not write what it has not shown you. Open the transfer plan again.',
+  'portability-plan-stale':
+    'The files have changed since the preview — the plan was recalculated. Review it again and apply.',
+  'portability-backups-off':
+    'The transfer did not start: backups are off, and without them there would be nothing to undo it with.',
+  'portability-target-not-writable':
+    'The transfer did not start: a target file is not writable — it is busy, read-only, or the disk is full.',
+  'portability-apply-rolled-back':
+    'The write failed — the transfer was undone entirely, the files are back as they were.',
+  'portability-apply-rollback-failed':
+    'The write failed, and so did the rollback: some files stayed changed. The copies are in the backups folder.',
+  'portability-transfer-not-found':
+    'There is nothing to undo: the panel has not transferred anything to this target.',
   'resource-file-unspecified': 'No file specified',
   'resource-template-not-found': 'Template not found',
   'resource-kind-unknown': 'Unknown resource kind',

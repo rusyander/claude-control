@@ -1,7 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { CATALOG_PROVIDERS } from '../../../providers/catalog.ts';
 import type { ConfigProvider } from '../../../providers/types.ts';
-import { ToolGateRegistry, toolGateOf, type GatewayToolCall } from './tool-gate.ts';
+import {
+  allToolGates,
+  ToolGateRegistry,
+  toolGateOf,
+  type GatewayToolCall,
+  type ToolGate,
+} from './tool-gate.ts';
 
 /**
  * Ворота — шов между двумя доменами, и на шве живёт молчаливый класс дефектов:
@@ -117,5 +123,39 @@ describe('реестр открытых прогонов', () => {
 
     expect(registry.size).toBe(0);
     expect(registry.gateOf('')).toBeUndefined();
+  });
+});
+
+describe('несколько ворот на одном прогоне (П4.2)', () => {
+  const gate = (allow: boolean, reason: string, seen: string[]): ToolGate => ({
+    async decide() {
+      seen.push(reason);
+      return allow ? { allow: true } : { allow: false, reason };
+    },
+  });
+  const call: GatewayToolCall = { id: 'c', name: 'Write', arguments: { file_path: '/tmp/a' } };
+
+  it('пустой список ворот не заводится вовсе', () => {
+    expect(allToolGates([])).toBeUndefined();
+  });
+
+  it('пропускают только тогда, когда пропустили ВСЕ', async () => {
+    const seen: string[] = [];
+    const both = allToolGates([gate(true, 'хуки', seen), gate(true, 'права', seen)]);
+    await expect(both?.decide(call)).resolves.toEqual({ allow: true });
+    expect(seen).toEqual(['хуки', 'права']);
+  });
+
+  it('после отказа вторые ворота не спрашиваются: их побочные действия настоящие', async () => {
+    const seen: string[] = [];
+    const both = allToolGates([gate(false, 'хуки', seen), gate(true, 'права', seen)]);
+    await expect(both?.decide(call)).resolves.toEqual({ allow: false, reason: 'хуки' });
+    expect(seen).toEqual(['хуки']);
+  });
+
+  it('причина уезжает от тех ворот, которые отказали', async () => {
+    const seen: string[] = [];
+    const both = allToolGates([gate(true, 'хуки', seen), gate(false, 'права', seen)]);
+    await expect(both?.decide(call)).resolves.toMatchObject({ reason: 'права' });
   });
 });

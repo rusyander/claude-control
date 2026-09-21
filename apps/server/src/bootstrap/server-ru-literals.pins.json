@@ -764,8 +764,8 @@
     "why": "path-rejection detail composed inside an error class"
   },
   "lib/server-texts/templates.ts": {
-    "n": 324,
-    "why": "generated RU side of the server text table (gen.mjs from L-gen/manifest): every line here IS a code, this is the one file where a Russian literal is the data"
+    "n": 329,
+    "why": "RU side of the server text table: every line here IS a code, this is the one file where a Russian literal is the data. The generator and its manifest are gone from the tree (see the file header) — a new code is written by hand and `n` rises with it"
   },
   "providers/catalog/kimi.ts": {
     "n": 1,

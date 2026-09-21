@@ -11,20 +11,42 @@
  * как показал 18.09.2026, через несколько часов после того, как поломка уехала
  * в историю.
  *
- * Проверяется три вещи, и каждая — причина реального отказа сборки:
+ * Проверяется четыре вещи, и каждая — причина реального отказа сборки:
  *   1. каждый импорт ЗНАЧЕНИЯ из `@agentdeck/contracts/<модуль>` в коде
  *      телефона есть в `VALUE_MODULES` (иначе «Unable to resolve module»);
  *   2. каждый модуль из `VALUE_MODULES` самодостаточен — ни одного импорта
  *      (иначе за ним в бандл уезжает zod, которого у телефона нет);
  *   3. каждый такой модуль объявлен в `exports` пакета контрактов (иначе
- *      сломается резолв у всех, кроме Metro).
+ *      сломается резолв у всех, кроме Metro);
+ *   4. словари серверных текстов телефона совпадают с панельными ФАЙЛ В ФАЙЛ.
+ *
+ * Про четвёртую — та же болезнь, что и про первую, и поймана 21.09.2026 теми же
+ * граблями. Новый код сообщения дописывается руками в обе копии словаря панели,
+ * а копия телефона — третья, и о ней забывают: `pnpm type-check` гоняет
+ * `pnpm -r`, куда телефон не входит вовсе, так что весь общий шлюз остаётся
+ * зелёным, пока `Record<GatewayMessageCode, string>` у телефона уже неполон.
+ * Так уехало 25 ключей за три волны. Словари телефона — БУКВАЛЬНО копии
+ * панельных (проверено побайтно), поэтому сравнение здесь точное, а не по
+ * набору ключей: разошедшаяся редакция одного и того же текста — тоже поломка.
+ * Сами `ru.ts`/`en.ts` рядом со словарями не сравниваются: шапка копии телефона
+ * намеренно ссылается на оригинал.
  *
  * Импорты ТИПОВ (`import type`) не считаются: они стираются компилятором и до
  * Metro не доходят.
  *
  * Запуск: node tools/qa/check-mobile-contracts.mjs [--selftest]
  */
-import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
+import {
+  cpSync,
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const METRO = 'apps/mobile/metro.config.js';
@@ -32,6 +54,9 @@ const CONTRACTS_PKG = 'packages/contracts/package.json';
 const CONTRACTS_SRC = 'packages/contracts/src';
 const MOBILE_ROOTS = ['apps/mobile/src', 'apps/mobile/app'];
 const CODE = /\.(ts|tsx|js|jsx)$/;
+/** Словари серверных текстов: панельный оригинал и копия телефона. */
+const WEB_DICT = 'apps/web/src/shared/config/i18n/server-messages';
+const MOBILE_DICT = 'apps/mobile/src/shared/config/i18n/server-messages';
 
 /** Список VALUE_MODULES читается из самого конфига — второй копии быть не должно. */
 function readValueModules(metroText) {
@@ -113,6 +138,38 @@ function externalDeps(entry, seen = new Set()) {
   return out;
 }
 
+/**
+ * Расхождения копии словарей с оригиналом: недостающий файл, лишний, разошедшийся.
+ *
+ * Сравниваются подпапки языков (`ru/`, `en/`) целиком и побайтно. Читается не
+ * набор ключей, а файл: ключ на месте, но с другой редакцией текста — это тоже
+ * разъезд, просто его не ловит даже `tsc` у телефона.
+ */
+function dictionaryProblems(webDir, mobileDir) {
+  const problems = [];
+  for (const lang of ['ru', 'en']) {
+    const web = join(webDir, lang);
+    const mobile = join(mobileDir, lang);
+    if (!existsSync(web) || !existsSync(mobile)) {
+      problems.push(`нет папки словарей: ${existsSync(web) ? mobile : web}`);
+      continue;
+    }
+    const names = new Set([...readdirSync(web), ...readdirSync(mobile)]);
+    for (const name of [...names].sort()) {
+      const webFile = join(web, name);
+      const mobileFile = join(mobile, name);
+      if (!existsSync(mobileFile)) {
+        problems.push(`${mobileFile}: словаря нет, а у панели он есть`);
+      } else if (!existsSync(webFile)) {
+        problems.push(`${mobileFile}: словарь есть только у телефона — копировать нечего`);
+      } else if (readFileSync(webFile, 'utf8') !== readFileSync(mobileFile, 'utf8')) {
+        problems.push(`${mobileFile}: разошёлся с ${webFile} — копия словаря отстала`);
+      }
+    }
+  }
+  return problems;
+}
+
 function check() {
   const metroText = readFileSync(METRO, 'utf8');
   const valueModules = readValueModules(metroText);
@@ -157,20 +214,68 @@ function check() {
     }
   }
 
+  // 4. Словари серверных текстов у телефона — копия панельных.
+  const drift = dictionaryProblems(WEB_DICT, MOBILE_DICT);
+  problems.push(...drift);
+  console.log(
+    `словарей серверных текстов сверено: ${readdirSync(join(WEB_DICT, 'ru')).length} × 2`,
+  );
+
   if (problems.length === 0) {
-    console.log('\nСвязка телефона с контрактами цела: всё, что нужно значением, Metro разрешит.');
+    console.log(
+      '\nСвязка телефона с контрактами цела: всё, что нужно значением, Metro разрешит,\n' +
+        'и словари серверных текстов у телефона те же, что у панели.',
+    );
     return 0;
   }
   console.log(`\n✕ нарушений (${problems.length}):`);
   for (const p of problems) console.log(`  ${p}`);
-  console.log(
-    '\nЛибо добавьте модуль в VALUE_MODULES (`apps/mobile/metro.config.js`) и в exports пакета,\n' +
-      'либо вынесите нужное значение в отдельный модуль БЕЗ импортов (как `platform-layers.ts`).',
-  );
+  // Подсказка про Metro — только если сломалось что-то из первых трёх проверок:
+  // у разъехавшегося словаря лечение другое, и общий совет увёл бы читателя не туда.
+  if (problems.length > drift.length) {
+    console.log(
+      '\nЛибо добавьте модуль в VALUE_MODULES (`apps/mobile/metro.config.js`) и в exports пакета,\n' +
+        'либо вынесите нужное значение в отдельный модуль БЕЗ импортов (как `platform-layers.ts`).',
+    );
+  }
+  if (drift.length > 0) {
+    console.log(
+      `\nРазъехавшийся словарь чинится копированием оригинала:\n` +
+        `  cp ${WEB_DICT}/<язык>/<раздел>.ts ${MOBILE_DICT}/<язык>/<раздел>.ts\n` +
+        'Новый код сообщения дописывается в ПЯТИ местах: таблица кодов контрактов, шаблон сервера,\n' +
+        'оба словаря панели — и следом эта копия.',
+    );
+  }
   return 1;
 }
 
-/** Самопроверка: сторож обязан краснеть на каждой из трёх поломок. */
+/**
+ * Сверка словарей на ПОВРЕЖДЁННОЙ копии: настоящие файлы панели против их копии
+ * во временной папке, где один файл испорчен, а один удалён.
+ *
+ * Иначе четвёртая проверка непроверяема: на здоровом дереве она зелена всегда и
+ * зелена же была бы, сравнивая папку саму с собой. Повреждение — единственный
+ * способ увидеть, что она вообще умеет краснеть.
+ */
+function damagedDictionary() {
+  const root = mkdtempSync(join(tmpdir(), 'mobile-dict-'));
+  try {
+    cpSync(WEB_DICT, root, { recursive: true });
+    const ruDir = join(root, 'ru');
+    const victim = readdirSync(ruDir).sort()[0];
+    writeFileSync(join(ruDir, victim), 'export const damaged = {};\n');
+    const missing = readdirSync(join(root, 'en')).sort()[0];
+    rmSync(join(root, 'en', missing));
+    const problems = dictionaryProblems(WEB_DICT, root);
+    const sawDrift = problems.some((p) => p.includes(victim) && p.includes('отстала'));
+    const sawMissing = problems.some((p) => p.includes(missing) && p.includes('словаря нет'));
+    return sawDrift && sawMissing && problems.length === 2;
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+/** Самопроверка: сторож обязан краснеть на каждой из поломок, которые ловит. */
 function selftest() {
   const cases = [
     [
@@ -198,6 +303,11 @@ function selftest() {
     [
       'список читается из конфига, а не из копии',
       () => readValueModules(readFileSync(METRO, 'utf8')).includes('platform-layers'),
+    ],
+    ['сверка словарей краснеет на испорченной и на пропавшей копии', damagedDictionary],
+    [
+      'сверка словарей молчит на целой копии',
+      () => dictionaryProblems(WEB_DICT, WEB_DICT).length === 0,
     ],
   ];
   let bad = 0;

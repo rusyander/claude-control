@@ -64,6 +64,16 @@ export const configEn: Record<ConfigMessageCode, string> = {
   'portability-subscription-layer-unknown': 'The canon has no such layer.',
   'portability-subscription-held':
     'The rebuild is on hold: either the projection was built by another canon version, or no layer is subscribed.',
+  'portability-drift-resolution-unknown':
+    'A divergence has three outcomes: take it into the canon, restore the projection, or unsubscribe the layers of that file.',
+  'portability-drift-absent':
+    'This target file matches what the panel left there: there is nothing to settle.',
+  'portability-drift-file-missing':
+    'The target has no such file: there is nothing to take into the canon — restore the projection or unsubscribe the layers.',
+  'portability-drift-nothing-to-adopt':
+    'This file holds no records of the subscribed layers: there is nothing to take into the canon.',
+  'portability-drift-nothing-to-do':
+    'This outcome produces no edit at all: look at the plan again.',
   'resource-file-unspecified': 'No file specified',
   'resource-template-not-found': 'Template not found',
   'resource-kind-unknown': 'Unknown resource kind',

@@ -239,6 +239,18 @@ function sameAsWritten(file: TransferFileRecord): boolean {
   return hashOf(file.filePath) === file.writtenHash;
 }
 
+/**
+ * Отпечаток файла на диске — `null`, если файла нет.
+ *
+ * Одно определение «каким панель этот файл оставила» на весь перенос: по нему
+ * отмена отказывается трогать файл, правленный после записи, и по нему же
+ * подписка держит пересборку (П5.2). Второе такое определение разошлось бы с
+ * первым на форме файла — BOM, переводы строк, — то есть молча.
+ */
+export function fileHashOrNull(path: string): string | null {
+  return existsSync(path) ? hashOf(path) : null;
+}
+
 function hashOf(path: string): string {
   return createHash('sha256').update(readFileSync(path)).digest('hex');
 }

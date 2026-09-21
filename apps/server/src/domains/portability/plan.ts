@@ -51,21 +51,42 @@ export function buildTransferPlan(
    * запись, — со всеми остальными заодно.
    */
   only?: ReadonlySet<string>,
+  /**
+   * Файлы цели, которых эта запись не касается вовсе (П5.2): их правил человек,
+   * и правка его новее нашей проекции. Отсеиваются ЗДЕСЬ, по тем же причинам,
+   * что и `only`: отпечаток и диффы обязаны описывать то, что применится.
+   *
+   * Отсев идёт по файлу, а не по записи, потому что руку человека сторожит хеш
+   * ФАЙЛА. Запись, которая у цели ещё не лежала, столкновением не считается и
+   * уехала бы в тронутый файл беспрепятственно — то есть панель дописала бы в
+   * файл, про который только что сказала «не трогаю».
+   */
+  skipFiles?: ReadonlySet<string>,
 ): PlannedTransfer {
   const emitted = emitEnvironment(env, { ...deps, target });
   const report = buildFidelityReport(env, target, computedAt);
 
-  const writes = only
+  const namedWrites = only
     ? emitted.writes.filter((write) => write.itemIds.some((id) => only.has(id)))
     : emitted.writes;
+  const writes = skipFiles
+    ? namedWrites.filter((write) => !skipFiles.has(write.filePath))
+    : namedWrites;
   const files = groupByFile(writes).map((group) => filePlan(target, group));
   // Со слов плана уходят записи, о которых не спрашивали: строка про них
   // описывала бы работу, которой в этом применении не будет. Заодно остаются
   // строки названных записей, что НЕ дают правки вовсе (у цели такой слой уже
   // доступен или невозможен), — без них подписка не узнала бы, что с ними.
-  const entries = only
+  const namedEntries = only
     ? emitted.entries.filter((entry) => only.has(entry.itemId))
     : emitted.entries;
+  // Строка записи, чей файл отсеян, ушла бы со словом «записана» о работе,
+  // которой не будет, — а по этим строкам подписка помечает спроецированное
+  // (`landsAtTarget`). Записи без файла (`runtime_only`, `already_available`)
+  // отсевом не затрагиваются: их исход про диск ничего не утверждает.
+  const entries = skipFiles
+    ? namedEntries.filter((entry) => !(entry.file !== null && skipFiles.has(entry.file)))
+    : namedEntries;
   const plan: TransferPlan = {
     source: env.provider,
     target: target.id,

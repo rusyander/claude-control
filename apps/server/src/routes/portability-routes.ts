@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { CANON_VERSION, checkCanonVersion, isEnvItemKind } from '@agentdeck/contracts/portable-env';
 import type { AgentEnvironment, EnvItemKind, EnvScope } from '@agentdeck/contracts/portable-env';
+import { landsAtTarget } from '@agentdeck/contracts/portable-emit';
 import { fidelityMark } from '@agentdeck/contracts/portable-fidelity';
 import type {
   FidelityAnswer,
@@ -8,11 +9,16 @@ import type {
   PreviousFidelity,
 } from '@agentdeck/contracts/portable-fidelity';
 import type { ProbeAnswer } from '@agentdeck/contracts/portable-probe';
-import type {
-  EnvSubscription,
-  SubscriptionApplyAnswer,
-  SubscriptionSyncPlan,
-  SubscriptionsAnswer,
+import {
+  isSubscriptionDriftResolution,
+  type EnvSubscription,
+  type SubscriptionApplyAnswer,
+  type SubscriptionDrift,
+  type SubscriptionDriftAnswer,
+  type SubscriptionDriftPlan,
+  type SubscriptionDriftResolution,
+  type SubscriptionSyncPlan,
+  type SubscriptionsAnswer,
 } from '@agentdeck/contracts/portable-subscribe';
 import type {
   TransferApplyAnswer,
@@ -36,16 +42,22 @@ import {
 import {
   applyTransfer,
   changedSinceTransfer,
+  fileHashOrNull,
   revertTransfer,
   TransferBackupsDisabledError,
   TransferRolledBackError,
   TransferTargetNotWritableError,
 } from '../domains/portability/apply.ts';
 import {
+  detectDrift,
   emptySubscription,
+  layersOfFile,
+  markAdoption,
   markProjection,
   planSubscriptionSync,
   subscriptionKey,
+  unsubscribeFile,
+  type LandedItem,
 } from '../domains/portability/subscribe.ts';
 import type { EmitWrite } from '../domains/portability/emit/types.ts';
 import { runProbe } from '../domains/portability/probe.ts';
@@ -563,6 +575,148 @@ export function registerPortabilityRoutes(app: FastifyInstance, ctx: ServerConte
       throw error;
     }
   });
+
+  /**
+   * Что сделает выбранный исход расхождения — до того, как он сделан (П5.2).
+   *
+   * Отдельная пара «план → применение», а не поле в пересборке: исход разбирает
+   * ОДИН файл, и показывать его вместе с общей пересборкой значило бы показать
+   * два разных решения одним диффом.
+   */
+  app.post<{ Body: DriftBody }>('/api/portability/subscription/drift/plan', (request, reply) => {
+    const drift = resolveDrift(ctx, request.body ?? {});
+    if (isRefusal(drift)) return send(reply, drift);
+    if (drift.transfer) rememberShownPlan(drift.transfer.fingerprint);
+    const plan: SubscriptionDriftPlan = {
+      filePath: drift.filePath,
+      state: drift.state,
+      resolution: drift.resolution,
+      transfer: drift.transfer,
+      layers: drift.layers,
+    };
+    return { plan };
+  });
+
+  /**
+   * Сделать выбранное. Ни один исход не перезаписывает файл сам по себе: сюда
+   * приходят только после показанного плана, и `unsubscribe` — единственный, у
+   * которого плана нет, потому что он не трогает ни одного байта у цели.
+   */
+  app.post<{ Body: DriftBody & { fingerprint?: string } }>(
+    '/api/portability/subscription/drift/apply',
+    (request, reply) => {
+      const body = request.body ?? {};
+      const drift = resolveDrift(ctx, body);
+      if (isRefusal(drift)) return send(reply, drift);
+      const syncedAt = new Date().toISOString();
+
+      if (drift.resolution === 'unsubscribe') {
+        const { subscription, layers } = unsubscribeFile(drift.subscription, drift.filePath);
+        ctx.store.savePortabilitySubscription(drift.key, subscription);
+        return {
+          subscription,
+          resolution: drift.resolution,
+          filePath: drift.filePath,
+          adopted: [],
+          unsubscribed: layers,
+        } satisfies SubscriptionDriftAnswer;
+      }
+
+      if (!drift.transfer)
+        return send(
+          reply,
+          refuse(
+            409,
+            'drift_nothing_to_do',
+            'Этот исход не даёт ни одной правки: посмотрите план заново.',
+            'portability-drift-nothing-to-do',
+          ),
+        );
+
+      const fingerprint = typeof body.fingerprint === 'string' ? body.fingerprint : '';
+      if (!fingerprint || !wasPlanShown(fingerprint))
+        return reply.code(409).send({
+          error: 'plan_not_shown',
+          message: 'Сначала предпросмотр: панель не пишет то, чего вам не показала.',
+          messageCode: 'portability-plan-not-shown',
+        });
+      if (fingerprint !== drift.transfer.fingerprint)
+        return reply.code(409).send({
+          error: 'plan_stale',
+          message: 'С момента предпросмотра файлы изменились — посмотрите план заново.',
+          messageCode: 'portability-plan-stale',
+        });
+
+      try {
+        const files = applyTransfer(
+          drift.transfer.target,
+          drift.transfer.root,
+          drift.writes,
+          ctx.backupDir,
+        );
+
+        if (drift.resolution === 'projection') {
+          const subscription = markProjection(
+            drift.subscription,
+            drift.env,
+            drift.landed,
+            files,
+            drift.transfer.root,
+            syncedAt,
+          );
+          ctx.store.savePortabilitySubscription(drift.key, subscription);
+          return {
+            subscription,
+            resolution: drift.resolution,
+            filePath: drift.filePath,
+            adopted: [],
+            unsubscribed: [],
+          } satisfies SubscriptionDriftAnswer;
+        }
+
+        // Канон ПЕРЕЧИТЫВАЕТСЯ после записи: отпечатки отметок обязаны быть
+        // канонными, а не взятыми у цели, иначе следующая же пересборка
+        // объявит запись разошедшейся и перепишет человеку его же правку.
+        const canon = readEnvironment(ctx, getProvider(PANEL_CANON_PROVIDER), drift);
+        const hash = fileHashOrNull(drift.filePath);
+        const subscription = markAdoption(
+          drift.subscription,
+          canon,
+          drift.adopted,
+          drift.filePath,
+          hash ?? '',
+          syncedAt,
+        );
+        ctx.store.savePortabilitySubscription(drift.key, subscription);
+        return {
+          subscription,
+          resolution: drift.resolution,
+          filePath: drift.filePath,
+          adopted: drift.adopted,
+          unsubscribed: [],
+        } satisfies SubscriptionDriftAnswer;
+      } catch (error) {
+        if (error instanceof TransferBackupsDisabledError)
+          return reply
+            .code(409)
+            .send({ error: 'backups_off', message: error.message, ...codeOf(error) });
+        if (error instanceof TransferTargetNotWritableError)
+          return reply
+            .code(409)
+            .send({ error: 'target_not_writable', message: error.message, ...codeOf(error) });
+        if (error instanceof TransferRolledBackError) {
+          reply.log.warn({ err: error }, 'portability: исход расхождения откачен');
+          return reply.code(500).send({
+            error: error.rolledBack ? 'apply_rolled_back' : 'apply_rollback_failed',
+            message: error.message,
+            filePath: error.filePath,
+            ...codeOf(error),
+          });
+        }
+        throw error;
+      }
+    },
+  );
 }
 
 /**
@@ -628,11 +782,188 @@ function resolveSubscription(
   return { key, subscription, target, ...level };
 }
 
+/** Общее тело двух маршрутов исхода расхождения. */
+interface DriftBody {
+  target?: string;
+  scope?: string;
+  project?: string;
+  filePath?: string;
+  resolution?: string;
+}
+
+/** Разобранный исход: что выбрано, по какому файлу и что из этого выйдет. */
+interface ResolvedDrift extends ResolvedSubscription {
+  filePath: string;
+  state: SubscriptionDrift['state'];
+  resolution: SubscriptionDriftResolution;
+  transfer: TransferPlan | null;
+  writes: readonly EmitWrite[];
+  landed: readonly LandedItem[];
+  adopted: readonly string[];
+  layers: readonly EnvItemKind[];
+  env: AgentEnvironment;
+}
+
+/** Разобранное до того, как считается сам исход: какой файл, что с ним, что выбрано. */
+type DriftHead = Omit<
+  ResolvedDrift,
+  'transfer' | 'writes' | 'landed' | 'adopted' | 'layers' | 'env'
+>;
+
+/**
+ * Разобрать исход расхождения — до единой точки для плана и применения.
+ *
+ * Оба маршрута считают ОДНО И ТО ЖЕ: план показывает то, что применение
+ * сделает. Разведи их по двум функциям — и отпечаток начнёт считаться по
+ * одному, а запись идти по другому, причём расходиться они будут молча.
+ */
+function resolveDrift(ctx: ServerContext, body: DriftBody): ResolvedDrift | Refusal {
+  const resolved = resolveSubscription(ctx, body);
+  if (isRefusal(resolved)) return resolved;
+
+  const filePath = typeof body.filePath === 'string' ? body.filePath : '';
+  const resolution = typeof body.resolution === 'string' ? body.resolution : '';
+  if (!isSubscriptionDriftResolution(resolution))
+    return refuse(
+      400,
+      'drift_resolution_unknown',
+      'У расхождения три исхода: взять в канон, вернуть проекцию, отписать слои файла.',
+      'portability-drift-resolution-unknown',
+    );
+
+  // Расхождение проверяется ЗАНОВО на каждом вызове, а не берётся из показанного
+  // плана: файл мог вернуться к прежнему виду сам (человек отменил правку), и
+  // разбирать исчезнувшее расхождение значило бы записать то, о чём уже некого
+  // спрашивать.
+  const drift = detectDrift(resolved.subscription, fileHashOrNull).find(
+    (file) => file.filePath === filePath,
+  );
+  if (!drift)
+    return refuse(
+      409,
+      'drift_absent',
+      'Этот файл цели совпадает с тем, каким панель его оставила: разбирать нечего.',
+      'portability-drift-absent',
+    );
+
+  const head = { ...resolved, filePath: drift.filePath, state: drift.state, resolution };
+  const nothing = { transfer: null, writes: [], landed: [], adopted: [], layers: [] } as const;
+
+  if (resolution === 'unsubscribe') {
+    const env = readEnvironment(ctx, getProvider(PANEL_CANON_PROVIDER), resolved);
+    return { ...head, ...nothing, layers: layersOfFile(resolved.subscription, filePath), env };
+  }
+
+  if (resolution === 'projection') {
+    const planned = planSubscription(ctx, body, filePath);
+    if (isRefusal(planned)) return planned;
+    return {
+      ...head,
+      ...nothing,
+      transfer: planned.plan.transfer,
+      writes: planned.writes,
+      landed: planned.landed,
+      env: planned.env,
+    };
+  }
+
+  // Исчезнувший файл нечего брать в канон: «взять» пустоту значило бы стереть
+  // записи, которых человек не трогал, — он удалил файл, а не отменил их.
+  if (drift.state === 'missing')
+    return refuse(
+      409,
+      'drift_file_missing',
+      'Этого файла у цели нет: брать в канон нечего — верните проекцию или отпишите слои.',
+      'portability-drift-file-missing',
+    );
+  return adoptionOf(ctx, resolved, drift, head);
+}
+
+/**
+ * Исход «взять правку человека в канон»: импортёр читает файл цели, перенос
+ * кладёт прочитанное в файлы канона.
+ *
+ * Обе половины — существующие механизмы, и это условие критерия приёмки, а не
+ * экономия: текстовая склейка означала бы, что в канон попало то, чего панель
+ * не разобрала, а такая запись дальше поехала бы во все подписанные CLI.
+ */
+function adoptionOf(
+  ctx: ServerContext,
+  resolved: ResolvedSubscription,
+  drift: SubscriptionDrift,
+  head: DriftHead,
+): ResolvedDrift | Refusal {
+  if (!hasImporter(resolved.target.id))
+    return refuse(
+      400,
+      'importer_missing',
+      'Панель пока не умеет читать среду этого CLI.',
+      'portability-importer-missing',
+    );
+
+  let targetEnv: AgentEnvironment;
+  try {
+    targetEnv = readEnvironment(ctx, resolved.target, resolved);
+  } catch {
+    return refuse(
+      400,
+      'source_not_readable',
+      'Файлы этого CLI не читаются: проверьте, что его настройки не испорчены.',
+      'portability-source-not-readable',
+    );
+  }
+
+  // Берутся записи ПОДПИСАННЫХ слоёв из ЭТОГО файла. Чужая запись, лежавшая в
+  // том же файле, делом панели никогда не была, и втащить её в канон значило бы
+  // разослать её всем подписанным целям заодно.
+  const layers = new Set<EnvItemKind>(resolved.subscription.layers);
+  const items = targetEnv.items.filter(
+    (item) => layers.has(item.kind) && item.source.file === drift.filePath,
+  );
+  if (items.length === 0)
+    return refuse(
+      409,
+      'drift_nothing_to_adopt',
+      'В этом файле нет записей подписанных слоёв: брать в канон нечего.',
+      'portability-drift-nothing-to-adopt',
+    );
+
+  const canon = getProvider(PANEL_CANON_PROVIDER);
+  const { plan, writes } = buildTransferPlan(
+    { ...targetEnv, items },
+    canon,
+    {
+      scope: resolved.scope,
+      projectRoot: resolved.projectRoot,
+      override: ctx.store.getSettings().claudeDirOverride,
+      // Запись канона с тем же именем — ровно та, которую человек и просит
+      // заменить своей правкой. Инвариант 10 бережёт его от МОЛЧАЛИВОЙ
+      // перезаписи, а здесь выбор сделан им, по одной записи и по показанному
+      // плану; верни эмиттер столкновение — исход не сработал бы никогда.
+      owned: new Set(items.map((item) => item.id)),
+    },
+    new Date().toISOString(),
+  );
+
+  return {
+    ...head,
+    transfer: writes.length > 0 ? plan : null,
+    writes,
+    landed: [],
+    // Взятыми считаются ДОЕХАВШИЕ до канона, а не все отобранные: запись,
+    // которую формат канона не принял, отметить взятой значило бы сказать
+    // «правка человека сохранена» про то, чего в каноне нет.
+    adopted: plan.entries.filter((entry) => landsAtTarget(entry.outcome)).map((e) => e.itemId),
+    layers: [],
+    env: targetEnv,
+  };
+}
+
 /** План пересборки плюс всё, что нужно её применению. */
 interface PlannedSubscription extends ResolvedSubscription {
   plan: SubscriptionSyncPlan;
   writes: readonly EmitWrite[];
-  landed: readonly string[];
+  landed: readonly LandedItem[];
   root: string | null;
   env: AgentEnvironment;
 }
@@ -640,6 +971,8 @@ interface PlannedSubscription extends ResolvedSubscription {
 function planSubscription(
   ctx: ServerContext,
   input: { target?: string; scope?: string; project?: string },
+  /** Файл, правку в котором человек разрешил перезаписать проекцией (П5.2). */
+  overwrite?: string,
 ): PlannedSubscription | Refusal {
   const resolved = resolveSubscription(ctx, input);
   if (isRefusal(resolved)) return resolved;
@@ -666,6 +999,10 @@ function planSubscription(
       override: ctx.store.getSettings().claudeDirOverride,
     },
     new Date().toISOString(),
+    // Диск читается ЗДЕСЬ, а не в домене решений: подменить этот читатель в
+    // проверке значит подменить диск, а не предмет проверки (П5.2).
+    fileHashOrNull,
+    overwrite,
   );
 
   return { ...resolved, plan, writes, landed, root, env };

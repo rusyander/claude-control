@@ -62,6 +62,15 @@ export const configRu: Record<ConfigMessageCode, string> = {
   'portability-subscription-layer-unknown': 'Такого слоя в каноне нет.',
   'portability-subscription-held':
     'Пересборка удержана: либо проекцию строила другая версия канона, либо ни один слой не подписан.',
+  'portability-drift-resolution-unknown':
+    'У расхождения три исхода: взять в канон, вернуть проекцию, отписать слои файла.',
+  'portability-drift-absent':
+    'Этот файл цели совпадает с тем, каким панель его оставила: разбирать нечего.',
+  'portability-drift-file-missing':
+    'Этого файла у цели нет: брать в канон нечего — верните проекцию или отпишите слои.',
+  'portability-drift-nothing-to-adopt':
+    'В этом файле нет записей подписанных слоёв: брать в канон нечего.',
+  'portability-drift-nothing-to-do': 'Этот исход не даёт ни одной правки: посмотрите план заново.',
   'resource-file-unspecified': 'Не указан файл',
   'resource-template-not-found': 'Шаблон не найден',
   'resource-kind-unknown': 'Неизвестный вид ресурса',

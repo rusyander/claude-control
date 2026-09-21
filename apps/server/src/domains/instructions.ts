@@ -1,9 +1,10 @@
 import { existsSync } from 'node:fs';
 import { basename, dirname } from 'node:path';
-import type { AppSettings, InstructionsFileInfo } from '@agentdeck/contracts';
+import type { AppSettings, InstructionsFileInfo, InstructionFilesView } from '@agentdeck/contracts';
 import { getActiveProvider } from '../providers/registry.ts';
 import type { ConfigProvider } from '../providers/types.ts';
 import { providerBackupName, readTextFile, writeTextFile } from '../lib/safe-io.ts';
+import { userInstructionTarget } from '../lib/instruction-files.ts';
 
 /**
  * Раздел «Глобальные инструкции» — универсальный по активному провайдеру.
@@ -33,6 +34,14 @@ export interface InstructionsTarget {
   filePath: string;
   fileName: string;
   cliDetected: boolean;
+  /**
+   * Только у Claude и только когда вызывающий назвал корень: имя файла там
+   * разрешается по ключу `instructionFiles` (П2.7), и экрану нужно не только
+   * имя, но и вся картина — что CLI читает, что лежит рядом непрочитанным и
+   * предложено ли имя, потому что файла ещё нет.
+   */
+  instructionFiles?: InstructionFilesView;
+  proposed?: boolean;
 }
 
 /**
@@ -45,10 +54,26 @@ export interface InstructionsTarget {
 export function resolveInstructionsTarget(
   store: InstructionsSettingsSource,
   claudeMdPath: string,
+  claude?: { root: string; requested?: string },
 ): InstructionsTarget | undefined {
   const provider = getActiveProvider(store);
   if (provider.capabilities.globalInstructions !== 'ready' || !provider.instructionsFile) {
     return undefined;
+  }
+
+  // Claude с названным корнем — единственный случай, где имя ещё не решено:
+  // резолвер отвечает и файлом, и картиной для экрана. Без корня (предпросмотр,
+  // поиск) берётся уже разрешённый путь — второй раз его решать незачем.
+  if (provider.id === 'claude' && claude) {
+    const target = userInstructionTarget(claude.root, claude.requested);
+    return {
+      provider,
+      filePath: target.filePath,
+      fileName: target.fileName,
+      cliDetected: existsSync(claude.root),
+      instructionFiles: target.view,
+      proposed: target.proposed,
+    };
   }
 
   const filePath =
@@ -76,6 +101,7 @@ export function readInstructionsInfo(target: InstructionsTarget): InstructionsFi
     cliDetected: target.cliDetected,
     providerId: target.provider.id,
     providerName: target.provider.name,
+    instructionFiles: target.instructionFiles,
   };
 }
 

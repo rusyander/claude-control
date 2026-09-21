@@ -43,6 +43,10 @@ export const gooseProvider: ConfigProvider = {
   permissionsConfig: {
     format: 'goose-yaml',
     path: gooseConfigYaml,
+    // Один скалярный ключ `GOOSE_MODE` на весь CLI: списков правил нет вовсе,
+    // поэтому отдельное правило записать НЕКУДА — только режим.
+    model: 'mode',
+    decisions: [],
     // Пофайловые разрешения инструментов — ТОЛЬКО ПОКАЗ (см. ниже про формат).
     readOnlyToolPermissionsPath: () => join(gooseConfigDir(), 'permission.yaml'),
   },

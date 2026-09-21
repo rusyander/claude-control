@@ -23,6 +23,7 @@ const ROUTE_SECTIONS: Record<string, readonly string[]> = {
   '/dlp': ['dlp'],
   '/platform': ['contour'],
   '/compare': ['compare'],
+  '/portability': ['portability'],
   '/help': ['help'],
   '/analytics': ['analytics'],
   '/chat': ['chat'],

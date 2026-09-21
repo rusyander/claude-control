@@ -4,6 +4,7 @@ import type {
   McpServerDraft,
   PermissionDraft,
   PermissionRule,
+  ProjectRulesAnswer,
   WriteResult,
 } from '@agentdeck/contracts';
 import { apiClient } from '@shared/api/client';
@@ -24,8 +25,10 @@ export function useProjectRules(projectId: string) {
   return useQuery({
     queryKey: queryKeys.projectRules(projectId),
     queryFn: async () => {
-      const { data } = await apiClient.get<{ content: string }>(`/projects/${projectId}/rules`);
-      return data.content;
+      // Не только текст: имя файла правил решается ключом `instructionFiles`, и
+      // экран обязан назвать, какой файл читает CLI (П2.7).
+      const { data } = await apiClient.get<ProjectRulesAnswer>(`/projects/${projectId}/rules`);
+      return data;
     },
     enabled: Boolean(projectId),
   });
@@ -34,10 +37,10 @@ export function useProjectRules(projectId: string) {
 export function useUpdateProjectRules(projectId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (content: string) => {
-      const { data } = await apiClient.put<WriteResult>(`/projects/${projectId}/rules`, {
-        content,
-      });
+    // Имя уходит ТОЛЬКО когда файла ещё нет: существующий панель не
+    // переименовывает, и сервер на такую просьбу отвечает 409.
+    mutationFn: async (draft: { content: string; fileName?: string }) => {
+      const { data } = await apiClient.put<WriteResult>(`/projects/${projectId}/rules`, draft);
       return data;
     },
     onSuccess: () => {

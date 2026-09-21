@@ -22,6 +22,7 @@ import { registerHistoryRoutes } from '../history-routes.ts';
 import { registerBackupRoutes } from '../backup-routes.ts';
 import { registerAnalyticsRoutes } from '../analytics-routes.ts';
 import { registerProviderCompareRoutes } from '../provider-compare-routes.ts';
+import { registerPortabilityRoutes } from '../portability-routes.ts';
 import { DEFAULT_HELP_WEB_SRC } from './help-routes.ts';
 import { registerPanelAgentRoutes } from './panel-agent-routes.ts';
 
@@ -161,6 +162,7 @@ describe('panel-agent actions: help, overview, plugins, history', () => {
     registerBackupRoutes(app, ctx);
     registerAnalyticsRoutes(app, ctx);
     registerProviderCompareRoutes(app, ctx);
+    registerPortabilityRoutes(app, ctx);
     registerPanelAgentRoutes(app, ctx, { hub: createEventHub(), pending, access });
     await app.ready();
   });
@@ -458,5 +460,62 @@ describe('panel-agent actions: help, overview, plugins, history', () => {
       }
       rmSync(fakeHome, { recursive: true, force: true });
     }
+  });
+
+  it('read_env_passport отдаёт состав среды и ни одного значения секрета', async () => {
+    const marker = 'sk-ant-МАРКЕР-АГЕНТА-7d41b0-НЕ-ДОЛЖЕН-УТЕЧЬ';
+    writeFileSync(
+      paths().settings,
+      JSON.stringify({
+        env: { ANTHROPIC_API_KEY: marker },
+        permissions: { deny: ['Read(./private)'] },
+      }),
+    );
+
+    const res = (await call('read_env_passport', {})).json<PanelActionResult>();
+    expect(res.outcome).toBe('done');
+
+    const passport = res.result as {
+      provider: string;
+      byKind: Record<string, number>;
+      items: Array<{ kind: string }>;
+    };
+    expect(passport.provider).toBe('claude');
+    // Секрет НАЙДЕН и назван — иначе «маркера нет» значило бы лишь, что ключ не
+    // прочитан вовсе, и проверка стала бы украшением.
+    expect(passport.byKind.secret).toBeGreaterThan(0);
+    expect(JSON.stringify(res)).not.toContain(marker);
+  });
+
+  it('обрезанный список записей назван обрезанным и не теряет ни одного вида', async () => {
+    // Записей заведомо больше предела показа: права дают их сотнями, а список
+    // отсортирован по `id` — простая обрезка выбрасывала бы хвост видов целиком.
+    writeFileSync(
+      paths().settings,
+      JSON.stringify({
+        env: { EDITOR: 'code' },
+        permissions: {
+          allow: Array.from({ length: 140 }, (_, index) => `Bash(cmd${index})`),
+          deny: ['Read(./private)'],
+        },
+      }),
+    );
+
+    const res = (await call('read_env_passport', {})).json<PanelActionResult>();
+    const passport = res.result as {
+      byKind: Record<string, number>;
+      items: Array<{ kind: string }>;
+      itemsShown: number;
+      itemsTotal: number;
+      itemsTruncated: boolean;
+    };
+
+    expect(passport.itemsTruncated).toBe(true);
+    expect(passport.itemsTotal).toBeGreaterThan(passport.itemsShown);
+    expect(passport.itemsShown).toBe(passport.items.length);
+    // Каждый вид, который есть в среде, представлен хотя бы одной записью:
+    // иначе модель читает обрезанный список как полный состав среды.
+    const shownKinds = new Set(passport.items.map((item) => item.kind));
+    for (const kind of Object.keys(passport.byKind)) expect(shownKinds.has(kind)).toBe(true);
   });
 });

@@ -46,8 +46,15 @@ interface RawMcpConfig {
   [key: string]: unknown;
 }
 
-/** Секция, куда приложение прячет выключенные серверы. Claude Code её игнорирует. */
-const DISABLED_KEY = 'mcpServersDisabled';
+/**
+ * Секция, куда приложение прячет выключенные серверы. Claude Code её игнорирует.
+ *
+ * Экспортируется ради переноса среды: эмиттер спрашивает «имя занято?» по ОБОИМ
+ * разделам, и второе имя ключа у него разошлось бы с этим молча.
+ */
+export const DISABLED_MCP_KEY = 'mcpServersDisabled';
+
+const DISABLED_KEY = DISABLED_MCP_KEY;
 
 /** Ключи записи, которые пишет сама панель; всё остальное в записи — чужое и сохраняется. */
 const OWN_KEYS = new Set(['type', 'command', 'args', 'url', 'env', 'headers']);

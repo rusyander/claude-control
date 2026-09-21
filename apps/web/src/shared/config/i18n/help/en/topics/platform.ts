@@ -255,8 +255,13 @@ export const platformEn: typeof platformRu = {
       'different places — a gateway that is down, a key that ran out and a model that stays ' +
       'silent are three different troubles. With the tool shim off, ONE more question follows ' +
       'the answer — will the model call a tool through the field. If it did not, wrote the ' +
-      'call as text, or the contour type drops the field, the line below says so and offers a ' +
-      '“Turn the shim on” button. A call written as text is never executed by the panel.',
+      'call as text, or the contour type drops the field, the panel turns the shim on ITSELF ' +
+      'and says so in a line on the card, with a “Turn the shim off” button: without it an ' +
+      'agent over the contour says it edits files and does not. The panel makes that call ' +
+      'once per contour — turn it off and the next activation will not bring it back. A ' +
+      'refused request with a tool is said about the REQUEST, not about the model, and leaves ' +
+      'the switch alone: there the “Turn the shim on” button stays. A call written as text is ' +
+      'never executed by the panel.',
     activeReturnRow: '“Back to the default provider”',
     activeReturnRowText:
       'Undoes the applies, clears the mark and leaves the panel and the CLIs on their usual ' +
@@ -546,17 +551,18 @@ export const platformEn: typeof platformRu = {
       'need not think about four settings at all.',
     layerSettings: 'Personal rules, hooks and permissions',
     layerSettingsText:
-      'Everything from `~/.claude` at once: CLAUDE.md rules, hooks, permissions, personal skills ' +
+      'Everything from `~/.claude` at once: the rules (CLAUDE.md or AGENTS.md), hooks, permissions, personal skills ' +
       'and personal MCP servers — with `--setting-sources project,local`. They cannot be dropped ' +
       'separately: for the CLI this is one `user` settings source, and promising separate ' +
       'dropping would mean drawing three switches where one is executed. Along with the ' +
       'permissions your `deny` rules stop applying — the fence you put around the agent. The ' +
       'project CLAUDE.md and repository settings THIS flag does not touch: those are the rules of ' +
       'the task, not ours (measured, not assumed). One file needs more than the flag: when the ' +
-      'project lives under your home folder, the CLI walks up, finds `~/.claude/CLAUDE.md` and ' +
-      'reads it as a project file. The panel then excludes exactly that file for the run ' +
-      '(`claudeMdExcludes` through `--settings`), so your personal rules do not come back in by ' +
-      'the side door.',
+      'project lives under your home folder, the CLI walks up, finds the personal instructions ' +
+      'file and reads it as a project file. The panel then excludes exactly those files for the ' +
+      'run (`claudeMdExcludes` through `--settings`) — BOTH names, CLAUDE.md and AGENTS.md, ' +
+      'because the naming mode is not ours to know — so your personal rules do not come back in ' +
+      'by the side door.',
     layerSkills: 'Skills',
     layerSkillsText:
       'Skills and the `Skill` tool itself — with `--disable-slash-commands`. A separate switch not ' +
@@ -945,8 +951,12 @@ export const platformEn: typeof platformRu = {
     shimCaption:
       'On the company platform the shim is on by default. On a compatible gateway it is off: that gateway ' +
       'accepts tools as a request field, and the panel passes them through as real calls, ' +
-      'with no protocol text. The contour type sets the default when you connect; after that ' +
-      'the switch is yours, and changing the type of a saved contour does not rewrite it. ' +
+      'with no protocol text. The contour type sets the default when you connect — and so ' +
+      'does the tool probe at activation, when the model does not call through the field; ' +
+      'after that the switch is yours, and neither changing the type of a saved contour nor a ' +
+      'new probe rewrites it. The wizard has a third answer too — “as a request field the ' +
+      'model ignores”: the gateway takes the field, no calls come back through it, and such a ' +
+      'contour gets the shim on from the start. ' +
       'Here is what goes up with the shim on, what comes back and the price you pay on every ' +
       'turn.',
     shimColumn: 'What',

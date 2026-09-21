@@ -6,7 +6,8 @@ import type { GatedNavItem } from '@entities/Provider';
  * Claude — CLAUDE.md, у Codex/Kimi/OpenCode — AGENTS.md, у Gemini — GEMINI.md; у
  * провайдера без единого файла (список у Aider, каталог правил у Cursor) — общее
  * «Инструкции». Иначе меню обещало CLAUDE.md, а редактировался AGENTS.md.
- * Решает МОДЕЛЬ, не id провайдера: у Claude модель `file` и имя CLAUDE.md.
+ * Решает МОДЕЛЬ, не id провайдера: у Claude модель `file`, а имя приходит уже
+ * РАЗРЕШЁННЫМ (П2.7) — дом без своего `CLAUDE.md` подписан `AGENTS.md`.
  */
 export function navItemLabel(
   item: GatedNavItem,

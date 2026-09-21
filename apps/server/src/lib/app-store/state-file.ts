@@ -44,6 +44,8 @@ export function mergeState(input: Partial<AppState>): AppState {
     integrationHealth: { ...base.integrationHealth, ...loaded.integrationHealth },
     platformHealth: { ...base.platformHealth, ...loaded.platformHealth },
     platformApplied: { ...base.platformApplied, ...loaded.platformApplied },
+    portabilityFidelity: { ...base.portabilityFidelity, ...loaded.portabilityFidelity },
+    portabilityTransfers: { ...base.portabilityTransfers, ...loaded.portabilityTransfers },
     platformSpend: { ...base.platformSpend, ...loaded.platformSpend },
     integrationLinks: { ...base.integrationLinks, ...loaded.integrationLinks },
     worktreeMirror: { ...base.worktreeMirror, ...loaded.worktreeMirror },

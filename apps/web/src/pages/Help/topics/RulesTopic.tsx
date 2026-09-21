@@ -66,7 +66,13 @@ export function RulesTopic() {
         <StorageCard
           title="CLAUDE.md"
           rows={[
-            { label: tr('storageFile'), value: '~/.claude/CLAUDE.md', isMono: true },
+            {
+              label: tr('storageFile'),
+              // Тот же файл, что в разделе «CLAUDE.md», и имя у него такое же
+              // разрешённое (П2.7): дом без своего `CLAUDE.md` живёт на `AGENTS.md`.
+              value: '~/.claude/CLAUDE.md · ~/.claude/AGENTS.md',
+              isMono: true,
+            },
             { label: tr('storageUnit'), value: tr('storageUnitValue') },
             { label: tr('storageDisabled'), value: tr('storageDisabledValue') },
             { label: tr('storageReader'), value: tr('storageReaderValue') },

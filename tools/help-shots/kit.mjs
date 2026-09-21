@@ -33,9 +33,18 @@
  * по разные стороны проверки нельзя: сторож и инструмент подтверждения обязаны
  * получать одно число, иначе подтверждение перестанет гасить красноту.
  */
-import { mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync, rmSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  writeFileSync,
+  readFileSync,
+  existsSync,
+  readdirSync,
+  rmSync,
+} from 'node:fs';
 import { createHash } from 'node:crypto';
-import { join, resolve } from 'node:path';
+import { join, parse, resolve } from 'node:path';
+import { tmpdir } from 'node:os';
 
 /**
  * Корень репозитория. Считается от места этого файла, а не от рабочего
@@ -49,6 +58,31 @@ export const SHOTS_ROOT = join(REPO_ROOT, 'apps/web/public/help');
 
 /** Чем закрывается секрет в кадре. Символ один и тот же везде — узнаваемо. */
 export const MASK = '••••••••••••';
+
+/**
+ * Одноразовый дом для съёмки — в каталоге, чьё имя не уедет в публичный кадр.
+ *
+ * Путь панели попадает В КАДР: с П2.7 страница инструкций печатает путь
+ * прочитанного файла. Временная папка системы на Windows лежит внутри профиля
+ * (`C:\Users\<учётка>\AppData\...`), и снимок унёс бы имя учётной записи машины
+ * в публичное дерево; каталог самого репозитория унёс бы его имя, а оно у этого
+ * репозитория — прежнее имя продукта, запрещённое сторожем марки.
+ *
+ * Поэтому дом заводится в нейтральном каталоге у корня диска. Он может быть
+ * недоступен на записи (чужая машина, ограниченные права) — тогда берётся
+ * обычная временная папка, и об этом сказано вслух: кадр получится, но путь в
+ * нём будет с именем учётной записи.
+ */
+export function shotHome(prefix) {
+  const neutral = join(parse(tmpdir()).root, 'agentdeck-help-shots');
+  try {
+    mkdirSync(neutral, { recursive: true });
+    return mkdtempSync(join(neutral, prefix));
+  } catch {
+    console.log(`нейтральный каталог ${neutral} недоступен — снимаю во временной папке профиля`);
+    return mkdtempSync(join(tmpdir(), prefix));
+  }
+}
 
 /** Опись схем рядом с их картинками: по ней видно, что картинка отстала. */
 export const DIAGRAMS_MANIFEST = 'diagrams.json';

@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { PLATFORM_PRESETS } from '@agentdeck/contracts/platform-presets';
+import {
+  clientToolsTravel,
+  PLATFORM_PRESETS,
+  shimByClientTools,
+} from '@agentdeck/contracts/platform-presets';
 import type { PlatformDriver } from '../driver.ts';
 import { allDrivers } from '../index.ts';
 import { contourHeaders, contourUrl } from '../../transport.ts';
@@ -285,7 +289,11 @@ describe.each(allDrivers)('набор соответствия: $id', (driver: P
       { tools: ANTHROPIC_REQUEST_WITH_TOOLS.tools },
       driver.requestFields,
     );
-    expect(loss.some((item) => item.field === 'tools')).toBe(driver.clientTools !== 'native');
+    // Потеря — только у `shim`: `native-no-call` поле ВЕЗЁТ, и молчание модели
+    // не повод называть потерянным то, что доехало.
+    expect(loss.some((item) => item.field === 'tools')).toBe(
+      !clientToolsTravel(driver.clientTools),
+    );
     for (const item of loss) expect(item.note.trim()).not.toBe('');
   });
 
@@ -300,7 +308,7 @@ describe.each(allDrivers)('набор соответствия: $id', (driver: P
       driver.requestFields,
       route,
     );
-    if (driver.clientTools === 'native') {
+    if (clientToolsTravel(driver.clientTools)) {
       expect(body.tools).toEqual([
         {
           type: 'function',
@@ -324,7 +332,9 @@ describe.each(allDrivers)('набор соответствия: $id', (driver: P
     // которой других рук нет (аудит DRV-20).
     const preset = PLATFORM_PRESETS[driver.id];
     expect(preset, `нет пресета у драйвера ${driver.id}`).toBeDefined();
-    expect(preset.defaults.toolShim).toBe(driver.clientTools === 'shim');
+    // Руки без прослойки есть только у `native`: и «поля нет» (`shim`), и «поле
+    // есть, а вызовов нет» (`native-no-call`) означают одно — умолчание «включена».
+    expect(preset.defaults.toolShim).toBe(shimByClientTools(driver.clientTools));
   });
 
   it('прослойка не шлёт выбор инструмента без `tools`, кроме объявленного драйвером', () => {

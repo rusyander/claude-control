@@ -76,7 +76,9 @@ export const HOOK_EVENT_INFO: readonly HookEventInfo[] = [
     matcherExamples: [],
     when: 'Когда Claude закончил отвечать',
     useFor: 'Итоговые действия: собрать отчёт, подать сигнал о завершении работы.',
-    canBlock: false,
+    // Код возврата 2 НЕ даёт агенту остановиться и продолжает разговор — это
+    // задокументированное поведение события, а не догадка.
+    canBlock: true,
   },
   {
     event: 'SubagentStop',
@@ -109,7 +111,9 @@ export const HOOK_EVENT_INFO: readonly HookEventInfo[] = [
     matcherExamples: ['manual', 'auto'],
     when: 'Перед сжатием контекста, когда он переполняется',
     useFor: 'Успеть выписать важное в файл, чтобы после сжатия восстановить состояние.',
-    canBlock: false,
+    // Код возврата 2 отменяет сжатие — событие «до действия», и действие ещё
+    // можно предотвратить.
+    canBlock: true,
   },
 ];
 

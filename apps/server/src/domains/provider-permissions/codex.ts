@@ -55,6 +55,7 @@ export function readCodexPermissions(text: string): CodexPermissionsValues {
       kind: 'codex',
       approvalPolicy: DEFAULT_APPROVAL,
       sandboxMode: DEFAULT_SANDBOX,
+      sandboxPresent: false,
       usingDefaults: true,
     };
   }
@@ -72,6 +73,7 @@ export function readCodexPermissions(text: string): CodexPermissionsValues {
     kind: 'codex',
     approvalPolicy: approvalPresent ? (rawApproval as CodexApprovalPolicy) : DEFAULT_APPROVAL,
     sandboxMode: sandboxPresent ? (rawSandbox as CodexSandboxMode) : DEFAULT_SANDBOX,
+    sandboxPresent,
     usingDefaults: rawApproval === undefined && rawSandbox === undefined,
   };
 }

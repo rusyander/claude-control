@@ -1,6 +1,7 @@
 import type { OurLayerId, OurRules, Platform, PlatformRunLayers } from '@agentdeck/contracts';
 import { posix, win32 } from 'node:path';
 import { defaultOurRules } from '@agentdeck/contracts/platform';
+import { INSTRUCTION_BASE_NAMES } from '../../lib/instruction-files.ts';
 
 /**
  * НАШИ слои в прогоне через контур (Т8): что из `~/.claude` едет в запуск.
@@ -140,16 +141,22 @@ export function userMemorySettings(
     return win ? clean.toLowerCase() : clean;
   };
 
-  const files = new Set<string>([
-    p.join(configDir, 'CLAUDE.md'),
-    p.join(home, '.claude', 'CLAUDE.md'),
-  ]);
+  // ОБА имени, в любом режиме `instructionFiles` (П2.7). Личный файл, снятый под
+  // именем `CLAUDE.md`, уезжал бы в запрос под именем `AGENTS.md`: с 2.1.277 CLI
+  // читает его тем же поиском и в тех же каталогах, а режим панель здесь не
+  // знает — исключаются оба, и лишнее исключение не стоит ничего.
+  const files = new Set<string>();
+  const addNames = (dir: string): void => {
+    for (const name of INSTRUCTION_BASE_NAMES) files.add(p.join(dir, name));
+  };
+  addNames(configDir);
+  addNames(p.join(home, '.claude'));
   let dir = p.normalize(place.cwd);
   for (;;) {
     if (key(dir) === key(home) || key(p.join(dir, '.claude')) === key(configDir)) {
-      files.add(p.join(dir, '.claude', 'CLAUDE.md'));
+      addNames(p.join(dir, '.claude'));
     }
-    if (key(dir) === key(configDir)) files.add(p.join(dir, 'CLAUDE.md'));
+    if (key(dir) === key(configDir)) addNames(dir);
     const parent = p.dirname(dir);
     if (parent === dir) break;
     dir = parent;

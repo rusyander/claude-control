@@ -134,15 +134,31 @@ export function resolveProjectFile(root: string, relativePath: string): string {
 }
 
 /**
- * Проектная цель активного провайдера — или `undefined`, если проектный уровень
- * им не поддержан (маршрут ответит 4xx). Поддержан, только когда `projects` =
- * `ready` И задан `projectConfig`. Claude сюда не попадает (у него свои роуты).
+ * Проектная цель АКТИВНОГО провайдера — тонкая обёртка над `providerProjectTargetFor`.
+ *
+ * Разделено ровно по той же причине, что и семейство `resolveProviderXTargetFor`
+ * (П0.2): «кто сейчас активен» — вопрос состояния панели, а «где у этого
+ * провайдера лежит проектный файл» — вопрос каталога. Переносу нужен второй, и
+ * брать его через активного провайдера он не имеет права: цель переноса задаёт
+ * человек, а не настройка панели.
  */
 export function resolveProviderProjectTarget(
   store: ProviderProjectSettingsSource,
   projectPath: string,
 ): ProviderProjectTarget | undefined {
-  const provider = getActiveProvider(store);
+  return providerProjectTargetFor(getActiveProvider(store), projectPath);
+}
+
+/**
+ * Проектная цель НАЗВАННОГО провайдера — или `undefined`, если проектный уровень
+ * им не поддержан (маршрут ответит 4xx). Поддержан, только когда `projects` =
+ * `ready` И задан `projectConfig`. Claude сюда не попадает (у него свои роуты и
+ * своя раскладка проекта — `portability/project.ts`).
+ */
+export function providerProjectTargetFor(
+  provider: ConfigProvider,
+  projectPath: string,
+): ProviderProjectTarget | undefined {
   if (provider.capabilities.projects !== 'ready' || !provider.projectConfig) return undefined;
 
   const root = resolve(projectPath);

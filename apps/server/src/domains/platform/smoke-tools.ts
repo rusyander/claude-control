@@ -104,6 +104,37 @@ export async function smokeTools(input: SmokeToolsInput): Promise<PlatformSmokeT
   }
 }
 
+/**
+ * Итоги пробы, после которых прослойку включает сама панель.
+ *
+ * `refused` сюда не входит намеренно: запрос с инструментом не прошёл — это
+ * сказано про ЗАПРОС, а не про модель. За ним стоит и «шлюз не принимает поле»,
+ * и обычный сбой минуты, и включать по нему прослойку значило бы лечить таймаут
+ * промптом в 100 тысяч знаков. Там остаётся кнопка на карточке.
+ */
+const SHIM_REASONS: ReadonlySet<string> = new Set(['no-call', 'call-as-text', 'dropped']);
+
+/**
+ * Включить ли прослойку за человека по итогу пробы (развилка 3, решение В1).
+ *
+ * Решение принимается ОДИН раз на контур: отметка `toolShimFromProbe` о том,
+ * что панель уже решала, сильнее любого нового итога. Иначе человек, выключивший
+ * прослойку ради цены хода, получал бы её обратно на каждой активации.
+ *
+ * Свои инструменты платформы запирают решение целиком: прослойка с ними —
+ * запрещённое сочетание (матрица конфликтов Т7), и дверь сохранения отвергла бы
+ * контур, который панель сама же и собрала.
+ */
+export function shimFromProbe(
+  platform: Pick<Platform, 'toolShim' | 'toolShimFromProbe' | 'rules'>,
+  tools: PlatformSmokeTools | undefined,
+): boolean {
+  if (!tools || tools.ok) return false;
+  if (platform.toolShim || platform.toolShimFromProbe) return false;
+  if (platform.rules.platform.platformTools.length > 0) return false;
+  return SHIM_REASONS.has(tools.reason ?? '');
+}
+
 /** Был ли в потоке Anthropic блок `tool_use`, и какой текст модель написала. */
 function readFrames(body: string): { called: boolean; text: string } {
   let called = false;

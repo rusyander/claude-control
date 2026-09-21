@@ -2,6 +2,8 @@ import {
   PLATFORM_ASSISTANT_TARGET,
   PLATFORM_PRESETS,
   foreignProviderId,
+  platformManifestDeclared,
+  shimByClientTools,
   type Platform,
   type PlatformApplyResult,
   type PlatformApplyTarget,
@@ -53,6 +55,11 @@ export function stepBefore(step: WizardStep): WizardStep {
  * Переопределения пресета у нового контура при смене пресета сбрасываются: они
  * сказаны о ПРЕЖНЕМ шлюзе («у моего vLLM ручки Anthropic нет»), и молча
  * перенесённые на другой стали бы утверждением, которого никто не делал.
+ *
+ * Объявление инструментов у НОВОГО контура тянет за собой умолчание прослойки:
+ * человек, сказавший «поле мой шлюз принимает, а модель по нему не зовёт»
+ * (`native-no-call`), сказал этим и то, что руки агенту даёт только прослойка.
+ * У сохранённого контура галочка — уже его выбор, и переопределение её не трогает.
  */
 export function draftWithPatch(
   current: Platform,
@@ -65,6 +72,12 @@ export function draftWithPatch(
   if (isNew && fields.driver !== undefined && fields.driver !== current.driver) {
     Object.assign(next, PLATFORM_PRESETS[fields.driver].defaults);
     delete next.manifest;
+    return next;
+  }
+  if (isNew && fields.manifest !== undefined) {
+    next.toolShim = shimByClientTools(
+      platformManifestDeclared(next.driver, next.manifest).clientTools,
+    );
   }
   return next;
 }

@@ -218,7 +218,38 @@ describe('реестр провайдеров', () => {
     expect(provider.permissionsConfig?.path()).toBe(join(home, 'settings.json'));
 
     // Хуки (QWEN-1) — ключ `hooks` В ТОМ ЖЕ settings.json, что права и MCP.
-    expect(provider.hooksConfig).toMatchObject({ format: 'qwen-json' });
+    //
+    // Список событий пишется ЗДЕСЬ ЛИТЕРАЛОМ, а не берётся из того же источника,
+    // что и каталог: по нему матрица верности решает, доедет ли хук канона до
+    // Qwen, и сверка списка с самим собой этого не заметила бы. Восемнадцать
+    // имён — дословно из документации форка, порядок тоже её.
+    expect(provider.hooksConfig).toEqual({
+      format: 'qwen-json',
+      path: expect.any(Function),
+      events: [
+        'PreToolUse',
+        'PostToolUse',
+        'PostToolUseFailure',
+        'PermissionRequest',
+        'PermissionDenied',
+        'SessionStart',
+        'SessionEnd',
+        'SubagentStart',
+        'SubagentStop',
+        'PreCompact',
+        'PostCompact',
+        'Notification',
+        'UserPromptSubmit',
+        'MessageDisplay',
+        'Stop',
+        'StopFailure',
+        'TodoCreated',
+        'TodoCompleted',
+      ],
+      // Остановить действие умеют ровно три: обещанная и не состоявшаяся
+      // блокировка означала бы молча снятый запрет (инвариант 6).
+      blockingEvents: ['UserPromptSubmit', 'PreToolUse', 'Stop'],
+    });
     expect(provider.hooksConfig?.path()).toBe(join(home, 'settings.json'));
     // Ключ живой: снятия с записи, как у OpenCode, здесь нет.
     expect(provider.hooksConfig?.writeDisabledReason).toBeUndefined();
@@ -381,7 +412,33 @@ describe('реестр провайдеров', () => {
     expect(provider.capabilities.env).toBe('unsupported');
 
     // Хуки (KIMI-1) — `[[hooks]]` в том же config.toml, что и права.
-    expect(provider.hooksConfig).toMatchObject({ format: 'kimi-toml' });
+    //
+    // Шестнадцать имён перечислены ЛИТЕРАЛОМ по той же причине, что у Qwen: из
+    // этого списка матрица верности выводит, доедет ли хук канона до Kimi, и
+    // сверка каталога с его же источником была бы тавтологией.
+    expect(provider.hooksConfig).toEqual({
+      format: 'kimi-toml',
+      path: expect.any(Function),
+      events: [
+        'UserPromptSubmit',
+        'PreToolUse',
+        'Stop',
+        'PostToolUse',
+        'PostToolUseFailure',
+        'PermissionRequest',
+        'PermissionResult',
+        'SessionStart',
+        'SessionEnd',
+        'SubagentStart',
+        'SubagentStop',
+        'StopFailure',
+        'Interrupt',
+        'PreCompact',
+        'PostCompact',
+        'Notification',
+      ],
+      blockingEvents: ['UserPromptSubmit', 'PreToolUse', 'Stop'],
+    });
     expect(provider.hooksConfig?.path()).toBe(join(home, 'config.toml'));
     // Скиллы (KIMI-2): свой каталог + чужой `~/.agents/skills` только на показ,
     // описание ограничено 240 знаками — так сказано в документации Kimi.
@@ -657,6 +714,10 @@ describe('реестр провайдеров', () => {
     expect(getProvider('codex').permissionsConfig).toEqual({
       format: 'toml',
       path: expect.any(Function),
+      // Режим на весь CLI, поимённых решений нет — по этим фактам матрица
+      // верности (П1.1) и считает уровень правила, а не по имени провайдера.
+      model: 'mode',
+      decisions: [],
     });
     expect(getProvider('codex').permissionsConfig?.path()).toBe(
       join(homedir(), '.codex', 'config.toml'),
@@ -667,6 +728,9 @@ describe('реестр провайдеров', () => {
     expect(getProvider('gemini').permissionsConfig).toEqual({
       format: 'gemini-json',
       path: expect.any(Function),
+      // Списка «спросить» у Gemini нет: правило `ask` поедет запретом.
+      model: 'rules',
+      decisions: ['allow', 'deny'],
     });
     expect(getProvider('gemini').permissionsConfig?.path()).toBe(
       join(homedir(), '.gemini', 'settings.json'),
@@ -676,6 +740,18 @@ describe('реестр провайдеров', () => {
     expect(getProvider('opencode').permissionsConfig).toEqual({
       format: 'opencode-json',
       path: expect.any(Function),
+      model: 'rules',
+      decisions: ['allow', 'ask', 'deny'],
+      // Единственный CLI со СВОИМ задокументированным словарём прав (П2.2).
+      // Пин исчерпывающий намеренно: открытый словарь или лишнее имя в карте —
+      // это правило, которое уедет к цели и не сработает, и молча такое
+      // появиться не должно.
+      ruleGrammar: {
+        tools: { Bash: 'bash', Edit: 'edit', WebFetch: 'webfetch' },
+        closed: true,
+        argumentTools: ['bash'],
+        oneShapePerTool: true,
+      },
     });
     expect(getProvider('opencode').permissionsConfig?.path()).toBe(
       join(homedir(), '.config', 'opencode', 'opencode.json'),
@@ -686,6 +762,8 @@ describe('реестр провайдеров', () => {
     expect(getProvider('cursor').permissionsConfig).toEqual({
       format: 'cursor-json',
       path: expect.any(Function),
+      model: 'rules',
+      decisions: ['allow', 'deny'],
     });
     expect(getProvider('cursor').permissionsConfig?.path()).toBe(
       join(homedir(), '.cursor', 'cli-config.json'),
@@ -784,6 +862,13 @@ describe('реестр провайдеров', () => {
       format: 'opencode-json',
       path: expect.any(Function),
       writeDisabledReason: expect.stringContaining('experimental.hook'),
+      // События названы СВОИМИ именами OpenCode: ни одного из них канон не
+      // знает, и матрица верности обязана отвечать «такого события у цели нет»,
+      // а не подбирать ближайшее по смыслу.
+      events: ['file_edited', 'session_completed'],
+      // Оба задокументированных события наблюдательные: остановить действие
+      // у OpenCode не умеет ни одно.
+      blockingEvents: [],
     });
     // OPENCODE-4: каталог файлов JS/TS + массив `plugin` в том же конфиге.
     expect(capabilities.plugins).toBe('ready');

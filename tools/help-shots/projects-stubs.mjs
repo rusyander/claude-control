@@ -616,11 +616,34 @@ export async function panelShell(page, state) {
     return route.fulfill({ json: state.projects });
   });
 
-  await page.route('**/api/projects/*/rules', (route) =>
-    route.request().method() === 'GET'
-      ? route.fulfill({ json: { content: PROJECT_RULES } })
-      : route.fulfill({ json: { ok: true } }),
-  );
+  // Ответ правил проекта — не один текст (П2.7): вкладка называет файл, который
+  // читает CLI, и без раскладки падает на первом же обращении к ней. Имя берётся
+  // от проекта из адреса: у выдуманного проекта на диске лежит `CLAUDE.md`.
+  await page.route('**/api/projects/*/rules', (route) => {
+    if (route.request().method() !== 'GET') return route.fulfill({ json: { ok: true } });
+    const id = route.request().url().split('/projects/')[1].split('/')[0];
+    const project =
+      state.projects.find((item) => item.id === id) ??
+      [PROJECT, PROJECT2].find((item) => item.id === id) ??
+      PROJECT;
+    const filePath = `${project.path.replace(/\//g, '\\')}\\CLAUDE.md`;
+    return route.fulfill({
+      json: {
+        content: PROJECT_RULES,
+        fileName: 'CLAUDE.md',
+        filePath,
+        instructionFiles: {
+          mode: 'claude-md-or-agents-md',
+          source: 'default',
+          read: [{ fileName: 'CLAUDE.md', filePath }],
+          ignored: [],
+          choices: ['CLAUDE.md', 'AGENTS.md'],
+          proposed: false,
+          notes: [],
+        },
+      },
+    });
+  });
   await json(page, '**/api/projects/*/mcp*', () => PROJECT_MCP);
   await json(page, '**/api/projects/*/permissions*', () => PROJECT_PERMISSIONS);
   await json(page, '**/api/projects/*/local*', () => PROJECT_LOCAL);

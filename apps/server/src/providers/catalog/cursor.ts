@@ -53,6 +53,10 @@ export const cursorProvider: ConfigProvider = {
   permissionsConfig: {
     format: 'cursor-json',
     path: () => join(cursorHome(), 'cli-config.json'),
+    // Два списка правил, `deny` приоритетнее. Списка `ask` у Cursor нет —
+    // правило «спросить» понижается до запрета (сторона строгости).
+    model: 'rules',
+    decisions: ['allow', 'deny'],
   },
   // Проектный уровень Cursor (COMMON-2 + CURSOR-1 + CURSOR-2): задокументированы
   // проектный MCP `<проект>/.cursor/mcp.json` (та же форма, адрес удалённого

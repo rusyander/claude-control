@@ -2,6 +2,7 @@ import { existsSync, statSync } from 'node:fs';
 import { join, resolve, isAbsolute, relative } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { Project, ProjectDraft } from '@agentdeck/contracts';
+import { projectInstructionTarget } from '../lib/instruction-files.ts';
 
 /**
  * Проектный уровень конфигурации. Панель ведёт не только пользовательский
@@ -71,12 +72,18 @@ export function projectName(path: string): string {
  * Пути к конфигам проекта от пути его каталога. Каталог нормализуется через
  * `resolve`, а все файлы получаются присоединением известных подпутей — выйти
  * за пределы каталога проекта такой путь по построению не может.
+ *
+ * Имя файла правил — НЕ константа (П2.7): с 2.1.277 проект без своего
+ * `CLAUDE.md` живёт на `AGENTS.md`, и для панели он был невидим. Режим берётся
+ * по тому же правилу, что у CLI: ближний файл настроек перекрывает дальний —
+ * `.claude/settings.local.json` → `.claude/settings.json` → пользовательский
+ * `settings.json`, путь к которому передаёт вызывающий (у него он уже есть).
  */
-export function resolveProjectPaths(projectPath: string): ProjectPaths {
+export function resolveProjectPaths(projectPath: string, userSettingsPath?: string): ProjectPaths {
   const root = resolve(projectPath);
   return {
     root,
-    claudeMd: join(root, 'CLAUDE.md'),
+    claudeMd: projectInstructionTarget(root, userSettingsPath).filePath,
     settings: join(root, '.claude', 'settings.json'),
     settingsLocal: join(root, '.claude', 'settings.local.json'),
     mcpConfig: join(root, '.mcp.json'),

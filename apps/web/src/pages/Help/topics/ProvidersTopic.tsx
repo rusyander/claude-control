@@ -121,7 +121,13 @@ export function ProvidersTopic() {
           <StorageCard
             title="Claude Code"
             rows={[
-              { label: tr('fileInstructions'), value: '~/.claude/CLAUDE.md', isMono: true },
+              {
+                label: tr('fileInstructions'),
+                // У Claude имя разрешается (П2.7), а не задано: где `CLAUDE.md`
+                // нет, читается `AGENTS.md` — то же общее имя, что у Codex.
+                value: '~/.claude/CLAUDE.md · ~/.claude/AGENTS.md',
+                isMono: true,
+              },
               { label: tr('fileRest'), value: tr('fileClaudeRest'), isMono: true },
             ]}
           />

@@ -2,6 +2,7 @@ import { getActiveProvider } from '../../providers/registry.ts';
 import { resolveInsideSectionDir, toClientRelative } from '../../lib/section-fs.ts';
 import { UnrecognizedFormatError } from '../../lib/format-errors.ts';
 import { UnsafePluginPathError } from './errors.ts';
+import type { ConfigProvider } from '../../providers/types.ts';
 import type { ProviderPluginsSettingsSource, ProviderPluginsTarget } from './types.ts';
 
 /**
@@ -19,10 +20,23 @@ export const OPENCODE_PLUGIN_EXTENSIONS = ['.js', '.ts', '.mjs'] as const;
 export function resolveProviderPluginsTarget(
   store: ProviderPluginsSettingsSource,
 ): ProviderPluginsTarget | undefined {
-  const provider = getActiveProvider(store);
+  return resolveProviderPluginsTargetFor(
+    getActiveProvider(store),
+    store.getSettings().claudeDirOverride,
+  );
+}
+
+/**
+ * То же самое для ЯВНО названного провайдера — не обязательно активного. Нужно
+ * переносу среды (`domains/portability/`): паспорт собирается для любого
+ * установленного CLI. Условие поддержки и построение цели те же самые.
+ */
+export function resolveProviderPluginsTargetFor(
+  provider: ConfigProvider,
+  override?: string,
+): ProviderPluginsTarget | undefined {
   if (provider.capabilities.plugins !== 'ready' || !provider.pluginsConfig) return undefined;
 
-  const override = store.getSettings().claudeDirOverride;
   const config = provider.pluginsConfig;
   return {
     provider,

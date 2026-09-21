@@ -32,11 +32,10 @@
  *             GUIDE_ONLY (имя одного сценария).
  */
 import { spawn } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
-import { openScenario, applyShotLanguage } from './kit.mjs';
+import { openScenario, applyShotLanguage, shotHome } from './kit.mjs';
 import { makeHome, makeProject, dropProject, PROJECT_DIR } from './rules-fixture.mjs';
 import { shootFirst } from './rules-first.mjs';
 import { shootLiving } from './rules-living.mjs';
@@ -62,7 +61,9 @@ async function waitFor(url, seconds) {
 }
 
 const started = [];
-const home = mkdtempSync(join(tmpdir(), 'cc-rules-guide-'));
+// Каталог панели виден В КАДРЕ: с П2.7 страница печатает путь прочитанного
+// файла инструкций, и путь обязан быть без имени учётной записи (`shotHome`).
+const home = shotHome('rules-guide-');
 makeProject();
 makeHome(home, { projects: [{ id: 'orders', name: 'Панель заказов', path: PROJECT_DIR }] });
 

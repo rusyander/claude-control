@@ -31,6 +31,22 @@ export const opencodeProvider: ConfigProvider = {
   permissionsConfig: {
     format: 'opencode-json',
     path: opencodeConfigFile,
+    // Уровень у инструмента (`allow`/`deny`/`ask`), у `bash` — карта шаблонов
+    // команд: правило источника едет правилом.
+    model: 'rules',
+    decisions: ['allow', 'ask', 'deny'],
+    // Единственный CLI, чей словарь прав ЗАДОКУМЕНТИРОВАН и отличается от
+    // канонического: три строчных имени и ничего больше (`lib/opencode-permission.ts`,
+    // OPENCODE-4). Поэтому словарь закрыт: правило о `Read` или `WebSearch`
+    // здесь не пишется вовсе — ключ вне этих трёх OpenCode не читает, и запрет
+    // лежал бы в файле, ничего не запрещая. Уточнение аргумента задокументировано
+    // только у `bash` (карта шаблонов команд).
+    ruleGrammar: {
+      tools: { Bash: 'bash', Edit: 'edit', WebFetch: 'webfetch' },
+      closed: true,
+      argumentTools: ['bash'],
+      oneShapePerTool: true,
+    },
   },
   // Хуки OpenCode (OPENCODE-3) — ключ `experimental.hook` того же opencode.json:
   // два события (`file_edited` — карта «шаблон файлов → действия»,
@@ -51,6 +67,14 @@ export const opencodeProvider: ConfigProvider = {
   hooksConfig: {
     format: 'opencode-json',
     path: opencodeConfigFile,
+    // События названы СВОИМИ именами OpenCode. Канон ни одного из них не знает —
+    // и подменять их «ближайшим по смыслу» запрещено (правило 3 универсальных
+    // провайдеров), поэтому в матрице этот механизм остаётся без событий канона.
+    // Пустой список здесь означал бы «механизм без событий» — другое утверждение.
+    events: ['file_edited', 'session_completed'],
+    // Оба задокументированных события (`file_edited`, `session_completed`)
+    // наблюдательные: остановить действие у OpenCode не умеет ни одно.
+    blockingEvents: [],
     writeDisabledReason:
       'Ключ experimental.hook исчез из справочника конфигурации OpenCode и из опубликованной схемы (проверено 25 июля 2026), а `experimental` в схеме закрыт для чужих ключей. Панель больше не пишет его: задокументированный способ повесить действие на событие — плагины.',
   },

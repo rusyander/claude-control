@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { getActiveProvider } from '../../providers/registry.ts';
 import { providerBackupName } from '../../lib/safe-io.ts';
+import type { ConfigProvider } from '../../providers/types.ts';
 import type { ProviderPermissionsSettingsSource, ProviderPermissionsTarget } from './types.ts';
 
 /** Имя копии для этой цели: своё, если задано, иначе стандартное `<id>-<basename>`. */
@@ -18,11 +19,24 @@ export function backupNameOf(target: ProviderPermissionsTarget): string {
 export function resolveProviderPermissionsTarget(
   store: ProviderPermissionsSettingsSource,
 ): ProviderPermissionsTarget | undefined {
-  const provider = getActiveProvider(store);
+  return resolveProviderPermissionsTargetFor(
+    getActiveProvider(store),
+    store.getSettings().claudeDirOverride,
+  );
+}
+
+/**
+ * То же самое для ЯВНО названного провайдера — не обязательно активного. Нужно
+ * переносу среды (`domains/portability/`): паспорт собирается для любого
+ * установленного CLI. Условие поддержки и построение цели те же самые.
+ */
+export function resolveProviderPermissionsTargetFor(
+  provider: ConfigProvider,
+  override?: string,
+): ProviderPermissionsTarget | undefined {
   if (provider.capabilities.permissions !== 'ready' || !provider.permissionsConfig)
     return undefined;
 
-  const override = store.getSettings().claudeDirOverride;
   const filePath = provider.permissionsConfig.path(override);
   return {
     provider,

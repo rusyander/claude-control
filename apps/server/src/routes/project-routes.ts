@@ -8,6 +8,7 @@ import type {
 } from '@agentdeck/contracts';
 import type { ServerContext } from '../context.ts';
 import { projectBackupName, readTextFile, writeTextFile } from '../lib/safe-io.ts';
+import { projectInstructionTarget, type InstructionTarget } from '../lib/instruction-files.ts';
 import { isLocalId, stripLocalPrefix } from '../lib/settings-source.ts';
 import {
   readMcpServers,
@@ -58,8 +59,13 @@ export function registerProjectRoutes(app: FastifyInstance, ctx: ServerContext):
   const requireProject = (id: string, reply: ErrorReply): Project | undefined =>
     requireProjectAccess(ctx, id, reply);
 
-  /** Пути к конфигам проекта по id из реестра. */
-  const pathsOf = (project: Project): ProjectPaths => resolveProjectPaths(project.path);
+  /**
+   * Пути к конфигам проекта по id из реестра. Пользовательский `settings.json`
+   * передаётся всегда: ключ `instructionFiles`, заданный глобально, действует и
+   * в проекте, пока проект его не перекрыл, — и от него зависит ИМЯ файла правил.
+   */
+  const pathsOf = (project: Project): ProjectPaths =>
+    resolveProjectPaths(project.path, ctx.location.paths.settings);
 
   /**
    * Имя резервной копии проектного файла — `project-<id>-<basename>`. Без него
@@ -120,22 +126,38 @@ export function registerProjectRoutes(app: FastifyInstance, ctx: ServerContext):
     return { ok: true };
   });
 
-  // --- Правила проекта: CLAUDE.md целиком (сырой markdown) ---
+  // --- Правила проекта: файл инструкций целиком (сырой markdown) ---
+
+  /**
+   * ИМЯ файла — не константа (П2.7): проект без своего `CLAUDE.md` живёт на
+   * `AGENTS.md`, и тот же резолвер, что строит `pathsOf`, отвечает, какой файл
+   * читает CLI, какой лежит рядом непрочитанным и предложено ли имя, потому что
+   * на диске ещё ничего нет.
+   */
+  const instructionTargetOf = (project: Project, requested?: string): InstructionTarget =>
+    projectInstructionTarget(project.path, ctx.location.paths.settings, requested);
 
   app.get<{ Params: { id: string } }>('/api/projects/:id/rules', (request, reply) => {
     const project = requireProject(request.params.id, reply);
     if (!project) return reply;
-    return { content: readTextFile(pathsOf(project).claudeMd) };
+    const target = instructionTargetOf(project);
+    return {
+      content: readTextFile(target.filePath),
+      fileName: target.fileName,
+      filePath: target.filePath,
+      instructionFiles: target.view,
+    };
   });
 
-  app.put<{ Params: { id: string }; Body: { content?: unknown } }>(
+  app.put<{ Params: { id: string }; Body: { content?: unknown; fileName?: unknown } }>(
     '/api/projects/:id/rules',
     (request, reply) => {
       const project = requireProject(request.params.id, reply);
       if (!project) return reply;
 
-      const content = (request.body ?? {}).content;
-      // Как и глобальный CLAUDE.md: пустая строка — осознанная очистка, всё
+      const body = request.body ?? {};
+      const content = body.content;
+      // Как и глобальный файл инструкций: пустая строка — осознанная очистка, всё
       // нестроковое — отказ, чтобы запрос без поля не затирал файл пустотой.
       if (typeof content !== 'string') {
         return reply.code(400).send({
@@ -144,8 +166,17 @@ export function registerProjectRoutes(app: FastifyInstance, ctx: ServerContext):
           messageCode: 'content-must-be-string',
         });
       }
+      if (body.fileName !== undefined && typeof body.fileName !== 'string') {
+        return reply.code(400).send({
+          error: 'invalid_file_name',
+          message: 'Имя файла инструкций обязано быть строкой.',
+          messageCode: 'instructions-file-name-must-be-string',
+        });
+      }
 
-      const claudeMd = pathsOf(project).claudeMd;
+      // Имя действует ТОЛЬКО пока файла нет; существующий резолвер не отдаст
+      // переименовать (`file_exists` → 409), и второй файл панель не заводит.
+      const claudeMd = instructionTargetOf(project, body.fileName).filePath;
       return done(
         writeTextFile(claudeMd, content, {
           backupDir: ctx.backupDir,

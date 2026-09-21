@@ -44,9 +44,9 @@ export const rulesEn: typeof rulesRu = {
       'what makes the agent ask for approval.',
     diffProject: 'Not project rules',
     diffProjectText:
-      'This is the personal ~/.claude/CLAUDE.md, which applies in any folder. A ' +
-      'project has its own CLAUDE.md and its own .claude directory; both live in ' +
-      '“Projects” and have no toggles.',
+      'This is the personal file from ~/.claude, which applies in any folder. A ' +
+      'project has its own, in the repository root, and its own .claude directory; ' +
+      'both live in “Projects” and have no toggles.',
     diffSkills: 'Not skills',
     diffSkillsText:
       'A skill is an instruction for one kind of task: it is pulled in when the ' +
@@ -222,7 +222,7 @@ export const rulesEn: typeof rulesRu = {
       'is visible in the frames above.',
     limitLevel: 'Level',
     limitLevelValue:
-      'only ~/.claude/CLAUDE.md. Toggles, groups and the sandbox exist for it alone; project files live in “Projects” and are edited as text',
+      'only the personal file from ~/.claude — CLAUDE.md, or AGENTS.md where there is none (the CLI decides the name; details in the “CLAUDE.md” section). Toggles, groups and the sandbox exist for it alone; project files live in “Projects” and are edited as text',
     limitReach: 'When it reaches Claude',
     limitReachValue:
       'at the start of the next session. An open conversation will not see the new revision — neither in the terminal nor in the panel’s chat',

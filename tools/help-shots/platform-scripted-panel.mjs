@@ -9,11 +9,11 @@
  * настоящий `claude` и файл на диске настоящие, и файл проверяется здесь же:
  * кадр «вызов выполнен» без файла был бы рисунком, а не снимком.
  */
-import { existsSync, mkdirSync, realpathSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { crc32, deflateSync } from 'node:zlib';
 import { startStubPlatform } from '../qa/stub-platform.mjs';
+import { shotHome } from './kit.mjs';
 import {
   L,
   exact,
@@ -167,9 +167,10 @@ async function setDefaultModel(page, web, model) {
 export async function shootScripted({ page, web, shots }) {
   const { scripted } = shots;
   let stub = await startStubPlatform({ port: STUB_PORT, png: lighthousePng() });
-  const folder = join(realpathSync.native(tmpdir()), 'cc-guide-shim');
-  rmSync(folder, { recursive: true, force: true });
-  mkdirSync(folder, { recursive: true });
+  // Путь виден в кадре — он стоит прямо в тексте просьбы. Временная папка
+  // профиля унесла бы в публичное дерево имя учётной записи машины, поэтому
+  // каталог берётся нейтральный (`shotHome`).
+  const folder = shotHome('shim-');
 
   try {
     // ── Сценарный контур: тот же мастер, без кадров ─────────────────────────

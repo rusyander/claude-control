@@ -48,7 +48,11 @@ describe('project-routes: GET .claude проекта («Из проекта»)',
     projectDir = mkdtempSync(join(tmpdir(), 'cc-project-'));
     store = new AppStore(appDataRoot);
 
-    const ctx = { store, backupDir: join(appDataRoot, 'backups') } as unknown as ServerContext;
+    const ctx = {
+      store,
+      backupDir: join(appDataRoot, 'backups'),
+      location: { paths: { root: appDataRoot, settings: join(appDataRoot, 'settings.json') } },
+    } as unknown as ServerContext;
 
     app = Fastify();
     // Регистрируем ОБА модуля, как в index.ts: так проверяется и то, что

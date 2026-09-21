@@ -40,6 +40,9 @@
  *              панели доезжал `~/.claude/CLAUDE.md` — его временная папка лежит
  *              под домашним каталогом, и CLI читает файл как правила проекта `~`
  *              (случай 7, лёгкое окно агента панели)
+ *   домAGENTS— то же место под именем `AGENTS.md` (2.1.277): исключение обязано
+ *              снимать ОБА имени (П2.7). Случай пропускается там, где CLI это
+ *              имя не читает вовсе — см. случай 9.
  *   дом      — `<дом>/.claude/CLAUDE.md` над проектом, а рядом `CLAUDE.md`
  *   монорепо   монорепозитория между домом и проектом: снятые личные настройки
  *              обязаны унести первый и оставить второй (случай 8, прогон чата)
@@ -69,6 +72,10 @@ const MARK = {
   append: 'T8APPENDMARKER',
   ancestor: 'T8ANCESTORMARKER',
   home: 'T8HOMEMARKER',
+  // То же место, но под ИМЕНЕМ `AGENTS.md`: с 2.1.277 CLI читает его тем же
+  // поиском вверх, и исключение, снимающее только `CLAUDE.md`, оставило бы
+  // личные правила в запросе через вторую дверь (П2.7).
+  homeAgents: 'T8HOMEAGENTSMARKER',
   mono: 'T8MONOMARKER',
 };
 
@@ -79,6 +86,17 @@ let bad = 0;
 const check = (ok, text) => {
   console.log(`${ok ? 'ок   ' : 'ПЛОХО'} ${text}`);
   if (!ok) bad += 1;
+};
+
+/**
+ * Случай, который эта среда провести не может. Не «ок» и не «плохо»: зелёным он
+ * соврал бы, красным обвинил бы код в чужом запрете. Печатается всегда и
+ * повторяется в итоге — иначе пропуск тихо зарастает.
+ */
+const skipped = [];
+const skip = (text, why) => {
+  console.log(`ПРОПУСК ${text} — ${why}`);
+  skipped.push(text);
 };
 
 class NotChecked extends Error {}
@@ -230,9 +248,12 @@ function buildConfigDir(work) {
  * Именно он отвечает на вопрос, который важнее личных меток: какой флаг уносит
  * инструменты самой задачи, а какой — нет.
  */
-function buildProjectDir(inside) {
+function buildProjectDir(inside, instructionsName = 'CLAUDE.md') {
   const work = inside ?? realpathSync.native(mkdtempSync(join(tmpdir(), 'cc-layers-work-')));
-  writeFileSync(join(work, 'CLAUDE.md'), `# Проект\n\n${MARK.project}\n`, 'utf8');
+  // Имя файла инструкций — параметр: случай 9 кладёт весь путь на `AGENTS.md`,
+  // потому что ЛЮБОЙ `CLAUDE.md` в рабочем каталоге или выше отменяет чтение
+  // `AGENTS.md` (правило CLI, не наше).
+  writeFileSync(join(work, instructionsName), `# Проект\n\n${MARK.project}\n`, 'utf8');
 
   const skillDir = join(work, '.claude', 'skills', MARK.projectSkill);
   mkdirSync(skillDir, { recursive: true });
@@ -275,6 +296,7 @@ function factsOf(body) {
     append: text.includes(MARK.append),
     ancestor: text.includes(MARK.ancestor),
     home: text.includes(MARK.home),
+    homeAgents: text.includes(MARK.homeAgents),
     mono: text.includes(MARK.mono),
     text,
     tools,
@@ -319,10 +341,18 @@ async function main() {
         ANTHROPIC_AUTH_TOKEN: 'layers-stub-token',
         ANTHROPIC_API_KEY: 'layers-stub-token',
         ANTHROPIC_MODEL: 'stub-layers',
-        DISABLE_TELEMETRY: '1',
         DISABLE_AUTOUPDATER: '1',
-        DISABLE_ERROR_REPORTING: '1',
-        CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1',
+        // Тишина в сети — умолчание проверки. Но ровно эти переменные отключают
+        // и забор флагов у Anthropic, а без него CLI не читает `AGENTS.md`
+        // вовсе (док «Features that need feature-flag fetching»). Случай про
+        // имя файла просит их снять — `flags: true`.
+        ...(tree?.flags
+          ? {}
+          : {
+              DISABLE_TELEMETRY: '1',
+              DISABLE_ERROR_REPORTING: '1',
+              CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1',
+            }),
         ...tree?.env,
       },
       layers,
@@ -528,18 +558,34 @@ ${MARK.ancestor}
    * рабочего каталога как он есть, с учётом регистра (замерено), а путь проекта в
    * панели приходит в том регистре, в каком его выбрал человек.
    */
-  const runUnderHome = async (label, ours) => {
+  const runUnderHome = async (label, ours, options = {}) => {
     const root = realpathSync.native(mkdtempSync(join(tmpdir(), 'cc-layers-under-home-')));
     mkdirSync(join(root, '.claude'), { recursive: true });
-    writeFileSync(join(root, '.claude', 'CLAUDE.md'), `# Дом\n\n${MARK.home}\n`, 'utf8');
+    // Имя файла инструкций — параметр случая, а не константа. При `agents: true`
+    // на `AGENTS.md` переводится ВЕСЬ путь от рабочего каталога вверх: CLI
+    // читает `AGENTS.md` только там, где ни в рабочем каталоге, ни выше нет ни
+    // одного `CLAUDE.md`/`.claude/CLAUDE.md`/`CLAUDE.local.md`. Оставь здесь
+    // хоть один — и метка не доехала бы независимо от нашего исключения,
+    // а проверка мерила бы правило CLI вместо своего флага.
+    const name = options.agents ? 'AGENTS.md' : 'CLAUDE.md';
+    writeFileSync(
+      join(root, '.claude', name),
+      `# Дом\n\n${options.agents ? MARK.homeAgents : MARK.home}\n`,
+      'utf8',
+    );
     const mono = join(root, 'mono');
     const work = join(mono, 'proj');
     mkdirSync(work, { recursive: true });
-    writeFileSync(join(mono, 'CLAUDE.md'), `# Монорепозиторий\n\n${MARK.mono}\n`, 'utf8');
-    buildProjectDir(work);
+    writeFileSync(join(mono, name), `# Монорепозиторий\n\n${MARK.mono}\n`, 'utf8');
+    buildProjectDir(work, name);
     const cwd = process.platform === 'win32' ? work.toLowerCase() : work;
     try {
-      return await runCase(label, ours, { work, cwd, env: { USERPROFILE: root, HOME: root } });
+      return await runCase(label, ours, {
+        work,
+        cwd,
+        env: { USERPROFILE: root, HOME: root },
+        flags: options.agents === true,
+      });
     } finally {
       // Дерево CLI, остановленное реестром, отпускает рабочий каталог не сразу
       // (EBUSY на Windows). Недоудалённая папка во временном каталоге — не повод
@@ -706,6 +752,47 @@ ${MARK.ancestor}
       );
       check(homeOff.facts.project, 'под домом: CLAUDE.md проекта остаётся');
     }
+
+    // ── 9. То же под именем AGENTS.md ────────────────────────────────────────
+    // С 2.1.277 личный файл может называться `AGENTS.md`, и CLI читает его тем же
+    // поиском вверх. Исключение, снимающее одно имя, оставляло бы снятые личные
+    // правила в запросе через второе (П2.7). Весь путь от рабочего каталога вверх
+    // переведён на `AGENTS.md`: хоть один `CLAUDE.md` над ним — и CLI не читает
+    // `AGENTS.md` вовсе. Контроль обязателен: без него «метки нет» значило бы
+    // лишь, что до этого имени дело не дошло.
+    // Чтение `AGENTS.md` включено флагом, который CLI забирает у Anthropic, и в
+    // сессии без этого забора он читает только `CLAUDE.md` (док «Features that
+    // need feature-flag fetching»). Тишину в сети случай поэтому снимает
+    // (`flags: true`), но стабовый токен забор не проходит — и тогда контроль
+    // пуст. Это запрет среды, а не наша ошибка: случай честно пропускается, а
+    // «снят» без доехавшей метки не засчитывается ни при каких условиях.
+    const agentsFull = await runUnderHome('home-agents-full', {}, { agents: true });
+    check(Boolean(agentsFull.facts), 'под домом (AGENTS.md): запрос записан на полном наборе');
+    if (agentsFull.facts?.homeAgents !== true) {
+      skip(
+        'под домом (AGENTS.md): исключение снимает и второе имя',
+        'CLI не прочитал ни одного AGENTS.md даже на полном наборе — сессия без флагов Anthropic (стабовый токен), и чтение этого имени в ней выключено целиком',
+      );
+    } else {
+      check(true, 'контроль: под домом ~/.claude/AGENTS.md доезжает поиском вверх');
+      const agentsOff = await runUnderHome(
+        'home-agents-settings',
+        { settings: false },
+        { agents: true },
+      );
+      check(
+        Boolean(agentsOff.facts),
+        'под домом (AGENTS.md): запрос записан со снятыми личными настройками',
+      );
+      if (agentsOff.facts) {
+        check(
+          !agentsOff.facts.homeAgents,
+          'под домом: ~/.claude/AGENTS.md снят вместе с личными настройками',
+        );
+        check(agentsOff.facts.mono, 'под домом (AGENTS.md): AGENTS.md монорепозитория остаётся');
+        check(agentsOff.facts.project, 'под домом (AGENTS.md): AGENTS.md проекта остаётся');
+      }
+    }
   } finally {
     stub.close();
   }
@@ -715,6 +802,7 @@ ${MARK.ancestor}
       ? '\nКаждый флаг уносит ровно тот слой, который подписан на карточке.'
       : `\nПроблем: ${bad}`,
   );
+  if (skipped.length > 0) console.log(`Не проверено здесь: ${skipped.join('; ')}.`);
   process.exit(bad === 0 ? 0 : 1);
 }
 

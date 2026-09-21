@@ -1,6 +1,6 @@
-import { copyFileSync, existsSync, mkdtempSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { basename, join } from 'node:path';
+import { join } from 'node:path';
 import { removeEntry } from './safe-io.ts';
 
 /**
@@ -26,14 +26,26 @@ export interface ConfigSandbox {
 /**
  * Скопировать файл во временный каталог. Имя файла сохраняется: адаптеры
  * различают форматы по расширению и кладут копии рядом по basename.
+ *
+ * `segments` — сколько КОНЦЕВЫХ отрезков пути сохранить в копии. По умолчанию
+ * один, и этого хватает почти всем: адаптеру важен сам файл. Скиллу — нет: у
+ * него имя папки обязано совпадать с именем скилла (`SKILL.md` у всех один), и
+ * плоская копия заставляла адаптер либо отказать, либо записать скилл МИМО
+ * песочницы — в системный временный каталог, оставив предпросмотр пустым.
  */
-export function createConfigSandbox(filePath: string): ConfigSandbox {
+export function createConfigSandbox(filePath: string, segments = 1): ConfigSandbox {
   const dir = mkdtempSync(join(tmpdir(), 'agentdeck-sandbox-'));
-  const copy = join(dir, basename(filePath));
+  const tail = filePath.split(/[\\/]/).slice(-Math.max(1, segments));
+  const copy = join(dir, ...tail);
   const existed = existsSync(filePath);
   // Файла может не быть вовсе (CLI ещё не запускали) — это нормальный случай:
-  // адаптер создаст его в копии, и мы увидим ветку «создание с нуля».
-  if (existed) copyFileSync(filePath, copy);
+  // адаптер создаст его в копии, и мы увидим ветку «создание с нуля». Каталог
+  // под него заранее не создаётся: пустая папка скилла означала бы для адаптера
+  // «скилл уже есть», и ветка создания отвечала бы отказом на пустом месте.
+  if (existed) {
+    mkdirSync(join(copy, '..'), { recursive: true });
+    copyFileSync(filePath, copy);
+  }
   // Каталог удаляем целиком: адаптер мог оставить рядом временные файлы записи.
   return { path: copy, existed, dispose: () => removeEntry(dir) };
 }

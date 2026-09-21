@@ -9,6 +9,7 @@ import { PageHeader } from '@shared/ui/page-header';
 import { ExplainBox } from '@shared/ui/explain-box';
 import { SkeletonList } from '@shared/ui/skeleton';
 import { LoadErrorCard } from '@shared/ui/load-error';
+import { InstructionFilesCard } from '@shared/ui/instruction-files';
 import { useClaudeMd, useUpdateClaudeMd } from '@entities/AppConfig';
 import { instructionsView } from './model/instructionsView';
 import { hasConflict, isDirty, syncWithDisk } from './model/editorSync';
@@ -21,13 +22,17 @@ import styles from './ClaudeMdPage.module.scss';
  * подпись и пояснение подстраиваются под файл и провайдера. Раздел «Правила»
  * разбирает файл на карточки, а здесь он открыт как есть: посмотреть, что вообще
  * в нём лежит, и поправить руками. Перед записью сервер делает резервную копию.
- * Для Claude вид и тексты остаются как раньше (регресс-ноль).
+ * Вид у Claude прежний, кроме ИМЕНИ: оно разрешается (П2.7), и дом без своего
+ * `CLAUDE.md` открывается под `AGENTS.md` — заголовком и пунктом меню.
  */
 export function ClaudeMdPage() {
   const { t } = useTranslation();
   const { data, isLoading, isError, refetch } = useClaudeMd();
   const update = useUpdateClaudeMd();
   const [editor, setEditor] = useState<EditorSync | undefined>(undefined);
+  // Имя выбирается ТОЛЬКО пока файла нет; выбор живёт в состоянии страницы и
+  // уходит вместе с сохранением — панель ничего не переименовывает (П2.7).
+  const [chosenName, setChosenName] = useState<string | undefined>(undefined);
 
   // Каждая версия с диска — первая загрузка, правка мимо панели, своё
   // сохранение — проходит сверку (`editorSync`): чистое поле следует за
@@ -40,7 +45,9 @@ export function ClaudeMdPage() {
   if (isError && data === undefined) {
     return (
       <Stack gap="var(--spacing-lg)" className={styles.page}>
-        <PageHeader title={t('nav.claudeMd')} helpTopic="claudeMd" />
+        {/* Имя файла не разрешено (ответа нет) — заголовок нейтральный: назвать
+            здесь «CLAUDE.md» значило бы угадать имя, которое решается на сервере. */}
+        <PageHeader title={t('nav.instructions')} helpTopic="claudeMd" />
         <LoadErrorCard onRetry={() => void refetch()} />
       </Stack>
     );
@@ -69,6 +76,17 @@ export function ClaudeMdPage() {
         title={t('claudeMd.explainTitle')}
         text={t(view.explain.key, view.explain.params)}
       />
+
+      {/* Только у Claude: имя файла решается ключом `instructionFiles`, и экран
+          обязан назвать, что читает CLI, — иначе проект на `AGENTS.md` выглядит
+          пустым, а `managed-only` молча даёт пустоту (П2.7). */}
+      {data.instructionFiles && (
+        <InstructionFilesCard
+          view={data.instructionFiles}
+          chosenName={chosenName ?? data.fileName}
+          onChooseName={setChosenName}
+        />
+      )}
 
       {view.cliHint && (
         <Card padding="sm">
@@ -126,7 +144,14 @@ export function ClaudeMdPage() {
                 variant="primary"
                 size="sm"
                 leftIcon={<Icon name="check" size={18} />}
-                onClick={() => update.mutate(value)}
+                onClick={() =>
+                  update.mutate({
+                    content: value,
+                    // Имя уходит только когда файла ещё нет: иначе сервер увидел
+                    // бы просьбу переименовать существующий и ответил 409.
+                    fileName: data.instructionFiles?.proposed ? chosenName : undefined,
+                  })
+                }
                 isLoading={update.isPending}
                 disabled={!dirty}
               >

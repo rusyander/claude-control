@@ -92,7 +92,9 @@ describe('detectClaudeLocation', () => {
       const root = loc.paths.root;
       expect(loc.paths.settings).toBe(join(root, 'settings.json'));
       expect(loc.paths.settingsLocal).toBe(join(root, 'settings.local.json'));
-      expect(loc.paths.claudeMd).toBe(join(root, 'CLAUDE.md'));
+      // Имя файла инструкций — РЕШЕНИЕ, а не константа (П2.7): каталог пуст,
+      // своего `CLAUDE.md` в нём нет, и CLI прочитал бы `AGENTS.md`.
+      expect(loc.paths.claudeMd).toBe(join(root, 'AGENTS.md'));
       expect(loc.paths.secretsEnv).toBe(join(root, '.mcp-secrets.env'));
       expect(loc.paths.skills).toBe(join(root, 'skills'));
       expect(loc.paths.hooks).toBe(join(root, 'hooks'));
@@ -112,7 +114,9 @@ describe('detectClaudeLocation', () => {
       mkdirSync(join(dir, 'skills'));
       const loc = detectClaudeLocation(dir);
       expect(loc.isValid).toBe(true);
-      expect(loc.missing).toContain('CLAUDE.md');
+      // Названо то имя, которое РЕШИЛ резолвер: сказать «нет CLAUDE.md» там, где
+      // CLI прочитает `AGENTS.md`, значит послать человека заводить не тот файл.
+      expect(loc.missing).toContain('AGENTS.md');
       expect(loc.missing).toContain('hooks/');
       expect(loc.missing).toContain('.claude.json');
       expect(loc.missing).not.toContain('settings.json');

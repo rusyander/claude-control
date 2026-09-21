@@ -4,6 +4,7 @@ import { getActiveProvider } from '../../providers/registry.ts';
 import { resolveInsideSectionDir, toClientRelative } from '../../lib/section-fs.ts';
 import { MDC_EXTENSION } from '../../lib/cursor-mdc.ts';
 import { UnsafeRulePathError } from './errors.ts';
+import type { ConfigProvider } from '../../providers/types.ts';
 import type { ProviderRulesSettingsSource, ProviderRulesTarget } from './types.ts';
 
 /**
@@ -14,7 +15,21 @@ import type { ProviderRulesSettingsSource, ProviderRulesTarget } from './types.t
 export function resolveProviderRulesTarget(
   store: ProviderRulesSettingsSource,
 ): ProviderRulesTarget | undefined {
-  const provider = getActiveProvider(store);
+  return resolveProviderRulesTargetFor(
+    getActiveProvider(store),
+    store.getSettings().claudeDirOverride,
+  );
+}
+
+/**
+ * То же самое для ЯВНО названного провайдера — не обязательно активного. Нужно
+ * переносу среды (`domains/portability/`): паспорт собирается для любого
+ * установленного CLI. Условие поддержки и построение цели те же самые.
+ */
+export function resolveProviderRulesTargetFor(
+  provider: ConfigProvider,
+  override?: string,
+): ProviderRulesTarget | undefined {
   if (provider.capabilities.globalInstructions !== 'ready' || !provider.instructionsRules) {
     return undefined;
   }
@@ -23,7 +38,7 @@ export function resolveProviderRulesTarget(
     provider,
     format: provider.instructionsRules.format,
     scope: 'global',
-    rulesDir: resolve(provider.instructionsRules.dir(store.getSettings().claudeDirOverride)),
+    rulesDir: resolve(provider.instructionsRules.dir(override)),
     backupPrefix: `${provider.id}-`,
   };
 }

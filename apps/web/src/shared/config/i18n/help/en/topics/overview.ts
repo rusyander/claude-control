@@ -143,8 +143,9 @@ export const overviewEn: typeof overviewRu = {
 
     storageReads: 'What it reads',
     storageReadsValue:
-      'CLAUDE.md, settings.json, settings.local.json, .claude.json (beside ~/.claude, or ' +
-      'inside a directory that was set explicitly), skills/, hooks/',
+      'the instructions file (CLAUDE.md, or AGENTS.md where there is none), settings.json, ' +
+      'settings.local.json, .claude.json (beside ~/.claude, or inside a directory that was ' +
+      'set explicitly), skills/, hooks/',
     storageOwn: 'The panel’s own files',
     storageOwnValue:
       'agentdeck/state.json (groups, health checks), agentdeck/backups/. Before the rename the folder carried the former product name: the first start copies it here and leaves the old one as a backup',
@@ -190,8 +191,9 @@ export const overviewEn: typeof overviewRu = {
     refusalMissing: '“Files not found: …”',
     refusalMissingText:
       'The listed files are not in the directory. That is not always breakage: some of ' +
-      'them are created on first use, and an empty rule list only means CLAUDE.md has ' +
-      'not been started yet.',
+      'them are created on first use, and an empty rule list only means the instructions ' +
+      'file has not been started yet. The name in the list is the one the CLI itself would ' +
+      'read: in an empty directory that is AGENTS.md, and AGENTS.md is what to create.',
     refusalBroken: '“N hooks with a broken path”',
     refusalBrokenText:
       'settings.json holds a hook whose script is not on disk. It will silently never ' +
@@ -265,8 +267,9 @@ export const overviewEn: typeof overviewRu = {
       'without reloading the page.',
     noteMissingTitle: '“Files not found” is not always a problem',
     noteMissingText:
-      'Some configuration files are created on first use. An empty rule list only means ' +
-      'CLAUDE.md has not been started yet.',
+      'Some configuration files are created on first use. An empty rule list only means the ' +
+      'instructions file has not been started yet, and the name in the list is the one the ' +
+      'CLI itself would read.',
     noteHealthTitle: 'MCP server health comes from the previous check',
     noteHealthText:
       'Opening the overview does not walk the servers: that would cost seconds per ' +
@@ -302,7 +305,7 @@ export const overviewEn: typeof overviewRu = {
     },
     trouble: {
       '01-wrong-dir':
-        'The directory is “set manually” — D:/backup/claude-2026-08, “Files not found: CLAUDE.md, settings.json”, and every tile is at zero',
+        'The directory is “set manually” — D:/backup/claude-2026-08, “Files not found: AGENTS.md, settings.json”, and every tile is at zero',
       '02-broken-hook':
         'The same overview on its own directory: the hooks tile caption is red — “1 hooks with a broken path”, and scripts report “1 not bound to events”',
       '03-hooks':

@@ -61,7 +61,13 @@ export function ClaudeMdTopic() {
         <StorageCard
           title="CLAUDE.md"
           rows={[
-            { label: tr('storageFile'), value: '~/.claude/CLAUDE.md', isMono: true },
+            {
+              label: tr('storageFile'),
+              // Имя — решение CLI, а не константа (П2.7): каталог без своего
+              // `CLAUDE.md` читается по `AGENTS.md`, и справка обязана сказать оба.
+              value: '~/.claude/CLAUDE.md · ~/.claude/AGENTS.md',
+              isMono: true,
+            },
             { label: tr('storageFormat'), value: tr('storageFormatValue') },
             { label: tr('storageReader'), value: tr('storageReaderValue') },
             { label: tr('storageWatch'), value: tr('storageWatchValue') },
@@ -81,6 +87,7 @@ export function ClaudeMdTopic() {
           cantTitle={t('help.common.cantTitle')}
           can={[
             tr('canSeeAll'),
+            tr('canSeeName'),
             tr('canEditAnything'),
             tr('canOrder'),
             tr('canRevert'),
@@ -89,6 +96,7 @@ export function ClaudeMdTopic() {
           ]}
           cant={[
             tr('cantProject'),
+            tr('cantRename'),
             tr('cantPreview'),
             tr('cantToggle'),
             tr('cantHistory'),
@@ -105,6 +113,9 @@ export function ClaudeMdTopic() {
           descriptionHeader={t('help.common.fieldPurpose')}
           rows={[
             { name: tr('limitLevel'), description: tr('limitLevelValue'), isMono: false },
+            // Имя стоит вторым, сразу за уровнем: «какой файл» — тот же вопрос,
+            // что «где», и за ним приходят раньше, чем за копиями и конфликтами.
+            { name: tr('limitName'), description: tr('limitNameValue'), isMono: false },
             { name: tr('limitSave'), description: tr('limitSaveValue'), isMono: false },
             { name: tr('limitConflict'), description: tr('limitConflictValue'), isMono: false },
             { name: tr('limitBackups'), description: tr('limitBackupsValue'), isMono: false },
@@ -129,6 +140,12 @@ export function ClaudeMdTopic() {
           </Callout>
           <Callout tone="success" title={tr('noteHeadingTitle')}>
             {tr('noteHeadingText')}
+          </Callout>
+          {/* Имя файла — предупреждение, а не справка: в режиме «только
+              CLAUDE.md» и в managed-only правка молча не доезжает до агента, и
+              человек ищет причину в тексте правила, а не в имени файла. */}
+          <Callout tone="warning" title={tr('noteNameTitle')}>
+            {tr('noteNameText')}
           </Callout>
           <Callout tone="info" title={tr('noteProviderTitle')}>
             {tr('noteProviderText')}

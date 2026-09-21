@@ -1,7 +1,8 @@
 import { existsSync, accessSync, constants, statSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join, dirname, resolve } from 'node:path';
+import { join, dirname, resolve, basename } from 'node:path';
 import { resolveAppDataDir } from './brand.mjs';
+import { userInstructionTarget } from './instruction-files.ts';
 import type { ClaudeLocation, ClaudePaths, DetectionSource } from '@agentdeck/contracts';
 import type { ServerMessageCode } from '@agentdeck/contracts/server-messages';
 
@@ -113,12 +114,23 @@ function resolveMcpConfig(root: string): string {
   return explicit ? join(root, '.claude.json') : join(dirname(root), '.claude.json');
 }
 
+/**
+ * Файл инструкций пользовательского уровня. С 2.1.277 это НЕ константа
+ * `CLAUDE.md`: при умолчании `claude-md-or-agents-md` каталог без своего
+ * `CLAUDE.md` читается по `AGENTS.md`, и панель, зашившая имя, показывала бы
+ * человеку пустоту, а первой же записью заводила файл, который у CLI молча
+ * побеждает существующий (П2.7). Правило — одно, в `instruction-files.ts`.
+ */
+function resolveClaudeMd(root: string): string {
+  return userInstructionTarget(root).filePath;
+}
+
 function buildPaths(root: string): ClaudePaths {
   return {
     root,
     settings: join(root, 'settings.json'),
     settingsLocal: join(root, 'settings.local.json'),
-    claudeMd: join(root, 'CLAUDE.md'),
+    claudeMd: resolveClaudeMd(root),
     secretsEnv: join(root, '.mcp-secrets.env'),
     skills: join(root, 'skills'),
     hooks: join(root, 'hooks'),
@@ -133,7 +145,9 @@ function buildPaths(root: string): ClaudePaths {
 function findMissing(paths: ClaudePaths): string[] {
   const checks: Array<[string, string]> = [
     ['settings.json', paths.settings],
-    ['CLAUDE.md', paths.claudeMd],
+    // Имя — то, которое разрешил резолвер: сказать «нет CLAUDE.md» там, где CLI
+    // читает `AGENTS.md`, значит послать человека заводить не тот файл.
+    [basename(paths.claudeMd), paths.claudeMd],
     ['skills/', paths.skills],
     ['hooks/', paths.hooks],
     ['.claude.json', paths.mcpConfig],

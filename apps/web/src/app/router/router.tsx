@@ -36,6 +36,10 @@ const ProviderComparePage = lazyRouteComponent(
   () => import('@pages/ProviderCompare/ProviderComparePage'),
   'ProviderComparePage',
 );
+const PortabilityPage = lazyRouteComponent(
+  () => import('@pages/Portability/PortabilityPage'),
+  'PortabilityPage',
+);
 const HelpPage = lazyRouteComponent(() => import('@pages/Help/HelpPage'), 'HelpPage');
 const AnalyticsPage = lazyRouteComponent(
   () => import('@pages/Analytics/AnalyticsPage'),
@@ -96,6 +100,7 @@ const routes = [
   { path: '/dlp', component: DlpPage },
   { path: '/platform', component: PlatformPage },
   { path: '/compare', component: ProviderComparePage },
+  { path: '/portability', component: PortabilityPage },
   // Словарь справки — отдельный чанк; лоадер дотягивает его до первого
   // рендера, поэтому страница ни разу не видит «help.…» вместо текста.
   { path: '/help', component: HelpPage, loader: () => loadHelp(toLanguage(i18n.language)) },

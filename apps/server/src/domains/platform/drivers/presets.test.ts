@@ -4,7 +4,9 @@ import {
   platformDrivers,
   platformManifestDeclared,
   platformManifestOf,
+  shimByClientTools,
 } from '@agentdeck/contracts/platform-presets';
+import { anthropicRequestToOpenAi, chooseToolRoute } from '../gateway/dialect.ts';
 import { defaultOurRules, defaultPlatformRules, type Platform } from '@agentdeck/contracts';
 import { allDrivers, driverFor, driverOf } from './index.ts';
 import { enterprisePlatformDriver } from './enterprise-platform.ts';
@@ -185,6 +187,33 @@ describe('переопределения контура поверх пресе�
       driverFor('enterprise-platform', { responseCeilingSec: 0 }).responseCeilingSec,
     ).toBeUndefined();
     expect(platformManifestOf({ responseCeilingSec: -1 })).toEqual({});
+  });
+
+  it('«полем, но модель не зовёт» — инструменты ВЕЗЁТ, а прослойку ставит умолчанием', () => {
+    // Третье состояние заведено ради живого случая: Ollama принимает `tools`
+    // схемой, а Qwen 2.5 Coder 7B и 14B не зовут по нему ничего. Прежние два
+    // значения заставляли выбрать между ложью «инструменты потеряны» (поле
+    // доехало) и обещанием рук, которых нет.
+    const driver = driverFor('ollama', { clientTools: 'native-no-call' });
+    expect(driver.clientTools).toBe('native-no-call');
+
+    const route = chooseToolRoute({ toolShim: false, platformTools: false }, driver, () => '');
+    expect(route).toEqual({ mode: 'native' });
+    const { body, lost } = anthropicRequestToOpenAi(
+      {
+        model: 'm',
+        messages: [{ role: 'user', content: 'привет' }],
+        tools: [{ name: 'calc', description: 'счёт', input_schema: { type: 'object' } }],
+      },
+      driver.requestFields,
+      route,
+    );
+    expect(body.tools).toHaveLength(1);
+    expect(lost.some((item) => item.field === 'tools')).toBe(false);
+
+    // А умолчание тумблера — как у `shim`: руки даёт только прослойка.
+    expect(shimByClientTools(driver.clientTools)).toBe(true);
+    expect(shimByClientTools(driverFor('ollama').clientTools)).toBe(false);
   });
 
   it('негодные поля из записи, правленной руками, значат «как у пресета»', () => {

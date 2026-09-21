@@ -7,6 +7,7 @@ import type {
   PlatformRuleField,
 } from '@agentdeck/contracts';
 import type { CompromiseId } from '@agentdeck/contracts/compromises';
+import type { PlatformClientTools } from '@agentdeck/contracts/platform-presets';
 
 /**
  * Драйвер контура — ЕДИНСТВЕННОЕ место, где панель знает о конкретной
@@ -244,8 +245,11 @@ export interface DriverAuth {
   scheme: string;
 }
 
-/** Как инструменты клиента доходят до модели (см. `clientTools`). */
-export type DriverClientTools = 'native' | 'shim';
+/**
+ * Как инструменты клиента доходят до модели (см. `clientTools`). Значения —
+ * общие с манифестом контракта: мастер показывает ровно то, чем ходит драйвер.
+ */
+export type DriverClientTools = PlatformClientTools;
 
 /** Поверхность агентов контура (см. `agents`). */
 export interface DriverAgents {
@@ -404,6 +408,10 @@ export interface PlatformDriver {
    * Как инструменты клиента доходят до модели:
    * - `native` — полем `tools` диалекта OpenAI. Мост переводит схемы, выбор,
    *   вызовы и их результаты, и агент работает руками без прослойки;
+   * - `native-no-call` — поле шлюз принимает и оно доезжает целым, но вызовов
+   *   от модели не приходит (Qwen 2.5 Coder 7B и 14B за Ollama). Инструменты
+   *   потерей НЕ называются — они доехали; руки даёт только прослойка, и
+   *   умолчание её здесь «включена»;
    * - `shim` — поля для них у платформы нет, и «агент через контур» возможен
    *   только прослойкой (Т5).
    *

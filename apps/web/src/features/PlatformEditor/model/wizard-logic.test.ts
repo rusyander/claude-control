@@ -146,6 +146,36 @@ describe('черновик', () => {
     expect(manifestWithField(none, 'anthropicMessages', undefined)).toBeUndefined();
   });
 
+  it('новый контур: объявление «полем, но модель не зовёт» включает прослойку сразу', () => {
+    // Человек, сказавший про свой шлюз «поле принимает, а модель по нему не
+    // зовёт», сказал этим и то, что руки агенту даёт только прослойка: контур,
+    // собранный с этим объявлением и выключенной прослойкой, обещал бы руки,
+    // которых нет.
+    const compat = draftWithPatch(DRAFT, { driver: 'openai-compat' }, true, true);
+    expect(compat.toolShim).toBe(false);
+
+    const idle = draftWithPatch(
+      compat,
+      { manifest: { clientTools: 'native-no-call' } },
+      true,
+      true,
+    );
+    expect(idle.toolShim).toBe(true);
+    const back = draftWithPatch(idle, { manifest: { clientTools: 'native' } }, true, true);
+    expect(back.toolShim).toBe(false);
+  });
+
+  it('сохранённый контур: объявление манифеста выбор человека не трогает', () => {
+    const edited = { ...DRAFT, driver: 'openai-compat' as const, toolShim: false };
+    const next = draftWithPatch(
+      edited,
+      { manifest: { clientTools: 'native-no-call' } },
+      true,
+      false,
+    );
+    expect(next.toolShim).toBe(false);
+  });
+
   it('сохранённый контур при смене драйвера выбор человека не трогает', () => {
     const edited = { ...DRAFT, toolShim: false, contourPrompt: true };
     const next = draftWithPatch(edited, { driver: 'openai-compat' }, true, false);

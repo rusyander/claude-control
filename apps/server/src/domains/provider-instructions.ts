@@ -113,12 +113,26 @@ const MAX_EDITABLE_BYTES = 1_000_000;
 export function resolveProviderInstructionsTarget(
   store: ProviderInstructionsSettingsSource,
 ): ProviderInstructionsTarget | undefined {
-  const provider = getActiveProvider(store);
+  return resolveProviderInstructionsTargetFor(
+    getActiveProvider(store),
+    store.getSettings().claudeDirOverride,
+  );
+}
+
+/**
+ * То же самое для ЯВНО названного провайдера — не обязательно активного. Нужно
+ * переносу среды (`domains/portability/`): паспорт собирается для любого
+ * установленного CLI. Условие поддержки и построение цели те же самые.
+ */
+export function resolveProviderInstructionsTargetFor(
+  provider: ConfigProvider,
+  override?: string,
+): ProviderInstructionsTarget | undefined {
   if (provider.capabilities.globalInstructions !== 'ready' || !provider.instructionsList) {
     return undefined;
   }
 
-  const configPath = provider.instructionsList.path(store.getSettings().claudeDirOverride);
+  const configPath = provider.instructionsList.path(override);
   return {
     provider,
     format: provider.instructionsList.format,

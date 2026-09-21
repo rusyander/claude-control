@@ -10,6 +10,7 @@ import type {
   ProviderCompareResponse,
   SearchResponse,
 } from '@agentdeck/contracts';
+import type { AgentEnvironment, EnvItem } from '@agentdeck/contracts/portable-env';
 import type { BackupEntry } from '../../domains/backups.ts';
 import {
   definePanelAction,
@@ -195,6 +196,80 @@ const compareProviders = definePanelAction({
     };
   },
   summary: 'journal-compare-providers',
+});
+
+/** Сколько записей паспорта едет модели: дальше растёт только объём ответа. */
+const PASSPORT_ITEM_LIMIT = 100;
+
+/**
+ * Первые записи паспорта — но ни один вид не теряется целиком.
+ *
+ * Записи отсортированы по `id`, то есть по виду: простая обрезка выбрасывала
+ * хвост алфавита ЦЕЛИКОМ. Сначала берётся по одной записи каждого вида, дальше —
+ * остальные по порядку.
+ */
+function firstOfEachKind(items: readonly EnvItem[], limit: number): EnvItem[] {
+  const seen = new Set<string>();
+  const first: EnvItem[] = [];
+  const rest: EnvItem[] = [];
+  for (const item of items) {
+    if (seen.has(item.kind)) rest.push(item);
+    else {
+      seen.add(item.kind);
+      first.push(item);
+    }
+  }
+  return [...first, ...rest].slice(0, limit);
+}
+
+const readPassport = definePanelAction({
+  name: 'read_env_passport',
+  section: 'portability',
+  risk: 'read',
+  description:
+    'Environment passport of one CLI: what it actually has configured, by item kind, plus named skips. Secret values are never carried. Read-only.',
+  input: z.object({
+    provider: z.string().min(1).optional().describe('Provider id; default = active provider'),
+  }),
+  route: (input) => ({
+    method: 'GET',
+    url: input.provider
+      ? `/api/portability/passport?provider=${encode(input.provider)}`
+      : '/api/portability/passport',
+  }),
+  shape: (_input, body) => {
+    const data = body as AgentEnvironment;
+    const byKind: Record<string, number> = {};
+    for (const item of data.items) byKind[item.kind] = (byKind[item.kind] ?? 0) + 1;
+
+    const shown = firstOfEachKind(data.items, PASSPORT_ITEM_LIMIT);
+
+    return {
+      provider: data.provider,
+      scope: data.scope,
+      root: data.root,
+      canonVersion: data.canonVersion,
+      byKind,
+      // Обрезка НАЗВАНА и пересчитана: список, молча обрезанный по `id`, отдавал
+      // модели среду без скиллов, секретов и субагентов целиком — на живом доме
+      // в 209 записей хвост алфавита не доезжал вовсе.
+      itemsShown: shown.length,
+      itemsTotal: data.items.length,
+      itemsTruncated: shown.length < data.items.length,
+      // Намерение записи — это и есть её смысл человеку; сырое тело сюда не
+      // едет: паспорт может быть большим, а модели нужен состав среды.
+      items: shown.map((item) => ({
+        kind: item.kind,
+        intent: item.intent,
+        file: item.source.file,
+        needs: item.needs.resolution === 'facts' ? item.needs.facts : item.needs.resolution,
+      })),
+      // Пропуски едут ЦЕЛИКОМ: обрезанный список пропусков читался бы как
+      // «остального нет», а это ровно та ложь о среде, против которой паспорт.
+      skipped: data.skipped,
+    };
+  },
+  summary: 'journal-env-passport',
 });
 
 // --- Плагины ---
@@ -576,6 +651,7 @@ export const PANEL_READ_ACTIONS: readonly AnyPanelAction[] = [
   searchPanel,
   analyticsSummary,
   compareProviders,
+  readPassport,
   listPlugins,
   listAvailablePlugins,
   installPlugin,

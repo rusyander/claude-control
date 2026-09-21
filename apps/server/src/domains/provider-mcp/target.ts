@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { providerBackupName, providerProjectBackupName } from '../../lib/safe-io.ts';
 import { getActiveProvider } from '../../providers/registry.ts';
+import type { ConfigProvider } from '../../providers/types.ts';
 import type { ProviderMcpSettingsSource, ProviderMcpTarget } from './types.ts';
 
 /**
@@ -13,10 +14,23 @@ import type { ProviderMcpSettingsSource, ProviderMcpTarget } from './types.ts';
 export function resolveProviderMcpTarget(
   store: ProviderMcpSettingsSource,
 ): ProviderMcpTarget | undefined {
-  const provider = getActiveProvider(store);
+  return resolveProviderMcpTargetFor(
+    getActiveProvider(store),
+    store.getSettings().claudeDirOverride,
+  );
+}
+
+/**
+ * То же самое для ЯВНО названного провайдера — не обязательно активного. Нужно
+ * переносу среды (`domains/portability/`): паспорт собирается для любого
+ * установленного CLI. Условие поддержки и построение цели те же самые.
+ */
+export function resolveProviderMcpTargetFor(
+  provider: ConfigProvider,
+  override?: string,
+): ProviderMcpTarget | undefined {
   if (provider.capabilities.mcp !== 'ready' || !provider.mcpConfig) return undefined;
 
-  const override = store.getSettings().claudeDirOverride;
   const filePath = provider.mcpConfig.path(override);
   return {
     provider,

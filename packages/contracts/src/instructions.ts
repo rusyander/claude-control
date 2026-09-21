@@ -30,4 +30,78 @@ export interface InstructionsFileInfo {
   providerId: string;
   /** Человекочитаемое имя активного провайдера — для заголовка раздела. */
   providerName: string;
+  /**
+   * Только у Claude: имя файла инструкций перестало быть константой (2.1.277).
+   * У прочих провайдеров поля нет — их файл действительно один.
+   */
+  instructionFiles?: InstructionFilesView;
+}
+
+/**
+ * Ответ `GET /api/projects/:id/rules` — файл правил проекта целиком.
+ *
+ * Имя несёт не декорация: проект без своего `CLAUDE.md` живёт на `AGENTS.md`, и
+ * человеку нужно видеть, какой файл он правит и какой при этом читает CLI.
+ */
+export interface ProjectRulesAnswer {
+  content: string;
+  fileName: string;
+  filePath: string;
+  instructionFiles: InstructionFilesView;
+}
+
+/**
+ * Режимы ключа `instructionFiles` в настройках Claude Code (2.1.277+).
+ *
+ * `claude-md` — только `CLAUDE.md`; `claude-md-or-agents-md` (умолчание) — там,
+ * где своего `CLAUDE.md` нет, читается `AGENTS.md`; `claude-md-and-agents-md` —
+ * оба рядом; `managed-only` — собственные файлы инструкций CLI не читает вовсе.
+ */
+export const instructionFilesModes = [
+  'claude-md',
+  'claude-md-or-agents-md',
+  'claude-md-and-agents-md',
+  'managed-only',
+] as const;
+
+export type InstructionFilesMode = (typeof instructionFilesModes)[number];
+
+/** Откуда взят режим: новый ключ, устаревший или умолчание самого CLI. */
+export type InstructionFilesSource = 'instructionFiles' | 'projectInstructions' | 'default';
+
+/** Один файл инструкций в корне: имя ОТ КОРНЯ (`.claude/AGENTS.md`) и полный путь. */
+export interface InstructionFileEntry {
+  fileName: string;
+  filePath: string;
+}
+
+/**
+ * Почему панель показывает именно это. Коды, а не готовый текст: у экрана две
+ * локали, и формулировка принадлежит клиенту, а не серверу.
+ */
+export type InstructionFilesNote =
+  | { code: 'managed-only' }
+  | { code: 'legacy-key' }
+  | { code: 'unrecognized'; value: string }
+  | { code: 'unreadable-settings' }
+  | { code: 'ignored-nearby'; files: string[] };
+
+/**
+ * Что происходит с именем файла инструкций в этом корне — для экрана.
+ *
+ * Панель НИКОГДА не переименовывает файл и не заводит второй: при двух файлах
+ * показываются оба, и названо, какой из них читает CLI по текущему режиму.
+ */
+export interface InstructionFilesView {
+  mode: InstructionFilesMode;
+  source: InstructionFilesSource;
+  /** Файлы, которые CLI действительно читает в этом корне, в порядке чтения. */
+  read: InstructionFileEntry[];
+  /** Файлы, лежащие рядом, которые CLI при этом режиме НЕ читает. */
+  ignored: InstructionFileEntry[];
+  /** Имена на выбор, когда файла ещё нет; пусто — выбора нет. */
+  choices: string[];
+  /** Файла на диске нет: `fileName` — предложение панели, а не находка. */
+  proposed: boolean;
+  notes: InstructionFilesNote[];
 }

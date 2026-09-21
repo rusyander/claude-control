@@ -16,6 +16,12 @@ const SECTION_UNSUPPORTED = {
   messageCode: 'instructions-global-missing',
 } as const;
 
+const INVALID_FILE_NAME = {
+  error: 'invalid_file_name',
+  message: 'Имя файла инструкций обязано быть строкой.',
+  messageCode: 'instructions-file-name-must-be-string',
+} as const;
+
 /**
  * Правила (карточки CLAUDE.md) и тот же файл целиком.
  *
@@ -69,27 +75,44 @@ export function registerRuleRoutes(app: FastifyInstance, ctx: ServerContext): vo
 
   // --- Глобальные инструкции целиком (универсальны по активному провайдеру) ---
   app.get('/api/claude-md', (_request, reply) => {
-    const target = resolveInstructionsTarget(ctx.store, paths().claudeMd);
+    const claudePaths = paths();
+    const target = resolveInstructionsTarget(ctx.store, claudePaths.claudeMd, {
+      root: claudePaths.root,
+    });
     if (!target) return reply.code(400).send(SECTION_UNSUPPORTED);
     return readInstructionsInfo(target);
   });
 
-  app.put<{ Body: { content?: unknown } }>('/api/claude-md', (request, reply) => {
-    const target = resolveInstructionsTarget(ctx.store, paths().claudeMd);
-    if (!target) return reply.code(400).send(SECTION_UNSUPPORTED);
-
-    const content = (request.body ?? {}).content;
-    // Различаем «намеренно пустой файл» ('') и «поля content нет / оно не строка».
-    // Раньше писали `content ?? ''`: запрос без поля затирал файл пустотой.
-    // Пустая строка — валидна (осознанная очистка), всё нестроковое — отказ.
-    if (typeof content !== 'string') {
-      return reply.code(400).send({
-        error: 'invalid_content',
-        message: 'Поле content обязано быть строкой (пустая строка допустима).',
-        messageCode: 'content-must-be-string',
+  app.put<{ Body: { content?: unknown; fileName?: unknown } }>(
+    '/api/claude-md',
+    (request, reply) => {
+      const body = request.body ?? {};
+      // Имя приходит ТОЛЬКО когда файла ещё нет и человек выбрал его на экране.
+      // Всё нестроковое — отказ; существующий файл панель не переименовывает
+      // (резолвер бросит `file_exists`, обработчик ошибок ответит 4xx).
+      if (body.fileName !== undefined && typeof body.fileName !== 'string') {
+        return reply.code(400).send(INVALID_FILE_NAME);
+      }
+      const claudePaths = paths();
+      const target = resolveInstructionsTarget(ctx.store, claudePaths.claudeMd, {
+        root: claudePaths.root,
+        requested: body.fileName,
       });
-    }
+      if (!target) return reply.code(400).send(SECTION_UNSUPPORTED);
 
-    return done(writeInstructions(target, content, ctx.backupDir));
-  });
+      const content = body.content;
+      // Различаем «намеренно пустой файл» ('') и «поля content нет / оно не строка».
+      // Раньше писали `content ?? ''`: запрос без поля затирал файл пустотой.
+      // Пустая строка — валидна (осознанная очистка), всё нестроковое — отказ.
+      if (typeof content !== 'string') {
+        return reply.code(400).send({
+          error: 'invalid_content',
+          message: 'Поле content обязано быть строкой (пустая строка допустима).',
+          messageCode: 'content-must-be-string',
+        });
+      }
+
+      return done(writeInstructions(target, content, ctx.backupDir));
+    },
+  );
 }

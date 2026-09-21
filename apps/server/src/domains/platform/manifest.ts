@@ -16,7 +16,10 @@ import { invalidField } from './errors.ts';
  */
 const WHY: Record<PlatformManifestField | 'manifest', [string, ServerMessageCode]> = {
   manifest: ['переопределения — объект полей', 'manifest-invalid-object'],
-  clientTools: ['инструменты — «native» или «shim»', 'manifest-invalid-client-tools'],
+  clientTools: [
+    'инструменты — «native», «native-no-call» или «shim»',
+    'manifest-invalid-client-tools',
+  ],
   effort: ['усилие — да или нет', 'manifest-invalid-effort'],
   anthropicMessages: [
     'путь ручки относительно версии: строчная латиница, цифры, «/», «_», «-»',

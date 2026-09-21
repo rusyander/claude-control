@@ -170,6 +170,7 @@ export const panelAgentRu = {
     search_panel: 'Поиск по панели',
     analytics_summary: 'Сводка аналитики',
     compare_providers: 'Сравнить провайдеров',
+    read_env_passport: 'Прочитать паспорт среды',
     list_plugins: 'Список плагинов',
     list_available_plugins: 'Доступные плагины',
     install_plugin: 'Установить плагин',

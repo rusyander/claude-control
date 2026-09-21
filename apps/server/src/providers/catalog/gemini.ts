@@ -31,7 +31,15 @@ export const geminiProvider: ConfigProvider = {
   // инструментов `coreTools` (белый) / `excludeTools` (чёрный, приоритетнее).
   // Значение `yolo` панель НЕ пишет никогда: по докам это режим только для флага
   // CLI, а в settings.json он валит старт ошибкой enum (сервер отвечает 400).
-  permissionsConfig: { format: 'gemini-json', path: geminiSettings },
+  permissionsConfig: {
+    format: 'gemini-json',
+    path: geminiSettings,
+    // Правила поимённо: белый список `coreTools` и чёрный `excludeTools`.
+    // Третьего списка (спросить) у Gemini нет — правило `ask` понижается до
+    // `deny`, и матрица верности обязана назвать это понижением.
+    model: 'rules',
+    decisions: ['allow', 'deny'],
+  },
   // Проектный уровень Gemini (COMMON-2 + GEMINI-2/3): задокументированы проектный
   // GEMINI.md, `<проект>/.gemini/settings.json` (MCP и права — проектные настройки
   // перекрывают пользовательские) и `<проект>/.gemini/.env`. Форматы те же, что у

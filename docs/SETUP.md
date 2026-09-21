@@ -4,7 +4,7 @@ Everything needed to get AgentDeck running. Not running — [Troubleshooting](TR
 
 > [!TIP]
 > If you would rather not dig into it by hand, open Claude Code in this folder and say "it won't
-> start, figure it out". The agent reads [CLAUDE.md](../CLAUDE.md), runs `pnpm doctor` and fixes it.
+> start, figure it out". The agent reads [AGENTS.md](../AGENTS.md), runs `pnpm doctor` and fixes it.
 
 🇷🇺 [Русская версия](SETUP.ru.md) · 📖 [What this project is](../README.md) · 🛠 [Troubleshooting](TROUBLESHOOTING.md) ·
 📱 [Access from a phone](REMOTE.md) · 🚫 [What the panel does not do](LIMITATIONS.md)

@@ -163,6 +163,7 @@ export const panelAgentEn: typeof panelAgentRu = {
     search_panel: 'Search the panel',
     analytics_summary: 'Analytics summary',
     compare_providers: 'Compare providers',
+    read_env_passport: 'Read environment passport',
     list_plugins: 'List plugins',
     list_available_plugins: 'Available plugins',
     install_plugin: 'Install a plugin',

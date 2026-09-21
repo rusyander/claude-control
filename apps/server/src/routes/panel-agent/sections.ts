@@ -22,6 +22,11 @@ export const PANEL_SECTIONS: readonly PanelSection[] = [
   { route: '/dlp', title: 'Data protection', description: 'Local DLP proxy and its rules' },
   { route: '/platform', title: 'Contour', description: 'Corporate model contours and gateway' },
   { route: '/compare', title: 'Compare CLIs', description: 'Side-by-side CLI provider comparison' },
+  {
+    route: '/portability',
+    title: 'Environment passport',
+    description: 'What one CLI actually has configured: items and named skips',
+  },
   { route: '/help', title: 'Help', description: 'In-panel documentation' },
   { route: '/analytics', title: 'Analytics', description: 'Usage and cost from transcripts' },
   { route: '/chat', title: 'Chat', description: 'CLI chats per project, runs, splits' },

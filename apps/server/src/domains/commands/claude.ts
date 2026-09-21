@@ -13,7 +13,10 @@ import { readMdCommand, trim } from './parse.ts';
  * у них нет, их каталог ведёт клиент панели.
  */
 export function readClaudeCommands(
-  paths: ClaudePaths,
+  // Ровно три поля раскладки, а не вся она: уровень проекта файла секретов не
+  // имеет (`portability/project.ts`), и требовать его ради полноты типа значило
+  // бы выдумать этому уровню путь, которого у него нет.
+  paths: Pick<ClaudePaths, 'root' | 'skills' | 'settings'>,
   store: AppStore,
 ): { commands: SlashCommand[]; notes: string[] } {
   const notes: string[] = [];

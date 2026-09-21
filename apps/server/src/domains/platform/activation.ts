@@ -16,7 +16,7 @@ import { catalogDefaultModel } from '@agentdeck/contracts/platform-models';
 import { PLATFORM_TERMINAL_CONSUMER } from '@agentdeck/contracts/platform-consumers';
 import { modelRulesFor } from './models.ts';
 import { withoutThink } from './gateway/think-tail.ts';
-import { smokeTools } from './smoke-tools.ts';
+import { shimFromProbe, smokeTools } from './smoke-tools.ts';
 import { serverText } from '../../lib/server-texts.ts';
 
 /**
@@ -157,6 +157,7 @@ async function probeAfterActivation(
     // состояние строку о том, чего больше нет, и убрать её было бы некому.
     if (readPlatforms(store).some((item) => item.id === platform.id)) {
       store.savePlatformSmoke(platform.id, smoke);
+      enableShimFromProbe(store, platform.id, smoke);
     }
     return { probe, smoke };
   } catch (error) {
@@ -178,6 +179,27 @@ async function probeAfterActivation(
       smoke: { ok: false, model: '', answer: '', latencyMs: 0, at, detail },
     };
   }
+}
+
+/**
+ * Умолчание прослойки по итогу пробы (развилка 3, решение В1): модель не
+ * позвала инструмент полем — прослойка включается сама, один раз на контур, и
+ * карточка говорит, что это сделала панель.
+ *
+ * Пишется ЗДЕСЬ, а не в самой пробе: проба отвечает на вопрос, а состояние
+ * панели меняет активация. Контур перечитывается из состояния — пока шли два
+ * сетевых запроса, человек мог сам щёлкнуть тумблером, и его выбор старше
+ * нашего.
+ */
+function enableShimFromProbe(store: AppStore, id: string, smoke: PlatformSmokeResult): void {
+  const current = findPlatform(store, id);
+  if (!current || !shimFromProbe(current, smoke.tools)) return;
+  writePlatforms(
+    store,
+    readPlatforms(store).map((item) =>
+      item.id === id ? { ...item, toolShim: true, toolShimFromProbe: smoke.at } : item,
+    ),
+  );
 }
 
 /**

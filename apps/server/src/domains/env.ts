@@ -93,13 +93,27 @@ interface RawSettings {
  */
 export function readEnvVars(
   settingsPath: string,
-  secretsPath: string,
+  /**
+   * Файл секретов панели. Не задан — уровень, у которого его нет (проект):
+   * читается только `settings.json`, и это НЕ то же самое, что пустой файл.
+   */
+  secretsPath: string | undefined,
   settingsLocalPath?: string,
+  /**
+   * Маскировать ли значения секретов. Список панели читает их замаскированными,
+   * а паспорт среды — сырыми: он решает сам, что секрет (правило шире), и сам же
+   * считает маску. Значение, замаскированное дважды, приезжало записью, которая
+   * УТВЕРЖДАЕТ значение, которого у переменной нет.
+   */
+  mask = true,
 ): EnvVar[] {
-  const fromSettings = readSettingsEnv(settingsPath, 'settings');
-  const fromLocal = settingsLocalPath ? readSettingsEnv(settingsLocalPath, 'settings-local') : [];
+  const fromSettings = readSettingsEnv(settingsPath, 'settings', mask);
+  const fromLocal = settingsLocalPath
+    ? readSettingsEnv(settingsLocalPath, 'settings-local', mask)
+    : [];
 
-  return [...fromSettings, ...fromLocal, ...parseEnvFile(readTextFile(secretsPath))];
+  const fromSecrets = secretsPath ? parseEnvFile(readTextFile(secretsPath), mask) : [];
+  return [...fromSettings, ...fromLocal, ...fromSecrets];
 }
 
 /**
@@ -149,9 +163,11 @@ export function readEnvLookup(
   return { ...fromJson(settingsPath), ...fromJson(settingsLocalPath), ...secrets };
 }
 
-function readSettingsEnv(path: string, source: EnvVar['source']): EnvVar[] {
+function readSettingsEnv(path: string, source: EnvVar['source'], mask = true): EnvVar[] {
   const settings = readJsonFile<RawSettings>(path, {});
-  return Object.entries(settings.env ?? {}).map(([key, value]) => toEnvVar(key, value, source));
+  return Object.entries(settings.env ?? {}).map(([key, value]) =>
+    toEnvVar(key, value, source, undefined, mask),
+  );
 }
 
 /**
@@ -232,7 +248,8 @@ function writeSettingsEnv(
  */
 export function saveEnvVar(
   settingsPath: string,
-  secretsPath: string,
+  /** Файл секретов; не задан — уровень, у которого его нет (проект). */
+  secretsPath: string | undefined,
   draft: EnvVarDraft,
   backupDir?: string,
   settingsLocalPath?: string,
@@ -250,6 +267,9 @@ export function saveEnvVar(
 
   // source === 'secrets' (assertEnvDraft отсёк всё прочее; env групп применяют
   // маршруты групп через applyGroupEnv, а не /api/env).
+  // Файла секретов у этого уровня нет — отказ, а не запись мимо: значение ушло
+  // бы в файл дома, то есть во все проекты сразу.
+  if (!secretsPath) throw new Error('У этого уровня нет файла секретов панели.');
   return upsertEnvFileLine(secretsPath, draft.key, draft.value, draft.comment, backupDir);
 }
 

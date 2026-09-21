@@ -1,3 +1,4 @@
+import { CLAUDE_HOOK_EVENTS } from '@agentdeck/contracts/vocabulary';
 import { detectClaudeLocation } from '../lib/claude-paths.ts';
 import { uniformCapabilities, type ConfigProvider } from './types.ts';
 
@@ -14,6 +15,21 @@ export const claudeProvider: ConfigProvider = {
   paths: (override) => detectClaudeLocation(override).paths,
   cli: { command: 'claude', windowsCommand: 'claude.cmd' },
   capabilities: uniformCapabilities('ready'),
+  // Все разделы Claude — СОБСТВЕННАЯ модель панели на своих маршрутах, поэтому
+  // ни одного универсального `*Config` у него нет. Матрица верности (П1.1)
+  // считает по каталогу, и без этого блока она решила бы, что в Claude не
+  // переносится ничего. События хуков берутся из справочника контрактов — того
+  // же словаря, которым живёт раздел хуков (совпадение сторожит тест).
+  nativeMechanisms: {
+    hookEvents: CLAUDE_HOOK_EVENTS.map((info) => ({ name: info.name, blocking: info.blocking })),
+    permissions: { model: 'rules', decisions: ['allow', 'ask', 'deny'] },
+    skills: true,
+    commands: true,
+    subagents: true,
+    mcp: true,
+    env: true,
+    plugins: true,
+  },
   // Файл инструкций — тот же CLAUDE.md, что и раздел «Правила»; уважает
   // пользовательский каталог (override/env), поэтому делегируем детекту, а не
   // хардкодим ~/.claude. Поведение раздела не меняется (регресс-ноль).

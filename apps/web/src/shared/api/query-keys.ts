@@ -15,6 +15,19 @@ export const queryKeys = {
   providerChecks: ['providers', 'checks'] as const,
   /** Сравнение конфигураций двух провайдеров — ключ зависит от обеих сторон. */
   providerCompare: (left: string, right: string) => ['providers', 'compare', left, right] as const,
+  /**
+   * Паспорт среды одного провайдера на одном УРОВНЕ: у каждого CLI свой, а дом и
+   * проект — две разные среды. Уровень в ключе обязателен: без него переключение
+   * на проект показало бы домашний паспорт из кэша (П2.5).
+   */
+  portabilityPassport: (provider: string, scope: string, project = '') =>
+    ['portability', 'passport', provider, scope, project] as const,
+  /** Отчёт верности переноса — ключ зависит от ОБЕИХ сторон и уровня: это свойство пары. */
+  portabilityFidelity: (source: string, target: string, scope: string, project = '') =>
+    ['portability', 'fidelity', source, target, scope, project] as const,
+  /** След применённого переноса — свойство той же пары на том же уровне. */
+  portabilityTransfer: (source: string, target: string, scope: string, project = '') =>
+    ['portability', 'transfer', source, target, scope, project] as const,
   overview: ['overview'] as const,
   rules: ['rules'] as const,
   hooks: ['hooks'] as const,

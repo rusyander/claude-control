@@ -21,6 +21,7 @@
  * В коде: `const stub = await startStubPlatform({ port: 0 }); stub.url; stub.calls; await stub.close();`
  */
 import { createServer } from 'node:http';
+import { pathToFileURL } from 'node:url';
 
 /** Пустая картинка 1×1: свипу нужен факт картинки, а не её содержимое. */
 const PNG_1X1 =
@@ -844,8 +845,15 @@ export function startStubPlatform({
   });
 }
 
-/** Запуск из терминала: держит порт, пока его не остановят. */
-if (import.meta.url === `file://${process.argv[1]?.replace(/\\/g, '/')}`) {
+/**
+ * Запуск из терминала: держит порт, пока его не остановят.
+ *
+ * Сравнение — через `pathToFileURL`, а не склейкой строки: на Windows путь
+ * `C:\…` давал `file://C:/…` против `file:///C:/…` у самого модуля, и ветка не
+ * срабатывала НИКОГДА — стаб, запущенный документированной строкой, молча
+ * завершался с нулём, а проверка, которая на него ходила, видела пустой порт.
+ */
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const arg = (name, fallback) => {
     const at = process.argv.indexOf(`--${name}`);
     return at === -1 ? fallback : process.argv[at + 1];

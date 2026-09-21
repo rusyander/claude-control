@@ -80,13 +80,46 @@ export function isManifestWirePath(value: string): boolean {
 export const PLATFORM_MANIFEST_TIMEOUT_MAX_SEC = 3600;
 
 /**
+ * Как инструменты клиента доходят до модели.
+ *
+ * Значений три, потому что живых случаев три, и два из них прежде смешивались
+ * в одном `native`:
+ * - `native` — шлюз принимает поле `tools`, и модель по нему зовёт: агент
+ *   работает руками без прослойки;
+ * - `native-no-call` — поле шлюз принимает (и оно доезжает целым, потерей не
+ *   называется), но вызовов от модели не приходит: так ведут себя Qwen 2.5
+ *   Coder 7B и 14B за Ollama. Руки даёт только прослойка, и умолчание её здесь
+ *   «включена» — как у `shim`;
+ * - `shim` — поля у платформы нет вовсе, инструменты теряются и названы потерей.
+ *
+ * Разница между `native-no-call` и `shim` не косметическая: при выключенной
+ * прослойке первый ВЕЗЁТ инструменты (и модель однажды может их позвать —
+ * проба это увидит), а второй их выбрасывает. Сказать про первый «поля нет»
+ * значило бы объяснять молчание модели отсутствием того, что доехало.
+ */
+export type PlatformClientTools = 'native' | 'native-no-call' | 'shim';
+
+/** Поле `tools` доезжает до платформы — потерей не называется. */
+export function clientToolsTravel(value: PlatformClientTools): boolean {
+  return value !== 'shim';
+}
+
+/** Умолчание прослойки для объявленного значения: руки без неё есть только у `native`. */
+export function shimByClientTools(value: PlatformClientTools): boolean {
+  return value !== 'native';
+}
+
+/**
  * Что пресет и контур могут сказать о шлюзе поверх кода базы. Отсутствующее
  * поле — «как у пресета», пустая строка — «не объявлено», даже если пресет
  * объявил: человек, знающий, что у его vLLM ручки Anthropic нет, так и говорит.
  */
 export const platformManifestSchema = object({
-  /** Инструменты клиента: полем (`native`) или текстом прослойки (`shim`). */
-  clientTools: zodEnum(['native', 'shim']).optional(),
+  /**
+   * Инструменты клиента: полем (`native`), полем без вызовов (`native-no-call`)
+   * или текстом прослойки (`shim`).
+   */
+  clientTools: zodEnum(['native', 'native-no-call', 'shim']).optional(),
   /** Отправлять ли усилие рассуждения. */
   effort: boolean().optional(),
   /** Родная ручка Anthropic; пусто — мост в OpenAI. */
@@ -259,7 +292,7 @@ export const PLATFORM_PRESETS: Record<PlatformDriverId, PlatformDriverPreset> = 
  * Нужно мастеру: «как у пресета» без самого значения человеку ничего не говорит.
  */
 export interface PlatformManifestDeclared {
-  clientTools: 'native' | 'shim';
+  clientTools: PlatformClientTools;
   effort: boolean;
   /** Пусто — ручки нет, клиент Anthropic идёт мостом. */
   anthropicMessages: string;

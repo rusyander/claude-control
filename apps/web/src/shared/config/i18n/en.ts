@@ -88,6 +88,7 @@ export const en: TranslationSchema = {
     groups: 'Groups',
     history: 'Change history',
     compare: 'Comparison',
+    portability: 'Environment passport',
     settings: 'Settings',
     dlp: 'Data protection',
     platform: 'Contour',
@@ -96,6 +97,196 @@ export const en: TranslationSchema = {
     sectionBehavior: 'Agent behaviour',
     sectionIntegrations: 'Integrations and access',
     sectionApp: 'Application',
+  },
+  portability: {
+    title: 'Environment passport',
+    subtitle: 'What the selected CLI actually has configured — as items and named skips',
+    provider: 'Provider',
+    itemCount: 'Items: {{count}}',
+    skipCount: 'Skips: {{count}}',
+    rootUnknown: 'Provider directory not determined',
+    noFile: 'no file — the item acts without one',
+    empty: 'The passport is empty',
+    emptyText:
+      'Nothing was found and no section was skipped: this CLI has no configured files on the machine.',
+    loadError: 'The passport failed to load',
+    loadErrorText: 'The panel could not read the environment. Check that the server is running.',
+    kind: {
+      instructions: 'Instructions',
+      skill: 'Skills',
+      command: 'Commands',
+      subagent: 'Subagents',
+      hook: 'Hooks',
+      permission: 'Permissions',
+      mcpServer: 'MCP servers',
+      envVar: 'Environment variables',
+      secret: 'Secrets',
+      plugin: 'Plugins',
+      panelGroup: 'Panel groups',
+      conversation: 'Conversations',
+    },
+    skip: {
+      no_section: 'no such section',
+      not_readable: 'not readable',
+      unsupported_format: 'format not parsed',
+      empty: 'empty',
+      disabled: 'disabled',
+    },
+    sectionOff: 'the whole section is switched off',
+    itemOff: 'switched off',
+    fromPlugin: 'from plugin {{name}}',
+    attachments_one: '{{count}} attachment',
+    attachments_few: '{{count}} attachments',
+    attachments_many: '{{count}} attachments',
+    attachments_other: '{{count}} attachments',
+    attachmentSkip: {
+      file_too_large: 'larger than the per-file cap',
+      skill_too_large: 'did not fit the skill cap',
+      not_readable: 'not readable',
+      link_outside: 'the link leads outside the skill',
+    },
+    target: 'Transfer target',
+    targetNone: 'not selected',
+    scope: 'Level',
+    scopeGlobal: 'Home',
+    scopeProject: 'Project',
+    project: 'Project',
+    projectNone: 'not selected',
+    projectNeeded:
+      'Pick a project — a project-level passport is taken from a named directory only.',
+    transfer: {
+      title: 'Transfer to {{target}}',
+      intro:
+        'The panel writes nothing until you have seen the plan: first what exactly changes in the target files.',
+      plan: 'Show transfer plan',
+      replan: 'Recalculate plan',
+      files: 'files: {{count}}',
+      created: 'created: {{count}}',
+      lines: '+{{added}} −{{removed}}',
+      willCreate: 'no such file — the transfer will create it',
+      unchangedFile: 'unchanged: the target already holds exactly this',
+      showDiff: 'Show diff',
+      diffTitle: 'What will end up in the file',
+      truncated: 'The file is too large for a line-by-line comparison — no diff was built.',
+      emptyPlan: 'Nothing to transfer: the target already holds everything the panel can carry.',
+      runtimeNote:
+        'Entries that only work when started through the panel: {{count}}. A CLI you start yourself will not see them.',
+      apply: 'Transfer',
+      applyTitle: 'Transfer the environment to {{target}}?',
+      applyText:
+        'The panel will write {{count}} files. It takes a backup before each write, so the whole transfer can be undone.',
+      appliedToast: 'Transfer applied. Files: {{count}}.',
+      applied: 'Transfer applied {{date}}. Files: {{count}}.',
+      revert: 'Undo transfer',
+      revertTitle: 'Undo the transfer?',
+      revertText:
+        'Every file returns to the copy taken before the transfer. Files and directories the transfer created are removed.',
+      revertConfirm: 'Undo transfer',
+      revertedToast: 'Files restored: {{count}}.',
+      changedSince:
+        'You edited these files after the transfer — undo will not touch them without your say-so:',
+      changedSinceAsk: 'You edited these files after the transfer. Restore them too?',
+      outcome: {
+        written: 'written',
+        already_available: 'already available',
+        runtime_only: 'only through the panel',
+        not_transferable: 'not transferable',
+        disabled_at_source: 'disabled at source',
+        refused_by_target: 'refused by target',
+        collision_needs_choice: 'needs your choice',
+      },
+    },
+    probe: {
+      title: 'Acceptance probe of {{target}}',
+      intro:
+        'The panel will start the real {{target}} in a temporary home, plant six probe records there and answer it with a stub instead of a model. Your own files are neither read nor changed: the temporary home is removed whole.',
+      run: 'Run the probe',
+      rerun: 'Run the probe again',
+      running: 'Running {{target}} — this takes up to a minute and a half.',
+      matched: 'matched: {{count}}',
+      mismatched: 'mismatched: {{count}}',
+      notChecked: 'not checked: {{count}}',
+      promisedOf: 'promised: {{level}}',
+      observedOf: 'observed: {{observation}}',
+      mismatchNote:
+        'Mismatches: {{count}}. That is a defect of the transfer, not of the probe: the panel promised a level and the target behaved otherwise.',
+      cliMissing:
+        'The target is not on this machine: "{{command}}" is not in PATH. Nothing to measure.',
+      layer: {
+        hook: 'Hook',
+        skill: 'Skill',
+        permission: 'Permission',
+        mcpServer: 'MCP server',
+        envVar: 'Environment variable',
+        command: 'Command',
+      },
+      observation: {
+        enforced: 'stopped the call',
+        present: 'arrived',
+        absent: 'did not arrive',
+        unknown: 'no run happened',
+      },
+      verdict: {
+        match: 'agrees',
+        mismatch: 'disagrees',
+        not_checked: 'not checked',
+      },
+      skip: {
+        cli_not_installed: 'the target is not in PATH',
+        no_probe_recipe: 'how to probe this CLI is not documented',
+        no_one_shot: 'a non-interactive run of this CLI is not documented',
+        no_stub_endpoint: 'the target takes no model address from the environment',
+        needs_panel_runtime: 'emulation promised — the runtime supervisor measures it',
+        needs_wire: 'wire promised — the contour must sit in the request path',
+        emit_failed: 'the probe environment for this target did not build',
+        run_failed: 'the target started and exited with an error',
+        timed_out: 'the target did not answer in time',
+      },
+    },
+    fidelity: {
+      title: 'Transfer fidelity to {{target}}',
+      countOf: '{{count}} {{level}}',
+      onlyThroughPanel:
+        'Works only when started through the panel: {{count}} item(s). A CLI started by hand will not see them.',
+      otherwise: 'without it — {{level}}',
+      levelEmpty: 'The passport has no items at this level.',
+      previous: 'The previous run on {{date}} promised something else.',
+      previousOtherCanon: 'It was computed with another version of the transfer dictionary.',
+      loadError: 'The fidelity report failed to load',
+      loadErrorText: 'The panel could not compute the transfer. Check that the server is running.',
+      level: {
+        native: 'native',
+        emulated: 'emulated',
+        wired: 'wired',
+        text: 'as text',
+        impossible: 'impossible',
+      },
+      reason: {
+        target_mechanism: 'the target has the same mechanism',
+        target_shares_location: 'the target reads the same directory — nothing to move',
+        no_mechanism: 'the target has no such section',
+        mechanism_read_only: 'the section exists, but the panel does not write to it',
+        event_absent: 'the target has no such event',
+        tool_events_absent: 'the target does not expose tool-call facts',
+        blocking_lost: 'this event cannot stop the action at the target',
+        needs_undetermined: 'the item requirements could not be determined',
+        decision_downgraded: 'the rule decision was downgraded towards strictness',
+        decision_unrepresentable:
+          'the target has no stricter decision, and the rule may not be weakened',
+        value_not_carried: 'the value does not travel: a secret lives in the environment only',
+        in_process_only: 'the entity lives inside another process',
+        account_only: 'the body is synced with the account and absent on disk',
+        unit_not_installable:
+          'the plugin is installed by the source store — its contents travel, not the unit',
+        panel_only_construct: 'a panel construct — no CLI has it',
+        no_panel_run: 'the panel cannot start this CLI',
+        no_wire: 'the CLI documents no endpoint of its own',
+      },
+      condition: {
+        run_through_panel: 'when started through the panel',
+        enable_contour: 'with the contour enabled',
+      },
+    },
   },
   providerCompare: {
     title: 'Configuration comparison',
@@ -284,7 +475,9 @@ export const en: TranslationSchema = {
     noMatchText: 'No rule title or body matches “{{query}}”.',
   },
   claudeMd: {
-    title: 'CLAUDE.md',
+    // The heading is the RESOLVED file name (П2.7): a home living on `AGENTS.md`
+    // alone opens under its own name, not under “CLAUDE.md”.
+    titleName: '{{file}}',
     subtitle: 'The whole global instructions file — exactly as Claude Code reads it',
     // Per-provider adaptation (Codex→AGENTS.md, Gemini→GEMINI.md). Claude uses the
     // keys above so its look and copy stay exactly as before.
@@ -296,14 +489,52 @@ export const en: TranslationSchema = {
       '{{provider}} was not found on this system — the file will be created at {{path}} on save.',
     explainTitle: 'What this is',
     explain:
-      'This is the same ~/.claude/CLAUDE.md the Rules section turns into cards. Here the file is open in full: preamble, arbitrary sections, order and formatting. Edit it by hand — a backup is made before writing.',
+      'This is the same ~/.claude/{{file}} the Rules section turns into cards. Here the file is open in full: preamble, arbitrary sections, order and formatting. Edit it by hand — a backup is made before writing.',
     chars: 'Characters: {{count}}',
     unsaved: 'unsaved changes',
     revert: 'Revert changes',
-    saved: 'CLAUDE.md saved',
+    // No file name: the toast is shown without params, and the name is resolved.
+    saved: 'Instructions file saved',
     changedOnDisk:
       'The file changed on disk while you were editing. Your edits are kept; “Save” will overwrite the newer file.',
     loadFromDisk: 'Load from disk',
+  },
+  instructionFiles: {
+    mode: {
+      'claude-md': 'The CLI reads CLAUDE.md only',
+      'claude-md-or-agents-md': 'The CLI reads CLAUDE.md, and AGENTS.md where there is none',
+      'claude-md-and-agents-md': 'The CLI reads CLAUDE.md and AGENTS.md side by side',
+      'managed-only': 'Your own instruction files are turned off',
+    },
+    source: {
+      instructionFiles: 'per the agents-md plugin option instructionFiles',
+      projectInstructions: 'per the deprecated agents-md plugin option projectInstructions',
+      default: 'by default',
+    },
+    // Наборы форм множественного числа в ru и en обязаны совпадать по ключам:
+    // тип словаря выводится из ru, и недостающая форма — ошибка сборки.
+    read_one: 'Read: {{files}}',
+    read_few: 'Read: {{files}}',
+    read_many: 'Read: {{files}}',
+    read_other: 'Read: {{files}}',
+    ignored_one: 'Sits alongside but is not read: {{files}}',
+    ignored_few: 'Sit alongside but are not read: {{files}}',
+    ignored_many: 'Sit alongside but are not read: {{files}}',
+    ignored_other: 'Sit alongside but are not read: {{files}}',
+    proposed: 'The file does not exist yet — it will be created on the first save.',
+    chooseName: 'Name of the new file',
+    note: {
+      managedOnly:
+        'managed-only mode: the CLI reads none of your own instruction files, only the ones your organisation manages. The file below is still editable, but it will not reach the request.',
+      legacyKey:
+        'The projectInstructions key is deprecated: the CLI honours it with a warning; the current key is instructionFiles.',
+      unrecognized: 'The value “{{value}}” was not recognised — the default mode was used.',
+      unreadableSettings: 'The settings file could not be parsed — the default mode was used.',
+      ignoredNearby_one: 'The CLI does not read {{files}} in this mode.',
+      ignoredNearby_few: 'The CLI does not read {{files}} in this mode.',
+      ignoredNearby_many: 'The CLI does not read {{files}} in this mode.',
+      ignoredNearby_other: 'The CLI does not read {{files}} in this mode.',
+    },
   },
   bulk: {
     modeSingle: 'One',
@@ -2001,8 +2232,12 @@ export const en: TranslationSchema = {
       refused:
         'The request with a tool failed: without the shim the agent will most likely not edit files.',
     },
+    smokeToolsShimOn:
+      'The panel turned the shim on after this probe. {{reason}} A turn through the shim is longer: the tools travel as text in every request.',
     enableShim: 'Turn the shim on',
     enableShimFailed: 'Could not turn the shim on',
+    disableShim: 'Turn the shim off',
+    disableShimFailed: 'Could not turn the shim off',
     turnNoTools:
       'This turn had no tool calls at all. If you expected edits, the contour model may not have handled tools: an agent that edits files is verified on models from {{size}}B.',
     turnCallAsText:
@@ -2080,9 +2315,13 @@ export const en: TranslationSchema = {
         'The word the vendor fields start with on the wire: {{value}}_status, {{value}}_guardrails, {{value}}_tools. Empty — as the preset says.',
       prefixError: 'Lowercase latin and digits, starting with a letter, up to 32 characters',
       toolsLabel: 'CLI tools',
-      tools: { native: 'as a request field', shim: 'through the shim' },
+      tools: {
+        native: 'as a request field',
+        'native-no-call': 'as a request field the model ignores',
+        shim: 'through the shim',
+      },
       toolsHint:
-        'As a field — the gateway accepts tools itself. Through the shim — the gateway drops the tools field and calls travel as text.',
+        'As a field — the gateway accepts tools itself. As a field the model ignores — the gateway takes the field but the model never calls anything through it: only the shim gives the agent hands, and it is on from the start. Through the shim — the gateway drops the tools field and calls travel as text.',
       effortLabel: 'Reasoning effort',
       effort: { on: 'sent', off: 'not sent' },
       effortHint: 'Not sent — the panel omits reasoning_effort and says so in the chat header.',
@@ -5236,17 +5475,17 @@ export const en: TranslationSchema = {
   projectConfig: {
     title: 'Projects — configuration',
     subtitle:
-      "A specific project's rules, permissions and MCP servers: its CLAUDE.md, .claude/settings.json and .mcp.json. " +
+      "A specific project's rules, permissions and MCP servers: its instruction file (CLAUDE.md or AGENTS.md), .claude/settings.json and .mcp.json. " +
       'Hooks, skills and rule files from .claude are shown read-only',
     addProject: 'Add project',
     explainTitle: 'What is this',
     explain:
-      'Besides the user-level ~/.claude, the panel manages a specific project’s config. Rules come from the project’s CLAUDE.md, permissions and hooks from .claude/settings.json, MCP servers from the root .mcp.json. The .claude directory is created on first write. Changes apply after restarting Claude Code.',
+      'Besides the user-level ~/.claude, the panel manages a specific project’s config. Rules come from the project’s instruction file — CLAUDE.md or AGENTS.md, whichever the CLI reads under the current mode; permissions and hooks from .claude/settings.json, MCP servers from the root .mcp.json. The .claude directory is created on first write. Changes apply after restarting Claude Code.',
     emptyTitle: 'No projects yet',
     emptyText: 'Add a project folder to manage its configuration separately from the user level.',
     count: 'Projects: {{count}}',
     removeDescription:
-      'The project will be removed from the panel registry. The project files (CLAUDE.md, .claude, .mcp.json) are NOT touched — only the path is forgotten.',
+      'The project will be removed from the panel registry. The project files (CLAUDE.md or AGENTS.md, .claude, .mcp.json) are NOT touched — only the path is forgotten.',
     pickTitle: 'Pick a project',
     pickText: 'On the left is the list of added projects. Select one to view and edit its config.',
     levelBadge: 'project level',
@@ -5254,7 +5493,7 @@ export const en: TranslationSchema = {
     tab_mcp: 'MCP servers',
     tab_permissions: 'Permissions',
     tab_local: 'From the project',
-    rulesHint: "The project's root CLAUDE.md in full — as Claude reads it in this project.",
+    rulesHint: "The project's root {{file}} in full — as Claude reads it in this project.",
     mcpHint: "The project's MCP servers from the root .mcp.json.",
     mcpEmpty: "The project's .mcp.json has no servers yet.",
     addMcp: 'Add server',

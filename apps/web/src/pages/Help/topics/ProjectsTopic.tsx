@@ -67,7 +67,13 @@ export function ProjectsTopic() {
               value: '~/.claude/agentdeck/state.json',
               isMono: true,
             },
-            { label: tr('storageRules'), value: '<проект>/CLAUDE.md', isMono: true },
+            {
+              label: tr('storageRules'),
+              // П2.7: проект без своего `CLAUDE.md` живёт на `AGENTS.md` — панель
+              // правит тот файл, который читает CLI, и второго не заводит.
+              value: '<проект>/CLAUDE.md · <проект>/AGENTS.md',
+              isMono: true,
+            },
             { label: tr('storageMcp'), value: '<проект>/.mcp.json', isMono: true },
             {
               label: tr('storagePerms'),

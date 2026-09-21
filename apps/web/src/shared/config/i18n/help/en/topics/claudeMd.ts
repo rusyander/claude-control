@@ -45,9 +45,10 @@ export const claudeMdEn: typeof claudeMdRu = {
       'one rule.',
     diffProject: 'Not a project file',
     diffProjectText:
-      'This is the personal ~/.claude/CLAUDE.md. A project has its own CLAUDE.md ' +
-      'in the repository root and its own .claude directory — both live in ' +
-      '“Projects”, on the “Rules” and “From the project” tabs.',
+      'This is the personal file from ~/.claude. A project has its own — in the ' +
+      'repository root — and its own .claude directory; both live in “Projects”, on ' +
+      'the “Rules” and “From the project” tabs. The name there is decided by the same ' +
+      'rule as here.',
     diffPreview: 'Not a markdown editor',
     diffPreviewText:
       'It is a plain text field: no preview, no highlighting, no folding. The ' +
@@ -157,7 +158,9 @@ export const claudeMdEn: typeof claudeMdRu = {
         'the chat it takes a new conversation or “Restart session” in the header menu.',
     },
 
-    canSeeAll: 'Read the whole global CLAUDE.md, preamble and service sections included',
+    canSeeAll: 'Read the whole global instructions file, preamble and service sections included',
+    canSeeName:
+      'See which file the CLI itself reads and which one lies beside it unread — in the line above the field',
     canEditAnything: 'Edit any part of the file, including what the “Rules” section never shows',
     canOrder: 'Reorder sections and set your own order of rules',
     canRevert: 'Discard unsaved changes and return to what is on disk',
@@ -166,7 +169,9 @@ export const claudeMdEn: typeof claudeMdRu = {
     canFollow:
       'See an edit made outside the panel: a clean field picks the new version up by itself, and on top of an unfinished edit the panel shows the divergence and a “Load from disk” button',
 
-    cantProject: 'Open a specific project’s CLAUDE.md — only the global one from ~/.claude is here',
+    cantProject: 'Open a specific project’s file — only the global one from ~/.claude is here',
+    cantRename:
+      'Rename the file or create a second one: the name is the CLI’s decision, and the panel does not change it',
     cantPreview: 'Get a markdown preview or syntax highlighting: this is a plain text field',
     cantToggle:
       'Switch a single rule off with a toggle or build a group out of rules — that is the “Rules” section',
@@ -192,7 +197,10 @@ export const claudeMdEn: typeof claudeMdRu = {
     limitsCaption: 'The numbers and conditions people trip over most often.',
     limitLevel: 'Level',
     limitLevelValue:
-      'only the active provider’s ~/.claude/CLAUDE.md. Project files live in “Projects”',
+      'only the active provider’s file in ~/.claude. Project files live in “Projects”',
+    limitName: 'The file name',
+    limitNameValue:
+      'for Claude the CLI decides it, not the panel: CLAUDE.md, and AGENTS.md where there is none (the default since 2.1.277). The resolved name stands in the page title and in the line above the field; the panel can only propose a name while no file exists on disk',
     limitSave: 'What the save sends',
     limitSaveValue:
       'the whole text of the field: the file is replaced, not appended to. On a divergence the last save wins',
@@ -249,6 +257,19 @@ export const claudeMdEn: typeof claudeMdRu = {
       'leaves them alone and makes no cards out of them. That is also where “0 rules” ' +
       'in a non-empty file comes from; for a subheading inside a rule use the third ' +
       'level, “### ”.',
+    noteNameTitle: 'For Claude the file name is the CLI’s decision, not a constant',
+    noteNameText:
+      'Since 2.1.277 the name is chosen by the instructionFiles option of the agents-md ' +
+      'plugin, and there are four modes: CLAUDE.md only · CLAUDE.md, and AGENTS.md where ' +
+      'there is none (the default) · both files side by side · none of your own ' +
+      '(managed-only — only the files handed out by the organization remain). The line ' +
+      'above the field names the mode, where it came from, which file is read and which ' +
+      'lies beside it unread. Read it exactly when an edit “does not arrive”: in the first ' +
+      'mode an edit to AGENTS.md never reaches the agent at all, and under managed-only no ' +
+      'edit does. The panel renames nothing and creates no second file: a CLAUDE.md left ' +
+      'beside AGENTS.md silently wins for the CLI, so the decision about the name is yours. ' +
+      'It offers a choice of name in exactly one case — the file does not exist yet and ' +
+      'will be created by the first save.',
     noteProviderTitle: 'Other providers — three different models of instructions',
     noteProviderText:
       'The section is universal, but different CLIs are built differently, and the ' +

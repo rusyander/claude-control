@@ -4,6 +4,7 @@ import { getActiveProvider } from '../../providers/registry.ts';
 import { resolveInsideSectionDir, toClientRelative } from '../../lib/section-fs.ts';
 import { SKILL_FILE_NAME } from '../../lib/opencode-skill.ts';
 import { UnsafeSkillPathError } from './errors.ts';
+import type { ConfigProvider } from '../../providers/types.ts';
 import type { ProviderSkillsSettingsSource, ProviderSkillsTarget } from './types.ts';
 
 /**
@@ -24,10 +25,23 @@ export function opencodeExternalSkillDirs(): string[] {
 export function resolveProviderSkillsTarget(
   store: ProviderSkillsSettingsSource,
 ): ProviderSkillsTarget | undefined {
-  const provider = getActiveProvider(store);
+  return resolveProviderSkillsTargetFor(
+    getActiveProvider(store),
+    store.getSettings().claudeDirOverride,
+  );
+}
+
+/**
+ * То же самое для ЯВНО названного провайдера — не обязательно активного. Нужно
+ * переносу среды (`domains/portability/`): паспорт собирается для любого
+ * установленного CLI. Условие поддержки и построение цели те же самые.
+ */
+export function resolveProviderSkillsTargetFor(
+  provider: ConfigProvider,
+  override?: string,
+): ProviderSkillsTarget | undefined {
   if (provider.capabilities.skills !== 'ready' || !provider.skillsConfig) return undefined;
 
-  const override = store.getSettings().claudeDirOverride;
   return {
     provider,
     format: provider.skillsConfig.format,

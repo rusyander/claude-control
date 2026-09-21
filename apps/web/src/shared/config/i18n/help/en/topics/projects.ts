@@ -86,11 +86,13 @@ export const projectsEn: typeof projectsRu = {
         'Drives and directories are read by the panel’s server, not by the browser: any ' +
         'folder on the machine is reachable, even one where Claude Code has never run. ' +
         '«Open this folder» takes the current directory — C:/work in the frame.',
-      sRules: 'Project rules: its whole CLAUDE.md',
+      sRules: 'Project rules: its whole instructions file',
       sRulesText:
-        'One text field, a character counter at the bottom (307 in the frame) and a ' +
-        'reminder that changes apply after Claude Code restarts. The project level has ' +
-        'no separate rules, toggles or groups: the file is edited as a whole.',
+        'On top, the line about the layout of names: which file the CLI itself reads — ' +
+        'CLAUDE.md or AGENTS.md — and which lies beside it unread. Below, one text field, ' +
+        'a character counter (307 in the frame) and a reminder that changes apply after ' +
+        'Claude Code restarts. The project level has no separate rules, toggles or ' +
+        'groups: the file is edited as a whole.',
       sMcp: 'The project’s MCP servers',
       sMcpText:
         'Read from the .mcp.json in the repository root. The forms are the same as on ' +
@@ -151,7 +153,8 @@ export const projectsEn: typeof projectsRu = {
     storageCreateValue: 'created on the first write if the project does not have it yet',
 
     canRegister: 'Open any folder on the machine as a project, by absolute path',
-    canRules: 'Edit the project’s CLAUDE.md as a whole, with a backup before the write',
+    canRules:
+      'Edit the project’s instructions file as a whole — CLAUDE.md or AGENTS.md, as the CLI decided — with a backup before the write',
     canMcp: 'Manage the project’s MCP servers in its .mcp.json',
     canPerms:
       'Configure the project’s permissions in .claude/settings.json and settings.local.json',

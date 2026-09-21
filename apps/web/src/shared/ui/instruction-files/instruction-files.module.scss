@@ -1,0 +1,37 @@
+.root {
+  width: 100%;
+}
+
+.path {
+  // Длинный абсолютный путь не должен растягивать карточку: переносим по любому
+  // месту, а не оставляем горизонтальную прокрутку страницы.
+  overflow-wrap: anywhere;
+  font-family: var(--font-mono);
+}
+
+.choices {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.choice {
+  padding: 2px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-caption);
+  cursor: pointer;
+
+  &:hover {
+    background-color: var(--color-surface-raised);
+  }
+}
+
+// Выбранное имя несёт не только цвет: у кнопки стоит `aria-checked`, и
+// скринридер называет её выбранной без опоры на заливку.
+.chosen {
+  border-color: var(--color-accent);
+  background-color: var(--color-surface-raised);
+  color: var(--color-fg);
+}

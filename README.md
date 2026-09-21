@@ -12,7 +12,7 @@ By default the panel configures Claude Code, where everything is available; it a
 
 > [!TIP]
 > **Won't start?** `pnpm doctor` explains every finding. Still stuck — open Claude Code in this
-> folder and say "it won't start, figure it out": it reads [CLAUDE.md](CLAUDE.md), the map of this
+> folder and say "it won't start, figure it out": it reads [AGENTS.md](AGENTS.md), the map of this
 > project written for the agent, and starts with diagnostics rather than with the code.
 
 ---

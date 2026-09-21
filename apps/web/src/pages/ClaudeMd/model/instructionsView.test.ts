@@ -20,10 +20,20 @@ describe('instructionsView: адаптация раздела под прова�
   it('claude: те же ключи, что и раньше, без подсказки о CLI (регресс-ноль)', () => {
     const view = instructionsView(info({ providerId: 'claude' }));
     expect(view.isClaude).toBe(true);
-    expect(view.title).toEqual({ key: 'claudeMd.title' });
+    expect(view.title).toEqual({ key: 'claudeMd.titleName', params: { file: 'CLAUDE.md' } });
     expect(view.subtitle).toEqual({ key: 'claudeMd.subtitle' });
-    expect(view.explain).toEqual({ key: 'claudeMd.explain' });
+    expect(view.explain).toEqual({ key: 'claudeMd.explain', params: { file: 'CLAUDE.md' } });
     expect(view.cliHint).toBeUndefined();
+  });
+
+  // П2.7: дом без своего `CLAUDE.md` живёт на `AGENTS.md`, и заголовок обязан
+  // назвать ТОТ файл, который открыт, — иначе экран врёт об имени.
+  it('claude на AGENTS.md: заголовок и пояснение называют разрешённое имя', () => {
+    const view = instructionsView(
+      info({ fileName: 'AGENTS.md', filePath: '/home/u/.claude/AGENTS.md' }),
+    );
+    expect(view.title.params).toEqual({ file: 'AGENTS.md' });
+    expect(view.explain.params).toEqual({ file: 'AGENTS.md' });
   });
 
   it('codex: заголовок содержит имя файла и провайдера (AGENTS.md / Codex)', () => {

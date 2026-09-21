@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
-import { mkdtempSync, rmSync, existsSync, readFileSync, readdirSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { McpServer, PermissionRule, Project } from '@agentdeck/contracts';
@@ -19,6 +19,11 @@ describe('project-routes: реестр и конфиги проекта', () => 
   let store: AppStore;
   let app: FastifyInstance;
 
+  /**
+   * Файл правил ПУСТОГО проекта. С 2.1.277 это не `CLAUDE.md`: имя предлагается
+   * резолвером, и умолчание — общее для четырёх CLI `AGENTS.md` (П2.7).
+   */
+  const rulesFile = (): string => join(projectDir, 'AGENTS.md');
   const claudeMd = (): string => join(projectDir, 'CLAUDE.md');
   const settingsJson = (): string => join(projectDir, '.claude', 'settings.json');
   const mcpJson = (): string => join(projectDir, '.mcp.json');
@@ -28,9 +33,12 @@ describe('project-routes: реестр и конфиги проекта', () => 
     projectDir = mkdtempSync(join(tmpdir(), 'cc-project-'));
     store = new AppStore(appDataRoot);
 
+    // `location` нужен по-настоящему: имя файла правил проекта решается по ключу
+    // `instructionFiles`, а он может стоять в ПОЛЬЗОВАТЕЛЬСКОМ settings.json (П2.7).
     const ctx = {
       store,
       backupDir: join(appDataRoot, 'backups'),
+      location: { paths: { root: appDataRoot, settings: join(appDataRoot, 'settings.json') } },
     } as unknown as ServerContext;
 
     app = Fastify();
@@ -114,7 +122,7 @@ describe('project-routes: реестр и конфиги проекта', () => 
     expect(res.statusCode).toBe(404);
   });
 
-  it('rules: PUT пишет CLAUDE.md проекта, GET читает целиком', async () => {
+  it('rules: PUT пишет файл правил проекта, GET читает целиком', async () => {
     const id = await addProject();
 
     const put = await app.inject({
@@ -123,10 +131,11 @@ describe('project-routes: реестр и конфиги проекта', () => 
       payload: { content: '# Проект\n\nПравила проекта.\n' },
     });
     expect(put.statusCode).toBe(200);
-    expect(readFileSync(claudeMd(), 'utf8')).toBe('# Проект\n\nПравила проекта.\n');
+    expect(readFileSync(rulesFile(), 'utf8')).toBe('# Проект\n\nПравила проекта.\n');
 
     const get = await app.inject({ method: 'GET', url: `/api/projects/${id}/rules` });
     expect(get.json<{ content: string }>().content).toBe('# Проект\n\nПравила проекта.\n');
+    expect(get.json<{ fileName: string }>().fileName).toBe('AGENTS.md');
   });
 
   it('копии проектных файлов лежат под своим именем, а не под именем пользовательского файла', async () => {
@@ -155,9 +164,9 @@ describe('project-routes: реестр и конфиги проекта', () => 
     // Раньше копия `<проект>/CLAUDE.md` называлась `CLAUDE.md.<метка>.bak` — как
     // пользовательская: попадала в её ленту истории, вытесняла её копии из
     // ротации и восстанавливалась поверх ~/.claude/CLAUDE.md.
-    expect(names.some((name) => name.startsWith(`project-${id}-CLAUDE.md.`))).toBe(true);
+    expect(names.some((name) => name.startsWith(`project-${id}-AGENTS.md.`))).toBe(true);
     expect(names.some((name) => name.startsWith(`project-${id}-settings.json.`))).toBe(true);
-    expect(names.some((name) => name.startsWith('CLAUDE.md.'))).toBe(false);
+    expect(names.some((name) => name.startsWith('AGENTS.md.'))).toBe(false);
     expect(names.some((name) => name.startsWith('settings.json.'))).toBe(false);
   });
 
@@ -175,7 +184,125 @@ describe('project-routes: реестр и конфиги проекта', () => 
       payload: { content: 123 },
     });
     expect(bad.statusCode).toBe(400);
-    expect(readFileSync(claudeMd(), 'utf8')).toBe('исходный');
+    expect(readFileSync(rulesFile(), 'utf8')).toBe('исходный');
+  });
+
+  /**
+   * П2.7: проект живёт на `AGENTS.md` — панель читает и правит ЕГО, а `CLAUDE.md`
+   * рядом не появляется. Оставшийся `CLAUDE.md` у CLI молча побеждает `AGENTS.md`,
+   * поэтому молчаливое создание второго файла подменило бы правила проекта.
+   */
+  describe('проект на AGENTS.md', () => {
+    beforeEach(() => {
+      writeFileSync(claudeMd(), 'не должен появиться', 'utf8');
+      rmSync(claudeMd());
+      writeFileSync(join(projectDir, 'AGENTS.md'), '# правила проекта\n', 'utf8');
+    });
+
+    it('читается наравне с проектом на CLAUDE.md и назван на экране', async () => {
+      const id = await addProject();
+      const get = await app.inject({ method: 'GET', url: `/api/projects/${id}/rules` });
+      const body = get.json<{
+        content: string;
+        fileName: string;
+        instructionFiles: { read: { fileName: string }[]; proposed: boolean };
+      }>();
+      expect(body.content).toBe('# правила проекта\n');
+      expect(body.fileName).toBe('AGENTS.md');
+      expect(body.instructionFiles.proposed).toBe(false);
+      expect(body.instructionFiles.read.map((one) => one.fileName)).toEqual(['AGENTS.md']);
+    });
+
+    it('сохранение правил НЕ заводит CLAUDE.md на диске', async () => {
+      const id = await addProject();
+      const put = await app.inject({
+        method: 'PUT',
+        url: `/api/projects/${id}/rules`,
+        payload: { content: '# новые правила\n' },
+      });
+      expect(put.statusCode).toBe(200);
+      expect(readFileSync(join(projectDir, 'AGENTS.md'), 'utf8')).toBe('# новые правила\n');
+      // Красное «до»: с зашитым именем здесь лежал бы второй файл, который CLI
+      // читает ВМЕСТО правленого.
+      expect(existsSync(claudeMd())).toBe(false);
+    });
+
+    it('копия сохраняет ПРЕЖНЕЕ имя файла', async () => {
+      const id = await addProject();
+      for (const content of ['# v1\n', '# v2\n']) {
+        await app.inject({
+          method: 'PUT',
+          url: `/api/projects/${id}/rules`,
+          payload: { content },
+        });
+      }
+      const names = readdirSync(join(appDataRoot, 'backups'));
+      expect(names.some((name) => name.startsWith(`project-${id}-AGENTS.md.`))).toBe(true);
+    });
+
+    it('переименовать существующий файл панель не даёт — 409', async () => {
+      const id = await addProject();
+      const res = await app.inject({
+        method: 'PUT',
+        url: `/api/projects/${id}/rules`,
+        payload: { content: '# текст\n', fileName: 'CLAUDE.md' },
+      });
+      expect(res.statusCode).toBe(409);
+      expect(existsSync(claudeMd())).toBe(false);
+    });
+  });
+
+  it('оба файла в проекте: показаны оба, и назван тот, что читает CLI', async () => {
+    writeFileSync(claudeMd(), '# CLAUDE\n', 'utf8');
+    writeFileSync(join(projectDir, 'AGENTS.md'), '# AGENTS\n', 'utf8');
+    const id = await addProject();
+
+    const get = await app.inject({ method: 'GET', url: `/api/projects/${id}/rules` });
+    const body = get.json<{
+      content: string;
+      fileName: string;
+      instructionFiles: {
+        read: { fileName: string }[];
+        ignored: { fileName: string }[];
+        notes: { code: string; files?: string[] }[];
+      };
+    }>();
+    // Умолчание `claude-md-or-agents-md`: рядом есть CLAUDE.md — AGENTS.md не читается.
+    expect(body.fileName).toBe('CLAUDE.md');
+    expect(body.content).toBe('# CLAUDE\n');
+    expect(body.instructionFiles.read.map((one) => one.fileName)).toEqual(['CLAUDE.md']);
+    expect(body.instructionFiles.ignored.map((one) => one.fileName)).toEqual(['AGENTS.md']);
+    expect(body.instructionFiles.notes).toContainEqual({
+      code: 'ignored-nearby',
+      files: ['AGENTS.md'],
+    });
+    // Ни слияния, ни удаления: оба файла остались как были.
+    expect(readFileSync(join(projectDir, 'AGENTS.md'), 'utf8')).toBe('# AGENTS\n');
+  });
+
+  it('managed-only назван, а не показан пустотой', async () => {
+    // Режим стоит в ПОЛЬЗОВАТЕЛЬСКОМ файле и в опциях встроенного плагина: в
+    // проектном `.claude/settings.json` CLI эту опцию не читает вовсе (П2.7).
+    writeFileSync(
+      join(appDataRoot, 'settings.json'),
+      JSON.stringify({
+        pluginConfigs: { 'agents-md@builtin': { options: { instructionFiles: 'managed-only' } } },
+      }),
+      'utf8',
+    );
+    writeFileSync(claudeMd(), '# свои правила\n', 'utf8');
+    const id = await addProject();
+
+    const get = await app.inject({ method: 'GET', url: `/api/projects/${id}/rules` });
+    const body = get.json<{
+      content: string;
+      instructionFiles: { mode: string; read: unknown[]; notes: { code: string }[] };
+    }>();
+    expect(body.instructionFiles.mode).toBe('managed-only');
+    expect(body.instructionFiles.read).toEqual([]);
+    expect(body.instructionFiles.notes).toContainEqual({ code: 'managed-only' });
+    // Файл человека остаётся виден и правим: режим за него панель не выбирает.
+    expect(body.content).toBe('# свои правила\n');
   });
 
   it('mcp: сервер пишется в .mcp.json корня проекта, читается и удаляется', async () => {

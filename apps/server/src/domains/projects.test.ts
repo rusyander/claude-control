@@ -17,7 +17,10 @@ describe('resolveProjectPaths', () => {
   it('строит стандартные проектные пути от каталога', () => {
     const paths = resolveProjectPaths(base);
     expect(paths.root).toBe(base);
-    expect(paths.claudeMd).toBe(join(base, 'CLAUDE.md'));
+    // Каталога на диске нет — имя ПРЕДЛАГАЕТСЯ, и предложение общее для четырёх
+    // CLI (`AGENTS.md`), а не прежняя константа `CLAUDE.md` (П2.7). Файл на диске
+    // всегда побеждает предложение — это проверяет `instruction-files.test.ts`.
+    expect(paths.claudeMd).toBe(join(base, 'AGENTS.md'));
     expect(paths.settings).toBe(join(base, '.claude', 'settings.json'));
     expect(paths.settingsLocal).toBe(join(base, '.claude', 'settings.local.json'));
     expect(paths.mcpConfig).toBe(join(base, '.mcp.json'));

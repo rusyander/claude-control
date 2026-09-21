@@ -1,4 +1,6 @@
 import { join } from 'node:path';
+import type { FidelityMark } from '@agentdeck/contracts/portable-fidelity';
+import type { TransferRecord } from '@agentdeck/contracts/portable-transfer';
 import type {
   AppSettings,
   Automation,
@@ -85,6 +87,15 @@ import {
   getPlatformApplied as readPlatformApplied,
   savePlatformApplied as writePlatformApplied,
 } from './platform-applied.ts';
+import {
+  getPortabilityFidelity as readPortabilityFidelity,
+  savePortabilityFidelity as writePortabilityFidelity,
+} from './portability-fidelity.ts';
+import {
+  forgetPortabilityTransfer as dropPortabilityTransfer,
+  getPortabilityTransfer as readPortabilityTransfer,
+  savePortabilityTransfer as writePortabilityTransfer,
+} from './portability-transfer.ts';
 import {
   forgetPlatformSpend as dropPlatformSpend,
   getPlatformSpend as readPlatformSpend,
@@ -661,6 +672,42 @@ export class AppStore {
   /** Контур отключён или удалён — след применения уходит вместе с ним. */
   forgetPlatformApplied(id: string): void {
     if (dropPlatformApplied(this.state, id)) this.persist();
+  }
+
+  // --- Перенос: отчёты верности (П1.2) ---
+
+  /** Оттиски отчётов верности: «источник→цель:уровень» → сводка с датой (копия). */
+  getPortabilityFidelity(): Record<string, FidelityMark> {
+    return readPortabilityFidelity(this.state);
+  }
+
+  /**
+   * Запомнить оттиск, ЕСЛИ обещание изменилось. Маршрут считает отчёт заново на
+   * каждом запросе, и файл состояния писался бы на каждом открытии страницы —
+   * запись только при изменении делает «прошлый раз» настоящим прошлым разом, а
+   * не предыдущей секундой.
+   */
+  savePortabilityFidelity(key: string, mark: FidelityMark): void {
+    if (writePortabilityFidelity(this.state, key, mark)) this.persist();
+  }
+
+  // --- Перенос: след применённого (П2.3) ---
+
+  /** След последнего переноса к этой цели — по нему работает отмена (копия). */
+  getPortabilityTransfer(key: string): TransferRecord | undefined {
+    return readPortabilityTransfer(this.state, key);
+  }
+
+  /** Запомнить след. Пишется всегда: перенос — событие, а не пересчёт. */
+  savePortabilityTransfer(key: string, record: TransferRecord): void {
+    writePortabilityTransfer(this.state, key, record);
+    this.persist();
+  }
+
+  /** Забыть след: перенос отменён целиком и возвращать больше нечего. */
+  forgetPortabilityTransfer(key: string): void {
+    dropPortabilityTransfer(this.state, key);
+    this.persist();
   }
 
   // --- Контуры: расход по дням (Т8) ---

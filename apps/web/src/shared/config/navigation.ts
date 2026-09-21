@@ -126,6 +126,9 @@ export const NAV_SECTIONS: NavSection[] = [
       { path: '/groups', label: 'nav.groups', icon: 'groups', key: 'groups' },
       { path: '/history', label: 'nav.history', icon: 'history', key: 'history' },
       { path: '/compare', label: 'nav.compare', icon: 'swap', key: 'compare' },
+      // Паспорт среды панель-level: его смысл в том, чтобы посмотреть и на
+      // ДРУГОЙ установленный CLI, а не только на активного.
+      { path: '/portability', label: 'nav.portability', icon: 'file', key: 'portability' },
       { path: '/settings', label: 'nav.settings', icon: 'settings', key: 'settings' },
       // Панель-level, без `capability`: прокси стоит между ЛЮБЫМ CLI и моделью.
       // Именно поэтому он здесь, а не среди интеграций: там всё гейтится по

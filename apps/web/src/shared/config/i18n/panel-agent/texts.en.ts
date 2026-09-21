@@ -214,6 +214,7 @@ export const panelTextsEn: PanelTextDictionary = {
   'journal-search-panel': 'Configuration search',
   'journal-analytics-summary': 'Analytics summary',
   'journal-compare-providers': 'CLI comparison',
+  'journal-env-passport': 'Environment passport',
   'journal-list-plugins': 'List of plugins',
   'journal-list-available-plugins': 'Plugin catalog',
   'journal-install-plugin': 'Install a plugin',

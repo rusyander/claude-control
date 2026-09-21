@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { PlatformToolShimReport } from '@agentdeck/contracts';
-import { shimDropped, shimEmptyKind, showsToolShim, showsToolsFact } from './toolShimView';
+import {
+  shimDropped,
+  shimEmptyKind,
+  showsToolShim,
+  showsToolsFact,
+  smokeToolsLineKind,
+} from './toolShimView';
 
 describe('showsToolsFact', () => {
   it('раздел, где все контуры получают инструменты полем, факта о тексте не показывает', () => {
@@ -96,5 +102,36 @@ describe('показ карточки прослойки', () => {
     expect(showsToolShim(false, true, report())).toBe(false);
     expect(showsToolShim(true, false, report())).toBe(false);
     expect(showsToolShim(true, true, undefined)).toBe(false);
+  });
+});
+
+/**
+ * Строка пробы инструментов: наклонение решается здесь, а не разметкой.
+ *
+ * Дорогой случай — «прослойку включила панель»: если строка при этом молчит,
+ * умолчание превращается в сюрприз, о котором человек узнаёт по длине хода.
+ */
+describe('строка итога пробы инструментов', () => {
+  const tools = { ok: false, reason: 'no-call' } as const;
+
+  it('прослойка выключена: зовёт — зелёно, не зовёт — предложение', () => {
+    expect(smokeToolsLineKind({ toolShim: false }, { ok: true })).toBe('ok');
+    expect(smokeToolsLineKind({ toolShim: false }, tools)).toBe('offer');
+  });
+
+  it('включённая ПАНЕЛЬЮ прослойка отчитывается о себе, включённая человеком — молчит', () => {
+    expect(
+      smokeToolsLineKind({ toolShim: true, toolShimFromProbe: '2026-09-20T10:00:00.000Z' }, tools),
+    ).toBe('auto');
+    expect(smokeToolsLineKind({ toolShim: true }, tools)).toBe('none');
+  });
+
+  it('модель зовёт, а прослойка включена панелью прежней пробой — отчитываться не о чем', () => {
+    expect(
+      smokeToolsLineKind(
+        { toolShim: true, toolShimFromProbe: '2026-09-20T10:00:00.000Z' },
+        { ok: true },
+      ),
+    ).toBe('none');
   });
 });

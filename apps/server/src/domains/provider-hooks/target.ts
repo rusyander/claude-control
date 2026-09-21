@@ -1,5 +1,6 @@
 import { getActiveProvider } from '../../providers/registry.ts';
 import { providerBackupName } from '../../lib/safe-io.ts';
+import type { ConfigProvider } from '../../providers/types.ts';
 import type {
   ProviderHooksFormat,
   ProviderHooksSettingsSource,
@@ -26,14 +27,30 @@ export function backupNameOf(target: ProviderHooksTarget): string {
 export function resolveProviderHooksTarget(
   store: ProviderHooksSettingsSource,
 ): ProviderHooksTarget | undefined {
-  const provider = getActiveProvider(store);
+  return resolveProviderHooksTargetFor(
+    getActiveProvider(store),
+    store.getSettings().claudeDirOverride,
+  );
+}
+
+/**
+ * То же самое для ЯВНО названного провайдера — не обязательно активного. Нужно
+ * переносу среды (`domains/portability/`): паспорт собирается для любого
+ * установленного CLI, а переключать ради чтения активного провайдера панели
+ * было бы подменой пользовательского выбора. Условие поддержки и построение
+ * цели те же самые — второй реализации у них нет.
+ */
+export function resolveProviderHooksTargetFor(
+  provider: ConfigProvider,
+  override?: string,
+): ProviderHooksTarget | undefined {
   if (provider.capabilities.hooks !== 'ready' || !provider.hooksConfig) return undefined;
 
   return {
     provider,
     format: provider.hooksConfig.format,
     scope: 'global',
-    filePath: provider.hooksConfig.path(store.getSettings().claudeDirOverride),
+    filePath: provider.hooksConfig.path(override),
     ...(provider.hooksConfig.writeDisabledReason
       ? { writeDisabledReason: provider.hooksConfig.writeDisabledReason }
       : {}),

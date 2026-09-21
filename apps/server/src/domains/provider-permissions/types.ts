@@ -54,6 +54,12 @@ export interface CodexPermissionsValues {
   kind: 'codex';
   approvalPolicy: CodexApprovalPolicy;
   sandboxMode: CodexSandboxMode;
+  /**
+   * Записан ли `sandbox_mode` в файле. Паспорт среды называет этот ключ
+   * непереносимым и цитирует его значение — цитировать дефолт адаптера как
+   * написанное человеком нельзя.
+   */
+  sandboxPresent: boolean;
   /** Оба значения — дефолты (ключей нет в файле); дефолт не записан. */
   usingDefaults: boolean;
 }

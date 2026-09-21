@@ -92,7 +92,7 @@
     "why": "exported document / markdown written for another tool"
   },
   "domains/env.ts": {
-    "n": 3,
+    "n": 4,
     "why": "internal invariant: a path the caller must pass (never reaches a response)"
   },
   "domains/format-check.ts": {
@@ -326,6 +326,102 @@
   "domains/plugins/templates.ts": {
     "n": 7,
     "why": "file content / template / parsed foreign format"
+  },
+  "domains/portability/apply.ts": {
+    "n": 4,
+    "why": "transfer failure texts thrown at the caller (backups off, target not writable, write failed and was rolled back); each carries its messageCode via coded(…), and the route answers with the code — the string stays the fallback"
+  },
+  "domains/portability/canon.ts": {
+    "n": 1,
+    "why": "invariant violation thrown at the caller (empty needs list); unreachable by construction, never an answer to the person"
+  },
+  "domains/portability/emit/context.ts": {
+    "n": 7,
+    "why": "emit-plan invariants thrown at the developer (catalog promises a mechanism no adapter writes, verdict missing, an item answered twice or not at all, two writes of one layer into one file) plus ticket labels for kinds not yet emitted; never an answer to the person"
+  },
+  "domains/portability/emit/text-block.ts": {
+    "n": 4,
+    "why": "text that LANDS IN THE TARGET FILE: the panel-owned block warning and the headings a degraded item becomes; the target CLI reads it, not an API client (moved here from emit/write-instructions.ts, which the Claude emitter now shares)"
+  },
+  "domains/portability/emit/types.ts": {
+    "n": 1,
+    "why": "emitter-missing error text; the route answers with the coded reply instead"
+  },
+  "domains/portability/fidelity-report.ts": {
+    "n": 1,
+    "why": "scope-unsupported error thrown at the caller; the route answers with the coded reply instead"
+  },
+  "domains/portability/import/claude.ts": {
+    "n": 9,
+    "why": "passport prose for the human: item intent / named skip detail, not an API error"
+  },
+  "domains/portability/import/codex.ts": {
+    "n": 4,
+    "why": "passport prose for the human: item intent / named skip detail, not an API error"
+  },
+  "domains/portability/instruction-imports.ts": {
+    "n": 8,
+    "why": "passport prose for the human: item intent / named skip detail, not an API error"
+  },
+  "domains/portability/needs-probe.ts": {
+    "n": 4,
+    "why": "passport prose for the human: item intent / named skip detail, not an API error"
+  },
+  "domains/portability/needs.ts": {
+    "n": 9,
+    "why": "passport prose for the human: item intent / named skip detail, not an API error"
+  },
+  "domains/portability/normalize-files.ts": {
+    "n": 21,
+    "why": "passport prose for the human: item intent / named skip detail, not an API error"
+  },
+  "domains/portability/normalize-hooks.ts": {
+    "n": 5,
+    "why": "passport prose for the human: item intent / named skip detail, not an API error"
+  },
+  "domains/portability/normalize-mcp.ts": {
+    "n": 7,
+    "why": "passport prose for the human: item intent / named skip detail, not an API error"
+  },
+  "domains/portability/normalize-permissions.ts": {
+    "n": 23,
+    "why": "passport prose for the human: item intent / named skip detail, not an API error"
+  },
+  "domains/portability/permissions-map.ts": {
+    "n": 1,
+    "why": "the refusal thrown at the developer when a permission translation weakened a decision (deny or ask turned into allow) — an invariant-6 breach that must stop the transfer, never an answer to the person"
+  },
+  "domains/portability/plan.ts": {
+    "n": 1,
+    "why": "invariant thrown at the developer: a file group with no writes in it; unreachable by construction, never an answer to the person"
+  },
+  "domains/portability/plugins-claude.ts": {
+    "n": 8,
+    "why": "passport prose for the human: named skip detail beside the skip reason code (registry missing, registry of a version the CLI does not load, install path gone, plugin switched off), not an API error"
+  },
+  "domains/portability/probe-canon.ts": {
+    "n": 18,
+    "why": "text of the six probe records themselves: item intents for the passport plus the skill body, command prompt and descriptions that LAND IN THE TARGET CLI's files and reach only the probe's own loopback stub — never an answer to the person"
+  },
+  "domains/portability/probe.ts": {
+    "n": 1,
+    "why": "the stub's closing reply to the target CLI (one line ending the scripted turn); it reaches the CLI's transcript inside the temporary home, never an answer to the person"
+  },
+  "domains/portability/project.ts": {
+    "n": 2,
+    "why": "level errors thrown at the caller (project root not named; the CLI documents no project level) plus the phrase the route repeats in its coded refusal — portability-project-required / portability-project-unsupported answer with the code, the string stays the fallback"
+  },
+  "domains/portability/sections.ts": {
+    "n": 11,
+    "why": "passport prose for the human: item intent / named skip detail, not an API error"
+  },
+  "domains/portability/subagents.ts": {
+    "n": 4,
+    "why": "passport prose for the human: item intent / named skip detail, not an API error"
+  },
+  "domains/portability/types.ts": {
+    "n": 1,
+    "why": "importer-missing error text; the route answers with the coded reply instead"
   },
   "domains/project-files/paths.ts": {
     "n": 2,
@@ -619,6 +715,10 @@
     "n": 1,
     "why": "path-rejection detail composed inside an error class"
   },
+  "lib/instruction-files.ts": {
+    "n": 7,
+    "why": "5 = passport prose for the human (named skip detail: which instructionFiles mode hid which file), moved here from domains/portability/instruction-files.ts; 2 = RU fallback message of InstructionNameRefusedError, which carries coded() beside it (instructions-file-name-unknown / instructions-file-exists)"
+  },
   "lib/request-body.ts": {
     "n": 2,
     "why": "log line / internal error not shown as text"
@@ -650,6 +750,10 @@
   "lib/server-texts/templates.ts": {
     "n": 322,
     "why": "generated RU side of the server text table (gen.mjs from L-gen/manifest): every line here IS a code, this is the one file where a Russian literal is the data"
+  },
+  "providers/catalog/kimi.ts": {
+    "n": 1,
+    "why": "human-facing catalog prose: why the panel never writes this section"
   },
   "providers/catalog/opencode.ts": {
     "n": 1,
@@ -716,7 +820,11 @@
     "why": "agent prompt / text the model reads"
   },
   "routes/panel-agent/texts.ts": {
-    "n": 248,
+    "n": 249,
     "why": "fallback RU table of panel-agent codes: each line is addressed by PanelTextCode and translated by the window; +11 note codes of the preview card"
+  },
+  "routes/portability-routes.ts": {
+    "n": 2,
+    "why": "server log line about an unreadable source; the reply itself carries messageCode (the parser text is deliberately kept out of the body)"
   }
 }

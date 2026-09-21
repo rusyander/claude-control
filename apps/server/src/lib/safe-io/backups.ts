@@ -96,6 +96,27 @@ export function providerBackupName(providerId: string, filePath: string): string
 }
 
 /**
+ * Имя резервной копии файла цели ПЕРЕНОСА — `<id>-<путь от корня цели>`.
+ *
+ * Отдельно от `providerBackupName`, хотя у файла в корне даёт ровно то же имя
+ * (`gemini-settings.json`), и разница появляется только во вложенных путях. Она
+ * и есть причина: перенос трогает ДЕСЯТКИ файлов за раз, и у скиллов basename
+ * совпадает у всех — `SKILL.md`. С именем по basename их копии попадали бы в
+ * ОДНУ ротацию, одиннадцатый скилл вытеснял бы копию первого, и отмена переноса
+ * молча не находила бы, к чему возвращаться, — ровно у тех файлов, которые уже
+ * переписаны. Путь от корня делает копии различимыми, а ротацию — пофайловой.
+ *
+ * Восстановлению из ленты такие копии не подлежат, как и все копии провайдеров:
+ * цель по basename не находится (`resolveBackupTarget`).
+ */
+export function transferBackupName(providerId: string, root: string, filePath: string): string {
+  const inside =
+    root && filePath.startsWith(root) ? filePath.slice(root.length) : basename(filePath);
+  const trail = inside.replace(/^[\\/]+/, '').replace(/[\\/]+/g, '-');
+  return `${providerId}-${trail || basename(filePath)}`;
+}
+
+/**
  * Имя резервной копии ПРОЕКТНОГО файла провайдера — `<id>-project-<basename>`.
  *
  * Отдельно от `providerBackupName`, потому что basename проектного файла

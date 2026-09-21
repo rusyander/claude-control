@@ -16,6 +16,7 @@ import {
   type NativeTraces,
 } from './native-tools.ts';
 import { localizeText, type TextLanguage } from '../../../lib/server-texts.ts';
+import { clientToolsTravel, type PlatformClientTools } from '@agentdeck/contracts/platform-presets';
 
 /**
  * Перевод диалектов: клиент говорит по-Anthropic, контур — по-OpenAI.
@@ -306,7 +307,11 @@ export type ToolRoute =
       /** Чем гасятся инструменты самой платформы (`driver.shimRequestFields`). */
       requestFields?: Readonly<Record<string, unknown>>;
     }
-  /** Полем `tools` диалекта OpenAI: платформа его принимает (`clientTools: 'native'`). */
+  /**
+   * Полем `tools` диалекта OpenAI: платформа его принимает — `clientTools`
+   * `native` или `native-no-call`. Зовёт ли по нему модель, маршрут не решает:
+   * это вопрос модели, и отвечает на него проба при активации.
+   */
   | { mode: 'native' };
 
 /**
@@ -319,11 +324,20 @@ export type ToolRoute =
  *   принимает `tools` схемой и молча не зовёт ничего, и лечится это только им;
  * - манифест драйвера: платформа, принимающая `tools` полем, получает их полем.
  *
+ * `native-no-call` идёт тем же маршрутом, что и `native`: поле платформа
+ * принимает, и выбрасывать его здесь значило бы объявить потерей то, что
+ * доезжает. Своё оно говорит умолчанием прослойки и словами на карточке, а не
+ * подменой маршрута — иначе модель, начавшая звать (сменили её или шлюз
+ * дообучили), не смогла бы это показать никогда.
+ *
  * Текст протокола читается только там, где он нужен: это файл каталога.
  */
 export function chooseToolRoute(
   platform: { toolShim: boolean; platformTools: boolean },
-  driver: { clientTools: 'native' | 'shim'; shimRequestFields?: Readonly<Record<string, unknown>> },
+  driver: {
+    clientTools: PlatformClientTools;
+    shimRequestFields?: Readonly<Record<string, unknown>>;
+  },
   protocolText: () => string,
 ): ToolRoute | undefined {
   if (platform.platformTools) return undefined;
@@ -334,7 +348,7 @@ export function chooseToolRoute(
       ...(driver.shimRequestFields ? { requestFields: driver.shimRequestFields } : {}),
     };
   }
-  return driver.clientTools === 'native' ? { mode: 'native' } : undefined;
+  return clientToolsTravel(driver.clientTools) ? { mode: 'native' } : undefined;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

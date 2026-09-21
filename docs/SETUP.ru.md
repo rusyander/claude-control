@@ -4,7 +4,7 @@
 
 > [!TIP]
 > Не хочется разбираться руками — откройте в этой папке Claude Code и скажите «не запускается,
-> разберись». Агент прочитает [CLAUDE.md](../CLAUDE.md), прогонит `pnpm doctor` и починит сам.
+> разберись». Агент прочитает [AGENTS.md](../AGENTS.md), прогонит `pnpm doctor` и починит сам.
 
 🇬🇧 [English version](SETUP.md) · 📖 [Описание проекта](../README.ru.md) · 🛠 [Починка](TROUBLESHOOTING.ru.md) ·
 📱 [Доступ с телефона](REMOTE.ru.md) · 🚫 [Чего панель не делает](LIMITATIONS.ru.md)

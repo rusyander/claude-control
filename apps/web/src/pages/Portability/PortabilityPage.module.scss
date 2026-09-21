@@ -1,0 +1,216 @@
+// Паспорт среды: строка «что это делает | что ему нужно от рантайма».
+// Две колонки, а не таблица из пяти: человек читает страницу вопросом «что у
+// меня настроено и переедет ли это», и всё остальное — подробности записи.
+
+.picker {
+  flex-wrap: wrap;
+
+  > *:first-child {
+    flex: 1 1 260px;
+    min-width: 0;
+  }
+}
+
+.summary {
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+// Корень паспорта — абсолютный путь: пусть жмётся, а не растягивает карточку.
+.root {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+}
+
+// Число сводки — кнопка, а не подпись: она открывает записи своего уровня.
+// Кнопкой, а не кликабельным бейджем, — ради клавиатуры и озвучивания
+// состояния (`aria-pressed`); вид целиком несёт бейдж внутри.
+.levelButton {
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  border-radius: 999px;
+
+  &:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+
+  &[aria-pressed='true'] {
+    box-shadow: 0 0 0 2px var(--color-accent);
+  }
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: var(--spacing-sm);
+  align-items: start;
+  padding: var(--spacing-2xs) var(--spacing-xs);
+  border-radius: 8px;
+
+  &:nth-child(odd) {
+    background: var(--color-surface-sunken);
+  }
+
+  // Пропуск — не запись: полоса слева отличает «этого мы не прочитали» от
+  // «это у вас есть», не крася строку целиком (бейджи справа сами несут цвет).
+  &[data-skip='true'] {
+    box-shadow: inset 2px 0 0 var(--color-warning);
+  }
+
+  // Пустой раздел — тоже не запись, но и не беда: полоса приглушённая, иначе
+  // страница обычного дома целиком в предупреждениях, и настоящее из них не
+  // видно.
+  &[data-skip='empty'] {
+    box-shadow: inset 2px 0 0 var(--color-border);
+  }
+}
+
+// Намерение записи — целая фраза, и длинная: описание скилла бывает в две
+// строки. Без переноса по словам она уезжает под соседнюю колонку и там
+// обрезается — то есть человек читает половину смысла записи.
+.intent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3xs);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+// Путь к файлу-источнику: моноширинный и приглушённый — он подпись, а не смысл.
+.source {
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  color: var(--color-fg-subtle);
+}
+
+.needs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-3xs);
+  min-width: 0;
+  justify-content: flex-end;
+
+  > * {
+    min-width: 0;
+  }
+}
+
+// Причина «рантайм не нужен» — фраза, а не ярлык: она переносится по словам и
+// выравнивается по правому краю вместе с бейджами фактов.
+.why {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+// След применённого переноса: отбит полосой, потому что говорит не о том, что
+// БУДЕТ, а о том, что уже случилось с файлами на диске.
+.applied {
+  padding: var(--spacing-xs);
+  border-radius: 8px;
+  background: var(--color-surface-sunken);
+  box-shadow: inset 2px 0 0 var(--color-accent);
+}
+
+// Строка файла плана: путь с метками слева, кнопка диффа справа.
+.fileRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--spacing-sm);
+  align-items: center;
+  padding: var(--spacing-2xs) var(--spacing-xs);
+  border-radius: 8px;
+
+  &:nth-child(odd) {
+    background: var(--color-surface-sunken);
+  }
+}
+
+// Дифф — те же цвета и моноширина, что в ленте изменений и в предпросмотре
+// одной записи: одна сущность читается в панели одинаково везде.
+.diff {
+  max-height: 50vh;
+  overflow: auto;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-sunken);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-body-sm);
+  line-height: 1.5;
+  scrollbar-width: thin;
+}
+
+.diffLine {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2xs);
+  padding: 0 var(--spacing-sm);
+
+  &[data-kind='add'] {
+    background: var(--color-success-subtle);
+    color: var(--color-success);
+  }
+
+  &[data-kind='del'] {
+    background: var(--color-danger-subtle);
+    color: var(--color-danger);
+  }
+
+  &[data-kind='ctx'] {
+    color: var(--color-fg-muted);
+  }
+}
+
+.diffSign {
+  flex: none;
+  width: 1.5ch;
+  user-select: none;
+  opacity: 0.7;
+}
+
+// Длинные строки конфига не переносим: перенос в диффе сбивает чтение колонок.
+.diffText {
+  white-space: pre;
+}
+
+// Выбор «вернуть и этот файл тоже» — по файлу, и путь рядом с флажком: человек
+// решает про конкретный файл, а не про список вообще.
+.alsoRevert {
+  display: flex;
+  gap: var(--spacing-2xs);
+  align-items: baseline;
+  min-width: 0;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+// На узком экране две колонки не помещаются: требования уходят под намерение,
+// а не жмут его до одного слова в строке.
+@media (width <= 720px) {
+  .row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .needs {
+    justify-content: flex-start;
+  }
+
+  .why {
+    text-align: left;
+  }
+
+  // Кнопка диффа уходит под путь: рядом с ним на 420 px она сжимала бы путь до
+  // нечитаемого огрызка.
+  .fileRow {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: start;
+  }
+}

@@ -1,5 +1,6 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { KIMI_BLOCKING_EVENTS, KIMI_HOOK_EVENTS } from '../../lib/kimi-hook.ts';
 import { buildCapabilities, type ConfigProvider } from '../types.ts';
 import { kimiCodeHome, unimplementedPaths } from './config-dirs.ts';
 
@@ -43,10 +44,25 @@ export const kimiProvider: ConfigProvider = {
     jsonHttpUrlKey: 'url',
     path: () => join(kimiCodeHome(), 'mcp.json'),
   },
-  permissionsConfig: { format: 'kimi-toml', path: kimiConfigToml },
+  permissionsConfig: {
+    format: 'kimi-toml',
+    path: kimiConfigToml,
+    // Массив таблиц `[[permission.rules]]`: `decision` из набора + `pattern`.
+    model: 'rules',
+    decisions: ['allow', 'ask', 'deny'],
+  },
   // Хуки Kimi (KIMI-1) — массив таблиц `[[hooks]]` в том же config.toml:
   // событие + матчер + команда оболочки + таймаут В СЕКУНДАХ (1–600).
-  hooksConfig: { format: 'kimi-toml', path: kimiConfigToml },
+  hooksConfig: {
+    format: 'kimi-toml',
+    path: kimiConfigToml,
+    // Имена событий — из самого адаптера формата: вторая копия списка разошлась
+    // бы с ним молча.
+    events: [...KIMI_HOOK_EVENTS],
+    // Блокировать умеют ровно три события из четырнадцати — это сказано в
+    // документации прямо (`lib/kimi-hook.ts`, KIMI_BLOCKING_EVENTS).
+    blockingEvents: [...KIMI_BLOCKING_EVENTS],
+  },
   // Скиллы Kimi (KIMI-2) — папка на скилл со `SKILL.md`: `~/.kimi-code/skills/`.
   // CLI грузит их ещё и из `~/.agents/skills` (и из проектных `.kimi-code/skills`,
   // `.agents/skills`) — панель об этом сообщает, но туда ничего не пишет.
@@ -65,6 +81,8 @@ export const kimiProvider: ConfigProvider = {
     format: 'kimi-plugins',
     dir: () => join(kimiCodeHome(), 'plugins', 'managed'),
     registryPath: () => join(kimiCodeHome(), 'plugins', 'installed.json'),
+    writeDisabledReason:
+      'Состоянием плагинов Kimi владеет его собственная команда `/plugins`, а форма реестра `installed.json` не задокументирована. Плагин как единица сюда не переносится; его содержимое — скиллы, команды, хуки, субагенты — едет обычными записями канона.',
   },
   // Проектный уровень: AGENTS.md в корне + `.kimi-code/mcp.json` (он сливается с
   // пользовательским, при совпадении имён побеждает проектный). Проектного

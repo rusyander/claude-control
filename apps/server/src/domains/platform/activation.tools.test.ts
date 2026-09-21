@@ -8,7 +8,8 @@ import { AppStore } from '../../lib/app-store.ts';
 import type { PlatformFetch } from './ca-fetch.ts';
 import { PlatformGateway } from './gateway/listener.ts';
 import { activatePlatform, type ContourActivationDeps } from './activation.ts';
-import { writePlatform, writeToken } from './store.ts';
+import { findPlatform, writePlatform, writeToken } from './store.ts';
+import { shimFromProbe } from './smoke-tools.ts';
 import { defaultPlatformTransport } from '@agentdeck/contracts/platform-transport';
 
 /**
@@ -201,5 +202,108 @@ describe('проба инструментов при активации', () => 
     const result = await activatePlatform(deps(), PLATFORM.id);
     expect(result.smoke.tools).toMatchObject({ ok: false, reason: 'dropped' });
     expect(calls).toHaveLength(1);
+  });
+});
+
+/**
+ * Умолчание прослойки по итогу пробы (развилка 3, решение В1). Проверяется по
+ * ЗАПИСАННОМУ контуру, а не по ответу активации: тумблер живёт в состоянии, и
+ * именно оттуда его читают конвейер и карточка.
+ */
+describe('прослойка по итогу пробы', () => {
+  const saved = (): Platform => findPlatform(store, PLATFORM.id) as Platform;
+
+  it('модель не вызвала инструмент — панель включает прослойку сама и отмечает, что это она', async () => {
+    await startWith(
+      sequence([
+        [DELTA, DONE],
+        [text('Готово.'), DONE],
+      ]),
+    );
+    const result = await activatePlatform(deps(), PLATFORM.id);
+
+    expect(saved().toolShim).toBe(true);
+    expect(saved().toolShimFromProbe).toBe(result.smoke.at);
+  });
+
+  it('вызов пришёл полем — тумблер остаётся человеческим, отметки нет', async () => {
+    await startWith(
+      sequence([
+        [DELTA, DONE],
+        [CALL, CALL_DONE],
+      ]),
+    );
+    await activatePlatform(deps(), PLATFORM.id);
+
+    expect(saved().toolShim).toBe(false);
+    expect(saved().toolShimFromProbe).toBeUndefined();
+  });
+
+  it('человек выключил включённое панелью — вторая активация не возвращает своё', async () => {
+    writePlatform(store, {
+      ...PLATFORM,
+      toolShim: false,
+      toolShimFromProbe: '2026-09-19T10:00:00.000Z',
+    });
+    await startWith(
+      sequence([
+        [DELTA, DONE],
+        [text('Готово.'), DONE],
+      ]),
+    );
+    await activatePlatform(deps(), PLATFORM.id);
+
+    expect(saved().toolShim).toBe(false);
+    expect(saved().toolShimFromProbe).toBe('2026-09-19T10:00:00.000Z');
+  });
+
+  it('запрос с инструментом отклонён — это сказано про запрос, а не про модель: тумблер не трогаем', async () => {
+    // Первый запрос — живой ответ потоком, второй (с инструментом) — отказ
+    // шлюза. Одной `sequence` так не сделать: статус в ней общий на прогон.
+    let asked = 0;
+    await startWith((url, init) => {
+      calls.push({
+        url,
+        headers: (init?.headers ?? {}) as Record<string, string>,
+        body: typeof init?.body === 'string' ? init.body : '',
+      });
+      asked += 1;
+      if (asked > 1) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ error: { message: 'upstream busy' } }), {
+            status: 503,
+            headers: { 'content-type': 'application/json' },
+          }),
+        );
+      }
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          const encoder = new TextEncoder();
+          for (const frame of [DELTA, DONE])
+            controller.enqueue(encoder.encode(`data: ${frame}\n\n`));
+          controller.close();
+        },
+      });
+      return Promise.resolve(
+        new Response(stream, { status: 200, headers: { 'content-type': 'text/event-stream' } }),
+      );
+    });
+    const result = await activatePlatform(deps(), PLATFORM.id);
+
+    expect(result.smoke.tools).toMatchObject({ ok: false, reason: 'refused' });
+    expect(saved().toolShim).toBe(false);
+    expect(saved().toolShimFromProbe).toBeUndefined();
+  });
+
+  it('свои инструменты платформы запирают решение: прослойка с ними — запрещённое сочетание', () => {
+    const withTools = {
+      ...PLATFORM,
+      rules: {
+        ...PLATFORM.rules,
+        platform: { ...PLATFORM.rules.platform, platformTools: ['web_search'] },
+      },
+    };
+    expect(shimFromProbe(withTools, { ok: false, reason: 'no-call' })).toBe(false);
+    expect(shimFromProbe(PLATFORM, { ok: false, reason: 'no-call' })).toBe(true);
   });
 });

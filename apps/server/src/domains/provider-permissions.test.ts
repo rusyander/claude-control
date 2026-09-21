@@ -151,6 +151,7 @@ sandbox_mode = "read-only"
       kind: 'codex',
       approvalPolicy: 'on-request',
       sandboxMode: 'workspace-write',
+      sandboxPresent: true,
       usingDefaults: false,
     });
   });
@@ -215,6 +216,7 @@ sandbox_mode = "read-only"
       kind: 'codex',
       approvalPolicy: 'on-request',
       sandboxMode: 'workspace-write',
+      sandboxPresent: false,
       usingDefaults: true,
     });
   });
@@ -226,6 +228,7 @@ sandbox_mode = "read-only"
       kind: 'codex',
       approvalPolicy: 'on-request',
       sandboxMode: 'workspace-write',
+      sandboxPresent: false,
       usingDefaults: true,
     });
   });

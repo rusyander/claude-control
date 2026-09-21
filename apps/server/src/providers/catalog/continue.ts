@@ -64,6 +64,10 @@ export const continueProvider: ConfigProvider = {
   permissionsConfig: {
     format: 'continue-yaml',
     path: () => join(continueHome(), 'permissions.yaml'),
+    // Отдельный `permissions.yaml` с тремя списками `allow` / `ask` /
+    // `exclude`: третий и есть запрет, поэтому решения все три.
+    model: 'rules',
+    decisions: ['allow', 'ask', 'deny'],
   },
   projectConfig: {
     instructionsRules: { format: 'continue-md', relativeDir: '.continue/rules' },

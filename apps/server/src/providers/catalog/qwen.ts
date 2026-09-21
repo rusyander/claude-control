@@ -1,4 +1,5 @@
 import { join } from 'node:path';
+import { QWEN_HOOK_EVENTS } from '../../lib/qwen-hook.ts';
 import { buildCapabilities, type ConfigProvider } from '../types.ts';
 import { qwenHome, unimplementedPaths } from './config-dirs.ts';
 
@@ -39,11 +40,28 @@ export const qwenProvider: ConfigProvider = {
   envConfig: { format: 'dotenv', path: () => join(qwenHome(), '.env') },
   // Права/аппрувы — свой формат (см. комментарий выше): `tools.approvalMode` +
   // списки правил `permissions.allow` / `ask` / `deny`.
-  permissionsConfig: { format: 'qwen-json', path: qwenSettings },
+  permissionsConfig: {
+    format: 'qwen-json',
+    path: qwenSettings,
+    // Три списка правил `permissions.allow|ask|deny` — решения все три.
+    model: 'rules',
+    decisions: ['allow', 'ask', 'deny'],
+  },
   // Хуки Qwen (QWEN-1) — ключ КОРНЯ `hooks` в том же settings.json: событие →
   // массив групп с матчером и действиями. Панель ведёт действия типа `command`
   // (см. lib/qwen-hook.ts); таймаут там в МИЛЛИСЕКУНДАХ.
-  hooksConfig: { format: 'qwen-json', path: qwenSettings },
+  hooksConfig: {
+    format: 'qwen-json',
+    path: qwenSettings,
+    // Имена восемнадцати событий ведёт сам адаптер формата — здесь ссылка на
+    // его список, а не вторая копия.
+    events: QWEN_HOOK_EVENTS.map((event) => event.name),
+    // Остановить действие (код выхода 2) документация называет у тех же трёх
+    // событий, что и у Kimi. Остальные пятнадцать перечислены наблюдательными
+    // НАРОЧНО: недообещать блокировку у цели — сторона строгости, а обещанная и
+    // не состоявшаяся означала бы молча снятый запрет (инвариант 6).
+    blockingEvents: ['UserPromptSubmit', 'PreToolUse', 'Stop'],
+  },
   // Скиллы Qwen (QWEN-2) — папка на скилл со `SKILL.md`: личные
   // `~/.qwen/skills/`, проектные `<проект>/.qwen/skills/`. Обязательные поля
   // шапки те же два (`name`, `description`), прочие (`priority`, `paths`,

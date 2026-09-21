@@ -7,6 +7,7 @@ import {
   isManifestVendorPrefix,
   isManifestWirePath,
   platformManifestDeclared,
+  type PlatformClientTools,
   type PlatformManifestOverrides,
 } from '@agentdeck/contracts';
 import { Stack } from '@shared/ui/stack';
@@ -136,7 +137,7 @@ export function StepAddressManifest({ model }: WizardStepProps) {
               label={t('platform.manifest.toolsLabel')}
               value={manifest?.clientTools ?? 'preset'}
               onChange={(value) =>
-                set('clientTools', value === 'preset' ? undefined : (value as 'native' | 'shim'))
+                set('clientTools', value === 'preset' ? undefined : (value as PlatformClientTools))
               }
               options={[
                 {
@@ -146,6 +147,10 @@ export function StepAddressManifest({ model }: WizardStepProps) {
                   }),
                 },
                 { value: 'native', label: t('platform.manifest.tools.native') },
+                {
+                  value: 'native-no-call',
+                  label: t('platform.manifest.tools.native-no-call'),
+                },
                 { value: 'shim', label: t('platform.manifest.tools.shim') },
               ]}
               hint={t('platform.manifest.toolsHint')}

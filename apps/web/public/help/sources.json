@@ -4,7 +4,7 @@
     {
       "topic": "platform",
       "document": "apps/web/src/pages/Help/topics/PlatformTopic.tsx",
-      "confirmedAt": "2026-09-18T12:05:06.107Z",
+      "confirmedAt": "2026-09-21T07:42:05.033Z",
       "sources": [
         {
           "path": "packages/contracts/src/compromises.ts",
@@ -19,7 +19,7 @@
         {
           "path": "apps/server/src/domains/platform/activation.ts",
           "why": "«Активный контур: ровно один»: что снимается при переключении, пробный запрос через свой шлюз, возврат к провайдеру по умолчанию",
-          "sha": "c630c3a398c57c97"
+          "sha": "b81b065df2ec9f5b"
         },
         {
           "path": "apps/server/src/domains/platform/store.ts",
@@ -104,7 +104,7 @@
         {
           "path": "apps/server/src/domains/platform/layers.ts",
           "why": "«Наши слои»: какой флаг снимает какой слой и почему личные правила, хуки и права уходят вместе",
-          "sha": "db0205b1f4edbf6a"
+          "sha": "f8d8d8810f442b5c"
         },
         {
           "path": "apps/server/src/domains/platform/spend.ts",
@@ -119,7 +119,7 @@
         {
           "path": "apps/web/src/features/PlatformEditor/model/wizard-logic.ts",
           "why": "«Подключение»: четыре шага мастера, которые показывает путеводитель по снимкам",
-          "sha": "ab3c6e745c8d2cc1"
+          "sha": "ad40f373523dd863"
         },
         {
           "path": "apps/web/src/features/PlatformEditor/ui/StepTargets.tsx",
@@ -189,7 +189,7 @@
         {
           "path": "apps/web/src/pages/Platform/lib/toolShimView.ts",
           "why": "«Чем прослойка отличается»: когда карточка вообще показывается и что она говорит вместо чисел",
-          "sha": "0448ccc629fb2f86"
+          "sha": "b825f37565fc2a3d"
         }
       ]
     },
@@ -364,7 +364,7 @@
         {
           "path": "apps/server/src/lib/safe-io/backups.ts",
           "why": "«Границы и числа»: глубина ротации копий и её предел",
-          "sha": "918abd8f8b3b52ac"
+          "sha": "3148dc52fdda44e9"
         },
         {
           "path": "apps/server/src/context.ts",
@@ -372,7 +372,7 @@
           "sha": "0e3da91f9c6d4a58"
         }
       ],
-      "confirmedAt": "2026-09-18T11:08:10.714Z"
+      "confirmedAt": "2026-09-21T07:42:05.123Z"
     },
     {
       "topic": "claudeMd",
@@ -381,7 +381,7 @@
         {
           "path": "apps/web/src/pages/ClaudeMd/ClaudeMdPage.tsx",
           "why": "«Как устроен раздел»: слои инструкций и переключение между ними",
-          "sha": "7d8e95b4064d1932"
+          "sha": "2f24409f5775f70b"
         },
         {
           "path": "apps/web/src/pages/ClaudeMd/model/editorSync.ts",
@@ -391,17 +391,17 @@
         {
           "path": "apps/web/src/pages/ClaudeMd/model/instructionsView.ts",
           "why": "«Что видно на экране»: сборка слоёв в один вид",
-          "sha": "74d952a7c3b3c535"
+          "sha": "3523f26d731fa1ff"
         },
         {
           "path": "apps/server/src/domains/instructions.ts",
           "why": "«Что пишет на диске»: запись CLAUDE.md и копия до правки",
-          "sha": "f2efe1d3309fa2e3"
+          "sha": "4b453d14bcf47f97"
         },
         {
           "path": "apps/web/src/pages/Projects/ProjectRulesTab.tsx",
           "why": "«Слой проекта»: с чем документ сравнивает личный слой",
-          "sha": "f8ef381f38f03bfd"
+          "sha": "27f08403e7e33afe"
         },
         {
           "path": "apps/server/src/domains/project-local.ts",
@@ -419,7 +419,7 @@
           "sha": "0e3da91f9c6d4a58"
         }
       ],
-      "confirmedAt": "2026-09-18T11:08:11.278Z"
+      "confirmedAt": "2026-09-21T07:42:05.227Z"
     },
     {
       "topic": "permissions",
@@ -480,7 +480,7 @@
         {
           "path": "apps/server/src/domains/mcp.ts",
           "why": "«Что пишет на диске»: запись сервера, mcpServersDisabled, запрет тёзки",
-          "sha": "2c4364c1a53910c5"
+          "sha": "f7f3717c558bb0d7"
         },
         {
           "path": "apps/server/src/domains/mcp-oauth/flow.ts",
@@ -493,7 +493,7 @@
           "sha": "ce56accdb8a89eb1"
         }
       ],
-      "confirmedAt": "2026-09-18T11:08:10.158Z"
+      "confirmedAt": "2026-09-21T07:42:05.320Z"
     },
     {
       "topic": "env",
@@ -502,7 +502,7 @@
         {
           "path": "apps/server/src/domains/env.ts",
           "why": "«Три файла»: запись, сохранение комментариев, одна строка для .mcp-secrets.env, перенос",
-          "sha": "f33e9ad9ed39fe52"
+          "sha": "4bf0b9c10f4ecad0"
         },
         {
           "path": "packages/contracts/src/env-secret.ts",
@@ -520,7 +520,7 @@
           "sha": "f2cce9316668ab0b"
         }
       ],
-      "confirmedAt": "2026-09-18T11:08:10.425Z"
+      "confirmedAt": "2026-09-21T07:42:05.413Z"
     },
     {
       "topic": "projects",
@@ -539,7 +539,7 @@
         {
           "path": "apps/server/src/domains/provider-projects.ts",
           "why": "«У другого провайдера свои проектные файлы»",
-          "sha": "69b966c1b02e8e99"
+          "sha": "1d3232048cc357ed"
         },
         {
           "path": "apps/web/src/pages/Projects/ProjectConfigPanel.tsx",
@@ -559,25 +559,25 @@
         {
           "path": "apps/server/src/providers/catalog/qwen.ts",
           "why": "Проектный уровень Qwen Code: хуки и скиллы проекта, которые называет документ",
-          "sha": "053a3acf5d53f5b9"
+          "sha": "e6befebda07ac276"
         },
         {
           "path": "apps/server/src/providers/catalog/opencode.ts",
           "why": "Проектный уровень OpenCode: права, хуки только на чтение, плагины",
-          "sha": "7c027030b5ab56c5"
+          "sha": "883d91bb5332ee78"
         },
         {
           "path": "apps/server/src/providers/catalog/kimi.ts",
           "why": "Проектный уровень Kimi Code: скиллы и MCP есть, проектных прав нет",
-          "sha": "8584f8061fad00f6"
+          "sha": "4f910a04cdb28a5c"
         },
         {
           "path": "apps/server/src/providers/catalog/cursor.ts",
           "why": "Проектный уровень Cursor: каталог правил вместо файла инструкций",
-          "sha": "b06b87bfedd3f829"
+          "sha": "d2696cecdcce26ad"
         }
       ],
-      "confirmedAt": "2026-09-18T11:08:11.587Z"
+      "confirmedAt": "2026-09-21T07:42:05.499Z"
     },
     {
       "topic": "groups",
@@ -646,7 +646,7 @@
     {
       "topic": "commands",
       "document": "apps/web/src/pages/Help/topics/CommandsTopic.tsx",
-      "confirmedAt": "2026-09-17T14:16:45.278Z",
+      "confirmedAt": "2026-09-21T07:42:05.601Z",
       "sources": [
         {
           "path": "apps/server/src/domains/commands/list.ts",
@@ -666,7 +666,7 @@
         {
           "path": "apps/server/src/domains/commands/claude.ts",
           "why": "реестр версии 2 и enabledPlugins[id] === true",
-          "sha": "71d3a70f7f6335ec"
+          "sha": "9140ade7787473f9"
         },
         {
           "path": "apps/web/src/entities/Command/model/builtinCommands.ts",
@@ -683,12 +683,12 @@
     {
       "topic": "hooks",
       "document": "apps/web/src/pages/Help/topics/HooksTopic.tsx",
-      "confirmedAt": "2026-09-18T11:08:10.906Z",
+      "confirmedAt": "2026-09-20T09:55:05.495Z",
       "sources": [
         {
           "path": "packages/contracts/src/hooks.ts",
           "why": "девять событий, matcher у четырёх, заготовки",
-          "sha": "718d14d5293703eb"
+          "sha": "d2ca5e1d7abfd954"
         },
         {
           "path": "apps/server/src/domains/hooks.ts",
@@ -749,7 +749,7 @@
     {
       "topic": "overview",
       "document": "apps/web/src/pages/Help/topics/OverviewTopic.tsx",
-      "confirmedAt": "2026-09-18T14:52:20.659Z",
+      "confirmedAt": "2026-09-21T07:42:05.714Z",
       "sources": [
         {
           "path": "apps/server/src/domains/overview.ts",
@@ -759,7 +759,7 @@
         {
           "path": "apps/server/src/lib/claude-paths.ts",
           "why": "«Откуда панель берёт каталог»: порядок manual → env → home и список недостающих файлов",
-          "sha": "3dbc200609ab5d29"
+          "sha": "c12ea763d6bf7f75"
         },
         {
           "path": "apps/web/src/pages/Overview/StatTile.tsx",
@@ -914,12 +914,12 @@
     {
       "topic": "settings",
       "document": "apps/web/src/pages/Help/topics/SettingsTopic.tsx",
-      "confirmedAt": "2026-09-18T14:52:26.103Z",
+      "confirmedAt": "2026-09-21T07:42:05.810Z",
       "sources": [
         {
           "path": "apps/server/src/lib/safe-io.ts",
           "why": "«Копии перед записью»: копия снимается перед каждой записью, и сколько их хранится",
-          "sha": "911bebfa6a49fac8"
+          "sha": "a6471b0d8a87afe3"
         },
         {
           "path": "apps/server/src/domains/backups.ts",
@@ -929,7 +929,7 @@
         {
           "path": "apps/server/src/lib/claude-paths.ts",
           "why": "«Каталог конфигурации»: порядок manual → env → home, которым выбран каталог",
-          "sha": "3dbc200609ab5d29"
+          "sha": "c12ea763d6bf7f75"
         },
         {
           "path": "apps/server/src/lib/credentials.ts",
@@ -1180,7 +1180,7 @@
         {
           "path": "packages/contracts/src/panel-agent.ts",
           "why": "«Ждёт до…»: 10 минут на решение карточки",
-          "sha": "ed5fcc977988d289"
+          "sha": "c7065e84c4ca5012"
         },
         {
           "path": "tools/mcp/panel.mjs",
@@ -1235,7 +1235,7 @@
         {
           "path": "apps/server/src/routes/panel-agent/actions-panel.ts",
           "why": "«Что агент умеет»: обзор, поиск, аналитика, сравнение — чтение",
-          "sha": "fc5a75294621a7bc"
+          "sha": "55ea8467ffc8e92c"
         },
         {
           "path": "apps/server/src/routes/panel-agent/help-routes.ts",
@@ -1243,7 +1243,7 @@
           "sha": "dbdcab729b80a8de"
         }
       ],
-      "confirmedAt": "2026-09-18T12:18:22.576Z"
+      "confirmedAt": "2026-09-19T11:56:00.432Z"
     }
   ]
 }

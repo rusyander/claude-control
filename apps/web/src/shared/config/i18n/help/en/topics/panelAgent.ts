@@ -81,8 +81,9 @@ export const panelAgentEn: typeof panelAgentRu = {
     secNavigation: 'Navigation',
     secNavigationText:
       'Where am I, list sections, open a page, overview, panel search, analytics summary, ' +
-      'provider comparison — read. A changing action opens the section with the result by ' +
-      'itself.',
+      'provider comparison, the environment passport of any installed CLI — read; the ' +
+      'passport never carries secret values. A changing action opens the section with the ' +
+      'result by itself.',
     secProjects: 'Projects and chats',
     secProjectsText:
       'Projects, chats, running runs, git state and worktrees — read. Add a project — change; ' +

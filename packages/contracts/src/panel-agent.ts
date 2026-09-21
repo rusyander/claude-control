@@ -316,6 +316,7 @@ export const panelTextParams = {
   'journal-search-panel': [],
   'journal-analytics-summary': [],
   'journal-compare-providers': [],
+  'journal-env-passport': [],
   'journal-list-plugins': [],
   'journal-list-available-plugins': [],
   'journal-install-plugin': [],

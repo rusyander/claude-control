@@ -35,7 +35,14 @@ export const codexProvider: ConfigProvider = {
   // Права/аппрувы Codex — скалярные ключи КОРНЯ config.toml (`approval_policy` /
   // `sandbox_mode`). Запись хирургическая (upsertCodexRootScalar): правится только
   // сам корневой скаляр, одноимённые ключи внутри таблиц (`[profiles.x]`) не тронуты.
-  permissionsConfig: { format: 'toml', path: codexConfigToml },
+  permissionsConfig: {
+    format: 'toml',
+    path: codexConfigToml,
+    // Корневые скаляры `approval_policy` / `sandbox_mode` — режим на весь CLI;
+    // правила поимённо Codex не принимает.
+    model: 'mode',
+    decisions: [],
+  },
   // Проектный уровень Codex (COMMON-2): задокументированы проектный AGENTS.md в
   // корне и проектный `.codex/config.toml` (приоритет проект > профиль > глобаль).
   // Файл тот же формат TOML, что и глобальный, — адаптер переиспользуется целиком.

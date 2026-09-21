@@ -83,3 +83,31 @@ export type KimiMode = (typeof KIMI_MODES)[number];
 /** Решение правила Kimi: что делать с подходящим вызовом инструмента. */
 export const KIMI_DECISIONS = ['allow', 'ask', 'deny'] as const;
 export type KimiDecision = (typeof KIMI_DECISIONS)[number];
+
+/**
+ * События хуков САМОГО Claude Code и способность каждого остановить действие
+ * (код выхода 2). Здесь — потому что этот набор нужен обеим сторонам, а сервер
+ * значения из бочки брать не может: `hooks.ts` тянет zod и `./settings-source`,
+ * и отдельной точкой экспорта он не резолвится.
+ *
+ * Вторая копия справочника `HOOK_EVENT_INFO` из `hooks.ts` (там у события ещё и
+ * подсказки для интерфейса) — и расхождение этих двух списков ловит тест: имена
+ * и `canBlock` обязаны совпадать поимённо.
+ */
+export const CLAUDE_HOOK_EVENTS = [
+  { name: 'PreToolUse', blocking: true },
+  { name: 'PostToolUse', blocking: false },
+  { name: 'UserPromptSubmit', blocking: true },
+  { name: 'Notification', blocking: false },
+  // `Stop` и `PreCompact` ОСТАНАВЛИВАЮТ действие (таблица «Exit code 2 behavior
+  // per event» документации CLI: «Prevents Claude from stopping» и «Blocks
+  // context compaction»). Здесь у обоих стояло `false`, и это был не пустяк: по
+  // этому полю матрица верности (П1.1) считает, доедет ли запрет, — блокирующий
+  // Stop-хук объявлялся потерявшим блокировку ДАЖЕ ПРИ ПЕРЕНОСЕ В САМ CLAUDE.
+  // `SubagentStop` остаётся наблюдательным: код 2 у него не признаётся.
+  { name: 'Stop', blocking: true },
+  { name: 'SubagentStop', blocking: false },
+  { name: 'SessionStart', blocking: false },
+  { name: 'SessionEnd', blocking: false },
+  { name: 'PreCompact', blocking: true },
+] as const;

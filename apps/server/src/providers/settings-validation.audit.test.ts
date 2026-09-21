@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { settingsPatchSchema, importStateSchema } from './settings-validation.ts';
+import { platformObjectSchema as contractPlatform } from '@agentdeck/contracts/platform';
+import {
+  settingsPatchSchema,
+  importStateSchema,
+  platformObjectSchema as serverPlatform,
+} from './settings-validation.ts';
 
 /**
  * Аудит «Настройки» 2026-09-03: поля, которые схема раньше молча вырезала.
@@ -93,6 +98,10 @@ describe('settings-validation: контуры', () => {
     consumers: ['chat', 'assistant'],
     budgetSince: '2026-09-01',
     toolShim: true,
+    // Отметка «прослойку включила панель по пробе» (Т5) — тот же класс: молча
+    // вырезанная отметка означала бы, что следующая активация включает
+    // прослойку, которую человек только что выключил.
+    toolShimFromProbe: '2026-09-20T09:52:20.973Z',
     contourPrompt: true,
     // Модель контура, переопределения на потребителя и карта имён (Т6) — та же
     // история: вырезанная молча карта означала бы, что «sonnet» снова уезжает в
@@ -125,6 +134,17 @@ describe('settings-validation: контуры', () => {
       headers: 'X-Tenant: research',
     },
   };
+
+  // Тот самый класс, который прошёл мимо этого файла на Т5: отметку пробы
+  // добавили в контракт, а в серверную копию схемы — нет, и `PUT` контура резал
+  // её молча. Список полей, переписанный в тесте руками, такого не ловит: он
+  // отстаёт ровно на то поле, которое только что добавили. Поэтому сверяются
+  // САМИ схемы, а не их пересказ.
+  it('набор полей контура совпадает с контрактом: копия не отстаёт молча', () => {
+    expect(Object.keys(serverPlatform.shape).sort()).toEqual(
+      Object.keys(contractPlatform.shape).sort(),
+    );
+  });
 
   it('PATCH проносит контур целиком, поле в поле', () => {
     const parsed = settingsPatchSchema.safeParse({ platforms: [platform] });

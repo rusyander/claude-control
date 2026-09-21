@@ -36,7 +36,13 @@ describe('provider-project-routes: проектный уровень прова�
     store = new AppStore(appDataRoot);
     if (provider !== 'claude') store.updateSettings({ provider });
 
-    const ctx = { store, backupDir: join(appDataRoot, 'backups') } as unknown as ServerContext;
+    // `location` — не украшение: имя файла правил проекта решается по ключу
+    // `instructionFiles`, который может стоять в пользовательском settings.json (П2.7).
+    const ctx = {
+      store,
+      backupDir: join(appDataRoot, 'backups'),
+      location: { paths: { root: appDataRoot, settings: join(appDataRoot, 'settings.json') } },
+    } as unknown as ServerContext;
     app = Fastify();
     registerProjectRoutes(app, ctx);
     registerProviderProjectRoutes(app, ctx);
@@ -787,7 +793,8 @@ describe('provider-project-routes: проектный уровень прова�
       payload: { content: '# правила проекта\n' },
     });
     expect(put.statusCode).toBe(200);
-    expect(readFileSync(join(projectDir, 'CLAUDE.md'), 'utf8')).toBe('# правила проекта\n');
+    // Проект пуст — имя предложено резолвером, и умолчание общее для четырёх CLI.
+    expect(readFileSync(join(projectDir, 'AGENTS.md'), 'utf8')).toBe('# правила проекта\n');
 
     const rules = await app.inject({ method: 'GET', url: `/api/projects/${id}/rules` });
     expect(rules.json<{ content: string }>().content).toBe('# правила проекта\n');
@@ -801,6 +808,7 @@ describe('provider-project-routes: проектный уровень прова�
     });
     expect(blocked.statusCode).toBe(400);
     expect(blocked.json<{ error: string }>().error).toBe('section_unsupported');
-    expect(readFileSync(join(projectDir, 'CLAUDE.md'), 'utf8')).toBe('# правила проекта\n');
+    // Проект пуст — имя предложено резолвером, и умолчание общее для четырёх CLI.
+    expect(readFileSync(join(projectDir, 'AGENTS.md'), 'utf8')).toBe('# правила проекта\n');
   });
 });

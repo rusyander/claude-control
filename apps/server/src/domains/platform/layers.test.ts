@@ -137,7 +137,14 @@ describe('исключение личного CLAUDE.md при снятых на
       platform: 'linux',
       fallbackHome: '/root',
     });
-    expect(list).toEqual(['/home/u/.claude/CLAUDE.md']);
+    // ВСЕ имена, которые CLI ищет вверх: с 2.1.277 личные правила приезжают и
+    // через `AGENTS.md`, а `CLAUDE.local.md` он читает всегда. Исключение под
+    // одним именем оставляло бы остальные двери открытыми (П2.7).
+    expect(list).toEqual([
+      '/home/u/.claude/CLAUDE.md',
+      '/home/u/.claude/CLAUDE.local.md',
+      '/home/u/.claude/AGENTS.md',
+    ]);
     expect(list?.some((file) => file.startsWith('/home/u/mono'))).toBe(false);
   });
 
@@ -148,7 +155,14 @@ describe('исключение личного CLAUDE.md при снятых на
       platform: 'linux',
       fallbackHome: '/root',
     });
-    expect(list).toEqual(['/cfg/CLAUDE.md', '/home/u/.claude/CLAUDE.md']);
+    expect(list).toEqual([
+      '/cfg/CLAUDE.md',
+      '/cfg/CLAUDE.local.md',
+      '/cfg/AGENTS.md',
+      '/home/u/.claude/CLAUDE.md',
+      '/home/u/.claude/CLAUDE.local.md',
+      '/home/u/.claude/AGENTS.md',
+    ]);
   });
 
   it('windows: написание рабочего каталога, прямые слэши и шаблон без учёта регистра', () => {
@@ -160,8 +174,14 @@ describe('исключение личного CLAUDE.md при снятых на
     });
     expect(list).toEqual([
       'C:/Users/Ivan (Work)/.claude/CLAUDE.md',
+      'C:/Users/Ivan (Work)/.claude/CLAUDE.local.md',
+      'C:/Users/Ivan (Work)/.claude/AGENTS.md',
       'c:/users/ivan (work)/.claude/CLAUDE.md',
+      'c:/users/ivan (work)/.claude/CLAUDE.local.md',
+      'c:/users/ivan (work)/.claude/AGENTS.md',
       '[cC]:/[uU][sS][eE][rR][sS]/[iI][vV][aA][nN] [(][wW][oO][rR][kK][)]/.[cC][lL][aA][uU][dD][eE]/[cC][lL][aA][uU][dD][eE].[mM][dD]',
+      '[cC]:/[uU][sS][eE][rR][sS]/[iI][vV][aA][nN] [(][wW][oO][rR][kK][)]/.[cC][lL][aA][uU][dD][eE]/[cC][lL][aA][uU][dD][eE].[lL][oO][cC][aA][lL].[mM][dD]',
+      '[cC]:/[uU][sS][eE][rR][sS]/[iI][vV][aA][nN] [(][wW][oO][rR][kK][)]/.[cC][lL][aA][uU][dD][eE]/[aA][gG][eE][nN][tT][sS].[mM][dD]',
     ]);
   });
 
@@ -172,6 +192,10 @@ describe('исключение личного CLAUDE.md при снятых на
       platform: 'win32',
       fallbackHome: 'C:\\Users\\other',
     });
-    expect(list).toEqual(['D:/p[1]/.claude/CLAUDE.md']);
+    expect(list).toEqual([
+      'D:/p[1]/.claude/CLAUDE.md',
+      'D:/p[1]/.claude/CLAUDE.local.md',
+      'D:/p[1]/.claude/AGENTS.md',
+    ]);
   });
 });

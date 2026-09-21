@@ -99,13 +99,23 @@ export function previewProviderWrite(
  * не должно — она разошлась бы с этой, и один из предпросмотров начал бы врать.
  */
 export function runPreview(
-  meta: { providerId: string; providerName: string; filePath: string },
+  meta: {
+    providerId: string;
+    providerName: string;
+    filePath: string;
+    /**
+     * Сколько концевых отрезков пути сохранить в песочнице. Просит об этом та
+     * запись, чей адаптер выводит из пути больше, чем имя файла: у скилла имя
+     * папки обязано совпадать с именем скилла.
+     */
+    sandboxSegments?: number;
+  },
   apply: (sandboxPath: string) => void,
 ): ProviderPreviewResponse {
   const exists = existsSync(meta.filePath);
   const before = exists ? readFileSync(meta.filePath, 'utf8') : '';
 
-  const sandbox = createConfigSandbox(meta.filePath);
+  const sandbox = createConfigSandbox(meta.filePath, meta.sandboxSegments);
   let after: string;
   try {
     apply(sandbox.path);

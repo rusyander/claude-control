@@ -86,6 +86,7 @@ export const PANEL_PAGES = [
   { path: '/tests?tab=report', name: 'Тестирование — отчёт' },
   { path: '/tests?tab=coverage', name: 'Тестирование — покрытие' },
   { path: '/compare', name: 'Сравнение' },
+  { path: '/portability', name: 'Паспорт среды' },
   { path: '/dlp', name: 'Защита данных' },
   {
     path: '/platform',

@@ -11,7 +11,7 @@ import {
   PLATFORM_TERMINAL_CONSUMER,
 } from '@agentdeck/contracts/platform-consumers';
 // Значения — подпутём: сервер идёт под `--experimental-strip-types`, и один
-// импорт значения из бочки контрактов убил бы процесс целиком (CLAUDE.md).
+// импорт значения из бочки контрактов убил бы процесс целиком (AGENTS.md).
 import {
   defaultOurRules,
   defaultPlatformRules,

@@ -3,11 +3,14 @@ import type { InstructionsFileInfo } from '@agentdeck/contracts';
 /**
  * Тексты раздела «Глобальные инструкции», адаптированные под активного провайдера.
  *
- * Раздел универсален: у Claude это CLAUDE.md, у Codex — AGENTS.md, у Gemini —
- * GEMINI.md. Заголовок/подпись/пояснение подстраиваются под файл и провайдера.
+ * Раздел универсален: у Claude это `CLAUDE.md` или `AGENTS.md` (имя решает CLI,
+ * П2.7), у Codex — AGENTS.md, у Gemini — GEMINI.md. Заголовок/подпись/пояснение
+ * подстраиваются под файл и провайдера.
  *
- * Для Claude — РОВНО те же ключи i18n, что и раньше (`claudeMd.title/subtitle/
- * explain`), без подсказки о CLI: вид и тексты остаются как есть (регресс-ноль).
+ * Для Claude — те же ключи i18n, что и раньше (`claudeMd.subtitle/explain`), без
+ * подсказки о CLI: вид и тексты остаются как есть. Исключение — ИМЯ файла: дом на
+ * одном `AGENTS.md` не должен читаться под заголовком «CLAUDE.md», поэтому и
+ * заголовок, и пояснение получают РАЗРЕШЁННОЕ имя параметром.
  * Для прочих провайдеров — ключи `*For` с параметрами (имя файла, провайдер,
  * путь). Если CLI не обнаружен — неалармирующая подсказка `cliMissing`; при этом
  * сохранение остаётся доступным (намерение пользователя явное).
@@ -36,9 +39,9 @@ export function instructionsView(info: InstructionsFileInfo): InstructionsView {
   if (info.providerId === 'claude') {
     return {
       isClaude: true,
-      title: { key: 'claudeMd.title' },
+      title: { key: 'claudeMd.titleName', params: { file: info.fileName } },
       subtitle: { key: 'claudeMd.subtitle' },
-      explain: { key: 'claudeMd.explain' },
+      explain: { key: 'claudeMd.explain', params: { file: info.fileName } },
       restartHint: { key: 'common.needsRestart' },
     };
   }

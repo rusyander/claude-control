@@ -38,9 +38,14 @@ export type {
   ProviderEnvConfigLocation,
   ProviderHooksConfigLocation,
   ProviderMcpConfigLocation,
+  ProviderPermissionRuleGrammar,
   ProviderPermissionsConfigLocation,
   ProviderPluginsConfigLocation,
   ProviderSkillsConfigLocation,
 } from './types/sections.ts';
 
-export type { ConfigProvider, ProviderProjectConfigLocation } from './types/provider.ts';
+export type {
+  ConfigProvider,
+  ProviderNativeMechanisms,
+  ProviderProjectConfigLocation,
+} from './types/provider.ts';

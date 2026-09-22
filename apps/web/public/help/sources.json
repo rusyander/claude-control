@@ -1287,10 +1287,10 @@
         {
           "path": "apps/server/src/routes/portability-carry-routes.ts",
           "why": "Кто попадает в список кандидатов, у кого заводится разговор и куда ложится заметка",
-          "sha": "b56f3780a0257e2e"
+          "sha": "75962f2e80575f84"
         }
       ],
-      "confirmedAt": "2026-09-21T19:44:07.202Z"
+      "confirmedAt": "2026-09-22T10:07:45.034Z"
     }
   ]
 }

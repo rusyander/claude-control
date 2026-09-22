@@ -253,6 +253,34 @@ describe('переходник нагрузки для родных хуков',
     expect(hookShimState(readFileSync(forced.path, 'utf8'))).toBe('ours');
   });
 
+  it('команда переходника исполняется целью, зовущей хук через cmd.exe', () => {
+    // Живая приёмка 22.09.2026 (`qwen 0.24.3`): свою команду хука эта цель
+    // отдаёт `cmd.exe /d /s /c` ОДНИМ элементом argv и без оболочки. Кавычки,
+    // которые панель ставила вокруг пути всегда, node экранирует как `\"`, и до
+    // него путь доезжает ВМЕСТЕ с ними — переходник не находится, цель считает
+    // хук ошибкой и вызов РАЗРЕШАЕТ. То есть перенесённый запрет снимается
+    // молча, а этого инвариант 6 не допускает.
+    //
+    // Проверяется ЗАПУСКОМ в той самой форме, а не видом строки: вопрос здесь —
+    // исполнится ли написанное, и ответить на него может только исполнение.
+    if (process.platform !== 'win32') return;
+    // Пробел в пути к временному каталогу этой цели непроходим в любом
+    // написании (см. `hookShimCommand`) — проверять на нём нечего.
+    if (dir.includes(' ')) return;
+
+    const shim = install('PreToolUse');
+    const result = spawnSync(
+      process.env.ComSpec ?? 'cmd.exe',
+      ['/d', '/s', '/c', hookShimCommand(shim.path)],
+      { input: JSON.stringify({ hook_event_name: 'PreToolUse' }), encoding: 'utf8', shell: false },
+    );
+
+    // Доказательство — то, что написал САМ скрипт человека: до него очередь
+    // дошла только если цель нашла и запустила переходник.
+    expect(result.stderr).not.toContain('Cannot find module');
+    expect(seen().payload).toMatchObject({ hook_event_name: 'PreToolUse' });
+  });
+
   it('файл, пересохранённый редактором в CRLF, остаётся своим', () => {
     // Иначе открытие в Блокноте навсегда заморозило бы переходник «правкой».
     const first = installHookShim({ dir, event: 'Stop', command: userCommand() });

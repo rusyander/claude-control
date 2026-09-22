@@ -8,7 +8,13 @@ import type { ChatRunRegistry } from '../domains/chat/ChatRunRegistry.ts';
 import type { ChatSession } from '../domains/chat/ChatSession.ts';
 import { CHAIN_MAX_AGE_MS, type HandoffChains } from '../domains/chat/ChatHandoff.ts';
 import { initiativePrompt } from '../domains/chat/initiative.ts';
-import { appendMessage, createChat, listChats, readChat } from '../domains/provider-chat/store.ts';
+import {
+  appendMessage,
+  createChat,
+  deleteChat,
+  listChats,
+  readChat,
+} from '../domains/provider-chat/store.ts';
 import type { ProviderChatService } from '../domains/provider-chat.ts';
 import {
   carryChats,
@@ -177,12 +183,20 @@ export function registerPortabilityCarryRoutes(
               ...(prefix ? { systemPrefix: prefix } : {}),
             },
           );
-          // Разговор уже заведён, а задание в него не ушло: это ТРЕТИЙ отказ, и
-          // человеку он говорит другое — чинить надо CLI, а пустой разговор у
-          // цели уже лежит.
-          return outcome.ok
-            ? { ok: true, key: foreignChatKey(target.id, created.id), chatId: created.id }
-            : { ok: false, failure: 'send_failed' };
+          if (outcome.ok)
+            return { ok: true, key: foreignChatKey(target.id, created.id), chatId: created.id };
+          // Разговор заведён, а задание в него не ушло: это ТРЕТИЙ отказ —
+          // чинить надо CLI, а не хранилище. Заведённый разговор убирается:
+          // задание в нём машинное (опора плюс корневая задача), руками человек
+          // его не повторит, и «откройте и отправьте снова» было бы советом в
+          // пустоту — переносить надо заново. Уборка своя, потому что снаружи
+          // ключа на этот разговор ещё ни у кого нет.
+          try {
+            deleteChat(appData(), target.id, created.id);
+          } catch (error) {
+            app.log.warn({ err: error }, 'empty carried chat left behind');
+          }
+          return { ok: false, failure: 'send_failed' };
         },
         /**
          * Слово в ленту разговора, каким бы провайдером он ни был. У чужого CLI

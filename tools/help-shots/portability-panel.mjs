@@ -462,6 +462,62 @@ try {
     await focus(carryCard);
     await carry.shot(page, '02-refusal', { side: 'panel' });
 
+    // ── Задержка ответа: экран ЖДЁТ, а не утверждает «ничего нет» ───────────
+    // Четвёртая вариация. Опасность ровно та же, что у отказа ниже, только
+    // окно короче: пока ответ в пути, пустой список читается как ответ
+    // сервера — человек щёлкнет тумблер по экрану «ни один слой не подписан»
+    // и запишет набор слоёв поверх настоящего. Кадра нет: это проверка, а не
+    // картинка справки.
+    const slow = async (route) => {
+      const url = route.request().url();
+      if (url.includes('portability/carry') || url.includes('portability/subscriptions')) {
+        await new Promise((done) => setTimeout(done, 9000));
+      }
+      await route.continue();
+    };
+    await page.route('**/api/**', slow);
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('nav');
+    await pause(2000);
+    await page.locator('select').nth(1).selectOption(TARGET);
+    await pause(1500);
+    const inFlight = await page.evaluate(() => document.body.innerText);
+    // Ожидание на экране — это скелет: `role="status"` с подписью «загрузка».
+    // Голый `role="status"` брать нельзя — в оболочке панели постоянно висит
+    // пустой sr-only диктор с той же ролью, и он один давал бы «ожидание» на
+    // любом экране, включая дочитанный.
+    const WAITING = '[role="status"][aria-label]:not([aria-label=""])';
+    const waiting = await page.locator(WAITING).count();
+    check(
+      'ответ в пути: экран ждёт, а не утверждает «работы нет» и «слои не подписаны»',
+      'ни одного утверждения о пустоте, на экране — ожидание',
+      `${TEXT.carryEmpty.test(inFlight) ? 'ЛОЖЬ: «незакрытых разговоров нет»; ' : ''}` +
+        `${TEXT.noLayers.test(inFlight) ? 'ЛОЖЬ: «ни один слой не подписан»; ' : ''}` +
+        `ожиданий на экране ${waiting}`,
+      !TEXT.carryEmpty.test(inFlight) && !TEXT.noLayers.test(inFlight) && waiting > 0,
+    );
+    // Ожидание обязано КОНЧИТЬСЯ ответом: экран, застрявший в скелете, врёт
+    // человеку не меньше пустого списка — просто молча.
+    await pause(12000);
+    const settled = await page.evaluate(() => document.body.innerText);
+    // Застрявшее ожидание надо НАЗВАТЬ: «осталось одно» не говорит, какой
+    // раздел не дождался ответа, и следующий прогон начинал бы разбор заново.
+    const stillWaiting = await page.evaluate(
+      (selector) =>
+        [...document.querySelectorAll(selector)].map((node) => {
+          const near = node.parentElement?.parentElement?.textContent?.trim().slice(0, 60) ?? '';
+          return `«${node.getAttribute('aria-label')}» рядом: ${near}`;
+        }),
+      WAITING,
+    );
+    check(
+      'задержанный ответ доезжает: ожидание сменилось данными',
+      'ответ на экране, ожиданий нет',
+      `${TEXT.carryTarget.test(settled) ? 'ответ на экране' : 'ответа нет'}, ожиданий ${stillWaiting.length}${stillWaiting.length ? `: ${stillWaiting.join(' · ')}` : ''}`,
+      TEXT.carryTarget.test(settled) && stillWaiting.length === 0,
+    );
+    await page.unroute('**/api/**', slow);
+
     // ── Плохой ответ: два GET экрана отвечают 500 ────────────────────────────
     // Кадра здесь нет — это проверка, а не картинка справки, и стоит она
     // последней: перехват остаётся на странице до конца прогона.

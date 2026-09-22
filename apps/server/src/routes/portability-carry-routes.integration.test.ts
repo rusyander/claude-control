@@ -51,6 +51,8 @@ describe('portability-carry: перенос незакрытой работы', 
   let chains: HandoffChains;
   let app: FastifyInstance;
   let sent: { providerId: string; chatId: string; text: string }[];
+  /** Отправка в чужой CLI: единственное, что тест вправе сломать сам. */
+  let sendOk: boolean;
   let started: { chatId: string; prompt: string; cwd: string }[];
   let emitted: { chatId: string; text: string }[];
 
@@ -69,6 +71,7 @@ describe('portability-carry: перенос незакрытой работы', 
     sent = [];
     started = [];
     emitted = [];
+    sendOk = true;
   });
 
   afterEach(async () => {
@@ -112,7 +115,7 @@ describe('portability-carry: перенос незакрытой работы', 
         providerChats: {
           send: (_data: string, providerId: string, chatId: string, ask: { text: string }) => {
             sent.push({ providerId, chatId, text: ask.text });
-            return { ok: true };
+            return sendOk ? { ok: true } : { ok: false, error: 'CLI не ответил' };
           },
         },
       } as never,
@@ -309,6 +312,25 @@ describe('portability-carry: перенос незакрытой работы', 
     expect(started[0]?.cwd).toBe(project);
     expect(started[0]?.prompt).toContain('.agent/PROGRESS.md');
     expect(answer.outcomes[0]?.chatId).toBe(started[0]?.chatId);
+  });
+
+  it('задание не ушло — пустой разговор у цели не остаётся', async () => {
+    // Хранилище завело разговор, а CLI задание не принял. Задание машинное
+    // (опора плюс корневая задача), руками человек его не повторит — значит
+    // пустой разговор не «место, где можно отправить снова», а мусор в списке
+    // цели. Отказ назван, разговор убран, источник цел.
+    const codex = foreignChat('codex', 'Переименование', 'переименуй foo в bar');
+    await serve('gemini');
+    sendOk = false;
+
+    const answer = await apply([foreignChatKey('codex', codex)]);
+
+    expect(answer.outcomes[0]).toMatchObject({ carried: false, failure: 'send_failed' });
+    // Отправку пробовали — и после её отказа у цели пусто.
+    expect(sent).toHaveLength(1);
+    expect(listChats(appData, 'gemini')).toHaveLength(0);
+    // Источник не тронут: заметки о переносе, которого не было, в нём нет.
+    expect(readChat(appData, 'codex', codex)?.messages).toHaveLength(1);
   });
 
   it('пустой выбор — отказ, а не тихий успех', async () => {

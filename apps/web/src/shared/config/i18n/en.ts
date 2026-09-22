@@ -233,7 +233,7 @@ export const en: TranslationSchema = {
         run_not_started: 'The run at the new CLI never started — no conversation was opened.',
         chat_not_created: "The panel's storage did not create a conversation for the new CLI.",
         send_failed:
-          'The conversation at the new CLI was created, but the task never reached it: open it and send again.',
+          'The task never reached the new CLI — the empty conversation it opened was removed. Fix the CLI and carry again.',
       },
     },
     subscription: {

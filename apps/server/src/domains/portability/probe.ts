@@ -144,7 +144,7 @@ export async function runProbe(deps: ProbeDeps): Promise<ProbeReport> {
     }
     recipe.prepare?.(home, workdir);
 
-    const stub = await startProbeStub(scriptFor(recipe, scripts));
+    const stub = await startProbeStub(scriptFor(recipe, scripts, workdir));
     try {
       const [command, ...prefix] = argv;
       const run = await runTarget({
@@ -199,6 +199,13 @@ function stubAddress(
     return (_home, baseUrl) => ({
       [vars.baseUrlEnv]: baseUrl,
       ...(vars.credentialEnv ? { [vars.credentialEnv]: PROBE_SOURCE } : {}),
+      // ИМЯ МОДЕЛИ — тоже часть адреса, и не по аккуратности: живой прогон
+      // 22.09.2026 (`qwen 0.24.3`) без него отказывается работать вовсе — «No
+      // auth type is selected», ноль запросов и шесть честных «не проверено».
+      // Профиль эндпоинта панель пишет человеку тремя переменными, и проба
+      // обязана писать те же три: иначе она мерила бы цель, собранную не так,
+      // как собирает панель.
+      ...(vars.modelEnv ? { [vars.modelEnv]: PROBE_SOURCE } : {}),
     });
   }
 
@@ -383,6 +390,14 @@ function homeEnv(home: string): Record<string, string> {
 function scriptFor(
   recipe: ProbeRecipe,
   scripts: ProbeScripts,
+  /**
+   * Рабочий каталог прогона: он нужен САМОМУ вызову, а не только запуску. Цель,
+   * читающая файл только по абсолютному пути (`qwen`, живой прогон 22.09.2026 —
+   * `File path must be absolute`), из одного имени файла вызова не соберёт, а
+   * ошибка чтения дала бы по негативу ЗЕЛЁНОЕ право там, где запрет не
+   * проверялся вовсе.
+   */
+  workdir: string,
 ): (turn: number) => readonly StubBlock[] {
   return (turn) => {
     if (turn > 0) return [{ type: 'text', text: 'Проба завершена.' }];
@@ -391,19 +406,19 @@ function scriptFor(
         type: 'tool_use',
         id: 'probe_forbidden',
         name: recipe.shellTool.name,
-        input: recipe.shellTool.call(`node "${scripts.forbiddenPath}"`),
+        input: recipe.shellTool.call(`node "${scripts.forbiddenPath}"`, workdir),
       },
       {
         type: 'tool_use',
         id: 'probe_env',
         name: recipe.shellTool.name,
-        input: recipe.shellTool.call(`node "${scripts.envPath}"`),
+        input: recipe.shellTool.call(`node "${scripts.envPath}"`, workdir),
       },
       {
         type: 'tool_use',
         id: 'probe_denied',
         name: recipe.readTool.name,
-        input: recipe.readTool.call(PROBE_MARKS.deniedFile),
+        input: recipe.readTool.call(PROBE_MARKS.deniedFile, workdir),
       },
     ];
   };

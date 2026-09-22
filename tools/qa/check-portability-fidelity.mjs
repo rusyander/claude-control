@@ -1,7 +1,7 @@
 /**
  * Матрица верности против опубликованной таблицы (П1.1).
  *
- * Матрица «слой × провайдер» в `TASKS-PORTABILITY.md` §3 — это ОБЕЩАНИЕ человеку.
+ * Матрица «слой × провайдер» в `docs/TASKS-PORTABILITY.ru.md` §3 — это ОБЕЩАНИЕ человеку.
  * Считает её код (`domains/portability/fidelity.ts`) по данным каталога. Эта
  * проверка сводит одно с другим: каждая клетка таблицы обязана совпасть с тем,
  * что модуль выдаёт для представителя этого слоя у этого провайдера. Разошлись —
@@ -63,7 +63,7 @@ function parseMatrix(text) {
 let checked = { layers: 0, columns: 0 };
 
 async function main() {
-  const planPath = new URL('../../TASKS-PORTABILITY.md', import.meta.url);
+  const planPath = new URL('../../docs/TASKS-PORTABILITY.ru.md', import.meta.url);
   const { columns, rows } = parseMatrix(readFileSync(planPath, 'utf8'));
   // Итоговую строку пишет САМА сверка, своими числами: «9 CLI» в ней было
   // написано рукой, и десятый провайдер каталога оставил бы её врать о девяти.

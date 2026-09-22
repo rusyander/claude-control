@@ -48,7 +48,13 @@ export interface ProbeRecipe {
  */
 export interface ProbeTool {
   readonly name: string;
-  call(argument: string): Record<string, unknown>;
+  /**
+   * Аргументы вызова. `workdir` — рабочий каталог прогона; он здесь потому, что
+   * у цели вроде `qwen` чтение принимает ТОЛЬКО абсолютный путь, а имя файла
+   * вызов получает голым. Цели, которой каталог не нужен, второй параметр
+   * просто не объявляет.
+   */
+  call(argument: string, workdir: string): Record<string, unknown>;
 }
 
 export const PROBE_RECIPES: Readonly<Record<string, ProbeRecipe>> = {
@@ -108,6 +114,30 @@ export const PROBE_RECIPES: Readonly<Record<string, ProbeRecipe>> = {
     readTool: { name: 'exec_command', call: (path) => ({ cmd: readFileCommand(path) }) },
     commandPrompt: '/agentdeck-probe-command',
     prepare: prepareCodexHome,
+  },
+  qwen: {
+    // Из ДВУХ протоколов каталога взят Anthropic: на нём говорит заглушка, и
+    // живой прогон 22.09.2026 (`qwen 0.24.3`) показал, что цель выбирает его по
+    // ОДНИМ переменным окружения, без флага `--auth-type`, — то есть ровно по
+    // тому, что панель ей и пишет.
+    args: (prompt) => ['-y', '-p', prompt],
+    apiKind: 'anthropic',
+    // `-y` — единственный способ дать этой цели выполнить вызов в headless: и
+    // `--allowed-tools run_shell_command`, и `permissions.allow` в настройках
+    // оставляют «requires user approval but cannot execute in non-interactive
+    // mode» (оба проверены живьём). В отличие от codex, ЦЕНЫ у этого флага нет:
+    // запрет он не снимает — тот же прогон под `-y` с правилом
+    // `read_file(*)` дал отказ «Matching deny rule», а оболочка при этом
+    // отработала. Появись у qwen обратное поведение — строка права ослепнет, и
+    // менять придётся вместе с ним.
+    shellTool: { name: 'run_shell_command', call: (command) => ({ command }) },
+    // Имена и форма аргументов сняты живым прогоном: у чтения поле `file_path`
+    // (не `absolute_path` родителя-форка), и путь принимается ТОЛЬКО
+    // абсолютный — «File path must be absolute». Относительное имя цель
+    // отвергает ошибкой, а ошибка чтения по негативу выглядела бы как
+    // сработавший запрет: зелёное право там, где его не проверяли.
+    readTool: { name: 'read_file', call: (path, workdir) => ({ file_path: join(workdir, path) }) },
+    commandPrompt: '/agentdeck-probe-command',
   },
 };
 

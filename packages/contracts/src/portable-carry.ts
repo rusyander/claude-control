@@ -81,7 +81,7 @@ export interface CarryPlan {
  * - `run_not_started` — у Claude прогон не пошёл (ключ не вернул стартер);
  * - `chat_not_created` — хранилище панели не завело разговор чужому CLI;
  * - `send_failed` — разговор заведён, но задание в него не ушло: чинить надо
- *   CLI, а заведённый разговор у цели уже лежит.
+ *   CLI, а пустой разговор у цели убран — переносить придётся заново.
  */
 export type CarryTargetFailure = 'run_not_started' | 'chat_not_created' | 'send_failed';
 

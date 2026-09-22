@@ -141,7 +141,10 @@ export const portabilityEn = {
         'the safeguards there is the target itself: the run at the new CLI may never ' +
         'start, the storage may not create the conversation, and a created ' +
         'conversation may not receive the task. Those three are different troubles, ' +
-        'fixed differently, and each is named in its own words after the count.',
+        'fixed differently, and each is named in its own words after the count. In ' +
+        'the last case the empty conversation is removed: the panel assembled that ' +
+        'task from the checkpoint and the original goal, and no one retypes it by ' +
+        'hand. Fix the CLI and carry again.',
     },
 
     notTitle: 'What this section is NOT',

@@ -19,6 +19,7 @@ import { MessageBubble } from './MessageBubble';
 import { StreamedAnswer } from './StreamedAnswer';
 import { QuestionCard } from './QuestionCard';
 import { PermissionCard } from './PermissionCard';
+import { BranchGateCard } from './BranchGateCard';
 import { ChildBlocks } from './ChildBlocks';
 import { ReviewDecisionCard } from './ReviewDecisionCard';
 import { waitsDecision } from '../lib/reviewWaiting';
@@ -47,6 +48,8 @@ export function ChatMessages({
   isRunning,
   permissions,
   onPermissionDecide,
+  branchGates,
+  onBranchDecide,
   childQuestions,
   onChildAnswer,
   childPermissions,
@@ -340,6 +343,10 @@ export function ChatMessages({
 
       {permissions && permissions.length > 0 && onPermissionDecide && (
         <PermissionCard permissions={permissions} onDecide={onPermissionDecide} />
+      )}
+
+      {branchGates && branchGates.length > 0 && onBranchDecide && (
+        <BranchGateCard gates={branchGates} onDecide={onBranchDecide} />
       )}
 
       {/*

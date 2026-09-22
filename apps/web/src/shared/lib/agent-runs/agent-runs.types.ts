@@ -23,6 +23,18 @@ export interface PendingPermission {
 }
 
 /**
+ * Первая правка в основной рабочей копии — придержана до ответа человека. Это
+ * тот же запрос прав (`toolUseId` общий), но спрашивают здесь не «можно ли», а
+ * «где»: завести копию с веткой, писать на месте или не писать вовсе.
+ */
+export interface PendingBranchGate extends PendingPermission {
+  /** Каталог, в котором идёт прогон, — основная копия репозитория. */
+  cwd: string;
+  /** Имя ветки, предложенное панелью; человек правит его прямо в карточке. */
+  branch: string;
+}
+
+/**
  * Сообщение, дописанное человеком, пока агент ещё занят. Уходит само, как только
  * текущий ход закончится, — тем же `--resume`, то есть в тот же разговор.
  *
@@ -86,6 +98,8 @@ export interface AgentRun {
   askedQuestion: boolean;
   /** Запросы на права, ждущие ответа человека (интерактивный permission-prompt). */
   permissions: PendingPermission[];
+  /** Ворота ветки: первая правка в основной копии ждёт решения человека. */
+  branchGates: PendingBranchGate[];
   /** Дописанное, пока агент занят: уйдёт по очереди, как только он освободится. */
   queued: QueuedMessage[];
   /**
@@ -268,6 +282,14 @@ export type ChatEvent =
   | { kind: 'error'; message: string; retriable?: boolean }
   | { kind: 'permission'; toolName: string; input: unknown; toolUseId: string }
   | { kind: 'permissionResolved'; toolUseId: string; behavior: 'allow' | 'deny' }
+  | {
+      kind: 'branchGate';
+      toolName: string;
+      input: unknown;
+      toolUseId: string;
+      cwd: string;
+      branch: string;
+    }
   /**
    * Заметка панели про прогон: подхвачен после перезапуска сервера без потока
    * вывода (`adopted`) или его процесс закрылся (`detachedDone`). Код — для

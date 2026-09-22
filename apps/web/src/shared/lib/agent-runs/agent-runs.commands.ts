@@ -374,6 +374,55 @@ export function setAutoApprove(id: string, enabled: boolean): void {
   void apiClient.post(`/chat/${target}/auto-approve`, { enabled }).catch(() => undefined);
 }
 
+/**
+ * Ответить воротам ветки. Карточку гасим только на успехе, и это не
+ * осторожность: «завести копию» может не пройти у самого git (занятое имя,
+ * грязная копия), а придержанная правка всё это время жива. Сняли бы карточку
+ * сразу — человек остался бы с идущим прогоном, который стоит, и без единой
+ * кнопки, чтобы ответить.
+ */
+export async function decideBranchGate(
+  id: string,
+  toolUseId: string,
+  choice: 'copy' | 'here' | 'stop',
+  branch?: string,
+): Promise<{ ok: boolean; path?: string; error?: string }> {
+  const run = getRun(id);
+  const key = run.id || id;
+  const current = runs.get(key);
+  const target = current?.serverRunId ?? key;
+  try {
+    const { data } = await apiClient.post(`/chat/${target}/branch-decision`, {
+      toolUseId,
+      choice,
+      ...(branch ? { branch } : {}),
+    });
+    const answer = data as { ok?: unknown; path?: unknown; message?: unknown };
+    if (answer?.ok !== true) {
+      return {
+        ok: false,
+        ...(typeof answer?.message === 'string' ? { error: answer.message } : {}),
+      };
+    }
+    const after = runs.get(key);
+    if (after) {
+      runs.set(key, {
+        ...after,
+        branchGates: after.branchGates.filter((gate) => gate.toolUseId !== toolUseId),
+      });
+      rebuildStatuses();
+      emit();
+    }
+    return { ok: true, ...(typeof answer.path === 'string' ? { path: answer.path } : {}) };
+  } catch (error) {
+    const body = (error as { response?: { data?: { message?: unknown } } })?.response?.data;
+    return {
+      ok: false,
+      ...(typeof body?.message === 'string' ? { error: body.message } : {}),
+    };
+  }
+}
+
 /** Ответить на запрос прав (клик «Разрешить»/«Запретить»). */
 export function decidePermission(
   id: string,

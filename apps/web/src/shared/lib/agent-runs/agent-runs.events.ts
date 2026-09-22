@@ -107,8 +107,29 @@ export function applyEvent(id: string, event: ChatEvent): void {
       firePermission = !already;
       break;
     }
+    case 'branchGate': {
+      const already = run.branchGates.some((gate) => gate.toolUseId === event.toolUseId);
+      next.branchGates = already
+        ? run.branchGates
+        : [
+            ...run.branchGates,
+            {
+              toolName: event.toolName,
+              input: event.input,
+              toolUseId: event.toolUseId,
+              cwd: event.cwd,
+              branch: event.branch,
+            },
+          ];
+      // Точка «агент ждёт человека» — та же, что у прав: работа стоит одинаково,
+      // чем бы карточка ни была.
+      firePermission = !already;
+      break;
+    }
     case 'permissionResolved':
       next.permissions = run.permissions.filter((p) => p.toolUseId !== event.toolUseId);
+      // Ворота ветки отвечают тем же `toolUseId` — снимаем и их карточку.
+      next.branchGates = run.branchGates.filter((gate) => gate.toolUseId !== event.toolUseId);
       break;
     case 'handoff':
       // В самом прогоне ничего не меняется: он закрыт, а работа уехала в другой
@@ -144,6 +165,7 @@ export function applyEvent(id: string, event: ChatEvent): void {
   // перерисовывала бы ленту табов, ради чего кэш и заводился.
   const shownInSnapshot =
     event.kind === 'permission' ||
+    event.kind === 'branchGate' ||
     event.kind === 'permissionResolved' ||
     event.kind === 'usage' ||
     (event.kind === 'tool' && event.name === 'AskUserQuestion');

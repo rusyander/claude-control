@@ -44,8 +44,8 @@ The per-CLI boundaries live in their own file:
 Chat is the panel’s largest section, and its boundaries are documented next to the section itself:
 [Chat, tabs and parallel agents § What the chat does not do](CHAT.md#what-the-chat-does-not-do) —
 a run that finished while the page was closed, conversations that cannot be deleted or renamed,
-project git without merging or conflict resolution, parallel copies, the fan-out caps and the rules
-of continuing in a clean session.
+project git without merging or conflict resolution, parallel copies, the first-edit gate, the
+fan-out caps and the rules of continuing in a clean session.
 
 ## Rules
 

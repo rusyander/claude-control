@@ -23,6 +23,10 @@
     "n": 10,
     "why": "agent prompt / text the model reads"
   },
+  "domains/chat/ChatBranchGate.ts": {
+    "n": 3,
+    "why": "agent prompt / text the model reads: the denial that names the copy, the restart task and the refusal of the whole edit — all three travel to the agent as a tool result, never to the interface"
+  },
   "domains/chat/ChatExport.ts": {
     "n": 3,
     "why": "exported document / markdown written for another tool"

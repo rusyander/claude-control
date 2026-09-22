@@ -564,6 +564,17 @@
   color: var(--color-warning, #d9822b);
 }
 
+// Ворота ветки: тон не «опасно», а «выбор» — правка не отклоняется, у неё
+// спрашивают место. Отсюда акцентная рамка вместо предупреждающей.
+.branchGate {
+  border-color: var(--color-accent);
+  border-left-color: var(--color-accent);
+}
+
+.branchGateHead {
+  color: var(--color-accent);
+}
+
 .permissionInput {
   margin: var(--spacing-2xs) 0;
   padding: var(--spacing-xs) var(--spacing-sm);

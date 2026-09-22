@@ -9,6 +9,7 @@ export const EMPTY_RUN: AgentRun = {
   tokens: 0,
   askedQuestion: false,
   permissions: [],
+  branchGates: [],
   queued: [],
   lastEventAt: 0,
 };

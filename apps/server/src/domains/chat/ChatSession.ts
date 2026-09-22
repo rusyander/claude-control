@@ -113,6 +113,35 @@ export class ChatSession {
     const key = this.registry.resolveKey(chatId);
     this.permissions.cancelRun(key);
     this.autoApprove.delete(key);
+    // Ответ «писать здесь» жил ровно этот прогон: следующий начинается снова в
+    // основной копии, и молчать о ветке ему не с чего.
+    this.branchGateSettled.delete(key);
+  }
+
+  /**
+   * Прогоны, где ворота ветки уже отработали: человек ответил «писать здесь».
+   * Спрашивать второй раз нечего — он сказал это про весь прогон, а не про один
+   * файл, и карточка на каждую следующую правку была бы ровно тем, от чего
+   * уходили. Копия сюда не пишется намеренно: после переезда прогон идёт в ней,
+   * а там ворота молчат сами (`isMainWorkingCopy` уже ложь).
+   */
+  private readonly branchGateSettled = new Set<string>();
+
+  /** Человек решил писать в основной копии — до конца этого прогона. */
+  settleBranchGate(chatId: string): void {
+    const key = this.registry.resolveKey(chatId);
+    this.branchGateSettled.add(key);
+    // Тот же предел и по той же причине, что у тумблеров: карта живёт в памяти
+    // процесса и читается только по ключу.
+    for (const oldest of this.branchGateSettled) {
+      if (this.branchGateSettled.size <= MAX_TOGGLES) break;
+      this.branchGateSettled.delete(oldest);
+    }
+  }
+
+  /** Отработали ли уже ворота ветки в этом прогоне. */
+  isBranchGateSettled(chatId: string): boolean {
+    return this.branchGateSettled.has(this.registry.resolveKey(chatId));
   }
 
   /** Запросить решение пользователя; ждёт клика в интерфейсе. */

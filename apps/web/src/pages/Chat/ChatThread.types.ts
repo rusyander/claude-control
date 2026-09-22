@@ -1,7 +1,12 @@
 import type { ChatMessage, ChatSummary } from '@agentdeck/contracts';
 import type { StreamState } from '@entities/Chat';
 import type { MediaRevision } from '@entities/Media';
-import type { ActiveRunView, PendingPermission, QueuedMessage } from '@shared/lib/agent-runs';
+import type {
+  ActiveRunView,
+  PendingBranchGate,
+  PendingPermission,
+  QueuedMessage,
+} from '@shared/lib/agent-runs';
 import type { HandoffControls } from '@features/ChatMessages';
 import type { ChildHub } from './model/useChildHub';
 import type { TaskSplitApi } from './model/useTaskSplit';
@@ -40,6 +45,8 @@ export interface ChatThreadProps {
   /** Ключ прогона этого разговора: по нему уходят права и повтор. */
   chatId?: string;
   permissions: PendingPermission[];
+  /** Ворота ветки: первая правка в основной копии ждёт решения человека. */
+  branchGates: PendingBranchGate[];
   /** Дописанное, ждущее конца хода: лента рисует его пузырём-призраком. */
   queued: QueuedMessage[];
   /** Убрать сообщение из очереди, пока оно не ушло. */

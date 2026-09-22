@@ -15,6 +15,7 @@ export type {
   StartInput,
   StreamedTool,
   PendingPermission,
+  PendingBranchGate,
   QueuedMessage,
   SendOutcome,
   HandoffEvent,

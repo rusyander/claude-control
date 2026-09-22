@@ -2,6 +2,7 @@ import {
   cancelQueued,
   clearRun,
   continueRun,
+  decideBranchGate,
   decidePermission,
   enqueue,
   quietRun,
@@ -60,6 +61,7 @@ export const agentRuns = {
   setOnHandoff,
   setAutoApprove,
   decidePermission,
+  decideBranchGate,
 };
 
 export { EMPTY_RUN } from './agent-runs.constants';
@@ -72,6 +74,7 @@ export { parseSseFrame } from './agent-runs.sse';
 export type {
   AgentRun,
   HandoffEvent,
+  PendingBranchGate,
   PendingPermission,
   QueuedMessage,
   SendOutcome,

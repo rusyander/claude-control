@@ -8,6 +8,7 @@ import type { MediaRevision } from '@entities/Media';
 import type { PendingPermission, QueuedMessage } from '@shared/lib/agent-runs';
 import type { ChildStageGroup } from './ChildStages.types';
 import type { ReviewDecisionItem } from './ReviewDecisionCard.types';
+import type { BranchGateCardProps, PendingBranchGate } from './BranchGateCard.types';
 
 /**
  * Всё, что карточке продолжения нужно от страницы, одним объектом. Плоскими
@@ -105,6 +106,10 @@ export interface ChatMessagesProps {
    * ответ обязан прийти тем же каналом, а не отдельной репликой в чат.
    */
   onPermissionDecide?: (toolUseId: string, behavior: 'allow' | 'deny', message?: string) => void;
+  /** Ворота ветки: первая правка в основной копии ждёт решения человека. */
+  branchGates?: PendingBranchGate[];
+  /** Ответ воротам; обещание — заведение копии может не пройти у git. */
+  onBranchDecide?: BranchGateCardProps['onDecide'];
   /**
    * Вопросы ДОЧЕРНИХ разговоров, ждущие ответа. Разделение задач разводит работу
    * по нескольким агентам, но человек остаётся один: обходить их чаты по кругу

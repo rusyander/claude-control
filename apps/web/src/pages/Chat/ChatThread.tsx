@@ -26,6 +26,7 @@ export function ChatThread({
   runStartedAt,
   chatId,
   permissions,
+  branchGates,
   queued,
   onCancelQueued,
   child,
@@ -82,10 +83,16 @@ export function ChatThread({
       isRunning={isRunning}
       runStartedAt={runStartedAt}
       permissions={permissions}
+      branchGates={branchGates}
       queued={queued}
       onCancelQueued={onCancelQueued}
       onPermissionDecide={(toolUseId, behavior, message) =>
         chatId && agentRuns.decidePermission(chatId, toolUseId, behavior, message)
+      }
+      onBranchDecide={(toolUseId, choice, branch) =>
+        chatId
+          ? agentRuns.decideBranchGate(chatId, toolUseId, choice, branch)
+          : Promise.resolve({ ok: false })
       }
       childStages={child.stages}
       onOpenChild={onOpenChild}

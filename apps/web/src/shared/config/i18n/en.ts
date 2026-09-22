@@ -1166,6 +1166,22 @@ export const en: TranslationSchema = {
     answerQueuedForChild: 'Answer for “{{title}}” is queued — it goes out at the end of the turn',
     pickOption: 'Answer with this option',
     permissionTitle: 'The agent needs permission',
+    branchGate: {
+      title: 'First edit — where do we work?',
+      reason:
+        'The agent is about to edit files ({{tool}}) in the main working copy. ' +
+        'One git directory is shared by every chat of the project: leave the work here and ' +
+        'the next chat edits the same files on the same branch.',
+      branchLabel: 'Branch for the copy',
+      branchHint:
+        'The copy lands next to the project, in "<repo>-worktrees", and the conversation moves ' +
+        'there — same history, same task, the main directory left untouched',
+      copy: 'Create the copy and continue there',
+      here: 'Write here',
+      stop: 'Do not edit',
+      working: 'Creating the copy…',
+      failed: 'The copy could not be created.',
+    },
     permissionFromChild: 'Requested by “{{title}}”',
     permissionLost:
       'The decision never reached the agent: the request had already been dropped — it timed out or the conversation was restarted. If the agent is still waiting, send the prompt again.',
@@ -1283,6 +1299,10 @@ export const en: TranslationSchema = {
       externalDestroyHint: 'Merging an MR, deleting a ticket or a wiki page — not undoable here',
       networkExec: 'Dangerous network commands',
       networkExecHint: 'curl | sh — running what was downloaded, curl -X DELETE',
+      editInMainCopy: 'Edits in the project main copy',
+      editInMainCopyHint:
+        'Off — before the first edit the panel offers a copy on its own branch and moves the ' +
+        'conversation there: one git directory is shared by every chat of the project',
     },
     retry: 'Retry',
     continueAfterDrop:

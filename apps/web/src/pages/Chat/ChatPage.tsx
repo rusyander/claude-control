@@ -394,6 +394,7 @@ export function ChatPage() {
             runStartedAt={run.startedAt}
             chatId={chatId}
             permissions={run.permissions}
+            branchGates={run.branchGates}
             queued={run.queued}
             onCancelQueued={(queuedId) => chatId && agentRuns.cancelQueued(chatId, queuedId)}
             child={child}

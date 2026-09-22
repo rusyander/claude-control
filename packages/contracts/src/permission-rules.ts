@@ -37,6 +37,7 @@ export const PERMISSION_RULE_IDS = [
   'packagePublish',
   'externalDestroy',
   'networkExec',
+  'editInMainCopy',
 ] as const;
 
 export type PermissionRuleId = (typeof PERMISSION_RULE_IDS)[number];
@@ -58,6 +59,13 @@ export const PERMISSION_RULE_DEFAULTS: Readonly<Record<PermissionRuleId, boolean
   packagePublish: false,
   externalDestroy: false,
   networkExec: false,
+  // Правка в ОСНОВНОЙ рабочей копии проекта. Выключено — перед первой правкой
+  // панель предлагает завести копию (`git worktree`) со своей веткой, и чат
+  // продолжается уже в ней. Причина не в безвозвратности, а в том, что каталог
+  // у git один на всех: два пишущих чата в одной копии правят одни файлы и
+  // уводят друг у друга HEAD. Включённое правило возвращает прежнее поведение —
+  // все чаты проекта пишут там, где открыты.
+  editInMainCopy: false,
 };
 
 /** Сохранённые положения тумблеров: id правила → разрешено без вопроса. */

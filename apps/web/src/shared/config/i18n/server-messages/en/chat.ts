@@ -8,6 +8,9 @@ export const chatEn: Record<ChatMessageCode, string> = {
     'Unsupported attachments: {{names}}. The message was not sent. Allowed extensions: {{supported}}.',
   'run-workspace-missing':
     'This chat’s working folder was not found: {{cwd}}. The conversation started there and can only continue from there.',
+  'branch-name-required': 'No branch name given — there is nothing to create the copy under.',
+  'branch-run-gone':
+    'The run waiting on the branch decision has finished: there is no one to create the copy for.',
   'editor-not-found': 'Code editor not found. Set it in the settings or install code/cursor.',
   'handoff-proposal-invalid':
     'The proposal could not be parsed: “what is done” and “how to continue” are required',

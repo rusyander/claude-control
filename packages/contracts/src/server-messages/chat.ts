@@ -4,6 +4,8 @@ export const chatMessageParams = {
   'run-empty-prompt': [],
   'run-unsupported-upload': ['names', 'supported'],
   'run-workspace-missing': ['cwd'],
+  'branch-name-required': [],
+  'branch-run-gone': [],
   'editor-not-found': [],
   'handoff-proposal-invalid': [],
   'restart-run-in-progress': [],

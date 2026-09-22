@@ -82,6 +82,22 @@ export const permissionDecisionBodySchema = object({
 export type PermissionDecisionBody = Infer<typeof permissionDecisionBodySchema>;
 
 /**
+ * Ответ человека воротам ветки. `copy` — завести копию с веткой и продолжить
+ * разговор в ней, `here` — писать в основной копии (до конца прогона больше не
+ * спрашивать), `stop` — отклонить саму правку.
+ *
+ * Имя ветки приходит от человека: панель его лишь предложила. Проверяет имя git
+ * (`check-ref-format`) — здесь только форма поля, иначе отказ звучал бы дважды и
+ * по-разному.
+ */
+export const branchDecisionBodySchema = object({
+  toolUseId: string().min(1),
+  choice: zodEnum(['copy', 'here', 'stop']),
+  branch: string().optional(),
+});
+export type BranchDecisionBody = Infer<typeof branchDecisionBodySchema>;
+
+/**
  * Git: каталог приходит путём. Сам путь (абсолютный, существует, каталог) проверяет
  * маршрут той же проверкой, что и реестр проектов, — здесь только форма поля.
  * Пустые строки не отсекаются намеренно: на них отвечает git своим текстом.

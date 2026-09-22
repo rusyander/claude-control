@@ -7,6 +7,15 @@ import { RUN_UNKNOWN_DENIED } from '../../domains/chat/run-ledger.ts';
 import { ChatSession } from '../../domains/chat/ChatSession.ts';
 import { apiTokenPath } from '../../lib/api-token.ts';
 import { shouldAutoApprove, isReadOnlyTool } from '../../domains/chat/auto-approve.ts';
+import {
+  BRANCH_GATE_STOPPED,
+  branchContinuePrompt,
+  branchMovedDenial,
+  isMainWorkingCopy,
+  isWritingCall,
+  suggestBranchName,
+} from '../../domains/chat/ChatBranchGate.ts';
+import { addWorktree, GitError } from '../../domains/project-git.ts';
 import { createGuardedPatternsReader } from '../../domains/permissions.ts';
 import { chatDirectory } from '../../domains/chat/ChatArtifacts.ts';
 import { resolveWorkspace, permissionModeFor } from '../../domains/chat/ChatWorkspace.ts';
@@ -33,6 +42,7 @@ import { parseBody } from '../../lib/request-body.ts';
 import { allowedPermissionRules } from '@agentdeck/contracts/permission-rules';
 import {
   autoApproveBodySchema,
+  branchDecisionBodySchema,
   chatSendBodySchema,
   permissionDecisionBodySchema,
   permissionRequestBodySchema,
@@ -499,6 +509,42 @@ export function registerChatRunRoutes(
       if (adopted?.autoApprove) session.armAutoApprove(adopted.key, adopted.autoApprove);
     }
 
+    // ВОРОТА ВЕТКИ — раньше автоподтверждения, и порядок тут решает всё: правка
+    // файла обратима, автоподтверждение пропустило бы её молча, и вопрос «где
+    // мы вообще пишем» не прозвучал бы никогда. Стоят они не про безопасность
+    // вызова, а про место: каталог у git один на всех, и первая правка делает
+    // чаты проекта зависимыми друг от друга (`ChatBranchGate.ts`).
+    const rules = allowedPermissionRules(ctx.store.getSettings().autoApproveRules);
+    const held = registry.describe(runId);
+    if (
+      !rules.has('editInMainCopy') &&
+      held &&
+      !session.isBranchGateSettled(runId) &&
+      isWritingCall(toolName, input) &&
+      isMainWorkingCopy(held.options.cwd)
+    ) {
+      // Имя ветки предлагаем по заданию прогона, а не по названию чата: задание
+      // и есть то, ради чего ветку заводят, и в списке веток оно скажет больше.
+      const branch = suggestBranchName(held.options.prompt, held.key);
+      const shown = registry.emitExternal(runId, {
+        kind: 'branchGate',
+        toolName,
+        input,
+        toolUseId,
+        cwd: held.options.cwd,
+        branch,
+      });
+      if (shown) {
+        const decision = await session.requestPermission({ runId, toolName, input, toolUseId });
+        registry.emitExternal(runId, {
+          kind: 'permissionResolved',
+          toolUseId,
+          behavior: decision.behavior,
+        });
+        return reply.send(decision);
+      }
+    }
+
     // Автоподтверждение: обратимый запрос разрешаем молча, не показывая
     // карточку. Человеку остаётся безвозвратное (удаление, затирание истории,
     // снос данных и инфраструктуры, публикация в чужой реестр) и всё, что
@@ -516,10 +562,10 @@ export function registerChatRunRoutes(
         input,
         guardedPatterns: guardedPatterns(),
         allowEdits: auto?.allowEdits ?? false,
-        // Правила читаются на КАЖДЫЙ запрос: тумблер щёлкают ровно тогда, когда
-        // надоела карточка, и действовать он обязан со следующего же вызова, а
-        // не со следующего прогона.
-        allowedRules: allowedPermissionRules(ctx.store.getSettings().autoApproveRules),
+        // Правила читаются на КАЖДЫЙ запрос (`rules` выше): тумблер щёлкают
+        // ровно тогда, когда надоела карточка, и действовать он обязан со
+        // следующего же вызова, а не со следующего прогона.
+        allowedRules: rules,
       })
     ) {
       return reply.send({ behavior: 'allow', updatedInput: input });
@@ -559,6 +605,100 @@ export function registerChatRunRoutes(
           : { behavior: 'deny', message: message ?? 'Отклонено пользователем.' },
       );
       return { ok };
+    },
+  );
+
+  /**
+   * Ответ воротам ветки. Три исхода, и только один из них что-то заводит:
+   *
+   * `copy` — копия с веткой от текущего HEAD, и разговор ПЕРЕЕЗЖАЕТ в неё. Тот
+   * же чат, та же сессия, то же задание: прогон останавливается и поднимается
+   * заново с `--resume` в новом каталоге. Переносить транскрипт при этом не надо
+   * — `--resume` находит сессию независимо от каталога (проверено живьём
+   * 22.09.2026), а рабочую папку разговора панель берёт из ПОСЛЕДНЕЙ записи
+   * транскрипта, так что дальше чат сам считает копию своим домом.
+   *
+   * `here` — писать в основной копии; больше в этом прогоне не спрашиваем.
+   *
+   * `stop` — отклонить саму правку.
+   */
+  app.post<{ Params: { chatId: string }; Body: unknown }>(
+    '/api/chat/:chatId/branch-decision',
+    async (request, reply) => {
+      const { chatId } = request.params;
+      const body = parseBody(branchDecisionBodySchema, request.body, reply);
+      if (!body) return reply;
+      const { toolUseId, choice, branch } = body;
+
+      if (choice === 'here') {
+        session.settleBranchGate(chatId);
+        return { ok: session.decidePermission(chatId, toolUseId, { behavior: 'allow' }) };
+      }
+      if (choice === 'stop') {
+        return {
+          ok: session.decidePermission(chatId, toolUseId, {
+            behavior: 'deny',
+            message: BRANCH_GATE_STOPPED,
+          }),
+        };
+      }
+
+      // Снимок — ДО всего: остановка стирает прогон из реестра, а поднимать его
+      // заново надо теми же параметрами (та же причина, что у паузы дерева).
+      const held = registry.describe(chatId);
+      if (!held) {
+        return refuse(reply, 409, 'run_unknown', RUN_UNKNOWN_DENIED, {
+          messageCode: 'branch-run-gone',
+        });
+      }
+      const name = branch?.trim();
+      if (!name) {
+        return refuse(reply, 400, 'branch_required', 'Имя ветки не задано.', {
+          messageCode: 'branch-name-required',
+        });
+      }
+
+      let created: { path: string; output: string };
+      try {
+        created = await addWorktree(
+          held.options.cwd,
+          name,
+          ctx.store.getWorktreeMirror(held.options.cwd),
+          undefined,
+          ctx.location.paths.mcpConfig,
+        );
+      } catch (error) {
+        // Отказ git — не повод снимать придержанный вызов: человек поправит имя
+        // и нажмёт снова, а агент всё это время честно ждёт у той же карточки.
+        const text = error instanceof GitError ? error.message : String(error);
+        return refuse(reply, 400, 'branch_failed', text);
+      }
+
+      // Порядок: сперва гасим прогон, потом отпускаем вызов. Наоборот агент
+      // получил бы отказ и успел бы сходить куда-нибудь ещё в основной копии —
+      // ровно то, ради чего ворота и стоят.
+      registry.stop(held.key);
+      session.decidePermission(chatId, toolUseId, {
+        behavior: 'deny',
+        message: branchMovedDenial(created.path, name),
+      });
+
+      const options = {
+        ...held.options,
+        cwd: created.path,
+        prompt: branchContinuePrompt(created.path, name),
+        ...(held.sessionId ? { sessionId: held.sessionId } : {}),
+      };
+      // Разветвление сессии здесь означало бы новый разговор — а переезжает тот
+      // же самый.
+      delete options.fork;
+      const started = registry.start(held.key, options, {
+        ...held.meta,
+        projectPath: created.path,
+        ...(held.sessionId ? { sessionId: held.sessionId } : {}),
+      });
+
+      return { ok: true, path: created.path, branch: name, started, output: created.output };
     },
   );
 }

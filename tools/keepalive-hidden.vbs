@@ -16,10 +16,13 @@ Set fso = CreateObject("Scripting.FileSystemObject")
 
 here = fso.GetParentFolderName(WScript.ScriptFullName)
 
+' Путь к node зашивается в задачу при установке. Сменился менеджер версий
+' (nvm снят, node переставлен) — файла больше нет, и WSH раз в пять минут
+' показывал окно «Не удается найти указанный файл». Мёртвый путь — не повод
+' падать: берём node из PATH, как без аргументов.
+nodeExe = "node"
 If WScript.Arguments.Count >= 1 Then
-    nodeExe = WScript.Arguments(0)
-Else
-    nodeExe = "node"
+    If fso.FileExists(WScript.Arguments(0)) Then nodeExe = WScript.Arguments(0)
 End If
 
 If WScript.Arguments.Count >= 2 Then
@@ -30,5 +33,9 @@ End If
 
 cmd = """" & nodeExe & """ """ & script & """"
 
+' Сторожа нет вовсе (node не в PATH, файл сторожа удалён) — молча выходим:
+' модальное окно WSH каждые пять минут хуже пропущенного подхвата, а причина
+' видна в `pnpm keepalive:status`.
+On Error Resume Next
 ' 0 = скрытое окно, False = не ждать завершения.
 shell.Run cmd, 0, False

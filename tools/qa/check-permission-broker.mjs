@@ -25,6 +25,17 @@
  * Запуск: `node tools/qa/check-permission-broker.mjs`
  * Нужен установленный `claude` (путь можно задать `CLAUDE_CLI`); сети и стенда
  * не нужно — стаб и шлюз поднимаются здесь же.
+ *
+ * Самопроверка: `node tools/qa/check-permission-broker.mjs --selftest` — портит
+ * САМУ таблицу сверки по каждой её статье (решения разошлись, брокер вмешался
+ * там, где канон молчит, доказательство на диске не зависит от прав) и требует,
+ * чтобы сверка покраснела ИМЕННО на этой статье, по одному следу на порчу.
+ * Настоящего `claude` она не зовёт: предмет самопроверки — способность таблицы
+ * увидеть расхождение, а не расхождение само. Ровно поэтому она и нужна: пока
+ * чужого CLI на машине нет, единственное живое свидетельство об этой проверке —
+ * что она умеет краснеть. Поэтому в воротах (`pnpm portability`) стоит ИМЕННО
+ * самопроверка, а полный прогон остаётся ручным: звать настоящий CLI десять раз
+ * по две минуты ворота не должны.
  */
 import { spawn } from 'node:child_process';
 import { existsSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -163,8 +174,61 @@ for (const row of rows) {
 process.stdout.write(JSON.stringify(out));
 `;
 
+const selftest = process.argv.includes('--selftest');
 const report = reporter();
-const { ok, bad } = report;
+
+/**
+ * Приговор таблицы: три статьи над уже измеренными строками.
+ *
+ * Вынесено из прогона отдельной функцией, чтобы самопроверка судила ТЕМ ЖЕ
+ * кодом. Своя копия сравнения в самопроверке означала бы, что краснеть умеет
+ * копия, а работает оригинал.
+ */
+function judge(rows, { ok, bad }) {
+  for (const { row, claude, broker: verdict } of rows) {
+    if (!row.decided) continue;
+    if (claude.allowed === verdict.allow) {
+      ok(`совпало: ${row.title}`);
+      continue;
+    }
+    bad(
+      `разошлось: ${row.title}`,
+      `claude ${verdictWord(claude.allowed)}, брокер ${verdictWord(verdict.allow)}; причина брокера: ${
+        verdict.reason || '—'
+      }\n    CLI сказал: ${JSON.stringify(claude.out.slice(-300))}`,
+    );
+  }
+
+  // Строка, где правила молчат: в равенство не входит, но обязана быть
+  // ПОКАЗАНА — иначе граница брокера остаётся необъявленной.
+  const silent = rows.find(({ row }) => !row.decided);
+  if (silent) {
+    console.log(
+      `\n  · граница: правила молчат — claude ${verdictWord(silent.claude.allowed)} (его режим), брокер ${verdictWord(
+        silent.broker.allow,
+      )} (не вмешивается)`,
+    );
+    if (!silent.broker.allow) {
+      bad(
+        'брокер вмешался туда, где канон молчит',
+        'брокер обязан пропускать вызов, о котором правил нет',
+      );
+    }
+  }
+
+  // Проверка умеет краснеть: соседние строки `allow` и `deny` одного вида дают
+  // РАЗНЫЙ исход у claude. Одинаковый означал бы, что доказательство на диске
+  // не зависит от прав вовсе.
+  const [allowRow, denyRow] = rows;
+  if (allowRow && denyRow && allowRow.claude.allowed === denyRow.claude.allowed) {
+    bad(
+      'доказательство на диске не зависит от прав',
+      `и allow, и deny дали «${verdictWord(allowRow.claude.allowed)}» — движок прав в прогоне не участвует`,
+    );
+  } else if (allowRow && denyRow) {
+    ok('движок прав claude в прогоне действительно участвует (allow ≠ deny)');
+  }
+}
 
 /**
  * Путь до настоящего CLI. На Windows берётся `claude.exe` пакета, а не
@@ -316,50 +380,7 @@ async function main() {
     }
     console.log('');
 
-    for (const { row, claude, broker: verdict } of rows) {
-      if (!row.decided) continue;
-      if (claude.allowed === verdict.allow) {
-        ok(`совпало: ${row.title}`);
-        continue;
-      }
-      bad(
-        `разошлось: ${row.title}`,
-        `claude ${verdictWord(claude.allowed)}, брокер ${verdictWord(verdict.allow)}; причина брокера: ${
-          verdict.reason || '—'
-        }\n    CLI сказал: ${JSON.stringify(claude.out.slice(-300))}`,
-      );
-    }
-
-    // Строка, где правила молчат: в равенство не входит, но обязана быть
-    // ПОКАЗАНА — иначе граница брокера остаётся необъявленной.
-    const silent = rows.find(({ row }) => !row.decided);
-    if (silent) {
-      console.log(
-        `\n  · граница: правила молчат — claude ${verdictWord(silent.claude.allowed)} (его режим), брокер ${verdictWord(
-          silent.broker.allow,
-        )} (не вмешивается)`,
-      );
-      if (!silent.broker.allow) {
-        bad(
-          'брокер вмешался туда, где канон молчит',
-          'брокер обязан пропускать вызов, о котором правил нет',
-        );
-      }
-    }
-
-    // Проверка умеет краснеть: соседние строки `allow` и `deny` одного вида дают
-    // РАЗНЫЙ исход у claude. Одинаковый означал бы, что доказательство на диске
-    // не зависит от прав вовсе.
-    const allowRow = rows[0];
-    const denyRow = rows[1];
-    if (allowRow.claude.allowed === denyRow.claude.allowed) {
-      bad(
-        'доказательство на диске не зависит от прав',
-        `и allow, и deny дали «${verdictWord(allowRow.claude.allowed)}» — движок прав в прогоне не участвует`,
-      );
-    } else {
-      ok('движок прав claude в прогоне действительно участвует (allow ≠ deny)');
-    }
+    judge(rows, report);
   } finally {
     driver.stop();
     await stub.close();
@@ -369,6 +390,97 @@ async function main() {
   console.log(report.failures === 0 ? '\nВсё сходится.' : `\nПровалов: ${report.failures}`);
   process.exit(report.failures === 0 ? 0 : 1);
 }
+
+/**
+ * Самопроверка таблицы: каждая её статья обязана покраснеть от своей порчи.
+ *
+ * Строки здесь ИЗМЕРЕНИЯМИ не являются и ими не притворяются: это исходы,
+ * которые таблица уже получила бы от настоящего прогона, и вопрос один — видит
+ * ли она в них расхождение. Целый прогон ради этого звать нечем и незачем: без
+ * установленного `claude` он не идёт вовсе, а статья, которая не может
+ * покраснеть, остаётся украшением ровно до дня, когда на ней что-то разойдётся.
+ */
+function runSelftest() {
+  /** Здоровая таблица: две решённые строки сошлись, у молчащей брокер не вмешался. */
+  const healthy = () => [
+    {
+      row: { title: 'allow по префиксу команды', decided: true },
+      claude: { allowed: true, out: '' },
+      broker: { allow: true, reason: '' },
+    },
+    {
+      row: { title: 'deny по префиксу команды', decided: true },
+      claude: { allowed: false, out: '' },
+      broker: { allow: false, reason: 'deny: Bash(touch:*)' },
+    },
+    {
+      row: { title: 'правила молчат', decided: false },
+      claude: { allowed: false, out: '' },
+      broker: { allow: true, reason: '' },
+    },
+  ];
+
+  const damages = [
+    {
+      name: 'решения разошлись',
+      trace: 'разошлось: allow по префиксу команды',
+      spoil: (rows) => {
+        rows[0].broker = { allow: false, reason: 'выдуманный отказ' };
+      },
+    },
+    {
+      name: 'брокер вмешался там, где канон молчит',
+      trace: 'брокер вмешался туда, где канон молчит',
+      spoil: (rows) => {
+        rows[2].broker = { allow: false, reason: 'выдуманный отказ' };
+      },
+    },
+    {
+      name: 'доказательство на диске не зависит от прав',
+      trace: 'доказательство на диске не зависит от прав',
+      // Оба CLI-исхода одинаковы, и брокер за ними — иначе покраснело бы
+      // равенство строк, а не эта статья: порча обязана краснить СВОЙ след.
+      spoil: (rows) => {
+        rows[1].claude = { allowed: true, out: '' };
+        rows[1].broker = { allow: true, reason: '' };
+      },
+    },
+  ];
+
+  const missed = [];
+  console.log('Самопроверка сверки прав: таблица против своих порч\n');
+
+  // Сперва здоровая: статья, краснеющая без порчи, ловила бы что угодно.
+  report.reset();
+  judge(healthy(), report);
+  if (report.failures > 0) {
+    missed.push(`здоровая таблица покраснела: ${report.failedNames.join(', ')}`);
+  }
+
+  for (const damage of damages) {
+    const rows = healthy();
+    damage.spoil(rows);
+    report.reset();
+    judge(rows, report);
+    if (!report.failedNames.includes(damage.trace)) {
+      missed.push(
+        `${damage.name}: ждали след «${damage.trace}», получили ${
+          report.failedNames.length > 0 ? `«${report.failedNames.join('», «')}»` : 'зелёную таблицу'
+        }`,
+      );
+    }
+  }
+
+  console.log('');
+  if (missed.length > 0) {
+    console.error(`Самопроверка: порча не поймана — ${missed.join('; ')}.`);
+    process.exit(1);
+  }
+  console.log(`Самопроверка пройдена: ${damages.length} порчи, каждая краснит свой след.`);
+  process.exit(0);
+}
+
+if (selftest) runSelftest();
 
 main().catch((error) => {
   if (error instanceof NotChecked) {

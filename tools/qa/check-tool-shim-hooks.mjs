@@ -362,21 +362,28 @@ async function run(dir, port, hookReport) {
 const DAMAGES = {
   'no-hold': {
     title: 'вызов не придерживается — уезжает клиенту, не спросив хука',
+    trace: 'запрещённый вызов до клиента НЕ доехал',
     file: 'apps/server/src/domains/platform/gateway/frames.ts',
-    from: '        this.#pending.push({ call: prepared.call, payload });',
-    to: '        this.#calls.push(prepared.call);',
+    // Порча снимает саму придержку: ветка ворот не берётся, и вызов идёт по
+    // прежнему пути — рисуется клиенту, ни о чём не спросив. Подмена одной
+    // строки внутри ветки этого НЕ воспроизводила: вызов не рисовался вовсе, и
+    // «до клиента не доехал» зеленело по неверной причине.
+    from: '      if (this.#options.shim?.toolEvents) {',
+    to: '      if (false && this.#options.shim?.toolEvents) {',
   },
   'empty-args': {
     title: 'аргументы вызова не доезжают до нагрузки хука',
+    trace: 'хук получил нагрузку Claude через stdin',
     file: 'apps/server/src/domains/portability/wire/tool-gate.ts',
     from: '        call: { id: call.id, name: call.name, input: call.arguments },',
     to: '        call: { id: call.id, name: call.name, input: undefined },',
   },
   'mute-reason': {
     title: 'причина отказа из stderr скрипта теряется',
+    trace: 'на месте вызова — результат инструмента с причиной',
     file: 'apps/server/src/domains/portability/supervisor/run.ts',
-    from: '      : ((parsed === undefined && script.exitCode === 2 && said ? said : undefined) ??\n        verdict.reason);',
-    to: '      : verdict.reason;',
+    from: '    const brokeWithCode = parsed === undefined && script.exitCode !== 0 && said;',
+    to: '    const brokeWithCode = false;',
   },
 };
 
@@ -399,17 +406,25 @@ async function main() {
     let missed = 0;
     for (const [damage, spec] of Object.entries(DAMAGES)) {
       const restore = damageFiles(damage);
-      let seen;
+      let names;
       try {
-        seen = await probe();
+        await probe();
       } finally {
+        names = tally.failedNames;
         restore();
       }
-      if (seen === 0) {
-        console.error(`Самопроверка: «${spec.title}» прошла незамеченной — проверка не краснеет.`);
+      // Красной обязана стать ИМЕННО та проверка, ради которой порча внесена:
+      // счёт провалов засчитал бы её соседней, а названная строка обещания
+      // осталась бы непроверенной.
+      const hit = names.filter((name) => name.includes(spec.trace));
+      if (hit.length === 0) {
+        console.error(
+          `Самопроверка: «${spec.title}» не поймана по следу «${spec.trace}» ` +
+            `(покраснело ${names.length}: ${JSON.stringify(names)}).`,
+        );
         missed += 1;
       } else {
-        console.log(`Самопроверка: «${spec.title}» замечена (провалов ${seen}).`);
+        console.log(`Самопроверка: «${spec.title}» замечена по следу «${spec.trace}».`);
       }
     }
     process.exit(missed > 0 ? 1 : 0);

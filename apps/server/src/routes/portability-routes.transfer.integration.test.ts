@@ -192,6 +192,40 @@ describe('portability-routes: перенос', () => {
     expect(again.json().messageCode).toBe('portability-plan-stale');
   });
 
+  /**
+   * Второе применение поверх неотменённого следа (инвариант 10 повтор разрешает).
+   *
+   * Копии второго применения сняты с файлов, которые перенос уже переписал, и
+   * ляг такой след поверх прежнего — «отменить» вернуло бы файлы к состоянию
+   * ПОСЛЕ первого переноса и отчиталось бы об успехе. Проверка смотрит на текст
+   * человека: он либо на диске, либо нет, и ответ маршрута на этот вопрос не
+   * влияет.
+   */
+  it('второе применение не стирает память о том, какими файлы были до панели', async () => {
+    const instructions = join(home, '.gemini', 'GEMINI.md');
+    const before = readFileSync(instructions, 'utf8');
+
+    const first = await planned();
+    expect((await post('apply', { ...target, fingerprint: first.fingerprint })).statusCode).toBe(
+      200,
+    );
+
+    // Второй показ даёт свой отпечаток: файлы цели уже другие.
+    const second = await planned();
+    expect(second.fingerprint).not.toBe(first.fingerprint);
+    expect((await post('apply', { ...target, fingerprint: second.fingerprint })).statusCode).toBe(
+      200,
+    );
+
+    const reverted = await post('revert', target);
+
+    expect(reverted.statusCode).toBe(200);
+    expect(readFileSync(instructions, 'utf8')).toBe(before);
+    expect(
+      store.getPortabilityTransfer(transferRecordKey('claude', 'gemini', 'global')),
+    ).toBeUndefined();
+  });
+
   it('отменять нечего — 404, а не молчаливое «готово»', async () => {
     const res = await post('revert', target);
 

@@ -64,7 +64,10 @@ export function buildTransferPlan(
   skipFiles?: ReadonlySet<string>,
 ): PlannedTransfer {
   const emitted = emitEnvironment(env, { ...deps, target });
-  const report = buildFidelityReport(env, target, computedAt);
+  // Разделы берутся у ПЛАНА, а не считаются здесь заново: на уровне проекта
+  // отчёт верности без них отказывается считаться вовсе (fail-closed), и без
+  // этой передачи проектный перенос падал на первой же строке отчёта.
+  const report = buildFidelityReport(env, target, computedAt, emitted.targets);
 
   const namedWrites = only
     ? emitted.writes.filter((write) => write.itemIds.some((id) => only.has(id)))
@@ -150,6 +153,9 @@ function filePlan(target: ConfigProvider, group: readonly EmitWrite[]): Transfer
     added: preview.added,
     removed: preview.removed,
     truncated: preview.truncated,
+    // Только у обрезанного сравнения — и только ради отпечатка: показывать хеш
+    // человеку нечего, а без него отпечаток такого файла слеп к его содержимому.
+    ...(preview.hashes ? { hashes: preview.hashes } : {}),
   };
 }
 
@@ -183,6 +189,11 @@ function fingerprintOf(
       file.added,
       file.removed,
       file.truncated,
+      // У обрезанного сравнения строк нет вовсе, а `added`/`removed` — нули:
+      // без хешей отпечаток такого файла не менялся бы ни от какой правки
+      // руками, и сторож устаревшего плана молчал бы именно там, где файл
+      // велик настолько, что править его руками опаснее всего.
+      file.hashes ? `${file.hashes.before}:${file.hashes.after}` : '',
       file.lines.map((line) => `${line.kind} ${line.text}`),
     ]),
   };

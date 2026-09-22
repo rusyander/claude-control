@@ -130,7 +130,7 @@ describe('provider-keys роуты', () => {
     expect(body.keyStatus.present).toBe(false);
   });
 
-  it('после PUT provider-runner → api (ключ есть)', async () => {
+  it('после PUT ключ у роута есть, и режим — по порядку Ф6, а не по машине', async () => {
     await boot('codex');
     await app.inject({
       method: 'PUT',
@@ -139,7 +139,21 @@ describe('provider-keys роуты', () => {
     });
     const res = await app.inject({ method: 'GET', url: '/api/provider-runner' });
     const body = res.json<ProviderRunnerInfo>();
-    expect(body.mode).toBe('api');
-    expect(body.reason).toBe('api_key');
+
+    // Роут отвечает за одно: ключ сохранён и виден. Каким станет режим, решает
+    // порядок Ф6 — подписка через CLI провайдера ПЕРВЕЕ платного API, — и
+    // зависит он от того, стоит ли `codex` на ЭТОЙ машине. Жёсткое `api` здесь
+    // держалось ровно до 22.09.2026, когда codex поставили для живой приёмки, и
+    // краснело потом на исправном коде. Сам переход «ключ есть, CLI нет → api»
+    // проверяется детерминированно, с подставленным поиском:
+    // `domains/provider-keys.test.ts` §«ключ есть, CLI НЕ найден → api».
+    expect(body.keyStatus.present).toBe(true);
+    if (body.cliFound) {
+      expect(body.mode).toBe('cli');
+      expect(body.reason).toBe('cli_found');
+    } else {
+      expect(body.mode).toBe('api');
+      expect(body.reason).toBe('api_key');
+    }
   });
 });

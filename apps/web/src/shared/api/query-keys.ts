@@ -28,6 +28,19 @@ export const queryKeys = {
   /** След применённого переноса — свойство той же пары на том же уровне. */
   portabilityTransfer: (source: string, target: string, scope: string, project = '') =>
     ['portability', 'transfer', source, target, scope, project] as const,
+  /**
+   * Подписки целей на канон (П5.1). Ключ ОДИН на весь список, без цели и без
+   * уровня: маршрут отдаёт все подписки разом, и разбить его на ключ по цели
+   * значило бы держать в кэше столько копий одного ответа, сколько целей
+   * человек успел открыть, — и обновлять из них одну.
+   *
+   * Источника в ключе нет и быть не может: канон подписки — собственная среда
+   * панели, и от выбранного на экране источника она не зависит.
+   */
+  portabilitySubscriptions: ['portability', 'subscriptions'] as const,
+
+  /** Незакрытая работа, которую можно перенести к активному CLI (П6.1). */
+  portabilityCarry: ['portability', 'carry'] as const,
   overview: ['overview'] as const,
   rules: ['rules'] as const,
   hooks: ['hooks'] as const,

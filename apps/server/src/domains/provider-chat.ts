@@ -16,6 +16,7 @@
 
 export {
   appendMessage,
+  chatTranscriptPath,
   createChat,
   deleteChat,
   listChats,

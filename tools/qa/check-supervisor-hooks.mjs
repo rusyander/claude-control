@@ -193,13 +193,15 @@ function runDriver(dir, driverPath, job, label) {
 }
 
 /** Скрипт хука: оставляет след на диске и выходит заданным кодом. */
-function hookScript(tracePath, exitCode, sleepMs = 0) {
+function hookScript(tracePath, exitCode, sleepMs = 0, print = '', printErr = '') {
   return `
 const fs = require('node:fs');
 const chunks = [];
 process.stdin.on('data', (chunk) => chunks.push(chunk));
 process.stdin.on('end', () => {
   fs.writeFileSync(${JSON.stringify(tracePath)}, Buffer.concat(chunks).toString('utf8'), 'utf8');
+  ${print ? `process.stdout.write(${JSON.stringify(print)});` : ''}
+  ${printErr ? `process.stderr.write(${JSON.stringify(printErr)});` : ''}
   ${sleepMs > 0 ? `setTimeout(() => process.exit(${exitCode}), ${sleepMs});` : `process.exit(${exitCode});`}
 });
 `;
@@ -240,11 +242,17 @@ async function eventCases(dir, damage) {
     },
     {
       label: 'unknown-code-blocking',
-      title: 'неизвестный код на блокирующем событии — fail-closed',
+      title: 'неизвестный код на блокирующем событии — fail-closed, с кодом и хвостом вывода',
       providerId: 'codex',
       event: 'UserPromptSubmit',
-      exitCode: 1,
-      expect: { blocked: true, ran: true, reason: true },
+      exitCode: 127,
+      printErr: 'node: command not found',
+      expect: {
+        blocked: true,
+        ran: true,
+        reason: true,
+        reasonHas: ['127', 'node: command not found'],
+      },
     },
     {
       label: 'unknown-code-observing',
@@ -272,16 +280,48 @@ async function eventCases(dir, damage) {
       exitCode: 2,
       expect: { blocked: false, ran: false, owner: 'native' },
     },
+    {
+      // П6.2: калитка запросов и триггер сценария в файлы чужого CLI не пишутся
+      // никогда, продублировать их цели нечем — поэтому запрет собственной
+      // записи панели обязан действовать и там, где событие у цели своё.
+      label: 'panel-owner',
+      title: 'собственная запись панели отыгрывается и на родном для цели событии',
+      providerId: 'kimi',
+      event: 'UserPromptSubmit',
+      exitCode: 2,
+      hookOwner: 'panel',
+      expect: { blocked: true, ran: true, reason: true },
+    },
+    {
+      // У Claude простой stdout на `UserPromptSubmit` — это контекст, и скрипт,
+      // снятый с него, печатает туда текст, а не JSON. Потерять напечатанное
+      // значило бы тихо отменить весь смысл такого хука.
+      label: 'stdout-context',
+      title: 'простой вывод скрипта доезжает контекстом, а не теряется',
+      providerId: 'codex',
+      event: 'UserPromptSubmit',
+      exitCode: 0,
+      print: 'Работай по шагам сценария.',
+      expect: { blocked: false, ran: true, context: 'Работай по шагам сценария.' },
+    },
   ];
 
   for (const item of cases) {
-    const tracePath = join(dir, `trace-${item.label}.txt`);
-    const scriptPath = join(dir, `hook-${item.label}.cjs`);
-    writeFileSync(scriptPath, hookScript(tracePath, item.exitCode, item.sleepMs ?? 0), 'utf8');
-
     // Порча самопроверки: у события отбирается блокирующая сила — блокирующие
     // случаи обязаны из-за этого покраснеть.
     const event = damage === 'unblock' && item.expect.blocked ? 'Notification' : item.event;
+    // Вторая порча: скрипт ничего не печатает. Краснеть обязан случай про
+    // контекст — без своей порчи он зеленел бы и тогда, когда надзиратель
+    // перестал бы поднимать напечатанное вовсе.
+    const print = damage === 'silence' ? '' : (item.print ?? '');
+
+    const tracePath = join(dir, `trace-${item.label}.txt`);
+    const scriptPath = join(dir, `hook-${item.label}.cjs`);
+    writeFileSync(
+      scriptPath,
+      hookScript(tracePath, item.exitCode, item.sleepMs ?? 0, print, item.printErr ?? ''),
+      'utf8',
+    );
 
     let outcome;
     try {
@@ -292,7 +332,13 @@ async function eventCases(dir, damage) {
           providerId: item.providerId,
           run: { ...EVENT_RUN, providerId: item.providerId },
           input: { event },
-          hooks: [{ event, command: `node "${scriptPath}"` }],
+          hooks: [
+            {
+              event,
+              command: `node "${scriptPath}"`,
+              ...(item.hookOwner ? { owner: item.hookOwner } : {}),
+            },
+          ],
           ...(item.timeoutMs ? { timeoutMs: item.timeoutMs } : {}),
         },
         item.label,
@@ -330,6 +376,16 @@ async function eventCases(dir, damage) {
     if (item.expect.reason && !outcome.reason) {
       problems.push(`${item.title}: отказ без причины — человеку нечего показать`);
     }
+    // План (§7) обещает для сломавшегося скрипта «код выхода и хвост вывода».
+    // Без обеих половин строка в ленте либо не называет код, либо отправляет
+    // человека смотреть тот же вывод руками.
+    for (const piece of item.expect.reasonHas ?? []) {
+      if (!(outcome.reason ?? '').includes(piece)) {
+        problems.push(
+          `${item.title}: в причине нет «${piece}» (${JSON.stringify(outcome.reason ?? null)})`,
+        );
+      }
+    }
     if (item.expect.owner && outcome.owner !== item.expect.owner) {
       problems.push(`${item.title}: владелец ${outcome.owner}, ожидался ${item.expect.owner}`);
     }
@@ -338,6 +394,11 @@ async function eventCases(dir, damage) {
     }
     if (item.expect.ignored && !outcome.results.some((result) => result.ignoredOnObservingEvent)) {
       problems.push(`${item.title}: вмешательство на наблюдательном событии не помечено`);
+    }
+    if (item.expect.context && !outcome.addedContext.includes(item.expect.context)) {
+      problems.push(
+        `${item.title}: напечатанное скриптом не доехало контекстом (${JSON.stringify(outcome.addedContext)})`,
+      );
     }
   }
 
@@ -348,25 +409,47 @@ const dir = mkdtempSync(join(tmpdir(), 'supervisor-hooks-'));
 
 try {
   if (SELFTEST) {
-    // Обе порчи обязаны покраснеть по отдельности. Проверка, которая ловит
-    // только одну из них, молчит о второй — а вторая и есть главный запрет.
+    // Каждая порча обязана покраснеть ПО СВОЕМУ следу. «Хоть что-нибудь
+    // покраснело» не годится: порча ловилась бы соседней проверкой, а та,
+    // ради которой её вносят, молчала бы — и молчание засчитывалось бы за
+    // работу.
     const cases = [
-      ['truncate', 'обрезанная нагрузка', (damage) => probe(dir, damage, damage)],
-      ['argv', 'нагрузка уехала аргументом', (damage) => probe(dir, damage, damage)],
+      [
+        'truncate',
+        'обрезанная нагрузка',
+        (damage) => probe(dir, damage, damage),
+        'не разобрал нагрузку',
+      ],
+      [
+        'argv',
+        'нагрузка уехала аргументом',
+        (damage) => probe(dir, damage, damage),
+        'скрипту достались аргументы',
+      ],
       [
         'unblock',
         'у блокирующего события отобрана блокирующая сила',
         (damage) => eventCases(dir, damage),
+        'blocked=false, ожидалось true',
+      ],
+      [
+        'silence',
+        'скрипт ничего не напечатал',
+        (damage) => eventCases(dir, damage),
+        'не доехало контекстом',
       ],
     ];
     let missed = 0;
-    for (const [damage, title, run] of cases) {
+    for (const [damage, title, run, trace] of cases) {
       const problems = await run(damage);
-      if (problems.length === 0) {
-        console.error(`Самопроверка: «${title}» прошла как целая — проверка не краснеет.`);
+      const hit = problems.filter((problem) => problem.includes(trace));
+      if (hit.length === 0) {
+        console.error(
+          `Самопроверка: «${title}» не поймана по следу «${trace}» (покраснело ${problems.length}).`,
+        );
         missed += 1;
       } else {
-        console.log(`Самопроверка: «${title}» замечена (${problems.length}).`);
+        console.log(`Самопроверка: «${title}» замечена по следу «${trace}» (${hit.length}).`);
       }
     }
     process.exit(missed > 0 ? 1 : 0);

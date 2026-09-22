@@ -130,6 +130,12 @@ function argumentMatches(pattern: string, value: string): boolean | undefined {
 type RuleFit = 'miss' | 'hit' | 'unmatchable';
 
 function fitOf(item: PermissionItem, call: GatewayToolCall): RuleFit {
+  // Выключенное право В СРЕДЕ человека есть, но НЕ ДЕЙСТВУЕТ: канон несёт его
+  // ради честного паспорта (поле `enabled` заведено ровно для этого), а брокер
+  // судит вызов только действующими. Иначе снятый человеком запрет продолжал бы
+  // запрещать — и объяснить отказ правилом, которого в настройках нет, нечем.
+  if (!item.enabled) return 'miss';
+
   // Режим подтверждений — настройка ВСЕГО ассистента, а не запись о вызове:
   // брокеру о конкретном вызове она не говорит ничего (см. `permissions-map.ts`).
   if (isModeRule(item.rule)) return 'miss';

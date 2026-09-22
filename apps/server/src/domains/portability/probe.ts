@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { EnvScope } from '@agentdeck/contracts/portable-env';
@@ -18,11 +18,12 @@ import {
 import { findCliOnPath } from '../../providers/detect.ts';
 import { providerCliCandidates } from '../../providers/cli.ts';
 import type { ConfigProvider } from '../../providers/types.ts';
-import type { ProviderEndpointApiKind } from '../../providers/types/assistant.ts';
+import { applyCodexEndpoint, CODEX_ENDPOINT_KEY_ENV } from '../platform/apply/config-files.ts';
 import { emitEnvironment } from './emit/index.ts';
 import { level } from './fidelity.ts';
 import { PROBE_MARKS, probeEnvironment, writeProbeScripts } from './probe-canon.ts';
 import type { ProbeScripts } from './probe-canon.ts';
+import { PROBE_RECIPES, type ProbeRecipe } from './probe-recipes.ts';
 import { startProbeStub, type StubBlock } from './probe-stub.ts';
 
 /**
@@ -73,77 +74,6 @@ import { startProbeStub, type StubBlock } from './probe-stub.ts';
 /** Сколько ждём целевой CLI. Один короткий прогон — минуты ему не нужны. */
 const RUN_TIMEOUT_MS = 90_000;
 
-/**
- * РЕЦЕПТ пробы одного CLI: как его запустить без диалога и какими именами он
- * зовёт свои инструменты.
- *
- * Это не «таблица провайдер → уровень», которую план запрещает (§5.4): уровень
- * по-прежнему считает матрица из каталога возможностей. Здесь лежит то, что из
- * каталога не выводится и выводиться не может, — argv неинтерактивного запуска и
- * СОБСТВЕННЫЕ имена инструментов CLI. Выдумать их нельзя: заглушка, позвавшая
- * несуществующий инструмент, покрасит пробу про себя, а не про перенос. Поэтому
- * цель без рецепта честно «не проверена», а список сокращается правкой кода.
- */
-interface ProbeRecipe {
-  /** Диалект заглушки; он же ключ в `endpointConfig` каталога. */
-  readonly apiKind: ProviderEndpointApiKind;
-  /** Неинтерактивный запуск с готовым промптом. */
-  args(prompt: string): readonly string[];
-  /** Имя инструмента оболочки и поле, в котором он ждёт команду. */
-  readonly shellTool: { readonly name: string; readonly arg: string };
-  /** Имя инструмента чтения файла и поле пути. */
-  readonly readTool: { readonly name: string; readonly arg: string };
-  /** Чем запрос вызывает пробную слэш-команду. */
-  readonly commandPrompt: string;
-  /** Подготовить временный дом до запуска: снять мастера первого запуска и т.п. */
-  prepare?(home: string, workdir: string): void;
-}
-
-const RECIPES: Readonly<Record<string, ProbeRecipe>> = {
-  claude: {
-    apiKind: 'anthropic',
-    // `--allowedTools` разрешает ДВА инструмента, без которых проба слепа: без
-    // них печатный режим откажет в вызове сам, и «хук заблокировал» стало бы
-    // неотличимо от «до хука не дошло». Запрет пробного права при этом остаётся
-    // в силе: правила `deny` у Claude Code сильнее любых разрешений.
-    args: (prompt) => ['-p', prompt, '--output-format', 'json', '--allowedTools', 'Bash,Read'],
-    shellTool: { name: 'Bash', arg: 'command' },
-    readTool: { name: 'Read', arg: 'file_path' },
-    commandPrompt: '/agentdeck-probe-command',
-    prepare: (home) => {
-      // Мастер первого запуска в пустом доме спросил бы про доверие к каталогу и
-      // повис бы без ответа. Файл лежит РЯДОМ с домом, а не внутри него — так
-      // его ищет сам CLI.
-      //
-      // ДОПИСЫВАЕМ, а не создаём заново: в этот же файл эмиттер только что
-      // положил пробный MCP-сервер, и запись целиком стёрла бы его — проба
-      // краснела бы на слое MCP от собственной подготовки.
-      // Путь — по правилу самого CLI: при заданном `CLAUDE_CONFIG_DIR` файл
-      // лежит ВНУТРИ каталога (`claude-paths.mcp-config.test.ts`), и проба
-      // задаёт эту переменную. Сосед `~/.claude.json` здесь не читался бы вовсе,
-      // а вместе с ним не читался бы и пробный MCP-сервер.
-      const path = join(home, '.claude', '.claude.json');
-      let current: Record<string, unknown> = {};
-      try {
-        const parsed: unknown = JSON.parse(readFileSync(path, 'utf8'));
-        if (parsed && typeof parsed === 'object') current = parsed as Record<string, unknown>;
-      } catch {
-        current = {};
-      }
-      writeFileSync(
-        path,
-        JSON.stringify({
-          ...current,
-          hasCompletedOnboarding: true,
-          bypassPermissionsModeAccepted: true,
-          projects: (current.projects as Record<string, unknown> | undefined) ?? {},
-        }),
-        'utf8',
-      );
-    },
-  },
-};
-
 /** Что нужно пробе. Дом человека сюда не приходит вовсе — и прийти не может. */
 export interface ProbeDeps {
   readonly target: ConfigProvider;
@@ -169,7 +99,7 @@ export interface ProbeDeps {
 export async function runProbe(deps: ProbeDeps): Promise<ProbeReport> {
   const target = deps.target;
   const ranAt = new Date().toISOString();
-  const recipe = RECIPES[target.id];
+  const recipe = PROBE_RECIPES[target.id];
   const candidates = providerCliCandidates(target);
   // Подделка считается установленной целью: проверять на ней «а нашёлся ли
   // бинарь» значило бы проверять `where`, а не пробу.
@@ -193,8 +123,8 @@ export async function runProbe(deps: ProbeDeps): Promise<ProbeReport> {
 
   if (!recipe) return refuse('no_probe_recipe');
   if (!found) return refuse('cli_not_installed');
-  const endpoint = target.endpointConfig?.[recipe.apiKind];
-  if (!endpoint) return refuse('no_stub_endpoint');
+  const address = stubAddress(target, recipe);
+  if (!address) return refuse('no_stub_endpoint');
 
   const home = mkdtempSync(join(tmpdir(), 'agentdeck-probe-'));
   try {
@@ -223,11 +153,7 @@ export async function runProbe(deps: ProbeDeps): Promise<ProbeReport> {
         /** Оболочка нужна только настоящему бинарю (.cmd-обёртка на Windows). */
         shell: deps.cliOverride === undefined,
         cwd: workdir,
-        env: {
-          ...homeEnv(home),
-          [endpoint.baseUrlEnv]: stub.baseUrl,
-          ...(endpoint.credentialEnv ? { [endpoint.credentialEnv]: 'agentdeck-probe' } : {}),
-        },
+        env: { ...homeEnv(home), ...address(home, stub.baseUrl) },
         timeoutMs: deps.timeoutMs ?? RUN_TIMEOUT_MS,
       });
 
@@ -242,13 +168,60 @@ export async function runProbe(deps: ProbeDeps): Promise<ProbeReport> {
         );
       }
 
-      return report(observe(stub.requests, promised));
+      return report(observe(stub.requests, promised, existsSync(scripts.mcpAskedPath)));
     } finally {
       await stub.close();
     }
   } finally {
     rmSync(home, { recursive: true, force: true });
   }
+}
+
+/**
+ * КУДА цель пойдёт за моделью — и чем ей об этом сказать.
+ *
+ * Способов ровно два, и выбирает между ними КАТАЛОГ, а не рецепт: переменная
+ * окружения (`endpointConfig`) либо кусок собственного конфига цели
+ * (`endpointFile`). Отказ `no_stub_endpoint` остаётся для цели, у которой нет ни
+ * того, ни другого: пойти в настоящую модель проба не имеет права ни при каких
+ * обстоятельствах — это чужие деньги и чужой трафик.
+ *
+ * Возвращается ФУНКЦИЯ, а не готовый адрес: у файлового способа запись обязана
+ * случиться уже после подъёма заглушки — раньше её адреса попросту не
+ * существует.
+ */
+function stubAddress(
+  target: ConfigProvider,
+  recipe: ProbeRecipe,
+): ((home: string, baseUrl: string) => Record<string, string>) | null {
+  const vars = target.endpointConfig?.[recipe.apiKind];
+  if (vars) {
+    return (_home, baseUrl) => ({
+      [vars.baseUrlEnv]: baseUrl,
+      ...(vars.credentialEnv ? { [vars.credentialEnv]: PROBE_SOURCE } : {}),
+    });
+  }
+
+  const file = target.endpointFile;
+  // Второй формат (`continue-yaml`) сюда не попадает не по забывчивости: у
+  // continue нет рецепта пробы, и до этой развилки он не доходит вовсе.
+  if (!file || file.apiKind !== recipe.apiKind || file.format !== 'codex-toml') return null;
+
+  return (home, baseUrl) => {
+    // Пишет ТОТ ЖЕ код, которым панель пишет контур человеку, а не вторая его
+    // копия: разойдись они — проба подтверждала бы адрес, которого панель не
+    // пишет, и молчала бы ровно о том дефекте, ради которого заведена. Путь
+    // берётся из каталога при подменённом окружении: иначе `codexHome()` указал
+    // бы на НАСТОЯЩИЙ дом человека, и проба написала бы туда.
+    applyCodexEndpoint(
+      withHomeEnv(home, () => file.path()),
+      PROBE_SOURCE,
+      baseUrl,
+      undefined,
+      file.wireApi,
+    );
+    return { [CODEX_ENDPOINT_KEY_ENV]: PROBE_SOURCE };
+  };
 }
 
 /** Найденный бинарь как argv; не нашёлся — `null`, а не пустая строка. */
@@ -269,8 +242,14 @@ export function probeRowsFrom(
   requests: readonly Record<string, unknown>[],
   target: ConfigProvider,
   scope: EnvScope,
+  /**
+   * Спрашивала ли цель у пробного MCP-сервера его инструменты. По умолчанию нет:
+   * готовому разговору взяться этому следу неоткуда, а умолчание «да» превратило
+   * бы непереехавший MCP из красного в «не проверено».
+   */
+  mcpAsked = false,
 ): readonly ProbeRow[] {
-  return observe(requests, promisedLevels(target, scope));
+  return observe(requests, promisedLevels(target, scope), mcpAsked);
 }
 
 /**
@@ -282,7 +261,14 @@ function promisedLevels(
   target: ConfigProvider,
   scope: EnvScope,
 ): ReadonlyMap<ProbeLayer, { level: ReturnType<typeof level>['level']; itemId: string }> {
-  const scripts = { hookPath: '', mcpPath: '', skillDir: '', forbiddenPath: '', envPath: '' };
+  const scripts = {
+    hookPath: '',
+    mcpPath: '',
+    skillDir: '',
+    forbiddenPath: '',
+    envPath: '',
+    mcpAskedPath: '',
+  };
   const env = probeEnvironment({
     source: PROBE_SOURCE,
     scope,
@@ -325,10 +311,7 @@ function plantProbeEnvironment(
    */
   workdir: string,
 ): ProbeScripts {
-  const saved = { ...process.env };
-  try {
-    Object.assign(process.env, homeEnv(home));
-
+  return withHomeEnv(home, () => {
     const scripts = writeProbeScripts(scratch);
     const env = probeEnvironment({
       source: PROBE_SOURCE,
@@ -342,6 +325,18 @@ function plantProbeEnvironment(
     const plan = emitEnvironment(env, { target, scope, projectRoot: workdir });
     for (const write of plan.writes) write.apply(undefined);
     return scripts;
+  });
+}
+
+/**
+ * Выполнить синхронный участок так, будто дом человека — временный каталог
+ * пробы. Ограничение на `await` внутри — то самое, о котором сказано выше.
+ */
+function withHomeEnv<T>(home: string, run: () => T): T {
+  const saved = { ...process.env };
+  try {
+    Object.assign(process.env, homeEnv(home));
+    return run();
   } finally {
     for (const key of Object.keys(process.env)) {
       if (!Object.hasOwn(saved, key)) delete process.env[key];
@@ -396,19 +391,19 @@ function scriptFor(
         type: 'tool_use',
         id: 'probe_forbidden',
         name: recipe.shellTool.name,
-        input: { [recipe.shellTool.arg]: `node "${scripts.forbiddenPath}"` },
+        input: recipe.shellTool.call(`node "${scripts.forbiddenPath}"`),
       },
       {
         type: 'tool_use',
         id: 'probe_env',
         name: recipe.shellTool.name,
-        input: { [recipe.shellTool.arg]: `node "${scripts.envPath}"` },
+        input: recipe.shellTool.call(`node "${scripts.envPath}"`),
       },
       {
         type: 'tool_use',
         id: 'probe_denied',
         name: recipe.readTool.name,
-        input: { [recipe.readTool.arg]: PROBE_MARKS.deniedFile },
+        input: recipe.readTool.call(PROBE_MARKS.deniedFile),
       },
     ];
   };
@@ -424,11 +419,16 @@ function scriptFor(
 function observe(
   requests: readonly Record<string, unknown>[],
   promised: ReturnType<typeof promisedLevels>,
+  /**
+   * Спрашивала ли цель у пробного MCP-сервера его инструменты. Отдельным
+   * свидетельством, потому что запрос к модели на этот вопрос не отвечает.
+   */
+  mcpAsked: boolean,
 ): ProbeRow[] {
   const first = JSON.stringify(requests[0] ?? {});
-  const messages = JSON.stringify((requests[0] ?? {}).messages ?? []);
+  const messages = replies(requests[0] ?? {});
   const tools = JSON.stringify((requests[0] ?? {}).tools ?? []);
-  const results = requests.slice(1).map((request) => JSON.stringify(request.messages ?? []));
+  const results = requests.slice(1).map(replies);
   const answered = results.join('\n');
   const toolsRan = requests.length > 1;
 
@@ -450,17 +450,42 @@ function observe(
         )
       : row('hook', 'unknown', '', 'run_failed'),
     row('skill', first.includes(PROBE_MARKS.skill) ? 'present' : 'absent', PROBE_MARKS.skill),
-    row(
-      'permission',
-      toolsRan ? (answered.includes(PROBE_MARKS.deniedContent) ? 'absent' : 'enforced') : 'unknown',
-      '',
-      toolsRan ? null : 'run_failed',
-    ),
-    row(
-      'mcpServer',
-      tools.includes(PROBE_MARKS.mcpTool) ? 'present' : 'absent',
-      PROBE_MARKS.mcpTool,
-    ),
+    // Право судится ПО ОБЕЩАННОМУ УРОВНЮ, и это не поблажка цели.
+    //
+    // «Нативно» — запрет обязан ОСТАНОВИТЬ чтение, и решает отсутствие
+    // содержимого файла. «Текстом» же панель ничего не принуждает и обещает
+    // ровно одно: запрет ДОЕДЕТ ДО МОДЕЛИ словами. Мерить его отказом значило бы
+    // гарантированно покрасить красным исправный перенос — цель, честно
+    // предупреждённая текстом, файл прочитает, потому что принуждать там нечему.
+    promisedText('permission', promised)
+      ? row(
+          'permission',
+          first.includes(PROBE_MARKS.deniedFile) ? 'present' : 'absent',
+          PROBE_MARKS.deniedFile,
+        )
+      : row(
+          'permission',
+          toolsRan
+            ? answered.includes(PROBE_MARKS.deniedContent)
+              ? 'absent'
+              : 'enforced'
+            : 'unknown',
+          '',
+          toolsRan ? null : 'run_failed',
+        ),
+    // MCP: имя инструмента в списке у модели — лучшее свидетельство, но не
+    // единственное возможное. Цель, которая сервер ПОДНЯЛА и список у него
+    // ВЗЯЛА, а модели его заранее не назвала, перенос не провалила — она просто
+    // объявляет инструменты по запросу (`codex-cli 0.155.1`, живой прогон
+    // 22.09.2026). Красный там обвинял бы исправный перенос, зелёный —
+    // подтверждал бы ненаблюдавшееся; поэтому строка честно «не проверена» с
+    // названной причиной. Сервер, которого не спросили вовсе, — по-прежнему
+    // `absent`, то есть красный: это и есть непереехавшая запись.
+    tools.includes(PROBE_MARKS.mcpTool)
+      ? row('mcpServer', 'present', PROBE_MARKS.mcpTool)
+      : mcpAsked
+        ? row('mcpServer', 'unknown', PROBE_MARKS.mcpTool, 'target_defers_tools')
+        : row('mcpServer', 'absent', PROBE_MARKS.mcpTool),
     toolsRan
       ? row(
           'envVar',
@@ -474,6 +499,24 @@ function observe(
       PROBE_MARKS.command,
     ),
   ];
+}
+
+/**
+ * Реплики запроса — ПО ИМЕНИ ПОЛЯ, а не по одному заранее выбранному.
+ *
+ * У клиента Anthropic разговор лежит в `messages`, у ручки `/responses` — в
+ * `input`; ровно по этому признаку узнаёт диалект и сама заглушка. Знай
+ * наблюдение только одно имя — у второго диалекта ответы инструментов не нашлись
+ * бы вовсе, и «вывод так и не появился» дало бы ЗЕЛЁНЫЙ там, где не было даже
+ * вызова: наблюдение по негативу без реплик подтверждает что угодно.
+ */
+function replies(request: Record<string, unknown>): string {
+  return JSON.stringify(request.messages ?? request.input ?? []);
+}
+
+/** Обещан ли этому слою уровень «текстом» — от него зависит, что вообще мерить. */
+function promisedText(layer: ProbeLayer, promised: ReturnType<typeof promisedLevels>): boolean {
+  return promised.get(layer)?.level === 'text';
 }
 
 /** Строка отчёта: обещание, ожидание, наблюдение и приговор между ними. */

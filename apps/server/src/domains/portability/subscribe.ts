@@ -9,6 +9,7 @@ import {
 import type {
   EnvSubscription,
   SubscriptionDrift,
+  SubscriptionRebuildReason,
   SubscriptionRow,
   SubscriptionSyncPlan,
 } from '@agentdeck/contracts/portable-subscribe';
@@ -150,24 +151,23 @@ export function planSubscriptionSync(
   overwrite?: string,
 ): PlannedSubscriptionSync {
   const key = subscriptionKey(subscription.target, subscription.scope, subscription.project);
+  // Проекцию строила другая версия словаря: сравнивать отпечатки нельзя — их
+  // считает код, который с версией и менялся. Совпавшей поэтому не объявляется
+  // НИ ОДНА запись, и проекция пересобирается целиком. Прежде здесь стояло
+  // удержание, и выхода из него не было: отпечатки обновляет только удачная
+  // пересборка, которую удержание и запрещало, — оставалась отписка, забывающая
+  // вместе с отметками хеши файлов, то есть сторожа руки человека.
+  const rebuild: SubscriptionRebuildReason | null =
+    subscription.canonVersion === env.canonVersion ? null : 'canon_version';
   const head = {
     key,
     target: subscription.target,
     scope: subscription.scope,
     layers: subscription.layers,
+    rebuild,
   };
 
-  // Проекцию строила другая версия словаря. Сравнивать отпечатки через версию
-  // нельзя — их считает код, который с версией и менялся, — поэтому строк здесь
-  // нет вовсе: список «разошлось/совпало», посчитанный несравнимыми правилами,
-  // человек прочитал бы как факт.
   const nothing = { writes: [], landed: [], root: null } as const;
-  if (subscription.canonVersion !== env.canonVersion) {
-    return {
-      plan: { ...head, rows: [], transfer: null, hold: 'canon_version', drift: [] },
-      ...nothing,
-    };
-  }
   if (subscription.layers.length === 0) {
     return {
       plan: { ...head, rows: [], transfer: null, hold: 'no_layers', drift: [] },
@@ -186,7 +186,7 @@ export function planSubscriptionSync(
   const skipFiles = new Set(drift.map((file) => file.filePath));
 
   const layers = new Set<EnvItemKind>(subscription.layers);
-  const rows = subscriptionRows(env, subscription, layers, held);
+  const rows = subscriptionRows(env, subscription, layers, held, rebuild !== null);
   // Разрешённый к перезаписи файл пересобирается ЦЕЛИКОМ, даже если канон по
   // его записям не двигался: человек выбрал вернуть проекцию, а «вернуть» —
   // это про то, что лежит на диске, а не про то, что изменилось в каноне.
@@ -233,12 +233,33 @@ export function planSubscriptionSync(
     .filter((entry) => landsAtTarget(entry.outcome))
     .map((entry) => ({ itemId: entry.itemId, file: entry.file }));
 
+  // Запись, которую эмиттер вернул столкновением, у цели тоже удержана файлом —
+  // просто не сторожем отпечатка, а чужим содержимым на диске. Без этой строки
+  // она осталась бы «новой» навсегда и молча: плана при одних столкновениях нет
+  // вовсе (ниже), и объяснить её человеку было бы нечем.
+  const collided = new Map(
+    plan.entries
+      .filter((entry) => entry.outcome === 'collision_needs_choice')
+      .map((entry) => [entry.itemId, entry.file]),
+  );
+  const answered = rows.map((row) =>
+    row.heldBy === null && collided.has(row.itemId)
+      ? { ...row, heldBy: collided.get(row.itemId) ?? null }
+      : row,
+  );
+
   // Ни одной правки — это `null`, а не план с нулём файлов. План, обещающий
   // пересборку и не пишущий ни байта, человек прочитал бы как сделанную
   // работу; отметки при этом всё равно обновятся у тех записей, что у цели уже
   // доступны без записи.
   return {
-    plan: { ...head, rows, transfer: writes.length > 0 ? plan : null, hold: null, drift },
+    plan: {
+      ...head,
+      rows: answered,
+      transfer: writes.length > 0 ? plan : null,
+      hold: null,
+      drift,
+    },
     writes,
     landed,
     root: plan.root,
@@ -377,11 +398,19 @@ export function markAdoption(
  * Снимаются ВСЕ слои файла: оставь панель один подписанным, он писал бы в тот
  * же файл, и то же расхождение открылось бы на следующей пересборке.
  *
- * Отпечаток файла ЗАБЫВАЕТСЯ, а отметки записей остаются. Разница не
- * случайна: хеш отвечает на вопрос «панель обещала держать этот файл» — она
- * больше не обещает, и хранить его значило бы вечно показывать расхождение
- * файла, которого никто не пересоберёт. Отметки же — память о том, что панель
- * у цели уже писала, и она переживает отписку по тем же причинам, что и в П5.1.
+ * Забывается ВСЁ, что панель помнила про этот файл: и его отпечаток, и отметки
+ * записей, которые в нём лежат. Хеш — обещание «панель держит этот файл»: она
+ * больше не держит, и хранить его значило бы вечно показывать расхождение
+ * файла, которого никто не пересоберёт.
+ *
+ * Отметки уходят вместе с ним, и это не симметрия ради симметрии. Отметка
+ * говорит эмиттеру «содержимое здесь наше» (`EmitDeps.owned`), и, пережив
+ * отписку, она пережила бы и хеш: человек снимает слой ради своей правки, потом
+ * одним щелчком включает слой обратно (`SubscriptionSection.tsx`) — и
+ * пересборка, которой сверять уже не с чем, считает файл своим и переписывает
+ * правку молча, без единой строки расхождения (инвариант 7). Без отметки тот же
+ * файл приходит к эмиттеру чужим, и его содержимое становится столкновением —
+ * то есть вопросом человеку, как и требует П5.2.
  */
 export function unsubscribeFile(
   subscription: EnvSubscription,
@@ -390,10 +419,14 @@ export function unsubscribeFile(
   const dropped = layersOfFile(subscription, filePath);
   const files = { ...subscription.files };
   delete files[filePath];
+  const marks = Object.fromEntries(
+    Object.entries(subscription.marks).filter(([, mark]) => mark.file !== filePath),
+  );
   return {
     subscription: {
       ...subscription,
       layers: subscription.layers.filter((layer) => !dropped.includes(layer)),
+      marks,
       files,
     },
     layers: dropped,
@@ -413,6 +446,12 @@ function subscriptionRows(
   layers: ReadonlySet<EnvItemKind>,
   /** Запись → файл, правка человека в котором её держит (П5.2). */
   held: ReadonlyMap<string, string>,
+  /**
+   * Отпечатки прошлой проекции несравнимы (сменилась версия словаря). Совпавших
+   * записей в таком плане нет: «совпало», посчитанное несравнимыми правилами,
+   * человек прочитал бы как факт.
+   */
+  incomparable: boolean,
 ): SubscriptionRow[] {
   const rows: SubscriptionRow[] = [];
   const present = new Set<string>();
@@ -422,7 +461,11 @@ function subscriptionRows(
     present.add(item.id);
     const mark = subscription.marks[item.id];
     const fingerprint = itemFingerprint(envItemFingerprintInput(item));
-    const state = !mark ? 'new' : mark.fingerprint === fingerprint ? 'unchanged' : 'changed';
+    const state = !mark
+      ? 'new'
+      : incomparable || mark.fingerprint !== fingerprint
+        ? 'changed'
+        : 'unchanged';
     rows.push({ itemId: item.id, kind: item.kind, state, heldBy: held.get(item.id) ?? null });
   }
 

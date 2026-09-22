@@ -17,7 +17,9 @@ import type { ConfigProvider } from '../../providers/types.ts';
 import { UnsafeProjectPathError } from '../provider-projects.ts';
 import { linkSharedDirs } from '../project-git/mirror-local.ts';
 import { emitEnvironment } from './emit/index.ts';
+import { buildFidelityReport } from './fidelity-report.ts';
 import { importEnvironment } from './import/index.ts';
+import { buildTransferPlan } from './plan.ts';
 import {
   claudeProjectPaths,
   projectSupport,
@@ -263,6 +265,36 @@ describe('уровень, которого у провайдера нет', () =
       emitEnvironment(env, { target: orphan(), scope: 'project', projectRoot: project }),
     ).toThrow(ProjectLevelUnsupportedError);
     expect(treeSnapshot(root)).toEqual(before);
+  });
+});
+
+describe('план переноса на уровень проекта', () => {
+  /**
+   * Отчёт верности внутри плана отказывается считаться без разделов цели
+   * (fail-closed), и план его не передавал: проектный перенос падал на первой же
+   * строке отчёта — то есть весь уровень был недостижим с экрана.
+   *
+   * Сверка идёт с отчётом, посчитанным по ЯВНО названным проектным разделам:
+   * «не упало» доказало бы только отсутствие исключения, а вопрос в том, ПО
+   * КАКИМ фактам отчёт посчитан.
+   */
+  it('считается по разделам проекта, а не по профилю дома', () => {
+    const env = projectPassport();
+    const deps = { scope: 'project' as const, projectRoot: project, override: home };
+    const computedAt = '2026-09-21T10:00:00.000Z';
+
+    const { plan } = buildTransferPlan(env, claudeProvider, deps, computedAt);
+
+    expect(plan.report.scope).toBe('project');
+    expect(plan.report.rows.length).toBeGreaterThan(0);
+    expect(plan.report).toEqual(
+      buildFidelityReport(
+        env,
+        claudeProvider,
+        computedAt,
+        sectionTargets(claudeProvider, 'project', { projectRoot: project, override: home }),
+      ),
+    );
   });
 });
 

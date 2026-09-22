@@ -28,6 +28,14 @@ import type { ImportResult, Importer } from '../types.ts';
  */
 export const importCodexEnvironment: Importer = (deps) => {
   const result = readUniversalSections(deps);
+  // Дом читается только на УРОВНЕ ДОМА. Проектный уровень Codex — это один
+  // `AGENTS.md` в каталоге проекта, и пропуски, вычитанные из `~/.codex`
+  // (`approval_policy`, `[agents]`, `[[skills.config]]`, `prompts/`), приезжали
+  // бы в проектный паспорт фактами о нём — то есть противоречили бы его же
+  // строкам «у Codex такого уровня нет». Остальные разделы берёт
+  // `readUniversalSections`, и он про уровень знает.
+  if (deps.scope === 'project') return result;
+
   const config = readCodexConfig();
   const unknownApproval = unrecognizedApproval(config, result.items);
 

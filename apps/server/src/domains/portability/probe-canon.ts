@@ -101,9 +101,10 @@ function hookScript(): string {
  * инструмент в список, который CLI отправляет модели, а вызывать его никто не
  * будет.
  */
-function mcpScript(): string {
+function mcpScript(askedPath: string): string {
   return [
     '// MCP-сервер приёмочной пробы (П2.4): один инструмент, никакой работы.',
+    "import { writeFileSync } from 'node:fs';",
     "let buffer = '';",
     'function send(message) {',
     '  process.stdout.write(JSON.stringify(message) + String.fromCharCode(10));',
@@ -131,6 +132,11 @@ function mcpScript(): string {
     '        },',
     '      });',
     "    } else if (request.method === 'tools/list') {",
+    // След того, что цель РЕАЛЬНО спросила у сервера его инструменты. Без него
+    // «имени инструмента нет в запросе к модели» неотличимо от «сервер не
+    // поднялся вовсе», а это противоположные ответы: первое бывает свойством
+    // цели, второе — всегда дефект переноса.
+    `      writeFileSync(${JSON.stringify(askedPath)}, 'asked');`,
     '      send({',
     "        jsonrpc: '2.0',",
     '        id: request.id,',
@@ -169,6 +175,15 @@ export interface ProbeScripts {
    * доехала» там, где она доехала. Оболочка у каждого CLI своя, а node один.
    */
   readonly envPath: string;
+  /**
+   * Файл, который пробный MCP-сервер создаёт, когда у него СПРОСИЛИ инструменты.
+   *
+   * Заведён живым прогоном 22.09.2026 (`codex-cli 0.155.1`): эта цель пробный
+   * сервер подняла и список у него взяла, но модели инструмент заранее не
+   * назвала — в запросе его имени нет. Без этого следа наблюдение читало бы
+   * такой исход как «MCP не доехал», то есть обвиняло бы исправный перенос.
+   */
+  readonly mcpAskedPath: string;
 }
 
 /**
@@ -181,10 +196,11 @@ export function writeProbeScripts(scratchDir: string): ProbeScripts {
   const mcpPath = join(scratchDir, 'probe-mcp.mjs');
   const forbiddenPath = join(scratchDir, `${PROBE_MARKS.forbidden}.mjs`);
   const envPath = join(scratchDir, 'probe-env.mjs');
+  const mcpAskedPath = join(scratchDir, 'probe-mcp-asked.txt');
   const skillDir = join(scratchDir, 'skills', PROBE_NAME);
   mkdirSync(skillDir, { recursive: true });
   writeFileSync(hookPath, hookScript(), 'utf8');
-  writeFileSync(mcpPath, mcpScript(), 'utf8');
+  writeFileSync(mcpPath, mcpScript(mcpAskedPath), 'utf8');
   writeFileSync(
     forbiddenPath,
     `process.stdout.write(${JSON.stringify(PROBE_MARKS.forbiddenRan)});`,
@@ -195,7 +211,7 @@ export function writeProbeScripts(scratchDir: string): ProbeScripts {
     `process.stdout.write(${JSON.stringify(PROBE_MARKS.envEcho)} + (process.env[${JSON.stringify(PROBE_ENV_NAME)}] ?? ''));`,
     'utf8',
   );
-  return { hookPath, mcpPath, skillDir, forbiddenPath, envPath };
+  return { hookPath, mcpPath, skillDir, forbiddenPath, envPath, mcpAskedPath };
 }
 
 /**
@@ -234,6 +250,8 @@ export function probeEnvironment(params: {
         sideEffects: ['runs_process'],
         command: `node "${scripts.hookPath}"`,
         scriptPath: scripts.hookPath,
+        // Скрипт пробы пишет она сама, перед сборкой канона.
+        scriptMissing: false,
         timeout: null,
         enabled: true,
         raw: scripts.hookPath,

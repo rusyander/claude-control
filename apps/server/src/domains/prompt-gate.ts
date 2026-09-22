@@ -28,6 +28,13 @@ const SCRIPT_NAME = `${BRAND_SLUG}-prompt-gate.mjs`;
  * переносит его под новое имя, а не ставит рядом второй гейт.
  */
 const LEGACY_SCRIPT_NAME = `${LEGACY_BRAND_SLUG}-prompt-gate.mjs`;
+/**
+ * Сколько секунд даётся калитке. С запасом: чтение файла правил и поиск по
+ * тексту промпта — единственное, что скрипт делает. Одно число на обе стороны —
+ * регистрацию у Claude и надзирателя чужого прогона (П6.2).
+ */
+export const GATE_HOOK_TIMEOUT_SEC = 10;
+
 const RULES_FILE = 'dlp-rules.json';
 const JOURNAL_FILE = 'dlp-journal.jsonl';
 const STATE_FILE = 'state.json';
@@ -44,11 +51,37 @@ export function gateScriptPath(hooksDir: string): string {
 
 /** Команда запуска — тот же вид, что у скриптов, создаваемых разделом хуков. */
 export function gateCommand(hooksDir: string): string {
-  return `node "${gateScriptPath(hooksDir).replace(/\\/g, '/')}"`;
+  return gateCommandOf(gateScriptPath(hooksDir));
+}
+
+/**
+ * Команда запуска КОНКРЕТНОГО файла калитки.
+ *
+ * Нужна отдельно от `gateCommand`, потому что установленный файл бывает и под
+ * прежним именем (`describePromptGate` его находит). Надзиратель (П6.2) обязан
+ * запускать тот файл, который лежит, а не тот, который панель положила бы сейчас.
+ */
+export function gateCommandOf(scriptPath: string): string {
+  return `node "${scriptPath.replace(/\\/g, '/')}"`;
 }
 
 function legacyGateScriptPath(hooksDir: string): string {
   return join(hooksDir, LEGACY_SCRIPT_NAME);
+}
+
+/**
+ * Файл калитки, который ЛЕЖИТ на диске, — под нынешним именем или под прежним.
+ *
+ * Дешёвая проверка (две записи в каталоге) намеренно: её спрашивает надзиратель
+ * на КАЖДОМ запросе чужому CLI (П6.2), а `describePromptGate` ради того же ответа
+ * перечитывает `settings.json`, правила и сам скрипт и пересобирает его заново.
+ */
+export function installedGateScriptPath(hooksDir: string): string | undefined {
+  const fresh = gateScriptPath(hooksDir);
+  if (existsSync(fresh)) return fresh;
+
+  const legacy = legacyGateScriptPath(hooksDir);
+  return existsSync(legacy) ? legacy : undefined;
 }
 
 function isGateHook(hook: Hook): boolean {
@@ -271,9 +304,7 @@ function registerHook(
       scriptPath: gateScriptPath(location.hooksDir),
       groupIds: [],
       source: 'settings',
-      // Секунд достаточно с запасом: чтение файла правил и поиск по тексту
-      // промпта — единственное, что скрипт делает.
-      timeout: 10,
+      timeout: GATE_HOOK_TIMEOUT_SEC,
     });
   }
 

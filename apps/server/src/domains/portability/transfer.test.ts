@@ -16,6 +16,7 @@ import type { TransferFileRecord } from '@agentdeck/contracts/portable-transfer'
 import { runtimeOnlyEntries } from '@agentdeck/contracts/portable-transfer';
 import { claudeProvider } from '../../providers/claude.ts';
 import { CATALOG_PROVIDERS } from '../../providers/catalog.ts';
+import { setBackupKeep } from '../../lib/safe-io.ts';
 import { listBackups } from '../backups.ts';
 import { importEnvironment } from './import/index.ts';
 import type { EmitWrite } from './emit/types.ts';
@@ -195,6 +196,27 @@ describe('план переноса', () => {
     expect(plan().plan.fingerprint).not.toBe(first);
   });
 
+  it('отпечаток слишком большого файла меняется от правки руками, хотя диффа нет', () => {
+    // Файл цели за порогом построчного сравнения: дифф не строится вовсе, и
+    // строк, по которым считался отпечаток, у него нет ни одной.
+    const huge = join(home, '.gemini', 'GEMINI.md');
+    const filler = `${'строка текста человека, повторённая много раз'.repeat(20)}\n`;
+    put(huge, `${BOM}${HUMAN_TEXT}\r\n${filler.repeat(600)}`);
+
+    const shown = plan().plan;
+    const file = shown.files.find((entry) => basename(entry.filePath) === 'GEMINI.md');
+    // Без этого проверка ничего не проверяет: на непревышенном пороге отпечаток
+    // держат строки, и правка ловилась бы и до починки.
+    expect(file?.truncated).toBe(true);
+    expect(file?.lines).toHaveLength(0);
+    expect([file?.added, file?.removed]).toEqual([0, 0]);
+
+    // Правка руками между показом и нажатием, не меняющая числа строк: ни
+    // `added`, ни `removed`, ни `exists`, ни `unchanged` от неё не двигаются.
+    put(huge, `${BOM}Это переписали руками.\r\n${filler.repeat(600)}`);
+    expect(plan().plan.fingerprint).not.toBe(shown.fingerprint);
+  });
+
   it('записи рантайма названы отдельно от тех, что лягут в файлы', () => {
     const built = plan().plan;
     const runtime = runtimeOnlyEntries(built);
@@ -281,6 +303,122 @@ describe('применение', () => {
     const skillCopies = backupNames().filter((name) => name.includes('SKILL.md'));
     expect(skillCopies.length).toBe(2);
     expect(new Set(skillCopies).size).toBe(2);
+  });
+
+  /**
+   * Два переноса в РАЗНЫЕ корни — один проект, другой проект, глобальный уровень.
+   *
+   * Путь от корня у них совпадает дословно (`GEMINI.md` лежит в корне каждого),
+   * поэтому копии ложились под одним именем и делили одну ротацию. Глубина 1 —
+   * не экзотика, а настройка панели (`backupKeep`, диапазон 1..100) и та
+   * граница, на которой столкновение видно сразу: второй перенос вытеснял копию
+   * первого, и отмена первого умирала на несуществующем файле.
+   */
+  it('перенос в другой корень не вытесняет копии первого из ротации', () => {
+    // Цель — Claude: из десяти CLI только у него уровень задаётся каталогом
+    // (`override`), а Gemini, Cursor и OpenCode читают глобальные файлы, и двух
+    // корней у них не бывает вовсе.
+    const rootA = join(home, 'проект-а', '.claude');
+    const rootB = join(home, 'проект-б', '.claude');
+    for (const root of [rootA, rootB]) put(join(root, 'CLAUDE.md'), `${BOM}${HUMAN_TEXT}\r\n`);
+    const before = snapshotHome(rootA);
+
+    setBackupKeep(1);
+    try {
+      const first = buildTransferPlan(
+        env,
+        claudeProvider,
+        { scope: 'global', override: rootA },
+        '2026-09-20T10:00:00.000Z',
+      );
+      const files = applyTransfer(first.plan.target, first.plan.root, first.writes, backupDir);
+      const copies = files.filter((file) => file.backupPath !== null);
+      expect(copies.length).toBeGreaterThan(0);
+
+      const second = buildTransferPlan(
+        env,
+        claudeProvider,
+        { scope: 'global', override: rootB },
+        '2026-09-20T10:01:00.000Z',
+      );
+      applyTransfer(second.plan.target, second.plan.root, second.writes, backupDir);
+
+      // Копии первого переноса на месте — ротация у каждого корня своя.
+      for (const file of copies) expect(existsSync(file.backupPath ?? '')).toBe(true);
+
+      // И отмена первого возвращает его дом байт в байт, а не падает на ENOENT.
+      const answer = revertTransfer(
+        {
+          source: 'claude',
+          target: 'claude',
+          scope: 'global',
+          appliedAt: '2026-09-20T10:05:00.000Z',
+          fingerprint: 'отпечаток',
+          files,
+        },
+        [],
+      );
+      expect(answer.changedSince).toEqual([]);
+      expect(snapshotHome(rootA)).toEqual(before);
+    } finally {
+      setBackupKeep(10);
+    }
+  });
+});
+
+/**
+ * Инвариант 5: секрет не ложится на диск чужого CLI.
+ *
+ * Проверка идёт ПО ДИСКУ ЦЕЛИ целиком, а не по классификации записи: вопрос
+ * инварианта — лежит ли значение в чужом файле, и ответить на него может только
+ * обход дома цели. Маркер в значении неповторим, поэтому его отсутствие во всех
+ * файлах — это ответ, а не совпадение.
+ */
+describe('секрет на диск цели не едет', () => {
+  /** Пароль боевой базы: имени `DATABASE_URL` нет и не будет ни в одном словаре. */
+  const MARKER = 'МАРКЕР-ПАРОЛЯ-9f2a';
+
+  /** Значение маркера где-нибудь в доме цели. */
+  function markerInHome(): string[] {
+    return [...snapshotHome().entries()]
+      .filter(([, hex]) => hex !== '<каталог>' && Buffer.from(hex, 'hex').includes(MARKER))
+      .map(([path]) => path);
+  }
+
+  it('значение с учёткой внутри не уезжает — даже под именем вне словаря', () => {
+    put(
+      join(home, '.claude', 'settings.json'),
+      JSON.stringify({
+        env: {
+          EDITOR: 'code',
+          DATABASE_URL: `postgres://admin:${MARKER}@db.internal:5432/prod`,
+        },
+      }),
+    );
+    const withSecret = importEnvironment({ provider: claudeProvider, scope: 'global' });
+
+    // В канон значение не попадает вовсе: у записи-секрета нет поля для него.
+    const item = withSecret.items.find((entry) => 'name' in entry && entry.name === 'DATABASE_URL');
+    expect(item?.kind).toBe('secret');
+    expect(JSON.stringify(withSecret)).not.toContain(MARKER);
+
+    const built = buildTransferPlan(
+      withSecret,
+      gemini!,
+      { scope: 'global' },
+      '2026-09-20T10:00:00.000Z',
+    );
+    applyTransfer(built.plan.target, built.plan.root, built.writes, backupDir);
+
+    expect(markerInHome()).toEqual([]);
+  });
+
+  /** Обратная сторона: обычная переменная обязана ехать, иначе отказ всеяден. */
+  it('переменная без учётки внутри едет как прежде', () => {
+    const { plan: built, writes } = plan();
+    applyTransfer(built.target, built.root, writes, backupDir);
+
+    expect(readFileSync(join(home, '.gemini', '.env'), 'utf8')).toContain('EDITOR=code');
   });
 });
 

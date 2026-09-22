@@ -23,6 +23,7 @@ import type { SectionTargets } from './project.ts';
 import { providerHookEvents } from './hook-events.ts';
 import { triggerOfEvent } from './needs.ts';
 import { isModeRule } from './permissions-map.ts';
+import { REQUEST_PATH_GATE_OPENED } from './wire/tool-gate.ts';
 
 /**
  * МАТРИЦА ВЕРНОСТИ (П1.1): на каком уровне запись канона доедет до конкретного
@@ -113,6 +114,16 @@ export interface TargetProfile {
   readonly panelRun: boolean;
   /** Есть ли куда поставить провод: задокументированный адрес эндпоинта. */
   readonly wire: boolean;
+  /**
+   * ОТКРЫВАЕТ ли панель ворота на пути запроса (`wire/tool-gate.ts`).
+   *
+   * Отдельно от `wire`: адрес у цели и врезка в панели — разные половины одного
+   * механизма, и чинятся они в разных местах. Пока эта половина закрыта, запись,
+   * которую принуждает только провод, держится на ЗАПАСНОМ уровне со своей же
+   * причиной: обещать «заработает через контур» там, где включённый контур
+   * ничего не меняет, — ровно та ложь, ради которой отчёт и заведён.
+   */
+  readonly wireOpened: boolean;
 }
 
 /**
@@ -165,6 +176,7 @@ export function describeTarget(provider: ConfigProvider, level?: SectionTargets)
     },
     panelRun: provider.assistant?.cliRunnable === true,
     wire: Boolean(provider.endpointConfig ?? provider.endpointFile),
+    wireOpened: REQUEST_PATH_GATE_OPENED,
   };
 
   return level ? atLevel(catalog, level) : catalog;
@@ -257,6 +269,7 @@ function nothingAtLevel(provider: string): TargetProfile {
     readOnly: { hooks: false, plugins: false },
     panelRun: false,
     wire: false,
+    wireOpened: REQUEST_PATH_GATE_OPENED,
   };
 }
 
@@ -543,7 +556,10 @@ function degraded(
   inRequestPath: boolean,
 ): FidelityVerdict {
   const asText: FidelityLevel = profile.instructions ? 'text' : 'impossible';
-  if (inRequestPath && profile.wire) {
+  // Условие «включите контур» ставится, только если включённый контур и правда
+  // меняет исход. Ворота закрыты — запись держится запасным уровнем со своей же
+  // причиной, а обещания контура на экране нет вовсе.
+  if (inRequestPath && profile.wire && profile.wireOpened) {
     return { level: 'wired', reason, condition: THROUGH_WIRE, fallback: asText };
   }
   if (asText === 'text') return verdict('text', reason);
@@ -574,6 +590,9 @@ function emulatedOr(profile: TargetProfile, reason: FidelityReason): FidelityVer
 /** Уровень провода, если у цели есть куда его поставить; иначе — названный отказ. */
 function wiredOr(profile: TargetProfile, reason: FidelityReason): FidelityVerdict {
   if (!profile.wire) return verdict('impossible', 'no_wire');
+  // См. `degraded`: запаса у этой ветки нет вовсе, и при закрытых воротах запись
+  // не работает никак — уровень остаётся «невозможно» со своей причиной.
+  if (!profile.wireOpened) return verdict('impossible', reason);
   return { level: 'wired', reason, condition: THROUGH_WIRE, fallback: 'impossible' };
 }
 

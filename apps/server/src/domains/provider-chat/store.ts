@@ -275,6 +275,39 @@ export function appendMessage(
 }
 
 /**
+ * Снять реплику, которая никуда не уехала.
+ *
+ * Нужно ровно одному случаю: калитка запросов отказала ДО запуска CLI. Реплика
+ * пишется в файл раньше отказа (человек должен видеть свой текст сразу), а
+ * прогон после отказа не начинается вовсе — и если её не убрать, она остаётся в
+ * переписке и уезжает чужому CLI СЛЕДУЮЩИМ сообщением внутри `history`. Калитка
+ * смотрит только последнюю реплику, второй раз эту она уже не увидит: запрет,
+ * сработавший один раз, обходился бы простым «напиши что-нибудь ещё».
+ *
+ * Возвращает `true`, если реплика была и снята.
+ */
+export function dropMessage(
+  appDataDir: string,
+  providerId: string,
+  chatId: string,
+  messageId: string,
+): boolean {
+  const file = chatFile(appDataDir, providerId, chatId);
+  if (!file || !existsSync(file)) return false;
+
+  try {
+    const { meta, messages } = readRecords(file);
+    if (!meta) return false;
+    const kept = messages.filter((message) => message.id !== messageId);
+    if (kept.length === messages.length) return false;
+    writeMeta(file, meta, kept);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Переписать шапку. Файл собирается заново и подменяется целиком: шапка — первая
  * строка, дописыванием её не поправить. Запись идёт во временный файл рядом и
  * переименованием на место, чтобы обрыв не оставил половину разговора.

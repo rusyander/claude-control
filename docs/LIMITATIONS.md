@@ -184,14 +184,14 @@ of continuing in a clean session.
 
 ## Prompt gate (hook)
 
-| What                                               | Why                                                                                                                                               |
-| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| It sees only what a human typed                    | **foreign.** The `UserPromptSubmit` event receives the prompt string; files the agent read, command output and subagent prompts never reach it    |
-| It cannot replace text with a placeholder          | **foreign.** The event cannot rewrite the prompt — hence two actions, reject or warn. Replacement is the proxy's job                              |
-| Rewording bypasses it                              | **by design.** It matches the same rules, not meaning: a barrier against an accidental paste, not against a deliberate send                       |
-| Claude Code only                                   | **foreign.** No other CLI documents a "prompt submitted" event that can refuse                                                                    |
-| Unreadable rules or an unfamiliar input shape pass | **by design.** The prompt goes through marked "not checked": a script that blocks everything after a format change gets switched off the same day |
-| A hand-edited script is never overwritten          | **by design.** Silently overwriting someone's edit in their own config is not allowed; restoring the panel's version is a separate button         |
+| What                                               | Why                                                                                                                                                                                                              |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| It sees only what a human typed                    | **foreign.** The `UserPromptSubmit` event receives the prompt string; files the agent read, command output and subagent prompts never reach it                                                                   |
+| It cannot replace text with a placeholder          | **foreign.** The event cannot rewrite the prompt — hence two actions, reject or warn. Replacement is the proxy's job                                                                                             |
+| Rewording bypasses it                              | **by design.** It matches the same rules, not meaning: a barrier against an accidental paste, not against a deliberate send                                                                                      |
+| On a foreign CLI the gate only acts in a panel run | **foreign.** No other CLI documents a "prompt submitted" event that can refuse, so the panel plays the hook itself — same script, same rules. The same CLI started by hand from a terminal will not see the gate |
+| Unreadable rules or an unfamiliar input shape pass | **by design.** The prompt goes through marked "not checked": a script that blocks everything after a format change gets switched off the same day                                                                |
+| A hand-edited script is never overwritten          | **by design.** Silently overwriting someone's edit in their own config is not allowed; restoring the panel's version is a separate button                                                                        |
 
 ## Phone and remote access
 

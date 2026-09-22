@@ -47,7 +47,35 @@ export interface SupervisorHook {
   readonly command: string;
   /** Персональный таймаут этого скрипта; не задан — общий. */
   readonly timeoutMs?: number;
+  /**
+   * Чей это скрипт (П6.2).
+   *
+   * `target` (умолчание) — запись живёт в файлах самой цели, и владельца события
+   * решает `hookEventOwner`: есть событие у CLI — отыгрывает он, надзиратель
+   * молчит, иначе хук сработал бы дважды.
+   *
+   * `panel` — собственный механизм панели (калитка запросов, триггер сценария
+   * группы). В файлы чужого CLI он не записывается НИКОГДА, поэтому продублировать
+   * его целью нечем, и отыгрывается он даже на родном для цели событии. Без этого
+   * калитка молча ничего не делала бы у `qwen` и `kimi` — единственных, у кого
+   * `UserPromptSubmit` свой.
+   */
+  readonly owner?: 'target' | 'panel';
 }
+
+/**
+ * События, у которых обычный stdout скрипта — это КОНТЕКСТ, а не лог.
+ *
+ * Так устроено у Claude: на `UserPromptSubmit` и `SessionStart` всё, что хук
+ * напечатал, дописывается в контекст, и скрипт, снятый с Claude, печатает туда
+ * простой текст, а не JSON. Без этой пары надзиратель терял бы напечатанное
+ * молча — а это ровно то, ради чего такой хук и пишут (П6.2: триггер сценария
+ * группы кладёт в контекст напоминание о порядке работы).
+ */
+const STDOUT_IS_CONTEXT: ReadonlySet<SupervisorEvent> = new Set([
+  'UserPromptSubmit',
+  'SessionStart',
+]);
 
 export interface SupervisorHookResult {
   readonly event: SupervisorEvent;
@@ -191,9 +219,15 @@ export async function runSupervisorEvent(
   const event = input.event;
   const owner = hookEventOwner(provider, event);
 
-  if (owner === 'native') {
-    // Событие есть у самой цели — она его и отыграет. Пустой результат здесь
-    // означает «надзиратель промолчал», а не «скриптов нет».
+  // Событие есть у самой цели — её скрипты отыгрывает она, и надзиратель к ним не
+  // прикасается. Собственные записи панели (`owner: 'panel'`) в файлах цели не
+  // лежат и продублированы быть не могут, поэтому идут в любом случае.
+  const applicable = hooks.filter(
+    (hook) => hook.event === event && (owner === 'supervisor' || hook.owner === 'panel'),
+  );
+  if (applicable.length === 0) {
+    // Пустой результат здесь означает «надзирателю нечего отыгрывать»,
+    // а не «скриптов у человека нет».
     return { event, owner, blocked: false, addedContext: [], results: [] };
   }
 
@@ -207,9 +241,7 @@ export async function runSupervisorEvent(
   let blocked = false;
   let reason: string | undefined;
 
-  for (const hook of hooks) {
-    if (hook.event !== event) continue;
-
+  for (const hook of applicable) {
     const script = await runScript(
       hook.command,
       payload,
@@ -232,11 +264,35 @@ export async function runSupervisorEvent(
     // доезжал до человека и до модели словами панели («хук вышел с кодом 2»), то
     // есть правило оставалось без объяснения ровно там, где объяснение и нужно.
     // Явный JSON сильнее: он — осознанный канал, а stderr пишут и ради отладки.
+    //
+    // ЛЮБОЙ другой ненулевой код — уже не решение хука, а его поломка (нет
+    // интерпретатора, упал, оболочка не нашла команду), и план требует для неё
+    // «код выхода и хвост вывода» (§7): без хвоста человек читал бы «завершился
+    // с кодом 127» и шёл смотреть тот же вывод руками. Поэтому код НАЗЫВАЕТСЯ
+    // панелью, а слова остаются скрипту.
     const said = script.stderr.trim().slice(0, MAX_REASON_CHARS);
+    const brokeWithCode = parsed === undefined && script.exitCode !== 0 && said;
     const hookReason = script.timedOut
       ? `Хук события ${event} не ответил за ${hook.timeoutMs ?? defaultTimeout} мс и был снят`
-      : ((parsed === undefined && script.exitCode === 2 && said ? said : undefined) ??
-        verdict.reason);
+      : ((brokeWithCode
+          ? script.exitCode === 2
+            ? said
+            : `Хук завершился с кодом ${script.exitCode}: ${said}`
+          : undefined) ?? verdict.reason);
+
+    // Обычный вывод отработавшего скрипта на событии, где stdout — это контекст.
+    // Явный JSON сильнее: он назван осознанно, а печатать простой текст умеет и
+    // скрипт, который просто рассказывает о себе.
+    const printed = script.stdout.trim();
+    const context =
+      verdict.addedContext ??
+      (STDOUT_IS_CONTEXT.has(event) &&
+      !script.timedOut &&
+      script.exitCode === 0 &&
+      parsed === undefined &&
+      printed
+        ? printed
+        : undefined);
 
     results.push({
       event,
@@ -244,13 +300,13 @@ export async function runSupervisorEvent(
       exitCode: script.exitCode,
       decision: verdict.decision,
       ...(hookReason ? { reason: hookReason } : {}),
-      ...(verdict.addedContext ? { addedContext: verdict.addedContext } : {}),
+      ...(context ? { addedContext: context } : {}),
       timedOut: script.timedOut,
       durationMs: script.durationMs,
       ignoredOnObservingEvent: intervened && !canBlock,
     });
 
-    if (verdict.addedContext) addedContext.push(verdict.addedContext);
+    if (context) addedContext.push(context);
 
     if (intervened && canBlock) {
       blocked = true;

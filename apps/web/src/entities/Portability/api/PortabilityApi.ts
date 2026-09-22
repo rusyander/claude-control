@@ -1,5 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { AgentEnvironment } from '@agentdeck/contracts/portable-env';
+import type { AgentEnvironment, EnvItemKind } from '@agentdeck/contracts/portable-env';
+import {
+  PANEL_CANON_PROVIDER,
+  type EnvSubscription,
+  type SubscriptionApplyAnswer,
+  type SubscriptionDriftAnswer,
+  type SubscriptionDriftPlan,
+  type SubscriptionDriftResolution,
+  type SubscriptionSyncPlan,
+  type SubscriptionsAnswer,
+} from '@agentdeck/contracts/portable-subscribe';
+import type { CarryApplyAnswer, CarryPlan } from '@agentdeck/contracts/portable-carry';
 import type { FidelityAnswer } from '@agentdeck/contracts/portable-fidelity';
 import type { ProbeAnswer } from '@agentdeck/contracts/portable-probe';
 import type {
@@ -226,6 +237,206 @@ export function useRevertTransfer() {
   });
 }
 
+// Подписка: канон — источник, чужой CLI — его проекция (П5.1, П5.2).
+//
+// Источник НИ В ОДИН из шести запросов не передаётся. Канон подписки —
+// собственная среда панели, и добавить сюда выбранный на экране источник
+// значило бы сделать подписку вторым переносом, у которого истин столько же,
+// сколько CLI на машине.
+
+/** Адрес подписки: цель на уровне. Больше ничем две подписки не отличаются. */
+export interface SubscriptionAddress extends PortabilityLevel {
+  target: string;
+}
+
+async function getSubscriptions(): Promise<SubscriptionsAnswer> {
+  const { data } = await apiClient.get<SubscriptionsAnswer>('/portability/subscriptions');
+  return data;
+}
+
+/**
+ * Все подписки панели — то, с чем экран ОТКРЫВАЕТСЯ.
+ *
+ * Обычный запрос списком, а не по выбранной цели: маршрут отдаёт их разом, и
+ * человек, переключающий цель, не должен ждать сети ради ответа, который уже
+ * лежит в кэше.
+ */
+export function useSubscriptions() {
+  return useQuery({
+    queryKey: queryKeys.portabilitySubscriptions,
+    queryFn: getSubscriptions,
+  });
+}
+
+async function putSubscription(
+  request: SubscriptionAddress & { layers: readonly EnvItemKind[] },
+): Promise<{ subscription: EnvSubscription }> {
+  const { data } = await apiClient.put<{ subscription: EnvSubscription }>(
+    '/portability/subscription',
+    request,
+  );
+  return data;
+}
+
+/**
+ * Подписать цель на слои — и отписать ею же, пустым списком.
+ *
+ * Отписка ничего у цели не удаляет: подписка её файлами не владела, она
+ * обещала их обновлять. Память о спроецированном сохраняется, поэтому повторная
+ * подписка не объявит новым каждый файл, который панель уже писала.
+ */
+export function useSaveSubscription() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: putSubscription,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.portabilitySubscriptions });
+    },
+  });
+}
+
+async function deleteSubscription(address: SubscriptionAddress): Promise<{ ok: boolean }> {
+  const { data } = await apiClient.delete<{ ok: boolean }>('/portability/subscription', {
+    params: { target: address.target, ...levelParams(address) },
+  });
+  return data;
+}
+
+/**
+ * Забыть подписку целиком — вместе с памятью о спроецированном. Файлы цели
+ * остаются такими, какими их оставили: панель перестаёт их обновлять, а не
+ * стирает.
+ */
+export function useForgetSubscription() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: deleteSubscription,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.portabilitySubscriptions });
+    },
+  });
+}
+
+async function postSubscriptionPlan(
+  address: SubscriptionAddress,
+): Promise<{ plan: SubscriptionSyncPlan }> {
+  const { data } = await apiClient.post<{ plan: SubscriptionSyncPlan }>(
+    '/portability/subscription/plan',
+    address,
+  );
+  return data;
+}
+
+/**
+ * План пересборки: что разошлось с каноном и что из-за этого будет записано.
+ *
+ * Мутация по той же причине, что и план переноса: сервер ничего не пишет, но
+ * считает план НАСТОЯЩЕЙ записью адаптеров по временным копиям, и тянуть это
+ * фоном при каждом открытии страницы было бы неверно понятым «только чтением».
+ */
+export function usePlanSubscription() {
+  return useMutation({ mutationFn: postSubscriptionPlan });
+}
+
+async function postSubscriptionApply(
+  request: SubscriptionAddress & { fingerprint: string },
+): Promise<SubscriptionApplyAnswer> {
+  const { data } = await apiClient.post<SubscriptionApplyAnswer>(
+    '/portability/subscription/apply',
+    request,
+  );
+  return data;
+}
+
+/**
+ * Пересобрать разошедшееся. Пишет тот же `applyTransfer`, что и разовый
+ * перенос, — с теми же резервными копиями и тем же откатом при провале.
+ *
+ * После успеха устаревает не только список подписок, но и паспорт ЦЕЛИ: в неё
+ * только что записали, и прежний паспорт говорил бы о среде, которой уже нет.
+ */
+export function useApplySubscription() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: postSubscriptionApply,
+    onSuccess: (_answer, variables) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.portabilitySubscriptions });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.portabilityPassport(
+          variables.target,
+          variables.scope,
+          variables.project,
+        ),
+      });
+    },
+  });
+}
+
+/** Адрес исхода: подписка плюс файл и то, что с ним решили сделать (П5.2). */
+export interface DriftAddress extends SubscriptionAddress {
+  filePath: string;
+  resolution: SubscriptionDriftResolution;
+}
+
+async function postDriftPlan(address: DriftAddress): Promise<{ plan: SubscriptionDriftPlan }> {
+  const { data } = await apiClient.post<{ plan: SubscriptionDriftPlan }>(
+    '/portability/subscription/drift/plan',
+    address,
+  );
+  return data;
+}
+
+/**
+ * Что сделает выбранный исход расхождения — до того, как он сделан.
+ *
+ * Отдельная пара «план → применение», а не поле общей пересборки: исход
+ * разбирает ОДИН файл, и показать его вместе с пересборкой значило бы показать
+ * два разных решения одним диффом.
+ */
+export function usePlanDrift() {
+  return useMutation({ mutationFn: postDriftPlan });
+}
+
+async function postDriftApply(
+  request: DriftAddress & { fingerprint?: string },
+): Promise<SubscriptionDriftAnswer> {
+  const { data } = await apiClient.post<SubscriptionDriftAnswer>(
+    '/portability/subscription/drift/apply',
+    request,
+  );
+  return data;
+}
+
+/**
+ * Сделать выбранное. `fingerprint` — того плана, который человеку ПОКАЗАЛИ;
+ * у `unsubscribe` его нет, и это не упущение: этот исход не трогает у цели ни
+ * одного байта, показывать в нём нечего.
+ *
+ * Паспорт цели устаревает у двух исходов из трёх, канон панели — у одного:
+ * `canon` пишет в файлы САМОЙ панели, и после него устарел паспорт источника
+ * канона, а не цели.
+ */
+export function useApplyDrift() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: postDriftApply,
+    onSuccess: (answer, variables) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.portabilitySubscriptions });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.portabilityPassport(
+          answer.resolution === 'canon' ? PANEL_CANON_PROVIDER : variables.target,
+          variables.scope,
+          variables.project,
+        ),
+      });
+    },
+  });
+}
+
 /** Что нужно пробе: цель и уровень. Источник ей не нужен — она про ЦЕЛЬ. */
 interface ProbeRequest {
   target: string;
@@ -248,4 +459,43 @@ async function postProbe(request: ProbeRequest): Promise<ProbeAnswer> {
  */
 export function useRunProbe() {
   return useMutation({ mutationFn: postProbe });
+}
+
+/**
+ * Незакрытая работа, которую панель предлагает перенести к новому CLI (П6.1).
+ *
+ * Запрос за ресурсом, а не мутация: список ничего не заводит и не запускает —
+ * он только читает разговоры и считает по ним предохранители. Свежесть нужна
+ * настоящая (разговор мог закрыться минуту назад), поэтому кэш здесь короткий.
+ */
+export function useCarryPlan() {
+  return useQuery({
+    queryKey: queryKeys.portabilityCarry,
+    queryFn: async (): Promise<CarryPlan> => {
+      const { data } = await apiClient.get<CarryPlan>('/portability/carry');
+      return data;
+    },
+    staleTime: 15_000,
+  });
+}
+
+async function postCarryApply(keys: string[]): Promise<CarryApplyAnswer> {
+  const { data } = await apiClient.post<CarryApplyAnswer>('/portability/carry/apply', { keys });
+  return data;
+}
+
+/**
+ * Перенести выбранное. Список после этого обязан перечитаться: перенесённый
+ * разговор перестаёт быть кандидатом (его опора уже отмечена), а у цели
+ * появился новый — и он, в свою очередь, кандидатом не является.
+ */
+export function useApplyCarry() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: postCarryApply,
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.portabilityCarry });
+    },
+  });
 }

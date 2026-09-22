@@ -1,5 +1,4 @@
 import { createHash } from 'node:crypto';
-import { resolve } from 'node:path';
 import type {
   ProjectTestBulkInput,
   ProjectTestCaseInput,
@@ -14,6 +13,7 @@ import { sendConditional } from '../../lib/conditional-get.ts';
 import {
   DEFAULT_GROUPS,
   bulkCases,
+  conventionFile,
   createGroup,
   forgetEnvironmentSecrets,
   installConvention,
@@ -333,11 +333,19 @@ export function registerTestLibraryRoutes(app: FastifyInstance, deps: TestsDeps)
     // Копия под именем ПРОЕКТНОГО файла, как у вкладки «Правила»; окно тестов
     // работает по пути, поэтому id берём из реестра, а незарегистрированный
     // каталог получает устойчивый ключ из своего пути.
-    const claudeMd = resolve(root, 'CLAUDE.md');
+    // Имя файла инструкций решает резолвер П2.7, а не эта кнопка: в проекте на
+    // `AGENTS.md` заведённый панелью `CLAUDE.md` молча погасил бы прежний файл.
+    const settings = deps.ctx.location.paths.settings;
+    const instructions = conventionFile(root, settings);
     const projectId =
       deps.ctx.store.getProjectByPath(root)?.id ??
-      createHash('sha1').update(claudeMd).digest('hex').slice(0, 12);
-    installConvention(root, deps.ctx.backupDir, projectBackupName(projectId, claudeMd));
+      createHash('sha1').update(instructions).digest('hex').slice(0, 12);
+    installConvention(
+      root,
+      deps.ctx.backupDir,
+      projectBackupName(projectId, instructions),
+      settings,
+    );
     return buildView(root, deps);
   });
 }

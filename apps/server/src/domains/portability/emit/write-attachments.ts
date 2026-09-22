@@ -2,7 +2,27 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { SkillItem } from '@agentdeck/contracts/portable-env';
 import { providerBackupName, writeBinaryFile } from '../../../lib/safe-io.ts';
+import { coded } from '../../../lib/server-text.ts';
+import { isSafeSegment } from './context.ts';
 import type { EmitWrite } from './types.ts';
+
+/**
+ * Опись скилла ведёт МИМО его каталога — план не строится вовсе.
+ *
+ * Отдельным классом, а не безымянной ошибкой: маршрут отвечает названным отказом
+ * с кодом, который клиент переводит, иначе человек увидел бы 500 и русскую
+ * строку в английском интерфейсе.
+ */
+export class SkillAttachmentUnsafePathError extends Error {
+  readonly attachmentPath: string;
+
+  constructor(skillName: string, attachmentPath: string) {
+    super(`Вложение скилла «${skillName}» лежит по небезопасному пути «${attachmentPath}».`);
+    coded(this, 'portability-attachment-unsafe-path', { name: skillName, path: attachmentPath });
+    this.name = 'SkillAttachmentUnsafePathError';
+    this.attachmentPath = attachmentPath;
+  }
+}
 
 /**
  * Вложения скилла — правкой на ФАЙЛ.
@@ -35,6 +55,16 @@ export function attachmentWrites(params: {
 
   return item.attachments.map((attachment) => {
     const segments = attachment.path.split('/');
+    // Единственное место, где путь складывался из чужой строки без проверки
+    // сегментов. Сегодня опись пишет наш же импортёр, читая каталог на этой
+    // машине, — но `..` в ней означал бы запись МИМО каталога скилла, у цели и
+    // у источника сразу, и узнавать об этом по следам чужого файла нельзя.
+    // Отказ тут громкий: план не строится вовсе, потому что тихо пропустить
+    // вложение значило бы записать цели скилл, ссылающийся на пустоту.
+    if (segments.length === 0 || !segments.every(isSafeSegment)) {
+      throw new SkillAttachmentUnsafePathError(item.name, attachment.path);
+    }
+
     const filePath = join(targetDir, ...segments);
     const read = (): Buffer => readFileSync(join(sourceDir, ...segments));
 

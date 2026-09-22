@@ -11,6 +11,7 @@ import type {
 import type { ProbeAnswer } from '@agentdeck/contracts/portable-probe';
 import {
   isSubscriptionDriftResolution,
+  PANEL_CANON_PROVIDER,
   type EnvSubscription,
   type SubscriptionApplyAnswer,
   type SubscriptionDrift,
@@ -43,11 +44,13 @@ import {
   applyTransfer,
   changedSinceTransfer,
   fileHashOrNull,
+  keepFirstBackups,
   revertTransfer,
   TransferBackupsDisabledError,
   TransferRolledBackError,
   TransferTargetNotWritableError,
 } from '../domains/portability/apply.ts';
+import { SkillAttachmentUnsafePathError } from '../domains/portability/emit/write-attachments.ts';
 import {
   detectDrift,
   emptySubscription,
@@ -246,6 +249,7 @@ export function registerPortabilityRoutes(app: FastifyInstance, ctx: ServerConte
     }
 
     try {
+      const key = transferRecordKey(plan.source, plan.target, plan.scope, planned.projectId);
       const files = applyTransfer(plan.target, plan.root, writes, ctx.backupDir);
       const record = {
         source: plan.source,
@@ -253,12 +257,11 @@ export function registerPortabilityRoutes(app: FastifyInstance, ctx: ServerConte
         scope: plan.scope,
         appliedAt: new Date().toISOString(),
         fingerprint: plan.fingerprint,
-        files,
+        // Неотменённый след поверх себя не кладётся: копии в нём — единственная
+        // память о том, какими файлы цели были ДО панели.
+        files: keepFirstBackups(ctx.store.getPortabilityTransfer(key), files),
       };
-      ctx.store.savePortabilityTransfer(
-        transferRecordKey(plan.source, plan.target, plan.scope, planned.projectId),
-        record,
-      );
+      ctx.store.savePortabilityTransfer(key, record);
       return { record, entries: plan.entries } satisfies TransferApplyAnswer;
     } catch (error) {
       if (error instanceof TransferBackupsDisabledError)
@@ -488,17 +491,16 @@ export function registerPortabilityRoutes(app: FastifyInstance, ctx: ServerConte
     if (isRefusal(planned)) return send(reply, planned);
     const { plan } = planned;
 
-    // Удержание — это ответ «не буду и вот почему», а не пустая пересборка:
-    // сменившаяся версия канона молча не пересобирается (инвариант П0.1).
+    // Удержание — это ответ «не буду и вот почему», а не пустая пересборка.
+    // Сменившаяся версия канона удержанием БОЛЬШЕ НЕ ОТВЕЧАЕТ: выхода из того
+    // удержания не было (`subscribe.ts`), и она пересобирает проекцию целиком.
     if (plan.hold)
       return send(
         reply,
         refuse(
           409,
           `subscription_${plan.hold}`,
-          plan.hold === 'canon_version'
-            ? 'Проекцию строила другая версия канона — пересоберите её заново, показав план.'
-            : 'Ни один слой не подписан: пересобирать нечего.',
+          'Ни один слой не подписан: пересобирать нечего.',
           'portability-subscription-held',
         ),
       );
@@ -719,15 +721,11 @@ export function registerPortabilityRoutes(app: FastifyInstance, ctx: ServerConte
   );
 }
 
-/**
- * Чья среда служит каноном подписки.
- *
- * Панель — это оболочка над Claude: его файлы она читает и пишет сама, и «канон
- * панели» означает ровно их. Константа существует, чтобы решение читалось в
- * одном месте, а не выглядело подставленным по умолчанию провайдером в двух
- * вызовах резолвера.
- */
-const PANEL_CANON_PROVIDER = 'claude';
+// Чья среда служит каноном подписки — `PANEL_CANON_PROVIDER` из контракта.
+// Панель — это оболочка над Claude: его файлы она читает и пишет сама, и «канон
+// панели» означает ровно их. Константа переехала в контракт, когда от неё стал
+// зависеть ЭКРАН (П7.1): своя копия строки на той стороне разошлась бы с этой
+// молча.
 
 /** Подписка, её ключ и разрешённый уровень — общее у четырёх маршрутов. */
 interface ResolvedSubscription extends ResolvedLevel {
@@ -1207,8 +1205,9 @@ function planTransfer(
     );
   }
 
-  return {
-    ...buildTransferPlan(
+  let plan: PlannedTransfer;
+  try {
+    plan = buildTransferPlan(
       env,
       target,
       {
@@ -1217,7 +1216,23 @@ function planTransfer(
         override: ctx.store.getSettings().claudeDirOverride,
       },
       new Date().toISOString(),
-    ),
+    );
+  } catch (error) {
+    // Опись скилла, ведущая мимо его каталога, роняет сборку плана намеренно
+    // (`write-attachments.ts`). Наружу это отказ с причиной, а не 500: 500
+    // читается как поломка панели, а сломана здесь чужая опись.
+    if (error instanceof SkillAttachmentUnsafePathError)
+      return refuse(
+        409,
+        'attachment_unsafe_path',
+        error.message,
+        'portability-attachment-unsafe-path',
+      );
+    throw error;
+  }
+
+  return {
+    ...plan,
     // След переноса ищется по паре «источник → цель» И по проекту: план о
     // проекте знает корень, а ключ состояния — идентификатор записи реестра.
     ...(resolved.projectId ? { projectId: resolved.projectId } : {}),

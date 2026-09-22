@@ -20,6 +20,7 @@ import { registerProviderPreviewRoutes } from '../routes/provider-preview-routes
 import { registerConfigPreviewRoutes } from '../routes/config-preview-routes.ts';
 import { registerProviderCompareRoutes } from '../routes/provider-compare-routes.ts';
 import { registerPortabilityRoutes } from '../routes/portability-routes.ts';
+import { registerPortabilityCarryRoutes } from '../routes/portability-carry-routes.ts';
 import { registerFormatCheckRoutes } from '../routes/format-check-routes.ts';
 import { registerPluginRoutes } from '../routes/plugin-routes.ts';
 import { registerAssistantRoutes } from '../routes/assistant-routes.ts';
@@ -106,6 +107,16 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
     registerConfigPreviewRoutes,
     registerProviderCompareRoutes,
     registerPortabilityRoutes,
+    // Перенос незакрытой работы к новому CLI (П6.1). Живёт отдельно от переноса
+    // среды: тому хватает хранилища, а этому нужны реестр прогонов, память
+    // цепочек, права сессии и сервис чужих чатов — всё, что переживает запрос.
+    (instance, context) =>
+      registerPortabilityCarryRoutes(instance, context, {
+        runs: chatRuns,
+        chains: handoffChains,
+        session: chatSession,
+        providerChats,
+      }),
     registerFormatCheckRoutes,
     registerPluginRoutes,
     registerAssistantRoutes,

@@ -100,7 +100,7 @@ The panel grew out of Claude Code and stays its tool: **the Claude provider is a
 
 ### The map: section × provider
 
-What actually works in each CLI — the "section × provider" table in [What the panel does not do with other CLIs](docs/LIMITATIONS-PROVIDERS.md#the-map-section--provider). File paths, the keys the panel edits and the reason behind every status — in [Providers: format details](docs/PROVIDERS.md).
+What actually works in each CLI — the "section × provider" table in [What the panel does not do with other CLIs](docs/LIMITATIONS-PROVIDERS.md#the-map-section--provider). File paths, the keys the panel edits and the reason behind every status — in [Providers: format details](docs/PROVIDERS.md). Moving a whole environment from one CLI into another, and what survives the move in what shape — in [Moving an environment between CLIs](docs/PORTABILITY.md).
 
 Claude is marked **verified**: its path has been exercised live and is covered by tests. The rest are **experimental**: formats come from each CLI's documentation and are covered by round-trip tests, but the first real write is worth eyeballing. Which is why four tools surround them — a write preview, a provider check on your machine, a daily comparison against the published schemas, and migration of settings between CLIs ([Providers: panel-side tools](docs/PROVIDER-TOOLS.md)). Not theory: the very first format check found a drift — `experimental.hook` is gone from the OpenCode schema, so hooks there are read-only as a fact rather than a guess.
 

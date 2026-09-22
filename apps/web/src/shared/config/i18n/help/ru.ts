@@ -39,6 +39,7 @@ import { endpointsRu } from './ru/topics/endpoints';
 import { providersRu } from './ru/topics/providers';
 import { integrationsRu } from './ru/topics/integrations';
 import { promptsRu } from './ru/topics/prompts';
+import { portabilityRu } from './ru/topics/portability';
 export const helpRu = {
   index: {
     subtitle: 'Как работает каждый раздел панели',
@@ -141,6 +142,7 @@ export const helpRu = {
     search: searchRu.shots,
     analytics: analyticsRu.shots,
     history: historyRu.shots,
+    portability: portabilityRu.shots,
     compare: compareRu.shots,
     settings: settingsRu.shots,
     providers: providersRu.shots,
@@ -207,6 +209,7 @@ export const helpRu = {
     search: searchRu.topic,
     compare: compareRu.topic,
     history: historyRu.topic,
+    portability: portabilityRu.topic,
     tests: testsRu.topic,
     projects: projectsRu.topic,
     dlp: dlpRu.topic,

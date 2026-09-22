@@ -60,6 +60,9 @@ export const continueProvider: ConfigProvider = {
     format: 'continue-yaml',
     path: () => join(continueHome(), 'config.yaml'),
     apiKind: 'openai-compat',
+    // `provider: openai` + `apiBase` у Continue — это путь `/chat/completions`,
+    // ровно тот, который шлюз и обслуживает.
+    wireApi: 'chat',
   },
   permissionsConfig: {
     format: 'continue-yaml',

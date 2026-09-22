@@ -87,6 +87,13 @@ function emitHooks(context: EmitContext): StageResult {
       throw new EmitMechanismMissingError(context.deps.target.id, 'hook');
     }
 
+    if (item.scriptMissing) {
+      // Скрипта нет на диске: переходник позвал бы его по пути, которого нет, и
+      // хук падал бы на каждом событии цели. Запись названа и не регистрируется (§7).
+      result.entries.push(emitEntry(item, verdict, 'script_missing', null));
+      continue;
+    }
+
     if (!item.enabled) {
       // У обоих форматов выключателя нет: записанный хук исполняется. Включить
       // то, что человек выключил сам, перенос не имеет права.

@@ -26,7 +26,7 @@
     "brand": "node tools/qa/check-brand.mjs && node tools/qa/check-brand.mjs --selftest",
     "citations": "node tools/qa/check-citations.mjs && node tools/qa/check-citations.mjs --selftest",
     "supervisor": "node tools/qa/check-supervisor-hooks.mjs && node tools/qa/check-supervisor-hooks.mjs --selftest && node tools/qa/check-supervisor-skills.mjs && node tools/qa/check-supervisor-skills.mjs --selftest && node tools/qa/check-tool-shim-hooks.mjs && node tools/qa/check-tool-shim-hooks.mjs --selftest",
-    "portability": "node tools/qa/check-portability-import.mjs && node tools/qa/check-portability-import.mjs --selftest && node tools/qa/check-portability-fidelity.mjs && node tools/qa/check-portability-fidelity.mjs --selftest && node tools/qa/check-portability-roundtrip.mjs && node tools/qa/check-portability-roundtrip.mjs --selftest && node tools/qa/check-portability-apply.mjs && node tools/qa/check-portability-apply.mjs --selftest && node tools/qa/check-portability-probe.mjs && node tools/qa/check-portability-probe.mjs --selftest && node tools/qa/check-portability-project.mjs && node tools/qa/check-portability-project.mjs --selftest && node tools/qa/check-portability-secrets.mjs && node tools/qa/check-portability-secrets.mjs --selftest",
+    "portability": "node tools/qa/check-portability-import.mjs && node tools/qa/check-portability-import.mjs --selftest && node tools/qa/check-portability-fidelity.mjs && node tools/qa/check-portability-fidelity.mjs --selftest && node tools/qa/check-portability-roundtrip.mjs && node tools/qa/check-portability-roundtrip.mjs --selftest && node tools/qa/check-portability-apply.mjs && node tools/qa/check-portability-apply.mjs --selftest && node tools/qa/check-portability-probe.mjs && node tools/qa/check-portability-probe.mjs --selftest && node tools/qa/check-portability-project.mjs && node tools/qa/check-portability-project.mjs --selftest && node tools/qa/check-portability-secrets.mjs && node tools/qa/check-portability-secrets.mjs --selftest && node tools/qa/check-portability-eleventh.mjs && node tools/qa/check-portability-eleventh.mjs --selftest && node tools/qa/check-permission-broker.mjs --selftest",
     "check": "pnpm format:check && pnpm type-check && pnpm lint && pnpm depcruise && pnpm compromises && pnpm negatives && pnpm shots && pnpm portability && pnpm supervisor && pnpm build",
     "doctor": "node tools/doctor.mjs",
     "tests": "node tools/tests-cli.mjs",
@@ -43,14 +43,6 @@
     "mobile:apk": "node tools/build-mobile-apk.mjs",
     "mobile:clean": "node tools/clean-mobile-build.mjs",
     "prepare": "husky"
-  },
-  "lint-staged": {
-    "*.{ts,tsx,js,mjs,cjs}": [
-      "eslint --no-warn-ignored",
-      "prettier --check --ignore-unknown"
-    ],
-    "*.{json,md,scss,css,yml,yaml,html}": "prettier --check --ignore-unknown",
-    "*": "node tools/check-lf.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.12.1",

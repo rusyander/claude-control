@@ -132,7 +132,7 @@ export function compileScenarioSkill(deps: EntityToggleDeps, group: Group): stri
   );
 
   if (scenario.trigger.trim() && isValidTrigger(scenario.trigger)) {
-    writeTextFile(join(skillDir(paths.skills, id), TRIGGER_FILE), buildTriggerScript(group, id), {
+    writeTextFile(join(skillDir(paths.skills, id), TRIGGER_FILE), buildTriggerScript(group), {
       backupDir,
     });
   }
@@ -149,17 +149,21 @@ export function compileScenarioSkill(deps: EntityToggleDeps, group: Group): stri
  * ещё. Любая осечка внутри хука стоит стека в контексте на каждом запросе,
  * поэтому скрипт при любой беде молча выходит с нулём.
  */
-export function buildTriggerScript(group: Group, skillId: string): string {
-  const notice =
-    `Запрос попадает под сценарий «${group.name}». ` +
-    `Выполняй по шагам из ~/.claude/skills/${skillId}/SKILL.md, не пропуская признаки выполнения.`;
+export function buildTriggerScript(group: Group): string {
+  const notice = `Запрос попадает под сценарий «${group.name}». Выполняй по шагам из `;
+  const tail = ', не пропуская признаки выполнения.';
 
   return `// Сгенерировано панелью AgentDeck из сценария группы «${group.name}».
 // Правки затираются при следующем сохранении группы — меняйте сценарий в панели.
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 const TRIGGER = new RegExp(${JSON.stringify(group.scenario?.trigger ?? '')}, 'i');
-const NOTICE = ${JSON.stringify(notice)};
+// Путь к телу сценария считается ОТ САМОГО СКРИПТА: он лежит в папке скилла, и
+// вписанный сюда «~/.claude/skills/…» врал бы дважды — при своём каталоге
+// конфигурации и у любого CLI, кроме Claude, которому дом Claude не дом (П6.2).
+const NOTICE =
+  ${JSON.stringify(notice)} + fileURLToPath(new URL('SKILL.md', import.meta.url)) + ${JSON.stringify(tail)};
 
 try {
   const input = JSON.parse(readFileSync(0, 'utf8') || '{}');
@@ -168,6 +172,35 @@ try {
   // Хук не имеет права мешать работе: любая ошибка здесь — молчаливый выход.
 }
 `;
+}
+
+/**
+ * Команда триггера сценария — ОДНА на обе стороны (П6.2).
+ *
+ * У Claude она уезжает в его `settings.json` (ниже), у чужого CLI её отыгрывает
+ * надзиратель в запуске панели. Вторая копия этой строки означала бы, что
+ * сценарий срабатывает по разным правилам в зависимости от провайдера, — а
+ * критерий П6.2 ровно обратный.
+ *
+ * `undefined` — триггеру не бывать: группа выключена, сценария нет, выражение
+ * пустое или сломанное. Все четыре случая означают «ничего не навязываем».
+ */
+export function scenarioTriggerCommand(skillsDir: string, group: Group): string | undefined {
+  if (!group.isEnabled || !hasScenario(group.scenario)) return undefined;
+
+  const pattern = group.scenario.trigger.trim();
+  if (!pattern || !isValidTrigger(pattern)) return undefined;
+
+  return `node "${scenarioTriggerPath(skillsDir, group)}" ${SCENARIO_MARKER}:${group.id}`;
+}
+
+/**
+ * Файл-триггер сценария на диске. Отдельно от команды, потому что спрашивают его
+ * существование: хук, чьего скрипта нет, на блокирующем событии оборачивается
+ * отказом КАЖДОГО сообщения, а не пропуском одного триггера.
+ */
+export function scenarioTriggerPath(skillsDir: string, group: Group): string {
+  return join(skillDir(skillsDir, scenarioSkillId(group)), TRIGGER_FILE);
 }
 
 /**
@@ -184,30 +217,23 @@ export function compileScenarioHooks(deps: EntityToggleDeps): void {
   const hooks = readHooks(paths.settings, store);
   const kept = hooks.filter((hook) => !hasScenarioMarker(hook.command));
 
-  const compiled: Hook[] = store
-    .getGroups()
-    .filter(
-      (group) =>
-        group.isEnabled &&
-        hasScenario(group.scenario) &&
-        group.scenario.trigger.trim().length > 0 &&
-        isValidTrigger(group.scenario.trigger),
-    )
-    .map((group) => {
-      const id = scenarioSkillId(group);
-      const script = join(skillDir(paths.skills, id), TRIGGER_FILE);
+  const compiled: Hook[] = store.getGroups().flatMap((group) => {
+    const command = scenarioTriggerCommand(paths.skills, group);
+    if (!command) return [];
 
-      return {
+    return [
+      {
         id: `scenario:${group.id}`,
         event: 'UserPromptSubmit' as const,
-        command: `node "${script}" ${SCENARIO_MARKER}:${group.id}`,
+        command,
         isEnabled: true,
         groupIds: [group.id],
         // Скомпилированное всегда уходит в основной settings.json: локальный
         // файл панель не переписывает.
         source: 'settings' as const,
-      };
-    });
+      },
+    ];
+  });
 
   // Ни одного триггера ни в файле, ни в группах — файл не трогаем. Иначе
   // каждый щелчок тумблера у обычной группы плодил бы резервную копию

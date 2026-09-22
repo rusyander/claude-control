@@ -105,6 +105,6 @@ export { buildRisk, budgetOf, byRisk, riskOfCase } from './project-tests/risk.ts
 export { DEFAULT_DIFF_RANGE, collectSource, stampOf } from './project-tests/generate-sources.ts';
 export { buildPlanPreview, toPlan } from './project-tests/plan-recipes.ts';
 export { suggestTaxonomy } from './project-tests/taxonomy.ts';
-export { hasConvention, installConvention } from './project-tests/convention.ts';
+export { conventionFile, hasConvention, installConvention } from './project-tests/convention.ts';
 export { ProjectTestRunRegistry } from './project-tests/runs.ts';
 export { repairFutureStamps, type RepairedStamp } from './project-tests/repair.ts';

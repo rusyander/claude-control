@@ -9,6 +9,7 @@ import { AppStore } from '../../../lib/app-store.ts';
 import { applyContour } from './apply.ts';
 import { buildPlatformApplyPlan, type ContourApplyDeps } from './plan.ts';
 import { rollbackContour } from './rollback.ts';
+import { applyCodexEndpoint, rollbackCodexEndpoint } from './config-files.ts';
 import { defaultPlatformTransport } from '@agentdeck/contracts/platform-transport';
 
 /**
@@ -155,9 +156,32 @@ describe('возврат файлов в исходное состояние', (
   });
 
   it('codex: своя таблица ушла, чужие и корневой ключ целы', () => {
+    // Писатель и откат проверяются НАПРЯМУЮ: целью контура codex сегодня не
+    // предлагается (его ручку шлюз не обслуживает, `targets.ts`), но хирургия по
+    // чужому TOML обязана оставаться верной к моменту, когда маршрут появится.
     writeFileSync(codexPath, CODEX_CONFIG);
-    applyContour(deps(), PLATFORM, { targets: ['codex'], model: 'gpt-4o' });
-    rollbackContour(deps(), PLATFORM.id);
+    const name = 'contour-company-dev';
+    const written = applyCodexEndpoint(
+      codexPath,
+      name,
+      'http://127.0.0.1:5179/company-dev/v1',
+      undefined,
+      'responses',
+    );
+    expect(readFileSync(codexPath, 'utf8')).toContain(`[model_providers.${name}]`);
+
+    rollbackCodexEndpoint(
+      codexPath,
+      name,
+      {
+        targetId: 'codex',
+        filePath: codexPath,
+        appliedAt: '2026-09-22T00:00:00.000Z',
+        fingerprint: '',
+        ...written,
+      },
+      undefined,
+    );
 
     const text = readFileSync(codexPath, 'utf8');
     expect(text).not.toContain('contour-company-dev');
@@ -183,14 +207,18 @@ describe('возврат файлов в исходное состояние', (
 
   it('несколько целей разом — все названы в ответе', () => {
     writeFileSync(settingsPath, JSON.stringify({ env: {} }));
-    writeFileSync(codexPath, CODEX_CONFIG);
+    writeFileSync(continuePath, CONTINUE_CONFIG);
     applyContour(deps(), PLATFORM, {
-      targets: ['assistant', 'claude', 'codex'],
+      targets: ['assistant', 'claude', 'continue'],
       model: 'gpt-4o',
     });
 
     const result = rollbackContour(deps(), PLATFORM.id);
-    expect(result.entries.map((item) => item.targetId)).toEqual(['assistant', 'claude', 'codex']);
+    expect(result.entries.map((item) => item.targetId)).toEqual([
+      'assistant',
+      'claude',
+      'continue',
+    ]);
     expect(result.entries.every((item) => item.outcome === 'restored')).toBe(true);
   });
 });
@@ -198,25 +226,25 @@ describe('возврат файлов в исходное состояние', (
 describe('точечный откат', () => {
   it('снимается названная цель, остальные остаются применёнными', () => {
     writeFileSync(settingsPath, JSON.stringify({ env: { EXISTING: 'keep-me' } }));
-    writeFileSync(codexPath, CODEX_CONFIG);
-    applyContour(deps(), PLATFORM, { targets: ['claude', 'codex'], model: 'gpt-4o' });
+    writeFileSync(continuePath, CONTINUE_CONFIG);
+    applyContour(deps(), PLATFORM, { targets: ['claude', 'continue'], model: 'gpt-4o' });
 
     const result = rollbackContour(deps(), PLATFORM.id, { targetIds: ['claude'] });
 
     expect(result.entries.map((item) => item.targetId)).toEqual(['claude']);
     expect(outcomeOf(result.entries, 'claude')).toBe('restored');
-    // Codex не тронут ни в файле, ни в следе: человек передумал про один CLI,
+    // Continue не тронут ни в файле, ни в следе: человек передумал про один CLI,
     // а не про весь контур.
-    expect(readFileSync(codexPath, 'utf8')).toContain('contour-company-dev');
+    expect(readFileSync(continuePath, 'utf8')).toContain('contour-company-dev');
     expect(store.getPlatformApplied()[PLATFORM.id]?.targets.map((item) => item.targetId)).toEqual([
-      'codex',
+      'continue',
     ]);
   });
 
   it('пока в следе есть цели, управляемый профиль живёт — на него смотрят они', () => {
     writeFileSync(settingsPath, JSON.stringify({ env: {} }));
-    writeFileSync(codexPath, CODEX_CONFIG);
-    applyContour(deps(), PLATFORM, { targets: ['claude', 'codex'], model: 'gpt-4o' });
+    writeFileSync(continuePath, CONTINUE_CONFIG);
+    applyContour(deps(), PLATFORM, { targets: ['claude', 'continue'], model: 'gpt-4o' });
 
     const result = rollbackContour(deps(), PLATFORM.id, { targetIds: ['claude'] });
     expect(result.profileRemoved).toBe(false);
@@ -236,8 +264,8 @@ describe('точечный откат', () => {
 
   it('цель, которую откат не смог тронуть, из следа тоже уходит', () => {
     writeFileSync(settingsPath, JSON.stringify({ env: {} }));
-    writeFileSync(codexPath, CODEX_CONFIG);
-    applyContour(deps(), PLATFORM, { targets: ['claude', 'codex'], model: 'gpt-4o' });
+    writeFileSync(continuePath, CONTINUE_CONFIG);
+    applyContour(deps(), PLATFORM, { targets: ['claude', 'continue'], model: 'gpt-4o' });
     writeFileSync(settingsPath, JSON.stringify({ env: { ANTHROPIC_BASE_URL: 'моё' } }));
 
     const result = rollbackContour(deps(), PLATFORM.id, { targetIds: ['claude'] });
@@ -245,7 +273,7 @@ describe('точечный откат', () => {
     // Вернуть её мы уже не сможем никогда — отпечаток не сойдётся, — и запись,
     // обещающая откат, которого нет, хуже её отсутствия.
     expect(store.getPlatformApplied()[PLATFORM.id]?.targets.map((item) => item.targetId)).toEqual([
-      'codex',
+      'continue',
     ]);
   });
 
@@ -326,19 +354,21 @@ describe('чужая работа', () => {
     expect(readFileSync(settingsPath, 'utf8')).toBe(mine);
   });
 
-  it('codex: правка чужой таблицы после применения откату не мешает', () => {
-    writeFileSync(codexPath, CODEX_CONFIG);
-    applyContour(deps(), PLATFORM, { targets: ['codex'], model: 'gpt-4o' });
+  it('continue: правка чужой записи после применения откату не мешает', () => {
+    // Вторая файловая цель занимает здесь место codex: правится регион, а не
+    // файл целиком, и чужая строка обязана пережить откат.
+    writeFileSync(continuePath, CONTINUE_CONFIG);
+    applyContour(deps(), PLATFORM, { targets: ['continue'], model: 'gpt-4o' });
     writeFileSync(
-      codexPath,
-      readFileSync(codexPath, 'utf8').replace('command = "npx"', 'command = "pnpm"'),
+      continuePath,
+      readFileSync(continuePath, 'utf8').replace('my assistant', 'мой помощник'),
     );
 
     const result = rollbackContour(deps(), PLATFORM.id);
-    expect(outcomeOf(result.entries, 'codex')).toBe('restored');
-    const text = readFileSync(codexPath, 'utf8');
+    expect(outcomeOf(result.entries, 'continue')).toBe('restored');
+    const text = readFileSync(continuePath, 'utf8');
     expect(text).not.toContain('contour-company-dev');
-    expect(text).toContain('command = "pnpm"');
+    expect(text).toContain('мой помощник');
   });
 
   it('файл, изменённый человеком после применения, не затирается — он назван', () => {

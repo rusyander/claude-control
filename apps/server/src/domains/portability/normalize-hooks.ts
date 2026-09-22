@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { isAbsolute, resolve } from 'node:path';
 import type { EnvSkip, EnvTrigger, HookItem } from '@agentdeck/contracts/portable-env';
 import type { ConfigProvider } from '../../providers/types.ts';
@@ -117,6 +118,11 @@ export function normalizeHooks(
       sideEffects: ['runs_process'],
       command: hook.command,
       scriptPath,
+      // Проверяется РАЗРЕШЁННЫЙ путь и на той же машине, с которой снят канон:
+      // все три вызывающих читают диск человека (`ownMachine`). Пути без
+      // скрипта (встроенная команда) «пропавшими» не считаются — проверять
+      // нечего.
+      scriptMissing: scriptPath !== null && !existsSync(scriptPath),
       timeout:
         typeof hook.timeout === 'number'
           ? { value: hook.timeout, unit: options.timeoutUnit }
@@ -142,11 +148,68 @@ export function normalizeHooks(
  * разбора) иначе не распознавался вовсе: скрипт не проверялся на диске, а к
  * чужому CLI команда уезжала дословно — и оболочка семейства sh съедала каждую
  * обратную косую, превращая путь в `C:Usershook.mjs` (П2.6).
+ *
+ * Команда разбирается на аргументы С УЧЁТОМ КАВЫЧЕК, а не одним выражением по
+ * всей строке. Выражение по строке исключало кавычки из класса символов, и
+ * потому на `node "C:\Program Files\…\gate.mjs"` совпадение начиналось после
+ * пробела ВНУТРИ пути: наружу уходил обрезок `Files\…\gate.mjs`, скрипт не
+ * находился на диске, а `hookCommandForTarget` подставлял полный путь на место
+ * обрезка и писал цели неисполнимое `node "C:\Program C:/…/Files/…/gate.mjs"`.
+ * Пробел в пути — не экзотика: `C:\Program Files`, имя человека из двух слов,
+ * каталог проекта с пробелом. Путь в кавычках без пробела терялся вовсе.
  */
 export function scriptPathOf(command: string): string | null {
-  const match =
-    /(?:^|\s)((?:[A-Za-z]:)?[^\s"']*[\\/][^\s"']*\.(?:sh|bash|js|mjs|cjs|ts|py|ps1))/.exec(command);
-  return match?.[1] ?? null;
+  for (const token of argTokens(command)) {
+    if (!looksLikeScript(token)) continue;
+    // Пробел внутри токена бывает двух родов: он часть пути («C:\Program
+    // Files\…») либо кавычки обернули целую команду («sh -c "node /a/b.mjs"»).
+    // Различаем по первому слову: начато как путь — значит путь.
+    const parts = token.split(/\s+/);
+    if (!/\s/.test(token) || SEPARATOR.test(parts[0] ?? '')) return token;
+    for (const part of parts) if (looksLikeScript(part)) return part;
+  }
+  return null;
+}
+
+const SEPARATOR = /[\\/]/;
+const SCRIPT_EXTENSION = /\.(?:sh|bash|js|mjs|cjs|ts|py|ps1)$/i;
+
+/** Похоже на путь до скрипта: разделитель каталогов есть, расширение на конце. */
+const looksLikeScript = (token: string): boolean =>
+  SEPARATOR.test(token) && SCRIPT_EXTENSION.test(token);
+
+/**
+ * Команда → аргументы. Пробел внутри кавычек не разделитель, сами кавычки в
+ * значение не входят: дальше путь сверяется с диском, а файла с кавычкой в
+ * имени не бывает.
+ */
+function argTokens(command: string): string[] {
+  const tokens: string[] = [];
+  let current = '';
+  let started = false;
+  let quote: string | null = null;
+  for (const char of command) {
+    if (quote) {
+      if (char === quote) quote = null;
+      else current += char;
+      continue;
+    }
+    if (char === '"' || char === "'") {
+      quote = char;
+      started = true;
+      continue;
+    }
+    if (/\s/.test(char)) {
+      if (started) tokens.push(current);
+      current = '';
+      started = false;
+      continue;
+    }
+    current += char;
+    started = true;
+  }
+  if (started) tokens.push(current);
+  return tokens;
 }
 
 /**
@@ -228,6 +291,8 @@ export function preservedHookItem(params: {
     sideEffects: ['runs_process'],
     command: params.value,
     scriptPath: null,
+    // Скрипта у записи нет вовсе: пропасть нечему.
+    scriptMissing: false,
     timeout: null,
     enabled: false,
     raw: params.value,

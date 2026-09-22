@@ -14,7 +14,21 @@ import type {
 import { buildEndpointPlan, resolveEndpointVars } from '../../endpoints/endpoint-plan.ts';
 import { resolveProviderEnvTargetFor } from '../../provider-env.ts';
 import { gatewayUrlFor, PLACEHOLDER_KEY } from './profile.ts';
+import { GATEWAY_ROUTES } from '../gateway/pipeline.ts';
 import { serverText } from '../../../lib/server-texts.ts';
+
+/**
+ * Обслуживает ли шлюз ту ручку, которой пойдёт CLI.
+ *
+ * Считается ИЗ САМОГО списка маршрутов шлюза, а не из второго перечня рядом:
+ * появится `/v1/responses` — codex поднимется из прочерков сам, ни одной правки
+ * здесь не понадобится. Отдельный список, наоборот, разошёлся бы молча, и
+ * панель снова предложила бы цель, которой шлюз не отвечает.
+ */
+function gatewayServes(wireApi: ProviderEndpointFile['wireApi']): boolean {
+  const suffix = wireApi === 'chat' ? '/chat/completions' : '/responses';
+  return GATEWAY_ROUTES.some((route) => route.endsWith(suffix));
+}
 
 /**
  * Куда контур переносится и почему у части CLI стоит прочерк.
@@ -139,7 +153,11 @@ export function filePlanFor(
   if (file.format === 'codex-toml') {
     return [
       { key: `model_providers.${name}.base_url`, value: baseUrl },
-      { key: `model_providers.${name}.wire_api`, value: 'chat' },
+      // Ручка — та, которую принимает сам CLI (`endpointFile.wireApi`), а не
+      // та, которую удобно шлюзу: конфиг с чужой ручкой codex не загружает
+      // целиком. Сегодня до этой строки дело не доходит — цель стоит прочерком,
+      // пока шлюз не обслуживает `/responses`.
+      { key: `model_providers.${name}.wire_api`, value: file.wireApi },
       { key: `model_providers.${name}.env_key`, value: 'CONTOUR_API_KEY' },
       // Провайдер, которого никто не выбрал, — мёртвая запись: корневой ключ и
       // есть то, ради чего таблица пишется.
@@ -207,6 +225,14 @@ export function describeContourTargets(
 
     const file = provider.endpointFile;
     if (file) {
+      // Ручка, которой CLI пойдёт по адресу, шлюзу неизвестна — цель становится
+      // прочерком ДО записи. Разница не формальная: конфиг codex с ручкой,
+      // которую он не принимает, не загружается целиком, и человек получает
+      // мёртвый CLI вместо неработающего контура (живая проба 22.09.2026).
+      if (!gatewayServes(file.wireApi)) {
+        targets.push(unsupported(provider, 'gateway_dialect'));
+        continue;
+      }
       const filePath = file.path(paths.override);
       targets.push({
         targetId: provider.id,

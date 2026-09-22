@@ -10,7 +10,7 @@ import type {
   SkillItem,
   SubagentItem,
 } from '@agentdeck/contracts/portable-env';
-import { isSecretName } from '../../lib/secret-mask.ts';
+import { findSecretSpans, isSecretFree, isSecretName } from '../../lib/secret-mask.ts';
 import {
   envItemId,
   envSkip,
@@ -261,13 +261,20 @@ export function pluginItem(params: {
  * этого не ловила: маркер лежал только в ключах, которые прежнее выражение
  * ловило. Теперь он лежит и в `OPENAI_KEY`, и в `GITHUB_PAT`.
  */
-export function looksLikeSecret(key: string): boolean {
-  return isSecretName(key.trim());
+export function looksLikeSecret(key: string, value?: string): boolean {
+  if (isSecretName(key.trim())) return true;
+  // Имя — не единственный носитель. `DATABASE_URL=postgres://admin:пароль@host`,
+  // `SLACK_WEBHOOK_URL`, `SENTRY_DSN` — боевые учётки под именами, которых нет и
+  // не может быть ни в одном списке слов: список кончается там, где начинается
+  // фантазия человека, а инвариант 5 обещан механизмом, а не словарём. Поэтому
+  // спрашиваем ещё и САМО значение — тем же детектором, что маскирует дифф.
+  return value !== undefined && !isSecretFree(value) && findSecretSpans(value).length > 0;
 }
 
 /**
- * Переменная окружения или секрет. Решает ИМЯ ключа: значение секрета в канон не
- * попадает вовсе — у `SecretItem` нет поля, куда его можно было бы положить.
+ * Переменная окружения или секрет. Решает имя ключа ИЛИ его значение: значение
+ * секрета в канон не попадает вовсе — у `SecretItem` нет поля, куда его можно
+ * было бы положить, и потому на диск чужого CLI оно уехать не может.
  */
 export function envVarOrSecret(params: {
   source: EnvSourceFactory;
@@ -276,7 +283,7 @@ export function envVarOrSecret(params: {
   file: string | null;
   holder: SecretItem['holder'];
 }): EnvVarItem | SecretItem {
-  if (looksLikeSecret(params.key)) {
+  if (looksLikeSecret(params.key, params.value)) {
     return {
       id: envItemId('secret', params.key),
       kind: 'secret',

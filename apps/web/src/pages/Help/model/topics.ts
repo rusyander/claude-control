@@ -27,6 +27,7 @@ import { PanelAgentTopic } from '../topics/PanelAgentTopic';
 import { IntegrationsTopic } from '../topics/IntegrationsTopic';
 import { PlatformTopic } from '../topics/PlatformTopic';
 import { PromptsTopic } from '../topics/PromptsTopic';
+import { PortabilityTopic } from '../topics/PortabilityTopic';
 
 export { HELP_ROUTE } from '@shared/config/routes';
 
@@ -114,6 +115,11 @@ export const HELP_GROUPS: HelpGroup[] = [
       { id: 'groups', icon: 'groups', pagePath: '/groups', Content: GroupsTopic },
       { id: 'history', icon: 'history', pagePath: '/history', Content: HistoryTopic },
       { id: 'compare', icon: 'swap', pagePath: '/compare', Content: CompareTopic },
+      // Порядок тот же, что в боковом меню: паспорт среды стоит между
+      // сравнением и настройками. Читают справку подряд, и документ про
+      // «что доедет до другого CLI» осмысленно встретить сразу после
+      // документа про «что у них разного».
+      { id: 'portability', icon: 'file', pagePath: '/portability', Content: PortabilityTopic },
       { id: 'settings', icon: 'settings', pagePath: '/settings', Content: SettingsTopic },
       // Свой эндпоинт — блок на странице настроек, но объясняет он окружение
       // чужих CLI, а не саму панель. Отдельным документом, потому что вопрос

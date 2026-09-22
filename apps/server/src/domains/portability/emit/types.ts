@@ -1,6 +1,7 @@
 import type { EmitEntry } from '@agentdeck/contracts/portable-emit';
 import type { AgentEnvironment, EnvItemKind, EnvScope } from '@agentdeck/contracts/portable-env';
 import type { ConfigProvider } from '../../../providers/types.ts';
+import type { SectionTargets } from '../project.ts';
 
 /**
  * Договор эмиссии: что эмиттеру дают и что он возвращает.
@@ -96,6 +97,15 @@ export interface EmitPlan {
   readonly scope: EnvScope;
   /** Корень цели: дом провайдера или каталог проекта. */
   readonly root: string;
+  /**
+   * Разделы цели НА ЭТОМ уровне — те самые, по которым план и считался.
+   *
+   * Едут наружу ради отчёта верности: на уровне проекта он обязан считаться по
+   * проектным разделам, а не по профилю дома, и посчитай их вызывающий сам —
+   * это было бы второе место, где решается, что у цели на уровне есть. Разойдись
+   * они, план и отчёт о нём говорили бы о разных целях.
+   */
+  readonly targets: SectionTargets;
   readonly entries: readonly EmitEntry[];
   readonly writes: readonly EmitWrite[];
 }

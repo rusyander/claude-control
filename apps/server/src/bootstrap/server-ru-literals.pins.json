@@ -331,6 +331,10 @@
     "n": 4,
     "why": "transfer failure texts thrown at the caller (backups off, target not writable, write failed and was rolled back); each carries its messageCode via coded(…), and the route answers with the code — the string stays the fallback"
   },
+  "domains/portability/carry-context.ts": {
+    "n": 4,
+    "why": "the two feed notices of a carried conversation (what travelled, and that the source is neither closed nor changed); in a foreign chat the stored string is their ONLY carrier, while the Claude branch sends the same text with code `contextCarried` — same shape as ChatRunner's modelDropped"
+  },
   "domains/portability/canon.ts": {
     "n": 1,
     "why": "invariant violation thrown at the caller (empty needs list); unreachable by construction, never an answer to the person"
@@ -344,8 +348,8 @@
     "why": "the GENERATED hook shim as one template: its Russian comments land in a file beside the target config and its single stderr note reaches the CLI output a person reads; never an API answer (same case as domains/prompt-gate/script.ts)"
   },
   "domains/portability/emit/text-block.ts": {
-    "n": 4,
-    "why": "text that LANDS IN THE TARGET FILE: the panel-owned block warning and the headings a degraded item becomes; the target CLI reads it, not an API client (moved here from emit/write-instructions.ts, which the Claude emitter now shares)"
+    "n": 8,
+    "why": "text that LANDS IN THE TARGET FILE: the panel-owned block warning, the headings a degraded item becomes, and the three decision words a permission carries when it travels as text (codex, aider, goose read that line as the whole rule); the target CLI reads it, not an API client (moved here from emit/write-instructions.ts, which the Claude emitter now shares)"
   },
   "domains/portability/emit/types.ts": {
     "n": 1,
@@ -424,7 +428,7 @@
     "why": "passport prose for the human: item intent / named skip detail, not an API error"
   },
   "domains/portability/supervisor/run.ts": {
-    "n": 2,
+    "n": 3,
     "why": "the reason a person reads when a supervisor hook denies the run or is killed on timeout — it reaches the chat, never an API answer (П3.2)"
   },
   "domains/portability/supervisor/skills-router.ts": {
@@ -780,8 +784,8 @@
     "why": "zod issue detail list (issues[]) not rendered by clients"
   },
   "routes/chat/handoff-routes.ts": {
-    "n": 1,
-    "why": "agent prompt / text the model reads"
+    "n": 2,
+    "why": "agent prompt / text the model reads; +1 the default title of a foreign-CLI continuation chat when the caller names none (same case as domains/provider-chat/store.ts — a stored record the person renames)"
   },
   "routes/chat/run-routes.ts": {
     "n": 2,

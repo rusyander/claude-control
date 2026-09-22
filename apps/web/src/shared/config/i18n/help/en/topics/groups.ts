@@ -50,7 +50,9 @@ export const groupsEn: typeof groupsRu = {
     diffMagicText:
       'It has no magic of its own: on save it becomes an ordinary hook in settings.json ' +
       'and works exactly the same. The value is in not having to remember the event, the ' +
-      'matcher and the syntax.',
+      'matcher and the syntax. For a foreign CLI run through the panel, the same scenario ' +
+      "is replayed by the panel's supervisor — both sides run one and the same command, " +
+      'otherwise a scenario would fire by different rules depending on the CLI.',
     diffAuto: 'The binding is not a project switch',
     diffAutoText:
       'It can only switch on. Leaving the project does not put the group out, and no ' +
@@ -289,7 +291,8 @@ export const groupsEn: typeof groupsRu = {
     fieldSteps:
       'The working-order steps. Compiled into a skill, and the skill is what joins the group.',
     fieldScenarioTrigger:
-      'A regular expression over the request text. Filled in — the panel installs a UserPromptSubmit hook.',
+      'A regular expression over the request text. Filled in — with Claude the panel installs ' +
+      'a UserPromptSubmit hook, with another CLI it plays the same thing itself in its own run.',
     fieldTrigger: 'The scenario’s event and an optional matcher.',
     fieldAction: 'The shell command to run.',
     fieldCompiled: 'A reference to the hook the scenario became. Read-only.',

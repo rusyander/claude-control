@@ -214,7 +214,19 @@ export function hookEventOwner(provider: ConfigProvider, event: SupervisorEvent)
   return native ? 'native' : 'supervisor';
 }
 
-/** События, которые у этой цели отыгрывает надзиратель, — строка отчёта верности. */
-export function supervisorOwnedEvents(provider: ConfigProvider): readonly SupervisorEvent[] {
-  return SUPERVISOR_EVENTS.filter((event) => hookEventOwner(provider, event) === 'supervisor');
+/**
+ * События ПРОГОНА, которые у этой цели отыгрывает надзиратель.
+ *
+ * Два события инструментов сюда не входят и входить не могут: у них есть третье
+ * состояние — контур выключен, отыгрывать нечем, — а по одному провайдеру его не
+ * видно. Полный список с ними считает `supervisorOwnedEvents`
+ * (`wire/tool-events.ts`), которому известен и контур.
+ */
+export function supervisorOwnedRunEvents(provider: ConfigProvider): readonly SupervisorEvent[] {
+  return SUPERVISOR_EVENTS.filter(
+    (event) =>
+      event !== 'PreToolUse' &&
+      event !== 'PostToolUse' &&
+      hookEventOwner(provider, event) === 'supervisor',
+  );
 }

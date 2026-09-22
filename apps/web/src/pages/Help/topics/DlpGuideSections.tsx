@@ -63,8 +63,8 @@ export function DlpGuideSections({ tr }: SectionProps) {
           <GuideStep title={g('gateHook')} text={g('gateHookText')}>
             <HelpShot topic="dlp" scenario="gate" frame="03-hook" side="panel" />
           </GuideStep>
-          <GuideStep title={g('gateClaudeOnly')} text={g('gateClaudeOnlyText')}>
-            <HelpShot topic="dlp" scenario="gate" frame="04-claude-only" side="panel" />
+          <GuideStep title={g('gateForeign')} text={g('gateForeignText')}>
+            <HelpShot topic="dlp" scenario="gate" frame="04-foreign-cli" side="panel" />
           </GuideStep>
         </GuideSteps>
       </HelpSection>

@@ -36,9 +36,17 @@ export function sleep(ms) {
 /** Счётчик провалов и две строки отчёта — общий вид у всех проверок провода. */
 export function reporter() {
   let failures = 0;
+  /**
+   * ИМЕНА провалившихся проверок, а не только их число: самопроверка обязана
+   * требовать, чтобы порча покраснела по СВОЕМУ следу. «Покраснело сколько-то»
+   * засчитывало бы порчу соседней проверке, а та, ради которой её вносят,
+   * молчала бы — и молчание шло бы за работу.
+   */
+  const failed = [];
   const ok = (name) => console.log(`  ✓ ${name}`);
   const bad = (name, detail = '') => {
     failures += 1;
+    failed.push(name);
     console.log(`  ✗ ${name}${detail ? `\n    ${detail}` : ''}`);
   };
   return {
@@ -48,9 +56,13 @@ export function reporter() {
     /** Обнуление перед повторным прогоном — им живёт самопроверка с повреждениями. */
     reset: () => {
       failures = 0;
+      failed.length = 0;
     },
     get failures() {
       return failures;
+    },
+    get failedNames() {
+      return [...failed];
     },
   };
 }

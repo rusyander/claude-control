@@ -609,7 +609,7 @@ export function registerChatHandoffRoutes(
 }
 
 /** Чьё продолжение заводится и с какими правами — общее у карточки и у кнопки перезапуска. */
-interface ContinuationSource {
+export interface ContinuationSource {
   /** Ключи закрываемого разговора — тумблеры прав наследуются по ним. */
   fromAliases: string[];
   chatId?: string;
@@ -623,8 +623,12 @@ interface ContinuationSource {
  * Запуск продолжения в том же каталоге — у карточки и у кнопки перезапуска один
  * и тот же: два пути к «новому разговору того же проекта» разошлись бы на первой
  * же правке (набор проекта, наследование модели, инициативы).
+ *
+ * Отдан наружу ради переноса незакрытой работы (П6.1): у него тот же вопрос —
+ * «открой разговор в этом каталоге у активного провайдера», — и собственная
+ * копия наследования прав, модели и набора проекта разошлась бы с этой.
  */
-function continuationStarter(
+export function continuationStarter(
   app: FastifyInstance,
   ctx: ServerContext,
   deps: {
@@ -689,9 +693,14 @@ function continuationStarter(
   }
 
   /** Разговор чужого CLI: свой идентификатор выдаёт его собственное хранилище. */
-  function startForeign(nextId: string, prompt: string, cwd: string): boolean {
+  function startForeign(prompt: string, cwd: string, title?: string): boolean {
     const appData = ctx.location.paths.appData;
-    const created = createChat(appData, provider.id, { title: nextId, workdir: cwd });
+    // Имя, а не ключ. Ключ вида `new-1758…` — временное написание разговора в
+    // реестре Claude, и в списке чужого CLI он читался как название.
+    const created = createChat(appData, provider.id, {
+      title: title ?? 'Продолжение',
+      workdir: cwd,
+    });
     if (!created) return false;
     // У чужого CLI инициатива — первая реплика переписки, а не флаг запуска:
     // без неё продолжение вело бы себя не так, как обычный чат того же CLI.
@@ -710,7 +719,7 @@ function continuationStarter(
     return outcome.ok;
   }
 
-  return ({ chatId: nextId, prompt, cwd }) => {
+  return ({ chatId: nextId, prompt, cwd, title }) => {
     // Продолжение идёт в том же каталоге, и набор проекта нужен ему ровно так
     // же, как исходному разговору: иначе после «чистой сессии» правила и скиллы
     // молча переставали действовать.
@@ -722,7 +731,7 @@ function continuationStarter(
     const started =
       provider.id === 'claude'
         ? startClaude(nextId, prompt, cwd)
-        : startForeign(nextId, prompt, cwd);
+        : startForeign(prompt, cwd, title);
     // Заметка — ПОСЛЕ старта: до него прогона в реестре нет, и сказать некуда.
     // У чужого CLI его нет вовсе — `emitExternal` отвечает «некуда», и факт
     // остаётся на странице «Наборы».

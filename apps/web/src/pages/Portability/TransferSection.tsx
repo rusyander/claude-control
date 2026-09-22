@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { TransferFilePlan, TransferPlan } from '@agentdeck/contracts/portable-transfer';
+import type { TransferPlan } from '@agentdeck/contracts/portable-transfer';
 import { Card } from '@shared/ui/card';
 import { Stack } from '@shared/ui/stack';
 import { Badge } from '@shared/ui/badge';
@@ -8,7 +8,6 @@ import { Button } from '@shared/ui/button';
 import { Modal } from '@shared/ui/modal';
 import { Typography } from '@shared/ui/typography';
 import { toErrorMessage } from '@shared/api/client';
-import { DIFF_LINE_PREFIX } from '@shared/config/diff-line-prefix';
 import { formatDateTime } from '@shared/lib/format';
 import { toast } from '@shared/lib/toast';
 import {
@@ -23,6 +22,7 @@ import {
   useTransferState,
   type PortabilityLevel,
 } from '@entities/Portability';
+import { PlanFiles } from './PlanFiles';
 import styles from './PortabilityPage.module.scss';
 
 interface TransferSectionProps {
@@ -66,7 +66,6 @@ export function TransferSection({ source, target, targetName, level }: TransferS
    * адаптеров при каждом открытии страницы.
    */
   const [plan, setPlan] = useState<TransferPlan | null>(null);
-  const [openDiff, setOpenDiff] = useState<TransferFilePlan | null>(null);
   const [confirmApply, setConfirmApply] = useState(false);
   const [confirmRevert, setConfirmRevert] = useState(false);
   /** Файлы, изменённые после переноса, которые человек ВСЁ ЖЕ велел вернуть. */
@@ -233,44 +232,7 @@ export function TransferSection({ source, target, targetName, level }: TransferS
               </Typography>
             )}
 
-            {/* Пустой план — ответ, а не ошибка: у цели уже лежит всё, что
-                панель умеет перенести. */}
-            {plan.files.length === 0 ? (
-              <Typography variant="body-sm" color="subtle">
-                {t('portability.transfer.emptyPlan')}
-              </Typography>
-            ) : (
-              <Stack gap="var(--spacing-3xs)" className={styles.rows}>
-                {plan.files.map((file) => (
-                  <div key={file.filePath} className={styles.fileRow}>
-                    <Stack gap="var(--spacing-3xs)" className={styles.intent}>
-                      <Typography variant="caption" className={styles.source}>
-                        {file.filePath}
-                      </Typography>
-                      <Stack direction="row" gap="var(--spacing-3xs)" className={styles.summary}>
-                        {!file.exists && (
-                          <Badge tone="info">{t('portability.transfer.willCreate')}</Badge>
-                        )}
-                        {file.unchanged && (
-                          <Badge tone="neutral">{t('portability.transfer.unchangedFile')}</Badge>
-                        )}
-                        {!file.unchanged && (
-                          <Badge tone="neutral">
-                            {t('portability.transfer.lines', {
-                              added: file.added,
-                              removed: file.removed,
-                            })}
-                          </Badge>
-                        )}
-                      </Stack>
-                    </Stack>
-                    <Button variant="ghost" size="sm" onClick={() => setOpenDiff(file)}>
-                      {t('portability.transfer.showDiff')}
-                    </Button>
-                  </div>
-                ))}
-              </Stack>
-            )}
+            <PlanFiles plan={plan} />
 
             <Stack direction="row" gap="var(--spacing-xs)">
               <Button
@@ -287,48 +249,6 @@ export function TransferSection({ source, target, targetName, level }: TransferS
           </Stack>
         )}
       </Stack>
-
-      {/* Дифф файла — тем же языком, что лента изменений и предпросмотр одной
-          записи: одна сущность показывается в панели одинаково везде. */}
-      <Modal
-        isOpen={openDiff !== null}
-        onOpenChange={(open) => !open && setOpenDiff(null)}
-        title={t('portability.transfer.diffTitle')}
-        description={openDiff?.filePath}
-        size="lg"
-        footer={
-          <Stack direction="row" gap="var(--spacing-xs)" justify="end">
-            <Button variant="secondary" onClick={() => setOpenDiff(null)}>
-              {t('common.close')}
-            </Button>
-          </Stack>
-        }
-      >
-        {openDiff && (
-          <Stack gap="var(--spacing-xs)">
-            {openDiff.truncated && (
-              <Typography variant="body-sm" color="subtle">
-                {t('portability.transfer.truncated')}
-              </Typography>
-            )}
-            {openDiff.unchanged && (
-              <Typography variant="body-sm" color="subtle">
-                {t('portability.transfer.unchangedFile')}
-              </Typography>
-            )}
-            <div className={styles.diff}>
-              {openDiff.lines.map((line, index) => (
-                // Строки диффа не имеют идентификатора; индекс здесь устойчив —
-                // список статичен и не переупорядочивается.
-                <div key={index} className={styles.diffLine} data-kind={line.kind}>
-                  <span className={styles.diffSign}>{DIFF_LINE_PREFIX[line.kind]}</span>
-                  <span className={styles.diffText}>{line.text}</span>
-                </div>
-              ))}
-            </div>
-          </Stack>
-        )}
-      </Modal>
 
       <Modal
         isOpen={confirmApply}

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { copyRecursive, removeEntry } from './fs-entry.ts';
@@ -96,7 +97,7 @@ export function providerBackupName(providerId: string, filePath: string): string
 }
 
 /**
- * Имя резервной копии файла цели ПЕРЕНОСА — `<id>-<путь от корня цели>`.
+ * Имя резервной копии файла цели ПЕРЕНОСА — `<id>-<метка корня>-<путь от корня>`.
  *
  * Отдельно от `providerBackupName`, хотя у файла в корне даёт ровно то же имя
  * (`gemini-settings.json`), и разница появляется только во вложенных путях. Она
@@ -113,7 +114,28 @@ export function transferBackupName(providerId: string, root: string, filePath: s
   const inside =
     root && filePath.startsWith(root) ? filePath.slice(root.length) : basename(filePath);
   const trail = inside.replace(/^[\\/]+/, '').replace(/[\\/]+/g, '-');
-  return `${providerId}-${trail || basename(filePath)}`;
+  return `${providerId}-${rootTag(root)}${trail || basename(filePath)}`;
+}
+
+/**
+ * Метка КОРНЯ в имени копии переноса.
+ *
+ * Путь от корня различает файлы ВНУТРИ одного переноса, но не переносы между
+ * собой: у проекта А, проекта Б и глобального уровня путь от их собственных
+ * корней одинаков (`AGENTS.md`), и копии ложились в ОДНУ ротацию. При
+ * `backupKeep = 1` перенос во второй проект вытеснял копию первого, и отмена
+ * там умирала на несуществующем файле. Соседи решают то же самое префиксами
+ * (`providerProjectBackupName`, `projectBackupName`), но там различителем
+ * служит короткий идентификатор, а здесь — путь произвольной длины: в имя файла
+ * он не помещается, поэтому от него берётся отпечаток.
+ *
+ * Пустой корень — законный случай (у CLI, чьи разделы лежат по разным
+ * каталогам, общего корня нет): метки тогда нет, имя строится от basename.
+ */
+function rootTag(root: string): string {
+  if (!root) return '';
+  const normalized = root.split('\\').join('/').replace(/\/+$/, '').toLowerCase();
+  return `${createHash('sha1').update(normalized).digest('hex').slice(0, 8)}-`;
 }
 
 /**

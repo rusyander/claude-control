@@ -1043,8 +1043,10 @@ export const chatEn: typeof chatRu = {
       'job along with the checkpoint, so the third session in a row still knows ' +
       'the bounds of its group. A conversation continues at most eight times in a ' +
       'row (review and fix stages do not count), and if the checkpoint is word for ' +
-      'word the same as at the previous move the panel stops earlier: the agent is ' +
-      'going in circles. A move that did not happen is explained by a toast: the ' +
+      'word the same as at the previous move — or as when this work was carried to ' +
+      'another CLI on the "Environment passport" page, the memory here is one — the ' +
+      'panel stops earlier: the agent is going in circles. A move that did not ' +
+      'happen is explained by a toast: the ' +
       'run failed, the checkpoint was not updated or did not change, the chain ran ' +
       'out. Turn it off per conversation with the toggle, or everywhere in Settings ' +
       '→ “Continue on its own in every conversation”; one switched off by hand ' +

@@ -69,6 +69,9 @@ export type ChatEvent =
        * 'planMissing' — работа группы стартовала без плана (Т1);
        * 'overlap' — ветки разделения сошлись на одних файлах (Т6);
        * 'groupsActivated' — набор, привязанный к проекту, включился сам;
+       * 'contextCarried' — незакрытая работа перенесена к другому CLI (П6.1):
+       * у исходного разговора это «работа ушла туда», у заведённого — «работа
+       * пришла оттуда»;
        * 'modelDropped' — имя модели не прошло грамматику аргументов и до CLI не
        * доехало: прогон идёт моделью, которую CLI выбрал сам.
        */
@@ -80,6 +83,7 @@ export type ChatEvent =
         | 'planMissing'
         | 'overlap'
         | 'groupsActivated'
+        | 'contextCarried'
         | 'modelDropped';
       text: string;
       /**

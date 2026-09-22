@@ -139,7 +139,9 @@ export function buildView(root: string, deps: TestsDeps): ProjectTestsView {
     dir: TESTS_DIR,
     groups: readGroups(root),
     run: deps.runs.get(root),
-    hasConvention: hasConvention(root),
+    // Тот же путь к пользовательским настройкам, что и у записи: режим
+    // `instructionFiles` решает, в каком файле соглашение вообще искать.
+    hasConvention: hasConvention(root, deps.ctx.location.paths.settings),
     sharedSteps: readSharedSteps(root),
     environments: readEnvironments(root),
     schema: readSchema(root),

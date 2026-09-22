@@ -77,6 +77,22 @@ export interface ProviderEndpointFile {
   path: (override?: string) => string;
   /** Диалект, на котором CLI пойдёт по этому адресу. */
   apiKind: ProviderEndpointApiKind;
+  /**
+   * КАКОЙ ручкой CLI пойдёт по этому адресу — и это не то же самое, что `apiKind`.
+   *
+   * Оба здешних CLI «OpenAI-совместимы», но ручки у них разные: Continue идёт в
+   * `/chat/completions`, а Codex с версии, снявшей `wire_api = "chat"`
+   * (`openai/codex#7782`), умеет только `/responses`. Шлюз панели обслуживает
+   * четыре маршрута, и `responses` среди них нет
+   * (`platform/gateway/pipeline.ts`, `GATEWAY_ROUTES`).
+   *
+   * Поле заведено живой пробой 22.09.2026 на настоящем `codex-cli 0.155.1`:
+   * конфиг, написанный панелью с `wire_api = "chat"`, этот CLI не загружает
+   * ЦЕЛИКОМ — падает любой его запуск, а не только запрос через контур. Пока
+   * шлюз не знает ручку, цель обязана быть прочерком с причиной, а не записью,
+   * которая ломает человеку CLI.
+   */
+  wireApi: 'chat' | 'responses';
 }
 
 /**

@@ -750,6 +750,7 @@ describe('реестр провайдеров', () => {
         tools: { Bash: 'bash', Edit: 'edit', WebFetch: 'webfetch' },
         closed: true,
         argumentTools: ['bash'],
+        argumentSyntax: 'own',
         oneShapePerTool: true,
       },
     });

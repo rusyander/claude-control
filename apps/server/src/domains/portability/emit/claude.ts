@@ -338,6 +338,14 @@ function emitClaudeHooks(context: EmitContext): StageResult {
     const verdict = verdictOf(context, item);
     if (verdict.level !== 'native') continue;
 
+    if (item.scriptMissing) {
+      // Скрипта нет на диске. Приговор при этом нативный — механизм у цели тот
+      // же, — и именно поэтому запись обязана остановиться ЗДЕСЬ: у цели она
+      // легла бы действующей и падала бы на каждом событии (§7).
+      result.entries.push(emitEntry(item, verdict, 'script_missing', null));
+      continue;
+    }
+
     if (!item.enabled) {
       // Приехавший извне хук выключен по инварианту 9: включение чужого скрипта
       // — отдельное подтверждение человека с показанным содержимым, а в

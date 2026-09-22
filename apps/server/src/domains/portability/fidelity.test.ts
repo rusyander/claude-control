@@ -278,14 +278,22 @@ describe('уровень считается по худшему из требо�
       },
       assistant: { apiKind: 'none', apiKeyEnvVars: [], cliRunnable: true },
     });
-    const wired = level(TOOL_HOOK, wireOnly);
+    // Пока панель не открывает ворота на пути запроса, обещания контура нет:
+    // уровень «невозможно» со своей причиной, а не «П» с условием, которое
+    // ничего не меняет (решение владельца 22.09.2026).
+    const closed = level(TOOL_HOOK, wireOnly);
+    expect(closed.level).toBe('impossible');
+    expect(closed.reason).toBe('tool_events_absent');
+    expect(closed.condition).toBeNull();
+
+    // Ворота открыты — приговор возвращается тем же кодом, и вторая половина
+    // клетки «П/×» на месте: условие не выполнено — отыгрывать НЕЧЕМ. Подменить
+    // вызов «эмуляцией через панель» нельзя: вызовов внутри чужого процесса
+    // панель не видит.
+    const wired = level(TOOL_HOOK, { ...describeTarget(wireOnly), wireOpened: true });
     expect(wired.level).toBe('wired');
     expect(wired.reason).toBe('tool_events_absent');
     expect(wired.condition).toBe('enable_contour');
-    // И вторая половина клетки «П/×»: условие не выполнено — отыгрывать НЕЧЕМ.
-    // Без этой строки отчёт обещал бы работающий хук и тому, кто контур не
-    // включал, а подменить вызов «эмуляцией через панель» нельзя: вызовов внутри
-    // чужого процесса панель не видит.
     expect(wired.fallback).toBe('impossible');
   });
 
@@ -362,7 +370,11 @@ describe('понижение — только в сторону строгост
       } as Partial<EnvItem> & Pick<EnvItem, 'kind'>),
       provider('codex'),
     );
-    expect(codex.level).toBe('wired');
+    // Ворота на пути запроса закрыты — остаётся текст, и условия контура на
+    // экране нет; с открытыми воротами это же правило поднимается до «П» с тем
+    // же запасом (проверено в `fidelity-report.test.ts`).
+    expect(codex.level).toBe('text');
+    expect(codex.condition).toBeNull();
     expect(codex.fallback).toBe('text');
 
     // У Goose режим тот же, а провода нет вовсе — остаётся текст.

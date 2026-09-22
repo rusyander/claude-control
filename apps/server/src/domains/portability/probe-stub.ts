@@ -88,7 +88,17 @@ export async function startProbeStub(script: StubScript): Promise<ProbeStub> {
       // отчёт показал четыре расхождения и ДВА ЗЕЛЁНЫХ. Зелёные и есть худшее:
       // хук и право признаются сработавшими по отсутствию условленного вывода,
       // а вывода не было потому, что вызовов не делали вовсе.
-      if (!Array.isArray(body.messages)) {
+      //
+      // Диалект узнаётся по ИМЕНИ поля с репликами, а не по маршруту: у клиента
+      // Anthropic это `messages`, у ручки `/responses` — `input`. Маршрут для
+      // этого не годится: CLI зовёт заглушку по адресу, который сам же и
+      // составляет, и хвост у него свой.
+      const dialect = Array.isArray(body.messages)
+        ? 'anthropic'
+        : Array.isArray(body.input)
+          ? 'responses'
+          : null;
+      if (!dialect) {
         return sendJson(response, { ok: true });
       }
 
@@ -99,7 +109,10 @@ export async function startProbeStub(script: StubScript): Promise<ProbeStub> {
         ? 'tool_use'
         : 'end_turn';
 
-      if (body.stream === true) sendStream(response, blocks, stopReason);
+      // Ручка `/responses` отвечает ТОЛЬКО потоком: цельного ответа её клиенты
+      // не ждут, и `stream` в теле они не присылают вовсе.
+      if (dialect === 'responses') sendResponsesStream(response, blocks);
+      else if (body.stream === true) sendStream(response, blocks, stopReason);
       else sendJson(response, message(blocks, stopReason));
     });
   });
@@ -201,5 +214,56 @@ function sendStream(
     usage: { output_tokens: 1 },
   });
   send('message_stop', { type: 'message_stop' });
+  response.end();
+}
+
+/**
+ * Тот же сценарий на ручке `/responses` — диалекте, на котором сегодня говорит
+ * codex и всё, что построено на нём.
+ *
+ * Событий ровно три вида, и это не экономия: клиент ждёт открытия ответа,
+ * готовых элементов вывода и закрытия. Промежуточные дельты текста ему не
+ * нужны — заглушка знает свою реплику целиком, и «печатать по буквам» значило
+ * бы усложнять то, что проба не измеряет.
+ *
+ * Вызов инструмента здесь — отдельный ВИД ЭЛЕМЕНТА (`function_call`), а не блок
+ * внутри сообщения, и аргументы едут СТРОКОЙ: у этой ручки так, и заглушка,
+ * пославшая объект, получила бы разбор чужого клиента вместо вызова.
+ */
+function sendResponsesStream(response: ServerResponse, blocks: readonly StubBlock[]): void {
+  response.writeHead(200, {
+    'content-type': 'text/event-stream',
+    'cache-control': 'no-cache',
+    connection: 'keep-alive',
+  });
+
+  const send = (event: string, data: unknown): void => {
+    response.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  };
+
+  const id = 'resp_agentdeck_probe';
+  send('response.created', { type: 'response.created', response: { id } });
+
+  for (const block of blocks) {
+    const item =
+      block.type === 'text'
+        ? {
+            type: 'message',
+            role: 'assistant',
+            content: [{ type: 'output_text', text: block.text }],
+          }
+        : {
+            type: 'function_call',
+            name: block.name,
+            arguments: JSON.stringify(block.input),
+            call_id: block.id,
+          };
+    send('response.output_item.done', { type: 'response.output_item.done', item });
+  }
+
+  send('response.completed', {
+    type: 'response.completed',
+    response: { id, usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 } },
+  });
   response.end();
 }

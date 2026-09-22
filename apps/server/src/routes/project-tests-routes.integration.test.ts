@@ -216,26 +216,43 @@ describe('project-tests-routes', () => {
     expect(response.json().message).toContain('origin/main..HEAD');
   });
 
-  it('соглашение вписывается в CLAUDE.md один раз и видно в ответе', async () => {
-    expect((await view()).hasConvention).toBe(false);
-
-    const first = (
+  const installConventionHere = async (): Promise<ProjectTestsView> =>
+    (
       await app.inject({
         method: 'POST',
         url: '/api/project-tests/convention',
         payload: { path: project },
       })
     ).json() as ProjectTestsView;
-    expect(first.hasConvention).toBe(true);
+
+  it('соглашение вписывается в CLAUDE.md проекта один раз и видно в ответе', async () => {
+    writeFileSync(join(project, 'CLAUDE.md'), '# Правила проекта\n', 'utf8');
+    expect((await view()).hasConvention).toBe(false);
+
+    expect((await installConventionHere()).hasConvention).toBe(true);
 
     const written = readFileSync(join(project, 'CLAUDE.md'), 'utf8');
     // Повтор ничего не добавляет: кнопку можно нажать дважды без последствий.
-    await app.inject({
-      method: 'POST',
-      url: '/api/project-tests/convention',
-      payload: { path: project },
-    });
+    await installConventionHere();
     expect(readFileSync(join(project, 'CLAUDE.md'), 'utf8')).toBe(written);
+  });
+
+  /**
+   * Проект, живущий на `AGENTS.md` (П2.7). Имя файла инструкций — решение
+   * человека: заведи панель рядом свой `CLAUDE.md`, и CLI начал бы читать его
+   * ВМЕСТО прежнего файла — одно присутствие `CLAUDE.md` гасит `AGENTS.md`
+   * молча, вместе со всеми правилами проекта.
+   */
+  it('в проекте на AGENTS.md пишет туда же и не заводит CLAUDE.md', async () => {
+    writeFileSync(join(project, 'AGENTS.md'), '# Правила проекта\n', 'utf8');
+
+    expect((await installConventionHere()).hasConvention).toBe(true);
+
+    expect(readdirSync(project)).not.toContain('CLAUDE.md');
+    expect(readFileSync(join(project, 'AGENTS.md'), 'utf8')).toContain('# Правила проекта');
+    expect(readFileSync(join(project, 'AGENTS.md'), 'utf8').length).toBeGreaterThan(
+      '# Правила проекта\n'.length,
+    );
   });
 
   it('соглашение дописывается в существующий CLAUDE.md с резервной копией, как PUT /rules', async () => {

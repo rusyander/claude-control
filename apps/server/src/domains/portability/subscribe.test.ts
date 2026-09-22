@@ -16,12 +16,13 @@ import type { EnvSubscription } from '@agentdeck/contracts/portable-subscribe';
 import { claudeProvider } from '../../providers/claude.ts';
 import { CATALOG_PROVIDERS } from '../../providers/catalog.ts';
 import { importEnvironment } from './import/index.ts';
-import { applyTransfer } from './apply.ts';
+import { applyTransfer, fileHashOrNull } from './apply.ts';
 import {
   emptySubscription,
   markProjection,
   planSubscriptionSync,
   subscriptionKey,
+  unsubscribeFile,
 } from './subscribe.ts';
 
 /**
@@ -156,6 +157,8 @@ function subscribe(layers: EnvSubscription['layers']): EnvSubscription {
 function sync(
   subscription: EnvSubscription,
   env = canon(),
+  /** Сверка с диском (П5.2). Не задан — круг идёт как в П5.1, без руки человека. */
+  readHash?: typeof fileHashOrNull,
 ): { subscription: EnvSubscription; plan: ReturnType<typeof planSubscriptionSync>['plan'] } {
   const { plan, writes, landed, root } = planSubscriptionSync(
     env,
@@ -163,6 +166,7 @@ function sync(
     gemini!,
     { scope: 'global' },
     '2026-09-21T10:00:00.000Z',
+    readHash,
   );
   if (root === null) return { subscription, plan };
 
@@ -369,19 +373,95 @@ describe('отписка', () => {
   });
 });
 
-describe('версия канона', () => {
-  it('другая версия удерживает пересборку и не даёт ни одной строки', () => {
+/**
+ * Исход «отписать слои этого файла» и жизнь ПОСЛЕ него (П5.2, инвариант 7).
+ *
+ * Сценарий кончается там, где человек снова включает слой: отписка защищает
+ * правку ровно до этого щелчка, а дальше вопрос в том, чем панель считает файл.
+ * Проверка смотрит на БАЙТЫ файла, а не на строки плана: «панель спросила» и
+ * «панель переписала» различаются только содержимым диска.
+ */
+describe('отписка от файла', () => {
+  /** Правка человека в файле, который писала панель. */
+  const BY_HAND = 'prompt = "Это я переписал руками."\n';
+
+  it('после повторной подписки правка человека не переписывается молча', () => {
     const first = sync(subscribe(['command']));
-    const before = snapshotTarget();
+    const edited = join(home, '.gemini', 'commands', 'release.toml');
+    expect(existsSync(edited)).toBe(true);
+    writeFileSync(edited, BY_HAND, 'utf8');
+
+    // Панель видит расхождение и предлагает исходы — это половина П5.2.
+    const seen = planSubscriptionSync(
+      canon(),
+      first.subscription,
+      gemini!,
+      { scope: 'global' },
+      '2026-09-21T10:01:00.000Z',
+      fileHashOrNull,
+    );
+    expect(seen.plan.drift.map((file) => file.filePath)).toEqual([edited]);
+
+    // Исход «отписать»: слой снят, файл человека остался как есть.
+    const { subscription: after, layers } = unsubscribeFile(first.subscription, edited);
+    expect(layers).toEqual(['command']);
+    expect(readFileSync(edited, 'utf8')).toBe(BY_HAND);
+
+    // Щелчок обратно: слой снова подписан — и канон по этой записи двинулся.
+    // Двинувшийся канон здесь обязателен: совпади запись с прошлой отметкой,
+    // пересборки не было бы вовсе, и правка уцелела бы по случайности, а не по
+    // правилу. Сверять панели уже не с чем, значит и своей запись считать нельзя.
+    writeCommand('release', 'Тело выпуска стало другим.');
+    const again = sync({ ...after, layers: ['command'] }, canon(), fileHashOrNull);
+
+    expect(readFileSync(edited, 'utf8')).toBe(BY_HAND);
+    // И молчания нет: строка записи названа удержанной этим самым файлом, а не
+    // осталась без объяснения.
+    const row = again.plan.rows.find((entry) => entry.itemId === 'command:release');
+    expect(row?.heldBy).toBe(edited);
+    // Ни байта записи: пересборки у этого файла не было вовсе.
+    expect(again.plan.transfer).toBeNull();
+  });
+});
+
+describe('версия канона', () => {
+  it('другая версия пересобирает проекцию целиком и называет причину', () => {
+    const first = sync(subscribe(['command']));
 
     const older: EnvSubscription = { ...first.subscription, canonVersion: CANON_VERSION - 1 };
-    const held = sync(older);
+    const again = sync(older);
 
-    expect(held.plan.hold).toBe('canon_version');
-    expect(held.plan.transfer).toBeNull();
-    // Строк нет намеренно: «разошлось/совпало», посчитанное несравнимыми
-    // правилами, человек прочитал бы как факт о своих файлах.
-    expect(held.plan.rows).toHaveLength(0);
-    expect(snapshotTarget()).toEqual(before);
+    // Причина названа: план, в котором внезапно «изменилось» всё, без неё
+    // читался бы как беда канона.
+    expect(again.plan.rebuild).toBe('canon_version');
+    expect(again.plan.hold).toBeNull();
+    // Ни одной «совпавшей»: «совпало», посчитанное несравнимыми правилами,
+    // человек прочитал бы как факт о своих файлах.
+    expect(again.plan.rows.every((row) => row.state !== 'unchanged')).toBe(true);
+    expect(again.plan.rows.length).toBeGreaterThan(0);
+
+    // И выход есть: удачная пересборка записала текущую версию, следующий круг
+    // считает отпечатки как обычно. Прежде выхода не было вовсе — отпечатки
+    // обновляла только пересборка, которую удержание и запрещало.
+    expect(again.subscription.canonVersion).toBe(CANON_VERSION);
+    expect(sync(again.subscription).plan.rebuild).toBeNull();
+  });
+
+  it('сменившаяся версия не снимает сторожа руки человека', () => {
+    const first = sync(subscribe(['command']));
+    const edited = join(home, '.gemini', 'commands', 'release.toml');
+    writeFileSync(edited, 'prompt = "Это я переписал руками."\n', 'utf8');
+    const byHand = readFileSync(edited, 'utf8');
+
+    // Хеши файлов считает содержимое, а не словарь: сменившаяся версия канона
+    // их сравнимости не отменяет. Отписка — прежний выход из удержания —
+    // забывала бы их вместе с отметками, и правка человека была бы переписана.
+    const older: EnvSubscription = { ...first.subscription, canonVersion: CANON_VERSION - 1 };
+    const again = sync(older, canon(), fileHashOrNull);
+
+    expect(again.plan.rebuild).toBe('canon_version');
+    expect(again.plan.drift.map((file) => file.filePath)).toEqual([edited]);
+    expect(again.plan.rows.find((row) => row.itemId === 'command:release')?.heldBy).toBe(edited);
+    expect(readFileSync(edited, 'utf8')).toBe(byHand);
   });
 });

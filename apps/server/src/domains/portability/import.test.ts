@@ -19,6 +19,7 @@ import { claudeProvider } from '../../providers/claude.ts';
 import { CATALOG_PROVIDERS } from '../../providers/catalog.ts';
 import { importClaudeEnvironment } from './import/claude.ts';
 import { hasImporter, importEnvironment, importerProviderIds } from './import/index.ts';
+import { hookCommandForTarget } from './emit/hook-command.ts';
 import {
   DEFAULT_INSTRUCTION_FILES_MODE,
   readInstructionFilesChoice,
@@ -530,6 +531,74 @@ describe('хуки', () => {
   });
 });
 
+/**
+ * Пробел в пути скрипта — не экзотика: `C:\Program Files`, имя человека из двух
+ * слов, каталог проекта с пробелом. Эталонный дом разворачивается во временном
+ * каталоге системы, а он на Windows пишется коротким именем (`RUSYAN~1`) и
+ * пробела не содержит НИКОГДА — поэтому для этого случая нужен свой дом, с
+ * пробелом в имени. Без него разбор команды молча выдавал обрезок пути
+ * (`Files\…\gate.mjs`), эмиттер подставлял полный путь на место обрезка, и цель
+ * получала неисполнимое `node "C:\Program C:/…/Files/…/gate.mjs"`.
+ */
+describe('хук, чей скрипт лежит по пути с пробелом', () => {
+  let spacedHome: string;
+
+  beforeAll(() => {
+    spacedHome = mkdtempSync(join(tmpdir(), 'portability пробел '));
+    mkdirSync(join(spacedHome, 'мои скрипты'), { recursive: true });
+    writeFileSync(join(spacedHome, 'мои скрипты', 'gate.mjs'), 'process.exit(0);\n', 'utf8');
+    writeFileSync(
+      join(spacedHome, 'settings.json'),
+      JSON.stringify({
+        hooks: {
+          PreToolUse: [
+            {
+              matcher: 'Bash',
+              hooks: [
+                {
+                  type: 'command',
+                  command: `node "${join(spacedHome, 'мои скрипты', 'gate.mjs')}"`,
+                },
+              ],
+            },
+          ],
+        },
+      }),
+    );
+  });
+
+  afterAll(() => {
+    rmSync(spacedHome, { recursive: true, force: true });
+  });
+
+  const spacedHook = (): HookItem | undefined => {
+    const result = importClaudeEnvironment({
+      provider: claudeProvider,
+      scope: 'global',
+      override: spacedHome,
+    });
+    return itemsOf<HookItem>(result.items, 'hook')[0];
+  };
+
+  it('скрипт найден на диске целиком, а не обрезком после пробела', () => {
+    const script = join(spacedHome, 'мои скрипты', 'gate.mjs');
+
+    expect(spacedHook()?.scriptPath).toBe(script);
+  });
+
+  it('целевая команда несёт путь целиком и ровно один раз', () => {
+    const item = spacedHook();
+    const command = hookCommandForTarget(item as HookItem);
+    const spelled = (item as HookItem).scriptPath?.split('\\').join('/') ?? '';
+
+    // Склейка обрезка с полным путём давала ДВА вхождения корня в одной строке —
+    // отсюда счёт вхождений, а не просто «путь содержится».
+    expect(command).toContain(spelled);
+    expect(command.split(spelled)).toHaveLength(2);
+    expect(command).toBe(`node "${spelled}"`);
+  });
+});
+
 describe('MCP, права, секреты', () => {
   it('запись type: sdk не превращается в команду и названа причиной CLI', () => {
     const result = importHome();
@@ -737,6 +806,37 @@ describe('карта соответствий первоисточника', () 
 
     expect(passport.skipped.some((skip) => skip.kind === 'subagent')).toBe(true);
     expect(passport.skipped.some((skip) => skip.kind === 'skill')).toBe(true);
+  });
+
+  it('проектный паспорт Codex не везёт фактов из дома', () => {
+    // Проектный уровень Codex — один `AGENTS.md` в каталоге проекта. Пропуски,
+    // вычитанные из `~/.codex`, приезжали в проектный паспорт фактами о НЁМ и
+    // противоречили его же строкам «у Codex такого уровня нет».
+    const codexHome = join(foreignHome, '.codex');
+    mkdirSync(join(codexHome, 'prompts'), { recursive: true });
+    writeFileSync(
+      join(codexHome, 'config.toml'),
+      ['approval_policy = "full-auto"', '', '[agents.reviewer]', 'instructions = "диффы"', ''].join(
+        '\n',
+      ),
+    );
+    const codex = CATALOG_PROVIDERS.find((provider) => provider.id === 'codex');
+    if (!codex) throw new Error('провайдера codex нет в каталоге');
+    const projectRoot = join(foreignHome, 'codex-project');
+    mkdirSync(projectRoot, { recursive: true });
+    writeFileSync(join(projectRoot, 'AGENTS.md'), 'Инструкции проекта.\n');
+
+    const project = importEnvironment({ provider: codex, scope: 'project', projectRoot });
+    const home = importEnvironment({ provider: codex, scope: 'global' });
+
+    for (const word of ['approval_policy', 'agents', 'prompts']) {
+      expect(project.skipped.some((skip) => skip.detail.includes(word))).toBe(false);
+      // Дом эти же факты называет — иначе проверка проходила бы и на пустом доме,
+      // то есть не проверяла бы ничего.
+      expect(home.skipped.some((skip) => skip.detail.includes(word))).toBe(true);
+    }
+    // И проектные записи на месте: отсев не съел сам уровень.
+    expect(project.items.some((item) => item.kind === 'instructions')).toBe(true);
   });
 
   it('gemini: режим подтверждений и оба списка инструментов едут по карте', () => {

@@ -192,8 +192,117 @@ export const en: TranslationSchema = {
         runtime_only: 'only through the panel',
         not_transferable: 'not transferable',
         disabled_at_source: 'disabled at source',
+        script_missing: 'script not found',
         refused_by_target: 'refused by target',
         collision_needs_choice: 'needs your choice',
+      },
+    },
+    /**
+     * Unfinished work travels with the environment (П6.1). The wording never
+     * promises that the transcript travels: no foreign format for it exists.
+     */
+    carry: {
+      title: 'Unfinished work at other CLIs',
+      intro:
+        'The transcript does not travel — no foreign format for it exists. What travels is what a clean-session continuation lives on: the checkpoint file in the working directory and the original task. The source conversation stays where it is and is not closed.',
+      target: 'Continue at: {{target}}',
+      loadError: 'The list of unfinished work did not load',
+      loadErrorText:
+        'The panel could not ask the other CLIs what is left unfinished. Check that the server is running and try again.',
+      empty:
+        'No unfinished conversations at other CLIs. The panel offers the ones that have a working directory and were touched within the last day.',
+      chain: 'carried: {{depth}} of {{max}}',
+      checkpoint: 'checkpoint: {{file}}',
+      carry: 'Carry the selected ({{count}})',
+      carriedToast: 'Conversations carried: {{count}}.',
+      refusedToast: 'Not carried: {{count}}. The reason is on the conversation row.',
+      notNoticed:
+        'The note did not land in the source feed: a Claude feed is the CLI own transcript, and the panel can only speak into a running run.',
+      failed: 'Carrying failed: the store of the new CLI refused.',
+      /** Why carrying is refused: the same codes as a clean-session continuation. */
+      refusal: {
+        chain_cap: 'Cannot carry: the continuation chain reached its cap.',
+        checkpoint_missing:
+          'Cannot carry: there is no checkpoint file in the directory — the new conversation would have nothing to read.',
+        checkpoint_unchanged:
+          'Cannot carry: the checkpoint has not changed since the last carry — the new conversation would read exactly the same.',
+        no_project: 'Cannot carry: the conversation has no working directory.',
+      },
+      /** The safeguards let it through and the target did not open a conversation. */
+      failure: {
+        run_not_started: 'The run at the new CLI never started — no conversation was opened.',
+        chat_not_created: "The panel's storage did not create a conversation for the new CLI.",
+        send_failed:
+          'The conversation at the new CLI was created, but the task never reached it: open it and send again.',
+      },
+    },
+    subscription: {
+      title: 'Subscription of {{target}} to the panel canon',
+      intro:
+        'A subscription keeps the target agreed with the canon from now on: the panel rebuilds its subscribed layers every time you ask. A one-off transfer answers "move what is there now"; a subscription answers "keep this agreed".',
+      canonNotSource:
+        'The canon of a subscription is the panel own environment, not the source picked above: the owner of the truth is one and is not chosen.',
+      layers: 'Layers the target is subscribed to',
+      loadError: 'Subscriptions did not load',
+      loadErrorText:
+        'The panel could not read the list of subscriptions. Until it is read there is nothing to show the layers from: check that the server is running and try again.',
+      noLayers:
+        'No layer is subscribed — there is nothing to rebuild. What the panel has already projected is still remembered.',
+      synced: 'Last rebuild: {{date}}.',
+      plan: 'Show the rebuild plan',
+      replan: 'Recompute the plan',
+      apply: 'Rebuild',
+      agree: 'Mark as agreed',
+      nothingToWrite:
+        'Nothing to write: the subscribed records either already sit at the target, or the target has no mechanism for that layer. The panel will remember them as agreed instead of reporting them as drifting every time.',
+      syncedToast: 'Rebuild done. Records affected: {{count}}.',
+      forget: 'Forget the subscription',
+      forgotToast: 'Subscription forgotten. The target files stay as the panel left them.',
+      heldCount: 'held by your edit: {{count}}',
+      heldBy: 'will not travel: you edited {{file}} by hand',
+      heldItems: 'records in the file: {{count}}',
+      showUnchanged: 'Show the agreed ({{count}})',
+      hideUnchanged: 'Hide the agreed',
+      driftTitle: 'Files edited by hand: {{count}}',
+      driftIntro:
+        'The rebuild does not touch them — not a byte. Choose what to do with your edit in each: the panel cannot overwrite it silently.',
+      chosen: 'Chosen: {{resolution}}',
+      willUnsubscribe: 'These layers will be unsubscribed:',
+      doResolve: 'Do it',
+      resolvedToast: 'The drift of {{file}} is resolved.',
+      unsubscribedToast: 'Layers unsubscribed: {{count}}.',
+      state: {
+        new: 'new',
+        changed: 'changed',
+        unchanged: 'agreed',
+        gone: 'gone from the canon',
+      },
+      hold: {
+        no_layers: 'No layer is subscribed: there is nothing to rebuild.',
+      },
+      rebuild: {
+        canon_version:
+          'The projection was built by another canon version: the old fingerprints cannot be compared with the new ones, so nothing in this plan counts as agreed — the subscription is rebuilt whole. Files you edited by hand are still left alone.',
+      },
+      drift: {
+        state: {
+          edited: 'edited by hand',
+          missing: 'the file is gone',
+        },
+      },
+      resolution: {
+        canon: {
+          title: 'Take the edit into the canon',
+          text: 'The panel reads the target file with its own importer and writes what it parsed into its own files. There is no text merge here: only what the panel parsed reaches the canon.',
+        },
+        projection: {
+          title: 'Restore the projection',
+          text: 'The panel rewrites from the canon what it writes itself: the whole file where the file is its own, and only its own section where it keeps a block inside a foreign file. An edit inside what is rewritten is lost, text outside it stays. The decision is yours, and it is never a silent one.',
+        },
+        unsubscribe: {
+          title: 'Stop writing into this file',
+          text: 'EVERY layer of this file is unsubscribed. Leaving one subscribed would reopen the same drift on the next rebuild.',
+        },
       },
     },
     probe: {
@@ -235,9 +344,11 @@ export const en: TranslationSchema = {
         cli_not_installed: 'the target is not in PATH',
         no_probe_recipe: 'how to probe this CLI is not documented',
         no_one_shot: 'a non-interactive run of this CLI is not documented',
-        no_stub_endpoint: 'the target takes no model address from the environment',
+        no_stub_endpoint: 'there is nothing to point this target at instead of a model',
         needs_panel_runtime: 'emulation promised — the runtime supervisor measures it',
         needs_wire: 'wire promised — the contour must sit in the request path',
+        target_defers_tools:
+          'the target took the record but does not name it to the model up front',
         emit_failed: 'the probe environment for this target did not build',
         run_failed: 'the target started and exited with an error',
         timed_out: 'the target did not answer in time',
@@ -3271,8 +3382,8 @@ export const en: TranslationSchema = {
       'A rule whose own action is “reject” stops the prompt regardless — the shared setting never downgrades it.',
     rules: 'Rules are shared with the proxy: {{count}} enabled, {{blocking}} of them blocking.',
     noRules: 'With no rule enabled there is nothing for the gate to check.',
-    claudeOnly:
-      'The gate is installed into the Claude Code configuration: no other CLI documents a “prompt submitted” event that can refuse. Switch the provider to Claude to enable it.',
+    foreignScope:
+      'For the active CLI ({{provider}}) the panel plays the gate itself, inside its own run — it writes nothing into the foreign CLI’s files: same rules, same journal, same script. A CLI you start from the terminal yourself will not see it.',
     scriptPath: 'Hook script',
     customized:
       'The script differs from the one the panel writes — it looks hand-edited. The panel leaves it alone.',

@@ -32,6 +32,7 @@ import { endpointsEn } from './en/topics/endpoints';
 import { providersEn } from './en/topics/providers';
 import { integrationsEn } from './en/topics/integrations';
 import { promptsEn } from './en/topics/prompts';
+import { portabilityEn } from './en/topics/portability';
 
 /** Типизирован по русской версии: забыть ключ при переводе не получится. */
 export const helpEn: HelpSchema = {
@@ -127,6 +128,7 @@ export const helpEn: HelpSchema = {
     search: searchEn.shots,
     analytics: analyticsEn.shots,
     history: historyEn.shots,
+    portability: portabilityEn.shots,
     compare: compareEn.shots,
     settings: settingsEn.shots,
     providers: providersEn.shots,
@@ -187,6 +189,7 @@ export const helpEn: HelpSchema = {
     search: searchEn.topic,
     compare: compareEn.topic,
     history: historyEn.topic,
+    portability: portabilityEn.topic,
     tests: testsEn.topic,
     projects: projectsEn.topic,
     dlp: dlpEn.topic,

@@ -22,6 +22,10 @@ import { dlpErrorMessage } from '@entities/Dlp';
  * `UserPromptSubmit` этого не позволяет, поэтому действий ровно два: отклонить
  * или предупредить. Кто хочет видеть всё тело запроса — включает прокси выше.
  *
+ * Провайдер карточку больше не ограничивает (П6.2): у чужого CLI такого события
+ * нет, и хук отыгрывает надзиратель панели — тот же скрипт, те же правила, тот же
+ * журнал. Меняется одна строка: где именно гейт действует.
+ *
  * Пока состояние грузится или сервер отказал, карточка стоит на месте с
  * заголовком: исчезающая карточка читалась бы как «гейта здесь нет».
  */
@@ -66,11 +70,16 @@ export function PromptGateCard() {
     );
   }
 
-  // Хук ставится в конфигурацию Claude Code: события «промпт отправлен» с
-  // возможностью отказа у остальных CLI не задокументировано. Пока активен
-  // другой провайдер, любое действие карточки молча правило бы чужой конфиг —
-  // поэтому спрятаны и тумблер, и выбор действия, и переустановка.
-  const isClaude = (providers?.active ?? 'claude') === 'claude';
+  // Гейт больше не Claude-only (П6.2): у чужого CLI события «промпт отправлен»
+  // нет, и панель отыгрывает его сама в своём запуске — тем же скриптом, по тем
+  // же правилам, в тот же журнал. Карточка поэтому работает при любом активном
+  // провайдере; меняется не управление, а строка о том, ГДЕ гейт действует.
+  //
+  // Чужой конфиг при этом не правится ничем: скрипт и его регистрация живут в
+  // собственных файлах панели, а не в файлах активного CLI.
+  const active = providers?.active ?? 'claude';
+  const activeName = providers?.providers.find((item) => item.id === active)?.name ?? active;
+  const isClaude = active === 'claude';
 
   const { settings, installed, customized, outdated, problem, rulesCount, blockRulesCount } = data;
 
@@ -99,7 +108,7 @@ export function PromptGateCard() {
           <Toggle
             checked={settings.enabled}
             onCheckedChange={(enabled) => run(enabled, settings.action)}
-            disabled={apply.isPending || !isClaude || (rulesCount === 0 && !settings.enabled)}
+            disabled={apply.isPending || (rulesCount === 0 && !settings.enabled)}
             aria-label={t('gate.title')}
           />
         </Stack>
@@ -108,24 +117,27 @@ export function PromptGateCard() {
           {t('gate.scope')}
         </Typography>
 
+        {/*
+         * Где гейт действует у чужого CLI — предупреждением, а не отказом: он
+         * работает, но только в запуске через панель, и умолчать об этом значило
+         * бы обещать защиту терминалу, до которого панель не дотягивается.
+         */}
         {!isClaude && (
           <Typography variant="body-sm" color="warning">
-            {t('gate.claudeOnly')}
+            {t('gate.foreignScope', { provider: activeName })}
           </Typography>
         )}
 
-        {isClaude && (
-          <SelectField
-            label={t('gate.action')}
-            value={settings.action}
-            onChange={(action) => run(settings.enabled, action as PromptGateAction)}
-            options={[
-              { value: 'block', label: t('gate.actionBlock') },
-              { value: 'warn', label: t('gate.actionWarn') },
-            ]}
-            hint={t('gate.actionHint')}
-          />
-        )}
+        <SelectField
+          label={t('gate.action')}
+          value={settings.action}
+          onChange={(action) => run(settings.enabled, action as PromptGateAction)}
+          options={[
+            { value: 'block', label: t('gate.actionBlock') },
+            { value: 'warn', label: t('gate.actionWarn') },
+          ]}
+          hint={t('gate.actionHint')}
+        />
 
         <Typography variant="caption" color="subtle">
           {t('gate.rules', { count: rulesCount, blocking: blockRulesCount })}
@@ -153,16 +165,14 @@ export function PromptGateCard() {
             <Typography variant="body-sm" color="warning">
               {t('gate.outdated')}
             </Typography>
-            {isClaude && (
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => run(true, settings.action)}
-                isLoading={apply.isPending}
-              >
-                {t('gate.rebuild')}
-              </Button>
-            )}
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => run(true, settings.action)}
+              isLoading={apply.isPending}
+            >
+              {t('gate.rebuild')}
+            </Button>
           </Stack>
         )}
 
@@ -171,16 +181,14 @@ export function PromptGateCard() {
             <Typography variant="body-sm" color="warning">
               {t('gate.customized')}
             </Typography>
-            {isClaude && (
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => run(true, settings.action, true)}
-                isLoading={apply.isPending}
-              >
-                {t('gate.reinstall')}
-              </Button>
-            )}
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => run(true, settings.action, true)}
+              isLoading={apply.isPending}
+            >
+              {t('gate.reinstall')}
+            </Button>
           </Stack>
         )}
 

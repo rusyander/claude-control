@@ -106,6 +106,20 @@ only.
 | **Kimi Code:** no project-level permissions                                          | **not ours.** The CLI reads exactly one user-level `config.toml`; per-project isolation is done by swapping `KIMI_CODE_HOME`                                                                                                                                                                                           |
 | **Kimi Code:** a foreign field in `[permission]` turns the section read-only         | **by design.** Fail-closed: regenerating a block with an ununderstood field would drop someone else's data                                                                                                                                                                                                             |
 
+### Moving an environment between CLIs
+
+How the transfer works is in [PORTABILITY.md](PORTABILITY.md); below are the limits only.
+
+| What                                                      | Why                                                                                                                                                                                                                                                            |
+| --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A secret value is never transferred                       | **by design.** The variable name travels, not its contents: a secret lives in the environment only, and the panel will not put it into a foreign config                                                                                                        |
+| Conversation history does not travel                      | **theirs.** None of the foreign CLIs has a transcript format — what travels is the environment, not the history. Unfinished work still continues at the new CLI from the checkpoint file: the checkpoint and the original task travel, the transcript does not |
+| A CLI you launch yourself will not see "emulated" entries | **by design.** The behaviour is held by the supervisor living inside a panel-started run; the target has no such mechanism. The caveat stands in the fidelity report BEFORE the transfer, not after                                                            |
+| The "wired" level drops when the contour is off           | **by design.** The panel sees a tool call only in a request path through its own gateway; without one there is nothing to promise a block with                                                                                                                 |
+| The panel does not install the target CLI                 | **by design.** Files are written even for a target that is not installed, but the fidelity is marked "not verified" rather than "works": there is nothing to measure it with                                                                                   |
+| There is no merging of two people's configurations        | **by design.** A transfer is about one person, their environment and their machine; they never have two sources                                                                                                                                                |
+| There is no line-level merge of your edit with the canon  | **by design.** A drift has three whole outcomes — take into the canon, restore the projection, stop writing into the file. A merge would require guessing what you meant                                                                                       |
+
 ### Care with foreign formats
 
 | What                                                              | Why                                                                                                                                                                                |

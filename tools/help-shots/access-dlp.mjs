@@ -174,12 +174,13 @@ export async function shootDlpGate(browser, web, scenario, { panel }) {
     await openSection(page, web, '/hooks', 3000);
     await scenario.shot(page, '03-hook');
 
-    // ── 04. Почему только Claude Code ────────────────────────────────────────
-    // У остальных CLI событие «промпт отправлен» с возможностью отказа не
-    // задокументировано, и панель говорит это прямо, а не гасит тумблер молча.
+    // ── 04. Как гейт выглядит у чужого CLI ───────────────────────────────────
+    // Управление больше не гаснет (П6.2): события «промпт отправлен» у такого CLI
+    // нет, и хук отыгрывает надзиратель панели — тем же скриптом, по тем же
+    // правилам. Меняется одна строка: где именно гейт действует.
     await patchSettings(panel, { provider: 'codex' });
     await openSection(page, web, '/dlp', 3000);
-    await shotCard(scenario, page, '04-claude-only', GATE);
+    await shotCard(scenario, page, '04-foreign-cli', GATE);
 
     await patchSettings(panel, { provider: 'claude' });
   } finally {

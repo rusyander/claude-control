@@ -153,7 +153,10 @@ export const platformEn: typeof platformRu = {
       'CLI works as a chat — the mark beside it says which. Circle: can be applied. Dash: ' +
       'unavailable, and ' +
       'the reason is spelled out — no environment file, no documented address variable, a ' +
-      'foreign dialect, a gateway that is down.',
+      'foreign dialect, a gateway that is down. A foreign dialect today means Gemini CLI ' +
+      'and Codex: codex speaks the “/responses” handle the gateway does not serve, and it ' +
+      'refuses to load a config with any other handle at all — a dash is more honest than ' +
+      'a write after which the CLI itself no longer starts.',
     screenJournal: 'Apply journal',
     screenJournalText:
       'One entry is one target, with its date and its own rollback button. A rollback removes ' +

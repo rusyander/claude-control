@@ -338,6 +338,12 @@ panel closed. It holds no dictionary — rules are read from disk on every run, 
 would carry personal data along with an environment transfer. A hand-edited script is neither
 overwritten nor deleted: the section says so, and restoring the panel's version is a separate button.
 
+The gate is not Claude-only. A foreign CLI has no "prompt submitted" event, so the panel plays the
+hook itself inside its own run — **with that very same script**, by the same rules, into the same
+journal. There is no second, "for foreigners" script: it would drift from the first on the first rule
+change. Nothing is written into the foreign CLI's configuration, and that is where the boundary comes
+from: the same CLI started by hand from a terminal will not see the gate.
+
 The gate is trivial to bypass — the same meaning in other words gets through. It is a barrier against
 pasting someone else's data into a prompt by accident, not against a person who wants to send it out.
 Real content control is §8.

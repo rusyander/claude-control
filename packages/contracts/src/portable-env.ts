@@ -364,6 +364,14 @@ export interface HookItem extends EnvItemBase, WithRaw {
   readonly command: string;
   /** Путь скрипта, если команда его зовёт: по нему проверяется, что скрипт с диска человека. */
   readonly scriptPath: string | null;
+  /**
+   * Скрипта, который зовёт команда, НЕТ на диске источника. Запись едет —
+   * человек обязан увидеть её вместе с причиной, — но у цели не регистрируется:
+   * зарегистрированный хук с несуществующим скриптом отдаёт ненулевой код на
+   * каждом событии, то есть ломает цель молчаливее, чем непереехавшая запись
+   * (§7, строка «скрипт хука отсутствует на диске»).
+   */
+  readonly scriptMissing: boolean;
   readonly timeout: { readonly value: number; readonly unit: 'ms' | 's' } | null;
   readonly enabled: boolean;
 }

@@ -4,12 +4,19 @@ import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parse as parseToml } from 'smol-toml';
-import type { AgentEnvironment, EnvItem } from '@agentdeck/contracts/portable-env';
+import {
+  envItemKinds,
+  type AgentEnvironment,
+  type EnvItem,
+} from '@agentdeck/contracts/portable-env';
 import { claudeProvider } from '../../providers/claude.ts';
 import { CATALOG_PROVIDERS } from '../../providers/catalog.ts';
 import { importEnvironment } from './import/index.ts';
 import { emitEnvironment, emitterProviderIds, hasEmitter } from './emit/index.ts';
 import { UnknownEmitProviderError, type EmitPlan } from './emit/types.ts';
+import { KINDS_NOT_YET_EMITTED } from './emit/context.ts';
+import { level } from './fidelity.ts';
+import { panelSupervisorHooks } from './supervisor/panel-hooks.ts';
 
 /**
  * Эмиттеры среды (П2.1): канон → десять CLI.
@@ -93,6 +100,15 @@ function writeSourceHome(root: string): void {
             matcher: 'Edit',
             hooks: [{ type: 'command', command: 'node ./format.mjs', timeout: 5 }],
           },
+          // Скрипта этого хука на диске НЕТ, и файл рядом не создаётся намеренно:
+          // §7 требует, чтобы такая запись доехала строкой с причиной и НЕ
+          // зарегистрировалась у цели.
+          {
+            matcher: 'Write',
+            hooks: [
+              { type: 'command', command: `node ${join(claude, 'hooks', 'gone.mjs')}`, timeout: 5 },
+            ],
+          },
         ],
         // Второй хук зовёт НАСТОЯЩИЙ скрипт по абсолютному пути в написании ЭТОЙ
         // ОС (на Windows — с обратными косыми). Чужой CLI обязан получить путь в
@@ -106,8 +122,33 @@ function writeSourceHome(root: string): void {
             ],
           },
         ],
+        // Хук СЕССИИ: фактов вызова инструмента ему не нужно, поэтому у цели без
+        // своих хуков приговор — «эмуляцией». Ниже проверяется, чем эта эмуляция
+        // оборачивается на самом деле.
+        SessionStart: [
+          {
+            hooks: [
+              {
+                type: 'command',
+                command: `node ${join(claude, 'hooks', 'greet.mjs')}`,
+                timeout: 5,
+              },
+            ],
+          },
+        ],
       },
     }),
+  );
+  // Скрипт сессионного хука читает только то, что панель знает о СВОЁМ запуске:
+  // ни имени инструмента, ни его ввода — иначе приговор ушёл бы в провод.
+  put(
+    join(claude, 'hooks', 'greet.mjs'),
+    [
+      "import { readFileSync } from 'node:fs';",
+      "const input = JSON.parse(readFileSync(0, 'utf8') || '{}');",
+      'process.stdout.write(String(input.session_id ?? ""));',
+      '',
+    ].join('\n'),
   );
   // Скрипт хука: он не копируется переносом — его зовут по его собственному пути
   // на этой же машине, поэтому он обязан лежать на диске и запускаться.
@@ -310,6 +351,74 @@ describe('план эмиссии', () => {
     }
   });
 
+  /**
+   * Список пропускаемых видов — ЕДИНСТВЕННЫЙ способ исчезнуть из плана молча, и
+   * тест сторожит именно это: пока вид числится в нём, его записи не получают
+   * строки вовсе, а всякий другой вид без эмиттера роняет построение.
+   *
+   * Без такого теста список рос бы правкой в одну строку: вид, чей эмиттер
+   * тяжело писать, дописывают сюда — и его записи перестают доезжать у всех
+   * десяти целей, не сказав об этом ни строкой плана, ни красным тестом.
+   */
+  it('список невозимых видов закрыт и состоит из настоящих видов канона', () => {
+    expect(Object.keys(KINDS_NOT_YET_EMITTED).sort()).toEqual(['conversation', 'panelGroup']);
+    // Опечатка в ключе не пропускает ничего, зато читается как пропуск: вид,
+    // который хотели отложить, полетел бы в эмиттеры и уронил план.
+    for (const kind of Object.keys(KINDS_NOT_YET_EMITTED)) {
+      expect(envItemKinds as readonly string[]).toContain(kind);
+    }
+    // И тикет назван у каждого: «отложено» без тикета — это «забыто».
+    for (const ticket of Object.values(KINDS_NOT_YET_EMITTED)) expect(ticket).toMatch(/^П\d/);
+  });
+
+  it('вид без эмиттера и без записи в списке роняет план, а не исчезает', () => {
+    const alien = {
+      ...(env.items[0] as EnvItem),
+      id: 'widget:невиданный',
+      kind: 'widget',
+    } as unknown as EnvItem;
+    const withAlien: AgentEnvironment = { ...env, items: [...env.items, alien] };
+
+    // Падение НАЗЫВАЕТ запись — по какой бы из двух проверок оно ни случилось
+    // (приговор не вынесен либо строки нет): вопрос теста в том, что вид без
+    // эмиттера не проходит молча, а не в том, кто именно его остановил.
+    expect(() => emitEnvironment(withAlien, { target: claudeProvider, scope: 'global' })).toThrow(
+      /«widget:невиданный»/,
+    );
+  });
+
+  it('вложение скилла с путём наружу каталога план не строит', () => {
+    // Опись вложений — единственная строка канона, из которой складывается путь
+    // ЦЕЛИ посегментно. Сегодня её пишет наш импортёр, но канон умеет приезжать
+    // файлом, и `..` в описи означал бы запись мимо каталога скилла.
+    const skill = env.items.find((entry) => entry.kind === 'skill');
+    const poisoned = {
+      ...(skill as EnvItem),
+      attachments: [{ path: '../../эксфильтрат.md', bytes: 3, sha256: 'x' }],
+    } as EnvItem;
+    const withPoison: AgentEnvironment = {
+      ...env,
+      items: env.items.map((entry) => (entry.id === poisoned.id ? poisoned : entry)),
+    };
+
+    expect(() => emitEnvironment(withPoison, { target: claudeProvider, scope: 'global' })).toThrow(
+      /небезопасному пути «\.\.\/\.\.\/эксфильтрат\.md»/,
+    );
+    // И отказ едет С КОДОМ: маршрут отвечает им названным 409, а английский
+    // интерфейс переводит его своим словарём — иначе человек увидел бы 500 и
+    // русскую строку.
+    let thrown: unknown;
+    try {
+      emitEnvironment(withPoison, { target: claudeProvider, scope: 'global' });
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toMatchObject({
+      messageCode: 'portability-attachment-unsafe-path',
+      params: { path: '../../эксфильтрат.md' },
+    });
+  });
+
   it('уровень приговора назван у каждой строки', () => {
     const plan = emitEnvironment(env, { target: claudeProvider, scope: 'global' });
     for (const entry of plan.entries) {
@@ -366,6 +475,26 @@ describe('перенос в Claude', () => {
     });
     expect(outcomes(strict, 'hook')).toContain('disabled_at_source');
     expect(outcomes(plan, 'hook')).toContain('written');
+  });
+
+  it('хук с пропавшим скриптом едет строкой и НЕ регистрируется у цели', () => {
+    const plan = emitAndApply('claude');
+    const row = plan.entries.find((entry) => entry.intent.includes('gone.mjs'));
+
+    // Строка есть — молчание человек прочитал бы как «доехало».
+    expect(row?.outcome).toBe('script_missing');
+    // Приговор при этом НАТИВНЫЙ: механизм у цели тот же, и причина отказа не в
+    // нём. Разведи их здесь — и в отчёте верности запись перестанет быть видна.
+    expect(row?.verdict.level).toBe('native');
+    expect(row?.file).toBeNull();
+
+    // И главное: в файле цели записи нет. Зарегистрированный хук с
+    // несуществующим скриптом падал бы на каждом `PostToolUse`.
+    const settings = join(home, '.claude-target', 'settings.json');
+    const text = existsSync(settings) ? readFileSync(settings, 'utf8') : '';
+    expect(text).not.toContain('gone.mjs');
+    // Соседний хук того же события доезжает — отказ точечный, а не «раздел не поехал».
+    expect(text).toContain('mark.mjs');
   });
 
   it('вложения скилла доезжают файлами, а не остаются у источника', () => {
@@ -566,6 +695,46 @@ describe('перенос в чужие CLI', () => {
       expect(run.status, `${id}: ${command ?? ''} → ${run.stderr}`).toBe(0);
       expect(readFileSync(marker, 'utf8'), id).toBe(HOOK_MARK);
     }
+  });
+
+  /**
+   * ЧЕМ ОБОРАЧИВАЕТСЯ «ЭМУЛЯЦИЕЙ» У ХУКА, ПЕРЕНЕСЁННОГО В ЦЕЛЬ БЕЗ ХУКОВ.
+   *
+   * Уровень Э обещает человеку: «механизма у цели нет, поведение держит панель
+   * вокруг своего запуска». У хука это обещание сегодня не выполняется, и
+   * проверка держит ровно этот факт, а не желаемое: на диск цели запись не
+   * ложится (`runtime_only` — писателя у неё нет), а надзиратель чужого прогона
+   * собирается ИЗ СОСТОЯНИЯ ПАНЕЛИ и канона не читает вовсе.
+   *
+   * Сказано это и человеку — в справке и в `docs/LIMITATIONS-PROVIDERS.ru.md`.
+   * Появится чтение хуков канона рантаймом — проверка покраснеет и заставит
+   * переписать обе стороны разом, а не разойтись молча.
+   */
+  it('хук уровня «эмуляцией» не едет ни файлом, ни надзирателем', () => {
+    const sessionHook = env.items.find(
+      (item) => item.kind === 'hook' && item.trigger.on === 'session',
+    );
+    if (!sessionHook) throw new Error('сессионного хука нет в каноне — фикстура изменилась');
+
+    const codex = PROVIDERS.find((provider) => provider.id === 'codex');
+    if (!codex) throw new Error('codex нет в каталоге');
+    expect(level(sessionHook, codex).level).toBe('emulated');
+
+    const plan = emitAndApply('codex');
+    const entry = plan.entries.find((candidate) => candidate.itemId === sessionHook.id);
+    expect(entry?.outcome).toBe('runtime_only');
+    expect(plan.writes.some((write) => write.itemIds.includes(sessionHook.id))).toBe(false);
+
+    // Конец пути: что бы ни лежало в каноне, надзиратель играет только записи
+    // самой панели — выключенная калитка и пустой список групп дают пусто.
+    expect(
+      panelSupervisorHooks({
+        settings: { promptGate: { enabled: false, action: 'block' } },
+        groups: [],
+        hooksDir: join(home, 'hooks'),
+        skillsDir: join(home, 'skills'),
+      }),
+    ).toEqual([]);
   });
 
   it('повторное применение не удваивает записи ни у одной цели', () => {

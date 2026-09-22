@@ -4,7 +4,12 @@ import type { Platform } from '@agentdeck/contracts';
 import { PLATFORM_ASSISTANT_TARGET } from '@agentdeck/contracts/platform';
 import { listProviders } from '../../../providers/registry.ts';
 import { buildManagedProfile, PLACEHOLDER_KEY } from './profile.ts';
-import { contourEntryName, describeContourTargets, type ContourTarget } from './targets.ts';
+import {
+  contourEntryName,
+  describeContourTargets,
+  filePlanFor,
+  type ContourTarget,
+} from './targets.ts';
 import { defaultPlatformTransport } from '@agentdeck/contracts/platform-transport';
 
 /**
@@ -129,19 +134,37 @@ describe('цели с переменными окружения', () => {
 });
 
 describe('цели с куском конфигурации', () => {
-  it('codex: своя таблица в model_providers и корневой выбор провайдера', () => {
+  it('codex: цель НЕ предлагается — его ручку шлюз не обслуживает', () => {
+    // Живая проба 22.09.2026 на `codex-cli 0.155.1`: конфиг, написанный панелью
+    // с `wire_api = "chat"`, этот CLI не загружает ЦЕЛИКОМ — падает любой его
+    // запуск, а не только запрос через контур. Пока у шлюза нет `/v1/responses`,
+    // предложить такую цель значит сломать человеку CLI ради неработающего
+    // контура, поэтому здесь прочерк с причиной, а не план записи.
     const codex = byId('codex');
+    expect(codex.reason).toBe('gateway_dialect');
+    expect(codex.write).toBeUndefined();
+    expect(codex.plan).toEqual([]);
+    expect(codex.filePath).toBe('');
+  });
+
+  it('план codex, когда ручка появится, несёт ручку САМОГО CLI, а не удобную шлюзу', () => {
+    // Вторая половина того же решения: построитель плана не «разучился» писать
+    // codex — он не зовётся, пока цель прочерк. Значение `wire_api` при этом
+    // берётся из каталога: зашитое `chat` и было тем, что ломало CLI.
+    const file = listProviders().find((item) => item.id === 'codex')?.endpointFile;
+    if (!file) throw new Error('у codex нет endpointFile');
     const name = contourEntryName(PLATFORM.id);
-    expect(codex.filePath).toContain('config.toml');
-    expect(planValue(codex, `model_providers.${name}.base_url`)).toBe(
+    const plan = filePlanFor(file, PLATFORM.id, 5179, 'gpt-4o');
+    const valueOf = (key: string) => plan.find((item) => item.key === key)?.value;
+
+    expect(valueOf(`model_providers.${name}.base_url`)).toBe(
       'http://127.0.0.1:5179/company-dev/v1',
     );
-    expect(planValue(codex, `model_providers.${name}.wire_api`)).toBe('chat');
+    expect(valueOf(`model_providers.${name}.wire_api`)).toBe('responses');
+    expect(valueOf(`model_providers.${name}.env_key`)).toBe('CONTOUR_API_KEY');
     // Провайдер, которого никто не выбрал, — мёртвая запись.
-    expect(planValue(codex, 'model_provider')).toBe(name);
-    // Ключ у codex задаётся ИМЕНЕМ переменной, значение подставляет шлюз.
-    expect(planValue(codex, `model_providers.${name}.env_key`)).toBe('CONTOUR_API_KEY');
-    expect(JSON.stringify(codex.plan)).not.toContain(PLACEHOLDER_KEY);
+    expect(valueOf('model_provider')).toBe(name);
+    expect(JSON.stringify(plan)).not.toContain(PLACEHOLDER_KEY);
   });
 
   it('continue: своя запись в списке моделей, чужие не упомянуты', () => {

@@ -7,10 +7,10 @@ import {
   encodeSupervisorPayload,
   hookEventOwner,
   payloadFieldsOfEvent,
-  supervisorOwnedEvents,
   type SupervisorEvent,
   type SupervisorRun,
 } from './payload.ts';
+import { supervisorOwnedEvents } from '../wire/tool-events.ts';
 
 const RUN: SupervisorRun = {
   providerId: 'codex',
@@ -124,9 +124,13 @@ describe('владелец события — ровно один', () => {
         const owner = hookEventOwner(provider, event);
         expect(['native', 'supervisor'], `${provider.id}/${event}`).toContain(owner);
 
-        const supervised = supervisorOwnedEvents(provider).includes(event);
-        // Два утверждения об одном событии обязаны совпадать: список для отчёта
-        // и решение для прогона — один факт, а не два.
+        // Список для отчёта и решение для прогона — один факт, а не два. У
+        // событий инструментов факт полнее: без контура их не отыгрывает никто,
+        // поэтому список спрашивают ПРИ включённом контуре, иначе сравнивались
+        // бы ответы на разные вопросы.
+        const supervised = supervisorOwnedEvents(provider, { throughContour: true }).includes(
+          event,
+        );
         expect(supervised, `${provider.id}/${event}`).toBe(owner === 'supervisor');
       }
     }
@@ -160,7 +164,12 @@ describe('владелец события — ровно один', () => {
     expect(bare, 'в каталоге нет цели без механизма хуков').toBeDefined();
     if (!bare) return;
 
-    expect(supervisorOwnedEvents(bare)).toEqual([...SUPERVISOR_EVENTS]);
+    expect(supervisorOwnedEvents(bare, { throughContour: true })).toEqual([...SUPERVISOR_EVENTS]);
+    // А с выключенным контуром — всё, КРОМЕ событий инструментов: отыгрывать их
+    // нечем, и числиться своими они не вправе (§3, `×∅`).
+    expect(supervisorOwnedEvents(bare, { throughContour: false })).toEqual(
+      SUPERVISOR_EVENTS.filter((event) => event !== 'PreToolUse' && event !== 'PostToolUse'),
+    );
   });
 });
 

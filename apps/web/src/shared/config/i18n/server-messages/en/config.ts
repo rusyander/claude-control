@@ -46,6 +46,8 @@ export const configEn: Record<ConfigMessageCode, string> = {
   'portability-source-not-readable':
     'This CLI files could not be read: check that its settings are not broken.',
   'portability-emitter-missing': 'The panel cannot write this CLI environment yet.',
+  'portability-attachment-unsafe-path':
+    'The transfer did not start: attachment «{{path}}» of skill «{{name}}» points outside its folder.',
   'portability-plan-not-shown':
     'Preview first: the panel does not write what it has not shown you. Open the transfer plan again.',
   'portability-plan-stale':
@@ -74,6 +76,7 @@ export const configEn: Record<ConfigMessageCode, string> = {
     'This file holds no records of the subscribed layers: there is nothing to take into the canon.',
   'portability-drift-nothing-to-do':
     'This outcome produces no edit at all: look at the plan again.',
+  'portability-carry-nothing-chosen': 'No conversation is selected: there is nothing to carry.',
   'resource-file-unspecified': 'No file specified',
   'resource-template-not-found': 'Template not found',
   'resource-kind-unknown': 'Unknown resource kind',

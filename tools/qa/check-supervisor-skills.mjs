@@ -298,18 +298,23 @@ const dir = mkdtempSync(join(tmpdir(), 'supervisor-skills-'));
 
 try {
   if (SELFTEST) {
+    // У каждой порчи СВОЙ след. «Хоть что-нибудь покраснело» засчитывало бы
+    // порчу соседней проверке, а та, ради которой её вносят, молчала бы.
     const cases = [
-      ['body-in-argv', 'тело скилла отправлено аргументом'],
-      ['no-expand', 'команда не развёрнута до записи реплики'],
+      ['body-in-argv', 'тело скилла отправлено аргументом', 'тело скилла уехало аргументом'],
+      ['no-expand', 'команда не развёрнута до записи реплики', 'не попала в переписку'],
     ];
     let missed = 0;
-    for (const [damage, title] of cases) {
+    for (const [damage, title, trace] of cases) {
       const problems = await probe(dir, damage, damage);
-      if (problems.length === 0) {
-        console.error(`Самопроверка: «${title}» прошла как целая — проверка не краснеет.`);
+      const hit = problems.filter((problem) => problem.includes(trace));
+      if (hit.length === 0) {
+        console.error(
+          `Самопроверка: «${title}» не поймана по следу «${trace}» (покраснело ${problems.length}).`,
+        );
         missed += 1;
       } else {
-        console.log(`Самопроверка: «${title}» замечена (${problems.length}).`);
+        console.log(`Самопроверка: «${title}» замечена по следу «${trace}» (${hit.length}).`);
         for (const problem of problems) console.log(`    · ${problem}`);
       }
     }

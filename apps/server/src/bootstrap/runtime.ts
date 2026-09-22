@@ -16,11 +16,13 @@ import { createTreeRuns } from '../domains/chat/tree-runs.ts';
 import { createParentNotice } from '../domains/chat/parent-notice.ts';
 import {
   appendMessage,
+  chatTranscriptPath,
   createForeignStagePlanner,
   foreignChatPrefix,
   readChatCascade,
   ProviderChatService,
 } from '../domains/provider-chat.ts';
+import { panelSupervisorHooks } from '../domains/portability/supervisor/panel-hooks.ts';
 import { DEFAULT_PROVIDER_ID, getProvider, isKnownProviderId } from '../providers/registry.ts';
 import { ProjectRunnerRegistry } from '../domains/project-runner.ts';
 import { ProjectTestManualRegistry, ProjectTestRunRegistry } from '../domains/project-tests.ts';
@@ -569,6 +571,40 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   providerChats.setContourSummarized((runTag) =>
     summarizedInRun(ctx.location.paths.appData, runTag),
   );
+  // Надзиратель чужого прогона (П6.2): собственные механизмы панели, написанные
+  // хуками Claude, отыгрываются у ЛЮБОГО провайдера — калитка запросов и триггер
+  // сценария группы. Спрашивается на каждом сообщении: выключенная калитка и
+  // погашенная группа обязаны перестать действовать со следующего запроса.
+  //
+  // Хуков, перенесённых в файлы самой цели, здесь нет и быть не может: их
+  // отыгрывает цель, и владельца события решает `hookEventOwner`.
+  providerChats.setSupervisor((run) => {
+    const hooks = panelSupervisorHooks({
+      settings: ctx.store.getSettings(),
+      groups: ctx.store.getGroups(),
+      hooksDir: ctx.location.paths.hooks,
+      skillsDir: ctx.location.paths.skills,
+    });
+    if (hooks.length === 0) return undefined;
+
+    // Транскрипт собирает хранилище разговоров — раскладкой `provider-chats/<id>`
+    // владеет оно, и второй копии пути в проекте быть не должно. Пути нет
+    // (идентификатор непригоден) — надзирателя не заводим вовсе: скрипт, которому
+    // обещан `transcript_path`, получил бы пустую строку.
+    const transcriptPath = chatTranscriptPath(run.appDataDir, run.providerId, run.chatId);
+    if (!transcriptPath) return undefined;
+
+    return {
+      run: {
+        providerId: run.providerId,
+        sessionId: run.chatId,
+        cwd: run.workdir ?? process.cwd(),
+        transcriptPath,
+      },
+      hooks,
+      ...(run.starting ? { sessionStart: 'startup' as const } : {}),
+    };
+  });
   // Хуки вызовов инструментов на проводе (П4.1): шлюз спрашивает по метке
   // прогона, реестр отвечает воротами того прогона. Реестр держится ЗДЕСЬ, а не
   // в слушателе, — он переживает перезапуск шлюза, а прогоны в этот момент идут.
@@ -576,11 +612,10 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   // реестр означает прежнее поведение прослойки, а не ожидание решения, которое
   // никто не примет.
   //
-  // Ворота ОТКРЫВАЕТ прогон, и делает это тот, кто знает набор скриптов прогона.
-  // Такого места в панели пока нет: `ProviderChatRun` принимает `supervisor`
-  // параметром, а заполнить его некому — набор хуков на прогон решается там же,
-  // где решается подписка разделов (П5.1). До той врезки реестр пуст, и провод
-  // ничего не меняет ни в одном прогоне; сказано это здесь, а не подразумевается.
+  // Ворота по-прежнему не открывает никто, и теперь это видно точнее: набор
+  // панели (выше) состоит из записей события `UserPromptSubmit`, а событий
+  // инструментов в нём нет ни одной. Появятся — открывать ворота будет та же
+  // врезка, другого места для этого не нужно.
   const toolGates = new ToolGateRegistry();
   platformGateway.setToolGate((runTag) => toolGates.gateOf(runTag));
   const events = createEventHub();

@@ -9,6 +9,10 @@
  * в ней нет.
  *
  * Что ещё проверяется:
+ *   0. таблица, каталог и словарь канона покрывают друг друга: столбцы =
+ *      провайдеры каталога, строка без представителя названа, вид записи без
+ *      представителя назван тоже (иначе проверка идёт по таблице и молчит о
+ *      том, чего в таблице нет, — о новом CLI и о новом виде записи);
  *   1. у каждого «×» причина из ЗАКРЫТОГО словаря (критерий приёмки П1.1);
  *   2. условие и запасной уровень согласованы: есть условие — есть иной исход;
  *   3. перенос В Claude считается тоже (в таблице его столбца нет — он источник);
@@ -17,183 +21,19 @@
  *
  * Запуск: `node tools/qa/check-portability-fidelity.mjs`
  * Самопроверка: `node tools/qa/check-portability-fidelity.mjs --selftest` —
- * подменяет клетку таблицы и возможность в каталоге и требует, чтобы проверка
- * покраснела ИМЕННО на них. Проверка, которая не может покраснеть, — украшение.
+ * подменяет клетку таблицы и добавляет канону вид записи без представителя,
+ * требуя, чтобы проверка покраснела ИМЕННО на них, по одному следу на подмену.
+ * Проверка, которая не может покраснеть, — украшение, и раздел без своей
+ * подмены — тоже.
  */
 import { readFileSync } from 'node:fs';
+import { LAYERS, cellOf } from './portability-layers.mjs';
 
 const selftest = process.argv.includes('--selftest');
 const failures = [];
 
 function check(name, condition, detail) {
   if (!condition) failures.push(detail ? `${name} — ${detail}` : name);
-}
-
-/** Буква матрицы по уровню верности. Словарь один на весь файл. */
-const LETTER = {
-  native: 'Н',
-  emulated: 'Э',
-  wired: 'П',
-  text: 'Т',
-  impossible: '×',
-};
-
-const src = {
-  provider: 'claude',
-  scope: 'global',
-  origin: 'file',
-  // Путь ВНУТРИ дома Claude: по нему видно, что цель читает тот же каталог.
-  file: `${process.env.HOME ?? process.env.USERPROFILE ?? ''}/.claude/skills/doc-hygiene/SKILL.md`,
-};
-
-function item(over) {
-  return {
-    id: `${over.kind}:пример`,
-    source: src,
-    intent: 'представитель слоя',
-    trigger: { on: 'always' },
-    blocking: 'inapplicable',
-    needs: { resolution: 'none', why: 'рантайм не нужен' },
-    sideEffects: [],
-    raw: '',
-    ...over,
-  };
-}
-
-/**
- * Представитель каждого слоя матрицы. Ключ — подпись строки таблицы так, как она
- * написана в плане; строка «Поведение CLI» каноном не едет вовсе и здесь её нет
- * намеренно (об этом сказано в самом плане).
- */
-const LAYERS = [
-  [
-    'Инструкции и память',
-    item({
-      kind: 'instructions',
-      fileName: 'CLAUDE.md',
-      text: 'текст',
-      includes: [],
-      legacy: false,
-      enabled: true,
-    }),
-  ],
-  [
-    'Скиллы',
-    item({
-      kind: 'skill',
-      name: 'doc-hygiene',
-      description: 'd',
-      body: 'b',
-      dir: `${src.file.replace('/SKILL.md', '')}`,
-      enabled: true,
-      trigger: { on: 'model' },
-    }),
-  ],
-  [
-    'Слэш-команды',
-    item({
-      kind: 'command',
-      name: 'gate',
-      namespace: null,
-      description: 'd',
-      prompt: 'p',
-      trigger: { on: 'user' },
-    }),
-  ],
-  [
-    'Субагенты',
-    item({
-      kind: 'subagent',
-      name: 'reviewer',
-      description: 'd',
-      tools: null,
-      model: null,
-      omitInstructions: false,
-      trigger: { on: 'model' },
-    }),
-  ],
-  [
-    'Хуки: события сессии',
-    item({
-      kind: 'hook',
-      command: 'node start.mjs',
-      scriptPath: null,
-      timeout: null,
-      enabled: false,
-      trigger: { on: 'session', event: 'session_start' },
-      blocking: 'observes',
-      needs: { resolution: 'facts', facts: ['session_id'], evidence: 'declared' },
-    }),
-  ],
-  [
-    'Хуки: события инструментов',
-    item({
-      kind: 'hook',
-      command: 'node guard.mjs',
-      scriptPath: null,
-      timeout: null,
-      enabled: false,
-      trigger: { on: 'tool', event: 'pre_tool', match: null },
-      blocking: 'blocks',
-      needs: { resolution: 'facts', facts: ['tool_name', 'tool_input'], evidence: 'declared' },
-    }),
-  ],
-  ['Права', item({ kind: 'permission', rule: 'Bash(rm -rf)', decision: 'deny', order: 0 })],
-  [
-    'MCP-серверы',
-    item({
-      kind: 'mcpServer',
-      name: 'context7',
-      transport: 'stdio',
-      command: 'npx',
-      args: [],
-      url: null,
-      envKeys: [],
-    }),
-  ],
-  ['Переменные окружения', item({ kind: 'envVar', name: 'EDITOR', value: 'code' })],
-  [
-    'Секреты и ключи',
-    item({ kind: 'secret', name: 'ANTHROPIC_API_KEY', mask: '…', holder: 'panel' }),
-  ],
-  [
-    // Форма плагина названа: единицей плагин едет только в механизм СВОЕЙ формы
-    // (П2.6). Строка таблицы говорит про плагин-модуль — файл, который цель
-    // кладёт к себе; форма `installed` (магазин Claude, реестр kimi) единицей не
-    // едет никуда, её содержимое едет обычными записями.
-    'Плагины как единица',
-    item({
-      kind: 'plugin',
-      name: 'pack',
-      version: null,
-      readOnly: false,
-      provides: [],
-      form: 'module',
-    }),
-  ],
-  [
-    'Группы и сценарии панели',
-    item({ kind: 'panelGroup', name: 'гейт', description: 'd', members: [] }),
-  ],
-  [
-    'Контекст разговоров',
-    item({
-      kind: 'conversation',
-      title: 'разговор',
-      turns: 4,
-      lastActiveIso: '2026-09-19T00:00:00.000Z',
-      workdir: null,
-    }),
-  ],
-];
-
-/** Клетка таблицы по приговору: уровень, а через косую — исход без условия. */
-function cellOf(verdict) {
-  const best = LETTER[verdict.level];
-  // Запасной «невозможно» в таблицу не выносится: у уровня «эмуляция» отсутствие
-  // панели и так означает, что запись не работает (это сказано в легенде).
-  if (verdict.fallback === verdict.level || verdict.fallback === 'impossible') return best;
-  return `${best}/${LETTER[verdict.fallback]}`;
 }
 
 /** Разобрать таблицу §3 плана: подпись строки → карта «провайдер → клетка». */
@@ -205,7 +45,7 @@ function parseMatrix(text) {
     cell
       .replaceAll('\\*', '')
       .replaceAll('*', '')
-      .replace(/[†‡§¶⊘∅]/g, '')
+      .replace(/[†‡§¶⊘∅∎]/g, '')
       .trim();
   const columns = lines[start].split('|').slice(2, -1).map(clean);
   const rows = new Map();
@@ -219,9 +59,15 @@ function parseMatrix(text) {
   return { columns, rows };
 }
 
+/** Что на самом деле сошлось — числами самой сверки, для итоговой строки. */
+let checked = { layers: 0, columns: 0 };
+
 async function main() {
   const planPath = new URL('../../TASKS-PORTABILITY.md', import.meta.url);
   const { columns, rows } = parseMatrix(readFileSync(planPath, 'utf8'));
+  // Итоговую строку пишет САМА сверка, своими числами: «9 CLI» в ней было
+  // написано рукой, и десятый провайдер каталога оставил бы её врать о девяти.
+  checked = { layers: LAYERS.length, columns: columns.length };
 
   const { level } = await import(
     new URL('../../apps/server/src/domains/portability/fidelity.ts', import.meta.url).href
@@ -237,7 +83,47 @@ async function main() {
   );
 
   const byId = new Map(CATALOG_PROVIDERS.map((provider) => [provider.id, provider]));
-  check('в таблице девять столбцов целевых CLI', columns.length === 9, `их ${columns.length}`);
+
+  // --- 0. Таблица и каталог покрывают друг друга -----------------------------
+  //
+  // Проверка клеток идёт ПО ТАБЛИЦЕ, поэтому сама по себе она молчит о том, чего
+  // в таблице нет: появись в каталоге одиннадцатый CLI — ни одна клетка не
+  // покраснеет, а обещание человеку останется о девяти. Поэтому покрытие
+  // сверяется в обе стороны, и так же — строки: строка, представителя которой
+  // здесь нет, не проверяется вовсе, и молчать об этом нельзя.
+  const catalogIds = CATALOG_PROVIDERS.map((provider) => provider.id).sort();
+  const columnIds = [...columns].sort();
+  check(
+    'столбцы таблицы §3 = каталог провайдеров',
+    columnIds.join(',') === catalogIds.join(','),
+    `в таблице [${columnIds.join(', ')}], в каталоге [${catalogIds.join(', ')}]`,
+  );
+
+  // Строка матрицы, которой нет среди представителей, — не «пока не проверяем»:
+  // это клетки, о которых план обещает, а гейт молчит. Единственное исключение
+  // названо поимённо, и причина у него та же, что в самом плане.
+  const NOT_CANON_ROWS = new Set(['Поведение CLI (модель и пр.)']);
+  const covered = new Set(LAYERS.map(([label]) => label));
+  for (const label of rows.keys()) {
+    if (covered.has(label) || NOT_CANON_ROWS.has(label)) continue;
+    failures.push(`строка таблицы «${label}» не проверяется: представителя слоя нет`);
+  }
+
+  // Та же сверка со стороны КАНОНА, и без неё покрытие было замкнуто само на
+  // себя: и таблица, и представители правятся руками, поэтому тринадцатый вид
+  // записи, заведённый в `envItemKinds`, не получил бы ни строки в таблице, ни
+  // представителя — и обе проверки остались бы зелёными, обещая человеку
+  // двенадцать слоёв вместо тринадцати.
+  const { envItemKinds } = await import(
+    new URL('../../packages/contracts/src/portable-env.ts', import.meta.url).href
+  );
+  // Подмена самопроверки: вид канона, представителя у которого заведомо нет.
+  const kinds = selftest ? [...envItemKinds, 'виджет'] : envItemKinds;
+  const represented = new Set(LAYERS.map(([, canonItem]) => canonItem.kind));
+  for (const kind of kinds) {
+    if (represented.has(kind)) continue;
+    failures.push(`вид канона «${kind}» не проверяется: представителя слоя нет`);
+  }
 
   // --- 1. Клетка за клеткой: таблица против вычисления ------------------------
   for (const [label, canonItem] of LAYERS) {
@@ -407,21 +293,29 @@ async function main() {
 await main();
 
 if (selftest) {
-  const poisoned = failures.filter((line) => line.startsWith('MCP-серверы / codex'));
-  if (poisoned.length !== 1) {
-    console.error(
-      `САМОПРОВЕРКА ПРОВАЛЕНА: подменённая клетка «MCP-серверы / codex» не поймана (поймано ${poisoned.length})`,
-    );
-    process.exit(1);
-  }
-  if (failures.length !== 1) {
-    console.error('САМОПРОВЕРКА ПРОВАЛЕНА: кроме подменённой клетки покраснело что-то ещё:');
-    for (const line of failures.filter((entry) => !entry.startsWith('MCP-серверы / codex'))) {
-      console.error(`  - ${line}`);
+  // Подмены ДВЕ, и каждая ловится по своему следу. Одной хватало, пока §0 не
+  // начал проверять покрытие со стороны канона: раздел, которому самопроверка
+  // не наносит урона, зеленеет всегда — то есть стоит украшением.
+  const damages = [
+    ['подменённая клетка «MCP-серверы / codex»', (line) => line.startsWith('MCP-серверы / codex')],
+    ['вид канона без представителя', (line) => line.includes('вид канона «виджет»')],
+  ];
+  const caught = new Set();
+  for (const [name, hit] of damages) {
+    const found = failures.filter(hit);
+    if (found.length !== 1) {
+      console.error(`САМОПРОВЕРКА ПРОВАЛЕНА: ${name} — поймано ${found.length}, ожидалась одна`);
+      process.exit(1);
     }
+    for (const line of found) caught.add(line);
+  }
+  const extra = failures.filter((line) => !caught.has(line));
+  if (extra.length > 0) {
+    console.error('САМОПРОВЕРКА ПРОВАЛЕНА: кроме подмен покраснело что-то ещё:');
+    for (const line of extra) console.error(`  - ${line}`);
     process.exit(1);
   }
-  console.log('Самопроверка: подменённая клетка поймана по имени, остальное зелено.');
+  console.log(`Самопроверка: ${damages.length} подмены пойманы по имени, остальное зелено.`);
   process.exit(0);
 }
 
@@ -431,4 +325,6 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log(`Матрица верности: ${LAYERS.length} слоёв × 9 CLI сошлись с §3 плана.`);
+console.log(
+  `Матрица верности: ${checked.layers} слоёв × ${checked.columns} CLI сошлись с §3 плана.`,
+);

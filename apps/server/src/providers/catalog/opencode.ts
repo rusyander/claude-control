@@ -45,6 +45,10 @@ export const opencodeProvider: ConfigProvider = {
       tools: { Bash: 'bash', Edit: 'edit', WebFetch: 'webfetch' },
       closed: true,
       argumentTools: ['bash'],
+      // Карта шаблонов команд — грамматика OpenCode, а не канона: правило
+      // `Bash(git push:*)` записалось бы шаблоном `git push:*`, которому не
+      // соответствует ни одна настоящая команда.
+      argumentSyntax: 'own',
       oneShapePerTool: true,
     },
   },

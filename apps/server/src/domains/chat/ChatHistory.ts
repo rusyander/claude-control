@@ -6,6 +6,7 @@ import {
   FULL_READ_LIMIT,
   fileSessionId,
   findTranscript,
+  readHeadRecords,
   readRecords,
   readTailRecords,
   streamLines,
@@ -236,6 +237,24 @@ export async function readChatMessages(
  * разговор можно лишь оттуда, где он начинался, — этот путь и берём из самого
  * транскрипта, он записан в каждой строке.
  */
+/**
+ * Исходное задание разговора — первая осмысленная реплика человека.
+ *
+ * Читается ТОЛЬКО начало файла: задание лежит в его первых строках, и размер
+ * транскрипта на цену ответа не влияет. Поэтому спрашивают задание поштучно, у
+ * выбранного разговора, а не строят его для всего списка: в списке оно никому
+ * не нужно, а файлов там сотни.
+ *
+ * Разговора нет или начало без реплик человека — пустая строка: задание, которое
+ * не прочитано, и задание, которого не было, для переноса одно и то же.
+ */
+export function readChatTask(projectsDir: string, chatId: string): string {
+  const path = findTranscript(projectsDir, chatId);
+  if (!path) return '';
+
+  return firstMeaningfulText(readHeadRecords(path));
+}
+
 export function findSessionCwd(projectsDir: string, sessionId: string): string | undefined {
   const path = findTranscript(projectsDir, sessionId);
   if (!path) return undefined;

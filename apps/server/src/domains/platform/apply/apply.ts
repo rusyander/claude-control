@@ -148,7 +148,7 @@ function writeTarget(
   const baseUrl = gatewayUrlFor(gateway.port, platform.id, write.apiKind);
   const result: FileWriteResult =
     write.file.format === 'codex-toml'
-      ? applyCodexEndpoint(write.filePath, name, baseUrl, deps.backupDir)
+      ? applyCodexEndpoint(write.filePath, name, baseUrl, deps.backupDir, write.file.wireApi)
       : applyContinueEndpoint(write.filePath, name, baseUrl, managed.model.trim(), deps.backupDir);
 
   return {

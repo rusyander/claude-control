@@ -195,3 +195,28 @@ describe('режим подтверждений вызова не разбира
     expect(matchPermission([permission('mode:untrusted', 'deny')], bash('ls'))).toBeUndefined();
   });
 });
+
+describe('выключенное право не решает', () => {
+  const off = (rule: string, decision: PermissionDecision): PermissionItem => ({
+    ...permission(rule, decision),
+    enabled: false,
+  });
+
+  it('снятый человеком запрет не запрещает', async () => {
+    // Канон несёт выключенное право ради честного паспорта; запрети оно вызов —
+    // отказ ссылался бы на правило, которого в настройках человека уже нет.
+    expect(matchPermission([off('Bash(rm:*)', 'deny')], bash('rm -rf /'))).toBeUndefined();
+
+    const { gate } = brokerWith([off('Bash(rm:*)', 'deny')]);
+    await expect(gate.decide(bash('rm -rf /'))).resolves.toMatchObject({ allow: true });
+  });
+
+  it('действующее правило рядом с выключенным решает само', () => {
+    const found = matchPermission(
+      [off('Bash(rm:*)', 'allow'), permission('Bash(rm:*)', 'deny')],
+      bash('rm -rf /'),
+    );
+    expect(found?.item.decision).toBe('deny');
+    expect(found?.item.enabled).toBe(true);
+  });
+});

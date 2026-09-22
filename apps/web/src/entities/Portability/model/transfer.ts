@@ -27,6 +27,9 @@ export const OUTCOME_TONE: Record<EmitOutcome, BadgeTone> = {
   collision_needs_choice: 'warning',
   refused_by_target: 'warning',
   disabled_at_source: 'neutral',
+  // Не «нейтрально»: запись у источника цела и человек ждал её у цели, а не
+  // доехала она из-за поломки, которую чинить ему.
+  script_missing: 'warning',
   not_transferable: 'danger',
 };
 

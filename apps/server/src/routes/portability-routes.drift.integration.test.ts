@@ -267,9 +267,14 @@ describe('portability-routes: расхождения подписки', () => {
     const stored = store.getPortabilitySubscription(key)!;
     expect(stored.layers).toEqual([]);
     expect(stored.files[commandFile('review')]).toBeUndefined();
-    // Память о спроецированном остаётся: повторная подписка не объявит новым
-    // каждый файл, который панель уже писала.
-    expect(stored.marks['command:review']).toBeDefined();
+    // Отметки ЭТОГО файла забыты вместе с его отпечатком. Переживи они отписку,
+    // отметка говорила бы эмиттеру «содержимое здесь наше» уже после того, как
+    // сверять стало не с чем, и повторная подписка одним щелчком переписала бы
+    // правку человека молча (инвариант 7).
+    expect(stored.marks['command:review']).toBeUndefined();
+    // А память о ДРУГИХ файлах цела: отписка разбирает ровно один файл, и
+    // повторная подписка не объявит новым всё, что панель когда-либо писала.
+    expect(stored.marks['command:release']).toBeDefined();
     expect(readFileSync(commandFile('review'), 'utf8')).toBe(touched);
   });
 

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import type {
   AppSettings,
@@ -74,6 +75,10 @@ export class InvalidDraftError extends Error {
  */
 const MAX_DIFF_CHARS = 400_000;
 
+/** Хеш текста для обрезанного сравнения: содержимое в отпечаток, а не на экран. */
+const textHash = (text: string): string =>
+  createHash('sha256').update(text).digest('hex').slice(0, 32);
+
 export function previewProviderWrite(
   store: PreviewSettingsSource,
   request: ProviderPreviewRequest,
@@ -133,7 +138,12 @@ export function runPreview(
   };
 
   if (before.length > MAX_DIFF_CHARS || after.length > MAX_DIFF_CHARS) {
-    return { ...base, lines: [], added: 0, removed: 0, truncated: true };
+    // Строк нет и счётчиков нет — значит о содержимом не сказано НИЧЕГО, и
+    // отпечаток показанного плана (`portability/plan.ts`) переставал ловить
+    // правку такого файла между предпросмотром и записью. Хеши это закрывают:
+    // показывать их незачем, но отпечаток обязан их учесть.
+    const hashes = { before: textHash(before), after: textHash(after) };
+    return { ...base, lines: [], added: 0, removed: 0, truncated: true, hashes };
   }
 
   const diff = diffLines(before, after);

@@ -186,16 +186,32 @@ describe('portability-routes: подписка', () => {
     expect(res.json().rows.every((row: { state: string }) => row.state === 'unchanged')).toBe(true);
   });
 
-  it('другая версия канона удерживает пересборку', async () => {
+  it('другая версия канона пересобирает проекцию целиком, а не запирает подписку', async () => {
     await subscribe(['command']);
     await resync();
+    const projected = readFileSync(commandFile('review'), 'utf8');
 
     const stored = store.getPortabilitySubscription(key)!;
     store.savePortabilitySubscription(key, { ...stored, canonVersion: CANON_VERSION - 1 });
 
-    const res = await post('subscription/apply', { ...target, fingerprint: 'что угодно' });
-    expect(res.statusCode).toBe(409);
-    expect(res.json().messageCode).toBe('portability-subscription-held');
+    // План называет причину и показывает ВСЮ подписку разошедшейся: отпечатки
+    // несравнимы, а не совпали.
+    const shown = await plan();
+    expect(shown.rebuild).toBe('canon_version');
+    expect(shown.hold).toBeNull();
+    expect(shown.rows.every((row) => row.state !== 'unchanged')).toBe(true);
+
+    // И пересборка проходит: прежде здесь был 409, из которого выхода не было
+    // — версию записывает только удачная пересборка.
+    const res = await post('subscription/apply', {
+      ...target,
+      fingerprint: shown.transfer?.fingerprint,
+    });
+    expect(res.statusCode).toBe(200);
+    expect(store.getPortabilitySubscription(key)?.canonVersion).toBe(CANON_VERSION);
+    expect(readFileSync(commandFile('review'), 'utf8')).toBe(projected);
+    // Следующий круг — обычный: причина ушла, записи снова совпали.
+    expect((await plan()).rebuild).toBeNull();
   });
 
   it('отписка не удаляет у цели ни байта', async () => {

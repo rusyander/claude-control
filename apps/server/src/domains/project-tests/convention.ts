@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { projectInstructionTarget } from '../../lib/instruction-files.ts';
 import { writeTextFile } from '../../lib/safe-io.ts';
 import { TESTS_DIR } from './store.ts';
 import { LEGACY_BRAND_SLUG } from '../../lib/brand.mjs';
@@ -83,9 +83,21 @@ const BLOCK = `${MARKER}
   без отдельной просьбы.
 `;
 
-/** Вписано ли соглашение в CLAUDE.md проекта. */
-export function hasConvention(root: string): boolean {
-  const path = join(root, 'CLAUDE.md');
+/**
+ * В КАКОЙ файл инструкций проекта пишется соглашение.
+ *
+ * Спрашивается общий резолвер имени (П2.7), а не `CLAUDE.md` строкой: проект,
+ * живущий на `AGENTS.md`, получил бы от панели второй файл инструкций — и CLI
+ * стал бы читать его вместо прежнего, потому что `CLAUDE.md` рядом гасит
+ * `AGENTS.md` молча. Имя файла инструкций — решение человека, а не панели.
+ */
+export function conventionFile(root: string, userSettingsPath?: string): string {
+  return projectInstructionTarget(root, userSettingsPath).filePath;
+}
+
+/** Вписано ли соглашение в файл инструкций проекта. */
+export function hasConvention(root: string, userSettingsPath?: string): boolean {
+  const path = conventionFile(root, userSettingsPath);
   if (!existsSync(path)) return false;
   try {
     const text = readFileSync(path, 'utf8');
@@ -96,15 +108,20 @@ export function hasConvention(root: string): boolean {
 }
 
 /**
- * Дописать соглашение в конец `CLAUDE.md`. Повторный вызов ничего не делает —
- * значит, кнопку можно нажать дважды без последствий.
+ * Дописать соглашение в конец файла инструкций проекта. Повторный вызов ничего
+ * не делает — значит, кнопку можно нажать дважды без последствий.
  */
-export function installConvention(root: string, backupDir?: string, backupName?: string): boolean {
-  if (hasConvention(root)) return false;
-  const path = join(root, 'CLAUDE.md');
+export function installConvention(
+  root: string,
+  backupDir?: string,
+  backupName?: string,
+  userSettingsPath?: string,
+): boolean {
+  if (hasConvention(root, userSettingsPath)) return false;
+  const path = conventionFile(root, userSettingsPath);
   const current = existsSync(path) ? readFileSync(path, 'utf8') : '';
   const separator = current.length === 0 || current.endsWith('\n\n') ? '' : '\n';
-  // Тот же CLAUDE.md правит вкладка «Правила» — с резервной копией и под ИМЕНЕМ
+  // Тот же файл правит вкладка «Правила» — с резервной копией и под ИМЕНЕМ
   // проектной копии (`project-<id>-CLAUDE.md`), а не пользовательской; дописывать
   // без копии значило бы, что одна кнопка бережёт файл, а другая нет.
   writeTextFile(

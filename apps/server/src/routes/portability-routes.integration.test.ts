@@ -29,6 +29,12 @@ import { registerPortabilityRoutes } from './portability-routes.ts';
 describe('portability-routes: паспорт среды', () => {
   /** Значение-маркер: доехало до ответа — проверка обязана покраснеть. */
   const SECRET_VALUE = 'sk-ant-МАРКЕР-МАРШРУТА-41c8e0-НЕ-ДОЛЖЕН-УТЕЧЬ';
+  /**
+   * Учётка под именем, которого нет ни в одном словаре. Пока секрет узнавали
+   * только по имени, этот случай был для проверки недостижим: покраснеть она
+   * могла лишь на распознаваемых именах, то есть на том, что и так работало.
+   */
+  const DSN_VALUE = 'postgres://admin:МАРКЕР-DSN-8d14@db.internal:5432/prod';
   /** Идентификатор записи реестра: корень проекта берётся только по нему. */
   const PROJECT_ID = 'prj-portability';
   /** Слово, которого нет в доме: по нему видно, чьи файлы прочитал паспорт. */
@@ -51,7 +57,12 @@ describe('portability-routes: паспорт среды', () => {
         // Два имени НАРОЧНО: `ANTHROPIC_API_KEY` секретом считало и прежнее
         // правило раздела, `OPENAI_KEY` — нет, и его значение уезжало в ответ
         // открытым текстом. Правило теперь общее с остальной панелью.
-        env: { EDITOR: 'code', ANTHROPIC_API_KEY: SECRET_VALUE, OPENAI_KEY: SECRET_VALUE },
+        env: {
+          EDITOR: 'code',
+          ANTHROPIC_API_KEY: SECRET_VALUE,
+          OPENAI_KEY: SECRET_VALUE,
+          DATABASE_URL: DSN_VALUE,
+        },
         permissions: { allow: ['Bash(git push:*)'], deny: ['Read(./private)'] },
       }),
     );
@@ -110,10 +121,16 @@ describe('portability-routes: паспорт среды', () => {
     expect(items.some((item) => item.kind === 'secret')).toBe(true);
     // Оба ключа названы секретами — иначе «маркера нет» держалось бы на одном
     // имени из двух, а второе ехало бы значением.
+    // Третье имя — вне словарей: секретом его делает само значение.
     expect(items.map((item) => item.id)).toEqual(
-      expect.arrayContaining(['secret:ANTHROPIC_API_KEY', 'secret:OPENAI_KEY']),
+      expect.arrayContaining([
+        'secret:ANTHROPIC_API_KEY',
+        'secret:OPENAI_KEY',
+        'secret:DATABASE_URL',
+      ]),
     );
     expect(res.body).not.toContain(SECRET_VALUE);
+    expect(res.body).not.toContain(DSN_VALUE);
   });
 
   it('вид, которого в доме не оказалось, назван пустым, а не пропущен молчанием', async () => {

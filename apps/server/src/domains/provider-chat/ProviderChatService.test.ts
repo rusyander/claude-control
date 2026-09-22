@@ -265,6 +265,57 @@ describe('ProviderChatService', () => {
   });
 
   /**
+   * Калитка запросов отказывает ДО запуска CLI, а реплика пишется в файл
+   * раньше отказа. Оставленная в переписке, она уезжала чужому CLI следующим
+   * сообщением внутри `history`: калитка смотрит только ПОСЛЕДНЮЮ реплику и
+   * второй раз эту уже не видит — запрет обходился простым «напиши ещё».
+   */
+  describe('отказ калитки до запуска', () => {
+    it('отказанная реплика снята из переписки и не уезжает следующим сообщением', () => {
+      send('Вот ключ sk-живой-ключ, почини деплой');
+      run.emit?.({
+        type: 'error',
+        error: 'Калитка отказала: Ключи доступа',
+        reason: 'hook_blocked',
+      });
+
+      const afterBlock = readChat(dir, 'codex', 'chat');
+      expect(
+        afterBlock?.messages.some((message) => message.content.includes('sk-живой-ключ')),
+      ).toBe(false);
+
+      // Главное утверждение — не про файл, а про то, что уезжает цели.
+      run = new FakeRun();
+      service = new ProviderChatService(() => run);
+      send('Почини деплой, пожалуйста');
+      const history = (run.options as { history: { content: string }[] }).history;
+
+      // Заметка об отказе в переписке ОСТАЁТСЯ — человек обязан видеть причину,
+      // и значения, из-за которого сработало правило, в ней нет. Уехать не
+      // должен именно запрещённый текст.
+      expect(history.some((message) => message.content.includes('sk-живой-ключ'))).toBe(false);
+      expect(history.map((message) => message.content)).toEqual([
+        'Калитка отказала: Ключи доступа',
+        'Почини деплой, пожалуйста',
+      ]);
+    });
+
+    it('отказ ПОСЛЕ ответа реплику не трогает: она уже уехала', () => {
+      send('Обычный вопрос');
+      run.emit?.({ type: 'delta', text: 'ответ' });
+      run.emit?.({ type: 'done', reply: 'ответ', transport: 'stream' });
+      run.emit?.({
+        type: 'error',
+        error: 'Хук события Stop потребовал продолжения',
+        reason: 'hook_blocked',
+      });
+
+      const chat = readChat(dir, 'codex', 'chat');
+      expect(chat?.messages.some((message) => message.content === 'Обычный вопрос')).toBe(true);
+    });
+  });
+
+  /**
    * Точка, на которой висит конвейер звеньев (`cascade.ts`). Важно не «зовётся
    * ли», а ЧТО в ней написано: снятый человеком ответ не законченная работа, и
    * заводить по нему ревью нельзя.

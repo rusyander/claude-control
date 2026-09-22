@@ -69,6 +69,7 @@ describe('пробная среда', () => {
         skillDir: '/tmp',
         forbiddenPath: '/tmp/probe/forbidden.mjs',
         envPath: '/tmp/probe/env.mjs',
+        mcpAskedPath: '/tmp/probe/mcp-asked.txt',
       },
       capturedAt: '2026-09-20T00:00:00.000Z',
     });
@@ -184,6 +185,110 @@ describe('приговоры по разговору с заглушкой', () 
   });
 });
 
+/**
+ * Тот же сработавший перенос, но у цели с ручкой `/responses`: реплики лежат в
+ * `input`, а не в `messages`. Форма снята живым прогоном `codex-cli 0.155.1`
+ * 22.09.2026 — выдумывать её нельзя, иначе тест проверял бы выдумку.
+ */
+function codexTranscript(): Record<string, unknown>[] {
+  return [
+    {
+      instructions: `## Право: запрещено \`Read(${PROBE_MARKS.deniedFile})\``,
+      tools: [],
+      input: [{ type: 'message', role: 'user', content: 'проба' }],
+    },
+    {
+      input: [
+        // Запрещённый вызов ОТРАБОТАЛ: хук у этой цели обещан «невозможно», и
+        // останавливать его нечему — это верный исход, а не провал.
+        {
+          type: 'function_call_output',
+          call_id: 'probe_forbidden',
+          output: PROBE_MARKS.forbiddenRan,
+        },
+        {
+          type: 'function_call_output',
+          call_id: 'probe_env',
+          output: `${PROBE_MARKS.envEcho}${PROBE_MARKS.env}`,
+        },
+        {
+          type: 'function_call_output',
+          call_id: 'probe_denied',
+          output: PROBE_MARKS.deniedContent,
+        },
+      ],
+    },
+  ];
+}
+
+describe('цель с ручкой /responses', () => {
+  it('реплики берутся по ИМЕНИ поля — иначе ответы инструментов не находятся вовсе', () => {
+    const rows = probeRowsFrom(codexTranscript(), getProvider('codex'), 'global');
+
+    // Хук у codex обещан «невозможно», и запрещённый вызов обязан был
+    // отработать. Читай наблюдение только `messages`, ответов инструментов оно
+    // не нашло бы — и «вывод не появился» дало бы ЗЕЛЁНЫЙ хук там, где его
+    // никто не останавливал.
+    expect(row(rows, 'hook').observed).toBe('absent');
+    expect(row(rows, 'hook').verdict).toBe('match');
+    expect(row(rows, 'envVar').observed).toBe('present');
+  });
+
+  it('право, обещанное ТЕКСТОМ, судится присутствием запрета, а не отказом', () => {
+    // Содержимое запрещённого файла в ответах ЕСТЬ: на этом уровне панель
+    // ничего не принуждает и не обещала принуждать.
+    const rows = probeRowsFrom(codexTranscript(), getProvider('codex'), 'global');
+
+    expect(row(rows, 'permission').promised).toBe('text');
+    expect(row(rows, 'permission').observed).toBe('present');
+    expect(row(rows, 'permission').verdict).toBe('match');
+  });
+
+  it('запрет НЕ доехал словами — краснеет право, и только оно', () => {
+    const transcript = codexTranscript();
+    // Ровно то, что делал перенос до 22.09.2026: до цели ехал пересказ
+    // намерения, в котором нет ни имени файла, ни слова «запрещено».
+    transcript[0] = {
+      instructions: '## Проба: право обязано отказать в чтении условленного файла.',
+      tools: [],
+      input: [{ type: 'message', role: 'user', content: 'проба' }],
+    };
+
+    const rows = probeRowsFrom(transcript, getProvider('codex'), 'global', true);
+    expect(row(rows, 'permission').verdict).toBe('mismatch');
+    expect(row(rows, 'permission').observed).toBe('absent');
+    expect(rows.filter((candidate) => candidate.verdict === 'mismatch')).toHaveLength(1);
+  });
+});
+
+describe('MCP-сервер: «не назвали» против «не доехал»', () => {
+  it('сервер СПРОСИЛИ, а модели не назвали — не проверено, а не красный', () => {
+    const rows = probeRowsFrom(codexTranscript(), getProvider('codex'), 'global', true);
+
+    expect(row(rows, 'mcpServer').verdict).toBe('not_checked');
+    expect(row(rows, 'mcpServer').skip).toBe('target_defers_tools');
+  });
+
+  it('сервера никто не спрашивал — это непереехавшая запись, и она красная', () => {
+    const rows = probeRowsFrom(codexTranscript(), getProvider('codex'), 'global', false);
+
+    expect(row(rows, 'mcpServer').observed).toBe('absent');
+    expect(row(rows, 'mcpServer').verdict).toBe('mismatch');
+  });
+
+  it('имя инструмента в списке у модели сильнее обоих — это совпадение', () => {
+    const transcript = codexTranscript();
+    transcript[0] = {
+      ...transcript[0],
+      tools: [{ type: 'namespace', name: `mcp__${PROBE_MARKS.mcpTool}` }],
+    };
+
+    const rows = probeRowsFrom(transcript, getProvider('codex'), 'global', true);
+    expect(row(rows, 'mcpServer').observed).toBe('present');
+    expect(row(rows, 'mcpServer').verdict).toBe('match');
+  });
+});
+
 describe('заглушка вместо модели', () => {
   it('служебный запрос без реплик НЕ считается ходом разговора', async () => {
     // Дефект, найденный живым прогоном 20.09.2026 (claude 2.1.263): CLI перед
@@ -234,11 +339,33 @@ describe('ступени отказа', () => {
     // значило бы обещать измерение, которого не будет.
     const report = await runProbe({ target: getProvider('gemini'), scope: 'global' });
     const skips = new Map(report.rows.map((candidate) => [candidate.layer, candidate.skip]));
+    const promised = new Map(report.rows.map((candidate) => [candidate.layer, candidate.promised]));
 
-    expect(skips.get('hook')).toBe('needs_wire');
     expect(skips.get('skill')).toBe('needs_panel_runtime');
     expect(skips.get('mcpServer')).toBe('no_probe_recipe');
+    // Ступень `needs_wire` СЕГОДНЯ недостижима, и это не потеря проверки, а её
+    // следствие: пока панель не открывает ворота на пути запроса, уровень
+    // «проводом» не обещается никому (`wire/tool-gate.ts`), и хук уезжает
+    // «невозможно» — причина у строки становится своя, про рецепт.
+    expect(promised.get('hook')).toBe('impossible');
+    expect(skips.get('hook')).toBe('no_probe_recipe');
     expect(report.summary.notChecked).toBe(6);
+  });
+
+  it('адрес заглушки в ФАЙЛЕ цели — не повод отказаться', async () => {
+    // У codex адрес модели переменной окружения не задаётся вовсе: он живёт
+    // таблицей в его собственном `config.toml`. Пока проба умела только
+    // переменные, эта цель отказывалась ступенью `no_stub_endpoint` — то есть
+    // была непроверяема при полностью задокументированном способе.
+    const report = await runProbe({
+      target: getProvider('codex'),
+      scope: 'global',
+      cliOverride: [process.execPath, '-e', 'process.exit(0)'],
+      timeoutMs: 20_000,
+    });
+
+    expect(report.rows.every((candidate) => candidate.skip !== 'no_stub_endpoint')).toBe(true);
+    expect(row(report.rows, 'envVar').skip).toBe('run_failed');
   });
 
   it('цель не дошла до модели — «не проверено», и после прогона не остаётся каталогов', async () => {

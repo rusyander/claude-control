@@ -5,7 +5,11 @@ import {
   type SupervisorHook,
   type SupervisorEventOutcome,
 } from '../supervisor/run.ts';
-import type { SupervisorRun } from '../supervisor/payload.ts';
+import {
+  supervisorOwnedRunEvents,
+  type SupervisorEvent,
+  type SupervisorRun,
+} from '../supervisor/payload.ts';
 
 /**
  * СОБЫТИЯ ИНСТРУМЕНТОВ НА ПРОВОДЕ (П4.1).
@@ -54,6 +58,24 @@ export function toolEventOwner(
 ): ToolEventOwner {
   if (providerHookEvents(provider).some((candidate) => candidate.name === event)) return 'native';
   return conditions.throughContour ? 'wire' : 'none';
+}
+
+/**
+ * ВСЕ события, которые у этой цели отыгрывает панель, — строка отчёта верности.
+ *
+ * Считается здесь, а не рядом с остальными семью, ровно потому, что ответ
+ * зависит от контура: `supervisorOwnedRunEvents` о `PreToolUse`/`PostToolUse`
+ * промолчать обязан — без контура их не отыгрывает никто, и назвать их своими
+ * значило бы обещать человеку исполнение хука, которого не будет.
+ */
+export function supervisorOwnedEvents(
+  provider: ConfigProvider,
+  conditions: ToolEventConditions,
+): readonly SupervisorEvent[] {
+  const tools = (['PreToolUse', 'PostToolUse'] as const).filter(
+    (event) => toolEventOwner(provider, event, conditions) === 'wire',
+  );
+  return [...supervisorOwnedRunEvents(provider), ...tools];
 }
 
 /** Вызов инструмента, как его увидел провод. */

@@ -78,6 +78,12 @@ export const permissionRefusals = [
   'tool_not_in_vocabulary',
   /** Инструмент у цели есть, а уточнения аргумента её формат для него не принимает. */
   'argument_not_expressible',
+  /**
+   * Уточнение цель принимает, но СВОИМ синтаксисом, и перевода канонического в
+   * него в документации нет. Дословная запись дала бы правило, которое у цели
+   * не совпадает ни с чем: запрет уехал бы «записанным» и не запрещал (инв. 6).
+   */
+  'argument_grammar_differs',
 ] as const;
 
 export type PermissionRefusal = (typeof permissionRefusals)[number];
@@ -120,6 +126,15 @@ export function translatePermission(
   if (parsed.argument !== null && grammar && !grammar.argumentTools.includes(tool)) {
     return { kind: 'refused', why: 'argument_not_expressible' };
   }
+  // Буквальный аргумент значит у обеих сторон одну и ту же команду и едет как
+  // есть; расходится только ПОДСТАНОВКА, и её переводить нечем.
+  if (
+    parsed.argument !== null &&
+    grammar?.argumentSyntax === 'own' &&
+    hasWildcard(parsed.argument)
+  ) {
+    return { kind: 'refused', why: 'argument_grammar_differs' };
+  }
 
   return {
     kind: 'rule',
@@ -128,6 +143,15 @@ export function translatePermission(
     rule: parsed.argument === null ? tool : `${tool}(${parsed.argument})`,
     decision,
   };
+}
+
+/**
+ * Подстановка в аргументе канона — грамматика Claude: `git push:*` значит
+ * «команда начинается с `git push`», `*` — «что угодно». Ровно эта часть и не
+ * переводится в чужой синтаксис; буквальная команда совпадает дословно.
+ */
+function hasWildcard(argument: string): boolean {
+  return argument.includes('*');
 }
 
 /**

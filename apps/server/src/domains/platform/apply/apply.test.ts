@@ -18,6 +18,7 @@ import { claudeTrackedFiles } from '../../tracked-files.ts';
 import { writePlatform, writeToken } from '../store.ts';
 import { PlatformError } from '../errors.ts';
 import { applyContour } from './apply.ts';
+import { applyCodexEndpoint } from './config-files.ts';
 import { type ContourApplyDeps } from './plan.ts';
 import { PLACEHOLDER_KEY } from './profile.ts';
 import { defaultPlatformTransport } from '@agentdeck/contracts/platform-transport';
@@ -314,12 +315,37 @@ describe('claude', () => {
 });
 
 describe('codex', () => {
-  it('правится только регион model_providers — остальной TOML цел', () => {
+  it('целью не предлагается и файла не трогает — ручка шлюзу неизвестна', () => {
+    // Живая проба 22.09.2026 (`codex-cli 0.155.1`): конфиг с `wire_api = "chat"`
+    // этот CLI не загружает ЦЕЛИКОМ — падает любой его запуск. Пока у шлюза нет
+    // `/v1/responses`, записать такую цель значит сломать человеку CLI, поэтому
+    // применение до файла не доходит.
     const configPath = join(home, '.codex', 'config.toml');
     mkdirSync(join(home, '.codex'), { recursive: true });
     writeFileSync(configPath, CODEX_CONFIG);
 
-    applyContour(deps(), PLATFORM, { targets: ['codex'], model: 'gpt-4o' });
+    const result = applyContour(deps(), PLATFORM, { targets: ['codex'], model: 'gpt-4o' });
+
+    expect(result.applied).toEqual([]);
+    expect(readFileSync(configPath, 'utf8')).toBe(CODEX_CONFIG);
+    expect(store.getPlatformApplied()['company-dev']).toBeUndefined();
+  });
+
+  it('правится только регион model_providers — остальной TOML цел', () => {
+    // Писатель проверяется НАПРЯМУЮ: через применение до него сегодня не
+    // добраться, а хирургия по чужому TOML — ровно то, что обязано остаться
+    // верным к моменту, когда маршрут `/v1/responses` появится.
+    const configPath = join(home, '.codex', 'config.toml');
+    mkdirSync(join(home, '.codex'), { recursive: true });
+    writeFileSync(configPath, CODEX_CONFIG);
+
+    applyCodexEndpoint(
+      configPath,
+      'contour-company-dev',
+      'http://127.0.0.1:5179/company-dev/v1',
+      undefined,
+      'responses',
+    );
     const text = readFileSync(configPath, 'utf8');
 
     // Комментарий, чужие таблицы и их содержимое — байт в байт.
@@ -331,21 +357,27 @@ describe('codex', () => {
 
     expect(text).toContain('[model_providers.contour-company-dev]');
     expect(text).toContain('base_url = "http://127.0.0.1:5179/company-dev/v1"');
+    // Ручка — та, которую принимает сам CLI; `chat` и был тем, что его ломало.
+    expect(text).toContain('wire_api = "responses"');
     // Корневой выбор провайдера — иначе запись мертва.
     expect(text).toContain('model_provider = "contour-company-dev"');
   });
 
-  it('прежний выбор провайдера сохраняется в следе', () => {
+  it('прежний выбор провайдера уезжает в след', () => {
     const configPath = join(home, '.codex', 'config.toml');
     mkdirSync(join(home, '.codex'), { recursive: true });
     writeFileSync(configPath, 'model_provider = "openai"\n');
 
-    // Уже выбранный провайдер — занятое место, и перебивается он только по
-    // явному согласию; в след при этом уходит прежнее имя.
-    applyContour(deps(), PLATFORM, { targets: ['codex'], overwrite: ['codex'] });
-    expect(store.getPlatformApplied()['company-dev']?.targets[0]?.previous).toEqual([
-      { key: 'model_provider', value: 'openai' },
-    ]);
+    // Уже выбранный провайдер — занятое место: в след уходит прежнее имя, иначе
+    // откат вернул бы человеку не его настройку.
+    const result = applyCodexEndpoint(
+      configPath,
+      'contour-company-dev',
+      'http://127.0.0.1:5179/company-dev/v1',
+      undefined,
+      'responses',
+    );
+    expect(result.previous).toEqual([{ key: 'model_provider', value: 'openai' }]);
   });
 });
 
@@ -440,12 +472,17 @@ describe('ключ контура', () => {
     // Ключ лежит там, где ему и место: в шифрохранилище панели.
     writeToken(appData, PLATFORM.id, SECRET);
 
-    const targets = ['assistant', 'claude', 'qwen', 'aider', 'codex', 'continue'];
+    // Codex из перебора ушёл не по недосмотру: его ручку шлюз не обслуживает,
+    // и целью он сегодня не предлагается вовсе (`targets.ts`).
+    const targets = ['assistant', 'claude', 'qwen', 'aider', 'continue'];
     const result = applyContour(deps(), PLATFORM, { targets, model: 'gpt-4o' });
     expect(result.applied.map((item) => item.targetId)).toEqual(targets);
 
     const files = [...walk(home), ...walk(join(root, 'claude')), ...walk(backupDir)];
-    expect(files.length).toBeGreaterThan(4);
+    // По файлу на каждую ПИШУЩУЮ цель: ассистент живёт в настройках панели и
+    // файла не трогает, остальные четыре — трогают. Меньше — значит перебор
+    // прошёл мимо чьего-то файла, и «ключа нигде нет» доказано не было.
+    expect(files.length).toBeGreaterThanOrEqual(targets.length - 1);
     for (const file of files) {
       const text = readFileSync(file, 'utf8');
       expect(text).not.toContain(SECRET);

@@ -156,6 +156,18 @@ describe('словарь инструментов цели', () => {
     expect(translated).toMatchObject({ kind: 'rule', tool: 'bash', rule: 'bash(git status)' });
   });
 
+  it('подстановка канона в чужой синтаксис не переводится — отказ, а не запрет-пустышка', () => {
+    // `Bash(git push:*)` уезжал шаблоном `git push:*` в карту команд OpenCode,
+    // где ему не соответствует ни одна настоящая команда: правило считалось
+    // записанным и не запрещало ничего — молча снятый запрет (инвариант 6).
+    const translated = translatePermission(
+      permission('Bash(git push:*)', 'deny'),
+      'deny',
+      opencode,
+    );
+    expect(translated).toEqual({ kind: 'refused', why: 'argument_grammar_differs' });
+  });
+
   it('закрытый словарь чужого имени не принимает — правило не пишется вовсе', () => {
     const translated = translatePermission(permission('Read', 'deny'), 'deny', opencode);
     expect(translated).toEqual({ kind: 'refused', why: 'tool_not_in_vocabulary' });

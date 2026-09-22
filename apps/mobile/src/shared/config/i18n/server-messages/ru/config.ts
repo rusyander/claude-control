@@ -45,6 +45,8 @@ export const configRu: Record<ConfigMessageCode, string> = {
   'portability-source-not-readable':
     'Файлы этого CLI не читаются: проверьте, что его настройки не испорчены.',
   'portability-emitter-missing': 'Панель пока не умеет писать среду этого CLI.',
+  'portability-attachment-unsafe-path':
+    'Перенос не начат: вложение «{{path}}» скилла «{{name}}» ведёт за пределы его каталога.',
   'portability-plan-not-shown':
     'Сначала предпросмотр: панель не пишет то, чего вам не показала. Откройте план переноса заново.',
   'portability-plan-stale':
@@ -71,6 +73,7 @@ export const configRu: Record<ConfigMessageCode, string> = {
   'portability-drift-nothing-to-adopt':
     'В этом файле нет записей подписанных слоёв: брать в канон нечего.',
   'portability-drift-nothing-to-do': 'Этот исход не даёт ни одной правки: посмотрите план заново.',
+  'portability-carry-nothing-chosen': 'Не выбрано ни одного разговора: переносить нечего.',
   'resource-file-unspecified': 'Не указан файл',
   'resource-template-not-found': 'Шаблон не найден',
   'resource-kind-unknown': 'Неизвестный вид ресурса',

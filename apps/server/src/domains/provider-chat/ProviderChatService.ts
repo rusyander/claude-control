@@ -13,7 +13,7 @@ import {
 } from './ProviderChatRun.ts';
 import type { PlatformRunRoute } from '../platform/routing.ts';
 import { expandCommand, type SupervisorCommand } from '../portability/supervisor/commands.ts';
-import { appendMessage, readChat } from './store.ts';
+import { appendMessage, dropMessage, readChat } from './store.ts';
 import { composeUserMessage } from './prompt.ts';
 import { serverText } from '../../lib/server-texts.ts';
 
@@ -34,6 +34,20 @@ export interface ProviderChatSubscriber {
   send: (event: ProviderChatEvent) => void;
   close: () => void;
 }
+
+/** Что надзиратель получает от прогона, чтобы собрать его набор скриптов (П6.2). */
+export interface SupervisorRunContext {
+  readonly providerId: string;
+  readonly chatId: string;
+  readonly appDataDir: string;
+  /** Рабочий каталог разговора; пусто — каталог сервера. */
+  readonly workdir?: string;
+  /** Разговор только что заведён — в нём это первая реплика человека. */
+  readonly starting: boolean;
+}
+
+/** Надзиратель одного прогона — ровно то, что принимает `ProviderChatRun`. */
+export type SupervisorSetup = NonNullable<ProviderChatRunOptions['supervisor']>;
 
 /** Сколько держать завершённый прогон — окно на переподключение вкладки. */
 const GRACE_MS = 60_000;
@@ -88,7 +102,14 @@ export interface ProviderChatFinished {
  */
 export type ProviderChatRunDeps = Omit<
   ProviderChatRunOptions,
-  'history' | 'chatId' | 'appDataDir' | 'workdir' | 'model' | 'effort' | 'platformEnv'
+  | 'history'
+  | 'chatId'
+  | 'appDataDir'
+  | 'workdir'
+  | 'model'
+  | 'effort'
+  | 'platformEnv'
+  | 'supervisor'
 > & {
   /**
    * Слэш-команды панели (П3.4). Разворачиваются ЗДЕСЬ, а не в прогоне: тело
@@ -173,6 +194,24 @@ export class ProviderChatService {
 
   private contourToolCalls?: (sinceMs: number) => number | undefined;
 
+  /**
+   * Набор скриптов, которые панель отыграет вокруг прогона (П6.2).
+   *
+   * Тем же приёмом, что у маршрута контура, и по той же причине: служба знает,
+   * КАКОЙ разговор она ведёт, но про калитку, группы и каталоги панели не знает
+   * ничего. Спрашивается на КАЖДОМ сообщении — выключенная калитка обязана
+   * перестать действовать со следующего запроса, а не с перезапуска панели; ровно
+   * поэтому поля нет и в `ProviderChatRunDeps`: отложенный запуск дерева унёс бы
+   * с собой набор, собранный при прежних настройках.
+   *
+   * Слушателя нет — надзиратель молчит, и прогон идёт как до него.
+   */
+  setSupervisor(resolve: (run: SupervisorRunContext) => SupervisorSetup | undefined): void {
+    this.supervisor = resolve;
+  }
+
+  private supervisor?: (run: SupervisorRunContext) => SupervisorSetup | undefined;
+
   /** Задать вопрос: реплика пользователя пишется сразу, ответ идёт потоком. */
   send(
     appDataDir: string,
@@ -232,6 +271,18 @@ export class ProviderChatService {
     // не поднимается, а в переписке остаётся причина.
     if (route.refusal) live.run = refusedRun(route.refusal);
 
+    // Набор скриптов надзирателя решается ЗДЕСЬ и на каждом сообщении — по тем же
+    // причинам, что и маршрут контура выше. `starting` считается по переписке ДО
+    // новой реплики: `SessionStart` принадлежит первому вопросу разговора, а не
+    // каждому.
+    const supervisor = this.supervisor?.({
+      providerId,
+      chatId,
+      appDataDir,
+      ...(chat.workdir ? { workdir: chat.workdir } : {}),
+      starting: chat.messages.length === 0,
+    });
+
     void live.run
       .start(
         {
@@ -240,6 +291,7 @@ export class ProviderChatService {
           chatId,
           appDataDir,
           platformEnv: route.env,
+          ...(supervisor ? { supervisor } : {}),
           ...(chat.workdir ? { workdir: chat.workdir } : {}),
           ...(model ? { model } : {}),
           ...(effort ? { effort } : {}),
@@ -276,6 +328,17 @@ export class ProviderChatService {
               ...(stored ? { message: stored } : {}),
             });
             return;
+          }
+
+          // Отказ калитки ДО запуска CLI снимает реплику из переписки: она
+          // никуда не уехала. Оставленная, она уедет чужому CLI СЛЕДУЮЩИМ
+          // сообщением внутри `history` — калитка смотрит только последнюю
+          // реплику и второй раз эту не увидит, то есть запрет обходился бы
+          // простым «напиши что-нибудь ещё». Признак «прогон не начинался» —
+          // наблюдаемый, а не додуманный: по контракту `hook_blocked` значит
+          // ровно это, и ни `delta`, ни `done` до него не приходило.
+          if (event.reason === 'hook_blocked' && live.partial === '' && !live.transport) {
+            dropMessage(appDataDir, providerId, chatId, message.id);
           }
 
           // Провалившийся прогон время тоже несёт: «сколько мы ждали зря» —

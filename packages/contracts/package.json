@@ -32,6 +32,7 @@
     "./platform-presets": "./src/platform-presets.ts",
     "./platform-tool-hint": "./src/platform-tool-hint.ts",
     "./platform-transport": "./src/platform-transport.ts",
+    "./portable-carry": "./src/portable-carry.ts",
     "./portable-emit": "./src/portable-emit.ts",
     "./portable-env": "./src/portable-env.ts",
     "./portable-env-schema": "./src/portable-env-schema.ts",

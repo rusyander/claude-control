@@ -4,7 +4,7 @@
     {
       "topic": "platform",
       "document": "apps/web/src/pages/Help/topics/PlatformTopic.tsx",
-      "confirmedAt": "2026-09-21T10:10:03.873Z",
+      "confirmedAt": "2026-09-21T20:24:35.891Z",
       "sources": [
         {
           "path": "packages/contracts/src/compromises.ts",
@@ -114,7 +114,7 @@
         {
           "path": "apps/server/src/domains/platform/apply/targets.ts",
           "why": "«Что работает и что нет», «Как отключить»: цели применения и четыре причины прочерка",
-          "sha": "73d48bc7bb83f206"
+          "sha": "a29b9d5738c5be37"
         },
         {
           "path": "apps/web/src/features/PlatformEditor/model/wizard-logic.ts",
@@ -215,7 +215,7 @@
         {
           "path": "apps/server/src/domains/chat/ChatHandoff.ts",
           "why": "«Чистая сессия»: предложение прозой или блоком, потолок цепочки, зацикливание",
-          "sha": "bdc6036705b75542"
+          "sha": "77bfe1aaec7dfa50"
         },
         {
           "path": "apps/server/src/domains/chat/ChatSplit.ts",
@@ -273,7 +273,7 @@
           "sha": "96807b82231b83be"
         }
       ],
-      "confirmedAt": "2026-09-18T12:49:51.835Z"
+      "confirmedAt": "2026-09-21T15:06:18.822Z"
     },
     {
       "topic": "tests",
@@ -364,7 +364,7 @@
         {
           "path": "apps/server/src/lib/safe-io/backups.ts",
           "why": "«Границы и числа»: глубина ротации копий и её предел",
-          "sha": "3148dc52fdda44e9"
+          "sha": "d4ec359f349b89c5"
         },
         {
           "path": "apps/server/src/context.ts",
@@ -372,7 +372,7 @@
           "sha": "0e3da91f9c6d4a58"
         }
       ],
-      "confirmedAt": "2026-09-21T07:42:05.123Z"
+      "confirmedAt": "2026-09-21T19:18:05.297Z"
     },
     {
       "topic": "claudeMd",
@@ -564,7 +564,7 @@
         {
           "path": "apps/server/src/providers/catalog/opencode.ts",
           "why": "Проектный уровень OpenCode: права, хуки только на чтение, плагины",
-          "sha": "883d91bb5332ee78"
+          "sha": "d4d6ce57424ab1a7"
         },
         {
           "path": "apps/server/src/providers/catalog/kimi.ts",
@@ -577,7 +577,7 @@
           "sha": "d2696cecdcce26ad"
         }
       ],
-      "confirmedAt": "2026-09-21T07:42:05.499Z"
+      "confirmedAt": "2026-09-21T19:18:05.455Z"
     },
     {
       "topic": "groups",
@@ -591,7 +591,7 @@
         {
           "path": "apps/server/src/domains/group-scenario.ts",
           "why": "«Сценарий»: шаги → скилл, триггер-хук, негодное выражение",
-          "sha": "14e55d497ca36b27"
+          "sha": "30d48183d8903303"
         },
         {
           "path": "apps/server/src/domains/group-activation.ts",
@@ -619,7 +619,7 @@
           "sha": "c6cb58bbc8938a4e"
         }
       ],
-      "confirmedAt": "2026-09-18T11:08:11.688Z"
+      "confirmedAt": "2026-09-21T19:18:05.664Z"
     },
     {
       "topic": "skills",
@@ -1022,7 +1022,7 @@
     {
       "topic": "dlp",
       "document": "apps/web/src/pages/Help/topics/DlpTopic.tsx",
-      "confirmedAt": "2026-09-18T11:08:09.682Z",
+      "confirmedAt": "2026-09-21T16:07:17.287Z",
       "sources": [
         {
           "path": "apps/server/src/domains/dlp/DlpProxy.ts",
@@ -1057,7 +1057,7 @@
         {
           "path": "apps/server/src/domains/prompt-gate.ts",
           "why": "«Где лежит»: скрипт прошлой версии против правленного руками, пересборка",
-          "sha": "f48bd25960c88779"
+          "sha": "02d4290d4114585d"
         }
       ]
     },
@@ -1244,6 +1244,53 @@
         }
       ],
       "confirmedAt": "2026-09-19T11:56:00.432Z"
+    },
+    {
+      "topic": "portability",
+      "document": "apps/web/src/pages/Help/topics/PortabilityTopic.tsx",
+      "sources": [
+        {
+          "path": "apps/server/src/domains/portability/fidelity.ts",
+          "why": "«Пять уровней верности»: какой уровень получает запись и по какой причине",
+          "sha": "6b2471af9289a468"
+        },
+        {
+          "path": "apps/server/src/domains/portability/plan.ts",
+          "why": "«План: что именно изменится в файлах»: исходы записей, счётчики и дифф по файлу",
+          "sha": "6203dc6ded9c0d55"
+        },
+        {
+          "path": "apps/server/src/domains/portability/apply.ts",
+          "why": "«Применено — и отменяется целиком»: резервная копия перед записью, откат, файлы, тронутые после переноса",
+          "sha": "7fa705f84865821a"
+        },
+        {
+          "path": "apps/server/src/domains/portability/subscribe.ts",
+          "why": "«Подписка и правка руками»: состояния записей, удержание тронутого файла, три исхода расхождения",
+          "sha": "cbc55007bfcb5391"
+        },
+        {
+          "path": "packages/contracts/src/portable-subscribe.ts",
+          "why": "Слова, которыми документ разговаривает о подписке: слои, состояния, исходы, канон панели",
+          "sha": "ce4285669dda076e"
+        },
+        {
+          "path": "apps/server/src/routes/portability-routes.ts",
+          "why": "Порядок шагов обоих путей: план до применения, отпечаток плана, маршруты расхождений",
+          "sha": "b72855b0e848e748"
+        },
+        {
+          "path": "apps/server/src/domains/portability/carry-context.ts",
+          "why": "Перенос незакрытой работы: что именно переезжает, предохранители с причинами, обе ленты",
+          "sha": "39357afa9e0f4e5f"
+        },
+        {
+          "path": "apps/server/src/routes/portability-carry-routes.ts",
+          "why": "Кто попадает в список кандидатов, у кого заводится разговор и куда ложится заметка",
+          "sha": "b56f3780a0257e2e"
+        }
+      ],
+      "confirmedAt": "2026-09-21T19:44:07.202Z"
     }
   ]
 }

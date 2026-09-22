@@ -101,7 +101,9 @@ Two fields without which the list stays a wish:
   step is finished.
 - **the trigger** — a regular expression over the request text. A skill's description only offers
   itself to the model; the expression installs a `UserPromptSubmit` hook next to the skill that
-  brings the working order up by itself. The panel rejects an invalid expression.
+  brings the working order up by itself. A foreign CLI has no such event, and the panel plays the
+  same trigger by the same command inside its own run — there is no second copy of the rule, or the
+  scenario would fire differently depending on the provider. The panel rejects an invalid expression.
 
 The block is called “Working order” rather than “Scenarios” because on this same page “Scenarios”
 already means when-then automations.

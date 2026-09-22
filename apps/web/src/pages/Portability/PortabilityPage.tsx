@@ -25,6 +25,8 @@ import {
 import { PassportSection } from './PassportSection';
 import { FidelityTable } from './FidelityTable';
 import { TransferSection } from './TransferSection';
+import { SubscriptionSection } from './SubscriptionSection';
+import { CarrySection } from './CarrySection';
 import { ProbeSection } from './ProbeSection';
 import styles from './PortabilityPage.module.scss';
 
@@ -164,7 +166,11 @@ export function PortabilityPage() {
   if ((settingsFailed || providersFailed) && (!settings || !providers)) {
     return (
       <Stack gap="var(--spacing-md)">
-        <PageHeader title={t('portability.title')} subtitle={t('portability.subtitle')} />
+        <PageHeader
+          title={t('portability.title')}
+          subtitle={t('portability.subtitle')}
+          helpTopic="portability"
+        />
         <LoadErrorCard
           onRetry={() => {
             void refetchSettings();
@@ -215,7 +221,11 @@ export function PortabilityPage() {
 
   return (
     <Stack gap="var(--spacing-md)">
-      <PageHeader title={t('portability.title')} subtitle={t('portability.subtitle')} />
+      <PageHeader
+        title={t('portability.title')}
+        subtitle={t('portability.subtitle')}
+        helpTopic="portability"
+      />
 
       <Card padding="md">
         <Stack gap="var(--spacing-sm)">
@@ -313,6 +323,26 @@ export function PortabilityPage() {
           level={level}
         />
       )}
+
+      {/* Подписка — ПОД разовым переносом: сначала человек учится переносить
+          один раз и видит, что из этого выходит, и только потом решает, держать
+          ли цель согласованной дальше. Порядок здесь — порядок разговора, а не
+          порядок появления тикетов. */}
+      {target && levelReady && (
+        <SubscriptionSection
+          source={providerId}
+          target={target}
+          targetName={targetName}
+          level={level}
+        />
+      )}
+
+      {/* Перенос незакрытой работы (П6.1) — ПОД переносом среды и подпиской, и
+          цели у них разные: среда едет в выбранную цель, работа — к АКТИВНОМУ
+          CLI. Раздел называет свою цель сам и не зависит от выбора выше, чтобы
+          эта разница не читалась как одно и то же решение. Цели переноса среды
+          он не ждёт: незакрытые разговоры есть и когда цель не выбрана. */}
+      <CarrySection providers={options} />
 
       {/* Проба — ПОД переносом: она отвечает на вопрос «а доехало ли на самом
           деле», который возникает после применения. Стоять над ним она не может

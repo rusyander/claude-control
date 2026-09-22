@@ -39,6 +39,17 @@ export interface FileWriteResult {
 const CODEX_PREFIX = 'model_providers';
 const CODEX_ROOT_KEY = 'model_provider';
 
+/**
+ * Имя переменной, в которой codex ждёт ключ к записанному провайдеру.
+ *
+ * Вслух и на экспорт, потому что читателей у него двое: писатель контура ниже и
+ * приёмочная проба, поднимающая этот же CLI на заглушке
+ * (`portability/probe.ts`). Разойдись две копии — проба ставила бы ключ не в ту
+ * переменную и падала бы с отказом самого codex, а выглядело бы это дефектом
+ * переноса.
+ */
+export const CODEX_ENDPOINT_KEY_ENV = 'CONTOUR_API_KEY';
+
 function readFile(filePath: string): string {
   return existsSync(filePath) ? readFileSync(filePath, 'utf8') : '';
 }
@@ -104,6 +115,8 @@ export function applyCodexEndpoint(
   name: string,
   baseUrl: string,
   backupDir: string | undefined,
+  /** Ручка из каталога: значение обязано быть правдой о самом CLI. */
+  wireApi: 'chat' | 'responses',
 ): FileWriteResult {
   const original = readFile(filePath);
   const providers = codexProviders(original);
@@ -113,12 +126,15 @@ export function applyCodexEndpoint(
   providers[name] = {
     name: `Контур ${name}`,
     base_url: baseUrl,
-    // `chat` — тот самый OpenAI-совместимый путь `/chat/completions`, который
-    // шлюз и обслуживает.
-    wire_api: 'chat',
+    // Ручка приезжает из каталога, а не зашита здесь: `wire_api = "chat"`
+    // сегодняшний codex не принимает и с таким конфигом не стартует вовсе
+    // (живая проба 22.09.2026). Шлюз `/responses` пока не обслуживает, поэтому
+    // цель стоит прочерком и сюда не доходит, — но записанное значение обязано
+    // быть правдой о CLI, иначе врезка маршрута начнётся с молчаливого дефекта.
+    wire_api: wireApi,
     // Имя переменной, а не ключ: codex требует НЕПУСТОЕ значение в ней, ключ
     // подставляет шлюз, и заглушка живёт в окружении, а не в конфиге.
-    env_key: 'CONTOUR_API_KEY',
+    env_key: CODEX_ENDPOINT_KEY_ENV,
   };
 
   const backupPath = writeCodex(filePath, original, providers, name, backupDir);

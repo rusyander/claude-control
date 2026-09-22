@@ -54,7 +54,16 @@ export const codexProvider: ConfigProvider = {
   // `model_providers` в том же config.toml (его документация: провайдер
   // описывается блоком с `base_url`/`wire_api`, и выбирается корневым ключом
   // `model_provider`). Значит контур сюда переносится — но не через env.
-  endpointFile: { format: 'codex-toml', path: codexConfigToml, apiKind: 'openai-compat' },
+  endpointFile: {
+    format: 'codex-toml',
+    path: codexConfigToml,
+    apiKind: 'openai-compat',
+    // Ручка `/responses`, а не `/chat/completions`: `wire_api = "chat"` codex
+    // больше не принимает и с таким конфигом не стартует вовсе (живая проба
+    // 22.09.2026, `codex-cli 0.155.1`). Шлюз этот маршрут не обслуживает,
+    // поэтому целью контура codex сегодня не становится — см. `apply/targets.ts`.
+    wireApi: 'responses',
+  },
   // Детект «конфиг найден» (Ф7): каталог ~/.codex. Только проверка существования.
   configLocations: () => [codexHome()],
   // Ассистент Codex: API — OpenAI (ключ OPENAI_API_KEY), есть рабочий CLI (`codex`).

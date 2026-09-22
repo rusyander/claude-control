@@ -121,6 +121,31 @@
   box-shadow: inset 2px 0 0 var(--color-accent);
 }
 
+// Слои подписки: сетка переключателей, а не столбик. Видов записи двенадцать, и
+// столбиком они уводят кнопку «показать план» за нижний край экрана.
+.layers {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--spacing-2xs) var(--spacing-sm);
+}
+
+.layer {
+  display: flex;
+  gap: var(--spacing-2xs);
+  align-items: center;
+  cursor: pointer;
+  font-size: var(--font-size-body-sm);
+}
+
+// Карточка расхождения: своя рамка и отступ — это отдельный разговор про один
+// файл, а не ещё одна строка плана.
+.driftCard {
+  padding: var(--spacing-xs);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface-sunken);
+}
+
 // Строка файла плана: путь с метками слева, кнопка диффа справа.
 .fileRow {
   display: grid;
@@ -140,7 +165,7 @@
 .diff {
   max-height: 50vh;
   overflow: auto;
-  border-radius: var(--radius-md);
+  border-radius: 8px;
   background: var(--color-surface-sunken);
   font-family: var(--font-mono);
   font-size: var(--font-size-body-sm);
@@ -212,5 +237,21 @@
   .fileRow {
     grid-template-columns: minmax(0, 1fr);
     justify-items: start;
+  }
+}
+
+// Строка незакрытого разговора: слева название с каталогом и причиной отказа,
+// справа метки провайдера и времени. Та же сетка, что у строки плана, — обе
+// отвечают на вопрос «что это и откуда», и расходиться им незачем.
+.carryRow {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 1fr);
+  gap: var(--spacing-sm);
+  align-items: start;
+  padding: var(--spacing-2xs) var(--spacing-xs);
+  border-radius: 8px;
+
+  &:nth-child(odd) {
+    background: var(--color-surface-sunken);
   }
 }

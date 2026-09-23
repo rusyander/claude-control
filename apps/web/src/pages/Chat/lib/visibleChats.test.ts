@@ -21,6 +21,26 @@ const chat = (patch: Partial<ChatSummary> & { id: string }): ChatSummary => ({
 const PROJECT = 'c:/work/demo';
 
 describe('видимые чаты проекта', () => {
+  /**
+   * Чат, который «первая правка» увела в git-копию: ни связи разделения, ни
+   * своего каталога во вкладке. Без основной копии он не виден нигде.
+   */
+  it('чат в git-копии проекта виден во вкладке проекта', () => {
+    const rows = visibleChats(
+      [
+        chat({
+          id: 'в-копии',
+          projectPath: 'C:\\work\\demo-worktrees\\agent-x',
+          homeProjectPath: 'C:\\work\\demo',
+        }),
+        chat({ id: 'чужая-копия', projectPath: 'C:/w/x', homeProjectPath: 'C:/work/demo-admin' }),
+      ],
+      PROJECT,
+    );
+
+    expect(rows.map((row) => row.id)).toEqual(['в-копии']);
+  });
+
   it('без открытого проекта показывает только песочницу', () => {
     const rows = visibleChats([
       chat({ id: 'песочница', isSandbox: true }),

@@ -19,6 +19,7 @@ export {
   selectAwaitingChats,
   mergeAwaitingStatuses,
   mergeAwaitingProjectStatuses,
+  foldCopyStatuses,
 } from './model/awaiting';
 // Тип состояния потока определён в shared (см. @shared/lib/chat-stream); entity
 // его переэкспортирует как часть публичного API. Рантайм-путь чата — стор

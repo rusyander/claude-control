@@ -1,9 +1,11 @@
 import { useMemo } from 'react';
 import { useChatStatuses, useProjectStatuses, type RunStatus } from '@shared/lib/agent-runs';
 import {
+  foldCopyStatuses,
   mergeAwaitingProjectStatuses,
   mergeAwaitingStatuses,
   useAwaitingChats,
+  useChats,
 } from '@entities/Chat';
 
 export interface ChatDots {
@@ -25,14 +27,19 @@ export function useChatDots(): ChatDots {
   const liveProjectStatuses = useProjectStatuses();
   const liveChatStatuses = useChatStatuses();
   const awaitingChats = useAwaitingChats();
+  const { data: chats } = useChats();
 
   const chatStatuses = useMemo(
     () => mergeAwaitingStatuses(liveChatStatuses, awaitingChats),
     [liveChatStatuses, awaitingChats],
   );
   const projectStatuses = useMemo(
-    () => mergeAwaitingProjectStatuses(liveProjectStatuses, awaitingChats),
-    [liveProjectStatuses, awaitingChats],
+    () =>
+      mergeAwaitingProjectStatuses(
+        foldCopyStatuses(liveProjectStatuses, chats ?? []),
+        awaitingChats,
+      ),
+    [liveProjectStatuses, awaitingChats, chats],
   );
 
   return { chatStatuses, projectStatuses };

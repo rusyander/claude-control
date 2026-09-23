@@ -10,6 +10,7 @@ import { killChildTree } from '../../lib/process-tree.ts';
 import { defaultCliCommand } from '../../providers/cli.ts';
 import { TurnTracker } from './stream-usage.ts';
 import { userMemorySettings } from '../platform/layers.ts';
+import { LiveSession, type LiveSessionPool, type TurnOutcome } from './live-session.ts';
 
 /** Путь к мини-MCP-серверу прав рядом с этим модулем. */
 const PERMISSION_SERVER = fileURLToPath(new URL('./permission-prompt-server.mjs', import.meta.url));
@@ -139,10 +140,35 @@ export interface RunOptions {
    * хардкодится здесь, но значение то же (claude / claude.cmd).
    */
   command?: string;
+  /**
+   * Ход, начатый самим CLI живой сессии (см. `live-session.ts`): прогон не
+   * отправляет сообщения, а забирает уже идущий ход — фоновая задача агента
+   * кончилась, и CLI продолжил работу сам.
+   */
+  wake?: boolean;
+}
+
+/** Сборка запуска CLI: общая у разового прогона и живой сессии. */
+interface Launch {
+  command: string;
+  args: string[];
+  env: NodeJS.ProcessEnv;
+  runIdFile?: string;
 }
 
 export class ChatRun {
   private child: ChildProcessWithoutNullStreams | undefined;
+  /**
+   * Живые сессии разговоров. Есть — ход уходит в процесс, который переживает
+   * конец хода вместе с фоновыми командами агента; нет (песочница) — разовый
+   * `claude -p`, как прежде.
+   */
+  private readonly pool: LiveSessionPool | undefined;
+  private session: LiveSession | undefined;
+
+  constructor(pool?: LiveSessionPool) {
+    this.pool = pool;
+  }
   private isStopped = false;
   /**
    * Временная папка прогона: конфиг MCP для брокера прав и дописка к системному
@@ -160,7 +186,7 @@ export class ChatRun {
    * перезапуск сервера убивает, а CLI живёт дальше.
    */
   get pid(): number | undefined {
-    return this.child?.pid;
+    return this.session?.pid ?? this.child?.pid;
   }
 
   /** Запускает CLI и вызывает onEvent по мере поступления событий. */
@@ -178,9 +204,16 @@ export class ChatRun {
 
   private async run(options: RunOptions, onEvent: (event: ChatEvent) => void): Promise<void> {
     mkdirSync(options.cwd, { recursive: true });
+    if (this.pool) return this.runLive(options, onEvent, this.pool);
+    const { command, args, env } = this.prepare(options, onEvent, false);
+    return this.runOnce(options, onEvent, command, args, env);
+  }
 
+  private prepare(options: RunOptions, onEvent: (event: ChatEvent) => void, live: boolean): Launch {
     const args = [
       '-p',
+      // Живая сессия ждёт сообщения строками JSON в stdin и не выходит после хода.
+      ...(live ? ['--input-format', 'stream-json'] : []),
       '--output-format',
       'stream-json',
       '--verbose',
@@ -205,13 +238,7 @@ export class ChatRun {
     // сам, и узнать об этом было неоткуда. Грамматика намеренно уже, чем «похоже
     // на имя модели» (оболочка Windows считает командой `& | < > ^ " % ( ) ; , !`
     // и пробел), так что отбрасывать такое имя правильно, а молчать о нём — нет.
-    if (options.model && !model) {
-      onEvent({
-        kind: 'notice',
-        code: 'modelDropped',
-        text: `Имя модели «${options.model.slice(0, 80)}» не прошло проверку аргументов командной строки и до CLI не доехало: прогон идёт моделью, которую CLI выбрал сам. Имя из каталога контура обычно проходит — здесь в нём знак, который оболочка Windows приняла бы за команду.`,
-      });
-    }
+    this.modelNotice(options, onEvent);
     if (effort) args.push('--effort', effort);
 
     // Свой промпт контура — ВМЕСТО промпта CLI, и только файлом: текст
@@ -301,8 +328,15 @@ export class ChatRun {
     // вызов вернётся ошибкой `Answer questions?`. Поэтому брокер отклоняет его
     // сам и сразу (`QUESTION_DENIED`), а ответ человека едет следующим
     // сообщением — весь путь живёт на стороне панели (см. `QUESTION_PROMPT`).
+    let runIdFile: string | undefined;
     if (options.permissionPrompt && options.permissionMode !== 'bypassPermissions') {
       const mcpConfigPath = join(this.ensureTempDir(), 'mcp.json');
+      // Живая сессия переживает ходы, а ключ прогона у каждого хода свой: брокер
+      // читает его из файла, который сессия переписывает перед ходом.
+      if (live) {
+        runIdFile = join(this.ensureTempDir(), 'run-id.txt');
+        writeFileSync(runIdFile, options.permissionPrompt.runId, 'utf8');
+      }
       writeFileSync(
         mcpConfigPath,
         JSON.stringify({
@@ -316,6 +350,7 @@ export class ChatRun {
                 ...(options.permissionPrompt.tokenFile
                   ? { PERM_TOKEN_FILE: options.permissionPrompt.tokenFile }
                   : {}),
+                ...(runIdFile ? { PERM_RUN_ID_FILE: runIdFile } : {}),
               },
             },
           },
@@ -332,7 +367,144 @@ export class ChatRun {
     // Имя чата — обычный текст с пробелами, а оболочка Windows разобрала бы
     // его как несколько аргументов, поэтому аргументы квотируются.
     const command = options.command ?? defaultCliCommand();
-    const child = spawn(command, shellArgs(args), {
+    return { command, args: shellArgs(args), env, ...(runIdFile ? { runIdFile } : {}) };
+  }
+
+  /**
+   * Ход в живой сессии разговора. Свободный процесс с теми же параметрами —
+   * сообщение уходит в него; нет такого — поднимается новый (`--resume`, если
+   * разговор уже есть), и после хода остаётся ждать следующего.
+   */
+  private async runLive(
+    options: RunOptions,
+    onEvent: (event: ChatEvent) => void,
+    pool: LiveSessionPool,
+  ): Promise<void> {
+    const sessionId = safeSessionId(options.sessionId);
+    const runId = options.permissionPrompt?.runId;
+    const tracker = new TurnTracker();
+    let streamError = false;
+    const onRaw = (raw: RawEvent): void => {
+      for (const event of tracker.track(raw)) onEvent(event);
+      for (const event of translate(raw)) {
+        if (event.kind === 'error') streamError = true;
+        onEvent(event);
+      }
+    };
+
+    if (options.wake) {
+      const session = pool.waking(sessionId);
+      const claimed = session?.claimWake(runId, onRaw);
+      if (!session || !claimed) return;
+      this.session = session;
+      const outcome = await claimed;
+      this.settleLive(outcome, pool, session, onEvent, streamError, options.command);
+      return;
+    }
+
+    // Ход, начатый CLI, которого реестр не принял, — не повод поднимать второй
+    // процесс на тот же транскрипт: этот прогон сначала показывает его, потом
+    // отправляет сообщение человека.
+    const unclaimed = options.fork ? undefined : pool.waking(sessionId);
+    if (unclaimed?.alive && unclaimed.pendingWake) {
+      const claimed = unclaimed.claimWake(runId, onRaw);
+      if (claimed) {
+        this.session = unclaimed;
+        await claimed;
+        if (this.isStopped) return;
+      }
+    }
+
+    const launch = options.fork ? undefined : this.prepareSignature(options);
+    let session = launch ? pool.take(sessionId, launch) : undefined;
+    if (!session) {
+      const { command, args, env, runIdFile } = this.prepare(options, onEvent, true);
+      session = new LiveSession({
+        command,
+        args,
+        cwd: options.cwd,
+        env,
+        shell: isWindows,
+        signature: launch ?? `fork:${Date.now()}`,
+        ...(this.tempDir ? { tempDir: this.tempDir } : {}),
+        ...(runIdFile ? { runIdFile } : {}),
+      });
+      // Папка прогона теперь принадлежит процессу: уберёт её сессия, когда он закроется.
+      this.tempDir = undefined;
+    } else {
+      // Тот же отказ, что в `prepare`, — без нового процесса его некому сказать.
+      this.modelNotice(options, onEvent);
+    }
+    this.session = session;
+    const outcome = await session.turn(options.prompt, runId, onRaw);
+    this.settleLive(outcome, pool, session, onEvent, streamError, options.command);
+  }
+
+  /** Имя модели, не прошедшее грамматику, до CLI не доезжает — и молчать об этом нельзя. */
+  private modelNotice(options: RunOptions, onEvent: (event: ChatEvent) => void): void {
+    if (options.model && !safeModel(options.model)) {
+      onEvent({
+        kind: 'notice',
+        code: 'modelDropped',
+        text: `Имя модели «${options.model.slice(0, 80)}» не прошло проверку аргументов командной строки и до CLI не доехало: прогон идёт моделью, которую CLI выбрал сам. Имя из каталога контура обычно проходит — здесь в нём знак, который оболочка Windows приняла бы за команду.`,
+      });
+    }
+  }
+
+  /** Конец хода живой сессии: процесс жив — в пул, умер — причина в ленту. */
+  private settleLive(
+    outcome: TurnOutcome,
+    pool: LiveSessionPool,
+    session: LiveSession,
+    onEvent: (event: ChatEvent) => void,
+    streamError: boolean,
+    command: string | undefined,
+  ): void {
+    if (this.isStopped) return;
+    if (!outcome.closed) {
+      pool.keep(session);
+      return;
+    }
+    pool.forget(session);
+    const failure = exitFailure(command ?? defaultCliCommand(), outcome, streamError);
+    if (failure) onEvent(failure);
+  }
+
+  /**
+   * Подпись запуска: всё, что уходит в командную строку и окружение, кроме
+   * сообщения, имени чата и ключа прогона. Совпала — ход можно отдать живому
+   * процессу; нет — нужен новый (модель, права, дописка к промпту иначе не
+   * меняются).
+   */
+  private prepareSignature(options: RunOptions): string {
+    return JSON.stringify({
+      command: options.command ?? defaultCliCommand(),
+      cwd: options.cwd,
+      model: safeModel(options.model) ?? '',
+      effort: safeEffort(options.effort) ?? '',
+      permissionMode: options.permissionMode ?? 'acceptEdits',
+      configDir: options.configDir ?? '',
+      env: options.env ?? {},
+      platformEnv: options.platformEnv ?? {},
+      platformSystemPrompt: options.platformSystemPrompt?.trim() ?? '',
+      platformArgs: options.platformArgs ?? [],
+      append: options.platformDropAppend
+        ? ''
+        : (options.appendSystemPrompt?.replace(/[\r\n]+/g, ' ').trim() ?? ''),
+      broker: options.permissionPrompt
+        ? [options.permissionPrompt.baseUrl, options.permissionPrompt.tokenFile ?? '']
+        : [],
+    });
+  }
+
+  private async runOnce(
+    options: RunOptions,
+    onEvent: (event: ChatEvent) => void,
+    command: string,
+    args: string[],
+    env: NodeJS.ProcessEnv,
+  ): Promise<void> {
+    const child = spawn(command, args, {
       cwd: options.cwd,
       shell: isWindows,
       windowsHide: true,
@@ -396,21 +568,13 @@ export class ChatRun {
 
     const code = await closed;
 
-    if (!this.isStopped) {
-      if (spawnError) {
-        // Молчать нельзя: несуществующий CLI закрывает потоки мгновенно, и без
-        // этой ветки прогон выглядел бы как удачный, но пустой ответ.
-        onEvent({
-          kind: 'error',
-          message: `Не удалось запустить «${command}»: ${spawnError.message}`,
-        });
-      } else if (code !== 0 && !streamError) {
-        onEvent({
-          kind: 'error',
-          message: stderr.join('').trim() || `claude завершился с кодом ${code}`,
-        });
-      }
-    }
+    if (this.isStopped) return;
+    const failure = exitFailure(
+      command,
+      { spawnError, code, stderr: stderr.join('').trim() },
+      streamError,
+    );
+    if (failure) onEvent(failure);
   }
 
   /**
@@ -423,6 +587,12 @@ export class ChatRun {
   stop(): void {
     this.isStopped = true;
     if (this.child) killChildTree(this.child);
+    // Живую сессию — тоже деревом и из пула вон: «Остановить» гасит и фоновые
+    // команды агента, как гасил их разовый процесс.
+    if (this.session) {
+      this.pool?.forget(this.session);
+      this.session.kill();
+    }
     this.cleanup();
   }
 
@@ -442,6 +612,32 @@ export class ChatRun {
     }
     this.tempDir = undefined;
   }
+}
+
+/**
+ * Ошибка закрывшегося CLI для ленты — общая у разового прогона и живой сессии.
+ *
+ * Сбой запуска молчать не может: несуществующий CLI закрывает потоки мгновенно,
+ * и без этой ветки прогон выглядел бы как удачный, но пустой ответ. Причину,
+ * которую CLI уже назвал потоком (`result` с `is_error`), ненулевой код не
+ * затирает.
+ */
+function exitFailure(
+  command: string,
+  exit: { spawnError?: Error | undefined; code?: number | undefined; stderr: string },
+  streamError: boolean,
+): ChatEvent | undefined {
+  if (exit.spawnError) {
+    return {
+      kind: 'error',
+      message: `Не удалось запустить «${command}»: ${exit.spawnError.message}`,
+    };
+  }
+  if (exit.code === 0 || streamError) return undefined;
+  return {
+    kind: 'error',
+    message: exit.stderr || `claude завершился с кодом ${exit.code ?? '?'}`,
+  };
 }
 
 /**

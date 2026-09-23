@@ -42,7 +42,7 @@ export function registerChatRoutes(
    */
   session: ChatSession,
 ): void {
-  registerChatTranscriptRoutes(app, ctx);
+  registerChatTranscriptRoutes(app, ctx, (chatId) => registry.isProcessAlive(chatId));
   registerChatBrowseRoutes(app, ctx);
   registerChatRunRoutes(app, ctx, registry, session);
   registerChatArtifactRoutes(app, ctx);

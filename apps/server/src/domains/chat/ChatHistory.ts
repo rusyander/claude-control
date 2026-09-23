@@ -2,6 +2,7 @@ import { readdirSync, statSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ChatSummary, ChatMessage, ChatMessagesPage } from '@agentdeck/contracts';
 import { isSandboxPath } from './ChatArtifacts.ts';
+import { layoutForCwd } from '../project-git/copy-readiness.ts';
 import {
   FULL_READ_LIMIT,
   fileSessionId,
@@ -107,6 +108,9 @@ function readSummary(path: string, projectName: string): ChatSummary | undefined
     project: projectName,
     projectPath,
     isSandbox: Boolean(projectPath) && isSandboxPath(projectPath),
+    // Разговор в git-копии числится и за основной копией — по файлу `.git`
+    // копии, без запуска git: список перечитывается на каждое событие.
+    homeProjectPath: projectPath ? layoutForCwd(projectPath).mainDir : undefined,
     messageCount: countDialogMessages(records),
     // Большой файл прочитан началом и хвостом (см. readRecords) — значит
     // середина не сосчитана. Отдаём это признаком, а не выдаём частичное число

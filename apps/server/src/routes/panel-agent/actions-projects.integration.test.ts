@@ -37,20 +37,23 @@ const SESSION = 'fake-session-a4';
 /** Столько фальшивый CLI «работает» после имени сессии: действие обязано вернуться раньше. */
 const RUN_MS = 2500;
 
+// Потоковый ввод, как у живой сессии: сообщение хода — строка JSON, stdin
+// открыт до конца разговора, процесс уходит по его закрытию.
 const FAKE = `
 import { writeFileSync } from 'node:fs';
-const chunks = [];
-for await (const chunk of process.stdin) chunks.push(chunk);
-writeFileSync(process.env.CC_FAKE_DUMP, JSON.stringify({
-  argv: process.argv.slice(2),
-  cwd: process.cwd(),
-  stdin: Buffer.concat(chunks).toString('utf8'),
-}));
+import { createInterface } from 'node:readline';
 const out = (event) => process.stdout.write(JSON.stringify(event) + '\\n');
-out({ type: 'system', subtype: 'init', session_id: '${SESSION}', model: 'fake-model', tools: [] });
-setTimeout(() => {
-  out({ type: 'result', subtype: 'success', is_error: false, result: 'ok', session_id: '${SESSION}', total_cost_usd: 0, duration_ms: 1 });
-}, ${RUN_MS});
+for await (const line of createInterface({ input: process.stdin })) {
+  writeFileSync(process.env.CC_FAKE_DUMP, JSON.stringify({
+    argv: process.argv.slice(2),
+    cwd: process.cwd(),
+    stdin: line,
+  }));
+  out({ type: 'system', subtype: 'init', session_id: '${SESSION}', model: 'fake-model', tools: [] });
+  setTimeout(() => {
+    out({ type: 'result', subtype: 'success', is_error: false, result: 'ok', session_id: '${SESSION}', total_cost_usd: 0, duration_ms: 1 });
+  }, ${RUN_MS});
+}
 `;
 
 interface Dump {
@@ -71,6 +74,7 @@ describe('panel-agent actions: projects & chat', () => {
   let pending: PanelPendingActions;
   let gateway: PlatformGateway;
   let app: FastifyInstance;
+  let registry: ChatRunRegistry;
   const savedPath = process.env.PATH;
   const savedDump = process.env.CC_FAKE_DUMP;
   const chatKeys: string[] = [];
@@ -135,7 +139,7 @@ describe('panel-agent actions: projects & chat', () => {
       requiresToken: () => false,
       expectedToken: () => '',
     };
-    const registry = new ChatRunRegistry();
+    registry = new ChatRunRegistry();
     app = Fastify();
     registerAccessGate(app, access);
     registerEmptyBodyGuard(app);
@@ -152,6 +156,8 @@ describe('panel-agent actions: projects & chat', () => {
     pending.cancelAll();
     await gateway.stop();
     await app.close();
+    // Живая сессия не уходит с концом хода: закрываем её сами.
+    registry.stopAll();
     process.env.PATH = savedPath;
     if (savedDump === undefined) delete process.env.CC_FAKE_DUMP;
     else process.env.CC_FAKE_DUMP = savedDump;

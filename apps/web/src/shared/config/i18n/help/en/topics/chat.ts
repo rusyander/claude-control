@@ -106,7 +106,7 @@ export const chatEn: typeof chatRu = {
     storageTranscripts: 'Transcripts',
     storageTranscriptsValue: '~/.claude/projects/<project-path>/<sessionId>.jsonl',
     storageWhatRuns: 'What is launched',
-    storageWhatRunsValue: 'claude -p --output-format stream-json',
+    storageWhatRunsValue: 'claude -p --input-format stream-json --output-format stream-json',
     storageSandbox: 'Chats outside a project',
     storageSandboxValue: '~/.agentdeck/chats/<chat id>/',
     storageImages: 'Drawn images',
@@ -726,7 +726,14 @@ export const chatEn: typeof chatRu = {
       'several groups, the “same decision for the rest” toggle clears them at once. ' +
       'After the fixes a separate “Commit and push to the MR” button appears — the ' +
       'only write into someone else’s branch, and only on your click. The panel never ' +
-      'merges or closes an MR: merging stays with you.',
+      'merges or closes an MR: merging stays with you. ' +
+      'When there are two or more links and something has to be DONE in those MRs — ' +
+      'resolve conflicts, merge in the fresh main branch, fix review comments — the ' +
+      'agent also offers a split first, one chat per MR. Such a group is tagged “edits ' +
+      'in the MR” on the card, a review one “review, no edits”. The copy sits on the MR ' +
+      'branch the same way, but this is ordinary work: the agent edits and commits into ' +
+      'that branch, and pushes, comments or edits the MR description only after you ' +
+      'answer its question. “Do it here, one by one” keeps every MR in this conversation.',
     splitTree: 'Where the new chats are',
     splitTreeText:
       'In the list on the left, in the same tab: the chat the proposal came from, ' +
@@ -1185,7 +1192,9 @@ export const chatEn: typeof chatRu = {
     askSent: 'Sent — and it shows',
     askSentText:
       'Once sent, the card dims and says what became of the answer: “the agent is ' +
-      'thinking” or “queued — it will be sent when the agent finishes its turn”. The ' +
+      'thinking” or “queued — it will be sent when the agent finishes its turn”, and ' +
+      'once the answer has arrived and the agent carries on, a tick and “Answer ' +
+      'received”. The ' +
       'note appears on the click, not on the server reply: the agent answers in tens ' +
       'of seconds, and all that time it must be obvious the click went through. An ' +
       'answered question stays answered: switching tabs and reloading the page do ' +

@@ -15,6 +15,7 @@ import { markQuestionAnswered, useAnsweredQuestions } from '@shared/lib/agent-ru
 import { ContextSummarizedNote } from '@entities/Platform';
 import { parseQuestions } from '../lib/parseQuestions';
 import { questionKey } from '../lib/questionKey';
+import { taskNoticesOf } from '../lib/taskNotice';
 import { QuestionCard } from './QuestionCard';
 import { TaskSplitCard } from './TaskSplitCard';
 import { HandoffCard } from './HandoffCard';
@@ -24,6 +25,13 @@ import { PlanCard } from './PlanCard';
 import { MediaFeedCard } from './MediaFeedCard';
 import type { MessageBubbleProps } from './ChatMessages.types';
 import styles from './ChatMessages.module.scss';
+
+/** Статус фоновой команды из уведомления CLI → своя строка. */
+const TASK_NOTICE_LABEL: Record<string, string> = {
+  completed: 'chat.taskNotice.completed',
+  failed: 'chat.taskNotice.failed',
+  killed: 'chat.taskNotice.killed',
+};
 
 /**
  * Одно сообщение. Реплики человека выделены фоном, ответы модели идут во всю
@@ -78,6 +86,25 @@ export function MessageBubble({
 
   // Сколько вызовов разделили этот расход — говорим об этом в разбивке.
   const toolCount = message.blocks.filter((block) => block.type === 'tool').length;
+
+  // Уведомление CLI о фоновой команде — строка состояния, а не пузырь человека:
+  // ни копировать, ни «изменить и отправить» здесь нечего.
+  const notices = useMemo(() => taskNoticesOf(message), [message]);
+  if (notices) {
+    return (
+      <div className={styles.row}>
+        <div className={styles.taskNotice} role="status">
+          {notices.map((notice, index) => (
+            <div key={index} className={styles.taskNoticeLine}>
+              <Icon name={notice.status === 'completed' ? 'check' : 'warning'} size={16} />
+              <span>{t(TASK_NOTICE_LABEL[notice.status] ?? 'chat.taskNotice.other')}</span>
+              {notice.summary && <span className={styles.taskNoticeSummary}>{notice.summary}</span>}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`${styles.row} ${isUser ? styles.rowUser : ''}`}>
@@ -336,6 +363,8 @@ export function MessageBubble({
                     }
                     busy={isRunning}
                     isAnswered={answered.has(key)}
+                    // Закрыт вопрос репликой человека — значит, ответ дошёл.
+                    isDelivered={!isQuestionOpen && !isLast}
                   />
                   {spend}
                 </div>

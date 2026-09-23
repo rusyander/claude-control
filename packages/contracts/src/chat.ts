@@ -21,6 +21,15 @@ export const chatSummarySchema = object({
    * проект, и трогать его без разрешения нельзя.
    */
   isSandbox: boolean(),
+  /**
+   * Основная копия репозитория, когда разговор идёт в его git-копии (worktree).
+   *
+   * Копия лежит в другом каталоге, и по одному `projectPath` разговор не попадал
+   * ни в одну вкладку: ни в проект (не его каталог), ни в копию (вкладки под неё
+   * никто не открывал). Так терялся чат, который «первая правка» перевела в
+   * копию, — он шёл, а найти его в списке было нельзя даже после F5.
+   */
+  homeProjectPath: string().optional(),
   messageCount: number(),
   /**
    * Счётчик неполный: у транскрипта больше 4 МБ список читает только начало и
@@ -291,13 +300,55 @@ export const progressAgentSchema = object({
 
 export type ProgressAgent = Infer<typeof progressAgentSchema>;
 
+/**
+ * Фоновая команда агента: `run_in_background` или команда, которую инструмент
+ * сам увёл в фон по таймауту. Процесс CLI в панели живёт один ход и убивает
+ * свой фон с концом хода — без этой строки человек видел тишину и не знал,
+ * идёт ли работа.
+ */
+export const progressShellSchema = object({
+  /** Id вызова инструмента, запустившего команду. */
+  id: string(),
+  /** Первая строка команды — как её написал агент. */
+  command: string(),
+  /** Когда команда запущена (время записи в транскрипте). */
+  startedAt: string().optional(),
+  /**
+   * `running` — идёт или, если ход уже кончился, оборвана вместе с ним: это
+   * решает интерфейс по статусу прогона. `stopped` — CLI сам сообщил, что
+   * команда не дожила до конца прежнего процесса.
+   */
+  status: union([literal('running'), literal('done'), literal('failed'), literal('stopped')]),
+});
+
+export type ProgressShell = Infer<typeof progressShellSchema>;
+
+/** Вызов инструмента, который ещё не вернул результат, — «что агент делает сейчас». */
+export const progressActiveToolSchema = object({
+  name: string(),
+  /** Команда, путь или описание — первая строка того, чем вызван инструмент. */
+  summary: string(),
+  startedAt: string().optional(),
+});
+
+export type ProgressActiveTool = Infer<typeof progressActiveToolSchema>;
+
 export const chatProgressSchema = object({
   /** Чекпоинты последнего плана агента (перезаписывается каждым TodoWrite). */
   tasks: array(progressTaskSchema),
   /** Субагенты этого разговора в порядке запуска. */
   agents: array(progressAgentSchema),
+  /** Фоновые команды разговора в порядке запуска (последние несколько). */
+  shells: array(progressShellSchema).optional(),
+  /** Последний вызов без результата — идёт прямо сейчас, если прогон жив. */
+  activeTool: progressActiveToolSchema.optional(),
   /** Время последней записи в транскрипт, по которой собран прогресс. */
   updatedAt: string().optional(),
+  /**
+   * Жив ли процесс CLI разговора (идёт ход или ждёт следующего). Фон живёт с
+   * процессом, а не с ходом; нет процесса — числящийся идущим фон оборван.
+   */
+  processAlive: boolean().optional(),
 });
 
 export type ChatProgress = Infer<typeof chatProgressSchema>;

@@ -1,4 +1,4 @@
-import { reviewLinkPrompt } from '@agentdeck/contracts/model-cascade';
+import { mergeRequestWorkPreamble, reviewLinkPrompt } from '@agentdeck/contracts/model-cascade';
 import {
   buildGroupPrompt,
   environmentPreamble,
@@ -374,8 +374,11 @@ export async function splitTasks({
   );
 
   for (const [position, item] of prepared.entries()) {
-    const { index, group, branch, cwd, isWorktree, mirror, review } = item;
+    const { index, group, branch, cwd, isWorktree, mirror, review: target } = item;
     const bootstrap = bootstraps[position];
+    // Работа в MR (конфликты, замечания) ветку берёт у MR, а дальше — обычная
+    // группа: своё задание, свои стадии, без карточки решения по замечаниям.
+    const review = target && !group.review?.work ? target : undefined;
     // Ревью по ссылке (Т7) — другое задание и другая стадия: план группе,
     // которая ничего не делает, не нужен, а понижать её нечем (класс `review`
     // держится на потолке).
@@ -387,7 +390,13 @@ export async function splitTasks({
           tasks: group.tasks,
           ...(proposal.shared ? { shared: proposal.shared } : {}),
         })
-      : buildGroupPrompt(group, proposal.shared);
+      : target
+        ? `${mergeRequestWorkPreamble({
+            url: target.url,
+            ...(target.branch ? { branch: target.branch } : {}),
+            onMrBranch: target.onMrBranch,
+          })}\n\n${buildGroupPrompt(group, proposal.shared)}`
+        : buildGroupPrompt(group, proposal.shared);
     const groupStage = review ? 'work' : stage;
     // Копии — преамбула панели первым абзацем: что зазеркалено и установлено,
     // провал подготовки (с хвостом лога) и прямое «начинай с задачи». Группа в

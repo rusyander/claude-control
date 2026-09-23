@@ -19,6 +19,7 @@ import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { Toggle } from '@shared/ui/toggle';
+import { Badge } from '@shared/ui/badge';
 import type { TaskSplitCardProps } from './TaskSplitCard.types';
 import styles from './TaskSplitCard.module.scss';
 
@@ -170,14 +171,21 @@ export function TaskSplitCard({
                   решают тут по самому запросу на слияние, поэтому ссылка видна
                   целиком и до кнопки, а не после заведения чата. */}
               {group.review && (
-                <a
-                  className={styles.reviewLink}
-                  href={group.review.url}
-                  target="_blank"
-                  rel="noreferrer noopener"
-                >
-                  {group.review.url}
-                </a>
+                <Stack direction="row" align="center" gap="var(--spacing-2xs)" wrap>
+                  {/* Что чат сделает с MR: прочитает или будет в нём править. От
+                      этого зависит, можно ли его оставить без присмотра. */}
+                  <Badge tone={group.review.work ? 'warning' : 'info'}>
+                    {t(group.review.work ? 'chat.split.mrWork' : 'chat.split.mrReview')}
+                  </Badge>
+                  <a
+                    className={styles.reviewLink}
+                    href={group.review.url}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                  >
+                    {group.review.url}
+                  </a>
+                </Stack>
               )}
               {/* Единственный пункт, дословно повторяющий заголовок, — это разбор
                   подставил название вместо списка, которого модель не прислала.

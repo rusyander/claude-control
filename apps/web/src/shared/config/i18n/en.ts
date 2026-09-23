@@ -862,6 +862,8 @@ export const en: TranslationSchema = {
     split: {
       title: 'Split the tasks: {{count}} groups',
       apply: 'Split into {{count}} chats',
+      mrReview: 'review, no edits',
+      mrWork: 'edits in the MR',
       keepHere: 'Do it here, one by one',
       keepHerePrompt: 'Do not split — do everything here, one task at a time.',
       createOnly: 'Only create the chats, do not start the agents',
@@ -1144,6 +1146,19 @@ export const en: TranslationSchema = {
         done: 'done',
         failed: 'failed',
       },
+      now: 'Now: {{what}}',
+      shells: 'Background commands',
+      shellsRunning: 'In background: {{count}}',
+      shellsLost: 'Background lost: {{count}}',
+      shellsLostHint:
+        'A background command lives as long as the conversation’s CLI process. When that process is replaced — Stop, another model or permission mode, a panel restart, a long idle — the command goes with the old one. There will be no result; the agent sees this at the start of its next turn.',
+      shellStatus: {
+        running: 'running',
+        done: 'done',
+        failed: 'failed',
+        stopped: 'stopped',
+        lost: 'lost with the old process',
+      },
     },
     questionTitle: 'Your choice is needed',
     questionMulti: 'multiple choices allowed',
@@ -1158,6 +1173,8 @@ export const en: TranslationSchema = {
     questionOtherPlaceholder: 'Write what you actually need',
     questionOtherMine: 'your answer',
     questionSentNote: 'Answer sent — the agent is thinking',
+    questionDeliveredNote: 'Answer received — the agent carries on',
+    questionDeliveredToNote: 'Answer received in “{{title}}”',
     questionQueuedNote: 'Answer queued — it will be sent when the agent finishes its turn',
     questionSentToNote: 'Answer sent to “{{title}}” — the agent is thinking',
     questionQueuedToNote: 'Answer queued for “{{title}}” — it goes out at the end of the turn',
@@ -1227,6 +1244,12 @@ export const en: TranslationSchema = {
     platformLayersAll:
       'Through the "{{title}}" contour the run goes without a single layer of ours: no rules, no ' +
       'hooks, no permissions, no skills, no MCP servers, no addition from the panel.',
+    taskNotice: {
+      completed: 'Background command finished',
+      failed: 'Background command failed',
+      killed: 'Background command stopped',
+      other: 'Background task notification',
+    },
     copyMessage: 'Copy message',
     editMessage: 'Edit and send as a new branch',
     usage: {

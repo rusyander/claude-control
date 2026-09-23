@@ -95,6 +95,14 @@ export interface TaskSplitReview {
    * копия заведётся от не той ветки, и ревью прочитает чужой дифф.
    */
   branch?: string;
+  /**
+   * Группа не ревьюит MR, а РАБОТАЕТ в нём: конфликты, замечания ревьюера,
+   * rebase, описание. Копия та же — на ветке MR, — но задание обычное, правки
+   * разрешены, а карточки решения по замечаниям нет: замечаний никто не пишет.
+   * Без этого режима несколько MR «на фикс» не делились вовсе: ревью-группа
+   * обязана ничего не править, а обычная группа ветку MR не находит.
+   */
+  work?: boolean;
 }
 
 /** Что человек решил делать с замечаниями ревью (Т7). */
@@ -208,7 +216,18 @@ export const SPLIT_SYSTEM_PROMPT =
   'по группе на КАЖДУЮ ссылку, и одна ссылка тоже даёт разделение — правило про три задачи здесь не ' +
   'действует. У такой группы kind: "review", review: {"url":"ссылка целиком"}, title — заголовок MR ' +
   'или его номер, tasks — что именно проверить. Ветку MR и копию на ней заведёт панель по ссылке. ' +
-  'Если задачи связаны между собой или их меньше трёх — блока не выводи и работай как обычно.';
+  // Несколько MR на работу (конфликты, замечания, rebase) — второй такой
+  // случай: человек хочет видеть каждый MR своим чатом, а в одном разговоре
+  // они шли вперемешку и вслепую. Одну ссылку «на фикс» не делим — это и есть
+  // обычная работа в этом разговоре.
+  'Второй отдельный случай — ДВЕ и больше ссылок на разные MR/PR, с которыми надо что-то СДЕЛАТЬ ' +
+  '(решить конфликты, влить свежую основную ветку, поправить по замечаниям, обновить описание): ' +
+  'тоже предложи разделение, по группе на каждый MR, даже если задач меньше трёх, — человек выберет ' +
+  'в карточке, делить или делать всё здесь по очереди. У такой группы review: {"url":"ссылка ' +
+  'целиком","action":"work"}, kind — класс работы (не "review"), tasks — что сделать в этом MR. ' +
+  'Ревью и работа в одном сообщении — разные группы с action "review" и "work". ' +
+  'Кроме этих двух случаев со ссылками: если задачи связаны между собой или их меньше трёх — ' +
+  'блока не выводи и работай как обычно.';
 
 /** Строка нужной длины или undefined: пустое поле лучше пустой строки. */
 function text(value: unknown, limit: number): string | undefined {
@@ -349,7 +368,11 @@ function reviewOf(group: Record<string, unknown>): TaskSplitReview | undefined {
   if (!url || !(url.startsWith('http://') || url.startsWith('https://'))) return undefined;
 
   const branch = text(source.branch ?? source.sourceBranch ?? source.source_branch, MAX_BRANCH);
-  return { url, ...(branch ? { branch } : {}) };
+  // Режим — только явным полем. По классу его не угадываем: ревью со своим
+  // классом (`design`) законно, и догадка превратила бы чтение чужого MR в правку.
+  const action = text(source.action ?? source.mode ?? group.action ?? group.mode, MAX_ASSIGNMENT);
+  const work = Boolean(action && action.toLowerCase() !== 'review');
+  return { url, ...(branch ? { branch } : {}), ...(work ? { work } : {}) };
 }
 
 /**
@@ -416,7 +439,7 @@ export function parseSplitProposal(raw: unknown): TaskSplitProposal | undefined 
       // Ревью по ссылке — само по себе класс работы: без него группа уехала бы
       // на подобранную ступень, то есть проверяла бы чужой код моделью слабее
       // той, что его писала. Названный агентом класс при этом не трогаем.
-      ...(kind ? { kind } : review ? { kind: 'review' } : {}),
+      ...(kind ? { kind } : review && !review.work ? { kind: 'review' } : {}),
       ...(review ? { review } : {}),
       ...(model ? { model } : {}),
       ...(effort ? { effort } : {}),
@@ -427,7 +450,8 @@ export function parseSplitProposal(raw: unknown): TaskSplitProposal | undefined 
   // кнопкой «разделить на 1 чат» только сбивала бы с толку. Ревью по ссылке —
   // исключение, и единственное (Т7): один MR — это уже отдельная работа в своей
   // копии на его ветке, ради которой разговор человека прерывать не надо.
-  if (groups.length < 2 && !groups.some((group) => group.review)) return undefined;
+  if (groups.length < 2 && !groups.some((group) => group.review && !group.review.work))
+    return undefined;
   if (groups.length === 0) return undefined;
 
   const shared = textOrList(source.shared ?? source.context, MAX_SHARED);

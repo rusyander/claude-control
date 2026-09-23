@@ -115,3 +115,24 @@
   color: var(--color-fg-muted);
   scrollbar-width: thin;
 }
+
+/* Что идёт прямо сейчас — первой строкой развёрнутой панели. */
+.now {
+  margin: 0 0 var(--spacing-2xs);
+  font-weight: var(--font-weight-medium);
+}
+
+/* Команда — моноширинно и в одну строку: целиком она в подсказке. */
+.shellCommand {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+}
+
+.shellStatus {
+  flex-shrink: 0;
+}

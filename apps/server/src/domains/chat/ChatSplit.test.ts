@@ -783,3 +783,86 @@ describe('группа ревью по ссылке', () => {
     expect(linked.map((chat) => chat.stage)).toEqual(['work']);
   });
 });
+
+describe('работа в нескольких MR', () => {
+  const MR1 = 'https://gitlab.com/team/app/-/merge_requests/772';
+  const MR2 = 'https://gitlab.com/team/app/-/merge_requests/773';
+
+  it('два MR на работу — законное разделение, режим работы — явным action', () => {
+    const proposal = parseSplitProposal({
+      groups: [
+        { title: '!772', tasks: ['реши конфликты'], review: { url: MR1, action: 'work' } },
+        {
+          title: '!773',
+          tasks: ['поправь'],
+          mr: { url: MR2 },
+          action: 'work',
+          kind: 'implementation',
+        },
+      ],
+    });
+
+    expect(proposal?.groups.map((group) => group.review)).toEqual([
+      { url: MR1, work: true },
+      { url: MR2, work: true },
+    ]);
+    // Класс «ревью» работе в MR не навязывается: иначе она ушла бы в режим чтения.
+    expect(proposal?.groups[0]?.kind).toBeUndefined();
+  });
+
+  it('одна ссылка на работу — не разделение: это обычная работа в этом разговоре', () => {
+    expect(
+      parseSplitProposal({
+        groups: [
+          { title: '!772', tasks: ['реши конфликты'], review: { url: MR1, action: 'work' } },
+        ],
+      }),
+    ).toBeUndefined();
+  });
+
+  it('группа работы в MR: копия на ветке MR, задание с правками, без ревью-связи', async () => {
+    const git = fakeGit();
+    const started: { stage: string; prompt: string; review?: unknown }[] = [];
+    const linked: { review?: unknown }[] = [];
+
+    await splitTasks({
+      projectPath: '/repo',
+      proposal: {
+        groups: [
+          {
+            title: '!772',
+            branch: 'x',
+            tasks: ['реши конфликты с main'],
+            review: { url: MR1, work: true },
+          },
+          { title: '!773', branch: 'y', tasks: ['посмотри'], review: { url: MR2 } },
+        ],
+      },
+      startRuns: true,
+      git,
+      now: () => 1000,
+      stage: 'plan',
+      resolveReview: async (review) => ({
+        branch: review.url.endsWith('772') ? 'feat/a' : 'feat/b',
+      }),
+      link: (chat) => void linked.push({ review: chat.review }),
+      start: (input) => {
+        started.push({ stage: input.stage, prompt: input.prompt, review: input.review });
+        return true;
+      },
+    });
+
+    expect(git.added).toEqual(['feat/a', 'feat/b']);
+    const [work, review] = started;
+    expect(work?.prompt).toContain(`работает в запросе на слияние ${MR1}`);
+    expect(work?.prompt).toContain('реши конфликты с main');
+    expect(work?.prompt).not.toContain('НИЧЕГО НЕ ПРАВЬ');
+    // Работа идёт обычными стадиями и карточку решения по замечаниям не заводит.
+    expect(work?.stage).toBe('plan');
+    expect(work?.review).toBeUndefined();
+    expect(linked[0]?.review).toBeUndefined();
+    // Ревью соседнего MR — прежнее, только чтение.
+    expect(review?.prompt).toContain('НИЧЕГО НЕ ПРАВЬ');
+    expect(review?.review).toMatchObject({ url: MR2 });
+  });
+});

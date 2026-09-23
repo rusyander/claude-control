@@ -464,6 +464,11 @@
   margin-top: var(--spacing-sm);
 }
 
+.questionDelivered {
+  flex: none;
+  color: var(--color-success);
+}
+
 .questionSpinner {
   flex: none;
   width: 14px;
@@ -773,4 +778,30 @@
   flex: 1;
   height: 1px;
   background: var(--color-border);
+}
+
+// Уведомление CLI о фоновой команде: строка состояния на месте реплики, тем же
+// негромким видом, что и остальные строки ленты.
+.taskNotice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2xs);
+  max-width: min(var(--text-measure), 100%);
+  padding: var(--spacing-2xs) var(--spacing-xs);
+  border: 1px dashed var(--color-border);
+  border-radius: 8px;
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-caption);
+}
+
+.taskNoticeLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.taskNoticeSummary {
+  overflow-wrap: anywhere;
+  opacity: 0.8;
 }

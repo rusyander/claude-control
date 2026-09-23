@@ -212,6 +212,9 @@ export function useArtifacts(chatId: string | undefined) {
  * транскрипт, поэтому данные есть и у вчерашнего разговора, а не только у
  * открытой вкладки. Пока агент работает, перечитываем раз в несколько секунд:
  * CLI дописывает транскрипт по ходу дела, и план обновляется почти сразу.
+ *
+ * Между ходами — реже и только пока в фоне что-то идёт: процесс разговора
+ * живёт дальше, и фон может как кончиться, так и оборваться вместе с ним.
  */
 export function useChatProgress(chatId: string | undefined, isRunning: boolean) {
   return useQuery({
@@ -221,7 +224,14 @@ export function useChatProgress(chatId: string | undefined, isRunning: boolean) 
       return data;
     },
     enabled: Boolean(chatId),
-    refetchInterval: isRunning ? 4000 : false,
+    refetchInterval: (query) => {
+      if (isRunning) return 4000;
+      const data = query.state.data;
+      const backgroundAlive =
+        data?.processAlive === true &&
+        (data.shells ?? []).some((shell) => shell.status === 'running');
+      return backgroundAlive ? 15_000 : false;
+    },
   });
 }
 

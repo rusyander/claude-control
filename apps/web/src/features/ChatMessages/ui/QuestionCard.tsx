@@ -44,7 +44,14 @@ import styles from './ChatMessages.module.scss';
  * подписи — дальше он живёт как обычный вариант: его видно, его можно
  * переспросить, он уезжает тем же одним сообщением.
  */
-export function QuestionCard({ questions, onPick, busy, target, isAnswered }: QuestionCardProps) {
+export function QuestionCard({
+  questions,
+  onPick,
+  busy,
+  target,
+  isAnswered,
+  isDelivered,
+}: QuestionCardProps) {
   const { t } = useTranslation();
   const [picked, setPicked] = useState<PickedAnswers>({});
   // Открытое поле своего варианта и набранный в нём текст — по вопросам.
@@ -398,20 +405,31 @@ export function QuestionCard({ questions, onPick, busy, target, isAnswered }: Qu
           gap="var(--spacing-2xs)"
           className={styles.questionSentNote}
         >
-          <span className={styles.questionSpinner} />
+          {/* Дошедший ответ крутилку не держит: агент уже работает дальше, и
+              вечный спиннер читался как «ответ застрял». */}
+          {isDelivered ? (
+            <Icon name="check" size={14} className={styles.questionDelivered} />
+          ) : (
+            <span className={styles.questionSpinner} />
+          )}
           <Typography as="span" variant="body-sm" color="muted">
             {/* Ответ на вопрос ребёнка уходит в ЕГО разговор: без имени
                 человек, ответивший шестерым, не помнит, кому именно. */}
             {target
-              ? t(isQueued ? 'chat.questionQueuedToNote' : 'chat.questionSentToNote', {
-                  title: target,
-                })
-              : t(isQueued ? 'chat.questionQueuedNote' : 'chat.questionSentNote')}
+              ? t(sentNoteKey(isDelivered, isQueued, true), { title: target })
+              : t(sentNoteKey(isDelivered, isQueued, false))}
           </Typography>
         </Stack>
       )}
     </div>
   );
+}
+
+/** Подпись под отправленным ответом: дошёл, ждёт очереди или только что ушёл. */
+function sentNoteKey(isDelivered: boolean | undefined, isQueued: boolean, hasTarget: boolean) {
+  if (isDelivered) return hasTarget ? 'chat.questionDeliveredToNote' : 'chat.questionDeliveredNote';
+  if (isQueued) return hasTarget ? 'chat.questionQueuedToNote' : 'chat.questionQueuedNote';
+  return hasTarget ? 'chat.questionSentToNote' : 'chat.questionSentNote';
 }
 
 /** Отвечен — свёрнут, текущий — активен, остальные погашены до своей очереди. */

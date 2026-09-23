@@ -23,6 +23,7 @@ import { BranchGateCard } from './BranchGateCard';
 import { ChildBlocks } from './ChildBlocks';
 import { ReviewDecisionCard } from './ReviewDecisionCard';
 import { waitsDecision } from '../lib/reviewWaiting';
+import { taskNoticesOf } from '../lib/taskNotice';
 import { FeedNotices } from './FeedNotices';
 import { QueuedBubbles } from './QueuedBubbles';
 import { RunTimer } from './RunTimer';
@@ -124,7 +125,8 @@ export function ChatMessages({
     for (let index = messages.length - 1; index >= 0; index -= 1) {
       const message = messages[index];
       if (!message) continue;
-      if (message.role === 'user') return undefined;
+      // Уведомление CLI о фоне пишется от имени человека, но ответом не является.
+      if (message.role === 'user' && !taskNoticesOf(message)) return undefined;
       if (message.blocks.some((block) => block.type === 'tool' && block.name === 'AskUserQuestion'))
         return index;
     }

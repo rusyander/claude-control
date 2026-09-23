@@ -4,9 +4,12 @@ import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Icon } from '@shared/ui/icon';
 import { Badge } from '@shared/ui/badge';
-import { summarizeProgress } from '../model/progressView';
+import { formatDuration } from '@shared/lib/format-duration';
+import { elapsedMs, summarizeProgress } from '../model/progressView';
+import { useNow } from '../model/useNow';
 import { TaskRow } from './TaskRow';
 import { AgentRow } from './AgentRow';
+import { ShellRow } from './ShellRow';
 import type { ChatProgressSheetProps } from './ChatProgressSheet.types';
 import styles from './ChatProgressSheet.module.scss';
 
@@ -21,13 +24,27 @@ import styles from './ChatProgressSheet.module.scss';
  * Когда агент раздаёт работу субагентам, их видно тут же веткой ниже: кто
  * запущен, с какой задачей, чем кончил. Иначе про оркестрацию известно только
  * то, что «что-то идёт».
+ *
+ * Ниже плана — что идёт прямо сейчас и что увели в фон, с таймером. Двадцать
+ * минут тишины без этой строки не отличить от зависания, а фоновая команда,
+ * умершая вместе с процессом разговора, выглядела бы идущей.
  */
-export function ChatProgressSheet({ progress, isRunning }: ChatProgressSheetProps) {
+export function ChatProgressSheet({ progress, isRunning = false }: ChatProgressSheetProps) {
   const { t } = useTranslation();
   const [isOpen, setOpen] = useState(false);
-  const summary = summarizeProgress(progress);
+  const summary = summarizeProgress(progress, isRunning);
+  const now = useNow(isRunning && (Boolean(summary.activeTool) || summary.shellsRunning > 0));
 
   if (!summary.hasAnything) return null;
+
+  const active = summary.activeTool;
+  const activeElapsed = active ? elapsedMs(active.startedAt, now) : undefined;
+  const activeLine = active
+    ? [active.name, active.summary, activeElapsed !== undefined && formatDuration(activeElapsed, t)]
+        .filter(Boolean)
+        .join(' · ')
+    : undefined;
+  const shells = progress?.shells ?? [];
 
   return (
     <div className={styles.sheet} data-chat-progress>
@@ -43,9 +60,11 @@ export function ChatProgressSheet({ progress, isRunning }: ChatProgressSheetProp
           {t('chat.progress.title')}
         </Typography>
 
-        <Badge tone={summary.done === summary.total ? 'success' : 'info'}>
-          {t('chat.progress.count', { done: summary.done, total: summary.total })}
-        </Badge>
+        {summary.total > 0 && (
+          <Badge tone={summary.done === summary.total ? 'success' : 'info'}>
+            {t('chat.progress.count', { done: summary.done, total: summary.total })}
+          </Badge>
+        )}
 
         {summary.agentsTotal > 0 && (
           <Badge tone={summary.agentsRunning > 0 ? 'warning' : 'neutral'}>
@@ -53,15 +72,34 @@ export function ChatProgressSheet({ progress, isRunning }: ChatProgressSheetProp
           </Badge>
         )}
 
+        {summary.shellsRunning > 0 && (
+          <Badge tone="warning">
+            {t('chat.progress.shellsRunning', { count: summary.shellsRunning })}
+          </Badge>
+        )}
+
+        {summary.shellsLost > 0 && (
+          <Badge tone="danger">
+            {t('chat.progress.shellsLost', { count: summary.shellsLost })}
+          </Badge>
+        )}
+
         {/* Текущий шаг — прямо в свёрнутой полосе: чаще всего нужен именно он,
-            и ради одной строки открывать панель незачем. */}
+            и ради одной строки открывать панель незачем. Нет шага в плане —
+            показываем вызов, который идёт, с таймером. */}
         <Typography variant="caption" color="subtle" as="span" className={styles.current}>
-          {summary.current ?? (isRunning ? t('chat.progress.working') : '')}
+          {summary.current ?? activeLine ?? (isRunning ? t('chat.progress.working') : '')}
         </Typography>
       </button>
 
       {isOpen && (
         <div className={styles.body}>
+          {activeLine && (
+            <Typography variant="body-sm" as="p" className={styles.now}>
+              {t('chat.progress.now', { what: activeLine })}
+            </Typography>
+          )}
+
           {progress?.tasks.length ? (
             <ul className={styles.tasks}>
               {progress.tasks.map((task, index) => (
@@ -84,6 +122,32 @@ export function ChatProgressSheet({ progress, isRunning }: ChatProgressSheetProp
                   <AgentRow key={agent.id} agent={agent} />
                 ))}
               </ul>
+            </Stack>
+          )}
+
+          {shells.length > 0 && (
+            <Stack gap="var(--spacing-2xs)" marginTop="var(--spacing-sm)">
+              <Typography variant="caption" color="subtle" as="span">
+                {t('chat.progress.shells')}
+              </Typography>
+              <ul className={styles.tree}>
+                {shells.map((shell) => (
+                  <ShellRow
+                    key={shell.id}
+                    shell={shell}
+                    isRunning={isRunning}
+                    {...(progress?.processAlive !== undefined
+                      ? { processAlive: progress.processAlive }
+                      : {})}
+                    now={now}
+                  />
+                ))}
+              </ul>
+              {summary.shellsLost > 0 && (
+                <Typography variant="caption" color="subtle" as="p">
+                  {t('chat.progress.shellsLostHint')}
+                </Typography>
+              )}
             </Stack>
           )}
         </div>

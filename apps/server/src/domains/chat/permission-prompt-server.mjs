@@ -32,6 +32,10 @@ import { request as httpRequest } from 'node:http';
 import { request as httpsRequest } from 'node:https';
 
 const RUN_ID = process.env.PERM_RUN_ID ?? '';
+// Живая сессия (один процесс CLI на разговор) переживает несколько ходов, а
+// каждый ход реестр заводит под своим ключом: ключ из окружения застыл бы на
+// первом. Файл переписывается на каждом ходе и читается на каждом запросе.
+const RUN_ID_FILE = process.env.PERM_RUN_ID_FILE ?? '';
 const BASE_URL = process.env.PERM_BASE_URL ?? '';
 const TOKEN_FILE = process.env.PERM_TOKEN_FILE ?? '';
 
@@ -111,15 +115,26 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
  * любой статус, любое решение — не повторяется никогда: отказ человека и
  * «прогон не в реестре» окончательны.
  */
+/** Ключ прогона на момент запроса: файл живой сессии, иначе окружение. */
+function currentRunId() {
+  if (!RUN_ID_FILE) return RUN_ID;
+  try {
+    return readFileSync(RUN_ID_FILE, 'utf8').trim() || RUN_ID;
+  } catch {
+    return RUN_ID;
+  }
+}
+
 async function askUser(args) {
-  if (!BASE_URL || !RUN_ID) {
+  const runId = currentRunId();
+  if (!BASE_URL || !runId) {
     return {
       behavior: 'deny',
       message: 'Некому подтвердить разрешение (нет связи с приложением).',
     };
   }
   const body = {
-    runId: RUN_ID,
+    runId,
     toolName: args.tool_name,
     input: args.input ?? {},
     toolUseId: args.tool_use_id ?? '',

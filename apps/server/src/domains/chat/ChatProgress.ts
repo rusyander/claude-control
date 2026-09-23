@@ -1,4 +1,10 @@
-import type { ChatProgress, ProgressTask, ProgressAgent } from '@agentdeck/contracts';
+import type {
+  ChatProgress,
+  ProgressTask,
+  ProgressAgent,
+  ProgressShell,
+  ProgressActiveTool,
+} from '@agentdeck/contracts';
 import {
   findTranscript,
   readTranscriptRecords,
@@ -33,20 +39,128 @@ export function readChatProgress(projectsDir: string, chatId: string): ChatProgr
 export function buildProgress(records: TranscriptRecord[]): ChatProgress {
   let tasks: ProgressTask[] = [];
   const agents = new Map<string, ProgressAgent>();
+  const shells = new Shells();
   let updatedAt: string | undefined;
 
   for (const record of records) {
     const content = record.message?.content;
-    if (!Array.isArray(content)) continue;
     if (record.timestamp) updatedAt = record.timestamp;
+    // Итог фоновой команды приходит отдельной репликой-уведомлением, строкой.
+    if (typeof content === 'string') {
+      shells.notice(content);
+      continue;
+    }
+    if (!Array.isArray(content)) continue;
 
     for (const block of content) {
-      if (block.type === 'tool_use') applyToolUse(block, agents, (next) => (tasks = next));
-      if (block.type === 'tool_result') applyToolResult(block, agents);
+      if (block.type === 'tool_use') {
+        applyToolUse(block, agents, (next) => (tasks = next));
+        shells.use(block, record.timestamp);
+      }
+      if (block.type === 'tool_result') {
+        applyToolResult(block, agents);
+        shells.result(block, resultText(block));
+      }
+      if (block.type === 'text' && record.type === 'user' && typeof block.text === 'string')
+        shells.notice(block.text);
     }
   }
 
-  return { tasks, agents: [...agents.values()], updatedAt };
+  const listed = shells.list();
+  return {
+    tasks,
+    agents: [...agents.values()],
+    ...(listed.length > 0 ? { shells: listed } : {}),
+    ...(shells.active ? { activeTool: shells.active } : {}),
+    updatedAt,
+  };
+}
+
+/** Сколько фоновых команд держать в панели: хвост, а не история разговора. */
+const SHELL_LIMIT = 8;
+
+/** Что агент увёл в фон и чем это кончилось, плюс вызов, который идёт сейчас. */
+class Shells {
+  private readonly byUse = new Map<string, ProgressShell>();
+  /** id фоновой задачи CLI → id вызова, который её завёл. */
+  private readonly byTask = new Map<string, string>();
+  private readonly pending = new Map<string, ProgressActiveTool>();
+  private readonly commands = new Map<string, string>();
+
+  use(block: TranscriptBlock, at: string | undefined): void {
+    if (!block.id || !block.name) return;
+    const input = (block.input ?? {}) as Record<string, unknown>;
+    const summary = toolSummary(input);
+    this.pending.set(block.id, { name: block.name, summary, ...(at ? { startedAt: at } : {}) });
+    if (block.name !== 'Bash') return;
+    // В строке фона нужна сама команда: описание «Install deps» не скажет,
+    // что именно висит двадцать минут.
+    const command = typeof input.command === 'string' ? firstLine(input.command) : summary;
+    this.commands.set(block.id, command);
+    if (input.run_in_background === true) {
+      this.byUse.set(block.id, {
+        id: block.id,
+        command,
+        ...(at ? { startedAt: at } : {}),
+        status: 'running',
+      });
+    }
+  }
+
+  result(block: TranscriptBlock, text: string): void {
+    const id = block.tool_use_id;
+    if (!id) return;
+    const started = this.pending.get(id);
+    this.pending.delete(id);
+    // Вызов, уведённый в фон, ответил распиской с id задачи: сам он кончился, а
+    // команда живёт дальше — и по таймауту тоже, хотя агент фон не просил.
+    const task = /(?:background with ID|background \(ID):\s*([\w-]+)/i.exec(text)?.[1];
+    if (!task) return;
+    this.byTask.set(task, id);
+    if (!this.byUse.has(id)) {
+      this.byUse.set(id, {
+        id,
+        command: this.commands.get(id) ?? '',
+        ...(started?.startedAt ? { startedAt: started.startedAt } : {}),
+        status: 'running',
+      });
+    }
+  }
+
+  /** `<task-notification>` — итог фоновой задачи, пришедший репликой. */
+  notice(text: string): void {
+    if (!text.includes('<task-notification>')) return;
+    const task = /<task-id>([^<]+)<\/task-id>/.exec(text)?.[1]?.trim();
+    const status = /<status>([^<]+)<\/status>/.exec(text)?.[1]?.trim();
+    const id = task ? this.byTask.get(task) : undefined;
+    const shell = id ? this.byUse.get(id) : undefined;
+    if (!id || !shell) return;
+    this.byUse.set(id, { ...shell, status: shellStatus(status) });
+  }
+
+  list(): ProgressShell[] {
+    return [...this.byUse.values()].slice(-SHELL_LIMIT);
+  }
+
+  /** Последний вызов без результата. Параллельных бывает несколько — важен свежий. */
+  get active(): ProgressActiveTool | undefined {
+    return [...this.pending.values()].at(-1);
+  }
+}
+
+function shellStatus(status: string | undefined): ProgressShell['status'] {
+  if (status === 'completed') return 'done';
+  if (status === 'failed') return 'failed';
+  return 'stopped';
+}
+
+/** Чем вызван инструмент — одной строкой: команда, путь, шаблон или описание. */
+function toolSummary(input: Record<string, unknown>): string {
+  for (const key of ['description', 'command', 'file_path', 'pattern', 'path', 'url', 'prompt']) {
+    const value = input[key];
+    if (typeof value === 'string' && value.trim()) return firstLine(value);
+  }
+  return '';
 }
 
 function applyToolUse(

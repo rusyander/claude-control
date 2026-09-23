@@ -14,7 +14,12 @@ import { sendConditional } from '../../lib/conditional-get.ts';
 import { projectsDir } from './paths.ts';
 
 /** Список разговоров, поиск по ним и чтение самой переписки — только чтение. */
-export function registerChatTranscriptRoutes(app: FastifyInstance, ctx: ServerContext): void {
+export function registerChatTranscriptRoutes(
+  app: FastifyInstance,
+  ctx: ServerContext,
+  /** Жив ли процесс CLI разговора — от него зависит, жив ли его фон. */
+  isProcessAlive: (chatId: string) => boolean = () => false,
+): void {
   // Тарифы достаёт слой маршрутов: кэш прайса и свои цены пользователя видны
   // только отсюда. Отдаём функцию, а не снимок, — правка цен подхватывается
   // следующим же запросом.
@@ -141,9 +146,12 @@ export function registerChatTranscriptRoutes(app: FastifyInstance, ctx: ServerCo
    * Прогресс агента: чекпоинты его собственного плана и дерево субагентов.
    * Только чтение — план принадлежит агенту, панель его не правит.
    */
-  app.get<{ Params: { chatId: string } }>('/api/chat/:chatId/progress', (request) =>
-    readChatProgress(projectsDir(ctx), request.params.chatId),
-  );
+  app.get<{ Params: { chatId: string } }>('/api/chat/:chatId/progress', (request) => {
+    const progress = readChatProgress(projectsDir(ctx), request.params.chatId);
+    // Фон в транскрипте числится идущим и после смерти процесса: уведомление об
+    // обрыве пишет только СЛЕДУЮЩИЙ процесс. Правду знает реестр.
+    return { ...progress, processAlive: isProcessAlive(request.params.chatId) };
+  });
 
   /**
    * Выгрузка разговора файлом — Markdown или JSON. Собирается из всей переписки

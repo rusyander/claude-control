@@ -20,6 +20,10 @@ describe('строка инициатив для прогона', () => {
     expect(bare).toContain('AskUserQuestion');
     expect(bare).toContain('Answer questions?');
     expect(bare).toContain('отказ панели');
+    // Фон переживает ход, но не смену процесса — нужное сейчас агент ждёт в том же ходе.
+    expect(bare).toContain('run_in_background');
+    expect(bare).toContain('живёт между ходами');
+    expect(bare).toContain('жди в том же ходе');
     expect(bare).not.toContain('agentdeck:split');
     expect(bare).not.toContain('agentdeck:handoff');
     expect(bare).not.toMatch(/[\r\n]/);

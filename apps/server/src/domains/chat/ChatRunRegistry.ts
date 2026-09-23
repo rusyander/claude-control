@@ -6,6 +6,7 @@ import type { PlatformRunConsumer } from '@agentdeck/contracts/platform-consumer
 import type { PlatformRunRoute } from '../platform/routing.ts';
 import { ChatRun, type ChatEvent, type RunOptions } from './ChatRunner.ts';
 import { DetachedRun, type DetachedRunDeps } from './detached-run.ts';
+import { LiveSessionPool } from './live-session.ts';
 import { looksLikeCheck } from './lowered-journal.ts';
 import {
   adoptableEntries,
@@ -292,6 +293,20 @@ export class ChatRunRegistry {
    * спрашивают и после (см. `resolveKey`).
    */
   private readonly retired = new Map<string, string>();
+  /**
+   * Живые процессы разговоров (см. `live-session.ts`): после хода CLI не
+   * выходит, и фоновые команды агента доживают до конца.
+   */
+  readonly livePool = new LiveSessionPool();
+  /**
+   * Чем продолжать разговор, когда CLI начал ход сам: ключ, параметры и мета
+   * последнего хода по `sessionId`. Прогон к этому времени давно вышел из
+   * буфера, а ход, начатый CLI, обязан попасть в ленту тем же разговором.
+   */
+  private readonly wakeable = new Map<
+    string,
+    { chatId: string; options: RunOptions; meta: RunMeta }
+  >();
 
   /** Накопленный за сеанс сервера расход — переживает перезагрузку вкладки. */
   private totalCostUsd = 0;
@@ -575,8 +590,27 @@ export class ChatRunRegistry {
    * Поле присваивается вручную: Node исполняет TypeScript в режиме strip-only
    * и parameter properties не поддерживает — с ними сервер не стартует вовсе.
    */
-  constructor(createRun: RunFactory = () => new ChatRun()) {
-    this.createRun = createRun;
+  constructor(createRun?: RunFactory) {
+    this.createRun = createRun ?? (() => new ChatRun(this.livePool));
+    this.livePool.onWake = (sessionId) => {
+      this.wake(sessionId);
+    };
+  }
+
+  /**
+   * Ход, начатый самим CLI живой сессии: фоновая задача агента кончилась, и
+   * агент продолжил работу без сообщения человека. Заводим под него обычный
+   * прогон того же разговора — вкладка узнает о нём опросом `/chat/active`.
+   * false — разговор неизвестен или занят: ход всё равно ляжет в транскрипт.
+   */
+  wake(sessionId: string): boolean {
+    const last = this.wakeable.get(sessionId);
+    if (!last) return false;
+    return this.start(
+      last.chatId,
+      { ...last.options, sessionId, prompt: '', wake: true },
+      { ...last.meta, sessionId },
+    );
   }
 
   /**
@@ -627,6 +661,16 @@ export class ChatRunRegistry {
       meta: { ...run.meta },
       ...(run.sessionId ? { sessionId: run.sessionId } : {}),
     };
+  }
+
+  /**
+   * Жив ли процесс CLI разговора: идёт прогон или ждёт следующего хода живая
+   * сессия. Нет — фоновые команды разговора умерли вместе с процессом.
+   */
+  isProcessAlive(chatId: string): boolean {
+    if (this.isRunning(chatId, chatId)) return true;
+    const sessionId = this.runs.get(this.resolveKey(chatId, chatId))?.sessionId ?? chatId;
+    return this.livePool.has(sessionId) || this.livePool.has(chatId);
   }
 
   isRunning(chatId: string, sessionId?: string): boolean {
@@ -890,6 +934,18 @@ export class ChatRunRegistry {
     run.finishedAt = Date.now();
     // Процесса больше нет — усыновлять после перезапуска нечего.
     this.ledger?.remove(run.chatId);
+    if (run.sessionId && !run.detached) {
+      this.wakeable.delete(run.sessionId);
+      this.wakeable.set(run.sessionId, {
+        chatId: run.chatId,
+        options: run.options,
+        meta: run.meta,
+      });
+      for (const key of this.wakeable.keys()) {
+        if (this.wakeable.size <= MAX_RETIRED) break;
+        this.wakeable.delete(key);
+      }
+    }
 
     // Продолжение в чистой сессии — ДО закрытия слушателей: событие о новом
     // разговоре должно уйти живой вкладке, а не только в буфер. Планировщик
@@ -1013,6 +1069,7 @@ export class ChatRunRegistry {
   /** Остановить все прогоны разом. */
   stopAll(): void {
     for (const chatId of [...this.runs.keys()]) this.stop(chatId);
+    this.livePool.closeAll();
   }
 
   /**

@@ -5,6 +5,7 @@ import {
   selectAwaitingChats,
   mergeAwaitingStatuses,
   mergeAwaitingProjectStatuses,
+  foldCopyStatuses,
 } from './awaiting';
 
 /**
@@ -74,16 +75,37 @@ describe('mergeAwaitingProjectStatuses', () => {
       chat('a', { awaitingReply: true, projectPath: 'C:/work/app' }),
     ]);
 
-    expect(merged.get('C:/work/app')).toBe('waiting');
+    // Ключ — как у id вкладки: сырой путь вкладка не ищет.
+    expect(merged.get('c:/work/app')).toBe('waiting');
+  });
+
+  it('путь транскрипта Windows находит вкладку', () => {
+    const merged = mergeAwaitingProjectStatuses(noRuns, [
+      chat('a', { awaitingReply: true, projectPath: 'C:\\work\\app\\' }),
+    ]);
+
+    expect(merged.get('c:/work/app')).toBe('waiting');
+  });
+
+  it('разговор в копии зажигает и вкладку основной копии', () => {
+    const merged = mergeAwaitingProjectStatuses(noRuns, [
+      chat('a', {
+        awaitingReply: true,
+        projectPath: 'C:\\work\\app-worktrees\\x',
+        homeProjectPath: 'C:\\work\\app',
+      }),
+    ]);
+
+    expect(merged.get('c:/work/app')).toBe('waiting');
   });
 
   it('красную точку не понижает: упавший агент важнее висящего вопроса', () => {
-    const statuses = new Map<string, RunStatus>([['C:/work/app', 'error']]);
+    const statuses = new Map<string, RunStatus>([['c:/work/app', 'error']]);
     const merged = mergeAwaitingProjectStatuses(statuses, [
       chat('a', { awaitingReply: true, projectPath: 'C:/work/app' }),
     ]);
 
-    expect(merged.get('C:/work/app')).toBe('error');
+    expect(merged.get('c:/work/app')).toBe('error');
   });
 
   it('разговор без проекта таб не трогает', () => {
@@ -92,5 +114,31 @@ describe('mergeAwaitingProjectStatuses', () => {
     ]);
 
     expect(merged.size).toBe(0);
+  });
+});
+
+describe('foldCopyStatuses', () => {
+  const inCopy = chat('a', {
+    projectPath: 'C:\\work\\app-worktrees\\x',
+    homeProjectPath: 'C:\\work\\app',
+  });
+
+  it('работающий в копии агент зажигает вкладку основной копии', () => {
+    const statuses = new Map<string, RunStatus>([['c:/work/app-worktrees/x', 'running']]);
+
+    expect(foldCopyStatuses(statuses, [inCopy]).get('c:/work/app')).toBe('running');
+  });
+
+  it('тревогу основной копии не понижает', () => {
+    const statuses = new Map<string, RunStatus>([
+      ['c:/work/app', 'error'],
+      ['c:/work/app-worktrees/x', 'running'],
+    ]);
+
+    expect(foldCopyStatuses(statuses, [inCopy]).get('c:/work/app')).toBe('error');
+  });
+
+  it('копия без прогона вкладку не трогает', () => {
+    expect(foldCopyStatuses(new Map(), [inCopy]).size).toBe(0);
   });
 });

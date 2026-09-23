@@ -21,6 +21,10 @@ import { normalizeProjectPath } from '@shared/lib/workspace';
  * `widget-app-admin`, и проверка по одному префиксу утащила бы соседний проект
  * в чужую вкладку.
  *
+ * Разговор в git-копии проекта — тоже свой, даже без связи разделения: так
+ * живёт чат, который «первая правка» перевела в копию, и копия, заведённая
+ * руками. Основную копию сервер называет в `homeProjectPath`.
+ *
  * Копий может и не быть: в проекте без git разделение заводит чаты В ТОМ ЖЕ
  * каталоге, и тогда они уже отобраны как свои. Без проверки такой разговор
  * попадал в список ДВАЖДЫ — та же строка, тот же ключ React, а дерево под
@@ -39,7 +43,12 @@ function insideProject(chatPath: string | undefined, projectId: string): boolean
 
 export function visibleChats(all: ChatSummary[], activeProjectId?: string): ChatSummary[] {
   const own = activeProjectId
-    ? all.filter((chat) => !chat.isSandbox && insideProject(chat.projectPath, activeProjectId))
+    ? all.filter(
+        (chat) =>
+          !chat.isSandbox &&
+          (insideProject(chat.projectPath, activeProjectId) ||
+            insideProject(chat.homeProjectPath, activeProjectId)),
+      )
     : all.filter((chat) => chat.isSandbox);
 
   // Ветвь достраиваем ЦЕЛИКОМ, ярус за ярусом. Один ярус — это только прямые

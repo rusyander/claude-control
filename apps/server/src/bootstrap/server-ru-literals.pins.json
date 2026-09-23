@@ -48,7 +48,7 @@
     "why": "agent prompt / text the model reads"
   },
   "domains/chat/initiative.ts": {
-    "n": 12,
+    "n": 19,
     "why": "agent prompt / text the model reads"
   },
   "domains/chat/split-conveyor.ts": {

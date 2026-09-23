@@ -1,4 +1,9 @@
-import type { ChatProgress, ProgressAgent, ProgressTask } from '@agentdeck/contracts';
+import type {
+  ChatProgress,
+  ProgressAgent,
+  ProgressShell,
+  ProgressTask,
+} from '@agentdeck/contracts';
 
 export interface ChatProgressSheetProps {
   progress?: ChatProgress;
@@ -12,4 +17,14 @@ export interface TaskRowProps {
 
 export interface AgentRowProps {
   agent: ProgressAgent;
+}
+
+export interface ShellRowProps {
+  shell: ProgressShell;
+  /** Ход ещё идёт. */
+  isRunning: boolean;
+  /** Жив ли процесс CLI разговора: нет — «идущая» команда умерла вместе с ним. */
+  processAlive?: boolean;
+  /** Текущее время для таймера — один на всю панель. */
+  now: number;
 }

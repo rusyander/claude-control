@@ -220,7 +220,7 @@
         {
           "path": "apps/server/src/domains/chat/ChatSplit.ts",
           "why": "«Разделить»: карточка предложения, дерево, группы",
-          "sha": "1ed9c7be357fe045"
+          "sha": "bb2af599616f7a31"
         },
         {
           "path": "apps/server/src/domains/chat/split-conveyor.ts",
@@ -273,7 +273,7 @@
           "sha": "96807b82231b83be"
         }
       ],
-      "confirmedAt": "2026-09-21T15:06:18.822Z"
+      "confirmedAt": "2026-09-23T08:27:56.726Z"
     },
     {
       "topic": "tests",

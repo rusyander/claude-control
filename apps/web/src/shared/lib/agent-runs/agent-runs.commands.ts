@@ -159,6 +159,47 @@ export async function resumeActive(): Promise<void> {
         setRun(known, { tailOnly: true, status: 'idle', text: '', thinking: '' });
         rebuildStatuses();
         emit();
+        continue;
+      }
+      // Новый ход разговора, чей прошлый ход у нас уже закрыт: его начал не этот
+      // таб — сам CLI (кончилась фоновая задача агента), телефон или соседнее
+      // окно. Раньше такой прогон пропускался, раз ключ знаком, и лента молчала
+      // до перезагрузки. Новизну сверяем по серверному времени старта: ход,
+      // закрытый у нас на мгновение раньше, чем на сервере, начался не позже.
+      if (
+        run &&
+        run.status !== 'running' &&
+        !run.parked &&
+        !controllers.has(known) &&
+        info.status === 'running' &&
+        run.startedAt !== undefined &&
+        info.startedAt !== undefined &&
+        info.startedAt > run.startedAt
+      ) {
+        ensureWatchdog();
+        setRun(known, {
+          sessionId: info.sessionId ?? run.sessionId,
+          ...(info.chatId !== known ? { serverRunId: info.chatId } : {}),
+          startedAt: info.startedAt,
+          ...(info.model ? { model: info.model } : {}),
+          status: 'running',
+          tailOnly: undefined,
+          text: '',
+          thinking: '',
+          tools: [],
+          tokens: 0,
+          textUsage: undefined,
+          costUsd: undefined,
+          error: undefined,
+          askedQuestion: false,
+          permissions: [],
+          stalled: undefined,
+          lastEventAt: Date.now(),
+          parked: true,
+          ...(info.detached ? { detached: true } : {}),
+        });
+        rebuildStatuses();
+        emit();
       }
       continue;
     }

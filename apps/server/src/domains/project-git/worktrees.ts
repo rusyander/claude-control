@@ -238,6 +238,13 @@ export async function addWorktree(
    * не с Claude Code, запись не заводится и не проверяется.
    */
   claudeJsonPath?: string,
+  /**
+   * Копия без своей ветки: `--detach` на этой ревизии, каталог — по имени
+   * `name` (плюс `dirName`, если задан). Нужна работе в MR, чья ветка уже стоит
+   * в другой копии: двух деревьев на одной ветке git не даёт, а заводить
+   * `<ветка>-2` от базы значит работать не на коде MR (Д2).
+   */
+  options?: { detachAt?: string; dirName?: string },
 ): Promise<{ path: string; output: string; mirror?: WorktreeMirrorReport }> {
   const info = await requireRepo(projectDir);
   if (info.unborn) {
@@ -253,7 +260,8 @@ export async function addWorktree(
   const main = list[0];
   if (!main) throw coded(new GitError('git не назвал ни одной рабочей копии'), 'git-no-worktrees');
 
-  const busy = list.find((item) => item.branch === value);
+  const detachAt = options?.detachAt?.trim();
+  const busy = detachAt ? undefined : list.find((item) => item.branch === value);
   if (busy) {
     throw busy.isMain
       ? coded(
@@ -268,7 +276,7 @@ export async function addWorktree(
         );
   }
 
-  const target = worktreeDirFor(main.path, value);
+  const target = worktreeDirFor(main.path, options?.dirName ?? value);
   if (list.some((item) => samePath(item.path, target))) {
     throw coded(
       new GitError(`Копия ${target} уже есть — откройте её вкладкой`),
@@ -284,14 +292,16 @@ export async function addWorktree(
     );
   }
 
-  const existed = info.branches.includes(value);
-  const args = existed
-    ? ['worktree', 'add', target, value]
-    : info.remote && info.remoteBranches.includes(value)
-      ? ['worktree', 'add', '--track', '-b', value, target, `${info.remote}/${value}`]
-      : base?.trim()
-        ? ['worktree', 'add', '-b', value, target, base.trim()]
-        : ['worktree', 'add', '-b', value, target];
+  const existed = Boolean(detachAt) || info.branches.includes(value);
+  const args = detachAt
+    ? ['worktree', 'add', '--detach', target, detachAt]
+    : existed
+      ? ['worktree', 'add', target, value]
+      : info.remote && info.remoteBranches.includes(value)
+        ? ['worktree', 'add', '--track', '-b', value, target, `${info.remote}/${value}`]
+        : base?.trim()
+          ? ['worktree', 'add', '-b', value, target, base.trim()]
+          : ['worktree', 'add', '-b', value, target];
 
   let out: string;
   try {

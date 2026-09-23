@@ -1,6 +1,7 @@
 import type { HandoffRefusal } from '@agentdeck/contracts/chat-handoff';
 import type { CascadeStage } from '@agentdeck/contracts/model-cascade';
 import type { ServerMessageCode, ServerMessageParams } from '@agentdeck/contracts/server-messages';
+import type { BranchGateChild } from './ChatBranchGate.ts';
 
 /**
  * Словарь событий чата: что панель получает от CLI и что отдаёт интерфейсу.
@@ -70,6 +71,10 @@ export type ChatEvent =
       cwd: string;
       /** Имя ветки, предложенное панелью; человек правит его в карточке. */
       branch: string;
+      /** Работа разговора отдана группам разделения — им и передавать правку (Д15). */
+      children?: BranchGateChild[];
+      /** Копия отводится от ветки MR, на которой работают дети, а не от HEAD (Д15). */
+      base?: string;
     }
   /**
    * Заметка панели в ленту — про прогон, а не от агента. Сейчас два повода, оба
@@ -89,7 +94,8 @@ export type ChatEvent =
        * у исходного разговора это «работа ушла туда», у заведённого — «работа
        * пришла оттуда»;
        * 'modelDropped' — имя модели не прошло грамматику аргументов и до CLI не
-       * доехало: прогон идёт моделью, которую CLI выбрал сам.
+       * доехало: прогон идёт моделью, которую CLI выбрал сам;
+       * 'childTold' — родитель написал группам блоком `agentdeck:tell` (Д7).
        */
       code:
         | 'adopted'
@@ -100,7 +106,8 @@ export type ChatEvent =
         | 'overlap'
         | 'groupsActivated'
         | 'contextCarried'
-        | 'modelDropped';
+        | 'modelDropped'
+        | 'childTold';
       text: string;
       /**
        * Код самого текста — отдельно от `code`, который называет ПОВОД. Повод
@@ -175,6 +182,12 @@ export type ChatEvent =
       postError?: string;
       /** Правки кончились — панель предлагает отправить их в MR. */
       pushOffer?: boolean;
+      /** Ревью кончилось без блока итога: замечаний не знаем, карточка предлагает повтор (Д4). */
+      missing?: boolean;
+      /** Правки кончились, а копия не изменилась: отправлять нечего (Д8). */
+      noChanges?: boolean;
+      /** Правки есть, но push не предложен: ветка MR неизвестна (Д9). */
+      pushBlocked?: 'branch-unknown';
     };
 
 /** Счётчики расхода в том виде, в каком их пишет CLI (и модель). */

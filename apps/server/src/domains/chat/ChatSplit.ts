@@ -1,6 +1,7 @@
 import { mergeRequestWorkPreamble, reviewLinkPrompt } from '@agentdeck/contracts/model-cascade';
 import {
   buildGroupPrompt,
+  deliveryPreamble,
   environmentPreamble,
   // Приведение имени ветки живёт в контрактах: по нему же панель узнаёт, что
   // предложение уже разделено, и второй реализации быть не должно.
@@ -15,11 +16,14 @@ import {
 import type { CascadePlan } from '@agentdeck/contracts/model-cascade';
 import type { WorktreeBootstrapState, WorktreeMirrorSettings } from '@agentdeck/contracts';
 import {
+  addMergeRequestWorktree,
   addWorktree,
   describeMirror,
   isGitRepo,
   listWorktrees,
   readProjectGit,
+  resolveMergeRequestBranch,
+  type MergeRequestBranch,
 } from '../project-git.ts';
 
 /**
@@ -67,6 +71,23 @@ export interface SplitGit {
    * `undefined` — команды нет. Провал — состояние, не исключение.
    */
   bootstrap?(dir: string, copy: string): Promise<WorktreeBootstrapState | undefined>;
+  /**
+   * Ветка MR у самого git, без форджа (Д2): голова MR и ветки удалённого.
+   * Нет метода — такого git нет (тест), и в дело идёт ветка из блока как есть.
+   */
+  resolveMergeRequest?(
+    dir: string,
+    url: string,
+    hints: readonly string[],
+  ): Promise<MergeRequestBranch | undefined>;
+  /**
+   * Копия ровно на ветке MR, без суффикса; занятая ветка — копия в detached
+   * HEAD на удалённой ветке (`detached: true`).
+   */
+  addMergeRequestWorktree?(
+    dir: string,
+    target: MergeRequestBranch,
+  ): Promise<SplitCopy & { detached: boolean }>;
 }
 
 /**
@@ -94,6 +115,15 @@ export function makeSplitGit(
       const created = await addWorktree(dir, branch, mirrorFor(dir), base, claudeJsonPath);
       return {
         path: created.path,
+        ...(created.mirror ? { mirror: describeMirror(created.mirror) } : {}),
+      };
+    },
+    resolveMergeRequest: resolveMergeRequestBranch,
+    async addMergeRequestWorktree(dir, target) {
+      const created = await addMergeRequestWorktree(dir, target, mirrorFor(dir), claudeJsonPath);
+      return {
+        path: created.path,
+        detached: created.detached,
         ...(created.mirror ? { mirror: describeMirror(created.mirror) } : {}),
       };
     },
@@ -144,6 +174,13 @@ export interface SplitReviewTarget {
   url: string;
   branch?: string;
   onMrBranch: boolean;
+  /** Удалённый, на котором живёт ветка MR: туда и уходит push. */
+  remote?: string;
+  /**
+   * Ветка MR занята другой копией, и эта стоит в detached HEAD на
+   * `<remote>/<branch>`: коммитить можно, отправлять — `HEAD:<branch>`.
+   */
+  detached?: boolean;
 }
 
 /** Что группа, ждавшая своей очереди, знает о тех, кто работал раньше (Т1). */
@@ -234,6 +271,11 @@ export interface SplitTasksInput {
    * колбэк обязан вернуть `undefined`, а не бросить.
    */
   resolveReview?: (review: TaskSplitReview) => Promise<{ branch?: string } | undefined>;
+  /**
+   * Доводить группы до готового MR (настройка проекта). Ревью чужого MR по
+   * ссылке не доставляется: оно ничего не правит.
+   */
+  deliver?: boolean;
 }
 
 /**
@@ -247,7 +289,9 @@ export interface SplitTasksInput {
  */
 async function reviewTargetOf(
   review: TaskSplitReview,
-  resolve?: SplitTasksInput['resolveReview'],
+  hints: readonly string[],
+  resolve: SplitTasksInput['resolveReview'],
+  fromGit: ((hints: readonly string[]) => Promise<MergeRequestBranch | undefined>) | undefined,
 ): Promise<SplitReviewTarget> {
   let fromForge: string | undefined;
   try {
@@ -255,10 +299,31 @@ async function reviewTargetOf(
   } catch {
     fromForge = undefined;
   }
+  // Git спрашиваем и после форджа: он же и подтянет ветку, чтобы копия встала
+  // на свежую голову MR. Подсказки — ветка форджа, потом ветки из блока агента
+  // (он кладёт ветку MR то в `review.branch`, то в `branch` группы).
+  if (fromGit) {
+    let found: MergeRequestBranch | undefined;
+    try {
+      found = await fromGit([...(fromForge ? [fromForge] : []), ...hints]);
+    } catch {
+      found = undefined;
+    }
+    if (found) {
+      return {
+        url: review.url,
+        branch: found.branch,
+        onMrBranch: true,
+        ...(found.remote ? { remote: found.remote } : {}),
+      };
+    }
+  }
   // Ветку форджа берём КАК ЕСТЬ: она уже настоящее имя ветки, а приведение
   // срезало бы длинную и увело копию на ветку, которой в MR нет.
   if (fromForge) return { url: review.url, branch: fromForge, onMrBranch: true };
-  if (review.branch) {
+  // Ветке из блока верим только там, где проверить её нечем (нет git-а с
+  // удалённым): git, не нашедший её, сказал правду — это не ветка MR.
+  if (!fromGit && review.branch) {
     return { url: review.url, branch: safeBranchName(review.branch), onMrBranch: true };
   }
   return { url: review.url, onMrBranch: false };
@@ -293,6 +358,7 @@ export async function splitTasks({
   context,
   resolveReview,
   claimBranch,
+  deliver = false,
 }: SplitTasksInput): Promise<TaskSplitResult> {
   const chats: TaskSplitStarted[] = [];
   const failures: TaskSplitFailure[] = [];
@@ -328,7 +394,17 @@ export async function splitTasks({
     // Ревью-группа (Т7) ветку не выдумывает: её копия обязана стоять на ветке
     // MR, иначе читать нечего. Имя такой ветки суффиксом НЕ разводится — с
     // суффиксом это была бы другая ветка, то есть другой дифф.
-    const review = group.review ? await reviewTargetOf(group.review, resolveReview) : undefined;
+    const mr = group.review;
+    const review = mr
+      ? await reviewTargetOf(
+          mr,
+          [mr.branch, group.branch].filter((hint): hint is string => Boolean(hint)),
+          resolveReview,
+          isRepo && git.resolveMergeRequest
+            ? (hints) => git.resolveMergeRequest!(projectPath, mr.url, hints)
+            : undefined,
+        )
+      : undefined;
     const wanted = review?.branch ?? safeBranchName(group.branch);
     const exact = Boolean(review?.onMrBranch);
     const branch = isRepo && !exact ? freeBranchName(wanted, taken) : wanted;
@@ -339,7 +415,16 @@ export async function splitTasks({
 
     if (isRepo) {
       try {
-        const copy = await git.addWorktree(projectPath, branch, context?.base);
+        // Ветка MR — ровно она, без суффикса и без базы предшественников: занятая
+        // ветка даёт копию в detached HEAD на удалённой, а не `<ветка>-2` от main.
+        const copy: SplitCopy & { detached?: boolean } =
+          exact && review && git.addMergeRequestWorktree
+            ? await git.addMergeRequestWorktree(projectPath, {
+                branch,
+                ...(review.remote ? { remote: review.remote } : {}),
+              })
+            : await git.addWorktree(projectPath, branch, context?.base);
+        if (copy.detached && review) review.detached = true;
         cwd = copy.path;
         mirror = copy.mirror;
         isWorktree = true;
@@ -387,6 +472,8 @@ export async function splitTasks({
           url: review.url,
           ...(review.branch ? { branch: review.branch } : {}),
           onMrBranch: review.onMrBranch,
+          ...(review.detached ? { detached: true } : {}),
+          ...(review.remote ? { remote: review.remote } : {}),
           tasks: group.tasks,
           ...(proposal.shared ? { shared: proposal.shared } : {}),
         })
@@ -395,15 +482,21 @@ export async function splitTasks({
             url: target.url,
             ...(target.branch ? { branch: target.branch } : {}),
             onMrBranch: target.onMrBranch,
+            ...(target.detached ? { detached: true } : {}),
+            ...(target.remote ? { remote: target.remote } : {}),
           })}\n\n${buildGroupPrompt(group, proposal.shared)}`
         : buildGroupPrompt(group, proposal.shared);
+    const delivered =
+      deliver && !review
+        ? `${deliveryPreamble({ branch, ...(target ? { mergeRequest: target.url } : {}) })}\n\n${base}`
+        : base;
     const groupStage = review ? 'work' : stage;
     // Копии — преамбула панели первым абзацем: что зазеркалено и установлено,
     // провал подготовки (с хвостом лога) и прямое «начинай с задачи». Группа в
     // общем каталоге работает в окружении человека — ей преамбула не нужна.
     const prompt = isWorktree
-      ? `${environmentPreamble({ ...(mirror ? { mirror } : {}), ...(bootstrap ? { bootstrap } : {}) })}\n\n${base}`
-      : base;
+      ? `${environmentPreamble({ ...(mirror ? { mirror } : {}), ...(bootstrap ? { bootstrap } : {}) })}\n\n${delivered}`
+      : delivered;
 
     // Ключ чата — тот же временный вид, что и у разговора, начатого из панели:
     // настоящим id разговор станет, когда CLI выдаст сессию. Иначе вкладка
@@ -412,7 +505,9 @@ export async function splitTasks({
     // Чем делать эту группу — решается ОДИН раз и уходит сразу в связь, в
     // прогон и в ответ: три расчёта одного и того же разошлись бы, и человек
     // видел бы в карточке не то, что запустилось.
-    const assignment = assign?.(group, prompt, index);
+    // Ревью чужого MR — всегда на потолке, какой бы класс ни назвал агент (Д14:
+    // ревью !773 с `kind: "implementation"` ушло на sonnet при потолке opus).
+    const assignment = assign?.(review ? { ...group, kind: 'review' } : group, prompt, index);
     // Родство — ПЕРЕД запуском: прогон назовёт настоящий ключ сессии сам, и к
     // этому моменту переносить должно быть что (см. `SplitLink`).
     link?.({

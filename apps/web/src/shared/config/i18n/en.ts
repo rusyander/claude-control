@@ -871,6 +871,9 @@ export const en: TranslationSchema = {
       askFailed: 'Could not ask for a split',
       done: 'Chats created: {{count}}',
       alreadyDone: 'Already split: {{done}} of {{count}} groups became chats',
+      droppedGroups:
+        'Groups over the limit will not start: {{count}} — ask the agent to merge groups',
+      droppedTasks: 'Tasks dropped over the per-group limit: {{count}}',
       failed: '“{{title}}” was not created: {{message}}',
       failedAll: 'The split failed: {{message}}',
       notParsed:
@@ -980,9 +983,26 @@ export const en: TranslationSchema = {
         triageInterrupted: 'triage interrupted by a restart — the groups await your answer',
         repairs: 'repaired by the panel: {{count}}',
         pending: 'waiting for the triage',
+        queued: 'queued — starts when a slot frees up',
+        mr: 'MR !{{id}}',
         waiting: 'waiting for: {{names}}',
         held: 'waiting for your answer',
         holdAnswered: 'answered',
+        retries: 'turn retried by the panel: {{count}}',
+        result: {
+          reviewed: 'checked, nothing changed',
+          changed: 'changes made',
+          unchanged: 'no changes in the copy',
+          pushed: 'changes pushed',
+          commits: 'commits: {{count}}',
+        },
+        waitingFor: {
+          question: 'waiting for your answer',
+          decision: 'waiting for a review decision',
+          'review-missing': 'review without a result',
+          background: 'waiting for background work',
+          retry: 'waiting for a retry',
+        },
         failed: 'did not start: {{message}}',
         base: 'from branch {{branch}}',
         holdPlaceholder: 'The answer goes into the group’s plan and task',
@@ -996,6 +1016,16 @@ export const en: TranslationSchema = {
         releaseStarted: 'Group released — “{{title}}” is starting',
         releaseQueued: 'Group released, but it has not started yet — check its row',
         releaseFailed: 'Release failed: {{message}}',
+        cleanup: 'Remove the copy',
+        cleanupHint:
+          'The group is closed. The copy leaves the disk; the branch only if it is empty. A branch with its own work and an MR branch stay, and git will not give up uncommitted changes',
+        cleanupFailed: 'Could not remove the copy: {{message}}',
+        cleaned: {
+          deleted: 'Copy removed, the empty branch deleted',
+          kept: 'Copy removed, the branch with work kept',
+          mr: 'Copy removed, the panel leaves the MR branch alone',
+          none: 'Copy removed',
+        },
       },
       overlap: {
         idle: 'Branch overlap not checked',
@@ -1109,6 +1139,11 @@ export const en: TranslationSchema = {
       doneToast_many: 'Decision applied: {{count}} groups, comments posted: {{posted}}',
       doneToast_other: 'Decision applied: {{count}} groups, comments posted: {{posted}}',
       pushToast: 'Consent to commit and push sent to the agent',
+      missing:
+        'The review reply ended without a result block — the findings are unknown. This is not "no findings".',
+      retry: 'Ask for the review result again',
+      retryToast: 'The review was asked for its result in the same session',
+      pushBlocked: 'The fixes cannot be pushed to the MR: the MR branch is unknown',
       failed: 'Failed: {{message}}',
     },
     attach: 'Attach a file',
@@ -1198,6 +1233,13 @@ export const en: TranslationSchema = {
       stop: 'Do not edit',
       working: 'Creating the copy…',
       failed: 'The copy could not be created.',
+      handedTitle:
+        'The work of this conversation is already handed to groups — they edit the code:',
+      handedChild: '{{number}}. “{{title}}” — branch {{branch}}',
+      handedHint:
+        '“Hand to a group” declines the edit here, and the agent forwards it to the right group in its chat.',
+      base: 'The copy will branch from the groups’ MR branch: {{base}}',
+      handOff: 'Hand to a group',
     },
     permissionFromChild: 'Requested by “{{title}}”',
     permissionLost:
@@ -5576,7 +5618,15 @@ export const en: TranslationSchema = {
       bootstrapCommand: 'Command after creating a copy',
       bootstrapCommandPlaceholder: 'pnpm install --frozen-lockfile --prefer-offline',
       bootstrapCommandHint:
-        'Runs in the copy before the agent starts, 10-minute ceiling, through the system shell with CI=1. Empty — by the root lockfile: pnpm-lock.yaml → pnpm install --frozen-lockfile --prefer-offline, package-lock.json → npm ci, yarn.lock → yarn install --immutable; no lockfile — nothing',
+        'Runs in the copy before the agent starts, 10-minute ceiling, through the system shell with CI=1. Empty — by the root lockfile: pnpm-lock.yaml → pnpm install --frozen-lockfile --prefer-offline, package-lock.json → npm ci, yarn.lock → yarn install --immutable; none in the root — the same in each first-level folder (frontend/, web/…); no lockfile — nothing',
+      splitSettings: 'Splitting tasks into groups',
+      splitDeliver: 'Take each group to a ready MR',
+      splitDeliverHint:
+        'The group follows the project delivery skill: branch, checks, commit, push and MR — one group, one branch, one MR. The MR link shows up in the group summary',
+      splitParallel: 'Groups at once',
+      splitParallelHint: 'The rest wait in a queue and start as slots free up: 1 to {{max}}',
+      splitParallelInvalid: 'A whole number from 1 to {{max}}',
+      splitSaved: 'Split settings saved — they apply to the next group launch',
       bootstrapTitle: 'Copy preparation',
       bootstrap: {
         running: 'installing',

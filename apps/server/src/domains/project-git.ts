@@ -82,3 +82,11 @@ export {
   pullChanges,
   pushBranch,
 } from './project-git/write.ts';
+export {
+  addMergeRequestWorktree,
+  mergeRequestRef,
+  parseLsRemote,
+  pickMergeRequestBranch,
+  resolveMergeRequestBranch,
+  type MergeRequestBranch,
+} from './project-git/merge-request.ts';

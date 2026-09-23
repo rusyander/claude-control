@@ -27,7 +27,15 @@ beforeAll(() => {
 
 afterEach(() => {
   registry?.stopAll();
-  if (cwd) rmSync(cwd, { recursive: true, force: true });
+  // Убитый CLI отпускает папку не мгновенно: под нагрузкой Windows отвечает EPERM
+  // и дольше секунды повторов (полный прогон 23.09). Уборка временной папки — не
+  // предмет теста: не отпустилась — остаётся системе, а не роняет проверку.
+  if (!cwd) return;
+  try {
+    rmSync(cwd, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
+  } catch {
+    /* папку держит умирающий процесс */
+  }
 });
 
 function fresh(): void {

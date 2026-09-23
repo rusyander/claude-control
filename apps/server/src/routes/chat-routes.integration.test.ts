@@ -3,6 +3,7 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import type { ChatSummary } from '@agentdeck/contracts';
 import { AppStore } from '../lib/app-store.ts';
 import type { ServerContext } from '../context.ts';
 import { registerChatRoutes, isRetriableRunError } from './chat-routes.ts';
@@ -19,6 +20,7 @@ import { ChatSession } from '../domains/chat/ChatSession.ts';
 describe('маршруты чата: проекты и ФС', () => {
   let root: string;
   let app: FastifyInstance;
+  let store: AppStore;
 
   beforeEach(async () => {
     root = mkdtempSync(join(tmpdir(), 'cc-routes-'));
@@ -38,10 +40,8 @@ describe('маршруты чата: проекты и ФС', () => {
       }) + '\n',
     );
 
-    const ctx = {
-      location: { paths: { root } },
-      store: new AppStore(join(root, 'agentdeck')),
-    } as unknown as ServerContext;
+    store = new AppStore(join(root, 'agentdeck'));
+    const ctx = { location: { paths: { root } }, store } as unknown as ServerContext;
 
     app = Fastify();
     const empty = new ChatRunRegistry();
@@ -69,6 +69,25 @@ describe('маршруты чата: проекты и ФС', () => {
       expect(again.statusCode).toBe(304);
       expect(again.body).toBe('');
     }
+  });
+
+  it('GET /api/chats несёт из связи родителя, имя и НОМЕР группы — ключ строки хаба (Д12)', async () => {
+    store.setChatLink('sess', {
+      parentChatId: 'parent',
+      title: 'Форма',
+      groupIndex: 2,
+      stage: 'fix',
+      createdAt: '2026-07-18T10:00:00.000Z',
+    });
+
+    const chats = (await app.inject({ method: 'GET', url: '/api/chats' })).json<ChatSummary[]>();
+
+    expect(chats.find((chat) => chat.id === 'sess')).toMatchObject({
+      parentId: 'parent',
+      groupTitle: 'Форма',
+      groupIndex: 2,
+      stage: 'fix',
+    });
   });
 
   it('GET /api/chats/projects возвращает проект из истории', async () => {

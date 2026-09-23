@@ -38,6 +38,7 @@ import {
   gitWorktreeAddBodySchema,
   gitWorktreeBootstrapBodySchema,
   gitWorktreeMirrorBodySchema,
+  splitSettingsBodySchema,
   gitWorktreeRemoveBodySchema,
 } from '@agentdeck/contracts/request-bodies';
 import { codeOf } from '../lib/server-text.ts';
@@ -431,6 +432,24 @@ export function registerProjectGitRoutes(
       exclude: body.exclude,
       ...(body.bootstrap !== undefined ? { bootstrap: body.bootstrap } : {}),
     });
+  });
+
+  /** Разделение на проекте: доставка групп до MR и сколько их идёт разом. */
+  app.get<{ Querystring: { path?: string } }>(
+    '/api/project-git/split-settings',
+    async (request, reply) => {
+      const path = requirePath(request.query.path, reply);
+      if (!path) return reply;
+      return ctx.store.getSplitSettings(path);
+    },
+  );
+
+  app.put<{ Body: unknown }>('/api/project-git/split-settings', async (request, reply) => {
+    const body = parseBody(splitSettingsBodySchema, request.body, reply);
+    if (!body) return reply;
+    const path = requirePath(body.path, reply);
+    if (!path) return reply;
+    return ctx.store.setSplitSettings(path, { deliver: body.deliver, parallel: body.parallel });
   });
 
   /**

@@ -9,6 +9,7 @@ import { apiTokenPath } from '../../lib/api-token.ts';
 import { shouldAutoApprove, isReadOnlyTool } from '../../domains/chat/auto-approve.ts';
 import {
   BRANCH_GATE_STOPPED,
+  branchGateHandedDenial,
   branchContinuePrompt,
   branchMovedDenial,
   isMainWorkingCopy,
@@ -526,6 +527,9 @@ export function registerChatRunRoutes(
       // Имя ветки предлагаем по заданию прогона, а не по названию чата: задание
       // и есть то, ради чего ветку заводят, и в списке веток оно скажет больше.
       const branch = suggestBranchName(held.options.prompt, held.key);
+      // Работа разговора отдана группам (Д15): карточка говорит кому, а копия,
+      // если её всё же заведут, встанет на ветку MR детей, а не на HEAD.
+      const handed = registry.branchGateContext(runId);
       const shown = registry.emitExternal(runId, {
         kind: 'branchGate',
         toolName,
@@ -533,6 +537,8 @@ export function registerChatRunRoutes(
         toolUseId,
         cwd: held.options.cwd,
         branch,
+        ...(handed?.children.length ? { children: handed.children } : {}),
+        ...(handed?.base ? { base: handed.base } : {}),
       });
       if (shown) {
         const decision = await session.requestPermission({ runId, toolName, input, toolUseId });
@@ -634,11 +640,16 @@ export function registerChatRunRoutes(
         session.settleBranchGate(chatId);
         return { ok: session.decidePermission(chatId, toolUseId, { behavior: 'allow' }) };
       }
+      // Решение сверяется с деревом В МОМЕНТ ответа, а не со снимком карточки:
+      // между ними могли пройти часы, и клиенту база копии не доверяется.
+      const handed = registry.branchGateContext(chatId);
       if (choice === 'stop') {
         return {
           ok: session.decidePermission(chatId, toolUseId, {
             behavior: 'deny',
-            message: BRANCH_GATE_STOPPED,
+            message: handed?.children.length
+              ? branchGateHandedDenial(handed.children)
+              : BRANCH_GATE_STOPPED,
           }),
         };
       }
@@ -664,7 +675,7 @@ export function registerChatRunRoutes(
           held.options.cwd,
           name,
           ctx.store.getWorktreeMirror(held.options.cwd),
-          undefined,
+          handed?.base,
           ctx.location.paths.mcpConfig,
         );
       } catch (error) {

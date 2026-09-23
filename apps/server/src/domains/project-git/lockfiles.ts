@@ -22,6 +22,13 @@ export const LOCKFILES = [
 ] as const;
 
 /**
+ * Где искать: в корне и в каталогах первого уровня — там же, где бутстрап
+ * находит lock-файл (Д13). `*` в `:(glob)` не переходит через `/`, так что
+ * глубже первого уровня не смотрим.
+ */
+const LOCKFILE_PATHSPECS = LOCKFILES.flatMap((name) => [name, `:(glob)*/${name}`]);
+
+/**
  * Разбор `git status --porcelain -z`: путь и то, отслеживается ли файл.
  * Формат: два символа статуса, пробел, путь; переименования (`R`) в списке
  * lock-файлов не встречаются — их `git status` для явных путей не показывает.
@@ -41,7 +48,7 @@ export function parseChurn(stdout: string): Array<{ path: string; tracked: boole
 export async function revertLockfileChurn(dir: string): Promise<string[]> {
   let status: string;
   try {
-    status = await git(dir, ['status', '--porcelain', '-z', '--', ...LOCKFILES]);
+    status = await git(dir, ['status', '--porcelain', '-z', '--', ...LOCKFILE_PATHSPECS]);
   } catch {
     return [];
   }

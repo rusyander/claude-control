@@ -65,6 +65,19 @@ describe('collectForeignStages', () => {
     expect(rows.map((row) => row.title)).toEqual(['Механика', 'Вёрстка']);
   });
 
+  it('ключ — номер группы: две группы на одной ветке MR — две строки (Д12)', () => {
+    const rows = collectForeignStages(
+      tree({
+        nodes: [
+          node({ chatId: 'codex:c1', title: 'Ревью', branch: 'feature/mr', groupIndex: 0 }),
+          node({ chatId: 'codex:c2', title: 'Правки', branch: 'feature/mr', groupIndex: 1 }),
+        ],
+      }),
+    );
+
+    expect(rows.map((row) => row.title)).toEqual(['Ревью', 'Правки']);
+  });
+
   it('дерево на паузе — строки помечены остановленными', () => {
     const rows = collectForeignStages(
       tree({

@@ -11,6 +11,8 @@ export {
   useMirrorWorktree,
   useMirrorSettings,
   useSaveMirrorSettings,
+  useSplitSettings,
+  useSaveSplitSettings,
   useBootstrapWorktree,
   useWorktreeBootstrapLog,
   projectGitKey,

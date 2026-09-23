@@ -25,6 +25,12 @@ export const chatEn: Record<ChatMessageCode, string> = {
   'split-review-decision-unknown': 'Unknown decision',
   'split-review-decided': 'A decision on this review has already been made',
   'split-review-nothing-to-send': 'Nothing to send: there were no review fixes here',
+  'split-review-branch-unknown':
+    'The MR branch is unknown — a push would create a new branch instead of updating the MR',
+  'split-review-no-session': 'The conversation has not started yet — nothing to continue',
+  'split-review-busy': 'The chat is still working — wait for the turn to end',
+  'split-review-start-failed': 'The run could not start',
+  'split-review-not-missing': 'The review result is already in — nothing to repeat',
   'conversation-not-found': 'Conversation not found',
   'panel-help-query-empty': 'Empty help query.',
   'panel-card-click-only': 'A card decision is made only by a click in the panel window.',
@@ -49,5 +55,9 @@ export const chatEn: Record<ChatMessageCode, string> = {
     'The group is not waiting for an answer: there is no question or it was already answered',
   'split-release-not-waiting':
     'The group is not waiting for predecessors: there is nothing to release',
+  'split-cleanup-nothing':
+    'Nothing to clean up: the group is not closed, has no copy, or the copy is already gone',
+  'split-cleanup-shared':
+    'Another group still works in this copy — clean it up once that group closes too',
   'panel-agent-last-not-user': 'the last message must be from the human',
 };

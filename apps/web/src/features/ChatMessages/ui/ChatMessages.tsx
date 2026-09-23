@@ -70,6 +70,7 @@ export function ChatMessages({
   reviews,
   onReviewDecide,
   onReviewPush,
+  onReviewRetry,
   reviewBusy,
   onRetry,
   onContinue,
@@ -393,6 +394,7 @@ export function ChatMessages({
             }
             onDecide={onReviewDecide}
             {...(onReviewPush ? { onPush: onReviewPush } : {})}
+            {...(onReviewRetry ? { onRetry: onReviewRetry } : {})}
             {...(reviewBusy !== undefined ? { busy: reviewBusy } : {})}
           />
         ))}

@@ -5,7 +5,7 @@ import {
   type PredecessorNote,
 } from '@agentdeck/contracts/split-plan';
 import { safeBranchName, type TaskSplitResult } from '@agentdeck/contracts/task-split';
-import type { SplitPlanView } from '@agentdeck/contracts/chat-handoff';
+import type { SplitGroupCleaned, SplitPlanView } from '@agentdeck/contracts/chat-handoff';
 import type { ChatLink, SplitPlanRecord } from '../../lib/app-store/app-store.types.ts';
 import type { ChatEvent } from './ChatRunner.ts';
 import type { RunFinished } from './ChatRunRegistry.ts';
@@ -82,8 +82,29 @@ export interface SplitConveyorDeps {
    * остальное работает как раньше.
    */
   watchOverlap?: (parentChatId: string) => void;
+  /**
+   * Сколько групп разделения работает одновременно (настройка проекта). Не
+   * задан — без ограничения. Сверх него готовые группы ждут в очереди
+   * (`pending`) и стартуют, как только у работающей кончится ход.
+   */
+  parallel?: (record: SplitPlanRecord) => number;
   log: (message: string, error?: unknown) => void;
   now?: () => Date;
+}
+
+/** Что конец хода значит для группы (Д3). */
+export interface ChainOutcome {
+  status: 'done' | 'failed' | 'awaiting' | 'background';
+  waitingFor?: SplitPlanRecord['groups'][number]['waitingFor'];
+  /** Хвост ответа — строке группы в хабе (Д16). */
+  tail?: string;
+  /** Ссылка на MR, названная в ответе (доставка группы). */
+  mr?: string;
+  /** Что сделано по фактам копии (Д5). */
+  result?: SplitPlanRecord['groups'][number]['result'];
+  error?: string;
+  /** Сколько раз надзор уже повторил упавший ход группы (Д10). */
+  retries?: number;
 }
 
 export interface SplitBeginInput {
@@ -355,32 +376,107 @@ export class SplitConveyor {
   }
 
   /**
-   * Цепочка группы кончилась (работа → ревью → правки, либо оборвалась):
-   * отметить и запустить тех, кто её ждал. Зовётся планировщиком стадий там,
-   * где следующего звена нет; повторный вызов по той же ветке ничего не меняет.
+   * Ход звена группы кончился, и следующего звена нет. Что это значит для
+   * группы, решает `outcome` (Д3): явный итог (`done`), сбой (`failed`) или
+   * пауза, которая группу НЕ закрывает — вопрос человеку, решение по ревью,
+   * фоновая команда. Раньше любой конец хода был `done`: хаб писал «готово»,
+   * ждавшие группы стартовали от недоделанной ветки, а статус больше не менялся,
+   * даже когда человек продолжил ребёнка.
+   *
+   * Ждущих отпускают только `done` и `failed`. Закрытую группу конец хода не
+   * трогает: снова открывает её только новый прогон (`onChainResumed`).
    */
-  onChainEnded(link: ChatLink, ok: boolean): void {
-    if (!link.branch) return;
+  onChainEnded(link: ChatLink, outcome: ChainOutcome): void {
     const record = this.deps.store.get(link.parentChatId);
     if (!record) return;
-    const group = record.groups.find(
-      (item) => item.status === 'started' && item.branch === link.branch,
-    );
+    const group = this.groupOf(record, link, ['started', 'awaiting', 'background']);
     if (!group) return;
 
-    group.status = ok ? 'done' : 'failed';
-    group.doneAt = this.now().toISOString();
-    if (!ok) group.error = 'цепочка кончилась ошибкой или остановкой';
+    const at = this.now().toISOString();
+    group.status = outcome.status;
+    if (outcome.waitingFor) group.waitingFor = outcome.waitingFor;
+    else delete group.waitingFor;
+    if (outcome.tail) group.tail = outcome.tail;
+    // Ссылку не стираем ходом без неё: вопрос после создания MR MR не отменяет.
+    if (outcome.mr) group.mr = outcome.mr;
+    if (outcome.result) group.result = outcome.result;
+    if (outcome.retries) group.retries = outcome.retries;
+    if (outcome.status === 'failed') {
+      group.error = outcome.error ?? 'цепочка кончилась ошибкой или остановкой';
+    } else delete group.error;
+    const closed = outcome.status === 'done' || outcome.status === 'failed';
+    if (closed) group.doneAt = at;
+    else delete group.doneAt;
     this.deps.store.set(record);
+    if (!closed) {
+      // Группа ждёт человека и не работает — её место в очереди свободно.
+      // Ждавших её это не отпускает: они стоят до `done`/`failed`.
+      void this.launchNext(record).catch((error) => {
+        this.deps.log('split conveyor: launch from queue failed', error);
+      });
+      return;
+    }
 
     // Сверка веток (Т6) — до запуска ждавших: работа этой группы уже легла, и
     // считать её пересечения можно прямо сейчас. Оно асинхронное и отдельное:
     // ни один отказ git не должен помешать соседям стартовать.
     this.deps.watchOverlap?.(record.parentChatId);
 
-    void this.launchUnblocked(record).catch((error) => {
+    void this.launchNext(record).catch((error) => {
       this.deps.log('split conveyor: launch after chain end failed', error);
     });
+  }
+
+  /**
+   * Освободилось место: сперва дождавшиеся предшественников (их работа уже
+   * отстояла очередь раз), потом готовые из очереди.
+   */
+  private async launchNext(record: SplitPlanRecord): Promise<void> {
+    await this.launchUnblocked(record);
+    await this.launchReady(record);
+  }
+
+  /**
+   * В чате группы снова идёт прогон — человек ответил, продолжил ребёнка или
+   * панель повторила упавший ход: группа снова «работает» (Д3). Итог прошлого
+   * хода больше не правда; ждавших, уже отпущенных, это не возвращает.
+   *
+   * `chatId` — чат, в котором пошёл прогон: он и есть теперь чат группы. У
+   * группы с конвейером первым был чат ПЛАНА, и без этой записи слово родителя
+   * (Д7) и сводка ему (Д6) вели в план, а не в работу (живой прогон 23.09).
+   */
+  onChainResumed(link: ChatLink, chatId?: string): void {
+    const record = this.deps.store.get(link.parentChatId);
+    if (!record) return;
+    const group = this.groupOf(record, link, [
+      'started',
+      'awaiting',
+      'background',
+      'done',
+      'failed',
+    ]);
+    if (!group) return;
+    if (chatId) group.chatId = chatId;
+    group.status = 'started';
+    delete group.waitingFor;
+    delete group.doneAt;
+    delete group.error;
+    this.deps.store.set(record);
+  }
+
+  /** Запись группы по номеру из связи (Д12), у старых связей — по ветке. */
+  private groupOf(
+    record: SplitPlanRecord,
+    link: ChatLink,
+    statuses: readonly SplitPlanRecord['groups'][number]['status'][],
+  ): SplitPlanRecord['groups'][number] | undefined {
+    const fit = (item: SplitPlanRecord['groups'][number]) => statuses.includes(item.status);
+    if (typeof link.groupIndex === 'number') {
+      const byIndex = record.groups.find((item) => item.index === link.groupIndex);
+      if (byIndex) return fit(byIndex) ? byIndex : undefined;
+    }
+    if (!link.branch) return undefined;
+    return record.groups.find((item) => fit(item) && item.branch === link.branch);
   }
 
   /**
@@ -435,6 +531,57 @@ export class SplitConveyor {
     return this.launchUnblocked(record);
   }
 
+  /**
+   * Убрать копию закрытой группы (Д19) — только по кнопке человека: панель сама
+   * не удаляет ничего. Без этого копии копились десятками (в живом проекте — 30), и
+   * ветки `…-2`, заведённые впустую, висели на `main` годами.
+   *
+   * Git здесь, как и запуск, снаружи (`remove`): домен решает только, можно ли.
+   * Нельзя — группа не закрыта, копии нет или её уже убрали, и ещё одно: в той
+   * же копии живёт другая, не закрытая группа (ревью и правки MR делят копию).
+   */
+  async cleanup(
+    parentChatId: string,
+    index: number,
+    remove: (target: {
+      projectPath: string;
+      path: string;
+      branch: string;
+      chatId?: string;
+    }) => Promise<SplitGroupCleaned['branch']>,
+  ): Promise<SplitGroupCleaned> {
+    const record = this.deps.store.get(parentChatId);
+    const group = record?.groups[index];
+    const closed = (status: string): boolean => status === 'done' || status === 'failed';
+    if (!record || !group || !group.path || group.cleaned || !closed(group.status)) {
+      throw coded(
+        new Error('Убирать нечего: группа не закрыта, копии нет или она уже убрана'),
+        'split-cleanup-nothing',
+      );
+    }
+    const path = group.path;
+    const norm = (value: string): string => value.replace(/\\/g, '/').toLowerCase();
+    const shared = record.groups.some(
+      (other) =>
+        other !== group && other.path && norm(other.path) === norm(path) && !closed(other.status),
+    );
+    if (shared) {
+      throw coded(
+        new Error('В этой копии ещё работает другая группа — уберите копию, когда закроется и она'),
+        'split-cleanup-shared',
+      );
+    }
+    const branch = await remove({
+      projectPath: record.projectPath,
+      path,
+      branch: group.branch,
+      ...(group.chatId ? { chatId: group.chatId } : {}),
+    });
+    group.cleaned = { at: this.now().toISOString(), branch };
+    this.deps.store.set(record);
+    return group.cleaned;
+  }
+
   /** Запись для пульта: по любому разговору дерева, новейшая из подходящих. */
   view(chatIds: readonly string[]): SplitPlanView | undefined {
     const records = Object.values(this.deps.store.all())
@@ -472,6 +619,12 @@ export class SplitConveyor {
         ...(group.path ? { path: group.path } : {}),
         ...(group.base ? { base: group.base } : {}),
         ...(group.error ? { error: group.error } : {}),
+        ...(group.waitingFor ? { waitingFor: group.waitingFor } : {}),
+        ...(group.result ? { result: group.result } : {}),
+        ...(group.tail ? { tail: group.tail } : {}),
+        ...(group.mr ? { mr: group.mr } : {}),
+        ...(group.retries ? { retries: group.retries } : {}),
+        ...(group.cleaned ? { cleaned: group.cleaned } : {}),
       })),
     };
   }
@@ -487,11 +640,37 @@ export class SplitConveyor {
     });
   }
 
-  /** Порция без ожиданий: всё, что `pending` и ни от кого не зависит. */
+  /**
+   * Сколько групп ещё можно завести сейчас. Работающая — та, у которой идёт
+   * прогон (`started`) или фоновая команда (`background`); ждущая человека
+   * места не занимает. Ответ человека может ненадолго поднять число работающих
+   * над потолком — останавливать уже идущий разговор ради очереди нельзя.
+   */
+  private slots(record: SplitPlanRecord): number {
+    const limit = this.deps.parallel?.(record);
+    if (!limit || limit < 1) return Number.POSITIVE_INFINITY;
+    const running = record.groups.filter(
+      (group) => group.status === 'started' || group.status === 'background',
+    ).length;
+    return Math.max(0, limit - running);
+  }
+
+  /** Номера групп в порядке разбора — очередь стартует в нём. */
+  private ordered(record: SplitPlanRecord): SplitPlanRecord['groups'] {
+    const position = (index: number): number => {
+      const at = record.order.indexOf(index);
+      return at < 0 ? record.order.length + index : at;
+    };
+    return [...record.groups].sort((a, b) => position(a.index) - position(b.index));
+  }
+
+  /** Порция без ожиданий: всё, что `pending` и ни от кого не зависит, — сколько влезает. */
   private async launchReady(record: SplitPlanRecord): Promise<TaskSplitResult> {
-    const ready = record.groups
+    const ready = this.ordered(record)
       .filter((group) => group.status === 'pending' && this.unmet(record, group).length === 0)
-      .map((group) => group.index);
+      .map((group) => group.index)
+      .slice(0, this.slots(record))
+      .sort((a, b) => a - b);
     if (ready.length === 0) return { chats: [], failures: [] };
 
     // Группы с ответом человека получают его в заметки — по одной, у каждой
@@ -517,8 +696,11 @@ export class SplitConveyor {
    */
   private async launchUnblocked(record: SplitPlanRecord): Promise<TaskSplitResult> {
     const results: TaskSplitResult[] = [];
-    for (const group of record.groups) {
+    for (const group of this.ordered(record)) {
       if (group.status !== 'waiting' || this.unmet(record, group).length > 0) continue;
+      // Места нет — группа остаётся `waiting` без неудовлетворённых
+      // предшественников и стартует со следующим освободившимся местом.
+      if (this.slots(record) === 0) break;
       results.push(
         await this.runPortion(record, [group.index], this.contextFor(record, group.index)),
       );

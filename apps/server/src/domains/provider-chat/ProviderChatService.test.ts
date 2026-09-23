@@ -201,6 +201,22 @@ describe('ProviderChatService', () => {
     expect((run.options as { history: unknown[] }).history).toHaveLength(1);
   });
 
+  it('родитель разделения получает сводку детей в ходе, но не в переписке (Д6)', () => {
+    const brief = '<agentdeck-children>\n1. «Шапка» — работает.\n</agentdeck-children>';
+    service.setChildrenBrief((providerId, chatId) =>
+      providerId === 'codex' && chatId === 'chat' ? brief : undefined,
+    );
+
+    send('исправлено?');
+
+    const history = (run.options as { history: { content: string }[] }).history;
+    expect(history.at(-1)?.content).toBe(`${brief}\n\nисправлено?`);
+    // Человек видит в переписке то, что написал он, а не панель.
+    expect(readChat(dir, 'codex', 'chat')?.messages.map((message) => message.content)).toEqual([
+      'исправлено?',
+    ]);
+  });
+
   /**
    * Время ответа (Т1 партии чужих CLI). Меряет панель по своему прогону —
    * расход чужие CLI отдают не все и по-разному, а часы есть всегда. Меряется

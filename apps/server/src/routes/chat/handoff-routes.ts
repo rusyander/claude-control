@@ -33,6 +33,9 @@ import { readChatMessages } from '../../domains/chat/ChatHistory.ts';
 import { projectsDir } from './paths.ts';
 import { planCascadeStage, stageAppendPrompt } from '../../domains/chat/ChatCascadeStages.ts';
 import type { ChatLink } from '../../lib/app-store/app-store.types.ts';
+import { carriedLink } from '../../lib/app-store/chat-links.ts';
+import { chainOutcomeOf, endsWithQuestion } from '../../domains/chat/chain-outcome.ts';
+import type { ChainOutcome } from '../../domains/chat/split-conveyor.ts';
 import type { TreeStartGate } from '../../domains/chat/tree-pause.ts';
 import { createChat, type ProviderChatService } from '../../domains/provider-chat.ts';
 import { checkProjectDir } from '../../domains/projects.ts';
@@ -59,6 +62,17 @@ import { apiTokenPath } from '../../lib/api-token.ts';
  * поставленный во вкладке, знающей чат по сессии, обязан действовать и на
  * прогон, зарегистрированный под временным `new-…`.
  */
+
+/**
+ * Ход кончился паузой, а не итогом: вопросом человеку текстом или с фоновой
+ * командой, которая ещё идёт (Д3). Следующее звено и push тогда рано.
+ */
+function pausedTurn(finished: RunFinished): boolean {
+  return (
+    finished.ok &&
+    (Boolean(finished.background) || Boolean(finished.asked) || endsWithQuestion(finished.text))
+  );
+}
 
 /** Оба написания ключа одного разговора, без пустых. */
 function aliasesOf(chatId?: string, sessionId?: string): string[] {
@@ -122,6 +136,10 @@ export interface SplitReviewDeps {
     link: ChatLink;
     ok: boolean;
     text: string;
+    /** Ход кончился вопросом или ждёт фон — push предлагать рано (Д8). */
+    paused?: boolean;
+    /** Правки в копии есть: без них push предлагать нечего (Д8). */
+    hasWork?: () => boolean;
   }) => ChatEvent | undefined;
 }
 
@@ -129,8 +147,8 @@ export interface SplitReviewDeps {
 export interface SplitStageDeps {
   /** Чат разбора кончился: применить блок, завести порцию; событие — в ленту разбора. */
   onTriageFinished: (finished: RunFinished, aliases: string[]) => ChatEvent | undefined;
-  /** Цепочка группы (работа → ревью → правки) кончилась; `ok` — без ошибки и остановки. */
-  onChainEnded: (link: ChatLink, ok: boolean) => void;
+  /** Ход последнего звена группы кончился; что это для группы — `outcome` (Д3). */
+  onChainEnded: (link: ChatLink, outcome: ChainOutcome) => void;
 }
 
 /** Что планировщику нужно снаружи, чтобы завести звено конвейера. */
@@ -192,6 +210,7 @@ export function createHandoffPlanner({
       text: finished.text,
       task: finished.options.prompt ?? '',
       hasWork: () => cascade.hasWork(cwd, link?.createdAt),
+      paused: pausedTurn(finished),
     });
     if (!plan) return undefined;
 
@@ -313,6 +332,9 @@ export function createHandoffPlanner({
       // Ревью чужого MR (Т7): звена после него не бывает — замечания ложатся в
       // связь, а дальше ждут человека. Считается ДО конца цепочки, чтобы хаб
       // показал карточку вместе с закрытием группы, а не следующим ходом.
+      const cwd = finished.projectPath;
+      const hasWork =
+        cascade && cwd && link ? () => cascade.hasWork(cwd, link.createdAt) : undefined;
       const reviewed = link
         ? review?.onReviewFinished({
             chatId: finished.chatId,
@@ -320,13 +342,30 @@ export function createHandoffPlanner({
             link,
             ok: finished.ok,
             text: finished.text,
+            paused: pausedTurn(finished),
+            ...(hasWork ? { hasWork } : {}),
           })
         : undefined;
-      // Звена нет и продолжения нет — цепочка группы кончилась: конвейер уровней
-      // отпускает тех, кто её ждал. План и разбор цепочкой не считаются: за
-      // планом работа заводится всегда, а разбор обработан выше.
+      // Звена нет и продолжения нет — ход группы кончился. Что это для неё —
+      // итог, пауза или сбой — решает `chainOutcomeOf` (Д3): только итог и сбой
+      // отпускают ждавших. План и разбор цепочкой не считаются: за планом
+      // работа заводится всегда, а разбор обработан выше. Связь перечитывается:
+      // ревью по ссылке только что записало в неё свой итог.
       if (split && link && link.stage !== 'plan' && link.stage !== 'triage') {
-        split.onChainEnded(link, finished.ok);
+        const current = cascade?.linkOf(aliases) ?? link;
+        split.onChainEnded(
+          current,
+          chainOutcomeOf({
+            link: current,
+            ok: finished.ok,
+            text: finished.text,
+            ...(finished.background ? { background: true } : {}),
+            ...(finished.asked ? { asked: true } : {}),
+            ...(hasWork ? { hasWork } : {}),
+            ...(finished.error ? { error: finished.error } : {}),
+            ...(finished.retry ? { retry: finished.retry } : {}),
+          }),
+        );
       }
       // Карточка сильнее отказа продолжения: человеку важно, что ревью
       // кончилось и чем, а не то, что блока продолжения в ответе не было.
@@ -670,7 +709,7 @@ export function continuationStarter(
     // продолжение уже не знало бы, чем ведётся работа). Заводим только там,
     // где связь была: у обычного разговора наследовать нечего.
     if (assigned) {
-      ctx.store.setChatLink(nextId, { ...assigned, createdAt: new Date().toISOString() });
+      ctx.store.setChatLink(nextId, carriedLink(assigned));
     }
     return deps.runs.start(
       nextId,

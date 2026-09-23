@@ -35,6 +35,25 @@
   white-space: nowrap;
 }
 
+// Ждут человека — вопрос или решение по ревью: это единственные фишки, после
+// которых работа не пойдёт сама, и они не должны сливаться с «ждёт фон».
+.chipAsk {
+  background: var(--color-warning-subtle);
+  color: var(--color-fg);
+}
+
+// Хвост ответа — цитата, а не состояние: курсивом, чтобы не сливался со строкой
+// ветки и звеньев над ним.
+.tail {
+  font-style: italic;
+}
+
+.mr {
+  color: var(--color-accent);
+  font-size: var(--font-size-caption);
+  white-space: nowrap;
+}
+
 .titleLine {
   display: flex;
   align-items: center;

@@ -23,6 +23,8 @@ export interface ReviewDecisionCardProps {
   onDecide: (chatId: string, decision: TaskSplitReviewDecision, all: boolean) => void;
   /** «Закоммитить и отправить в MR» — вторым кликом, уже после правок. */
   onPush?: (chatId: string) => void;
+  /** «Повторить итог ревью» — ответ ревью кончился без блока итога (Д4). */
+  onRetry?: (chatId: string) => void;
   /** Запрос в пути: кнопки крутятся, второй клик не уходит. */
   busy?: boolean;
 }

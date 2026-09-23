@@ -59,8 +59,47 @@ export function linkChatSession(state: AppState, chatId: string, sessionId: stri
   const link = state.chatLinks?.[chatId];
   if (!link || chatId === sessionId) return false;
   if (state.chatLinks?.[sessionId]) return false;
+  // Канонический ключ разговора (Д11) — первый, под которым связь записана.
+  // Одинаковое содержимое двух ключей держится лишь до первой записи поля под
+  // одним из них (`saveLink`, `markReviewed`), а после перезапуска это и вовсе
+  // два разных объекта.
+  link.conversation ??= chatId;
   setChatLink(state, sessionId, link);
   return true;
+}
+
+/**
+ * Связь, скопированная на ДРУГОЙ разговор — продолжение («перейти в чистый
+ * чат»), звено каскада, чат правок по ревью: родитель и назначение переезжают,
+ * а канонический ключ — нет. С чужим ключом дерево склеило бы новый разговор со
+ * старым в один узел (Д11).
+ */
+export function carriedLink(link: ChatLink): ChatLink {
+  const { conversation: _closed, ...rest } = link;
+  return { ...rest, createdAt: new Date().toISOString() };
+}
+
+/**
+ * Признак одного разговора. Связи старше канонического ключа узнаются по
+ * содержимому — как узнавались до него.
+ */
+export function linkIdentity(link: ChatLink): string {
+  return link.conversation ? `c:${link.conversation}` : `j:${JSON.stringify(link)}`;
+}
+
+/** Связь под ключом `chatId` и все ключи того же разговора. */
+export function conversationKeys(links: Record<string, ChatLink>, chatId: string): string[] {
+  const link = links[chatId];
+  if (!link) return [];
+  // Канонический ключ разговора (Д11): одинаковое содержимое связи переставало
+  // быть признаком одного разговора, как только одно поле писалось по одному
+  // ключу, — и дерево раздваивалось. Старые связи без него — по содержимому.
+  if (link.conversation) {
+    const keys = Object.keys(links).filter((key) => links[key]?.conversation === link.conversation);
+    return keys.includes(chatId) ? keys : [chatId, ...keys];
+  }
+  const identity = JSON.stringify(link);
+  return Object.keys(links).filter((key) => JSON.stringify(links[key]) === identity);
 }
 
 /** Самые старые связи вытесняются: файл состояния не должен расти без края. */

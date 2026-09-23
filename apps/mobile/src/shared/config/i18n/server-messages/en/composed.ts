@@ -128,4 +128,6 @@ export const composedEn: Record<ComposedMessageCode, string> = {
     'The triage was cut short by a panel restart and will never give a result. Start the group as proposed? Your answer rides into its task.',
   'split-triage-interrupted-notice':
     'The triage was cut short by a panel restart — there will be no result. Groups waiting for your answer: {{groups}}; they will not start by themselves.',
+  'child-tell-notice':
+    'The parent wrote to its groups. Delivered: {{sent}} · queued until their turn ends: {{queued}} · not delivered (the group has no chat or copy): {{refused}}.',
 };

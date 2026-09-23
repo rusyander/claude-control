@@ -24,8 +24,8 @@
     "why": "agent prompt / text the model reads"
   },
   "domains/chat/ChatBranchGate.ts": {
-    "n": 3,
-    "why": "agent prompt / text the model reads: the denial that names the copy, the restart task and the refusal of the whole edit — all three travel to the agent as a tool result, never to the interface"
+    "n": 5,
+    "why": "agent prompt / text the model reads: the denial that names the copy, the restart task, the refusal of the whole edit and the hand-to-group denial with its group line (Д15) — all travel to the agent as a tool result, never to the interface"
   },
   "domains/chat/ChatExport.ts": {
     "n": 3,
@@ -43,13 +43,25 @@
     "n": 4,
     "why": "agent prompt / text the model reads; +1 the `modelDropped` feed notice — same shape as detached-run.ts: the code travels for translation, the text for a client with no dictionary"
   },
+  "domains/chat/child-tell.ts": {
+    "n": 1,
+    "why": "agent prompt / text the model reads: the parent's message header as the child sees it (Д7)"
+  },
+  "domains/chat/children-brief.ts": {
+    "n": 29,
+    "why": "agent prompt / text the model reads: the children brief prepended to a split parent's turn (Д6), stripped from the feed"
+  },
   "domains/chat/detached-run.ts": {
     "n": 2,
     "why": "agent prompt / text the model reads"
   },
   "domains/chat/initiative.ts": {
-    "n": 19,
+    "n": 24,
     "why": "agent prompt / text the model reads"
+  },
+  "domains/chat/run-retry.ts": {
+    "n": 2,
+    "why": "agent prompt / text the model reads: continuation after a failed turn (Д10)"
   },
   "domains/chat/split-conveyor.ts": {
     "n": 11,
@@ -60,8 +72,8 @@
     "why": "composed list explanation / git output assembly"
   },
   "domains/chat/split-review.ts": {
-    "n": 11,
-    "why": "agent prompt / text the model reads"
+    "n": 14,
+    "why": "agent prompt / text the model reads, plus reviewNoticeText: the review outcome line in a foreign CLI feed, where the stored string is its ONLY carrier (the Claude feed renders the event card instead)"
   },
   "domains/commands/claude.ts": {
     "n": 4,
@@ -772,7 +784,7 @@
     "why": "path-rejection detail composed inside an error class"
   },
   "lib/server-texts/templates.ts": {
-    "n": 329,
+    "n": 330,
     "why": "RU side of the server text table: every line here IS a code, this is the one file where a Russian literal is the data. The generator and its manifest are gone from the tree (see the file header) — a new code is written by hand and `n` rises with it"
   },
   "providers/catalog/kimi.ts": {
@@ -796,8 +808,8 @@
     "why": "agent prompt / text the model reads"
   },
   "routes/chat/split-launch.ts": {
-    "n": 3,
-    "why": "agent prompt / text the model reads"
+    "n": 4,
+    "why": "agent prompt / text the model reads, plus the stage suffix of a stored chat title (правки/ревью/отправка)"
   },
   "routes/chat/split-routes.ts": {
     "n": 1,

@@ -1,7 +1,7 @@
 import type { ChatTreeView } from '@agentdeck/contracts/chat-handoff';
 import { CASCADE_STAGES, type CascadeStage } from '@agentdeck/contracts/model-cascade';
 import { parseForeignChatKey } from '@agentdeck/contracts/foreign-chat-key';
-import { mergeSplitGroups, type ChildStageGroup } from '@features/ChatMessages';
+import { mergeSplitGroups, splitGroupKey, type ChildStageGroup } from '@features/ChatMessages';
 
 /**
  * Хаб родителя у чужого CLI: те же строки групп, что у Claude, но собранные из
@@ -26,11 +26,11 @@ import { mergeSplitGroups, type ChildStageGroup } from '@features/ChatMessages';
 export function collectForeignStages(tree: ChatTreeView | undefined): ChildStageGroup[] {
   if (!tree) return [];
 
-  // Ключ группы — ветка: звенья одной группы живут в одной копии и в одной
-  // ветке. Ветки нет (делили не репозиторий) — держит название группы.
+  // Ключ группы — тот же, что у Claude: номер группы из связи, у старых связей
+  // ветка, без неё название группы.
   const groups = new Map<string, ChatTreeView['nodes']>();
   for (const node of tree.nodes) {
-    const key = node.branch || node.title || node.chatId;
+    const key = splitGroupKey({ ...node, id: node.chatId });
     const list = groups.get(key);
     if (list) list.push(node);
     else groups.set(key, [node]);

@@ -1,11 +1,17 @@
 import {
   fixStagePrompt,
   reviewPushPrompt,
+  reviewRetryPrompt,
   scanReviewBlocks,
 } from '@agentdeck/contracts/model-cascade';
 import type { TaskSplitReviewDecision } from '@agentdeck/contracts/task-split';
 import type { SplitReviewOutcome, SplitReviewView } from '@agentdeck/contracts/chat-handoff';
 import type { ChatLink, ChatReviewState } from '../../lib/app-store/app-store.types.ts';
+import {
+  carriedLink,
+  conversationKeys as keysOf,
+  linkIdentity,
+} from '../../lib/app-store/chat-links.ts';
 import type { ChatEvent } from './ChatRunner.ts';
 
 /**
@@ -74,13 +80,23 @@ export interface SplitReviewDeps {
     cwd: string;
     model?: string;
     effort?: string;
-    stage: 'fix' | 'push';
+    stage: 'fix' | 'push' | 'review' | 'tell';
     /** Ключи закончившегося разговора: от них наследуются тумблеры и дерево. */
     fromAliases: string[];
     title?: string;
-  }) => { started: boolean; chatId?: string };
+    /**
+     * Продолжить ЭТОТ разговор, а не заводить новый (Д8, Д4): push идёт в
+     * сессию правок, которая их и сделала, повтор итога — в сессию ревью.
+     */
+    resume?: { sessionId: string };
+  }) => { started: boolean; chatId?: string; busy?: boolean };
   /** Заметка в ленту родителя; `false` — родителя никто не слушает. */
   emit?: (parentChatId: string, event: ChatEvent) => boolean;
+  /**
+   * Решение человека закрыло группу без нового прогона («ничего не делать»,
+   * «только отписать»): конвейер отмечает её готовой и отпускает ждавших (Д3).
+   */
+  closeGroup?: (link: ChatLink) => void;
   log: (message: string, error?: unknown) => void;
   now?: () => Date;
 }
@@ -126,12 +142,22 @@ export function reviewNoticeText(event: Extract<ChatEvent, { kind: 'review' }>):
   if (event.pushOffer) {
     return 'Правки по замечаниям сделаны — отправить их в MR можно кнопкой на карточке решения.';
   }
+  if (event.noChanges) {
+    return 'Правки по замечаниям кончились, а копия не изменилась — отправлять в MR нечего.';
+  }
+  if (event.pushBlocked) {
+    return 'Правки по замечаниям сделаны, но отправить их в MR панель не может: ветка MR неизвестна.';
+  }
   const head = `Ревью ${event.url}`;
+  if (event.missing) {
+    return `${head}: ответ кончился без блока итога — замечания неизвестны. Повторить итог можно кнопкой на карточке.`;
+  }
   if (event.decision) {
     const tail = event.postError ? ` Комментарий не записан: ${event.postError}.` : '';
     return `${head}: ${DECISION_WORDS[event.decision]}.${tail}`;
   }
-  if (event.findings.length === 0) return `${head}: замечаний нет — группа закрыта.`;
+  // «Проверено», а не «сделано»: ревью ничего не меняло (Д5).
+  if (event.findings.length === 0) return `${head}: проверено, замечаний нет — правок не было.`;
   return `${head}: замечаний ${event.findings.length} — решение за вами, карточка ниже.`;
 }
 
@@ -151,14 +177,12 @@ function isPostRetry(review: ChatReviewState, decision: TaskSplitReviewDecision)
   return Boolean(review.postError) && !review.postedAt;
 }
 
-/** Связь под ключом `chatId` и все ключи того же разговора. */
-function keysOf(links: Record<string, ChatLink>, chatId: string): string[] {
-  const link = links[chatId];
-  if (!link) return [];
-  // Связь копируется на `sessionId` как есть — одинаковое содержимое и есть
-  // признак одного разговора. Тот же приём, что и в дереве чатов.
-  const identity = JSON.stringify(link);
-  return Object.keys(links).filter((key) => JSON.stringify(links[key]) === identity);
+/**
+ * Настоящий ключ сессии разговора: не временный `new-…`, под которым звено
+ * заводилось, а тот, под которым CLI его хранит и умеет продолжить.
+ */
+function sessionKeyOf(aliases: readonly string[]): string | undefined {
+  return aliases.find((key) => !key.startsWith('new-'));
 }
 
 export class SplitReview {
@@ -191,6 +215,8 @@ export class SplitReview {
       ...(blocked ? { postBlocked: blocked } : {}),
       ...(review.pushOffer ? { pushOffer: true } : {}),
       ...(review.pushedAt ? { pushedAt: review.pushedAt } : {}),
+      ...(review.missing ? { missing: true } : {}),
+      ...(review.pushBlocked ? { pushBlocked: review.pushBlocked } : {}),
     };
   }
 
@@ -208,6 +234,10 @@ export class SplitReview {
     link: ChatLink;
     ok: boolean;
     text: string;
+    /** Ход кончился вопросом человеку или ждёт фоновую команду (Д3, Д8). */
+    paused?: boolean;
+    /** Есть ли в копии правки — по git, не по словам агента (Д8). */
+    hasWork?: () => boolean;
   }): ChatEvent | undefined {
     const { link, ok, text } = input;
     const review = link.review;
@@ -215,29 +245,43 @@ export class SplitReview {
     const at = this.now().toISOString();
 
     // Правки по ревью кончились — предлагаем отправить их в MR. Отдельным
-    // кликом: push в чужую ветку панель сама не делает никогда.
+    // кликом: push в чужую ветку панель сама не делает никогда. Но только
+    // когда отправлять ЕСТЬ что и КУДА (Д8, Д9): ход, кончившийся вопросом,
+    // ещё не конец правок; копия без изменений — не повод для коммита; без
+    // известной ветки MR push ушёл бы в новую удалённую ветку.
     if (link.stage === 'fix') {
-      if (!ok || review.pushOffer || review.pushedAt) return undefined;
-      this.save(input.aliases, link, { ...review, pushOffer: true });
-      return {
-        kind: 'review',
-        chatId: input.chatId,
-        url: review.url,
-        findings: [],
-        pushOffer: true,
-      };
+      if (!ok || input.paused || review.pushOffer || review.pushedAt) return undefined;
+      const base = { kind: 'review' as const, chatId: input.chatId, url: review.url, findings: [] };
+      if (input.hasWork && !input.hasWork()) return { ...base, noChanges: true };
+      if (!review.branch) {
+        const pushBlocked = 'branch-unknown' as const;
+        this.save(input.aliases, link, { ...review, pushBlocked });
+        return { ...base, pushBlocked };
+      }
+      const { pushBlocked: _blocked, ...rest } = review;
+      this.save(input.aliases, link, { ...rest, pushOffer: true });
+      return { ...base, pushOffer: true };
     }
 
     if (link.stage !== 'review' || review.findings) return undefined;
     // Прогон упал или остановлен — читать нечего: замечания появятся, когда
     // человек перезапустит ревью, а пустой список закрыл бы группу как чистую.
-    if (!ok) return undefined;
+    // Ход с вопросом человеку — тоже ещё не итог: ответ продолжит ревью.
+    if (!ok || input.paused) return undefined;
 
-    const findings = scanReviewBlocks(text).findings ?? [];
+    const scanned = scanReviewBlocks(text).findings;
+    const { missing: _missing, ...rest } = review;
+    // Блока нет — это НЕ «замечаний нет» (Д4): группа ждёт, карточка
+    // предлагает повторить итог в той же сессии.
+    if (!scanned) {
+      this.save(input.aliases, link, { ...rest, missing: true });
+      return { kind: 'review', chatId: input.chatId, url: review.url, findings: [], missing: true };
+    }
+    const findings = scanned;
     // Пустой список — законный и лучший ответ: группа закрыта, карточки нет.
     const decided = findings.length === 0;
     this.save(input.aliases, link, {
-      ...review,
+      ...rest,
       findings,
       ...(decided ? { decision: 'none' as const, decidedAt: at } : {}),
     });
@@ -319,25 +363,29 @@ export class SplitReview {
       return { applied: [], skipped: [input.chatId] };
     }
 
-    // Ключ несёт исходный разговор по той же причине, по которой ключ правок
-    // несёт номер: отправку нажимают по разным карточкам одного дерева, и голый
-    // `new-<ts>` дал бы двум чатам один ключ — второй затёр бы первый.
-    const chatId = `new-${Date.now()}-push-${input.chatId.replace(/[^\w]+/g, '')}`;
-    const aliases = keysOf(links, input.chatId);
-    const at = this.now().toISOString();
-    this.save(aliases, link, { ...review, pushedAt: at, pushOffer: false });
-    this.deps.store.set(chatId, {
-      ...link,
-      createdAt: at,
-      stage: 'push',
-      review: { ...review, pushedAt: at, pushOffer: false },
-    });
+    // Ветка MR неизвестна — push ушёл бы в новую удалённую ветку, а не в MR (Д9).
+    if (!review.branch) {
+      return { applied: [{ chatId: input.chatId, refused: 'branch-unknown' }], skipped: [] };
+    }
 
+    // Push — продолжение СЕССИИ ПРАВОК (Д8), а не новый чат в той же копии:
+    // только она знает, что и зачем правила, и только так в копии не
+    // оказывается двух агентов разом.
+    const aliases = keysOf(links, input.chatId);
+    const session = sessionKeyOf(aliases);
+    if (!session) {
+      return {
+        applied: [{ chatId: input.chatId, refused: 'no-session' }],
+        skipped: [],
+      };
+    }
     const outcome = this.deps.start({
-      chatId,
+      chatId: session,
       prompt: reviewPushPrompt({
         url: review.url,
-        ...(review.branch ? { branch: review.branch } : {}),
+        branch: review.branch,
+        ...(review.remote ? { remote: review.remote } : {}),
+        ...(review.detached ? { detached: true } : {}),
       }),
       cwd: review.path ?? '',
       ...(link.model ? { model: link.model } : {}),
@@ -345,14 +393,73 @@ export class SplitReview {
       stage: 'push',
       fromAliases: aliases,
       ...(link.title ? { title: link.title } : {}),
+      resume: { sessionId: session },
     });
-    const pushChatId = this.settle(chatId, outcome);
-    if (!outcome.started) this.deps.log('split review: push run refused', input.chatId);
+    if (!outcome.started) {
+      this.deps.log('split review: push run refused', input.chatId);
+      return {
+        applied: [
+          {
+            chatId: input.chatId,
+            refused: outcome.busy ? 'busy' : 'start-failed',
+          },
+        ],
+        skipped: [],
+      };
+    }
+    // Отметка — после старта: отказанный запуск не должен прятать кнопку.
+    this.save(aliases, link, { ...review, pushedAt: this.now().toISOString(), pushOffer: false });
+    return { applied: [{ chatId: input.chatId, pushChatId: session }], skipped: [] };
+  }
 
-    return {
-      applied: [{ chatId: input.chatId, ...(outcome.started ? { pushChatId } : {}) }],
-      skipped: [],
-    };
+  /**
+   * «Повторить итог ревью» (Д4): ответ кончился без блока, и группа висит без
+   * замечаний. Сообщение уходит в ТУ ЖЕ сессию ревью — MR она уже прочитала.
+   */
+  retryReview(input: { chatId: string; parentChatId?: string }): SplitReviewOutcome {
+    const links = this.deps.store.all();
+    const link = links[input.chatId];
+    const review = link?.review;
+    if (!link || !review?.missing || link.stage !== 'review') {
+      return { applied: [], skipped: [input.chatId] };
+    }
+    if (input.parentChatId && !this.belongs(links, link, input.parentChatId)) {
+      return { applied: [], skipped: [input.chatId] };
+    }
+    const aliases = keysOf(links, input.chatId);
+    const session = sessionKeyOf(aliases);
+    if (!session) {
+      return {
+        applied: [{ chatId: input.chatId, refused: 'no-session' }],
+        skipped: [],
+      };
+    }
+    const outcome = this.deps.start({
+      chatId: session,
+      prompt: reviewRetryPrompt(),
+      cwd: review.path ?? '',
+      ...(link.model ? { model: link.model } : {}),
+      ...(link.effort ? { effort: link.effort } : {}),
+      stage: 'review',
+      fromAliases: aliases,
+      ...(link.title ? { title: link.title } : {}),
+      resume: { sessionId: session },
+    });
+    if (!outcome.started) {
+      return {
+        applied: [
+          {
+            chatId: input.chatId,
+            refused: outcome.busy ? 'busy' : 'start-failed',
+          },
+        ],
+        skipped: [],
+      };
+    }
+    // Отметка снимается, чтобы конец хода прочитал блок заново.
+    const { missing: _missing, ...rest } = review;
+    this.save(aliases, link, rest);
+    return { applied: [{ chatId: input.chatId, retryChatId: session }], skipped: [] };
   }
 
   /**
@@ -387,7 +494,7 @@ export class SplitReview {
       if (review.decidedAt && !isPostRetry(review, decision)) continue;
       // Один разговор двумя ключами — одно решение: без этого «применить ко
       // всем» заводило бы по двое правок на каждую группу.
-      const identity = JSON.stringify(link);
+      const identity = linkIdentity(link);
       if (seen.has(identity)) continue;
       seen.add(identity);
       out.push(chatId);
@@ -444,7 +551,7 @@ export class SplitReview {
     if (!retry && (decision === 'fix' || decision === 'both')) {
       const fixChatId = `new-${Date.now()}-fix${index}`;
       this.deps.store.set(fixChatId, {
-        ...link,
+        ...carriedLink(link),
         createdAt: at,
         stage: 'fix',
         review: next,
@@ -465,6 +572,9 @@ export class SplitReview {
     }
 
     this.save(aliases, link, next);
+    // Решение без прогона — последнее слово по группе (Д3): иначе она так и
+    // висела бы «ждёт решения», держа тех, кто стоит за ней.
+    if (!retry && (decision === 'none' || decision === 'post')) this.deps.closeGroup?.(link);
     this.deps.emit?.(link.parentChatId, {
       kind: 'review',
       chatId,

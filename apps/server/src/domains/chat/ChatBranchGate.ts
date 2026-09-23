@@ -1,3 +1,4 @@
+import type { SplitGroupStatusView, SplitPlanView } from '@agentdeck/contracts/chat-handoff';
 import { gitSync } from '../project-git/exec.ts';
 
 /**
@@ -129,6 +130,72 @@ export function branchMovedDenial(path: string, branch: string): string {
  */
 export function branchContinuePrompt(path: string, branch: string): string {
   return `Рабочий каталог сменился: ты в копии ${path} на ветке ${branch}, основной каталог проекта остаётся нетронутым. Продолжай ту же задачу здесь и начни с правки, которая не прошла.`;
+}
+
+/** Группа разделения глазами ворот: кому отдана работа и как к ней обратиться. */
+export interface BranchGateChild {
+  /** Номер группы с единицы — тот, что пишется в блоке `agentdeck:tell N`. */
+  number: number;
+  title: string;
+  branch: string;
+  status: SplitGroupStatusView;
+  chatId?: string;
+}
+
+/**
+ * Что воротам известно о разговоре, чья работа отдана группам (Д15). Без этого
+ * родитель, у которого дети уже чинят тот же MR, получал обычную карточку, и
+ * «завести копию» уносило его в третью копию от `main` — мимо детей и мимо MR.
+ */
+export interface BranchGateContext {
+  children: BranchGateChild[];
+  /**
+   * От чего отводить копию родителя: ветка MR, на которой работают дети. Есть,
+   * только когда она у детей одна, — из двух разных MR выбирать наугад нельзя.
+   */
+  base?: string;
+}
+
+/** Ветка MR ребёнка по его связи — то, что панель узнала у git/форджа (Д2, Д9). */
+export interface ChildReviewBranch {
+  branch?: string;
+  remote?: string;
+}
+
+export function branchGateContext(
+  split: SplitPlanView | undefined,
+  reviewOf: (chatId: string) => ChildReviewBranch | undefined,
+): BranchGateContext | undefined {
+  if (!split || split.groups.length === 0) return undefined;
+  const children = split.groups.map((group) => ({
+    number: group.index + 1,
+    title: group.title,
+    branch: group.branch,
+    status: group.status,
+    ...(group.chatId ? { chatId: group.chatId } : {}),
+  }));
+  // Удалённая ветка, а не локальная: копия MR часто стоит в detached HEAD, и
+  // локальной ветки с этим именем может не быть вовсе (Д2).
+  const bases = new Set(
+    split.groups
+      .map((group) => (group.chatId ? reviewOf(group.chatId) : undefined))
+      .filter((review): review is ChildReviewBranch & { branch: string } => Boolean(review?.branch))
+      .map((review) => (review.remote ? `${review.remote}/${review.branch}` : review.branch)),
+  );
+  const [base] = bases;
+  return { children, ...(bases.size === 1 && base ? { base } : {}) };
+}
+
+/**
+ * Отказ правке родителя, когда работа отдана группам: не «нельзя», а куда её
+ * нести. Агент уже умеет писать ребёнку (Д7), и человеку остаётся одно нажатие
+ * вместо третьей копии на ту же задачу.
+ */
+export function branchGateHandedDenial(children: readonly BranchGateChild[]): string {
+  const list = children.map(
+    (child) => `${child.number} — «${child.title}» (ветка ${child.branch})`,
+  );
+  return `Правка не применена: работа этого разговора отдана группам разделения, и правит код группа, а не ты. Группы: ${list.join('; ')}. Передай правку нужной группе блоком \`\`\`agentdeck:tell N с текстом поручения — панель доставит его в чат группы.`;
 }
 
 /** Отказ, когда человек не разрешил правку вовсе. */

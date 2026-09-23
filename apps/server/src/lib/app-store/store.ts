@@ -2,6 +2,7 @@ import { join } from 'node:path';
 import type { FidelityMark } from '@agentdeck/contracts/portable-fidelity';
 import type { EnvSubscription } from '@agentdeck/contracts/portable-subscribe';
 import type { TransferRecord } from '@agentdeck/contracts/portable-transfer';
+import type { SplitSettings } from '@agentdeck/contracts/task-split';
 import type {
   AppSettings,
   Automation,
@@ -132,6 +133,10 @@ import {
   getWorktreeMirror as readWorktreeMirror,
   setWorktreeMirror as writeWorktreeMirror,
 } from './worktree-mirror.ts';
+import {
+  getSplitSettings as readSplitSettings,
+  setSplitSettings as writeSplitSettings,
+} from './split-settings.ts';
 import {
   forgetMcpHealth as dropMcpHealth,
   getMcpHealth as readMcpHealth,
@@ -822,6 +827,17 @@ export class AppStore {
 
   setWorktreeMirror(path: string, settings: WorktreeMirrorSettings): WorktreeMirrorSettings {
     const next = writeWorktreeMirror(this.state, path, settings);
+    this.persist();
+    return next;
+  }
+
+  /** Разделение на проекте: доставка групп до MR и сколько их идёт разом. */
+  getSplitSettings(path: string): SplitSettings {
+    return readSplitSettings(this.state, path);
+  }
+
+  setSplitSettings(path: string, settings: SplitSettings): SplitSettings {
+    const next = writeSplitSettings(this.state, path, settings);
     this.persist();
     return next;
   }

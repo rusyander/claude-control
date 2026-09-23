@@ -19,6 +19,7 @@ import {
   chatTranscriptPath,
   createForeignStagePlanner,
   foreignChatPrefix,
+  readChat,
   readChatCascade,
   ProviderChatService,
 } from '../domains/provider-chat.ts';
@@ -48,6 +49,10 @@ import { readLastAssistantTurn } from '../domains/chat/ChatHistory.ts';
 import { createHandoffPlanner } from '../routes/chat/handoff-routes.ts';
 import { projectsDir } from '../routes/chat/paths.ts';
 import { SplitConveyor } from '../domains/chat/split-conveyor.ts';
+import { childrenBrief } from '../domains/chat/children-brief.ts';
+import { branchGateContext } from '../domains/chat/ChatBranchGate.ts';
+import { ChildTells } from '../domains/chat/child-tell.ts';
+import { RunRetry, retriesLink, retryForeignRun, retryOutcome } from '../domains/chat/run-retry.ts';
 import { SplitOverlap } from '../domains/chat/split-overlap.ts';
 import { SplitReview } from '../domains/chat/split-review.ts';
 import {
@@ -57,8 +62,10 @@ import {
 } from '../routes/chat/split-launch.ts';
 import { commentMergeRequestByUrl, parseMergeRequestUrl } from '../domains/integrations/forge.ts';
 import { readIntegrations, readToken } from '../domains/integrations/store.ts';
+import { carriedLink, conversationKeys } from '../lib/app-store/chat-links.ts';
 import { createEventHub, type EventHub } from '../lib/event-hub.ts';
 import { PANEL_ACTION_CONFIRM_TIMEOUT_MS } from '@agentdeck/contracts/panel-agent';
+import { foreignChatKey } from '@agentdeck/contracts/foreign-chat-key';
 import { PanelPendingActions } from '../domains/panel-agent/pending.ts';
 import { reapPanelAgentOrphans } from '../domains/panel-agent/processes.ts';
 
@@ -217,6 +224,17 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
    * бы ровно в момент, когда чат становится настоящим.
    */
   chatRuns.setSessionListener((chatId, sessionId) => ctx.store.linkChatSession(chatId, sessionId));
+  // Ребёнок разделения — у кого есть связь с родителем (Д16, Д18).
+  chatRuns.setChildResolver((keys) =>
+    keys.some((key) => Boolean(ctx.store.getChatLink(key)?.parentChatId)),
+  );
+  // Родитель разделения видит своих детей в начале каждого хода (Д6). Конвейер
+  // заводится ниже — к первому старту прогона он уже есть.
+  chatRuns.setChildrenBriefResolver((keys) => childrenBrief(splitConveyor.view(keys)));
+  // Ворота первой правки родителя знают о детях и о ветке MR (Д15).
+  chatRuns.setBranchGateContextResolver((keys) =>
+    branchGateContext(splitConveyor.view(keys), (chatId) => ctx.store.getChatLink(chatId)?.review),
+  );
   chatRuns.setFirstEditListener((keys, at) => ctx.store.markChatFirstEdit(keys, at));
   /**
    * Журнал понижённых прогонов: чем вели и видела ли панель проверки. Путь до
@@ -254,26 +272,28 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   // Заводится ДО дерева: его прогоны входят в дерево переходником
   // (`createTreeRuns`), а не отдельным деревом.
   const providerChats = new ProviderChatService();
+  // Прогоны дерева у любого провайдера: реализация выбирается по КЛЮЧУ связи —
+  // именованный (`codex:c1a2…`) ведёт к чужому чату, обычный к реестру. Тем же
+  // переходником повторяет упавшие ходы надзор (Д10).
+  const treeRuns = createTreeRuns({
+    registry: chatRuns,
+    chats: providerChats,
+    appDataDir: () => ctx.location.paths.appData,
+    provider: (id) =>
+      id !== DEFAULT_PROVIDER_ID && isKnownProviderId(id) ? getProvider(id) : undefined,
+    models: (provider) => ctx.models.current(provider.modelVendors ?? []).models,
+    // Дописка продолженного прогона собирается заново по шапке разговора: она
+    // нигде не хранится, а без неё продолжённая после паузы работа поехала бы
+    // без инициатив панели и без планки сдачи (Т5).
+    systemPrefix: (providerId, chatId) =>
+      foreignChatPrefix(
+        readChatCascade(ctx.location.paths.appData, providerId, chatId),
+        ctx.store.getSettings(),
+      ) || undefined,
+  });
   const treePause = new TreePause({
     links: () => ctx.store.getChatLinks(),
-    // Прогоны дерева у любого провайдера: реализация выбирается по КЛЮЧУ связи
-    // — именованный (`codex:c1a2…`) ведёт к чужому чату, обычный к реестру.
-    runs: createTreeRuns({
-      registry: chatRuns,
-      chats: providerChats,
-      appDataDir: () => ctx.location.paths.appData,
-      provider: (id) =>
-        id !== DEFAULT_PROVIDER_ID && isKnownProviderId(id) ? getProvider(id) : undefined,
-      models: (provider) => ctx.models.current(provider.modelVendors ?? []).models,
-      // Дописка продолженного прогона собирается заново по шапке разговора: она
-      // нигде не хранится, а без неё продолжённая после паузы работа поехала бы
-      // без инициатив панели и без планки сдачи (Т5).
-      systemPrefix: (providerId, chatId) =>
-        foreignChatPrefix(
-          readChatCascade(ctx.location.paths.appData, providerId, chatId),
-          ctx.store.getSettings(),
-        ) || undefined,
-    }),
+    runs: treeRuns,
     store: {
       get: (root) => ctx.store.getTreePause(root),
       all: () => ctx.store.getTreePauses(),
@@ -365,6 +385,9 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     // чужого родителя прогона в реестре нет, и та же заметка ложится репликой
     // его хранилища — развилка одна на всех (Т4).
     emit: (parentChatId, event) => sayToParent(parentChatId, event),
+    // «Ничего не делать» / «только отписать» — последнее слово по группе (Д3).
+    closeGroup: (link) =>
+      splitConveyor.onChainEnded(link, { status: 'done', result: { kind: 'reviewed' } }),
     log: (message, error) => console.warn(message, error),
   });
   splitReviewRef.current = splitReview;
@@ -390,98 +413,191 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
         ...(record.request.model ? { model: record.request.model } : {}),
         ...(record.request.effort ? { effort: record.request.effort } : {}),
       }).startTriage(prompt, claim),
+    parallel: (record) => ctx.store.getSplitSettings(record.projectPath).parallel,
     log: (message, error) => console.warn(message, error),
   });
-  chatRuns.setHandoffPlanner(
-    createHandoffPlanner({
-      runs: chatRuns,
-      chains: handoffChains,
-      gate: treePause,
-      session: chatSession,
-      selfBaseUrl,
-      contextLimit: () => ctx.store.getSettings().handoffContextLimit,
-      // Продолжение наследует связь закрытого разговора: и родителя в дереве, и
-      // подобранную под задачу модель. Иначе следующее сообщение человека —
-      // первое, что придёт в новый чат без модели, — уехало бы на дефолте.
-      carryLink: (from, to) => {
-        const link = from.map((key) => ctx.store.getChatLink(key)).find(Boolean);
-        if (link) ctx.store.setChatLink(to, { ...link, createdAt: new Date().toISOString() });
-      },
-      /**
-       * Конвейер «работа → ревью → фикс»: чем оплачивается понижение модели.
-       * Всё, что ему нужно снаружи, — связи чатов, настройки и один вопрос к
-       * git. Решение о звене принимает домен (`ChatCascadeStages`), запускает
-       * планировщик, а собирается это здесь, как и остальные долгоживущие связки.
-       */
-      cascade: {
-        linkOf: (aliases) => aliases.map((key) => ctx.store.getChatLink(key)).find(Boolean),
-        saveLink: (chatId, link) => ctx.store.setChatLink(chatId, link),
-        // Отметка ставится по ОБОИМ ключам чата: под временным он живёт в памяти
-        // вкладок, под настоящим — в списке, и проверить работу дважды нельзя ни
-        // из того, ни из другого.
-        markReviewed: (aliases, at) => {
-          for (const key of aliases) {
-            const link = ctx.store.getChatLink(key);
-            if (link) ctx.store.setChatLink(key, { ...link, reviewedAt: at });
-          }
-        },
-        // Та же отметка для плана (Т1): вторая работа той же группы не заводится.
-        markPlanned: (aliases, at) => {
-          for (const key of aliases) {
-            const link = ctx.store.getChatLink(key);
-            if (link) ctx.store.setChatLink(key, { ...link, plannedAt: at });
-          }
-        },
-        hasWork: (cwd, since) => hasWorkSince(cwd, since),
-        settings: () => ctx.store.getSettings(),
-      },
-      split: {
-        onTriageFinished: (finished, aliases) => splitConveyor.onTriageFinished(finished, aliases),
-        onChainEnded: (link, ok) => splitConveyor.onChainEnded(link, ok),
-      },
-      // Ревью по ссылке (Т7): замечания из ответа — в связь, карточка — человеку.
-      review: { onReviewFinished: (input) => splitReview.finished(input) },
-    }),
+  // Новый прогон в чате группы — группа снова «работает» (Д3): человек ответил
+  // на вопрос, продолжил ребёнка или панель повторила упавший ход.
+  // Надзор повторов (Д10): упавший ход ребёнка разделения продолжается сам —
+  // через паузу или в момент сброса лимита. Стоящее дерево повтор не будит:
+  // старт ложится в очередь паузы и уйдёт по «Продолжить всё».
+  const runRetry = new RunRetry({
+    start: (chatId, options, meta) =>
+      treePause.defer('stage', chatId, options, meta) || treeRuns.start(chatId, options, meta),
+    log: (message, error) => console.warn(message, error),
+  });
+  const isRetriedChild = (keys: readonly string[]): boolean =>
+    keys.some((key) => retriesLink(ctx.store.getChatLink(key)));
+  chatRuns.setStartListener((keys) => {
+    runRetry.started(keys);
+    for (const key of keys) {
+      const link = ctx.store.getChatLink(key);
+      if (link && link.stage !== 'plan' && link.stage !== 'triage') {
+        splitConveyor.onChainResumed(link, key);
+        return;
+      }
+    }
+  });
+  // Родитель в чужом CLI знает о детях так же, как в Claude (Д6).
+  providerChats.setChildrenBrief((providerId, chatId) =>
+    childrenBrief(splitConveyor.view([foreignChatKey(providerId, chatId)])),
   );
+  providerChats.setStartListener((providerId, chatId) => {
+    runRetry.started([foreignChatKey(providerId, chatId)]);
+    const key = foreignChatKey(providerId, chatId);
+    const link = ctx.store.getChatLink(key);
+    if (link && link.stage !== 'plan' && link.stage !== 'triage')
+      splitConveyor.onChainResumed(link, key);
+  });
+  // Слово родителя ребёнку (Д7): блок `agentdeck:tell` в ответе родителя
+  // доставляется продолжением сессии группы, занятой — после её хода.
+  const childTells = new ChildTells({
+    split: (keys) => splitConveyor.view(keys),
+    aliasesOf: (chatId) => {
+      const keys = conversationKeys(ctx.store.getChatLinks(), chatId);
+      return keys.length > 0 ? keys : [chatId];
+    },
+    settingsOf: (chatId) => {
+      const link = ctx.store.getChatLink(chatId);
+      return {
+        ...(link?.model ? { model: link.model } : {}),
+        ...(link?.effort ? { effort: link.effort } : {}),
+      };
+    },
+    start: createReviewStarter(ctx, launchDeps),
+    notify: (keys, event) => {
+      keys.some((key) => sayToParent(key, event));
+    },
+    log: (message, error) => console.warn(message, error),
+  });
+  // Конец любого хода: ребёнку могло ждать слово родителя, а родитель мог его сказать.
+  const tellsOnFinish = (keys: readonly string[], ok: boolean, text: string): void => {
+    try {
+      childTells.childFinished(keys);
+      if (ok) childTells.parentFinished(keys, text);
+    } catch (error) {
+      console.warn('child tell failed', error);
+    }
+  };
+  // Потолок живых процессов превышен, а вытеснить некого (Д17): не молчим.
+  chatRuns.livePool.onOverflow = (size, max) =>
+    console.warn(
+      `live sessions: ${size} over the limit ${max}, all busy or holding background work`,
+    );
+  const handoffPlanner = createHandoffPlanner({
+    runs: chatRuns,
+    chains: handoffChains,
+    gate: treePause,
+    session: chatSession,
+    selfBaseUrl,
+    contextLimit: () => ctx.store.getSettings().handoffContextLimit,
+    // Продолжение наследует связь закрытого разговора: и родителя в дереве, и
+    // подобранную под задачу модель. Иначе следующее сообщение человека —
+    // первое, что придёт в новый чат без модели, — уехало бы на дефолте.
+    carryLink: (from, to) => {
+      const link = from.map((key) => ctx.store.getChatLink(key)).find(Boolean);
+      if (link) ctx.store.setChatLink(to, carriedLink(link));
+    },
+    /**
+     * Конвейер «работа → ревью → фикс»: чем оплачивается понижение модели.
+     * Всё, что ему нужно снаружи, — связи чатов, настройки и один вопрос к
+     * git. Решение о звене принимает домен (`ChatCascadeStages`), запускает
+     * планировщик, а собирается это здесь, как и остальные долгоживущие связки.
+     */
+    cascade: {
+      linkOf: (aliases) => aliases.map((key) => ctx.store.getChatLink(key)).find(Boolean),
+      saveLink: (chatId, link) => ctx.store.setChatLink(chatId, link),
+      // Отметка ставится по ОБОИМ ключам чата: под временным он живёт в памяти
+      // вкладок, под настоящим — в списке, и проверить работу дважды нельзя ни
+      // из того, ни из другого.
+      markReviewed: (aliases, at) => {
+        for (const key of aliases) {
+          const link = ctx.store.getChatLink(key);
+          if (link) ctx.store.setChatLink(key, { ...link, reviewedAt: at });
+        }
+      },
+      // Та же отметка для плана (Т1): вторая работа той же группы не заводится.
+      markPlanned: (aliases, at) => {
+        for (const key of aliases) {
+          const link = ctx.store.getChatLink(key);
+          if (link) ctx.store.setChatLink(key, { ...link, plannedAt: at });
+        }
+      },
+      hasWork: (cwd, since) => hasWorkSince(cwd, since),
+      settings: () => ctx.store.getSettings(),
+    },
+    split: {
+      onTriageFinished: (finished, aliases) => splitConveyor.onTriageFinished(finished, aliases),
+      onChainEnded: (link, ok) => splitConveyor.onChainEnded(link, ok),
+    },
+    // Ревью по ссылке (Т7): замечания из ответа — в связь, карточка — человеку.
+    review: { onReviewFinished: (input) => splitReview.finished(input) },
+  });
+  chatRuns.setHandoffPlanner((finished) => {
+    const keys = finished.sessionId ? [finished.chatId, finished.sessionId] : [finished.chatId];
+    tellsOnFinish(keys, finished.ok, finished.text);
+    const decision = isRetriedChild(keys) ? runRetry.finished(finished) : undefined;
+    const retry = retryOutcome(decision);
+    return handoffPlanner(retry ? { ...finished, retry } : finished);
+  });
   /**
    * Тот же конвейер «работа → ревью → правки», но у чужих CLI. Живёт не на
    * реестре прогонов (их разговоры идут мимо него вовсе), а на завершении ответа
    * и стадии в шапке разговора; решение принимает домен, снаружи ему нужны
    * провайдер, каталог моделей, настройки и один вопрос к git.
    */
-  providerChats.setFinishedListener(
-    createForeignStagePlanner({
-      chats: providerChats,
-      // Claude сюда не попадает никогда: у него свой чат и свой конвейер.
-      // Незнакомый id — не звено: `getProvider` откатился бы на Claude, а тот
-      // отказался бы запускаться, оставив в переписке ошибку на пустом месте.
-      provider: (id) =>
-        id !== DEFAULT_PROVIDER_ID && isKnownProviderId(id) ? getProvider(id) : undefined,
-      models: (provider) => ctx.models.current(provider.modelVendors ?? []).models,
-      settings: () => ctx.store.getSettings(),
-      hasWork: (cwd, since) => hasWorkSince(cwd, since),
-      // Связи звеньев: та же группа и тот же родитель, новая стадия — без них
-      // дерево чужого разделения видит одну работу.
-      linkOf: (key) => ctx.store.getChatLink(key),
-      saveLink: (key, link) => ctx.store.setChatLink(key, link),
-      // Стоящее дерево звеньев не запускает: чат заведён, старт в очереди (Т5).
-      gate: treePause,
-      // Уровни (Т3): разбор у чужого CLI кончился — итог применяет тот же
-      // конвейер, что и у Claude, а строка о нём уходит в ленту разбора.
-      onTriage: ({ chatKey, ok, text }) => {
-        const event = splitConveyor.onTriageFinished({ ok, text }, [chatKey]);
-        return event?.kind === 'notice' ? event.text : undefined;
+  const foreignStagePlanner = createForeignStagePlanner({
+    chats: providerChats,
+    // Claude сюда не попадает никогда: у него свой чат и свой конвейер.
+    // Незнакомый id — не звено: `getProvider` откатился бы на Claude, а тот
+    // отказался бы запускаться, оставив в переписке ошибку на пустом месте.
+    provider: (id) =>
+      id !== DEFAULT_PROVIDER_ID && isKnownProviderId(id) ? getProvider(id) : undefined,
+    models: (provider) => ctx.models.current(provider.modelVendors ?? []).models,
+    settings: () => ctx.store.getSettings(),
+    hasWork: (cwd, since) => hasWorkSince(cwd, since),
+    // Связи звеньев: та же группа и тот же родитель, новая стадия — без них
+    // дерево чужого разделения видит одну работу.
+    linkOf: (key) => ctx.store.getChatLink(key),
+    saveLink: (key, link) => ctx.store.setChatLink(key, link),
+    // Стоящее дерево звеньев не запускает: чат заведён, старт в очереди (Т5).
+    gate: treePause,
+    // Уровни (Т3): разбор у чужого CLI кончился — итог применяет тот же
+    // конвейер, что и у Claude, а строка о нём уходит в ленту разбора.
+    onTriage: ({ chatKey, ok, text }) => {
+      const event = splitConveyor.onTriageFinished({ ok, text }, [chatKey]);
+      return event?.kind === 'notice' ? event.text : undefined;
+    },
+    onChainEnded: (link, ok) => splitConveyor.onChainEnded(link, ok),
+    // Ревью MR по ссылке (Т6): тот же домен, что у Claude, — замечания
+    // читаются один раз и ложатся в связь, а решение ждёт человека.
+    onReviewFinished: (input) => splitReview.finished(input),
+    // Продолжение в чистой сессии (Т7): память цепочек ОДНА на оба
+    // провайдера — тумблер, номер шага и отпечаток файла-опоры общие, иначе
+    // «те же пределы» у чужого CLI оказались бы другими.
+    chains: handoffChains,
+  });
+  providerChats.setFinishedListener((finished) => {
+    const key = foreignChatKey(finished.providerId, finished.chatId);
+    tellsOnFinish([key], finished.ok, finished.text);
+    // Надзор повторов и у чужого CLI (Д10). Сессии у него нет: продолжение —
+    // реплика в тот же разговор, история уезжает вместе с ней.
+    const retry = retryForeignRun(
+      runRetry,
+      {
+        key,
+        cwd: readChat(ctx.location.paths.appData, finished.providerId, finished.chatId)?.workdir,
+        ok: finished.ok,
+        ...(finished.error ? { error: finished.error } : {}),
+        ...(finished.stopped ? { stopped: true } : {}),
+        retried: isRetriedChild([key]),
       },
-      onChainEnded: (link, ok) => splitConveyor.onChainEnded(link, ok),
-      // Ревью MR по ссылке (Т6): тот же домен, что у Claude, — замечания
-      // читаются один раз и ложатся в связь, а решение ждёт человека.
-      onReviewFinished: (input) => splitReview.finished(input),
-      // Продолжение в чистой сессии (Т7): память цепочек ОДНА на оба
-      // провайдера — тумблер, номер шага и отпечаток файла-опоры общие, иначе
-      // «те же пределы» у чужого CLI оказались бы другими.
-      chains: handoffChains,
-    }),
-  );
+      (chatKey, options, meta) =>
+        treePause.defer('stage', chatKey, options, meta) || treeRuns.start(chatKey, options, meta),
+      (message, error) => console.warn(message, error),
+    );
+    foreignStagePlanner(retry ? { ...finished, retry } : finished);
+  });
   // Прокси защиты данных: тоже слушатель, тоже переживает запрос. Создаётся
   // всегда, поднимается — только если человек включил его в настройках.
   const dlpProxy = new DlpProxy();

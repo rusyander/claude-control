@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TaskSplitReviewDecision } from '@agentdeck/contracts/task-split';
 import type { ChatTreeView } from '@agentdeck/contracts/chat-handoff';
-import { useReviewDecision, useReviewPush } from '@entities/ChatTree';
+import { useReviewDecision, useReviewPush, useReviewRetry } from '@entities/ChatTree';
 import { collectReviews, reviewTreeOf, type ReviewDecisionItem } from '@features/ChatMessages';
 import { toErrorMessage } from '@shared/api/client';
 import { toast } from '@shared/lib/toast';
@@ -19,6 +19,7 @@ export interface ForeignReviews {
   items: ReviewDecisionItem[];
   decide: (chatId: string, verdict: TaskSplitReviewDecision, all: boolean) => void;
   push: (chatId: string) => void;
+  retry: (chatId: string) => void;
   busy: boolean;
 }
 
@@ -48,6 +49,7 @@ export function useForeignReviews(input: {
 
   const decision = useReviewDecision();
   const pushRun = useReviewPush();
+  const retryRun = useReviewRetry();
   const treeOf = (chatId: string): string => reviewTreeOf(items, chatId, [tree?.root, treeKey]);
   const failed = (error: unknown): void => {
     toast.error(
@@ -101,5 +103,25 @@ export function useForeignReviews(input: {
     );
   };
 
-  return { items, decide, push, busy: decision.isPending || pushRun.isPending };
+  const retry = (chatId: string): void => {
+    if (retryRun.isPending) return;
+    retryRun.mutate(
+      { parentChatId: treeOf(chatId), chatId },
+      {
+        onSuccess: () => {
+          toast.success(t('chat.review.retryToast'));
+          settle();
+        },
+        onError: failed,
+      },
+    );
+  };
+
+  return {
+    items,
+    decide,
+    push,
+    retry,
+    busy: decision.isPending || pushRun.isPending || retryRun.isPending,
+  };
 }

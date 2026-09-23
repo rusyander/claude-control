@@ -2,7 +2,7 @@ import type { ChatSummary } from '@agentdeck/contracts';
 import type { SplitPlanView } from '@agentdeck/contracts/chat-handoff';
 import { CASCADE_STAGES, type CascadeStage } from '@agentdeck/contracts/model-cascade';
 import type { ActiveRunView } from '@shared/lib/agent-runs';
-import { mergeSplitGroups, type ChildStageGroup } from '@features/ChatMessages';
+import { mergeSplitGroups, splitGroupKey, type ChildStageGroup } from '@features/ChatMessages';
 
 /**
  * Сводка «кто на чём работает» для родительского разговора.
@@ -13,13 +13,15 @@ import { mergeSplitGroups, type ChildStageGroup } from '@features/ChatMessages';
  * это полтора десятка строк на три группы, и по ним не прочесть главного — на
  * каком звене группа стоит СЕЙЧАС и чем оно ведётся.
  *
- * Поэтому сводка считается по ГРУППАМ, а не по чатам: звенья одной группы живут
- * в одной копии и в одной ветке, ветка их и объединяет. Ветки нет (делили не
- * репозиторий — дети работают в общем каталоге) — группу держит вместе связь
- * через заголовок, под которым её завело разделение.
+ * Поэтому сводка считается по ГРУППАМ, а не по чатам: звенья одной группы
+ * держит вместе номер группы из связи (Д12), у связей старше него — ветка, а
+ * без неё (делили не репозиторий) — имя группы, под которым её завело
+ * разделение.
  *
  * Показывается ПОСЛЕДНЕЕ звено группы: оно и есть её нынешнее состояние, а
- * пройденные подписаны рядом, чтобы был виден путь. Порядок внутри группы — по
+ * пройденные подписаны рядом, чтобы был виден путь. «Идёт» — если идёт любое
+ * звено: правки работали, пока последним уже стоял чат отправки, и группа
+ * выглядела стоящей. Порядок внутри группы — по
  * времени заведения разговора: панель заводит звенья строго друг за другом, и
  * это единственный порядок, в котором они бывают.
  *
@@ -39,12 +41,11 @@ export function collectChildStages(
   const children = chats.filter((chat) => chat.parentId === parentChatId);
   if (children.length === 0 && !split) return [];
 
-  // Ключ группы — ветка; без неё имя группы из связи. Заголовок чата ключом не
-  // годится: это текст его первого сообщения, а он у работы, её ревью и правок
-  // разный — три звена одной группы разъехались бы по трём строкам.
+  // Заголовок чата ключом не годится: это текст его первого сообщения, а он у
+  // работы, её ревью и правок разный — три звена разъехались бы по трём строкам.
   const groups = new Map<string, ChatSummary[]>();
   for (const chat of children) {
-    const key = chat.branch || chat.groupTitle || chat.id;
+    const key = splitGroupKey({ ...chat, title: chat.groupTitle });
     const list = groups.get(key);
     if (list) list.push(chat);
     else groups.set(key, [chat]);
@@ -70,6 +71,11 @@ function groupRow(
   const ordered = [...list].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   const last = ordered.at(-1);
   if (!last) return undefined;
+  const isRunning = ordered.some((chat) =>
+    runs.some(
+      (run) => (run.id === chat.id || run.sessionId === chat.id) && run.status === 'running',
+    ),
+  );
 
   return {
     chatId: last.id,
@@ -85,9 +91,10 @@ function groupRow(
     ...(last.model ? { model: last.model } : {}),
     // Ключ прогона сверяется дважды: разговор, заведённый панелью, живёт под
     // временным `new-…`, пока CLI не назовёт настоящий `sessionId`.
-    isRunning: runs.some(
-      (run) => (run.id === last.id || run.sessionId === last.id) && run.status === 'running',
-    ),
+    isRunning,
+    // Звено спросило человека инструментом и стоит (Д16): из транскрипта, а не
+    // из конвейера — вопрос бывает и у разговора, продолженного руками.
+    ...(last.awaitingReply && !isRunning ? { waitingFor: 'question' as const } : {}),
   };
 }
 

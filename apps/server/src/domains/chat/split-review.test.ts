@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import {
   SplitReview,
   reviewNoticeText,
@@ -42,10 +42,19 @@ function stand(
      */
     realKey?: string;
     started?: boolean;
+    /** Запуск отказал, потому что разговор ещё идёт. */
+    busy?: boolean;
   } = {},
 ) {
   const links: Record<string, ChatLink> = {};
-  const started: { chatId: string; prompt: string; cwd: string; stage: string }[] = [];
+  const started: {
+    chatId: string;
+    prompt: string;
+    cwd: string;
+    stage: string;
+    resume?: string;
+  }[] = [];
+  const closed: ChatLink[] = [];
   const posted: { url: string; body: string }[] = [];
   const events: { parent: string; event: unknown }[] = [];
 
@@ -67,12 +76,15 @@ function stand(
         prompt: input.prompt,
         cwd: input.cwd,
         stage: input.stage,
+        ...(input.resume ? { resume: input.resume.sessionId } : {}),
       });
+      if (options.busy) return { started: false, busy: true };
       return {
         started: options.started ?? true,
         ...(options.realKey ? { chatId: options.realKey } : {}),
       };
     },
+    closeGroup: (link) => void closed.push(link),
     emit: (parent, event) => {
       events.push({ parent, event });
       return true;
@@ -81,7 +93,7 @@ function stand(
     now: () => new Date('2026-09-09T12:00:00.000Z'),
   });
 
-  return { review, links, started, posted, events };
+  return { review, links, started, posted, events, closed };
 }
 
 /** Ответ ревьюера в том виде, в каком его печатает модель. */
@@ -224,6 +236,18 @@ describe('решение человека', () => {
     const fixLink = links[started[0]?.chatId ?? ''];
     expect(fixLink?.stage).toBe('fix');
     expect(fixLink?.review?.url).toBe(URL);
+  });
+
+  it('чат правок — другой разговор: ключа разговора группы он не наследует (Д11)', async () => {
+    const { review, links, started } = stand();
+    links.c1 = { ...waiting(), conversation: 'new-group' };
+    links['sess-group'] = links.c1;
+
+    await review.decide({ chatId: 'c1', decision: 'fix' });
+
+    const fixLink = links[started[0]?.chatId ?? ''];
+    expect(fixLink?.parentChatId).toBe(links.c1.parentChatId);
+    expect(fixLink?.conversation).toBeUndefined();
   });
 
   it('«отписать» пишет ОДИН сводный комментарий и правок не заводит', async () => {
@@ -446,7 +470,13 @@ describe('отправка правок в MR', () => {
     const { review, links, started } = stand();
     links.fix = reviewLink({
       stage: 'fix',
-      review: { url: URL, path: '/copy', findings: ['одно'], pushOffer: true },
+      review: {
+        url: URL,
+        branch: 'feature/login',
+        path: '/copy',
+        findings: ['одно'],
+        pushOffer: true,
+      },
     });
 
     review.push({ chatId: 'fix' });
@@ -456,33 +486,148 @@ describe('отправка правок в MR', () => {
     expect(second.applied).toEqual([]);
   });
 
-  it('две отправки в одну миллисекунду получают разные ключи', () => {
+  it('push продолжает СЕССИЮ правок, а не заводит новый чат в той же копии (Д8)', () => {
     const { review, links, started } = stand();
-    // Группы разные: одинаковое содержимое связи домен считает ОДНИМ
-    // разговором под двумя ключами — тогда вторая отправка и не должна идти.
-    for (const key of ['fix1', 'fix2']) {
-      links[key] = reviewLink({
-        stage: 'fix',
-        title: `MR ${key}`,
-        branch: `feature/${key}`,
-        review: { url: `${URL}${key}`, path: `/copy-${key}`, findings: ['одно'], pushOffer: true },
-      });
-    }
+    const fix = reviewLink({
+      stage: 'fix',
+      conversation: 'conv-fix',
+      review: {
+        url: URL,
+        branch: 'feature/login',
+        path: '/copy',
+        findings: ['одно'],
+        pushOffer: true,
+      },
+    });
+    // Связь живёт под временным ключом и под настоящим ключом сессии.
+    links['new-1-fix0'] = fix;
+    links['sess-fix'] = fix;
 
-    // Часы фиксируем: гонка воспроизводится только когда обе отправки
-    // пришлись на одну миллисекунду, а ловить её случайно — не проверка.
-    const clock = vi.spyOn(Date, 'now').mockReturnValue(1758000000000);
-    try {
-      review.push({ chatId: 'fix1' });
-      review.push({ chatId: 'fix2' });
-    } finally {
-      clock.mockRestore();
-    }
+    const outcome = review.push({ chatId: 'new-1-fix0' });
 
-    // Ключ из одного только `Date.now()` был бы один на двоих, и второй чат
-    // отправки затёр бы первый.
-    expect(started).toHaveLength(2);
-    expect(started[0]?.chatId).not.toBe(started[1]?.chatId);
+    expect(started).toHaveLength(1);
+    expect(started[0]?.chatId).toBe('sess-fix');
+    expect(started[0]?.resume).toBe('sess-fix');
+    expect(outcome.applied[0]?.pushChatId).toBe('sess-fix');
+    // Нового чата в дереве нет: ключей столько же, сколько было.
+    expect(Object.keys(links).sort()).toEqual(['new-1-fix0', 'sess-fix']);
+    expect(links['sess-fix']?.review?.pushedAt).toBe('2026-09-09T12:00:00.000Z');
+    expect(links['new-1-fix0']?.review?.pushedAt).toBe('2026-09-09T12:00:00.000Z');
+  });
+
+  it('копия в detached HEAD — push идёт в ветку MR через HEAD:<ветка> (Д9)', () => {
+    const { review, links, started } = stand();
+    links.fix = reviewLink({
+      stage: 'fix',
+      review: {
+        url: URL,
+        branch: 'feature/login',
+        remote: 'upstream',
+        detached: true,
+        path: '/copy',
+        findings: ['одно'],
+        pushOffer: true,
+      },
+    });
+
+    review.push({ chatId: 'fix' });
+
+    expect(started[0]?.prompt).toContain('git push upstream HEAD:feature/login');
+  });
+
+  it('ветка MR неизвестна — push отказан с причиной и не запускается (Д9)', () => {
+    const { review, links, started } = stand();
+    links.fix = reviewLink({
+      stage: 'fix',
+      review: { url: URL, path: '/copy', findings: ['одно'], pushOffer: true },
+    });
+
+    const outcome = review.push({ chatId: 'fix' });
+
+    expect(started).toEqual([]);
+    expect(outcome.applied[0]?.refused).toBe('branch-unknown');
+    expect(links.fix?.review?.pushedAt).toBeUndefined();
+  });
+
+  it('чат правок ещё работает — отказ, кнопка остаётся (Д8)', () => {
+    const { review, links } = stand({ busy: true });
+    links.fix = reviewLink({
+      stage: 'fix',
+      review: {
+        url: URL,
+        branch: 'feature/login',
+        path: '/copy',
+        findings: ['одно'],
+        pushOffer: true,
+      },
+    });
+
+    const outcome = review.push({ chatId: 'fix' });
+
+    expect(outcome.applied[0]?.refused).toBe('busy');
+    expect(links.fix?.review?.pushOffer).toBe(true);
+    expect(links.fix?.review?.pushedAt).toBeUndefined();
+  });
+
+  it('ход правок кончился вопросом — push не предлагается (Д8)', () => {
+    const { review, links } = stand();
+    links.fix = reviewLink({
+      stage: 'fix',
+      review: { url: URL, branch: 'feature/login', path: '/copy', findings: ['одно'] },
+    });
+
+    const event = review.finished({
+      chatId: 'fix',
+      aliases: ['fix'],
+      link: links.fix as ChatLink,
+      ok: true,
+      text: 'Какой вариант выбрать?',
+      paused: true,
+    });
+
+    expect(event).toBeUndefined();
+    expect(links.fix?.review?.pushOffer).toBeUndefined();
+  });
+
+  it('правки не изменили копию — push не предлагается, лента говорит почему (Д8)', () => {
+    const { review, links } = stand();
+    links.fix = reviewLink({
+      stage: 'fix',
+      review: { url: URL, branch: 'feature/login', path: '/copy', findings: ['одно'] },
+    });
+
+    const event = review.finished({
+      chatId: 'fix',
+      aliases: ['fix'],
+      link: links.fix as ChatLink,
+      ok: true,
+      text: 'Всё уже было поправлено.',
+      hasWork: () => false,
+    });
+
+    expect(event).toMatchObject({ noChanges: true });
+    expect(links.fix?.review?.pushOffer).toBeUndefined();
+  });
+
+  it('ветка MR неизвестна — push не предлагается, причина в связи и в виде (Д9)', () => {
+    const { review, links } = stand();
+    links.fix = reviewLink({
+      stage: 'fix',
+      review: { url: URL, path: '/copy', findings: ['одно'] },
+    });
+
+    const event = review.finished({
+      chatId: 'fix',
+      aliases: ['fix'],
+      link: links.fix as ChatLink,
+      ok: true,
+      text: 'Поправил.',
+      hasWork: () => true,
+    });
+
+    expect(event).toMatchObject({ pushBlocked: 'branch-unknown' });
+    expect(links.fix?.review?.pushOffer).toBeUndefined();
+    expect(review.view(links.fix as ChatLink)?.pushBlocked).toBe('branch-unknown');
   });
 
   it('без предложения (правок не было) отправлять нечего', () => {
@@ -515,18 +660,24 @@ describe('звено у чужого CLI', () => {
     expect(links[requested]).toBeUndefined();
   });
 
-  it('отправка в MR переезжает так же', () => {
-    const { review, links, started } = stand({ realKey: 'codex:push1' });
-    links.fix = reviewLink({
+  it('отправка в MR продолжает тот же разговор чужого CLI', () => {
+    const { review, links, started } = stand({ realKey: 'codex:fix1' });
+    links['codex:fix1'] = reviewLink({
       stage: 'fix',
-      review: { url: URL, path: '/copy', findings: ['одно'], pushOffer: true },
+      review: {
+        url: URL,
+        branch: 'feature/login',
+        path: '/copy',
+        findings: ['одно'],
+        pushOffer: true,
+      },
     });
 
-    const outcome = review.push({ chatId: 'fix' });
+    const outcome = review.push({ chatId: 'codex:fix1' });
 
-    expect(outcome.applied[0]?.pushChatId).toBe('codex:push1');
-    expect(links['codex:push1']?.stage).toBe('push');
-    expect(links[started[0]?.chatId ?? '']).toBeUndefined();
+    expect(started[0]?.resume).toBe('codex:fix1');
+    expect(outcome.applied[0]?.pushChatId).toBe('codex:fix1');
+    expect(Object.keys(links)).toEqual(['codex:fix1']);
   });
 
   it('запуск не удался — ключа в ответе нет, и в дереве не появляется чужой', async () => {
@@ -539,6 +690,114 @@ describe('звено у чужого CLI', () => {
     expect(outcome.applied[0]?.decision).toBe('fix');
     expect(outcome.applied[0]?.fixChatId).toBeUndefined();
     expect(Object.keys(links).some((key) => key.startsWith('codex:'))).toBe(false);
+  });
+});
+
+describe('ревью без блока итога (Д4)', () => {
+  it('нет блока — это не «замечаний нет»: группа ждёт, карточка предлагает повтор', () => {
+    const { review, links } = stand();
+    links.c1 = reviewLink();
+
+    const event = review.finished({
+      chatId: 'c1',
+      aliases: ['c1'],
+      link: links.c1 as ChatLink,
+      ok: true,
+      text: 'Посмотрел, в целом нормально.',
+    });
+
+    expect(event).toMatchObject({ kind: 'review', missing: true, findings: [] });
+    expect(links.c1?.review?.missing).toBe(true);
+    expect(links.c1?.review?.decidedAt).toBeUndefined();
+    expect(review.view(links.c1 as ChatLink)?.missing).toBe(true);
+    expect(reviewNoticeText(event as never)).not.toContain('замечаний нет');
+  });
+
+  it('ход с вопросом человеку — ещё не итог: ни замечаний, ни «нет блока»', () => {
+    const { review, links } = stand();
+    links.c1 = reviewLink();
+
+    const event = review.finished({
+      chatId: 'c1',
+      aliases: ['c1'],
+      link: links.c1 as ChatLink,
+      ok: true,
+      text: 'Смотреть только бэкенд или фронт тоже?',
+      paused: true,
+    });
+
+    expect(event).toBeUndefined();
+    expect(links.c1?.review?.missing).toBeUndefined();
+  });
+
+  it('повтор идёт в ТУ ЖЕ сессию ревью, а следующий блок читается', () => {
+    const { review, links, started } = stand();
+    links.c1 = reviewLink({
+      review: { url: URL, branch: 'feature/login', path: '/copy', missing: true },
+    });
+
+    const outcome = review.retryReview({ chatId: 'c1' });
+
+    expect(started).toHaveLength(1);
+    expect(started[0]?.resume).toBe('c1');
+    expect(started[0]?.stage).toBe('review');
+    expect(started[0]?.prompt).toContain('agentdeck:review');
+    expect(outcome.applied[0]?.retryChatId).toBe('c1');
+    expect(links.c1?.review?.missing).toBeUndefined();
+
+    const event = review.finished({
+      chatId: 'c1',
+      aliases: ['c1'],
+      link: links.c1 as ChatLink,
+      ok: true,
+      text: answer(['src/a.ts:1 — ошибка']),
+    });
+    expect(event).toMatchObject({ findings: ['src/a.ts:1 — ошибка'] });
+  });
+
+  it('повтор без отметки «нет блока» не запускается', () => {
+    const { review, links, started } = stand();
+    links.c1 = reviewLink();
+
+    expect(review.retryReview({ chatId: 'c1' }).applied).toEqual([]);
+    expect(started).toEqual([]);
+  });
+});
+
+describe('решение закрывает группу (Д3)', () => {
+  it('«ничего» и «отписать» закрывают группу, «исправить» — нет: правки ещё идут', async () => {
+    const { review, links, closed } = stand();
+    for (const key of ['a', 'b', 'c']) {
+      links[key] = reviewLink({
+        title: key,
+        review: { url: `${URL}${key}`, path: `/${key}`, findings: ['x'] },
+      });
+    }
+
+    await review.decide({ chatId: 'a', decision: 'none' });
+    await review.decide({ chatId: 'b', decision: 'post' });
+    await review.decide({ chatId: 'c', decision: 'fix' });
+
+    expect(closed.map((link) => link.title)).toEqual(['a', 'b']);
+  });
+});
+
+describe('ключ разговора (Д11)', () => {
+  it('связи одного разговора с РАЗНЫМ содержимым — всё равно один разговор', async () => {
+    const { review, links, started } = stand();
+    const base = reviewLink({
+      conversation: 'conv-1',
+      review: { url: URL, path: '/copy', findings: ['x'] },
+    });
+    links['new-1'] = base;
+    // Под вторым ключом поле разошлось — раньше это раздваивало дерево.
+    links['sess-1'] = { ...base, reviewedAt: '2026-09-09T11:00:00.000Z' };
+
+    await review.decide({ chatId: 'new-1', decision: 'none', applyToAll: true });
+
+    expect(started).toEqual([]);
+    expect(links['new-1']?.review?.decision).toBe('none');
+    expect(links['sess-1']?.review?.decision).toBe('none');
   });
 });
 

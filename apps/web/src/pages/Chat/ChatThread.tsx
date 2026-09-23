@@ -112,6 +112,7 @@ export function ChatThread({
       reviews={child.reviews}
       onReviewDecide={child.reviewDecide}
       onReviewPush={child.reviewPush}
+      onReviewRetry={child.reviewRetry}
       reviewBusy={child.reviewBusy}
       childPermissions={child.permissions}
       // Решение по правам ребёнка уходит в ЕГО прогон — тем же путём, что и

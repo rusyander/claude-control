@@ -27,9 +27,41 @@ import { blockLang, blockLangPattern } from './brand.ts';
 /** Язык блока: он же признак, по которому панель узнаёт предложение. */
 export const SPLIT_BLOCK_LANG = blockLang('split');
 
-/** Потолки: предложение приходит из ответа модели, а не из формы. */
-export const SPLIT_MAX_GROUPS = 8;
+/**
+ * Потолки: предложение приходит из ответа модели, а не из формы.
+ *
+ * Групп до 30: группа — это ветка и MR, и выгрузка из трекера на 60–80 задач
+ * законно раскладывается на 20 групп. Прежние 8 резали хвост молча — агент о
+ * потолке не знал, человек об обрезке не узнавал (23.09.2026). Сколько групп
+ * работает ОДНОВРЕМЕННО, решает не этот потолок, а настройка проекта.
+ */
+export const SPLIT_MAX_GROUPS = 30;
 export const SPLIT_MAX_TASKS_PER_GROUP = 50;
+
+/**
+ * Разделение на проекте — задаётся человеком один раз, действует на каждое
+ * разделение в этом репозитории.
+ */
+export interface SplitSettings {
+  /**
+   * Доводить каждую группу до готового MR навыком доставки проекта: задачи
+   * группы — одна ветка и один MR, с ревью, живой проверкой и описанием.
+   */
+  deliver: boolean;
+  /**
+   * Сколько групп работает одновременно; остальные ждут в очереди и стартуют,
+   * как только у работающей кончится ход. Двадцать групп разом — двадцать
+   * сессий на потолке со своими ревьюерами: окно подписки кончается за час.
+   */
+  parallel: number;
+}
+
+/** Прежнее поведение: при старом потолке в 8 групп разом шли все восемь. */
+export const SPLIT_PARALLEL_DEFAULT = 8;
+export const SPLIT_SETTINGS_DEFAULT: SplitSettings = {
+  deliver: false,
+  parallel: SPLIT_PARALLEL_DEFAULT,
+};
 const MAX_TITLE = 120;
 const MAX_BRANCH = 120;
 const MAX_TASK = 2_000;
@@ -113,6 +145,12 @@ export interface TaskSplitProposal {
   /** Контекст, который уходит в КАЖДЫЙ чат: общие правила, стек, договорённости. */
   shared?: string;
   groups: TaskSplitGroup[];
+  /**
+   * Что разбор отбросил по потолкам: групп сверх `SPLIT_MAX_GROUPS` и задач
+   * сверх `SPLIT_MAX_TASKS_PER_GROUP`. Карточка говорит об этом вслух — иначе
+   * хвост выгрузки пропадал бы без следа.
+   */
+  dropped?: { groups?: number; tasks?: number };
 }
 
 /** Чат, заведённый под группу. */
@@ -208,6 +246,10 @@ export const SPLIT_SYSTEM_PROMPT =
   'Панель покажет человеку карточку выбора вместо этого блока, поэтому не пересказывай JSON словами. ' +
   'Заводить ветки, копии репозитория и чаты самому НЕ нужно и нечем: всё это делает панель, ' +
   'когда человек нажмёт кнопку в карточке. ' +
+  `Групп не больше ${SPLIT_MAX_GROUPS}, задач в группе не больше ${SPLIT_MAX_TASKS_PER_GROUP}: сверх этого панель ` +
+  'группы не заведёт. Каждая группа станет своей веткой и своим запросом на слияние — группируй то, что ' +
+  'ревьюить и вливать вместе, а не просто похожее по теме. Задачу из трекера пиши с её ключом (ABC-123) и ' +
+  'ссылкой: по ним группа возьмёт задачу в работу. ' +
   'После блока остановись и жди решения. ' +
   // Ревью по ссылке (Т7) — единственный случай, когда одна группа законна:
   // MR и есть отдельная работа в своей копии на его ветке. Без этой оговорки
@@ -371,7 +413,10 @@ function reviewOf(group: Record<string, unknown>): TaskSplitReview | undefined {
   // Режим — только явным полем. По классу его не угадываем: ревью со своим
   // классом (`design`) законно, и догадка превратила бы чтение чужого MR в правку.
   const action = text(source.action ?? source.mode ?? group.action ?? group.mode, MAX_ASSIGNMENT);
-  const work = Boolean(action && action.toLowerCase() !== 'review');
+  // `work: true` — собственный вывод этого разбора: веб шлёт на сервер уже
+  // разобранное предложение, и сервер разбирает его ещё раз. Без этого поля
+  // второй разбор терял режим, и работа в MR уезжала ревью с «НИЧЕГО НЕ ПРАВЬ».
+  const work = source.work === true || Boolean(action && action.toLowerCase() !== 'review');
   return { url, ...(branch ? { branch } : {}), ...(work ? { work } : {}) };
 }
 
@@ -408,6 +453,7 @@ export function parseSplitProposal(raw: unknown): TaskSplitProposal | undefined 
   if (!Array.isArray(list)) return undefined;
 
   const groups: TaskSplitGroup[] = [];
+  let droppedTasks = 0;
   for (const [index, item] of list.slice(0, SPLIT_MAX_GROUPS).entries()) {
     if (!item || typeof item !== 'object') continue;
     const group = item as Record<string, unknown>;
@@ -421,6 +467,10 @@ export function parseSplitProposal(raw: unknown): TaskSplitProposal | undefined 
     // из-за поля, которое человек и так видит в заголовке карточки.
     const tasks = taskList(group);
     if (tasks.length === 0) tasks.push(title);
+    const listed = group.tasks ?? group.task ?? group.items ?? group.prompt;
+    if (Array.isArray(listed) && listed.length > SPLIT_MAX_TASKS_PER_GROUP) {
+      droppedTasks += listed.length - SPLIT_MAX_TASKS_PER_GROUP;
+    }
 
     const branch = text(group.branch, MAX_BRANCH) ?? branchFromTitle(title, index);
     const brief = briefOf(group);
@@ -455,7 +505,16 @@ export function parseSplitProposal(raw: unknown): TaskSplitProposal | undefined 
   if (groups.length === 0) return undefined;
 
   const shared = textOrList(source.shared ?? source.context, MAX_SHARED);
-  return { groups, ...(shared ? { shared } : {}) };
+  const droppedGroups = Math.max(0, list.length - SPLIT_MAX_GROUPS);
+  const dropped = {
+    ...(droppedGroups > 0 ? { groups: droppedGroups } : {}),
+    ...(droppedTasks > 0 ? { tasks: droppedTasks } : {}),
+  };
+  return {
+    groups,
+    ...(shared ? { shared } : {}),
+    ...(Object.keys(dropped).length > 0 ? { dropped } : {}),
+  };
 }
 
 /** Что осталось от текста после вырезания блоков и что из них разобрано. */
@@ -601,10 +660,13 @@ export interface EnvironmentPreambleInput {
  *
  * До неё агент в свежей копии сам поднимал MCP, зеркалил `.claude/`, ставил
  * зависимости в фоне и откатывал переписанные lock-файлы — минуты и контекст
- * на каждом ребёнке разделения, часть шагов упиралась в человека. Теперь всё
- * это сделано ДО старта, и преамбула говорит прямо: окружение готово, начинай
- * с задачи. Провал подготовки не скрывается — хвост лога здесь же, и агент
- * решает сам, повторять установку или обойтись.
+ * на каждом ребёнке разделения, часть шагов упиралась в человека. Теперь это
+ * делается ДО старта, и преамбула называет готовым РОВНО сделанное (Д13):
+ * «окружение готово» при ненастроенной подготовке отправило детей живого проекта на
+ * пустые `node_modules` — 5–10 минут установки, поднятые установщиком
+ * дев-серверы и четыре переписанных lock-файла. Провал подготовки не
+ * скрывается — хвост лога здесь же, и агент решает сам, повторять установку
+ * или обойтись.
  */
 export function environmentPreamble(input: EnvironmentPreambleInput): string {
   const lines: string[] = [];
@@ -633,10 +695,58 @@ export function environmentPreamble(input: EnvironmentPreambleInput): string {
       }`,
     );
   }
-  lines.push(
-    'Окружение готово — не проверяй и не настраивай его (MCP, локальный слой, зависимости), начинай сразу с задачи.',
-  );
+  if (boot?.status === 'ok') {
+    lines.push(
+      'Окружение готово — не проверяй и не настраивай его (MCP, локальный слой, зависимости), начинай сразу с задачи.',
+    );
+  } else {
+    if (!boot) {
+      lines.push(
+        'Зависимости панель НЕ ставила: подготовка копии в настройках проекта не задана. Задаче они не нужны — не ставь. Нужны — поставь сам одной командой установки без запуска дев-серверов и сборки, а переписанные установкой lock-файлы не коммить.',
+      );
+    }
+    lines.push(
+      input.mirror
+        ? 'MCP и локальный слой не настраивай — начинай с задачи.'
+        : 'MCP не настраивай — начинай с задачи.',
+    );
+  }
   return lines.join('\n');
+}
+
+/**
+ * Доставка группы до готового MR (настройка проекта `SplitSettings.deliver`).
+ *
+ * Конвейер доставки панель не повторяет: он уже есть навыком (`ticket-delivery`
+ * и проектные варианты — взять задачу, ветка, проверки, коммит, пуш, черновик
+ * MR, ревью, живая проверка, описание) и отлажен на живых задачах. Панель
+ * велит группе пройти его и держит то, чего навык не знает: копия и ветка уже
+ * заведены, задачи группы — один MR, остановка — вопрос через панель.
+ *
+ * Без этой строки группа кончалась «готово» с незакоммиченной работой в копии,
+ * и всё от коммита до MR человек делал руками по каждой группе (23.09.2026).
+ */
+export function deliveryPreamble(input: { branch: string; mergeRequest?: string }): string {
+  return [
+    'Доставка до готового MR — обязанность этой группы: человек включил её на проекте, и это его ' +
+      'разрешение на коммит, пуш, создание и обновление MR и шаги в трекере по задачам группы. ' +
+      'Слияние, удаление веток и force-push по-прежнему запрещены.',
+    'Проведи задачи группы по навыку доставки задач (проектный вариант, например ' +
+      '`<проект>-ticket-delivery`, главнее общего `ticket-delivery`; навыка нет — пройди те же этапы ' +
+      'сам): задачи трекера — в работу на себя, правка, проверки проекта, коммит, пуш, черновик MR, ' +
+      'ревью, живая проверка, сверка с дизайном, если к задаче приложен макет, исправление ' +
+      'найденного, описание MR — и снять черновик, когда всё чисто.',
+    'Все задачи группы — ОДНА ветка и ОДИН MR: ключи задач — в описании MR, из каждой задачи — ' +
+      'ссылка на MR.',
+    input.mergeRequest
+      ? `MR уже есть: ${input.mergeRequest}. Новый не создавай — пушь в его ветку и обнови описание.`
+      : `Ветку копии панель уже завела: ${input.branch}. Новую не заводи; требует соглашение ` +
+        'проекта другого имени — переименуй эту до первого пуша (`git branch -m`).',
+    'Остановка навыка (задача чужая, нужна миграция БД, неясно, чего хотят) — вопрос человеку ' +
+      'инструментом AskUserQuestion; получив ответ, продолжай с того же этапа.',
+    'Последней строкой ответа — ссылка на MR.',
+    'Звено плана этот раздел только учитывает в плане; выполняет его звено работы.',
+  ].join('\n');
 }
 
 export function buildGroupPrompt(group: TaskSplitGroup, shared?: string): string {

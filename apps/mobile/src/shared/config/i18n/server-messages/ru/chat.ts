@@ -24,6 +24,11 @@ export const chatRu: Record<ChatMessageCode, string> = {
   'split-review-decision-unknown': 'Неизвестное решение',
   'split-review-decided': 'Решение по этому ревью уже принято',
   'split-review-nothing-to-send': 'Отправлять нечего: правок по ревью здесь не было',
+  'split-review-branch-unknown': 'Ветка MR неизвестна — push ушёл бы в новую ветку, а не в MR',
+  'split-review-no-session': 'Разговор ещё не начался — продолжать нечего',
+  'split-review-busy': 'Чат ещё работает — дождитесь конца хода',
+  'split-review-start-failed': 'Запуск не удался',
+  'split-review-not-missing': 'Итог ревью уже получен — повторять нечего',
   'conversation-not-found': 'Разговор не найден',
   'panel-help-query-empty': 'Пустой запрос к справке.',
   'panel-card-click-only': 'Решение по карточке принимается только кликом в окне панели.',
@@ -44,5 +49,8 @@ export const chatRu: Record<ChatMessageCode, string> = {
   'panel-agent-busy': 'В этом разговоре агент ещё отвечает — дождитесь конца хода.',
   'split-hold-not-waiting': 'Группа не ждёт ответа: вопроса нет или на него уже ответили',
   'split-release-not-waiting': 'Группа не ждёт предшественников: отпускать нечего',
+  'split-cleanup-nothing': 'Убирать нечего: группа не закрыта, копии нет или она уже убрана',
+  'split-cleanup-shared':
+    'В этой копии ещё работает другая группа — уберите копию, когда закроется и она',
   'panel-agent-last-not-user': 'последняя реплика должна быть человека',
 };

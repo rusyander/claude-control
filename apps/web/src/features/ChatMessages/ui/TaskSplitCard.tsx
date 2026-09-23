@@ -263,6 +263,23 @@ export function TaskSplitCard({
         })}
       </Stack>
 
+      {/* Отброшенное потолком разбора — вслух: хвост выгрузки из трекера иначе
+          пропадал молча, и никто не знал, что задач было больше. */}
+      {proposal.dropped && (
+        <div className={styles.dropped}>
+          {Boolean(proposal.dropped.groups) && (
+            <Typography variant="caption" color="warning" as="p" data-split-dropped="groups">
+              {t('chat.split.droppedGroups', { count: proposal.dropped.groups })}
+            </Typography>
+          )}
+          {Boolean(proposal.dropped.tasks) && (
+            <Typography variant="caption" color="warning" as="p" data-split-dropped="tasks">
+              {t('chat.split.droppedTasks', { count: proposal.dropped.tasks })}
+            </Typography>
+          )}
+        </div>
+      )}
+
       {/* Глубину контур не принимает — одной строкой на всю карточку, а не у
           каждой группы: выбор глубины у групп остаётся, но наверх не уедет. */}
       {hasCascade && routed && !routed.effort && (

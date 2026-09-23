@@ -21,7 +21,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 
 class FakeChild extends EventEmitter {
   readonly stdin = Object.assign(new EventEmitter(), {
-    write: () => true,
+    write: (_chunk: string): boolean => true,
     end: () => undefined,
   });
   readonly stdout = new PassThrough();
@@ -48,6 +48,8 @@ interface SpawnCall {
   args: string[];
   /** Содержимое файла читаем в момент запуска: после прогона папки уже нет. */
   fileContents: Record<string, string>;
+  /** Что ушло процессу во вход — сам промпт хода. */
+  stdin?: string;
 }
 
 /**
@@ -165,5 +167,116 @@ describe('ChatRun: свой системный промпт контура (Т5.
     expect(own).not.toBe(appended);
     expect(call.fileContents[own]).toBe(CONTOUR);
     expect(call.fileContents[appended]).toBe(APPENDED);
+  });
+});
+
+/**
+ * Прогон ребёнка разделения — через НАСТОЯЩИЙ реестр: он решает «это ребёнок»
+ * на каждом старте, как и маршрут контура, и отдаёт решение прогону.
+ */
+async function viaRegistry(
+  childKeys: string[],
+  chatId: string,
+  sessionId?: string,
+  brief?: (keys: readonly string[]) => string | undefined,
+  prompt = 'задача',
+): Promise<SpawnCall> {
+  const original = Object.getOwnPropertyDescriptor(process, 'platform');
+  Object.defineProperty(process, 'platform', { value: 'linux', configurable: true });
+  const call: SpawnCall = { args: [], fileContents: {}, stdin: '' };
+  const child = new FakeChild();
+  child.stdin.write = (chunk: string) => {
+    call.stdin += chunk;
+    return true;
+  };
+
+  vi.resetModules();
+  vi.doMock('node:child_process', () => ({
+    spawn: (_command: string, args: string[]) => {
+      call.args = args;
+      queueMicrotask(() => {
+        child.stdout.end();
+        child.stderr.end();
+        child.emit('close', 0);
+      });
+      return child;
+    },
+    spawnSync: () => ({ status: 0 }),
+  }));
+
+  try {
+    const { ChatRun } = await import('./ChatRunner.ts');
+    const { ChatRunRegistry } = await import('./ChatRunRegistry.ts');
+    const registry = new ChatRunRegistry(() => new ChatRun());
+    registry.setChildResolver((keys) => keys.some((key) => childKeys.includes(key)));
+    if (brief) registry.setChildrenBriefResolver(brief);
+    registry.start(
+      chatId,
+      { prompt, cwd: process.cwd(), appendSystemPrompt: 'Инициативы панели.' },
+      { projectPath: process.cwd(), ...(sessionId ? { sessionId } : {}) },
+    );
+    await vi.waitFor(() => expect(call.args.length).toBeGreaterThan(0));
+    return call;
+  } finally {
+    if (original) Object.defineProperty(process, 'platform', original);
+  }
+}
+
+describe('ChatRun: прогон ребёнка разделения', () => {
+  it('ребёнку закрыт обмен с другими сессиями и велено спрашивать инструментом (Д16, Д18)', async () => {
+    const call = await viaRegistry(['new-1'], 'new-1');
+
+    // Fix-чат и push-чат договорились сами и передали «User decided: stop»,
+    // пересказав решение человека без проверки (Д18).
+    const deny = call.args.indexOf('--disallowedTools');
+    expect(deny).toBeGreaterThanOrEqual(0);
+    expect(call.args[deny + 1]?.split(',')).toEqual(['SendMessage', 'ListAgents']);
+
+    const appended = call.args[call.args.indexOf('--append-system-prompt') + 1] ?? '';
+    expect(appended.startsWith('Инициативы панели.')).toBe(true);
+    // Вопрос текстом из родителя не виден: «твоего вопроса я не видел» (Д16).
+    expect(appended).toContain('ТОЛЬКО инструментом AskUserQuestion');
+    expect(appended).toContain('С другими сессиями CLI не договаривайся');
+  });
+
+  it('ребёнок узнаётся и по ключу сессии, под которым его продолжают', async () => {
+    const call = await viaRegistry(['sess-1'], 'new-9', 'sess-1');
+
+    expect(call.args).toContain('--disallowedTools');
+  });
+
+  it('обычный разговор ничего этого не получает', async () => {
+    const call = await viaRegistry(['other'], 'new-1');
+
+    expect(call.args).not.toContain('--disallowedTools');
+    expect(call.args[call.args.indexOf('--append-system-prompt') + 1]).toBe('Инициативы панели.');
+  });
+});
+
+describe('сводка детей в ходе родителя (Д6)', () => {
+  const BRIEF = '<agentdeck-children>\n1. «Шапка» — работает.\n</agentdeck-children>';
+
+  it('ход родителя начинается со сводки, найденной по ключу сессии', async () => {
+    const call = await viaRegistry([], 'new-3', 'parent-sess', (keys) =>
+      keys.includes('parent-sess') ? BRIEF : undefined,
+    );
+
+    // Родитель не знал о детях и на «исправлено?» садился делать работу сам.
+    expect(call.stdin).toBe(`${BRIEF}\n\nзадача`);
+    // В системную дописку сводка не идёт: та входит в подпись живого процесса.
+    expect(call.args[call.args.indexOf('--append-system-prompt') + 1]).toBe('Инициативы панели.');
+  });
+
+  it('продолжение со старым промптом получает свежую сводку, а не вторую', async () => {
+    const stale = '<agentdeck-children>\n1. «Шапка» — ждёт итога разбора.\n</agentdeck-children>';
+    const call = await viaRegistry([], 'parent', undefined, () => BRIEF, `${stale}\n\nзадача`);
+
+    expect(call.stdin).toBe(`${BRIEF}\n\nзадача`);
+  });
+
+  it('разговор без детей идёт с промптом как есть', async () => {
+    const call = await viaRegistry([], 'solo', undefined, () => undefined);
+
+    expect(call.stdin).toBe('задача');
   });
 });

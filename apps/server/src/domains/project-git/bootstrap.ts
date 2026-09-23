@@ -1,6 +1,13 @@
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { createWriteStream, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  createWriteStream,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  writeFileSync,
+} from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 import type { WorktreeBootstrapState } from '@agentdeck/contracts';
 import { killChildTree } from '../../lib/process-tree.ts';
@@ -13,7 +20,8 @@ import { killChildTree } from '../../lib/process-tree.ts';
  * проверок проекта.
  *
  * Команду задаёт человек на проекте; пусто — панель определяет по lock-файлу в
- * корне копии (pnpm / npm / yarn), а без lock-файла не делает ничего. Потолок
+ * корне копии (pnpm / npm / yarn), а нет его там — в каталогах первого уровня;
+ * без lock-файла не делает ничего. Потолок
  * десять минут; провал копию не отменяет и группу разделения не останавливает —
  * агент получает хвост лога в задании и решает сам.
  *
@@ -30,14 +38,44 @@ export const BOOTSTRAP_TIMEOUT_MS = 10 * 60 * 1000;
 /** Хвост лога, который уезжает в карточку и в задание агента. */
 export const LOG_TAIL_CHARS = 2000;
 
-/** Команда по lock-файлу в корне каталога; нет lock-файла — нет команды. */
-export function detectBootstrapCommand(dir: string): string | undefined {
+/** Команда по lock-файлу ровно в этом каталоге. */
+function lockfileCommand(dir: string): string | undefined {
   if (existsSync(join(dir, 'pnpm-lock.yaml'))) {
     return 'pnpm install --frozen-lockfile --prefer-offline';
   }
   if (existsSync(join(dir, 'package-lock.json'))) return 'npm ci';
   if (existsSync(join(dir, 'yarn.lock'))) return 'yarn install --immutable';
   return undefined;
+}
+
+/** Каталоги первого уровня, где lock-файл не ищем: служебные и чужие зависимости. */
+const SKIP_NESTED = new Set(['node_modules', 'vendor', 'dist', 'build']);
+
+/**
+ * Команда по lock-файлу: в корне — она одна; в корне нет — по каталогам
+ * первого уровня (Д13). Репозиторий «бэкенд + фронт рядом» держит lock-файл
+ * в `frontend/` или `web/`, и без этого шага копия группы оставалась без
+ * зависимостей. Несколько таких каталогов — по команде на каждый, по алфавиту,
+ * через `cd` туда и обратно: так строка одинаково идёт в `cmd.exe` и в `sh`.
+ */
+export function detectBootstrapCommand(dir: string): string | undefined {
+  const root = lockfileCommand(dir);
+  if (root) return root;
+  let entries: string[];
+  try {
+    entries = readdirSync(dir, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name)
+      .filter((name) => !name.startsWith('.') && !SKIP_NESTED.has(name))
+      .sort();
+  } catch {
+    return undefined;
+  }
+  const steps = entries.flatMap((name) => {
+    const command = lockfileCommand(join(dir, name));
+    return command ? [`cd "${name}" && ${command} && cd ..`] : [];
+  });
+  return steps.length > 0 ? steps.join(' && ') : undefined;
 }
 
 /** Настроенная человеком команда сильнее автоопределения; пустая строка — «определи сама». */

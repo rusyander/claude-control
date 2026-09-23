@@ -137,7 +137,7 @@ gates.open(
       cwd: job.appDataDir,
       transcriptPath: job.appDataDir + '/transcript.jsonl',
     },
-    hooks: [{ event: 'PreToolUse', command: process.execPath + ' ' + JSON.stringify(job.hookPath) }],
+    hooks: [{ event: 'PreToolUse', command: JSON.stringify(process.execPath) + ' ' + JSON.stringify(job.hookPath) }],
   }),
 );
 `,

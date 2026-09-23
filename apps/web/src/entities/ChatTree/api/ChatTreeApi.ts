@@ -3,6 +3,7 @@ import type {
   ChatTreePaused,
   ChatTreeResumed,
   ChatTreeView,
+  SplitGroupCleaned,
   SplitOverlapView,
   SplitReviewOutcome,
 } from '@agentdeck/contracts/chat-handoff';
@@ -18,6 +19,7 @@ import { apiClient } from '@shared/api/client';
  */
 
 export const chatTreeKeys = {
+  all: ['chat-tree'] as const,
   tree: (chatId: string) => ['chat-tree', chatId] as const,
 };
 
@@ -98,6 +100,23 @@ export function useReleaseGroup() {
 }
 
 /**
+ * Убрать копию закрытой группы (Д19) — по кнопке человека: панель сама не
+ * удаляет ничего. Ветка уходит с копией, только если пустая. Адресуется
+ * РОДИТЕЛЮ с номером группы — как ответ и «отпустить».
+ */
+export function useCleanupGroup() {
+  return useMutation({
+    mutationFn: async (input: { parentChatId: string; index: number }) => {
+      const { data } = await apiClient.post<SplitGroupCleaned>(
+        `/chat/split/${encodeURIComponent(input.parentChatId)}/cleanup`,
+        { index: input.index },
+      );
+      return data;
+    },
+  });
+}
+
+/**
  * Пересечения веток разделения (Т6) по кнопке в хабе.
  *
  * Это ЧТЕНИЕ, а не действие, и всё же мутация: считает его сервер запросами к
@@ -148,6 +167,19 @@ export function useReviewDecision() {
  * Отдельной ручкой, а не решением: это запись в ЧУЖУЮ ветку. Панель её не
  * делает сама ни при каких настройках, и согласие человека на неё отдельное.
  */
+/** «Повторить итог ревью» (Д4): то же сообщение в ту же сессию ревью. */
+export function useReviewRetry() {
+  return useMutation({
+    mutationFn: async (input: { parentChatId: string; chatId: string }) => {
+      const { data } = await apiClient.post<SplitReviewOutcome>(
+        `/chat/split/${encodeURIComponent(input.parentChatId)}/review-retry`,
+        { chatId: input.chatId },
+      );
+      return data;
+    },
+  });
+}
+
 export function useReviewPush() {
   return useMutation({
     mutationFn: async (input: { parentChatId: string; chatId: string }) => {

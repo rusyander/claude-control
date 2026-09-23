@@ -76,6 +76,11 @@ export interface CascadeStageInput {
    * уже сошлось.
    */
   hasWork: () => boolean;
+  /**
+   * Ход кончился паузой, а не итогом: вопросом человеку или с фоновой
+   * командой, которая ещё идёт (Д3). Следующего звена тогда не заводим.
+   */
+  paused?: boolean;
   /** Часы — в тесте фиксируются. */
   now?: () => Date;
 }
@@ -206,6 +211,7 @@ export function planCascadeStage(input: CascadeStageInput): CascadeStagePlan | u
     createdAt: now().toISOString(),
     ...(link.title ? { title: link.title } : {}),
     ...(link.branch ? { branch: link.branch } : {}),
+    ...(typeof link.groupIndex === 'number' ? { groupIndex: link.groupIndex } : {}),
     ...(kind ? { kind } : {}),
     ...(link.ceilingModel ? { ceilingModel: link.ceilingModel } : {}),
     ...(link.ceilingEffort ? { ceilingEffort: link.ceilingEffort } : {}),
@@ -216,6 +222,11 @@ export function planCascadeStage(input: CascadeStageInput): CascadeStagePlan | u
   if (!ok) return undefined;
 
   if (stage === 'work') {
+    // Ход кончился вопросом человеку или ждёт фоновую команду — работа не
+    // закончена (Д3): проверяющий читал бы недоделанное, пока сама работа
+    // продолжается в той же копии. Ревью заведётся после того хода, что
+    // кончится без паузы.
+    if (input.paused) return undefined;
     // Работа на потолке проверкой не усиливается: усиливать нечем.
     if (!link.lowered) return undefined;
     // Ревью на работу заводится ровно один раз. Без отметки второе сообщение

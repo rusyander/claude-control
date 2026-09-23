@@ -10,9 +10,11 @@ import type { ServerContext } from '../../context.ts';
 import type { SplitConveyor } from '../../domains/chat/split-conveyor.ts';
 import type { SplitOverlap } from '../../domains/chat/split-overlap.ts';
 import type { SplitReview } from '../../domains/chat/split-review.ts';
+import type { SplitReviewRefusal } from '@agentdeck/contracts/chat-handoff';
 import { checkProjectDir } from '../../domains/projects.ts';
 import { createSplitLauncher, type SplitLaunchDeps } from './split-launch.ts';
-import { codeOf } from '../../lib/server-text.ts';
+import { codeOf, coded } from '../../lib/server-text.ts';
+import { removeGroupCopy } from '../../domains/chat/split-cleanup.ts';
 
 /**
  * Разделение списка задач по нескольким чатам — одним запросом.
@@ -243,6 +245,55 @@ export function registerChatSplitRoutes(
   );
 
   /**
+   * Убрать копию закрытой группы (Д19) — по кнопке человека в хабе, и только
+   * так: сама панель не удаляет ничего. Ветка уходит вместе с копией, только
+   * если она пустая; ветку MR не трогаем вовсе (`removeGroupCopy`).
+   */
+  app.post<{ Params: { parent: string }; Body: { index?: number } }>(
+    '/api/chat/split/:parent/cleanup',
+    async (request, reply) => {
+      if (!deps.conveyor)
+        return reply
+          .code(404)
+          .send({ message: 'Конвейер уровней выключен', messageCode: 'split-conveyor-off' });
+      const index = Number(request.body?.index);
+      if (!Number.isInteger(index) || index < 0) {
+        return reply
+          .code(400)
+          .send({ message: 'Нужен номер группы', messageCode: 'split-group-number-required' });
+      }
+      try {
+        return await deps.conveyor.cleanup(request.params.parent, index, async (target) => {
+          // Снести каталог из-под живого процесса — потерять его работу молча.
+          const norm = (value: string): string => value.replace(/\\/g, '/').toLowerCase();
+          const busy = deps.runs
+            .active()
+            .some(
+              (run) =>
+                run.projectPath &&
+                norm(run.projectPath) === norm(target.path) &&
+                deps.runs.isRunning(run.chatId),
+            );
+          if (busy) {
+            throw coded(
+              new Error('В этой копии работает агент — остановите его и повторите'),
+              'worktree-agent-running',
+            );
+          }
+          return removeGroupCopy({
+            ...target,
+            keepBranch: Boolean(target.chatId && ctx.store.getChatLink(target.chatId)?.review),
+            claudeJsonPath: ctx.location.paths.mcpConfig,
+            mirror: ctx.store.getWorktreeMirror(target.projectPath),
+          });
+        });
+      } catch (error) {
+        return reply.code(409).send({ message: (error as Error).message, ...codeOf(error) });
+      }
+    },
+  );
+
+  /**
    * Пересечения веток разделения (Т6) — по кнопке в хабе. Тот же счёт, что
    * панель делает сама по концу цепочки любой группы: маршрут нужен, чтобы
    * человек мог спросить, не дожидаясь ничьего конца.
@@ -339,7 +390,55 @@ export function registerChatSplitRoutes(
           messageCode: 'split-review-nothing-to-send',
         });
       }
+      const refused = outcome.applied[0]?.refused;
+      if (refused) return reply.code(409).send(REFUSALS[refused]);
+      return outcome;
+    },
+  );
+
+  /**
+   * «Повторить итог ревью» (Д4): ответ ревью кончился без блока, и группа висит
+   * без замечаний. Сообщение уходит в ту же сессию — MR она уже прочитала.
+   */
+  app.post<{ Params: { parent: string }; Body: { chatId?: string } }>(
+    '/api/chat/split/:parent/review-retry',
+    (request, reply) => {
+      if (!deps.review)
+        return reply
+          .code(404)
+          .send({ message: 'Ревью по ссылкам выключено', messageCode: 'split-review-off' });
+      const chatId = String(request.body?.chatId ?? '').trim();
+      if (!chatId)
+        return reply
+          .code(400)
+          .send({ message: 'Не указан разговор', messageCode: 'conversation-unspecified' });
+      const outcome = deps.review.retryReview({ chatId, parentChatId: request.params.parent });
+      if (outcome.applied.length === 0) {
+        return reply.code(409).send({
+          message: 'Итог ревью уже получен — повторять нечего',
+          messageCode: 'split-review-not-missing',
+        });
+      }
+      const refused = outcome.applied[0]?.refused;
+      if (refused) return reply.code(409).send(REFUSALS[refused]);
       return outcome;
     },
   );
 }
+
+/** Отказ запуска — текстом и кодом: клиент переводит код, лог читает текст. */
+const REFUSALS: Record<SplitReviewRefusal, { message: string; messageCode: string }> = {
+  'branch-unknown': {
+    message: 'Ветка MR неизвестна — push ушёл бы в новую ветку, а не в MR',
+    messageCode: 'split-review-branch-unknown',
+  },
+  'no-session': {
+    message: 'Разговор ещё не начался — продолжать нечего',
+    messageCode: 'split-review-no-session',
+  },
+  busy: {
+    message: 'Чат ещё работает — дождитесь конца хода',
+    messageCode: 'split-review-busy',
+  },
+  'start-failed': { message: 'Запуск не удался', messageCode: 'split-review-start-failed' },
+};

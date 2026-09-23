@@ -648,7 +648,8 @@ export const chatEn: typeof chatRu = {
       'background, before any agent starts there. Which one: the “Command after ' +
       'creating a copy” field in “Copy settings”; empty — the panel looks at the root ' +
       'lockfile (pnpm-lock.yaml → pnpm install --frozen-lockfile --prefer-offline, ' +
-      'package-lock.json → npm ci, yarn.lock → yarn install --immutable) and does ' +
+      'package-lock.json → npm ci, yarn.lock → yarn install --immutable); none in the ' +
+      'root — the same in each first-level folder (frontend/, web/…) in turn; it does ' +
       'nothing without one. The command runs through the system shell with CI=1, ' +
       '10-minute ceiling. The copy’s card shows “installing” / “dependencies ready” / ' +
       '“install failed”, the log and a “Retry install” button. A failure stops ' +
@@ -704,17 +705,31 @@ export const chatEn: typeof chatRu = {
       'task given to it is the shared context plus that group’s tasks. No new tabs ' +
       'appear: the project stays one, and the groups’ chats stand as a tree under ' +
       'the conversation the proposal came from. A branch name already taken gets a ' +
-      'suffix rather than a refusal. If the project is not a repository, the chats ' +
+      'suffix rather than a refusal — except for MR groups: their copy sits on the ' +
+      'MR branch itself. If the project is not a repository, the chats ' +
       'are created in the same directory, with no copies. One group failing does ' +
       'not cancel the rest: a separate toast says so, and the other chats stay.',
+    splitDeliver: 'Up to a ready MR, and the group queue',
+    splitDeliverText:
+      'Set per project: “Parallel branches” → “Splitting tasks into groups”. The ' +
+      '“Take each group to a ready MR” toggle puts an instruction at the top of the ' +
+      'group task to follow the project delivery skill: branch, checks, commit, push ' +
+      'and MR — one group, one branch, one MR. The MR link the agent ends its reply ' +
+      'with shows in the group summary as “MR !N”. “Groups at once” is how many groups ' +
+      'work at the same time (8 by default, up to 30); the rest wait “queued” and start ' +
+      'as slots free up. One proposal holds at most 30 groups and 50 tasks per group: ' +
+      'anything beyond is dropped, and the card says how much.',
     splitReview: 'Reviewing someone else’s merge requests',
     splitReviewText:
       'Drop MR (or PR) links into the chat and ask for a review — the split creates ' +
       'one group per link, even for a single link. The copy of such a group is put on ' +
-      'the MR branch itself: the panel asks GitLab or GitHub for it over the enabled ' +
-      'integration instead of trusting the agent’s word. If that fails, the copy is ' +
-      'cut from the base branch and the card says so outright: the findings may have ' +
-      'been read from the wrong diff. The review runs on the ceiling model, with no ' +
+      'the MR branch itself: the panel finds it in git — by the MR ref on the remote — ' +
+      'instead of trusting the agent’s word, and needs no integration for it. If the ' +
+      'branch is already open in another copy, the new one sits on the same MR head ' +
+      'without a branch of its own (detached HEAD) rather than a “branch-2” cut from ' +
+      'main. If the branch cannot be found, the copy is cut from the base branch and ' +
+      'the card says so outright: the findings may have been read from the wrong ' +
+      'diff. The review runs on the ceiling model, with no ' +
       'plan and no fixes: the agent is told to change nothing and to write nothing ' +
       'into the MR. It returns a list of findings, and the decision is yours — the ' +
       'card shows up both in the parent summary and in the group chat, sharing one ' +
@@ -722,10 +737,15 @@ export const chatEn: typeof chatRu = {
       'list), “Post to the MR” (the panel writes ONE summary comment; without the ' +
       'integration the button is disabled and says why), “Both” and “Do nothing”. A ' +
       'refusal from the forge does not cancel the fixes — the reason stays on the ' +
-      'card. No findings at all closes the group by itself, with no card. With ' +
-      'several groups, the “same decision for the rest” toggle clears them at once. ' +
-      'After the fixes a separate “Commit and push to the MR” button appears — the ' +
-      'only write into someone else’s branch, and only on your click. The panel never ' +
+      'card. No findings at all closes the group by itself, with no card. A review ' +
+      'answer without the summary block is not “no findings”: the group waits, and ' +
+      'the card offers to repeat the summary in the same session. With several ' +
+      'groups, the “same decision for the rest” toggle clears them at once. After ' +
+      'the fixes a separate “Commit and push to the MR” button appears — the only ' +
+      'write into someone else’s branch, and only on your click. It is absent while ' +
+      'the fixes are unfinished (the turn ended with a question), while the copy has ' +
+      'no changes, and while the MR branch is unknown; the push goes exactly to the MR ' +
+      'branch, continuing the fix session. The panel never ' +
       'merges or closes an MR: merging stays with you. ' +
       'When there are two or more links and something has to be DONE in those MRs — ' +
       'resolve conflicts, merge in the fresh main branch, fix review comments — the ' +
@@ -760,7 +780,15 @@ export const chatEn: typeof chatRu = {
       'the agent keeps working, on a permission it STOPS, and without a shared hub ' +
       'you learn about the halt only by opening its tab. Auto-approval is inherited ' +
       'from the parent, so only dangerous calls and whatever your rules mark as ' +
-      '“ask” reach you.',
+      '“ask” reach you. A child asks only through the card: a question typed at the ' +
+      'end of its answer is invisible from the parent, and it is told so. Children ' +
+      'cannot strike deals with each other — the session messaging tools are closed ' +
+      'to them, and a fork becomes a question to you. The parent, in turn, knows its ' +
+      'children: every turn of it carries a summary of the groups (branch, copy, ' +
+      'state, result), and work handed to a group it does not do itself but passes ' +
+      'on — the message goes to the group’s chat when its turn ends, queued if the ' +
+      'group is busy. The parent’s first edit in the main copy also offers “Hand to a ' +
+      'group”, and a copy for work in an MR is cut from the MR branch.',
     splitDone: 'The same proposal is not split twice',
     splitDoneText:
       'Once the group chats exist, the buttons in the card give way to an “Already ' +
@@ -784,7 +812,10 @@ export const chatEn: typeof chatRu = {
       'No subagents appear here: every group is an ordinary chat you talk in ' +
       'yourself, only inside its own copy of the repository. The panel will not ' +
       'bring the branches back together — that is your step, as with copies made ' +
-      'by hand.',
+      'by hand. The copy of a closed group can be removed with “Remove the copy” in its ' +
+      'summary row: the directory goes, the branch is deleted only if all its work ' +
+      'is already in the main branch, and an MR branch is never touched. A copy ' +
+      'still shared by an open group is not removed.',
 
     cascadeTitle: 'Model routing: what each chat of a split runs on',
     cascadeCaption:
@@ -874,7 +905,17 @@ export const chatEn: typeof chatRu = {
       'panel hides nothing when it happens: the copy is still branched off the ' +
       'predecessor’s branch, and the task says outright that this work is ' +
       'unfinished. If the group is no longer waiting, the panel answers that there ' +
-      'is nothing to release and starts nothing.',
+      'is nothing to release and starts nothing. A group is “done” only when its ' +
+      'chain has really ended: a turn that ended with a question, a background ' +
+      'command or awaiting your decision is labelled “waiting …”, and later groups ' +
+      'do not treat it as done. A done row states the result as facts — “checked, ' +
+      'nothing changed” or “changes made · commits: N” — plus the last line of the ' +
+      'agent’s answer. A group turn (other than plan and triage) that failed on the ' +
+      'network, a limit or a sudden ' +
+      'process death is retried by the panel itself, continuing the same session: ' +
+      'up to three times with a pause, and on a limit at the moment it resets; the ' +
+      'row says “waiting for a retry”. A real error is not retried, and a group that ' +
+      'gave up shows the reason and the number of retries.',
     cascadeOverlap: 'Branch overlap after the work',
     cascadeOverlapText:
       'Triage splits the groups by ownership IN ADVANCE — and gets it wrong in ' +

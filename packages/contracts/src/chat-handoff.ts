@@ -449,6 +449,8 @@ export interface ChatTreeNode {
   parentChatId?: string;
   title?: string;
   branch?: string;
+  /** Номер группы разделения — ключ строки хаба (Д12). */
+  groupIndex?: number;
   stage?: string;
   running: boolean;
   /** Группа ревьюит MR по ссылке (Т7): что нашла и что человек решил. */
@@ -486,9 +488,19 @@ export interface SplitReviewView {
   postBlocked?: string;
   /** Правки по замечаниям кончились — панель предлагает отправить их в MR. */
   pushOffer?: boolean;
+  /** Ревью кончилось без блока итога — замечаний не знаем, есть кнопка повтора (Д4). */
+  missing?: boolean;
+  /** Правки есть, а push не предложен: ветка MR неизвестна (Д9). Код, текст у клиента. */
+  pushBlocked?: 'branch-unknown';
   /** Согласие на коммит и push отдано агенту (ISO). */
   pushedAt?: string;
 }
+
+/**
+ * Почему push или повтор ревью не запущены: ветка MR неизвестна (Д9), сессии
+ * ещё нет, разговор ещё идёт (второй агент в той же копии, Д8), запуск отказал.
+ */
+export type SplitReviewRefusal = 'branch-unknown' | 'no-session' | 'busy' | 'start-failed';
 
 /**
  * Чем кончилось решение человека по ревью (Т7): что панель сделала и чего не
@@ -498,6 +510,7 @@ export interface SplitReviewView {
  * это и есть тот случай, ради которого ответ подробнее «ок» — «правки пошли,
  * комментарий не ушёл» надо показать одной репликой, а не двумя тостами.
  */
+
 export interface SplitReviewOutcome {
   /** Разговоры, которых решение коснулось, и что с каждым вышло. */
   applied: {
@@ -510,8 +523,12 @@ export interface SplitReviewOutcome {
     postError?: string;
     /** Заведён чат правок. */
     fixChatId?: string;
-    /** Заведён чат отправки правок в MR. */
+    /** Чат правок продолжен отправкой в MR — его же сессия (Д8). */
     pushChatId?: string;
+    /** Повтор итога ревью отправлен в тот же разговор (Д4). */
+    retryChatId?: string;
+    /** Почему запуск не состоялся — код, текст его у клиента. */
+    refused?: SplitReviewRefusal;
   }[];
   /** Разговоры, которые решение обошло: там уже решено или карточки не было. */
   skipped: string[];
@@ -605,14 +622,53 @@ export interface SplitPlanView {
     /** Вопрос разбора человеку — группа стоит до ответа. */
     hold?: string;
     holdAnswer?: string;
-    status: 'pending' | 'waiting' | 'held' | 'started' | 'done' | 'failed';
+    /**
+     * `started` — работает; `awaiting` — ждёт человека (вопрос, решение по
+     * ревью, итог ревью не получен); `background` — ход кончился, фоновая
+     * команда идёт; `done` — явный итог; `failed` — сбой (Д3).
+     */
+    status: SplitGroupStatusView;
+    /** Чего именно ждёт группа в `awaiting`/`background`. */
+    waitingFor?: SplitGroupWait;
+    /**
+     * Что сделано — по фактам копии, не по словам агента (Д5): `reviewed` —
+     * только проверка, правок не было; `changed` — правки есть; `pushed` —
+     * согласие на push отдано. С `commits` — сколько коммитов у ветки поверх базы.
+     */
+    result?: { kind: 'reviewed' | 'changed' | 'unchanged' | 'pushed'; commits?: number };
+    /** Хвост последнего ответа ребёнка — видно, о чём он спросил текстом (Д16). */
+    tail?: string;
+    /** Ссылка на MR группы — последняя, что группа назвала в ответе. */
+    mr?: string;
+    /** Сколько раз панель сама продолжила упавший прогон группы (Д10). */
+    retries?: number;
     chatId?: string;
     path?: string;
     /** От какой ветки отведена копия. */
     base?: string;
     error?: string;
+    /** Копию закрытой группы убрали по кнопке человека (Д19). */
+    cleaned?: SplitGroupCleaned;
   })[];
 }
+
+/**
+ * Итог уборки копии закрытой группы (Д19): копия убрана всегда, а ветка —
+ * только пустая. `deleted` — ветка удалена (в ней не было ничего сверх основной
+ * копии); `kept` — оставлена, в ней есть своя работа; `mr` — ветку MR панель не
+ * трогает; `none` — своей ветки у копии не было (detached HEAD).
+ */
+export interface SplitGroupCleaned {
+  at: string;
+  branch: 'deleted' | 'kept' | 'mr' | 'none';
+}
+
+/** Состояние группы разделения (Д3). */
+export type SplitGroupStatusView =
+  'pending' | 'waiting' | 'held' | 'started' | 'awaiting' | 'background' | 'done' | 'failed';
+
+/** Чего ждёт группа: вопрос текстом, решение по ревью, итог ревью, фоновую команду, повтор. */
+export type SplitGroupWait = 'question' | 'decision' | 'review-missing' | 'background' | 'retry';
 
 export interface ChatTreeView {
   root: string;

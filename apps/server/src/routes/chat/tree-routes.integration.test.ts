@@ -14,6 +14,7 @@ import type { ServerContext } from '../../context.ts';
 import { ChatRunRegistry, type RunLike } from '../../domains/chat/ChatRunRegistry.ts';
 import type { RunOptions } from '../../domains/chat/ChatRunner.ts';
 import { TreePause } from '../../domains/chat/tree-pause.ts';
+import { carriedLink } from '../../lib/app-store/chat-links.ts';
 import { createTreeRuns } from '../../domains/chat/tree-runs.ts';
 import { ProviderChatService, createChat } from '../../domains/provider-chat.ts';
 import type { ConfigProvider } from '../../providers/types.ts';
@@ -156,6 +157,41 @@ describe('маршруты паузы дерева', () => {
       await app.inject({ method: 'POST', url: '/api/chat/parent/tree/resume' })
     ).json<ChatTreeResumed>();
     expect(again.wasPaused).toBe(false);
+  });
+
+  it('поле, записанное под одним ключом разговора, не раздваивает узел (Д11)', async () => {
+    // Так пишет конвейер (`saveLink`/`markReviewed`): новой связью под одним
+    // ключом — и содержимое двух ключей одного разговора расходится.
+    const link = store.getChatLink('sess-new-1');
+    if (!link) throw new Error('связь не переехала на ключ сессии');
+    store.setChatLink('sess-new-1', { ...link, plannedAt: '2026-09-09T11:00:00.000Z' });
+
+    const view = (
+      await app.inject({ method: 'GET', url: '/api/chat/new-2/tree' })
+    ).json<ChatTreeView>();
+
+    expect(view.nodes.map((node) => node.chatId).sort()).toEqual(['sess-new-1', 'sess-new-2']);
+    expect(view.nodes.find((node) => node.chatId === 'sess-new-1')?.aliases).toEqual(['new-1']);
+  });
+
+  it('продолжение наследует родителя, но не ключ разговора: это отдельный узел (Д11)', async () => {
+    // Так связь переезжает на продолжение («перейти в чистый чат»): тем же
+    // родителем и назначением, но это ДРУГОЙ разговор.
+    const link = store.getChatLink('sess-new-1');
+    if (!link) throw new Error('связь не переехала на ключ сессии');
+    store.setChatLink('next-1', { ...carriedLink(link), groupIndex: 3 });
+
+    const view = (
+      await app.inject({ method: 'GET', url: '/api/chat/new-2/tree' })
+    ).json<ChatTreeView>();
+
+    expect(view.nodes.map((node) => node.chatId).sort()).toEqual([
+      'next-1',
+      'sess-new-1',
+      'sess-new-2',
+    ]);
+    // Номер группы — ключ строки хаба у чужого CLI (Д12).
+    expect(view.nodes.find((node) => node.chatId === 'next-1')?.groupIndex).toBe(3);
   });
 });
 

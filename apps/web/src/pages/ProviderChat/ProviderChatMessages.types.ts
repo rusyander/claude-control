@@ -71,6 +71,8 @@ export interface ProviderChatMessagesProps {
   onReviewDecide?: (chatId: string, decision: TaskSplitReviewDecision, all: boolean) => void;
   /** «Закоммитить и отправить в MR» — отдельный клик после правок. */
   onReviewPush?: (chatId: string) => void;
+  /** «Повторить итог ревью» — ответ ревью без блока итога (Д4). */
+  onReviewRetry?: (chatId: string) => void;
   reviewBusy?: boolean;
   /**
    * Разговор и его модель — ими подписана карточка вложения из блока агента

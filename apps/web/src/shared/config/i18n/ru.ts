@@ -926,6 +926,9 @@ export const ru = {
       askFailed: 'Не удалось спросить о разделении',
       done: 'Заведено чатов: {{count}}',
       alreadyDone: 'Уже разделено: {{done}} из {{count}} групп стали чатами',
+      droppedGroups:
+        'Сверх потолка не заведутся групп: {{count}} — попросите агента укрупнить группы',
+      droppedTasks: 'Сверх потолка группы отброшено задач: {{count}}',
       failed: '«{{title}}» не завелась: {{message}}',
       failedAll: 'Разделить не удалось: {{message}}',
       notParsed:
@@ -1061,9 +1064,26 @@ export const ru = {
         triageInterrupted: 'разбор оборвался при перезапуске — группы ждут вашего ответа',
         repairs: 'поправлено панелью: {{count}}',
         pending: 'ждёт итога разбора',
+        queued: 'в очереди — стартует, как освободится место',
+        mr: 'MR !{{id}}',
         waiting: 'ждёт: {{names}}',
         held: 'ждёт вашего ответа',
         holdAnswered: 'ответ дан',
+        retries: 'панель повторила ход: {{count}}',
+        result: {
+          reviewed: 'проверено, правок не было',
+          changed: 'правки внесены',
+          unchanged: 'правок в копии нет',
+          pushed: 'правки отправлены',
+          commits: 'коммитов: {{count}}',
+        },
+        waitingFor: {
+          question: 'ждёт вашего ответа',
+          decision: 'ждёт решения по ревью',
+          'review-missing': 'ревью без итога',
+          background: 'ждёт фоновую работу',
+          retry: 'ждёт повтора',
+        },
         failed: 'не завелась: {{message}}',
         base: 'от ветки {{branch}}',
         holdPlaceholder: 'Ответ уедет в план и в задание группы',
@@ -1083,6 +1103,16 @@ export const ru = {
         releaseStarted: 'Группа отпущена — «{{title}}» стартует',
         releaseQueued: 'Группа отпущена, но пока не стартовала — смотрите её строку',
         releaseFailed: 'Отпустить не удалось: {{message}}',
+        cleanup: 'Убрать копию',
+        cleanupHint:
+          'Группа закрыта. Копия уйдёт с диска; ветка — только пустая. Ветка со своей работой и ветка MR остаются, незакоммиченные правки git не отдаст',
+        cleanupFailed: 'Убрать копию не удалось: {{message}}',
+        cleaned: {
+          deleted: 'Копия убрана, пустая ветка удалена',
+          kept: 'Копия убрана, ветка с работой оставлена',
+          mr: 'Копия убрана, ветку MR панель не трогает',
+          none: 'Копия убрана',
+        },
       },
       /**
        * Пересечения веток после работы (Т6): что задели общего и в каком порядке
@@ -1211,6 +1241,11 @@ export const ru = {
       doneToast_many: 'Решение принято: {{count}} групп, комментариев в MR: {{posted}}',
       doneToast_other: 'Решение принято: {{count}} групп, комментариев в MR: {{posted}}',
       pushToast: 'Агенту отправлено согласие на коммит и push',
+      missing:
+        'Ответ ревью кончился без блока итога — замечания неизвестны. Это не «замечаний нет».',
+      retry: 'Повторить итог ревью',
+      retryToast: 'Ревью попросили выдать итог — в той же сессии',
+      pushBlocked: 'Отправить правки в MR нельзя: ветка MR неизвестна',
       failed: 'Не удалось: {{message}}',
     },
     attach: 'Приложить файл',
@@ -1308,6 +1343,12 @@ export const ru = {
       stop: 'Не править',
       working: 'Завожу копию…',
       failed: 'Копию завести не удалось.',
+      handedTitle: 'Работа этого разговора уже отдана группам — код правят они:',
+      handedChild: '{{number}}. «{{title}}» — ветка {{branch}}',
+      handedHint:
+        '«Передать группе» отклонит правку здесь, и агент перешлёт её нужной группе в её чат.',
+      base: 'Копия встанет на ветку MR групп: {{base}}',
+      handOff: 'Передать группе',
     },
     permissionFromChild: 'Просит «{{title}}»',
     permissionLost:
@@ -5772,7 +5813,16 @@ export const ru = {
       bootstrapCommand: 'Команда после создания копии',
       bootstrapCommandPlaceholder: 'pnpm install --frozen-lockfile --prefer-offline',
       bootstrapCommandHint:
-        'Идёт в копии до старта агента, потолок 10 минут, через оболочку системы с CI=1. Пусто — по lock-файлу в корне: pnpm-lock.yaml → pnpm install --frozen-lockfile --prefer-offline, package-lock.json → npm ci, yarn.lock → yarn install --immutable; без lock-файла ничего',
+        'Идёт в копии до старта агента, потолок 10 минут, через оболочку системы с CI=1. Пусто — по lock-файлу в корне: pnpm-lock.yaml → pnpm install --frozen-lockfile --prefer-offline, package-lock.json → npm ci, yarn.lock → yarn install --immutable; в корне нет — то же в каждом каталоге первого уровня (frontend/, web/…); без lock-файла ничего',
+      splitSettings: 'Разделение задач на группы',
+      splitDeliver: 'Доводить каждую группу до готового MR',
+      splitDeliverHint:
+        'Группа ведёт работу по скилу доставки проекта: ветка, проверки, коммит, push и MR — одна группа, одна ветка, один MR. Ссылка на MR появится в сводке групп',
+      splitParallel: 'Групп разом',
+      splitParallelHint:
+        'Остальные ждут в очереди и стартуют по мере того, как освобождается место: от 1 до {{max}}',
+      splitParallelInvalid: 'Целое число от 1 до {{max}}',
+      splitSaved: 'Настройка разделения сохранена — подействует на следующий запуск групп',
       bootstrapTitle: 'Подготовка копии',
       bootstrap: {
         running: 'ставится',

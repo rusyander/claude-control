@@ -270,7 +270,10 @@ export function createSplitLauncher(
    * сам идёт на потолке, а работа на подобранной ступени.
    */
   const linkRecord = (chat: Parameters<SplitLink>[0], parent: string): ChatLink => {
-    const { title, branch, path, assignment, stage, group, prompt, context, review } = chat;
+    const { title, branch, path, assignment, stage, group, prompt, context, review, index } = chat;
+    // Номер группы в разделении — ключ её строки в хабе (Д12): ветку агент
+    // волен переключить, а звенья одной группы от этого не становятся чужими.
+    const groupIndex = { groupIndex: index };
     const notes = composeGroupNotes({
       ...(group.notes ? { notes: group.notes } : {}),
       ...(context?.predecessors ? { predecessors: context.predecessors } : {}),
@@ -285,6 +288,7 @@ export function createSplitLauncher(
         parentChatId: parent,
         title,
         branch,
+        ...groupIndex,
         createdAt: new Date().toISOString(),
         stage: 'plan',
         // План идёт на потолке. У чужого CLI потолок безымянный — это прогон
@@ -312,6 +316,7 @@ export function createSplitLauncher(
         parentChatId: parent,
         title,
         branch,
+        ...groupIndex,
         createdAt: new Date().toISOString(),
         stage: 'review',
         ...(assignment
@@ -326,6 +331,8 @@ export function createSplitLauncher(
           url: review.url,
           ...(review.branch ? { branch: review.branch } : {}),
           ...(review.onMrBranch ? {} : { onMrBranch: false }),
+          ...(review.remote ? { remote: review.remote } : {}),
+          ...(review.detached ? { detached: true } : {}),
           path,
         },
       };
@@ -334,6 +341,7 @@ export function createSplitLauncher(
       parentChatId: parent,
       title,
       branch,
+      ...groupIndex,
       createdAt: new Date().toISOString(),
       // Назначение живёт в связи, а не только в прогоне: второе сообщение
       // ребёнку приходит уже без него.
@@ -630,6 +638,7 @@ export function createSplitLauncher(
         stage: options.stage === 'plan' && canPlan ? 'plan' : 'work',
         ...(options.context ? { context: options.context } : {}),
         ...(options.claimBranch ? { claimBranch: options.claimBranch } : {}),
+        deliver: ctx.store.getSplitSettings(dir).deliver,
       }),
     startTriage: (prompt, claim) => {
       // У чужого CLI разбор — такой же разговор его хранилища, как и всё
@@ -689,7 +698,7 @@ export function createSplitLauncher(
 export function createReviewStarter(
   ctx: ServerContext,
   deps: SplitLaunchDeps,
-): (input: ReviewStageStart) => { started: boolean; chatId?: string } {
+): (input: ReviewStageStart) => { started: boolean; chatId?: string; busy?: boolean } {
   const selfBaseUrl = `http://127.0.0.1:${process.env.PORT ?? 5178}`;
 
   return (input) => {
@@ -711,12 +720,22 @@ export function createReviewStarter(
       input.cwd,
       (error) => deps.log.warn({ err: error }, 'group activation failed'),
     );
+    const sessionId = input.resume?.sessionId;
+    // Продолжение того же разговора (Д8, Д4): второй прогон поверх идущего —
+    // это два агента в одной копии, поэтому отказ с причиной.
+    if (sessionId && deps.runs.isRunning(input.chatId, sessionId)) {
+      return { started: false, busy: true };
+    }
     deps.runs.muteSplit(input.chatId);
-    if (input.fromAliases.length > 0) deps.session.inherit(input.fromAliases, input.chatId);
+    // Тумблеры наследует только НОВЫЙ разговор: у продолженного они свои.
+    if (!sessionId && input.fromAliases.length > 0) {
+      deps.session.inherit(input.fromAliases, input.chatId);
+    }
 
     const initiative = initiativePrompt(settings, { splitMuted: true });
     const options = {
       prompt: input.prompt,
+      ...(sessionId ? { sessionId } : {}),
       cwd: input.cwd,
       command: activeCliCommand(ctx.store),
       model: input.model || settings.chatModel,
@@ -725,7 +744,11 @@ export function createReviewStarter(
       permissionPrompt: { runId: input.chatId, baseUrl: selfBaseUrl, tokenFile: apiTokenPath() },
       ...(initiative ? { appendSystemPrompt: initiative } : {}),
     };
-    const meta = { origin: 'groups' as const, projectPath: input.cwd };
+    const meta = {
+      origin: 'groups' as const,
+      projectPath: input.cwd,
+      ...(sessionId ? { sessionId } : {}),
+    };
     // Дерево на паузе — прогон заведён, но ждёт «Продолжить всё»: решение
     // человека при этом не теряется, оно уже записано в связь.
     if (deps.gate?.defer('stage', input.chatId, options, meta)) return { started: true };
@@ -733,7 +756,7 @@ export function createReviewStarter(
     // Заметка — после старта: до него прогона в реестре нет (см. `start`).
     const notice = started ? groupsActivatedNotice(activated) : undefined;
     if (notice) deps.runs.emitExternal(input.chatId, notice);
-    return { started };
+    return started ? { started } : { started, ...(sessionId ? { busy: true } : {}) };
   };
 }
 
@@ -744,9 +767,11 @@ export interface ReviewStageStart {
   cwd: string;
   model?: string;
   effort?: string;
-  stage: 'fix' | 'push';
+  stage: 'fix' | 'push' | 'review' | 'tell';
   fromAliases: string[];
   title?: string;
+  /** Продолжить этот разговор, а не заводить новый (Д8 push, Д4 повтор итога, Д7 слово родителя). */
+  resume?: { sessionId: string };
 }
 
 /**
@@ -763,7 +788,7 @@ function startForeignReviewStage(
   deps: SplitLaunchDeps,
   providerId: string,
   input: ReviewStageStart,
-): { started: boolean; chatId?: string } {
+): { started: boolean; chatId?: string; busy?: boolean } {
   // Claude сюда не попадает никогда, незнакомый провайдер — тем более:
   // `getProvider` откатился бы на Claude и запустил чужую ветку не тем CLI.
   if (providerId === DEFAULT_PROVIDER_ID || !isKnownProviderId(providerId)) {
@@ -777,7 +802,30 @@ function startForeignReviewStage(
     (error) => deps.log.warn({ err: error }, 'group activation failed'),
   );
 
-  const word = input.stage === 'fix' ? 'правки' : 'отправка';
+  // Продолжение того же разговора (Д8, Д4): чат уже есть в хранилище.
+  const resumed = input.resume ? parseForeignChatKey(input.resume.sessionId) : undefined;
+  if (resumed) {
+    const initiative = initiativePrompt(ctx.store.getSettings(), {
+      splitMuted: true,
+      foreign: true,
+    });
+    const sent = deps.providerChats.send(
+      appData,
+      providerId,
+      resumed.chatId,
+      { text: input.prompt },
+      {
+        provider,
+        models: ctx.models.current(provider.modelVendors ?? []).models,
+        ...(initiative ? { systemPrefix: initiative } : {}),
+      },
+    );
+    return sent.ok
+      ? { started: true, chatId: input.resume!.sessionId }
+      : { started: false, ...(sent.reason === 'already_running' ? { busy: true } : {}) };
+  }
+
+  const word = input.stage === 'fix' ? 'правки' : input.stage === 'review' ? 'ревью' : 'отправка';
   const created = createChat(appData, providerId, {
     title: input.title ? `${input.title} · ${word}` : word,
     workdir: input.cwd,

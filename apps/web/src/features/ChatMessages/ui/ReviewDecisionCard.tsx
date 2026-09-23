@@ -32,6 +32,7 @@ export function ReviewDecisionCard({
   others = 0,
   onDecide,
   onPush,
+  onRetry,
   busy,
 }: ReviewDecisionCardProps) {
   const { t } = useTranslation();
@@ -55,9 +56,12 @@ export function ReviewDecisionCard({
         <Typography variant="body-sm" weight="medium" as="span">
           {item.title ? t('chat.review.titleNamed', { title: item.title }) : t('chat.review.title')}
         </Typography>
-        <span className={styles.count}>
-          {t('chat.cascade.review.count', { count: findings.length })}
-        </span>
+        {/* Без итога счётчик соврал бы «0 замечаний»: их число неизвестно (Д4). */}
+        {!review.missing && (
+          <span className={styles.count}>
+            {t('chat.cascade.review.count', { count: findings.length })}
+          </span>
+        )}
       </Stack>
 
       {/* Ссылка целиком, а не «MR №42»: человек по ней и уходит смотреть. */}
@@ -74,21 +78,7 @@ export function ReviewDecisionCard({
         </Typography>
       )}
 
-      {findings.length === 0 ? (
-        <Typography variant="body-sm" color="subtle" className={styles.clean}>
-          {t('chat.review.clean')}
-        </Typography>
-      ) : (
-        <ol className={styles.list}>
-          {findings.map((finding, index) => (
-            <li key={index}>
-              <Typography variant="body-sm" as="div" className={styles.item}>
-                {finding}
-              </Typography>
-            </li>
-          ))}
-        </ol>
-      )}
+      <ReviewFindings item={item} onRetry={onRetry} busy={busy} />
 
       {/* Выбор есть только пока он не сделан: перерешать нечего — правки уже
           заведены, а комментарий уже написан в чужое обсуждение. */}
@@ -147,6 +137,59 @@ export function ReviewDecisionCard({
 }
 
 /**
+ * Что ревью нашло. Нет блока итога — это НЕ «замечаний нет» (Д4): замечания
+ * неизвестны, и честная строка вместе с повтором стоит на месте списка.
+ */
+function ReviewFindings({
+  item,
+  onRetry,
+  busy,
+}: Pick<ReviewDecisionCardProps, 'item' | 'onRetry' | 'busy'>) {
+  const { t } = useTranslation();
+  const { review, chatId } = item;
+
+  if (review.missing) {
+    return (
+      <Stack gap="var(--spacing-2xs)">
+        <Typography variant="body-sm" as="div" className={styles.warning}>
+          {t('chat.review.missing')}
+        </Typography>
+        {onRetry && (
+          <Stack direction="row" gap="var(--spacing-2xs)" wrap className={styles.actions}>
+            <Button
+              variant="primary"
+              leftIcon={<Icon name="refresh" size={18} />}
+              isLoading={busy}
+              onClick={() => onRetry(chatId)}
+            >
+              {t('chat.review.retry')}
+            </Button>
+          </Stack>
+        )}
+      </Stack>
+    );
+  }
+  if (review.findings.length === 0) {
+    return (
+      <Typography variant="body-sm" color="subtle" className={styles.clean}>
+        {t('chat.review.clean')}
+      </Typography>
+    );
+  }
+  return (
+    <ol className={styles.list}>
+      {review.findings.map((finding, index) => (
+        <li key={index}>
+          <Typography variant="body-sm" as="div" className={styles.item}>
+            {finding}
+          </Typography>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+/**
  * Чем кончилось решение: что выбрано, ушёл ли комментарий и не пора ли
  * отправлять правки.
  *
@@ -184,6 +227,12 @@ function ReviewOutcome({
       {review.pushedAt && (
         <Typography variant="caption" color="subtle" as="span">
           {t('chat.review.pushed')}
+        </Typography>
+      )}
+      {/* Правки есть, а отправить их некуда (Д9): молчащая кнопка хуже причины. */}
+      {review.pushBlocked && !review.pushedAt && (
+        <Typography variant="caption" as="span" className={styles.error}>
+          {t('chat.review.pushBlocked')}
         </Typography>
       )}
       {/* Правки готовы — но push в чужую ветку панель сама не делает никогда:

@@ -1,4 +1,13 @@
-import { object, string, boolean, array, unknown, enum as zodEnum, type infer as Infer } from 'zod';
+import {
+  object,
+  string,
+  boolean,
+  number,
+  array,
+  unknown,
+  enum as zodEnum,
+  type infer as Infer,
+} from 'zod';
 
 /**
  * Тела мутирующих запросов чата, прав и git: схемы, по которым сервер проверяет
@@ -127,6 +136,12 @@ export const gitMirrorSettingsBodySchema = object({
   exclude: array(string().max(400)).max(200),
   /** Команда после создания копии; пусто — по lock-файлу. */
   bootstrap: string().max(2000).optional(),
+});
+/** Разделение на проекте: доставка до MR и сколько групп разом (`SplitSettings`). */
+export const splitSettingsBodySchema = object({
+  path: gitPathSchema,
+  deliver: boolean(),
+  parallel: number().int().min(1).max(30),
 });
 /** Повторный бутстрап уже существующей копии — кнопкой на карточке. */
 export const gitWorktreeBootstrapBodySchema = object({

@@ -5,6 +5,9 @@ import {
   parseSplitProposal,
   safeBranchName,
   scanSplitBlocks,
+  SPLIT_MAX_GROUPS,
+  SPLIT_MAX_TASKS_PER_GROUP,
+  SPLIT_SYSTEM_PROMPT,
   type TaskSplitProposal,
 } from '@agentdeck/contracts/task-split';
 import { splitTasks, type SplitGit, type SplitTasksInput } from './ChatSplit.ts';
@@ -257,6 +260,41 @@ describe('терпимость разбора к именам полей', () =>
   });
 });
 
+// Выгрузка из трекера на 60–80 задач раскладывается и на 20 групп (группа —
+// ветка и MR). Потолок в 8 резал хвост молча: ни агент, ни человек о нём не знали.
+describe('потолки предложения', () => {
+  const groups = (count: number, tasks = 1) =>
+    Array.from({ length: count }, (_, index) => ({
+      title: `Группа ${index + 1}`,
+      tasks: Array.from({ length: tasks }, (_, task) => `GOR-${index * 100 + task}`),
+    }));
+
+  it('двадцать групп выгрузки заводятся все', () => {
+    const parsed = parseSplitProposal({ groups: groups(20) });
+
+    expect(parsed?.groups).toHaveLength(20);
+    expect(parsed?.dropped).toBeUndefined();
+  });
+
+  it('сверх потолка — отброшенное названо числом, а не пропадает молча', () => {
+    const parsed = parseSplitProposal({ groups: groups(SPLIT_MAX_GROUPS + 3) });
+
+    expect(parsed?.groups).toHaveLength(SPLIT_MAX_GROUPS);
+    expect(parsed?.dropped).toEqual({ groups: 3 });
+
+    const long = parseSplitProposal({
+      groups: [...groups(1, SPLIT_MAX_TASKS_PER_GROUP + 4), ...groups(1)],
+    });
+    expect(long?.groups[0]?.tasks).toHaveLength(SPLIT_MAX_TASKS_PER_GROUP);
+    expect(long?.dropped).toEqual({ tasks: 4 });
+  });
+
+  it('потолок назван агенту в инструкции', () => {
+    expect(SPLIT_SYSTEM_PROMPT).toContain(`Групп не больше ${SPLIT_MAX_GROUPS}`);
+    expect(SPLIT_SYSTEM_PROMPT).not.toContain('\n');
+  });
+});
+
 describe('имя ветки из заголовка модели', () => {
   it('пробелы и запрещённые символы становятся дефисами', () => {
     expect(safeBranchName('Правки формы входа')).toBe('Правки-формы-входа');
@@ -311,6 +349,49 @@ describe('разделение задач по чатам', () => {
       '/copies/feature-header',
     ]);
     expect(result.failures).toHaveLength(0);
+  });
+
+  // Без доставки группа кончалась «готово» с незакоммиченной работой в копии, и
+  // коммит, пуш и MR по каждой группе человек делал руками (23.09.2026).
+  it('доставка включена — задание группы велит довести её до MR в ветке копии', async () => {
+    const prompts: string[] = [];
+
+    await splitTasks({
+      projectPath: '/repo',
+      proposal: PROPOSAL,
+      startRuns: true,
+      git: fakeGit({ takenBranches: async () => ['feature/login'] }),
+      deliver: true,
+      start: ({ prompt }) => {
+        prompts.push(prompt);
+        return true;
+      },
+    });
+
+    expect(prompts).toHaveLength(2);
+    expect(prompts[0]).toContain('Доставка до готового MR');
+    expect(prompts[0]).toContain('ticket-delivery');
+    // Ветка — та, что завёл git, с суффиксом, а не имя из предложения.
+    expect(prompts[0]).toContain('Ветку копии панель уже завела: feature/login-2.');
+    // Задание группы при этом цело и идёт после преамбулы.
+    expect(prompts[0]).toMatch(/Доставка до готового MR[\s\S]*починить валидацию/);
+  });
+
+  it('доставка выключена — задание как раньше, без слова о MR', async () => {
+    const prompts: string[] = [];
+
+    await splitTasks({
+      projectPath: '/repo',
+      proposal: PROPOSAL,
+      startRuns: true,
+      git: fakeGit(),
+      start: ({ prompt }) => {
+        prompts.push(prompt);
+        return true;
+      },
+    });
+
+    expect(prompts.some((prompt) => prompt.includes('Доставка до готового MR'))).toBe(false);
   });
 
   it('занятое имя ветки получает суффикс, а не отказ', async () => {
@@ -450,6 +531,8 @@ describe('разделение задач по чатам', () => {
     expect(prompts[0]).toContain('кодом 1');
     expect(prompts[0]).toContain('ERR_PNPM_OUTDATED_LOCKFILE');
     expect(prompts[0]).toContain('починить валидацию');
+    // Провал — не «окружение готово» (Д13): зависимости могут отсутствовать.
+    expect(prompts[0]).not.toContain('Окружение готово');
     // Удачная подготовка — в преамбуле как сделанное, без предупреждения.
     expect(prompts[1]).not.toContain('Подготовка копии');
     expect(prompts[1]).toContain('зависимости установлены');
@@ -498,6 +581,29 @@ describe('разделение задач по чатам', () => {
     expect(task).not.toBe('');
     expect(first).toContain(task);
     expect(first?.indexOf('начинай сразу с задачи')).toBeLessThan(first?.indexOf(task) ?? -1);
+  });
+
+  it('подготовка не настроена — преамбула прямо говорит, что зависимости не ставились (Д13)', async () => {
+    const prompts: string[] = [];
+
+    await splitTasks({
+      projectPath: '/repo',
+      proposal: PROPOSAL,
+      startRuns: true,
+      git: fakeGit({}),
+      start: ({ prompt }) => {
+        prompts.push(prompt);
+        return true;
+      },
+    });
+
+    const [first] = prompts;
+    // Так было в живом проекте: «готово» при пустых node_modules — и 5–10 минут
+    // установки, дев-серверы и четыре переписанных lock-файла у детей.
+    expect(first).not.toContain('Окружение готово');
+    expect(first).toContain('Зависимости панель НЕ ставила');
+    expect(first).toContain('без запуска дев-серверов');
+    expect(first).toContain('lock-файлы');
   });
 
   it('группа в общем каталоге преамбулы не получает', async () => {
@@ -808,6 +914,35 @@ describe('работа в нескольких MR', () => {
     ]);
     // Класс «ревью» работе в MR не навязывается: иначе она ушла бы в режим чтения.
     expect(proposal?.groups[0]?.kind).toBeUndefined();
+  });
+
+  // Д1: веб шлёт на сервер уже разобранное предложение, сервер разбирает его
+  // второй раз. Второй разбор терял `work`, и работа в MR уезжала ревью.
+  it('повторный разбор ничего не теряет: parse(parse(x)) ≡ parse(x)', () => {
+    const once = parseSplitProposal({
+      shared: ['общий', 'контекст'],
+      groups: [
+        { title: '!772', tasks: ['реши конфликты'], review: { url: MR1, action: 'work' } },
+        {
+          title: '!773',
+          tasks: ['поправь'],
+          mr: { url: MR2, branch: 'feat/b' },
+          action: 'work',
+          kind: 'implementation',
+          files: ['src/a.ts'],
+        },
+        { title: 'Ревью', tasks: ['посмотри'], review: MR2, model: 'opus', effort: 'high' },
+      ],
+    });
+
+    const twice = parseSplitProposal(JSON.parse(JSON.stringify(once)));
+    expect(twice).toEqual(once);
+    expect(twice?.groups.map((group) => group.review?.work ?? false)).toEqual([true, true, false]);
+    expect(twice?.groups.map((group) => group.kind)).toEqual([
+      undefined,
+      'implementation',
+      'review',
+    ]);
   });
 
   it('одна ссылка на работу — не разделение: это обычная работа в этом разговоре', () => {

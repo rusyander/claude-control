@@ -268,11 +268,7 @@ export function ProviderChatPage() {
     void queryClient.invalidateQueries({ queryKey: chatTreeKeys.tree(treeKey ?? '') });
   };
   const treeFailed = (error: unknown): void => {
-    toast.error(
-      t('chat.cascade.tree.failed', {
-        message: toErrorMessage(error),
-      }),
-    );
+    toast.error(t('chat.cascade.tree.failed', { message: toErrorMessage(error) }));
   };
   /**
    * Ревью MR по ссылке (Т6): карточки решения открытого разговора. Живёт в
@@ -453,6 +449,7 @@ export function ProviderChatPage() {
             reviews={reviews.items}
             onReviewDecide={reviews.decide}
             onReviewPush={reviews.push}
+            onReviewRetry={reviews.retry}
             reviewBusy={reviews.busy}
             {...(activeChatId ? { mediaChatId: activeChatId } : {})}
             {...(chat?.model ? { mediaModel: chat.model } : {})}

@@ -99,4 +99,5 @@ export const composedMessageParams = {
   'worktree-install-started': ['command'],
   'split-triage-interrupted-hold': [],
   'split-triage-interrupted-notice': ['groups'],
+  'child-tell-notice': ['sent', 'queued', 'refused'],
 } as const satisfies Record<string, readonly string[]>;

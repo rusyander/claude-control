@@ -171,6 +171,8 @@ export interface ChatMessagesProps {
   onReviewDecide?: (chatId: string, decision: TaskSplitReviewDecision, all: boolean) => void;
   /** «Закоммитить и отправить в MR» — отдельным кликом после правок. */
   onReviewPush?: (chatId: string) => void;
+  /** «Повторить итог ревью» — ответ ревью без блока итога (Д4). */
+  onReviewRetry?: (chatId: string) => void;
   reviewBusy?: boolean;
   /** Повторить упавший запрос — кнопка прямо в карточке ошибки. */
   onRetry?: () => void;

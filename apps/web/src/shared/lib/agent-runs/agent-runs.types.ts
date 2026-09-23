@@ -1,5 +1,5 @@
 import type { MessageUsage } from '@agentdeck/contracts';
-import type { HandoffRefusal } from '@agentdeck/contracts/chat-handoff';
+import type { HandoffRefusal, SplitGroupStatusView } from '@agentdeck/contracts/chat-handoff';
 import type {
   ServerMessageCode,
   ServerMessageNestedParams,
@@ -22,6 +22,16 @@ export interface PendingPermission {
   toolUseId: string;
 }
 
+/** Группа разделения, которой отдана работа разговора (Д15). */
+export interface BranchGateChild {
+  /** Номер с единицы — им агент адресует группу в `agentdeck:tell N`. */
+  number: number;
+  title: string;
+  branch: string;
+  status: SplitGroupStatusView;
+  chatId?: string;
+}
+
 /**
  * Первая правка в основной рабочей копии — придержана до ответа человека. Это
  * тот же запрос прав (`toolUseId` общий), но спрашивают здесь не «можно ли», а
@@ -32,6 +42,10 @@ export interface PendingBranchGate extends PendingPermission {
   cwd: string;
   /** Имя ветки, предложенное панелью; человек правит его прямо в карточке. */
   branch: string;
+  /** Работа разговора отдана группам разделения — карточка говорит, кому (Д15). */
+  children?: BranchGateChild[];
+  /** Копия встанет на ветку MR детей, а не на HEAD основной копии (Д15). */
+  base?: string;
 }
 
 /**
@@ -289,6 +303,8 @@ export type ChatEvent =
       toolUseId: string;
       cwd: string;
       branch: string;
+      children?: BranchGateChild[];
+      base?: string;
     }
   /**
    * Заметка панели про прогон: подхвачен после перезапуска сервера без потока
@@ -304,7 +320,8 @@ export type ChatEvent =
        * 'overlap' — ветки разделения сошлись на одних файлах (Т6);
        * 'groupsActivated' — набор, привязанный к проекту, включился сам;
        * 'contextCarried' — незакрытая работа перенесена к другому CLI (П6.1);
-       * 'modelDropped' — имя модели не прошло грамматику аргументов.
+       * 'modelDropped' — имя модели не прошло грамматику аргументов;
+       * 'childTold' — родитель написал группам блоком `agentdeck:tell` (Д7).
        */
       code:
         | 'adopted'
@@ -315,7 +332,8 @@ export type ChatEvent =
         | 'overlap'
         | 'groupsActivated'
         | 'contextCarried'
-        | 'modelDropped';
+        | 'modelDropped'
+        | 'childTold';
       text: string;
       /**
        * Код самой строки — отдельно от `code`, который называет повод. Есть не

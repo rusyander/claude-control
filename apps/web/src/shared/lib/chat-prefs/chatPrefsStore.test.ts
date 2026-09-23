@@ -43,8 +43,10 @@ describe('sanitizePrefs', () => {
     expect(sanitizePrefs(undefined).autoApprove).toBe(true);
     expect(sanitizePrefs({}).autoApprove).toBe(true);
     expect(sanitizePrefs({ autoApprove: false }).autoApprove).toBe(true);
-    expect(sanitizePrefs({ autoApprove: false, version: 2 }).autoApprove).toBe(false);
-    expect(sanitizePrefs({ autoApprove: true, version: 2 }).autoApprove).toBe(true);
+    // Версия 2 — тоже прежняя: версия 3 включает автоподтверждение ещё раз.
+    expect(sanitizePrefs({ autoApprove: false, version: 2 }).autoApprove).toBe(true);
+    expect(sanitizePrefs({ autoApprove: false, version: 3 }).autoApprove).toBe(false);
+    expect(sanitizePrefs({ autoApprove: true, version: 3 }).autoApprove).toBe(true);
   });
 
   /**

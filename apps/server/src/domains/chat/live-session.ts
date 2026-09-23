@@ -292,6 +292,11 @@ export const DEFAULT_LIVE_LIMITS: LivePoolLimits = {
 export class LiveSessionPool {
   /** Ход, начатый самим CLI: реестр заводит под него прогон (см. `ChatRunRegistry.wake`). */
   onWake?: (sessionId: string) => void;
+  /**
+   * Потолок процессов превышен, а вытеснить некого: все заняты ходом или
+   * держат фоновую работу. Процессы не закрываются — об этом говорится (Д17).
+   */
+  onOverflow?: (size: number, max: number) => void;
 
   private readonly sessions = new Map<string, LiveSession>();
   private readonly limits: LivePoolLimits;
@@ -305,6 +310,13 @@ export class LiveSessionPool {
 
   get size(): number {
     return this.sessions.size;
+  }
+
+  /** Процесс сессии держит фоновую работу агента (Д3). */
+  backgroundOf(sessionId: string | undefined): boolean {
+    if (!sessionId) return false;
+    const session = this.sessions.get(sessionId);
+    return Boolean(session?.alive && session.hasBackgroundWork);
   }
 
   /** Есть ли у сессии живой процесс — занятый или ждущий следующего хода. */
@@ -394,16 +406,17 @@ export class LiveSessionPool {
 
   private enforceMax(): void {
     while (this.sessions.size > this.limits.max) {
+      // Процесс с фоновой задачей не вытесняем никогда (Д17): закрыть его —
+      // убить задачу агента, и пробуждения после неё не будет, ребёнок просто
+      // замолчит. Лишний процесс сверх потолка дешевле потерянной работы.
       const idle = [...this.sessions.entries()]
-        .filter(([, session]) => !session.busy)
-        // Сначала те, кто ничего не ждёт в фоне, потом — давнее простаивающие.
-        .sort(
-          ([, a], [, b]) =>
-            Number(a.hasBackgroundWork) - Number(b.hasBackgroundWork) ||
-            a.lastUsedAt - b.lastUsedAt,
-        );
+        .filter(([, session]) => !session.busy && !session.hasBackgroundWork)
+        .sort(([, a], [, b]) => a.lastUsedAt - b.lastUsedAt);
       const victim = idle[0];
-      if (!victim) return;
+      if (!victim) {
+        this.onOverflow?.(this.sessions.size, this.limits.max);
+        return;
+      }
       this.sessions.delete(victim[0]);
       victim[1].close();
     }

@@ -75,6 +75,7 @@ export type {
   AgentRun,
   HandoffEvent,
   PendingBranchGate,
+  BranchGateChild,
   PendingPermission,
   QueuedMessage,
   SendOutcome,

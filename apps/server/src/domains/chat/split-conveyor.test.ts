@@ -4,7 +4,10 @@ import { SPLIT_PLAN_BLOCK_LANG } from '@agentdeck/contracts/split-plan';
 import type { ChatLink, SplitPlanRecord } from '../../lib/app-store/app-store.types.ts';
 import type { RunFinished } from './ChatRunRegistry.ts';
 import type { SplitGroupContext } from './ChatSplit.ts';
-import { SplitConveyor } from './split-conveyor.ts';
+import { SplitConveyor, type ChainOutcome } from './split-conveyor.ts';
+
+const DONE: ChainOutcome = { status: 'done' };
+const FAILED: ChainOutcome = { status: 'failed' };
 
 /**
  * Конвейер уровней (Т1): что стартует после разбора, кто ждёт кого, от какой
@@ -41,6 +44,8 @@ function build(
   options: {
     triageStarts?: boolean;
     failLaunch?: number[];
+    /** Сколько групп разом (настройка проекта); не задано — без ограничения. */
+    parallel?: number;
     /** Что запуск делает ВНУТРИ себя, до возврата: настоящее имя ветки, конец цепочки. */
     during?: (
       groups: number[],
@@ -84,6 +89,7 @@ function build(
       deferred: false,
     }),
     watchOverlap: (parent) => void overlapChecks.push(parent),
+    ...(options.parallel ? { parallel: () => options.parallel as number } : {}),
     log: () => undefined,
     now: () => new Date(2026, 8, 9, 12, 0, (tick += 1)),
   });
@@ -219,11 +225,11 @@ describe('SplitConveyor: ожидания и ответ человека', () =>
     await conveyor.answerHold('родитель', 2, 'только Chrome');
     expect(records.get('родитель')?.groups[2]?.status).toBe('waiting');
 
-    conveyor.onChainEnded(link(1), true);
+    conveyor.onChainEnded(link(1), DONE);
     await wait();
     expect(launches).toHaveLength(1);
 
-    conveyor.onChainEnded(link(0), false);
+    conveyor.onChainEnded(link(0), FAILED);
     await wait();
 
     expect(launches).toHaveLength(2);
@@ -244,8 +250,8 @@ describe('SplitConveyor: ожидания и ответ человека', () =>
   it('без ответа человека группа стоит даже после предшественников', async () => {
     const { conveyor, launches, link, records, wait } = await triaged();
 
-    conveyor.onChainEnded(link(0), true);
-    conveyor.onChainEnded(link(1), true);
+    conveyor.onChainEnded(link(0), DONE);
+    conveyor.onChainEnded(link(1), DONE);
     await wait();
 
     expect(launches).toHaveLength(1);
@@ -266,14 +272,73 @@ describe('SplitConveyor: ожидания и ответ человека', () =>
   it('конец цепочки чужой ветки или повторный конец ничего не меняют', async () => {
     const { conveyor, link, records, wait } = await triaged();
 
-    conveyor.onChainEnded({ ...link(0), branch: 'other' }, true);
-    conveyor.onChainEnded({ ...link(0), parentChatId: 'кто-то' }, true);
+    conveyor.onChainEnded({ ...link(0), branch: 'other' }, DONE);
+    conveyor.onChainEnded({ ...link(0), parentChatId: 'кто-то' }, DONE);
     await wait();
     expect(records.get('родитель')?.groups[0]?.status).toBe('started');
 
-    conveyor.onChainEnded(link(0), true);
-    conveyor.onChainEnded(link(0), false);
+    conveyor.onChainEnded(link(0), DONE);
+    conveyor.onChainEnded(link(0), FAILED);
     await wait();
+    expect(records.get('родитель')?.groups[0]?.status).toBe('done');
+  });
+
+  it('вопрос человеку группу не закрывает и ждавших не отпускает; новый прогон — снова «работает» (Д3)', async () => {
+    const { conveyor, launches, link, records, wait } = await triaged();
+    await conveyor.answerHold('родитель', 2, 'Chrome');
+    conveyor.onChainEnded(link(1), DONE);
+    conveyor.onChainEnded(link(0), {
+      status: 'awaiting',
+      waitingFor: 'question',
+      tail: 'Какой браузер?',
+    });
+    await wait();
+
+    // Третья ждёт ОБЕИХ: «ждёт ответа» — не конец, от недоделанной ветки не стартуют.
+    expect(launches).toHaveLength(1);
+    expect(conveyor.view(['родитель'])?.groups[0]).toMatchObject({
+      status: 'awaiting',
+      waitingFor: 'question',
+      tail: 'Какой браузер?',
+    });
+
+    conveyor.onChainResumed(link(0));
+    const resumed = records.get('родитель')?.groups[0];
+    expect(resumed?.status).toBe('started');
+    expect(resumed?.waitingFor).toBeUndefined();
+
+    conveyor.onChainEnded(link(0), { status: 'done', result: { kind: 'changed' } });
+    await wait();
+    expect(launches).toHaveLength(2);
+    expect(conveyor.view(['родитель'])?.groups[0]?.result).toEqual({ kind: 'changed' });
+  });
+
+  it('чат группы — тот, где идёт её звено, а не первый (план): туда и ведёт слово родителя', async () => {
+    const { conveyor, link } = await triaged();
+    const planChat = conveyor.view(['родитель'])?.groups[0]?.chatId;
+
+    conveyor.onChainResumed(link(0), 'чат-работы');
+
+    expect(planChat).toBeDefined();
+    expect(conveyor.view(['родитель'])?.groups[0]?.chatId).toBe('чат-работы');
+  });
+
+  it('закрытую группу снова открывает только новый прогон', async () => {
+    const { conveyor, link, records } = await triaged();
+    conveyor.onChainEnded(link(0), DONE);
+    conveyor.onChainEnded(link(0), { status: 'awaiting', waitingFor: 'question' });
+    expect(records.get('родитель')?.groups[0]?.status).toBe('done');
+
+    conveyor.onChainResumed(link(0));
+    conveyor.onChainEnded(link(0), { status: 'awaiting', waitingFor: 'question' });
+    expect(records.get('родитель')?.groups[0]?.status).toBe('awaiting');
+  });
+
+  it('группа находится по номеру из связи, даже когда ветка копии другая (Д12)', async () => {
+    const { conveyor, link, records } = await triaged();
+
+    conveyor.onChainEnded({ ...link(0), branch: 'feature/login-mr', groupIndex: 0 }, DONE);
+
     expect(records.get('родитель')?.groups[0]?.status).toBe('done');
   });
 
@@ -281,11 +346,11 @@ describe('SplitConveyor: ожидания и ответ человека', () =>
     const { conveyor, link, overlapChecks, wait } = await triaged();
 
     // Чужая ветка и чужой родитель концом ЭТОГО разделения не считаются.
-    conveyor.onChainEnded({ ...link(0), branch: 'other' }, true);
-    conveyor.onChainEnded(link(0), true);
-    conveyor.onChainEnded(link(1), false);
+    conveyor.onChainEnded({ ...link(0), branch: 'other' }, DONE);
+    conveyor.onChainEnded(link(0), DONE);
+    conveyor.onChainEnded(link(1), FAILED);
     // Повторный конец той же ветки: группа уже `done`, сверять нечего.
-    conveyor.onChainEnded(link(0), true);
+    conveyor.onChainEnded(link(0), DONE);
     await wait();
 
     expect(overlapChecks).toEqual(['родитель', 'родитель']);
@@ -326,7 +391,7 @@ describe('SplitConveyor: имя ветки и ручное освобожден�
         // в репозитории — `feature/login-2`, и связь несёт второе.
         claimBranch(0, 'feature/login-2');
         // Цепочка кончилась раньше, чем вернулась вся порция (чужой CLI).
-        built.conveyor.onChainEnded({ ...built.link(0), branch: 'feature/login-2' }, true);
+        built.conveyor.onChainEnded({ ...built.link(0), branch: 'feature/login-2' }, DONE);
       },
     });
     await built.begin();
@@ -388,8 +453,8 @@ describe('SplitConveyor: имя ветки и ручное освобожден�
       noticed: [],
     };
 
-    conveyor.onChainEnded(link(0), true);
-    conveyor.onChainEnded(link(1), true);
+    conveyor.onChainEnded(link(0), DONE);
+    conveyor.onChainEnded(link(1), DONE);
     await wait();
 
     const context = launches[1]?.context as SplitGroupContext;
@@ -404,13 +469,76 @@ describe('SplitConveyor: имя ветки и ручное освобожден�
     const { conveyor, launches, link, wait } = await triaged();
     await conveyor.answerHold('родитель', 2, 'только Chrome');
 
-    conveyor.onChainEnded(link(0), true);
-    conveyor.onChainEnded(link(1), true);
+    conveyor.onChainEnded(link(0), DONE);
+    conveyor.onChainEnded(link(1), DONE);
     await wait();
 
     const context = launches[1]?.context as SplitGroupContext;
     expect(context.predecessors?.[0]).not.toHaveProperty('files');
     expect(context.predecessors?.[0]).not.toHaveProperty('filesTotal');
+  });
+});
+
+// Выгрузка из трекера — это и 20 групп; разом они съели бы окно подписки за час.
+describe('SplitConveyor: сколько групп разом', () => {
+  it('сверх настройки группы ждут в очереди и стартуют по одной, как освобождается место', async () => {
+    const { conveyor, begin, launches, records, link, wait } = build({ parallel: 1 });
+    await begin();
+    conveyor.onTriageFinished(finished('Ничего не нашёл.'), ['new-1-triage']);
+    await wait();
+
+    expect(launches).toEqual([{ groups: [0] }]);
+    expect(records.get('родитель')?.groups.map((group) => group.status)).toEqual([
+      'started',
+      'pending',
+      'pending',
+    ]);
+
+    conveyor.onChainEnded(link(0), DONE);
+    await wait();
+    expect(launches.map((item) => item.groups)).toEqual([[0], [1]]);
+
+    // Вопрос человеку группу не закрывает, но и места не держит: работать
+    // она не может, пока не ответят.
+    conveyor.onChainEnded(link(1), { status: 'awaiting', waitingFor: 'question' });
+    await wait();
+    expect(launches.map((item) => item.groups)).toEqual([[0], [1], [2]]);
+  });
+
+  it('очередь идёт в порядке разбора, а не в порядке предложения', async () => {
+    const { conveyor, begin, launches, records, wait } = build({ parallel: 2 });
+    await begin();
+    conveyor.onTriageFinished(
+      finished(block({ groups: [{ index: 3, notes: 'первой' }], order: [3, 1, 2] })),
+      ['new-1-triage'],
+    );
+    await wait();
+
+    expect(records.get('родитель')?.order).toEqual([2, 0, 1]);
+    expect(launches).toEqual([{ groups: [0, 2] }]);
+  });
+
+  it('ссылка на MR группы доезжает в пульт и не стирается следующим ходом без неё', async () => {
+    const { conveyor, begin, link, wait } = build({ parallel: 1 });
+    await begin();
+    conveyor.onTriageFinished(finished('Ничего не нашёл.'), ['new-1-triage']);
+    await wait();
+    const mr = 'https://git.example.com/team/app/-/merge_requests/815';
+
+    conveyor.onChainEnded(link(0), { status: 'awaiting', waitingFor: 'question', mr });
+    conveyor.onChainResumed(link(0));
+    conveyor.onChainEnded(link(0), DONE);
+
+    expect(conveyor.view(['родитель'])?.groups[0]?.mr).toBe(mr);
+  });
+
+  it('без настройки — как раньше: все готовые разом', async () => {
+    const { conveyor, begin, launches, wait } = build();
+    await begin();
+    conveyor.onTriageFinished(finished('Ничего не нашёл.'), ['new-1-triage']);
+    await wait();
+
+    expect(launches).toEqual([{ groups: [0, 1, 2] }]);
   });
 });
 

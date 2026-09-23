@@ -200,7 +200,7 @@
         {
           "path": "apps/server/src/domains/chat/ChatRunner.ts",
           "why": "«Путь одного сообщения»: как панель запускает процесс CLI и откуда читает ответ",
-          "sha": "4f88c6068c6bd5eb"
+          "sha": "b0bb720986366939"
         },
         {
           "path": "apps/server/src/domains/chat/ChatPermissions.ts",
@@ -220,12 +220,12 @@
         {
           "path": "apps/server/src/domains/chat/ChatSplit.ts",
           "why": "«Разделить»: карточка предложения, дерево, группы",
-          "sha": "bb2af599616f7a31"
+          "sha": "2ba92278444109e0"
         },
         {
           "path": "apps/server/src/domains/chat/split-conveyor.ts",
           "why": "«Что запускает „Разделить“»: разбор в корне, план в копии, порядок after и hold",
-          "sha": "6d6edbdfd7ffccc8"
+          "sha": "4b9b6b0364264f84"
         },
         {
           "path": "apps/server/src/domains/chat/split-overlap.ts",
@@ -235,7 +235,7 @@
         {
           "path": "apps/server/src/domains/chat/tree-pause.ts",
           "why": "«Пауза дерева»: ответ всегда от корня, продолжение всего дерева",
-          "sha": "94111883bf642c98"
+          "sha": "b9ffe77d37f36c8d"
         },
         {
           "path": "apps/server/src/domains/media/images.ts",
@@ -270,10 +270,10 @@
         {
           "path": "apps/server/src/routes/project-git-routes.ts",
           "why": "«Копии и прогоны»: отказ убрать копию с живым агентом и маршрут «Добрать»",
-          "sha": "96807b82231b83be"
+          "sha": "94d45bb5742ff85a"
         }
       ],
-      "confirmedAt": "2026-09-23T08:27:56.726Z"
+      "confirmedAt": "2026-09-23T16:04:31.088Z"
     },
     {
       "topic": "tests",
@@ -554,7 +554,7 @@
         {
           "path": "apps/server/src/routes/project-git-routes.ts",
           "why": "«Раздел не гит-клиент»: что умеет полоса над чатом проекта и чего панель не делает нигде",
-          "sha": "96807b82231b83be"
+          "sha": "94d45bb5742ff85a"
         },
         {
           "path": "apps/server/src/providers/catalog/qwen.ts",
@@ -577,7 +577,7 @@
           "sha": "d2696cecdcce26ad"
         }
       ],
-      "confirmedAt": "2026-09-21T19:18:05.455Z"
+      "confirmedAt": "2026-09-23T16:50:21.624Z"
     },
     {
       "topic": "groups",

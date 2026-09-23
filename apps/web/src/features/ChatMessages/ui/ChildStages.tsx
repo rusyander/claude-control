@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import type { SplitPlanView } from '@agentdeck/contracts/chat-handoff';
@@ -8,9 +8,11 @@ import { TextField } from '@shared/ui/text-field';
 import { Typography } from '@shared/ui/typography';
 import { StatusDot } from '@shared/ui/status-dot';
 import { formatDuration } from '@shared/lib/format-duration';
+import { cn } from '@shared/lib/cn';
 import { serverFieldText } from '@shared/config/i18n';
 import { triageChipState } from '../lib/triageChipState';
 import { SplitOverlapPanel } from './SplitOverlapPanel';
+import { GroupCopyCleanup } from './GroupCopyCleanup';
 import type { ChildStageGroup, ChildStagesProps } from './ChildStages.types';
 import styles from './ChildStages.module.scss';
 
@@ -101,22 +103,31 @@ export function ChildStages({
 
       {groups.map((group) =>
         group.chatId ? (
-          <button
-            key={group.chatId}
-            type="button"
-            className={styles.row}
-            data-hub-row="chat"
-            onClick={() => onOpen(group.chatId)}
-          >
-            {/* Идущий прогон пульсирует, законченное звено стоит ровно: работает
+          <Fragment key={group.chatId}>
+            <button
+              type="button"
+              className={styles.row}
+              data-hub-row="chat"
+              onClick={() => onOpen(group.chatId)}
+            >
+              {/* Идущий прогон пульсирует, законченное звено стоит ровно: работает
                 группа или ждёт человека — первое, что тут спрашивают. */}
-            <StatusDot
-              tone={group.isRunning ? 'success' : 'neutral'}
-              pulse={group.isRunning}
-              label={t(group.isRunning ? 'chat.cascade.hub.running' : 'chat.cascade.hub.idle')}
-            />
-            <GroupText group={group} />
-          </button>
+              <StatusDot
+                tone={group.isRunning ? 'success' : 'neutral'}
+                pulse={group.isRunning}
+                label={t(group.isRunning ? 'chat.cascade.hub.running' : 'chat.cascade.hub.idle')}
+              />
+              <GroupText group={group} />
+            </button>
+            {/* Кнопка — соседом строки, а не внутри: строка сама кнопка. */}
+            {group.copy && split?.parentChatId && (
+              <GroupCopyCleanup
+                parentChatId={split.parentChatId}
+                index={group.copy.index}
+                {...(group.copy.cleaned ? { cleaned: group.copy.cleaned } : {})}
+              />
+            )}
+          </Fragment>
         ) : (
           <div key={group.title} className={styles.rowStatic} data-hub-row={group.pending}>
             {/* Чата нет — открывать нечего, и точка стоит ровно: группа ждёт, а
@@ -217,6 +228,16 @@ function GroupText({ group }: { group: ChildStageGroup }) {
     parts.push(group.stages.map((stage) => t(`chat.cascade.stageFull.${stage}`)).join(' › '));
   }
   if (group.pending) parts.push(pendingText(group, t));
+  else if (group.error) parts.push(t('chat.cascade.hub.failed', { message: group.error }));
+  if (group.retries) parts.push(t('chat.cascade.hub.retries', { count: group.retries }));
+  // ЧТО сделано, а не просто «готово» (Д5): проверка без правок и правки с
+  // коммитами читались одинаково, и человек считал задачу выполненной.
+  if (group.result) {
+    parts.push(t(`chat.cascade.hub.result.${group.result.kind}`));
+    if (group.result.commits) {
+      parts.push(t('chat.cascade.hub.result.commits', { count: group.result.commits }));
+    }
+  }
   if (group.model) parts.push(group.model);
   if (group.firstEditAfterMs !== undefined) {
     parts.push(
@@ -238,10 +259,52 @@ function GroupText({ group }: { group: ChildStageGroup }) {
             {t('chat.cascade.tree.paused')}
           </Typography>
         )}
+        {/* Стоит не просто так, а ждёт — и чаще всего человека (Д3, Д16). */}
+        {group.waitingFor && (
+          <Typography
+            variant="caption"
+            as="span"
+            className={cn(
+              styles.chip,
+              (group.waitingFor === 'question' || group.waitingFor === 'decision') &&
+                styles.chipAsk,
+            )}
+            data-hub-waiting={group.waitingFor}
+          >
+            {t(`chat.cascade.hub.waitingFor.${group.waitingFor}`)}
+          </Typography>
+        )}
       </span>
       <Typography variant="caption" color="subtle" as="span" truncate>
         {parts.join(' · ')}
       </Typography>
+      {/* MR группы (доставка): из хаба — прямо в него, а не через чат группы. */}
+      {group.mr && (
+        <a
+          className={styles.mr}
+          href={group.mr}
+          target="_blank"
+          rel="noreferrer noopener"
+          data-hub-mr
+        >
+          {t('chat.cascade.hub.mr', { id: group.mr.match(/(\d+)$/)?.[1] ?? '' })}
+        </a>
+      )}
+      {/* Хвост последнего ответа (Д16): вопрос, заданный текстом, иначе не видно
+          из родителя. Целиком — по наведению. */}
+      {group.tail && (
+        <Typography
+          variant="caption"
+          color="subtle"
+          as="span"
+          truncate
+          className={styles.tail}
+          title={group.tail}
+          data-hub-tail
+        >
+          «{group.tail}»
+        </Typography>
+      )}
     </Stack>
   );
 }
@@ -253,6 +316,8 @@ function pendingText(group: ChildStageGroup, t: TFunction): string {
       return t('chat.cascade.hub.failed', { message: group.error ?? '' });
     case 'held':
       return t('chat.cascade.hub.held');
+    case 'queued':
+      return t('chat.cascade.hub.queued');
     case 'waiting': {
       const waiting = t('chat.cascade.hub.waiting', { names: (group.waitsFor ?? []).join(', ') });
       return group.holdAnswered ? `${t('chat.cascade.hub.holdAnswered')} · ${waiting}` : waiting;

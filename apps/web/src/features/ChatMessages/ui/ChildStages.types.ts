@@ -1,5 +1,10 @@
 import type { CascadeStage } from '@agentdeck/contracts/model-cascade';
-import type { ChatTreeView } from '@agentdeck/contracts/chat-handoff';
+import type {
+  ChatTreeView,
+  SplitGroupCleaned,
+  SplitGroupWait,
+  SplitPlanView,
+} from '@agentdeck/contracts/chat-handoff';
 import type { CodedFields } from '@agentdeck/contracts/server-messages';
 
 /**
@@ -33,9 +38,10 @@ export interface ChildStageGroup {
   /**
    * Чата ещё нет: чего группа ждёт. `pending` — итога разбора, `waiting` —
    * конца предшественников (`waitsFor`), `held` — ответа человека (`hold`).
-   * `failed` без чата — копия не завелась вовсе (`error`).
+   * `failed` без чата — копия не завелась вовсе (`error`). `queued` — разбор
+   * прошёл, группа ждёт места в очереди (настройка «групп разом»).
    */
-  pending?: 'pending' | 'waiting' | 'held' | 'failed';
+  pending?: 'pending' | 'queued' | 'waiting' | 'held' | 'failed';
   /**
    * Номер группы в конвейере. Есть только у строки БЕЗ чата: обе двери к
    * стоящей группе (ответ на вопрос разбора и «отпустить») адресуются родителю
@@ -56,7 +62,31 @@ export interface ChildStageGroup {
   base?: string;
   /** Почему копия или прогон не завелись. */
   error?: string;
+  /**
+   * Чата группа есть, а ход кончился ожиданием (Д3, Д16): вопроса человеку,
+   * решения по ревью, фоновой работы, повтора. Без этого такая группа в хабе
+   * выглядела просто остановившейся.
+   */
+  waitingFor?: SplitGroupWait;
+  /**
+   * Что группа сделала — по фактам копии, не по словам агента (Д5): «проверено,
+   * правок не было» и «правки внесены» не должны читаться одинаково «готово».
+   */
+  result?: SplitGroupResult;
+  /** Хвост последнего ответа — о чём группа спросила текстом или чем кончила (Д16). */
+  tail?: string;
+  /** MR группы — последняя ссылка на MR/PR в её ответе (доставка). */
+  mr?: string;
+  /** Сколько раз панель сама продолжила упавший ход группы (Д10). */
+  retries?: number;
+  /**
+   * Копия закрытой группы (Д19): её можно убрать кнопкой, адресуясь родителю с
+   * номером группы. `cleaned` — уже убрана, и чем кончилось с веткой.
+   */
+  copy?: { index: number; cleaned?: SplitGroupCleaned['branch'] };
 }
+
+export type SplitGroupResult = NonNullable<SplitPlanView['groups'][number]['result']>;
 
 export interface ChildStagesProps {
   groups: ChildStageGroup[];

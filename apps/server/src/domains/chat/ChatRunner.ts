@@ -11,6 +11,7 @@ import { defaultCliCommand } from '../../providers/cli.ts';
 import { TurnTracker } from './stream-usage.ts';
 import { userMemorySettings } from '../platform/layers.ts';
 import { LiveSession, type LiveSessionPool, type TurnOutcome } from './live-session.ts';
+import { CHILD_DENIED_TOOLS, CHILD_PROMPT } from './initiative.ts';
 
 /** Путь к мини-MCP-серверу прав рядом с этим модулем. */
 const PERMISSION_SERVER = fileURLToPath(new URL('./permission-prompt-server.mjs', import.meta.url));
@@ -146,6 +147,13 @@ export interface RunOptions {
    * кончилась, и CLI продолжил работу сам.
    */
   wake?: boolean;
+  /**
+   * Прогон ребёнка разделения: закрыты инструменты обмена с другими сессиями и
+   * дописаны правила ребёнка (`CHILD_PROMPT`). Решает реестр на КАЖДОМ старте
+   * по связи разговора — продолжение после паузы дерева несёт прежние
+   * параметры, и прошлое решение пережило бы переезд связи.
+   */
+  child?: boolean;
 }
 
 /** Сборка запуска CLI: общая у разового прогона и живой сессии. */
@@ -240,6 +248,7 @@ export class ChatRun {
     // и пробел), так что отбрасывать такое имя правильно, а молчать о нём — нет.
     this.modelNotice(options, onEvent);
     if (effort) args.push('--effort', effort);
+    if (options.child) args.push('--disallowedTools', CHILD_DENIED_TOOLS.join(','));
 
     // Свой промпт контура — ВМЕСТО промпта CLI, и только файлом: текст
     // многострочный и с примерами JSON, а разбор кавычек в командной строке
@@ -258,7 +267,11 @@ export class ChatRun {
     // затёртую строку было бы неоткуда вернуть, когда галочку включат обратно.
     const appended = options.platformDropAppend
       ? ''
-      : options.appendSystemPrompt?.replace(/[\r\n]+/g, ' ').trim();
+      : [options.appendSystemPrompt, options.child ? CHILD_PROMPT : '']
+          .filter(Boolean)
+          .join(' ')
+          .replace(/[\r\n]+/g, ' ')
+          .trim();
     if (appended) {
       if (isWindows) {
         // ФАЙЛОМ, а не аргументом, и это не перестраховка. Замерено 2 сентября
@@ -491,6 +504,7 @@ export class ChatRun {
       append: options.platformDropAppend
         ? ''
         : (options.appendSystemPrompt?.replace(/[\r\n]+/g, ' ').trim() ?? ''),
+      child: Boolean(options.child),
       broker: options.permissionPrompt
         ? [options.permissionPrompt.baseUrl, options.permissionPrompt.tokenFile ?? '']
         : [],

@@ -324,6 +324,7 @@ describe('маршруты продолжения в чистой сессии',
         effort: 'high',
         kind: 'implementation',
         lowered: true,
+        conversation: 'new-1',
       });
     });
 
@@ -361,6 +362,8 @@ describe('маршруты продолжения в чистой сессии',
         kind: 'implementation',
         lowered: true,
       });
+      // Продолжение — другой разговор: с ключом закрытого дерево склеило бы их (Д11).
+      expect(link?.conversation).toBeUndefined();
     });
 
     it('у обычного разговора наследовать нечего — связи не заводим', async () => {
@@ -732,9 +735,13 @@ ${block(PROPOSAL)}`,
 describe('планировщик конвейера подбора модели', () => {
   const CWD = 'C:/work/проект-worktrees/rename';
 
-  function fakeRun(text: string): RunLike {
+  /** `tools` — вызовы инструментов, которые ход сделал до текста ответа. */
+  function fakeRun(text: string, tools: readonly string[] = []): RunLike {
     return {
       start: async (_options, onEvent) => {
+        tools.forEach((name, index) =>
+          onEvent({ kind: 'tool', name, input: {}, id: `toolu_${index}` }),
+        );
         onEvent({ kind: 'text', text });
         onEvent({ kind: 'done', costUsd: 0, durationMs: 1, sessionId: 'sess-работа' });
       },
@@ -742,9 +749,9 @@ describe('планировщик конвейера подбора модели'
     };
   }
 
-  function build(text: string, options: { hasWork?: boolean } = {}) {
+  function build(text: string, options: { hasWork?: boolean; tools?: readonly string[] } = {}) {
     const chains = new HandoffChains();
-    const registry = new ChatRunRegistry(() => fakeRun(text));
+    const registry = new ChatRunRegistry(() => fakeRun(text, options.tools));
     const links = new Map<string, ChatLink>();
     const runs: { chatId: string; model?: string; effort?: string; append?: string }[] = [];
     // Реестр подменён не полностью: прогоны настоящие, а вот с чем их запустили
@@ -882,10 +889,13 @@ describe('планировщик конвейера подбора модели'
    * группы доходит до конвейера с её связью.
    */
   describe('уровни разделения', () => {
-    function buildLevels(text: string, options: { hasWork?: boolean } = {}) {
-      const built = build(text);
+    function buildLevels(
+      text: string,
+      options: { hasWork?: boolean; tools?: readonly string[] } = {},
+    ) {
+      const built = build(text, options.tools ? { tools: options.tools } : {});
       const planned: string[] = [];
-      const ended: { branch?: string; ok: boolean }[] = [];
+      const ended: { branch?: string; ok: boolean; status?: string }[] = [];
       const triaged: string[] = [];
       built.registry.setHandoffPlanner(
         createHandoffPlanner({
@@ -906,8 +916,12 @@ describe('планировщик конвейера подбора модели'
               triaged.push(finished.chatId);
               return { kind: 'notice', code: 'triageApplied', text: 'применён' };
             },
-            onChainEnded: (link, ok) =>
-              void ended.push({ ...(link.branch ? { branch: link.branch } : {}), ok }),
+            onChainEnded: (link, outcome) =>
+              void ended.push({
+                ...(link.branch ? { branch: link.branch } : {}),
+                ok: outcome.status !== 'failed',
+                status: outcome.status,
+              }),
           },
         }),
       );
@@ -943,7 +957,7 @@ describe('планировщик конвейера подбора модели'
       expect(links.get(work?.chatId ?? '')).toMatchObject({ stage: 'work', lowered: true });
       expect(planned).toContain('чат-план');
       // План — не цепочка: конвейер узнаёт о конце РАБОТЫ, а не плана.
-      expect(ended).toEqual([{ branch: 'split/rename', ok: true }]);
+      expect(ended).toEqual([{ branch: 'split/rename', ok: true, status: 'done' }]);
     });
 
     it('план без блока: работа стартует с пометкой, что плана нет', async () => {
@@ -987,9 +1001,35 @@ describe('планировщик конвейера подбора модели'
       await run(registry, 'чат-правки');
 
       expect(ended).toEqual([
-        { branch: 'split/rename', ok: true },
-        { branch: 'split/fix', ok: true },
+        { branch: 'split/rename', ok: true, status: 'done' },
+        { branch: 'split/fix', ok: true, status: 'done' },
       ]);
+    });
+
+    it('ход работы кончился вопросом — группа ждёт человека, ревью не заводится (Д3)', async () => {
+      const { registry, links, ended, runs } = buildLevels('Переименовать и api.ts тоже?');
+      links.set('чат-работа', { ...WORK_LINK, lowered: true });
+
+      await run(registry, 'чат-работа');
+
+      expect(ended).toEqual([{ branch: 'split/rename', ok: true, status: 'awaiting' }]);
+      expect(runs.filter((item) => item.chatId.startsWith('new-'))).toEqual([]);
+    });
+
+    // Живой прогон 23.09: ребёнок спросил, как велит Д16, инструментом, получил
+    // «вопрос показан карточкой — заверши ход» и ответил «Жду ваш выбор…» без
+    // вопросительного знака. Группа закрылась «готово», ждавшие пошли бы от
+    // недоделанной ветки.
+    it('вопрос инструментом AskUserQuestion — тоже ожидание человека, даже без «?» в тексте', async () => {
+      const { registry, links, ended, runs } = buildLevels('Жду ваш выбор между красным и синим.', {
+        tools: ['AskUserQuestion'],
+      });
+      links.set('чат-работа', { ...WORK_LINK, lowered: true });
+
+      await run(registry, 'чат-работа');
+
+      expect(ended).toEqual([{ branch: 'split/rename', ok: true, status: 'awaiting' }]);
+      expect(runs.filter((item) => item.chatId.startsWith('new-'))).toEqual([]);
     });
   });
 });

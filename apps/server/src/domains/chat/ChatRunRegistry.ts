@@ -7,6 +7,8 @@ import type { PlatformRunRoute } from '../platform/routing.ts';
 import { ChatRun, type ChatEvent, type RunOptions } from './ChatRunner.ts';
 import { DetachedRun, type DetachedRunDeps } from './detached-run.ts';
 import { LiveSessionPool } from './live-session.ts';
+import { withChildrenBrief } from './children-brief.ts';
+import type { BranchGateContext } from './ChatBranchGate.ts';
 import { looksLikeCheck } from './lowered-journal.ts';
 import {
   adoptableEntries,
@@ -63,11 +65,31 @@ export interface RunFinished {
   /** Окно контекста на последнем шаге; 0 — расход не приходил (чужой CLI, ошибка). */
   contextTokens: number;
   /**
+   * Ход кончился, а фоновая команда агента ещё идёт (живая сессия держит её):
+   * работа не закончена, группа разделения ждёт фон, а не «готово» (Д3).
+   */
+  background?: boolean;
+  /**
+   * Ход звал `AskUserQuestion`: вопрос висит карточкой, агент по `QUESTION_DENIED`
+   * закончил ход ожиданием ответа — и текст при этом не обязан кончаться «?».
+   * Для группы это «ждёт человека», а не «готово» (Д3/Д16, живой прогон 23.09).
+   */
+  asked?: boolean;
+  /**
    * Чем прогон был для контура (Т3). Нужно продолжениям и звеньям конвейера:
    * они заводятся ОТ этого прогона, и без переноса работа группы спрашивала бы
    * маршрут как «чат» — то есть меняла бы провайдера посреди цепочки.
    */
   origin?: PlatformRunConsumer;
+  /** Последняя ошибка хода — по ней надзор решает, временный ли сбой (Д10). */
+  error?: string;
+  /** Последнее событие лимита: `rejected` с `resetsAt` — повтор в момент сброса (Д10). */
+  limit?: { resetsAt: number; status: string };
+  /**
+   * Надзор уже назначил повтор этого хода (Д10): группа не `failed`, а ждёт
+   * повтора. Ставит обёртка планировщика, не реестр.
+   */
+  retry?: { attempt: number; at: number } | { exhausted: number };
 }
 
 /** Событие с порядковым номером — по нему клиент догоняет пропущенное. */
@@ -197,6 +219,11 @@ interface RegisteredRun {
   seq: number;
   status: RunStatus;
   errored: boolean;
+  /** Текст последней ошибки и последний лимит хода — надзору повторов (Д10). */
+  lastError?: string;
+  limit?: { resetsAt: number; status: string };
+  /** Ход звал `AskUserQuestion` — см. `RunFinished.asked`. */
+  asked?: boolean;
   sessionId?: string;
   /** Момент первой правки кода (мс) — слушателю сообщается один раз. */
   firstEditAt?: number;
@@ -433,6 +460,57 @@ export class ChatRunRegistry {
 
   setFirstEditListener(listener: (keys: readonly string[], at: string) => void): void {
     this.onFirstEdit = listener;
+  }
+
+  /**
+   * Прогон разговора стартовал — любой: сообщение человека, звено конвейера,
+   * повтор, ход, начатый самим CLI. Слушатель — конвейер разделения: группа,
+   * чей ход кончился паузой или итогом, снова «работает» (Д3).
+   */
+  private onRunStart?: (keys: readonly string[]) => void;
+
+  setStartListener(listener: (keys: readonly string[]) => void): void {
+    this.onRunStart = listener;
+  }
+
+  /**
+   * Ребёнок ли разговор разделения (Д16, Д18) — по связи, которую знает
+   * хранилище, а реестр нет. Спрашивается на каждом старте по обоим ключам.
+   */
+  private childOf?: (keys: readonly string[]) => boolean;
+
+  setChildResolver(resolver: (keys: readonly string[]) => boolean): void {
+    this.childOf = resolver;
+  }
+
+  /**
+   * Сводка детей для хода родителя (Д6) — у разговора, работа которого отдана
+   * группам разделения. Считается на каждом старте: состояние детей меняется
+   * между ходами, и вчерашняя сводка была бы неправдой.
+   */
+  private briefOf?: (keys: readonly string[]) => string | undefined;
+
+  setChildrenBriefResolver(resolver: (keys: readonly string[]) => string | undefined): void {
+    this.briefOf = resolver;
+  }
+
+  /**
+   * Дети разговора глазами ворот ветки (Д15): кому отдана работа и от какой
+   * ветки MR отводить копию. Задаёт bootstrap — конвейер разделения живёт там.
+   */
+  private gateContextOf?: (keys: readonly string[]) => BranchGateContext | undefined;
+
+  setBranchGateContextResolver(
+    resolver: (keys: readonly string[]) => BranchGateContext | undefined,
+  ): void {
+    this.gateContextOf = resolver;
+  }
+
+  /** Дети прогона для ворот ветки — по ключу разговора и по его сессии. */
+  branchGateContext(chatId: string): BranchGateContext | undefined {
+    const key = this.resolveKey(chatId);
+    const sessionId = this.runs.get(key)?.sessionId;
+    return this.gateContextOf?.(sessionId && sessionId !== key ? [key, sessionId] : [key]);
   }
 
   /**
@@ -735,6 +813,11 @@ export class ChatRunRegistry {
       // затёртый, он не вернулся бы после паузы дерева (ревью Т8, MAJOR-4).
       platformArgs: route.layers?.args ?? [],
       platformDropAppend: route.layers ? !route.layers.systemPrompt : false,
+      child: this.childOf?.(meta.sessionId ? [chatId, meta.sessionId] : [chatId]) ?? false,
+      prompt: withChildrenBrief(
+        options.prompt,
+        this.briefOf?.(meta.sessionId ? [chatId, meta.sessionId] : [chatId]),
+      ),
     };
     // Журнал понижений отвечает на «окупается ли понижение», и отвечать он обязан
     // моделью, которой прогон ШЁЛ. Через контур это модель маршрута, а не имя из
@@ -769,6 +852,11 @@ export class ChatRunRegistry {
       checks: [],
     };
     this.runs.set(chatId, registered);
+    try {
+      this.onRunStart?.(meta.sessionId ? [chatId, meta.sessionId] : [chatId]);
+    } catch {
+      // Слушатель чужой: его сбой не имеет права сорвать старт прогона.
+    }
 
     // Отказ обязательного контура — ошибка прогона тем же путём, что и сбой
     // CLI: процесс не поднимается вовсе, а человек видит причину в ленте.
@@ -831,7 +919,12 @@ export class ChatRunRegistry {
       this.onSession?.(run.chatId, run.sessionId);
       this.persist(run.chatId);
     }
-    if (event.kind === 'error') run.errored = true;
+    if (event.kind === 'error') {
+      run.errored = true;
+      run.lastError = event.message;
+    }
+    if (event.kind === 'limit') run.limit = { resetsAt: event.resetsAt, status: event.status };
+    if (event.kind === 'tool' && event.name === 'AskUserQuestion') run.asked = true;
     // Текст копим ХВОСТОМ: планировщику продолжения нужен конец ответа, а не
     // весь разговор (см. TEXT_TAIL).
     if (event.kind === 'text') {
@@ -975,7 +1068,11 @@ export class ChatRunRegistry {
           startedAt: run.startedAt,
           options: run.options,
           contextTokens: run.contextTokens,
+          ...(this.livePool.backgroundOf(run.sessionId) ? { background: true } : {}),
+          ...(run.asked ? { asked: true } : {}),
           ...(run.meta.origin ? { origin: run.meta.origin } : {}),
+          ...(run.lastError ? { error: run.lastError } : {}),
+          ...(run.limit ? { limit: run.limit } : {}),
         });
         if (event) this.emit(run, event);
       } catch {

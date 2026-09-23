@@ -23,7 +23,8 @@ import type {
   ProviderCheckResult,
   PushDevice,
 } from '@agentdeck/contracts';
-import type { SplitOverlapView } from '@agentdeck/contracts/chat-handoff';
+import type { SplitGroupCleaned, SplitOverlapView } from '@agentdeck/contracts/chat-handoff';
+import type { SplitSettings } from '@agentdeck/contracts/task-split';
 
 /**
  * Откуда взялся чат: см. `AppState.chatLinks`.
@@ -68,6 +69,19 @@ export interface ChatLink {
   title?: string;
   /** Ветка, под которой завели копию репозитория. */
   branch?: string;
+  /**
+   * Номер группы в разделении — ключ её строки в хабе (Д12). Ветка ключом не
+   * годится: агент переключает её или уходит в detached HEAD, и одна группа
+   * распадалась на две строки.
+   */
+  groupIndex?: number;
+  /**
+   * Канонический ключ разговора (Д11): под ним связь записана ПЕРВОЙ, обычно
+   * временный `new-…`. Копия на `sessionId` несёт его же — так два ключа одного
+   * разговора узнаются и тогда, когда их связи разошлись (`firstEditAt` пишется
+   * под ключами одного прогона). Нет — связь старше поля, узнаём по содержимому.
+   */
+  conversation?: string;
   /** Когда связь записана — по ней вытесняются самые старые. */
   createdAt: string;
   /**
@@ -163,6 +177,15 @@ export interface ChatReviewState {
   path?: string;
   /** Копия отведена ОТ ветки MR; `false` — от базы (ревью читало не тот дифф). */
   onMrBranch?: boolean;
+  /** Удалённый ветки MR — туда уходит push (Д9). */
+  remote?: string;
+  /** Копия в detached HEAD на `<remote>/<branch>`: push только `HEAD:<branch>` (Д2). */
+  detached?: boolean;
+  /**
+   * Ревью кончилось без блока `agentdeck:review` (Д4): итога нет, группа не
+   * закрыта, на карточке — «повторить ревью». Снимается повтором.
+   */
+  missing?: boolean;
   /** Замечания из блока ревью; пустой список — законный ответ, группа закрыта. */
   findings?: string[];
   decision?: 'fix' | 'post' | 'both' | 'none';
@@ -173,9 +196,20 @@ export interface ChatReviewState {
   postError?: string;
   /** Правки кончились — панель предлагает закоммитить и отправить их в MR. */
   pushOffer?: boolean;
+  /** Правки есть, но push не предложен: ветка MR неизвестна (Д9). */
+  pushBlocked?: 'branch-unknown';
   /** Согласие на коммит и push отдано агенту (ISO). */
   pushedAt?: string;
 }
+
+/**
+ * Состояние группы (Д3): `started` — работает; `awaiting` — ход кончился
+ * вопросом или по ревью ждут решения человека; `background` — ход кончился, а
+ * фоновая команда агента ещё идёт; `done` — только явный итог; `failed` — сбой.
+ * Ждущих соседей отпускают только `done` и `failed`.
+ */
+export type SplitGroupStatus =
+  'pending' | 'waiting' | 'held' | 'started' | 'awaiting' | 'background' | 'done' | 'failed';
 
 /** Группа разделения глазами конвейера уровней (Т1): где она и чего ждёт. */
 export interface SplitPlanGroupRecord {
@@ -195,7 +229,7 @@ export interface SplitPlanGroupRecord {
    * `held` — ждёт ответа человека; `started` — цепочка идёт; `done` — цепочка
    * кончилась; `failed` — копию завести не удалось или цепочка оборвалась ошибкой.
    */
-  status: 'pending' | 'waiting' | 'held' | 'started' | 'done' | 'failed';
+  status: SplitGroupStatus;
   /**
    * Человек отпустил группу, не дождавшись предшественников: их цепочки
    * считаются пройденными. Хранится, а не решается на лету, потому что запуск
@@ -210,6 +244,18 @@ export interface SplitPlanGroupRecord {
   startedAt?: string;
   doneAt?: string;
   error?: string;
+  /** Чего ждёт группа в `awaiting`/`background` (Д3). */
+  waitingFor?: 'question' | 'decision' | 'review-missing' | 'background' | 'retry';
+  /** Что сделано — по фактам копии (Д5). */
+  result?: { kind: 'reviewed' | 'changed' | 'unchanged' | 'pushed'; commits?: number };
+  /** Хвост последнего ответа ребёнка (Д16). */
+  tail?: string;
+  /** Последняя ссылка на MR/PR в ответе группы — её MR при доставке. */
+  mr?: string;
+  /** Сколько раз панель сама продолжила упавший прогон (Д10). */
+  retries?: number;
+  /** Копия убрана по кнопке человека (Д19); ветка — только пустая. */
+  cleaned?: SplitGroupCleaned;
 }
 
 /**
@@ -559,6 +605,11 @@ export interface AppState {
    * от умолчания — ключа нет, значит копия получает встроенный список.
    */
   worktreeMirror?: Record<string, WorktreeMirrorSettings>;
+  /**
+   * Разделение на проекте (доставка до MR, групп разом): нормализованный путь
+   * основной копии → отклонение от `SPLIT_SETTINGS_DEFAULT`.
+   */
+  splitSettings?: Record<string, SplitSettings>;
   /**
    * Где РАЗРЕШЕНО принимать черновик генерации тестов без просмотра:
    * нормализованный путь проекта → true. Только отклонение от умолчания —

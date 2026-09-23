@@ -60,12 +60,39 @@ export function BranchGateCard({ gates, onDecide }: BranchGateCardProps) {
       {gates.map((gate) => {
         const name = names[gate.toolUseId] ?? gate.branch;
         const pending = busy === gate.toolUseId;
+        // Работа отдана группам (Д15): главный путь — передать правку им, а не
+        // заводить третью копию на ту же задачу.
+        const handed = gate.children && gate.children.length > 0 ? gate.children : undefined;
         return (
           <div key={gate.toolUseId} className={styles.questionItem}>
             <Typography variant="body-sm" color="muted">
               {t('chat.branchGate.reason', { tool: gate.toolName })}
             </Typography>
             <pre className={styles.permissionInput}>{gate.cwd}</pre>
+            {handed && (
+              <Stack gap="var(--spacing-3xs)" marginTop="var(--spacing-2xs)">
+                <Typography variant="body-sm" weight="semibold">
+                  {t('chat.branchGate.handedTitle')}
+                </Typography>
+                {handed.map((child) => (
+                  <Typography key={child.number} variant="body-sm">
+                    {t('chat.branchGate.handedChild', {
+                      number: child.number,
+                      title: child.title,
+                      branch: child.branch,
+                    })}
+                  </Typography>
+                ))}
+                <Typography variant="body-sm" color="muted">
+                  {t('chat.branchGate.handedHint')}
+                </Typography>
+              </Stack>
+            )}
+            {gate.base && (
+              <Typography variant="body-sm" color="muted">
+                {t('chat.branchGate.base', { base: gate.base })}
+              </Typography>
+            )}
             <TextField
               label={t('chat.branchGate.branchLabel')}
               value={name}
@@ -84,11 +111,11 @@ export function BranchGateCard({ gates, onDecide }: BranchGateCardProps) {
             >
               <Button
                 size="sm"
-                variant="ghost"
+                variant={handed ? 'primary' : 'ghost'}
                 disabled={pending}
                 onClick={() => void decide(gate.toolUseId, 'stop')}
               >
-                {t('chat.branchGate.stop')}
+                {handed ? t('chat.branchGate.handOff') : t('chat.branchGate.stop')}
               </Button>
               <Button
                 size="sm"
@@ -100,7 +127,7 @@ export function BranchGateCard({ gates, onDecide }: BranchGateCardProps) {
               </Button>
               <Button
                 size="sm"
-                variant="primary"
+                variant={handed ? 'secondary' : 'primary'}
                 disabled={pending || name.trim().length === 0}
                 onClick={() => void decide(gate.toolUseId, 'copy', name.trim())}
               >

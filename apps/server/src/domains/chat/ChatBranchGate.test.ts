@@ -3,7 +3,12 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { isMainWorkingCopy, isWritingCall, suggestBranchName } from './ChatBranchGate.ts';
+import {
+  branchGateContext,
+  isMainWorkingCopy,
+  isWritingCall,
+  suggestBranchName,
+} from './ChatBranchGate.ts';
 
 describe('ворота ветки: что считается правкой', () => {
   it('инструменты правки — свои и чужих CLI', () => {
@@ -95,5 +100,30 @@ describe('ворота ветки: основная копия и копия', (
     const plain = join(root, 'plain');
     mkdirSync(plain, { recursive: true });
     expect(isMainWorkingCopy(plain)).toBe(false);
+  });
+});
+
+describe('ворота ветки: работа отдана группам (Д15)', () => {
+  const group = (index: number, chatId: string) => ({
+    index,
+    title: `Группа ${index + 1}`,
+    branch: `agent/g${index + 1}`,
+    after: [],
+    status: 'started' as const,
+    chatId,
+  });
+  const split = { parentChatId: 'p', order: [0, 1], groups: [group(0, 'c1'), group(1, 'c2')] };
+
+  it('две ветки MR у детей — базу наугад не выбираем', () => {
+    const context = branchGateContext(split, (chatId) => ({ branch: `mr-${chatId}` }));
+    expect(context?.children.map((child) => child.number)).toEqual([1, 2]);
+    expect(context?.base).toBeUndefined();
+  });
+
+  it('одна ветка MR на всех — от неё и отводим; без разделения контекста нет', () => {
+    expect(branchGateContext(split, () => ({ branch: 'mr', remote: 'origin' }))?.base).toBe(
+      'origin/mr',
+    );
+    expect(branchGateContext(undefined, () => undefined)).toBeUndefined();
   });
 });

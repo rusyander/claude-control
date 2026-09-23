@@ -12,6 +12,7 @@ import type {
   PendingTreeStart,
   TreePauseRecord,
 } from '../../lib/app-store/app-store.types.ts';
+import { linkIdentity } from '../../lib/app-store/chat-links.ts';
 import type { ChatRunRegistry, RunMeta } from './ChatRunRegistry.ts';
 import type { RunOptions } from './ChatRunner.ts';
 import type { AutoApproveState } from './ChatSession.ts';
@@ -261,13 +262,14 @@ export class TreePause implements TreeStartGate {
     const root = rootOf(links, chatId);
     const record = this.deps.store.get(root);
 
-    // Два ключа одной связи — один разговор: связь копируется на `sessionId`
-    // как есть, и одинаковое содержимое надёжнее любого реестра, который
-    // помнит лишь живые и недавно ушедшие прогоны.
+    // Два ключа одной связи — один разговор: узнаём по каноническому ключу
+    // разговора (Д11), а не по содержимому — оно расходится с первой записью
+    // поля под одним ключом, и узел раздваивался. Реестр прогонов здесь не
+    // помощник: он помнит лишь живые и недавно ушедшие прогоны.
     const byIdentity = new Map<string, ChatTreeNode>();
     for (const key of collectTree(links, root)) {
       const link = links[key] as ChatLink;
-      const identity = JSON.stringify(link);
+      const identity = linkIdentity(link);
       const running = this.deps.runs.isRunning(key);
       const node = byIdentity.get(identity);
       if (node) {
@@ -287,6 +289,7 @@ export class TreePause implements TreeStartGate {
         parentChatId: link.parentChatId,
         ...(link.title ? { title: link.title } : {}),
         ...(link.branch ? { branch: link.branch } : {}),
+        ...(typeof link.groupIndex === 'number' ? { groupIndex: link.groupIndex } : {}),
         ...(link.stage ? { stage: link.stage } : {}),
         running,
         ...(() => {

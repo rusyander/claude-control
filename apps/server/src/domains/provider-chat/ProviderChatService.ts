@@ -15,6 +15,7 @@ import type { PlatformRunRoute } from '../platform/routing.ts';
 import { expandCommand, type SupervisorCommand } from '../portability/supervisor/commands.ts';
 import { appendMessage, dropMessage, readChat } from './store.ts';
 import { composeUserMessage } from './prompt.ts';
+import { withChildrenBrief } from '../chat/children-brief.ts';
 import { serverText } from '../../lib/server-texts.ts';
 
 /**
@@ -88,6 +89,10 @@ export interface ProviderChatFinished {
   ok: boolean;
   /** Текст ответа целиком. */
   text: string;
+  /** Чем кончился упавший ход — по нему надзор решает, временный ли сбой (Д10). */
+  error?: string;
+  /** Ход остановил человек: это не сбой, и повторять его нельзя. */
+  stopped?: boolean;
   /**
    * Когда прогон начался. Нужен продолжению в чистой сессии (Т7): файл-опора
    * обязан быть свежее старта, иначе новая сессия читала бы вчерашнее.
@@ -148,6 +153,13 @@ export class ProviderChatService {
    */
   setFinishedListener(listener: (finished: ProviderChatFinished) => void): void {
     this.onFinished = listener;
+  }
+
+  private onStarted?: (providerId: string, chatId: string) => void;
+
+  /** Кому сообщать, что ответ начался: группа снова «работает» (Д3). */
+  setStartListener(listener: (providerId: string, chatId: string) => void): void {
+    this.onStarted = listener;
   }
 
   /**
@@ -212,6 +224,17 @@ export class ProviderChatService {
 
   private supervisor?: (run: SupervisorRunContext) => SupervisorSetup | undefined;
 
+  /**
+   * Сводка детей разделения для хода родителя (Д6) — как у Claude, но в
+   * переписку она не пишется: историю модели собирает панель, и сводка едет
+   * только в последней реплике ЭТОГО хода. В переписке — то, что сказал человек.
+   */
+  setChildrenBrief(resolve: (providerId: string, chatId: string) => string | undefined): void {
+    this.childrenBriefOf = resolve;
+  }
+
+  private childrenBriefOf?: (providerId: string, chatId: string) => string | undefined;
+
   /** Задать вопрос: реплика пользователя пишется сразу, ответ идёт потоком. */
   send(
     appDataDir: string,
@@ -247,8 +270,17 @@ export class ProviderChatService {
     };
     if (existing?.cleanupTimer) clearTimeout(existing.cleanupTimer);
     this.runs.set(chatId, live);
+    try {
+      this.onStarted?.(providerId, chatId);
+    } catch {
+      // Слушатель не должен ронять отправку, реплика уже записана.
+    }
 
-    const history = [...chat.messages, message];
+    const brief = this.childrenBriefOf?.(providerId, chatId);
+    const history = [
+      ...chat.messages,
+      brief ? { ...message, content: withChildrenBrief(message.content, brief) } : message,
+    ];
     // Маршрут решается ЗДЕСЬ, на каждом сообщении, и в опции прогона приходит
     // только отсюда: у `ProviderChatRunDeps` этого поля нет намеренно — иначе
     // адрес контура протащил бы в новый запуск отложенный вызов конвейера,
@@ -442,6 +474,8 @@ export class ProviderChatService {
         startedAt: live.startedAt,
         ok: event.type === 'done' && !live.stopped,
         text: event.type === 'done' ? (event.message?.content ?? live.partial) : '',
+        ...(event.type === 'error' ? { error: event.error } : {}),
+        ...(live.stopped ? { stopped: true } : {}),
       });
     } catch {
       // Слушатель зовётся ИЗ колбэка прогона: брошенное отсюда исключение

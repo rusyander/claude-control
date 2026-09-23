@@ -55,6 +55,7 @@ export function ProviderChatMessages({
   reviews,
   onReviewDecide,
   onReviewPush,
+  onReviewRetry,
   reviewBusy,
   mediaChatId,
   mediaModel,
@@ -308,6 +309,7 @@ export function ProviderChatMessages({
                 }
                 onDecide={onReviewDecide}
                 {...(onReviewPush ? { onPush: onReviewPush } : {})}
+                {...(onReviewRetry ? { onRetry: onReviewRetry } : {})}
                 {...(reviewBusy !== undefined ? { busy: reviewBusy } : {})}
               />
             ))}

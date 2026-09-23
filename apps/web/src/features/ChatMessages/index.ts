@@ -31,7 +31,7 @@ export type { ChildStageGroup, ChildStagesProps } from './ui/ChildStages.types';
  * группу, у которой чата ещё нет, показывают обе ленты, а собрать её можно
  * только из записи конвейера, и второй копии этого счёта быть не должно.
  */
-export { mergeSplitGroups } from './lib/mergeSplitGroups';
+export { mergeSplitGroups, splitGroupKey } from './lib/mergeSplitGroups';
 /**
  * Карточка решения по ревью чужого MR (Т7) и её сбор по дереву. Наружу — по той
  * же причине, что и хаб: лент ДВЕ, у Claude карточку ставит `ChatMessages`, у

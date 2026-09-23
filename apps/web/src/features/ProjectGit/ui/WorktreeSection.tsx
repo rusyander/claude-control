@@ -20,6 +20,7 @@ import type { ProjectWorktree, WorktreeMirrorReport as MirrorReport } from '@ent
 import type { WorktreeSectionProps } from './WorktreeSection.types';
 import { WorktreeMirrorReport } from './WorktreeMirrorReport';
 import { WorktreeMirrorSettings } from './WorktreeMirrorSettings';
+import { SplitSettings } from './SplitSettings';
 import { WorktreeBootstrapCard } from './WorktreeBootstrapCard';
 import { WorktreeReadiness } from './WorktreeReadiness';
 import styles from './WorktreeSection.module.scss';
@@ -279,6 +280,7 @@ export function WorktreeSection({ path, busy }: WorktreeSectionProps) {
       </Typography>
 
       <WorktreeMirrorSettings path={path} disabled={busy || pending} />
+      <SplitSettings path={path} disabled={busy || pending} />
     </Stack>
   );
 }

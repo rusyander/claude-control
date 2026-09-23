@@ -12,6 +12,7 @@ import { ProviderChatService } from '../domains/provider-chat.ts';
 import { SplitConveyor } from '../domains/chat/split-conveyor.ts';
 import { createSplitLauncher, launchFromRecord } from './chat/split-launch.ts';
 import type { ChatLink } from '../lib/app-store/app-store.types.ts';
+import { SPLIT_BLOCK_LANG, scanSplitBlocks } from '@agentdeck/contracts/task-split';
 
 /**
  * Маршрут разделения задач по чатам. Каталог берём обычный (не репозиторий) —
@@ -121,6 +122,40 @@ describe('POST /api/chat/split', () => {
     expect(started).toHaveLength(2);
     expect(started[0]?.prompt).toContain('первая задача');
     expect(started[0]?.prompt).toContain('Общее');
+  });
+
+  // Д1 (инцидент 23.09): веб шлёт предложение, уже разобранное общим сканером,
+  // и сервер разбирает его второй раз. Работа в MR доезжала до ребёнка ревью.
+  it('работа в MR с телом веба доезжает до ребёнка работой, а не ревью', async () => {
+    const block = JSON.stringify({
+      groups: [
+        {
+          title: '!773',
+          tasks: ['поправь по замечаниям, закоммить и запушь'],
+          review: { url: 'https://gitlab.com/team/app/-/merge_requests/773', action: 'work' },
+        },
+        {
+          title: '!772',
+          tasks: ['поправь по замечаниям'],
+          review: { url: 'https://gitlab.com/team/app/-/merge_requests/772', action: 'work' },
+        },
+      ],
+    });
+    const web = scanSplitBlocks('```' + SPLIT_BLOCK_LANG + '\n' + block + '\n```').proposals[0];
+    expect(web?.groups).toHaveLength(2);
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/chat/split',
+      payload: { projectPath: project, proposal: web, startRuns: true },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(started).toHaveLength(2);
+    for (const run of started) {
+      expect(run.prompt).toContain('работает в запросе на слияние');
+      expect(run.prompt).not.toContain('НИЧЕГО НЕ ПРАВЬ');
+    }
   });
 
   it('набор, привязанный к проекту, включается и для порождённых чатов', async () => {
@@ -599,7 +634,9 @@ describe('POST /api/chat/split', () => {
       expect(record?.groups.map((group) => group.status)).toEqual(['started', 'waiting']);
 
       // Цепочка первой кончилась — вторая стартует с заметкой о предшественнике.
-      conveyor.onChainEnded(store.getChatLink(started[0]?.chatId ?? '') as ChatLink, true);
+      conveyor.onChainEnded(store.getChatLink(started[0]?.chatId ?? '') as ChatLink, {
+        status: 'done',
+      });
       await new Promise((done) => setTimeout(done, 30));
       expect(started).toHaveLength(2);
       expect(store.getChatLink(started[1]?.chatId ?? '')?.notes).toContain(

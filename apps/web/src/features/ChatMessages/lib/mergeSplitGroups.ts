@@ -2,6 +2,22 @@ import type { SplitPlanView } from '@agentdeck/contracts/chat-handoff';
 import type { ChildStageGroup } from '../ui/ChildStages.types';
 
 /**
+ * Ключ строки хаба для звена группы. Номер группы из связи — первым (Д12):
+ * ветку, прочитанную из разговора, агент волен сменить (или уйти в detached
+ * HEAD), и одна группа распадалась на две строки. Номера нет (связь старше
+ * поля) — ветка, затем имя группы, затем сам разговор.
+ */
+export function splitGroupKey(link: {
+  groupIndex?: number | undefined;
+  branch?: string | undefined;
+  title?: string | undefined;
+  id: string;
+}): string {
+  if (typeof link.groupIndex === 'number') return `#${link.groupIndex}`;
+  return link.branch || link.title || link.id;
+}
+
+/**
  * Склейка строк хаба с записью конвейера уровней: порядок старта плюс группы,
  * у которых чата ЕЩЁ НЕТ.
  *
@@ -13,8 +29,7 @@ import type { ChildStageGroup } from '../ui/ChildStages.types';
  *
  * Отличаются страницы только источником готовых строк — список чатов и реестр
  * прогонов у Claude, дерево у чужого CLI, — и потому сюда приходит уже готовая
- * карта «ключ группы → строка». Ключ — ветка, иначе название группы: звенья
- * одной группы живут в одной копии и в одной ветке.
+ * карта «ключ группы → строка», посчитанного `splitGroupKey`.
  */
 export function mergeSplitGroups(
   byKey: Map<string, ChildStageGroup>,
@@ -40,13 +55,45 @@ export function mergeSplitGroups(
   for (const index of order) {
     const group = split.groups.find((item) => item.index === index);
     if (!group) continue;
-    const found = findRow(byKey, group.branch || group.title, group.chatId);
+    const found =
+      findRow(byKey, splitGroupKey({ groupIndex: group.index, id: '' }), group.chatId) ??
+      findRow(byKey, group.branch || group.title, group.chatId);
     if (found) {
       taken.add(found.key);
       ordered.push({
         ...found.row,
         title: group.title || found.row.title,
         ...(group.base ? { base: group.base } : {}),
+        // Чего ждёт группа, у которой чат есть (Д3): решения по ревью, фона,
+        // повтора. Вопрос из транскрипта точнее — его не перекрываем.
+        ...(!found.row.waitingFor && group.waitingFor && !found.row.isRunning
+          ? { waitingFor: group.waitingFor }
+          : {}),
+        // Итог и хвост ответа — про ПРОШЛЫЙ ход (Д5, Д16): у идущего звена они
+        // уже неправда, новый ответ ещё пишется.
+        ...(!found.row.isRunning && group.result ? { result: group.result } : {}),
+        ...(!found.row.isRunning && group.tail ? { tail: group.tail } : {}),
+        // Ссылка на MR — факт, а не прошлый ход: MR не исчезает, пока группа
+        // снова работает (правит по ревью), поэтому видна и у идущего звена.
+        ...(group.mr ? { mr: group.mr } : {}),
+        // Группа сдалась (Д10): без причины строка с чатом выглядела просто
+        // остановившейся, и «попытки кончились» человек не узнавал ниоткуда.
+        ...(!found.row.isRunning && group.status === 'failed' && group.error
+          ? { error: group.error }
+          : {}),
+        ...(!found.row.isRunning && group.retries ? { retries: group.retries } : {}),
+        // Закрытая группа с копией (Д19): предложить убрать. Идущему звену —
+        // нет: сносить каталог из-под агента нельзя.
+        ...(!found.row.isRunning &&
+        group.path &&
+        (group.status === 'done' || group.status === 'failed')
+          ? {
+              copy: {
+                index: group.index,
+                ...(group.cleaned ? { cleaned: group.cleaned.branch } : {}),
+              },
+            }
+          : {}),
       });
       continue;
     }
@@ -81,8 +128,11 @@ function pendingRow(group: SplitPlanView['groups'][number], split: SplitPlanView
   // «started»/«done» у группы, чей чат до списка ещё не доехал) читается как
   // «ждёт итога разбора»: строке нужно сказать, почему группы не видно.
   const known = ['held', 'waiting', 'failed'] as const;
+  // Разбор уже применён, а группа всё ещё `pending` — она ждёт места: сколько
+  // групп идёт разом, решает настройка проекта.
   const pending: ChildStageGroup['pending'] =
-    known.find((status) => status === group.status) ?? 'pending';
+    known.find((status) => status === group.status) ??
+    (group.status === 'pending' && split.triage ? 'queued' : 'pending');
   return {
     chatId: '',
     title: group.title,

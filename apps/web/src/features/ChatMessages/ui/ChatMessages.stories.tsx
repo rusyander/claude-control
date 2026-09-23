@@ -102,6 +102,53 @@ export const ОчередьДописанного: Story = {
   },
 };
 
+const gate = {
+  toolName: 'Edit',
+  input: { file_path: 'src/app.ts' },
+  toolUseId: 'gate-1',
+  cwd: 'C:/work/project',
+  branch: 'agent/popravit-shapku-a1b2c3',
+};
+
+export const ВоротаВетки: Story = {
+  parameters: {
+    docs: {
+      description: {
+        story: 'Первая правка в основной копии: агент стоит, пока человек не скажет, где работать.',
+      },
+    },
+  },
+  args: {
+    branchGates: [gate],
+    onBranchDecide: async () => ({ ok: true }),
+  },
+};
+
+export const ВоротаВеткиРаботаУГрупп: Story = {
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Работа разговора отдана группам разделения (Д15): карточка называет их, главный ' +
+          'путь — передать правку группе, а копия, если её всё же завести, встанет на ветку MR.',
+      },
+    },
+  },
+  args: {
+    branchGates: [
+      {
+        ...gate,
+        children: [
+          { number: 1, title: 'Шапка', branch: 'feature/header', status: 'started' },
+          { number: 2, title: 'Подвал', branch: 'feature/header', status: 'awaiting' },
+        ],
+        base: 'origin/feature/header',
+      },
+    ],
+    onBranchDecide: async () => ({ ok: true }),
+  },
+};
+
 export const СвязьПотеряна: Story = {
   parameters: {
     docs: {

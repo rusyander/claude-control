@@ -1143,4 +1143,8 @@ export const serverTextTemplates = {
     ru: 'Разбор оборвался перезапуском панели — итога не будет. Групп ждёт вашего ответа: {{groups}}; сами они не стартуют.',
     en: 'The triage was cut short by a panel restart — there will be no result. Groups waiting for your answer: {{groups}}; they will not start by themselves.',
   },
+  'child-tell-notice': {
+    ru: 'Родитель написал группам. Передано: {{sent}} · в очереди до конца их хода: {{queued}} · не доставлено (у группы нет чата или копии): {{refused}}.',
+    en: 'The parent wrote to its groups. Delivered: {{sent}} · queued until their turn ends: {{queued}} · not delivered (the group has no chat or copy): {{refused}}.',
+  },
 } as const satisfies Record<string, { ru: string; en: string }>;

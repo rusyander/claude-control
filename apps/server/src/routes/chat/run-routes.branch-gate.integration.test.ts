@@ -10,6 +10,7 @@ import { ChatRunRegistry, type RunLike } from '../../domains/chat/ChatRunRegistr
 import type { RunOptions } from '../../domains/chat/ChatRunner.ts';
 import { ChatSession } from '../../domains/chat/ChatSession.ts';
 import type { ChatEvent } from '../../domains/chat/chat-events.ts';
+import { branchGateContext } from '../../domains/chat/ChatBranchGate.ts';
 import { registerChatRunRoutes } from './run-routes.ts';
 
 /**
@@ -253,5 +254,90 @@ describe('маршруты чата: ворота ветки', () => {
 
     session.decidePermission(CHAT, 'tool-1', { behavior: 'deny', message: 'конец теста' });
     await pending;
+  });
+
+  describe('работа отдана группам (Д15)', () => {
+    /**
+     * Дети чинят MR, чья ветка есть только у удалённого — как у копии MR в
+     * detached HEAD (Д2). Дерево детей — через ту же сборку, что в bootstrap.
+     */
+    const handToChildren = (): void => {
+      const remote = join(root, 'remote.git');
+      git(root, 'init', '--bare', remote);
+      git(repo, 'remote', 'add', 'origin', remote);
+      git(repo, 'checkout', '-b', 'mr-feature');
+      writeFileSync(join(repo, 'mr.txt'), 'правка MR\n', 'utf8');
+      git(repo, 'add', '.');
+      git(repo, 'commit', '-m', 'MR');
+      git(repo, 'push', 'origin', 'mr-feature');
+      git(repo, 'checkout', 'main');
+      git(repo, 'branch', '-D', 'mr-feature');
+      registry.setBranchGateContextResolver((keys) =>
+        branchGateContext(
+          keys.includes(SESSION)
+            ? {
+                parentChatId: SESSION,
+                order: [0],
+                groups: [
+                  {
+                    index: 0,
+                    title: 'Шапка',
+                    branch: 'mr-feature',
+                    after: [],
+                    status: 'started',
+                    chatId: 'child-1',
+                  },
+                ],
+              }
+            : undefined,
+          (chatId) =>
+            chatId === 'child-1' ? { branch: 'mr-feature', remote: 'origin' } : undefined,
+        ),
+      );
+    };
+
+    it('карточка называет группы и ветку MR, от которой встанет копия', async () => {
+      handToChildren();
+      startRun();
+      const pending = askPermission();
+
+      expect(await waitForGate()).toMatchObject({
+        children: [{ number: 1, title: 'Шапка', branch: 'mr-feature', status: 'started' }],
+        base: 'origin/mr-feature',
+      });
+
+      session.decidePermission(CHAT, 'tool-1', { behavior: 'deny', message: 'конец теста' });
+      await pending;
+    });
+
+    it('«завести копию» — копия от ветки MR, а не от main', async () => {
+      handToChildren();
+      startRun();
+      const pending = askPermission();
+      await waitForGate();
+
+      const response = await decide({ toolUseId: 'tool-1', choice: 'copy', branch: 'agent/proba' });
+
+      expect(response.statusCode).toBe(200);
+      const copyPath = (response.json() as { path: string }).path;
+      // Код MR в копии есть: она отведена от его ветки.
+      expect(existsSync(join(copyPath, 'mr.txt'))).toBe(true);
+      expect(git(copyPath, 'rev-parse', '--abbrev-ref', 'HEAD').trim()).toBe('agent/proba');
+      await pending;
+    });
+
+    it('«не писать» — отказ говорит агенту передать правку группе', async () => {
+      handToChildren();
+      startRun();
+      const pending = askPermission();
+      await waitForGate();
+
+      await decide({ toolUseId: 'tool-1', choice: 'stop' });
+
+      const answer = (await pending).json() as { behavior: string; message: string };
+      expect(answer.behavior).toBe('deny');
+      expect(answer.message).toContain('agentdeck:tell N');
+      expect(answer.message).toContain('1 — «Шапка»');
+    });
   });
 });

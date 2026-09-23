@@ -18,6 +18,7 @@ import {
   useResumeTree,
   useReviewDecision,
   useReviewPush,
+  useReviewRetry,
 } from '@entities/ChatTree';
 import {
   collectReviews,
@@ -94,6 +95,8 @@ export interface ChildHub {
   reviewDecide: (chatId: string, decision: TaskSplitReviewDecision, all: boolean) => void;
   /** «Закоммитить и отправить в MR» — отдельным кликом после правок. */
   reviewPush: (chatId: string) => void;
+  /** «Повторить итог ревью» (Д4). */
+  reviewRetry: (chatId: string) => void;
   reviewBusy: boolean;
 }
 
@@ -278,6 +281,7 @@ export function useChildHub(
 
   const decision = useReviewDecision();
   const push = useReviewPush();
+  const retry = useReviewRetry();
   const treeOf = (chatId: string): string =>
     reviewTreeOf(reviews, chatId, [ownParentChatId, parentChatId]);
 
@@ -332,6 +336,25 @@ export function useChildHub(
     );
   };
 
+  const reviewRetry = (chatId: string): void => {
+    if (retry.isPending) return;
+    retry.mutate(
+      { parentChatId: treeOf(chatId), chatId },
+      {
+        onSuccess: () => {
+          toast.success(t('chat.review.retryToast'));
+          settle();
+        },
+        onError: (error) =>
+          toast.error(
+            t('chat.review.failed', {
+              message: toErrorMessage(error),
+            }),
+          ),
+      },
+    );
+  };
+
   // Сводка групп считается с видом конвейера: без него группы, у которых чата
   // ещё нет, в сводке отсутствовали бы вовсе.
   const isPaused = Boolean(tree.data?.paused);
@@ -357,6 +380,7 @@ export function useChildHub(
     reviews,
     reviewDecide,
     reviewPush,
-    reviewBusy: decision.isPending || push.isPending,
+    reviewRetry,
+    reviewBusy: decision.isPending || push.isPending || retry.isPending,
   };
 }

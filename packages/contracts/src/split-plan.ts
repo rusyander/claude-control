@@ -1,4 +1,5 @@
 import { blockLang, blockLangPattern } from './brand.ts';
+import { SPLIT_MAX_GROUPS } from './task-split.ts';
 /**
  * Два уровня плана ПЕРЕД работой групп разделения (Т1, 09.09.2026).
  *
@@ -21,7 +22,7 @@ export const SPLIT_PLAN_BLOCK_LANG = blockLang('split-plan');
 export const PLAN_BLOCK_LANG = blockLang('plan');
 
 /** Потолки разбора: всё сверх них — не план, а простыня. */
-const MAX_GROUPS = 8;
+const MAX_GROUPS = SPLIT_MAX_GROUPS;
 const MAX_TASKS = 50;
 const MAX_TASK = 2_000;
 const MAX_OWNS = 40;

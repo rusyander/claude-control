@@ -7,6 +7,7 @@ import type {
   WorktreeBootstrapState,
   WorktreeMirrorSettings,
 } from '@agentdeck/contracts';
+import type { SplitSettings } from '@agentdeck/contracts/task-split';
 import { apiClient } from '@shared/api/client';
 import { normalizeProjectPath } from '@shared/lib/workspace';
 
@@ -208,6 +209,38 @@ export function useSaveMirrorSettings() {
     },
     onSuccess: (result, body) => {
       queryClient.setQueryData(mirrorSettingsKeyFor(body.path), result);
+    },
+  });
+}
+
+/** Ключ настроек разделения — по основной копии, как и шаблоны зеркала. */
+function splitSettingsKeyFor(path: string | undefined): readonly unknown[] {
+  return [...projectGitKey, 'split-settings', path ? normalizeProjectPath(path) : ''];
+}
+
+/** Разделение на проекте: доводить ли группу до MR и сколько групп идёт разом. */
+export function useSplitSettings(path: string | undefined) {
+  return useQuery({
+    queryKey: splitSettingsKeyFor(path),
+    queryFn: async () => {
+      const { data } = await apiClient.get<SplitSettings>('/project-git/split-settings', {
+        params: { path },
+      });
+      return data;
+    },
+    enabled: Boolean(path),
+  });
+}
+
+export function useSaveSplitSettings() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: { path: string } & SplitSettings) => {
+      const { data } = await apiClient.put<SplitSettings>('/project-git/split-settings', body);
+      return data;
+    },
+    onSuccess: (result, body) => {
+      queryClient.setQueryData(splitSettingsKeyFor(body.path), result);
     },
   });
 }

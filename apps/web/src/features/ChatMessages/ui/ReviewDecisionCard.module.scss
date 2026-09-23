@@ -56,8 +56,9 @@
   margin-bottom: var(--spacing-2xs);
   padding: var(--spacing-2xs) var(--spacing-xs);
   border-radius: 8px;
-  background: var(--color-warning-bg, var(--color-surface));
-  color: var(--color-warning-fg, var(--color-fg));
+  border-left: 2px solid var(--color-warning);
+  background: var(--color-warning-subtle);
+  color: var(--color-fg);
 }
 
 .list {
@@ -89,5 +90,5 @@
 }
 
 .error {
-  color: var(--color-danger-fg, var(--color-fg));
+  color: var(--color-danger);
 }

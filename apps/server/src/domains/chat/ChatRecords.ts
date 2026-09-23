@@ -1,5 +1,6 @@
 import type { ChatSummary, ChatBlock, MessageUsage } from '@agentdeck/contracts';
 import { splitAttachments } from '@agentdeck/contracts/uploads';
+import { stripChildrenBrief } from './children-brief.ts';
 
 /**
  * Разбор одной записи транскрипта: что это за строка и что из неё показывать.
@@ -215,14 +216,20 @@ export function branchOf(record: Record): string | undefined {
 
 export function toBlocks(record: Record): ChatBlock[] {
   const content = record.message?.content;
-  if (typeof content === 'string') return content.trim() ? [{ type: 'text', text: content }] : [];
+  // Сводку детей (Д6) панель кладёт в начало хода родителя для агента, не для
+  // человека: в пузыре его реплики её быть не должно.
+  const said = (text: string): string => (record.type === 'user' ? stripChildrenBrief(text) : text);
+  if (typeof content === 'string') {
+    const text = said(content);
+    return text.trim() ? [{ type: 'text', text }] : [];
+  }
   if (!Array.isArray(content)) return [];
 
   const blocks: ChatBlock[] = [];
 
   for (const block of content) {
-    if (block.type === 'text' && block.text?.trim()) {
-      blocks.push({ type: 'text', text: block.text });
+    if (block.type === 'text' && block.text && said(block.text).trim()) {
+      blocks.push({ type: 'text', text: said(block.text) });
     } else if (block.type === 'thinking' && block.thinking?.trim()) {
       blocks.push({ type: 'thinking', text: block.thinking });
     } else if (block.type === 'tool_use') {
@@ -265,7 +272,7 @@ export function textOf(record: Record | undefined): string {
  * выглядят мусором, поэтому их вырезаем.
  */
 export function cleanText(text: string): string {
-  return text
+  return stripChildrenBrief(text)
     .replace(/<(ide_[a-z_]+|command-[a-z]+|task-notification|system-reminder)>[\s\S]*?<\/\1>/g, '')
     .replace(/<[^>]+>/g, ' ')
     .replace(/\s+/g, ' ')

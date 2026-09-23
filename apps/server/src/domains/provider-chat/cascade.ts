@@ -13,6 +13,7 @@ import {
 } from '@agentdeck/contracts/split-plan';
 import { foreignChatKey } from '@agentdeck/contracts/foreign-chat-key';
 import type { ChatLink } from '../../lib/app-store/app-store.types.ts';
+import { carriedLink } from '../../lib/app-store/chat-links.ts';
 import type { ConfigProvider } from '../../providers/types.ts';
 import type { RunOptions } from '../chat/ChatRunner.ts';
 import type { RunMeta } from '../chat/ChatRunRegistry.ts';
@@ -20,6 +21,8 @@ import type { ChatEvent } from '../chat/chat-events.ts';
 import type { TreeStartGate } from '../chat/tree-pause.ts';
 import { initiativePrompt } from '../chat/initiative.ts';
 import { reviewNoticeText } from '../chat/split-review.ts';
+import { chainOutcomeOf, endsWithQuestion, type ChainOutcomeInput } from '../chat/chain-outcome.ts';
+import type { ChainOutcome } from '../chat/split-conveyor.ts';
 import type { HandoffChains, HashFile, StatFile } from '../chat/ChatHandoff.ts';
 import { planForeignHandoff, type ForeignHandoffDeps } from './handoff.ts';
 import { appendMessage, createChat, readChat, readChatCascade, setChatCascade } from './store.ts';
@@ -93,6 +96,11 @@ export interface ForeignStageInput {
    * поля у Claude и у чужого CLI одни и те же, и второй их копии быть не должно.
    */
   link?: ChatLink;
+  /**
+   * Ход кончился вопросом человеку (Д3): работа не закончена, и ревью по ней
+   * было бы проверкой недоделанного.
+   */
+  paused?: boolean;
 }
 
 /** Название звена: от названия ГРУППЫ, а не предыдущего звена. */
@@ -167,7 +175,7 @@ export function planForeignStage(input: ForeignStageInput): ForeignStagePlan | u
   if (cascade.stage === 'fix' || cascade.stage === 'triage') return undefined;
   // План — единственное звено, после которого следующее стартует и при неудаче.
   if (cascade.stage === 'plan') return afterForeignPlan(cascade, input.link, ok, text);
-  if (!ok) return undefined;
+  if (!ok || input.paused) return undefined;
 
   const kind = cascade.kind as TaskKind | undefined;
   const base: ProviderChatCascade = {
@@ -293,6 +301,10 @@ export interface ForeignRunFinished {
   text: string;
   /** Момент старта прогона: по нему проверяется свежесть файла-опоры (Т7). */
   startedAt: number;
+  /** Чем кончился упавший ход — уходит в итог группы (Д10). */
+  error?: string;
+  /** Надзор назначил повтор или попытки кончились (Д10) — см. `chainOutcomeOf`. */
+  retry?: ChainOutcomeInput['retry'];
 }
 
 /** Что планировщику нужно снаружи, чтобы завести звено. */
@@ -333,7 +345,7 @@ export interface ForeignStagePlannerDeps {
    * тех, кто её ждал (`after`), и сверяет ветки. План и разбор цепочкой не
    * считаются: за планом работа заводится всегда.
    */
-  onChainEnded?: (link: ChatLink, ok: boolean) => void;
+  onChainEnded?: (link: ChatLink, outcome: ChainOutcome) => void;
   /**
    * Ревью чужого MR по ссылке (Т6) кончилось: замечания — в связь, решение —
    * человеку. Отвечает событием, которое лента чужого разговора показывает
@@ -346,6 +358,8 @@ export interface ForeignStagePlannerDeps {
     link: ChatLink;
     ok: boolean;
     text: string;
+    paused?: boolean;
+    hasWork?: () => boolean;
   }) => ChatEvent | undefined;
   /**
    * Память цепочек продолжения в чистой сессии (Т7) — ТА ЖЕ, что у Claude:
@@ -431,7 +445,12 @@ export function createForeignStagePlanner(
       // ревью-группы шапки нет вовсе — она идёт на потолке, то есть без
       // подобранной ступени, — и по шапке такой разговор от обычного не
       // отличить. Признак ревью один и живёт в связи.
+      // Вопрос человеку текстом — пауза, а не итог (Д3). Фон чужого CLI панели
+      // не виден: его ход кончается вместе с процессом.
+      const paused = finished.ok && endsWithQuestion(finished.text);
       if (link?.review) {
+        const reviewPath = link.review.path;
+        const reviewWork = reviewPath ? () => deps.hasWork(reviewPath, link.createdAt) : undefined;
         const event = deps.onReviewFinished?.({
           chatId: chatKey,
           // Ключ у чужого разговора один: переносить связь на сессию, как у
@@ -440,6 +459,8 @@ export function createForeignStagePlanner(
           link,
           ok: finished.ok,
           text: finished.text,
+          paused,
+          ...(reviewWork ? { hasWork: reviewWork } : {}),
         });
         if (event?.kind === 'review') {
           appendMessage(appDataDir, providerId, chatId, {
@@ -449,7 +470,19 @@ export function createForeignStagePlanner(
         }
         // Цепочка группы кончилась ровно здесь: следующего звена не будет, а
         // ждущие соседи (`after`) и сверка веток об этом узнать обязаны.
-        deps.onChainEnded?.(link, finished.ok);
+        // Связь перечитывается: ревью только что записало в неё свой итог.
+        const current = deps.linkOf?.(chatKey) ?? link;
+        deps.onChainEnded?.(
+          current,
+          chainOutcomeOf({
+            link: current,
+            ok: finished.ok,
+            text: finished.text,
+            ...(reviewWork ? { hasWork: reviewWork } : {}),
+            ...(finished.error ? { error: finished.error } : {}),
+            ...(finished.retry ? { retry: finished.retry } : {}),
+          }),
+        );
         return;
       }
 
@@ -521,12 +554,25 @@ export function createForeignStagePlanner(
         task,
         hasWork: () => deps.hasWork(cwd, chat.createdAt),
         ...(link ? { link } : {}),
+        ...(paused ? { paused } : {}),
       });
       if (!plan) {
         // Звена больше не будет — цепочка группы кончилась. План сюда не
         // попадает: за ним работа заводится всегда, а если не завелась, то
         // потому что уже была заведена (`plannedAt`).
-        if (link && cascade.stage !== 'plan') deps.onChainEnded?.(link, finished.ok);
+        if (link && cascade.stage !== 'plan') {
+          deps.onChainEnded?.(
+            link,
+            chainOutcomeOf({
+              link,
+              ok: finished.ok,
+              text: finished.text,
+              hasWork: () => deps.hasWork(cwd, chat.createdAt),
+              ...(finished.error ? { error: finished.error } : {}),
+              ...(finished.retry ? { retry: finished.retry } : {}),
+            }),
+          );
+        }
         return;
       }
 
@@ -566,7 +612,7 @@ export function createForeignStagePlanner(
       const stageKey = foreignChatKey(providerId, created.id);
       if (link) {
         deps.saveLink?.(stageKey, {
-          ...link,
+          ...carriedLink(link),
           stage: plan.stage,
           createdAt: new Date().toISOString(),
           ...(plan.model ? { model: plan.model } : {}),

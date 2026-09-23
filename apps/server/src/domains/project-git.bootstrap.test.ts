@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { WorktreeBootstraps, bootstrapCommandFor, detectBootstrapCommand } from './project-git.ts';
 import { logTail } from './project-git/bootstrap.ts';
-import { parseChurn } from './project-git/lockfiles.ts';
+import { parseChurn, revertLockfileChurn } from './project-git/lockfiles.ts';
 
 /**
  * Бутстрап копии (T5): выбор команды — на файлах, запуск — на настоящих
@@ -22,7 +23,7 @@ function dropTemp(target: string): void {
 
 const NODE = process.execPath.includes(' ') ? `"${process.execPath}"` : process.execPath;
 
-describe('detectBootstrapCommand: по lock-файлу в корне', () => {
+describe('detectBootstrapCommand: по lock-файлу в корне и на первом уровне', () => {
   let dir: string;
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), 'cc-boot-detect-'));
@@ -46,6 +47,87 @@ describe('detectBootstrapCommand: по lock-файлу в корне', () => {
     expect(bootstrapCommandFor(dir, undefined)).toBe(
       'pnpm install --frozen-lockfile --prefer-offline',
     );
+  });
+
+  it('в корне нет — каталоги первого уровня по алфавиту, служебные мимо (Д13)', () => {
+    mkdirSync(join(dir, 'web'));
+    writeFileSync(join(dir, 'web', 'pnpm-lock.yaml'), '');
+    mkdirSync(join(dir, 'admin'));
+    writeFileSync(join(dir, 'admin', 'package-lock.json'), '{}');
+    mkdirSync(join(dir, 'backend'));
+    mkdirSync(join(dir, 'node_modules', 'x'), { recursive: true });
+    writeFileSync(join(dir, 'node_modules', 'yarn.lock'), '');
+    mkdirSync(join(dir, '.cache'));
+    writeFileSync(join(dir, '.cache', 'yarn.lock'), '');
+    mkdirSync(join(dir, 'web', 'deep'));
+    writeFileSync(join(dir, 'web', 'deep', 'yarn.lock'), '');
+
+    expect(detectBootstrapCommand(dir)).toBe(
+      'cd "admin" && npm ci && cd .. && ' +
+        'cd "web" && pnpm install --frozen-lockfile --prefer-offline && cd ..',
+    );
+    // Lock-файл в корне сильнее вложенных: корень — это и есть проект.
+    writeFileSync(join(dir, 'yarn.lock'), '');
+    expect(detectBootstrapCommand(dir)).toBe('yarn install --immutable');
+  });
+
+  it('вложенная команда настоящей оболочкой проходит оба каталога и возвращается', async () => {
+    mkdirSync(join(dir, 'a'));
+    writeFileSync(join(dir, 'a', 'package-lock.json'), '{}');
+    mkdirSync(join(dir, 'b'));
+    writeFileSync(join(dir, 'b', 'package-lock.json'), '{}');
+    // Та же строка, но вместо `npm ci` — отметка в текущем каталоге: так видно,
+    // что `cd` дошёл до каждого, а хвост `cd ..` вернул в корень.
+    const command = (detectBootstrapCommand(dir) ?? '').replaceAll(
+      'npm ci',
+      `${NODE} -e "require('fs').writeFileSync('ran','')"`,
+    );
+    const runner = new WorktreeBootstraps(join(dir, '.logs'), { timeoutMs: 20_000 });
+    const state = await runner.run(
+      dir,
+      `${command} && ${NODE} -e "require('fs').writeFileSync('back','')"`,
+    );
+
+    expect(state.status).toBe('ok');
+    expect(existsSync(join(dir, 'a', 'ran'))).toBe(true);
+    expect(existsSync(join(dir, 'b', 'ran'))).toBe(true);
+    expect(existsSync(join(dir, 'back'))).toBe(true);
+  });
+});
+
+describe('revertLockfileChurn: корень и первый уровень', () => {
+  let dir: string;
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'cc-boot-churn-'));
+  });
+  afterEach(() => dropTemp(dir));
+
+  it('откатывает переписанные lock-файлы в корне и в каталоге первого уровня, глубже — нет', async () => {
+    const run = (...args: string[]) => execFileSync('git', args, { cwd: dir, stdio: 'pipe' });
+    run('init', '-q');
+    mkdirSync(join(dir, 'web', 'deep'), { recursive: true });
+    writeFileSync(join(dir, 'package-lock.json'), 'root');
+    writeFileSync(join(dir, 'web', 'pnpm-lock.yaml'), 'web');
+    writeFileSync(join(dir, 'web', 'deep', 'yarn.lock'), 'deep');
+    run('add', '-A');
+    run('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '-m', 'init');
+
+    writeFileSync(join(dir, 'package-lock.json'), 'rewritten');
+    writeFileSync(join(dir, 'web', 'pnpm-lock.yaml'), 'rewritten');
+    writeFileSync(join(dir, 'web', 'deep', 'yarn.lock'), 'rewritten');
+    writeFileSync(join(dir, 'web', 'yarn.lock'), 'new');
+
+    const reverted = await revertLockfileChurn(dir);
+
+    expect([...reverted].sort()).toEqual([
+      'package-lock.json',
+      'web/pnpm-lock.yaml',
+      'web/yarn.lock',
+    ]);
+    expect(readFileSync(join(dir, 'package-lock.json'), 'utf8')).toBe('root');
+    expect(readFileSync(join(dir, 'web', 'pnpm-lock.yaml'), 'utf8')).toBe('web');
+    expect(existsSync(join(dir, 'web', 'yarn.lock'))).toBe(false);
+    expect(readFileSync(join(dir, 'web', 'deep', 'yarn.lock'), 'utf8')).toBe('rewritten');
   });
 });
 

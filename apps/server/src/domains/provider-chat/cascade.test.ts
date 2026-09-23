@@ -448,6 +448,7 @@ describe('createForeignStagePlanner', () => {
         title: 'Переименование',
         branch: 'split/rename',
         createdAt: '2026-09-09T10:00:00.000Z',
+        conversation: 'codex:work',
       },
     };
     const send = vi.fn().mockReturnValue({ ok: true });
@@ -473,6 +474,8 @@ describe('createForeignStagePlanner', () => {
       branch: 'split/rename',
       stage: 'review',
     });
+    // Звено — другой разговор: с ключом работы дерево склеило бы их в узел (Д11).
+    expect(links[`codex:${nextId}`]?.conversation).toBeUndefined();
   });
 
   it('связи у разговора нет — звено остаётся вне дерева, как и он сам', () => {
@@ -742,15 +745,20 @@ describe('createForeignStagePlanner', () => {
     it('замечания уходят домену, а лента пересказывает их словами', () => {
       const link = reviewChat('mr');
       const send = vi.fn();
-      const onReviewFinished = vi.fn().mockReturnValue({
-        kind: 'review',
-        chatId: 'codex:mr',
-        url: 'https://gitlab.com/t/a/-/merge_requests/42',
-        findings: ['src/a.ts:10 — забыт await'],
+      // Домен записывает замечания в связь — как настоящий `SplitReview`.
+      let current = link;
+      const onReviewFinished = vi.fn().mockImplementation(() => {
+        current = { ...link, review: { ...link.review!, findings: ['src/a.ts:10 — забыт await'] } };
+        return {
+          kind: 'review',
+          chatId: 'codex:mr',
+          url: 'https://gitlab.com/t/a/-/merge_requests/42',
+          findings: ['src/a.ts:10 — забыт await'],
+        };
       });
       const onChainEnded = vi.fn();
 
-      planner(send, true, { linkOf: () => link, onReviewFinished, onChainEnded })({
+      planner(send, true, { linkOf: () => current, onReviewFinished, onChainEnded })({
         providerId: 'codex',
         appDataDir: dir,
         startedAt: 0,
@@ -759,20 +767,27 @@ describe('createForeignStagePlanner', () => {
         text: 'посмотрел',
       });
 
-      expect(onReviewFinished).toHaveBeenCalledWith({
-        chatId: 'codex:mr',
-        aliases: ['codex:mr'],
-        link,
-        ok: true,
-        text: 'посмотрел',
-      });
+      expect(onReviewFinished).toHaveBeenCalledWith(
+        expect.objectContaining({
+          chatId: 'codex:mr',
+          aliases: ['codex:mr'],
+          link,
+          ok: true,
+          text: 'посмотрел',
+          paused: false,
+        }),
+      );
       // Ни правок, ни чего-либо ещё: решение за человеком.
       expect(send).not.toHaveBeenCalled();
       const last = readChat(dir, 'codex', 'mr')?.messages.at(-1);
       expect(last?.role).toBe('notice');
       expect(last?.content).toContain('решение за вами');
-      // Цепочка группы кончилась: ждущие соседи и сверка веток об этом узнают.
-      expect(onChainEnded).toHaveBeenCalledWith(link, true);
+      // Ход кончился, но группа НЕ готова (Д3): замечания ждут решения человека,
+      // и ждущие соседи от этого не стартуют.
+      expect(onChainEnded).toHaveBeenCalledWith(
+        current,
+        expect.objectContaining({ status: 'awaiting', waitingFor: 'decision' }),
+      );
     });
 
     it('домену сказать нечего — лента не трогается', () => {

@@ -1,3 +1,5 @@
+import type { BranchGateChild } from '@shared/lib/agent-runs';
+
 /** Придержанная первая правка: где именно агент собирался писать. */
 export interface PendingBranchGate {
   toolName: string;
@@ -5,6 +7,10 @@ export interface PendingBranchGate {
   toolUseId: string;
   cwd: string;
   branch: string;
+  /** Работа разговора отдана группам — кнопка отказа передаёт правку им (Д15). */
+  children?: BranchGateChild[];
+  /** Ветка MR детей: от неё встанет копия. */
+  base?: string;
 }
 
 export interface BranchGateCardProps {

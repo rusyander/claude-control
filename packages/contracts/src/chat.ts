@@ -89,6 +89,12 @@ export const chatSummarySchema = object({
    */
   groupTitle: string().optional(),
   /**
+   * Номер группы разделения из связи — ключ строки хаба у родителя (Д12).
+   * Ветка разговора ключом не годится: агент переключил ветку или ушёл в
+   * detached HEAD — и одна группа распадалась на две строки.
+   */
+  groupIndex: number().int().nonnegative().optional(),
+  /**
    * Когда агент впервые правил код (первый вызов Edit/Write/MultiEdit/NotebookEdit).
    *
    * Из связи, не из транскрипта: реестр прогонов видит вызов живьём и пишет

@@ -119,6 +119,8 @@ export function applyEvent(id: string, event: ChatEvent): void {
               toolUseId: event.toolUseId,
               cwd: event.cwd,
               branch: event.branch,
+              ...(event.children?.length ? { children: event.children } : {}),
+              ...(event.base ? { base: event.base } : {}),
             },
           ];
       // Точка «агент ждёт человека» — та же, что у прав: работа стоит одинаково,

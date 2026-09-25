@@ -139,6 +139,16 @@ export const chatSummarySchema = object({
    */
   accepted: boolean().optional(),
   /**
+   * MR группы разделения, чей это разговор, — ссылка из записи плана. У всех
+   * звеньев группы: MR один на группу, и в списке его ищут у любой её строки.
+   */
+  mergeRequest: string().optional(),
+  /**
+   * Группа доводит работу до MR, а MR ещё нет. Только у групп с доставкой: у
+   * остальных MR и не ожидается, и «нет MR» читалось бы как недоделка.
+   */
+  mergeRequestPending: boolean().optional(),
+  /**
    * Разделение в работе: у родителя — хоть одна его группа идёт, ждёт человека
    * или доводит фон; у чата группы — именно эта. Между стадиями конвейера живого
    * прогона нет, и без метки идущая группа в списке опускалась к молчащим
@@ -426,4 +436,33 @@ export interface ChatAutoModeView {
   enabled: boolean;
   override?: boolean;
   global: boolean;
+}
+
+/** Одна копия CLI в PATH. Версии нет — копия не ответила на `--version`. */
+export interface CliInstall {
+  path: string;
+  version?: string;
+}
+
+/**
+ * Какой CLI панель запускает для чата и нет ли рядом новее (замечание живого
+ * прогона 25.09.2026: панель молча работала копией 2.1.278 при стоящей 2.1.282).
+ */
+export interface CliInfo {
+  /** Имя, под которым панель зовёт CLI (`claude.cmd` / `claude`). */
+  command: string;
+  /** Копия, которую ОС берёт первой по PATH; нет — CLI не найден. */
+  path?: string;
+  version?: string;
+  /** Все копии в PATH по порядку поиска. */
+  installs: CliInstall[];
+  /** Новейшая копия, если запускается не она. */
+  newer?: CliInstall;
+}
+
+/** Итог `claude update`: хвост вывода и сведения после обновления. */
+export interface CliUpdateResult {
+  ok: boolean;
+  output: string;
+  info: CliInfo;
 }

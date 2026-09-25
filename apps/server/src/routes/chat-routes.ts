@@ -6,6 +6,7 @@ import { registerChatTranscriptRoutes } from './chat/transcript-routes.ts';
 import { registerChatBrowseRoutes } from './chat/browse-routes.ts';
 import { registerChatRunRoutes } from './chat/run-routes.ts';
 import { registerChatArtifactRoutes } from './chat/artifact-routes.ts';
+import { registerChatCliRoutes } from './chat/cli-routes.ts';
 
 /**
  * Классификация ошибок CLI живёт в домене; здесь она переэкспортирована, чтобы
@@ -48,4 +49,5 @@ export function registerChatRoutes(
   registerChatBrowseRoutes(app, ctx);
   registerChatRunRoutes(app, ctx, registry, session);
   registerChatArtifactRoutes(app, ctx);
+  registerChatCliRoutes(app);
 }

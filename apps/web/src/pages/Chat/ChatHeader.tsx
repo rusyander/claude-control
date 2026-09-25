@@ -50,6 +50,7 @@ export function ChatHeader({
   autoApprove,
   onAutoApproveChange,
   runStatus,
+  errorOverflow,
   onRetry,
   onContinue,
   onAllowAndContinue,
@@ -158,7 +159,7 @@ export function ChatHeader({
             что и «Открыть в редакторе». */}
         {isProjectContext && projectPath && <ProjectRunnerControls path={projectPath} />}
 
-        {runStatus === 'error' && chatId && (
+        {runStatus === 'error' && chatId && !errorOverflow && (
           <>
             <Button
               variant="secondary"

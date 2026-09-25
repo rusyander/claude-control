@@ -291,6 +291,8 @@ function afterStream(
       status: 'running',
       error: undefined,
       errorCode: undefined,
+      errorParams: undefined,
+      errorOverflow: undefined,
       errorRetriable: undefined,
       stalled: undefined,
       dropped: undefined,
@@ -309,6 +311,8 @@ function afterStream(
       status: 'running',
       error: undefined,
       errorCode: undefined,
+      errorParams: undefined,
+      errorOverflow: undefined,
       errorRetriable: undefined,
       stalled: undefined,
       dropped: undefined,
@@ -391,6 +395,8 @@ export function startRun(input: StartInput): Promise<SendOutcome> {
     costUsd: undefined,
     error: undefined,
     errorCode: undefined,
+    errorParams: undefined,
+    errorOverflow: undefined,
     errorRetriable: undefined,
     // Свой запуск — свой прогон: чужой серверный ключ от прошлого отказа
     // забываем, иначе поток и остановка ушли бы к чужому разговору.

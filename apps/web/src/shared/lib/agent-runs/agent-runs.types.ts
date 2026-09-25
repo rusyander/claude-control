@@ -102,6 +102,10 @@ export interface AgentRun {
   errorCode?: string;
   /** Сервер (или сеть) сказал, что сбой временный, — можно перезапустить самим. */
   errorRetriable?: boolean;
+  /** Параметры кода ошибки CLI (`cli-outdated`: какая версия стоит и какая нужна). */
+  errorParams?: ServerMessageNestedParams;
+  /** Контекст разговора переполнен: карточка предлагает сжать или начать заново. */
+  errorOverflow?: boolean;
   /**
    * Ключ, под которым прогон зарегистрирован НА СЕРВЕРЕ. Отличается от `id`,
    * когда разговор начался в другой вкладке под временным `new-…`, а эта знает
@@ -300,7 +304,16 @@ export type ChatEvent =
     }
   | { kind: 'done'; costUsd: number; durationMs: number; sessionId: string }
   // `retriable` ставит сервер: временный ли сбой, решает он, а не разбор текста.
-  | { kind: 'error'; message: string; retriable?: boolean }
+  | {
+      kind: 'error';
+      message: string;
+      retriable?: boolean;
+      /** Известная ошибка CLI (устаревшая версия, переполненный контекст) — код сервера. */
+      code?: ServerMessageCode;
+      params?: ServerMessageNestedParams;
+      /** Контекст переполнен — и тогда, когда главный код другой. */
+      overflow?: boolean;
+    }
   | { kind: 'permission'; toolName: string; input: unknown; toolUseId: string }
   | { kind: 'permissionResolved'; toolUseId: string; behavior: 'allow' | 'deny' }
   | {

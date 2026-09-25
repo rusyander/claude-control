@@ -89,6 +89,8 @@ export interface RestartSessionBody {
   allowEdits: boolean;
   model?: string;
   effort?: string;
+  /** Контекст переполнен: продолжение заводится сразу, агента ни о чём не просят. */
+  overflow?: boolean;
 }
 
 /** «Перезапустить сессию» из меню шапки; 409 — прогон ещё идёт. */

@@ -212,6 +212,24 @@ export async function readBranchFiles(input: {
 }
 
 /**
+ * Что сейчас на самом деле стоит в копии группы — коммит её HEAD.
+ *
+ * Имя ветки в записи плана — то, что панель ЗАКАЗАЛА, а не то, на чём работа:
+ * агент группы вправе завести свою ветку (живой прогон 25.09.2026 — план
+ * хранил имя, обрезанное до 100 знаков, агент завёл полное), и сверка по
+ * заказанному имени падала `fatal: ambiguous argument`. Копии нет или она не
+ * читается — `undefined`, и сверка остаётся при имени из записи.
+ */
+export async function readWorktreeHead(worktreeDir: string): Promise<string | undefined> {
+  if (!isGitRepo(worktreeDir)) return undefined;
+  try {
+    return (await git(worktreeDir, ['rev-parse', 'HEAD'])).trim() || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Что основная ветка задела С ТОЧКИ РАСХОЖДЕНИЯ с веткой группы (находка 61):
  * `<ветка>...<основная>` — ровно то, что приехало в основную после того, как
  * группа от неё отошла (или после её последнего rebase). Сеть не трогаем:

@@ -93,6 +93,32 @@ export function ChatRow({
               {t('chat.cascade.tree.accepted')}
             </Typography>
           )}
+          {/* MR группы — прямо из списка (живой прогон 25.09): иначе, дошла ли
+              группа до MR, видно только в хабе родителя. Строка — кнопка, и
+              вложенная ссылка в ней недопустима: чип открывает MR сам и не
+              даёт клику выбрать чат. */}
+          {chat.mergeRequest && (
+            <Typography
+              variant="caption"
+              color="accent"
+              as="span"
+              className={`${styles.stage} ${styles.mrChip}`}
+              role="link"
+              title={t('chat.cascade.tree.openMr')}
+              data-row-mr
+              onClick={(event) => {
+                event.stopPropagation();
+                window.open(chat.mergeRequest, '_blank', 'noopener,noreferrer');
+              }}
+            >
+              {t('chat.cascade.hub.mr', { id: chat.mergeRequest.match(/(\d+)$/)?.[1] ?? '' })}
+            </Typography>
+          )}
+          {chat.mergeRequestPending && (
+            <Typography variant="caption" color="subtle" as="span" className={styles.stage}>
+              {t('chat.cascade.tree.noMr')}
+            </Typography>
+          )}
         </Stack>
 
         {snippet ? (

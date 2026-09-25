@@ -7,6 +7,7 @@ import {
   HANDOFF_GROUP_MAX_CHAIN,
   HANDOFF_SYSTEM_PROMPT,
   parseHandoffProposal,
+  overflowHandoffProposal,
   restartHandoffProposal,
   restartRequestPrompt,
   scanHandoffBlocks,
@@ -629,10 +630,15 @@ export function registerChatHandoffRoutes(
       allowEdits?: boolean;
       model?: string;
       effort?: string;
+      /**
+       * Контекст переполнен («Prompt is too long»): просьбу обновить опору
+       * разговор не примет, продолжение заводится сразу.
+       */
+      overflow?: boolean;
     };
   }>('/api/chat/:id/restart', async (request, reply) => {
     const chatId = request.params.id;
-    const { projectPath, sessionId, allowEdits, model, effort } = request.body ?? {};
+    const { projectPath, sessionId, allowEdits, model, effort, overflow } = request.body ?? {};
     const fromAliases = aliasesOf(chatId, sessionId);
 
     if (fromAliases.some((key) => deps.runs.isRunning(key))) {
@@ -658,7 +664,7 @@ export function registerChatHandoffRoutes(
     const mtime = target ? statMtime(target) : undefined;
     const fresh = mtime !== undefined && Number.isFinite(lastTurnAt) && mtime >= lastTurnAt;
 
-    if (!fresh || !target) {
+    if (!overflow && (!fresh || !target)) {
       deps.chains.setAuto(fromAliases, true);
       return {
         mode: 'requested' as const,
@@ -670,9 +676,12 @@ export function registerChatHandoffRoutes(
       .filter((item): item is { type: 'text'; text: string } => item.type === 'text')
       .map((item) => item.text)
       .join('\n');
-    const hash = hashFile(target);
+    const hash = target ? hashFile(target) : undefined;
+    const splitParent = fromAliases.some((key) => ctx.store.getSplitPlan(key) !== undefined);
     const started = startHandoff({
-      proposal: restartHandoffProposal(HANDOFF_DEFAULT_CHECKPOINT),
+      proposal: overflow
+        ? overflowHandoffProposal(HANDOFF_DEFAULT_CHECKPOINT, { splitParent })
+        : restartHandoffProposal(HANDOFF_DEFAULT_CHECKPOINT),
       cwd: dir,
       fromAliases,
       chains: deps.chains,
@@ -807,6 +816,9 @@ export function continuationStarter(
     if (assigned) {
       ctx.store.setChatLink(nextId, carriedLink(assigned));
     }
+    // Родитель разделения уносит группы с собой — тоже ДО запуска: первый же ход
+    // свежей сессии получает сводку групп (`withChildrenBrief` по её ключу).
+    ctx.store.moveSplitPlan(source.fromAliases, nextId);
     // Пусто в запросе — берём назначение закрываемого разговора, и только
     // потом настройку. Панель модель шлёт всегда, телефон и API-клиенты —
     // нет, и без этой ступени их продолжение уезжало бы на другой модели,

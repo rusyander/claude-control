@@ -58,6 +58,7 @@ import {
   mrDescriptionGap,
   readBranchFiles,
   readTargetMoved,
+  readWorktreeHead,
   readDeliveryFacts,
   readMergeTarget,
   resolveProjectDelivery,
@@ -378,6 +379,7 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
       mergeBase: (mainDir) => readMergeTarget(mainDir),
       changedFiles: (input) => readBranchFiles(input),
       movedFiles: (input) => readTargetMoved(input),
+      headOf: (dir) => readWorktreeHead(dir),
     },
     store: {
       get: (parent) => ctx.store.getSplitPlan(parent),

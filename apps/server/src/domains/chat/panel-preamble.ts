@@ -38,11 +38,19 @@ import { groupIdentityLine } from './split-conveyor.ts';
 
 const MARK = '⁣panel-preamble-mark⁣';
 
-/** Неизменное начало первой строки текста: до заглушки, а без неё — строка целиком. */
+/**
+ * Сколько знаков первой строки хватает, чтобы узнать преамбулу. Строка целиком
+ * не годится: её хвост правят, а транскрипты на диске хранят прежний текст
+ * (живой прогон 25.09.2026 — абзац доставки дописали про force-push, и чаты
+ * групп, заведённые накануне, снова назывались «Доставка до готового MR —…»).
+ */
+const OPENER_MAX = 60;
+
+/** Неизменное начало первой строки текста: до заглушки и не длиннее `OPENER_MAX`. */
 function openerOf(text: string): string {
   const firstLine = text.split('\n', 1)[0] ?? '';
   const at = firstLine.indexOf(MARK);
-  return (at >= 0 ? firstLine.slice(0, at) : firstLine).trimStart();
+  return (at >= 0 ? firstLine.slice(0, at) : firstLine).trimStart().slice(0, OPENER_MAX);
 }
 
 /** Начала короче этого за преамбулу не считаются: слишком легко совпасть с речью человека. */
@@ -75,6 +83,9 @@ const WHOLE = openers([
   deliverStagePrompt({ branch: MARK, after: 'work' }),
   deliverStagePrompt({ after: 'work' }),
   reviewLinkPrompt({ url: MARK }),
+  // Продолжение группы в чистой сессии: задание группы в нём — цитата из
+  // предложения, своих слов человека там нет.
+  buildHandoffPrompt(HANDOFF, MARK, { group: true }),
 ]);
 
 /** Начала строки ветки группы: с веткой и без неё (одни ключи задач). */

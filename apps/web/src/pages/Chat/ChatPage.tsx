@@ -360,6 +360,7 @@ export function ChatPage() {
             autoApprove={autoApprove}
             onAutoApproveChange={toggleAutoApprove}
             runStatus={run.status}
+            errorOverflow={run.errorOverflow}
             onRetry={() => chatId && agentRuns.retry(chatId)}
             onContinue={() => dispatch(t('chat.continueWord'), [])}
             onAllowAndContinue={() => chatId && agentRuns.retry(chatId, { fullAccess: true })}
@@ -420,6 +421,8 @@ export function ChatPage() {
             effort={run.effort}
             taskSplit={taskSplit}
             onContinue={() => chatId && agentRuns.continue(chatId, t('chat.continueWord'))}
+            onCompact={() => dispatch('/compact', [])}
+            {...(handoff.restartOverflow ? { onFreshSession: handoff.restartOverflow } : {})}
             onRefresh={() => {
               session.refresh();
               if (chatId) agentRuns.quiet(chatId);

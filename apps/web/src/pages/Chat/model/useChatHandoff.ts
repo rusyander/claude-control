@@ -50,6 +50,8 @@ export interface ChatHandoffApi {
    * разговора включается. Пусто — разговора или проекта ещё нет.
    */
   restartSession?: () => void;
+  /** Контекст переполнен: свежая сессия сразу, без просьбы агенту обновить опору. */
+  restartOverflow?: () => void;
   /** Всё, что нужно карточке в ленте; пусто — продолжать некуда (нет проекта). */
   controls?: HandoffControls;
 }
@@ -257,7 +259,7 @@ export function useChatHandoff({
   };
 
   const [restarting, setRestarting] = useState(false);
-  const restart = (): void => {
+  const restart = (options: { overflow?: boolean } = {}): void => {
     if (!projectPath || !chatId || restarting) return;
     setRestarting(true);
     void restartSession(chatId, {
@@ -266,6 +268,7 @@ export function useChatHandoff({
       allowEdits,
       model,
       effort,
+      ...(options.overflow ? { overflow: true } : {}),
     })
       .then(async (outcome) => {
         if (outcome.mode === 'started') {
@@ -335,7 +338,9 @@ export function useChatHandoff({
 
   return {
     ...(projectPath ? { askHandoff } : {}),
-    ...(projectPath && chatId ? { restartSession: restart } : {}),
+    ...(projectPath && chatId
+      ? { restartSession: () => restart(), restartOverflow: () => restart({ overflow: true }) }
+      : {}),
     ...(projectPath
       ? {
           controls: {

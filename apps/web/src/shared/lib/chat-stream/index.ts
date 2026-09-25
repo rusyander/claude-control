@@ -64,6 +64,11 @@ export interface StreamState {
   noticeCode?: ServerMessageCode;
   noticeParams?: ServerMessageNestedParams;
   error?: string;
+  /** Код известной ошибки CLI — текст на языке интерфейса и действие в карточке. */
+  errorCode?: string;
+  errorParams?: ServerMessageNestedParams;
+  /** Контекст переполнен: «Сжать контекст» и «Новая сессия». */
+  errorOverflow?: boolean;
   sessionId?: string;
   costUsd?: number;
   /** Момент сброса окна лимитов, unix-секунды. */

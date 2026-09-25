@@ -18,6 +18,11 @@ export const chatRu: Record<ChatMessageCode, string> = {
   'handoff-proposal-invalid': 'Предложение не разобрано: нужны «что закрыто» и «чем продолжить»',
   'restart-run-in-progress':
     'Прогон ещё идёт: дождитесь конца хода или остановите его, потом перезапускайте',
+  'cli-not-found': 'CLI Claude не найден в PATH',
+  'cli-outdated':
+    'Панель запускает Claude Code {{current}}, а модели нужна версия {{required}} или новее. Обновите CLI.',
+  'prompt-too-long':
+    'Контекст разговора переполнен: следующее сообщение он не примет. Сожмите контекст или продолжите в новой сессии.',
   'conversation-unspecified': 'Не указан разговор',
   'split-proposal-invalid': 'Разделение не разобрано: нужны минимум две группы с задачами',
   'split-conveyor-off': 'Конвейер уровней выключен',

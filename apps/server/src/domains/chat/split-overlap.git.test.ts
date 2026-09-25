@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { readBranchFiles, readMergeTarget } from '../project-git/read.ts';
+import { readBranchFiles, readMergeTarget, readWorktreeHead } from '../project-git/read.ts';
 import { DRIFT_RECHECK_MS, SplitOverlap } from './split-overlap.ts';
 import type { ChatEvent } from './ChatRunner.ts';
 import type { SplitPlanRecord } from '../../lib/app-store/app-store.types.ts';
@@ -91,7 +91,7 @@ describe('пересечения веток разделения на насто
 
   function overlap(): SplitOverlap {
     return new SplitOverlap({
-      git: { mergeBase: readMergeTarget, changedFiles: readBranchFiles },
+      git: { mergeBase: readMergeTarget, changedFiles: readBranchFiles, headOf: readWorktreeHead },
       store: {
         get: (parent) => records.get(parent),
         set: (record) => void records.set(record.parentChatId, structuredClone(record)),
@@ -203,6 +203,22 @@ describe('пересечения веток разделения на насто
     ]);
     expect(notices).toHaveLength(1);
     expect(notices[0]).toContain('web/a.ts');
+  });
+
+  it('агент завёл ветку под своим именем — сверка идёт по копии, а не по имени из плана', async () => {
+    // Живой прогон 25.09.2026: план хранил имя, обрезанное до 100 знаков, а агент
+    // группы работал на ветке с полным именем. `база...g0` падал «ambiguous argument».
+    const g0 = group('g0-agent-full-name', 'main');
+    const g1 = group('g1', 'main');
+    commit(g0, { 'web/a.ts': 'a0\n' }, 'g0');
+    commit(g1, { 'web/a.ts': 'a1\n' }, 'g1');
+    plan([g0, g1]);
+
+    const view = await overlap().check('родитель');
+
+    expect(view?.unread).toEqual([]);
+    expect(view?.counted.map((item) => item.names)).toEqual([['web/a.ts'], ['web/a.ts']]);
+    expect(view?.files).toEqual([{ path: 'web/a.ts', groups: [0, 1], outside: [] }]);
   });
 
   it('закрытые разделения по расписанию не пересчитываются', async () => {

@@ -38,6 +38,8 @@ export function ChatThread({
   effort,
   taskSplit,
   onContinue,
+  onCompact,
+  onFreshSession,
   onRefresh,
   handoff,
   isProjectContext,
@@ -148,6 +150,9 @@ export function ChatThread({
       }
       onRetry={chatId ? () => agentRuns.retry(chatId) : undefined}
       onContinue={chatId ? onContinue : undefined}
+      onDismissError={chatId ? () => agentRuns.dismissError(chatId) : undefined}
+      onCompact={chatId ? onCompact : undefined}
+      onFreshSession={chatId ? onFreshSession : undefined}
       onRefresh={onRefresh}
       costUnit={costUnit}
       // Кто рисовал и диктовал в карточке вложения (Т10): модель разговора

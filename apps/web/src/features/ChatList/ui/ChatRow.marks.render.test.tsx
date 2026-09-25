@@ -39,4 +39,20 @@ describe('строка списка чатов — метки дерева', () 
     expect(html).not.toContain(i18n.t('chat.cascade.tree.awaitsYou'));
     expect(html).not.toContain(i18n.t('chat.cascade.tree.accepted'));
   });
+
+  // Живой прогон 25.09: MR группы в списке не был виден — только в хабе.
+  it('MR группы — чип с номером; доставка без MR — «MR нет»; без доставки — ничего', () => {
+    const url = 'https://tracker.example.com/proj/-/merge_requests/826';
+    const withMr = render(chat({ mergeRequest: url }));
+    const pending = render(chat({ mergeRequestPending: true }));
+    const plain = render(chat());
+
+    expect(withMr).toContain('data-row-mr');
+    expect(withMr).toContain(i18n.t('chat.cascade.hub.mr', { id: '826' }));
+    expect(withMr).not.toContain(i18n.t('chat.cascade.tree.noMr'));
+    expect(pending).toContain(i18n.t('chat.cascade.tree.noMr'));
+    expect(pending).not.toContain('data-row-mr');
+    expect(plain).not.toContain('data-row-mr');
+    expect(plain).not.toContain(i18n.t('chat.cascade.tree.noMr'));
+  });
 });

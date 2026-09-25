@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -611,6 +611,26 @@ describe('deckFile: отдать файл', () => {
     expect(html.bytes.toString('utf8')).toContain('Итоги квартала');
     expect(pptx.bytes.subarray(0, 2).toString('latin1')).toBe('PK');
     expect(html.record.title).toBe('Итоги квартала');
+  });
+
+  // Живой прогон 25.09.2026: Dark Reader перекрашивал светлые слайды в «металл»
+  // с серым текстом. Новые колоды несут замок темы, а собранные раньше получают
+  // его при отдаче — файл на диске прежний, лечится то, что видит браузер.
+  it('HTML отдаётся с замком светлой темы — и колода, собранная до замка', async () => {
+    const id = await madeDeck();
+    const path = deckFilePath(appData, id, 'html');
+    expect(readFileSync(path, 'utf8')).toContain('<meta name="darkreader-lock">');
+    const old = readFileSync(path, 'utf8')
+      .replace('<meta name="color-scheme" content="only light">\n', '')
+      .replace('<meta name="darkreader-lock">\n', '');
+    writeFileSync(path, old, 'utf8');
+
+    const html = (await deckFile(deps(), id, 'html')).bytes.toString('utf8');
+
+    expect(html.match(/name="darkreader-lock"/g)).toHaveLength(1);
+    expect(html).toContain('<meta name="color-scheme" content="only light">');
+    expect(html.indexOf('darkreader-lock')).toBeLessThan(html.indexOf('</head>'));
+    expect(html).toContain('Итоги квартала');
   });
 
   it('чужого идентификатора не существует, и путь им не построить', async () => {

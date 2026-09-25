@@ -12,6 +12,7 @@ import type { ServerContext } from '../../context.ts';
 import { registerChatTranscriptRoutes } from './transcript-routes.ts';
 import { groupIdentityLine } from '../../domains/chat/split-conveyor.ts';
 import { planStagePrompt } from '@agentdeck/contracts/split-plan';
+import { buildHandoffPrompt } from '@agentdeck/contracts/chat-handoff';
 
 /**
  * Название чата группы в списке (живой стенд 25.09.2026): звено, чья первая
@@ -166,6 +167,44 @@ ${workAfterPlanPrompt({ task })}`,
     expect(chat?.title).toBe('Форма входа');
     // Группой снятое звено по-прежнему не числится: номера группы у него нет.
     expect(chat?.groupIndex).toBeUndefined();
+  });
+
+  // Живой прогон 25.09.2026: абзац доставки с тех пор дописали, а чаты групп,
+  // заведённые накануне, хранят прежний текст и назывались «Доставка до
+  // готового MR — обязанность этой группы…».
+  it('абзац доставки в прежней редакции — не название, чат зовётся заданием', async () => {
+    transcript(
+      'deliver-old',
+      `${environmentPreamble({ mirror: 'Локальный слой: перенесено 234' })}\n\n` +
+        'Доставка до готового MR — обязанность этой группы: человек включил её на проекте, и это его ' +
+        'разрешение на коммит, пуш и MR.\nПроведи задачи группы по навыку доставки.\n\n' +
+        buildGroupPrompt({
+          title: 'Форма входа',
+          branch: 'fix/login',
+          tasks: ['Поправь валидацию формы входа'],
+        }),
+    );
+    store.setChatLink('deliver-old', link('Форма входа'));
+
+    const title = (await list()).get('deliver-old')?.title;
+
+    expect(title).toBe('Поправь валидацию формы входа');
+  });
+
+  it('продолжение группы в чистой сессии называется именем группы', async () => {
+    transcript(
+      'handoff-1',
+      buildHandoffPrompt(
+        { done: 'сделано', next: 'дальше', checkpoint: '.agent/PROGRESS.md' },
+        'Поправь валидацию формы входа',
+        { group: true },
+      ),
+    );
+    store.setChatLink('handoff-1', link('Форма входа'));
+
+    const title = (await list()).get('handoff-1')?.title;
+
+    expect(title).toBe('Форма входа');
   });
 
   it('чат без связи с одной преамбулой — как раньше, имя проекта', async () => {

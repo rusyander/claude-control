@@ -8,6 +8,8 @@ import { Icon } from '@shared/ui/icon';
 import { TokenBadge } from '@shared/ui/token-badge';
 import { CrashCard, ErrorBoundary } from '@shared/ui/error-boundary';
 import { toast } from '@shared/lib/toast';
+import { serverMessageText } from '@shared/config/i18n/server-message';
+import { CliInfoPanel } from '@entities/ChatCli';
 import { isStreamShown } from '@shared/lib/chat-stream';
 import { markQuestionAnswered, useAnsweredQuestions } from '@shared/lib/agent-runs';
 import { branchMarks } from '../lib/branchMarks';
@@ -77,6 +79,9 @@ export function ChatMessages({
   reviewBusy,
   onRetry,
   onContinue,
+  onDismissError,
+  onCompact,
+  onFreshSession,
   onRefresh,
   costUnit,
   effort,
@@ -421,6 +426,18 @@ export function ChatMessages({
                 {t('chat.errorTitle')}
               </Typography>
             </Stack>
+            {/*
+              Известная ошибка CLI (живой прогон 25.09): сначала — что случилось
+              и что делать, словами интерфейса; сырой текст остаётся ниже, его
+              несут в тикет. Устаревший CLI — путь и версия той копии, что
+              запускается, и кнопка обновления именно её.
+            */}
+            {stream.errorCode && serverMessageText(stream.errorCode, stream.errorParams) && (
+              <Typography variant="body-sm" as="div" data-chat-error-explained>
+                {serverMessageText(stream.errorCode, stream.errorParams)}
+              </Typography>
+            )}
+            {stream.errorCode === 'cli-outdated' && <CliInfoPanel refresh withUpdate />}
             <div className={styles.errorText}>{stream.error}</div>
             {/*
               Три действия вместо одного. «Повторить» отправляет задачу заново —
@@ -431,7 +448,7 @@ export function ChatMessages({
               карточкой, из-за которой их ищут.
             */}
             <Stack direction="row" gap="var(--spacing-2xs)" wrap>
-              {onRetry && (
+              {onRetry && !stream.errorOverflow && (
                 <Button
                   size="sm"
                   variant="secondary"
@@ -441,9 +458,27 @@ export function ChatMessages({
                   {t('chat.retry')}
                 </Button>
               )}
-              {onContinue && (
+              {onContinue && !stream.errorOverflow && (
                 <Button size="sm" variant="secondary" onClick={onContinue}>
                   {t('chat.continue')}
+                </Button>
+              )}
+              {/* Переполненный разговор не примет ни «Повторить», ни «Продолжить»:
+                  выход — сжать контекст или уйти в свежую сессию. */}
+              {stream.errorOverflow && onCompact && (
+                <Button size="sm" variant="secondary" onClick={onCompact} data-chat-compact>
+                  {t('chat.overflow.compact')}
+                </Button>
+              )}
+              {stream.errorOverflow && onFreshSession && (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={onFreshSession}
+                  title={t('chat.overflow.freshHint')}
+                  data-chat-fresh-session
+                >
+                  {t('chat.overflow.fresh')}
                 </Button>
               )}
               <Button
@@ -458,6 +493,16 @@ export function ChatMessages({
               >
                 {t('chat.copyError')}
               </Button>
+              {onDismissError && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  leftIcon={<Icon name="close" size={18} />}
+                  onClick={onDismissError}
+                >
+                  {t('chat.dismissError')}
+                </Button>
+              )}
             </Stack>
           </div>
         </div>

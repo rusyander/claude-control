@@ -1,6 +1,6 @@
 import type { FastifyReply } from 'fastify';
 import type { ChatRunRegistry, RunSubscriber, BufferedEvent } from './ChatRunRegistry.ts';
-import { isRetriableRunError } from './run-errors.ts';
+import { isRetriableRunError, runErrorCode } from './run-errors.ts';
 
 /**
  * Транспорт ответа: прогон отдаётся потоком SSE. Здесь только доставка кадров —
@@ -22,7 +22,12 @@ function frame(buffered: BufferedEvent): string {
   const event = buffered.event;
   const payload =
     event.kind === 'error'
-      ? { ...event, seq: buffered.seq, retriable: isRetriableRunError(event.message) }
+      ? {
+          ...event,
+          seq: buffered.seq,
+          retriable: isRetriableRunError(event.message),
+          ...runErrorCode(event.message),
+        }
       : { ...event, seq: buffered.seq };
   return `data: ${JSON.stringify(payload)}\n\n`;
 }

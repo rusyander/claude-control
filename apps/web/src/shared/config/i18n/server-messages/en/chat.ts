@@ -18,6 +18,11 @@ export const chatEn: Record<ChatMessageCode, string> = {
     'The proposal could not be parsed: “what is done” and “how to continue” are required',
   'restart-run-in-progress':
     'The run is still going: wait for the turn to end or stop it, then restart',
+  'cli-not-found': 'Claude CLI was not found on PATH',
+  'cli-outdated':
+    'The panel runs Claude Code {{current}}, but the model needs version {{required}} or newer. Update the CLI.',
+  'prompt-too-long':
+    'The conversation context is full: it will not accept another message. Compact the context or continue in a new session.',
   'conversation-unspecified': 'No conversation specified',
   'split-proposal-invalid':
     'The split could not be parsed: at least two groups with tasks are required',

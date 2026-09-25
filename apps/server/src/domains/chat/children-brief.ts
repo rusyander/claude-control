@@ -90,6 +90,9 @@ export function childrenBrief(split: SplitPlanView | undefined): string | undefi
  */
 export function withChildrenBrief(prompt: string, brief: string | undefined): string {
   const bare = prompt.replace(BLOCK, '');
+  // Команда CLI (`/compact` из карточки переполнения) узнаётся, только пока
+  // стоит первой: сводка перед ней превратила бы команду в обычный текст.
+  if (bare.trimStart().startsWith('/')) return bare;
   return brief ? `${brief}\n\n${bare}` : bare;
 }
 

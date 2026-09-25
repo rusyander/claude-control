@@ -6,4 +6,4 @@
  * Этот файл оставлен фасадом, чтобы прежние пути импорта (`deck/html.ts`) и
  * тесты продолжали работать: точка входа у колоды одна.
  */
-export { renderDeckHtml } from './html/index.ts';
+export { lockDeckTheme, renderDeckHtml } from './html/index.ts';

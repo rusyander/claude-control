@@ -96,6 +96,12 @@ export interface OverlapGit {
    * идущей группой (находка 61, `split-drift.ts`). Нет — дрейф не считается.
    */
   movedFiles?: MovedFiles;
+  /**
+   * Коммит, на котором сейчас стоит копия группы (`readWorktreeHead`). Сверка
+   * идёт по нему, а не по имени ветки из записи: агент мог завести ветку под
+   * другим именем. Нет или не прочиталось — берётся имя из записи.
+   */
+  headOf?(worktreeDir: string): Promise<string | undefined>;
 }
 
 export interface SplitOverlapDeps {
@@ -372,10 +378,17 @@ export class SplitOverlap {
     const record = this.deps.store.get(parentChatId);
     if (!record) return undefined;
 
-    const groups: OverlapGroup[] = record.groups.map((group) => ({
+    const heads = await Promise.all(
+      record.groups.map((group) =>
+        group.path && this.deps.git.headOf
+          ? this.deps.git.headOf(group.path).catch(() => undefined)
+          : Promise.resolve(undefined),
+      ),
+    );
+    const groups: OverlapGroup[] = record.groups.map((group, position) => ({
       index: group.index,
       title: group.title,
-      branch: group.branch,
+      branch: heads[position] ?? group.branch,
       ...(group.path ? { path: group.path } : {}),
       ...(group.base ? { base: group.base } : {}),
       ...(record.proposal.groups[group.index]?.owns

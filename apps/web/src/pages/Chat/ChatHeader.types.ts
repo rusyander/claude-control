@@ -49,6 +49,11 @@ export interface ChatHeaderProps {
 
   /** Статус прогона активного чата — от него зависят кнопки восстановления. */
   runStatus: RunStatus;
+  /**
+   * Ход упал на переполненном контексте: повтор и продолжение упрутся в него же,
+   * поэтому шапка их прячет — выход из переполнения даёт карточка ошибки.
+   */
+  errorOverflow?: boolean;
   onRetry: () => void;
   onContinue: () => void;
   onAllowAndContinue: () => void;

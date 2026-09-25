@@ -80,6 +80,7 @@ export {
   readMergeTarget,
   readProjectGit,
   readTargetMoved,
+  readWorktreeHead,
   requireRepo,
   splitRootOf,
 } from './project-git/read.ts';

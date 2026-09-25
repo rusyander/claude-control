@@ -70,6 +70,7 @@ import {
   getSplitPlan as readSplitPlan,
   getSplitPlans as readSplitPlans,
   setSplitPlan as writeSplitPlan,
+  moveSplitPlan as relocateSplitPlan,
 } from './split-plans.ts';
 import type {
   AppState,
@@ -589,7 +590,12 @@ export class AppStore {
    * связи нет: сохранять что-то на каждый чат панели здесь незачем.
    */
   linkChatSession(chatId: string, sessionId: string): void {
-    if (moveChatLink(this.state, chatId, sessionId)) this.persist();
+    const linked = moveChatLink(this.state, chatId, sessionId);
+    // Родитель, продолженный в чистой сессии, получил запись под временным
+    // ключом: список знает разговор по настоящему id, и группы под `new-…`
+    // висели бы без родителя.
+    const moved = chatId.startsWith('new-') && relocateSplitPlan(this.state, [chatId], sessionId);
+    if (linked || moved) this.persist();
   }
 
   /** Первая правка кода в разговоре ребёнка — момент в связь; чужие прогоны молча мимо. */
@@ -633,6 +639,13 @@ export class AppStore {
   setSplitPlan(record: SplitPlanRecord): void {
     writeSplitPlan(this.state, record);
     this.persist();
+  }
+
+  /** Разделение — к продолжению родителя: запись, связи групп, переадресация прежнего ключа. */
+  moveSplitPlan(from: readonly string[], to: string): boolean {
+    const moved = relocateSplitPlan(this.state, from, to);
+    if (moved) this.persist();
+    return moved;
   }
 
   // --- Внешние интеграции: итог проверки связи и привязки проектов ---

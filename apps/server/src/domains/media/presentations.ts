@@ -37,7 +37,7 @@ import {
   refusalOf,
   type MediaDeps,
 } from './upstream.ts';
-import { renderDeckHtml } from './deck/html.ts';
+import { lockDeckTheme, renderDeckHtml } from './deck/html.ts';
 import { renderDeckPptx } from './deck/pptx.ts';
 import { canPrintPdf, printDeckPdf } from './deck/pdf.ts';
 import { deckAssets } from './deck/assets.ts';
@@ -457,7 +457,11 @@ export async function deckFile(
     cacheDeckPdf(deps.appDataDir, id, bytes);
     return { record, bytes };
   }
-  return { record, bytes: readDeckFile(deps.appDataDir, id, format) };
+  const bytes = readDeckFile(deps.appDataDir, id, format);
+  if (format === 'html') {
+    return { record, bytes: Buffer.from(lockDeckTheme(bytes.toString('utf8')), 'utf8') };
+  }
+  return { record, bytes };
 }
 
 /**

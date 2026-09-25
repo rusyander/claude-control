@@ -253,4 +253,42 @@ describe('GET /api/chats — метки «ждёт вас» и «принято�
     expect(chats.get('fresh')?.accepted).toBeUndefined();
     expect(chats.get('fresh')?.copyLeft).toBeUndefined();
   });
+
+  // Живой прогон 25.09: MR группы был виден только в хабе родителя — в списке
+  // чатов по строке группы не понять, дошла ли она до MR.
+  it('MR группы — у её строки; группа с доставкой без MR — «MR нет», без доставки — ничего', async () => {
+    child('g-mr', 0);
+    child('g-wait', 1);
+    child('g-plain', 2);
+    store.setSplitPlan({
+      parentChatId: 'parent',
+      projectPath: join(root, 'work'),
+      createdAt: '2026-09-25T10:00:00.000Z',
+      order: [0, 1, 2],
+      request: {},
+      proposal: { groups: [] },
+      groups: [
+        {
+          index: 0,
+          status: 'done',
+          chatId: 'g-mr',
+          deliver: true,
+          mr: 'https://tracker.example.com/proj/-/merge_requests/826',
+        },
+        { index: 1, status: 'running', chatId: 'g-wait', deliver: true },
+        { index: 2, status: 'done', chatId: 'g-plain' },
+      ],
+    } as unknown as SplitPlanRecord);
+
+    const chats = await list();
+
+    expect(chats.get('g-mr')).toMatchObject({
+      mergeRequest: 'https://tracker.example.com/proj/-/merge_requests/826',
+    });
+    expect(chats.get('g-mr')?.mergeRequestPending).toBeUndefined();
+    expect(chats.get('g-wait')).toMatchObject({ mergeRequestPending: true });
+    expect(chats.get('g-wait')?.mergeRequest).toBeUndefined();
+    expect(chats.get('g-plain')?.mergeRequest).toBeUndefined();
+    expect(chats.get('g-plain')?.mergeRequestPending).toBeUndefined();
+  });
 });

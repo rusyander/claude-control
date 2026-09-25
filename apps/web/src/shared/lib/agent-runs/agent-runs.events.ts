@@ -94,6 +94,10 @@ export function applyEvent(id: string, event: ChatEvent): void {
       next.error = event.message;
       // Признак временности — только тот, что прислал сервер.
       next.errorRetriable = event.retriable === true;
+      // Код известной ошибки CLI: карточка скажет её словами и даст действие.
+      next.errorCode = event.code;
+      next.errorParams = event.params;
+      next.errorOverflow = event.overflow === true || undefined;
       break;
     case 'permission': {
       // Новый запрос прав — добавляем (без дублей по toolUseId).

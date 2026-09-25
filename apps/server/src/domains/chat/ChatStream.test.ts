@@ -37,3 +37,45 @@ describe('streamRun', () => {
     }
   });
 });
+
+describe('кадр ошибки прогона', () => {
+  let app: FastifyInstance | undefined;
+
+  afterEach(async () => {
+    await app?.close();
+    app = undefined;
+  });
+
+  // Живой прогон 25.09: переполненный родитель показывал сырую строку API.
+  // Кадр несёт код — карточка скажет словами интерфейса и даст выход.
+  it('известная ошибка CLI уходит с кодом, параметрами и флагом переполнения', async () => {
+    const message =
+      'Prompt is too long · automatic compaction failed: API Error: 400 Claude Code 2.1.278 does ' +
+      'not support this model; version 2.1.280 or newer is required.';
+    const registry = {
+      attach: (
+        _chatId: string,
+        _from: number,
+        subscriber: import('./ChatRunRegistry.ts').RunSubscriber,
+      ) => {
+        subscriber.send({ seq: 1, event: { kind: 'error', message } });
+        subscriber.close();
+        return () => undefined;
+      },
+    } as unknown as ChatRunRegistry;
+    app = Fastify();
+    app.get('/stream', (_request, reply) => streamRun(registry, reply, 'чат', 0));
+
+    const response = await app.inject({ method: 'GET', url: '/stream' });
+    const frame = JSON.parse(response.body.trim().replace(/^data: /, ''));
+
+    expect(frame).toMatchObject({
+      kind: 'error',
+      message,
+      code: 'cli-outdated',
+      params: { current: '2.1.278', required: '2.1.280' },
+      overflow: true,
+      retriable: false,
+    });
+  });
+});

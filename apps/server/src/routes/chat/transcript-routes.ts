@@ -120,6 +120,12 @@ export function registerChatTranscriptRoutes(
               ...(group && ownsGroup(group.chatId) && WORKING.has(group.status)
                 ? { inWork: true }
                 : {}),
+              // MR — у любого звена группы: он один на группу (владелец, 25.09).
+              ...(group?.mr
+                ? { mergeRequest: group.mr }
+                : group?.deliver
+                  ? { mergeRequestPending: true }
+                  : {}),
               ...named(chat, link.title),
               parentId: link.parentChatId,
               // Ветка связи — только подпорка: она запомнена при заведении

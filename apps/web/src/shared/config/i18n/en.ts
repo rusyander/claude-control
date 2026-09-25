@@ -1216,6 +1216,8 @@ export const en: TranslationSchema = {
         paused: 'paused',
         awaitsYou: 'waits for you',
         accepted: 'accepted',
+        noMr: 'no MR',
+        openMr: 'Open the group MR',
         pausedToast_one: 'Tree stopped: {{count}} run. Auto-starts are queued.',
         pausedToast_few: 'Tree stopped: {{count}} runs. Auto-starts are queued.',
         pausedToast_many: 'Tree stopped: {{count}} runs. Auto-starts are queued.',
@@ -1321,6 +1323,24 @@ export const en: TranslationSchema = {
     reconnecting: 'Lost the connection to the answer — reconnecting',
     errorTitle: 'The agent stopped with an error',
     copyError: 'Copy the error',
+    dismissError: 'Close',
+    /** Full context: the error card offers a way out (live run 25.09). */
+    overflow: {
+      compact: 'Compact context',
+      fresh: 'Continue in a new session',
+      freshHint:
+        'A new conversation from the checkpoint file; a split parent takes its groups along',
+    },
+    /** The CLI the panel runs chats with: path, version, a newer copy. */
+    cli: {
+      loading: 'Checking the CLI…',
+      current: 'Running Claude Code {{version}}: {{path}}',
+      missing: 'CLI “{{command}}” was not found on PATH',
+      newer: 'A newer copy exists — {{version}}: {{path}}. The panel takes the first copy on PATH.',
+      update: 'Update CLI',
+      updated: 'CLI updated: now {{version}}',
+      updateFailed: 'Update failed: {{output}}',
+    },
     connectionLost:
       'Lost the connection to the run. The agent may have finished — look in the history.',
     messageCrash: 'This message could not be rendered. The rest of the conversation is intact.',

@@ -62,12 +62,15 @@ export const DEFAULT_STATE: AppState = {
     // Пусто — правила прав как из коробки (contracts/permission-rules.ts):
     // записи разрешены, снос спрашивает. Сюда пишутся только СВОИ положения.
     autoApproveRules: {},
+    // Авторежим прав в чатах — из коробки включён (владелец, 24.09.2026).
+    chatAutoMode: true,
     modelPricing: {},
     encryptSecretBackups: false,
     taskSplitInitiative: true,
     handoffInitiative: true,
     handoffContextLimit: 0,
     handoffAutoDefault: true,
+    deliverToMr: true,
     autoUpdateModels: true,
     // Каталог по умолчанию открытый: контур есть не у всех, а список ключа
     // появляется только после того, как контур настроен и проверен.

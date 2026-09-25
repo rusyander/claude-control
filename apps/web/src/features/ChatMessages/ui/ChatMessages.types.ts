@@ -9,6 +9,7 @@ import type { PendingPermission, QueuedMessage } from '@shared/lib/agent-runs';
 import type { ChildStageGroup } from './ChildStages.types';
 import type { ReviewDecisionItem } from './ReviewDecisionCard.types';
 import type { BranchGateCardProps, PendingBranchGate } from './BranchGateCard.types';
+import type { ChildBranch } from './TaskSplitCard.types';
 
 /**
  * Всё, что карточке продолжения нужно от страницы, одним объектом. Плоскими
@@ -53,6 +54,11 @@ export interface ChildQuestion {
   toolUseId?: string;
   /** Ребёнок ещё работает — ответ ему встанет в очередь, о чём карточка и скажет. */
   isRunning?: boolean;
+  /**
+   * Вопрос задан ТЕКСТОМ, без `AskUserQuestion` (журнал 97 g7): хвост ответа
+   * ребёнка. Вариантов нет — карточка с полем ответа, `input` пустой.
+   */
+  text?: string;
 }
 
 /** Запросы прав дочернего разговора и подпись, чей он. */
@@ -156,6 +162,9 @@ export interface ChatMessagesProps {
    */
   onRelease?: (index: number) => void;
   releaseBusy?: boolean;
+  /** «Продолжить» оборванные группы (WP1c): без номера — все, с номером — одну. */
+  onResumeInterrupted?: (index?: number) => void;
+  resumeInterruptedBusy?: boolean;
   /** Пересчитать пересечения веток разделения (Т6) — кнопка в сводке групп. */
   onCheckOverlap?: () => void;
   overlapBusy?: boolean;
@@ -206,7 +215,7 @@ export interface ChatMessagesProps {
    * понимает, что разделение состоялось: без этого кнопка живёт до следующей
    * реплики агента, и второе нажатие заводит те же копии ещё раз.
    */
-  childBranches?: readonly string[];
+  childBranches?: readonly ChildBranch[];
   /** Продолжение в чистой сессии (карточка в ответе агента). */
   handoff?: HandoffControls;
   /**
@@ -269,7 +278,7 @@ export interface MessageBubbleProps {
   /** Потолок разговора: по нему карточка показывает и даёт менять модель группы. */
   splitCeiling?: CascadeCeiling;
   /** Ветки уже выделенных чатов — признак, что предложение отработано. */
-  childBranches?: readonly string[];
+  childBranches?: readonly ChildBranch[];
   /** Продолжение в чистой сессии (карточка вместо блока в тексте). */
   handoff?: HandoffControls;
   /** Разговор, к которому привязать файл вложения из блока агента (Т10). */

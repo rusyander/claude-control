@@ -3,6 +3,7 @@ import { execFile, spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { writeJsonFile } from '../../lib/safe-io.ts';
 import { serverText } from '../../lib/server-texts.ts';
+import type { PlatformRunConsumer } from '@agentdeck/contracts/platform-consumers';
 
 /**
  * Журнал идущих прогонов на диске — чтобы реестр пережил перезапуск панели.
@@ -25,6 +26,8 @@ import { serverText } from '../../lib/server-texts.ts';
 export interface LedgerAutoApprove {
   enabled: boolean;
   allowEdits: boolean;
+  /** Унаследован группой от родителя разделения (`AutoApproveState.inherited`). */
+  inherited?: true;
 }
 
 export interface RunLedgerEntry {
@@ -47,6 +50,48 @@ export interface RunLedgerEntry {
    * человека о каждом вызове — ровно там, где до перезапуска молчал.
    */
   autoApprove?: LedgerAutoApprove;
+  /**
+   * Режим прав CLI (`--permission-mode`). Звенья конвейера наследуют его от
+   * законченного прогона, и без записи усыновлённый прогон отдавал им дефолт
+   * `acceptEdits`: живой прогон 24.09.2026 — после перезапуска панели ревью и
+   * правки групп пошли не в авторежиме и встали на карточке прав.
+   */
+  permissionMode?: string;
+  /** Чем прогон был для контура (`RunMeta.origin`): ход, начатый CLI после подхвата, — тот же. */
+  origin?: PlatformRunConsumer;
+  /**
+   * Процесс живёт за посредником (`live-relay.mjs`): после перезапуска к нему
+   * ПОДКЛЮЧАЮТСЯ, а не усыновляют без потока. `pid` записи тогда — посредник:
+   * он живёт ровно столько, сколько CLI, и держит его трубы.
+   */
+  relay?: LedgerRelay;
+  /**
+   * Ход кончился, процесс ждёт следующего — живая сессия, а не прогон. Раньше
+   * такая сессия в журнал не попадала вовсе: после перезапуска её фон никто не
+   * ждал, а уборщик процессов снимал её CLI как сироту (журнал 29, 84).
+   */
+  idle?: true;
+  /**
+   * Все процессы записи — посредник, оболочка, сам CLI: уборщику процессов,
+   * чтобы ни одно звено цепочки не сочлось сиротой (журнал 84).
+   */
+  pids?: number[];
+}
+
+/** Процесс живой сессии за посредником — всё, что нужно, чтобы подключиться снова. */
+export interface LedgerRelay {
+  /** Именованный канал (Windows) или сокет посредника. */
+  pipe: string;
+  /** Pid посредника. */
+  pid: number;
+  /** Отпечаток параметров запуска (`LiveLaunch.signature`): ход с другими — новым процессом. */
+  signature: string;
+  tempDir?: string;
+  runIdFile?: string;
+  /** Фоновые задачи агента на момент записи (журнал 64). */
+  background?: number;
+  /** Оболочка, под которой посредник поднял CLI. */
+  childPid?: number;
 }
 
 /** Сколько записей держим. Строка на прогон; больше сотни живых прогонов не бывает. */
@@ -117,15 +162,29 @@ export class RunLedger {
     return readRunLedger(this.appDataDir, this.file);
   }
 
-  /** Записать или обновить запись по ключу; свежие — в конце. */
+  /**
+   * Записать или обновить запись по ключу; свежие — в конце. Запись о том же
+   * процессе посредника под другим ключом (ход пошёл под `sessionId`, а ждала
+   * сессия под `new-…`) заменяется: процесс один — и запись одна.
+   */
   upsert(entry: RunLedgerEntry): void {
-    const rest = this.read().filter((item) => item.key !== entry.key);
+    const pipe = entry.relay?.pipe;
+    const rest = this.read().filter(
+      (item) => item.key !== entry.key && !(pipe && item.relay?.pipe === pipe),
+    );
     this.write([...rest, entry].slice(-LIMIT));
   }
 
   remove(key: string): void {
     const current = this.read();
     const next = current.filter((item) => item.key !== key);
+    if (next.length !== current.length) this.write(next);
+  }
+
+  /** Процесс посредника закрылся — снять ждущую запись о нём (идущую снимет конец прогона). */
+  removeIdleRelay(pipe: string): void {
+    const current = this.read();
+    const next = current.filter((item) => !(item.idle && item.relay?.pipe === pipe));
     if (next.length !== current.length) this.write(next);
   }
 

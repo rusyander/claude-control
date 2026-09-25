@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import type { ProjectGitInfo } from '@agentdeck/contracts';
 import { git, gitSync, GitError } from './exec.ts';
 import {
@@ -23,6 +23,47 @@ import { coded } from '../../lib/server-text.ts';
 /** В каталоге проекта есть `.git` (каталог или файл рабочего дерева worktree). */
 export function isGitRepo(projectDir: string): boolean {
   return Boolean(projectDir.trim()) && existsSync(join(projectDir, '.git'));
+}
+
+/**
+ * Каталог, из которого делят задачи на группы: верх репозитория, а не каталог,
+ * куда агент ушёл `cd`.
+ *
+ * CLI держит каталог оболочки между вызовами, и последний `cwd` транскрипта —
+ * это `…/cp-admin-ui/src`, если агент туда перешёл. Живой прогон 24.09.2026:
+ * такой путь уехал в разделение, `isGitRepo` не нашёл в нём `.git`, и восемь
+ * групп стартовали в ОДНОМ каталоге без своих копий.
+ *
+ * Копия (`git worktree`), чей HEAD совпадает с HEAD основной копии, сворачивается
+ * в основную: наследовать от неё нечего, а ветки групп должны отходить от той же
+ * базы, что и MR. Копия с собственными коммитами остаётся собой — её ветка и есть
+ * база работы. Не репозиторий — каталог как есть.
+ */
+export async function splitRootOf(dir: string): Promise<string> {
+  const read = async (cwd: string, args: string[]): Promise<string | undefined> => {
+    try {
+      return (await git(cwd, args)).trim() || undefined;
+    } catch {
+      return undefined;
+    }
+  };
+  const top = await read(dir, ['rev-parse', '--show-toplevel']);
+  if (!top) return dir;
+  const root = resolve(top);
+  const gitDir = await read(root, ['rev-parse', '--absolute-git-dir']);
+  const common = await read(root, ['rev-parse', '--path-format=absolute', '--git-common-dir']);
+  if (!gitDir || !common || samePath(gitDir, common) || basename(common) !== '.git') return root;
+  const main = dirname(resolve(common));
+  const [head, mainHead] = await Promise.all([
+    read(root, ['rev-parse', 'HEAD']),
+    read(main, ['rev-parse', 'HEAD']),
+  ]);
+  return head && head === mainHead ? main : root;
+}
+
+function samePath(a: string, b: string): boolean {
+  const norm = (path: string): string => resolve(path).replace(/\\/g, '/').toLowerCase();
+  return norm(a) === norm(b);
 }
 
 /**
@@ -171,6 +212,29 @@ export async function readBranchFiles(input: {
 }
 
 /**
+ * Что основная ветка задела С ТОЧКИ РАСХОЖДЕНИЯ с веткой группы (находка 61):
+ * `<ветка>...<основная>` — ровно то, что приехало в основную после того, как
+ * группа от неё отошла (или после её последнего rebase). Сеть не трогаем:
+ * основная — в том виде, в каком её знают ссылки (`readMergeTarget`).
+ */
+export async function readTargetMoved(input: {
+  mainDir: string;
+  target: string;
+  branch: string;
+}): Promise<string[]> {
+  const out = await git(input.mainDir, [
+    'diff',
+    '--name-only',
+    '-z',
+    `${input.branch}...${input.target}`,
+  ]);
+  return out
+    .split('\0')
+    .map((path) => path.trim())
+    .filter(Boolean);
+}
+
+/**
  * Пути из `status --porcelain=v1 -z -uall`. Запись — `XY<пробел><путь>\0`, а у
  * переименования следом отдельным полем идёт ПРЕЖНИЙ путь: считаем оба, потому
  * что задеты оба — сосед, работающий со старым именем, конфликтует именно с ним.
@@ -201,4 +265,50 @@ export function parseDirtyPaths(stdout: string): string[] {
 export async function readCurrentBranch(projectDir: string): Promise<string | undefined> {
   const out = await git(projectDir, ['branch', '--show-current']).catch(() => '');
   return out.trim() || undefined;
+}
+
+/**
+ * База, от которой считать правки веток разделения: ветка основной копии — но в
+ * том виде, в каком её знает удалённый, если локальная от него отстала.
+ *
+ * Локальный `main` основной копии живёт своей жизнью: его не подтягивают
+ * неделями, а группы работают от свежего `origin/main` (агент сам делает
+ * `fetch`/`rebase` по правилам проекта). Три точки против отставшей ветки
+ * расходятся с веткой группы в СТАРОЙ точке, и всё, что приехало в `main` с тех
+ * пор, считалось правками группы: живой прогон 24.09.2026 — 481 файл вместо 232,
+ * пересечения по чужим Go-сервисам и helm (находка 52).
+ *
+ * Отслеживаемая ветка берётся, только если локальная — её предок (отстала, но не
+ * разошлась): у локальных коммитов поверх удалённого группы отведены именно от
+ * них, и сравнивать с удалённым значило бы записать эти коммиты в правки групп.
+ * Отслеживаемой нет — ветка того же имени у основного удалённого; нет и её —
+ * локальная ветка, как раньше. Сеть не трогаем: только то, что уже в ссылках.
+ */
+export async function readMergeTarget(projectDir: string): Promise<string | undefined> {
+  const local = await readCurrentBranch(projectDir);
+  if (!local) return undefined;
+  const read = async (args: string[]): Promise<string> =>
+    (await git(projectDir, args).catch(() => '')).trim();
+  let remote = await read([
+    'rev-parse',
+    '--abbrev-ref',
+    '--symbolic-full-name',
+    `${local}@{upstream}`,
+  ]);
+  if (!remote) {
+    const name = pickRemote(await read(['remote']));
+    const candidate = name ? `${name}/${local}` : '';
+    if (
+      candidate &&
+      (await read(['rev-parse', '--verify', '--quiet', `refs/remotes/${candidate}`]))
+    ) {
+      remote = candidate;
+    }
+  }
+  if (!remote) return local;
+  const behind = await git(projectDir, ['merge-base', '--is-ancestor', local, remote]).then(
+    () => true,
+    () => false,
+  );
+  return behind ? remote : local;
 }

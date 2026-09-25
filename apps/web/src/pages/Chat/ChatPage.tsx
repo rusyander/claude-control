@@ -24,6 +24,7 @@ import {
 } from '@entities/Chat';
 import { useProjects, useOpenInEditor } from '@entities/Project';
 import { useSettings } from '@entities/AppConfig';
+import { useChatAutoMode, useSetChatAutoMode } from '@entities/ChatAutoMode';
 import { useModelCatalog } from '@entities/ModelCatalog';
 import { lastTurnFacts, TurnToolHintLine, useTurnToolHint } from '@entities/Platform';
 import { Stack } from '@shared/ui/stack';
@@ -71,7 +72,7 @@ export function ChatPage() {
   const [previewWidth, resizePreview] = usePreviewWidth();
   // Тумблер прав хранится в chatPrefs (localStorage): по умолчанию правки
   // разрешены и не слетают после перезагрузки.
-  const { allowEdits, setAllowEdits, autoApprove, setAutoApprove } = useChatPrefs();
+  const { allowEdits, setAllowEdits } = useChatPrefs();
   const [isFolderPickerOpen, setFolderPickerOpen] = useState(false);
   const [isCodeOpen, setCodeOpen] = useState(false);
   const [isTestsOpen, setTestsOpen] = useState(false);
@@ -95,6 +96,13 @@ export function ChatPage() {
   const { activeChat, chatId, projectPath, isProjectContext, draftKey, preview, pending } = session;
 
   const run = useAgentRun(chatId);
+  // Авторежим прав этого чата — с сервера: выбор человека в чате сильнее
+  // глобальной настройки, не выбирал — чат идёт за ней. В отправку уходит только
+  // выбор чата; без него сервер сам возьмёт глобальную.
+  const autoMode = useChatAutoMode(chatId, run.sessionId);
+  const setChatAutoMode = useSetChatAutoMode();
+  const autoApprove = autoMode.data?.enabled ?? settings?.chatAutoMode ?? true;
+  const autoApproveOverride = autoMode.data?.override;
   // Досланное из очереди сразу встаёт в ленту своим пузырём (см. хук).
   useQueuedAsPending(run.sentFromQueue, session.setPending);
   const isRunning = run.status === 'running';
@@ -102,9 +110,9 @@ export function ChatPage() {
 
   const [input, setInput] = useDraft(draftKey);
 
-  // Модель и глубина продумывания: общий дефолт из настроек плюс выбор этого
-  // разговора (подробности — в хуке).
-  const models = useChatModelPrefs(draftKey, settings);
+  // Модель и глубина продумывания: общий дефолт из настроек, глубина, назначенная
+  // разговору панелью, и выбор этого разговора (подробности — в хуке).
+  const models = useChatModelPrefs(draftKey, settings, activeChat);
   // Кто ответит: подпись ожидания называет модель, а через контур — модель контура.
   const modelName = useRunModelName({
     consumer: activeChat?.parentId ? 'groups' : 'chat',
@@ -196,7 +204,7 @@ export function ChatPage() {
     setDraftId: session.setDraftId,
     setPending: session.setPending,
     allowEdits,
-    autoApprove,
+    autoApprove: autoApproveOverride,
     ...models.effective,
   });
 
@@ -217,6 +225,7 @@ export function ChatPage() {
     allowEdits,
     ...models.effective,
     dispatch,
+    ...(child.tree ? { tree: child.tree } : {}),
   });
 
   // Продолжение в чистой сессии: этап закрыт — работа уезжает в новый разговор
@@ -260,12 +269,14 @@ export function ChatPage() {
     return accepted;
   };
 
-  // Автоподтверждение прав: запоминаем выбор для всех чатов и, если прогон уже
-  // идёт, сообщаем о нём серверу — иначе тумблер подействовал бы только со
-  // следующего сообщения.
+  // Авторежим прав: щелчок — выбор ЭТОГО чата, сервер его запоминает, и он
+  // сильнее глобальной настройки. Идущему прогону — тут же, в том числе под
+  // ключом, которым его завела другая вкладка, — иначе тумблер подействовал бы
+  // только со следующего сообщения.
   const toggleAutoApprove = (enabled: boolean): void => {
-    setAutoApprove(enabled);
-    if (chatId) agentRuns.setAutoApprove(chatId, enabled);
+    if (!chatId) return;
+    setChatAutoMode.mutate({ chatId, enabled });
+    agentRuns.setAutoApprove(chatId, enabled);
   };
 
   return (
@@ -319,6 +330,7 @@ export function ChatPage() {
             projectName={ws.activeProject?.name}
             projectPath={projectPath}
             isProjectContext={isProjectContext}
+            {...(child.groupDeliver === undefined ? {} : { groupDeliver: child.groupDeliver })}
             chatId={chatId}
             activeRuns={activeRuns}
             totalCost={spend.cost}
@@ -403,7 +415,7 @@ export function ChatPage() {
             onOpenChild={session.openChatById}
             chats={chats.data ?? []}
             activeRuns={activeRuns}
-            childAnswerOptions={{ allowEdits, autoApprove, ...models.effective }}
+            childAnswerOptions={{ allowEdits, ...models.effective }}
             costUnit={costUnit}
             effort={run.effort}
             taskSplit={taskSplit}

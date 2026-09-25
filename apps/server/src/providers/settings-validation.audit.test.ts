@@ -18,12 +18,14 @@ describe('settings-validation: поля аудита', () => {
       handoffInitiative: false,
       handoffContextLimit: 150_000,
       handoffAutoDefault: true,
+      deliverToMr: false,
       remoteAccess: { enabled: true, publicUrl: 'https://x.example', notify: false },
     });
     expect(parsed.success).toBe(true);
     if (parsed.success) {
       expect(parsed.data.taskSplitInitiative).toBe(true);
       expect(parsed.data.handoffContextLimit).toBe(150_000);
+      expect(parsed.data.deliverToMr).toBe(false);
       // Единственный писатель удалённого доступа — /api/remote.
       expect('remoteAccess' in parsed.data).toBe(false);
     }

@@ -1,6 +1,7 @@
 import type { ChatSummary, ChatBlock, MessageUsage } from '@agentdeck/contracts';
 import { splitAttachments } from '@agentdeck/contracts/uploads';
 import { stripChildrenBrief } from './children-brief.ts';
+import { withoutPanelPreamble } from './panel-preamble.ts';
 
 /**
  * Разбор одной записи транскрипта: что это за строка и что из неё показывать.
@@ -163,11 +164,22 @@ export function isDialogMessage(record: Record): boolean {
   // Отметка самого CLI: в пакетном режиме он дописывает её в конец хода, когда
   // отвечать не на что. Репликой разговора она не является и в ленте только
   // разбивает переписку пустыми вставками.
-  if (record.type === 'assistant' && textOf(record).trim() === 'No response requested.') {
-    return false;
-  }
+  if (isSyntheticReply(record)) return false;
 
   return true;
+}
+
+/**
+ * Запись «ответа», которого модель не давала: CLI пишет её сам (`model:
+ * <synthetic>`), например «No response requested.» при `--resume` до первого
+ * слова модели. Ни репликой, ни концом хода она не является (журнал 96: после
+ * продолжения группы последним ответом считалась эта заглушка).
+ */
+export function isSyntheticReply(record: Record): boolean {
+  if (record.type !== 'assistant') return false;
+  return (
+    record.message?.model === '<synthetic>' || textOf(record).trim() === 'No response requested.'
+  );
 }
 
 /**
@@ -178,18 +190,66 @@ export function isDialogMessage(record: Record): boolean {
  * длиннее символа. Не нашёлся — годится и одиночный: «?» или «а» в названии
  * лучше, чем кодированное имя папки, которое ставится вместо пустого.
  */
-export function firstMeaningfulText(records: Record[]): string {
+export function firstMeaningfulText(
+  records: Record[],
+  shape: (text: string) => string = (text) => text,
+  /** Правка сырого текста ДО очистки: абзацы в нём ещё различимы. */
+  raw: (text: string) => string = (text) => text,
+): string {
   let single = '';
 
   for (const record of records) {
     if (!isDialogMessage(record) || record.type !== 'user') continue;
 
-    const text = humanText(record);
+    const text = shape(cleanText(raw(splitAttachments(textOf(record)).text)));
     if (text.length > 1) return text;
     if (text && !single) single = text;
   }
 
   return single;
+}
+
+/**
+ * Название чата по первой реплике — без ссылок. Задание, начатое адресом из
+ * трекера, называлось самим адресом, и список показывал
+ * «https://tracker.example.com/browse/…» вместо задачи (живой прогон 24.09.2026).
+ * Сам текст задания (`readChatTask`) ссылки сохраняет: агенту они нужны.
+ * Преамбулы панели (подготовка копии, доставка, задание звена) — тоже мимо:
+ * группы назывались «Панель подготовила эту копию: …» (`panel-preamble.ts`).
+ */
+export function chatTitleText(records: Record[]): string {
+  return firstMeaningfulText(records, withoutLinks, withoutPanelPreamble);
+}
+
+/**
+ * Первая реплика со словами написана панелью целиком. Название тогда берётся из
+ * следующей реплики человека, а у звена группы это обычно ответ на её вопрос
+ * («Локальный репозиторий»), а не задача — и чат группы звали ответом (живой
+ * прогон 26.09, D8). По этому признаку список предпочитает имя группы.
+ */
+export function opensWithPanel(records: Record[]): boolean {
+  const first = records.find(
+    (record) =>
+      isDialogMessage(record) &&
+      record.type === 'user' &&
+      cleanText(splitAttachments(textOf(record)).text).length > 1,
+  );
+  return Boolean(first) && !cleanText(withoutPanelPreamble(splitAttachments(textOf(first)).text));
+}
+
+/**
+ * Текст без ссылок: от адреса остаётся только ключ задачи трекера (`PROJ-1064`),
+ * если он в адресе есть, — по нему человек и узнаёт задачу. Ищется в пути, а не
+ * в имени хоста: хост вида `a-1.example` ключом не является.
+ */
+export function withoutLinks(text: string): string {
+  return text
+    .replace(/\bhttps?:\/\/[^\s<>"'`]+/gi, (url) => {
+      const path = url.replace(/^https?:\/\/[^/]*/i, '');
+      return ` ${/\b[A-Z][A-Z0-9_]*-\d+\b/.exec(path)?.[0] ?? ''} `;
+    })
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 /**
@@ -286,6 +346,19 @@ export function lastValue<T>(
   for (let index = records.length - 1; index >= 0; index -= 1) {
     const record = records[index];
     const value = record && pick(record);
+    if (value !== undefined && value !== false) return value as T;
+  }
+
+  return undefined;
+}
+
+/** Первое непустое значение — зеркало `lastValue` для полей, где верно начало. */
+export function firstValue<T>(
+  records: Record[],
+  pick: (record: Record) => T | undefined,
+): T | undefined {
+  for (const record of records) {
+    const value = pick(record);
     if (value !== undefined && value !== false) return value as T;
   }
 

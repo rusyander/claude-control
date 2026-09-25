@@ -15,9 +15,16 @@ import { normalizeProjectPath } from '@shared/lib/workspace';
 export function selectAwaitingChats(
   chats: readonly ChatSummary[],
   statuses: ReadonlyMap<string, RunStatus>,
+  /**
+   * Ждущие по памяти сервера (вопросы и запросы прав деревьев). Пока ответа
+   * нет — метка `awaitsYou` снимка списка; есть — он правдивее снимка: ответ
+   * человека снимает вопрос сразу, а список перечитается лишь по событию.
+   */
+  server?: ReadonlySet<string>,
 ): ChatSummary[] {
   return chats.filter((chat) => {
-    if (!chat.awaitingReply) return false;
+    const asked = server ? server.has(chat.id) : Boolean(chat.awaitsYou);
+    if (!chat.awaitingReply && !asked) return false;
     const live = statuses.get(chat.id);
     return live === undefined || (!isLive(live) && live !== 'waiting');
   });

@@ -1,18 +1,25 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
-import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { AppStore } from '../lib/app-store.ts';
 import type { ServerContext } from '../context.ts';
 import { registerChatSplitRoutes } from './chat/split-routes.ts';
+import { registerChatTranscriptRoutes } from './chat/transcript-routes.ts';
 import { ChatRunRegistry, type RunLike } from '../domains/chat/ChatRunRegistry.ts';
 import { ChatSession } from '../domains/chat/ChatSession.ts';
 import { ProviderChatService } from '../domains/provider-chat.ts';
-import { SplitConveyor } from '../domains/chat/split-conveyor.ts';
+import { copyRootOf, SplitConveyor } from '../domains/chat/split-conveyor.ts';
 import { createSplitLauncher, launchFromRecord } from './chat/split-launch.ts';
 import type { ChatLink } from '../lib/app-store/app-store.types.ts';
-import { SPLIT_BLOCK_LANG, scanSplitBlocks } from '@agentdeck/contracts/task-split';
+import {
+  GROUP_QUESTIONS_HUMAN_LINE,
+  SPLIT_BLOCK_LANG,
+  scanSplitBlocks,
+} from '@agentdeck/contracts/task-split';
+import { SPLIT_DEFAULTS_BUILTIN } from '@agentdeck/contracts/split-groups';
 
 /**
  * Маршрут разделения задач по чатам. Каталог берём обычный (не репозиторий) —
@@ -35,6 +42,7 @@ describe('POST /api/chat/split', () => {
     /** Чем прогон реально стартовал: подбор модели проверяется только здесь. */
     model?: string;
     effort?: string;
+    permissionMode?: string;
     /** Родитель, известный хранилищу В МОМЕНТ запуска, — см. тест про гонку. */
     parentAtStart?: string;
   }[];
@@ -57,6 +65,7 @@ describe('POST /api/chat/split', () => {
           ...(options.appendSystemPrompt ? { appendSystemPrompt: options.appendSystemPrompt } : {}),
           ...(options.model ? { model: options.model } : {}),
           ...(options.effort ? { effort: options.effort } : {}),
+          ...(options.permissionMode ? { permissionMode: options.permissionMode } : {}),
           ...(store.getChatLink(chatId)?.parentChatId
             ? { parentAtStart: store.getChatLink(chatId)?.parentChatId }
             : {}),
@@ -122,6 +131,36 @@ describe('POST /api/chat/split', () => {
     expect(started).toHaveLength(2);
     expect(started[0]?.prompt).toContain('первая задача');
     expect(started[0]?.prompt).toContain('Общее');
+  });
+
+  // Аудит 25.09, L40: общая строка «развилки решает человек» доезжает до групп.
+  it('развилки у человека во вкладке «Группы» — строка вопросов в задании группы', async () => {
+    store.setSplitDefaults({ ...structuredClone(SPLIT_DEFAULTS_BUILTIN), groupQuestions: 'human' });
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/chat/split',
+      payload: { projectPath: project, proposal, startRuns: true },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(started[0]?.prompt).toContain(GROUP_QUESTIONS_HUMAN_LINE);
+  });
+
+  it('группы с правками идут в авторежиме прав, без правок — спрашивают', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/chat/split',
+      payload: { projectPath: project, proposal, startRuns: true, allowEdits: true },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(started.map((run) => run.permissionMode)).toEqual(['auto', 'auto']);
+
+    started.length = 0;
+    await app.inject({
+      method: 'POST',
+      url: '/api/chat/split',
+      payload: { projectPath: project, proposal, startRuns: true },
+    });
+    expect(started.map((run) => run.permissionMode)).toEqual(['default', 'default']);
   });
 
   // Д1 (инцидент 23.09): веб шлёт предложение, уже разобранное общим сканером,
@@ -198,8 +237,13 @@ describe('POST /api/chat/split', () => {
     });
 
     const body = response.json() as { chats: { chatId: string }[] };
+    // Помечен унаследованным: строки вкладки «Группы» ему не уступают (M3).
     for (const chat of body.chats) {
-      expect(session.autoApproveFor(chat.chatId)).toEqual({ enabled: true, allowEdits: true });
+      expect(session.autoApproveFor(chat.chatId)).toEqual({
+        enabled: true,
+        allowEdits: true,
+        inherited: true,
+      });
     }
   });
 
@@ -235,6 +279,36 @@ describe('POST /api/chat/split', () => {
 
     expect(started).toHaveLength(2);
     for (const run of started) expect(run.parentAtStart).toBe('parent');
+  });
+
+  // Живой прогон 25.09 (F5): второй план того же разговора вклеивал в свои
+  // строки чаты прошлого — по тому же номеру группы у того же родителя.
+  it('новое разделение снимает звенья прошлого плана того же разговора', async () => {
+    const split = async () =>
+      (
+        (
+          await app.inject({
+            method: 'POST',
+            url: '/api/chat/split',
+            payload: { projectPath: project, proposal, startRuns: true, parentChatId: 'parent' },
+          })
+        ).json() as { chats: { chatId: string }[] }
+      ).chats.map((chat) => chat.chatId);
+    // Прошлый чат группы успел назвать настоящую сессию — у связи два ключа.
+    const first = await split();
+    const firstLink = store.getChatLink(first[0] ?? '');
+    if (firstLink) store.setChatLink('old-session', { ...firstLink, conversation: first[0] });
+
+    const second = await split();
+
+    expect(first).toHaveLength(2);
+    for (const chatId of [...first, 'old-session']) {
+      expect(store.getChatLink(chatId)).toBeUndefined();
+      expect(store.getRetiredChatLinks()[chatId]?.parentChatId).toBe('parent');
+    }
+    for (const chatId of second) {
+      expect(store.getChatLink(chatId)).toMatchObject({ parentChatId: 'parent' });
+    }
   });
 
   it('без родителя связей не заводим — разделение бывает и без разговора', async () => {
@@ -500,8 +574,10 @@ describe('POST /api/chat/split', () => {
         launch: (record, groups, context) =>
           launchFromRecord(ctx, launchDeps(), record, groups, context),
         startTriage: (record, prompt) =>
+          // Как в `runtime.ts`: разбор — в верхе репозитория, настройки — по пути проекта.
           createSplitLauncher(ctx, launchDeps(), {
-            projectPath: record.projectPath,
+            projectPath: copyRootOf(record),
+            settingsPath: record.projectPath,
             parentChatId: record.parentChatId,
             ...(record.request.model ? { model: record.request.model } : {}),
             ...(record.request.effort ? { effort: record.request.effort } : {}),
@@ -557,6 +633,8 @@ describe('POST /api/chat/split', () => {
         cwd: project,
         model: 'claude-opus-5',
         effort: 'high',
+        // Человека у разбора нет: при default каждый `cd … && grep` ждал кнопки (живой прогон 24.09).
+        permissionMode: 'auto',
       });
       expect(started[0]?.prompt).toContain('разбор разделения');
       expect(started[0]?.prompt).toContain('agentdeck:split-plan');
@@ -865,6 +943,209 @@ describe('POST /api/chat/split', () => {
         (off.json() as { chats: { started: boolean }[] }).chats.map((chat) => chat.started),
       ).toEqual([true, true]);
       expect(store.getSplitPlan('parent-2')).toBeUndefined();
+    });
+
+    /**
+     * Живой прогон 24.09.2026: агент родителя ушёл `cd` в подкаталог, путь чата
+     * уехал в разделение, и восемь групп стартовали в ОДНОМ подкаталоге без копий.
+     */
+    describe('путь разделения из подкаталога репозитория', () => {
+      let sub: string;
+
+      beforeEach(() => {
+        const run = (...args: string[]) =>
+          execFileSync('git', args, { cwd: project, stdio: 'ignore' });
+        run('init', '-b', 'main');
+        run('config', 'user.email', 't@t');
+        run('config', 'user.name', 't');
+        sub = join(project, 'app', 'src');
+        mkdirSync(sub, { recursive: true });
+        writeFileSync(join(sub, 'a.ts'), 'export {};\n');
+        run('add', '.');
+        run('commit', '-m', 'init');
+      });
+
+      afterEach(() => {
+        rmSync(`${project}-worktrees`, { recursive: true, force: true });
+      });
+
+      async function startTriage(conveyor: SplitConveyor, projectPath: string): Promise<string> {
+        const instance = await withRoutes(conveyor);
+        const first = await instance.inject({
+          method: 'POST',
+          url: '/api/chat/split',
+          payload: { projectPath, proposal, startRuns: true, parentChatId: 'parent-1', ...ceiling },
+        });
+        await instance.close();
+        return (first.json() as { triage: { chatId: string } }).triage.chatId;
+      }
+
+      function finishTriage(conveyor: SplitConveyor, triageId: string): void {
+        const block = [
+          '```agentdeck:split-plan',
+          JSON.stringify({ groups: [{ index: 1 }, { index: 2 }], order: [1, 2] }),
+          '```',
+        ].join('\n');
+        conveyor.onTriageFinished(
+          {
+            chatId: triageId,
+            projectPath: project,
+            text: block,
+            ok: true,
+            startedAt: 1,
+            options: { prompt: '', cwd: project },
+            contextTokens: 0,
+          },
+          [triageId],
+        );
+      }
+
+      /** Пока конвейер заводит копии (git worktree add), стартов ещё нет. */
+      async function waitStarts(count: number): Promise<void> {
+        for (let i = 0; i < 100 && started.length < count; i += 1) {
+          await new Promise((done) => setTimeout(done, 50));
+        }
+      }
+
+      // Временный каталог Windows приходит коротким именем (`RUSYAN~1`), git
+      // отвечает длинным — сравниваем настоящие пути.
+      const norm = (path: string): string =>
+        (existsSync(path) ? realpathSync.native(path) : path).replace(/\\/g, '/').toLowerCase();
+      const inCopies = (cwd: string): boolean =>
+        norm(cwd).startsWith(`${norm(project)}-worktrees/`);
+
+      it('разбор идёт в корне репозитория, группы — каждая в своей копии', async () => {
+        const conveyor = withConveyor();
+        const triageId = await startTriage(conveyor, sub);
+        expect(norm(started[0]?.cwd ?? '')).toBe(norm(project));
+        // Запись помнит оба пути (m6): открытый человеком — ключ его настроек,
+        // верх репозитория — корень копий.
+        const record = store.getSplitPlan('parent-1');
+        expect(norm(record?.projectPath ?? '')).toBe(norm(sub));
+        expect(norm(record ? copyRootOf(record) : '')).toBe(norm(project));
+
+        started.length = 0;
+        finishTriage(conveyor, triageId);
+        await waitStarts(2);
+
+        const cwds = started.map((run) => run.cwd);
+        expect(cwds).toHaveLength(2);
+        expect(new Set(cwds.map(norm)).size).toBe(2);
+        expect(cwds.every(inCopies)).toBe(true);
+      }, 20_000);
+
+      it('перезапуск из итога разбора уводит группы из подкаталога в копии', async () => {
+        const conveyor = withConveyor();
+        const triageId = await startTriage(conveyor, project);
+        // Запись, какой она была в живом прогоне: разделение из подкаталога.
+        const record = store.getSplitPlan('parent-1');
+        if (!record) throw new Error('нет записи');
+        const { copyRoot: _root, ...legacy } = record;
+        store.setSplitPlan({ ...legacy, projectPath: sub });
+        started.length = 0;
+        finishTriage(conveyor, triageId);
+        await waitStarts(2);
+        const wrong = started.map((run) => run.chatId);
+        expect(started.map((run) => norm(run.cwd))).toEqual([norm(sub), norm(sub)]);
+
+        const instance = await withRoutes(conveyor);
+        started.length = 0;
+        const response = await instance.inject({
+          method: 'POST',
+          url: '/api/chat/split/parent-1/relaunch',
+        });
+        // Перезапуск отвечает сразу (находка 19), копии заводятся фоном.
+        expect(response.statusCode).toBe(202);
+        await waitStarts(2);
+        await instance.close();
+
+        const cwds = started.map((run) => run.cwd);
+        expect(cwds).toHaveLength(2);
+        expect(new Set(cwds.map(norm)).size).toBe(2);
+        expect(cwds.every(inCopies)).toBe(true);
+        for (const chatId of wrong) expect(store.getChatLink(chatId)).toBeUndefined();
+        const after = store.getSplitPlan('parent-1');
+        expect(norm(after?.projectPath ?? '')).toBe(norm(sub));
+        expect(norm(after ? copyRootOf(after) : '')).toBe(norm(project));
+      }, 20_000);
+
+      /**
+       * Находка 20 живого прогона: перезапуск СТИРАЛ связи снятых групп, и восемь
+       * старых чатов разом всплыли корнями списка. Теперь звено снимается: для
+       * панели оно мертво (ни `getChatLink`, ни `getChatLinks` его не отдают), а
+       * список держит разговор под родителем с меткой `retired` — без номера и
+       * стадии группы, чтобы хаб не принял его за живую группу.
+       */
+      it('перезапуск снимает звенья старых групп, а не стирает связи', async () => {
+        const conveyor = withConveyor();
+        const triageId = await startTriage(conveyor, project);
+        started.length = 0;
+        finishTriage(conveyor, triageId);
+        await waitStarts(2);
+        const wrong = started.map((run) => run.chatId);
+        expect(wrong).toHaveLength(2);
+
+        // Транскрипты старых групп на диске — список чатов читает их оттуда.
+        const dir = join(root, 'projects', 'proj');
+        mkdirSync(dir, { recursive: true });
+        for (const chatId of wrong) {
+          const record = {
+            type: 'user',
+            uuid: `u-${chatId}`,
+            cwd: project,
+            timestamp: '2026-09-24T10:00:00.000Z',
+            message: { role: 'user', content: `задание ${chatId}` },
+          };
+          writeFileSync(join(dir, `${chatId}.jsonl`), `${JSON.stringify(record)}\n`);
+        }
+
+        const instance = Fastify();
+        registerChatSplitRoutes(instance, ctx, { ...launchDeps(), conveyor });
+        registerChatTranscriptRoutes(instance, ctx);
+        await instance.ready();
+        started.length = 0;
+        const response = await instance.inject({
+          method: 'POST',
+          url: '/api/chat/split/parent-1/relaunch',
+        });
+        expect(response.statusCode).toBe(202);
+        await waitStarts(2);
+        const list = await instance.inject({ method: 'GET', url: '/api/chats' });
+        await instance.close();
+
+        const fresh = started.map((run) => run.chatId);
+        expect(fresh).toHaveLength(2);
+        expect(fresh.some((chatId) => wrong.includes(chatId))).toBe(false);
+        for (const chatId of wrong) {
+          expect(store.getChatLink(chatId)).toBeUndefined();
+          expect(store.getChatLinks()[chatId]).toBeUndefined();
+          expect(store.getRetiredChatLinks()[chatId]).toMatchObject({ parentChatId: 'parent-1' });
+          expect(store.getRetiredChatLinks()[chatId]?.retiredAt).toBeTruthy();
+        }
+        // Новые группы — живые звенья со своими номерами.
+        for (const chatId of fresh) {
+          expect(store.getChatLink(chatId)?.parentChatId).toBe('parent-1');
+          expect(typeof store.getChatLink(chatId)?.groupIndex).toBe('number');
+        }
+
+        const chats = list.json() as {
+          id: string;
+          parentId?: string;
+          retired?: boolean;
+          groupIndex?: number;
+          stage?: string;
+          groupTitle?: string;
+        }[];
+        for (const chatId of wrong) {
+          const chat = chats.find((entry) => entry.id === chatId);
+          expect(chat).toMatchObject({ parentId: 'parent-1', retired: true });
+          expect(chat?.groupIndex).toBeUndefined();
+          expect(chat?.stage).toBeUndefined();
+          // Имя группы снятое звено держит (WP9h): им оно и называется, когда
+          // первая реплика целиком написана панелью.
+          expect(chat?.groupTitle).toBe(store.getRetiredChatLinks()[chatId]?.title);
+        }
+      }, 20_000);
     });
   });
 });

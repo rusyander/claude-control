@@ -646,12 +646,15 @@ export const chatEn: typeof chatRu = {
     parallelBootstrapText:
       'Right after the mirror a preparation command runs in the copy — in the ' +
       'background, before any agent starts there. Which one: the “Command after ' +
-      'creating a copy” field in “Copy settings”; empty — the panel looks at the root ' +
-      'lockfile (pnpm-lock.yaml → pnpm install --frozen-lockfile --prefer-offline, ' +
-      'package-lock.json → npm ci, yarn.lock → yarn install --immutable); none in the ' +
-      'root — the same in each first-level folder (frontend/, web/…) in turn; it does ' +
-      'nothing without one. The command runs through the system shell with CI=1, ' +
-      '10-minute ceiling. The copy’s card shows “installing” / “dependencies ready” / ' +
+      'creating a copy” field in “Copy settings”; empty — the panel decides by the ' +
+      'lockfiles. In the copy root: pnpm-lock.yaml → pnpm install --frozen-lockfile ' +
+      '--prefer-offline, package-lock.json → npm ci --prefer-offline --no-audit ' +
+      '--no-fund, yarn.lock → yarn install --immutable. None in the root — the same in ' +
+      'each first-level folder (frontend/, web/…), up to four at once; a local library ' +
+      'its neighbours depend on through file:, whose entry (dist) is not built in a ' +
+      'fresh copy, is built with its build script after the install. Without a lockfile ' +
+      'the panel does nothing. The command runs through the system shell with CI=1, ' +
+      '10-minute ceiling for the whole preparation. The copy’s card shows “installing” / “dependencies ready” / ' +
       '“install failed”, the log and a “Retry install” button. A failure stops ' +
       'nothing: the copy stays, and on task splitting the agent gets the log tail as ' +
       'the first paragraph of its task and decides itself whether to retry or go ' +
@@ -711,14 +714,19 @@ export const chatEn: typeof chatRu = {
       'not cancel the rest: a separate toast says so, and the other chats stay.',
     splitDeliver: 'Up to a ready MR, and the group queue',
     splitDeliverText:
-      'Set per project: “Parallel branches” → “Splitting tasks into groups”. The ' +
-      '“Take each group to a ready MR” toggle puts an instruction at the top of the ' +
-      'group task to follow the project delivery skill: branch, checks, commit, push ' +
-      'and MR — one group, one branch, one MR. The MR link the agent ends its reply ' +
-      'with shows in the group summary as “MR !N”. “Groups at once” is how many groups ' +
-      'work at the same time (8 by default, up to 30); the rest wait “queued” and start ' +
-      'as slots free up. One proposal holds at most 30 groups and 50 tasks per group: ' +
-      'anything beyond is dropped, and the card says how much.',
+      'The “To MR” button in a project chat header shows how a task will end: “on”, ' +
+      '“off” or “nowhere” (the repository has no remote). Delivery is on out of the ' +
+      'box; to turn it off everywhere — “Settings” → “Models” → “Take tasks to a ready ' +
+      'MR”. Delivery follows the project delivery skill (the panel finds its name by ' +
+      'itself and shows it in the button panel): in a plain chat the agent takes a ' +
+      'code-change task to an MR — branch, checks, commit, push, MR, review, ' +
+      'description — while questions and reviews without edits open no MR; in a split ' +
+      'each group is one branch and one MR, and the group summary shows its link as ' +
+      '“MR !N”. The panel picks “Split groups at once” by itself: 4 when copy ' +
+      'preparation is heavy (several installs or a build), otherwise 8; your own number ' +
+      'goes up to 30, “Pick automatically” brings the automatic value back. The rest ' +
+      'wait “queued” and start as slots free up. One proposal holds at most 30 groups ' +
+      'and 50 tasks per group: anything beyond is dropped, and the card says how much.',
     splitReview: 'Reviewing someone else’s merge requests',
     splitReviewText:
       'Drop MR (or PR) links into the chat and ask for a review — the split creates ' +

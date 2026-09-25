@@ -97,6 +97,17 @@ describe('живая сессия разговора', { timeout: 30_000 }, () =
     expect(registry.isProcessAlive(SESSION)).toBe(false);
   });
 
+  // Аудит 25.09, L280: заглушка CLI в живом потоке — ни текста, ни шага расхода.
+  it('заглушка <synthetic> в живом ходе не даёт ни текста, ни расхода', async () => {
+    fresh();
+    const text = await turn('new-syn', 'SYNTHETIC');
+    expect(text).toMatch(/^turn 1 pid \d+$/);
+    const models = eventsOf('new-syn').flatMap((event) =>
+      event.kind === 'usage' ? [event.model ?? ''] : [],
+    );
+    expect(models).not.toContain('<synthetic>');
+  });
+
   it('расход хода — разница, а не накопленный итог процесса', async () => {
     fresh();
     await turn('new-2', 'раз');

@@ -66,6 +66,7 @@ export function useSaveDlpRules() {
   const queryClient = useQueryClient();
 
   return useMutation({
+    meta: { silentError: true },
     mutationFn: saveRules,
     // Промис возвращается намеренно: страница сбрасывает черновик в своём
     // onSuccess, и к тому моменту в кеше уже должны лежать новые правила —
@@ -79,13 +80,14 @@ export function useSaveDlpRules() {
  * прислать черновиком: смотреть результат ДО сохранения важнее, чем после.
  */
 export function useDlpPreview() {
-  return useMutation({ mutationFn: preview });
+  return useMutation({ meta: { silentError: true }, mutationFn: preview });
 }
 
 export function useSetDlpRunning() {
   const queryClient = useQueryClient();
 
   return useMutation({
+    meta: { silentError: true },
     mutationFn: setRunning,
     onSuccess: (info) => {
       queryClient.setQueryData(queryKeys.dlp, info);

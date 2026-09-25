@@ -32,7 +32,9 @@ export function collectChildQuestions(
 ): ChildQuestion[] {
   if (!parentChatId) return [];
 
-  const children = chats.filter((chat) => chat.parentId === parentChatId);
+  // Отброшенный перезапуском разделения чат (L20) не спрашивает: его группу уже
+  // заменили, и ответ ушёл бы работе, которая не продолжается.
+  const children = chats.filter((chat) => chat.parentId === parentChatId && !chat.retired);
   if (children.length === 0) return [];
 
   const found: ChildQuestion[] = [];

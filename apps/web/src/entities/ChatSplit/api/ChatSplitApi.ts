@@ -1,6 +1,7 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import type { TaskSplitProposal, TaskSplitResult } from '@agentdeck/contracts/task-split';
 import type { CascadeAssignment } from '@agentdeck/contracts/model-cascade';
+import { chatTreeKeys } from '@entities/ChatTree';
 import { apiClient } from '@shared/api/client';
 import { normalizeProjectPath } from '@shared/lib/workspace';
 
@@ -33,13 +34,34 @@ export interface SplitTasksBody {
   assignments?: Record<number, CascadeAssignment>;
 }
 
+/**
+ * `silentError` выключает общий тост из MutationCache: отказ разбирают оба
+ * вызова сами (409 «план ещё идёт» — предложением его отменить), и общий тост
+ * встал бы вторым, с сырым текстом сервера (живой прогон 25.09, D2).
+ */
+export const splitTasksMutation = {
+  mutationFn: async (body: SplitTasksBody) => {
+    const { data } = await apiClient.post<TaskSplitResult>('/chat/split', body);
+    return data;
+  },
+  meta: { silentError: true },
+};
+
+/**
+ * Запрос считается идущим, пока дерево не перечитано: по записи плана в дереве
+ * заперта кнопка «Разделить», и между ответом 200 и новым деревом она
+ * оживала на долю секунды — второе нажатие ловило 409 (живой прогон 26.09, D1).
+ * Обещание из `onSuccess` мутация ждёт, и `isPending` держится до конца.
+ */
+export function splitTasksOptions(queryClient: QueryClient) {
+  return {
+    ...splitTasksMutation,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: chatTreeKeys.all }),
+  };
+}
+
 export function useSplitTasks() {
-  return useMutation({
-    mutationFn: async (body: SplitTasksBody) => {
-      const { data } = await apiClient.post<TaskSplitResult>('/chat/split', body);
-      return data;
-    },
-  });
+  return useMutation(splitTasksOptions(useQueryClient()));
 }
 
 /**

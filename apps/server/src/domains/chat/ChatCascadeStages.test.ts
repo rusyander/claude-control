@@ -89,6 +89,37 @@ describe('planCascadeStage: после работы', () => {
     expect(plan({ link: older })).toBeUndefined();
   });
 
+  // M8: ревью этой работе не положено — группа с доставкой идёт в доставку сразу.
+  it('работа на потолке группы с доставкой заводит доставку на модели работы', () => {
+    const staged = plan({ link: workLink({ lowered: false }), deliver: true });
+
+    expect(staged?.stage).toBe('deliver');
+    expect(staged?.model).toBe('sonnet');
+    expect(staged?.prompt).toContain('отдельного ревью у неё нет');
+    expect(staged?.link).toMatchObject({ stage: 'deliver', parentChatId: 'parent' });
+  });
+
+  it('связь без потолка у группы с доставкой тоже идёт в доставку', () => {
+    const older = workLink();
+    delete older.ceilingModel;
+
+    expect(plan({ link: older, deliver: true })?.stage).toBe('deliver');
+  });
+
+  it('пустую работу, паузу и второй круг без просьбы не доставляем; ревью — само доведёт', () => {
+    const ceiling = workLink({ lowered: false });
+    expect(plan({ link: ceiling, deliver: true, hasWork: () => false })).toBeUndefined();
+    expect(plan({ link: ceiling, deliver: true, paused: true })).toBeUndefined();
+    const delivered = workLink({ lowered: false, deliveredAt: '2026-09-07T11:00:00.000Z' });
+    expect(plan({ link: delivered, deliver: true })).toBeUndefined();
+    expect(plan({ link: delivered, deliver: true, redeliver: true })?.stage).toBe('deliver');
+    // Ревью уже заведено на эту работу — доставку заводит его круг, не работа.
+    const reviewed = workLink({ reviewedAt: '2026-09-07T11:00:00.000Z' });
+    expect(plan({ link: reviewed, deliver: true })).toBeUndefined();
+    // Понижённая работа по-прежнему идёт в ревью, а не мимо него.
+    expect(plan({ deliver: true })?.stage).toBe('review');
+  });
+
   it('обычный чат вне разделения конвейера не знает', () => {
     expect(planCascadeStage({ ok: true, text: '', task: '', hasWork: () => true })).toBeUndefined();
   });
@@ -264,5 +295,82 @@ describe('planCascadeStage: после плана и разбора', () => {
 
   it('разбор (уровень 1) звеньев не заводит: его итог применяет конвейер', () => {
     expect(plan({ link: workLink({ stage: 'triage' }), text: 'что угодно' })).toBeUndefined();
+  });
+});
+
+/**
+ * Аудит 25.09, L238: чат группы перенаправляется на звено, и ревью, правки и
+ * доставка начинали с нуля — без задания, плана и итога прошлого звена.
+ */
+describe('planCascadeStage: контекст следующего звена', () => {
+  const PLAN = '## Шаги\n1. Найти foo\n2. Заменить на bar';
+
+  it('план кладёт выжимку в связь работы, и она едет до ревью', () => {
+    const afterPlan = plan({
+      link: workLink({ stage: 'plan', lowered: true, workModel: 'sonnet', task: 'Переименуй foo' }),
+      text: ['```agentdeck:plan', PLAN, '```'].join('\n'),
+    });
+    expect(afterPlan?.link.planSummary).toContain('1. Найти foo');
+
+    const review = plan({
+      link: afterPlan!.link,
+      text: 'Сделал: переименовал в 12 файлах.',
+    });
+    expect(review?.stage).toBe('review');
+    expect(review?.prompt).toContain('1. Найти foo');
+    expect(review?.prompt).toContain('переименовал в 12 файлах');
+    expect(review?.link).toMatchObject({
+      task: 'Переименуй foo',
+      planSummary: afterPlan!.link.planSummary,
+    });
+  });
+
+  it('правки получают задание, план, ветку и вывод ревью; связь несёт их дальше', () => {
+    const staged = plan({
+      link: workLink({
+        stage: 'review',
+        model: 'claude-opus-5',
+        lowered: false,
+        workModel: 'sonnet',
+        task: 'Переименуй foo в bar',
+        planSummary: PLAN,
+      }),
+      text: [
+        'Ревьюер: переименование неполное.',
+        '```agentdeck:review',
+        '{"findings":["b.ts:3 — остался foo"]}',
+        '```',
+      ].join('\n'),
+      deliver: true,
+    });
+    expect(staged?.stage).toBe('fix');
+    expect(staged?.prompt).toContain('Задание группы:');
+    expect(staged?.prompt).toContain('Переименуй foo в bar');
+    expect(staged?.prompt).toContain('2. Заменить на bar');
+    expect(staged?.prompt).toContain('Ветка группы: split/rename.');
+    expect(staged?.prompt).toContain('Итог прошлого звена (ревью):');
+    expect(staged?.prompt).toContain('переименование неполное');
+    expect(staged?.link).toMatchObject({ task: 'Переименуй foo в bar', planSummary: PLAN });
+    // Аудит 25.09, L258: не воспроизвелось — не повод тянуть инфраструктуру.
+    expect(staged?.prompt).toContain('не повод менять инфраструктуру');
+  });
+
+  it('доставка после правок знает задание и итог правок и перечитывает обсуждения MR', () => {
+    const staged = plan({
+      link: workLink({ stage: 'fix', task: 'Переименуй foo в bar', planSummary: PLAN }),
+      text: 'Поправил b.ts, тесты зелёные.',
+      deliver: true,
+    });
+    expect(staged?.stage).toBe('deliver');
+    expect(staged?.prompt).toContain('Переименуй foo в bar');
+    expect(staged?.prompt).toContain('Итог прошлого звена (правки):');
+    expect(staged?.prompt).toContain('Поправил b.ts');
+    // Аудит 25.09, L199: «готово» по MR — только после всех его обсуждений.
+    expect(staged?.prompt).toContain('перечитай ВСЕ обсуждения MR');
+    // Аудит 25.09, L163: дифф сверяется с заданием, шаг за его границу — вопросом.
+    expect(staged?.prompt).toContain('Сверь дифф ветки с основной');
+    expect(staged?.prompt).toContain('выходит за задачи группы');
+    // Контекст есть — «контекста у тебя нет» задание не говорит.
+    expect(staged?.prompt).not.toContain('контекста прошлых звеньев у тебя нет');
   });
 });

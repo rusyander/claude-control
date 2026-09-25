@@ -1,6 +1,8 @@
 import type { SplitOverlapFile, SplitOverlapView } from '@agentdeck/contracts/chat-handoff';
 import type { SplitPlanRecord } from '../../lib/app-store/app-store.types.ts';
 import type { ChatEvent } from './ChatRunner.ts';
+import { copyRootOf } from './split-conveyor.ts';
+import { applyDrift, driftCandidates, readDrift, type MovedFiles } from './split-drift.ts';
 
 /**
  * Пересечения веток разделения — контроль ПОСЛЕ работы (Т6).
@@ -35,6 +37,21 @@ import type { ChatEvent } from './ChatRunner.ts';
  */
 const COUNTED_NAMES_MAX = 20;
 
+/**
+ * Пересчёт по расписанию, пока группы работают (находка 61c). Конец цепочки
+ * бывает раз в час, а соседи за это время успевают залезть в один файл — узнать
+ * это при слиянии поздно. Не чаще раза в десять минут на разделение: пересчёт —
+ * два вызова git на группу, и тратить их на каждый такт незачем.
+ */
+export const DRIFT_RECHECK_MS = 10 * 60_000;
+/** Такт расписания — половина срока: запись, считанная концом цепочки, не ждёт двух сроков. */
+export const DRIFT_TICK_MS = DRIFT_RECHECK_MS / 2;
+/** Сколько разделений пересчитать за такт — самые давние первыми. */
+export const DRIFT_RECHECK_MAX = 4;
+
+/** Группа ещё работает — её ветка может задеть что-то новое. */
+const ACTIVE = new Set(['started', 'background', 'awaiting']);
+
 /** Одна группа глазами пересечений: ветка, копия и объявленное владение. */
 export interface OverlapGroup {
   index: number;
@@ -50,9 +67,19 @@ export interface OverlapGroup {
   after: number[];
 }
 
+/** Ветка группы, прочитанная git: что она задела. */
+interface ScannedGroup {
+  index: number;
+  files: string[];
+  owns?: readonly string[];
+}
+
 /** Ровно то, что пересечениям нужно от git. Отдельным типом — ради теста без репозитория. */
 export interface OverlapGit {
-  /** Ветка, в которую всё это будет сливаться, — текущая ветка основной копии. */
+  /**
+   * Ветка, в которую всё это будет сливаться, — ветка основной копии, а если
+   * локальная отстала от удалённого, то её свежий вид (`readMergeTarget`).
+   */
   mergeBase(mainDir: string): Promise<string | undefined>;
   /**
    * Файлы, которые ветка задела относительно базы: коммиты плюс незакоммиченное
@@ -64,6 +91,11 @@ export interface OverlapGit {
     base: string;
     branch: string;
   }): Promise<string[]>;
+  /**
+   * Что ветка слияния задела с развилки с веткой группы — дрейф основной под
+   * идущей группой (находка 61, `split-drift.ts`). Нет — дрейф не считается.
+   */
+  movedFiles?: MovedFiles;
 }
 
 export interface SplitOverlapDeps {
@@ -72,6 +104,8 @@ export interface SplitOverlapDeps {
   store: {
     get(parentChatId: string): SplitPlanRecord | undefined;
     set(record: SplitPlanRecord): void;
+    /** Все записи — пересчёту по расписанию (`recheckRunning`); нет — его нет. */
+    all?(): Record<string, SplitPlanRecord>;
   };
   /**
    * Заметка в ленту РОДИТЕЛЯ. `false` — прогона у родителя нет и сказать некуда:
@@ -267,6 +301,73 @@ export class SplitOverlap {
     return started;
   }
 
+  /**
+   * Пересчитать разделения, где группы ещё работают (находка 61c): хоть одна
+   * группа идёт, копий хотя бы две (пересекаться не с кем), прошлый счёт старше
+   * `DRIFT_RECHECK_MS`. Не больше `DRIFT_RECHECK_MAX` за раз, давние первыми.
+   * Сказать о новом пересечении — тот же `check`: один раз на факт.
+   * Возвращает, кого пересчитали.
+   */
+  async recheckRunning(): Promise<string[]> {
+    const all = this.deps.store.all?.();
+    if (!all) return [];
+    const now = this.now().getTime();
+    const due = Object.values(all)
+      .filter((record) => {
+        const copies = record.groups.filter((group) => group.path && !group.cleaned);
+        // Со счётом дрейфа хватает одной идущей копии: основная ветка — тоже сосед.
+        const least = this.deps.git.movedFiles ? 1 : 2;
+        if (copies.length < least || !copies.some((group) => ACTIVE.has(group.status)))
+          return false;
+        const at = record.overlap ? Date.parse(record.overlap.at) : Number.NaN;
+        return Number.isNaN(at) || now - at >= DRIFT_RECHECK_MS;
+      })
+      .sort((a, b) => (a.overlap?.at ?? '').localeCompare(b.overlap?.at ?? ''))
+      .slice(0, DRIFT_RECHECK_MAX);
+    const checked: string[] = [];
+    for (const record of due) {
+      try {
+        await this.check(record.parentChatId);
+        checked.push(record.parentChatId);
+      } catch (error) {
+        this.deps.log('split overlap: periodic recheck failed', error);
+      }
+    }
+    return checked;
+  }
+
+  /**
+   * Завести пересчёт по расписанию. Такты не идут внахлёст: медленный git
+   * пропускает такт, а не копит очередь. Таймер не держит процесс. Возвращает
+   * остановку.
+   */
+  watchDrift(
+    every = DRIFT_TICK_MS,
+    timers: {
+      set: (tick: () => void, ms: number) => unknown;
+      clear: (handle: unknown) => void;
+    } = {
+      set: (tick, ms) => {
+        const handle = setInterval(tick, ms);
+        handle.unref?.();
+        return handle;
+      },
+      clear: (handle) => clearInterval(handle as ReturnType<typeof setInterval>),
+    },
+  ): () => void {
+    let busy = false;
+    const handle = timers.set(() => {
+      if (busy) return;
+      busy = true;
+      void this.recheckRunning()
+        .catch((error) => this.deps.log('split overlap: periodic recheck failed', error))
+        .finally(() => {
+          busy = false;
+        });
+    }, every);
+    return () => timers.clear(handle);
+  }
+
   private async run(parentChatId: string): Promise<SplitOverlapView | undefined> {
     const record = this.deps.store.get(parentChatId);
     if (!record) return undefined;
@@ -283,7 +384,25 @@ export class SplitOverlap {
       after: group.after,
     }));
 
-    const view = await this.collect(record.projectPath, record.order, groups);
+    const { view, scanned, target } = await this.collect(copyRootOf(record), record.order, groups);
+    const moved = this.deps.git.movedFiles;
+    const active = driftCandidates(record);
+    const shared =
+      moved && target
+        ? await readDrift({
+            moved,
+            mainDir: copyRootOf(record),
+            target,
+            groups: scanned
+              .filter((group) => active.has(group.index))
+              .map((group) => ({
+                index: group.index,
+                branch: groups.find((g) => g.index === group.index)?.branch ?? '',
+                files: group.files,
+              })),
+            log: this.deps.log,
+          })
+        : undefined;
 
     // Читаем запись ЗАНОВО: git шёл секунды, и за это время конвейер мог
     // записать конец другой цепочки. Перезаписать его нашей копией значило бы
@@ -305,6 +424,15 @@ export class SplitOverlap {
       if (said) told = [...noticed, ...unseen.map(factOf)];
     }
     fresh.overlap = { ...view, noticed: told };
+    if (shared && target) {
+      applyDrift({
+        record: fresh,
+        target,
+        shared,
+        at: view.at,
+        emit: (event) => this.deps.emit(parentChatId, event),
+      });
+    }
     this.deps.store.set(fresh);
     return view;
   }
@@ -314,12 +442,12 @@ export class SplitOverlap {
     mainDir: string,
     order: readonly number[],
     groups: readonly OverlapGroup[],
-  ): Promise<SplitOverlapView> {
+  ): Promise<{ view: SplitOverlapView; scanned: ScannedGroup[]; target?: string }> {
     const at = this.now().toISOString();
     const base = await this.mergeBase(mainDir);
     const counted: SplitOverlapView['counted'] = [];
     const unread: SplitOverlapView['unread'] = [];
-    const scanned: { index: number; files: string[]; owns?: readonly string[] }[] = [];
+    const scanned: ScannedGroup[] = [];
 
     for (const group of groups) {
       if (!group.path) continue;
@@ -349,13 +477,14 @@ export class SplitOverlap {
       }
     }
 
-    return {
+    const view = {
       at,
       files: intersectGroups(scanned),
       mergeOrder: mergeOrderOf(groups, order),
       counted,
       unread,
     };
+    return { view, scanned, ...(base ? { target: base } : {}) };
   }
 
   private async mergeBase(mainDir: string): Promise<string | undefined> {

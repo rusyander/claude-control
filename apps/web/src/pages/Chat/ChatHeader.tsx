@@ -8,6 +8,7 @@ import { formatSpend } from '@shared/lib/format';
 import { AgentsPanel } from '@features/AgentsPanel';
 import { ChatModelPicker } from '@features/ChatModelPicker';
 import { ProjectRunnerControls } from '@features/ProjectRunner';
+import { DeliveryControl } from '@features/ProjectGit';
 import { ChatHeaderMenu } from './ChatHeaderMenu';
 import { formatTime } from './lib/formatTime';
 import type { ChatHeaderProps } from './ChatHeader.types';
@@ -23,6 +24,7 @@ export function ChatHeader({
   projectName,
   projectPath,
   isProjectContext,
+  groupDeliver,
   chatId,
   activeRuns,
   totalCost,
@@ -103,6 +105,15 @@ export function ChatHeader({
           onModelChange={onModelChange}
           onEffortChange={onEffortChange}
         />
+
+        {/* Доставка до MR — первой среди кнопок проекта: её подпись говорит,
+            чем кончится следующая задача, и искать её по меню нельзя. */}
+        {isProjectContext && projectPath && (
+          <DeliveryControl
+            path={projectPath}
+            {...(groupDeliver === undefined ? {} : { groupDeliver })}
+          />
+        )}
 
         {isProjectContext && projectPath && (
           <>

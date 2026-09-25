@@ -1,4 +1,4 @@
-import { MAX_STREAMS } from './agent-runs.constants';
+import { HIDDEN_STREAMS, MAX_STREAMS } from './agent-runs.constants';
 import { runStream } from './agent-runs.lifecycle';
 import {
   callbacks,
@@ -23,8 +23,11 @@ import type { AgentRun } from './agent-runs.types';
  * разговор, прогон, ждущий человека, ветви открытого, дотягиваемый хвост,
  * остальные — по старшинству. Прогон без потока «припаркован»: сервер ведёт
  * его как прежде, вкладка знает о нём из опроса `/chat/active`, а поток
- * получает, как только освободится место. Скрытая вкладка не держит ни одного:
- * её потоки нужны никому, а соединения — соседней вкладке.
+ * получает, как только освободится место. Скрытая вкладка держит не больше
+ * одного и только за хвостом законченного прогона: живой вывод в ней не нужен
+ * никому, а соединения нужны соседней вкладке, — но чем кончился ход (вопрос,
+ * падение, просто конец), приходит только потоком, и без него человек в другой
+ * вкладке не узнал бы, что его ждут (живой прогон 24.09, находка 77).
  */
 
 /** Разговоры, на которые смотрят вместе с открытым, — его ветви-дети. */
@@ -38,10 +41,18 @@ export function setWatched(ids: string[]): void {
   rebalance();
 }
 
-/** Сколько потоков вкладке можно держать сейчас. Скрытой — ни одного. */
+function isHidden(): boolean {
+  return typeof document !== 'undefined' && document.visibilityState === 'hidden';
+}
+
+/** Сколько потоков вкладке можно держать сейчас. Скрытой — один, и только хвосту. */
 export function budget(): number {
-  if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return 0;
-  return MAX_STREAMS;
+  return isHidden() ? HIDDEN_STREAMS : MAX_STREAMS;
+}
+
+/** Может ли прогон держать поток сейчас: в скрытой вкладке — только хвост. */
+function mayStream(key: string): boolean {
+  return !isHidden() || runs.get(key)?.tailOnly === true;
 }
 
 function isAwaitingHuman(run: AgentRun): boolean {
@@ -121,7 +132,13 @@ export function rebalance(): void {
   const limit = budget();
   for (let guard = 0; guard < 32; guard += 1) {
     const streamed = [...controllers.keys()].filter((key) => !sending.has(key)).sort(byRank);
-    const parked = parkedKeys().sort(byRank);
+    // Вкладку скрыли — живые потоки отпускаются все, место остаётся хвостам.
+    const stray = streamed.find((key) => !mayStream(key));
+    if (stray) {
+      parkRun(stray);
+      continue;
+    }
+    const parked = parkedKeys().filter(mayStream).sort(byRank);
     const worst = streamed[streamed.length - 1];
     const best = parked[0];
 

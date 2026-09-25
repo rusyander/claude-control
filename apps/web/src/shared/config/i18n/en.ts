@@ -729,6 +729,36 @@ export const en: TranslationSchema = {
       'A sandbox conversation will not work: Claude Code will answer «Not logged in». Set the access up in Settings → Claude Code access.',
   },
   chat: {
+    delivery: {
+      buttonOn: 'To MR: on',
+      buttonOff: 'To MR: off',
+      buttonNoRemote: 'To MR: nowhere',
+      buttonHint: 'Delivering this project’s tasks to a ready MR',
+      groupHint:
+        'The split plan’s choice for this group. The setting inside applies to the project’s next tasks',
+      title: 'Delivery to MR — this project',
+      deliver: 'Take tasks to a ready MR',
+      deliverHint:
+        'Plain chat: the agent takes a code-change task to an MR — branch, checks, commit, push, MR, review, description; questions and reviews without edits open no MR. Split: each group is one branch and one MR, its link shows in the group summary',
+      noRemote:
+        'The repository has no remote (git remote) — there is nowhere to open an MR, delivery is off',
+      skill: 'Project delivery skill: `{{name}}`',
+      skillNone:
+        'The project has no delivery skill of its own — the agent follows the general `ticket-delivery` or the same stages by itself',
+      parallel: 'Split groups at once',
+      parallelHint: 'Set by hand. The rest wait in a queue: 1 to {{max}}',
+      parallelAuto:
+        'From the shared rules (Settings → Groups): {{reason}}. The rest wait in a queue; your own number — 1 to {{max}}',
+      parallelHeavy: 'the project is heavy by the tab rule',
+      parallelLight: 'the project is light by the tab rule',
+      parallelReset: 'Reset to shared',
+      parallelInvalid: 'A whole number from 1 to {{max}}',
+      save: 'Save',
+      saved: 'Project delivery saved — applies from the next message',
+      bootstrapAuto: 'New copy preparation — detected automatically:',
+      bootstrapConfigured: 'New copy preparation — set on the project:',
+      bootstrapNone: 'nothing: no lockfile',
+    },
     title: 'Chat',
     newChat: 'New chat',
     searchChats: 'Search chats',
@@ -960,6 +990,7 @@ export const en: TranslationSchema = {
         plan: 'plan',
         review: 'review',
         fix: 'fixes',
+        deliver: 'delivery',
       },
       stageFull: {
         triage: 'triage',
@@ -967,6 +998,7 @@ export const en: TranslationSchema = {
         work: 'work',
         review: 'review',
         fix: 'fixes',
+        deliver: 'delivery',
       },
       hub: {
         title_one: 'Split group: {{count}}',
@@ -977,7 +1009,49 @@ export const en: TranslationSchema = {
         idle: 'no run in progress',
         firstEdit: 'first edit after {{time}}',
         work: 'worked {{time}}',
+        workTime: 'worked {{time}}',
+        triageRunningFor: 'triage in progress · {{time}}',
+        summary: {
+          accepted_one: 'accepted: {{count}}',
+          accepted_few: 'accepted: {{count}}',
+          accepted_many: 'accepted: {{count}}',
+          accepted_other: 'accepted: {{count}}',
+          done_one: 'done: {{count}}',
+          done_few: 'done: {{count}}',
+          done_many: 'done: {{count}}',
+          done_other: 'done: {{count}}',
+          running_one: 'running: {{count}}',
+          running_few: 'running: {{count}}',
+          running_many: 'running: {{count}}',
+          running_other: 'running: {{count}}',
+          ask_one: 'waiting for you: {{count}}',
+          ask_few: 'waiting for you: {{count}}',
+          ask_many: 'waiting for you: {{count}}',
+          ask_other: 'waiting for you: {{count}}',
+          queued_one: 'queued: {{count}}',
+          queued_few: 'queued: {{count}}',
+          queued_many: 'queued: {{count}}',
+          queued_other: 'queued: {{count}}',
+          failed_one: 'failed: {{count}}',
+          failed_few: 'failed: {{count}}',
+          failed_many: 'failed: {{count}}',
+          failed_other: 'failed: {{count}}',
+          cancelled_one: 'cancelled: {{count}}',
+          cancelled_few: 'cancelled: {{count}}',
+          cancelled_many: 'cancelled: {{count}}',
+          cancelled_other: 'cancelled: {{count}}',
+          idle_one: 'stopped: {{count}}',
+          idle_few: 'stopped: {{count}}',
+          idle_many: 'stopped: {{count}}',
+          idle_other: 'stopped: {{count}}',
+          elapsed: 'elapsed {{time}}',
+          idleHint:
+            'Has a chat, no run, no outcome: waiting on background work, a retry, delivery, or stopped',
+        },
+        inactive: 'Inactive: {{count}}',
+        inactiveHint: 'Chats of groups discarded by a split relaunch: their work does not continue',
         triageRunning: 'triage in progress',
+        triageStopped: 'triage not running',
         triageApplied: 'triage applied',
         triageMissing: 'no triage received — the groups went as proposed',
         triageInterrupted: 'triage interrupted by a restart — the groups await your answer',
@@ -1002,8 +1076,44 @@ export const en: TranslationSchema = {
           'review-missing': 'review without a result',
           background: 'waiting for background work',
           retry: 'waiting for a retry',
+          delivery: 'panel is checking delivery',
+          interrupted: 'interrupted',
+          limit: 'subscription limit',
         },
         failed: 'did not start: {{message}}',
+        stopped: 'stopped: {{message}}',
+        deliveryMissing: 'missing for the MR: {{list}}',
+        deliveryNudges: 'delivery reminders: {{count}}',
+        interruptedAt: 'process cut short at {{time}}',
+        interruptResumes: 'resumed by the panel: {{count}}',
+        autoNotices: 'Allowed automatically: {{list}}',
+        autoNoticesDismiss: 'Dismiss',
+        resumeInterrupted: 'Resume',
+        resumeAllInterrupted: 'Resume interrupted ({{count}})',
+        resumeInterruptedHint:
+          'Resume from where it stopped in the same session: the agent first rebuilds its state from git and the transcript, then continues',
+        resumeInterruptedDone: 'Groups resumed: {{count}}',
+        resumeInterruptedRefused:
+          'Could not resume: {{count}} — the group has no session or copy; relaunch it',
+        resumeInterruptedFailed: 'Resume failed: {{message}}',
+        control: {
+          pause: 'Pause',
+          pauseHint:
+            'Stop the group and give its slot to the next one in the queue; groups waiting for it keep waiting',
+          resume: 'Resume',
+          resumeHint: 'Resume the group where it stopped, in the same session; takes a queue slot',
+          start: 'Start now',
+          startHint: 'Start the group without waiting for the queue',
+          paused: 'Group paused',
+          resumed: 'Group resumed',
+          resumeQueued: 'The resume goes out after the group’s current turn',
+          started: 'Group started',
+          limitUntil: 'waits for the limit until {{time}}',
+          consent: '{{reason}}. Go anyway?',
+          force: 'Yes, start',
+          cancel: 'Cancel',
+          failed: 'Failed: {{message}}',
+        },
         base: 'from branch {{branch}}',
         holdPlaceholder: 'The answer goes into the group’s plan and task',
         holdSend: 'Answer',
@@ -1020,11 +1130,57 @@ export const en: TranslationSchema = {
         cleanupHint:
           'The group is closed. The copy leaves the disk; the branch only if it is empty. A branch with its own work and an MR branch stay, and git will not give up uncommitted changes',
         cleanupFailed: 'Could not remove the copy: {{message}}',
+        cancelPlan: {
+          action: 'Cancel plan',
+          hint: 'Stop every group of this split and close the plan. Chats, copies and branches stay — after cancelling you can split again',
+          confirm: 'Stop all groups and close the plan?',
+          yes: 'Yes, cancel the plan',
+          no: 'No',
+          done: 'Plan cancelled: {{cancelled}} groups closed, {{stopped}} runs stopped',
+          failed: 'Could not cancel the plan: {{message}}',
+          offerTitle: 'The split is still running',
+          offer: 'Click to go to “Cancel plan”.',
+        },
         cleaned: {
           deleted: 'Copy removed, the empty branch deleted',
           kept: 'Copy removed, the branch with work kept',
           mr: 'Copy removed, the panel leaves the MR branch alone',
           none: 'Copy removed',
+        },
+        accept: {
+          action: 'Accept',
+          hint: 'Mark the group accepted: you reviewed the delivery and agree. Only you set this mark — the panel never infers it from facts',
+          undo: 'Remove mark',
+          undoHint: 'Remove the «accepted» mark from the group',
+          marker: 'accepted',
+          failed: 'Failed: {{message}}',
+        },
+        tickets: {
+          title_one: 'Suggested tickets: {{count}}',
+          title_few: 'Suggested tickets: {{count}}',
+          title_many: 'Suggested tickets: {{count}}',
+          title_other: 'Suggested tickets: {{count}}',
+          hint: 'Defects outside the groups’ tasks found along the way. The panel does not file tickets — copy and file them yourself',
+          foundBy: 'found by: {{groups}}',
+          copy: 'Copy',
+          copied: 'Copied',
+          copyFailed: 'Could not copy',
+          copyText: '{{title}}\n\nWhere: {{where}}\nWhy: {{why}}\nFound by split group: {{groups}}',
+          file: 'File in {{project}}',
+          fileAsk: 'File an issue in {{project}}?',
+          fileConfirm: 'File',
+          filed: 'Filed: {{key}}',
+          fileFailed: 'Could not file: {{message}}',
+        },
+        humanSteps: {
+          title_one: 'For you to do: {{count}}',
+          title_few: 'For you to do: {{count}}',
+          title_many: 'For you to do: {{count}}',
+          title_other: 'For you to do: {{count}}',
+          hint: 'Steps the groups cannot take themselves: a merge request dependency, access, another service’s settings. The panel does not perform them',
+          askedBy: 'asked by: {{groups}}',
+          copyText:
+            '{{action}}\n\nWhere: {{where}}\nWhy: {{why}}\nAsked by split group: {{groups}}',
         },
       },
       overlap: {
@@ -1041,6 +1197,12 @@ export const en: TranslationSchema = {
         unread: 'Unread: {{names}}',
         clean: 'Branches checked — no shared files',
         failed: 'Check failed: {{message}}',
+        expand: 'Show files',
+        collapse: 'Collapse the list',
+        outsideCount_one: 'Outside ownership: {{count}} file',
+        outsideCount_few: 'Outside ownership: {{count}} files',
+        outsideCount_many: 'Outside ownership: {{count}} files',
+        outsideCount_other: 'Outside ownership: {{count}} files',
       },
       tree: {
         pauseAll: 'Stop all ({{count}})',
@@ -1052,6 +1214,8 @@ export const en: TranslationSchema = {
           'Start the stopped runs over and release the queue: this CLI has no session, ' +
           'so continuing means asking the same thing again',
         paused: 'paused',
+        awaitsYou: 'waits for you',
+        accepted: 'accepted',
         pausedToast_one: 'Tree stopped: {{count}} run. Auto-starts are queued.',
         pausedToast_few: 'Tree stopped: {{count}} runs. Auto-starts are queued.',
         pausedToast_many: 'Tree stopped: {{count}} runs. Auto-starts are queued.',
@@ -1068,6 +1232,7 @@ export const en: TranslationSchema = {
         workNoPlan: 'No plan received — working without one: {{name}}',
         review: 'Work finished — reviewing it on the ceiling model: {{name}}',
         fix: 'The review found {{count}} findings — fixing: {{name}}',
+        deliver: 'Work reviewed — delivering it to an MR: {{name}}',
       },
       triage: {
         title: 'Split triage',
@@ -1214,8 +1379,15 @@ export const en: TranslationSchema = {
     questionSentToNote: 'Answer sent to “{{title}}” — the agent is thinking',
     questionQueuedToNote: 'Answer queued for “{{title}}” — it goes out at the end of the turn',
     questionFromChild: 'Asked by “{{title}}”',
+    textQuestion: {
+      title: 'Asked in plain text — reply here',
+      placeholder: 'The reply goes to “{{title}}”',
+      label: 'Reply to “{{title}}”',
+      send: 'Reply',
+    },
     answerSentToChild: 'Answer sent to “{{title}}”',
     answerQueuedForChild: 'Answer for “{{title}}” is queued — it goes out at the end of the turn',
+    answerRefusedForChild: 'Answer for “{{title}}” was not accepted: {{message}}',
     pickOption: 'Answer with this option',
     permissionTitle: 'The agent needs permission',
     branchGate: {
@@ -1334,7 +1506,7 @@ export const en: TranslationSchema = {
     autoApproveOn: 'Permissions auto',
     autoApproveOff: 'Permissions manual',
     autoApproveHint:
-      'The panel itself approves anything that can be undone — commit, push, branch, moving a file, an API call. What still asks is the irreversible: deleting, wiping history, tearing down data and infrastructure, publishing — plus anything covered by ask/deny rules from settings.json. Reading files is always allowed, whatever this toggle says.',
+      'The panel itself approves anything that can be undone — commit, push, branch, moving a file, an API call. What still asks is the irreversible: deleting, wiping history, tearing down data and infrastructure, publishing — plus anything covered by ask/deny rules from settings.json. Reading files is always allowed, whatever this toggle says. This is auto mode for this chat only: on — Claude runs in CLI auto mode, and models without it get the panel’s auto-approve. The choice here beats the “Auto permission mode in every chat” setting either way.',
     menu: 'Chat settings',
     menuHint: 'Permission toggles, rules, export, refresh and help',
     menuPermissions: 'Permissions',
@@ -1382,6 +1554,8 @@ export const en: TranslationSchema = {
     yesterday: 'Yesterday',
     thisWeek: 'This week',
     earlier: 'Earlier',
+    runningNow: 'Running now',
+    inactiveBranch: 'Inactive',
     justNow: 'just now',
     minutesAgo: '{{count}} min ago',
     limitResets: 'limit until {{time}}',
@@ -3865,6 +4039,9 @@ export const en: TranslationSchema = {
     tab_prompts: 'Prompts',
     tabHint_prompts:
       'The texts the panel speaks to the model with, not on your behalf: the tool protocol, the agent behind a contour, the image and presentation modes.',
+    tab_groups: 'Groups',
+    tabHint_groups:
+      'Split groups: what they decide on their own, how many run at once and which project counts as heavy. Shared rules and what a project overrides.',
     tab_integrations: 'Integrations',
     tabHint_integrations:
       'Jira and Confluence, a forge by token, Telegram, test management and CI reports: where the panel takes outside context from and where it hands results back.',
@@ -3876,6 +4053,43 @@ export const en: TranslationSchema = {
     tab_transfer: 'Transfer',
     tabHint_transfer:
       'A snapshot of the panel settings and moving a provider environment to another machine.',
+    groups: {
+      loading: 'Loading group rules…',
+      saved: 'Group rules saved — they apply from the next group request',
+      defaultsTitle: 'Shared rules',
+      defaultsHint:
+        'They apply in every project until the project sets its own. Where a row is not given to a human, a group goes by its plan to an MR without one.',
+      permissionsTitle: 'What a group decides on its own',
+      permissionsHint:
+        '"Itself" — the group allows it to itself and moves on. "With a note" — also on its own, but the parent hub keeps an "allowed automatically" line. "Human" — it stops on a card and waits for a human.',
+      level: { auto: 'Itself', notify: 'With a note', human: 'Human' },
+      questionsTitle: 'Group decision points',
+      questionsHint: 'What a group does when the plan allows several solutions.',
+      questions: {
+        plan: 'Decides by the plan itself',
+        human: 'Asks a human and waits',
+      },
+      routine: 'Ordinary work',
+      routineHint:
+        'File edits, builds, tests, linters and other commands the rules below do not cover. Reading is always allowed',
+      parallelTitle: 'How many groups at once',
+      parallelLight: 'Light project',
+      parallelHeavy: 'Heavy project',
+      byDefault: 'Default — {{value}}',
+      heavyTitle: 'What counts as a heavy project',
+      heavyRule:
+        'Now: heavy when copy preparation has more than {{chains}} installs or one install has more than {{steps}} steps (install and build are two steps).',
+      heavyChains: 'Installs per copy more than',
+      heavySteps: 'Steps in one install more than',
+      projectTitle: 'Project',
+      projectHint:
+        'A project setting beats the shared one. A row without its own setting is marked "as shared" and follows the shared rules.',
+      project: 'Project',
+      projectPick: 'Pick a project',
+      own: 'own',
+      inherited: 'as shared',
+      resetToShared: 'Reset to shared',
+    },
     account: 'Claude Code account',
     subscription: 'Subscription',
     limitsNote:
@@ -3967,6 +4181,12 @@ export const en: TranslationSchema = {
     chatModelAuto: 'Whatever Claude picks (Opus 4.8, 1M)',
     chatEffort: 'Default thinking effort',
     chatEffortHint: 'How deeply the agent reasons about the answer.',
+    deliverToMr: 'Take tasks to a ready MR',
+    deliverToMrHint:
+      'On — a project chat header shows the “To MR” button: that is where delivery is turned on and off ' +
+      'for this project (on out of the box). The agent takes a code-change task to a ready MR by the ' +
+      'project delivery skill, each split group to its own MR; questions and reviews without edits open ' +
+      'no MR. Off — no button, and no project delivers.',
     taskSplitInitiative: 'Offer to split tasks across chats',
     taskSplitInitiativeHint:
       'Given three or more independent tasks in one message, the agent first offers to spread them ' +
@@ -3998,6 +4218,13 @@ export const en: TranslationSchema = {
       'either way, and nothing waives the safeguards — a fresh mark in the checkpoint file, a ' +
       'successfully finished turn, a checkpoint that changed since last time, no more than eight ' +
       'continuations in a row.',
+    chatAutoMode: 'Auto permission mode in every chat',
+    chatAutoModeHint:
+      'On out of the box: a chat allowed to edit runs like Claude Code auto mode — routine requests ' +
+      '(builds, tests, git status, file edits) go through on their own, while anything irreversible ' +
+      '(deletion, rolling back uncommitted work, rewriting history) and your ask/deny rules still ' +
+      'wait for you. For models without auto mode (haiku) and other CLIs, the panel’s auto-approve ' +
+      'does the same. The permissions toggle in the chat menu beats this setting either way.',
     chatEffortAuto: 'CLI default',
     pricingTitle: 'Rates used to estimate cost',
     pricingHint:
@@ -4441,6 +4668,10 @@ export const en: TranslationSchema = {
     notifyDone: 'Project "{{name}}": agent finished',
     notifyChildDone: 'Chat "{{title}}": agent finished',
     notifyChildError: 'Chat "{{title}}": error or limit',
+    notifyChildWaiting: 'Chat "{{title}}": agent is waiting for a reply',
+    notifyOpenDone: 'Open chat: agent finished',
+    notifyOpenWaiting: 'Open chat: agent is waiting for a reply',
+    notifyOpenError: 'Open chat: error or limit',
     starterPrompt:
       'You are working in the project "{{name}}". Read-only for now. Look around and briefly say what this project is and what you suggest starting with.',
     introHint:
@@ -5618,15 +5849,7 @@ export const en: TranslationSchema = {
       bootstrapCommand: 'Command after creating a copy',
       bootstrapCommandPlaceholder: 'pnpm install --frozen-lockfile --prefer-offline',
       bootstrapCommandHint:
-        'Runs in the copy before the agent starts, 10-minute ceiling, through the system shell with CI=1. Empty — by the root lockfile: pnpm-lock.yaml → pnpm install --frozen-lockfile --prefer-offline, package-lock.json → npm ci, yarn.lock → yarn install --immutable; none in the root — the same in each first-level folder (frontend/, web/…); no lockfile — nothing',
-      splitSettings: 'Splitting tasks into groups',
-      splitDeliver: 'Take each group to a ready MR',
-      splitDeliverHint:
-        'The group follows the project delivery skill: branch, checks, commit, push and MR — one group, one branch, one MR. The MR link shows up in the group summary',
-      splitParallel: 'Groups at once',
-      splitParallelHint: 'The rest wait in a queue and start as slots free up: 1 to {{max}}',
-      splitParallelInvalid: 'A whole number from 1 to {{max}}',
-      splitSaved: 'Split settings saved — they apply to the next group launch',
+        'Runs in the copy before the agent starts, 10-minute ceiling, through the system shell with CI=1. Empty — the panel decides by lockfiles: in the root pnpm-lock.yaml → pnpm install --frozen-lockfile --prefer-offline, package-lock.json → npm ci --prefer-offline --no-audit --no-fund, yarn.lock → yarn install --immutable; none in the root — the same in each first-level folder (frontend/, web/…), up to four at once; a local library (file:) whose entry is not built in the copy is built with its build script. No lockfile — nothing',
       bootstrapTitle: 'Copy preparation',
       bootstrap: {
         running: 'installing',

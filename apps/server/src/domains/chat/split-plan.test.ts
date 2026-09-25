@@ -166,6 +166,29 @@ describe('applySplitPlan: панель не доверяет разбору', ()
     expect(applied.repairs.join('\n')).toContain('пропала из разбора');
   });
 
+  /**
+   * Итоговая проверка 25.09 (D3): строка, стоявшая в КАЖДОЙ группе уже в
+   * предложении («Проверить исправление: node test.mjs»), не повтор разбора —
+   * раньше она оставалась только у первой группы.
+   */
+  it('общая строка предложения остаётся у всех групп, повтором не считается', () => {
+    const shared = 'Проверить исправление: node test.mjs';
+    const withShared = GROUPS.map((group) => ({ ...group, tasks: [...group.tasks, shared] }));
+    const applied = applySplitPlan(withShared, {
+      groups: withShared.map((group, index) => ({
+        index,
+        owns: [],
+        tasks: group.tasks,
+        after: [],
+      })),
+      conflicts: [],
+      order: [],
+    });
+
+    for (const group of applied.groups) expect(group.tasks).toContain(shared);
+    expect(applied.repairs).toEqual([]);
+  });
+
   it('ожидание по кругу снимается — стоять вечно нельзя', () => {
     const applied = applySplitPlan(GROUPS, {
       groups: [

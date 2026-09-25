@@ -1,17 +1,16 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { SPLIT_MAX_GROUPS, SPLIT_SETTINGS_DEFAULT } from '@agentdeck/contracts/task-split';
+import { SPLIT_MAX_GROUPS } from '@agentdeck/contracts/task-split';
 import { Stack } from '@shared/ui/stack';
-import { Typography } from '@shared/ui/typography';
+import { CodeText, Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
-import { Icon } from '@shared/ui/icon';
 import { TextField } from '@shared/ui/text-field';
 import { Toggle } from '@shared/ui/toggle';
 import { toast } from '@shared/lib/toast';
 import { toErrorMessage } from '@shared/api/client';
-import { useSplitSettings, useSaveSplitSettings } from '@entities/ProjectGit';
+import { useSaveSplitSettings } from '@entities/ProjectGit';
 import type { SplitSettingsProps } from './SplitSettings.types';
-import styles from './WorktreeMirrorSettings.module.scss';
+import styles from './DeliveryControl.module.scss';
 
 /** Число групп разом: целое от 1 до потолка групп, иначе — не сохраняем. */
 function parseParallel(text: string): number | undefined {
@@ -21,37 +20,34 @@ function parseParallel(text: string): number | undefined {
 }
 
 /**
- * Разделение задач на этом проекте: доводить ли каждую группу до готового MR и
- * сколько групп работает одновременно. Хранится в панели по основной копии,
- * как и настройка копий, — группы разделения живут в копиях этого же проекта.
+ * Доставка до MR на этом проекте — тело панели кнопки «До MR» в шапке чата.
  *
- * Свёрнуто по умолчанию, как и соседняя настройка копий: нужно раз на проект.
+ * Тумблер сохраняется сразу, как и прочие тумблеры шапки: его трогают, чтобы
+ * следующее сообщение ушло уже с ним. Число групп разом — полем с кнопкой: его
+ * печатают, и сохранять каждую цифру значило бы гонять недописанное.
+ *
+ * Навык и подготовку копии панель выводит сама и только показывает: человеку
+ * не нужно их настраивать, но видеть, что именно пойдёт, он должен.
  */
-export function SplitSettings({ path, disabled }: SplitSettingsProps) {
+export function SplitSettings({ path, view }: SplitSettingsProps) {
   const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
-  // Черновик — с первой правки, как у настройки копий: обновление с сервера
-  // не затирает то, что человек ещё печатает.
-  const [draft, setDraft] = useState<{ deliver: boolean; parallel: string } | undefined>(undefined);
-
-  const settings = useSplitSettings(open ? path : undefined);
   const save = useSaveSplitSettings();
+  // Черновик числа — с первой правки: обновление с сервера не затирает то, что
+  // человек ещё печатает.
+  const [draft, setDraft] = useState<string | undefined>(undefined);
 
-  const stored = settings.data ?? SPLIT_SETTINGS_DEFAULT;
-  const deliver = draft?.deliver ?? stored.deliver;
-  const parallelText = draft?.parallel ?? String(stored.parallel);
+  const parallelText = draft ?? String(view.parallel);
   const parallel = parseParallel(parallelText);
-  const dirty = draft !== undefined;
-  const locked = disabled || settings.isLoading;
+  const { profile } = view;
+  const pinned = view.parallelAuto ? null : view.parallel;
 
-  const onSave = (): void => {
-    if (parallel === undefined) return;
+  const put = (body: { deliver: boolean; parallel: number | null }, onDone?: () => void): void => {
     save.mutate(
-      { path, deliver, parallel },
+      { path, ...body },
       {
         onSuccess: () => {
-          setDraft(undefined);
-          toast.success(t('git.worktrees.splitSaved'));
+          onDone?.();
+          toast.success(t('chat.delivery.saved'));
         },
         onError: (error) => toast.error(toErrorMessage(error)),
       },
@@ -59,61 +55,103 @@ export function SplitSettings({ path, disabled }: SplitSettingsProps) {
   };
 
   return (
-    <Stack gap="var(--spacing-3xs)" className={styles.settings}>
-      <Button
-        variant="ghost"
-        size="sm"
-        aria-expanded={open}
-        leftIcon={<Icon name={open ? 'chevronDown' : 'chevronRight'} size={16} />}
-        onClick={() => setOpen((value) => !value)}
-      >
-        {t('git.worktrees.splitSettings')}
-      </Button>
-
-      {open && (
-        <Stack gap="var(--spacing-2xs)" className={styles.form}>
-          <Stack gap="var(--spacing-3xs)">
-            <Stack direction="row" align="center" gap="var(--spacing-2xs)">
-              <Toggle
-                size="sm"
-                checked={deliver}
-                disabled={locked}
-                onCheckedChange={(value) => setDraft({ deliver: value, parallel: parallelText })}
-                aria-label={t('git.worktrees.splitDeliver')}
-              />
-              <Typography variant="body-sm" as="span">
-                {t('git.worktrees.splitDeliver')}
-              </Typography>
-            </Stack>
-            <Typography variant="caption" color="subtle">
-              {t('git.worktrees.splitDeliverHint')}
-            </Typography>
-          </Stack>
-          <TextField
-            label={t('git.worktrees.splitParallel')}
-            value={parallelText}
-            disabled={locked}
-            hint={t('git.worktrees.splitParallelHint', { max: SPLIT_MAX_GROUPS })}
-            error={
-              parallel === undefined
-                ? t('git.worktrees.splitParallelInvalid', { max: SPLIT_MAX_GROUPS })
-                : undefined
-            }
-            onChange={(value) => setDraft({ deliver, parallel: value })}
-          />
-          <Stack direction="row" gap="var(--spacing-2xs)" justify="end">
-            <Button
-              variant="secondary"
-              size="sm"
-              isLoading={save.isPending}
-              disabled={disabled || !dirty || parallel === undefined}
-              onClick={onSave}
-            >
-              {t('git.worktrees.mirrorSave')}
-            </Button>
-          </Stack>
-        </Stack>
+    <Stack gap="var(--spacing-xs)">
+      {!profile.remote && (
+        <Typography variant="caption" color="warning" as="p" className={styles.note}>
+          {t('chat.delivery.noRemote')}
+        </Typography>
       )}
+
+      <Stack as="label" direction="row" className={styles.toggleRow}>
+        <Toggle
+          size="sm"
+          checked={view.deliver}
+          disabled={save.isPending}
+          onCheckedChange={(deliver) => put({ deliver, parallel: pinned })}
+          aria-label={t('chat.delivery.deliver')}
+        />
+        <span className={styles.toggleText}>
+          <Typography variant="body-sm" as="span">
+            {t('chat.delivery.deliver')}
+          </Typography>
+          <Typography variant="caption" color="subtle" as="span">
+            {t('chat.delivery.deliverHint')}
+          </Typography>
+        </span>
+      </Stack>
+
+      <Typography variant="caption" color="subtle" as="p" className={styles.note}>
+        <CodeText
+          text={
+            profile.skill
+              ? t('chat.delivery.skill', { name: profile.skill })
+              : t('chat.delivery.skillNone')
+          }
+        />
+      </Typography>
+
+      <div className={styles.divider} />
+
+      <TextField
+        label={t('chat.delivery.parallel')}
+        value={parallelText}
+        disabled={save.isPending}
+        hint={
+          view.parallelAuto
+            ? t('chat.delivery.parallelAuto', {
+                reason: profile.heavy
+                  ? t('chat.delivery.parallelHeavy')
+                  : t('chat.delivery.parallelLight'),
+                max: SPLIT_MAX_GROUPS,
+              })
+            : t('chat.delivery.parallelHint', { max: SPLIT_MAX_GROUPS })
+        }
+        error={
+          parallel === undefined
+            ? t('chat.delivery.parallelInvalid', { max: SPLIT_MAX_GROUPS })
+            : undefined
+        }
+        onChange={setDraft}
+      />
+      <Stack direction="row" gap="var(--spacing-2xs)" justify="end">
+        {!view.parallelAuto && (
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={save.isPending}
+            onClick={() =>
+              put({ deliver: view.deliver, parallel: null }, () => setDraft(undefined))
+            }
+          >
+            {t('chat.delivery.parallelReset')}
+          </Button>
+        )}
+        <Button
+          variant="secondary"
+          size="sm"
+          isLoading={save.isPending}
+          disabled={draft === undefined || parallel === undefined}
+          onClick={() =>
+            parallel !== undefined &&
+            put({ deliver: view.deliver, parallel }, () => setDraft(undefined))
+          }
+        >
+          {t('chat.delivery.save')}
+        </Button>
+      </Stack>
+
+      <div className={styles.divider} />
+
+      <Stack gap="var(--spacing-3xs)">
+        <Typography variant="caption" color="subtle" as="span">
+          {profile.bootstrapConfigured
+            ? t('chat.delivery.bootstrapConfigured')
+            : t('chat.delivery.bootstrapAuto')}
+        </Typography>
+        <Typography variant="caption" as="code" className={styles.command}>
+          {profile.bootstrap ?? t('chat.delivery.bootstrapNone')}
+        </Typography>
+      </Stack>
     </Stack>
   );
 }

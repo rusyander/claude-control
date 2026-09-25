@@ -1,5 +1,21 @@
 import { defineConfig } from 'vitest/config';
 
+/**
+ * Прогон всего набора, а не его части. Покрытие и его пороги — про весь набор:
+ * часть (файлы в аргументах, `-t`) порог не проходит по определению, а два
+ * одновременных прогона с покрытием делят `coverage/.tmp` и валят друг друга
+ * ENOENT («Something removed the coverage directory»). Поэтому часть набора
+ * покрытие не считает; `--coverage.enabled` в командной строке сильнее.
+ */
+const wholeSuite = !process.argv
+  .slice(2)
+  .some(
+    (arg) =>
+      arg === '-t' ||
+      arg.startsWith('--testNamePattern') ||
+      (/^[^-]/.test(arg) && !['run', 'watch'].includes(arg)),
+  );
+
 export default defineConfig({
   test: {
     // Тесты домена — чистая логика над временными каталогами, без сети,
@@ -34,10 +50,10 @@ export default defineConfig({
         'src/**/__fixtures__/**',
         'src/domains/prompts/catalog/**',
       ],
-      // Считается в каждом прогоне: порог — часть гейта, а не отдельный режим.
-      // Уровень зафиксирован по замеру 06.09.2026 (86,3 / 78,1 / 88,6 / 89,1):
-      // падение ниже делает `pnpm test` красным, рост — повод поднять порог.
-      enabled: true,
+      // Считается в каждом прогоне всего набора: порог — часть гейта, а не
+      // отдельный режим. Уровень зафиксирован по замеру 06.09.2026 (86,3 / 78,1 /
+      // 88,6 / 89,1): падение ниже делает `pnpm test` красным, рост — повод поднять порог.
+      enabled: wholeSuite,
       reporter: ['text-summary', 'html'],
       thresholds: { statements: 85, branches: 77, functions: 88, lines: 88 },
     },

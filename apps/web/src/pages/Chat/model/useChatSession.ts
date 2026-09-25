@@ -20,6 +20,7 @@ import { useClearRunnerAutostart } from '@entities/ProjectRunner';
 import { useForgetProjectCodeView } from '@entities/ProjectFile';
 import { draftKeyFor } from '../lib/draftKey';
 import { visibleChats } from '../lib/visibleChats';
+import { childOfRun, runViewChat } from '../lib/runViewChat';
 
 export interface ChatSessionInput {
   /** Все разговоры из истории Claude Code — по ним находится «повзрослевший» чат. */
@@ -34,6 +35,8 @@ export interface ChatSessionInput {
  */
 export interface ViewTarget {
   id: string;
+  /** Разговор прогона, когда CLI его уже выдал: у группы ключ прогона — временный. */
+  sessionId?: string | undefined;
   projectPath?: string;
 }
 
@@ -241,10 +244,8 @@ export function useChatSession({ chats }: ChatSessionInput): ChatSession {
   // Новый чат становится настоящим после первого ответа: тогда Claude Code
   // выдаёт sessionId, и разговор находится в списке.
   useEffect(() => {
-    const sessionId = run.sessionId;
-    if (!sessionId || activeChat || isRunning) return;
-
-    const created = chats?.find((chat) => chat.id === sessionId);
+    if (activeChat) return;
+    const created = runViewChat(chats, run.sessionId, isRunning);
     if (!created) return;
 
     // Ключ контекста меняется с `home`/`project:…` на `chat:<id>`. Переносим на
@@ -314,7 +315,7 @@ export function useChatSession({ chats }: ChatSessionInput): ChatSession {
     // ЭТОЙ вкладке: открывать ради него отдельный проект — значит вернуть ряд
     // одинаковых вкладок, от которого ушли. Видно здесь — открываем здесь, и
     // каталог берётся из самого разговора.
-    const child = chats?.find((chat) => chat.id === activeRun.id && chat.parentId);
+    const child = childOfRun(chats, activeRun);
     if (child && visibleChats(chats ?? [], ws.activeProject?.id).some((c) => c.id === child.id)) {
       openChat(child);
       return;

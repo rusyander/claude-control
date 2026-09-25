@@ -1,7 +1,8 @@
+import type { ChatSummary } from '@agentdeck/contracts';
 import { useDraft } from '@shared/lib/draft';
 
 export interface ChatModelPrefs {
-  /** Из настроек панели — общий для всех разговоров. */
+  /** Из настроек панели — общий для всех разговоров; обе перекрывает назначенное чату. */
   defaultModel: string;
   defaultEffort: string;
   /** Выбор ДЛЯ ЭТОГО разговора; пусто — берётся общий. */
@@ -28,9 +29,18 @@ export interface ChatModelPrefs {
 export function useChatModelPrefs(
   draftKey: string,
   settings?: { chatModel?: string; chatEffort?: string },
+  chat?: Pick<ChatSummary, 'effort' | 'assignedModel'>,
 ): ChatModelPrefs {
-  const defaultModel = settings?.chatModel ?? '';
-  const defaultEffort = settings?.chatEffort ?? 'xhigh';
+  // Модель, назначенная разговору панелью (группа разделения, разбор), важнее
+  // настройки — по тому же правилу, что и глубина ниже: без неё следующее
+  // сообщение человека в группе на haiku ушло бы на модели из настроек.
+  const defaultModel = chat?.assignedModel || (settings?.chatModel ?? '');
+  // Глубина, назначенная разговору панелью (разбор, группа разделения), важнее
+  // настройки: разговор ИДЁТ на ней, и шапка с подписью из настроек врала бы
+  // (живой прогон 24.09: разбор на xhigh, в шапке «Высокая»), а следующее
+  // сообщение человека уехало бы на настройке — сервер берёт назначенную
+  // глубину, только когда панель не прислала свою.
+  const defaultEffort = chat?.effort || (settings?.chatEffort ?? 'xhigh');
   const [modelOverride, setModelOverride] = useDraft(`chat-model:${draftKey}`);
   const [effortOverride, setEffortOverride] = useDraft(`chat-effort:${draftKey}`);
 

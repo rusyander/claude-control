@@ -179,4 +179,45 @@ describe('agentRuns — очередь дописанного', () => {
     expect(bodies.some((body) => body.includes('дописанное'))).toBe(false);
     expect(getRun('q-4').queued).toHaveLength(0);
   });
+
+  /**
+   * Живой прогон 26.09 (F3): «Отменить план» останавливает ходы групп на
+   * сервере, и конец остановленного хода досылал очередь вкладки в закрытую
+   * группу новым ходом CLI. Ответ отмены называет чаты групп — их очередь гаснет.
+   */
+  it('«Отменить план» гасит очередь групп: конец остановленного хода её не досылает', async () => {
+    let finish: (() => void) | undefined;
+    const encoder = new TextEncoder();
+    fetchMock.mockImplementationOnce(
+      async () =>
+        ({
+          ok: true,
+          status: 200,
+          body: new ReadableStream<Uint8Array>({
+            start(controller) {
+              finish = () => {
+                controller.enqueue(encoder.encode(`${DONE}\n\n`));
+                controller.close();
+              };
+            },
+          }),
+        }) as unknown as Response,
+    );
+
+    void agentRuns.start({ chatId: 'q-5', prompt: 'работа группы' });
+    agentRuns.enqueue('q-5', { prompt: 'дописанное' });
+    await settle();
+
+    agentRuns.haltQueued(['q-5']);
+    // Сервер снял прогон — поток кончается сам, без «Остановить» во вкладке.
+    finish?.();
+    await settle();
+
+    const bodies = fetchMock.mock.calls.map(([, init]) =>
+      String((init as RequestInit | undefined)?.body ?? ''),
+    );
+    expect(bodies.some((body) => body.includes('работа группы'))).toBe(true);
+    expect(bodies.some((body) => body.includes('дописанное'))).toBe(false);
+    expect(getRun('q-5').queued).toHaveLength(0);
+  });
 });

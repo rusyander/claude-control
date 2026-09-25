@@ -2,10 +2,14 @@ import type { CascadeStage } from '@agentdeck/contracts/model-cascade';
 import type {
   ChatTreeView,
   SplitGroupCleaned,
+  SplitGroupStatusView,
   SplitGroupWait,
   SplitPlanView,
 } from '@agentdeck/contracts/chat-handoff';
-import type { CodedFields } from '@agentdeck/contracts/server-messages';
+import type { CodedFields, CodedList } from '@agentdeck/contracts/server-messages';
+import type { GroupControlState } from './GroupControl.types';
+import type { GroupAcceptanceState } from './GroupAcceptance.types';
+import type { GroupAutoNoticesState } from './GroupAutoNotices.types';
 
 /**
  * Группа разделения глазами родителя: где она сейчас и чем ведётся.
@@ -32,7 +36,30 @@ export interface ChildStageGroup {
   firstEditAfterMs?: number;
   /** Сумма времени цепочки (мс): у каждого звена от заведения до последней записи. */
   workMs?: number;
+  /**
+   * Когда заведено первое звено цепочки и когда была последняя запись в ней
+   * (ISO). По ним хаб считает, сколько идёт разбор и всё разделение: `workMs`
+   * тут не годится — у молчащего прогона последняя запись стоит, а время идёт.
+   */
+  startedAt?: string;
+  lastAt?: string;
   isRunning: boolean;
+  /**
+   * Состояние группы по записи конвейера (Д3). Нужно сводке хаба: «готово» по
+   * строке с чатом иначе не отличить от «стоит».
+   */
+  status?: SplitGroupStatusView;
+  /**
+   * Чат группы, отброшенной перезапуском разделения (L20): связь с родителем
+   * сохранена, но работа не продолжается. Строкой группы не считается — хаб
+   * показывает такие чаты внизу, под «Неактивно».
+   */
+  retired?: boolean;
+  /**
+   * Снятая группа оставила неубранную копию (F5.2): родитель, которому
+   * адресуется её уборка. Нет — убирать нечего.
+   */
+  retiredCopy?: { parentChatId: string };
   /** Дерево стоит на паузе — группа остановлена и ждёт «Продолжить всё». */
   isPaused?: boolean;
   /**
@@ -62,6 +89,9 @@ export interface ChildStageGroup {
   base?: string;
   /** Почему копия или прогон не завелись. */
   error?: string;
+  /** Код причины, если её писала панель: показ — `serverFieldText(group, 'error')`. */
+  errorCode?: CodedFields<'error'>['errorCode'];
+  errorParams?: CodedFields<'error'>['errorParams'];
   /**
    * Чата группа есть, а ход кончился ожиданием (Д3, Д16): вопроса человеку,
    * решения по ревью, фоновой работы, повтора. Без этого такая группа в хабе
@@ -80,10 +110,32 @@ export interface ChildStageGroup {
   /** Сколько раз панель сама продолжила упавший ход группы (Д10). */
   retries?: number;
   /**
+   * Чего не хватило до доставки по фактам git (ветка не отправлена, нет MR с её
+   * головой, незакоммиченное) — и сколько раз панель уже напомнила группе.
+   */
+  deliveryMissing?: string[];
+  /** Коды строк `deliveryMissing` по индексу — показ `serverFieldList`. */
+  deliveryMissingCodes?: CodedList<'deliveryMissing'>['deliveryMissingCodes'];
+  deliveryNudges?: number;
+  /**
    * Копия закрытой группы (Д19): её можно убрать кнопкой, адресуясь родителю с
    * номером группы. `cleaned` — уже убрана, и чем кончилось с веткой.
    */
   copy?: { index: number; cleaned?: SplitGroupCleaned['branch'] };
+  /**
+   * Процесс группы оборвался посреди хода (WP1c): номер группы для «Продолжить»,
+   * когда оборвался и сколько раз панель уже продолжила её сама.
+   */
+  interrupted?: { index: number; at: string; resumes?: number };
+  /** Пауза, продолжение или «запустить сейчас» одной группы (журнал 81, 89). */
+  control?: GroupControlState;
+  /** Что группа разрешила себе по строке «с отметкой» — до «Убрать» (аудит 25.09, L51). */
+  autoNotices?: GroupAutoNoticesState;
+  /**
+   * Ручная приёмка доставленной группы (TK-accepted): есть у группы, которую
+   * конвейер закрыл «готово», или у уже принятой. `acceptedAt` — когда приняли.
+   */
+  acceptance?: GroupAcceptanceState;
 }
 
 export type SplitGroupResult = NonNullable<SplitPlanView['groups'][number]['result']>;
@@ -131,4 +183,12 @@ export interface ChildStagesProps {
   onCheckOverlap?: () => void;
   /** Сверка в пути — кнопка крутится, второй клик не уходит. */
   overlapBusy?: boolean;
+  /**
+   * «Продолжить» оборванные группы (WP1c): без номера — все, с номером — одну.
+   * После выключения машины один клик поднимает всё, что оборвалось. Без
+   * обработчика кнопок нет.
+   */
+  onResumeInterrupted?: (index?: number) => void;
+  /** Запрос в пути — кнопка крутится, второй клик не уходит. */
+  resumeInterruptedBusy?: boolean;
 }

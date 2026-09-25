@@ -8,6 +8,11 @@ export const chatEn: Record<ChatMessageCode, string> = {
     'Unsupported attachments: {{names}}. The message was not sent. Allowed extensions: {{supported}}.',
   'run-workspace-missing':
     'This chat’s working folder was not found: {{cwd}}. The conversation started there and can only continue from there.',
+  'run-session-unknown':
+    'Conversation {{sessionId}} was not found: there is no transcript with this sessionId. The message was not sent — a new conversation without a sessionId starts separately.',
+  'branch-name-required': 'No branch name given — there is nothing to create the copy under.',
+  'branch-run-gone':
+    'The run waiting on the branch decision has finished: there is no one to create the copy for.',
   'editor-not-found': 'Code editor not found. Set it in the settings or install code/cursor.',
   'handoff-proposal-invalid':
     'The proposal could not be parsed: “what is done” and “how to continue” are required',
@@ -18,6 +23,7 @@ export const chatEn: Record<ChatMessageCode, string> = {
     'The split could not be parsed: at least two groups with tasks are required',
   'split-conveyor-off': 'The level conveyor is off',
   'split-group-number-required': 'A group number is required',
+  'split-group-not-found': 'Group not found',
   'split-answer-empty': 'The answer is empty',
   'split-overlap-off': 'Branch comparison is off',
   'split-levels-missing': 'There is no split with levels here',
@@ -55,9 +61,27 @@ export const chatEn: Record<ChatMessageCode, string> = {
     'The group is not waiting for an answer: there is no question or it was already answered',
   'split-release-not-waiting':
     'The group is not waiting for predecessors: there is nothing to release',
+  'split-relaunch-nothing': 'There is no split here: nothing to relaunch',
+  'split-ticket-missing': 'This split has no such suggested ticket',
+  'split-ticket-tracker-missing': 'No tracker is linked to the project: nowhere to file the ticket',
+  'split-relaunch-running': 'This split is already being relaunched',
+  'split-plan-running':
+    'The split of this conversation is still running — wait for its groups to finish or cancel the plan',
   'split-cleanup-nothing':
     'Nothing to clean up: the group is not closed, has no copy, or the copy is already gone',
   'split-cleanup-shared':
     'Another group still works in this copy — clean it up once that group closes too',
   'panel-agent-last-not-user': 'the last message must be from the human',
+  'split-pause-not-running': 'The group is not running — nothing to pause',
+  'split-resume-not-paused': 'The group is not paused — nothing to resume',
+  'split-resume-refused': 'Nothing to resume the group with: it has no conversation or copy',
+  'split-start-not-queued': 'The group is not queued — nothing to start',
+  'split-accept-not-done': 'Nothing to accept: the group does not exist or is not delivered yet',
+  'split-group-no-slot': 'All slots are taken: {{running}} of {{limit}} running',
+  'split-limit-active': 'The subscription limit is exhausted until {{until}}',
+  'split-plan-cancel-nothing':
+    'Nothing to cancel: the split of this conversation has already finished',
+  'split-plan-cancel-unknown': 'This conversation has no split',
+  'split-plan-cancelled': 'The plan is cancelled: its groups are closed — start a new split',
+  'split-group-cleanup-failed': 'The copy could not be removed: {{detail}}',
 };

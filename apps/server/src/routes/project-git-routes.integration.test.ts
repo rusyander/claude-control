@@ -56,10 +56,14 @@ const GIT_AVAILABLE = hasGit();
  */
 function storeContext(claudeJsonPath: string): ServerContext {
   const mirrors = new Map<string, WorktreeMirrorSettings>();
+  const splits = new Map<string, unknown>();
   return {
     worktreeBootstraps: new WorktreeBootstraps(mkdtempSync(join(tmpdir(), 'cc-wt-boot-'))),
     location: { paths: { mcpConfig: claudeJsonPath } },
     store: {
+      getSettings: () => ({ deliverToMr: false }),
+      getSplitSettings: (path: string) => splits.get(path),
+      setSplitSettings: (path: string, settings: unknown) => void splits.set(path, settings),
       getWorktreeMirror: (path: string) => mirrors.get(path) ?? { include: [], exclude: [] },
       setWorktreeMirror: (path: string, settings: WorktreeMirrorSettings) => {
         mirrors.set(path, settings);
@@ -263,6 +267,8 @@ describe('project-git-routes: рабочие копии', () => {
   let busyPath: string | undefined;
   /** Прогон в этой копии ещё идёт (иначе он лишь досиживает в буфере догона). */
   let busyRunning = true;
+  /** Кого конвейер просили подтолкнуть после смены настроек разделения. */
+  let kicked: string[] = [];
 
   const gitIn = (cwd: string, ...args: string[]): void => {
     execFileSync('git', args, { cwd, stdio: 'ignore', windowsHide: true });
@@ -275,14 +281,20 @@ describe('project-git-routes: рабочие копии', () => {
     siblings = join(dirname(dir), `${basename(dir)}-worktrees`);
     busyPath = undefined;
     busyRunning = true;
+    kicked = [];
     app = Fastify();
     // Двойник реестра повторяет его существенное свойство: `active()` держит
     // прогон ещё минуту ПОСЛЕ завершения (буфер догона), и «занято» решает не
     // он, а `isRunning`.
-    registerProjectGitRoutes(app, storeContext(claudeJson), {
-      active: () => (busyPath ? [{ chatId: 'run-1', projectPath: busyPath }] : []),
-      isRunning: () => busyRunning,
-    });
+    registerProjectGitRoutes(
+      app,
+      storeContext(claudeJson),
+      {
+        active: () => (busyPath ? [{ chatId: 'run-1', projectPath: busyPath }] : []),
+        isRunning: () => busyRunning,
+      },
+      (path) => void kicked.push(path),
+    );
     await app.ready();
   });
 
@@ -290,6 +302,59 @@ describe('project-git-routes: рабочие копии', () => {
     await app.close();
     dropTemp(siblings);
     dropTemp(dir);
+  });
+
+  // Журнал 25: смена «сколько групп разом» толкает очередь групп проекта.
+  it('сохранение настроек разделения толкает конвейер проекта; кривое тело — нет', async () => {
+    const bad = await app.inject({
+      method: 'PUT',
+      url: '/api/project-git/split-settings',
+      payload: { path: dir, deliver: false, parallel: 0 },
+    });
+    expect(bad.statusCode).toBe(400);
+    expect(kicked).toEqual([]);
+
+    const res = await app.inject({
+      method: 'PUT',
+      url: '/api/project-git/split-settings',
+      payload: { path: dir, deliver: false, parallel: 3 },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(kicked).toEqual([dir]);
+  });
+
+  // Живой прогон 25.09 (O2): шапка чата группы спрашивает по пути КОПИИ, записи
+  // там нет, и доставка читалась коробочной — «вкл» при выключенной в проекте.
+  it('настройки разделения копии — это настройки её основной копии', async () => {
+    gitIn(dir, 'init', '--initial-branch=main');
+    gitIn(dir, 'config', 'user.email', 'test@example.invalid');
+    gitIn(dir, 'config', 'user.name', 'Test');
+    gitIn(dir, 'commit', '--allow-empty', '-m', 'first');
+    const copy = join(siblings, 'feature-one');
+    gitIn(dir, 'worktree', 'add', '-b', 'feature/one', copy);
+    await app.inject({
+      method: 'PUT',
+      url: '/api/project-git/split-settings',
+      payload: { path: dir, deliver: false, parallel: 2 },
+    });
+
+    const fromCopy = await app.inject({
+      method: 'GET',
+      url: `/api/project-git/split-settings?path=${encodeURIComponent(copy)}`,
+    });
+    expect(fromCopy.json<{ deliver: boolean }>().deliver).toBe(false);
+
+    // Переключатель в шапке чата группы меняет настройку проекта, а не копии.
+    await app.inject({
+      method: 'PUT',
+      url: '/api/project-git/split-settings',
+      payload: { path: copy, deliver: true, parallel: 2 },
+    });
+    const fromMain = await app.inject({
+      method: 'GET',
+      url: `/api/project-git/split-settings?path=${encodeURIComponent(dir)}`,
+    });
+    expect(fromMain.json<{ deliver: boolean }>().deliver).toBe(true);
   });
 
   it('каталог без git — 200 и isRepo:false, а не ошибка запроса', async () => {

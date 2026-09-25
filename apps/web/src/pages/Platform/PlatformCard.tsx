@@ -61,7 +61,7 @@ export function PlatformCard({ status, onEdit }: PlatformCardProps) {
   const disable = useDisablePlatform();
   const remove = useDeletePlatform();
   const clearExhausted = useClearExhausted();
-  const activate = useActivatePlatform();
+  const activate = useActivatePlatform({ silentError: true });
   const deactivate = useDeactivatePlatform();
   const plan = usePlatformApplyPlan(platform.id);
 

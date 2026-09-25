@@ -270,10 +270,10 @@
         {
           "path": "apps/server/src/routes/project-git-routes.ts",
           "why": "«Копии и прогоны»: отказ убрать копию с живым агентом и маршрут «Добрать»",
-          "sha": "94d45bb5742ff85a"
+          "sha": "38a7ef8857ef8997"
         }
       ],
-      "confirmedAt": "2026-09-23T16:04:31.088Z"
+      "confirmedAt": "2026-09-24T07:12:44.320Z"
     },
     {
       "topic": "tests",
@@ -554,7 +554,7 @@
         {
           "path": "apps/server/src/routes/project-git-routes.ts",
           "why": "«Раздел не гит-клиент»: что умеет полоса над чатом проекта и чего панель не делает нигде",
-          "sha": "94d45bb5742ff85a"
+          "sha": "38a7ef8857ef8997"
         },
         {
           "path": "apps/server/src/providers/catalog/qwen.ts",
@@ -577,7 +577,7 @@
           "sha": "d2696cecdcce26ad"
         }
       ],
-      "confirmedAt": "2026-09-23T16:50:21.624Z"
+      "confirmedAt": "2026-09-24T07:13:06.391Z"
     },
     {
       "topic": "groups",
@@ -1230,7 +1230,7 @@
         {
           "path": "apps/server/src/routes/panel-agent/actions-app.ts",
           "why": "«Что агент умеет» и «Настройки только для вас»: настройки, провайдер, эндпоинты, интеграции, DLP",
-          "sha": "e12af8ed1719836e"
+          "sha": "e08adc6c860ed7d2"
         },
         {
           "path": "apps/server/src/routes/panel-agent/actions-panel.ts",
@@ -1243,7 +1243,7 @@
           "sha": "dbdcab729b80a8de"
         }
       ],
-      "confirmedAt": "2026-09-19T11:56:00.432Z"
+      "confirmedAt": "2026-09-24T07:13:06.474Z"
     },
     {
       "topic": "portability",

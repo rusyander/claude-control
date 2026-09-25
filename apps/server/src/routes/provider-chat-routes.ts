@@ -29,6 +29,7 @@ import {
   type ProviderChatSubscriber,
 } from '../domains/provider-chat.ts';
 import { checkProjectDir } from '../domains/projects.ts';
+import { chatDeliveryFor } from '../domains/project-git.ts';
 
 /**
  * Чат чужого провайдера: список разговоров, переписка, вопрос, поток ответа и
@@ -179,7 +180,20 @@ export function registerProviderChatRoutes(
       // Инициативы панели — у чужого CLI это первая реплика переписки, а не
       // флаг: системного промпта у них нет. Правило про AskUserQuestion сюда не
       // идёт: такого инструмента у чужого CLI нет вовсе.
-      const initiative = initiativePrompt(ctx.store.getSettings(), { foreign: true });
+      // Доставка до MR — как у чата Claude: обычному разговору проекта, не
+      // ребёнку разделения (его доставка — в задании группы).
+      const workdir = readChat(appData(), providerId, request.params.id)?.workdir;
+      const child = ctx.store.getChatLink(foreignChatKey(providerId, request.params.id));
+      const delivery =
+        workdir && !child ? chatDeliveryFor(ctx.store, workdir, { foreign: true }) : undefined;
+      const initiative = initiativePrompt(ctx.store.getSettings(), {
+        foreign: true,
+        // Чат группы делить дальше не предлагается — ни звену, ни ответу
+        // человека в него (живой прогон 25.09: ответ в группу получал
+        // инструкцию разделения, которой у звена нет).
+        ...(child ? { splitMuted: true } : {}),
+        ...(delivery ? { delivery } : {}),
+      });
       const outcome = chats.send(
         appData(),
         providerId,
@@ -333,7 +347,8 @@ export function registerProviderChatRoutes(
   app.post<{ Params: { id: string } }>('/api/provider-chat/chats/:id/stop', (request, reply) => {
     const providerId = requireProvider(reply);
     if (!providerId) return reply;
-    return { stopped: chats.stop(request.params.id) };
+    // Кнопка человека: группа разделения встаёт на паузу, как у Claude (89c).
+    return { stopped: chats.stopByHuman(request.params.id) };
   });
 
   /** Что происходит прямо сейчас — этим вкладка догоняет пропущенное после F5. */

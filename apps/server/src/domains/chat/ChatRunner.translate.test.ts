@@ -114,6 +114,33 @@ describe('translate — разбор потока CLI', () => {
     expect(events).toEqual([{ kind: 'error', message: 'Запрос не выполнен' }]);
   });
 
+  /**
+   * Форма — как у CLI (claude 2.x, строка `result` провала выполнения): текста
+   * ответа нет, причина — в `errors`. Живой прогон 24.09.2026 показал на этом
+   * месте голое «Запрос не выполнен».
+   */
+  it('провал самого CLI → причина из errors, а не пустая фраза', () => {
+    const events = translate(
+      raw({
+        type: 'result',
+        subtype: 'error_during_execution',
+        is_error: true,
+        num_turns: 0,
+        errors: ['No conversation found with session ID: 0b1e7c3e-0000-4000-8000-000000000000'],
+      }),
+    );
+    expect(events).toEqual([
+      {
+        kind: 'error',
+        message: 'No conversation found with session ID: 0b1e7c3e-0000-4000-8000-000000000000',
+      },
+    ]);
+    // Причины нет и в errors — называется хотя бы подтип провала.
+    expect(
+      translate(raw({ type: 'result', subtype: 'error_max_turns', is_error: true, errors: [] })),
+    ).toEqual([{ kind: 'error', message: 'Запрос не выполнен (error_max_turns)' }]);
+  });
+
   it('незнакомый тип события → пусто (шум CLI отбрасывается)', () => {
     expect(translate(raw({ type: 'system', subtype: 'other' }))).toEqual([]);
     expect(translate(raw({ type: 'user' }))).toEqual([]);

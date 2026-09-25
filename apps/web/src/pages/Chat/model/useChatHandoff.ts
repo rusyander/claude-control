@@ -92,6 +92,8 @@ function stageToast(event: HandoffEvent, name: string, t: TFunction): string {
     const key = event.planMissing ? 'workNoPlan' : 'work';
     return t(`chat.cascade.started.${key}`, { name });
   }
+  // Доставка группы — тоже звено, а не «продолжение в чистой сессии».
+  if (event.stage === 'deliver') return t('chat.cascade.started.deliver', { name });
   return t('chat.handoff.autoDone', { name });
 }
 

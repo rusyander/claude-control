@@ -1,0 +1,26 @@
+// «Предложить тикет» (95b) — раздел карточки хаба, как пересечения веток: находки
+// групп про ТЕ ЖЕ группы, что строками выше, и отдельная карточка разорвала бы их.
+.section {
+  margin-top: var(--spacing-2xs);
+  padding-top: var(--spacing-2xs);
+  border-top: 1px solid var(--color-border);
+}
+
+.item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-2xs);
+  padding: var(--spacing-3xs) 0;
+}
+
+.body {
+  min-width: 0;
+  flex: 1;
+}
+
+// «Почему» бывает в несколько предложений: переносится, а не режется — это то,
+// ради чего тикет вообще заводят.
+.why {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

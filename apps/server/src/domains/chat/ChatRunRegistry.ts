@@ -4,20 +4,25 @@ import type { PlatformRunConsumer } from '@agentdeck/contracts/platform-consumer
 // Только тип маршрута: про контуры, шлюз и ключи реестр по-прежнему не знает
 // ничего — решение принимает домен платформы, реестр лишь передаёт его прогону.
 import type { PlatformRunRoute } from '../platform/routing.ts';
+import { claudeModelHasAutoMode } from '../../providers/claude-auto-mode.ts';
 import { ChatRun, type ChatEvent, type RunOptions } from './ChatRunner.ts';
 import { DetachedRun, type DetachedRunDeps } from './detached-run.ts';
 import { LiveSessionPool } from './live-session.ts';
 import { withChildrenBrief } from './children-brief.ts';
 import type { BranchGateContext } from './ChatBranchGate.ts';
+import type { ClosingTurn } from './ChatHistory.ts';
 import { looksLikeCheck } from './lowered-journal.ts';
+import { normalizePath } from '../project-runner/targets.ts';
 import {
   adoptableEntries,
   isPidAlive,
   pidLooksLikeCli,
   resolveCliPid,
   type LedgerAutoApprove,
+  type LedgerRelay,
   type RunLedgerEntry,
 } from './run-ledger.ts';
+import { endRelayInput, ledgerRunMeta, ledgerRunOptions, reattachSession } from './run-reattach.ts';
 
 /**
  * Реестр прогонов Claude Code, отвязанный от HTTP-запроса.
@@ -89,7 +94,12 @@ export interface RunFinished {
    * Надзор уже назначил повтор этого хода (Д10): группа не `failed`, а ждёт
    * повтора. Ставит обёртка планировщика, не реестр.
    */
-  retry?: { attempt: number; at: number } | { exhausted: number };
+  retry?: { attempt: number; at: number; limit?: true } | { exhausted: number };
+  /**
+   * Усыновлённый процесс умер, не дописав ход: закрывающего ответа в транскрипте
+   * нет. Это обрыв, а не итог — группа разделения прервана (WP1c).
+   */
+  interrupted?: true;
 }
 
 /** Событие с порядковым номером — по нему клиент догоняет пропущенное. */
@@ -133,8 +143,11 @@ export interface BufferedEvent {
 export interface RunSubscriber {
   /** Отдать событие клиенту. */
   send: (buffered: BufferedEvent) => void;
-  /** Прогон завершился — закрыть поток слушателя. */
-  close: () => void;
+  /**
+   * Прогон завершился — закрыть поток слушателя. `stopped` — его остановили
+   * (кнопка, пауза, отмена плана), а не ход кончился сам.
+   */
+  close: (reason?: 'stopped') => void;
 }
 
 /** Сведения о прогоне для группировки и переподключения (в т.ч. после F5). */
@@ -179,6 +192,14 @@ export interface RunLike {
   stop(): void;
   /** PID процесса, известный сразу после `start()`; нет — прогон не усыновить. */
   readonly pid?: number | undefined;
+  /** Живая сессия за посредником — в журнал, чтобы подключиться после перезапуска. */
+  readonly live?: LedgerRelay | undefined;
+  /** Под каким pid искать сам CLI (оболочка посредника); нет — под `pid`. */
+  shellPid?(): Promise<number | undefined>;
+  /** Выход сервера: процесс, способный его пережить, отпустить живым (см. `detachAll`). */
+  detach?(): void;
+  /** Процесс ушёл сам, держа фоновые задачи агента, — обрыв, а не провал (W3-4c). */
+  readonly lostBackground?: boolean;
 }
 
 type RunFactory = () => RunLike;
@@ -257,6 +278,16 @@ interface RegisteredRun {
    * сдачи усыновлённого по-прежнему не видит (проверок панель не наблюдала).
    */
   detached?: boolean;
+  /**
+   * Подхвачен после перезапуска через посредника (`run-reattach.ts`): поток
+   * идёт, но начало хода ушло прежнему серверу — пустой ответ дочитывается из
+   * транскрипта, как у усыновлённого.
+   */
+  reattached?: boolean;
+  /** Все процессы прогона за посредником: он сам, оболочка, CLI (журнал 84). */
+  pids?: number[];
+  /** Фон, записанный в журнал до перезапуска: процесс умер — умер и он (журнал 64). */
+  ledgerBackground?: number;
 }
 
 /** Куда реестр пишет идущие прогоны, чтобы пережить перезапуск (см. `run-ledger.ts`). */
@@ -274,6 +305,8 @@ export interface RunLedgerSink {
   read(): RunLedgerEntry[];
   upsert(entry: RunLedgerEntry): void;
   remove(key: string): void;
+  /** Процесс живой сессии закрылся — ждущая запись о нём больше ничего не бережёт. */
+  removeIdleRelay?(pipe: string): void;
 }
 
 /** Токены одного шага — то, из чего считается его цена. */
@@ -474,6 +507,42 @@ export class ChatRunRegistry {
   }
 
   /**
+   * Человек нажал «Стоп» в чате (журнал 89c). Слушатель — конвейер разделения:
+   * остановленная группа встаёт на паузу, а не «сбоем», и место в очереди
+   * отдаёт следующей. Остановка панелью (выход, замена прогона) сюда не идёт.
+   */
+  private onHumanStop?: (keys: readonly string[]) => void;
+
+  setHumanStopListener(listener: (keys: readonly string[]) => void): void {
+    this.onHumanStop = listener;
+  }
+
+  /**
+   * Ждущий процесс живой сессии ушёл сам, держа фоновые задачи (решение W3-4c):
+   * группа разделения стояла «ждёт фон», пробуждения не будет уже никогда, и
+   * без этого сигнала она так и стояла бы. Слушатель — конвейер: это обрыв,
+   * группа продолжается с восстановлением состояния. Процесс с идущим прогоном
+   * сюда не идёт — обрыв скажет конец самого прогона (`interrupted`).
+   */
+  private onBackgroundLost?: (keys: readonly string[]) => void;
+
+  setBackgroundLostListener(listener: (keys: readonly string[]) => void): void {
+    this.onBackgroundLost = listener;
+  }
+
+  /**
+   * Агент встал на человеке — вызов `AskUserQuestion`, запрос прав — или запрос
+   * прав решён. Слушатель — серверная запись ждущих вопросов (WP9c): поток
+   * видит только вкладка, которая к нему подключена, а у группы, запущенной
+   * конвейером, такой вкладки нет.
+   */
+  private onAsk?: (keys: readonly string[], event: ChatEvent) => void;
+
+  setAskListener(listener: (keys: readonly string[], event: ChatEvent) => void): void {
+    this.onAsk = listener;
+  }
+
+  /**
    * Ребёнок ли разговор разделения (Д16, Д18) — по связи, которую знает
    * хранилище, а реестр нет. Спрашивается на каждом старте по обоим ключам.
    */
@@ -532,9 +601,11 @@ export class ChatRunRegistry {
    * Claude Code. Крючок ставит bootstrap — каталог транскриптов знает он, а
    * реестр о каталогах конфигурации не знает ничего.
    */
-  private readClosingTurn?: (chatId: string, sessionId?: string) => string | undefined;
+  private readClosingTurn?: (chatId: string, sessionId?: string) => ClosingTurn | undefined;
 
-  setClosingTurnReader(read: (chatId: string, sessionId?: string) => string | undefined): void {
+  setClosingTurnReader(
+    read: (chatId: string, sessionId?: string) => ClosingTurn | undefined,
+  ): void {
     this.readClosingTurn = read;
   }
 
@@ -558,20 +629,39 @@ export class ChatRunRegistry {
     const key = this.resolveKey(chatId);
     const run = this.runs.get(key);
     if (!run || run.status !== 'running') return;
-    const pid = run.cliPid ?? run.run.pid;
+    this.ledger.upsert(this.ledgerEntry(key, run, false));
+  }
+
+  /**
+   * Запись журнала о прогоне. `idle` — ход кончился, а процесс живой сессии
+   * ждёт следующего: запись остаётся, чтобы после перезапуска подключиться к
+   * нему и дождаться его фона (журнал 29), а уборщик процессов не счёл его
+   * сиротой (журнал 84). Pid записи за посредником — сам посредник.
+   */
+  private ledgerEntry(key: string, run: RegisteredRun, idle: boolean): RunLedgerEntry {
+    const live = run.run.live;
+    const pid = live?.pid ?? run.cliPid ?? run.run.pid;
     const autoApprove = this.snapshotAutoApprove?.(key);
-    this.ledger.upsert({
+    return {
       key,
       ...(run.sessionId ? { sessionId: run.sessionId } : {}),
       ...(run.meta.projectPath ? { projectPath: run.meta.projectPath } : {}),
       cwd: run.options.cwd,
       ...(pid !== undefined ? { pid } : {}),
-      startedAt: run.startedAt,
+      // У ждущей сессии отсчёт суток (`MAX_AGE_MS`) — от конца хода: разговор
+      // живёт днями, а номер процесса за это время успевает смениться только
+      // у того, кто давно молчит.
+      startedAt: idle ? Date.now() : run.startedAt,
       ...(run.options.model ? { model: run.options.model } : {}),
       ...(run.options.effort ? { effort: run.options.effort } : {}),
       ...(run.meta.lowered ? { lowered: run.meta.lowered } : {}),
       ...(autoApprove ? { autoApprove } : {}),
-    });
+      ...(run.options.permissionMode ? { permissionMode: run.options.permissionMode } : {}),
+      ...(run.meta.origin ? { origin: run.meta.origin } : {}),
+      ...(live ? { relay: live } : {}),
+      ...(run.pids ? { pids: run.pids } : {}),
+      ...(idle ? { idle: true as const } : {}),
+    };
   }
 
   /**
@@ -582,24 +672,28 @@ export class ChatRunRegistry {
    * уходит событие сессии: по нему вкладка узнаёт ключ и время старта, а
    * заметка о подхвате — следом, из самого прогона. false — усыновлять нечего:
    * pid не записан или под этим ключом уже что-то идёт.
+   *
+   * Процесс за посредником подхватывается целиком (`run-reattach.ts`): сессия
+   * встаёт в пул, ждущая — ждёт следующего хода и будит агента по концу фона,
+   * застигнутая посреди хода — отдаёт его поток прогону, который её забирает.
    */
   adopt(entry: RunLedgerEntry, deps: DetachedRunDeps = {}): boolean {
     if (entry.pid === undefined || this.runs.has(entry.key)) return false;
-    const run = new DetachedRun(entry.pid, entry.startedAt, deps);
+    const live = reattachSession(entry, this.livePool);
+    const options = ledgerRunOptions(entry);
+    const meta = ledgerRunMeta(entry);
+    if (live && entry.sessionId) {
+      this.wakeable.set(entry.sessionId, { chatId: entry.key, options, meta });
+    }
+    // Ждущей сессии прогон не нужен: ход заведёт её пробуждение или человек.
+    if (entry.idle) return Boolean(live);
+    if (entry.relay && !live) endRelayInput(entry);
+    const run = live ? this.createRun() : new DetachedRun(entry.pid, entry.startedAt, deps);
     const registered: RegisteredRun = {
       chatId: entry.key,
       run,
-      meta: {
-        ...(entry.projectPath ? { projectPath: entry.projectPath } : {}),
-        ...(entry.sessionId ? { sessionId: entry.sessionId } : {}),
-        ...(entry.lowered ? { lowered: entry.lowered } : {}),
-      },
-      options: {
-        prompt: '',
-        cwd: entry.cwd,
-        ...(entry.model ? { model: entry.model } : {}),
-        ...(entry.effort ? { effort: entry.effort } : {}),
-      },
+      meta,
+      options,
       startedAt: entry.startedAt,
       text: '',
       events: [],
@@ -612,7 +706,9 @@ export class ChatRunRegistry {
       spentTokens: 0,
       contextTokens: 0,
       checks: [],
-      detached: true,
+      ...(live ? { reattached: true } : { detached: true }),
+      ...(entry.pids ? { pids: entry.pids } : {}),
+      ...(entry.relay?.background ? { ledgerBackground: entry.relay.background } : {}),
     };
     this.runs.set(entry.key, registered);
     if (entry.sessionId) {
@@ -623,8 +719,11 @@ export class ChatRunRegistry {
         tools: 0,
       });
     }
+    // Подхваченная сессия отдаёт прогону ход, застигнутый перезапуском, тем же
+    // путём, что и ход, начатый самим CLI после фона.
+    const startOptions = live ? { ...options, sessionId: entry.sessionId, wake: true } : options;
     void run
-      .start(registered.options, (event) => this.emit(registered, event))
+      .start(startOptions, (event) => this.emit(registered, event))
       .then(() => this.finish(registered))
       .catch(() => this.finish(registered));
     return true;
@@ -672,6 +771,18 @@ export class ChatRunRegistry {
     this.createRun = createRun ?? (() => new ChatRun(this.livePool));
     this.livePool.onWake = (sessionId) => {
       this.wake(sessionId);
+    };
+    this.livePool.onClosed = (session) => {
+      const pipe = session.relay?.pipe;
+      if (pipe) this.ledger?.removeIdleRelay?.(pipe);
+      const sessionId = session.sessionId;
+      if (!session.lostBackground || !sessionId || this.isRunning(sessionId)) return;
+      const owner = this.wakeable.get(sessionId)?.chatId;
+      try {
+        this.onBackgroundLost?.([...new Set([sessionId, ...(owner ? [owner] : [])])]);
+      } catch {
+        // Слушатель чужой: его сбой не должен сорвать уборку записи.
+      }
     };
   }
 
@@ -747,12 +858,43 @@ export class ChatRunRegistry {
    */
   isProcessAlive(chatId: string): boolean {
     if (this.isRunning(chatId, chatId)) return true;
+    // Ждущая сессия, подхваченная после перезапуска, прогона в реестре не имеет:
+    // ключ разговора к её sessionId ведёт память о пробуждаемых.
+    for (const [session, last] of this.wakeable) {
+      if (last.chatId === chatId && this.livePool.has(session)) return true;
+    }
     const sessionId = this.runs.get(this.resolveKey(chatId, chatId))?.sessionId ?? chatId;
     return this.livePool.has(sessionId) || this.livePool.has(chatId);
   }
 
   isRunning(chatId: string, sessionId?: string): boolean {
     return this.runs.get(this.resolveKey(chatId, sessionId))?.status === 'running';
+  }
+
+  /**
+   * Идёт ли в каталоге другой прогон, кроме названных ключей (журнал 90): два
+   * агента в одной копии правят одно дерево наперегонки, и звено, заведённое
+   * поверх продолженного человеком разговора, работало по чужим правкам.
+   * `counts` сужает круг: прогон чужой группы в общем каталоге (проект без git —
+   * копий нет) не мешает, иначе итог группы терялся навсегда.
+   */
+  runningIn(
+    cwd: string,
+    except: readonly string[] = [],
+    counts: (other: { chatId: string; sessionId?: string }) => boolean = () => true,
+  ): boolean {
+    const target = normalizePath(cwd);
+    for (const run of this.runs.values()) {
+      if (run.status !== 'running') continue;
+      if (except.includes(run.chatId)) continue;
+      if (run.sessionId && except.includes(run.sessionId)) continue;
+      const dir = run.meta.projectPath ?? run.options.cwd;
+      if (!dir || normalizePath(dir) !== target) continue;
+      if (counts({ chatId: run.chatId, ...(run.sessionId ? { sessionId: run.sessionId } : {}) })) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /** Есть ли прогон в реестре (идущий или в буфере после завершения). */
@@ -802,6 +944,15 @@ export class ChatRunRegistry {
       // Не через контур — поля отсутствуют, и выбор человека остаётся как был.
       ...(route.model?.model ? { model: route.model.model } : {}),
       ...(route.effort === false ? { effort: '' } : {}),
+      // Авторежим решён по модели, которую ПРОСИЛИ; контур мог подставить свою.
+      // Без авторежима у неё CLI молча опустил бы `auto` до `default`, и прогон
+      // спрашивал бы каждую правку, — такой идёт в `acceptEdits`, а рутину
+      // снимает автоподтверждение панели (`providers/claude-auto-mode.ts`).
+      ...(options.permissionMode === 'auto' &&
+      route.model?.model &&
+      !claudeModelHasAutoMode(route.model.model)
+        ? { permissionMode: 'acceptEdits' }
+        : {}),
       platformEnv: route.env,
       // Промпт контура ставится и СНИМАЕТСЯ здесь же: прогон, продолженный
       // после выключенной галочки, обязан вернуться к промпту CLI.
@@ -875,20 +1026,37 @@ export class ChatRunRegistry {
     // В журнал — ПОСЛЕ старта: pid появляется в момент `spawn`, а тот идёт до
     // первого `await` внутри `start`, так что здесь он уже известен.
     this.persist(chatId);
-    // Первая запись — с номером обёртки, чтобы окно без записи было нулевым;
-    // как только под ней найден сам CLI, запись переписывается его номером.
-    const wrapperPid = run.pid;
-    if (this.ledger && wrapperPid !== undefined) {
-      void this.resolvePid(wrapperPid)
-        .then((cliPid) => {
-          if (cliPid === wrapperPid || registered.status !== 'running') return;
-          registered.cliPid = cliPid;
-          this.persist(registered.chatId);
-        })
-        .catch(() => {});
-    }
+    if (this.ledger) void this.trackPids(registered).catch(() => {});
 
     return true;
+  }
+
+  /**
+   * Первая запись — с номером обёртки, чтобы окно без записи было нулевым; как
+   * только под ней найден сам CLI, запись переписывается его номером. За
+   * посредником номер записи остаётся его (уборщик процессов щадит по нему всю
+   * цепочку), а в `pids` ложатся все три звена: посредник, оболочка, CLI
+   * (журнал 84) — оболочку посредник называет своей первой строкой.
+   */
+  private async trackPids(registered: RegisteredRun): Promise<void> {
+    const run = registered.run;
+    const shell = run.shellPid ? await run.shellPid() : run.pid;
+    if (shell === undefined) return;
+    const cliPid = await this.resolvePid(shell);
+    const relayPid = run.live?.pid;
+    if (relayPid === undefined && cliPid === shell) return;
+    if (relayPid !== undefined) registered.pids = [...new Set([relayPid, shell, cliPid])];
+    registered.cliPid = cliPid;
+    if (registered.status === 'running') {
+      this.persist(registered.chatId);
+      return;
+    }
+    // Короткий ход кончается раньше поиска CLI (~0,8 с через CIM): номера
+    // дописываются в ждущую запись, пока та ещё про этот процесс.
+    const current = this.ledger?.read().find((item) => item.key === registered.chatId);
+    if (current?.idle && current.relay?.pipe === run.live?.pipe) {
+      this.ledger?.upsert(this.ledgerEntry(registered.chatId, registered, true));
+    }
   }
 
   /**
@@ -980,6 +1148,18 @@ export class ChatRunRegistry {
     if (event.kind === 'tool' && event.name === 'AskUserQuestion') {
       this.notify?.({ kind: 'question', chatId: run.chatId, projectPath: run.meta.projectPath });
     }
+    if (
+      this.onAsk &&
+      (event.kind === 'permission' ||
+        event.kind === 'permissionResolved' ||
+        (event.kind === 'tool' && event.name === 'AskUserQuestion'))
+    ) {
+      try {
+        this.onAsk(run.sessionId ? [run.chatId, run.sessionId] : [run.chatId], event);
+      } catch {
+        // Молча: запись вопроса — для хаба, а поток прогона обязан идти дальше.
+      }
+    }
     if (event.kind === 'tool' && !run.firstEditAt && EDIT_TOOLS.has(event.name)) {
       run.firstEditAt = Date.now();
       const keys = run.sessionId ? [run.chatId, run.sessionId] : [run.chatId];
@@ -1011,12 +1191,12 @@ export class ChatRunRegistry {
    * Ответ усыновлённого прогона из транскрипта. Ошибка чтения — пусто: чужой
    * файл не имеет права уронить завершение прогона.
    */
-  private closingTurnOf(run: RegisteredRun): string {
-    if (run.errored || !this.readClosingTurn) return '';
+  private closingTurnOf(run: RegisteredRun): ClosingTurn | undefined {
+    if (run.errored || !this.readClosingTurn) return undefined;
     try {
-      return this.readClosingTurn(run.chatId, run.sessionId) ?? '';
+      return this.readClosingTurn(run.chatId, run.sessionId);
     } catch {
-      return '';
+      return undefined;
     }
   }
 
@@ -1025,8 +1205,14 @@ export class ChatRunRegistry {
     if (run.status !== 'running') return;
     run.status = run.errored ? 'error' : 'done';
     run.finishedAt = Date.now();
-    // Процесса больше нет — усыновлять после перезапуска нечего.
-    this.ledger?.remove(run.chatId);
+    // Процесс живой сессии ждёт следующего хода — запись остаётся ждущей: по
+    // ней новый сервер подключится к нему после перезапуска (журнал 29), а
+    // уборщик не сочтёт его сиротой. Процесса нет — подхватывать нечего.
+    if (run.sessionId && run.run.live && this.livePool.has(run.sessionId)) {
+      this.ledger?.upsert(this.ledgerEntry(run.chatId, run, true));
+    } else {
+      this.ledger?.remove(run.chatId);
+    }
     if (run.sessionId && !run.detached) {
       this.wakeable.delete(run.sessionId);
       this.wakeable.set(run.sessionId, {
@@ -1053,11 +1239,38 @@ export class ChatRunRegistry {
     // (`readLastAssistantTurn`), и тогда молчим, как и раньше. Дважды применить
     // решение перезапуск не даёт: одноразовость держат отметки конвейера
     // (`reviewedAt`/`plannedAt`), а `finish` у прогона случается один раз.
-    const text = run.detached ? this.closingTurnOf(run) : run.text;
+    // Вопрос инструментом у усыновлённого тоже из транскрипта: событие потока,
+    // которым его отмечает живой прогон, умерло вместе с прежним сервером.
+    // Живой прогон с ответом длиннее хвоста — тоже из транскрипта (находка 24):
+    // разбор ответил 49 661 символом с блоком в начале, хвост потока его срезал,
+    // и план групп пропал молча. Закрывающий ход приходит целиком; нет его —
+    // остаётся хвост, как раньше.
+    // Подхваченный посредником прогон, чей ход кончился до перезапуска, потока
+    // не получил вовсе — ответ тоже в транскрипте.
+    const inherited = Boolean(run.reattached && !run.text);
+    const clipped = !run.detached && run.text.length >= TEXT_TAIL;
+    const closing = run.detached || inherited || clipped ? this.closingTurnOf(run) : undefined;
+    const text = run.detached ? (closing?.text ?? '') : (closing?.text ?? run.text);
+    const asked = run.asked || Boolean(closing?.asked);
+    // Закрывающего хода нет — процесс умер посреди него. Раньше здесь молчали,
+    // и группа разделения стояла «работает» навсегда (журнал 39, 110); теперь
+    // планировщик узнаёт обрыв и ничего, кроме него, не решает. Усыновлённый без
+    // посредника процесс, у которого журнал видел фон, — тоже обрыв (журнал 64):
+    // CLI вышел по концу ввода и унёс фоновые задачи, чьих итогов ответ не знает.
+    // Процесс живой сессии, ушедший сам с фоном посреди хода, — то же (W3-4c).
+    const lostBackground = Boolean(
+      (run.detached && (run.ledgerBackground ?? 0) > 0) || run.run.lostBackground,
+    );
+    // Ход, кончившийся ОШИБКОЙ (лимит подписки и т.п.), — не обрыв: его итог
+    // решают ожидание лимита и повтор, а не автопродолжение прямо в тот же
+    // лимит (итоговое ревью 25.09, m4).
+    const interrupted = Boolean(
+      ((run.detached || run.reattached) && !text && !run.errored) || lostBackground,
+    );
 
     // Журнал сдачи усыновлённому по-прежнему не полагается: проверок панель не
     // видела не потому, что их не было, — их скрыл умерший поток.
-    if (this.planHandoff && (!run.detached || text)) {
+    if (this.planHandoff) {
       try {
         const event = this.planHandoff({
           chatId: run.chatId,
@@ -1069,7 +1282,8 @@ export class ChatRunRegistry {
           options: run.options,
           contextTokens: run.contextTokens,
           ...(this.livePool.backgroundOf(run.sessionId) ? { background: true } : {}),
-          ...(run.asked ? { asked: true } : {}),
+          ...(asked ? { asked: true } : {}),
+          ...(interrupted ? { interrupted: true as const } : {}),
           ...(run.meta.origin ? { origin: run.meta.origin } : {}),
           ...(run.lastError ? { error: run.lastError } : {}),
           ...(run.limit ? { limit: run.limit } : {}),
@@ -1158,15 +1372,50 @@ export class ChatRunRegistry {
       // делала, а `stopAll` при выходе панели споткнулся бы на первом же таком.
     }
     if (run.status === 'running') run.status = 'stopped';
-    for (const subscriber of run.subscribers) subscriber.close();
+    for (const subscriber of run.subscribers) subscriber.close('stopped');
     this.remove(key);
     return true;
+  }
+
+  /** «Стоп» человека: слушатель узнаёт ДО остановки — конец хода застанет паузу. */
+  stopByHuman(chatId: string): boolean {
+    const key = this.resolveKey(chatId);
+    const run = this.runs.get(key);
+    if (!run) return false;
+    // Ход уже кончился (прогон лишь в буфере после завершения): «Стоп» ничего
+    // не остановил, и ставить группу на паузу не за что (итоговое ревью 25.09, m3).
+    if (run.status !== 'running') return this.stop(chatId);
+    const keys = [...new Set([chatId, key, ...(run.sessionId ? [run.sessionId] : [])])];
+    try {
+      this.onHumanStop?.(keys);
+    } catch {
+      // Слушатель чужой: его сбой не имеет права сорвать остановку.
+    }
+    return this.stop(chatId);
   }
 
   /** Остановить все прогоны разом. */
   stopAll(): void {
     for (const chatId of [...this.runs.keys()]) this.stop(chatId);
     this.livePool.closeAll();
+  }
+
+  /**
+   * Выход сервера — Ctrl+C, SIGTERM сторожа или наблюдателя, штатное завершение.
+   * Процессы за посредником НЕ гасим: посредник для того и заведён, чтобы CLI с
+   * фоновыми командами пережил перезапуск панели, а прежний `stopAll` здесь
+   * убивал их на каждом штатном выходе (журнал 29, решение W3-4a). Записи журнала
+   * остаются — новый сервер подключится по ним. Усыновлённый процесс не наш и
+   * тоже живёт. Гаснет только то, что на трубах сервера не переживёт его и так.
+   * Остановить всех — явное действие человека: «Остановить» по каждому прогону.
+   */
+  detachAll(): void {
+    for (const [key, run] of [...this.runs]) {
+      if (run.status !== 'running') continue;
+      if (run.run.detach && (run.detached || run.run.live)) run.run.detach();
+      else this.stop(key);
+    }
+    this.livePool.detachAll();
   }
 
   /**
@@ -1212,7 +1461,10 @@ export class ChatRunRegistry {
     run.subscribers.clear();
     this.runs.delete(chatId);
     // Остановленный по кнопке сюда приходит, минуя `finish`, — журнал чистим и здесь.
-    this.ledger?.remove(chatId);
+    // Запись ждущей сессии живёт дольше прогона: её снимает закрытие процесса.
+    const idleLive =
+      run.status !== 'stopped' && run.sessionId && run.run.live && this.livePool.has(run.sessionId);
+    if (!idleLive) this.ledger?.remove(chatId);
     // Прогон ушёл, но его два написания спрашивать не перестанут: карточка
     // разделения знает разговор по sessionId, а тумблеры и висящие состояния
     // заведены под тем ключом, с которым прогон стартовал. Помним связь после

@@ -7,19 +7,6 @@
 
 const STORAGE_KEY = 'agentdeck:chat-prefs';
 
-/**
- * Версия сохранённого набора. Нужна ровно для одного: сменить ДЕФОЛТ у тех, кто
- * панелью уже пользовался. Хранилище пишется целиком на любую правку, поэтому у
- * старого пользователя лежит `autoApprove: false` — не его выбор, а прежний
- * дефолт, и без версии новый дефолт не дошёл бы ни до кого, кроме чистого
- * браузера. Переход на версию 2 (07.09.2026) включает автоподтверждение один
- * раз; выключенное ПОСЛЕ него уже сохраняется и переживает перезагрузку.
- * Версия 3 (24.09.2026, владелец) включает его ещё раз: группы разделения
- * наследуют тумблер родителя, и выключенный когда-то давно тумблер ставил
- * двадцать групп на карточки «Разрешить».
- */
-const PREFS_VERSION = 3;
-
 export interface ChatPrefs {
   /** Разрешать агенту править файлы (acceptEdits). По умолчанию — да. */
   allowEdits: boolean;
@@ -31,14 +18,10 @@ export interface ChatPrefs {
    * тихий, чтобы услышать его из другой комнаты или поверх музыки.
    */
   soundVolume: number;
-  /**
-   * Подтверждать безопасные запросы прав самой панелью. По умолчанию — ДА
-   * (решение владельца, 07.09.2026): выключенным тумблером панель встречала
-   * каждого нового человека карточкой «Разрешить» на любой чих, и первым же
-   * действием его всё равно включали. Кому нужен разбор поштучно — выключает
-   * один раз, положение переживает перезагрузку.
-   */
-  autoApprove: boolean;
+  // Автоподтверждение прав здесь больше не живёт (24.09.2026): это авторежим
+  // ЧАТА — глобальная настройка панели `chatAutoMode` и выбор в самом чате, оба
+  // на сервере (`entities/ChatAutoMode`). Прогоны чата заводит и панель, без
+  // вкладки, а браузерный тумблер до них не доходил.
 }
 
 /** Границы громкости: тише 0 не бывает, выше 4× сигнал начинает хрипеть. */
@@ -50,7 +33,6 @@ const DEFAULT: ChatPrefs = {
   allowEdits: true,
   sound: true,
   soundVolume: DEFAULT_SOUND_VOLUME,
-  autoApprove: true,
 };
 
 /** Привести громкость к допустимому диапазону; мусор из хранилища → дефолт. */
@@ -60,16 +42,12 @@ export function clampVolume(raw: unknown): number {
 }
 
 export function sanitizePrefs(raw: unknown): ChatPrefs {
-  const source = (raw ?? {}) as Partial<ChatPrefs> & { version?: number };
-  // Набор из прежней версии: положение автоподтверждения в нём — не выбор
-  // человека, а старый дефолт, поэтому берём новый.
-  const isCurrent = source.version === PREFS_VERSION;
+  const source = (raw ?? {}) as Partial<ChatPrefs>;
 
   return {
     allowEdits: typeof source.allowEdits === 'boolean' ? source.allowEdits : true,
     sound: typeof source.sound === 'boolean' ? source.sound : true,
     soundVolume: clampVolume(source.soundVolume),
-    autoApprove: isCurrent ? source.autoApprove !== false : true,
   };
 }
 
@@ -84,10 +62,7 @@ function load(): ChatPrefs {
 
 function persist(prefs: ChatPrefs): void {
   try {
-    globalThis.localStorage?.setItem(
-      STORAGE_KEY,
-      JSON.stringify({ ...prefs, version: PREFS_VERSION }),
-    );
+    globalThis.localStorage?.setItem(STORAGE_KEY, JSON.stringify(prefs));
   } catch {
     // Приватный режим — работаем в памяти.
   }
@@ -114,13 +89,6 @@ export function subscribeChatPrefs(listener: () => void): () => void {
 export function setAllowEdits(allowEdits: boolean): void {
   if (prefs.allowEdits === allowEdits) return;
   prefs = { ...prefs, allowEdits };
-  persist(prefs);
-  emit();
-}
-
-export function setAutoApprove(autoApprove: boolean): void {
-  if (prefs.autoApprove === autoApprove) return;
-  prefs = { ...prefs, autoApprove };
   persist(prefs);
   emit();
 }

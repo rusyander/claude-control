@@ -1,0 +1,30 @@
+// Заголовок раздела пересечений как переключатель: занимает строку так же, как
+// простая подпись до него, чтобы «Сверить ветки» не сдвигалась при сворачивании.
+.toggle {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--spacing-3xs);
+  min-width: 0;
+  padding: 2px var(--spacing-3xs);
+  margin-left: calc(-1 * var(--spacing-3xs));
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--color-fg-subtle);
+  text-align: left;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--color-bg);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 1px;
+  }
+}
+
+.outsideCount {
+  padding: 0 var(--spacing-3xs) var(--spacing-3xs);
+}

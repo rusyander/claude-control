@@ -56,7 +56,9 @@ export const projectsEn: typeof projectsRu = {
       'tree is clean. The panel does have git, just elsewhere: the bar above a project’s ' +
       'chat can branch, commit, pull and push, it creates parallel copies of branches, ' +
       'and each copy’s card shows how complete it is — what is missing and whether the ' +
-      'access entry is there; «Fill in» carries the missing part over again. What the ' +
+      'access entry is there; «Fill in» carries the missing part over again, and the ' +
+      '«To MR» button in the chat header decides whether the agent carries work through ' +
+      'to a merge request. What the ' +
       'panel never does anywhere is merging — merging branches stays with you.',
 
     guide: {

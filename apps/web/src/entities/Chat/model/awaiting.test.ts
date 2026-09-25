@@ -52,6 +52,33 @@ describe('selectAwaitingChats', () => {
 
     expect(selectAwaitingChats(chats, statuses).map((item) => item.id)).toEqual(['a']);
   });
+
+  /**
+   * Находка 77 (24.09): вопрос группы, заведённой без вкладки, событий в ней не
+   * даёт — ждущих называет память сервера, а не снимок списка.
+   */
+  it('чат из памяти сервера ждёт, даже если снимок списка об этом не знает', () => {
+    const chats = [chat('g'), chat('b')];
+
+    expect(selectAwaitingChats(chats, noRuns, new Set(['g'])).map((item) => item.id)).toEqual([
+      'g',
+    ]);
+  });
+
+  it('ответ сервера правдивее устаревшей метки списка: снятый вопрос не зовёт', () => {
+    const chats = [chat('g', { awaitsYou: true })];
+
+    expect(selectAwaitingChats(chats, noRuns, new Set())).toEqual([]);
+    // Пока сервер не ответил — верим метке списка.
+    expect(selectAwaitingChats(chats, noRuns).map((item) => item.id)).toEqual(['g']);
+  });
+
+  it('живой вопрос вкладки перебивает и сервер — звонок не задваивается', () => {
+    const chats = [chat('g')];
+    const statuses = new Map<string, RunStatus>([['g', 'waiting']]);
+
+    expect(selectAwaitingChats(chats, statuses, new Set(['g']))).toEqual([]);
+  });
 });
 
 describe('mergeAwaitingStatuses', () => {

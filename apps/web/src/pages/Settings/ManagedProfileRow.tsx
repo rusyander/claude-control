@@ -39,7 +39,7 @@ export function ManagedProfileRow({
   ownerKnown,
 }: ManagedProfileRowProps) {
   const { t } = useTranslation();
-  const deactivate = useDeactivatePlatform();
+  const deactivate = useDeactivatePlatform({ silentError: true });
 
   // Контур удалили, а профиль остался: сказать об этом прямо и не мешать
   // человеку убрать его обычной кнопкой — возвращать больше нечего. Только

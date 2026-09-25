@@ -82,13 +82,20 @@ export default function ChatScreen() {
   const [value, setValue] = useState<ComposerValue>({
     text: '',
     allowEdits: true,
-    // Как в панели: автоподтверждение включено по умолчанию — с телефона
-    // отвечать на карточку «Разрешить» на каждый шаг тем более некому.
-    autoApprove: true,
+    // Авторежим не задан: сервер возьмёт выбор этого чата или глобальную
+    // настройку панели. Явное `true` здесь каждой отправкой перекрывало бы
+    // выключенное в панели — телефон решал бы за человека.
     model: '',
     effort: '',
     files: [],
   });
+  // Выбор авторежима принадлежит чату: переход в другой разговор его снимает,
+  // иначе первая же отправка там записала бы чужой выбор новому чату.
+  useEffect(() => {
+    setValue((current) =>
+      current.autoApprove === undefined ? current : { ...current, autoApprove: undefined },
+    );
+  }, [chatId]);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState('');
 
@@ -332,6 +339,7 @@ export default function ChatScreen() {
 
         <Composer
           chatId={chatId}
+          sessionId={run.sessionId ?? (isDraft(chatId) ? undefined : chatId)}
           image={image}
           value={value}
           onChange={setValue}

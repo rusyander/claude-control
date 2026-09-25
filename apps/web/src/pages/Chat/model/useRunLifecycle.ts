@@ -1,11 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { ChatMessage } from '@agentdeck/contracts';
-import { agentRuns, type RunStatus } from '@shared/lib/agent-runs';
+import { agentRuns, startActivePoll, type RunStatus } from '@shared/lib/agent-runs';
 import { chatKeys } from '@entities/Chat';
-
-/** Как часто спрашивать сервер о чужих прогонах. Ответ — из памяти, не с диска. */
-const ADOPT_INTERVAL_MS = 5000;
 
 export interface RunLifecycleInput {
   /** Разговор, открытый прямо сейчас: его прогон стор не считает фоновым. */
@@ -57,16 +54,10 @@ export function useRunLifecycle({
   // спросил, — поэтому спрашиваем. Пока этого не было, чужой разговор не
   // показывал ни живого вывода, ни точки на табе, а его завершение не освежало
   // список чатов: новый разговор появлялся там лишь после перезагрузки.
-  // Ответ — реестр в памяти сервера, поэтому такт частый и дешёвый.
-  useEffect(() => {
-    void agentRuns.resumeActive();
-    const timer = window.setInterval(() => {
-      // Скрытая вкладка ничего не показывает — и спрашивать ей незачем; при
-      // возвращении такт всё равно наступит через несколько секунд.
-      if (document.visibilityState === 'visible') void agentRuns.resumeActive();
-    }, ADOPT_INTERVAL_MS);
-    return () => window.clearInterval(timer);
-  }, []);
+  // Ответ — реестр в памяти сервера, поэтому такт частый и дешёвый. Скрытая
+  // вкладка спрашивает тоже, только реже: иначе человек в соседней вкладке не
+  // узнал бы ни о конце хода, ни о вопросе агента (такты — в `startActivePoll`).
+  useEffect(() => startActivePoll(), []);
 
   // Открытый чат — чтобы стор не уведомлял о его собственном завершении.
   useEffect(() => {

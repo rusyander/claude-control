@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { existsSync } from 'node:fs';
+import { existsSync, renameSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import type {
   ProjectWorktree,
@@ -511,13 +511,57 @@ async function dirtIsOnlyLocalLayer(
   );
 }
 
+/** Сколько раз и с каким шагом ждать, пока папку отпустит только что закрытый процесс. */
+const LOCK_PROBE_TRIES = 10;
+const LOCK_PROBE_STEP_MS = 300;
+
+function isLockError(error: unknown): boolean {
+  const code = (error as NodeJS.ErrnoException | undefined)?.code;
+  return code === 'EPERM' || code === 'EBUSY' || code === 'EACCES';
+}
+
+/**
+ * Проба «папку никто не держит»: переименовать туда и обратно. На Windows
+ * каталог, который чей-то cwd или в котором открыт файл, не переименовать, как и
+ * не удалить; на остальных ОС проба просто проходит. Выходящему процессу даём
+ * несколько сотен миллисекунд: закрытый только что CLI уводит за собой свои MCP.
+ */
+async function assertCopyUnlocked(dir: string): Promise<void> {
+  const probe = `${dir}.unlock-probe-${process.pid}`;
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      renameSync(dir, probe);
+      break;
+    } catch (error) {
+      if (!isLockError(error)) return;
+      if (attempt >= LOCK_PROBE_TRIES) {
+        throw coded(
+          new GitError('Папку копии держит запущенный процесс — закройте его и повторите'),
+          'worktree-copy-locked',
+        );
+      }
+      await new Promise((done) => setTimeout(done, LOCK_PROBE_STEP_MS));
+    }
+  }
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      renameSync(probe, dir);
+      return;
+    } catch (error) {
+      if (!isLockError(error) || attempt >= LOCK_PROBE_TRIES) throw error;
+      await new Promise((done) => setTimeout(done, LOCK_PROBE_STEP_MS));
+    }
+  }
+}
+
 /**
  * Убрать копию. Путь обязан быть из списка копий ЭТОГО репозитория, основная не
  * удаляется никогда. Пропавший каталог (`prunable`) не удаляют, а подчищают
  * `prune`: удалять там уже нечего, а запись в git осталась.
  *
  * Незакоммиченные правки внутри копии git не отдаст без `--force` — и правильно
- * сделает: это чужая работа, а не мусор. Его отказ уходит человеку как есть.
+ * сделает: это чужая работа, а не мусор. Его отказ уходит человеку кодом
+ * `worktree-copy-dirty`.
  */
 export async function removeWorktree(
   projectDir: string,
@@ -527,6 +571,11 @@ export async function removeWorktree(
   claudeJsonPath?: string,
   /** Шаблоны зеркала проекта: по ним отличаем свой слой от работы человека. */
   mirror?: WorktreeMirrorSettings,
+  /**
+   * Отпустить копию до удаления: закрыть свои процессы с cwd в ней. Зовётся
+   * только для настоящей копии этого репозитория (не основной) и может отказать.
+   */
+  release?: (path: string) => Promise<void>,
 ): Promise<GitOutput> {
   await requireRepo(projectDir);
   const list = await readWorktrees(projectDir);
@@ -538,6 +587,14 @@ export async function removeWorktree(
       new GitError('Это основная рабочая копия — её удалить нельзя'),
       'worktree-main-undeletable',
     );
+
+  // Папку держит процесс (cwd простаивающего CLI, открытый файл) — отказ ДО
+  // всего, что меняет диск: `git worktree remove` стёр бы файлы, снял копию с
+  // учёта и споткнулся о сам каталог, оставив полкопии (живой прогон 25.09).
+  if (!entry.prunable) {
+    await release?.(entry.path);
+    await assertCopyUnlocked(entry.path);
+  }
 
   // Запись доступа снимается ДО удаления каталога: после `worktree remove`
   // путь уже не проверить, а мёртвая запись досталась бы следующей ветке с тем
@@ -560,6 +617,21 @@ export async function removeWorktree(
   const forced = force || (await dirtIsOnlyLocalLayer(entry.path, mirror));
 
   const args = ['worktree', 'remove', ...(forced ? ['--force'] : []), entry.path];
-  const out = await git(projectDir, args, GIT_NETWORK_TIMEOUT_MS);
+  let out: string;
+  try {
+    out = await git(projectDir, args, GIT_NETWORK_TIMEOUT_MS);
+  } catch (error) {
+    // Отказ git из-за правок — ожидаемый ответ, а не сбой: человеку — своими
+    // словами и с кодом, а не сырым `fatal: … use --force`.
+    if (error instanceof GitError && /modified or untracked files/i.test(error.message)) {
+      throw coded(
+        new GitError(
+          'В копии есть незакоммиченные правки — закоммитьте или уберите их и повторите',
+        ),
+        'worktree-copy-dirty',
+      );
+    }
+    throw error;
+  }
   return gitOutput(out, `Копия ${entry.path} убрана`, 'worktree-removed', { path: entry.path });
 }

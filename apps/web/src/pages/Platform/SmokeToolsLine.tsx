@@ -34,7 +34,7 @@ interface SmokeToolsLineProps {
  */
 export function SmokeToolsLine({ platform, tools }: SmokeToolsLineProps) {
   const { t } = useTranslation();
-  const save = useSavePlatform();
+  const save = useSavePlatform({ silentError: true });
 
   const setShim = (toolShim: boolean): void => {
     save.mutate(

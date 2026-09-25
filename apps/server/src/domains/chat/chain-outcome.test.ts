@@ -26,6 +26,62 @@ describe('endsWithQuestion', () => {
     expect(endsWithQuestion('Готово.\n\n```ts\nconst a = b ? c : d?\n```')).toBe(false);
     expect(endsWithQuestion('')).toBe(false);
   });
+
+  // Живой прогон 24.09 (g10): «Подтвердите пуш в новой карточке.» — без «?»,
+  // группа ушла в ревью, пока человек не ответил. Отказ панели в AskUserQuestion
+  // сам велит «коротко скажи, что ждёшь ответа», и ответ так и звучит.
+  it('просьба решить без «?» в последнем абзаце — тоже вопрос человеку', () => {
+    expect(endsWithQuestion('Ветка готова.\n\nПодтвердите пуш в новой карточке.')).toBe(true);
+    expect(endsWithQuestion('Жду ответа.')).toBe(true);
+    expect(endsWithQuestion('Жду вашего решения по двум вариантам выше.')).toBe(true);
+    expect(endsWithQuestion('Жду ваш выбор между красным и синим.')).toBe(true);
+    expect(endsWithQuestion('Выберите вариант в карточке.')).toBe(true);
+    expect(endsWithQuestion('Please confirm the push.')).toBe(true);
+    expect(endsWithQuestion('Waiting for your decision on the schema.')).toBe(true);
+  });
+
+  it('отчёт о сделанном со словами «жду»/«подтверждено» — не вопрос', () => {
+    expect(endsWithQuestion('MR открыт, жду ревью.')).toBe(false);
+    expect(endsWithQuestion('Подтверждено тестом, всё зелёное.')).toBe(false);
+    expect(endsWithQuestion('Пуш подтвердил человек, MR !12 обновлён.')).toBe(false);
+    expect(endsWithQuestion('Подтвердите пуш — сказал я себе и сделал.\n\nГотово.')).toBe(false);
+    expect(endsWithQuestion('Done. Let me know if anything else is needed.')).toBe(false);
+  });
+
+  // Итоговое ревью 25.09 (m8): повелительное внутри отчёта или с условием
+  // ставило группу в ожидание вопроса, и зависимые не стартовали.
+  it('повелительное с условием или посреди фразы — отчёт, а не вопрос', () => {
+    expect(endsWithQuestion('MR !12 открыт.\n\nОтветь, если нужно ещё что-то.')).toBe(false);
+    expect(endsWithQuestion('Готово. При желании укажи ревьюера в MR.')).toBe(false);
+    expect(endsWithQuestion('Готово: можно укажите ревьюера в MR позже.')).toBe(false);
+    expect(endsWithQuestion('Готово.\n\n- Подтвердите пуш в карточке.')).toBe(true);
+  });
+
+  // Живой прогон 25.09 (F1, третий): план кончился вопросом и списком вариантов
+  // под ним — вопрос не узнан, работа стартовала мимо ответа; работа кончилась
+  // «Дождусь твоего выбора» — группа закрылась «готово», хотя ждала человека.
+  it('вопрос со списком вариантов под ним и «дождусь выбора» — вопрос человеку', () => {
+    expect(
+      endsWithQuestion(
+        'Разобрал код.\n\nПрежде чем я составлю план, ответьте на вопрос:\n\n' +
+          '**Какой формат нужен для отрицательных сумм?**\n\n' +
+          'Варианты:\n- `"-$50.00"` (минус перед валютой)\n- `"($50.00)"` (скобки)\n- другой формат',
+      ),
+    ).toBe(true);
+    expect(
+      endsWithQuestion(
+        '**Какой формат нужен?**\n\nВарианты, например:\n- `-$50.00`\n- `($50.00)`\n\n' +
+          'Дождусь твоего выбора, затем напишу тесты и исправлю код.',
+      ),
+    ).toBe(true);
+    expect(endsWithQuestion('Подожду вашего ответа по схеме.')).toBe(true);
+  });
+
+  it('список сделанного после абзаца без вопроса — отчёт, а не вопрос', () => {
+    expect(endsWithQuestion('Нужен ли тест? Нужен.\n\nСделано:\n- тест\n- правка')).toBe(false);
+    expect(endsWithQuestion('Готово.\n\nИтог:\n- sum\n- capitalize')).toBe(false);
+    expect(endsWithQuestion('MR открыт, дождусь ревью.')).toBe(false);
+  });
 });
 
 describe('replyTail', () => {
@@ -123,5 +179,42 @@ describe('chainOutcomeOf', () => {
       waitingFor: 'decision',
       result: { kind: 'changed' },
     });
+  });
+});
+
+// Аудит 25.09, L63 и L110: предупреждение лимита и число замечаний ревью едут с итогом.
+describe('chainOutcomeOf: лимит на исходе и вердикт ревью', () => {
+  it('allowed_warning даёт срок сброса; обычное allowed — нет', () => {
+    const resetsAt = Date.UTC(2026, 8, 25, 18, 0) / 1000;
+    const warned = chainOutcomeOf({
+      link: WORK,
+      ok: true,
+      text: 'Готово.',
+      limit: { resetsAt, status: 'allowed_warning' },
+    });
+    expect(warned.status).toBe('done');
+    expect(warned.limitWarningUntil).toBe(new Date(resetsAt * 1000).toISOString());
+    const allowed = chainOutcomeOf({
+      link: WORK,
+      ok: true,
+      text: 'Готово.',
+      limit: { resetsAt, status: 'allowed' },
+    });
+    expect(allowed.limitWarningUntil).toBeUndefined();
+  });
+
+  it('ревью своей работы кончило цепочку — число замечаний вердикта', () => {
+    const review: ChatLink = { parentChatId: 'p', createdAt: '', branch: 'b', stage: 'review' };
+    const text = [
+      'Итог.',
+      '```agentdeck:review',
+      '{"findings":["a.ts:1 — x","b.ts:2 — y"]}',
+      '```',
+    ].join('\n');
+    expect(chainOutcomeOf({ link: review, ok: true, text }).reviewFindings).toBe(2);
+    expect(
+      chainOutcomeOf({ link: review, ok: true, text: 'Без блока.' }).reviewFindings,
+    ).toBeUndefined();
+    expect(chainOutcomeOf({ link: WORK, ok: true, text }).reviewFindings).toBeUndefined();
   });
 });

@@ -25,12 +25,22 @@ export interface ChatRowData {
    * уже не даёт, и дерево не превращается в лес отступов.
    */
   depth?: number;
+  /** Ветвь поднята наверх: в ней сейчас идёт прогон (см. `withActiveFirst`). */
+  pinned?: boolean;
+  /** Первый из снятых перезапуском детей: над ним разделитель «Неактивно». */
+  inactiveStart?: boolean;
 }
 
 export type TimeGroup = 'today' | 'yesterday' | 'thisWeek' | 'earlier';
 
+/** Заголовок в списке: дата или «Сейчас работают» над поднятыми ветвями. */
+export type ListGroup = TimeGroup | 'running';
+
 export type Row =
-  { kind: 'header'; group: TimeGroup } | { kind: 'chat'; group: TimeGroup; data: ChatRowData };
+  | { kind: 'header'; group: ListGroup }
+  | { kind: 'chat'; group: ListGroup; data: ChatRowData }
+  /** Разделитель внутри ветви: ниже — дети, снятые перезапуском разделения. */
+  | { kind: 'inactive'; group: ListGroup; parentId: string };
 
 export interface ChatRowProps {
   chat: ChatSummary;

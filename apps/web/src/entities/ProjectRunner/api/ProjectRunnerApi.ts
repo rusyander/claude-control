@@ -75,9 +75,12 @@ export function useProjectRunnerInfo(path: string | undefined) {
 function useRunnerInfoMutation<TVariables extends { path: string }>(
   url: string,
   body: (variables: TVariables) => Record<string, unknown>,
+  /** Отказ показывает вызов сам — общий тост промолчит. */
+  silentError = false,
 ) {
   const queryClient = useQueryClient();
   return useMutation({
+    meta: { silentError },
     mutationFn: async (variables: TVariables) => {
       const { data } = await apiClient.post<ProjectRunnerInfo>(url, body(variables));
       return data;
@@ -92,6 +95,9 @@ function useRunnerInfoMutation<TVariables extends { path: string }>(
 export function useStartRunner() {
   const queryClient = useQueryClient();
   return useMutation({
+    // Отказ показывает вызов своим тостом; общий из MutationCache встал бы
+    // вторым, с сырым текстом сервера (живой прогон 26.09, F4).
+    meta: { silentError: true },
     mutationFn: async ({ path, dir, command }: RunnerTargetRef & { command?: string }) => {
       const { data } = await apiClient.post<ProjectRunnerView>('/project-runner/start', {
         path,
@@ -110,6 +116,7 @@ export function useStartRunner() {
 export function useStopRunner() {
   const queryClient = useQueryClient();
   return useMutation({
+    meta: { silentError: true },
     mutationFn: async ({ path, dir }: RunnerTargetRef) => {
       const { data } = await apiClient.post<{ ok: boolean }>('/project-runner/stop', { path, dir });
       return data;
@@ -148,6 +155,7 @@ export function usePortHolders(port: number | undefined) {
 export function useFreePort() {
   const queryClient = useQueryClient();
   return useMutation({
+    meta: { silentError: true },
     mutationFn: async ({ port }: { port: number }) => {
       const { data } = await apiClient.post<PortHoldersInfo>('/project-runner/free-port', { port });
       return data;
@@ -167,6 +175,7 @@ export function useSetRunnerAutostart() {
   return useRunnerInfoMutation<RunnerTargetRef & { enabled: boolean }>(
     '/project-runner/autostart',
     ({ path, dir, enabled }) => ({ path, dir, enabled }),
+    true,
   );
 }
 
@@ -185,5 +194,6 @@ export function useSaveRunnerSettings() {
   return useRunnerInfoMutation<RunnerTargetRef & { command?: string; port?: number | null }>(
     '/project-runner/settings',
     ({ path, dir, command, port }) => ({ path, dir, command, port }),
+    true,
   );
 }

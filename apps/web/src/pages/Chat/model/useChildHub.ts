@@ -23,14 +23,17 @@ import {
 import {
   collectReviews,
   reviewTreeOf,
+  type ChildBranch,
   type ChildPermission,
   type ChildQuestion,
   type ChildStageGroup,
   type ReviewDecisionItem,
+  useResumeInterruptedGroups,
 } from '@features/ChatMessages';
 import { collectChildQuestions } from '../lib/childQuestions';
 import { collectChildPermissions } from '../lib/childPermissions';
-import { collectChildStages } from '../lib/childStages';
+import { collectChildStages, groupDeliverOf, treeForChat } from '../lib/childStages';
+import { withTreeAsks } from '../lib/treeAsks';
 
 /** Всё, что родительский разговор знает о своих детях, одним объектом. */
 export interface ChildHub {
@@ -50,13 +53,15 @@ export interface ChildHub {
    * предложение отработано, и убирает кнопку: иначе она остаётся живой до
    * следующей реплики агента, и второе нажатие заводит те же копии ещё раз.
    */
-  branches: string[];
+  branches: ChildBranch[];
   /**
    * Группы разделения с их звеньями: на чём каждая стоит сейчас и чем ведётся.
    * Считается по веткам, а не по чатам — у одной группы разговоров до четырёх.
    * С конвейером уровней (Т1) сюда входят и группы, у которых чата ещё нет.
    */
   stages: ChildStageGroup[];
+  /** Открыт чат группы разделения: её «До MR» из плана (O2). */
+  groupDeliver?: boolean;
   /**
    * Дерево разговоров с сервера: сколько идёт и стоит ли всё на паузе. Есть
    * только у разговора с детьми — у остальных спрашивать нечего.
@@ -76,6 +81,9 @@ export interface ChildHub {
    */
   release: (index: number) => void;
   releaseBusy: boolean;
+  /** «Продолжить» оборванные группы (WP1c): без номера — все, с номером — одну. */
+  resumeInterrupted: (index?: number) => void;
+  resumeInterruptedBusy: boolean;
   /**
    * Пересчитать пересечения веток (Т6). Панель считает их и сама — по концу
    * цепочки любой группы, — но человек вправе спросить, не дожидаясь ничьего
@@ -130,7 +138,9 @@ export function useChildHub(
       questions: collectChildQuestions(all, parentChatId, runs),
       permissions: collectChildPermissions(all, parentChatId, runs),
       list: children.map((chat) => ({ id: chat.id, title: chat.title || chat.id })),
-      branches: children.map((chat) => chat.branch ?? '').filter(Boolean),
+      branches: children.flatMap((chat) =>
+        chat.branch ? [{ branch: chat.branch, createdAt: chat.createdAt }] : [],
+      ),
     };
   }, [chats, parentChatId, runs]);
 
@@ -144,8 +154,17 @@ export function useChildHub(
 
   // Дерево и его пауза — с сервера: он знает связи и он же глушит автостарты в
   // стоящем дереве. После нажатия прогоны стартуют и гаснут ВНЕ этой вкладки,
-  // поэтому стор прогонов пересчитывается тем же путём, что после F5.
-  const tree = useChatTree(parentChatId, hub.list.length > 0);
+  // поэтому стор прогонов пересчитывается тем же путём, что после F5. Дерево
+  // спрашивается и без детей в списке: на разборе их ещё нет, а план уже идёт —
+  // по нему заперта «Разделить» и видна «Отменить план» (D1).
+  const tree = useChatTree(parentChatId, true);
+  // Вопросы и права отцепленных групп — из записи сервера (журнал 30, 36, 62):
+  // поток прогона видит только подключённая вкладка, а группу конвейера не
+  // смотрит никто, и её вопрос иначе не доходил до хаба вовсе.
+  const asks = useMemo(
+    () => withTreeAsks(hub, tree.data, parentChatId, chats ?? []),
+    [hub, tree.data, parentChatId, chats],
+  );
   const pause = usePauseTree();
   const resume = useResumeTree();
   const hold = useAnswerHold();
@@ -156,6 +175,10 @@ export function useChildHub(
     void queryClient.invalidateQueries({ queryKey: chatKeys.list });
     void queryClient.invalidateQueries({ queryKey: chatTreeKeys.tree(parentChatId ?? '') });
   };
+  const resumeInterrupted = useResumeInterruptedGroups({
+    ...(parentChatId ? { parentChatId } : {}),
+    settle,
+  });
   const fail = (error: unknown): void => {
     toast.error(
       t('chat.cascade.tree.failed', {
@@ -358,16 +381,24 @@ export function useChildHub(
   // Сводка групп считается с видом конвейера: без него группы, у которых чата
   // ещё нет, в сводке отсутствовали бы вовсе.
   const isPaused = Boolean(tree.data?.paused);
-  const split = tree.data?.split;
+  const view = useMemo(() => treeForChat(tree.data, parentChatId), [tree.data, parentChatId]);
+  const split = view?.split;
   const stages = useMemo(() => {
     const rows = collectChildStages(chats ?? [], parentChatId, runs, split);
     return isPaused ? rows.map((group) => ({ ...group, isPaused: true })) : rows;
   }, [chats, parentChatId, runs, split, isPaused]);
 
+  const groupDeliver = groupDeliverOf(
+    ownTree.data,
+    (chats ?? []).find((chat) => chat.id === parentChatId),
+  );
+
   return {
     ...hub,
+    ...(groupDeliver === undefined ? {} : { groupDeliver }),
+    ...asks,
     stages,
-    ...(tree.data ? { tree: tree.data } : {}),
+    ...(view ? { tree: view } : {}),
     pauseAll,
     resumeAll,
     treeBusy: pause.isPending || resume.isPending,
@@ -375,6 +406,8 @@ export function useChildHub(
     holdBusy: hold.isPending,
     release: releaseGroup,
     releaseBusy: release.isPending,
+    resumeInterrupted: resumeInterrupted.resume,
+    resumeInterruptedBusy: resumeInterrupted.busy,
     checkOverlap,
     overlapBusy: overlap.isPending,
     reviews,

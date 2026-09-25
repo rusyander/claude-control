@@ -23,6 +23,8 @@ export interface ChildBlocksProps {
   /** «Отпустить» группу, ждущую предшественников (Т1) — туда же и тем же номером. */
   onRelease?: (index: number) => void;
   releaseBusy?: boolean;
+  onResumeInterrupted?: (index?: number) => void;
+  resumeInterruptedBusy?: boolean;
   /** Пересчитать пересечения веток (Т6) — кнопка в сводке групп. */
   onCheckOverlap?: () => void;
   overlapBusy?: boolean;

@@ -5,6 +5,8 @@ export const gitMessageParams = {
   'worktree-install-no-command': [],
   'worktree-path-required': [],
   'worktree-agent-running': [],
+  'worktree-copy-locked': [],
+  'worktree-copy-dirty': [],
   'git-command-missing-exec': [],
   'git-not-repo': [],
   'git-no-commits-first': [],

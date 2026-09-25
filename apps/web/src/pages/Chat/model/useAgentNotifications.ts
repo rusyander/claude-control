@@ -5,6 +5,8 @@ import { agentRuns, type RunStatus } from '@shared/lib/agent-runs';
 import { toast } from '@shared/lib/toast';
 import { notifyAgent, type NotifyKind } from '@shared/lib/notify-sound';
 import { dismissAttention } from '@shared/lib/attention';
+import { askNotifyPermissionOnGesture, showSystemNotice } from '@shared/lib/system-notify';
+import { backgroundRunNotice, openRunNotice } from '../lib/runNotice';
 
 /** Каким звуком зовёт завершившийся фоновый прогон: упал, спросил или просто закончил. */
 const BACKGROUND_SOUND: Record<RunStatus, NotifyKind> = {
@@ -42,8 +44,10 @@ export interface AgentNotificationsInput {
 
 /**
  * Как панель зовёт человека к агенту: тосты и звук про фоновые прогоны, звук
- * про свой, снятие метки в браузере по факту увиденного. Ничего не рисует —
- * только подписки на стор прогонов.
+ * про свой, снятие метки в браузере по факту увиденного. Вкладку не видно —
+ * ещё и системное уведомление браузера: тост на скрытой вкладке никто не
+ * увидит (живой прогон 24.09, находка 77). Ничего не рисует — только подписки
+ * на стор прогонов.
  */
 export function useAgentNotifications({
   chatId,
@@ -57,6 +61,10 @@ export function useAgentNotifications({
   // Подписки переустанавливать по составу детей, а не по массиву: он
   // пересобирается на каждом рендере родителя.
   const childKeys = (children ?? []).map((child) => `${child.id}\u0000${child.title}`).join(',');
+
+  // Разрешение на системные уведомления — на первом клике или клавише, один
+  // раз; на загрузке страницы не спрашиваем ничего.
+  useEffect(() => askNotifyPermissionOnGesture(), []);
 
   // Фоновый агент в другом проекте задал вопрос, завершил или упал — сообщаем
   // тостом. Так за несколькими агентами видно из одного места.
@@ -77,19 +85,15 @@ export function useAgentNotifications({
         ? onOpenChild && { onClick: () => onOpenChild(child.id) }
         : path && { onClick: () => ws.reveal(path, name) };
 
-      if (child) {
-        if (backgroundRun.status === 'error')
-          toast.error(t('projects.notifyChildError', { title: child.title }), options || undefined);
-        else if (backgroundRun.status !== 'waiting')
-          toast.success(
-            t('projects.notifyChildDone', { title: child.title }),
-            options || undefined,
-          );
-      } else if (backgroundRun.status === 'waiting')
-        toast.warning(t('projects.notifyWaiting', { name }), options || undefined);
-      else if (backgroundRun.status === 'error')
-        toast.error(t('projects.notifyError', { name }), options || undefined);
-      else toast.success(t('projects.notifyDone', { name }), options || undefined);
+      const notice = backgroundRunNotice(backgroundRun.status, child, name);
+      const text = t(notice.key, notice.params);
+      if (notice.toast) toast[notice.tone](text, options || undefined);
+      showSystemNotice({
+        title: t('common.appName'),
+        body: text,
+        tag: backgroundRun.id,
+        onClick: options ? options.onClick : undefined,
+      });
 
       // Звук уведомления — чтобы услышать другого агента, не глядя в экран.
       notifyAgent(BACKGROUND_SOUND[backgroundRun.status]);
@@ -107,12 +111,17 @@ export function useAgentNotifications({
       const isHere =
         keys.includes(chatId) ||
         (children ?? []).some((child) => keys.includes(child.id as string | undefined));
-      if (!isHere) {
-        const path = permissionRun.projectPath;
-        const name = path ? projectShortName(path) : t('workspace.homeTab');
-        const options = path ? { onClick: () => ws.reveal(path, name) } : undefined;
-        toast.warning(t('projects.notifyPermission', { name }), options);
-      }
+      const path = permissionRun.projectPath;
+      const name = path ? projectShortName(path) : t('workspace.homeTab');
+      const options = path && !isHere ? { onClick: () => ws.reveal(path, name) } : undefined;
+      if (!isHere) toast.warning(t('projects.notifyPermission', { name }), options);
+      // «Уже на экране» — только для видимой вкладки: скрытую зовёт система.
+      showSystemNotice({
+        title: t('common.appName'),
+        body: t('projects.notifyPermission', { name }),
+        tag: `permission:${permissionRun.id}`,
+        onClick: options?.onClick,
+      });
       notifyAgent('waiting');
     });
     return () => agentRuns.setOnPermissionRequest(undefined);
@@ -126,8 +135,13 @@ export function useAgentNotifications({
   useEffect(() => {
     const prev = prevStatusRef.current;
     prevStatusRef.current = runStatus;
+    // Системное уведомление — и про конец хода: на скрытой вкладке человек
+    // иначе не узнает, что разговор, который он оставил, закончен.
+    const key = openRunNotice(prev, runStatus);
+    if (key) showSystemNotice({ title: t('common.appName'), body: t(key), tag: runId || 'open' });
     if (prev !== 'running') return;
     if (runStatus === 'waiting' || runStatus === 'error') notifyAgent(runStatus);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [runStatus]);
 
   // Метка в браузере гаснет по действию человека, а не по таймеру: открыт тот

@@ -39,12 +39,14 @@ export function appDataOf(deps: IntegrationsDeps): string {
  * работать у всех, кто вики не пользуется.
  */
 export function atlassianAccess(deps: IntegrationsDeps): AtlassianAccess {
-  const token = requireConnected(deps.ctx.store, appDataOf(deps), 'atlassian', 'Atlassian');
-  return toAccess(
-    readIntegrations(deps.ctx.store).atlassian,
-    token,
-    readConfluenceToken(appDataOf(deps)) ?? '',
-  );
+  return atlassianAccessOf(deps.ctx);
+}
+
+/** То же по контексту сервера — для маршрутов вне интеграций (тикеты разделения). */
+export function atlassianAccessOf(ctx: ServerContext): AtlassianAccess {
+  const appData = ctx.location.paths.appData;
+  const token = requireConnected(ctx.store, appData, 'atlassian', 'Atlassian');
+  return toAccess(readIntegrations(ctx.store).atlassian, token, readConfluenceToken(appData) ?? '');
 }
 
 /**

@@ -7,7 +7,8 @@ import type {
   WorktreeBootstrapState,
   WorktreeMirrorSettings,
 } from '@agentdeck/contracts';
-import type { SplitSettings } from '@agentdeck/contracts/task-split';
+import type { GroupPermissionLevel } from '@agentdeck/contracts/split-groups';
+import type { SplitSettingsView } from '@agentdeck/contracts/task-split';
 import { apiClient } from '@shared/api/client';
 import { normalizeProjectPath } from '@shared/lib/workspace';
 
@@ -143,6 +144,9 @@ export function useProjectWorktrees(path: string | undefined) {
 function useWorktreeAction<TBody extends { path: string }>(url: string) {
   const queryClient = useQueryClient();
   return useMutation({
+    // Отказ показывает вызов своим тостом; общий из MutationCache встал бы
+    // вторым, с сырым текстом сервера (живой прогон 26.09, F4).
+    meta: { silentError: true },
     mutationFn: async (body: TBody) => {
       const { data } = await apiClient.post<ProjectWorktreesResult>(url, body);
       return data;
@@ -200,6 +204,7 @@ export function useMirrorSettings(path: string | undefined) {
 export function useSaveMirrorSettings() {
   const queryClient = useQueryClient();
   return useMutation({
+    meta: { silentError: true },
     mutationFn: async (body: { path: string } & WorktreeMirrorSettings) => {
       const { data } = await apiClient.put<WorktreeMirrorSettings>(
         '/project-git/mirror-settings',
@@ -218,12 +223,15 @@ function splitSettingsKeyFor(path: string | undefined): readonly unknown[] {
   return [...projectGitKey, 'split-settings', path ? normalizeProjectPath(path) : ''];
 }
 
-/** Разделение на проекте: доводить ли группу до MR и сколько групп идёт разом. */
+/**
+ * Доставка до MR на проекте: включена ли, сколько групп разделения идёт разом и
+ * что панель узнала о проекте сама (удалённый репозиторий, навык, подготовка копии).
+ */
 export function useSplitSettings(path: string | undefined) {
   return useQuery({
     queryKey: splitSettingsKeyFor(path),
     queryFn: async () => {
-      const { data } = await apiClient.get<SplitSettings>('/project-git/split-settings', {
+      const { data } = await apiClient.get<SplitSettingsView>('/project-git/split-settings', {
         params: { path },
       });
       return data;
@@ -235,8 +243,18 @@ export function useSplitSettings(path: string | undefined) {
 export function useSaveSplitSettings() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (body: { path: string } & SplitSettings) => {
-      const { data } = await apiClient.put<SplitSettings>('/project-git/split-settings', body);
+    meta: { silentError: true },
+    /**
+     * `parallel: null` — вернуть общий потолок; `permissions` не задано — строки
+     * разрешений проекта не трогаем, `null` — сбросить их к общим.
+     */
+    mutationFn: async (body: {
+      path: string;
+      deliver: boolean;
+      parallel: number | null;
+      permissions?: Record<string, GroupPermissionLevel> | null;
+    }) => {
+      const { data } = await apiClient.put<SplitSettingsView>('/project-git/split-settings', body);
       return data;
     },
     onSuccess: (result, body) => {

@@ -54,6 +54,29 @@ describe('agentTextView — рисунок агента на телефоне', 
  * один импорт пакета по дороге — и бандл не собирается, хотя vitest (он находит
  * zod у пакета контрактов) зелёный. Поэтому граф проверяется по тексту.
  */
+describe('agentTextView — блок тикета группы', () => {
+  const ticket = [
+    '<agentdeck:ticket>',
+    'title: Кнопка съезжает',
+    'where: a.tsx:1',
+    '</agentdeck:ticket>',
+  ].join('\n');
+
+  it('закрытый блок уходит из текста, отчёт вокруг остаётся', () => {
+    const view = agentTextView(['Отчёт.', ticket, 'Конец.'].join('\n\n'), ru.chat);
+    expect(view.markdown).not.toContain('agentdeck:ticket');
+    expect(view.markdown).not.toContain('Кнопка съезжает');
+    expect(view.markdown).toContain('Конец.');
+  });
+
+  it('пока ответ печатается, недописанный блок спрятан вместе с хвостом', () => {
+    const view = agentTextView('Отчёт.\n\n<agentdeck:ticket>\ntitle: Кно', ru.chat, {
+      streaming: true,
+    });
+    expect(view.markdown).toBe('Отчёт.');
+  });
+});
+
 describe('media-block грузится без чужих пакетов', () => {
   it('ни один модуль, достижимый из media-block.ts, не ввозит пакет значением', () => {
     const here = dirname(fileURLToPath(import.meta.url));

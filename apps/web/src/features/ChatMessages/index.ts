@@ -6,7 +6,7 @@ export { ChatMessages } from './ui/ChatMessages';
  * разошлась бы с первой на первой же правке формата.
  */
 export { TaskSplitCard } from './ui/TaskSplitCard';
-export type { TaskSplitCardProps } from './ui/TaskSplitCard.types';
+export type { ChildBranch, TaskSplitCardProps } from './ui/TaskSplitCard.types';
 /** Карточка продолжения в чистой сессии — по той же причине, что и соседняя. */
 export { HandoffCard } from './ui/HandoffCard';
 export type { HandoffCardProps } from './ui/HandoffCard.types';
@@ -44,3 +44,8 @@ export type { ReviewDecisionCardProps } from './ui/ReviewDecisionCard.types';
 export type { ReviewDecisionItem } from './ui/ReviewDecisionCard.types';
 export { collectReviews, reviewTreeOf } from './lib/reviewItems';
 export { waitsDecision } from './lib/reviewWaiting';
+/**
+ * «Продолжить» оборванные группы (WP1c) — хабу обеих лент, по той же причине.
+ */
+export { useResumeInterruptedGroups } from './model/useResumeInterruptedGroups';
+export type { ResumeInterruptedGroups } from './model/useResumeInterruptedGroups';

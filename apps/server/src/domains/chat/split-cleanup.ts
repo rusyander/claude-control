@@ -8,7 +8,7 @@ import { removeWorktree } from '../project-git/worktrees.ts';
  * конвейере (`SplitConveyor.cleanup`), здесь только то, что делает git.
  *
  * Копию убирает `removeWorktree` без `--force`: незакоммиченная работа человека
- * — не мусор, и отказ git уходит ему как есть. Ветку удаляем только ПУСТУЮ —
+ * — не мусор, и отказ git уходит ему кодом. Ветку удаляем только ПУСТУЮ —
  * вершина которой уже есть в основной копии: тогда удаление не теряет ни одного
  * коммита. Ветка со своей работой и ветка MR остаются: слить их или выбросить
  * решает человек, а не панель.
@@ -21,9 +21,11 @@ export async function removeGroupCopy(input: {
   keepBranch: boolean;
   claudeJsonPath?: string;
   mirror?: WorktreeMirrorSettings;
+  /** Закрыть свои процессы в копии до удаления (см. `removeWorktree`). */
+  release?: (path: string) => Promise<void>;
 }): Promise<SplitGroupCleaned['branch']> {
   const { projectPath, path, branch } = input;
-  await removeWorktree(projectPath, path, false, input.claudeJsonPath, input.mirror);
+  await removeWorktree(projectPath, path, false, input.claudeJsonPath, input.mirror, input.release);
   if (input.keepBranch) return 'mr';
   const ref = `refs/heads/${branch}`;
   try {

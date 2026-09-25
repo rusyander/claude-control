@@ -237,6 +237,16 @@ export async function openStream(
     settle?.({ ok: false, code: refusal.code, message: refusal.message, files: refusal.files });
     return 'refused';
   }
+  // 202 — разговор занят, сообщение встало в очередь сервера (`queueIfBusy`).
+  // Потока этого сообщения ещё нет: подключаемся к ИДУЩЕМУ прогону по его
+  // ключу (`dirty` — обычный повод переподключиться), а новый ход вкладки
+  // подхватят опросом идущих, когда сервер его запустит.
+  if (mode === 'send' && response.status === 202) {
+    const queued = (await response.json().catch(() => ({}))) as { runId?: string };
+    setRun(id, { serverRunId: queued.runId ?? runs.get(id)?.serverRunId });
+    settle?.({ ok: true, queued: true });
+    return 'dirty';
+  }
   if (!response.body) {
     if (mode === 'send') throw new Error('Пустой ответ сервера');
     return 'dirty';

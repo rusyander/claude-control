@@ -243,12 +243,13 @@ const SETTINGS_KEYS = {
   handoffInitiative: z.boolean(),
   handoffContextLimit: z.number().int().nonnegative(),
   handoffAutoDefault: z.boolean(),
+  deliverToMr: z.boolean(),
   autoUpdateModels: z.boolean(),
   previewProviderWrites: z.boolean(),
 };
 
 const HUMAN_ONLY_SETTINGS =
-  'claudeDirOverride, revealSecretsByDefault, backupBeforeWrite, encryptSecretBackups, autoApproveRules, ' +
+  'claudeDirOverride, revealSecretsByDefault, backupBeforeWrite, encryptSecretBackups, autoApproveRules, chatAutoMode, ' +
   'promptGate, modelPricing, platformGateway, remote access';
 
 const getSettings = definePanelAction({

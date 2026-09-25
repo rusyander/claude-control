@@ -26,6 +26,8 @@ import {
   type SplitStart,
 } from '../../domains/chat/ChatSplit.ts';
 import { initiativePrompt } from '../../domains/chat/initiative.ts';
+import { copyRootOf } from '../../domains/chat/split-conveyor.ts';
+import { AUTONOMOUS_PERMISSION_MODE } from '../../domains/chat/ChatWorkspace.ts';
 import type { ChatLink, SplitPlanRecord } from '../../lib/app-store/app-store.types.ts';
 import { apiTokenPath } from '../../lib/api-token.ts';
 import { activateGroupsQuietly, groupsActivatedNotice } from '../../domains/group-activation.ts';
@@ -35,7 +37,7 @@ import {
   isCascadeEnabled,
 } from '../../domains/model-cascade.ts';
 import { planForeignAssignment } from '../../domains/provider-cascade.ts';
-import { bootstrapCommandFor } from '../../domains/project-git.ts';
+import { bootstrapPlanFor, resolveProjectDelivery } from '../../domains/project-git.ts';
 import { readMergeRequestByUrl } from '../../domains/integrations/forge.ts';
 import { readIntegrations, readToken } from '../../domains/integrations/store.ts';
 import {
@@ -74,7 +76,14 @@ export interface SplitLaunchDeps {
 
 /** Что человек попросил при разделении — то, что конвейер хранит в записи. */
 export interface SplitRequest {
+  /** Каталог копий и разбора — верх репозитория. */
   projectPath: string;
+  /**
+   * Путь, под которым у проекта лежат настройки (подбор, доставка): тот, что
+   * человек открыл. Проект — подкаталог репозитория, и копии заводятся от его
+   * верха, а правила — по-прежнему его (m6). Нет — тот же `projectPath`.
+   */
+  settingsPath?: string;
   parentChatId?: string;
   allowEdits?: boolean;
   model?: string;
@@ -128,6 +137,7 @@ export function createSplitLauncher(
 ): SplitLauncher {
   const selfBaseUrl = `http://127.0.0.1:${process.env.PORT ?? 5178}`;
   const dir = resolve(request.projectPath);
+  const settingsDir = resolve(request.settingsPath ?? request.projectPath);
   const { allowEdits, model, effort, parentChatId } = request;
 
   const provider = getActiveProvider(ctx.store);
@@ -163,10 +173,14 @@ export function createSplitLauncher(
   // нельзя: в ней имя модели Claude, а прогон пойдёт кодексом.
   const ceiling = isForeign
     ? undefined
-    : cascadeCeilingFor({ entries: cascadeEntries, settings: ctx.store.getSettings() }, dir, {
-        model,
-        effort,
-      });
+    : cascadeCeilingFor(
+        { entries: cascadeEntries, settings: ctx.store.getSettings() },
+        settingsDir,
+        {
+          model,
+          effort,
+        },
+      );
   // Каталог моделей: им алиас разворачивается в свежую модель семейства.
   const catalog = ctx.models.current(provider.modelVendors ?? []).models;
   // Потолок в том виде, в каком с ним можно ЗАПУСТИТЬ прогон: `max` срезан до
@@ -186,7 +200,9 @@ export function createSplitLauncher(
    * уровни включает то же правило проекта, что и подбор: выключив подбор в
    * репозитории, человек выключил и уровни.
    */
-  const canPlan = isForeign ? isCascadeEnabled(cascadeEntries, dir) : Boolean(runnableCeiling);
+  const canPlan = isForeign
+    ? isCascadeEnabled(cascadeEntries, settingsDir)
+    : Boolean(runnableCeiling);
   const planned = canPlan && Boolean(parentKey);
 
   /**
@@ -213,8 +229,8 @@ export function createSplitLauncher(
   const git = makeSplitGit(
     (projectDir) => ctx.store.getWorktreeMirror(projectDir),
     async (projectDir, copy) => {
-      const command = bootstrapCommandFor(copy, ctx.store.getWorktreeMirror(projectDir).bootstrap);
-      return command ? ctx.worktreeBootstraps.run(copy, command) : undefined;
+      const plan = bootstrapPlanFor(copy, ctx.store.getWorktreeMirror(projectDir).bootstrap);
+      return plan ? ctx.worktreeBootstraps.run(copy, plan) : undefined;
     },
     ctx.location.paths.mcpConfig,
   );
@@ -226,7 +242,7 @@ export function createSplitLauncher(
    */
   const assign = isForeign
     ? (group: TaskSplitProposal['groups'][number], prompt: string) =>
-        isCascadeEnabled(cascadeEntries, dir)
+        isCascadeEnabled(cascadeEntries, settingsDir)
           ? planForeignAssignment(provider, catalog, {
               ...(group.kind ? { kind: group.kind } : {}),
               tasks: group.tasks.length,
@@ -377,7 +393,7 @@ export function createSplitLauncher(
     deps.runs.muteSplit(chatId);
     // Автоподтверждение наследуется от родителя: делят как раз для того, чтобы
     // не сидеть над каждым.
-    if (parentChatId) deps.session.inherit([parentChatId], chatId);
+    if (parentChatId) deps.session.inherit([parentChatId], chatId, true);
 
     const isPlan = stage === 'plan' && assignment && runnableCeiling;
     const initiative = [
@@ -433,7 +449,7 @@ export function createSplitLauncher(
       effort: isPlan
         ? runnableCeiling.effort
         : (assignment?.effort ?? (effort || settings.chatEffort)),
-      permissionMode: allowEdits ? 'acceptEdits' : 'default',
+      permissionMode: allowEdits ? AUTONOMOUS_PERMISSION_MODE : 'default',
       permissionPrompt: { runId: chatId, baseUrl: selfBaseUrl, tokenFile: apiTokenPath() },
       ...(initiative ? { appendSystemPrompt: initiative } : {}),
     };
@@ -638,7 +654,10 @@ export function createSplitLauncher(
         stage: options.stage === 'plan' && canPlan ? 'plan' : 'work',
         ...(options.context ? { context: options.context } : {}),
         ...(options.claimBranch ? { claimBranch: options.claimBranch } : {}),
-        deliver: ctx.store.getSplitSettings(dir).deliver,
+        // Главный выключатель, проект и удалённый репозиторий — вместе.
+        deliver: resolveProjectDelivery(ctx.store, settingsDir).active,
+        // Кто решает развилки групп — общая строка вкладки «Группы».
+        groupQuestions: ctx.store.getSplitDefaults().groupQuestions,
       }),
     startTriage: (prompt, claim) => {
       // У чужого CLI разбор — такой же разговор его хранилища, как и всё
@@ -667,9 +686,9 @@ export function createSplitLauncher(
         command: activeCliCommand(ctx.store),
         model: runnableCeiling.model,
         effort: runnableCeiling.effort,
-        // Разбор только читает: права на правки ему не выдаются даже при
-        // «разрешить правки» у детей.
-        permissionMode: 'default',
+        // Разбор только читает (так велит его задание), но спрашивать права ему
+        // некого: при `default` каждый `cd … && grep` ждал кнопки в чате разбора.
+        permissionMode: AUTONOMOUS_PERMISSION_MODE,
         permissionPrompt: { runId: chatId, baseUrl: selfBaseUrl, tokenFile: apiTokenPath() },
         ...(initiative ? { appendSystemPrompt: initiative } : {}),
       };
@@ -691,7 +710,7 @@ export function createSplitLauncher(
  * его моделью и правами уже нет. Всё, что нужно, лежит в связи чата ревью, а
  * недостающее берётся из настроек панели.
  *
- * Права — `acceptEdits`, и это не вольность: человек только что нажал «исправить
+ * Права — авторежим (`AUTONOMOUS_PERMISSION_MODE`), и это не вольность: человек нажал «исправить
  * в копии». Без них агент встал бы на первом же файле, дожидаясь у панели того,
  * кто уже ответил.
  */
@@ -740,7 +759,7 @@ export function createReviewStarter(
       command: activeCliCommand(ctx.store),
       model: input.model || settings.chatModel,
       effort: input.effort || settings.chatEffort,
-      permissionMode: 'acceptEdits',
+      permissionMode: AUTONOMOUS_PERMISSION_MODE,
       permissionPrompt: { runId: input.chatId, baseUrl: selfBaseUrl, tokenFile: apiTokenPath() },
       ...(initiative ? { appendSystemPrompt: initiative } : {}),
     };
@@ -875,7 +894,8 @@ export function launchFromRecord(
   claimBranch?: (index: number, branch: string) => void,
 ): Promise<TaskSplitResult> {
   const launcher = createSplitLauncher(ctx, deps, {
-    projectPath: record.projectPath,
+    projectPath: copyRootOf(record),
+    settingsPath: record.projectPath,
     parentChatId: record.parentChatId,
     ...(record.request.allowEdits !== undefined ? { allowEdits: record.request.allowEdits } : {}),
     ...(record.request.model ? { model: record.request.model } : {}),

@@ -127,6 +127,56 @@ function projectRef(access: ForgeAccess): string {
   return access.kind === 'github' ? access.repo : encodeURIComponent(access.repo);
 }
 
+/** GET к API форджа тем же доступом — для чтений вне этого файла (`mr-review.ts`). */
+export async function forgeGet<T>(access: ForgeAccess, path: string): Promise<T> {
+  const response = await sendRequest({
+    url: `${access.api}${path}`,
+    system: systemName(access),
+    headers: { ...headers(access), Accept: 'application/json' },
+  });
+  if (!response.ok) {
+    throw failedResponse(systemName(access), response, 300);
+  }
+  return parseJson<T>(systemName(access), response);
+}
+
+/** Путь проекта в адресе API — для чтений вне этого файла. */
+export function forgeProjectRef(access: ForgeAccess): string {
+  return projectRef(access);
+}
+
+/**
+ * Запрос GraphQL к GitHub — для чтений вне этого файла (`mr-review.ts`): «ветка
+ * ревью решена» REST не отдаёт. Адрес — не под корнем REST: у github.com
+ * `api.github.com/graphql`, у своей инсталляции `<сайт>/api/graphql`, а не
+ * `/api/v3/graphql`. Ошибки GraphQL приходят с кодом 200 в `errors` — и
+ * бросаются так же, как отказ HTTP: «не прочиталось» не равно «пусто».
+ */
+export async function forgeGraphql<T>(
+  access: ForgeAccess,
+  query: string,
+  variables: Record<string, unknown>,
+): Promise<T> {
+  const cloud = access.api === apiRoot('github', GITHUB_CLOUD);
+  const response = await sendRequest({
+    url: cloud ? `${access.api}/graphql` : `${access.site}/api/graphql`,
+    method: 'POST',
+    system: systemName(access),
+    headers: { ...headers(access), 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ query, variables }),
+  });
+  if (!response.ok) throw failedResponse(systemName(access), response, 300);
+  const parsed = parseJson<{ data?: T | null; errors?: { message?: string }[] }>(
+    systemName(access),
+    response,
+  );
+  if (parsed?.errors?.length || !parsed?.data) {
+    const reasons = (parsed?.errors ?? []).map((error) => error.message ?? '').join('; ');
+    throw new Error(`GitHub GraphQL: ${reasons || 'no data'}`);
+  }
+  return parsed.data;
+}
+
 async function post<T>(access: ForgeAccess, path: string, body: unknown): Promise<T> {
   const response = await sendRequest({
     url: `${access.api}${path}`,

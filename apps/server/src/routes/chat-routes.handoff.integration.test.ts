@@ -10,6 +10,7 @@ import { createHandoffPlanner, registerChatHandoffRoutes } from './chat/handoff-
 import { ChatRunRegistry, type RunLike } from '../domains/chat/ChatRunRegistry.ts';
 import { ChatSession } from '../domains/chat/ChatSession.ts';
 import { HandoffChains } from '../domains/chat/ChatHandoff.ts';
+import { AUTONOMOUS_PERMISSION_MODE } from '../domains/chat/ChatWorkspace.ts';
 import { ProviderChatService } from '../domains/provider-chat.ts';
 import type { ChatLink } from '../lib/app-store/app-store.types.ts';
 
@@ -753,7 +754,13 @@ describe('планировщик конвейера подбора модели'
     const chains = new HandoffChains();
     const registry = new ChatRunRegistry(() => fakeRun(text, options.tools));
     const links = new Map<string, ChatLink>();
-    const runs: { chatId: string; model?: string; effort?: string; append?: string }[] = [];
+    const runs: {
+      chatId: string;
+      model?: string;
+      effort?: string;
+      append?: string;
+      permissionMode?: string;
+    }[] = [];
     // Реестр подменён не полностью: прогоны настоящие, а вот с чем их запустили
     // — видно только отсюда, поэтому старт перехватывается обёрткой.
     const start = registry.start.bind(registry);
@@ -763,6 +770,7 @@ describe('планировщик конвейера подбора модели'
         ...(opts.model ? { model: opts.model } : {}),
         ...(opts.effort ? { effort: opts.effort } : {}),
         ...(opts.appendSystemPrompt ? { append: opts.appendSystemPrompt } : {}),
+        ...(opts.permissionMode ? { permissionMode: opts.permissionMode } : {}),
       });
       return start(chatId, opts, meta);
     };
@@ -805,10 +813,40 @@ describe('планировщик конвейера подбора модели'
   };
 
   /** Прогон одного звена от старта до завершения планировщика. */
-  async function run(registry: ChatRunRegistry, chatId: string): Promise<void> {
-    registry.start(chatId, { prompt: 'переименуй foo в bar', cwd: CWD }, { projectPath: CWD });
+  async function run(
+    registry: ChatRunRegistry,
+    chatId: string,
+    permissionMode?: string,
+  ): Promise<void> {
+    registry.start(
+      chatId,
+      { prompt: 'переименуй foo в bar', cwd: CWD, ...(permissionMode ? { permissionMode } : {}) },
+      { projectPath: CWD },
+    );
     await new Promise((done) => setTimeout(done, 20));
   }
+
+  it('звено группы идёт в авторежиме, даже если прогон работы режим потерял', async () => {
+    // Усыновлённый после перезапуска прогон приходит без режима — живой прогон
+    // 24.09.2026: ревью и правки групп встали на невидимой карточке прав.
+    const { registry, links, runs } = build('Готово, переименовал.');
+    links.set('чат-работа', WORK_LINK);
+
+    await run(registry, 'чат-работа');
+
+    const review = runs.find((item) => item.chatId.startsWith('new-'));
+    expect(review?.permissionMode).toBe(AUTONOMOUS_PERMISSION_MODE);
+  });
+
+  it('группа без права правок так и идёт без него', async () => {
+    const { registry, links, runs } = build('Готово, переименовал.');
+    links.set('чат-работа', WORK_LINK);
+
+    await run(registry, 'чат-работа', 'default');
+
+    const review = runs.find((item) => item.chatId.startsWith('new-'));
+    expect(review?.permissionMode).toBe('default');
+  });
 
   it('после понижённой работы сам заводит ревью на потолке', async () => {
     const { registry, links, runs } = build('Готово, переименовал.');
@@ -980,6 +1018,21 @@ describe('планировщик конвейера подбора модели'
 
       expect(runs.some((item) => item.chatId.startsWith('new-'))).toBe(true);
       expect(seen).toEqual([{ stage: 'work', planMissing: true }]);
+    });
+
+    // Живой прогон 25.09: план спросил человека, и панель тут же завела работу
+    // по недописанному плану — ответ ушёл в чат, который уже никто не читал.
+    it('план кончился вопросом — работа не заводится, группа ждёт человека', async () => {
+      const { registry, links, runs, planned, ended } = buildLevels(
+        'Разделить по модулям или одним коммитом?',
+      );
+      links.set('чат-план', PLAN_LINK);
+
+      await run(registry, 'чат-план');
+
+      expect(runs.filter((item) => item.chatId.startsWith('new-'))).toEqual([]);
+      expect(planned).toEqual([]);
+      expect(ended).toEqual([{ branch: 'split/rename', ok: true, status: 'awaiting' }]);
     });
 
     it('разбор идёт конвейеру, а не в звенья', async () => {

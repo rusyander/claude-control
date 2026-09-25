@@ -1,7 +1,6 @@
 import { Fragment, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import type { SplitPlanView } from '@agentdeck/contracts/chat-handoff';
 import { Button } from '@shared/ui/button';
 import { Stack } from '@shared/ui/stack';
 import { TextField } from '@shared/ui/text-field';
@@ -9,10 +8,19 @@ import { Typography } from '@shared/ui/typography';
 import { StatusDot } from '@shared/ui/status-dot';
 import { formatDuration } from '@shared/lib/format-duration';
 import { cn } from '@shared/lib/cn';
-import { serverFieldText } from '@shared/config/i18n';
-import { triageChipState } from '../lib/triageChipState';
+import { serverFieldList, serverFieldText } from '@shared/config/i18n';
+import { countedGroups, triageElapsedMs, triageLive } from '../lib/hubSummary';
+import { useTickingNow } from '../lib/useTickingNow';
 import { SplitOverlapPanel } from './SplitOverlapPanel';
 import { GroupCopyCleanup } from './GroupCopyCleanup';
+import { PlanCancel } from './PlanCancel';
+import { GroupControl } from './GroupControl';
+import { HubSummary } from './HubSummary';
+import { RetiredChats } from './RetiredChats';
+import { GroupAcceptance } from './GroupAcceptance';
+import { GroupAutoNotices } from './GroupAutoNotices';
+import { SplitFollowUps } from './SplitFollowUps';
+import { TriageChip } from './TriageChip';
 import type { ChildStageGroup, ChildStagesProps } from './ChildStages.types';
 import styles from './ChildStages.module.scss';
 
@@ -46,11 +54,19 @@ export function ChildStages({
   releaseBusy,
   onCheckOverlap,
   overlapBusy,
+  onResumeInterrupted,
+  resumeInterruptedBusy,
   foreign,
 }: ChildStagesProps) {
   const { t } = useTranslation();
+  // Время разбора и всего разделения тикает, только пока что-то идёт.
+  const now = useTickingNow(groups.some((group) => group.isRunning));
   if (groups.length === 0) return null;
 
+  // Отброшенные перезапуском чаты (L20) — не группы: ни в счёт, ни в строки.
+  const retired = groups.filter((group) => group.retired);
+  const live = groups.filter((group) => !group.retired);
+  const interrupted = live.filter((group) => group.interrupted).length;
   const paused = tree?.paused;
   const canPause = !paused && (tree?.running ?? 0) > 0 && Boolean(onPauseAll);
   const canResume = Boolean(paused) && Boolean(onResumeAll);
@@ -60,12 +76,20 @@ export function ChildStages({
     <div className={styles.card} data-child-hub>
       <div className={styles.head}>
         <Typography variant="caption" color="subtle" as="span" className={styles.headText}>
-          {t('chat.cascade.hub.title', { count: groups.length })}
+          {/* Считаются группы: строка разбора — общая, не группа (L37: «12
+              групп» при одиннадцати). */}
+          {t('chat.cascade.hub.title', { count: countedGroups(groups).length })}
         </Typography>
         {/* Итог разбора — одной фишкой: применён, не получен, ещё идёт. Что
             панель в нём поправила, видно по наведению: это оправдание её
             самоуправства, а не новость. */}
-        {split && <TriageChip triage={split.triage} />}
+        {split && (
+          <TriageChip
+            triage={split.triage}
+            live={triageLive(live, tree)}
+            elapsedMs={triageElapsedMs(live, now)}
+          />
+        )}
         {paused && (
           <Typography variant="caption" color="subtle" as="span" className={styles.chip}>
             {t('chat.cascade.tree.paused')}
@@ -99,9 +123,26 @@ export function ChildStages({
             })}
           </Button>
         )}
+        {/* Оборванные группы (WP1c) — одной кнопкой: после выключения машины
+            человек не должен обходить группы по одной. */}
+        {interrupted > 0 && onResumeInterrupted && (
+          <Button
+            size="sm"
+            variant="secondary"
+            isLoading={resumeInterruptedBusy}
+            title={t('chat.cascade.hub.resumeInterruptedHint')}
+            data-resume-interrupted="all"
+            onClick={() => onResumeInterrupted()}
+          >
+            {t('chat.cascade.hub.resumeAllInterrupted', { count: interrupted })}
+          </Button>
+        )}
+        {split && <PlanCancel split={split} />}
       </div>
 
-      {groups.map((group) =>
+      <HubSummary groups={live} now={now} />
+
+      {live.map((group) =>
         group.chatId ? (
           <Fragment key={group.chatId}>
             <button
@@ -127,6 +168,22 @@ export function ChildStages({
                 {...(group.copy.cleaned ? { cleaned: group.copy.cleaned } : {})}
               />
             )}
+            {group.interrupted && onResumeInterrupted && (
+              <div className={styles.holdActions} data-resume-interrupted="group">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  isLoading={resumeInterruptedBusy}
+                  title={t('chat.cascade.hub.resumeInterruptedHint')}
+                  onClick={() => onResumeInterrupted(group.interrupted?.index)}
+                >
+                  {t('chat.cascade.hub.resumeInterrupted')}
+                </Button>
+              </div>
+            )}
+            {group.control && <GroupControl control={group.control} />}
+            {group.acceptance && <GroupAcceptance acceptance={group.acceptance} />}
+            {group.autoNotices && <GroupAutoNotices autoNotices={group.autoNotices} />}
           </Fragment>
         ) : (
           <div key={group.title} className={styles.rowStatic} data-hub-row={group.pending}>
@@ -165,6 +222,7 @@ export function ChildStages({
                   </Button>
                 </div>
               )}
+              {group.control && <GroupControl control={group.control} />}
             </Stack>
           </div>
         ),
@@ -179,42 +237,12 @@ export function ChildStages({
         {...(onCheckOverlap ? { onCheck: onCheckOverlap } : {})}
         {...(overlapBusy !== undefined ? { busy: overlapBusy } : {})}
       />
+
+      {/* После пересечений — то, что осталось человеку: шаги и тикеты групп. */}
+      {split && <SplitFollowUps split={split} />}
+
+      <RetiredChats chats={retired} onOpen={onOpen} />
     </div>
-  );
-}
-
-/**
- * Итог разбора одной фишкой: идёт, применён, не получен, оборван перезапуском.
- * Что панель в разборе поправила (потерянные задачи, снятые круги ожиданий) —
- * по наведению: это оправдание её самоуправства, а не новость, ради которой
- * стоит занимать строку.
- *
- * Оборванный разбор — отдельная подпись, а не оттенок «не получен»: там группы
- * ПОШЛИ как предложено, здесь они не пошли вовсе и ждут ответа человека.
- */
-function TriageChip({ triage }: { triage: SplitPlanView['triage'] }) {
-  const { t } = useTranslation();
-  const state = triageChipState(triage);
-  const label = {
-    running: t('chat.cascade.hub.triageRunning'),
-    applied: t('chat.cascade.hub.triageApplied'),
-    missing: t('chat.cascade.hub.triageMissing'),
-    interrupted: t('chat.cascade.hub.triageInterrupted'),
-  }[state];
-  const repairs = triage?.repairs ?? [];
-
-  return (
-    <Typography
-      variant="caption"
-      color="subtle"
-      as="span"
-      className={styles.chip}
-      data-hub-triage={state}
-      title={repairs.join('\n') || undefined}
-    >
-      {label}
-      {repairs.length > 0 ? ` · ${t('chat.cascade.hub.repairs', { count: repairs.length })}` : ''}
-    </Typography>
   );
 }
 
@@ -228,8 +256,29 @@ function GroupText({ group }: { group: ChildStageGroup }) {
     parts.push(group.stages.map((stage) => t(`chat.cascade.stageFull.${stage}`)).join(' › '));
   }
   if (group.pending) parts.push(pendingText(group, t));
-  else if (group.error) parts.push(t('chat.cascade.hub.failed', { message: group.error }));
+  // Сдавшаяся группа с чатом: причина по коду, но не «не завелась» — она
+  // работала (живой прогон 25.09, D5: так читались группы после 8–11 минут работы).
+  else if (group.error) {
+    parts.push(t('chat.cascade.hub.stopped', { message: serverFieldText(group, 'error') }));
+  }
+  // Строки пробелов доставки — по их кодам, на языке интерфейса.
+  const missing = serverFieldList(group, 'deliveryMissing');
   if (group.retries) parts.push(t('chat.cascade.hub.retries', { count: group.retries }));
+  if (group.deliveryNudges) {
+    parts.push(t('chat.cascade.hub.deliveryNudges', { count: group.deliveryNudges }));
+  }
+  // Когда оборвалась и сколько раз панель уже продолжала сама: кончились
+  // попытки — это видно, а не угадывается по тишине.
+  if (group.interrupted) {
+    const time = new Date(group.interrupted.at).toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    parts.push(t('chat.cascade.hub.interruptedAt', { time }));
+    if (group.interrupted.resumes) {
+      parts.push(t('chat.cascade.hub.interruptResumes', { count: group.interrupted.resumes }));
+    }
+  }
   // ЧТО сделано, а не просто «готово» (Д5): проверка без правок и правки с
   // коммитами читались одинаково, и человек считал задачу выполненной.
   if (group.result) {
@@ -244,8 +293,10 @@ function GroupText({ group }: { group: ChildStageGroup }) {
       t('chat.cascade.hub.firstEdit', { time: formatDuration(group.firstEditAfterMs, t) }),
     );
   }
+  // Длительность, а не состояние (L23): «в работе 21м» у остановленного звена
+  // читалось как «работает» — состояние говорит точка слева.
   if (group.workMs !== undefined) {
-    parts.push(t('chat.cascade.hub.work', { time: formatDuration(group.workMs, t) }));
+    parts.push(t('chat.cascade.hub.workTime', { time: formatDuration(group.workMs, t) }));
   }
 
   return (
@@ -254,6 +305,19 @@ function GroupText({ group }: { group: ChildStageGroup }) {
         <Typography variant="body-sm" as="span" truncate>
           {group.title}
         </Typography>
+        {/* Принято человеком (TK-accepted) — отметка его приёмки, не панели. */}
+        {group.acceptance?.acceptedAt && (
+          <Typography
+            variant="caption"
+            color="subtle"
+            as="span"
+            className={styles.chip}
+            title={new Date(group.acceptance.acceptedAt).toLocaleString()}
+            data-hub-accepted
+          >
+            {t('chat.cascade.hub.accept.marker')}
+          </Typography>
+        )}
         {group.isPaused && (
           <Typography variant="caption" color="subtle" as="span" className={styles.chip}>
             {t('chat.cascade.tree.paused')}
@@ -290,6 +354,20 @@ function GroupText({ group }: { group: ChildStageGroup }) {
           {t('chat.cascade.hub.mr', { id: group.mr.match(/(\d+)$/)?.[1] ?? '' })}
         </a>
       )}
+      {/* Чего не хватило до доставки по фактам git: без этого «ждёт» у группы,
+          которой панель напомнила доделать MR, не объяснял ничего. */}
+      {missing.length > 0 && (
+        <Typography
+          variant="caption"
+          color="subtle"
+          as="span"
+          truncate
+          title={missing.join('\n')}
+          data-hub-delivery-missing
+        >
+          {t('chat.cascade.hub.deliveryMissing', { list: missing.join('; ') })}
+        </Typography>
+      )}
       {/* Хвост последнего ответа (Д16): вопрос, заданный текстом, иначе не видно
           из родителя. Целиком — по наведению. */}
       {group.tail && (
@@ -313,7 +391,7 @@ function GroupText({ group }: { group: ChildStageGroup }) {
 function pendingText(group: ChildStageGroup, t: TFunction): string {
   switch (group.pending) {
     case 'failed':
-      return t('chat.cascade.hub.failed', { message: group.error ?? '' });
+      return t('chat.cascade.hub.failed', { message: serverFieldText(group, 'error') });
     case 'held':
       return t('chat.cascade.hub.held');
     case 'queued':

@@ -5,6 +5,7 @@ import { scanSplitBlocks } from '@agentdeck/contracts/task-split';
 import { scanHandoffBlocks } from '@agentdeck/contracts/chat-handoff';
 import { scanReviewBlocks } from '@agentdeck/contracts/model-cascade';
 import { scanMediaBlocks } from '@agentdeck/contracts/media-block';
+import { withoutSplitTickets } from '@agentdeck/contracts/split-tickets';
 import {
   TaskSplitCard,
   HandoffCard,
@@ -50,6 +51,8 @@ export function ProviderChatMessages({
   holdBusy,
   onRelease,
   releaseBusy,
+  onResumeInterrupted,
+  resumeInterruptedBusy,
   onCheckOverlap,
   overlapBusy,
   reviews,
@@ -123,7 +126,8 @@ export function ProviderChatMessages({
     // Вложения агента (Т10): рисунок и колода приезжают блоками, и карточка
     // встаёт на их место. Именно эта дорога и работает у чужого CLI — ни
     // контура, ни ключа она не требует.
-    const media = scanMediaBlocks(review.text);
+    // Блок тикета группы (95b) — служебный: его список держит хаб.
+    const media = scanMediaBlocks(withoutSplitTickets(review.text));
     const hasCards =
       split.proposals.length > 0 ||
       handoff.proposals.length > 0 ||
@@ -249,6 +253,8 @@ export function ProviderChatMessages({
               {...(holdBusy !== undefined ? { holdBusy } : {})}
               {...(onRelease ? { onRelease } : {})}
               {...(releaseBusy !== undefined ? { releaseBusy } : {})}
+              {...(onResumeInterrupted ? { onResumeInterrupted } : {})}
+              {...(resumeInterruptedBusy !== undefined ? { resumeInterruptedBusy } : {})}
               {...(onCheckOverlap ? { onCheckOverlap } : {})}
               {...(overlapBusy !== undefined ? { overlapBusy } : {})}
               foreign
@@ -323,7 +329,9 @@ export function ProviderChatMessages({
                   вердикта прячется с открывающей кавычки и до конца, иначе
                   человек несколько секунд смотрит, как растёт служебный JSON. */}
               <Typography className={styles.turnText}>
-                {(partial ? scanReviewBlocks(partial).text : '') || t('providerChat.thinking')}
+                {(partial
+                  ? withoutSplitTickets(scanReviewBlocks(partial).text, { streaming: true })
+                  : '') || t('providerChat.thinking')}
                 <span className={styles.caret}>▍</span>
               </Typography>
             </Stack>

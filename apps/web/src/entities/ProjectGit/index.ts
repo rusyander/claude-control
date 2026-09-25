@@ -17,6 +17,7 @@ export {
   useWorktreeBootstrapLog,
   projectGitKey,
 } from './api/ProjectGitApi';
+export { useSplitDefaults, useSaveSplitDefaults } from './api/SplitDefaultsApi';
 export type {
   ProjectGitChange,
   ProjectGitFileStatus,

@@ -1,3 +1,9 @@
+import {
+  scanSplitHumanSteps,
+  scanSplitTickets,
+  withoutSplitTickets,
+} from '@agentdeck/contracts/split-tickets';
+import { scanReviewBlocks } from '@agentdeck/contracts/model-cascade';
 import type { ChatLink } from '../../lib/app-store/app-store.types.ts';
 import type { ChainOutcome } from './split-conveyor.ts';
 
@@ -15,27 +21,85 @@ import type { ChainOutcome } from './split-conveyor.ts';
 /** Сколько знаков хвоста ответа уезжает в строку группы хаба. */
 const TAIL_MAX = 280;
 
-/** Текст без блоков кода: вопрос в них — не вопрос человеку. */
+/**
+ * Текст без блоков кода и блоков тикетов (95b): вопрос в них — не вопрос
+ * человеку. Отсюда читают и хаб (хвост), и запись вопросов текстом.
+ */
 function prose(text: string): string {
-  return text.replace(/```[\s\S]*?(```|$)/g, '').trim();
+  return withoutSplitTickets(text)
+    .replace(/```[\s\S]*?(```|$)/g, '')
+    .trim();
+}
+
+/**
+ * Просьба решить без вопросительного знака (живой прогон 24.09, g10: «Подтвердите
+ * пуш в новой карточке.» — группа ушла в ревью, пока человек не ответил). Отказ
+ * панели в `AskUserQuestion` сам велит «коротко скажи, что ждёшь ответа», и
+ * закрывающий ход так и звучит. Только повелительное и «жду вашего решения»:
+ * «подтвердил», «жду ревью», «дайте знать, если…» — отчёт, а не вопрос.
+ */
+const AWAITS_HUMAN = [
+  /(?<!\p{L})(жду|дождусь|подожду)\s+(ваш\p{L}*\s+|тво\p{L}*\s+)?(ответ|решени|выбор|подтверждени|указани|команд|отмашк)/iu,
+  /\b(please confirm|waiting for your|awaiting your)\b/i,
+];
+
+/** Повелительное «реши» — только в начале фразы: «…укажи ревьюера в MR» внутри отчёта — не просьба. */
+const DECIDE_OPENER =
+  /^(подтверди|подтвердите|выбери|выберите|ответь|ответьте|укажи|укажите)(?!\p{L})/iu;
+
+/** Условие делает просьбу вежливым хвостом отчёта: «Ответь, если нужно ещё». */
+const CONDITIONAL = /(?<!\p{L})(если|при необходимости|при желании|if)(?!\p{L})/iu;
+
+/**
+ * Фраза последнего абзаца начинается повелительным «реши» и не оговорена
+ * условием (итоговое ревью 25.09, m8: отчёт «…Ответь, если нужно ещё» ставил
+ * группу в ожидание вопроса, и зависимые не стартовали).
+ */
+function asksToDecide(paragraph: string): boolean {
+  return paragraph
+    .split(/(?<=[.!?…])\s+|\n/)
+    .map((sentence) => sentence.trim().replace(/^([-*•]|\d+[.)])\s+/, ''))
+    .some((sentence) => DECIDE_OPENER.test(sentence) && !CONDITIONAL.test(sentence));
 }
 
 /**
  * Ход кончился вопросом человеку, заданным ТЕКСТОМ (Д16: хаб такие не видел).
  *
  * Смотрим последний абзац: вопросительный знак в конце одной из его строк
- * (с кавычкой или скобкой после него) — это вопрос, которого агент ждёт.
- * Вопрос в середине ответа, на который он сам и ответил, сюда не попадает.
+ * (с кавычкой или скобкой после него) или просьба решить (`AWAITS_HUMAN`) —
+ * это вопрос, которого агент ждёт. Вопрос в середине ответа, на который он
+ * сам и ответил, сюда не попадает.
  */
 export function endsWithQuestion(text: string): boolean {
   const body = prose(text);
   if (!body) return false;
   const paragraphs = body.split(/\n\s*\n/);
   const last = paragraphs.at(-1) ?? '';
-  return last
+  if (AWAITS_HUMAN.some((pattern) => pattern.test(last))) return true;
+  if (asksToDecide(last)) return true;
+  if (hasQuestionLine(last)) return true;
+  // Вопрос, а под ним перечень вариантов ответа (живой прогон 25.09, F1): список
+  // — продолжение вопроса, а не отчёт после него.
+  const before = paragraphs.at(-2);
+  return before !== undefined && isOptionList(last) && hasQuestionLine(before);
+}
+
+/** Строка абзаца кончается вопросительным знаком (с кавычкой, скобкой или выделением после). */
+function hasQuestionLine(paragraph: string): boolean {
+  return paragraph
     .split('\n')
     .map((line) => line.trim())
     .some((line) => /\?[\s»"')\]*_]*$/.test(line));
+}
+
+/** Абзац — перечень вариантов: пункты списка, над ними может стоять строка с двоеточием. */
+function isOptionList(paragraph: string): boolean {
+  const lines = paragraph
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const items = lines[0]?.endsWith(':') ? lines.slice(1) : lines;
+  return items.length > 0 && items.every((line) => /^([-*•]|\d+[.)])\s+/.test(line));
 }
 
 /** Хвост последнего абзаца ответа — одной строкой. */
@@ -71,7 +135,9 @@ export interface ChainOutcomeInput {
   /** Текст ошибки упавшего хода — в строку группы. */
   error?: string;
   /** Решение надзора повторов (Д10): повтор назначен или попытки кончились. */
-  retry?: { attempt: number; at: number } | { exhausted: number };
+  retry?: { attempt: number; at: number; limit?: true } | { exhausted: number };
+  /** Последнее событие лимита подписки хода (`RunFinished.limit`). */
+  limit?: { resetsAt: number; status: string };
 }
 
 /**
@@ -79,13 +145,46 @@ export interface ChainOutcomeInput {
  * фон, ревью (его итог в связи), вопрос текстом, и только потом «готово».
  */
 export function chainOutcomeOf(input: ChainOutcomeInput): ChainOutcome {
-  const { link, ok, text } = input;
+  const { link, ok } = input;
+  // Итог читается по тексту БЕЗ блоков тикетов (95b): блок в конце ответа
+  // иначе стал бы хвостом, вопросом или ссылкой на MR группы.
+  const text = withoutSplitTickets(input.text);
   const tail = replyTail(text);
   const mr = lastMergeRequestUrl(text);
-  const withTail = { ...(tail ? { tail } : {}), ...(mr ? { mr } : {}) };
+  // Дефекты вне задач группы (95b) едут с любым итогом хода: находка не
+  // пропадает оттого, что ход кончился вопросом или сбоем.
+  const tickets = scanSplitTickets(input.text);
+  // Шаги, которые может сделать только человек (находка 112), — по тому же правилу.
+  const humanSteps = scanSplitHumanSteps(input.text);
+  // Лимит на исходе (аудит 25.09, L63): ход прошёл, но очередь до сброса
+  // новых групп не заводит — едет с любым итогом, как и находки.
+  const warningAt =
+    input.limit?.status === 'allowed_warning' && input.limit.resetsAt > 0
+      ? input.limit.resetsAt
+      : undefined;
+  // Ревью своей работы кончило цепочку: сколько замечаний в вердикте (L110).
+  const findings = link.stage === 'review' ? scanReviewBlocks(input.text).findings : undefined;
+  const withTail = {
+    ...(warningAt ? { limitWarningUntil: new Date(warningAt * 1000).toISOString() } : {}),
+    ...(findings ? { reviewFindings: findings.length } : {}),
+    ...(tail ? { tail } : {}),
+    ...(mr ? { mr } : {}),
+    ...(tickets.length > 0 ? { tickets } : {}),
+    ...(humanSteps.length > 0 ? { humanSteps } : {}),
+  };
   if (!ok) {
     // Повтор назначен — группа не сдалась, она ждёт (Д10): ждавшие её не
     // стартуют от недоделанной ветки.
+    // Лимит подписки (журнал 89): группа ждёт сброса, срок — в записи конвейера.
+    if (input.retry && 'attempt' in input.retry && input.retry.limit) {
+      return {
+        status: 'awaiting',
+        waitingFor: 'limit',
+        retries: input.retry.attempt,
+        limitUntil: new Date(input.retry.at).toISOString(),
+        ...withTail,
+      };
+    }
     if (input.retry && 'attempt' in input.retry) {
       return { status: 'awaiting', waitingFor: 'retry', retries: input.retry.attempt, ...withTail };
     }

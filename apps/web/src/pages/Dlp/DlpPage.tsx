@@ -50,7 +50,7 @@ import { PromptGateCard } from './PromptGateCard';
 export function DlpPage() {
   const { t } = useTranslation();
   const { data: settings, isError: isSettingsError, refetch: refetchSettings } = useSettings();
-  const updateSettings = useUpdateSettings();
+  const updateSettings = useUpdateSettings({ silentError: true });
   const { data, isLoading, isError, refetch } = useDlp();
   const saveRules = useSaveDlpRules();
   const setRunning = useSetDlpRunning();

@@ -60,6 +60,7 @@ export function useForgetRemoteDevice() {
 /** Проверочное уведомление на все привязанные телефоны. */
 export function useTestRemoteNotification() {
   return useMutation({
+    meta: { silentError: true },
     mutationFn: async () => {
       const { data } = await apiClient.post<{ ok: boolean; devices: number }>('/remote/test');
       return data;

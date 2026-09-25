@@ -1,7 +1,8 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { createInterface } from 'node:readline';
 import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
-import { homedir, tmpdir } from 'node:os';
+import { availableParallelism, homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ChatEvent, RawEvent } from './chat-events.ts';
@@ -11,7 +12,9 @@ import { defaultCliCommand } from '../../providers/cli.ts';
 import { TurnTracker } from './stream-usage.ts';
 import { userMemorySettings } from '../platform/layers.ts';
 import { LiveSession, type LiveSessionPool, type TurnOutcome } from './live-session.ts';
-import { CHILD_DENIED_TOOLS, CHILD_PROMPT } from './initiative.ts';
+import type { LedgerRelay } from './run-ledger.ts';
+import { CHILD_DENIED_TOOLS, childAppend } from './initiative.ts';
+import { SyntheticGate } from './synthetic-gate.ts';
 
 /** Путь к мини-MCP-серверу прав рядом с этим модулем. */
 const PERMISSION_SERVER = fileURLToPath(new URL('./permission-prompt-server.mjs', import.meta.url));
@@ -27,6 +30,40 @@ const PERMISSION_SERVER = fileURLToPath(new URL('./permission-prompt-server.mjs'
  */
 
 const isWindows = process.platform === 'win32';
+
+/** Подпись запуска живой сессии — отпечатком (см. `ChatRun.prepareSignature`). */
+function signatureOf(snapshot: unknown): string {
+  return createHash('sha256').update(JSON.stringify(snapshot)).digest('hex');
+}
+
+/**
+ * Какую долю ядер отдать тестам одного ребёнка разделения.
+ *
+ * Дети идут параллельно (до `parallel` групп), и каждый гоняет проверки своей
+ * копии. Vitest по умолчанию берёт почти все ядра на КАЖДЫЙ запуск: в живом
+ * прогоне 24.09.2026 (находка 46) две группы с mustfail+vitest подняли около
+ * сорока рабочих процессов, и соседняя группа почти восемь минут ждала prettier.
+ * Четверть — компромисс: проверки редко совпадают у всех групп разом, а
+ * одиночный прогон ребёнка от четверти ядер не становится мучительным.
+ */
+const CHILD_TEST_SHARE = 4;
+
+/**
+ * Потолок рабочих процессов vitest для ребёнка разделения. `VITEST_MAX_WORKERS`
+ * читает vitest 4 (им же идут и UI-проекты), `VITEST_MAX_THREADS` и
+ * `VITEST_MAX_FORKS` — vitest до 4-й версии. Заданный человеком в окружении
+ * панели потолок не трогаем; `options.env` прогона, идущий позже, сильнее.
+ */
+function childTestWorkers(base: NodeJS.ProcessEnv): Record<string, string> {
+  if (base.VITEST_MAX_WORKERS || base.VITEST_MAX_THREADS || base.VITEST_MAX_FORKS) return {};
+  const cores = availableParallelism();
+  const workers = String(Math.max(1, Math.floor(cores / CHILD_TEST_SHARE)));
+  return {
+    VITEST_MAX_WORKERS: workers,
+    VITEST_MAX_THREADS: workers,
+    VITEST_MAX_FORKS: workers,
+  };
+}
 
 export type { ChatEvent, RawEvent, RawUsage } from './chat-events.ts';
 
@@ -197,6 +234,41 @@ export class ChatRun {
     return this.session?.pid ?? this.child?.pid;
   }
 
+  /**
+   * Процесс живой сессии глазами журнала прогонов: канал посредника, подпись,
+   * папка процесса и фон. Нет посредника — после перезапуска подключаться не к
+   * чему, и журнал обходится pid, как раньше.
+   */
+  get live(): LedgerRelay | undefined {
+    const session = this.session;
+    const relay = session?.relay;
+    if (!session || !relay) return undefined;
+    return {
+      pipe: relay.pipe,
+      pid: relay.pid,
+      signature: session.signature,
+      ...session.files,
+      background: session.backgroundCount,
+      ...(session.childPid !== undefined ? { childPid: session.childPid } : {}),
+    };
+  }
+
+  /** Процесс живой сессии ушёл сам, унеся фоновые задачи (см. `LiveSession.lostBackground`). */
+  get lostBackground(): boolean {
+    return this.session?.lostBackground ?? false;
+  }
+
+  /**
+   * Под каким pid искать сам CLI: у посредника — оболочка, которую он поднял
+   * (известна с его первой строки), иначе — свой процесс.
+   */
+  async shellPid(): Promise<number | undefined> {
+    const session = this.session;
+    if (!session?.relay) return this.pid;
+    await session.whenSynced();
+    return session.childPid;
+  }
+
   /** Запускает CLI и вызывает onEvent по мере поступления событий. */
   async start(options: RunOptions, onEvent: (event: ChatEvent) => void): Promise<void> {
     try {
@@ -265,13 +337,13 @@ export class ChatRun {
     // Слой Т8 снимает дописку ЗДЕСЬ, а не затиранием текста в параметрах:
     // сохранённый снимок прогона переживает паузу дерева и перезапуск панели, и
     // затёртую строку было бы неоткуда вернуть, когда галочку включат обратно.
-    const appended = options.platformDropAppend
-      ? ''
-      : [options.appendSystemPrompt, options.child ? CHILD_PROMPT : '']
-          .filter(Boolean)
-          .join(' ')
-          .replace(/[\r\n]+/g, ' ')
-          .trim();
+    // Ребёнку разделения — его правила и НЕ совет уводить гейты в фон (журнал
+    // 60b): фон группы гибнет со сменой процесса, а конвейер по концу хода
+    // решает судьбу группы.
+    const own = options.child
+      ? childAppend(options.appendSystemPrompt)
+      : (options.appendSystemPrompt ?? '');
+    const appended = options.platformDropAppend ? '' : own.replace(/[\r\n]+/g, ' ').trim();
     if (appended) {
       if (isWindows) {
         // ФАЙЛОМ, а не аргументом, и это не перестраховка. Замерено 2 сентября
@@ -306,6 +378,7 @@ export class ChatRun {
 
     const env = {
       ...process.env,
+      ...(options.child ? childTestWorkers(process.env) : {}),
       ...(options.configDir ? { CLAUDE_CONFIG_DIR: options.configDir } : {}),
       ...options.env,
       // Маршрут контура — ПОСЛЕДНИМ и отдельно от `env`: он пересобирается на
@@ -396,8 +469,11 @@ export class ChatRun {
     const sessionId = safeSessionId(options.sessionId);
     const runId = options.permissionPrompt?.runId;
     const tracker = new TurnTracker();
+    const synthetic = new SyntheticGate();
     let streamError = false;
     const onRaw = (raw: RawEvent): void => {
+      // Заглушка CLI — не ответ модели: ни расхода, ни текста (`synthetic-gate.ts`).
+      if (!synthetic.pass(raw)) return;
       for (const event of tracker.track(raw)) onEvent(event);
       for (const event of translate(raw)) {
         if (event.kind === 'error') streamError = true;
@@ -432,16 +508,20 @@ export class ChatRun {
     let session = launch ? pool.take(sessionId, launch) : undefined;
     if (!session) {
       const { command, args, env, runIdFile } = this.prepare(options, onEvent, true);
-      session = new LiveSession({
-        command,
-        args,
-        cwd: options.cwd,
-        env,
-        shell: isWindows,
-        signature: launch ?? `fork:${Date.now()}`,
-        ...(this.tempDir ? { tempDir: this.tempDir } : {}),
-        ...(runIdFile ? { runIdFile } : {}),
-      });
+      session = new LiveSession(
+        {
+          command,
+          args,
+          cwd: options.cwd,
+          env,
+          shell: isWindows,
+          signature: launch ?? `fork:${Date.now()}`,
+          ...(this.tempDir ? { tempDir: this.tempDir } : {}),
+          ...(runIdFile ? { runIdFile } : {}),
+        },
+        Date.now,
+        pool.open,
+      );
       // Папка прогона теперь принадлежит процессу: уберёт её сессия, когда он закроется.
       this.tempDir = undefined;
     } else {
@@ -490,7 +570,9 @@ export class ChatRun {
    * меняются).
    */
   private prepareSignature(options: RunOptions): string {
-    return JSON.stringify({
+    // Отпечаток, а не сам снимок: подпись едет в журнал прогонов на диске
+    // (подхват после перезапуска), а в окружении — ключи контура.
+    return signatureOf({
       command: options.command ?? defaultCliCommand(),
       cwd: options.cwd,
       model: safeModel(options.model) ?? '',
@@ -557,6 +639,7 @@ export class ChatRun {
     // событиями расход хода приходит ПОСЛЕ его вызовов (message_delta замыкает
     // ход), без них — до; интерфейсу порядок не важен, он сводит их по id.
     const tracker = new TurnTracker();
+    const synthetic = new SyntheticGate();
     const lines = createInterface({ input: child.stdout });
     // Причину провала CLI уже назвал потоком (`result` с `is_error`): «API Error:
     // 400 Проверки контента контура остановили ответ…». Код выхода при этом тоже
@@ -570,6 +653,7 @@ export class ChatRun {
 
       try {
         const raw = JSON.parse(line) as RawEvent;
+        if (!synthetic.pass(raw)) continue;
         for (const event of tracker.track(raw)) onEvent(event);
         for (const event of translate(raw)) {
           if (event.kind === 'error') streamError = true;
@@ -608,6 +692,22 @@ export class ChatRun {
       this.session.kill();
     }
     this.cleanup();
+  }
+
+  /**
+   * Выход сервера (Ctrl+C, SIGTERM, штатное завершение): процесс за посредником
+   * отпускается живым — он ждёт следующего сервера, ради этого посредник и
+   * заведён. То, что держится на трубах сервера, гаснет, как при остановке.
+   */
+  detach(): void {
+    const session = this.session;
+    if (!session?.relay) {
+      this.stop();
+      return;
+    }
+    this.isStopped = true;
+    this.pool?.forget(session);
+    session.detach();
   }
 
   /** Убрать временный mcp-config сервера прав. */
@@ -715,7 +815,7 @@ export function translate(raw: RawEvent): ChatEvent[] {
   }
 
   if (raw.type === 'result') {
-    if (raw.is_error) return [{ kind: 'error', message: raw.result ?? 'Запрос не выполнен' }];
+    if (raw.is_error) return [{ kind: 'error', message: resultFailure(raw) }];
     return [
       {
         kind: 'done',
@@ -727,4 +827,22 @@ export function translate(raw: RawEvent): ChatEvent[] {
   }
 
   return [];
+}
+
+/**
+ * Причина провала из итоговой строки CLI. Текст ответа (`result`) есть только у
+ * провала модели; провал самого CLI — «No conversation found with session ID»,
+ * лимит ходов, сбой сборки запроса — приходит без него, списком `errors` и
+ * подтипом. Раньше такой провал показывался как «Запрос не выполнен» без
+ * единого слова о причине (живой прогон 24.09.2026, отправка с неизвестным
+ * `sessionId`).
+ */
+function resultFailure(raw: RawEvent): string {
+  if (raw.result) return raw.result;
+  const errors = raw.errors;
+  const reasons = Array.isArray(errors)
+    ? errors.filter((item): item is string => typeof item === 'string' && item.trim() !== '')
+    : [];
+  if (reasons.length > 0) return reasons.join('; ');
+  return raw.subtype ? `Запрос не выполнен (${raw.subtype})` : 'Запрос не выполнен';
 }

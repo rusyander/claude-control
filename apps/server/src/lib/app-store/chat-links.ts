@@ -20,13 +20,40 @@ import type { AppState, ChatLink } from './app-store.types.ts';
 /** Сколько связей помним. Пять чатов на разделение — сотня разделений назад. */
 const MAX_LINKS = 500;
 
+/**
+ * Живые связи. Снятые перезапуском (`retiredAt`) отсюда не выходят: для всех
+ * читателей панели — конвейера, пауз, прав, повторов — такое звено всё равно
+ * что удалено, и ни один из них не должен принять его за работающую группу.
+ */
 export function getChatLinks(state: AppState): Record<string, ChatLink> {
-  return state.chatLinks ?? {};
+  const all = state.chatLinks ?? {};
+  if (!Object.values(all).some((link) => link.retiredAt)) return all;
+  return Object.fromEntries(Object.entries(all).filter(([, link]) => !link.retiredAt));
 }
 
-/** Родитель этого чата, если он порождён разделением. */
+/** Родитель этого чата, если он порождён разделением и звено не снято. */
 export function getChatLink(state: AppState, chatId: string): ChatLink | undefined {
-  return state.chatLinks?.[chatId];
+  const link = state.chatLinks?.[chatId];
+  return link && !link.retiredAt ? link : undefined;
+}
+
+/** Снятые звенья — только списку чатов: чтобы старый разговор остался под родителем. */
+export function getRetiredChatLinks(state: AppState): Record<string, ChatLink> {
+  return Object.fromEntries(
+    Object.entries(state.chatLinks ?? {}).filter(([, link]) => link.retiredAt),
+  );
+}
+
+/**
+ * Снять звено, не стирая связь (перезапуск групп разделения). Раньше связь
+ * удалялась, и старые чаты групп всплывали в списке корнями — восемь разом
+ * (журнал живого прогона, находка 20). Молчит, когда связи нет или она уже снята.
+ */
+export function retireChatLink(state: AppState, chatId: string, at: string): boolean {
+  const link = state.chatLinks?.[chatId];
+  if (!link || link.retiredAt) return false;
+  link.retiredAt = at;
+  return true;
 }
 
 export function setChatLink(state: AppState, chatId: string, link: ChatLink): void {

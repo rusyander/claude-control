@@ -9,17 +9,20 @@ import {
   findTranscript,
   readHeadRecords,
   readRecords,
-  readTailRecords,
   streamLines,
 } from './ChatTranscriptFile.ts';
 import {
   branchOf,
+  chatTitleText,
   countDialogMessages,
   firstMeaningfulText,
+  firstValue,
   humanText,
   isAwaitingReply,
   isDialogMessage,
+  isSyntheticReply,
   lastValue,
+  opensWithPanel,
   toBlocks,
   toUsage,
   withAwaitingWindow,
@@ -41,11 +44,13 @@ import {
 const MESSAGE_LIMIT = 400;
 
 /**
- * Сколько символов закрывающего хода отдавать наружу. Столько же, сколько реестр
- * прогонов копит по потоку (`TEXT_TAIL`): разборщикам нужен конец ответа, а не
- * весь разговор.
+ * Сколько символов закрывающего хода отдавать наружу. Ход — одно сообщение, а
+ * не весь разговор, и отдаётся он ЦЕЛИКОМ: реестр читает его именно тогда, когда
+ * хвост потока (`TEXT_TAIL`) ответа не вместил, а блок бывает и в начале
+ * (находка 24: 49 661 символ, блок разбора на 1 816-м). Потолок — только от
+ * ответа неправдоподобного размера: читается это раз на конец прогона.
  */
-const CLOSING_TURN_MAX = 32_768;
+const CLOSING_TURN_MAX = 512 * 1024;
 
 export { findTranscript };
 
@@ -100,11 +105,18 @@ function readSummary(path: string, projectName: string): ChatSummary | undefined
     record.type === 'ai-title' ? record.aiTitle : undefined,
   );
   const lastMessage = [...records].reverse().find(isDialogMessage);
-  const projectPath = lastValue(records, (record) => record.cwd) ?? '';
+  // Проект — ПЕРВЫЙ `cwd` транскрипта: там сессия начата и там её файл. Поздние
+  // строки несут каталог оболочки агента: после `cd sub/dir` чат «уезжал» в
+  // подпапку, а продолжение из неё заводило новую папку проекта у CLI.
+  const projectPath = firstValue(records, (record) => record.cwd) ?? '';
+  const ownTitle = title?.trim() || chatTitleText(records).slice(0, 70);
 
   const summary: ChatSummary = {
     id: fileSessionId(path),
-    title: title?.trim() || firstMeaningfulText(records).slice(0, 70) || projectName,
+    title: ownTitle || projectName,
+    // Своих слов нет — имя проекта лишь заглушка; список поставит имя группы.
+    // Так же и слова после реплики панели: у звена это ответ, а не задача.
+    ...(ownTitle && (title?.trim() || !opensWithPanel(records)) ? {} : { untitled: true }),
     project: projectName,
     projectPath,
     isSandbox: Boolean(projectPath) && isSandboxPath(projectPath),
@@ -233,15 +245,6 @@ export async function readChatMessages(
 }
 
 /**
- * Рабочая папка, из которой велась сессия.
- *
- * Claude Code привязывает сессию к каталогу: транскрипты разложены по папкам
- * вида `~/.claude/projects/<путь-с-заменёнными-разделителями>/`, и `--resume`
- * ищет сессию только среди сессий текущего каталога. Поэтому продолжать
- * разговор можно лишь оттуда, где он начинался, — этот путь и берём из самого
- * транскрипта, он записан в каждой строке.
- */
-/**
  * Исходное задание разговора — первая осмысленная реплика человека.
  *
  * Читается ТОЛЬКО начало файла: задание лежит в его первых строках, и размер
@@ -259,18 +262,29 @@ export function readChatTask(projectsDir: string, chatId: string): string {
   return firstMeaningfulText(readHeadRecords(path));
 }
 
+/**
+ * Рабочая папка, из которой велась сессия.
+ *
+ * Claude Code привязывает сессию к каталогу: транскрипты разложены по папкам
+ * вида `~/.claude/projects/<путь-с-заменёнными-разделителями>/`, и `--resume`
+ * ищет сессию только среди сессий текущего каталога. Поэтому продолжать
+ * разговор можно лишь оттуда, где он начинался, — этот путь и берём из самого
+ * транскрипта. Берём ПЕРВЫЙ `cwd`: он записан в каждой строке, но поздние строки
+ * несут каталог оболочки агента, и после `cd sub/dir` последний `cwd` уводил
+ * продолжение в подпапку — CLI не находил там сессию и заводил новую.
+ */
 export function findSessionCwd(projectsDir: string, sessionId: string): string | undefined {
   const path = findTranscript(projectsDir, sessionId);
   if (!path) return undefined;
 
-  // Хвоста хватает: `cwd` записан в КАЖДОЙ строке, а читать ради него весь
-  // транскрипт (до четырёх мегабайт на каждую отправку) незачем. В хвосте
-  // пусто — последние строки без `cwd` — тогда уже целиком.
-  const fromTail = lastValue(readTailRecords(path), (record) => record.cwd);
-  if (fromTail) return fromTail;
+  // Начала хватает: первая строка с `cwd` лежит в первых строках файла, а читать
+  // ради неё весь транскрипт (до четырёх мегабайт на каждую отправку) незачем.
+  // В начале пусто — тогда уже тем же способом, что и список.
+  const fromHead = firstValue(readHeadRecords(path), (record) => record.cwd);
+  if (fromHead) return fromHead;
 
   const records = readRecords(path, statSync(path).size);
-  return lastValue(records, (record) => record.cwd);
+  return firstValue(records, (record) => record.cwd);
 }
 
 /**
@@ -295,18 +309,26 @@ export function readTranscriptRecords(path: string): TranscriptRecord[] {
  * что процесс оборвали на полуслове, а запись человека (в том числе результат
  * инструмента) после хода — что ход был серединой работы, а не её концом.
  * Ветки субагентов (`isSidechain`) пропускаем: там свой разговор.
+ *
+ * `asked` — ход с последней реплики человека звал `AskUserQuestion`. Потока у
+ * усыновлённого прогона нет, и признак, который живому ставит событие потока,
+ * берётся отсюда: отказ панели велит агенту «скажи, что ждёшь ответа», и
+ * закрывающий ход — обычный текст (живой прогон 24.09: группа ушла в ревью,
+ * пока вопрос висел). Реплика человека признак снимает — на тот вопрос уже
+ * ответили.
  */
 export function readLastAssistantTurn(
   projectsDir: string,
   chatId: string,
   cap = CLOSING_TURN_MAX,
-): string | undefined {
+): ClosingTurn | undefined {
   const path = findTranscript(projectsDir, chatId);
   if (!path) return undefined;
 
   let turnId: string | undefined;
   let parts: string[] = [];
   let calledTool = false;
+  let asked = false;
   // Последняя осмысленная запись — ход агента. Пока false, накопленное не в счёт.
   let closing = false;
 
@@ -314,8 +336,11 @@ export function readLastAssistantTurn(
     if (record.isSidechain || record.isMeta || record.isCompactSummary) continue;
     if (!record.message) continue;
     if (record.type !== 'assistant' && record.type !== 'user') continue;
+    // Заглушку CLI модель не писала (журнал 96): концом хода она не бывает.
+    if (isSyntheticReply(record)) continue;
     if (record.type === 'user' || record.isApiErrorMessage) {
       closing = false;
+      if (record.type === 'user' && isHumanPrompt(record.message.content)) asked = false;
       continue;
     }
 
@@ -333,7 +358,10 @@ export function readLastAssistantTurn(
     } else if (Array.isArray(content)) {
       for (const block of content) {
         if (block.type === 'text' && block.text?.trim()) parts.push(block.text);
-        else if (block.type === 'tool_use') calledTool = true;
+        else if (block.type === 'tool_use') {
+          calledTool = true;
+          if (block.name === 'AskUserQuestion') asked = true;
+        }
       }
     }
     closing = true;
@@ -342,7 +370,22 @@ export function readLastAssistantTurn(
   if (!closing || calledTool) return undefined;
   // Хвостом, как копит текст реестр прогонов: разборщикам нужен конец ответа.
   const text = parts.join('\n').trim().slice(-cap);
-  return text || undefined;
+  return text ? { text, ...(asked ? { asked: true } : {}) } : undefined;
+}
+
+/** Закрывающий ход усыновлённого прогона: текст и вопрос инструментом. */
+export interface ClosingTurn {
+  text: string;
+  asked?: boolean;
+}
+
+/**
+ * Запись человека, а не результат инструмента: строка или блоки, среди которых
+ * есть не только `tool_result`.
+ */
+function isHumanPrompt(content: string | ContentBlock[] | undefined): boolean {
+  if (typeof content === 'string') return content.trim().length > 0;
+  return Array.isArray(content) && content.some((block) => block.type !== 'tool_result');
 }
 
 export type TranscriptRecord = Record;

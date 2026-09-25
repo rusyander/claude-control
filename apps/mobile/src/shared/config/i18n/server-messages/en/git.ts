@@ -7,6 +7,8 @@ export const gitEn: Record<GitMessageCode, string> = {
     'No command: neither set on the project nor a lock file in the copy root',
   'worktree-path-required': 'A copy path is required',
   'worktree-agent-running': 'An agent is working in this copy — stop it and try again',
+  'worktree-copy-locked': 'A running process holds the copy folder — close it and try again',
+  'worktree-copy-dirty': 'The copy has uncommitted changes — commit or discard them and try again',
   'git-command-missing-exec': 'The git command was not found. Install git or add it to PATH.',
   'git-not-repo': 'The project directory has no .git — it is not a repository',
   'git-no-commits-first': 'The repository has no commits yet — make the first commit',

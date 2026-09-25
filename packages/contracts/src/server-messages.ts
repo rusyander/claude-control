@@ -100,6 +100,22 @@ export type ServerMessageNestedParams = Record<
 >;
 
 /**
+ * Подстановки-моменты: сервер шлёт момент ISO, а часы из него собирает
+ * КЛИЕНТ — по поясу того, кто смотрит. Панель и телефон бывают в разных поясах
+ * (доступ через Tailscale), и «лимит до 14:00» по часам сервера читалось бы
+ * как чужое время.
+ */
+export const CLOCK_PARAMS: ReadonlySet<string> = new Set(['until']);
+
+/** Момент ISO → «ЧЧ:ММ» в поясе этого процесса; не момент — как есть. */
+export function localClock(iso: string): string {
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return iso;
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `${pad(at.getHours())}:${pad(at.getMinutes())}`;
+}
+
+/**
  * Вложенные подстановки → плоские, каждая уже переведённая. `undefined` —
  * вложенный код клиенту неизвестен (сервер новее): тогда переводить нечего и
  * показывается русская строка поля целиком, а не фраза с дырой посередине.
@@ -112,7 +128,7 @@ export function resolveServerParams(
   const out: ServerMessageParams = {};
   for (const [name, value] of Object.entries(params as Record<string, unknown>)) {
     if (typeof value === 'string' || typeof value === 'number') {
-      out[name] = value;
+      out[name] = typeof value === 'string' && CLOCK_PARAMS.has(name) ? localClock(value) : value;
       continue;
     }
     if (typeof value !== 'object' || value === null) continue;

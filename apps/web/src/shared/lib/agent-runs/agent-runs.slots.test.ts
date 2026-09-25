@@ -4,7 +4,7 @@ vi.mock('@shared/api/client', () => ({
   apiClient: { defaults: { baseURL: '/api' }, post: vi.fn(), get: vi.fn() },
 }));
 
-import { MAX_STREAMS } from './agent-runs.constants';
+import { HIDDEN_STREAMS, MAX_STREAMS } from './agent-runs.constants';
 import { budget, priority, setWatched } from './agent-runs.slots';
 import { callbacks, runs, sending, setRun } from './agent-runs.state';
 import type { AgentRun } from './agent-runs.types';
@@ -58,9 +58,11 @@ describe('priority — место прогона в очереди за пото
     expect(priority('perm', run)).toBe(2);
   });
 
-  it('бюджет видимой вкладки — MAX_STREAMS, скрытой — ноль', () => {
+  // Скрытой — один поток, и только за хвостом законченного (находка 77):
+  // кто его получает, проверяет agentRunsStore.hidden.test.ts.
+  it('бюджет видимой вкладки — MAX_STREAMS, скрытой — HIDDEN_STREAMS', () => {
     expect(budget()).toBe(MAX_STREAMS);
     vi.stubGlobal('document', { visibilityState: 'hidden', addEventListener: () => undefined });
-    expect(budget()).toBe(0);
+    expect(budget()).toBe(HIDDEN_STREAMS);
   });
 });

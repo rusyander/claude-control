@@ -10,6 +10,7 @@ import { scanHandoffBlocks } from '@agentdeck/contracts/chat-handoff';
 import { scanReviewBlocks } from '@agentdeck/contracts/model-cascade';
 import { scanPlanBlocks, scanSplitPlanBlocks } from '@agentdeck/contracts/split-plan';
 import { scanMediaBlocks } from '@agentdeck/contracts/media-block';
+import { withoutSplitTickets } from '@agentdeck/contracts/split-tickets';
 import { attachmentBasename, splitAttachments } from '@agentdeck/contracts/uploads';
 import { markQuestionAnswered, useAnsweredQuestions } from '@shared/lib/agent-runs';
 import { ContextSummarizedNote } from '@entities/Platform';
@@ -167,7 +168,9 @@ export function MessageBubble({
             // Вложения агента (Т10): рисунок и колода приезжают блоками, и
             // карточка встаёт на их место в самой ленте — эта дорога есть у
             // любого CLI, а результат её остаётся частью разговора.
-            const media = scanMediaBlocks(plan.text);
+            // Блок тикета группы (95b) — служебный: список держит хаб. Только у
+            // ответа агента: человек, приславший блок, видит свой текст как есть.
+            const media = scanMediaBlocks(isUser ? plan.text : withoutSplitTickets(plan.text));
             // Список путей вложений дописывает сервер, а не человек: в пузыре он
             // читался как сырой перечень абсолютных путей. Показываем чипами с
             // именем файла; сам текст для копирования и правки (`plainText`)
@@ -211,6 +214,7 @@ export function MessageBubble({
                       ceiling={splitCeiling}
                       disabled={isRunning}
                       childBranches={childBranches}
+                      proposedAt={message.timestamp}
                     />
                   ))}
                   {/* Блок предложения, который панель не поняла, остаётся выше

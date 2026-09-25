@@ -3,7 +3,8 @@ import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { ATTACHMENTS_MARKER } from '@agentdeck/contracts/uploads';
-import { readChatMessages, readChats } from './ChatHistory.ts';
+import { findSessionCwd, readChatMessages, readChats } from './ChatHistory.ts';
+import { listProjects } from './ChatProjects.ts';
 
 /**
  * Тесты пагинации ленты переписки. Ключевое: по умолчанию отдаётся хвост
@@ -295,6 +296,29 @@ ${turn('u1', 'а теперь вопрос')}
 
     expect(readChats(projectsDir).find((item) => item.id === 'two')?.title).toBe('а теперь вопрос');
   });
+
+  // Живой прогон 24.09: задание, начатое адресом из трекера, называлось адресом.
+  it('ссылка в названии сжимается до ключа задачи трекера', () => {
+    const dir = join(projectsDir, 'proj');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      join(dir, 'link.jsonl'),
+      `${JSON.stringify({
+        type: 'user',
+        uuid: 'u0',
+        cwd: 'C:/work/app',
+        message: {
+          role: 'user',
+          content: 'https://jira.example.com/browse/PROJ-1064 сделай тикет',
+        },
+      })}
+`,
+    );
+
+    expect(readChats(projectsDir).find((item) => item.id === 'link')?.title).toBe(
+      'PROJ-1064 сделай тикет',
+    );
+  });
 });
 
 describe('подпись «контур сжал историю»', () => {
@@ -356,5 +380,58 @@ describe('подпись «контур сжал историю»', () => {
     write([answer('a1', 'msg_c1-aaaaaaaaaaaa', [{ type: 'text', text: 'ответ' }])]);
     const page = await readChatMessages(projectsDir, 's');
     expect(page.messages[0]).not.toHaveProperty('contextSummarized');
+  });
+});
+
+/**
+ * Регрессия журнала живого прогона (находки 11/15/22/35): агент сделал
+ * `cd cp-admin-ui/src`, CLI записал этот каталог в `cwd` поздних строк, и чат
+ * «уехал» в подпапку — список показывал её проектом, а продолжение запускалось
+ * из неё и заводило у CLI новую папку проекта. Проект чата — первый `cwd`.
+ */
+describe('проект чата — первый cwd транскрипта', () => {
+  let projectsDir: string;
+
+  beforeEach(() => {
+    projectsDir = mkdtempSync(join(tmpdir(), 'cc-chat-cwd-'));
+    const dir = join(projectsDir, 'C--work-app');
+    mkdirSync(dir, { recursive: true });
+    const lines = [
+      { type: 'summary', summary: 'без каталога' },
+      { type: 'user', uuid: 'u0', cwd: 'C:/work/app', message: { role: 'user', content: 'начни' } },
+      {
+        type: 'assistant',
+        uuid: 'a0',
+        cwd: 'C:/work/app',
+        message: { role: 'assistant', content: 'cd cp-admin-ui/src' },
+      },
+      {
+        type: 'assistant',
+        uuid: 'a1',
+        cwd: 'C:/work/app/cp-admin-ui/src',
+        message: { role: 'assistant', content: 'работаю в подпапке' },
+      },
+    ];
+    writeFileSync(
+      join(dir, 'drift.jsonl'),
+      `${lines.map((line) => JSON.stringify(line)).join('\n')}\n`,
+    );
+  });
+
+  afterEach(() => {
+    rmSync(projectsDir, { recursive: true, force: true });
+  });
+
+  it('в списке чат числится за каталогом, где начат, а не за подпапкой оболочки', () => {
+    const chat = readChats(projectsDir).find((entry) => entry.id === 'drift');
+    expect(chat?.projectPath).toBe('C:/work/app');
+  });
+
+  it('подпапка оболочки не становится отдельным проектом', () => {
+    expect(listProjects(projectsDir).map((project) => project.path)).toEqual(['C:/work/app']);
+  });
+
+  it('продолжение ведётся из каталога начала — там CLI и хранит сессию', () => {
+    expect(findSessionCwd(projectsDir, 'drift')).toBe('C:/work/app');
   });
 });

@@ -496,6 +496,37 @@ describe('collectChildStages', () => {
     expect(rows.find((row) => row.chatId === 'gone')?.copy).toEqual({ index: 2, cleaned: 'kept' });
   });
 
+  it('оборванная группа несёт номер для «Продолжить», время обрыва и счёт; идущей кнопка не нужна (WP1c)', () => {
+    const chats = [
+      chat({ id: 'cut', parentId: 'parent', groupIndex: 0, stage: 'work' }),
+      chat({ id: 'back', parentId: 'parent', groupIndex: 1, stage: 'work' }),
+    ];
+    const group = (index: number, chatId: string) => ({
+      index,
+      title: chatId,
+      branch: `feature/${chatId}`,
+      after: [],
+      status: 'awaiting' as const,
+      waitingFor: 'interrupted' as const,
+      interruptedAt: '2026-09-24T21:00:00.000Z',
+      interruptResumes: 2,
+      chatId,
+      path: `/copies/${chatId}`,
+    });
+
+    const rows = collectChildStages(chats, 'parent', [run({ id: 'back' })], {
+      parentChatId: 'parent',
+      order: [0, 1],
+      groups: [group(0, 'cut'), group(1, 'back')],
+    });
+
+    const cut = rows.find((row) => row.chatId === 'cut');
+    expect(cut?.waitingFor).toBe('interrupted');
+    expect(cut?.interrupted).toEqual({ index: 0, at: '2026-09-24T21:00:00.000Z', resumes: 2 });
+    // Уже продолжена — прогон идёт: запись конвейера ещё не догнала, кнопки нет.
+    expect(rows.find((row) => row.chatId === 'back')?.interrupted).toBeUndefined();
+  });
+
   it('незнакомая стадия читается как работа, а первая правка считается по звену работы, не плана', () => {
     const chats = [
       chat({

@@ -1,18 +1,37 @@
 import { useEffect, useMemo, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import type { ChatSummary } from '@agentdeck/contracts';
 import { useChatStatuses } from '@shared/lib/agent-runs';
-import { notifyAgent } from '@shared/lib/notify-sound';
-import { toast } from '@shared/lib/toast';
-import { useWorkspace, projectShortName } from '@shared/lib/workspace';
-import { useChats } from '../api/ChatApi';
+import { useWorkspace } from '@shared/lib/workspace';
+import { chatKeys, useAwaitingAsks, useChats } from '../api/ChatApi';
+import { announceAwaiting } from './announceAwaiting';
 import { selectAwaitingChats } from './awaiting';
 
-/** Разговоры, стоящие на вопросе к человеку, — по данным транскрипта. */
+/**
+ * Разговоры, стоящие на вопросе к человеку: транскрипт плюс вопросы деревьев из
+ * памяти сервера. Чат, которого список ещё не знает (группу только что завели),
+ * перечитывает список — иначе звать было бы не к кому.
+ */
 export function useAwaitingChats(): ChatSummary[] {
   const { data } = useChats();
+  const { data: asks } = useAwaitingAsks();
   const statuses = useChatStatuses();
-  return useMemo(() => selectAwaitingChats(data ?? [], statuses), [data, statuses]);
+  const client = useQueryClient();
+  const server = useMemo(
+    () => (asks ? new Set(asks.chats.map((ask) => ask.chatId)) : undefined),
+    [asks],
+  );
+
+  useEffect(() => {
+    if (!data || !server) return;
+    const known = new Set(data.map((chat) => chat.id));
+    if ([...server].some((id) => !known.has(id))) {
+      void client.invalidateQueries({ queryKey: chatKeys.list, exact: true });
+    }
+  }, [client, data, server]);
+
+  return useMemo(() => selectAwaitingChats(data ?? [], statuses, server), [data, statuses, server]);
 }
 
 /**
@@ -20,6 +39,8 @@ export function useAwaitingChats(): ChatSummary[] {
  * когда разговор впервые оказался ждущим. Первый снимок только запоминается:
  * панель открыли, а вопрос висит со вчера — звонить об этом значит приучить
  * человека не обращать внимания на звук.
+ *
+ * Скрытую вкладку зовёт ещё и уведомление системы (`announceAwaiting`).
  *
  * Тост здесь не украшение: метка в браузере говорит «тебя где-то ждут», но не
  * говорит ГДЕ, а точка видна только в уже открытом табе проекта. Клик по тосту
@@ -47,16 +68,7 @@ export function useAwaitingAlarm(): ChatSummary[] {
     const fresh = awaiting.filter((chat) => !seeded.has(chat.id));
     if (fresh.length === 0) return;
 
-    for (const chat of fresh) {
-      const path = chat.isSandbox ? undefined : chat.projectPath;
-      const name = path ? projectShortName(path) : t('workspace.homeTab');
-      toast.warning(t('projects.notifyWaiting', { name }), {
-        onClick: path ? () => ws.reveal(path, name) : undefined,
-      });
-    }
-
-    // Звук один на пачку: пять вопросов разом — это один повод подойти.
-    notifyAgent('waiting');
+    announceAwaiting(fresh, { t, reveal: (path, name) => ws.reveal(path, name) });
     // `ws` меняется при каждом обновлении рабочего пространства, а повод —
     // только вместе со списком; лишняя зависимость звонила бы повторно.
     // eslint-disable-next-line react-hooks/exhaustive-deps

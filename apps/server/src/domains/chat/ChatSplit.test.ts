@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   branchTaken,
   buildGroupPrompt,
+  GROUP_QUESTIONS_HUMAN_LINE,
   parseSplitProposal,
   safeBranchName,
   scanSplitBlocks,
@@ -9,6 +10,7 @@ import {
   SPLIT_MAX_TASKS_PER_GROUP,
   SPLIT_SYSTEM_PROMPT,
   type TaskSplitProposal,
+  UNCONFIRMED_FINDING_LINE,
 } from '@agentdeck/contracts/task-split';
 import { splitTasks, type SplitGit, type SplitTasksInput } from './ChatSplit.ts';
 
@@ -266,7 +268,7 @@ describe('потолки предложения', () => {
   const groups = (count: number, tasks = 1) =>
     Array.from({ length: count }, (_, index) => ({
       title: `Группа ${index + 1}`,
-      tasks: Array.from({ length: tasks }, (_, task) => `GOR-${index * 100 + task}`),
+      tasks: Array.from({ length: tasks }, (_, task) => `PROJ-${index * 100 + task}`),
     }));
 
   it('двадцать групп выгрузки заводятся все', () => {
@@ -307,6 +309,14 @@ describe('имя ветки из заголовка модели', () => {
 
   it('пустое имя не оставляет ветку без названия', () => {
     expect(safeBranchName('   ')).toBe('task');
+  });
+
+  // Живой прогон 24.09.2026: ключи задач через запятую уехали в имя ветки как есть.
+  it('запятые и знаки оболочки не доезжают до имени ветки', () => {
+    expect(safeBranchName('fix-PROJ-1064,PROJ-1068, PROJ-1070/форма')).toBe(
+      'fix-PROJ-1064-PROJ-1068-PROJ-1070/форма',
+    );
+    expect(safeBranchName('feat/"a";b&c|d$(e)`f`#1!')).toBe('feat/a-b-c-d-e-f-1');
   });
 
   /**
@@ -375,6 +385,37 @@ describe('разделение задач по чатам', () => {
     expect(prompts[0]).toContain('Ветку копии панель уже завела: feature/login-2.');
     // Задание группы при этом цело и идёт после преамбулы.
     expect(prompts[0]).toMatch(/Доставка до готового MR[\s\S]*починить валидацию/);
+  });
+
+  /**
+   * Аудит 25.09, L40: «развилки решает человек» во вкладке «Группы» спорит с
+   * правилом «работай автономно» — строка про вопросы обязана доехать до группы
+   * и с доставкой, и без неё, а по умолчанию группа решает по плану.
+   */
+  it('развилки у человека — строка вопросов в задании группы, по умолчанию — решение по плану', async () => {
+    const run = async (options: { deliver?: boolean; groupQuestions?: 'plan' | 'human' }) => {
+      const prompts: string[] = [];
+      await splitTasks({
+        projectPath: '/repo',
+        proposal: PROPOSAL,
+        startRuns: true,
+        git: fakeGit(),
+        ...options,
+        start: ({ prompt }) => {
+          prompts.push(prompt);
+          return true;
+        },
+      });
+      return prompts[0] ?? '';
+    };
+    expect(await run({ deliver: true, groupQuestions: 'human' })).toContain(
+      GROUP_QUESTIONS_HUMAN_LINE,
+    );
+    expect(await run({ groupQuestions: 'human' })).toContain(GROUP_QUESTIONS_HUMAN_LINE);
+    const byPlan = await run({ deliver: true });
+    expect(byPlan).not.toContain(GROUP_QUESTIONS_HUMAN_LINE);
+    expect(byPlan).toContain('Развилку, для которой у тебя есть рекомендуемый вариант, решай сам');
+    expect(byPlan).toContain(UNCONFIRMED_FINDING_LINE);
   });
 
   it('доставка выключена — задание как раньше, без слова о MR', async () => {

@@ -145,6 +145,15 @@ export class ChildTells {
     (this.deps.defer ?? ((next) => setTimeout(next, 0)))(run);
   }
 
+  /**
+   * Сообщение панели группе тем же каналом — продолжением её сессии, занятой
+   * группе после хода (напоминание доставки, WP1b). Текст уходит как есть:
+   * это слово панели, а не родителя.
+   */
+  send(message: Pending): Delivery {
+    return this.deliver(message);
+  }
+
   private deliver(pending: Pending): Delivery {
     const aliases = this.deps.aliasesOf(pending.chatId);
     // Продолжается НАСТОЯЩАЯ сессия: под временным ключом CLI разговор не хранит.

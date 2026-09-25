@@ -24,8 +24,8 @@
     "why": "agent prompt / text the model reads"
   },
   "domains/chat/ChatBranchGate.ts": {
-    "n": 5,
-    "why": "agent prompt / text the model reads: the denial that names the copy, the restart task, the refusal of the whole edit and the hand-to-group denial with its group line (Д15) — all travel to the agent as a tool result, never to the interface"
+    "n": 6,
+    "why": "agent prompt / text the model reads: the denial that names the copy, the restart task, the refusal of the whole edit, the hand-to-group denial with its group line (Д15) and the copy-to-main-copy edit refusal (D4) — all travel to the agent as a tool result, never to the interface"
   },
   "domains/chat/ChatExport.ts": {
     "n": 3,
@@ -40,7 +40,7 @@
     "why": "exported document / markdown written for another tool"
   },
   "domains/chat/ChatRunner.ts": {
-    "n": 4,
+    "n": 5,
     "why": "agent prompt / text the model reads; +1 the `modelDropped` feed notice — same shape as detached-run.ts: the code travels for translation, the text for a client with no dictionary"
   },
   "domains/chat/child-tell.ts": {
@@ -48,24 +48,28 @@
     "why": "agent prompt / text the model reads: the parent's message header as the child sees it (Д7)"
   },
   "domains/chat/children-brief.ts": {
-    "n": 29,
-    "why": "agent prompt / text the model reads: the children brief prepended to a split parent's turn (Д6), stripped from the feed"
+    "n": 33,
+    "why": "agent prompt / text the model reads: the children brief prepended to a split parent's turn (Д6), stripped from the feed; +2 paused / limit-wait status lines (WP9e)"
   },
   "domains/chat/detached-run.ts": {
     "n": 2,
     "why": "agent prompt / text the model reads"
   },
   "domains/chat/initiative.ts": {
-    "n": 24,
-    "why": "agent prompt / text the model reads"
+    "n": 33,
+    "why": "agent prompt / text the model reads; +3 CHILD_PROMPT autonomy rule (take the recommended option, ask only irreversible/out-of-scope, journal 78) — appended to the split child's system prompt, never shown; +4 SPLIT_FOREGROUND_PROMPT (split group runs checks in the foreground, replaces BACKGROUND_PROMPT for children, journal 60b) — system-prompt append, never shown"
+  },
+  "domains/chat/mr-watch.ts": {
+    "n": 14,
+    "why": "agent prompt / text the model reads: the panel prompt resuming a delivered group with open MR threads or a red pipeline"
   },
   "domains/chat/run-retry.ts": {
     "n": 2,
     "why": "agent prompt / text the model reads: continuation after a failed turn (Д10)"
   },
   "domains/chat/split-conveyor.ts": {
-    "n": 11,
-    "why": "composed list explanation / git output assembly"
+    "n": 29,
+    "why": "composed list explanation / git output assembly; agent prompts of the panel to a group (branch/tickets line, delivery-gap nudge, interrupted-turn resume, limit-reset resume and paused-group resume — WP9e +8). group.error / deliveryMissing texts are coded (split-group-texts.ts, errorCode/deliveryMissingCodes in the view)"
   },
   "domains/chat/split-overlap.ts": {
     "n": 9,
@@ -600,7 +604,7 @@
     "why": "agent prompt / text the model reads, plus the supervisor refusal reason a person reads in the chat when a hook denies the run (П3.2)"
   },
   "domains/provider-chat/cascade.ts": {
-    "n": 7,
+    "n": 8,
     "why": "agent prompt / text the model reads"
   },
   "domains/provider-chat/handoff.ts": {
@@ -784,7 +788,7 @@
     "why": "path-rejection detail composed inside an error class"
   },
   "lib/server-texts/templates.ts": {
-    "n": 330,
+    "n": 354,
     "why": "RU side of the server text table: every line here IS a code, this is the one file where a Russian literal is the data. The generator and its manifest are gone from the tree (see the file header) — a new code is written by hand and `n` rises with it"
   },
   "providers/catalog/kimi.ts": {

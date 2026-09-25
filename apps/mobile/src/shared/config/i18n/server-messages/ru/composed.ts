@@ -124,6 +124,40 @@ export const composedRu: Record<ComposedMessageCode, string> = {
     'Разбор оборвался при перезапуске панели и итога не даст. Запустить группу как предложено? Ответ уедет в её задачу.',
   'split-triage-interrupted-notice':
     'Разбор оборвался перезапуском панели — итога не будет. Групп ждёт вашего ответа: {{groups}}; сами они не стартуют.',
+  'split-groups-interrupted-notice':
+    'Процессы групп оборвались посреди хода: {{groups}}. Панель сама продолжит их с восстановлением состояния (продолжено: {{resumed}}); остальные ждут кнопки «Продолжить» в хабе.',
   'child-tell-notice':
     'Родитель написал группам. Передано: {{sent}} · в очереди до конца их хода: {{queued}} · не доставлено (у группы нет чата или копии): {{refused}}.',
+  'split-limit-wait-notice':
+    'Группы разделения упёрлись в лимит подписки и ждут его сброса до {{until}}: продолжатся сами, очередь до сброса не стартует.',
+  'split-limit-warning-notice':
+    'Лимит подписки на исходе: новые группы разделения не стартуют до его сброса в {{until}}, идущие продолжают работу.',
+  'split-delivery-description-unchecked-notice':
+    'Группа «{{group}}»: описание MR {{mr}} панель не проверила — MR не читается (интеграция с форджем выключена или нет токена). Проверьте описание сами.',
+  'split-mr-watch-limit-notice':
+    'Группа «{{group}}»: наблюдатель MR {{mr}} продолжал её уже {{resumes}} раз и больше сам не продолжает — новые ветки ревьюера и падения конвейера ждут вас.',
+  'split-default-drift-notice':
+    'Группа «{{group}}»: {{target}} ушла вперёд и задела её файлы ({{count}}): {{files}}. Ветку посреди работы панель не трогает — перенесёт её rebase при доставке.',
+  'split-group-run-not-started': 'прогон не запустился',
+  'split-group-chain-failed': 'цепочка кончилась ошибкой или остановкой',
+  'split-group-plan-cancelled': 'план отменён человеком',
+  'split-delivery-unverifiable':
+    'доставку не проверить: удалённый не ответил {{checks}} раз подряд ({{reason}})',
+  'split-delivery-local-failed': 'доставку не проверить: копия группы не читается ({{reason}})',
+  'split-delivery-incomplete': 'доставка не доведена: {{missing}}',
+  'split-delivery-incomplete-2': 'доставка не доведена: {{first}}; {{second}}',
+  'split-delivery-incomplete-3': 'доставка не доведена: {{first}}; {{second}}; {{third}}',
+  'split-delivery-remote-down':
+    'удалённый недоступен с {{since}}: панель проверяет его раз в {{minutes}} мин и продолжит группу, когда он ответит ({{reason}})',
+  'split-delivery-remote-silent': 'удалённый не ответил: {{reason}}',
+  'delivery-gap-dirty': 'незакоммиченные правки: {{files}}',
+  'delivery-gap-dirty-more': 'незакоммиченные правки: {{files}} и ещё {{more}}',
+  'delivery-gap-not-pushed':
+    'ветка {{branch}} не отправлена на удалённый (или отстаёт от HEAD копии)',
+  'delivery-gap-no-mr': 'нет MR, чья голова — HEAD копии (ветка {{branch}})',
+  'delivery-gap-review-unfinished': 'ревью работы не закончено: вердикта ревьюера нет',
+  'delivery-gap-fix-missing':
+    'замечания ревью ({{count}}) не исправлены: звено правок после ревью не проходило',
+  'delivery-gap-mr-description': 'у MR {{mr}} пустое описание',
+  'delivery-gap-no-copy': 'нет копии группы',
 };

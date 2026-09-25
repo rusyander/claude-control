@@ -5,10 +5,9 @@ import {
   setAllowEdits,
   setSound,
   setSoundVolume,
-  setAutoApprove,
 } from './chatPrefsStore';
 
-/** Настройки чата (localStorage): правки, звук, автоподтверждение прав. */
+/** Настройки чата (localStorage): правки и звук. */
 export function useChatPrefs() {
   const prefs = useSyncExternalStore(subscribeChatPrefs, getChatPrefs, getChatPrefs);
   return {
@@ -18,7 +17,5 @@ export function useChatPrefs() {
     setSound,
     soundVolume: prefs.soundVolume,
     setSoundVolume,
-    autoApprove: prefs.autoApprove,
-    setAutoApprove,
   };
 }

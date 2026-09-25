@@ -12,7 +12,8 @@ import { serverText } from '../lib/server-texts.ts';
 import {
   GitError,
   addWorktree,
-  bootstrapCommandFor,
+  bootstrapPlanFor,
+  resolveProjectDelivery,
   checkoutBranch,
   commitAll,
   createBranch,
@@ -24,7 +25,7 @@ import {
   removeWorktree,
   type GitOutput,
 } from '../domains/project-git.ts';
-import { checkCopyReady } from '../domains/project-git/copy-readiness.ts';
+import { checkCopyReady, layoutForCwd } from '../domains/project-git/copy-readiness.ts';
 import { copyProjectAccess } from '../domains/project-git/copy-access.ts';
 import { checkProjectDir } from '../domains/projects.ts';
 import { parseBody } from '../lib/request-body.ts';
@@ -86,6 +87,8 @@ export function registerProjectGitRoutes(
   app: FastifyInstance,
   ctx: ServerContext,
   runs?: ActiveRuns,
+  /** Настройки разделения сменились: очередь групп проекта добирает места. */
+  onSplitSettings?: (projectPath: string) => void,
 ): void {
   /**
    * Каталог из запроса, пригодный для запуска git, или undefined с уже
@@ -272,10 +275,10 @@ export function registerProjectGitRoutes(
    * (ни настроенной, ни lock-файла) — тишина, не ошибка.
    */
   const startBootstrap = (path: string, copy: string): string | undefined => {
-    const command = bootstrapCommandFor(copy, ctx.store.getWorktreeMirror(path).bootstrap);
-    if (!command) return undefined;
-    void ctx.worktreeBootstraps.run(copy, command);
-    return command;
+    const plan = bootstrapPlanFor(copy, ctx.store.getWorktreeMirror(path).bootstrap);
+    if (!plan) return undefined;
+    void ctx.worktreeBootstraps.run(copy, plan);
+    return plan.summary;
   };
 
   /** Обёртка операций над копиями: результат = новый список + вывод git. */
@@ -434,22 +437,37 @@ export function registerProjectGitRoutes(
     });
   });
 
-  /** Разделение на проекте: доставка групп до MR и сколько их идёт разом. */
+  /**
+   * Разделение на проекте: доставка групп до MR и сколько их идёт разом. Копия
+   * читает и пишет настройку своей основной копии — как строка доставки её чата
+   * (`chatDeliveryFor`). По пути копии записи нет, и шапка чата группы
+   * показывала коробочное «До MR: вкл» при выключенной доставке проекта (живой
+   * прогон 25.09, O2).
+   */
+  const settingsDirOf = (path: string): string => layoutForCwd(path).mainDir ?? path;
+
   app.get<{ Querystring: { path?: string } }>(
     '/api/project-git/split-settings',
     async (request, reply) => {
       const path = requirePath(request.query.path, reply);
       if (!path) return reply;
-      return ctx.store.getSplitSettings(path);
+      return resolveProjectDelivery(ctx.store, settingsDirOf(path)).view;
     },
   );
 
   app.put<{ Body: unknown }>('/api/project-git/split-settings', async (request, reply) => {
     const body = parseBody(splitSettingsBodySchema, request.body, reply);
     if (!body) return reply;
-    const path = requirePath(body.path, reply);
-    if (!path) return reply;
-    return ctx.store.setSplitSettings(path, { deliver: body.deliver, parallel: body.parallel });
+    const asked = requirePath(body.path, reply);
+    if (!asked) return reply;
+    const path = settingsDirOf(asked);
+    ctx.store.setSplitSettings(path, {
+      deliver: body.deliver,
+      parallel: body.parallel,
+      ...(body.permissions !== undefined ? { permissions: body.permissions } : {}),
+    });
+    onSplitSettings?.(path);
+    return resolveProjectDelivery(ctx.store, path).view;
   });
 
   /**

@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   createWriteStream,
@@ -8,9 +8,15 @@ import {
   readdirSync,
   writeFileSync,
 } from 'node:fs';
-import { basename, join, resolve } from 'node:path';
+import { basename, join, resolve, sep } from 'node:path';
 import type { WorktreeBootstrapState } from '@agentdeck/contracts';
+import {
+  isHeavyShape,
+  SPLIT_HEAVY_RULE_DEFAULT,
+  type SplitHeavyRule,
+} from '@agentdeck/contracts/split-groups';
 import { killChildTree } from '../../lib/process-tree.ts';
+import { gitSync } from './exec.ts';
 
 /**
  * Бутстрап копии: команда, которая идёт в новой копии ДО того, как в ней
@@ -19,10 +25,11 @@ import { killChildTree } from '../../lib/process-tree.ts';
  * агента уходит на «поставлю зависимости», а при отказе он изворачивается без
  * проверок проекта.
  *
- * Команду задаёт человек на проекте; пусто — панель определяет по lock-файлу в
- * корне копии (pnpm / npm / yarn), а нет его там — в каталогах первого уровня;
- * без lock-файла не делает ничего. Потолок
- * десять минут; провал копию не отменяет и группу разделения не останавливает —
+ * Команду задаёт человек на проекте; пусто — панель сама строит план по
+ * lock-файлам (`detectBootstrapPlan`): установка в корне, а нет его там — по
+ * каталогу первого уровня на цепочку, разом, со сборкой локальной библиотеки,
+ * чей вход в копии не собран. Без lock-файла не делает ничего. Потолок
+ * десять минут на весь план; провал копию не отменяет и группу разделения не останавливает —
  * агент получает хвост лога в задании и решает сам.
  *
  * Лог и запись о состоянии лежат в `<appData>/worktree-logs/<slug>.{log,json}`:
@@ -38,50 +45,258 @@ export const BOOTSTRAP_TIMEOUT_MS = 10 * 60 * 1000;
 /** Хвост лога, который уезжает в карточку и в задание агента. */
 export const LOG_TAIL_CHARS = 2000;
 
-/** Команда по lock-файлу ровно в этом каталоге. */
-function lockfileCommand(dir: string): string | undefined {
-  if (existsSync(join(dir, 'pnpm-lock.yaml'))) {
-    return 'pnpm install --frozen-lockfile --prefer-offline';
-  }
-  if (existsSync(join(dir, 'package-lock.json'))) return 'npm ci';
-  if (existsSync(join(dir, 'yarn.lock'))) return 'yarn install --immutable';
+/** Одна команда подготовки; `cwd` — каталог относительно корня копии, `''` — сам корень. */
+export interface BootstrapStep {
+  cwd: string;
+  command: string;
+}
+
+/**
+ * Цепочка — шаги ОДНОГО каталога по порядку (установка, затем сборка);
+ * `after` — каталоги, чьи цепочки должны кончиться раньше.
+ */
+export interface BootstrapChain {
+  cwd: string;
+  steps: BootstrapStep[];
+  after: string[];
+}
+
+/**
+ * План подготовки копии: цепочки идут ПАРАЛЛЕЛЬНО, шаги в цепочке — по
+ * порядку. `summary` — то, что человек видит в карточке копии и в состоянии.
+ */
+export interface BootstrapPlan {
+  summary: string;
+  chains: BootstrapChain[];
+}
+
+/** Сколько цепочек одного плана идёт разом: шесть `npm ci` сразу забивают диск. */
+export const BOOTSTRAP_CHAIN_LIMIT = 4;
+
+type PackageManager = 'pnpm' | 'npm' | 'yarn';
+
+function lockfileManager(dir: string): PackageManager | undefined {
+  if (existsSync(join(dir, 'pnpm-lock.yaml'))) return 'pnpm';
+  if (existsSync(join(dir, 'package-lock.json'))) return 'npm';
+  if (existsSync(join(dir, 'yarn.lock'))) return 'yarn';
   return undefined;
 }
+
+/**
+ * Установка по lock-файлу. `--prefer-offline` у npm — из замера 24.09.2026 на
+ * каталоге в 36 тыс. файлов: 16 с без флага, 9–10 с с ним (кэш тёплый — пакеты
+ * уже ставились в основную копию). Аудит и призывы к пожертвованиям — лишний
+ * сетевой запрос в каждой копии.
+ */
+const INSTALL: Record<PackageManager, string> = {
+  pnpm: 'pnpm install --frozen-lockfile --prefer-offline',
+  npm: 'npm ci --prefer-offline --no-audit --no-fund',
+  yarn: 'yarn install --immutable',
+};
+
+const BUILD: Record<PackageManager, string> = {
+  pnpm: 'pnpm run build',
+  npm: 'npm run build',
+  yarn: 'yarn build',
+};
 
 /** Каталоги первого уровня, где lock-файл не ищем: служебные и чужие зависимости. */
 const SKIP_NESTED = new Set(['node_modules', 'vendor', 'dist', 'build']);
 
-/**
- * Команда по lock-файлу: в корне — она одна; в корне нет — по каталогам
- * первого уровня (Д13). Репозиторий «бэкенд + фронт рядом» держит lock-файл
- * в `frontend/` или `web/`, и без этого шага копия группы оставалась без
- * зависимостей. Несколько таких каталогов — по команде на каждый, по алфавиту,
- * через `cd` туда и обратно: так строка одинаково идёт в `cmd.exe` и в `sh`.
- */
-export function detectBootstrapCommand(dir: string): string | undefined {
-  const root = lockfileCommand(dir);
-  if (root) return root;
-  let entries: string[];
+interface PackageJson {
+  main?: unknown;
+  module?: unknown;
+  types?: unknown;
+  typings?: unknown;
+  exports?: unknown;
+  scripts?: Record<string, unknown>;
+  dependencies?: Record<string, unknown>;
+  devDependencies?: Record<string, unknown>;
+  optionalDependencies?: Record<string, unknown>;
+}
+
+function readPackageJson(dir: string): PackageJson | undefined {
   try {
-    entries = readdirSync(dir, { withFileTypes: true })
-      .filter((entry) => entry.isDirectory())
-      .map((entry) => entry.name)
-      .filter((name) => !name.startsWith('.') && !SKIP_NESTED.has(name))
-      .sort();
+    const raw = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')) as unknown;
+    return raw && typeof raw === 'object' ? (raw as PackageJson) : undefined;
   } catch {
     return undefined;
   }
-  const steps = entries.flatMap((name) => {
-    const command = lockfileCommand(join(dir, name));
-    return command ? [`cd "${name}" && ${command} && cd ..`] : [];
+}
+
+/** Все строковые листья `exports` плюс `main`/`module`/`types`; шаблоны с `*` — мимо. */
+function entryPaths(pkg: PackageJson): string[] {
+  const out: string[] = [];
+  const collect = (value: unknown): void => {
+    if (typeof value === 'string') {
+      if (!value.includes('*')) out.push(value);
+    } else if (value && typeof value === 'object') {
+      for (const nested of Object.values(value)) collect(nested);
+    }
+  };
+  collect(pkg.main);
+  collect(pkg.module);
+  collect(pkg.types);
+  collect(pkg.typings);
+  collect(pkg.exports);
+  return out;
+}
+
+/**
+ * Локальная зависимость, которую надо собрать: объявленный вход пакета в копии
+ * отсутствует, а сборка у пакета есть. Так выглядит общая библиотека, чей
+ * `dist` в `.gitignore`: в основной копии он собран руками давно, в свежей
+ * копии его нет, и приложения-соседи падают на первом же импорте.
+ */
+function needsBuild(dir: string): boolean {
+  const pkg = readPackageJson(dir);
+  if (!pkg || typeof pkg.scripts?.build !== 'string') return false;
+  const entries = entryPaths(pkg);
+  if (entries.some((entry) => !existsSync(resolve(dir, entry)))) return true;
+  return entries.length > 0 && !allTracked(dir, entries);
+}
+
+/**
+ * Окажутся ли входы в СВЕЖЕЙ копии. План строится и по основной копии — для
+ * сводки в настройках и для выбора «групп разом», — а там `dist` давно собран
+ * руками и лежит на диске, хотя в git его нет: сводка теряла сборку, и
+ * подготовка выглядела лёгкой (живой прогон 24.09.2026). В копию приезжает
+ * только то, что git отслеживает; не репозиторий — правда за диском. Один
+ * вызов git на пакет: план строится на каждой отправке в чат проекта.
+ */
+function allTracked(dir: string, entries: string[]): boolean {
+  const listed = gitSync(dir, ['ls-files', '-z', '--', ...entries]);
+  if (listed === undefined) return true;
+  const tracked = listed
+    .split('\0')
+    .filter(Boolean)
+    .map((path) => resolve(dir, path));
+  // Вход бывает и каталогом (`./dist/styles/`): его отслеживаемые файлы — внутри.
+  return entries.every((entry) => {
+    const full = resolve(dir, entry);
+    return tracked.some((path) => path === full || path.startsWith(`${full}${sep}`));
   });
-  return steps.length > 0 ? steps.join(' && ') : undefined;
+}
+
+/** Локальные зависимости каталога (`file:` / `link:`), лежащие внутри копии. */
+function localDependencies(root: string, dir: string): string[] {
+  const pkg = readPackageJson(dir);
+  if (!pkg) return [];
+  const specs = [pkg.dependencies, pkg.devDependencies, pkg.optionalDependencies].flatMap((group) =>
+    Object.values(group ?? {}),
+  );
+  const rootKey = normalizeDir(root);
+  return specs.flatMap((spec) => {
+    if (typeof spec !== 'string') return [];
+    const match = /^(?:file|link):(.+)$/.exec(spec);
+    if (!match?.[1]) return [];
+    const target = resolve(dir, match[1]);
+    const key = normalizeDir(target);
+    return key.startsWith(`${rootKey}/`) ? [key.slice(rootKey.length + 1)] : [];
+  });
+}
+
+function nestedPackageDirs(dir: string): string[] {
+  try {
+    return readdirSync(dir, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name)
+      .filter((name) => !name.startsWith('.') && !SKIP_NESTED.has(name))
+      .sort()
+      .filter((name) => lockfileManager(join(dir, name)) !== undefined);
+  } catch {
+    return [];
+  }
+}
+
+function summarize(chains: BootstrapChain[]): string {
+  return chains
+    .map((chain) => {
+      const text = chain.steps.map((step) => step.command).join(' && ');
+      return chain.cwd ? `[${chain.cwd}] ${text}` : text;
+    })
+    .join(' · ');
+}
+
+/**
+ * План по lock-файлам: в корне — одна установка; в корне нет — по каталогам
+ * первого уровня (Д13), каждый своей цепочкой, разом. Репозиторий «бэкенд +
+ * фронт рядом» держит lock-файл в `frontend/` или `web/`, а «несколько
+ * приложений + общая библиотека» — в каждом из них.
+ *
+ * Каталог, от которого соседи зависят через `file:`, и чей вход в копии не
+ * собран, получает сборку после установки. Соседи на pnpm и yarn ждут его
+ * цепочку: они кладут `file:`-пакет копией на установке, и без собранного
+ * `dist` в неё уезжает пустота; npm ставит ссылку и не ждёт.
+ */
+export function detectBootstrapPlan(dir: string): BootstrapPlan | undefined {
+  const root = lockfileManager(dir);
+  if (root) {
+    const chains = [{ cwd: '', steps: [{ cwd: '', command: INSTALL[root] }], after: [] }];
+    return { summary: summarize(chains), chains };
+  }
+  const names = nestedPackageDirs(dir);
+  if (names.length === 0) return undefined;
+  // Путь зависимости нормализован (на Windows — в нижнем регистре); сверяем с
+  // каталогами в том же виде, а храним их настоящие имена.
+  const known = new Map(
+    names.map((name) => [process.platform === 'win32' ? name.toLowerCase() : name, name]),
+  );
+  const deps = new Map(
+    names.map((name) => [
+      name,
+      [...new Set(localDependencies(dir, join(dir, name)))].flatMap((target) => {
+        const real = known.get(target);
+        return real && real !== name ? [real] : [];
+      }),
+    ]),
+  );
+  const built = new Set(
+    [...new Set([...deps.values()].flat())].filter((name) => needsBuild(join(dir, name))),
+  );
+  // Собираемые библиотеки — первыми: под потолком одновременных они на
+  // критическом пути, соседям без них делать нечего.
+  const ordered = [
+    ...names.filter((name) => built.has(name)),
+    ...names.filter((name) => !built.has(name)),
+  ];
+  const chains = ordered.map((name): BootstrapChain => {
+    const manager = lockfileManager(join(dir, name)) as PackageManager;
+    const steps = [{ cwd: name, command: INSTALL[manager] }];
+    if (built.has(name)) steps.push({ cwd: name, command: BUILD[manager] });
+    // npm ставит `file:`-пакет ссылкой и в его вход не заглядывает — ждать
+    // сборку незачем; pnpm и yarn кладут копию, и её надо снять с собранного.
+    const after = manager === 'npm' ? [] : (deps.get(name) ?? []).filter((dep) => built.has(dep));
+    return { cwd: name, steps, after };
+  });
+  return { summary: summarize(chains), chains };
+}
+
+/** Настроенная человеком команда — одна цепочка в корне. */
+function planOfCommand(command: string): BootstrapPlan {
+  return { summary: command, chains: [{ cwd: '', steps: [{ cwd: '', command }], after: [] }] };
 }
 
 /** Настроенная человеком команда сильнее автоопределения; пустая строка — «определи сама». */
-export function bootstrapCommandFor(dir: string, configured?: string): string | undefined {
+export function bootstrapPlanFor(dir: string, configured?: string): BootstrapPlan | undefined {
   const own = configured?.trim();
-  return own || detectBootstrapCommand(dir);
+  return own ? planOfCommand(own) : detectBootstrapPlan(dir);
+}
+
+/**
+ * Тяжёлая подготовка — установок или шагов в цепочке больше порога: групп
+ * разом стоит меньше. Порог — правило вкладки «Группы»; из коробки прежнее
+ * «больше одной установки или сборка».
+ */
+export function isHeavyPlan(
+  plan: BootstrapPlan | undefined,
+  rule: SplitHeavyRule = SPLIT_HEAVY_RULE_DEFAULT,
+): boolean {
+  if (!plan) return false;
+  return isHeavyShape(
+    plan.chains.map((chain) => chain.steps.length),
+    rule,
+  );
 }
 
 /** Последние символы лога, начиная с целой строки. */
@@ -95,6 +310,29 @@ export function logTail(text: string, max = LOG_TAIL_CHARS): string {
 function normalizeDir(dir: string): string {
   const text = resolve(dir).replace(/\\/g, '/').replace(/\/+$/, '');
   return process.platform === 'win32' ? text.toLowerCase() : text;
+}
+
+/**
+ * Команда через оболочку системы — так её пишет человек (`pnpm install &&
+ * pnpm build`), с `CI=1`: установщики в этом режиме не задают вопросов и не
+ * рисуют прогресс.
+ */
+function spawnShell(command: string, cwd: string): ChildProcess {
+  const env = { ...process.env, CI: '1', FORCE_COLOR: '0' };
+  return process.platform === 'win32'
+    ? spawn('cmd.exe', ['/d', '/s', '/c', `"${command}"`], {
+        cwd,
+        windowsHide: true,
+        windowsVerbatimArguments: true,
+        env,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      })
+    : spawn('/bin/sh', ['-c', command], {
+        cwd,
+        detached: true,
+        env,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
 }
 
 export interface BootstrapOptions {
@@ -183,24 +421,31 @@ export class WorktreeBootstraps {
   }
 
   /**
-   * Запустить команду в копии. Повторный вызов, пока идёт первый, возвращает
-   * ТОТ ЖЕ результат, а не второй процесс поверх первого: два `pnpm install` в
-   * одном каталоге ломают друг друга.
+   * Запустить подготовку копии: строка — одна команда в корне, план — его
+   * цепочки. Повторный вызов, пока идёт первый, возвращает ТОТ ЖЕ результат, а
+   * не второй процесс поверх первого: два `pnpm install` в одном каталоге ломают
+   * друг друга.
    *
    * Никогда не отклоняется: отказ оболочки, таймаут, ненулевой код — всё это
    * состояние `failed` с причиной в логе, а не исключение у вызывающего.
    */
-  run(dir: string, command: string): Promise<WorktreeBootstrapState> {
+  run(dir: string, work: string | BootstrapPlan): Promise<WorktreeBootstrapState> {
     const key = normalizeDir(dir);
     const active = this.running.get(key);
     if (active) return active;
 
+    const plan = typeof work === 'string' ? planOfCommand(work) : work;
     const startedAt = this.now().toISOString();
-    const state: WorktreeBootstrapState = { command, status: 'running', startedAt, logTail: '' };
+    const state: WorktreeBootstrapState = {
+      command: plan.summary,
+      status: 'running',
+      startedAt,
+      logTail: '',
+    };
     this.states.set(key, state);
     this.writeRecord(dir, state);
 
-    const promise = this.execute(dir, command, state).finally(() => {
+    const promise = this.execute(dir, plan, state).finally(() => {
       this.running.delete(key);
     });
     this.running.set(key, promise);
@@ -209,19 +454,21 @@ export class WorktreeBootstraps {
 
   private async execute(
     dir: string,
-    command: string,
+    plan: BootstrapPlan,
     state: WorktreeBootstrapState,
   ): Promise<WorktreeBootstrapState> {
     mkdirSync(this.logDir, { recursive: true });
     const chunks: string[] = [];
     let size = 0;
-    const remember = (text: string): void => {
+    let file: ReturnType<typeof createWriteStream> | undefined;
+    const write = (text: string): void => {
       chunks.push(text);
       size += text.length;
       // Хвост держим в памяти ограниченно: лог целиком лежит в файле.
       while (size > LOG_TAIL_CHARS * 4 && chunks.length > 1) {
         size -= (chunks.shift() as string).length;
       }
+      file?.write(text);
     };
 
     const finish = (patch: Partial<WorktreeBootstrapState>): WorktreeBootstrapState => {
@@ -236,85 +483,126 @@ export class WorktreeBootstraps {
       return done;
     };
 
-    let file: ReturnType<typeof createWriteStream> | undefined;
     try {
       file = createWriteStream(this.logPath(dir), { flags: 'w' });
-      const header = `$ ${command}\n[${state.startedAt}] cwd: ${dir}\n\n`;
-      file.write(header);
-      remember(header);
     } catch (error) {
-      const text = `Лог не открылся: ${error instanceof Error ? error.message : String(error)}\n`;
-      remember(text);
+      write(`Лог не открылся: ${error instanceof Error ? error.message : String(error)}\n`);
     }
+    write(`$ ${plan.summary}\n[${state.startedAt}] cwd: ${dir}\n\n`);
 
-    const isWindows = process.platform === 'win32';
-    const child = isWindows
-      ? spawn('cmd.exe', ['/d', '/s', '/c', `"${command}"`], {
-          cwd: dir,
-          windowsHide: true,
-          windowsVerbatimArguments: true,
-          env: { ...process.env, CI: '1', FORCE_COLOR: '0' },
-          stdio: ['ignore', 'pipe', 'pipe'],
-        })
-      : spawn('/bin/sh', ['-c', command], {
-          cwd: dir,
-          detached: true,
-          env: { ...process.env, CI: '1', FORCE_COLOR: '0' },
-          stdio: ['ignore', 'pipe', 'pipe'],
-        });
-
-    const onData = (chunk: Buffer): void => {
-      const text = chunk.toString('utf8');
-      remember(text);
-      file?.write(text);
-    };
-    child.stdout?.on('data', onData);
-    child.stderr?.on('data', onData);
-
+    // Вывод параллельных цепочек перемешан — каждую строку метим каталогом.
+    // Одна цепочка в корне (настроенная команда) идёт без меток, как раньше.
+    const tagged = plan.chains.length > 1 || plan.chains.some((chain) => chain.cwd !== '');
+    const children = new Set<ChildProcess>();
     let timedOut = false;
     const timer = setTimeout(() => {
       timedOut = true;
-      const note = `\n[потолок ${Math.round(this.timeoutMs / 60_000)} мин — процесс остановлен]\n`;
-      remember(note);
-      file?.write(note);
-      killChildTree(child, { group: !isWindows });
+      write(`\n[потолок ${Math.round(this.timeoutMs / 60_000)} мин — процесс остановлен]\n`);
+      for (const child of children) killChildTree(child, { group: process.platform !== 'win32' });
     }, this.timeoutMs);
 
-    const result = await new Promise<WorktreeBootstrapState>((resolveState) => {
-      child.on('error', (error) => {
-        clearTimeout(timer);
-        const text = `\nКоманда не запустилась: ${error.message}\n`;
-        remember(text);
-        file?.write(text);
-        resolveState(finish({ status: 'failed' }));
-      });
-      child.on('close', (code, signal) => {
-        clearTimeout(timer);
-        const footer = `\n[${this.now().toISOString()}] ${
-          timedOut ? 'таймаут' : `код ${code ?? signal ?? '?'}`
-        }\n`;
-        remember(footer);
-        file?.write(footer);
-        const ok = !timedOut && code === 0;
-        // Чистота дерева — после любой команды: и провальная установка успевает
-        // переписать lock-файл. Отказ отката не портит итог установки.
-        const cleanup = this.afterRun ? this.afterRun(dir).catch(() => []) : Promise.resolve([]);
-        void cleanup.then((reverted) => {
-          if (reverted.length > 0) {
-            const note = `[lock-файлы откачены: ${reverted.join(', ')}]\n`;
-            remember(note);
-            file?.write(note);
+    const runStep = (step: BootstrapStep): Promise<number | undefined> => {
+      const tag = tagged ? `[${step.cwd || '.'}] ` : '';
+      if (tagged) write(`${tag}$ ${step.command}\n`);
+      return new Promise((resolveStep) => {
+        const child = spawnShell(step.command, step.cwd ? join(dir, step.cwd) : dir);
+        children.add(child);
+        let pending = '';
+        const onData = (chunk: Buffer): void => {
+          const text = chunk.toString('utf8');
+          if (!tag) {
+            write(text);
+            return;
           }
-          resolveState(
-            finish({
-              status: ok ? 'ok' : 'failed',
-              ...(typeof code === 'number' ? { exitCode: code } : {}),
-              ...(timedOut ? { timedOut: true } : {}),
-              ...(reverted.length > 0 ? { reverted } : {}),
-            }),
-          );
-        });
+          const lines = (pending + text).split('\n');
+          pending = lines.pop() ?? '';
+          if (lines.length > 0) write(lines.map((line) => `${tag}${line}\n`).join(''));
+        };
+        child.stdout?.on('data', onData);
+        child.stderr?.on('data', onData);
+        let settled = false;
+        const settle = (code: number | undefined, note: string): void => {
+          if (settled) return;
+          settled = true;
+          children.delete(child);
+          if (pending) write(`${tag}${pending}\n`);
+          write(note);
+          resolveStep(code);
+        };
+        child.on('error', (error) =>
+          settle(undefined, `\n${tag}Команда не запустилась: ${error.message}\n`),
+        );
+        child.on('close', (code, signal) =>
+          settle(
+            typeof code === 'number' ? code : undefined,
+            `\n${tag}[${this.now().toISOString()}] ${
+              timedOut ? 'таймаут' : `код ${code ?? signal ?? '?'}`
+            }\n`,
+          ),
+        );
       });
+    };
+
+    // Первый провал решает итог: его код — в состоянии, как у одиночной команды.
+    let failure: { code?: number } | undefined;
+    const runChain = async (chain: BootstrapChain): Promise<void> => {
+      for (const step of chain.steps) {
+        if (timedOut) return;
+        const code = await runStep(step);
+        if (code !== 0) {
+          failure ??= typeof code === 'number' ? { code } : {};
+          return;
+        }
+      }
+    };
+
+    // Цепочка стартует, когда кончились те, от кого она зависит (удачно или
+    // нет: провал сборки соседа — строка в логе, а не повод не ставить своё),
+    // и когда есть свободное место под потолком одновременных.
+    const done = new Set<string>();
+    const waiting = [...plan.chains];
+    await new Promise<void>((resolveAll) => {
+      let active = 0;
+      const pump = (): void => {
+        if (waiting.length === 0 && active === 0) {
+          resolveAll();
+          return;
+        }
+        for (let index = 0; index < waiting.length && active < BOOTSTRAP_CHAIN_LIMIT;) {
+          const chain = waiting[index] as BootstrapChain;
+          const ready =
+            timedOut ||
+            chain.after.every((dep) => done.has(dep) || !plan.chains.some((c) => c.cwd === dep));
+          if (!ready) {
+            index++;
+            continue;
+          }
+          waiting.splice(index, 1);
+          active++;
+          void runChain(chain).finally(() => {
+            active--;
+            done.add(chain.cwd);
+            pump();
+          });
+        }
+      };
+      pump();
+    });
+    clearTimeout(timer);
+
+    // Чистота дерева — после любой команды: и провальная установка успевает
+    // переписать lock-файл. Отказ отката не портит итог установки.
+    const reverted = this.afterRun ? await this.afterRun(dir).catch(() => []) : [];
+    if (reverted.length > 0) write(`[lock-файлы откачены: ${reverted.join(', ')}]\n`);
+    const result = finish({
+      status: !timedOut && !failure ? 'ok' : 'failed',
+      ...(failure?.code !== undefined
+        ? { exitCode: failure.code }
+        : !failure && !timedOut
+          ? { exitCode: 0 }
+          : {}),
+      ...(timedOut ? { timedOut: true } : {}),
+      ...(reverted.length > 0 ? { reverted } : {}),
     });
     file?.end();
     return result;

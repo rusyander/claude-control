@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
+import { chatKeys } from '@entities/Chat';
 import { chatTreeKeys, useCleanupGroup } from '@entities/ChatTree';
 import { toErrorMessage } from '@shared/api/client';
 import { toast } from '@shared/lib/toast';
@@ -17,7 +18,7 @@ import styles from './ChildStages.module.scss';
  * чужой), и провод через две страницы ради одного нажатия был бы вдвое длиннее
  * самой кнопки. Дерево после ответа перечитывается — строка покажет итог.
  */
-export function GroupCopyCleanup({ parentChatId, index, cleaned }: GroupCopyCleanupProps) {
+export function GroupCopyCleanup({ parentChatId, index, chatId, cleaned }: GroupCopyCleanupProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const cleanup = useCleanupGroup();
@@ -32,17 +33,17 @@ export function GroupCopyCleanup({ parentChatId, index, cleaned }: GroupCopyClea
 
   const remove = (): void => {
     if (cleanup.isPending) return;
-    cleanup.mutate(
-      { parentChatId, index },
-      {
-        onSuccess: (result) => {
-          toast.success(t(`chat.cascade.hub.cleaned.${result.branch}`));
-          void queryClient.invalidateQueries({ queryKey: chatTreeKeys.all });
-        },
-        onError: (error) =>
-          toast.error(t('chat.cascade.hub.cleanupFailed', { message: toErrorMessage(error) })),
+    if (!chatId && index === undefined) return;
+    cleanup.mutate(chatId ? { parentChatId, chatId } : { parentChatId, index: index as number }, {
+      onSuccess: (result) => {
+        toast.success(t(`chat.cascade.hub.cleaned.${result.branch}`));
+        void queryClient.invalidateQueries({ queryKey: chatTreeKeys.all });
+        // Метку «копия осталась» у старого чата несёт список чатов.
+        if (chatId) void queryClient.invalidateQueries({ queryKey: chatKeys.list });
       },
-    );
+      onError: (error) =>
+        toast.error(t('chat.cascade.hub.cleanupFailed', { message: toErrorMessage(error) })),
+    });
   };
 
   return (

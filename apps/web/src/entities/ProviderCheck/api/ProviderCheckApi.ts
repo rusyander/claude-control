@@ -42,6 +42,7 @@ export function useRunProviderCheck() {
   const queryClient = useQueryClient();
 
   return useMutation({
+    meta: { silentError: true },
     mutationFn: runCheck,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.providerChecks }),
   });

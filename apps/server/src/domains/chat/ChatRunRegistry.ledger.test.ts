@@ -285,7 +285,7 @@ describe('ChatRunRegistry — усыновление после перезапу
     });
   });
 
-  it('смерть pid закрывает прогон: заметка и done, слушатели закрыты, планировщик и журнал сдачи молчат', async () => {
+  it('смерть pid закрывает прогон: заметка и done, слушатели закрыты, планировщик узнаёт обрыв, журнал сдачи молчит', async () => {
     const plan = vi.fn(() => undefined);
     const journal = vi.fn();
     const notify = vi.fn();
@@ -302,12 +302,59 @@ describe('ChatRunRegistry — усыновление после перезапу
     const kinds = events.map((item) => item.event.kind);
     expect(kinds.slice(-2)).toEqual(['notice', 'done']);
     expect(state.closed).toBe(true);
-    expect(plan).not.toHaveBeenCalled();
+    // Закрывающего хода нет (транскрипт не читается) — это обрыв: планировщик
+    // узнаёт его и ничего, кроме него, не решает (WP1c). Раньше он молчал, и
+    // группа разделения стояла «работает» навсегда.
+    expect(plan).toHaveBeenCalledTimes(1);
+    expect(plan).toHaveBeenCalledWith(
+      expect.objectContaining({ chatId: 'new-1', text: '', interrupted: true }),
+    );
     expect(journal).not.toHaveBeenCalled();
     expect(notify).toHaveBeenCalledWith({ kind: 'done', chatId: 'new-1', projectPath: '/proj' });
     expect(ledger.entries.has('new-1')).toBe(false);
     // В grace-буфере — как обычный завершённый: вкладка дотянет хвост после F5.
     expect(registry.active()[0]?.status).toBe('done');
+  });
+
+  it('фон, который журнал видел у неподхваченного процесса, — обрыв, даже с ответом (журнал 64)', async () => {
+    const plan = vi.fn(() => undefined);
+    registry.setHandoffPlanner(plan);
+    registry.setClosingTurnReader(() => ({ text: 'гейты ушли в фон, вернусь с итогом' }));
+    // Посредник без sessionId в пул не встаёт: CLI доделает ход по концу ввода
+    // и уйдёт, унеся фон, — ответ «вернусь с итогом» никто не выполнит.
+    adopt({
+      ...ENTRY,
+      sessionId: undefined,
+      relay: {
+        pipe: '\\\\.\\pipe\\agentdeck-test-absent',
+        pid: 4242,
+        signature: 's',
+        background: 2,
+      },
+    });
+    alive = false;
+    await flush(60);
+
+    expect(plan).toHaveBeenCalledWith(
+      expect.objectContaining({ text: 'гейты ушли в фон, вернусь с итогом', interrupted: true }),
+    );
+  });
+
+  it('режим прав переживает перезапуск: старт → журнал → усыновление → журнал', () => {
+    // Без режима в журнале звенья усыновлённого прогона шли в `acceptEdits`
+    // и вставали на карточке прав (живой прогон 24.09.2026).
+    const fresh = new ChatRunRegistry(() => new FakeRun(777));
+    const written = new FakeLedger();
+    fresh.setLedger(written);
+    fresh.start('auto-1', { ...OPTIONS, permissionMode: 'auto' }, { projectPath: '/proj' });
+    const entry = written.entries.get('auto-1');
+    expect(entry?.permissionMode).toBe('auto');
+    fresh.stopAll();
+
+    ledger.remove('new-1');
+    expect(adopt({ ...ENTRY, permissionMode: entry?.permissionMode })).toBe(true);
+    registry.persist('new-1');
+    expect(ledger.entries.get('new-1')?.permissionMode).toBe('auto');
   });
 
   it('«Остановить» валит дерево по pid и убирает прогон вместе с записью', () => {

@@ -25,6 +25,24 @@
   min-width: 0;
 }
 
+// Сводка под шапкой (L37): счётчики-капсулы одной строкой, переносятся на
+// узком экране, а не распирают карточку.
+.summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-3xs) var(--spacing-2xs);
+  margin-bottom: var(--spacing-3xs);
+}
+
+// «Неактивно» (L20): отброшенные перезапуском чаты — последним разделом,
+// отчёркнуты от живых групп, чтобы не читались их продолжением.
+.inactive {
+  margin-top: var(--spacing-2xs);
+  padding-top: var(--spacing-2xs);
+  border-top: 1px solid var(--color-border);
+}
+
 // Фишка «на паузе» — та же форма, что у звена конвейера в списке чатов: одно
 // слово в капсуле на утопленной поверхности, читается в обеих темах.
 .chip {

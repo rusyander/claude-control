@@ -54,7 +54,7 @@ export function useEndpoints(profileId: string) {
  * несёт список моделей, из которого пользователь выбирает имя модели.
  */
 export function useProbeEndpoint() {
-  return useMutation({ mutationFn: probe });
+  return useMutation({ meta: { silentError: true }, mutationFn: probe });
 }
 
 /** Запись профиля в конфигурацию выбранного CLI. */
@@ -62,6 +62,7 @@ export function useApplyEndpoint() {
   const queryClient = useQueryClient();
 
   return useMutation({
+    meta: { silentError: true },
     mutationFn: apply,
     onSuccess: () => {
       // Запись меняет файл конфигурации: обновляем разделы окружения и ленту

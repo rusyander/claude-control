@@ -104,6 +104,8 @@ export function ChatThread({
       holdBusy={child.holdBusy}
       onRelease={child.release}
       releaseBusy={child.releaseBusy}
+      onResumeInterrupted={child.resumeInterrupted}
+      resumeInterruptedBusy={child.resumeInterruptedBusy}
       onCheckOverlap={child.checkOverlap}
       overlapBusy={child.overlapBusy}
       // Ревью чужих MR (Т7): в родителе — карточки всех групп, в самой группе —
@@ -140,6 +142,8 @@ export function ChatThread({
             toast.success(
               t(wasQueued ? 'chat.answerQueuedForChild' : 'chat.answerSentToChild', { title }),
             ),
+          onRefused: (title, message) =>
+            toast.error(t('chat.answerRefusedForChild', { title, message })),
         })
       }
       onRetry={chatId ? () => agentRuns.retry(chatId) : undefined}

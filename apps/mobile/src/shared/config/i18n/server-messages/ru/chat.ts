@@ -8,6 +8,11 @@ export const chatRu: Record<ChatMessageCode, string> = {
     'Не поддерживаются вложения: {{names}}. Сообщение не отправлено. Допустимые расширения: {{supported}}.',
   'run-workspace-missing':
     'Рабочая папка этого чата не найдена: {{cwd}}. Разговор начинался в ней, и продолжить его можно только оттуда.',
+  'run-session-unknown':
+    'Разговор {{sessionId}} не найден: транскрипта с таким sessionId нет. Сообщение не отправлено — новый разговор без sessionId начинается отдельно.',
+  'branch-name-required': 'Имя ветки не задано — копию заводить не под что.',
+  'branch-run-gone':
+    'Прогон, который ждал решения о ветке, уже закончился: копию заводить не для кого.',
   'editor-not-found':
     'Редактор кода не найден. Укажите его в настройках или установите code/cursor.',
   'handoff-proposal-invalid': 'Предложение не разобрано: нужны «что закрыто» и «чем продолжить»',
@@ -17,6 +22,7 @@ export const chatRu: Record<ChatMessageCode, string> = {
   'split-proposal-invalid': 'Разделение не разобрано: нужны минимум две группы с задачами',
   'split-conveyor-off': 'Конвейер уровней выключен',
   'split-group-number-required': 'Нужен номер группы',
+  'split-group-not-found': 'Группа не найдена',
   'split-answer-empty': 'Ответ пустой',
   'split-overlap-off': 'Сверка веток выключена',
   'split-levels-missing': 'Разделения с уровнями тут нет',
@@ -49,8 +55,25 @@ export const chatRu: Record<ChatMessageCode, string> = {
   'panel-agent-busy': 'В этом разговоре агент ещё отвечает — дождитесь конца хода.',
   'split-hold-not-waiting': 'Группа не ждёт ответа: вопроса нет или на него уже ответили',
   'split-release-not-waiting': 'Группа не ждёт предшественников: отпускать нечего',
+  'split-relaunch-nothing': 'Разделения нет: перезапускать нечего',
+  'split-ticket-missing': 'Такого предложения тикета в разделении нет',
+  'split-ticket-tracker-missing': 'Трекер у проекта не привязан: завести тикет некуда',
+  'split-relaunch-running': 'Перезапуск этого разделения уже идёт',
+  'split-plan-running':
+    'Разделение этого разговора ещё идёт — дождитесь конца групп или отмените план',
   'split-cleanup-nothing': 'Убирать нечего: группа не закрыта, копии нет или она уже убрана',
   'split-cleanup-shared':
     'В этой копии ещё работает другая группа — уберите копию, когда закроется и она',
   'panel-agent-last-not-user': 'последняя реплика должна быть человека',
+  'split-pause-not-running': 'Группа сейчас не работает — ставить на паузу нечего',
+  'split-resume-not-paused': 'Группа не на паузе — продолжать нечего',
+  'split-resume-refused': 'Продолжить группу нечем: у неё нет разговора или копии',
+  'split-start-not-queued': 'Группа не в очереди — запускать нечего',
+  'split-accept-not-done': 'Принять нечего: группы нет или она ещё не доставлена',
+  'split-group-no-slot': 'Все места заняты: работает {{running}} из {{limit}}',
+  'split-limit-active': 'Лимит подписки исчерпан до {{until}}',
+  'split-plan-cancel-nothing': 'Отменять нечего: разделение этого разговора уже закончилось',
+  'split-plan-cancel-unknown': 'Разделения с этим разговором нет',
+  'split-plan-cancelled': 'План отменён: его группы закрыты — начните новое разделение',
+  'split-group-cleanup-failed': 'Копию убрать не удалось: {{detail}}',
 };

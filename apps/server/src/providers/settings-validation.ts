@@ -7,6 +7,7 @@ import {
   array,
   unknown,
   preprocess,
+  union,
   enum as zodEnum,
 } from 'zod';
 // Значение, а не тип, и потому ПОДПУТЁМ, а не из барреля: баррель под
@@ -34,6 +35,8 @@ import {
   platformTransportSchema,
 } from '@agentdeck/contracts/platform-transport';
 import { modelSources } from '@agentdeck/contracts/models';
+import { SPLIT_MAX_GROUPS } from '@agentdeck/contracts/task-split';
+import { SPLIT_HEAVY_RULE_MAX } from '@agentdeck/contracts/split-groups';
 import { isKnownProviderId } from './registry.ts';
 
 /**
@@ -364,10 +367,12 @@ export const settingsPatchSchema = object({
   handoffInitiative: boolean(),
   handoffContextLimit: number().int().nonnegative(),
   handoffAutoDefault: boolean(),
+  deliverToMr: boolean(),
   // Правила прав: id правила → разрешено без вопроса. Схема нарочно широкая —
   // состав правил меняется с кодом, а сервер, зная только старый набор, вырезал
   // бы из патча новое правило и молча возвращал бы тумблер назад.
   autoApproveRules: record(string(), boolean()),
+  chatAutoMode: boolean(),
   modelPricing: record(string(), modelPricingSchema),
   encryptSecretBackups: boolean(),
   autoUpdateModels: boolean(),
@@ -449,8 +454,33 @@ export const importStateSchema = object({
   // контура, но терял бы всё, что панель о нём УЗНАЛА, — и раздел на новой
   // машине показывал бы «не проверялся» по работающему контуру.
   platformHealth: record(string(), unknown()),
+  // Разделение: записи проектов и общие правила вкладки «Группы». Без ключей
+  // снимок увозил бы группы, но терял бы, сколько их идёт разом и что они
+  // решают сами. Чтение обоих прощающее (`split-settings.ts`), поэтому здесь
+  // только форма верхнего уровня.
+  splitSettings: record(string(), unknown()),
+  splitDefaults: record(string(), unknown()),
   // `secretBackupVerifier` намеренно НЕ импортируем: это отпечаток парольной
   // фразы, которая есть только в голове у владельца исходной машины. Чужой
   // verifier заблокировал бы шифрование копий здесь навсегда.
   settings: importSettingsSchema,
 }).partial();
+
+/**
+ * `PUT /api/split-defaults` — общие правила групп разделения (вкладка
+ * «Группы»). Границы здесь, а не только в форме: запрос приходит и с телефона,
+ * и из скрипта, а потолок 0 значил бы «группы не стартуют никогда» без единой
+ * ошибки на экране. Состав строк разрешений не сверяем — он меняется с кодом,
+ * незнакомую строку чтение просто не увидит (`pickGroupPermissions`).
+ */
+export const splitDefaultsSchema = object({
+  // Булево — от клиента прошлой версии (`true` — сама, `false` — человеку).
+  permissions: record(string(), union([boolean(), zodEnum(['auto', 'notify', 'human'])])),
+  groupQuestions: zodEnum(['plan', 'human']).optional(),
+  parallelLight: number().int().min(1).max(SPLIT_MAX_GROUPS),
+  parallelHeavy: number().int().min(1).max(SPLIT_MAX_GROUPS),
+  heavy: object({
+    chains: number().int().min(1).max(SPLIT_HEAVY_RULE_MAX),
+    steps: number().int().min(1).max(SPLIT_HEAVY_RULE_MAX),
+  }),
+});

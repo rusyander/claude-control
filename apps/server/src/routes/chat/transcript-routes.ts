@@ -1,5 +1,6 @@
 import { statSync } from 'node:fs';
 import type { FastifyInstance } from 'fastify';
+import type { ChatSummary } from '@agentdeck/contracts';
 import type { ServerContext } from '../../context.ts';
 import { readChats, readChatMessages, findTranscript } from '../../domains/chat/ChatHistory.ts';
 import { summarizedMessageIds } from '../../domains/platform/gateway/summarized-ledger.ts';
@@ -9,9 +10,17 @@ import { listProjects } from '../../domains/chat/ChatProjects.ts';
 import { buildChatExport, type ExportFormat } from '../../domains/chat/ChatExport.ts';
 import { createStepCost } from '../../domains/chat/ChatCost.ts';
 import { pausedChatIds } from '../../domains/chat/tree-pause.ts';
+import { conversationKeys } from '../../lib/app-store/chat-links.ts';
+import type { SplitGroupStatus } from '../../lib/app-store/app-store.types.ts';
 import { clampInt, DEFAULT_MESSAGE_PAGE, MAX_MESSAGE_PAGE } from '../../domains/chat/constants.ts';
 import { sendConditional } from '../../lib/conditional-get.ts';
 import { projectsDir } from './paths.ts';
+
+/**
+ * Группа в работе: идёт ход, ждёт человека или доводит фоновую команду.
+ * Очередь (`pending`/`waiting`/`held`) и пауза — ещё или уже нет.
+ */
+const WORKING: ReadonlySet<SplitGroupStatus> = new Set(['started', 'awaiting', 'background']);
 
 /** Список разговоров, поиск по ним и чтение самой переписки — только чтение. */
 export function registerChatTranscriptRoutes(
@@ -19,6 +28,8 @@ export function registerChatTranscriptRoutes(
   ctx: ServerContext,
   /** Жив ли процесс CLI разговора — от него зависит, жив ли его фон. */
   isProcessAlive: (chatId: string) => boolean = () => false,
+  /** Ждёт ли разговор дерева человека — метка «ждёт вас» в списке. */
+  awaitsYou: (chatId: string) => boolean = () => false,
 ): void {
   // Тарифы достаёт слой маршрутов: кэш прайса и свои цены пользователя видны
   // только отсюда. Отдаём функцию, а не снимок, — правка цен подхватывается
@@ -44,16 +55,72 @@ export function registerChatTranscriptRoutes(
     // и связям, а не по реестру: остановленный прогон из реестра УШЁЛ, и ничем
     // иным «стоит» от «молчит» в списке не отличить.
     const paused = pausedChatIds(ctx.store.getTreePauses(), links);
+    // Звенья, снятые перезапуском групп: разговор остаётся под родителем, а не
+    // всплывает корнем, но группой уже не числится — ни номера, ни стадии, только
+    // метка `retired`. Имя группы остаётся: без него звено, чья первая реплика
+    // целиком написана панелью, называлось первой репликой или именем проекта.
+    const retired = ctx.store.getRetiredChatLinks();
+    // Звено без своих слов (задание ревью, правок, доставки пишет панель) —
+    // именем группы, а не заглушкой-проектом.
+    const named = (chat: ChatSummary, groupTitle?: string) =>
+      chat.untitled && groupTitle ? { title: groupTitle } : {};
     const withLinks =
-      Object.keys(links).length === 0 && paused.size === 0
+      Object.keys(links).length === 0 && paused.size === 0 && Object.keys(retired).length === 0
         ? chats
         : chats.map((chat) => {
             const link = links[chat.id];
             const flag = paused.has(chat.id) ? { paused: true } : {};
-            if (!link) return paused.has(chat.id) ? { ...chat, ...flag } : chat;
+            const old = link ? undefined : retired[chat.id];
+            if (old) {
+              // Группа прошлого разделения, пережившая новое (F5.2): приёмка и
+              // неубранная копия — по чату, номер у неё от старого плана.
+              const keys = conversationKeys(retired, chat.id);
+              const kept = ctx.store
+                .getSplitPlan(old.parentChatId)
+                ?.retiredGroups?.find(
+                  (item) => item.chatId && (item.chatId === chat.id || keys.includes(item.chatId)),
+                );
+              return {
+                ...chat,
+                ...flag,
+                ...named(chat, old.title),
+                parentId: old.parentChatId,
+                retired: true,
+                ...(kept?.acceptedAt ? { accepted: true } : {}),
+                ...(kept?.path && !kept.cleaned ? { copyLeft: true } : {}),
+                ...(old.title ? { groupTitle: old.title } : {}),
+              };
+            }
+            if (!link) {
+              // Родитель разделения — наверх списка, пока его группы в работе.
+              const plan = ctx.store.getSplitPlan(chat.id);
+              const working =
+                !plan?.cancelledAt && plan?.groups.some((item) => WORKING.has(item.status));
+              if (!working) return paused.has(chat.id) ? { ...chat, ...flag } : chat;
+              return { ...chat, ...flag, inWork: true };
+            }
+            // Метки списка (итоговое ревью 25.09): без них ждущий ребёнок и
+            // принятая группа читались в списке как просто молчащие чаты.
+            const group =
+              typeof link.groupIndex === 'number'
+                ? ctx.store
+                    .getSplitPlan(link.parentChatId)
+                    ?.groups.find((item) => item.index === link.groupIndex)
+                : undefined;
+            // Группа помнит чат и черновым ключом `new-…`, если её цепочка ушла
+            // в продолжение раньше, чем узнала настоящий id (живой прогон 25.09).
+            const ownsGroup = (key: string | undefined): boolean =>
+              key !== undefined &&
+              (key === chat.id || conversationKeys(links, chat.id).includes(key));
             return {
               ...chat,
               ...flag,
+              ...(awaitsYou(chat.id) ? { awaitsYou: true } : {}),
+              ...(group?.acceptedAt && ownsGroup(group.chatId) ? { accepted: true } : {}),
+              ...(group && ownsGroup(group.chatId) && WORKING.has(group.status)
+                ? { inWork: true }
+                : {}),
+              ...named(chat, link.title),
               parentId: link.parentChatId,
               // Ветка связи — только подпорка: она запомнена при заведении
               // копии, а транскрипт знает, где агент оказался после неё.
@@ -77,6 +144,15 @@ export function registerChatTranscriptRoutes(
               // есть: без него сводка звеньев у родителя молчит про модель
               // ровно в те минуты, когда на неё и смотрят.
               ...(chat.model || !link.model ? {} : { model: link.model }),
+              // Назначенная глубина — только из связи: транскрипт её не пишет, и
+              // без неё шапка разговора показывала бы глубину из настроек, а не
+              // ту, на которой разговор идёт на самом деле.
+              ...(link.effort ? { effort: link.effort } : {}),
+              // Назначенная модель — отдельным полем и по тому же правилу, что
+              // глубина: `model` выше — чем разговор шёл, а шапке нужно, чем
+              // панель велела ему идти, чтобы следующее сообщение не уехало на
+              // модели из настроек.
+              ...(link.model ? { assignedModel: link.model } : {}),
               // Первая правка кода — только из связи: транскрипт этого не
               // считает, а по разнице с заведением ребёнка сводка у родителя
               // показывает, сколько ушло на обживание копии.

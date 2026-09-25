@@ -29,6 +29,7 @@ const STATUS: Record<SplitPlanView['groups'][number]['status'], string> = {
   background: 'ход кончился, идёт фоновая команда',
   done: 'закончила',
   failed: 'сбой',
+  paused: 'на паузе — её остановил человек',
 };
 
 const WAIT: Record<NonNullable<SplitPlanView['groups'][number]['waitingFor']>, string> = {
@@ -37,6 +38,9 @@ const WAIT: Record<NonNullable<SplitPlanView['groups'][number]['waitingFor']>, s
   'review-missing': 'ревью кончилось без итога',
   background: 'ждёт фоновую команду',
   retry: 'ждёт повтора после сбоя',
+  delivery: 'панель проверяет доставку по git (ветка, MR)',
+  interrupted: 'процесс оборвался посреди хода — ждёт продолжения',
+  limit: 'упёрлась в лимит подписки — продолжится после сброса',
 };
 
 const RESULT: Record<NonNullable<SplitPlanView['groups'][number]['result']>['kind'], string> = {

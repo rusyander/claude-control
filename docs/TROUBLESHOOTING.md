@@ -70,8 +70,14 @@ kill -9 <pid>
 Or just move: `PORT=5200 API_PORT=5200 pnpm dev`. The frontend port is stricter — `strictPort` is
 on, so Vite will not silently slide to 8889; free 8888 the same way.
 
-> `node --watch` supervises a child process: kill the child specifically and the parent is left in
-> an undefined state. Stop the server fully and start it again.
+> `pnpm dev` runs the API under the `apps/server/src/lib/dev-watch.mjs` watcher, not `node --watch`.
+> Kill the server specifically and the watcher will not bring it back until the next code edit (it
+> logs that the server exited and it waits for edits). Stop `pnpm dev` fully and start it again.
+>
+> The watcher restarts the server only on a real edit (file write time or size), and ignores tests,
+> fixtures and `.md`. It kills only the server itself: live-session relays and their CLIs survive the
+> restart, and the new server reconnects to them. While an agent turn is running the restart waits —
+> for 10 minutes at most; `AGENTDECK_DEV_DEFER=0` turns the wait off.
 
 ### `pnpm: command not found`
 
@@ -96,7 +102,7 @@ drifting from the lockfile.
 
 ## The panel was running and switched itself off
 
-After a few idle hours the stand can vanish entirely or by half: the API answers and the front end does not, or the other way round. Nothing in the panel crashed. A system process janitor took it: `pnpm dev` grows from a shell that exited long ago, so the whole tree reads as orphaned, and usually only the processes holding a socket are spared — the `pnpm`, `cmd` and `node --watch` above them die, and one half of the stand is left living alone.
+After a few idle hours the stand can vanish entirely or by half: the API answers and the front end does not, or the other way round. Nothing in the panel crashed. A system process janitor took it: `pnpm dev` grows from a shell that exited long ago, so the whole tree reads as orphaned, and usually only the processes holding a socket are spared — the `pnpm`, `cmd` and the `dev-watch` watcher above them die, and one half of the stand is left living alone.
 
 The repository ships a watchdog for exactly this:
 

@@ -65,13 +65,33 @@ export function resolveWorkspace(
 }
 
 /**
+ * Режим прав прогонов, которые панель заводит сама — разбор разделения, группы,
+ * правки по ревью. Человека у такого прогона по построению нет: при `default`
+ * и `acceptEdits` каждый Bash вне списка разрешённых (npm, git, glab, даже
+ * `cd … && grep`) вставал ждать кнопки внутри дочернего чата, и конвейер из
+ * десятка групп стоял. `auto` — классификатор CLI: безопасное проходит, опасное
+ * режется без вопроса. Модели без авторежима (haiku) CLI сам опускает до `default`.
+ */
+export const AUTONOMOUS_PERMISSION_MODE = 'auto';
+
+/**
  * Режим прав для запуска.
  *
  * В песочнице Claude пишет свободно — там его файлы и есть результат работы.
  * В настоящем проекте по умолчанию только чтение: панель не должна молча
  * править рабочий код. Разрешение выдаётся осознанно, тумблером в шапке чата.
+ *
+ * `autoMode` — авторежим чата (настройка `chatAutoMode`, тумблер чата сильнее)
+ * при модели, у которой авторежим CLI есть (`supportsCliAutoMode`). Тогда вместо
+ * `acceptEdits` — `auto`: при `acceptEdits` каждый Bash вне списка разрешённых
+ * вставал ждать кнопки (живой прогон 24.09.2026). «Только чтение» авторежим не
+ * отменяет: он разрешил бы правки, от которых человек отказался.
  */
-export function permissionModeFor(workspace: Workspace, allowEdits?: boolean): string {
-  if (workspace.isSandbox || allowEdits) return 'acceptEdits';
-  return 'default';
+export function permissionModeFor(
+  workspace: Workspace,
+  allowEdits?: boolean,
+  autoMode = false,
+): string {
+  if (!workspace.isSandbox && !allowEdits) return 'default';
+  return autoMode ? AUTONOMOUS_PERMISSION_MODE : 'acceptEdits';
 }

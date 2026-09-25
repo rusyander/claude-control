@@ -1,5 +1,7 @@
 import type { SplitPlanView } from '@agentdeck/contracts/chat-handoff';
 import type { ChildStageGroup } from '../ui/ChildStages.types';
+import type { GroupControlState } from '../ui/GroupControl.types';
+import { acceptanceOf } from './groupAcceptance';
 
 /**
  * Ключ строки хаба для звена группы. Номер группы из связи — первым (Д12):
@@ -63,6 +65,8 @@ export function mergeSplitGroups(
       ordered.push({
         ...found.row,
         title: group.title || found.row.title,
+        // Состояние по конвейеру — для счётчиков сводки хаба (L37).
+        status: group.status,
         ...(group.base ? { base: group.base } : {}),
         // Чего ждёт группа, у которой чат есть (Д3): решения по ревью, фона,
         // повтора. Вопрос из транскрипта точнее — его не перекрываем.
@@ -78,10 +82,23 @@ export function mergeSplitGroups(
         ...(group.mr ? { mr: group.mr } : {}),
         // Группа сдалась (Д10): без причины строка с чатом выглядела просто
         // остановившейся, и «попытки кончились» человек не узнавал ниоткуда.
-        ...(!found.row.isRunning && group.status === 'failed' && group.error
-          ? { error: group.error }
-          : {}),
+        ...(!found.row.isRunning && group.status === 'failed' ? errorOf(group) : {}),
         ...(!found.row.isRunning && group.retries ? { retries: group.retries } : {}),
+        // Чего не хватило до доставки — видно и у идущего звена: это то, что
+        // группа сейчас доделывает по напоминанию панели.
+        ...deliveryMissingOf(group),
+        ...(group.deliveryNudges ? { deliveryNudges: group.deliveryNudges } : {}),
+        // Оборванная группа (WP1c): идущему звену кнопка не нужна — его уже
+        // продолжили.
+        ...(!found.row.isRunning && group.waitingFor === 'interrupted' && group.interruptedAt
+          ? {
+              interrupted: {
+                index: group.index,
+                at: group.interruptedAt,
+                ...(group.interruptResumes ? { resumes: group.interruptResumes } : {}),
+              },
+            }
+          : {}),
         // Закрытая группа с копией (Д19): предложить убрать. Идущему звену —
         // нет: сносить каталог из-под агента нельзя.
         ...(!found.row.isRunning &&
@@ -94,6 +111,22 @@ export function mergeSplitGroups(
               },
             }
           : {}),
+        // Пауза одной группы (журнал 81a) — метка строки и кнопка «Продолжить».
+        ...(group.status === 'paused' ? { isPaused: true } : {}),
+        ...controlOf(group, split),
+        // Ручная приёмка доставленной группы (TK-accepted).
+        ...acceptanceOf(group, split, found.row.isRunning),
+        // Разрешённое по строке «с отметкой» — и у идущего звена: это то, что
+        // прошло без человека прямо сейчас.
+        ...(group.autoNotices?.length
+          ? {
+              autoNotices: {
+                parentChatId: split.parentChatId,
+                index: group.index,
+                notices: group.autoNotices,
+              },
+            }
+          : {}),
       });
       continue;
     }
@@ -101,6 +134,29 @@ export function mergeSplitGroups(
   }
   for (const [key] of byKey) take(key);
   return ordered;
+}
+
+type SplitGroup = SplitPlanView['groups'][number];
+
+/** Причина сбоя — вместе с кодом: без него английский хаб показал бы русскую строку. */
+function errorOf(group: SplitGroup): Pick<ChildStageGroup, 'error' | 'errorCode' | 'errorParams'> {
+  if (!group.error) return {};
+  return {
+    error: group.error,
+    ...(group.errorCode ? { errorCode: group.errorCode } : {}),
+    ...(group.errorParams ? { errorParams: group.errorParams } : {}),
+  };
+}
+
+/** Чего не хватило до доставки — вместе с кодами строк (по индексу). */
+function deliveryMissingOf(
+  group: SplitGroup,
+): Pick<ChildStageGroup, 'deliveryMissing' | 'deliveryMissingCodes'> {
+  if (!group.deliveryMissing) return {};
+  return {
+    deliveryMissing: group.deliveryMissing,
+    ...(group.deliveryMissingCodes ? { deliveryMissingCodes: group.deliveryMissingCodes } : {}),
+  };
 }
 
 /** Строка группы конвейера среди строк по чатам: по ключу ветки, иначе по чату. */
@@ -158,6 +214,42 @@ function pendingRow(group: SplitPlanView['groups'][number], split: SplitPlanView
       : {}),
     ...(group.holdAnswer ? { holdAnswered: true } : {}),
     ...(group.base ? { base: group.base } : {}),
-    ...(group.error ? { error: group.error } : {}),
+    ...errorOf(group),
+    ...(pending === 'queued' ? controlOf(group, split) : {}),
   };
+}
+
+/**
+ * Что можно сделать с группой из строки (журнал 81, 89): работающую или
+ * ждущую — на паузу, остановленную — продолжить, ждущую места — запустить
+ * сейчас. Оборванной своя кнопка «Продолжить» (WP1c), и вторая ей не нужна.
+ * Срок сброса лимита — у самой группы, у очереди — общий по разделению.
+ */
+function controlOf(
+  group: SplitPlanView['groups'][number],
+  split: SplitPlanView,
+): Pick<ChildStageGroup, 'control'> {
+  const action = controlAction(group);
+  if (!action) return {};
+  const limitUntil = group.waitingFor === 'limit' ? group.limitUntil : undefined;
+  const queueLimit = action === 'start' ? split.limitUntil : undefined;
+  const until = limitUntil ?? queueLimit;
+  return {
+    control: {
+      parentChatId: split.parentChatId,
+      index: group.index,
+      action,
+      ...(until ? { limitUntil: until } : {}),
+    },
+  };
+}
+
+function controlAction(
+  group: SplitPlanView['groups'][number],
+): GroupControlState['action'] | undefined {
+  if (group.status === 'paused') return 'resume';
+  if (group.status === 'pending') return 'start';
+  const working =
+    group.status === 'started' || group.status === 'background' || group.status === 'awaiting';
+  return working && group.waitingFor !== 'interrupted' ? 'pause' : undefined;
 }

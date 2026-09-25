@@ -13,6 +13,7 @@ import { markQuestionAnswered, useAnsweredQuestions } from '@shared/lib/agent-ru
 import { branchMarks } from '../lib/branchMarks';
 import { parseQuestions } from '../lib/parseQuestions';
 import { liveQuestionKey } from '../lib/questionKey';
+import { streamStepSpend } from '../lib/streamSpend';
 import { useMessageTimings } from '../lib/useMessageTimings';
 import { useFeedScroll } from '../lib/useFeedScroll';
 import { MessageBubble } from './MessageBubble';
@@ -65,6 +66,8 @@ export function ChatMessages({
   holdBusy,
   onRelease,
   releaseBusy,
+  onResumeInterrupted,
+  resumeInterruptedBusy,
   onCheckOverlap,
   overlapBusy,
   reviews,
@@ -220,15 +223,16 @@ export function ChatMessages({
                 tool.name === 'AskUserQuestion' ? parseQuestions(tool.input) : undefined;
 
               // Расход шага приходит отдельным событием и садится на свой вызов
-              // по id. У параллельных вызовов он общий — сколько их было,
-              // считаем прямо здесь, по совпадению шага.
-              const spend = tool.usage ? (
+              // по id. У параллельных вызовов он общий — бейдж один, у первого
+              // вызова шага, как в истории (`streamStepSpend`).
+              const step = streamStepSpend(stream.tools, index);
+              const spend = step ? (
                 <TokenBadge
-                  usage={tool.usage}
+                  usage={step.usage}
                   unit={costUnit}
                   effort={effort}
                   label={tool.name}
-                  sharedWith={stream.tools.filter((other) => other.usage === tool.usage).length}
+                  sharedWith={step.sharedWith}
                   className={styles.spend}
                 />
               ) : null;
@@ -368,6 +372,8 @@ export function ChatMessages({
         holdBusy={holdBusy}
         onRelease={onRelease}
         releaseBusy={releaseBusy}
+        onResumeInterrupted={onResumeInterrupted}
+        resumeInterruptedBusy={resumeInterruptedBusy}
         onCheckOverlap={onCheckOverlap}
         overlapBusy={overlapBusy}
         permissions={childPermissions}

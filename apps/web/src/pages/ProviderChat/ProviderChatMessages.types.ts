@@ -56,6 +56,9 @@ export interface ProviderChatMessagesProps {
    */
   onRelease?: (index: number) => void;
   releaseBusy?: boolean;
+  /** «Продолжить» оборванные группы (WP1c): без номера — все, с номером — одну. */
+  onResumeInterrupted?: (index?: number) => void;
+  resumeInterruptedBusy?: boolean;
   /**
    * Сверить ветки групп (Т4): считает сервер запросами к git, поэтому кнопка, а
    * не постоянный пересчёт. Сам результат приезжает деревом.

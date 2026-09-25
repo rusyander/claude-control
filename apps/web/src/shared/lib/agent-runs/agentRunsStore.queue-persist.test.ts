@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
 
 vi.mock('@shared/api/client', () => ({
   apiClient: {
@@ -76,6 +76,13 @@ describe('agentRuns — очередь переживает перезагруз
 
   const sentPrompts = (): string[] =>
     fetchMock.mock.calls.map(([, init]) => String((init as RequestInit | undefined)?.body ?? ''));
+
+  // Первый импорт стора собирает весь граф модулей: под нагрузкой полного
+  // прогона он один съедал пятисекундный лимит первого теста. Собираем заранее —
+  // `reload()` дальше только перевыполняет уже собранные модули.
+  beforeAll(async () => {
+    await import('./agentRunsStore');
+  }, 30_000);
 
   beforeEach(() => {
     storage = fakeStorage();

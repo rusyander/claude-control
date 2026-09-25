@@ -1,5 +1,6 @@
 import type { AppSettings, ModelInfo } from '@agentdeck/contracts';
 import {
+  deliverStagePrompt,
   fixStagePrompt,
   loweredWorkPrompt,
   reviewStagePrompt,
@@ -22,6 +23,7 @@ import type { TreeStartGate } from '../chat/tree-pause.ts';
 import { initiativePrompt } from '../chat/initiative.ts';
 import { reviewNoticeText } from '../chat/split-review.ts';
 import { chainOutcomeOf, endsWithQuestion, type ChainOutcomeInput } from '../chat/chain-outcome.ts';
+import { asksDelivery } from '../chat/ChatCascadeStages.ts';
 import type { ChainOutcome } from '../chat/split-conveyor.ts';
 import type { HandoffChains, HashFile, StatFile } from '../chat/ChatHandoff.ts';
 import { planForeignHandoff, type ForeignHandoffDeps } from './handoff.ts';
@@ -50,12 +52,14 @@ import type { ProviderChatRunDeps, ProviderChatService } from './ProviderChatSer
  *
  * Цепочка конечна по построению, отдельного счётчика ей не нужно: `work` даёт
  * ровно одно `review` (и только раз — по отметке `reviewedAt`), `review` даёт
- * `fix` только по НЕПУСТОМУ списку замечаний, а после `fix` не бывает ничего.
+ * `fix` только по НЕПУСТОМУ списку замечаний, а после `fix` — только доставка
+ * группы с доставкой до MR (W3-3, зеркало Claude), одна на круг (`deliveredAt`);
+ * после доставки не бывает ничего.
  */
 
 /** Что панель запустит следующим звеном у чужого провайдера. */
 export interface ForeignStagePlan {
-  stage: 'work' | 'review' | 'fix';
+  stage: 'work' | 'review' | 'fix' | 'deliver';
   /** Название нового разговора: человек находит звенья в списке по нему. */
   title: string;
   /** Задание звена — первой репликой нового разговора. */
@@ -101,13 +105,57 @@ export interface ForeignStageInput {
    * было бы проверкой недоделанного.
    */
   paused?: boolean;
+  /** Группа доводит работу до MR: за правками и чистым ревью — доставка (W3-3). */
+  deliver?: boolean;
+  /** Человек сам попросил доставить снова — отметка `deliveredAt` не держит. */
+  redeliver?: boolean;
 }
+
+const STAGE_WORDS: Record<ForeignStagePlan['stage'], string> = {
+  work: 'работа',
+  review: 'ревью',
+  fix: 'правки',
+  deliver: 'доставка',
+};
 
 /** Название звена: от названия ГРУППЫ, а не предыдущего звена. */
 function stageTitle(cascade: ProviderChatCascade, stage: ForeignStagePlan['stage']): string {
   const base = cascade.group?.trim() || cascade.branch?.trim() || 'Группа';
-  const word = stage === 'review' ? 'ревью' : stage === 'fix' ? 'правки' : 'работа';
-  return `${base} · ${word}`;
+  return `${base} · ${STAGE_WORDS[stage]}`;
+}
+
+/**
+ * Звено ДОСТАВКИ у чужого CLI (W3-3) — то же, что у Claude: на модели работы,
+ * одно на круг. Задание без инструмента вопросов: у чужого CLI его нет, и
+ * вопрос человеку — ход, кончившийся вопросом.
+ */
+function foreignDeliverPlan(
+  cascade: ProviderChatCascade,
+  input: ForeignStageInput,
+  after: 'fix' | 'review' | 'work',
+): ForeignStagePlan | undefined {
+  if (!input.deliver) return undefined;
+  if (cascade.deliveredAt && !input.redeliver) return undefined;
+  const model = cascade.workModel;
+  return {
+    stage: 'deliver',
+    title: stageTitle(cascade, 'deliver'),
+    prompt: deliverStagePrompt({
+      after,
+      foreign: true,
+      ...(cascade.branch ? { branch: cascade.branch } : {}),
+    }),
+    ...(model ? { model } : {}),
+    ...(cascade.workEffort ? { effort: cascade.workEffort } : {}),
+    cascade: {
+      stage: 'deliver',
+      ...(cascade.group ? { group: cascade.group } : {}),
+      ...(cascade.branch ? { branch: cascade.branch } : {}),
+      ...(cascade.kind ? { kind: cascade.kind } : {}),
+      ...(model ? { workModel: model } : {}),
+      ...(cascade.workEffort ? { workEffort: cascade.workEffort } : {}),
+    },
+  };
 }
 
 /**
@@ -169,13 +217,14 @@ function afterForeignPlan(
 export function planForeignStage(input: ForeignStageInput): ForeignStagePlan | undefined {
   const { cascade, ok, text, task, hasWork } = input;
   if (!cascade) return undefined;
-  // Правки — конец цепочки: ревью второго круга панель не заводит. Разбор
-  // (уровень 1) звеньев не заводит вовсе: его итог применяет конвейер
-  // разделения, а не планировщик стадий.
-  if (cascade.stage === 'fix' || cascade.stage === 'triage') return undefined;
+  // Доставка — конец цепочки. Разбор (уровень 1) звеньев не заводит вовсе: его
+  // итог применяет конвейер разделения, а не планировщик стадий.
+  if (cascade.stage === 'deliver' || cascade.stage === 'triage') return undefined;
   // План — единственное звено, после которого следующее стартует и при неудаче.
   if (cascade.stage === 'plan') return afterForeignPlan(cascade, input.link, ok, text);
   if (!ok || input.paused) return undefined;
+  // После правок ревью второго круга панель не заводит — только доставку.
+  if (cascade.stage === 'fix') return foreignDeliverPlan(cascade, input, 'fix');
 
   const kind = cascade.kind as TaskKind | undefined;
   const base: ProviderChatCascade = {
@@ -187,7 +236,11 @@ export function planForeignStage(input: ForeignStageInput): ForeignStagePlan | u
 
   if (cascade.stage === 'work') {
     // Работа шла настройкой CLI — усиливать нечем: ревью пошло бы ровно тем же.
-    if (!cascade.lowered) return undefined;
+    // Ревью ей не будет, и группа с доставкой идёт в доставку сразу (M8, зеркало
+    // Claude); пустую работу не доставляем.
+    if (!cascade.lowered) {
+      return input.deliver && hasWork() ? foreignDeliverPlan(cascade, input, 'work') : undefined;
+    }
     // Ревью на работу заводится один раз. Без отметки второе сообщение человека
     // в тот же разговор заводило бы ещё одну проверку — и так на каждый ход.
     if (cascade.reviewedAt) return undefined;
@@ -216,7 +269,9 @@ export function planForeignStage(input: ForeignStageInput): ForeignStagePlan | u
   // Ревью закончилось. Блока нет вовсе — ревьюер не отчитался в понятном виде, и
   // заводить по такому ответу правки нельзя: человек прочтёт его текст сам.
   const findings = scanReviewBlocks(text).findings;
-  if (!findings || findings.length === 0) return undefined;
+  if (!findings) return undefined;
+  // Замечаний нет — чинить нечего, а доставлять группе с доставкой есть что.
+  if (findings.length === 0) return foreignDeliverPlan(cascade, input, 'review');
 
   const model = cascade.workModel;
   if (!model) return undefined;
@@ -227,6 +282,7 @@ export function planForeignStage(input: ForeignStageInput): ForeignStagePlan | u
     prompt: fixStagePrompt(findings, {
       ...(cascade.branch ? { branch: cascade.branch } : {}),
       reviewer: 'cli',
+      ...(input.deliver ? { deliver: true } : {}),
     }),
     model,
     ...(cascade.workEffort ? { effort: cascade.workEffort } : {}),
@@ -346,6 +402,8 @@ export interface ForeignStagePlannerDeps {
    * считаются: за планом работа заводится всегда.
    */
   onChainEnded?: (link: ChatLink, outcome: ChainOutcome) => void;
+  /** Группа связи доводит работу до MR — за правками идёт доставка (W3-3). */
+  delivers?: (link: ChatLink) => boolean;
   /**
    * Ревью чужого MR по ссылке (Т6) кончилось: замечания — в связь, решение —
    * человеку. Отвечает событием, которое лента чужого разговора показывает
@@ -547,6 +605,9 @@ export function createForeignStagePlanner(
       if (!chat.workdir) return;
       const cwd = chat.workdir;
 
+      // Повтор доставки на тот же круг — только по ПОСЛЕДНЕЙ реплике человека:
+      // она и завела этот ход (W3-3).
+      const said = chat.messages.findLast((message) => message.role === 'user')?.content ?? '';
       const plan = planForeignStage({
         cascade,
         ok: finished.ok,
@@ -555,6 +616,8 @@ export function createForeignStagePlanner(
         hasWork: () => deps.hasWork(cwd, chat.createdAt),
         ...(link ? { link } : {}),
         ...(paused ? { paused } : {}),
+        ...(link?.parentChatId && deps.delivers?.(link) ? { deliver: true } : {}),
+        ...(cascade.deliveredAt && asksDelivery(said) ? { redeliver: true } : {}),
       });
       if (!plan) {
         // Звена больше не будет — цепочка группы кончилась. План сюда не
@@ -584,6 +647,9 @@ export function createForeignStagePlanner(
       // следующем же сообщении человека.
       if (plan.stage === 'review') {
         setChatCascade(appDataDir, providerId, chatId, { reviewedAt: new Date().toISOString() });
+      }
+      if (plan.stage === 'deliver') {
+        setChatCascade(appDataDir, providerId, chatId, { deliveredAt: new Date().toISOString() });
       }
       if (plan.stage === 'work') {
         setChatCascade(appDataDir, providerId, chatId, { plannedAt: new Date().toISOString() });

@@ -1,6 +1,9 @@
 import {
   buildTreeResumePrompt,
+  type ChatAwaitingView,
+  type ChatTreeAsk,
   type ChatTreeNode,
+  type ChatTreeNodeStatus,
   type ChatTreePaused,
   type ChatTreeResumed,
   type ChatTreeView,
@@ -70,6 +73,11 @@ export interface TreePauseDeps {
    * выглядят как раньше.
    */
   reviewView?: (link: ChatLink) => SplitReviewView | undefined;
+  /**
+   * Чем разговор с этими ключами стоит на человеке (WP9c): серверная запись
+   * вопросов и запросов прав. Нет — узлы без них, как раньше.
+   */
+  asksOf?: (keys: readonly string[]) => ChatTreeAsk[];
   now?: () => Date;
 }
 
@@ -143,6 +151,37 @@ export class TreePause implements TreeStartGate {
 
   private now(): string {
     return (this.deps.now?.() ?? new Date()).toISOString();
+  }
+
+  /** Ждёт ли разговор дерева человека — метка «ждёт вас» в списке чатов. */
+  awaitsHuman(chatId: string): boolean {
+    return (this.deps.asksOf?.([chatId]) ?? []).length > 0;
+  }
+
+  /**
+   * Все ждущие человека разговоры деревьев — для сигнала вкладке. Разговор,
+   * заведённый панелью, связан дважды (временный `new-…` и настоящий ключ), а
+   * вопрос у него один: считается один раз, под настоящим ключом.
+   */
+  awaiting(): ChatAwaitingView['chats'] {
+    const asksOf = this.deps.asksOf;
+    if (!asksOf) return [];
+    const seen = new Map<string, ChatAwaitingView['chats'][number]>();
+    for (const [chatId, link] of Object.entries(this.deps.links())) {
+      if (!link.parentChatId) continue;
+      const ask = asksOf([chatId])[0];
+      if (!ask) continue;
+      const key = `${ask.runId}:${ask.toolUseId ?? ask.askedAt}`;
+      const known = seen.get(key);
+      if (known && !known.chatId.startsWith('new-')) continue;
+      seen.set(key, {
+        chatId,
+        parentChatId: link.parentChatId,
+        kind: ask.kind,
+        askedAt: ask.askedAt,
+      });
+    }
+    return [...seen.values()];
   }
 
   /** Стоит ли дерево, в котором живёт разговор (по любому его ключу). */
@@ -299,6 +338,17 @@ export class TreePause implements TreeStartGate {
       });
     }
     const nodes = [...byIdentity.values()];
+    const parked = record ? pausedChatIds({ [root]: record }, {}) : new Set<string>();
+    for (const node of nodes) {
+      const keys = [node.chatId, ...node.aliases];
+      const asks = this.deps.asksOf?.(keys) ?? [];
+      if (asks.length > 0) node.asks = asks;
+      node.status = nodeStatus(
+        node.running,
+        asks,
+        keys.some((key) => parked.has(key)),
+      );
+    }
     const rootRunning = this.deps.runs.isRunning(root);
     return {
       root,
@@ -315,6 +365,22 @@ export class TreePause implements TreeStartGate {
       nodes,
     };
   }
+}
+
+/**
+ * Состояние узла по фактам (журнал 89). Запрос прав держит прогон на месте —
+ * это «ждёт», даже пока процесс жив; вопрос посреди хода — ещё нет: агент
+ * договаривает ход и только потом встаёт.
+ */
+function nodeStatus(
+  running: boolean,
+  asks: readonly ChatTreeAsk[],
+  parked: boolean,
+): ChatTreeNodeStatus {
+  if (asks.some((ask) => ask.kind === 'permission')) return 'waiting';
+  if (running) return 'running';
+  if (asks.length > 0) return 'waiting';
+  return parked ? 'paused' : 'idle';
 }
 
 /**

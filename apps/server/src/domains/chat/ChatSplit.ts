@@ -2,7 +2,9 @@ import { mergeRequestWorkPreamble, reviewLinkPrompt } from '@agentdeck/contracts
 import {
   buildGroupPrompt,
   deliveryPreamble,
+  GROUP_QUESTIONS_HUMAN_LINE,
   environmentPreamble,
+  splitTicketPreamble,
   // Приведение имени ветки живёт в контрактах: по нему же панель узнаёт, что
   // предложение уже разделено, и второй реализации быть не должно.
   safeBranchName,
@@ -276,6 +278,11 @@ export interface SplitTasksInput {
    * ссылке не доставляется: оно ничего не правит.
    */
   deliver?: boolean;
+  /**
+   * Развилки группы (вкладка «Группы», аудит 25.09, L40): `human` — вопросом
+   * человеку и ждать, иначе по плану сама.
+   */
+  groupQuestions?: 'plan' | 'human';
 }
 
 /**
@@ -359,6 +366,7 @@ export async function splitTasks({
   resolveReview,
   claimBranch,
   deliver = false,
+  groupQuestions = 'plan',
 }: SplitTasksInput): Promise<TaskSplitResult> {
   const chats: TaskSplitStarted[] = [];
   const failures: TaskSplitFailure[] = [];
@@ -486,17 +494,30 @@ export async function splitTasks({
             ...(target.remote ? { remote: target.remote } : {}),
           })}\n\n${buildGroupPrompt(group, proposal.shared)}`
         : buildGroupPrompt(group, proposal.shared);
+    // Развилки — человеку: строка едет в преамбулу доставки, а без доставки —
+    // отдельным абзацем; ревью чужого MR развилок не решает, ему она не нужна.
+    const asksHuman = groupQuestions === 'human' && !review;
     const delivered =
       deliver && !review
-        ? `${deliveryPreamble({ branch, ...(target ? { mergeRequest: target.url } : {}) })}\n\n${base}`
-        : base;
+        ? `${deliveryPreamble({
+            branch,
+            ...(target ? { mergeRequest: target.url } : {}),
+            questions: groupQuestions,
+          })}\n\n${base}`
+        : asksHuman
+          ? `${GROUP_QUESTIONS_HUMAN_LINE}\n\n${base}`
+          : base;
+    // Дефекты вне задач — блоком тикета (95b), последним абзацем задания. Только
+    // там, где запись разделения ведёт конвейер (`claimBranch`): без записи блок
+    // некуда положить, и обещание «панель покажет» было бы неправдой.
+    const withTickets = claimBranch ? `${delivered}\n\n${splitTicketPreamble()}` : delivered;
     const groupStage = review ? 'work' : stage;
     // Копии — преамбула панели первым абзацем: что зазеркалено и установлено,
     // провал подготовки (с хвостом лога) и прямое «начинай с задачи». Группа в
     // общем каталоге работает в окружении человека — ей преамбула не нужна.
     const prompt = isWorktree
-      ? `${environmentPreamble({ ...(mirror ? { mirror } : {}), ...(bootstrap ? { bootstrap } : {}) })}\n\n${delivered}`
-      : delivered;
+      ? `${environmentPreamble({ ...(mirror ? { mirror } : {}), ...(bootstrap ? { bootstrap } : {}) })}\n\n${withTickets}`
+      : withTickets;
 
     // Ключ чата — тот же временный вид, что и у разговора, начатого из панели:
     // настоящим id разговор станет, когда CLI выдаст сессию. Иначе вкладка
@@ -556,6 +577,7 @@ export async function splitTasks({
             ...(assignment.kind ? { kind: assignment.kind } : {}),
           }
         : {}),
+      ...(deliver && !review ? { deliver: true } : {}),
     });
   }
 

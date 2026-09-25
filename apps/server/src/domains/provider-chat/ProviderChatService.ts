@@ -444,6 +444,29 @@ export class ProviderChatService {
     return true;
   }
 
+  /**
+   * Человек нажал «Стоп» (журнал 89c у Claude, открытый вопрос WP9e). Слушатель —
+   * конвейер разделения: группа встаёт на паузу, а не «сбоем», и место в очереди
+   * отдаёт. Остановка панелью (удаление чата, выход) сюда не идёт.
+   */
+  private onHumanStop?: (providerId: string, chatId: string) => void;
+
+  setHumanStopListener(listener: (providerId: string, chatId: string) => void): void {
+    this.onHumanStop = listener;
+  }
+
+  /** «Стоп» человека: слушатель узнаёт ДО остановки — конец хода застанет паузу. */
+  stopByHuman(chatId: string): boolean {
+    const live = this.runs.get(chatId);
+    if (!live?.isRunning) return false;
+    try {
+      this.onHumanStop?.(live.providerId, chatId);
+    } catch {
+      // Слушатель чужой: его сбой не имеет права сорвать остановку.
+    }
+    return this.stop(chatId);
+  }
+
   /** Погасить всё разом — при выходе сервера. */
   stopAll(): void {
     for (const [chatId] of this.runs) this.stop(chatId);

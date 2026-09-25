@@ -1143,8 +1143,98 @@ export const serverTextTemplates = {
     ru: 'Разбор оборвался перезапуском панели — итога не будет. Групп ждёт вашего ответа: {{groups}}; сами они не стартуют.',
     en: 'The triage was cut short by a panel restart — there will be no result. Groups waiting for your answer: {{groups}}; they will not start by themselves.',
   },
+  'split-groups-interrupted-notice': {
+    ru: 'Процессы групп оборвались посреди хода: {{groups}}. Панель сама продолжит их с восстановлением состояния (продолжено: {{resumed}}); остальные ждут кнопки «Продолжить» в хабе.',
+    en: 'Group processes were cut short mid-turn: {{groups}}. The panel resumes them itself with a state rebuild (resumed: {{resumed}}); the rest wait for the «Resume» button in the hub.',
+  },
   'child-tell-notice': {
     ru: 'Родитель написал группам. Передано: {{sent}} · в очереди до конца их хода: {{queued}} · не доставлено (у группы нет чата или копии): {{refused}}.',
     en: 'The parent wrote to its groups. Delivered: {{sent}} · queued until their turn ends: {{queued}} · not delivered (the group has no chat or copy): {{refused}}.',
   },
+  'split-limit-wait-notice': {
+    ru: 'Группы разделения упёрлись в лимит подписки и ждут его сброса до {{until}}: продолжатся сами, очередь до сброса не стартует.',
+    en: 'Split groups hit the subscription limit and wait for its reset at {{until}}: they resume by themselves, and the queue does not start until then.',
+  },
+  'split-limit-warning-notice': {
+    ru: 'Лимит подписки на исходе: новые группы разделения не стартуют до его сброса в {{until}}, идущие продолжают работу.',
+    en: 'The subscription limit is running low: new split groups do not start until its reset at {{until}}, running groups keep working.',
+  },
+  'split-delivery-description-unchecked-notice': {
+    ru: 'Группа «{{group}}»: описание MR {{mr}} панель не проверила — MR не читается (интеграция с форджем выключена или нет токена). Проверьте описание сами.',
+    en: 'Group «{{group}}»: the panel did not check the description of MR {{mr}} — the MR cannot be read (the forge integration is off or there is no token). Check the description yourself.',
+  },
+  'split-mr-watch-limit-notice': {
+    ru: 'Группа «{{group}}»: наблюдатель MR {{mr}} продолжал её уже {{resumes}} раз и больше сам не продолжает — новые ветки ревьюера и падения конвейера ждут вас.',
+    en: 'Group «{{group}}»: the MR watcher for {{mr}} has resumed it {{resumes}} times and stops resuming it by itself — new reviewer threads and pipeline failures wait for you.',
+  },
+  'split-default-drift-notice': {
+    ru: 'Группа «{{group}}»: {{target}} ушла вперёд и задела её файлы ({{count}}): {{files}}. Ветку посреди работы панель не трогает — перенесёт её rebase при доставке.',
+    en: 'Group «{{group}}»: {{target}} moved ahead and touched its files ({{count}}): {{files}}. The panel leaves the branch alone mid-work — the delivery rebase moves it.',
+  },
+  'split-group-run-not-started': { ru: 'прогон не запустился', en: 'the run did not start' },
+  'split-group-plan-cancelled': {
+    ru: 'план отменён человеком',
+    en: 'the plan was cancelled by a human',
+  },
+  'split-group-chain-failed': {
+    ru: 'цепочка кончилась ошибкой или остановкой',
+    en: 'the chain ended with an error or a stop',
+  },
+  'split-delivery-unverifiable': {
+    ru: 'доставку не проверить: удалённый не ответил {{checks}} раз подряд ({{reason}})',
+    en: 'delivery cannot be checked: the remote did not answer {{checks}} times in a row ({{reason}})',
+  },
+  'split-delivery-local-failed': {
+    ru: 'доставку не проверить: копия группы не читается ({{reason}})',
+    en: 'delivery cannot be checked: the group copy cannot be read ({{reason}})',
+  },
+  'split-delivery-incomplete': {
+    ru: 'доставка не доведена: {{missing}}',
+    en: 'delivery not completed: {{missing}}',
+  },
+  'split-delivery-incomplete-2': {
+    ru: 'доставка не доведена: {{first}}; {{second}}',
+    en: 'delivery not completed: {{first}}; {{second}}',
+  },
+  'split-delivery-incomplete-3': {
+    ru: 'доставка не доведена: {{first}}; {{second}}; {{third}}',
+    en: 'delivery not completed: {{first}}; {{second}}; {{third}}',
+  },
+  'split-delivery-remote-down': {
+    ru: 'удалённый недоступен с {{since}}: панель проверяет его раз в {{minutes}} мин и продолжит группу, когда он ответит ({{reason}})',
+    en: 'the remote is unreachable since {{since}}: the panel checks it every {{minutes}} min and resumes the group once it answers ({{reason}})',
+  },
+  'split-delivery-remote-silent': {
+    ru: 'удалённый не ответил: {{reason}}',
+    en: 'the remote did not answer: {{reason}}',
+  },
+  'delivery-gap-dirty': {
+    ru: 'незакоммиченные правки: {{files}}',
+    en: 'uncommitted changes: {{files}}',
+  },
+  'delivery-gap-dirty-more': {
+    ru: 'незакоммиченные правки: {{files}} и ещё {{more}}',
+    en: 'uncommitted changes: {{files}} and {{more}} more',
+  },
+  'delivery-gap-not-pushed': {
+    ru: 'ветка {{branch}} не отправлена на удалённый (или отстаёт от HEAD копии)',
+    en: 'branch {{branch}} is not pushed to the remote (or lags behind the copy HEAD)',
+  },
+  'delivery-gap-no-mr': {
+    ru: 'нет MR, чья голова — HEAD копии (ветка {{branch}})',
+    en: 'no MR whose head is the copy HEAD (branch {{branch}})',
+  },
+  'delivery-gap-review-unfinished': {
+    ru: 'ревью работы не закончено: вердикта ревьюера нет',
+    en: 'the work review is not finished: there is no reviewer verdict',
+  },
+  'delivery-gap-fix-missing': {
+    ru: 'замечания ревью ({{count}}) не исправлены: звено правок после ревью не проходило',
+    en: 'review findings ({{count}}) are not fixed: the fix stage did not run after the review',
+  },
+  'delivery-gap-mr-description': {
+    ru: 'у MR {{mr}} пустое описание',
+    en: 'MR {{mr}} has an empty description',
+  },
+  'delivery-gap-no-copy': { ru: 'нет копии группы', en: 'the group has no copy' },
 } as const satisfies Record<string, { ru: string; en: string }>;

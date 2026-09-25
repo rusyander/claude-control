@@ -380,8 +380,25 @@ export interface HandoffCheckInput {
    * отказ: новая сессия прочитала бы ровно то же, что и предыдущая.
    */
   previousHash?: string;
+  /** Потолок цепочки: у группы разделения он свой, короче (`HANDOFF_GROUP_MAX_CHAIN`). */
+  maxDepth?: number;
   stat?: StatFile;
   hash?: HashFile;
+}
+
+/**
+ * Свой блок продолжения группы разделения панель исполняет без тумблера
+ * (журнал 42c, 45b, 59c). Тумблер — решение человека в ЕГО разговоре, а у
+ * группы человека нет по построению: он включил разделение и ушёл. Блок группы,
+ * оставленный без хода, значил группу, стоящую до утра с `next: коммит, пуш,
+ * MR` в последнем ответе, — и хаб писал про неё «готово».
+ *
+ * План и разбор не в счёт: за планом работа заводится всегда, а разбор
+ * продолжений не имеет вовсе. Прочие предохранители (свежий файл-опора,
+ * потолок цепочки, «ходит по кругу») действуют и здесь.
+ */
+export function splitOwnsHandoff(link?: { parentChatId?: string; stage?: string }): boolean {
+  return Boolean(link?.parentChatId) && link?.stage !== 'plan' && link?.stage !== 'triage';
 }
 
 /**
@@ -397,6 +414,7 @@ export function evaluateHandoff({
   auto,
   depth,
   previousHash,
+  maxDepth = HANDOFF_MAX_CHAIN,
   stat = statMtime,
   hash = hashFile,
 }: HandoffCheckInput): HandoffVerdict {
@@ -404,7 +422,7 @@ export function evaluateHandoff({
   if (!auto) return { ok: false, reason: 'auto_off', proposal };
   if (!ok) return { ok: false, reason: 'run_failed', proposal };
   if (!cwd) return { ok: false, reason: 'no_project', proposal };
-  if (depth >= HANDOFF_MAX_CHAIN) return { ok: false, reason: 'chain_cap', proposal };
+  if (depth >= maxDepth) return { ok: false, reason: 'chain_cap', proposal };
 
   const target = checkpointInside(cwd, proposal.checkpoint);
   if (!target) return { ok: false, reason: 'checkpoint_missing', proposal };
@@ -473,6 +491,8 @@ export interface StartHandoffInput {
   rootTask?: string;
   /** Отпечаток файла-опоры сейчас — для предохранителя «чекпойнт не изменился». */
   checkpointHash?: string;
+  /** Продолжение группы разделения: задание в промпте — граница, а не ориентир. */
+  group?: boolean;
 }
 
 /**
@@ -490,6 +510,7 @@ export function startHandoff({
   now = Date.now,
   rootTask,
   checkpointHash,
+  group = false,
 }: StartHandoffInput): HandoffStarted {
   // Ключ чата — тот же временный вид, что и у разговора, начатого из панели:
   // настоящим id он станет, когда CLI выдаст сессию.
@@ -497,7 +518,7 @@ export function startHandoff({
   // Задание в промпте и задание в памяти цепочки — одно и то же: иначе второе
   // продолжение получило бы не тот текст, что первое.
   const task = chains.rootTaskOf(fromAliases) ?? rootTask?.trim().slice(0, HANDOFF_ROOT_TASK_MAX);
-  const prompt = buildHandoffPrompt(proposal, task);
+  const prompt = buildHandoffPrompt(proposal, task, { group });
   const chainDepth = chains.link(fromAliases, chatId, {
     ...(task ? { rootTask: task } : {}),
     ...(checkpointHash ? { checkpointHash } : {}),

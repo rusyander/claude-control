@@ -6,6 +6,7 @@ import {
   type RunSubscriber,
 } from './ChatRunRegistry.ts';
 import type { ChatEvent, RunOptions } from './ChatRunner.ts';
+import type { PlatformRunRoute } from '../platform/routing.ts';
 import type { LoweredRunRecord } from '@agentdeck/contracts/model-cascade';
 
 /**
@@ -271,6 +272,28 @@ describe('ChatRunRegistry — происхождение прогона и ма�
       message: 'Контур «Company» обязателен, а шлюз панели не поднят',
     });
     expect(refusing.describe('r1')?.status).not.toBe('running');
+  });
+
+  it('контур подставил модель без авторежима CLI — прогон идёт в acceptEdits, Claude остаётся в auto', () => {
+    const swapped = new ChatRunRegistry(() => new FakeRun());
+    let model = 'qwen3-coder';
+    swapped.setPlatformRouting(
+      () =>
+        ({
+          env: {},
+          model: { model, asked: 'sonnet', source: 'mapped', replaced: true },
+        }) as PlatformRunRoute,
+    );
+
+    swapped.start('s1', { ...OPTIONS, model: 'sonnet', permissionMode: 'auto' }, {});
+    expect(swapped.describe('s1')?.options).toMatchObject({
+      model: 'qwen3-coder',
+      permissionMode: 'acceptEdits',
+    });
+
+    model = 'claude-sonnet-5';
+    swapped.start('s2', { ...OPTIONS, model: 'sonnet', permissionMode: 'auto' }, {});
+    expect(swapped.describe('s2')?.options.permissionMode).toBe('auto');
   });
 
   it('происхождения нет — спрашивается «чат», и адрес прошлой жизни затирается', () => {
@@ -823,5 +846,79 @@ describe('ChatRunRegistry — журнал понижённых прогонов
     // Слушателя закрыли, прогон завершён — наблюдение не имеет права ломать работу.
     expect(live.state.closed).toBe(true);
     expect(registry.isRunning('c1')).toBe(false);
+  });
+});
+
+/**
+ * Второй агент в той же копии (журнал 90): звено группы не должно стартовать в
+ * каталоге, где идёт другой прогон, — реестр должен уметь это сказать.
+ */
+describe('ChatRunRegistry.runningIn', () => {
+  const runs: FakeRun[] = [];
+  let registry: ChatRunRegistry;
+
+  beforeEach(() => {
+    runs.length = 0;
+    registry = new ChatRunRegistry(() => {
+      const run = new FakeRun();
+      runs.push(run);
+      return run;
+    });
+  });
+
+  it('видит идущий прогон в том же каталоге, хвостовой слэш не мешает', () => {
+    registry.start('c1', { prompt: 'a', cwd: '/tmp/wt-1' }, {});
+    expect(registry.runningIn('/tmp/wt-1/')).toBe(true);
+    expect(registry.runningIn('/tmp/wt-2')).toBe(false);
+  });
+
+  it.runIf(process.platform === 'win32')('Windows: регистр и разделители не мешают', () => {
+    registry.start('c1', { prompt: 'a', cwd: 'C:\\work\\wt-1' }, {});
+    expect(registry.runningIn('c:/work/wt-1/')).toBe(true);
+    expect(registry.runningIn('C:/work/wt-2')).toBe(false);
+  });
+
+  it('названные ключи (сам завершившийся разговор) не в счёт', () => {
+    registry.start('c1', { prompt: 'a', cwd: '/tmp/wt' }, { sessionId: 's1' });
+    expect(registry.runningIn('/tmp/wt', ['c1'])).toBe(false);
+    expect(registry.runningIn('/tmp/wt', ['s1'])).toBe(false);
+    expect(registry.runningIn('/tmp/wt', ['other'])).toBe(true);
+  });
+
+  it('каталог проекта из meta важнее cwd; завершённый прогон не в счёт', async () => {
+    registry.start('c1', { prompt: 'a', cwd: '/tmp/cwd' }, { projectPath: '/tmp/proj' });
+    expect(registry.runningIn('/tmp/proj')).toBe(true);
+    runs[0]?.finish();
+    await flush();
+    expect(registry.runningIn('/tmp/proj')).toBe(false);
+  });
+});
+
+/**
+ * Итоговое ревью 25.09 (m3): «Стоп» по прогону, чей ход уже кончился (он ещё
+ * в буфере после завершения), звал слушателя паузы — группа в ожидании
+ * вставала на паузу от кнопки, не остановившей ничего.
+ */
+describe('ChatRunRegistry.stopByHuman', () => {
+  it('ход идёт — слушатель паузы узнаёт; ход кончился — нет', async () => {
+    const runs: FakeRun[] = [];
+    const registry = new ChatRunRegistry(() => {
+      const run = new FakeRun();
+      runs.push(run);
+      return run;
+    });
+    const stops: string[][] = [];
+    registry.setHumanStopListener((keys) => void stops.push([...keys]));
+
+    registry.start('c1', { prompt: 'a', cwd: '/tmp/wt' }, {});
+    expect(registry.stopByHuman('c1')).toBe(true);
+    expect(stops).toHaveLength(1);
+
+    registry.start('c2', { prompt: 'b', cwd: '/tmp/wt' }, {});
+    runs[1]?.finish();
+    await flush();
+    expect(registry.isRunning('c2')).toBe(false);
+    expect(registry.stopByHuman('c2')).toBe(true);
+    expect(stops).toHaveLength(1);
   });
 });

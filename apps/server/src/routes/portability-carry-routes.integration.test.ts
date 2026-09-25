@@ -111,7 +111,7 @@ describe('portability-carry: перенос незакрытой работы', 
             return false;
           },
         },
-        session: { inherit: () => {} },
+        session: { inherit: () => {}, autoModeOverride: () => undefined },
         providerChats: {
           send: (_data: string, providerId: string, chatId: string, ask: { text: string }) => {
             sent.push({ providerId, chatId, text: ask.text });

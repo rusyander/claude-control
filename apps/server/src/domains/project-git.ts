@@ -46,9 +46,24 @@ export { LOCKFILES, parseChurn, revertLockfileChurn } from './project-git/lockfi
 export {
   BOOTSTRAP_TIMEOUT_MS,
   WorktreeBootstraps,
-  bootstrapCommandFor,
-  detectBootstrapCommand,
+  bootstrapPlanFor,
+  detectBootstrapPlan,
+  isHeavyPlan,
+  type BootstrapPlan,
 } from './project-git/bootstrap.ts';
+export {
+  chatDeliveryFor,
+  deliveryActive,
+  effectiveParallel,
+  findDeliverySkill,
+  resolveProjectDelivery,
+} from './project-git/delivery.ts';
+export {
+  missingDelivery,
+  mrDescriptionGap,
+  readDeliveryFacts,
+  type DeliveryFacts,
+} from './project-git/delivery-facts.ts';
 export {
   parseBranches,
   parseNumstat,
@@ -62,8 +77,11 @@ export {
   parseDirtyPaths,
   readBranchFiles,
   readCurrentBranch,
+  readMergeTarget,
   readProjectGit,
+  readTargetMoved,
   requireRepo,
+  splitRootOf,
 } from './project-git/read.ts';
 export {
   addWorktree,

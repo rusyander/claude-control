@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { initiativePrompt } from './initiative.ts';
+import { chatDeliveryPrompt } from '@agentdeck/contracts/task-split';
+import { DELIVERY_AFTER_SPLIT, initiativePrompt } from './initiative.ts';
 
 /**
  * Инициативы уезжают к агенту одним аргументом командной строки, поэтому
@@ -115,5 +116,54 @@ describe('строка инициатив для прогона', () => {
     const split = initiativePrompt({ taskSplitInitiative: true, handoffInitiative: false }) ?? '';
     expect(split).toContain('ОДНА задача');
     expect(split).toContain('не больше одного раза за разговор');
+  });
+
+  /**
+   * Доставка до MR в обычном чате: строка приезжает, только когда её передали,
+   * остаётся однострочной и сама ограничивает себя задачей на изменение кода —
+   * MR на «объясни, как это работает» был бы вредом.
+   */
+  it('доставка: приезжает по запросу, одной строкой, с планкой и запретами', () => {
+    const settings = { taskSplitInitiative: false, handoffInitiative: false };
+    expect(initiativePrompt(settings)).not.toContain('Доставка до MR');
+
+    const delivery = chatDeliveryPrompt({ skill: 'acme-ticket-delivery' });
+    const line = initiativePrompt(settings, { delivery }) ?? '';
+    expect(line).toContain('Доставка до MR на этом проекте включена');
+    expect(line).toContain('`acme-ticket-delivery`');
+    expect(line).toContain('задача на изменение кода');
+    expect(line).toContain('MR не требуют');
+    expect(line).toContain('слияние, удаление веток и force-push запрещены');
+    expect(line).not.toMatch(/[\r\n]/);
+
+    // Чужому CLI — без AskUserQuestion, но строка доезжает.
+    const foreign = chatDeliveryPrompt({ foreign: true });
+    expect(foreign).not.toContain('AskUserQuestion');
+    expect(foreign).toContain('`ticket-delivery`');
+    expect(initiativePrompt(settings, { foreign: true, delivery: foreign })).toContain(foreign);
+  });
+
+  /**
+   * Живой прогон 24.09.2026: родитель получил и «предложи разделение», и
+   * «доставь до MR» без старшинства — и мог доставить пять тикетов сам.
+   * Доставка остаётся (разделение включено из коробки, чат с одной задачей
+   * без неё не дошёл бы до MR), но уступает разделению явно.
+   */
+  it('доставка рядом с разделением уступает ему; без разделения — как была', () => {
+    const delivery = chatDeliveryPrompt({ skill: 'acme-ticket-delivery' });
+    const split = { taskSplitInitiative: true, handoffInitiative: false };
+
+    const both = initiativePrompt(split, { delivery }) ?? '';
+    expect(both).toContain(`${DELIVERY_AFTER_SPLIT} ${delivery}`);
+    expect(both).toContain('если предлагаешь разделение, ничего не доставляй');
+    expect(both).toContain('Доставка до MR на этом проекте включена');
+    expect(both).not.toMatch(/[\r\n]/);
+
+    // Разделение уже предлагали — старшинство не нужно, строка доставки чистая.
+    const muted = initiativePrompt(split, { delivery, splitMuted: true }) ?? '';
+    expect(muted).toContain(delivery);
+    expect(muted).not.toContain(DELIVERY_AFTER_SPLIT);
+    const off = { taskSplitInitiative: false, handoffInitiative: false };
+    expect(initiativePrompt(off, { delivery })).not.toContain(DELIVERY_AFTER_SPLIT);
   });
 });

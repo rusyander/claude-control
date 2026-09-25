@@ -1,5 +1,6 @@
 import type { ChatSummary } from '@agentdeck/contracts';
-import type { ChatRowData, Row, TimeGroup } from '../ui/ChatList.types';
+import { isLive, type RunStatus } from '@shared/lib/agent-runs';
+import type { ChatRowData, ListGroup, Row, TimeGroup } from '../ui/ChatList.types';
 
 /**
  * Совпадения по телу приходят глобально; показываем из них только те, что есть
@@ -31,6 +32,10 @@ export function matchBodyHits(
  * списка — порядок родителей остаётся прежним (свежие сверху), а дети встают под
  * своим родителем в том же порядке, в каком их завели.
  *
+ * Снятые перезапуском разделения дети (`retired`) уходят в конец своей ветви,
+ * под разделитель «Неактивно» (находка 20 журнала): работа их не продолжается,
+ * а вперемешку с живыми группами они читались как ещё идущие.
+ *
  * Сирота (родитель не попал в видимый список — удалён, отфильтрован поиском)
  * остаётся обычной строкой на своём месте: спрятать разговор, потому что не
  * нашлась его родня, — худшее, что можно сделать со списком.
@@ -57,9 +62,13 @@ export function withTree(items: ChatRowData[]): ChatRowData[] {
     rows.push(item);
     placed.add(item.chat.id);
 
-    for (const child of byParent.get(item.chat.id) ?? []) {
+    const kin = byParent.get(item.chat.id) ?? [];
+    const live = kin.filter((child) => !child.chat.retired);
+    const retired = kin.filter((child) => child.chat.retired);
+    for (const child of [...live, ...retired]) {
       if (placed.has(child.chat.id)) continue;
-      rows.push({ ...child, depth: 1 });
+      const first = child === retired[0];
+      rows.push({ ...child, depth: 1, ...(first ? { inactiveStart: true } : {}) });
       placed.add(child.chat.id);
     }
   }
@@ -67,21 +76,67 @@ export function withTree(items: ChatRowData[]): ChatRowData[] {
   return rows;
 }
 
-/** Раскладывает отсортированный список по группам «Сегодня / Вчера / …». */
+/**
+ * Поднимает наверх ветви, где сейчас идёт прогон (владелец, 24.09.2026).
+ *
+ * Работает поверх `withTree`: ветвь — это корень и его дети, и поднимается
+ * она целиком, иначе ребёнок уехал бы от родителя. Идущей ветвь считается,
+ * если идёт корень или любой ребёнок: у разделения обычно работают группы, а
+ * родитель молчит. Внутри поднятой ветви идущие дети встают первыми. Остальное
+ * — в прежнем порядке (свежие сверху), порядок среди поднятых — тоже прежний.
+ *
+ * «Идёт» решает вызывающий: живой прогон или разделение в работе (метка
+ * `inWork` — между стадиями конвейера прогона нет, а группа работает). Снятые
+ * перезапуском дети остаются в самом низу ветви, что бы про них ни думал
+ * `isActive`.
+ *
+ * Строки поднятых ветвей помечаются `pinned`: заголовок даты над ними врал бы —
+ * вчерашний чат, который работает сейчас, стоял бы под «Сегодня».
+ */
+export function withActiveFirst(
+  items: ChatRowData[],
+  isActive: (chatId: string) => boolean,
+): ChatRowData[] {
+  const branches: ChatRowData[][] = [];
+  for (const item of items) {
+    const branch = branches.at(-1);
+    if (item.depth && branch) branch.push(item);
+    else branches.push([item]);
+  }
+
+  const active: ChatRowData[] = [];
+  const rest: ChatRowData[] = [];
+  for (const [root, ...children] of branches) {
+    if (!root) continue;
+    const running = children.filter((child) => !child.chat.retired && isActive(child.chat.id));
+    if (!isActive(root.chat.id) && running.length === 0) {
+      rest.push(root, ...children);
+      continue;
+    }
+    const idle = children.filter((child) => !running.includes(child));
+    for (const row of [root, ...running, ...idle]) active.push({ ...row, pinned: true });
+  }
+
+  return active.length === 0 ? items : [...active, ...rest];
+}
+
+/** Раскладывает отсортированный список по группам «Сейчас работают / Сегодня / Вчера / …». */
 export function withGroupHeaders(items: ChatRowData[]): Row[] {
   const rows: Row[] = [];
-  let current: TimeGroup | undefined;
+  let current: ListGroup | undefined;
 
   for (const data of items) {
     // Ветвь дерева не отрывается от своего корня: у ребёнка своя дата, и по ней
     // между ним и родителем мог бы встать заголовок «Вчера» — тогда дерево
     // распалось бы ровно там, ради чего его и рисуют.
-    const group = data.depth
-      ? (current ?? timeGroup(data.chat.updatedAt))
-      : timeGroup(data.chat.updatedAt);
+    const own: ListGroup = data.pinned ? 'running' : timeGroup(data.chat.updatedAt);
+    const group = data.depth ? (current ?? own) : own;
     if (group !== current) {
       rows.push({ kind: 'header', group });
       current = group;
+    }
+    if (data.inactiveStart && data.chat.parentId) {
+      rows.push({ kind: 'inactive', group, parentId: data.chat.parentId });
     }
     rows.push({ kind: 'chat', group, data });
   }
@@ -103,4 +158,29 @@ export function timeGroup(iso: string): TimeGroup {
   const weekAgo = new Date(startOfToday);
   weekAgo.setDate(weekAgo.getDate() - 7);
   return date.getTime() >= weekAgo.getTime() ? 'thisWeek' : 'earlier';
+}
+
+/**
+ * Строки списка целиком: дерево, поднятые ветви, заголовки. «Идёт» — живой
+ * прогон, в том числе замолчавший, или разделение в работе (`inWork`: между
+ * стадиями группы прогона нет, а работа идёт).
+ */
+export function chatListRows(
+  found: ChatRowData[],
+  statuses: ReadonlyMap<string, RunStatus> | undefined,
+): Row[] {
+  const working = new Set(found.filter((row) => row.chat.inWork).map((row) => row.chat.id));
+  return withGroupHeaders(
+    withActiveFirst(withTree(found), (id) => {
+      const status = statuses?.get(id);
+      return working.has(id) || (status !== undefined && isLive(status));
+    }),
+  );
+}
+
+/** Ключ строки виртуального списка: у заголовка — группа, у разделителя — ветвь. */
+export function rowKey(row: Row): string {
+  if (row.kind === 'header') return `group-${row.group}`;
+  if (row.kind === 'inactive') return `inactive-${row.parentId}`;
+  return row.data.chat.id;
 }

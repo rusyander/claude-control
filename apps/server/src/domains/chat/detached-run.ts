@@ -88,6 +88,14 @@ export class DetachedRun {
     this.resolve = undefined;
   }
 
+  /**
+   * Выход сервера: процесс не наш, и выход панели его не касается — запись в
+   * журнале остаётся, и следующий сервер усыновит его снова.
+   */
+  detach(): void {
+    this.clear();
+  }
+
   private clear(): void {
     if (this.timer) clearInterval(this.timer);
     this.timer = undefined;

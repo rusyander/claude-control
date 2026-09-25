@@ -68,7 +68,8 @@ export function ChatRow({
           {(chat.stage === 'triage' ||
             chat.stage === 'plan' ||
             chat.stage === 'review' ||
-            chat.stage === 'fix') && (
+            chat.stage === 'fix' ||
+            chat.stage === 'deliver') && (
             <Typography variant="caption" color="subtle" as="span" className={styles.stage}>
               {t(`chat.cascade.stage.${chat.stage}`)}
             </Typography>
@@ -78,6 +79,18 @@ export function ChatRow({
           {chat.paused && (
             <Typography variant="caption" color="subtle" as="span" className={styles.stage}>
               {t('chat.cascade.tree.paused')}
+            </Typography>
+          )}
+          {/* Ждёт человека и принятая группа — те же слова, что в сводке хаба:
+              иначе в списке их не отличить от просто молчащих чатов. */}
+          {chat.awaitsYou && (
+            <Typography variant="caption" color="warning" as="span" className={styles.stage}>
+              {t('chat.cascade.tree.awaitsYou')}
+            </Typography>
+          )}
+          {chat.accepted && (
+            <Typography variant="caption" color="success" as="span" className={styles.stage}>
+              {t('chat.cascade.tree.accepted')}
             </Typography>
           )}
         </Stack>

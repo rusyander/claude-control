@@ -4,7 +4,9 @@ import {
   boolean,
   number,
   array,
+  record,
   unknown,
+  union,
   enum as zodEnum,
   type infer as Infer,
 } from 'zod';
@@ -36,8 +38,10 @@ export const chatSendBodySchema = object({
   /** Полный доступ (bypassPermissions) — «Разрешить и продолжить» у упавшего агента. */
   fullAccess: boolean().optional(),
   /**
-   * Автоподтверждение безопасных запросов прав — тумблером из шапки чата.
-   * Опасное (git-записи, удаление, миграции) и всё под правилами `ask`/`deny`
+   * Авторежим прав этого чата — выбор человека тумблером в меню чата. Задан —
+   * сильнее глобальной `chatAutoMode` в обе стороны и запоминается за чатом; не
+   * задан — действует запомненный выбор чата, а без него глобальная настройка.
+   * Опасное (удаление, затирание истории) и всё под правилами `ask`/`deny`
    * по-прежнему спрашивают человека.
    */
   autoApprove: boolean().optional(),
@@ -66,6 +70,13 @@ export const chatSendBodySchema = object({
    * планка сдачи, та же, что у понижённой группы разделения.
    */
   lowered: boolean().optional(),
+  /**
+   * Разговор занят — не отказывать, а поставить сообщение в очередь сервера:
+   * оно уйдёт продолжением той же сессии, как только ход кончится. Так отвечает
+   * хаб родителя ребёнку, чей прогон вкладка не знает (отцепленная группа):
+   * 409 здесь терял бы ответ человека. Ответ — 202 `{ queued: true, runId }`.
+   */
+  queueIfBusy: boolean().optional(),
 });
 export type ChatSendBody = Infer<typeof chatSendBodySchema>;
 
@@ -141,7 +152,15 @@ export const gitMirrorSettingsBodySchema = object({
 export const splitSettingsBodySchema = object({
   path: gitPathSchema,
   deliver: boolean(),
-  parallel: number().int().min(1).max(30),
+  /** `null` — вернуть общий потолок вкладки «Группы» (лёгкий или тяжёлый проект). */
+  parallel: number().int().min(1).max(30).nullable(),
+  /**
+   * Строки разрешений групп, переопределённые проектом. Нет поля — строки не
+   * трогаем (так шлёт кнопка «До MR»); `null` — сбросить к общим.
+   */
+  permissions: record(string(), union([boolean(), zodEnum(['auto', 'notify', 'human'])]))
+    .nullable()
+    .optional(),
 });
 /** Повторный бутстрап уже существующей копии — кнопкой на карточке. */
 export const gitWorktreeBootstrapBodySchema = object({

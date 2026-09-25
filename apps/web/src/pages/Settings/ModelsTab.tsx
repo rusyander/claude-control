@@ -93,6 +93,15 @@ export function ModelsTab({ settings, patch }: SettingsTabProps) {
             checked={settings.taskSplitInitiative}
             onChange={(taskSplitInitiative) => patch({ taskSplitInitiative })}
           />
+          {/* Главный выключатель доставки до MR. Сама настройка — на проекте,
+              кнопкой «До MR» в шапке чата: у репозиториев разный путь до MR, а
+              здесь решается одно — есть ли эта кнопка вообще. */}
+          <SettingToggleRow
+            label={t('settings.deliverToMr')}
+            hint={t('settings.deliverToMrHint')}
+            checked={settings.deliverToMr}
+            onChange={(deliverToMr) => patch({ deliverToMr })}
+          />
           {/* Инициатива закрыть этап и продолжить в чистой сессии. Тумблер
               включает только ПРЕДЛОЖЕНИЕ: сам переход всё равно идёт по решению
               человека — кнопкой на карточке или автоматом, включённым в том
@@ -123,6 +132,14 @@ export function ModelsTab({ settings, patch }: SettingsTabProps) {
             hint={t('settings.handoffAutoDefaultHint')}
             checked={settings.handoffAutoDefault}
             onChange={(handoffAutoDefault) => patch({ handoffAutoDefault })}
+          />
+          {/* Авторежим прав для чатов, где тумблер в меню чата не трогали.
+              Тумблер конкретного чата сильнее — в обе стороны. */}
+          <SettingToggleRow
+            label={t('settings.chatAutoMode')}
+            hint={t('settings.chatAutoModeHint')}
+            checked={settings.chatAutoMode}
+            onChange={(chatAutoMode) => patch({ chatAutoMode })}
           />
         </Stack>
       </Card>

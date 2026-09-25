@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
+import { availableParallelism } from 'node:os';
 
 /**
  * Падение запуска CLI не должно уносить сервер.
@@ -205,5 +206,163 @@ describe('ChatRun.start: имя модели, отброшенное грамм�
     const args = (spawnMock.mock.calls[0] as unknown as [string, string[]])[1];
     expect(args).toContain('--model');
     expect(args).toContain('qwen2.5:7b');
+  });
+});
+
+/**
+ * Находка 46 живого прогона: параллельные группы разделения гоняли vitest каждая
+ * на все ядра — около сорока рабочих процессов разом. Ребёнку разделения панель
+ * ставит потолок в окружение CLI; обычному чату — нет.
+ */
+describe('ChatRun.start: потолок рабочих процессов vitest', () => {
+  const KEYS = ['VITEST_MAX_WORKERS', 'VITEST_MAX_THREADS', 'VITEST_MAX_FORKS'] as const;
+
+  /** Окружение, с которым CLI реально запущен. */
+  async function spawnedEnv(
+    extra: { child?: boolean; env?: Record<string, string> } = {},
+  ): Promise<NodeJS.ProcessEnv> {
+    const run = new ChatRun();
+    const finished = run.start(
+      { prompt: 'привет', cwd: process.cwd(), command: 'fake-cli', ...extra },
+      () => undefined,
+    );
+    process.nextTick(() => {
+      child.stdout.end();
+      child.stderr.end();
+      child.emit('close', 0);
+    });
+    await finished;
+    const call = spawnMock.mock.calls[0] as unknown as [
+      string,
+      string[],
+      { env: NodeJS.ProcessEnv },
+    ];
+    return call[2].env;
+  }
+
+  const saved: Partial<Record<(typeof KEYS)[number], string>> = {};
+  beforeEach(() => {
+    for (const key of KEYS) {
+      saved[key] = process.env[key];
+      delete process.env[key];
+    }
+  });
+  afterEach(() => {
+    for (const key of KEYS) {
+      if (saved[key] === undefined) delete process.env[key];
+      else process.env[key] = saved[key];
+    }
+  });
+
+  it('ребёнку разделения — четверть ядер, во всех трёх именах', async () => {
+    const env = await spawnedEnv({ child: true });
+    const expected = String(Math.max(1, Math.floor(availableParallelism() / 4)));
+    for (const key of KEYS) expect(env[key]).toBe(expected);
+  });
+
+  it('обычный чат потолка не получает', async () => {
+    const env = await spawnedEnv();
+    for (const key of KEYS) expect(env[key]).toBeUndefined();
+  });
+
+  it('потолок из окружения панели сильнее нашего', async () => {
+    process.env.VITEST_MAX_WORKERS = '7';
+    const env = await spawnedEnv({ child: true });
+    expect(env.VITEST_MAX_WORKERS).toBe('7');
+    expect(env.VITEST_MAX_THREADS).toBeUndefined();
+  });
+
+  it('окружение прогона сильнее нашего', async () => {
+    const env = await spawnedEnv({ child: true, env: { VITEST_MAX_WORKERS: '3' } });
+    expect(env.VITEST_MAX_WORKERS).toBe('3');
+  });
+});
+
+/**
+ * Аудит 25.09, L280: заглушка CLI (`model: <synthetic>`, «No response
+ * requested.») в живом потоке давала шаг расхода с нулями — окно в шапке
+ * падало в ноль, — а её текст ложился в ленту и хвост ответа.
+ */
+describe('ChatRun.start: заглушка CLI в потоке', () => {
+  it('ни расхода, ни текста от <synthetic>; настоящий ответ проходит', async () => {
+    const events: { kind: string; message?: string; text?: string; model?: string }[] = [];
+    const finished = runWithDeadline(events, process.cwd());
+    const zero = { input_tokens: 0, output_tokens: 0 };
+    const lines = [
+      {
+        type: 'stream_event',
+        event: {
+          type: 'message_start',
+          message: { id: 'm0', model: '<synthetic>', role: 'assistant', content: [], usage: zero },
+        },
+      },
+      {
+        type: 'stream_event',
+        event: {
+          type: 'content_block_delta',
+          index: 0,
+          delta: { type: 'text_delta', text: 'No response requested.' },
+        },
+      },
+      { type: 'stream_event', event: { type: 'message_delta', usage: zero } },
+      { type: 'stream_event', event: { type: 'message_stop' } },
+      {
+        type: 'assistant',
+        message: {
+          id: 'm0',
+          model: '<synthetic>',
+          role: 'assistant',
+          content: [{ type: 'text', text: 'No response requested.' }],
+          usage: zero,
+        },
+      },
+      // Настоящий ответ: текст — дельтами, как у живого CLI.
+      {
+        type: 'stream_event',
+        event: {
+          type: 'message_start',
+          message: { id: 'm1', model: 'claude-opus-5', role: 'assistant', content: [] },
+        },
+      },
+      {
+        type: 'stream_event',
+        event: {
+          type: 'content_block_delta',
+          index: 0,
+          delta: { type: 'text_delta', text: 'Настоящий ответ' },
+        },
+      },
+      {
+        type: 'stream_event',
+        event: { type: 'message_delta', usage: { input_tokens: 120, output_tokens: 7 } },
+      },
+      { type: 'stream_event', event: { type: 'message_stop' } },
+      {
+        type: 'assistant',
+        message: {
+          id: 'm1',
+          model: 'claude-opus-5',
+          role: 'assistant',
+          content: [{ type: 'text', text: 'Настоящий ответ' }],
+          usage: { input_tokens: 120, output_tokens: 7 },
+        },
+      },
+      { type: 'result', subtype: 'success', is_error: false, result: 'Настоящий ответ' },
+    ];
+
+    process.nextTick(() => {
+      for (const line of lines) child.stdout.write(`${JSON.stringify(line)}\n`);
+      child.stdout.end();
+      child.stderr.end();
+      child.emit('close', 0);
+    });
+
+    expect(await finished).toBe(true);
+    const texts = events.filter((event) => event.kind === 'text').map((event) => event.text);
+    expect(texts.join('')).not.toContain('No response requested');
+    expect(texts.join('')).toContain('Настоящий ответ');
+    const models = events.filter((event) => event.kind === 'usage').map((event) => event.model);
+    expect(models).not.toContain('<synthetic>');
+    expect(models).toContain('claude-opus-5');
   });
 });

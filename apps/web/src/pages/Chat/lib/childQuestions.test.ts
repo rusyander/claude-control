@@ -107,6 +107,18 @@ describe('collectChildQuestions', () => {
     expect(collectChildQuestions(chats, 'parent', runs)).toEqual([]);
   });
 
+  /**
+   * Чат группы, отброшенной перезапуском разделения (`retired`, L20): её работа
+   * не продолжается, и вопрос оттуда в родителе звал бы человека отвечать тому,
+   * кого уже заменили.
+   */
+  it('вопрос отброшенного перезапуском чата в родителя не попадает', () => {
+    const chats = [chat('parent'), chat('old', { parentId: 'parent', retired: true })];
+    const runs = [run('old', { tools: [ask('Старый вопрос')] })];
+
+    expect(collectChildQuestions(chats, 'parent', runs)).toEqual([]);
+  });
+
   it('без открытого разговора и без детей — пусто', () => {
     const chats = [chat('parent'), chat('kid', { parentId: 'parent' })];
     expect(collectChildQuestions(chats, undefined, [run('kid', { tools: [ask('Что?')] })])).toEqual(

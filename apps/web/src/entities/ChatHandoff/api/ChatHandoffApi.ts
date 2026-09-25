@@ -30,6 +30,7 @@ export interface StartHandoffBody {
 
 export function useStartHandoff() {
   return useMutation({
+    meta: { silentError: true },
     mutationFn: async (body: StartHandoffBody) => {
       const { data } = await apiClient.post<HandoffStarted>('/chat/handoff', body);
       return data;

@@ -50,6 +50,7 @@ export function TaskSplitCard({
   isPending,
   disabled,
   childBranches,
+  proposedAt,
 }: TaskSplitCardProps) {
   const { t } = useTranslation();
   // «Только завести чаты» — для случая, когда сначала хочется прочитать задания
@@ -126,8 +127,17 @@ export function TaskSplitCard({
   // Сколько групп уже стали чатами. Считаем по веткам, а не по названиям: имя
   // ветки — единственное, что переживает и заведение копии, и перезагрузку
   // страницы, и переход с телефона.
-  const done = childBranches?.length
-    ? proposal.groups.filter((group) => branchTaken(group.branch, childBranches)).length
+  // Только чаты, заведённые после предложения: раньше заведённые — от прошлого
+  // плана (отменённого или закрытого) и из этой карточки не рождались.
+  const since = proposedAt ? Date.parse(proposedAt) : Number.NaN;
+  const taken = (childBranches ?? [])
+    .filter((child) => {
+      const at = child.createdAt ? Date.parse(child.createdAt) : Number.NaN;
+      return Number.isNaN(since) || Number.isNaN(at) || at >= since;
+    })
+    .map((child) => child.branch);
+  const done = taken.length
+    ? proposal.groups.filter((group) => branchTaken(group.branch, taken)).length
     : 0;
   // Хотя бы одна группа заведена — предложение отработано. Именно «хотя бы
   // одна», а не «все»: при частичном сбое (три ветки из четырёх) повтор завёл

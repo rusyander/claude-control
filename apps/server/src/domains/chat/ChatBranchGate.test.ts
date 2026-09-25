@@ -1,12 +1,13 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   branchGateContext,
   isMainWorkingCopy,
   isWritingCall,
+  mainCopyTargetOf,
   suggestBranchName,
 } from './ChatBranchGate.ts';
 
@@ -39,6 +40,56 @@ describe('ворота ветки: что считается правкой', ()
     for (const command of reads) expect(isWritingCall('Bash', { command })).toBe(false);
   });
 
+  /**
+   * Живой прогон 24.09.2026: оба чтения ниже остановили прогон в основной
+   * копии и увели его в копию с веткой. Таблица — в обе стороны: починка не
+   * имеет права ослепить ворота на настоящую запись рядом.
+   */
+  it('сброс потока в никуда и имя каталога с `cp-` — чтение, запись рядом — по-прежнему запись', () => {
+    const reads = [
+      'ls "$NVM_HOME" 2>/dev/null',
+      'cd cp-admin-ui && git status',
+      'cd cp-admin-ui/src && rg "useForm" .',
+      'git log --oneline -5 2>&1 | head',
+      'npm ls react &>/dev/null; echo $?',
+      'where node 2>nul',
+      'Get-ChildItem 2>$null',
+      'node -e "console.log([1].map((a) => a))"',
+      'cat install-notes.md',
+      'rg -n "tee-shirt" src',
+      'ls ./patches/dd-helper',
+      "ls '/dev/null'",
+    ];
+    for (const command of reads) {
+      expect({ command, write: isWritingCall('Bash', { command }) }).toEqual({
+        command,
+        write: false,
+      });
+    }
+
+    const writes = [
+      'ls > out.txt',
+      'ls 2>/dev/null > out.txt',
+      'npm test 2> err.log',
+      'echo a>b',
+      'echo x >> /dev/null.txt',
+      'echo x > nul.txt',
+      'cd cp-admin-ui && cp a.ts b.ts',
+      '(cd x && mv a b)',
+      'cp -r src dst',
+      'find . -name "*.ts" | xargs cp -t out',
+      'node build.mjs | tee',
+      'dd if=a of=b',
+      'npm install',
+    ];
+    for (const command of writes) {
+      expect({ command, write: isWritingCall('Bash', { command }) }).toEqual({
+        command,
+        write: true,
+      });
+    }
+  });
+
   it('команда приходит массивом argv — разбирается так же', () => {
     expect(isWritingCall('run_shell_command', { command: ['sed', '-i', 's/a/b/', 'f.ts'] })).toBe(
       true,
@@ -57,6 +108,20 @@ describe('ворота ветки: имя ветки по заданию', () =>
     const first = suggestBranchName('правки по ревью', 'aaaaaa111111');
     const second = suggestBranchName('правки по ревью', 'bbbbbb222222');
     expect(first).not.toBe(second);
+  });
+
+  it('ссылка в задании имени не даёт — остаётся ключ задачи из неё', () => {
+    expect(
+      suggestBranchName('https://tracker.example.com/browse/PROJ-1064 поправь форму', 'abc123def'),
+    ).toBe('agent/proj-1064-poprav-formu-123def');
+    // Ключа в ссылке нет — от неё не остаётся ничего, имя берётся из текста.
+    expect(
+      suggestBranchName(
+        'https://tracker.example.com/secure/Dashboard.jspa\nпочини вход',
+        'abc123def',
+      ),
+    ).toBe('agent/pochini-vhod-123def');
+    expect(suggestBranchName('https://example.com/x', 'zzz999')).toBe('agent/chat-zzz999');
   });
 
   it('задание без букв — имя всё равно годное', () => {
@@ -100,6 +165,45 @@ describe('ворота ветки: основная копия и копия', (
     const plain = join(root, 'plain');
     mkdirSync(plain, { recursive: true });
     expect(isMainWorkingCopy(plain)).toBe(false);
+  });
+
+  /**
+   * Итоговая проверка 25.09 (D4): группа из своей копии записала абсолютным
+   * путём в `.agent/` основной копии — ворота смотрели только на каталог прогона.
+   */
+  describe('правка из копии в основную копию', () => {
+    const intoMain = (tool: string, input: unknown, cwd = copy): string | undefined =>
+      mainCopyTargetOf(cwd, tool, input);
+    const slashed = (path: string): string => path.split('\\').join('/').toLowerCase();
+
+    it('инструмент правки с путём в основную копию — пойман, назван её корень', () => {
+      const target = join(main, '.agent', 'notes.agent.md');
+      expect(slashed(intoMain('Write', { file_path: target }) ?? '')).toBe(
+        slashed(realpathSync.native(main)),
+      );
+      expect(intoMain('write_file', { path: join(main, 'a.txt') })).toBeDefined();
+    });
+
+    it('правка внутри своей копии, относительный путь и чтение — не в счёт', () => {
+      expect(intoMain('Edit', { file_path: join(copy, 'a.txt') })).toBeUndefined();
+      expect(intoMain('Edit', { file_path: 'a.txt' })).toBeUndefined();
+      expect(intoMain('Read', { file_path: join(main, 'a.txt') })).toBeUndefined();
+    });
+
+    it('оболочка: запись по пути основной копии поймана, по своему — нет', () => {
+      // Путь в команде — настоящий, как его отдаёт git (без короткого имени Windows).
+      const real = realpathSync.native(main);
+      expect(
+        intoMain('Bash', { command: `echo x > "${slashed(real)}/.agent/n.md"` }),
+      ).toBeDefined();
+      expect(intoMain('Bash', { command: `echo x > ${join(real, 'b.txt')}` })).toBeDefined();
+      expect(intoMain('Bash', { command: `echo x > ${join(copy, 'b.txt')}` })).toBeUndefined();
+      expect(intoMain('Bash', { command: `cat ${join(main, 'a.txt')}` })).toBeUndefined();
+    });
+
+    it('прогон в основной копии — решают прежние ворота, не эта проверка', () => {
+      expect(intoMain('Write', { file_path: join(main, 'a.txt') }, main)).toBeUndefined();
+    });
   });
 });
 

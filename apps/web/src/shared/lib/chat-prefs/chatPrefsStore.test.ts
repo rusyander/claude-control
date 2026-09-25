@@ -34,22 +34,6 @@ describe('sanitizePrefs', () => {
   });
 
   /**
-   * Автоподтверждение с 07.09.2026 включено по умолчанию. Набор из прежней
-   * версии (без `version`) хранит старый дефолт `false` — это не выбор
-   * человека, и его перекрывает новый. Осознанное «выключено» сохраняется, но
-   * только вместе с текущей версией набора.
-   */
-  it('автоподтверждение: дефолт включён, старый набор перекрывается, свежий выбор сохраняется', () => {
-    expect(sanitizePrefs(undefined).autoApprove).toBe(true);
-    expect(sanitizePrefs({}).autoApprove).toBe(true);
-    expect(sanitizePrefs({ autoApprove: false }).autoApprove).toBe(true);
-    // Версия 2 — тоже прежняя: версия 3 включает автоподтверждение ещё раз.
-    expect(sanitizePrefs({ autoApprove: false, version: 2 }).autoApprove).toBe(true);
-    expect(sanitizePrefs({ autoApprove: false, version: 3 }).autoApprove).toBe(false);
-    expect(sanitizePrefs({ autoApprove: true, version: 3 }).autoApprove).toBe(true);
-  });
-
-  /**
    * Громкость по умолчанию 200%: базовый синтезированный тон слышно едва, и
    * ради него настройка и заводилась. Мусор и выход за границы не должны ни
    * оглушать, ни выключать звук молча.

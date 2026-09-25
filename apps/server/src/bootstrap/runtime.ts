@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import type { ProjectTestRun, ProjectTestRunRequest } from '@agentdeck/contracts';
 import type { ServerContext } from '../context.ts';
+import { serverText } from '../lib/server-texts.ts';
 import { ChatRunRegistry, type RunNotice } from '../domains/chat/ChatRunRegistry.ts';
 import { appendLoweredRun } from '../domains/chat/lowered-journal.ts';
 import {
@@ -12,6 +13,13 @@ import {
 import { ChatSession } from '../domains/chat/ChatSession.ts';
 import { HandoffChains, HandoffChainStore } from '../domains/chat/ChatHandoff.ts';
 import { TreePause } from '../domains/chat/tree-pause.ts';
+import {
+  hasParentLink,
+  lastAskedInput,
+  PENDING_ASKS_FILE,
+  wirePendingAsks,
+  type PendingAsks,
+} from '../domains/chat/pending-asks.ts';
 import { createTreeRuns } from '../domains/chat/tree-runs.ts';
 import { createParentNotice } from '../domains/chat/parent-notice.ts';
 import {
@@ -44,15 +52,29 @@ import { createRunNotifier } from '../domains/remote-notify.ts';
 import { createTelegramNotifier, type TelegramNotice } from '../domains/notify/telegram.ts';
 import { createWebhookNotifier } from '../domains/notify/webhook.ts';
 import { activateAtlassianMcp } from '../domains/integrations/mcp-server.ts';
-import { hasWorkSince, readBranchFiles, readCurrentBranch } from '../domains/project-git.ts';
+import {
+  hasWorkSince,
+  missingDelivery,
+  mrDescriptionGap,
+  readBranchFiles,
+  readTargetMoved,
+  readDeliveryFacts,
+  readMergeTarget,
+  resolveProjectDelivery,
+} from '../domains/project-git.ts';
 import { readLastAssistantTurn } from '../domains/chat/ChatHistory.ts';
 import { createHandoffPlanner } from '../routes/chat/handoff-routes.ts';
 import { projectsDir } from '../routes/chat/paths.ts';
-import { SplitConveyor } from '../domains/chat/split-conveyor.ts';
+import { atlassianTicketTracker } from '../domains/chat/split-ticket-tracker.ts';
+import { copyRootOf, SplitConveyor } from '../domains/chat/split-conveyor.ts';
+import { MrWatch } from '../domains/chat/mr-watch.ts';
+import { readMergeRequestReview } from '../domains/integrations/mr-review.ts';
 import { childrenBrief } from '../domains/chat/children-brief.ts';
 import { branchGateContext } from '../domains/chat/ChatBranchGate.ts';
 import { ChildTells } from '../domains/chat/child-tell.ts';
 import { RunRetry, retriesLink, retryForeignRun, retryOutcome } from '../domains/chat/run-retry.ts';
+import { pauseOnForeignStop, pauseOnHumanStop } from '../routes/chat/split-control-routes.ts';
+import { interruptOnBackgroundLost } from '../domains/chat/background-lost.ts';
 import { SplitOverlap } from '../domains/chat/split-overlap.ts';
 import { SplitReview } from '../domains/chat/split-review.ts';
 import {
@@ -65,7 +87,7 @@ import { readIntegrations, readToken } from '../domains/integrations/store.ts';
 import { carriedLink, conversationKeys } from '../lib/app-store/chat-links.ts';
 import { createEventHub, type EventHub } from '../lib/event-hub.ts';
 import { PANEL_ACTION_CONFIRM_TIMEOUT_MS } from '@agentdeck/contracts/panel-agent';
-import { foreignChatKey } from '@agentdeck/contracts/foreign-chat-key';
+import { foreignChatKey, parseForeignChatKey } from '@agentdeck/contracts/foreign-chat-key';
 import { PanelPendingActions } from '../domains/panel-agent/pending.ts';
 import { reapPanelAgentOrphans } from '../domains/panel-agent/processes.ts';
 
@@ -93,6 +115,8 @@ export interface Runtime {
   handoffChains: HandoffChains;
   /** Пауза дерева разговоров; маршруты дерева и разделения берут её отсюда. */
   treePause: TreePause;
+  /** Записанные вопросы деревьев; отмена плана разделения снимает вопросы групп. */
+  pendingAsks: PendingAsks;
   /** Чаты чужих CLI. */
   providerChats: ProviderChatService;
   /** Конвейер уровней разделения (Т1): разбор → план → работа, ожидания между группами. */
@@ -139,9 +163,10 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   /**
    * Права и автоподтверждение чатов — один объект на сервер, а не на маршрут:
    * продолжение в чистой сессии заводит прогон мимо маршрута отправки, и
-   * тумблеры закрытого разговора должны достаться новому.
+   * тумблеры закрытого разговора должны достаться новому. Тумблеры лежат и на
+   * диске: родитель без прогона после перезапуска отдаёт их детям разделения.
    */
-  const chatSession = new ChatSession(chatRuns);
+  const chatSession = new ChatSession(chatRuns, ctx.location.paths.appData);
   // Прогоны тестов — третий такой объект: агент ходит по кейсам минутами, и
   // оборванный при выходе панели процесс остался бы висеть с полным доступом.
   //
@@ -291,9 +316,16 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
         ctx.store.getSettings(),
       ) || undefined,
   });
+  // Вопросы и запросы прав разговоров дерева — на сервере, а не во вкладке (WP9c).
+  const pendingAsks = wirePendingAsks(chatRuns, {
+    file: join(ctx.location.paths.appData, PENDING_ASKS_FILE),
+    isTreeChat: hasParentLink((key) => ctx.store.getChatLink(key)),
+    readAsked: (chatId, sessionId) => lastAskedInput(projectsDir(ctx), sessionId ?? chatId),
+  });
   const treePause = new TreePause({
     links: () => ctx.store.getChatLinks(),
     runs: treeRuns,
+    asksOf: (keys) => pendingAsks.of(keys, (runId) => chatRuns.isRunning(runId)),
     store: {
       get: (root) => ctx.store.getTreePause(root),
       all: () => ctx.store.getTreePauses(),
@@ -341,18 +373,25 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
 
   const splitOverlap = new SplitOverlap({
     git: {
-      mergeBase: (mainDir) => readCurrentBranch(mainDir),
+      // Ветка основной копии в свежем виде удалённого, если локальная отстала
+      // (находка 52): иначе всё, что приехало в main, считалось правками групп.
+      mergeBase: (mainDir) => readMergeTarget(mainDir),
       changedFiles: (input) => readBranchFiles(input),
+      movedFiles: (input) => readTargetMoved(input),
     },
     store: {
       get: (parent) => ctx.store.getSplitPlan(parent),
       set: (record) => ctx.store.setSplitPlan(record),
+      all: () => ctx.store.getSplitPlans(),
     },
     // Заметка идёт в ленту РОДИТЕЛЯ: разделение — его решение, и сводка групп
     // тоже его. Прогона у родителя нет — `false`, и факт подождёт (см. домен).
     emit: (parentChatId, event) => sayToParent(parentChatId, event),
     log: (message, error) => console.warn(message, error),
   });
+  // Пока группы работают — пересчёт по расписанию (находка 61c), а не только по
+  // концу цепочки: соседи сходятся в одном файле задолго до своего конца.
+  splitOverlap.watchDrift();
   /**
    * Ревью запроса на слияние по ссылке (Т7). Домен решает, что делать с
    * замечаниями, а всё, что умеет ПИСАТЬ, подаётся сюда снаружи: комментарий в
@@ -392,6 +431,7 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   });
   splitReviewRef.current = splitReview;
 
+  const ticketTracker = atlassianTicketTracker(ctx);
   const splitConveyor = new SplitConveyor({
     store: {
       get: (parent) => ctx.store.getSplitPlan(parent),
@@ -399,21 +439,91 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
       findByTriage: (chatIds) => ctx.store.findSplitPlanByTriage(chatIds),
       all: () => ctx.store.getSplitPlans(),
     },
+    ticketTracker: (projectPath) => ticketTracker.projectOf(projectPath),
     watchOverlap: (parentChatId) => {
       void splitOverlap.check(parentChatId).catch((error) => {
         console.warn('split overlap: check after chain end failed', error);
       });
+      // Тот же конец цепочки ставит наблюдение за MR доставленной группы (WP1j).
+      // `mrWatch` объявлен ниже: к первому концу цепочки он уже есть.
+      mrWatch.sync(parentChatId);
     },
     launch: (record, groups, context, claimBranch) =>
       launchFromRecord(ctx, launchDeps, record, groups, context, claimBranch),
     startTriage: (record, prompt, claim) =>
       createSplitLauncher(ctx, launchDeps, {
-        projectPath: record.projectPath,
+        projectPath: copyRootOf(record),
+        settingsPath: record.projectPath,
         parentChatId: record.parentChatId,
         ...(record.request.model ? { model: record.request.model } : {}),
         ...(record.request.effort ? { effort: record.request.effort } : {}),
       }).startTriage(prompt, claim),
-    parallel: (record) => ctx.store.getSplitSettings(record.projectPath).parallel,
+    parallel: (record) => resolveProjectDelivery(ctx.store, record.projectPath).view.parallel,
+    // Доставка группы по фактам git (WP1b): «готово» — только когда ветка на
+    // удалённом и MR с той же головой; иначе напоминание группе её же сессией.
+    delivery: {
+      facts: async (group, mr, projectPath) => {
+        if (!group.path) return { missing: [serverText('delivery-gap-no-copy')] };
+        const facts = await readDeliveryFacts({
+          cwd: group.path,
+          branch: group.branch,
+          ...(mr ? { mr } : {}),
+          mirror: ctx.store.getWorktreeMirror(projectPath),
+        });
+        const missing = missingDelivery(facts, group.branch);
+        // Описание MR читается форджем только у найденного по голове MR.
+        const description = facts.mr
+          ? await mrDescriptionGap(facts.mr, async (url) => {
+              const token = forgeToken();
+              if (!token || !readIntegrations(ctx.store).forge.enabled) return undefined;
+              return readMergeRequestReview(url, token);
+            })
+          : {};
+        return {
+          missing: description.missing ? [...missing, description.missing] : missing,
+          ...(facts.mr ? { mr: facts.mr } : {}),
+          ...(facts.unreachable ? { unreachable: facts.unreachable } : {}),
+          ...(description.unchecked ? { descriptionUnchecked: true } : {}),
+        };
+      },
+      // `childTells` объявлен ниже: к моменту первой проверки он уже есть.
+      nudge: (group, prompt): 'sent' | 'queued' | 'refused' =>
+        group.chatId && group.path
+          ? childTells.send({ chatId: group.chatId, cwd: group.path, prompt, title: group.title })
+          : 'refused',
+    },
+    // Оборванная группа (WP1c) продолжается своей же сессией. Сессии нет —
+    // процесс умер в первом ходе, продолжать нечего: ждёт человека, а не
+    // очередь, которую никто не разберёт.
+    resume: (group, prompt): 'sent' | 'queued' | 'refused' => {
+      if (!group.chatId || !group.path) return 'refused';
+      const keys = conversationKeys(ctx.store.getChatLinks(), group.chatId);
+      if (![group.chatId, ...keys].some((key) => !key.startsWith('new-'))) return 'refused';
+      return childTells.send({ chatId: group.chatId, cwd: group.path, prompt, title: group.title });
+    },
+    // Ожидание сброса лимита (журнал 89): срок в записи, таймер только будит.
+    schedule: (run, ms) => setTimeout(run, ms).unref(),
+    notify: (parentChatId, event) => void sayToParent(parentChatId, event),
+    log: (message, error) => console.warn(message, error),
+  });
+  // MR доставленной группы после «готово» (WP1j): ветки ревьюеров и исход
+  // конвейера — по расписанию, только чтением; нашлось — группа продолжается.
+  // Интеграция выключена или токена нет — читать нечем, наблюдатель молчит.
+  const mrWatch = new MrWatch({
+    store: {
+      get: (parent) => ctx.store.getSplitPlan(parent),
+      set: (record) => ctx.store.setSplitPlan(record),
+      all: () => ctx.store.getSplitPlans(),
+    },
+    read: async (url) => {
+      const token = forgeToken();
+      if (!token || !readIntegrations(ctx.store).forge.enabled) return undefined;
+      return readMergeRequestReview(url, token);
+    },
+    resume: (parentChatId, index, prompt) =>
+      splitConveyor.resumeDelivered(parentChatId, index, prompt),
+    schedule: (run, ms) => setTimeout(run, ms).unref(),
+    notify: (parentChatId, event) => void sayToParent(parentChatId, event),
     log: (message, error) => console.warn(message, error),
   });
   // Новый прогон в чате группы — группа снова «работает» (Д3): человек ответил
@@ -421,18 +531,40 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   // Надзор повторов (Д10): упавший ход ребёнка разделения продолжается сам —
   // через паузу или в момент сброса лимита. Стоящее дерево повтор не будит:
   // старт ложится в очередь паузы и уйдёт по «Продолжить всё».
+  // Группа на паузе (журнал 81a) повтором не продолжается: её остановил
+  // человек, и продолжит тоже он.
+  const pausedGroup = (chatId: string): boolean =>
+    [chatId, ...conversationKeys(ctx.store.getChatLinks(), chatId)].some((key) => {
+      const link = ctx.store.getChatLink(key);
+      return Boolean(link && splitConveyor.isPaused(link));
+    });
   const runRetry = new RunRetry({
     start: (chatId, options, meta) =>
-      treePause.defer('stage', chatId, options, meta) || treeRuns.start(chatId, options, meta),
+      pausedGroup(chatId) ||
+      treePause.defer('stage', chatId, options, meta) ||
+      treeRuns.start(chatId, options, meta),
+    // Лимит группы разделения ждёт конвейер по записи — переживает перезапуск.
+    persistsLimit: (keys) =>
+      keys.some((key) => {
+        const link = ctx.store.getChatLink(key);
+        return Boolean(link && retriesLink(link) && splitConveyor.tracksGroup(link));
+      }),
     log: (message, error) => console.warn(message, error),
   });
+  // «Стоп» человека в чате группы — пауза группы (журнал 89c).
+  chatRuns.setHumanStopListener(pauseOnHumanStop(ctx.store, splitConveyor));
+  // Процесс группы умер, держа фон, — обрыв с продолжением, а не провал (W3-4c).
+  chatRuns.setBackgroundLostListener(interruptOnBackgroundLost(ctx.store, splitConveyor));
+  // И у чужого CLI: его «Стоп» — та же пауза группы (открытый вопрос WP9e).
+  providerChats.setHumanStopListener(pauseOnForeignStop(ctx.store, splitConveyor));
   const isRetriedChild = (keys: readonly string[]): boolean =>
     keys.some((key) => retriesLink(ctx.store.getChatLink(key)));
   chatRuns.setStartListener((keys) => {
     runRetry.started(keys);
+    pendingAsks.started(keys);
     for (const key of keys) {
       const link = ctx.store.getChatLink(key);
-      if (link && link.stage !== 'plan' && link.stage !== 'triage') {
+      if (link && link.stage !== 'triage') {
         splitConveyor.onChainResumed(link, key);
         return;
       }
@@ -446,8 +578,7 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     runRetry.started([foreignChatKey(providerId, chatId)]);
     const key = foreignChatKey(providerId, chatId);
     const link = ctx.store.getChatLink(key);
-    if (link && link.stage !== 'plan' && link.stage !== 'triage')
-      splitConveyor.onChainResumed(link, key);
+    if (link && link.stage !== 'triage') splitConveyor.onChainResumed(link, key);
   });
   // Слово родителя ребёнку (Д7): блок `agentdeck:tell` в ответе родителя
   // доставляется продолжением сессии группы, занятой — после её хода.
@@ -529,6 +660,9 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     split: {
       onTriageFinished: (finished, aliases) => splitConveyor.onTriageFinished(finished, aliases),
       onChainEnded: (link, ok) => splitConveyor.onChainEnded(link, ok),
+      onChainInterrupted: (link) => splitConveyor.onChainInterrupted(link),
+      identityOf: (link) => splitConveyor.identityOf(link),
+      delivers: (link) => splitConveyor.delivers(link),
     },
     // Ревью по ссылке (Т7): замечания из ответа — в связь, карточка — человеку.
     review: { onReviewFinished: (input) => splitReview.finished(input) },
@@ -536,7 +670,11 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   chatRuns.setHandoffPlanner((finished) => {
     const keys = finished.sessionId ? [finished.chatId, finished.sessionId] : [finished.chatId];
     tellsOnFinish(keys, finished.ok, finished.text);
-    const decision = isRetriedChild(keys) ? runRetry.finished(finished) : undefined;
+    pendingAsks.finished(finished);
+    // Обрыв — не упавший ход: его продолжает конвейер с восстановлением
+    // состояния, и повтор надзора поверх завёл бы второй прогон той же группы.
+    const decision =
+      !finished.interrupted && isRetriedChild(keys) ? runRetry.finished(finished) : undefined;
     const retry = retryOutcome(decision);
     return handoffPlanner(retry ? { ...finished, retry } : finished);
   });
@@ -569,6 +707,8 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
       return event?.kind === 'notice' ? event.text : undefined;
     },
     onChainEnded: (link, ok) => splitConveyor.onChainEnded(link, ok),
+    // Доставка группы у чужого CLI — тем же звеном, что у Claude (W3-3).
+    delivers: (link) => splitConveyor.delivers(link),
     // Ревью MR по ссылке (Т6): тот же домен, что у Claude, — замечания
     // читаются один раз и ложатся в связь, а решение ждёт человека.
     onReviewFinished: (input) => splitReview.finished(input),
@@ -593,7 +733,9 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
         retried: isRetriedChild([key]),
       },
       (chatKey, options, meta) =>
-        treePause.defer('stage', chatKey, options, meta) || treeRuns.start(chatKey, options, meta),
+        pausedGroup(chatKey) ||
+        treePause.defer('stage', chatKey, options, meta) ||
+        treeRuns.start(chatKey, options, meta),
       (message, error) => console.warn(message, error),
     );
     foreignStagePlanner(retry ? { ...finished, retry } : finished);
@@ -750,7 +892,7 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
    * усыновлённый прогон спрашивал бы о каждом вызове. Мёртвое вычищается.
    */
   const runLedger = new RunLedger(ctx.location.paths.appData);
-  chatRuns.setLedger(runLedger, (key) => chatSession.autoApproveFor(key));
+  chatRuns.setLedger(runLedger, (key) => chatSession.snapshotForLedger(key));
   // Ответ усыновлённого прогона: потока у него нет, но текст лежит в транскрипте
   // Claude Code. Каталог считается на каждое чтение — он меняется на лету
   // (`ctx.relocate`), и запомненный путь читал бы прежнюю папку до перезапуска.
@@ -781,14 +923,37 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   )) {
     sayToParent(parentChatId, event);
   }
+  // Проверки доставки, оборванные прежним процессом, — заново (WP1b).
+  splitConveyor.recoverDeliveryChecks();
+  // Наблюдение за MR доставленных групп (WP1j): таймеры жили в прежнем процессе.
+  mrWatch.recover();
+  // Ожидание сброса лимита подписки (журнал 89a): таймер жил в прежнем процессе.
+  splitConveyor.recoverLimitWaits();
+  // Группы, чей прогон не пережил перезапуск, — прерваны и продолжаются (WP1c).
+  // Тоже после усыновления: живой усыновлённый прогон — не обрыв.
+  const groupAlive = (group: { chatId?: string }): boolean => {
+    if (!group.chatId) return false;
+    const keys = [group.chatId, ...conversationKeys(ctx.store.getChatLinks(), group.chatId)];
+    return keys.some((key) => {
+      const foreign = parseForeignChatKey(key);
+      return foreign
+        ? providerChats.status(foreign.chatId).isRunning
+        : chatRuns.isProcessAlive(key);
+    });
+  };
+  for (const { parentChatId, event } of splitConveyor.recoverInterruptedGroups(groupAlive)) {
+    sayToParent(parentChatId, event);
+  }
 
   // Спавненные dev-серверы проектов, CLI чатов и прогоны тестов живут в памяти
   // процесса. Гасим их при выходе, чтобы дочерние процессы не осиротели и не
   // держали занятыми порты.
   const shutdown = (): void => {
-    // Чаты Claude — тоже: без этого перезапуск панели оставлял их CLI сиротами,
-    // и агент дописывал транскрипт, которого никто уже не читал, тратя лимит.
-    chatRuns.stopAll();
+    // Чаты Claude — НЕ гасим: CLI за посредником переживает перезапуск панели
+    // вместе с фоновыми командами, и новый сервер подключается к нему по журналу
+    // (решение W3-4a). Гаснет только то, что без сервера не живёт; остановить
+    // всех — действие человека, а не побочный эффект Ctrl+C или сторожа.
+    chatRuns.detachAll();
     projectRunner.stopAll();
     providerChats.stopAll();
     projectTestRuns.stopAll();
@@ -815,6 +980,7 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     notifyRun,
     handoffChains,
     treePause,
+    pendingAsks,
     providerChats,
     splitConveyor,
     splitOverlap,

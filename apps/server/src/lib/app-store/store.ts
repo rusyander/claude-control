@@ -2,7 +2,12 @@ import { join } from 'node:path';
 import type { FidelityMark } from '@agentdeck/contracts/portable-fidelity';
 import type { EnvSubscription } from '@agentdeck/contracts/portable-subscribe';
 import type { TransferRecord } from '@agentdeck/contracts/portable-transfer';
-import type { SplitSettings } from '@agentdeck/contracts/task-split';
+import type { StoredSplitSettings } from '@agentdeck/contracts/task-split';
+import type {
+  GroupPermissionLevel,
+  SplitDefaults,
+  StoredSplitDefaults,
+} from '@agentdeck/contracts/split-groups';
 import type {
   AppSettings,
   Automation,
@@ -48,8 +53,10 @@ import {
   clearChatLink as dropChatLink,
   getChatLink as readChatLink,
   getChatLinks as readChatLinks,
+  getRetiredChatLinks as readRetiredChatLinks,
   linkChatSession as moveChatLink,
   markChatFirstEdit as stampFirstEdit,
+  retireChatLink as stampChatLinkRetired,
   setChatLink as writeChatLink,
 } from './chat-links.ts';
 import {
@@ -136,6 +143,8 @@ import {
 import {
   getSplitSettings as readSplitSettings,
   setSplitSettings as writeSplitSettings,
+  getSplitDefaults as readSplitDefaults,
+  setSplitDefaults as writeSplitDefaults,
 } from './split-settings.ts';
 import {
   forgetMcpHealth as dropMcpHealth,
@@ -564,6 +573,16 @@ export class AppStore {
     if (dropChatLink(this.state, chatId)) this.persist();
   }
 
+  /** Снятые перезапуском звенья — для дерева в списке чатов, и только для него. */
+  getRetiredChatLinks(): Record<string, ChatLink> {
+    return readRetiredChatLinks(this.state);
+  }
+
+  /** Снять звено перезапуском групп: связь остаётся, но живой больше не считается. */
+  retireChatLink(chatId: string): void {
+    if (stampChatLinkRetired(this.state, chatId, new Date().toISOString())) this.persist();
+  }
+
   /**
    * Прогон назвал настоящий `sessionId` — переносим на него связь с временного
    * ключа. Зовётся на КАЖДОМ прогоне, поэтому молча ничего не делает, когда
@@ -832,14 +851,37 @@ export class AppStore {
   }
 
   /** Разделение на проекте: доставка групп до MR и сколько их идёт разом. */
-  getSplitSettings(path: string): SplitSettings {
+  getSplitSettings(path: string): StoredSplitSettings {
     return readSplitSettings(this.state, path);
   }
 
-  setSplitSettings(path: string, settings: SplitSettings): SplitSettings {
+  setSplitSettings(
+    path: string,
+    settings: {
+      deliver: boolean;
+      parallel?: number | null;
+      permissions?: Record<string, GroupPermissionLevel | boolean> | null;
+    },
+  ): StoredSplitSettings {
     const next = writeSplitSettings(this.state, path, settings);
     this.persist();
     return next;
+  }
+
+  /** Общие правила групп разделения (вкладка «Группы»). */
+  getSplitDefaults(): SplitDefaults {
+    return readSplitDefaults(this.state);
+  }
+
+  setSplitDefaults(defaults: StoredSplitDefaults): SplitDefaults {
+    const next = writeSplitDefaults(this.state, defaults);
+    this.persist();
+    return next;
+  }
+
+  /** Проекты, у которых есть записи разделения, — их очередь толкают общие правила. */
+  getSplitProjectPaths(): string[] {
+    return [...new Set(Object.values(this.state.splitPlans ?? {}).map((plan) => plan.projectPath))];
   }
 
   /** Все привязки разом: активация MCP по началу прогона спрашивает именно так. */

@@ -95,7 +95,12 @@ export type ChatEvent =
        * пришла оттуда»;
        * 'modelDropped' — имя модели не прошло грамматику аргументов и до CLI не
        * доехало: прогон идёт моделью, которую CLI выбрал сам;
-       * 'childTold' — родитель написал группам блоком `agentdeck:tell` (Д7).
+       * 'childTold' — родитель написал группам блоком `agentdeck:tell` (Д7);
+       * 'groupsInterrupted' — процессы групп оборвались посреди хода (WP1c);
+       * 'groupsLimited' — группы ждут сброса лимита подписки (журнал 89);
+       * 'mrWatchLimit' — наблюдатель MR исчерпал самостоятельные продолжения;
+       * 'defaultDrift' — основная ветка ушла вперёд и задела файлы идущей группы (находка 61);
+       * 'deliveryUnchecked' — часть готовности группы (описание MR) панель не проверила.
        */
       code:
         | 'adopted'
@@ -107,7 +112,12 @@ export type ChatEvent =
         | 'groupsActivated'
         | 'contextCarried'
         | 'modelDropped'
-        | 'childTold';
+        | 'childTold'
+        | 'groupsInterrupted'
+        | 'groupsLimited'
+        | 'mrWatchLimit'
+        | 'defaultDrift'
+        | 'deliveryUnchecked';
       text: string;
       /**
        * Код самого текста — отдельно от `code`, который называет ПОВОД. Повод
@@ -207,6 +217,8 @@ export interface RawUsage {
 export interface RawEvent {
   type: string;
   subtype?: string;
+  /** Причины провала `result` без текста (`error_during_execution` и т. п.). */
+  errors?: unknown;
   session_id?: string;
   model?: string;
   tools?: unknown[];

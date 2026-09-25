@@ -1,5 +1,5 @@
 import type { ChatSummary } from '@agentdeck/contracts';
-import type { SplitPlanView } from '@agentdeck/contracts/chat-handoff';
+import type { ChatTreeView, SplitPlanView } from '@agentdeck/contracts/chat-handoff';
 import { CASCADE_STAGES, type CascadeStage } from '@agentdeck/contracts/model-cascade';
 import type { ActiveRunView } from '@shared/lib/agent-runs';
 import { mergeSplitGroups, splitGroupKey, type ChildStageGroup } from '@features/ChatMessages';
@@ -38,8 +38,13 @@ export function collectChildStages(
 ): ChildStageGroup[] {
   if (!parentChatId) return [];
 
-  const children = chats.filter((chat) => chat.parentId === parentChatId);
-  if (children.length === 0 && !split) return [];
+  // Чаты групп, отброшенных перезапуском разделения (L20), — отдельно: в
+  // склейку с конвейером их пускать нельзя. Ветка у них та же, что у
+  // перезапущенной группы, и группа в очереди «занимала» строку мёртвого чата.
+  const kids = chats.filter((chat) => chat.parentId === parentChatId);
+  const children = kids.filter((chat) => !chat.retired);
+  const retired = kids.filter((chat) => chat.retired).map((chat) => retiredRow(chat, runs));
+  if (children.length === 0 && !split) return retired;
 
   // Заголовок чата ключом не годится: это текст его первого сообщения, а он у
   // работы, её ревью и правок разный — три звена разъехались бы по трём строкам.
@@ -56,10 +61,60 @@ export function collectChildStages(
     const row = groupRow(key, list, runs);
     if (row) byKey.set(key, row);
   }
-  if (!split) return [...byKey.values()];
+  if (!split) return [...byKey.values(), ...retired];
   // Порядок старта и группы без чата — общее с лентой чужого CLI: тот же счёт
   // по той же записи конвейера, разный только источник готовых строк.
-  return mergeSplitGroups(byKey, split);
+  return [...mergeSplitGroups(byKey, split), ...retired];
+}
+
+/**
+ * Дерево, каким его видит хаб ЭТОГО разговора. Сервер отдаёт дерево по корню,
+ * и в чате группы приезжал план всего разделения: хаб звена рисовал все группы
+ * «ждёт итога разбора» и кнопки «Остановить всё / Отменить план» чужого плана
+ * (живой прогон 26.09, F2). План принадлежит разговору, который его завёл.
+ */
+export function treeForChat(
+  tree: ChatTreeView | undefined,
+  chatId: string | undefined,
+): ChatTreeView | undefined {
+  if (!tree?.split || tree.split.parentChatId === chatId) return tree;
+  const own = { ...tree };
+  delete own.split;
+  return own;
+}
+
+/**
+ * Решение «До MR» группы, принятое при разделении, — для шапки её чата. Путь
+ * копии даёт настройку проекта, а она расходится с планом, запущенным с другим
+ * выбором (живой прогон 25.09, O2). Не группа или план не её родителя — нет.
+ */
+export function groupDeliverOf(
+  tree: ChatTreeView | undefined,
+  chat: Pick<ChatSummary, 'parentId' | 'groupIndex'> | undefined,
+): boolean | undefined {
+  const split = tree?.split;
+  if (!split || !chat?.parentId || chat.groupIndex === undefined) return undefined;
+  if (split.parentChatId !== chat.parentId) return undefined;
+  return split.groups.find((group) => group.index === chat.groupIndex)?.deliver;
+}
+
+/**
+ * Строка отброшенного чата — по одной на разговор, без склейки в группу:
+ * номера группы и её имени у такой связи сервер уже не отдаёт, а ветку агент
+ * волен был сменить. Показывается под «Неактивно», открыть её можно.
+ */
+function retiredRow(chat: ChatSummary, runs: ActiveRunView[]): ChildStageGroup {
+  return {
+    chatId: chat.id,
+    title: chat.title || chat.id,
+    ...(chat.branch ? { branch: chat.branch } : {}),
+    stages: [stageOf(chat)],
+    isRunning: runs.some(
+      (run) => (run.id === chat.id || run.sessionId === chat.id) && run.status === 'running',
+    ),
+    retired: true,
+    ...(chat.copyLeft && chat.parentId ? { retiredCopy: { parentChatId: chat.parentId } } : {}),
+  };
 }
 
 /** Строка группы, у которой чат уже есть. */
@@ -88,6 +143,7 @@ function groupRow(
     stages: ordered.map(stageOf),
     ...firstEditDelay(ordered.find((chat) => stageOf(chat) === 'work')),
     ...workTime(ordered),
+    ...chainSpan(ordered),
     ...(last.model ? { model: last.model } : {}),
     // Ключ прогона сверяется дважды: разговор, заведённый панелью, живёт под
     // временным `new-…`, пока CLI не назовёт настоящий `sessionId`.
@@ -132,4 +188,22 @@ function workTime(chain: ChatSummary[]): { workMs?: number } {
     measured = true;
   }
   return measured ? { workMs: total } : {};
+}
+
+/**
+ * Начало цепочки и её последняя запись — моменты, а не длительность: сколько
+ * ИДЁТ прогон, считается от начала до «сейчас», и последняя запись молчащего
+ * разбора (L13) тут бы соврала. Цепочка упорядочена по заведению.
+ */
+function chainSpan(chain: ChatSummary[]): { startedAt?: string; lastAt?: string } {
+  const startedAt = chain[0]?.createdAt;
+  const lastAt = chain
+    .map((chat) => chat.updatedAt)
+    .filter((at) => Number.isFinite(Date.parse(at)))
+    .sort()
+    .at(-1);
+  return {
+    ...(startedAt && Number.isFinite(Date.parse(startedAt)) ? { startedAt } : {}),
+    ...(lastAt ? { lastAt } : {}),
+  };
 }

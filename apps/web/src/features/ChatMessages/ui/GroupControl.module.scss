@@ -1,0 +1,14 @@
+// Управление группой в строке хаба: подпись слева, кнопки справа — как у
+// соседних дверей строки (ответ, «отпустить», уборка копии).
+.control {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--spacing-2xs);
+  margin-top: var(--spacing-2xs);
+}
+
+.caption {
+  margin-right: auto;
+}

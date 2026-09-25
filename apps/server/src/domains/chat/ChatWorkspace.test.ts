@@ -94,5 +94,20 @@ describe('resolveWorkspace', () => {
         'acceptEdits',
       );
     });
+
+    it('авторежим чата с правом правок → auto, в проекте и в песочнице', () => {
+      expect(permissionModeFor({ cwd: 'x', isSandbox: false, isMissing: false }, true, true)).toBe(
+        'auto',
+      );
+      expect(permissionModeFor({ cwd: 'x', isSandbox: true, isMissing: false }, false, true)).toBe(
+        'auto',
+      );
+    });
+
+    it('авторежим не отменяет «только чтение»', () => {
+      expect(permissionModeFor({ cwd: 'x', isSandbox: false, isMissing: false }, false, true)).toBe(
+        'default',
+      );
+    });
   });
 });

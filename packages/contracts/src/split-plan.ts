@@ -350,6 +350,15 @@ export function applySplitPlan(
     const source = planned && planned.tasks.length > 0 ? planned.tasks : group.tasks;
     const own: string[] = [];
     for (const task of source) {
+      if (own.some((known) => sameTask(known, task))) continue;
+      // Общая строка (итоговая проверка 25.09, D3): «Проверить исправление: …»
+      // стояла в каждой группе ещё в предложении — это не повтор разбора, и у
+      // групп после первой она пропадать не должна.
+      if (group.tasks.some((mine) => sameTask(mine, task))) {
+        if (!seen.some((known) => sameTask(known, task))) seen.push(task);
+        own.push(task);
+        continue;
+      }
       if (seen.some((known) => sameTask(known, task))) {
         if (planned && planned.tasks.length > 0) {
           repairs.push(

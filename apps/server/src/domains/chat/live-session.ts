@@ -1,8 +1,13 @@
-import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
-import { createInterface } from 'node:readline';
 import { rmSync, writeFileSync } from 'node:fs';
 import type { RawEvent } from './chat-events.ts';
-import { killChildTree } from '../../lib/process-tree.ts';
+import {
+  connectRelay,
+  relayOpener,
+  type LiveTransport,
+  type RelayAddress,
+  type RelaySynced,
+  type TransportOpener,
+} from './live-transport.ts';
 
 /**
  * Живая сессия: ОДИН процесс Claude Code на разговор, а не по процессу на ход.
@@ -24,6 +29,9 @@ import { killChildTree } from '../../lib/process-tree.ts';
  * Второй замер того же дня: `usage` в `result` — за ход, а `total_cost_usd`
  * КОПИТСЯ за жизнь процесса. Сессия переводит его в разницу за ход, иначе общий
  * счётчик расхода задваивался бы на каждом следующем ходе.
+ *
+ * Трубы CLI держит посредник (`live-relay.mjs`), а не сервер: перезапуск панели
+ * закрывал stdin, и CLI уходил в конце хода вместе с фоном (журнал 29, 60, 69).
  */
 
 /** С чем поднят процесс: ходы с другими параметрами в него не отправить. */
@@ -67,8 +75,10 @@ export class LiveSession {
   /** Ход, начатый самим CLI, пока его никто не забрал (см. `claimWake`). */
   onWake?: (session: LiveSession) => void;
   onClose?: (session: LiveSession) => void;
+  /** Pid, под которым посредник поднял CLI (оболочка на Windows); прямой запуск — нет. */
+  childPid: number | undefined;
 
-  private readonly child: ChildProcessWithoutNullStreams;
+  private readonly transport: LiveTransport;
   private readonly now: () => number;
   private readonly launch: LiveLaunch;
   private sink: { onRaw: RawSink; resolve: (outcome: TurnOutcome) => void } | undefined;
@@ -79,50 +89,90 @@ export class LiveSession {
   private stderr = '';
   private costSoFar = 0;
   private backgroundTasks = 0;
+  /**
+   * Подхвачен посреди хода после перезапуска панели: кончился ли ход, пока
+   * сервера не было, скажет только посредник (`relay_synced`).
+   */
+  private inheritedTurn = false;
+  private syncedWaiters: Array<() => void> = [];
+  private closedWaiters: Array<() => void> = [];
+  private isSynced = false;
+  /** Процесс закрывает сама панель (остановка, пул, выход) — это не обрыв. */
+  private released = false;
 
-  constructor(launch: LiveLaunch, now: () => number = Date.now) {
+  constructor(launch: LiveLaunch, now: () => number = Date.now, open?: TransportOpener) {
     this.launch = launch;
     this.signature = launch.signature;
     this.lastUsedAt = now();
     this.now = now;
-    const child = spawn(launch.command, launch.args, {
-      cwd: launch.cwd,
-      shell: launch.shell,
-      windowsHide: true,
-      env: launch.env,
-    });
-    this.child = child;
-    // Сбой запуска приходит событием, а не исключением, и без слушателя уносит
-    // весь сервер (см. `ChatRun.run`). То же у stdin: запись в закрывшийся CLI
-    // отдаёт EPIPE отдельным `error`.
-    child.on('error', (error: Error) => {
-      this.spawnError = error;
-      this.markClosed(-1);
-    });
-    child.on('close', (code) => this.markClosed(code ?? 0));
-    child.stdin.on('error', () => undefined);
-    child.stderr.on('data', (chunk: Buffer) => {
-      this.stderr = (this.stderr + chunk.toString()).slice(-STDERR_TAIL);
-    });
-    createInterface({ input: child.stdout }).on('line', (line) => {
-      if (!line.trim()) return;
-      let raw: RawEvent;
-      try {
-        raw = JSON.parse(line) as RawEvent;
-      } catch {
-        // Не JSON — предупреждение CLI, шум.
-        return;
-      }
-      this.route(raw);
+    this.transport = (open ?? relayOpener())(launch, {
+      line: (line) => this.onLine(line),
+      stderr: (chunk) => {
+        this.stderr = (this.stderr + chunk).slice(-STDERR_TAIL);
+      },
+      close: (code, error, stderr) => {
+        if (error) this.spawnError = error;
+        if (stderr) this.stderr = stderr.slice(-STDERR_TAIL);
+        this.markClosed(code);
+      },
+      synced: (info) => this.onSynced(info),
     });
   }
 
+  /**
+   * Подключиться к посреднику, пережившему прежний сервер. `inTurn` — журнал
+   * застал сессию посреди хода: вывод, накопленный посредником, достаётся
+   * прогону, который заберёт этот ход (`claimWake`), а не теряется до `init`.
+   */
+  static reattach(
+    address: RelayAddress,
+    launch: LiveLaunch,
+    options: { sessionId: string; inTurn: boolean; background?: number; now?: () => number },
+  ): LiveSession {
+    const session = new LiveSession(launch, options.now, (_launch, handlers) =>
+      connectRelay(address, handlers),
+    );
+    session.sessionId = options.sessionId;
+    // Фон из журнала — до первой строки посредника: не дозвонились до него
+    // вовсе, а фон был, — это тоже потерянный фон.
+    session.backgroundTasks = options.background ?? 0;
+    if (options.inTurn) {
+      session.waking = [];
+      session.inheritedTurn = true;
+    }
+    return session;
+  }
+
   get pid(): number | undefined {
-    return this.child.pid;
+    return this.transport.pid;
+  }
+
+  /** Канал посредника; нет — процесс поднят напрямую и перезапуск не переживёт. */
+  get relay(): RelayAddress | undefined {
+    return this.transport.relay;
+  }
+
+  /** Папка процесса и файл ключа прогона — в журнал, для подхвата после перезапуска. */
+  get files(): { tempDir?: string; runIdFile?: string } {
+    return {
+      ...(this.launch.tempDir ? { tempDir: this.launch.tempDir } : {}),
+      ...(this.launch.runIdFile ? { runIdFile: this.launch.runIdFile } : {}),
+    };
   }
 
   get alive(): boolean {
     return !this.closed;
+  }
+
+  /** Рабочая папка процесса: пока он жив, Windows не даст её удалить. */
+  get cwd(): string {
+    return this.launch.cwd;
+  }
+
+  /** Промис выхода процесса; уже вышедший — разрешён сразу. */
+  whenClosed(): Promise<void> {
+    if (this.closed) return Promise.resolve();
+    return new Promise((resolve) => this.closedWaiters.push(resolve));
   }
 
   /** Занята ходом — своим или начатым самим CLI. */
@@ -135,23 +185,45 @@ export class LiveSession {
     return this.backgroundTasks > 0;
   }
 
+  /** Сколько фоновых задач агента идёт — в журнал прогонов (журнал 64). */
+  get backgroundCount(): number {
+    return this.backgroundTasks;
+  }
+
+  /**
+   * Процесс ушёл сам (упал, снят снаружи, посредник закрыл простой), держа
+   * фоновые задачи: их итогов не будет, и пробуждения тоже. Это обрыв работы, а
+   * не её провал (решение W3-4c), — группу продолжают с восстановлением
+   * состояния. Закрытое панелью сюда не относится.
+   */
+  get lostBackground(): boolean {
+    return this.closed && !this.released && this.backgroundTasks > 0;
+  }
+
   /** Ход, начатый самим CLI, ждёт хозяина. */
   get pendingWake(): boolean {
     return this.waking !== undefined;
   }
 
+  /** Первая строка посредника пришла (или её не будет: прямой запуск, смерть). */
+  whenSynced(timeoutMs = 10_000): Promise<void> {
+    if (this.isSynced || this.closed || !this.transport.relay) return Promise.resolve();
+    return new Promise<void>((resolve) => {
+      const timer = setTimeout(resolve, timeoutMs);
+      timer.unref?.();
+      this.syncedWaiters.push(() => {
+        clearTimeout(timer);
+        resolve();
+      });
+    });
+  }
+
   /** Отправить сообщение человека; обещание закрывается концом хода. */
   turn(prompt: string, runId: string | undefined, onRaw: RawSink): Promise<TurnOutcome> {
     if (this.closed) return Promise.resolve(this.outcome());
-    if (runId && this.launch.runIdFile) {
-      try {
-        writeFileSync(this.launch.runIdFile, runId, 'utf8');
-      } catch {
-        // Без файла брокер возьмёт ключ из окружения — ключ первого хода.
-      }
-    }
+    this.writeRunId(runId);
     const done = this.expect(onRaw);
-    this.child.stdin.write(
+    this.transport.write(
       JSON.stringify({ type: 'user', message: { role: 'user', content: prompt } }) + '\n',
     );
     return done;
@@ -164,13 +236,7 @@ export class LiveSession {
   claimWake(runId: string | undefined, onRaw: RawSink): Promise<TurnOutcome> | undefined {
     const buffered = this.waking;
     if (!buffered) return undefined;
-    if (runId && this.launch.runIdFile) {
-      try {
-        writeFileSync(this.launch.runIdFile, runId, 'utf8');
-      } catch {
-        // См. `turn`.
-      }
-    }
+    this.writeRunId(runId);
     this.waking = undefined;
     const done = this.expect(onRaw);
     for (const raw of buffered) this.deliver(raw);
@@ -180,7 +246,8 @@ export class LiveSession {
   /** Закрыть мягко: конец stdin — CLI доделывает и выходит сам. */
   close(): void {
     if (this.closed) return;
-    this.child.stdin.end();
+    this.released = true;
+    this.transport.end();
     // Страховка: процесс, не вышедший сам, валим деревом.
     setTimeout(() => this.kill(), 10_000).unref();
   }
@@ -188,7 +255,58 @@ export class LiveSession {
   /** Убить деревом: на Windows CLI живёт под `cmd.exe`. */
   kill(): void {
     if (this.closed) return;
-    killChildTree(this.child);
+    this.released = true;
+    this.transport.kill();
+  }
+
+  /**
+   * Сервер уходит, процесс остаётся: подключение к посреднику рвётся молча, а
+   * папка процесса не убирается — в ней конфиг брокера прав, и новый сервер
+   * найдёт её по журналу. Прямой запуск без сервера не живёт — он гаснет.
+   */
+  detach(): void {
+    if (this.closed) return;
+    this.released = true;
+    this.transport.detach();
+  }
+
+  private writeRunId(runId: string | undefined): void {
+    if (!runId || !this.launch.runIdFile) return;
+    try {
+      writeFileSync(this.launch.runIdFile, runId, 'utf8');
+    } catch {
+      // Без файла брокер возьмёт ключ из окружения — ключ первого хода.
+    }
+  }
+
+  private onLine(line: string): void {
+    if (!line.trim()) return;
+    let raw: RawEvent;
+    try {
+      raw = JSON.parse(line) as RawEvent;
+    } catch {
+      // Не JSON — предупреждение CLI, шум.
+      return;
+    }
+    this.route(raw);
+  }
+
+  private onSynced(info: RelaySynced): void {
+    this.backgroundTasks = info.background;
+    if (info.childPid !== undefined) this.childPid = info.childPid;
+    this.isSynced = true;
+    for (const waiter of this.syncedWaiters.splice(0)) waiter();
+    if (!this.inheritedTurn) return;
+    this.inheritedTurn = false;
+    if (info.busy) return;
+    // Ход кончился до перезапуска: его `result` ушёл прежнему серверу, и
+    // накопленный вывод посредника его не несёт — ждать нечего. Ответ прогон
+    // дочитает из транскрипта.
+    this.lastUsedAt = this.now();
+    this.waking = undefined;
+    const sink = this.sink;
+    this.sink = undefined;
+    sink?.resolve({ closed: false, stderr: '' });
   }
 
   private expect(onRaw: RawSink): Promise<TurnOutcome> {
@@ -255,6 +373,8 @@ export class LiveSession {
     this.closed = true;
     this.exitCode = code;
     this.waking = undefined;
+    for (const waiter of this.syncedWaiters.splice(0)) waiter();
+    for (const waiter of this.closedWaiters.splice(0)) waiter();
     const sink = this.sink;
     this.sink = undefined;
     sink?.resolve(this.outcome());
@@ -293,19 +413,35 @@ export class LiveSessionPool {
   /** Ход, начатый самим CLI: реестр заводит под него прогон (см. `ChatRunRegistry.wake`). */
   onWake?: (sessionId: string) => void;
   /**
+   * Процесс из пула закрылся — между ходами или посреди. Реестру: запись о нём
+   * в журнале прогонов больше не бережёт ничего живого.
+   */
+  onClosed?: (session: LiveSession) => void;
+  /**
    * Потолок процессов превышен, а вытеснить некого: все заняты ходом или
    * держат фоновую работу. Процессы не закрываются — об этом говорится (Д17).
    */
   onOverflow?: (size: number, max: number) => void;
+  /**
+   * Чем поднимать новый процесс. По умолчанию — через посредника: CLI
+   * переживает перезапуск панели (`live-relay.mjs`).
+   */
+  readonly open: TransportOpener;
 
   private readonly sessions = new Map<string, LiveSession>();
   private readonly limits: LivePoolLimits;
   private readonly now: () => number;
   private timer: ReturnType<typeof setInterval> | undefined;
 
-  constructor(limits: LivePoolLimits = DEFAULT_LIVE_LIMITS, now: () => number = Date.now) {
+  constructor(
+    limits: LivePoolLimits = DEFAULT_LIVE_LIMITS,
+    now: () => number = Date.now,
+    open?: TransportOpener,
+  ) {
     this.limits = limits;
     this.now = now;
+    this.open =
+      open ?? relayOpener({ idleMs: limits.idleMs, backgroundIdleMs: limits.backgroundIdleMs });
   }
 
   get size(): number {
@@ -370,6 +506,7 @@ export class LiveSessionPool {
       if (live.sessionId && this.sessions.get(live.sessionId) === live) {
         this.sessions.delete(live.sessionId);
       }
+      this.onClosed?.(live);
     };
     this.sessions.set(sessionId, session);
     // Ход, начатый CLI в ту же пачку вывода, что и конец прошлого, пришёл, когда
@@ -397,8 +534,51 @@ export class LiveSessionPool {
     }
   }
 
+  /**
+   * Закрыть простаивающие процессы, чья рабочая папка внутри `dir` (уборка копии
+   * группы, отмена плана). Простой CLI держит папку своим cwd: Windows не отдаёт
+   * её на удаление, и `git worktree remove` оставлял полкопии — файлы стёрты,
+   * копия снята с учёта, пустой каталог заперт (живой прогон 25.09). Занятый ходом
+   * или фоном процесс не закрывается — его работа важнее уборки. Есть хоть один
+   * такой — не закрывается никто (`busy` > 0): уборка всё равно откажет, и
+   * гасить ради неё остальных незачем. `closed` — когда вышли все закрытые.
+   */
+  closeIdleIn(
+    dir: string,
+    /**
+     * Гасить деревом (уборка копии): мягкий конец ввода выпускает сам CLI, а его
+     * MCP-серверы с тем же cwd живут ещё секунды — папку держат они (F4c). Простой
+     * процесс без хода и фона деревом гасить не жалко: разговор уже на диске.
+     */
+    options: { tree?: boolean } = {},
+  ): { busy: number; closed: Promise<void> } {
+    const root = comparablePath(dir);
+    const inside = [...this.sessions].filter(([, session]) => {
+      const cwd = comparablePath(session.cwd);
+      return session.alive && (cwd === root || cwd.startsWith(`${root}/`));
+    });
+    const busy = inside.filter(([, session]) => session.busy || session.hasBackgroundWork).length;
+    if (busy > 0) return { busy, closed: Promise.resolve() };
+    const exits = inside.map(([key, session]) => {
+      this.sessions.delete(key);
+      const exit = session.whenClosed();
+      if (options.tree) session.kill();
+      else session.close();
+      return exit;
+    });
+    return { busy: 0, closed: Promise.all(exits).then(() => undefined) };
+  }
+
   closeAll(): void {
     for (const session of this.sessions.values()) session.kill();
+    this.sessions.clear();
+    if (this.timer) clearInterval(this.timer);
+    this.timer = undefined;
+  }
+
+  /** Выход сервера: процессы за посредниками живут дальше, пул их только отпускает. */
+  detachAll(): void {
+    for (const session of this.sessions.values()) session.detach();
     this.sessions.clear();
     if (this.timer) clearInterval(this.timer);
     this.timer = undefined;
@@ -421,4 +601,9 @@ export class LiveSessionPool {
       victim[1].close();
     }
   }
+}
+
+/** Путь для сравнения: прямые слэши, без хвостового, без регистра. */
+function comparablePath(path: string): string {
+  return path.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
 }

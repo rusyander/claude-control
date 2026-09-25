@@ -155,7 +155,7 @@ export function useTransferState(provider: string, target: string, level: Portab
  * операции адаптеров по временным копиям и считается только по нажатию.
  */
 export function usePlanTransfer() {
-  return useMutation({ mutationFn: postPlan });
+  return useMutation({ meta: { silentError: true }, mutationFn: postPlan });
 }
 
 /**
@@ -169,6 +169,7 @@ export function useApplyTransfer() {
   const queryClient = useQueryClient();
 
   return useMutation({
+    meta: { silentError: true },
     mutationFn: postApply,
     onSuccess: (_answer, variables) => {
       void queryClient.invalidateQueries({
@@ -208,6 +209,7 @@ export function useRevertTransfer() {
   const queryClient = useQueryClient();
 
   return useMutation({
+    meta: { silentError: true },
     mutationFn: postRevert,
     onSuccess: (_answer, variables) => {
       void queryClient.invalidateQueries({
@@ -289,6 +291,7 @@ export function useSaveSubscription() {
   const queryClient = useQueryClient();
 
   return useMutation({
+    meta: { silentError: true },
     mutationFn: putSubscription,
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.portabilitySubscriptions });
@@ -312,6 +315,7 @@ export function useForgetSubscription() {
   const queryClient = useQueryClient();
 
   return useMutation({
+    meta: { silentError: true },
     mutationFn: deleteSubscription,
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.portabilitySubscriptions });
@@ -337,7 +341,7 @@ async function postSubscriptionPlan(
  * фоном при каждом открытии страницы было бы неверно понятым «только чтением».
  */
 export function usePlanSubscription() {
-  return useMutation({ mutationFn: postSubscriptionPlan });
+  return useMutation({ meta: { silentError: true }, mutationFn: postSubscriptionPlan });
 }
 
 async function postSubscriptionApply(
@@ -361,6 +365,7 @@ export function useApplySubscription() {
   const queryClient = useQueryClient();
 
   return useMutation({
+    meta: { silentError: true },
     mutationFn: postSubscriptionApply,
     onSuccess: (_answer, variables) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.portabilitySubscriptions });
@@ -397,7 +402,7 @@ async function postDriftPlan(address: DriftAddress): Promise<{ plan: Subscriptio
  * два разных решения одним диффом.
  */
 export function usePlanDrift() {
-  return useMutation({ mutationFn: postDriftPlan });
+  return useMutation({ meta: { silentError: true }, mutationFn: postDriftPlan });
 }
 
 async function postDriftApply(
@@ -458,7 +463,7 @@ async function postProbe(request: ProbeRequest): Promise<ProbeAnswer> {
  * из кэша на следующий день он говорил бы о переносе, которого уже нет.
  */
 export function useRunProbe() {
-  return useMutation({ mutationFn: postProbe });
+  return useMutation({ meta: { silentError: true }, mutationFn: postProbe });
 }
 
 /**

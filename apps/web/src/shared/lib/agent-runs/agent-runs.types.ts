@@ -220,6 +220,12 @@ export interface StartInput {
   parentChatId?: string;
   /** Подпись ветви в дереве: имя проекта или группы. */
   parentTitle?: string;
+  /**
+   * Занятому разговору — в очередь СЕРВЕРА, а не отказ 409: так отвечает хаб
+   * родителя ребёнку, чей прогон эта вкладка не ведёт (W3-5). Сервер отвечает
+   * 202 с ключом идущего прогона и отправит сообщение сам, когда ход кончится.
+   */
+  queueIfBusy?: boolean;
 }
 
 /**
@@ -252,9 +258,10 @@ export interface HandoffEvent {
    * проверка работы (`review`) или правки по её замечаниям (`fix`). Для вкладки
    * это то же самое событие — работа уехала в соседний разговор того же
    * каталога, — меняется только подпись. `work` приходит после плана группы
-   * (Т1): следующее звено за планом — сама работа.
+   * (Т1): следующее звено за планом — сама работа. `deliver` — доставка группы
+   * до MR после правок или чистого ревью.
    */
-  stage?: 'triage' | 'plan' | 'work' | 'review' | 'fix';
+  stage?: 'triage' | 'plan' | 'work' | 'review' | 'fix' | 'deliver';
   /** Замечания ревью, по которым заведены правки. */
   findings?: string[];
   /** Работа группы стартовала БЕЗ плана: прогон плана не дал блока (Т1). */
@@ -321,7 +328,12 @@ export type ChatEvent =
        * 'groupsActivated' — набор, привязанный к проекту, включился сам;
        * 'contextCarried' — незакрытая работа перенесена к другому CLI (П6.1);
        * 'modelDropped' — имя модели не прошло грамматику аргументов;
-       * 'childTold' — родитель написал группам блоком `agentdeck:tell` (Д7).
+       * 'childTold' — родитель написал группам блоком `agentdeck:tell` (Д7);
+       * 'groupsInterrupted' — процессы групп оборвались посреди хода (WP1c);
+       * 'groupsLimited' — группы ждут сброса лимита подписки (журнал 89);
+       * 'mrWatchLimit' — наблюдатель MR исчерпал самостоятельные продолжения;
+       * 'defaultDrift' — основная ветка ушла вперёд и задела файлы идущей группы (находка 61);
+       * 'deliveryUnchecked' — часть готовности группы (описание MR) панель не проверила.
        */
       code:
         | 'adopted'
@@ -333,7 +345,12 @@ export type ChatEvent =
         | 'groupsActivated'
         | 'contextCarried'
         | 'modelDropped'
-        | 'childTold';
+        | 'childTold'
+        | 'groupsInterrupted'
+        | 'groupsLimited'
+        | 'mrWatchLimit'
+        | 'defaultDrift'
+        | 'deliveryUnchecked';
       text: string;
       /**
        * Код самой строки — отдельно от `code`, который называет повод. Есть не
@@ -369,4 +386,5 @@ export type ChatEvent =
  * набранное — человеку остаётся печатать заново.
  */
 export type SendOutcome =
-  { ok: true } | { ok: false; code?: string; message: string; files?: string[] };
+  /** `queued` — сервер принял сообщение в очередь занятого разговора (202), а не запустил ход. */
+  { ok: true; queued?: boolean } | { ok: false; code?: string; message: string; files?: string[] };

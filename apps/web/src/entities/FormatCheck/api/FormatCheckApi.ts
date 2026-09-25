@@ -33,6 +33,7 @@ export function useRefreshFormatCheck() {
   const queryClient = useQueryClient();
 
   return useMutation({
+    meta: { silentError: true },
     mutationFn: refreshFormatCheck,
     onSuccess: (report) => {
       queryClient.setQueryData<FormatCheckResponse>(queryKeys.formatCheck, {

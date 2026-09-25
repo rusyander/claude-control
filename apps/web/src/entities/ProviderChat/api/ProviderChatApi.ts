@@ -45,6 +45,7 @@ export function useCreateProviderChat() {
   const queryClient = useQueryClient();
 
   return useMutation({
+    meta: { silentError: true },
     mutationFn: async (input: { title?: string; workdir?: string } = {}) => {
       const { data } = await apiClient.post<ProviderChatSummary>('/provider-chat/chats', input);
       return data;
@@ -78,6 +79,7 @@ export function useDeleteProviderChat() {
   const queryClient = useQueryClient();
 
   return useMutation({
+    meta: { silentError: true },
     mutationFn: async (chatId: string) => {
       await apiClient.delete(`/provider-chat/chats/${chatId}`);
     },
@@ -103,6 +105,7 @@ export function useRestartProviderChat() {
   const queryClient = useQueryClient();
 
   return useMutation({
+    meta: { silentError: true },
     mutationFn: async (chatId: string) => {
       const { data } = await apiClient.post<ProviderChatRestart>(
         `/provider-chat/chats/${chatId}/restart`,

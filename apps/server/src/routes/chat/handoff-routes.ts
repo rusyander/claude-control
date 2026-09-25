@@ -4,6 +4,7 @@ import type { AppSettings } from '@agentdeck/contracts';
 import {
   HANDOFF_DEFAULT_CHECKPOINT,
   HANDOFF_MAX_CHAIN,
+  HANDOFF_GROUP_MAX_CHAIN,
   HANDOFF_SYSTEM_PROMPT,
   parseHandoffProposal,
   restartHandoffProposal,
@@ -17,11 +18,13 @@ import type { ChatRunRegistry, RunFinished } from '../../domains/chat/ChatRunReg
 import type { ChatSession } from '../../domains/chat/ChatSession.ts';
 import { initiativePrompt } from '../../domains/chat/initiative.ts';
 import { planContextRotation } from '../../domains/chat/context-rotation.ts';
+import { AUTONOMOUS_PERMISSION_MODE } from '../../domains/chat/ChatWorkspace.ts';
 import { activateGroupsQuietly, groupsActivatedNotice } from '../../domains/group-activation.ts';
 import {
   checkpointInside,
   evaluateHandoff,
   hashFile,
+  splitOwnsHandoff,
   startHandoff,
   statMtime,
   type HandoffChains,
@@ -31,7 +34,11 @@ import {
 } from '../../domains/chat/ChatHandoff.ts';
 import { readChatMessages } from '../../domains/chat/ChatHistory.ts';
 import { projectsDir } from './paths.ts';
-import { planCascadeStage, stageAppendPrompt } from '../../domains/chat/ChatCascadeStages.ts';
+import {
+  asksDelivery,
+  planCascadeStage,
+  stageAppendPrompt,
+} from '../../domains/chat/ChatCascadeStages.ts';
 import type { ChatLink } from '../../lib/app-store/app-store.types.ts';
 import { carriedLink } from '../../lib/app-store/chat-links.ts';
 import { chainOutcomeOf, endsWithQuestion } from '../../domains/chat/chain-outcome.ts';
@@ -39,7 +46,8 @@ import type { ChainOutcome } from '../../domains/chat/split-conveyor.ts';
 import type { TreeStartGate } from '../../domains/chat/tree-pause.ts';
 import { createChat, type ProviderChatService } from '../../domains/provider-chat.ts';
 import { checkProjectDir } from '../../domains/projects.ts';
-import { getActiveProvider } from '../../providers/registry.ts';
+import { getActiveProvider, getActiveProviderId } from '../../providers/registry.ts';
+import { supportsCliAutoMode } from '../../providers/auto-mode.ts';
 import { activeCliCommand } from '../../providers/cli.ts';
 import { apiTokenPath } from '../../lib/api-token.ts';
 
@@ -77,6 +85,11 @@ function pausedTurn(finished: RunFinished): boolean {
 /** Оба написания ключа одного разговора, без пустых. */
 function aliasesOf(chatId?: string, sessionId?: string): string[] {
   return [chatId, sessionId].filter((value): value is string => Boolean(value));
+}
+
+/** Одна ли это группа разделения: тот же родитель и тот же номер группы. */
+function sameGroup(other: ChatLink | undefined, link: ChatLink): boolean {
+  return other?.parentChatId === link.parentChatId && other.groupIndex === link.groupIndex;
 }
 
 export interface HandoffPlannerDeps {
@@ -149,6 +162,12 @@ export interface SplitStageDeps {
   onTriageFinished: (finished: RunFinished, aliases: string[]) => ChatEvent | undefined;
   /** Ход последнего звена группы кончился; что это для группы — `outcome` (Д3). */
   onChainEnded: (link: ChatLink, outcome: ChainOutcome) => void;
+  /** Процесс группы оборвался посреди хода — итога нет, группа прервана (WP1c). */
+  onChainInterrupted?: (link: ChatLink) => void;
+  /** Ветка и задачи группы — первой строкой звену за ней (журнал 98). */
+  identityOf?: (link: ChatLink) => string | undefined;
+  /** Группа связи доводит работу до MR — за правками идёт звено доставки (журнал 59a). */
+  delivers?: (link: ChatLink) => boolean;
 }
 
 /** Что планировщику нужно снаружи, чтобы завести звено конвейера. */
@@ -211,6 +230,11 @@ export function createHandoffPlanner({
       task: finished.options.prompt ?? '',
       hasWork: () => cascade.hasWork(cwd, link?.createdAt),
       paused: pausedTurn(finished),
+      ...(link?.parentChatId && split?.delivers?.(link) ? { deliver: true } : {}),
+      // Доставка раз на круг (W3-3): повтор — только когда человек о нём попросил.
+      ...(link?.deliveredAt && asksDelivery(finished.options.prompt ?? '')
+        ? { redeliver: true }
+        : {}),
     });
     if (!plan) return undefined;
 
@@ -224,14 +248,36 @@ export function createHandoffPlanner({
     // План отработан ровно один раз: второе сообщение человека в чат плана без
     // отметки заводило бы вторую работу той же группы (Т1).
     if (plan.stage === 'work') cascade.markPlanned?.(aliases, new Date().toISOString());
+    // Доставка — раз на круг (W3-3): отметка по всем ключам чата, как у ревью, —
+    // иначе сообщение человека в законченный чат правок завело бы вторую.
+    if (plan.stage === 'deliver') {
+      const at = new Date().toISOString();
+      for (const key of aliases) {
+        const own = cascade.linkOf([key]);
+        if (own) cascade.saveLink(key, { ...own, deliveredAt: at });
+      }
+    }
 
-    const options = { ...finished.options, prompt: plan.prompt };
+    // Звено группы разделения знает свою ветку и задачи с первой строки: без
+    // ключа задачи в словах пользователя сторож git не пускает правку истории
+    // своей же ветки, и звено вставало с вопросом (журнал 98).
+    const identity = link?.parentChatId ? split?.identityOf?.(link) : undefined;
+    const prompt = identity ? `${identity}\n\n${plan.prompt}` : plan.prompt;
+    const options = { ...finished.options, prompt };
     delete options.sessionId;
     delete options.fork;
     delete options.name;
     options.model = plan.model;
     options.effort = plan.effort;
     options.permissionPrompt = { runId: chatId, baseUrl: selfBaseUrl, tokenFile: apiTokenPath() };
+    // Группа разделения идёт в авторежиме (split-launch.ts), и звено обязано его
+    // держать. Прогон, усыновлённый после перезапуска журналом без режима, отдал
+    // бы дефолт `acceptEdits` — и звено встало бы на карточке прав, которую никто
+    // не видит (живой прогон 24.09.2026). Группа без права правок (`default`)
+    // так и остаётся без него.
+    if (link?.parentChatId && options.permissionMode !== 'default') {
+      options.permissionMode = AUTONOMOUS_PERMISSION_MODE;
+    }
     // Дописка собирается заново по стадии: у работы в ней лежит планка сдачи
     // «тебя ведёт модель ниже потолка», и в ревью она сказала бы проверяющему
     // ровно обратное тому, зачем его завели.
@@ -289,6 +335,29 @@ export function createHandoffPlanner({
     // бывает, его итог применяет конвейер разделения. Проверяется первым, чтобы
     // блок продолжения в ответе разбора не завёл чистую сессию.
     const link = cascade?.linkOf(aliases);
+    // Оборванный ход (WP1c) не решает ничего: ни продолжения, ни звена, ни итога
+    // группы — ответа нет. Группа разделения прервана и ждёт продолжения; разбор
+    // остаётся за обходом при старте (`recoverInterruptedTriage`).
+    if (finished.interrupted) {
+      if (link?.parentChatId && link.stage !== 'triage') split?.onChainInterrupted?.(link);
+      return undefined;
+    }
+    // Второй агент в той же копии (журнал 90): пока в ней идёт другой прогон
+    // группы — человек продолжил её руками, панель напомнила, — конец ЭТОГО хода
+    // не решает ничего: звено поверх живого прогона правило бы то же дерево
+    // наперегонки. Решит конец того прогона. Считаются только прогоны ТОЙ ЖЕ
+    // группы: группы проекта без git делят один каталог, и чужой прогон в нём
+    // навсегда глотал бы итог этой.
+    if (
+      link?.parentChatId &&
+      link.stage !== 'triage' &&
+      finished.projectPath &&
+      runs.runningIn(finished.projectPath, aliases, (other) =>
+        sameGroup(cascade?.linkOf(aliasesOf(other.chatId, other.sessionId)), link),
+      )
+    ) {
+      return undefined;
+    }
     if (split && link?.stage === 'triage') return split.onTriageFinished(finished, aliases);
 
     // Блок сильнее прозы: он называет, что закрыто и чем продолжить. Проза —
@@ -314,8 +383,10 @@ export function createHandoffPlanner({
       ...(finished.projectPath ? { cwd: finished.projectPath } : {}),
       ok: finished.ok,
       startedAt: finished.startedAt,
-      auto: chains.isAuto(aliases),
+      // Свой блок группы разделения исполняется без тумблера (журнал 42c).
+      auto: chains.isAuto(aliases) || splitOwnsHandoff(link),
       depth: chains.depth(aliases),
+      ...(splitOwnsHandoff(link) ? { maxDepth: HANDOFF_GROUP_MAX_CHAIN } : {}),
       ...(chains.lastCheckpointHash(aliases) !== undefined
         ? { previousHash: chains.lastCheckpointHash(aliases) as string }
         : {}),
@@ -348,10 +419,18 @@ export function createHandoffPlanner({
         : undefined;
       // Звена нет и продолжения нет — ход группы кончился. Что это для неё —
       // итог, пауза или сбой — решает `chainOutcomeOf` (Д3): только итог и сбой
-      // отпускают ждавших. План и разбор цепочкой не считаются: за планом
-      // работа заводится всегда, а разбор обработан выше. Связь перечитывается:
-      // ревью по ссылке только что записало в неё свой итог.
-      if (split && link && link.stage !== 'plan' && link.stage !== 'triage') {
+      // отпускают ждавших. Разбор цепочкой не считается — он обработан выше.
+      // План — только когда кончился вопросом или фоном: работа за ним не
+      // заведена, и группа ждёт человека, а не «работает» без прогона (после
+      // перезапуска такую подобрал бы `recoverInterruptedGroups` и продолжил
+      // план без ответа). Связь перечитывается: ревью по ссылке только что
+      // записало в неё свой итог.
+      if (
+        split &&
+        link &&
+        link.stage !== 'triage' &&
+        (link.stage !== 'plan' || pausedTurn(finished))
+      ) {
         const current = cascade?.linkOf(aliases) ?? link;
         split.onChainEnded(
           current,
@@ -364,6 +443,7 @@ export function createHandoffPlanner({
             ...(hasWork ? { hasWork } : {}),
             ...(finished.error ? { error: finished.error } : {}),
             ...(finished.retry ? { retry: finished.retry } : {}),
+            ...(finished.limit ? { limit: finished.limit } : {}),
           }),
         );
       }
@@ -402,6 +482,7 @@ export function createHandoffPlanner({
       // человека. Продолжение своё не перебивает: наследство сильнее.
       ...(finished.options.prompt ? { rootTask: finished.options.prompt } : {}),
       ...(checkpointHash ? { checkpointHash } : {}),
+      ...(splitOwnsHandoff(link) ? { group: true } : {}),
       start: ({ chatId, prompt }) => {
         // Продолжение идёт ТЕМИ ЖЕ параметрами: модель, глубина, права, команда
         // CLI и системные дописки — всё от закрытого прогона. Меняются ровно
@@ -421,6 +502,12 @@ export function createHandoffPlanner({
         // без наследования встало бы на первом же запросе прав, пока человека
         // нет у панели, — ради чего цепочка и заводилась.
         if (runs.isSplitMuted(finished.chatId)) runs.muteSplit(chatId);
+        // Продолжение группы — тот же авторежим, что у звена (журнал 44): прогон,
+        // усыновлённый после перезапуска без режима, отдал бы дефолт, и группа
+        // встала бы на карточке прав, которую никто не видит.
+        if (link?.parentChatId && options.permissionMode !== 'default') {
+          options.permissionMode = AUTONOMOUS_PERMISSION_MODE;
+        }
         session.inherit(aliases, chatId);
         // Связь — тоже от закрытого разговора, и строго ДО запуска: перенос на
         // настоящий `sessionId` ищет запись по временному ключу и, не найдя,
@@ -693,6 +780,15 @@ export function continuationStarter(
   // разговор со связью принадлежит дереву групп, и его продолжение обязано
   // спрашивать маршрут потребителем «Группы разделения», а не «Чат».
   const origin = assigned ? ('groups' as const) : undefined;
+  // Продолжение группы разделения идёт авторежимом, как её запуск и звенья
+  // (журнал 44): с `default` чистая сессия группы вставала на первом же Bash
+  // вне списка, а человека у неё нет. Право правок — от кнопки ИЛИ от самого
+  // разделения: вкладка ребёнка тумблер родителя не знает. Группа, заведённая
+  // без права правок, его и здесь не получает.
+  const groupEdits =
+    assigned?.parentChatId !== undefined &&
+    (source.allowEdits ||
+      ctx.store.getSplitPlan(assigned.parentChatId)?.request.allowEdits === true);
 
   /** Прогон Claude — тот же путь, что и у обычной отправки в чат проекта. */
   function startClaude(nextId: string, prompt: string, cwd: string): boolean {
@@ -711,19 +807,33 @@ export function continuationStarter(
     if (assigned) {
       ctx.store.setChatLink(nextId, carriedLink(assigned));
     }
+    // Пусто в запросе — берём назначение закрываемого разговора, и только
+    // потом настройку. Панель модель шлёт всегда, телефон и API-клиенты —
+    // нет, и без этой ступени их продолжение уезжало бы на другой модели,
+    // чем шла работа.
+    const model = source.model || assigned?.model || settings.chatModel;
+    // Продолжение обычного чата — тот же разговор, и авторежим у него тот же,
+    // что при отправке (`run-routes.ts`): выбор человека в чате сильнее
+    // глобальной настройки; у модели без авторежима CLI — `acceptEdits`, рутину
+    // снимет автоподтверждение, унаследованное строкой выше.
+    const cliAutoMode =
+      (deps.session.autoModeOverride(...source.fromAliases) ?? settings.chatAutoMode) &&
+      supportsCliAutoMode(getActiveProviderId(ctx.store), model);
     return deps.runs.start(
       nextId,
       {
         prompt,
         cwd,
         command: activeCliCommand(ctx.store),
-        // Пусто в запросе — берём назначение закрываемого разговора, и только
-        // потом настройку. Панель модель шлёт всегда, телефон и API-клиенты —
-        // нет, и без этой ступени их продолжение уезжало бы на другой модели,
-        // чем шла работа.
-        model: source.model || assigned?.model || settings.chatModel,
+        model,
         effort: source.effort || assigned?.effort || settings.chatEffort,
-        permissionMode: source.allowEdits ? 'acceptEdits' : 'default',
+        permissionMode: groupEdits
+          ? AUTONOMOUS_PERMISSION_MODE
+          : source.allowEdits
+            ? cliAutoMode
+              ? AUTONOMOUS_PERMISSION_MODE
+              : 'acceptEdits'
+            : 'default',
         permissionPrompt: { runId: nextId, baseUrl: selfBaseUrl, tokenFile: apiTokenPath() },
         ...(initiative ? { appendSystemPrompt: initiative } : {}),
       },

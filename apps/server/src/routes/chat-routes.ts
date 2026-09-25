@@ -41,8 +41,10 @@ export function registerChatRoutes(
    * Обязателен нарочно: забытый аргумент завёл бы второе, молчаливое состояние.
    */
   session: ChatSession,
+  /** Ждёт ли разговор дерева человека — метка «ждёт вас» в списке чатов. */
+  awaitsYou?: (chatId: string) => boolean,
 ): void {
-  registerChatTranscriptRoutes(app, ctx, (chatId) => registry.isProcessAlive(chatId));
+  registerChatTranscriptRoutes(app, ctx, (chatId) => registry.isProcessAlive(chatId), awaitsYou);
   registerChatBrowseRoutes(app, ctx);
   registerChatRunRoutes(app, ctx, registry, session);
   registerChatArtifactRoutes(app, ctx);

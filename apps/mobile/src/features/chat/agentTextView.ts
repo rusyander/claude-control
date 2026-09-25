@@ -1,6 +1,7 @@
 import { scanSplitBlocks } from '@agentdeck/contracts/task-split';
 import { scanHandoffBlocks } from '@agentdeck/contracts/chat-handoff';
 import { scanMediaBlocks } from '@agentdeck/contracts/media-block';
+import { withoutSplitTickets } from '@agentdeck/contracts/split-tickets';
 
 /** Слова, которыми телефон говорит о блоках, которые он не показывает карточкой. */
 export interface AgentTextWords {
@@ -42,7 +43,10 @@ export function agentTextView(
 ): AgentTextView {
   const split = scanSplitBlocks(text);
   const handoff = scanHandoffBlocks(split.text);
-  const media = scanMediaBlocks(handoff.text, { streaming: options.streaming });
+  // Блок тикета группы (95b) — служебный, как в ленте панели: список держит хаб
+  // (итоговое ревью 25.09, m9 — телефон показывал сырой тег с полями).
+  const tickets = withoutSplitTickets(handoff.text, { streaming: options.streaming });
+  const media = scanMediaBlocks(tickets, { streaming: options.streaming });
   const notes = [
     ...split.proposals.map(() => words.offerSplit),
     ...handoff.proposals.map(() => words.offerHandoff),

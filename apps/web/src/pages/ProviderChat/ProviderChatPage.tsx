@@ -1,13 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
-import type { TaskSplitProposal } from '@agentdeck/contracts/task-split';
 import type { HandoffProposal } from '@agentdeck/contracts/chat-handoff';
-import { foreignChatKey } from '@agentdeck/contracts/foreign-chat-key';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { ConfirmDialog } from '@shared/ui/confirm-dialog';
-import { toErrorMessage } from '@shared/api/client';
 import { toast } from '@shared/lib/toast';
 import { FolderPicker } from '@features/FolderPicker';
 import { useProviderRunner } from '@entities/ProviderKeys';
@@ -21,16 +18,6 @@ import {
   useProviderChats,
   useRestartProviderChat,
 } from '@entities/ProviderChat';
-import { useSplitTasks } from '@entities/ChatSplit';
-import {
-  chatTreeKeys,
-  useAnswerHold,
-  useChatTree,
-  useCheckOverlap,
-  usePauseTree,
-  useResumeTree,
-} from '@entities/ChatTree';
-
 import { useStartHandoff } from '@entities/ChatHandoff';
 import { MediaDeckCard, useChatMedia } from '@entities/Media';
 import { MediaFeedCard } from '@features/ChatMessages';
@@ -40,9 +27,7 @@ import { ProviderChatSidebar } from './ProviderChatSidebar';
 import { ProviderChatHeader } from './ProviderChatHeader';
 import { ProviderChatMessages } from './ProviderChatMessages';
 import { ProviderChatComposer } from './ProviderChatComposer';
-import { collectForeignStages } from './lib/foreignStages';
-import { useForeignRelease } from './model/useForeignRelease';
-import { useForeignReviews } from './model/useForeignReviews';
+import { useForeignSplitHub } from './model/useForeignSplitHub';
 import styles from './ProviderChatPage.module.scss';
 
 /**
@@ -170,39 +155,12 @@ export function ProviderChatPage() {
     });
   };
 
-  /**
-   * Разделение задач по чатам. Копии репозитория и сами разговоры заводит тот же
-   * серверный маршрут, что и у Claude, — вид чата решает активный провайдер, а
-   * не клиент. Здесь остаётся освежить список: новые разговоры уже созданы.
-   */
-  const split = useSplitTasks();
-  const splitTasks = (proposal: TaskSplitProposal, options: { startRuns: boolean }): void => {
-    const projectPath = chat?.workdir;
-    if (!projectPath) return;
-    split.mutate(
-      {
-        projectPath,
-        proposal,
-        startRuns: options.startRuns,
-        allowEdits: true,
-        // Родитель обязателен: без него связей не будет, а с ними — ни дерева,
-        // ни хаба, ни стадий. Ключ панель именует сама (`codex:c1a2…`).
-        ...(activeChatId ? { parentChatId: activeChatId } : {}),
-      },
-      {
-        onSuccess: (result) => {
-          void queryClient.invalidateQueries({ queryKey: providerChatKeys.list });
-          if (result.chats.length > 0) {
-            toast.success(t('chat.split.done', { count: result.chats.length }));
-          }
-          for (const failure of result.failures) {
-            toast.error(t('chat.split.failed', { title: failure.title, message: failure.message }));
-          }
-        },
-        onError: (error) => toast.error(t('chat.split.failedAll', { message: error.message })),
-      },
-    );
-  };
+  // Разделение и хаб групп — своим хуком: страница собирает ленту (W3-5).
+  const { splitTasks, hub } = useForeignSplitHub({
+    ...(runner?.providerId ? { providerId: runner.providerId } : {}),
+    ...(activeChatId ? { activeChatId } : {}),
+    ...(chat?.workdir ? { workdir: chat.workdir } : {}),
+  });
 
   /**
    * Продолжение в чистой сессии. Здесь это буквально новый разговор панели с тем
@@ -230,146 +188,6 @@ export function ProviderChatPage() {
         onError: (error) => toast.error(t('chat.handoff.failed', { message: error.message })),
       },
     );
-  };
-
-  /**
-   * Дерево этого разговора: дети разделения, их звенья и состояние. Ключ
-   * именованный — связь чужого чата не находится по «голому» идентификатору.
-   *
-   * Спрашивается у любого открытого разговора, а не только у известного
-   * родителя: узнать про детей заранее неоткуда — своих связей список чужих
-   * разговоров не несёт, — а ответ пустому дереву стоит одного чтения состояния
-   * и ничего не рисует.
-   */
-  const treeKey =
-    runner?.providerId && activeChatId
-      ? foreignChatKey(runner.providerId, activeChatId)
-      : undefined;
-  const tree = useChatTree(treeKey, Boolean(treeKey));
-  /**
-   * Хаб — только у КОРНЯ дерева. Дерево поднимается от любого ключа ВВЕРХ, до
-   * разговора без связи, поэтому у ребёнка приезжает дерево его родителя — то
-   * же самое, что у родителя. Без этой проверки лента группы показывала бы
-   * пульт всего разделения, включая соседей, которых человек здесь не решает.
-   */
-  const isRoot = Boolean(treeKey) && tree.data?.root === treeKey;
-  const stages = isRoot ? collectForeignStages(tree.data) : [];
-
-  /**
-   * «Остановить всё» и «Продолжить всё» (Т5). Дерево одно на любого провайдера,
-   * и кнопки те же — гасят идущие прогоны групп и держат очередь автостартов на
-   * сервере. Продолжение у чужого CLI не «с того же места»: сессии нет, поэтому
-   * задание уходит заново, и на карточке это сказано словами.
-   */
-  const pause = usePauseTree();
-  const resume = useResumeTree();
-  const settleTree = (): void => {
-    void queryClient.invalidateQueries({ queryKey: providerChatKeys.list });
-    void queryClient.invalidateQueries({ queryKey: chatTreeKeys.tree(treeKey ?? '') });
-  };
-  const treeFailed = (error: unknown): void => {
-    toast.error(t('chat.cascade.tree.failed', { message: toErrorMessage(error) }));
-  };
-  /**
-   * Ревью MR по ссылке (Т6): карточки решения открытого разговора. Живёт в
-   * `model/useForeignReviews` — здесь остаётся то, чем страница СОБИРАЕТСЯ, а не
-   * то, как она решает; правило «родителю все, группе своё» одно на оба чата.
-   */
-  // «Отпустить» ждущую группу (Т3) — своим модулем рядом с карточками ревью:
-  // страница собирает ленту, а переписку с сервером ведут они.
-  const release = useForeignRelease({
-    ...(treeKey ? { treeKey } : {}),
-    settle: settleTree,
-  });
-
-  const reviews = useForeignReviews({
-    ...(tree.data ? { tree: tree.data } : {}),
-    ...(treeKey ? { treeKey } : {}),
-    isRoot,
-    settle: settleTree,
-  });
-
-  const pauseAll = (): void => {
-    if (!treeKey || pause.isPending) return;
-    pause.mutate(treeKey, {
-      onSuccess: (result) => {
-        toast.success(t('chat.cascade.tree.pausedToast', { count: result.stopped }));
-        settleTree();
-      },
-      onError: treeFailed,
-    });
-  };
-  /**
-   * Ответ человека на вопрос разбора (Т3). Адресуется РОДИТЕЛЮ именованным
-   * ключом и номером группы: у стоящей группы чата ещё нет — копия заводится
-   * после ответа, и ответ уезжает в её план и в работу заметкой.
-   */
-  const hold = useAnswerHold();
-  const answerHold = (index: number, answer: string): void => {
-    if (!treeKey || hold.isPending) return;
-    hold.mutate(
-      { parentChatId: treeKey, index, answer },
-      {
-        onSuccess: (result) => {
-          const started = result.chats.find((chat) => chat.started);
-          toast.success(
-            started
-              ? t('chat.cascade.hub.holdStarted', { title: started.title })
-              : t('chat.cascade.hub.holdQueued'),
-          );
-          for (const failure of result.failures) {
-            toast.error(t('chat.split.failed', { title: failure.title, message: failure.message }));
-          }
-          settleTree();
-        },
-        onError: (error) =>
-          toast.error(
-            t('chat.cascade.hub.holdFailed', {
-              message: toErrorMessage(error),
-            }),
-          ),
-      },
-    );
-  };
-
-  /**
-   * Сверка веток групп (Т4). Считает её сервер запросами к git по концу цепочки
-   * каждой группы, а кнопка — способ пересчитать раньше: работа могла лечь, а
-   * человек уже смотрит. Ответ приезжает и сам, деревом, поэтому здесь нужен
-   * только исход нажатия: пусто — сказать об этом, иначе кнопка выглядит
-   * ничего не сделавшей.
-   */
-  const overlap = useCheckOverlap();
-  const checkOverlap = (): void => {
-    if (!treeKey || overlap.isPending) return;
-    overlap.mutate(treeKey, {
-      onSuccess: (view) => {
-        if (view.files.length === 0) toast.success(t('chat.cascade.overlap.clean'));
-        void queryClient.invalidateQueries({ queryKey: chatTreeKeys.tree(treeKey) });
-      },
-      onError: (error) =>
-        toast.error(
-          t('chat.cascade.overlap.failed', {
-            message: toErrorMessage(error),
-          }),
-        ),
-    });
-  };
-
-  const resumeAll = (): void => {
-    if (!treeKey || resume.isPending) return;
-    resume.mutate(treeKey, {
-      onSuccess: (result) => {
-        toast.success(
-          t('chat.cascade.tree.resumedToastForeign', {
-            resumed: result.resumed,
-            flushed: result.flushed,
-          }),
-        );
-        settleTree();
-      },
-      onError: treeFailed,
-    });
   };
 
   const deleteChat = (): void => {
@@ -430,27 +248,11 @@ export function ProviderChatPage() {
             isCreating={create.isPending}
             {...(chat?.workdir ? { onSplit: splitTasks } : {})}
             onKeepHere={() => send(t('chat.split.keepHerePrompt'))}
-            isSplitPending={split.isPending}
             {...(chat?.workdir ? { onHandoff: continueClean } : {})}
             onHandoffKeepHere={() => send(t('chat.handoff.keepHerePrompt'))}
             isHandoffPending={handoff.isPending}
-            stages={stages}
-            {...(tree.data ? { tree: tree.data } : {})}
+            {...hub}
             onOpenChild={setActiveChatId}
-            onPauseAll={pauseAll}
-            onResumeAll={resumeAll}
-            treeBusy={pause.isPending || resume.isPending}
-            onAnswerHold={answerHold}
-            holdBusy={hold.isPending}
-            onRelease={release.release}
-            releaseBusy={release.busy}
-            onCheckOverlap={checkOverlap}
-            overlapBusy={overlap.isPending}
-            reviews={reviews.items}
-            onReviewDecide={reviews.decide}
-            onReviewPush={reviews.push}
-            onReviewRetry={reviews.retry}
-            reviewBusy={reviews.busy}
             {...(activeChatId ? { mediaChatId: activeChatId } : {})}
             {...(chat?.model ? { mediaModel: chat.model } : {})}
             {...(media.topic ? { mediaTopic: media.topic } : {})}

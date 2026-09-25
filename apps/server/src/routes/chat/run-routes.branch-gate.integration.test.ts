@@ -240,6 +240,42 @@ describe('маршруты чата: ворота ветки', () => {
     await response;
   });
 
+  /**
+   * Итоговая проверка 25.09 (D4): группа из своей копии записала абсолютным
+   * путём в `.agent/` основной копии — ворота смотрели только на каталог прогона,
+   * и правка прошла без карточки. Теперь — отказ с адресом своей копии.
+   */
+  it('прогон в копии пишет в основную копию — отказ, и в нём своя копия', async () => {
+    const copy = join(root, 'repo-worktrees', 'group');
+    git(repo, 'worktree', 'add', '-b', 'group', copy);
+    registry.start(
+      CHAT,
+      { prompt: 'правка группы', cwd: copy, sessionId: SESSION },
+      { projectPath: copy, sessionId: SESSION },
+    );
+    session.armAutoApprove(CHAT, { enabled: true, allowEdits: true });
+
+    const response = await askPermission('Write', {
+      file_path: join(repo, '.agent', 'mr-fix.agent.md'),
+    });
+
+    const answer = response.json() as { behavior: string; message: string };
+    expect(answer.behavior).toBe('deny');
+    expect(answer.message).toContain(copy);
+    // Правка внутри своей копии идёт прежней дорогой — тумблер её пропускает.
+    const inside = await app.inject({
+      method: 'POST',
+      url: '/api/chat/permission-request',
+      payload: {
+        runId: CHAT,
+        toolName: 'Write',
+        input: { file_path: join(copy, 'b.txt') },
+        toolUseId: 'two',
+      },
+    });
+    expect((inside.json() as { behavior: string }).behavior).toBe('allow');
+  });
+
   it('git отказал в имени ветки — карточка остаётся, вызов всё ещё придержан', async () => {
     startRun();
     const pending = askPermission();

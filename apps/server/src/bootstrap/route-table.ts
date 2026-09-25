@@ -40,6 +40,7 @@ import { registerProjectLocalRoutes } from '../routes/project-local-routes.ts';
 import { registerProviderProjectRoutes } from '../routes/provider-project-routes.ts';
 import { registerProjectRunnerRoutes } from '../routes/project-runner-routes.ts';
 import { registerProjectGitRoutes } from '../routes/project-git-routes.ts';
+import { registerSplitDefaultsRoutes } from '../routes/split-defaults-routes.ts';
 import { registerProjectFilesRoutes } from '../routes/project-files-routes.ts';
 import { registerProjectTestsRoutes } from '../routes/project-tests-routes.ts';
 import { registerProjectTestsPublishRoutes } from '../routes/project-tests/publish-routes.ts';
@@ -71,6 +72,7 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
     providerChats,
     handoffChains,
     treePause,
+    pendingAsks,
     splitConveyor,
     splitOverlap,
     splitReview,
@@ -130,10 +132,21 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
     registerProjectLocalRoutes,
     registerProviderProjectRoutes,
     // Реестр прогонов git-маршрутам нужен ровно за одним: не дать снести рабочую
-    // копию, в которой прямо сейчас работает агент.
-    (instance, context) => registerProjectGitRoutes(instance, context, chatRuns),
+    // копию, в которой прямо сейчас работает агент. Конвейер — чтобы поднятый
+    // потолок «сколько групп разом» сразу добирал очередь (журнал 25).
+    (instance, context) =>
+      registerProjectGitRoutes(instance, context, chatRuns, (path) =>
+        splitConveyor.kickProject(path),
+      ),
+    // Общие правила вкладки «Группы»: сменившийся общий потолок толкает очередь
+    // каждого проекта с разделением — так же, как потолок проекта.
+    (instance, context) =>
+      registerSplitDefaultsRoutes(instance, context, (path) => splitConveyor.kickProject(path)),
     registerProjectFilesRoutes,
-    (instance, context) => registerChatRoutes(instance, context, chatRuns, chatSession),
+    (instance, context) =>
+      registerChatRoutes(instance, context, chatRuns, chatSession, (chatId) =>
+        treePause.awaitsHuman(chatId),
+      ),
     // Правило «подбирать модель под задачу»: одно положение на проект, без
     // зависимостей — ни реестр прогонов, ни сессия ему не нужны.
     registerChatCascadeRoutes,
@@ -149,6 +162,7 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
         conveyor: splitConveyor,
         overlap: splitOverlap,
         review: splitReview,
+        asks: pendingAsks,
       }),
     // Пауза дерева: «Остановить всё» / «Продолжить всё» у родителя и само
     // дерево для пульта. Объект переживает запрос — он же глушит автостарты.

@@ -1,5 +1,8 @@
 import type { SplitGroupStatusView, SplitPlanView } from '@agentdeck/contracts/chat-handoff';
+import { existsSync, realpathSync } from 'node:fs';
+import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 import { gitSync } from '../project-git/exec.ts';
+import { withoutLinks } from './ChatRecords.ts';
 
 /**
  * Ворота ветки: первая правка в ОСНОВНОЙ рабочей копии не проходит молча.
@@ -56,12 +59,18 @@ const EDIT_TOOL_NAMES = new Set(
  * копии, поэтому сомнение решается в пользу карточки.
  */
 const SHELL_WRITE = [
-  />{1,2}\s*[^\s|&;]+/, // перенаправление в файл
-  /(^|[\s|(])tee\b/i,
+  // Перенаправление в файл. Не запись — сброс потока в никуда (`2>/dev/null`,
+  // `>nul`, `>$null`) и слияние потоков (`2>&1`), а также стрелки `=>`/`->` в
+  // коде `node -e`: живой прогон 24.09.2026 — `ls "$NVM_HOME" 2>/dev/null` в
+  // основной копии остановил прогон и увёл его в копию, хотя не писал ничего.
+  /(^|[^=-])>{1,2}\s*(?!&|["']?(?:\/dev\/(?:null|stdout|stderr)|nul|\$null)["']?(?:$|[\s|&;)]))[^\s|&;>]+/i,
+  // Имя команды — отдельным словом: `\b` видит границу и перед дефисом, и
+  // `cd cp-admin-ui` читалось как `cp` (тот же живой прогон).
+  /(^|[\s|(])tee(?=$|[\s;|&)])/i,
   /(^|[\s|(])sed\b[^\n|;]*\s-i\b/i,
-  /(^|[\s|(])(patch|dd)\b/i,
+  /(^|[\s|(])(patch|dd)(?=$|[\s;|&)])/i,
   /\bgit\s+(apply|am)\b/i,
-  /(^|[\s|(])(cp|mv|install)\b/i,
+  /(^|[\s|(])(cp|mv|install)(?=$|[\s;|&)])/i,
   /(^|[\s|(])(Set-Content|Add-Content|Out-File)\b/i,
 ];
 
@@ -113,6 +122,99 @@ export function isMainWorkingCopy(cwd: string): boolean {
 
 function normalize(path: string): string {
   return path.trim().split('\\').join('/').replace(/\/+$/, '').toLowerCase();
+}
+
+/** Поля пути у инструментов правки — своих и чужих CLI. */
+const PATH_FIELDS = [
+  'file_path',
+  'notebook_path',
+  'path',
+  'filePath',
+  'target_file',
+  'absolute_path',
+];
+
+function targetPathOf(input: unknown): string | undefined {
+  if (!input || typeof input !== 'object') return undefined;
+  const record = input as Record<string, unknown>;
+  for (const field of PATH_FIELDS) {
+    const value = record[field];
+    if (typeof value === 'string' && value.trim()) return value;
+  }
+  return undefined;
+}
+
+/**
+ * Настоящий путь: короткое имя Windows (`RUSYAN~1`) и ссылки раскрыты у
+ * ближайшего существующего предка — сам файл правки ещё может не существовать.
+ */
+function realOf(path: string): string {
+  const tail: string[] = [];
+  let current = resolve(path);
+  while (!existsSync(current)) {
+    const parent = dirname(current);
+    if (parent === current) return resolve(path);
+    tail.unshift(basename(current));
+    current = parent;
+  }
+  try {
+    return join(realpathSync.native(current), ...tail);
+  } catch {
+    return resolve(path);
+  }
+}
+
+function isInside(path: string, dir: string): boolean {
+  const target = normalize(realOf(path));
+  const root = normalize(realOf(dir));
+  return target === root || target.startsWith(`${root}/`);
+}
+
+/**
+ * Правка из КОПИИ в основную копию того же репозитория (итоговая проверка
+ * 25.09, D4). Ворота выше смотрят на каталог прогона, а группа из своей копии
+ * писала абсолютным путём в `.agent/` основной — мимо карточки, в дерево,
+ * которое обязано оставаться витриной на main.
+ *
+ * Возвращает корень основной копии, если вызов пишет в неё, иначе `undefined`:
+ * прогон и так в основной копии (там решают ворота выше), каталог не копия
+ * git, правка внутри своей копии. Путь берётся из поля инструмента правки; у
+ * оболочки — грубо, по вхождению пути основной копии в команду (путь своей
+ * копии, если она лежит внутри основной, из команды сперва вычёркивается).
+ */
+export function mainCopyTargetOf(
+  cwd: string,
+  toolName: string,
+  input: unknown,
+): string | undefined {
+  if (!isWritingCall(toolName, input)) return undefined;
+  const gitDir = gitSync(cwd, ['rev-parse', '--absolute-git-dir']);
+  const common = gitSync(cwd, ['rev-parse', '--path-format=absolute', '--git-common-dir']);
+  if (!gitDir || !common || normalize(gitDir) === normalize(common)) return undefined;
+  // Общий каталог копии — `<основная>/.git`; у голого репозитория основной копии нет.
+  if (!normalize(common).endsWith('/.git')) return undefined;
+  const mainRoot = dirname(common.trim());
+  if (SHELL_TOOL_NAMES.has(toolName.toLowerCase())) {
+    const variants = (path: string): string[] => {
+      const slashed = normalize(path);
+      return [slashed, slashed.split('/').join('\\')];
+    };
+    let command = commandOf(input).toLowerCase();
+    for (const own of [...variants(cwd), ...variants(realOf(cwd))]) {
+      command = command.split(own).join(' ');
+    }
+    const roots = [...variants(mainRoot), ...variants(realOf(mainRoot))];
+    return roots.some((root) => command.includes(root)) ? mainRoot : undefined;
+  }
+  const target = targetPathOf(input);
+  if (!target) return undefined;
+  const absolute = isAbsolute(target) ? target : resolve(cwd, target);
+  return isInside(absolute, mainRoot) && !isInside(absolute, cwd) ? mainRoot : undefined;
+}
+
+/** Отказ правке из копии в основную копию: куда писать вместо неё. */
+export function outsideCopyDenial(cwd: string, mainRoot: string): string {
+  return `Правка не применена: файл лежит в основной копии проекта ${mainRoot}, а ты работаешь в своей копии ${cwd}. Основная копия остаётся нетронутой — сделай ту же правку по такому же пути внутри ${cwd}.`;
 }
 
 /**
@@ -249,7 +351,9 @@ const TRANSLIT: Record<string, string> = {
  * лишь годное умолчание, которое переживёт `git check-ref-format`.
  */
 export function suggestBranchName(title: string | undefined, chatId: string): string {
-  const slug = [...(title ?? '').toLowerCase()]
+  // Ссылка — не название: задание, начатое адресом из трекера, давало ветку
+  // `agent/https-tracker-example-com-brows-…`. Ключ задачи из ссылки остаётся.
+  const slug = [...withoutLinks(title ?? '').toLowerCase()]
     .map((char) => TRANSLIT[char] ?? char)
     .join('')
     .replace(/[^a-z0-9]+/g, '-')

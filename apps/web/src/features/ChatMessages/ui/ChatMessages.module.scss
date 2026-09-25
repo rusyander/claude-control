@@ -382,6 +382,14 @@
   margin-bottom: var(--spacing-3xs);
 }
 
+// Полоса запросов детей над хабом: отделена от строк хаба снизу, чтобы
+// карточки не читались как часть строки группы.
+.childAsks {
+  margin-bottom: var(--spacing-sm);
+  padding-bottom: var(--spacing-xs);
+  border-bottom: 1px solid var(--color-border);
+}
+
 .questionItem + .questionItem {
   margin-top: var(--spacing-md);
   padding-top: var(--spacing-md);

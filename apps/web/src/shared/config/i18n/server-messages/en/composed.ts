@@ -128,6 +128,41 @@ export const composedEn: Record<ComposedMessageCode, string> = {
     'The triage was cut short by a panel restart and will never give a result. Start the group as proposed? Your answer rides into its task.',
   'split-triage-interrupted-notice':
     'The triage was cut short by a panel restart — there will be no result. Groups waiting for your answer: {{groups}}; they will not start by themselves.',
+  'split-groups-interrupted-notice':
+    'Group processes were cut short mid-turn: {{groups}}. The panel resumes them itself with a state rebuild (resumed: {{resumed}}); the rest wait for the «Resume» button in the hub.',
   'child-tell-notice':
     'The parent wrote to its groups. Delivered: {{sent}} · queued until their turn ends: {{queued}} · not delivered (the group has no chat or copy): {{refused}}.',
+  'split-limit-wait-notice':
+    'Split groups hit the subscription limit and wait for its reset at {{until}}: they resume by themselves, and the queue does not start until then.',
+  'split-limit-warning-notice':
+    'The subscription limit is running low: new split groups do not start until its reset at {{until}}, running groups keep working.',
+  'split-delivery-description-unchecked-notice':
+    'Group «{{group}}»: the panel did not check the description of MR {{mr}} — the MR cannot be read (the forge integration is off or there is no token). Check the description yourself.',
+  'split-mr-watch-limit-notice':
+    'Group «{{group}}»: the MR watcher for {{mr}} has resumed it {{resumes}} times and stops resuming it by itself — new reviewer threads and pipeline failures wait for you.',
+  'split-default-drift-notice':
+    'Group «{{group}}»: {{target}} moved ahead and touched its files ({{count}}): {{files}}. The panel leaves the branch alone mid-work — the delivery rebase moves it.',
+  'split-group-run-not-started': 'the run did not start',
+  'split-group-chain-failed': 'the chain ended with an error or a stop',
+  'split-group-plan-cancelled': 'the plan was cancelled by a human',
+  'split-delivery-unverifiable':
+    'delivery cannot be checked: the remote did not answer {{checks}} times in a row ({{reason}})',
+  'split-delivery-local-failed':
+    'delivery cannot be checked: the group copy cannot be read ({{reason}})',
+  'split-delivery-incomplete': 'delivery not completed: {{missing}}',
+  'split-delivery-incomplete-2': 'delivery not completed: {{first}}; {{second}}',
+  'split-delivery-incomplete-3': 'delivery not completed: {{first}}; {{second}}; {{third}}',
+  'split-delivery-remote-down':
+    'the remote is unreachable since {{since}}: the panel checks it every {{minutes}} min and resumes the group once it answers ({{reason}})',
+  'split-delivery-remote-silent': 'the remote did not answer: {{reason}}',
+  'delivery-gap-dirty': 'uncommitted changes: {{files}}',
+  'delivery-gap-dirty-more': 'uncommitted changes: {{files}} and {{more}} more',
+  'delivery-gap-not-pushed':
+    'branch {{branch}} is not pushed to the remote (or lags behind the copy HEAD)',
+  'delivery-gap-no-mr': 'no MR whose head is the copy HEAD (branch {{branch}})',
+  'delivery-gap-review-unfinished': 'the work review is not finished: there is no reviewer verdict',
+  'delivery-gap-fix-missing':
+    'review findings ({{count}}) are not fixed: the fix stage did not run after the review',
+  'delivery-gap-mr-description': 'MR {{mr}} has an empty description',
+  'delivery-gap-no-copy': 'the group has no copy',
 };

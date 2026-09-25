@@ -11,7 +11,7 @@ import { useT } from '../../shared/config/i18n';
 import { Field, Mono, Row } from '../../shared/ui';
 import { colors, font, radius, space } from '../../shared/config/theme';
 import { runPlanConsumer, runPlanView, usePlatformRunPlan } from '../../entities/platform/api';
-import { useChats } from '../../entities/chat/api';
+import { shownAutoMode, useChatAutoMode, useChats } from '../../entities/chat/api';
 import type { ImageModeState } from './useImageMode';
 
 /**
@@ -31,7 +31,11 @@ const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'] as const;
 export interface ComposerValue {
   text: string;
   allowEdits: boolean;
-  autoApprove: boolean;
+  /**
+   * Авторежим прав, выбранный в этом чате. Не тронут — не шлётся вовсе, и сервер
+   * берёт выбор чата или глобальную настройку панели (включена из коробки).
+   */
+  autoApprove?: boolean;
   model: string;
   effort: string;
   files: Upload[];
@@ -46,6 +50,7 @@ export function Composer({
   busy,
   image,
   chatId,
+  sessionId,
 }: {
   value: ComposerValue;
   onChange: (next: ComposerValue) => void;
@@ -57,10 +62,14 @@ export function Composer({
   image?: ImageModeState;
   /** Этот разговор: по нему решается, каким потребителем спрашивать маршрут. */
   chatId: string;
+  /** Настоящий id разговора, когда он уже известен: выбор авторежима записан и под ним. */
+  sessionId?: string | undefined;
 }) {
   const t = useT();
   const [open, setOpen] = useState(false);
   const [refused, setRefused] = useState('');
+  const autoModeView = useChatAutoMode(chatId, sessionId);
+  const autoMode = shownAutoMode(value.autoApprove, autoModeView.data);
   const catalog = useQuery({
     queryKey: ['models'],
     queryFn: () => api.get<ModelCatalogResponse>('/models'),
@@ -156,8 +165,8 @@ export function Composer({
             />
             <Toggle
               label={t.composer.autoApprove}
-              on={value.autoApprove}
-              onPress={() => onChange({ ...value, autoApprove: !value.autoApprove })}
+              on={autoMode}
+              onPress={() => onChange({ ...value, autoApprove: !autoMode })}
             />
           </Row>
 

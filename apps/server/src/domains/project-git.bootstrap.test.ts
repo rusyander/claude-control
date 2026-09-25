@@ -3,7 +3,12 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { WorktreeBootstraps, bootstrapCommandFor, detectBootstrapCommand } from './project-git.ts';
+import {
+  WorktreeBootstraps,
+  bootstrapPlanFor,
+  detectBootstrapPlan,
+  isHeavyPlan,
+} from './project-git.ts';
 import { logTail } from './project-git/bootstrap.ts';
 import { parseChurn, revertLockfileChurn } from './project-git/lockfiles.ts';
 
@@ -23,7 +28,14 @@ function dropTemp(target: string): void {
 
 const NODE = process.execPath.includes(' ') ? `"${process.execPath}"` : process.execPath;
 
-describe('detectBootstrapCommand: по lock-файлу в корне и на первом уровне', () => {
+const NPM_CI = 'npm ci --prefer-offline --no-audit --no-fund';
+const PNPM_I = 'pnpm install --frozen-lockfile --prefer-offline';
+
+function writeJson(path: string, value: unknown): void {
+  writeFileSync(path, JSON.stringify(value));
+}
+
+describe('detectBootstrapPlan: по lock-файлу в корне и на первом уровне', () => {
   let dir: string;
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), 'cc-boot-detect-'));
@@ -31,25 +43,24 @@ describe('detectBootstrapCommand: по lock-файлу в корне и на п�
   afterEach(() => dropTemp(dir));
 
   it('pnpm / npm / yarn — своя команда, без lock-файла — ничего', () => {
-    expect(detectBootstrapCommand(dir)).toBeUndefined();
+    expect(detectBootstrapPlan(dir)).toBeUndefined();
     writeFileSync(join(dir, 'yarn.lock'), '');
-    expect(detectBootstrapCommand(dir)).toBe('yarn install --immutable');
+    expect(detectBootstrapPlan(dir)?.summary).toBe('yarn install --immutable');
     writeFileSync(join(dir, 'package-lock.json'), '{}');
-    expect(detectBootstrapCommand(dir)).toBe('npm ci');
+    expect(detectBootstrapPlan(dir)?.summary).toBe(NPM_CI);
     writeFileSync(join(dir, 'pnpm-lock.yaml'), '');
-    expect(detectBootstrapCommand(dir)).toBe('pnpm install --frozen-lockfile --prefer-offline');
+    expect(detectBootstrapPlan(dir)?.summary).toBe(PNPM_I);
+    expect(isHeavyPlan(detectBootstrapPlan(dir))).toBe(false);
   });
 
   it('настроенная команда сильнее автоопределения, пустая — «определи сама»', () => {
     writeFileSync(join(dir, 'pnpm-lock.yaml'), '');
-    expect(bootstrapCommandFor(dir, '  make setup  ')).toBe('make setup');
-    expect(bootstrapCommandFor(dir, '   ')).toBe('pnpm install --frozen-lockfile --prefer-offline');
-    expect(bootstrapCommandFor(dir, undefined)).toBe(
-      'pnpm install --frozen-lockfile --prefer-offline',
-    );
+    expect(bootstrapPlanFor(dir, '  make setup  ')?.summary).toBe('make setup');
+    expect(bootstrapPlanFor(dir, '   ')?.summary).toBe(PNPM_I);
+    expect(bootstrapPlanFor(dir, undefined)?.summary).toBe(PNPM_I);
   });
 
-  it('в корне нет — каталоги первого уровня по алфавиту, служебные мимо (Д13)', () => {
+  it('в корне нет — по цепочке на каталог первого уровня, служебные мимо (Д13)', () => {
     mkdirSync(join(dir, 'web'));
     writeFileSync(join(dir, 'web', 'pnpm-lock.yaml'), '');
     mkdirSync(join(dir, 'admin'));
@@ -62,36 +73,170 @@ describe('detectBootstrapCommand: по lock-файлу в корне и на п�
     mkdirSync(join(dir, 'web', 'deep'));
     writeFileSync(join(dir, 'web', 'deep', 'yarn.lock'), '');
 
-    expect(detectBootstrapCommand(dir)).toBe(
-      'cd "admin" && npm ci && cd .. && ' +
-        'cd "web" && pnpm install --frozen-lockfile --prefer-offline && cd ..',
-    );
+    const plan = detectBootstrapPlan(dir);
+    expect(plan?.chains.map((chain) => chain.cwd)).toEqual(['admin', 'web']);
+    expect(plan?.summary).toBe(`[admin] ${NPM_CI} · [web] ${PNPM_I}`);
+    expect(isHeavyPlan(plan)).toBe(true);
     // Lock-файл в корне сильнее вложенных: корень — это и есть проект.
     writeFileSync(join(dir, 'yarn.lock'), '');
-    expect(detectBootstrapCommand(dir)).toBe('yarn install --immutable');
+    expect(detectBootstrapPlan(dir)?.summary).toBe('yarn install --immutable');
   });
 
-  it('вложенная команда настоящей оболочкой проходит оба каталога и возвращается', async () => {
+  it('локальная библиотека с несобранным входом собирается, соседи её ждут', () => {
+    for (const name of ['lib', 'app', 'e2e', 'web']) {
+      mkdirSync(join(dir, name));
+      writeFileSync(join(dir, name, name === 'web' ? 'pnpm-lock.yaml' : 'package-lock.json'), '{}');
+    }
+    writeJson(join(dir, 'lib', 'package.json'), {
+      exports: {
+        '.': { types: './dist/index.d.ts', import: './dist/index.js' },
+        './x/*': './dist/*',
+      },
+      scripts: { build: 'vite build' },
+    });
+    writeJson(join(dir, 'app', 'package.json'), {
+      dependencies: { lib: 'file:../lib', outside: 'file:../../elsewhere', react: '^18' },
+    });
+    writeJson(join(dir, 'web', 'package.json'), { dependencies: { lib: 'link:../lib' } });
+    writeJson(join(dir, 'e2e', 'package.json'), { devDependencies: {} });
+
+    const plan = detectBootstrapPlan(dir);
+    const byDir = Object.fromEntries((plan?.chains ?? []).map((chain) => [chain.cwd, chain]));
+    expect(byDir.lib?.steps.map((step) => step.command)).toEqual([NPM_CI, 'npm run build']);
+    // Собираемая — первой; npm-сосед не ждёт (ставит ссылку), pnpm-сосед ждёт (кладёт копию).
+    expect(plan?.chains[0]?.cwd).toBe('lib');
+    expect(byDir.app?.after).toEqual([]);
+    expect(byDir.web?.after).toEqual(['lib']);
+    expect(byDir.app?.steps).toHaveLength(1);
+    expect(byDir.e2e?.after).toEqual([]);
+
+    // Вход собран (как в основной копии) — сборки нет, ждать некого.
+    mkdirSync(join(dir, 'lib', 'dist'));
+    writeFileSync(join(dir, 'lib', 'dist', 'index.d.ts'), '');
+    writeFileSync(join(dir, 'lib', 'dist', 'index.js'), '');
+    const built = detectBootstrapPlan(dir);
+    expect(built?.chains.find((chain) => chain.cwd === 'lib')?.steps).toHaveLength(1);
+    expect(built?.chains.find((chain) => chain.cwd === 'web')?.after).toEqual([]);
+  });
+
+  /**
+   * Живой прогон 24.09.2026: сводка подготовки считалась по ОСНОВНОЙ копии, где
+   * `dist` общей библиотеки собран руками, — сборка из плана пропадала, хотя в
+   * свежую копию `dist` не приезжает (он в `.gitignore`). Репозиторий настоящий:
+   * вопрос именно в том, что git отдаст копии.
+   */
+  it('основная копия с собранным, но не отслеживаемым входом — план как у свежей копии', () => {
+    const git = (...args: string[]): string =>
+      execFileSync('git', args, { cwd: dir, encoding: 'utf8' });
+    for (const name of ['lib', 'app']) {
+      mkdirSync(join(dir, name));
+      writeFileSync(join(dir, name, 'package-lock.json'), '{}');
+    }
+    writeJson(join(dir, 'lib', 'package.json'), {
+      exports: { '.': { types: './dist/index.d.ts', import: './dist/index.js' } },
+      scripts: { build: 'vite build' },
+    });
+    writeJson(join(dir, 'app', 'package.json'), { dependencies: { lib: 'file:../lib' } });
+    writeFileSync(join(dir, '.gitignore'), 'dist/\n');
+    git('init', '-b', 'main');
+    git('config', 'user.email', 'probe@example.com');
+    git('config', 'user.name', 'probe');
+    git('add', '.');
+    git('commit', '-m', 'init');
+    mkdirSync(join(dir, 'lib', 'dist'));
+    writeFileSync(join(dir, 'lib', 'dist', 'index.d.ts'), '');
+    writeFileSync(join(dir, 'lib', 'dist', 'index.js'), '');
+
+    const plan = detectBootstrapPlan(dir);
+    expect(plan?.chains.find((chain) => chain.cwd === 'lib')?.steps.map((s) => s.command)).toEqual([
+      NPM_CI,
+      'npm run build',
+    ]);
+    expect(plan?.summary).toContain(
+      '[lib] npm ci --prefer-offline --no-audit --no-fund && npm run build',
+    );
+    expect(isHeavyPlan(plan)).toBe(true);
+
+    // Вход закоммичен — копия получит его из git, собирать нечего.
+    writeFileSync(join(dir, '.gitignore'), '');
+    git('add', '.');
+    git('commit', '-m', 'dist in git');
+    expect(
+      detectBootstrapPlan(dir)?.chains.find((chain) => chain.cwd === 'lib')?.steps,
+    ).toHaveLength(1);
+  });
+});
+
+describe('WorktreeBootstraps.run: план настоящими процессами', () => {
+  let dir: string;
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'cc-boot-plan-'));
     mkdirSync(join(dir, 'a'));
-    writeFileSync(join(dir, 'a', 'package-lock.json'), '{}');
     mkdirSync(join(dir, 'b'));
-    writeFileSync(join(dir, 'b', 'package-lock.json'), '{}');
-    // Та же строка, но вместо `npm ci` — отметка в текущем каталоге: так видно,
-    // что `cd` дошёл до каждого, а хвост `cd ..` вернул в корень.
-    const command = (detectBootstrapCommand(dir) ?? '').replaceAll(
-      'npm ci',
-      `${NODE} -e "require('fs').writeFileSync('ran','')"`,
+    mkdirSync(join(dir, 'c'));
+  });
+  afterEach(() => dropTemp(dir));
+
+  const node = (code: string): string => `${NODE} -e "${code}"`;
+  // Ждёт файл до 8 с и падает, если не дождался: так видно, что цепочки шли РАЗОМ.
+  const waitFor = (file: string): string =>
+    node(
+      `const f=require('fs');const t=Date.now();(function w(){if(f.existsSync('${file}'))process.exit(0);if(Date.now()-t>8000)process.exit(7);setTimeout(w,50)})()`,
     );
-    const runner = new WorktreeBootstraps(join(dir, '.logs'), { timeoutMs: 20_000 });
-    const state = await runner.run(
-      dir,
-      `${command} && ${NODE} -e "require('fs').writeFileSync('back','')"`,
-    );
+  const touch = (file: string): string => node(`require('fs').writeFileSync('${file}','')`);
+  const step = (cwd: string, command: string) => ({ cwd, command });
+
+  it('цепочки идут параллельно, зависимая ждёт свою, каждая в своём каталоге', async () => {
+    const runner = new WorktreeBootstraps(join(dir, '.logs'), { timeoutMs: 30_000 });
+    const state = await runner.run(dir, {
+      summary: 'plan',
+      chains: [
+        // a ждёт отметку b: без параллельного запуска упала бы по таймауту ожидания.
+        {
+          cwd: 'a',
+          steps: [step('a', waitFor('../b/started')), step('a', touch('done'))],
+          after: [],
+        },
+        {
+          cwd: 'b',
+          steps: [step('b', touch('started')), step('b', waitFor('../a/done'))],
+          after: [],
+        },
+        // c стартует только после a: отметка a уже должна лежать.
+        {
+          cwd: 'c',
+          steps: [step('c', node(`process.exit(require('fs').existsSync('../a/done')?0:9)`))],
+          after: ['a'],
+        },
+      ],
+    });
 
     expect(state.status).toBe('ok');
-    expect(existsSync(join(dir, 'a', 'ran'))).toBe(true);
-    expect(existsSync(join(dir, 'b', 'ran'))).toBe(true);
-    expect(existsSync(join(dir, 'back'))).toBe(true);
+    expect(state.exitCode).toBe(0);
+    expect(state.command).toBe('plan');
+    const log = runner.log(dir);
+    expect(log).toContain('[a] $ ');
+    expect(log).toContain('[c] ');
+  });
+
+  it('провал шага: код в состоянии, хвост цепочки пропущен, соседняя доходит', async () => {
+    const runner = new WorktreeBootstraps(join(dir, '.logs'), { timeoutMs: 30_000 });
+    const state = await runner.run(dir, {
+      summary: 'plan',
+      chains: [
+        {
+          cwd: 'a',
+          steps: [step('a', node('process.exit(4)')), step('a', touch('after-fail'))],
+          after: [],
+        },
+        { cwd: 'b', steps: [step('b', touch('ok'))], after: ['a'] },
+      ],
+    });
+
+    expect(state.status).toBe('failed');
+    expect(state.exitCode).toBe(4);
+    expect(existsSync(join(dir, 'a', 'after-fail'))).toBe(false);
+    expect(existsSync(join(dir, 'b', 'ok'))).toBe(true);
   });
 });
 

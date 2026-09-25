@@ -34,3 +34,4 @@ export { runStatus, aggregateStatus, statusTone, isLive, STALL_MS } from './stat
 export type { RunStatus } from './status';
 export { selectActiveRuns, countRunning } from './selectors';
 export type { ActiveRunView, RunLike } from './selectors';
+export { startActivePoll } from './agent-runs.poll';

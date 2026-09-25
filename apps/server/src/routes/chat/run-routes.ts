@@ -1,11 +1,13 @@
+import { randomUUID } from 'node:crypto';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import type { ServerContext } from '../../context.ts';
 import type { ServerMessageCode, ServerMessageParams } from '@agentdeck/contracts/server-messages';
 import { initiativePrompt, QUESTION_DENIED } from '../../domains/chat/initiative.ts';
+import { childAppendPrompt } from '../../domains/chat/ChatCascadeStages.ts';
 import type { ChatRunRegistry } from '../../domains/chat/ChatRunRegistry.ts';
 import { RUN_UNKNOWN_DENIED } from '../../domains/chat/run-ledger.ts';
 import { ChatSession } from '../../domains/chat/ChatSession.ts';
-import { apiTokenPath } from '../../lib/api-token.ts';
+import { apiTokenPath, readApiToken } from '../../lib/api-token.ts';
 import { shouldAutoApprove, isReadOnlyTool } from '../../domains/chat/auto-approve.ts';
 import {
   BRANCH_GATE_STOPPED,
@@ -14,12 +16,19 @@ import {
   branchMovedDenial,
   isMainWorkingCopy,
   isWritingCall,
+  mainCopyTargetOf,
+  outsideCopyDenial,
   suggestBranchName,
 } from '../../domains/chat/ChatBranchGate.ts';
-import { addWorktree, GitError } from '../../domains/project-git.ts';
+import { addWorktree, chatDeliveryFor, GitError } from '../../domains/project-git.ts';
 import { createGuardedPatternsReader } from '../../domains/permissions.ts';
 import { chatDirectory } from '../../domains/chat/ChatArtifacts.ts';
-import { resolveWorkspace, permissionModeFor } from '../../domains/chat/ChatWorkspace.ts';
+import { findTranscript } from '../../domains/chat/ChatTranscriptFile.ts';
+import {
+  AUTONOMOUS_PERMISSION_MODE,
+  resolveWorkspace,
+  permissionModeFor,
+} from '../../domains/chat/ChatWorkspace.ts';
 import {
   saveUpload,
   isSupportedUpload,
@@ -35,12 +44,25 @@ import {
 import { cascadeCeilingFor, expandAssignedModel } from '../../domains/model-cascade.ts';
 import { loweredWorkPrompt } from '@agentdeck/contracts/model-cascade';
 import { activeCliCommand } from '../../providers/cli.ts';
-import { getActiveProvider } from '../../providers/registry.ts';
+import { getActiveProvider, getActiveProviderId } from '../../providers/registry.ts';
+import { supportsCliAutoMode } from '../../providers/auto-mode.ts';
+import type { ChatAutoModeView } from '@agentdeck/contracts';
 import { estimateCost } from '../../domains/analytics/pricing.ts';
 import { projectsDir, validTargetCwd } from './paths.ts';
 import { streamRun, streamGone } from '../../domains/chat/ChatStream.ts';
+import {
+  QUEUED_SEND_HEADER,
+  QueuedSendJournal,
+  queueAfterRun,
+  type QueuedSend,
+} from '../../domains/chat/busy-send-queue.ts';
 import { parseBody } from '../../lib/request-body.ts';
 import { allowedPermissionRules } from '@agentdeck/contracts/permission-rules';
+import {
+  groupAutoApproveFor,
+  groupDecision,
+  recordGroupAutoNotice,
+} from '../../domains/chat/group-permissions.ts';
 import {
   autoApproveBodySchema,
   branchDecisionBodySchema,
@@ -118,6 +140,62 @@ export function registerChatRunRoutes(
   // Адрес, по которому мини-MCP-сервер прав стучится за решением пользователя.
   const selfBaseUrl = `http://127.0.0.1:${process.env.PORT ?? 5178}`;
 
+  // Очередь сообщений занятому разговору — на диске: перезапуск панели не
+  // должен молча терять ответ, о котором вкладка уже сказала «в очереди» (m7).
+  const queuedSends = new QueuedSendJournal(ctx.location.paths.appData);
+  /** Отправить сообщение из очереди тем же маршрутом — со всеми его проверками. */
+  const sendQueued = (entry: QueuedSend, authorization?: string): void => {
+    queuedSends.remove(entry.id);
+    // После перезапуска заголовка человека нет — нужен свой токен, если он включён.
+    const auth =
+      authorization ??
+      (ctx.store.getSettings().remoteAccess.enabled ? `Bearer ${readApiToken()}` : undefined);
+    app
+      .inject({
+        method: 'POST',
+        url: '/api/chat/send',
+        headers: { ...(auth ? { authorization: auth } : {}), [QUEUED_SEND_HEADER]: '1' },
+        payload: entry.body as Record<string, unknown>,
+      })
+      .then((sent) => {
+        if (sent.statusCode >= 300) {
+          app.log.warn({ chatId: entry.chatId, status: sent.statusCode }, 'queued send refused');
+        }
+      })
+      .catch((error: unknown) =>
+        app.log.warn({ err: error, chatId: entry.chatId }, 'queued send failed'),
+      );
+  };
+  const sendAfterRun = (entry: QueuedSend, runId: string, authorization?: string): void =>
+    queueAfterRun(
+      registry,
+      runId,
+      () => sendQueued(entry, authorization),
+      undefined,
+      () => {
+        queuedSends.remove(entry.id);
+        app.log.warn({ chatId: entry.chatId }, 'queued send dropped: run stopped');
+      },
+    );
+  // Оставшееся от прежнего процесса — после готовности сервера: усыновление
+  // прогонов из журнала к этому моменту уже прошло (`createRuntime`), и занятый
+  // разговор отличается от свободного честно.
+  app.addHook('onReady', async () => {
+    const pending = queuedSends.all();
+    if (pending.length === 0) return;
+    setTimeout(() => {
+      for (const entry of pending) {
+        const raw = (entry.body as { sessionId?: unknown } | null)?.sessionId;
+        const sessionId = typeof raw === 'string' ? raw : undefined;
+        if (registry.isRunning(entry.chatId, sessionId)) {
+          sendAfterRun(entry, registry.resolveKey(entry.chatId, sessionId));
+        } else {
+          sendQueued(entry);
+        }
+      }
+    }, 0);
+  });
+
   // Форма тела — схема в contracts (`chatSendBodySchema`), там же и смысл полей.
   app.post<{ Body: unknown }>(
     '/api/chat/send',
@@ -155,8 +233,23 @@ export function registerChatRunRoutes(
       // назад и текст ответа, и кнопку «Остановить». Без этого человек упирался в
       // отказ, которому нечего противопоставить, кроме перезагрузки страницы.
       if (registry.isRunning(chatId, sessionId)) {
+        const runId = registry.resolveKey(chatId, sessionId);
+        // Просили не отказывать (ответ из хаба ребёнку, чей прогон вкладка не
+        // знает): сообщение ждёт конца хода на сервере и уходит тем же маршрутом
+        // — со всеми его проверками, — а не теряется в 409.
+        if (body.queueIfBusy) {
+          const entry: QueuedSend = {
+            id: randomUUID(),
+            chatId,
+            body,
+            queuedAt: new Date().toISOString(),
+          };
+          queuedSends.add(entry);
+          sendAfterRun(entry, runId, request.headers.authorization);
+          return reply.code(202).send({ queued: true, runId });
+        }
         return refuse(reply, 409, 'run_busy', RUN_BUSY_MESSAGE, {
-          runId: registry.resolveKey(chatId, sessionId),
+          runId,
           messageCode: 'run-busy',
         });
       }
@@ -190,6 +283,26 @@ export function registerChatRunRoutes(
             messageCode: 'run-unsupported-upload',
             params: { names: names.join(', '), supported: SUPPORTED_UPLOAD_EXTENSIONS.join(', ') },
           },
+        );
+      }
+
+      // `sessionId` — обещание продолжить ЕСТЬ разговор. Без транскрипта
+      // продолжать нечего, а молчаливый запуск стоил дорого: живой прогон
+      // 24.09.2026 — отправка с `sessionId: ".jsonl"` в чат группы завела под тем
+      // же chatId СВЕЖУЮ сессию без истории, а UUID без транскрипта кончался
+      // голым «Запрос не выполнен». Имя проверяется целиком, а не после чистки:
+      // поиск транскрипта выбрасывает лишние знаки и нашёл бы чужой разговор.
+      // Пустая строка — «сессии нет», как и раньше: CLI её тоже не продолжает.
+      if (
+        sessionId &&
+        !(/^[A-Za-z0-9-]+$/.test(sessionId) && findTranscript(projectsDir(ctx), sessionId))
+      ) {
+        return refuse(
+          reply,
+          404,
+          'session_unknown',
+          `Разговор ${sessionId} не найден: транскрипта с таким sessionId нет. Сообщение не отправлено — новый разговор без sessionId начинается отдельно.`,
+          { sessionId, messageCode: 'run-session-unknown', params: { sessionId } },
         );
       }
 
@@ -275,12 +388,25 @@ export function registerChatRunRoutes(
       const uploadDir = workspace.isSandbox ? cwd : chatDirectory(chatId);
       const saved = (files ?? []).map((file) => saveUpload(uploadDir, file.name, file.base64));
 
-      // Автоподтверждение — на этот прогон.
+      // Авторежим этого чата (владелец, 24.09.2026). Выбор человека в чате —
+      // поле отправки или тумблер, запомненный сервером, — сильнее глобальной
+      // `chatAutoMode` в обе стороны; не выбирал — чат идёт за ней. Тот же
+      // авторежим включает и автоподтверждение панели: у моделей без авторежима
+      // CLI (haiku, чужие CLI) рутину снимает именно оно, а безвозвратное и
+      // правила `ask`/`deny` по-прежнему уходят человеку (`auto-approve.ts`).
+      if (autoApproveRequested !== undefined) {
+        session.setAutoModeOverride(chatId, autoApproveRequested);
+      }
+      const autoOverride = autoApproveRequested ?? session.autoModeOverride(chatId, sessionId);
+      const autoMode = autoOverride ?? ctx.store.getSettings().chatAutoMode;
       session.armAutoApprove(chatId, {
-        enabled: autoApproveRequested === true,
+        enabled: autoMode,
         // «Только чтение» — это выключенный тумблер правок в настоящем проекте;
         // в песочнице и при полном доступе правки разрешены всегда.
         allowEdits: workspace.isSandbox || allowEdits === true || fullAccess === true,
+        // Положение из глобальной настройки — не решение человека в этом чате:
+        // строки вкладки «Группы» ему не уступают, как и тумблеру родителя.
+        ...(autoOverride === undefined ? { inherited: true as const } : {}),
       });
 
       // Что назначено ЭТОМУ чату при разделении. Ключей у разговора два —
@@ -297,9 +423,14 @@ export function registerChatRunRoutes(
         cwd,
         { model, effort },
       );
+      // Доставка до MR — обычному чату проекта; ребёнок разделения получает её
+      // заданием группы, а песочнице доставлять некуда.
+      const delivery =
+        workspace.isSandbox || assigned ? undefined : chatDeliveryFor(ctx.store, cwd);
       const initiative = initiativePrompt(ctx.store.getSettings(), {
         splitMuted: registry.isSplitMuted(chatId),
         ...(ceiling ? { cascade: ceiling } : {}),
+        ...(delivery ? { delivery } : {}),
       });
 
       // Веер ручного параллельного запуска, отправленный ступенью НИЖЕ потолка
@@ -307,10 +438,15 @@ export function registerChatRunRoutes(
       // задании сказано прямо: конвейер «работа → ревью → фикс» живёт на связи
       // разделения и на копии ветки, а прогоны веера идут в настоящих проектах,
       // где ни того, ни другого нет. Обещать ревью значило бы соврать агенту.
+      // Чат группы разделения получает дописку своего звена, а не обычного
+      // разговора (`childAppendPrompt`): ответ человека в него — тот же ход
+      // группы, и делить его дальше не предлагается.
       const appendSystemPrompt =
-        [initiative ?? '', lowered ? loweredWorkPrompt(undefined, { review: false }) : '']
-          .filter(Boolean)
-          .join(' ') || undefined;
+        (assigned && !workspace.isSandbox
+          ? childAppendPrompt(assigned, ctx.store.getSettings())
+          : [initiative ?? '', lowered ? loweredWorkPrompt(undefined, { review: false }) : '']
+              .filter(Boolean)
+              .join(' ')) || undefined;
 
       // Ступень лестницы приходит алиасом, а алиас CLI — это «рекомендованная
       // модель уровня», не последняя в семействе: `--model sonnet` уводил прогон
@@ -353,6 +489,13 @@ export function registerChatRunRoutes(
       const origin =
         assigned || (parentChatId && parentChatId !== chatId) ? ('groups' as const) : undefined;
 
+      // Авторежим CLI — только там, где он есть: haiku CLI молча опускает до
+      // `default`, и прогон спрашивал бы даже правку файла. Таким — `acceptEdits`
+      // плюс автоподтверждение панели, взведённое выше.
+      const cliAutoMode =
+        autoMode &&
+        supportsCliAutoMode(getActiveProviderId(ctx.store), runModel || assigned?.model);
+
       // Запускаем прогон в реестре и подключаемся к нему потоком. Обрыв этого
       // соединения агента не тронет.
       const started = registry.start(
@@ -380,9 +523,15 @@ export function registerChatRunRoutes(
           ...(appendSystemPrompt ? { appendSystemPrompt } : {}),
           // Полный доступ снимает все проверки прав — по кнопке «Разрешить и
           // продолжить» у агента, вставшего из-за отсутствия разрешения.
+          // Чат дерева разделения с правом правок идёт в авторежиме, как и его
+          // запуск (`split-launch.ts`): иначе ответ человека в чате группы
+          // продолжал её в `acceptEdits`, и она вставала на карточке прав, которой
+          // человек не видит (живой прогон 24.09.2026).
           permissionMode: fullAccess
             ? 'bypassPermissions'
-            : permissionModeFor(workspace, allowEdits),
+            : allowEdits && (assigned?.parentChatId || origin)
+              ? AUTONOMOUS_PERMISSION_MODE
+              : permissionModeFor(workspace, allowEdits, cliAutoMode),
           // Интерактивные права: запрос на инструмент вне авторазрешённого уходит
           // человеку кнопкой в чате. При полном доступе прав не спрашивают, но
           // брокер всё равно подключается — через него же приезжает ВОПРОС агента
@@ -426,6 +575,11 @@ export function registerChatRunRoutes(
       const activationNotice = groupsActivatedNotice(activatedGroups);
       if (activationNotice) registry.emitExternal(chatId, activationNotice);
 
+      // Доставка из очереди сервера (`queueIfBusy`): поток читать некому —
+      // идущий прогон вкладки подхватят опросом.
+      if (request.headers[QUEUED_SEND_HEADER]) {
+        return reply.code(202).send({ started: true, runId: chatId });
+      }
       await streamRun(registry, reply, chatId, 0);
     },
   );
@@ -460,7 +614,8 @@ export function registerChatRunRoutes(
   app.post<{ Params: { chatId: string } }>('/api/chat/:chatId/stop', (request) => {
     // Заодно отклоняем висящие запросы прав — иначе агент ждал бы решения зря.
     session.abort(request.params.chatId);
-    return { ok: registry.stop(request.params.chatId) };
+    // «Стоп» человека: группа разделения встаёт на паузу (журнал 89c).
+    return { ok: registry.stopByHuman(request.params.chatId) };
   });
 
   /**
@@ -477,6 +632,24 @@ export function registerChatRunRoutes(
       if (body === undefined && reply.sent) return reply;
       session.toggleAutoApprove(request.params.chatId, body?.enabled === true);
       return { ok: true };
+    },
+  );
+
+  /**
+   * Авторежим прав чата: что действует, выбирал ли его человек в этом чате и
+   * что стоит глобально. По нему меню чата показывает тумблер — выбор живёт на
+   * сервере, а не в браузере: прогоны чата заводит и панель, без вкладки.
+   */
+  app.get<{ Params: { chatId: string }; Querystring: { sessionId?: string } }>(
+    '/api/chat/:chatId/auto-mode',
+    (request): ChatAutoModeView => {
+      const global = ctx.store.getSettings().chatAutoMode;
+      const override = session.autoModeOverride(request.params.chatId, request.query.sessionId);
+      return {
+        enabled: override ?? global,
+        ...(override !== undefined ? { override } : {}),
+        global,
+      };
     },
   );
 
@@ -517,6 +690,15 @@ export function registerChatRunRoutes(
     // чаты проекта зависимыми друг от друга (`ChatBranchGate.ts`).
     const rules = allowedPermissionRules(ctx.store.getSettings().autoApproveRules);
     const held = registry.describe(runId);
+    // Прогона нет в реестре — ни живого, ни усыновлённого из журнала: ни обходом
+    // при старте (`bootstrap/runtime.ts`), ни поздним подхватом выше. Значит его
+    // процесс мёртв или записи о нём нет вовсе. Отказ — раньше любого
+    // автоподтверждения: с включённым по умолчанию авторежимом остановленный
+    // прогон иначе получал бы молчаливое «разрешено». Текст честный и с
+    // действием: он уезжает агенту результатом вызова и в транскрипт, откуда его
+    // видит лента. «Разговор не найден» здесь стояло 09.09.2026 на 24 отказах за
+    // секунду.
+    if (!held) return reply.send({ behavior: 'deny', message: RUN_UNKNOWN_DENIED });
     if (
       !rules.has('editInMainCopy') &&
       held &&
@@ -550,6 +732,18 @@ export function registerChatRunRoutes(
         return reply.send(decision);
       }
     }
+    // Прогон в своей копии пишет в основную (D4): карточка «завести копию» тут
+    // ни к чему — копия уже есть, — поэтому отказ с адресом, куда писать.
+    const intoMain =
+      !rules.has('editInMainCopy') && held
+        ? mainCopyTargetOf(held.options.cwd, toolName, input)
+        : undefined;
+    if (held && intoMain) {
+      return reply.send({
+        behavior: 'deny',
+        message: outsideCopyDenial(held.options.cwd, intoMain),
+      });
+    }
 
     // Автоподтверждение: обратимый запрос разрешаем молча, не показывая
     // карточку. Человеку остаётся безвозвратное (удаление, затирание истории,
@@ -561,7 +755,22 @@ export function registerChatRunRoutes(
     // отменять, а карточка на каждый открытый файл останавливала прогон чаще
     // всего остального вместе взятого.
     const auto = session.autoApproveFor(runId);
+    // Группа разделения решает по строкам вкладки «Группы» (`group-permissions.ts`):
+    // её ведёт конвейер, а не браузер. Уступают строки только тумблеру, который
+    // человек ВКЛЮЧИЛ в чате группы сам; унаследованный от родителя или
+    // выключенный (ответ из хаба шлёт его выключенным) — не в счёт.
+    const humanOn = auto?.enabled === true && auto.inherited !== true;
+    const group = humanOn ? undefined : groupAutoApproveFor(ctx.store, [runId, held?.key]);
+    const groupLevel = group
+      ? groupDecision(group, { toolName, input, guardedPatterns: guardedPatterns() })
+      : 'human';
+    if (group && groupLevel !== 'human') {
+      // «С отметкой»: прошло без человека, но хаб родителя это покажет.
+      if (groupLevel === 'notify') recordGroupAutoNotice(ctx.store, group, { toolName, input });
+      return reply.send({ behavior: 'allow', updatedInput: input });
+    }
     if (
+      !group &&
       (auto?.enabled || isReadOnlyTool(toolName)) &&
       shouldAutoApprove({
         toolName,
@@ -577,11 +786,7 @@ export function registerChatRunRoutes(
       return reply.send({ behavior: 'allow', updatedInput: input });
     }
 
-    // Прогона нет в реестре — ни живого, ни усыновлённого из журнала: ни обходом
-    // при старте (`bootstrap/runtime.ts`), ни поздним подхватом выше. Значит его
-    // процесс мёртв или записи о нём нет вовсе. Текст честный и с действием: он
-    // уезжает агенту результатом вызова и в транскрипт, откуда его видит лента.
-    // «Разговор не найден» здесь стояло 09.09.2026 на 24 отказах за секунду.
+    // Прогон мог уйти из реестра, пока шли проверки выше, — тот же отказ.
     const shown = registry.emitExternal(runId, { kind: 'permission', toolName, input, toolUseId });
     if (!shown) return reply.send({ behavior: 'deny', message: RUN_UNKNOWN_DENIED });
 

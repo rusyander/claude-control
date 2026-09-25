@@ -90,6 +90,28 @@ describe('маршруты чата: проекты и ФС', () => {
     });
   });
 
+  // Живой прогон 24.09 (находка 17): разбор шёл на xhigh, а шапка чата
+  // показывала «Высокая» из настроек — глубины разговора в списке не было.
+  it('GET /api/chats несёт глубину, назначенную разговору связью', async () => {
+    store.setChatLink('sess', {
+      parentChatId: 'parent',
+      effort: 'xhigh',
+      createdAt: '2026-07-18T10:00:00.000Z',
+    });
+
+    const chats = (await app.inject({ method: 'GET', url: '/api/chats' })).json<ChatSummary[]>();
+
+    expect(chats.find((chat) => chat.id === 'sess')?.effort).toBe('xhigh');
+  });
+
+  it('GET /api/chats без назначенной глубины поля не несёт', async () => {
+    store.setChatLink('sess', { parentChatId: 'parent', createdAt: '2026-07-18T10:00:00.000Z' });
+
+    const chats = (await app.inject({ method: 'GET', url: '/api/chats' })).json<ChatSummary[]>();
+
+    expect(chats.find((chat) => chat.id === 'sess')).not.toHaveProperty('effort');
+  });
+
   it('GET /api/chats/projects возвращает проект из истории', async () => {
     const res = await app.inject({ method: 'GET', url: '/api/chats/projects' });
     expect(res.statusCode).toBe(200);

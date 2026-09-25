@@ -6,7 +6,7 @@
   "description": "Локальный API поверх файлов конфигурации Claude Code",
   "main": "./src/index.ts",
   "scripts": {
-    "dev": "node --watch --experimental-strip-types src/index.ts",
+    "dev": "node src/lib/dev-watch.mjs",
     "start": "node --experimental-strip-types src/index.ts",
     "build": "tsc --noEmit",
     "type-check": "tsc --noEmit",

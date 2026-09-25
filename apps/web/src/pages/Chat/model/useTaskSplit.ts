@@ -2,11 +2,13 @@ import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import type { TaskSplitProposal } from '@agentdeck/contracts/task-split';
 import type { CascadeAssignment, CascadeCeiling } from '@agentdeck/contracts/model-cascade';
+import type { ChatTreeView } from '@agentdeck/contracts/chat-handoff';
 import { agentRuns } from '@shared/lib/agent-runs';
 import { saveDraft } from '@shared/lib/draft';
 import { toast } from '@shared/lib/toast';
 import { chatKeys } from '@entities/Chat';
 import { projectGitKey } from '@entities/ProjectGit';
+import { offerPlanCancel, splitLocked } from '@entities/ChatTree';
 import {
   useSplitTasks,
   useCascadeRule,
@@ -25,6 +27,11 @@ export interface TaskSplitInput {
   effort: string;
   /** Отправка готового текста в текущий разговор (просьба и отказ идут ею). */
   dispatch: (prompt: string, files: never[]) => Promise<boolean>;
+  /**
+   * Дерево этого разговора с сервера: в нём запись конвейера. Идущее разделение
+   * держит кнопку так же, как идущий запрос (`splitLocked`, находка 12).
+   */
+  tree?: ChatTreeView;
 }
 
 /** Согласие на разделение: запускать ли прогоны и что человек поменял руками. */
@@ -75,6 +82,7 @@ export function useTaskSplit({
   model,
   effort,
   dispatch,
+  tree,
 }: TaskSplitInput): TaskSplitApi {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -166,6 +174,8 @@ export function useTaskSplit({
           }
         },
         onError: (error) => {
+          // План этого чата ещё идёт — не тупик, а предложение его отменить.
+          if (offerPlanCancel(error, t)) return;
           toast.error(t('chat.split.failedAll', { message: (error as Error).message }));
         },
       },
@@ -176,7 +186,7 @@ export function useTaskSplit({
     ...(projectPath ? { askSplit } : {}),
     split,
     keepHere,
-    isPending: splitTasks.isPending,
+    isPending: splitLocked(splitTasks.isPending, tree, parentChatId),
     // Правило читается на проект, а потолок — из шапки этого разговора: ровно
     // то, что уедет в запрос. Выключено — поля нет, и карточка про модели молчит.
     ...(projectPath && cascade.data?.enabled !== false ? { ceiling: { model, effort } } : {}),

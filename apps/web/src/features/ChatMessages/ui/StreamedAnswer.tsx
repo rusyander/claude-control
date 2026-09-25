@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { scanSplitBlocks } from '@agentdeck/contracts/task-split';
 import { scanHandoffBlocks } from '@agentdeck/contracts/chat-handoff';
 import { scanMediaBlocks } from '@agentdeck/contracts/media-block';
+import { withoutSplitTickets } from '@agentdeck/contracts/split-tickets';
 import { renderMarkdown } from '@shared/lib/markdown/renderMarkdown';
 import { TokenBadge } from '@shared/ui/token-badge';
 import { TaskSplitCard } from './TaskSplitCard';
@@ -32,7 +33,12 @@ export function StreamedAnswer({ stream, splitCeiling, costUnit, effort }: Strea
   const handoff = useMemo(() => scanHandoffBlocks(split.text), [split.text]);
   // Здесь — и только здесь — разбор знает, что ответ ещё идёт: незакрытый блок
   // прячется вместе с хвостом, иначе в ленте секундами стоит простыня JSON.
-  const media = useMemo(() => scanMediaBlocks(handoff.text, { streaming: true }), [handoff.text]);
+  // Блок тикета группы (95b) — служебный: его список держит хаб.
+  const media = useMemo(
+    () =>
+      scanMediaBlocks(withoutSplitTickets(handoff.text, { streaming: true }), { streaming: true }),
+    [handoff.text],
+  );
 
   if (!stream.text) return null;
 

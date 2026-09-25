@@ -22,7 +22,8 @@ export interface ChatSendInput {
   setDraftId: Dispatch<SetStateAction<string | undefined>>;
   setPending: Dispatch<SetStateAction<ChatMessage[]>>;
   allowEdits: boolean;
-  autoApprove: boolean;
+  /** Авторежим, выбранный в этом чате; не выбирал — сервер берёт глобальную настройку. */
+  autoApprove?: boolean;
   /** Модель и глубина продумывания: дефолт из настроек или оверрайд чата. */
   model: string;
   effort: string;

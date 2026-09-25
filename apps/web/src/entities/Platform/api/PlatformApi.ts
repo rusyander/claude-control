@@ -281,6 +281,7 @@ export function useRestartGateway() {
 export function useStartGateway() {
   const queryClient = useQueryClient();
   return useMutation({
+    meta: { silentError: true },
     mutationFn: startGateway,
     onSuccess: (info) => {
       queryClient.setQueryData(queryKeys.platformGateway, info);
@@ -308,9 +309,15 @@ export function usePlatformRunPlan(consumer: string) {
 }
 
 /** Сохранить контур целиком (и ключ, если его тронули). */
-export function useSavePlatform() {
+export function useSavePlatform({
+  silentError = false,
+}: {
+  /** Отказ показывает вызов сам — общий тост промолчит. */
+  silentError?: boolean;
+} = {}) {
   const queryClient = useQueryClient();
   return useMutation({
+    meta: { silentError },
     mutationFn: savePlatform,
     onSuccess: (_status, variables) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.platforms });
@@ -414,9 +421,15 @@ export function useDisablePlatform() {
  * предпросмотр применения сбрасывается отдельно: иначе он продолжал бы
  * показывать записанное, которого в файлах уже нет.
  */
-export function useActivatePlatform() {
+export function useActivatePlatform({
+  silentError = false,
+}: {
+  /** Отказ показывает вызов сам — общий тост промолчит. */
+  silentError?: boolean;
+} = {}) {
   const queryClient = useQueryClient();
   return useMutation({
+    meta: { silentError },
     mutationFn: activatePlatform,
     onSuccess: (result, id) => {
       invalidateApplied(queryClient, id);
@@ -438,9 +451,15 @@ export function useActivatePlatform() {
  * Вернуть провайдер по умолчанию. Один маршрут на две кнопки — на карточке
  * контура и в строке провайдера: «вернуть как было» это одно действие.
  */
-export function useDeactivatePlatform() {
+export function useDeactivatePlatform({
+  silentError = false,
+}: {
+  /** Отказ показывает вызов сам — общий тост промолчит. */
+  silentError?: boolean;
+} = {}) {
   const queryClient = useQueryClient();
   return useMutation({
+    meta: { silentError },
     mutationFn: deactivatePlatform,
     onSuccess: (_result, id) => invalidateApplied(queryClient, id),
   });

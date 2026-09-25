@@ -132,9 +132,15 @@ export function applySettingsUpdate(
   void queryClient.resetQueries({ predicate: (query) => isProviderScopedKey(query.queryKey) });
 }
 
-export function useUpdateSettings() {
+export function useUpdateSettings({
+  silentError = false,
+}: {
+  /** Отказ показывает вызов сам — общий тост промолчит. */
+  silentError?: boolean;
+} = {}) {
   const queryClient = useQueryClient();
   return useMutation({
+    meta: { silentError },
     mutationFn: patchSettings,
     onSuccess: (settings, variables) => {
       applySettingsUpdate(queryClient, settings, variables);

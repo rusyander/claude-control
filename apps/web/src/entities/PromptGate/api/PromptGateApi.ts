@@ -34,6 +34,7 @@ export function useApplyPromptGate() {
   const queryClient = useQueryClient();
 
   return useMutation({
+    meta: { silentError: true },
     mutationFn: applyPromptGate,
     onSuccess: (info) => {
       queryClient.setQueryData(queryKeys.promptGate, info);

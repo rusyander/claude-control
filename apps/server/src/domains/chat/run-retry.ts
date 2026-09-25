@@ -69,21 +69,34 @@ export interface RunRetryDeps {
   start: (chatId: string, options: RunOptions, meta: RunMeta) => boolean;
   schedule?: (run: () => void, ms: number) => unknown;
   cancel?: (handle: unknown) => void;
+  /**
+   * Лимит этого разговора помнит конвейер разделения (журнал 89): срок сброса
+   * лежит в его записи и переживает перезапуск, а будит группу он же. Таймер
+   * здесь жил только в памяти — стенд перезапускался, и группа не продолжалась
+   * никогда. Не задан — таймер, как раньше.
+   */
+  persistsLimit?: (keys: readonly string[]) => boolean;
   now?: () => number;
   log: (message: string, error?: unknown) => void;
 }
 
 /** Решение по упавшему ходу: будет повтор (и когда) или группа сдаётся. */
 export type RetryDecision =
-  | { retrying: true; attempt: number; at: number }
+  | { retrying: true; attempt: number; at: number; limit?: true }
   | { retrying: false; attempts: number; kind: FailureKind };
 
 /** Решение надзора глазами итога группы (`chainOutcomeOf`): ждёт повтора или сдалась. */
 export function retryOutcome(
   decision: RetryDecision | undefined,
-): { attempt: number; at: number } | { exhausted: number } | undefined {
+): { attempt: number; at: number; limit?: true } | { exhausted: number } | undefined {
   if (!decision) return undefined;
-  if (decision.retrying) return { attempt: decision.attempt, at: decision.at };
+  if (decision.retrying) {
+    return {
+      attempt: decision.attempt,
+      at: decision.at,
+      ...(decision.limit ? { limit: decision.limit } : {}),
+    };
+  }
   return decision.attempts > 0 ? { exhausted: decision.attempts } : undefined;
 }
 
@@ -109,11 +122,16 @@ export class RunRetry {
       ...(finished.projectPath ? { projectPath: finished.projectPath } : {}),
       ...(finished.sessionId ? { sessionId: finished.sessionId } : {}),
     };
-    return this.settle(key, finished, () => {
-      if (!this.deps.start(finished.chatId, options, meta)) {
-        this.deps.log('run retry: start refused', finished.chatId);
-      }
-    });
+    return this.settle(
+      key,
+      finished,
+      () => {
+        if (!this.deps.start(finished.chatId, options, meta)) {
+          this.deps.log('run retry: start refused', finished.chatId);
+        }
+      },
+      [finished.chatId],
+    );
   }
 
   /**
@@ -125,6 +143,7 @@ export class RunRetry {
     key: string,
     finished: Pick<RunFinished, 'ok' | 'error' | 'limit'>,
     fire: () => void,
+    aliases: readonly string[] = [],
   ): RetryDecision | undefined {
     if (finished.ok) {
       this.spent.delete(key);
@@ -141,6 +160,13 @@ export class RunRetry {
     const attempt = spent + 1;
     this.spent.set(key, attempt);
     const at = failure.at ?? now + (RETRY_DELAYS_MS[spent] ?? RETRY_DELAYS_MS.at(-1)!);
+    // Лимит группы разделения ждёт конвейер — по записи, а не по таймеру
+    // процесса. Попытка всё равно считается: лимит, в который ход упирается
+    // снова и снова, — не повод продолжать вечно.
+    if (failure.kind === 'limit' && this.deps.persistsLimit?.([key, ...aliases])) {
+      this.cancel(key);
+      return { retrying: true, attempt, at, limit: true };
+    }
     const run = (): void => {
       this.timers.delete(key);
       fire();

@@ -10,7 +10,7 @@ import { VirtualList } from '@shared/ui/virtual-list';
 import { useElementHeight } from '@shared/hooks/use-element-height';
 import { useDebouncedValue } from '@shared/hooks/use-debounced-value';
 import { useChatBodySearch, MIN_CHAT_SEARCH_LENGTH } from '@entities/Chat';
-import { matchBodyHits, withGroupHeaders, withTree } from '../lib/rows';
+import { chatListRows, matchBodyHits, rowKey } from '../lib/rows';
 import { ChatRow } from './ChatRow';
 import { GROUP_HEIGHT, ROW_HEIGHT } from './ChatList.constants';
 import type { ChatListProps, ChatRowData, ChatSearchMode } from './ChatList.types';
@@ -68,7 +68,14 @@ export function ChatList({
   // Заголовки групп идут строками того же списка — иначе виртуализация и
   // разбивка по датам мешали бы друг другу. Дерево строится ДО заголовков:
   // ветвь обязана остаться под своим корнем, а не уехать в свою дату.
-  const rows = useMemo(() => withGroupHeaders(withTree(found)), [found]);
+  //
+  // Идущие ветви — над датами (владелец, 24.09.2026): за работающим агентом
+  // следят, и искать его среди вчерашних разговоров не должно быть нужно.
+  // «Идёт» — живой прогон, в том числе замолчавший, или разделение в работе
+  // (`inWork`: между стадиями группы прогона нет, а работа идёт). Вопрос из
+  // транскрипта (жёлтая точка без прогона) наверх не поднимает: такие висят и
+  // неделями.
+  const rows = useMemo(() => chatListRows(found, statuses), [found, statuses]);
 
   const showSkeleton = isLoading || (mode === 'messages' && isBodyReady && bodySearch.isLoading);
   const searchNeedle = mode === 'messages' ? bodyQuery : '';
@@ -122,15 +129,25 @@ export function ChatList({
 
         <VirtualList
           items={rows}
-          rowHeight={(row) => (row.kind === 'header' ? GROUP_HEIGHT : ROW_HEIGHT)}
+          rowHeight={(row) => (row.kind === 'chat' ? ROW_HEIGHT : GROUP_HEIGHT)}
           height={height}
-          getKey={(row) => (row.kind === 'header' ? `group-${row.group}` : row.data.chat.id)}
-          renderRow={(row) =>
-            row.kind === 'header' ? (
-              <Typography variant="caption" color="subtle" className={styles.group} as="div">
-                {t(`chat.${row.group}`)}
-              </Typography>
-            ) : (
+          getKey={rowKey}
+          renderRow={(row) => {
+            if (row.kind === 'header') {
+              return (
+                <Typography variant="caption" color="subtle" className={styles.group} as="div">
+                  {t(row.group === 'running' ? 'chat.runningNow' : `chat.${row.group}`)}
+                </Typography>
+              );
+            }
+            if (row.kind === 'inactive') {
+              return (
+                <Typography variant="caption" color="subtle" className={styles.inactive} as="div">
+                  {t('chat.inactiveBranch')}
+                </Typography>
+              );
+            }
+            return (
               <ChatRow
                 chat={row.data.chat}
                 isActive={row.data.chat.id === activeId}
@@ -142,8 +159,8 @@ export function ChatList({
                 depth={row.data.depth}
                 onSelect={() => onSelect(row.data.chat)}
               />
-            )
-          }
+            );
+          }}
         />
       </div>
     </Stack>

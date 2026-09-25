@@ -4,7 +4,7 @@
     {
       "topic": "platform",
       "document": "apps/web/src/pages/Help/topics/PlatformTopic.tsx",
-      "confirmedAt": "2026-09-21T20:24:35.891Z",
+      "confirmedAt": "2026-09-25T18:14:04.990Z",
       "sources": [
         {
           "path": "packages/contracts/src/compromises.ts",
@@ -149,7 +149,7 @@
         {
           "path": "apps/server/src/domains/media/presentations.ts",
           "why": "строка «Презентации» в таблице «что работает через контур»: обычный запрос в чат, файлы собирает панель",
-          "sha": "861e6b575d37d3ce"
+          "sha": "e99c101db7407f6c"
         },
         {
           "path": "apps/server/src/domains/platform/data-mask.ts",
@@ -554,7 +554,7 @@
         {
           "path": "apps/server/src/routes/project-git-routes.ts",
           "why": "«Раздел не гит-клиент»: что умеет полоса над чатом проекта и чего панель не делает нигде",
-          "sha": "38a7ef8857ef8997"
+          "sha": "3486cc3492ef1771"
         },
         {
           "path": "apps/server/src/providers/catalog/qwen.ts",
@@ -577,7 +577,7 @@
           "sha": "d2696cecdcce26ad"
         }
       ],
-      "confirmedAt": "2026-09-24T07:13:06.391Z"
+      "confirmedAt": "2026-09-25T18:14:05.071Z"
     },
     {
       "topic": "groups",
@@ -1230,7 +1230,7 @@
         {
           "path": "apps/server/src/routes/panel-agent/actions-app.ts",
           "why": "«Что агент умеет» и «Настройки только для вас»: настройки, провайдер, эндпоинты, интеграции, DLP",
-          "sha": "e08adc6c860ed7d2"
+          "sha": "9c3ee63a3b5c2e42"
         },
         {
           "path": "apps/server/src/routes/panel-agent/actions-panel.ts",
@@ -1243,7 +1243,7 @@
           "sha": "dbdcab729b80a8de"
         }
       ],
-      "confirmedAt": "2026-09-24T07:13:06.474Z"
+      "confirmedAt": "2026-09-25T18:14:05.169Z"
     },
     {
       "topic": "portability",

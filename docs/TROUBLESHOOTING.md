@@ -22,6 +22,8 @@ Symptom → cause → what to do. Start with `pnpm doctor`: it explains every fi
 - [A section does not work](#a-section-does-not-work)
   - [`claude` is not recognised / command not found](#claude-is-not-recognised--command-not-found)
   - [Chat answers "Not logged in"](#chat-answers-not-logged-in)
+  - [Chat says "the model needs version … or newer"](#chat-says-the-model-needs-version--or-newer)
+  - [Chat says "The conversation context is full"](#chat-says-the-conversation-context-is-full)
   - [The plugins page is empty or shows a CLI error](#the-plugins-page-is-empty-or-shows-a-cli-error)
   - [An MCP server never connects](#an-mcp-server-never-connects)
   - [Analytics is empty or has gaps](#analytics-is-empty-or-has-gaps)
@@ -175,6 +177,21 @@ terminal and run `pnpm dev`.
 The CLI is installed but not authenticated: run `claude` in a terminal and log in. The panel
 deliberately has no login of its own. The same cause usually breaks the sandbox — it copies
 `.credentials.json`, and there is nothing to copy.
+
+### Chat says "the model needs version … or newer"
+
+The panel runs the first `claude` on the server's `PATH`. With several copies on the machine (one
+from nvm, another from npm, say) the first may be an old one: the model rejects it and automatic
+context compaction fails. The chat's error card shows which copy runs and whether a newer one sits
+beside it, and its "Update CLI" button runs `claude update` on the copy the panel uses.
+`curl http://127.0.0.1:5178/api/chat/cli` gives the same answer. The other way out: drop the old copy
+from `PATH` and restart `pnpm dev` from a new terminal.
+
+### Chat says "The conversation context is full"
+
+The conversation reached its limit and the CLI will not take another message. Instead of a retry the
+error card offers two ways out: "Compact context" (the same as `/compact`) or "Continue in a new
+session" — a new conversation from the checkpoint file. A split parent takes its groups along.
 
 ### The plugins page is empty or shows a CLI error
 

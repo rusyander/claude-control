@@ -16,9 +16,10 @@
  *      план переноса в него ОТКАЗЫВАЕТСЯ по имени, а не выходит пустым;
  *   3. ни одной ветки по имени ЦЕЛИ вне каталога и половин `import/`/`emit/`:
  *      различие провайдеров выражается возможностью, ветка в домене — это
- *      матрица, которая начала лгать (§5.3);
- *   4. роспись живой приёмки: у каждого CLI каталога есть пункт в `TASKS.md`
- *      со всеми шестью пробами, и список проб взят из самого плана, а не
+ *      матрица, которая начала лгать (§5 плана);
+ *   4. роспись живой приёмки: у каждого CLI каталога есть открытый пункт в
+ *      `TASKS.md` со всеми шестью пробами ЛИБО строка в разделе «Живая
+ *      приёмка: закрыто» плана, и список проб взят из самого плана, а не
  *      переписан рядом.
  *
  * Запуск: `node tools/qa/check-portability-eleventh.mjs`
@@ -254,13 +255,13 @@ function checkRoster(ctx, damage) {
   const failures = [];
   const plan = readFileSync(new URL('docs/TASKS-PORTABILITY.ru.md', root), 'utf8');
 
-  // Шесть проб берутся ИЗ ПЛАНА: список назван в §9 (доктрина) и в критерии
-  // П7.2, и обе копии обязаны совпасть — иначе приёмка закрывается не тем, о чём
-  // договаривались.
+  // Шесть проб берутся ИЗ ПЛАНА: список назван в §9 (доктрина) и в разделе
+  // закрытой приёмки, и обе копии обязаны совпасть — иначе приёмка закрывается
+  // не тем, о чём договаривались.
   const spelled = [...plan.matchAll(/\(хук блокирует[^)]*\)/g)].map((match) => match[0]);
   if (spelled.length < 2) {
     failures.push(
-      `список проб назван в плане ${spelled.length} раз(а), ожидались §9 и критерий П7.2`,
+      `список проб назван в плане ${spelled.length} раз(а), ожидались §9 и «Живая приёмка: закрыто»`,
     );
     return failures;
   }
@@ -296,11 +297,32 @@ function checkRoster(ctx, damage) {
     }
     if (current && line.trim().length > 0) items.set(current, `${items.get(current)}\n${line}`);
   }
+  // Закрытый пункт уходит из `TASKS.md` (там только открытое) и остаётся
+  // строкой таблицы в плане: «| `codex` | 22.09.2026 | …».
+  const closed = new Set();
+  const planLines = plan.split('\n');
+  const closedAt = planLines.findIndex(
+    (line) => line.startsWith('#') && line.includes('Живая приёмка: закрыто'),
+  );
+  for (let index = closedAt + 1; closedAt >= 0 && index < planLines.length; index += 1) {
+    const line = planLines[index];
+    if (line.startsWith('#')) break;
+    const row = /^\| `([^`]+)` +\|/.exec(line);
+    if (row) closed.add(row[1]);
+  }
+
   // Подмена: один CLI выпал из росписи — ровно то, что случится, когда
   // одиннадцатый заведут в каталоге и забудут про живую приёмку.
-  if (damage) items.delete(ctx.catalogIds[0]);
+  if (damage) {
+    items.delete(ctx.catalogIds[0]);
+    closed.delete(ctx.catalogIds[0]);
+  }
 
   for (const id of ['claude', ...ctx.catalogIds]) {
+    if (closed.has(id)) {
+      if (items.has(id)) failures.push(`«${id}» и закрыт в плане, и открыт в TASKS.md`);
+      continue;
+    }
     const body = items.get(id);
     if (!body) {
       failures.push(`живой приёмки нет ни для одного пункта CLI «${id}»`);
@@ -314,7 +336,7 @@ function checkRoster(ctx, damage) {
       failures.push(`у «${id}» не названы пробы: ${missing.join(' · ')}`);
     }
   }
-  for (const id of items.keys()) {
+  for (const id of [...items.keys(), ...closed]) {
     if (id !== 'claude' && !ctx.catalogIds.includes(id)) {
       failures.push(`в росписи живой приёмки CLI «${id}», которого нет в каталоге`);
     }

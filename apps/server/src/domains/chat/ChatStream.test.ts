@@ -67,7 +67,8 @@ describe('кадр ошибки прогона', () => {
     app.get('/stream', (_request, reply) => streamRun(registry, reply, 'чат', 0));
 
     const response = await app.inject({ method: 'GET', url: '/stream' });
-    const frame = JSON.parse(response.body.trim().replace(/^data: /, ''));
+    const data = response.body.split('\n').find((line) => line.startsWith('data: ')) ?? '';
+    const frame = JSON.parse(data.slice('data: '.length));
 
     expect(frame).toMatchObject({
       kind: 'error',
@@ -77,5 +78,26 @@ describe('кадр ошибки прогона', () => {
       overflow: true,
       retriable: false,
     });
+  });
+
+  // Живой прогон 25.09: сервер отдавал заголовки за 0,2 с, а через прокси Vite
+  // ответ доходил с первым пингом через 10 с, и отправленный текст висел в поле.
+  it('поток открывается комментарием до первого кадра — прокси отдают ответ сразу', async () => {
+    const registry = {
+      attach: (
+        _chatId: string,
+        _from: number,
+        subscriber: import('./ChatRunRegistry.ts').RunSubscriber,
+      ) => {
+        subscriber.close();
+        return () => undefined;
+      },
+    } as unknown as ChatRunRegistry;
+    app = Fastify();
+    app.get('/stream', (_request, reply) => streamRun(registry, reply, 'чат', 0));
+
+    const response = await app.inject({ method: 'GET', url: '/stream' });
+
+    expect(response.body.startsWith(': open\n\n')).toBe(true);
   });
 });

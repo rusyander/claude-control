@@ -269,7 +269,7 @@ export const panelAgentEn: typeof panelAgentRu = {
     limitHooks: 'Settings only you change',
     limitHooksText:
       'The config directory, revealing secrets, backups before writing and their encryption, ' +
-      'rule auto-approval, the prompt gate, model prices, the gateway and remote access are ' +
+      'rule auto-approval, the auto permission mode in every chat, the prompt gate, model prices, the gateway and remote access are ' +
       'not changed by the agent — it asks you to do it in «Settings». The agent writes hooks, ' +
       'but read the hook command in full on the card: Claude Code will run it.',
     limitStartChat: 'Starting a chat',

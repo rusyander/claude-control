@@ -1,0 +1,533 @@
+{
+  "topic": "panelAgent",
+  "frames": {
+    "first/01-launcher": {
+      "light-ru": {
+        "file": "01-launcher.png",
+        "width": 1400,
+        "height": 900
+      },
+      "light-en": {
+        "file": "01-launcher.en.png",
+        "width": 1400,
+        "height": 900
+      },
+      "dark-ru": {
+        "file": "01-launcher.dark.png",
+        "width": 1400,
+        "height": 900
+      },
+      "dark-en": {
+        "file": "01-launcher.dark.en.png",
+        "width": 1400,
+        "height": 900
+      }
+    },
+    "first/02-empty": {
+      "light-ru": {
+        "file": "02-empty.png",
+        "width": 1400,
+        "height": 900
+      },
+      "light-en": {
+        "file": "02-empty.en.png",
+        "width": 1400,
+        "height": 900
+      },
+      "dark-ru": {
+        "file": "02-empty.dark.png",
+        "width": 1400,
+        "height": 900
+      },
+      "dark-en": {
+        "file": "02-empty.dark.en.png",
+        "width": 1400,
+        "height": 900
+      }
+    },
+    "first/03-change-card": {
+      "light-ru": {
+        "file": "03-change-card.png",
+        "width": 440,
+        "height": 900
+      },
+      "light-en": {
+        "file": "03-change-card.en.png",
+        "width": 440,
+        "height": 900
+      },
+      "dark-ru": {
+        "file": "03-change-card.dark.png",
+        "width": 440,
+        "height": 900
+      },
+      "dark-en": {
+        "file": "03-change-card.dark.en.png",
+        "width": 440,
+        "height": 900
+      }
+    },
+    "first/04-done": {
+      "light-ru": {
+        "file": "04-done.png",
+        "width": 1400,
+        "height": 900
+      },
+      "light-en": {
+        "file": "04-done.en.png",
+        "width": 1400,
+        "height": 900
+      },
+      "dark-ru": {
+        "file": "04-done.dark.png",
+        "width": 1400,
+        "height": 900
+      },
+      "dark-en": {
+        "file": "04-done.dark.en.png",
+        "width": 1400,
+        "height": 900
+      }
+    },
+    "first/05-diff-card": {
+      "light-ru": {
+        "file": "05-diff-card.png",
+        "width": 440,
+        "height": 900
+      },
+      "light-en": {
+        "file": "05-diff-card.en.png",
+        "width": 440,
+        "height": 900
+      },
+      "dark-ru": {
+        "file": "05-diff-card.dark.png",
+        "width": 440,
+        "height": 900
+      },
+      "dark-en": {
+        "file": "05-diff-card.dark.en.png",
+        "width": 440,
+        "height": 900
+      }
+    },
+    "first/06-rule-saved": {
+      "light-ru": {
+        "file": "06-rule-saved.png",
+        "width": 1400,
+        "height": 900
+      },
+      "light-en": {
+        "file": "06-rule-saved.en.png",
+        "width": 1400,
+        "height": 900
+      },
+      "dark-ru": {
+        "file": "06-rule-saved.dark.png",
+        "width": 1400,
+        "height": 900
+      },
+      "dark-en": {
+        "file": "06-rule-saved.dark.en.png",
+        "width": 1400,
+        "height": 900
+      }
+    },
+    "first/07-danger-card": {
+      "light-ru": {
+        "file": "07-danger-card.png",
+        "width": 440,
+        "height": 900
+      },
+      "light-en": {
+        "file": "07-danger-card.en.png",
+        "width": 440,
+        "height": 900
+      },
+      "dark-ru": {
+        "file": "07-danger-card.dark.png",
+        "width": 440,
+        "height": 900
+      },
+      "dark-en": {
+        "file": "07-danger-card.dark.en.png",
+        "width": 440,
+        "height": 900
+      }
+    },
+    "first/08-rejected": {
+      "light-ru": {
+        "file": "08-rejected.png",
+        "width": 440,
+        "height": 900
+      },
+      "light-en": {
+        "file": "08-rejected.en.png",
+        "width": 440,
+        "height": 900
+      },
+      "dark-ru": {
+        "file": "08-rejected.dark.png",
+        "width": 440,
+        "height": 900
+      },
+      "dark-en": {
+        "file": "08-rejected.dark.en.png",
+        "width": 440,
+        "height": 900
+      }
+    },
+    "first/09-journal": {
+      "light-ru": {
+        "file": "09-journal.png",
+        "width": 440,
+        "height": 900
+      },
+      "light-en": {
+        "file": "09-journal.en.png",
+        "width": 440,
+        "height": 900
+      },
+      "dark-ru": {
+        "file": "09-journal.dark.png",
+        "width": 440,
+        "height": 900
+      },
+      "dark-en": {
+        "file": "09-journal.dark.en.png",
+        "width": 440,
+        "height": 900
+      }
+    },
+    "first/10-history": {
+      "light-ru": {
+        "file": "10-history.png",
+        "width": 440,
+        "height": 900
+      },
+      "light-en": {
+        "file": "10-history.en.png",
+        "width": 440,
+        "height": 900
+      },
+      "dark-ru": {
+        "file": "10-history.dark.png",
+        "width": 440,
+        "height": 900
+      },
+      "dark-en": {
+        "file": "10-history.dark.en.png",
+        "width": 440,
+        "height": 900
+      }
+    },
+    "first/11-scenario-card": {
+      "light-ru": {
+        "file": "11-scenario-card.png",
+        "width": 440,
+        "height": 900
+      },
+      "light-en": {
+        "file": "11-scenario-card.en.png",
+        "width": 440,
+        "height": 900
+      },
+      "dark-ru": {
+        "file": "11-scenario-card.dark.png",
+        "width": 440,
+        "height": 900
+      },
+      "dark-en": {
+        "file": "11-scenario-card.dark.en.png",
+        "width": 440,
+        "height": 900
+      }
+    },
+    "first/12-scenario-created": {
+      "light-ru": {
+        "file": "12-scenario-created.png",
+        "width": 1400,
+        "height": 900
+      },
+      "light-en": {
+        "file": "12-scenario-created.en.png",
+        "width": 1400,
+        "height": 900
+      },
+      "dark-ru": {
+        "file": "12-scenario-created.dark.png",
+        "width": 1400,
+        "height": 900
+      },
+      "dark-en": {
+        "file": "12-scenario-created.dark.en.png",
+        "width": 1400,
+        "height": 900
+      }
+    },
+    "guards/01-contour-card": {
+      "light-ru": {
+        "file": "01-contour-card.png",
+        "width": 440,
+        "height": 900
+      },
+      "light-en": {
+        "file": "01-contour-card.en.png",
+        "width": 440,
+        "height": 900
+      },
+      "dark-ru": {
+        "file": "01-contour-card.dark.png",
+        "width": 440,
+        "height": 900
+      },
+      "dark-en": {
+        "file": "01-contour-card.dark.en.png",
+        "width": 440,
+        "height": 900
+      }
+    },
+    "guards/02-key-field": {
+      "light-ru": {
+        "file": "02-key-field.png",
+        "width": 1400,
+        "height": 900
+      },
+      "light-en": {
+        "file": "02-key-field.en.png",
+        "width": 1400,
+        "height": 900
+      },
+      "dark-ru": {
+        "file": "02-key-field.dark.png",
+        "width": 1400,
+        "height": 900
+      },
+      "dark-en": {
+        "file": "02-key-field.dark.en.png",
+        "width": 1400,
+        "height": 900
+      }
+    },
+    "guards/03-key-masked": {
+      "light-ru": {
+        "file": "03-key-masked.png",
+        "width": 440,
+        "height": 900
+      },
+      "light-en": {
+        "file": "03-key-masked.en.png",
+        "width": 440,
+        "height": 900
+      },
+      "dark-ru": {
+        "file": "03-key-masked.dark.png",
+        "width": 440,
+        "height": 900
+      },
+      "dark-en": {
+        "file": "03-key-masked.dark.en.png",
+        "width": 440,
+        "height": 900
+      }
+    },
+    "guards/04-stale": {
+      "light-ru": {
+        "file": "04-stale.png",
+        "width": 440,
+        "height": 900
+      },
+      "light-en": {
+        "file": "04-stale.en.png",
+        "width": 440,
+        "height": 900
+      },
+      "dark-ru": {
+        "file": "04-stale.dark.png",
+        "width": 440,
+        "height": 900
+      },
+      "dark-en": {
+        "file": "04-stale.dark.en.png",
+        "width": 440,
+        "height": 900
+      }
+    },
+    "guards/05-mcp-card": {
+      "light-ru": {
+        "file": "05-mcp-card.png",
+        "width": 440,
+        "height": 900
+      },
+      "light-en": {
+        "file": "05-mcp-card.en.png",
+        "width": 440,
+        "height": 900
+      },
+      "dark-ru": {
+        "file": "05-mcp-card.dark.png",
+        "width": 440,
+        "height": 900
+      },
+      "dark-en": {
+        "file": "05-mcp-card.dark.en.png",
+        "width": 440,
+        "height": 900
+      }
+    },
+    "guards/06-mcp-secret": {
+      "light-ru": {
+        "file": "06-mcp-secret.png",
+        "width": 1400,
+        "height": 900
+      },
+      "light-en": {
+        "file": "06-mcp-secret.en.png",
+        "width": 1400,
+        "height": 900
+      },
+      "dark-ru": {
+        "file": "06-mcp-secret.dark.png",
+        "width": 1400,
+        "height": 900
+      },
+      "dark-en": {
+        "file": "06-mcp-secret.dark.en.png",
+        "width": 1400,
+        "height": 900
+      }
+    },
+    "guards/07-other-cli": {
+      "light-ru": {
+        "file": "07-other-cli.png",
+        "width": 440,
+        "height": 900
+      },
+      "light-en": {
+        "file": "07-other-cli.en.png",
+        "width": 440,
+        "height": 900
+      },
+      "dark-ru": {
+        "file": "07-other-cli.dark.png",
+        "width": 440,
+        "height": 900
+      },
+      "dark-en": {
+        "file": "07-other-cli.dark.en.png",
+        "width": 440,
+        "height": 900
+      }
+    },
+    "guards/08-dlp-broken": {
+      "light-ru": {
+        "file": "08-dlp-broken.png",
+        "width": 440,
+        "height": 900
+      },
+      "light-en": {
+        "file": "08-dlp-broken.en.png",
+        "width": 440,
+        "height": 900
+      },
+      "dark-ru": {
+        "file": "08-dlp-broken.dark.png",
+        "width": 440,
+        "height": 900
+      },
+      "dark-en": {
+        "file": "08-dlp-broken.dark.en.png",
+        "width": 440,
+        "height": 900
+      }
+    },
+    "guards/09-cli-not-found": {
+      "light-ru": {
+        "file": "09-cli-not-found.png",
+        "width": 440,
+        "height": 900
+      },
+      "light-en": {
+        "file": "09-cli-not-found.en.png",
+        "width": 440,
+        "height": 900
+      },
+      "dark-ru": {
+        "file": "09-cli-not-found.dark.png",
+        "width": 440,
+        "height": 900
+      },
+      "dark-en": {
+        "file": "09-cli-not-found.dark.en.png",
+        "width": 440,
+        "height": 900
+      }
+    },
+    "guards/10-endpoint-unsupported": {
+      "light-ru": {
+        "file": "10-endpoint-unsupported.png",
+        "width": 440,
+        "height": 900
+      },
+      "light-en": {
+        "file": "10-endpoint-unsupported.en.png",
+        "width": 440,
+        "height": 900
+      },
+      "dark-ru": {
+        "file": "10-endpoint-unsupported.dark.png",
+        "width": 440,
+        "height": 900
+      },
+      "dark-en": {
+        "file": "10-endpoint-unsupported.dark.en.png",
+        "width": 440,
+        "height": 900
+      }
+    },
+    "guards/11-contour-unreachable": {
+      "light-ru": {
+        "file": "11-contour-unreachable.png",
+        "width": 440,
+        "height": 900
+      },
+      "light-en": {
+        "file": "11-contour-unreachable.en.png",
+        "width": 440,
+        "height": 900
+      },
+      "dark-ru": {
+        "file": "11-contour-unreachable.dark.png",
+        "width": 440,
+        "height": 900
+      },
+      "dark-en": {
+        "file": "11-contour-unreachable.dark.en.png",
+        "width": 440,
+        "height": 900
+      }
+    },
+    "guards/12-busy": {
+      "light-ru": {
+        "file": "12-busy.png",
+        "width": 440,
+        "height": 900
+      },
+      "light-en": {
+        "file": "12-busy.en.png",
+        "width": 440,
+        "height": 900
+      },
+      "dark-ru": {
+        "file": "12-busy.dark.png",
+        "width": 440,
+        "height": 900
+      },
+      "dark-en": {
+        "file": "12-busy.dark.en.png",
+        "width": 440,
+        "height": 900
+      }
+    }
+  }
+}

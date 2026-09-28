@@ -108,6 +108,34 @@ export const serverTextTemplates = {
     ru: 'У контура «{{title}}» не сохранён ключ',
     en: 'Contour “{{title}}” has no saved key',
   },
+  'gateway-section-closed-chat': {
+    ru: 'Раздел «Чат» закрыт для контура «{{title}}» — запрос не отправлен. Открыть раздел можно на карточке контура',
+    en: 'The Chat section is closed for contour “{{title}}” — the request was not sent. Open the section on the contour card',
+  },
+  'gateway-section-closed-groups': {
+    ru: 'Раздел «Группы разделения» закрыт для контура «{{title}}» — запрос не отправлен. Открыть раздел можно на карточке контура',
+    en: 'The Split groups section is closed for contour “{{title}}” — the request was not sent. Open the section on the contour card',
+  },
+  'gateway-section-closed-tests': {
+    ru: 'Раздел «Агент тестов» закрыт для контура «{{title}}» — запрос не отправлен. Открыть раздел можно на карточке контура',
+    en: 'The Tests agent section is closed for contour “{{title}}” — the request was not sent. Open the section on the contour card',
+  },
+  'gateway-section-closed-assistant': {
+    ru: 'Раздел «Ассистент панели» закрыт для контура «{{title}}» — запрос не отправлен. Открыть раздел можно на карточке контура',
+    en: 'The Panel assistant section is closed for contour “{{title}}” — the request was not sent. Open the section on the contour card',
+  },
+  'gateway-section-closed-terminal': {
+    ru: 'Раздел «Терминал (файлы CLI)» закрыт для контура «{{title}}» — запрос не отправлен. Открыть раздел можно на карточке контура',
+    en: 'The Terminal (CLI files) section is closed for contour “{{title}}” — the request was not sent. Open the section on the contour card',
+  },
+  'gateway-section-closed-foreign': {
+    ru: 'Чат {{cli}} закрыт для контура «{{title}}» — запрос не отправлен. Открыть раздел можно на карточке контура',
+    en: 'The {{cli}} chat is closed for contour “{{title}}” — the request was not sent. Open the section on the contour card',
+  },
+  'gateway-section-unknown': {
+    ru: 'Адрес шлюза несёт незнакомую отметку раздела — запрос не отправлен. Примените контур заново, чтобы адрес переписался',
+    en: 'The gateway address carries an unknown section mark — the request was not sent. Apply the contour again to rewrite the address',
+  },
   'gateway-body-too-large': {
     ru: 'Тело запроса больше 32 МБ — шлюз его не принимает',
     en: 'The request body is over 32 MB — the gateway does not accept it',
@@ -328,7 +356,7 @@ export const serverTextTemplates = {
   'proxy-body-not-json': { ru: 'тело запроса не JSON', en: 'the request body is not JSON' },
   'proxy-stopped-unparsed': {
     ru: 'AgentDeck: {{reason}}, запрос остановлен (настройка «пропускать неразобранное» выключена)',
-    en: 'AgentDeck: {{reason}}, the request was stopped (the «let unparsed through» setting is off)',
+    en: 'AgentDeck: {{reason}}, the request was stopped (the “Pass through unparsed bodies” setting is off)',
   },
   'proxy-upstream-unreachable': {
     ru: 'AgentDeck: адрес модели не отвечает ({{reason}})',
@@ -523,7 +551,7 @@ export const serverTextTemplates = {
   },
   'contour-conflict-anonymization-detail-off': {
     ru: 'Не выбор из двух: слои складываются по порядку. По API-ключу подмена у контура не гарантирована — проба стенда показала запрос без подмены, а карту подмены клиенту API контур не отдаёт. Наша маска у такого контура включается сама, но СЕЙЧАС она выключена на этой карточке: запрос уедет в контур как есть. Включает переключатель «Маска данных панели» выше.',
-    en: "Not a choice between two: the layers stack in order. Over an API key the contour's substitution is not guaranteed — the stand probe showed a request without it, and the contour does not hand the substitution map to an API client. Our mask turns itself on for such a contour, but RIGHT NOW it is off on this card: the request goes to the contour as it is. The “The panel’s data mask” switch above turns it on.",
+    en: 'Not a choice between two: the layers stack in order. Over an API key the contour’s substitution is not guaranteed — the stand probe showed a request without it, and the contour does not hand the substitution map to an API client. Our mask turns itself on for such a contour, but RIGHT NOW it is off on this card: the request goes to the contour as it is. The “The panel’s data mask” switch above turns it on.',
   },
   'contour-conflict-compaction-title': {
     ru: 'Сжатие истории контуром ⟷ наши контрольные точки',
@@ -693,6 +721,10 @@ export const serverTextTemplates = {
   'checks-format-rejected': {
     ru: 'Формат файла не принят: {{reason}}',
     en: 'The file format was not accepted: {{reason}}',
+  },
+  'checks-format-no-schema': {
+    ru: 'Схема {{file}} официально не публикуется — сверять не с чем.',
+    en: 'No official schema is published for {{file}} — nothing to check against.',
   },
   'checks-mcp-reread-missing': {
     ru: 'Запись пробного сервера прошла, но при перечитывании его нет — формат файла разобран не полностью.',
@@ -1019,6 +1051,10 @@ export const serverTextTemplates = {
     en: 'A browser prints the PDF, and none was found on this machine. Install Google Chrome, Microsoft Edge or Chromium (or name its path in the {{env}} environment variable) — the other report formats work without it.',
   },
   'sandbox-event-custom-title': { ru: 'Свой ввод', en: 'Your own input' },
+  'chat-process-lost': {
+    ru: 'Процесс чата потерян: его завершили вне панели. Разговор сохранён — отправьте сообщение, и он продолжится с того же места.',
+    en: 'The chat process was lost: it was ended outside the panel. The conversation is saved — send a message and it continues where it stopped.',
+  },
   'chat-run-not-in-ledger': {
     ru: 'Панель перезапускалась, прогон не в реестре — отправьте сообщение заново.',
     en: 'The panel was restarted and the run is not in the ledger — send the message again.',
@@ -1056,7 +1092,6 @@ export const serverTextTemplates = {
     ru: 'Группа «{{name}}» уже есть — по имени её находят и удаляют, двух одинаковых быть не должно.',
     en: 'The group «{{name}}» already exists — it is found and deleted by name, and there must not be two of them.',
   },
-  'automation-not-found': { ru: 'Сценария «{{id}}» нет.', en: 'There is no automation «{{id}}».' },
   'group-env-key-invalid': {
     ru: 'Имя переменной «{{key}}» не годится: латиница, цифры и подчёркивание, не с цифры.',
     en: 'The variable name «{{key}}» will not do: latin letters, digits and underscore, not starting with a digit.',
@@ -1151,6 +1186,18 @@ export const serverTextTemplates = {
     ru: 'Родитель написал группам. Передано: {{sent}} · в очереди до конца их хода: {{queued}} · не доставлено (у группы нет чата или копии): {{refused}}.',
     en: 'The parent wrote to its groups. Delivered: {{sent}} · queued until their turn ends: {{queued}} · not delivered (the group has no chat or copy): {{refused}}.',
   },
+  'split-triage-groups-picked-notice': {
+    ru: 'Разбор выбрал группы панели: {{picks}}.',
+    en: 'The triage picked panel groups: {{picks}}.',
+  },
+  'path-step-started-notice': {
+    ru: 'Шаг пути группы «{{step}}» идёт в этом чате.',
+    en: 'Group path step “{{step}}” runs in this chat.',
+  },
+  'path-gate-failed-notice': {
+    ru: 'Шаг пути «{{step}}» не прошёл проверку: {{note}}. Цепочка ждёт ответа в этом чате.',
+    en: 'Path step “{{step}}” did not pass its check: {{note}}. The chain waits for an answer in this chat.',
+  },
   'split-limit-wait-notice': {
     ru: 'Группы разделения упёрлись в лимит подписки и ждут его сброса до {{until}}: продолжатся сами, очередь до сброса не стартует.',
     en: 'Split groups hit the subscription limit and wait for its reset at {{until}}: they resume by themselves, and the queue does not start until then.',
@@ -1170,6 +1217,14 @@ export const serverTextTemplates = {
   'split-default-drift-notice': {
     ru: 'Группа «{{group}}»: {{target}} ушла вперёд и задела её файлы ({{count}}): {{files}}. Ветку посреди работы панель не трогает — перенесёт её rebase при доставке.',
     en: 'Group «{{group}}»: {{target}} moved ahead and touched its files ({{count}}): {{files}}. The panel leaves the branch alone mid-work — the delivery rebase moves it.',
+  },
+  'chat-autonomy-deferred-notice': {
+    ru: 'Фоновые команды агента ещё идут ({{count}}): процесс чата перезапустится с новой настройкой автономии, когда они кончатся, — перезапуск сейчас оборвал бы их. До тех пор у самого процесса прежняя метка автономии.',
+    en: "The agent's background commands are still running ({{count}}): the chat process restarts with the new autonomy setting once they finish — restarting now would kill them. Until then the process itself keeps its previous autonomy marker.",
+  },
+  'chat-stop-unconfirmed-notice': {
+    ru: 'Остановить процесс агента ({{pid}}) не удалось: без снимка процессов панель не может проверить, что этот номер всё ещё его, а чужой процесс не трогает. Прогон остаётся идущим — нажмите «Остановить» ещё раз; после перезапуска панели он будет подхвачен снова.',
+    en: "The agent process ({{pid}}) could not be stopped: without a process snapshot the panel cannot verify that this number is still the agent's, and it never touches a foreign process. The run stays running — press Stop again; after a panel restart it is picked up again.",
   },
   'split-group-run-not-started': { ru: 'прогон не запустился', en: 'the run did not start' },
   'split-group-plan-cancelled': {
@@ -1237,4 +1292,28 @@ export const serverTextTemplates = {
     en: 'MR {{mr}} has an empty description',
   },
   'delivery-gap-no-copy': { ru: 'нет копии группы', en: 'the group has no copy' },
+  'sieve-gap-conflicts': {
+    ru: 'сито «интеграция»: слияние со свежей основной веткой даёт конфликт в {{files}} — перенесите ветку на свежую основную (rebase) и разрешите конфликт',
+    en: 'integration sieve: merging with fresh main conflicts in {{files}} — rebase the branch onto fresh main and resolve the conflict',
+  },
+  'sieve-gap-foreign-removals': {
+    ru: 'сито «чужие −»: ветка удаляет строки, пришедшие в основную после старта группы: {{files}} — верните их или назовите каждый файл в строке foreign-removals отчёта о ситах с причиной',
+    en: 'foreign-removals sieve: the branch deletes lines that landed in main after the group started: {{files}} — restore them or name every file in the foreign-removals row of the sieve report with the reason',
+  },
+  'sieve-gap-consumers': {
+    ru: 'сито «потребители вне диффа»: удалённое ({{tokens}}) ещё используется в {{files}} — поправьте потребителей или назовите каждый файл в строке consumers-repo-wide отчёта о ситах с причиной',
+    en: 'consumers sieve: removed names ({{tokens}}) are still used in {{files}} — fix the consumers or name every file in the consumers-repo-wide row of the sieve report with the reason',
+  },
+  'sieve-gap-unreported': {
+    ru: 'сито {{sieve}} не отчитано: нужна строка в блоке {{lang}} — {"sieves":[{"id":"…","status":"pass|fail|n/a","evidence":"команда и строка её вывода или причина"}]}',
+    en: 'sieve {{sieve}} is not reported: a row is needed in a {{lang}} block — {"sieves":[{"id":"…","status":"pass|fail|n/a","evidence":"the command and a line of its output, or the reason"}]}',
+  },
+  'sieve-gap-no-evidence': {
+    ru: 'сито {{sieve}} отмечено без доказательства: нужна команда и строка её вывода или причина',
+    en: 'sieve {{sieve}} is marked without evidence: the command and a line of its output, or the reason, are needed',
+  },
+  'sieve-gap-failed': {
+    ru: 'сито {{sieve}} не пройдено: {{evidence}}',
+    en: 'sieve {{sieve}} failed: {{evidence}}',
+  },
 } as const satisfies Record<string, { ru: string; en: string }>;

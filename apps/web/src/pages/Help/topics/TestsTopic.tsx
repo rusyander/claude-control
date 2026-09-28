@@ -8,6 +8,7 @@ import { TestsHealthSections } from './TestsHealthSections';
 import { TestsExchangeSections } from './TestsExchangeSections';
 import { TestsLimitsSections } from './TestsLimitsSections';
 import { TestsNotesSection } from './TestsNotesSection';
+import { TestsE2eSection } from './TestsE2eSection';
 
 /**
  * Документ раздела «Тесты» — рабочее место тестировщика целиком.
@@ -59,11 +60,15 @@ export function TestsTopic() {
             { title: tr('vsChat'), text: tr('vsChatText') },
             { title: tr('vsCi'), text: tr('vsCiText') },
             { title: tr('vsProjects'), text: tr('vsProjectsText') },
+            { title: tr('vsProjectsLoad'), text: tr('vsProjectsLoadText') },
           ]}
         />
       </HelpSection>
 
       <TestsGuideSections />
+
+      {/* Код тестов рядом с кейсами: папка e2e, генерация спек и агент чата. */}
+      <TestsE2eSection />
 
       <HelpSection title={t('help.common.storageTitle')} caption={tr('storageCaption')}>
         <StorageCard
@@ -71,7 +76,7 @@ export function TestsTopic() {
           rows={[
             {
               label: tr('storageGroup'),
-              value: '<проект>/.agent/tests/<группа>.tests.json',
+              value: tr('storageGroupValue'),
               isMono: true,
             },
             { label: tr('storageShared'), value: '.agent/tests/_shared.steps.json', isMono: true },
@@ -86,7 +91,7 @@ export function TestsTopic() {
             { label: tr('storageRuns'), value: '.agent/tests/runs/<id>.run.json', isMono: true },
             {
               label: tr('storageAttachments'),
-              value: '.agent/tests/attachments/<кейс>/',
+              value: '.agent/tests/attachments/<caseId>/',
               isMono: true,
             },
             { label: tr('storageVersions'), value: tr('storageVersionsValue') },
@@ -259,6 +264,8 @@ export function TestsTopic() {
             { name: tr('runsSummary'), description: tr('runsSummaryText'), isMono: false },
             { name: tr('runsCoverage'), description: tr('runsCoverageText'), isMono: false },
             { name: tr('runsFlaky'), description: tr('runsFlakyText'), isMono: false },
+            { name: tr('runsFlakyMark'), description: tr('runsFlakyMarkText'), isMono: false },
+            { name: tr('runsCaseHistory'), description: tr('runsCaseHistoryText'), isMono: false },
             { name: tr('runsSpend'), description: tr('runsSpendText'), isMono: false },
             { name: tr('runsSession'), description: tr('runsSessionText'), isMono: false },
           ]}

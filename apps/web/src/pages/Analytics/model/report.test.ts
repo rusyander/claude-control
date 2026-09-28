@@ -214,6 +214,7 @@ function analytics(partial: Partial<Analytics> = {}): Analytics {
         isActive: false,
       },
     ],
+    periodSessions: 1,
     topTools: [],
     topSkills: [],
     runningAgents: [{ pid: 4242, name: 'claude.exe', memoryMb: 512 }],

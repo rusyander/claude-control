@@ -217,6 +217,65 @@ describe('ProviderChatService', () => {
     ]);
   });
 
+  it('строка тестов проекта — хвостом последней реплики, одной строкой и не в переписке', () => {
+    createChat(dir, 'codex', { id: 'wd', workdir: dir });
+    const asked: string[] = [];
+    service.setWorkspaceNote((cwd) => {
+      asked.push(cwd);
+      return 'QA workspace:\ne2e folder "e2e"';
+    });
+    service.send(dir, 'codex', 'wd', { text: 'напиши тест' }, { provider: PROVIDER });
+
+    const history = (run.options as { history: { content: string }[] }).history;
+    // Перевод строки убран: многострочный запрос через `.cmd` Windows не проходит.
+    expect(history.at(-1)?.content).toBe(
+      'напиши тест <agentdeck-workspace>QA workspace: e2e folder "e2e"</agentdeck-workspace>',
+    );
+    expect(asked).toEqual([dir]);
+    expect(readChat(dir, 'codex', 'wd')?.messages.map((message) => message.content)).toEqual([
+      'напиши тест',
+    ]);
+  });
+
+  /** F-164. Со вложением последняя строка — путь файла, и строка липла к нему. */
+  it('со вложением строка тестов идёт своей строкой, а не хвостом пути', () => {
+    createChat(dir, 'codex', { id: 'wd', workdir: dir });
+    service.setWorkspaceNote(() => 'QA workspace: e2e');
+    service.send(
+      dir,
+      'codex',
+      'wd',
+      { text: 'посмотри', attachments: ['C:/tmp/a.png'] },
+      { provider: PROVIDER },
+    );
+    const content = (run.options as { history: { content: string }[] }).history.at(-1)?.content;
+    expect(content?.split('\n').slice(-2)).toEqual([
+      'C:/tmp/a.png',
+      '<agentdeck-workspace>QA workspace: e2e</agentdeck-workspace>',
+    ]);
+  });
+
+  it('команда со слэша уходит без строки; сбой решателя отправку не срывает', () => {
+    createChat(dir, 'codex', { id: 'wd', workdir: dir });
+    service.setWorkspaceNote(() => 'note');
+    service.send(dir, 'codex', 'wd', { text: '/compact' }, { provider: PROVIDER });
+    expect((run.options as { history: { content: string }[] }).history.at(-1)?.content).toBe(
+      '/compact',
+    );
+    run.emit?.({ type: 'done', reply: 'ok', transport: 'stream' });
+    run.finish();
+
+    run = new FakeRun();
+    const failing = new ProviderChatService(() => run);
+    failing.setWorkspaceNote(() => {
+      throw new Error('boom');
+    });
+    failing.send(dir, 'codex', 'wd', { text: 'вопрос' }, { provider: PROVIDER });
+    expect((run.options as { history: { content: string }[] }).history.at(-1)?.content).toBe(
+      'вопрос',
+    );
+  });
+
   /**
    * Время ответа (Т1 партии чужих CLI). Меряет панель по своему прогону —
    * расход чужие CLI отдают не все и по-разному, а часы есть всегда. Меряется

@@ -7,69 +7,49 @@
     "n": 5,
     "why": "log line / internal error not shown as text"
   },
+  "bootstrap/watcher-capture.ts": {
+    "n": 9,
+    "why": "watcher signal text for WATCH-REPORT.md (human report, Russian by design): 5xx/4xx/409-loop/slow/log/CLI-exit wording"
+  },
   "domains/analytics/pricing-source.ts": {
     "n": 3,
     "why": "log line / internal error not shown as text"
   },
   "domains/assistant-runner/api.ts": {
     "n": 1,
-    "why": "agent prompt / text the model reads"
+    "why": "API error line shown to the human in the assistant reply"
   },
   "domains/assistant-runner/cli.ts": {
     "n": 3,
-    "why": "agent prompt / text the model reads"
+    "why": "CLI timeout / exit / missing-flag errors shown to the human"
   },
   "domains/assistant.ts": {
-    "n": 10,
-    "why": "agent prompt / text the model reads"
-  },
-  "domains/chat/ChatBranchGate.ts": {
-    "n": 6,
-    "why": "agent prompt / text the model reads: the denial that names the copy, the restart task, the refusal of the whole edit, the hand-to-group denial with its group line (Д15) and the copy-to-main-copy edit refusal (D4) — all travel to the agent as a tool result, never to the interface"
+    "n": 1,
+    "why": "CLI exit error shown in the form-assistant reply bubble (the prompt itself is English, D-E)"
   },
   "domains/chat/ChatExport.ts": {
     "n": 3,
     "why": "exported document / markdown written for another tool"
   },
-  "domains/chat/ChatPermissions.ts": {
-    "n": 3,
-    "why": "agent prompt / text the model reads"
-  },
   "domains/chat/ChatRecords.ts": {
     "n": 2,
-    "why": "exported document / markdown written for another tool"
+    "why": "exported document / markdown written for another tool; +3 mode word of a media chat title (Презентация/Правка презентации/Рисунок) — KNOWN GAP: English UI shows it Russian, title is a plain string with no code slot"
   },
   "domains/chat/ChatRunner.ts": {
     "n": 5,
-    "why": "agent prompt / text the model reads; +1 the `modelDropped` feed notice — same shape as detached-run.ts: the code travels for translation, the text for a client with no dictionary"
-  },
-  "domains/chat/child-tell.ts": {
-    "n": 1,
-    "why": "agent prompt / text the model reads: the parent's message header as the child sees it (Д7)"
-  },
-  "domains/chat/children-brief.ts": {
-    "n": 33,
-    "why": "agent prompt / text the model reads: the children brief prepended to a split parent's turn (Д6), stripped from the feed; +2 paused / limit-wait status lines (WP9e)"
+    "why": "run errors shown in the chat feed (model name rejected, spawn failed, exit code, request failed); +1 the `modelDropped` feed notice — the code travels for translation"
   },
   "domains/chat/detached-run.ts": {
     "n": 2,
-    "why": "agent prompt / text the model reads"
+    "why": "feed notices of a run picked up after a panel restart (the human reads them)"
   },
-  "domains/chat/initiative.ts": {
-    "n": 33,
-    "why": "agent prompt / text the model reads; +3 CHILD_PROMPT autonomy rule (take the recommended option, ask only irreversible/out-of-scope, journal 78) — appended to the split child's system prompt, never shown; +4 SPLIT_FOREGROUND_PROMPT (split group runs checks in the foreground, replaces BACKGROUND_PROMPT for children, journal 60b) — system-prompt append, never shown"
-  },
-  "domains/chat/mr-watch.ts": {
-    "n": 14,
-    "why": "agent prompt / text the model reads: the panel prompt resuming a delivered group with open MR threads or a red pipeline"
-  },
-  "domains/chat/run-retry.ts": {
-    "n": 2,
-    "why": "agent prompt / text the model reads: continuation after a failed turn (Д10)"
+  "domains/chat/panel-preamble-legacy.ts": {
+    "n": 17,
+    "why": "matching data: Russian openers of panel preambles in transcripts written before the D-E translation, never shown, never sent"
   },
   "domains/chat/split-conveyor.ts": {
-    "n": 29,
-    "why": "composed list explanation / git output assembly; agent prompts of the panel to a group (branch/tickets line, delivery-gap nudge, interrupted-turn resume, limit-reset resume and paused-group resume — WP9e +8). group.error / deliveryMissing texts are coded (split-group-texts.ts, errorCode/deliveryMissingCodes in the view)"
+    "n": 9,
+    "why": "feed notices of the triage outcome (applied / not received) the human reads in the parent chat; every prompt to a group is English (D-E)"
   },
   "domains/chat/split-overlap.ts": {
     "n": 9,
@@ -77,11 +57,11 @@
   },
   "domains/chat/split-review.ts": {
     "n": 14,
-    "why": "agent prompt / text the model reads, plus reviewNoticeText: the review outcome line in a foreign CLI feed, where the stored string is its ONLY carrier (the Claude feed renders the event card instead)"
+    "why": "review outcome the human reads: the MR comment written INTO the forge, the feed notice and reviewNoticeText in a foreign CLI feed"
   },
   "domains/commands/claude.ts": {
     "n": 4,
-    "why": "agent prompt / text the model reads"
+    "why": "passport notes of the command palette (plugin registry version, missing install dir) the human reads"
   },
   "domains/dlp/default-rules.ts": {
     "n": 32,
@@ -105,7 +85,7 @@
   },
   "domains/env-transfer/prompts.ts": {
     "n": 4,
-    "why": "agent prompt / text the model reads"
+    "why": "import refusals of the prompts section of an environment archive, shown to the human"
   },
   "domains/env-transfer/readme.ts": {
     "n": 17,
@@ -116,7 +96,7 @@
     "why": "internal invariant: a path the caller must pass (never reaches a response)"
   },
   "domains/format-check.ts": {
-    "n": 3,
+    "n": 2,
     "why": "log line / internal error not shown as text"
   },
   "domains/group-activation.ts": {
@@ -128,12 +108,16 @@
     "why": "validation of a draft written by the agent: the text answers the agent, not a screen"
   },
   "domains/group-scenario.ts": {
-    "n": 7,
-    "why": "agent prompt / text the model reads"
+    "n": 4,
+    "why": "file content: the scenario body written into the group skill the human edits; byte-compared with the legacy compiled output"
+  },
+  "domains/groups/knob-candidates.ts": {
+    "n": 17,
+    "why": "parser vocabulary: Russian stems (agent, reviewer, pass, retry…) matched inside the human's rule text to find numeric knobs; never shown"
   },
   "domains/hook-scripts.ts": {
-    "n": 8,
-    "why": "agent prompt / text the model reads"
+    "n": 7,
+    "why": "file content: Russian comments of the generated hook script the human edits"
   },
   "domains/integrations/atlassian/client.ts": {
     "n": 1,
@@ -163,12 +147,8 @@
     "n": 5,
     "why": "RU twin of the already coded failureCode (the code travels beside it)"
   },
-  "domains/integrations/links.ts": {
-    "n": 4,
-    "why": "context line assembled for the agent prompt"
-  },
   "domains/integrations/publish.ts": {
-    "n": 6,
+    "n": 4,
     "why": "exported document / markdown written for another tool"
   },
   "domains/integrations/tms/testit.ts": {
@@ -249,23 +229,23 @@
   },
   "domains/panel-agent/conversations.ts": {
     "n": 1,
-    "why": "internal id invariant (never reaches a response)"
+    "why": "internal id invariant; the sealed-turn footer is English (sealFooter in contracts panel-agent-feed) and the window renders the human note from the seal code"
   },
   "domains/panel-agent/data-mask.ts": {
     "n": 3,
-    "why": "agent prompt / text the model reads"
+    "why": "DLP refusal the human reads + the mask label КЛЮЧ, the same label as the built-in DLP rule (user-editable data, kept identical on purpose)"
   },
   "domains/panel-agent/help-topics.ts": {
-    "n": 3,
-    "why": "agent prompt / text the model reads"
+    "n": 4,
+    "why": "internal invariant errors of the help index parser (never shown, never sent) + the Russian word endings the help search stems with (matching data, never shown)"
   },
   "domains/panel-agent/launch.ts": {
     "n": 6,
-    "why": "agent prompt / text the model reads"
+    "why": "launch refusals shown on the panel agent card"
   },
   "domains/panel-agent/runner.ts": {
     "n": 4,
-    "why": "agent prompt / text the model reads"
+    "why": "turn errors shown on the panel agent card"
   },
   "domains/permissions.ts": {
     "n": 1,
@@ -304,8 +284,8 @@
     "why": "frame notes for unknown upstream frames: trace payload, not rendered"
   },
   "domains/platform/gateway/native-tools.ts": {
-    "n": 4,
-    "why": "vendor-tool manifest note + the tool-result body handed to the model, never rendered"
+    "n": 2,
+    "why": "KNOWN GAP (model text, contour lane): vendor-tool manifest note + the tool-result body handed to the model"
   },
   "domains/platform/gateway/spend-flush.ts": {
     "n": 7,
@@ -315,25 +295,13 @@
     "n": 4,
     "why": "Russian word forms of the claim regex: matching data, never shown"
   },
-  "domains/platform/gateway/tool-shim/encode.ts": {
-    "n": 3,
-    "why": "protocol text the model reads (tool name fallback, error prefix)"
-  },
-  "domains/platform/gateway/tool-shim/protocol.ts": {
-    "n": 2,
-    "why": "protocol text declaring the tools to the model"
-  },
   "domains/platform/redact.ts": {
     "n": 1,
     "why": "mask placeholder inside the request trace"
   },
-  "domains/platform/routing.ts": {
-    "n": 6,
-    "why": "model-routing prompt text the CLI reads"
-  },
   "domains/platform/smoke-tools.ts": {
     "n": 2,
-    "why": "smoke prompt the model reads"
+    "why": "KNOWN GAP (model text, contour lane): smoke prompt and probe tool description the model reads"
   },
   "domains/plugins/actions.ts": {
     "n": 2,
@@ -351,13 +319,13 @@
     "n": 4,
     "why": "transfer failure texts thrown at the caller (backups off, target not writable, write failed and was rolled back); each carries its messageCode via coded(…), and the route answers with the code — the string stays the fallback"
   },
-  "domains/portability/carry-context.ts": {
-    "n": 4,
-    "why": "the two feed notices of a carried conversation (what travelled, and that the source is neither closed nor changed); in a foreign chat the stored string is their ONLY carrier, while the Claude branch sends the same text with code `contextCarried` — same shape as ChatRunner's modelDropped"
-  },
   "domains/portability/canon.ts": {
     "n": 1,
     "why": "invariant violation thrown at the caller (empty needs list); unreachable by construction, never an answer to the person"
+  },
+  "domains/portability/carry-context.ts": {
+    "n": 4,
+    "why": "the two feed notices of a carried conversation (what travelled, and that the source is neither closed nor changed); in a foreign chat the stored string is their ONLY carrier, while the Claude branch sends the same text with code `contextCarried` — same shape as ChatRunner's modelDropped"
   },
   "domains/portability/emit/context.ts": {
     "n": 7,
@@ -451,14 +419,6 @@
     "n": 3,
     "why": "the reason a person reads when a supervisor hook denies the run or is killed on timeout — it reaches the chat, never an API answer (П3.2)"
   },
-  "domains/portability/supervisor/skills-router.ts": {
-    "n": 2,
-    "why": "the skill catalog heading and the 'read this file' pointer — text the TARGET model reads inside the prompt, not panel UI, so it is not a server-texts key (П3.4)"
-  },
-  "domains/portability/supervisor/subagents.ts": {
-    "n": 1,
-    "why": "the skills heading inside a subagent's own instructions — read by the target model, same channel as the prompt (П3.4)"
-  },
   "domains/portability/types.ts": {
     "n": 1,
     "why": "importer-missing error text; the route answers with the coded reply instead"
@@ -469,15 +429,11 @@
   },
   "domains/project-git/bootstrap.ts": {
     "n": 8,
-    "why": "agent prompt / text the model reads"
+    "why": "log lines appended to the copy-preparation log the human opens"
   },
   "domains/project-runner/registry.ts": {
     "n": 3,
     "why": "log line / internal error not shown as text"
-  },
-  "domains/project-tests/convention.ts": {
-    "n": 1,
-    "why": "agent prompt / text the model reads"
   },
   "domains/project-tests/defect-status.ts": {
     "n": 9,
@@ -487,17 +443,37 @@
     "n": 22,
     "why": "exported document / markdown written for another tool"
   },
+  "domains/project-tests/e2e-parse-pytest.ts": {
+    "n": 4,
+    "why": "regex vocabulary of test scenarios (Given/When/Then words in Russian)"
+  },
+  "domains/project-tests/e2e-parse.ts": {
+    "n": 4,
+    "why": "parsing a foreign format / matching foreign text"
+  },
+  "domains/project-tests/e2e-run.ts": {
+    "n": 6,
+    "why": "run history scope labels (stored record text, same as other run scopes) + the timeout line appended to the command's own log"
+  },
+  "domains/project-tests/e2e-scaffold.ts": {
+    "n": 1,
+    "why": "file content written into the user's project"
+  },
   "domains/project-tests/export-cases.ts": {
     "n": 61,
     "why": "exported document / markdown written for another tool"
   },
-  "domains/project-tests/export-release.ts": {
-    "n": 68,
-    "why": "exported document / markdown written for another tool"
+  "domains/project-tests/export-release-texts.ts": {
+    "n": 47,
+    "why": "exported milestone readiness dictionary: the ru half of a ru/en pair picked by the exporter's interface language (E1 28.09); en sibling in the same object; export-release.ts itself went to 0"
+  },
+  "domains/project-tests/export-run-texts.ts": {
+    "n": 55,
+    "why": "exported run report dictionary: the ru half of a ru/en pair picked by the exporter's interface language (L8 28.09); en sibling in the same object"
   },
   "domains/project-tests/export-run.ts": {
-    "n": 55,
-    "why": "exported document / markdown written for another tool"
+    "n": 1,
+    "why": "unknown-format guard: the route answers its own coded 400 before reaching it; report words live in export-run-texts.ts"
   },
   "domains/project-tests/generate-sources.ts": {
     "n": 1,
@@ -512,7 +488,7 @@
     "why": "composed explanation list / stored user-owned default"
   },
   "domains/project-tests/import-cases.ts": {
-    "n": 63,
+    "n": 62,
     "why": "matching data: foreign header aliases / stopwords, never shown"
   },
   "domains/project-tests/import-manual-cases.ts": {
@@ -520,8 +496,8 @@
     "why": "heuristics of a foreign manual format: matching data, never shown"
   },
   "domains/project-tests/import-results.ts": {
-    "n": 2,
-    "why": "text written INTO the imported case record + import scope name stored with it"
+    "n": 1,
+    "why": "import scope name stored with the run record (the retry-pass phrase became the flakyAttempts field, F-355)"
   },
   "domains/project-tests/library.ts": {
     "n": 8,
@@ -544,27 +520,27 @@
     "why": "media: plan reasons translated client-side by key / nested decode reasons"
   },
   "domains/project-tests/prompt.ts": {
-    "n": 188,
-    "why": "agent prompt / text the model reads"
+    "n": 10,
+    "why": "runName: the run title shown in the chat list (the task itself is English, D-E); REGRESSION_TAGS/regressionTag: the regression tag value in the library language (F-63) — data the human filters by, not a message"
   },
   "domains/project-tests/release.ts": {
     "n": 8,
     "why": "exported document / markdown written for another tool"
+  },
+  "domains/project-tests/repair.ts": {
+    "n": 2,
+    "why": "ORPHAN_RUN_ERROR stored in the run record `error` field — KNOWN GAP: run records carry no errorCode, English UI shows it Russian"
   },
   "domains/project-tests/risk.ts": {
     "n": 16,
     "why": "composed explanation list / stored user-owned default"
   },
   "domains/project-tests/run-permissions.ts": {
-    "n": 9,
-    "why": "agent prompt / text the model reads"
-  },
-  "domains/project-tests/runs-store.ts": {
     "n": 1,
-    "why": "grouping key for cases without an area"
+    "why": "internal error thrown at the caller when the permission receiver got no port"
   },
   "domains/project-tests/runs.ts": {
-    "n": 15,
+    "n": 24,
     "why": "run-log notes: a free-text log of the run, kept as the agent wrote it"
   },
   "domains/project-tests/similar.ts": {
@@ -572,8 +548,8 @@
     "why": "matching data: foreign header aliases / stopwords, never shown"
   },
   "domains/project-tests/store.ts": {
-    "n": 7,
-    "why": "stored defaults of a new library (group descriptions, copy suffix) + strictValue field labels"
+    "n": 12,
+    "why": "stored defaults of a new library (group descriptions, copy suffix) + strictValue field labels (Тип, Тип ссылки, Приоритет, Готовность, Статус автоматизации)"
   },
   "domains/project-tests/taxonomy.ts": {
     "n": 4,
@@ -585,43 +561,35 @@
   },
   "domains/prompt-gate.ts": {
     "n": 2,
-    "why": "agent prompt / text the model reads"
+    "why": "hook-missing error shown on the prompt gate card"
   },
   "domains/prompt-gate/script.ts": {
     "n": 1,
-    "why": "agent prompt / text the model reads"
+    "why": "file content: the generated prompt-gate hook, its comments and the block reason the human sees"
   },
   "domains/prompts/catalog.ts": {
     "n": 1,
-    "why": "agent prompt / text the model reads"
+    "why": "internal invariant error: a prompt id missing from the catalog"
   },
   "domains/prompts/errors.ts": {
     "n": 1,
-    "why": "agent prompt / text the model reads"
-  },
-  "domains/provider-chat/ProviderChatRun.ts": {
-    "n": 8,
-    "why": "agent prompt / text the model reads, plus the supervisor refusal reason a person reads in the chat when a hook denies the run (П3.2)"
+    "why": "size refusal of an edited prompt, shown to the human"
   },
   "domains/provider-chat/cascade.ts": {
     "n": 8,
-    "why": "agent prompt / text the model reads"
+    "why": "stage words of a stored chat title and the plan-missing feed notice the human reads"
   },
   "domains/provider-chat/handoff.ts": {
     "n": 10,
-    "why": "agent prompt / text the model reads"
+    "why": "continuation titles and the refusal / feed texts of a foreign-CLI continuation the human reads"
   },
-  "domains/provider-chat/prompt.ts": {
-    "n": 1,
-    "why": "agent prompt / text the model reads"
+  "domains/provider-chat/ProviderChatRun.ts": {
+    "n": 8,
+    "why": "run errors and the supervisor refusal reason a person reads in the chat when a hook denies the run (П3.2)"
   },
   "domains/provider-chat/store.ts": {
     "n": 3,
     "why": "stored default title of a foreign-CLI chat record (the user renames it)"
-  },
-  "domains/provider-check/steps-assistant.ts": {
-    "n": 1,
-    "why": "probe prompt sent to the model"
   },
   "domains/provider-compare/sections.ts": {
     "n": 5,
@@ -679,17 +647,13 @@
     "n": 5,
     "why": "outbound notification to an external channel (phone push / Telegram)"
   },
-  "domains/resources/ResourceAssistant.ts": {
-    "n": 17,
-    "why": "agent prompt / text the model reads"
-  },
   "domains/resources/templates.ts": {
     "n": 20,
     "why": "file content / template / parsed foreign format"
   },
   "domains/rules.ts": {
-    "n": 3,
-    "why": "file content assembled for CLAUDE.md (blocks written to disk)"
+    "n": 1,
+    "why": "file content assembled for CLAUDE.md: the «## ПРАВИЛО:» heading written to disk (disabled rules no longer carry a Russian service note — F1)"
   },
   "domains/sandbox/HookEvents.ts": {
     "n": 4,
@@ -714,6 +678,18 @@
   "domains/skills/write.ts": {
     "n": 1,
     "why": "file content / template / parsed foreign format"
+  },
+  "domains/watcher/analyzer.ts": {
+    "n": 2,
+    "why": "watcher problem.detail raw reason (timeout/no reply); coded by problemCode analysis_failed"
+  },
+  "domains/watcher/report-texts.ts": {
+    "n": 75,
+    "why": "WATCH-REPORT.md dictionary: the ru half of a ru/en pair picked by the panel UI language (owner 27.09); moved out of report.ts, which now holds none"
+  },
+  "domains/watcher/watcher.ts": {
+    "n": 1,
+    "why": "watcher fallback text (problem.message / report placeholder); client renders watcher.problem.<code>"
   },
   "index.ts": {
     "n": 5,
@@ -788,8 +764,8 @@
     "why": "path-rejection detail composed inside an error class"
   },
   "lib/server-texts/templates.ts": {
-    "n": 354,
-    "why": "RU side of the server text table: every line here IS a code, this is the one file where a Russian literal is the data. The generator and its manifest are gone from the tree (see the file header) — a new code is written by hand and `n` rises with it"
+    "n": 373,
+    "why": "RU side of the server text table: every line here IS a code, this is the one file where a Russian literal is the data. The generator and its manifest are gone from the tree (see the file header) — a new code is written by hand and `n` rises with it; +6 sieve-gap-* codes of the pre-MR sieves (28.09)"
   },
   "providers/catalog/kimi.ts": {
     "n": 1,
@@ -804,20 +780,16 @@
     "why": "zod issue detail list (issues[]) not rendered by clients"
   },
   "routes/chat/handoff-routes.ts": {
-    "n": 2,
-    "why": "agent prompt / text the model reads; +1 the default title of a foreign-CLI continuation chat when the caller names none (same case as domains/provider-chat/store.ts — a stored record the person renames)"
+    "n": 1,
+    "why": "stored default title of a foreign-CLI continuation chat when the caller names none (the user renames it)"
   },
   "routes/chat/run-routes.ts": {
-    "n": 2,
-    "why": "agent prompt / text the model reads"
+    "n": 1,
+    "why": "RUN_BUSY_MESSAGE fallback text of a coded refusal the human reads"
   },
   "routes/chat/split-launch.ts": {
     "n": 4,
-    "why": "agent prompt / text the model reads, plus the stage suffix of a stored chat title (правки/ревью/отправка)"
-  },
-  "routes/chat/split-routes.ts": {
-    "n": 1,
-    "why": "agent prompt / text the model reads"
+    "why": "stored chat title parts: the triage chat title and the stage suffix (правки/ревью/отправка)"
   },
   "routes/entity/mcp-routes.ts": {
     "n": 1,
@@ -833,35 +805,115 @@
   },
   "routes/panel-agent/action-kit.ts": {
     "n": 2,
-    "why": "agent prompt / text the model reads"
+    "why": "diff body placeholder of the preview card the human confirms"
   },
   "routes/panel-agent/actions-app.ts": {
     "n": 1,
-    "why": "agent prompt / text the model reads"
+    "why": "default DLP rule label ДАННЫЕ (user data, written into the rule record)"
+  },
+  "routes/panel-agent/actions-chat-control.ts": {
+    "n": 7,
+    "why": "model-facing action descriptions quote the Russian UI label the human names (split buttons «Разделить задачи по чатам» / «Разделить на N чата», the Chat page «Проекты» tab) so the model maps the human's words to the action; never shown to the human"
+  },
+  "routes/panel-agent/actions-chat.ts": {
+    "n": 3,
+    "why": "model-facing action descriptions quote the Russian UI label the human names (split buttons «Разделить задачи по чатам» / «Разделить на N чата», the Chat page «Проекты» tab) so the model maps the human's words to the action; never shown to the human"
   },
   "routes/panel-agent/actions-config.ts": {
     "n": 1,
-    "why": "agent prompt / text the model reads"
+    "why": "diff body placeholder of the preview card the human confirms"
   },
-  "routes/panel-agent/actions-contour.ts": {
+  "routes/panel-agent/actions-entities-extra.ts": {
+    "n": 1,
+    "why": "diff body placeholder of the preview card the human confirms"
+  },
+  "routes/panel-agent/actions-gaps-chat.ts": {
+    "n": 7,
+    "why": "model-facing action descriptions quote the Russian UI label the human names («Закрыть этап», «Подбирать модель под задачу», «Пересечения», «Принять», «Снять отметку») so the model maps the human's words to the action; never shown to the human"
+  },
+  "routes/panel-agent/actions-gaps-settings.ts": {
     "n": 2,
-    "why": "agent prompt / text the model reads"
+    "why": "model-facing action descriptions quote the Russian UI label the human names (settings buttons) so the model maps the human's words to the action; never shown to the human"
+  },
+  "routes/panel-agent/actions-gaps-tests.ts": {
+    "n": 3,
+    "why": "model-facing action descriptions quote the Russian UI label the human names (Tests block buttons) so the model maps the human's words to the action; never shown to the human"
+  },
+  "routes/panel-agent/actions-groups-sources.ts": {
+    "n": 1,
+    "why": "diff body placeholder of the preview card the human confirms"
+  },
+  "routes/panel-agent/actions-integrations-read.ts": {
+    "n": 1,
+    "why": "integration-link card: the too-large-diff placeholder inside the diff body, same as stateCard in action-kit.ts (the card flags truncated: true, the window shows its own text)"
+  },
+  "routes/panel-agent/actions-panel.ts": {
+    "n": 1,
+    "why": "diff body placeholder for a truncated file inside the preview diff text (content, not a label)"
+  },
+  "routes/panel-agent/actions-project-config.ts": {
+    "n": 1,
+    "why": "too-large-diff placeholder inside the diff body of the preview card, same as stateCard in action-kit.ts"
+  },
+  "routes/panel-agent/actions-tests-setup.ts": {
+    "n": 1,
+    "why": "data: the «(копия)» suffix of a copied Tests-block item title, written into the project store in the human's language like the web copy action"
+  },
+  "routes/panel-agent/project-actions.harness.ts": {
+    "n": 1,
+    "why": "test harness: a fixture project name, never shipped"
   },
   "routes/panel-agent/registry.ts": {
     "n": 2,
-    "why": "agent prompt / text the model reads"
+    "why": "internal invariant errors of the action registry, thrown at the developer"
   },
   "routes/panel-agent/run-routes.ts": {
+    "n": 3,
+    "why": "internal invariant + conversation_stale / conversation_deleted fallbacks (coded by refuse(); underscore code invisible to the detector)"
+  },
+  "routes/panel-agent/secret-sweep.fixture.ts": {
     "n": 1,
-    "why": "internal invariant of the conversation shape"
+    "why": "test fixture: a rule heading seeded into a throwaway config dir for the secret sweep, never shipped"
   },
   "routes/panel-agent/sections.ts": {
     "n": 1,
-    "why": "agent prompt / text the model reads"
+    "why": "internal invariant error: an empty section list"
+  },
+  "routes/panel-agent/tests-block-kit.ts": {
+    "n": 5,
+    "why": "bilingual status labels {ru,en} of Tests-block results; the language is picked per reply, the en side is the pair"
+  },
+  "routes/panel-agent/texts-chat-sandbox-agents.ts": {
+    "n": 49,
+    "why": "fallback RU table of U5c panel-agent codes (chat session and files, editor, sandbox, contour agents and embeddings): each line is addressed by PanelTextCode and translated by the window"
+  },
+  "routes/panel-agent/texts-chat.ts": {
+    "n": 46,
+    "why": "fallback RU table of panel-agent codes: each line is addressed by PanelTextCode and translated by the window (U1 chat actions)"
+  },
+  "routes/panel-agent/texts-gaps.ts": {
+    "n": 57,
+    "why": "fallback RU table of lane-A gap-closing panel-agent codes (chat modes, cascade, split accept/resume, provider check, resource summary, defects, e2e folder): each line is addressed by PanelTextCode and translated by the window"
+  },
+  "routes/panel-agent/texts-groups-entities.ts": {
+    "n": 65,
+    "why": "fallback RU table of U5a panel-agent codes (groups by scope, entity rows, skill files): each line is addressed by PanelTextCode and translated by the window"
+  },
+  "routes/panel-agent/texts-manage.ts": {
+    "n": 108,
+    "why": "fallback RU table of U5b panel-agent codes (settings, dlp, contour manage, integrations read, portability, analytics, backups, plugin scaffold, pre-MR sieves): each line is addressed by PanelTextCode and translated by the window"
+  },
+  "routes/panel-agent/texts-projects.ts": {
+    "n": 78,
+    "why": "fallback RU table of panel-agent codes: each line is addressed by PanelTextCode and translated by the window (project actions)"
+  },
+  "routes/panel-agent/texts-tests-block.ts": {
+    "n": 86,
+    "why": "fallback RU table of panel-agent codes: each line is addressed by PanelTextCode and translated by the window (Tests block actions)"
   },
   "routes/panel-agent/texts.ts": {
-    "n": 249,
-    "why": "fallback RU table of panel-agent codes: each line is addressed by PanelTextCode and translated by the window; +11 note codes of the preview card"
+    "n": 312,
+    "why": "fallback RU table of panel-agent codes: each line is addressed by PanelTextCode and translated by the window; +11 note codes of the preview card; +12 group read/draft/step/knob codes; +3 scenario draft codes; +4 group copy codes; +9 e2e-folder preview codes of create_project (F-53)"
   },
   "routes/portability-routes.ts": {
     "n": 4,

@@ -429,7 +429,7 @@ describe('тексты звеньев', () => {
   it('ревью запрещает правки и требует блок вердикта', () => {
     const prompt = reviewStagePrompt({ task: 'Переименуй foo в bar', model: 'sonnet' });
 
-    expect(prompt).toContain('НИЧЕГО НЕ ПРАВЬ');
+    expect(prompt).toContain('EDIT NOTHING');
     expect(prompt).toContain(REVIEW_BLOCK_LANG);
     expect(prompt).toContain('Переименуй foo в bar');
   });
@@ -440,7 +440,7 @@ describe('тексты звеньев', () => {
     expect(prompt).toContain('1. первое');
     expect(prompt).toContain('2. второе');
     expect(prompt).toContain('split/rename');
-    expect(prompt).toContain('модель сильнее');
+    expect(prompt).toContain('a stronger model');
   });
 
   /**
@@ -451,8 +451,8 @@ describe('тексты звеньев', () => {
   it('правки у чужого CLI не называют ревьюера сильнейшим', () => {
     const prompt = fixStagePrompt(['первое'], { reviewer: 'cli' });
 
-    expect(prompt).toContain('другая модель');
-    expect(prompt).not.toContain('модель сильнее');
+    expect(prompt).toContain('another model');
+    expect(prompt).not.toContain('a stronger model');
   });
 
   /**
@@ -460,22 +460,22 @@ describe('тексты звеньев', () => {
    * о проверке, оставляет незаконченное незаконченным.
    */
   it('планка сдачи обещает ревью, а не только проверки проекта', () => {
-    expect(loweredWorkPrompt('mechanical')).toContain('ревью');
-    expect(loweredWorkPrompt('mechanical')).toContain('модели-потолке');
+    expect(loweredWorkPrompt('mechanical')).toContain('review');
+    expect(loweredWorkPrompt('mechanical')).toContain('on the ceiling model');
   });
 
   /** Тот же текст чужому CLI: ступень отсчитывается от настройки CLI, не от потолка. */
   it('планка сдачи у чужого CLI обещает ревью настроенной моделью CLI', () => {
     const prompt = loweredWorkPrompt('mechanical', { reviewer: 'cli' });
 
-    expect(prompt).toContain('настроенной моделью самого CLI');
-    expect(prompt).not.toContain('потолка разговора');
+    expect(prompt).toContain('the model the CLI itself is configured with');
+    expect(prompt).not.toContain('ceiling of the conversation');
   });
 
   /** Правки — конец цепочки: обещать по ним ещё одно ревью нечем. */
   it('планка сдачи без ревью говорит об этом прямо', () => {
     const prompt = loweredWorkPrompt('mechanical', { review: false });
 
-    expect(prompt).toContain('Ревью этой работы панель не заведёт');
+    expect(prompt).toContain('The panel will not start a review of this work');
   });
 });

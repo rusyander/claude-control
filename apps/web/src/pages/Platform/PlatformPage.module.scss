@@ -194,3 +194,46 @@
     min-width: 0;
   }
 }
+
+/* Сторона, снятая выбором «чьи правила действуют» (баг 11б): рамка пунктиром и
+   надпись словами, а не прозрачность — приглушённый текст проваливал контраст
+   (axe), а значения на ней живые и правятся, выбор снимает их только с прогона. */
+.rulesColumnOff.rulesColumnOff {
+  border-style: dashed;
+}
+
+// Снятые выбором наши слои — пунктиром вокруг блока слоёв, а не всей колонки:
+// маска и прослойка рядом действуют (F-243).
+.layersOff {
+  padding: var(--spacing-xs);
+  border: 1px dashed var(--color-border);
+  border-radius: 8px;
+}
+
+.sideOffNote {
+  padding: var(--spacing-2xs) var(--spacing-xs);
+  border: 1px dashed var(--color-border);
+  border-radius: 8px;
+}
+
+/* Пересечение с правилом другой стороны — под строкой, которой касается:
+   полоса слева отделяет его от описания самой строки. */
+.overlap {
+  padding-left: var(--spacing-xs);
+  border-left: 2px solid var(--color-border);
+}
+
+/* Разделы через контур на карточке: строка раздела — тумблер, имя и состояние. */
+.sectionRow {
+  padding: var(--spacing-3xs) 0;
+}
+
+.sectionRow + .sectionRow {
+  border-top: 1px solid var(--color-border);
+}
+
+/* Место тумблера у строки без тумблера: имена разделов стоят одной колонкой. */
+.sectionGap {
+  flex: none;
+  width: 32px;
+}

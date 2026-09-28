@@ -4,6 +4,9 @@ import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { ModelInfo } from '@agentdeck/contracts';
+import { ESCALATE_LINE } from '@agentdeck/contracts/model-cascade';
+import { writePanelJson } from '../lib/app-store/group-sources.ts';
+import { foreignChildExtra } from '../domains/chat/group-run-lines.ts';
 import { AppStore } from '../lib/app-store.ts';
 import type { ServerContext } from '../context.ts';
 import { registerChatSplitRoutes } from './chat/split-routes.ts';
@@ -143,12 +146,12 @@ describe('POST /api/chat/split — чужой провайдер', () => {
   it('понижённой группе дописывается планка сдачи, группе на потолке — нет', async () => {
     await split();
 
-    expect(runs[0]?.systemPrefix).toContain('НИЖЕ той, которой CLI работает');
+    expect(runs[0]?.systemPrefix).toContain('BELOW the one the CLI uses by its own setting');
     // Ревью здесь обещается, но не «моделью-потолком»: потолка у чужого CLI нет,
     // и проверку панель заводит прогоном без подобранной ступени.
-    expect(runs[0]?.systemPrefix).toContain('настроенной моделью самого CLI');
-    expect(runs[0]?.systemPrefix ?? '').not.toContain('потолка разговора');
-    expect(runs[1]?.systemPrefix ?? '').not.toContain('НИЖЕ');
+    expect(runs[0]?.systemPrefix).toContain('on the model the CLI itself is configured with');
+    expect(runs[0]?.systemPrefix ?? '').not.toContain('the ceiling of the conversation');
+    expect(runs[1]?.systemPrefix ?? '').not.toContain('BELOW');
   });
 
   /**
@@ -173,6 +176,51 @@ describe('POST /api/chat/split — чужой провайдер', () => {
 
     const ceiling = listChats(appData, 'codex').find((item) => item.title === 'Архитектура');
     expect(readChatCascade(appData, 'codex', ceiling?.id ?? '')).toBe(undefined);
+  });
+
+  // Раунд 5: чужие дети получали без чисел группы и без строки эскалации то,
+  // что ребёнок Claude получает в дописке (`childStageExtra`).
+  it('ребёнок получает числа группы родителя и строку эскалации — как у Claude', async () => {
+    store.saveGroup({
+      id: 'x',
+      name: 'Набор X',
+      description: '',
+      color: 'accent',
+      icon: 'folder',
+      members: [{ kind: 'skill', id: 'ladder' }],
+      env: {},
+      projectPaths: [],
+      knobs: { 'ladder:review-rounds': 4 },
+      isEnabled: true,
+      order: 0,
+    });
+    writePanelJson(appData, 'skill-knobs.json', {
+      'global|skill:ladder': {
+        hash: 'h',
+        knobs: [
+          {
+            key: 'review-rounds',
+            skillId: 'ladder',
+            label: { ru: 'Круги ревью', en: 'Review rounds' },
+            default: 2,
+            min: 1,
+            max: 5,
+            quote: 'Run 2 review rounds.',
+          },
+        ],
+      },
+    });
+    store.setChatGroupSettings('codex:родитель', { groupChoice: 'global:x' });
+
+    await split();
+
+    expect(runs).toHaveLength(2);
+    for (const run of runs) {
+      expect(run.systemPrefix).toContain(ESCALATE_LINE);
+      expect(run.systemPrefix).toContain('ladder — Review rounds: 4 (skill default 2)');
+      // Та же строка, что соберут ответ человека, переход стадии и продолжение.
+      expect(run.systemPrefix).toContain(foreignChildExtra(store, appData, `codex:${run.chatId}`));
+    }
   });
 
   it('разговор называется группой, а не служебным ключом', async () => {

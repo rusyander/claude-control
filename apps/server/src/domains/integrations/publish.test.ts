@@ -6,6 +6,8 @@ import type { ProjectTestRunRecord } from '@agentdeck/contracts';
 import { AppStore } from '../../lib/app-store.ts';
 import { createGroup, upsertCase } from '../project-tests/store.ts';
 import { writeRun } from '../project-tests/runs-store.ts';
+import { runToMarkdown } from '../project-tests/export-run.ts';
+import { RUN_TEXTS } from '../project-tests/export-run-texts.ts';
 import { writeLink } from './links.ts';
 import { commentText, markdownToStorage, publishRun } from './publish.ts';
 import { writeSettings, writeToken } from './store.ts';
@@ -212,9 +214,21 @@ describe('markdown отчёта → storage Confluence', () => {
   });
 
   it('комментарий Jira обрезается перед таблицей, а без неё остаётся целым', () => {
-    expect(commentText('# Шапка\n\n## Что упало\n\nнет\n\n## Проходы\n\n| a |')).toBe(
+    const table = `## Проходы\n\n| ${RUN_TEXTS.ru.columns.join(' | ')} |`;
+    expect(commentText(`# Шапка\n\n## Что упало\n\nнет\n\n${table}`)).toBe(
       '# Шапка\n\n## Что упало\n\nнет',
     );
+    expect(commentText(`# Head\n\n## Passes\n\n${RUN_TEXTS.en.noResults}`)).toBe('# Head');
     expect(commentText('# Шапка\n\nвсё')).toBe('# Шапка\n\nвсё');
+  });
+
+  // Ревью 28.09 (F-266): резали по ПЕРВОЙ строке «## Проходы» — заметка упавшего
+  // кейса с такой строкой обрывала комментарий посреди списка упавшего.
+  it('строка «## Проходы» в заметке кейса не обрывает комментарий', () => {
+    const note = 'кнопка серая\n## Проходы\nподробности ниже';
+    const markdown = runToMarkdown({ ...RUN, results: [{ ...RUN.results[0]!, note }] }, [], 'ru');
+    const comment = commentText(markdown);
+    expect(comment).toContain('подробности ниже');
+    expect(comment).not.toContain(`| ${RUN_TEXTS.ru.columns.join(' | ')} |`);
   });
 });

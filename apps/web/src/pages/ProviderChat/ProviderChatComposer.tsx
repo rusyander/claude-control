@@ -1,10 +1,16 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { ChatModeMenu } from '@features/ChatComposer';
+import {
+  ImageAttachButton,
+  ImageAttachTray,
+  ImageAttachZone,
+  useImageAttach,
+} from '@shared/ui/image-attach';
 import type { ProviderChatComposerProps } from './ProviderChatComposer.types';
 import styles from './ProviderChatPage.module.scss';
 
@@ -27,15 +33,41 @@ export function ProviderChatComposer({
   const isDeck = modes?.mode === 'deck';
   const isMedia = isImage || isDeck;
   const isDrawing = Boolean(modes?.isDrawing);
+  // Картинки — тем же общим вложением, что у всех полей агента; в неттекстовом
+  // режиме вложения не участвуют, как и файлы.
+  const attach = useImageAttach({ disabled: Boolean(isBlocked) || isMedia });
+
+  // Отправка идёт, пока картинки кладутся к панели: `isRunning` встаёт только
+  // после этого, и второй Enter за это время отправлял то же сообщение ещё раз
+  // (ревью 28.09 F-92). Ref — для второго нажатия до перерисовки, состояние — для
+  // кнопки.
+  const sendingRef = useRef(false);
+  const [isSending, setIsSending] = useState(false);
 
   const submit = (): void => {
     const text = input.trim();
-    if (!text || isRunning || isBlocked || isDrawing) return;
+    if (!text || sendingRef.current || isRunning || isBlocked || isDrawing || attach.isPreparing) {
+      return;
+    }
+    sendingRef.current = true;
+    setIsSending(true);
+    const sentInput = input;
+    const sentIds = isMedia ? [] : attach.items.map((item) => item.id);
     // Поле чистим только после «да»: отказ (занятый прогон, недоступный маршрут)
-    // иначе стирал бы набранное описание.
-    void Promise.resolve(onSend(text)).then((accepted) => {
-      if (accepted !== false) setInput('');
-    });
+    // иначе стирал бы набранное описание. Убирается ровно ушедшее: набранное и
+    // приложенное за время отправки — уже следующее сообщение.
+    void Promise.resolve(onSend(text, isMedia ? [] : attach.images))
+      .then((accepted) => {
+        if (accepted === false) return;
+        setInput((current) =>
+          current.startsWith(sentInput) ? current.slice(sentInput.length).trimStart() : current,
+        );
+        for (const id of sentIds) attach.remove(id);
+      })
+      .finally(() => {
+        sendingRef.current = false;
+        setIsSending(false);
+      });
   };
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>): void => {
@@ -120,7 +152,8 @@ export function ProviderChatComposer({
         </Stack>
       )}
 
-      <div className={styles.composer}>
+      {!isMedia && <ImageAttachTray attach={attach} />}
+      <ImageAttachZone attach={attach} className={styles.composer}>
         <textarea
           className={styles.textarea}
           value={input}
@@ -151,16 +184,17 @@ export function ProviderChatComposer({
           onClick={onAttach}
           disabled={isBlocked || isMedia}
         />
+        <ImageAttachButton attach={attach} />
         <Button
           variant="primary"
           onClick={submit}
-          disabled={!input.trim() || isRunning || isBlocked || isDrawing}
-          isLoading={isDrawing}
+          disabled={!input.trim() || isRunning || isBlocked || isDrawing || attach.isPreparing}
+          isLoading={isDrawing || isSending}
           leftIcon={<Icon name={isMedia ? 'image' : 'send'} size={18} />}
         >
           {sendLabel}
         </Button>
-      </div>
+      </ImageAttachZone>
     </>
   );
 }

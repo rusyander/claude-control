@@ -14,6 +14,7 @@ import { tmpdir } from 'node:os';
 import type { PanelActionResult, PanelPendingAction } from '@agentdeck/contracts/panel-agent';
 import { PANEL_AGENT_HEADER } from '@agentdeck/contracts/panel-agent';
 import { AppStore } from '../../lib/app-store.ts';
+import { SECRET_MASK } from '../../lib/secret-mask.ts';
 import type { ServerContext } from '../../context.ts';
 import { registerAccessGate } from '../../lib/access-gate.ts';
 import { registerEmptyBodyGuard } from '../../lib/empty-body.ts';
@@ -548,6 +549,24 @@ describe('panel-agent actions: configuration', () => {
     };
     const [perm] = perms.permissions;
     expect(perm?.id).toMatch(/^masked:[0-9a-f]{16}$/);
+    // Переключение по непрозрачному id: страница получает тот же id, а не шаблон с секретом.
+    frames.length = 0;
+    const off = await decided(
+      'toggle_permission_rule',
+      { id: perm!.id, isEnabled: false },
+      'approve',
+    );
+    expect(off.result).toMatchObject({
+      outcome: 'done',
+      page: { route: '/permissions', focus: perm!.id },
+    });
+    expect(leaked(JSON.stringify([off.card, off.result, frames])), 'toggle').toEqual([]);
+    const on = await decided(
+      'toggle_permission_rule',
+      { id: perm!.id, isEnabled: true },
+      'approve',
+    );
+    expect(on.result.outcome).toBe('done');
     frames.length = 0;
     const removed = await decided('remove_permission_rule', { id: perm!.id }, 'approve');
     expect(leaked(JSON.stringify([removed.card, frames])), 'remove card').toEqual([]);
@@ -643,6 +662,180 @@ describe('panel-agent actions: configuration', () => {
     );
     expect(result.outcome).toBe('done');
     expect(readFileSync(paths().mcpConfig, 'utf8')).toContain('b.example.com');
+  });
+
+  it('MCP, прочитанный маской и присланный обратно: секреты на диске целы, правка легла', async () => {
+    writeRealShapes(2);
+    type Shown = {
+      name: string;
+      transport: string;
+      command?: string;
+      args: string[];
+      url?: string;
+      env: Record<string, string>;
+      headers: Record<string, string>;
+    };
+    const listed = (await call('list_mcp', {})).json<PanelActionResult>().result as {
+      servers: Shown[];
+    };
+    // Ровно те поля записи, что модель прочла, — служебные поля окна не шлются.
+    const shown = (name: string): Shown => {
+      const { transport, command, args, url, env, headers } = listed.servers.find(
+        (item) => item.name === name,
+      )!;
+      return { name, transport, command, args, url, env, headers };
+    };
+    const edits: Array<[string, Record<string, unknown>]> = [
+      ['xauth', { headers: { ...shown('xauth').headers, Accept: 'application/json' } }],
+      ['db', { env: { ...shown('db').env, DEBUG: '1' } }],
+      ['remote', { env: { DEBUG: '1' } }],
+    ];
+    for (const [name, change] of edits) {
+      const { result } = await decided(
+        'save_mcp_server',
+        { ...shown(name), id: name, ...change },
+        'approve',
+      );
+      expect(result.outcome, name).toBe('done');
+    }
+    const after = readFileSync(paths().mcpConfig, 'utf8');
+    expect(after).not.toContain(SECRET_MASK);
+    expect(
+      Object.keys(REAL).filter((key) => after.includes(REAL[key as keyof typeof REAL])),
+    ).toEqual(['bearer', 'xAuth', 'userinfo', 'ghp', 'hex', 'dbPass']);
+    expect(after.match(/"DEBUG": "1"/g)).toHaveLength(2);
+    expect(after).toContain('"Accept": "application/json"');
+
+    // Маска в правленом значении — отказ: пароль не уезжает на новый хост.
+    const before = snapshot();
+    const moved = (
+      await call('save_mcp_server', {
+        ...shown('db'),
+        id: 'db',
+        env: {
+          ...shown('db').env,
+          DATABASE_URL: shown('db').env.DATABASE_URL!.replace('db.local', 'evil.example.net'),
+        },
+      })
+    ).json<PanelActionResult>();
+    expect(moved.outcome).toBe('failed');
+    expect(moved.message).toContain('env.DATABASE_URL');
+    expect(await pending.list()).toEqual([]);
+    expect(snapshot()).toEqual(before);
+  });
+
+  it('правило с секретом и длинным телом: полное чтение по id, правка по маске не стирает ключ', async () => {
+    const key = j('Zx9kLmN0pQrS7t', 'UvWxYz12345');
+    const tail = 'Хвост правила, который обрезан в списке.';
+    const body = `Ключ контура: key=${key}\n\n${'Длинное пояснение. '.repeat(100)}\n${tail}`;
+    writeFileSync(paths().claudeMd, `${CLAUDE_MD}\n## ПРАВИЛО: Контур\n\n${body}\n`);
+
+    const list = (await call('list_rules', {})).json<PanelActionResult>().result as {
+      rules: Array<{ id: string; body: string; bodyTruncated?: boolean }>;
+    };
+    const head = list.rules.find((rule) => rule.id === 'kontur')!;
+    expect(head.bodyTruncated).toBe(true);
+    expect(head.body).not.toContain(tail);
+    expect(JSON.stringify(list)).not.toContain(key);
+
+    const full = (await call('list_rules', { id: 'kontur' })).json<PanelActionResult>().result as {
+      body: { text: string; length: number };
+    };
+    expect(full.body.text).toContain(tail);
+    expect(full.body.text).not.toContain(key);
+
+    const { card, result } = await decided(
+      'save_rule',
+      { id: 'kontur', title: 'Контур', body: full.body.text.replace(tail, 'Новый хвост.') },
+      'approve',
+    );
+    expect(result.outcome).toBe('done');
+    expect(card.preview.diff).not.toContain(key);
+    const after = readFileSync(paths().claudeMd, 'utf8');
+    expect(after).toContain(`key=${key}`);
+    expect(after).toContain('Новый хвост.');
+    expect(after).not.toContain(SECRET_MASK);
+
+    // Лишняя маска — отказ до карточки, файл цел.
+    const before = snapshot();
+    const extra = (
+      await call('save_rule', {
+        id: 'kontur',
+        title: 'Контур',
+        body: `${full.body.text}\nЕщё ключ: key=${SECRET_MASK}`,
+      })
+    ).json<PanelActionResult>();
+    expect(extra.outcome).toBe('failed');
+    expect(await pending.list()).toEqual([]);
+    expect(snapshot()).toEqual(before);
+  });
+
+  it('bodyTruncated меряет показанный (маскированный) текст, а не сырой', async () => {
+    // Сырой текст длиннее предела только за счёт секрета: маска его короче,
+    // и показанное тело целиком влезает — флаг «обрезано» тут был бы ложью.
+    const key = j('Zx9kLmN0pQrS7tUvWxYz', '12345abcdeFGHIJklmnoPQRST67890');
+    const tail = 'Конец.';
+    const filler = 'Пояснение. '
+      .repeat(200)
+      .slice(0, 1500 - `key=${key}\n`.length - tail.length + 5);
+    const body = `key=${key}\n${filler}${tail}`;
+    writeFileSync(paths().claudeMd, `${CLAUDE_MD}\n## ПРАВИЛО: Контур\n\n${body}\n`);
+
+    const list = (await call('list_rules', {})).json<PanelActionResult>().result as {
+      rules: Array<{ id: string; body: string; bodyTruncated?: boolean }>;
+    };
+    const head = list.rules.find((rule) => rule.id === 'kontur')!;
+    expect(head.body).not.toContain(key);
+    expect(head.body.endsWith(tail)).toBe(true);
+    expect(head.bodyTruncated).toBeUndefined();
+  });
+
+  it('[P1] скилл с секретом: тело читается по id маской, правка шага не стирает ключ ни в описании, ни в теле', async () => {
+    const key = j('glp', 'at-', 'Qw8eRt6yUi4oPa2sDf0g');
+    const skillFile = join(root, 'skills', 'deploy', 'SKILL.md');
+    mkdirSync(join(root, 'skills', 'deploy'), { recursive: true });
+    writeFileSync(
+      skillFile,
+      `---\nname: deploy\ndescription: Деплой с токеном ${key}\n---\n\n# Деплой\n\n1. Сборка.\n2. Заливка, токен ${key}.\n`,
+    );
+
+    const listed = (await call('list_skills', {})).json<PanelActionResult>();
+    expect(JSON.stringify(listed)).not.toContain(key);
+
+    // Без чтения тела модель не может дописать шаг: save_skill заменяет тело целиком.
+    const full = (await call('list_skills', { id: 'deploy' })).json<PanelActionResult>();
+    expect(full.outcome).toBe('done');
+    const skill = full.result as { description: string; body: { text: string } };
+    expect(skill.body.text).toContain('2. Заливка, токен');
+    expect(JSON.stringify(full)).not.toContain(key);
+
+    const { card, result } = await decided(
+      'save_skill',
+      {
+        id: 'deploy',
+        name: 'deploy',
+        description: skill.description,
+        body: `${skill.body.text}3. Проверь логи.\n`,
+      },
+      'approve',
+    );
+    expect(result.outcome).toBe('done');
+    expect(card.preview.diff).not.toContain(key);
+    const after = readFileSync(skillFile, 'utf8');
+    expect(after).toContain(`description: Деплой с токеном ${key}`);
+    expect(after).toContain(`2. Заливка, токен ${key}.`);
+    expect(after).toContain('3. Проверь логи.');
+    expect(after).not.toContain(SECRET_MASK);
+  });
+
+  it('[P1] описания правок текста говорят модели, что маска •••••• возвращается с диска', async () => {
+    const actions = (await app.inject({ method: 'GET', url: '/api/agent/actions' })).json<{
+      actions: Array<{ name: string; description: string }>;
+    }>().actions;
+    for (const name of ['save_rule', 'save_skill']) {
+      const description = actions.find((action) => action.name === name)?.description ?? '';
+      expect(description, name).toContain(SECRET_MASK);
+    }
   });
 
   it('файл с чужим отступом: карточка называет переписывание формы', async () => {
@@ -770,5 +963,139 @@ describe('panel-agent actions: configuration', () => {
     expect(server.result.outcome).toBe('done');
     expect(readFileSync(mcp, 'utf8')).not.toContain('docs.example.com');
     expect(readFileSync(mcp, 'utf8')).toContain('"numStartups": 4');
+  });
+
+  it('созданное и переименованное правило, новый скилл: экран и итог несут НОВЫЙ id', async () => {
+    const ruleIds = async (): Promise<Array<{ id: string; title: string }>> =>
+      (await app.inject({ method: 'GET', url: '/api/rules' })).json();
+
+    // Создание: id правила — слаг заголовка, известный только после записи.
+    const created = await decided(
+      'save_rule',
+      { title: 'Зелёный прогон', body: 'Прогон зелёный.' },
+      'approve',
+    );
+    expect(created.result.outcome).toBe('done');
+    const fresh = (await ruleIds()).find((rule) => rule.title === 'Зелёный прогон');
+    expect(fresh).toBeDefined();
+    expect(created.result.page).toEqual({ route: '/rules', focus: fresh!.id });
+    expect(created.result.result).toMatchObject({ id: fresh!.id });
+
+    // Переименование меняет слаг: фокус на старом id указывал бы в пустоту.
+    const renamed = await decided(
+      'save_rule',
+      { id: 'testy', title: 'Тесты сначала', body: 'Сначала тест.' },
+      'approve',
+    );
+    expect(renamed.result.outcome).toBe('done');
+    const moved = (await ruleIds()).find((rule) => rule.title === 'Тесты сначала');
+    expect(moved).toBeDefined();
+    expect(moved!.id).not.toBe('testy');
+    expect(renamed.result.page).toEqual({ route: '/rules', focus: moved!.id });
+
+    // Скилл: папка выводится из имени — её и фокусируем.
+    const skill = await decided(
+      'save_skill',
+      { name: 'Новый скилл', description: 'Что-то делает', body: '# Тело' },
+      'approve',
+    );
+    expect(skill.result.outcome).toBe('done');
+    const skills: Array<{ id: string; name: string }> = (
+      await app.inject({ method: 'GET', url: '/api/skills' })
+    ).json();
+    const made = skills.find((item) => item.name === 'Новый скилл');
+    expect(made).toBeDefined();
+    expect(skill.result.page).toEqual({ route: '/skills', focus: made!.id });
+  });
+
+  // Фильтр сравнивал запрос с СЫРЫМ шаблоном: модель видела `Bearer ••••••`, но по
+  // счётчику total подбирала токен посимвольно — `ghp_Abc1` → 1, `ghp_Xyz9` → 0.
+  it('list_permissions: фильтр не выдаёт подстроки замаскированного токена', async () => {
+    const token = `ghp_Abc123SecretTokenValue${'0'.repeat(14)}`;
+    writeFileSync(
+      paths().settings,
+      `${JSON.stringify({ permissions: { allow: [`Bash(curl -H "Authorization: Bearer ${token}" https://api.github.com/*)`] } }, null, 2)}\n`,
+    );
+    const total = async (query: string): Promise<number> =>
+      (
+        (await call('list_permissions', { query })).json<PanelActionResult>().result as {
+          total: number;
+        }
+      ).total;
+    expect(await total('api.github.com')).toBe(1);
+    expect(await total('ghp_Abc1')).toBe(0);
+    expect(await total('SecretToken')).toBe(0);
+  });
+
+  it('[P3] list_permissions: длинный список — страница, итоги и фильтр влезают в ответ моста', async () => {
+    const many = Array.from(
+      { length: 220 },
+      (_, index) => `mcp__agentdeck-probe-server-${index}__some_fairly_long_tool_name_${index}`,
+    );
+    writeFileSync(
+      paths().settings,
+      `${JSON.stringify({ permissions: { allow: many, deny: ['Bash(rm:*)'], ask: ['Write'] } }, null, 2)}\n`,
+    );
+    type Page = {
+      total: number;
+      counts: { allow: number; ask: number; deny: number; disabled: number };
+      offset: number;
+      nextOffset?: number;
+      permissions: Array<{ id: string; decision: string }>;
+    };
+    const page = async (input: unknown): Promise<Page> => {
+      const answer = (await call('list_permissions', input)).json<PanelActionResult>();
+      expect(answer.outcome).toBe('done');
+      // Мост режет ответ на 20 000 символах JSON — страница обязана влезать целиком.
+      expect(JSON.stringify(answer.result).length).toBeLessThan(20_000);
+      return answer.result as Page;
+    };
+    const first = await page({});
+    expect(first.total).toBe(222);
+    expect(first.counts).toEqual({ allow: 220, ask: 1, deny: 1, disabled: 0 });
+    expect(first.nextOffset).toBe(first.permissions.length);
+    const seen = new Set(first.permissions.map((rule) => rule.id));
+    for (let next = first.nextOffset; next !== undefined;) {
+      const more = await page({ offset: next });
+      for (const rule of more.permissions) seen.add(rule.id);
+      next = more.nextOffset;
+    }
+    expect(seen.size).toBe(222);
+    const denies = await page({ decision: 'deny' });
+    expect(denies.total).toBe(1);
+    expect(denies.permissions.map((rule) => rule.id)).toEqual(['deny:Bash(rm:*)']);
+    const found = await page({ query: 'SERVER-17__' });
+    expect(found.permissions.map((rule) => rule.id)).toEqual([
+      'allow:mcp__agentdeck-probe-server-17__some_fairly_long_tool_name_17',
+    ]);
+  });
+
+  it('[P3] add_permission_rule: экран докручивает список до нового права', async () => {
+    const added = await decided(
+      'add_permission_rule',
+      { decision: 'deny', pattern: ' Bash(curl:*) ' },
+      'approve',
+    );
+    expect(added.result.outcome).toBe('done');
+    const ids = (await app.inject({ method: 'GET', url: '/api/permissions' }))
+      .json<Array<{ id: string }>>()
+      .map((rule) => rule.id);
+    expect(ids).toContain('deny:Bash(curl:*)');
+    expect(added.result.page).toEqual({ route: '/permissions', focus: 'deny:Bash(curl:*)' });
+  });
+
+  it('[P3] add_permission_rule: заголовок карточки называет решение словами, а не ключом allow/deny/ask', async () => {
+    // Живой прогон: «Добавить право deny: Bash(…)» — английский ключ посреди русской карточки.
+    const expected = {
+      allow: 'Разрешить: Bash(probe-a:*)',
+      deny: 'Запретить: Bash(probe-d:*)',
+      ask: 'Спрашивать перед: Bash(probe-q:*)',
+    } as const;
+    for (const decision of ['allow', 'deny', 'ask'] as const) {
+      const pattern = expected[decision].slice(expected[decision].indexOf(': ') + 2);
+      const { card } = await decided('add_permission_rule', { decision, pattern }, 'reject');
+      expect(card.preview.summary).toBe(expected[decision]);
+      expect(card.preview.summaryCode).toBe(`summary-permission-add-${decision}`);
+    }
   });
 });

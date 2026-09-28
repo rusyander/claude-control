@@ -11,6 +11,7 @@
  */
 import { clearSkills, setSkills } from './config-fixture.mjs';
 import { openSection, closeModal } from './config-stubs.mjs';
+import { shotLanguage } from './kit.mjs';
 
 export async function shootSkillsFirst(browser, web, scenario, home) {
   const page = await browser.newPage({ viewport: { width: 1440, height: 950 } });
@@ -32,7 +33,11 @@ export async function shootSkillsFirst(browser, web, scenario, home) {
     await page.getByLabel(/^(Имя скилла|Skill name)$/).fill('release-checklist');
     await page
       .getByLabel(/^(Описание — когда применять|Description — when to apply)$/)
-      .fill('Use КОГДА собираются выкатывать ветку и просят проверить, всё ли готово к отправке.');
+      .fill(
+        shotLanguage() === 'en'
+          ? 'Use WHEN a branch is about to ship and the user asks whether everything is ready.'
+          : 'Use КОГДА собираются выкатывать ветку и просят проверить, всё ли готово к отправке.',
+      );
     await page.waitForTimeout(600);
     await scenario.shot(page, '02-form', { clip: '[role="dialog"]', padding: 24 });
 

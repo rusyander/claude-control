@@ -78,7 +78,12 @@ const FIRST_PROMPT = 'задание звена';
 
 function build(
   text: string,
-  options: { delivers?: boolean; mtime?: number; every?: boolean } = {},
+  options: {
+    delivers?: boolean;
+    mtime?: number;
+    every?: boolean;
+    sieves?: (stage: string) => Promise<string>;
+  } = {},
 ) {
   const chains = new HandoffChains();
   const registry = new ChatRunRegistry((): RunLike => ({
@@ -127,12 +132,15 @@ function build(
         markReviewed: () => undefined,
         hasWork: () => true,
         settings: () => ({ taskSplitInitiative: true, handoffInitiative: false }),
+        ...(options.sieves
+          ? { sieves: (_cwd: string, _link: ChatLink, stage: string) => options.sieves!(stage) }
+          : {}),
       },
       split: {
         onTriageFinished: () => undefined,
         onChainEnded: (link, outcome) =>
           void ended.push({ ...(link.stage ? { stage: link.stage } : {}), status: outcome.status }),
-        identityOf: () => 'Ветка группы: split/rename. Задачи группы: PROJ-7.',
+        identityOf: () => 'Group branch: split/rename. Group tasks: PROJ-7.',
         delivers: () => options.delivers ?? false,
       },
     }),
@@ -165,12 +173,84 @@ describe('звено доставки группы разделения', () => 
     expect(deliver?.model).toBe('sonnet');
     expect(deliver?.permissionMode).toBe(AUTONOMOUS_PERMISSION_MODE);
     // Ветка и задачи — первой строкой (журнал 98), дальше — шаги доставки.
-    expect(deliver?.prompt.startsWith('Ветка группы: split/rename.')).toBe(true);
+    expect(deliver?.prompt.startsWith('Group branch: split/rename.')).toBe(true);
     expect(deliver?.prompt).toContain('git fetch');
     expect(deliver?.prompt).toContain('rebase');
     expect(deliver?.prompt).toContain('MR');
     // Итог группы сказал конец доставки, а не правок.
     expect(ended).toEqual([{ stage: 'deliver', status: 'done' }]);
+  });
+
+  // Ревью сит, 28.09, п. 12: пути копии читаются асинхронно — git на большой копии
+  // не держит сервер; звено стартует, когда абзац готов, и метки в задании нет.
+  it('абзац сит приходит асинхронно: звено ждёт его, метка в задание не попадает', async () => {
+    let release: (paragraph: string) => void = () => undefined;
+    const asked: string[] = [];
+    const { registry, links, runs } = build('Поправил все три замечания.', {
+      delivers: true,
+      sieves: (stage) => {
+        asked.push(stage);
+        return new Promise((done) => (release = done));
+      },
+    });
+    links.set('чат-правки', FIX_LINK);
+
+    await run(registry, 'чат-правки');
+    expect(asked).toEqual(['deliver']);
+    expect(stageRuns(runs)).toEqual([]);
+
+    release('SIEVES-PARAGRAPH');
+    await new Promise((done) => setTimeout(done, 20));
+    const deliver = stageRuns(runs)[0];
+    expect(deliver?.prompt).toContain('SIEVES-PARAGRAPH');
+    expect(deliver?.prompt).not.toContain('agentdeck:sieve-slot');
+  });
+
+  it('пустой абзац сит уносит метку: задание без следа места под него', async () => {
+    const { registry, links, runs } = build('Поправил.', {
+      delivers: true,
+      sieves: async () => '',
+    });
+    links.set('чат-правки', FIX_LINK);
+
+    await run(registry, 'чат-правки');
+
+    const deliver = stageRuns(runs)[0];
+    expect(deliver?.prompt).toContain('git fetch');
+    expect(deliver?.prompt).not.toContain('agentdeck:sieve-slot');
+  });
+
+  // Ревью сит 28.09, R4 minor 5: абзац обещает, что несданное сито держит «готово», —
+  // а судит это только доставка группы. Каскадный чат без родителя его не получает.
+  it('ревью каскада без родителя или без доставки — без абзаца сит; группы с доставкой — с ним', async () => {
+    const asked: string[] = [];
+    const sieves = async (stage: string) => {
+      asked.push(stage);
+      return 'SIEVES-PARAGRAPH';
+    };
+    const cases = [
+      { link: { ...WORK_LINK, parentChatId: '' }, delivers: true },
+      { link: WORK_LINK, delivers: false },
+    ];
+    for (const { link, delivers } of cases) {
+      const alone = build('Сделал.', { delivers, sieves });
+      alone.links.set('чат-каскада', link);
+
+      await run(alone.registry, 'чат-каскада');
+
+      const review = stageRuns(alone.runs)[0];
+      expect(alone.saved[0]?.stage).toBe('review');
+      expect(review?.prompt).not.toContain('SIEVES-PARAGRAPH');
+      expect(review?.prompt).not.toContain('agentdeck:sieve-slot');
+    }
+    expect(asked).toEqual([]);
+
+    // Контроль: то же звено в группе с доставкой абзац получает — отказ выше не пустышка.
+    const group = build('Сделал.', { delivers: true, sieves });
+    group.links.set('чат-группы', WORK_LINK);
+    await run(group.registry, 'чат-группы');
+    expect(asked).toEqual(['review']);
+    expect(stageRuns(group.runs)[0]?.prompt).toContain('SIEVES-PARAGRAPH');
   });
 
   it('чистое ревью группы с доставкой тоже заводит доставку', async () => {
@@ -194,7 +274,7 @@ describe('звено доставки группы разделения', () => 
 
     const fix = stageRuns(runs)[0];
     expect(saved[0]?.stage).toBe('fix');
-    expect(fix?.prompt).toContain('коммит, пуш и MR им не запрещены');
+    expect(fix?.prompt).toContain('commit, push and MR are not forbidden by it');
   });
 
   it('конец доставки — конец цепочки: итог уходит конвейеру, звеньев больше нет', async () => {
@@ -228,7 +308,7 @@ describe('звено доставки группы разделения', () => 
     expect(saved[0]?.stage).toBe('deliver');
     expect(links.get('чат-работы')?.deliveredAt).toBeTruthy();
     expect(links.get(deliver?.chatId ?? '')).toMatchObject({ stage: 'deliver', model: 'sonnet' });
-    expect(deliver?.prompt).toContain('отдельного ревью у неё нет');
+    expect(deliver?.prompt).toContain('it has no separate review');
     expect(ended).toEqual([{ stage: 'deliver', status: 'done' }]);
   });
 
@@ -306,12 +386,12 @@ ${handoffBlock()}`,
     const hops = stageRuns(runs);
     expect(hops).toHaveLength(HANDOFF_GROUP_MAX_CHAIN);
     const prompt = hops[0]?.prompt ?? '';
-    expect(prompt.startsWith('Это новая сессия группы разделения')).toBe(true);
-    expect(prompt).toContain('задачи других групп не бери');
-    expect(prompt).toContain('ответь коротким итогом без блока продолжения');
+    expect(prompt.startsWith('This is a new session of a split group')).toBe(true);
+    expect(prompt).toContain('do not take tasks of other groups');
+    expect(prompt).toContain('answer with a short summary without a continuation block');
     // Задание группы — целиком и после предложения прошлой сессии.
     expect(
-      prompt.indexOf(`Задание группы:
+      prompt.indexOf(`Group task:
 ${FIRST_PROMPT}`),
     ).toBeGreaterThan(prompt.indexOf('коммит, пуш, MR'));
     // За потолком ход группы кончился, и дальше её ведёт конвейер — один раз.

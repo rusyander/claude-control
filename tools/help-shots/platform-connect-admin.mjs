@@ -14,7 +14,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
-import { openScenario } from './kit.mjs';
+import { openScenario, shotLanguage } from './kit.mjs';
 
 const BASE = process.env.PLATFORM_ADMIN_URL ?? 'http://inst.localhost';
 const LOGIN = process.env.PLATFORM_ADMIN_LOGIN ?? 'admin@instance.local';
@@ -23,8 +23,10 @@ const PASSWORD_FILE = process.env.PLATFORM_ADMIN_PASSWORD_FILE;
 if (!PASSWORD_FILE)
   throw new Error('нужна PLATFORM_ADMIN_PASSWORD_FILE: файл с паролем админа стенда');
 
+const EN = shotLanguage() === 'en';
+
 /** Имя ключа, который выпускается ради кадра и достаётся панели. */
-const KEY_NAME = 'AgentDeck · путеводитель';
+const KEY_NAME = EN ? 'AgentDeck · guide' : 'AgentDeck · путеводитель';
 
 /**
  * Колонка ключа в списке: одна она известна по МЕСТУ, а не по виду — там стоит
@@ -36,7 +38,11 @@ const KEY_CELL = 'td:nth-child(2) span, td:nth-child(2) code, td:nth-child(2) di
 const scenario = openScenario('platform', 'connect');
 
 const browser = await chromium.launch();
-const page = await browser.newPage({ viewport: { width: 1280, height: 820 } });
+// Язык админки идёт от языка браузера: английские кадры — английским браузером.
+const page = await browser.newPage({
+  viewport: { width: 1280, height: 820 },
+  locale: EN ? 'en-US' : 'ru-RU',
+});
 
 try {
   // ── 1. Вход ──────────────────────────────────────────────────────────────
@@ -47,7 +53,7 @@ try {
   const password = readFileSync(PASSWORD_FILE, 'utf8').trim();
   await page.fill('input[name="email"]', LOGIN);
   await page.fill('input[name="password"]', password);
-  await page.getByRole('button', { name: 'Войти', exact: true }).click();
+  await page.getByRole('button', { name: /^(Войти|Sign in)$/ }).click();
   await page.waitForTimeout(4000);
   if (page.url().includes('/login')) {
     throw new Error('вход не удался — останавливаюсь, повтора не будет');
@@ -69,7 +75,7 @@ try {
   // по умолчанию спорил бы с собственным текстом.
   await page.goto(`${BASE}/models/create`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(2500);
-  await page.fill('input[name="name"]', 'Qwen 2.5 0.5B (локальная)');
+  await page.fill('input[name="name"]', EN ? 'Qwen 2.5 0.5B (local)' : 'Qwen 2.5 0.5B (локальная)');
   const provider = page.locator('select[name="provider"]');
   if (await provider.count()) await provider.selectOption({ label: 'Ollama' }).catch(() => {});
   await page.fill('input[name="model_ref"]', 'qwen2.5:0.5b');
@@ -96,7 +102,7 @@ try {
 
   // ── 7. Ключ показан один раз ─────────────────────────────────────────────
   await page
-    .getByRole('button', { name: /^(Создать|Сохранить|Выпустить)/ })
+    .getByRole('button', { name: /^(Создать|Сохранить|Выпустить|Create|Save|Issue)/ })
     .last()
     .click();
   await page.waitForTimeout(3500);
@@ -113,9 +119,12 @@ try {
     if ((await row.count()) === 0) break;
     await row.locator('button').last().click();
     await page.waitForTimeout(800);
-    await page.getByText('Удалить', { exact: true }).first().click();
+    await page
+      .getByText(/^(Удалить|Delete)$/)
+      .first()
+      .click();
     await page.waitForTimeout(1000);
-    const confirm = page.getByRole('button', { name: /^Удалить/ }).last();
+    const confirm = page.getByRole('button', { name: /^(Удалить|Delete)/ }).last();
     if (await confirm.count()) await confirm.click();
     await page.waitForTimeout(1800);
     removed += 1;

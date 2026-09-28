@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os';
 import type { PanelActionResult, PanelPendingAction } from '@agentdeck/contracts/panel-agent';
 import { PANEL_AGENT_HEADER } from '@agentdeck/contracts/panel-agent';
 import { AppStore } from '../../lib/app-store.ts';
+import { SECRET_MASK } from '../../lib/secret-mask.ts';
 import type { ServerContext } from '../../context.ts';
 import { registerAccessGate } from '../../lib/access-gate.ts';
 import { registerEmptyBodyGuard } from '../../lib/empty-body.ts';
@@ -360,6 +361,16 @@ describe('panel-agent actions: panel state', () => {
     expect(saved.result.outcome).toBe('done');
     const read = (await call('get_dlp', {})).json<PanelActionResult>();
     expect(read.result).toMatchObject({ rules: [{ id: 'name', terms: ['Урманов'] }] });
+    // [P3] Живой прогон 26.09: /dlp открывался без подсветки добавленного правила.
+    // Список уходит целиком — какое правило новое, знает только маршрут записи.
+    expect(saved.result.page).toEqual({ route: '/dlp', focus: 'dlp-rule:name' });
+    const added = await decided('save_dlp_rules', {
+      rules: [...rules, { id: 'mail', name: 'Почта', kind: 'terms', terms: ['a@b.c'] }],
+    });
+    expect(added.result.page).toEqual({ route: '/dlp', focus: 'dlp-rule:mail' });
+    // Только удаление — подсвечивать нечего, страница открывается без якоря.
+    const trimmed = await decided('save_dlp_rules', { rules });
+    expect(trimmed.result.page).toEqual({ route: '/dlp' });
 
     const started = await decided('toggle_dlp_proxy', { running: true });
     expect(started.result.outcome).toBe('done');
@@ -397,12 +408,461 @@ describe('panel-agent actions: panel state', () => {
       (disk().getSettings().integrations.forge as unknown as { baseUrl: string }).baseUrl,
     ).toBe('https://gitlab.example.com');
 
-    const check = (await call('check_integration', { id: 'forge' })).json<PanelActionResult>();
-    expect(['done', 'failed']).toContain(check.outcome);
+    // Проверка пишет итог на диск — только после карточки; без токена сеть не нужна.
+    const { result: check } = await decided('check_integration', { id: 'forge' });
+    expect(check.outcome).toBe('done');
 
     expect(disk().getSettings().integrations.forge.enabled).toBe(true);
     const forgot = await decided('forget_integration', { id: 'forge' });
     expect(forgot.result.outcome).toBe('done');
     expect(disk().getSettings().integrations.forge.enabled).toBe(false);
+  });
+
+  /** Ключ из кусков: литерал целиком похож на настоящий, и сторож его не пропустит. */
+  const opaque = () => ['Zx9kLm2Qp', '7Rt4Wv8Yb3Nc6'].join('');
+
+  /** Запись человеком — маршрутом окна, с разрешённым Origin. */
+  const human = (method: 'POST' | 'PUT', url: string, payload: object) =>
+    app.inject({ method, url, headers: { origin: ORIGIN }, payload });
+
+  // Ревью 26.09: токен профиля лежит по его id и едет за адресом — агент менял
+  // хост, а probe_endpoint (чтение, без карточки) отправлял токен на новый.
+  it('save_endpoint: хост профиля с сохранённым токеном агент не меняет; путь того же хоста — можно', async () => {
+    const input = {
+      name: 'Шлюз',
+      baseUrl: 'https://gw.example.com/v1',
+      apiKind: 'openai-compat',
+      model: 'm',
+    };
+    await decided('save_endpoint', input);
+    const id = disk().getSettings().endpointProfiles[0]!.id;
+    const token = await human('PUT', `/api/endpoints/${id}/token`, { token: 'sk-test-0123456789' });
+    expect(token.statusCode).toBeLessThan(400);
+
+    const { cards, result } = await callWithoutCard('save_endpoint', {
+      ...input,
+      id,
+      baseUrl: 'https://evil.example/v1',
+    });
+    expect(cards).toEqual([]);
+    expect(result).toMatchObject({ outcome: 'failed' });
+    expect(result.message).toMatch(/token/i);
+    expect(disk().getSettings().endpointProfiles[0]!.baseUrl).toBe('https://gw.example.com/v1');
+
+    const samePlace = await decided('save_endpoint', {
+      ...input,
+      id,
+      baseUrl: 'https://gw.example.com/v2',
+    });
+    expect(samePlace.result.outcome).toBe('done');
+  });
+
+  it('save_endpoint: второй профиль с тем же именем, адресом и видом API — отказ до карточки', async () => {
+    const input = {
+      name: 'Дубль',
+      baseUrl: 'http://127.0.0.1:11434/v1',
+      apiKind: 'anthropic',
+      model: 'first',
+    };
+    expect((await decided('save_endpoint', input)).result.outcome).not.toBe('failed');
+    const id = disk().getSettings().endpointProfiles[0]!.id;
+
+    const { cards, result } = await callWithoutCard('save_endpoint', { ...input, model: 'second' });
+    expect(cards).toEqual([]);
+    expect(result.outcome).toBe('failed');
+    expect(result.message).toContain(id);
+    expect(
+      disk()
+        .getSettings()
+        .endpointProfiles.map((item) => item.model),
+    ).toEqual(['first']);
+  });
+
+  it('save_integration: адрес, прочитанный маской, пишется значением с диска; лишняя маска — отказ', async () => {
+    const url = `https://hooks.example.com/in?token=${opaque()}`;
+    const seeded = await human('PUT', '/api/integrations/webhook', {
+      settings: { enabled: false, url, events: ['runError'] },
+    });
+    expect(seeded.statusCode).toBe(200);
+    const listed = (await call('list_integrations', {})).json<PanelActionResult>();
+    const shown = (listed.result as { id: string; settings: { url: string } }[]).find(
+      (item) => item.id === 'webhook',
+    )!.settings.url;
+    expect(shown).not.toContain(opaque());
+    expect(shown).toContain(SECRET_MASK);
+
+    const webhook = () =>
+      disk().getSettings().integrations.webhook as unknown as { url: string; enabled: boolean };
+    const { result } = await decided('save_integration', {
+      id: 'webhook',
+      settings: { url: shown, enabled: true },
+    });
+    expect(result.outcome).not.toBe('failed');
+    expect(webhook()).toMatchObject({ url, enabled: true });
+
+    const extra = await callWithoutCard('save_integration', {
+      id: 'webhook',
+      settings: { url: `${shown}&sig=${SECRET_MASK}` },
+    });
+    expect(extra.cards).toEqual([]);
+    expect(extra.result.outcome).toBe('failed');
+    // Маска внутри списка или объекта — тоже отказ до карточки, не 400 после «да».
+    const nested = await callWithoutCard('save_integration', {
+      id: 'webhook',
+      settings: { events: [SECRET_MASK] },
+    });
+    expect(nested.cards).toEqual([]);
+    expect(nested.result.outcome).toBe('failed');
+    expect(webhook().url).toBe(url);
+  });
+
+  // Ревью 28.09 (F-08): профиль эндпоинта и MCP с секретами отказывают при смене
+  // хоста, интеграция — нет: одна карточка «Адрес» отправляла сохранённый токен
+  // туда, куда указала модель.
+  it('save_integration: при сохранённом токене смена хоста — отказ до карточки', async () => {
+    const seeded = await human('PUT', '/api/integrations/forge', {
+      settings: { enabled: true, kind: 'gitlab', baseUrl: 'https://gitlab.example.com', repo: '' },
+      token: 'glpat-abcdefghijklmnopqrst',
+    });
+    expect(seeded.statusCode).toBe(200);
+    const forge = () =>
+      disk().getSettings().integrations.forge as unknown as { baseUrl: string; kind: string };
+
+    for (const settings of [
+      { baseUrl: 'https://evil.example.net' },
+      { baseUrl: '' },
+      { kind: 'github' },
+    ]) {
+      const moved = await callWithoutCard('save_integration', { id: 'forge', settings });
+      expect(moved.cards).toEqual([]);
+      expect(moved.result.outcome).toBe('failed');
+    }
+    expect(forge()).toMatchObject({ baseUrl: 'https://gitlab.example.com', kind: 'gitlab' });
+
+    // Тот же хост, другой путь и остальные поля — проходят.
+    const { result } = await decided('save_integration', {
+      id: 'forge',
+      settings: { baseUrl: 'https://gitlab.example.com/', repo: 'team/app' },
+    });
+    expect(result.outcome).not.toBe('failed');
+    expect(forge().baseUrl).toBe('https://gitlab.example.com/');
+  });
+
+  it('save_group: env, прочитанный маской (list_env), пишется значением с диска; маска в новой группе — отказ', async () => {
+    const dbUrl = `postgres://app:${opaque()}@db:5432/x`;
+    const made = await human('POST', '/api/groups', { name: 'База', env: { DB_URL: dbUrl } });
+    expect(made.statusCode).toBe(200);
+    const id = made.json<{ id: string }>().id;
+    const listed = (await call('list_env', {})).json<PanelActionResult>();
+    const shown = (listed.result as { variables: { key: string; value: string }[] }).variables.find(
+      (item) => item.key === 'DB_URL',
+    )!.value;
+    expect(shown).toContain(SECRET_MASK);
+
+    const { result } = await decided('save_group', {
+      id,
+      name: 'База',
+      env: { DB_URL: shown, MODE: 'on' },
+    });
+    expect(result.outcome).toBe('done');
+    expect(disk().getGroups()[0]?.env).toEqual({ DB_URL: dbUrl, MODE: 'on' });
+    expect(settingsJson().env?.DB_URL).toBe(dbUrl);
+
+    const fresh = await callWithoutCard('save_group', { name: 'Новая', env: { DB_URL: shown } });
+    expect(fresh.cards).toEqual([]);
+    expect(fresh.result.outcome).toBe('failed');
+    expect(disk().getGroups()).toHaveLength(1);
+  });
+
+  it('[P3] save_group: env выключенной группы с секретом правится — list_groups даёт значения маской, маска секрета возвращается с диска', async () => {
+    // Выключенная группа: её env не в settings.json, list_env его не видит. Раньше
+    // list_groups давал одни имена, а env правки — полная замена: добавить ключ
+    // значило стереть остальные. Секретное имя с маской отказывалось как «секрет».
+    const token = opaque();
+    const made = await human('POST', '/api/groups', {
+      name: 'Пробный',
+      env: { AGENTDECK_PROBE_P3_G1: 'one', AGENTDECK_PROBE_P3_API_TOKEN: token },
+    });
+    const id = made.json<{ id: string }>().id;
+    await app.inject({
+      method: 'POST',
+      url: `/api/groups/${id}/enabled`,
+      headers: { origin: ORIGIN },
+      payload: { isEnabled: false },
+    });
+    const listed = (await call('list_groups', {})).json<PanelActionResult>();
+    const env = (
+      listed.result as { groups: { id: string; env: Record<string, string> }[] }
+    ).groups.find((group) => group.id === id)!.env;
+    expect(env).toEqual({
+      AGENTDECK_PROBE_P3_G1: 'one',
+      AGENTDECK_PROBE_P3_API_TOKEN: SECRET_MASK,
+    });
+    expect(JSON.stringify(listed.result)).not.toContain(token);
+
+    const { result } = await decided('save_group', {
+      id,
+      name: 'Пробный',
+      env: { ...env, AGENTDECK_PROBE_P3_G4: 'four' },
+    });
+    expect(result.outcome).toBe('done');
+    expect(
+      disk()
+        .getGroups()
+        .find((group) => group.id === id)?.env,
+    ).toEqual({
+      AGENTDECK_PROBE_P3_G1: 'one',
+      AGENTDECK_PROBE_P3_API_TOKEN: token,
+      AGENTDECK_PROBE_P3_G4: 'four',
+    });
+  });
+
+  it('[P3] delete_group: карточка называет, что удаление сделает за пределами state.json', async () => {
+    // Живой прогон 26.09: карточка показывала только запись группы в state.json,
+    // а удаление снимало её переменные из settings.json и включало обратно
+    // участников, которых гасила выключенная группа.
+    const on = await decided('save_group', {
+      name: 'Вкл',
+      members: ['skill:review'],
+      env: { AGENTDECK_PROBE_P3_G1: 'one' },
+    });
+    expect(on.result.outcome).toBe('done');
+    const onId = disk().getGroups()[0]!.id;
+    const fieldsOf = async (id: string) => {
+      const running = call('delete_group', { id });
+      const card = await waitPending();
+      await app.inject({
+        method: 'POST',
+        url: `/api/agent/pending/${card.id}`,
+        headers: { origin: ORIGIN },
+        payload: { decision: 'reject' },
+      });
+      await running;
+      return Object.fromEntries((card.preview.fields ?? []).map((f) => [f.labelCode, f.value]));
+    };
+    const onFields = await fieldsOf(onId);
+    expect(onFields['label-group-delete-env']).toBe('AGENTDECK_PROBE_P3_G1');
+    expect(onFields['label-group-delete-back-on']).toBeUndefined();
+    expect(onFields['label-members']).toBe('skill:review');
+
+    await decided('toggle_group', { id: onId, isEnabled: false });
+    const offFields = await fieldsOf(onId);
+    expect(offFields['label-group-delete-env']).toBeUndefined();
+    expect(offFields['label-group-delete-back-on']).toBe('skill:review');
+
+    // Карточка не соврала: после удаления участник включён, переменной нет.
+    // И итог действия говорит это модели: иначе её ответ после удаления
+    // преуменьшал сделанное («группа удалена» — и только).
+    const removed = await decided('delete_group', { id: onId });
+    expect(removed.result.result).toMatchObject({
+      ok: true,
+      envRemoved: [],
+      membersBackOn: ['skill:review'],
+    });
+    expect(disk().isDisabled('skill', 'review')).toBe(false);
+    expect(settingsJson().env?.AGENTDECK_PROBE_P3_G1).toBeUndefined();
+  });
+
+  it('save_group: новая группа открывается на странице групп с фокусом на ней', async () => {
+    const { result } = await decided('save_group', { name: 'Фокус' });
+    const id = disk().getGroups()[0]!.id;
+    expect(result.page).toEqual({ route: '/groups', focus: id });
+  });
+
+  it('настройки открываются на вкладке своего раздела: модели, интеграции, провайдеры, ключ', async () => {
+    const input = {
+      name: 'Вкладка',
+      baseUrl: 'http://127.0.0.1:11434/v1',
+      apiKind: 'anthropic',
+      model: 'one',
+    };
+    await decided('save_endpoint', input);
+    const id = disk().getSettings().endpointProfiles[0]!.id;
+    const models = { route: `/settings?id=${id}`, focus: 'models' };
+    const edited = await decided('save_endpoint', { ...input, id, model: 'two' });
+    expect(edited.result).toMatchObject({ outcome: 'done', page: models });
+    expect((await decided('apply_endpoint', { id, provider: 'claude' })).result.page).toEqual(
+      models,
+    );
+    expect((await decided('delete_endpoint', { id })).result.page).toEqual({
+      route: '/settings',
+      focus: 'models',
+    });
+
+    const seeded = await human('PUT', '/api/integrations/forge', {
+      settings: { enabled: false, kind: 'gitlab', baseUrl: 'https://gitlab.example.com', repo: '' },
+      token: opaque(),
+    });
+    expect(seeded.statusCode).toBe(200);
+    // Действие ведёт на СВОЮ карточку, а не в начало вкладки (живой прогон 26.09:
+    // карточка вебхука — шестая, под экраном).
+    const integrations = { route: '/settings', focus: 'integration:forge' };
+    const saved = await decided('save_integration', {
+      id: 'forge',
+      settings: { repo: 'team/app' },
+    });
+    expect(saved.result).toMatchObject({ outcome: 'done', page: integrations });
+    expect((await decided('forget_integration', { id: 'forge' })).result.page).toEqual(
+      integrations,
+    );
+
+    for (const [patch, tab] of [
+      [{ chatEffort: 'high' }, 'models'],
+      [{ backupKeep: 9 }, 'safety'],
+      [{ costUnit: 'money' }, 'spend'],
+      [{ theme: 'dark' }, 'general'],
+    ] as const) {
+      const { result } = await decided('update_settings', patch);
+      expect(result.page, tab).toEqual({ route: '/settings', focus: tab });
+    }
+
+    const switched = await decided('switch_provider', { provider: 'codex' });
+    expect(switched.result.page).toEqual({ route: '/settings', focus: 'providers' });
+  });
+
+  it('check_integration: проверка шлёт наружу и пишет итог — только после карточки', async () => {
+    const hits: string[] = [];
+    // Приёмник вебхука — граница сети: настоящая отправка уходит в него.
+    const receiver = createHttpServer((request, response) => {
+      hits.push(request.method ?? '');
+      response.end('{}');
+    });
+    await new Promise<void>((done) => receiver.listen(0, '127.0.0.1', done));
+    const url = `http://127.0.0.1:${(receiver.address() as { port: number }).port}/hook`;
+    try {
+      const seeded = await human('PUT', '/api/integrations/webhook', {
+        settings: { enabled: true, url, events: ['runError'] },
+      });
+      expect(seeded.statusCode).toBe(200);
+
+      const running = call('check_integration', { id: 'webhook' });
+      const card = await waitPending();
+      expect(card.risk).toBe('change');
+      expect(card.preview.fields.map((field) => field.value).join(' ')).toContain(url);
+      expect(hits).toEqual([]);
+      await app.inject({
+        method: 'POST',
+        url: `/api/agent/pending/${card.id}`,
+        headers: { origin: ORIGIN },
+        payload: { decision: 'reject' },
+      });
+      expect((await running).json<PanelActionResult>().outcome).toBe('rejected');
+      expect(hits).toEqual([]);
+
+      const { result } = await decided('check_integration', { id: 'webhook' });
+      expect(result.outcome).toBe('done');
+      expect(hits).toEqual(['POST']);
+    } finally {
+      await new Promise((done) => receiver.close(done));
+    }
+  });
+
+  it('check_integration: без адреса — отказ до карточки, одобрять нечего', async () => {
+    // Живой прогон 26.09: «проверь связь вебхука» при пустом адресе давал карточку,
+    // человек одобрял, и проверка падала «не указан адрес» — одобрение впустую.
+    const seeded = await human('PUT', '/api/integrations/webhook', {
+      settings: { enabled: false, url: '', events: ['runError'] },
+    });
+    expect(seeded.statusCode).toBe(200);
+    const answer = (await call('check_integration', { id: 'webhook' })).json<PanelActionResult>();
+    expect(answer.outcome).toBe('failed');
+    expect(answer.message).toContain('save_integration');
+    expect(await listPending()).toEqual([]);
+  });
+
+  it('toggle_dlp_proxy: в настройках включено, а прокси лежит — «запустить» поднимает его', async () => {
+    // Без включённого правила прокси не поднимается вовсе — правило ставит человек.
+    const rules = await human('PUT', '/api/dlp/rules', {
+      rules: [{ id: 'name', name: 'Имя', kind: 'terms', terms: ['Урманов'] }],
+    });
+    expect(rules.statusCode).toBe(200);
+    store.updateSettings({ dlp: { ...store.getSettings().dlp, enabled: true } });
+    expect(proxy.running).toBe(false);
+    const { card, result } = await decided('toggle_dlp_proxy', { running: true });
+    expect(card.preview.diff).toContain('running');
+    expect(result.outcome).toBe('done');
+    expect(proxy.running).toBe(true);
+  });
+
+  it('toggle_dlp_proxy: прокси подняли между карточкой и «да» — карточка устарела', async () => {
+    const rules = await human('PUT', '/api/dlp/rules', {
+      rules: [{ id: 'name', name: 'Имя', kind: 'terms', terms: ['Урманов'] }],
+    });
+    expect(rules.statusCode).toBe(200);
+    store.updateSettings({ dlp: { ...store.getSettings().dlp, enabled: true } });
+    const running = call('toggle_dlp_proxy', { running: true });
+    const card = await waitPending();
+    // Флаг в настройках уже `true` и не меняется: разницу видит только слушатель.
+    expect((await human('POST', '/api/dlp/start', {})).statusCode).toBe(200);
+    await app.inject({
+      method: 'POST',
+      url: `/api/agent/pending/${card.id}`,
+      headers: { origin: ORIGIN },
+      payload: { decision: 'approve' },
+    });
+    expect((await running).json<PanelActionResult>()).toMatchObject({
+      outcome: 'failed',
+      messageCode: 'stale_preview',
+    });
+  });
+
+  it('save_integration: вебхуку ключ не нужен, выключение ключа не просит; адрес — строкой карточки', async () => {
+    const hook = await decided('save_integration', {
+      id: 'webhook',
+      settings: { url: 'http://127.0.0.1:9/agentdeck-hook', enabled: true },
+    });
+    // Секрет подписи вебхука необязателен (TOKENLESS): «нужен ключ» тут неправда.
+    expect(hook.result.outcome).toBe('done');
+    expect(hook.card.preview.fields).toContainEqual(
+      expect.objectContaining({
+        labelCode: 'label-address',
+        value: 'http://127.0.0.1:9/agentdeck-hook',
+      }),
+    );
+
+    const integrations = store.getSettings().integrations;
+    store.updateSettings({
+      integrations: { ...integrations, forge: { ...integrations.forge, enabled: true } },
+    });
+    const off = await decided('save_integration', { id: 'forge', settings: { enabled: false } });
+    expect(off.result.outcome).toBe('done');
+    expect(off.result.page).toEqual({ route: '/settings', focus: 'integration:forge' });
+  });
+
+  it('toggle_dlp_proxy: без адреса пересылки или без правил — отказ до карточки; адрес — строкой карточки', async () => {
+    const noRules = await callWithoutCard('toggle_dlp_proxy', { running: true });
+    expect(noRules.cards).toEqual([]);
+    expect(noRules.result.outcome).toBe('failed');
+    expect(noRules.result.message).toMatch(/rule/i);
+
+    const rules = await human('PUT', '/api/dlp/rules', {
+      rules: [{ id: 'name', name: 'Имя', kind: 'terms', terms: ['Урманов'] }],
+    });
+    expect(rules.statusCode).toBe(200);
+    store.updateSettings({ dlp: { ...store.getSettings().dlp, upstreamUrl: '' } });
+    const noUpstream = await callWithoutCard('toggle_dlp_proxy', { running: true });
+    expect(noUpstream.cards).toEqual([]);
+    expect(noUpstream.result.outcome).toBe('failed');
+    expect(noUpstream.result.message).toContain('/dlp');
+    expect(proxy.running).toBe(false);
+
+    // Адрес из профиля эндпоинта — тот же выбор, что у запуска (`resolveDlpUpstream`).
+    store.updateSettings({
+      endpointProfiles: [
+        {
+          id: 'ep-up',
+          name: 'Шлюз',
+          baseUrl: 'http://127.0.0.1:9/gw',
+          apiKind: 'anthropic',
+          model: '',
+          writeToken: false,
+        } as never,
+      ],
+      dlp: { ...store.getSettings().dlp, upstreamProfileId: 'ep-up' },
+    });
+    const { card } = await decided('toggle_dlp_proxy', { running: true });
+    expect(card.preview.fields).toContainEqual(
+      expect.objectContaining({ labelCode: 'label-address', value: 'http://127.0.0.1:9/gw' }),
+    );
   });
 });

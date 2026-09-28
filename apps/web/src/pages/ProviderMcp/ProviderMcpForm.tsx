@@ -88,7 +88,7 @@ export function ProviderMcpForm({
           label={t('mcp.serverName')}
           value={name}
           onChange={setName}
-          placeholder="например: context7"
+          placeholder={t('mcp.serverNamePlaceholder', { example: 'context7' })}
           hint={t('mcp.serverNameHint')}
           isMono
           autoFocus={!server}
@@ -125,7 +125,7 @@ export function ProviderMcpForm({
               onChange={setEnvText}
               multiline
               rows={4}
-              placeholder={'API_KEY=значение'}
+              placeholder={t('mcp.envPlaceholder')}
               hint={t('mcp.envHint')}
               isMono
             />

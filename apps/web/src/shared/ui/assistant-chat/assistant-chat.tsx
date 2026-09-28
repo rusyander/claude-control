@@ -11,13 +11,29 @@ import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { Badge } from '@shared/ui/badge';
+import {
+  ImageAttachButton,
+  ImageAttachTray,
+  ImageAttachZone,
+  SentImageNames,
+  useImageAttach,
+} from '@shared/ui/image-attach';
+import type { AgentImage } from '@agentdeck/contracts/agent-images';
+import {
+  assistHistory,
+  keptSecretMisses,
+  type AssistantApplyReport,
+  type AssistTurn,
+} from '@shared/lib/assistant-fields';
+import { AssistantMissed } from './assistant-missed';
 import styles from './assistant-chat.module.scss';
 import type { AssistantChatProps, AssistantMessage } from './assistant-chat.types';
 
 interface AssistResponse {
   reply: string;
   fields: Record<string, unknown>;
-  sessionId?: string;
+  /** Поля, где маску секрета вернуть не удалось: форма их не трогает. */
+  kept?: string[];
   error?: string;
 }
 
@@ -27,13 +43,13 @@ interface AssistResponse {
  * «пояснение + значения полей», и поля применяются к форме сразу.
  *
  * Переписка живёт только пока открыто окно: помощник нужен для одного
- * заполнения, а не для длинной истории.
+ * заполнения, а не для длинной истории. Сессии у помощника нет (лёгкое окно,
+ * D4 28.09) — прежние реплики едут в каждом запросе (`history`).
  */
 export function AssistantChat({ kind, fields, schema, onApply, placeholder }: AssistantChatProps) {
   const { t, i18n } = useTranslation();
   const [messages, setMessages] = useState<AssistantMessage[]>([]);
   const [input, setInput] = useState('');
-  const [sessionId, setSessionId] = useState<string | undefined>(undefined);
 
   const feedRef = useRef<HTMLDivElement>(null);
   const speech = useSpeechRecognition(i18n.language === 'en' ? 'en-US' : 'ru-RU');
@@ -63,19 +79,39 @@ export function AssistantChat({ kind, fields, schema, onApply, placeholder }: As
   }, [messages]);
 
   const ask = useMutation({
-    mutationFn: async (message: string) => {
+    mutationFn: async ({
+      message,
+      images,
+      history,
+    }: {
+      message: string;
+      images: AgentImage[];
+      history: AssistTurn[];
+    }) => {
       const { data } = await apiClient.post<AssistResponse>(
         '/assist',
-        { kind, message, fields, schema, sessionId },
+        {
+          kind,
+          message,
+          fields,
+          schema,
+          history,
+          // Картинка едет блоком в самом запросе: «заполни по снимку» — обычная просьба.
+          ...(images.length > 0 ? { images } : {}),
+        },
         { timeout: 200_000 },
       );
       return data;
     },
     onSuccess: (data) => {
-      setSessionId(data.sessionId);
-
-      const changed = Object.keys(data.fields);
-      if (changed.length > 0) onApply(data.fields);
+      const proposed = Object.keys(data.fields ?? {});
+      // `void` у onApply — окна без отчёта (витрина): тогда поля — ключи ответа.
+      const report =
+        proposed.length > 0
+          ? (onApply(data.fields) as AssistantApplyReport | undefined)
+          : undefined;
+      const changed = report ? report.applied : proposed;
+      const missed = [...(report?.missed ?? []), ...keptSecretMisses(data.kept)];
 
       setMessages((current) => [
         ...current,
@@ -83,20 +119,36 @@ export function AssistantChat({ kind, fields, schema, onApply, placeholder }: As
           id: `a-${Date.now()}`,
           role: 'assistant',
           text: data.error ? t('assistant.failed') : data.reply || t('assistant.noReply'),
+          ...(data.error ? { failed: true } : {}),
           changedFields: changed,
+          ...(missed.length > 0 ? { missed } : {}),
         },
       ]);
     },
   });
 
+  const attach = useImageAttach({ disabled: ask.isPending });
+
   const send = (): void => {
     const text = input.trim();
-    if (!text || ask.isPending) return;
+    if (!text || ask.isPending || attach.isPreparing) return;
 
-    setMessages((current) => [...current, { id: `u-${Date.now()}`, role: 'user', text }]);
+    const images = attach.images;
+    // История — до этой реплики: сама просьба едет отдельным полем.
+    const history = assistHistory(messages);
+    setMessages((current) => [
+      ...current,
+      {
+        id: `u-${Date.now()}`,
+        role: 'user',
+        text,
+        ...(images.length > 0 ? { images: images.map((image) => image.name) } : {}),
+      },
+    ]);
     setInput('');
     speech.reset();
-    ask.mutate(text);
+    attach.clear();
+    ask.mutate({ message: text, images, history });
   };
 
   return (
@@ -123,6 +175,8 @@ export function AssistantChat({ kind, fields, schema, onApply, placeholder }: As
         {messages.map((message) => (
           <div
             key={message.id}
+            // Метки для QA-прогона: чья реплика и какие поля изменил ответ.
+            data-assistant-message={message.role}
             className={[
               styles.message,
               message.role === 'user' ? styles.user : styles.assistant,
@@ -131,9 +185,10 @@ export function AssistantChat({ kind, fields, schema, onApply, placeholder }: As
             <Typography variant="body-sm" color={message.role === 'user' ? 'inverse' : 'default'}>
               {message.text}
             </Typography>
+            {message.images && <SentImageNames names={message.images} inverse />}
 
             {message.changedFields && message.changedFields.length > 0 && (
-              <div className={styles.changed}>
+              <div className={styles.changed} data-assistant-changed>
                 {message.changedFields.map((field) => (
                   <Badge key={field} tone="success">
                     {field}
@@ -141,6 +196,7 @@ export function AssistantChat({ kind, fields, schema, onApply, placeholder }: As
                 ))}
               </div>
             )}
+            {message.missed && <AssistantMissed missed={message.missed} />}
           </div>
         ))}
 
@@ -198,7 +254,8 @@ export function AssistantChat({ kind, fields, schema, onApply, placeholder }: As
             </Typography>
           )}
 
-          <div className={styles.composer}>
+          <ImageAttachTray attach={attach} className={styles.attachTray} />
+          <ImageAttachZone attach={attach} className={styles.composer}>
             <textarea
               className={styles.input}
               // Метка для QA-прогона: по ней проверяется, что помощник есть в форме.
@@ -218,6 +275,7 @@ export function AssistantChat({ kind, fields, schema, onApply, placeholder }: As
             />
 
             <div className={styles.composerActions}>
+              <ImageAttachButton attach={attach} />
               {speech.supported && (
                 <Button
                   variant="secondary"
@@ -237,11 +295,11 @@ export function AssistantChat({ kind, fields, schema, onApply, placeholder }: As
                 icon={<Icon name="send" size={24} />}
                 aria-label={t('assistant.send')}
                 onClick={send}
-                disabled={!input.trim() || ask.isPending}
+                disabled={!input.trim() || ask.isPending || attach.isPreparing}
                 isLoading={ask.isPending}
               />
             </div>
-          </div>
+          </ImageAttachZone>
         </>
       )}
     </div>

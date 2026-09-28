@@ -359,7 +359,7 @@ describe('ChatRunRegistry — усыновление после перезапу
 
   it('«Остановить» валит дерево по pid и убирает прогон вместе с записью', () => {
     adopt();
-    expect(registry.stop('sess-1')).toBe(true);
+    expect(registry.stop('sess-1')).toBe('stopped');
     expect(kill).toHaveBeenCalledWith(4242);
     expect(registry.active()).toEqual([]);
     expect(ledger.entries.has('new-1')).toBe(false);

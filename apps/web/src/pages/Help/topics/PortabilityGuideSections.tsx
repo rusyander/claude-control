@@ -36,6 +36,9 @@ export function PortabilityGuideSections({ tr }: SectionProps) {
           <GuideStep title={g('transferApplied')} text={g('transferAppliedText')}>
             <HelpShot topic="portability" scenario="transfer" frame="04-applied" side="panel" />
           </GuideStep>
+          <GuideStep title={g('transferProbe')} text={g('transferProbeText')}>
+            <HelpShot topic="portability" scenario="transfer" frame="05-probe" side="panel" />
+          </GuideStep>
         </GuideSteps>
       </HelpSection>
 

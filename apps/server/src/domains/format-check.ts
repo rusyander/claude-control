@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import type { FormatCheckProvider, FormatCheckReport } from '@agentdeck/contracts';
 import { readJsonFile, writeJsonFile } from '../lib/safe-io.ts';
+import { serverText } from '../lib/server-texts.ts';
 
 /**
  * Сверка форматов чужих CLI с их ОФИЦИАЛЬНЫМИ схемами (IDEA-3).
@@ -33,12 +34,15 @@ interface ProviderSchemaSpec {
   providerId: string;
   schemaUrl?: string;
   keys: Array<{ path: string; section: string }>;
-  /** Почему схемы нет — текст показывается как есть. */
-  noSchemaNote?: string;
+  /** Почему схемы нет: русский текст и его код с именем файла для перевода. */
+  noSchema?: Pick<FormatCheckProvider, 'note' | 'noteCode' | 'noteParams'>;
 }
 
-const NO_SCHEMA = (file: string): string =>
-  `Схема ${file} официально не публикуется — сверять не с чем.`;
+const NO_SCHEMA = (file: string): ProviderSchemaSpec['noSchema'] => ({
+  note: serverText('checks-format-no-schema', { file }),
+  noteCode: 'checks-format-no-schema',
+  noteParams: { file },
+});
 
 export const FORMAT_CHECK_REGISTRY: readonly ProviderSchemaSpec[] = [
   {
@@ -58,14 +62,14 @@ export const FORMAT_CHECK_REGISTRY: readonly ProviderSchemaSpec[] = [
       // бы расхождением, которое уже разобрано.
     ],
   },
-  { providerId: 'codex', keys: [], noSchemaNote: NO_SCHEMA('config.toml') },
-  { providerId: 'gemini', keys: [], noSchemaNote: NO_SCHEMA('settings.json') },
-  { providerId: 'qwen', keys: [], noSchemaNote: NO_SCHEMA('settings.json') },
-  { providerId: 'continue', keys: [], noSchemaNote: NO_SCHEMA('config.yaml') },
-  { providerId: 'goose', keys: [], noSchemaNote: NO_SCHEMA('config.yaml') },
-  { providerId: 'kimi', keys: [], noSchemaNote: NO_SCHEMA('config.toml') },
-  { providerId: 'cursor', keys: [], noSchemaNote: NO_SCHEMA('cli-config.json') },
-  { providerId: 'aider', keys: [], noSchemaNote: NO_SCHEMA('.aider.conf.yml') },
+  { providerId: 'codex', keys: [], noSchema: NO_SCHEMA('config.toml') },
+  { providerId: 'gemini', keys: [], noSchema: NO_SCHEMA('settings.json') },
+  { providerId: 'qwen', keys: [], noSchema: NO_SCHEMA('settings.json') },
+  { providerId: 'continue', keys: [], noSchema: NO_SCHEMA('config.yaml') },
+  { providerId: 'goose', keys: [], noSchema: NO_SCHEMA('config.yaml') },
+  { providerId: 'kimi', keys: [], noSchema: NO_SCHEMA('config.toml') },
+  { providerId: 'cursor', keys: [], noSchema: NO_SCHEMA('cli-config.json') },
+  { providerId: 'aider', keys: [], noSchema: NO_SCHEMA('.aider.conf.yml') },
 ];
 
 /** Неделя: схемы меняются с релизами CLI, чаще ходить незачем. */
@@ -191,7 +195,7 @@ export async function runFormatCheck(
         providerId: spec.providerId,
         state: 'no-schema',
         keys: [],
-        note: spec.noSchemaNote,
+        ...spec.noSchema,
       });
       continue;
     }
@@ -209,6 +213,23 @@ export async function runFormatCheck(
   }
 
   return { checkedAt: now().toISOString(), providers };
+}
+
+/**
+ * Код пояснения «схемы нет» у отчёта из кэша прошлой версии: кэш живёт неделю,
+ * и без кода английская панель показывала бы русский текст до самого обновления.
+ * Код берётся из реестра, а не из текста; запись с кодом и чужой текст (отказ
+ * сети) не трогаются.
+ */
+function withNoteCodes(report: FormatCheckReport): FormatCheckReport {
+  const providers = report.providers.map((row) => {
+    if (row.state !== 'no-schema' || row.noteCode) return row;
+    const spec = FORMAT_CHECK_REGISTRY.find((item) => item.providerId === row.providerId);
+    return spec?.noSchema
+      ? { ...row, noteCode: spec.noSchema.noteCode, noteParams: spec.noSchema.noteParams }
+      : row;
+  });
+  return { ...report, providers };
 }
 
 /**
@@ -232,7 +253,7 @@ export class FormatCheckStore {
 
   /** Что известно сейчас. `undefined` — сверка ещё не выполнялась. */
   current(): FormatCheckReport | undefined {
-    return this.report;
+    return this.report && withNoteCodes(this.report);
   }
 
   /** Результат устарел (или его нет вовсе). */

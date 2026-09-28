@@ -31,6 +31,7 @@ import {
   upsertCase,
 } from '../../domains/project-tests.ts';
 import { assertUnlocked, buildView, guard, idList, requireRoot, type TestsDeps } from './shared.ts';
+import { PANEL_AGENT_HEADER } from '@agentdeck/contracts/panel-agent';
 
 /**
  * Библиотека: группы, кейсы, общие шаги, окружения, свои поля и статусы,
@@ -110,26 +111,28 @@ export function registerTestLibraryRoutes(app: FastifyInstance, deps: TestsDeps)
   );
 
   /** Создать или обновить кейс. Без `id` в теле — создаётся новый. */
-  app.post<{ Body: { path?: string; groupId?: string; testCase?: ProjectTestCaseInput } }>(
-    '/api/project-tests/case',
-    (request, reply) => {
-      const root = requireRoot(request.body?.path, reply);
-      if (!root) return reply;
-      const input = request.body?.testCase;
-      if (!input || typeof input !== 'object') {
-        return reply.code(400).send({
-          message: 'Нужно описание теста.',
-          messageCode: 'library-test-description-required',
-        });
-      }
-      return guard(reply, () => {
-        const groupId = String(request.body?.groupId ?? '');
-        assertUnlocked(deps, root, groupId);
-        upsertCase(root, groupId, input, now());
-        return buildView(root, deps);
+  app.post<{
+    Body: { path?: string; groupId?: string; testCase?: ProjectTestCaseInput };
+  }>('/api/project-tests/case', (request, reply) => {
+    const root = requireRoot(request.body?.path, reply);
+    if (!root) return reply;
+    const input = request.body?.testCase;
+    if (!input || typeof input !== 'object') {
+      return reply.code(400).send({
+        message: 'Нужно описание теста.',
+        messageCode: 'library-test-description-required',
       });
-    },
-  );
+    }
+    return guard(reply, () => {
+      const groupId = String(request.body?.groupId ?? '');
+      assertUnlocked(deps, root, groupId);
+      // Кейс агента — по пометке исполнителя действий агента панели, а не по полю
+      // тела: поле мог прислать любой клиент.
+      const author = request.headers[PANEL_AGENT_HEADER] !== undefined ? 'agent' : 'human';
+      upsertCase(root, groupId, input, now(), author);
+      return buildView(root, deps);
+    });
+  });
 
   /** Удалить кейс. */
   app.delete<{ Querystring: { path?: string; groupId?: string; caseId?: string } }>(

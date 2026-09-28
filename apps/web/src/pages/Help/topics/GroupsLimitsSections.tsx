@@ -27,7 +27,9 @@ export function GroupsLimitsSections() {
             tr('canToggleGroup'),
             tr('canGroupEnv'),
             tr('canBindProject'),
-            tr('canSteps'),
+            tr('canDiscover'),
+            tr('canCopy'),
+            tr('canPath'),
             tr('canAutomation'),
             tr('canConflict'),
             tr('canSandbox'),
@@ -40,6 +42,8 @@ export function GroupsLimitsSections() {
             tr('cantOverride'),
             tr('cantRevive'),
             tr('cantAutoOff'),
+            tr('cantBuiltIn'),
+            tr('cantBoth'),
             tr('cantPermSandbox'),
           ]}
         />
@@ -53,10 +57,11 @@ export function GroupsLimitsSections() {
           descriptionHeader={t('help.common.fieldPurpose')}
           rows={[
             { name: tr('limitMembers'), description: tr('limitMembersValue'), isMono: false },
+            { name: tr('limitStages'), description: tr('limitStagesValue'), isMono: false },
+            { name: tr('limitDiscovery'), description: tr('limitDiscoveryValue'), isMono: false },
             { name: tr('limitEvents'), description: tr('limitEventsValue'), isMono: false },
             { name: tr('limitExit'), description: tr('limitExitValue'), isMono: false },
             { name: tr('limitAuto'), description: tr('limitAutoValue'), isMono: false },
-            { name: tr('limitRebuild'), description: tr('limitRebuildValue'), isMono: false },
             { name: tr('limitSandbox'), description: tr('limitSandboxValue'), isMono: false },
           ]}
         />
@@ -67,14 +72,17 @@ export function GroupsLimitsSections() {
           <Callout tone="warning" title={tr('noteAutoOnTitle')}>
             {tr('noteAutoOnText')}
           </Callout>
+          <Callout tone="warning" title={tr('noteEnglishTitle')}>
+            {tr('noteEnglishText')}
+          </Callout>
           <Callout tone="warning" title={tr('noteRebuildTitle')}>
             {tr('noteRebuildText')}
           </Callout>
           <Callout tone="warning" title={tr('noteLocalHookTitle')}>
             {tr('noteLocalHookText')}
           </Callout>
-          <Callout tone="warning" title={tr('noteTriggerTitle')}>
-            {tr('noteTriggerText')}
+          <Callout tone="info" title={tr('noteOldStepsTitle')}>
+            {tr('noteOldStepsText')}
           </Callout>
           <Callout tone="info" title={tr('noteInvisibleTitle')}>
             {tr('noteInvisibleText')}
@@ -97,8 +105,8 @@ export function GroupsLimitsSections() {
             { title: tr('undoOff'), text: tr('undoOffText') },
             { title: tr('undoDelete'), text: tr('undoDeleteText') },
             { title: tr('undoAuto'), text: tr('undoAutoText') },
-            { title: tr('undoHook'), text: tr('undoHookText') },
-            { title: tr('undoSkill'), text: tr('undoSkillText') },
+            { title: tr('undoOverride'), text: tr('undoOverrideText') },
+            { title: tr('undoStep'), text: tr('undoStepText') },
           ]}
         />
       </HelpSection>

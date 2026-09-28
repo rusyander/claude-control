@@ -48,7 +48,9 @@ describe('перезапуск переполненного разговора',
         ? '<agentdeck-children>СВОДКА ГРУПП</agentdeck-children>'
         : undefined,
     );
-    registry.setSessionListener((chatId, sessionId) => store.linkChatSession(chatId, sessionId));
+    registry.setSessionListener((chatId, sessionId, from) =>
+      store.linkChatSession(chatId, sessionId, from),
+    );
     const ctx = {
       location: {
         paths: {
@@ -131,7 +133,7 @@ describe('перезапуск переполненного разговора',
     expect(started).toHaveLength(1);
     expect(started[0]?.chatId).toBe(next);
     expect(started[0]?.prompt).toContain('СВОДКА ГРУПП');
-    expect(started[0]?.prompt).toContain('Работа этого разговора идёт в группах разделения');
+    expect(started[0]?.prompt).toContain('The work of this conversation goes on in split groups');
     expect(started[0]?.prompt).toContain('agentdeck:tell');
   });
 
@@ -161,7 +163,7 @@ describe('перезапуск переполненного разговора',
 
     expect(outcome.mode).toBe('started');
     expect(store.getSplitPlans()).toEqual({});
-    expect(started[0]?.prompt).toContain('Продолжай работу по .agent/PROGRESS.md');
+    expect(started[0]?.prompt).toContain('Continue the work from .agent/PROGRESS.md');
     expect(started[0]?.prompt).not.toContain('СВОДКА ГРУПП');
   });
 

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
-import { apiClient, LONG_TIMEOUTS } from '@shared/api/client';
+import { apiClient, LONG_TIMEOUTS, toErrorMessage } from '@shared/api/client';
 import { queryKeys } from '@shared/api/query-keys';
 import { formatDateTime } from '@shared/lib/format';
 import { Stack } from '@shared/ui/stack';
@@ -14,10 +14,10 @@ import { Icon } from '@shared/ui/icon';
 import { DeleteButton } from '@features/EntityDelete';
 import { SandboxButton } from '@features/SandboxRunner';
 import { McpToolsModal } from '@features/McpToolPicker';
-import { useStartOAuth, useClearOAuth } from '@entities/McpServer';
+import { useStartOAuth, useClearOAuth, type StartOAuthResult } from '@entities/McpServer';
 import { healthFromError } from './model/healthFromError';
 import { oauthStartOutcome } from './model/oauthStartOutcome';
-import type { HealthResult, McpServerCardProps } from './McpServerCard.types';
+import type { AuthNotice, HealthResult, McpServerCardProps } from './McpServerCard.types';
 import styles from './McpServerCard.module.scss';
 
 /**
@@ -43,7 +43,8 @@ export function McpServerCard({
   const [isToolsOpen, setIsToolsOpen] = useState(false);
   // Адрес входа, который придётся открыть руками: окно срезал блокировщик.
   const [manualAuthUrl, setManualAuthUrl] = useState<string>();
-  const [authError, setAuthError] = useState<string>();
+  // Ответ кнопки «Авторизоваться» словами — у каждого исхода свой, молчащих нет.
+  const [authNotice, setAuthNotice] = useState<AuthNotice>();
   const autoChecked = useRef(false);
 
   const startOAuth = useStartOAuth();
@@ -84,46 +85,70 @@ export function McpServerCard({
   // OAuth есть только у сетевых серверов; у stdio авторизоваться негде.
   const canOAuth = server.transport !== 'stdio';
 
+  // Что делать с ответом старта — у каждого исхода свои слова, молчащих нет.
+  const onStarted = (result: StartOAuthResult, popup: Window | null): void => {
+    const outcome = oauthStartOutcome(result, popup !== null);
+
+    if (outcome.kind === 'authorized') {
+      popup?.close();
+      setAuthNotice({ tone: 'success', text: t('mcp.oauthAlready') });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.mcp });
+      return;
+    }
+
+    // Сервер отвечает без входа (локальный Dev Mode Figma): раньше окно
+    // молча закрывалось, значка не появлялось — кнопка казалась мёртвой.
+    // Говорим словами и сразу проверяем связь: «Отвечает» — ответ на
+    // вопрос «работает ли», ради которого кнопку и нажимали.
+    if (outcome.kind === 'notRequired') {
+      popup?.close();
+      setAuthNotice({ tone: 'success', text: t('mcp.oauthNotRequired') });
+      void checkHealth();
+      return;
+    }
+
+    if (outcome.kind === 'popup' && popup) {
+      setAuthNotice({ tone: 'subtle', text: t('mcp.oauthPopupOpened') });
+      popup.location.href = outcome.url;
+      // Окно закрылось — вход, скорее всего, завершён: обновляем статус.
+      const timer = window.setInterval(() => {
+        if (popup.closed) {
+          window.clearInterval(timer);
+          setAuthNotice(undefined);
+          void queryClient.invalidateQueries({ queryKey: queryKeys.mcp });
+        }
+      }, 1000);
+      return;
+    }
+
+    // Дальше — случаи, в которых раньше не происходило ничего: мутация
+    // удалась (значит, и общий тост об ошибке молчит), окна нет, а вход на
+    // сервере уже заведён. Без адреса или ссылки человек остаётся ни с чем.
+    if (outcome.kind === 'noUrl') {
+      setAuthNotice({ tone: 'danger', text: t('mcp.oauthNoUrl') });
+      return;
+    }
+    setManualAuthUrl(outcome.url);
+  };
+
   const authorize = (): void => {
     setManualAuthUrl(undefined);
-    setAuthError(undefined);
+    setAuthNotice(undefined);
 
     // Окно открываем синхронно по клику: если ждать ответа сервера, а потом
     // открывать, блокировщик всплывающих окон успеет его срезать.
     const popup = window.open('about:blank', 'mcp-oauth', 'width=600,height=760');
 
     startOAuth.mutate(server.id, {
-      onSuccess: (result) => {
-        const outcome = oauthStartOutcome(result, popup !== null);
-
-        if (outcome.kind === 'authorized') {
-          popup?.close();
-          void queryClient.invalidateQueries({ queryKey: queryKeys.mcp });
-          return;
-        }
-
-        if (outcome.kind === 'popup' && popup) {
-          popup.location.href = outcome.url;
-          // Окно закрылось — вход, скорее всего, завершён: обновляем статус.
-          const timer = window.setInterval(() => {
-            if (popup.closed) {
-              window.clearInterval(timer);
-              void queryClient.invalidateQueries({ queryKey: queryKeys.mcp });
-            }
-          }, 1000);
-          return;
-        }
-
-        // Дальше — случаи, в которых раньше не происходило ничего: мутация
-        // удалась (значит, и общий тост об ошибке молчит), окна нет, а вход на
-        // сервере уже заведён. Без адреса или ссылки человек остаётся ни с чем.
-        if (outcome.kind === 'noUrl') {
-          setAuthError(t('mcp.oauthNoUrl'));
-          return;
-        }
-        setManualAuthUrl(outcome.url);
+      onSuccess: (result) => onStarted(result, popup),
+      // Отказ — у кнопки, с причиной сервера (общий тост хук глушит).
+      onError: (error) => {
+        popup?.close();
+        setAuthNotice({
+          tone: 'danger',
+          text: t('mcp.oauthFailed', { reason: toErrorMessage(error) }),
+        });
       },
-      onError: () => popup?.close(),
     });
   };
 
@@ -135,9 +160,14 @@ export function McpServerCard({
     checkedAt: server.checkedAt,
   };
 
+  // «Авторизоваться» у сервера, который уже отвечает без входа, ничего не
+  // даст (токена у него нет и не будет) — кнопку не показываем. «Выйти» при
+  // сохранённом токене остаётся всегда.
+  const showOAuth = canOAuth && (server.hasOAuth || shown.health !== 'connected');
+
   return (
     <>
-      <Card padding="md">
+      <Card padding="md" data-agent-anchor={server.id}>
         <Stack
           direction="row"
           gap="var(--spacing-md)"
@@ -205,20 +235,28 @@ export function McpServerCard({
               </Stack>
             )}
 
-            {authError && (
-              <Typography variant="caption" color="danger">
-                {authError}
+            {authNotice && (
+              <Typography
+                variant="caption"
+                color={authNotice.tone}
+                role={authNotice.tone === 'danger' ? 'alert' : 'status'}
+              >
+                {authNotice.text}
               </Typography>
             )}
           </Stack>
 
           <Stack direction="row" align="center" gap="var(--spacing-xs)" wrap justify="end">
-            {canOAuth &&
+            {showOAuth &&
               (server.hasOAuth ? (
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => clearOAuth.mutate(server.id)}
+                  // Статус «Отвечает» — ещё со временем входа: без новой проверки
+                  // карточка оставалась бы без «Выйти» и без «Авторизоваться».
+                  onClick={() =>
+                    clearOAuth.mutate(server.id, { onSuccess: () => void checkHealth() })
+                  }
                   isLoading={clearOAuth.isPending}
                 >
                   {t('mcp.signOut')}

@@ -18,6 +18,7 @@ export const checksMessageParams = {
   'checks-config-missing': ['paths'],
   'checks-config-present': ['paths'],
   'checks-format-rejected': ['reason'],
+  'checks-format-no-schema': ['file'],
   'checks-mcp-reread-missing': [],
   'checks-mcp-neighbours': [],
   'checks-mcp-ok': ['count'],

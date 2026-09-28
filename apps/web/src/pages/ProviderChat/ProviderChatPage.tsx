@@ -19,7 +19,9 @@ import {
   useRestartProviderChat,
 } from '@entities/ProviderChat';
 import { useStartHandoff } from '@entities/ChatHandoff';
-import { MediaDeckCard, useChatMedia } from '@entities/Media';
+import { MediaDeckCard, storeAgentImageFiles, useChatMedia } from '@entities/Media';
+import type { AgentImage } from '@agentdeck/contracts/agent-images';
+import { toErrorMessage } from '@shared/api/client';
 import { MediaFeedCard } from '@features/ChatMessages';
 import { TurnToolHintLine, useTurnToolHint } from '@entities/Platform';
 import { foreignConsumerId } from '@agentdeck/contracts/platform-consumers';
@@ -103,9 +105,23 @@ export function ProviderChatPage() {
     setPicker('none');
   };
 
-  const send = (text: string): void => {
-    void run.send(text, attachments);
+  const send = async (text: string, images: AgentImage[] = []): Promise<boolean> => {
+    let paths = attachments;
+    // Картинки чужой CLI читает сам — файлами: панель кладёт их к себе и
+    // добавляет пути к вложениям этой отправки. Не дошли — сообщение не уходит,
+    // текст и чипы остаются в поле.
+    if (images.length > 0) {
+      try {
+        const stored = await storeAgentImageFiles(images);
+        paths = [...attachments, ...stored.map((file) => file.path)];
+      } catch (error) {
+        toast.error(t('attach.uploadFailed', { message: toErrorMessage(error) }));
+        return false;
+      }
+    }
+    void run.send(text, paths);
     setAttachments([]);
+    return true;
   };
 
   /**
@@ -120,6 +136,7 @@ export function ProviderChatPage() {
    * контур» и не показать результат нельзя.
    */
   const media = useChatMedia({
+    host: 'provider-chat',
     chatId: activeChatId ?? '',
     ask: (text) => {
       if (!activeChatId || run.isRunning) return false;

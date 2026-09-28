@@ -55,6 +55,24 @@ describe('хаб разделения — управление группой', 
     expect(html).not.toContain('chat.cascade.hub');
   });
 
+  // F-323, соседи: срок лимита — на языке интерфейса, а не браузера.
+  it('срок лимита — в записи языка интерфейса: en с AM/PM, ru без', async () => {
+    const split: SplitPlanView = {
+      parentChatId: 'parent',
+      triage: { at: '2026-09-25T10:00:00.000Z', received: true, repairs: [], conflicts: [] },
+      order: [0],
+      groups: [group(0)],
+      limitUntil: '2026-09-25T18:00:00.000Z',
+    };
+    await i18n.changeLanguage('en');
+    try {
+      expect(textOf(render(new Map(), split))).toMatch(/\d{2}:\d{2}\s?(AM|PM)/);
+    } finally {
+      await i18n.changeLanguage('ru');
+    }
+    expect(textOf(render(new Map(), split))).not.toMatch(/AM|PM/);
+  });
+
   it('работающая группа — «Пауза», остановленная — «Продолжить»', () => {
     const key = (index: number): string => splitGroupKey({ groupIndex: index, id: '' });
     const html = render(

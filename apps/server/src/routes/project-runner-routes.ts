@@ -9,6 +9,7 @@ import {
   freePort,
   resolveTargetDir,
 } from '../domains/project-runner.ts';
+import { isProjectOrCopy } from '../domains/project-tests.ts';
 import { codeOf } from '../lib/server-text.ts';
 
 /**
@@ -39,6 +40,26 @@ export function registerProjectRunnerRoutes(
       return undefined;
     }
     return path;
+  };
+
+  /**
+   * Запуск исполняет команду в каталоге из запроса, автозапуск — при следующем
+   * старте панели. Граница та же, что у автотестов (F-16): проекты из раздела
+   * «Проекты», каталоги внутри них и копии их веток. Смотреть цели, снимать
+   * автозапуск и гасить свой же сервер можно где угодно — это ничего не запускает.
+   */
+  const requireOwnProject = (
+    path: string,
+    reply: { code: (n: number) => { send: (b: unknown) => unknown } },
+  ): boolean => {
+    const projects = ctx.store.getProjects().map((project) => project.path);
+    if (isProjectOrCopy(path, projects)) return true;
+    reply.code(403).send({
+      message:
+        'Dev-сервер панель запускает только у проектов из раздела «Проекты», каталогов внутри них и копий их веток. Добавьте этот каталог проектом.',
+      messageCode: 'runner-project-unregistered',
+    });
+    return false;
   };
 
   /** Что панель помнит про цель — в форме, которую ждёт `describeRunner`. */
@@ -103,6 +124,7 @@ export function registerProjectRunnerRoutes(
           messageCode: 'runner-enabled-boolean',
         });
       }
+      if (request.body.enabled && !requireOwnProject(path, reply)) return reply;
 
       try {
         const target = resolveTargetDir(path, request.body.dir);
@@ -141,6 +163,7 @@ export function registerProjectRunnerRoutes(
     async (request, reply) => {
       const path = requirePath(request.body?.path, reply);
       if (!path) return reply;
+      if (!requireOwnProject(path, reply)) return reply;
 
       try {
         const target = resolveTargetDir(path, request.body.dir);

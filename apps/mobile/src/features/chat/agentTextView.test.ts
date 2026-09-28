@@ -99,3 +99,64 @@ describe('media-block грузится без чужих пакетов', () => 
     expect(bare).toEqual([]);
   });
 });
+
+describe('agentTextView — блок замечания главному чату', () => {
+  const block = [
+    'Сделал миграцию.',
+    '```agentdeck:escalate',
+    '{"severity":"critical","text":"Миграция удалит колонку"}',
+    '```',
+  ].join('\n');
+
+  it('блок agentdeck:escalate не попадает в текст ленты', () => {
+    const view = agentTextView(block, ru.chat);
+    expect(view.markdown).toBe('Сделал миграцию.');
+    expect(view.markdown).not.toContain('severity');
+  });
+
+  it('пока ответ печатается, незакрытый блок спрятан вместе с хвостом', () => {
+    const view = agentTextView('Сделал.\n```agentdeck:escalate\n{"severity":"crit', ru.chat, {
+      streaming: true,
+    });
+    expect(view.markdown).not.toContain('severity');
+    expect(view.markdown).toContain('Сделал.');
+  });
+});
+
+/**
+ * Служебные блоки — только у ответа агента (ревью 28.09, F-226, как лента
+ * панели): человек, описавший формат, видит свой пример, а не пустое место.
+ */
+describe('agentTextView — текст человека', () => {
+  const escalate = [
+    'Формат:',
+    '```agentdeck:escalate',
+    '{"severity":"critical","text":"Миграция удалит колонку"}',
+    '```',
+  ].join('\n');
+  const ticket = ['<agentdeck:ticket>', 'title: Кнопка съезжает', '</agentdeck:ticket>'].join('\n');
+
+  it('блок эскалации и блок тикета остаются в тексте', () => {
+    const view = agentTextView(`${escalate}\n\n${ticket}`, ru.chat, { fromUser: true });
+    expect(view.markdown).toContain('Миграция удалит колонку');
+    expect(view.markdown).toContain('agentdeck:escalate');
+    expect(view.markdown).toContain('Кнопка съезжает');
+  });
+
+  it('ответ агента с тем же текстом — по-прежнему без блоков', () => {
+    const view = agentTextView(`${escalate}\n\n${ticket}`, ru.chat);
+    expect(view.markdown).not.toContain('Миграция удалит колонку');
+    expect(view.markdown).not.toContain('Кнопка съезжает');
+  });
+
+  // Тестов отрисовки у телефона нет (среда node, без нативных модулей), поэтому
+  // проводка от ленты до разбора проверяется по тексту: без неё флаг есть, а
+  // лента по-прежнему режет текст человека.
+  it('лента передаёт автора текста в разбор', () => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const transcript = readFileSync(resolve(here, 'Transcript.tsx'), 'utf8');
+    const agentText = readFileSync(resolve(here, 'AgentText.tsx'), 'utf8');
+    expect(transcript).toMatch(/<AgentText[^>]*\bfromUser=\{message\.role === 'user'\}/);
+    expect(agentText).toMatch(/agentTextView\(text, t\.chat, \{[^}]*\bfromUser\b[^}]*\}\)/);
+  });
+});

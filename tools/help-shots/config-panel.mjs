@@ -25,7 +25,7 @@
  *
  * Запуск: node tools/help-shots/config-panel.mjs
  * Переменные: GUIDE_PANEL_PORT (5196), GUIDE_WEB_PORT (8906),
- *             GUIDE_ONLY (имя одного сценария вида `skills/living`).
+ *             GUIDE_ONLY (сценарии вида `skills/living`, несколько — через запятую).
  */
 import { spawn } from 'node:child_process';
 import { chromium } from 'playwright';
@@ -111,7 +111,7 @@ try {
   // иначе проверяется полным прогоном всех десяти.
   const only = process.env.GUIDE_ONLY ?? '';
   const run = async (topic, name, shoot) => {
-    if (only && only !== `${topic}/${name}`) return;
+    if (only && !only.split(',').includes(`${topic}/${name}`)) return;
     const scenario = openScenario(topic, name);
     console.log(`\nсценарий ${topic}/${name}`);
     await shoot(browser, WEB, scenario, home);

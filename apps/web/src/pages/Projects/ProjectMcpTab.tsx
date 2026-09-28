@@ -9,10 +9,13 @@ import { SkeletonList } from '@shared/ui/skeleton';
 import { useProjectMcp, useDeleteProjectMcp, useSetProjectMcpEnabled } from '@entities/Project';
 import { ProjectMcpCard } from './ProjectMcpCard';
 import { ProjectMcpForm } from './ProjectMcpForm';
-import type { ProjectTabProps } from './ProjectRulesTab.types';
+import { SourceLine } from './SourceLine';
+import { projectFilePath } from './lib/projectFilePath';
+import type { ProjectFileTabProps } from './ProjectRulesTab.types';
+import styles from './ProjectsPage.module.scss';
 
-/** MCP-серверы проекта из его корневого `.mcp.json`. */
-export function ProjectMcpTab({ projectId }: ProjectTabProps) {
+/** MCP-серверы проекта из его корневого `.mcp.json` — правятся здесь. */
+export function ProjectMcpTab({ projectId, projectPath }: ProjectFileTabProps) {
   const { t } = useTranslation();
   const [editing, setEditing] = useState<McpServer | undefined>(undefined);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -33,10 +36,13 @@ export function ProjectMcpTab({ projectId }: ProjectTabProps) {
 
   return (
     <Stack gap="var(--spacing-sm)">
-      <Stack direction="row" justify="between" align="center" wrap gap="var(--spacing-sm)">
-        <Typography variant="caption" color="subtle">
-          {t('projectConfig.mcpHint')}
-        </Typography>
+      <div className={styles.sectionHead}>
+        <div className={styles.sectionText}>
+          <SourceLine isEditable path={projectFilePath(projectPath, '.mcp.json')} />
+          <Typography variant="caption" color="subtle" className={styles.sectionHint}>
+            {t('projectsPage.hint.mcp')}
+          </Typography>
+        </div>
         <Button
           variant="primary"
           size="sm"
@@ -45,7 +51,7 @@ export function ProjectMcpTab({ projectId }: ProjectTabProps) {
         >
           {t('projectConfig.addMcp')}
         </Button>
-      </Stack>
+      </div>
 
       {isLoading && <SkeletonList rows={3} />}
 

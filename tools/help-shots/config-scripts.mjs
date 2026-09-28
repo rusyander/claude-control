@@ -21,7 +21,7 @@ export async function shootScriptsFiles(browser, web, scenario, home) {
     // ── 01. Все файлы папки ──────────────────────────────────────────────────
     // Пометка «Используется» — про привязку к хуку, и она транзитивна: общий
     // модуль, который импортирует привязанный скрипт, забытым не считается.
-    await openSection(page, web, '/scripts', 2500);
+    await openSection(page, web, '/scripts?tab=all', 2500);
     await scenario.shot(page, '01-list');
 
     // ── 02. Содержимое файла ─────────────────────────────────────────────────
@@ -54,6 +54,12 @@ export async function shootScriptsFiles(browser, web, scenario, home) {
     await page.waitForTimeout(1500);
     await scenario.shot(page, '04-delete', { clip: '[role="dialog"]', padding: 24 });
     await closeModal(page);
+
+    // ── 05. Вкладка «Не привязаны» ───────────────────────────────────────────
+    // Отбор по вопросу «что забыто»: тесты сюда не попадают, их не привязывают.
+    await page.getByRole('tab', { name: /^(Не привязаны|Not bound)/ }).click();
+    await page.waitForTimeout(1200);
+    await scenario.shot(page, '05-unused');
   } finally {
     await page.close();
   }
@@ -64,7 +70,7 @@ export async function shootScriptsNew(browser, web, scenario) {
 
   try {
     // ── 01. Готовые каркасы ──────────────────────────────────────────────────
-    await openSection(page, web, '/scripts', 2500);
+    await openSection(page, web, '/scripts?tab=all', 2500);
     await page
       .getByRole('button', { name: /^(Добавить скрипт|Add script)$/ })
       .first()
@@ -74,9 +80,12 @@ export async function shootScriptsNew(browser, web, scenario) {
 
     // ── 02. Каркас подставил код и имя ───────────────────────────────────────
     // Имя файла подставляется только в пустое поле: введённое руками не трогают.
-    // Пресет «Страж команды» — заготовка панели, а не переведённый текст: он
-    // одинаков в обеих съёмках.
-    await page.getByRole('button', { name: 'Страж команды', exact: true }).first().click();
+    // Заготовки переведены (`ScriptTemplate.en.ts`): английская съёмка жмёт
+    // «Command guard» и получает файл с английскими комментариями.
+    await page
+      .getByRole('button', { name: /^(Страж команды|Command guard)$/ })
+      .first()
+      .click();
     await page.waitForTimeout(1000);
     await page.getByLabel(/^(Имя файла|File name)$/).fill('no-secrets.mjs');
     await page.waitForTimeout(600);
@@ -89,11 +98,11 @@ export async function shootScriptsNew(browser, web, scenario) {
       .click();
     await page.waitForTimeout(1200);
     await page
-      .getByRole('button', { name: /^Формат при сохранении/ })
+      .getByRole('button', { name: /^(Формат при сохранении|Format on save)/ })
       .first()
       .click();
     await page
-      .getByRole('button', { name: /^Брифинг при старте/ })
+      .getByRole('button', { name: /^(Брифинг при старте|Session start brief)/ })
       .first()
       .click();
     await page.waitForTimeout(600);

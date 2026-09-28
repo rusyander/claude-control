@@ -1,0 +1,21 @@
+/* Под кнопкой строки, поверх соседних строк: подсказка не двигает список. */
+.hint {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 5;
+  width: max-content;
+  max-width: min(420px, 80vw);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: 8px;
+  background: var(--color-fg);
+  color: var(--color-surface);
+  box-shadow: var(--shadow-lg);
+  line-height: 1.4;
+  white-space: normal;
+
+  /* Цвет текста внутри — от подсказки, а не от оттенков Typography. */
+  & * {
+    color: inherit;
+  }
+}

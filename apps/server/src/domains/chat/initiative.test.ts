@@ -20,11 +20,11 @@ describe('строка инициатив для прогона', () => {
 
     expect(bare).toContain('AskUserQuestion');
     expect(bare).toContain('Answer questions?');
-    expect(bare).toContain('отказ панели');
+    expect(bare).toContain('a refusal from the panel');
     // Фон переживает ход, но не смену процесса — нужное сейчас агент ждёт в том же ходе.
     expect(bare).toContain('run_in_background');
-    expect(bare).toContain('живёт между ходами');
-    expect(bare).toContain('жди в том же ходе');
+    expect(bare).toContain('lives between turns');
+    expect(bare).toContain('wait in the same turn');
     expect(bare).not.toContain('agentdeck:split');
     expect(bare).not.toContain('agentdeck:handoff');
     expect(bare).not.toMatch(/[\r\n]/);
@@ -74,7 +74,7 @@ describe('строка инициатив для прогона', () => {
       { taskSplitInitiative: true, handoffInitiative: true },
     ]) {
       const prompt = initiativePrompt(settings) ?? '';
-      expect(prompt.startsWith('Этот прогон запущен из панели AgentDeck')).toBe(true);
+      expect(prompt.startsWith('This run was started from the AgentDeck panel')).toBe(true);
     }
   });
 
@@ -96,7 +96,7 @@ describe('строка инициатив для прогона', () => {
 
     expect(muted).not.toContain('agentdeck:split');
     expect(muted).toContain('agentdeck:handoff');
-    expect(muted.startsWith('Этот прогон запущен из панели AgentDeck')).toBe(true);
+    expect(muted.startsWith('This run was started from the AgentDeck panel')).toBe(true);
   });
 
   it('единственная инициатива погашена — у чужого CLI строки нет вовсе', () => {
@@ -114,8 +114,8 @@ describe('строка инициатив для прогона', () => {
    */
   it('в инструкции названа планка задачи и запрет спрашивать дважды', () => {
     const split = initiativePrompt({ taskSplitInitiative: true, handoffInitiative: false }) ?? '';
-    expect(split).toContain('ОДНА задача');
-    expect(split).toContain('не больше одного раза за разговор');
+    expect(split).toContain('ONE task');
+    expect(split).toContain('at most once per conversation');
   });
 
   /**
@@ -125,15 +125,15 @@ describe('строка инициатив для прогона', () => {
    */
   it('доставка: приезжает по запросу, одной строкой, с планкой и запретами', () => {
     const settings = { taskSplitInitiative: false, handoffInitiative: false };
-    expect(initiativePrompt(settings)).not.toContain('Доставка до MR');
+    expect(initiativePrompt(settings)).not.toContain('delivery up to an MR');
 
     const delivery = chatDeliveryPrompt({ skill: 'acme-ticket-delivery' });
     const line = initiativePrompt(settings, { delivery }) ?? '';
-    expect(line).toContain('Доставка до MR на этом проекте включена');
+    expect(line).toContain('enabled delivery up to an MR on this project');
     expect(line).toContain('`acme-ticket-delivery`');
-    expect(line).toContain('задача на изменение кода');
-    expect(line).toContain('MR не требуют');
-    expect(line).toContain('слияние, удаление веток и force-push запрещены');
+    expect(line).toContain('code-change task');
+    expect(line).toContain('needs no MR');
+    expect(line).toContain('merging, deleting branches and force-push are forbidden');
     expect(line).not.toMatch(/[\r\n]/);
 
     // Чужому CLI — без AskUserQuestion, но строка доезжает.
@@ -155,8 +155,8 @@ describe('строка инициатив для прогона', () => {
 
     const both = initiativePrompt(split, { delivery }) ?? '';
     expect(both).toContain(`${DELIVERY_AFTER_SPLIT} ${delivery}`);
-    expect(both).toContain('если предлагаешь разделение, ничего не доставляй');
-    expect(both).toContain('Доставка до MR на этом проекте включена');
+    expect(both).toContain('if you propose a split, deliver nothing');
+    expect(both).toContain('enabled delivery up to an MR on this project');
     expect(both).not.toMatch(/[\r\n]/);
 
     // Разделение уже предлагали — старшинство не нужно, строка доставки чистая.

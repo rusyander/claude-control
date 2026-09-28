@@ -4,20 +4,23 @@ import {
   lstatSync,
   mkdirSync,
   readdirSync,
+  readlinkSync,
   rmdirSync,
   statSync,
   symlinkSync,
   unlinkSync,
   utimesSync,
 } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import type {
   WorktreeMirrorReport,
   WorktreeMirrorSettings,
   WorktreeMirrorSkipped,
 } from '@agentdeck/contracts';
-import { serverText } from '../../lib/server-texts.ts';
+import { localizeText, serverText } from '../../lib/server-texts.ts';
 import { git } from './exec.ts';
+import { isPanelScaffold } from '../project-tests/e2e-folder.ts';
+import { PANEL_E2E_DIR } from '../project-tests/e2e-scaffold.ts';
 
 /**
  * Локальный слой репозитория — в копию, без вопросов.
@@ -393,6 +396,20 @@ export function listFilesUnder(root: string, dir: string): string[] {
  */
 export const LINK_DIRS: readonly string[] = ['.claude/skills', '.claude/hooks'];
 
+/**
+ * Папка e2e, заведённая панелью, — тоже ссылкой, но только она. Она скрыта от
+ * git (`.git/info/exclude`), поэтому чекаут копии её не несёт, а копией файлов
+ * тесты, написанные агентом копии, умерли бы вместе с ней: ни в MR (папки нет в
+ * git), ни в кейсы оригинала. Ссылкой тест ложится сразу в папку оригинала, и
+ * сверка идёт по кейсам оригинала (`e2eLinkedRoot`). Своя папка проекта в git —
+ * её копия получает чекаутом, и ссылка ей не нужна.
+ */
+function linkDirs(mainDir: string): string[] {
+  return isPanelScaffold(join(mainDir, PANEL_E2E_DIR))
+    ? [...LINK_DIRS, PANEL_E2E_DIR]
+    : [...LINK_DIRS];
+}
+
 export interface LinkResult {
   linked: string[];
   failed: WorktreeMirrorSkipped[];
@@ -405,7 +422,7 @@ export interface LinkResult {
  */
 export function linkSharedDirs(mainDir: string, copyDir: string): LinkResult {
   const result: LinkResult = { linked: [], failed: [] };
-  for (const rel of LINK_DIRS) {
+  for (const rel of linkDirs(mainDir)) {
     const src = join(mainDir, rel);
     const dst = join(copyDir, rel);
     try {
@@ -439,6 +456,22 @@ export function linkSharedDirs(mainDir: string, copyDir: string): LinkResult {
   return result;
 }
 
+/** Ссылка `link` ведёт в `target` — читается сама ссылка, висячая тоже. */
+function linksTo(link: string, target: string): boolean {
+  let raw: string;
+  try {
+    raw = readlinkSync(link);
+  } catch {
+    return false;
+  }
+  // junction Windows отдаёт путь с префиксом `\\?\`; регистр там не различается.
+  const key = (path: string): string => {
+    const full = resolve(dirname(link), path.replace(/^\\\\\?\\/, ''));
+    return process.platform === 'win32' ? full.toLowerCase() : full;
+  };
+  return key(raw) === key(target);
+}
+
 /**
  * Снять ссылки с копии перед её удалением.
  *
@@ -453,9 +486,17 @@ export function linkSharedDirs(mainDir: string, copyDir: string): LinkResult {
  * значит связать не удалось и файлы приехали копией: его не трогаем, им
  * распорядится git.
  */
-export function unlinkSharedDirs(copyDir: string): string[] {
+export function unlinkSharedDirs(copyDir: string, mainDir?: string): string[] {
   const removed: string[] = [];
-  for (const rel of LINK_DIRS) {
+  // Ссылка e2e снимается, только если она наша: ведёт в e2e оригинала (так её
+  // ставит linkSharedDirs) или в заготовку панели. Метку в конфиге человек может
+  // стереть, а папку оригинала — удалить, и ссылка осталась бы в копии; свою же
+  // ссылку проекта с тем же именем, ведущую в другое место, удалять не нам.
+  const e2e = join(copyDir, PANEL_E2E_DIR);
+  const ours =
+    (mainDir !== undefined && linksTo(e2e, join(mainDir, PANEL_E2E_DIR))) || isPanelScaffold(e2e);
+  const own = ours ? [PANEL_E2E_DIR] : [];
+  for (const rel of [...LINK_DIRS, ...own]) {
     const dst = join(copyDir, rel);
     let info;
     try {
@@ -541,7 +582,10 @@ export async function mirrorLocalLayer(
         reasonCode: 'worktree-mirror-skip-build-env' as const,
       })),
     ],
-    unlisted: plan.unlisted,
+    // Связанное ссылкой — не «осталось за бортом»: оно в копии, просто общее.
+    unlisted: plan.unlisted.filter(
+      (path) => !links.linked.some((rel) => path.replace(/\/+$/, '') === rel),
+    ),
     kept: 0,
     ...(links.linked.length > 0 ? { linked: links.linked } : {}),
   };
@@ -630,4 +674,32 @@ export function describeMirror(report: WorktreeMirrorReport): string {
   if (report.unlisted.length > 0)
     parts.push(serverText('worktree-mirror-unlisted', { paths: report.unlisted.join(', ') }));
   return parts.join(', ');
+}
+
+/**
+ * Граница частей строки зеркала: запятая перед словом следующего шаблона.
+ * Счётные части — только слово с числом и концом части; «за бортом» — всегда
+ * последняя часть, и её пути (имена из репозитория человека) не режутся вовсе:
+ * путь «weird, пропущено 3/» иначе разрывался и переводился кусками (F-310).
+ */
+const MIRROR_PART = /, (?=ссылкой: |без изменений \d+(?:, |$)|пропущено \d+(?:, |$))/;
+// Начало части «за бортом» — из самого шаблона: литерал разошёлся бы с ним.
+const MIRROR_TAIL = `, ${serverText('worktree-mirror-unlisted', { paths: '' })}`;
+
+function mirrorRowForModel(row: string): string {
+  const tail = row.indexOf(MIRROR_TAIL);
+  const head = tail === -1 ? row : row.slice(0, tail);
+  const parts = head.split(MIRROR_PART);
+  if (tail !== -1) parts.push(row.slice(tail + 2));
+  return parts.map((part) => localizeText(part, 'en')).join(', ');
+}
+
+/**
+ * Строка зеркала (и строка доступа под ней) для задания модели — по-английски:
+ * всё, что панель шлёт модели, английское (решение владельца D-E, 27.09.2026).
+ * Строка собрана из шаблонов через запятую, а перевод узнаёт шаблон целиком,
+ * поэтому она переводится по частям. Незнакомая часть остаётся как есть.
+ */
+export function mirrorLineForModel(line: string): string {
+  return line.split('\n').map(mirrorRowForModel).join('\n');
 }

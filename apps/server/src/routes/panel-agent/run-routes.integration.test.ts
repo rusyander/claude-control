@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { delimiter, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type {
@@ -51,6 +51,8 @@ const argv = process.argv.slice(2);
 // теперь список, и переменная теста до процесса не дошла бы.
 const DUMP = new URL('./dump.json', import.meta.url);
 const SLOW = new URL('./slow-ms.txt', import.meta.url);
+const SLOW_AFTER = new URL('./slow-after-ms.txt', import.meta.url);
+const FAIL_AFTER = new URL('./fail-after.txt', import.meta.url);
 const after = (flag) => { const at = argv.indexOf(flag); return at >= 0 ? argv[at + 1] : undefined; };
 const chunks = [];
 for await (const chunk of process.stdin) chunks.push(chunk);
@@ -71,7 +73,9 @@ if (existsSync(SLOW)) await new Promise((done) => setTimeout(done, Number(readFi
 const out = (event) => process.stdout.write(JSON.stringify(event) + '\\n');
 out({ type: 'system', subtype: 'init' });
 out({ type: 'assistant', message: { content: [{ type: 'tool_use', id: 't1', name: 'mcp__${PANEL_AGENT_BRIDGE_ID}__where_am_i', input: {} }] } });
-out({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 't1', is_error: false }] } });
+out({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 't1', is_error: false, content: [{ type: 'text', text: 'Done.\\n{ "route": "/projects", "chatKey": "new-7f3a" }' }] }] } });
+if (existsSync(SLOW_AFTER)) await new Promise((done) => setTimeout(done, Number(readFileSync(SLOW_AFTER, 'utf8'))));
+if (existsSync(FAIL_AFTER)) process.exit(3);
 out({ type: 'assistant', message: { content: [{ type: 'text', text: 'Вы в разделе проектов.' }] } });
 out({ type: 'result', subtype: 'success', is_error: false, result: 'Вы в разделе проектов.' });
 `;
@@ -265,6 +269,31 @@ describe('POST /api/agent/run', () => {
     expect(list.json()).toEqual([expect.objectContaining({ id: 'conv-1', messages: 2 })]);
   });
 
+  it('следующий ход разговора знает итоги действий прошлого хода; другой разговор — нет', async () => {
+    const first = await run({ ...body, conversationId: 'conv-mem' });
+    expect(first.statusCode).toBe(200);
+    // Первый ход: прежних действий нет, в stdin — реплика как есть.
+    expect(dump().stdin).toBe(body.messages[0]!.content);
+
+    const next = await run({
+      ...body,
+      conversationId: 'conv-mem',
+      messages: [
+        ...body.messages,
+        { role: 'assistant', content: 'Вы в разделе проектов.' },
+        { role: 'user', content: 'Открой тот чат' },
+      ],
+    });
+    expect(next.statusCode).toBe(200);
+    const stdin = dump().stdin;
+    expect(stdin).toContain('where_am_i');
+    expect(stdin).toContain('new-7f3a');
+
+    const other = await run({ ...body, conversationId: 'conv-other' });
+    expect(other.statusCode).toBe(200);
+    expect(dump().stdin).toBe(body.messages[0]!.content);
+  });
+
   it('окружение процесса — список: ни ключа API, ни переменных панели, вход в аккаунт на месте', async () => {
     const planted = {
       ANTHROPIC_API_KEY: ['sk', 'ant', 'planted', 'env'].join('-'),
@@ -345,10 +374,41 @@ describe('POST /api/agent/run', () => {
       conversationId: 'conv-other',
       preview: { summary: 'x', fields: [] },
     });
-    const killed = await run(body);
+    // Свой разговор: conv-1 уже знает ответ первого хода, и та же история была бы
+    // историей отставшей вкладки (отказ conversation_stale, а не ход).
+    const killed = await run({ ...body, conversationId: 'conv-ceiling' });
     pending.cancel(other.pending.id);
     expect(framesOf(killed.payload).at(-1)).toMatchObject({ kind: 'error' });
     expect(JSON.stringify(framesOf(killed.payload).at(-1))).toContain('отведённое время');
+  });
+
+  it('разговор удаляется из истории; идущий — нет; чужой или кривой id — 404', async () => {
+    // Удалить разговор было нечем: пробные и ненужные копились в истории навсегда.
+    expect((await run({ ...body, conversationId: 'conv-del' })).statusCode).toBe(200);
+    const removed = await app.inject({
+      method: 'DELETE',
+      url: '/api/agent/conversations/conv-del',
+    });
+    expect(removed.statusCode).toBe(200);
+    const gone = await app.inject({ method: 'GET', url: '/api/agent/conversations/conv-del' });
+    expect(gone.statusCode).toBe(404);
+    const list = await app.inject({ method: 'GET', url: '/api/agent/conversations' });
+    expect(list.json<Array<{ id: string }>>().map((item) => item.id)).not.toContain('conv-del');
+    const again = await app.inject({ method: 'DELETE', url: '/api/agent/conversations/conv-del' });
+    expect(again.statusCode).toBe(404);
+    const crooked = await app.inject({ method: 'DELETE', url: '/api/agent/conversations/..%2Fx' });
+    expect(crooked.statusCode).toBe(404);
+
+    // Идущий ход ещё допишет файл разговора: удалять его сейчас — вернуть через секунду.
+    writeFileSync(join(bin, 'slow-ms.txt'), '1200');
+    const running = run({ ...body, conversationId: 'conv-busy' });
+    await new Promise((done) => setTimeout(done, 300));
+    const busy = await app.inject({ method: 'DELETE', url: '/api/agent/conversations/conv-busy' });
+    expect(busy.statusCode).toBe(409);
+    expect(busy.json()).toMatchObject({ messageCode: 'panel-conversation-running' });
+    await running;
+    const after = await app.inject({ method: 'DELETE', url: '/api/agent/conversations/conv-busy' });
+    expect(after.statusCode).toBe(200);
   });
 
   it('процесс агента в журнале процессов, пока жив; после хода запись снята', async () => {
@@ -364,6 +424,155 @@ describe('POST /api/agent/run', () => {
     expect(during[0]!.pid).toBeGreaterThan(0);
     await running;
     expect(JSON.parse(readFileSync(ledger, 'utf8'))).toEqual([]);
+  });
+
+  const conversationFile = (id: string) => join(appData, 'panel-agent', `${id}.json`);
+  const stored = (id: string): PanelAgentConversation =>
+    JSON.parse(readFileSync(conversationFile(id), 'utf8')) as PanelAgentConversation;
+
+  it('сделанное пишется в файл по ходу, а не только в конце', async () => {
+    // Живой прогон 26.09: перезапуск панели посреди хода оставлял от хода одну
+    // просьбу — одобренное и выполненное действие из разговора пропадало.
+    writeFileSync(join(bin, 'slow-after-ms.txt'), '1500');
+    const running = run(body);
+    let during: PanelAgentConversation | undefined;
+    for (let attempt = 0; attempt < 100 && !during?.openTurn?.actions.length; attempt += 1) {
+      await new Promise((done) => setTimeout(done, 20));
+      if (existsSync(conversationFile('conv-1'))) during = stored('conv-1');
+    }
+    expect(during?.openTurn).toMatchObject({ actions: ['where_am_i'], texts: [] });
+    expect(during?.messages.map((message) => message.role)).toEqual(['user']);
+    await running;
+    const after = stored('conv-1');
+    expect(after.openTurn).toBeUndefined();
+    expect(after.messages.map((message) => message.content)).toEqual([
+      body.messages[0]!.content,
+      'Вы в разделе проектов.',
+    ]);
+  });
+
+  it('ход упал после действия — сделанное запечатано, и следующий ход его видит', async () => {
+    writeFileSync(join(bin, 'fail-after.txt'), '1');
+    const failed = await run(body);
+    expect(framesOf(failed.payload).at(-1)).toMatchObject({ kind: 'error' });
+    const sealedTurn = stored('conv-1');
+    expect(sealedTurn.openTurn).toBeUndefined();
+    expect(sealedTurn.messages).toHaveLength(2);
+    expect(sealedTurn.messages[1]).toMatchObject({ role: 'assistant', interrupted: true });
+    // Запечатанный ответ уходит модели следующим ходом — по-английски (D-E);
+    // человеку окно рисует пометку своим языком по коду `seal`.
+    expect(sealedTurn.messages[1]!.content).toContain('Actions performed: where_am_i.');
+    expect(sealedTurn.messages[1]!.content).toContain('The answer was not finished:');
+    expect(sealedTurn.messages[1]!.content).not.toMatch(/[А-Яа-яЁё]/);
+    expect(sealedTurn.messages[1]!.seal).toMatchObject({
+      reason: 'failed',
+      actions: ['where_am_i'],
+    });
+
+    // Окно после обрыва выкидывает просьбу без ответа — и запечатанный ответ с ней.
+    rmSync(join(bin, 'fail-after.txt'));
+    const next = await run({ ...body, messages: [{ role: 'user', content: 'продолжай' }] });
+    expect(framesOf(next.payload).at(-1)).toMatchObject({ kind: 'done' });
+    expect(dump().stdin).toContain('Actions performed: where_am_i.');
+    expect(dump().stdin).not.toContain('Ответ не дописан');
+    const after = stored('conv-1');
+    expect(after.messages.map((message) => message.role)).toEqual([
+      'user',
+      'assistant',
+      'user',
+      'assistant',
+    ]);
+    expect(after.messages[1]!.interrupted).toBe(true);
+    expect(after.messages[2]!.content).toBe('продолжай');
+  });
+
+  it('ход прежнего процесса панели запечатывается при чтении: перезапуск его не стирает', async () => {
+    const at = new Date().toISOString();
+    mkdirSync(join(appData, 'panel-agent'), { recursive: true });
+    writeFileSync(
+      join(appData, 'panel-agent', 'conv-restart.json'),
+      JSON.stringify({
+        id: 'conv-restart',
+        createdAt: at,
+        updatedAt: at,
+        context: body.context,
+        messages: [{ role: 'user', content: 'выключи правило', at }],
+        openTurn: {
+          boot: 'previous-process',
+          startedAt: at,
+          texts: ['Выключаю.'],
+          actions: ['toggle_rule'],
+        },
+      }),
+    );
+    const read = await app.inject({ method: 'GET', url: '/api/agent/conversations/conv-restart' });
+    const conversation = read.json<PanelAgentConversation>();
+    expect(conversation.openTurn).toBeUndefined();
+    expect(conversation.messages[1]).toMatchObject({ role: 'assistant', interrupted: true });
+    expect(conversation.messages[1]!.content).toBe(
+      'Выключаю.\n\nActions performed: toggle_rule.\n\nThe answer was not finished: the panel restarted mid-turn.',
+    );
+    expect(conversation.messages[1]!.seal).toEqual({ reason: 'restart', actions: ['toggle_rule'] });
+    // Запечатано на диске, а не только в ответе.
+    expect(stored('conv-restart').messages).toHaveLength(2);
+  });
+
+  it('отставшая вкладка не затирает ход другой вкладки: отказ conversation_stale, файл цел', async () => {
+    const first = await run({ ...body, conversationId: 'conv-tabs' });
+    expect(first.statusCode).toBe(200);
+    const reply = stored('conv-tabs').messages[1]!.content;
+    const alpha = [...body.messages, { role: 'assistant', content: reply }];
+    // Вкладка A продолжает разговор: её ход в файле.
+    const beta = await run({
+      ...body,
+      conversationId: 'conv-tabs',
+      messages: [...alpha, { role: 'user', content: 'бета' }],
+    });
+    expect(beta.statusCode).toBe(200);
+    expect(stored('conv-tabs').messages).toHaveLength(4);
+    // Вкладка B открыла разговор до хода A и пишет со своей историей.
+    const gamma = await run({
+      ...body,
+      conversationId: 'conv-tabs',
+      messages: [...alpha, { role: 'user', content: 'гамма' }],
+    });
+    expect(gamma.statusCode).toBe(409);
+    expect(gamma.json()).toMatchObject({ error: 'conversation_stale' });
+    const after = stored('conv-tabs');
+    expect(after.messages.map((message) => message.content)).toContain('бета');
+    expect(after.messages.map((message) => message.content)).not.toContain('гамма');
+    // Вкладка, знающая весь файл, продолжает как обычно.
+    const delta = await run({
+      ...body,
+      conversationId: 'conv-tabs',
+      messages: [
+        ...after.messages.map(({ role, content }) => ({ role, content })),
+        { role: 'user', content: 'дельта' },
+      ],
+    });
+    expect(delta.statusCode).toBe(200);
+  });
+
+  it('[Z5-9] удалённый в другой вкладке разговор не воскресает: отказ conversation_deleted', async () => {
+    const first = await run({ ...body, conversationId: 'conv-gone' });
+    expect(first.statusCode).toBe(200);
+    const history = stored('conv-gone').messages.map(({ role, content }) => ({ role, content }));
+    // Вкладка A удалила разговор из «Истории», вкладка B держит его открытым и пишет дальше.
+    const removed = await app.inject({
+      method: 'DELETE',
+      url: '/api/agent/conversations/conv-gone',
+    });
+    expect(removed.statusCode).toBe(200);
+    const late = await run({
+      ...body,
+      conversationId: 'conv-gone',
+      messages: [...history, { role: 'user', content: 'ещё вопрос' }],
+    });
+    expect(late.statusCode).toBe(409);
+    expect(late.json()).toMatchObject({ error: 'conversation_deleted' });
+    expect(existsSync(conversationFile('conv-gone'))).toBe(false);
+    const list = await app.inject({ method: 'GET', url: '/api/agent/conversations' });
+    expect(list.json<Array<{ id: string }>>().map((item) => item.id)).not.toContain('conv-gone');
   });
 
   it('where_am_i отвечает страницей хода этого разговора', async () => {
@@ -398,7 +607,9 @@ describe('POST /api/agent/run', () => {
     expect(framesOf(response.payload)[0]).toMatchObject({ kind: 'start', contourId: CONTOUR });
 
     const seen = dump();
-    expect(seen.env.ANTHROPIC_BASE_URL).toBe(`http://127.0.0.1:${GATEWAY_PORT}/${CONTOUR}`);
+    expect(seen.env.ANTHROPIC_BASE_URL).toBe(
+      `http://127.0.0.1:${GATEWAY_PORT}/${CONTOUR}/_s/assistant`,
+    );
     expect(seen.env.ANTHROPIC_AUTH_TOKEN).toBe(PLACEHOLDER_KEY);
     expect(seen.env.ANTHROPIC_MODEL).toBe('qwen2.5:7b');
     expect(readFileSync(dumpFile, 'utf8')).not.toContain(SECRET);
@@ -421,7 +632,9 @@ describe('POST /api/agent/run', () => {
     const response = await run(body);
     expect(response.statusCode).toBe(200);
     const seen = dump();
-    expect(seen.env.ANTHROPIC_BASE_URL).toBe(`http://127.0.0.1:${GATEWAY_PORT}/${CONTOUR}`);
+    expect(seen.env.ANTHROPIC_BASE_URL).toBe(
+      `http://127.0.0.1:${GATEWAY_PORT}/${CONTOUR}/_s/assistant`,
+    );
     expect(seen.argv).not.toContain('--system-prompt-file');
     expect(seen.contourPrompt).toBeNull();
     for (const arg of lightWindowLayers().args) expect(seen.argv).toContain(arg);
@@ -436,6 +649,10 @@ describe('POST /api/agent/run', () => {
         { role: 'user', content: `всё-таки возьми ${PASTED_KEY} и сохрани` },
       ],
     };
+    // Продолжение идёт в разговор, который уже есть: историю с id клиенты шлют только после `start`.
+    expect((await run({ ...body, messages: secretBody.messages.slice(0, 1) })).statusCode).toBe(
+      200,
+    );
     const response = await run(secretBody);
     expect(response.statusCode).toBe(200);
 
@@ -558,5 +775,70 @@ describe('POST /api/agent/run', () => {
     const badId = await run({ ...body, conversationId: 'a&calc' });
     expect(badId.statusCode).toBe(400);
     expect(badId.json()).toMatchObject({ error: 'invalid_body' });
+  });
+
+  // Картинка агенту (12b): у агента нет файловой системы, поэтому картинка едет
+  // В САМОМ ЗАПРОСЕ — строкой потокового ввода с блоком image. Доказательство —
+  // stdin и argv, снятые фальшивым CLI, а не ответ маршрута.
+  const PNG =
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+
+  it('картинка едет блоком image потокового ввода, байт в байт', async () => {
+    const response = await run({
+      ...body,
+      messages: [{ role: 'user', content: 'Что на снимке?\n\nAttached images: shot.png' }],
+      images: [{ name: 'shot.png', mediaType: 'image/png', base64: PNG }],
+    });
+    expect(response.statusCode).toBe(200);
+    expect(framesOf(response.payload).at(-1)).toEqual({
+      kind: 'done',
+      reply: 'Вы в разделе проектов.',
+    });
+
+    const seen = dump();
+    // Флаг сразу за -p: вариадические флаги дальше съели бы его значение.
+    expect(seen.argv.slice(0, 3)).toEqual(['-p', '--input-format', 'stream-json']);
+    const lines = seen.stdin.split('\n').filter(Boolean);
+    expect(lines).toHaveLength(1);
+    const line = JSON.parse(lines[0]!) as {
+      type: string;
+      message: { role: string; content: Array<Record<string, unknown>> };
+    };
+    expect(line.type).toBe('user');
+    expect(line.message.role).toBe('user');
+    expect(line.message.content[0]).toEqual({
+      type: 'image',
+      source: { type: 'base64', media_type: 'image/png', data: PNG },
+    });
+    expect(line.message.content[1]).toMatchObject({ type: 'text' });
+    expect(String(line.message.content[1]!.text)).toContain('Attached images: shot.png');
+  });
+
+  it('ход без картинки — прежний запуск: текст в stdin, без потокового ввода', async () => {
+    const response = await run(body);
+    expect(response.statusCode).toBe(200);
+    const seen = dump();
+    expect(seen.argv).not.toContain('--input-format');
+    expect(seen.stdin).toBe(body.messages[0]!.content);
+  });
+
+  it('не картинка под видом PNG — 400 с именем файла, CLI не запускается', async () => {
+    const response = await run({
+      ...body,
+      images: [
+        {
+          name: 'note.png',
+          mediaType: 'image/png',
+          base64: Buffer.from('просто текст, не картинка').toString('base64'),
+        },
+      ],
+    });
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({
+      error: 'invalid_images',
+      messageCode: 'media-agent-image-not-image',
+      params: { name: 'note.png' },
+    });
+    expect(existsSync(dumpFile)).toBe(false);
   });
 });

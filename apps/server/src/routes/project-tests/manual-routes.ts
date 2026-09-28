@@ -127,23 +127,26 @@ export function registerTestManualRoutes(app: FastifyInstance, deps: TestsDeps):
    * ради одной кнопки заводить второй способ загрузки не за что. Потолок и
    * список расширений держит домен.
    */
-  app.post<{ Body: { path?: string; caseId?: string; name?: string; contentBase64?: string } }>(
-    '/api/project-tests/attachment',
-    (request, reply) => {
-      const root = requireRoot(request.body?.path, reply);
-      if (!root) return reply;
-      const { caseId, name, contentBase64 } = request.body ?? {};
-      if (!caseId || !name || !contentBase64) {
-        return reply.code(400).send({
-          message: 'Нужен кейс, имя файла и содержимое.',
-          messageCode: 'manual-attachment-incomplete',
-        });
-      }
-      return guard(reply, () => ({
-        file: saveAttachment(root, caseId, name, contentBase64, now()),
-      }));
-    },
-  );
+  app.post<{
+    Body: { path?: string; caseId?: string; name?: string; contentBase64?: string; at?: string };
+  }>('/api/project-tests/attachment', (request, reply) => {
+    const root = requireRoot(request.body?.path, reply);
+    if (!root) return reply;
+    const { caseId, name, contentBase64, at } = request.body ?? {};
+    // `at` — время карточки агента: имя файла выходит тем, что человек видел в
+    // карточке, а не временем клика. Негодное время — текущее.
+    const when =
+      typeof at === 'string' && !Number.isNaN(Date.parse(at)) ? new Date(at).toISOString() : now();
+    if (!caseId || !name || !contentBase64) {
+      return reply.code(400).send({
+        message: 'Нужен кейс, имя файла и содержимое.',
+        messageCode: 'manual-attachment-incomplete',
+      });
+    }
+    return guard(reply, () => ({
+      file: saveAttachment(root, caseId, name, contentBase64, when),
+    }));
+  });
 
   /**
    * Снимок на сравнение с эталоном.

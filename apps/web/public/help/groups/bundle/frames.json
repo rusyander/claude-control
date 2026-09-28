@@ -9,15 +9,65 @@
       "masked": 0,
       "width": 1440,
       "height": 1100,
-      "shotAt": "2026-09-17T20:55:12.647Z",
-      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 3 CLAUDE.md Скиллы 3 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 2 Права 3 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка Группы Свой порядок поверх правил, хуков, скиллов и серверов Создать группу Зачем это Пока нет ни одной группы Группа объединяет правила, скиллы, хуки и серверы, чтобы включать их разом и задавать общие переменные. Удобно, когда набор настроек нужен под конкретную задачу. Создать группу Сценарии Создать сценарий Сценарии Пусто",
+      "shotAt": "2026-09-28T14:32:39.113Z",
+      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 3 CLAUDE.md Скиллы 2 Команды Хуки 2 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 2 Права 3 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Группы Свой порядок поверх правил, хуков, скиллов и серверов Обнаружить группы Создать группу Зачем это Глобальные 0 В проектах 0 Найдено 0 Обнаружение 0 Доступны в любом проекте; при разделении задачи по веткам «Авто» выбирает их по строке «Когда». Пока нет ни одной группы Группа объединяет правила, скиллы, хуки и серверы, чтобы включать их разом и задавать общие переменные. Удобно, когда набор настроек нужен под конкретную задачу. Создать группу",
       "en": {
         "file": "01-empty.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1100,
-        "shotAt": "2026-09-17T20:56:19.650Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 3 CLAUDE.md Skills 3 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 2 Permissions 3 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Groups Your own structure across rules, hooks, skills and servers Create group Why this exists No groups yet A group bundles rules, skills, hooks and servers so you can toggle them together and set shared variables. Handy when a set of settings belongs to one task. Create group Automations Create automation Automations Empty"
+        "shotAt": "2026-09-28T14:34:48.467Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 3 CLAUDE.md Skills 2 Commands Hooks 2 Scripts 0 Plugins Integrations and access MCP servers 2 Permissions 3 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Groups Your own structure across rules, hooks, skills and servers Discover groups Create group Why this exists Global 0 In projects 0 Found 0 Discovery 0 Available in any project; when a task is split across branches, “Auto” picks them by their “When” line. No groups yet A group bundles rules, skills, hooks and servers so you can toggle them together and set shared variables. Handy when a set of settings belongs to one task. Create group"
+      },
+      "dark": {
+        "file": "01-empty.dark.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 1100,
+        "shotAt": "2026-09-28T14:36:54.271Z",
+        "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 3 CLAUDE.md Скиллы 2 Команды Хуки 2 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 2 Права 3 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Группы Свой порядок поверх правил, хуков, скиллов и серверов Обнаружить группы Создать группу Зачем это Глобальные 0 В проектах 0 Найдено 0 Обнаружение 0 Доступны в любом проекте; при разделении задачи по веткам «Авто» выбирает их по строке «Когда». Пока нет ни одной группы Группа объединяет правила, скиллы, хуки и серверы, чтобы включать их разом и задавать общие переменные. Удобно, когда набор настроек нужен под конкретную задачу. Создать группу"
+      },
+      "darkEn": {
+        "file": "01-empty.dark.en.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 1100,
+        "shotAt": "2026-09-28T14:39:00.194Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 3 CLAUDE.md Skills 2 Commands Hooks 2 Scripts 0 Plugins Integrations and access MCP servers 2 Permissions 3 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Groups Your own structure across rules, hooks, skills and servers Discover groups Create group Why this exists Global 0 In projects 0 Found 0 Discovery 0 Available in any project; when a task is split across branches, “Auto” picks them by their “When” line. No groups yet A group bundles rules, skills, hooks and servers so you can toggle them together and set shared variables. Handy when a set of settings belongs to one task. Create group"
+      }
+    },
+    {
+      "id": "01-kind",
+      "side": "panel",
+      "file": "01-kind.png",
+      "masked": 0,
+      "width": 700,
+      "height": 450,
+      "shotAt": "2026-09-28T14:32:39.458Z",
+      "text": "Какую группу создать Любая группа включается тумблером и выбирается «Авто» по строке «Когда». Разница — в том, как идёт работа. Сценарий Шаги по порядку — это вся работа. Шаг — ваш текст, скилл, правило или хук. Стадий конвейера нет. Набор Скиллы, правила, хуки и серверы, которые включаются и выключаются вместе. Работа идёт по стадиям конвейера, свои шаги встают между ними.",
+      "en": {
+        "file": "01-kind.en.png",
+        "masked": 0,
+        "width": 700,
+        "height": 431,
+        "shotAt": "2026-09-28T14:34:48.798Z",
+        "text": "Which group to create Any group is switched on with its toggle and picked by “Auto” from its “When” line. The difference is how the work runs. Scenario Steps in order are the whole work. A step is your own text, a skill, a rule or a hook. No pipeline stages. Bundle Skills, rules, hooks and servers that are switched on and off together. The work runs through the pipeline stages; your own steps go between them."
+      },
+      "dark": {
+        "file": "01-kind.dark.png",
+        "masked": 0,
+        "width": 700,
+        "height": 450,
+        "shotAt": "2026-09-28T14:36:54.594Z",
+        "text": "Какую группу создать Любая группа включается тумблером и выбирается «Авто» по строке «Когда». Разница — в том, как идёт работа. Сценарий Шаги по порядку — это вся работа. Шаг — ваш текст, скилл, правило или хук. Стадий конвейера нет. Набор Скиллы, правила, хуки и серверы, которые включаются и выключаются вместе. Работа идёт по стадиям конвейера, свои шаги встают между ними."
+      },
+      "darkEn": {
+        "file": "01-kind.dark.en.png",
+        "masked": 0,
+        "width": 700,
+        "height": 431,
+        "shotAt": "2026-09-28T14:39:00.521Z",
+        "text": "Which group to create Any group is switched on with its toggle and picked by “Auto” from its “When” line. The difference is how the work runs. Scenario Steps in order are the whole work. A step is your own text, a skill, a rule or a hook. No pipeline stages. Bundle Skills, rules, hooks and servers that are switched on and off together. The work runs through the pipeline stages; your own steps go between them."
       }
     },
     {
@@ -26,16 +76,66 @@
       "side": "panel",
       "masked": 0,
       "width": 1440,
-      "height": 1015,
-      "shotAt": "2026-09-17T20:55:14.858Z",
-      "text": "Создать группу Название Описание Состав группы всего Правило Скилл Хук Сервер Право Группа Правило Отвечай диффом Правило Новых зависимостей не заводить Правило Отвечай по-русски Скилл shots-before-after Скилл Тикеты магазина Скилл release-notes Хук PreToolUse · Bash Хук SessionStart Хук UserPromptSubmit Сервер design-mocks Сервер catalog-mock Право deny · Bash(git push:*) Право allow · Bash(git push:*) Право allow · Bash(pnpm test:*) Порядок применения 1 Правило Отвечай диффом 2 Правило Новых зависимостей не заводить 3 Скилл shots-before-after 4 Хук PreToolUse · Bash 5 Сервер design-mocks 6 Право deny · Bash(git push:*) Выбрано: 6 Проекты Витрина магазина C:/work/shop-front Админка магазина C:/work/shop-admin Группа включится сама, когда агент начнёт работать в этом проекте — и в копиях его веток. Обратно сама не выключается: файлы конфигурации общие, а чатов может идти несколько сразу. Порядок работы Когда применять Эта строка становится описанием скилла — по ней Claude решает, браться ли за порядок работы. Триггер по тексту запроса Регулярное выражение. Заполнено — панель ставит хук, который напомнит о порядке работы сам; пусто — Claude подключает скилл по описанию. Шаги Добавить шаг Шаги компилируются в скилл (skills/scenario-…): он становится участником группы и гаснет вместе с ней. Переменные окружения группы Попадут в settings.json, пока группа включена. Удобно держать наборы настроек и переключать их целиком. Помощник Опишите словами, что нужно — поля заполнятся сами Например: «хочу правило, чтобы перед словами о готовности всегда прогонялись тесты». Можно надиктовать голосом. Отмена Сохранить",
+      "height": 960,
+      "shotAt": "2026-09-28T14:32:41.698Z",
+      "text": "Новый набор Название Описание Когда уместна Одна строка: по ней «Авто» выбирает эту группу, когда задачу делят по веткам. Порядок работы собирают в окне группы — откройте её карточку. Состав группы Все Правило Скилл Хук Сервер Право Группа Правило Отвечай диффом Правило Новых зависимостей не заводить Правило Отвечай по-русски Скилл shots-before-after Скилл release-notes Хук PreToolUse · Bash Хук SessionStart Сервер design-mocks Сервер catalog-mock Право deny · Bash(git push:*) Право allow · Bash(git push:*) Право allow · Bash(pnpm test:*) Порядок применения 1 Правило Отвечай диффом answer-with-diff 2 Правило Новых зависимостей не заводить no-new-deps 3 Скилл shots-before-after Снимает экран до и после правки, которую видно глазами. 4 Хук PreToolUse · Bash node ~/.claude/hooks/no-push.mjs PreToolUse:push 5 Сервер design-mocks 6 Право deny · Bash(git push:*) perm-push-deny Выбрано: 6 Проекты Витрина магазина C:/work/shop-front Админка магазина C:/work/shop-admin Группа включится сама, когда агент начнёт работать в этом проекте — и в копиях его веток. Обратно сама не выключается: файлы конфигурации общие, а чатов может идти несколько сразу. Переменные окружения группы Попадут в settings.json, пока группа включена. Удобно держать наборы настроек и переключать их целиком. Помощник Опишите словами, что нужно — поля заполнятся сами Например: «хочу правило, чтобы перед словами о готовности всегда прогонялись тесты». Можно надиктовать голосом. Отмена Сохранить",
       "en": {
         "file": "02-form.en.png",
         "masked": 0,
         "width": 1440,
-        "height": 1015,
-        "shotAt": "2026-09-17T20:56:21.804Z",
-        "text": "Create group Name Description Group contents total Rule Skill Hook Server Permission Group Rule Отвечай диффом Rule Новых зависимостей не заводить Rule Отвечай по-русски Skill shots-before-after Skill Тикеты магазина Skill release-notes Hook PreToolUse · Bash Hook SessionStart Hook UserPromptSubmit Server design-mocks Server catalog-mock Permission deny · Bash(git push:*) Permission allow · Bash(git push:*) Permission allow · Bash(pnpm test:*) Apply order 1 Rule Отвечай диффом 2 Rule Новых зависимостей не заводить 3 Skill shots-before-after 4 Hook PreToolUse · Bash 5 Server design-mocks 6 Permission deny · Bash(git push:*) Selected: 6 Projects Витрина магазина C:/work/shop-front Админка магазина C:/work/shop-admin The group switches itself on when an agent starts working in this project — branch copies included. It never switches itself off: the config files are shared and several chats may be running at once. Working order When to apply This line becomes the skill description — Claude decides by it whether to follow the working order. Trigger on the prompt text A regular expression. Filled in — the panel adds a hook that brings the working order up itself; empty — Claude picks the skill up by its description. Steps Add step Steps compile into a skill (skills/scenario-…): it becomes a member of the group and goes dark with it. Group environment variables Applied to settings.json while the group is enabled. Handy for keeping sets of settings and switching them as a whole. Assistant Describe what you need — the fields fill themselves For example: \"I want a rule that tests are always run before claiming something is done\". You can dictate it by voice. Cancel Save"
+        "height": 960,
+        "shotAt": "2026-09-28T14:34:50.991Z",
+        "text": "New bundle Name Description When it fits One line: “Auto” picks this group by it when a task is split across branches. The working order is built in the group’s window — open its card. Group contents All Rule Skill Hook Server Permission Group Rule Отвечай диффом Rule Новых зависимостей не заводить Rule Отвечай по-русски Skill shots-before-after Skill release-notes Hook PreToolUse · Bash Hook SessionStart Server design-mocks Server catalog-mock Permission deny · Bash(git push:*) Permission allow · Bash(git push:*) Permission allow · Bash(pnpm test:*) Apply order 1 Rule Отвечай диффом answer-with-diff 2 Rule Новых зависимостей не заводить no-new-deps 3 Skill shots-before-after Снимает экран до и после правки, которую видно глазами. 4 Hook PreToolUse · Bash node ~/.claude/hooks/no-push.mjs PreToolUse:push 5 Server design-mocks 6 Permission deny · Bash(git push:*) perm-push-deny Selected: 6 Projects Витрина магазина C:/work/shop-front Админка магазина C:/work/shop-admin The group switches itself on when an agent starts working in this project — branch copies included. It never switches itself off: the config files are shared and several chats may be running at once. Group environment variables Applied to settings.json while the group is enabled. Handy for keeping sets of settings and switching them as a whole. Assistant Describe what you need — the fields fill themselves For example: \"I want a rule that tests are always run before claiming something is done\". You can dictate it by voice. Cancel Save"
+      },
+      "dark": {
+        "file": "02-form.dark.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 960,
+        "shotAt": "2026-09-28T14:36:56.875Z",
+        "text": "Новый набор Название Описание Когда уместна Одна строка: по ней «Авто» выбирает эту группу, когда задачу делят по веткам. Порядок работы собирают в окне группы — откройте её карточку. Состав группы Все Правило Скилл Хук Сервер Право Группа Правило Отвечай диффом Правило Новых зависимостей не заводить Правило Отвечай по-русски Скилл shots-before-after Скилл release-notes Хук PreToolUse · Bash Хук SessionStart Сервер design-mocks Сервер catalog-mock Право deny · Bash(git push:*) Право allow · Bash(git push:*) Право allow · Bash(pnpm test:*) Порядок применения 1 Правило Отвечай диффом answer-with-diff 2 Правило Новых зависимостей не заводить no-new-deps 3 Скилл shots-before-after Снимает экран до и после правки, которую видно глазами. 4 Хук PreToolUse · Bash node ~/.claude/hooks/no-push.mjs PreToolUse:push 5 Сервер design-mocks 6 Право deny · Bash(git push:*) perm-push-deny Выбрано: 6 Проекты Витрина магазина C:/work/shop-front Админка магазина C:/work/shop-admin Группа включится сама, когда агент начнёт работать в этом проекте — и в копиях его веток. Обратно сама не выключается: файлы конфигурации общие, а чатов может идти несколько сразу. Переменные окружения группы Попадут в settings.json, пока группа включена. Удобно держать наборы настроек и переключать их целиком. Помощник Опишите словами, что нужно — поля заполнятся сами Например: «хочу правило, чтобы перед словами о готовности всегда прогонялись тесты». Можно надиктовать голосом. Отмена Сохранить"
+      },
+      "darkEn": {
+        "file": "02-form.dark.en.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 960,
+        "shotAt": "2026-09-28T14:39:02.691Z",
+        "text": "New bundle Name Description When it fits One line: “Auto” picks this group by it when a task is split across branches. The working order is built in the group’s window — open its card. Group contents All Rule Skill Hook Server Permission Group Rule Отвечай диффом Rule Новых зависимостей не заводить Rule Отвечай по-русски Skill shots-before-after Skill release-notes Hook PreToolUse · Bash Hook SessionStart Server design-mocks Server catalog-mock Permission deny · Bash(git push:*) Permission allow · Bash(git push:*) Permission allow · Bash(pnpm test:*) Apply order 1 Rule Отвечай диффом answer-with-diff 2 Rule Новых зависимостей не заводить no-new-deps 3 Skill shots-before-after Снимает экран до и после правки, которую видно глазами. 4 Hook PreToolUse · Bash node ~/.claude/hooks/no-push.mjs PreToolUse:push 5 Server design-mocks 6 Permission deny · Bash(git push:*) perm-push-deny Selected: 6 Projects Витрина магазина C:/work/shop-front Админка магазина C:/work/shop-admin The group switches itself on when an agent starts working in this project — branch copies included. It never switches itself off: the config files are shared and several chats may be running at once. Group environment variables Applied to settings.json while the group is enabled. Handy for keeping sets of settings and switching them as a whole. Assistant Describe what you need — the fields fill themselves For example: \"I want a rule that tests are always run before claiming something is done\". You can dictate it by voice. Cancel Save"
+      }
+    },
+    {
+      "id": "02-order",
+      "side": "panel",
+      "file": "02-order.png",
+      "masked": 0,
+      "width": 1440,
+      "height": 960,
+      "shotAt": "2026-09-28T14:32:42.451Z",
+      "text": "Новый набор Название Описание Когда уместна Одна строка: по ней «Авто» выбирает эту группу, когда задачу делят по веткам. Порядок работы собирают в окне группы — откройте её карточку. Состав группы Все Правило Скилл Хук Сервер Право Группа Правило Отвечай диффом Правило Новых зависимостей не заводить Правило Отвечай по-русски Скилл shots-before-after Скилл release-notes Хук PreToolUse · Bash Хук SessionStart Сервер design-mocks Сервер catalog-mock Право deny · Bash(git push:*) Право allow · Bash(git push:*) Право allow · Bash(pnpm test:*) Порядок применения 1 Правило Отвечай диффом answer-with-diff 2 Правило Новых зависимостей не заводить no-new-deps 3 Скилл shots-before-after Снимает экран до и после правки, которую видно глазами. 4 Хук PreToolUse · Bash node ~/.claude/hooks/no-push.mjs PreToolUse:push 5 Сервер design-mocks 6 Право deny · Bash(git push:*) perm-push-deny Новый участник встанет на место 2 — отметьте его в списке выше. Отменить вставку Выбрано: 6 Проекты Витрина магазина C:/work/shop-front Админка магазина C:/work/shop-admin Группа включится сама, когда агент начнёт работать в этом проекте — и в копиях его веток. Обратно сама не выключается: файлы конфигурации общие, а чатов может идти несколько сразу. Переменные окружения группы Попадут в settings.json, пока группа включена. Удобно держать наборы настроек и переключать их целиком. Помощник Опишите словами, что нужно — поля заполнятся сами Например: «хочу правило, чтобы перед словами о готовности всегда прогонялись тесты». Можно надиктовать голосом. Отмена Сохранить",
+      "en": {
+        "file": "02-order.en.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 960,
+        "shotAt": "2026-09-28T14:34:51.720Z",
+        "text": "New bundle Name Description When it fits One line: “Auto” picks this group by it when a task is split across branches. The working order is built in the group’s window — open its card. Group contents All Rule Skill Hook Server Permission Group Rule Отвечай диффом Rule Новых зависимостей не заводить Rule Отвечай по-русски Skill shots-before-after Skill release-notes Hook PreToolUse · Bash Hook SessionStart Server design-mocks Server catalog-mock Permission deny · Bash(git push:*) Permission allow · Bash(git push:*) Permission allow · Bash(pnpm test:*) Apply order 1 Rule Отвечай диффом answer-with-diff 2 Rule Новых зависимостей не заводить no-new-deps 3 Skill shots-before-after Снимает экран до и после правки, которую видно глазами. 4 Hook PreToolUse · Bash node ~/.claude/hooks/no-push.mjs PreToolUse:push 5 Server design-mocks 6 Permission deny · Bash(git push:*) perm-push-deny The new member will take place 2 — tick it in the list above. Cancel inserting Selected: 6 Projects Витрина магазина C:/work/shop-front Админка магазина C:/work/shop-admin The group switches itself on when an agent starts working in this project — branch copies included. It never switches itself off: the config files are shared and several chats may be running at once. Group environment variables Applied to settings.json while the group is enabled. Handy for keeping sets of settings and switching them as a whole. Assistant Describe what you need — the fields fill themselves For example: \"I want a rule that tests are always run before claiming something is done\". You can dictate it by voice. Cancel Save"
+      },
+      "dark": {
+        "file": "02-order.dark.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 960,
+        "shotAt": "2026-09-28T14:36:57.624Z",
+        "text": "Новый набор Название Описание Когда уместна Одна строка: по ней «Авто» выбирает эту группу, когда задачу делят по веткам. Порядок работы собирают в окне группы — откройте её карточку. Состав группы Все Правило Скилл Хук Сервер Право Группа Правило Отвечай диффом Правило Новых зависимостей не заводить Правило Отвечай по-русски Скилл shots-before-after Скилл release-notes Хук PreToolUse · Bash Хук SessionStart Сервер design-mocks Сервер catalog-mock Право deny · Bash(git push:*) Право allow · Bash(git push:*) Право allow · Bash(pnpm test:*) Порядок применения 1 Правило Отвечай диффом answer-with-diff 2 Правило Новых зависимостей не заводить no-new-deps 3 Скилл shots-before-after Снимает экран до и после правки, которую видно глазами. 4 Хук PreToolUse · Bash node ~/.claude/hooks/no-push.mjs PreToolUse:push 5 Сервер design-mocks 6 Право deny · Bash(git push:*) perm-push-deny Новый участник встанет на место 2 — отметьте его в списке выше. Отменить вставку Выбрано: 6 Проекты Витрина магазина C:/work/shop-front Админка магазина C:/work/shop-admin Группа включится сама, когда агент начнёт работать в этом проекте — и в копиях его веток. Обратно сама не выключается: файлы конфигурации общие, а чатов может идти несколько сразу. Переменные окружения группы Попадут в settings.json, пока группа включена. Удобно держать наборы настроек и переключать их целиком. Помощник Опишите словами, что нужно — поля заполнятся сами Например: «хочу правило, чтобы перед словами о готовности всегда прогонялись тесты». Можно надиктовать голосом. Отмена Сохранить"
+      },
+      "darkEn": {
+        "file": "02-order.dark.en.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 960,
+        "shotAt": "2026-09-28T14:39:03.409Z",
+        "text": "New bundle Name Description When it fits One line: “Auto” picks this group by it when a task is split across branches. The working order is built in the group’s window — open its card. Group contents All Rule Skill Hook Server Permission Group Rule Отвечай диффом Rule Новых зависимостей не заводить Rule Отвечай по-русски Skill shots-before-after Skill release-notes Hook PreToolUse · Bash Hook SessionStart Server design-mocks Server catalog-mock Permission deny · Bash(git push:*) Permission allow · Bash(git push:*) Permission allow · Bash(pnpm test:*) Apply order 1 Rule Отвечай диффом answer-with-diff 2 Rule Новых зависимостей не заводить no-new-deps 3 Skill shots-before-after Снимает экран до и после правки, которую видно глазами. 4 Hook PreToolUse · Bash node ~/.claude/hooks/no-push.mjs PreToolUse:push 5 Server design-mocks 6 Permission deny · Bash(git push:*) perm-push-deny The new member will take place 2 — tick it in the list above. Cancel inserting Selected: 6 Projects Витрина магазина C:/work/shop-front Админка магазина C:/work/shop-admin The group switches itself on when an agent starts working in this project — branch copies included. It never switches itself off: the config files are shared and several chats may be running at once. Group environment variables Applied to settings.json while the group is enabled. Handy for keeping sets of settings and switching them as a whole. Assistant Describe what you need — the fields fill themselves For example: \"I want a rule that tests are always run before claiming something is done\". You can dictate it by voice. Cancel Save"
       }
     },
     {
@@ -44,16 +144,32 @@
       "side": "panel",
       "masked": 0,
       "width": 1440,
-      "height": 1015,
-      "shotAt": "2026-09-17T20:55:15.590Z",
-      "text": "Создать группу Название Описание Состав группы всего Правило Скилл Хук Сервер Право Группа Правило Отвечай диффом Правило Новых зависимостей не заводить Правило Отвечай по-русски Скилл shots-before-after Скилл Тикеты магазина Скилл release-notes Хук PreToolUse · Bash Хук SessionStart Хук UserPromptSubmit Сервер design-mocks Сервер catalog-mock Право deny · Bash(git push:*) Право allow · Bash(git push:*) Право allow · Bash(pnpm test:*) Порядок применения 1 Правило Отвечай диффом 2 Правило Новых зависимостей не заводить 3 Скилл shots-before-after 4 Хук PreToolUse · Bash 5 Сервер design-mocks 6 Право deny · Bash(git push:*) 7 Право allow · Bash(git push:*) Выбрано: 7 Конфликт прав: для «Bash(git push:*)» в группе заданы и allow, и deny — Claude Code возьмёт одно. Проекты Витрина магазина C:/work/shop-front Админка магазина C:/work/shop-admin Группа включится сама, когда агент начнёт работать в этом проекте — и в копиях его веток. Обратно сама не выключается: файлы конфигурации общие, а чатов может идти несколько сразу. Порядок работы Когда применять Эта строка становится описанием скилла — по ней Claude решает, браться ли за порядок работы. Триггер по тексту запроса Регулярное выражение. Заполнено — панель ставит хук, который напомнит о порядке работы сам; пусто — Claude подключает скилл по описанию. Шаги Добавить шаг Шаги компилируются в скилл (skills/scenario-…): он становится участником группы и гаснет вместе с ней. Переменные окружения группы Попадут в settings.json, пока группа включена. Удобно держать наборы настроек и переключать их целиком. Помощник Опишите словами, что нужно — поля заполнятся сами Например: «хочу правило, чтобы перед словами о готовности всегда прогонялись тесты». Можно надиктовать голосом. Отмена Сохранить",
+      "height": 960,
+      "shotAt": "2026-09-28T14:32:43.294Z",
+      "text": "Новый набор Название Описание Когда уместна Одна строка: по ней «Авто» выбирает эту группу, когда задачу делят по веткам. Порядок работы собирают в окне группы — откройте её карточку. Состав группы Все Правило Скилл Хук Сервер Право Группа Правило Отвечай диффом Правило Новых зависимостей не заводить Правило Отвечай по-русски Скилл shots-before-after Скилл release-notes Хук PreToolUse · Bash Хук SessionStart Сервер design-mocks Сервер catalog-mock Право deny · Bash(git push:*) Право allow · Bash(git push:*) Право allow · Bash(pnpm test:*) Порядок применения 1 Правило Отвечай диффом answer-with-diff 2 Правило Новых зависимостей не заводить no-new-deps 3 Скилл shots-before-after Снимает экран до и после правки, которую видно глазами. 4 Хук PreToolUse · Bash node ~/.claude/hooks/no-push.mjs PreToolUse:push 5 Сервер design-mocks 6 Право deny · Bash(git push:*) perm-push-deny 7 Право allow · Bash(git push:*) perm-push-allow Выбрано: 7 Конфликт прав: для «Bash(git push:*)» в группе заданы и allow, и deny — Claude Code возьмёт одно. Проекты Витрина магазина C:/work/shop-front Админка магазина C:/work/shop-admin Группа включится сама, когда агент начнёт работать в этом проекте — и в копиях его веток. Обратно сама не выключается: файлы конфигурации общие, а чатов может идти несколько сразу. Переменные окружения группы Попадут в settings.json, пока группа включена. Удобно держать наборы настроек и переключать их целиком. Помощник Опишите словами, что нужно — поля заполнятся сами Например: «хочу правило, чтобы перед словами о готовности всегда прогонялись тесты». Можно надиктовать голосом. Отмена Сохранить",
       "en": {
         "file": "03-conflict.en.png",
         "masked": 0,
         "width": 1440,
-        "height": 1015,
-        "shotAt": "2026-09-17T20:56:22.536Z",
-        "text": "Create group Name Description Group contents total Rule Skill Hook Server Permission Group Rule Отвечай диффом Rule Новых зависимостей не заводить Rule Отвечай по-русски Skill shots-before-after Skill Тикеты магазина Skill release-notes Hook PreToolUse · Bash Hook SessionStart Hook UserPromptSubmit Server design-mocks Server catalog-mock Permission deny · Bash(git push:*) Permission allow · Bash(git push:*) Permission allow · Bash(pnpm test:*) Apply order 1 Rule Отвечай диффом 2 Rule Новых зависимостей не заводить 3 Skill shots-before-after 4 Hook PreToolUse · Bash 5 Server design-mocks 6 Permission deny · Bash(git push:*) 7 Permission allow · Bash(git push:*) Selected: 7 Permission conflict: \"Bash(git push:*)\" is set to both allow and deny in the group — Claude Code picks one. Projects Витрина магазина C:/work/shop-front Админка магазина C:/work/shop-admin The group switches itself on when an agent starts working in this project — branch copies included. It never switches itself off: the config files are shared and several chats may be running at once. Working order When to apply This line becomes the skill description — Claude decides by it whether to follow the working order. Trigger on the prompt text A regular expression. Filled in — the panel adds a hook that brings the working order up itself; empty — Claude picks the skill up by its description. Steps Add step Steps compile into a skill (skills/scenario-…): it becomes a member of the group and goes dark with it. Group environment variables Applied to settings.json while the group is enabled. Handy for keeping sets of settings and switching them as a whole. Assistant Describe what you need — the fields fill themselves For example: \"I want a rule that tests are always run before claiming something is done\". You can dictate it by voice. Cancel Save"
+        "height": 960,
+        "shotAt": "2026-09-28T14:34:52.520Z",
+        "text": "New bundle Name Description When it fits One line: “Auto” picks this group by it when a task is split across branches. The working order is built in the group’s window — open its card. Group contents All Rule Skill Hook Server Permission Group Rule Отвечай диффом Rule Новых зависимостей не заводить Rule Отвечай по-русски Skill shots-before-after Skill release-notes Hook PreToolUse · Bash Hook SessionStart Server design-mocks Server catalog-mock Permission deny · Bash(git push:*) Permission allow · Bash(git push:*) Permission allow · Bash(pnpm test:*) Apply order 1 Rule Отвечай диффом answer-with-diff 2 Rule Новых зависимостей не заводить no-new-deps 3 Skill shots-before-after Снимает экран до и после правки, которую видно глазами. 4 Hook PreToolUse · Bash node ~/.claude/hooks/no-push.mjs PreToolUse:push 5 Server design-mocks 6 Permission deny · Bash(git push:*) perm-push-deny 7 Permission allow · Bash(git push:*) perm-push-allow Selected: 7 Permission conflict: \"Bash(git push:*)\" is set to both allow and deny in the group — Claude Code picks one. Projects Витрина магазина C:/work/shop-front Админка магазина C:/work/shop-admin The group switches itself on when an agent starts working in this project — branch copies included. It never switches itself off: the config files are shared and several chats may be running at once. Group environment variables Applied to settings.json while the group is enabled. Handy for keeping sets of settings and switching them as a whole. Assistant Describe what you need — the fields fill themselves For example: \"I want a rule that tests are always run before claiming something is done\". You can dictate it by voice. Cancel Save"
+      },
+      "dark": {
+        "file": "03-conflict.dark.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 960,
+        "shotAt": "2026-09-28T14:36:58.421Z",
+        "text": "Новый набор Название Описание Когда уместна Одна строка: по ней «Авто» выбирает эту группу, когда задачу делят по веткам. Порядок работы собирают в окне группы — откройте её карточку. Состав группы Все Правило Скилл Хук Сервер Право Группа Правило Отвечай диффом Правило Новых зависимостей не заводить Правило Отвечай по-русски Скилл shots-before-after Скилл release-notes Хук PreToolUse · Bash Хук SessionStart Сервер design-mocks Сервер catalog-mock Право deny · Bash(git push:*) Право allow · Bash(git push:*) Право allow · Bash(pnpm test:*) Порядок применения 1 Правило Отвечай диффом answer-with-diff 2 Правило Новых зависимостей не заводить no-new-deps 3 Скилл shots-before-after Снимает экран до и после правки, которую видно глазами. 4 Хук PreToolUse · Bash node ~/.claude/hooks/no-push.mjs PreToolUse:push 5 Сервер design-mocks 6 Право deny · Bash(git push:*) perm-push-deny 7 Право allow · Bash(git push:*) perm-push-allow Выбрано: 7 Конфликт прав: для «Bash(git push:*)» в группе заданы и allow, и deny — Claude Code возьмёт одно. Проекты Витрина магазина C:/work/shop-front Админка магазина C:/work/shop-admin Группа включится сама, когда агент начнёт работать в этом проекте — и в копиях его веток. Обратно сама не выключается: файлы конфигурации общие, а чатов может идти несколько сразу. Переменные окружения группы Попадут в settings.json, пока группа включена. Удобно держать наборы настроек и переключать их целиком. Помощник Опишите словами, что нужно — поля заполнятся сами Например: «хочу правило, чтобы перед словами о готовности всегда прогонялись тесты». Можно надиктовать голосом. Отмена Сохранить"
+      },
+      "darkEn": {
+        "file": "03-conflict.dark.en.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 960,
+        "shotAt": "2026-09-28T14:39:04.192Z",
+        "text": "New bundle Name Description When it fits One line: “Auto” picks this group by it when a task is split across branches. The working order is built in the group’s window — open its card. Group contents All Rule Skill Hook Server Permission Group Rule Отвечай диффом Rule Новых зависимостей не заводить Rule Отвечай по-русски Skill shots-before-after Skill release-notes Hook PreToolUse · Bash Hook SessionStart Server design-mocks Server catalog-mock Permission deny · Bash(git push:*) Permission allow · Bash(git push:*) Permission allow · Bash(pnpm test:*) Apply order 1 Rule Отвечай диффом answer-with-diff 2 Rule Новых зависимостей не заводить no-new-deps 3 Skill shots-before-after Снимает экран до и после правки, которую видно глазами. 4 Hook PreToolUse · Bash node ~/.claude/hooks/no-push.mjs PreToolUse:push 5 Server design-mocks 6 Permission deny · Bash(git push:*) perm-push-deny 7 Permission allow · Bash(git push:*) perm-push-allow Selected: 7 Permission conflict: \"Bash(git push:*)\" is set to both allow and deny in the group — Claude Code picks one. Projects Витрина магазина C:/work/shop-front Админка магазина C:/work/shop-admin The group switches itself on when an agent starts working in this project — branch copies included. It never switches itself off: the config files are shared and several chats may be running at once. Group environment variables Applied to settings.json while the group is enabled. Handy for keeping sets of settings and switching them as a whole. Assistant Describe what you need — the fields fill themselves For example: \"I want a rule that tests are always run before claiming something is done\". You can dictate it by voice. Cancel Save"
       }
     },
     {
@@ -62,16 +178,32 @@
       "side": "panel",
       "masked": 0,
       "width": 1440,
-      "height": 1015,
-      "shotAt": "2026-09-17T20:55:16.742Z",
-      "text": "Создать группу Название Описание Состав группы всего Правило Скилл Хук Сервер Право Группа Правило Отвечай диффом Правило Новых зависимостей не заводить Правило Отвечай по-русски Скилл shots-before-after Скилл Тикеты магазина Скилл release-notes Хук PreToolUse · Bash Хук SessionStart Хук UserPromptSubmit Сервер design-mocks Сервер catalog-mock Право deny · Bash(git push:*) Право allow · Bash(git push:*) Право allow · Bash(pnpm test:*) Порядок применения 1 Правило Отвечай диффом 2 Правило Новых зависимостей не заводить 3 Скилл shots-before-after 4 Хук PreToolUse · Bash 5 Сервер design-mocks 6 Право deny · Bash(git push:*) Выбрано: 6 Проекты Витрина магазина C:/work/shop-front Админка магазина C:/work/shop-admin Группа включится сама, когда агент начнёт работать в этом проекте — и в копиях его веток. Обратно сама не выключается: файлы конфигурации общие, а чатов может идти несколько сразу. Порядок работы Когда применять Эта строка становится описанием скилла — по ней Claude решает, браться ли за порядок работы. Триггер по тексту запроса Регулярное выражение. Заполнено — панель ставит хук, который напомнит о порядке работы сам; пусто — Claude подключает скилл по описанию. Шаги Добавить шаг Шаги компилируются в скилл (skills/scenario-…): он становится участником группы и гаснет вместе с ней. Переменные окружения группы Попадут в settings.json, пока группа включена. Удобно держать наборы настроек и переключать их целиком. Помощник Опишите словами, что нужно — поля заполнятся сами Например: «хочу правило, чтобы перед словами о готовности всегда прогонялись тесты». Можно надиктовать голосом. Отмена Сохранить",
+      "height": 960,
+      "shotAt": "2026-09-28T14:32:44.491Z",
+      "text": "Новый набор Название Описание Когда уместна Одна строка: по ней «Авто» выбирает эту группу, когда задачу делят по веткам. Порядок работы собирают в окне группы — откройте её карточку. Состав группы Все Правило Скилл Хук Сервер Право Группа Правило Отвечай диффом Правило Новых зависимостей не заводить Правило Отвечай по-русски Скилл shots-before-after Скилл release-notes Хук PreToolUse · Bash Хук SessionStart Сервер design-mocks Сервер catalog-mock Право deny · Bash(git push:*) Право allow · Bash(git push:*) Право allow · Bash(pnpm test:*) Порядок применения 1 Правило Отвечай диффом answer-with-diff 2 Правило Новых зависимостей не заводить no-new-deps 3 Скилл shots-before-after Снимает экран до и после правки, которую видно глазами. 4 Хук PreToolUse · Bash node ~/.claude/hooks/no-push.mjs PreToolUse:push 5 Сервер design-mocks 6 Право deny · Bash(git push:*) perm-push-deny Выбрано: 6 Проекты Витрина магазина C:/work/shop-front Админка магазина C:/work/shop-admin Группа включится сама, когда агент начнёт работать в этом проекте — и в копиях его веток. Обратно сама не выключается: файлы конфигурации общие, а чатов может идти несколько сразу. Переменные окружения группы Попадут в settings.json, пока группа включена. Удобно держать наборы настроек и переключать их целиком. Помощник Опишите словами, что нужно — поля заполнятся сами Например: «хочу правило, чтобы перед словами о готовности всегда прогонялись тесты». Можно надиктовать голосом. Отмена Сохранить",
       "en": {
         "file": "04-env.en.png",
         "masked": 0,
         "width": 1440,
-        "height": 1015,
-        "shotAt": "2026-09-17T20:56:23.690Z",
-        "text": "Create group Name Description Group contents total Rule Skill Hook Server Permission Group Rule Отвечай диффом Rule Новых зависимостей не заводить Rule Отвечай по-русски Skill shots-before-after Skill Тикеты магазина Skill release-notes Hook PreToolUse · Bash Hook SessionStart Hook UserPromptSubmit Server design-mocks Server catalog-mock Permission deny · Bash(git push:*) Permission allow · Bash(git push:*) Permission allow · Bash(pnpm test:*) Apply order 1 Rule Отвечай диффом 2 Rule Новых зависимостей не заводить 3 Skill shots-before-after 4 Hook PreToolUse · Bash 5 Server design-mocks 6 Permission deny · Bash(git push:*) Selected: 6 Projects Витрина магазина C:/work/shop-front Админка магазина C:/work/shop-admin The group switches itself on when an agent starts working in this project — branch copies included. It never switches itself off: the config files are shared and several chats may be running at once. Working order When to apply This line becomes the skill description — Claude decides by it whether to follow the working order. Trigger on the prompt text A regular expression. Filled in — the panel adds a hook that brings the working order up itself; empty — Claude picks the skill up by its description. Steps Add step Steps compile into a skill (skills/scenario-…): it becomes a member of the group and goes dark with it. Group environment variables Applied to settings.json while the group is enabled. Handy for keeping sets of settings and switching them as a whole. Assistant Describe what you need — the fields fill themselves For example: \"I want a rule that tests are always run before claiming something is done\". You can dictate it by voice. Cancel Save"
+        "height": 960,
+        "shotAt": "2026-09-28T14:34:53.686Z",
+        "text": "New bundle Name Description When it fits One line: “Auto” picks this group by it when a task is split across branches. The working order is built in the group’s window — open its card. Group contents All Rule Skill Hook Server Permission Group Rule Отвечай диффом Rule Новых зависимостей не заводить Rule Отвечай по-русски Skill shots-before-after Skill release-notes Hook PreToolUse · Bash Hook SessionStart Server design-mocks Server catalog-mock Permission deny · Bash(git push:*) Permission allow · Bash(git push:*) Permission allow · Bash(pnpm test:*) Apply order 1 Rule Отвечай диффом answer-with-diff 2 Rule Новых зависимостей не заводить no-new-deps 3 Skill shots-before-after Снимает экран до и после правки, которую видно глазами. 4 Hook PreToolUse · Bash node ~/.claude/hooks/no-push.mjs PreToolUse:push 5 Server design-mocks 6 Permission deny · Bash(git push:*) perm-push-deny Selected: 6 Projects Витрина магазина C:/work/shop-front Админка магазина C:/work/shop-admin The group switches itself on when an agent starts working in this project — branch copies included. It never switches itself off: the config files are shared and several chats may be running at once. Group environment variables Applied to settings.json while the group is enabled. Handy for keeping sets of settings and switching them as a whole. Assistant Describe what you need — the fields fill themselves For example: \"I want a rule that tests are always run before claiming something is done\". You can dictate it by voice. Cancel Save"
+      },
+      "dark": {
+        "file": "04-env.dark.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 960,
+        "shotAt": "2026-09-28T14:36:59.604Z",
+        "text": "Новый набор Название Описание Когда уместна Одна строка: по ней «Авто» выбирает эту группу, когда задачу делят по веткам. Порядок работы собирают в окне группы — откройте её карточку. Состав группы Все Правило Скилл Хук Сервер Право Группа Правило Отвечай диффом Правило Новых зависимостей не заводить Правило Отвечай по-русски Скилл shots-before-after Скилл release-notes Хук PreToolUse · Bash Хук SessionStart Сервер design-mocks Сервер catalog-mock Право deny · Bash(git push:*) Право allow · Bash(git push:*) Право allow · Bash(pnpm test:*) Порядок применения 1 Правило Отвечай диффом answer-with-diff 2 Правило Новых зависимостей не заводить no-new-deps 3 Скилл shots-before-after Снимает экран до и после правки, которую видно глазами. 4 Хук PreToolUse · Bash node ~/.claude/hooks/no-push.mjs PreToolUse:push 5 Сервер design-mocks 6 Право deny · Bash(git push:*) perm-push-deny Выбрано: 6 Проекты Витрина магазина C:/work/shop-front Админка магазина C:/work/shop-admin Группа включится сама, когда агент начнёт работать в этом проекте — и в копиях его веток. Обратно сама не выключается: файлы конфигурации общие, а чатов может идти несколько сразу. Переменные окружения группы Попадут в settings.json, пока группа включена. Удобно держать наборы настроек и переключать их целиком. Помощник Опишите словами, что нужно — поля заполнятся сами Например: «хочу правило, чтобы перед словами о готовности всегда прогонялись тесты». Можно надиктовать голосом. Отмена Сохранить"
+      },
+      "darkEn": {
+        "file": "04-env.dark.en.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 960,
+        "shotAt": "2026-09-28T14:39:05.348Z",
+        "text": "New bundle Name Description When it fits One line: “Auto” picks this group by it when a task is split across branches. The working order is built in the group’s window — open its card. Group contents All Rule Skill Hook Server Permission Group Rule Отвечай диффом Rule Новых зависимостей не заводить Rule Отвечай по-русски Skill shots-before-after Skill release-notes Hook PreToolUse · Bash Hook SessionStart Server design-mocks Server catalog-mock Permission deny · Bash(git push:*) Permission allow · Bash(git push:*) Permission allow · Bash(pnpm test:*) Apply order 1 Rule Отвечай диффом answer-with-diff 2 Rule Новых зависимостей не заводить no-new-deps 3 Skill shots-before-after Снимает экран до и после правки, которую видно глазами. 4 Hook PreToolUse · Bash node ~/.claude/hooks/no-push.mjs PreToolUse:push 5 Server design-mocks 6 Permission deny · Bash(git push:*) perm-push-deny Selected: 6 Projects Витрина магазина C:/work/shop-front Админка магазина C:/work/shop-admin The group switches itself on when an agent starts working in this project — branch copies included. It never switches itself off: the config files are shared and several chats may be running at once. Group environment variables Applied to settings.json while the group is enabled. Handy for keeping sets of settings and switching them as a whole. Assistant Describe what you need — the fields fill themselves For example: \"I want a rule that tests are always run before claiming something is done\". You can dictate it by voice. Cancel Save"
       }
     },
     {
@@ -79,17 +211,33 @@
       "file": "05-card.png",
       "side": "panel",
       "masked": 0,
-      "width": 1440,
-      "height": 1100,
-      "shotAt": "2026-09-17T20:55:18.386Z",
-      "text": "AgentDeck Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 3 CLAUDE.md Скиллы 3 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 2 Права 3 Переменные Проекты Тестирование Приложение Группы 1 История изменений Сравнение Настройки Защита данных Контур Справка Группы Свой порядок поверх правил, хуков, скиллов и серверов Создать группу Зачем это Ревью фронтенда 6 участников env: 1 Всё, что нужно на разборе чужой ветки, и ничего сверх того. Сценарии Создать сценарий Сценарии Пусто Сохранено",
+      "width": 928,
+      "height": 768,
+      "shotAt": "2026-09-28T14:32:47.448Z",
+      "text": "Ревью фронтенда Редактировать Копировать Когда: не указано — «Авто» эту группу не выберет Порядок работы Состав Порядок работы над задачей: стадии конвейера — тонкие разделители, шаги скиллов собраны в блоки, ваши шаги стоят между ними. Шаг внутри блока скилла идёт в том же ходе, что и скилл; шаг после стадии — отдельным проверяемым ходом после неё. 0 шагов Добавить шаг РАЗБОР ЗАДАЧИ ПЛАН РАБОТА РЕВЬЮ ПРАВКИ ДОСТАВКА",
       "en": {
         "file": "05-card.en.png",
         "masked": 0,
-        "width": 1440,
-        "height": 1100,
-        "shotAt": "2026-09-17T20:56:25.298Z",
-        "text": "AgentDeck Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 3 CLAUDE.md Skills 3 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 2 Permissions 3 Environment Projects Testing Application Groups 1 Change history Comparison Settings Data protection Contour Help Groups Your own structure across rules, hooks, skills and servers Create group Why this exists Ревью фронтенда 6 members env: 1 Всё, что нужно на разборе чужой ветки, и ничего сверх того. Automations Create automation Automations Empty Saved"
+        "width": 928,
+        "height": 768,
+        "shotAt": "2026-09-28T14:34:56.578Z",
+        "text": "Ревью фронтенда Edit Copy When: not set — “Auto” will not pick this group Working order Members How the task is worked: pipeline stages are thin separators, skill steps are grouped into blocks, your steps sit between them. A step inside a skill block runs in the same turn as the skill; a step after a stage runs as its own checked turn after it. 0 steps Add step TRIAGE PLAN WORK REVIEW FIXES DELIVERY"
+      },
+      "dark": {
+        "file": "05-card.dark.png",
+        "masked": 0,
+        "width": 928,
+        "height": 768,
+        "shotAt": "2026-09-28T14:37:02.572Z",
+        "text": "Ревью фронтенда Редактировать Копировать Когда: не указано — «Авто» эту группу не выберет Порядок работы Состав Порядок работы над задачей: стадии конвейера — тонкие разделители, шаги скиллов собраны в блоки, ваши шаги стоят между ними. Шаг внутри блока скилла идёт в том же ходе, что и скилл; шаг после стадии — отдельным проверяемым ходом после неё. 0 шагов Добавить шаг РАЗБОР ЗАДАЧИ ПЛАН РАБОТА РЕВЬЮ ПРАВКИ ДОСТАВКА"
+      },
+      "darkEn": {
+        "file": "05-card.dark.en.png",
+        "masked": 0,
+        "width": 928,
+        "height": 768,
+        "shotAt": "2026-09-28T14:39:08.266Z",
+        "text": "Ревью фронтенда Edit Copy When: not set — “Auto” will not pick this group Working order Members How the task is worked: pipeline stages are thin separators, skill steps are grouped into blocks, your steps sit between them. A step inside a skill block runs in the same turn as the skill; a step after a stage runs as its own checked turn after it. 0 steps Add step TRIAGE PLAN WORK REVIEW FIXES DELIVERY"
       }
     },
     {
@@ -99,15 +247,31 @@
       "masked": 0,
       "width": 1440,
       "height": 1100,
-      "shotAt": "2026-09-17T20:55:19.953Z",
-      "text": "AgentDeck Свернуть панель 2 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 3 CLAUDE.md Скиллы 3 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 2 Права 2 Переменные Проекты Тестирование Приложение Группы 1 История изменений Сравнение Настройки Защита данных Контур Справка Группы Свой порядок поверх правил, хуков, скиллов и серверов Создать группу Зачем это Ревью фронтенда 6 участников env: 1 Выключено Всё, что нужно на разборе чужой ветки, и ничего сверх того. Сценарии Создать сценарий Сценарии Пусто Сохранено Обновлено",
+      "shotAt": "2026-09-28T14:32:49.497Z",
+      "text": "AgentDeck Свернуть панель 2 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 3 CLAUDE.md Скиллы 2 Команды Хуки 2 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 2 Права 3 Переменные Проекты Тестирование Приложение Группы 1 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Группы Свой порядок поверх правил, хуков, скиллов и серверов Обнаружить группы Создать группу Зачем это Глобальные 1 В проектах 0 Найдено 0 Обнаружение 0 Доступны в любом проекте; при разделении задачи по веткам «Авто» выбирает их по строке «Когда». Ревью фронтенда глобальная Когда: не указано — «Авто» эту группу не выберет Своих шагов нет — только стадии конвейера. скилл 1 · правила 2 · хук 1 · сервер 1 · право 1 6 участников",
       "en": {
         "file": "06-off.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1100,
-        "shotAt": "2026-09-17T20:56:26.868Z",
-        "text": "AgentDeck Collapse the sidebar 2 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 3 CLAUDE.md Skills 3 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 2 Permissions 2 Environment Projects Testing Application Groups 1 Change history Comparison Settings Data protection Contour Help Groups Your own structure across rules, hooks, skills and servers Create group Why this exists Ревью фронтенда 6 members env: 1 Disabled Всё, что нужно на разборе чужой ветки, и ничего сверх того. Automations Create automation Automations Empty Saved Updated"
+        "shotAt": "2026-09-28T14:34:58.604Z",
+        "text": "AgentDeck Collapse the sidebar 2 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 3 CLAUDE.md Skills 2 Commands Hooks 2 Scripts 0 Plugins Integrations and access MCP servers 2 Permissions 3 Environment Projects Testing Application Groups 1 Change history Comparison Environment passport Settings Data protection Contour Help Groups Your own structure across rules, hooks, skills and servers Discover groups Create group Why this exists Global 1 In projects 0 Found 0 Discovery 0 Available in any project; when a task is split across branches, “Auto” picks them by their “When” line. Ревью фронтенда global When: not set — “Auto” will not pick this group No own steps — pipeline stages only. 1 skill · 2 rules · 1 hook · 1 server · 1 permission 6 members"
+      },
+      "dark": {
+        "file": "06-off.dark.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 1100,
+        "shotAt": "2026-09-28T14:37:04.622Z",
+        "text": "AgentDeck Свернуть панель 2 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 3 CLAUDE.md Скиллы 2 Команды Хуки 2 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 2 Права 3 Переменные Проекты Тестирование Приложение Группы 1 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Группы Свой порядок поверх правил, хуков, скиллов и серверов Обнаружить группы Создать группу Зачем это Глобальные 1 В проектах 0 Найдено 0 Обнаружение 0 Доступны в любом проекте; при разделении задачи по веткам «Авто» выбирает их по строке «Когда». Ревью фронтенда глобальная Когда: не указано — «Авто» эту группу не выберет Своих шагов нет — только стадии конвейера. скилл 1 · правила 2 · хук 1 · сервер 1 · право 1 6 участников"
+      },
+      "darkEn": {
+        "file": "06-off.dark.en.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 1100,
+        "shotAt": "2026-09-28T14:39:10.291Z",
+        "text": "AgentDeck Collapse the sidebar 2 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 3 CLAUDE.md Skills 2 Commands Hooks 2 Scripts 0 Plugins Integrations and access MCP servers 2 Permissions 3 Environment Projects Testing Application Groups 1 Change history Comparison Environment passport Settings Data protection Contour Help Groups Your own structure across rules, hooks, skills and servers Discover groups Create group Why this exists Global 1 In projects 0 Found 0 Discovery 0 Available in any project; when a task is split across branches, “Auto” picks them by their “When” line. Ревью фронтенда global When: not set — “Auto” will not pick this group No own steps — pipeline stages only. 1 skill · 2 rules · 1 hook · 1 server · 1 permission 6 members"
       }
     },
     {
@@ -117,15 +281,31 @@
       "masked": 0,
       "width": 1440,
       "height": 1100,
-      "shotAt": "2026-09-17T20:55:22.121Z",
-      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 3 CLAUDE.md Скиллы 3 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 2 Права 2 Переменные Проекты Тестирование Приложение Группы 1 История изменений Сравнение Настройки Защита данных Контур Справка Правила Личные правила из CLAUDE.md — действуют во всех проектах Добавить правило Что это Отвечай диффом Выключено Правку показывай куском файла до и после, а не пересказом. Новых зависимостей не заводить Выключено Пакет добавляется только после отдельного разговора. Отвечай по-русски Ответы, вопросы и подписи — по-русски.",
+      "shotAt": "2026-09-28T14:32:52.063Z",
+      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 3 CLAUDE.md Скиллы 2 Команды Хуки 2 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 2 Права 3 Переменные Проекты Тестирование Приложение Группы 1 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Правила Личные правила из CLAUDE.md — действуют во всех проектах Добавить правило Что это Все 3 Включены 2 Выключены 1 Все правила формата панели из CLAUDE.md. Поиск ищет по заголовку и тексту внутри открытой вкладки. Отвечай диффом Правку показывай куском файла до и после, а не пересказом. Новых зависимостей не заводить Выключено Пакет добавляется только после отдельного разговора. Отвечай по-русски Ответы, вопросы и подписи — по-русски.",
       "en": {
         "file": "07-rules-off.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1100,
-        "shotAt": "2026-09-17T20:56:29.050Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 3 CLAUDE.md Skills 3 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 2 Permissions 2 Environment Projects Testing Application Groups 1 Change history Comparison Settings Data protection Contour Help Rules Personal rules from CLAUDE.md — active in every project Add rule What this is Отвечай диффом Disabled Правку показывай куском файла до и после, а не пересказом. Новых зависимостей не заводить Disabled Пакет добавляется только после отдельного разговора. Отвечай по-русски Ответы, вопросы и подписи — по-русски."
+        "shotAt": "2026-09-28T14:35:01.024Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 3 CLAUDE.md Skills 2 Commands Hooks 2 Scripts 0 Plugins Integrations and access MCP servers 2 Permissions 3 Environment Projects Testing Application Groups 1 Change history Comparison Environment passport Settings Data protection Contour Help Rules Personal rules from CLAUDE.md — active in every project Add rule What this is All 3 On 2 Off 1 Every rule in the panel format from CLAUDE.md. Search looks at titles and text within the open tab. Отвечай диффом Правку показывай куском файла до и после, а не пересказом. Новых зависимостей не заводить Disabled Пакет добавляется только после отдельного разговора. Отвечай по-русски Ответы, вопросы и подписи — по-русски."
+      },
+      "dark": {
+        "file": "07-rules-off.dark.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 1100,
+        "shotAt": "2026-09-28T14:37:07.208Z",
+        "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 3 CLAUDE.md Скиллы 2 Команды Хуки 2 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 2 Права 3 Переменные Проекты Тестирование Приложение Группы 1 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Правила Личные правила из CLAUDE.md — действуют во всех проектах Добавить правило Что это Все 3 Включены 2 Выключены 1 Все правила формата панели из CLAUDE.md. Поиск ищет по заголовку и тексту внутри открытой вкладки. Отвечай диффом Правку показывай куском файла до и после, а не пересказом. Новых зависимостей не заводить Выключено Пакет добавляется только после отдельного разговора. Отвечай по-русски Ответы, вопросы и подписи — по-русски."
+      },
+      "darkEn": {
+        "file": "07-rules-off.dark.en.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 1100,
+        "shotAt": "2026-09-28T14:39:12.711Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 3 CLAUDE.md Skills 2 Commands Hooks 2 Scripts 0 Plugins Integrations and access MCP servers 2 Permissions 3 Environment Projects Testing Application Groups 1 Change history Comparison Environment passport Settings Data protection Contour Help Rules Personal rules from CLAUDE.md — active in every project Add rule What this is All 3 On 2 Off 1 Every rule in the panel format from CLAUDE.md. Search looks at titles and text within the open tab. Отвечай диффом Правку показывай куском файла до и после, а не пересказом. Новых зависимостей не заводить Disabled Пакет добавляется только после отдельного разговора. Отвечай по-русски Ответы, вопросы и подписи — по-русски."
       }
     },
     {
@@ -135,15 +315,31 @@
       "masked": 0,
       "width": 1440,
       "height": 1100,
-      "shotAt": "2026-09-17T20:55:28.073Z",
-      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 3 CLAUDE.md Скиллы 3 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 2 Права 3 Переменные Проекты Тестирование Приложение Группы 1 История изменений Сравнение Настройки Защита данных Контур Справка Правила Личные правила из CLAUDE.md — действуют во всех проектах Добавить правило Что это Отвечай диффом Правку показывай куском файла до и после, а не пересказом. Новых зависимостей не заводить Выключено Пакет добавляется только после отдельного разговора. Отвечай по-русски Ответы, вопросы и подписи — по-русски.",
+      "shotAt": "2026-09-28T14:32:58.997Z",
+      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 3 CLAUDE.md Скиллы 2 Команды Хуки 2 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 2 Права 3 Переменные Проекты Тестирование Приложение Группы 1 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Правила Личные правила из CLAUDE.md — действуют во всех проектах Добавить правило Что это Все 3 Включены 2 Выключены 1 Все правила формата панели из CLAUDE.md. Поиск ищет по заголовку и тексту внутри открытой вкладки. Отвечай диффом Правку показывай куском файла до и после, а не пересказом. Новых зависимостей не заводить Выключено Пакет добавляется только после отдельного разговора. Отвечай по-русски Ответы, вопросы и подписи — по-русски.",
       "en": {
         "file": "08-rules-on.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1100,
-        "shotAt": "2026-09-17T20:56:34.885Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 3 CLAUDE.md Skills 3 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 2 Permissions 3 Environment Projects Testing Application Groups 1 Change history Comparison Settings Data protection Contour Help Rules Personal rules from CLAUDE.md — active in every project Add rule What this is Отвечай диффом Правку показывай куском файла до и после, а не пересказом. Новых зависимостей не заводить Disabled Пакет добавляется только после отдельного разговора. Отвечай по-русски Ответы, вопросы и подписи — по-русски."
+        "shotAt": "2026-09-28T14:35:07.400Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 3 CLAUDE.md Skills 2 Commands Hooks 2 Scripts 0 Plugins Integrations and access MCP servers 2 Permissions 3 Environment Projects Testing Application Groups 1 Change history Comparison Environment passport Settings Data protection Contour Help Rules Personal rules from CLAUDE.md — active in every project Add rule What this is All 3 On 2 Off 1 Every rule in the panel format from CLAUDE.md. Search looks at titles and text within the open tab. Отвечай диффом Правку показывай куском файла до и после, а не пересказом. Новых зависимостей не заводить Disabled Пакет добавляется только после отдельного разговора. Отвечай по-русски Ответы, вопросы и подписи — по-русски."
+      },
+      "dark": {
+        "file": "08-rules-on.dark.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 1100,
+        "shotAt": "2026-09-28T14:37:13.974Z",
+        "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 3 CLAUDE.md Скиллы 2 Команды Хуки 2 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 2 Права 3 Переменные Проекты Тестирование Приложение Группы 1 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Правила Личные правила из CLAUDE.md — действуют во всех проектах Добавить правило Что это Все 3 Включены 2 Выключены 1 Все правила формата панели из CLAUDE.md. Поиск ищет по заголовку и тексту внутри открытой вкладки. Отвечай диффом Правку показывай куском файла до и после, а не пересказом. Новых зависимостей не заводить Выключено Пакет добавляется только после отдельного разговора. Отвечай по-русски Ответы, вопросы и подписи — по-русски."
+      },
+      "darkEn": {
+        "file": "08-rules-on.dark.en.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 1100,
+        "shotAt": "2026-09-28T14:39:19.090Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 3 CLAUDE.md Skills 2 Commands Hooks 2 Scripts 0 Plugins Integrations and access MCP servers 2 Permissions 3 Environment Projects Testing Application Groups 1 Change history Comparison Environment passport Settings Data protection Contour Help Rules Personal rules from CLAUDE.md — active in every project Add rule What this is All 3 On 2 Off 1 Every rule in the panel format from CLAUDE.md. Search looks at titles and text within the open tab. Отвечай диффом Правку показывай куском файла до и после, а не пересказом. Новых зависимостей не заводить Disabled Пакет добавляется только после отдельного разговора. Отвечай по-русски Ответы, вопросы и подписи — по-русски."
       }
     },
     {
@@ -152,15 +348,31 @@
       "side": "panel",
       "masked": 0,
       "width": 660,
-      "height": 550,
-      "shotAt": "2026-09-17T20:55:31.253Z",
+      "height": 560,
+      "shotAt": "2026-09-28T14:33:02.943Z",
       "text": "Удалить безвозвратно? Группа будет удалена. Сами правила, скиллы, хуки и серверы останутся на месте: исчезнет только их объединение. Если группа сейчас выключена, её участники снова включатся. Введите «Ревью фронтенда», чтобы подтвердить Отмена Удалить",
       "en": {
         "file": "09-delete.en.png",
         "masked": 0,
         "width": 660,
-        "height": 550,
-        "shotAt": "2026-09-17T20:56:37.933Z",
+        "height": 560,
+        "shotAt": "2026-09-28T14:35:10.916Z",
+        "text": "Delete permanently? The group will be deleted. The rules, skills, hooks and servers themselves stay where they are — only the grouping disappears. If the group is currently off, its members are switched back on. Type \"Ревью фронтенда\" to confirm Cancel Delete"
+      },
+      "dark": {
+        "file": "09-delete.dark.png",
+        "masked": 0,
+        "width": 660,
+        "height": 560,
+        "shotAt": "2026-09-28T14:37:17.897Z",
+        "text": "Удалить безвозвратно? Группа будет удалена. Сами правила, скиллы, хуки и серверы останутся на месте: исчезнет только их объединение. Если группа сейчас выключена, её участники снова включатся. Введите «Ревью фронтенда», чтобы подтвердить Отмена Удалить"
+      },
+      "darkEn": {
+        "file": "09-delete.dark.en.png",
+        "masked": 0,
+        "width": 660,
+        "height": 560,
+        "shotAt": "2026-09-28T14:39:22.641Z",
         "text": "Delete permanently? The group will be deleted. The rules, skills, hooks and servers themselves stay where they are — only the grouping disappears. If the group is currently off, its members are switched back on. Type \"Ревью фронтенда\" to confirm Cancel Delete"
       }
     }

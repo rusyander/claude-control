@@ -9,6 +9,7 @@ import {
 } from '@agentdeck/contracts';
 import { apiClient, toErrorMessage } from '@shared/api/client';
 import { queryKeys } from '@shared/api/query-keys';
+import { presetText } from '@shared/config/i18n';
 import { Stack } from '@shared/ui/stack';
 import { Card } from '@shared/ui/card';
 import { Modal } from '@shared/ui/modal';
@@ -21,6 +22,7 @@ import { mcpServerApi, MCP_TRANSPORTS } from '@entities/McpServer';
 import { envToText, textToEnv, parseArgs, formatArgs } from '@shared/lib/env-text';
 import type { McpFormModalProps } from './McpFormModal.types';
 import { McpJsonImport } from './McpJsonImport';
+import { mcpAssistantSpec } from '../model/mcpAssistant';
 import styles from './McpFormModal.module.scss';
 
 /**
@@ -191,26 +193,17 @@ export function McpFormModal({ isOpen, onOpenChange, server, secretAnchor }: Mcp
         <McpJsonImport onDone={() => onOpenChange(false)} />
       ) : (
         <FormWithAssistant
-          kind={t('mcp.title')}
+          kind="MCP server"
           fields={{ name, transport, command, args, url, envText, headersText }}
-          schema={{
-            name: 'Имя сервера в конфиге',
-            transport: 'Транспорт: stdio, sse или http',
-            command: 'Команда запуска для stdio, например npx',
-            args: 'Аргументы команды через пробел',
-            url: 'Адрес для sse и http',
-            envText: 'Переменные окружения по строке в формате KEY=VALUE',
-            headersText: 'HTTP-заголовки для sse и http по строке в формате Имя=значение',
-          }}
+          spec={mcpAssistantSpec(MCP_TRANSPORTS)}
           onApply={(applied) => {
-            if (typeof applied.name === 'string') setName(applied.name);
-            if (typeof applied.transport === 'string')
-              setTransport(applied.transport as McpTransport);
-            if (typeof applied.command === 'string') setCommand(applied.command);
-            if (typeof applied.args === 'string') setArgs(applied.args);
-            if (typeof applied.url === 'string') setUrl(applied.url);
-            if (typeof applied.envText === 'string') setEnvText(applied.envText);
-            if (typeof applied.headersText === 'string') setHeadersText(applied.headersText);
+            if (applied.name !== undefined) setName(applied.name);
+            if (applied.transport !== undefined) setTransport(applied.transport as McpTransport);
+            if (applied.command !== undefined) setCommand(applied.command);
+            if (applied.args !== undefined) setArgs(applied.args);
+            if (applied.url !== undefined) setUrl(applied.url);
+            if (applied.envText !== undefined) setEnvText(applied.envText);
+            if (applied.headersText !== undefined) setHeadersText(applied.headersText);
           }}
         >
           <Stack gap="var(--spacing-md)">
@@ -258,9 +251,9 @@ export function McpFormModal({ isOpen, onOpenChange, server, secretAnchor }: Mcp
                         size="sm"
                         variant="secondary"
                         onClick={() => applyPreset(preset)}
-                        title={preset.description}
+                        title={presetText(t, 'mcp', preset.id, 'description', preset.description)}
                       >
-                        {preset.title}
+                        {presetText(t, 'mcp', preset.id, 'title', preset.title)}
                       </Button>
                     ))}
                   </Stack>
@@ -272,7 +265,7 @@ export function McpFormModal({ isOpen, onOpenChange, server, secretAnchor }: Mcp
               label={t('mcp.serverName')}
               value={name}
               onChange={setName}
-              placeholder="например: gitlab-company"
+              placeholder={t('mcp.serverNamePlaceholder', { example: 'gitlab-company' })}
               hint={t('mcp.serverNameHint')}
               isMono
               autoFocus={!server}

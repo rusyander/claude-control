@@ -14,13 +14,19 @@
  *   или размер, файл появился или исчез; чтение файла перезапуском не считается;
  * - тесты, фикстуры, объявления типов, .md и всё вне кода не смотрит;
  * - собирает правки пачкой (пауза `DEBOUNCE_MS`), а не перезапускает на каждую;
- * - валит только процесс сервера, не дерево: посредники живых сессий
- *   (`live-relay.mjs`) отвязаны и переживают перезапуск вместе с CLI;
+ * - валит только процесс сервера, не дерево (ни `taskkill /T`, ни группы):
+ *   посредники живых сессий (`live-relay.mjs`) отвязаны и переживают
+ *   перезапуск вместе с CLI; запущенный с IPC уходит вместе с родителем;
  * - откладывает перезапуск, пока в журнале прогонов есть идущий ход с живым
  *   процессом (не дольше `DEFER_CAP_MS`): поток хода не рвётся на середине.
- *   `AGENTDECK_DEV_DEFER=0` — перезапускать сразу.
+ *   `AGENTDECK_DEV_DEFER=0` — перезапускать сразу;
+ * - прежде чем погасить работающий сервер, пробует новую сборку
+ *   (`dev-boot-probe.mjs`): не поднимается — прежний сервер работает дальше,
+ *   а в журнал уходит файл и строка ошибки;
+ * - упавший сам сервер поднимает снова (паузы `RELAUNCH_DELAYS_MS`): панель не
+ *   остаётся пустой до следующей правки, а посредники чатов — без сервера.
  */
-/* global process, setTimeout, clearTimeout, console */
+/* global process, setTimeout, clearTimeout, console, URL */
 import { spawn } from 'node:child_process';
 import { readdirSync, readFileSync, statSync, watch } from 'node:fs';
 import { homedir } from 'node:os';
@@ -166,6 +172,49 @@ function pidAlive(pid) {
   }
 }
 
+const PROBE_SCRIPT = fileURLToPath(new URL('./dev-boot-probe.mjs', import.meta.url));
+const PROBE_TIMEOUT_MS = 90_000;
+/** Паузы перед подъёмом упавшего сервера: первая короткая, дальше реже. */
+const RELAUNCH_DELAYS_MS = [1_000, 2_000, 5_000, 10_000, 30_000];
+/** Проживший столько сервер упал не при загрузке — отсчёт пауз заново. */
+const STABLE_MS = 60_000;
+
+/** Пауза перед `attempt`-й попыткой подряд поднять упавший сервер. */
+export function relaunchDelay(attempt) {
+  return RELAUNCH_DELAYS_MS[Math.min(attempt, RELAUNCH_DELAYS_MS.length - 1)];
+}
+
+/**
+ * Поднимается ли код сервера — проба графа модулей в отдельном процессе
+ * (`dev-boot-probe.mjs`), без порта и без подхвата сессий. `output` — хвост
+ * stderr пробы: в нём файл и строка ошибки.
+ */
+export function probeBuild(serverDir, entry = 'src/index.ts', timeoutMs = PROBE_TIMEOUT_MS) {
+  return new Promise((done) => {
+    const probe = spawn(
+      process.execPath,
+      ['--experimental-strip-types', '--no-warnings', PROBE_SCRIPT, entry],
+      { cwd: serverDir, stdio: ['ignore', 'ignore', 'pipe'], windowsHide: true },
+    );
+    let output = '';
+    probe.stderr.on('data', (chunk) => {
+      output = (output + chunk.toString()).slice(-4_000);
+    });
+    const timer = setTimeout(() => {
+      output += `\nпроба не уложилась в ${timeoutMs / 1000} с`;
+      probe.kill();
+    }, timeoutMs);
+    probe.on('error', (error) => {
+      clearTimeout(timer);
+      done({ ok: false, output: error.message });
+    });
+    probe.on('close', (code) => {
+      clearTimeout(timer);
+      done({ ok: code === 0, output: output.trim() });
+    });
+  });
+}
+
 function main() {
   const serverDir = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
   const roots = [
@@ -180,20 +229,66 @@ function main() {
   let child;
   let deferredSince;
   let timer;
+  let relaunchTimer;
+  let crashes = 0;
+  let waitingEdit = false;
+  let probing = false;
+  let again = false;
 
   const launch = () => {
+    const startedAt = Date.now();
     child = spawn(process.execPath, ['--experimental-strip-types', 'src/index.ts'], {
       cwd: serverDir,
       stdio: 'inherit',
     });
     const current = child;
     current.on('exit', (code, signal) => {
-      if (current === child) log(`сервер вышел (${code ?? signal}), жду правок`);
+      if (current !== child) return;
+      // Сервер упал сам (не сторож его погасил): панель без него пуста, а
+      // посредники чатов ждут, пока к ним подключатся, — поднимаем снова.
+      child = undefined;
+      if (Date.now() - startedAt >= STABLE_MS) crashes = 0;
+      const delay = relaunchDelay(crashes);
+      crashes += 1;
+      log(`сервер вышел (${code ?? signal}), поднимаю снова через ${delay / 1000} с`);
+      clearTimeout(relaunchTimer);
+      relaunchTimer = setTimeout(() => void relaunch(), delay);
     });
   };
 
-  const restart = () => {
+  /**
+   * Подъём после падения: сломанный код поднимать незачем — ждём правку. Но
+   * проба падает и не из-за кода (таймаут под нагрузкой, сбой запуска), и
+   * ждать правку вечно тогда нельзя (F-199): проба повторяется с растущей
+   * паузой, а правка перезапустит раньше. Полный текст сбоя — один раз.
+   */
+  const relaunch = async () => {
+    if (child) return;
+    const probe = await probeBuild(serverDir);
+    if (child) return;
+    if (!probe.ok) {
+      const delay = relaunchDelay(crashes);
+      crashes += 1;
+      log(
+        waitingEdit
+          ? `проба снова не прошла, повторю через ${delay / 1000} с`
+          : `новая сборка не поднимается — жду правку, проба повторится через ${delay / 1000} с:\n${probe.output}`,
+      );
+      waitingEdit = true;
+      clearTimeout(relaunchTimer);
+      relaunchTimer = setTimeout(() => void relaunch(), delay);
+      return;
+    }
+    waitingEdit = false;
+    launch();
+  };
+
+  const restart = async () => {
     clearTimeout(timer);
+    if (probing) {
+      again = true;
+      return;
+    }
     const now = Date.now();
     if (defer && busyRun(readEntries(ledgerFile), pidAlive)) {
       deferredSince ??= now;
@@ -207,9 +302,28 @@ function main() {
     deferredSince = undefined;
     const files = [...pending];
     pending.clear();
-    log(
-      `перезапуск: ${files.slice(0, 3).join(', ')}${files.length > 3 ? ` и ещё ${files.length - 3}` : ''}`,
-    );
+    const named = `${files.slice(0, 3).join(', ')}${files.length > 3 ? ` и ещё ${files.length - 3}` : ''}`;
+    // Сначала проба: сломанная правка не имеет права погасить работающий сервер.
+    probing = true;
+    const probe = await probeBuild(serverDir);
+    probing = false;
+    if (again) {
+      // Пока шла проба, пришли ещё правки — проверяем уже их вместе с этими.
+      again = false;
+      for (const file of files) pending.add(file);
+      void restart();
+      return;
+    }
+    if (!probe.ok) {
+      log(
+        `новая сборка не поднимается — ${child ? 'работает прежняя' : 'жду правку'} (${named}):\n${probe.output}`,
+      );
+      return;
+    }
+    log(`перезапуск: ${named}`);
+    clearTimeout(relaunchTimer);
+    crashes = 0;
+    waitingEdit = false;
     const old = child;
     child = undefined;
     if (old && old.exitCode === null && old.signalCode === null) {
@@ -222,17 +336,24 @@ function main() {
 
   new SourceWatcher(roots, (files) => {
     for (const file of files) pending.add(file);
-    if (deferredSince === undefined) restart();
+    if (deferredSince === undefined) void restart();
   }).start();
   launch();
   const stop = () => {
     const current = child;
     child = undefined;
+    clearTimeout(relaunchTimer);
     current?.kill();
     process.exit(0);
   };
   process.on('SIGINT', stop);
   process.on('SIGTERM', stop);
+  // Запущен с каналом IPC (проверки, чужой пусковой скрипт) — уходит вместе с
+  // тем, кто запустил: на Windows сигналов у Node нет, и иначе снять сторожа
+  // с его сервером можно было только деревом (`taskkill /T`), а дерево по
+  // номеру родителя цепляет чужие процессы, чей давно умерший родитель носил
+  // тот же номер. Здесь гаснет ровно свой сервер, по своему номеру.
+  if (process.send) process.on('disconnect', stop);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main();

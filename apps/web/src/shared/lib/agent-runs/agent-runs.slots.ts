@@ -1,5 +1,6 @@
 import { HIDDEN_STREAMS, MAX_STREAMS } from './agent-runs.constants';
 import { runStream } from './agent-runs.lifecycle';
+import { isOpenAsk } from '@shared/lib/chat-stream';
 import {
   callbacks,
   controllers,
@@ -56,11 +57,7 @@ function mayStream(key: string): boolean {
 }
 
 function isAwaitingHuman(run: AgentRun): boolean {
-  return (
-    run.permissions.length > 0 ||
-    run.askedQuestion ||
-    run.tools.some((tool) => tool.name === 'AskUserQuestion')
-  );
+  return run.permissions.length > 0 || run.askedQuestion || run.tools.some(isOpenAsk);
 }
 
 function matches(id: string | undefined, key: string, run: AgentRun): boolean {

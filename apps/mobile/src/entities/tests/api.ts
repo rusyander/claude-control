@@ -3,11 +3,12 @@ import type {
   ProjectTestCaseInput,
   ProjectTestManualResultInput,
   ProjectTestManualSession,
+  ProjectTestPyramid,
   ProjectTestRunMode,
   ProjectTestRunRecord,
   ProjectTestsView,
 } from '@agentdeck/contracts';
-import { api } from '../../shared/api/client';
+import { ApiError, api } from '../../shared/api/client';
 
 /**
  * Тест-кейсы проекта — те же файлы в `.agent/tests/`, что видит панель.
@@ -32,13 +33,24 @@ const RUNS_KEY = 'project-tests-runs';
 const MANUAL_KEY = 'project-tests-manual';
 const POLL_MS = 2000;
 
+/**
+ * 409 — «занято»: прогон уже идёт (запущен в панели или агентом). Экран с
+ * таким отказом устарел и перечитывает состояние, иначе кнопка «Запустить»
+ * упиралась бы в тот же отказ снова.
+ */
+const isConflict = (error: unknown): boolean => error instanceof ApiError && error.status === 409;
+
 export function useProjectTests(projectPath: string | undefined): UseQueryResult<ProjectTestsView> {
   return useQuery({
     queryKey: [KEY, projectPath],
     queryFn: () => api.get<ProjectTestsView>('/project-tests', { path: projectPath }),
     enabled: Boolean(projectPath),
     staleTime: 0,
-    refetchInterval: (query) => (query.state.data?.run?.status === 'running' ? POLL_MS : false),
+    // Прогон агента и прогон автотестов панелью идут порознь — ждём любой.
+    refetchInterval: (query) =>
+      query.state.data?.run?.status === 'running' || query.state.data?.e2eRun?.status === 'running'
+        ? POLL_MS
+        : false,
   });
 }
 
@@ -55,6 +67,9 @@ function useViewMutation<TVariables>(
   return useMutation({
     mutationFn: send,
     onSuccess: (data) => client.setQueryData([KEY, projectPath], data),
+    onError: (error) => {
+      if (isConflict(error)) void client.invalidateQueries({ queryKey: [KEY, projectPath] });
+    },
   });
 }
 
@@ -126,6 +141,21 @@ export function useTestRuns(
 }
 
 /**
+ * Пирамида тестов проекта — только чтение. Сервер обходит весь проект, поэтому
+ * без опроса: экран перечитывает её, когда его тянут вниз.
+ */
+export function useTestPyramid(
+  projectPath: string | undefined,
+): UseQueryResult<ProjectTestPyramid> {
+  return useQuery({
+    queryKey: [KEY, 'pyramid', projectPath],
+    queryFn: () => api.get<ProjectTestPyramid>('/project-tests/pyramid', { path: projectPath }),
+    enabled: Boolean(projectPath),
+    staleTime: 5 * 60_000,
+  });
+}
+
+/**
  * Открытая сессия ручного прогона. `undefined` — её нет, и это НЕ ошибка:
  * экран показывает кнопку «начать», а не пустое место с крутилкой.
  */
@@ -162,6 +192,11 @@ function useManualMutation<TVariables>(
     mutationFn: send,
     onSuccess: (data) => {
       client.setQueryData([MANUAL_KEY, projectPath], data.session);
+      void client.invalidateQueries({ queryKey: [KEY, projectPath] });
+    },
+    onError: (error) => {
+      if (!isConflict(error)) return;
+      void client.invalidateQueries({ queryKey: [MANUAL_KEY, projectPath] });
       void client.invalidateQueries({ queryKey: [KEY, projectPath] });
     },
   });

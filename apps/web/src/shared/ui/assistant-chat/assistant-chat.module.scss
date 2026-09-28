@@ -108,6 +108,22 @@
   gap: var(--spacing-3xs);
 }
 
+// Непринятое из ответа — под отметками полей, тем же отступом.
+.missed {
+  margin-top: var(--spacing-2xs);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3xs);
+  overflow-wrap: anywhere;
+}
+
+// Приложенные картинки — над полем, на фоне поля: они часть того, что уйдёт.
+.attachTray {
+  padding: var(--spacing-xs) var(--spacing-sm) 0;
+  border-top: 1px solid var(--color-border);
+  background-color: var(--color-surface);
+}
+
 .composer {
   display: flex;
   align-items: flex-end;

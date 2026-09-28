@@ -13,6 +13,7 @@ import {
 import { foreignChatKey } from '@agentdeck/contracts/foreign-chat-key';
 import type { ServerContext } from '../context.ts';
 import { initiativePrompt } from '../domains/chat/initiative.ts';
+import { foreignChildExtra } from '../domains/chat/group-run-lines.ts';
 import { checkpointInside, statMtime, type HandoffChains } from '../domains/chat/ChatHandoff.ts';
 import { getActiveProvider } from '../providers/registry.ts';
 import {
@@ -24,7 +25,7 @@ import {
   readChat,
   readChatCascade,
   startForeignHandoff,
-  foreignChatPrefix,
+  foreignContinuationPrefix,
   type ProviderChatService,
   type ProviderChatSubscriber,
 } from '../domains/provider-chat.ts';
@@ -186,14 +187,23 @@ export function registerProviderChatRoutes(
       const child = ctx.store.getChatLink(foreignChatKey(providerId, request.params.id));
       const delivery =
         workdir && !child ? chatDeliveryFor(ctx.store, workdir, { foreign: true }) : undefined;
-      const initiative = initiativePrompt(ctx.store.getSettings(), {
-        foreign: true,
-        // Чат группы делить дальше не предлагается — ни звену, ни ответу
-        // человека в него (живой прогон 25.09: ответ в группу получал
-        // инструкцию разделения, которой у звена нет).
-        ...(child ? { splitMuted: true } : {}),
-        ...(delivery ? { delivery } : {}),
-      });
+      const initiative =
+        [
+          initiativePrompt(ctx.store.getSettings(), {
+            foreign: true,
+            // Чат группы делить дальше не предлагается — ни звену, ни ответу
+            // человека в него (живой прогон 25.09: ответ в группу получал
+            // инструкцию разделения, которой у звена нет).
+            ...(child ? { splitMuted: true } : {}),
+            ...(delivery ? { delivery } : {}),
+          }),
+          // Строки группы звена — те же, что на его старте (`foreignChildExtra`).
+          child
+            ? foreignChildExtra(ctx.store, appData(), foreignChatKey(providerId, request.params.id))
+            : undefined,
+        ]
+          .filter(Boolean)
+          .join(' ') || undefined;
       const outcome = chats.send(
         appData(),
         providerId,
@@ -304,9 +314,13 @@ export function registerProviderChatRoutes(
             ...(input.cascade ? { cascade: input.cascade } : {}),
           })?.id,
         run: (nextId, prompt, header) => {
-          const prefix = header
-            ? foreignChatPrefix(header, ctx.store.getSettings())
-            : initiativePrompt(ctx.store.getSettings(), { foreign: true });
+          // Ребёнок без шапки (дочерний не-план) — тоже звено: «без разделения»
+          // и строки группы, как в send-маршруте выше.
+          const nextKey = foreignChatKey(providerId, nextId);
+          const prefix = foreignContinuationPrefix(header, ctx.store.getSettings(), {
+            linked: Boolean(ctx.store.getChatLink(nextKey)),
+            extra: foreignChildExtra(ctx.store, appData(), nextKey),
+          });
           chats.send(
             appData(),
             providerId,

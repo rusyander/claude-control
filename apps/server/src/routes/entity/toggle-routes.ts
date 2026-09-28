@@ -9,7 +9,7 @@ import {
 } from '../../domains/entity-toggle.ts';
 import { assertSkillId } from '../../domains/skills.ts';
 import { assertMcpServerExists } from '../../domains/mcp.ts';
-import { done } from '../write-result.ts';
+import { done, live } from '../write-result.ts';
 
 /** Включение и выключение любой сущности — один маршрут на все виды. */
 export function registerEntityToggleRoutes(app: FastifyInstance, ctx: ServerContext): void {
@@ -52,6 +52,9 @@ export function registerEntityToggleRoutes(app: FastifyInstance, ctx: ServerCont
       const effective = !ctx.store.isDisabled(kind, id, legacyId);
       const { needsHookRewrite, backupPath } = applyEntityState(deps, kind, id, effective);
 
+      // Скилл — перенос папки из skills/ и обратно: CLI подхватывает его на лету,
+      // как правку и удаление скилла, и «нужен перезапуск» было бы неправдой (F-232).
+      if (kind === 'skill') return live(backupPath);
       // У MCP переключение — перезапись ~/.claude.json с копией: тост называет её.
       return done(needsHookRewrite ? rewriteHooks(deps) : backupPath);
     },

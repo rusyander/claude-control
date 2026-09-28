@@ -1,6 +1,7 @@
 /** Коды текстов сервера, раздел «system»: Система, место конфигурации, удалённый доступ. Сборка всех — `../server-messages.ts`. */
 export const systemMessageParams = {
   'analytics-pricing-refresh-failed': ['failure'],
+  'session-processes-unavailable': [],
   'endpoint-profile-not-found': [],
   'value-too-long': [],
   'remote-settings-invalid': [],

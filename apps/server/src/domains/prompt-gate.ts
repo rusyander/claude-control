@@ -100,13 +100,23 @@ function isLegacyGateHook(hook: Hook): boolean {
  * не зашит: хук читает его из `state.json` в момент срабатывания, поэтому
  * тумблер «Вести журнал» не оставляет на диске устаревший скрипт.
  */
-function expectedScript(location: GateLocation, settings: PromptGateSettings): string {
+function expectedScript(
+  location: GateLocation,
+  settings: PromptGateSettings,
+  language: string,
+): string {
   return buildGateScript({
     rulesPath: join(location.appDataDir, RULES_FILE),
     journalPath: join(location.appDataDir, JOURNAL_FILE),
     statePath: join(location.appDataDir, STATE_FILE),
     action: settings.action,
+    ...(scriptLanguage(language) ? { language: 'en' as const } : {}),
   });
+}
+
+/** Английский скрипт — только при английском интерфейсе; остальное — русский. */
+function scriptLanguage(language: string): 'en' | undefined {
+  return language === 'en' ? 'en' : undefined;
 }
 
 /**
@@ -131,7 +141,16 @@ export function isPanelScript(source: string): boolean {
  */
 const PAST_CORES = new Set(['d3f9e8a3b45bd7b34859a0e3ffd915307148409b7c3c9d0ff47d7e065bf3eb2e']);
 
-const CORE_END = '\n\n/** Ведём ли журнал';
+/** Конец ядра — первый комментарий шаблона; у английского шаблона он свой. */
+const CORE_ENDS = ['\n\n/** Ведём ли журнал', '\n\n/** Whether to keep the journal'];
+
+function coreEndOf(text: string, from: number): number {
+  for (const marker of CORE_ENDS) {
+    const at = text.indexOf(marker, from);
+    if (at >= 0) return at;
+  }
+  return -1;
+}
 
 type ScriptState = 'current' | 'outdated' | 'foreign';
 
@@ -145,12 +164,12 @@ function panelScriptState(source: string): ScriptState {
   return scriptStateAsIs(renamed) === 'foreign' ? 'foreign' : 'outdated';
 }
 
-/** Откуда скрипт читает правила — из его же блока настроек. */
-function scriptRulesPath(source: string): string | undefined {
+/** Блок настроек скрипта — откуда он читает правила и на каком языке говорит. */
+function scriptConfig(source: string): GateScriptConfig | undefined {
   const match = /^const CONFIG = (\{[\s\S]*?\n\});$/m.exec(source);
   if (!match?.[1]) return undefined;
   try {
-    return (JSON.parse(match[1]) as GateScriptConfig).rulesPath;
+    return JSON.parse(match[1]) as GateScriptConfig;
   } catch {
     return undefined;
   }
@@ -170,8 +189,8 @@ function scriptStateAsIs(source: string): ScriptState {
   // Ядро — между блоком настроек и первой функцией шаблона. Всё вокруг обязано
   // совпасть байт в байт: правка руками где угодно ещё остаётся чужой.
   const coreStart = match.index + match[0].length;
-  const coreEnd = source.indexOf(CORE_END, coreStart);
-  const expectedEnd = expected.indexOf(CORE_END, coreStart);
+  const coreEnd = coreEndOf(source, coreStart);
+  const expectedEnd = coreEndOf(expected, coreStart);
   if (coreEnd < 0 || expectedEnd < 0) return 'foreign';
   const core = source.slice(coreStart, coreEnd).trim();
   if (!PAST_CORES.has(createHash('sha256').update(core).digest('hex'))) return 'foreign';
@@ -200,11 +219,15 @@ export function describePromptGate(store: AppStore, location: GateLocation): Pro
     // Свой скрипт устарел и тогда, когда лежит под прежним именем или читает
     // правила из прежнего каталога данных: после переезда тот больше не
     // обновляется, и гейт молча работал бы по застывшему списку.
+    // И тогда, когда он говорит не на языке интерфейса: сообщения гейта человек
+    // читает в CLI, а не в панели, и переключение языка их не переводит.
+    const config = scriptConfig(current ?? '');
     outdated =
       state === 'outdated' ||
       (state === 'current' &&
         (scriptPath === legacyPath ||
-          scriptRulesPath(current ?? '') !== join(location.appDataDir, RULES_FILE)));
+          config?.rulesPath !== join(location.appDataDir, RULES_FILE) ||
+          config?.language !== scriptLanguage(store.getSettings().language)));
   }
 
   let rulesCount = 0;
@@ -263,7 +286,7 @@ export function applyPromptGate(
   }
 
   if (settings.enabled) {
-    const wanted = expectedScript(location, settings);
+    const wanted = expectedScript(location, settings, store.getSettings().language);
     if ((current === undefined || options.force || ours) && current !== wanted) {
       writeTextFile(scriptPath, wanted, { backupDir: options.backupDir });
     }

@@ -20,6 +20,7 @@ import {
   isPlatformDay,
   platformCapabilities,
   platformIdPattern,
+  platformRulesApplies,
   platformThinkingSchema,
   platformToolModes,
 } from '@agentdeck/contracts/platform';
@@ -195,6 +196,9 @@ export const platformObjectSchema = object({
       mcp: boolean().default(true),
       systemPrompt: boolean().default(true),
     }).default(defaultOurRules),
+    // Чьи правила действуют (баг 11б). Без default: нет поля — «оба набора»,
+    // как до выбора; умолчание здесь записало бы выбор, которого человек не делал.
+    applies: zodEnum(platformRulesApplies).optional(),
   }).default(() => ({ platform: defaultPlatformRules(), ours: defaultOurRules() })),
   caCertPath: string(),
   // Как запрос доезжает до контура (DRV-04/05). Схема контракта целиком, а не
@@ -428,6 +432,10 @@ export const importStateSchema = object({
   disabled: record(string(), array(string())),
   disabledByGroup: record(string(), record(string(), array(string()))),
   disabledHooks: record(string(), unknown()),
+  // Текст выключенных правил живёт ТОЛЬКО здесь (в CLAUDE.md его нет): без
+  // ключа импорт снимка стирал бы их навсегда. Форма записей сверяется при
+  // чтении (`disabled-rules.ts`).
+  disabledRules: array(unknown()),
   envByGroup: record(string(), array(string())),
   // Эти четыре поля обязаны быть в схеме, хотя `importState` и так умеет их
   // сливать: zod вырезает всё, чего в схеме нет, — и без них экспорт с одной

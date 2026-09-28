@@ -607,7 +607,7 @@ await page.setViewportSize({ width: 1400, height: 900 });
 tree = TREE;
 
 // --- 12. Понижённые прогоны на аналитике ---------------------------------
-await page.goto(`${BASE}/analytics`, { waitUntil: 'domcontentloaded' });
+await page.goto(`${BASE}/analytics?tab=live`, { waitUntil: 'domcontentloaded' });
 await page.waitForSelector('nav');
 await page.waitForTimeout(1800);
 

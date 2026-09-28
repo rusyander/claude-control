@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type { ProjectTestManualSession, ProjectTestSharedStep } from '@agentdeck/contracts';
 import {
   formatElapsed,
+  nextOpenPoint,
   patchStepResult,
   resolveSteps,
   savedFor,
@@ -175,5 +176,27 @@ describe('toBase64', () => {
     FakeReader.failure = new Error('read failed');
     const file = new File(['x'], 'shot.txt', { type: 'text/plain' });
     await expect(toBase64(file)).rejects.toThrow('read failed');
+  });
+});
+
+/**
+ * После отметки пульт ведёт к следующему НЕОТМЕЧЕННОМУ проходу. Раньше он
+ * шагал на соседний: человек, вернувшийся перепройти пятый из семи, после
+ * отметки попадал на уже закрытый шестой, а не туда, где остановился.
+ */
+describe('nextOpenPoint', () => {
+  const points = ['a', 'b', 'c', 'd'].map((id) => ({ id }));
+  const done = (...ids: string[]) => ids.map((pointId) => ({ pointId }));
+
+  it('после перепрохода ведёт к первому открытому дальше, а не на соседний закрытый', () => {
+    expect(nextOpenPoint(points, done('a', 'b', 'c'), 1)).toBe(3);
+  });
+
+  it('открытых дальше нет — возвращается к первому открытому сначала', () => {
+    expect(nextOpenPoint(points, done('b', 'c', 'd'), 3)).toBe(0);
+  });
+
+  it('всё отмечено — остаётся на месте', () => {
+    expect(nextOpenPoint(points, done('a', 'b', 'c', 'd'), 2)).toBe(2);
   });
 });

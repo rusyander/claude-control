@@ -4,6 +4,7 @@ import { Modal } from '@shared/ui/modal';
 import { Stack } from '@shared/ui/stack';
 import { TabButton } from '@shared/ui/tab-button';
 import { Typography } from '@shared/ui/typography';
+import { serverFieldText } from '@shared/config/i18n';
 import { TestSettingsEnvironments } from './TestSettingsEnvironments';
 import { TestSettingsSteps } from './TestSettingsSteps';
 import { TestSettingsFields } from './TestSettingsFields';
@@ -53,7 +54,7 @@ export function TestSettingsModal({ isOpen, onOpenChange, board }: TestSettingsM
             </Typography>
             {board.libraryIssues.map((issue) => (
               <Typography key={issue.file} variant="caption" as="span">
-                {issue.file} — {issue.error}
+                {issue.file} — {serverFieldText(issue, 'error')}
               </Typography>
             ))}
             <Typography variant="caption" color="subtle" as="span">

@@ -25,8 +25,10 @@ import {
   useDisablePlatform,
   usePlatformApplyPlan,
 } from '@entities/Platform';
+import { appliedFileTargets } from '@features/PlatformEditor';
 import { AppliedTargets } from './AppliedTargets';
 import { ApplyJournal } from './ApplyJournal';
+import { ContourConfig } from './ContourConfig';
 import { GatewayDownLine } from './GatewayDownLine';
 import { SmokeLine } from './SmokeLine';
 import { SmokeToolsLine } from './SmokeToolsLine';
@@ -292,8 +294,7 @@ export function PlatformCard({ status, onEdit }: PlatformCardProps) {
               лживой: занижена и ни одного признака этого на экране. */}
           {(periodSpend.unreportedAnswers ?? 0) > 0 && (
             <Typography variant="caption" color="subtle">
-              {/* TODO код: строка ждёт ключа словаря (`platform.spendUnreported`). */}
-              Ответов без счёта от контура: {periodSpend.unreportedAnswers} — оценка занижена.
+              {t('platform.spendUnreported', { n: periodSpend.unreportedAnswers })}
             </Typography>
           )}
 
@@ -339,6 +340,14 @@ export function PlatformCard({ status, onEdit }: PlatformCardProps) {
             {t('platform.notCheckedText')}
           </Typography>
         )}
+
+        {/* Разделы через контур и чьи правила действуют (баг 11) — здесь, а не
+            только на вкладках: на карточке человек смотрит на контур. */}
+        <ContourConfig
+          status={status}
+          options={plan.data?.consumers}
+          filesApplied={appliedFileTargets(plan.data?.targets ?? []).size > 0}
+        />
 
         {plan.data && (
           <AppliedTargets

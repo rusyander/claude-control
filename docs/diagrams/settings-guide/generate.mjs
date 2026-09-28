@@ -425,6 +425,225 @@ legend(p1, 60, bottomOf(p1) + 60, [
   { caption: 'чего не происходит', edgeColour: FLOW.back, dashed: true },
 ]);
 
+// ─── Страница: фоновый наблюдатель ─────────────────────────────────────────
+//
+// Источник фактов — `apps/server/src/bootstrap/watcher-capture.ts` (что
+// сервер считает проблемой), `apps/web/src/shared/lib/watch-capture` (что
+// страница), `domains/watcher/{fingerprint,events,report,analyzer,watcher}.ts`
+// (склейка, отчёт, разбор, потолок). Числа — значения по умолчанию оттуда же.
+
+const p2 = newPage('Фоновый наблюдатель', 'p2');
+heading(
+  p2,
+  60,
+  30,
+  'Фоновый наблюдатель: от проблемы до раздела отчёта',
+  'Проблема пишется в отчёт сразу, модель сверяет её с кодом позже и пачкой. Одна причина — один раздел, сколько бы раз она ни повторилась.',
+  1240,
+);
+
+// Карточки одного ряда — одной высоты (по самой длинной): иначе низы рваные,
+// и стрелка между соседями уходит ступенькой.
+const row2 = (y, items) => {
+  const h = Math.max(...items.map(([, , w, spec]) => cardH(spec, w)));
+  for (const [id, x, w, spec] of items) card(p2, id, x, y, w, { ...spec, h });
+  return y + h;
+};
+let rowY = row2(150, [
+  [
+    'w:server',
+    AX,
+    AW,
+    {
+      pal: C.group,
+      icon: 'shape=process',
+      iconText: 'srv',
+      title: 'Сервер панели',
+      lines: [
+        'Ответы 5xx; 400 и 422 — тело не прошло схему; 404 на путь без маршрута; 409, повторившийся трижды за минуту.',
+        'Ошибки и предупреждения журнала, ответы дольше 5 с, CLI с ненулевым кодом — с концом его stderr: так приходят и ошибки провайдера.',
+      ],
+    },
+  ],
+  [
+    'w:fp',
+    BX,
+    BW,
+    {
+      pal: C.check,
+      icon: 'shape=hexagon',
+      iconText: 'id',
+      title: 'Одна причина — один раздел',
+      lines: [
+        'Отпечаток = текст без чисел и идентификаторов + место: маршрут у запроса, верхний кадр стека у остального. Откуда пришло — с сервера или со страницы — в отпечаток не входит.',
+        'Повтор — счётчик и время последнего раза, а не новый раздел.',
+      ],
+    },
+  ],
+  [
+    'w:cap',
+    CX,
+    CW,
+    {
+      pal: C.note,
+      title: 'Потолок разборов',
+      lines: [
+        'Не больше 12 разборов в час. Сверх потолка проблемы ждут со статусом «проверяется», карточка говорит об этом словами.',
+        'Нет проблем — нет и вызовов модели.',
+      ],
+    },
+  ],
+]);
+rowY = row2(rowY + 55, [
+  [
+    'w:page',
+    AX,
+    AW,
+    {
+      pal: C.group,
+      icon: 'shape=card',
+      iconText: 'стр',
+      title: 'Страница',
+      lines: [
+        'Ошибки и отказы промисов, падения отрисовки, ошибки и предупреждения консоли.',
+        'Запросы, которых сервер не видел (обрыв сети), HTML вместо JSON, загрузка дольше 30 с.',
+      ],
+    },
+  ],
+  [
+    'w:report',
+    BX,
+    BW,
+    {
+      pal: C.store,
+      icon: 'shape=note;size=14',
+      iconText: 'md',
+      title: 'WATCH-REPORT.md — сразу',
+      lines: [
+        'Раздел появляется со статусом «проверяется» ещё до разбора. Номер WR-n не меняется, сверху — оглавление таблицей.',
+        'Секреты вычищаются до записи. Текст вне меток панель не трогает.',
+      ],
+    },
+  ],
+  [
+    'w:model',
+    CX,
+    CW,
+    {
+      pal: C.cli,
+      icon: 'shape=process',
+      iconText: 'claude',
+      title: 'Разбор пачкой — дешёвая модель',
+      lines: [
+        'Всегда Claude и только Read, Grep, Glob; рабочий каталог — исходники панели, окружение узкое.',
+        'На каждую проблему: статус сверки, файл и строка, причина, шаги, как исправить, важность.',
+      ],
+    },
+  ],
+]);
+row2(rowY + 55, [
+  [
+    'w:not',
+    AX,
+    AW,
+    {
+      pal: C.warn,
+      title: 'Не проблема',
+      lines: [
+        '401, 403 и прочие 4xx — отказ по существу.',
+        'Отказ, уже записанный сервером, страница второй раз не шлёт: сервер помечает ответ заголовком.',
+        'Выключенный наблюдатель не собирает ничего и не тратит токены.',
+      ],
+    },
+  ],
+  [
+    'w:out',
+    BX,
+    BW,
+    {
+      pal: C.human,
+      icon: 'shape=card',
+      iconText: 'вы',
+      title: 'Кому отчёт',
+      lines: [
+        'Файл пересылают разработчику или отдают другому агенту: раздел читается без контекста, на него ссылаются по номеру — «исправлено WR-12».',
+      ],
+    },
+  ],
+  [
+    'w:merge',
+    CX,
+    CW,
+    {
+      pal: C.check,
+      title: 'Слияние и замечания',
+      lines: [
+        'Докажет по коду ту же причину у двух разделов — один вливается в другой.',
+        'До трёх замечаний за ответ: дефекты, замеченные рядом, — отдельные разделы с пометкой «замечание».',
+      ],
+    },
+  ],
+]);
+
+link(p2, 'w:server', 'w:fp', 'сигнал', { colour: FLOW.fwd, exit: [1, 0.3], entry: [0, 0.3] });
+// Серединой просвета между колонками, а не по рамкам карточек.
+const wPage = p2.V.get('w:page');
+const wFp = p2.V.get('w:fp');
+const gapAB = r10((wPage.x + wPage.w + wFp.x) / 2);
+link(p2, 'w:page', 'w:fp', 'сигнал на сервер', {
+  colour: FLOW.fwd,
+  exit: [1, 0.3],
+  entry: [0, 0.8],
+  points: [
+    { x: gapAB, y: wPage.y + 0.3 * wPage.h },
+    { x: gapAB, y: wFp.y + 0.8 * wFp.h },
+  ],
+});
+link(p2, 'w:fp', 'w:report', 'сразу', { colour: FLOW.fwd, exit: [0.5, 1], entry: [0.5, 0] });
+link(p2, 'w:report', 'w:model', 'пачкой', {
+  colour: FLOW.fwd,
+  exit: [1, 0.3],
+  entry: [0, 0.3],
+});
+link(p2, 'w:cap', 'w:model', 'сверх потолка — ждёт', {
+  colour: FLOW.back,
+  dashed: true,
+  exit: [0.5, 1],
+  entry: [0.5, 0],
+});
+link(p2, 'w:model', 'w:merge', 'ответ', { colour: FLOW.fwd, exit: [0.5, 1], entry: [0.5, 0] });
+// Обратное ребро идёт серединой просвета между колонками: без точек роутер
+// прижимал его к рамке «Слияния».
+const wMerge = p2.V.get('w:merge');
+const wRep = p2.V.get('w:report');
+const gapX = r10((wRep.x + wRep.w + wMerge.x) / 2);
+link(p2, 'w:merge', 'w:report', 'разделы на месте', {
+  colour: FLOW.data,
+  exit: [0, 0.5],
+  entry: [1, 0.8],
+  points: [
+    { x: gapX, y: wMerge.cy },
+    { x: gapX, y: wRep.y + 0.8 * wRep.h },
+  ],
+});
+link(p2, 'w:report', 'w:out', 'файл', { colour: FLOW.human, exit: [0.5, 1], entry: [0.5, 0] });
+
+routeEdges(p2);
+legend(p2, 60, bottomOf(p2) + 60, [
+  { caption: 'откуда приходит проблема', fill: C.group.tint, stroke: C.group.line },
+  { caption: 'работа панели', fill: C.check.tint, stroke: C.check.line },
+  { caption: 'файл на диске', fill: C.store.tint, stroke: C.store.line },
+  { caption: 'модель', fill: C.cli.tint, stroke: C.cli.line },
+  { caption: 'предел', fill: C.note.tint, stroke: C.note.line },
+  { caption: 'человек или агент', fill: C.human.tint, stroke: C.human.line },
+  { caption: 'что не считается проблемой', fill: C.warn.tint, stroke: C.warn.line },
+  { caption: 'значок — чья это коробка', fill: '#FFFFFF', stroke: C.panel.line },
+  { caption: 'порядок', edgeColour: FLOW.fwd },
+  { caption: 'кому файл', edgeColour: FLOW.human },
+  { caption: 'кто что пишет', edgeColour: FLOW.data },
+  { caption: 'ожидание', edgeColour: FLOW.back, dashed: true },
+]);
+
 // ─── Вывод ─────────────────────────────────────────────────────────────────
 
 function pageXml(p, width, height) {
@@ -451,12 +670,20 @@ const bounds = (p) => {
   return { w: w + 60, h: h + 60 };
 };
 
-const b1 = bounds(p1);
+const pages = [p1, p2];
 const xml =
   '<mxfile host="app.diagrams.net" version="24.7.7">\n' +
-  `${pageXml(p1, b1.w, b1.h)}\n` +
+  pages
+    .map((p) => {
+      const b = bounds(p);
+      return `${pageXml(p, b.w, b.h)}\n`;
+    })
+    .join('') +
   '</mxfile>\n';
 
 mkdirSync(dirname(OUT), { recursive: true });
 writeFileSync(OUT, xml, 'utf8');
-console.log(`записано ${OUT}: ${b1.w}×${b1.h}, ячеек ${p1.cells.length}`);
+for (const p of pages) {
+  const b = bounds(p);
+  console.log(`записано ${OUT} [${p.name}]: ${b.w}×${b.h}, ячеек ${p.cells.length}`);
+}

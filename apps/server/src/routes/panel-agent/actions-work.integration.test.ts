@@ -148,6 +148,20 @@ describe('panel-agent actions: projects outside chat', () => {
       git('commit', '-m', 'init');
       writeFileSync(join(projectDir, 'a.txt'), 'two\n');
 
+      // Папка вне списка панели — отказ до маршрута git, даже если это репозиторий.
+      const outside = realpathSync(mkdtempSync(join(tmpdir(), 'cc-agent-work-outside-')));
+      try {
+        execFileSync('git', ['init'], { cwd: outside, stdio: 'ignore', windowsHide: true });
+        for (const name of ['project_git_status', 'list_worktrees']) {
+          const refused = (await call(name, { projectPath: outside })).json<PanelActionResult>();
+          expect({ name, outcome: refused.outcome }).toEqual({ name, outcome: 'failed' });
+          expect(refused.message).toContain('not registered');
+        }
+      } finally {
+        rmSync(outside, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+      }
+      store.addProject({ id: 'p-work', name: 'work', path: projectDir });
+
       const status = (
         await call('project_git_status', { projectPath: projectDir })
       ).json<PanelActionResult>();
@@ -171,6 +185,12 @@ describe('panel-agent actions: projects outside chat', () => {
             ['feature', false],
           ]),
         );
+        // Рабочая копия зарегистрированного проекта — своя папка, не чужая.
+        const copyStatus = (
+          await call('project_git_status', { projectPath: copy })
+        ).json<PanelActionResult>();
+        expect(copyStatus.outcome).toBe('done');
+        expect(copyStatus.result).toMatchObject({ isRepo: true, branch: 'feature' });
       } finally {
         git('worktree', 'remove', '--force', copy);
         rmSync(`${projectDir}-worktrees`, { recursive: true, force: true });

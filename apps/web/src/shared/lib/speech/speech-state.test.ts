@@ -26,7 +26,7 @@ describe('nextStateAfterEnd', () => {
 
 describe('о каких ошибках говорим', () => {
   it('нет доступа, нет сети, нет поддержки — объясняем', () => {
-    const kinds: SpeechErrorKind[] = ['no-permission', 'network', 'unsupported'];
+    const kinds: SpeechErrorKind[] = ['no-permission', 'network', 'unsupported', 'no-microphone'];
     expect(kinds.filter(isReportableSpeechError)).toEqual(kinds);
   });
 
@@ -44,6 +44,7 @@ describe('о каких ошибках говорим', () => {
       'network',
       'aborted',
       'unsupported',
+      'no-microphone',
     ];
     const keys = kinds.map(speechErrorMessageKey).filter((key): key is string => key !== null);
 

@@ -4,7 +4,8 @@ import type { historyRu } from '../../ru/topics/history';
 export const historyEn: typeof historyRu = {
   topic: {
     title: 'Change history',
-    summary: 'A feed of configuration edits with a line diff over the backups',
+    summary:
+      'A feed of configuration edits with a line diff over the backups; roll back an edit by returning its block',
     lead:
       'Before every write the panel puts aside a backup of the file. The feed is built ' +
       'from those copies: what changed and when, and how an edit differs from the one ' +
@@ -44,10 +45,11 @@ export const historyEn: typeof historyRu = {
     pathTextText:
       'Any write by the panel into a configuration file starts with a copy: the file, ' +
       'stamped with the time, lands in the backup directory. The feed groups copies by ' +
-      'target file and sorts them by time, working out what changed in each. An ordinary ' +
-      'copy is compared with the previous one; the newest with the current file on disk ' +
-      '(that is the last edit not yet copied, including one made by hand in an editor); ' +
-      'the oldest has no predecessor and nothing to be compared with. The diff is our ' +
+      'target file and sorts them by time, working out what the edit after each one ' +
+      'changed. An ordinary copy is compared with the next one; the newest with the ' +
+      'current file on disk (that is the latest edit, including one made by hand in an ' +
+      'editor); only the last copy of a file that is gone has nothing to be compared with. ' +
+      'The diff is our ' +
       'own and line-based: a very large or binary file is not parsed. Copies of another ' +
       'CLI’s files are visible with the provider’s badge, but reverting from them is ' +
       'refused — their names overlap with Claude’s. Secrets never appear in the feed: ' +
@@ -61,16 +63,18 @@ export const historyEn: typeof historyRu = {
         'entry of its own.',
       traceFeed: 'The feed: what, when, and against what',
       traceFeedText:
-        'Every row is one copy: the file, the time and what it was compared with. ' +
-        '“Against the current file” is the newest copy, that is the latest edit not yet ' +
-        'copied. “First known version” is the oldest copy, which has no predecessor. ' +
-        '“No changes” means a write happened while the content stayed the same.',
+        'Every row is one edit: the file, the time and what the copy taken before it was ' +
+        'compared with. “Against the next copy” is an edit the file changed after again; ' +
+        '“Against the current file” is the file’s latest edit. So every write shows up ' +
+        'exactly once, under its own time. “First known version” appears only when the ' +
+        'file itself is gone. “No changes” means a write happened while the content ' +
+        'stayed the same.',
       traceDiff: 'The diff opens right inside the row',
       traceDiffText:
         'Removed lines in red, added ones in green, the rest of the file as context ' +
         'around them. In the newest copy’s diff (“against the current file”) every block ' +
         'of changes has its own return button: exactly that block comes back, not the ' +
-        'whole edit and not the whole file. Older copies (“against the previous copy”) ' +
+        'whole edit and not the whole file. Older copies (“against the next copy”) ' +
         'show a read-only diff — no block can be returned from it.',
       traceRevert: 'The confirmation says what exactly will happen',
       traceRevertText:
@@ -147,11 +151,11 @@ export const historyEn: typeof historyRu = {
     limitsCaption: 'What the panel answers instead of a diff or a revert — and what to do.',
     limitsColumn: 'What is on screen',
     limitsMeaningColumn: 'Why, and what to do',
-    limitFirst: '“First known version”',
+    limitFirst: '“file deleted — no current version”',
     limitFirstText:
-      'The oldest copy has no predecessor, so there is nothing to compare it with. ' +
-      'Earlier edits either happened before the panel was installed or have already been ' +
-      'pushed out by rotation.',
+      'This is the last copy of a file that is no longer on disk: there is no next copy ' +
+      'and no current file, so nothing to compare it with. The file can be brought back ' +
+      'whole — from Settings.',
     limitSame: '“No changes”',
     limitSameText:
       'The copy matched its neighbour: a write happened while the content stayed the ' +
@@ -166,7 +170,7 @@ export const historyEn: typeof historyRu = {
       'The file is over 512 KB or longer than 5000 lines, or it is binary. The feed stays ' +
       'cheap; block returns are unavailable for such a file too — it can only be restored ' +
       'whole, from the settings.',
-    limitMissing: '“Current file not found”',
+    limitMissing: '“The current file was not found”',
     limitMissingText:
       'The copy exists but the file itself is not on disk — it was deleted or renamed. ' +
       'There is nowhere to return the block to: restore the whole file from the settings.',
@@ -187,10 +191,10 @@ export const historyEn: typeof historyRu = {
     rowMeaningColumn: 'What it means',
     rowFile: 'The file name',
     rowFileText: 'Which configuration file changed. A provider badge means another CLI’s file.',
-    rowAgainst: '“Against the previous copy”',
+    rowAgainst: '“Against the next copy”',
     rowAgainstText:
-      'An ordinary copy: the edit that led to it is shown. This is a view forward in ' +
-      'time, so “+” is what was added right then.',
+      'An ordinary copy: it was taken before an edit, and what that edit did is shown — ' +
+      'up to the next copy of the same file. “+” is what was added right at that time.',
     rowCurrent: '“Against the current file”',
     rowCurrentText:
       'The newest copy is compared with what lies on disk right now. This is where the ' +
@@ -200,7 +204,8 @@ export const historyEn: typeof historyRu = {
       'How many lines this edit added and removed. Zeros are not shown: if nothing was ' +
       'removed, only “+N” stands there.',
     rowFirst: '“First known version”',
-    rowFirstText: 'The oldest copy of the file: it has no predecessor, so it never has a diff.',
+    rowFirstText:
+      'The last copy of a file that is no longer on disk: nothing to compare it with, so it never has a diff.',
     rowProvider: 'The provider badge',
     rowProviderText:
       'A copy of the active CLI’s file. The diff reads, the return button is absent — and ' +
@@ -223,7 +228,10 @@ export const historyEn: typeof historyRu = {
     noteWholeTitle: 'A whole file is returned in Settings',
     noteWholeText:
       'History returns a block. Full restore from a copy, the list of copies and the ' +
-      'rotation depth live in the safety tab of the settings.',
+      'rotation depth live in the safety tab of the settings. The panel agent can ' +
+      'return a whole copy too: its card shows a "now → will be" diff per file (edits ' +
+      'made after the copy go away with the restore) and the copy time in local ' +
+      'time; if the file already matches the copy, there is no card.',
     noteBigTitle: 'Large files are not parsed',
     noteBigText:
       'A file that is too large (over 512 KB or longer than 5000 lines) or binary does ' +
@@ -233,13 +241,13 @@ export const historyEn: typeof historyRu = {
   shots: {
     trace: {
       '01-feed':
-        'A feed of five entries: CLAUDE.md “against the current file” +4 −1, CLAUDE.md “against the previous copy” +3, settings.json +2 −1, “This is the first known version — nothing to compare with”, and .claude.json “no changes”',
+        'A feed of five entries, newest first: CLAUDE.md “vs current file” +4 −1, CLAUDE.md “vs next copy” “no changes”, settings.json “vs current file” +2 −1, CLAUDE.md “vs next copy” +3, and .claude.json “vs current file” +13 −1',
       '02-diff':
-        'The diff of that entry opened: the removed line “Прогонять тесты.” in red, three added ones in green, each block with its own “Return this change” button',
+        'The diff of that entry opened: the removed line “Прогонять тесты.” (“Run the tests.”) in red, three added ones in green, each block with its own “Revert this change” button',
       '03-revert':
-        'The “Return only this change?” dialog: one block comes back, the current state is kept as a separate copy, and the edit takes effect after Claude Code restarts',
+        'The “Revert only this change?” dialog: one block comes back, the current state is kept as a separate copy, and the edit takes effect after Claude Code restarts',
       '04-after':
-        'After the return a new CLAUDE.md entry +1 −1 stands on top of the feed, the one below it now reads “no changes”, and the toast at the bottom names the copy taken — CLAUDE.md with a timestamp and the .bak extension',
+        'After the revert a new CLAUDE.md entry “vs current file” +1 −1 stands on top of the feed; the former top one is now compared “vs next copy” and still shows its own edit +4 −1, and the toast at the bottom names the copy taken — CLAUDE.md with a timestamp and the .bak extension',
     },
   },
 

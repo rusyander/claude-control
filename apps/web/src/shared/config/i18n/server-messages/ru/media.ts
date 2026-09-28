@@ -33,4 +33,8 @@ export const mediaRu: Record<MediaMessageCode, string> = {
   'media-deck-topic-empty': 'назовите тему презентации',
   'media-deck-topic-too-long': 'тема длиннее 4000 знаков',
   'media-block-empty': 'блок пустой',
+  'media-agent-images-invalid': 'картинки в запросе переданы не так, как ждёт панель',
+  'media-agent-images-too-many': 'в одном сообщении не больше {{limit}} картинок',
+  'media-agent-image-too-large': '{{name}} — {{size}} МБ, а картинка агенту уходит до {{limit}} МБ',
+  'media-agent-image-not-image': '{{name}} — не картинка PNG, JPEG, GIF или WebP',
 };

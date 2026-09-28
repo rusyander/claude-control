@@ -6,8 +6,12 @@ export interface Snapshot {
   at: string;
 }
 
-/** Метка «против чего дифф» — переносим её и в ленту, и в полный дифф. */
-export type BaseLabel = 'previous' | 'current' | 'initial';
+/**
+ * Метка «против чего дифф» — переносим её и в ленту, и в полный дифф. `next` —
+ * следующая копия того же файла; `previous` больше не выдаётся (так звалась
+ * прежняя, ошибочная база), но окно и старые кадры справки её ещё знают.
+ */
+export type BaseLabel = 'next' | 'previous' | 'current' | 'initial';
 
 /** Что взято базой сравнения: путь (undefined — базы нет) и метка. */
 export interface DiffBase {

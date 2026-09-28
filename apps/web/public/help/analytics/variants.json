@@ -1,0 +1,225 @@
+{
+  "topic": "analytics",
+  "frames": {
+    "live/01-idle": {
+      "light-ru": {
+        "file": "01-idle.png",
+        "width": 1440,
+        "height": 700
+      },
+      "light-en": {
+        "file": "01-idle.en.png",
+        "width": 1440,
+        "height": 700
+      },
+      "dark-ru": {
+        "file": "01-idle.dark.png",
+        "width": 1440,
+        "height": 700
+      },
+      "dark-en": {
+        "file": "01-idle.dark.en.png",
+        "width": 1440,
+        "height": 700
+      }
+    },
+    "live/02-running": {
+      "light-ru": {
+        "file": "02-running.png",
+        "width": 1440,
+        "height": 700
+      },
+      "light-en": {
+        "file": "02-running.en.png",
+        "width": 1440,
+        "height": 700
+      },
+      "dark-ru": {
+        "file": "02-running.dark.png",
+        "width": 1440,
+        "height": 700
+      },
+      "dark-en": {
+        "file": "02-running.dark.en.png",
+        "width": 1440,
+        "height": 700
+      }
+    },
+    "report/01-today": {
+      "light-ru": {
+        "file": "01-today.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "light-en": {
+        "file": "01-today.en.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-ru": {
+        "file": "01-today.dark.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-en": {
+        "file": "01-today.dark.en.png",
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    "report/02-month": {
+      "light-ru": {
+        "file": "02-month.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "light-en": {
+        "file": "02-month.en.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-ru": {
+        "file": "02-month.dark.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-en": {
+        "file": "02-month.dark.en.png",
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    "report/03-detail": {
+      "light-ru": {
+        "file": "03-detail.png",
+        "width": 700,
+        "height": 640
+      },
+      "light-en": {
+        "file": "03-detail.en.png",
+        "width": 700,
+        "height": 640
+      },
+      "dark-ru": {
+        "file": "03-detail.dark.png",
+        "width": 700,
+        "height": 640
+      },
+      "dark-en": {
+        "file": "03-detail.dark.en.png",
+        "width": 700,
+        "height": 640
+      }
+    },
+    "report/04-hours": {
+      "light-ru": {
+        "file": "04-hours.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "light-en": {
+        "file": "04-hours.en.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-ru": {
+        "file": "04-hours.dark.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-en": {
+        "file": "04-hours.dark.en.png",
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    "report/05-sessions": {
+      "light-ru": {
+        "file": "05-sessions.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "light-en": {
+        "file": "05-sessions.en.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-ru": {
+        "file": "05-sessions.dark.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-en": {
+        "file": "05-sessions.dark.en.png",
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    "report/06-breakdown": {
+      "light-ru": {
+        "file": "06-breakdown.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "light-en": {
+        "file": "06-breakdown.en.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-ru": {
+        "file": "06-breakdown.dark.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-en": {
+        "file": "06-breakdown.dark.en.png",
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    "report/07-session-where": {
+      "light-ru": {
+        "file": "07-session-where.png",
+        "width": 700,
+        "height": 518
+      },
+      "light-en": {
+        "file": "07-session-where.en.png",
+        "width": 700,
+        "height": 518
+      },
+      "dark-ru": {
+        "file": "07-session-where.dark.png",
+        "width": 700,
+        "height": 518
+      },
+      "dark-en": {
+        "file": "07-session-where.dark.en.png",
+        "width": 700,
+        "height": 518
+      }
+    },
+    "report/08-session-stop": {
+      "light-ru": {
+        "file": "08-session-stop.png",
+        "width": 700,
+        "height": 504
+      },
+      "light-en": {
+        "file": "08-session-stop.en.png",
+        "width": 700,
+        "height": 504
+      },
+      "dark-ru": {
+        "file": "08-session-stop.dark.png",
+        "width": 700,
+        "height": 504
+      },
+      "dark-en": {
+        "file": "08-session-stop.dark.en.png",
+        "width": 700,
+        "height": 504
+      }
+    }
+  }
+}

@@ -7,10 +7,12 @@ import { GroupsLimitsSections } from './GroupsLimitsSections';
  * Документ раздела «Группы».
  *
  * Порядок тот же, что у «Правил»: зачем это нужно → чем это НЕ является → как
- * устроено и оба пути в снимках → привязка и старшинство тумблеров → что уходит
- * на диск → поля → границы, тонкости и отмена.
+ * устроено и четыре пути в снимках → пара «глобальная ↔ проектная», привязка и
+ * старшинство тумблеров → что уходит на диск → поля → границы, тонкости и отмена.
  *
- * Два блока стоят между снимками и хранением намеренно. «Привязка к проекту» —
+ * Три блока стоят между снимками и хранением намеренно. Пара — правила о том,
+ * какая сторона действует в проекте и что панель кладёт в репозиторий: на
+ * экране видно одно её состояние, а правила — про все. «Привязка к проекту» —
  * единственная автоматика раздела, и в момент срабатывания на экране не
  * происходит ничего: группа просто оказывается включённой, снять это кадром
  * нечем. «Кто кого перебивает» отвечает на самый частый вопрос раздела —
@@ -39,7 +41,8 @@ export function GroupsTopic() {
         <OptionCards
           items={[
             { title: tr('whyEnv'), text: tr('whyEnvText') },
-            { title: tr('whyBundle'), text: tr('whyBundleText') },
+            { title: tr('whySources'), text: tr('whySourcesText') },
+            { title: tr('whyPath'), text: tr('whyPathText') },
             { title: tr('whySimple'), text: tr('whySimpleText') },
           ]}
         />
@@ -59,6 +62,18 @@ export function GroupsTopic() {
 
       <GroupsGuideSections tr={tr} />
 
+      <HelpSection title={tr('pairTitle')} caption={tr('pairCaption')}>
+        <OptionCards
+          minWidth={320}
+          items={[
+            { title: tr('pairOne'), text: tr('pairOneText') },
+            { title: tr('pairOverride'), text: tr('pairOverrideText') },
+            { title: tr('pairMerge'), text: tr('pairMergeText') },
+            { title: tr('pairClaude'), text: tr('pairClaudeText') },
+          ]}
+        />
+      </HelpSection>
+
       {/* В самом разделе автоматического включения не видно: человек в этот
           момент смотрит в чат. Единственный его след на экране — строка в ленте
           прогона, и у чужого CLI нет даже её. Поэтому — словами. */}
@@ -66,6 +81,7 @@ export function GroupsTopic() {
         <OptionCards
           items={[
             { title: tr('bindProject'), text: tr('bindProjectText') },
+            { title: tr('bindWhen'), text: tr('bindWhenText') },
             { title: tr('bindNotice'), text: tr('bindNoticeText') },
             { title: tr('bindWorktree'), text: tr('bindWorktreeText') },
             { title: tr('bindNoOff'), text: tr('bindNoOffText') },
@@ -94,18 +110,28 @@ export function GroupsTopic() {
               value: '~/.claude/agentdeck/state.json',
               isMono: true,
             },
-            { label: tr('storageEnv'), value: '~/.claude/settings.json → env', isMono: true },
             {
-              label: tr('storageSkill'),
-              value: '~/.claude/skills/scenario-<название>/',
+              label: tr('storagePairs'),
+              value: '~/.claude/agentdeck/group-sources.json',
               isMono: true,
             },
+            {
+              label: tr('storageDiscovery'),
+              value: '~/.claude/agentdeck/group-discovery.json',
+              isMono: true,
+            },
+            {
+              label: tr('storageSummaries'),
+              value: '~/.claude/agentdeck/summaries.json',
+              isMono: true,
+            },
+            { label: tr('storageOverride'), value: tr('storageOverrideValue') },
+            { label: tr('storageEnv'), value: '~/.claude/settings.json → env', isMono: true },
             {
               label: tr('storageHooks'),
               value: '~/.claude/settings.json → hooks',
               isMono: true,
             },
-            { label: tr('storageMarker'), value: tr('storageMarkerValue') },
             { label: tr('storageDisabled'), value: tr('storageDisabledValue') },
           ]}
         />
@@ -124,18 +150,19 @@ export function GroupsTopic() {
               badgeTone: 'accent',
             },
             { name: 'description', description: tr('fieldDescription') },
+            { name: 'when', description: tr('fieldWhen') },
             { name: 'members', description: tr('fieldMembers') },
             { name: 'env', description: tr('fieldEnv') },
             { name: 'projectPaths', description: tr('fieldProjectPaths') },
-            { name: 'scenario.steps', description: tr('fieldSteps') },
-            { name: 'scenario.trigger', description: tr('fieldScenarioTrigger') },
-            { name: 'trigger', description: tr('fieldTrigger') },
-            { name: 'action', description: tr('fieldAction') },
+            { name: 'scope', description: tr('fieldScope') },
             {
-              name: 'compiledHookId',
-              description: tr('fieldCompiled'),
+              name: 'origin',
+              description: tr('fieldOrigin'),
               badge: t('help.common.readOnly'),
             },
+            { name: 'flow', description: tr('fieldFlow') },
+            { name: 'path.steps', description: tr('fieldPathSteps') },
+            { name: 'knobs', description: tr('fieldKnobs') },
           ]}
         />
       </HelpSection>

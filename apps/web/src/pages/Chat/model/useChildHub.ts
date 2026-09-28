@@ -192,6 +192,10 @@ export function useChildHub(
     pause.mutate(parentChatId, {
       onSuccess: (result) => {
         toast.success(t('chat.cascade.tree.pausedToast', { count: result.stopped }));
+        // Процесс жив, номер нечем проверить (F-145): «остановлено» было бы неправдой.
+        if (result.unconfirmed > 0) {
+          toast.warning(t('chat.cascade.tree.notStoppedToast', { count: result.unconfirmed }));
+        }
         settle();
       },
       onError: fail,

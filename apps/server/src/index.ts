@@ -5,10 +5,12 @@ import { allowedOrigins } from './lib/origin-guard.ts';
 import { readApiToken } from './lib/api-token.ts';
 import { registerAccessGate } from './lib/access-gate.ts';
 import { createConfigWatcher } from './lib/config-watcher.ts';
+import { appStateDomains } from './lib/app-state-events.ts';
 import { registerEmptyBodyGuard } from './lib/empty-body.ts';
 import { registerCodedErrors } from './lib/server-text.ts';
 import { detectProviders } from './providers/detect.ts';
 import { autostartProjects } from './domains/project-runner.ts';
+import { isProjectOrCopy } from './domains/project-tests.ts';
 import { buildDlpRuntime } from './domains/dlp.ts';
 import { gatewayPricing } from './domains/platform/spend.ts';
 import { reconcileActivePlatform } from './domains/platform/activation.ts';
@@ -16,6 +18,7 @@ import { startSandboxHousekeeping } from './domains/sandbox/SandboxConfig.ts';
 import { createRuntime, installShutdownHandlers } from './bootstrap/runtime.ts';
 import { buildRouteTable } from './bootstrap/route-table.ts';
 import { startupBanner } from './bootstrap/banner.ts';
+import { createWatchCapture } from './bootstrap/watcher-capture.ts';
 
 /**
  * Сборка сервера: гейт доступа, долгоживущие объекты, таблица маршрутов,
@@ -31,7 +34,14 @@ const HOST = '127.0.0.1'; // только локально: приложение
 const ALLOWED_ORIGINS = allowedOrigins(WEB_PORT);
 
 const ctx = new ServerContext();
-const app = Fastify({ logger: { level: 'warn' } });
+// Журнал идёт через перехват фонового наблюдателя: в stdout всё как раньше, а
+// ошибка кода панели становится сигналом, пока тумблер наблюдателя включён.
+const watchCapture = createWatchCapture();
+const app = Fastify({
+  logger: { level: 'warn', stream: watchCapture.logStream },
+  // Ключ находки групп несёт путь проекта: глубокая папка Windows за 100 знаков давала 414 при импорте.
+  routerOptions: { maxParamLength: 2048 },
+});
 
 // Два рубежа до маршрутов и до CORS: Origin и — при включённом удалённом
 // доступе — токен. Тумблер читается на каждый запрос: он меняется на лету.
@@ -50,8 +60,13 @@ registerEmptyBodyGuard(app);
 // Ошибка с кодом текста, не пойманная маршрутом, уезжает с кодом (`server-text.ts`).
 registerCodedErrors(app);
 
+// Ответы 5xx — сигнал фоновому наблюдателю. Хук до маршрутов: добавленный
+// позже, он бы к ним не применился.
+watchCapture.registerHooks(app);
+
 // Объекты, живущие дольше запроса, — только отсюда их можно погасить при выходе.
 const runtime = createRuntime(ctx, `http://${HOST}:${PORT}`);
+watchCapture.attach(runtime.watcher);
 
 // Состояние читается на каждый sync, а не замыкается: и настройки, и
 // расположение подменяются целиком при смене каталога (`ctx.relocate`).
@@ -69,8 +84,17 @@ const configWatcher = createConfigWatcher({
  * следилкой по ПРЕЖНЕМУ каталогу после переезда. Хук объявлен до маршрутов:
  * добавленный позже, он бы к ним не применился.
  */
-app.addHook('onResponse', (request, _reply, done) => {
-  if (request.method !== 'GET') configWatcher.sync();
+app.addHook('onResponse', (request, reply, done) => {
+  if (request.method !== 'GET') {
+    configWatcher.sync();
+    // Папки e2e — по тому же поводу: проект добавили или убрали из реестра,
+    // тумблер наблюдения переключили.
+    runtime.e2eWatch.sync();
+    // Собственное состояние панели (настройки, группы, выбор группы) — на тот же
+    // поток событий: иначе соседняя вкладка и телефон видят его только после F5.
+    const domains = appStateDomains(request.method, request.url, reply.statusCode);
+    if (domains.length > 0) runtime.events.broadcast(domains, '');
+  }
   done();
 });
 
@@ -96,6 +120,10 @@ installShutdownHandlers(runtime);
 
 await app.listen({ port: PORT, host: HOST });
 
+// Папки e2e проектов ищутся обходом каждого проекта — после подъёма слушателя,
+// чтобы готовность API не ждала обхода.
+setImmediate(() => runtime.e2eWatch.sync());
+
 // Прогрев кеша поиска CLI: первый `where`/`which` по всем провайдерам блокирует
 // цикл событий ~1,5 с — лучше сразу после старта, чем на первом запросе панели.
 setImmediate(() => {
@@ -109,8 +137,14 @@ setImmediate(() => {
 // Цели с включённым тумблером автозапуска поднимаются сами и БЕЗ браузера —
 // панель уже открыта там, где нужно.
 // Слушатель к этому моменту принят, так что медленный dev-сервер не задержит
-// готовность API.
-const autostarted = await autostartProjects(runtime.projectRunner, ctx.store);
+// готовность API. Граница та же, что у ручного запуска: отметка у каталога вне
+// проектов панели его команду не исполняет (F-16).
+const autostarted = await autostartProjects(runtime.projectRunner, ctx.store, (path) =>
+  isProjectOrCopy(
+    path,
+    ctx.store.getProjects().map((project) => project.path),
+  ),
+);
 
 // Прокси защиты данных поднимается сам, если он включён: CLI уже настроен на
 // его адрес, и молчаливое «панель перезапустилась, прокси не поднялся» означало

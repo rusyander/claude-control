@@ -41,8 +41,12 @@ const {
 
 const PANEL_AGENT_HEADER = 'x-agentdeck-agent';
 const PANEL_ACTION_CONFIRM_TIMEOUT_MS = 10 * 60_000;
-/** Вызов ждёт клика человека: запас сверху, чтобы исход таймаута пришёл от панели. */
-const CALL_TIMEOUT_MS = PANEL_ACTION_CONFIRM_TIMEOUT_MS + 30_000;
+/**
+ * Вызов ждёт клика человека: запас сверху, чтобы исход таймаута пришёл от панели.
+ * Переопределение — только для теста честного «исход неизвестен».
+ */
+const CALL_TIMEOUT_MS =
+  Number(brandEnv('BRIDGE_CALL_TIMEOUT_MS')) || PANEL_ACTION_CONFIRM_TIMEOUT_MS + 30_000;
 const LIST_TIMEOUT_MS = 15_000;
 /** Ответ маршрута модели — обрезанным: огромный список съел бы весь ход. */
 const RESULT_LIMIT = 20_000;
@@ -62,6 +66,13 @@ function panelToken() {
   } catch {
     return '';
   }
+}
+
+/** Запрос не ушёл вовсе: соединения не было или адрес негодный (fetch: «bad port»). */
+function connectionRefused(error) {
+  const cause = (error && error.cause) || {};
+  if (['ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN'].includes(cause.code)) return true;
+  return !cause.code && /bad port|invalid url/i.test(String(cause.message));
 }
 
 function say(text) {
@@ -89,10 +100,22 @@ async function call(method, path, body, timeout) {
       signal: AbortSignal.timeout(timeout),
     });
   } catch (error) {
-    const reason = error && error.name === 'TimeoutError' ? 'no answer in time' : String(error);
+    // «Ничего не сделано» верно, только когда соединения не было. Таймаут и обрыв
+    // приходят, когда панель уже взяла запрос: одобренное поздно действие могло
+    // выполниться, и «панель не запущена» было бы неправдой.
+    if (connectionRefused(error)) {
+      return {
+        ok: false,
+        message: `The agentdeck panel at ${BASE} is unreachable (${String(error)}). Nothing was done. Tell the human the panel is not running.`,
+      };
+    }
+    const reason =
+      error && error.name === 'TimeoutError'
+        ? `no answer within ${Math.round(timeout / 1000)} s`
+        : String(error);
     return {
       ok: false,
-      message: `The agentdeck panel at ${BASE} is unreachable (${reason}). Nothing was done. Tell the human the panel is not running.`,
+      message: `The panel took the request but gave no outcome (${reason}). The outcome is UNKNOWN: the action may have run. Read the current state first; do not retry blindly, and tell the human.`,
     };
   }
   // Тело под `try`: панель под `node --watch` может перезапуститься посреди ответа.
@@ -121,7 +144,9 @@ async function call(method, path, body, timeout) {
 function clip(value) {
   const text = typeof value === 'string' ? value : JSON.stringify(value, null, 1);
   if (text === undefined) return '';
-  return text.length > RESULT_LIMIT ? `${text.slice(0, RESULT_LIMIT)}\n…(truncated)` : text;
+  return text.length > RESULT_LIMIT
+    ? `${text.slice(0, RESULT_LIMIT)}\n…(truncated: ${RESULT_LIMIT} of ${text.length} chars shown; ask for a narrower read)`
+    : text;
 }
 
 /** Исход действия — предложением для модели. */
@@ -141,8 +166,16 @@ function renderOutcome(result) {
     case 'cancelled':
       return say('The call was cancelled before the human decided. Nothing was executed.');
     case 'needs-secret':
+      // Проекция без секрета (id черновика, имя сервера, поле ключа) нужна модели
+      // для следующего шага, и сообщение панели говорит, что перечитать.
       return say(
-        `A secret is needed. The panel opened its own secret field for the human${result.page ? ` (${result.page.route})` : ''}. Wait for the human; never ask for the key in chat.`,
+        [
+          `A secret is needed. The panel opened its own secret field for the human${result.page ? ` (${result.page.route})` : ''}. Wait for the human; never ask for the key in chat.`,
+          result.message ?? '',
+          clip(result.result),
+        ]
+          .filter(Boolean)
+          .join('\n'),
       );
     case 'invalid':
       return refuse(`Input rejected by the action schema: ${result.message ?? 'invalid input'}`);

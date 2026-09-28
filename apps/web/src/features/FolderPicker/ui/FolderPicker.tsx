@@ -50,6 +50,7 @@ export function FolderPicker({
       title={title ?? t('folderPicker.title')}
       description={hint ?? t('folderPicker.hint')}
       size="md"
+      bodyFill
       footer={
         <Stack
           direction="row"
@@ -81,48 +82,53 @@ export function FolderPicker({
         </Stack>
       }
     >
-      <Stack direction="row" wrap gap="var(--spacing-2xs)" className={styles.roots}>
-        {roots.data?.map((root) => (
-          <button
-            key={root.path}
-            type="button"
-            className={styles.chip}
-            onClick={() => setCurrent(root.path)}
-          >
-            {root.name}
-          </button>
-        ))}
-        {parent && (
-          <button type="button" className={styles.chip} onClick={() => setCurrent(parent)}>
-            <Icon name="chevronLeft" size={14} /> {t('folderPicker.up')}
-          </button>
-        )}
-      </Stack>
+      {/* Корни и «вверх» стоят на месте, прокручивается только список папок. */}
+      <div className={styles.pane}>
+        <Stack direction="row" wrap gap="var(--spacing-2xs)" className={styles.roots}>
+          {roots.data?.map((root) => (
+            <button
+              key={root.path}
+              type="button"
+              className={styles.chip}
+              onClick={() => setCurrent(root.path)}
+            >
+              {root.name}
+            </button>
+          ))}
+          {parent && (
+            <button type="button" className={styles.chip} onClick={() => setCurrent(parent)}>
+              <Icon name="chevronLeft" size={14} /> {t('folderPicker.up')}
+            </button>
+          )}
+        </Stack>
 
-      <div className={styles.list}>
-        {isLoading && <SkeletonList rows={6} withActions={false} />}
+        <div className={styles.list}>
+          {isLoading && <SkeletonList rows={6} withActions={false} />}
 
-        {!isLoading && entries.length === 0 && (
-          <Typography variant="body-sm" color="subtle" className={styles.empty}>
-            {t('folderPicker.empty')}
-          </Typography>
-        )}
-
-        {entries.map((entry) => (
-          <button
-            key={entry.path}
-            type="button"
-            className={styles.item}
-            onClick={() => (entry.isFile ? onPick(entry.path, entry.name) : setCurrent(entry.path))}
-            title={entry.path}
-          >
-            <Icon name={entry.isFile ? 'file' : 'folder'} size={18} />
-            <Typography variant="body-sm" as="span" truncate>
-              {entry.name}
+          {!isLoading && entries.length === 0 && (
+            <Typography variant="body-sm" color="subtle" className={styles.empty}>
+              {t('folderPicker.empty')}
             </Typography>
-            {!entry.isFile && <Icon name="chevronRight" size={16} />}
-          </button>
-        ))}
+          )}
+
+          {entries.map((entry) => (
+            <button
+              key={entry.path}
+              type="button"
+              className={styles.item}
+              onClick={() =>
+                entry.isFile ? onPick(entry.path, entry.name) : setCurrent(entry.path)
+              }
+              title={entry.path}
+            >
+              <Icon name={entry.isFile ? 'file' : 'folder'} size={18} />
+              <Typography variant="body-sm" as="span" truncate>
+                {entry.name}
+              </Typography>
+              {!entry.isFile && <Icon name="chevronRight" size={16} />}
+            </button>
+          ))}
+        </div>
       </div>
     </Modal>
   );

@@ -2,9 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useRouterState } from '@tanstack/react-router';
 import { useQueryClient } from '@tanstack/react-query';
+import type { AgentImage } from '@agentdeck/contracts/agent-images';
 import type { PanelPendingAction } from '@agentdeck/contracts/panel-agent';
 import {
   buildPageContext,
+  contextProject,
   isPreviewTruncatedRefusal,
   isSecretAnchor,
   pageNavigation,
@@ -15,15 +17,19 @@ import {
   withPending,
   withoutPending,
 } from '@entities/PanelAgent';
-import { fetchProjectRegistry } from '@entities/Project';
+import { fetchProjectRegistry, readTestsProjectId, useTestsProject } from '@entities/Project';
+import { requestComposerMode } from '@entities/Media';
 import { queryKeys } from '@shared/api/query-keys';
 import { toErrorMessage } from '@shared/api/client';
 import { useWorkspace } from '@shared/lib/workspace';
 import { Icon } from '@shared/ui/icon';
 import { usePanelAgentSession } from '../model/usePanelAgentSession';
+import { focusAfterSideDock } from '@shared/lib/side-dock';
 import { focusAnchor, focusWindow, isFocusFree, watchTyping } from '../model/focusAnchor';
 import { actionTitle } from '../model/actionTitle';
 import { sectionQueryKeys } from '../model/sectionKeys';
+import { outcomeMayHaveWritten } from '../model/outcomeWrites';
+import { pendingOpensWindow, sealNoteFrom } from '../model/conversation';
 import { PanelAgentWindow } from './PanelAgentWindow';
 import type { PanelAgentLauncherProps } from './PanelAgentLauncher.types';
 import styles from './PanelAgent.module.scss';
@@ -41,6 +47,16 @@ export function PanelAgentLauncher({ isCollapsed = false }: PanelAgentLauncherPr
   const queryClient = useQueryClient();
   const location = useRouterState({ select: (state) => state.location });
   const { activeProject, openProject } = useWorkspace();
+  const testsProjects = useTestsProject();
+  // Проект раздела тестирования читается в момент вызова: выбор меняют на самой
+  // странице, а у этой копии хука своё состояние.
+  const pageProjectNow = () =>
+    contextProject(
+      location.pathname,
+      activeProject,
+      testsProjects.projects.find((project) => project.id === readTestsProjectId()) ??
+        testsProjects.selected,
+    );
   const [isOpen, setIsOpen] = useState(false);
   const [focusRequest, setFocusRequest] = useState(0);
   const panelRef = useRef<HTMLElement | null>(null);
@@ -61,10 +77,28 @@ export function PanelAgentLauncher({ isCollapsed = false }: PanelAgentLauncherPr
       runFailed: (message: string) => t('panelAgent.runFailed', { message }),
       refusal: (code: string) =>
         i18n.exists(`panelAgent.refusal.${code}`) ? t(`panelAgent.refusal.${code}`) : undefined,
+      interruptedByReload: t('panelAgent.interruptedByReload'),
+      streamLost: t('panelAgent.streamLost'),
+      staleReloaded: (text: string) => t('panelAgent.staleReloaded', { text }),
+      deletedElsewhere: (text: string) => t('panelAgent.deletedElsewhere', { text }),
+      sealNote: sealNoteFrom({
+        actions: (list) => t('panelAgent.sealed.actions', { list }),
+        failed: (name) => t('panelAgent.sealed.failed', { name }),
+        notFinished: (reason) => t('panelAgent.sealed.notFinished', { reason }),
+        reason: {
+          restart: t('panelAgent.sealed.reason.restart'),
+          stopped: t('panelAgent.sealed.reason.stopped'),
+          timeout: t('panelAgent.sealed.reason.timeout'),
+          failed: t('panelAgent.sealed.reason.failed'),
+        },
+      }),
     }),
     [t, i18n],
   );
-  const session = usePanelAgentSession(texts);
+  const session = usePanelAgentSession(texts, {
+    // Ход оборвала перезагрузка: окно открывается само, иначе о нём не узнать.
+    onInterruptedRestore: () => setIsOpen(true),
+  });
   const { data: pending = [] } = usePanelAgentPending();
   const decide = useDecidePanelAction();
 
@@ -90,7 +124,8 @@ export function PanelAgentLauncher({ isCollapsed = false }: PanelAgentLauncherPr
   usePanelAgentEvents((event) => {
     if (event.type === 'agent-pending') {
       setPending((list) => withPending(list, event.pending));
-      setIsOpen(true);
+      // Чужая карточка окно не открывает — только значок (см. `pendingOpensWindow`).
+      if (pendingOpensWindow(event.pending, session.isOwn)) setIsOpen(true);
       return;
     }
     if (event.type === 'agent-decided') {
@@ -99,12 +134,14 @@ export function PanelAgentLauncher({ isCollapsed = false }: PanelAgentLauncherPr
         ?.find((item) => item.id === event.id);
       setPending((list) => withoutPending(list, event.id));
       dropDeciding(event.id);
+      // Строка итога — в разговор карточки; данные перечитывает каждая вкладка.
+      const own = card !== undefined && session.isOwn(card.conversationId);
       // Причина исхода по коду (`stale_preview`): одобренное не выполнено, и
       // строка «ошибка маршрута» рядом с причиной отправила бы человека искать
       // поломку панели — показываем только причину.
       const reason = actionMessageText(event.messageCode);
-      if (reason) session.note(reason, 'error');
-      else if (card) {
+      if (own && reason) session.note(reason, 'error');
+      else if (own && card) {
         session.note(
           t('panelAgent.decidedLine', {
             name: actionTitle(card.name, t, (key) => i18n.exists(key)),
@@ -112,10 +149,10 @@ export function PanelAgentLauncher({ isCollapsed = false }: PanelAgentLauncherPr
           }),
         );
       }
-      // Правка агента прошла — открытая страница перечитывает свой раздел.
+      // Правка агента могла записать — открытая страница перечитывает свой раздел.
       // Наблюдатель файлов видит не всякую запись (реестр проектов, контур), и
       // без этого страница стояла бы на старом снимке до F5.
-      if (event.outcome === 'done' || event.outcome === 'needs-secret') {
+      if (outcomeMayHaveWritten(event.outcome)) {
         for (const queryKey of sectionQueryKeys(event.section)) {
           void queryClient.invalidateQueries({ queryKey });
         }
@@ -127,9 +164,24 @@ export function PanelAgentLauncher({ isCollapsed = false }: PanelAgentLauncherPr
     // разговор идёт дальше. `focus` у чата и тестов — часть адреса (`?id=`,
     // `?tab=`), у прочих — якорь, и фокус уходит в него, когда страница его
     // дорисует. Прежнее ожидание снимается: следующий переход главнее.
+    // Экран уводит только разговор этого окна: чужая вкладка или телефон — нет.
+    if (!session.isOwn(event.conversationId)) return;
     const target = pageNavigation(event.page);
     agentFocusRef.current?.cancel();
     agentFocusRef.current = undefined;
+    // Режим заказываем ДО перехода: страница чата может смонтироваться только
+    // после него и заберёт просьбу при монтировании.
+    if (target.composerMode) requestComposerMode(target.composerMode);
+    // Метка в состоянии истории — каждый показ отдельный переход: повтор того же
+    // адреса роутер иначе глотал (тот же URL и то же состояние — только
+    // перезагрузка данных), и страница не снимала фильтры и не докручивала
+    // список к строке второй раз (F-239). Страницы узнают показ по ключу записи.
+    const go = (): void =>
+      void navigate({
+        to: target.to,
+        search: target.search,
+        state: { agentOpenAt: Date.now() },
+      } as never);
     if (target.project) {
       // Проект чата — вкладка рабочего места: сначала открываем её, потом чат,
       // и страница чата сама заводит черновик нового разговора в этом проекте.
@@ -143,11 +195,16 @@ export function PanelAgentLauncher({ isCollapsed = false }: PanelAgentLauncherPr
           if (project) openProject(project.path, project.name);
         })
         .catch(() => undefined)
-        .finally(() => void navigate({ to: target.to, search: target.search } as never));
+        .finally(go);
     } else {
-      void navigate({ to: target.to, search: target.search } as never);
+      go();
     }
-    session.note(t('panelAgent.openedPage', { route: event.page.route }));
+    // Режим композера — просьба странице, а не часть адреса: в строке его нет.
+    session.note(
+      t('panelAgent.openedPage', {
+        route: target.composerMode ? target.to : event.page.route,
+      }),
+    );
     if (target.anchor) {
       const watch: { route: string; cancel: () => void; returnToWindow: boolean } = {
         route: target.to,
@@ -198,7 +255,7 @@ export function PanelAgentLauncher({ isCollapsed = false }: PanelAgentLauncherPr
     if (agentFocusRef.current) agentFocusRef.current.returnToWindow = false;
     // Фокус был в окне — возвращаем на кнопку, откуда в окно приходят. Стоял на
     // странице — не трогаем.
-    if (isFocusFree()) triggerRef.current?.focus();
+    if (isFocusFree()) focusAfterSideDock(triggerRef.current);
   };
 
   // Escape на странице, пока окно открыто. Фокус потерян (карточку сняли, узел
@@ -246,15 +303,16 @@ export function PanelAgentLauncher({ isCollapsed = false }: PanelAgentLauncherPr
     );
   };
 
-  const onSend = (text: string): void => {
+  const onSend = (text: string, images: AgentImage[]): void => {
     void session.send(
       text,
       buildPageContext({
         pathname: location.pathname,
         searchStr: location.searchStr,
         title: labelKey ? t(labelKey) : undefined,
-        projectPath: activeProject?.path,
+        projectPath: pageProjectNow()?.path,
       }),
+      images,
     );
   };
 
@@ -295,7 +353,8 @@ export function PanelAgentLauncher({ isCollapsed = false }: PanelAgentLauncherPr
           )}
           {session.state.running && <span className={styles.runningDot} aria-hidden="true" />}
         </span>
-        <span className={styles.label}>{title}</span>
+        {/* Свёрнутая панель уже подписи: первая буква торчала у её края («А»). */}
+        {!isCollapsed && <span className={styles.label}>{title}</span>}
       </button>
       <span className={styles.srOnly} role="status">
         {pending.length > 0 ? t('panelAgent.pendingBadge', { count: pending.length }) : ''}
@@ -313,7 +372,7 @@ export function PanelAgentLauncher({ isCollapsed = false }: PanelAgentLauncherPr
         approveRefused={approveRefused}
         onDecide={onDecide}
         pageLabel={pageLabel}
-        projectLabel={activeProject?.name}
+        projectLabel={pageProjectNow()?.name}
         onSend={onSend}
       />
     </>

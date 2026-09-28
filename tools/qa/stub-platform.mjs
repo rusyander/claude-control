@@ -744,6 +744,8 @@ export function startStubPlatform({
   const field = (name) => `${vendorPrefix}_${name}`;
   /** След вызовов: свип проверяет по нему, ЧТО именно ушло наверх. */
   const calls = [];
+  /** Сессии опубликованных агентов: id сессии → агент → реплики. */
+  const agentSessions = new Map();
 
   const server = createServer(async (request, response) => {
     const url = new URL(request.url ?? '/', 'http://stub');
@@ -793,6 +795,61 @@ export function startStubPlatform({
         return;
       }
       sendJson(response, 200, { created: 1, data: [{ b64_json: png }] });
+      return;
+    }
+
+    // Опубликованные агенты платформы компании (`agent/completions`,
+    // `agent/sessions/<id>`) и эмбеддинги: форма провода та, что разбирают
+    // `domains/platform/agents.ts` и `embeddings.ts`. Агент отвечает эхом
+    // последней реплики, сессия живёт в памяти стаба, вектор — длина текста и
+    // его номер, чтобы проверка видела, какой вектор к какому тексту.
+    const agentSession = /\/agent\/sessions\/([^/]+)$/.exec(url.pathname);
+    if (agentSession) {
+      const id = decodeURIComponent(agentSession[1]);
+      if (request.method === 'DELETE') {
+        agentSessions.delete(id);
+        sendJson(response, 200, { ok: true });
+        return;
+      }
+      const only = url.searchParams.get('agent');
+      const records = [...(agentSessions.get(id)?.entries() ?? [])]
+        .filter(([agent]) => !only || agent === only)
+        .map(([agent, messages]) => ({ agent_id: agent, messages }));
+      sendJson(response, 200, { sessions: records });
+      return;
+    }
+    if (url.pathname.endsWith('/agent/completions') && request.method === 'POST') {
+      const agent = String(json.agent ?? '');
+      const messages = Array.isArray(json.messages) ? json.messages : [];
+      const asked = String(messages.at(-1)?.content ?? '');
+      const content = `${agent}: ${asked}`;
+      if (typeof json.session === 'string') {
+        const session = agentSessions.get(json.session) ?? new Map();
+        session.set(agent, [
+          ...(session.get(agent) ?? []),
+          ...messages,
+          { role: 'assistant', content },
+        ]);
+        agentSessions.set(json.session, session);
+      }
+      sendJson(response, 200, {
+        choices: [{ index: 0, message: { role: 'assistant', content }, finish_reason: 'stop' }],
+        ...(typeof json.session === 'string' ? { session_recorded: true } : {}),
+      });
+      return;
+    }
+    if (url.pathname.endsWith('/embeddings') && request.method === 'POST') {
+      const input = Array.isArray(json.input) ? json.input : [json.input];
+      sendJson(response, 200, {
+        object: 'list',
+        model: json.model,
+        data: input.map((item, index) => ({
+          object: 'embedding',
+          index,
+          embedding: [String(item).length, index, 0, 0, 0, 0, 0, 1],
+        })),
+        usage: { prompt_tokens: input.length * 3, total_tokens: input.length * 3 },
+      });
       return;
     }
 

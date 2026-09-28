@@ -65,6 +65,26 @@ export function PanelAgentTopic() {
         />
       </HelpSection>
 
+      {/* Строки с ключами `links*` агент получает в системном промпте дословно —
+          человек и агент читают один и тот же текст о связях разделов. */}
+      <HelpSection title={tr('linksTitle')} caption={tr('linkCaption')}>
+        <FieldTable
+          nameHeader={tr('linkTableName')}
+          descriptionHeader={tr('linkTableWhat')}
+          rows={[
+            row('linksMap'),
+            row('linksChat'),
+            row('linksConfig'),
+            row('linksTests'),
+            row('linksGroupWord'),
+            row('linksRulesWord'),
+            row('linksYours'),
+            row('linksLong'),
+            row('linksInside'),
+          ]}
+        />
+      </HelpSection>
+
       <HelpSection title={tr('actionsTitle')} caption={tr('actionsCaption')}>
         <FieldTable
           nameHeader={tr('actionsSection')}
@@ -86,10 +106,18 @@ export function PanelAgentTopic() {
             riskyRow('secSettings'),
             riskyRow('secEndpoints'),
             riskyRow('secIntegrations'),
-            changeRow('secDlp'),
+            riskyRow('secDlp'),
             riskyRow('secContour'),
             riskyRow('secTests'),
             readRow('secHelp'),
+            riskyRow('secProjectConfig'),
+            riskyRow('secProjectGit'),
+            riskyRow('secProjectRunner'),
+            riskyRow('secChatSession'),
+            dangerRow('secSandbox'),
+            riskyRow('secContourAgents'),
+            riskyRow('secChats'),
+            riskyRow('secAnalyticsPortability'),
           ]}
         />
       </HelpSection>

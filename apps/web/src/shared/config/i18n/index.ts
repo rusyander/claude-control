@@ -12,3 +12,5 @@ export {
 } from './server-message';
 export { hasHelp, loadHelp } from './help-loader';
 export { useHelpDictionary } from './useHelpDictionary';
+export { presetText } from './preset-text';
+export type { PresetArea } from './preset-text';

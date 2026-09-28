@@ -59,6 +59,22 @@ const QUARANTINE = {
       runs: 5,
       greenStreak: 0,
     },
+    {
+      // Зелёный на повторе раннера: стабильность 100%, основание — число повторов,
+      // и текст идёт кодом, как его шлёт сервер.
+      kind: 'quarantine',
+      groupId: 'gui',
+      caseId: 'gui-004',
+      title: 'Поиск по каталогу',
+      message: 'Прошёл только на повторе в 3 прогонах из 6 при пороге 2.',
+      messageCode: 'quarantine-suggest-retries',
+      params: { flakes: 3, runs: 6, limit: 2 },
+      reason: 'Нестабилен: проходит только на повторе (3 прогонов).',
+      stability: 100,
+      runs: 6,
+      greenStreak: 6,
+      retryFlakes: 3,
+    },
   ],
   stale: [
     {
@@ -72,7 +88,7 @@ const QUARANTINE = {
       days: 31,
     },
   ],
-  thresholds: { greenStreak: 5, stability: 70, minRuns: 4 },
+  thresholds: { greenStreak: 5, stability: 70, minRuns: 4, retryFlakes: 2 },
   checkedAt: '2026-09-08T10:00:00.000Z',
 };
 
@@ -229,6 +245,16 @@ await page.route('**/api/project-tests/impact*', async (route) =>
   route.fulfill({ json: { files: [], cases: [] } }),
 );
 await page.route('**/api/project-tests?*', async (route) => route.fulfill({ json: view }));
+// История кейса и отметки «нестабилен» библиотеки — свои ручки; без заглушки
+// запрос ушёл бы на реальный стенд с выдуманным путём проекта.
+await page.route('**/api/project-tests/flaky*', async (route) =>
+  route.fulfill({ json: { window: 10, minFlips: 2, cases: [] } }),
+);
+await page.route('**/api/project-tests/case-history*', async (route) =>
+  route.fulfill({
+    json: { groupId: '', caseId: '', entries: [], flaky: { isFlaky: false, flips: 0, runs: 0 } },
+  }),
+);
 
 let bad = 0;
 const check = (ok, text) => {
@@ -245,18 +271,21 @@ const shot = async (name) => {
 };
 
 await page.goto(`${BASE}/`, { waitUntil: 'domcontentloaded' });
-await page.evaluate(
-  (project) =>
-    localStorage.setItem(
-      'agentdeck:workspace',
-      JSON.stringify({
-        projectTabs: [{ id: project.path.toLowerCase(), path: project.path, name: project.name }],
-        activeTabId: project.path.toLowerCase(),
-        views: {},
-      }),
-    ),
-  PROJECT,
-);
+// Выбор проекта в разделе тестов — свой, в `agentdeck:tests-project`, а не
+// активная вкладка: без него раздел открывает запомненный или ПЕРВЫЙ проект
+// списка, а первым идёт настоящий реестр стенда — и запуск уходил не в тот
+// проект. Закрепляем проверочный явно.
+await page.evaluate((project) => {
+  localStorage.setItem(
+    'agentdeck:workspace',
+    JSON.stringify({
+      projectTabs: [{ id: project.path.toLowerCase(), path: project.path, name: project.name }],
+      activeTabId: project.path.toLowerCase(),
+      views: {},
+    }),
+  );
+  localStorage.setItem('agentdeck:tests-project', project.path.toLowerCase());
+}, PROJECT);
 
 await page.goto(`${BASE}/tests?tab=report`, { waitUntil: 'domcontentloaded' });
 await page.waitForSelector('nav');
@@ -289,6 +318,21 @@ check(
 check(
   (await main.getByText(/В карантине: ждём починки логина/i).count()) > 0,
   'видно, чего этот карантин ждал',
+);
+
+// Повтор раннера (Playwright retries): кейс со 100% стабильностью предложен
+// отдельным основанием, число повторов — меткой, порог — в подсказке.
+check(
+  (await main.getByText(/или 2 прогона «зелёный только на повторе»/i).count()) > 0,
+  'порог повторов назван в подсказке',
+);
+check(
+  (await main.getByText('на повторе ×3', { exact: true }).count()) === 1,
+  'зелёный на повторе помечен числом повторов',
+);
+check(
+  (await main.getByText(/Прошёл только на повторе в 3 прогонах из 6 при пороге 2/i).count()) > 0,
+  'основание по повторам написано словами из кода сервера',
 );
 
 // Поставить карантин: причина подставлена, и без неё кнопка не работает.

@@ -45,6 +45,8 @@ export type TreeStartKind = PendingTreeStart['kind'];
 /** Воротца перед автостартом: `true` — дерево стоит, старт отложен в очередь. */
 export interface TreeStartGate {
   defer(kind: TreeStartKind, chatId: string, options: RunOptions, meta: RunMeta): boolean;
+  /** Стоит ли дерево чата — старт, отложенный до готового задания, ляжет в очередь. */
+  paused?(chatId: string): boolean;
 }
 
 export interface TreePauseStore {
@@ -206,6 +208,7 @@ export class TreePause implements TreeStartGate {
     };
 
     let stopped = 0;
+    let unconfirmed = 0;
     const seen = new Set<string>();
     for (const key of [root, ...collectTree(links, root)]) {
       const run = this.deps.runs.describe(key);
@@ -221,7 +224,14 @@ export class TreePause implements TreeStartGate {
         pausedAt: this.now(),
       };
       // Остановка — ПОСЛЕ снимка: реестр забывает прогон сразу.
-      this.deps.runs.stop(run.key);
+      if (this.deps.runs.stop(run.key) === 'unconfirmed') {
+        // Процесс жив и не снят — номер нечем проверить (F-145). В запись паузы
+        // его не кладём: «Продолжить» подняло бы по нему вторую копию той же
+        // сессии рядом с живой. Прогон доходит свой ход; следующие старты дерева
+        // пауза всё равно откладывает, а человек узнаёт число из ответа.
+        unconfirmed += 1;
+        continue;
+      }
       record.chats[run.key] = snapshot;
       stopped += 1;
     }
@@ -230,6 +240,7 @@ export class TreePause implements TreeStartGate {
     return {
       root,
       stopped,
+      unconfirmed,
       chats: Object.keys(record.chats).length,
       alreadyPaused: existing !== undefined,
     };
@@ -278,6 +289,10 @@ export class TreePause implements TreeStartGate {
       }
     }
     return { root, wasPaused: true, resumed, flushed };
+  }
+
+  paused(chatId: string): boolean {
+    return Boolean(this.deps.store.get(rootOf(this.deps.links(), chatId)));
   }
 
   defer(kind: TreeStartKind, chatId: string, options: RunOptions, meta: RunMeta): boolean {

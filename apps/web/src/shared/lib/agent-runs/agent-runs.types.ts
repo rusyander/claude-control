@@ -13,6 +13,8 @@ export interface StreamedTool {
   id?: string;
   /** Расход шага, породившего вызов; общий на все вызовы одного шага. */
   usage?: MessageUsage;
+  /** Вопрос закрыт автономией чата (см. `shared/lib/chat-stream`). */
+  autoPicks?: { question: string; label: string }[];
 }
 
 /** Запрос агента на разрешение инструмента — ждёт «Разрешить»/«Запретить». */
@@ -316,6 +318,18 @@ export type ChatEvent =
     }
   | { kind: 'permission'; toolName: string; input: unknown; toolUseId: string }
   | { kind: 'permissionResolved'; toolUseId: string; behavior: 'allow' | 'deny' }
+  /** Вопрос закрыт автономией чата — выбор ложится на свой вызов по id. */
+  | {
+      kind: 'autoPick';
+      toolUseId: string;
+      picks: { question: string; label: string; critical?: boolean }[];
+    }
+  /**
+   * Критичное от ребёнка — в ленту главного чата. Сама карточка читает список
+   * заметок сервера (его освежает рассылка `chat-escalations`); здесь событие
+   * только объявлено, чтобы поток его не спотыкался.
+   */
+  | { kind: 'escalation'; notice: { childChatId: string; text: string } }
   | {
       kind: 'branchGate';
       toolName: string;
@@ -347,6 +361,11 @@ export type ChatEvent =
        * 'mrWatchLimit' — наблюдатель MR исчерпал самостоятельные продолжения;
        * 'defaultDrift' — основная ветка ушла вперёд и задела файлы идущей группы (находка 61);
        * 'deliveryUnchecked' — часть готовности группы (описание MR) панель не проверила.
+       * 'pathStep' / 'pathGateFailed' — шаг «Пути» группы пошёл в этом чате / не прошёл проверку.
+       * 'autonomyDeferred' — галочку автономии переключили, а процесс держит фоновые
+       *   команды: перезапуск с новой меткой ждёт их конца (F-31).
+       * 'stopUnconfirmed' — «Остановить» не сняло процесс: номер не проверить без
+       *   снимка процессов, а чужое панель не трогает; прогон остаётся идущим (F-145).
        */
       code:
         | 'adopted'
@@ -363,7 +382,11 @@ export type ChatEvent =
         | 'groupsLimited'
         | 'mrWatchLimit'
         | 'defaultDrift'
-        | 'deliveryUnchecked';
+        | 'deliveryUnchecked'
+        | 'pathStep'
+        | 'pathGateFailed'
+        | 'autonomyDeferred'
+        | 'stopUnconfirmed';
       text: string;
       /**
        * Код самой строки — отдельно от `code`, который называет повод. Есть не

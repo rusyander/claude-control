@@ -202,6 +202,16 @@ await page.route('**/api/project-tests/impact*', async (route) =>
   route.fulfill({ json: { files: [], cases: [] } }),
 );
 await page.route('**/api/project-tests?*', async (route) => route.fulfill({ json: view }));
+// История кейса и отметки «нестабилен» библиотеки — свои ручки; без заглушки
+// запрос ушёл бы на реальный стенд с выдуманным путём проекта.
+await page.route('**/api/project-tests/flaky*', async (route) =>
+  route.fulfill({ json: { window: 10, minFlips: 2, cases: [] } }),
+);
+await page.route('**/api/project-tests/case-history*', async (route) =>
+  route.fulfill({
+    json: { groupId: '', caseId: '', entries: [], flaky: { isFlaky: false, flips: 0, runs: 0 } },
+  }),
+);
 
 let bad = 0;
 const check = (ok, text) => {
@@ -218,18 +228,21 @@ const shot = async (name) => {
 };
 
 await page.goto(`${BASE}/`, { waitUntil: 'domcontentloaded' });
-await page.evaluate(
-  (project) =>
-    localStorage.setItem(
-      'agentdeck:workspace',
-      JSON.stringify({
-        projectTabs: [{ id: project.path.toLowerCase(), path: project.path, name: project.name }],
-        activeTabId: project.path.toLowerCase(),
-        views: {},
-      }),
-    ),
-  PROJECT,
-);
+// Выбор проекта в разделе тестов — свой, в `agentdeck:tests-project`, а не
+// активная вкладка: без него раздел открывает запомненный или ПЕРВЫЙ проект
+// списка, а первым идёт настоящий реестр стенда — и запуск уходил не в тот
+// проект. Закрепляем проверочный явно.
+await page.evaluate((project) => {
+  localStorage.setItem(
+    'agentdeck:workspace',
+    JSON.stringify({
+      projectTabs: [{ id: project.path.toLowerCase(), path: project.path, name: project.name }],
+      activeTabId: project.path.toLowerCase(),
+      views: {},
+    }),
+  );
+  localStorage.setItem('agentdeck:tests-project', project.path.toLowerCase());
+}, PROJECT);
 
 await page.goto(`${BASE}/tests`, { waitUntil: 'domcontentloaded' });
 await page.waitForSelector('nav');

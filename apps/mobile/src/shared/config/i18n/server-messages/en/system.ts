@@ -2,6 +2,8 @@ import type { SystemMessageCode } from '@agentdeck/contracts/server-messages';
 
 export const systemEn: Record<SystemMessageCode, string> = {
   'analytics-pricing-refresh-failed': 'Could not refresh the price list: {{failure}}',
+  'session-processes-unavailable':
+    'Could not read the process list, so where the session runs cannot be checked right now. Try again.',
   'endpoint-profile-not-found': 'Custom endpoint profile not found.',
   'value-too-long': 'The value exceeds the allowed length.',
   'remote-settings-invalid': 'The settings are invalid',

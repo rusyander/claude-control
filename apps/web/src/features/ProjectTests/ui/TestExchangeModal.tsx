@@ -17,12 +17,16 @@ import {
   type CasesFormat,
   type ResultsFormat,
 } from '@entities/ProjectTest';
+import { importSource, type ImportSource } from '../model/importSource';
 import type { TestExchangeModalProps } from './TestExchangeModal.types';
 import styles from './ProjectTests.module.scss';
 
 const RESULTS_FORMATS: ResultsFormat[] = ['junit', 'playwright', 'allure'];
 const CASES_FORMATS: CasesFormat[] = ['csv', 'xlsx', 'testrail-csv', 'markdown'];
 const EXPORT_FORMATS = ['csv', 'xlsx', 'md'] as const;
+
+/** Файл, выбранный с диска: имя нужно для текста отказа на пустом. */
+type PickedFile = { name: string; content: string };
 
 /** Книга Excel — байты, всё остальное разбирается как текст. */
 async function readFile(file: File, isBinary: boolean): Promise<string> {
@@ -89,24 +93,33 @@ export function TestExchangeModal({
     }
   };
 
-  const sendResults = (content?: string): Promise<void> =>
-    run(() =>
+  /** Пустой выбранный файл получает отказ здесь же и в сеть не уходит. */
+  const send = (
+    picked: PickedFile | undefined,
+    typedPath: string,
+    post: (source: ImportSource) => Promise<ProjectTestImportResult>,
+  ): Promise<void> => {
+    const source = importSource(picked?.content, typedPath);
+    if (source === 'empty') {
+      setDone(undefined);
+      setError(t('tests.exchange.emptyFile', { name: picked?.name ?? '' }));
+      return Promise.resolve();
+    }
+    return run(() => post(source));
+  };
+
+  const sendResults = (picked?: PickedFile): Promise<void> =>
+    send(picked, resultsFile, (source) =>
       importResults.mutateAsync({
         format: resultsFormat,
-        content,
-        file: content ? undefined : resultsFile.trim() || undefined,
+        ...source,
         environmentId: environmentId || undefined,
       }),
     );
 
-  const sendCases = (content?: string): Promise<void> =>
-    run(() =>
-      importCases.mutateAsync({
-        groupId,
-        format: casesFormat,
-        content,
-        file: content ? undefined : casesFile.trim() || undefined,
-      }),
+  const sendCases = (picked?: PickedFile): Promise<void> =>
+    send(picked, casesFile, (source) =>
+      importCases.mutateAsync({ groupId, format: casesFormat, ...source }),
     );
 
   return (
@@ -125,7 +138,9 @@ export function TestExchangeModal({
           <Typography variant="caption" color="subtle">
             {t('tests.exchange.resultsHint')}
           </Typography>
-          <Stack direction="row" gap="var(--spacing-xs)" wrap align="end">
+          {/* По верху, а не по низу: у поля файла под вводом подсказка, и при
+              выравнивании по низу само поле вставало выше списков рядом. */}
+          <Stack direction="row" gap="var(--spacing-xs)" wrap align="start">
             <SelectField
               label={t('tests.exchange.format')}
               value={resultsFormat}
@@ -163,7 +178,11 @@ export function TestExchangeModal({
               className={styles.file}
               onChange={(event) => {
                 const file = event.target.files?.[0];
-                if (file) void readFile(file, false).then((content) => sendResults(content));
+                if (file) {
+                  void readFile(file, false).then((content) =>
+                    sendResults({ name: file.name, content }),
+                  );
+                }
                 event.target.value = '';
               }}
             />
@@ -194,7 +213,9 @@ export function TestExchangeModal({
           <Typography variant="caption" color="subtle">
             {t(isManual ? 'tests.exchange.casesHintMarkdown' : 'tests.exchange.casesHint')}
           </Typography>
-          <Stack direction="row" gap="var(--spacing-xs)" wrap align="end">
+          {/* По верху, а не по низу: у поля файла под вводом подсказка, и при
+              выравнивании по низу само поле вставало выше списков рядом. */}
+          <Stack direction="row" gap="var(--spacing-xs)" wrap align="start">
             <SelectField
               label={t('tests.exchange.format')}
               value={casesFormat}
@@ -209,7 +230,7 @@ export function TestExchangeModal({
                   указывать их по одному было бы работой вместо импорта. */}
               <TextField
                 label={t(isManual ? 'tests.exchange.folder' : 'tests.exchange.file')}
-                hint={t(isManual ? 'tests.exchange.folderHint' : 'tests.exchange.fileHint')}
+                hint={t(isManual ? 'tests.exchange.folderHint' : 'tests.exchange.casesFileHint')}
                 value={casesFile}
                 onChange={setCasesFile}
                 isMono
@@ -225,7 +246,9 @@ export function TestExchangeModal({
               onChange={(event) => {
                 const file = event.target.files?.[0];
                 if (file) {
-                  void readFile(file, casesFormat === 'xlsx').then((content) => sendCases(content));
+                  void readFile(file, casesFormat === 'xlsx').then((content) =>
+                    sendCases({ name: file.name, content }),
+                  );
                 }
                 event.target.value = '';
               }}

@@ -158,7 +158,7 @@ describe('ассистент панели', () => {
       .getSettings()
       .endpointProfiles.find((item) => item.id === 'contour-company-dev');
     expect(profile).toMatchObject({
-      baseUrl: 'http://127.0.0.1:5179/company-dev/v1',
+      baseUrl: 'http://127.0.0.1:5179/company-dev/_s/assistant/v1',
       model: 'gpt-4o',
       ownerPlatformId: 'company-dev',
       writeToken: false,
@@ -220,7 +220,7 @@ describe('claude', () => {
 
     expect(settings.env).toEqual({
       EXISTING: 'keep-me',
-      ANTHROPIC_BASE_URL: 'http://127.0.0.1:5179/company-dev',
+      ANTHROPIC_BASE_URL: 'http://127.0.0.1:5179/company-dev/_s/terminal',
       ANTHROPIC_MODEL: 'gpt-4o',
       ANTHROPIC_AUTH_TOKEN: PLACEHOLDER_KEY,
     });
@@ -404,7 +404,7 @@ describe('занятое место и неподдержанные цели', (
     expect(
       (JSON.parse(readFileSync(settingsPath, 'utf8')) as { env: Record<string, string> }).env
         .ANTHROPIC_BASE_URL,
-    ).toBe('http://127.0.0.1:5179/company-dev');
+    ).toBe('http://127.0.0.1:5179/company-dev/_s/terminal');
   });
 
   it('цель с прочерком пропускается со СВОЕЙ причиной', () => {
@@ -434,11 +434,11 @@ describe('занятое место и неподдержанные цели', (
     expect(
       (JSON.parse(readFileSync(settingsPath, 'utf8')) as { env: Record<string, string> }).env
         .ANTHROPIC_BASE_URL,
-    ).toBe('http://127.0.0.1:5180/company-dev');
+    ).toBe('http://127.0.0.1:5180/company-dev/_s/terminal');
     expect(
       store.getSettings().endpointProfiles.find((item) => item.id === 'contour-company-dev')
         ?.baseUrl,
-    ).toBe('http://127.0.0.1:5180/company-dev/v1');
+    ).toBe('http://127.0.0.1:5180/company-dev/_s/assistant/v1');
   });
 
   it('незнакомая цель — отказ с именем поля, а не молчаливый пропуск', () => {

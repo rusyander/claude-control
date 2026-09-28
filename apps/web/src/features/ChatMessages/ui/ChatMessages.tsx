@@ -7,10 +7,7 @@ import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { TokenBadge } from '@shared/ui/token-badge';
 import { CrashCard, ErrorBoundary } from '@shared/ui/error-boundary';
-import { toast } from '@shared/lib/toast';
-import { serverMessageText } from '@shared/config/i18n/server-message';
-import { CliInfoPanel } from '@entities/ChatCli';
-import { isStreamShown } from '@shared/lib/chat-stream';
+import { isOpenAsk, isStreamShown } from '@shared/lib/chat-stream';
 import { markQuestionAnswered, useAnsweredQuestions } from '@shared/lib/agent-runs';
 import { branchMarks } from '../lib/branchMarks';
 import { parseQuestions } from '../lib/parseQuestions';
@@ -21,6 +18,7 @@ import { useFeedScroll } from '../lib/useFeedScroll';
 import { MessageBubble } from './MessageBubble';
 import { StreamedAnswer } from './StreamedAnswer';
 import { QuestionCard } from './QuestionCard';
+import { AutoPickLine } from './AutoPickLine';
 import { PermissionCard } from './PermissionCard';
 import { BranchGateCard } from './BranchGateCard';
 import { ChildBlocks } from './ChildBlocks';
@@ -28,6 +26,7 @@ import { ReviewDecisionCard } from './ReviewDecisionCard';
 import { waitsDecision } from '../lib/reviewWaiting';
 import { taskNoticesOf } from '../lib/taskNotice';
 import { FeedNotices } from './FeedNotices';
+import { FeedErrorCard } from './FeedErrorCard';
 import { QueuedBubbles } from './QueuedBubbles';
 import { RunTimer } from './RunTimer';
 import type { ChatMessagesProps } from './ChatMessages.types';
@@ -136,8 +135,8 @@ export function ChatMessages({
       if (!message) continue;
       // Уведомление CLI о фоне пишется от имени человека, но ответом не является.
       if (message.role === 'user' && !taskNoticesOf(message)) return undefined;
-      if (message.blocks.some((block) => block.type === 'tool' && block.name === 'AskUserQuestion'))
-        return index;
+      // Закрытый автономией вопрос ответа не ждёт.
+      if (message.blocks.some((block) => block.type === 'tool' && isOpenAsk(block))) return index;
     }
     return undefined;
   }, [messages]);
@@ -241,6 +240,15 @@ export function ChatMessages({
                   className={styles.spend}
                 />
               ) : null;
+
+              if (tool.autoPicks !== undefined) {
+                return (
+                  <div key={`${tool.name}-${index}`} className={styles.block}>
+                    <AutoPickLine picks={tool.autoPicks} />
+                    {spend}
+                  </div>
+                );
+              }
 
               if (questions) {
                 // Имя живого вопроса — id вызова, без имени разговора: оно у
@@ -410,103 +418,14 @@ export function ChatMessages({
           />
         ))}
 
-      {/*
-        Ошибка — такое же событие разговора, как ответ, и место ей в ленте.
-        Раньше здесь была голая красная строка внизу: на длинной переписке её
-        не отличить от обрыва, а что делать дальше — не сказано. Карточка
-        называет беду, показывает текст целиком (он бывает многострочным) и
-        даёт то самое действие, которого человек ищет, — повторить.
-      */}
-      {stream.error && (
-        <div className={styles.row}>
-          <div className={styles.errorCard} role="alert" data-chat-error>
-            <Stack direction="row" align="center" gap="var(--spacing-2xs)">
-              <Icon name="error" size={20} />
-              <Typography variant="body-sm" weight="medium" as="span">
-                {t('chat.errorTitle')}
-              </Typography>
-            </Stack>
-            {/*
-              Известная ошибка CLI (живой прогон 25.09): сначала — что случилось
-              и что делать, словами интерфейса; сырой текст остаётся ниже, его
-              несут в тикет. Устаревший CLI — путь и версия той копии, что
-              запускается, и кнопка обновления именно её.
-            */}
-            {stream.errorCode && serverMessageText(stream.errorCode, stream.errorParams) && (
-              <Typography variant="body-sm" as="div" data-chat-error-explained>
-                {serverMessageText(stream.errorCode, stream.errorParams)}
-              </Typography>
-            )}
-            {stream.errorCode === 'cli-outdated' && <CliInfoPanel refresh withUpdate />}
-            <div className={styles.errorText}>{stream.error}</div>
-            {/*
-              Три действия вместо одного. «Повторить» отправляет задачу заново —
-              но часть работы уже сделана, и переделывать её незачем: «Продолжить»
-              просит агента доделать с места обрыва. Текст ошибки нужен целиком —
-              его несут в тикет или в поиск, а выделять мышью из ленты неудобно.
-              Раньше эти две кнопки жили только в шапке, где их не связать с
-              карточкой, из-за которой их ищут.
-            */}
-            <Stack direction="row" gap="var(--spacing-2xs)" wrap>
-              {onRetry && !stream.errorOverflow && (
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  leftIcon={<Icon name="refresh" size={18} />}
-                  onClick={onRetry}
-                >
-                  {t('chat.retry')}
-                </Button>
-              )}
-              {onContinue && !stream.errorOverflow && (
-                <Button size="sm" variant="secondary" onClick={onContinue}>
-                  {t('chat.continue')}
-                </Button>
-              )}
-              {/* Переполненный разговор не примет ни «Повторить», ни «Продолжить»:
-                  выход — сжать контекст или уйти в свежую сессию. */}
-              {stream.errorOverflow && onCompact && (
-                <Button size="sm" variant="secondary" onClick={onCompact} data-chat-compact>
-                  {t('chat.overflow.compact')}
-                </Button>
-              )}
-              {stream.errorOverflow && onFreshSession && (
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={onFreshSession}
-                  title={t('chat.overflow.freshHint')}
-                  data-chat-fresh-session
-                >
-                  {t('chat.overflow.fresh')}
-                </Button>
-              )}
-              <Button
-                size="sm"
-                variant="ghost"
-                leftIcon={<Icon name="copy" size={18} />}
-                onClick={() =>
-                  void navigator.clipboard.writeText(stream.error ?? '').then(() => {
-                    toast.success(t('toasts.copied'));
-                  })
-                }
-              >
-                {t('chat.copyError')}
-              </Button>
-              {onDismissError && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  leftIcon={<Icon name="close" size={18} />}
-                  onClick={onDismissError}
-                >
-                  {t('chat.dismissError')}
-                </Button>
-              )}
-            </Stack>
-          </div>
-        </div>
-      )}
+      <FeedErrorCard
+        stream={stream}
+        onRetry={onRetry}
+        onContinue={onContinue}
+        onDismissError={onDismissError}
+        onCompact={onCompact}
+        onFreshSession={onFreshSession}
+      />
 
       <div ref={feed.bottomRef} />
     </div>

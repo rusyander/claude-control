@@ -18,6 +18,7 @@ export {
   projectGitKey,
 } from './api/ProjectGitApi';
 export { useSplitDefaults, useSaveSplitDefaults } from './api/SplitDefaultsApi';
+export { useSieves, useDeleteLearnedSieve, useAcceptLearnedSieve } from './api/SievesApi';
 export type {
   ProjectGitChange,
   ProjectGitFileStatus,

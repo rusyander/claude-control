@@ -296,7 +296,7 @@ describe('инструменты клиента полем', () => {
           { id: 'toolu_2', type: 'function', function: { name: 'Write', arguments: '{}' } },
         ],
       },
-      { role: 'tool', tool_call_id: 'toolu_2', content: 'ошибка: нет прав' },
+      { role: 'tool', tool_call_id: 'toolu_2', content: 'error: нет прав' },
     ]);
     // Картинку роль `tool` не несёт — и это названо, а не выброшено молча.
     expect(lost.map((item) => item.field)).toEqual(['content[].tool_result (внутри картинка)']);

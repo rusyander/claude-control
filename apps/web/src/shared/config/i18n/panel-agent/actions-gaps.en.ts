@@ -1,0 +1,33 @@
+import type { panelActionsGapsRu } from './actions-gaps.ru.ts';
+
+/** English titles of the gap-closing actions (lane A, 28.09); keys follow the Russian module. */
+export const panelActionsGapsEn: Record<keyof typeof panelActionsGapsRu, string> = {
+  read_chat_modes: 'Chat modes',
+  read_chat_spend: 'Chat spend this session',
+  request_chat_handoff: 'Ask a chat to close its stage',
+  read_model_cascade: 'Model picked per task',
+  set_model_cascade: 'Turn model picking on or off',
+  list_lowered_runs: 'Lowered runs',
+  read_split_overlap: 'Split branch overlaps',
+  split_accept_group: 'Accept a split group',
+  split_resume_interrupted: 'Resume interrupted groups',
+  read_model_pricing: 'Model prices',
+  list_editors: 'Code editors',
+  read_claude_access: 'Account access',
+  browse_folders: 'Folder browser',
+  list_providers: 'Providers',
+  read_provider_checks: 'Provider check results',
+  run_provider_check: 'Check the provider',
+  jira_transitions: 'Jira issue transitions',
+  portability_fidelity: 'Environment transfer fidelity',
+  summarize_resource: 'Describe a resource briefly',
+  read_project_changes: 'Agent edits in a chat',
+  read_worktree_bootstrap_log: 'Copy install log',
+  read_project_local_config: 'The project’s own .claude',
+  draft_defect: 'Defect draft',
+  refresh_defect_states: 'Refresh defect states',
+  list_test_drafts: 'Test drafts',
+  create_e2e_folder: 'Create the e2e folder',
+  remove_e2e_folder: 'Remove the e2e folder',
+  list_default_test_groups: 'Default test groups',
+};

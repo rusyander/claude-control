@@ -60,7 +60,7 @@ export function ProjectsTopic() {
 
       <HelpSection title={t('help.common.storageTitle')}>
         <StorageCard
-          title="<проект>/"
+          title={tr('storageDir')}
           rows={[
             {
               label: tr('storageRegistry'),
@@ -71,19 +71,19 @@ export function ProjectsTopic() {
               label: tr('storageRules'),
               // П2.7: проект без своего `CLAUDE.md` живёт на `AGENTS.md` — панель
               // правит тот файл, который читает CLI, и второго не заводит.
-              value: '<проект>/CLAUDE.md · <проект>/AGENTS.md',
+              value: tr('storageRulesValue'),
               isMono: true,
             },
-            { label: tr('storageMcp'), value: '<проект>/.mcp.json', isMono: true },
+            { label: tr('storageMcp'), value: tr('storageMcpValue'), isMono: true },
             {
               label: tr('storagePerms'),
-              value: '<проект>/.claude/settings.json · settings.local.json',
+              value: tr('storagePermsValue'),
               isMono: true,
             },
             { label: tr('storageLocal'), value: tr('storageLocalValue') },
             {
               label: tr('storageBackup'),
-              value: '~/.claude/agentdeck/backups/project-<id>-<файл>',
+              value: tr('storageBackupValue'),
               isMono: true,
             },
             { label: tr('storageCreate'), value: tr('storageCreateValue') },

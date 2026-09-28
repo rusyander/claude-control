@@ -248,7 +248,9 @@ export function ChildStages({
 
 /** Название группы и строка её состояния — одна и та же у строки с чатом и без. */
 function GroupText({ group }: { group: ChildStageGroup }) {
-  const { t } = useTranslation();
+  // Время — языком интерфейса, а не браузера: английский хаб в русском
+  // браузере показывал русские даты (F-323).
+  const { t, i18n } = useTranslation();
   const parts: string[] = [];
   if (group.branch) parts.push(group.branch);
   if (group.base) parts.push(t('chat.cascade.hub.base', { branch: group.base }));
@@ -270,7 +272,7 @@ function GroupText({ group }: { group: ChildStageGroup }) {
   // Когда оборвалась и сколько раз панель уже продолжала сама: кончились
   // попытки — это видно, а не угадывается по тишине.
   if (group.interrupted) {
-    const time = new Date(group.interrupted.at).toLocaleTimeString([], {
+    const time = new Date(group.interrupted.at).toLocaleTimeString(i18n.language, {
       hour: '2-digit',
       minute: '2-digit',
     });
@@ -312,7 +314,7 @@ function GroupText({ group }: { group: ChildStageGroup }) {
             color="subtle"
             as="span"
             className={styles.chip}
-            title={new Date(group.acceptance.acceptedAt).toLocaleString()}
+            title={new Date(group.acceptance.acceptedAt).toLocaleString(i18n.language)}
             data-hub-accepted
           >
             {t('chat.cascade.hub.accept.marker')}

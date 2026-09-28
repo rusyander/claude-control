@@ -33,6 +33,7 @@ import { providersEn } from './en/topics/providers';
 import { integrationsEn } from './en/topics/integrations';
 import { promptsEn } from './en/topics/prompts';
 import { portabilityEn } from './en/topics/portability';
+import { phoneEn } from './en/topics/phone';
 
 /** Типизирован по русской версии: забыть ключ при переводе не получится. */
 export const helpEn: HelpSchema = {
@@ -104,11 +105,19 @@ export const helpEn: HelpSchema = {
     notesTitle: 'Things people trip over',
     onlyOnCreate: 'when creating only',
     readOnly: 'read only',
+    tabsTitle: 'Section tabs',
+    tabsCaption:
+      'The page is split into tabs, each about one thing. The open tab is kept in the page ' +
+      'address, so a link leads exactly there, and it is remembered: come back to the section ' +
+      'and you land on the same tab. Arrow keys on the tab strip switch tabs from the keyboard.',
+    tabName: 'Tab',
+    tabWhat: 'What it holds',
   },
 
   shots: {
     sidePlatform: 'Contour admin',
     sidePanel: 'Panel',
+    sidePhone: 'Phone',
     chat: chatEn.shots,
     platform: platformEn.shots,
     tests: testsEn.shots,
@@ -137,6 +146,7 @@ export const helpEn: HelpSchema = {
     prompts: promptsEn.shots,
     dlp: dlpEn.shots,
     panelAgent: panelAgentEn.shots,
+    phone: phoneEn.shots,
   },
 
   diagrams: {
@@ -168,6 +178,7 @@ export const helpEn: HelpSchema = {
     integrations: integrationsEn.diagrams,
     dlp: dlpEn.diagrams,
     panelAgent: panelAgentEn.diagrams,
+    phone: phoneEn.diagrams,
   },
 
   topics: {
@@ -194,6 +205,7 @@ export const helpEn: HelpSchema = {
     projects: projectsEn.topic,
     dlp: dlpEn.topic,
     panelAgent: panelAgentEn.topic,
+    phone: phoneEn.topic,
     platform: platformEn.topic,
     endpoints: endpointsEn.topic,
     providers: providersEn.topic,

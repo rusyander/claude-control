@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { TaskSplitResult } from '@agentdeck/contracts/task-split';
 import type { ChatLink, SplitPlanRecord } from '../../lib/app-store/app-store.types.ts';
-import { serverText } from '../../lib/server-texts.ts';
+import { localizeText, serverText } from '../../lib/server-texts.ts';
 import type { ChatEvent } from './ChatRunner.ts';
 import {
   SplitConveyor,
@@ -116,7 +116,9 @@ describe('SplitConveyor: готовность по следам звеньев',
     const fixMissing = serverText('delivery-gap-fix-missing', { count: 2 });
     expect(t.group(0)?.status).not.toBe('done');
     expect(t.group(0)?.deliveryMissing).toEqual([fixMissing]);
-    expect(t.nudges.join('\n')).toContain(fixMissing);
+    // Задание группе — по-английски (D-E): строка недостачи в нём переведена.
+    expect(localizeText(fixMissing, 'en')).not.toBe(fixMissing);
+    expect(t.nudges.join('\n')).toContain(localizeText(fixMissing, 'en'));
   });
 
   it('ревью → правки → доставка: следы полны, группа готова', async () => {

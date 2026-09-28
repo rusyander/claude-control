@@ -1,5 +1,11 @@
 import type { TmsKind } from './integrations';
-import type { CodedList } from './server-messages';
+import type { CodedList, CodedMessage } from './server-messages';
+import type { ProjectTestRunSummary } from './project-tests-summary';
+import type {
+  ProjectTestAutomationCommand,
+  ProjectTestE2eFolder,
+  ProjectTestE2eRun,
+} from './project-tests-e2e';
 
 /**
  * Тест-кейсы проекта: что проверяют, чем это кончилось и как это шло.
@@ -233,6 +239,13 @@ export interface ProjectTestCase {
   note?: string;
   /** Разбор последнего провала — заполняется прогоном. */
   failure?: ProjectTestFailure;
+  /**
+   * Последний результат зелёный только на повторе раннера. Поле, а не заметка:
+   * слова берёт из своего словаря каждая сторона. Действует, пока `runId` равен
+   * `lastRunId`, — прогон агента или ручной проход поверх него делает отметку
+   * прошлой, даже если записавший кейс её не убрал.
+   */
+  flaky?: ProjectTestRetryPass;
   /** Момент последнего прогона, ISO. */
   lastRunAt?: string;
   /** Прогон, давший последний результат — по нему открывается запись в истории. */
@@ -462,6 +475,13 @@ export interface ProjectTestStepResult {
   attachments?: string[];
 }
 
+/** Зелёный на повторе: сколько попыток упало до прохода и какой прогон это дал. */
+export interface ProjectTestRetryPass {
+  /** Упавших попыток; `1` — нижняя граница, когда отчёт назвал тест нестабильным без попыток. */
+  attempts: number;
+  runId?: string;
+}
+
 /** Результат одного тест-поинта в прогоне. */
 export interface ProjectTestPointResult {
   pointId: string;
@@ -481,6 +501,21 @@ export interface ProjectTestPointResult {
   failure?: ProjectTestFailure;
   /** Ссылки на заведённые дефекты. */
   defects?: string[];
+  /**
+   * Сколько попыток упало, прежде чем раннер засчитал проход зелёным (повторы
+   * Playwright: `retries`). Только у `passed`: зелёный на повторе — главный
+   * признак нестабильного теста, а в статусе он неотличим от честного зелёного.
+   */
+  flakyAttempts?: number;
+}
+
+/** Задуманный проход, который остался без результата. */
+export interface ProjectTestUnwalkedPoint {
+  pointId: string;
+  groupId: string;
+  caseId: string;
+  title: string;
+  params?: Record<string, string>;
 }
 
 /** Что делает запущенный прогон. */
@@ -503,14 +538,18 @@ export type ProjectTestRunStatus = 'running' | 'done' | 'error' | 'stopped';
 /** Кто прогонял. */
 export type ProjectTestActor = 'agent' | 'human' | 'ci';
 
+/**
+ * Откуда пришла запись импорта: `ci` — отчёт сборки, принесённый человеком
+ * или `pnpm tests import`; `e2e` — прогон автотестов папки, запущенный панелью.
+ * Обе — `mode:'import'`: результаты легли из junit, агента не было. Поле
+ * различает их в истории; запись без него — прежний импорт из CI.
+ */
+export type ProjectTestRunOrigin = 'ci' | 'e2e';
+
 /** Сводка по прогону — то, что видно в списке истории без раскрытия. */
-export interface ProjectTestRunSummary {
-  total: number;
-  passed: number;
-  failed: number;
-  skipped: number;
-  blocked: number;
-}
+// Итог по статусам живёт листом (`project-tests-summary`): его берёт и папка e2e,
+// а импорт отсюда замыкал модули в круг. Прежний путь импорта сохранён.
+export type { ProjectTestRunSummary } from './project-tests-summary';
 
 /** Прогон агента или человека: генерация кейсов, проверка, автоматизация. */
 export interface ProjectTestRun {
@@ -563,6 +602,8 @@ export interface ProjectTestRunRecord {
   id: string;
   mode: ProjectTestRunMode;
   actor: ProjectTestActor;
+  /** Только у `mode:'import'`; читать через `runOrigin` — пусто значит `ci`. */
+  origin?: ProjectTestRunOrigin;
   groupId?: string;
   planId?: string;
   environmentId?: string;
@@ -575,11 +616,27 @@ export interface ProjectTestRunRecord {
   startedAt: string;
   finishedAt?: string;
   error?: string;
+  /** Код текста `error` для перевода; `error` — запасной русский текст. */
+  messageCode?: string;
+  /** Код выхода команды прогона (автотесты, `tests-cli run`); у агента и человека — нет. */
+  exitCode?: number;
   tokens?: number;
   costUsd?: number;
   sessionId?: string;
   results: ProjectTestPointResult[];
   summary: ProjectTestRunSummary;
+  /**
+   * Сколько проходов было задумано. Больше `summary.total` — часть брошена
+   * непройденной, и история называет её числом, а не теряет. Пусто — прогон
+   * своего плана не знает (агент, импорт).
+   */
+  planned?: number;
+  /**
+   * Какие именно задуманные проходы остались без результата. Одного числа мало:
+   * агент панели, прочитав запись, отвечал «один кейс не пройден, какой — не
+   * видно», и отчёт наружу не мог его назвать.
+   */
+  unwalked?: ProjectTestUnwalkedPoint[];
   /** Что генерация предложила и что из этого приняли. */
   draft?: ProjectTestDraftOutcome;
   /**
@@ -624,6 +681,8 @@ export interface ProjectTestRunDiffCase {
   to?: ProjectTestStatus;
   /** Что агент увидел в новом прогоне — по нему и разбирают новый провал. */
   note?: string;
+  /** Зелёный в новом прогоне только на повторе — сколько попыток упало до него. */
+  flakyAttempts?: number;
 }
 
 /** Один прогон в шапке сравнения: по чему видно, что сравнивают. */
@@ -631,6 +690,8 @@ export interface ProjectTestRunDiffSide {
   id: string;
   startedAt: string;
   mode: ProjectTestRunMode;
+  /** Только у импорта (`runOrigin`): сравнивая, видно, что сошлись панель и CI. */
+  origin?: ProjectTestRunOrigin;
   planId?: string;
   environmentId?: string;
   release?: string;
@@ -905,6 +966,9 @@ export interface ProjectTestQuarantineSuggestion {
   message: string;
   /** Причина карантина, предложенная по умолчанию: человек её правит. */
   reason?: string;
+  /** Та же причина кодом — поле ввода заполняется на языке интерфейса. */
+  reasonCode?: string;
+  reasonParams?: Record<string, string | number>;
   /** Действующая причина — её видно, когда предлагается карантин снять. */
   muteReason?: string;
   /** Стабильность 0–100 по истории прогонов. */
@@ -913,6 +977,8 @@ export interface ProjectTestQuarantineSuggestion {
   runs: number;
   /** Сколько зелёных подряд у кейса на сегодня. */
   greenStreak: number;
+  /** В скольких прогонах кейс прошёл только на повторе раннера (`flakyAttempts`). */
+  retryFlakes?: number;
 }
 
 /**
@@ -940,7 +1006,7 @@ export interface ProjectTestQuarantineReport {
   quarantine: ProjectTestQuarantineSuggestion[];
   stale: ProjectTestStaleCase[];
   /** Пороги, по которым считали: карточка показывает их человеку. */
-  thresholds: { greenStreak: number; stability: number; minRuns: number };
+  thresholds: { greenStreak: number; stability: number; minRuns: number; retryFlakes: number };
   /** Почему требования не сверялись: Atlassian выключен или Jira не ответила. */
   warning?: string;
   warningCode?: string;
@@ -1312,9 +1378,10 @@ export interface ProjectTestReleaseDocument {
  * нет», добавляет своё, и запись целиком стирает файл, который кто-то писал
  * руками. Поэтому причина едет на экран, а запись в такой файл запрещена.
  */
-export interface ProjectTestLibraryIssue {
+export interface ProjectTestLibraryIssue extends CodedMessage {
   /** Файл от корня проекта: `.agent/tests/environments.json`. */
   file: string;
+  /** Причина словами сервера; клиент называет её по `messageCode`, эта — запасная. */
   error: string;
 }
 
@@ -1349,6 +1416,12 @@ export interface ProjectTestsView {
   /** Ветка и коммит рабочей копии — контекст, в котором сейчас смотрят кейсы. */
   branch?: string;
   commit?: string;
+  /** Папка e2e проекта: где агенты пишут автотесты и откуда панель их забирает. */
+  e2e?: ProjectTestE2eFolder;
+  /** Последний прогон автотестов папки самой панелью (кнопка «Прогнать автотесты»). */
+  e2eRun?: ProjectTestE2eRun;
+  /** Своя команда прогона проекта из `.agent/tests/automation.json`. */
+  automation?: ProjectTestAutomationCommand;
 }
 
 /** Правка кейса из панели. Нет `id` — кейс создаётся. */
@@ -1450,6 +1523,11 @@ export interface ProjectTestRunRequest {
   diffRange?: string;
   /** Провал, из которого заводится регрессионный кейс. */
   sourceCase?: { groupId: string; caseId: string; runId?: string };
+  /**
+   * Генерация пишет не только кейсы, но и автотесты в папку e2e проекта и
+   * прогоняет их; черновик такой генерации панель принимает сама.
+   */
+  e2e?: boolean;
 }
 
 /**

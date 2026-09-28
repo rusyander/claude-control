@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useSyncExternalStore } from 'react';
 import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 
 /**
@@ -14,6 +15,46 @@ import * as SecureStore from 'expo-secure-store';
 
 const KEY_URL = 'panel.url';
 const KEY_TOKEN = 'panel.token';
+
+/**
+ * Хранилище пары. На телефоне — SecureStore; в веб-сборке Expo (ею снимают
+ * экраны приложения для проверки) у SecureStore нет реализации вовсе, и чтение
+ * падало исключением — приложение оставалось белым листом. Там — sessionStorage:
+ * пара живёт до закрытия вкладки (F5 её не теряет), а не вечно в localStorage,
+ * где токен полного доступа к машине читал бы любой скрипт того же origin и
+ * после того, как вкладку закрыли (F-22). Адрес — туда же: пара неделима.
+ */
+const web = (): Storage | undefined => globalThis.sessionStorage;
+
+/**
+ * Пару, которую прежняя веб-сборка оставила в localStorage, переносим во
+ * вкладку и стираем там — иначе токен лежал бы на диске и после обновления.
+ */
+function takeLegacy(key: string): string | null {
+  const legacy = globalThis.localStorage;
+  const value = legacy?.getItem(key) ?? null;
+  if (value === null) return null;
+  legacy?.removeItem(key);
+  if (web()?.getItem(key) === null) web()?.setItem(key, value);
+  return web()?.getItem(key) ?? value;
+}
+
+const store = {
+  get: (key: string): Promise<string | null> =>
+    Platform.OS === 'web'
+      ? Promise.resolve(takeLegacy(key) ?? web()?.getItem(key) ?? null)
+      : SecureStore.getItemAsync(key),
+  set: (key: string, value: string): Promise<void> =>
+    Platform.OS === 'web'
+      ? Promise.resolve(web()?.setItem(key, value))
+      : SecureStore.setItemAsync(key, value),
+  remove: (key: string): Promise<void> => {
+    if (Platform.OS !== 'web') return SecureStore.deleteItemAsync(key);
+    web()?.removeItem(key);
+    globalThis.localStorage?.removeItem(key);
+    return Promise.resolve();
+  },
+};
 
 /**
  * Адрес, вшитый в сборку (`MOBILE_DEFAULT_URL` при `pnpm mobile:apk`). Нужен,
@@ -54,10 +95,7 @@ export function normalizeUrl(raw: string): string {
 }
 
 export async function loadConnection(): Promise<Connection> {
-  const [url, token] = await Promise.all([
-    SecureStore.getItemAsync(KEY_URL),
-    SecureStore.getItemAsync(KEY_TOKEN),
-  ]);
+  const [url, token] = await Promise.all([store.get(KEY_URL), store.get(KEY_TOKEN)]);
   state = { url: url ?? '', token: token ?? '', ready: true };
   emit();
   return state;
@@ -65,16 +103,13 @@ export async function loadConnection(): Promise<Connection> {
 
 export async function saveConnection(url: string, token: string): Promise<void> {
   const normalized = normalizeUrl(url);
-  await Promise.all([
-    SecureStore.setItemAsync(KEY_URL, normalized),
-    SecureStore.setItemAsync(KEY_TOKEN, token.trim()),
-  ]);
+  await Promise.all([store.set(KEY_URL, normalized), store.set(KEY_TOKEN, token.trim())]);
   state = { url: normalized, token: token.trim(), ready: true };
   emit();
 }
 
 export async function clearConnection(): Promise<void> {
-  await Promise.all([SecureStore.deleteItemAsync(KEY_URL), SecureStore.deleteItemAsync(KEY_TOKEN)]);
+  await Promise.all([store.remove(KEY_URL), store.remove(KEY_TOKEN)]);
   state = { url: '', token: '', ready: true };
   emit();
 }

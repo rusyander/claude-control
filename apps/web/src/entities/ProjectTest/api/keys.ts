@@ -26,6 +26,10 @@ export const testKeys = {
   runs: (path: string | undefined) => [ROOT, 'runs', path ?? ''],
   run: (path: string | undefined, id: string | undefined) => [ROOT, 'run', path ?? '', id ?? ''],
   report: (path: string | undefined) => [ROOT, 'report', path ?? ''],
+  /** Отметки «нестабилен» проекта — все подписи прогона разом. */
+  flaky: (path: string | undefined) => [ROOT, 'flaky', path ?? ''],
+  /** История результатов всех кейсов проекта — для сброса разом. */
+  caseHistory: (path: string | undefined) => [ROOT, 'case-history', path ?? ''],
   /** Сравнение прогонов: обе стороны в ключе — это разный вопрос к истории. */
   diff: (path: string | undefined, id: string | undefined, baseId?: string) => [
     ROOT,
@@ -51,14 +55,21 @@ export const testKeys = {
   lint: (path: string | undefined) => [ROOT, 'lint', path ?? ''],
   /** Карантин и устаревание — считаются по библиотеке и истории прогонов. */
   quarantine: (path: string | undefined) => [ROOT, 'quarantine', path ?? ''],
+  /** Пирамида: обход всего проекта, поэтому свой ключ, а не поле вида. */
+  pyramid: (path: string | undefined) => [ROOT, 'pyramid', path ?? ''],
   /** Риск кейсов: считается по всей библиотеке разом, бюджет применяется на экране. */
   risk: (path: string | undefined) => [ROOT, 'risk', path ?? ''],
-  /** Готовность вехи: веха входит в ключ — это разные документы. */
-  release: (path: string | undefined, release: string | undefined) => [
+  /**
+   * Готовность вехи: веха входит в ключ — это разные документы. Язык тоже:
+   * вердикт сервер пишет на языке панели, и без него после переключения из
+   * кэша приходил прежний документ.
+   */
+  release: (path: string | undefined, release: string | undefined, language: string) => [
     ROOT,
     'release',
     path ?? '',
     release ?? '',
+    language,
   ],
   /** Предложение таксономии: порог входит в ключ — это разный вопрос. */
   taxonomy: (path: string | undefined, minCases: number) => [

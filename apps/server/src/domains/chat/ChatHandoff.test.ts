@@ -176,18 +176,20 @@ describe('просьба перезапуститься словами', () => {
 describe('первое сообщение новой сессии', () => {
   it('исходное задание едет последним и обрезается по потолку', () => {
     const prompt = buildHandoffPrompt(PROPOSAL, 'Сделай экспорт отчётов. '.repeat(1000));
-    expect(prompt).toContain('Исходное задание');
-    expect(prompt.indexOf('Исходное задание')).toBeGreaterThan(prompt.indexOf(PROPOSAL.next));
+    expect(prompt).toContain('The original task of the whole work');
+    expect(prompt.indexOf('The original task of the whole work')).toBeGreaterThan(
+      prompt.indexOf(PROPOSAL.next),
+    );
     expect(prompt.length).toBeLessThan(HANDOFF_ROOT_TASK_MAX + 600);
   });
 
   it('без исходного задания строки о нём нет', () => {
-    expect(buildHandoffPrompt(PROPOSAL)).not.toContain('Исходное задание');
+    expect(buildHandoffPrompt(PROPOSAL)).not.toContain('The original task of the whole work');
   });
 
   it('предупреждает о потере контекста и называет файл-опору', () => {
     const prompt = buildHandoffPrompt(PROPOSAL);
-    expect(prompt).toContain('новая сессия');
+    expect(prompt).toContain('This is a new session');
     expect(prompt).toContain('.agent/PROGRESS.md');
     expect(prompt).toContain(PROPOSAL.next);
   });

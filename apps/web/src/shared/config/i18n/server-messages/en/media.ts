@@ -34,4 +34,9 @@ export const mediaEn: Record<MediaMessageCode, string> = {
   'media-deck-topic-empty': 'name the presentation topic',
   'media-deck-topic-too-long': 'the topic is longer than 4000 characters',
   'media-block-empty': 'the block is empty',
+  'media-agent-images-invalid': 'the images in the request are not in the shape the panel expects',
+  'media-agent-images-too-many': 'one message carries at most {{limit}} images',
+  'media-agent-image-too-large':
+    '{{name}} is {{size}} MB, and an image goes to the agent up to {{limit}} MB',
+  'media-agent-image-not-image': '{{name}} is not a PNG, JPEG, GIF or WebP image',
 };

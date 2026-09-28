@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const get = vi.fn();
 vi.mock('../../shared/api/client', () => ({ api: { get: (...args: unknown[]) => get(...args) } }));
+vi.mock('../../shared/config/i18n', () => ({ useT: () => ({}) }));
 
 import { chatAutoModeQuery, shownAutoMode } from './api';
 

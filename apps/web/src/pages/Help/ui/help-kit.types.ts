@@ -103,7 +103,7 @@ export interface TopicNavProps {
 }
 
 /** Чья это сторона на снимке: подпись говорит это первым словом. */
-export type HelpShotSide = 'platform' | 'panel';
+export type HelpShotSide = 'platform' | 'panel' | 'phone';
 
 export interface HelpShotProps {
   /** Раздел справки — он же папка каталога и первая часть ключа подписи. */
@@ -142,4 +142,13 @@ export interface TopicCardProps {
   icon: IconName;
   /** Куда ведёт карточка: /help?topic=<id>. */
   topicId: string;
+}
+
+export interface PageTabsSectionProps {
+  /** Раздел страницы — ключ `pageTabs.<page>` словаря. */
+  page: string;
+  /** Id вкладок в порядке полосы — тот же список, что у страницы. */
+  tabs: readonly string[];
+  /** Своё имя вкладки, когда оно не в `pageTabs.<page>.tab` (у сравнения — имя раздела). */
+  labelOf?: (id: string) => string;
 }

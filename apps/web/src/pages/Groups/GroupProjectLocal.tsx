@@ -6,7 +6,7 @@ import { Skeleton } from '@shared/ui/skeleton';
 import { ProjectLocalConfigView, useProjectLocalByPath } from '@entities/Project';
 import { useProviders, activeProvider } from '@entities/Provider';
 import type { GroupProjectLocalPathProps, GroupProjectLocalProps } from './GroupProjectLocal.types';
-import styles from './GroupsPage.module.scss';
+import styles from './GroupProjectLocal.module.scss';
 
 /**
  * «Из проекта» на карточке привязанной группы: собственный набор каждого

@@ -53,18 +53,6 @@ export class GroupExistsError extends Error {
   }
 }
 
-/** Автоматизации с таким id нет — 404. */
-export class AutomationNotFoundError extends Error {
-  readonly statusCode = 404;
-  readonly code = 'not_found';
-
-  constructor(id: string) {
-    super(serverText('automation-not-found', { id }));
-    coded(this, 'automation-not-found', { id });
-    this.name = 'AutomationNotFoundError';
-  }
-}
-
 const MEMBER_KINDS: readonly GroupMemberKind[] = [
   'rule',
   'hook',

@@ -12,7 +12,14 @@ import { promptText } from '../../prompts.ts';
 import type { DriverBudgetRefusal, PlatformDriver } from '../drivers/driver.ts';
 import { driverOf } from '../drivers/index.ts';
 import { applyManagedRules, refusesStream } from '../rules-matrix.ts';
-import { findPlatform, readToken } from '../store.ts';
+import { consumersOf, findPlatform, readToken } from '../store.ts';
+import { effectivePlatform } from '../rules-apply.ts';
+import {
+  foreignProviderId,
+  parseSectionPath,
+  SECTION_SEGMENT,
+} from '@agentdeck/contracts/platform-consumers';
+import { getProvider, isKnownProviderId } from '../../../providers/registry.ts';
 import {
   anthropicRequestToOpenAi,
   chooseToolRoute,
@@ -185,14 +192,63 @@ const RUN_TAG = /^[A-Za-z0-9-]{1,64}$/;
  * запросу нет, а транскрипта, куда шлюз мог бы что-то вписать, у такого CLI нет.
  * По метке ответ чата узнаёт, что контур сжимал историю именно в ЕГО прогоне.
  */
-export function splitPath(url: string): { platformId: string; rest: string; runTag?: string } {
+export function splitPath(url: string): GatewayPath {
   const path = url.split('?')[0] ?? url;
   const parts = path.split('/').filter(Boolean);
-  const tag = parts[1] === RUN_TAG_SEGMENT ? parts[2] : undefined;
-  if (tag !== undefined && RUN_TAG.test(tag)) {
-    return { platformId: parts[0] ?? '', rest: `/${parts.slice(3).join('/')}`, runTag: tag };
+  const platformId = parts[0] ?? '';
+  let at = 1;
+  let section: string | undefined;
+  if (parts[at] === SECTION_SEGMENT) {
+    const parsed = parseSectionPath(parts, at + 1);
+    // Незнакомая отметка — не «адрес без отметки»: опечатка в ней открывала бы
+    // закрытый раздел. Маршрут всё равно разбирается — отказ уходит в форме
+    // диалекта клиента, а не голым 404.
+    if (!parsed) return { platformId, rest: `/${parts.slice(at + 1).join('/')}`, badSection: true };
+    section = parsed.consumer;
+    at += 1 + parsed.used;
   }
-  return { platformId: parts[0] ?? '', rest: `/${parts.slice(1).join('/')}` };
+  const withSection = section === undefined ? {} : { section };
+  const tag = parts[at] === RUN_TAG_SEGMENT ? parts[at + 1] : undefined;
+  if (tag !== undefined && RUN_TAG.test(tag)) {
+    return { platformId, rest: `/${parts.slice(at + 2).join('/')}`, runTag: tag, ...withSection };
+  }
+  return { platformId, rest: `/${parts.slice(at).join('/')}`, ...withSection };
+}
+
+/** Разобранный адрес шлюза. */
+export interface GatewayPath {
+  platformId: string;
+  rest: string;
+  runTag?: string;
+  /** Раздел из отметки `_s/<раздел>` (баг 11а); нет — адрес без отметки. */
+  section?: string;
+  /** Отметка стоит, но раздел в ней не читается. */
+  badSection?: true;
+}
+
+/**
+ * Раздел закрыт на этом контуре — текст отказа. У каждого раздела своя фраза, а
+ * не имя подстановкой: подстановка «Чат» в английском интерфейсе осталась бы
+ * русской, а короткий шаблон из одного слова разбирался бы в каждом поле панели.
+ */
+function sectionClosedText(section: string, title: string): string {
+  const cli = foreignProviderId(section);
+  if (cli !== undefined) {
+    const name = isKnownProviderId(cli) ? (getProvider(cli)?.name ?? cli) : cli;
+    return serverText('gateway-section-closed-foreign', { cli: name, title });
+  }
+  switch (section) {
+    case 'chat':
+      return serverText('gateway-section-closed-chat', { title });
+    case 'groups':
+      return serverText('gateway-section-closed-groups', { title });
+    case 'tests':
+      return serverText('gateway-section-closed-tests', { title });
+    case 'assistant':
+      return serverText('gateway-section-closed-assistant', { title });
+    default:
+      return serverText('gateway-section-closed-terminal', { title });
+  }
 }
 
 export async function handleGatewayRequest(
@@ -201,12 +257,13 @@ export async function handleGatewayRequest(
   deps: PipelineDeps,
 ): Promise<void> {
   const url = request.url ?? '/';
-  const { platformId, rest, runTag } = splitPath(url);
+  const { platformId, rest, runTag, section, badSection } = splitPath(url);
   const route = platformId ? resolveRoute(rest) : undefined;
   // В след запроса путь идёт БЕЗ строки запроса: часть CLI носит в ней свой
   // ключ (`?key=…`), а журнал шлюза уезжает на экран панели целиком. Метка
-  // прогона из пути тоже убрана — у следа для неё своё поле.
-  const path = runTag ? `/${platformId}${rest}` : (url.split('?')[0] ?? url);
+  // прогона и отметка раздела из пути тоже убраны — у следа для них свои поля.
+  const path =
+    runTag || section || badSection ? `/${platformId}${rest}` : (url.split('?')[0] ?? url);
 
   // Проверка связи CLI: Claude Code при старте зовёт `<базовый адрес>/api/hello`.
   // Вопрос в ней — «жив ли адрес», и живой шлюз отвечает на него сам: в контур
@@ -232,8 +289,8 @@ export async function handleGatewayRequest(
   }
 
   const dialect = route === 'models' ? modelsDialect(request) : dialectOf(route);
-  const platform = findPlatform(deps.store, platformId);
-  if (!platform) {
+  const stored = findPlatform(deps.store, platformId);
+  if (!stored) {
     return refuse(response, deps, {
       platformId,
       path,
@@ -243,6 +300,30 @@ export async function handleGatewayRequest(
       message: serverText('gateway-contour-unknown', { id: platformId }),
     });
   }
+
+  // Раздел, закрытый на этом контуре, закрыт на КАЖДОМ запросе (баг 11а), а не
+  // только на следующем запуске: процесс, получивший адрес при открытом разделе,
+  // и файлы CLI, которые никто не переписал, держат адрес до конца. Раньше
+  // ключа и включённости — отказ говорит о решении человека, а не о поломке.
+  // Адрес без отметки проходит: свои проверки панели, картинки и файлы,
+  // записанные до отметки (справка раздела говорит это словами).
+  if (badSection || (section !== undefined && !consumersOf(stored).includes(section))) {
+    return refuse(response, deps, {
+      platformId,
+      path,
+      dialect,
+      status: 403,
+      code: 'permission_error',
+      message: badSection
+        ? serverText('gateway-section-unknown')
+        : sectionClosedText(section ?? '', stored.title),
+      ...(section === undefined ? {} : { section }),
+    });
+  }
+
+  // Действующие правила (баг 11б): выбор «чьи правила» подменяет их здесь один
+  // раз, и сборка тела, путь инструментов и родная ручка читают уже его.
+  const platform = effectivePlatform(stored);
 
   const token = readToken(deps.appDataDir, platformId);
   if (!platform.enabled || !token) {
@@ -287,7 +368,7 @@ export async function handleGatewayRequest(
       },
     );
   }
-  return chat(request, response, deps, platform, token, path, dialect, runTag);
+  return chat(request, response, deps, platform, token, path, dialect, runTag, section);
 }
 
 /**
@@ -404,6 +485,7 @@ async function chat(
   path: string,
   dialect: Dialect,
   runTag?: string,
+  section?: string,
 ): Promise<void> {
   // Объявленный размер проверяется ДО чтения: 40-мегабайтное тело незачем
   // тянуть в память ради того, чтобы отказать в конце.
@@ -716,6 +798,7 @@ async function chat(
     summarized: facts.summarized,
     ...(dialect === 'anthropic' && facts.messageId ? { messageId: facts.messageId } : {}),
     ...(runTag ? { runTag } : {}),
+    ...(section ? { section } : {}),
     violations: facts.violations,
     ...(facts.violations.length > 0 ? { violationActions: facts.violationActions } : {}),
     masked: facts.masked,
@@ -1524,6 +1607,8 @@ interface Refusal {
   lost?: string[];
   /** Отказ пришёл от проверок содержимого (451), а не от ключа или бюджета. */
   blocked?: boolean;
+  /** Раздел из адреса — след закрытого раздела называет, чей запрос не пустили. */
+  section?: string;
 }
 
 /** Отказ: форма диалекта клиента, русская причина, след в панель. */
@@ -1547,6 +1632,7 @@ function refuse(response: ServerResponse, deps: PipelineDeps, refusal: Refusal):
     blocked: refusal.blocked,
     lost: refusal.lost,
     error: refusal.message,
+    ...(refusal.section ? { section: refusal.section } : {}),
   });
 }
 
@@ -1567,6 +1653,7 @@ function record(deps: PipelineDeps, event: Partial<PlatformGatewayEvent>): void 
     summarized: event.summarized ?? false,
     ...(event.messageId ? { messageId: event.messageId } : {}),
     ...(event.runTag ? { runTag: event.runTag } : {}),
+    ...(event.section ? { section: event.section } : {}),
     violations: event.violations ?? [],
     ...(event.violationActions ? { violationActions: event.violationActions } : {}),
     masked: event.masked ?? false,

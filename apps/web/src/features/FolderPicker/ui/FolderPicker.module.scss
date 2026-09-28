@@ -1,5 +1,6 @@
 // Раскладка (flex + wrap + gap) — на Stack; остаётся только нижний отступ.
 .roots {
+  flex-shrink: 0;
   margin-bottom: var(--spacing-sm);
 }
 
@@ -23,11 +24,21 @@
   }
 }
 
+// Тело окна отдано целиком (bodyFill): высоту задаёт размер окна, список
+// забирает остаток под корнями и прокручивается сам.
+.pane {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
 .list {
-  min-height: 240px;
-  max-height: 48vh;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   scrollbar-width: thin;
+  scrollbar-gutter: stable;
 }
 
 .item {

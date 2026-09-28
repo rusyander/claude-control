@@ -1,7 +1,8 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { previewInLanguage } from '@agentdeck/contracts/panel-agent';
 import { initialDecision } from '@entities/PanelAgent';
-import { DECISION_ARM_MS, canTakeFocus } from '../model/focusAnchor';
+import { DECISION_ARM_MS, canTakeFocus, decisionPress } from '../model/focusAnchor';
 import { actionTitle } from '../model/actionTitle';
 import { panelText } from '../model/panelText';
 import { Button } from '@shared/ui/button';
@@ -30,16 +31,28 @@ export function PendingActionCard({
   approveRefused = false,
   onDecide,
   autoFocus,
+  foreign,
 }: PendingActionCardProps) {
   const { t, i18n } = useTranslation();
   const approveRef = useRef<HTMLButtonElement>(null);
   const rejectRef = useRef<HTMLButtonElement>(null);
   const isDanger = pending.risk === 'danger';
-  const isTruncated = pending.preview.truncated === true;
+  // Двуязычные данные (заголовки шагов) — стороной языка окна; коды переводит словарь.
+  const preview = previewInLanguage(pending.preview, i18n.language);
+  const isTruncated = preview.truncated === true;
   // Одобрить нельзя: предпросмотр обрезан, или сервер сам отказал в одобрении.
   const cannotApprove = isTruncated || approveRefused;
-  // Время появления карточки: нажатие в первые полсекунды — не решение.
-  const shownAtRef = useRef(Date.now());
+  // Первые полсекунды после появления нажатие — не решение: палец уже летел.
+  // Кнопки при этом видно приглушены, а нажатие объясняется строкой.
+  const [armed, setArmed] = useState(false);
+  const [armHint, setArmHint] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setArmed(true);
+      setArmHint(false);
+    }, DECISION_ARM_MS);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Обрезанный предпросмотр одобрить нельзя — фокус по умолчанию на «Отклонить».
   const defaultDecision = cannotApprove ? 'reject' : initialDecision(pending.risk);
@@ -56,11 +69,13 @@ export function PendingActionCard({
   }, [autoFocus, pending.id, defaultDecision]);
 
   const decide = (decision: 'approve' | 'reject'): void => {
-    if (Date.now() - shownAtRef.current < DECISION_ARM_MS) return;
-    if (decision === 'approve' && cannotApprove) return;
-    onDecide(decision);
+    const press = decisionPress(armed, decision, cannotApprove);
+    if (press === 'arming') setArmHint(true);
+    if (press === 'decide') onDecide(decision);
   };
 
+  // Кнопка по умолчанию — цель фокуса при открытии окна (`focusWindow`); у
+  // карточки чужого разговора её нет: Enter не должен решать чужую просьбу.
   const headingId = `agent-card-${pending.id}`;
   const truncatedId = `agent-card-truncated-${pending.id}`;
   const expires = new Date(pending.expiresAt).toLocaleTimeString(i18n.language, {
@@ -70,11 +85,29 @@ export function PendingActionCard({
 
   return (
     <section
-      className={[styles.card, isDanger && styles.cardDanger].filter(Boolean).join(' ')}
+      className={[styles.card, isDanger && styles.cardDanger, foreign && styles.cardForeign]
+        .filter(Boolean)
+        .join(' ')}
       aria-labelledby={headingId}
       data-agent-pending={pending.id}
+      data-agent-pending-foreign={foreign ? '' : undefined}
       data-risk={pending.risk}
     >
+      {foreign && (
+        <div className={styles.cardOrigin}>
+          <Badge tone="neutral">{t('panelAgent.foreign.badge')}</Badge>
+          {foreign.origin && (
+            <Typography variant="caption" color="muted">
+              {t('panelAgent.foreign.from', { title: foreign.origin })}
+            </Typography>
+          )}
+          {foreign.onOpenConversation && (
+            <Button variant="ghost" size="sm" onClick={foreign.onOpenConversation}>
+              {t('panelAgent.foreign.open')}
+            </Button>
+          )}
+        </div>
+      )}
       <Typography
         variant="body-sm"
         weight="semibold"
@@ -86,12 +119,7 @@ export function PendingActionCard({
       </Typography>
 
       <Typography variant="body">
-        {panelText(
-          t,
-          pending.preview.summaryCode,
-          pending.preview.summaryParams,
-          pending.preview.summary,
-        )}
+        {panelText(t, preview.summaryCode, preview.summaryParams, preview.summary)}
       </Typography>
 
       <dl className={styles.fields}>
@@ -105,7 +133,7 @@ export function PendingActionCard({
           </Badge>
         </dd>
         {/* Ключ — номер строки: подписи повторяются (два «Добавить · …» у кейсов). */}
-        {pending.preview.fields.map((field, index) => (
+        {preview.fields.map((field, index) => (
           <FieldRow
             key={index}
             label={panelText(t, field.labelCode, field.labelParams, field.label)}
@@ -114,13 +142,13 @@ export function PendingActionCard({
         ))}
       </dl>
 
-      {pending.preview.diff && (
+      {preview.diff && (
         <>
           <Typography variant="caption" color="muted">
             {t('panelAgent.card.diff')}
           </Typography>
           <pre className={styles.diff} tabIndex={0} aria-label={t('panelAgent.card.diff')}>
-            {pending.preview.diff.split('\n').map((line, index) => (
+            {preview.diff.split('\n').map((line, index) => (
               <div key={index} className={diffLineClass(line)}>
                 {line || ' '}
               </div>
@@ -151,7 +179,13 @@ export function PendingActionCard({
         </Typography>
       )}
 
-      <div className={styles.cardActions}>
+      {armHint && !armed && (
+        <Typography variant="caption" color="muted" role="status" data-agent-arm-hint>
+          {t('panelAgent.card.armHint')}
+        </Typography>
+      )}
+
+      <div className={styles.cardActions} data-agent-armed={armed ? '' : undefined}>
         {isDeciding && (
           <Typography variant="caption" color="muted" role="status">
             {t('panelAgent.card.deciding')}
@@ -162,8 +196,10 @@ export function PendingActionCard({
           variant="secondary"
           onClick={() => decide('reject')}
           disabled={isDeciding}
+          aria-disabled={!armed || undefined}
+          className={armed ? undefined : styles.decisionArming}
           data-agent-decision="reject"
-          data-agent-default={defaultDecision === 'reject' || undefined}
+          data-agent-default={(!foreign && defaultDecision === 'reject') || undefined}
         >
           {t('panelAgent.card.reject')}
         </Button>
@@ -172,9 +208,11 @@ export function PendingActionCard({
           variant={isDanger ? 'danger' : 'primary'}
           onClick={() => decide('approve')}
           disabled={isDeciding || cannotApprove}
+          aria-disabled={(!armed && !cannotApprove) || undefined}
+          className={armed ? undefined : styles.decisionArming}
           aria-describedby={cannotApprove ? truncatedId : undefined}
           data-agent-decision="approve"
-          data-agent-default={defaultDecision === 'approve' || undefined}
+          data-agent-default={(!foreign && defaultDecision === 'approve') || undefined}
         >
           {t('panelAgent.card.approve')}
         </Button>

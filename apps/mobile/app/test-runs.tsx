@@ -3,10 +3,12 @@ import { Stack } from 'expo-router';
 import type { ProjectTestRunRecord } from '@agentdeck/contracts';
 import { Card, Empty, Loading, Muted, Row, Screen, Title } from '../src/shared/ui';
 import { colors, font, radius, space } from '../src/shared/config/theme';
-import { useT } from '../src/shared/config/i18n';
+import { useLanguage, useT } from '../src/shared/config/i18n';
 import { useWorkspace } from '../src/shared/lib/workspace';
 import { useTestRuns } from '../src/entities/tests/api';
 import { formatWhen } from '../src/entities/tests/status';
+import { runLabel } from '../src/entities/tests/runLabel';
+import { serverField } from '../src/shared/api/server-message';
 
 /**
  * История прогонов: файлы `runs/*.run.json` того же проекта, от новых к старым.
@@ -71,25 +73,27 @@ export default function TestRunsScreen() {
 }
 
 function RunRow({ record }: { record: ProjectTestRunRecord }) {
+  const language = useLanguage();
   const t = useT();
   const summary = record.summary;
   const isBad = record.status === 'error' || summary.failed > 0;
+  const label = runLabel(record, t.tests.runs);
 
   return (
     <View style={[styles.run, isBad && styles.runBad]}>
       <Row gap={space.sm}>
         <Title style={styles.grow} numberOfLines={1}>
-          {t.tests.runs.mode[record.mode]}
+          {label.title}
         </Title>
         <Muted>{t.tests.runs.state[record.status]}</Muted>
       </Row>
-      <Muted>{formatWhen(record.startedAt)}</Muted>
+      <Muted>{formatWhen(record.startedAt, language)}</Muted>
       <Text style={styles.summary}>
         {t.tests.runs.summary(summary.passed, summary.failed, summary.skipped, summary.blocked)}
       </Text>
       <Muted>
         {[
-          t.tests.runs.actor[record.actor],
+          label.actor,
           record.groupId,
           record.branch,
           record.commit?.slice(0, 7),
@@ -98,7 +102,9 @@ function RunRow({ record }: { record: ProjectTestRunRecord }) {
           .filter(Boolean)
           .join(' · ')}
       </Muted>
-      {record.error ? <Text style={styles.bad}>{record.error}</Text> : null}
+      {/* Текст записи — по коду на языке телефона: сырой `error` сервер пишет
+          по-русски, и английский телефон показывал его как есть (F-360). */}
+      {record.error ? <Text style={styles.bad}>{serverField(record, 'error')}</Text> : null}
     </View>
   );
 }

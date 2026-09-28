@@ -117,26 +117,27 @@ describe('История изменений', () => {
       expect(newest.removed).toBe(0);
     });
 
-    it('старая копия сравнивается с предыдущей: первая известная версия без диффа', () => {
+    it('старая копия сравнивается со следующей: видна правка, сделанная в её время', () => {
       const items = buildHistory(backupDir, knownPaths);
       const oldest = items[1]!;
-      expect(oldest.label).toBe('initial');
-      expect(oldest.added).toBe(0);
+      // Копия 09:00 = line1, следующая = line1\nline2 → в 09:00 добавили line2.
+      expect(oldest.label).toBe('next');
+      expect(oldest.added).toBe(1);
       expect(oldest.removed).toBe(0);
     });
 
-    it('средняя копия сравнивается с предыдущей копией', () => {
-      // Третья копия между старой и свежей — у неё есть предыдущая.
+    it('средняя копия сравнивается со следующей копией', () => {
+      // Третья копия между старой и свежей — у неё есть следующая.
       writeFileSync(
         join(backupDir, 'settings.json.2026-07-19T09-30-00-000Z.bak'),
         'line1\nlineX\n',
       );
       const items = buildHistory(backupDir, knownPaths);
       const middle = items.find((item) => item.name.includes('09-30'))!;
-      // previous = line1, this = line1\nlineX → добавлена lineX.
-      expect(middle.label).toBe('previous');
+      // this = line1\nlineX, next = line1\nline2 → lineX заменили на line2.
+      expect(middle.label).toBe('next');
       expect(middle.added).toBe(1);
-      expect(middle.removed).toBe(0);
+      expect(middle.removed).toBe(1);
     });
 
     it('полный дифф свежей копии содержит строки', () => {
@@ -313,5 +314,34 @@ describe('История изменений', () => {
       expect(entry?.skipped).toBe(true);
       expect(entry?.reason).toBe('binary');
     });
+  });
+});
+
+describe('[P3] лента истории: каждая правка видна ровно один раз, под своим временем', () => {
+  it('копия снята ПЕРЕД записью — её запись показывает «копия → следующее состояние»', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'cc-history-p3-'));
+    try {
+      const backupDir = join(dir, 'backups');
+      const settingsPath = join(dir, 'settings.json');
+      mkdirSync(backupDir, { recursive: true });
+      // Три записи: W1 (09:00) добавила b, W2 (10:00) добавила c, W3 (11:00) добавила d.
+      writeFileSync(join(backupDir, 'settings.json.2026-07-19T09-00-00-000Z.bak'), 'a\n');
+      writeFileSync(join(backupDir, 'settings.json.2026-07-19T10-00-00-000Z.bak'), 'a\nb\n');
+      writeFileSync(join(backupDir, 'settings.json.2026-07-19T11-00-00-000Z.bak'), 'a\nb\nc\n');
+      writeFileSync(settingsPath, 'a\nb\nc\nd\n');
+      const known = [claudeTarget(settingsPath)];
+      const items = buildHistory(backupDir, known);
+      const added = (stamp: string): string[] =>
+        buildDiff(backupDir, `settings.json.2026-07-19T${stamp}-00-00-000Z.bak`, known)!
+          .lines.filter((line) => line.kind === 'add')
+          .map((line) => line.text);
+      expect(added('09')).toEqual(['b']);
+      expect(added('10')).toEqual(['c']);
+      expect(added('11')).toEqual(['d']);
+      expect(items.map((item) => item.added)).toEqual([1, 1, 1]);
+      expect(items.map((item) => item.label)).toEqual(['current', 'next', 'next']);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

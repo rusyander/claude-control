@@ -55,9 +55,9 @@ export const analyticsEn: typeof analyticsRu = {
     guide: {
       reportTitle: 'Path 1. The report: where the spend went',
       reportCaption:
-        'A look back. The entrance is the section itself: the period on top, the ' +
-        'breakdowns below, the sessions at the end. Everything shown here is counted ' +
-        'from files on disk.',
+        'A look back. The entrance is the section itself: the period in the header, the ' +
+        'report’s breakdowns on the Summary, Models and projects, Tools and hours and ' +
+        'Sessions tabs. Everything shown here is counted from files on disk.',
       reportToday: 'Today’s day by default',
       reportTodayText:
         'These are calendar days from local midnight, not the last 24 hours: in the ' +
@@ -67,9 +67,13 @@ export const analyticsEn: typeof analyticsRu = {
       reportMonth: 'Another period — the same tiles, different numbers',
       reportMonthText:
         'Day presets are calendar days too: “30 days” means today plus the 29 whole days ' +
-        'before it. A longer period brings in the daily chart, and the model and project ' +
-        'breakdowns fill up: two projects are visibly sharing the spend.',
-      reportDetail: 'A click on a bar opens the details',
+        'before it. A longer period brings the daily chart onto the Summary. The chosen ' +
+        'period stays when you switch to any tab of the report.',
+      reportBreakdown: 'Models and projects — a tab of its own',
+      reportBreakdownText:
+        'Where the period’s tokens went: by model and by project, bars on one scale. ' +
+        'This is where two projects are visibly sharing the spend. Every row opens the details.',
+      reportDetail: 'A click on a model row opens the details',
       reportDetailText:
         'The window holds this model’s whole spend: its share of the total, the number ' +
         'of requests, all four kinds of tokens separately, and the cost estimate. Below ' +
@@ -80,12 +84,36 @@ export const analyticsEn: typeof analyticsRu = {
         'Beside it is what the agent really uses: tools are counted from the calls in the ' +
         'transcripts, while skill statistics are taken from Claude Code’s own file rather ' +
         'than recomputed.',
-      reportSessions: 'Sessions and the scan line at the bottom',
+      reportSessions: 'Sessions and the scan line',
       reportSessionsText:
-        'Each row is a conversation: project, git branch, models and volume. At the very ' +
-        'bottom of the page it says how many files the panel walked and in how many ' +
+        'Each row is a conversation: project, git branch, models and volume. Under every ' +
+        'breakdown of the report it says how many files the panel walked and in how many ' +
         'milliseconds — that line is what shows the numbers came off the disk, not out of ' +
         'somebody’s database.',
+      reportSessionsGo: '“Go to”: into the conversation, or to where the session runs',
+      reportSessionsGoText:
+        'A panel chat opens in its chat, a finished session in a conversation carrying ' +
+        'its history. A session running outside the panel (in a terminal, in VS Code) is ' +
+        'not taken over — a second writer into the same transcript would interleave the ' +
+        'turns — instead the panel shows where it runs: process number, start time, ' +
+        'command, directory and a button to its project if the project is in the panel. If the ' +
+        'system does not return the process list, the panel does not call such a session ' +
+        'finished; it says the process list could not be read, and “Go to” can be pressed again.',
+      reportSessionsStop: '“Stop”: first it says what will be stopped',
+      reportSessionsStopText:
+        'The button is there while the session runs. The dialog names the process, place, ' +
+        'command and directory, and only after you confirm does it stop the process ' +
+        'together with its children; if the panel itself was started from that process, ' +
+        'the dialog warns separately. The outcome is put in words — including “the ' +
+        'process is already gone” when it ended on its own while the dialog was open. A ' +
+        'process the panel could not identify is not stopped, and the panel says why. If ' +
+        'the process number cannot be verified at that moment (the system did not return ' +
+        'the process list or their parents, or a live number dropped out of the CLI list), ' +
+        'the panel leaves it untouched and says plainly “not stopped” — ' +
+        'the stop can be repeated. For a panel chat no process is killed: the button stops the chat run itself, like ' +
+        '“Stop” in the chat, and the outcome reads “The panel chat stopped”. If the panel could ' +
+        'not verify the chat’s process, it leaves it alone and answers “The agent process was ' +
+        'not stopped…”: the run goes on, and the stop can be repeated.',
 
       liveTitle: 'Path 2. The live slice: is anyone working right now',
       liveCaption:
@@ -187,7 +215,10 @@ export const analyticsEn: typeof analyticsRu = {
     limitSessionsText:
       'The last twenty-five conversations of the period are shown, not all of them — and ' +
       'the CSV or JSON export carries the same twenty-five. The summary numbers, however, ' +
-      'are counted over every session of the period, not over the visible ones.',
+      'are counted over every session of the period, not over the visible ones. The number ' +
+      'on the “Sessions” tab is the exact count of conversations in the period; when there ' +
+      'are more than the list holds, the hint on the number says so: “Sessions in the ' +
+      'period: N; the list shows the latest 25”.',
     limitProject: 'A conversation is counted under the “wrong” project',
     limitProjectText:
       'The project is the directory the session was launched from: every record has its ' +
@@ -248,14 +279,15 @@ export const analyticsEn: typeof analyticsRu = {
     metricHoursText:
       'The only chart about routine: which hours of the day the work happens in, in your ' +
       'machine’s time. Handy for noticing that half the spend falls on night runs.',
-    metricScan: 'The scan line at the bottom',
+    metricScan: 'The scan line',
     metricScanText:
       'How many files the panel walked and in how many milliseconds. Files are read in ' +
       'full, so this is an honest measure of the work, not an estimate.',
     metricSessions: 'Sessions',
     metricSessionsText:
       'The period’s conversations with their project, git branches and volume. Active ones ' +
-      'are marked; the list holds the latest twenty-five.',
+      'are marked; the list holds the latest twenty-five. Every row has “Go to”, a ' +
+      'running one also “Stop”.',
 
     loweredTitle: 'Lowered fan-out runs',
     loweredCaption:
@@ -349,13 +381,19 @@ export const analyticsEn: typeof analyticsRu = {
       '01-today':
         'The “Today” period: 1.1 million tokens in total (1,124,802), 9 requests to the model, 14.3 thousand generated, 89 % read from cache, 0.96 $ at API rates',
       '02-month':
-        'The same screen over “30 days”: 53.3 million tokens, 486 requests, 86.9 % from cache, 59.72 $ — and the daily spend chart from 08-13 to 09-10 has appeared',
+        'The same screen over “30 days”: 53.3 million tokens, 486 requests, 86.9 % from cache, 62.79 $ — and the daily spend chart from 08-29 to 09-26 has appeared',
       '03-detail':
-        'A click on the claude-opus-4-8 bar: 19.1 million tokens (35.9 % of the total volume), 173 requests, 16.3 million read from cache, 2.4 million written, an estimate of 36.57 $ — and the latest sessions of that model',
+        'A click on the claude-opus-4-8 row: 19.1 million tokens (35.9 % of the total volume), 173 requests, 16.3 million read from cache, 2.4 million written, an estimate of 36.57 $ — and the latest sessions of that model',
       '04-hours':
         'Activity by hour from 9:00 to 18:00, the most often called tools (Read 104, Task 96, WebFetch 95) and skill usage (release-notes 34, price-import 21, legacy-import 4)',
       '05-sessions':
-        'The latest sessions with their project, git branch (main, feature/roles), models and volume; below them the card about subscription limits and the line “50 files scanned in 34 ms”',
+        'The latest sessions with their project, git branch (main, feature/roles), models, volume and a “Go to” button on every row; below them the card about subscription limits',
+      '07-session-where':
+        'The “Where the session runs” dialog: in a terminal — outside the panel, PID 41872, start time, the claude --resume command and the directory C:/work/shop-front; the project is not in the panel, so “Open the project” is unavailable',
+      '08-session-stop':
+        'The “Stop the session?” dialog: process 41872 (in a terminal — outside the panel) is taken down together with its child processes, below it its number, start time, command and directory; “Cancel” and “Stop” buttons',
+      '06-breakdown':
+        'The Models and projects tab over 30 days: claude-opus-4-8 19.1M, claude-sonnet-5 17.3M, claude-haiku-4-5 16.9M; work/shop-front 31.7M, work/shop-admin 21.6M',
     },
     live: {
       '01-idle': 'The “Running right now” block at zero: “No running Claude Code processes found”',

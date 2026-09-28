@@ -1,6 +1,8 @@
 import type {
+  CodedMessage,
   ProjectTestAttributeDef,
   ProjectTestEnvironment,
+  ProjectTestLibraryIssue,
   ProjectTestFilter,
   ProjectTestSchema,
   ProjectTestSecretRef,
@@ -24,6 +26,7 @@ import {
   writeJson,
 } from './files.ts';
 import { coded } from '../../lib/server-text.ts';
+import { AUTOMATION_FILE, readAutomation } from './automation.ts';
 
 /**
  * Обвязка библиотеки тестов: общие шаги, окружения, свои поля и статусы,
@@ -61,12 +64,25 @@ const FILE_TITLES: Record<string, string> = {
  * Что из обвязки не прочиталось. Чтение остаётся щадящим — этот список нужен
  * тем, кто показывает файлы человеку, а не тем, кто просто берёт из них данные.
  */
-export function readLibraryIssues(root: string): { file: string; error: string }[] {
-  const issues: { file: string; error: string }[] = [];
+export function readLibraryIssues(root: string): ProjectTestLibraryIssue[] {
+  const issues: ProjectTestLibraryIssue[] = [];
+  // Причина едет и кодом: окно настроек называет её на языке интерфейса, а
+  // строка `error` остаётся для CLI и старого клиента (F-356).
+  const issue = (file: string, read: { error?: string } & CodedMessage): void => {
+    if (!read.error) return;
+    issues.push({
+      file: testsFile(file),
+      error: read.error,
+      ...(read.messageCode ? { messageCode: read.messageCode } : {}),
+      ...(read.params ? { params: read.params } : {}),
+    });
+  };
   for (const file of [SHARED_FILE, ENVIRONMENTS_FILE, SCHEMA_FILE, VIEWS_FILE]) {
-    const { error } = readJson(root, file);
-    if (error) issues.push({ file: testsFile(file), error });
+    issue(file, readJson(root, file));
   }
+  // Команда прогона проверяется и по смыслу: файл без «command» — тоже поломка,
+  // иначе кнопка молча закрыта, а человек не знает почему.
+  issue(AUTOMATION_FILE, readAutomation(root));
   return issues;
 }
 

@@ -1,4 +1,4 @@
-import { apiClient } from '@shared/api/client';
+import { apiClient, messageFromPayload, toErrorMessage } from '@shared/api/client';
 import { i18n } from '@shared/config/i18n';
 import { toast } from '@shared/lib/toast';
 import { drainQueue, finalize, startRun } from './agent-runs.lifecycle';
@@ -16,7 +16,7 @@ import {
   setRun,
 } from './agent-runs.state';
 import { loadQueue, persistQueue } from './agent-runs.queue-store';
-import { ensureSlotsWatch, rebalance } from './agent-runs.slots';
+import { attachRun, ensureSlotsWatch, rebalance } from './agent-runs.slots';
 import { ensureWatchdog, rebuildStatuses } from './agent-runs.statuses';
 import type { AgentRun, HandoffEvent, QueuedMessage } from './agent-runs.types';
 import { permissionDeliveryProblem } from './permissionDelivery';
@@ -310,10 +310,13 @@ export function stopRun(id: string): void {
   void apiClient.post(`/chat/${target}/stop`).catch((error: unknown) => {
     const run = runs.get(key);
     if (!run) return;
-    runs.set(key, {
-      ...run,
-      error: error instanceof Error ? error.message : String(error),
-    });
+    // Текст — словами сервера (код перевода), а не «status code 409» axios.
+    const message = toErrorMessage(error);
+    if (isStopUnconfirmed(error)) {
+      resumeAfterRefusedStop(key, id, message);
+      return;
+    }
+    runs.set(key, { ...run, error: message });
     emit();
   });
   const controller = controllers.get(key);
@@ -322,6 +325,43 @@ export function stopRun(id: string): void {
   // Оборвать нечего, и без этого он навис бы «идущим» навсегда: поток
   // завершён, таймер только что снят, а финализировать его больше некому.
   if (!controller) finalize(key);
+}
+
+function isStopUnconfirmed(error: unknown): boolean {
+  const data = (error as { response?: { data?: { code?: unknown } } } | null)?.response?.data;
+  return data?.code === 'stop_unconfirmed';
+}
+
+/**
+ * Сервер не снял процесс (F-145): номер нечем проверить, а чужое он не трогает.
+ * Прогон на сервере идёт — поток, оборванный кнопкой, подключаем заново, иначе
+ * агент работал бы дальше под видом «остановлено», а лента молчала бы до F5.
+ * Ждём, пока прежний поток дочитается: он закрывает ход по метке остановки, и
+ * снять её раньше значило бы превратить его конец в падение с авто-рестартом.
+ */
+function resumeAfterRefusedStop(key: string, id: string, message: string, tries = 0): void {
+  if (!runs.has(key)) return;
+  if (controllers.has(key) && tries < 100) {
+    setTimeout(() => resumeAfterRefusedStop(key, id, message, tries + 1), 20);
+    return;
+  }
+  stoppedByUser.delete(key);
+  stoppedByUser.delete(id);
+  // Буфер прогона отдадут заново с нулевого `seq` — набранное начинаем с чистого.
+  setRun(key, {
+    status: 'running',
+    error: message,
+    text: '',
+    thinking: '',
+    tools: [],
+    stalled: undefined,
+    dropped: undefined,
+    lastEventAt: Date.now(),
+    parked: true,
+  });
+  rebuildStatuses();
+  emit();
+  attachRun(key);
 }
 
 /**
@@ -486,12 +526,12 @@ export async function decideBranchGate(
       choice,
       ...(branch ? { branch } : {}),
     });
-    const answer = data as { ok?: unknown; path?: unknown; message?: unknown };
+    const answer = data as { ok?: unknown; path?: unknown };
     if (answer?.ok !== true) {
-      return {
-        ok: false,
-        ...(typeof answer?.message === 'string' ? { error: answer.message } : {}),
-      };
+      // Тот же путь текста, что у отказа с исключением ниже: код сервера — на
+      // языке интерфейса, сырой русский `message` — только запасной (F-336).
+      const text = messageFromPayload(answer);
+      return { ok: false, ...(text ? { error: text } : {}) };
     }
     const after = runs.get(key);
     if (after) {
@@ -504,11 +544,11 @@ export async function decideBranchGate(
     }
     return { ok: true, ...(typeof answer.path === 'string' ? { path: answer.path } : {}) };
   } catch (error) {
-    const body = (error as { response?: { data?: { message?: unknown } } })?.response?.data;
-    return {
-      ok: false,
-      ...(typeof body?.message === 'string' ? { error: body.message } : {}),
-    };
+    // Текст по коду сервера на языке интерфейса (умерший запрос — «истёк»),
+    // русский `message` — запасной.
+    const body = (error as { response?: { data?: unknown } })?.response?.data;
+    const text = messageFromPayload(body);
+    return { ok: false, ...(text ? { error: text } : {}) };
   }
 }
 

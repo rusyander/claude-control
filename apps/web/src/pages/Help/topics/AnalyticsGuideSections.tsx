@@ -34,6 +34,9 @@ export function AnalyticsGuideSections({ tr }: SectionProps) {
           <GuideStep title={g('reportMonth')} text={g('reportMonthText')}>
             <HelpShot topic="analytics" scenario="report" frame="02-month" side="panel" />
           </GuideStep>
+          <GuideStep title={g('reportBreakdown')} text={g('reportBreakdownText')}>
+            <HelpShot topic="analytics" scenario="report" frame="06-breakdown" side="panel" />
+          </GuideStep>
           <GuideStep title={g('reportDetail')} text={g('reportDetailText')}>
             <HelpShot topic="analytics" scenario="report" frame="03-detail" side="panel" />
           </GuideStep>
@@ -42,6 +45,12 @@ export function AnalyticsGuideSections({ tr }: SectionProps) {
           </GuideStep>
           <GuideStep title={g('reportSessions')} text={g('reportSessionsText')}>
             <HelpShot topic="analytics" scenario="report" frame="05-sessions" side="panel" />
+          </GuideStep>
+          <GuideStep title={g('reportSessionsGo')} text={g('reportSessionsGoText')}>
+            <HelpShot topic="analytics" scenario="report" frame="07-session-where" side="panel" />
+          </GuideStep>
+          <GuideStep title={g('reportSessionsStop')} text={g('reportSessionsStopText')}>
+            <HelpShot topic="analytics" scenario="report" frame="08-session-stop" side="panel" />
           </GuideStep>
         </GuideSteps>
       </HelpSection>

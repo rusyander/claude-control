@@ -88,7 +88,7 @@ let journal = EMPTY;
 await page.route('**/api/chat/lowered-runs*', (route) => route.fulfill({ json: journal }));
 
 const open = async () => {
-  await page.goto(`${BASE}/analytics`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`${BASE}/analytics?tab=live`, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('nav');
   await page.waitForTimeout(1500);
 };

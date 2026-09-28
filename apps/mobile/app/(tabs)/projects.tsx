@@ -35,7 +35,7 @@ export default function ProjectsScreen() {
 
   const open = (path: string): void => {
     openProject(path);
-    router.push('/');
+    router.push('/chat');
   };
 
   const entries = dir ? (listing.data?.entries ?? []) : (roots.data ?? []);
@@ -67,7 +67,7 @@ export default function ProjectsScreen() {
           <Row gap={space.sm}>
             <Button
               title={t.projects.toChat}
-              onPress={() => router.push('/')}
+              onPress={() => router.push('/chat')}
               style={styles.grow}
             />
             <Button

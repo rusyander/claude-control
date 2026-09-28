@@ -1,0 +1,93 @@
+{
+  "topic": "search",
+  "frames": {
+    "find/01-prompt": {
+      "light-ru": {
+        "file": "01-prompt.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "light-en": {
+        "file": "01-prompt.en.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-ru": {
+        "file": "01-prompt.dark.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-en": {
+        "file": "01-prompt.dark.en.png",
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    "find/02-two-sections": {
+      "light-ru": {
+        "file": "02-two-sections.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "light-en": {
+        "file": "02-two-sections.en.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-ru": {
+        "file": "02-two-sections.dark.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-en": {
+        "file": "02-two-sections.dark.en.png",
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    "find/03-variables": {
+      "light-ru": {
+        "file": "03-variables.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "light-en": {
+        "file": "03-variables.en.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-ru": {
+        "file": "03-variables.dark.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-en": {
+        "file": "03-variables.dark.en.png",
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    "find/04-empty": {
+      "light-ru": {
+        "file": "04-empty.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "light-en": {
+        "file": "04-empty.en.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-ru": {
+        "file": "04-empty.dark.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-en": {
+        "file": "04-empty.dark.en.png",
+        "width": 1440,
+        "height": 1000
+      }
+    }
+  }
+}

@@ -78,8 +78,10 @@ export function registerPluginRoutes(app: FastifyInstance, ctx: ServerContext): 
     return addMarketplace(request.body.source, activeCliCommand(ctx.store));
   });
 
+  // Параметр уже раскодирован Fastify: второе раскодирование падало на «%» пятисоткой
+  // и превращало присланное имя в другое.
   app.delete<{ Params: { name: string } }>('/api/plugins/marketplaces/:name', (request) =>
-    removeMarketplace(decodeURIComponent(request.params.name), activeCliCommand(ctx.store)),
+    removeMarketplace(request.params.name, activeCliCommand(ctx.store)),
   );
 
   // Скаффолдер: пишет файлы в выбранный пользователем каталог (не в ~/.claude),

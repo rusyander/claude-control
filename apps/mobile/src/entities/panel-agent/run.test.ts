@@ -18,7 +18,7 @@ vi.mock('../../shared/api/client', () => ({
   authHeaders: () => ({ Authorization: 'Bearer phone-token' }),
 }));
 
-const { runPanelAgent } = await import('./run');
+const { STREAM_LOST, runPanelAgent } = await import('./run');
 
 function streamOf(chunks: string[]): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
@@ -88,14 +88,123 @@ describe('ход агента панели с телефона', () => {
     });
   });
 
-  it('поток без итогового кадра — обрыв, а не успех', async () => {
+  it('поток без итогового кадра (панель перезапустилась) — обрыв связи, а не успех', async () => {
     fetchMock.mockResolvedValue(new Response(streamOf([frame({ kind: 'text', text: 'нач' })])));
     const outcome = await runPanelAgent(
       { messages: [{ role: 'user', content: 'x' }], context: { route: 'phone' } },
       () => undefined,
       new AbortController().signal,
     );
-    expect(outcome).toMatchObject({ ok: false, code: 'cut' });
+    expect(outcome).toMatchObject({ ok: false, code: STREAM_LOST });
+  });
+
+  it('замолчавший поток кончает ход кодом stream_lost, а не висит в «Агент думает…»', async () => {
+    const encoder = new TextEncoder();
+    const hanging = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(
+          encoder.encode(frame({ kind: 'start', conversationId: 'c1', providerId: 'claude' })),
+        );
+      },
+    });
+    fetchMock.mockResolvedValue(new Response(hanging));
+    const kinds: string[] = [];
+    const outcome = await runPanelAgent(
+      { messages: [{ role: 'user', content: 'x' }], context: { route: 'phone' } },
+      (event) => kinds.push(event.kind),
+      new AbortController().signal,
+      40,
+    );
+    expect(kinds).toEqual(['start']);
+    expect(outcome).toMatchObject({ ok: false, code: STREAM_LOST });
+  });
+
+  it('пинги держат ход живым: паузы короче порога, весь ход — много дольше', async () => {
+    const encoder = new TextEncoder();
+    const pause = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 40));
+    const alive = new ReadableStream<Uint8Array>({
+      async start(controller) {
+        controller.enqueue(
+          encoder.encode(frame({ kind: 'start', conversationId: 'c1', providerId: 'claude' })),
+        );
+        for (let i = 0; i < 3; i += 1) {
+          await pause();
+          controller.enqueue(encoder.encode(': ping\n\n'));
+        }
+        await pause();
+        controller.enqueue(encoder.encode(frame({ kind: 'done', reply: 'Три.' })));
+        controller.close();
+      },
+    });
+    fetchMock.mockResolvedValue(new Response(alive));
+    const outcome = await runPanelAgent(
+      { messages: [{ role: 'user', content: 'x' }], context: { route: 'phone' } },
+      () => undefined,
+      new AbortController().signal,
+      80,
+    );
+    expect(outcome).toEqual({ ok: true });
+  });
+
+  // F-101: приложение в фоне — JS спит, кадры копятся в сокете. При возврате
+  // просроченный таймер тишины срабатывал раньше, чем читались накопленные
+  // кадры, и живой ход обрывался (а сервер его останавливал).
+  it('возврат из фона: просроченный таймер не рвёт живой ход', async () => {
+    const encoder = new TextEncoder();
+    const alive = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(
+          encoder.encode(frame({ kind: 'start', conversationId: 'c1', providerId: 'claude' })),
+        );
+        setTimeout(
+          () =>
+            setImmediate(() => {
+              // «Фон»: поток JS стоит дольше двух порогов тишины подряд.
+              const until = Date.now() + 150;
+              while (Date.now() < until) {
+                // занято
+              }
+              // Кадр, пришедший «пока спали», доходит уже после просроченного
+              // таймера тишины — как при возврате приложения на экран.
+              setTimeout(() => {
+                controller.enqueue(encoder.encode(frame({ kind: 'done', reply: 'Готово.' })));
+                controller.close();
+              }, 0);
+            }),
+          5,
+        );
+      },
+    });
+    fetchMock.mockResolvedValue(new Response(alive));
+    const outcome = await runPanelAgent(
+      { messages: [{ role: 'user', content: 'x' }], context: { route: 'phone' } },
+      () => undefined,
+      new AbortController().signal,
+      40,
+    );
+    expect(outcome).toEqual({ ok: true });
+  });
+
+  it('порванный посреди хода поток — тот же обрыв связи', async () => {
+    const encoder = new TextEncoder();
+    let sent = false;
+    const broken = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (sent) {
+          controller.error(new Error('socket hang up'));
+          return;
+        }
+        sent = true;
+        controller.enqueue(encoder.encode(frame({ kind: 'text', text: 'нач' })));
+      },
+    });
+    fetchMock.mockResolvedValue(new Response(broken));
+    const outcome = await runPanelAgent(
+      { messages: [{ role: 'user', content: 'x' }], context: { route: 'phone' } },
+      () => undefined,
+      new AbortController().signal,
+    );
+    expect(outcome).toMatchObject({ ok: false, code: STREAM_LOST });
   });
 
   it('кадр error завершает ход с его текстом', async () => {

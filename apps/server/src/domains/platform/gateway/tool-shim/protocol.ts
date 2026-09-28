@@ -75,7 +75,7 @@ export function readTools(input: unknown): ShimTool[] {
 
 /** Версия протокола, названная самим текстом промпта. */
 export function protocolVersionOf(text: string): number | undefined {
-  const match = /верси[яи]\s+(\d+)/i.exec(text);
+  const match = /(?:version|верси[яи])\s+(\d+)/i.exec(text);
   return match ? Number(match[1]) : undefined;
 }
 
@@ -87,11 +87,11 @@ export function protocolVersionOf(text: string): number | undefined {
  * тысяч знаков на каждый ход — цена, которую платит человек.
  */
 export function renderToolList(tools: readonly ShimTool[]): string {
-  const lines = ['Список инструментов:', ''];
+  const lines = ['Tool list:', ''];
   for (const tool of tools) {
     lines.push(`### ${tool.name}`);
     if (tool.description) lines.push(tool.description);
-    lines.push(`Аргументы: ${JSON.stringify(tool.schema ?? {})}`);
+    lines.push(`Arguments: ${JSON.stringify(tool.schema ?? {})}`);
     lines.push('');
   }
   return lines.join('\n').trimEnd();

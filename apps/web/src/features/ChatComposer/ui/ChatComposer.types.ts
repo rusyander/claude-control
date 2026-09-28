@@ -1,3 +1,11 @@
+/** Отсеянные при вложении — их называют человеку, каждый со своей причиной. */
+export interface AttachRejection {
+  /** Тип, который панель не передаёт: только имена. */
+  unsupported: string[];
+  /** Крупнее предела: имя и настоящий размер — «больше 20 МБ» без него не сверить. */
+  tooLarge: { name: string; size: number }[];
+}
+
 export interface AttachedFile {
   name: string;
   sizeBytes: number;
@@ -26,11 +34,11 @@ export interface ChatComposerProps {
   onSend: (files: AttachedFile[]) => void | boolean | Promise<void | boolean>;
   onStop: () => void;
   /**
-   * Файлы, которые не приложились (сейчас — крупнее предела). Сказать о них
-   * обязана страница: отказ идёт тем же путём, что и отказ по типу файла, —
-   * одним сообщением, а не вторым механизмом рядом.
+   * Файлы, которые не приложились: тип, который панель не передаёт, или размер
+   * больше предела. Сказать о них обязана страница — тем же семейством
+   * сообщений, что и отказ при отправке, а не вторым механизмом рядом.
    */
-  onRejectFiles?: (names: string[]) => void;
+  onRejectFiles?: (rejection: AttachRejection) => void;
   isRunning: boolean;
   /**
    * Попросить агента разделить задачи по чатам. Пусто — кнопки нет: вне проекта

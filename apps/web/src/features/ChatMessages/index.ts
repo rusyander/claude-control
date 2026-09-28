@@ -16,6 +16,7 @@ export type { HandoffCardProps } from './ui/HandoffCard.types';
  * которая работает у любого CLI.
  */
 export { MediaFeedCard } from './ui/MediaFeedCard';
+export { MediaRequestText } from './ui/MediaRequestText';
 export type { MediaFeedCardProps } from './ui/MediaFeedCard.types';
 export type { ChildPermission, ChildQuestion, HandoffControls } from './ui/ChatMessages.types';
 /**
@@ -25,6 +26,12 @@ export type { ChildPermission, ChildQuestion, HandoffControls } from './ui/ChatM
  * списка чатов и прогонов, у чужого CLI из дерева (`pages/ProviderChat/lib`).
  */
 export { ChildStages } from './ui/ChildStages';
+/**
+ * Вопросы и запросы прав звеньев у родителя. Собирает их страница
+ * (`pages/Chat/lib/treeAsks`), рисует этот блок — и её тест сверяет сборку с
+ * настоящей отрисовкой, а не с копией разметки.
+ */
+export { ChildBlocks } from './ui/ChildBlocks';
 export type { ChildStageGroup, ChildStagesProps } from './ui/ChildStages.types';
 /**
  * Склейка строк хаба с записью конвейера уровней. Наружу — по той же причине:

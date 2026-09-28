@@ -78,7 +78,7 @@ export function registerScriptRoutes(app: FastifyInstance, ctx: ServerContext): 
             request.body.content,
             ctx.backupDir,
           ),
-          needsRestart: true,
+          needsRestart: false,
         };
       } catch (error) {
         return replyScriptError(reply, error);
@@ -86,6 +86,8 @@ export function registerScriptRoutes(app: FastifyInstance, ctx: ServerContext): 
     },
   );
 
+  // needsRestart: false во всех трёх ответах: скрипт запускается заново на каждое
+  // событие хука, правка действует со следующего события — перезапуск CLI не нужен.
   // Создание — только нового файла: существующее имя даёт 409, а не перезапись
   // (правка существующего идёт через PUT по его id).
   app.post<{ Body: { name?: string; content?: string } }>('/api/scripts', (request, reply) => {
@@ -99,7 +101,7 @@ export function registerScriptRoutes(app: FastifyInstance, ctx: ServerContext): 
 
     try {
       createScript(ctx.location.paths.hooks, name, request.body.content ?? '');
-      return { ok: true, needsRestart: true };
+      return { ok: true, needsRestart: false };
     } catch (error) {
       return replyScriptError(reply, error);
     }
@@ -110,7 +112,7 @@ export function registerScriptRoutes(app: FastifyInstance, ctx: ServerContext): 
       return {
         ok: true,
         backupPath: deleteScript(ctx.location.paths.hooks, request.params['*'], ctx.backupDir),
-        needsRestart: true,
+        needsRestart: false,
       };
     } catch (error) {
       return replyScriptError(reply, error);

@@ -1,5 +1,5 @@
 import { existsSync, readdirSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { envItemKinds } from '@agentdeck/contracts/portable-env';
 import type {
   EnvItem,
@@ -224,7 +224,16 @@ function readInstructionsAndRules(stage: Stage): ImportResult {
   for (const file of resolved.sources) {
     const raw = readTextFile(file.filePath);
     const source = sourceFactory(deps.provider.id, deps.scope, file.filePath);
-    const parsed = parseRules(raw, deps.scope, store);
+    // Выключенные панелью правила живут в её состоянии и относятся к ОДНОМУ
+    // файлу — CLAUDE.md своего дома; у проекта и у прочих файлов их нет.
+    const ownClaudeMd =
+      deps.scope === 'global' && resolve(file.filePath) === resolve(join(paths.root, 'CLAUDE.md'));
+    const parsed = parseRules(
+      raw,
+      deps.scope,
+      store,
+      ownClaudeMd ? (deps.state?.disabledRules?.() ?? []) : [],
+    );
 
     if (parsed.rules.length === 0) {
       items.push(

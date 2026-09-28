@@ -243,7 +243,9 @@ describe('panel-agent actions: contour', () => {
       await app.inject({ method: 'GET', url: '/api/agent/actions' })
     ).json<PanelActionsList>();
     const contour = actions.filter((action) => action.section === 'contour');
-    expect(contour.map((action) => [action.name, action.risk])).toEqual([
+    // Первые пять — набор А6 в порядке показа; за ними идут наборы других
+    // дорожек (управление контуром, агенты контура), проверка ключа — по всем.
+    expect(contour.slice(0, 5).map((action) => [action.name, action.risk])).toEqual([
       ['list_contours', 'read'],
       ['contour_status', 'read'],
       ['probe_contour_url', 'read'],
@@ -323,7 +325,7 @@ describe('panel-agent actions: contour', () => {
       'approve',
     );
     expect(again.result.outcome).toBe('done');
-    expect(again.result.result).toMatchObject({ note: 'ключ сохранён', title: 'Dev 2' });
+    expect(again.result.result).toMatchObject({ note: 'key saved', title: 'Dev 2' });
 
     assertNoKeyAnywhere();
   });

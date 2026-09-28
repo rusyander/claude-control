@@ -86,7 +86,7 @@ describe('scanSplitTickets', () => {
 
     expect(scanSplitTickets(preamble)).toHaveLength(1);
     expect(scanSplitHumanSteps(preamble)).toEqual([
-      expect.objectContaining({ action: 'что сделать' }),
+      expect.objectContaining({ action: 'what to do' }),
     ]);
   });
 

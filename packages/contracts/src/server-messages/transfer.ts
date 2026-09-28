@@ -57,9 +57,11 @@ export const transferMessageParams = {
   'backup-restore-target-unknown': ['target'],
   'backup-passphrase-required': [],
   'backup-decrypt-failed': [],
+  'backup-preview-encrypted': [],
   'history-provider-copy-readonly': ['file'],
   'history-current-file-missing': [],
   'history-binary-no-hunks': [],
   'history-too-large-no-hunks': [],
   'history-hunk-not-found': [],
+  'history-hunk-not-newest': [],
 } as const satisfies Record<string, readonly string[]>;

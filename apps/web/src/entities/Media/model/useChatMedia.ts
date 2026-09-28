@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { MediaDeck, MediaImage } from '@agentdeck/contracts';
 import { toast } from '@shared/lib/toast';
@@ -11,6 +11,7 @@ import {
   useMediaPrompt,
 } from '../api/MediaApi';
 import type { ComposerMode, ComposerModeState } from './composer-mode';
+import { onComposerModeRequest, takeComposerMode, type ComposerHost } from './composer-request';
 import { deckModeView, imageModeView } from './media-mode';
 import { composerFlags, planMediaSubmit } from './media-submit';
 import type { MediaRevision } from './revision';
@@ -27,6 +28,8 @@ export interface ChatMediaInput {
   ask?: (text: string) => Promise<boolean> | boolean;
   /** Правый столбец один: открытый результат убирает предпросмотр артефакта. */
   closePreview?: () => void;
+  /** Чей это композер: режим, заказанный агентом, забирает только чат Claude. */
+  host?: ComposerHost;
 }
 
 export interface ChatMediaApi {
@@ -69,7 +72,12 @@ export interface ChatMediaApi {
  * либо запертым с причиной. Считать её здесь во второй раз значило бы разойтись с
  * настоящим маршрутом — болезнь, которую в Т6 вылечил один общий `chooseRunModel`.
  */
-export function useChatMedia({ chatId, ask, closePreview }: ChatMediaInput): ChatMediaApi {
+export function useChatMedia({
+  chatId,
+  ask,
+  closePreview,
+  host = 'chat',
+}: ChatMediaInput): ChatMediaApi {
   const { t } = useTranslation();
   const [mode, setMode] = useState<ComposerMode>('text');
   const [shownImage, setShownImage] = useState<MediaImage>();
@@ -77,6 +85,17 @@ export function useChatMedia({ chatId, ask, closePreview }: ChatMediaInput): Cha
   /** Колода, которую правит следующая отправка. Пусто — обычная сборка. */
   const [revising, setRevising] = useState<MediaDeck>();
   const [topic, setTopic] = useState<string>();
+
+  // Режим, заказанный тем, кто открыл чат за человека (агент панели): забираем
+  // при монтировании и по сигналу, если страница уже была открыта.
+  useEffect(() => {
+    const apply = (): void => {
+      const wanted = takeComposerMode(host);
+      if (wanted) setMode(wanted);
+    };
+    apply();
+    return onComposerModeRequest(apply);
+  }, [host]);
 
   // Признак разговора уезжает в план: с агентом рядом дорога есть всегда, и
   // сервер обязан считать доступность именно для этого места.

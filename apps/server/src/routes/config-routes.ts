@@ -15,6 +15,7 @@ import {
 } from '../lib/credentials.ts';
 import { buildOverview } from '../domains/overview.ts';
 import { readAccount } from '../domains/account.ts';
+import { applyPromptGate } from '../domains/prompt-gate.ts';
 import { forgetOrphanPlatforms, withLegacyConsumers } from '../domains/platform/store.ts';
 import { reconcileActivePlatform } from '../domains/platform/activation.ts';
 import { reconcileManagedProfiles } from '../domains/platform/apply/profile.ts';
@@ -28,6 +29,7 @@ import {
 import { basename } from 'node:path';
 import { issuesOf } from '../lib/request-body.ts';
 import { codeOf } from '../lib/server-text.ts';
+import { runLegacyGroupMigrations } from '../domains/groups/legacy-migrations.ts';
 import type { CredentialsLookup } from '../lib/credentials.ts';
 
 /** Источник доступа и причина с кодом — без самого токена. */
@@ -38,6 +40,15 @@ function credentialsReply(found: CredentialsLookup) {
     reasonCode: found.reasonCode,
     reasonParams: found.reasonParams,
   };
+}
+
+/**
+ * После смены каталога на лету: у нового каталога свой state.json, и перенос
+ * старого «Порядка работы» в путь, который на старте делает onReady, нужен и ему.
+ */
+function afterRelocate(app: FastifyInstance, ctx: ServerContext): void {
+  const deps = { paths: ctx.location.paths, store: ctx.store, backupDir: ctx.backupDir };
+  runLegacyGroupMigrations(deps, app.log);
 }
 
 /** Маршруты про само приложение: расположение конфигов, настройки, сводка. */
@@ -84,7 +95,10 @@ export function registerConfigRoutes(app: FastifyInstance, ctx: ServerContext): 
     // Запоминаем там, откуда путь прочитает следующий запуск (хранилище
     // каталога старта), а не в `ctx.store` — после переезда это уже хранилище
     // НОВОГО каталога, и панель после перезапуска забывала ручной путь.
-    if (result.isValid) ctx.rememberDirOverride(path);
+    if (result.isValid) {
+      ctx.rememberDirOverride(path);
+      afterRelocate(app, ctx);
+    }
     return result;
   });
 
@@ -186,6 +200,7 @@ export function registerConfigRoutes(app: FastifyInstance, ctx: ServerContext): 
         });
       }
       ctx.rememberDirOverride(claudeDirOverride);
+      if (result.isValid) afterRelocate(app, ctx);
     }
     const settings = ctx.store.updateSettings(patch);
     // Глубина ротации копий действует сразу для следующих записей.
@@ -195,6 +210,26 @@ export function registerConfigRoutes(app: FastifyInstance, ctx: ServerContext): 
     // её ввода (см. backupEntry), а UI задаёт фразу отдельным запросом.
     if (patch.encryptSecretBackups !== undefined) {
       setEncryptSecretBackups(settings.encryptSecretBackups);
+    }
+    // Гейт на промпте говорит с человеком в CLI на языке, выбранном при сборке.
+    // Смена языка пересобирает СВОЙ скрипт сразу; правленный руками не трогается
+    // (это решает applyPromptGate). Отказ диска настройку не откатывает: язык
+    // интерфейса важнее, а карточка гейта покажет устаревший скрипт.
+    if (patch.language !== undefined && settings.promptGate.enabled) {
+      try {
+        applyPromptGate(
+          ctx.store,
+          {
+            hooksDir: ctx.location.paths.hooks,
+            settingsPath: ctx.location.paths.settings,
+            appDataDir: ctx.location.paths.appData,
+          },
+          settings.promptGate,
+          { backupDir: ctx.backupDir },
+        );
+      } catch (error) {
+        request.log.warn({ err: error }, 'prompt gate rebuild after language change failed');
+      }
     }
     // Контуры — единственный ключ настроек, за которым тянутся данные ВНЕ
     // настроек: ключ в шифрохранилище и след пробы. Этот маршрут про них не
@@ -257,7 +292,7 @@ export function registerConfigRoutes(app: FastifyInstance, ctx: ServerContext): 
         }
       : parsed.data;
 
-    ctx.store.importState(state);
+    ctx.store.importForeignState(state);
     // Снимок принёс СВОЙ список контуров, а ключи остались от прежнего: те, чьих
     // контуров в снимке нет, стали бы секретами без владельца — панель их больше
     // не показывает, значит и стереть их было бы уже нечем.

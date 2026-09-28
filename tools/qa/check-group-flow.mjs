@@ -23,34 +23,46 @@ page.on('console', (message) => {
 await page.goto(`${BASE_URL}/groups`, { waitUntil: 'domcontentloaded' });
 await page.waitForSelector('nav');
 
-// --- привязка к проекту и порядок работы: только форма, без сохранения ---
-// Сценарий НЕ сохраняем намеренно: сохранение записало бы скилл в настоящий
-// ~/.claude/skills, а автотест не имеет права оставлять следы в конфигурации.
-await page.getByRole('button', { name: /Создать группу/i }).click();
-await page.waitForSelector('[role="dialog"]');
+// --- привязка к проекту и «Когда»: только форма, без сохранения ---
+// «Порядок работы» из формы ушёл во вкладку окна группы (check-group-path.mjs);
+// в форме осталась одна строка «Когда уместна», по которой «Авто» выбирает группу.
+await page
+  .getByRole('button', { name: /Создать группу/i })
+  .first()
+  .click();
+// Одна кнопка создания, вид выбирается в окне: здесь нужен «Набор».
+await page
+  .getByRole('dialog', { name: 'Какую группу создать' })
+  .getByRole('button', { name: /^Набор/ })
+  .click();
+await page.getByRole('dialog', { name: 'Новый набор' }).waitFor();
 
 // Ищем внутри диалога: «Проекты» есть ещё и в боковом меню.
 const dialog = page.locator('[role="dialog"]');
 const hasBinding = await dialog.getByText('Проекты', { exact: true }).isVisible();
-const hasOrder = await dialog.getByText('Порядок работы', { exact: true }).isVisible();
-console.log('Блоки привязки и порядка работы на месте:', hasBinding && hasOrder ? 'да' : 'НЕТ');
-
-await page.getByLabel('Триггер по тексту запроса').fill('PRJ-(\\d+');
-await page.waitForTimeout(200);
-const showsTriggerError = await page.getByText('Это не регулярное выражение').isVisible();
-console.log('Сломанное выражение триггера подсвечено:', showsTriggerError ? 'да' : 'НЕТ');
-
-await page.getByRole('button', { name: /Добавить шаг/i }).click();
-await page.waitForTimeout(200);
-const hasStepFields = await page.getByLabel('Готово, когда').isVisible();
-console.log('Шаг добавляется вместе с признаком выполнения:', hasStepFields ? 'да' : 'НЕТ');
+const hasWhen = await dialog.getByLabel('Когда уместна').isVisible();
+const hasOldOrder = await dialog.getByText('Порядок работы', { exact: true }).isVisible();
+console.log(
+  'Привязка к проектам и поле «Когда уместна» на месте:',
+  hasBinding && hasWhen ? 'да' : 'НЕТ',
+);
+console.log('Старого блока «Порядок работы» в форме нет:', hasOldOrder ? 'НЕТ' : 'да');
+if (!hasBinding || !hasWhen || hasOldOrder) problems.push('форма группы: блоки не те');
 
 await page.getByRole('button', { name: /^Отмена$/ }).click();
 await page.waitForSelector('[role="dialog"]', { state: 'detached', timeout: 8000 });
 
 // --- создание ---
-await page.getByRole('button', { name: /Создать группу/i }).click();
-await page.waitForSelector('[role="dialog"]');
+await page
+  .getByRole('button', { name: /Создать группу/i })
+  .first()
+  .click();
+// Одна кнопка создания, вид выбирается в окне: здесь нужен «Набор».
+await page
+  .getByRole('dialog', { name: 'Какую группу создать' })
+  .getByRole('button', { name: /^Набор/ })
+  .click();
+await page.getByRole('dialog', { name: 'Новый набор' }).waitFor();
 await page.getByLabel('Название').fill(GROUP_NAME);
 await page.getByLabel('Описание').fill('создана автотестом, будет удалена');
 
@@ -71,6 +83,7 @@ const isCreated = await card
   .then(() => true)
   .catch(() => false);
 console.log('Группа создана и видна в списке:', isCreated ? 'да' : 'НЕТ');
+if (!isCreated) problems.push('группа не появилась в списке');
 
 // --- метка у скилла ---
 await page.goto(`${BASE_URL}/skills`, { waitUntil: 'domcontentloaded' });
@@ -80,7 +93,9 @@ await page.waitForTimeout(500);
 // --- удаление ---
 await page.goto(`${BASE_URL}/groups`, { waitUntil: 'domcontentloaded' });
 await page.waitForSelector('nav');
-await page.waitForTimeout(500);
+// Удаление живёт в шапке окна группы: карточка сетки — только главное.
+await page.getByRole('button', { name: GROUP_NAME, exact: true }).first().click();
+await page.getByRole('dialog', { name: GROUP_NAME }).waitFor({ timeout: 8000 });
 await page
   .getByRole('button', { name: new RegExp(`Удалить: ${GROUP_NAME}`, 'i') })
   .first()
@@ -102,6 +117,8 @@ const isDeleted = await page
   .then(() => true)
   .catch(() => false);
 console.log('Группа удалена:', isDeleted ? 'да' : 'НЕТ');
+if (!isDeleted) problems.push('группа не удалилась');
 
 await browser.close();
 console.log(problems.length ? `ПРОБЛЕМЫ:\n  ${problems.join('\n  ')}` : 'Ошибок консоли нет.');
+process.exit(problems.length ? 1 : 0);

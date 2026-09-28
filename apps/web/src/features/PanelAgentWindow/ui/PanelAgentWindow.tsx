@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { AnimatePresence, motion } from 'motion/react';
@@ -7,6 +7,9 @@ import { useReducedMotion } from '@shared/hooks/use-reduced-motion/useReducedMot
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { Typography } from '@shared/ui/typography';
+import { isEscapeYieldedToSideDock } from '@shared/lib/side-dock';
+import { ResizeHandle } from '@shared/ui/resize-handle';
+import { useDockWidth } from '../model/useDockWidth';
 import { focusWindow } from '../model/focusAnchor';
 import { ConversationView } from './ConversationView';
 import { HistoryView } from './HistoryView';
@@ -42,9 +45,22 @@ export function PanelAgentWindow({
   const isReduced = useReducedMotion();
   const titleId = useId();
   const descriptionId = useId();
+  const dock = useDockWidth();
 
-  // Ждущая карточка важнее истории: окно, открытое кадром, показывает разговор.
-  const shown = conversation.pending.length > 0 ? 'conversation' : view;
+  // Новая карточка СВОЕГО разговора возвращает окно к разговору — один раз, при
+  // появлении; дальше выбирает человек. Карточка другой вкладки или телефона
+  // видна в разговоре и на значке, но вид не держит: иначе «История» и «Журнал»
+  // не нажимались бы, пока где-то ждёт чужое решение.
+  const ownPendingIds = conversation.pending
+    .filter((card) => session.isOwn(card.conversationId))
+    .map((card) => card.id);
+  const ownPendingKey = ownPendingIds.join(',');
+  const seenPendingRef = useRef<ReadonlySet<string>>(new Set());
+  useEffect(() => {
+    const ids = ownPendingKey ? ownPendingKey.split(',') : [];
+    if (ids.some((id) => !seenPendingRef.current.has(id))) setView('conversation');
+    seenPendingRef.current = new Set(ids);
+  }, [ownPendingKey]);
 
   // Просьба кнопки агента: фокус в окно — к ждущей карточке или в поле ввода.
   // Счётчик, а не флаг: повторное нажатие при уже открытом окне тоже просьба.
@@ -54,7 +70,10 @@ export function PanelAgentWindow({
   }, [focusRequest, isOpen, panelRef]);
 
   const openConversation = (id: string): void => {
-    void session.openConversation(id).then(() => setView('conversation'));
+    void session
+      .openConversation(id)
+      .catch(() => session.note(t('panelAgent.history.openFailed'), 'error'))
+      .finally(() => setView('conversation'));
   };
 
   return createPortal(
@@ -70,17 +89,33 @@ export function PanelAgentWindow({
           aria-describedby={descriptionId}
           tabIndex={-1}
           data-panel-agent-window
+          data-side-dock
           variants={SLIDE}
           initial="hidden"
           animate="visible"
           exit="hidden"
           transition={withReducedMotion({ duration: DURATION.normal, ease: EASE }, isReduced)}
           onKeyDown={(event) => {
-            if (event.key !== 'Escape' || event.defaultPrevented) return;
+            if (event.key !== 'Escape') return;
+            // Модальное окно страницы рядом уступило этот Escape окну (side-dock).
+            if (event.defaultPrevented && !isEscapeYieldedToSideDock(event.nativeEvent)) return;
             event.preventDefault();
             onClose();
           }}
         >
+          {/* Ширину тянут за левый край — мышью или стрелками с клавиатуры. На
+              узком экране окно во весь экран, и тянуть там нечего. */}
+          {dock.isWide && (
+            <div className={styles.resizeEdge} data-panel-agent-resize>
+              <ResizeHandle
+                width={dock.width}
+                min={dock.min}
+                max={dock.max}
+                label={t('panelAgent.resize')}
+                onResize={dock.resize}
+              />
+            </div>
+          )}
           <header className={styles.dockHeader}>
             <div className={styles.dockTitle}>
               <Typography variant="heading-sm" as="h2" id={titleId}>
@@ -107,13 +142,13 @@ export function PanelAgentWindow({
                   key={item}
                   type="button"
                   className={styles.viewButton}
-                  aria-pressed={shown === item}
+                  aria-pressed={view === item}
                   onClick={() => setView(item)}
                 >
                   {t(`panelAgent.views.${item}`)}
                 </button>
               ))}
-              {shown === 'conversation' && session.state.feed.length > 0 && (
+              {view === 'conversation' && session.state.feed.length > 0 && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -126,9 +161,26 @@ export function PanelAgentWindow({
               )}
             </div>
 
-            {shown === 'conversation' && <ConversationView session={session} {...conversation} />}
-            {shown === 'history' && <HistoryView onOpen={openConversation} />}
-            {shown === 'journal' && <JournalView />}
+            {view === 'conversation' && (
+              <ConversationView
+                session={session}
+                {...conversation}
+                onOpenConversation={openConversation}
+              />
+            )}
+            {view === 'history' && (
+              <HistoryView
+                onOpen={openConversation}
+                isBusy={session.state.running}
+                {...(session.state.conversationId
+                  ? { currentId: session.state.conversationId }
+                  : {})}
+                onDeleted={(id) => {
+                  if (id === session.state.conversationId) session.reset();
+                }}
+              />
+            )}
+            {view === 'journal' && <JournalView />}
           </div>
         </motion.section>
       )}

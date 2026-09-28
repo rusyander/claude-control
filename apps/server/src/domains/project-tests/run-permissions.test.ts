@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { ProjectTestCase, ProjectTestRunMode } from '@agentdeck/contracts';
@@ -11,6 +11,7 @@ import {
   startPermissionGate,
   type RunPermissionGate,
 } from './run-permissions.ts';
+import { e2eFolderView } from './e2e-folder.ts';
 
 /**
  * Права прогона. Раньше агент шёл с `bypassPermissions`, и границы держало
@@ -93,7 +94,7 @@ describe('project-tests run-permissions', () => {
       // Соседние файлы хозяйства — тоже не её дело: черновик и есть весь результат.
       expect(isWritable(scope, '.agent/tests/_shared.steps.json')).toBe(false);
       expect(isWritable(scope, '.agent/tests/environments.json')).toBe(false);
-      expect(describeScope(scope)).toContain('черновик');
+      expect(describeScope(scope)).toContain('draft');
     });
 
     it('за корень проекта не выпускает даже абсолютным путём', () => {
@@ -153,7 +154,7 @@ describe('project-tests run-permissions', () => {
       expect(decidePermission(scope, 'Bash', { command: 'git push origin main' }).behavior).toBe(
         'deny',
       );
-      expect(denied.message).toContain('коммить');
+      expect(denied.message).toContain('commit and push nothing');
     });
 
     it('вопрос человеку в прогоне отклоняется: спрашивать некого', () => {
@@ -233,5 +234,45 @@ describe('project-tests run-permissions', () => {
       expect(response.status).toBe(200);
       expect(((await response.json()) as { behavior: string }).behavior).toBe('deny');
     });
+  });
+});
+
+// `testDir` из конфига Playwright брался дословно: чужой репозиторий с `testDir: '.'`
+// во вложенном приложении открывал агенту тестов запись в код приложения, а
+// `testDir: '..'` — запись за пределами проекта.
+describe('папка e2e из конфига не расширяет запись агента', () => {
+  let base: string;
+  beforeEach(() => {
+    base = mkdtempSync(join(tmpdir(), 'cc-e2e-scope-'));
+  });
+  afterEach(() => rmSync(base, { recursive: true, force: true }));
+
+  const scopeFor = (root: string) => runScope(root, 'generate', [], e2eFolderView(root).dir);
+
+  it('testDir «.» во вложенном приложении — код приложения не пишется', () => {
+    const root = join(base, 'proj');
+    mkdirSync(join(root, 'apps', 'web', 'src'), { recursive: true });
+    writeFileSync(
+      join(root, 'apps', 'web', 'playwright.config.ts'),
+      "export default { testDir: '.' }\n",
+    );
+    expect(isWritable(scopeFor(root), 'apps/web/src/App.tsx')).toBe(false);
+  });
+
+  it('testDir «..» — за пределы проекта не пишется', () => {
+    const root = join(base, 'proj');
+    mkdirSync(root, { recursive: true });
+    writeFileSync(join(root, 'playwright.config.ts'), "export default { testDir: '..' }\n");
+    expect(isWritable(scopeFor(root), join(base, 'other', 'secret.txt'))).toBe(false);
+  });
+
+  it('обычная папка тестов из конфига по-прежнему пишется', () => {
+    const root = join(base, 'proj');
+    mkdirSync(join(root, 'apps', 'web', 'e2e'), { recursive: true });
+    writeFileSync(
+      join(root, 'apps', 'web', 'playwright.config.ts'),
+      "export default { testDir: './e2e' }\n",
+    );
+    expect(isWritable(scopeFor(root), 'apps/web/e2e/login.spec.ts')).toBe(true);
   });
 });

@@ -6,7 +6,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
-import { killChildTree, killPidTree } from '../../lib/process-tree.ts';
+import { killChildTree, killPidTree, type KillOptions } from '../../lib/process-tree.ts';
+import { watchCliChild } from '../../lib/cli-spawn.ts';
+import { isPidAlive } from './run-ledger.ts';
 
 /**
  * Чем живая сессия говорит с процессом CLI (`live-session.ts`).
@@ -44,7 +46,11 @@ export interface LiveTransport {
   write(line: string): void;
   /** Конец ввода: CLI доделывает ход и выходит сам. */
   end(): void;
-  kill(): void;
+  /**
+   * Снять процесс. `'unconfirmed'` — процесс жив и не снят: номер нечем
+   * проверить (нет снимка процессов, F-205), а чужое панель не трогает (F-145).
+   */
+  kill(): 'unconfirmed' | void;
   /**
    * Отпустить процесс, не трогая его: сервер уходит, а CLI за посредником живёт
    * дальше и ждёт следующего сервера. Прямой запуск без труб сервера не живёт —
@@ -73,6 +79,18 @@ export type TransportOpener = (
 export interface RelayAddress {
   pipe: string;
   pid: number;
+  /**
+   * Ключ канала: посредник принимает подключение только после строки
+   * `relay_hello` с ним. Имя канала видно любому процессу машины (список
+   * `\\.\pipe\`), а подключившийся первым получал бы ввод CLI — то есть ходы
+   * агента от чужого имени. Нет ключа — посредник старый и пускает всех.
+   */
+  token?: string;
+}
+
+/** Первая строка подключения к посреднику: старый посредник служебную строку молча пропускает. */
+export function relayHello(token: string): string {
+  return `${JSON.stringify({ type: 'relay_hello', token })}\n`;
 }
 
 export const RELAY_SCRIPT = fileURLToPath(new URL('./live-relay.mjs', import.meta.url));
@@ -86,6 +104,8 @@ export const spawnDirect: TransportOpener = (launch, handlers) => {
     windowsHide: true,
     env: launch.env,
   });
+  // Ненулевой выход CLI — фоновому наблюдателю; до чтения stderr.
+  watchCliChild(launch.command, launch.args, child);
   // Сбой запуска приходит событием, а не исключением, и без слушателя уносит
   // весь сервер (см. `ChatRun.run`). То же у stdin: запись в закрывшийся CLI
   // отдаёт EPIPE отдельным `error`.
@@ -125,6 +145,7 @@ export interface RelayOptions {
 export function relayOpener(options: RelayOptions = {}): TransportOpener {
   return (launch, handlers) => {
     const pipe = newPipeName();
+    const token = randomBytes(16).toString('hex');
     const spec = join(launch.tempDir ?? tmpdir(), `relay-${randomBytes(6).toString('hex')}.json`);
     writeFileSync(
       spec,
@@ -135,6 +156,7 @@ export function relayOpener(options: RelayOptions = {}): TransportOpener {
         env: launch.env,
         shell: launch.shell,
         pipe,
+        token,
         ...(options.idleMs ? { idleMs: options.idleMs } : {}),
         ...(options.backgroundIdleMs ? { backgroundIdleMs: options.backgroundIdleMs } : {}),
       }),
@@ -143,7 +165,7 @@ export function relayOpener(options: RelayOptions = {}): TransportOpener {
     // Посредника поднимает пусковой процесс и тут же выходит (`live-relay-launch.mjs`):
     // родителя-сервера у посредника нет, и `taskkill /T` по серверу его не достаёт.
     // Pid приходит строкой пускового процесса, до неё в адресе 0 — «ещё не знаем».
-    const address: RelayAddress = { pipe, pid: 0 };
+    const address: RelayAddress = { pipe, pid: 0, token };
     // Задание (job object) того, кто запустил сервер, посредник всё же наследует,
     // если оно не разрешает тихий выход: вырваться из него node не умеет
     // (CREATE_BREAKAWAY_FROM_JOB libuv не ставит). Отвязанность пускового процесса
@@ -161,8 +183,35 @@ export function relayOpener(options: RelayOptions = {}): TransportOpener {
       if (!address.pid && pid > 0) address.pid = pid;
     });
     launcher.unref();
-    return connectRelay(address, handlers, options.connectMs);
+    return connectRelay(address, handlers, options.connectMs, { fresh: true });
   };
+}
+
+/**
+ * Посредник пропал, не сказав кода выхода (убит снаружи, канал пережившего
+ * прежний сервер посредника не поднялся).
+ * Процесс CLI при этом потерян, но разговор — нет: стенограмма на диске, и
+ * следующий ход продолжит ту же сессию. Метка нужна ленте: без неё причина
+ * уходила строкой «Не удалось запустить «claude»: relay closed», и человек
+ * читал это как поломку установки.
+ */
+export function relayLost(message: string): Error {
+  return Object.assign(new Error(message), { relayLost: true });
+}
+
+export function isRelayLost(error: unknown): boolean {
+  return error instanceof Error && (error as { relayLost?: unknown }).relayLost === true;
+}
+
+/**
+ * Канал так и не поднялся. У посредника, пережившего прежний сервер, это
+ * потеря процесса — разговор цел. У свежего запуска — сбой запуска: посредник
+ * упал при старте, и каждая повторная отправка упадёт так же, поэтому обещание
+ * «отправьте, и он продолжится» ложно, а сырую причину (труба) лента сохраняет.
+ */
+function unreachable(pipe: string, fresh: boolean): Error {
+  const message = `relay ${pipe} unreachable`;
+  return fresh ? new Error(`${message}: the relay channel never came up`) : relayLost(message);
 }
 
 /**
@@ -174,12 +223,30 @@ export function connectRelay(
   address: RelayAddress,
   handlers: TransportHandlers,
   connectMs = 10_000,
+  options: {
+    fresh?: boolean;
+    /**
+     * Снятие дерева по номеру, когда канала нет. Подменяют тесты — снимок
+     * процессов, который отказал (F-205), иначе не воспроизвести.
+     */
+    killTree?: (pid: number, options: KillOptions) => readonly number[];
+  } = {},
 ): LiveTransport {
+  const killTree = options.killTree ?? killPidTree;
   const queue: string[] = [];
   let socket: Socket | undefined;
   let closed = false;
   let exitSeen = false;
-  const until = Date.now() + connectMs;
+  // Когда посредник точно был жив под своим pid (канал поднялся): снятие по
+  // номеру сверяет время создания процесса с этим мигом — номер, доставшийся
+  // после смерти посредника чужому процессу, не снимается (`process-tree.ts`).
+  let aliveAt = 0;
+  // Канала нет — то, что номер наш, известно на миг подключения: свежий
+  // посредник только что запущен, пережившего прежний сервер реестр усыновил,
+  // проверив «жив и похож на CLI». Момент СНЯТИЯ этим не годился: номер,
+  // освободившийся и занятый чужим между ними, снимался бы как свой.
+  const ownedAt = Date.now();
+  const until = ownedAt + connectMs;
 
   const close = (code: number, error?: Error, stderr?: string): void => {
     if (closed) return;
@@ -192,6 +259,8 @@ export function connectRelay(
     const next = connect(address.pipe);
     next.once('connect', () => {
       socket = next;
+      aliveAt = Date.now();
+      if (address.token) next.write(relayHello(address.token));
       for (const line of queue.splice(0)) next.write(line);
       createInterface({ input: next }).on('line', (line) => {
         if (line.startsWith('{"type":"relay_')) {
@@ -220,12 +289,12 @@ export function connectRelay(
       if (socket === next) return;
       next.destroy();
       if (Date.now() < until) setTimeout(attempt, 50);
-      else close(-1, new Error(`relay ${address.pipe} unreachable`));
+      else close(-1, unreachable(address.pipe, options.fresh === true));
     });
     next.on('close', () => {
       if (socket !== next) return;
       // Посредник ушёл, не сказав код выхода: убит снаружи (уборщик, taskkill).
-      if (!exitSeen) close(-1, new Error('relay closed'));
+      if (!exitSeen) close(-1, relayLost('relay closed'));
     });
   };
   attempt();
@@ -248,8 +317,13 @@ export function connectRelay(
       }
       // Канала ещё (или уже) нет — снимаем посредника деревом по pid; pid ещё не
       // пришёл — просьба уйдёт первой строкой, как только канал поднимется.
-      if (address.pid) killPidTree(address.pid);
-      else if (!closed) queue.push(`${JSON.stringify({ type: 'relay_kill' })}\n`);
+      if (address.pid) {
+        const killed = killTree(address.pid, { spawnedAt: aliveAt || ownedAt });
+        // Ничего не снято, а посредник жив: номер не сверить (нет снимка), и
+        // снимать его вслепую нельзя. Сказать «снят» — бросить CLI работать без
+        // присмотра со словом «остановлено» (F-145, то же у `DetachedRun.stop`).
+        if (killed.length === 0 && isPidAlive(address.pid)) return 'unconfirmed';
+      } else if (!closed) queue.push(`${JSON.stringify({ type: 'relay_kill' })}\n`);
     },
     detach: () => {
       // Молча: конец подключения — не конец процесса, и прогону о нём не говорим.

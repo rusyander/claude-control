@@ -162,7 +162,7 @@ describe('/api/permissions — id переезжает вместе с прав�
       url: `/api/permissions/${encodeURIComponent('local:allow:WebFetch')}/move`,
     });
     expect(res.statusCode).toBe(200);
-    expect(perms(localPath()).allow).toEqual([]);
+    expect(perms(localPath()).allow).toBeUndefined(); // опустевший список уходит из файла
     expect(perms(settingsPath()).allow).toContain('WebFetch');
     expect(members()).toContain('allow:WebFetch');
     expect(members()).not.toContain('local:allow:WebFetch');

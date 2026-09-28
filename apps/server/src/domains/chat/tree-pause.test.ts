@@ -48,10 +48,10 @@ function fakeRuns(running: Record<string, { sessionId?: string; options?: Partia
     describe: (chatId: string) => runs.get(chatId),
     isRunning: (chatId: string) => runs.get(chatId)?.status === 'running',
     stop: (chatId: string) => {
-      if (!runs.has(chatId)) return false;
+      if (!runs.has(chatId)) return 'absent' as const;
       runs.delete(chatId);
       stopped.push(chatId);
-      return true;
+      return 'stopped' as const;
     },
     start: (chatId: string, options: RunOptions, meta: RunMeta) => {
       if (runs.get(chatId)?.status === 'running') return false;
@@ -141,7 +141,13 @@ describe('пауза дерева', () => {
     });
 
     const result = tree.pause('sess-a');
-    expect(result).toEqual({ root: 'root', stopped: 3, chats: 3, alreadyPaused: false });
+    expect(result).toEqual({
+      root: 'root',
+      stopped: 3,
+      unconfirmed: 0,
+      chats: 3,
+      alreadyPaused: false,
+    });
     expect(runs.stopped.sort()).toEqual(['new-a', 'new-a-review', 'root']);
     expect(runs.isRunning('stranger')).toBe(true);
 
@@ -156,7 +162,13 @@ describe('пауза дерева', () => {
     // Повтор — доостанавливает успевшее запуститься, запись та же.
     runs.start('new-b', { prompt: 'вручную', cwd: 'C:/p' }, { projectPath: 'C:/p' });
     const again = tree.pause('root');
-    expect(again).toEqual({ root: 'root', stopped: 1, chats: 4, alreadyPaused: true });
+    expect(again).toEqual({
+      root: 'root',
+      stopped: 1,
+      unconfirmed: 0,
+      chats: 4,
+      alreadyPaused: true,
+    });
     expect(store.records.root?.at).toBe('2026-09-09T12:00:00.000Z');
   });
 

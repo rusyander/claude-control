@@ -4,13 +4,16 @@ import type { ProviderChatMessage } from '@agentdeck/contracts';
 import { scanSplitBlocks } from '@agentdeck/contracts/task-split';
 import { scanHandoffBlocks } from '@agentdeck/contracts/chat-handoff';
 import { scanReviewBlocks } from '@agentdeck/contracts/model-cascade';
-import { scanMediaBlocks } from '@agentdeck/contracts/media-block';
+import { mediaRequestOf, scanMediaBlocks } from '@agentdeck/contracts/media-block';
 import { withoutSplitTickets } from '@agentdeck/contracts/split-tickets';
+import { withoutEscalateBlocks } from '@agentdeck/contracts/chat-escalate';
+import { withoutSieveBlocks } from '@agentdeck/contracts/sieves';
 import {
   TaskSplitCard,
   HandoffCard,
   ChildStages,
   MediaFeedCard,
+  MediaRequestText,
   ReviewDecisionCard,
   waitsDecision,
 } from '@features/ChatMessages';
@@ -116,6 +119,10 @@ export function ProviderChatMessages({
 
   /** Текст реплики без блоков предложений плюс карточки на их месте. */
   const renderTurn = (message: ProviderChatMessage): ReactNode => {
+    // Просьба режима «Презентация»/«Картинка»: слова человека сверху, правила
+    // из каталога свёрнуты — как в ленте Claude.
+    const request = message.role === 'user' ? mediaRequestOf(message.content) : undefined;
+    if (request) return <MediaRequestText request={request} text={message.content} />;
     const split = scanSplitBlocks(message.content);
     const handoff = scanHandoffBlocks(split.text);
     // Блок вердикта ревью — служебный: по нему панель заводит звено правок, а
@@ -126,8 +133,15 @@ export function ProviderChatMessages({
     // Вложения агента (Т10): рисунок и колода приезжают блоками, и карточка
     // встаёт на их место. Именно эта дорога и работает у чужого CLI — ни
     // контура, ни ключа она не требует.
-    // Блок тикета группы (95b) — служебный: его список держит хаб.
-    const media = scanMediaBlocks(withoutSplitTickets(review.text));
+    // Блок тикета группы (95b) — служебный: его список держит хаб. Блок
+    // эскалации пишут чужие дочерние чаты, подбирает его сервер — человеку сырой
+    // JSON не нужен (`chat-escalate.ts`). Оба — только у ответа агента, как в
+    // ленте Claude: человек, описавший формат, видит свой пример (ревью 28.09, F-226).
+    const media = scanMediaBlocks(
+      message.role === 'user'
+        ? review.text
+        : withoutSieveBlocks(withoutEscalateBlocks(withoutSplitTickets(review.text))),
+    );
     const hasCards =
       split.proposals.length > 0 ||
       handoff.proposals.length > 0 ||
@@ -330,7 +344,13 @@ export function ProviderChatMessages({
                   человек несколько секунд смотрит, как растёт служебный JSON. */}
               <Typography className={styles.turnText}>
                 {(partial
-                  ? withoutSplitTickets(scanReviewBlocks(partial).text, { streaming: true })
+                  ? withoutEscalateBlocks(
+                      withoutSieveBlocks(
+                        withoutSplitTickets(scanReviewBlocks(partial).text, { streaming: true }),
+                        { streaming: true },
+                      ),
+                      { streaming: true },
+                    )
                   : '') || t('providerChat.thinking')}
                 <span className={styles.caret}>▍</span>
               </Typography>

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { EventEmitter } from 'node:events';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Group } from '@agentdeck/contracts';
@@ -8,21 +8,17 @@ import { AppStore } from '../lib/app-store.ts';
 import { getProvider } from '../providers/registry.ts';
 import { ProviderChatRun } from './provider-chat/ProviderChatRun.ts';
 import { panelSupervisorHooks } from './portability/supervisor/panel-hooks.ts';
-import { compileScenarioSkill } from './group-scenario.ts';
 
 /**
- * СЦЕНАРИЙ ГРУППЫ ДЕЙСТВУЕТ У ЛЮБОГО ПРОВАЙДЕРА (П6.2, критерий 1).
+ * СТАРЫЙ СЦЕНАРИЙ ГРУППЫ БОЛЬШЕ НЕ ОТЫГРЫВАЕТСЯ У ЧУЖОГО CLI.
  *
- * Сценарий компилируется в скилл и скрипт-триггер — записи канона панели. У
- * Claude триггер стоит его же хуком; у чужого CLI такого события нет вовсе, и
- * отыгрывает его надзиратель в запуске панели.
+ * Прежде надзиратель запуска панели ставил чужому CLI триггер сценария:
+ * запрос под регулярку уезжал с порядком работы в контексте. Порядок работы
+ * переехал в «Путь» и идёт ходами конвейера, поэтому подсказка по регулярке —
+ * это дубль, который расходится с путём при первой правке.
  *
- * Доказательство берётся с КОНЦА пути, а не с середины: проверяется текст,
- * который уехал в argv чужому CLI. Что «хук вернул строку» — утверждение о
- * хуке, а вопрос здесь другой: дошёл ли порядок работы до модели.
- *
- * Настоящее здесь всё, кроме самого CLI: скрипт триггера собран рабочим кодом,
- * лежит на диске и запущен настоящей оболочкой.
+ * Доказательство — с конца пути: argv, уехавший чужому CLI. Запись группы с
+ * `scenario` и триггером, записанная старой панелью, лежит в состоянии как есть.
  */
 
 /** Фейковый CLI: запоминает argv и молча закрывается. */
@@ -102,9 +98,8 @@ describe('сценарий группы у чужого CLI', () => {
     rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   });
 
-  /** Завести сценарий так, как это делает сохранение группы в панели. */
+  /** Запись группы, какой её оставила панель до «Пути»: сценарий с триггером. */
   function compile(): void {
-    compileScenarioSkill({ paths, store, backupDir: join(dir, 'backups') } as never, group);
     store.saveGroup(group);
   }
 
@@ -139,55 +134,15 @@ describe('сценарий группы у чужого CLI', () => {
 
   const sentToCli = (): string => argv.map((line) => line.join(' ')).join('\n');
 
-  it('запрос под выражение уезжает CLI вместе с порядком работы', async () => {
+  it('запрос под выражение уезжает CLI без старого порядка работы', async () => {
     compile();
 
     await ask('Сделай PRJ-42 к пятнице');
 
+    // Запрос дошёл (не отказ блокирующего хука), и сценария в нём нет.
     expect(argv).toHaveLength(1);
-    expect(sentToCli()).toContain('Задача из Jira');
-    // Путь к телу сценария — НАСТОЯЩИЙ файл панели, а не «~/.claude/skills/…»:
-    // у чужого CLI дом Claude не дом, и такая строка была бы обещанием файла,
-    // которого по названному адресу нет.
-    const skillPath = join(paths.skills, 'scenario-zadacha-iz-jira', 'SKILL.md');
-    expect(sentToCli()).toContain(skillPath);
-    expect(readFileSync(skillPath, 'utf8')).toContain('Прочитать тикет');
-  });
-
-  it('запрос мимо выражения ничего не навязывает', async () => {
-    compile();
-
-    await ask('Почини деплой');
-
-    expect(argv).toHaveLength(1);
+    expect(sentToCli()).toContain('PRJ-42');
     expect(sentToCli()).not.toContain('Задача из Jira');
-  });
-
-  /**
-   * Скилл сценария человек удалил с диска руками (панель об этом не знает).
-   *
-   * `UserPromptSubmit` — событие блокирующее, и хук, чьего файла нет, вернул бы
-   * код выхода 1: решение неизвестно, значит отказ. Один удалённый файл остановил
-   * бы ВСЮ переписку со всеми чужими CLI, поэтому проверка смотрит не на список
-   * хуков, а на то, доехал ли запрос до CLI вообще.
-   */
-  it('удалённый скрипт триггера не отказывает в каждом сообщении', async () => {
-    compile();
-    rmSync(join(paths.skills, 'scenario-zadacha-iz-jira'), { recursive: true, force: true });
-
-    await ask('Сделай PRJ-42 к пятнице');
-
-    expect(argv).toHaveLength(1);
-    // Порядка работы в запросе нет — взять его неоткуда, и это честно.
-    expect(sentToCli()).not.toContain('Задача из Jira');
-  });
-
-  it('выключенная группа не срабатывает', async () => {
-    compile();
-    store.saveGroup({ ...group, isEnabled: false });
-
-    await ask('Сделай PRJ-42 к пятнице');
-
-    expect(sentToCli()).not.toContain('Задача из Jira');
+    expect(sentToCli()).not.toContain('Прочитать тикет');
   });
 });

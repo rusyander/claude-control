@@ -19,6 +19,8 @@ export const filesEn: Record<FilesMessageCode, string> = {
   'file-changed-on-disk': 'The file on disk changed after it was opened.',
   'runner-command-empty': 'The launch command is empty.',
   'runner-subdir-outside': 'The subfolder must be inside the project: {{dir}}',
+  'runner-project-unregistered':
+    'The panel starts dev servers only for projects in the Projects section, folders inside them and copies of their branches. Add this folder as a project.',
   'resource-path-escapes': 'The path goes outside the resource',
   'resource-path-invalid': 'Invalid path',
   'resource-file-exists': 'A file with this name already exists',

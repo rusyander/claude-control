@@ -18,6 +18,7 @@
 import { spawn } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { killChildProcessTree } from '../../apps/server/src/lib/kill-tree.mjs';
 
 /**
  * Проверка не состоялась — это не провал предмета.
@@ -183,7 +184,9 @@ export async function startGatewayDriver({ dir, source, job, env }) {
     },
   );
 
-  const reap = () => child.kill();
+  // Деревом, общим помощником (не `taskkill /T`, который снимал чужих сирот):
+  // всё, что водитель успел поднять, уходит вместе с ним.
+  const reap = () => killChildProcessTree(child);
   process.once('exit', reap);
   const onSignal = (code) => () => {
     reap();

@@ -40,6 +40,7 @@ import { providersRu } from './ru/topics/providers';
 import { integrationsRu } from './ru/topics/integrations';
 import { promptsRu } from './ru/topics/prompts';
 import { portabilityRu } from './ru/topics/portability';
+import { phoneRu } from './ru/topics/phone';
 export const helpRu = {
   index: {
     subtitle: 'Как работает каждый раздел панели',
@@ -109,6 +110,13 @@ export const helpRu = {
     notesTitle: 'Тонкости, о которые спотыкаются',
     onlyOnCreate: 'только при создании',
     readOnly: 'только чтение',
+    tabsTitle: 'Вкладки раздела',
+    tabsCaption:
+      'Страница разложена по вкладкам — каждая про одно. Открытая вкладка стоит в адресе ' +
+      'страницы, поэтому ссылка ведёт ровно туда, и запоминается: вернувшись в раздел, вы ' +
+      'попадёте на ту же вкладку. Стрелки на полосе вкладок переключают их с клавиатуры.',
+    tabName: 'Вкладка',
+    tabWhat: 'Что на ней',
   },
 
   /**
@@ -123,6 +131,7 @@ export const helpRu = {
   shots: {
     sidePlatform: 'Админка контура',
     sidePanel: 'Панель',
+    sidePhone: 'Телефон',
     chat: chatRu.shots,
     platform: platformRu.shots,
     tests: testsRu.shots,
@@ -151,6 +160,7 @@ export const helpRu = {
     prompts: promptsRu.shots,
     dlp: dlpRu.shots,
     panelAgent: panelAgentRu.shots,
+    phone: phoneRu.shots,
   },
 
   /**
@@ -188,6 +198,7 @@ export const helpRu = {
     integrations: integrationsRu.diagrams,
     dlp: dlpRu.diagrams,
     panelAgent: panelAgentRu.diagrams,
+    phone: phoneRu.diagrams,
   },
 
   topics: {
@@ -214,6 +225,7 @@ export const helpRu = {
     projects: projectsRu.topic,
     dlp: dlpRu.topic,
     panelAgent: panelAgentRu.topic,
+    phone: phoneRu.topic,
     platform: platformRu.topic,
     endpoints: endpointsRu.topic,
     providers: providersRu.topic,

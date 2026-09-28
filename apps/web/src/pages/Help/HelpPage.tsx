@@ -8,6 +8,7 @@ import { PageHeader } from '@shared/ui/page-header';
 import { SkeletonList } from '@shared/ui/skeleton';
 import { useHelpDictionary } from '@shared/config/i18n';
 import { HELP_ROUTE, findHelpTopic } from './model/topics';
+import { useTopicScroll } from './model/useTopicScroll';
 import { HelpIndex } from './HelpIndex';
 import { HelpTopicView } from './HelpTopicView';
 import styles from './HelpPage.module.scss';
@@ -19,6 +20,18 @@ import styles from './HelpPage.module.scss';
  * прибавляется на каждый новый раздел.
  */
 export function HelpPage() {
+  // Прокрутка принадлежит колонке раздела, а не документу: сброс, якорь и
+  // возврат по «Назад» держит обёртка вокруг любого из состояний страницы.
+  const rootRef = useTopicScroll();
+
+  return (
+    <div ref={rootRef} className={styles.scrollAnchor}>
+      <HelpPageBody />
+    </div>
+  );
+}
+
+function HelpPageBody() {
   const { t } = useTranslation();
   const { topic: topicId } = useSearch({ strict: false }) as { topic?: string };
   const topic = findHelpTopic(topicId);

@@ -1,5 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { normalizeProjectPath } from '../../lib/app-store/projects.ts';
+import { spelledOnDisk } from '../../lib/disk-spelling.ts';
 import { writeJsonFile } from '../../lib/safe-io.ts';
 import { ProjectFileError, resolveProjectPath } from '../project-files/paths.ts';
 import { coded } from '../../lib/server-text.ts';
@@ -20,6 +22,51 @@ export const TESTS_DIR = '.agent/tests';
 
 /** Потолок на файл: кейсы — текст, мегабайты здесь означают порчу. */
 export const MAX_FILE_BYTES = 2 * 1024 * 1024;
+
+/**
+ * Запись реестра по проекту в любом написании пути.
+ *
+ * Реестры прогонов держат проект путём «как на диске» (маршрут приводит к
+ * нему), а наблюдатель папки e2e и конец хода чата спрашивают путём «как
+ * ввели»: реестр проектов хранит `c:\work\…`, cwd чата — как написан. Точный
+ * `Map.get` их не видел, и замок молча не срабатывал.
+ */
+export function projectEntry<T>(map: ReadonlyMap<string, T>, path: string): T | undefined {
+  const exact = map.get(path);
+  if (exact !== undefined) return exact;
+  const wanted = normalizeProjectPath(resolve(path));
+  for (const [key, value] of map) {
+    if (normalizeProjectPath(resolve(key)) === wanted) return value;
+  }
+  // Короткое имя 8.3 (старая запись реестра, %TEMP%, cwd оболочки) регистр и
+  // слэши не сворачивают — сверка по написанию на диске, с обеих сторон. Только
+  // когда дёшево не нашлось: это обращение к диску на каждый ключ.
+  if (map.size === 0) return undefined;
+  const onDisk = diskKey(path);
+  for (const [key, value] of map) {
+    if (diskKey(key) === onDisk) return value;
+  }
+  return undefined;
+}
+
+/** Ключ каталога по написанию на диске: регистр, слэши и 8.3 свёрнуты. */
+function diskKey(path: string): string {
+  return normalizeProjectPath(spelledOnDisk(resolve(path)));
+}
+
+/**
+ * Перед новой записью — убрать записи того же проекта в другом написании:
+ * иначе поиск по третьему написанию мог найти старый законченный прогон
+ * раньше идущего.
+ */
+export function forgetOtherSpellings(map: Map<string, unknown>, path: string): void {
+  const wanted = normalizeProjectPath(resolve(path));
+  const onDisk = map.size > 0 ? diskKey(path) : '';
+  for (const key of [...map.keys()]) {
+    if (key === path) continue;
+    if (normalizeProjectPath(resolve(key)) === wanted || diskKey(key) === onDisk) map.delete(key);
+  }
+}
 
 export class ProjectTestsError extends Error {
   statusCode = 400;

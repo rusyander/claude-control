@@ -5,20 +5,20 @@ import { useEntityUrl } from '@shared/hooks/use-entity-url';
 import { Stack } from '@shared/ui/stack';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
-import { TabButton } from '@shared/ui/tab-button';
-import { TextField } from '@shared/ui/text-field';
 import { Typography } from '@shared/ui/typography';
-import { Modal } from '@shared/ui/modal';
 import { EmptyState } from '@shared/ui/empty-state';
 import { ConfirmDialog } from '@shared/ui/confirm-dialog';
-import { toErrorMessage } from '@shared/api/client';
+import { useTestFlakyMarks } from '@entities/ProjectTest';
+import { flakyIndex } from '../model/caseResults';
 import { TestFilterBar } from './TestFilterBar';
 import { TestSectionTree } from './TestSectionTree';
+import { TestGroupList } from './TestGroupList';
 import { TestCaseTable } from './TestCaseTable';
 import { TestBulkToolbar } from './TestBulkToolbar';
 import { TestCaseEditor } from './TestCaseEditor';
 import { TestHistoryModal } from './TestHistoryModal';
 import { TestExchangeModal } from './TestExchangeModal';
+import { TestGroupFormModal } from './TestGroupFormModal';
 import type { TestLibraryProps } from './TestLibrary.types';
 import styles from './ProjectTests.module.scss';
 import { serverFieldText } from '@shared/config/i18n';
@@ -37,31 +37,26 @@ import { serverFieldText } from '@shared/config/i18n';
 export function TestLibrary({ board, actions, empty }: TestLibraryProps) {
   const { t } = useTranslation();
   const [isGroupOpen, setGroupOpen] = useState(false);
-  const [groupId, setGroupId] = useState('');
-  const [groupError, setGroupError] = useState<string | undefined>();
+  // Правка заведённой группы: то же окно, что и «Новая группа», с запертым id.
+  const [isGroupEditing, setGroupEditing] = useState(false);
   const [isGroupRemoving, setGroupRemoving] = useState(false);
   const [editing, setEditing] = useState<ProjectTestCase | undefined>();
+  // Группа открытого кейса: по ней карточка тянет историю результатов, а в
+  // сквозном списке она не обязана совпадать с выбранной.
+  const [editingGroupId, setEditingGroupId] = useState('');
   const [isCaseOpen, setCaseOpen] = useState(false);
   const [removing, setRemoving] = useState<ProjectTestCase | undefined>();
   const [isHistoryOpen, setHistoryOpen] = useState(false);
   const [isExchangeOpen, setExchangeOpen] = useState(false);
+  // Отметки «нестабилен» и история кейса перечитываются, когда меняется
+  // подпись последнего прогона: кончился прогон — вердикт мог смениться.
+  const runStamp = `${board.run?.id ?? ''}:${board.run?.status ?? ''}`;
+  const flakyMarks = useTestFlakyMarks(board.path, runStamp);
+  const flaky = useMemo(() => flakyIndex(flakyMarks.data), [flakyMarks.data]);
 
-  const addGroup = async (): Promise<void> => {
-    setGroupError(undefined);
-    try {
-      await board.addGroup(groupId.trim().toLowerCase());
-    } catch (error) {
-      // Причина — под полем, а не только в тосте за окном: отказ (400 на
-      // негодный id) иначе уходит необработанным отклонением промиса.
-      setGroupError(toErrorMessage(error));
-      return;
-    }
-    setGroupId('');
-    setGroupOpen(false);
-  };
-
-  const openCase = (testCase?: ProjectTestCase): void => {
+  const openCase = (testCase?: ProjectTestCase, groupId = board.activeId): void => {
     setEditing(testCase);
+    setEditingGroupId(groupId);
     setCaseOpen(true);
   };
 
@@ -83,7 +78,7 @@ export function TestLibrary({ board, actions, empty }: TestLibraryProps) {
     getId: (item) => `${item.groupId}:${item.testCase.id}`,
     onOpen: (item) => {
       board.select(item.groupId);
-      openCase(item.testCase);
+      openCase(item.testCase, item.groupId);
     },
   });
 
@@ -91,24 +86,42 @@ export function TestLibrary({ board, actions, empty }: TestLibraryProps) {
 
   return (
     <div className={styles.library}>
-      <Stack direction="row" gap="var(--spacing-2xs)" align="center" wrap className={styles.tabs}>
-        {board.groups.map((group) => (
-          <TabButton
-            key={group.id}
-            isActive={group.id === board.activeId}
-            onClick={() => board.select(group.id)}
+      {/* Шапка открытой группы: её имя, файл и то, что делают с ней целиком.
+          Сами группы — списком слева: ряд вкладок на двух десятках групп
+          занимал пять строк и уводил кейсы за низ экрана. */}
+      <Stack
+        direction="row"
+        gap="var(--spacing-2xs)"
+        align="center"
+        wrap
+        className={`${styles.tabs} ${styles.narrowable}`}
+      >
+        {board.active && (
+          <Stack gap="0" className={styles.groupHead}>
+            <Typography
+              variant="body"
+              weight="medium"
+              as="span"
+              truncate
+              title={board.active.title}
+            >
+              {board.active.title}
+            </Typography>
+            <Typography variant="caption" color="subtle" as="span" truncate>
+              {t('tests.library.groupFile', { file: board.active.file })}
+            </Typography>
+          </Stack>
+        )}
+        {board.groups.length === 0 && (
+          <Button
+            variant="ghost"
+            size="sm"
+            leftIcon={<Icon name="plus" size={18} />}
+            onClick={() => setGroupOpen(true)}
           >
-            {`${group.title} (${group.cases.length})`}
-          </TabButton>
-        ))}
-        <Button
-          variant="ghost"
-          size="sm"
-          leftIcon={<Icon name="plus" size={18} />}
-          onClick={() => setGroupOpen(true)}
-        >
-          {t('projectTests.addGroup')}
-        </Button>
+            {t('projectTests.addGroup')}
+          </Button>
+        )}
         {board.active && (
           <>
             <Button
@@ -125,9 +138,10 @@ export function TestLibrary({ board, actions, empty }: TestLibraryProps) {
               variant="ghost"
               size="sm"
               leftIcon={<Icon name="history" size={18} />}
+              title={t('projectTests.history.open')}
               onClick={() => setHistoryOpen(true)}
             >
-              {t('projectTests.history.open')}
+              <span className={styles.narrowLabel}>{t('projectTests.history.open')}</span>
             </Button>
             {/* Обмен — рядом с историей: и то, и другое про связь набора с
                 внешним миром, а не про правку кейсов. */}
@@ -142,26 +156,25 @@ export function TestLibrary({ board, actions, empty }: TestLibraryProps) {
             <Button
               variant="ghost"
               size="sm"
+              leftIcon={<Icon name="edit" size={18} />}
+              title={t('projectTests.editGroup')}
+              onClick={() => setGroupEditing(true)}
+            >
+              <span className={styles.narrowLabel}>{t('projectTests.editGroup')}</span>
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
               leftIcon={<Icon name="trash" size={18} />}
+              title={t('projectTests.removeGroup')}
               onClick={() => setGroupRemoving(true)}
             >
-              {t('projectTests.removeGroup')}
+              <span className={styles.narrowLabel}>{t('projectTests.removeGroup')}</span>
             </Button>
           </>
         )}
         {actions}
       </Stack>
-
-      {board.active?.error && (
-        <Stack gap="var(--spacing-3xs)">
-          <Typography variant="body" color="danger">
-            {t('projectTests.broken', { error: serverFieldText(board.active, 'error') })}
-          </Typography>
-          <Typography variant="caption" color="subtle">
-            {t('projectTests.brokenHint')}
-          </Typography>
-        </Stack>
-      )}
 
       {board.groups.length === 0 &&
         !board.isLoading &&
@@ -192,18 +205,41 @@ export function TestLibrary({ board, actions, empty }: TestLibraryProps) {
             onApply={board.bulk}
             onClear={board.clearChecked}
           />
+        </>
+      )}
 
-          <div className={styles.libraryBody}>
-            <aside className={styles.tree}>
+      {/* Левая колонка видна и при сломанной группе: причина стоит справа, а
+          соседние группы должны оставаться в одном нажатии. */}
+      {board.groups.length > 0 && (
+        <div className={styles.libraryBody}>
+          <aside className={styles.tree}>
+            <TestGroupList
+              groups={board.groups}
+              activeId={board.activeId}
+              onSelect={board.select}
+              onAdd={() => setGroupOpen(true)}
+            />
+            {board.active && !board.active.error && (
               <TestSectionTree
                 sections={board.filters.sections}
                 total={board.filters.total}
                 selected={selectedSection}
                 onSelect={(path) => board.filters.patch({ sections: path ? [path] : undefined })}
               />
-            </aside>
+            )}
+          </aside>
 
-            <div className={styles.tableArea}>
+          <div className={styles.tableArea}>
+            {board.active?.error ? (
+              <Stack gap="var(--spacing-3xs)">
+                <Typography variant="body" color="danger">
+                  {t('projectTests.broken', { error: serverFieldText(board.active, 'error') })}
+                </Typography>
+                <Typography variant="caption" color="subtle">
+                  {t('projectTests.brokenHint')}
+                </Typography>
+              </Stack>
+            ) : (
               <TestCaseTable
                 rows={board.filters.filtered}
                 total={board.filters.total}
@@ -215,18 +251,22 @@ export function TestLibrary({ board, actions, empty }: TestLibraryProps) {
                 // Счёт риска показывается только там, где его спросили
                 // порядком: в обычном списке это лишняя колонка цифр.
                 risk={board.filters.sort === 'risk' ? board.filters.risk : undefined}
-                onEdit={(testCase) => openCase(testCase)}
+                flaky={flaky}
+                onEdit={(testCase, groupId) => openCase(testCase, groupId)}
                 onRemove={(testCase) => setRemoving(testCase)}
               />
-            </div>
+            )}
           </div>
-        </>
+        </div>
       )}
 
       <TestCaseEditor
         isOpen={isCaseOpen}
         onOpenChange={setCaseOpen}
         testCase={editing}
+        projectPath={board.path}
+        runStamp={runStamp}
+        groupId={editingGroupId}
         sharedSteps={board.sharedSteps}
         schema={board.schema}
         sections={board.filters.facets.sections}
@@ -248,39 +288,18 @@ export function TestLibrary({ board, actions, empty }: TestLibraryProps) {
         groupId={board.activeId}
       />
 
-      <Modal
-        isOpen={isGroupOpen}
-        onOpenChange={setGroupOpen}
-        title={t('projectTests.addGroup')}
-        size="sm"
-        footer={
-          <Stack direction="row" gap="var(--spacing-xs)" justify="end">
-            <Button variant="ghost" onClick={() => setGroupOpen(false)}>
-              {t('common.cancel')}
-            </Button>
-            <Button
-              variant="primary"
-              disabled={groupId.trim().length === 0}
-              onClick={() => void addGroup()}
-            >
-              {t('projectTests.save')}
-            </Button>
-          </Stack>
-        }
-      >
-        <TextField
-          label={t('projectTests.groupId')}
-          hint={t('projectTests.groupIdHint')}
-          value={groupId}
-          onChange={(next) => {
-            setGroupId(next);
-            setGroupError(undefined);
-          }}
-          error={groupError}
-          autoFocus
-          isMono
-        />
-      </Modal>
+      <TestGroupFormModal
+        isOpen={isGroupOpen || isGroupEditing}
+        onOpenChange={(open) => {
+          if (open) return;
+          setGroupOpen(false);
+          setGroupEditing(false);
+        }}
+        groups={board.groups}
+        group={isGroupEditing ? board.active : undefined}
+        onCreate={board.addGroup}
+        onUpdate={board.updateGroup}
+      />
 
       <ConfirmDialog
         isOpen={removing !== undefined}

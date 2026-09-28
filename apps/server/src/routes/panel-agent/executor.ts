@@ -15,6 +15,15 @@ export interface InjectAccess {
  */
 export const STREAM_HEAD_TIMEOUT_MS = 20_000;
 
+/**
+ * Сколько исполнитель ждёт ответа маршрута ЧТЕНИЯ (GET). Без срока зависшее
+ * чтение держало вызов инструмента до срока переходника (10,5 мин), а потолок
+ * хода агента всё это время шёл. Срок покрывает самое медленное известное
+ * чтение — каталог плагинов: `claude plugin list` (60 с) и `--available`
+ * (180 с) подряд. Запись срока не получает: её исход после него был бы неизвестен.
+ */
+export const READ_ROUTE_TIMEOUT_MS = 4 * 60_000;
+
 /** Кадры, после которых начало прогона известно: дальше читать незачем. */
 const HEAD_KINDS = new Set(['session', 'done', 'error', 'gone']);
 
@@ -34,6 +43,7 @@ export function createRouteInjector(
   app: FastifyInstance,
   access: InjectAccess,
   streamHeadTimeoutMs = STREAM_HEAD_TIMEOUT_MS,
+  readTimeoutMs = READ_ROUTE_TIMEOUT_MS,
 ): InjectRoute {
   return async ({ method, url, body, stream }) => {
     const headers: Record<string, string> = { [PANEL_AGENT_HEADER]: '1' };
@@ -45,7 +55,9 @@ export function createRouteInjector(
       ...(body === undefined ? {} : { payload: body as object }),
     };
     if (!stream) {
-      const response = await app.inject(options);
+      const answer = app.inject(options);
+      const response =
+        method === 'GET' ? await withinReadBudget(answer, readTimeoutMs) : await answer;
       return { status: response.statusCode, body: parseBody(response.body) };
     }
 
@@ -65,6 +77,29 @@ export function createRouteInjector(
     source.destroy();
     return { status: response.statusCode, body: head };
   };
+}
+
+/**
+ * Ответ чтения или честный отказ по сроку. `app.inject` не отменить — маршрут
+ * дорабатывает сам, его поздний ответ просто никому не нужен.
+ */
+function withinReadBudget<T>(answer: Promise<T>, timeoutMs: number): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  const late = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => {
+      reject(
+        new Error(
+          `No answer within ${Math.round(timeoutMs / 1000)} s: the panel is slow on this read. ` +
+            'The read may still finish its own work in the background (a model call, a catalog ' +
+            'scan); do not repeat it at once — try again later or tell the human.',
+        ),
+      );
+    }, timeoutMs);
+    timer.unref?.();
+  });
+  // Поздний отказ маршрута после срока — не необработанное исключение процесса.
+  answer.catch(() => {});
+  return Promise.race([answer, late]).finally(() => clearTimeout(timer));
 }
 
 async function readAll(source: Readable): Promise<string> {

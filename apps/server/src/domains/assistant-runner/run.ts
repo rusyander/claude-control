@@ -1,16 +1,56 @@
 import type { ConfigProvider } from '../../providers/types.ts';
 import { resolveRunner, getRawKey } from '../provider-keys.ts';
-import { flattenPrompt, runClaudeDelegate, runProviderCli, runSessionServer } from './cli.ts';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import {
+  flattenPrompt,
+  userImages,
+  runClaudeDelegate,
+  runProviderCli,
+  runSessionServer,
+  withImagePaths,
+} from './cli.ts';
 import { runProviderApi } from './api.ts';
+import { SECRET_MASK, maskSecretsInText, restoreMaskedSecrets } from '../../lib/secret-mask.ts';
 import type { AssistantMessage, AssistantRunResult, RunAssistantDeps } from './types.ts';
 
 // --- Публичный switch --------------------------------------------------------
 
 /**
+ * Хэши коммитов и содержимого окну ассистента и группам нужны как есть (ревью F6):
+ * без имени рядом это не секрет, а под секретным именем их ловят именные правила.
+ */
+const RUNNER_MASK = { keepHashes: true } as const;
+
+/**
  * Запуск ассистента активного провайдера по switch. Claude → делегирует своему
  * существующему CLI-пути (не через раннеры прочих); остальные — по режиму раннера.
+ *
+ * Секреты (U6, 28.09): любая модель — CLI, API, свой эндпоинт — видит текст
+ * реплик через маску (детектор общий с агентом панели и помощником формы).
+ * Маска в ответе возвращается секретом только в строке, слово в слово равной
+ * прочитанной; в новом месте (`?k=••••••` к чужому адресу) она остаётся маской.
  */
 export async function runAssistant(
+  provider: ConfigProvider,
+  messages: AssistantMessage[],
+  deps: RunAssistantDeps,
+): Promise<AssistantRunResult> {
+  const masked = messages.map((message) => ({
+    ...message,
+    content: maskSecretsInText(message.content, RUNNER_MASK),
+  }));
+  const result = await runMasked(provider, masked, deps);
+  if (!result.ok || !result.reply.includes(SECRET_MASK)) return result;
+  const saved = messages.map((message) => message.content).join('\n');
+  return {
+    ...result,
+    reply: restoreMaskedSecrets(saved, result.reply, RUNNER_MASK) ?? result.reply,
+  };
+}
+
+async function runMasked(
   provider: ConfigProvider,
   messages: AssistantMessage[],
   deps: RunAssistantDeps,
@@ -40,17 +80,31 @@ export async function runAssistant(
   }
 
   if (resolution.mode === 'cli') {
+    const hasImages = userImages(messages).length > 0;
     // IDEA-8: сначала сессионный режим (если провайдер его заявил и диалог
-    // опознан), при любой заминке — привычный one-shot.
-    const session = await runSessionServer(provider, messages, deps, resolution.cliCommandFound);
+    // опознан), при любой заминке — привычный one-shot. С картинками — сразу
+    // one-shot: сессионный вход принимает только текст.
+    const session = hasImages
+      ? undefined
+      : await runSessionServer(provider, messages, deps, resolution.cliCommandFound);
     if (session) return session;
 
-    const cliResult = await runProviderCli(
-      provider,
-      flattenPrompt(messages),
-      deps,
-      resolution.cliCommandFound,
-    );
+    // Картинки чужому CLI — файлами во временной папке и путями в тексте. Папка
+    // же — рабочий каталог хода: Gemini и Qwen читают файлы только внутри
+    // рабочей области, и путь во временной папке ОС был бы им недостижим.
+    const imageDir = hasImages ? mkdtempSync(join(tmpdir(), 'cc-assistant-images-')) : undefined;
+    let cliResult: AssistantRunResult;
+    try {
+      cliResult = await runProviderCli(
+        provider,
+        flattenPrompt(imageDir ? withImagePaths(messages, imageDir) : messages),
+        deps,
+        resolution.cliCommandFound,
+        imageDir,
+      );
+    } finally {
+      if (imageDir) rmSync(imageDir, { recursive: true, force: true });
+    }
     // CLI без задокументированного флага → пробуем платный API как фолбэк.
     if (cliResult.reason === 'cli_not_scriptable') {
       const key = getRawKey(provider, deps.appDataDir);

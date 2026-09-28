@@ -15,6 +15,7 @@ import {
 import {
   defaultOurRules,
   defaultPlatformRules,
+  platformRulesApplies,
   platformThinkingModes,
   platformToolModes,
   thinkingModeInput,
@@ -36,6 +37,7 @@ import { attachTextCodes } from '../../lib/server-texts.ts';
 import { dataMaskOn, describeDataMask } from './data-mask.ts';
 import { layerOn, runLayers } from './layers.ts';
 import { platformRuleRows, ruleConflicts } from './rules-matrix.ts';
+import { effectiveOurRules } from './rules-apply.ts';
 import { HEADER_SAFE_KEY, invalidField, platformNotFound, notConnected } from './errors.ts';
 import { budgetVerdict, daysSince, emptySpend, sumDays } from './spend.ts';
 
@@ -104,7 +106,7 @@ export function readPlatforms(store: AppStore): Platform[] {
     // где контур пересохраняют, дефекта не видно вовсе; ломается ровно та,
     // где контур настроили однажды и он просто работает. Найдено враждебным
     // ревью Т7.
-    rules: { platform: rulesOf(platform), ours: ourRulesOf(platform) },
+    rules: rulesRecordOf(platform),
     // Переопределения пресета (DRV-03) — поле за полем: негодный путь из записи,
     // правленной руками, значит «как у пресета», а не сломанный шлюз.
     manifest: platformManifestOf(platform.manifest),
@@ -120,6 +122,21 @@ export function readPlatforms(store: AppStore): Platform[] {
         ? platform.contourPrompt
         : platformPreset(platform.driver).defaults.contourPrompt,
   }));
+}
+
+/**
+ * Правила целиком: обе стороны и выбор «чьи действуют» (баг 11б). Выбор
+ * сохраняется, только если он из известных: мусор значит «оба набора», как у
+ * записи до выбора, а не отказ читать весь раздел.
+ */
+function rulesRecordOf(platform: Platform): Platform['rules'] {
+  const applies = (platform as { rules?: { applies?: unknown } }).rules?.applies;
+  const known = platformRulesApplies.find((value) => value === applies);
+  return {
+    platform: rulesOf(platform),
+    ours: ourRulesOf(platform),
+    ...(known ? { applies: known } : {}),
+  };
 }
 
 /**
@@ -497,7 +514,7 @@ export function describePlatform(
         // личных настроек снимает и его (Т8). Строка матрицы обязана это знать:
         // иначе человек, выключивший наши слои, читал бы «наша сторона включена»
         // про проверку, которой в этом прогоне нет.
-        promptGate: settings.promptGate.enabled && layerOn(platform.rules.ours, 'settings'),
+        promptGate: settings.promptGate.enabled && layerOn(effectiveOurRules(platform), 'settings'),
         toolShim: platform.toolShim,
         managedContext: health?.limits.managedContext === true,
       }),

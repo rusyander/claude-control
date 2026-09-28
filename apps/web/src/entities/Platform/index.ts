@@ -8,6 +8,7 @@ export {
   useRestartGateway,
   useStartGateway,
   useSavePlatform,
+  useIsPlatformSaving,
   useCheckPlatform,
   usePlatformApplyPlan,
   useApplyPlatform,

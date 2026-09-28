@@ -32,6 +32,20 @@ export const gatewayEn: Record<GatewayMessageCode, string> = {
   'gateway-contour-unknown': 'Contour “{{id}}” is not set up in the panel',
   'gateway-contour-disabled': 'Contour “{{title}}” is turned off in the panel',
   'gateway-contour-no-key': 'Contour “{{title}}” has no saved key',
+  'gateway-section-closed-chat':
+    'The Chat section is closed for contour “{{title}}” — the request was not sent. Open the section on the contour card',
+  'gateway-section-closed-groups':
+    'The Split groups section is closed for contour “{{title}}” — the request was not sent. Open the section on the contour card',
+  'gateway-section-closed-tests':
+    'The Tests agent section is closed for contour “{{title}}” — the request was not sent. Open the section on the contour card',
+  'gateway-section-closed-assistant':
+    'The Panel assistant section is closed for contour “{{title}}” — the request was not sent. Open the section on the contour card',
+  'gateway-section-closed-terminal':
+    'The Terminal (CLI files) section is closed for contour “{{title}}” — the request was not sent. Open the section on the contour card',
+  'gateway-section-closed-foreign':
+    'The {{cli}} chat is closed for contour “{{title}}” — the request was not sent. Open the section on the contour card',
+  'gateway-section-unknown':
+    'The gateway address carries an unknown section mark — the request was not sent. Apply the contour again to rewrite the address',
   'gateway-body-too-large': 'The request body is over 32 MB — the gateway does not accept it',
   'gateway-body-not-json': 'The request body does not parse as JSON',
   'gateway-answer-not-model':
@@ -114,6 +128,6 @@ export const gatewayEn: Record<GatewayMessageCode, string> = {
   'proxy-shape-unknown': 'the request shape does not parse',
   'proxy-body-not-json': 'the request body is not JSON',
   'proxy-stopped-unparsed':
-    'AgentDeck: {{reason}}, the request was stopped (the «let unparsed through» setting is off)',
+    'AgentDeck: {{reason}}, the request was stopped (the “Pass through unparsed bodies” setting is off)',
   'proxy-upstream-unreachable': 'AgentDeck: the model address does not answer ({{reason}})',
 };

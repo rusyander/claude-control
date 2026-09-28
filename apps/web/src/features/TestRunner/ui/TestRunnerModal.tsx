@@ -47,6 +47,7 @@ export function TestRunnerModal({
   projectPath,
   groups,
   sharedSteps,
+  emptyActions,
 }: TestRunnerModalProps) {
   const { t } = useTranslation();
   const runner = useManualRunner(projectPath, groups, sharedSteps, isOpen);
@@ -100,6 +101,7 @@ export function TestRunnerModal({
             icon="check"
             title={t('tests.runner.noSession')}
             text={t('tests.runner.noSessionHint')}
+            action={emptyActions}
           />
         ) : (
           <div className={styles.layout}>

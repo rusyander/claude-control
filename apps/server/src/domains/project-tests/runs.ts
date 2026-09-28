@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { existsSync } from 'node:fs';
+import { existsSync, rmSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 import type {
   ProjectTestCase,
   ProjectTestEnvironment,
@@ -15,6 +16,7 @@ import { pointId, summarize as summarizeResults } from '@agentdeck/contracts/tes
 import { ChatRun, type ChatEvent } from '../chat/ChatRunner.ts';
 import type { RunNotice } from '../chat/ChatRunRegistry.ts';
 import type { PlatformRunRoute } from '../platform/routing.ts';
+import { forgetOtherSpellings, ProjectTestsLockedError, projectEntry } from './files.ts';
 import {
   ProjectTestsError,
   ProjectTestsNotFoundError,
@@ -23,7 +25,7 @@ import {
   writeGroup,
 } from './store.ts';
 import { buildPrompt, runName, type PromptContext } from './prompt.ts';
-import { applyDraft, confineDraft, draftFile, readDraft } from './drafts.ts';
+import { applyDraft, confineDraft, draftFile, readDraft, writeDraft } from './drafts.ts';
 import { stampOf } from './generate-sources.ts';
 import { redactor } from './env-secrets.ts';
 import { defaultEnvironment, readEnvironments, readSharedSteps } from './library.ts';
@@ -37,6 +39,44 @@ import {
   type RunScope,
 } from './run-permissions.ts';
 import { coded } from '../../lib/server-text.ts';
+import { e2eFolderView } from './e2e-folder.ts';
+import { e2eCommand, shellLine } from './e2e-command.ts';
+import { E2E_JUNIT_REPORT } from './e2e-scaffold.ts';
+import { syncE2eFolder } from './e2e-sync.ts';
+import { importResultsIntoRun } from './import-results.ts';
+import {
+  PanelAgentProcesses,
+  reapPanelAgentOrphans,
+  type ReapDeps,
+} from '../panel-agent/processes.ts';
+
+/**
+ * Журнал процессов агентских прогонов в каталоге данных панели. `node --watch`
+ * на Windows убивает панель без обработчиков, а CLI прогона живёт дальше: висит
+ * до суток на мёртвом приёмнике прав вместе с браузером под тестом, пока история
+ * пишет «агент остановился». Усыновлять его некуда — реестр в памяти, — поэтому
+ * на старте живое убивается, как у агента панели.
+ */
+export const PROJECT_TEST_PROCESS_LEDGER = 'project-test-runs.json';
+
+/**
+ * Журнал раннеров «Прогнать автотесты» (`e2e-run.ts`, F-105). Раннер идёт через
+ * оболочку и жёсткое убийство панели переживает: Playwright с браузерами висел
+ * сиротой и дописывал отчёт туда, откуда читает следующий прогон. Свой файл —
+ * записи раннера не смешиваются с CLI агентских прогонов.
+ */
+export const E2E_RUN_PROCESS_LEDGER = 'e2e-runs.json';
+
+/**
+ * Старт панели: снять дерево каждого живого процесса прогонов тестов из обоих
+ * журналов — CLI агентского прогона и раннера автотестов. Сколько убито.
+ */
+export function reapProjectTestOrphans(appData: string, deps: ReapDeps = {}): number {
+  return (
+    reapPanelAgentOrphans(appData, deps, PROJECT_TEST_PROCESS_LEDGER) +
+    reapPanelAgentOrphans(appData, deps, E2E_RUN_PROCESS_LEDGER)
+  );
+}
 
 /**
  * Прогоны тестов: генерация кейсов, их проверка, свободный поиск, автоматизация.
@@ -83,6 +123,10 @@ export class ProjectTestRunRegistry {
       redact?: (text: string) => string;
       /** Отпечатки кейсов отбора на старте — по ним видно, что агент тронул. */
       snapshot?: Map<string, string>;
+      /** Папка e2e генерации с кодом тестов: после конца — сверка и отчёт junit. */
+      e2e?: { dir: string; junit: string };
+      /** Журнал процесса CLI — есть, когда маршрут назвал каталог данных панели. */
+      processes?: PanelAgentProcesses;
     }
   >();
 
@@ -108,9 +152,16 @@ export class ProjectTestRunRegistry {
     this.platformRouting = resolve;
   }
 
+  /** Язык панели: на нём имя сессии прогона в списке разговоров. */
+  private language: () => 'ru' | 'en' = () => 'ru';
+
+  setLanguage(language: () => 'ru' | 'en'): void {
+    this.language = language;
+  }
+
   /** Прогон проекта: идущий или последний завершившийся. */
   get(projectPath: string): ProjectTestRun | undefined {
-    return this.runs.get(projectPath)?.view;
+    return projectEntry(this.runs, projectPath)?.view;
   }
 
   /** Все прогоны — по ним панель узнаёт, что где-то ещё идёт работа. */
@@ -130,7 +181,7 @@ export class ProjectTestRunRegistry {
    * Прогон без группы (`groupId` пуст) идёт по всем файлам сразу и держит любую.
    */
   holds(projectPath: string, groupId?: string): string | undefined {
-    const entry = this.runs.get(projectPath);
+    const entry = projectEntry(this.runs, projectPath);
     if (!entry || entry.view.status !== 'running') return undefined;
     if (entry.view.groupId && groupId && entry.view.groupId !== groupId) return undefined;
     return entry.view.id;
@@ -145,15 +196,27 @@ export class ProjectTestRunRegistry {
     now: string,
     material?: ProjectTestGenerateMaterial,
     resolveSecrets?: RunSecretsResolver,
+    /**
+     * `appData` — каталог данных панели: в нём выбор папки e2e человеком
+     * (монорепозиторий). Без него генерация брала первую найденную папку, а
+     * карточка, заметка чата и кнопка прогона — выбранную.
+     *
+     * `ensureE2e` — завести папку e2e (пишет маршрут: домен про запись панели не
+     * знает). Зовётся ПОСЛЕ всех отказов старта: отказанный прогон («уже идёт»,
+     * «кейсов нет») папку на диске не оставляет.
+     */
+    options: { appData?: string; ensureE2e?: () => void } = {},
   ): ProjectTestRun {
     const root = request.projectPath;
     if (!existsSync(root))
       throw coded(new ProjectTestsError('Каталог проекта не найден.'), 'project-dir-not-found');
 
-    const active = this.runs.get(root);
+    const active = projectEntry(this.runs, root);
+    // Занято — конфликт (409) с id идущего прогона, как у замка группы, а не
+    // 400 «кривой запрос»: клиент по коду понимает «уже идёт» и может его открыть.
     if (active?.view.status === 'running') {
       throw coded(
-        new ProjectTestsError('Прогон по этому проекту уже идёт.'),
+        new ProjectTestsLockedError('Прогон по этому проекту уже идёт.', active.view.id),
         'run-already-running',
       );
     }
@@ -225,12 +288,34 @@ export class ProjectTestRunRegistry {
       request.planId ? readPlan(root, request.planId)?.environmentIds?.[0] : undefined,
     );
     const { branch, commit } = gitContext(root);
+    // Генерация с кодом тестов: папку заводит маршрут, здесь её только находим —
+    // домен считается на голом каталоге и про запись панели не знает.
+    if (request.mode === 'generate' && request.e2e) options.ensureE2e?.();
+    const folder =
+      request.mode === 'generate' && request.e2e ? e2eFolderView(root, options.appData) : undefined;
+    // Команда прогона — та же, что у кнопки «Прогнать автотесты», с отчётом туда,
+    // откуда его заберёт `settleE2e`: путь абсолютный, иначе Playwright разрешал
+    // его от каталога конфига и писал в e2e/e2e/results — мимо панели.
+    // Имя отчёта — своё у прогона: копии проекта делят папку e2e оригинала
+    // ссылкой, и две генерации в двух копиях писали один `results/junit.xml`,
+    // ставя кейсам результаты соседа (F-316).
+    const runId = randomUUID();
+    const junit = runReportName(runId);
+    const command = folder?.dir && e2eCommand(root, folder, join(root, folder.dir, junit));
+    const e2e = folder?.dir
+      ? {
+          dir: folder.dir,
+          framework: folder.framework,
+          junit,
+          ...(command ? { command: shellLine(command) } : {}),
+        }
+      : undefined;
     // Веху называет человек, а если не назвал — берём метку git: релиз,
     // помеченный тегом, отчёт узнаёт сам, и просить об этом ещё раз незачем.
     const release = request.release?.trim() || releaseTag(root);
 
     const view: ProjectTestRun = {
-      id: randomUUID(),
+      id: runId,
       projectPath: root,
       mode: request.mode,
       actor: 'agent',
@@ -272,6 +357,7 @@ export class ProjectTestRunRegistry {
       // реестр — нет, и тянуть сюда сеть значило бы сделать старт прогона
       // зависящим от чужой системы.
       material,
+      e2e,
     };
     const prompt = buildPrompt(
       request.groupId ? groups.filter((group) => group.id === request.groupId) : groups,
@@ -280,12 +366,25 @@ export class ProjectTestRunRegistry {
     );
 
     const run = new ChatRun();
+    forgetOtherSpellings(this.runs, root);
     this.runs.set(root, {
       view,
       run,
-      autoAccept: request.autoAccept === true,
+      // Решение владельца: генерация с кодом тестов идёт до конца сама — черновик
+      // применяется, откат остаётся в истории черновиков.
+      autoAccept: request.autoAccept === true || e2e !== undefined,
+      ...(e2e ? { e2e: { dir: e2e.dir, junit: e2e.junit } } : {}),
       redact: redactor(secrets.values),
       snapshot: fingerprintCases(groups, view),
+      ...(options.appData
+        ? {
+            processes: new PanelAgentProcesses(
+              () => options.appData as string,
+              undefined,
+              PROJECT_TEST_PROCESS_LEDGER,
+            ),
+          }
+        : {}),
     });
     // Нехватка доступа прогон не отменяет, но молчать о ней нельзя: провал
     // входа иначе выглядит как поломка приложения.
@@ -297,14 +396,19 @@ export class ProjectTestRunRegistry {
           'заполните её в доступах окружения, иначе вход в стенд не выполнится',
       );
     }
+    if (request.e2e && !e2e) {
+      this.note(root, 'e2e', 'папки e2e в проекте нет — генерация напишет только кейсы');
+    }
     this.persist(root, view);
 
     const scope = runScope(
       root,
       request.mode,
       scoped.flatMap((group) => group.cases),
+      e2e?.dir,
     );
-    void this.launch(root, run, prompt, runName(request, scoped), scope, secrets.values);
+    const name = runName(request, scoped, this.language());
+    void this.launch(root, run, prompt, name, scope, secrets.values);
 
     return view;
   }
@@ -342,7 +446,7 @@ export class ProjectTestRunRegistry {
     try {
       // Обязательный контур без шлюза или ключа: мимо него агент не идёт.
       if (route.refusal) throw new Error(route.refusal);
-      await run.start(
+      const started = run.start(
         {
           prompt,
           cwd: root,
@@ -375,6 +479,14 @@ export class ProjectTestRunRegistry {
         },
         (event) => this.consume(root, event),
       );
+      // Номер процесса известен сразу после `start` — запуск идёт до первого
+      // ожидания; в журнал он уходит до того, как панель успеет умереть.
+      const entry = this.runs.get(root);
+      const running = entry?.run === run && entry.view.status === 'running';
+      if (running && entry.processes && run.pid !== undefined) {
+        entry.processes.started(entry.view.id, run.pid, root);
+      }
+      await started;
     } catch (error) {
       this.finish(root, 'error', (error as Error).message);
     }
@@ -500,13 +612,15 @@ export class ProjectTestRunRegistry {
     // конца работы — это чужая дверь в решения о правах.
     entry.gate?.close();
     entry.gate = undefined;
+    // Прогон кончился в этом процессе панели — убирать на старте нечего.
+    entry.processes?.exited(entry.view.id);
     entry.view.status = status;
     entry.view.finishedAt = new Date().toISOString();
     if (error) entry.view.error = entry.redact ? entry.redact(error) : error;
     // Заметки к кейсам пишет агент, а они уезжают в историю прогонов — файл в
     // git проверяемого проекта. Секрет, попавший в «не пустил с паролем …»,
     // остался бы там навсегда.
-    if (entry.view.mode === 'run' || entry.view.mode === 'automate') {
+    if (recordsResults(entry.view.mode)) {
       stampRunResults(projectPath, entry.view, entry.snapshot ?? new Map(), entry.view.finishedAt);
     }
     entry.view.results = collectResults(projectPath, entry.view, entry.redact);
@@ -514,6 +628,7 @@ export class ProjectTestRunRegistry {
     if (entry.view.mode === 'generate' || entry.view.mode === 'run') {
       this.settleDraft(projectPath, entry.view, entry.autoAccept === true);
     }
+    if (entry.e2e && status === 'done') this.settleE2e(projectPath, entry.view, entry.e2e);
     this.persist(projectPath, entry.view);
     // Об остановке рукой сообщать незачем: её сделал тот же человек, который
     // сейчас смотрит на панель.
@@ -539,14 +654,23 @@ export class ProjectTestRunRegistry {
    * в архиве.
    */
   private settleDraft(root: string, view: ProjectTestRun, auto: boolean): void {
-    const written = readDraft(root, view.id);
-    if (!written) return;
+    const found = readDraft(root, view.id);
+    if (!found) return;
+    // Время черновика — панели: агент пишет его сам и ошибается на часы и сутки
+    // (живой прогон 26.09 — полдень завтрашнего дня), а по нему черновики
+    // сортируются, и выдуманное будущее заслоняло бы всё, что придёт после.
+    const at = view.finishedAt ?? new Date().toISOString();
+    const written = found.error || found.createdAt === at ? found : { ...found, createdAt: at };
+    if (written !== found) writeDraft(root, written);
     // Группу выбрал человек; агент её советом считает, панель — правилом.
     const draft = confineDraft(root, written, view.groupId);
     if (draft.error) {
       this.note(root, 'черновик', draft.error);
       return;
     }
+    // Отброшенные правки — строкой лога: при автоприёмке черновик человек не
+    // открывает, и причина иначе осталась бы только в файле.
+    for (const warning of draft.warnings ?? []) this.note(root, 'черновик', warning);
 
     let accepted = 0;
     if (auto) {
@@ -569,6 +693,62 @@ export class ProjectTestRunRegistry {
     }
 
     view.draft = { runId: view.id, proposed: draft.items.length, accepted, auto };
+  }
+
+  /**
+   * Конец генерации с кодом тестов: тесты папки — в кейсы, отчёт junit — в
+   * результаты. ПОСЛЕ черновика: кейсы с метками `[id]` к этому моменту уже в
+   * группах, и сверка находит их по метке, а не заводит дубли.
+   *
+   * Отчёт берётся, только если он свежее старта прогона: старый файл от прошлого
+   * запуска выдал бы чужие результаты за результаты этого.
+   */
+  private settleE2e(root: string, view: ProjectTestRun, e2e: { dir: string; junit: string }): void {
+    try {
+      const sync = syncE2eFolder(root, new Date().toISOString(), { dir: e2e.dir });
+      this.note(
+        root,
+        'e2e',
+        `сверка папки ${e2e.dir}: файлов ${sync.files}, тестов ${sync.tests}, новых кейсов ` +
+          `${sync.added}, привязано ${sync.linked}`,
+      );
+    } catch (failure) {
+      this.note(root, 'e2e', `сверка папки не удалась: ${(failure as Error).message}`);
+      return;
+    }
+    const report = `${e2e.dir}/${e2e.junit}`;
+    let fresh = false;
+    try {
+      fresh = statSync(join(root, report)).mtimeMs >= Date.parse(view.startedAt) - 1000;
+    } catch {
+      // Отчёта нет — тесты не запускались.
+    }
+    if (!fresh) {
+      this.note(root, 'e2e', `свежего отчёта ${report} нет — результаты не проставлены`);
+      return;
+    }
+    try {
+      // Результаты — строкой ЭТОЙ генерации: отдельная запись «импорт» делала из
+      // одного запуска две строки истории, и итог генерации читался пустым.
+      const { result: imported, points } = importResultsIntoRun(
+        root,
+        { format: 'junit', file: report, environmentId: view.environmentId },
+        view.id,
+      );
+      view.results = points;
+      view.summary = summarizeResults(points);
+      this.note(
+        root,
+        'e2e',
+        `отчёт ${report}: результатов ${imported.read}, легло на кейсы ${imported.matched}` +
+          (imported.unmatched.length > 0 ? `, без кейса ${imported.unmatched.length}` : ''),
+      );
+    } catch (failure) {
+      this.note(root, 'e2e', `отчёт не разобран: ${(failure as Error).message}`);
+    }
+    // Результаты уже в истории; отчёт со своим именем у каждого прогона иначе
+    // копился бы в папке без конца.
+    rmSync(join(root, report), { force: true });
   }
 
   /** Прогон в историю — той же формой, что и ручной. */
@@ -723,19 +903,28 @@ export function stampRunResults(
 }
 
 /**
+ * Режим, который проверяет приложение и оставляет результаты в кейсах.
+ * Исследование сюда входит: его находки — новые кейсы с `failed`/`passed`, и
+ * без штампа запись сессии показывала «0 из 0» при найденных багах.
+ */
+export function recordsResults(mode: ProjectTestRun['mode']): boolean {
+  return mode === 'run' || mode === 'automate' || mode === 'explore';
+}
+
+/**
  * Что агент записал за этот прогон.
  *
  * Считаем по файлам кейсов, по штампу `lastRunId`: своего учёта у прогона нет и
  * быть не должно — статусы пишет агент, и второй счётчик в памяти неизбежно
- * разошёлся бы с файлами. Генерация и исследование результатов не дают: они
- * описывают проверки, а не проходят их.
+ * разошёлся бы с файлами. Генерация результатов не даёт: она описывает
+ * проверки, а не проходит их.
  */
 export function collectResults(
   root: string,
   view: ProjectTestRun,
   redact?: (text: string) => string,
 ): ProjectTestPointResult[] {
-  if (view.mode === 'generate' || view.mode === 'explore') return [];
+  if (!recordsResults(view.mode)) return [];
   const hide = (value?: string): string | undefined => (value && redact ? redact(value) : value);
   const results: ProjectTestPointResult[] = [];
   for (const group of readGroups(root)) {
@@ -805,4 +994,13 @@ function firstArg(input: unknown): string {
 /** Лог растёт бесконечно — держим хвост: интересен конец, а не начало. */
 function tail(text: string): string {
   return text.length > MAX_LOG ? text.slice(text.length - MAX_LOG) : text;
+}
+
+/**
+ * Отчёт генерации рядом с отчётом заготовки (`results/junit.xml`), но со своим
+ * именем: `results/` сверка папки пропускает (`SKIP_DIRS`), а файл убирается
+ * после разбора.
+ */
+function runReportName(runId: string): string {
+  return E2E_JUNIT_REPORT.replace(/\.xml$/, `-${runId}.xml`);
 }

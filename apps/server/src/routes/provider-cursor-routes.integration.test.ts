@@ -1,6 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import {
+  mkdtempSync,
+  rmSync,
+  mkdirSync,
+  writeFileSync,
+  readFileSync,
+  existsSync,
+  realpathSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { AppStore } from '../lib/app-store.ts';
@@ -100,7 +108,8 @@ describe('cursor: каталог правил .mdc на tmp-HOME', () => {
     process.env.USERPROFILE = home;
     rulesDir = join(home, '.cursor', 'rules');
     root = mkdtempSync(join(tmpdir(), 'cc-cursor-routes-'));
-    projectDir = mkdtempSync(join(tmpdir(), 'cc-cursor-project-'));
+    // Реестр пишет путь написанием на диске (F-134): tmpdir на Windows даёт 8.3.
+    projectDir = realpathSync.native(mkdtempSync(join(tmpdir(), 'cc-cursor-project-')));
   });
   afterEach(async () => {
     await app?.close();

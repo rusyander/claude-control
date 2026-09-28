@@ -1,11 +1,15 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { REVIEW_BLOCK_LANG } from '@agentdeck/contracts/model-cascade';
+import { ESCALATE_LINE, REVIEW_BLOCK_LANG } from '@agentdeck/contracts/model-cascade';
 import { HANDOFF_BLOCK_LANG } from '@agentdeck/contracts/chat-handoff';
+import { SPLIT_SYSTEM_PROMPT } from '@agentdeck/contracts/task-split';
 import type { ChatLink } from '../../lib/app-store/app-store.types.ts';
 import { HandoffChains } from '../chat/ChatHandoff.ts';
+import { foreignChildExtra } from '../chat/group-run-lines.ts';
+import { AppStore } from '../../lib/app-store.ts';
+import { writePanelJson } from '../../lib/app-store/group-sources.ts';
 import type { ConfigProvider } from '../../providers/types.ts';
 import {
   createForeignStagePlanner,
@@ -140,7 +144,7 @@ describe('planForeignStage', () => {
     expect(plan?.findings).toHaveLength(2);
     expect(plan?.prompt).toContain('1. src/a.ts: не переименован bar');
     // Ревьюером был сам CLI своей настройкой — «сильнее» тут не обещается.
-    expect(plan?.prompt).toContain('другая модель');
+    expect(plan?.prompt).toContain('another model');
   });
 
   it('пустой список замечаний закрывает цепочку', () => {
@@ -365,8 +369,8 @@ describe('foreignStagePrefix', () => {
     }) as ForeignStagePlan;
 
     const prefix = foreignStagePrefix(plan, settings);
-    expect(prefix).toContain('прогони проверки проекта');
-    expect(prefix).toContain('Ревью этой работы панель не заведёт');
+    expect(prefix).toContain('run the project checks');
+    expect(prefix).toContain('The panel will not start a review of this work');
   });
 });
 
@@ -656,6 +660,176 @@ describe('createForeignStagePlanner', () => {
     });
 
     expect(readChat(dir, 'codex', 'triage')?.messages).toHaveLength(1);
+  });
+
+  /**
+   * Строки группы звена (раунд 5): чужой ребёнок получает то же, что ребёнок
+   * Claude, — числа группы родителя и у работы строку эскалации. Хранилище и
+   * `foreignChildExtra` настоящие, как в runtime.
+   */
+  describe('строки группы звена', () => {
+    let store: AppStore;
+    let appData: string;
+    const KNOBS_LINE = 'ladder — Review rounds: 4 (skill default 2)';
+
+    beforeEach(() => {
+      appData = join(dir, 'agentdeck');
+      mkdirSync(appData, { recursive: true });
+      store = new AppStore(appData);
+      store.saveGroup({
+        id: 'x',
+        name: 'Набор X',
+        description: '',
+        color: 'accent',
+        icon: 'folder',
+        members: [{ kind: 'skill', id: 'ladder' }],
+        env: {},
+        projectPaths: [],
+        knobs: { 'ladder:review-rounds': 4 },
+        isEnabled: true,
+        order: 0,
+      });
+      writePanelJson(appData, 'skill-knobs.json', {
+        'global|skill:ladder': {
+          hash: 'h',
+          knobs: [
+            {
+              key: 'review-rounds',
+              skillId: 'ladder',
+              label: { ru: 'Круги ревью', en: 'Review rounds' },
+              default: 2,
+              min: 1,
+              max: 5,
+              quote: 'Run 2 review rounds.',
+            },
+          ],
+        },
+      });
+      store.setChatGroupSettings('codex:parent', { groupChoice: 'global:x' });
+    });
+
+    const staged = (send: ReturnType<typeof vi.fn>) =>
+      planner(send, true, {
+        linkOf: (key) => store.getChatLink(key),
+        saveLink: (key, link) => store.setChatLink(key, link),
+        childExtra: (key) => foreignChildExtra(store, appData, key),
+      });
+
+    const prefixOf = (send: ReturnType<typeof vi.fn>): string =>
+      (send.mock.calls[0]?.[4] as { systemPrefix?: string } | undefined)?.systemPrefix ?? '';
+
+    it('работа после плана: числа группы родителя и строка эскалации', () => {
+      planChat('plan', PLAN_HEAD, 'Переименуй foo в bar');
+      store.setChatLink('codex:plan', {
+        parentChatId: 'codex:parent',
+        title: 'Переименование',
+        createdAt: '2026-09-26T00:00:00.000Z',
+        stage: 'plan',
+      });
+      const send = vi.fn().mockReturnValue({ ok: true });
+      staged(send)({
+        providerId: 'codex',
+        appDataDir: dir,
+        startedAt: 0,
+        chatId: 'plan',
+        ok: true,
+        text: '```agentdeck:plan\n1. Прочитать src/foo.ts\n```',
+      });
+
+      const workId = send.mock.calls[0]?.[2] as string;
+      const prefix = prefixOf(send);
+      expect(prefix).toContain(ESCALATE_LINE);
+      expect(prefix).toContain(KNOBS_LINE);
+      // Та же строка, что соберёт ответ человека в этот чат и продолжение после паузы.
+      expect(prefix).toContain(foreignChildExtra(store, appData, `codex:${workId}`));
+    });
+
+    it('ревью после работы: числа группы есть, строки эскалации нет — она в задании', () => {
+      workChat('work');
+      store.setChatLink('codex:work', {
+        parentChatId: 'codex:parent',
+        title: 'Переименование',
+        createdAt: '2026-09-26T00:00:00.000Z',
+      });
+      const send = vi.fn().mockReturnValue({ ok: true });
+      staged(send)({
+        providerId: 'codex',
+        appDataDir: dir,
+        startedAt: 0,
+        chatId: 'work',
+        ok: true,
+        text: 'сделал',
+      });
+
+      const prefix = prefixOf(send);
+      expect(prefix).toContain(KNOBS_LINE);
+      expect(prefix).not.toContain(ESCALATE_LINE);
+    });
+
+    it('продолжение работы в чистой сессии несёт те же строки, что и звено', () => {
+      workChat('work');
+      store.setChatLink('codex:work', {
+        parentChatId: 'codex:parent',
+        title: 'Переименование',
+        createdAt: '2026-09-26T00:00:00.000Z',
+      });
+      const send = vi.fn().mockReturnValue({ ok: true });
+      planner(send, true, {
+        linkOf: (key) => store.getChatLink(key),
+        saveLink: (key, link) => store.setChatLink(key, link),
+        childExtra: (key) => foreignChildExtra(store, appData, key),
+        chains: new HandoffChains(() => true),
+        stat: () => Date.now(),
+        hash: () => 'sha-new',
+      })({
+        providerId: 'codex',
+        appDataDir: dir,
+        startedAt: 0,
+        chatId: 'work',
+        ok: true,
+        text: handoffBlock(),
+      });
+
+      const nextId = send.mock.calls[0]?.[2] as string;
+      const prefix = prefixOf(send);
+      expect(prefix).toContain(ESCALATE_LINE);
+      expect(prefix).toContain(KNOBS_LINE);
+      expect(prefix).toContain(foreignChildExtra(store, appData, `codex:${nextId}`));
+    });
+
+    it('продолжение ребёнка без шапки: «без разделения» и строки группы, как у звена', () => {
+      // Дочерний не-план получает `cascade: undefined` (`split-launch.ts`): связь
+      // группы есть, шапки нет. Без неё продолжение получало инструкцию
+      // разделения — ровно то, от чего защищает `splitMuted`.
+      createChat(dir, 'codex', { id: 'child', title: 'Группа 1', workdir: dir });
+      appendMessage(dir, 'codex', 'child', { role: 'user', content: 'Сделай группу 1' });
+      store.setChatLink('codex:child', {
+        parentChatId: 'codex:parent',
+        title: 'Группа 1',
+        createdAt: '2026-09-26T00:00:00.000Z',
+      });
+      const send = vi.fn().mockReturnValue({ ok: true });
+      planner(send, true, {
+        settings: () => ({ taskSplitInitiative: true, handoffInitiative: false }),
+        linkOf: (key) => store.getChatLink(key),
+        saveLink: (key, link) => store.setChatLink(key, link),
+        childExtra: (key) => foreignChildExtra(store, appData, key),
+        chains: new HandoffChains(() => true),
+        stat: () => Date.now(),
+        hash: () => 'sha-new',
+      })({
+        providerId: 'codex',
+        appDataDir: dir,
+        startedAt: 0,
+        chatId: 'child',
+        ok: true,
+        text: handoffBlock(),
+      });
+
+      const prefix = prefixOf(send);
+      expect(prefix).toContain(KNOBS_LINE);
+      expect(prefix).not.toContain(SPLIT_SYSTEM_PROMPT);
+    });
   });
 
   it('после плана заводит работу подобранной ступенью и метит план', () => {

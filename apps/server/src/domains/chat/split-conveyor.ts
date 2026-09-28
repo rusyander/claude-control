@@ -3,6 +3,7 @@ import {
   scanSplitPlanBlocks,
   triageStagePrompt,
   type PredecessorNote,
+  type TriageGroupCatalogEntry,
 } from '@agentdeck/contracts/split-plan';
 import { safeBranchName, type TaskSplitResult } from '@agentdeck/contracts/task-split';
 import { parseForeignChatKey } from '@agentdeck/contracts/foreign-chat-key';
@@ -19,6 +20,12 @@ import {
   type SplitGroupCleaned,
   type SplitPlanView,
 } from '@agentdeck/contracts/chat-handoff';
+import {
+  mergeSieveRows,
+  type LearnedSieveRow,
+  type SieveClass,
+  type SieveReportRow,
+} from '@agentdeck/contracts/sieves';
 import type {
   ChatLink,
   SplitPlanGroupRecord,
@@ -29,12 +36,13 @@ import type { RunFinished } from './ChatRunRegistry.ts';
 import type { SplitGroupContext } from './ChatSplit.ts';
 import { coded } from '../../lib/server-text.ts';
 import { normalizePath } from '../project-runner/targets.ts';
-import { matchText, serverText } from '../../lib/server-texts.ts';
+import { localizeText, matchText, serverText } from '../../lib/server-texts.ts';
 import {
   deliveryIncompleteText,
   deliveryMissingCodesOf,
   errorCodeOf,
 } from './split-group-texts.ts';
+import { groupIdentityLine } from './panel-preamble.ts';
 
 /**
  * Конвейер уровней разделения (Т1): разбор ПЕРЕД копиями, порции запуска
@@ -134,6 +142,27 @@ export interface SplitConveyorDeps {
   schedule?: (run: () => void, ms: number) => unknown;
   /** Заметка в ленту родителя (лимит подписки); не задана — хаб покажет и так. */
   notify?: (parentChatId: string, event: ChatEvent) => void;
+  /**
+   * Группы панели, из которых разбор выбирает группу каждой группе разделения
+   * (выбор группы родителя — `auto`). `undefined` — разбор не выбирает: у
+   * родителя явная группа или выбирать не из чего. Не задан — выбора нет вовсе.
+   */
+  groupCatalog?: (
+    record: Pick<SplitPlanRecord, 'parentChatId' | 'projectPath'>,
+  ) => TriageGroupCatalogEntry[] | undefined;
+  /**
+   * Сита перед MR (решение владельца 28.09): приём выученных по тредам MR и
+   * счёт пойманных до MR. Нет — конвейер работает без обучения.
+   */
+  sieves?: {
+    learn: (input: {
+      rows: readonly LearnedSieveRow[];
+      relayed: readonly string[];
+      projectPath: string;
+      mr?: string;
+    }) => { accepted: unknown[]; rejected: unknown[] };
+    caught: (classes: readonly SieveClass[]) => void;
+  };
   log: (message: string, error?: unknown) => void;
   now?: () => Date;
 }
@@ -148,6 +177,11 @@ export interface DeliveryVerdict {
   unreachable?: string;
   /** Описание MR не прочитать (фордж выключен, нет токена) — сказать человеку. */
   descriptionUnchecked?: boolean;
+  /**
+   * Классы сит, которые сработали на этой проверке (механика панели или сито,
+   * сданное «fail»): блокер пойман до MR — в счёт панели, раз на группу.
+   */
+  sieveClasses?: SieveClass[];
   /**
    * Сама копия не читается (status/rev-parse упали локально): ждать тут нечего,
    * сеть ни при чём — группа закрывается сбоем с причиной (m5).
@@ -193,19 +227,6 @@ export function trackerKeys(text: string): string[] {
   return keys;
 }
 
-/**
- * Первая строка каждого сообщения, которое панель сама шлёт в чат группы
- * (журнал 98): ветка и ключи задач. Сторож git пускает правку истории своей
- * ветки только по ключу задачи в словах пользователя текущего окна, а в
- * продолжении, заведённом панелью, ключа не было — агент упёрся в отказ и
- * встал с вопросом. Звено и продолжение без ветки к тому же не знают, где они.
- */
-export function groupIdentityLine(branch: string, tickets: readonly string[]): string {
-  const parts = [branch ? `Ветка группы: ${branch}.` : ''];
-  if (tickets.length > 0) parts.push(`Задачи группы: ${tickets.join(', ')}.`);
-  return parts.filter(Boolean).join(' ');
-}
-
 /** Сколько снятых групп разговор помнит: запись не должна расти без края. */
 const RETIRED_GROUPS_MAX = 50;
 
@@ -244,12 +265,13 @@ function withoutMr(outcome: ChainOutcome): ChainOutcome {
 /** Напоминание группе: чего не хватает, и что делать, если доставка невозможна. */
 export function deliveryNudgePrompt(branch: string, missing: readonly string[]): string {
   return [
-    'Панель проверила доставку группы по git — она не доведена. Не хватает:',
-    ...missing.map((line) => `- ${line}`),
+    "The panel checked the group's delivery against git — it is not finished. Missing:",
+    // Строки пробелов — тексты сервера (русские, с кодом): модели — их английская сторона.
+    ...missing.map((line) => `- ${localizeText(line, 'en')}`),
     '',
-    `Доведи по навыку доставки: закоммить работу, отправь ветку ${branch}, открой MR ` +
-      '(или обнови существующий) и дай ссылку на него последней строкой. Если доставка ' +
-      'невозможна (нет доступа, решение за человеком) — спроси человека вопросом, а не отчётом.',
+    `Finish it with the delivery skill: commit the work, push the branch ${branch}, open an MR ` +
+      '(or update the existing one) and give its link as the last line. If delivery is ' +
+      "impossible (no access, the decision is the human's) — ask the human with a question, not a report.",
   ].join('\n');
 }
 
@@ -262,12 +284,12 @@ export const MAX_INTERRUPT_RESUMES = 2;
 /** Продолжение оборванной группы: сперва восстановить состояние по фактам, потом работать. */
 export function interruptResumePrompt(branch: string): string {
   return [
-    'Процесс этой группы оборвался посреди хода (перезапуск панели или смерть CLI): фоновые ' +
-      'команды погибли, незаписанное в файлы пропало.',
-    'Сначала восстанови состояние по фактам: git status, git log, что уже сделано — по своему ' +
-      'транскрипту; оборванные проверки запусти заново.',
-    `Потом продолжи с места остановки в ветке ${branch}. Если работа уже была закончена — ` +
-      'повтори итог последнего хода (что сделано, ссылка на MR) и остановись.',
+    "This group's process broke off in the middle of a turn (a panel restart or the CLI died): " +
+      'background commands died, whatever was not written to files is lost.',
+    'First restore the state from the facts: git status, git log, what is already done — from ' +
+      'your transcript; run the interrupted checks again.',
+    `Then continue from where you stopped on the branch ${branch}. If the work was already ` +
+      'finished, repeat the summary of the last turn (what was done, the MR link) and stop.',
   ].join('\n');
 }
 
@@ -280,20 +302,21 @@ export const LIMIT_RESUME_STAGGER_MS = 60_000;
 /** Продолжение группы, ждавшей сброса лимита подписки. */
 export function limitResumePrompt(branch: string): string {
   return [
-    'Прошлый ход группы упёрся в лимит подписки; лимит сброшен, панель продолжает работу.',
-    'Сначала сверь состояние по фактам (git status, git log, свой транскрипт) — оборванные ' +
-      'проверки запусти заново.',
-    `Потом продолжи с места остановки в ветке ${branch}.`,
+    "The group's previous turn hit the subscription limit; the limit has reset and the panel " +
+      'continues the work.',
+    'First check the state against the facts (git status, git log, your transcript) — run the ' +
+      'interrupted checks again.',
+    `Then continue from where you stopped on the branch ${branch}.`,
   ].join('\n');
 }
 
 /** Продолжение группы после паузы человека. */
 export function pauseResumePrompt(branch: string): string {
   return [
-    'Человек поставил группу на паузу и теперь продолжает её. Ход, шедший до паузы, был ' +
-      'остановлен: незаписанное в файлы могло пропасть.',
-    'Сначала сверь состояние по фактам (git status, git log, свой транскрипт), потом продолжи ' +
-      `с места остановки в ветке ${branch}.`,
+    'The human paused the group and is now resuming it. The turn that was running before the ' +
+      'pause was stopped: whatever was not written to files may be lost.',
+    'First check the state against the facts (git status, git log, your transcript), then ' +
+      `continue from where you stopped on the branch ${branch}.`,
   ].join('\n');
 }
 
@@ -336,6 +359,10 @@ export interface ChainOutcome {
   tickets?: SplitTicketProposal[];
   /** Шаги, которые группа сделать не может, а человек может (находка 112). */
   humanSteps?: SplitHumanStepProposal[];
+  /** Строки отчёта о ситах из текста хода. */
+  sieveRows?: SieveReportRow[];
+  /** Сита, выученные группой по тредам её MR, — ещё не проверенные. */
+  learnedSieves?: LearnedSieveRow[];
 }
 
 export interface SplitBeginInput {
@@ -457,8 +484,13 @@ export class SplitConveyor {
       return { record, result: await this.launchReady(record) };
     }
 
+    const catalog = this.deps.groupCatalog?.(record);
+    if (catalog && catalog.length > 0) {
+      record.groupCatalog = catalog.map((entry) => ({ key: entry.key, name: entry.name }));
+    }
     const prompt = triageStagePrompt({
       ...(input.proposal.shared ? { shared: input.proposal.shared } : {}),
+      ...(record.groupCatalog && catalog ? { catalog } : {}),
       groups: input.proposal.groups.map((group) => ({
         title: group.title,
         branch: group.branch,
@@ -512,6 +544,8 @@ export class SplitConveyor {
     const titles = record.proposal.groups.map((group) => group.title);
     const scan = finished.ok ? scanSplitPlanBlocks(finished.text, titles) : undefined;
     const applied = scan?.plan ? applySplitPlan(record.proposal.groups, scan.plan) : undefined;
+    /** Группы панели, выбранные разбором, — строкой ««группа» → набор» на каждую. */
+    const picks: string[] = [];
 
     if (applied) {
       record.order = applied.order;
@@ -524,6 +558,11 @@ export class SplitConveyor {
         else delete source.owns;
         if (group.notes) source.notes = group.notes;
         else delete source.notes;
+        const picked = this.pickOf(record, group.groupKey);
+        if (picked) {
+          source.groupKey = picked.key;
+          picks.push(`«${source.title}» → ${picked.name}`);
+        }
         state.after = group.after;
         if (group.hold) state.hold = group.hold;
         state.status = group.hold ? 'held' : group.after.length > 0 ? 'waiting' : 'pending';
@@ -561,13 +600,49 @@ export class SplitConveyor {
       .filter(Boolean)
       .join(' · ');
 
+    // Выбор групп — в ленту родителя кодом: сводка выше шаблона не имеет, а
+    // что каждой группе выбрано, человек должен прочитать на своём языке.
+    if (picks.length > 0) {
+      const params = { picks: picks.join('; ') };
+      this.deps.notify?.(record.parentChatId, {
+        kind: 'notice',
+        code: 'triageApplied',
+        text: serverText('split-triage-groups-picked-notice', params),
+        textCode: 'split-triage-groups-picked-notice',
+        textParams: params,
+      });
+    }
+    const pickLine =
+      picks.length > 0
+        ? ` ${serverText('split-triage-groups-picked-notice', { picks: picks.join('; ') })}`
+        : '';
+
     return applied
-      ? { kind: 'notice', code: 'triageApplied', text: `Разбор применён — ${summary}.` }
+      ? {
+          kind: 'notice',
+          code: 'triageApplied',
+          text: `Разбор применён — ${summary}.${pickLine}`,
+        }
       : {
           kind: 'notice',
           code: 'triageMissing',
           text: `Разбор не получен (${finished.ok ? 'блока в ответе нет' : 'прогон не завершился'}) — группы стартуют как предложено: ${summary}.`,
         };
+  }
+
+  /**
+   * Выбор разбора, сверенный с каталогом, который ему предлагали. Незнакомый
+   * ключ (модель выдумала или переписала) отбрасывается с записью в журнал:
+   * группа идёт без выбора, как шла бы без каталога.
+   */
+  private pickOf(
+    record: SplitPlanRecord,
+    groupKey: string | undefined,
+  ): { key: string; name: string } | undefined {
+    if (!groupKey) return undefined;
+    const entry = record.groupCatalog?.find((item) => item.key === groupKey);
+    if (!entry) this.deps.log(`split conveyor: triage picked an unknown group ${groupKey}`);
+    return entry;
   }
 
   /**
@@ -643,6 +718,14 @@ export class SplitConveyor {
     const group = this.groupOf(record, link, ['started', 'awaiting', 'background']);
     if (!group) return;
     traceStage(group, link, this.now(), outcome.reviewFindings);
+    // Отчёт о ситах всех звеньев цепочки — в запись группы: его судит проверка
+    // доставки, а следующий круг (продолжение по MR) досдаёт недостающее.
+    const sieveRows = mergeSieveRows(
+      mergeSieveRows(group.sieveRows, link.sieveRows ?? []),
+      outcome.sieveRows ?? [],
+    );
+    if (sieveRows.length > 0) group.sieveRows = sieveRows;
+    if (outcome.learnedSieves?.length) this.learnSieves(record, group, outcome.learnedSieves);
 
     // Группа с доставкой закрывается только по фактам git (живой прогон 24.09:
     // «готово» у групп без push, без MR и со ссылкой на чужой MR). До ответа
@@ -663,6 +746,32 @@ export class SplitConveyor {
       return;
     }
     this.settle(record, group, outcome);
+  }
+
+  /**
+   * Сита, выученные группой по тредам её MR. Проверяет хранилище: тред должен
+   * быть среди тех, что наблюдатель MR сам переслал группе (`relayedLinks`).
+   */
+  private learnSieves(
+    record: SplitPlanRecord,
+    group: SplitPlanGroupRecord,
+    rows: readonly LearnedSieveRow[],
+  ): void {
+    const sieves = this.deps.sieves;
+    if (!sieves) return;
+    try {
+      const outcome = sieves.learn({
+        rows,
+        relayed: group.mrWatch?.relayedLinks ?? [],
+        projectPath: record.projectPath,
+        ...(group.mr ? { mr: group.mr } : {}),
+      });
+      this.deps.log(
+        `split conveyor: group «${group.title}» sieves learned ${outcome.accepted.length}, rejected ${outcome.rejected.length}`,
+      );
+    } catch (error) {
+      this.deps.log('split conveyor: learning sieves failed', error);
+    }
   }
 
   /** Итог хода — в запись группы (без записи в хранилище). */
@@ -853,6 +962,20 @@ export class SplitConveyor {
     }
     // Готовность по следам звеньев — вместе с фактами git (аудит 25.09, L110).
     verdict = { ...verdict, missing: [...verdict.missing, ...stageTraceGaps(group.stageTrace)] };
+    // Сработавшее сито — блокер, пойманный до MR: в счёт панели раз на группу
+    // и класс, сколько бы напоминаний ни понадобилось.
+    const fresh = (verdict.sieveClasses ?? []).filter(
+      (cls) => !(group.sieveCaught ?? []).includes(cls),
+    );
+    if (fresh.length > 0) {
+      group.sieveCaught = [...(group.sieveCaught ?? []), ...new Set(fresh)];
+      this.deps.store.set(record);
+      try {
+        this.deps.sieves?.caught([...new Set(fresh)]);
+      } catch (error) {
+        this.deps.log('split conveyor: sieve tally failed', error);
+      }
+    }
 
     if (verdict.missing.length === 0) {
       delete group.deliveryMissing;
@@ -1294,8 +1417,9 @@ export class SplitConveyor {
    * Нужен, когда группы стартовали НЕ ТАМ (живой прогон 24.09.2026: восемь групп
    * в одном подкаталоге, без копий): разбор на потолке стоит минуты, и его итог
    * верен — неверен был каталог. Незакрытые группы теряют чаты (`discard`
-   * останавливает прогон и снимает связь) и встают в очередь заново; закрытые
-   * (`done`) не трогаются. Решение человека: панель сама ничего не перезапускает.
+   * снимает связь; прогоны маршрут останавливает до вызова) и встают в очередь
+   * заново; закрытые (`done`) не трогаются. Решение человека: панель сама
+   * ничего не перезапускает.
    */
   async relaunch(
     parentChatId: string,

@@ -3,8 +3,20 @@ import { useTranslation } from 'react-i18next';
 import { Badge } from '@shared/ui/badge';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
+import { renderMarkdown } from '@shared/lib/markdown/renderMarkdown';
 import { Typography } from '@shared/ui/typography';
+import {
+  ImageAttachButton,
+  ImageAttachTray,
+  ImageAttachZone,
+  SentImageNames,
+  useImageAttach,
+} from '@shared/ui/image-attach';
+import { splitAgentImages } from '@agentdeck/contracts/agent-images';
+import { usePanelAgentConversations } from '@entities/PanelAgent';
 import { actionTitle } from '../model/actionTitle';
+import { noteReturnedFocus } from '../model/focusAnchor';
+import { splitPending } from '../model/conversation';
 import { appendDictation, isDictating, type VoiceView } from '../model/voiceInput';
 import { PendingActionCard } from './PendingActionCard';
 import { VoiceControl } from './VoiceControl';
@@ -26,6 +38,7 @@ export function ConversationView({
   pageLabel,
   projectLabel,
   onSend,
+  onOpenConversation,
 }: ConversationViewProps) {
   const { t, i18n } = useTranslation();
   const [input, setInput] = useState('');
@@ -38,6 +51,15 @@ export function ConversationView({
   // падает на тело страницы — с клавиатуры человек выпал бы из окна.
   const cardHadFocusRef = useRef(false);
   const { state } = session;
+  // Картинки уходят с репликой блоками в самом запросе: у агента панели нет
+  // файловой системы, путь к файлу ему бесполезен.
+  const attach = useImageAttach({ disabled: state.running });
+  // Список ожиданий у панели общий: карточки других разговоров идут отдельно и
+  // помечены, иначе их отклоняли из нового разговора, приняв за свои.
+  const { own, foreign } = splitPending(pending, session.isOwn);
+  const { data: conversations } = usePanelAgentConversations(foreign.length > 0);
+  const titleOf = (id?: string): string | undefined =>
+    conversations?.find((item) => item.id === id)?.title;
 
   useEffect(() => {
     feedRef.current?.scrollTo({ top: feedRef.current.scrollHeight });
@@ -47,13 +69,15 @@ export function ConversationView({
     if (!cardHadFocusRef.current || document.activeElement !== document.body) return;
     cardHadFocusRef.current = false;
     inputRef.current?.focus();
+    noteReturnedFocus(inputRef.current);
   }, [pending]);
 
   const send = (): void => {
     const text = input.trim();
-    if (!text || state.running || dictating) return;
+    if (!text || state.running || dictating || attach.isPreparing) return;
     setInput('');
-    onSend(text);
+    onSend(text, attach.images);
+    attach.clear();
   };
 
   return (
@@ -75,7 +99,7 @@ export function ConversationView({
           );
         }}
       >
-        {state.feed.length === 0 && pending.length === 0 && (
+        {state.feed.length === 0 && own.length === 0 && (
           <Typography variant="body-sm" color="subtle">
             {t('panelAgent.emptyConversation')}
           </Typography>
@@ -92,9 +116,16 @@ export function ConversationView({
                 ].join(' ')}
                 data-agent-message={item.kind}
               >
-                <Typography variant="body-sm" color={item.kind === 'user' ? 'inverse' : 'default'}>
-                  {item.text}
-                </Typography>
+                {item.kind === 'user' ? (
+                  <UserText text={item.text} />
+                ) : (
+                  <div
+                    className={styles.markdown}
+                    // Модель отвечает разметкой (**имя**, `ключ`, списки) — без разбора
+                    // звёздочки стояли в тексте. markdown-it с выключенным сырым html.
+                    dangerouslySetInnerHTML={{ __html: renderMarkdown(item.text) }}
+                  />
+                )}
               </div>
             );
           }
@@ -129,7 +160,7 @@ export function ConversationView({
           </Typography>
         )}
 
-        {pending.map((item, index) => (
+        {own.map((item, index) => (
           <PendingActionCard
             key={item.id}
             pending={item}
@@ -140,9 +171,44 @@ export function ConversationView({
             autoFocus={index === 0}
           />
         ))}
+
+        {foreign.length > 0 && (
+          <section className={styles.foreignGroup} aria-label={t('panelAgent.foreign.title')}>
+            <Typography variant="body-sm" weight="semibold" as="h3">
+              {t('panelAgent.foreign.title')}
+            </Typography>
+            <Typography variant="caption" color="muted">
+              {t('panelAgent.foreign.hint')}
+            </Typography>
+            {foreign.map((item) => {
+              const id = item.conversationId;
+              // Разговор, ещё не сохранённый (идёт первый ход), открыть нечем.
+              const origin = titleOf(id);
+              return (
+                <PendingActionCard
+                  key={item.id}
+                  pending={item}
+                  isDeciding={deciding.has(item.id)}
+                  error={decideErrors[item.id]}
+                  approveRefused={approveRefused.has(item.id)}
+                  onDecide={(decision) => onDecide(item.id, decision)}
+                  autoFocus={false}
+                  foreign={{
+                    origin,
+                    onOpenConversation:
+                      id && origin && onOpenConversation && !state.running
+                        ? () => onOpenConversation(id)
+                        : undefined,
+                  }}
+                />
+              );
+            })}
+          </section>
+        )}
       </div>
 
-      <div className={styles.composer}>
+      <ImageAttachTray attach={attach} />
+      <ImageAttachZone attach={attach} className={styles.composer}>
         <textarea
           ref={inputRef}
           className={styles.input}
@@ -163,6 +229,7 @@ export function ConversationView({
           aria-label={t('panelAgent.inputLabel')}
           rows={2}
         />
+        <ImageAttachButton attach={attach} />
         <VoiceControl
           disabled={state.running}
           onViewChange={setVoice}
@@ -189,10 +256,26 @@ export function ConversationView({
             icon={<Icon name="send" size={24} />}
             aria-label={t('panelAgent.send')}
             onClick={send}
-            disabled={!input.trim() || dictating}
+            disabled={!input.trim() || dictating || attach.isPreparing}
           />
         )}
-      </div>
+      </ImageAttachZone>
+    </>
+  );
+}
+
+/**
+ * Реплика человека: текст и имена картинок под ним. Строку имён реплика несёт
+ * по-английски для модели (`Attached images:`) — человеку она видна чипами.
+ */
+function UserText({ text }: { text: string }) {
+  const split = splitAgentImages(text);
+  return (
+    <>
+      <Typography variant="body-sm" color="inverse">
+        {split.text}
+      </Typography>
+      <SentImageNames names={split.images} inverse />
     </>
   );
 }

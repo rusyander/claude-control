@@ -2,6 +2,7 @@ import type { OurLayerId, OurRules, Platform, PlatformRunLayers } from '@agentde
 import { posix, win32 } from 'node:path';
 import { defaultOurRules } from '@agentdeck/contracts/platform';
 import { INSTRUCTION_BASE_NAMES } from '../../lib/instruction-files.ts';
+import { effectiveOurRules } from './rules-apply.ts';
 
 /**
  * НАШИ слои в прогоне через контур (Т8): что из `~/.claude` едет в запуск.
@@ -54,9 +55,12 @@ export function layerOn(rules: OurRules, layer: OurLayerId): boolean {
   return rules.enabled && rules[layer];
 }
 
-/** Слои этого контура для прогона Claude. */
+/**
+ * Слои этого контура для прогона Claude. Выбор «только правила контура» снимает
+ * их все — тем же общим выключателем, что и на карточке (`rules-apply.ts`).
+ */
 export function runLayers(platform: Platform): RunLayers {
-  return layersOf(platform.rules.ours, true);
+  return layersOf(effectiveOurRules(platform), true);
 }
 
 /**

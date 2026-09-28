@@ -220,10 +220,10 @@ describe('заметки и задания уровней', () => {
     });
 
     expect(notes).toContain('api.ts не трогать');
-    expect(notes).toContain('«Шапка» (ветка feature/header)');
-    expect(notes).toContain('завершилась ошибкой');
-    expect(notes).toContain('отведена от ветки feature/tests');
-    expect(notes).toContain('Ответ человека: только Chrome');
+    expect(notes).toContain('"Шапка" (branch feature/header)');
+    expect(notes).toContain('ended with an error');
+    expect(notes).toContain('branches off feature/tests');
+    expect(notes).toContain("The human's answer: только Chrome");
     expect(composeGroupNotes({})).toBeUndefined();
   });
 
@@ -236,14 +236,14 @@ describe('заметки и задания уровней', () => {
       ],
     });
 
-    expect(notes).toContain('уже задеты: src/a0.ts');
-    expect(notes).toContain('src/a19.ts и ещё 5');
+    expect(notes).toContain('already touched: src/a0.ts');
+    expect(notes).toContain('src/a19.ts and 5 more');
     // Обрезанного хвоста в задании быть не должно — на то и потолок.
     expect(notes).not.toContain('src/a20.ts');
     // «Ещё пишет» и «упала» — разные новости для агента.
-    expect(notes).toContain('цепочка НЕ кончилась');
-    expect(notes).not.toContain('завершилась ошибкой');
-    expect(notes).toContain('задето файлов: 3');
+    expect(notes).toContain('chain did NOT finish');
+    expect(notes).not.toContain('ended with an error');
+    expect(notes).toContain('files touched: 3');
   });
 
   it('разбор просит ровно один блок, ничего не правит и нумерует группы с единицы', () => {
@@ -255,9 +255,9 @@ describe('заметки и задания уровней', () => {
       ],
     });
 
-    expect(prompt).toContain('Группа 1: «Форма входа»');
-    expect(prompt).toContain('Группа 2: «Шапка» (ветка feature/header, класс mechanical)');
-    expect(prompt).toContain('НИЧЕГО НЕ ПРАВЬ');
+    expect(prompt).toContain('Group 1: "Форма входа"');
+    expect(prompt).toContain('Group 2: "Шапка" (branch feature/header, class mechanical)');
+    expect(prompt).toContain('EDIT NOTHING');
     expect(prompt).toContain(SPLIT_PLAN_BLOCK_LANG);
   });
 
@@ -270,9 +270,9 @@ describe('заметки и задания уровней', () => {
       workModel: 'sonnet',
     });
 
-    expect(prompt.split('\n')[0]).toBe('План работы для группы «Шапка» в ветке feature/header.');
-    expect(prompt).toContain('на модели sonnet');
-    expect(prompt).toContain('правь только здесь): src/header.tsx');
+    expect(prompt.split('\n')[0]).toBe('Work plan for the group "Шапка" on branch feature/header.');
+    expect(prompt).toContain('on the model sonnet');
+    expect(prompt).toContain('edit only here): src/header.tsx');
     expect(prompt).toContain(PLAN_BLOCK_LANG);
   });
 
@@ -280,9 +280,9 @@ describe('заметки и задания уровней', () => {
     const withPlan = workAfterPlanPrompt({ task: 'Задание', plan: '## Шаги\n1. Раз' });
     const without = workAfterPlanPrompt({ task: 'Задание', notes: 'api.ts не трогать' });
 
-    expect(withPlan).toContain('следуй ему по шагам');
+    expect(withPlan).toContain('follow it step by');
     expect(withPlan).toContain('## Шаги');
-    expect(without).toContain('панель не получила');
+    expect(without).toContain('The panel did not receive');
     expect(without).toContain('api.ts не трогать');
     expect(without.startsWith('Задание')).toBe(true);
   });

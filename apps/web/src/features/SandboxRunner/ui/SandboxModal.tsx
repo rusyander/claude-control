@@ -6,6 +6,7 @@ import { Modal } from '@shared/ui/modal';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { TabButton } from '@shared/ui/tab-button';
+import { toErrorMessage } from '@shared/api/client';
 import {
   useCreateSandbox,
   useDeleteSandbox,
@@ -64,16 +65,9 @@ export function SandboxModal({
   const latest = useRef({ kind, hasProbe, selection, open: create.mutate, drop: remove.mutate });
   latest.current = { kind, hasProbe, selection, open: create.mutate, drop: remove.mutate };
 
-  useEffect(() => {
-    if (!isOpen) return undefined;
-
-    const { kind: currentKind, hasProbe: probe, selection: what, open, drop } = latest.current;
-    const id = `ui-${currentKind}-${Date.now()}`;
-
-    setSandboxId(id);
-    setTab(probe ? 'probe' : 'chat');
-    open(
-      { id, selection: what },
+  const build = (id: string): void =>
+    latest.current.open(
+      { id, selection: latest.current.selection },
       {
         onSuccess: (data) => {
           setDescription(data.description);
@@ -81,6 +75,18 @@ export function SandboxModal({
         },
       },
     );
+  const buildRef = useRef(build);
+  buildRef.current = build;
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
+    const { kind: currentKind, hasProbe: probe, drop } = latest.current;
+    const id = `ui-${currentKind}-${Date.now()}`;
+
+    setSandboxId(id);
+    setTab(probe ? 'probe' : 'chat');
+    buildRef.current(id);
 
     // Песочница живёт ровно столько, сколько открыто окно: закрыли — стёрли.
     return () => {
@@ -115,7 +121,12 @@ export function SandboxModal({
           {tab === 'probe' && kind === 'mcp' && mcpId && <McpProbePanel mcpId={mcpId} />}
 
           {tab === 'probe' && kind !== 'mcp' && (
-            <HookProbePanel sandboxId={sandboxId} hookId={hookId} scriptName={scriptName} />
+            <HookProbePanel
+              sandboxId={sandboxId}
+              hookId={hookId}
+              scriptName={scriptName}
+              isReady={description !== undefined}
+            />
           )}
 
           {tab === 'chat' && (
@@ -130,6 +141,19 @@ export function SandboxModal({
             </Typography>
 
             {create.isPending && <Typography color="muted">{t('sandbox.preparing')}</Typography>}
+
+            {/* Песочница не создалась — причина и «Повторить» здесь: иначе кнопки
+                прогона стояли выключенными без объяснения. */}
+            {create.isError && (
+              <Stack gap="var(--spacing-2xs)" align="start" role="alert">
+                <Typography variant="body-sm" color="danger">
+                  {t('sandbox.createFailed', { reason: toErrorMessage(create.error) })}
+                </Typography>
+                <Button size="sm" onClick={() => build(sandboxId)}>
+                  {t('common.retry')}
+                </Button>
+              </Stack>
+            )}
 
             {description && <ContentsList description={description} />}
 

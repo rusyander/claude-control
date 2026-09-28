@@ -9,6 +9,7 @@ import { Icon } from '@shared/ui/icon';
 import { NotificationCenter } from '@shared/ui/notification-center';
 import { Badge } from '@shared/ui/badge';
 import { PanelAgentLauncher } from '@features/PanelAgentWindow';
+import { WatcherIndicator } from '@features/WatcherIndicator';
 import { useOverview } from '@entities/AppConfig';
 import {
   useProviders,
@@ -128,6 +129,9 @@ export function Sidebar({ isCollapsed, onToggle, isNarrow = false }: SidebarProp
 
         {/* Агент панели: одна точка входа на всех страницах, окно поверх раздела. */}
         <PanelAgentLauncher isCollapsed={isCollapsed} />
+
+        {/* Фоновый наблюдатель: строка есть, только пока он включён. */}
+        <WatcherIndicator isCollapsed={isCollapsed} />
 
         {sections.map((section) => (
           <Stack key={section.label} gap="var(--spacing-3xs)">

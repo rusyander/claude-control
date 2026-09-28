@@ -40,7 +40,7 @@
  * Запуск: node tools/help-shots/access-providers-panel.mjs
  * Переменные: GUIDE_PANEL_PORT (5197), GUIDE_WEB_PORT (8907),
  *             GUIDE_UPSTREAM_PORT (5297), GUIDE_DLP_PORT (5397),
- *             GUIDE_ONLY (имя одного сценария: first-run, switch, local…).
+ *             GUIDE_ONLY (сценарии через запятую: first-run, switch, local…).
  */
 import { spawn } from 'node:child_process';
 import { join } from 'node:path';
@@ -155,7 +155,7 @@ try {
   // селектор не должен прятать за собой семь других. Итог прогона — код выхода.
   const broken = [];
   const run = async (topic, name, shoot) => {
-    if (only && only !== name) return;
+    if (only && !only.split(',').includes(name)) return;
     const scenario = openScenario(topic, name);
     console.log(`\nсценарий ${topic}/${name}`);
     // Список замазываний общий на всю пачку и ставится здесь: у сценария нет

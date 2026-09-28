@@ -181,6 +181,61 @@ describe('panel-agent actions: hooks, env, instructions, scripts', () => {
     expect(settings().hooks?.PostToolUse?.[0]?.matcher).toBe('Edit');
   });
 
+  it('save_hook: id хука — от содержимого, экран фокусирует id ПОСЛЕ записи', async () => {
+    const listHooks = async (): Promise<Array<{ id: string; command: string }>> =>
+      (await app.inject({ method: 'GET', url: '/api/hooks' })).json();
+
+    const added = await decided('save_hook', {
+      event: 'PostToolUse',
+      matchers: ['Edit'],
+      command: 'node format.mjs',
+    });
+    const fresh = (await listHooks()).find((hook) => hook.command === 'node format.mjs');
+    expect(fresh).toBeDefined();
+    expect(added.result.page).toEqual({ route: '/hooks', focus: fresh!.id });
+    expect(added.result.result).toMatchObject({ id: fresh!.id });
+
+    // Правка команды меняет id: фокус на прежнем указывал бы на хук, которого нет.
+    const edited = await decided('save_hook', {
+      id: fresh!.id,
+      event: 'PostToolUse',
+      matchers: ['Edit'],
+      command: 'node format.mjs --fix',
+    });
+    const moved = (await listHooks()).find((hook) => hook.command === 'node format.mjs --fix');
+    expect(moved).toBeDefined();
+    expect(moved!.id).not.toBe(fresh!.id);
+    expect(edited.result.page).toEqual({ route: '/hooks', focus: moved!.id });
+  });
+
+  it('[P1] save_hook: правка одной команды не теряет timeout и matcher хука', async () => {
+    const added = await decided('save_hook', {
+      event: 'PreToolUse',
+      matchers: ['Bash', 'Write'],
+      command: 'node probe.mjs',
+      timeout: 30,
+    });
+    const id = (added.result.result as { id: string }).id;
+    // Модель узнаёт таймаут только из списка — без него сохранить его нечем.
+    const listed = (await call('list_hooks', {})).json<PanelActionResult>().result as {
+      hooks: Array<{ id: string; timeout?: number }>;
+    };
+    expect(listed.hooks.find((hook) => hook.id === id)?.timeout).toBe(30);
+
+    const edited = await decided('save_hook', {
+      id,
+      event: 'PreToolUse',
+      command: 'node probe.mjs --v2',
+    });
+    expect(edited.result.outcome).toBe('done');
+    const group = settings().hooks?.PreToolUse?.find((item) =>
+      item.hooks.some((hook) => hook.command === 'node probe.mjs --v2'),
+    ) as { matcher?: string; hooks: Array<{ command: string; timeout?: number }> } | undefined;
+    expect(group?.matcher).toBe('Bash|Write');
+    expect(group?.hooks[0]?.timeout).toBe(30);
+    expect(edited.card.preview.diff).not.toMatch(/^-\s*"timeout"/m);
+  });
+
   it('save_hook с литералом секрета — отказ без карточки, файл не тронут', async () => {
     const before = readFileSync(paths().settings, 'utf8');
     const result = (
@@ -221,6 +276,27 @@ describe('panel-agent actions: hooks, env, instructions, scripts', () => {
     expect(readdirSync(join(appData, 'backups')).length).toBeGreaterThan(0);
   });
 
+  // [P1] Выключенный хук живёт снимком в панели, settings.json его уже не содержит:
+  // дифф пуст, и карточка падала «Nothing would change» — выключенный хук агент
+  // удалить не мог вовсе. Карточка обязана сказать, что стирается снимок.
+  it('[P1] delete_hook удаляет и выключенный хук: карточка с заметкой, снимок стёрт', async () => {
+    const hooks = (await app.inject({ method: 'GET', url: '/api/hooks' })).json<
+      Array<{ id: string; command: string }>
+    >();
+    const guard = hooks.find((hook) => hook.command === 'node guard.mjs');
+    expect((await decided('toggle_hook', { id: guard!.id, isEnabled: false })).result.outcome).toBe(
+      'done',
+    );
+
+    const removed = await decided('delete_hook', { id: guard!.id });
+    expect(removed.result.outcome).toBe('done');
+    expect(JSON.stringify(removed.card.preview.fields)).toContain('note-hook-delete-disabled');
+    const after = (await app.inject({ method: 'GET', url: '/api/hooks' })).json<
+      Array<{ id: string }>
+    >();
+    expect(after.find((hook) => hook.id === guard!.id)).toBeUndefined();
+  });
+
   it('устаревшая карточка: файл правили между показом и «да» — ничего не записано', async () => {
     const { result } = await decided(
       'save_hook',
@@ -244,8 +320,23 @@ describe('panel-agent actions: hooks, env, instructions, scripts', () => {
 
     const { card, result } = await decided('set_env', { key: 'MY_FLAG', value: 'on' });
     expect(card.preview.diff).toContain('MY_FLAG');
-    expect(result).toMatchObject({ outcome: 'done', page: { route: '/env', focus: 'MY_FLAG' } });
+    expect(result).toMatchObject({
+      outcome: 'done',
+      page: { route: '/env', focus: 'settings:MY_FLAG' },
+    });
     expect(settings().env?.MY_FLAG).toBe('on');
+  });
+
+  // Секрет по имени решает то же правило, что и раздел «Переменные»: слово
+  // целиком. Подстрочное правило отказывало в MAX_THINKING_TOKENS=31999 и
+  // помечало его секретом, хотя экран показывает его открыто.
+  it('set_env: MAX_THINKING_TOKENS — обычная переменная, как на экране «Переменные»', async () => {
+    const { result } = await decided('set_env', { key: 'MAX_THINKING_TOKENS', value: '31999' });
+    expect(result).toMatchObject({
+      outcome: 'done',
+      page: { route: '/env', focus: 'settings:MAX_THINKING_TOKENS' },
+    });
+    expect(settings().env?.MAX_THINKING_TOKENS).toBe('31999');
   });
 
   it('set_env секрета: значение от агента — отказ; пустое — поле человеку, существующий не затирается', async () => {
@@ -291,6 +382,64 @@ describe('panel-agent actions: hooks, env, instructions, scripts', () => {
     expect(readFileSync(paths().claudeMd, 'utf8')).toBe(content);
   });
 
+  // Модель читает файлы маской и сохраняет целиком: маска не должна лечь на место
+  // секрета — карточка маскирует обе стороны diff, и человек разницы не увидит.
+  it('правка прочитанного маской: секреты возвращаются с диска, чужие маски — отказ', async () => {
+    const read = (await call('read_claude_md', {})).json<PanelActionResult>();
+    const masked = (read.result as { text: string }).text;
+    expect(masked).toContain('••••••');
+    const edited = `${masked}Отвечать кратко.\n`;
+    const saved = await decided('save_claude_md', { content: edited });
+    expect(saved.result.outcome).toBe('done');
+    expect(readFileSync(paths().claudeMd, 'utf8')).toContain('sk-ant-SECRET-IN-MD');
+    expect(readFileSync(paths().claudeMd, 'utf8')).toContain('Отвечать кратко.');
+
+    const extra = (
+      await call('save_claude_md', { content: `${edited}ЕЩЁ_TOKEN=••••••\n` })
+    ).json<PanelActionResult>();
+    expect(extra.outcome).toBe('failed');
+    expect(extra.message).toContain('••••••');
+
+    const script = join(paths().hooks, 'deploy.sh');
+    writeFileSync(script, `export API_TOKEN=${'VALUE'}9f8e7d6c5b4a3f2e1d0c\necho 1\n`);
+    const readScript = (await call('read_script', { id: 'deploy.sh' })).json<PanelActionResult>();
+    const scriptText = (readScript.result as { text: string }).text;
+    expect(scriptText).not.toContain('9f8e7d6c');
+    const replaced = await decided('save_script', {
+      id: 'deploy.sh',
+      content: scriptText.replace('echo 1', 'echo 2'),
+    });
+    expect(replaced.result.outcome).toBe('done');
+    expect(readFileSync(script, 'utf8')).toBe(
+      `export API_TOKEN=${'VALUE'}9f8e7d6c5b4a3f2e1d0c\necho 2\n`,
+    );
+
+    const withToken = settings();
+    withToken.hooks!.PreToolUse![0]!.hooks[0]!.command = `API_TOKEN=${'VALUE'}9f8e7d6c5b4a3f2e1d0c node guard.mjs`;
+    writeFileSync(paths().settings, `${JSON.stringify(withToken, null, 2)}\n`);
+    const hooks = (await call('list_hooks', {})).json<PanelActionResult>().result as {
+      hooks: Array<{ id: string; event: string; command: string }>;
+    };
+    const guard = hooks.hooks.find((hook) => hook.command.includes('guard.mjs'))!;
+    expect(guard.command).toContain('••••••');
+    const hook = await decided('save_hook', {
+      id: guard.id,
+      event: 'PreToolUse',
+      matchers: ['Bash', 'Edit'],
+      command: guard.command,
+    });
+    expect(hook.result.outcome).toBe('done');
+    expect(JSON.stringify(settings().hooks)).toContain('9f8e7d6c5b4a3f2e1d0c node guard.mjs');
+    // F-294: команда пришла маской, matcher сменился — id хука новый, и фокус
+    // обязан указать на него, а не на прежний id, которого больше нет.
+    const after = (await app.inject({ method: 'GET', url: '/api/hooks' })).json<
+      Array<{ id: string; command: string }>
+    >();
+    const rewritten = after.find((item) => item.command.includes('guard.mjs'));
+    expect(rewritten?.id).not.toBe(guard.id);
+    expect(hook.result.page).toEqual({ route: '/hooks', focus: rewritten!.id });
+  });
+
   it('скрипты: создать, прочитать, заменить, удалить; команды и переключатель скилла', async () => {
     const created = await decided('save_script', {
       id: 'sub/check.mjs',
@@ -330,6 +479,53 @@ describe('panel-agent actions: hooks, env, instructions, scripts', () => {
     >();
     expect(skills.find((item) => item.id === 'review')?.isEnabled).toBe(false);
   });
+  // Описание резалось ДО маски: токен на границе среза детектор уже не узнавал, и
+  // его префикс уходил модели открытым (18 из 20 символов `ghp_…`).
+  it('list_scripts: токен на границе среза описания не уходит модели', async () => {
+    const token = `ghp_${'A1b2C3d4E5'.repeat(4)}`;
+    for (let lead = 220; lead <= 238; lead += 3) {
+      const about = `// ${'x'.repeat(lead)} ${token} tail\n`;
+      writeFileSync(join(paths().hooks, `cut-${lead}.mjs`), about);
+    }
+    const answer = (await call('list_scripts', {})).json<PanelActionResult>();
+    const scripts = (answer.result as { scripts: Array<{ id: string; description?: string }> })
+      .scripts;
+    const cut = scripts.filter((item) => item.id.startsWith('cut-'));
+    expect(cut).toHaveLength(7);
+    for (const item of cut) expect(item.description ?? '').not.toContain('ghp_');
+  });
+
+  it('[P1] list_scripts: длинный список — страницы в пределе моста, хвост достижим', async () => {
+    const about = `// ${'Проверяет правку и пишет след в журнал. '.repeat(15)}\n`;
+    for (let index = 0; index < 90; index += 1) {
+      writeFileSync(join(paths().hooks, `probe-${String(index).padStart(2, '0')}.mjs`), about);
+    }
+    type Page = {
+      total: number;
+      nextOffset?: number;
+      scripts: Array<{ id: string; description?: string }>;
+    };
+    const page = async (offset?: number): Promise<Page> => {
+      const answer = (
+        await call('list_scripts', offset === undefined ? {} : { offset })
+      ).json<PanelActionResult>();
+      expect(answer.outcome).toBe('done');
+      // Переходник режет ответ на 20 000 символах JSON: страница обязана влезать.
+      expect(JSON.stringify(answer.result).length).toBeLessThan(20_000);
+      return answer.result as Page;
+    };
+    const first = await page();
+    expect(first.total).toBe(91);
+    const seen = new Set(first.scripts.map((item) => item.id));
+    for (let next = first.nextOffset; next !== undefined;) {
+      const more = await page(next);
+      for (const item of more.scripts) seen.add(item.id);
+      next = more.nextOffset;
+    }
+    expect(seen.size).toBe(91);
+    expect(seen.has('probe-89.mjs')).toBe(true);
+  });
+
   it('toggle_mcp_server и toggle_permission_rule: выключенное уходит из файла и возвращается', async () => {
     const mcpFile = () =>
       JSON.parse(readFileSync(paths().mcpConfig, 'utf8')) as {
@@ -346,7 +542,10 @@ describe('panel-agent actions: hooks, env, instructions, scripts', () => {
     expect(mcpFile().mcpServers?.docs).toMatchObject({ url: 'https://docs.example.com/mcp' });
 
     const rule = await decided('toggle_permission_rule', { id: 'allow:Read', isEnabled: false });
-    expect(rule.result.outcome).toBe('done');
+    expect(rule.result).toMatchObject({
+      outcome: 'done',
+      page: { route: '/permissions', focus: 'allow:Read' },
+    });
     expect(settings().permissions?.allow ?? []).not.toContain('Read');
     const back = await decided('toggle_permission_rule', { id: 'allow:Read', isEnabled: true });
     expect(back.result.outcome).toBe('done');

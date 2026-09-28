@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatBytes, formatTokens, formatSpend } from './format';
+import { formatBytes, formatBytesIn, formatTokens, formatSpend } from './format';
 import { formatMoney, formatPercent, formatCompact } from './format-number';
 import { sourceLabel } from './location-label';
 import type { ClaudeLocation } from '@agentdeck/contracts';
@@ -31,6 +31,39 @@ describe('formatBytes', () => {
 
   it('крупный размер округляется до десятых', () => {
     expect(formatBytes(5.25 * 1024 * 1024)).toBe('5.3 MB');
+  });
+});
+
+describe('formatBytesIn — размер во фразе на языке интерфейса', () => {
+  const forms: Record<string, string> = { one: 'байт', few: 'байта', many: 'байт', other: 'байта' };
+  const plural = (count: number): string =>
+    `${count} ${forms[new Intl.PluralRules('ru').select(count)]}`;
+  const ru = { bytes: plural, kilobytes: 'КБ', megabytes: 'МБ' };
+
+  it('кейс chat-004: 25 МБ и предел 20 МБ — по-русски, без «.0» и латиницы', () => {
+    expect(formatBytesIn(25 * 1024 * 1024, ru, 'ru')).toBe('25 МБ');
+    expect(formatBytesIn(20 * 1024 * 1024, ru, 'ru')).toBe('20 МБ');
+  });
+
+  it('дробная часть — через запятую в русской локали', () => {
+    expect(formatBytesIn(1536, ru, 'ru')).toBe('1,5 КБ');
+    expect(formatBytesIn(1536, { ...ru, kilobytes: 'KB' }, 'en')).toBe('1.5 KB');
+  });
+
+  it('размер сверх предела не округляется до предела (F-334)', () => {
+    // Отказ «больше 20 МБ не прикладывается: x.png — 20 МБ» спорил сам с собой.
+    expect(formatBytesIn(20 * 1024 * 1024 + 1, ru, 'ru')).toBe('20,1 МБ');
+    expect(formatBytesIn(21_021_520, ru, 'ru')).toBe('20,1 МБ');
+    // Без мегабайта ни байта — уже не «1 024 КБ».
+    expect(formatBytesIn(1024 * 1024 - 1, ru, 'ru')).toBe('1 МБ');
+    expect(formatBytesIn(1025, ru, 'ru')).toBe('1,1 КБ');
+  });
+
+  it('байты склоняются', () => {
+    expect(formatBytesIn(1, ru, 'ru')).toBe('1 байт');
+    expect(formatBytesIn(3, ru, 'ru')).toBe('3 байта');
+    expect(formatBytesIn(512, ru, 'ru')).toBe('512 байт');
+    expect(formatBytesIn(1023, ru, 'ru')).toBe('1023 байта');
   });
 });
 

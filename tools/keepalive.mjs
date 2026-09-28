@@ -56,6 +56,7 @@ import {
   legacyAppDataDirOf,
   resolveBrandDir,
 } from '../apps/server/src/lib/brand.mjs';
+import { killChildProcessTree, killProcessTree } from '../apps/server/src/lib/kill-tree.mjs';
 
 const WIN = platform() === 'win32';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -64,7 +65,6 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 // отдаёт EPERM, а PATH под Git Bash до них не всегда доводит.
 const SYSTEM32 = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32');
 const SCHTASKS = WIN ? join(SYSTEM32, 'schtasks.exe') : 'schtasks';
-const TASKKILL = WIN ? join(SYSTEM32, 'taskkill.exe') : 'taskkill';
 const NETSTAT = WIN ? join(SYSTEM32, 'netstat.exe') : 'netstat';
 const WSCRIPT = join(SYSTEM32, 'wscript.exe');
 
@@ -146,14 +146,15 @@ function pidAlive(pid) {
   }
 }
 
-/** Погасить дерево процессов целиком: pnpm → cmd → vite/node. */
-function killTree(pid) {
-  try {
-    if (WIN) execFileSync(TASKKILL, ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore' });
-    else process.kill(-pid, 'SIGTERM');
-  } catch {
-    // Уже мёртв — ровно тот случай, ради которого мы сюда и пришли.
-  }
+/**
+ * Погасить дерево процессов целиком: pnpm → cmd → vite/node. Общий помощник
+ * сервера (`kill-tree.mjs`), не `taskkill /T`: тот шёл по номерам родителей,
+ * которые Windows не чистит, и снимал чужих сирот — 2026-09-27 так уборка
+ * тестового прогона сняла самого сторожа. `spawnedAt` — когда номер точно был
+ * тем, за кем следим: занявший его позже чужой процесс не трогаем.
+ */
+function killTree(pid, spawnedAt) {
+  killProcessTree(pid, { group: !WIN, spawnedAt });
 }
 
 /**
@@ -231,7 +232,8 @@ function start(unit) {
 function stop(unit) {
   const child = unit.child;
   unit.child = null;
-  if (child?.pid) killTree(child.pid);
+  // Свой дочерний: номер держит libuv, пока он жив, — время сверять не нужно.
+  if (child) killChildProcessTree(child, { group: !WIN });
 }
 
 /**
@@ -245,7 +247,7 @@ function dropAdopted(unit) {
   unit.adoptedPid = 0;
   if (!pid || !pidAlive(pid)) return;
   log(`${unit.id}: добиваю остаток прежнего стенда (pid ${pid})`);
-  killTree(pid);
+  killTree(pid, unit.adoptedAt);
 }
 
 function restart(unit) {
@@ -433,7 +435,10 @@ function uninstall() {
   try {
     const pid = Number(readFileSync(PID_PATH, 'utf8').trim());
     if (pid && pidAlive(pid)) {
-      if (WIN) execFileSync(TASKKILL, ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore' });
+      // Файл номера пишет сам живой сторож на старте: его время — момент, когда
+      // номер точно был сторожем. Файл остался от упавшего, номер занял чужой —
+      // дерево не снимается.
+      if (WIN) killProcessTree(pid, { spawnedAt: statSync(PID_PATH).mtimeMs });
       else process.kill(pid, 'SIGTERM');
     }
   } catch {
@@ -499,6 +504,7 @@ if (mode === '--install') {
       // Запоминаем владельца порта: своего процесса у такого стенда нет, и без
       // этого его остаток потом нечем будет погасить (см. `dropAdopted`).
       unit.adoptedPid = listenerPid(unit.port);
+      unit.adoptedAt = Date.now();
       log(
         `${unit.id}: порт ${unit.port} уже занят${unit.adoptedPid ? ` (pid ${unit.adoptedPid})` : ''} — беру под наблюдение, не перезапускаю`,
       );

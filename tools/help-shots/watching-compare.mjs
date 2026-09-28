@@ -25,28 +25,28 @@ export async function shootLook(browser, web, scenario) {
   try {
     await settings(page);
     await location(page);
-    await open(page, web, '/compare', 2500);
+    await open(page, web, '/compare?tab=mcp', 2500);
     await pickRight(page, 'codex');
 
     // ── 01. Выбор сторон и первый раздел: MCP-серверы ────────────────────────
     await frame(scenario, page, '01-mcp');
 
     // ── 02. Переменные: секрет сверен по наличию, а не по значению ───────────
-    // Прокрутка именно `block: 'start'`, а не `scrollIntoViewIfNeeded`: заголовок
-    // раздела переменных виден и в первом кадре, поэтому «если нужно» не делало
-    // ничего, и кадр выходил побайтово тем же, что 01.
-    await page
-      .getByText(/^(Переменные окружения|Environment variables)$/)
-      .evaluate((node) => node.scrollIntoView({ block: 'start' }));
+    // Каждый раздел сравнения — своя вкладка; выбранные стороны при переходе
+    // остаются, поэтому вкладку открываем щелчком, а не новым адресом.
+    await page.getByRole('tab', { name: /^(Переменные окружения|Environment variables)/ }).click();
     await page.waitForTimeout(700);
     await frame(scenario, page, '02-env');
 
-    // ── 03. Права и инструкции: «модели разные» и «отличается» ───────────────
-    await page
-      .getByText(/^(Глобальные инструкции|Global instructions)$/)
-      .evaluate((node) => node.scrollIntoView({ block: 'start' }));
+    // ── 03. Права: «модели разные» — рядом, но без переноса ──────────────────
+    await page.getByRole('tab', { name: /^(Права|Permissions)/ }).click();
     await page.waitForTimeout(700);
-    await frame(scenario, page, '03-instructions');
+    await frame(scenario, page, '03-permissions');
+
+    // ── 04. Инструкции: сравнивается текст, а не имена файлов ────────────────
+    await page.getByRole('tab', { name: /^(Глобальные инструкции|Global instructions)/ }).click();
+    await page.waitForTimeout(700);
+    await frame(scenario, page, '04-instructions');
   } finally {
     await page.close();
   }
@@ -58,7 +58,7 @@ export async function shootMove(browser, web, scenario) {
   try {
     await settings(page);
     await location(page);
-    await open(page, web, '/compare', 2500);
+    await open(page, web, '/compare?tab=mcp', 2500);
     await pickRight(page, 'codex');
 
     // ── 01. Что переносить нельзя — видно до всякого клика ───────────────────

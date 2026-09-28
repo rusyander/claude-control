@@ -63,29 +63,6 @@ export function linkForCwd(
   return undefined;
 }
 
-/**
- * Строка контекста для агента: то, чего он не может выяснить сам.
- *
- * Пусто, если человек ничего не привязал, — выдумывать тикет нельзя, а пустая
- * строка в задании безобиднее ложной.
- */
-export function describeLink(link: IntegrationLink): string {
-  const parts = [
-    link.jiraIssueKey
-      ? `задача ${link.jiraIssueKey}${link.jiraIssueTitle ? ` — ${link.jiraIssueTitle}` : ''}`
-      : '',
-    link.jiraProjectKey ? `проект Jira ${link.jiraProjectKey}` : '',
-    link.confluencePageId
-      ? `страница Confluence ${link.confluencePageId}${
-          link.confluencePageTitle ? ` — ${link.confluencePageTitle}` : ''
-        }`
-      : '',
-    link.forgeRepo ? `репозиторий ${link.forgeRepo}` : '',
-    link.note ?? '',
-  ].filter(Boolean);
-  return parts.join('; ');
-}
-
 function requirePath(path: string): string {
   const value = String(path ?? '').trim();
   if (!value)

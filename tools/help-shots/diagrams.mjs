@@ -29,7 +29,7 @@
  * и в `shots.mjs` скилла drawio-architect. Без сети прогон честно падает, а не
  * пишет пустой файл.
  *
- * Запуск: node tools/help-shots/diagrams.mjs
+ * Запуск: node tools/help-shots/diagrams.mjs (`DIAGRAMS_ONLY=chat` — только свои разделы)
  */
 import { readFileSync, readdirSync, mkdirSync, writeFileSync, statSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -146,7 +146,7 @@ const SETS = [
   {
     source: 'docs/diagrams/settings-guide/settings-guide.drawio',
     topic: 'settings',
-    pages: ['what-happens-before-a-write'],
+    pages: ['what-happens-before-a-write', 'how-the-watcher-works'],
   },
   {
     source: 'docs/diagrams/providers-guide/providers-guide.drawio',
@@ -173,11 +173,22 @@ const SETS = [
     topic: 'panelAgent',
     pages: ['action-path', 'keys-and-files'],
   },
+  {
+    source: 'docs/diagrams/phone-guide/phone-guide.drawio',
+    topic: 'phone',
+    pages: ['phone-path'],
+  },
 ];
+
+// DIAGRAMS_ONLY=chat,groups сужает экспорт до своих разделов: полный прогон
+// переснимает и чужие схемы, и в рабочей копии появляются правки, которых никто
+// не делал.
+const only = (process.env.DIAGRAMS_ONLY ?? '').split(',').filter(Boolean);
+const chosen = only.length > 0 ? SETS.filter((set) => only.includes(set.topic)) : SETS;
 
 const browser = await chromium.launch();
 try {
-  for (const set of SETS) {
+  for (const set of chosen) {
     const xml = readFileSync(join(ROOT, set.source), 'utf8');
     const dir = join(SHOTS_ROOT, set.topic, 'diagrams');
     mkdirSync(dir, { recursive: true });

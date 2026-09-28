@@ -14,6 +14,30 @@
  */
 import { settings, location, liveAgents, open, frame } from './watching-stubs.mjs';
 
+/**
+ * «Где идёт» для кадров 07–08: идёт в терминале. Каталог и номер сессии —
+ * из настоящего ответа сервера; подменено только место процесса.
+ */
+async function sessionInTerminal(page) {
+  await page.route('**/api/analytics/sessions/*/where', async (route) => {
+    const real = await (await route.fetch()).json();
+    const id = real.sessionId ?? '';
+    route.fulfill({
+      json: {
+        ...real,
+        where: {
+          kind: 'process',
+          pid: 41872,
+          startedAt: new Date(Date.now() - 12 * 60_000).toISOString(),
+          host: 'terminal',
+          command: `claude --resume ${id}`,
+          ownsPanel: false,
+        },
+      },
+    });
+  });
+}
+
 export async function shootReport(browser, web, scenario) {
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 
@@ -24,7 +48,7 @@ export async function shootReport(browser, web, scenario) {
     await liveAgents(page, []);
 
     // ── 01. Период по умолчанию — сегодня ────────────────────────────────────
-    await open(page, web, '/analytics', 3000);
+    await open(page, web, '/analytics?tab=overview', 3000);
     await frame(scenario, page, '01-today');
 
     // ── 02. Тридцать дней: появляется график по дням ─────────────────────────
@@ -33,6 +57,12 @@ export async function shootReport(browser, web, scenario) {
     await frame(scenario, page, '02-month');
 
     // ── 03. Столбец модели — дверь в разбивку ────────────────────────────────
+    // Разрезы отчёта — вкладки; выбранный период при переходе остаётся.
+    await page.getByRole('tab', { name: /^(Модели и проекты|Models and projects)/ }).click();
+    await page.waitForTimeout(800);
+    // ── 06. Вкладка «Модели и проекты» целиком ───────────────────────────────
+    // Номер после 05 — кадр добавлен позже; в документе стоит перед 03.
+    await frame(scenario, page, '06-breakdown');
     await page
       .getByRole('button', { name: /claude-/ })
       .first()
@@ -44,16 +74,48 @@ export async function shootReport(browser, web, scenario) {
     await page.waitForTimeout(500);
 
     // ── 04. Часы суток, инструменты и скиллы ─────────────────────────────────
-    await page
-      .getByText(/Активность по часам суток|Activity by hour of day/)
-      .scrollIntoViewIfNeeded();
+    await page.getByRole('tab', { name: /^(Инструменты и часы|Tools and hours)/ }).click();
     await page.waitForTimeout(800);
     await frame(scenario, page, '04-hours');
 
     // ── 05. Сессии, объём обхода и прямая оговорка про лимиты ────────────────
-    await page.getByText(/Про лимиты подписки|About subscription limits/).scrollIntoViewIfNeeded();
+    await page.getByRole('tab', { name: /^(Сессии|Sessions)/ }).click();
     await page.waitForTimeout(800);
+    // Карточка про лимиты стоит под списком: кадр опускается к ней, иначе подпись
+    // обещала бы то, чего на снимке нет.
+    await page
+      .getByText(/^(Про лимиты подписки|About subscription limits)$/)
+      .first()
+      .evaluate((node) => node.scrollIntoView({ block: 'end' }))
+      .catch(() => null);
+    await page.mouse.wheel(0, 120);
+    await page.waitForTimeout(400);
     await frame(scenario, page, '05-sessions');
+
+    // ── 07–08. «Перейти» и «Остановить» у идущей сессии ─────────────────────
+    // Процесс CLI на стенде съёмки не запущен, поэтому ответ «где идёт»
+    // подменён: всё, кроме места (номер, команда), — настоящее от сервера.
+    await sessionInTerminal(page);
+    await page.getByRole('tab', { name: /^(Сводка|Summary)/ }).click();
+    await page.getByRole('tab', { name: /^(Сессии|Sessions)/ }).click();
+    await page.waitForTimeout(800);
+    await page
+      .getByRole('button', { name: /^(Перейти|Go to): / })
+      .first()
+      .click();
+    await page.waitForSelector('[role="dialog"]');
+    await page.waitForTimeout(600);
+    await frame(scenario, page, '07-session-where', { clip: '[role="dialog"]', padding: 40 });
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(400);
+    await page
+      .getByRole('button', { name: /^(Остановить|Stop): / })
+      .first()
+      .click();
+    await page.waitForSelector('[role="dialog"]');
+    await page.waitForTimeout(600);
+    await frame(scenario, page, '08-session-stop', { clip: '[role="dialog"]', padding: 40 });
+    await page.keyboard.press('Escape');
   } finally {
     await page.close();
   }
@@ -68,7 +130,7 @@ export async function shootLive(browser, web, scenario) {
 
     // ── 01. Ничего не запущено ───────────────────────────────────────────────
     await liveAgents(page, []);
-    await open(page, web, '/analytics', 3000);
+    await open(page, web, '/analytics?tab=live', 3000);
     await frame(scenario, page, '01-idle');
 
     // ── 02. Два процесса: итог строкой, номера — по клику ────────────────────

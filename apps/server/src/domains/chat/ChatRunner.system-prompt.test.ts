@@ -58,7 +58,7 @@ interface SpawnCall {
  */
 async function runOn(
   platform: string,
-  extra: { appendSystemPrompt?: string; platformSystemPrompt?: string } = {
+  extra: { appendSystemPrompt?: string; platformSystemPrompt?: string; workspaceNote?: string } = {
     appendSystemPrompt: APPENDED,
   },
 ): Promise<SpawnCall> {
@@ -129,6 +129,35 @@ describe('ChatRun: дописка к системному промпту', () =>
     expect(flag).toBeGreaterThanOrEqual(0);
     expect(call.args[flag + 1]).toBe(APPENDED);
     expect(call.args.some((arg) => arg.includes('--append-system-prompt-file'))).toBe(false);
+  });
+});
+
+describe('ChatRun: строка о тестах проекта', () => {
+  it('едет в той же дописке, после текста панели, с переводами строки', async () => {
+    const call = await runOn('linux', {
+      appendSystemPrompt: 'инициатива панели\n1. шаг\n2. шаг',
+      workspaceNote: 'QA workspace:\ne2e folder "e2e"',
+    });
+    const flag = call.args.indexOf('--append-system-prompt');
+    expect(call.args[flag + 1]).toBe(
+      'инициатива панели\n1. шаг\n2. шаг\n\nQA workspace:\ne2e folder "e2e"',
+    );
+  });
+
+  it('на Windows файл дописки хранит строки как есть, аргумента с переводом строки нет', async () => {
+    const call = await runOn('win32', {
+      appendSystemPrompt: 'инициатива панели\n1. шаг\n2. шаг',
+      workspaceNote: 'QA workspace',
+    });
+    const flag = call.args.indexOf('--append-system-prompt-file');
+    const path = call.args[flag + 1] ?? '';
+    expect(call.fileContents[path]).toBe('инициатива панели\n1. шаг\n2. шаг\n\nQA workspace');
+    expect(call.args.some((arg) => /[\r\n]/.test(arg))).toBe(false);
+  });
+
+  it('без текста панели строка уходит одна', async () => {
+    const call = await runOn('linux', { workspaceNote: 'QA workspace' });
+    expect(call.args[call.args.indexOf('--append-system-prompt') + 1]).toBe('QA workspace');
   });
 });
 
@@ -235,8 +264,8 @@ describe('ChatRun: прогон ребёнка разделения', () => {
     const appended = call.args[call.args.indexOf('--append-system-prompt') + 1] ?? '';
     expect(appended.startsWith('Инициативы панели.')).toBe(true);
     // Вопрос текстом из родителя не виден: «твоего вопроса я не видел» (Д16).
-    expect(appended).toContain('ТОЛЬКО инструментом AskUserQuestion');
-    expect(appended).toContain('С другими сессиями CLI не договаривайся');
+    expect(appended).toContain('ONLY with the AskUserQuestion tool');
+    expect(appended).toContain('Do not make deals with other CLI sessions');
   });
 
   it('ребёнок узнаётся и по ключу сессии, под которым его продолжают', async () => {
@@ -278,5 +307,50 @@ describe('сводка детей в ходе родителя (Д6)', () => {
     const call = await viaRegistry([], 'solo', undefined, () => undefined);
 
     expect(call.stdin).toBe('задача');
+  });
+});
+
+/**
+ * F-45. Подпись живой сессии решает, отдать ли ход процессу из пула. Строка о
+ * тестах проекта (`workspaceNote`) едет в дописке, но в подпись не входила:
+ * папка e2e, появившаяся между ходами, не меняла подпись, и ход уходил процессу
+ * со старым системным промптом.
+ */
+describe('ChatRun: подпись живой сессии', () => {
+  async function signatureOf(extra: {
+    appendSystemPrompt?: string;
+    workspaceNote?: string;
+  }): Promise<string> {
+    vi.resetModules();
+    const { ChatRun } = await import('./ChatRunner.ts');
+    let seen = '';
+    const stop = new Error('подпись снята');
+    const pool = {
+      waking: () => undefined,
+      take: (_session: string | undefined, signature: string) => {
+        seen = signature;
+        throw stop;
+      },
+    };
+    await expect(
+      new ChatRun(pool as never).start(
+        { prompt: 'задача', cwd: process.cwd(), sessionId: 'sess-1', ...extra },
+        () => undefined,
+      ),
+    ).rejects.toBe(stop);
+    return seen;
+  }
+
+  it('строка о тестах проекта и переводы строки в дописке меняют подпись', async () => {
+    const bare = await signatureOf({ appendSystemPrompt: 'Панель.' });
+    // Отпечаток и отложимая часть — метка автономии (F-31); сырого окружения в подписи нет.
+    expect(bare).toMatch(/^[0-9a-f]{64}~autonomous=[01]$/);
+    expect(await signatureOf({ appendSystemPrompt: 'Панель.' })).toBe(bare);
+    expect(
+      await signatureOf({ appendSystemPrompt: 'Панель.', workspaceNote: 'Тесты: e2e.' }),
+    ).not.toBe(bare);
+    expect(await signatureOf({ appendSystemPrompt: 'а\nб' })).not.toBe(
+      await signatureOf({ appendSystemPrompt: 'а б' }),
+    );
   });
 });

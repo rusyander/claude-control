@@ -228,4 +228,20 @@ describe('импорт кейсов', () => {
       /Нечего импортировать/,
     );
   });
+
+  // Живой прогон 26.09: мусор вместо книги давал «Это не книга Excel: Это не
+  // ZIP-архив: …» — два «это не» подряд и без кода, так что английский
+  // интерфейс показывал русский текст. Причина — внутренняя деталь ZIP, человеку
+  // нужен вывод и что делать.
+  it('не книга — одна фраза с кодом, без внутренностей архива', () => {
+    let caught: (Error & { messageCode?: string }) | undefined;
+    try {
+      readXlsx(Buffer.from('нет'));
+    } catch (error) {
+      caught = error as Error & { messageCode?: string };
+    }
+    expect(caught?.messageCode).toBe('import-cases-xlsx-broken');
+    expect(caught?.message).not.toMatch(/ZIP/);
+    expect(caught?.message.match(/Это не/g)).toHaveLength(1);
+  });
 });

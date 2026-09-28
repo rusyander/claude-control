@@ -1,6 +1,8 @@
 export { ChatComposer } from './ui/ChatComposer';
 // Предел размера вложения нужен и странице: она называет его в сообщении об отказе.
 export { MAX_FILE_BYTES } from './lib/attachments';
+// Состав отказа при вложении: страница превращает его в сообщение.
+export type { AttachRejection } from './ui/ChatComposer.types';
 /**
  * Само меню «Режим» — наружу, потому что композеров в панели ДВА: этот и свой у
  * чужого CLI (`pages/ProviderChat`). Режимы работают в обоих, и вторая копия меню

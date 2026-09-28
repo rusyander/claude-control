@@ -2,6 +2,7 @@ import type { HandoffRefusal } from '@agentdeck/contracts/chat-handoff';
 import type { CascadeStage } from '@agentdeck/contracts/model-cascade';
 import type { ServerMessageCode, ServerMessageParams } from '@agentdeck/contracts/server-messages';
 import type { BranchGateChild } from './ChatBranchGate.ts';
+import type { EscalationNotice, RecommendedPick } from '@agentdeck/contracts/chat-group-settings';
 
 /**
  * Словарь событий чата: что панель получает от CLI и что отдаёт интерфейсу.
@@ -55,7 +56,32 @@ export type ChatEvent =
   | { kind: 'error'; message: string }
   // Интерактивные права: агент хочет применить инструмент — ждём решения человека.
   | { kind: 'permission'; toolName: string; input: unknown; toolUseId: string }
-  | { kind: 'permissionResolved'; toolUseId: string; behavior: 'allow' | 'deny' }
+  /**
+   * Запрос прав решён. `expired` — решал не человек: CLI перестал ждать ответа
+   * (или истёк срок брокера), и карточка обязана сказать «истекло», а не
+   * «запрещено».
+   */
+  | { kind: 'permissionResolved'; toolUseId: string; behavior: 'allow' | 'deny'; expired?: true }
+  /**
+   * CLI вернул результат вызова `toolUseId` — ВНУТРЕННЕЕ событие реестра, в
+   * поток вкладок не уходит. Висящий по этому вызову запрос прав после него
+   * мёртв: CLI уже пошёл дальше (оборвал вызов по своему сроку), и ответ на
+   * карточку ничего не запустит. Живой ответ до результата не доживает —
+   * брокер снимает запрос в момент клика, раньше, чем CLI исполнит вызов.
+   */
+  | { kind: 'toolResult'; toolUseId: string }
+  /**
+   * Вопрос `AskUserQuestion` закрыт автономией чата: за человека взят вариант с
+   * «(Recommended)». Узнаётся по результату вызова (`auto-pick.ts`), лента
+   * рисует приглушённую строку «Автовыбор: …» вместо карточки вопроса.
+   */
+  | { kind: 'autoPick'; toolUseId: string; picks: RecommendedPick[] }
+  /**
+   * Критическое замечание ребёнка — в ленту ГЛАВНОГО чата дерева. Правда о нём
+   * хранится у панели (`GET /api/chat/escalations`); событие лишь будит идущий
+   * прогон корня, чтобы карточка появилась без перезагрузки.
+   */
+  | { kind: 'escalation'; notice: EscalationNotice }
   /**
    * Ворота ветки: первая правка в основной рабочей копии придержана, человек
    * выбирает — копия с веткой, здесь же или отказ. Это тот же придержанный
@@ -101,6 +127,11 @@ export type ChatEvent =
        * 'mrWatchLimit' — наблюдатель MR исчерпал самостоятельные продолжения;
        * 'defaultDrift' — основная ветка ушла вперёд и задела файлы идущей группы (находка 61);
        * 'deliveryUnchecked' — часть готовности группы (описание MR) панель не проверила.
+       * 'pathStep' / 'pathGateFailed' — шаг «Пути» группы пошёл в этом чате / не прошёл проверку.
+       * 'autonomyDeferred' — галочку автономии переключили, а процесс держит фоновые
+       *   команды: перезапуск с новой меткой ждёт их конца (F-31).
+       * 'stopUnconfirmed' — «Остановить» не сняло процесс: номер не проверить без
+       *   снимка процессов, а чужое панель не трогает; прогон остаётся идущим (F-145).
        */
       code:
         | 'adopted'
@@ -117,7 +148,11 @@ export type ChatEvent =
         | 'groupsLimited'
         | 'mrWatchLimit'
         | 'defaultDrift'
-        | 'deliveryUnchecked';
+        | 'deliveryUnchecked'
+        | 'pathStep'
+        | 'pathGateFailed'
+        | 'autonomyDeferred'
+        | 'stopUnconfirmed';
       text: string;
       /**
        * Код самого текста — отдельно от `code`, который называет ПОВОД. Повод
@@ -227,7 +262,16 @@ export interface RawEvent {
     id?: string;
     /** Модель ЭТОГО шага: в разговоре они чередуются (переключение, субагенты). */
     model?: string;
-    content?: { type: string; text?: string; name?: string; input?: unknown; id?: string }[];
+    content?: {
+      type: string;
+      text?: string;
+      name?: string;
+      input?: unknown;
+      id?: string;
+      /** `tool_result` в строке `user`: к какому вызову и что вернулось. */
+      tool_use_id?: string;
+      content?: unknown;
+    }[];
     /** В `assistant` это заглушка из `message_start` — полный расход в `message_delta`. */
     usage?: RawUsage;
   };

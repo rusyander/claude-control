@@ -213,7 +213,7 @@ async function run(stub, appData) {
     sent?.model === 'stub-image' &&
       sent?.stream === true &&
       sent?.messages?.[0]?.role === 'system' &&
-      String(sent?.messages?.[0]?.content).includes('рисуешь') &&
+      String(sent?.messages?.[0]?.content).includes('You draw') &&
       sent?.messages?.[1]?.content === 'кот на подоконнике',
     JSON.stringify(sent).slice(0, 300),
   );
@@ -800,7 +800,7 @@ async function mediaEverywhere(stub, appData) {
     revisePrompt.status === 200 &&
       askedRevise.includes(DECK_JSON.title) &&
       askedRevise.includes('третий слайд короче') &&
-      askedRevise.includes('ВСЯ колода после правки') &&
+      askedRevise.includes('the WHOLE deck after the revision') &&
       askedRevise.includes('pictureId'),
     `${revisePrompt.status} ${askedRevise.slice(0, 200)}`,
   );

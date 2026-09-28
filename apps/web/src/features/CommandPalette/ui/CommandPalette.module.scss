@@ -24,6 +24,16 @@
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
   overflow: hidden;
+
+  &.besideDock {
+    width: calc(100vw - var(--panel-agent-dock-inset, 0px) - var(--spacing-xl));
+  }
+}
+
+// Рядом с пристёгнутым окном агента (useBesideDockDialog): затемнение и палитра —
+// слева от него, на ту же ширину, на какую оно сдвигает страницу.
+.besideDock {
+  right: var(--panel-agent-dock-inset, 0px);
 }
 
 .inputRow {

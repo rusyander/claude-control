@@ -1,7 +1,15 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { delimiter, join } from 'node:path';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { basename, delimiter, dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { PanelActionResult, PanelPendingAction } from '@agentdeck/contracts/panel-agent';
 import { PANEL_AGENT_HEADER } from '@agentdeck/contracts/panel-agent';
@@ -22,7 +30,9 @@ import { registerConfigRoutes } from '../config-routes.ts';
 import { registerPlatformRoutes } from '../platform-routes.ts';
 import { registerChatRunRoutes } from '../chat/run-routes.ts';
 import { registerChatTranscriptRoutes } from '../chat/transcript-routes.ts';
+import { registerMediaRoutes } from '../media-routes.ts';
 import { registerPanelAgentRoutes } from './panel-agent-routes.ts';
+import { PROJECT_CHAT_ACTIONS } from './actions-projects.ts';
 
 /**
  * Действия «Проекты, чат» (А4) на настоящих маршрутах: список чатов из
@@ -34,14 +44,31 @@ import { registerPanelAgentRoutes } from './panel-agent-routes.ts';
 const isWindows = process.platform === 'win32';
 const ORIGIN = 'http://localhost:8888';
 const SESSION = 'fake-session-a4';
-/** Столько фальшивый CLI «работает» после имени сессии: действие обязано вернуться раньше. */
-const RUN_MS = 2500;
+/**
+ * Срок ожидания кадра сессии у исполнителя. Полторы секунды не хватало: под
+ * нагрузкой полного набора холодный старт `claude.cmd` → node сам длится
+ * дольше, исполнитель отдавал ключ прогона `new-…` вместо имени сессии, и тест
+ * краснел там, где код не трогали. Запас нужен всем тестам, кроме одного.
+ */
+const HEAD_MS = 10_000;
+/** Короткий срок — только тесту, где CLI намеренно называет сессию позже срока. */
+const SHORT_HEAD_MS = 1500;
+const LATE_SESSION_TEST =
+  'start_chat: CLI назвал сессию позже срока — страница открывается на ключ идущего прогона';
+/** Метка первого сообщения, на которой фальшивый CLI называет сессию позже срока. */
+const SLOW = 'МЕДЛЕННЫЙ-СТАРТ';
+/** Метка, на которой фальшивый CLI отказывает до имени сессии. */
+const FAIL = 'СБОЙ-СТАРТА';
 
 // Потоковый ввод, как у живой сессии: сообщение хода — строка JSON, stdin
 // открыт до конца разговора, процесс уходит по его закрытию.
+// Итог хода фальшивый CLI отдаёт только по файлу-сигналу теста (`<dump>.finish`):
+// «прогон ещё идёт» тогда не гонка со временем, а состояние, которое держит тест.
 const FAKE = `
-import { writeFileSync } from 'node:fs';
+import { existsSync, writeFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
+const finish = process.env.CC_FAKE_DUMP + '.finish';
+writeFileSync(process.env.CC_FAKE_DUMP + '.pid', String(process.pid));
 const out = (event) => process.stdout.write(JSON.stringify(event) + '\\n');
 for await (const line of createInterface({ input: process.stdin })) {
   writeFileSync(process.env.CC_FAKE_DUMP, JSON.stringify({
@@ -49,17 +76,56 @@ for await (const line of createInterface({ input: process.stdin })) {
     cwd: process.cwd(),
     stdin: line,
   }));
+  // CLI отказал до начала работы: итог-ошибка без имени сессии.
+  if (line.includes('${FAIL}')) {
+    out({ type: 'result', subtype: 'error_during_execution', is_error: true, result: 'тестовая причина отказа', session_id: '' });
+    continue;
+  }
+  // Тяжёлая конфигурация (хуки, MCP): имя сессии приходит позже срока исполнителя.
+  if (line.includes('${SLOW}')) await new Promise((done) => setTimeout(done, ${SHORT_HEAD_MS} + 500));
   out({ type: 'system', subtype: 'init', session_id: '${SESSION}', model: 'fake-model', tools: [] });
-  setTimeout(() => {
+  const poll = setInterval(() => {
+    if (!existsSync(finish)) return;
+    clearInterval(poll);
     out({ type: 'result', subtype: 'success', is_error: false, result: 'ok', session_id: '${SESSION}', total_cost_usd: 0, duration_ms: 1 });
-  }, ${RUN_MS});
+  }, 50);
 }
+// stdin закрыт — разговор окончен: сигнала итога уже не будет, выходим сами.
+process.exit(0);
 `;
 
 interface Dump {
   argv: string[];
   cwd: string;
   stdin: string;
+}
+
+const sleep = (ms: number) => new Promise((done) => setTimeout(done, ms));
+
+function isAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Дождаться выхода фальшивого CLI по его pid-файлу; не вышел за срок — снять. */
+async function fakeGone(pidFile: string): Promise<void> {
+  if (!existsSync(pidFile)) return;
+  const pid = Number(readFileSync(pidFile, 'utf8'));
+  for (let waited = 0; isAlive(pid) && waited < 3000; waited += 50) await sleep(50);
+  if (isAlive(pid)) {
+    try {
+      process.kill(pid, 'SIGKILL');
+    } catch {
+      // Вышел между проверкой и сигналом.
+    }
+  }
+  for (let waited = 0; isAlive(pid) && waited < 3000; waited += 50) await sleep(50);
+  // Обёртка `cmd.exe` уходит следом за node и тоже держит каталог.
+  await sleep(200);
 }
 
 describe('panel-agent actions: projects & chat', () => {
@@ -79,7 +145,7 @@ describe('panel-agent actions: projects & chat', () => {
   const savedDump = process.env.CC_FAKE_DUMP;
   const chatKeys: string[] = [];
 
-  beforeEach(async () => {
+  beforeEach(async ({ task }) => {
     root = mkdtempSync(join(tmpdir(), 'cc-agent-a4-config-'));
     appData = join(root, 'agentdeck');
     mkdirSync(appData, { recursive: true });
@@ -148,7 +214,13 @@ describe('panel-agent actions: projects & chat', () => {
     registerPlatformRoutes(app, ctx, gateway);
     registerChatRunRoutes(app, ctx, registry, new ChatSession(registry));
     registerChatTranscriptRoutes(app, ctx);
-    registerPanelAgentRoutes(app, ctx, { hub, pending, access });
+    registerMediaRoutes(app, ctx, () => 0);
+    registerPanelAgentRoutes(app, ctx, {
+      hub,
+      pending,
+      access,
+      streamHeadTimeoutMs: task.name === LATE_SESSION_TEST ? SHORT_HEAD_MS : HEAD_MS,
+    });
     await app.ready();
   });
 
@@ -162,9 +234,10 @@ describe('panel-agent actions: projects & chat', () => {
     if (savedDump === undefined) delete process.env.CC_FAKE_DUMP;
     else process.env.CC_FAKE_DUMP = savedDump;
     resetCliLookupCache();
-    // Прогон мог ещё дописывать: ждём, пока фальшивый CLI выйдет, иначе Windows
-    // не отдаст каталог.
-    await new Promise((done) => setTimeout(done, RUN_MS + 300));
+    // Фальшивый CLI держит свой каталог, пока жив, и Windows его не отдаёт (EPERM).
+    // Под нагрузкой снятие деревом не укладывалось ни в какую фиксированную паузу:
+    // ждём самого выхода, а не дождавшись — снимаем сами, процесс наш.
+    await fakeGone(`${dumpFile}.pid`);
     for (const dir of [root, projectDir, bin]) {
       rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
     }
@@ -202,8 +275,9 @@ describe('panel-agent actions: projects & chat', () => {
       payload: { decision },
     });
 
-  const active = async (): Promise<Array<{ chatId: string; sessionId?: string; status: string }>> =>
-    (await app.inject({ method: 'GET', url: '/api/chat/active' })).json();
+  const active = async (): Promise<
+    Array<{ chatId: string; sessionId?: string; status: string; projectPath?: string }>
+  > => (await app.inject({ method: 'GET', url: '/api/chat/active' })).json();
 
   const field = (card: PanelPendingAction, label: string): string | undefined =>
     card.preview.fields.find((item) => item.label === label)?.value;
@@ -238,6 +312,56 @@ describe('panel-agent actions: projects & chat', () => {
     const limited = (await call('list_chats', { limit: 1 })).json<PanelActionResult>();
     expect((limited.result as { chats: unknown[] }).chats).toHaveLength(1);
     expect(await listPending()).toEqual([]);
+  });
+
+  it('list_chats: разговор в git-копии числится за проектом, чат панели помечен', async () => {
+    // Копия проекта — каталог с файлом `.git`, указывающим в worktrees основной
+    // копии: так её узнаёт список чатов (homeProjectPath) и вкладка проекта.
+    const gitDir = join(projectDir, '.git', 'worktrees', 'copy');
+    mkdirSync(gitDir, { recursive: true });
+    writeFileSync(join(gitDir, 'commondir'), '../..\n');
+    const copyDir = mkdtempSync(join(tmpdir(), 'cc-agent-a4-copy-'));
+    writeFileSync(join(copyDir, '.git'), `gitdir: ${gitDir}\n`);
+    const dir = join(root, 'projects', 'demo');
+    mkdirSync(dir, { recursive: true });
+    const line = (cwd: string, text: string) =>
+      JSON.stringify({
+        type: 'user',
+        uuid: 'u1',
+        cwd,
+        timestamp: '2026-09-17T10:00:00.000Z',
+        message: { role: 'user', content: text },
+      });
+    try {
+      writeFileSync(join(dir, 'chat-in-copy.jsonl'), `${line(copyDir, 'работа в копии')}\n`);
+      writeFileSync(
+        join(dir, 'chat-in-panel.jsonl'),
+        `${line(join(sandboxRoot(), 'new-probe'), 'свой чат')}\n`,
+      );
+
+      const mine = (
+        await call('list_chats', { projectPath: projectDir })
+      ).json<PanelActionResult>();
+      expect(mine.result).toMatchObject({
+        total: 1,
+        chats: [{ id: 'chat-in-copy', projectPath: copyDir, homeProjectPath: projectDir }],
+      });
+      const all = (await call('list_chats', {})).json<PanelActionResult>();
+      const chats = (all.result as { chats: Array<Record<string, unknown>> }).chats;
+      expect(chats.find((chat) => chat.id === 'chat-in-panel')).toMatchObject({ inPanel: true });
+      expect(chats.find((chat) => chat.id === 'chat-in-copy')?.inPanel).toBeUndefined();
+    } finally {
+      rmSync(copyDir, { recursive: true, force: true });
+    }
+  });
+
+  it('«открой чат про …» ведёт к существующему чату: описания называют путь list_chats → open_page', () => {
+    // Живой прогон: на «открой чат про …» агент запускал НОВЫЙ чат (карточка start_chat),
+    // потому что ни одно описание не говорило, как открыть уже идущий.
+    const byName = new Map(PROJECT_CHAT_ACTIONS.map((action) => [action.name, action.description]));
+    expect(byName.get('start_chat')).toMatch(
+      /EXISTING chat[\s\S]*list_chats[\s\S]*open_page \/chat/,
+    );
   });
 
   it('list_active_runs — ответ реестра как есть, пустой без прогонов', async () => {
@@ -290,8 +414,9 @@ describe('panel-agent actions: projects & chat', () => {
     );
     expect(field(card, 'Первое сообщение')).toBe('Проверь README');
 
-    const startedAt = Date.now();
     await decide(card.id, 'approve');
+    // Итог хода CLI отдаст только по сигналу теста ниже: не отцепись действие от
+    // потока — оно ждало бы этот итог и упёрлось в срок теста.
     const result = (await running).json<PanelActionResult>();
     expect(result).toMatchObject({
       outcome: 'done',
@@ -299,8 +424,6 @@ describe('panel-agent actions: projects & chat', () => {
       result: { started: true, sessionId: SESSION },
       page: { route: '/chat', focus: SESSION },
     });
-    // Действие вернулось, пока прогон ещё идёт: вызов агента не держится весь ответ.
-    expect(Date.now() - startedAt).toBeLessThan(RUN_MS);
     const runs = await active();
     expect(runs).toHaveLength(1);
     expect(runs[0]).toMatchObject({
@@ -322,7 +445,8 @@ describe('panel-agent actions: projects & chat', () => {
       }),
     );
 
-    // Отцепление не убило прогон: он доходит до конца сам.
+    // Отцепление не убило прогон: по сигналу он доходит до конца сам.
+    writeFileSync(`${dumpFile}.finish`, '');
     for (let attempt = 0; attempt < 100; attempt += 1) {
       if ((await active())[0]?.status === 'done') break;
       await new Promise((done) => setTimeout(done, 100));
@@ -336,6 +460,9 @@ describe('panel-agent actions: projects & chat', () => {
     ).json<PanelActionResult>();
     expect(unknown.outcome).toBe('failed');
     expect(unknown.message).toContain('not registered');
+    // Отказ ведёт к чату без проекта, а не к регистрации папки (жалоба владельца).
+    expect(unknown.message).toContain('start_chat WITHOUT project');
+    expect(unknown.message).not.toMatch(/Call [^.]*create_project/);
 
     store.updateSettings({ provider: 'codex' });
     const foreign = (
@@ -361,4 +488,149 @@ describe('panel-agent actions: projects & chat', () => {
     expect(existsSync(dumpFile)).toBe(false);
     expect(await active()).toEqual([]);
   });
+
+  it('start_chat без проекта: чат домашней вкладки — ни поиска проекта, ни каталога проекта у CLI', async () => {
+    const running = call('start_chat', { prompt: 'Что такое MCP?' });
+    const card = await waitPending();
+    expect(card.preview).toMatchObject({ summaryCode: 'summary-start-chat-home' });
+    expect(card.preview.fields).toContainEqual(
+      expect.objectContaining({ labelCode: 'label-project', valueCode: 'value-no-project' }),
+    );
+    expect(card.preview.fields).toContainEqual(
+      expect.objectContaining({ labelCode: 'label-chat-mode', valueCode: 'value-mode-message' }),
+    );
+    await decide(card.id, 'approve');
+    const result = (await running).json<PanelActionResult>();
+    expect(result).toMatchObject({
+      outcome: 'done',
+      result: { started: true, sessionId: SESSION },
+      page: { route: '/chat', focus: SESSION },
+    });
+    const runs = await active();
+    const chatKey = runs[0]?.chatId ?? '';
+    chatKeys.push(chatKey);
+    // Пути сравниваются в каноническом виде: TEMP на Windows приходит в 8.3
+    // (`RUSYAN~1`), а процесс видит длинную форму — сырое «не равно» было бы
+    // зелёным, даже если CLI запущен в каталоге проекта.
+    const canonical = (path: string): string => realpathSync.native(path).toLowerCase();
+    expect(runs[0]?.projectPath ? canonical(runs[0].projectPath) : '').not.toBe(
+      canonical(projectDir),
+    );
+    const dump = JSON.parse(readFileSync(dumpFile, 'utf8')) as Dump;
+    expect(canonical(dump.cwd)).not.toBe(canonical(projectDir));
+    // Положительная сторона: CLI работает в собственной папке чата песочницы.
+    expect(chatKey).not.toBe('');
+    expect(canonical(dump.cwd)).toBe(canonical(join(sandboxRoot(), chatKey)));
+    expect(dump.stdin).toContain('Что такое MCP?');
+  });
+
+  it('start_chat mode=deck: первым сообщением уходит просьба режима «Презентация», чат открывается в нём', async () => {
+    const running = call('start_chat', { prompt: 'История кофе', mode: 'deck' });
+    const card = await waitPending();
+    expect(card.preview.fields).toContainEqual(
+      expect.objectContaining({ labelCode: 'label-chat-mode', valueCode: 'value-mode-deck' }),
+    );
+    expect(field(card, 'Тема')).toBe('История кофе');
+    // Та же просьба, что собирает режим композера: сверяем с самим маршрутом.
+    const expected = (
+      await app.inject({
+        method: 'POST',
+        url: '/api/media/prompt',
+        payload: { kind: 'deck', topic: 'История кофе' },
+      })
+    ).json<{ prompt: string }>().prompt;
+    expect(expected).toContain('agentdeck:deck');
+    expect(field(card, 'Первое сообщение')).toBe(expected);
+
+    await decide(card.id, 'approve');
+    const result = (await running).json<PanelActionResult>();
+    expect(result).toMatchObject({
+      outcome: 'done',
+      page: { route: '/chat?mode=deck', focus: SESSION },
+    });
+    chatKeys.push((await active())[0]?.chatId ?? '');
+    const dump = JSON.parse(readFileSync(dumpFile, 'utf8')) as Dump;
+    expect(dump.stdin).toContain('agentdeck:deck');
+    expect(dump.stdin).toContain('История кофе');
+  });
+
+  it(LATE_SESSION_TEST, async () => {
+    const running = call('start_chat', { prompt: `${SLOW} вопрос` });
+    const card = await waitPending();
+    await decide(card.id, 'approve');
+    const result = (await running).json<PanelActionResult>();
+    const runs = await active();
+    chatKeys.push(runs[0]?.chatId ?? '');
+    expect(runs[0]?.chatId).toMatch(/^new-/);
+    expect(result).toMatchObject({
+      outcome: 'done',
+      result: { started: true, chatKey: runs[0]?.chatId },
+      page: { route: '/chat', focus: runs[0]?.chatId },
+    });
+    expect((result.result as { sessionId?: string }).sessionId).toBeUndefined();
+  });
+
+  it('start_chat: CLI отказал до начала — failed с причиной, страница чата не открывается', async () => {
+    const running = call('start_chat', { prompt: `${FAIL} вопрос` });
+    const card = await waitPending();
+    await decide(card.id, 'approve');
+    const result = (await running).json<PanelActionResult>();
+    chatKeys.push(...(await active()).map((run) => run.chatId));
+    // Отказавший прогон из списка идущих уходит, а папку чата маршрут уже завёл —
+    // её называет снимок самого CLI (иначе каждый прогон оставлял пустую папку).
+    const dump = JSON.parse(readFileSync(dumpFile, 'utf8')) as Dump;
+    const home = realpathSync.native(sandboxRoot()).toLowerCase();
+    if (realpathSync.native(dirname(dump.cwd)).toLowerCase() === home) {
+      chatKeys.push(basename(dump.cwd));
+    }
+    // «Done.» с started:false читался моделью как успех, а человек попадал в пустой чат.
+    expect(result.outcome).toBe('failed');
+    expect(result.message).toContain('тестовая причина отказа');
+    expect(result.page).toBeUndefined();
+    expect(frames.filter((frame) => frame.type === 'agent-open-page')).toEqual([]);
+  });
+
+  it('[P2] create_project: обречённый ввод отказан до карточки — одобрять нечего', async () => {
+    // Живой прогон 26.09: несуществующий каталог, файл, относительный путь и уже
+    // заведённый проект получали карточку; относительный показывал путь от
+    // каталога СЕРВЕРА, а клик кончался отказом маршрута — человек одобрял ничто.
+    const file = join(projectDir, 'README-probe.md');
+    writeFileSync(file, 'x');
+    const cases: Array<[string, RegExp]> = [
+      [join(projectDir, 'nope-dir'), /does not exist/],
+      [file, /not a directory/],
+      ['agentdeck-probe-rel', /must be absolute/],
+      [projectDir, /p-demo/],
+    ];
+    if (isWindows) cases.push([projectDir.toUpperCase(), /p-demo/]);
+    for (const [path, reason] of cases) {
+      const answer = (await call('create_project', { path })).json<PanelActionResult>();
+      expect(answer.outcome, path).toBe('failed');
+      expect(answer.message, path).toMatch(reason);
+      expect(await listPending(), path).toEqual([]);
+    }
+    const opened = (await call('create_project', { path: projectDir })).json<PanelActionResult>();
+    expect(opened.message).toContain('open_page');
+  });
+
+  it.runIf(isWindows)(
+    'create_project: тот же каталог в другом регистре заведён между карточкой и кликом — stale_preview',
+    async () => {
+      const fresh = mkdtempSync(join(tmpdir(), 'cc-agent-a4-case-'));
+      try {
+        const running = call('create_project', { path: fresh.toUpperCase() });
+        const card = await waitPending();
+        // Человек добавил тот же каталог руками, путём в другом регистре.
+        store.addProject({ id: 'p-by-hand', name: 'Руками', path: fresh.toLowerCase() });
+        await decide(card.id, 'approve');
+        expect((await running).json<PanelActionResult>()).toMatchObject({
+          outcome: 'failed',
+          messageCode: 'stale_preview',
+        });
+        expect(store.getProjects().filter((item) => item.id !== 'p-demo')).toHaveLength(1);
+      } finally {
+        rmSync(fresh, { recursive: true, force: true });
+      }
+    },
+  );
 });

@@ -5,6 +5,8 @@ import type { StreamedTool } from '../../shared/lib/runs';
 import type { CostUnit } from '../../shared/lib/format';
 import { TokenBadge } from './TokenBadge';
 import { summarizeToolInput } from './toolSummary';
+import { autoPickText } from './autoPickText';
+import { useT } from '../../shared/config/i18n';
 
 /**
  * Вызов инструмента в ленте. Свёрнут по умолчанию: за один ход агент делает
@@ -14,7 +16,17 @@ import { summarizeToolInput } from './toolSummary';
  */
 export function ToolCall({ tool, costUnit }: { tool: StreamedTool; costUnit: CostUnit }) {
   const [open, setOpen] = useState(false);
+  const t = useT();
   const summary = summarizeToolInput(tool.input);
+
+  // Вопрос закрыла автономия чата — строка выбора вместо вызова.
+  if (tool.autoPicks !== undefined) {
+    return (
+      <Text style={styles.summary} testID="auto-pick">
+        {autoPickText(tool.autoPicks, t)}
+      </Text>
+    );
+  }
 
   return (
     <View style={styles.root}>

@@ -24,7 +24,7 @@ createRoot(container).render(
       <I18nextProvider i18n={i18n}>
         {/* Последний рубеж: сбой провайдера или роутера — карточка вместо пустоты. */}
         <ErrorBoundary
-          scope="приложение"
+          scope="app"
           fallback={(error, reset) => (
             <div style={{ padding: 'var(--spacing-lg)' }}>
               <CrashCard error={error} onRetry={reset} />

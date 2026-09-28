@@ -1,0 +1,225 @@
+{
+  "topic": "integrations",
+  "frames": {
+    "atlassian/01-cards": {
+      "light-ru": {
+        "file": "01-cards.png",
+        "width": 1400,
+        "height": 1300
+      },
+      "light-en": {
+        "file": "01-cards.en.png",
+        "width": 1400,
+        "height": 1300
+      },
+      "dark-ru": {
+        "file": "01-cards.dark.png",
+        "width": 1400,
+        "height": 1300
+      },
+      "dark-en": {
+        "file": "01-cards.dark.en.png",
+        "width": 1400,
+        "height": 1300
+      }
+    },
+    "atlassian/02-filled": {
+      "light-ru": {
+        "file": "02-filled.png",
+        "width": 1116,
+        "height": 500
+      },
+      "light-en": {
+        "file": "02-filled.en.png",
+        "width": 1116,
+        "height": 500
+      },
+      "dark-ru": {
+        "file": "02-filled.dark.png",
+        "width": 1116,
+        "height": 500
+      },
+      "dark-en": {
+        "file": "02-filled.dark.en.png",
+        "width": 1116,
+        "height": 500
+      }
+    },
+    "atlassian/03-checked": {
+      "light-ru": {
+        "file": "03-checked.png",
+        "width": 1116,
+        "height": 626
+      },
+      "light-en": {
+        "file": "03-checked.en.png",
+        "width": 1116,
+        "height": 626
+      },
+      "dark-ru": {
+        "file": "03-checked.dark.png",
+        "width": 1116,
+        "height": 626
+      },
+      "dark-en": {
+        "file": "03-checked.dark.en.png",
+        "width": 1116,
+        "height": 626
+      }
+    },
+    "atlassian/04-mcp": {
+      "light-ru": {
+        "file": "04-mcp.png",
+        "width": 1400,
+        "height": 1300
+      },
+      "light-en": {
+        "file": "04-mcp.en.png",
+        "width": 1400,
+        "height": 1300
+      },
+      "dark-ru": {
+        "file": "04-mcp.dark.png",
+        "width": 1400,
+        "height": 1300
+      },
+      "dark-en": {
+        "file": "04-mcp.dark.en.png",
+        "width": 1400,
+        "height": 1300
+      }
+    },
+    "atlassian/05-forge": {
+      "light-ru": {
+        "file": "05-forge.png",
+        "width": 1116,
+        "height": 486
+      },
+      "light-en": {
+        "file": "05-forge.en.png",
+        "width": 1116,
+        "height": 468
+      },
+      "dark-ru": {
+        "file": "05-forge.dark.png",
+        "width": 1116,
+        "height": 486
+      },
+      "dark-en": {
+        "file": "05-forge.dark.en.png",
+        "width": 1116,
+        "height": 468
+      }
+    },
+    "atlassian/06-forgotten": {
+      "light-ru": {
+        "file": "06-forgotten.png",
+        "width": 1116,
+        "height": 396
+      },
+      "light-en": {
+        "file": "06-forgotten.en.png",
+        "width": 1116,
+        "height": 378
+      },
+      "dark-ru": {
+        "file": "06-forgotten.dark.png",
+        "width": 1116,
+        "height": 396
+      },
+      "dark-en": {
+        "file": "06-forgotten.dark.en.png",
+        "width": 1116,
+        "height": 378
+      }
+    },
+    "notify/01-webhook": {
+      "light-ru": {
+        "file": "01-webhook.png",
+        "width": 1116,
+        "height": 514
+      },
+      "light-en": {
+        "file": "01-webhook.en.png",
+        "width": 1116,
+        "height": 514
+      },
+      "dark-ru": {
+        "file": "01-webhook.dark.png",
+        "width": 1116,
+        "height": 514
+      },
+      "dark-en": {
+        "file": "01-webhook.dark.en.png",
+        "width": 1116,
+        "height": 514
+      }
+    },
+    "notify/02-webhook-checked": {
+      "light-ru": {
+        "file": "02-webhook-checked.png",
+        "width": 1116,
+        "height": 574
+      },
+      "light-en": {
+        "file": "02-webhook-checked.en.png",
+        "width": 1116,
+        "height": 574
+      },
+      "dark-ru": {
+        "file": "02-webhook-checked.dark.png",
+        "width": 1116,
+        "height": 574
+      },
+      "dark-en": {
+        "file": "02-webhook-checked.dark.en.png",
+        "width": 1116,
+        "height": 574
+      }
+    },
+    "notify/03-events": {
+      "light-ru": {
+        "file": "03-events.png",
+        "width": 1116,
+        "height": 574
+      },
+      "light-en": {
+        "file": "03-events.en.png",
+        "width": 1116,
+        "height": 574
+      },
+      "dark-ru": {
+        "file": "03-events.dark.png",
+        "width": 1116,
+        "height": 574
+      },
+      "dark-en": {
+        "file": "03-events.dark.en.png",
+        "width": 1116,
+        "height": 574
+      }
+    },
+    "notify/04-telegram": {
+      "light-ru": {
+        "file": "04-telegram.png",
+        "width": 1116,
+        "height": 436
+      },
+      "light-en": {
+        "file": "04-telegram.en.png",
+        "width": 1116,
+        "height": 436
+      },
+      "dark-ru": {
+        "file": "04-telegram.dark.png",
+        "width": 1116,
+        "height": 436
+      },
+      "dark-en": {
+        "file": "04-telegram.dark.en.png",
+        "width": 1116,
+        "height": 436
+      }
+    }
+  }
+}

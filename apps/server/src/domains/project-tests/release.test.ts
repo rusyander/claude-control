@@ -85,6 +85,18 @@ describe('project-tests/release: что считается проверенны�
     expect(doc.verdict.blockers).toContain('Не проверено кейсов: 1 из 2.');
   });
 
+  // Ревью z1 C24: отчёт вехи и отчёт прогона называли один провал по-разному —
+  // здесь терялись шаг и ожидание. Причина собирается одной функцией.
+  it('причина провала — та же строка, что в отчёте прогона: шаг, факт, ожидание', () => {
+    const groups = [group('gui', [testCase('a')])];
+    const failure = { step: 2, actual: 'кнопка серая', expected: 'кнопка активна' };
+    const runs = [run('r1', '1.4', [result('a', 'failed', { failure })])];
+
+    const doc = buildRelease('1.4', groups, runs, { now: NOW });
+
+    expect(doc.red[0]?.note).toBe('шаг 2: кнопка серая (ожидалось: кнопка активна)');
+  });
+
   it('зелёный прогон ЧУЖОЙ вехи готовности не улучшает', () => {
     const groups = [group('gui', [testCase('a')])];
     const runs = [
@@ -145,6 +157,27 @@ describe('project-tests/release: карантин и вердикт', () => {
     expect(doc.muted.map((item) => item.caseId)).toEqual(['a']);
     expect(doc.verdict.ready).toBe(true);
     expect(doc.verdict.text).toContain('В карантине 1');
+  });
+
+  // Вердикт один на экран и файл (E1): язык панели — язык и строки, и причин.
+  it('вердикт на языке панели: английский без кириллицы вне названия вехи', () => {
+    const groups = [group('gui', [testCase('a', { muted: true }), testCase('b'), testCase('c')])];
+    const runs = [run('r1', '1.4', [result('a', 'failed'), result('b', 'failed')])];
+
+    const en = buildRelease('1.4', groups, runs, { now: NOW, lang: 'en' }).verdict;
+    expect(en.text).toBe(
+      'Milestone “1.4”: too early to ship. Failures: 1. Unchecked cases: 1 of 3. ' +
+        'In quarantine: 1 — their failures do not count toward the verdict.',
+    );
+    expect(en.blockers).toEqual(['Failures: 1.', 'Unchecked cases: 1 of 3.']);
+    const ru = buildRelease('1.4', groups, runs, { now: NOW }).verdict;
+    expect(ru.text).toBe(
+      'Веха «1.4»: отдавать рано. Провалов: 1. Не проверено кейсов: 1 из 3. ' +
+        'В карантине 1 — их провалы в вердикт не идут.',
+    );
+    expect(buildRelease('2.0', groups, [], { now: NOW, lang: 'en' }).verdict.blockers[0]).toBe(
+      'The milestone has no runs: nothing to check.',
+    );
   });
 
   it('всё зелёное и без дефектов — вердикт готов, список причин пуст', () => {

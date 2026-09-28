@@ -179,6 +179,9 @@ export function ChatTopic() {
         <Callout tone="warning" title={tr('lostTitle')}>
           {tr('lostText')}
         </Callout>
+        <Callout tone="warning" title={tr('failTitle')}>
+          {tr('failText')}
+        </Callout>
       </HelpSection>
 
       <HelpSection title={tr('panelTitle')}>

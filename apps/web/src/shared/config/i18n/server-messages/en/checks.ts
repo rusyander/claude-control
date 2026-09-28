@@ -23,6 +23,8 @@ export const checksEn: Record<ChecksMessageCode, string> = {
     "None of the configuration paths were found ({{paths}}). They usually appear after the CLI's first run.",
   'checks-config-present': 'The configuration is in place: {{paths}}.',
   'checks-format-rejected': 'The file format was not accepted: {{reason}}',
+  'checks-format-no-schema':
+    'No official schema is published for {{file}} — nothing to check against.',
   'checks-mcp-reread-missing':
     'Writing the probe server succeeded, but on re-reading it is gone — the file format is not fully parsed.',
   'checks-mcp-neighbours':

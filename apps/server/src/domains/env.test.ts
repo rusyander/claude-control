@@ -10,6 +10,7 @@ import {
   deleteEnvVar,
   moveEnvVar,
   markGroupEnv,
+  maskValue,
 } from './env.ts';
 
 /**
@@ -60,7 +61,32 @@ describe('env', () => {
     it('короткий секрет маскируется целиком', () => {
       writeFileSync(secretsPath, 'API_KEY=short');
       const vars = readEnvVars(settingsPath, secretsPath);
-      expect(vars.find((v) => v.key === 'API_KEY')?.value).toBe('•••••');
+      expect(vars.find((v) => v.key === 'API_KEY')?.value).toBe('••••••••');
+    });
+
+    // Кейс access-integrations-004: маска — точки и два последних символа.
+    // Прежняя открывала первые четыре и последние четыре: 8 знаков из 12.
+    it('маска секрета — точки и два последних символа, начала нет', () => {
+      writeFileSync(secretsPath, 'PROBE_TOKEN=Zq7xK2mP9wLr');
+      const vars = readEnvVars(settingsPath, secretsPath);
+      expect(vars.find((v) => v.key === 'PROBE_TOKEN')?.value).toBe('••••••••Lr');
+    });
+  });
+
+  describe('maskValue', () => {
+    it('длина маски не зависит от длины значения', () => {
+      expect(maskValue('a'.repeat(10))).toHaveLength(10);
+      expect(maskValue('a'.repeat(200))).toHaveLength(10);
+    });
+
+    it('с восьми символов виден хвост, короче — ни одного символа', () => {
+      expect(maskValue('1234567')).toBe('••••••••');
+      expect(maskValue('12345678')).toBe('••••••••78');
+      expect(maskValue('x')).toBe('••••••••');
+    });
+
+    it('пустое значение остаётся пустым: «не задано» не выглядит заданным', () => {
+      expect(maskValue('')).toBe('');
     });
 
     it('слова TOKEN/SECRET/KEY/PASSWORD/PAT считаются секретом', () => {

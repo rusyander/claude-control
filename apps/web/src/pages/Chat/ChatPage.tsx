@@ -31,6 +31,7 @@ import { Stack } from '@shared/ui/stack';
 import { useChatMedia } from '@entities/Media';
 import { ChatSidebar } from './ChatSidebar';
 import { ChatHeader } from './ChatHeader';
+import { ChatEscalationNotices } from './ChatEscalationNotices';
 import { ChatArtifactsBar } from './ChatArtifactsBar';
 import { ChatThread } from './ChatThread';
 import { ChatOverlays } from './ChatOverlays';
@@ -332,6 +333,7 @@ export function ChatPage() {
             isProjectContext={isProjectContext}
             {...(child.groupDeliver === undefined ? {} : { groupDeliver: child.groupDeliver })}
             chatId={chatId}
+            {...(run.sessionId ? { sessionId: run.sessionId } : {})}
             activeRuns={activeRuns}
             totalCost={spend.cost}
             totalTokens={spend.tokens}
@@ -390,6 +392,13 @@ export function ChatPage() {
               session.setPreview(artifact);
             }}
             onDelete={askDelete}
+          />
+
+          {/* Критичное от детей разделения — только у главного чата дерева. */}
+          <ChatEscalationNotices
+            chatId={chatId}
+            {...(run.sessionId ? { sessionId: run.sessionId } : {})}
+            onOpenChild={session.openChatById}
           />
 
           <ChatThread

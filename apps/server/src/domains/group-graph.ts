@@ -1,4 +1,5 @@
 import type { EntityRef, Group, GroupMember } from '@agentdeck/contracts';
+import { inClaudeGlobals, type GroupScope } from '@agentdeck/contracts/group-sources';
 
 /**
  * Обход графа групп: вложенная группа может входить участником в другую, поэтому
@@ -19,23 +20,38 @@ export const MAX_GROUP_DEPTH = 32;
  * списку идёт включение/выключение и простановка отметок «погашено группой» —
  * по всей ветке, а не только по прямым участникам.
  */
-export function collectLeafMembers(groups: Group[], root: GroupMember[]): EntityRef[] {
-  const byId = new Map(groups.map((group) => [group.id, group]));
+export function collectLeafMembers(
+  groups: Group[],
+  root: GroupMember[],
+  rootScope?: GroupScope,
+): EntityRef[] {
+  // Только общие группы: обход в проектные не спускается, а проектная с тем же
+  // id иначе заслоняла общую подгруппу, и её листья терялись (F-186).
+  const byId = new Map(
+    groups.filter((group) => inClaudeGlobals(group.scope)).map((group) => [group.id, group]),
+  );
   const leaves: EntityRef[] = [];
   const seen = new Set<string>();
   const path = new Set<string>();
 
-  const walk = (members: GroupMember[], depth: number): void => {
+  const walk = (members: GroupMember[], scope: GroupScope | undefined, depth: number): void => {
     if (depth > MAX_GROUP_DEPTH) return;
 
     for (const member of members) {
+      // Проектный участник и проектная группа целиком тумблер общих каталогов
+      // не трогают — ни голый участник (он живёт в проекте, `memberScope`), ни
+      // выбранный из общих: иначе включение проектной группы переключило бы
+      // одноимённый глобальный скилл, а метки «погашено группой» у него не
+      // было бы (`disablingGroups` проектные группы не считает).
+      // Копия для другой CLI — то же: её участники — файлы той CLI.
+      if (!inClaudeGlobals(scope) || (member.scope && !inClaudeGlobals(member.scope))) continue;
       if (member.kind === 'group') {
         // Уже на текущей ветке — это цикл, глубже не идём.
         if (path.has(member.id)) continue;
         const sub = byId.get(member.id);
-        if (!sub) continue;
+        if (!sub || !inClaudeGlobals(sub.scope)) continue;
         path.add(member.id);
-        walk(sub.members, depth + 1);
+        walk(sub.members, sub.scope, depth + 1);
         path.delete(member.id);
         continue;
       }
@@ -47,7 +63,7 @@ export function collectLeafMembers(groups: Group[], root: GroupMember[]): Entity
     }
   };
 
-  walk(root, 0);
+  walk(root, rootScope, 0);
   return leaves;
 }
 

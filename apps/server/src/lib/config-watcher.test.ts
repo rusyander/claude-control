@@ -1,6 +1,15 @@
-import { describe, it, expect } from 'vitest';
+import type { EventEmitter } from 'node:events';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { describe, it, expect, vi } from 'vitest';
 import type { ClaudePaths } from '@agentdeck/contracts';
-import { createConfigWatcher, domainsForPath, type WatcherLike } from './config-watcher.ts';
+import {
+  createConfigWatcher,
+  defaultCreateWatcher,
+  domainsForPath,
+  type WatcherLike,
+} from './config-watcher.ts';
 
 /**
  * Наблюдатель за конфигами. Настоящий chokidar не поднимаем — подставляем
@@ -169,5 +178,24 @@ describe('domainsForPath', () => {
 
   it('прочее — общая сводка', () => {
     expect(domainsForPath(paths, '/cfg-a/что-то.json')).toEqual(['overview']);
+  });
+});
+
+// Ревью 28.09 (F-30): без слушателя `'error'` настоящий chokidar бросал из
+// необработанного промиса — папка без прав на чтение роняла панель на старте.
+describe('ошибка настоящего наблюдателя', () => {
+  it('EPERM уходит в лог, а не в процесс', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'cc-config-watch-'));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const watcher = defaultCreateWatcher([dir]) as unknown as EventEmitter & WatcherLike;
+    try {
+      const error = Object.assign(new Error('EPERM: operation not permitted'), { code: 'EPERM' });
+      expect(() => watcher.emit('error', error)).not.toThrow();
+      expect(warn).toHaveBeenCalledWith('config watch: watcher error', error);
+    } finally {
+      warn.mockRestore();
+      await watcher.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

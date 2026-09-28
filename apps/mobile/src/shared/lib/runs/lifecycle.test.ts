@@ -56,7 +56,7 @@ vi.mock('../../config/i18n', () => ({
   }),
 }));
 
-import { restoreQueue, resumeActive, send } from './lifecycle';
+import { restoreQueue, resumeActive, send, stop } from './lifecycle';
 import { controllers, getRun, lastSeqs, runs, setRun, subscribe } from './store';
 import type { ActiveRunInfo } from './types';
 
@@ -260,6 +260,66 @@ describe('сторож потока', () => {
     await resumeActive();
     expect(fetchMock.mock.calls.length).toBe(calls + 1);
     expect(getRun('s1').status).toBe('running');
+  });
+});
+
+/**
+ * Ревью 28.09 (F-145): сервер не снял процесс — номер нечем проверить, и чужое
+ * он не трогает. Раньше телефон глотал любой отказ и рисовал «остановлено», а
+ * агент работал дальше.
+ */
+describe('«Остановить», которое сервер не подтвердил (F-145)', () => {
+  it('409 stop_unconfirmed: прогон идёт дальше, поток не оборван, человек видит почему', async () => {
+    setRun('c9', { status: 'running' });
+    const stream = new AbortController();
+    controllers.set('c9', stream);
+    apiPost.mockRejectedValueOnce(
+      Object.assign(new Error('Процесс агента не остановлен'), {
+        status: 409,
+        code: 'stop_unconfirmed',
+      }),
+    );
+
+    await stop('c9');
+
+    expect(getRun('c9').status).toBe('running');
+    expect(getRun('c9').error).toBe('Процесс агента не остановлен');
+    expect(stream.signal.aborted).toBe(false);
+  });
+
+  it('прогона на сервере уже нет — по-прежнему «остановлено»', async () => {
+    setRun('c10', { status: 'running' });
+    apiPost.mockRejectedValueOnce(Object.assign(new Error('нет'), { status: 404 }));
+    await stop('c10');
+    expect(getRun('c10').status).toBe('stopped');
+  });
+});
+
+describe('отказ «занят» в первые секунды хода (F-67)', () => {
+  it('409 run_busy: прогон подхвачен, ответ встал в очередь и принят', async () => {
+    // Inbox и /chat/active опрашиваются независимо: телефон ещё не знает о ходе,
+    // начатом с компьютера, — подсказка «ответ уйдёт, когда он закончит ход»
+    // должна выполняться и тут, а не показывать отказ.
+    const stream = sseStream();
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 409,
+        json: async () => ({ code: 'run_busy', runId: 'srv-1' }),
+      } as unknown as Response)
+      .mockResolvedValueOnce(stream.response);
+
+    const outcome = await send({ chatId: 'c1', prompt: 'Да, удаляй', allowEdits: true });
+    await flush();
+
+    expect(outcome).toEqual({ ok: true });
+    const run = getRun('c1');
+    expect(run.status).toBe('running');
+    expect(run.queued.map((item) => item.prompt)).toEqual(['Да, удаляй']);
+    expect(run.queued[0]?.allowEdits).toBe(true);
+    // Поток идёт по серверному имени прогона из отказа.
+    expect(String(fetchMock.mock.calls[1]?.[0])).toContain('/chat/srv-1/stream');
+    controllers.get('c1')?.abort();
   });
 });
 

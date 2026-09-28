@@ -15,6 +15,7 @@
  * ставили бы разные статусы на один и тот же отчёт.
  *
  *   node tools/tests-cli.mjs list --project .
+ *   node tools/tests-cli.mjs sync --project .
  *   node tools/tests-cli.mjs show gui-001
  *   node tools/tests-cli.mjs run --group e2e
  *   node tools/tests-cli.mjs import --format junit --file test-results/junit.xml
@@ -29,7 +30,16 @@
  * решила, что он сейчас не сторожевой.
  */
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -44,6 +54,8 @@ const DEFAULT_RESULTS = [
   ['junit', 'junit.xml'],
   ['junit', 'test-results.xml'],
   ['junit', 'reports/junit.xml'],
+  // Куда пишет отчёт папка e2e, заведённая панелью (`e2e-scaffold.ts`).
+  ['junit', 'e2e/results/junit.xml'],
   ['playwright', 'test-results/results.json'],
   ['playwright', 'playwright-report/results.json'],
   ['allure', 'allure-results'],
@@ -53,6 +65,7 @@ const HELP = `Тест-кейсы проекта без панели.
 
   list      группы и кейсы со статусами
   show      один кейс целиком: show <caseId>
+  sync      тесты папки e2e — в кейсы: новые заводятся, знакомым обновляется привязка
   run       прогнать автотесты кейсов и забрать результаты
   import    забрать результаты прогона или кейсы из файла
   export    выгрузить группу в csv | md | xlsx
@@ -66,9 +79,12 @@ const HELP = `Тест-кейсы проекта без панели.
   --group <id>      только эта группа
   --format <f>      junit | playwright | allure | csv | xlsx | testrail-csv | testrail | allure-testops | md
   --file <f>        файл или каталог с отчётом (путь от корня проекта)
+  --dir <d>         для sync: папка e2e (по умолчанию ищется сама)
   --reporter <r>    text | junit — вид отчёта команд report и diff
   --out <f>         писать результат в файл вместо экрана
-  --cmd "<...>"     команда прогона (по умолчанию npm test из package.json)
+  --cmd "<...>"     команда прогона (по умолчанию: кейсы папки e2e — её раннером,
+                    иначе своя команда из .agent/tests/automation.json,
+                    иначе npm test из package.json)
   --results <f>     где прогон оставит отчёт (по умолчанию ищется сам)
   --dry             для run: показать, что было бы запущено, и выйти
   --fail-on <s>     для lint: ронять сборку с этой серьёзности (error | warning | info)
@@ -98,6 +114,7 @@ async function main() {
   if (command === 'list') return await listCases(project, options);
   if (command === 'show') return await showCase(project, positional[0]);
   if (command === 'run') return await runTests(project, options);
+  if (command === 'sync') return await syncFolder(project, options);
   if (command === 'import') return await importFile(project, options);
   if (command === 'export') return await exportGroupFile(project, options);
   if (command === 'report') return await report(project, options);
@@ -187,11 +204,14 @@ async function listCases(project, options) {
       continue;
     }
     console.log(`\n[${group.id}] ${group.title} — кейсов: ${group.cases.length}`);
+    // Ширина — по самому длинному id группы: при постоянных 12 длинные id
+    // (`panel-agent-003`) сдвигали названия, и столбец рвался.
+    const width = Math.max(12, ...group.cases.map((item) => item.id.length));
     for (const item of group.cases) {
       const mark = STATUS_MARK[item.status] ?? '.';
       const automation = item.automation?.file ? ` → ${item.automation.file}` : '';
       const archived = item.archived ? ' (архив)' : '';
-      console.log(`  ${mark} ${item.id.padEnd(12)} ${item.title}${automation}${archived}`);
+      console.log(`  ${mark} ${item.id.padEnd(width)} ${item.title}${automation}${archived}`);
     }
   }
   console.log('');
@@ -226,6 +246,7 @@ async function showCase(project, caseId) {
     }
     if (item.expected) console.log(`\nОжидание: ${item.expected}`);
     if (item.note) console.log(`Заметка последнего прогона: ${item.note}`);
+    if (item.failure) console.log(`Провал: ${failureText(item.failure)}`);
     return;
   }
   throw new Error(`Кейса «${caseId}» в проекте нет.`);
@@ -237,6 +258,25 @@ async function showCase(project, caseId) {
  * названной причиной: молчаливое красное на неавтоматизированном кейсе было бы
  * враньём.
  */
+/**
+ * Сверка папки e2e с кейсами — тем же модулем, что кнопка «Обновить из папки».
+ * Ей пользуется и агент чата: написал тест с меткой `[id]` — сверил — кейс в разделе.
+ */
+async function syncFolder(project, options) {
+  const { syncE2eFolder } = await domain('e2e-sync');
+  const dir = options.dir ? toProjectRelative(project, resolve(project, options.dir)) : undefined;
+  const result = syncE2eFolder(project, new Date().toISOString(), dir ? { dir } : {});
+  console.log(
+    `Папка ${result.dir}: файлов ${result.files}, тестов ${result.tests}; ` +
+      `новых кейсов ${result.added}, привязано ${result.linked}`,
+  );
+  if (result.groups.length > 0) console.log(`Заведены группы: ${result.groups.join(', ')}`);
+  for (const item of result.skipped) console.log(`  пропущено ${item.file}: ${item.reason}`);
+  for (const item of result.missing) {
+    console.log(`  тест кейса ${item.groupId}/${item.caseId} исчез из ${item.file}`);
+  }
+}
+
 async function runTests(project, options) {
   const groups = await groupsOf(project, options);
   const automated = [];
@@ -256,41 +296,168 @@ async function runTests(project, options) {
   }
 
   const files = [...new Set(automated.map((entry) => entry.item.automation.file))];
-  const command = options.cmd ?? projectTestCommand(project);
-  const line = command.includes('{files}')
-    ? command.replace('{files}', files.join(' '))
-    : `${command} ${files.join(' ')}`;
+  // Без --cmd тесты папки e2e идут той же командой, что у кнопки панели: из
+  // каталога её конфига, раннером папки, с отчётом во временный файл. Запуск
+  // из корня брал чужую версию Playwright и не находил тестов. Не папка —
+  // своя команда проекта из automation.json (её же зовёт кнопка), и только
+  // потом npm test.
+  const plan = options.cmd
+    ? commandPlan(options.cmd, files, project)
+    : ((await e2ePlan(project, files)) ??
+      (await automationPlan(project, files)) ??
+      commandPlan(projectTestCommand(project), files, project));
 
   console.log(`Кейсов с автотестом: ${automated.length}, файлов: ${files.length}`);
-  console.log(`Команда: ${line}`);
+  console.log(`Команда: ${plan.line}`);
   if (options.dry) {
+    dropTemp(plan.temp);
     printSkipped(skipped);
     return;
   }
 
   const started = Date.now();
-  const result = spawnSync(line, { cwd: project, shell: true, stdio: 'inherit' });
+  const result = spawnSync(plan.line, {
+    cwd: plan.cwd,
+    env: { ...process.env, ...plan.env },
+    shell: true,
+    stdio: 'inherit',
+    ...(plan.timeout ? { timeout: plan.timeout } : {}),
+  });
+  if (result.error?.code === 'ETIMEDOUT') {
+    console.log(`\nПрогон дольше ${plan.timeout / 60_000} мин — остановлен.`);
+  }
+  const exitCode = result.status ?? undefined;
   console.log(
-    `\nКоманда завершилась с кодом ${result.status ?? 'нет кода'} за ${Math.round((Date.now() - started) / 1000)} с`,
+    `\nКоманда завершилась с кодом ${exitCode ?? 'нет кода'} за ${Math.round((Date.now() - started) / 1000)} с`,
   );
 
-  const found = options.results
-    ? [detectFormat(options.results, options.format), options.results]
-    : findResults(project);
+  const found =
+    plan.results ??
+    (options.results
+      ? [detectFormat(options.results, options.format), options.results]
+      : findResults(project));
   if (!found) {
     console.log(
       'Отчёт прогона не найден — статусы не тронуты. Укажите его: --results <файл> [--format junit|playwright|allure]',
     );
     printSkipped(skipped);
+    dropTemp(plan.temp);
     process.exit(result.status ?? 0);
   }
 
   const [format, file] = found;
+  const path = isAbsolute(file) ? file : join(project, file);
+  // Отчёт, которого ЭТОТ прогон не писал, — вчерашний: упавшая до тестов
+  // команда «обновляла» бы кейсы и писала запись истории о прогоне, которого не было.
+  if (!freshSince(path, started)) {
+    console.log(
+      `Отчёт ${file} старше этого прогона — команда его не написала. Статусы не тронуты, запись в историю не легла.`,
+    );
+    printSkipped(skipped);
+    dropTemp(plan.temp);
+    process.exit(result.status || 1);
+  }
+
   const { importResults } = await domain('import-results');
-  const imported = importResults(project, { format, file: toProjectRelative(project, file) });
-  printImport(imported, `Импортировано из ${file} (${format})`);
+  const imported = importResults(project, {
+    format,
+    ...(plan.temp
+      ? { content: readFileSync(path, 'utf8') }
+      : { file: toProjectRelative(project, file) }),
+    origin: plan.origin,
+    scope: `tests-cli run: ${plan.line}`,
+    exitCode,
+  });
+  printImport(imported, `Импортировано из ${plan.temp ? 'отчёта прогона' : file} (${format})`);
   printSkipped(skipped);
+  dropTemp(plan.temp);
   process.exit(result.status ?? 0);
+}
+
+/** Своя команда прогона: файлы — в `{files}` или в конец строки, запуск из корня. */
+function commandPlan(command, files, project) {
+  const line = command.includes('{files}')
+    ? command.replace('{files}', files.join(' '))
+    : `${command} ${files.join(' ')}`;
+  return { line, cwd: project, env: {}, origin: 'ci' };
+}
+
+/**
+ * Команда папки e2e, если все файлы кейсов лежат в ней. Раннер не установлен —
+ * отказ словами: `npx` скачал бы его без спроса (однажды — 0,8 ГБ Cypress).
+ */
+async function e2ePlan(project, files) {
+  const { e2eFolderView } = await domain('e2e-folder');
+  const { e2eCommand, installedBin, runDirOf } = await domain('e2e-command');
+  const folder = e2eFolderView(project);
+  if (!folder.dir || folder.state === 'missing') return undefined;
+  const prefix = `${folder.dir.replace(/\/+$/, '')}/`;
+  if (!files.every((file) => file.startsWith(prefix))) return undefined;
+  const temp = mkdtempSync(join(tmpdir(), 'cc-tests-run-'));
+  const report = join(temp, 'junit.xml');
+  const command = e2eCommand(project, folder, report, files);
+  if (!command) {
+    dropTemp(temp);
+    return undefined;
+  }
+  if (command.bin && !installedBin(command.cwd, command.bin)) {
+    dropTemp(temp);
+    throw new Error(
+      `Раннер автотестов не установлен, а сам он не ставится. Выполните в ${runDirOf(project, command)}: ${command.install}`,
+    );
+  }
+  return {
+    line: command.line,
+    cwd: command.cwd,
+    env: command.env,
+    results: ['junit', report],
+    temp,
+    origin: 'e2e',
+  };
+}
+
+/**
+ * Своя команда проекта из `.agent/tests/automation.json` — та же, что у кнопки
+ * панели: подстановки `{files}`/`{report}`, отчёт во временный файл через
+ * `AGENTDECK_JUNIT_REPORT`. `files` — файлы кейсов с автотестом (группы, если задана). Сломанный файл —
+ * отказ словами, а не тихий откат на npm test.
+ */
+async function automationPlan(project, files) {
+  const { readAutomation, automationCommand } = await domain('automation');
+  const { automation, error } = readAutomation(project);
+  if (error) throw new Error(`.agent/tests/automation.json: ${error}`);
+  if (!automation) return undefined;
+  const temp = mkdtempSync(join(tmpdir(), 'cc-tests-run-'));
+  const own = automationCommand(project, automation, files, join(temp, 'junit.xml'));
+  return {
+    line: own.line,
+    cwd: own.cwd,
+    env: own.env,
+    results: ['junit', own.report],
+    temp,
+    origin: 'e2e',
+    ...(automation.timeoutMinutes ? { timeout: automation.timeoutMinutes * 60_000 } : {}),
+  };
+}
+
+/** Файл или каталог (Allure) изменён не раньше старта прогона. */
+function freshSince(path, started) {
+  try {
+    const stat = statSync(path);
+    const newest = stat.isDirectory()
+      ? Math.max(
+          stat.mtimeMs,
+          ...readdirSync(path).map((name) => statSync(join(path, name)).mtimeMs),
+        )
+      : stat.mtimeMs;
+    return newest >= started - 1000;
+  } catch {
+    return false;
+  }
+}
+
+function dropTemp(temp) {
+  if (temp) rmSync(temp, { recursive: true, force: true });
 }
 
 function printSkipped(skipped) {
@@ -534,21 +701,40 @@ function mark(severity) {
  */
 async function diff(project, options, positional) {
   const [first, second] = positional;
-  if (!first || !second) throw new Error('Нужны два прогона: diff <база> <новый>');
-
-  const { readRun } = await domain('runs-store');
-  const runA = readRun(project, first);
-  const runB = readRun(project, second);
-  if (!runA) throw new Error(`Прогона «${first}» в проекте нет.`);
-  if (!runB) throw new Error(`Прогона «${second}» в проекте нет.`);
-
-  const swapped = Date.parse(runB.startedAt) < Date.parse(runA.startedAt);
-  const [from, to] = swapped ? [runB, runA] : [runA, runB];
-  if (swapped) console.error(`Порядок поменян: «${from.id}» старше «${to.id}».`);
-
   const groups = await groupsOf(project, options);
-  const { diffRuns } = await domain('compare');
-  const result = diffRuns(from, to, groups);
+  const { readRun, readRuns } = await domain('runs-store');
+  const { diffRuns, diffWithPrevious } = await domain('compare');
+
+  let result;
+  if (first && second) {
+    const runA = readRun(project, first);
+    const runB = readRun(project, second);
+    if (!runA) throw new Error(`Прогона «${first}» в проекте нет.`);
+    if (!runB) throw new Error(`Прогона «${second}» в проекте нет.`);
+
+    const swapped = Date.parse(runB.startedAt) < Date.parse(runA.startedAt);
+    const [from, to] = swapped ? [runB, runA] : [runA, runB];
+    if (swapped) console.error(`Порядок поменян: «${from.id}» старше «${to.id}».`);
+    result = diffRuns(from, to, groups);
+  } else {
+    // Один прогон — с ближайшим прошлым, у которого есть результаты; ни одного —
+    // последний с результатами. Так же сравнивает панель, и CI после прогона
+    // пишет просто `pnpm tests diff`, не выясняя идентификаторы.
+    // Сравнивать не с чем — это не провал: код 1 только за новые провалы, а
+    // первый прогон проекта в CI красным из-за пустой истории быть не должен.
+    const nothing = (text) => {
+      console.log(text);
+      process.exit(0);
+    };
+    const latest = first ?? readRuns(project, 200).find((run) => run.results.length > 0)?.id;
+    if (!latest) nothing('В истории нет прогонов с результатами: сравнивать не с чем.');
+    try {
+      result = diffWithPrevious(project, latest, undefined, groups);
+    } catch (error) {
+      if (error?.messageCode === 'compare-first-run') nothing(error.message);
+      throw error;
+    }
+  }
   const reporter = options.reporter && options.reporter !== true ? options.reporter : 'text';
 
   if (reporter === 'junit') {
@@ -576,10 +762,15 @@ async function diff(project, options, positional) {
   process.exit(result.newFailures.length > 0 ? 1 : 0);
 }
 
+const ORIGIN_TEXT = { e2e: 'автотесты панели', ci: 'импорт из CI' };
+
 /** Одна сторона сравнения строкой: по ней и видно, что с чем сравнили. */
 function runSide(item) {
   const parts = [`${item.id} от ${item.startedAt.slice(0, 16).replace('T', ' ')}`];
   parts.push(`режим ${item.mode}`);
+  // Импорт бывает двух родов, и «режим import» их не различал: прогон автотестов
+  // панелью и отчёт сборки. Поле ставит сервер по одному правилу — `runOrigin`.
+  if (item.origin) parts.push(ORIGIN_TEXT[item.origin] ?? item.origin);
   if (item.planId) parts.push(`план ${item.planId}`);
   if (item.environmentId) parts.push(`окружение ${item.environmentId}`);
   if (item.release) parts.push(`веха ${item.release}`);
@@ -615,9 +806,15 @@ async function plan(project, options, positional) {
   const { readRuns } = await domain('runs-store');
   const input = { recipe, groups, runs: readRuns(project, 50) };
 
-  const budget = numberOption(options.budget);
+  const budget = numberOption(options.budget, '--budget', 'число минут больше нуля');
+  if (budget !== undefined && budget <= 0)
+    throw new Error(`--budget ждёт число минут больше нуля, а пришло «${options.budget}».`);
   if (budget !== undefined) input.budget = budget;
-  const threshold = numberOption(options.threshold);
+  const threshold = numberOption(options.threshold, '--threshold', 'долю 0–1 или проценты 0–100');
+  if (threshold !== undefined && (threshold <= 0 || threshold > 100))
+    throw new Error(
+      `--threshold ждёт долю 0–1 или проценты 0–100, а пришло «${options.threshold}».`,
+    );
   // Порог принимаем и долей, и процентами: «--threshold 80» человек напишет
   // раньше, чем «0.8», а правило считает в долях.
   if (threshold !== undefined) input.threshold = threshold > 1 ? threshold / 100 : threshold;
@@ -660,11 +857,17 @@ async function plan(project, options, positional) {
   console.log(`\nПлан записан: ${saved.id} — ${saved.title}`);
 }
 
-/** Число из опции; всё, что не число, отбрасывается — подставлять своё нельзя. */
-function numberOption(value) {
-  if (value === undefined || value === true) return undefined;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : undefined;
+/**
+ * Число из опции. Не число — отказ с именем опции: молча подставленное
+ * значение по умолчанию («--budget abc» становился тридцатью минутами) давало
+ * план не того размера, о котором просили, и никто этого не видел.
+ */
+function numberOption(value, name, what) {
+  if (value === undefined) return undefined;
+  const parsed = value === true ? NaN : Number(String(value).replace(',', '.'));
+  if (!Number.isFinite(parsed))
+    throw new Error(`${name} ждёт ${what}, а пришло «${value === true ? '' : value}».`);
+  return parsed;
 }
 
 function isRed(item) {
@@ -672,7 +875,25 @@ function isRed(item) {
 }
 
 function redLine(group, item) {
-  return `  X ${group.id}/${item.id} ${item.title}${item.note ? ` — ${item.note}` : ''}`;
+  // Причина — общая заметка, а без неё разбор провала: человек часто пишет
+  // только к красному шагу, и строка без причины в логе CI ничего не называет.
+  const reason = item.note || (item.failure ? failureText(item.failure, true) : '');
+  return `  X ${group.id}/${item.id} ${item.title}${reason ? ` — ${reason}` : ''}`;
+}
+
+/** Разбор провала строкой: полной для `show`, короткой для строки отчёта. */
+function failureText(failure, short = false) {
+  if (short) {
+    const where = failure.step ? `шаг ${failure.step}: ` : '';
+    const wanted = failure.expected ? ` (ожидалось: ${failure.expected})` : '';
+    return `${where}${failure.actual ?? 'провал'}${wanted}`;
+  }
+  const parts = [];
+  if (failure.step) parts.push(`шаг ${failure.step}`);
+  if (failure.expected) parts.push(`ожидалось: ${failure.expected}`);
+  if (failure.actual) parts.push(`получилось: ${failure.actual}`);
+  if (failure.retry === 'flaky') parts.push('попытки разошлись');
+  return parts.join(' · ');
 }
 
 function countOf(cases) {

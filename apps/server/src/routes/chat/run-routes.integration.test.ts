@@ -1,3 +1,5 @@
+import { ESCALATE_LINE } from '@agentdeck/contracts/model-cascade';
+import { childStageExtra } from '../../domains/chat/group-run-lines.ts';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { execFileSync } from 'node:child_process';
@@ -166,7 +168,15 @@ describe('маршрут отправки: потребитель контура
 
     expect(response.statusCode).toBe(200);
     expect(prompts[0] ?? '').not.toContain('agentdeck:split');
-    expect(prompts[0]).toBe(stageAppendPrompt({ stage: 'work', link }, store.getSettings()));
+    expect(prompts[0]).toBe(
+      stageAppendPrompt(
+        { stage: 'work', link },
+        store.getSettings(),
+        childStageExtra('work', undefined),
+      ),
+    );
+    // Работе звена сказано, как поднять критическое в главный чат (раунд 3).
+    expect(prompts[0]).toContain(ESCALATE_LINE);
   });
 
   describe('доставка до MR', () => {
@@ -184,7 +194,7 @@ describe('маршрут отправки: потребитель контура
       const response = await send(PLAIN);
 
       expect(response.statusCode).toBe(200);
-      expect(prompts[0]).toContain('Доставка до MR на этом проекте включена');
+      expect(prompts[0]).toContain('enabled delivery up to an MR on this project');
     });
 
     it('ребёнок разделения её не получает: доставка — в задании группы', async () => {
@@ -197,7 +207,7 @@ describe('маршрут отправки: потребитель контура
       const response = await send(CHILD);
 
       expect(response.statusCode).toBe(200);
-      expect(prompts[0] ?? '').not.toContain('Доставка до MR');
+      expect(prompts[0] ?? '').not.toContain('delivery up to an MR');
     });
   });
 });

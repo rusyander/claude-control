@@ -12,7 +12,7 @@ export function SettingToggleRow({ label, hint, checked, onChange }: SettingTogg
     <Stack direction="row" align="center" justify="between" gap="var(--spacing-md)">
       {/* Подпись ограничена по ширине строкой текста, чтобы длинное пояснение
           не тянулось через всю карточку. */}
-      <Stack gap="var(--spacing-3xs)" style={{ maxWidth: 'var(--text-measure)' }}>
+      <Stack gap="var(--spacing-3xs)" className="prose">
         <Typography variant="body-sm" as="span">
           {label}
         </Typography>

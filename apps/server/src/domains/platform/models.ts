@@ -11,6 +11,7 @@ import type { AppStore } from '../../lib/app-store.ts';
 import { managedModel } from './apply/profile.ts';
 import { driverOf } from './drivers/index.ts';
 import { chooseToolRoute } from './gateway/dialect.ts';
+import { effectivePlatformRules } from './rules-apply.ts';
 
 /**
  * Модель контура: что панель кладёт в управляемый профиль, в окружение прогона
@@ -97,7 +98,7 @@ export function toolRouteOf(platform: Platform): PlatformToolRoute {
   const route = chooseToolRoute(
     {
       toolShim: platform.toolShim,
-      platformTools: platform.rules.platform.platformTools.length > 0,
+      platformTools: effectivePlatformRules(platform).platformTools.length > 0,
     },
     driverOf(platform),
     () => '',

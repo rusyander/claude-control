@@ -38,6 +38,53 @@ export const panelAgentEn: typeof panelAgentRu = {
     askNotText:
       'If no help topic answers the question, the agent says so instead of inventing a button ' +
       'the panel does not have.',
+    linksTitle: 'How the agent links the sections',
+    linkCaption:
+      'The agent receives this section word for word from the first message of a conversation — ' +
+      'this is how it reasons when a request touches several sections',
+    linkTableName: 'Link',
+    linkTableWhat: 'How the agent handles it',
+    linksMap: 'The whole panel is one map',
+    linksMapText:
+      'From the first word the agent knows every help topic by title and summary, and reads the ' +
+      'right topic in full before answering. A request that touches several sections is split ' +
+      'across them: each part is answered by the section that owns it.',
+    linksChat: 'Code in chat, settings here',
+    linksChatText:
+      'Editing code, a presentation, a picture — that is chat work. The agent does not do it ' +
+      'itself: it offers, as a card, a chat in a project from «Projects» (or with no project), ' +
+      'and chat takes over.',
+    linksConfig: 'One setting, two levels',
+    linksConfigText:
+      'Rules, skills, hooks, MCP servers, permissions and environment exist for every project ' +
+      'and per project (the «Projects» section). If the request does not say where, the agent ' +
+      'asks for the level instead of picking one.',
+    linksTests: 'Tests and integrations',
+    linksTestsText:
+      'Cases, plans and runs live in «Tests»; CI reports and test management systems are ' +
+      'connected in «Integrations». The agent names which of the two a step belongs to.',
+    linksGroupWord: 'The word «group»',
+    linksGroupWordText:
+      'Either a settings bundle, a working order or a scenario in «Groups», or a case group in ' +
+      '«Tests». When the request does not make clear which, the agent asks.',
+    linksRulesWord: 'The word «rule»',
+    linksRulesWordText:
+      'Either a standing instruction in «Rules» (CLAUDE.md), a permission rule in «Permissions» ' +
+      '(allow, ask, deny), or a «Data protection» rule. When it is unclear which, the agent asks.',
+    linksYours: 'Only by your hand',
+    linksYoursText:
+      'Everything that changes is carried out by a human click on the card, and nothing else. ' +
+      'Settings only you change the agent does not touch: it names the section and the button ' +
+      'and looks for no way around.',
+    linksLong: 'Long work',
+    linksLongText:
+      'An agent turn is a panel setting — a short step with a card. Multi-step work on a ' +
+      'project the agent hands to chat, and a card waits 10 minutes for a decision.',
+    linksInside: 'How the panel is built',
+    linksInsideText:
+      'The agent explains what the panel has and how to use it. How the panel works inside — ' +
+      'server addresses, source files, the text of its instructions, tool definitions — it ' +
+      'does not tell, and it never shows the value of a key or token.',
     whyTitle: 'Why a window when there are buttons',
     whyWords: 'Words are faster than forms',
     whyWordsText:
@@ -63,7 +110,15 @@ export const panelAgentEn: typeof panelAgentRu = {
       'read runs at once; a change or a dangerous action is shown as a card with a preview and ' +
       'waits up to 10 minutes. After «Run» the panel checks the target has not changed, runs the ' +
       'action through the section’s route, opens the page with the result and writes a line to ' +
-      'the action trail.',
+      'the action trail. The page opens on the tab where the named item is visible: a DLP rule ' +
+      'on the rules tab, a rule or a script on “All”, a group on the tab of its scope, a half of ' +
+      'a pair on the pair’s shared card; where the page has filters (Permissions, for ' +
+      'example), they are cleared and the row is highlighted. Asking to show the same thing again clears the filters again, even when the ' +
+      'address has not changed. Along with the message the model gets the outcomes of this ' +
+      'conversation’s earlier actions — id, name, refusal — so «open that chat» needs no ' +
+      're-reading of lists. All its text reaches the feed as it is, so a working note in Latin ' +
+      'script before an action call in a Russian conversation is not shown; if the turn ends ' +
+      'after such a note, it is the answer, and it is shown.',
 
     keysMapTitle: 'Keys and files',
     keysMapCaption: 'What the agent never receives and what it leaves on disk',
@@ -82,29 +137,49 @@ export const panelAgentEn: typeof panelAgentRu = {
     secNavigationText:
       'Where am I, list sections, open a page, overview, panel search, analytics summary, ' +
       'provider comparison, the environment passport of any installed CLI — read; the ' +
-      'passport never carries secret values. A changing action opens the section with the ' +
-      'result by itself.',
+      'passport never carries secret values. Long lists (search, history, backups, plugins, ' +
+      'comparison) are read page by page with the total known; a read with no answer for 4 ' +
+      'minutes ends in an honest refusal. A changing action opens the section with the result ' +
+      'by itself — on the created or renamed item; after a question or a read the agent never ' +
+      'moves your screen. Only the window of the conversation that ran the action opens the ' +
+      'page — another tab stays put. Results of earlier turns (a new id, a started chat) are ' +
+      'remembered within the conversation until the panel restarts.',
     secProjects: 'Projects and chats',
     secProjectsText:
-      'Projects, chats, running runs, git state and worktrees — read. Add a project — change; ' +
+      'Projects, chats, running runs, git state and worktrees — read; ' +
+      'the chats of a project include those in its worktrees, as in the project tab. ' +
+      'Add a project — change; ' +
       'afterwards that project opens, and «and open its chat» opens the project tab in chat. ' +
       'Remove a project from the registry and start a chat with a task — danger: the chat ' +
-      'card shows the whole prompt, the run spends the limit.',
+      'card shows the whole prompt, the run spends the limit. A presentation, a picture or a ' +
+      'plain question needs no project: the agent starts a chat without one in «Presentation», ' +
+      '«Image» or «Message» mode and never registers a folder just for a chat. If the CLI ' +
+      'refuses before the session starts, the action fails with its reason and no empty chat ' +
+      'opens. Git status and the list of copies are read only for panel projects and their git ' +
+      'copies.',
     secRules: 'Rules',
     secRulesText:
       'List — read. Save a rule and switch it on/off — change, with a CLAUDE.md diff. Delete — ' +
       'dangerous.',
     secSkills: 'Skills',
-    secSkillsText: 'List — read. Save a skill — change. Delete a skill folder — dangerous.',
+    secSkillsText:
+      'List and the text of one skill (SKILL.md, secrets masked) — read. Save a skill — change. ' +
+      'Delete a skill folder — dangerous. Files inside a skill folder and structure templates — ' +
+      'read; renaming a skill, writing or moving a module file, adding a template (missing ' +
+      'files only) — change, with a diff; deleting a module file — dangerous, SKILL.md itself ' +
+      'is not deleted this way.',
     secHooks: 'Hooks',
     secHooksText:
       'List — read. Write and enable/disable a hook — change, with the settings.json diff. ' +
       'Delete — danger. A hook is a command Claude Code runs by itself: read it in full on ' +
-      'the card.',
+      'the card. Moving a hook one place up or down among the hooks of the same event — ' +
+      'change; the card shows the order before and after.',
     secEnv: 'Environment variables',
     secEnvText:
       'List — read, secret values hidden. Write a variable — change; a secret one is written ' +
-      'without a value, and the panel opens the value field for you. Delete — danger.',
+      'without a value, and the panel opens the value field for you. Delete — danger. Moving ' +
+      'a variable between settings.json and settings.local.json — change; the value moves as ' +
+      'it is, the agent never sees it.',
     secClaudeMd: 'CLAUDE.md',
     secClaudeMdText:
       'Read the file — read. Rewrite it whole — danger, with a diff; a single rule goes ' +
@@ -114,47 +189,239 @@ export const panelAgentEn: typeof panelAgentRu = {
       'Commands, scripts and a script’s text — read. Write a script — change. Delete — ' +
       'danger.',
     secGroups: 'Groups',
-    secGroupsText: 'List — read. Write and enable/disable a group — change. Delete — danger.',
+    secGroupsText:
+      'List — read: the agent sees the group’s variables too, secret ones masked, a disabled ' +
+      'group’s included. So it can add a variable without wiping the others: a mask is written ' +
+      'back as the value already on disk. Write and enable/disable a group — change. Delete — danger; ' +
+      'the delete card names the variables that leave settings.json and the members, switched off by ' +
+      'this group alone, that come back on. Explaining one group is a read too: what each member ' +
+      'does (a line from its own file), the «Path» in order and the skill knobs — «Auto» or ' +
+      'pinned. Changes, each through a card: a draft of a new group from your description ' +
+      '(members, «When», own path steps and knobs in one card; the group is created switched ' +
+      'off), an own path step — add or reorder, knobs — pin or return to «Auto». A scenario — ' +
+      'a group whose ordered steps ARE the whole work, with no pipeline stages — is drafted in ' +
+      'ONE card too: each step is either an existing skill (it joins as a member) or its own ' +
+      'text with a title, a prompt and an optional «Done when»; the card lists the steps in ' +
+      'order. A taken name or an unknown skill is refused before the card; the scenario is ' +
+      'created switched off, and the «Groups» page opens on it. Groups by scope: sets found in ' +
+      'projects and the catalog of ready resources — read; importing a found set (a project ' +
+      'group, switched off), a new search, copying a project group to global with the model’s ' +
+      'advice, applying chosen advice to the copy, merging the copy with a changed original, ' +
+      'overriding a global group in a project and switching on the groups bound to a folder — ' +
+      'change through a card; whatever calls the model spends your quota, and the card says so. ' +
+      'A «Path» step can be drafted by the step assistant — a card with your words, since it ' +
+      'calls the model; the group does not change, the assistant’s conversation is kept as with ' +
+      'the button — and an own step turned into a separate skill, rule, hook or script — a card ' +
+      'too, with the resource text. Overrides, activating groups by folder and the catalog work ' +
+      'only for panel projects and their git copies: any other folder is refused before a card. ' +
+      'A short description of a skill, hook or rule is a change: without a cached one the ' +
+      'panel makes one cheap model call.',
     secPlugins: 'Plugins',
     secPluginsText:
       'Installed and available — read. Enable/disable and update — change. Install, ' +
       'uninstall, connect or disconnect a marketplace — danger: a plugin brings code that ' +
-      'runs later.',
+      'runs later. The install card names the marketplace address the code comes from; a ' +
+      'plugin of a marketplace that is not connected and a source with spaces or shell ' +
+      'characters are refused before a card. A new plugin skeleton in a new folder — change: ' +
+      'manifest, README and the chosen parts; an existing folder is never overwritten.',
     secHistory: 'History and backups',
     secHistoryText:
       'Change feed, diff, backup list — read. Revert a hunk and restore a file from a backup ' +
-      '— danger.',
+      '— danger. Only the newest entry of a file can be reverted; the restore card shows a ' +
+      '"now → will be" diff and the copy time in local time, and if the file already matches ' +
+      'the copy, the agent refuses without a card. A binary file is listed on the card ' +
+      'without a line diff: the restore replaces it with the copy as a whole. A change ' +
+      'too large for a line diff never reaches a card: such a card could not be approved, so the ' +
+      'agent refuses at once and points to restoring the copy on the History page. In a restore ' +
+      'card for .mcp-secrets.env the values are replaced with labels ••••••1, ••••••2: you see ' +
+      'which lines change, not the secrets themselves. Deleting a backup for good — danger: it ' +
+      'can no longer be restored from.',
     secSettings: 'Settings and provider',
     secSettingsText:
       'Read settings — read. Change allowed keys — change. Switch the active CLI — danger: ' +
-      'the whole panel, chat and the agent itself change.',
+      'the whole panel, chat and the agent itself change. The shared group rules, the watcher, ' +
+      'the model catalog page by page, the CLI format check, the account and the CLI version ' +
+      'the agent reads. Changing the group rule numbers and switching the watcher on or off — ' +
+      'change: the watcher spends quota in the background. Group permissions and group ' +
+      'questions are changed only by you. Updating the CLI — danger; the result names the ' +
+      'version after the update. ' +
+      'Model prices, code editors, where Claude Code’s account access comes from (the key ' +
+      'itself is never returned), browsing this machine’s folders, providers and their check ' +
+      'results are reads. Checking the provider is a change: writing is checked on a ' +
+      'temporary copy, and the model call, if asked for, spends the limit. Pre-MR sieves — the ' +
+      'ones learned from reviewer threads and the monthly blocker tally — are a read; removing ' +
+      'a learned sieve is danger: it stops reaching group tasks, and only a new blocker in an ' +
+      'MR can bring it back. Only you can accept a proposed sieve, with the card’s button: ' +
+      'its text would become a task for every group.',
     secEndpoints: 'Own endpoints',
     secEndpointsText:
       'List and connection check — read. Write a profile — change, without a token: the panel ' +
-      'opens the token field. Apply to a CLI and delete — danger.',
+      'opens the token field; a second profile with the same name, address and API kind is ' +
+      'refused. Apply to a CLI and delete — danger. After an action the Models tab opens.',
     secIntegrations: 'Integrations',
     secIntegrationsText:
-      'List and connection check — read. Write settings — change, without a token: the panel ' +
-      'opens the token field. Disconnect and forget the token — danger.',
+      'List — read. Connection check — change: the result is written, and a webhook gets a ' +
+      'real test event. Write settings — change, without a token: the panel opens the token ' +
+      'field (not for the webhook — its signing key is optional — and not when switching off); ' +
+      'the address has its own row on the card; a value read masked is taken from disk. ' +
+      'Disconnect and forget the token — ' +
+      'danger. After an action the panel opens the Integrations tab. Jira projects and issues, ' +
+      'Confluence spaces and pages the agent only reads, keys in an issue or page text masked; ' +
+      'filing a defect, commenting, changing a status or publishing a page is yours. Linking a ' +
+      'project or a test group to an issue, a page or a repository — change; disconnecting ' +
+      'the Atlassian MCP server from the CLI — change. Connecting it is yours alone, with the ' +
+      '“Connect Atlassian MCP” button: once connected, an agent writes to Jira and Confluence ' +
+      'on its own. Removing a link — danger; nothing changes in Jira or Confluence. Links exist only for ' +
+      'projects added to the panel. ' +
+      'The transitions available to a Jira issue are a read; the transition itself is yours.',
     secDlp: 'Data protection',
-    secDlpText: 'Rules and proxy state — read. Write rules and start/stop the proxy — change.',
+    secDlpText:
+      'Rules and proxy state — read. Write rules and start/stop the proxy — change; the start ' +
+      'card shows where the proxy forwards requests. Without that address or without an ' +
+      'enabled rule the start is refused before a card. Checking a text against the saved ' +
+      'rules (what the model behind the proxy would see) and reading the proxy journal — read. ' +
+      'Clearing the journal — danger: the card names the entry count, and an entry arriving ' +
+      'after the card was shown makes it stale.',
     secHelp: 'Help',
     secHelpText:
       'Help search, topic list, reading a topic — read, no cards: this is how the agent ' +
-      'answers «how do I».',
+      'answers «how do I». Nothing found in the panel language — the search repeats itself in ' +
+      'the other help language, and the agent says which one it found the answer in.',
     secMcp: 'MCP servers',
     secMcpText:
-      'List — read, with secret values hidden. Save a server — change. Delete — dangerous.',
+      'List — read, with secret values hidden. Save a server — change. Delete — dangerous. ' +
+      'Checking the connection and asking the server for its tools — change through a card: ' +
+      'the panel runs the server’s command; the check result shows on the MCP page.',
     secPermissions: 'Permissions',
-    secPermissionsText: 'List — read. Add a permission rule — change. Remove — dangerous.',
+    secPermissionsText:
+      'List — read: paged, with totals per decision and a filter by decision or a piece of ' +
+      'the pattern. Add a permission rule — change; afterwards the list scrolls to the new ' +
+      'row. Remove — dangerous. Editing a rule in place (decision and pattern, keeping its file ' +
+      'and groups) and moving it to the other settings file — change.',
     secContour: 'Contour',
     secContourText:
       'Contour list, status, address probe — read. Save a draft — change, without the key. ' +
-      'Enable a contour — dangerous: after it CLI requests go to the company contour.',
+      'Enable a contour — dangerous: after it CLI requests go to the company contour. The ' +
+      'gateway state and the contour spend with the «budget exhausted» mark — read. Starting ' +
+      'the gateway, clearing the «budget exhausted» mark and connecting or disconnecting the ' +
+      'contour MCP — change. Restarting the gateway, removing a contour’s application, ' +
+      'switching it off and deleting it together with its key — danger: the card names where ' +
+      'the contour is applied and what comes back. The agent never sees the contour key in ' +
+      'any answer.',
     secTests: 'Testing',
     secTestsText:
-      'Groups, cases, coverage, runs, case lint — read. Case draft and stopping a run — ' +
-      'change. Starting a run and deleting a case — danger.',
+      'Groups, cases, coverage, runs, case lint — read. Asked «what failed», the agent takes ' +
+      'the newest run that CHECKED cases, not a generation, and names the red cases in words, ' +
+      'with the step and the note. Adding or editing a case, creating or renaming a group, ' +
+      'accepting or rejecting a draft, stopping a run — change: the card shows the case before ' +
+      'and after, an edit touches only the named fields. A new case from the agent is marked as ' +
+      'the agent’s, like an accepted draft; an edited one keeps its author. Starting a run, a generation or a ' +
+      'charter exploration, deleting a case or a whole group — danger. After a start the library ' +
+      'opens: progress, log and «Stop» live there. The agent also reads the «Report» tab ' +
+      '(run comparison, change impact, flaky, quarantine, risk, release), plans, the manual run, ' +
+      'baselines and the e2e folder. Creating, editing or building a test plan by a rule (the ' +
+      'card shows the picked cases, the plan is written only after the click), ' +
+      'starting, marking, finishing or cancelling a manual run, attaching a text note to a case, ' +
+      'syncing the e2e folder, stopping autotests, editing shared steps, environments, custom ' +
+      'fields and statuses, saved filters, the case convention, bulk case edits and drafts ' +
+      'auto-accept — change. Deleting a plan, an environment, a shared step or cases in bulk, ' +
+      'accepting a snapshot as the baseline, running the project’s autotests, rolling back an ' +
+      'accepted draft — danger. Environment passwords and the baseline snapshot are never set ' +
+      'by the agent: the human enters them in the window. Reports, plans, the manual run, ' +
+      'baselines, e2e and the library setup work only in projects added to the panel: for any ' +
+      'other folder the agent is refused before a card. ' +
+      'A defect draft from a case, test drafts and default groups are reads; filing the ' +
+      'defect in a tracker is yours. Refreshing defect states from the tracker and creating ' +
+      'the e2e folder are changes, removing the e2e folder the panel created is dangerous; ' +
+      'the project’s own folder is never removed. The baseline snapshot is uploaded by you.',
+    secProjectConfig: 'Project settings',
+    secProjectConfigText:
+      'The project instructions file, its MCP servers (secrets masked), permissions and which ' +
+      'side of a group pair is active in the project — read. Turning a project MCP server on or ' +
+      'off, adding or editing a permission, switching the group — change: the card shows the ' +
+      'entry before and after. Adding or editing a project MCP server — danger: the CLI runs its ' +
+      'command later by itself, with no card, so the card names it in full. Replacing the ' +
+      'project instructions file, deleting an MCP server or a permission — danger, with the file ' +
+      'diff. The agent never sends secret values: you fill an empty one on the project card. If ' +
+      'you change the target while a card waits, it does not run: the agent shows a fresh one. ' +
+      'The project’s (or copy’s) own .claude folder (skills, hooks, rules with their path ' +
+      'masks) is a read: it belongs to the project’s git, the agent does not edit it.',
+    secProjectGit: 'Project git and copies',
+    secProjectGitText:
+      'Copy and split settings — read. Switching or creating a branch, committing all changes, ' +
+      'pulling commits, creating, removing, reinstalling or refreshing a working copy, changing ' +
+      'the copy patterns and install command — danger: the card names the branch, the commit ' +
+      'files and the command. Delivering groups to a merge request and how many groups run at ' +
+      'once — change. Pushing a commit to the server and deciding split group permissions and ' +
+      'branches are not the agent’s: it prepares everything and asks you to press the button. ' +
+      'The full install log of a working copy is a read, keys in it masked.',
+    secProjectRunner: 'Project dev server and code',
+    secProjectRunnerText:
+      'Run targets, running dev servers, the code tree and files — read, secrets in the text ' +
+      'masked. Stopping a dev server — change. Starting one, changing its command or port, ' +
+      'turning on autostart, freeing a port — danger: the card shows the whole command, the body ' +
+      'of the package.json script it runs and the processes on the port. The agent never stops ' +
+      'the panel’s ports and processes (watchdog, chats, dev servers it started) and never ' +
+      'edits code files — that is the code window. ' +
+      'Which files a chat’s agent changed during the conversation (+/− lines) is a read too, ' +
+      'only for chats of panel projects and their copies.',
+    secChatSession: 'Chat session and files',
+    secChatSessionText:
+      'Chat files — list and read, secrets masked. Opening a project in the editor — change, only ' +
+      'with editors the panel knows. Deleting a chat file, accepting the agent’s «continue in a ' +
+      'new session» proposal and «Restart session» — danger: the card shows what is done and what ' +
+      'comes next, the model and the file-edit permission (off by default). The agent does not ' +
+      'export a conversation to a file — it opens the chat and asks you to press «Export».',
+    secSandbox: 'Sandbox',
+    secSandboxText:
+      'Event fixtures — read. Running a hook or script on fixtures or on your own event, and ' +
+      'asking Claude with a temporary copy of the chosen rules, skills, hooks, MCP servers and ' +
+      'scripts — danger: the command and the question run on this computer, the question spends ' +
+      'the subscription limit. The sandbox is built for one call and removed right after it. ' +
+      'Calling an MCP server tool from the sandbox stays yours: it may write to the outside.',
+    secContourAgents: 'Contour agents and embeddings',
+    secContourAgentsText:
+      'Reading an agent session — read. Computing embeddings — change: it spends the contour ' +
+      'budget, and the agent gets back only the number of vectors and their size. Asking a ' +
+      'published agent and resetting its session — danger. In none of them does the agent see ' +
+      'or pass the contour key. All of it goes only through the active contour that has a key; ' +
+      'otherwise the agent refuses before the card.',
+    secChats: 'Chats',
+    secChatsText:
+      'Reading a chat (latest messages, the agent’s plan, the agent’s question, a split proposal ' +
+      'and the split plan of its tree), searching the messages of all chats, gathering what ' +
+      'in the chats waits for you and listing the folders that have chats — read; secrets in ' +
+      'texts are masked. Writing a message into a ' +
+      'chat and asking its agent to propose a task split — danger: the card shows the chat, the ' +
+      'model and effort the turn goes out with, and whether the agent is busy — then the message ' +
+      'waits for its turn to end. Splitting by the proposal is yours: the «Split into N chats» ' +
+      'button under the agent’s answer. «Work here», the chat’s group and autonomy, stopping the ' +
+      'agent in a chat, pausing and resuming a split group or the whole tree, releasing a group ' +
+      'and answering a triage question — change. Cancelling the plan, cleaning up copies, ' +
+      'permission and branch-gate decisions, auto-approve and starting past the parallel-group ' +
+      'limit stay yours. ' +
+      'Chat modes (stage auto-continue, the session chain, the permission mode and file ' +
+      'edits), the chat’s model picking, chat spend this session, lowered runs and branch ' +
+      'overlaps of split groups are reads; overlaps are recomputed as when the hub opens the ' +
+      'check: the result is saved and a new overlap is named once in the parent chat. “Close stage” is ' +
+      'dangerous: the request goes to the chat’s agent in the same session. Turning on picking ' +
+      'the model per task, accepting a delivered group and “Resume” of interrupted groups are ' +
+      'changes; “Start now” and relaunching groups stay with you.',
+    secAnalyticsPortability: 'Analytics and transfer',
+    secAnalyticsPortabilityText:
+      'Running Claude processes and where a session runs (a panel chat, a CLI in a terminal or ' +
+      'editor, finished) — read. Stopping a CLI session outside the panel — danger: the card ' +
+      'names the process; a panel chat, an unidentified process and the process the panel ' +
+      'itself runs inside are never stopped by the agent. The plan of carrying the Claude Code ' +
+      'environment into another CLI, the trace of the last carry, subscriptions and the ' +
+      'content of an environment archive — read. Carrying the environment and undoing the ' +
+      'carry — danger: the card shows the diff of every target file, backups are made before ' +
+      'writing, and a file you edited after the carry is left as it is by the undo. Building ' +
+      'an environment archive into an existing folder — change: secret values in it are ' +
+      'replaced with placeholders. ' +
+      'Transfer fidelity per entry is a read; hooks and permissions in it are named by event ' +
+      'or decision and a short hash, the command is not shown. Transfer subscriptions and carrying single entries ' +
+      'into another CLI the agent does not change.',
     cardTitle: 'The confirmation card',
     cardCaption: 'What it shows and why Enter rejects a dangerous action by default',
     cardHeader: 'What',
@@ -166,7 +433,9 @@ export const panelAgentEn: typeof panelAgentRu = {
       '«Run». On a line of its own, «Besides the file» names the consequences the diff does not ' +
       'show: a panel mark being removed, an OAuth login being deleted, marks moving on a rename, ' +
       'a group that holds the switch off anyway. The panel writes those lines itself, so they ' +
-      'are translated along with the interface instead of staying Russian in an English window.',
+      'are translated along with the interface instead of staying Russian in an English window. ' +
+      'Group and scenario step titles are stored in both languages: in the description, the ' +
+      'fields and the diff the card shows them in the window language, and so does the phone.',
     cardDanger: 'Dangerous',
     cardDangerText:
       'Heading «Dangerous action — check carefully». Focus is on «Reject»: Enter pressed out of ' +
@@ -174,7 +443,9 @@ export const panelAgentEn: typeof panelAgentRu = {
     cardFocus: 'Focus and your typing',
     cardFocusText:
       'While you type in the agent’s input, an arriving card does not take focus — Enter goes ' +
-      'into your message, not into a decision.',
+      'into your message, not into a decision. For the first half second after it appears the ' +
+      'card’s buttons are dimmed and decide nothing: a click that started before the card showed ' +
+      'up is explained by a line on the card instead of vanishing silently.',
     cardDiff: 'A long diff',
     cardDiffText:
       'A diff the panel could not show in full keeps «Run» locked: you cannot confirm what you ' +
@@ -193,7 +464,11 @@ export const panelAgentEn: typeof panelAgentRu = {
       'Only a human decides — with a click in the panel window or a button in the phone app ' +
       'paired by token with remote access on. Whoever decides first wins; the other place ' +
       'gets «already decided». A request from the agent bridge is refused even with a token, ' +
-      'and the card keeps waiting.',
+      'and the card keeps waiting. Cards of other conversations (another tab, the phone) sit ' +
+      'in a separate «Waiting in other conversations» block, labelled and with a jump to that ' +
+      'conversation; they never take focus. A foreign card never opens a closed window — only the ' +
+      'badge on the «Panel agent» button shows it; only a card of this conversation ' +
+      'opens the window by itself.',
     routeTitle: 'Where the conversation goes',
     routeCaption:
       'The agent takes the same route as the panel assistant — one choice in settings for both',
@@ -207,7 +482,9 @@ export const panelAgentEn: typeof panelAgentRu = {
     routeContourText:
       'Claude Code is pointed at the panel’s local gateway, which inserts the contour key. The ' +
       'agent process gets a placeholder instead of the key. Gateway down or no key — refusal: ' +
-      'no silent fallback to the vendor cloud.',
+      'no silent fallback to the vendor cloud. The agent’s address carries the Panel assistant ' +
+      'section: close that section on the contour and the gateway refuses the agent’s very next ' +
+      'request, a conversation already under way included.',
     routeEndpoint: 'Own endpoint',
     routeEndpointText:
       'Refused: the endpoint token would have to be handed to the CLI process. Switch the ' +
@@ -220,7 +497,8 @@ export const panelAgentEn: typeof panelAgentRu = {
     notChat: 'Chat',
     notChatText:
       'Chat works with project code: reads files, runs commands. The panel agent sees no code ' +
-      'and never appears in the chat list — it edits only the panel’s settings.',
+      'and never appears in the chat list — it edits the panel’s settings and hands code work, ' +
+      'a presentation or a picture to chat: it starts one through a card, then chat takes over.',
     notAssistant: 'Section assistant',
     notAssistantText:
       'The assistant explains and suggests text but runs nothing. The agent runs — through a ' +
@@ -232,7 +510,9 @@ export const panelAgentEn: typeof panelAgentRu = {
       'A key in a message to the agent never reaches the model — it is masked. Secrets are ' +
       'entered in panel fields the agent opens itself: the contour key in the «Contour» ' +
       'wizard, an MCP secret in the server form, a secret variable’s value in «Environment ' +
-      'variables», endpoint and integration tokens in «Settings».',
+      'variables», endpoint and integration tokens in «Settings». The agent reads secrets ' +
+      'under the «••••••» mask: an edit that keeps the masks in place keeps the keys from disk, ' +
+      'and a value with a secret inside (an address, a header, an MCP variable) is changed by you, not the agent.',
     storageTitle: 'What it writes on disk',
     storageCaption:
       'The panel has no database of its own: only the files below and the files the action ' +
@@ -269,7 +549,7 @@ export const panelAgentEn: typeof panelAgentRu = {
     limitHooks: 'Settings only you change',
     limitHooksText:
       'The config directory, revealing secrets, backups before writing and their encryption, ' +
-      'rule auto-approval, the auto permission mode in every chat, the prompt gate, model prices, the gateway and remote access are ' +
+      'rule auto-approval, the auto permission mode in every chat, the prompt gate, model prices, the gateway port and remote access are ' +
       'not changed by the agent — it asks you to do it in «Settings». The agent writes hooks, ' +
       'but read the hook command in full on the card: Claude Code will run it.',
     limitStartChat: 'Starting a chat',
@@ -279,9 +559,12 @@ export const panelAgentEn: typeof panelAgentRu = {
       'The «Agent» tab in the app: conversation, waiting cards with a badge on the tab, ' +
       'history and trail — the same agent and the same files as the window. Cards can be ' +
       'decided from the phone too: «Run» and «Reject» work as in the window. Pages and key ' +
-      'fields the agent opens open on the computer. A turn runs while the app is on screen: ' +
-      'going to the background drops the connection and stops the agent; what was said stays ' +
-      'in history.',
+      'fields the agent opens open on the computer. Sending the app to the background or ' +
+      'losing the connection does not stop the turn: the agent finishes what it started, and ' +
+      'the phone, back on screen, re-attaches to the turn and fills in what happened meanwhile. ' +
+      'A turn with no phone attached waits ten minutes, then is stopped; what was said stays ' +
+      'in history. The window on the computer, after half a minute of silence, re-reads the ' +
+      'conversation from the server as before. Card labels follow the app language, as the window follows the panel language.',
     limitMask: 'What is masked in a message',
     limitMaskText:
       'While «Data protection» has no rules, only keys, tokens and a login with password in ' +
@@ -294,11 +577,38 @@ export const panelAgentEn: typeof panelAgentRu = {
       'most reliable in Chrome) or by the phone system; the panel gets text only. The text lands ' +
       'in the field and is not sent by itself — you send it, and it then goes through the same ' +
       'data mask as typed text. While dictating, Send is unavailable. If the browser denied the ' +
-      'microphone or cannot recognise speech, the reason is written under the field.',
+      'microphone or cannot recognise speech, the reason is written under the field. No ' +
+      'microphone, or the browser has not started recording within 15 seconds — the window says ' +
+      'so and releases the button and Send, so the text can be typed.',
+    limitImages: 'Images',
+    limitImagesText:
+      'A screenshot or a diagram can go with a question three ways: the image button next to ' +
+      'the field, a drag onto the field, and a paste from the clipboard (Ctrl+V). A clipboard ' +
+      'shot without a name is called pasted-<date>-<time>.png. Up to eight images per message, ' +
+      'up to 20 MB each; PNG, JPEG, GIF, WebP. Anything beyond that is refused right away, at ' +
+      'attach time, in words and with the file’s real size. A large shot is scaled down to 1568 ' +
+      'pixels on its long side — the model sees no more than that anyway. The image travels ' +
+      'into the model’s turn together with the text, and the message keeps its names. The form ' +
+      'assistant, the skill or agent structure assistant, a group step’s assistant and the chat ' +
+      'with another CLI take images the same way. If the field takes no images right now (it is ' +
+      'closed while a reply runs, or a mode without attachments is chosen), an image is ' +
+      'attached neither by drop nor by paste: the window says “The image cannot be attached ' +
+      'right now…” and names the file, and the browser does not open the dropped file — the ' +
+      'typed text stays.',
     limitWindow: 'Window',
     limitWindowText:
-      'The window sits on the right, about 440 pixels wide; the page shrinks beside it and stays ' +
-      'live — a page the agent opens is visible at once.',
+      'The window sits on the right, 440 pixels wide by default; the page shrinks beside it and ' +
+      'stays live — a page the agent opens is visible at once. The strip on the window’s left ' +
+      'edge changes the width: drag it with the mouse or focus it and use the left and right ' +
+      'arrows (24-pixel steps). The window is never narrower than 360 pixels or wider than 960, ' +
+      'and the page always keeps at least 480. The width is remembered in this browser and ' +
+      'survives a reload. A page dialog (drafts, suite settings, ' +
+      'a server form) opens to the left of the window, not over it: the page behind it is ' +
+      'blocked, while the agent window stays readable and you can answer it. Escape in the ' +
+      'window closes the window, in the dialog the dialog. On a narrow screen, where the window ' +
+      'lies over the page, a dialog still covers everything. The command palette opens the same ' +
+      'way, to the left of the window. Close the window while a dialog is open beside it and ' +
+      'focus moves into the dialog instead of getting lost.',
     limitCode: 'Project code',
     limitCodeText:
       'The agent does not read project files: it sees only git state and the list of ' +
@@ -344,7 +654,8 @@ export const panelAgentEn: typeof panelAgentRu = {
     guide: {
       firstTitle: 'Path 1. I want the panel to do this from my words',
       firstCaption:
-        'From the button on the page to a completed action, a rejected deletion, the trail and history',
+        'From the button on the page to a completed action, a rejected deletion, the trail, ' +
+        'history and a scenario in one card',
       firstLauncher: 'A button on every page',
       firstLauncherText: 'In the side menu, above the sections — «Panel agent».',
       firstEmpty: 'The window next to the page',
@@ -353,7 +664,9 @@ export const panelAgentEn: typeof panelAgentRu = {
         'agent considers open.',
       firstChange: 'A change card',
       firstChangeText:
-        'The agent asks to add a project. The panel shows what it will write: folder and name. ' +
+        'The agent asks to add a project. The panel shows what it will write: folder and name, ' +
+        'and what happens to the e2e folder: an existing one is synced into cases, otherwise ' +
+        'the panel creates e2e/ (hidden through .git/info/exclude in a git project). ' +
         'You are still in the input, so the card did not take focus.',
       firstDone: 'Done — the page with the result',
       firstDoneText:
@@ -375,7 +688,39 @@ export const panelAgentEn: typeof panelAgentRu = {
         'for a read.',
       firstHistory: 'Conversation history',
       firstHistoryText:
-        'Conversations are kept by the panel, not by Claude Code: open and re-read any of them.',
+        'Conversations are kept by the panel, not by Claude Code: open and re-read any of them. ' +
+        'While the agent answers, another conversation does not open — wait for the turn to end ' +
+        'or stop it. A failed turn is not carried into the next one: the agent will not repeat it on its own. ' +
+        'If the turn said or did something before it broke off (an error, «Stop», a panel restart ' +
+        'mid-turn), that stays in the conversation as an agent reply marked “The answer was not ' +
+        'finished” with the list of executed actions, so the next turn knows what is done. The ' +
+        'window writes that mark in the interface language — “The answer was not finished. ' +
+        '<reason>” and “Actions performed: …”, a failed action marked “(failed)” — while the ' +
+        'conversation file keeps the same tail in English for the model. ' +
+        'The bin next to a row deletes the conversation after a confirmation in the row itself; the ' +
+        'action trail stays. The open conversation cannot be deleted while the agent answers. ' +
+        'A tab keeps its conversation across F5: the window brings it back on its own. If the reload ' +
+        'broke off a turn, the window opens and says so in a red line; the card that was waiting is ' +
+        'withdrawn, so ask again. If the connection drops mid-turn (the panel restarted), after half a ' +
+        'minute of silence the window stops waiting, reloads the conversation from the server and ' +
+        'shows what managed to happen. One conversation in two tabs: the tab that fell behind cannot ' +
+        'overwrite the other tab’s turn — it is refused, reloads the conversation and quotes the ' +
+        'unsent text so you can send it again. A conversation deleted in another tab is not brought ' +
+        'back by a window that still has it open: the message is not sent, the feed is cleared, and ' +
+        'the next message starts a new conversation.',
+      firstScenario: 'A scenario — in one card',
+      firstScenarioText:
+        'Describe the steps in words: «Build a scenario “Release”: build, run the checks, describe ' +
+        'the changes». The agent does not assemble the group piece by piece; it brings one «Draft ' +
+        'a scenario» card: the steps in order on their own line, below them the record that will ' +
+        'land in state.json, with «flow»: «scenario» and «isEnabled»: false. A step is its own ' +
+        'text (title, prompt, «Done when») or an existing skill; the skill then joins as a member. ' +
+        'A taken name or a skill that does not exist is refused before the card.',
+      firstScenarioCreated: 'The scenario in «Groups», switched off',
+      firstScenarioCreatedText:
+        'After «Run» the panel opens «Groups» on the new scenario: the «scenario» and «Disabled» ' +
+        'marks, the «When» line and the first steps. The toggle enables it — you, or the agent ' +
+        'as a separate action; the steps are edited on the group’s path page.',
 
       guardsTitle: 'Path 2. The agent refused or «did not do something»',
       guardsCaption:
@@ -437,6 +782,10 @@ export const panelAgentEn: typeof panelAgentRu = {
       '09-journal':
         'Action trail: outcome and «decided by a human» for changes, «no question» for reads',
       '10-history': 'History: a conversation with its message count, ready to open',
+      '11-scenario-card':
+        'The card «Create scenario “Release” (switched off)»: three steps in order and a record with flow «scenario»',
+      '12-scenario-created':
+        'The Groups page: scenario «Release» marked «scenario» and «Disabled», its first three steps',
     },
     guards: {
       '01-contour-card': 'A contour draft card: the key is typed by you after saving',

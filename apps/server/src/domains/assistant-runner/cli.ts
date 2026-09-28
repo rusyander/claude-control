@@ -1,9 +1,17 @@
 import { killChildTree } from '../../lib/process-tree.ts';
 import { spawnCliProcess } from '../../lib/cli-spawn.ts';
+import {
+  readStreamJsonResult,
+  STREAM_JSON_INPUT_ARGS,
+  streamJsonUserLine,
+  writeAgentImages,
+  type AgentImage,
+} from '../../lib/agent-images.ts';
 import type { ConfigProvider } from '../../providers/types.ts';
 import { providerCliCommand } from '../../providers/cli.ts';
 import { opencodeServe } from '../opencode-serve.ts';
 import { DEFAULT_TIMEOUT } from './constants.ts';
+import { lightWindowArgs, lightWindowDir } from '../assistant.ts';
 import type {
   AssistantMessage,
   AssistantRunResult,
@@ -14,8 +22,9 @@ import type {
 /**
  * Снять зависший one-shot ЦЕЛИКОМ. На Windows мы запускаем CLI через `cmd.exe /c`,
  * поэтому `child.kill()` убивает только сам cmd.exe, а настоящий процесс CLI
- * остаётся жить и держать порты/файлы. `taskkill /T /F` валит всё дерево; на POSIX
- * достаточно обычного сигнала. Ошибки глушим — снятие процесса не должно ронять ответ.
+ * остаётся жить и держать порты/файлы. `killChildTree` валит всё дерево (обход по
+ * времени создания, без `taskkill /T`); на POSIX достаточно обычного сигнала.
+ * Ошибки глушим — снятие процесса не должно ронять ответ.
  */
 const killSpawned = killChildTree;
 
@@ -39,9 +48,13 @@ function spawnCli(
   args: string[],
   deps: RunAssistantDeps,
   stdin?: string,
+  cwd?: string,
 ): Promise<SpawnOutcome> {
   const timeoutMs = deps.timeoutMs ?? DEFAULT_TIMEOUT;
-  const spawned = spawnCliProcess(command, args, { spawnImpl: deps.spawnImpl });
+  const spawned = spawnCliProcess(command, args, {
+    spawnImpl: deps.spawnImpl,
+    ...(cwd ? { cwd } : {}),
+  });
 
   if (spawned.error) {
     return Promise.resolve({
@@ -98,6 +111,9 @@ function spawnCli(
   });
 }
 
+/** Текст сбоя «CLI не ответил вовремя» — по нему обнаружение групп узнаёт таймаут. */
+export const CLI_TIMEOUT_ERROR = 'CLI не ответил за отведённое время';
+
 /** Превратить исход spawn в результат ассистента (общее для claude и прочих CLI). */
 function outcomeToResult(
   providerId: string,
@@ -123,7 +139,7 @@ function outcomeToResult(
       reply: '',
       experimental,
       reason: 'cli_error',
-      error: 'CLI не ответил за отведённое время',
+      error: CLI_TIMEOUT_ERROR,
     };
   }
   const reply = outcome.stdout.trim();
@@ -153,6 +169,13 @@ function outcomeToResult(
  * Делегация Claude его СУЩЕСТВУЮЩЕМУ CLI-пути (print-режим `claude -p`, промпт
  * через stdin — многострочный текст с кавычками не рвётся). ChatRunner и богатый
  * стриминговый чат НЕ трогаются; это просто вызов уже установленного `claude`.
+ *
+ * ЛЁГКОЕ ОКНО (U6, 28.09) — как у помощника формы: окно ассистента и вызовы
+ * групп — текст на вход, текст на выход, всё нужное модели уже в задании. До
+ * правки `claude -p [--model haiku]` шёл со всеми слоями человека (правила,
+ * хуки, скиллы, MCP), с инструментами, копил транскрипт на каждый служебный
+ * вызов и запускался в каталоге сервера (правила репозитория через CLAUDE.md).
+ * Хвост `lightWindowArgs()` — последним: `--tools ""` съел бы следующий аргумент.
  */
 export async function runClaudeDelegate(
   provider: ConfigProvider,
@@ -163,9 +186,80 @@ export async function runClaudeDelegate(
   // Имя берём то, которое детект РЕАЛЬНО нашёл в PATH (на Windows это `claude.cmd`,
   // как и раньше; но если стоит только `claude.exe` — запустится он).
   const command = cliCommand ?? providerCliCommand(provider);
-  const outcome = await spawnCli(command, ['-p'], deps, flattenPrompt(messages));
-  // Claude — verified-путь, не помечаем experimental.
-  return outcomeToResult(provider.id, outcome, false);
+  // Модель — только когда её попросили явно (дешёвая ступень для служебных вызовов групп).
+  const head = deps.model ? ['-p', '--model', deps.model] : ['-p'];
+  const images = userImages(messages);
+  const { dir, cleanup } = lightWindowDir();
+  try {
+    if (images.length === 0) {
+      const outcome = await spawnCli(
+        command,
+        [...head, ...lightWindowArgs()],
+        deps,
+        flattenPrompt(messages),
+        dir,
+      );
+      // Claude — verified-путь, не помечаем experimental.
+      return outcomeToResult(provider.id, outcome, false);
+    }
+    // С картинками — потоковый ввод: текстом stdin картинку не передать, а блок
+    // `image` модель видит в этом же ответе. Итог читается из события `result`.
+    const outcome = await spawnCli(
+      command,
+      [...head, ...STREAM_JSON_INPUT_ARGS, ...lightWindowArgs()],
+      deps,
+      streamJsonUserLine(flattenPrompt(messages), images),
+      dir,
+    );
+    return outcomeToResult(provider.id, fromStreamJson(outcome), false);
+  } finally {
+    cleanup();
+  }
+}
+
+/**
+ * Картинки всех реплик человека по порядку. Запрос one-shot несёт историю
+ * целиком, и снимок первого хода нужен модели и на втором — так же шлют все
+ * ходы пути API; раньше уходили только картинки последней реплики (F-148).
+ */
+export function userImages(messages: AssistantMessage[]): readonly AgentImage[] {
+  return messages.flatMap((message) => (message.role === 'user' ? (message.images ?? []) : []));
+}
+
+/** Исход потокового вывода в форму текстового: ответ — текст события `result`. */
+function fromStreamJson(outcome: SpawnOutcome): SpawnOutcome {
+  if (outcome.spawnError || outcome.timedOut) return outcome;
+  const result = readStreamJsonResult(outcome.stdout);
+  if (!result) return { ...outcome, stdout: '' };
+  if (result.isError)
+    return { ...outcome, code: outcome.code || 1, stdout: '', stderr: result.text };
+  return { ...outcome, stdout: result.text };
+}
+
+/**
+ * Реплики для чужого CLI, у которого нет входа для картинки в запросе: картинки
+ * ложатся файлами в `dir`, а текст каждой реплики называет пути своих — CLI
+ * читает файлы своими инструментами, как вложения чата. Суффикс пишется в той
+ * же строке, но однострочности запроса это не обещает: история склеена через
+ * пустые строки, а обрезку на переводе строки под `.cmd` ловит `cli-spawn`.
+ */
+export function withImagePaths(messages: AssistantMessage[], dir: string): AssistantMessage[] {
+  const paths = writeAgentImages(dir, userImages(messages));
+  if (paths.length === 0) return messages;
+  // Путь — у той реплики, к которой картинку приложили: файлы пишутся одним
+  // списком по порядку реплик, и каждая забирает свою долю.
+  let next = 0;
+  return messages.map((message) => {
+    const count = message.role === 'user' ? (message.images?.length ?? 0) : 0;
+    const own = paths.slice(next, next + count);
+    next += count;
+    return own.length === 0
+      ? { role: message.role, content: message.content }
+      : {
+          role: message.role,
+          content: `${message.content} (Attached images, read them from disk: ${own.join(', ')})`,
+        };
+  });
 }
 
 /** One-shot CLI прочих провайдеров по задокументированному print-флагу. */
@@ -174,9 +268,13 @@ export async function runProviderCli(
   prompt: string,
   deps: RunAssistantDeps,
   cliCommand?: string,
+  cwd?: string,
 ): Promise<AssistantRunResult> {
   const command = cliCommand ?? providerCliCommand(provider);
-  const args = provider.assistant?.oneShotArgs?.(prompt);
+  const args = provider.assistant?.oneShotArgs?.(
+    prompt,
+    deps.model ? { model: deps.model } : undefined,
+  );
   if (!args) {
     // CLI установлен, но неинтерактивный флаг не задокументирован → программно
     // не запускаем (fail-closed). Вызывающий попробует api/none.
@@ -190,7 +288,7 @@ export async function runProviderCli(
       error: `Для «${provider.name}» не задан неинтерактивный флаг запуска CLI.`,
     };
   }
-  const outcome = await spawnCli(command, args, deps);
+  const outcome = await spawnCli(command, args, deps, undefined, cwd);
   return outcomeToResult(provider.id, outcome, true);
 }
 

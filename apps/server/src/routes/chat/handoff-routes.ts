@@ -39,12 +39,20 @@ import {
   asksDelivery,
   planCascadeStage,
   stageAppendPrompt,
+  stageOf,
 } from '../../domains/chat/ChatCascadeStages.ts';
+import { childStageExtra } from '../../domains/chat/group-run-lines.ts';
+import { planPathTurn } from '../../domains/chat/path-steps.ts';
+import type { CascadeStage } from '@agentdeck/contracts/model-cascade';
+import type { PathStep } from '@agentdeck/contracts/group-path';
+import type { SieveReportRow, SieveStage } from '@agentdeck/contracts/sieves';
+import { serverText } from '../../lib/server-texts.ts';
 import type { ChatLink } from '../../lib/app-store/app-store.types.ts';
 import { carriedLink } from '../../lib/app-store/chat-links.ts';
 import { chainOutcomeOf, endsWithQuestion } from '../../domains/chat/chain-outcome.ts';
 import type { ChainOutcome } from '../../domains/chat/split-conveyor.ts';
 import type { TreeStartGate } from '../../domains/chat/tree-pause.ts';
+import { fillSieveSlot, SIEVE_SLOT, type SieveAsk } from '../../domains/chat/sieve-gate.ts';
 import { createChat, type ProviderChatService } from '../../domains/provider-chat.ts';
 import { checkProjectDir } from '../../domains/projects.ts';
 import { getActiveProvider, getActiveProviderId } from '../../providers/registry.ts';
@@ -135,10 +143,29 @@ export interface HandoffPlannerDeps {
    * человеку. Нет поля — ревью по ссылкам в этой сборке нет.
    */
   review?: SplitReviewDeps;
+  /**
+   * Свои шаги «Пути» группы чата (`path-steps.ts`). Нет поля — путь только из
+   * встроенных стадий, как до шагов.
+   */
+  pathSteps?: PathStepDeps;
+  /**
+   * Строка «чисел» группы звена (`chatKnobsLine`) — связь уже записана, и
+   * выбор группы читается через родителя. Нет поля — чисел в дописке нет.
+   */
+  groupKnobs?: (keys: readonly string[], cwd: string) => string | undefined;
   /** Время правки файла; подменяется в тестах. */
   stat?: StatFile;
   /** Отпечаток файла; подменяется в тестах вместе с `stat`. */
   hash?: HashFile;
+}
+
+/** Откуда планировщик берёт свои шаги пути. */
+export interface PathStepDeps {
+  /** Шаги группы этого разговора, привязанные к стадии, в порядке пути; группы нет — пусто. */
+  /** `cwd` — каталог прогона: по нему закрепление сверяется с парой проекта (F-107). */
+  stepsAt: (aliases: string[], stage: CascadeStage, cwd: string) => PathStep[];
+  /** Отложить старт хода шага; по умолчанию — следующий оборот цикла событий. */
+  defer?: (next: () => void) => void;
 }
 
 /** Чем планировщик отвечает домену ревью по ссылке (Т7). */
@@ -185,6 +212,13 @@ export interface CascadeStageDeps {
   hasWork: (cwd: string, since?: string) => boolean;
   /** Настройки — из них собирается системная дописка звена. */
   settings: () => Pick<AppSettings, 'taskSplitInitiative' | 'handoffInitiative'>;
+  /** Абзац сит перед MR для звена ревью или доставки (`sievePromptBlock`). */
+  sieves?: (
+    cwd: string,
+    link: ChatLink,
+    stage: SieveStage,
+    done: readonly SieveReportRow[],
+  ) => Promise<string>;
 }
 
 /**
@@ -206,6 +240,8 @@ export function createHandoffPlanner({
   cascade,
   split,
   review,
+  pathSteps,
+  groupKnobs,
   stat,
   hash,
 }: HandoffPlannerDeps): (finished: RunFinished) => ChatEvent | undefined {
@@ -224,12 +260,26 @@ export function createHandoffPlanner({
 
     const link = cascade.linkOf(aliases);
     const cwd = finished.projectPath;
+    // Абзац сит план получает меткой: пути копии читаются асинхронно, и
+    // подставляет его запуск звена ниже (см. `SIEVE_SLOT`).
+    let sieveAsk = undefined as SieveAsk | undefined;
     const plan = planCascadeStage({
       ...(link ? { link } : {}),
       ok: finished.ok,
       text: finished.text,
       task: finished.options.prompt ?? '',
       hasWork: () => cascade.hasWork(cwd, link?.createdAt),
+      // Сита — только там, где их отчёт судит доставка группы: абзац обещает, что
+      // несданное сито держит «готово», а в обычном чате с подбором модели его
+      // никто не проверил бы (ревью сит, 28.09).
+      ...(link?.parentChatId && split?.delivers?.(link) && cascade.sieves
+        ? {
+            sieves: (stage: SieveStage, done: readonly SieveReportRow[]) => {
+              sieveAsk = { stage, done };
+              return SIEVE_SLOT;
+            },
+          }
+        : {}),
       paused: pausedTurn(finished),
       ...(link?.parentChatId && split?.delivers?.(link) ? { deliver: true } : {}),
       // Доставка раз на круг (W3-3): повтор — только когда человек о нём попросил.
@@ -282,7 +332,11 @@ export function createHandoffPlanner({
     // Дописка собирается заново по стадии: у работы в ней лежит планка сдачи
     // «тебя ведёт модель ниже потолка», и в ревью она сказала бы проверяющему
     // ровно обратное тому, зачем его завели.
-    const append = stageAppendPrompt(plan, cascade.settings());
+    const append = stageAppendPrompt(
+      plan,
+      cascade.settings(),
+      childStageExtra(plan.stage, groupKnobs?.([chatId], cwd)),
+    );
     if (append) options.appendSystemPrompt = append;
     else delete options.appendSystemPrompt;
 
@@ -315,8 +369,24 @@ export function createHandoffPlanner({
     };
     // Дерево на паузе — звено заведено (связь записана), но не запущено:
     // ляжет в очередь и стартует по «Продолжить всё».
-    const deferred = gate?.defer('stage', chatId, options, meta) ?? false;
-    if (!deferred && !runs.start(chatId, options, meta)) return undefined;
+    const sieves = sieveAsk && link && cascade.sieves;
+    let deferred: boolean;
+    if (sieveAsk && link && sieves) {
+      // Абзац сит — асинхронно, старт звена — следом. Событие в ленту уходит
+      // сразу: ключ звена свежий, и `start` отказывает только идущему прогону.
+      const ask = sieveAsk;
+      deferred = gate?.paused?.(chatId) ?? false;
+      void sieves(cwd, link, ask.stage, ask.done)
+        .catch(() => '')
+        .then((paragraph) => {
+          options.prompt = fillSieveSlot(options.prompt ?? '', paragraph);
+          if (gate?.defer('stage', chatId, options, meta)) return;
+          if (!runs.start(chatId, options, meta)) console.warn('stage did not start', chatId);
+        });
+    } else {
+      deferred = gate?.defer('stage', chatId, options, meta) ?? false;
+      if (!deferred && !runs.start(chatId, options, meta)) return undefined;
+    }
 
     return {
       kind: 'handoff',
@@ -330,8 +400,142 @@ export function createHandoffPlanner({
     };
   }
 
-  return (finished) => {
-    const aliases = aliasesOf(finished.chatId, finished.sessionId);
+  /**
+   * Ход в чате стадии у группы со своими шагами пути: завести шаг продолжением
+   * ТОЙ ЖЕ сессии, остановить цепочку на проваленной проверке или отдать дальше
+   * ответ стадии, отложенный на время шагов. Шагов нет — ход идёт как шёл.
+   */
+  function pathTurn(
+    finished: RunFinished,
+    aliases: string[],
+    link: ChatLink | undefined,
+  ): { stop: true; event?: ChatEvent } | { stop: false; finished: RunFinished } {
+    const cwd = finished.projectPath;
+    if (!pathSteps || !cascade || !link || !cwd || !finished.sessionId)
+      return { stop: false, finished };
+    const stage = stageOf(link);
+    const steps = pathSteps.stepsAt(aliases, stage, cwd);
+    if (steps.length === 0 && !link.pathRun) return { stop: false, finished };
+
+    const decision = planPathTurn({
+      link,
+      stage,
+      steps,
+      ok: finished.ok,
+      paused: pausedTurn(finished),
+      text: finished.text,
+      task: finished.options.prompt ?? '',
+    });
+    // Отметки шагов — у каждого ключа разговора, как `deliveredAt`: связь лежит
+    // и под временным `new-…`, и под `sessionId`.
+    const saveRun = (next: ChatLink): void => {
+      for (const key of aliases) {
+        const own = cascade.linkOf([key]);
+        if (!own) continue;
+        const updated = { ...own };
+        if (next.pathRun) updated.pathRun = next.pathRun;
+        else delete updated.pathRun;
+        cascade.saveLink(key, updated);
+      }
+    };
+    const stepName = (step: { title: { ru: string; en: string } }): string =>
+      step.title.ru.trim() || step.title.en.trim() || '—';
+
+    if (decision.kind === 'wait') {
+      // Ход шага кончился сбоем или вопросом: шаг остаётся незакрытым
+      // (`pathRun.pending`), но группа разделения должна узнать итог — иначе
+      // висит «в работе», ждавшие не стартуют, надзор повтора её не видит.
+      if (link.parentChatId && split) {
+        split.onChainEnded(
+          link,
+          chainOutcomeOf({
+            link,
+            ok: finished.ok,
+            text: finished.text,
+            ...(finished.background ? { background: true } : {}),
+            ...(finished.asked ? { asked: true } : {}),
+            ...(finished.error ? { error: finished.error } : {}),
+            ...(finished.retry ? { retry: finished.retry } : {}),
+            ...(finished.limit ? { limit: finished.limit } : {}),
+          }),
+        );
+      }
+      return { stop: true };
+    }
+    if (decision.kind === 'gate-failed') {
+      const params = { step: stepName(decision.step), note: decision.note || '—' };
+      // Группа ждёт человека — так же, как ход, кончившийся вопросом: ждавшие её
+      // не стартуют от незакрытого шага, хаб показывает «ждёт ответа».
+      if (link.parentChatId) {
+        split?.onChainEnded(link, {
+          status: 'awaiting',
+          waitingFor: 'question',
+          tail: serverText('path-gate-failed-notice', params),
+        });
+      }
+      return {
+        stop: true,
+        event: {
+          kind: 'notice',
+          code: 'pathGateFailed',
+          text: serverText('path-gate-failed-notice', params),
+          textCode: 'path-gate-failed-notice',
+          textParams: params,
+        },
+      };
+    }
+    if (decision.kind === 'continue') {
+      if (decision.link) saveRun(decision.link);
+      return {
+        stop: false,
+        finished: {
+          ...finished,
+          text: decision.text,
+          options: { ...finished.options, prompt: decision.task },
+        },
+      };
+    }
+
+    // Шаг — продолжение живой сессии стадии теми же параметрами: иначе ход не
+    // совпал бы подписью с процессом и пошёл холодным `--resume`.
+    const options = { ...finished.options, prompt: decision.prompt, sessionId: finished.sessionId };
+    delete options.fork;
+    delete options.name;
+    const meta = {
+      projectPath: cwd,
+      sessionId: finished.sessionId,
+      ...(finished.origin ? { origin: finished.origin } : {}),
+    };
+    // Отметка — ДО запуска: второй конец хода не заведёт тот же шаг снова.
+    saveRun(decision.link);
+    // Старт — после того, как закончившийся прогон закроет своих слушателей:
+    // новый прогон под тем же ключом вытесняет запись старого, и поток вкладки,
+    // ещё висящий на ней, не получил бы конца никогда (как слово родителя, Д7).
+    // Ключ — настоящий, не временный `new-…`: под ним CLI разговор не хранит.
+    const key = aliases.find((alias) => !alias.startsWith('new-')) ?? finished.sessionId;
+    (pathSteps.defer ?? ((next: () => void) => setTimeout(next, 0)))(() => {
+      if (gate?.defer('stage', key, options, meta)) return;
+      if (runs.start(key, options, meta)) return;
+      // Не стартовал (разговор уже занят) — шаг не пропадает молча: отметка
+      // снята, и следующий конец хода в этом чате заведёт его снова.
+      saveRun(link);
+      console.warn('path step did not start', key, decision.step.id);
+    });
+    const params = { step: stepName(decision.step) };
+    return {
+      stop: true,
+      event: {
+        kind: 'notice',
+        code: 'pathStep',
+        text: serverText('path-step-started-notice', params),
+        textCode: 'path-step-started-notice',
+        textParams: params,
+      },
+    };
+  }
+
+  return (arrived) => {
+    const aliases = aliasesOf(arrived.chatId, arrived.sessionId);
     // Разбор (уровень 1, Т1) — не работа: ни продолжений, ни звеньев у него не
     // бывает, его итог применяет конвейер разделения. Проверяется первым, чтобы
     // блок продолжения в ответе разбора не завёл чистую сессию.
@@ -339,7 +543,7 @@ export function createHandoffPlanner({
     // Оборванный ход (WP1c) не решает ничего: ни продолжения, ни звена, ни итога
     // группы — ответа нет. Группа разделения прервана и ждёт продолжения; разбор
     // остаётся за обходом при старте (`recoverInterruptedTriage`).
-    if (finished.interrupted) {
+    if (arrived.interrupted) {
       if (link?.parentChatId && link.stage !== 'triage') split?.onChainInterrupted?.(link);
       return undefined;
     }
@@ -352,13 +556,18 @@ export function createHandoffPlanner({
     if (
       link?.parentChatId &&
       link.stage !== 'triage' &&
-      finished.projectPath &&
-      runs.runningIn(finished.projectPath, aliases, (other) =>
+      arrived.projectPath &&
+      runs.runningIn(arrived.projectPath, aliases, (other) =>
         sameGroup(cascade?.linkOf(aliasesOf(other.chatId, other.sessionId)), link),
       )
     ) {
       return undefined;
     }
+    // Свои шаги «Пути» группы идут ДО всего остального: разбор, продолжение и
+    // звено решаются по ответу стадии, который шаги отложили (`path-steps.ts`).
+    const pathed = pathTurn(arrived, aliases, link);
+    if (pathed.stop) return pathed.event;
+    const { finished } = pathed;
     if (split && link?.stage === 'triage') return split.onTriageFinished(finished, aliases);
 
     // Блок сильнее прозы: он называет, что закрыто и чем продолжить. Проза —
@@ -739,7 +948,8 @@ export function registerChatHandoffRoutes(
    */
   app.get('/api/chat/handoff/request', () => ({
     prompt:
-      'Заверши текущий этап и подготовь продолжение в чистой сессии. ' + HANDOFF_SYSTEM_PROMPT,
+      'Close the current stage and prepare the continuation in a clean session. ' +
+      HANDOFF_SYSTEM_PROMPT,
   }));
 }
 

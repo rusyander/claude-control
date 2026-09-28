@@ -4,6 +4,7 @@ import {
   ProjectTestsNotFoundError,
   buildReport,
   collectSource,
+  createE2eFolder,
   diffWithPrevious,
   historyOf,
   impactOf,
@@ -12,13 +13,26 @@ import {
   readRuns,
   runSecrets,
 } from '../../domains/project-tests.ts';
-import { exportRunPdf } from '../../domains/project-tests/export-run.ts';
-import { buildView, guard, guardAsync, idList, requireRoot, type TestsDeps } from './shared.ts';
+import { exportLanguage, exportRunPdf } from '../../domains/project-tests/export-run.ts';
+import {
+  assertNoE2eRun,
+  isOwnProject,
+  buildView,
+  guard,
+  guardAsync,
+  idList,
+  requireRoot,
+  settleOrphansOnce,
+  type TestsDeps,
+} from './shared.ts';
 import { coded } from '../../lib/server-text.ts';
 import { attachTextCodes } from '../../lib/server-texts.ts';
 
 /** Режимы прогона: чужое слово в теле не должно запускать неизвестно что. */
 const MODES: ProjectTestRunMode[] = ['generate', 'run', 'explore', 'automate'];
+
+/** Без id — ошибка вызова (400), а не «прогона «» нет». */
+const RUN_UNSPECIFIED = { message: 'Не указан прогон.', messageCode: 'run-unspecified' } as const;
 
 /**
  * Прогоны агента, их история и отчёт.
@@ -53,6 +67,7 @@ export function registerTestRunRoutes(app: FastifyInstance, deps: TestsDeps): vo
       sourceRef?: string;
       diffRange?: string;
       sourceCase?: { groupId: string; caseId: string; runId?: string };
+      e2e?: boolean;
     };
   }>('/api/project-tests/run', async (request, reply) => {
     const root = requireRoot(request.body?.path, reply);
@@ -88,6 +103,10 @@ export function registerTestRunRoutes(app: FastifyInstance, deps: TestsDeps): vo
       sourceRef: request.body?.sourceRef?.trim() || undefined,
       diffRange: request.body?.diffRange?.trim() || undefined,
       sourceCase: request.body?.sourceCase,
+      // Настоящие спеки пишет только генерация: у прочих режимов свой путь к коду.
+      // Папку e2e она заводит и спеки гоняет только у проекта реестра или копии его
+      // ветки (граница «Завести папку»); в чужом каталоге — те же кейсы без спек.
+      e2e: mode === 'generate' && request.body?.e2e === true && isOwnProject(deps, root),
     };
 
     // Зеркало замка группы: пока человек отмечает кейсы, агент в тот же файл не
@@ -107,6 +126,8 @@ export function registerTestRunRoutes(app: FastifyInstance, deps: TestsDeps): vo
     }
 
     return guardAsync(reply, async () => {
+      // Автотесты на закрытии пишут в те же файлы групп — агент ждёт их конца.
+      assertNoE2eRun(deps, root);
       // Материал собирается ДО старта: не собрался — прогон не начинается, и
       // человек читает причину. Генерация «по требованию» без требования
       // написала бы правдоподобные кейсы ни о чём.
@@ -119,8 +140,20 @@ export function registerTestRunRoutes(app: FastifyInstance, deps: TestsDeps): vo
       // лежат в каталоге панели и зашифрованы, а домен обязан считаться на голом
       // каталоге проекта. Значения уходят в переменные процесса CLI и больше
       // никуда — ни в задание, ни в лог, ни в историю прогонов.
-      deps.runs.start(run, new Date().toISOString(), material, (environment) =>
-        runSecrets(deps.ctx.location.paths.appData, root, environment),
+      // Генерации с e2e нужна папка: её нет — заводим (правило владельца: папка
+      // есть у каждого проекта), своя остаётся как есть.
+      // Заводит её реестр, после своих отказов: иначе отказанный старт оставлял
+      // папку на диске.
+      deps.runs.start(
+        run,
+        new Date().toISOString(),
+        material,
+        (environment) => runSecrets(deps.ctx.location.paths.appData, root, environment),
+        {
+          appData: deps.ctx.location.paths.appData,
+          ensureE2e: () =>
+            createE2eFolder(deps.ctx.location.paths.appData, root, new Date().toISOString()),
+        },
       );
       return buildView(root, deps);
     });
@@ -141,6 +174,9 @@ export function registerTestRunRoutes(app: FastifyInstance, deps: TestsDeps): vo
       const root = requireRoot(request.query.path, reply);
       if (!root) return reply;
       const limit = Number(request.query.limit ?? 50);
+      // История читается и без полного вида (агент панели): сирота прошлой жизни
+      // панели иначе числилась бы идущей, пока кто-нибудь не откроет раздел.
+      settleOrphansOnce(root, deps);
       return guard(reply, () => ({
         runs: readRuns(root, Number.isFinite(limit) && limit > 0 ? Math.min(limit, 200) : 50),
       }));
@@ -153,8 +189,10 @@ export function registerTestRunRoutes(app: FastifyInstance, deps: TestsDeps): vo
     (request, reply) => {
       const root = requireRoot(request.query.path, reply);
       if (!root) return reply;
+      // Без id — ошибка вызова, как у сравнения и выгрузки, а не «прогона «» нет».
+      const id = request.query.id?.trim();
+      if (!id) return reply.code(400).send(RUN_UNSPECIFIED);
       return guard(reply, () => {
-        const id = String(request.query.id ?? '');
         const run = readRun(root, id);
         if (!run)
           throw coded(
@@ -180,10 +218,7 @@ export function registerTestRunRoutes(app: FastifyInstance, deps: TestsDeps): vo
       const root = requireRoot(request.query.path, reply);
       if (!root) return reply;
       const id = request.query.id?.trim();
-      if (!id)
-        return reply
-          .code(400)
-          .send({ message: 'Не указан прогон.', messageCode: 'run-unspecified' });
+      if (!id) return reply.code(400).send(RUN_UNSPECIFIED);
       return guard(reply, () =>
         attachTextCodes(
           diffWithPrevious(root, id, request.query.baseId?.trim() || undefined, readGroups(root)),
@@ -204,8 +239,14 @@ export function registerTestRunRoutes(app: FastifyInstance, deps: TestsDeps): vo
     async (request, reply) => {
       const root = requireRoot(request.query.path, reply);
       if (!root) return reply;
+      const id = request.query.id?.trim();
+      if (!id) return reply.code(400).send(RUN_UNSPECIFIED);
       return guardAsync(reply, async () => {
-        const file = await exportRunPdf(root, String(request.query.id ?? ''));
+        const file = await exportRunPdf(
+          root,
+          id,
+          exportLanguage(deps.ctx.store.getSettings().language),
+        );
         return reply
           .type(file.contentType)
           .header('Content-Disposition', `attachment; filename="${file.filename}"`)

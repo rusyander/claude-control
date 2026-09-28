@@ -63,10 +63,14 @@ export const transferRu: Record<TransferMessageCode, string> = {
   'backup-restore-target-unknown': 'Непонятно, куда возвращать копию «{{target}}»',
   'backup-passphrase-required': 'Нужна парольная фраза для расшифровки копии',
   'backup-decrypt-failed': 'Не удалось расшифровать',
+  'backup-preview-encrypted':
+    'Копия зашифрована: что изменит откат, видно только после расшифровки',
   'history-provider-copy-readonly':
     'Копия файла провайдера «{{file}}» доступна только для просмотра — откат отсюда не выполняется.',
   'history-current-file-missing': 'Текущий файл не найден',
   'history-binary-no-hunks': 'Бинарный файл — построчный откат недоступен',
   'history-too-large-no-hunks': 'Файл слишком большой — построчный откат недоступен',
   'history-hunk-not-found': 'Изменение не найдено',
+  'history-hunk-not-newest':
+    'Построчно откатывается только самая свежая копия файла — её дифф идёт против текущего файла. Откройте верхнюю запись этого файла или восстановите копию целиком.',
 };

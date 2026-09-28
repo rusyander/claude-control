@@ -84,6 +84,8 @@ export interface LedgerRelay {
   pipe: string;
   /** Pid посредника. */
   pid: number;
+  /** Ключ канала (`RelayAddress.token`): без него новый сервер к посреднику не подключится. */
+  token?: string;
   /** Отпечаток параметров запуска (`LiveLaunch.signature`): ход с другими — новым процессом. */
   signature: string;
   tempDir?: string;
@@ -284,11 +286,18 @@ const CLI_CHILD = /^(claude|claude\.exe|node|node\.exe)$/i;
  * Дети процесса на Windows. `wmic` на свежих сборках нет, у `tasklist` нет
  * фильтра по родителю — остаётся CIM через PowerShell (~0,8 с, поэтому только
  * асинхронно и никогда на пути запроса).
+ *
+ * Ребёнок — только созданный НЕ раньше родителя: запись о родителе Windows не
+ * чистит, и сирота, чей мёртвый родитель отдал номер нашей обёртке, иначе
+ * сошла бы за CLI — её номер ушёл бы в журнал, и уборка следующего старта
+ * сняла бы чужой процесс (так же, как `taskkill /T`, см. `lib/kill-tree.mjs`).
  */
 export function listChildProcesses(pid: number): Promise<ChildProcessInfo[]> {
   const script =
-    `Get-CimInstance -ClassName Win32_Process -Filter "ParentProcessId = ${pid}" | ` +
-    'ForEach-Object { $_.ProcessId.ToString() + " " + $_.Name }';
+    `$parent = Get-CimInstance -ClassName Win32_Process -Filter "ProcessId = ${pid}"; ` +
+    `if ($parent) { Get-CimInstance -ClassName Win32_Process -Filter "ParentProcessId = ${pid}" | ` +
+    'Where-Object { $_.CreationDate -ge $parent.CreationDate } | ' +
+    'ForEach-Object { $_.ProcessId.ToString() + " " + $_.Name } }';
   return new Promise((resolve) => {
     execFile(
       'powershell',

@@ -9,15 +9,31 @@
       "masked": 0,
       "width": 1400,
       "height": 900,
-      "shotAt": "2026-09-17T20:57:05.169Z",
-      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка Обзор конфигурации Что сейчас подключено к вашему Claude Code Каталог конфигурации из переменной окружения C:\\work\\claude-demo-panel-agent\\.claude Не найдены файлы: skills/, hooks/, .claude.json Изменения за 7 дн. 0 Изменений нет Правила 0 0 включено Добавить CLAUDE.md Скиллы 0 0 включено Добавить Хуки 0 0 включено Добавить Скрипты 0 все привязаны к хукам Добавить MCP-серверы 0 0 включено Добавить Права 0 0 разрешено · 0 запрещено Группы 0 пока не созданы Резервные копии 0 копий пока нет Открыть историю",
+      "shotAt": "2026-09-28T14:32:12.775Z",
+      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Обзор конфигурации Что сейчас подключено к вашему Claude Code Каталог конфигурации из переменной окружения C:\\work\\claude-demo-panel-agent\\.claude Не найдены файлы: skills/, hooks/, .claude.json Изменения за 7 дн. 0 Изменений нет Правила 0 0 включено Добавить CLAUDE.md Скиллы 0 0 включено Добавить Хуки 0 0 включено Добавить Скрипты 0 все привязаны к хукам Добавить MCP-серверы 0 0 включено Добавить Права 0 0 разрешено · 0 запрещено Группы 0 пока не созданы Резервные копии 0 копий пока нет Открыть историю",
       "en": {
         "file": "01-launcher.en.png",
         "masked": 0,
         "width": 1400,
         "height": 900,
-        "shotAt": "2026-09-17T20:58:44.847Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Configuration overview What is currently wired into your Claude Code Configuration directory from environment variable C:\\work\\claude-demo-panel-agent\\.claude Missing files: skills/, hooks/, .claude.json Changes in 7 days 0 No changes Rules 0 0 enabled Add CLAUDE.md Skills 0 0 enabled Add Hooks 0 0 enabled Add Scripts 0 all bound to hooks Add MCP servers 0 0 enabled Add Permissions 0 0 allowed · 0 denied Groups 0 none yet Backups 0 no backups yet Open history"
+        "shotAt": "2026-09-28T14:34:02.343Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Configuration overview What is currently wired into your Claude Code Configuration directory from environment variable C:\\work\\claude-demo-panel-agent\\.claude Missing files: skills/, hooks/, .claude.json Changes in 7 days 0 No changes Rules 0 0 enabled Add CLAUDE.md Skills 0 0 enabled Add Hooks 0 0 enabled Add Scripts 0 all bound to hooks Add MCP servers 0 0 enabled Add Permissions 0 0 allowed · 0 denied Groups 0 none yet Backups 0 no backups yet Open history"
+      },
+      "dark": {
+        "file": "01-launcher.dark.png",
+        "masked": 0,
+        "width": 1400,
+        "height": 900,
+        "shotAt": "2026-09-28T14:35:47.327Z",
+        "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Обзор конфигурации Что сейчас подключено к вашему Claude Code Каталог конфигурации из переменной окружения C:\\work\\claude-demo-panel-agent\\.claude Не найдены файлы: skills/, hooks/, .claude.json Изменения за 7 дн. 0 Изменений нет Правила 0 0 включено Добавить CLAUDE.md Скиллы 0 0 включено Добавить Хуки 0 0 включено Добавить Скрипты 0 все привязаны к хукам Добавить MCP-серверы 0 0 включено Добавить Права 0 0 разрешено · 0 запрещено Группы 0 пока не созданы Резервные копии 0 копий пока нет Открыть историю"
+      },
+      "darkEn": {
+        "file": "01-launcher.dark.en.png",
+        "masked": 0,
+        "width": 1400,
+        "height": 900,
+        "shotAt": "2026-09-28T14:37:32.787Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Configuration overview What is currently wired into your Claude Code Configuration directory from environment variable C:\\work\\claude-demo-panel-agent\\.claude Missing files: skills/, hooks/, .claude.json Changes in 7 days 0 No changes Rules 0 0 enabled Add CLAUDE.md Skills 0 0 enabled Add Hooks 0 0 enabled Add Scripts 0 all bound to hooks Add MCP servers 0 0 enabled Add Permissions 0 0 allowed · 0 denied Groups 0 none yet Backups 0 no backups yet Open history"
       }
     },
     {
@@ -27,15 +43,31 @@
       "masked": 0,
       "width": 1400,
       "height": 900,
-      "shotAt": "2026-09-17T20:57:06.172Z",
-      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка Обзор конфигурации Что сейчас подключено к вашему Claude Code Каталог конфигурации из переменной окружения C:\\work\\claude-demo-panel-agent\\.claude Не найдены файлы: skills/, hooks/, .claude.json Изменения за 7 дн. 0 Изменений нет Правила 0 0 включено Добавить CLAUDE.md Скиллы 0 0 включено Добавить Хуки 0 0 включено Добавить Скрипты 0 все привязаны к хукам Добавить MCP-серверы 0 0 включено Добавить Права 0 0 разрешено · 0 запрещено Группы 0 пока не созданы Резервные копии 0 копий пока нет Открыть историю Агент панели Пишите обычными словами — агент выполняет это в панели теми же действиями, что и вы. Любое изменение ждёт вашего подтверждения. Разговор История След действий Страница: Обзор Например: «Перейди в проекты и создай проект C:/work/demo».",
+      "shotAt": "2026-09-28T14:32:13.813Z",
+      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Обзор конфигурации Что сейчас подключено к вашему Claude Code Каталог конфигурации из переменной окружения C:\\work\\claude-demo-panel-agent\\.claude Не найдены файлы: skills/, hooks/, .claude.json Изменения за 7 дн. 0 Изменений нет Правила 0 0 включено Добавить CLAUDE.md Скиллы 0 0 включено Добавить Хуки 0 0 включено Добавить Скрипты 0 все привязаны к хукам Добавить MCP-серверы 0 0 включено Добавить Права 0 0 разрешено · 0 запрещено Группы 0 пока не созданы Резервные копии 0 копий пока нет Открыть историю Агент панели Пишите обычными словами — агент выполняет это в панели теми же действиями, что и вы. Любое изменение ждёт вашего подтверждения. Разговор История След действий Страница: Обзор Например: «Перейди в проекты и создай проект C:/work/demo».",
       "en": {
         "file": "02-empty.en.png",
         "masked": 0,
         "width": 1400,
         "height": 900,
-        "shotAt": "2026-09-17T20:58:45.845Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Configuration overview What is currently wired into your Claude Code Configuration directory from environment variable C:\\work\\claude-demo-panel-agent\\.claude Missing files: skills/, hooks/, .claude.json Changes in 7 days 0 No changes Rules 0 0 enabled Add CLAUDE.md Skills 0 0 enabled Add Hooks 0 0 enabled Add Scripts 0 all bound to hooks Add MCP servers 0 0 enabled Add Permissions 0 0 allowed · 0 denied Groups 0 none yet Backups 0 no backups yet Open history Panel agent Write in plain words — the agent does it in the panel with the same actions you would. Every change waits for your confirmation. Conversation History Action trail Page: Overview For example: “Go to projects and create project C:/work/demo”."
+        "shotAt": "2026-09-28T14:34:03.373Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Configuration overview What is currently wired into your Claude Code Configuration directory from environment variable C:\\work\\claude-demo-panel-agent\\.claude Missing files: skills/, hooks/, .claude.json Changes in 7 days 0 No changes Rules 0 0 enabled Add CLAUDE.md Skills 0 0 enabled Add Hooks 0 0 enabled Add Scripts 0 all bound to hooks Add MCP servers 0 0 enabled Add Permissions 0 0 allowed · 0 denied Groups 0 none yet Backups 0 no backups yet Open history Panel agent Write in plain words — the agent does it in the panel with the same actions you would. Every change waits for your confirmation. Conversation History Action trail Page: Overview For example: “Go to projects and create project C:/work/demo”."
+      },
+      "dark": {
+        "file": "02-empty.dark.png",
+        "masked": 0,
+        "width": 1400,
+        "height": 900,
+        "shotAt": "2026-09-28T14:35:48.331Z",
+        "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Обзор конфигурации Что сейчас подключено к вашему Claude Code Каталог конфигурации из переменной окружения C:\\work\\claude-demo-panel-agent\\.claude Не найдены файлы: skills/, hooks/, .claude.json Изменения за 7 дн. 0 Изменений нет Правила 0 0 включено Добавить CLAUDE.md Скиллы 0 0 включено Добавить Хуки 0 0 включено Добавить Скрипты 0 все привязаны к хукам Добавить MCP-серверы 0 0 включено Добавить Права 0 0 разрешено · 0 запрещено Группы 0 пока не созданы Резервные копии 0 копий пока нет Открыть историю Агент панели Пишите обычными словами — агент выполняет это в панели теми же действиями, что и вы. Любое изменение ждёт вашего подтверждения. Разговор История След действий Страница: Обзор Например: «Перейди в проекты и создай проект C:/work/demo»."
+      },
+      "darkEn": {
+        "file": "02-empty.dark.en.png",
+        "masked": 0,
+        "width": 1400,
+        "height": 900,
+        "shotAt": "2026-09-28T14:37:33.810Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Configuration overview What is currently wired into your Claude Code Configuration directory from environment variable C:\\work\\claude-demo-panel-agent\\.claude Missing files: skills/, hooks/, .claude.json Changes in 7 days 0 No changes Rules 0 0 enabled Add CLAUDE.md Skills 0 0 enabled Add Hooks 0 0 enabled Add Scripts 0 all bound to hooks Add MCP servers 0 0 enabled Add Permissions 0 0 allowed · 0 denied Groups 0 none yet Backups 0 no backups yet Open history Panel agent Write in plain words — the agent does it in the panel with the same actions you would. Every change waits for your confirmation. Conversation History Action trail Page: Overview For example: “Go to projects and create project C:/work/demo”."
       }
     },
     {
@@ -45,15 +77,31 @@
       "masked": 0,
       "width": 440,
       "height": 900,
-      "shotAt": "2026-09-17T20:57:09.068Z",
-      "text": "Агент панели Пишите обычными словами — агент выполняет это в панели теми же действиями, что и вы. Любое изменение ждёт вашего подтверждения. Разговор История След действий Новый разговор Страница: Обзор Добавь проект C:\\work\\claude-demo-panel-agent\\shop Добавлю проект — подтвердите карточку. Действие: Создать проект Агент думает… Агент просит подтвердить Добавить проект «Магазин» в реестр панели Действие Создать проект изменение Каталог C:\\work\\claude-demo-panel-agent\\shop Название Магазин Ждёт до 02:07 Отклонить Выполнить",
+      "shotAt": "2026-09-28T14:32:16.208Z",
+      "text": "Агент панели Пишите обычными словами — агент выполняет это в панели теми же действиями, что и вы. Любое изменение ждёт вашего подтверждения. Разговор История След действий Новый разговор Страница: Обзор Добавь проект C:\\work\\claude-demo-panel-agent\\shop Добавлю проект — подтвердите карточку. Действие: Создать проект Агент думает… Агент просит подтвердить Добавить проект «Магазин» в реестр панели Действие Создать проект изменение Каталог C:\\work\\claude-demo-panel-agent\\shop Название Магазин Папка e2e своей нет — панель заведёт заготовку Playwright в e2e/ (проект не под git, прятать не от кого) Ждёт до 19:42 Отклонить Выполнить",
       "en": {
         "file": "03-change-card.en.png",
         "masked": 0,
         "width": 440,
         "height": 900,
-        "shotAt": "2026-09-17T20:58:48.246Z",
-        "text": "Panel agent Write in plain words — the agent does it in the panel with the same actions you would. Every change waits for your confirmation. Conversation History Action trail New conversation Page: Overview Add project C:\\work\\claude-demo-panel-agent\\shop Adding the project — please confirm the card. Action: Create a project The agent is thinking… The agent asks for confirmation Add project “Shop” to the panel registry Action Create a project change Directory C:\\work\\claude-demo-panel-agent\\shop Title Shop Waits until 02:08 AM Reject Run"
+        "shotAt": "2026-09-28T14:34:05.805Z",
+        "text": "Panel agent Write in plain words — the agent does it in the panel with the same actions you would. Every change waits for your confirmation. Conversation History Action trail New conversation Page: Overview Add project C:\\work\\claude-demo-panel-agent\\shop Adding the project — please confirm the card. Action: Create a project The agent is thinking… The agent asks for confirmation Add project “Shop” to the panel registry Action Create a project change Directory C:\\work\\claude-demo-panel-agent\\shop Title Shop e2e folder none of its own — the panel will create a Playwright starter in e2e/ (not under git, nothing to hide from) Waits until 07:44 PM Reject Run"
+      },
+      "dark": {
+        "file": "03-change-card.dark.png",
+        "masked": 0,
+        "width": 440,
+        "height": 900,
+        "shotAt": "2026-09-28T14:35:50.754Z",
+        "text": "Агент панели Пишите обычными словами — агент выполняет это в панели теми же действиями, что и вы. Любое изменение ждёт вашего подтверждения. Разговор История След действий Новый разговор Страница: Обзор Добавь проект C:\\work\\claude-demo-panel-agent\\shop Добавлю проект — подтвердите карточку. Действие: Создать проект Агент думает… Агент просит подтвердить Добавить проект «Магазин» в реестр панели Действие Создать проект изменение Каталог C:\\work\\claude-demo-panel-agent\\shop Название Магазин Папка e2e своей нет — панель заведёт заготовку Playwright в e2e/ (проект не под git, прятать не от кого) Ждёт до 19:45 Отклонить Выполнить"
+      },
+      "darkEn": {
+        "file": "03-change-card.dark.en.png",
+        "masked": 0,
+        "width": 440,
+        "height": 900,
+        "shotAt": "2026-09-28T14:37:36.198Z",
+        "text": "Panel agent Write in plain words — the agent does it in the panel with the same actions you would. Every change waits for your confirmation. Conversation History Action trail New conversation Page: Overview Add project C:\\work\\claude-demo-panel-agent\\shop Adding the project — please confirm the card. Action: Create a project The agent is thinking… The agent asks for confirmation Add project “Shop” to the panel registry Action Create a project change Directory C:\\work\\claude-demo-panel-agent\\shop Title Shop e2e folder none of its own — the panel will create a Playwright starter in e2e/ (not under git, nothing to hide from) Waits until 07:47 PM Reject Run"
       }
     },
     {
@@ -63,15 +111,31 @@
       "masked": 0,
       "width": 1400,
       "height": 900,
-      "shotAt": "2026-09-17T20:57:12.389Z",
-      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка Проекты — конфигурация Правила, права и MCP-серверы конкретного проекта: его CLAUDE.md, .claude/settings.json и .mcp.json. Хуки, скиллы и файлы правил из .claude показываются для чтения Добавить проект Что это Проектов: 1 Магазин C:\\work\\claude-demo-panel-agent\\shop Магазин проектный уровень C:\\work\\claude-demo-panel-agent\\shop Внешние привязки Ничего не привязано Привязать Правила MCP-серверы Права Из проекта CLAUDE.md в корне проекта целиком — как его читает Claude в этом проекте. Символов: 0 Отменить правки Сохранить Изменения применятся после перезапуска Claude Code Агент панели Пишите обычными словами — агент выполняет это в панели теми же действиями, что и вы. Любое изменение ждёт вашего подтверждения. Разговор История След действий Новый разговор Страница: Проекты Добавь проект C:\\work\\claude-demo-panel-agent\\shop Добавлю проект — подтвердите карточку. Действие: Создать проект Открыта страница /projects?id=b71c2639-162e-46c8-8629-4a3e91f5938f Создать проект: выполнено Проект «Магазин» добавлен, открыл страницу «Проекты».",
+      "shotAt": "2026-09-28T14:32:19.561Z",
+      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Проекты — конфигурация Инструкции, MCP-серверы и права одного репозитория правятся здесь, его собственный .claude — только для чтения Добавить проект Что это Проектов: 1 Магазин C:\\work\\claude-demo-panel-agent\\shop Магазин C:\\work\\claude-demo-panel-agent\\shop Внешние привязки Ничего не привязано Привязать Инструкции MCP-серверы 0 Права 0 Из проекта 0 — скиллов: 0, хуков: 0, правил: 0 правится здесь C:\\work\\claude-demo-panel-agent\\shop\\AGENTS.md Править CLI читает CLAUDE.md, а где его нет — AGENTS.md Файла ещё нет — он будет создан при первом сохранении. Имя нового файла CLAUDE.md AGENTS.md AGENTS.md в проекте ещё нет Файл появится при первом сохранении. Пока его нет, в этом проекте действуют только ваши личные инструкции. Написать AGENTS.md Символов: 0 Изменения применятся после перезапуска Claude Code Агент панели Пишите обычными словами — агент выполняет это в панели теми же действиями, что и вы. Любое изменение ждёт вашего подтверждения. Разговор История След действий Новый разговор Страница: Проекты Добавь проект C:\\work\\claude-demo-panel-agent\\shop Добавлю проект — подтвердите карточку. Действие: Создать проект Открыта страница /projects?id=c4d20520-74fd-4514-9baa-60f00826f89e Создать проект: выполнено Проект «Магазин» добавлен, открыл страницу «Проекты».",
       "en": {
         "file": "04-done.en.png",
         "masked": 0,
         "width": 1400,
         "height": 900,
-        "shotAt": "2026-09-17T20:58:51.561Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Projects — configuration A specific project's rules, permissions and MCP servers: its CLAUDE.md, .claude/settings.json and .mcp.json. Hooks, skills and rule files from .claude are shown read-only Add project What is this Projects: 1 Shop C:\\work\\claude-demo-panel-agent\\shop Shop project level C:\\work\\claude-demo-panel-agent\\shop External links Nothing linked Link Rules MCP servers Permissions From the project The project's root CLAUDE.md in full — as Claude reads it in this project. Characters: 0 Revert changes Save Changes apply after restarting Claude Code Panel agent Write in plain words — the agent does it in the panel with the same actions you would. Every change waits for your confirmation. Conversation History Action trail New conversation Page: Projects Add project C:\\work\\claude-demo-panel-agent\\shop Adding the project — please confirm the card. Action: Create a project Opened page /projects?id=8e77d84b-dbb4-4ccc-84c5-0e8aba69159b Create a project: done Project “Shop” added; I opened the Projects page."
+        "shotAt": "2026-09-28T14:34:09.170Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Projects — configuration One repository's instructions, MCP servers and permissions are edited here; its own .claude is read-only Add project What is this Projects: 1 Shop C:\\work\\claude-demo-panel-agent\\shop Shop C:\\work\\claude-demo-panel-agent\\shop External links Nothing linked Link Instructions MCP servers 0 Permissions 0 From the project 0 — skills: 0, hooks: 0, rules: 0 edited here C:\\work\\claude-demo-panel-agent\\shop\\AGENTS.md Edit The CLI reads CLAUDE.md, and AGENTS.md where there is none The file does not exist yet — it will be created on the first save. Name of the new file CLAUDE.md AGENTS.md The project has no AGENTS.md yet The file appears on the first save. Until then only your personal instructions apply in this project. Write AGENTS.md Characters: 0 Changes apply after restarting Claude Code Panel agent Write in plain words — the agent does it in the panel with the same actions you would. Every change waits for your confirmation. Conversation History Action trail New conversation Page: Projects Add project C:\\work\\claude-demo-panel-agent\\shop Adding the project — please confirm the card. Action: Create a project Opened page /projects?id=06017c77-698f-4430-ac47-31a9d1e0e872 Create a project: done Project “Shop” added; I opened the Projects page."
+      },
+      "dark": {
+        "file": "04-done.dark.png",
+        "masked": 0,
+        "width": 1400,
+        "height": 900,
+        "shotAt": "2026-09-28T14:35:54.114Z",
+        "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Проекты — конфигурация Инструкции, MCP-серверы и права одного репозитория правятся здесь, его собственный .claude — только для чтения Добавить проект Что это Проектов: 1 Магазин C:\\work\\claude-demo-panel-agent\\shop Магазин C:\\work\\claude-demo-panel-agent\\shop Внешние привязки Ничего не привязано Привязать Инструкции MCP-серверы 0 Права 0 Из проекта 0 — скиллов: 0, хуков: 0, правил: 0 правится здесь C:\\work\\claude-demo-panel-agent\\shop\\AGENTS.md Править CLI читает CLAUDE.md, а где его нет — AGENTS.md Файла ещё нет — он будет создан при первом сохранении. Имя нового файла CLAUDE.md AGENTS.md AGENTS.md в проекте ещё нет Файл появится при первом сохранении. Пока его нет, в этом проекте действуют только ваши личные инструкции. Написать AGENTS.md Символов: 0 Изменения применятся после перезапуска Claude Code Агент панели Пишите обычными словами — агент выполняет это в панели теми же действиями, что и вы. Любое изменение ждёт вашего подтверждения. Разговор История След действий Новый разговор Страница: Проекты Добавь проект C:\\work\\claude-demo-panel-agent\\shop Добавлю проект — подтвердите карточку. Действие: Создать проект Открыта страница /projects?id=a630600b-dc7e-4a38-874f-524b90f09454 Создать проект: выполнено Проект «Магазин» добавлен, открыл страницу «Проекты»."
+      },
+      "darkEn": {
+        "file": "04-done.dark.en.png",
+        "masked": 0,
+        "width": 1400,
+        "height": 900,
+        "shotAt": "2026-09-28T14:37:39.532Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Projects — configuration One repository's instructions, MCP servers and permissions are edited here; its own .claude is read-only Add project What is this Projects: 1 Shop C:\\work\\claude-demo-panel-agent\\shop Shop C:\\work\\claude-demo-panel-agent\\shop External links Nothing linked Link Instructions MCP servers 0 Permissions 0 From the project 0 — skills: 0, hooks: 0, rules: 0 edited here C:\\work\\claude-demo-panel-agent\\shop\\AGENTS.md Edit The CLI reads CLAUDE.md, and AGENTS.md where there is none The file does not exist yet — it will be created on the first save. Name of the new file CLAUDE.md AGENTS.md The project has no AGENTS.md yet The file appears on the first save. Until then only your personal instructions apply in this project. Write AGENTS.md Characters: 0 Changes apply after restarting Claude Code Panel agent Write in plain words — the agent does it in the panel with the same actions you would. Every change waits for your confirmation. Conversation History Action trail New conversation Page: Projects Add project C:\\work\\claude-demo-panel-agent\\shop Adding the project — please confirm the card. Action: Create a project Opened page /projects?id=437d84c2-57d1-4273-9f42-5c403c2c18dc Create a project: done Project “Shop” added; I opened the Projects page."
       }
     },
     {
@@ -81,15 +145,31 @@
       "masked": 0,
       "width": 440,
       "height": 900,
-      "shotAt": "2026-09-17T20:57:15.320Z",
-      "text": "Агент панели Пишите обычными словами — агент выполняет это в панели теми же действиями, что и вы. Любое изменение ждёт вашего подтверждения. Разговор История След действий Новый разговор Страница: Проекты Добавь проект C:\\work\\claude-demo-panel-agent\\shop Добавлю проект — подтвердите карточку. Действие: Создать проект Открыта страница /projects?id=b71c2639-162e-46c8-8629-4a3e91f5938f Создать проект: выполнено Проект «Магазин» добавлен, открыл страницу «Проекты». Добавь правило: всегда отвечать по-русски Готовлю правило — посмотрите, что изменится в файле. Действие: Сохранить правило Агент думает… Агент просит подтвердить Добавить правило «Всегда отвечать по-русски» в CLAUDE.md Действие Сохранить правило изменение Заголовок Всегда отвечать по-русски Файл C:\\work\\claude-demo-panel-agent\\.claude\\CLAUDE.md (+4 −0) Что изменится --- a/C:\\work\\claude-demo-panel-agent\\.claude\\CLAUDE.md +++ b/C:\\work\\claude-demo-panel-agent\\.claude\\CLAUDE.md @@ -3,3 +3,7 @@ ## Коротко о главном Сначала план, потом правка. + +## ПРАВИЛО: Всегда отвечать по-русски + +Всегда отвечать по-русски. Ждёт до 02:07 Отклонить Выполнить",
+      "shotAt": "2026-09-28T14:32:23.129Z",
+      "text": "Агент панели Пишите обычными словами — агент выполняет это в панели теми же действиями, что и вы. Любое изменение ждёт вашего подтверждения. Разговор История След действий Новый разговор Страница: Проекты Добавь проект C:\\work\\claude-demo-panel-agent\\shop Добавлю проект — подтвердите карточку. Действие: Создать проект Открыта страница /projects?id=c4d20520-74fd-4514-9baa-60f00826f89e Создать проект: выполнено Проект «Магазин» добавлен, открыл страницу «Проекты». Добавь правило: всегда отвечать по-русски Готовлю правило — посмотрите, что изменится в файле. Действие: Сохранить правило Агент думает… Агент просит подтвердить Добавить правило «Всегда отвечать по-русски» в CLAUDE.md Действие Сохранить правило изменение Заголовок Всегда отвечать по-русски Файл C:\\work\\claude-demo-panel-agent\\.claude\\CLAUDE.md (+4 −0) Что изменится --- a/C:\\work\\claude-demo-panel-agent\\.claude\\CLAUDE.md +++ b/C:\\work\\claude-demo-panel-agent\\.claude\\CLAUDE.md @@ -3,3 +3,7 @@ ## Коротко о главном Сначала план, потом правка. + +## ПРАВИЛО: Всегда отвечать по-русски + +Всегда отвечать по-русски. Ждёт до 19:42 Отклонить Выполнить",
       "en": {
         "file": "05-diff-card.en.png",
         "masked": 0,
         "width": 440,
         "height": 900,
-        "shotAt": "2026-09-17T20:58:53.946Z",
-        "text": "Panel agent Write in plain words — the agent does it in the panel with the same actions you would. Every change waits for your confirmation. Conversation History Action trail New conversation Page: Projects Add project C:\\work\\claude-demo-panel-agent\\shop Adding the project — please confirm the card. Action: Create a project Opened page /projects?id=8e77d84b-dbb4-4ccc-84c5-0e8aba69159b Create a project: done Project “Shop” added; I opened the Projects page. Add a rule: always answer in Russian Preparing the rule — see what changes in the file. Action: Save a rule The agent is thinking… The agent asks for confirmation Add rule “Always answer in Russian” to CLAUDE.md Action Save a rule change Heading Always answer in Russian File C:\\work\\claude-demo-panel-agent\\.claude\\CLAUDE.md (+4 −0) What will change --- a/C:\\work\\claude-demo-panel-agent\\.claude\\CLAUDE.md +++ b/C:\\work\\claude-demo-panel-agent\\.claude\\CLAUDE.md @@ -3,3 +3,7 @@ ## Коротко о главном Сначала план, потом правка. + +## ПРАВИЛО: Always answer in Russian + +Always answer in Russian. Waits until 02:08 AM Reject Run"
+        "shotAt": "2026-09-28T14:34:12.137Z",
+        "text": "Panel agent Write in plain words — the agent does it in the panel with the same actions you would. Every change waits for your confirmation. Conversation History Action trail New conversation Page: Projects Add project C:\\work\\claude-demo-panel-agent\\shop Adding the project — please confirm the card. Action: Create a project Opened page /projects?id=06017c77-698f-4430-ac47-31a9d1e0e872 Create a project: done Project “Shop” added; I opened the Projects page. Add a rule: always answer in Russian Preparing the rule — see what changes in the file. Action: Save a rule The agent is thinking… The agent asks for confirmation Add rule “Always answer in Russian” to CLAUDE.md Action Save a rule change Heading Always answer in Russian File C:\\work\\claude-demo-panel-agent\\.claude\\CLAUDE.md (+4 −0) What will change --- a/C:\\work\\claude-demo-panel-agent\\.claude\\CLAUDE.md +++ b/C:\\work\\claude-demo-panel-agent\\.claude\\CLAUDE.md @@ -3,3 +3,7 @@ ## Коротко о главном Сначала план, потом правка. + +## ПРАВИЛО: Always answer in Russian + +Always answer in Russian. Waits until 07:44 PM Reject Run"
+      },
+      "dark": {
+        "file": "05-diff-card.dark.png",
+        "masked": 0,
+        "width": 440,
+        "height": 900,
+        "shotAt": "2026-09-28T14:35:56.538Z",
+        "text": "Агент панели Пишите обычными словами — агент выполняет это в панели теми же действиями, что и вы. Любое изменение ждёт вашего подтверждения. Разговор История След действий Новый разговор Страница: Проекты Добавь проект C:\\work\\claude-demo-panel-agent\\shop Добавлю проект — подтвердите карточку. Действие: Создать проект Открыта страница /projects?id=a630600b-dc7e-4a38-874f-524b90f09454 Создать проект: выполнено Проект «Магазин» добавлен, открыл страницу «Проекты». Добавь правило: всегда отвечать по-русски Готовлю правило — посмотрите, что изменится в файле. Действие: Сохранить правило Агент думает… Агент просит подтвердить Добавить правило «Всегда отвечать по-русски» в CLAUDE.md Действие Сохранить правило изменение Заголовок Всегда отвечать по-русски Файл C:\\work\\claude-demo-panel-agent\\.claude\\CLAUDE.md (+4 −0) Что изменится --- a/C:\\work\\claude-demo-panel-agent\\.claude\\CLAUDE.md +++ b/C:\\work\\claude-demo-panel-agent\\.claude\\CLAUDE.md @@ -3,3 +3,7 @@ ## Коротко о главном Сначала план, потом правка. + +## ПРАВИЛО: Всегда отвечать по-русски + +Всегда отвечать по-русски. Ждёт до 19:45 Отклонить Выполнить"
+      },
+      "darkEn": {
+        "file": "05-diff-card.dark.en.png",
+        "masked": 0,
+        "width": 440,
+        "height": 900,
+        "shotAt": "2026-09-28T14:37:41.929Z",
+        "text": "Panel agent Write in plain words — the agent does it in the panel with the same actions you would. Every change waits for your confirmation. Conversation History Action trail New conversation Page: Projects Add project C:\\work\\claude-demo-panel-agent\\shop Adding the project — please confirm the card. Action: Create a project Opened page /projects?id=437d84c2-57d1-4273-9f42-5c403c2c18dc Create a project: done Project “Shop” added; I opened the Projects page. Add a rule: always answer in Russian Preparing the rule — see what changes in the file. Action: Save a rule The agent is thinking… The agent asks for confirmation Add rule “Always answer in Russian” to CLAUDE.md Action Save a rule change Heading Always answer in Russian File C:\\work\\claude-demo-panel-agent\\.claude\\CLAUDE.md (+4 −0) What will change --- a/C:\\work\\claude-demo-panel-agent\\.claude\\CLAUDE.md +++ b/C:\\work\\claude-demo-panel-agent\\.claude\\CLAUDE.md @@ -3,3 +3,7 @@ ## Коротко о главном Сначала план, потом правка. + +## ПРАВИЛО: Always answer in Russian + +Always answer in Russian. Waits until 07:47 PM Reject Run"
       }
     },
     {
@@ -99,15 +179,31 @@
       "masked": 0,
       "width": 1400,
       "height": 900,
-      "shotAt": "2026-09-17T20:57:19.432Z",
-      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка Правила Личные правила из CLAUDE.md — действуют во всех проектах Добавить правило Что это Всегда отвечать по-русски Всегда отвечать по-русски. Агент панели Пишите обычными словами — агент выполняет это в панели теми же действиями, что и вы. Любое изменение ждёт вашего подтверждения. Разговор История След действий Новый разговор Страница: Правила Добавь проект C:\\work\\claude-demo-panel-agent\\shop Добавлю проект — подтвердите карточку. Действие: Создать проект Открыта страница /projects?id=b71c2639-162e-46c8-8629-4a3e91f5938f Создать проект: выполнено Проект «Магазин» добавлен, открыл страницу «Проекты». Добавь правило: всегда отвечать по-русски Готовлю правило — посмотрите, что изменится в файле. Действие: Сохранить правило Открыта страница /rules Сохранить правило: выполнено Правило записано в CLAUDE.md.",
+      "shotAt": "2026-09-28T14:32:27.275Z",
+      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Правила Личные правила из CLAUDE.md — действуют во всех проектах Добавить правило Что это Все 1 Включены 1 Выключены 0 Все правила формата панели из CLAUDE.md. Поиск ищет по заголовку и тексту внутри открытой вкладки. Всегда отвечать по-русски Всегда отвечать по-русски. Агент панели Пишите обычными словами — агент выполняет это в панели теми же действиями, что и вы. Любое изменение ждёт вашего подтверждения. Разговор История След действий Новый разговор Страница: Правила Добавь проект C:\\work\\claude-demo-panel-agent\\shop Добавлю проект — подтвердите карточку. Действие: Создать проект Открыта страница /projects?id=c4d20520-74fd-4514-9baa-60f00826f89e Создать проект: выполнено Проект «Магазин» добавлен, открыл страницу «Проекты». Добавь правило: всегда отвечать по-русски Готовлю правило — посмотрите, что изменится в файле. Действие: Сохранить правило Открыта страница /rules Сохранить правило: выполнено Правило записано в CLAUDE.md.",
       "en": {
         "file": "06-rule-saved.en.png",
         "masked": 0,
         "width": 1400,
         "height": 900,
-        "shotAt": "2026-09-17T20:58:58.061Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Rules Personal rules from CLAUDE.md — active in every project Add rule What this is Always answer in Russian Always answer in Russian. Panel agent Write in plain words — the agent does it in the panel with the same actions you would. Every change waits for your confirmation. Conversation History Action trail New conversation Page: Rules Add project C:\\work\\claude-demo-panel-agent\\shop Adding the project — please confirm the card. Action: Create a project Opened page /projects?id=8e77d84b-dbb4-4ccc-84c5-0e8aba69159b Create a project: done Project “Shop” added; I opened the Projects page. Add a rule: always answer in Russian Preparing the rule — see what changes in the file. Action: Save a rule Opened page /rules Save a rule: done The rule is written to CLAUDE.md."
+        "shotAt": "2026-09-28T14:34:16.266Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Rules Personal rules from CLAUDE.md — active in every project Add rule What this is All 1 On 1 Off 0 Every rule in the panel format from CLAUDE.md. Search looks at titles and text within the open tab. Always answer in Russian Always answer in Russian. Panel agent Write in plain words — the agent does it in the panel with the same actions you would. Every change waits for your confirmation. Conversation History Action trail New conversation Page: Rules Add project C:\\work\\claude-demo-panel-agent\\shop Adding the project — please confirm the card. Action: Create a project Opened page /projects?id=06017c77-698f-4430-ac47-31a9d1e0e872 Create a project: done Project “Shop” added; I opened the Projects page. Add a rule: always answer in Russian Preparing the rule — see what changes in the file. Action: Save a rule Opened page /rules Save a rule: done The rule is written to CLAUDE.md."
+      },
+      "dark": {
+        "file": "06-rule-saved.dark.png",
+        "masked": 0,
+        "width": 1400,
+        "height": 900,
+        "shotAt": "2026-09-28T14:36:00.657Z",
+        "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Правила Личные правила из CLAUDE.md — действуют во всех проектах Добавить правило Что это Все 1 Включены 1 Выключены 0 Все правила формата панели из CLAUDE.md. Поиск ищет по заголовку и тексту внутри открытой вкладки. Всегда отвечать по-русски Всегда отвечать по-русски. Агент панели Пишите обычными словами — агент выполняет это в панели теми же действиями, что и вы. Любое изменение ждёт вашего подтверждения. Разговор История След действий Новый разговор Страница: Правила Добавь проект C:\\work\\claude-demo-panel-agent\\shop Добавлю проект — подтвердите карточку. Действие: Создать проект Открыта страница /projects?id=a630600b-dc7e-4a38-874f-524b90f09454 Создать проект: выполнено Проект «Магазин» добавлен, открыл страницу «Проекты». Добавь правило: всегда отвечать по-русски Готовлю правило — посмотрите, что изменится в файле. Действие: Сохранить правило Открыта страница /rules Сохранить правило: выполнено Правило записано в CLAUDE.md."
+      },
+      "darkEn": {
+        "file": "06-rule-saved.dark.en.png",
+        "masked": 0,
+        "width": 1400,
+        "height": 900,
+        "shotAt": "2026-09-28T14:37:46.060Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Rules Personal rules from CLAUDE.md — active in every project Add rule What this is All 1 On 1 Off 0 Every rule in the panel format from CLAUDE.md. Search looks at titles and text within the open tab. Always answer in Russian Always answer in Russian. Panel agent Write in plain words — the agent does it in the panel with the same actions you would. Every change waits for your confirmation. Conversation History Action trail New conversation Page: Rules Add project C:\\work\\claude-demo-panel-agent\\shop Adding the project — please confirm the card. Action: Create a project Opened page /projects?id=437d84c2-57d1-4273-9f42-5c403c2c18dc Create a project: done Project “Shop” added; I opened the Projects page. Add a rule: always answer in Russian Preparing the rule — see what changes in the file. Action: Save a rule Opened page /rules Save a rule: done The rule is written to CLAUDE.md."
       }
     },
     {
@@ -117,15 +213,31 @@
       "masked": 0,
       "width": 440,
       "height": 900,
-      "shotAt": "2026-09-17T20:57:24.938Z",
-      "text": "Агент панели Пишите обычными словами — агент выполняет это в панели теми же действиями, что и вы. Любое изменение ждёт вашего подтверждения. Разговор История След действий Новый разговор Страница: Правила Добавь проект C:\\work\\claude-demo-panel-agent\\shop Добавлю проект — подтвердите карточку. Действие: Создать проект Открыта страница /projects?id=b71c2639-162e-46c8-8629-4a3e91f5938f Создать проект: выполнено Проект «Магазин» добавлен, открыл страницу «Проекты». Добавь правило: всегда отвечать по-русски Готовлю правило — посмотрите, что изменится в файле. Действие: Сохранить правило Открыта страница /rules Сохранить правило: выполнено Правило записано в CLAUDE.md. Удали правило про русский язык Действие: Список правил Удаление необратимо — проверьте карточку. Действие: Удалить правило Агент думает… Опасное действие — проверьте внимательно Удалить правило «Всегда отвечать по-русски» Действие Удалить правило опасное Идентификатор vsegda-otvechat-po-russki Файл C:\\work\\claude-demo-panel-agent\\.claude\\CLAUDE.md (+0 −4) Что изменится --- a/C:\\work\\claude-demo-panel-agent\\.claude\\CLAUDE.md +++ b/C:\\work\\claude-demo-panel-agent\\.claude\\CLAUDE.md @@ -3,7 +3,3 @@ ## Коротко о главном Сначала план, потом правка. - -## ПРАВИЛО: Всегда отвечать по-русски - -Всегда отвечать по-русски. Ждёт до 02:07 Отклонить Выполнить",
+      "shotAt": "2026-09-28T14:32:33.322Z",
+      "text": "Агент панели Пишите обычными словами — агент выполняет это в панели теми же действиями, что и вы. Любое изменение ждёт вашего подтверждения. Разговор История След действий Новый разговор Страница: Правила Добавь проект C:\\work\\claude-demo-panel-agent\\shop Добавлю проект — подтвердите карточку. Действие: Создать проект Открыта страница /projects?id=c4d20520-74fd-4514-9baa-60f00826f89e Создать проект: выполнено Проект «Магазин» добавлен, открыл страницу «Проекты». Добавь правило: всегда отвечать по-русски Готовлю правило — посмотрите, что изменится в файле. Действие: Сохранить правило Открыта страница /rules Сохранить правило: выполнено Правило записано в CLAUDE.md. Удали правило про русский язык Действие: Список правил Удаление необратимо — проверьте карточку. Действие: Удалить правило Агент думает… Опасное действие — проверьте внимательно Удалить правило «Всегда отвечать по-русски» Действие Удалить правило опасное Идентификатор vsegda-otvechat-po-russki Файл C:\\work\\claude-demo-panel-agent\\.claude\\CLAUDE.md (+0 −4) Что изменится --- a/C:\\work\\claude-demo-panel-agent\\.claude\\CLAUDE.md +++ b/C:\\work\\claude-demo-panel-agent\\.claude\\CLAUDE.md @@ -3,7 +3,3 @@ ## Коротко о главном Сначала план, потом правка. - -## ПРАВИЛО: Всегда отвечать по-русски - -Всегда отвечать по-русски. Ждёт до 19:42 Отклонить Выполнить",
       "en": {
         "file": "07-danger-card.en.png",
         "masked": 0,
         "width": 440,
         "height": 900,
-        "shotAt": "2026-09-17T20:59:03.545Z",
-        "text": "Panel agent Write in plain words — the agent does it in the panel with the same actions you would. Every change waits for your confirmation. Conversation History Action trail New conversation Page: Rules Add project C:\\work\\claude-demo-panel-agent\\shop Adding the project — please confirm the card. Action: Create a project Opened page /projects?id=8e77d84b-dbb4-4ccc-84c5-0e8aba69159b Create a project: done Project “Shop” added; I opened the Projects page. Add a rule: always answer in Russian Preparing the rule — see what changes in the file. Action: Save a rule Opened page /rules Save a rule: done The rule is written to CLAUDE.md. Delete the Russian-language rule Action: List rules Deleting cannot be undone — check the card. Action: Delete a rule The agent is thinking… Dangerous action — check carefully Delete rule “Always answer in Russian” Action Delete a rule dangerous Identifier always-answer-in-russian File C:\\work\\claude-demo-panel-agent\\.claude\\CLAUDE.md (+0 −4) What will change --- a/C:\\work\\claude-demo-panel-agent\\.claude\\CLAUDE.md +++ b/C:\\work\\claude-demo-panel-agent\\.claude\\CLAUDE.md @@ -3,7 +3,3 @@ ## Коротко о главном Сначала план, потом правка. - -## ПРАВИЛО: Always answer in Russian - -Always answer in Russian. Waits until 02:09 AM Reject Run"
+        "shotAt": "2026-09-28T14:34:21.757Z",
+        "text": "Panel agent Write in plain words — the agent does it in the panel with the same actions you would. Every change waits for your confirmation. Conversation History Action trail New conversation Page: Rules Add project C:\\work\\claude-demo-panel-agent\\shop Adding the project — please confirm the card. Action: Create a project Opened page /projects?id=06017c77-698f-4430-ac47-31a9d1e0e872 Create a project: done Project “Shop” added; I opened the Projects page. Add a rule: always answer in Russian Preparing the rule — see what changes in the file. Action: Save a rule Opened page /rules Save a rule: done The rule is written to CLAUDE.md. Delete the Russian-language rule Action: List rules Deleting cannot be undone — check the card. Action: Delete a rule The agent is thinking… Dangerous action — check carefully Delete rule “Always answer in Russian” Action Delete a rule dangerous Identifier always-answer-in-russian File C:\\work\\claude-demo-panel-agent\\.claude\\CLAUDE.md (+0 −4) What will change --- a/C:\\work\\claude-demo-panel-agent\\.claude\\CLAUDE.md +++ b/C:\\work\\claude-demo-panel-agent\\.claude\\CLAUDE.md @@ -3,7 +3,3 @@ ## Коротко о главном Сначала план, потом правка. - -## ПРАВИЛО: Always answer in Russian - -Always answer in Russian. Waits until 07:44 PM Reject Run"
+      },
+      "dark": {
+        "file": "07-danger-card.dark.png",
+        "masked": 0,
+        "width": 440,
+        "height": 900,
+        "shotAt": "2026-09-28T14:36:06.152Z",
+        "text": "Агент панели Пишите обычными словами — агент выполняет это в панели теми же действиями, что и вы. Любое изменение ждёт вашего подтверждения. Разговор История След действий Новый разговор Страница: Правила Добавь проект C:\\work\\claude-demo-panel-agent\\shop Добавлю проект — подтвердите карточку. Действие: Создать проект Открыта страница /projects?id=a630600b-dc7e-4a38-874f-524b90f09454 Создать проект: выполнено Проект «Магазин» добавлен, открыл страницу «Проекты». Добавь правило: всегда отвечать по-русски Готовлю правило — посмотрите, что изменится в файле. Действие: Сохранить правило Открыта страница /rules Сохранить правило: выполнено Правило записано в CLAUDE.md. Удали правило про русский язык Действие: Список правил Удаление необратимо — проверьте карточку. Действие: Удалить правило Агент думает… Опасное действие — проверьте внимательно Удалить правило «Всегда отвечать по-русски» Действие Удалить правило опасное Идентификатор vsegda-otvechat-po-russki Файл C:\\work\\claude-demo-panel-agent\\.claude\\CLAUDE.md (+0 −4) Что изменится --- a/C:\\work\\claude-demo-panel-agent\\.claude\\CLAUDE.md +++ b/C:\\work\\claude-demo-panel-agent\\.claude\\CLAUDE.md @@ -3,7 +3,3 @@ ## Коротко о главном Сначала план, потом правка. - -## ПРАВИЛО: Всегда отвечать по-русски - -Всегда отвечать по-русски. Ждёт до 19:46 Отклонить Выполнить"
+      },
+      "darkEn": {
+        "file": "07-danger-card.dark.en.png",
+        "masked": 0,
+        "width": 440,
+        "height": 900,
+        "shotAt": "2026-09-28T14:37:51.548Z",
+        "text": "Panel agent Write in plain words — the agent does it in the panel with the same actions you would. Every change waits for your confirmation. Conversation History Action trail New conversation Page: Rules Add project C:\\work\\claude-demo-panel-agent\\shop Adding the project — please confirm the card. Action: Create a project Opened page /projects?id=437d84c2-57d1-4273-9f42-5c403c2c18dc Create a project: done Project “Shop” added; I opened the Projects page. Add a rule: always answer in Russian Preparing the rule — see what changes in the file. Action: Save a rule Opened page /rules Save a rule: done The rule is written to CLAUDE.md. Delete the Russian-language rule Action: List rules Deleting cannot be undone — check the card. Action: Delete a rule The agent is thinking… Dangerous action — check carefully Delete rule “Always answer in Russian” Action Delete a rule dangerous Identifier always-answer-in-russian File C:\\work\\claude-demo-panel-agent\\.claude\\CLAUDE.md (+0 −4) What will change --- a/C:\\work\\claude-demo-panel-agent\\.claude\\CLAUDE.md +++ b/C:\\work\\claude-demo-panel-agent\\.claude\\CLAUDE.md @@ -3,7 +3,3 @@ ## Коротко о главном Сначала план, потом правка. - -## ПРАВИЛО: Always answer in Russian - -Always answer in Russian. Waits until 07:47 PM Reject Run"
       }
     },
     {
@@ -135,15 +247,31 @@
       "masked": 0,
       "width": 440,
       "height": 900,
-      "shotAt": "2026-09-17T20:57:27.038Z",
-      "text": "Агент панели Пишите обычными словами — агент выполняет это в панели теми же действиями, что и вы. Любое изменение ждёт вашего подтверждения. Разговор История След действий Новый разговор Страница: Правила Добавь проект C:\\work\\claude-demo-panel-agent\\shop Добавлю проект — подтвердите карточку. Действие: Создать проект Открыта страница /projects?id=b71c2639-162e-46c8-8629-4a3e91f5938f Создать проект: выполнено Проект «Магазин» добавлен, открыл страницу «Проекты». Добавь правило: всегда отвечать по-русски Готовлю правило — посмотрите, что изменится в файле. Действие: Сохранить правило Открыта страница /rules Сохранить правило: выполнено Правило записано в CLAUDE.md. Удали правило про русский язык Действие: Список правил Удаление необратимо — проверьте карточку. Действие: Удалить правило Удалить правило: отклонено Вы отклонили — ничего не выполнено. Что сделать вместо этого?",
+      "shotAt": "2026-09-28T14:32:35.408Z",
+      "text": "Агент панели Пишите обычными словами — агент выполняет это в панели теми же действиями, что и вы. Любое изменение ждёт вашего подтверждения. Разговор История След действий Новый разговор Страница: Правила Добавь проект C:\\work\\claude-demo-panel-agent\\shop Добавлю проект — подтвердите карточку. Действие: Создать проект Открыта страница /projects?id=c4d20520-74fd-4514-9baa-60f00826f89e Создать проект: выполнено Проект «Магазин» добавлен, открыл страницу «Проекты». Добавь правило: всегда отвечать по-русски Готовлю правило — посмотрите, что изменится в файле. Действие: Сохранить правило Открыта страница /rules Сохранить правило: выполнено Правило записано в CLAUDE.md. Удали правило про русский язык Действие: Список правил Удаление необратимо — проверьте карточку. Действие: Удалить правило Удалить правило: отклонено Вы отклонили — ничего не выполнено. Что сделать вместо этого?",
       "en": {
         "file": "08-rejected.en.png",
         "masked": 0,
         "width": 440,
         "height": 900,
-        "shotAt": "2026-09-17T20:59:05.612Z",
-        "text": "Panel agent Write in plain words — the agent does it in the panel with the same actions you would. Every change waits for your confirmation. Conversation History Action trail New conversation Page: Rules Add project C:\\work\\claude-demo-panel-agent\\shop Adding the project — please confirm the card. Action: Create a project Opened page /projects?id=8e77d84b-dbb4-4ccc-84c5-0e8aba69159b Create a project: done Project “Shop” added; I opened the Projects page. Add a rule: always answer in Russian Preparing the rule — see what changes in the file. Action: Save a rule Opened page /rules Save a rule: done The rule is written to CLAUDE.md. Delete the Russian-language rule Action: List rules Deleting cannot be undone — check the card. Action: Delete a rule Delete a rule: rejected You rejected it — nothing was done. What should I do instead?"
+        "shotAt": "2026-09-28T14:34:23.858Z",
+        "text": "Panel agent Write in plain words — the agent does it in the panel with the same actions you would. Every change waits for your confirmation. Conversation History Action trail New conversation Page: Rules Add project C:\\work\\claude-demo-panel-agent\\shop Adding the project — please confirm the card. Action: Create a project Opened page /projects?id=06017c77-698f-4430-ac47-31a9d1e0e872 Create a project: done Project “Shop” added; I opened the Projects page. Add a rule: always answer in Russian Preparing the rule — see what changes in the file. Action: Save a rule Opened page /rules Save a rule: done The rule is written to CLAUDE.md. Delete the Russian-language rule Action: List rules Deleting cannot be undone — check the card. Action: Delete a rule Delete a rule: rejected You rejected it — nothing was done. What should I do instead?"
+      },
+      "dark": {
+        "file": "08-rejected.dark.png",
+        "masked": 0,
+        "width": 440,
+        "height": 900,
+        "shotAt": "2026-09-28T14:36:08.232Z",
+        "text": "Агент панели Пишите обычными словами — агент выполняет это в панели теми же действиями, что и вы. Любое изменение ждёт вашего подтверждения. Разговор История След действий Новый разговор Страница: Правила Добавь проект C:\\work\\claude-demo-panel-agent\\shop Добавлю проект — подтвердите карточку. Действие: Создать проект Открыта страница /projects?id=a630600b-dc7e-4a38-874f-524b90f09454 Создать проект: выполнено Проект «Магазин» добавлен, открыл страницу «Проекты». Добавь правило: всегда отвечать по-русски Готовлю правило — посмотрите, что изменится в файле. Действие: Сохранить правило Открыта страница /rules Сохранить правило: выполнено Правило записано в CLAUDE.md. Удали правило про русский язык Действие: Список правил Удаление необратимо — проверьте карточку. Действие: Удалить правило Удалить правило: отклонено Вы отклонили — ничего не выполнено. Что сделать вместо этого?"
+      },
+      "darkEn": {
+        "file": "08-rejected.dark.en.png",
+        "masked": 0,
+        "width": 440,
+        "height": 900,
+        "shotAt": "2026-09-28T14:37:53.613Z",
+        "text": "Panel agent Write in plain words — the agent does it in the panel with the same actions you would. Every change waits for your confirmation. Conversation History Action trail New conversation Page: Rules Add project C:\\work\\claude-demo-panel-agent\\shop Adding the project — please confirm the card. Action: Create a project Opened page /projects?id=437d84c2-57d1-4273-9f42-5c403c2c18dc Create a project: done Project “Shop” added; I opened the Projects page. Add a rule: always answer in Russian Preparing the rule — see what changes in the file. Action: Save a rule Opened page /rules Save a rule: done The rule is written to CLAUDE.md. Delete the Russian-language rule Action: List rules Deleting cannot be undone — check the card. Action: Delete a rule Delete a rule: rejected You rejected it — nothing was done. What should I do instead?"
       }
     },
     {
@@ -153,15 +281,31 @@
       "masked": 0,
       "width": 440,
       "height": 900,
-      "shotAt": "2026-09-17T20:57:28.636Z",
-      "text": "Агент панели Пишите обычными словами — агент выполняет это в панели теми же действиями, что и вы. Любое изменение ждёт вашего подтверждения. Разговор История След действий 18.09.2026, 01:57:24 Удалить правило опасное отклонено решил человек Удаление правила — с диффом файла 18.09.2026, 01:57:20 Список правил чтение выполнено без вопроса Список правил 18.09.2026, 01:57:15 Сохранить правило изменение выполнено решил человек Правка правила CLAUDE.md — с диффом файла 18.09.2026, 01:57:09 Создать проект изменение выполнено решил человек Добавление проекта в реестр",
+      "shotAt": "2026-09-28T14:32:37.011Z",
+      "text": "Агент панели Пишите обычными словами — агент выполняет это в панели теми же действиями, что и вы. Любое изменение ждёт вашего подтверждения. Разговор История След действий 28.09.2026, 19:32:33 Удалить правило опасное отклонено решил человек Удаление правила — с диффом файла 28.09.2026, 19:32:28 Список правил чтение выполнено без вопроса Список правил 28.09.2026, 19:32:23 Сохранить правило изменение выполнено решил человек Правка правила CLAUDE.md — с диффом файла 28.09.2026, 19:32:16 Создать проект изменение выполнено решил человек Добавление проекта в реестр",
       "en": {
         "file": "09-journal.en.png",
         "masked": 0,
         "width": 440,
         "height": 900,
-        "shotAt": "2026-09-17T20:59:07.214Z",
-        "text": "Panel agent Write in plain words — the agent does it in the panel with the same actions you would. Every change waits for your confirmation. Conversation History Action trail 9/18/2026, 1:59:03 AM Delete a rule dangerous rejected decided by a human Deleting a rule — with a file diff 9/18/2026, 1:58:58 AM List rules read done no question List of rules 9/18/2026, 1:58:53 AM Save a rule change done decided by a human Editing a CLAUDE.md rule — with a file diff 9/18/2026, 1:58:48 AM Create a project change done decided by a human Adding a project to the registry"
+        "shotAt": "2026-09-28T14:34:25.461Z",
+        "text": "Panel agent Write in plain words — the agent does it in the panel with the same actions you would. Every change waits for your confirmation. Conversation History Action trail 9/28/2026, 7:34:21 PM Delete a rule dangerous rejected decided by a human Deleting a rule — with a file diff 9/28/2026, 7:34:16 PM List rules read done no question List of rules 9/28/2026, 7:34:12 PM Save a rule change done decided by a human Editing a CLAUDE.md rule — with a file diff 9/28/2026, 7:34:06 PM Create a project change done decided by a human Adding a project to the registry"
+      },
+      "dark": {
+        "file": "09-journal.dark.png",
+        "masked": 0,
+        "width": 440,
+        "height": 900,
+        "shotAt": "2026-09-28T14:36:09.836Z",
+        "text": "Агент панели Пишите обычными словами — агент выполняет это в панели теми же действиями, что и вы. Любое изменение ждёт вашего подтверждения. Разговор История След действий 28.09.2026, 19:36:06 Удалить правило опасное отклонено решил человек Удаление правила — с диффом файла 28.09.2026, 19:36:01 Список правил чтение выполнено без вопроса Список правил 28.09.2026, 19:35:56 Сохранить правило изменение выполнено решил человек Правка правила CLAUDE.md — с диффом файла 28.09.2026, 19:35:51 Создать проект изменение выполнено решил человек Добавление проекта в реестр"
+      },
+      "darkEn": {
+        "file": "09-journal.dark.en.png",
+        "masked": 0,
+        "width": 440,
+        "height": 900,
+        "shotAt": "2026-09-28T14:37:55.212Z",
+        "text": "Panel agent Write in plain words — the agent does it in the panel with the same actions you would. Every change waits for your confirmation. Conversation History Action trail 9/28/2026, 7:37:51 PM Delete a rule dangerous rejected decided by a human Deleting a rule — with a file diff 9/28/2026, 7:37:46 PM List rules read done no question List of rules 9/28/2026, 7:37:41 PM Save a rule change done decided by a human Editing a CLAUDE.md rule — with a file diff 9/28/2026, 7:37:36 PM Create a project change done decided by a human Adding a project to the registry"
       }
     },
     {
@@ -171,15 +315,99 @@
       "masked": 0,
       "width": 440,
       "height": 900,
-      "shotAt": "2026-09-17T20:57:30.251Z",
-      "text": "Агент панели Пишите обычными словами — агент выполняет это в панели теми же действиями, что и вы. Любое изменение ждёт вашего подтверждения. Разговор История След действий Добавь проект C:\\work\\claude-demo-panel-agent\\shop 18.09.2026, 01:57:24 · Сообщений: 6",
+      "shotAt": "2026-09-28T14:32:38.608Z",
+      "text": "Агент панели Пишите обычными словами — агент выполняет это в панели теми же действиями, что и вы. Любое изменение ждёт вашего подтверждения. Разговор История След действий Добавь проект C:\\work\\claude-demo-panel-agent\\shop 28.09.2026, 19:32:33 · Сообщений: 6",
       "en": {
         "file": "10-history.en.png",
         "masked": 0,
         "width": 440,
         "height": 900,
-        "shotAt": "2026-09-17T20:59:08.811Z",
-        "text": "Panel agent Write in plain words — the agent does it in the panel with the same actions you would. Every change waits for your confirmation. Conversation History Action trail Add project C:\\work\\claude-demo-panel-agent\\shop 9/18/2026, 1:59:03 AM · Messages: 6"
+        "shotAt": "2026-09-28T14:34:27.052Z",
+        "text": "Panel agent Write in plain words — the agent does it in the panel with the same actions you would. Every change waits for your confirmation. Conversation History Action trail Add project C:\\work\\claude-demo-panel-agent\\shop 9/28/2026, 7:34:21 PM · Messages: 6"
+      },
+      "dark": {
+        "file": "10-history.dark.png",
+        "masked": 0,
+        "width": 440,
+        "height": 900,
+        "shotAt": "2026-09-28T14:36:11.447Z",
+        "text": "Агент панели Пишите обычными словами — агент выполняет это в панели теми же действиями, что и вы. Любое изменение ждёт вашего подтверждения. Разговор История След действий Добавь проект C:\\work\\claude-demo-panel-agent\\shop 28.09.2026, 19:36:06 · Сообщений: 6"
+      },
+      "darkEn": {
+        "file": "10-history.dark.en.png",
+        "masked": 0,
+        "width": 440,
+        "height": 900,
+        "shotAt": "2026-09-28T14:37:56.808Z",
+        "text": "Panel agent Write in plain words — the agent does it in the panel with the same actions you would. Every change waits for your confirmation. Conversation History Action trail Add project C:\\work\\claude-demo-panel-agent\\shop 9/28/2026, 7:37:51 PM · Messages: 6"
+      }
+    },
+    {
+      "id": "11-scenario-card",
+      "side": "panel",
+      "file": "11-scenario-card.png",
+      "masked": 0,
+      "width": 440,
+      "height": 900,
+      "shotAt": "2026-09-28T14:32:43.219Z",
+      "text": "Агент панели Пишите обычными словами — агент выполняет это в панели теми же действиями, что и вы. Любое изменение ждёт вашего подтверждения. Разговор История След действий Новый разговор Страница: Правила Собери сценарий «Выпуск»: собрать, прогнать проверки, описать изменения Соберу сценарий одной карточкой — подтвердите её. Действие: Набросать сценарий Агент думает… Агент просит подтвердить Создать сценарий «Выпуск» (выключенным) Действие Набросать сценарий изменение Шаги сценария 1. Собрать 2. Прогнать проверки 3. Описать изменения Что изменится --- a/state.json: groups/Выпуск +++ b/state.json: groups/Выпуск @@ -0,0 +1,38 @@ +{ + \"name\": \"Выпуск\", + \"description\": \"Сборка, проверка и выпуск версии\", + \"color\": \"accent\", + \"icon\": \"folder\", + \"members\": [], + \"env\": {}, + \"projectPaths\": [], + \"isEnabled\": false, + \"flow\": \"scenario\", + \"when\": \"Когда просят выпустить версию\", + \"steps\": [ + { + \"title\": { + \"ru\": \"Собрать\", + \"en\": \"Build\" + }, + \"prompt\": \"Build the project with the build script from package.json.\", + \"gate\": \"The build finished without errors\" + }, + { + \"title\": { + \"ru\": \"Прогнать проверки\", + \"en\": \"Run the checks\" + }, + \"prompt\": \"Run the tests and the linter, fix what is red.\", + \"gate\": \"Tests and linter are green\" + }, + { + \"title\": { + \"ru\": \"Описать изменения\", + \"en\": \"Describe the changes\" + }, + \"prompt\": \"Collect the changes since the previous version.\", + \"gate\": \"The change list is ready\" + } + ] +} Ждёт до 19:42 Отклонить Выполнить",
+      "en": {
+        "file": "11-scenario-card.en.png",
+        "masked": 0,
+        "width": 440,
+        "height": 900,
+        "shotAt": "2026-09-28T14:34:31.638Z",
+        "text": "Panel agent Write in plain words — the agent does it in the panel with the same actions you would. Every change waits for your confirmation. Conversation History Action trail New conversation Page: Rules Build a scenario «Release»: build, run the checks, describe the changes I will draft the scenario as one card — please confirm it. Action: Draft a scenario The agent is thinking… The agent asks for confirmation Create scenario “Release” (switched off) Action Draft a scenario change Scenario steps 1. Build 2. Run the checks 3. Describe the changes What will change --- a/state.json: groups/Release +++ b/state.json: groups/Release @@ -0,0 +1,38 @@ +{ + \"name\": \"Release\", + \"description\": \"Build, check and ship a version\", + \"color\": \"accent\", + \"icon\": \"folder\", + \"members\": [], + \"env\": {}, + \"projectPaths\": [], + \"isEnabled\": false, + \"flow\": \"scenario\", + \"when\": \"When asked to ship a version\", + \"steps\": [ + { + \"title\": { + \"ru\": \"Собрать\", + \"en\": \"Build\" + }, + \"prompt\": \"Build the project with the build script from package.json.\", + \"gate\": \"The build finished without errors\" + }, + { + \"title\": { + \"ru\": \"Прогнать проверки\", + \"en\": \"Run the checks\" + }, + \"prompt\": \"Run the tests and the linter, fix what is red.\", + \"gate\": \"Tests and linter are green\" + }, + { + \"title\": { + \"ru\": \"Описать изменения\", + \"en\": \"Describe the changes\" + }, + \"prompt\": \"Collect the changes since the previous version.\", + \"gate\": \"The change list is ready\" + } + ] +} Waits until 07:44 PM Reject Run"
+      },
+      "dark": {
+        "file": "11-scenario-card.dark.png",
+        "masked": 0,
+        "width": 440,
+        "height": 900,
+        "shotAt": "2026-09-28T14:36:16.050Z",
+        "text": "Агент панели Пишите обычными словами — агент выполняет это в панели теми же действиями, что и вы. Любое изменение ждёт вашего подтверждения. Разговор История След действий Новый разговор Страница: Правила Собери сценарий «Выпуск»: собрать, прогнать проверки, описать изменения Соберу сценарий одной карточкой — подтвердите её. Действие: Набросать сценарий Агент думает… Агент просит подтвердить Создать сценарий «Выпуск» (выключенным) Действие Набросать сценарий изменение Шаги сценария 1. Собрать 2. Прогнать проверки 3. Описать изменения Что изменится --- a/state.json: groups/Выпуск +++ b/state.json: groups/Выпуск @@ -0,0 +1,38 @@ +{ + \"name\": \"Выпуск\", + \"description\": \"Сборка, проверка и выпуск версии\", + \"color\": \"accent\", + \"icon\": \"folder\", + \"members\": [], + \"env\": {}, + \"projectPaths\": [], + \"isEnabled\": false, + \"flow\": \"scenario\", + \"when\": \"Когда просят выпустить версию\", + \"steps\": [ + { + \"title\": { + \"ru\": \"Собрать\", + \"en\": \"Build\" + }, + \"prompt\": \"Build the project with the build script from package.json.\", + \"gate\": \"The build finished without errors\" + }, + { + \"title\": { + \"ru\": \"Прогнать проверки\", + \"en\": \"Run the checks\" + }, + \"prompt\": \"Run the tests and the linter, fix what is red.\", + \"gate\": \"Tests and linter are green\" + }, + { + \"title\": { + \"ru\": \"Описать изменения\", + \"en\": \"Describe the changes\" + }, + \"prompt\": \"Collect the changes since the previous version.\", + \"gate\": \"The change list is ready\" + } + ] +} Ждёт до 19:46 Отклонить Выполнить"
+      },
+      "darkEn": {
+        "file": "11-scenario-card.dark.en.png",
+        "masked": 0,
+        "width": 440,
+        "height": 900,
+        "shotAt": "2026-09-28T14:38:01.395Z",
+        "text": "Panel agent Write in plain words — the agent does it in the panel with the same actions you would. Every change waits for your confirmation. Conversation History Action trail New conversation Page: Rules Build a scenario «Release»: build, run the checks, describe the changes I will draft the scenario as one card — please confirm it. Action: Draft a scenario The agent is thinking… The agent asks for confirmation Create scenario “Release” (switched off) Action Draft a scenario change Scenario steps 1. Build 2. Run the checks 3. Describe the changes What will change --- a/state.json: groups/Release +++ b/state.json: groups/Release @@ -0,0 +1,38 @@ +{ + \"name\": \"Release\", + \"description\": \"Build, check and ship a version\", + \"color\": \"accent\", + \"icon\": \"folder\", + \"members\": [], + \"env\": {}, + \"projectPaths\": [], + \"isEnabled\": false, + \"flow\": \"scenario\", + \"when\": \"When asked to ship a version\", + \"steps\": [ + { + \"title\": { + \"ru\": \"Собрать\", + \"en\": \"Build\" + }, + \"prompt\": \"Build the project with the build script from package.json.\", + \"gate\": \"The build finished without errors\" + }, + { + \"title\": { + \"ru\": \"Прогнать проверки\", + \"en\": \"Run the checks\" + }, + \"prompt\": \"Run the tests and the linter, fix what is red.\", + \"gate\": \"Tests and linter are green\" + }, + { + \"title\": { + \"ru\": \"Описать изменения\", + \"en\": \"Describe the changes\" + }, + \"prompt\": \"Collect the changes since the previous version.\", + \"gate\": \"The change list is ready\" + } + ] +} Waits until 07:47 PM Reject Run"
+      }
+    },
+    {
+      "id": "12-scenario-created",
+      "side": "panel",
+      "file": "12-scenario-created.png",
+      "masked": 0,
+      "width": 1400,
+      "height": 900,
+      "shotAt": "2026-09-28T14:32:46.843Z",
+      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 1 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Группы Свой порядок поверх правил, хуков, скиллов и серверов Обнаружить группы Создать группу Зачем это Глобальные 1 В проектах 0 Найдено 0 Обнаружение 11 Доступны в любом проекте; при разделении задачи по веткам «Авто» выбирает их по строке «Когда». Выпуск глобальная сценарий Выключено Когда: Когда просят выпустить версию Первые шаги Собрать Прогнать проверки Описать изменения участников нет 3 шага · 0 участников Агент панели Пишите обычными словами — агент выполняет это в панели теми же действиями, что и вы. Любое изменение ждёт вашего подтверждения. Разговор История След действий Новый разговор Страница: Группы Собери сценарий «Выпуск»: собрать, прогнать проверки, описать изменения Соберу сценарий одной карточкой — подтвердите её. Действие: Набросать сценарий Открыта страница /groups Набросать сценарий: выполнено Сценарий «Выпуск» создан выключенным, три шага по порядку; открыл раздел «Группы».",
+      "en": {
+        "file": "12-scenario-created.en.png",
+        "masked": 0,
+        "width": 1400,
+        "height": 900,
+        "shotAt": "2026-09-28T14:34:35.272Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 1 Change history Comparison Environment passport Settings Data protection Contour Help Groups Your own structure across rules, hooks, skills and servers Discover groups Create group Why this exists Global 1 In projects 0 Found 0 Discovery 11 Available in any project; when a task is split across branches, “Auto” picks them by their “When” line. Release global scenario Disabled When: When asked to ship a version First steps Build Run the checks Describe the changes no members 3 steps · 0 members Panel agent Write in plain words — the agent does it in the panel with the same actions you would. Every change waits for your confirmation. Conversation History Action trail New conversation Page: Groups Build a scenario «Release»: build, run the checks, describe the changes I will draft the scenario as one card — please confirm it. Action: Draft a scenario Opened page /groups Draft a scenario: done Scenario “Release” created switched off, three steps in order; I opened Groups."
+      },
+      "dark": {
+        "file": "12-scenario-created.dark.png",
+        "masked": 0,
+        "width": 1400,
+        "height": 900,
+        "shotAt": "2026-09-28T14:36:19.690Z",
+        "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 1 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Группы Свой порядок поверх правил, хуков, скиллов и серверов Обнаружить группы Создать группу Зачем это Глобальные 1 В проектах 0 Найдено 0 Обнаружение 11 Доступны в любом проекте; при разделении задачи по веткам «Авто» выбирает их по строке «Когда». Выпуск глобальная сценарий Выключено Когда: Когда просят выпустить версию Первые шаги Собрать Прогнать проверки Описать изменения участников нет 3 шага · 0 участников Агент панели Пишите обычными словами — агент выполняет это в панели теми же действиями, что и вы. Любое изменение ждёт вашего подтверждения. Разговор История След действий Новый разговор Страница: Группы Собери сценарий «Выпуск»: собрать, прогнать проверки, описать изменения Соберу сценарий одной карточкой — подтвердите её. Действие: Набросать сценарий Открыта страница /groups Набросать сценарий: выполнено Сценарий «Выпуск» создан выключенным, три шага по порядку; открыл раздел «Группы»."
+      },
+      "darkEn": {
+        "file": "12-scenario-created.dark.en.png",
+        "masked": 0,
+        "width": 1400,
+        "height": 900,
+        "shotAt": "2026-09-28T14:38:05.010Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 1 Change history Comparison Environment passport Settings Data protection Contour Help Groups Your own structure across rules, hooks, skills and servers Discover groups Create group Why this exists Global 1 In projects 0 Found 0 Discovery 11 Available in any project; when a task is split across branches, “Auto” picks them by their “When” line. Release global scenario Disabled When: When asked to ship a version First steps Build Run the checks Describe the changes no members 3 steps · 0 members Panel agent Write in plain words — the agent does it in the panel with the same actions you would. Every change waits for your confirmation. Conversation History Action trail New conversation Page: Groups Build a scenario «Release»: build, run the checks, describe the changes I will draft the scenario as one card — please confirm it. Action: Draft a scenario Opened page /groups Draft a scenario: done Scenario “Release” created switched off, three steps in order; I opened Groups."
       }
     }
   ]

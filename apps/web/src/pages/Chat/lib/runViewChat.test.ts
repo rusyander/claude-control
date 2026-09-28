@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ChatSummary } from '@agentdeck/contracts';
-import { childOfRun, runViewChat } from './runViewChat';
+import { childOfRun, runForUrl, runViewChat } from './runViewChat';
 
 const chat = (id: string, parentId?: string): ChatSummary =>
   ({ id, title: id, ...(parentId ? { parentId } : {}) }) as ChatSummary;
@@ -34,5 +34,22 @@ describe('вид прогона → разговор', () => {
     expect(childOfRun(CHATS, { id: 'сессия-группы' })?.id).toBe('сессия-группы');
     // Разговор человека ребёнком не считается — его ведёт прежняя дорога.
     expect(childOfRun(CHATS, { id: 'new-2', sessionId: 'сессия-человека' })).toBeUndefined();
+  });
+});
+
+describe('адрес → живой прогон', () => {
+  const runs = [{ id: 'new-1', sessionId: 'сессия-агента' }];
+
+  it('разговора ещё нет в списке — адрес открывает его идущий первый ход', () => {
+    expect(runForUrl('сессия-агента', CHATS, runs)).toBe(runs[0]);
+  });
+
+  it('разговор уже в списке или список не пришёл — прогон не подменяет разговор', () => {
+    expect(
+      runForUrl('сессия-человека', CHATS, [{ id: 'new-2', sessionId: 'сессия-человека' }]),
+    ).toBeUndefined();
+    expect(runForUrl('сессия-агента', undefined, runs)).toBeUndefined();
+    expect(runForUrl(undefined, CHATS, runs)).toBeUndefined();
+    expect(runForUrl('чужая', CHATS, runs)).toBeUndefined();
   });
 });

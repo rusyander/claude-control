@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { queryKeys } from '@shared/api/query-keys';
 import { SECTION_QUERY_KEYS, sectionQueryKeys } from './sectionKeys';
 
 /**
@@ -58,6 +59,10 @@ describe('ключи разделов агента панели', () => {
     expect(sectionQueryKeys(undefined)).toEqual([]);
     expect(sectionQueryKeys('navigation')).toEqual([]);
     expect(sectionQueryKeys('help')).toEqual([]);
+  });
+
+  it('эндпоинт перечитывает env: применение пишет переменные в конфиг CLI', () => {
+    expect(sectionQueryKeys('endpoints')).toContainEqual(queryKeys.env);
   });
 
   it('смена провайдера перечитывает всё (пустой ключ совпадает с любым)', () => {

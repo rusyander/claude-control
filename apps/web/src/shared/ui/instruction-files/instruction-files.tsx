@@ -1,9 +1,11 @@
+import { useId, useRef, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Card } from '@shared/ui/card';
 import { Icon } from '@shared/ui/icon';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { cn } from '@shared/lib/cn';
+import { rovingTarget } from '@shared/lib/roving';
 import styles from './instruction-files.module.scss';
 import type { InstructionFilesCardProps } from './instruction-files.types';
 
@@ -26,6 +28,28 @@ export function InstructionFilesCard({
 }: InstructionFilesCardProps) {
   const { t } = useTranslation();
   const offerChoice = view.proposed && onChooseName !== undefined && view.choices.length > 1;
+  // Карточек на странице может быть две (правила проекта рядом с общими) —
+  // подпись группы у каждой своя, иначе обе группы называла бы первая.
+  const labelId = `${useId()}-name-label`;
+  const choiceRefs = useRef(new Map<string, HTMLButtonElement>());
+  // Остановка Tab одна на группу — у выбранного имени; выбранного нет среди
+  // вариантов — у первого, иначе в группу не попасть с клавиатуры вовсе.
+  const tabStop =
+    chosenName !== undefined && view.choices.includes(chosenName) ? chosenName : view.choices[0];
+
+  /**
+   * Радиогруппа по образцу ARIA: стрелки/Home/End переводят фокус и сразу
+   * выбирают имя (ревью 28.09, F-244 — роль обещала стрелки, а каждая кнопка
+   * была своим шагом Tab и стрелки не работали).
+   */
+  const handleChoiceKey = (event: KeyboardEvent<HTMLDivElement>): void => {
+    const focused = (event.target as HTMLElement).dataset.choice ?? tabStop;
+    const next = rovingTarget(view.choices, focused, event.key);
+    if (next === undefined || !onChooseName) return;
+    event.preventDefault();
+    onChooseName(next);
+    choiceRefs.current.get(next)?.focus();
+  };
 
   return (
     <Card padding="sm" className={cn(styles.root, className)}>
@@ -111,20 +135,27 @@ export function InstructionFilesCard({
 
         {offerChoice && (
           <Stack direction="row" align="center" gap="var(--spacing-xs)" wrap>
-            <Typography variant="caption" color="subtle" id="instruction-file-name-label">
+            <Typography variant="caption" color="subtle" id={labelId}>
               {t('instructionFiles.chooseName')}
             </Typography>
             <div
               role="radiogroup"
-              aria-labelledby="instruction-file-name-label"
+              aria-labelledby={labelId}
               className={styles.choices}
+              onKeyDown={handleChoiceKey}
             >
               {view.choices.map((name) => (
                 <button
                   key={name}
+                  ref={(node) => {
+                    if (node) choiceRefs.current.set(name, node);
+                    else choiceRefs.current.delete(name);
+                  }}
                   type="button"
                   role="radio"
                   aria-checked={name === chosenName}
+                  tabIndex={name === tabStop ? 0 : -1}
+                  data-choice={name}
                   className={cn(styles.choice, name === chosenName && styles.chosen)}
                   onClick={() => onChooseName(name)}
                 >

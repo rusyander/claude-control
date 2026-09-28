@@ -1,4 +1,4 @@
-import { object, string, array, record } from 'zod';
+import { object, string, array, record, unknown } from 'zod';
 import { groupSchema, automationSchema } from './groups';
 import { hookSchema } from './hooks';
 import { projectSchema } from './projects';
@@ -26,6 +26,8 @@ export const importStateSchema = object({
   disabledByGroup: record(string(), record(string(), array(string()))).optional(),
   /** Снимки выключенных хуков (их текст живёт только здесь). */
   disabledHooks: record(string(), hookSchema).optional(),
+  /** Текст и место выключенных правил CLAUDE.md (в самом файле их нет). */
+  disabledRules: array(unknown()).optional(),
   /** id группы → имена env-ключей, записанных ею в settings.json. */
   envByGroup: record(string(), array(string())).optional(),
   /** Реестр проектов уровня конфигурации — запомненные пути к их каталогам. */

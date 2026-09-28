@@ -8,6 +8,7 @@ import {
   sendProviderChatMessage,
   stopProviderChat,
 } from '../api/ProviderChatApi';
+import { isAnswerRunningRefusal } from './sendRefusal';
 
 /**
  * Идущий ответ открытого разговора: текст, который уже напечатан, и признак
@@ -74,9 +75,32 @@ export function useProviderChatRun(chatId: string | undefined): ProviderChatRunS
       }
 
       if (controller.signal.aborted) return;
+      // Поток кончился — вкладка больше ни к чему не подключена: по этой
+      // ссылке отказ 409 решает, подхватывать ли идущий ход.
+      if (abortRef.current === controller) abortRef.current = undefined;
       await settle(id);
     },
     [settle],
+  );
+
+  /**
+   * Подхватить ход, идущий на сервере: напечатанное к этому моменту берём из
+   * статуса (поток шлёт только новые куски), дальше — поток. Хода уже нет —
+   * просто сверяемся.
+   */
+  const followRunning = useCallback(
+    async (id: string) => {
+      try {
+        const status = await readProviderChatStatus(id);
+        if (!status.isRunning) return settle(id);
+        setPartial(status.partial);
+        setIsRunning(true);
+      } catch {
+        return settle(id);
+      }
+      await attach(id);
+    },
+    [attach, settle],
   );
 
   // Открыли разговор — узнаём, не идёт ли по нему ответ прямо сейчас.
@@ -111,7 +135,6 @@ export function useProviderChatRun(chatId: string | undefined): ProviderChatRunS
       if (!chatId) return;
 
       setError(undefined);
-      setPartial('');
       setIsRunning(true);
       try {
         await sendProviderChatMessage(chatId, {
@@ -119,15 +142,26 @@ export function useProviderChatRun(chatId: string | undefined): ProviderChatRunS
           ...(attachments?.length ? { attachments } : {}),
         });
       } catch (cause) {
-        setIsRunning(false);
         setError(toErrorMessage(cause));
+        // 409 — идёт прошлый ответ: индикатор и напечатанное не трогаем, а если
+        // вкладка этот ход не видела (начат в другой вкладке или автоматом) —
+        // подключаемся к нему. Гасим только ход, который так и не начался.
+        if (isAnswerRunningRefusal(cause)) {
+          const attached = abortRef.current && !abortRef.current.signal.aborted;
+          if (!attached) await followRunning(chatId);
+          return;
+        }
+        setIsRunning(false);
         return;
       }
 
+      // Напечатанное прошлого хода стираем, только когда новый ход принят:
+      // отказ не должен съесть текст идущего ответа.
+      setPartial('');
       void queryClient.invalidateQueries({ queryKey: providerChatKeys.detail(chatId) });
       await attach(chatId);
     },
-    [chatId, attach, queryClient],
+    [chatId, attach, followRunning, queryClient],
   );
 
   const stop = useCallback(async () => {

@@ -65,7 +65,7 @@ export function ContourSpendCard() {
           <CompromiseMark id="telemetry-local" />
         </Stack>
 
-        <Typography variant="caption" color="subtle" style={{ maxWidth: 'var(--text-measure)' }}>
+        <Typography variant="caption" color="subtle" className="prose">
           {t('analytics.contourSpend.hint')}
         </Typography>
 

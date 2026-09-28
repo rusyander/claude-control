@@ -1,11 +1,20 @@
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { Platform, PlatformRuleRow } from '@agentdeck/contracts';
+import type {
+  Platform,
+  PlatformRuleConflict,
+  PlatformRuleRow,
+  PlatformRulesApplies,
+} from '@agentdeck/contracts';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Badge } from '@shared/ui/badge';
 import styles from '../PlatformPage.module.scss';
 import { managedRules, observedRules } from '../lib/rulesView';
+import { ourOverlapName, overlapsByPlatformRule } from '../lib/contourConfigView';
 import { ManagedRuleField } from './ManagedRuleField';
+import { OverlapMark } from './OverlapMark';
+import { SideOffNote } from './SideOffNote';
 import type { RuleDrafts } from './useRuleDrafts';
 import { serverFieldText } from '@shared/config/i18n';
 
@@ -15,6 +24,10 @@ interface PlatformRulesColumnProps {
   drafts: RuleDrafts;
   toolsLocked: boolean;
   update: (next: Platform) => void;
+  /** Пересечения с нашими правилами — отметка под строкой, которой касаются. */
+  conflicts: readonly PlatformRuleConflict[];
+  /** Колонка снята выбором «чьи правила действуют» — каким именно. */
+  offBy: PlatformRulesApplies | undefined;
 }
 
 /**
@@ -22,6 +35,9 @@ interface PlatformRulesColumnProps {
  * (поля запроса, которые контур принимает), снизу то, что контур делает сам и
  * чего отсюда не отменить. Человек, не нашедший галочки, должен прочитать
  * «включает владелец контура», а не решить, что панель сломалась.
+ *
+ * Строка, которая задевает наше правило, несёт отметку пересечения прямо под
+ * собой (баг 11в), а снятая выбором колонка — пунктир и надпись (баг 11б).
  */
 export function PlatformRulesColumn({
   platform,
@@ -29,16 +45,30 @@ export function PlatformRulesColumn({
   drafts,
   toolsLocked,
   update,
+  conflicts,
+  offBy,
 }: PlatformRulesColumnProps) {
   const { t } = useTranslation();
   const managed = managedRules(rules);
   const observed = observedRules(rules);
+  const overlaps = overlapsByPlatformRule(conflicts);
+
+  /** Наша сторона пересечения словами; незнакомую называет заголовок ячейки. */
+  const oursName = (cell: PlatformRuleConflict): string => {
+    const name = ourOverlapName(cell.ourRule);
+    return name ? t(`contourConfig.overlap.ours.${name}`) : serverFieldText(cell, 'title');
+  };
+  const mark = (id: string): ReactNode => {
+    const cell = overlaps.get(id);
+    return cell ? <OverlapMark cell={cell} what={oursName(cell)} /> : null;
+  };
 
   return (
     <section
-      className={`${styles.rulesColumn} ${styles.rulesColumnPlatform}`}
+      className={`${styles.rulesColumn} ${styles.rulesColumnPlatform} ${offBy ? styles.rulesColumnOff : ''}`}
       aria-labelledby={`rules-platform-${platform.id}`}
       data-rules-side="platform"
+      data-side-off={offBy ? 'true' : 'false'}
     >
       <Stack gap="var(--spacing-sm)">
         <Stack gap="var(--spacing-3xs)">
@@ -49,6 +79,7 @@ export function PlatformRulesColumn({
             {t('platform.rulesSidePlatformText')}
           </Typography>
         </Stack>
+        <SideOffNote offBy={offBy} />
         {/* Драйвер, не объявивший о себе ничего (любой совместимый шлюз), даёт
           пустой список — и это «неизвестно», а не «ничего не делает». */}
         {rules.length === 0 && (
@@ -63,14 +94,16 @@ export function PlatformRulesColumn({
               {t('platform.rulesManaged')}
             </Typography>
             {managed.map((row) => (
-              <ManagedRuleField
-                key={row.id}
-                row={row}
-                platform={platform}
-                drafts={drafts}
-                toolsLocked={toolsLocked}
-                update={update}
-              />
+              <Stack key={row.id} gap="var(--spacing-3xs)" data-rule-row={row.id}>
+                <ManagedRuleField
+                  row={row}
+                  platform={platform}
+                  drafts={drafts}
+                  toolsLocked={toolsLocked}
+                  update={update}
+                />
+                {mark(row.id)}
+              </Stack>
             ))}
           </Stack>
         )}
@@ -80,7 +113,7 @@ export function PlatformRulesColumn({
               {t('platform.rulesObserved')}
             </Typography>
             {observed.map((row) => (
-              <Stack key={row.id} gap="var(--spacing-3xs)">
+              <Stack key={row.id} gap="var(--spacing-3xs)" data-rule-row={row.id}>
                 <Stack direction="row" align="center" gap="var(--spacing-2xs)" wrap>
                   <Typography variant="body-sm" as="span">
                     {serverFieldText(row, 'title')}
@@ -90,6 +123,7 @@ export function PlatformRulesColumn({
                 <Typography variant="caption" color="muted" as="span">
                   {serverFieldText(row, 'detail')}
                 </Typography>
+                {mark(row.id)}
               </Stack>
             ))}
           </Stack>

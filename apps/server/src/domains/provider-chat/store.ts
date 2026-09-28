@@ -126,6 +126,39 @@ export function chatTranscriptPath(
   return chatFile(appDataDir, providerId, chatId);
 }
 
+/**
+ * Какие из каталогов картинок агента (`<appData>/agent-images/<имя>`) упоминает
+ * хоть один сохранённый разговор. Разговор чужого CLI уходит агенту целиком на
+ * каждом ходе — каталог, на который он ссылается, удалять нельзя (F-267).
+ *
+ * Читается сырой текст файлов: путь в JSON записан с экранированными `\`, и
+ * разбирать каждую реплику ради поиска подстроки незачем. Не прочёлся каталог
+ * разговоров — бросает: вызывающий тогда не удаляет ничего.
+ */
+export function agentImageDirsInChats(
+  appDataDir: string,
+  names: readonly string[],
+): ReadonlySet<string> {
+  const wanted = new Set(names);
+  const found = new Set<string>();
+  const root = join(appDataDir, 'provider-chats');
+  if (wanted.size === 0 || !existsSync(root)) return found;
+  const mention = /agent-images(?:\\\\|\\|\/)+([A-Za-z0-9_-]+)/g;
+  for (const provider of readdirSync(root, { withFileTypes: true })) {
+    if (!provider.isDirectory()) continue;
+    const dir = join(root, provider.name);
+    for (const file of readdirSync(dir)) {
+      if (!file.endsWith('.jsonl')) continue;
+      const text = readFileSync(join(dir, file), 'utf8');
+      for (const match of text.matchAll(mention)) {
+        if (wanted.has(match[1]!)) found.add(match[1]!);
+      }
+      if (found.size === wanted.size) return found;
+    }
+  }
+  return found;
+}
+
 /** Название по первому вопросу: список разговоров должен читаться без открытия. */
 export function titleFromText(text: string): string {
   const line = text.trim().split('\n')[0]?.trim() ?? '';

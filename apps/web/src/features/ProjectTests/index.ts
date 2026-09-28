@@ -14,6 +14,8 @@ export { TestSettingsModal } from './ui/TestSettingsModal';
 export type { TestSettingsModalProps } from './ui/TestSettingsModal.types';
 
 export { TestsOnboarding } from './ui/TestsOnboarding';
+export { TestE2eCard } from './ui/TestE2eCard';
+export type { TestE2eCardProps } from './ui/TestE2eCard.types';
 export type { TestsOnboardingProps } from './ui/TestsOnboarding.types';
 
 export { useTestsBoard } from './model/useTestsBoard';

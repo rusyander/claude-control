@@ -1,6 +1,15 @@
 import { useTranslation } from 'react-i18next';
 import { FlowDiagram } from '@shared/ui/diagram';
-import { HelpSection, StorageCard, FieldTable, StepList, Callout, OptionCards } from '../ui';
+import { SCRIPTS_TABS } from '@pages/Scripts/model/tabs';
+import {
+  HelpSection,
+  StorageCard,
+  FieldTable,
+  StepList,
+  Callout,
+  OptionCards,
+  PageTabsSection,
+} from '../ui';
 import { ScriptsGuideSections } from './ScriptsGuideSections';
 import { ScriptsLimitsSections } from './ScriptsLimitsSections';
 
@@ -32,6 +41,8 @@ export function ScriptsTopic() {
       <Callout tone="info" title={tr('guideTitle')}>
         {tr('guideText')}
       </Callout>
+
+      <PageTabsSection page="scripts" tabs={SCRIPTS_TABS} />
 
       <HelpSection title={t('help.common.whyTitle')}>
         <OptionCards

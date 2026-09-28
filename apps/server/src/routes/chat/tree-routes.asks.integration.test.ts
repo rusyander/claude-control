@@ -52,7 +52,9 @@ describe('дерево разговоров: вопросы и права гру
         }),
       stop: () => undefined,
     }));
-    registry.setSessionListener((chatId, sessionId) => store.linkChatSession(chatId, sessionId));
+    registry.setSessionListener((chatId, sessionId, from) =>
+      store.linkChatSession(chatId, sessionId, from),
+    );
     // Та же сборка, что в `bootstrap/runtime.ts`: запись подписана на реестр,
     // начало и конец хода зовут её рядом с конвейером.
     const asks = wirePendingAsks(registry, {

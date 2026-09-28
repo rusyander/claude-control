@@ -237,6 +237,16 @@ await page.route('**/api/project-tests/impact*', async (route) =>
   route.fulfill({ json: { files: [], cases: [] } }),
 );
 await page.route('**/api/project-tests?*', async (route) => route.fulfill({ json: view }));
+// История кейса и отметки «нестабилен» библиотеки — свои ручки; без заглушки
+// запрос ушёл бы на реальный стенд с выдуманным путём проекта.
+await page.route('**/api/project-tests/flaky*', async (route) =>
+  route.fulfill({ json: { window: 10, minFlips: 2, cases: [] } }),
+);
+await page.route('**/api/project-tests/case-history*', async (route) =>
+  route.fulfill({
+    json: { groupId: '', caseId: '', entries: [], flaky: { isFlaky: false, flips: 0, runs: 0 } },
+  }),
+);
 
 let bad = 0;
 const check = (ok, text) => {
@@ -244,19 +254,30 @@ const check = (ok, text) => {
   if (!ok) bad += 1;
 };
 
-await page.goto(`${BASE}/`, { waitUntil: 'domcontentloaded' });
-await page.evaluate(
-  (project) =>
-    localStorage.setItem(
-      'agentdeck:workspace',
-      JSON.stringify({
-        projectTabs: [{ id: project.path.toLowerCase(), path: project.path, name: project.name }],
-        activeTabId: project.path.toLowerCase(),
-        views: {},
-      }),
-    ),
-  PROJECT,
+// Пирамида тестов (вкладка «Покрытие» и отчёт) читается по пути проекта; путь здесь
+// вымышленный, и настоящий сервер ответил бы 400 — ошибкой в консоли, а не
+// поведением, которое проверяет этот сценарий.
+await page.route('**/api/project-tests/pyramid*', async (route) =>
+  route.fulfill({
+    json: { frameworks: [], split: false, truncated: false, checkedAt: '2026-09-28T00:00:00.000Z' },
+  }),
 );
+await page.goto(`${BASE}/`, { waitUntil: 'domcontentloaded' });
+// Выбор проекта в разделе тестов — свой, в `agentdeck:tests-project`, а не
+// активная вкладка: без него раздел открывает запомненный или ПЕРВЫЙ проект
+// списка, а первым идёт настоящий реестр стенда — и запуск уходил не в тот
+// проект. Закрепляем проверочный явно.
+await page.evaluate((project) => {
+  localStorage.setItem(
+    'agentdeck:workspace',
+    JSON.stringify({
+      projectTabs: [{ id: project.path.toLowerCase(), path: project.path, name: project.name }],
+      activeTabId: project.path.toLowerCase(),
+      views: {},
+    }),
+  );
+  localStorage.setItem('agentdeck:tests-project', project.path.toLowerCase());
+}, PROJECT);
 
 await page.goto(`${BASE}/tests`, { waitUntil: 'domcontentloaded' });
 await page.waitForSelector('nav');
@@ -356,7 +377,7 @@ if ((await runsTab.count()) === 0) {
   // Заголовок ищем по aria-controls, а не по первому попавшемуся
   // `[aria-expanded]`: свернуть боковую панель — тоже раскрывающаяся кнопка, и
   // она стоит в разметке раньше.
-  const head = main.locator('[aria-expanded][aria-controls^="run-body-"]').first();
+  const head = main.locator('[id^="run-card-"] button[aria-expanded]').first();
   if ((await head.count()) > 0) {
     await head.click();
     await page.waitForTimeout(1200);

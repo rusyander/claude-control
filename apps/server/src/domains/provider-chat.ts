@@ -31,6 +31,7 @@ export {
   createForeignStagePlanner,
   foreignStagePrefix,
   foreignChatPrefix,
+  foreignContinuationPrefix,
   planForeignStage,
   type ForeignRunFinished,
   type ForeignStagePlan,

@@ -1,8 +1,19 @@
-import { spawn } from 'node:child_process';
-import { safeSessionId } from '../lib/cli-args.ts';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { spawnCliProcess } from '../lib/cli-spawn.ts';
 import { killChildTree } from '../lib/process-tree.ts';
 import { defaultCliCommand } from '../providers/cli.ts';
 import { coded } from '../lib/server-text.ts';
+import { SECRET_MASK } from '../lib/secret-mask.ts';
+import {
+  readStreamJsonResult,
+  STREAM_JSON_INPUT_ARGS,
+  streamJsonUserLine,
+  type AgentImage,
+} from '../lib/agent-images.ts';
+import { lightWindowLayers } from './platform/layers.ts';
+import { maskAssistText, maskFormFields, restoreFormSecrets } from './assistant-secrets.ts';
 
 /**
  * Помощник по заполнению форм. Работает через сам Claude Code в неинтерактивном
@@ -11,7 +22,21 @@ import { coded } from '../lib/server-text.ts';
  *
  * Модель просят вернуть строгий JSON с полями формы и коротким пояснением —
  * так ответ можно применить к форме, а не пересказывать пользователю текстом.
+ *
+ * ЛЁГКОЕ ОКНО (решение владельца D4, 28.09). Помощнику не нужно ничего, кроме
+ * задания: всё, что он знает о форме, — в тексте. Поэтому запуск без
+ * инструментов, без сохранения сессии и без наших слоёв (правила, хуки, скиллы,
+ * MCP человека) — теми же флагами, что у агента панели (`lightWindowLayers`), в
+ * пустом временном каталоге. Разговор продолжается историей В ЗАПРОСЕ, а не
+ * `--resume`: прежний запуск копил транскрипт на каждый вопрос к форме (130
+ * файлов в `projects/…apps-server/` к 28.09) вместе с полями формы.
  */
+
+/** Реплика прежнего разговора в окне помощника — её держит клиент. */
+export interface AssistTurn {
+  role: 'user' | 'assistant';
+  text: string;
+}
 
 export interface AssistRequest {
   /** Что заполняем: правило, скилл, хук, сервер, право, переменная, группа. */
@@ -22,38 +47,79 @@ export interface AssistRequest {
   fields: Record<string, unknown>;
   /** Описание полей: имя → что это, чтобы модель не выдумывала структуру. */
   schema: Record<string, string>;
-  /** Идентификатор прошлого ответа: продолжает диалог вместо нового. */
-  sessionId?: string;
+  /** Прежние реплики окна, по порядку: сессии у помощника нет. */
+  history?: readonly AssistTurn[];
+  /** Картинки сообщения — уже проверенные маршрутом (`readAgentImages`). */
+  images?: readonly AgentImage[];
 }
 
 export interface AssistResponse {
   reply: string;
   fields: Record<string, unknown>;
-  sessionId?: string;
+  /**
+   * Поля, где модель переписала маску секрета так, что вернуть секрет нельзя:
+   * их нет в `fields`, форма оставляет их как были и называет человеку.
+   */
+  kept?: string[];
   /** Текст ошибки, если вызов не удался. */
   error?: string;
 }
 
-const isWindows = process.platform === 'win32';
+/** Сколько последних реплик истории уходит модели и сколько знаков в каждой. */
+const HISTORY_TURNS = 20;
+const HISTORY_TEXT_MAX = 4000;
 
-function buildPrompt(request: AssistRequest): string {
+/**
+ * История для задания: последние реплики, секреты — маской. Общая для помощника
+ * формы и помощника структуры.
+ */
+export function historyLines(history: readonly AssistTurn[] | undefined): string[] {
+  const turns = (history ?? []).slice(-HISTORY_TURNS);
+  if (turns.length === 0) return [];
   return [
-    `Ты помогаешь заполнить форму «${request.kind}» в приложении управления настройками Claude Code.`,
+    'Conversation so far in this window (oldest first):',
+    ...turns.map((turn) => {
+      const text = maskAssistText(turn.text).trim();
+      const shown = text.length > HISTORY_TEXT_MAX ? `${text.slice(0, HISTORY_TEXT_MAX)}…` : text;
+      return `${turn.role === 'assistant' ? 'Assistant' : 'Human'}: ${shown}`;
+    }),
     '',
-    'Поля формы и их назначение:',
+  ];
+}
+
+function buildPrompt(request: AssistRequest, maskedFields: Record<string, unknown>): string {
+  return [
+    `You help fill in the form "${request.kind}" in an app that manages Claude Code settings.`,
+    'You have no tools: everything you know about the form is in this message.',
+    '',
+    'Form fields, their purpose and the kind of value each takes:',
     ...Object.entries(request.schema).map(([key, hint]) => `- ${key}: ${hint}`),
     '',
-    'Текущее содержимое формы (JSON):',
-    JSON.stringify(request.fields, null, 2),
+    `Current content of the form (JSON). ${SECRET_MASK} stands for a hidden secret value:`,
+    JSON.stringify(maskedFields, null, 2),
     '',
-    `Запрос пользователя: ${request.message}`,
+    ...historyLines(request.history),
+    `The user's current request: ${maskAssistText(request.message)}`,
     '',
-    'Верни ТОЛЬКО JSON без markdown-обёртки, строго такой структуры:',
-    '{"reply": "короткое пояснение на русском, что ты заполнил или изменил",',
-    ' "fields": {"имя_поля": "значение", ...}}',
+    'Return ONLY one JSON object without a markdown wrapper, of this structure:',
+    '{"reply": "a short explanation of what you filled in or changed, in the language of the user\'s request",',
+    ' "fields": {"<field>": <value>, ...}}',
+    'For example: {"reply": "Filled in the name, the tools and the timeout.",',
+    ' "fields": {"name": "lint-on-save", "matchers": ["Edit", "Write"], "timeout": 30}}',
     '',
-    'В fields клади только те поля, которые нужно изменить, с готовыми значениями.',
-    'Не добавляй полей, которых нет в списке выше. Не объясняй ничего вне JSON.',
+    'Rules for "fields":',
+    '- Put in only the fields that must change, with ready values, and only fields from the list above.',
+    '- Every value follows its field\'s "Value:" line exactly: a JSON array where it says array ' +
+      '(never a comma-separated string), a JSON number where it says number (never a string), ' +
+      'true or false for a flag, null only where the line allows it, and for allowed values only ' +
+      'the quoted value itself, never its label in brackets.',
+    '- If the user asks only for suggestions, options, ideas, an opinion or an explanation, or says ' +
+      'not to change or fill anything, return "fields": {} and put the suggestions into "reply". ' +
+      'Fill fields only when the user asks to fill, set, change, add or create something.',
+    `- Never put a secret value into fields. Where a text you rewrite contains ${SECRET_MASK}, keep ` +
+      'those parts exactly as shown. If the user wants a secret set, leave it out and say in ' +
+      '"reply" that they type it into the form themselves.',
+    '- Explain nothing outside the JSON.',
   ].join('\n');
 }
 
@@ -72,35 +138,98 @@ function extractJson(text: string): { reply: string; fields: Record<string, unkn
       reply?: string;
       fields?: Record<string, unknown>;
     };
-    return { reply: parsed.reply ?? '', fields: parsed.fields ?? {} };
+    const fields =
+      parsed.fields && typeof parsed.fields === 'object' && !Array.isArray(parsed.fields)
+        ? parsed.fields
+        : {};
+    return { reply: typeof parsed.reply === 'string' ? parsed.reply : '', fields };
   } catch {
     return null;
   }
 }
 
+/** Сколько ждать помощника формы. */
+const ASSIST_TIMEOUT_MS = 180_000;
+
+/**
+ * Хвост лёгкого окна — общий для помощника формы, помощника структуры и
+ * служебных вызовов модели через раннер (группы, окно ассистента): без
+ * сохранения сессии, без наших слоёв, без инструментов. `--tools ""` —
+ * последним: пустое значение вариадического флага съело бы следующий голый
+ * аргумент (как у агента панели), поэтому хвост всегда в конце argv.
+ */
+export function lightWindowArgs(): string[] {
+  return ['--no-session-persistence', ...lightWindowLayers().args, '--tools', ''];
+}
+
+/**
+ * Рабочий каталог лёгкого окна — пустая временная папка: CLI ищет `CLAUDE.md`
+ * вверх от него, и каталог сервера принёс бы правила репозитория. `cleanup`
+ * не бросает: пустая папка без секретов — не повод ронять ответ.
+ */
+export function lightWindowDir(): { dir: string; cleanup: () => void } {
+  const dir = mkdtempSync(join(tmpdir(), 'cc-assistant-'));
+  return {
+    dir,
+    cleanup: () => {
+      try {
+        rmSync(dir, { recursive: true, force: true });
+      } catch {
+        // Не удалилась (держит антивирус) — останется во временной папке ОС.
+      }
+    },
+  };
+}
+
+/** Аргументы помощника формы: JSON-конверт (или поток с картинками) + лёгкое окно. */
+export function oneShotArgs(streaming: boolean): string[] {
+  return [
+    '-p',
+    ...(streaming ? STREAM_JSON_INPUT_ARGS : ['--output-format', 'json']),
+    ...lightWindowArgs(),
+  ];
+}
+
 /**
  * Запускает CLI и отдаёт промпт через стандартный ввод. Аргументом его
  * передавать нельзя: многострочный текст с кавычками рвётся оболочкой,
- * и до модели доходит обрывок.
+ * и до модели доходит обрывок. Ответ — конверт `--output-format json` в обоих
+ * режимах. Общий для помощника формы и помощника структуры ресурса: вторая
+ * копия уже разошлась с этой (не ловила EPIPE на stdin).
+ *
+ * Запуск — `spawnCliProcess` (настоящий `.exe` без оболочки, иначе квотирование
+ * `shellArgs`): прежний `spawn(…, { shell: true })` на Windows склеивал argv
+ * пробелами, и пустое значение `--tools ""` исчезло бы, а флаг съел бы
+ * следующий. Рабочий каталог — пустая временная папка: CLI ищет `CLAUDE.md`
+ * вверх от него, и каталог сервера принёс бы правила репозитория.
  */
-function runClaude(prompt: string, command: string, sessionId?: string): Promise<string> {
-  const args = ['-p', '--output-format', 'json'];
-  const safeId = safeSessionId(sessionId);
-  if (safeId) args.push('--resume', safeId);
+export function runClaudeOneShot(
+  prompt: string,
+  command: string,
+  images: readonly AgentImage[] = [],
+  timeoutMs: number = ASSIST_TIMEOUT_MS,
+): Promise<string> {
+  // С картинками — потоковый ввод (картинка едет блоком `image`), и итог
+  // приходит событием `result` потокового вывода, а не одним JSON.
+  const streaming = images.length > 0;
+  const { dir, cleanup } = lightWindowDir();
+
+  const spawned = spawnCliProcess(command, oneShotArgs(streaming), { cwd: dir });
+  if (spawned.error) {
+    cleanup();
+    return Promise.reject(spawned.error);
+  }
+  const child = spawned.child;
 
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, {
-      shell: isWindows,
-      windowsHide: true,
-    });
-
     let stdout = '';
     let stderr = '';
     const timer = setTimeout(() => {
       // Дерево, а не сам процесс: под `cmd.exe` обычный kill оставил бы CLI жить.
       killChildTree(child);
+      cleanup();
       reject(coded(new Error('Помощник не ответил за отведённое время'), 'assistant-timeout'));
-    }, 180_000);
+    }, timeoutMs);
 
     child.stdout.on('data', (chunk: Buffer) => {
       stdout += chunk.toString();
@@ -111,23 +240,34 @@ function runClaude(prompt: string, command: string, sessionId?: string): Promise
 
     child.on('error', (error) => {
       clearTimeout(timer);
+      cleanup();
       reject(error);
     });
 
     child.on('close', (code) => {
       clearTimeout(timer);
-      if (code === 0) resolve(stdout);
+      cleanup();
+      if (code === 0) resolve(streaming ? envelopeOf(stdout) : stdout);
       else reject(new Error(stderr.slice(0, 500) || `CLI завершился с кодом ${code}`));
     });
 
-    // Обработчик ОБЯЗАТЕЛЕН: CLI закрывается сразу (сломан, не залогинен, протух
-    // --resume), а промпт со схемой и всей формой обычно длиннее буфера канала,
-    // и недописанный поток отдаёт EPIPE (на Windows EOF) отдельным `error`.
+    // Обработчик ОБЯЗАТЕЛЕН: CLI закрывается сразу (сломан, не залогинен), а
+    // промпт со схемой и всей формой обычно длиннее буфера канала, и
+    // недописанный поток отдаёт EPIPE (на Windows EOF) отдельным `error`.
     // Необработанное событие потока роняет весь сервер — здесь же это лишь
     // «ввод не долетел»: исход прогона решают код выхода и stderr ниже.
     child.stdin.on('error', () => undefined);
-    child.stdin.write(prompt);
+    child.stdin.write(streaming ? streamJsonUserLine(prompt, images) : prompt);
     child.stdin.end();
+  });
+}
+
+/** Итог потокового вывода в форме конверта `--output-format json`. */
+function envelopeOf(stdout: string): string {
+  const result = readStreamJsonResult(stdout);
+  return JSON.stringify({
+    result: result?.text ?? '',
+    is_error: result?.isError ?? true,
   });
 }
 
@@ -136,17 +276,28 @@ export async function askAssistant(
   command: string = defaultCliCommand(),
 ): Promise<AssistResponse> {
   try {
-    const stdout = await runClaude(buildPrompt(request), command, request.sessionId);
-    const envelope = JSON.parse(stdout) as { result?: string; session_id?: string };
+    const fields = request.fields ?? {};
+    const masked = maskFormFields(fields);
+    const stdout = await runClaudeOneShot(
+      buildPrompt(request, masked),
+      command,
+      request.images ?? [],
+    );
+    const envelope = JSON.parse(stdout) as { result?: string };
     const parsed = extractJson(envelope.result ?? '');
 
     if (!parsed) {
       // Модель ответила текстом вместо JSON — показываем ответ как есть,
       // поля не трогаем: лучше ничего не менять, чем испортить форму.
-      return { reply: envelope.result ?? '', fields: {}, sessionId: envelope.session_id };
+      return { reply: envelope.result ?? '', fields: {} };
     }
 
-    return { ...parsed, sessionId: envelope.session_id };
+    const restored = restoreFormSecrets(fields, masked, parsed.fields);
+    return {
+      reply: parsed.reply,
+      fields: restored.fields,
+      ...(restored.kept.length > 0 ? { kept: restored.kept } : {}),
+    };
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     return { reply: '', fields: {}, error: detail };

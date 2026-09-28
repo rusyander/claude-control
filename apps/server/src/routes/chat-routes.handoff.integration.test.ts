@@ -13,6 +13,7 @@ import { HandoffChains } from '../domains/chat/ChatHandoff.ts';
 import { AUTONOMOUS_PERMISSION_MODE } from '../domains/chat/ChatWorkspace.ts';
 import { ProviderChatService } from '../domains/provider-chat.ts';
 import type { ChatLink } from '../lib/app-store/app-store.types.ts';
+import { wireGroupActivation } from '../bootstrap/group-activation-wiring.ts';
 
 /**
  * Продолжение работы в чистой сессии: маршруты и планировщик вместе.
@@ -239,7 +240,7 @@ describe('маршруты продолжения в чистой сессии',
       expect(response.statusCode).toBe(200);
       const body = response.json();
       expect(body.mode).toBe('requested');
-      expect(body.prompt).toContain('Обнови .agent/PROGRESS.md');
+      expect(body.prompt).toContain('Update .agent/PROGRESS.md');
       expect(body.prompt).toContain(HANDOFF_BLOCK_LANG);
       expect(chains.isAuto(['new-7'])).toBe(true);
       expect(registry.active()).toHaveLength(0);
@@ -285,7 +286,7 @@ describe('маршруты продолжения в чистой сессии',
       expect(body).toMatchObject({ mode: 'started', started: true, path: project, chainDepth: 1 });
       expect(started).toHaveLength(1);
       expect(started[0]?.prompt).toContain('.agent/PROGRESS.md');
-      expect(started[0]?.prompt).toContain('Исходное задание');
+      expect(started[0]?.prompt).toContain('The original task of the whole work');
       expect(started[0]?.prompt).toContain('Сделай экспорт отчётов');
     });
   });
@@ -733,13 +734,29 @@ ${block(PROPOSAL)}`,
  * не только то, ЧТО заводится, но и то, что оно заводится на правильной модели,
  * с правильной дописской и ровно один раз.
  */
+/** Каталоги конфигурации рядом с временным хранилищем — включение группы пишет только туда. */
+function groupPaths(root: string) {
+  return {
+    root,
+    appData: join(root, 'agentdeck'),
+    settings: join(root, 'settings.json'),
+    settingsLocal: join(root, 'settings.local.json'),
+    claudeMd: join(root, 'CLAUDE.md'),
+    secretsEnv: join(root, 'secrets.env'),
+    skills: join(root, 'skills'),
+    hooks: join(root, 'hooks'),
+    mcpConfig: join(root, '.claude.json'),
+  };
+}
+
 describe('планировщик конвейера подбора модели', () => {
   const CWD = 'C:/work/проект-worktrees/rename';
 
   /** `tools` — вызовы инструментов, которые ход сделал до текста ответа. */
-  function fakeRun(text: string, tools: readonly string[] = []): RunLike {
+  function fakeRun(text: string, tools: readonly string[] = [], onStart?: () => void): RunLike {
     return {
       start: async (_options, onEvent) => {
+        onStart?.();
         tools.forEach((name, index) =>
           onEvent({ kind: 'tool', name, input: {}, id: `toolu_${index}` }),
         );
@@ -750,10 +767,34 @@ describe('планировщик конвейера подбора модели'
     };
   }
 
-  function build(text: string, options: { hasWork?: boolean; tools?: readonly string[] } = {}) {
+  function build(
+    text: string,
+    options: { hasWork?: boolean; tools?: readonly string[]; store?: AppStore; dir?: string } = {},
+  ) {
     const chains = new HandoffChains();
-    const registry = new ChatRunRegistry(() => fakeRun(text, options.tools));
+    const { store } = options;
+    /** Включённые группы в момент, когда прогон реально стартовал, — по порядку стартов. */
+    const enabledAtStart: string[][] = [];
+    const registry = new ChatRunRegistry(() =>
+      fakeRun(text, options.tools, () => {
+        if (store) {
+          enabledAtStart.push(
+            store
+              .getGroups()
+              .filter((group) => group.isEnabled)
+              .map((group) => group.id),
+          );
+        }
+      }),
+    );
     const links = new Map<string, ChatLink>();
+    // Со store связи живут там же, где в runtime: включение группы читает дерево из него.
+    const readLink = (key: string) => (store ? store.getChatLink(key) : links.get(key));
+    const writeLink = (key: string, link: ChatLink) =>
+      store ? store.setChatLink(key, link) : void links.set(key, link);
+    if (store) {
+      wireGroupActivation({ store, paths: groupPaths(options.dir ?? ''), chatRuns: registry });
+    }
     const runs: {
       chatId: string;
       model?: string;
@@ -782,12 +823,12 @@ describe('планировщик конвейера подбора модели'
         session: new ChatSession(registry),
         selfBaseUrl: 'http://127.0.0.1:5178',
         cascade: {
-          linkOf: (aliases) => aliases.map((key) => links.get(key)).find(Boolean),
-          saveLink: (chatId, link) => void links.set(chatId, link),
+          linkOf: (aliases) => aliases.map(readLink).find(Boolean),
+          saveLink: (chatId, link) => void writeLink(chatId, link),
           markReviewed: (aliases, at) => {
             for (const key of aliases) {
-              const link = links.get(key);
-              if (link) links.set(key, { ...link, reviewedAt: at });
+              const link = readLink(key);
+              if (link) writeLink(key, { ...link, reviewedAt: at });
             }
           },
           hasWork: () => options.hasWork ?? true,
@@ -795,7 +836,7 @@ describe('планировщик конвейера подбора модели'
         },
       }),
     );
-    return { chains, registry, links, runs };
+    return { chains, registry, links, runs, enabledAtStart };
   }
 
   const WORK_LINK: ChatLink = {
@@ -859,10 +900,46 @@ describe('планировщик конвейера подбора модели'
     expect(review?.effort).toBe('high');
     // Планка сдачи работы в ревью не уезжает: она сказала бы проверяющему
     // ровно обратное тому, зачем его завели.
-    expect(review?.append ?? '').not.toContain('НИЖЕ потолка');
+    expect(review?.append ?? '').not.toContain('BELOW the ceiling');
     expect(links.get(review?.chatId ?? '')?.stage).toBe('review');
     // Отметка о проверке — на работе, по её собственному ключу.
     expect(links.get('чат-работа')?.reviewedAt).toBeTruthy();
+  });
+
+  // Раунд 4: звено конвейера стартует мимо маршрута отправки — явная группа
+  // родителя до него не доезжала.
+  it('звено конвейера стартует с включённой группой родителя', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'cc-stage-group-'));
+    try {
+      mkdirSync(join(dir, 'agentdeck'), { recursive: true });
+      const store = new AppStore(join(dir, 'agentdeck'));
+      store.saveGroup({
+        id: 'x',
+        name: 'Набор X',
+        description: '',
+        color: 'accent',
+        icon: 'folder',
+        members: [],
+        env: {},
+        isEnabled: false,
+        order: 0,
+        projectPaths: [],
+      });
+      store.setChatGroupSettings('родитель', { groupChoice: 'global:x' });
+      // Своё «auto» у работы: группу включает именно старт звена, а не её прогон.
+      store.setChatGroupSettings('чат-работа', { groupChoice: 'auto' });
+      store.setChatLink('чат-работа', WORK_LINK);
+      const { registry, runs, enabledAtStart } = build('Готово, переименовал.', { store, dir });
+
+      await run(registry, 'чат-работа');
+
+      const review = runs.findIndex((item) => item.chatId.startsWith('new-'));
+      expect(review).toBeGreaterThan(0);
+      expect(enabledAtStart[0]).not.toContain('x');
+      expect(enabledAtStart[review]).toContain('x');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it('пустой дифф не стоит прогона на потолке', async () => {
@@ -893,7 +970,7 @@ describe('планировщик конвейера подбора модели'
     expect(fix?.model).toBe('sonnet');
     expect(fix?.effort).toBe('medium');
     // Правки идут ниже потолка — планка сдачи им нужна.
-    expect(fix?.append ?? '').toContain('НИЖЕ потолка');
+    expect(fix?.append ?? '').toContain('BELOW the ceiling');
     expect(links.get(fix?.chatId ?? '')?.stage).toBe('fix');
   });
 
@@ -991,7 +1068,7 @@ describe('планировщик конвейера подбора модели'
       const work = runs.find((item) => item.chatId.startsWith('new-'));
       expect(work?.model).toBe('sonnet');
       expect(work?.effort).toBe('medium');
-      expect(work?.append).toContain('НИЖЕ потолка');
+      expect(work?.append).toContain('BELOW the ceiling');
       expect(links.get(work?.chatId ?? '')).toMatchObject({ stage: 'work', lowered: true });
       expect(planned).toContain('чат-план');
       // План — не цепочка: конвейер узнаёт о конце РАБОТЫ, а не плана.

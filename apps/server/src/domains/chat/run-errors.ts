@@ -1,3 +1,5 @@
+import { serverText } from '../../lib/server-texts.ts';
+
 /**
  * Похоже ли падение прогона на временное — «сеть моргнула», перегрузка, таймаут.
  *
@@ -15,7 +17,7 @@ export function isRetriableRunError(message: string): boolean {
 
 /** Код известной ошибки CLI — клиент показывает понятный текст и действие, а не сырую строку. */
 export interface RunErrorCode {
-  code: 'cli-outdated' | 'prompt-too-long';
+  code: 'cli-outdated' | 'prompt-too-long' | 'chat-process-lost';
   params?: Record<string, string>;
   /** Контекст переполнен — и при коде устаревшего CLI (сжатие упало из-за версии). */
   overflow?: boolean;
@@ -28,6 +30,9 @@ export interface RunErrorCode {
  * обновление чинит и сжатие; переполнение при этом остаётся флагом.
  */
 export function runErrorCode(message: string): RunErrorCode | undefined {
+  // Текст панели по коду (`ChatRunner.exitFailure`): код едет рядом, чтобы
+  // английский интерфейс не показывал русскую строку.
+  if (message === serverText('chat-process-lost')) return { code: 'chat-process-lost' };
   const overflow = /prompt is too long/i.test(message);
   const outdated =
     /Claude Code (\d+\.\d+\.\d+) does not support this model; version (\d+\.\d+\.\d+) or newer is required/i.exec(

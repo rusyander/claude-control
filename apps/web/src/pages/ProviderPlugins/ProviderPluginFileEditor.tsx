@@ -5,6 +5,7 @@ import { Card } from '@shared/ui/card';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { Typography } from '@shared/ui/typography';
+import { sameText } from '@shared/lib/same-text';
 import { SkeletonList } from '@shared/ui/skeleton';
 import { useProviderPluginFile, useSaveProviderPluginFile } from '@entities/ProviderPlugins';
 import type { ProviderPluginFileEditorProps } from './ProviderPluginFileEditor.types';
@@ -39,7 +40,9 @@ export function ProviderPluginFileEditor({
     return <SkeletonList rows={4} withActions={false} />;
   }
 
-  const dirty = content !== data.content;
+  // Без учёта переносов строк: textarea отдаёт LF, файл на Windows — CRLF, и
+  // одна набранная и стёртая буква навсегда оставляла «не сохранено» (ревью 28.09 F-90).
+  const dirty = !sameText(content, data.content);
 
   return (
     <Card padding="md">

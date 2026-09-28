@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
-import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, existsSync, readFileSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { AddressInfo } from 'node:net';
@@ -231,7 +231,8 @@ describe('panel-agent-routes', () => {
 
     const result = (await running).json<PanelActionResult>();
     expect(result).toMatchObject({ outcome: 'done', status: 200 });
-    expect(registeredPaths()).toEqual([projectDir]);
+    // Реестр пишет путь так, как он записан на диске (без 8.3 из tmpdir, F-134).
+    expect(registeredPaths()).toEqual([realpathSync.native(projectDir)]);
     // Страница — карточка созданного проекта, а не список (D5).
     const created = new AppStore(appData).getProjects()[0];
     expect(result.page).toEqual({ route: `/projects?id=${created?.id}` });
@@ -264,8 +265,13 @@ describe('panel-agent-routes', () => {
   });
 
   it('подтверждённый вызов, отвергнутый маршрутом, — failed со статусом и текстом маршрута', async () => {
-    const running = call('create_project', { path: join(projectDir, 'missing-dir') });
+    // Каталог есть, пока человек читает карточку, и пропал до клика: заведомо
+    // обречённый ввод отказан ещё до карточки, отказ маршрута — это такая гонка.
+    const vanishing = join(projectDir, 'vanishing-dir');
+    mkdirSync(vanishing);
+    const running = call('create_project', { path: vanishing });
     const card = await waitPending();
+    rmSync(vanishing, { recursive: true, force: true });
     await decide(card.id, 'approve');
     const result = (await running).json<PanelActionResult>();
     expect(result.outcome).toBe('failed');
@@ -340,7 +346,8 @@ describe('panel-agent-routes', () => {
     expect(approved.statusCode).toBe(200);
     expect((await running).json<PanelActionResult>()).toMatchObject({ outcome: 'done' });
     // Доказательство — реестр проектов, а не ответ маршрута.
-    expect(registeredPaths()).toEqual([projectDir]);
+    // Реестр пишет путь так, как он записан на диске (без 8.3 из tmpdir, F-134).
+    expect(registeredPaths()).toEqual([realpathSync.native(projectDir)]);
     expect(journalLines().at(-1)).toMatchObject({ name: 'create_project', decidedBy: 'human' });
   });
 
@@ -530,6 +537,7 @@ describe('panel-agent: отпечаток предпросмотра', () => {
       pending,
       access,
       actions: [action],
+      ledger: { 'POST /touch': 'action:touch_target' },
     });
     await app.ready();
   });
@@ -588,6 +596,7 @@ describe('panel-agent: отпечаток предпросмотра', () => {
         expectedToken: () => '',
       },
       actions: [truncatedAction],
+      ledger: { 'POST /touch': 'action:huge_edit' },
     });
     await app.ready();
     const called = app.inject({

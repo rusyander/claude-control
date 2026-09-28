@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Badge } from '@shared/ui/badge';
+import { serverFieldText } from '@shared/config/i18n';
 import { stateTone } from './FormatCheckCard.lib';
 import type { FormatCheckRowProps } from './FormatCheckRow.types';
 import styles from './FormatCheckCard.module.scss';
@@ -9,6 +10,8 @@ import styles from './FormatCheckCard.module.scss';
 /** Итог по одному CLI: состояние, ведомые ключи и пояснение. */
 export function FormatCheckRow({ row, name }: FormatCheckRowProps) {
   const { t } = useTranslation();
+  // «Схемы нет» приходит с кодом и переводится; отказ сети — чужой текст как есть.
+  const note = serverFieldText(row, 'note');
 
   return (
     <Stack direction="row" align="start" gap="var(--spacing-xs)" className={styles.row} wrap>
@@ -17,9 +20,9 @@ export function FormatCheckRow({ row, name }: FormatCheckRowProps) {
         <Typography variant="body-sm" as="span">
           {name}
         </Typography>
-        {row.note && (
+        {note && (
           <Typography variant="caption" color="subtle" as="span">
-            {row.note}
+            {note}
           </Typography>
         )}
         {row.keys.map((key) => (

@@ -1,4 +1,5 @@
 import type { EntityRef, Group, GroupMember } from '@agentdeck/contracts';
+import { inClaudeGlobals } from '@agentdeck/contracts/group-sources';
 import { readHooks } from './hooks.ts';
 import {
   applyEntityStates,
@@ -8,7 +9,7 @@ import {
 } from './entity-toggle.ts';
 import { applyGroupEnv, existingEnvKeys } from './env.ts';
 import { collectLeafMembers } from './group-graph.ts';
-import { compileScenarioHooks } from './group-scenario.ts';
+import { retireScenarioHooks } from './group-scenario.ts';
 
 /**
  * Включение и выключение группы целиком.
@@ -49,7 +50,7 @@ export function setGroupEnabled(
   // а не только прямых участников. Отметка «погашено этой группой» ставится
   // от id переключаемой группы — так лист, входящий ещё и в другую группу,
   // оживает лишь когда его отпустят все.
-  const leaves = collectLeafMembers(store.getGroups(), group.members);
+  const leaves = collectLeafMembers(store.getGroups(), group.members, group.scope);
 
   // Хук из settings.local.json группе не подчиняется: панель в этот файл не
   // пишет, поэтому выключить его нечем — и `readHooks` честно показывает его
@@ -92,16 +93,17 @@ export function setGroupEnabled(
   // выключение — снимает свои, не задев ручные и общие с другой группой.
   const envBackup = applyGroupEnvState(deps, group, isEnabled);
 
-  // Триггер сценария принадлежит включённой группе: выключенная не должна
-  // ничего навязывать. Пересборка идёт ЗДЕСЬ, а не в маршруте, потому что
-  // тумблер щёлкает не только человек — привязка к проекту включает группу
-  // сама, и сценарий обязан появиться и в этом случае.
-  compileScenarioHooks(deps);
+  // Старые хуки-триггеры сценариев снимаются при каждом щелчке: компиляция
+  // сценария снята (шаги живут в «Пути»), и уцелевший триггер отказывал бы в
+  // каждом сообщении. Без триггеров settings.json не трогается.
+  const retiredBackup = retireScenarioHooks(deps);
 
   return {
     affected: leaves.length - skippedLocalHooks,
     skippedLocalHooks,
-    backupPath: hookBackup ?? envBackup,
+    // Первая копия — состояние до щелчка; снятие триггера тоже пишет файл, и
+    // без его копии итог молчал бы о записи (F-219).
+    backupPath: hookBackup ?? envBackup ?? retiredBackup,
   };
 }
 
@@ -113,7 +115,7 @@ export function releaseGroupMembers(deps: EntityToggleDeps, group: Group): void 
   const { store } = deps;
   const states: EntityState[] = [];
 
-  for (const member of collectLeafMembers(store.getGroups(), group.members)) {
+  for (const member of collectLeafMembers(store.getGroups(), group.members, group.scope)) {
     store.setGroupDisabled(member.kind, member.id, group.id, false);
     states.push({
       kind: member.kind,
@@ -124,6 +126,43 @@ export function releaseGroupMembers(deps: EntityToggleDeps, group: Group): void 
 
   applyEntityStates(deps, states);
   rewriteHooks(deps);
+}
+
+/** Что удаление группы сделает за пределами её записи в state.json. */
+export interface GroupDeletionEffect {
+  /** Ключи env, которые уйдут из settings.json (держит только эта группа). */
+  envRemoved: string[];
+  /** Участники `kind:id`, которых гасила только эта группа, — они снова включатся. */
+  membersBackOn: string[];
+}
+
+/**
+ * Итог удаления без записи — для карточки подтверждения. Повторяет правила
+ * маршрута удаления: env снимается как при выключении (`applyGroupEnvState`),
+ * участники выключенной группы отпускаются (`releaseGroupMembers`). Карточка,
+ * показывающая одну запись группы, умалчивала бы, что вместе с ней уходят живые
+ * переменные и оживают погашенные сущности.
+ */
+export function groupDeletionEffect(
+  store: EntityToggleDeps['store'],
+  group: Group,
+): GroupDeletionEffect {
+  const envRemoved = store
+    .getGroupEnvKeys(group.id)
+    .filter((key) => !store.isEnvKeyOwnedByGroup(key, group.id));
+  const membersBackOn = group.isEnabled
+    ? []
+    : collectLeafMembers(store.getGroups(), group.members, group.scope)
+        .filter((member) => {
+          const holders = store.disablingGroups(member.kind, member.id);
+          return (
+            holders.includes(group.id) &&
+            holders.length === 1 &&
+            !store.isDisabledManually(member.kind, member.id)
+          );
+        })
+        .map((member) => `${member.kind}:${member.id}`);
+  return { envRemoved, membersBackOn };
 }
 
 /** Совпадают ли наборы env двух версий группы (одни ключи и значения). */
@@ -148,6 +187,9 @@ export function applyGroupEnvState(
   group: Group,
   isEnabled: boolean,
 ): string | undefined {
+  // Проектная группа не пишет в общий settings.json: её окружение — дело проекта.
+  // Копия для другой CLI — тоже: settings.json Claude ей чужой.
+  if (!inClaudeGlobals(group.scope)) return undefined;
   const { paths, store, backupDir } = deps;
   const settingsPath = paths.settings;
 
@@ -198,8 +240,8 @@ export function reconcileMembers(
   // Сравниваем не прямой состав, а развёрнутые листья: правка вложенной группы
   // добавляет/убирает всех её потомков, и отметки удержания должны идти за ними.
   const groups = store.getGroups();
-  const nextLeaves = collectLeafMembers(groups, group.members);
-  const previousLeaves = collectLeafMembers(groups, previousMembers);
+  const nextLeaves = collectLeafMembers(groups, group.members, group.scope);
+  const previousLeaves = collectLeafMembers(groups, previousMembers, group.scope);
 
   const nextKeys = new Set(nextLeaves.map(keyOf));
   const prevKeys = new Set(previousLeaves.map(keyOf));

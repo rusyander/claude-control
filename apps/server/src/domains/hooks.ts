@@ -75,10 +75,35 @@ function withRemembered(own: Hook[], remembered: Hook[]): Hook[] {
  * который понимает Claude Code.
  */
 
-interface RawHookCommand {
+export interface RawHookCommand {
   type: string;
-  command: string;
+  command?: string;
   timeout?: number;
+  [key: string]: unknown;
+}
+
+/**
+ * Всё, чего нет в плоской записи: `type` не-команды, `prompt`, `statusMessage`,
+ * `once`, `async`… У обычной команды без добавок — `undefined`, чтобы запись в
+ * списке и снимок выключенного хука не обрастали пустым полем.
+ */
+function extraOf(raw: RawHookCommand): Record<string, unknown> | undefined {
+  const { command: _command, timeout: _timeout, ...rest } = raw;
+  const keys = Object.keys(rest);
+  return keys.length === 1 && rest.type === 'command' ? undefined : rest;
+}
+
+/**
+ * Запись обратно в файл: сначала то, что панель показывает, потом поля, которых
+ * она не касается, — как были. Команду получает только командный хук: у
+ * prompt/http/agent её нет, и пустая строка там сделала бы запись невалидной.
+ */
+export function hookEntryOf(hook: Hook): RawHookCommand {
+  const { type = 'command', ...rest } = hook.extra ?? {};
+  const raw: RawHookCommand = { type: typeof type === 'string' ? type : 'command' };
+  if (raw.type === 'command' || hook.command) raw.command = hook.command;
+  if (hook.timeout !== undefined) raw.timeout = hook.timeout;
+  return { ...raw, ...rest };
 }
 
 interface RawMatcherGroup {
@@ -151,16 +176,21 @@ function parseHooksFile(
 
   for (const [event, groups] of Object.entries(settings.hooks ?? {})) {
     groups.forEach((group, groupIndex) => {
-      group.hooks.forEach((command, commandIndex) => {
+      group.hooks.forEach((raw, commandIndex) => {
+        // У prompt/http/agent-хука команды нет — пустая строка, а не `undefined`:
+        // снимок выключенного хука проходит схему состояния, где команда — строка,
+        // и его ключ считается от того же значения, что id в списке.
+        const command = typeof raw.command === 'string' ? raw.command : '';
+        const extra = extraOf(raw);
         // Полный дубль хука неразличим по содержимому — такому даём суффикс,
         // иначе выключение одного гасило бы оба.
-        const base = `${prefix}${hookId(event, group.matcher, command.command)}`;
+        const base = `${prefix}${hookId(event, group.matcher, command)}`;
         let id = base;
         for (let n = 2; usedIds.has(id); n += 1) id = `${base}-${n}`;
         usedIds.add(id);
 
         const legacyId = `${prefix}${legacyHookId(event, groupIndex, commandIndex)}`;
-        const scriptPath = extractScriptPath(command.command);
+        const scriptPath = extractScriptPath(command);
         // Claude Code запускает хук с cwd = каталог проекта, поэтому относительный
         // путь скрипта в `.claude` проекта — норма. Проверяем его от корня проекта,
         // а не от cwd сервера: иначе живой `.claude/hooks/x.mjs` шёл как «не найден».
@@ -171,15 +201,16 @@ function parseHooksFile(
           legacyId,
           event: event as HookEvent,
           matcher: group.matcher,
-          command: command.command,
-          timeout: command.timeout,
+          command,
+          timeout: raw.timeout,
+          ...(extra ? { extra } : {}),
           // Локальный хук выключить нечем: панель в этот файл не пишет,
           // поэтому он всегда показан включённым — как оно и есть на деле.
           isEnabled: source === 'settings-local' || overlay.isEnabled(id, legacyId),
           scriptPath,
           scriptExists: scriptFile ? existsSync(scriptFile) : undefined,
           description: scriptFile ? readScriptDescription(scriptFile) : undefined,
-          groupIds: overlay.groupIds(id, legacyId, command.command),
+          groupIds: overlay.groupIds(id, legacyId, command),
           source,
         });
       });
@@ -263,8 +294,7 @@ export function writeHooks(
     // Хуки с одинаковым matcher объединяем в одну группу — так же,
     // как это делает сам Claude Code.
     const existing = groups.find((group) => group.matcher === hook.matcher);
-    const command: RawHookCommand = { type: 'command', command: hook.command };
-    if (hook.timeout !== undefined) command.timeout = hook.timeout;
+    const command = hookEntryOf(hook);
 
     if (existing) existing.hooks.push(command);
     else
@@ -385,6 +415,11 @@ export function upsertHook(
   // Несколько фильтров объединяются в одно регулярное выражение —
   // именно такой формат понимает Claude Code.
   const matcher = draft.matchers.filter(Boolean).join('|') || undefined;
+  // Форма правит команду, событие, фильтр и таймаут; `statusMessage`, `async` и
+  // прочие поля командного хука, которых в форме нет, остаются. Хук другого типа
+  // форма превращает в команду — его `prompt` к команде не относится.
+  const extra = hooks[index]?.extra;
+  const keptExtra = extra && (extra.type ?? 'command') === 'command' ? extra : undefined;
 
   const next: Hook = {
     id: hookId ?? `${draft.event}:new:${Date.now()}`,
@@ -392,6 +427,7 @@ export function upsertHook(
     matcher,
     command,
     timeout: draft.timeout,
+    ...(keptExtra ? { extra: keptExtra } : {}),
     isEnabled: draft.isEnabled,
     scriptPath: generated?.path ?? extractScriptPath(command),
     groupIds: draft.groupIds,

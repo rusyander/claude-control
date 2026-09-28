@@ -15,7 +15,7 @@ import {
   Title,
 } from '../src/shared/ui';
 import { colors, font, radius, space } from '../src/shared/config/theme';
-import { useT } from '../src/shared/config/i18n';
+import { useLanguage, useT } from '../src/shared/config/i18n';
 import { useWorkspace } from '../src/shared/lib/workspace';
 import {
   useInstallTestConvention,
@@ -25,11 +25,15 @@ import {
   useStartManualRun,
   useStartTestRun,
   useStopTestRun,
+  useTestPyramid,
 } from '../src/entities/tests/api';
 import { formatWhen } from '../src/entities/tests/status';
 import { TestCaseEditor } from '../src/features/tests/TestCaseEditor';
 import { TestCaseRow } from '../src/features/tests/TestCaseRow';
+import { TestE2eCard } from '../src/features/tests/TestE2eCard';
+import { TestPyramidCard } from '../src/features/tests/TestPyramidCard';
 import { TestLinks } from '../src/features/tests/TestLinks';
+import { usePullRefresh } from '../src/shared/lib/pull-refresh';
 import {
   EMPTY_FILTER,
   TestFilters,
@@ -51,11 +55,14 @@ import {
  * тап ради переключения между GUI и E2E не окупается.
  */
 export default function TestsScreen() {
+  const language = useLanguage();
   const t = useT();
   const workspace = useWorkspace();
   const projectPath = workspace.projectPath;
 
   const tests = useProjectTests(projectPath);
+  const pyramid = useTestPyramid(projectPath);
+  const pull = usePullRefresh(tests.refetch, pyramid.refetch);
   const start = useStartTestRun(projectPath);
   const stop = useStopTestRun(projectPath);
   const save = useSaveTestCase(projectPath);
@@ -127,8 +134,8 @@ export default function TestsScreen() {
         scroll
         refreshControl={
           <RefreshControl
-            refreshing={tests.isFetching}
-            onRefresh={() => void tests.refetch()}
+            refreshing={pull.refreshing}
+            onRefresh={pull.onRefresh}
             tintColor={colors.accent}
           />
         }
@@ -138,6 +145,12 @@ export default function TestsScreen() {
           {/* К чему привязан проект — до кнопок запуска: требования открывают
               ПЕРЕД прогоном, а не после того, как что-то покраснело. */}
           <TestLinks projectPath={projectPath} groupId={active?.id} />
+          <TestE2eCard
+            folder={tests.data?.e2e}
+            run={tests.data?.e2eRun}
+            automation={tests.data?.automation}
+          />
+          <TestPyramidCard pyramid={pyramid.data} />
           <Field
             value={scope}
             onChangeText={setScope}
@@ -230,7 +243,7 @@ export default function TestsScreen() {
             </>
           )}
           {run ? (
-            <Text style={styles.runState}>{runLabel(run.status, run.mode, run.error, t)}</Text>
+            <Text style={styles.runState}>{agentRunState(run.status, run.mode, run.error, t)}</Text>
           ) : null}
           {start.error ? <Text style={styles.bad}>{(start.error as Error).message}</Text> : null}
           {startManual.error ? (
@@ -285,7 +298,7 @@ export default function TestsScreen() {
             </Row>
             <Muted>{t.tests.counts(counts.passed, counts.failed, counts.rest)}</Muted>
             <Muted>
-              {lastRunAt ? t.tests.lastRun(formatWhen(lastRunAt)) : t.tests.lastRunNever}
+              {lastRunAt ? t.tests.lastRun(formatWhen(lastRunAt, language)) : t.tests.lastRunNever}
             </Muted>
 
             <TestFilters cases={cases} filter={filter} onChange={setFilter} />
@@ -354,8 +367,11 @@ export default function TestsScreen() {
   );
 }
 
-/** Подпись состояния прогона одной строкой. */
-function runLabel(
+/**
+ * Подпись состояния прогона агента одной строкой. Не `runLabel`: так называется
+ * подпись записи истории в entities/tests — другое значение под тем же именем.
+ */
+function agentRunState(
   status: string,
   mode: string,
   error: string | undefined,

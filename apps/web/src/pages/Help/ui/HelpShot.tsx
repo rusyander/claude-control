@@ -1,32 +1,39 @@
-import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useTheme } from '@shared/hooks/use-theme';
 import { Typography } from '@shared/ui/typography';
+import { pickShot, shotLangOf } from '../model/shotVariant';
+import { useShotVariants } from '../model/useShotVariants';
 import styles from './help-kit.module.scss';
-import type { HelpShotProps } from './help-kit.types';
+import type { HelpShotProps, HelpShotSide } from './help-kit.types';
+
+/** Чей экран на кадре — первое слово подписи. */
+const SIDE_KEYS: Record<HelpShotSide, string> = {
+  panel: 'help.shots.sidePanel',
+  platform: 'help.shots.sidePlatform',
+  // Экран приложения на телефоне: снят с эмулятора Android, у приложения одна
+  // (тёмная) тема, поэтому кадр узкий и от темы панели не зависит.
+  phone: 'help.shots.sidePhone',
+};
 
 /**
  * Снимок экрана в справке.
  *
  * Каталог общий на ВСЕ разделы: `раздел → сценарий → кадр`, файлы лежат в
- * `apps/web/public/help/<раздел>/<сценарий>/<кадр>.png` и раздаются как
- * статика. Компонент не знает ни одного конкретного кадра — он собирает адрес
- * и ключ подписи по одному правилу, поэтому завтрашние снимки чата и тестов
- * встанут сюда же без единой правки.
+ * `apps/web/public/help/<раздел>/<сценарий>/` и раздаются как статика.
+ * Компонент не знает ни одного конкретного кадра — он собирает адрес и ключ
+ * подписи по одному правилу, поэтому новые снимки встают сюда без правки.
  *
- * ЯЗЫК КАДРА. Переводилась только подпись, а на картинке оставался русский
- * интерфейс: английскому читателю такая пара не объясняет ничего — подпись
- * называет кнопку одним словом, а на снимке написано другое. Английский кадр
- * лежит РЯДОМ с русским и называется `<кадр>.en.png`: съёмка кладёт его в ту же
- * папку и в ту же опись, и сторож `tools/qa/check-help-shots.mjs` видит его тем
- * же плоским списком PNG, каким видит русский, — без второго обхода каталога.
+ * ЧЕТЫРЕ ВАРИАНТА. Каждый кадр снят в светлой и тёмной теме панели, по-русски
+ * и по-английски: светлый снимок на тёмной странице висит белым прямоугольником,
+ * а русский интерфейс под английской подписью не объясняет ничего. Какой файл
+ * какому варианту отвечает и какого он размера, знает опись раздела
+ * `variants.json` — её пишет съёмка (`tools/help-shots/kit.mjs`) и сверяет
+ * `tools/qa/check-help-shots.mjs`. Выбор и порядок замены недостающего варианта
+ * — `pickShot` в `model/shotVariant.ts`.
  *
- * ПРОПУСК ЗАКРЫВАЕТСЯ САМ. Английских кадров пока меньше, чем русских, и
- * переснимаются они разделами. Пока раздел не переснят, `onError` подставляет
- * русский файл: читатель видит снимок не на своём языке — это хуже перевода, но
- * несравнимо лучше битой картинки посреди инструкции. Неудачный адрес
- * запоминается, а не выставляется флаг «сломано»: как только язык (а с ним и
- * желаемый адрес) меняется, попытка повторяется сама — без эффекта и без
- * ключа-пересборки.
+ * БЕЗ СКАЧКА. Размер из описи уходит в `width`/`height`: место под картинку
+ * зарезервировано до загрузки, и смена темы или языка не двигает текст. Пока
+ * опись не пришла, картинки нет вовсе — иначе на миг мелькнул бы чужой вариант.
  *
  * Подпись и `alt` — ОДИН текст: `help.shots.<раздел>.<сценарий>.<кадр>`.
  * Отдельная «альтернативная» формулировка разошлась бы с видимой в первый же
@@ -37,26 +44,28 @@ import type { HelpShotProps } from './help-kit.types';
  */
 export function HelpShot({ topic, scenario, frame, side }: HelpShotProps) {
   const { t, i18n } = useTranslation();
+  const { theme } = useTheme();
+  const { index, settled } = useShotVariants(topic);
   const caption = t(`help.shots.${topic}.${scenario}.${frame}`);
-
-  const russian = `/help/${topic}/${scenario}/${frame}.png`;
-  const wanted = i18n.language.startsWith('en') ? `${russian.slice(0, -4)}.en.png` : russian;
-  const [broken, setBroken] = useState('');
-  const src = broken === wanted ? russian : wanted;
+  const shot = pickShot(index, { topic, scenario, frame }, theme, shotLangOf(i18n.language));
 
   return (
-    <figure className={styles.shot}>
-      <img
-        className={styles.shotImage}
-        src={src}
-        alt={caption}
-        loading="lazy"
-        onError={() => setBroken(wanted)}
-      />
+    <figure className={side === 'phone' ? `${styles.shot} ${styles.shotPhone}` : styles.shot}>
+      {settled ? (
+        <img
+          className={styles.shotImage}
+          src={shot.src}
+          width={shot.width}
+          height={shot.height}
+          alt={caption}
+          loading="lazy"
+          data-shot={`${scenario}/${frame}`}
+          data-variant={shot.variant}
+        />
+      ) : null}
       <figcaption className={styles.shotCaption}>
         <Typography variant="caption" color="muted" as="span">
-          {side === 'platform' ? t('help.shots.sidePlatform') : t('help.shots.sidePanel')} ·{' '}
-          {caption}
+          {t(SIDE_KEYS[side])} · {caption}
         </Typography>
       </figcaption>
     </figure>

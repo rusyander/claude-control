@@ -85,16 +85,17 @@ export async function shootSetup(browser, web, scenario) {
     // с кнопками сохранения, о которых говорит следующий шаг.
     await page.waitForTimeout(7000);
 
-    // ── 03. Правила проекта: его CLAUDE.md целиком ───────────────────────────
+    // ── 03. Инструкции проекта: его CLAUDE.md документом для чтения ─────────
     await scenario.shot(page, '03-rules');
 
     // ── 04. MCP-серверы проекта из его .mcp.json ─────────────────────────────
-    await page.getByRole('button', { name: /^(MCP-серверы|MCP servers)$/ }).click();
+    // Вкладки — роль tab, и в имени за подписью идёт счётчик.
+    await page.getByRole('tab', { name: /^(MCP-серверы|MCP servers)/ }).click();
     await page.waitForTimeout(900);
     await scenario.shot(page, '04-mcp');
 
     // ── 05. Права проекта из .claude/settings.json ───────────────────────────
-    await page.getByRole('button', { name: /^(Права|Permissions)$/ }).click();
+    await page.getByRole('tab', { name: /^(Права|Permissions)/ }).click();
     await page.waitForTimeout(900);
     await scenario.shot(page, '05-permissions');
 

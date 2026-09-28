@@ -28,6 +28,7 @@ import { IntegrationsTopic } from '../topics/IntegrationsTopic';
 import { PlatformTopic } from '../topics/PlatformTopic';
 import { PromptsTopic } from '../topics/PromptsTopic';
 import { PortabilityTopic } from '../topics/PortabilityTopic';
+import { PhoneTopic } from '../topics/PhoneTopic';
 
 export { HELP_ROUTE } from '@shared/config/routes';
 
@@ -145,6 +146,10 @@ export const HELP_GROUPS: HelpGroup[] = [
       // Окно агента есть на каждой странице, своего раздела у него нет: `pagePath`
       // ведёт на «Обзор», откуда окно открывают чаще всего.
       { id: 'panelAgent', icon: 'commands', pagePath: '/', Content: PanelAgentTopic },
+      // Последним намеренно: телефон — окно во всё, что описано выше, и читать про
+      // него осмысленно, когда разделы уже знакомы. Своей страницы у него нет:
+      // `pagePath` ведёт в «Настройки», где стоит карточка «Удалённый доступ».
+      { id: 'phone', icon: 'phone', pagePath: '/settings', Content: PhoneTopic },
     ],
   },
 ];

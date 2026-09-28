@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { AnimatePresence, motion } from 'motion/react';
 import { DIALOG, FADE, DURATION, EASE, withReducedMotion } from '@shared/lib/motion';
 import { useReducedMotion } from '@shared/hooks/use-reduced-motion/useReducedMotion';
+import { useBesideDockDialog } from '@shared/hooks/use-beside-dock-dialog';
 import { Stack } from '@shared/ui/stack';
 import { CodeText, Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
@@ -21,6 +22,7 @@ export function Modal({
   title,
   description,
   children,
+  headerActions,
   footer,
   size = 'md',
   bodyFill = false,
@@ -59,8 +61,13 @@ export function Modal({
   };
   const block = dismissible ? undefined : (event: Event): void => event.preventDefault();
 
+  // Открыто пристёгнутое окно (агент панели) и ему хватает места: модальное окно
+  // встаёт слева от него, а не поверх (`@shared/lib/side-dock`).
+  const { besideDock, onInteractOutside, onEscapeKeyDown } = useBesideDockDialog(isOpen, block);
+  const besideClass = besideDock ? styles.besideDock : undefined;
+
   return (
-    <Root open={isOpen} onOpenChange={handleOpenChange}>
+    <Root open={isOpen} onOpenChange={handleOpenChange} modal={!besideDock}>
       {/*
         forceMount отдаёт управление показом AnimatePresence: без него Radix
         снимает окно с экрана мгновенно, и анимации закрытия не существует —
@@ -69,27 +76,42 @@ export function Modal({
       <AnimatePresence>
         {isOpen && (
           <Portal forceMount>
-            <Overlay asChild forceMount>
+            {besideDock ? (
+              // Без режима модальности Radix затемнение не рисует — своё, слева от окна.
               <motion.div
-                className={styles.overlay}
+                className={[styles.overlay, besideClass].join(' ')}
+                aria-hidden="true"
+                data-modal-beside-dock
                 variants={FADE}
                 initial="hidden"
                 animate="visible"
                 exit="hidden"
                 transition={fade}
               />
-            </Overlay>
+            ) : (
+              <Overlay asChild forceMount>
+                <motion.div
+                  className={styles.overlay}
+                  variants={FADE}
+                  initial="hidden"
+                  animate="visible"
+                  exit="hidden"
+                  transition={fade}
+                />
+              </Overlay>
+            )}
 
             <Content
               asChild
               forceMount
-              onEscapeKeyDown={block}
+              onEscapeKeyDown={onEscapeKeyDown}
               onPointerDownOutside={block}
-              onInteractOutside={block}
+              onInteractOutside={onInteractOutside}
               onCloseAutoFocus={restoreOpenerFocus}
             >
               <motion.div
-                className={[styles.content, styles[size]].join(' ')}
+                className={[styles.content, styles[size], besideClass].filter(Boolean).join(' ')}
+                data-modal-size={size}
                 variants={DIALOG}
                 initial="hidden"
                 animate="visible"
@@ -107,6 +129,7 @@ export function Modal({
                       </Typography>
                     </Description>
                   )}
+                  {headerActions && <div className={styles.headerActions}>{headerActions}</div>}
                 </Stack>
 
                 {dismissible && (
@@ -124,6 +147,7 @@ export function Modal({
 
                 <div
                   className={[styles.body, bodyFill && styles.bodyFill].filter(Boolean).join(' ')}
+                  data-modal-body
                 >
                   {children}
                 </div>

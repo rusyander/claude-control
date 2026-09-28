@@ -4,16 +4,21 @@ import { useQueryClient } from '@tanstack/react-query';
 import type { PanelPendingAction } from '@agentdeck/contracts/panel-agent';
 import { Button, Mono, Muted, Row, Title } from '../../shared/ui';
 import { colors, radius, space } from '../../shared/config/theme';
-import { useT } from '../../shared/config/i18n';
+import { useLanguage, useT } from '../../shared/config/i18n';
+import { formatClock } from '../../shared/lib/format';
 import { ApiError } from '../../shared/api/client';
 import { PANEL_AGENT_KEYS, useDecidePanelAction } from '../../entities/panel-agent/api';
 import {
   canApprove,
   cardFields,
+  cardPreview,
+  cardSummary,
+  type CardText,
   decisionProblem,
   isDanger,
   isFinalRefusal,
 } from '../../entities/panel-agent/model';
+import { panelText } from '../../entities/panel-agent/panelText';
 
 /** Кнопки глухи первые полсекунды: карточка всплывает под пальцем, и тап по ленте решал бы её. */
 const DECISION_ARM_MS = 500;
@@ -40,7 +45,11 @@ export function AgentPendingCard({ pending }: { pending: PanelPendingAction }) {
 
   const danger = isDanger(pending);
   const approvable = canApprove(pending) && !approveRefused;
-  const fields = cardFields(pending);
+  const language = useLanguage();
+  const text: CardText = (code, params, fallback) =>
+    panelText(t.panelTexts, language, code, params, fallback);
+  const fields = cardFields(pending, text, language);
+  const diff = cardPreview(pending, language).diff;
 
   const send = (decision: 'approve' | 'reject'): void => {
     if (Date.now() - mountedAt.current < DECISION_ARM_MS) return;
@@ -76,17 +85,15 @@ export function AgentPendingCard({ pending }: { pending: PanelPendingAction }) {
     );
   };
 
-  const expires = new Date(pending.expiresAt).toLocaleTimeString([], {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  // Язык интерфейса, а не системы телефона (F-323).
+  const expires = formatClock(pending.expiresAt, language);
   const busy = decide.isPending || sent;
 
   return (
     <View style={[styles.card, danger && styles.danger]} accessibilityRole="summary">
       <Title>{danger ? t.agent.card.dangerHeading : t.agent.card.heading}</Title>
       <Mono style={danger ? styles.dangerText : styles.name}>{pending.name}</Mono>
-      <Muted>{pending.preview.summary}</Muted>
+      <Muted>{cardSummary(pending, text, language)}</Muted>
 
       {fields.map((field, index) => (
         <View key={`${field.label}-${index}`} style={styles.field}>
@@ -101,11 +108,11 @@ export function AgentPendingCard({ pending }: { pending: PanelPendingAction }) {
         </View>
       ))}
 
-      {pending.preview.diff ? (
+      {diff ? (
         <View style={styles.field}>
           <Mono style={styles.label}>{t.agent.card.diff}</Mono>
           <ScrollView style={styles.long} nestedScrollEnabled>
-            <Mono>{pending.preview.diff}</Mono>
+            <Mono>{diff}</Mono>
           </ScrollView>
         </View>
       ) : null}

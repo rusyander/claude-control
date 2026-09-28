@@ -47,8 +47,8 @@ export const claudeMdEn: typeof claudeMdRu = {
     diffProjectText:
       'This is the personal file from ~/.claude. A project has its own — in the ' +
       'repository root — and its own .claude directory; both live in “Projects”, on ' +
-      'the “Rules” and “From the project” tabs. The name there is decided by the same ' +
-      'rule as here.',
+      'the “Instructions” and “From the project” tabs. The name there is decided by ' +
+      'the same rule as here.',
     diffPreview: 'Not a markdown editor',
     diffPreviewText:
       'It is a plain text field: no preview, no highlighting, no folding. The ' +
@@ -80,14 +80,15 @@ export const claudeMdEn: typeof claudeMdRu = {
         'edit sat in the field, the file was rewritten from outside.',
       uEditor: 'The whole file',
       uEditorText:
-        'The “# Личные правила” preamble, then the rule sections in the order they ' +
-        'sit in the file. At the bottom, the counter: “Символов: 717” — that much ' +
+        'The “# Личные правила” (“personal rules”) preamble of the sample file, then the ' +
+        'rule sections in the order they sit in the file. At the bottom, the counter: ' +
+        '“Characters: 717” — that much ' +
         'goes into the context of every session.',
       uUnsaved: 'An unsaved edit',
       uUnsavedText:
-        'A fifth rule was typed in — the counter reads “803 · есть несохранённые ' +
-        'правки”, while the sidebar still shows 4 for Rules: on disk the file is ' +
-        'still the old one. “Discard changes” returns the field to the loaded text.',
+        'A fifth rule was typed in — the counter reads “803 · unsaved changes”, while ' +
+        'the sidebar still shows 4 for Rules: on disk the file is still the old one. ' +
+        '“Revert changes” returns the field to the loaded text.',
       uConflict: 'The file changed on disk',
       uConflictText:
         'While the edit sat in the field, the file was rewritten outside — and the ' +
@@ -116,9 +117,10 @@ export const claudeMdEn: typeof claudeMdRu = {
         'configuration. It opens when you pick a project in the list on the left.',
       lFile: 'The project’s CLAUDE.md',
       lFileText:
-        'The “Rules” tab of a project card holds the same kind of whole-file view, ' +
-        'but for the project: “CLAUDE.md in the project root as Claude reads it in ' +
-        'this project”, with its own character counter below. This level has no ' +
+        'The “Instructions” tab of a project card holds the same whole file, but for ' +
+        'the project: it opens as a document to read with the file path above it, ' +
+        '“Edit” opens it for editing, and its own character counter sits below. Beside ' +
+        'it is the same card about the layout of names as here. This level has no rule ' +
         'cards, toggles or groups.',
       lLocal: 'The project’s own .claude directory',
       lLocalText:
@@ -142,10 +144,9 @@ export const claudeMdEn: typeof claudeMdRu = {
         'not by a mechanism.',
       orderCant: 'What it cannot do',
       orderCantText:
-        'Switch a personal rule off. The toggle and the “Отключённые правила” service ' +
-        'section exist only in the personal file, and project text cannot reach them; ' +
-        'nor is there a way to keep the personal file out of the session — it is read ' +
-        'in full.',
+        'Switch a personal rule off. Only the rules of the personal file have the toggle, ' +
+        'and project text cannot reach it; nor is there a way to keep the personal file ' +
+        'out of the session — it is read in full.',
       orderMarks: 'The panel’s marks are not a level of instructions',
       orderMarksText:
         'What is switched off and which groups hold what, the panel keeps in its own ' +
@@ -155,7 +156,7 @@ export const claudeMdEn: typeof claudeMdRu = {
       orderWhenText:
         'At the start of the next session — at any level. An open conversation will ' +
         'not see the new revision, neither in the terminal nor in the panel’s chat; in ' +
-        'the chat it takes a new conversation or “Restart session” in the header menu.',
+        'the chat it takes a new conversation or “Restart the session” in the header menu.',
     },
 
     canSeeAll: 'Read the whole global instructions file, preamble and service sections included',
@@ -182,7 +183,8 @@ export const claudeMdEn: typeof claudeMdRu = {
 
     storageFile: 'File',
     storageFormat: 'Format',
-    storageFormatValue: 'ordinary markdown; rules are “## ПРАВИЛО: …” sections',
+    storageFormatValue:
+      'ordinary markdown; rules are “## ПРАВИЛО: …” sections (ПРАВИЛО is Russian for RULE, and the heading is written exactly so in any interface language)',
     storageReader: 'Who reads it',
     storageReaderValue: 'Claude Code itself at session start, in full',
     storageWatch: 'Watching the file',
@@ -234,12 +236,15 @@ export const claudeMdEn: typeof claudeMdRu = {
     noteRestartText:
       'The file is written at once, but a session reads it once, at start. Check an ' +
       'edit in a new conversation, otherwise it looks like the rule does not work.',
-    noteDisabledTitle: 'The “Отключённые правила (AgentDeck)” section is not junk',
+    noteDisabledTitle: 'A switched-off rule is not in the file — and nothing is lost',
     noteDisabledText:
-      'The panel puts the text of rules switched off with a toggle there: they must ' +
-      'not stay in the main body of the file or Claude would follow them. Erase that ' +
-      'section by hand and the text of the switched-off rules is gone — the toggle ' +
-      'will not bring it back.',
+      'The toggle removes the rule from CLAUDE.md entirely: otherwise Claude would read ' +
+      'and follow it, and every word of the file costs tokens on every turn. The panel ' +
+      'keeps the rule’s text and place in its own state.json, and switching it on puts ' +
+      'it back exactly where it stood. A “Отключённые правила (AgentDeck)” section left ' +
+      'by earlier panel versions is still read and leaves the file on the next rule ' +
+      'write — do not erase it by hand: the text of rules switched off before the ' +
+      'update goes with it.',
     noteConflictTitle: 'The field and the file diverge silently in one direction only',
     noteConflictText:
       'While the field holds no edits of yours, the panel simply takes the new version ' +
@@ -252,7 +257,7 @@ export const claudeMdEn: typeof claudeMdRu = {
       'and are rolled back from “Settings” — that is the safety net for editing by hand.',
     noteHeadingTitle: 'Only “## ПРАВИЛО: …” makes a section a rule',
     noteHeadingText:
-      'The word ПРАВИЛО in any case, the colon required. “## Язык общения”, ' +
+      'The word ПРАВИЛО (RULE) in any case, the colon required. “## Code style”, ' +
       '“### ПРАВИЛО: …” and “## ПРАВИЛО without a colon” are ordinary text: the panel ' +
       'leaves them alone and makes no cards out of them. That is also where “0 rules” ' +
       'in a non-empty file comes from; for a subheading inside a rule use the third ' +
@@ -290,17 +295,17 @@ export const claudeMdEn: typeof claudeMdRu = {
 
   shots: {
     file: {
-      '01-editor': 'The whole file: preamble, rule sections and the “Символов: 717” counter',
+      '01-editor': 'The whole file: preamble, rule sections and the “Characters: 717” counter',
       '02-unsaved':
-        'A fifth rule typed into the field: “803 · есть несохранённые правки”, the sidebar still shows 4',
+        'A fifth rule typed into the field: “803 · unsaved changes”, the sidebar still shows 4',
       '03-conflict':
         'The file was rewritten outside: the edit in the field is intact, the divergence card and “Load from disk” on top',
     },
     layers: {
       '01-projects':
-        'The project registry: “Проектов: 1”, configuration opens by picking it in the list',
+        'The project registry: “Projects: 1”, configuration opens by picking it in the list',
       '02-project-file':
-        'The project’s CLAUDE.md on the “Rules” tab: the whole text, no cards and no toggles here',
+        'The project’s CLAUDE.md on the “Instructions” tab: the whole file as a document, edited via “Edit”',
       '03-project-local':
         'The “From the project” tab: skills, hooks and rules of the .claude directory — marked read-only',
     },

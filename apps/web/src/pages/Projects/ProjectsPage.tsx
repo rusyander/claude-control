@@ -2,7 +2,6 @@ import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Project } from '@agentdeck/contracts';
-import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
@@ -10,26 +9,33 @@ import { PageHeader } from '@shared/ui/page-header';
 import { ExplainBox } from '@shared/ui/explain-box';
 import { EmptyState } from '@shared/ui/empty-state';
 import { SkeletonList } from '@shared/ui/skeleton';
+import { cn } from '@shared/lib/cn';
 import { useEntityUrl, useEntityUrlWriter } from '@shared/hooks/use-entity-url';
 import { FolderPicker } from '@features/FolderPicker';
-import { DeleteButton } from '@features/EntityDelete';
 import { useProjectRegistry, useAddProject, useRemoveProject } from '@entities/Project';
 import { useSettings } from '@entities/AppConfig';
+import { toast } from '@shared/lib/toast';
+import { projectOnboardingText } from './projectOnboarding';
 import { ProjectConfigPanel } from './ProjectConfigPanel';
 import { ProviderProjectPanel } from './ProviderProjectPanel';
 import styles from './ProjectsPage.module.scss';
 
 /**
  * Проектный уровень конфигурации. Панель обычно ведёт пользовательский `~/.claude`,
- * а этот раздел — конфиги КОНКРЕТНОГО проекта: его CLAUDE.md, права и хуки в
+ * а этот раздел — конфиги КОНКРЕТНОГО проекта: его файл инструкций, права в
  * `.claude/settings.json` и MCP-серверы в корневом `.mcp.json`. Слева — реестр
  * запомненных проектов, справа — конфиг выбранного.
  *
+ * Раскладка собрана вокруг того, зачем сюда приходят: выбрать проект, прочитать
+ * и поправить его инструкции, права и MCP, увидеть, что пришло из репозитория.
+ * Страница занимает всю колонку — и ширину, и высоту: документ инструкций
+ * дотягивается до низа окна, а реестр слева стоит на месте при прокрутке.
+ *
  * Реестр проектов — раздел САМОЙ панели и от провайдера не зависит. А вот конфиг
- * выбранного проекта у каждого провайдера свой: Claude — прежняя панель без
- * изменений (правила/MCP/права), прочие — универсальная (инструкции проекта +
- * MCP из его проектного файла, COMMON-2). До загрузки настроек считаем
- * провайдера дефолтным (claude) — как в остальных гейтах.
+ * выбранного проекта у каждого провайдера свой: Claude — своя панель
+ * (инструкции/MCP/права/из проекта), прочие — универсальная (разделы решает
+ * сервер, COMMON-2). До загрузки настроек считаем провайдера дефолтным (claude) —
+ * как в остальных гейтах.
  */
 export function ProjectsPage() {
   const { t } = useTranslation();
@@ -62,6 +68,13 @@ export function ProjectsPage() {
         onSuccess: (project) => {
           setIsPickerOpen(false);
           select(project);
+          // Папку e2e панель заводит или сверяет при добавлении — человек узнаёт
+          // об этом здесь, а не из `git status`. Тост живёт дольше обычного:
+          // его читают, а не просто замечают.
+          const note = projectOnboardingText(project.e2e, t);
+          if (note) {
+            toast[note.tone](note.text, { title: t('testsE2e.onboard.title'), duration: 8000 });
+          }
         },
       },
     );
@@ -92,18 +105,23 @@ export function ProjectsPage() {
         />
       );
     }
-    if (providerId === 'claude') return <ProjectConfigPanel project={selected} />;
-    return <ProviderProjectPanel project={selected} />;
+    const panelProps = {
+      project: selected,
+      onRemove: () => handleRemove(selected),
+      isRemoving: removeProject.isPending,
+    };
+    if (providerId === 'claude') return <ProjectConfigPanel {...panelProps} />;
+    return <ProviderProjectPanel {...panelProps} />;
   };
 
   return (
-    <Stack gap="var(--spacing-lg)" className={styles.page}>
+    <div className={styles.page}>
       <PageHeader
         title={t('projectConfig.title')}
         // Тексты про CLAUDE.md/.claude уместны только у Claude — у остальных
         // провайдеров раздел ведёт ИХ проектные файлы (см. providerProject.*).
         subtitle={
-          providerId === 'claude' ? t('projectConfig.subtitle') : t('providerProject.subtitle')
+          providerId === 'claude' ? t('projectsPage.subtitle') : t('providerProject.subtitle')
         }
         helpTopic="projects"
         actions={
@@ -134,57 +152,47 @@ export function ProjectsPage() {
 
       {!isLoading && projects.length > 0 && (
         <div className={styles.layout}>
-          <Stack gap="var(--spacing-2xs)" className={styles.registry}>
+          <nav aria-label={t('projectsPage.registryLabel')} className={styles.registry}>
             <Typography variant="caption" color="subtle">
               {t('projectConfig.count', { count: projects.length })}
             </Typography>
 
-            {projects.map((project) => (
-              <Stack key={project.id} direction="row" align="center" gap="var(--spacing-2xs)">
-                <button
-                  type="button"
-                  className={[
-                    styles.projectButton,
-                    project.id === selectedId && styles.projectButtonActive,
-                  ]
-                    .filter(Boolean)
-                    .join(' ')}
-                  onClick={() => select(project)}
-                  title={project.path}
-                  style={{ flex: 1, minWidth: 0 }}
-                >
-                  <Stack direction="row" align="center" gap="var(--spacing-2xs)">
-                    <Icon name="folder" size={16} />
-                    <Typography variant="body-sm" weight="medium" as="span" truncate>
-                      {project.name}
-                    </Typography>
-                  </Stack>
-                  <Typography
-                    variant="mono"
-                    color="subtle"
-                    as="span"
-                    truncate
-                    className={styles.projectPath}
-                  >
-                    {project.path}
-                  </Typography>
-                </button>
-
-                <DeleteButton
-                  entityName={project.name}
-                  description={t('projectConfig.removeDescription')}
-                  onDelete={() => handleRemove(project)}
-                  isPending={removeProject.isPending}
-                />
-              </Stack>
-            ))}
-          </Stack>
+            <ul className={styles.registryList}>
+              {projects.map((project) => {
+                const isActive = project.id === selectedId;
+                return (
+                  <li key={project.id}>
+                    <button
+                      type="button"
+                      className={cn(styles.projectButton, isActive && styles.projectButtonActive)}
+                      aria-current={isActive ? 'true' : undefined}
+                      onClick={() => select(project)}
+                      title={project.path}
+                    >
+                      <Typography variant="body-sm" weight="medium" as="span" truncate>
+                        {project.name}
+                      </Typography>
+                      <Typography
+                        variant="mono"
+                        color="subtle"
+                        as="span"
+                        truncate
+                        className={styles.projectPath}
+                      >
+                        {project.path}
+                      </Typography>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </nav>
 
           {renderDetails()}
         </div>
       )}
 
       <FolderPicker isOpen={isPickerOpen} onOpenChange={setIsPickerOpen} onPick={handlePick} />
-    </Stack>
+    </div>
   );
 }

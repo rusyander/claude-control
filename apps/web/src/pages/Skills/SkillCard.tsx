@@ -24,7 +24,7 @@ export function SkillCard({ skill, onToggle, onEdit, onDelete, isDeleting }: Ski
   const hasFiles = skill.files.length > 0;
 
   return (
-    <Card padding="md">
+    <Card padding="md" data-agent-anchor={skill.id}>
       <Stack direction="row" gap="var(--spacing-md)" align="start" width="100%">
         <Stack gap="var(--spacing-2xs)" flex={1} minWidth={0}>
           <Stack direction="row" align="center" gap="var(--spacing-xs)" wrap>

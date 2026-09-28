@@ -43,7 +43,10 @@ export function useTestDraft(path: string | undefined, runId: string | undefined
  * кейсов должен обновиться тем же кадром, что и сам черновик, — иначе человек
  * увидит «принято» и прежний список.
  */
-function useDraftMutation<TVariables, TResult extends { view: ProjectTestsView }>(
+function useDraftMutation<
+  TVariables,
+  TResult extends { view: ProjectTestsView; draft: ProjectTestDraft },
+>(
   path: string | undefined,
   runId: string | undefined,
   send: (variables: TVariables) => Promise<TResult>,
@@ -53,7 +56,10 @@ function useDraftMutation<TVariables, TResult extends { view: ProjectTestsView }
     mutationFn: send,
     onSuccess: (data) => {
       client.setQueryData(testKeys.view(path), data.view);
-      void client.invalidateQueries({ queryKey: testKeys.draft(path, runId) });
+      // Черновик — из ответа, не перечитанный: отклонённый и откаченный уезжает
+      // в архив, `GET /drafts?runId=` отвечает 404, и окно оставалось на прежнем
+      // кадре — «всё принято», снова кнопка отката.
+      client.setQueryData(testKeys.draft(path, runId), data.draft);
       void client.invalidateQueries({ queryKey: testKeys.report(path) });
       void client.invalidateQueries({ queryKey: testKeys.runs(path) });
     },

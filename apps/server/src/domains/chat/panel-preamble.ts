@@ -5,10 +5,28 @@ import {
   mergeRequestWorkPreamble,
   reviewLinkPrompt,
   reviewStagePrompt,
+  ANSWER_LANGUAGE_LINE,
 } from '@agentdeck/contracts/model-cascade';
-import { buildHandoffPrompt, type HandoffProposal } from '@agentdeck/contracts/chat-handoff';
+import {
+  buildHandoffPrompt,
+  HANDOFF_ROOT_TASK_LINE,
+  type HandoffProposal,
+} from '@agentdeck/contracts/chat-handoff';
 import { planStagePrompt } from '@agentdeck/contracts/split-plan';
-import { groupIdentityLine } from './split-conveyor.ts';
+import { LEGACY_IDENTITY, LEGACY_LEADING, LEGACY_WHOLE } from './panel-preamble-legacy.ts';
+
+/**
+ * Первая строка каждого сообщения, которое панель сама шлёт в чат группы
+ * (журнал 98): ветка и ключи задач. Сторож git пускает правку истории своей
+ * ветки только по ключу задачи в словах пользователя текущего окна, а в
+ * продолжении, заведённом панелью, ключа не было — агент упёрся в отказ и
+ * встал с вопросом. Звено и продолжение без ветки к тому же не знают, где они.
+ */
+export function groupIdentityLine(branch: string, tickets: readonly string[]): string {
+  const parts = [branch ? `Group branch: ${branch}.` : ''];
+  if (tickets.length > 0) parts.push(`Group tasks: ${tickets.join(', ')}.`);
+  return parts.filter(Boolean).join(' ');
+}
 
 /**
  * Что в первой реплике чата написала ПАНЕЛЬ, а не человек, — чтобы название
@@ -62,34 +80,43 @@ function openers(texts: string[]): string[] {
 
 const HANDOFF: HandoffProposal = { done: MARK, next: MARK, checkpoint: MARK };
 
-const LEADING = openers([
-  environmentPreamble({ mirror: MARK }),
-  environmentPreamble({}),
-  deliveryPreamble({ branch: MARK }),
-  mergeRequestWorkPreamble({ url: MARK }),
-  buildHandoffPrompt(HANDOFF),
-]);
+const LEADING = [
+  ...openers([
+    environmentPreamble({ mirror: MARK }),
+    environmentPreamble({}),
+    deliveryPreamble({ branch: MARK }),
+    mergeRequestWorkPreamble({ url: MARK }),
+    buildHandoffPrompt(HANDOFF),
+  ]),
+  ...LEGACY_LEADING,
+];
 
-const WHOLE = openers([
-  planStagePrompt({ title: MARK, task: MARK, branch: MARK }),
-  planStagePrompt({ title: MARK, task: MARK }),
-  reviewStagePrompt({ task: MARK, model: MARK, branch: MARK }),
-  reviewStagePrompt({ task: MARK }),
-  fixStagePrompt([MARK], { branch: MARK }),
-  fixStagePrompt([MARK]),
-  deliverStagePrompt({ branch: MARK, after: 'fix' }),
-  deliverStagePrompt({ branch: MARK, after: 'review' }),
-  deliverStagePrompt({ after: 'review' }),
-  deliverStagePrompt({ branch: MARK, after: 'work' }),
-  deliverStagePrompt({ after: 'work' }),
-  reviewLinkPrompt({ url: MARK }),
-  // Продолжение группы в чистой сессии: задание группы в нём — цитата из
-  // предложения, своих слов человека там нет.
-  buildHandoffPrompt(HANDOFF, MARK, { group: true }),
-]);
+const WHOLE = [
+  ...LEGACY_WHOLE,
+  ...openers([
+    planStagePrompt({ title: MARK, task: MARK, branch: MARK }),
+    planStagePrompt({ title: MARK, task: MARK }),
+    reviewStagePrompt({ task: MARK, model: MARK, branch: MARK }),
+    reviewStagePrompt({ task: MARK }),
+    fixStagePrompt([MARK], { branch: MARK }),
+    fixStagePrompt([MARK]),
+    deliverStagePrompt({ branch: MARK, after: 'fix' }),
+    deliverStagePrompt({ branch: MARK, after: 'review' }),
+    deliverStagePrompt({ after: 'review' }),
+    deliverStagePrompt({ branch: MARK, after: 'work' }),
+    deliverStagePrompt({ after: 'work' }),
+    reviewLinkPrompt({ url: MARK }),
+    // Продолжение группы в чистой сессии: задание группы в нём — цитата из
+    // предложения, своих слов человека там нет.
+    buildHandoffPrompt(HANDOFF, MARK, { group: true }),
+  ]),
+];
 
 /** Начала строки ветки группы: с веткой и без неё (одни ключи задач). */
-const IDENTITY = openers([groupIdentityLine(MARK, []), groupIdentityLine('', [MARK])]);
+const IDENTITY = [
+  ...openers([groupIdentityLine(MARK, []), groupIdentityLine('', [MARK])]),
+  ...LEGACY_IDENTITY,
+];
 
 const startsWithAny = (line: string, list: readonly string[]): boolean => {
   const bare = line.trimStart();
@@ -105,8 +132,23 @@ export function withoutPanelPreamble(text: string): string {
   const lines = text.split('\n');
   if (startsWithAny(lines.find((line) => line.trim()) ?? '', IDENTITY)) return '';
   if (lines.some((line) => startsWithAny(line, WHOLE))) return '';
-  const paragraphs = text.split(/\n[ \t]*\n/);
+  const paragraphs = withoutPanelTail(text).split(/\n[ \t]*\n/);
   let first = 0;
   while (first < paragraphs.length && startsWithAny(paragraphs[first] ?? '', LEADING)) first += 1;
-  return first === 0 ? text : paragraphs.slice(first).join('\n\n');
+  return paragraphs.slice(first).join('\n\n');
+}
+
+/**
+ * Хвост панели после слов задания. Строка языка ответа приписана к заданиям
+ * модели по-английски (решение владельца D-E) и в названии чата стояла бы
+ * английской фразой; справка об исходном задании продолжения — тоже: название
+ * продолжения — что делать дальше, а не пересказ всей работы.
+ */
+function withoutPanelTail(text: string): string {
+  const at = text.indexOf(`\n${HANDOFF_ROOT_TASK_LINE}`);
+  const head = at >= 0 ? text.slice(0, at) : text;
+  return head
+    .split(/\n[ \t]*\n/)
+    .filter((paragraph) => paragraph.trim() !== ANSWER_LANGUAGE_LINE)
+    .join('\n\n');
 }

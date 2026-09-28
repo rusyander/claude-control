@@ -1,0 +1,25 @@
+import { pageTabDomId, pageTabPanelDomId } from '@shared/lib/page-tab';
+
+/**
+ * Вкладки страницы групп. Групп будет десятки, и четыре раздела одной лентой
+ * уже не просматривались: человек приходит либо за глобальными, либо за
+ * проектными, либо разбирать находки, либо смотреть, почему обнаружение
+ * споткнулось. `id` попадает в адрес (`/groups?tab=…`), порядок — порядок на экране.
+ *
+ * Выбор, память и адрес — общим `usePageTab` разделов; своя здесь только полоса
+ * (`GroupsTabs`): у неё числа с «читаю» и «не прочиталось», которых у общей нет.
+ */
+export const GROUPS_TABS = ['global', 'project', 'found', 'discovery'] as const;
+
+export type GroupsTabId = (typeof GROUPS_TABS)[number];
+
+/** Имя раздела для `usePageTab`: память — `agentdeck.groups.tab`, как была. */
+export const GROUPS_PAGE = 'groups';
+
+export function groupsTabDomId(tab: GroupsTabId): string {
+  return pageTabDomId(GROUPS_PAGE, tab);
+}
+
+export function groupsPanelDomId(tab: GroupsTabId): string {
+  return pageTabPanelDomId(GROUPS_PAGE, tab);
+}

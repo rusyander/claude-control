@@ -12,7 +12,12 @@ import { registerProviderSkillsRoutes } from '../routes/provider-skills-routes.t
 import { registerProviderPermissionsRoutes } from '../routes/provider-permissions-routes.ts';
 import { registerProviderKeysRoutes } from '../routes/provider-keys-routes.ts';
 import { registerGroupRoutes } from '../routes/group-routes.ts';
+import { registerGroupSourcesRoutes } from '../routes/group-sources-routes.ts';
+import { registerGroupPathRoutes } from '../routes/group-path-routes.ts';
+import { registerGroupKnobsRoutes } from '../routes/group-knobs-routes.ts';
+import { registerGroupDuplicateRoutes } from '../routes/group-duplicate-routes.ts';
 import { registerAnalyticsRoutes } from '../routes/analytics-routes.ts';
+import { registerAnalyticsSessionRoutes } from '../routes/analytics-session-routes.ts';
 import { registerModelRoutes } from '../routes/model-routes.ts';
 import { registerEndpointRoutes } from '../routes/endpoint-routes.ts';
 import { registerProviderCheckRoutes } from '../routes/provider-check-routes.ts';
@@ -30,6 +35,7 @@ import { registerChatSplitRoutes } from '../routes/chat/split-routes.ts';
 import { registerChatCascadeRoutes } from '../routes/chat/cascade-routes.ts';
 import { registerChatHandoffRoutes } from '../routes/chat/handoff-routes.ts';
 import { registerChatTreeRoutes } from '../routes/chat/tree-routes.ts';
+import { registerChatGroupSettingsRoutes } from '../routes/chat/group-settings-routes.ts';
 import { registerSandboxRoutes } from '../routes/sandbox-routes.ts';
 import { registerResourceRoutes } from '../routes/resource-routes.ts';
 import { registerBackupRoutes } from '../routes/backup-routes.ts';
@@ -41,6 +47,7 @@ import { registerProviderProjectRoutes } from '../routes/provider-project-routes
 import { registerProjectRunnerRoutes } from '../routes/project-runner-routes.ts';
 import { registerProjectGitRoutes } from '../routes/project-git-routes.ts';
 import { registerSplitDefaultsRoutes } from '../routes/split-defaults-routes.ts';
+import { registerSieveRoutes } from '../routes/sieve-routes.ts';
 import { registerProjectFilesRoutes } from '../routes/project-files-routes.ts';
 import { registerProjectTestsRoutes } from '../routes/project-tests-routes.ts';
 import { registerProjectTestsPublishRoutes } from '../routes/project-tests/publish-routes.ts';
@@ -54,6 +61,7 @@ import { registerPromptGateRoutes } from '../routes/prompt-gate-routes.ts';
 import { registerPromptRoutes } from '../routes/prompt-routes.ts';
 import { registerRemoteRoutes } from '../routes/remote-routes.ts';
 import { registerEventsRoutes } from '../routes/events-routes.ts';
+import { registerWatcherRoutes } from '../routes/watcher-routes.ts';
 import { registerPanelAgentRoutes } from '../routes/panel-agent/panel-agent-routes.ts';
 import { registerPanelAgentRunRoutes } from '../routes/panel-agent/run-routes.ts';
 import type { AccessGateDeps } from '../lib/access-gate.ts';
@@ -79,6 +87,8 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
     projectRunner,
     projectTestRuns,
     projectTestManual,
+    e2eRuns,
+    e2eWatch,
     dlpProxy,
     platformGateway,
     notifyRun,
@@ -101,7 +111,16 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
     registerProviderPermissionsRoutes,
     registerProviderKeysRoutes,
     registerGroupRoutes,
+    // Группы по областям (обнаружение, копия в общие, выбор, переопределение) и «Путь».
+    registerGroupSourcesRoutes,
+    registerGroupPathRoutes,
+    // «Числа» группы: сколько прогонов делают её скиллы.
+    registerGroupKnobsRoutes,
+    // «Копировать группу»: независимая выключенная копия рядом с оригиналом.
+    registerGroupDuplicateRoutes,
     registerAnalyticsRoutes,
+    // «Перейти» / «Остановить» у сессий аналитики: прогоны панели знает реестр.
+    (instance, context) => registerAnalyticsSessionRoutes(instance, context, chatRuns),
     registerModelRoutes,
     registerEndpointRoutes,
     registerProviderCheckRoutes,
@@ -142,6 +161,8 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
     // каждого проекта с разделением — так же, как потолок проекта.
     (instance, context) =>
       registerSplitDefaultsRoutes(instance, context, (path) => splitConveyor.kickProject(path)),
+    // Сита перед MR: выученные по тредам MR и счёт блокеров — та же вкладка «Группы».
+    registerSieveRoutes,
     registerProjectFilesRoutes,
     (instance, context) =>
       registerChatRoutes(instance, context, chatRuns, chatSession, (chatId) =>
@@ -150,6 +171,8 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
     // Правило «подбирать модель под задачу»: одно положение на проект, без
     // зависимостей — ни реестр прогонов, ни сессия ему не нужны.
     registerChatCascadeRoutes,
+    // Группа и автономность чата, заметки главному чату — только хранилище.
+    registerChatGroupSettingsRoutes,
     // Разделение задач по чатам заводит копии репозитория и открывает разговоры —
     // у Claude через реестр прогонов, у чужого CLI через его собственный сервис.
     // Поэтому оба живут дольше запроса и приходят сюда параметром.
@@ -183,7 +206,10 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
     // Тестам нужны оба реестра: прогоны агента и ручная сессия человека. Оба
     // переживают запрос — вкладку закрывают, а прогон идёт дальше.
     (instance, context) =>
-      registerProjectTestsRoutes(instance, context, projectTestRuns, projectTestManual),
+      registerProjectTestsRoutes(instance, context, projectTestRuns, projectTestManual, {
+        e2eRuns,
+        e2eWatch,
+      }),
     // Публикация отчёта наружу — часть интеграций, а не раздела тестов: ей нужны
     // токен, привязка и живая сеть, а раздел обязан работать и без всего этого.
     registerProjectTestsPublishRoutes,
@@ -221,6 +247,9 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
     // Поток событий об изменениях файлов: подписчиков держит хаб, рассылку по
     // нему ведёт наблюдатель за конфигами.
     (instance, context) => registerEventsRoutes(instance, context, events),
+    // Фоновый наблюдатель: тумблер, статус и сбои со страницы. Сам объект живёт
+    // дольше запроса — его разбор идёт, пока тумблер включён.
+    (instance, context) => registerWatcherRoutes(instance, context, runtime.watcher),
     // Агент панели: действия исполняются настоящими маршрутами через `inject`,
     // поэтому ему нужен тот же гейт доступа (токен при удалённом доступе), а
     // решению по карточке — список своих источников.

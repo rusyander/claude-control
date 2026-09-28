@@ -12,6 +12,9 @@ class DisabledSpeechProvider implements SpeechProvider {
   stop(): void {
     /* распознавание отключено */
   }
+  dispose(): void {
+    /* распознавание отключено */
+  }
   onPartial(): void {
     /* событий нет */
   }

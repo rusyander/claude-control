@@ -43,17 +43,17 @@ describe('childrenBrief (Д6)', () => {
     const brief = childrenBrief(SPLIT) ?? '';
 
     expect(brief.startsWith('<agentdeck-children>')).toBe(true);
-    expect(brief).toContain('Сам её не делай');
+    expect(brief).toContain('Do not do it yourself');
     expect(brief).toContain(
-      '1. «Ревью MR» (ветка feature/mr, копия C:/work/p-mr, чат review-1) — закончила; ' +
-        'только проверка, правок не было.',
+      '1. "Ревью MR" (branch feature/mr, copy C:/work/p-mr, chat review-1) — finished; ' +
+        'check only, no edits.',
     );
     expect(brief).toContain(
-      '2. «Шапка» (ветка feature/header, чат work-2) — ждёт человека; задала вопрос и ждёт ' +
-        'ответа. Последний ответ: «Липкой делать и на мобильном?»',
+      '2. "Шапка" (branch feature/header, chat work-2) — waits for the human; asked a question ' +
+        'and waits for the answer. Last answer: "Липкой делать и на мобильном?"',
     );
     expect(brief).toContain(
-      '3. «Тесты» (ветка feature/tests, чата ещё нет) — сбой: копия не завелась.',
+      '3. "Тесты" (branch feature/tests, no chat yet) — failed: копия не завелась.',
     );
   });
 
@@ -61,7 +61,7 @@ describe('childrenBrief (Д6)', () => {
     const [, , third] = SPLIT.groups;
     const brief = childrenBrief({ ...SPLIT, groups: [{ ...third!, retries: 3 }] }) ?? '';
 
-    expect(brief).toContain('— сбой: копия не завелась (панель повторяла ход: 3).');
+    expect(brief).toContain('— failed: копия не завелась (the panel retried the turn: 3).');
   });
 
   it('разделения нет — сводки нет', () => {
@@ -73,7 +73,7 @@ describe('childrenBrief (Д6)', () => {
     const tail = `${'а'.repeat(500)} Что делать?`;
     const brief = childrenBrief({ ...SPLIT, groups: [{ ...SPLIT.groups[1]!, tail }] }) ?? '';
 
-    expect(brief).toContain('Что делать?»');
+    expect(brief).toContain('Что делать?"');
     expect(brief).not.toContain('а'.repeat(300));
   });
 });

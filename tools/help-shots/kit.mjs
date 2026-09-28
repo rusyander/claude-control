@@ -250,6 +250,120 @@ export function shotLanguage(env = process.env) {
 }
 
 /**
+ * ТЕМА СЪЁМКИ. Справка открыта в той же теме, что и панель, и светлый кадр на
+ * тёмной странице висит белым прямоугольником. Поэтому кадр снимается и в
+ * тёмной теме — НАСТОЯЩЕЙ темой панели (`settings.theme` → `data-theme` на
+ * <html>), а не фильтром поверх светлого снимка: у тёмной темы свои токены,
+ * контрасты и подложки, и фильтр показал бы интерфейс, которого не бывает.
+ */
+export const SHOT_THEMES = ['light', 'dark'];
+
+/** Тема текущего прогона. Переменная одна на всю пачку: `GUIDE_THEME=dark`. */
+export function shotTheme(env = process.env) {
+  return env.GUIDE_THEME === 'dark' ? 'dark' : 'light';
+}
+
+/**
+ * Четыре варианта кадра: тема × язык. Имя файла — суффикс к идентификатору
+ * кадра в той же папке (`01-x.png`, `01-x.en.png`, `01-x.dark.png`,
+ * `01-x.dark.en.png`) — по той же причине, по которой английский кадр лёг
+ * рядом с русским, а не в папку: сторож видит все варианты одним плоским
+ * списком PNG.
+ *
+ * В описи запись ОДНА на кадр: светлый русский — поля самой записи (так было
+ * до вариантов, и старые описи читаются без миграции), остальные — вложенные
+ * `en`, `dark`, `darkEn` со своим файлом, текстом и временем.
+ *
+ * Суффиксы знает ТОЛЬКО этот файл: справка берёт имя файла из описи раздела
+ * `variants.json` (её пишет `writeVariantIndex`), а не собирает его сама.
+ */
+export const SHOT_VARIANTS = [
+  { key: 'light-ru', theme: 'light', lang: 'ru', field: null, suffix: '' },
+  { key: 'light-en', theme: 'light', lang: 'en', field: 'en', suffix: '.en' },
+  { key: 'dark-ru', theme: 'dark', lang: 'ru', field: 'dark', suffix: '.dark' },
+  { key: 'dark-en', theme: 'dark', lang: 'en', field: 'darkEn', suffix: '.dark.en' },
+];
+
+/** Вариант по теме и языку прогона. */
+export function shotVariant(theme = shotTheme(), lang = shotLanguage()) {
+  return SHOT_VARIANTS.find((variant) => variant.theme === theme && variant.lang === lang);
+}
+
+/** Отпечаток варианта в записи кадра или `undefined`, если его не снимали. */
+export function variantOf(frame, variant) {
+  if (variant.field) return frame[variant.field] ?? undefined;
+  return frame.file ? frame : undefined;
+}
+
+/**
+ * Какие варианты у кадра ОБЯЗАНЫ быть. Сторона `platform` — чужое приложение
+ * (админка платформы компании): тема панели на него не действует, и «тёмный»
+ * снимок был бы тем же светлым под другим именем. У него только два языка;
+ * справка на тёмной теме покажет светлый — это и есть правда о том экране.
+ * Сторона `phone` — то же рассуждение: кадр снят с эмулятора Android, у
+ * приложения одна своя тема, и тема панели на него не действует.
+ */
+export function requiredVariants(side) {
+  return side === 'platform' || side === 'phone'
+    ? SHOT_VARIANTS.filter((variant) => variant.theme === 'light')
+    : SHOT_VARIANTS;
+}
+
+/** Опись вариантов раздела — лежит в папке раздела, читает её справка. */
+export const VARIANT_INDEX = 'variants.json';
+
+/**
+ * Собрать опись вариантов раздела из описей его сценариев.
+ *
+ * Справке нужны ровно три вещи на вариант: есть ли он, как называется файл и
+ * какого он размера (`width`/`height` на `<img>` резервируют место, и смена
+ * темы не двигает страницу). Отдавать ей `frames.json` целиком нельзя: там
+ * видимый текст каждого кадра, до сотни килобайт на сценарий.
+ *
+ * Одна функция на обе стороны: съёмка пишет её результат, сторож считает
+ * заново и сравнивает — разойтись им не на чем.
+ */
+export function buildVariantIndex(topic, scenarios) {
+  const frames = {};
+  const ordered = [...scenarios].sort((a, b) => a.scenario.localeCompare(b.scenario));
+  for (const { scenario, manifest } of ordered) {
+    for (const frame of manifest.frames ?? []) {
+      const variants = {};
+      for (const variant of SHOT_VARIANTS) {
+        const taken = variantOf(frame, variant);
+        if (!taken?.file) continue;
+        variants[variant.key] = { file: taken.file, width: taken.width, height: taken.height };
+      }
+      frames[`${scenario}/${frame.id}`] = variants;
+    }
+  }
+  return { topic, frames };
+}
+
+/** Описи сценариев раздела с диска: `[{ scenario, manifest }]`. */
+export function readTopicManifests(topic, root = SHOTS_ROOT) {
+  const topicDir = join(root, topic);
+  if (!existsSync(topicDir)) return [];
+  return readdirSync(topicDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && existsSync(join(topicDir, entry.name, 'frames.json')))
+    .map((entry) => ({
+      scenario: entry.name,
+      manifest: JSON.parse(readFileSync(join(topicDir, entry.name, 'frames.json'), 'utf8')),
+    }));
+}
+
+/** Текст описи вариантов — один на запись и на сверку. */
+export function renderVariantIndex(topic, scenarios) {
+  return `${JSON.stringify(buildVariantIndex(topic, scenarios), null, 2)}\n`;
+}
+
+/** Переписать опись вариантов раздела по его описям сценариев. */
+export function writeVariantIndex(topic, root = SHOTS_ROOT) {
+  const text = renderVariantIndex(topic, readTopicManifests(topic, root));
+  writeFileSync(join(root, topic, VARIANT_INDEX), text, 'utf8');
+}
+
+/**
  * Переключить язык ПАНЕЛИ перед съёмкой.
  *
  * Делается на сервере, а не в браузере, и это не мелочь: язык живёт в настройках
@@ -263,14 +377,17 @@ export function shotLanguage(env = process.env) {
  * пути, по которому язык приходит человеку, — кадр доказывал бы работу
  * подкрутки, а не работу настройки.
  */
-export async function applyShotLanguage(panel, lang = shotLanguage()) {
+export async function applyShotLanguage(panel, lang = shotLanguage(), theme = shotTheme()) {
+  // Тема едет тем же запросом и тем же путём, что и язык: все пачки уже зовут
+  // эту функцию после подъёма панели, и `GUIDE_THEME=dark` доходит до каждой
+  // без правки четырёх десятков сценариев.
   const response = await fetch(`${panel}/api/settings`, {
     method: 'PATCH',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ language: lang }),
+    body: JSON.stringify({ language: lang, theme }),
   });
   if (!response.ok) throw new Error(`PATCH /api/settings language: ${response.status}`);
-  console.log(`язык съёмки: ${lang}`);
+  console.log(`язык съёмки: ${lang}, тема: ${theme}`);
   return lang;
 }
 
@@ -283,7 +400,8 @@ export async function applyShotLanguage(panel, lang = shotLanguage()) {
  * `applyShotLanguage` после подъёма панели, а `openScenario` подхватит сам —
  * иначе про язык пришлось бы помнить в каждом из четырёх десятков сценариев.
  */
-export function openScenario(topic, scenario, lang = shotLanguage()) {
+export function openScenario(topic, scenario, lang = shotLanguage(), theme = shotTheme()) {
+  const variant = shotVariant(theme, lang);
   const dir = join(SHOTS_ROOT, topic, scenario);
   mkdirSync(dir, { recursive: true });
   const manifestPath = join(dir, 'frames.json');
@@ -296,8 +414,8 @@ export function openScenario(topic, scenario, lang = shotLanguage()) {
   /** Что сняла ИМЕННО эта съёмка: по этому списку чистится своя сторона. */
   const thisRun = { side: '', ids: new Set() };
 
-  /** Имя файла кадра: русский — как раньше, английский — с суффиксом. */
-  const fileOf = (id) => (lang === 'en' ? `${id}.en.png` : `${id}.png`);
+  /** Имя файла кадра: светлый русский — как раньше, прочие — с суффиксом варианта. */
+  const fileOf = (id) => `${id}${variant.suffix}.png`;
 
   return {
     dir,
@@ -315,6 +433,16 @@ export function openScenario(topic, scenario, lang = shotLanguage()) {
      */
     async shot(page, id, options = {}) {
       const { side = 'panel', mask = [], maskText = DEFAULT_MASKS, clip, padding = 16 } = options;
+
+      // Пустой кадр — не кадр. Фронт съёмки смотрит в то же дерево исходников,
+      // что и стенд, и чужая правка i18n-модуля перезагружает страницу целиком:
+      // кадр, снятый в этот миг, выходил белым листом (6 КБ вместо 70). Ждём,
+      // пока оболочка панели вернётся, и говорим об этом вслух.
+      if (side === 'panel' && (await page.locator('nav').count()) === 0) {
+        console.log(`  кадр ${id}: страница перезагрузилась до кадра — жду оболочку панели`);
+        await page.waitForSelector('nav', { timeout: 20000 });
+        await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => null);
+      }
 
       // Селекторы закрывают то, что известно по месту; выражения — то, что
       // известно по виду (ключ, почта). Второе надёжнее: разметка чужого
@@ -375,7 +503,26 @@ export function openScenario(topic, scenario, lang = shotLanguage()) {
       // поэтому совпадение здесь означает «интерфейс в кадре действительно
       // английский». Сторону `enterprise-platform` не трогаем: чужое приложение своего
       // языка нам не сообщает.
+      // Тема — тем же приёмом: `data-theme` ставит ThemeProvider из настроек,
+      // и совпадение значит, что на кадре настоящая тёмная тема панели. Чужое
+      // приложение (сторона `platform`) от темы панели не зависит, и тёмного
+      // его варианта не бывает: съёмка такой стороны в тёмной теме — ошибка
+      // запуска, а не повод положить светлую картинку под тёмным именем.
+      if (side === 'platform' && theme !== 'light') {
+        throw new Error(
+          `кадр ${id}: сторона platform от темы панели не зависит — снимайте её с GUIDE_THEME=light`,
+        );
+      }
       if (side === 'panel') {
+        const pageTheme = await page.evaluate(
+          () => document.documentElement.dataset.theme || '(пусто)',
+        );
+        if (pageTheme !== theme) {
+          throw new Error(
+            `кадр ${id}: съёмка идёт в теме «${theme}», а на странице «${pageTheme}» — ` +
+              'позовите applyShotLanguage(PANEL) после подъёма панели',
+          );
+        }
         const pageLang = await page.evaluate(() => document.documentElement.lang || '(пусто)');
         if (!pageLang.startsWith(lang)) {
           throw new Error(
@@ -410,12 +557,12 @@ export function openScenario(topic, scenario, lang = shotLanguage()) {
       // знать, чем закончился первый. Русский прогон так же бережёт `en`.
       frames.set(
         id,
-        lang === 'en'
-          ? { ...previousFrame, id, side, en: taken }
+        variant.field
+          ? { ...previousFrame, id, side, [variant.field]: taken }
           : { ...previousFrame, id, side, ...taken },
       );
       console.log(
-        `  кадр ${id} [${lang}]${maskedCount ? ` (замазано узлов: ${maskedCount})` : ''}`,
+        `  кадр ${id} [${variant.key}]${maskedCount ? ` (замазано узлов: ${maskedCount})` : ''}`,
       );
     },
 
@@ -431,24 +578,32 @@ export function openScenario(topic, scenario, lang = shotLanguage()) {
     finish() {
       for (const [id, frame] of [...frames]) {
         if (frame.side !== thisRun.side || thisRun.ids.has(id)) continue;
-        // Английский прогон снимает с учёта только английский близнец: русский
-        // кадр снят не им, и удалять чужую работу он права не имеет.
-        if (lang === 'en') {
-          if (!frame.en) continue;
-          rmSync(join(dir, frame.en.file), { force: true });
-          frames.set(id, { ...frame, en: undefined });
-          console.log(`  снят с учёта устаревший английский кадр ${id}`);
+        // Прогон варианта снимает с учёта только СВОЙ вариант: светлый русский
+        // кадр и соседние варианты сняты не им, и удалять чужую работу он права
+        // не имеет.
+        if (variant.field) {
+          const own = frame[variant.field];
+          if (!own) continue;
+          rmSync(join(dir, own.file), { force: true });
+          frames.set(id, { ...frame, [variant.field]: undefined });
+          console.log(`  снят с учёта устаревший вариант ${variant.key} кадра ${id}`);
           continue;
         }
         frames.delete(id);
-        rmSync(join(dir, frame.file), { force: true });
-        // Шага больше нет — английского его снимка тоже быть не должно.
-        if (frame.en) rmSync(join(dir, frame.en.file), { force: true });
+        // Шага больше нет — ни одного его варианта тоже быть не должно.
+        for (const other of SHOT_VARIANTS) {
+          const taken = variantOf(frame, other);
+          if (taken?.file) rmSync(join(dir, taken.file), { force: true });
+        }
         console.log(`  снят с учёта устаревший кадр ${id}`);
       }
       const list = [...frames.values()].sort((a, b) => a.id.localeCompare(b.id));
       // Файл, которого нет НИ В ОДНОЙ записи, — сирота: опись здесь главная.
-      const known = new Set(list.flatMap((frame) => [frame.file, frame.en?.file]).filter(Boolean));
+      const known = new Set(
+        list
+          .flatMap((frame) => SHOT_VARIANTS.map((other) => variantOf(frame, other)?.file))
+          .filter(Boolean),
+      );
       for (const name of readdirSync(dir)) {
         if (!name.endsWith('.png') || known.has(name)) continue;
         rmSync(join(dir, name), { force: true });
@@ -459,11 +614,14 @@ export function openScenario(topic, scenario, lang = shotLanguage()) {
         JSON.stringify({ topic, scenario, frames: list }, null, 2) + '\n',
         'utf8',
       );
+      // Опись вариантов раздела — производная от описей сценариев, и
+      // переписывается вместе с ними, иначе справка не узнает о новом кадре.
+      writeVariantIndex(topic);
       const files = readdirSync(dir).filter((name) => name.endsWith('.png'));
-      const english = list.filter((frame) => frame.en).length;
-      console.log(
-        `\nОпись: ${list.length} кадров (английских ${english}), файлов на диске ${files.length}`,
-      );
+      const counts = SHOT_VARIANTS.map(
+        (other) => `${other.key} ${list.filter((frame) => variantOf(frame, other)).length}`,
+      ).join(', ');
+      console.log(`\nОпись: ${list.length} кадров (${counts}), файлов на диске ${files.length}`);
       return list;
     },
   };

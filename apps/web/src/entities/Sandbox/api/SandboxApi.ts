@@ -57,6 +57,8 @@ export type HookDecision = 'block' | 'ask' | 'pass' | 'error';
 export interface ProbeResult {
   fixtureId: string;
   exitCode: number;
+  /** Сигнал, которым хук убит извне (тогда `exitCode` = -1, причина это называет). */
+  signal?: string;
   stdout: string;
   stderr: string;
   decision: HookDecision;
@@ -86,6 +88,8 @@ export function useEventFixtures() {
 
 export function useCreateSandbox() {
   return useMutation({
+    // Сбой создания окно песочницы называет само, рядом с «Повторить».
+    meta: { silentError: true },
     mutationFn: async (input: { id: string; selection: SandboxSelection }) => {
       const { data } = await apiClient.post<{
         id: string;

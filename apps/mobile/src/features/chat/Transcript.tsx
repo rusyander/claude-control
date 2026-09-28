@@ -8,6 +8,8 @@ import type { CostUnit } from '../../shared/lib/format';
 import { AgentText } from './AgentText';
 import { TokenBadge } from './TokenBadge';
 import { summarizeToolInput } from './toolSummary';
+import { autoPickText } from './autoPickText';
+import { taskNoticesOf, type TaskNotice } from './taskNotice';
 
 /**
  * Прошлая переписка из транскрипта. Отличается от живого потока тем, что уже
@@ -39,6 +41,20 @@ export function Transcript({
   return (
     <View style={styles.root}>
       {messages.map((message) => {
+        // Итог фоновой задачи, записанный CLI от имени человека, — строкой
+        // события, а не пузырём человека с простынёй XML.
+        const notices = taskNoticesOf(message);
+        if (notices) {
+          return (
+            <View key={message.id} style={styles.notice} testID="task-notice">
+              {notices.map((notice, index) => (
+                <Text key={index} style={styles.noticeText}>
+                  {noticeLine(notice, t)}
+                </Text>
+              ))}
+            </View>
+          );
+        }
         const timing = timings.get(message.id);
         const toolsOnly = message.blocks.length > 0 && message.blocks.every(isTool);
         // Расход считается моделью на всё сообщение целиком, поэтому и стоит
@@ -61,13 +77,24 @@ export function Transcript({
               if (block.type === 'text') {
                 // Предложения панели и вложения агента приходят блоками кода
                 // внутри ответа: рисунок — карточкой, остальное (решается в
-                // панели) — строкой вместо сырого JSON.
-                return <AgentText key={index} text={block.text} />;
+                // панели) — строкой вместо сырого JSON. Текст человека служебных
+                // блоков не теряет (ревью 28.09, F-226).
+                return (
+                  <AgentText key={index} text={block.text} fromUser={message.role === 'user'} />
+                );
               }
               if (block.type === 'thinking') {
                 return (
                   <Text key={index} style={styles.thinking} numberOfLines={6}>
                     {block.text}
+                  </Text>
+                );
+              }
+              if (block.type === 'tool' && block.autoPicks !== undefined) {
+                // Вопрос закрыла автономия чата — след выбора, а не вызов.
+                return (
+                  <Text key={index} style={styles.thinking} testID="auto-pick">
+                    {autoPickText(block.autoPicks, t)}
                   </Text>
                 );
               }
@@ -120,6 +147,19 @@ export function Transcript({
   );
 }
 
+function noticeLine(notice: TaskNotice, t: ReturnType<typeof useT>): string {
+  const mark = notice.status === 'completed' ? '✓' : '!';
+  const summary = notice.summary ? ` · ${notice.summary}` : '';
+  return `${mark} ${noticeLabel(notice.status, t)}${summary}`;
+}
+
+function noticeLabel(status: string, t: ReturnType<typeof useT>): string {
+  if (status === 'completed') return t.chat.taskNotice.completed;
+  if (status === 'failed') return t.chat.taskNotice.failed;
+  if (status === 'killed') return t.chat.taskNotice.killed;
+  return t.chat.taskNotice.other;
+}
+
 function isTool(block: ChatBlock): boolean {
   return block.type === 'tool';
 }
@@ -155,4 +195,6 @@ const styles = StyleSheet.create({
   toolError: { color: colors.danger },
   summarized: { color: colors.warning, fontSize: font.small, lineHeight: 18 },
   toolSummary: { color: colors.textFaint, fontSize: font.small, fontFamily: font.mono, flex: 1 },
+  notice: { gap: space.xs, paddingHorizontal: space.sm },
+  noticeText: { color: colors.textDim, fontSize: font.small, lineHeight: 18 },
 });

@@ -5,11 +5,13 @@ import { PERMISSION_RULE_IDS, resolvePermissionRules } from '@agentdeck/contract
 import { useSettings, useUpdateSettings } from '@entities/AppConfig';
 import { useCascadeRule, useSetCascadeRule } from '@entities/ChatSplit';
 import { HELP_ROUTE } from '@shared/config/routes';
+import { useAnchoredPanel } from '@shared/hooks/use-anchored-panel';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { Toggle } from '@shared/ui/toggle';
+import { ChatGroupSettingsMenu } from './ChatGroupSettingsMenu';
 import type { ChatHeaderMenuProps } from './ChatHeaderMenu.types';
 import styles from './ChatHeaderMenu.module.scss';
 
@@ -23,6 +25,8 @@ import styles from './ChatHeaderMenu.module.scss';
  * остаётся работа.
  */
 export function ChatHeaderMenu({
+  chatId,
+  sessionId,
   allowEdits,
   onAllowEditsChange,
   projectPath,
@@ -37,6 +41,7 @@ export function ChatHeaderMenu({
   const { t } = useTranslation();
   const [isOpen, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const { panelRef, panelStyle } = useAnchoredPanel<HTMLDivElement>(isOpen);
 
   // Правила прав живут в настройках ПАНЕЛИ, а не в разговоре: решение «пусть
   // агент сам пишет комментарии в MR» относится к человеку и его сервисам, и
@@ -87,13 +92,27 @@ export function ChatHeaderMenu({
         aria-haspopup="dialog"
         title={t('chat.menuHint')}
       >
-        {t('chat.menu')}
+        <span data-bar-label="">{t('chat.menu')}</span>
       </Button>
 
       {isOpen && (
         <>
           <div className={styles.backdrop} onClick={() => setOpen(false)} aria-hidden="true" />
-          <div className={styles.panel} role="dialog" aria-label={t('chat.menu')}>
+          <div
+            ref={panelRef}
+            className={styles.panel}
+            style={panelStyle}
+            role="dialog"
+            aria-label={t('chat.menu')}
+          >
+            {chatId && (
+              <ChatGroupSettingsMenu
+                chatId={chatId}
+                {...(sessionId ? { sessionId } : {})}
+                {...(projectPath ? { projectPath } : {})}
+              />
+            )}
+
             <Typography
               variant="caption"
               color="subtle"

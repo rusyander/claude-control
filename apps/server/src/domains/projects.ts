@@ -3,6 +3,8 @@ import { join, resolve, isAbsolute, relative } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { Project, ProjectDraft } from '@agentdeck/contracts';
 import { projectInstructionTarget } from '../lib/instruction-files.ts';
+import { spelledOnDisk } from '../lib/disk-spelling.ts';
+import { normalizeProjectPath } from '../lib/app-store/projects.ts';
 
 /**
  * Проектный уровень конфигурации. Панель ведёт не только пользовательский
@@ -34,17 +36,33 @@ export interface ProjectPaths {
   mcpConfig: string;
 }
 
-/** Проблема с каталогом проекта или null, если он пригоден. */
-export function checkProjectDir(path: string): string | null {
-  if (!path.trim()) return 'Путь к проекту не задан';
-  if (!isAbsolute(path)) return `Путь к проекту должен быть абсолютным: ${path}`;
-  if (!existsSync(path)) return `Каталог проекта не существует: ${path}`;
+/** Чем непригоден каталог проекта — кодом: агенту панели нужен английский текст, человеку русский. */
+export type ProjectDirProblem = 'empty' | 'relative' | 'missing' | 'not-dir' | 'unreadable';
+
+export function projectDirProblem(path: string): ProjectDirProblem | null {
+  if (!path.trim()) return 'empty';
+  if (!isAbsolute(path)) return 'relative';
+  if (!existsSync(path)) return 'missing';
   try {
-    if (!statSync(path).isDirectory()) return `Это не каталог: ${path}`;
+    if (!statSync(path).isDirectory()) return 'not-dir';
   } catch {
-    return `Каталог проекта недоступен: ${path}`;
+    return 'unreadable';
   }
   return null;
+}
+
+const PROJECT_DIR_PROBLEM_RU: Record<ProjectDirProblem, (path: string) => string> = {
+  empty: () => 'Путь к проекту не задан',
+  relative: (path) => `Путь к проекту должен быть абсолютным: ${path}`,
+  missing: (path) => `Каталог проекта не существует: ${path}`,
+  'not-dir': (path) => `Это не каталог: ${path}`,
+  unreadable: (path) => `Каталог проекта недоступен: ${path}`,
+};
+
+/** Проблема с каталогом проекта или null, если он пригоден. */
+export function checkProjectDir(path: string): string | null {
+  const problem = projectDirProblem(path);
+  return problem ? PROJECT_DIR_PROBLEM_RU[problem](path) : null;
 }
 
 /**
@@ -103,9 +121,25 @@ export function isInsideProject(root: string, candidate: string): boolean {
 /**
  * Собрать запись реестра из тела запроса. Путь валидируется вызывающим кодом
  * (`checkProjectDir`) до этого; здесь только нормализация и генерация id.
+ *
+ * Путь — в написании на диске: вставленный путь из %TEMP% или cwd оболочки
+ * агента приходит коротким именем 8.3, а раздел «Тесты» ищет проект по
+ * написанию на диске — под «как ввели» своя папка e2e выглядела чужой.
  */
+/**
+ * Проект реестра, стоящий на том же каталоге, — по написанию на диске с ОБЕИХ
+ * сторон. Записи, сделанные до перехода на это написание, хранят путь как ввели
+ * (короткое имя 8.3), и сверка с сырыми записями их не видела (F-134).
+ */
+export function findProjectOnDisk(projects: readonly Project[], path: string): Project | undefined {
+  const wanted = normalizeProjectPath(spelledOnDisk(resolve(path)));
+  return projects.find(
+    (project) => normalizeProjectPath(spelledOnDisk(resolve(project.path))) === wanted,
+  );
+}
+
 export function makeProject(draft: ProjectDraft): Project {
-  const path = resolve(draft.path.trim());
+  const path = spelledOnDisk(resolve(draft.path.trim()));
   return {
     id: randomUUID(),
     name: draft.name?.trim() || projectName(path),

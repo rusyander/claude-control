@@ -5,12 +5,15 @@ export const portabilityEn = {
     summary:
       'What a CLI actually has configured, what of it reaches another one — and how to keep them in agreement',
     lead:
-      'The section answers four questions in a row. What the chosen CLI actually ' +
-      'has configured — as entries and named omissions, never as silence. What of ' +
-      'it reaches another CLI and in what shape — the fidelity report. What ' +
-      'exactly will change in the target files — the transfer plan, shown before ' +
-      'the first write. And finally: should the target be kept in agreement from ' +
-      'now on — a subscription to the panel canon. The passport and the report ' +
+      'The section answers five questions, one tab each. What the chosen CLI ' +
+      'actually has configured — as entries and named omissions, never as silence ' +
+      '("Passport"). What of it reaches another CLI, in what shape, and what ' +
+      'exactly will change in its files — the fidelity report and the plan, shown ' +
+      'before the first write ("Transfer"). Should the target be kept in agreement ' +
+      'from now on — a subscription to the panel canon ("Subscription"). Did it ' +
+      'really arrive — a probe on the target’s real CLI ("Target probe"). And ' +
+      'apart from that — unfinished conversations of other CLIs ("Unfinished ' +
+      'work"). The passport and the report ' +
       'write nothing; only the transfer and the rebuild write, and every write ' +
       'starts with a backup.',
 
@@ -18,7 +21,7 @@ export const portabilityEn = {
     guideText:
       'First, why the section exists at all and how a transfer differs from a ' +
       'subscription. Then two paths in screenshots: the one-off transfer ' +
-      '(passport → fidelity → plan → applied) and the subscription (layers → ' +
+      '(passport → fidelity → plan → applied → target probe) and the subscription (layers → ' +
       'rebuild plan → hand edit → outcome). After the screenshots: what the ' +
       'section is not, what it reads and writes, the five fidelity levels, limits ' +
       'and refusals, and the fine print.',
@@ -55,9 +58,12 @@ export const portabilityEn = {
         'each step answers the question the previous one raises.',
       transferPassport: 'Passport: what the source has',
       transferPassportText:
-        'At the top: the source provider, the transfer target and the level (home ' +
-        'or project). Below: entries by kind and the "entries" and "omissions" ' +
-        'counters. An omission is a named reason: no such section, unreadable, ' +
+        'At the top: the source and the level (global or project); the transfer ' +
+        'target is picked on the "Transfer" tab and remembered by the browser. ' +
+        'Below: the entry kinds, collapsed to a heading with the entry and omission ' +
+        'counts; a click on the heading expands the kind. A requirement shared by ' +
+        'every entry of a kind stands once above the list instead of on every row. ' +
+        'An omission is a named reason: no such section, unreadable, ' +
         'format not parsed, empty, disabled. Only the unreadable ones are ' +
         'coloured: an empty section is a lawful part of an ordinary home.',
       transferFidelity: 'Fidelity report: what reaches the target',
@@ -82,6 +88,12 @@ export const portabilityEn = {
         'many files, and the revert button. It survives a page reload. Files you ' +
         'edited AFTER the transfer are named one by one and are left alone by ' +
         'default: restoring a backup over your own edit would erase it silently.',
+      transferProbe: 'The target probe: did it really arrive',
+      transferProbeText:
+        'The fidelity report is a promise, the probe is a check. On the Target probe tab ' +
+        'the panel starts the target’s real CLI in a temporary home, plants its own probe ' +
+        'records there and answers it with a stub instead of a model. The probe does not ' +
+        'read your files; the temporary home is removed whole.',
 
       subscribeTitle: 'Path two. Subscription and a hand edit',
       subscribeCaption:
@@ -123,7 +135,7 @@ export const portabilityEn = {
         'A candidate is a conversation of ANOTHER CLI (Claude included) that has a ' +
         'working directory and was touched within the last day. The destination is ' +
         'named on the card and is not a choice: it is the active CLI, not the ' +
-        'environment transfer target picked above. The source conversation is ' +
+        'environment transfer target of the other tabs. The source conversation is ' +
         'neither closed nor changed — carrying opens a new one instead of spoiling ' +
         'the old one. A note about the carry lands in the source conversation: with ' +
         'another CLI it stays there for good, while with Claude the feed is its own ' +
@@ -302,7 +314,7 @@ export const portabilityEn = {
 
     noteCanonTitle: 'The subscription canon is the panel, not the chosen source',
     noteCanonText:
-      'The provider at the top is the source of the ONE-OFF transfer and can be ' +
+      'The source at the top is the source of the ONE-OFF transfer and can be ' +
       'changed. The subscription canon is single and is not a choice: the panel ' +
       'own files. Otherwise the truth would have two owners, and the first ' +
       'rebuild would erase the work of the second.',
@@ -331,13 +343,15 @@ export const portabilityEn = {
   shots: {
     transfer: {
       '01-passport':
-        'The Claude environment passport: entries by kind, the "Entries" and "Omissions" counters, the directory root and the chosen transfer target — Codex',
+        'The Claude environment passport: the "Items" and "Skips" counters, the directory root and the entry kinds collapsed to headings; the "Instructions" kind is expanded — the requirement its entries share stands once above the list',
       '02-fidelity':
         'The fidelity report for a transfer into Codex: the summary over five levels, the "works only when started through the panel" line above the table and a reason on every entry',
       '03-plan':
-        'The transfer plan: target files by name, "+N −M" for each, entry outcomes as separate badges and the line-by-line diff of what will end up in the file',
+        'The transfer plan: target files by name, "+N −M" for each, entry outcomes as separate badges; "Show diff" opens line by line what will end up in the file',
       '04-applied':
-        'The transfer is applied: the date, the number of files and the "Revert the transfer" button in place of the plan',
+        'The transfer is applied: the date, the number of files and the "Undo transfer" button in place of the plan',
+      '05-probe':
+        'The Target probe tab: the card “Acceptance probe of Codex (OpenAI)” — what the probe will do and what it will not touch — and the “Run the probe” button',
     },
     subscribe: {
       '01-layers':
@@ -351,7 +365,7 @@ export const portabilityEn = {
     },
     carry: {
       '01-list':
-        'The "Unfinished work at other CLIs" card: the "Continue at: Claude Code" line names the active CLI, not the environment transfer target picked above; the Codex conversation shows its working directory and the checkpoint file the new conversation will read',
+        'The "Unfinished work at other CLIs" card: the "Continue at: Claude Code" line names the active CLI, not the environment transfer target of the neighbouring tabs; the Codex conversation shows its working directory and the checkpoint file the new conversation will read',
       '02-refusal':
         'An unusable conversation stays in the list: its switch is off and the reason is named on the row itself — there is no checkpoint file in the directory; the usable conversation next to it is still selectable',
     },

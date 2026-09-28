@@ -13,6 +13,7 @@ import { useResourceTemplates, useApplyTemplate } from '@entities/Resource';
 import { toErrorMessage } from '@shared/api/client';
 import { skillApi, useRenameSkill } from '@entities/Skill';
 import { SKILL_BODY_TEMPLATE_IDS, type SkillBodyTemplateId } from '../lib/skill-templates';
+import { skillAssistantSpec } from '../model/skillAssistant';
 import { primaryLabelKey } from './SkillFormModal.lib';
 import type { SkillFormModalProps } from './SkillFormModal.types';
 import styles from './SkillFormModal.module.scss';
@@ -129,7 +130,7 @@ export function SkillFormModal({ isOpen, onOpenChange, skill }: SkillFormModalPr
       isOpen={isOpen}
       onOpenChange={onOpenChange}
       title={skill ? `${t('common.edit')}: ${skill.name}` : t('skills.addSkill')}
-      description={t('common.needsRestart')}
+      description={t('skills.liveReload')}
       size="xl"
       footer={
         <>
@@ -149,6 +150,7 @@ export function SkillFormModal({ isOpen, onOpenChange, skill }: SkillFormModalPr
           <button
             type="button"
             className={`${styles.modeTab} ${!isBuilder ? styles.modeTabActive : ''}`}
+            aria-pressed={!isBuilder}
             onClick={() => setIsBuilder(false)}
           >
             <Icon name="file" size={20} />
@@ -165,6 +167,7 @@ export function SkillFormModal({ isOpen, onOpenChange, skill }: SkillFormModalPr
           <button
             type="button"
             className={`${styles.modeTab} ${isBuilder ? styles.modeTabActive : ''}`}
+            aria-pressed={isBuilder}
             onClick={() => setIsBuilder(true)}
           >
             <Icon name="skills" size={20} />
@@ -181,18 +184,30 @@ export function SkillFormModal({ isOpen, onOpenChange, skill }: SkillFormModalPr
       )}
 
       <FormWithAssistant
-        kind={t('skills.title')}
-        fields={{ name, description, body }}
-        schema={{
-          name: 'Имя скилла латиницей через дефис',
-          description:
-            'Когда применять скилл: ситуация и слова пользователя. По этому полю Claude решает, подключать ли скилл',
-          body: 'Инструкции в markdown: что делать по шагам, чего не делать, как проверить результат',
+        kind="skill"
+        fields={{
+          name,
+          description,
+          body,
+          structureTemplate: templateId ?? '',
+          ...(skill ? { renameTo: renameId } : {}),
         }}
+        spec={skillAssistantSpec({
+          created: Boolean(activeId),
+          editing: Boolean(skill),
+          templates: templates.data ?? [],
+        })}
         onApply={(applied) => {
-          if (typeof applied.name === 'string') setName(applied.name);
-          if (typeof applied.description === 'string') setDescription(applied.description);
-          if (typeof applied.body === 'string') setBody(applied.body);
+          if (applied.name !== undefined) setName(applied.name);
+          if (applied.description !== undefined) setDescription(applied.description);
+          if (applied.body !== undefined) setBody(applied.body);
+          // Заготовка структуры есть только у конструктора — включаем его, как
+          // сделал бы человек, прежде чем выбрать карточку.
+          if (applied.structureTemplate !== undefined) {
+            setIsBuilder(true);
+            setTemplateId(applied.structureTemplate);
+          }
+          if (applied.renameTo !== undefined) setRenameId(applied.renameTo);
         }}
       >
         <Stack gap="var(--spacing-md)">
@@ -200,7 +215,7 @@ export function SkillFormModal({ isOpen, onOpenChange, skill }: SkillFormModalPr
             label={t('skills.skillName')}
             value={name}
             onChange={setName}
-            placeholder="например: perf-audit"
+            placeholder={t('skills.skillNamePlaceholder')}
             hint={t('skills.skillNameHint')}
             isMono
             autoFocus={!skill}
@@ -236,7 +251,7 @@ export function SkillFormModal({ isOpen, onOpenChange, skill }: SkillFormModalPr
             onChange={setDescription}
             multiline
             rows={4}
-            placeholder="Use КОГДА пользователь просит…"
+            placeholder={t('skills.descriptionPlaceholder')}
             hint={t('skills.descriptionHint')}
           />
 
@@ -299,6 +314,8 @@ export function SkillFormModal({ isOpen, onOpenChange, skill }: SkillFormModalPr
                     key={template.id}
                     type="button"
                     className={`${styles.template} ${templateId === template.id ? styles.templateActive : ''}`}
+                    aria-pressed={templateId === template.id}
+                    data-skill-template={template.id}
                     onClick={() =>
                       setTemplateId((current) =>
                         current === template.id ? undefined : template.id,
@@ -308,14 +325,18 @@ export function SkillFormModal({ isOpen, onOpenChange, skill }: SkillFormModalPr
                     <Stack gap="var(--spacing-3xs)">
                       <Stack direction="row" align="center" gap="var(--spacing-2xs)" wrap>
                         <Typography variant="body-sm" weight="medium" as="span">
-                          {template.title}
+                          {t(`resourceTemplate.${template.id}.title`, {
+                            defaultValue: template.title,
+                          })}
                         </Typography>
                         <Typography variant="caption" color="subtle" as="span">
                           {template.paths.join(', ')}
                         </Typography>
                       </Stack>
                       <Typography variant="caption" color="muted">
-                        {template.description}
+                        {t(`resourceTemplate.${template.id}.description`, {
+                          defaultValue: template.description,
+                        })}
                       </Typography>
                     </Stack>
                   </button>

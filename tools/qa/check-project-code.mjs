@@ -65,6 +65,15 @@ await page.route('**/api/project-git*', async (route) =>
   }),
 );
 
+// Настройки разделения читаются по пути проекта, а выдуманного каталога сервер
+// не знает (404 в консоли). Спрашиваем настоящий сервер о существующем каталоге:
+// форма ответа — его, а не написанная здесь от руки.
+await page.route('**/api/project-git/split-settings*', async (route) => {
+  const url = new URL(route.request().url());
+  url.searchParams.set('path', process.cwd());
+  return route.continue({ url: url.toString() });
+});
+
 /** Снимок окна кода: сервер здесь подменён, но ведёт себя как настоящий. */
 let view = null;
 

@@ -1,4 +1,5 @@
 import type { PanelPendingAction } from '@agentdeck/contracts/panel-agent';
+import type { AgentImage } from '@agentdeck/contracts/agent-images';
 import type { PanelAgentSession } from '../model/usePanelAgentSession';
 
 export interface ConversationViewProps {
@@ -13,5 +14,8 @@ export interface ConversationViewProps {
   /** Раздел, где стоит человек, словами. */
   pageLabel: string;
   projectLabel?: string;
-  onSend: (text: string) => void;
+  /** Отправка реплики; картинки — блоками в самом запросе хода. */
+  onSend: (text: string, images: AgentImage[]) => void;
+  /** Открыть другой разговор — у карточки, которую просил он. */
+  onOpenConversation?: (id: string) => void;
 }

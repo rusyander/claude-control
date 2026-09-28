@@ -132,7 +132,12 @@ export const mcpEn: typeof mcpRu = {
         'The same 401, but the entry carries no header of its own — the server is asking you ' +
         'to sign in. “Authorize” opens the sign-in window, the panel stores the token and ' +
         'refreshes it later. If a blocker ate the window, the sign-in address appears on the ' +
-        'card as a link.',
+        'card as a link. A server that answers without sign-in (the local Figma Dev Mode) ' +
+        'says so — “no authorization needed” — the panel checks the connection itself and ' +
+        'the button goes away: there is nothing to sign in to. A failed sign-in start is ' +
+        'written beside the button with the server’s reason. While a token is stored, the ' +
+        'button’s place holds “Sign out”: it erases the token, the panel checks the ' +
+        'connection again at once, and the card shows the next step — “Authorize” again.',
       troubleDisabled: 'A disabled server is silent in a different way',
       troubleDisabledText:
         'The toggle moves the entry into mcpServersDisabled of the same file: Claude Code ' +
@@ -148,7 +153,10 @@ export const mcpEn: typeof mcpRu = {
     canImport:
       'Paste a whole JSON configuration: the “Several from JSON” mode creates every ' +
       'server described in it',
-    canAssistant: 'Fill the form with the assistant by describing the server in words',
+    canAssistant:
+      'Fill the form with the assistant by describing the server in words. Secret values (tokens, ' +
+      'keys, passwords in variables, headers and arguments) are never shown to it — it sees a ' +
+      'mask, and the saved secret stays as it was',
     canHealth:
       'Check the connection with a real MCP handshake on any transport and see the ' +
       'number of tools',
@@ -162,7 +170,8 @@ export const mcpEn: typeof mcpRu = {
     canOAuth:
       'Sign in interactively over OAuth to a network server: the panel opens the ' +
       'authorization window, stores the token and refreshes it on expiry. If the ' +
-      'window is blocked, the sign-in address shows up on the card as a link',
+      'window is blocked, the sign-in address shows up on the card as a link. A server ' +
+      'that answers without sign-in has no button: the card says no authorization is needed',
     canAutoCheck:
       'Turn on an automatic connection check when the section opens — the mcpAutoCheck ' +
       'setting in Settings (off by default, so servers are not started needlessly)',

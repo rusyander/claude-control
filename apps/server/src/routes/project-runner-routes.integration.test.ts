@@ -1,13 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, sep } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createServer } from 'node:net';
 import type { ProjectRunnerInfo } from '@agentdeck/contracts';
 import { AppStore } from '../lib/app-store.ts';
 import type { ServerContext } from '../context.ts';
 import { ProjectRunnerRegistry } from '../domains/project-runner.ts';
+import { spelledOnDisk } from '../lib/disk-spelling.ts';
 import { registerProjectRunnerRoutes } from './project-runner-routes.ts';
 
 /**
@@ -50,6 +51,8 @@ describe('project-runner-routes', () => {
     writePkg(join(project, 'apps', 'api'), { name: 'api', scripts: { start: 'node .' } });
 
     store = new AppStore(join(root, 'agentdeck'));
+    // Запуск и автозапуск — только у проектов панели (F-16): монорепа заведена.
+    store.addProject({ id: 'mono', name: 'mono', path: project });
     app = Fastify();
     registerProjectRunnerRoutes(
       app,
@@ -231,6 +234,88 @@ describe('project-runner-routes', () => {
       });
       expect(res.statusCode).toBe(400);
     }
+  });
+
+  // Запуск исполняет команду в каталоге из запроса, автозапуск — при следующем
+  // старте панели. По одному пути это делалось в ЛЮБОМ каталоге; граница та же,
+  // что у автотестов (F-16): проекты панели, каталоги внутри них и копии веток.
+  it('чужой каталог: запуск и автозапуск — 403 с кодом, ничего не записано', async () => {
+    const foreign = join(root, 'foreign');
+    writePkg(foreign, { name: 'foreign', scripts: { dev: 'node -e 0' } });
+
+    const start = await app.inject({
+      method: 'POST',
+      url: '/api/project-runner/start',
+      payload: { path: foreign, command: 'node -e 0' },
+    });
+    expect(start.statusCode).toBe(403);
+    expect(start.json<{ messageCode?: string }>().messageCode).toBe('runner-project-unregistered');
+    expect(store.getRunnerCommand(foreign)).toBeUndefined();
+
+    const autostart = await app.inject({
+      method: 'POST',
+      url: '/api/project-runner/autostart',
+      payload: { path: foreign, enabled: true },
+    });
+    expect(autostart.statusCode).toBe(403);
+    expect(store.listAutostartProjects()).toEqual([]);
+
+    // Снять автозапуск можно и у чужого каталога — это ничего не запускает.
+    const off = await app.inject({
+      method: 'POST',
+      url: '/api/project-runner/autostart',
+      payload: { path: foreign, enabled: false },
+    });
+    expect(off.statusCode).toBe(200);
+  });
+
+  // Сверка по строке: `<проект>\..\foreign` начинается с пути проекта, а ОС
+  // открывает по нему соседний каталог — запуск ушёл бы в чужую команду.
+  it('выход из проекта через «..» — 403, как у чужого каталога', async () => {
+    const foreign = join(root, 'foreign');
+    writePkg(foreign, { name: 'foreign', scripts: { dev: 'node -e 0' } });
+    const escaped = `${project}${sep}..${sep}foreign`;
+
+    for (const url of ['/api/project-runner/start', '/api/project-runner/autostart']) {
+      const res = await app.inject({
+        method: 'POST',
+        url,
+        payload: { path: escaped, command: 'node -e 0', enabled: true },
+      });
+      expect(res.statusCode, url).toBe(403);
+    }
+    expect(store.listAutostartProjects()).toEqual([]);
+
+    // И «..», по строке не выходящий из проекта, — отказ: на POSIX `ссылка/..`
+    // ведёт к родителю ЦЕЛИ ссылки, и строка тут не говорит, куда придёт ОС.
+    const inside = await app.inject({
+      method: 'POST',
+      url: '/api/project-runner/autostart',
+      payload: { path: `${project}${sep}apps${sep}..`, enabled: true },
+    });
+    expect(inside.statusCode).toBe(403);
+  });
+
+  // Реестр хранит путь как ввели — у временной папки Windows это короткое имя
+  // 8.3 (`RUSYAN~1`). Запрос в длинном написании — тот же каталог, не чужой.
+  it('проект в написании 8.3, запрос в длинном — граница пропускает', async (context) => {
+    const long = spelledOnDisk(project);
+    if (long === project) context.skip();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/project-runner/autostart',
+      payload: { path: long, enabled: true },
+    });
+    expect(res.statusCode).toBe(200);
+  });
+
+  it('подпапка проекта панели проходит границу: автозапуск ставится', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/project-runner/autostart',
+      payload: { path: join(project, 'apps', 'web'), enabled: true },
+    });
+    expect(res.statusCode).toBe(200);
   });
 
   it('нет ни скрипта, ни команды → цель не запускаема, но остаётся в списке', async () => {

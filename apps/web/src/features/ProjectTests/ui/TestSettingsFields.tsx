@@ -180,7 +180,7 @@ export function TestSettingsFields({ board, onError }: TestSettingsSectionProps)
               <TextField
                 label={t('tests.settings.field.options')}
                 hint={t('tests.settings.field.optionsHint')}
-                placeholder="дым, регресс, приёмка"
+                placeholder={t('tests.settings.field.optionsPlaceholder')}
                 value={options}
                 onChange={setOptions}
               />

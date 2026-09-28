@@ -109,8 +109,9 @@ export function RunnerTargetRow({ path, target, run, defaultOpen }: RunnerTarget
               variant="ghost"
               size="sm"
               iconOnly
-              icon={<Icon name="send" size={16} />}
+              icon={<Icon name="play" size={16} />}
               aria-label={`${t('runner.start')}: ${target.name}`}
+              title={target.runnable ? target.command : target.reason}
               disabled={!target.runnable}
               isLoading={start.isPending}
               onClick={() => start.mutate({ path, dir: target.dir }, { onError: failed })}

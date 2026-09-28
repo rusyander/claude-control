@@ -1,0 +1,269 @@
+{
+  "topic": "mcp",
+  "frames": {
+    "connect/01-empty": {
+      "light-ru": {
+        "file": "01-empty.png",
+        "width": 1400,
+        "height": 1200
+      },
+      "light-en": {
+        "file": "01-empty.en.png",
+        "width": 1400,
+        "height": 1200
+      },
+      "dark-ru": {
+        "file": "01-empty.dark.png",
+        "width": 1400,
+        "height": 1200
+      },
+      "dark-en": {
+        "file": "01-empty.dark.en.png",
+        "width": 1400,
+        "height": 1200
+      }
+    },
+    "connect/02-form-presets": {
+      "light-ru": {
+        "file": "02-form-presets.png",
+        "width": 1400,
+        "height": 928
+      },
+      "light-en": {
+        "file": "02-form-presets.en.png",
+        "width": 1400,
+        "height": 928
+      },
+      "dark-ru": {
+        "file": "02-form-presets.dark.png",
+        "width": 1400,
+        "height": 928
+      },
+      "dark-en": {
+        "file": "02-form-presets.dark.en.png",
+        "width": 1400,
+        "height": 928
+      }
+    },
+    "connect/03-import": {
+      "light-ru": {
+        "file": "03-import.png",
+        "width": 1400,
+        "height": 928
+      },
+      "light-en": {
+        "file": "03-import.en.png",
+        "width": 1400,
+        "height": 928
+      },
+      "dark-ru": {
+        "file": "03-import.dark.png",
+        "width": 1400,
+        "height": 928
+      },
+      "dark-en": {
+        "file": "03-import.dark.en.png",
+        "width": 1400,
+        "height": 928
+      }
+    },
+    "connect/04-card-unknown": {
+      "light-ru": {
+        "file": "04-card-unknown.png",
+        "width": 1400,
+        "height": 1200
+      },
+      "light-en": {
+        "file": "04-card-unknown.en.png",
+        "width": 1400,
+        "height": 1200
+      },
+      "dark-ru": {
+        "file": "04-card-unknown.dark.png",
+        "width": 1400,
+        "height": 1200
+      },
+      "dark-en": {
+        "file": "04-card-unknown.dark.en.png",
+        "width": 1400,
+        "height": 1200
+      }
+    },
+    "connect/05-connected": {
+      "light-ru": {
+        "file": "05-connected.png",
+        "width": 1116,
+        "height": 144
+      },
+      "light-en": {
+        "file": "05-connected.en.png",
+        "width": 1116,
+        "height": 144
+      },
+      "dark-ru": {
+        "file": "05-connected.dark.png",
+        "width": 1116,
+        "height": 144
+      },
+      "dark-en": {
+        "file": "05-connected.dark.en.png",
+        "width": 1116,
+        "height": 144
+      }
+    },
+    "connect/06-tools": {
+      "light-ru": {
+        "file": "06-tools.png",
+        "width": 928,
+        "height": 768
+      },
+      "light-en": {
+        "file": "06-tools.en.png",
+        "width": 928,
+        "height": 768
+      },
+      "dark-ru": {
+        "file": "06-tools.dark.png",
+        "width": 928,
+        "height": 768
+      },
+      "dark-en": {
+        "file": "06-tools.dark.en.png",
+        "width": 928,
+        "height": 768
+      }
+    },
+    "trouble/01-failed": {
+      "light-ru": {
+        "file": "01-failed.png",
+        "width": 1116,
+        "height": 184
+      },
+      "light-en": {
+        "file": "01-failed.en.png",
+        "width": 1116,
+        "height": 184
+      },
+      "dark-ru": {
+        "file": "01-failed.dark.png",
+        "width": 1116,
+        "height": 184
+      },
+      "dark-en": {
+        "file": "01-failed.dark.en.png",
+        "width": 1116,
+        "height": 184
+      }
+    },
+    "trouble/02-missing-var": {
+      "light-ru": {
+        "file": "02-missing-var.png",
+        "width": 1116,
+        "height": 184
+      },
+      "light-en": {
+        "file": "02-missing-var.en.png",
+        "width": 1116,
+        "height": 184
+      },
+      "dark-ru": {
+        "file": "02-missing-var.dark.png",
+        "width": 1116,
+        "height": 184
+      },
+      "dark-en": {
+        "file": "02-missing-var.dark.en.png",
+        "width": 1116,
+        "height": 184
+      }
+    },
+    "trouble/03-token-rejected": {
+      "light-ru": {
+        "file": "03-token-rejected.png",
+        "width": 1116,
+        "height": 166
+      },
+      "light-en": {
+        "file": "03-token-rejected.en.png",
+        "width": 1116,
+        "height": 166
+      },
+      "dark-ru": {
+        "file": "03-token-rejected.dark.png",
+        "width": 1116,
+        "height": 166
+      },
+      "dark-en": {
+        "file": "03-token-rejected.dark.en.png",
+        "width": 1116,
+        "height": 166
+      }
+    },
+    "trouble/04-oauth": {
+      "light-ru": {
+        "file": "04-oauth.png",
+        "width": 1116,
+        "height": 166
+      },
+      "light-en": {
+        "file": "04-oauth.en.png",
+        "width": 1116,
+        "height": 166
+      },
+      "dark-ru": {
+        "file": "04-oauth.dark.png",
+        "width": 1116,
+        "height": 166
+      },
+      "dark-en": {
+        "file": "04-oauth.dark.en.png",
+        "width": 1116,
+        "height": 166
+      }
+    },
+    "trouble/05-disabled": {
+      "light-ru": {
+        "file": "05-disabled.png",
+        "width": 1116,
+        "height": 122
+      },
+      "light-en": {
+        "file": "05-disabled.en.png",
+        "width": 1116,
+        "height": 122
+      },
+      "dark-ru": {
+        "file": "05-disabled.dark.png",
+        "width": 1116,
+        "height": 122
+      },
+      "dark-en": {
+        "file": "05-disabled.dark.en.png",
+        "width": 1116,
+        "height": 122
+      }
+    },
+    "trouble/06-headers": {
+      "light-ru": {
+        "file": "06-headers.png",
+        "width": 1400,
+        "height": 928
+      },
+      "light-en": {
+        "file": "06-headers.en.png",
+        "width": 1400,
+        "height": 928
+      },
+      "dark-ru": {
+        "file": "06-headers.dark.png",
+        "width": 1400,
+        "height": 928
+      },
+      "dark-en": {
+        "file": "06-headers.dark.en.png",
+        "width": 1400,
+        "height": 928
+      }
+    }
+  }
+}

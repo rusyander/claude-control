@@ -28,7 +28,7 @@
         <mxCell id="p1:backup:icon" value="bak" style="shape=cylinder3;backgroundOutline=1;size=7;fillColor=#FFFFFF;strokeColor=#FB8C00;html=1;whiteSpace=wrap;align=center;verticalAlign=bottom;fontSize=7;fontColor=#EF6C00;informational=1;" vertex="1" parent="p1:backup">
           <mxGeometry x="10" y="10" width="40" height="50" as="geometry"/>
         </mxCell>
-        <mxCell id="p1:file" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#EF6C00;text-align:left&quot;&gt;~/.claude/CLAUDE.md&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Включённое правило — раздел «## ПРАВИЛО: Заголовок».&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Выключенное — «### Заголовок» внутри служебного раздела «## Отключённые правила (AgentDeck)».&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Шапка и обычные разделы остаются на своих местах.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFF3E0;strokeColor=#FB8C00;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;spacingLeft=50;informational=1;" vertex="1" parent="1">
+        <mxCell id="p1:file" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#EF6C00;text-align:left&quot;&gt;~/.claude/CLAUDE.md&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Включённое правило — раздел «## ПРАВИЛО: Заголовок».&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Выключенного правила в файле нет вовсе: его текст и место хранит state.json панели.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Шапка и обычные разделы остаются на своих местах.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFF3E0;strokeColor=#FB8C00;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;spacingLeft=50;informational=1;" vertex="1" parent="1">
           <mxGeometry x="60" y="710" width="360" height="90" as="geometry"/>
         </mxCell>
         <mxCell id="p1:file:icon" value="md" style="shape=note;size=14;fillColor=#FFFFFF;strokeColor=#FB8C00;html=1;whiteSpace=wrap;align=center;verticalAlign=bottom;fontSize=7;fontColor=#EF6C00;informational=1;" vertex="1" parent="p1:file">
@@ -170,8 +170,8 @@
         <mxCell id="p2:on:icon" value="вкл" style="shape=card;fillColor=#FFFFFF;strokeColor=#43A047;html=1;whiteSpace=wrap;align=center;verticalAlign=bottom;fontSize=7;fontColor=#1B5E20;informational=1;" vertex="1" parent="p2:on">
           <mxGeometry x="10" y="10" width="40" height="50" as="geometry"/>
         </mxCell>
-        <mxCell id="p2:off" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#B71C1C;text-align:left&quot;&gt;Выключено&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Тот же текст переехал под «### Заголовок» в служебный раздел «## Отключённые правила (AgentDeck)» в конце файла.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;В списке правило остаётся с пометкой «Выключено», в счётчике раздела — учитывается.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFEBEE;strokeColor=#E53935;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;spacingLeft=50;informational=1;" vertex="1" parent="1">
-          <mxGeometry x="540" y="150" width="360" height="90" as="geometry"/>
+        <mxCell id="p2:off" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#B71C1C;text-align:left&quot;&gt;Выключено&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Раздел убран из CLAUDE.md: Claude Code его не читает и токенов на него не тратит. Текст и место правила хранит state.json панели.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;В списке правило остаётся с пометкой «Выключено», в счётчике раздела — учитывается.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFEBEE;strokeColor=#E53935;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;spacingLeft=50;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="540" y="150" width="360" height="110" as="geometry"/>
         </mxCell>
         <mxCell id="p2:off:icon" value="выкл" style="shape=card;fillColor=#FFFFFF;strokeColor=#E53935;html=1;whiteSpace=wrap;align=center;verticalAlign=bottom;fontSize=7;fontColor=#B71C1C;informational=1;" vertex="1" parent="p2:off">
           <mxGeometry x="10" y="10" width="40" height="50" as="geometry"/>
@@ -185,8 +185,8 @@
         <mxCell id="p2:group" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#4527A0;text-align:left&quot;&gt;Группа гасит пачкой&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Тумблер группы переключает все её правила разом — ради этого группы и заводят.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Отметка группы отдельная от ручной: правило, выключенное рукой, не оживёт при включении группы, а входящее в две группы оживёт, только когда его отпустят обе.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#EDE7F6;strokeColor=#7E57C2;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="1">
           <mxGeometry x="60" y="460" width="360" height="110" as="geometry"/>
         </mxCell>
-        <mxCell id="p2:keep" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#EF6C00;text-align:left&quot;&gt;Служебный раздел — не мусор&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;В нём лежит текст выключенных правил. Сотрёте раздел руками на странице CLAUDE.md — текст пропадёт, и тумблер вернуть его уже не сможет.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Панель собирает этот раздел заново при каждой записи файла.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFDE7;strokeColor=#F9A825;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="1">
-          <mxGeometry x="540" y="470" width="360" height="80" as="geometry"/>
+        <mxCell id="p2:keep" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#EF6C00;text-align:left&quot;&gt;Включение — на прежнее место&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Панель помнит соседей правила: включённое встаёт туда, где стояло, а не в конец файла.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Соседа удалили — встаёт перед вторым соседом; пропали оба — на прежнюю позицию.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFDE7;strokeColor=#F9A825;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="540" y="470" width="360" height="90" as="geometry"/>
         </mxCell>
         <mxCell id="p2:project" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#00695C;text-align:left&quot;&gt;Только личный уровень&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Тумблеры, группы и песочница есть у правил из ~/.claude/CLAUDE.md.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;У проектного CLAUDE.md и файлов .claude/rules самого проекта их нет: панель правит первый текстом целиком, а вторые только показывает.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#E0F2F1;strokeColor=#26A69A;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="1">
           <mxGeometry x="1020" y="470" width="360" height="80" as="geometry"/>
@@ -198,15 +198,18 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="edge:p2:off:p2:on" value="тумблер обратно — текст на месте" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#78909C;dashed=1;dashPattern=6 4;exitX=0;exitY=0.7;exitDx=0;exitDy=0;entryX=1;entryY=0.7;entryDx=0;entryDy=0;" edge="1" parent="1" source="p2:off" target="p2:on">
+        <mxCell id="edge:p2:off:p2:on" value="тумблер обратно — на прежнее место" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#78909C;dashed=1;dashPattern=6 4;exitX=0;exitY=0.7;exitDx=0;exitDy=0;entryX=1;entryY=0.7;entryDx=0;entryDy=0;" edge="1" parent="1" source="p2:off" target="p2:on">
           <mxGeometry relative="1" x="0" y="44" as="geometry">
             <Array as="points">
-            <mxPoint x="420" y="213"/>
+            <mxPoint x="420" y="227"/>
             </Array>
           </mxGeometry>
         </mxCell>
         <mxCell id="edge:p2:off:p2:gone" value="корзина" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#2E7D32;exitX=1;exitY=0.35;exitDx=0;exitDy=0;entryX=0;entryY=0.35;entryDx=0;entryDy=0;" edge="1" parent="1" source="p2:off" target="p2:gone">
           <mxGeometry relative="1" x="0" y="0" as="geometry">
+            <Array as="points">
+            <mxPoint x="1020" y="189"/>
+            </Array>
           </mxGeometry>
         </mxCell>
         <mxCell id="edge:p2:gone:p2:on" value="откат копии в «Настройках» —&lt;br&gt;вернётся весь файл" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#78909C;dashed=1;dashPattern=6 4;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="p2:gone" target="p2:on">

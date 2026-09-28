@@ -22,8 +22,10 @@ const meta = {
           'все формы приложения открываются в окне размера `xl` — в узком окне ' +
           'колонки схлопываются и помощник перестаёт быть виден рядом с полями, ' +
           'а смысл в том, чтобы видеть их одновременно.\n\n' +
-          '`fields` и `schema` передаются помощнику как контекст: что уже введено ' +
-          'и что вообще можно заполнить. Заполняет он только описанные поля.\n\n' +
+          '`fields` и `spec` передаются помощнику как контекст: что уже введено ' +
+          'и что вообще можно заполнить — у перечислимых полей с допустимыми ' +
+          'значениями. Ответ проверяется тем же `spec`: форма получает только ' +
+          'годное, отброшенное называется под ответом.\n\n' +
           '**Переписка требует поднятого сервера панели** — без него видна ' +
           'раскладка с пустым чатом.',
       },
@@ -32,7 +34,7 @@ const meta = {
   args: {
     kind: 'Правило доступа',
     fields: {},
-    schema: {},
+    spec: {},
     onApply: () => undefined,
     children: null,
   },
@@ -51,13 +53,17 @@ export const ФормаПрава: Story = {
         <FormWithAssistant
           kind="Правило доступа"
           fields={{ pattern, decision }}
-          schema={{
-            pattern: 'Шаблон: имя инструмента целиком (Bash, Read) или с уточнением',
-            decision: 'Решение: allow, ask или deny',
+          spec={{
+            pattern: { type: 'text', hint: 'A whole tool name (Bash, Read) or a narrowed one' },
+            decision: {
+              type: 'choice',
+              hint: 'Decision',
+              options: [{ value: 'allow' }, { value: 'ask' }, { value: 'deny' }],
+            },
           }}
           onApply={(applied) => {
-            if (typeof applied.pattern === 'string') setPattern(applied.pattern);
-            if (typeof applied.decision === 'string') setDecision(applied.decision);
+            if (applied.pattern !== undefined) setPattern(applied.pattern);
+            if (applied.decision !== undefined) setDecision(applied.decision);
           }}
           placeholder="Например: запрети пушить в main без подтверждения"
         >
@@ -108,13 +114,15 @@ export const ФормаСкилла: Story = {
         <FormWithAssistant
           kind="Скилл"
           fields={{ name, description, body }}
-          schema={{
-            name: 'Имя папки скилла: латиница через дефис',
-            description: 'Описание, по которому Claude решает подключать скилл',
-            body: 'Тело SKILL.md — сами инструкции',
+          spec={{
+            name: { type: 'text', hint: 'Skill folder name, kebab-case' },
+            description: { type: 'text', hint: 'When Claude should load the skill' },
+            body: { type: 'text', hint: 'SKILL.md body — the instructions' },
           }}
           onApply={(applied) => {
-            if (typeof applied.description === 'string') setDescription(applied.description);
+            if (applied.name !== undefined) setName(applied.name);
+            if (applied.description !== undefined) setDescription(applied.description);
+            if (applied.body !== undefined) setBody(applied.body);
           }}
           placeholder="Например: скилл для проверки контрастности и клавиатурной навигации"
         >

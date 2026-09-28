@@ -30,7 +30,7 @@ export function BridgeRow() {
           <Typography variant="body" weight="medium" as="h2">
             {t('platform.agentsBridgeTitle')}
           </Typography>
-          <Typography variant="body-sm" color="subtle" style={{ maxWidth: 'var(--text-measure)' }}>
+          <Typography variant="body-sm" color="subtle" className="prose">
             {t('platform.agentsBridgeText')}
           </Typography>
         </Stack>

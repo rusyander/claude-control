@@ -1,6 +1,7 @@
 import type { ChatLink } from '../../lib/app-store/app-store.types.ts';
 import type { RunOptions } from './ChatRunner.ts';
 import type { RunFinished, RunMeta } from './ChatRunRegistry.ts';
+import { localizeText } from '../../lib/server-texts.ts';
 import { isRetriableRunError } from './run-errors.ts';
 
 /**
@@ -57,10 +58,11 @@ export function retriesLink(link: Pick<ChatLink, 'parentChatId' | 'stage'> | und
 
 /** Что уходит сессии при повторе: не задача заново, а продолжение с места обрыва. */
 export function retryPrompt(error: string | undefined): string {
-  const why = error ? ` (${error.replace(/\s+/g, ' ').slice(0, 200)})` : '';
+  // Причина — текст сервера; модели — его английская сторона, если он известен.
+  const why = error ? ` (${localizeText(error, 'en').replace(/\s+/g, ' ').slice(0, 200)})` : '';
   return (
-    `Прошлый ход оборвался сбоем${why}. Продолжай с места обрыва: проверь, что уже ` +
-    'сделано в копии, и доведи задачу до конца. Заново не начинай.'
+    `The previous turn broke off with a failure${why}. Continue from where it broke off: check ` +
+    'what is already done in the copy and finish the task. Do not start over.'
   );
 }
 

@@ -1,4 +1,6 @@
+import { useCallback } from 'react';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
+import { localizeMediaTitle } from '@agentdeck/contracts/chat-title';
 import type {
   ChatAutoModeView,
   ChatMessagesPage,
@@ -6,6 +8,7 @@ import type {
   ChatSummary,
 } from '@agentdeck/contracts';
 import { api } from '../../shared/api/client';
+import { useT } from '../../shared/config/i18n';
 
 /**
  * Разговоры и их содержимое. Источник — транскрипты самого Claude Code, поэтому
@@ -34,17 +37,42 @@ export type AwaitingChats = Record<string, boolean>;
 
 const STALE_MS = 15_000;
 
+/**
+ * Слово режима в названии («Картинка: …») сервер пишет по-русски — одно
+ * название на все клиенты; телефон ставит слово своего языка.
+ */
+function useLocalTitle(): <T extends { title: string }>(chat: T) => T {
+  const t = useT();
+  return useCallback(
+    <T extends { title: string }>(chat: T): T => {
+      const title = localizeMediaTitle(chat.title, (mode) => t.chat.titleWord[mode]);
+      return title === chat.title ? chat : { ...chat, title };
+    },
+    [t],
+  );
+}
+
 export function useChats(): UseQueryResult<ChatSummary[]> {
+  const localTitle = useLocalTitle();
+  const select = useCallback((chats: ChatSummary[]) => chats.map(localTitle), [localTitle]);
   return useQuery({
     queryKey: ['chats'],
     queryFn: () => api.get<ChatSummary[]>('/chats'),
     staleTime: STALE_MS,
+    select,
   });
 }
 
 export function useChatProjects(): UseQueryResult<ProjectChats[]> {
+  const localTitle = useLocalTitle();
+  const select = useCallback(
+    (projects: ProjectChats[]) =>
+      projects.map((project) => ({ ...project, chats: project.chats.map(localTitle) })),
+    [localTitle],
+  );
   return useQuery({
     queryKey: ['chats', 'projects'],
+    select,
     queryFn: () => api.get<ProjectChats[]>('/chats/projects'),
     staleTime: STALE_MS,
   });

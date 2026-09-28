@@ -19,15 +19,18 @@ const CASES = [
   ['mcp', '/mcp', /Добавить сервер/i],
   ['permission', '/permissions', /Добавить правило/i],
   ['env', '/env', /Добавить переменную/i],
-  ['group', '/groups', /Создать группу/i],
-  ['automation', '/groups', /Создать сценарий/i],
+  // У групп одна кнопка «Создать группу» и выбор вида в окне: «Набор» или «Сценарий».
+  ['group', '/groups', /Создать группу/i, { pick: /^Набор/ }],
+  // Сценарий спрашивает только имя, «Когда» и место: помощник у него — в составителе
+  // шага «Порядка работы», который открывается сразу после создания.
+  ['scenario', '/groups', /Создать группу/i, { assistant: false, pick: /^Сценарий/ }],
 ];
 
 const browser = await chromium.launch();
 const context = await browser.newContext({ viewport: { width: 1440, height: 950 } });
 const problems = [];
 
-for (const [name, path, buttonPattern] of CASES) {
+for (const [name, path, buttonPattern, { assistant = true, pick } = {}] of CASES) {
   const page = await context.newPage();
   page.on('pageerror', (error) => problems.push(`[${name}] pageerror: ${error.message}`));
   page.on('console', (message) => {
@@ -39,6 +42,16 @@ for (const [name, path, buttonPattern] of CASES) {
     await page.waitForSelector('nav');
     await page.getByRole('button', { name: buttonPattern }).first().click();
     await page.waitForSelector('[role="dialog"]', { timeout: 5000 });
+    if (pick) {
+      await page.locator('[role="dialog"]').getByRole('button', { name: pick }).click();
+      // Окно выбора уходит с анимацией закрытия (data-state="closed", скрыто от
+      // дерева доступности, но ещё в DOM), форма вида уже открыта — ждём, пока
+      // окно останется одно, иначе следующий `[role="dialog"]` видит два.
+      await page
+        .locator('[role="dialog"][data-state="closed"]')
+        .waitFor({ state: 'detached', timeout: 5000 });
+      await page.locator('[role="dialog"]').waitFor({ timeout: 5000 });
+    }
 
     // Ждём конца анимации появления, иначе снимок выйдет полупрозрачным.
     await page
@@ -51,14 +64,14 @@ for (const [name, path, buttonPattern] of CASES) {
     const hasAssistant = await page
       .locator('[role="dialog"] textarea[data-assistant-input]')
       .count();
-    if (hasAssistant === 0) problems.push(`[${name}] нет панели помощника`);
+    if (assistant && hasAssistant === 0) problems.push(`[${name}] нет панели помощника`);
 
     await page.screenshot({ path: join(OUT_DIR, `${name}.png`) });
     console.log(
       `${name.padEnd(11)} OK — «${heading}»${hasAssistant ? ' + помощник' : ' БЕЗ ПОМОЩНИКА'}`,
     );
   } catch (error) {
-    problems.push(`[${name}] ${error.message.split('\n')[0]}`);
+    problems.push(`[${name}] ${error.message.split('\n').slice(0, 4).join(' | ')}`);
     console.log(`${name.padEnd(11)} ОШИБКА`);
   }
 
@@ -68,3 +81,5 @@ for (const [name, path, buttonPattern] of CASES) {
 await browser.close();
 
 console.log(problems.length ? `\nПРОБЛЕМЫ:\n  ${problems.join('\n  ')}` : '\nОшибок консоли нет.');
+// Проблемы печатались, а выход был 0 — прогон через блок «Тесты» и гейт видели зелёное.
+process.exitCode = problems.length ? 1 : 0;

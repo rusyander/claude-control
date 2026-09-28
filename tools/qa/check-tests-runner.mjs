@@ -110,6 +110,15 @@ await page.route('**/api/project-git*', async (route) =>
   }),
 );
 
+// Реестр проектов — тоже заглушка: раздел берёт первым проект РЕЕСТРА, а не
+// вкладку, и на стенде с живым реестром проход уходил в чужой каталог —
+// проверка краснела от того, что человек добавил себе проект.
+await page.route('**/api/projects', async (route) =>
+  route.request().method() === 'GET'
+    ? route.fulfill({ json: [{ id: 'qa-project', name: PROJECT.name, path: PROJECT.path }] })
+    : route.fallback(),
+);
+
 await page.route('**/api/chats/projects*', async (route) =>
   route.fulfill({
     json: [
@@ -238,6 +247,16 @@ await page.route('**/api/project-tests/impact*', async (route) =>
   route.fulfill({ json: { files: [], cases: [] } }),
 );
 await page.route('**/api/project-tests?*', async (route) => route.fulfill({ json: view }));
+// История кейса и отметки «нестабилен» библиотеки — свои ручки; без заглушки
+// запрос ушёл бы на реальный стенд с выдуманным путём проекта.
+await page.route('**/api/project-tests/flaky*', async (route) =>
+  route.fulfill({ json: { window: 10, minFlips: 2, cases: [] } }),
+);
+await page.route('**/api/project-tests/case-history*', async (route) =>
+  route.fulfill({
+    json: { groupId: '', caseId: '', entries: [], flaky: { isFlaky: false, flips: 0, runs: 0 } },
+  }),
+);
 
 let bad = 0;
 const check = (ok, text) => {

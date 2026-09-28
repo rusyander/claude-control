@@ -242,6 +242,22 @@ describe('domains/platform/store: контуры и ключи', () => {
     }
   });
 
+  it('выбор «чьи правила» переживает чтение, мусор читается как «оба набора» (баг 11б)', () => {
+    const withApplies = (applies: unknown) =>
+      ({ ...PLATFORM, rules: { ...PLATFORM.rules, applies } }) as unknown as Platform;
+    store.updateSettings({ platforms: [withApplies('ours')] });
+    expect(readPlatforms(store)[0]!.rules.applies).toBe('ours');
+    store.updateSettings({ platforms: [withApplies('всё')] });
+    expect(readPlatforms(store)[0]!.rules).not.toHaveProperty('applies');
+
+    // Карточка считает матрицу на ДЕЙСТВУЮЩИХ правилах: снятая сторона названа.
+    store.updateSettings({ platforms: [withApplies('contour')] });
+    const guard = describePlatforms(store, dir)[0]!.conflicts.find(
+      (cell) => cell.id === 'guardrails',
+    );
+    expect(guard).toMatchObject({ winner: 'both', offBy: 'ours' });
+  });
+
   it('повторная запись заменяет контур на месте, а не плодит второй', () => {
     writePlatform(store, PLATFORM);
     writePlatform(store, { ...PLATFORM, title: 'Company · prod' });

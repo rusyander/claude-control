@@ -1,0 +1,346 @@
+{
+  "topic": "tests",
+  "scenario": "e2e",
+  "frames": [
+    {
+      "id": "01-missing",
+      "side": "panel",
+      "file": "01-missing.png",
+      "masked": 0,
+      "width": 1132,
+      "height": 156,
+      "shotAt": "2026-09-28T09:55:10.723Z",
+      "text": "Папка автотестов Папки e2e в проекте нет — агентам некуда класть настоящие тесты. Кнопка заведёт e2e/ с конфигом Playwright и спрячет её от git — проект не изменится. Настоящие тесты туда пишут агенты, раздел сводит их с кейсами. Создать папку",
+      "en": {
+        "file": "01-missing.en.png",
+        "masked": 0,
+        "width": 1132,
+        "height": 156,
+        "shotAt": "2026-09-28T09:57:34.243Z",
+        "text": "Autotest folder The project has no e2e folder — agents have nowhere to put real tests. The button creates e2e/ with a Playwright config and hides it from git — the project stays unchanged. Agents write the real tests there; the section matches them to cases. Create folder"
+      },
+      "darkEn": {
+        "file": "01-missing.dark.en.png",
+        "masked": 0,
+        "width": 1132,
+        "height": 156,
+        "shotAt": "2026-09-28T14:36:10.526Z",
+        "text": "Autotest folder The project has no e2e folder — agents have nowhere to put real tests. The button creates e2e/ with a Playwright config and hides it from git — the project stays unchanged. Agents write the real tests there; the section matches them to cases. Create folder"
+      },
+      "dark": {
+        "file": "01-missing.dark.png",
+        "masked": 0,
+        "width": 1132,
+        "height": 156,
+        "shotAt": "2026-09-28T09:59:55.390Z",
+        "text": "Папка автотестов Папки e2e в проекте нет — агентам некуда класть настоящие тесты. Кнопка заведёт e2e/ с конфигом Playwright и спрячет её от git — проект не изменится. Настоящие тесты туда пишут агенты, раздел сводит их с кейсами. Создать папку"
+      }
+    },
+    {
+      "id": "02-created",
+      "side": "panel",
+      "file": "02-created.png",
+      "masked": 0,
+      "width": 1132,
+      "height": 176,
+      "shotAt": "2026-09-28T09:55:12.318Z",
+      "text": "Папка автотестов Папка e2e/ — заведена панелью Playwright · 0 файлов тестов · скрыта от git Обновить из папки Убрать папку Прогнать автотесты Только «SMOKE»",
+      "en": {
+        "file": "02-created.en.png",
+        "masked": 0,
+        "width": 1132,
+        "height": 176,
+        "shotAt": "2026-09-28T09:57:35.825Z",
+        "text": "Autotest folder Folder e2e/ — created by the panel Playwright · 0 test files · hidden from git Update from folder Remove folder Run autotests Only “SMOKE”"
+      },
+      "darkEn": {
+        "file": "02-created.dark.en.png",
+        "masked": 0,
+        "width": 1132,
+        "height": 176,
+        "shotAt": "2026-09-28T14:36:12.110Z",
+        "text": "Autotest folder Folder e2e/ — created by the panel Playwright · 0 test files · hidden from git Update from folder Remove folder Run autotests Only “SMOKE”"
+      },
+      "dark": {
+        "file": "02-created.dark.png",
+        "masked": 0,
+        "width": 1132,
+        "height": 176,
+        "shotAt": "2026-09-28T09:59:56.973Z",
+        "text": "Папка автотестов Папка e2e/ — заведена панелью Playwright · 0 файлов тестов · скрыта от git Обновить из папки Убрать папку Прогнать автотесты Только «SMOKE»"
+      }
+    },
+    {
+      "id": "03-synced",
+      "side": "panel",
+      "file": "03-synced.png",
+      "masked": 0,
+      "width": 1440,
+      "height": 900,
+      "shotAt": "2026-09-28T09:55:14.636Z",
+      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Тестирование Рабочее место тестировщика над проектом из реестра: библиотека кейсов, планы, ручные и агентские прогоны, отчёт. Кейсы лежат в файлах самого проекта. Ручной проход Проект Магазин C:\\work\\cc-help-tests\\shop Кейсы: .agent/tests Настройки набора Внешние привязки Ничего не привязано Привязать Библиотека Планы Прогоны Отчёт Покрытие Окружение по умолчанию Локальное Доступы Прогнать Полный перетест Только изменённое Сгенерировать кейсы По диффу Принимать сразу Исследовать Автоматизировать (6) 5 пройдено · 1 провалено · 0 пропущено · 0 не проверялось ветка main Как работает агент прогона: читает проект, меняет только файлы тестов Из чата кейсы не ведутся Вписать в CLAUDE.md проекта Папка автотестов Папка e2e/ — заведена панелью Playwright · 1 файл тестов · скрыта от git Обновить из папки Убрать папку Сверено: файлов 1, тестов 2; новых кейсов 2, привязано 0. Прогнать автотесты Только «SMOKE» SMOKE Файл: .agent/tests/smoke.tests.json Добавить тест История файла Обмен Изменить группу Удалить группу Пройти руками Фильтры Сохранить набор Группы Корзина 2 SMOKE 6 Новая группа Секции Все секции 6 Каталог 1 Поиск 1 Корзина 3 Добавление 1 Правка 2 Оформление 2 Доставка 1 Скидки 1 Показано 6 из 6 Кейс Статус Важность Готовность Авто Зона Варианты Действия Товар добавляется в корзину Корзина/Добавление корзина дым пройден высокая черновик руками Корзина 1 Количество товара в корзине меняется Корзина/Правка карантин: Ждём починки пересчёта суммы, дефект SHOP-31 открыт корзина дым провален высокая черновик руками Корзина 1 Позиция удаляется из корзины Корзина/Правка корзина пройден средняя черновик руками Корзина 1 Заказ оформляется с доставкой курьером Оформление/Доставка оформление дым пройден блокер черновик руками Оформление 1 Промокод уменьшает сумму заказа Оформление/Скидки оформление пройден средняя черновик руками Оформление 1 Поиск находит товар по части названия Каталог/Поиск каталог дым пройден высокая черновик руками Каталог 1",
+      "en": {
+        "file": "03-synced.en.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 900,
+        "shotAt": "2026-09-28T09:57:38.120Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Testing A tester’s workspace over a project from the registry: case library, plans, manual and agent runs, report. The cases live in the project’s own files. Manual run Project Магазин C:\\work\\cc-help-tests\\shop Cases: .agent/tests Library settings External links Nothing linked Link Library Plans Runs Report Coverage Environment default Local Credentials Run Full retest Changed only Generate cases From the diff Accept immediately Explore Automate (6) 5 passed · 1 failed · 0 skipped · 0 not run branch main How the run agent works: reads the project, changes only test files Chat does not keep the cases Write it into the project’s CLAUDE.md Autotest folder Folder e2e/ — created by the panel Playwright · 1 test file · hidden from git Update from folder Remove folder Synced: 1 files, 2 tests; 2 new cases, 0 relinked. Run autotests Only “SMOKE” SMOKE File: .agent/tests/smoke.tests.json Add a test File history Exchange Edit group Delete group Run it manually Filters Save the view Groups Корзина 2 SMOKE 6 New group Sections All sections 6 Каталог 1 Поиск 1 Корзина 3 Добавление 1 Правка 2 Оформление 2 Доставка 1 Скидки 1 Showing 6 of 6 Case Status Priority Readiness Auto Area Variants Actions Товар добавляется в корзину Корзина/Добавление корзина дым passed high draft manual Корзина 1 Количество товара в корзине меняется Корзина/Правка quarantine: Ждём починки пересчёта суммы, дефект SHOP-31 открыт корзина дым failed high draft manual Корзина 1 Позиция удаляется из корзины Корзина/Правка корзина passed medium draft manual Корзина 1 Заказ оформляется с доставкой курьером Оформление/Доставка оформление дым passed blocker draft manual Оформление 1 Промокод уменьшает сумму заказа Оформление/Скидки оформление passed medium draft manual Оформление 1 Поиск находит товар по части названия Каталог/Поиск каталог дым passed high draft manual Каталог 1"
+      },
+      "darkEn": {
+        "file": "03-synced.dark.en.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 900,
+        "shotAt": "2026-09-28T14:36:14.425Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Testing A tester’s workspace over a project from the registry: case library, plans, manual and agent runs, report. The cases live in the project’s own files. Manual run Project Магазин C:\\work\\cc-help-tests\\shop Cases: .agent/tests Library settings External links Nothing linked Link Library Plans Runs Report Coverage Environment default Local Credentials Run Full retest Changed only Generate cases From the diff Accept immediately Explore Automate (6) 5 passed · 1 failed · 0 skipped · 0 not run branch main How the run agent works: reads the project, changes only test files Chat does not keep the cases Write it into the project’s CLAUDE.md Autotest folder Folder e2e/ — created by the panel Playwright · 1 test file · hidden from git Update from folder Remove folder Synced: 1 files, 2 tests; 2 new cases, 0 relinked. Run autotests Only “SMOKE” SMOKE File: .agent/tests/smoke.tests.json Add a test File history Exchange Edit group Delete group Run it manually Filters Save the view Groups Корзина 2 SMOKE 6 New group Sections All sections 6 Каталог 1 Поиск 1 Корзина 3 Добавление 1 Правка 2 Оформление 2 Доставка 1 Скидки 1 Showing 6 of 6 Case Status Priority Readiness Auto Area Variants Actions Товар добавляется в корзину Корзина/Добавление корзина дым passed high draft manual Корзина 1 Количество товара в корзине меняется Корзина/Правка quarantine: Ждём починки пересчёта суммы, дефект SHOP-31 открыт корзина дым failed high draft manual Корзина 1 Позиция удаляется из корзины Корзина/Правка корзина passed medium draft manual Корзина 1 Заказ оформляется с доставкой курьером Оформление/Доставка оформление дым passed blocker draft manual Оформление 1 Промокод уменьшает сумму заказа Оформление/Скидки оформление passed medium draft manual Оформление 1 Поиск находит товар по части названия Каталог/Поиск каталог дым passed high draft manual Каталог 1"
+      },
+      "dark": {
+        "file": "03-synced.dark.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 900,
+        "shotAt": "2026-09-28T09:59:59.309Z",
+        "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Тестирование Рабочее место тестировщика над проектом из реестра: библиотека кейсов, планы, ручные и агентские прогоны, отчёт. Кейсы лежат в файлах самого проекта. Ручной проход Проект Магазин C:\\work\\cc-help-tests\\shop Кейсы: .agent/tests Настройки набора Внешние привязки Ничего не привязано Привязать Библиотека Планы Прогоны Отчёт Покрытие Окружение по умолчанию Локальное Доступы Прогнать Полный перетест Только изменённое Сгенерировать кейсы По диффу Принимать сразу Исследовать Автоматизировать (6) 5 пройдено · 1 провалено · 0 пропущено · 0 не проверялось ветка main Как работает агент прогона: читает проект, меняет только файлы тестов Из чата кейсы не ведутся Вписать в CLAUDE.md проекта Папка автотестов Папка e2e/ — заведена панелью Playwright · 1 файл тестов · скрыта от git Обновить из папки Убрать папку Сверено: файлов 1, тестов 2; новых кейсов 2, привязано 0. Прогнать автотесты Только «SMOKE» SMOKE Файл: .agent/tests/smoke.tests.json Добавить тест История файла Обмен Изменить группу Удалить группу Пройти руками Фильтры Сохранить набор Группы Корзина 2 SMOKE 6 Новая группа Секции Все секции 6 Каталог 1 Поиск 1 Корзина 3 Добавление 1 Правка 2 Оформление 2 Доставка 1 Скидки 1 Показано 6 из 6 Кейс Статус Важность Готовность Авто Зона Варианты Действия Товар добавляется в корзину Корзина/Добавление корзина дым пройден высокая черновик руками Корзина 1 Количество товара в корзине меняется Корзина/Правка карантин: Ждём починки пересчёта суммы, дефект SHOP-31 открыт корзина дым провален высокая черновик руками Корзина 1 Позиция удаляется из корзины Корзина/Правка корзина пройден средняя черновик руками Корзина 1 Заказ оформляется с доставкой курьером Оформление/Доставка оформление дым пройден блокер черновик руками Оформление 1 Промокод уменьшает сумму заказа Оформление/Скидки оформление пройден средняя черновик руками Оформление 1 Поиск находит товар по части названия Каталог/Поиск каталог дым пройден высокая черновик руками Каталог 1"
+      }
+    },
+    {
+      "id": "04-remove-confirm",
+      "side": "panel",
+      "file": "04-remove-confirm.png",
+      "masked": 0,
+      "width": 1132,
+      "height": 281,
+      "shotAt": "2026-09-28T09:55:49.402Z",
+      "text": "Папка автотестов Папка e2e/ — заведена панелью Playwright · 2 файла тестов · скрыта от git Обновить из папки В папке 2 чужих файла (тесты агентов или ваши правки). Убрать вместе с ними? Убрать вместе с ними Отмена Прогнать автотесты Только «Корзина» Упало 1 из 2, прошло 1. Открыть прогон в истории Вывод команды",
+      "en": {
+        "file": "04-remove-confirm.en.png",
+        "masked": 0,
+        "width": 1132,
+        "height": 281,
+        "shotAt": "2026-09-28T09:58:11.579Z",
+        "text": "Autotest folder Folder e2e/ — created by the panel Playwright · 2 test files · hidden from git Update from folder The folder holds 2 files the panel did not write (agent tests or your edits). Remove them too? Remove them too Cancel Run autotests Only “Корзина” 1 of 2 failed, 1 passed. Open the run in history Command output"
+      },
+      "darkEn": {
+        "file": "04-remove-confirm.dark.en.png",
+        "masked": 0,
+        "width": 1132,
+        "height": 281,
+        "shotAt": "2026-09-28T14:36:49.195Z",
+        "text": "Autotest folder Folder e2e/ — created by the panel Playwright · 2 test files · hidden from git Update from folder The folder holds 2 files the panel did not write (agent tests or your edits). Remove them too? Remove them too Cancel Run autotests Only “Корзина” 1 of 2 failed, 1 passed. Open the run in history Command output"
+      },
+      "dark": {
+        "file": "04-remove-confirm.dark.png",
+        "masked": 0,
+        "width": 1132,
+        "height": 281,
+        "shotAt": "2026-09-28T10:00:34.695Z",
+        "text": "Папка автотестов Папка e2e/ — заведена панелью Playwright · 2 файла тестов · скрыта от git Обновить из папки В папке 2 чужих файла (тесты агентов или ваши правки). Убрать вместе с ними? Убрать вместе с ними Отмена Прогнать автотесты Только «Корзина» Упало 1 из 2, прошло 1. Открыть прогон в истории Вывод команды"
+      }
+    },
+    {
+      "id": "05-run-done",
+      "side": "panel",
+      "file": "05-run-done.png",
+      "masked": 0,
+      "width": 1132,
+      "height": 265,
+      "shotAt": "2026-09-28T09:55:17.885Z",
+      "text": "Папка автотестов Папка e2e/ — заведена панелью Playwright · 1 файл тестов · скрыта от git Обновить из папки Убрать папку Сверено: файлов 1, тестов 2; новых кейсов 2, привязано 0. Прогнать автотесты Только «SMOKE» Упало 1 из 2, прошло 1. Открыть прогон в истории Вывод команды",
+      "en": {
+        "file": "05-run-done.en.png",
+        "masked": 0,
+        "width": 1132,
+        "height": 265,
+        "shotAt": "2026-09-28T09:57:41.377Z",
+        "text": "Autotest folder Folder e2e/ — created by the panel Playwright · 1 test file · hidden from git Update from folder Remove folder Synced: 1 files, 2 tests; 2 new cases, 0 relinked. Run autotests Only “SMOKE” 1 of 2 failed, 1 passed. Open the run in history Command output"
+      },
+      "darkEn": {
+        "file": "05-run-done.dark.en.png",
+        "masked": 0,
+        "width": 1132,
+        "height": 265,
+        "shotAt": "2026-09-28T14:36:17.681Z",
+        "text": "Autotest folder Folder e2e/ — created by the panel Playwright · 1 test file · hidden from git Update from folder Remove folder Synced: 1 files, 2 tests; 2 new cases, 0 relinked. Run autotests Only “SMOKE” 1 of 2 failed, 1 passed. Open the run in history Command output"
+      },
+      "dark": {
+        "file": "05-run-done.dark.png",
+        "masked": 0,
+        "width": 1132,
+        "height": 265,
+        "shotAt": "2026-09-28T10:00:02.583Z",
+        "text": "Папка автотестов Папка e2e/ — заведена панелью Playwright · 1 файл тестов · скрыта от git Обновить из папки Убрать папку Сверено: файлов 1, тестов 2; новых кейсов 2, привязано 0. Прогнать автотесты Только «SMOKE» Упало 1 из 2, прошло 1. Открыть прогон в истории Вывод команды"
+      }
+    },
+    {
+      "id": "06-run-history",
+      "side": "panel",
+      "file": "06-run-history.png",
+      "masked": 0,
+      "width": 1440,
+      "height": 900,
+      "shotAt": "2026-09-28T09:55:21.360Z",
+      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Тестирование Рабочее место тестировщика над проектом из реестра: библиотека кейсов, планы, ручные и агентские прогоны, отчёт. Кейсы лежат в файлах самого проекта. Ручной проход Проект Магазин C:\\work\\cc-help-tests\\shop Кейсы: .agent/tests Настройки набора Внешние привязки Ничего не привязано Привязать Библиотека Планы Прогоны Отчёт Покрытие Записи все автотесты панели импорт из CI автотесты панель 28.09.2026, 14:55:14 main local пройдено: 1 провалено: 1 пропущено: 0 длительность: 0с Отчёт .md Отчёт .csv Отчёт .pdf импорт CI 28.09.2026, 14:54:59 main пройдено: 2 провалено: 0 пропущено: 0 длительность: 0с Отчёт .md Отчёт .csv Отчёт .pdf вручную человек 28.09.2026, 14:54:00 main local пройдено: 5 провалено: 1 пропущено: 0 длительность: 15с Отчёт .md Отчёт .csv Отчёт .pdf",
+      "en": {
+        "file": "06-run-history.en.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 900,
+        "shotAt": "2026-09-28T09:57:44.679Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Testing A tester’s workspace over a project from the registry: case library, plans, manual and agent runs, report. The cases live in the project’s own files. Manual run Project Магазин C:\\work\\cc-help-tests\\shop Cases: .agent/tests Library settings External links Nothing linked Link Library Plans Runs Report Coverage Records all panel autotests CI import autotests panel 9/28/2026, 2:57:38 PM main local passed: 1 failed: 1 skipped: 0 duration: 0s Report .md Report .csv Report .pdf import CI 9/28/2026, 2:57:23 PM main passed: 2 failed: 0 skipped: 0 duration: 0s Report .md Report .csv Report .pdf manual human 9/28/2026, 2:56:24 PM main local passed: 5 failed: 1 skipped: 0 duration: 15s Report .md Report .csv Report .pdf"
+      },
+      "darkEn": {
+        "file": "06-run-history.dark.en.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 900,
+        "shotAt": "2026-09-28T14:36:21.120Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Testing A tester’s workspace over a project from the registry: case library, plans, manual and agent runs, report. The cases live in the project’s own files. Manual run Project Магазин C:\\work\\cc-help-tests\\shop Cases: .agent/tests Library settings External links Nothing linked Link Library Plans Runs Report Coverage Records all panel autotests CI import autotests panel 9/28/2026, 7:36:14 PM main local passed: 1 failed: 1 skipped: 0 duration: 0s Report .md Report .csv Report .pdf import CI 9/28/2026, 7:35:59 PM main passed: 2 failed: 0 skipped: 0 duration: 0s Report .md Report .csv Report .pdf manual human 9/28/2026, 7:35:00 PM main local passed: 5 failed: 1 skipped: 0 duration: 15s Report .md Report .csv Report .pdf"
+      },
+      "dark": {
+        "file": "06-run-history.dark.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 900,
+        "shotAt": "2026-09-28T10:00:06.337Z",
+        "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Тестирование Рабочее место тестировщика над проектом из реестра: библиотека кейсов, планы, ручные и агентские прогоны, отчёт. Кейсы лежат в файлах самого проекта. Ручной проход Проект Магазин C:\\work\\cc-help-tests\\shop Кейсы: .agent/tests Настройки набора Внешние привязки Ничего не привязано Привязать Библиотека Планы Прогоны Отчёт Покрытие Записи все автотесты панели импорт из CI автотесты панель 28.09.2026, 14:59:59 main local пройдено: 1 провалено: 1 пропущено: 0 длительность: 0с Отчёт .md Отчёт .csv Отчёт .pdf импорт CI 28.09.2026, 14:59:43 main пройдено: 2 провалено: 0 пропущено: 0 длительность: 0с Отчёт .md Отчёт .csv Отчёт .pdf вручную человек 28.09.2026, 14:58:44 main local пройдено: 5 провалено: 1 пропущено: 0 длительность: 15с Отчёт .md Отчёт .csv Отчёт .pdf"
+      }
+    },
+    {
+      "id": "07-chat-test",
+      "side": "panel",
+      "file": "07-chat-test.png",
+      "masked": 0,
+      "width": 1440,
+      "height": 900,
+      "shotAt": "2026-09-28T09:55:39.527Z",
+      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Чаты Магазин Новый чат По названию По сообщениям Показано 0 из 0 Магазин C:\\work\\cc-help-tests\\shop Opus 4.8 (1M) Fable Opus Sonnet Haiku Claude Opus 5.5 · claude-opus-5-5 Claude Fable 5.1 · claude-fable-5-1 Claude Opus 5 · claude-opus-5 Claude Sonnet 5 · claude-sonnet-5 Claude Fable 5 · claude-fable-5 Claude Opus 4.8 · claude-opus-4-8 Claude Opus 4.7 · claude-opus-4-7 Claude Sonnet 4.6 · claude-sonnet-4-6 Claude Opus 4.6 · claude-opus-4-6 Claude Opus 4.5 (latest) · claude-opus-4-5 Claude Opus 4.5 · claude-opus-4-5-20251101 Claude Haiku 4.5 (latest) · claude-haiku-4-5 Claude Haiku 4.5 · claude-haiku-4-5-20251001 Claude Sonnet 4.5 (latest) · claude-sonnet-4-5 Claude Sonnet 4.5 · claude-sonnet-4-5-20250929 Оч. высокая Низкая Средняя Высокая Оч. высокая Максимум Агенты 0 tok Настройки чата До MR: некуда Код проекта Тесты Редактор Dev-сервер main Изменено файлов: 2 Напиши e2e-тест: заказ оплачивается картой. Write Тест лёг в e2e/checkout.spec.ts — в папку автотестов, которую назвала панель. Кейс «[checkout-001]» раздел «Тесты» заведёт сам, когда ход закончится. Сообщение Enter — отправить, Shift+Enter — перенос строки",
+      "en": {
+        "file": "07-chat-test.en.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 900,
+        "shotAt": "2026-09-28T09:58:02.062Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Chats Магазин New chat By title In messages Showing 0 of 0 Магазин C:\\work\\cc-help-tests\\shop Opus 4.8 (1M) Fable Opus Sonnet Haiku Claude Opus 5.5 · claude-opus-5-5 Claude Fable 5.1 · claude-fable-5-1 Claude Opus 5 · claude-opus-5 Claude Sonnet 5 · claude-sonnet-5 Claude Fable 5 · claude-fable-5 Claude Opus 4.8 · claude-opus-4-8 Claude Opus 4.7 · claude-opus-4-7 Claude Sonnet 4.6 · claude-sonnet-4-6 Claude Opus 4.6 · claude-opus-4-6 Claude Opus 4.5 (latest) · claude-opus-4-5 Claude Opus 4.5 · claude-opus-4-5-20251101 Claude Haiku 4.5 (latest) · claude-haiku-4-5 Claude Haiku 4.5 · claude-haiku-4-5-20251001 Claude Sonnet 4.5 (latest) · claude-sonnet-4-5 Claude Sonnet 4.5 · claude-sonnet-4-5-20250929 Very high Low Medium High Very high Max Agents 0 tok Chat settings To MR: nowhere Project code Tests Editor Dev server main Changed files: 2 Write an e2e test: an order is paid by card. Write The test is in e2e/checkout.spec.ts — the autotest folder the panel named. The case «[checkout-001]» appears in Tests by itself when this turn ends. Message Enter to send, Shift+Enter for a new line"
+      },
+      "darkEn": {
+        "file": "07-chat-test.dark.en.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 900,
+        "shotAt": "2026-09-28T14:36:39.284Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Chats Магазин New chat By title In messages Showing 0 of 0 Магазин C:\\work\\cc-help-tests\\shop Opus 4.8 (1M) Fable Opus Sonnet Haiku Claude Opus 5.5 · claude-opus-5-5 Claude Fable 5.1 · claude-fable-5-1 Claude Opus 5 · claude-opus-5 Claude Sonnet 5 · claude-sonnet-5 Claude Fable 5 · claude-fable-5 Claude Opus 4.8 · claude-opus-4-8 Claude Opus 4.7 · claude-opus-4-7 Claude Sonnet 4.6 · claude-sonnet-4-6 Claude Opus 4.6 · claude-opus-4-6 Claude Opus 4.5 (latest) · claude-opus-4-5 Claude Opus 4.5 · claude-opus-4-5-20251101 Claude Haiku 4.5 (latest) · claude-haiku-4-5 Claude Haiku 4.5 · claude-haiku-4-5-20251001 Claude Sonnet 4.5 (latest) · claude-sonnet-4-5 Claude Sonnet 4.5 · claude-sonnet-4-5-20250929 Very high Low Medium High Very high Max Agents 0 tok Chat settings To MR: nowhere Project code Tests Editor Dev server main Changed files: 2 Write an e2e test: an order is paid by card. Write The test is in e2e/checkout.spec.ts — the autotest folder the panel named. The case «[checkout-001]» appears in Tests by itself when this turn ends. Message Enter to send, Shift+Enter for a new line"
+      },
+      "dark": {
+        "file": "07-chat-test.dark.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 900,
+        "shotAt": "2026-09-28T10:00:24.587Z",
+        "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Чаты Магазин Новый чат По названию По сообщениям Показано 0 из 0 Магазин C:\\work\\cc-help-tests\\shop Opus 4.8 (1M) Fable Opus Sonnet Haiku Claude Opus 5.5 · claude-opus-5-5 Claude Fable 5.1 · claude-fable-5-1 Claude Opus 5 · claude-opus-5 Claude Sonnet 5 · claude-sonnet-5 Claude Fable 5 · claude-fable-5 Claude Opus 4.8 · claude-opus-4-8 Claude Opus 4.7 · claude-opus-4-7 Claude Sonnet 4.6 · claude-sonnet-4-6 Claude Opus 4.6 · claude-opus-4-6 Claude Opus 4.5 (latest) · claude-opus-4-5 Claude Opus 4.5 · claude-opus-4-5-20251101 Claude Haiku 4.5 (latest) · claude-haiku-4-5 Claude Haiku 4.5 · claude-haiku-4-5-20251001 Claude Sonnet 4.5 (latest) · claude-sonnet-4-5 Claude Sonnet 4.5 · claude-sonnet-4-5-20250929 Оч. высокая Низкая Средняя Высокая Оч. высокая Максимум Агенты 0 tok Настройки чата До MR: некуда Код проекта Тесты Редактор Dev-сервер main Изменено файлов: 2 Напиши e2e-тест: заказ оплачивается картой. Write Тест лёг в e2e/checkout.spec.ts — в папку автотестов, которую назвала панель. Кейс «[checkout-001]» раздел «Тесты» заведёт сам, когда ход закончится. Сообщение Enter — отправить, Shift+Enter — перенос строки"
+      }
+    },
+    {
+      "id": "08-chat-case",
+      "side": "panel",
+      "file": "08-chat-case.png",
+      "masked": 0,
+      "width": 1440,
+      "height": 900,
+      "shotAt": "2026-09-28T09:55:44.430Z",
+      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Тестирование Рабочее место тестировщика над проектом из реестра: библиотека кейсов, планы, ручные и агентские прогоны, отчёт. Кейсы лежат в файлах самого проекта. Ручной проход Проект Магазин C:\\work\\cc-help-tests\\shop Кейсы: .agent/tests Настройки набора Внешние привязки Ничего не привязано Привязать Библиотека Планы Прогоны Отчёт Покрытие Окружение по умолчанию Локальное Доступы Прогнать Полный перетест Только изменённое Сгенерировать кейсы По диффу Принимать сразу Исследовать Автоматизировать (0) 0 пройдено · 0 провалено · 0 пропущено · 1 не проверялось ветка main Как работает агент прогона: читает проект, меняет только файлы тестов Из чата кейсы не ведутся Вписать в CLAUDE.md проекта Папка автотестов Папка e2e/ — заведена панелью Playwright · 2 файла тестов · скрыта от git Обновить из папки Убрать папку Прогнать автотесты Только «Оформление» Упало 1 из 2, прошло 1. Открыть прогон в истории Вывод команды Оформление Файл: .agent/tests/checkout.tests.json Добавить тест История файла Обмен Изменить группу Удалить группу Пройти руками Фильтры Сохранить набор Группы Корзина 2 Оформление 1 SMOKE 6 Новая группа Секции Все секции 1 Оформление 1 Показано 1 из 1 Кейс Статус Важность Готовность Авто Зона Варианты Действия заказ оплачивается картой Оформление smoke не проверялся средняя готов автотест — 1",
+      "en": {
+        "file": "08-chat-case.en.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 900,
+        "shotAt": "2026-09-28T09:58:06.735Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Testing A tester’s workspace over a project from the registry: case library, plans, manual and agent runs, report. The cases live in the project’s own files. Manual run Project Магазин C:\\work\\cc-help-tests\\shop Cases: .agent/tests Library settings External links Nothing linked Link Library Plans Runs Report Coverage Environment default Local Credentials Run Full retest Changed only Generate cases From the diff Accept immediately Explore Automate (0) 0 passed · 0 failed · 0 skipped · 1 not run branch main How the run agent works: reads the project, changes only test files Chat does not keep the cases Write it into the project’s CLAUDE.md Autotest folder Folder e2e/ — created by the panel Playwright · 2 test files · hidden from git Update from folder Remove folder Run autotests Only “Оформление” 1 of 2 failed, 1 passed. Open the run in history Command output Оформление File: .agent/tests/checkout.tests.json Add a test File history Exchange Edit group Delete group Run it manually Filters Save the view Groups Корзина 2 Оформление 1 SMOKE 6 New group Sections All sections 1 Оформление 1 Showing 1 of 1 Case Status Priority Readiness Auto Area Variants Actions заказ оплачивается картой Оформление smoke not run medium ready automated — 1"
+      },
+      "darkEn": {
+        "file": "08-chat-case.dark.en.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 900,
+        "shotAt": "2026-09-28T14:36:44.113Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Testing A tester’s workspace over a project from the registry: case library, plans, manual and agent runs, report. The cases live in the project’s own files. Manual run Project Магазин C:\\work\\cc-help-tests\\shop Cases: .agent/tests Library settings External links Nothing linked Link Library Plans Runs Report Coverage Environment default Local Credentials Run Full retest Changed only Generate cases From the diff Accept immediately Explore Automate (0) 0 passed · 0 failed · 0 skipped · 1 not run branch main How the run agent works: reads the project, changes only test files Chat does not keep the cases Write it into the project’s CLAUDE.md Autotest folder Folder e2e/ — created by the panel Playwright · 2 test files · hidden from git Update from folder Remove folder Run autotests Only “Оформление” 1 of 2 failed, 1 passed. Open the run in history Command output Оформление File: .agent/tests/checkout.tests.json Add a test File history Exchange Edit group Delete group Run it manually Filters Save the view Groups Корзина 2 Оформление 1 SMOKE 6 New group Sections All sections 1 Оформление 1 Showing 1 of 1 Case Status Priority Readiness Auto Area Variants Actions заказ оплачивается картой Оформление smoke not run medium ready automated — 1"
+      },
+      "dark": {
+        "file": "08-chat-case.dark.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 900,
+        "shotAt": "2026-09-28T10:00:29.637Z",
+        "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Тестирование Рабочее место тестировщика над проектом из реестра: библиотека кейсов, планы, ручные и агентские прогоны, отчёт. Кейсы лежат в файлах самого проекта. Ручной проход Проект Магазин C:\\work\\cc-help-tests\\shop Кейсы: .agent/tests Настройки набора Внешние привязки Ничего не привязано Привязать Библиотека Планы Прогоны Отчёт Покрытие Окружение по умолчанию Локальное Доступы Прогнать Полный перетест Только изменённое Сгенерировать кейсы По диффу Принимать сразу Исследовать Автоматизировать (0) 0 пройдено · 0 провалено · 0 пропущено · 1 не проверялось ветка main Как работает агент прогона: читает проект, меняет только файлы тестов Из чата кейсы не ведутся Вписать в CLAUDE.md проекта Папка автотестов Папка e2e/ — заведена панелью Playwright · 2 файла тестов · скрыта от git Обновить из папки Убрать папку Прогнать автотесты Только «Оформление» Упало 1 из 2, прошло 1. Открыть прогон в истории Вывод команды Оформление Файл: .agent/tests/checkout.tests.json Добавить тест История файла Обмен Изменить группу Удалить группу Пройти руками Фильтры Сохранить набор Группы Корзина 2 Оформление 1 SMOKE 6 Новая группа Секции Все секции 1 Оформление 1 Показано 1 из 1 Кейс Статус Важность Готовность Авто Зона Варианты Действия заказ оплачивается картой Оформление smoke не проверялся средняя готов автотест — 1"
+      }
+    },
+    {
+      "id": "09-retry-quarantine",
+      "side": "panel",
+      "file": "09-retry-quarantine.png",
+      "masked": 0,
+      "width": 1132,
+      "height": 362,
+      "shotAt": "2026-09-28T09:55:32.072Z",
+      "text": "Карантин и устаревание Пороги: 5 зелёных подряд предлагают снять карантин, стабильность ниже 70% или 2 прогона «зелёный только на повторе» — поставить. Панель не применяет ничего сама. Пора выключить: 1 100% на повторе ×2 товар добавляется в корзину cart-001 Прошёл только на повторе в 2 прогонах из 2 при пороге 2: статус зелёный, но без повтора кейс падает. Причина карантина Чего он ждёт и до каких пор — без этого его через месяц никто не снимет. Поставить карантин Atlassian не подключён: даты требований не сверялись.",
+      "en": {
+        "file": "09-retry-quarantine.en.png",
+        "masked": 0,
+        "width": 1132,
+        "height": 362,
+        "shotAt": "2026-09-28T09:57:54.818Z",
+        "text": "Quarantine and ageing Thresholds: 5 greens in a row suggest lifting quarantine; stability below 70% or 2 runs green only on a retry suggest setting it. The panel applies nothing on its own. Worth muting: 1 100% on retry ×2 товар добавляется в корзину cart-001 Passed only on a retry in 2 runs out of 2 with a threshold of 2: the status is green, but without the retry the case fails. Quarantine reason What it waits for and until when — without it nobody will dare lift it later. Quarantine Atlassian is not connected: requirement dates were not checked."
+      },
+      "darkEn": {
+        "file": "09-retry-quarantine.dark.en.png",
+        "masked": 0,
+        "width": 1132,
+        "height": 362,
+        "shotAt": "2026-09-28T14:36:31.715Z",
+        "text": "Quarantine and ageing Thresholds: 5 greens in a row suggest lifting quarantine; stability below 70% or 2 runs green only on a retry suggest setting it. The panel applies nothing on its own. Worth muting: 1 100% on retry ×2 товар добавляется в корзину cart-001 Passed only on a retry in 2 runs out of 2 with a threshold of 2: the status is green, but without the retry the case fails. Quarantine reason What it waits for and until when — without it nobody will dare lift it later. Quarantine Atlassian is not connected: requirement dates were not checked."
+      },
+      "dark": {
+        "file": "09-retry-quarantine.dark.png",
+        "masked": 0,
+        "width": 1132,
+        "height": 362,
+        "shotAt": "2026-09-28T10:00:17.034Z",
+        "text": "Карантин и устаревание Пороги: 5 зелёных подряд предлагают снять карантин, стабильность ниже 70% или 2 прогона «зелёный только на повторе» — поставить. Панель не применяет ничего сама. Пора выключить: 1 100% на повторе ×2 товар добавляется в корзину cart-001 Прошёл только на повторе в 2 прогонах из 2 при пороге 2: статус зелёный, но без повтора кейс падает. Причина карантина Чего он ждёт и до каких пор — без этого его через месяц никто не снимет. Поставить карантин Atlassian не подключён: даты требований не сверялись."
+      }
+    },
+    {
+      "id": "10-pyramid",
+      "side": "panel",
+      "file": "10-pyramid.png",
+      "masked": 0,
+      "width": 1132,
+      "height": 277,
+      "shotAt": "2026-09-28T09:55:32.768Z",
+      "text": "Пирамида тестов Пересчитать Считается по файлам проекта, без запуска. Слой известен, только если его каркас назван самим проектом — конфигом, зависимостью или go.mod. E2E 2 теста в 1 файле e2e Интеграционные 2 теста в 1 файле Модульные 9 тестов в 3 файлах Каркасы: vitest (package.json)",
+      "en": {
+        "file": "10-pyramid.en.png",
+        "masked": 0,
+        "width": 1132,
+        "height": 277,
+        "shotAt": "2026-09-28T09:57:55.510Z",
+        "text": "Test pyramid Recount Counted from the project files, without running anything. A layer is known only when the project itself names its framework — a config, a dependency or go.mod. E2E 2 tests in 1 file e2e Integration 2 tests in 1 file Unit 9 tests in 3 files Frameworks: vitest (package.json)"
+      },
+      "darkEn": {
+        "file": "10-pyramid.dark.en.png",
+        "masked": 0,
+        "width": 1132,
+        "height": 277,
+        "shotAt": "2026-09-28T14:36:32.412Z",
+        "text": "Test pyramid Recount Counted from the project files, without running anything. A layer is known only when the project itself names its framework — a config, a dependency or go.mod. E2E 2 tests in 1 file e2e Integration 2 tests in 1 file Unit 9 tests in 3 files Frameworks: vitest (package.json)"
+      },
+      "dark": {
+        "file": "10-pyramid.dark.png",
+        "masked": 0,
+        "width": 1132,
+        "height": 277,
+        "shotAt": "2026-09-28T10:00:17.743Z",
+        "text": "Пирамида тестов Пересчитать Считается по файлам проекта, без запуска. Слой известен, только если его каркас назван самим проектом — конфигом, зависимостью или go.mod. E2E 2 теста в 1 файле e2e Интеграционные 2 теста в 1 файле Модульные 9 тестов в 3 файлах Каркасы: vitest (package.json)"
+      }
+    }
+  ]
+}

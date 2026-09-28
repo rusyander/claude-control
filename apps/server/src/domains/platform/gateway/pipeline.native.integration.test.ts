@@ -385,6 +385,23 @@ describe('родной диалект Anthropic у платформы', () => {
     expect(gateway.status().compromises).toContain('dialect-bridge');
   });
 
+  // Ревью 28.09 (F-272): подпись читала ЗАПИСАННЫЕ инструменты платформы. При
+  // «только наши правила» они не действуют, прослойка включена — конвейер идёт
+  // мостом (pipeline.ts читает действующие правила), а подпись о мосте гасла.
+  it('«только наши правила» с записанными инструментами платформы — мост подписан', async () => {
+    writePlatform(store, {
+      ...PLATFORM,
+      toolShim: true,
+      rules: {
+        ...PLATFORM.rules,
+        applies: 'ours',
+        platform: { ...defaultPlatformRules(), platformTools: ['web_search'] },
+      },
+    });
+    await start(platformAnswers(sse(EVENTS)));
+    expect(gateway.status().compromises).toContain('dialect-bridge');
+  });
+
   it('инструменты платформы включены — клиентские сняты и названы потерей', async () => {
     writePlatform(store, {
       ...PLATFORM,

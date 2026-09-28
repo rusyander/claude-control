@@ -1,3 +1,4 @@
+import { LEARN_SIEVES_LINE } from '@agentdeck/contracts/sieves';
 import type {
   SplitMrWatch,
   SplitPlanGroupRecord,
@@ -94,6 +95,17 @@ export function pendingThreads(review: MrReview, relayed: readonly string[]): Mr
   });
 }
 
+/**
+ * Ссылка на тред — от форджа, если он её дал (GitHub), иначе якорь GitLab.
+ * Та же строка уходит в задание группе и в `relayedLinks`: по ней панель
+ * сверяет выученное сито с настоящим тредом.
+ */
+export function threadLink(thread: MrReviewThread, mr: string): string | undefined {
+  const last = thread.notes[thread.notes.length - 1];
+  if (!last) return undefined;
+  return last.url ?? `${mr}#note_${last.id}`;
+}
+
 /** Реплика в одну строку: промпт — не место для простыней ревьюера. */
 function excerpt(text: string, limit = 300): string {
   const flat = text.replace(/\s+/g, ' ').trim();
@@ -112,41 +124,45 @@ export function mrWatchPrompt(input: {
   red?: MrReviewPipeline;
 }): string {
   const lines = [
-    `Панель проверила MR группы после «готово» (${input.mr}, ветка ${input.branch}) — ` +
-      'там есть то, что ждёт группу.',
+    `The panel checked the group's MR after "done" (${input.mr}, branch ${input.branch}) — ` +
+      'there is something waiting for the group.',
   ];
   if (input.threads.length > 0) {
-    lines.push('', `Нерешённые ветки ревьюеров, ждущие ответа (${input.threads.length}):`);
+    lines.push('', `Unresolved reviewer threads waiting for an answer (${input.threads.length}):`);
     for (const thread of input.threads) {
       const first = thread.notes[0];
       const last = thread.notes[thread.notes.length - 1];
       if (!first || !last) continue;
       const where = thread.path ? ` · ${thread.path}${thread.line ? `:${thread.line}` : ''}` : '';
       const reply =
-        last !== first ? ` — последняя реплика ${last.author}: «${excerpt(last.body, 200)}»` : '';
-      // Ссылка на реплику — от форджа, если он её дал (GitHub), иначе якорь GitLab.
-      const link = last.url ?? `${input.mr}#note_${last.id}`;
-      lines.push(`- ${first.author}${where} · ${link}: «${excerpt(first.body)}»${reply}`);
+        last !== first ? ` — last reply by ${last.author}: "${excerpt(last.body, 200)}"` : '';
+      const link = threadLink(thread, input.mr);
+      lines.push(`- ${first.author}${where} · ${link}: "${excerpt(first.body)}"${reply}`);
     }
   }
   if (input.red) {
     lines.push(
       '',
-      `Конвейер MR упал: №${input.red.id}${input.red.url ? ` (${input.red.url})` : ''}. ` +
-        'Прочитай логи упавших заданий и почини в ветке. Если падение не про эту работу ' +
-        '(инфраструктура, чужой флак) — докажи это строками лога и скажи человеку, ничего не правя.',
+      `The MR pipeline failed: #${input.red.id}${input.red.url ? ` (${input.red.url})` : ''}. ` +
+        'Read the logs of the failed jobs and fix it in the branch. If the failure is not about ' +
+        "this work (infrastructure, someone else's flake) — prove it with log lines and tell the " +
+        'human, editing nothing.',
     );
   }
   lines.push(
     '',
-    'Сначала перечитай ВСЕ обсуждения MR целиком, а не только перечисленные: пока ты не ' +
-      'работал, могли прийти новые.',
-    'Каждое замечание — поправь в ветке и ответь в той же ветке обсуждения, что сделано, ' +
-      'или ответь, почему не правишь. Ветку закрывает ревьюер, не ты.',
-    `Доведи доставку как прежде: закоммить, отправь ветку ${input.branch}, MR тот же. ` +
-      'Прежде чем снова сказать «готово», перечитай обсуждения MR ещё раз — новое, пришедшее ' +
-      'за время работы, тоже твоё.',
+    'First re-read ALL MR discussions in full, not only the ones listed: new ones may have ' +
+      'arrived while you were not working.',
+    'For each comment — fix it in the branch and reply in the same discussion thread with what ' +
+      'was done, or reply why you do not change it. The reviewer resolves the thread, not you. ' +
+      'Write the replies in the language of the discussion.',
+    `Finish the delivery as before: commit, push the branch ${input.branch}, the same MR. ` +
+      'Before saying "done" again, re-read the MR discussions once more — anything new that ' +
+      'arrived during the work is yours too.',
   );
+  // Тред ревьюера — блокер, ушедший в MR: из него учится сито (решение
+  // владельца 28.09), чтобы следующая группа поймала такое до MR.
+  if (input.threads.length > 0) lines.push('', LEARN_SIEVES_LINE);
   return lines.join('\n');
 }
 
@@ -316,6 +332,10 @@ export class MrWatch {
     // Запись — ДО продолжения: старт прогона тут же переводит группу в
     // «работает», и после него круг уже не наш.
     watch.relayed = [...(watch.relayed ?? []), ...threads.map(relayKey)].slice(-MAX_RELAYED);
+    const links = threads.map((thread) => threadLink(thread, mr)).filter(Boolean) as string[];
+    if (links.length > 0) {
+      watch.relayedLinks = [...(watch.relayedLinks ?? []), ...links].slice(-MAX_RELAYED);
+    }
     watch.resumes = resumes + 1;
     this.deps.store.set(record);
     const sent = this.deps.resume(

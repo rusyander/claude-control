@@ -99,6 +99,31 @@ describe('backup-routes: включение шифрования копий се
     expect(blob.toString('utf8')).not.toContain('живой-секрет');
   });
 
+  it('зашифрованная копия: отказы предпросмотра и отката несут код текста, не голую русскую строку', async () => {
+    await app.inject({
+      method: 'POST',
+      url: '/api/backups/secret-passphrase',
+      payload: { passphrase: PASS, enable: true },
+    });
+    writeFileSync(secretsPath, SECRET);
+    const copy = backupEntry(secretsPath, backupDir);
+    const name = encodeURIComponent(basename(copy!));
+    // Фраза «забыта»: как после перезапуска панели.
+    setSecretPassphrase(undefined);
+
+    const preview = await app.inject({ method: 'GET', url: `/api/backups/${name}/preview` });
+    expect(preview.statusCode).toBe(400);
+    expect(preview.json()).toMatchObject({ messageCode: 'backup-preview-encrypted' });
+
+    const restore = await app.inject({
+      method: 'POST',
+      url: `/api/backups/${name}/restore`,
+      payload: {},
+    });
+    expect(restore.statusCode).toBe(400);
+    expect(restore.json()).toMatchObject({ messageCode: 'backup-passphrase-required' });
+  });
+
   it('короткая фраза отклоняется 400 и режим не включается', async () => {
     const res = await app.inject({
       method: 'POST',

@@ -188,8 +188,37 @@ markdown.renderer.rules.link_open = (tokens, index, options, env, self) => {
   return defaultLinkOpen(tokens, index, options, env, self);
 };
 
+/** Окружение разбора: `noImages` — картинки ссылками, а не `<img>`. */
+interface RenderEnv {
+  noImages?: boolean;
+}
+
+const defaultImage =
+  markdown.renderer.rules.image ??
+  ((tokens, index, options, _env, self) => self.renderToken(tokens, index, options));
+
+markdown.renderer.rules.image = (tokens, index, options, env: RenderEnv, self) => {
+  if (!env?.noImages) return defaultImage(tokens, index, options, env, self);
+  const token = tokens[index];
+  const src = token?.attrGet('src') ?? '';
+  const alt = self.renderInlineAsText(token?.children ?? [], options, env) || src;
+  const escape = markdown.utils.escapeHtml;
+  return `<a href="${escape(src)}" target="_blank" rel="noreferrer noopener">${escape(alt)}</a>`;
+};
+
 export function renderMarkdown(text: string): string {
   return markdown.render(text);
+}
+
+/**
+ * Документ из репозитория (файл инструкций, markdown в окне кода): картинка —
+ * ссылка с подписью, а не `<img>`. Файл пишет кто угодно — клонированный чужой
+ * CLAUDE.md с `![](https://…/pixel.png)` заставлял панель при открытии вкладки
+ * сходить по чужому адресу (IP, время), а относительная картинка всё равно
+ * рисовалась битой: страница панели — не каталог репозитория.
+ */
+export function renderDocumentMarkdown(text: string): string {
+  return markdown.render(text, { noImages: true } satisfies RenderEnv);
 }
 
 /** Короткий фрагмент без блочных обёрток — для строки в списке. */

@@ -94,11 +94,23 @@ export function toSteps(raw: unknown): StepShape[] {
   return [];
 }
 
-/** Шаг одной строкой — для промпта агенту, поиска и узких списков. */
-export function stepText(step: StepShape): string {
+/** Подписи частей шага в строке: у экрана — на языке его интерфейса. */
+export interface StepTextLabels {
+  data: string;
+  expected: string;
+}
+
+const RU_STEP_LABELS: StepTextLabels = { data: 'данные', expected: 'ожидание' };
+
+/**
+ * Шаг одной строкой — для промпта агенту, поиска и узких списков. Подписи по
+ * умолчанию русские (промпт и файлы кейсов); экран передаёт свои — английский
+ * телефон показывал «ожидание:» посреди английского текста.
+ */
+export function stepText(step: StepShape, labels: StepTextLabels = RU_STEP_LABELS): string {
   const parts = [step.action];
-  if (step.data) parts.push(`данные: ${step.data}`);
-  if (step.expected) parts.push(`ожидание: ${step.expected}`);
+  if (step.data) parts.push(`${labels.data}: ${step.data}`);
+  if (step.expected) parts.push(`${labels.expected}: ${step.expected}`);
   return parts.join(' · ');
 }
 
@@ -227,6 +239,17 @@ export function pointId(
   return [groupId, caseId, environmentId ?? '', tail].filter(Boolean).join('|');
 }
 
+/**
+ * Откуда пришла запись истории, если это импорт: `e2e` — автотесты папки,
+ * прогнанные панелью, `ci` — отчёт сборки. У записи без поля — `ci`: так
+ * писались все импорты до появления прогона панелью. Не импорт — `undefined`.
+ * Одно правило для сервера, веба и телефона, чтобы подпись не разъехалась.
+ */
+export function runOrigin(run: { mode: string; origin?: string }): 'ci' | 'e2e' | undefined {
+  if (run.mode !== 'import') return undefined;
+  return run.origin === 'e2e' ? 'e2e' : 'ci';
+}
+
 /** Пустая сводка прогона — из неё складывают счёт по результатам. */
 export function emptySummary(): {
   total: number;
@@ -339,4 +362,89 @@ export function pickWithinBudget<T extends BudgetItem>(items: T[], budget: numbe
     picked.push(item);
   }
   return { picked, left, minutes };
+}
+
+/**
+ * «Прошёл только на повторе» у кейса — число упавших попыток, пока признак
+ * относится к ПОСЛЕДНЕМУ результату. Признак пишет импорт отчёта вместе с
+ * `lastRunId`; прогон, записанный мимо импорта (агент, человек, телефон), его
+ * не снимает, и без сверки прогона кейс показывал бы чужой давний повтор.
+ */
+export function retryPassAttempts(testCase: {
+  flaky?: { attempts: number; runId?: string };
+  lastRunId?: string;
+  status?: string;
+}): number | undefined {
+  const flaky = testCase.flaky;
+  if (!flaky || flaky.attempts < 1 || testCase.status !== 'passed') return undefined;
+  if (flaky.runId && flaky.runId !== testCase.lastRunId) return undefined;
+  return flaky.attempts;
+}
+
+/** Разбор провала в том виде, в каком он лежит в результате. */
+export interface FailureShape {
+  step?: number;
+  expected?: string;
+  actual?: string;
+}
+
+/** Причина результата: откуда взята, текст и контекст шага. */
+export interface ResultReason {
+  source: 'failure' | 'note' | 'flaky';
+  /**
+   * Пусто — провал по шагу без описания или зелёный на повторе: сторона
+   * называет его своим словом.
+   */
+  text: string;
+  step?: number;
+  /** Только у разбора провала: заметка не знает, что ожидалось. */
+  expected?: string;
+  /** Только у `flaky`: сколько попыток упало до зелёной. */
+  attempts?: number;
+}
+
+/**
+ * Что видел исполнитель — ОДНИМ порядком на выгрузку, отчёт вехи, историю кейса
+ * в вебе и телефон. Разбор провала первым: в нём «что вышло» на конкретном
+ * шаге, а заметка бывает общей («смотрел на стенде 2») или стеком. Заметка —
+ * когда «что вышло» не записано; провал по шагу без обоих — пустой текст, и
+ * сторона называет его своим словом. Прежде выгрузка брала заметку, а веб —
+ * разбор, и один результат наружу и в панели назывался по-разному.
+ *
+ * Статус здесь не проверяется: история кейса показывает причину только у
+ * неуспеха, выгрузка — у любого результата с заметкой; это решает вызывающий.
+ */
+export function resultReason(result: {
+  note?: string;
+  failure?: FailureShape;
+  /** Упавшие попытки до зелёной: причина без слов, её называет сторона. */
+  flakyAttempts?: number;
+}): ResultReason | undefined {
+  const failure = result.failure;
+  const actual = failure?.actual?.trim();
+  if (actual) {
+    return {
+      source: 'failure',
+      text: actual,
+      ...(failure?.step !== undefined ? { step: failure.step } : {}),
+      ...(failure?.expected ? { expected: failure.expected } : {}),
+    };
+  }
+  const note = result.note?.trim();
+  if (note) {
+    return {
+      source: 'note',
+      text: note,
+      ...(failure?.step !== undefined ? { step: failure.step } : {}),
+    };
+  }
+  const attempts = result.flakyAttempts ?? 0;
+  if (failure?.step === undefined && attempts > 0) return { source: 'flaky', text: '', attempts };
+  if (failure?.step === undefined) return undefined;
+  return {
+    source: 'failure',
+    text: '',
+    step: failure.step,
+    ...(failure.expected ? { expected: failure.expected } : {}),
+  };
 }

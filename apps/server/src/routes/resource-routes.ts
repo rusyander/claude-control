@@ -12,6 +12,8 @@ import { layoutOf, type ResourceKind } from '../domains/resources/registry.ts';
 import { templatesFor, templateById } from '../domains/resources/templates.ts';
 import { assistStructure } from '../domains/resources/ResourceAssistant.ts';
 import { activeCliCommand } from '../providers/cli.ts';
+import { readAgentImages } from '../lib/agent-images.ts';
+import { assistHistorySchema, invalidAssistBody } from './assistant-routes.ts';
 
 /**
  * Файлы ресурсов — общие маршруты для всех видов.
@@ -24,6 +26,12 @@ export function registerResourceRoutes(app: FastifyInstance, ctx: ServerContext)
   type Params = { kind: string; id: string };
 
   const kindOf = (params: Params): ResourceKind | undefined => layoutOf(params.kind)?.kind;
+
+  // Писать здесь можно только файлы скиллов и папки hooks/: скиллы Claude Code
+  // перечитывает на лету, скрипт хука запускается заново на каждое событие.
+  // «Нужен перезапуск» было бы неправдой (как у `live()` в маршрутах скиллов);
+  // плагин, правило и MCP через эти маршруты не пишутся вовсе (`isWritable`).
+  const needsRestart = false;
 
   /**
    * Имя файла приходит из запроса и дальше идёт в `safePath`, где его сразу
@@ -79,7 +87,7 @@ export function registerResourceRoutes(app: FastifyInstance, ctx: ServerContext)
           );
           created += 1;
         }
-        return { ok: true, created, needsRestart: true };
+        return { ok: true, created, needsRestart };
       } catch (error) {
         return reply.code(400).send({ message: messageOf(error) });
       }
@@ -91,15 +99,21 @@ export function registerResourceRoutes(app: FastifyInstance, ctx: ServerContext)
    * Применяет их сразу слиянием — существующее обновляется, новое добавляется,
    * ничего не удаляется само.
    */
-  app.post<{ Params: Params; Body: { prompt: string; sessionId?: string } }>(
+  app.post<{ Params: Params; Body: { prompt: string; history?: unknown; images?: unknown } }>(
     '/api/resources/:kind/:id/assist',
-    { bodyLimit: 4 * 1024 * 1024 },
+    // Картинки (до восьми по 3,75 МБ в base64) — предел как у помощника формы.
+    { bodyLimit: 48 * 1024 * 1024 },
     async (request, reply) => {
       const kind = kindOf(request.params);
       if (!kind)
         return reply
           .code(404)
           .send({ message: 'Неизвестный вид ресурса', messageCode: 'resource-kind-unknown' });
+      const images = readAgentImages(request.body?.images);
+      if (!images.ok) return reply.code(400).send(images.refusal);
+      // Сессии у помощника нет (лёгкое окно): разговор — прежними репликами в теле.
+      const history = assistHistorySchema.safeParse(request.body?.history ?? []);
+      if (!history.success) return reply.code(400).send(invalidAssistBody(history.error));
 
       const result = await assistStructure(
         kind,
@@ -107,7 +121,8 @@ export function registerResourceRoutes(app: FastifyInstance, ctx: ServerContext)
         request.body.prompt,
         ctx.location,
         activeCliCommand(ctx.store),
-        request.body.sessionId,
+        history.data,
+        images.images,
       );
 
       if (result.error) return reply.code(400).send({ message: result.error });
@@ -130,7 +145,9 @@ export function registerResourceRoutes(app: FastifyInstance, ctx: ServerContext)
         }
       }
 
-      return { reply: result.reply, applied, sessionId: result.sessionId };
+      // Файлы с секретом, который модель видела маской и не вернула на место, не
+      // записаны: окно называет их, иначе человек не узнал бы, почему файла нет.
+      return { reply: result.reply, applied, ...(result.kept ? { kept: result.kept } : {}) };
     },
   );
 
@@ -188,7 +205,7 @@ export function registerResourceRoutes(app: FastifyInstance, ctx: ServerContext)
           ctx.location,
           ctx.backupDir,
         );
-        return { ok: true, needsRestart: true };
+        return { ok: true, needsRestart };
       } catch (error) {
         // Отказ по правам или выходу за границы — это ожидаемый ответ,
         // а не поломка сервера.
@@ -217,7 +234,7 @@ export function registerResourceRoutes(app: FastifyInstance, ctx: ServerContext)
           ctx.location,
           ctx.backupDir,
         );
-        return { ok: true, needsRestart: true, backupPath };
+        return { ok: true, needsRestart, backupPath };
       } catch (error) {
         return reply.code(400).send({ message: messageOf(error) });
       }
@@ -235,7 +252,7 @@ export function registerResourceRoutes(app: FastifyInstance, ctx: ServerContext)
 
       try {
         moveResourceFile(kind, request.params.id, request.body.from, request.body.to, ctx.location);
-        return { ok: true, needsRestart: true };
+        return { ok: true, needsRestart };
       } catch (error) {
         return reply.code(400).send({ message: messageOf(error) });
       }

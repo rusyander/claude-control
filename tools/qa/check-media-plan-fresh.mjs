@@ -230,7 +230,7 @@ check(
   `страница чата спрашивает план как разговор с агентом (${planUrls.at(-1)?.split('?')[1] ?? '—'})`,
 );
 
-const drawing = page.getByText('Рисунок от агента').first();
+const drawing = page.getByText('Картинка от агента').first();
 check(
   await drawing.isVisible().catch(() => false),
   'рисунок из блока ответа показан карточкой в ленте',

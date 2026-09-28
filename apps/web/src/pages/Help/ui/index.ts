@@ -10,6 +10,7 @@ export { TopicCard } from './TopicCard';
 export { HelpShot } from './HelpShot';
 export { HelpDiagram } from './HelpDiagram';
 export { GuideSteps, GuideStep } from './GuideStep';
+export { PageTabsSection } from './PageTabsSection';
 export type {
   OptionCard,
   OptionCardsProps,
@@ -30,4 +31,5 @@ export type {
   HelpDiagramProps,
   GuideStepsProps,
   GuideStepProps,
+  PageTabsSectionProps,
 } from './help-kit.types';

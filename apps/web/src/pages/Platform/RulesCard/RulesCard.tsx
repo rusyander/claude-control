@@ -11,7 +11,8 @@ import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { useSavePlatform } from '@entities/Platform';
 import styles from '../PlatformPage.module.scss';
-import { platformRules } from '../lib/rulesView';
+import { rulesAppliesOf, sideOff, toolExclusionLocks } from '../lib/contourConfigView';
+import { RulesChoice } from '../RulesChoice';
 import { OursRulesColumn } from './OursRulesColumn';
 import { PlatformRulesColumn } from './PlatformRulesColumn';
 import { RuleConflicts } from './RuleConflicts';
@@ -63,9 +64,11 @@ export function RulesCard(props: RulesCardProps) {
    * разворот чужого архива) правится и убирается: запертое наглухо поле было бы
    * тупиком, из которого человек выходит только удалением контура (ревью Т7).
    */
-  const hasPlatformTools = platformRules(platform).platformTools.length > 0;
-  const toolsLocked = platform.toolShim && !hasPlatformTools;
-  const shimLocked = !platform.toolShim && hasPlatformTools;
+  const { toolsLocked, shimLocked } = toolExclusionLocks(platform);
+
+  /** Какую колонку снял выбор «чьи правила действуют» (баг 11б). */
+  const applies = rulesAppliesOf(platform);
+  const off = sideOff(applies);
 
   return (
     <Card padding="md">
@@ -74,10 +77,14 @@ export function RulesCard(props: RulesCardProps) {
           <Typography variant="body" weight="medium" as="h2">
             {t('platform.rulesTitle', { title: platform.title })}
           </Typography>
-          <Typography variant="body-sm" color="subtle" style={{ maxWidth: 'var(--text-measure)' }}>
+          <Typography variant="body-sm" color="subtle" className="prose">
             {t('platform.rulesText')}
           </Typography>
         </Stack>
+
+        {/* Выбор стоит НАД колонками: он решает, какая из них вообще уходит в
+            прогон, и читать колонки до него — читать не то, что случится. */}
+        <RulesChoice platform={platform} withTitle />
 
         {/* Две колонки, подписанные по тому, ЧЬЁ правило: владелец раздела не
             находил, где выбираются правила, потому что правила платформы и наши
@@ -90,6 +97,8 @@ export function RulesCard(props: RulesCardProps) {
             drafts={drafts}
             toolsLocked={toolsLocked}
             update={update}
+            conflicts={conflicts}
+            offBy={off.contour ? applies : undefined}
           />
           <OursRulesColumn
             platform={platform}
@@ -97,6 +106,9 @@ export function RulesCard(props: RulesCardProps) {
             dataMask={dataMask}
             shimLocked={shimLocked}
             update={update}
+            rules={rules}
+            conflicts={conflicts}
+            offBy={off.ours ? applies : undefined}
           />
         </div>
 

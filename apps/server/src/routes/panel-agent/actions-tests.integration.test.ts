@@ -1,8 +1,18 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { delimiter, join } from 'node:path';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { delimiter, join, relative } from 'node:path';
 import { tmpdir } from 'node:os';
+import { createHash } from 'node:crypto';
 import type { PanelActionResult, PanelPendingAction } from '@agentdeck/contracts/panel-agent';
 import { PANEL_AGENT_HEADER } from '@agentdeck/contracts/panel-agent';
 import type { ProjectTestsView } from '@agentdeck/contracts';
@@ -20,6 +30,20 @@ import { registerProjectTestsRoutes } from '../project-tests-routes.ts';
 import { registerPlatformRoutes } from '../platform-routes.ts';
 import { describeProviders } from '../../providers/registry.ts';
 import { registerPanelAgentRoutes } from './panel-agent-routes.ts';
+import { registerProjectRoutes } from '../project-routes.ts';
+import { TEST_ACTIONS } from './actions-tests.ts';
+import { WORK_ACTIONS } from './actions-work.ts';
+
+/** Содержимое папки целиком: путь → sha256. Равенство до и после = ничего не записано. */
+function snapshot(root: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const entry of readdirSync(root, { recursive: true, withFileTypes: true })) {
+    if (!entry.isFile()) continue;
+    const file = join(entry.parentPath, entry.name);
+    out[relative(root, file)] = createHash('sha256').update(readFileSync(file)).digest('hex');
+  }
+  return out;
+}
 
 /**
  * Действия «Тестирование» (А5) на настоящих маршрутах раздела тестов и
@@ -142,6 +166,7 @@ describe('panel-agent actions: tests', () => {
     );
 
     store = new AppStore(appData);
+    store.addProject({ id: 'p-a5', name: 'A5', path: projectDir });
     hub = createEventHub();
     frames = [];
     hub.subscribe((payload) => frames.push(JSON.parse(payload) as Record<string, unknown>));
@@ -161,6 +186,7 @@ describe('panel-agent actions: tests', () => {
     app = Fastify();
     registerAccessGate(app, access);
     registerEmptyBodyGuard(app);
+    registerProjectRoutes(app, ctx);
     registerProjectTestsRoutes(app, ctx, runs, new ProjectTestManualRegistry());
     registerPlatformRoutes(app, ctx, gateway);
     // Провайдер в карточке прогона — из реестра провайдеров, а не строкой; тот же
@@ -236,7 +262,69 @@ describe('panel-agent actions: tests', () => {
     expect(await listPending()).toEqual([]);
   });
 
-  it('list_cases — кейсы группы; неверный каталог — failed с текстом маршрута', async () => {
+  it('a folder the panel does not know — every Testing action refused before a card, nothing written', async () => {
+    const outside = mkdtempSync(join(tmpdir(), 'cc-agent-a5-outside-'));
+    try {
+      const tests = join(outside, '.agent', 'tests');
+      mkdirSync(join(tests, 'drafts'), { recursive: true });
+      writeFileSync(join(tests, 'gui.tests.json'), readFileSync(groupFile()));
+      writeFileSync(
+        join(tests, 'drafts', `${DRAFT_RUN}.draft.json`),
+        readFileSync(join(testsDir(), 'drafts', `${DRAFT_RUN}.draft.json`)),
+      );
+      const inputs: Record<string, Record<string, unknown>> = {
+        list_test_groups: {},
+        list_cases: {},
+        coverage: {},
+        last_run: {},
+        draft_cases: { runId: DRAFT_RUN },
+        run_tests: { groupId: 'gui' },
+        save_test_case: { groupId: 'gui', title: 'Чужой кейс' },
+        save_test_group: { id: 'other', title: 'Чужая группа' },
+        delete_test_group: { id: 'gui' },
+        reject_draft: { runId: DRAFT_RUN },
+        list_test_runs: {},
+        read_test_run: { runId: 'run-1' },
+        lint_tests: {},
+        stop_tests: {},
+        delete_test_case: { groupId: 'gui', caseId: 'gui-001' },
+      };
+      // Каждое действие раздела проверено: новое без входа здесь роняет тест.
+      const section = [
+        ...TEST_ACTIONS,
+        ...WORK_ACTIONS.filter((action) => action.section === 'tests'),
+      ];
+      expect(Object.keys(inputs).sort()).toEqual(section.map((a) => a.name).sort());
+      const before = snapshot(outside);
+      const seen: Record<string, unknown> = {};
+      const refused: Record<string, unknown> = {};
+      for (const [name, input] of Object.entries(inputs)) {
+        const answer = call(name, { projectPath: outside, ...input });
+        let settled = false;
+        void answer.finally(() => (settled = true));
+        let carded = false;
+        while (!settled) {
+          for (const card of await listPending()) {
+            carded = true;
+            await decide(card.id, 'reject');
+          }
+          await new Promise((done) => setTimeout(done, 10));
+        }
+        const result = (await answer).json<PanelActionResult>();
+        const notRegistered = (result.message ?? '').includes('not registered');
+        seen[name] = { carded, outcome: result.outcome, notRegistered };
+        refused[name] = { carded: false, outcome: 'failed', notRegistered: true };
+      }
+      expect(seen).toEqual(refused);
+      expect(snapshot(outside)).toEqual(before);
+      // Агент тестов не запускался: фальшивый CLI оставил бы снимок процесса.
+      expect(existsSync(dumpFile)).toBe(false);
+    } finally {
+      rmSync(outside, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+    }
+  });
+
+  it('list_cases — кейсы группы; неверный каталог — failed до маршрута', async () => {
     const body = (
       await call('list_cases', { projectPath: projectDir, groupId: 'gui' })
     ).json<PanelActionResult>();
@@ -254,8 +342,9 @@ describe('panel-agent actions: tests', () => {
     const wrong = (
       await call('list_cases', { projectPath: join(projectDir, 'missing') })
     ).json<PanelActionResult>();
-    expect(wrong).toMatchObject({ outcome: 'failed', status: 400 });
-    expect(wrong.message).toContain('не существует');
+    // Каталога нет в списке панели — отказ раньше маршрута раздела.
+    expect(wrong).toMatchObject({ outcome: 'failed' });
+    expect(wrong.message).toContain('not registered');
   });
 
   it('coverage — требование из ссылки кейса', async () => {
@@ -335,7 +424,7 @@ describe('panel-agent actions: tests', () => {
     expect(result).toMatchObject({
       outcome: 'done',
       status: 200,
-      page: { route: '/tests', focus: 'library' },
+      page: { route: `/tests?project=${encodeURIComponent(projectDir)}`, focus: 'library' },
     });
     // Файл группы на диске — то, что увидит человек.
     const group = JSON.parse(readFileSync(groupFile(), 'utf8')) as {
@@ -452,7 +541,9 @@ describe('panel-agent actions: tests', () => {
       outcome: 'done',
       status: 200,
       result: { run: { mode: 'run', status: 'running' } },
-      page: { route: '/tests', focus: 'runs' },
+      // Живой прогон виден на вкладке библиотеки: там пульт со статусом и логом,
+      // а на вкладке прогонов идущая генерация выглядела пустой записью «0 из 0».
+      page: { route: `/tests?project=${encodeURIComponent(projectDir)}`, focus: 'library' },
     });
     const runId = (result.result as { run: { id: string } }).run.id;
 
@@ -462,7 +553,11 @@ describe('panel-agent actions: tests', () => {
       await new Promise((done) => setTimeout(done, 100));
     }
     const dump = JSON.parse(readFileSync(dumpFile, 'utf8')) as { cwd: string; stdin: string };
-    expect(dump.cwd.toLowerCase()).toBe(projectDir.toLowerCase());
+    // Панель канонизирует путь проекта (realpath): на Windows временный каталог
+    // приходит коротким именем 8.3 (`LONGNA~1`), а процесс получает длинное.
+    // Сравниваем канонические формы обеих сторон — это один и тот же каталог.
+    const canonical = (path: string): string => realpathSync.native(path).toLowerCase();
+    expect(canonical(dump.cwd)).toBe(canonical(projectDir));
     expect(dump.stdin).toContain('gui-002');
     const last = (await call('last_run', { projectPath: projectDir })).json<PanelActionResult>();
     expect(last.result).toMatchObject({ run: { id: runId, mode: 'run' } });
@@ -556,6 +651,8 @@ describe('panel-agent actions: tests', () => {
     expect((await running).json<PanelActionResult>()).toMatchObject({
       outcome: 'done',
       result: { deleted: true },
+      // Удалённого кейса на странице нет: библиотека того же проекта, а не `?tab=<группа>`.
+      page: { route: `/tests?project=${encodeURIComponent(projectDir)}`, focus: 'library' },
     });
     const group = JSON.parse(readFileSync(groupFile(), 'utf8')) as { cases: Array<{ id: string }> };
     expect(group.cases.map((item) => item.id)).toEqual(['gui-001']);
@@ -585,10 +682,307 @@ describe('panel-agent actions: tests', () => {
       expect(card.preview.diff).toContain('+  "status": "stopped"');
       await decide(card.id, 'approve');
       const stopped = (await stopping).json<PanelActionResult>();
-      expect(stopped.outcome).toBe('done');
+      expect(stopped).toMatchObject({
+        outcome: 'done',
+        // Остановленный прогон виден на «Прогонах»; без вкладки страница падала
+        // на «Библиотеку» (живой прогон T2, 26.09).
+        page: { route: `/tests?project=${encodeURIComponent(projectDir)}`, focus: 'runs' },
+      });
       expect((await view()).run?.status).not.toBe('running');
     } finally {
       delete process.env.CC_FAKE_DELAY;
     }
+  });
+  const readGroupFile = (name = 'gui') =>
+    JSON.parse(readFileSync(join(testsDir(), `${name}.tests.json`), 'utf8')) as {
+      title: string;
+      cases: Array<Record<string, unknown>>;
+    };
+
+  it('last_run: «что упало» — последний ПРОВЕРЯВШИЙ прогон, красные с названием и разбором', async () => {
+    // Свободный текст исполнителя может нести токен: модели он уходит маской.
+    const token = ['gl', 'pat-', 'Qw8eRt6yUi4oPa2sDf0g'].join('');
+    const runsDir = join(testsDir(), 'runs');
+    mkdirSync(runsDir, { recursive: true });
+    writeFileSync(
+      join(runsDir, '20260917100000-cccc.run.json'),
+      JSON.stringify({
+        id: 'run-checked',
+        mode: 'run',
+        actor: 'agent',
+        status: 'done',
+        error: `claude: 401 for Authorization: Bearer ${token}`,
+        startedAt: '2026-09-17T10:00:00.000Z',
+        results: [
+          {
+            pointId: 'p1',
+            groupId: 'gui',
+            caseId: 'gui-001',
+            status: 'blocked',
+            note: `стенд не поднялся: token ${token}`,
+          },
+          {
+            pointId: 'p2',
+            groupId: 'gui',
+            caseId: 'gui-002',
+            status: 'failed',
+            note: 'кнопка не нажимается',
+            failure: {
+              step: 1,
+              expected: `Открыто с PRIVATE-TOKEN: ${token}`,
+              actual: 'Ничего',
+              retry: 'flaky',
+              retryNote: `во второй раз открылось, token=${token}`,
+            },
+          },
+        ],
+      }),
+    );
+    // Генерация новее — но она ничего не проверяла, и «что упало» не про неё.
+    writeFileSync(
+      join(runsDir, '20260917110000-dddd.run.json'),
+      JSON.stringify({
+        id: 'run-generated',
+        mode: 'generate',
+        actor: 'agent',
+        status: 'stopped',
+        startedAt: '2026-09-17T11:00:00.000Z',
+        results: [],
+      }),
+    );
+    const body = (await call('last_run', { projectPath: projectDir })).json<PanelActionResult>();
+    expect(body.result).toMatchObject({
+      run: {
+        id: 'run-checked',
+        failed: [
+          { caseId: 'gui-001', status: 'blocked', title: 'Вход в панель' },
+          {
+            groupId: 'gui',
+            caseId: 'gui-002',
+            title: 'Выход из панели',
+            note: 'кнопка не нажимается',
+            failure: { step: 1, actual: 'Ничего' },
+          },
+        ],
+      },
+      newerWithoutChecks: [{ id: 'run-generated', mode: 'generate', status: 'stopped' }],
+    });
+    expect(JSON.stringify(body)).not.toContain(token);
+  });
+
+  it('last_run: исследование с находками — ответ на «что упало», пустое — только в списке новее', async () => {
+    const runsDir = join(testsDir(), 'runs');
+    mkdirSync(runsDir, { recursive: true });
+    const record = (name: string, extra: Record<string, unknown>) =>
+      writeFileSync(
+        join(runsDir, name),
+        JSON.stringify({ actor: 'agent', status: 'done', ...extra }),
+      );
+    record('20260918100000-aaaa.run.json', {
+      id: 'run-explore-found',
+      mode: 'explore',
+      startedAt: '2026-09-18T10:00:00.000Z',
+      results: [
+        {
+          pointId: 'p1',
+          groupId: 'gui',
+          caseId: 'gui-002',
+          status: 'failed',
+          note: 'пустое имя принято',
+          failure: { step: 2, expected: 'Ошибка', actual: 'Сохранено' },
+        },
+      ],
+    });
+    record('20260918110000-bbbb.run.json', {
+      id: 'run-explore-empty',
+      mode: 'explore',
+      startedAt: '2026-09-18T11:00:00.000Z',
+      results: [],
+    });
+    const body = (await call('last_run', { projectPath: projectDir })).json<PanelActionResult>();
+    expect(body.result).toMatchObject({
+      run: {
+        id: 'run-explore-found',
+        failed: [{ caseId: 'gui-002', title: 'Выход из панели', failure: { step: 2 } }],
+      },
+      newerWithoutChecks: [{ id: 'run-explore-empty', mode: 'explore', summary: { total: 0 } }],
+    });
+  });
+
+  it('отказ маршрута чтения назван разделом, а не адресом API', async () => {
+    // Проект в списке панели, но каталог пропал: проверку регистрации он
+    // проходит, отказывает уже маршрут чтения раздела.
+    store.addProject({ id: 'p-a5-gone', name: 'Gone', path: join(projectDir, 'missing') });
+    const body = (
+      await call('run_tests', { projectPath: join(projectDir, 'missing') })
+    ).json<PanelActionResult>();
+    expect(body.outcome).toBe('failed');
+    expect(body.message).toContain('«project-tests»');
+    expect(body.message).not.toContain('/api/');
+  });
+
+  it('run_tests explore: без хартии — отказ до карточки; с хартией — карточка режима', async () => {
+    const bare = (
+      await call('run_tests', { projectPath: projectDir, mode: 'explore' })
+    ).json<PanelActionResult>();
+    expect(bare.outcome).toBe('failed');
+    expect(bare.message).toContain('scope');
+    expect(await listPending()).toEqual([]);
+
+    const running = call('run_tests', {
+      projectPath: projectDir,
+      mode: 'explore',
+      scope: 'вложения в чате',
+    });
+    const card = await waitPending();
+    expect(card.preview.fields.find((item) => item.labelCode === 'label-mode')).toMatchObject({
+      valueCode: 'value-mode-explore',
+    });
+    await decide(card.id, 'reject');
+    expect((await running).json<PanelActionResult>().outcome).toBe('rejected');
+  });
+
+  it('save_test_case: новый кейс — карточка, отказ не пишет, approve пишет и отдаёт id', async () => {
+    const input = {
+      projectPath: projectDir,
+      groupId: 'gui',
+      title: 'Пустое сообщение не отправляется',
+      steps: [{ action: 'Нажать Enter в пустом поле', expected: 'Ничего не ушло' }],
+      priority: 'high',
+    };
+    const rejected = call('save_test_case', input);
+    const first = await waitPending();
+    expect(first).toMatchObject({ name: 'save_test_case', risk: 'change' });
+    expect(first.preview.diff).toContain('Пустое сообщение не отправляется');
+    await decide(first.id, 'reject');
+    expect((await rejected).json<PanelActionResult>().outcome).toBe('rejected');
+    expect(readGroupFile().cases).toHaveLength(2);
+
+    const approved = call('save_test_case', input);
+    await decide((await waitPending()).id, 'approve');
+    const result = (await approved).json<PanelActionResult>();
+    expect(result).toMatchObject({
+      outcome: 'done',
+      result: { groupId: 'gui', caseId: 'gui-003' },
+      page: { route: `/tests?project=${encodeURIComponent(projectDir)}`, focus: 'library' },
+    });
+    const saved = readGroupFile().cases.find((item) => item.id === 'gui-003');
+    // Кейс написал агент: человек подтвердил карточку, как подтверждает черновик,
+    // и принятый черновик тоже остаётся `agent`. Пометка `human` защитила бы его
+    // от следующей генерации, как будто его писал человек.
+    expect(saved).toMatchObject({
+      title: 'Пустое сообщение не отправляется',
+      priority: 'high',
+      source: 'agent',
+    });
+
+    // Правка агентом своего же кейса не переписывает автора.
+    const edit = call('save_test_case', {
+      projectPath: projectDir,
+      groupId: 'gui',
+      caseId: 'gui-003',
+      priority: 'low',
+    });
+    await decide((await waitPending()).id, 'approve');
+    expect((await edit).json<PanelActionResult>().outcome).toBe('done');
+    expect(readGroupFile().cases.find((item) => item.id === 'gui-003')).toMatchObject({
+      priority: 'low',
+      source: 'agent',
+    });
+  });
+
+  it('save_test_case: правка — только названные поля, шаги и заголовок с диска; чужой id — отказ', async () => {
+    const editing = call('save_test_case', {
+      projectPath: projectDir,
+      groupId: 'gui',
+      caseId: 'gui-002',
+      expected: 'Сессия закрыта, открыт экран входа',
+    });
+    const card = await waitPending();
+    expect(card.preview.diff).toContain('Сессия закрыта');
+    await decide(card.id, 'approve');
+    expect((await editing).json<PanelActionResult>().outcome).toBe('done');
+    const saved = readGroupFile().cases.find((item) => item.id === 'gui-002');
+    expect(saved).toMatchObject({
+      title: 'Выход из панели',
+      expected: 'Сессия закрыта, открыт экран входа',
+      steps: [{ action: 'Открыть', expected: 'Открыто' }],
+      // Кейс человека, поправленный агентом, остаётся человеческим — иначе
+      // следующая генерация получила бы право его удалить.
+      source: 'human',
+    });
+
+    const unknown = (
+      await call('save_test_case', {
+        projectPath: projectDir,
+        groupId: 'gui',
+        caseId: 'gui-404',
+        title: 'x',
+      })
+    ).json<PanelActionResult>();
+    expect(unknown.outcome).toBe('failed');
+    expect(unknown.message).toContain('gui-404');
+    expect(await listPending()).toEqual([]);
+  });
+
+  it('save_test_group / delete_test_group: новая группа — файл; удаление — карточка с числом кейсов', async () => {
+    const creating = call('save_test_group', {
+      projectPath: projectDir,
+      id: 'api',
+      title: 'API',
+      description: 'Маршруты сервера',
+    });
+    await decide((await waitPending()).id, 'approve');
+    expect((await creating).json<PanelActionResult>().outcome).toBe('done');
+    expect(readGroupFile('api')).toMatchObject({ title: 'API', cases: [] });
+
+    const renaming = call('save_test_group', {
+      projectPath: projectDir,
+      id: 'gui',
+      title: 'Интерфейс',
+    });
+    const renameCard = await waitPending();
+    expect(renameCard.preview.diff).toContain('Интерфейс');
+    await decide(renameCard.id, 'approve');
+    expect((await renaming).json<PanelActionResult>().outcome).toBe('done');
+    expect(readGroupFile().title).toBe('Интерфейс');
+    expect(readGroupFile().cases).toHaveLength(2);
+
+    const deleting = call('delete_test_group', { projectPath: projectDir, id: 'gui' });
+    const card = await waitPending();
+    expect(card).toMatchObject({ name: 'delete_test_group', risk: 'danger' });
+    expect(card.preview.summaryParams).toMatchObject({ count: 2 });
+    await decide(card.id, 'reject');
+    expect((await deleting).json<PanelActionResult>().outcome).toBe('rejected');
+    expect(existsSync(groupFile())).toBe(true);
+
+    const approved = call('delete_test_group', { projectPath: projectDir, id: 'gui' });
+    await decide((await waitPending()).id, 'approve');
+    expect((await approved).json<PanelActionResult>().outcome).toBe('done');
+    expect(existsSync(groupFile())).toBe(false);
+  });
+
+  it('reject_draft: карточка — ждущие кейсы; approve отклоняет черновик маршрутом приёмки', async () => {
+    const rejecting = call('reject_draft', { projectPath: projectDir, runId: DRAFT_RUN });
+    const card = await waitPending();
+    expect(card).toMatchObject({ name: 'reject_draft', risk: 'change' });
+    expect(card.preview.summaryParams).toMatchObject({ count: 2 });
+    await decide(card.id, 'approve');
+    expect((await rejecting).json<PanelActionResult>().outcome).toBe('done');
+    const view = (
+      await app.inject({
+        method: 'GET',
+        url: `/api/project-tests?path=${encodeURIComponent(projectDir)}`,
+      })
+    ).json<ProjectTestsView>();
+    // Положительная сторона: отклонённый целиком черновик уехал в архив с
+    // пометкой — пустой список «ждущих» прошёл бы и тогда, когда поле drafts
+    // из ответа пропало или черновик никто не тронул.
+    const archived = JSON.parse(
+      readFileSync(join(testsDir(), 'drafts', 'archive', `${DRAFT_RUN}.draft.json`), 'utf8'),
+    ) as { status: string };
+    expect(archived.status).toBe('rejected');
+    expect((view.drafts ?? []).filter((item) => item.status === 'pending')).toEqual([]);
+    expect(readGroupFile().cases).toHaveLength(2);
   });
 });

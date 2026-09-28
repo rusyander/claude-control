@@ -46,6 +46,8 @@ export interface CaseDraft {
   automationFile: string;
   automationTestName: string;
   automationExternalId: string;
+  /** Файлы кода строками: по ним кейс попадает в «прогнать задетое». */
+  codePaths: string;
   archived: boolean;
 }
 
@@ -72,6 +74,7 @@ const BLANK: CaseDraft = {
   automationFile: '',
   automationTestName: '',
   automationExternalId: '',
+  codePaths: '',
   archived: false,
 };
 
@@ -106,6 +109,7 @@ export function fromCase(testCase: ProjectTestCase | undefined): CaseDraft {
     automationFile: testCase.automation?.file ?? '',
     automationTestName: testCase.automation?.testName ?? '',
     automationExternalId: testCase.automation?.externalId ?? '',
+    codePaths: (testCase.codePaths ?? []).join('\n'),
     archived: Boolean(testCase.archived),
   };
 }
@@ -164,7 +168,9 @@ export function toInput(draft: CaseDraft): ProjectTestCaseInput {
     oracle: isChecklist ? '' : draft.oracle.trim(),
     priority: draft.priority,
     readiness: draft.readiness,
-    ...(Number.isFinite(duration) && duration > 0 ? { duration } : {}),
+    // Пустое поле уходит нулём — это «очисти»: без поля сервер оставил бы на
+    // диске прежнее число, и стёртую оценку было бы не убрать.
+    duration: Number.isFinite(duration) && duration > 0 ? duration : 0,
     tags: draft.tags
       .split(',')
       .map((tag) => tag.trim())
@@ -179,6 +185,10 @@ export function toInput(draft: CaseDraft): ProjectTestCaseInput {
       testName: draft.automationTestName.trim(),
       externalId: draft.automationExternalId.trim(),
     },
+    codePaths: draft.codePaths
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean),
     archived: draft.archived,
   };
 }

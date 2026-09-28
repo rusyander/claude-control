@@ -1,6 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import {
+  mkdtempSync,
+  rmSync,
+  mkdirSync,
+  writeFileSync,
+  readFileSync,
+  existsSync,
+  realpathSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { AppStore } from '../lib/app-store.ts';
@@ -78,7 +86,8 @@ describe('aider: инструкции-список и проектный уро�
     process.env.USERPROFILE = home;
     configPath = join(home, '.aider.conf.yml');
     root = mkdtempSync(join(tmpdir(), 'cc-aider-routes-'));
-    projectDir = mkdtempSync(join(tmpdir(), 'cc-aider-project-'));
+    // Реестр пишет путь написанием на диске (F-134): tmpdir на Windows даёт 8.3.
+    projectDir = realpathSync.native(mkdtempSync(join(tmpdir(), 'cc-aider-project-')));
   });
   afterEach(async () => {
     await app?.close();

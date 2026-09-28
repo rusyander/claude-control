@@ -251,8 +251,8 @@ export function planSkillTurn(request: SkillTurnRequest): SkillTurnPlan {
 
 /** Заголовок каталога в инструкциях цели. */
 const SKILL_CATALOG_HEADING =
-  'Доступные скиллы (имя: назначение). Назови скилл по имени, чтобы получить его инструкции:';
+  'Available skills (name: purpose). Name a skill to get its instructions:';
 
 function skillBodyHeading(name: string): string {
-  return `Инструкции скилла «${name}» лежат в файле, прочитай его целиком:`;
+  return `The instructions of the skill "${name}" are in a file, read it in full:`;
 }

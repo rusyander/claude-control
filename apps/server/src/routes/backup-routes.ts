@@ -1,8 +1,10 @@
 import type { FastifyInstance } from 'fastify';
 import type { ServerContext } from '../context.ts';
-import { listBackups, restoreBackup, deleteBackup } from '../domains/backups.ts';
+import { listBackups, restoreBackup, deleteBackup, restorePreview } from '../domains/backups.ts';
+import { unifiedDiff } from '../domains/config-preview/unified-diff.ts';
 import { setSecretPassphrase, hasSecretPassphrase } from '../lib/safe-io.ts';
 import { makeVerifier, verifyPassphrase } from '../lib/secret-crypto.ts';
+import { codeOf } from '../lib/server-text.ts';
 
 /**
  * Резервные копии: посмотреть и откатиться.
@@ -93,11 +95,52 @@ export function registerBackupRoutes(app: FastifyInstance, ctx: ServerContext): 
 
       // Неизвестная копия — 404, как у DELETE ниже; 400 остаётся за плохим
       // запросом (нет фразы, копию некуда возвращать).
-      if (!result.ok) return reply.code(result.notFound ? 404 : 400).send({ error: result.error });
+      // Код текста рядом со строкой: без него английское окно показывало русскую.
+      if (!result.ok)
+        return reply
+          .code(result.notFound ? 404 : 400)
+          .send({ error: result.error, ...codeOf(result) });
 
       return { ...result, needsRestart: true };
     },
   );
+
+  /**
+   * Что изменит откат к копии: дифф «сейчас → станет» по каждому файлу, секреты
+   * в строках замаскированы. Нужен карточке подтверждения агента панели: откат
+   * переписывает файл целиком и уносит правки, сделанные после копии.
+   */
+  app.get<{ Params: { name: string } }>('/api/backups/:name/preview', (request, reply) => {
+    const preview = restorePreview(
+      ctx.store.backupDir,
+      request.params.name,
+      restorableTargets(),
+      ctx.location.paths.skills,
+    );
+    if (!preview.ok) {
+      return reply.code(preview.notFound ? 404 : 400).send({
+        error: preview.error,
+        messageCode: preview.messageCode,
+        ...(preview.params ? { params: preview.params } : {}),
+      });
+    }
+    return {
+      // Двоичное и сверхбольшое строками не показать: у такого файла только
+      // факт замены (`binary`) или отметка «не помещается» (`truncated`).
+      files: preview.files.map((file) =>
+        file.skipped
+          ? {
+              path: file.path,
+              diff: '',
+              added: 0,
+              removed: 0,
+              truncated: file.skipped === 'too-large' && file.differs === true,
+              ...(file.skipped === 'binary' && file.differs ? { binary: true } : {}),
+            }
+          : { path: file.path, ...unifiedDiff(file.path, file.before, file.after) },
+      ),
+    };
+  });
 
   app.delete<{ Params: { name: string } }>('/api/backups/:name', (request, reply) => {
     // То же самое, что и в откате: имя уже раскодировано маршрутизатором.

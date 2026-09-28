@@ -1,6 +1,6 @@
 import { mkdirSync, copyFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { readHooks } from '../hooks.ts';
+import { hookEntryOf, readHooks } from '../hooks.ts';
 import { readMcpServers } from '../mcp.ts';
 import type { ClaudeLocation } from '@agentdeck/contracts';
 import type { AppStore } from '../../lib/app-store.ts';
@@ -79,7 +79,9 @@ function collectHooks(
       description.scripts.push(name);
     }
 
-    const entry = { matcher: hook.matcher ?? '', hooks: [{ type: 'command', command }] };
+    // Запись — тем же сборщиком, что пишет settings.json: prompt-хук остаётся
+    // prompt-хуком, таймаут и statusMessage едут вместе с командой.
+    const entry = { matcher: hook.matcher ?? '', hooks: [hookEntryOf({ ...hook, command })] };
     result[hook.event] = [...(result[hook.event] ?? []), entry];
     description.hooks.push(`${hook.event}${hook.matcher ? ` · ${hook.matcher}` : ''}`);
   }

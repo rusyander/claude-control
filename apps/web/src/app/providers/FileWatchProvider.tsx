@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { DOMAIN_KEYS } from '@shared/api/query-keys';
 import { publishPanelAgentEvent } from '@entities/PanelAgent';
+import { refreshSettingsFromServer } from '@entities/AppConfig';
 import type { FileWatchProviderProps } from './FileWatchProvider.types';
 
 /**
@@ -75,6 +76,12 @@ export function FileWatchProvider({ children }: FileWatchProviderProps) {
           void queryClient.invalidateQueries({ queryKey: ['chats'], exact: true });
           const sessionId = payload.path?.match(/([^\\/]+)\.jsonl$/)?.[1];
           if (sessionId) void queryClient.invalidateQueries({ queryKey: ['chats', sessionId] });
+          continue;
+        }
+        // Настройки сменили снаружи (соседняя вкладка, телефон): мало перечитать —
+        // язык, тема, провайдер должны примениться так же, как после своего PATCH.
+        if (domain === 'settings') {
+          void refreshSettingsFromServer(queryClient);
           continue;
         }
         for (const key of DOMAIN_KEYS[domain] ?? []) {

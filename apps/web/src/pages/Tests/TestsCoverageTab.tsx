@@ -210,7 +210,11 @@ export function TestsCoverageTab({ projectPath }: { projectPath: string | undefi
             <Stack direction="row" gap="var(--spacing-2xs)" wrap>
               {(data?.orphans ?? []).slice(0, 40).map((one) => (
                 <Badge key={`${one.groupId}:${one.caseId}`} tone={STATUS_TONE[one.status]}>
-                  {one.title}
+                  {/* Длинное название обрезается, целиком — в подсказке: без
+                      этого одна плашка уходила за край карточки. */}
+                  <span className={styles.coverageCaseTitle} title={one.title}>
+                    {one.title}
+                  </span>
                 </Badge>
               ))}
             </Stack>
@@ -292,7 +296,11 @@ function CoverageRow({
           <Stack direction="row" gap="var(--spacing-2xs)" wrap>
             {item.cases.map((one) => (
               <Badge key={`${one.groupId}:${one.caseId}`} tone={STATUS_TONE[one.status]}>
-                {one.muted ? `${one.title} · ${t('tests.muted.short')}` : one.title}
+                {/* Та же обрезка, что у кейсов без требования: длинное название
+                    иначе выносит плашку за край карточки требования. */}
+                <span className={styles.coverageCaseTitle} title={one.title}>
+                  {one.muted ? `${one.title} · ${t('tests.muted.short')}` : one.title}
+                </span>
               </Badge>
             ))}
           </Stack>

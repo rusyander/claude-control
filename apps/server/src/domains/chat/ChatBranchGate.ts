@@ -214,7 +214,7 @@ export function mainCopyTargetOf(
 
 /** Отказ правке из копии в основную копию: куда писать вместо неё. */
 export function outsideCopyDenial(cwd: string, mainRoot: string): string {
-  return `Правка не применена: файл лежит в основной копии проекта ${mainRoot}, а ты работаешь в своей копии ${cwd}. Основная копия остаётся нетронутой — сделай ту же правку по такому же пути внутри ${cwd}.`;
+  return `The edit was not applied: the file lies in the project's main copy ${mainRoot}, while you work in your own copy ${cwd}. The main copy stays untouched — make the same edit at the same path inside ${cwd}.`;
 }
 
 /**
@@ -223,7 +223,7 @@ export function outsideCopyDenial(cwd: string, mainRoot: string): string {
  * куда именно переехала работа: следующий ход агент делает уже там.
  */
 export function branchMovedDenial(path: string, branch: string): string {
-  return `Правка в основной копии не применена: работа переезжает в ${path} на ветку ${branch}. Прогон поднимается в этом каталоге и продолжает ту же задачу — повтори правку там.`;
+  return `The edit in the main copy was not applied: the work is moving to ${path} on the branch ${branch}. The run restarts in that directory and continues the same task — repeat the edit there.`;
 }
 
 /**
@@ -231,7 +231,7 @@ export function branchMovedDenial(path: string, branch: string): string {
  * короткая и без пересказа: история разговора при `--resume` никуда не делась.
  */
 export function branchContinuePrompt(path: string, branch: string): string {
-  return `Рабочий каталог сменился: ты в копии ${path} на ветке ${branch}, основной каталог проекта остаётся нетронутым. Продолжай ту же задачу здесь и начни с правки, которая не прошла.`;
+  return `The working directory has changed: you are in the copy ${path} on the branch ${branch}, the project's main directory stays untouched. Continue the same task here and start with the edit that did not go through.`;
 }
 
 /** Группа разделения глазами ворот: кому отдана работа и как к ней обратиться. */
@@ -295,14 +295,14 @@ export function branchGateContext(
  */
 export function branchGateHandedDenial(children: readonly BranchGateChild[]): string {
   const list = children.map(
-    (child) => `${child.number} — «${child.title}» (ветка ${child.branch})`,
+    (child) => `${child.number} — "${child.title}" (branch ${child.branch})`,
   );
-  return `Правка не применена: работа этого разговора отдана группам разделения, и правит код группа, а не ты. Группы: ${list.join('; ')}. Передай правку нужной группе блоком \`\`\`agentdeck:tell N с текстом поручения — панель доставит его в чат группы.`;
+  return `The edit was not applied: the work of this conversation was handed to split groups, and a group edits the code, not you. Groups: ${list.join('; ')}. Pass the edit to the right group with a \`\`\`agentdeck:tell N block containing the instruction — the panel delivers it to the group chat.`;
 }
 
 /** Отказ, когда человек не разрешил правку вовсе. */
 export const BRANCH_GATE_STOPPED =
-  'Правка отклонена: работать в основной рабочей копии проекта не разрешено.';
+  "The edit was refused: working in the project's main working copy is not allowed.";
 
 /**
  * Кириллица в имени ветки допустима для самого git, но дальше её ждут чужие

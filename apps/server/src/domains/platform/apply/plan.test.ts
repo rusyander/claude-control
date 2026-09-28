@@ -100,7 +100,7 @@ describe('готовность', () => {
   it('оба адреса шлюза и имя профиля названы', () => {
     const plan = buildPlatformApplyPlan(deps(), PLATFORM);
     expect(plan.profileId).toBe(managedProfileId(PLATFORM.id));
-    expect(plan.baseUrl).toBe('http://127.0.0.1:5179/company-dev/v1');
+    expect(plan.baseUrl).toBe('http://127.0.0.1:5179/company-dev/_s/assistant/v1');
     expect(plan.rootUrl).toBe('http://127.0.0.1:5179/company-dev');
   });
 
@@ -109,7 +109,7 @@ describe('готовность', () => {
     const plan = buildPlatformApplyPlan(deps(), PLATFORM);
     // Иначе человек сверял бы с карточкой шлюза, где стоит доставшийся адрес,
     // строку плана с задуманным — и записал бы вторую.
-    expect(plan.baseUrl).toBe('http://127.0.0.1:5181/company-dev/v1');
+    expect(plan.baseUrl).toBe('http://127.0.0.1:5181/company-dev/_s/assistant/v1');
     expect(plan.rootUrl).toBe('http://127.0.0.1:5181/company-dev');
     expect(targetOf(plan, 'claude').plan[0]?.value).toContain('5181');
   });
@@ -144,7 +144,7 @@ describe('занятое место', () => {
       {
         key: 'ANTHROPIC_BASE_URL',
         current: 'https://свой-шлюз.local',
-        incoming: 'http://127.0.0.1:5179/company-dev',
+        incoming: 'http://127.0.0.1:5179/company-dev/_s/terminal',
       },
     ]);
   });
@@ -152,7 +152,9 @@ describe('занятое место', () => {
   it('совпадающее значение конфликтом не считается', () => {
     writeFileSync(
       settingsPath,
-      JSON.stringify({ env: { ANTHROPIC_BASE_URL: 'http://127.0.0.1:5179/company-dev' } }),
+      JSON.stringify({
+        env: { ANTHROPIC_BASE_URL: 'http://127.0.0.1:5179/company-dev/_s/terminal' },
+      }),
     );
     // Это ровно то состояние, в которое приводит наше же применение: требовать
     // за него подтверждения значило бы поднимать тревогу на пустом месте.

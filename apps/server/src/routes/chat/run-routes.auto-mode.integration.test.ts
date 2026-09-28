@@ -49,7 +49,9 @@ describe('авторежим прав чата', () => {
         }),
       stop: () => undefined,
     }));
-    registry.setSessionListener((chatId, sessionId) => store.linkChatSession(chatId, sessionId));
+    registry.setSessionListener((chatId, sessionId, from) =>
+      store.linkChatSession(chatId, sessionId, from),
+    );
     const asks = wirePendingAsks(registry, {
       file: join(data, PENDING_ASKS_FILE),
       // Тот же предикат, что собирает `bootstrap/runtime.ts`.
@@ -174,7 +176,7 @@ describe('авторежим прав чата', () => {
     const view = (
       await app.inject({ method: 'GET', url: `/api/chat/${PLAIN}/auto-mode` })
     ).json<ChatAutoModeView>();
-    expect(view).toEqual({ enabled: false, override: false, global: true });
+    expect(view).toEqual({ enabled: false, override: false, global: true, allowEdits: false });
 
     expect((await send(PLAIN)).permissionMode).toBe('acceptEdits');
     expect(await decide(PLAIN, 'npm test')).toBe('card');

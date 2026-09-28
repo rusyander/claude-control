@@ -7,7 +7,14 @@ import type { SpeechErrorKind, SpeechState } from '@shared/lib/speech';
  * ничем, и одна строка «не вышло» для обоих оставила бы его жать кнопку снова.
  */
 export type VoiceView =
-  'idle' | 'listening' | 'finalizing' | 'unsupported' | 'denied' | 'network' | 'error';
+  | 'idle'
+  | 'listening'
+  | 'finalizing'
+  | 'unsupported'
+  | 'denied'
+  | 'network'
+  | 'microphone'
+  | 'error';
 
 export interface VoiceInputState {
   state: SpeechState;
@@ -24,6 +31,7 @@ export function voiceView({ state, supported, error, attempted }: VoiceInputStat
   if (state === 'error') {
     if (error === 'no-permission') return 'denied';
     if (error === 'network') return 'network';
+    if (error === 'no-microphone') return 'microphone';
     if (error === 'unsupported') return 'unsupported';
     return 'error';
   }
@@ -37,7 +45,13 @@ export function isDictating(view: VoiceView): boolean {
 
 /** Отказ, о котором строка под полем говорит как о проблеме (`role=alert`). */
 export function isVoiceProblem(view: VoiceView): boolean {
-  return view === 'unsupported' || view === 'denied' || view === 'network' || view === 'error';
+  return (
+    view === 'unsupported' ||
+    view === 'denied' ||
+    view === 'network' ||
+    view === 'microphone' ||
+    view === 'error'
+  );
 }
 
 /**

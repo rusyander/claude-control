@@ -164,6 +164,30 @@ export async function shootFirst(browser, web, scenario, { stand }) {
     // ── 10. История разговоров ──────────────────────────────────────────────
     await view(page, 'История', 'History');
     await windowShot(scenario, page, '10-history');
+
+    // ── 11. Сценарий одной карточкой: шаги по порядку, группа выключена ─────
+    await view(page, 'Разговор', 'Conversation');
+    await newConversation(page);
+    await send(
+      page,
+      t(
+        'Собери сценарий «Выпуск»: собрать, прогнать проверки, описать изменения',
+        'Build a scenario «Release»: build, run the checks, describe the changes',
+      ),
+      { card: true },
+    );
+    await windowShot(scenario, page, '11-scenario-card');
+
+    // ── 12. После «Выполнить» сценарий в «Группах», выключенный ─────────────
+    await page.locator('[data-agent-decision="approve"]').click();
+    await turnOver(page);
+    await page.waitForURL(/\/groups/, { timeout: 15_000 }).catch(() => undefined);
+    await page
+      .getByText(t('Выпуск', 'Release'), { exact: true })
+      .first()
+      .waitFor({ timeout: 15_000 });
+    await page.waitForTimeout(1500);
+    await scenario.shot(page, '12-scenario-created');
   } finally {
     await page.close();
   }

@@ -1,10 +1,10 @@
-import type { ClaudePaths, EntityKind, Hook, PermissionDecision } from '@agentdeck/contracts';
+import type { ClaudePaths, EntityKind, Hook } from '@agentdeck/contracts';
 import type { AppStore } from '../lib/app-store.ts';
 import { readRules, saveRule, setRulesEnabled } from './rules.ts';
 import { readHooks, writeHooks } from './hooks.ts';
 import { setSkillEnabled } from './skills.ts';
 import { setMcpServerEnabled, McpServerNotFoundError } from './mcp.ts';
-import { savePermission, deletePermission, setPermissionsEnabled } from './permissions.ts';
+import { setPermissionsEnabled } from './permissions.ts';
 import { isLocalId, stripLocalPrefix } from '../lib/settings-source.ts';
 
 /**
@@ -112,7 +112,9 @@ export function applyEntityStates(deps: EntityToggleDeps, states: EntityState[])
   }
 
   if (rules.size > 0) setRulesEnabled(paths.claudeMd, rules, store, backupDir);
-  for (const [target, list] of permissions) setPermissionsEnabled(target, list, backupDir);
+  for (const [target, list] of permissions) {
+    setPermissionsEnabled(target, list, backupDir, deps.store);
+  }
 
   return { needsHookRewrite };
 }
@@ -152,9 +154,10 @@ export function applyEntityState(
   const backupPath =
     kind === 'mcp' ? toggleMcpServer(paths.mcpConfig, id, isEnabled, backupDir) : undefined;
 
-  // Правило физически уезжает в раздел отключённых — перезаписью CLAUDE.md.
-  // Состояние передаём явно: при чтении оно берётся из расположения правила в
-  // файле, а нам нужно записать то, которое запросили, иначе выключенное
+  // Выключенное правило физически убирается из CLAUDE.md (текст и место
+  // хранит состояние панели), включённое возвращается на своё место.
+  // Состояние передаём явно: при чтении оно берётся из того, где правило
+  // лежит, а нам нужно записать то, которое запросили, иначе выключенное
   // правило нечем было бы включить обратно.
   if (kind === 'rule') {
     const rule = readRules(paths.claudeMd, store).find((item) => item.id === id);
@@ -166,22 +169,12 @@ export function applyEntityState(
   // группа лишь помечала бы право у себя, а Claude Code продолжал бы его
   // применять. Всё нужное для реконструкции лежит в id (`[local:]decision:pattern`),
   // поэтому выключенное право есть чем вернуть. Локальное право правим в
-  // settings.local.json, префикс `local:` файлу неизвестен — снимаем.
+  // settings.local.json, префикс `local:` файлу неизвестен — снимаем. Путь тот
+  // же, что у группового тумблера: он помнит место права и чьи контейнеры
+  // (F-270/F-271), и поштучное выключение-включение тоже возвращает файл байт в байт.
   if (kind === 'permission') {
     const target = isLocalId(id) ? paths.settingsLocal : paths.settings;
-    const bareId = stripLocalPrefix(id);
-
-    if (isEnabled) {
-      const [decision, ...rest] = bareId.split(':');
-      savePermission(
-        target,
-        null,
-        { decision: decision as PermissionDecision, pattern: rest.join(':'), groupIds: [] },
-        backupDir,
-      );
-    } else {
-      deletePermission(target, bareId, backupDir);
-    }
+    setPermissionsEnabled(target, [{ id: stripLocalPrefix(id), isEnabled }], backupDir, store);
   }
 
   // Хук выключается удалением из settings.json, поэтому его команду надо

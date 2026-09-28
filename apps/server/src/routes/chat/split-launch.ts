@@ -1,5 +1,9 @@
 import { resolve } from 'node:path';
-import type { TaskSplitProposal, TaskSplitResult } from '@agentdeck/contracts/task-split';
+import type {
+  TaskSplitGroup,
+  TaskSplitProposal,
+  TaskSplitResult,
+} from '@agentdeck/contracts/task-split';
 import {
   clampAssignment,
   loweredWorkPrompt,
@@ -26,6 +30,13 @@ import {
   type SplitStart,
 } from '../../domains/chat/ChatSplit.ts';
 import { initiativePrompt } from '../../domains/chat/initiative.ts';
+import {
+  chatKnobsLine,
+  childStageExtra,
+  foreignChildExtra,
+} from '../../domains/chat/group-run-lines.ts';
+import { writePickedGroup } from '../../domains/chat/group-auto-pick.ts';
+import { readChoice } from '../../domains/groups/choice.ts';
 import { copyRootOf } from '../../domains/chat/split-conveyor.ts';
 import { AUTONOMOUS_PERMISSION_MODE } from '../../domains/chat/ChatWorkspace.ts';
 import type { ChatLink, SplitPlanRecord } from '../../lib/app-store/app-store.types.ts';
@@ -385,6 +396,27 @@ export function createSplitLauncher(
       ? (chat) => ctx.store.setChatLink(chat.chatId, linkRecord(chat, parentKey))
       : undefined;
 
+  /**
+   * Группа, выбранная разбором (`group.groupKey`), — своим выбором ребёнка ДО
+   * его первого прогона. Включает её уже старт (реестр Claude и служба чужих
+   * CLI, `group-activation-wiring.ts`) — тем же путём, что и группу родителя.
+   */
+  function applyPick(chatKey: string, group: TaskSplitGroup): void {
+    if (!group.groupKey) return;
+    try {
+      // Пары — как сейчас, а не как в каталоге разбора: сторону могли сменить,
+      // пока группа ждала запуска (F-107, см. `activePick`). Проект — тот же
+      // путь настроек, по которому каталог и собирался (`record.projectPath`).
+      writePickedGroup(ctx.store, chatKey, group.groupKey, {
+        groups: ctx.store.getGroups(),
+        projectPath: settingsDir,
+        pairChoice: readChoice(ctx.location.paths.appData, settingsDir),
+      });
+    } catch (error) {
+      deps.log.warn({ err: error }, 'group auto-pick failed');
+    }
+  }
+
   /** Прогон Claude — тот же путь, что и у обычной отправки в чат проекта. */
   function startClaude(input: Parameters<SplitStart>[0]): boolean {
     const { chatId, prompt, cwd, assignment, stage, group, title, branch, context } = input;
@@ -401,6 +433,12 @@ export function createSplitLauncher(
       // План идёт на потолке без права правок — планки сдачи ему не надо; её
       // получит работа, когда план кончится (`stageAppendPrompt`).
       !isPlan && assignment?.lowered ? loweredWorkPrompt(assignment.kind) : '',
+      // Та же стадия, что ляжет в связь (`linkRecord`), и то же дополнение, что
+      // соберёт следующий ход (`childAppendPrompt`): подпись процесса одна.
+      childStageExtra(
+        isPlan ? 'plan' : input.review ? 'review' : 'work',
+        chatKnobsLine(ctx.store, ctx.location.paths.appData, [chatId], cwd),
+      ),
     ]
       .filter(Boolean)
       .join(' ');
@@ -531,11 +569,18 @@ export function createSplitLauncher(
         linkRecord({ ...input, chatId: created.id, path: cwd }, parentKey),
       );
     }
+    // Выбор разбора — после связи (по ней ребёнок видит выбор родителя) и до отправки.
+    applyPick(foreignChatKey(provider.id, created.id), group);
     const initiative = [
       initiativePrompt(ctx.store.getSettings(), { splitMuted: true, foreign: true }),
       // План идёт на потолке — планка сдачи ему не нужна; её получит работа,
       // когда план кончится (`foreignStagePrefix`).
       !isPlan && assignment?.lowered ? loweredWorkPrompt(assignment.kind, { reviewer: 'cli' }) : '',
+      // Строки группы звена — те же, что у ребёнка Claude, и собраны по связи,
+      // записанной выше: переход стадии, продолжение и ответ человека строят их
+      // тем же `foreignChildExtra`. Системной дописки у чужого CLI нет — всё
+      // это едет в `systemPrefix`, первой репликой перед заданием.
+      foreignChildExtra(ctx.store, appData, foreignChatKey(provider.id, created.id)) ?? '',
     ]
       .filter(Boolean)
       .join(' ');
@@ -626,6 +671,9 @@ export function createSplitLauncher(
       input.cwd,
       (error) => deps.log.warn({ err: error }, 'group activation failed'),
     );
+    // У Claude ключ ребёнка и связь уже есть (`link` зовётся до `start`); у
+    // чужого CLI ключ выдаёт его хранилище — выбор ложится внутри `startForeign`.
+    if (!isForeign) applyPick(input.chatId, input.group);
     const started = isForeign ? startForeign(input) : startClaude(input);
     // Заметка — ПОСЛЕ старта: до него прогона в реестре нет. У чужого CLI его
     // нет вовсе, и `emitExternal` честно отвечает «сказать некуда» — факт

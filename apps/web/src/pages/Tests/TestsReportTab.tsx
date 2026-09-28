@@ -7,11 +7,15 @@ import { Icon } from '@shared/ui/icon';
 import { Typography } from '@shared/ui/typography';
 import { EmptyState } from '@shared/ui/empty-state';
 import { SkeletonList } from '@shared/ui/skeleton';
+import { LoadErrorCard } from '@shared/ui/load-error';
 import { percentOf, useStartTestRun, useTestReport } from '@entities/ProjectTest';
+import { queryView } from './model/queryView';
 import { automationTotal, redCases, statusTotals } from './model/reportMetrics';
 import { TestsHealthCard } from './TestsHealthCard';
 import { TestsQuarantineCard } from './TestsQuarantineCard';
+import { TestsPyramidCard } from './TestsPyramidCard';
 import { TestsReleaseCard } from './TestsReleaseCard';
+import { TestsReportTotals } from './TestsReportTotals';
 import { TestsRunDiff } from './TestsRunDiff';
 import { TestsTrend } from './TestsTrend';
 import styles from './TestsPage.module.scss';
@@ -26,11 +30,17 @@ import styles from './TestsPage.module.scss';
  * остального раздела и тянется в общий бандл.
  */
 export function TestsReportTab({ projectPath }: { projectPath: string | undefined }) {
-  const { t } = useTranslation();
+  // Дата — языком интерфейса, а не браузера: английская панель иначе
+  // показывала русские даты (F-323).
+  const { t, i18n } = useTranslation();
   const report = useTestReport(projectPath);
   const start = useStartTestRun(projectPath);
 
-  if (report.isLoading) return <SkeletonList rows={4} />;
+  const view = queryView(report, (data) => !data);
+  if (view === 'loading') return <SkeletonList rows={4} />;
+  // Упавший запрос — не «отчёт пока пуст»: при живой истории пустота звала
+  // запускать прогон, а не повторить запрос.
+  if (view === 'failed') return <LoadErrorCard onRetry={() => void report.refetch()} />;
   // Здоровье набора считается по САМОЙ библиотеке, а не по истории: набор без
   // единого прогона уже бывает с дублями и без оракулов, и прятать это за «нет
   // прогонов» значило бы молчать ровно там, где чинить дешевле всего.
@@ -44,6 +54,7 @@ export function TestsReportTab({ projectPath }: { projectPath: string | undefine
         />
         <TestsHealthCard projectPath={projectPath} />
         <TestsQuarantineCard projectPath={projectPath} />
+        <TestsPyramidCard projectPath={projectPath} />
       </Stack>
     );
   }
@@ -115,42 +126,7 @@ export function TestsReportTab({ projectPath }: { projectPath: string | undefine
           </Stack>
         </Card>
 
-        <Card padding="md">
-          <Stack gap="var(--spacing-2xs)">
-            <Typography variant="caption" color="subtle">
-              {t('tests.report.totals')}
-            </Typography>
-            <Typography variant="body-sm">
-              {t('tests.report.runsCount', { count: data.totals.runs })}
-            </Typography>
-            <Typography variant="body-sm">
-              {t('tests.report.tokens', { count: data.totals.tokens })}
-            </Typography>
-            <Typography variant="body-sm">
-              {t('tests.report.cost', { value: data.totals.costUsd.toFixed(2) })}
-            </Typography>
-            <Typography variant="body-sm">
-              {t('tests.report.duration', {
-                minutes: Math.round(data.totals.durationMs / 60000),
-              })}
-            </Typography>
-            {/* Карантин показывается ТОЛЬКО когда он есть: строка «в карантине
-                0» приучает не читать это место, а именно из него сборка узнаёт,
-                почему она зелёная при красном кейсе. */}
-            {data.totals.muted > 0 && (
-              <Typography variant="body-sm">
-                {t('tests.report.muted', { count: data.totals.muted })}
-              </Typography>
-            )}
-            {data.totals.lastRunAt && (
-              <Typography variant="caption" color="subtle">
-                {t('tests.report.lastRun', {
-                  time: new Date(data.totals.lastRunAt).toLocaleString(),
-                })}
-              </Typography>
-            )}
-          </Stack>
-        </Card>
+        <TestsReportTotals totals={data.totals} />
       </div>
 
       {/* Первое, что спрашивают у отчёта после регресса: что сломалось с
@@ -305,7 +281,7 @@ export function TestsReportTab({ projectPath }: { projectPath: string | undefine
                 </Badge>
                 {item.lastRunAt && (
                   <Typography variant="caption" color="subtle" as="span">
-                    {new Date(item.lastRunAt).toLocaleString()}
+                    {new Date(item.lastRunAt).toLocaleString(i18n.language)}
                   </Typography>
                 )}
               </Stack>
@@ -422,6 +398,7 @@ export function TestsReportTab({ projectPath }: { projectPath: string | undefine
 
       <TestsHealthCard projectPath={projectPath} />
       <TestsQuarantineCard projectPath={projectPath} />
+      <TestsPyramidCard projectPath={projectPath} />
     </Stack>
   );
 }

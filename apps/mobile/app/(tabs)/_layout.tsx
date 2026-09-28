@@ -3,9 +3,13 @@ import { SymbolView } from 'expo-symbols';
 import { colors } from '../../src/shared/config/theme';
 import { useT } from '../../src/shared/config/i18n';
 import { PENDING_POLL_MS, usePanelAgentPending } from '../../src/entities/panel-agent/api';
+import { isConfigured, useConnection } from '../../src/shared/api/connection';
+import { pendingCount } from '../../src/entities/inbox/model';
+import { useSent } from '../../src/features/inbox/sent';
+import { useInboxChats } from '../../src/features/inbox/useInboxChats';
 
 /**
- * Пять вкладок — ровно то, ради чего приложение существует: разговор,
+ * Пять вкладок — ровно то, ради чего приложение существует: главная (что идёт и кто ждёт),
  * переключение проекта, аналитика, агент панели (А8) и своя настройка. Остальные три десятка
  * разделов панели на телефон не переносятся: они настраивают конфигурацию, а
  * это работа за столом.
@@ -15,6 +19,11 @@ export default function TabLayout() {
   // Значок на вкладке агента: карточка ждёт решения, а человек сейчас в чате.
   const pending = usePanelAgentPending(PENDING_POLL_MS.badge);
   const waiting = pending.data?.length ?? 0;
+  // Значок на главной: вопросы агентов из всех чатов, тот же запрос, что у
+  // самой главной, — второго опроса нет; вопросы идущих ходов — из их потоков.
+  const inbox = useInboxChats(isConfigured(useConnection()));
+  const sent = useSent();
+  const asks = pendingCount(inbox.data ?? [], sent);
   return (
     <Tabs
       screenOptions={{
@@ -32,11 +41,13 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: t.tabs.chat,
+          title: t.tabs.home,
           headerShown: false,
+          tabBarBadge: asks > 0 ? asks : undefined,
+          tabBarAccessibilityLabel: asks > 0 ? t.home.homeTabA11y(asks) : t.tabs.home,
           tabBarIcon: ({ color }) => (
             <SymbolView
-              name={{ ios: 'bubble.left.and.bubble.right', android: 'chat', web: 'chat' }}
+              name={{ ios: 'house', android: 'home', web: 'home' }}
               tintColor={color}
               size={26}
             />

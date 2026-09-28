@@ -136,7 +136,7 @@ export function EndpointCard() {
           </Button>
         </Stack>
 
-        <Typography variant="body-sm" color="subtle" style={{ maxWidth: 'var(--text-measure)' }}>
+        <Typography variant="body-sm" color="subtle" className="prose">
           {t('endpoints.hint')}
         </Typography>
 

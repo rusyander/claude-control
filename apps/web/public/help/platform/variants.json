@@ -1,0 +1,385 @@
+{
+  "topic": "platform",
+  "frames": {
+    "activate/01-smoke-ok": {
+      "light-ru": {
+        "file": "01-smoke-ok.png",
+        "width": 988,
+        "height": 878
+      },
+      "light-en": {
+        "file": "01-smoke-ok.en.png",
+        "width": 988,
+        "height": 847
+      }
+    },
+    "activate/02-return-settings": {
+      "light-ru": {
+        "file": "02-return-settings.png",
+        "width": 930,
+        "height": 1838
+      },
+      "light-en": {
+        "file": "02-return-settings.en.png",
+        "width": 930,
+        "height": 1838
+      }
+    },
+    "agent/01-chat-run": {
+      "light-ru": {
+        "file": "01-chat-run.png",
+        "width": 1280,
+        "height": 1000
+      },
+      "light-en": {
+        "file": "01-chat-run.en.png",
+        "width": 1280,
+        "height": 1000
+      }
+    },
+    "agent/02-shim-card": {
+      "light-ru": {
+        "file": "02-shim-card.png",
+        "width": 988,
+        "height": 209
+      },
+      "light-en": {
+        "file": "02-shim-card.en.png",
+        "width": 988,
+        "height": 209
+      }
+    },
+    "connect/01-admin-login": {
+      "light-ru": {
+        "file": "01-admin-login.png",
+        "width": 1280,
+        "height": 820
+      }
+    },
+    "connect/02-admin-dashboard": {
+      "light-ru": {
+        "file": "02-admin-dashboard.png",
+        "width": 1280,
+        "height": 820
+      }
+    },
+    "connect/03-admin-models": {
+      "light-ru": {
+        "file": "03-admin-models.png",
+        "width": 1280,
+        "height": 820
+      }
+    },
+    "connect/04-admin-model-create": {
+      "light-ru": {
+        "file": "04-admin-model-create.png",
+        "width": 1280,
+        "height": 820
+      }
+    },
+    "connect/05-admin-keys": {
+      "light-ru": {
+        "file": "05-admin-keys.png",
+        "width": 1280,
+        "height": 820
+      }
+    },
+    "connect/06-admin-key-create": {
+      "light-ru": {
+        "file": "06-admin-key-create.png",
+        "width": 1280,
+        "height": 820
+      }
+    },
+    "connect/07-admin-key-issued": {
+      "light-ru": {
+        "file": "07-admin-key-issued.png",
+        "width": 1280,
+        "height": 820
+      }
+    },
+    "connect/08-admin-usage": {
+      "light-ru": {
+        "file": "08-admin-usage.png",
+        "width": 1280,
+        "height": 820
+      }
+    },
+    "connect/09-panel-empty": {
+      "light-ru": {
+        "file": "09-panel-empty.png",
+        "width": 1280,
+        "height": 820
+      },
+      "light-en": {
+        "file": "09-panel-empty.en.png",
+        "width": 1280,
+        "height": 820
+      }
+    },
+    "connect/10-wizard-address": {
+      "light-ru": {
+        "file": "10-wizard-address.png",
+        "width": 912,
+        "height": 729
+      },
+      "light-en": {
+        "file": "10-wizard-address.en.png",
+        "width": 912,
+        "height": 729
+      }
+    },
+    "connect/11-wizard-probe": {
+      "light-ru": {
+        "file": "11-wizard-probe.png",
+        "width": 912,
+        "height": 729
+      },
+      "light-en": {
+        "file": "11-wizard-probe.en.png",
+        "width": 912,
+        "height": 729
+      }
+    },
+    "connect/12-wizard-key": {
+      "light-ru": {
+        "file": "12-wizard-key.png",
+        "width": 912,
+        "height": 639
+      },
+      "light-en": {
+        "file": "12-wizard-key.en.png",
+        "width": 912,
+        "height": 639
+      }
+    },
+    "connect/13-wizard-capabilities": {
+      "light-ru": {
+        "file": "13-wizard-capabilities.png",
+        "width": 912,
+        "height": 729
+      },
+      "light-en": {
+        "file": "13-wizard-capabilities.en.png",
+        "width": 912,
+        "height": 729
+      }
+    },
+    "connect/14-wizard-targets": {
+      "light-ru": {
+        "file": "14-wizard-targets.png",
+        "width": 912,
+        "height": 1222
+      },
+      "light-en": {
+        "file": "14-wizard-targets.en.png",
+        "width": 912,
+        "height": 1222
+      }
+    },
+    "connect/15-wizard-gateway": {
+      "light-ru": {
+        "file": "15-wizard-gateway.png",
+        "width": 912,
+        "height": 1222
+      },
+      "light-en": {
+        "file": "15-wizard-gateway.en.png",
+        "width": 912,
+        "height": 1222
+      }
+    },
+    "connect/16-panel-card": {
+      "light-ru": {
+        "file": "16-panel-card.png",
+        "width": 1280,
+        "height": 820
+      },
+      "light-en": {
+        "file": "16-panel-card.en.png",
+        "width": 1280,
+        "height": 820
+      }
+    },
+    "connect/18-panel-delete": {
+      "light-ru": {
+        "file": "18-panel-delete.png",
+        "width": 452,
+        "height": 381
+      },
+      "light-en": {
+        "file": "18-panel-delete.en.png",
+        "width": 452,
+        "height": 362
+      }
+    },
+    "media/01-capability-row": {
+      "light-ru": {
+        "file": "01-capability-row.png",
+        "width": 932,
+        "height": 49
+      },
+      "light-en": {
+        "file": "01-capability-row.en.png",
+        "width": 932,
+        "height": 49
+      }
+    },
+    "media/02-mode-menu": {
+      "light-ru": {
+        "file": "02-mode-menu.png",
+        "width": 388,
+        "height": 278
+      },
+      "light-en": {
+        "file": "02-mode-menu.en.png",
+        "width": 388,
+        "height": 260
+      }
+    },
+    "route/01-model-card": {
+      "light-ru": {
+        "file": "01-model-card.png",
+        "width": 988,
+        "height": 611
+      },
+      "light-en": {
+        "file": "01-model-card.en.png",
+        "width": 988,
+        "height": 611
+      }
+    },
+    "route/02-chat-header": {
+      "light-ru": {
+        "file": "02-chat-header.png",
+        "width": 1280,
+        "height": 900
+      },
+      "light-en": {
+        "file": "02-chat-header.en.png",
+        "width": 1280,
+        "height": 900
+      }
+    },
+    "rules/01-rules-panel": {
+      "light-ru": {
+        "file": "01-rules-panel.png",
+        "width": 930,
+        "height": 394
+      },
+      "light-en": {
+        "file": "01-rules-panel.en.png",
+        "width": 930,
+        "height": 334
+      }
+    },
+    "rules/02-rules-ours": {
+      "light-ru": {
+        "file": "02-rules-ours.png",
+        "width": 930,
+        "height": 825
+      },
+      "light-en": {
+        "file": "02-rules-ours.en.png",
+        "width": 930,
+        "height": 789
+      }
+    },
+    "rules/03-rules-conflicts": {
+      "light-ru": {
+        "file": "03-rules-conflicts.png",
+        "width": 930,
+        "height": 346
+      },
+      "light-en": {
+        "file": "03-rules-conflicts.en.png",
+        "width": 930,
+        "height": 346
+      }
+    },
+    "scripted/01-shim-call": {
+      "light-ru": {
+        "file": "01-shim-call.png",
+        "width": 1280,
+        "height": 1000
+      },
+      "light-en": {
+        "file": "01-shim-call.en.png",
+        "width": 1280,
+        "height": 1000
+      }
+    },
+    "scripted/02-shim-quote": {
+      "light-ru": {
+        "file": "02-shim-quote.png",
+        "width": 1280,
+        "height": 1000
+      },
+      "light-en": {
+        "file": "02-shim-quote.en.png",
+        "width": 1280,
+        "height": 1000
+      }
+    },
+    "scripted/03-shim-card": {
+      "light-ru": {
+        "file": "03-shim-card.png",
+        "width": 988,
+        "height": 245
+      },
+      "light-en": {
+        "file": "03-shim-card.en.png",
+        "width": 988,
+        "height": 245
+      }
+    },
+    "scripted/04-image-menu": {
+      "light-ru": {
+        "file": "04-image-menu.png",
+        "width": 388,
+        "height": 242
+      },
+      "light-en": {
+        "file": "04-image-menu.en.png",
+        "width": 388,
+        "height": 242
+      }
+    },
+    "scripted/05-image-card": {
+      "light-ru": {
+        "file": "05-image-card.png",
+        "width": 1680,
+        "height": 900
+      },
+      "light-en": {
+        "file": "05-image-card.en.png",
+        "width": 1680,
+        "height": 900
+      }
+    },
+    "scripted/06-switch-button": {
+      "light-ru": {
+        "file": "06-switch-button.png",
+        "width": 988,
+        "height": 699
+      },
+      "light-en": {
+        "file": "06-switch-button.en.png",
+        "width": 988,
+        "height": 699
+      }
+    },
+    "scripted/07-smoke-red": {
+      "light-ru": {
+        "file": "07-smoke-red.png",
+        "width": 988,
+        "height": 920
+      },
+      "light-en": {
+        "file": "07-smoke-red.en.png",
+        "width": 988,
+        "height": 862
+      }
+    }
+  }
+}

@@ -6,15 +6,14 @@ import { readRules, saveRule } from './rules.ts';
 import { AppStore } from '../lib/app-store.ts';
 
 /**
- * Регрессия настоящей потери данных, найденной на живом CLAUDE.md.
+ * Выключение правила не равно удалению — регрессия настоящей потери данных,
+ * найденной на живом CLAUDE.md (текст выключенного правила стирала следующая
+ * перезапись файла).
  *
- * Выключенное правило уезжает в служебный раздел файла, и панель обещает, что
- * текст сохранён. Но разбор пропускал содержимое этого раздела целиком:
- * правило исчезало из списка, а сборка файла идёт из того же списка — значит
- * следующая перезапись стирала правило насовсем.
- *
- * Порядок такой: выключить → перечитать → перезаписать по другому поводу →
- * убедиться, что текст на месте и правило можно включить обратно.
+ * С F1 (решение владельца 27.09) выключенное правило в CLAUDE.md НЕ лежит вовсе:
+ * его текст держит состояние панели. Порядок проверки прежний: выключить →
+ * перечитать → перезаписать по другому поводу → убедиться, что текст цел и
+ * правило включается обратно.
  */
 describe('Выключенные правила не теряются', () => {
   let dir: string;
@@ -61,9 +60,25 @@ describe('Выключенные правила не теряются', () => {
     expect(rules.find((rule) => rule.id === 'pervoe')?.isEnabled).toBe(false);
   });
 
-  it('текст выключенного правила сохраняется дословно', () => {
+  it('F1: выключенного правила в CLAUDE.md нет — ни заголовка, ни текста', () => {
     disable('pervoe');
 
+    const markdown = readFileSync(claudeMd, 'utf8');
+    expect(markdown).not.toContain('первое');
+    expect(markdown).not.toContain('Текст первого правила.');
+    expect(markdown).not.toContain('Отключённые правила');
+    expect(markdown).toBe('# Правила\n\n## ПРАВИЛО: второе\n\nТекст второго правила.\n');
+  });
+
+  it('F1: текст выключенного правила лежит в state.json дословно', () => {
+    disable('pervoe');
+
+    const onDisk = JSON.parse(readFileSync(join(dir, 'agentdeck', 'state.json'), 'utf8')) as {
+      disabledRules?: Array<{ title: string; body: string }>;
+    };
+    expect(onDisk.disabledRules).toEqual([
+      expect.objectContaining({ title: 'первое', body: 'Текст первого правила.' }),
+    ]);
     const rule = readRules(claudeMd, store).find((item) => item.id === 'pervoe');
     expect(rule?.body).toBe('Текст первого правила.');
   });
@@ -75,31 +90,27 @@ describe('Выключенные правила не теряются', () => {
     const second = readRules(claudeMd, store).find((item) => item.id === 'vtoroe');
     saveRule(claudeMd, 'vtoroe', { ...second!, body: 'Изменённый текст.' }, store);
 
-    const markdown = readFileSync(claudeMd, 'utf8');
-    expect(markdown).toContain('Текст первого правила.');
-    expect(readRules(claudeMd, store).map((rule) => rule.id)).toContain('pervoe');
+    const kept = readRules(claudeMd, store).find((rule) => rule.id === 'pervoe');
+    expect(kept?.body).toBe('Текст первого правила.');
+    expect(kept?.isEnabled).toBe(false);
+    // Новое хранилище над тем же каталогом — то, что увидит панель после перезапуска.
+    const reopened = new AppStore(join(dir, 'agentdeck'));
+    expect(readRules(claudeMd, reopened).find((rule) => rule.id === 'pervoe')?.body).toBe(
+      'Текст первого правила.',
+    );
   });
 
-  it('правило включается обратно и возвращается в основной раздел', () => {
+  it('F2: включённое правило возвращается на прежнее место — файл байт в байт', () => {
     disable('pervoe');
 
-    // Так же, как это делает маршрут: состояние передаётся явно, потому что
-    // при чтении оно определяется расположением правила в файле.
+    // Так же, как это делает маршрут: состояние передаётся явно.
     store.setEnabled('rule', 'pervoe', true);
     const rule = readRules(claudeMd, store).find((item) => item.id === 'pervoe');
     saveRule(claudeMd, 'pervoe', { ...rule!, isEnabled: true }, store);
 
-    const markdown = readFileSync(claudeMd, 'utf8');
-    expect(markdown).toContain('## ПРАВИЛО: первое');
-    expect(markdown).not.toContain('Отключённые правила');
+    expect(readFileSync(claudeMd, 'utf8')).toBe(ORIGINAL);
+    expect(store.getDisabledRules()).toEqual([]);
     expect(readRules(claudeMd, store).find((item) => item.id === 'pervoe')?.isEnabled).toBe(true);
-  });
-
-  it('пояснение служебного раздела не прилипает к тексту правила', () => {
-    disable('pervoe');
-
-    const rule = readRules(claudeMd, store).find((item) => item.id === 'pervoe');
-    expect(rule?.body).not.toMatch(/выключены в приложении/);
   });
 
   it('одноимённые правила и после выключения различаются по id', () => {
@@ -115,8 +126,8 @@ describe('Выключенные правила не теряются', () => {
     const sameTitle = rules.filter((rule) => rule.title === 'первое');
     expect(sameTitle).toHaveLength(2);
     expect(new Set(sameTitle.map((rule) => rule.id)).size).toBe(2);
-    // Оба текста на месте: ни один не съеден.
+    // Оба текста целы: один в файле, другой в состоянии панели.
     expect(readFileSync(claudeMd, 'utf8')).toContain('Дубль с другим текстом.');
-    expect(readFileSync(claudeMd, 'utf8')).toContain('Текст первого правила.');
+    expect(sameTitle.map((rule) => rule.body)).toContain('Текст первого правила.');
   });
 });

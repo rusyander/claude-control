@@ -2,7 +2,9 @@ import { readdirSync, statSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ChatSummary, ChatMessage, ChatMessagesPage } from '@agentdeck/contracts';
 import { isSandboxPath } from './ChatArtifacts.ts';
+import { attachAutoPicks, autoPickResults, rememberAsks, type AskSeen } from './auto-pick.ts';
 import { layoutForCwd } from '../project-git/copy-readiness.ts';
+import { findSecretSpans, SECRET_MASK } from '../../lib/secret-mask.ts';
 import {
   FULL_READ_LIMIT,
   fileSessionId,
@@ -66,6 +68,23 @@ const cache = new Map<string, CacheEntry>();
  * Список чатов. Разговоры лежат в подкаталогах по проектам; вложенные папки
  * с ветками субагентов пропускаем — в списке нужны только сами сессии.
  */
+/** Длина заголовка из первой реплики. */
+const TITLE_MAX = 70;
+
+/**
+ * Заголовок из первой реплики — её первые `TITLE_MAX` символов. Ключ, который разрез
+ * рассекает, уходит маской целиком (ревью U0, m2, 28.09.2026): обрезок короче порогов
+ * детектора, и маска модели (`maskedTitle`) его уже не узнаёт. Ключ, целиком стоящий
+ * до разреза, остаётся как был: его прячет маска модели, а человеку список показывает
+ * его собственные слова.
+ */
+function cutTitle(text: string): string {
+  if (text.length <= TITLE_MAX) return text;
+  const cut = findSecretSpans(text).find((span) => span.start < TITLE_MAX && span.end > TITLE_MAX);
+  if (!cut) return text.slice(0, TITLE_MAX);
+  return `${text.slice(0, Math.min(cut.start, TITLE_MAX - SECRET_MASK.length))}${SECRET_MASK}`;
+}
+
 export function readChats(projectsDir: string): ChatSummary[] {
   if (!existsSync(projectsDir)) return [];
 
@@ -109,7 +128,7 @@ function readSummary(path: string, projectName: string): ChatSummary | undefined
   // строки несут каталог оболочки агента: после `cd sub/dir` чат «уезжал» в
   // подпапку, а продолжение из неё заводило новую папку проекта у CLI.
   const projectPath = firstValue(records, (record) => record.cwd) ?? '';
-  const ownTitle = title?.trim() || chatTitleText(records).slice(0, 70);
+  const ownTitle = title?.trim() || cutTitle(chatTitleText(records));
 
   const summary: ChatSummary = {
     id: fileSessionId(path),
@@ -188,6 +207,7 @@ export async function readChatMessages(
   // стоял свой бейдж с тем же самым расходом — в разы больше, чем потрачено.
   // Расход берём из последней строки хода: все они несут одинаковый.
   let tailId: string | undefined;
+  const asks = new Map<string, AskSeen>();
 
   for await (const line of streamLines(path)) {
     const trimmed = line.trim();
@@ -200,10 +220,13 @@ export async function readChatMessages(
       continue;
     }
 
+    // Автовыбор узнаётся по `tool_result` — строке, которую отсев ниже прячет.
+    if (record.type === 'user') attachAutoPicks(asks, record.message?.content);
     if (!isDialogMessage(record)) continue;
 
     const blocks = toBlocks(record);
     if (blocks.length === 0) continue;
+    if (record.type === 'assistant') rememberAsks(asks, record.message?.content, blocks);
 
     const messageId = record.type === 'assistant' ? record.message?.id : undefined;
     const tail = ring.at(-1);
@@ -328,7 +351,10 @@ export function readLastAssistantTurn(
   let turnId: string | undefined;
   let parts: string[] = [];
   let calledTool = false;
-  let asked = false;
+  // Вопросы без ответа — поимённо: автовыбор закрывает СВОЙ вызов, и второй
+  // вопрос того же хода, оставшийся человеку, ждать не перестаёт. Вызов без id
+  // автовыбором не закрыть — он висит до реплики человека.
+  const asked = new Set<string>();
   // Последняя осмысленная запись — ход агента. Пока false, накопленное не в счёт.
   let closing = false;
 
@@ -340,7 +366,9 @@ export function readLastAssistantTurn(
     if (isSyntheticReply(record)) continue;
     if (record.type === 'user' || record.isApiErrorMessage) {
       closing = false;
-      if (record.type === 'user' && isHumanPrompt(record.message.content)) asked = false;
+      if (record.type === 'user' && isHumanPrompt(record.message.content)) asked.clear();
+      // Вопрос закрыт автономией — человека он не ждёт.
+      for (const pick of autoPickResults(record.message.content)) asked.delete(pick.toolUseId);
       continue;
     }
 
@@ -360,7 +388,7 @@ export function readLastAssistantTurn(
         if (block.type === 'text' && block.text?.trim()) parts.push(block.text);
         else if (block.type === 'tool_use') {
           calledTool = true;
-          if (block.name === 'AskUserQuestion') asked = true;
+          if (block.name === 'AskUserQuestion') asked.add(block.id || `unkeyed:${asked.size}`);
         }
       }
     }
@@ -370,7 +398,7 @@ export function readLastAssistantTurn(
   if (!closing || calledTool) return undefined;
   // Хвостом, как копит текст реестр прогонов: разборщикам нужен конец ответа.
   const text = parts.join('\n').trim().slice(-cap);
-  return text ? { text, ...(asked ? { asked: true } : {}) } : undefined;
+  return text ? { text, ...(asked.size > 0 ? { asked: true } : {}) } : undefined;
 }
 
 /** Закрывающий ход усыновлённого прогона: текст и вопрос инструментом. */

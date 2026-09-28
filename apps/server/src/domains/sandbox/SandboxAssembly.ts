@@ -45,51 +45,59 @@ export function createSandbox(
       { reason: wiped.error },
     );
 
-  mkdirSync(configDir, { recursive: true });
-  mkdirSync(workDir, { recursive: true });
+  // Всё, что ниже, пишет в песочницу копию доступа к аккаунту: сборка, упавшая на
+  // середине (скилл не скопировался, настройки не записались), не оставляет
+  // `.credentials.json` лежать на диске до подметания — корень сносится сразу.
+  try {
+    mkdirSync(configDir, { recursive: true });
+    mkdirSync(workDir, { recursive: true });
 
-  // Источник токена зависит от системы: файл на Windows и Linux, связка ключей
-  // на macOS. Не нашлось — песочницу всё равно собираем: пусть человек увидит
-  // внятную причину в интерфейсе, а не «Not logged in» из недр CLI.
-  const credentials = readClaudeCredentials(location.paths.root);
-  if (credentials.content) {
-    // Именно writeSecretFile: это копия настоящего доступа к аккаунту, и она
-    // не должна ни мгновения лежать с правами по умолчанию.
-    writeSecretFile(join(configDir, '.credentials.json'), credentials.content);
+    // Источник токена зависит от системы: файл на Windows и Linux, связка ключей
+    // на macOS. Не нашлось — песочницу всё равно собираем: пусть человек увидит
+    // внятную причину в интерфейсе, а не «Not logged in» из недр CLI.
+    const credentials = readClaudeCredentials(location.paths.root);
+    if (credentials.content) {
+      // Именно writeSecretFile: это копия настоящего доступа к аккаунту, и она
+      // не должна ни мгновения лежать с правами по умолчанию.
+      writeSecretFile(join(configDir, '.credentials.json'), credentials.content);
+    }
+
+    const description: SandboxDescription = {
+      rules: writeRules(configDir, selection, location, store),
+      skills: copySkills(configDir, selection, location, store),
+      scripts: [],
+      hooks: [],
+      mcpServers: [],
+    };
+
+    copyScripts(configDir, selection, location, description);
+
+    const settings = buildSettings(configDir, selection, location, store, description);
+    writeFileSync(join(configDir, 'settings.json'), JSON.stringify(settings, null, 2), 'utf8');
+
+    return {
+      id,
+      configDir,
+      workDir,
+      description,
+      credentials: { source: credentials.source, reason: credentials.reason },
+      // Окружение запуска этой песочницы. Рабочая папка едет здесь, а не через
+      // глобальный process.env: раньше collectHooks писал её в process.env сервера,
+      // и при параллельной сборке двух песочниц значение протекало во все
+      // последующие дочерние процессы (побеждала последняя). Здесь оно привязано к
+      // конкретной песочнице. Ключ API файлом не кладётся — Claude Code читает его
+      // из окружения.
+      env: {
+        [brandEnvName('SANDBOX_WORKDIR')]: workDir,
+        // Прежнее имя — для хуков, написанных до переименования продукта.
+        [legacyEnvName('SANDBOX_WORKDIR')]: workDir,
+        ...(credentials.apiKey ? { ANTHROPIC_API_KEY: credentials.apiKey } : {}),
+      },
+    };
+  } catch (error) {
+    removeTree(root);
+    throw error;
   }
-
-  const description: SandboxDescription = {
-    rules: writeRules(configDir, selection, location, store),
-    skills: copySkills(configDir, selection, location, store),
-    scripts: [],
-    hooks: [],
-    mcpServers: [],
-  };
-
-  copyScripts(configDir, selection, location, description);
-
-  const settings = buildSettings(configDir, selection, location, store, description);
-  writeFileSync(join(configDir, 'settings.json'), JSON.stringify(settings, null, 2), 'utf8');
-
-  return {
-    id,
-    configDir,
-    workDir,
-    description,
-    credentials: { source: credentials.source, reason: credentials.reason },
-    // Окружение запуска этой песочницы. Рабочая папка едет здесь, а не через
-    // глобальный process.env: раньше collectHooks писал её в process.env сервера,
-    // и при параллельной сборке двух песочниц значение протекало во все
-    // последующие дочерние процессы (побеждала последняя). Здесь оно привязано к
-    // конкретной песочнице. Ключ API файлом не кладётся — Claude Code читает его
-    // из окружения.
-    env: {
-      [brandEnvName('SANDBOX_WORKDIR')]: workDir,
-      // Прежнее имя — для хуков, написанных до переименования продукта.
-      [legacyEnvName('SANDBOX_WORKDIR')]: workDir,
-      ...(credentials.apiKey ? { ANTHROPIC_API_KEY: credentials.apiKey } : {}),
-    },
-  };
 }
 
 /**

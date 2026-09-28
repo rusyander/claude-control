@@ -5,7 +5,7 @@ import { Button, Card, Empty, Field, Loading, Mono, Muted, Row, Screen } from '.
 import { colors, font, space } from '../src/shared/config/theme';
 import { useT } from '../src/shared/config/i18n';
 import { newChatId, openChat, useWorkspace } from '../src/shared/lib/workspace';
-import { useRuns, visibleStatus } from '../src/shared/lib/runs';
+import { runNamed, useRuns, visibleStatus } from '../src/shared/lib/runs';
 import { useChats } from '../src/entities/chat/api';
 
 /**
@@ -34,7 +34,10 @@ export default function ChatsScreen() {
 
   const open = (id: string, projectPath: string): void => {
     openChat(id, projectPath);
-    router.back();
+    // Сюда приходят и из чата, и с главной. Из чата — вернуться в него же, с
+    // главной — встать на место списка: стрелка чата тогда ведёт на главную,
+    // а не обратно в список.
+    router.dismissTo('/chat');
   };
 
   return (
@@ -62,7 +65,8 @@ export default function ChatsScreen() {
         {!chats.isLoading && visible.length === 0 ? <Empty text={t.chats.nothing} /> : null}
 
         {visible.slice(0, 100).map((chat) => {
-          const run = runs.find((item) => item.id === chat.id);
+          // Ход со стола идёт под `new-…`, а строка списка названа сессией.
+          const run = runNamed(runs, chat.id);
           const status = run ? visibleStatus(run) : '';
           return (
             <Pressable key={chat.id} onPress={() => open(chat.id, chat.projectPath)}>

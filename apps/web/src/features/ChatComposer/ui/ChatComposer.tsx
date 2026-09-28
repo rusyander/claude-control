@@ -9,7 +9,8 @@ import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { UPLOAD_ACCEPT_ATTRIBUTE } from '@agentdeck/contracts/uploads';
-import { planAttach, toAttachedFile } from '../lib/attachments';
+import { carriesFiles, filesOf } from '@shared/lib/attach';
+import { hasRejections, pastedNames, planAttach, toAttachedFile } from '../lib/attachments';
 import { ChatModeMenu } from './ChatModeMenu';
 import type { AttachedFile, ChatComposerProps, ComposerMode } from './ChatComposer.types';
 import styles from './ChatComposer.module.scss';
@@ -89,14 +90,16 @@ export function ChatComposer({
     input.style.height = `${input.scrollHeight}px`;
   }, [value]);
 
-  const attach = async (list: FileList | null): Promise<void> => {
-    if (!list) return;
+  const attach = async (list: readonly File[]): Promise<void> => {
+    if (list.length === 0) return;
 
     // Слишком большой файл раньше отсеивался молча: чип не появлялся, сообщения
-    // не было — отличить это от сломанного перетаскивания было нельзя. Отказ
-    // уходит тем же путём, что и отказ по типу файла: сообщением от страницы.
+    // не было — отличить это от сломанного перетаскивания было нельзя. Отказ по
+    // размеру и по типу уходит одним путём: сообщением от страницы.
     const plan = planAttach([...list]);
-    if (plan.rejected.length > 0) onRejectFiles?.(plan.rejected);
+    if (hasRejections(plan)) {
+      onRejectFiles?.({ unsupported: plan.unsupported, tooLarge: plan.tooLarge });
+    }
     if (plan.accepted.length === 0) return;
 
     const attached = await Promise.all(plan.accepted.map(toAttachedFile));
@@ -204,14 +207,39 @@ export function ChatComposer({
       <div
         className={`${styles.box} ${isDragging ? styles.boxDragging : ''}`}
         onDragOver={(event: DragEvent) => {
+          // Перетаскивают текст — это обычная правка поля, не вложение.
+          if (!carriesFiles(event.dataTransfer)) return;
           event.preventDefault();
           setIsDragging(true);
         }}
         onDragLeave={() => setIsDragging(false)}
         onDrop={(event: DragEvent) => {
-          event.preventDefault();
           setIsDragging(false);
-          void attach(event.dataTransfer.files);
+          const dropped = filesOf(event.dataTransfer);
+          if (dropped.length === 0) return;
+          event.preventDefault();
+          // В режиме картинки или презентации чипов нет (как и у вставки): файл,
+          // брошенный сюда, был бы не виден и ушёл бы со следующим сообщением.
+          if (isMedia) return;
+          void attach(dropped);
+        }}
+        // Вставка Ctrl+V: снимок экрана из буфера ложится чипом, как перетащенный.
+        // Раньше вставка файла в чате не делала ничего. Текст вставляется как обычно.
+        onPasteCapture={(event) => {
+          const pasted = filesOf(event.clipboardData);
+          if (pasted.length === 0 || isMedia) return;
+          event.preventDefault();
+          const names = pastedNames(
+            pasted,
+            files.map((item) => item.name),
+            new Date(),
+          );
+          void attach(
+            pasted.map((file, index) => {
+              const name = names[index] ?? file.name;
+              return name === file.name ? file : new File([file], name, { type: file.type });
+            }),
+          );
         }}
       >
         {files.length > 0 && !isMedia && (
@@ -337,7 +365,13 @@ export function ChatComposer({
               multiple
               className={styles.hiddenInput}
               accept={UPLOAD_ACCEPT_ATTRIBUTE}
-              onChange={(event: ChangeEvent<HTMLInputElement>) => void attach(event.target.files)}
+              data-chat-attach-input
+              onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                const picked = Array.from(event.target.files ?? []);
+                // Тот же файл второй раз подряд — снова событие.
+                event.target.value = '';
+                void attach(picked);
+              }}
             />
             {/* Разделить задачи можно и задним числом: агент предлагает это сам
                 только на трёх и более независимых задачах, а спросить вправе

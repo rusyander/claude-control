@@ -34,9 +34,9 @@ function commandsOf(prompt: string): string[] {
   return [...prompt.matchAll(/`(git [^`]+)`/g)].map((match) => match[1] ?? '');
 }
 
-/** Исполнить команду из задания: `<основная>` — имя основной, как его назвал бы агент. */
+/** Исполнить команду из задания: `<main>` — имя основной, как его назвал бы агент. */
 function runFromPrompt(cwd: string, command: string, main: string): string {
-  const args = command.replace('<основная>', main).split(/\s+/).slice(1);
+  const args = command.replace('<main>', main).split(/\s+/).slice(1);
   return git(cwd, ...args);
 }
 
@@ -102,24 +102,24 @@ describe('задание доставки отставшей отправлен�
     const leased = commandsOf(prompt).filter((command) => command.includes('--force-with-lease'));
 
     expect(leased).toEqual([`git push --force-with-lease origin ${BRANCH}`]);
-    expect(prompt).toContain('только свою ветку группы');
-    expect(prompt).toContain('никогда основную, защищённую или ветку другой группы');
+    expect(prompt).toContain('only your own group branch');
+    expect(prompt).toContain("never the main, a protected or another group's branch");
   });
 
   it('конфликт такого rebase — вопрос человеку, а не решение звена', () => {
     const prompt = deliverStagePrompt({ branch: BRANCH, after: 'fix' });
 
-    expect(prompt).toMatch(/конфликт этого rebase: [^\n]*AskUserQuestion/);
+    expect(prompt).toMatch(/conflict of that rebase: [^\n]*AskUserQuestion/);
     expect(prompt).toContain('git rebase --abort');
   });
 
   it('преамбула группы без звена доставки разрешает то же и так же узко', () => {
     const preamble = deliveryPreamble({ branch: BRANCH });
 
-    expect(preamble).toContain('git push --force-with-lease origin <ветка группы>');
-    expect(preamble).toContain('никогда основную, защищённую или ветку другой группы');
-    expect(preamble).toMatch(/конфликт при таком rebase — вопрос человеку/);
-    expect(preamble).not.toContain('Слияние, удаление веток и force-push по-прежнему запрещены');
+    expect(preamble).toContain('git push --force-with-lease origin <group branch>');
+    expect(preamble).toContain("never the main, a protected branch or another group's branch");
+    expect(preamble).toMatch(/a conflict in such a rebase is a question to the human/);
+    expect(preamble).not.toContain('Merging, deleting branches and force-push are still forbidden');
   });
 
   it('чужому CLI — вопрос человеку без инструмента, которого у него нет', () => {

@@ -3,6 +3,9 @@ import type {
   ProjectTestBulkInput,
   ProjectTestCaseInput,
   ProjectTestDraftSummary,
+  ProjectTestE2eFolder,
+  ProjectTestE2eRun,
+  ProjectTestAutomationCommand,
   ProjectTestEnvironment,
   ProjectTestGroup,
   ProjectTestLibraryIssue,
@@ -28,6 +31,7 @@ import {
   useSaveTestEnvironment,
   useSaveTestSchema,
   useSaveTestView,
+  useUpdateTestGroup,
   useSetTestDraftAuto,
   useStartTestRun,
   useTestLint,
@@ -90,13 +94,21 @@ export interface TestsBoard {
   saveCase: (groupId: string, testCase: ProjectTestCaseInput) => Promise<unknown>;
   removeCase: (groupId: string, caseId: string) => void;
   bulk: (payload: ProjectTestBulkInput) => Promise<unknown>;
-  addGroup: (id: string, title?: string) => Promise<unknown>;
+  addGroup: (id: string, title?: string, description?: string) => Promise<unknown>;
+  /** Название и описание группы; идентификатор (имя файла) не меняется. */
+  updateGroup: (id: string, title?: string, description?: string) => Promise<unknown>;
   removeGroup: (id: string) => void;
   saveEnvironment: (environment: ProjectTestEnvironment) => Promise<unknown>;
   /** Знает ли о кейсах обычный разговор — то есть вписаны ли они в CLAUDE.md. */
   hasConvention: boolean;
   installConvention: () => void;
   branch?: string;
+  /** Папка настоящих автотестов проекта; нет в ответе — старый сервер. */
+  e2e?: ProjectTestE2eFolder;
+  /** Прогон автотестов папки панелью: идёт или последний итог. */
+  e2eRun?: ProjectTestE2eRun;
+  /** Своя команда прогона проекта (`.agent/tests/automation.json`); нет — только папка e2e. */
+  automation?: ProjectTestAutomationCommand;
   /** Черновики генерации строкой: по ним рисуется плашка «предложения ждут». */
   drafts: ProjectTestDraftSummary[];
   /** Непринятый черновик — тот, ради которого человек сюда и вернулся. */
@@ -182,6 +194,7 @@ export function useTestsBoard(projectPath: string | undefined, isOpen: boolean):
   useEffect(() => setBudget(undefined), [filters.filter, filters.withFindings]);
 
   const create = useCreateTestGroup(projectPath);
+  const rename = useUpdateTestGroup(projectPath);
   const drop = useRemoveTestGroup(projectPath);
   const save = useSaveTestCase(projectPath);
   const erase = useRemoveTestCase(projectPath);
@@ -272,15 +285,9 @@ export function useTestsBoard(projectPath: string | undefined, isOpen: boolean):
     plans: tests.data?.plans ?? [],
     run: tests.data?.run,
     isBusy: create.isPending || drop.isPending || save.isPending || start.isPending,
-    error: messageOf(
-      create.error ??
-        drop.error ??
-        save.error ??
-        erase.error ??
-        bulk.error ??
-        start.error ??
-        stop.error,
-    ),
+    // Отказ создания группы и сохранения кейса сюда не попадает: его
+    // показывает сама форма, а строка пульта держала бы его и после «Отмены».
+    error: messageOf(drop.error ?? erase.error ?? bulk.error ?? start.error ?? stop.error),
     start: (payload) => {
       setChecked([]);
       start.mutate(payload);
@@ -293,12 +300,22 @@ export function useTestsBoard(projectPath: string | undefined, isOpen: boolean):
       setChecked([]);
       return result;
     },
-    addGroup: (id, title) => create.mutateAsync({ id, title }),
+    // Заведённая группа сразу становится вкладкой: иначе следующий «Добавить
+    // тест» уходил в прежнюю, а новая оставалась где-то в ряду вкладок.
+    addGroup: async (id, title, description) => {
+      const result = await create.mutateAsync({ id, title, description });
+      select(id);
+      return result;
+    },
+    updateGroup: (id, title, description) => rename.mutateAsync({ id, title, description }),
     removeGroup: (id) => drop.mutate(id),
     saveEnvironment: (environment) => saveEnvironment.mutateAsync(environment),
     hasConvention: tests.data?.hasConvention ?? false,
     installConvention: () => convention.mutate(undefined as never),
     branch: tests.data?.branch,
+    e2e: tests.data?.e2e,
+    e2eRun: tests.data?.e2eRun,
+    automation: tests.data?.automation,
     drafts,
     pendingDraft: drafts.find((item) => item.status === 'pending'),
     autoAcceptDrafts: tests.data?.autoAcceptDrafts ?? false,

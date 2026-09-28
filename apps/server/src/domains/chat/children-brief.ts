@@ -1,4 +1,5 @@
 import type { SplitPlanView } from '@agentdeck/contracts/chat-handoff';
+import { localizeText } from '../../lib/server-texts.ts';
 
 /**
  * Сводка детей для хода родителя (Д6).
@@ -21,64 +22,66 @@ const ANY_BLOCK = new RegExp(`<${TAG}>[\\s\\S]*?</${TAG}>\\s*`, 'g');
 const TAIL_LIMIT = 240;
 
 const STATUS: Record<SplitPlanView['groups'][number]['status'], string> = {
-  pending: 'ждёт итога разбора',
-  waiting: 'ждёт конца предшественников',
-  held: 'ждёт ответа человека на вопрос разбора',
-  started: 'работает',
-  awaiting: 'ждёт человека',
-  background: 'ход кончился, идёт фоновая команда',
-  done: 'закончила',
-  failed: 'сбой',
-  paused: 'на паузе — её остановил человек',
+  pending: 'waits for the triage result',
+  waiting: 'waits for its predecessors to finish',
+  held: "waits for the human's answer to the triage question",
+  started: 'working',
+  awaiting: 'waits for the human',
+  background: 'turn ended, a background command is running',
+  done: 'finished',
+  failed: 'failed',
+  paused: 'paused — the human stopped it',
 };
 
 const WAIT: Record<NonNullable<SplitPlanView['groups'][number]['waitingFor']>, string> = {
-  question: 'задала вопрос и ждёт ответа',
-  decision: 'ждёт решения по ревью',
-  'review-missing': 'ревью кончилось без итога',
-  background: 'ждёт фоновую команду',
-  retry: 'ждёт повтора после сбоя',
-  delivery: 'панель проверяет доставку по git (ветка, MR)',
-  interrupted: 'процесс оборвался посреди хода — ждёт продолжения',
-  limit: 'упёрлась в лимит подписки — продолжится после сброса',
+  question: 'asked a question and waits for the answer',
+  decision: 'waits for a decision on the review',
+  'review-missing': 'the review ended without a summary',
+  background: 'waits for a background command',
+  retry: 'waits for a retry after a failure',
+  delivery: 'the panel is checking the delivery against git (branch, MR)',
+  interrupted: 'the process broke off mid-turn — waits to be continued',
+  limit: 'hit the subscription limit — continues after the reset',
 };
 
 const RESULT: Record<NonNullable<SplitPlanView['groups'][number]['result']>['kind'], string> = {
-  reviewed: 'только проверка, правок не было',
-  changed: 'правки внесены',
-  unchanged: 'правок в копии нет',
-  pushed: 'правки отправлены',
+  reviewed: 'check only, no edits',
+  changed: 'edits made',
+  unchanged: 'no edits in the copy',
+  pushed: 'edits pushed',
 };
 
 export function childrenBrief(split: SplitPlanView | undefined): string | undefined {
   if (!split || split.groups.length === 0) return undefined;
   const lines = split.groups.map((group, position) => {
     const where = [
-      group.branch ? `ветка ${group.branch}` : '',
-      group.path ? `копия ${group.path}` : '',
-      group.chatId ? `чат ${group.chatId}` : 'чата ещё нет',
+      group.branch ? `branch ${group.branch}` : '',
+      group.path ? `copy ${group.path}` : '',
+      group.chatId ? `chat ${group.chatId}` : 'no chat yet',
     ].filter(Boolean);
     const state = [
       group.status === 'failed' && group.error
-        ? `${STATUS.failed}: ${group.error}` +
-          (group.retries ? ` (панель повторяла ход: ${group.retries})` : '')
+        ? // Ошибка — текст сервера (русский, с кодом): модели — его английская сторона.
+          `${STATUS.failed}: ${localizeText(group.error, 'en')}` +
+          (group.retries ? ` (the panel retried the turn: ${group.retries})` : '')
         : STATUS[group.status],
       group.waitingFor ? WAIT[group.waitingFor] : '',
       group.result
         ? RESULT[group.result.kind] +
-          (group.result.commits ? `, коммитов: ${group.result.commits}` : '')
+          (group.result.commits ? `, commits: ${group.result.commits}` : '')
         : '',
     ].filter(Boolean);
-    const tail = group.tail ? ` Последний ответ: «${clip(group.tail)}»` : '';
-    return `${position + 1}. «${group.title}» (${where.join(', ')}) — ${state.join('; ')}.${tail}`;
+    const tail = group.tail ? ` Last answer: "${clip(group.tail)}"` : '';
+    return `${position + 1}. "${group.title}" (${where.join(', ')}) — ${state.join('; ')}.${tail}`;
   });
   return [
     `<${TAG}>`,
-    'Работа этого разговора отдана группам разделения — у каждой своя копия и свой чат. ' +
-      'Сам её не делай: ни правок, ни новых копий и веток. О состоянии отвечай по этой ' +
-      'сводке. Нужно что-то сказать группе — выведи блок ```agentdeck:tell N``` (N — номер ' +
-      'группы ниже) с текстом внутри: панель доставит его в чат группы в конце твоего ' +
-      'хода, а занятой группе — после её хода.',
+    'The work of this conversation was handed to split groups — each has its own copy and its ' +
+      'own chat. Do not do it yourself: no edits, no new copies or branches. Answer about the ' +
+      'state from this summary. To tell a group something, output a block ```agentdeck:tell N``` ' +
+      '(N is the group number below) with the text inside: the panel delivers it to the group ' +
+      'chat at the end of your turn, and to a busy group after its turn. Answer the human in the ' +
+      'language they write in.',
     ...lines,
     `</${TAG}>`,
   ].join('\n');

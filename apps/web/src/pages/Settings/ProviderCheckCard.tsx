@@ -90,7 +90,7 @@ export function ProviderCheckCard() {
 
         {/* Ширина по мере читаемости: без ограничения текст растягивается на всю
             карточку и читается хуже (ловится аудитом раскладки). */}
-        <Typography variant="body-sm" color="subtle" style={{ maxWidth: 'var(--text-measure)' }}>
+        <Typography variant="body-sm" color="subtle" className="prose">
           {t('providerCheck.hint')}
         </Typography>
 

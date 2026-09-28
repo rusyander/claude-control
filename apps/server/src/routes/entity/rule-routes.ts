@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { RuleDraft } from '@agentdeck/contracts';
 import type { ServerContext } from '../../context.ts';
-import { readRules, saveRule, deleteRule } from '../../domains/rules.ts';
+import { assertRuleTitleFree, readRules, saveRule, deleteRule } from '../../domains/rules.ts';
 import {
   resolveInstructionsTarget,
   readInstructionsInfo,
@@ -53,16 +53,26 @@ export function registerRuleRoutes(app: FastifyInstance, ctx: ServerContext): vo
   const hasRule = (id: string): boolean =>
     readRules(paths().claudeMd, ctx.store).some((rule) => rule.id === id);
 
+  /**
+   * Заголовок, занятый другим правилом, — отказ 409 (D-A): и на создании, и на
+   * переименовании. Правка тёзки, уже лежавшего в файле, без смены заголовка
+   * проходит — `assertRuleTitleFree` сравнивает с его же нынешним заголовком.
+   */
+  const assertTitleFree = (id: string, draft: RuleDraft): void =>
+    assertRuleTitleFree(readRules(paths().claudeMd, ctx.store), id, String(draft?.title ?? ''));
+
   app.put<{ Params: { id: string }; Body: RuleDraft }>('/api/rules/:id', (request, reply) => {
     if (!hasRule(request.params.id)) return reply.code(404).send(NOT_FOUND);
+    assertTitleFree(request.params.id, request.body);
     return done(
       saveRule(paths().claudeMd, request.params.id, request.body, ctx.store, ctx.backupDir),
     );
   });
 
-  app.post<{ Body: RuleDraft }>('/api/rules', (request) =>
-    done(saveRule(paths().claudeMd, '', request.body, ctx.store, ctx.backupDir)),
-  );
+  app.post<{ Body: RuleDraft }>('/api/rules', (request) => {
+    assertTitleFree('', request.body);
+    return done(saveRule(paths().claudeMd, '', request.body, ctx.store, ctx.backupDir));
+  });
 
   app.delete<{ Params: { id: string } }>('/api/rules/:id', (request, reply) => {
     if (!hasRule(request.params.id)) return reply.code(404).send(NOT_FOUND);

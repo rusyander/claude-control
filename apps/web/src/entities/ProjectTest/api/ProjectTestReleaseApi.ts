@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import type { ProjectTestReleaseDocument } from '@agentdeck/contracts';
 import { apiClient } from '@shared/api/client';
 import { testKeys } from './keys';
@@ -14,8 +15,9 @@ import { testKeys } from './keys';
  * и платить этим за каждый показ отчёта незачем.
  */
 export function useTestRelease(path: string | undefined, release: string | undefined) {
+  const { i18n } = useTranslation();
   return useQuery({
-    queryKey: testKeys.release(path, release),
+    queryKey: testKeys.release(path, release, i18n.language),
     queryFn: async () => {
       const { data } = await apiClient.get<{
         releases: string[];

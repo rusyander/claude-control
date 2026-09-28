@@ -1,12 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { MutationObserver } from '@tanstack/react-query';
-import { queryClient } from '@app/queryClient';
+import { MutationObserver, QueryClient } from '@tanstack/react-query';
 import { apiClient } from '@shared/api/client';
 import { fileSplitTicketMutation } from './ChatTreeApi';
 
 /**
- * «Завести» тикет (L277) на настоящем общем клиенте запросов: запрос уходит по
- * адресу родителя с ключом и описанием. Что отказ не даёт второго тоста,
+ * «Завести» тикет (L277): запрос уходит по адресу родителя с ключом и
+ * описанием. Что отказ не даёт второго тоста,
  * проверяет общий `queryClient.double-toast.test.ts` по вызову в строке хаба.
  */
 describe('завести тикет группы', () => {
@@ -16,7 +15,7 @@ describe('завести тикет группы', () => {
     const post = vi
       .spyOn(apiClient, 'post')
       .mockResolvedValue({ data: { key: 'PROJ-7', created: true } });
-    const observer = new MutationObserver(queryClient, {
+    const observer = new MutationObserver(new QueryClient(), {
       ...fileSplitTicketMutation,
       meta: { silentError: true },
     });

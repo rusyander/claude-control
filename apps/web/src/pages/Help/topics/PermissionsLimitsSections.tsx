@@ -82,6 +82,7 @@ export function PermissionsLimitsSections({ tr, common }: SectionProps) {
           rows={[
             { name: tr('refusalShadow'), description: tr('refusalShadowText'), isMono: false },
             { name: tr('refusalUnknown'), description: tr('refusalUnknownText'), isMono: false },
+            { name: tr('refusalParen'), description: tr('refusalParenText'), isMono: false },
             { name: tr('refusalNotSet'), description: tr('refusalNotSetText'), isMono: false },
             { name: tr('refusalRestart'), description: tr('refusalRestartText'), isMono: false },
             { name: tr('refusalDeleted'), description: tr('refusalDeletedText'), isMono: false },

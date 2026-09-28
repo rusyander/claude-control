@@ -1,0 +1,312 @@
+{
+  "topic": "groups",
+  "scenario": "path",
+  "frames": [
+    {
+      "id": "01-path",
+      "side": "panel",
+      "file": "01-path.png",
+      "masked": 0,
+      "width": 928,
+      "height": 768,
+      "shotAt": "2026-09-28T14:33:59.467Z",
+      "text": "Порядок задачи (общий) Редактировать Копировать Когда: задача с номером тикета в любом проекте В проекте изменилось: скилл ticket-delivery Слить в нашу копию Что действует в C:/work/shop Глобальная Проектная Не тронута, осталась в проекте, неактивна Переопределение в проекте Файл .claude/rules/agentdeck-group.local.md велит CLI следовать глобальной группе вместо проектной лестницы. В коммит не попадает; выключение возвращает проект байт в байт. Порядок работы Состав Порядок работы над задачей: стадии конвейера — тонкие разделители, шаги скиллов собраны в блоки, ваши шаги стоят между ними. Шаг внутри блока скилла идёт в том же ходе, что и скилл; шаг после стадии — отдельным проверяемым ходом после неё. 4 шага Свернуть все Добавить шаг РАЗБОР ЗАДАЧИ ПЛАН РАБОТА ticket-delivery 2 шага чужой скилл 3 настраиваемых числа 1 Взять тикет и завести ветку чужой скилл Кругов ревью Авто (в скилле: 2) 1 2 3 4 5 Агентов на круг Авто (в скилле: 2) 1 2 3 4 5 6 Проверяющих Авто (в скилле: 1) 0 1 2 3 2 Сделать и проверить чужой скилл РЕВЬЮ 3 Прогнать e2e промпт Прогони e2e и приложи отчёт. Готово, когда: отчёт e2e зелёный ПРАВКИ ДОСТАВКА 4 Заметки к релизу чужой скилл у скилла нет настраиваемых чисел",
+      "en": {
+        "file": "01-path.en.png",
+        "masked": 0,
+        "width": 928,
+        "height": 768,
+        "shotAt": "2026-09-28T14:36:06.944Z",
+        "text": "Порядок задачи (общий) Edit Copy When: задача с номером тикета в любом проекте Changed in the project: skill ticket-delivery Merge into our copy Active in C:/work/shop Global Project Untouched, stays in the project, inactive Project override The file .claude/rules/agentdeck-group.local.md tells the CLI to follow the global group instead of the project ladder. Never committed; turning it off restores the project byte for byte. Working order Members How the task is worked: pipeline stages are thin separators, skill steps are grouped into blocks, your steps sit between them. A step inside a skill block runs in the same turn as the skill; a step after a stage runs as its own checked turn after it. 4 steps Collapse all Add step TRIAGE PLAN WORK ticket-delivery 2 steps foreign skill 3 adjustable numbers 1 Взять тикет и завести ветку foreign skill Review rounds Auto (skill: 2) 1 2 3 4 5 Agents per round Auto (skill: 2) 1 2 3 4 5 6 Verifiers Auto (skill: 1) 0 1 2 3 2 Сделать и проверить foreign skill REVIEW 3 Run e2e prompt Run e2e and attach the report. Done when: e2e report is green FIXES DELIVERY 4 Release notes foreign skill the skill has no adjustable numbers"
+      },
+      "dark": {
+        "file": "01-path.dark.png",
+        "masked": 0,
+        "width": 928,
+        "height": 768,
+        "shotAt": "2026-09-28T14:38:13.868Z",
+        "text": "Порядок задачи (общий) Редактировать Копировать Когда: задача с номером тикета в любом проекте В проекте изменилось: скилл ticket-delivery Слить в нашу копию Что действует в C:/work/shop Глобальная Проектная Не тронута, осталась в проекте, неактивна Переопределение в проекте Файл .claude/rules/agentdeck-group.local.md велит CLI следовать глобальной группе вместо проектной лестницы. В коммит не попадает; выключение возвращает проект байт в байт. Порядок работы Состав Порядок работы над задачей: стадии конвейера — тонкие разделители, шаги скиллов собраны в блоки, ваши шаги стоят между ними. Шаг внутри блока скилла идёт в том же ходе, что и скилл; шаг после стадии — отдельным проверяемым ходом после неё. 4 шага Свернуть все Добавить шаг РАЗБОР ЗАДАЧИ ПЛАН РАБОТА ticket-delivery 2 шага чужой скилл 3 настраиваемых числа 1 Взять тикет и завести ветку чужой скилл Кругов ревью Авто (в скилле: 2) 1 2 3 4 5 Агентов на круг Авто (в скилле: 2) 1 2 3 4 5 6 Проверяющих Авто (в скилле: 1) 0 1 2 3 2 Сделать и проверить чужой скилл РЕВЬЮ 3 Прогнать e2e промпт Прогони e2e и приложи отчёт. Готово, когда: отчёт e2e зелёный ПРАВКИ ДОСТАВКА 4 Заметки к релизу чужой скилл у скилла нет настраиваемых чисел"
+      },
+      "darkEn": {
+        "file": "01-path.dark.en.png",
+        "masked": 0,
+        "width": 928,
+        "height": 768,
+        "shotAt": "2026-09-28T14:40:18.376Z",
+        "text": "Порядок задачи (общий) Edit Copy When: задача с номером тикета в любом проекте Changed in the project: skill ticket-delivery Merge into our copy Active in C:/work/shop Global Project Untouched, stays in the project, inactive Project override The file .claude/rules/agentdeck-group.local.md tells the CLI to follow the global group instead of the project ladder. Never committed; turning it off restores the project byte for byte. Working order Members How the task is worked: pipeline stages are thin separators, skill steps are grouped into blocks, your steps sit between them. A step inside a skill block runs in the same turn as the skill; a step after a stage runs as its own checked turn after it. 4 steps Collapse all Add step TRIAGE PLAN WORK ticket-delivery 2 steps foreign skill 3 adjustable numbers 1 Взять тикет и завести ветку foreign skill Review rounds Auto (skill: 2) 1 2 3 4 5 Agents per round Auto (skill: 2) 1 2 3 4 5 6 Verifiers Auto (skill: 1) 0 1 2 3 2 Сделать и проверить foreign skill REVIEW 3 Run e2e prompt Run e2e and attach the report. Done when: e2e report is green FIXES DELIVERY 4 Release notes foreign skill the skill has no adjustable numbers"
+      }
+    },
+    {
+      "id": "02-ask",
+      "side": "panel",
+      "file": "02-ask.png",
+      "masked": 0,
+      "width": 960,
+      "height": 800,
+      "shotAt": "2026-09-28T14:34:00.431Z",
+      "text": "Новый шаг Встанет после стадии «Ревью» Описать словами Выбрать готовый Хук Вы после ревью прогнать e2e и приложить отчёт Ассистент Есть похожий скилл «e2e-runner»: гоняет e2e и собирает отчёт Ассистент уточняет На каком стенде гонять e2e? Куда приложить отчёт? Ваш ответ Ответить Итоговый шаг RU EN Название шага Текст для модели Готово, когда В прогон уходит английская сторона: модели инструкции даются по-английски. Отмена Подтвердить",
+      "en": {
+        "file": "02-ask.en.png",
+        "masked": 0,
+        "width": 960,
+        "height": 800,
+        "shotAt": "2026-09-28T14:36:07.891Z",
+        "text": "New step Goes after the “Review” stage Describe in words Pick a ready one Hook You после ревью прогнать e2e и приложить отчёт Assistant There is a similar skill “e2e-runner”: гоняет e2e и собирает отчёт The assistant asks На каком стенде гонять e2e? Куда приложить отчёт? Your answer Answer Final step RU EN Step title Text for the model Done when Runs read the English side: models get their instructions in English. Cancel Confirm"
+      },
+      "dark": {
+        "file": "02-ask.dark.png",
+        "masked": 0,
+        "width": 960,
+        "height": 800,
+        "shotAt": "2026-09-28T14:38:14.816Z",
+        "text": "Новый шаг Встанет после стадии «Ревью» Описать словами Выбрать готовый Хук Вы после ревью прогнать e2e и приложить отчёт Ассистент Есть похожий скилл «e2e-runner»: гоняет e2e и собирает отчёт Ассистент уточняет На каком стенде гонять e2e? Куда приложить отчёт? Ваш ответ Ответить Итоговый шаг RU EN Название шага Текст для модели Готово, когда В прогон уходит английская сторона: модели инструкции даются по-английски. Отмена Подтвердить"
+      },
+      "darkEn": {
+        "file": "02-ask.dark.en.png",
+        "masked": 0,
+        "width": 960,
+        "height": 800,
+        "shotAt": "2026-09-28T14:40:19.311Z",
+        "text": "New step Goes after the “Review” stage Describe in words Pick a ready one Hook You после ревью прогнать e2e и приложить отчёт Assistant There is a similar skill “e2e-runner”: гоняет e2e и собирает отчёт The assistant asks На каком стенде гонять e2e? Куда приложить отчёт? Your answer Answer Final step RU EN Step title Text for the model Done when Runs read the English side: models get their instructions in English. Cancel Confirm"
+      }
+    },
+    {
+      "id": "03-proposal",
+      "side": "panel",
+      "file": "03-proposal.png",
+      "masked": 0,
+      "width": 960,
+      "height": 800,
+      "shotAt": "2026-09-28T14:34:01.501Z",
+      "text": "Новый шаг Встанет после стадии «Ревью» Описать словами Выбрать готовый Хук Вы после ревью прогнать e2e и приложить отчёт Ассистент Есть похожий скилл «e2e-runner»: гоняет e2e и собирает отчёт Ассистент уточняет На каком стенде гонять e2e? Куда приложить отчёт? Вы на локальном стенде, отчёт — в описание MR Ассистент Шаг готов — проверьте его ниже и подтвердите. Что сделать на этом шаге — по-русски или по-английски Подготовить Итоговый шаг RU EN Название шага Текст для модели Готово, когда В прогон уходит английская сторона: модели инструкции даются по-английски. Отмена Подтвердить",
+      "en": {
+        "file": "03-proposal.en.png",
+        "masked": 0,
+        "width": 960,
+        "height": 800,
+        "shotAt": "2026-09-28T14:36:08.961Z",
+        "text": "New step Goes after the “Review” stage Describe in words Pick a ready one Hook You после ревью прогнать e2e и приложить отчёт Assistant There is a similar skill “e2e-runner”: гоняет e2e и собирает отчёт The assistant asks На каком стенде гонять e2e? Куда приложить отчёт? You на локальном стенде, отчёт — в описание MR Assistant The step is ready: check it below and confirm. What to do at this step — in Russian or English Prepare Final step RU EN Step title Text for the model Done when Runs read the English side: models get their instructions in English. Cancel Confirm"
+      },
+      "dark": {
+        "file": "03-proposal.dark.png",
+        "masked": 0,
+        "width": 960,
+        "height": 800,
+        "shotAt": "2026-09-28T14:38:15.866Z",
+        "text": "Новый шаг Встанет после стадии «Ревью» Описать словами Выбрать готовый Хук Вы после ревью прогнать e2e и приложить отчёт Ассистент Есть похожий скилл «e2e-runner»: гоняет e2e и собирает отчёт Ассистент уточняет На каком стенде гонять e2e? Куда приложить отчёт? Вы на локальном стенде, отчёт — в описание MR Ассистент Шаг готов — проверьте его ниже и подтвердите. Что сделать на этом шаге — по-русски или по-английски Подготовить Итоговый шаг RU EN Название шага Текст для модели Готово, когда В прогон уходит английская сторона: модели инструкции даются по-английски. Отмена Подтвердить"
+      },
+      "darkEn": {
+        "file": "03-proposal.dark.en.png",
+        "masked": 0,
+        "width": 960,
+        "height": 800,
+        "shotAt": "2026-09-28T14:40:20.362Z",
+        "text": "New step Goes after the “Review” stage Describe in words Pick a ready one Hook You после ревью прогнать e2e и приложить отчёт Assistant There is a similar skill “e2e-runner”: гоняет e2e и собирает отчёт The assistant asks На каком стенде гонять e2e? Куда приложить отчёт? You на локальном стенде, отчёт — в описание MR Assistant The step is ready: check it below and confirm. What to do at this step — in Russian or English Prepare Final step RU EN Step title Text for the model Done when Runs read the English side: models get their instructions in English. Cancel Confirm"
+      }
+    },
+    {
+      "id": "04-translate",
+      "side": "panel",
+      "file": "04-translate.png",
+      "masked": 0,
+      "width": 960,
+      "height": 800,
+      "shotAt": "2026-09-28T14:34:02.464Z",
+      "text": "Новый шаг Встанет после стадии «Ревью» Описать словами Выбрать готовый Хук Вы после ревью прогнать e2e и приложить отчёт Ассистент Есть похожий скилл «e2e-runner»: гоняет e2e и собирает отчёт Ассистент уточняет На каком стенде гонять e2e? Куда приложить отчёт? Вы на локальном стенде, отчёт — в описание MR Ассистент Шаг готов — проверьте его ниже и подтвердите. Что сделать на этом шаге — по-русски или по-английски Подготовить Итоговый шаг RU EN Название шага Текст для модели Готово, когда Вы правили EN — сторона RU устарела. «Подтвердить» сначала переведёт её, или переведите сейчас и проверьте. Перевести на RU В прогон уходит английская сторона: модели инструкции даются по-английски. Отмена Перевести на RU и подтвердить",
+      "en": {
+        "file": "04-translate.en.png",
+        "masked": 0,
+        "width": 960,
+        "height": 800,
+        "shotAt": "2026-09-28T14:36:09.875Z",
+        "text": "New step Goes after the “Review” stage Describe in words Pick a ready one Hook You после ревью прогнать e2e и приложить отчёт Assistant There is a similar skill “e2e-runner”: гоняет e2e и собирает отчёт The assistant asks На каком стенде гонять e2e? Куда приложить отчёт? You на локальном стенде, отчёт — в описание MR Assistant The step is ready: check it below and confirm. What to do at this step — in Russian or English Prepare Final step RU EN Step title Text for the model Done when You edited EN — the RU side is stale. “Confirm” translates it first, or translate now and check it. Translate to RU Runs read the English side: models get their instructions in English. Cancel Translate to RU and confirm"
+      },
+      "dark": {
+        "file": "04-translate.dark.png",
+        "masked": 0,
+        "width": 960,
+        "height": 800,
+        "shotAt": "2026-09-28T14:38:16.815Z",
+        "text": "Новый шаг Встанет после стадии «Ревью» Описать словами Выбрать готовый Хук Вы после ревью прогнать e2e и приложить отчёт Ассистент Есть похожий скилл «e2e-runner»: гоняет e2e и собирает отчёт Ассистент уточняет На каком стенде гонять e2e? Куда приложить отчёт? Вы на локальном стенде, отчёт — в описание MR Ассистент Шаг готов — проверьте его ниже и подтвердите. Что сделать на этом шаге — по-русски или по-английски Подготовить Итоговый шаг RU EN Название шага Текст для модели Готово, когда Вы правили EN — сторона RU устарела. «Подтвердить» сначала переведёт её, или переведите сейчас и проверьте. Перевести на RU В прогон уходит английская сторона: модели инструкции даются по-английски. Отмена Перевести на RU и подтвердить"
+      },
+      "darkEn": {
+        "file": "04-translate.dark.en.png",
+        "masked": 0,
+        "width": 960,
+        "height": 800,
+        "shotAt": "2026-09-28T14:40:21.297Z",
+        "text": "New step Goes after the “Review” stage Describe in words Pick a ready one Hook You после ревью прогнать e2e и приложить отчёт Assistant There is a similar skill “e2e-runner”: гоняет e2e и собирает отчёт The assistant asks На каком стенде гонять e2e? Куда приложить отчёт? You на локальном стенде, отчёт — в описание MR Assistant The step is ready: check it below and confirm. What to do at this step — in Russian or English Prepare Final step RU EN Step title Text for the model Done when You edited EN — the RU side is stale. “Confirm” translates it first, or translate now and check it. Translate to RU Runs read the English side: models get their instructions in English. Cancel Translate to RU and confirm"
+      }
+    },
+    {
+      "id": "05-promote",
+      "side": "panel",
+      "file": "05-promote.png",
+      "masked": 0,
+      "width": 960,
+      "height": 800,
+      "shotAt": "2026-09-28T14:34:04.396Z",
+      "text": "Скилл, хук или правило — или промпт панели? Шаг сохранён промптом панели. Ассистент предлагает сделать из него скилл в каталоге провайдера: тогда его можно подключать и в других группах, а шаг просто сошлётся на него. Или оставьте промптом — он хранится в данных группы, в прогон уходит английская сторона. Черновик файла --- name: e2e-on-stand description: Run e2e on the stand --- 1. Run e2e. Оставить промптом панели Сделать: скилл",
+      "en": {
+        "file": "05-promote.en.png",
+        "masked": 0,
+        "width": 960,
+        "height": 800,
+        "shotAt": "2026-09-28T14:36:11.774Z",
+        "text": "A skill, hook or rule — or a panel prompt? The step is saved as a panel prompt. The assistant suggests turning it into a skill in the provider's folder: other groups can use it too, and the step simply points at it. Or keep it a prompt — it stays in the group data, and the run reads its English side. File draft --- name: e2e-on-stand description: Run e2e on the stand --- 1. Run e2e. Keep as a panel prompt Make: skill"
+      },
+      "dark": {
+        "file": "05-promote.dark.png",
+        "masked": 0,
+        "width": 960,
+        "height": 800,
+        "shotAt": "2026-09-28T14:38:18.730Z",
+        "text": "Скилл, хук или правило — или промпт панели? Шаг сохранён промптом панели. Ассистент предлагает сделать из него скилл в каталоге провайдера: тогда его можно подключать и в других группах, а шаг просто сошлётся на него. Или оставьте промптом — он хранится в данных группы, в прогон уходит английская сторона. Черновик файла --- name: e2e-on-stand description: Run e2e on the stand --- 1. Run e2e. Оставить промптом панели Сделать: скилл"
+      },
+      "darkEn": {
+        "file": "05-promote.dark.en.png",
+        "masked": 0,
+        "width": 960,
+        "height": 800,
+        "shotAt": "2026-09-28T14:40:23.177Z",
+        "text": "A skill, hook or rule — or a panel prompt? The step is saved as a panel prompt. The assistant suggests turning it into a skill in the provider's folder: other groups can use it too, and the step simply points at it. Or keep it a prompt — it stays in the group data, and the run reads its English side. File draft --- name: e2e-on-stand description: Run e2e on the stand --- 1. Run e2e. Keep as a panel prompt Make: skill"
+      }
+    },
+    {
+      "id": "06-summary",
+      "side": "panel",
+      "file": "06-summary.png",
+      "masked": 0,
+      "width": 928,
+      "height": 768,
+      "shotAt": "2026-09-28T14:34:06.420Z",
+      "text": "Порядок задачи (общий) Редактировать Копировать Когда: задача с номером тикета в любом проекте В проекте изменилось: скилл ticket-delivery Слить в нашу копию Что действует в C:/work/shop Глобальная Проектная Не тронута, осталась в проекте, неактивна Переопределение в проекте Файл .claude/rules/agentdeck-group.local.md велит CLI следовать глобальной группе вместо проектной лестницы. В коммит не попадает; выключение возвращает проект байт в байт. Порядок работы Состав Порядок работы над задачей: стадии конвейера — тонкие разделители, шаги скиллов собраны в блоки, ваши шаги стоят между ними. Шаг внутри блока скилла идёт в том же ходе, что и скилл; шаг после стадии — отдельным проверяемым ходом после неё. 5 шагов Свернуть все Добавить шаг РАЗБОР ЗАДАЧИ ПЛАН РАБОТА ticket-delivery 2 шага чужой скилл 3 настраиваемых числа 1 Взять тикет и завести ветку чужой скилл Кругов ревью Авто (в скилле: 2) 1 2 3 4 5 Агентов на круг Авто (в скилле: 2) 1 2 3 4 5 6 Проверяющих Авто (в скилле: 1) 0 1 2 3 2 Сделать и проверить чужой скилл РЕВЬЮ 3 Прогнать e2e на стенде промпт (ru) Run e2e on the local stand and attach the HTML report to the MR description. Готово, когда: (ru) e2e report is green 4 Прогнать e2e промпт Прогони e2e и приложи отчёт. Готово, когда: отчёт e2e зелёный ПРАВКИ ДОСТАВКА 5 Заметки к релизу чужой скилл «release-notes» — что делает: собирает заметки к релизу из закрытых задач. Как работает: читает историю и пишет раздел в CHANGELOG. у скилла нет настраиваемых чисел",
+      "en": {
+        "file": "06-summary.en.png",
+        "masked": 0,
+        "width": 928,
+        "height": 768,
+        "shotAt": "2026-09-28T14:36:13.791Z",
+        "text": "Порядок задачи (общий) Edit Copy When: задача с номером тикета в любом проекте Changed in the project: skill ticket-delivery Merge into our copy Active in C:/work/shop Global Project Untouched, stays in the project, inactive Project override The file .claude/rules/agentdeck-group.local.md tells the CLI to follow the global group instead of the project ladder. Never committed; turning it off restores the project byte for byte. Working order Members How the task is worked: pipeline stages are thin separators, skill steps are grouped into blocks, your steps sit between them. A step inside a skill block runs in the same turn as the skill; a step after a stage runs as its own checked turn after it. 5 steps Collapse all Add step TRIAGE PLAN WORK ticket-delivery 2 steps foreign skill 3 adjustable numbers 1 Взять тикет и завести ветку foreign skill Review rounds Auto (skill: 2) 1 2 3 4 5 Agents per round Auto (skill: 2) 1 2 3 4 5 6 Verifiers Auto (skill: 1) 0 1 2 3 2 Сделать и проверить foreign skill REVIEW 3 Run e2e on the stand prompt Run e2e on the local stand and attach the HTML report to the MR description. Done when: e2e report is green 4 Run e2e prompt Run e2e and attach the report. Done when: e2e report is green FIXES DELIVERY 5 Release notes foreign skill «release-notes» — what it does: collects release notes from closed tasks. How: reads history and writes a CHANGELOG section. the skill has no adjustable numbers"
+      },
+      "dark": {
+        "file": "06-summary.dark.png",
+        "masked": 0,
+        "width": 928,
+        "height": 768,
+        "shotAt": "2026-09-28T14:38:20.716Z",
+        "text": "Порядок задачи (общий) Редактировать Копировать Когда: задача с номером тикета в любом проекте В проекте изменилось: скилл ticket-delivery Слить в нашу копию Что действует в C:/work/shop Глобальная Проектная Не тронута, осталась в проекте, неактивна Переопределение в проекте Файл .claude/rules/agentdeck-group.local.md велит CLI следовать глобальной группе вместо проектной лестницы. В коммит не попадает; выключение возвращает проект байт в байт. Порядок работы Состав Порядок работы над задачей: стадии конвейера — тонкие разделители, шаги скиллов собраны в блоки, ваши шаги стоят между ними. Шаг внутри блока скилла идёт в том же ходе, что и скилл; шаг после стадии — отдельным проверяемым ходом после неё. 5 шагов Свернуть все Добавить шаг РАЗБОР ЗАДАЧИ ПЛАН РАБОТА ticket-delivery 2 шага чужой скилл 3 настраиваемых числа 1 Взять тикет и завести ветку чужой скилл Кругов ревью Авто (в скилле: 2) 1 2 3 4 5 Агентов на круг Авто (в скилле: 2) 1 2 3 4 5 6 Проверяющих Авто (в скилле: 1) 0 1 2 3 2 Сделать и проверить чужой скилл РЕВЬЮ 3 Прогнать e2e на стенде промпт (ru) Run e2e on the local stand and attach the HTML report to the MR description. Готово, когда: (ru) e2e report is green 4 Прогнать e2e промпт Прогони e2e и приложи отчёт. Готово, когда: отчёт e2e зелёный ПРАВКИ ДОСТАВКА 5 Заметки к релизу чужой скилл «release-notes» — что делает: собирает заметки к релизу из закрытых задач. Как работает: читает историю и пишет раздел в CHANGELOG. у скилла нет настраиваемых чисел"
+      },
+      "darkEn": {
+        "file": "06-summary.dark.en.png",
+        "masked": 0,
+        "width": 928,
+        "height": 768,
+        "shotAt": "2026-09-28T14:40:25.178Z",
+        "text": "Порядок задачи (общий) Edit Copy When: задача с номером тикета в любом проекте Changed in the project: skill ticket-delivery Merge into our copy Active in C:/work/shop Global Project Untouched, stays in the project, inactive Project override The file .claude/rules/agentdeck-group.local.md tells the CLI to follow the global group instead of the project ladder. Never committed; turning it off restores the project byte for byte. Working order Members How the task is worked: pipeline stages are thin separators, skill steps are grouped into blocks, your steps sit between them. A step inside a skill block runs in the same turn as the skill; a step after a stage runs as its own checked turn after it. 5 steps Collapse all Add step TRIAGE PLAN WORK ticket-delivery 2 steps foreign skill 3 adjustable numbers 1 Взять тикет и завести ветку foreign skill Review rounds Auto (skill: 2) 1 2 3 4 5 Agents per round Auto (skill: 2) 1 2 3 4 5 6 Verifiers Auto (skill: 1) 0 1 2 3 2 Сделать и проверить foreign skill REVIEW 3 Run e2e on the stand prompt Run e2e on the local stand and attach the HTML report to the MR description. Done when: e2e report is green 4 Run e2e prompt Run e2e and attach the report. Done when: e2e report is green FIXES DELIVERY 5 Release notes foreign skill «release-notes» — what it does: collects release notes from closed tasks. How: reads history and writes a CHANGELOG section. the skill has no adjustable numbers"
+      }
+    },
+    {
+      "id": "07-knobs",
+      "side": "panel",
+      "file": "07-knobs.png",
+      "masked": 0,
+      "width": 928,
+      "height": 768,
+      "shotAt": "2026-09-28T14:34:07.449Z",
+      "text": "Взять тикет и завести ветку чужой скилл · ticket-delivery Что это Чужой скилл ticket-delivery: в нашем каталоге скиллов его нет — он из другого провайдера или удалён. Где стоит После стадии «Работа»: шаг 1 скилла ticket-delivery. Описание доводит тикет до MR: ветка, правка, проверки, описание. Числа шага Кругов ревью Авто (в скилле: 2) 1 2 3 4 5 Из текста скилла: «Ревью идёт в 2 круга: второй проверяет правки первого.» Агентов на круг Авто (в скилле: 2) 1 2 3 4 5 6 Из текста скилла: «На круг — 2 агента, у каждого своя полоса файлов.» Проверяющих Авто (в скилле: 1) 0 1 2 3 Из текста скилла: «Итог подтверждает 1 проверяющий.» «Авто» — число выбирает скилл. Выбранное число группа закрепляет, даже если оно равно числу в скилле; сам скилл не правится.",
+      "en": {
+        "file": "07-knobs.en.png",
+        "masked": 0,
+        "width": 928,
+        "height": 768,
+        "shotAt": "2026-09-28T14:36:14.791Z",
+        "text": "Взять тикет и завести ветку foreign skill · ticket-delivery What it is Foreign skill ticket-delivery: it is not in our skills folder — it belongs to another provider or was removed. Where it stands After the “Work” stage: step 1 of skill ticket-delivery. Description доводит тикет до MR: ветка, правка, проверки, описание. Step numbers Review rounds Auto (skill: 2) 1 2 3 4 5 From the skill’s text: “Ревью идёт в 2 круга: второй проверяет правки первого.” Agents per round Auto (skill: 2) 1 2 3 4 5 6 From the skill’s text: “На круг — 2 агента, у каждого своя полоса файлов.” Verifiers Auto (skill: 1) 0 1 2 3 From the skill’s text: “Итог подтверждает 1 проверяющий.” “Auto” lets the skill choose the number. A number you pick is pinned for the group, even when it equals the skill’s own; the skill itself is not edited."
+      },
+      "dark": {
+        "file": "07-knobs.dark.png",
+        "masked": 0,
+        "width": 928,
+        "height": 768,
+        "shotAt": "2026-09-28T14:38:21.697Z",
+        "text": "Взять тикет и завести ветку чужой скилл · ticket-delivery Что это Чужой скилл ticket-delivery: в нашем каталоге скиллов его нет — он из другого провайдера или удалён. Где стоит После стадии «Работа»: шаг 1 скилла ticket-delivery. Описание доводит тикет до MR: ветка, правка, проверки, описание. Числа шага Кругов ревью Авто (в скилле: 2) 1 2 3 4 5 Из текста скилла: «Ревью идёт в 2 круга: второй проверяет правки первого.» Агентов на круг Авто (в скилле: 2) 1 2 3 4 5 6 Из текста скилла: «На круг — 2 агента, у каждого своя полоса файлов.» Проверяющих Авто (в скилле: 1) 0 1 2 3 Из текста скилла: «Итог подтверждает 1 проверяющий.» «Авто» — число выбирает скилл. Выбранное число группа закрепляет, даже если оно равно числу в скилле; сам скилл не правится."
+      },
+      "darkEn": {
+        "file": "07-knobs.dark.en.png",
+        "masked": 0,
+        "width": 928,
+        "height": 768,
+        "shotAt": "2026-09-28T14:40:26.176Z",
+        "text": "Взять тикет и завести ветку foreign skill · ticket-delivery What it is Foreign skill ticket-delivery: it is not in our skills folder — it belongs to another provider or was removed. Where it stands After the “Work” stage: step 1 of skill ticket-delivery. Description доводит тикет до MR: ветка, правка, проверки, описание. Step numbers Review rounds Auto (skill: 2) 1 2 3 4 5 From the skill’s text: “Ревью идёт в 2 круга: второй проверяет правки первого.” Agents per round Auto (skill: 2) 1 2 3 4 5 6 From the skill’s text: “На круг — 2 агента, у каждого своя полоса файлов.” Verifiers Auto (skill: 1) 0 1 2 3 From the skill’s text: “Итог подтверждает 1 проверяющий.” “Auto” lets the skill choose the number. A number you pick is pinned for the group, even when it equals the skill’s own; the skill itself is not edited."
+      }
+    },
+    {
+      "id": "08-pick",
+      "side": "panel",
+      "file": "08-pick.png",
+      "masked": 0,
+      "width": 928,
+      "height": 768,
+      "shotAt": "2026-09-28T14:34:11.512Z",
+      "text": "Новый шаг Встанет после стадии «Ревью» Описать словами Выбрать готовый Хук Все наш скилл правило хук утилита найдено: 5 Прогон e2e наш скилл гоняет e2e на стенде и прикладывает отчёт e2e-runner Заметки к релизу наш скилл собирает заметки из закрытых задач release-notes Чек-лист ревью правило что проверить перед MR review-checklist после правки файла: линт хук запускает pnpm lint после правки PostToolUse:7c1e tools/shots.mjs утилита проекта снимает кадры tools/shots.mjs Отмена",
+      "en": {
+        "file": "08-pick.en.png",
+        "masked": 0,
+        "width": 928,
+        "height": 768,
+        "shotAt": "2026-09-28T14:36:18.824Z",
+        "text": "New step Goes after the “Review” stage Describe in words Pick a ready one Hook All our skill rule hook utility found: 5 E2E run our skill runs e2e on the stand, attaches the report e2e-runner Release notes our skill collects notes from closed tasks release-notes Review checklist rule what to check before an MR review-checklist after a file edit: lint hook runs pnpm lint after an edit PostToolUse:7c1e tools/shots.mjs utility project снимает кадры tools/shots.mjs Cancel"
+      },
+      "dark": {
+        "file": "08-pick.dark.png",
+        "masked": 0,
+        "width": 928,
+        "height": 768,
+        "shotAt": "2026-09-28T14:38:25.730Z",
+        "text": "Новый шаг Встанет после стадии «Ревью» Описать словами Выбрать готовый Хук Все наш скилл правило хук утилита найдено: 5 Прогон e2e наш скилл гоняет e2e на стенде и прикладывает отчёт e2e-runner Заметки к релизу наш скилл собирает заметки из закрытых задач release-notes Чек-лист ревью правило что проверить перед MR review-checklist после правки файла: линт хук запускает pnpm lint после правки PostToolUse:7c1e tools/shots.mjs утилита проекта снимает кадры tools/shots.mjs Отмена"
+      },
+      "darkEn": {
+        "file": "08-pick.dark.en.png",
+        "masked": 0,
+        "width": 928,
+        "height": 768,
+        "shotAt": "2026-09-28T14:40:30.213Z",
+        "text": "New step Goes after the “Review” stage Describe in words Pick a ready one Hook All our skill rule hook utility found: 5 E2E run our skill runs e2e on the stand, attaches the report e2e-runner Release notes our skill collects notes from closed tasks release-notes Review checklist rule what to check before an MR review-checklist after a file edit: lint hook runs pnpm lint after an edit PostToolUse:7c1e tools/shots.mjs utility project снимает кадры tools/shots.mjs Cancel"
+      }
+    },
+    {
+      "id": "09-hook",
+      "side": "panel",
+      "file": "09-hook.png",
+      "masked": 0,
+      "width": 928,
+      "height": 768,
+      "shotAt": "2026-09-28T14:34:12.074Z",
+      "text": "Новый шаг Встанет после стадии «Ревью» Описать словами Выбрать готовый Хук Хук — команда, которую CLI запускает на событии. Он станет участником группы, а шаг сошлётся на него. Название шага Как шаг будет называться в порядке работы. Событие PreToolUse PostToolUse UserPromptSubmit Notification Stop SubagentStop SessionStart SessionEnd PreCompact Фильтр (matcher) Имя инструмента, например Edit|Write. Пусто — на любом. Команда Команда оболочки; путь к скрипту — абсолютный. Создать хук и добавить шагом Отмена",
+      "en": {
+        "file": "09-hook.en.png",
+        "masked": 0,
+        "width": 928,
+        "height": 768,
+        "shotAt": "2026-09-28T14:36:19.355Z",
+        "text": "New step Goes after the “Review” stage Describe in words Pick a ready one Hook A hook is a command the CLI runs on an event. It becomes a member of the group, and the step references it. Step title What the step is called in the working order. Event PreToolUse PostToolUse UserPromptSubmit Notification Stop SubagentStop SessionStart SessionEnd PreCompact Filter (matcher) A tool name, e.g. Edit|Write. Empty — on any. Command A shell command; a script path must be absolute. Create the hook and add it as a step Cancel"
+      },
+      "dark": {
+        "file": "09-hook.dark.png",
+        "masked": 0,
+        "width": 928,
+        "height": 768,
+        "shotAt": "2026-09-28T14:38:26.269Z",
+        "text": "Новый шаг Встанет после стадии «Ревью» Описать словами Выбрать готовый Хук Хук — команда, которую CLI запускает на событии. Он станет участником группы, а шаг сошлётся на него. Название шага Как шаг будет называться в порядке работы. Событие PreToolUse PostToolUse UserPromptSubmit Notification Stop SubagentStop SessionStart SessionEnd PreCompact Фильтр (matcher) Имя инструмента, например Edit|Write. Пусто — на любом. Команда Команда оболочки; путь к скрипту — абсолютный. Создать хук и добавить шагом Отмена"
+      },
+      "darkEn": {
+        "file": "09-hook.dark.en.png",
+        "masked": 0,
+        "width": 928,
+        "height": 768,
+        "shotAt": "2026-09-28T14:40:30.746Z",
+        "text": "New step Goes after the “Review” stage Describe in words Pick a ready one Hook A hook is a command the CLI runs on an event. It becomes a member of the group, and the step references it. Step title What the step is called in the working order. Event PreToolUse PostToolUse UserPromptSubmit Notification Stop SubagentStop SessionStart SessionEnd PreCompact Filter (matcher) A tool name, e.g. Edit|Write. Empty — on any. Command A shell command; a script path must be absolute. Create the hook and add it as a step Cancel"
+      }
+    }
+  ]
+}

@@ -54,7 +54,7 @@ export const dlpEn: typeof dlpRu = {
       'Five steps; everything outside the panel is a single address line in the CLI config.',
     step1: 'Set up rules',
     step1Text:
-      'The ready-made set — twenty built-in patterns: email, phones, INN, SNILS, OGRN, ' +
+      'The “Rules” tab. The ready-made set — twenty built-in patterns: email, phones, INN, SNILS, OGRN, ' +
       'passports, cards, IBAN, crypto wallets, IP and MAC addresses, UUID, URL, a login with a ' +
       'password in an address, JWT and secret keys. For a set built earlier the section names ' +
       'the missing patterns and adds them with one button. INN, SNILS, OGRN, card numbers and ' +
@@ -63,16 +63,16 @@ export const dlpEn: typeof dlpRu = {
       'work and teaches people to switch protection off.',
     step2: 'Add your own dictionary',
     step2Text:
-      'Staff names, project names, internal addresses — one value per line. This is precisely ' +
+      'Also on the “Rules” tab. Staff names, project names, internal addresses — one value per line. This is precisely ' +
       'what no built-in pattern knows, and precisely what leaks most often.',
     step3: 'Check against a sample text',
     step3Text:
-      'The section shows exactly what the model would see, from the current edits and without ' +
+      'The “Check” tab. The section shows exactly what the model would see, from the current edits and without ' +
       'touching the network. Better to find a mistake in a rule here than in the journal ' +
       'after a leak.',
     step4: 'Start the proxy',
     step4Text:
-      'Say where to forward: the vendor cloud, a local model or an endpoint profile. With no ' +
+      'The “Proxy” tab. Say where to forward: the vendor cloud, a local model or an endpoint profile. With no ' +
       'address the proxy will not start — it will not guess the vendor cloud for you. Port and ' +
       'address are saved on Enter or when the field loses focus; any settings change restarts ' +
       'a running proxy, and placeholder numbering starts over.',
@@ -171,7 +171,7 @@ export const dlpEn: typeof dlpRu = {
       'This is not a model and not a heuristic: the proxy will not guess a surname you did ' +
       'not write down, will not notice a typo in it, and will not read a passport photo in an ' +
       'attachment. With no enabled rule the proxy does not start at all — the panel refuses ' +
-      'with “no enabled rule” (нет ни одного включённого правила), and a running proxy whose ' +
+      'with “there is no enabled rule”, and a running proxy whose ' +
       'last rule is switched off stops. The real risk is an incomplete set: the section says ' +
       '"running", and whatever the rules do not describe goes out as is.',
     limitParaphraseTitle: 'The model may paraphrase a placeholder',
@@ -225,14 +225,16 @@ export const dlpEn: typeof dlpRu = {
       'there; the panel keeps no hidden mechanism. Changing the action rewrites the panel’s ' +
       'script; a hand-edited file is left alone — “Restore the panel’s script” brings it back. A ' +
       'script built by an earlier panel version is not treated as a hand edit: the card says the ' +
-      'new patterns are missing from it, and “Rebuild the script” writes the current one.',
+      'new patterns are missing from it, and “Rebuild the script” writes the current one. The ' +
+      'gate’s messages in the CLI and its description under Hooks follow the interface language: ' +
+      'switching the language rebuilds the panel’s script at once, a hand-edited one stays as is.',
 
     gateLimitTitle: 'A second to bypass — and that is fine',
     gateLimitText:
       'The same meaning in other words gets through: the gate matches rules, it does not ' +
       'understand text. This is a barrier against pasting someone’s passport into a prompt by ' +
       'accident, not against a person who wants the data out. Real content control is the ' +
-      'proxy above.',
+      'proxy, on the “Proxy” tab.',
     gateSharedTitle: 'Rules shared with the proxy',
     gateSharedText:
       'There is no second dictionary: the gate reads the same dlp-rules.json. A rule whose own ' +
@@ -287,19 +289,24 @@ export const dlpEn: typeof dlpRu = {
         'coherent text rather than a soup of different numbers.',
       firstPreview: '4. The sample-text check — before saving and without the network',
       firstPreviewText:
-        'The field shows exactly what the model would see: “Check order [ДАННЫЕ_1], phone ' +
-        '[ТЕЛЕФОН_1], card [КАРТА_1]”, with “3 replacements” broken down by rule beside ' +
-        'it. It is computed from the current, still unsaved edits and goes nowhere.',
+        'The field shows exactly what the model would see: the sample line with [DATA_1], ' +
+        '[PHONE_1] and [CARD_1] in place of the name, the phone and the card number, with ' +
+        '“replacements: 3” broken down by rule beside ' +
+        'it. It is computed from the current, still unsaved edits and goes nowhere. The rules ' +
+        'draft starts with your first edit: until you change something, the page shows the ' +
+        'saved list, including one the panel agent wrote. If the list changed outside the ' +
+        'page while you were editing, “The rules changed outside this page…” appears on the ' +
+        'page: saving replaces them with your edits, discarding shows the new ones.',
       firstRunning: '5. The proxy is up — the address for the CLI is on screen',
       firstRunningText:
         'The panel names the address (http://127.0.0.1:5397 in this frame) and says it can ' +
         'be handed to a CLI as an endpoint profile. The counters are still zero. “Pass ' +
-        'unparsed” is off: a request whose body the panel did not parse is refused — a ' +
+        'through unparsed bodies” is off: a request whose body the panel did not parse is refused — a ' +
         'proxy that silently passes what it does not understand is worse than none.',
       firstJournal: '6. The journal: rule, placeholder and count — no values',
       firstJournalText:
         'Two lines from one run: “blocked” by the “Secret keys” rule and “masked” with the ' +
-        '[ДАННЫЕ_1] and [ТЕЛЕФОН_1] placeholders. The values themselves are not there and ' +
+        '[DATA_1] and [PHONE_1] placeholders. The values themselves are not there and ' +
         'never will be — otherwise the journal would hoard what is being protected.',
       firstCounters: '7. The counters answer “is it actually working”',
       firstCountersText:
@@ -309,14 +316,14 @@ export const dlpEn: typeof dlpRu = {
 
       gateTitle: 'Path: install the gate on the prompt',
       gateCaption:
-        'The second tool, lower in the same section. Four frames: the card before ' +
+        'The second tool of the same section, the “Prompt gate” tab. Four frames: the card before ' +
         'installing, after, the generated hook and the same card on a foreign CLI.',
       gateOff: '1. The card lists its blind spots outright',
       gateOffText:
         'Before installing it already says what the gate cannot see by design: files the ' +
         'agent read, command output, subagent prompts. And that it cannot replace the ' +
         'prompt text — the event does not allow it. Next to that, the count of rules ' +
-        'shared with the proxy: “7 enabled, 1 of them blocking”.',
+        'shared with the proxy: “21 enabled, 2 of them blocking”.',
       gateOn: '2. Installed — and the script path is visible',
       gateOnText:
         'The panel generates the hook script and shows its path: the file can be opened ' +
@@ -391,14 +398,16 @@ export const dlpEn: typeof dlpRu = {
     refusalsCaption: 'Exactly what the CLI receives or the panel shows, and what to do about it.',
     refusalsColumn: 'What is shown',
     refusalsMeaningColumn: 'Reason and way out',
-    refusalBlocked: '“the request was stopped by rule ‘…’” (400)',
+    refusalBlocked:
+      '“The request was stopped by rule “…” — it contains data that must not go to the model” (400)',
     refusalBlockedText:
       'A rule with the “block” action matched. The refusal arrives in the API’s own error ' +
       'shape, so the CLI prints it as text rather than “unexpected response”. The code is 400, ' +
       'not 403: Claude Code reads a 403 as a login failure and appends “Failed to ' +
       'authenticate.” although the key is fine. The journal carries a “blocked” line with the ' +
       'rule name.',
-    refusalUnknown: '“…, the request was stopped (the «let unparsed through» setting is off)”',
+    refusalUnknown:
+      '“…, the request was stopped (the “Pass through unparsed bodies” setting is off)”',
     refusalUnknownText:
       'The body was not parsed: a foreign path, not JSON, or an unfamiliar schema. Turn ' +
       'the toggle on if you trust that channel — but then the unparsed goes through as is.',
@@ -410,10 +419,11 @@ export const dlpEn: typeof dlpRu = {
     refusalUpstreamText:
       'The proxy got as far as forwarding and the destination is silent. Check the ' +
       '“Forward to” field, or the endpoint profile it is taken from.',
-    refusalGateProvider: '“Switch the provider to Claude to enable it”',
-    refusalGateProviderText:
-      'The gate is installed into Claude Code’s configuration; other CLIs document no ' +
-      '“prompt submitted” event that can refuse. The proxy works for all of them.',
+    refusalGateNoRules: '“With no rule enabled there is nothing for the gate to check.”',
+    refusalGateNoRulesText:
+      'The gate toggle will not switch on while the section has no enabled rule: the gate ' +
+      'checks the prompt by the same rules as the proxy. Enable a rule on the “Rules” tab. ' +
+      'Switching the CLI does not turn the gate off: for a foreign CLI the panel plays it itself.',
     refusalGateUnsure: '“The prompt was NOT checked”',
     refusalGateUnsureText:
       'The rules file cannot be read, or the hook input shape is unfamiliar. The prompt ' +
@@ -430,16 +440,16 @@ export const dlpEn: typeof dlpRu = {
       '03-terms':
         'Your own dictionary: a word list instead of a pattern — surnames, projects, internal names',
       '04-preview':
-        'The sample-text check: “3 replacements” and the line the model will see — before saving, offline',
+        'The sample-text check: “replacements: 3” and the line the model will see — before saving, offline',
       '05-running':
-        'The proxy is up: http://127.0.0.1:5397 for the CLI, counters at zero, “pass unparsed” off',
+        'The proxy is up: http://127.0.0.1:5397 for the CLI, counters at zero, “Pass through unparsed bodies” off',
       '06-journal':
         'The journal: “blocked” by the “Secret keys” rule and “masked” with placeholders — no values',
       '07-counters': 'The counters after the run: “requests: 2 · masked: 1 · blocked: 1”',
     },
     gate: {
       '01-gate-off':
-        'The gate card before installing: blind spots listed and the shared rule count (7 enabled, 1 blocking)',
+        'The gate card before installing: blind spots listed and the shared rule count (21 enabled, 2 blocking)',
       '02-gate-on':
         'The gate installed: the generated script path and the choice of action on a match',
       '03-hook':

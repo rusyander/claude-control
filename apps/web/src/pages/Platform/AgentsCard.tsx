@@ -114,7 +114,7 @@ export function AgentsCard({ platform, hasToken }: AgentsCardProps) {
             </Typography>
             <CompromiseMark id="agents-manual-roster" />
           </Stack>
-          <Typography variant="body-sm" color="subtle" style={{ maxWidth: 'var(--text-measure)' }}>
+          <Typography variant="body-sm" color="subtle" className="prose">
             {t('platform.agentsOwner')}
           </Typography>
         </Stack>

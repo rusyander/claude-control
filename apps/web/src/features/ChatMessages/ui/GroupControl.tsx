@@ -35,7 +35,7 @@ function needsConsent(error: unknown): boolean {
  * длиннее самой кнопки.
  */
 export function GroupControl({ control }: GroupControlProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
   const pause = usePauseGroup();
   const resume = useResumePausedGroup();
@@ -62,7 +62,13 @@ export function GroupControl({ control }: GroupControlProps) {
     const input = { parentChatId, index, ...(force ? { force: true } : {}) };
     if (control.action === 'pause') {
       pause.mutate(input, {
-        onSuccess: () => settled(t('chat.cascade.hub.control.paused')),
+        onSuccess: (result) => {
+          settled(t('chat.cascade.hub.control.paused'));
+          // Процесс жив, номер нечем проверить (F-145): группа на паузе, ход доходит.
+          if (result.unconfirmed > 0) {
+            toast.warning(t('chat.cascade.tree.notStoppedToast', { count: result.unconfirmed }));
+          }
+        },
         onError: failed,
       });
     } else if (control.action === 'resume') {
@@ -86,7 +92,11 @@ export function GroupControl({ control }: GroupControlProps) {
   };
 
   const time = control.limitUntil
-    ? new Date(control.limitUntil).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    ? // Язык интерфейса, а не браузера (F-323).
+      new Date(control.limitUntil).toLocaleTimeString(i18n.language, {
+        hour: '2-digit',
+        minute: '2-digit',
+      })
     : undefined;
 
   return (

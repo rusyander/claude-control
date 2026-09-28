@@ -1,6 +1,7 @@
 import type {
   ProjectTestAttributeDef,
   ProjectTestCase,
+  ProjectTestFlakyMark,
   ProjectTestRiskItem,
 } from '@agentdeck/contracts';
 import type { CaseWithGroup } from '@entities/ProjectTest';
@@ -24,4 +25,6 @@ export interface TestCaseTableProps {
    * число без вопроса, ради которого его считали, только шумит в строке.
    */
   risk?: Map<string, ProjectTestRiskItem>;
+  /** Нестабильные по истории прогонов кейсы, «группа:кейс» → вердикт. */
+  flaky?: Map<string, ProjectTestFlakyMark>;
 }

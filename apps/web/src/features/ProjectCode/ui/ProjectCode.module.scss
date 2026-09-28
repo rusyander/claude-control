@@ -267,14 +267,19 @@
 .editor {
   height: 100%;
 
-  --code-keyword: #8250df;
-  --code-string: #0a7c42;
-  --code-comment: #6e7781;
+  // Светлая палитра держит 4,5:1 (WCAG AA) не только на белом, но и на
+  // приглушённом фоне (строка с курсором, поле правки документа) и на фоне
+  // выделения любого акцента: прежние фиолетовый (#8250df) и серый (#6e7781)
+  // выходили на них ровно на 4,5 и ниже — axe в светлой теме. Серые — с
+  // запасом под зелёную заливку правки на строке с курсором (там фон темнее).
+  --code-keyword: #6639ba;
+  --code-string: #116329;
+  --code-comment: #525c67;
   --code-number: #0550ae;
-  --code-function: #8250df;
+  --code-function: #6639ba;
   --code-type: #953800;
   --code-property: #0550ae;
-  --code-punctuation: #57606a;
+  --code-punctuation: #4f5963;
 
   :global(.cm-editor) {
     height: 100%;
@@ -285,13 +290,16 @@
   // намеренно удваивают `.cm-editor`: иначе выигрывает библиотечный красный на
   // удалении, а договорённость здесь другая — старое серым, новое зелёным.
 
-  // Новый код — тот, что реально лежит в файле, — зелёный.
+  // Новый код — тот, что реально лежит в файле, — зелёный. Заливка лёгкая
+  // намеренно: подсветка синтаксиса поверх неё обязана держать 4,5:1, а при
+  // 12 % строки и 22 % слова вышло 3,0–4,2 в обеих темах (axe). Строку всё
+  // равно отмечает сплошная зелёная метка в поле номеров.
   :global(.cm-editor.cm-editor .cm-changedLine) {
-    background: color-mix(in srgb, var(--color-success) 12%, transparent);
+    background: color-mix(in srgb, var(--color-success) 6%, transparent);
   }
 
   :global(.cm-editor.cm-editor .cm-changedText) {
-    background: color-mix(in srgb, var(--color-success) 22%, transparent);
+    background: color-mix(in srgb, var(--color-success) 10%, transparent);
   }
 
   :global(.cm-editor.cm-editor .cm-changedLineGutter) {
@@ -321,7 +329,8 @@
 :global(:root[data-theme='dark']) .editor {
   --code-keyword: #d2a8ff;
   --code-string: #7ee787;
-  --code-comment: #8b949e;
+  // Чуть светлее прежнего #8b949e: на янтарном выделении тот давал 4,49.
+  --code-comment: #939ca6;
   --code-number: #79c0ff;
   --code-function: #d2a8ff;
   --code-type: #ffa657;

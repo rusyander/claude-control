@@ -109,8 +109,10 @@ describe('маршруты групп: переключатель гасит у�
     };
     expect(settings.hooks?.Stop ?? []).toHaveLength(0);
 
-    // Правило уехало в раздел отключённых.
-    expect(readFileSync(claudeMdPath(), 'utf8')).toMatch(/Отключённые|disabled/i);
+    // Выключенное правило уходит из CLAUDE.md целиком (владелец 28.09): его текст
+    // хранит панель, включение вернёт его на прежнее место.
+    expect(readFileSync(claudeMdPath(), 'utf8')).not.toContain('Текст правила.');
+    expect(store.disablingGroups('rule', 'moe-pravilo')).toEqual([groupId]);
   });
 
   it('включение группы возвращает участников на место', async () => {
@@ -198,6 +200,38 @@ describe('маршруты групп: переключатель гасит у�
 
     expect(existsSync(join(root, 'skills', 'мой-скилл'))).toBe(true);
     expect(store.disablingGroups('skill', 'мой-скилл')).toEqual([]);
+  });
+
+  it('новая выключенная группа ничего не гасит: общий участник включённой группы остаётся', async () => {
+    // Так создаёт черновик агент панели (draft_group): группа выключена, а её
+    // участники — те же скилл и правило, что у включённой группы.
+    const draft = await app.inject({
+      method: 'POST',
+      url: '/api/groups',
+      payload: {
+        name: 'Черновик агента',
+        members: [
+          { kind: 'rule', id: 'moe-pravilo' },
+          { kind: 'skill', id: 'мой-скилл' },
+        ],
+        isEnabled: false,
+      },
+    });
+    expect(draft.statusCode).toBe(200);
+    const draftId = draft.json<{ id: string }>().id;
+
+    expect(existsSync(join(root, 'skills', 'мой-скилл'))).toBe(true);
+    expect(store.disablingGroups('skill', 'мой-скилл')).toEqual([]);
+    expect(readFileSync(claudeMdPath(), 'utf8')).toContain('Текст правила.');
+    expect(store.disablingGroups('rule', 'moe-pravilo')).toEqual([]);
+
+    // Спящая группа работает как обычная: включили и выключили — участники погашены.
+    const flip = (isEnabled: boolean) =>
+      app.inject({ method: 'POST', url: `/api/groups/${draftId}/enabled`, payload: { isEnabled } });
+    await flip(true);
+    await flip(false);
+    expect(existsSync(join(root, 'skills', 'мой-скилл'))).toBe(false);
+    expect(store.disablingGroups('skill', 'мой-скилл')).toEqual([draftId]);
   });
 
   it('переключение несуществующей группы — 404, а не тихий успех', async () => {

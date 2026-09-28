@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
 import type {
   PanelActionJournalEntry,
@@ -66,6 +66,17 @@ export function usePanelAgentConversations(enabled: boolean) {
     queryFn: async () =>
       (await apiClient.get<PanelAgentConversationSummary[]>('/agent/conversations')).data,
     enabled,
+  });
+}
+
+/** Удалить разговор из истории; список перечитывается. Идущий ход сервер не даёт удалить (409). */
+export function useDeletePanelAgentConversation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await apiClient.delete(`/agent/conversations/${encodeURIComponent(id)}`);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.panelAgentConversations }),
   });
 }
 

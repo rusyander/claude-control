@@ -16,6 +16,7 @@
  * возврата фокуса или невидимый фокус на интерактивном элементе.
  *
  * Запуск: node tools/qa/check-keyboard.mjs   (браузеры: pnpm qa:setup)
+ *         node tools/qa/check-keyboard.mjs --only permissions   разделы по пути, имени или slug
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -27,8 +28,12 @@ const BASE = process.env.APP_URL ?? 'http://localhost:8888';
 const REPORT_DIR = join('.agent', 'tmp', 'a11y');
 mkdirSync(REPORT_DIR, { recursive: true });
 
-/** Сколько Tab максимум на раздел: длинные списки не должны длиться вечно. */
-const MAX_TABS = 400;
+/**
+ * Сколько Tab максимум на раздел: длинные списки не должны длиться вечно, но и
+ * обрываться раньше конца не должны — «Все правила» в правах это ~150 строк по
+ * четыре действия, ~590 остановок до выхода в навигацию.
+ */
+const MAX_TABS = 1000;
 
 /** Снимок текущего фокуса: что это, где оно и видно ли кольцо. */
 const snapshot = () => {
@@ -48,8 +53,13 @@ const snapshot = () => {
     .slice(0, 50);
   const path = [];
   for (let node = el; node && node !== document.body; node = node.parentElement) {
+    // Строка виртуального списка узнаётся по своему номеру (`data-index`), а не
+    // по месту среди соседей: при прокрутке узлы переиспользуются, и 24-й узел
+    // холста — сперва строка 23, потом строка 40. По месту обход счёл бы новую
+    // строку пройденной и оборвал круг посреди списка.
+    const row = node.getAttribute('data-index');
     const index = node.parentElement ? Array.from(node.parentElement.children).indexOf(node) : 0;
-    path.push(`${node.tagName.toLowerCase()}:${index}`);
+    path.push(`${node.tagName.toLowerCase()}${row === null ? `:${index}` : `#${row}`}`);
   }
   // Кольцо фокуса: outline либо box-shadow на самом элементе. Поле ввода
   // может рисовать обводку контейнером (`.box:focus-within`, как композер
@@ -113,7 +123,16 @@ async function sweep(page) {
 async function checkDialog(page) {
   const create = await findCreateButton(page);
   if (!create) return { note: 'нет кнопки создания', problem: null };
-  await create.focus();
+  // Локатор ищет кнопку заново при каждом действии; пропала насовсем — это
+  // находка с названием, а не падение всего обхода на таймауте фокуса.
+  const focused = await create.focus({ timeout: 5000 }).then(
+    () => true,
+    () => false,
+  );
+  if (!focused) {
+    const note = 'кнопка создания исчезла между поиском и фокусом';
+    return { note, problem: note };
+  }
   await page.keyboard.press('Enter');
   const box = page.locator('[role="dialog"]').first();
   const opened = await box.waitFor({ state: 'visible', timeout: 2500 }).then(
@@ -138,7 +157,9 @@ async function checkDialog(page) {
   let returned = false;
   for (let waited = 0; closed && !returned && waited < 2500; waited += 100) {
     await page.waitForTimeout(100);
-    returned = await create.evaluate((el) => el === document.activeElement);
+    returned = await create
+      .evaluate((el) => el === document.activeElement, null, { timeout: 500 })
+      .catch(() => false);
   }
   const note = `модалка: фокус внутри ${focusInside ? 'да' : 'НЕТ'}, Escape ${closed ? 'закрывает' : 'НЕ закрывает'}, фокус ${returned ? 'вернулся' : 'НЕ вернулся'}`;
   return { note, problem: focusInside && closed && returned ? null : note };
@@ -149,12 +170,24 @@ async function checkDialog(page) {
  * проверяется единственное, что от неё требуется с клавиатуры: Escape закрывает.
  */
 async function checkOpenDialog(page) {
-  const box = page.locator('[role="dialog"]').first();
+  // Окна бывают вложенными (окно шага поверх окна группы): Escape закрывает
+  // одно верхнее. Ждём, что видимых окон стало меньше: `.last()` после
+  // закрытия верхнего молча указал бы на нижнее, и проверка врала бы «НЕ
+  // закрывает».
+  const shown = page.locator('[role="dialog"]').filter({ visible: true });
+  const before = await shown.count();
+  // Показанная подсказка по WCAG 1.4.13 первой уходит по Escape — окно
+  // закрывает второе нажатие, так же как у человека.
+  if ((await page.locator('[role="tooltip"]:visible').count()) > 0) {
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(200);
+  }
   await page.keyboard.press('Escape');
-  const closed = await box.waitFor({ state: 'hidden', timeout: 2500 }).then(
-    () => true,
-    () => false,
-  );
+  let closed = false;
+  for (let waited = 0; waited < 2500 && !closed; waited += 100) {
+    await page.waitForTimeout(100);
+    closed = (await shown.count()) < before;
+  }
   const note = `открытая модалка: Escape ${closed ? 'закрывает' : 'НЕ закрывает'}`;
   return { note, problem: closed ? null : note };
 }
@@ -201,6 +234,19 @@ async function checkNavEnter(page, path) {
   return { note, problem: moved ? null : note };
 }
 
+// `--only <строка>` — разделы, чей путь, имя или slug содержит строку (под Git
+// Bash без ведущего `/`: он превращает `/hooks` в путь Windows).
+const onlyAt = process.argv.indexOf('--only');
+const only = onlyAt >= 0 ? process.argv[onlyAt + 1] : undefined;
+const entries = PANEL_PAGES.filter(
+  (entry) => !only || entry.path.includes(only) || entry.name.includes(only) || entry.slug === only,
+);
+// Фильтр, под который не подошёл ни один раздел, — не «обход чист».
+if (entries.length === 0) {
+  console.log(`Ни один раздел не подошёл под --only «${only}» — обходить нечего.`);
+  process.exit(2);
+}
+
 const browser = await chromium.launch();
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 const page = await context.newPage();
@@ -208,8 +254,35 @@ await bypassOnboarding(page);
 
 const problems = [];
 const summary = [];
+const unverified = [];
 
-for (const entry of PANEL_PAGES) {
+/**
+ * Живой стенд перезагружает страницу сам, когда соседняя правка задевает модуль
+ * без горячей замены: посреди проверки это «Execution context was destroyed», и
+ * весь обход падал на одном разделе, не напечатав ни строки. Такой сбой — про
+ * стенд, а не про раздел: раздел проверяется заново, один раз.
+ */
+const RELOADED = /Execution context was destroyed|because of a navigation|net::ERR_ABORTED/i;
+
+for (const entry of entries) {
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    try {
+      await checkEntry(entry);
+      break;
+    } catch (error) {
+      const message = String(error.message).split('\n')[0];
+      if (attempt === 1 && RELOADED.test(message)) continue;
+      // Раздел, который не открылся или не дал себя проверить (стенд лёг,
+      // подмена отстала от разметки), — непроверенный поимённо, а не повод
+      // уронить обход остальных.
+      unverified.push(`${entry.name} (${entry.path}): ${message}`);
+      break;
+    }
+  }
+}
+
+/** Один раздел целиком; в итог пишет только в конце, чтобы повтор не удвоил строки. */
+async function checkEntry(entry) {
   const { path, name } = entry;
   await openPanelPage(page, BASE, entry);
 
@@ -268,8 +341,16 @@ for (const entry of PANEL_PAGES) {
 await browser.close();
 
 console.log(summary.join('\n'));
+if (unverified.length > 0) {
+  console.log(`\nНЕ ПРОВЕРЕНО (${unverified.length}):\n  · ${unverified.join('\n  · ')}`);
+}
 if (problems.length > 0) {
   console.log(`\nПроблемы (${problems.length}):\n  · ${problems.join('\n  · ')}`);
+  process.exit(1);
+}
+// Непроверенный раздел — не «чисто»: обход с дырой не выдаётся за зелёный.
+if (unverified.length > 0) {
+  console.log('\nПроблем не найдено, но обход неполон.');
   process.exit(1);
 }
 console.log('\nКлавиатурный обход чист.');

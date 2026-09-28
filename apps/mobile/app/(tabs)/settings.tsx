@@ -7,6 +7,7 @@ import { colors, font, radius, space } from '../../src/shared/config/theme';
 import { setLanguage, useLanguage, useT, type Language } from '../../src/shared/config/i18n';
 import { clearConnection, isConfigured, useConnection } from '../../src/shared/api/connection';
 import { registerForPush } from '../../src/shared/lib/notifications';
+import { usePullRefresh } from '../../src/shared/lib/pull-refresh';
 import {
   useForgetDevice,
   useRemote,
@@ -37,6 +38,7 @@ export default function SettingsScreen() {
   const router = useRouter();
   const connection = useConnection();
   const remote = useRemote();
+  const pull = usePullRefresh(remote.refetch);
   const update = useRemoteUpdate();
   const forget = useForgetDevice();
   const test = useTestNotification();
@@ -60,8 +62,8 @@ export default function SettingsScreen() {
       scroll
       refreshControl={
         <RefreshControl
-          refreshing={remote.isFetching}
-          onRefresh={() => void remote.refetch()}
+          refreshing={pull.refreshing}
+          onRefresh={pull.onRefresh}
           tintColor={colors.accent}
         />
       }

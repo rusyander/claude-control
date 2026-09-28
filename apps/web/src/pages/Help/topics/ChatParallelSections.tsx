@@ -1,11 +1,11 @@
 import { useTranslation } from 'react-i18next';
-import { HelpSection, Callout, OptionCards } from '../ui';
+import { HelpSection, Callout, OptionCards, GuideSteps, GuideStep, HelpShot } from '../ui';
 
 /**
  * Соседние разделы документа «Чат» об одном и том же: как работа одного проекта
  * расходится по нескольким разговорам — копии репозитория руками, разделение
- * задач, которое предлагает сам агент, подбор модели под каждую группу и
- * продолжение закрытого этапа в чистой сессии. Вынесены из `ChatTopic` целиком:
+ * задач, которое предлагает сам агент, подбор модели под каждую группу, группа
+ * и автономность чата и продолжение закрытого этапа в чистой сессии. Вынесены из `ChatTopic` целиком:
  * вместе они переваливали документ за предел длины файла.
  */
 export function ChatParallelSections() {
@@ -45,6 +45,7 @@ export function ChatParallelSections() {
             { title: tr('splitCard'), text: tr('splitCardText') },
             { title: tr('splitWhat'), text: tr('splitWhatText') },
             { title: tr('splitDeliver'), text: tr('splitDeliverText') },
+            { title: tr('splitSieves'), text: tr('splitSievesText') },
             { title: tr('splitReview'), text: tr('splitReviewText') },
             { title: tr('splitTree'), text: tr('splitTreeText') },
             { title: tr('splitParent'), text: tr('splitParentText') },
@@ -68,6 +69,9 @@ export function ChatParallelSections() {
             { title: tr('cascadeReview'), text: tr('cascadeReviewText') },
             { title: tr('cascadeLevels'), text: tr('cascadeLevelsText') },
             { title: tr('cascadeHub'), text: tr('cascadeHubText') },
+            { title: tr('cascadeDelivery'), text: tr('cascadeDeliveryText') },
+            { title: tr('cascadeControl'), text: tr('cascadeControlText') },
+            { title: tr('cascadeRules'), text: tr('cascadeRulesText') },
             { title: tr('cascadeOverlap'), text: tr('cascadeOverlapText') },
             { title: tr('cascadePause'), text: tr('cascadePauseText') },
             { title: tr('cascadeManual'), text: tr('cascadeManualText') },
@@ -77,6 +81,24 @@ export function ChatParallelSections() {
           ]}
         />
         <Callout tone="warning" title={tr('cascadeNote')} />
+      </HelpSection>
+
+      {/* Группа и автономность чата — чем и насколько сами идут эти разговоры:
+          выбор под вопросом агента и путь критичного обратно к человеку. */}
+      <HelpSection title={tr('autonomyTitle')} caption={tr('autonomyCaption')}>
+        <GuideSteps>
+          <GuideStep title={tr('autonomyMenu')} text={tr('autonomyMenuText')}>
+            <HelpShot topic="chat" scenario="autonomy" frame="03-menu" side="panel" />
+          </GuideStep>
+          <GuideStep title={tr('autonomyPick')} text={tr('autonomyPickText')}>
+            <HelpShot topic="chat" scenario="autonomy" frame="02-auto-pick" side="panel" />
+          </GuideStep>
+          <GuideStep title={tr('autonomyEscalation')} text={tr('autonomyEscalationText')}>
+            <HelpShot topic="chat" scenario="autonomy" frame="01-escalation" side="panel" />
+          </GuideStep>
+          <GuideStep title={tr('autonomyWhere')} text={tr('autonomyWhereText')} />
+        </GuideSteps>
+        <Callout tone="warning" title={tr('autonomyNote')} />
       </HelpSection>
 
       {/* Продолжение в чистой сессии: там работа расходится вширь, здесь —

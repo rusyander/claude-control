@@ -153,7 +153,7 @@ await page.route('**/api/chat/handoff', (route) => {
       chatId: 'new-1',
       path: CHAT_PATH,
       started: handoffBody.startRun === true,
-      prompt: `Это новая сессия.\n${handoffBody.proposal.next}`,
+      prompt: `This is a new session.\n${handoffBody.proposal.next}`,
       chainDepth: 2,
     },
   });
@@ -311,7 +311,7 @@ check(
   'о заведённом чате сказано человеку',
 );
 check(
-  (await page.locator('textarea').first().inputValue()).includes('Это новая сессия'),
+  (await page.locator('textarea').first().inputValue()).includes('This is a new session'),
   'задание положено в поле ввода нового разговора',
 );
 

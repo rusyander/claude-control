@@ -1,0 +1,137 @@
+{
+  "topic": "claudeMd",
+  "frames": {
+    "file/01-editor": {
+      "light-ru": {
+        "file": "01-editor.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "light-en": {
+        "file": "01-editor.en.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-ru": {
+        "file": "01-editor.dark.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-en": {
+        "file": "01-editor.dark.en.png",
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    "file/02-unsaved": {
+      "light-ru": {
+        "file": "02-unsaved.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "light-en": {
+        "file": "02-unsaved.en.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-ru": {
+        "file": "02-unsaved.dark.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-en": {
+        "file": "02-unsaved.dark.en.png",
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    "file/03-conflict": {
+      "light-ru": {
+        "file": "03-conflict.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "light-en": {
+        "file": "03-conflict.en.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-ru": {
+        "file": "03-conflict.dark.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-en": {
+        "file": "03-conflict.dark.en.png",
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    "layers/01-projects": {
+      "light-ru": {
+        "file": "01-projects.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "light-en": {
+        "file": "01-projects.en.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-ru": {
+        "file": "01-projects.dark.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-en": {
+        "file": "01-projects.dark.en.png",
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    "layers/02-project-file": {
+      "light-ru": {
+        "file": "02-project-file.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "light-en": {
+        "file": "02-project-file.en.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-ru": {
+        "file": "02-project-file.dark.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-en": {
+        "file": "02-project-file.dark.en.png",
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    "layers/03-project-local": {
+      "light-ru": {
+        "file": "03-project-local.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "light-en": {
+        "file": "03-project-local.en.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-ru": {
+        "file": "03-project-local.dark.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-en": {
+        "file": "03-project-local.dark.en.png",
+        "width": 1440,
+        "height": 1000
+      }
+    }
+  }
+}

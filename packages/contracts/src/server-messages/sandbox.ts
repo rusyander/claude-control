@@ -12,6 +12,7 @@ export const sandboxMessageParams = {
   'sandbox-hook-exit-2': [],
   'sandbox-hook-no-decision': ['code'],
   'sandbox-hook-not-started': [],
+  'sandbox-hook-signal': ['signal'],
   'sandbox-wipe-failed': ['reason'],
   'sandbox-remove-failed': ['path', 'reason'],
 } as const satisfies Record<string, readonly string[]>;

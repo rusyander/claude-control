@@ -146,6 +146,21 @@ reading code. No stand, no installed CLI.
 Everything else about the contour is proved on frames built inside the test that reads them — green
 there is compatible with nothing passing over a real wire.
 
+## Tests block — agentdeck tests itself through it
+
+Owner 27.09.2026: the Tests block is the product, so agentdeck's own QA runs THROUGH it — a check
+run beside it proves nothing about the block. Store: `.agent/tests/` (cases, groups, history).
+
+- A case is linked by `automation={status:'automated', file, testName?}` (testName = vitest
+  "describe > it" for unit files). Run: `node tools/tests-cli.mjs run --project . [--group g]`;
+  `tools/qa/junit-run.mjs` turns exit-code scripts and vitest into JUnit `[caseId]` testcases,
+  `--health <url>` records a stand restart as skipped, never failed.
+- A verdict on a case comes only from a run recorded in the block's history, not from a local run.
+- A new QA script is linked to its case in the same pass that writes it.
+- A red result is classified before it is reported: product defect, stale check, or stand down.
+- Never link a script that writes real config (`~/.claude*`, the contour, transcripts): a linked
+  case gets run unattended.
+
 ## Layer boundaries — checked, not just described
 
 Both apps' layer maps are machine-enforced by `.dependency-cruiser.cjs` (`pnpm depcruise`), NOT by

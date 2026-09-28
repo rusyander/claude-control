@@ -1,0 +1,63 @@
+/* Подписи слева, значения справа; на узком экране — друг под другом. */
+.facts {
+  display: grid;
+  grid-template-columns: minmax(120px, max-content) minmax(0, 1fr);
+  gap: var(--spacing-sm) var(--spacing-md);
+  margin: 0;
+
+  dt {
+    padding-top: 2px;
+  }
+
+  dd {
+    margin: 0;
+    min-width: 0;
+  }
+
+  @media (max-width: 560px) {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--spacing-3xs);
+
+    dd {
+      margin-bottom: var(--spacing-sm);
+    }
+  }
+}
+
+.path {
+  overflow-wrap: anywhere;
+}
+
+.block {
+  display: block;
+  margin-top: var(--spacing-3xs);
+}
+
+/* Текст шага — как написан: переносы строк значимы. */
+.text {
+  display: block;
+  max-width: 72ch;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.knobs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.knob {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--spacing-3xs);
+}
+
+.quote {
+  max-width: 72ch;
+  overflow-wrap: anywhere;
+}

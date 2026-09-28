@@ -19,7 +19,7 @@ import { serverFieldText } from '@shared/config/i18n';
  * можно без модели — за доли секунды и бесплатно. Два режима: готовые
  * заготовки типовых случаев и свой ввод — произвольное JSON-событие руками.
  */
-export function HookProbePanel({ sandboxId, hookId, scriptName }: HookProbePanelProps) {
+export function HookProbePanel({ sandboxId, hookId, scriptName, isReady }: HookProbePanelProps) {
   const { t } = useTranslation();
   const fixtures = useEventFixtures();
   const probe = useProbeHook();
@@ -111,6 +111,7 @@ export function HookProbePanel({ sandboxId, hookId, scriptName }: HookProbePanel
               leftIcon={<Icon name="check" size={24} />}
               onClick={runFixtures}
               isLoading={probe.isPending}
+              disabled={!isReady}
             >
               {selected.length > 0 ? t('sandbox.runSelected') : t('sandbox.runAll')}
             </Button>
@@ -141,6 +142,7 @@ export function HookProbePanel({ sandboxId, hookId, scriptName }: HookProbePanel
               leftIcon={<Icon name="check" size={24} />}
               onClick={runCustom}
               isLoading={probe.isPending}
+              disabled={!isReady}
             >
               {t('sandbox.runCustom')}
             </Button>

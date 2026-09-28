@@ -1,4 +1,10 @@
-import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import {
+  useIsMutating,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+} from '@tanstack/react-query';
 import type {
   Platform,
   PlatformActivationResult,
@@ -308,6 +314,13 @@ export function usePlatformRunPlan(consumer: string) {
   });
 }
 
+const PLATFORM_SAVE_KEY = ['platform-save'] as const;
+
+/** Идёт ли сохранение контура: собранный посреди чужой записи, он вернул бы её назад. */
+export function useIsPlatformSaving(): boolean {
+  return useIsMutating({ mutationKey: PLATFORM_SAVE_KEY }) > 0;
+}
+
 /** Сохранить контур целиком (и ключ, если его тронули). */
 export function useSavePlatform({
   silentError = false,
@@ -319,6 +332,24 @@ export function useSavePlatform({
   return useMutation({
     meta: { silentError },
     mutationFn: savePlatform,
+    mutationKey: PLATFORM_SAVE_KEY,
+    // Писатели контура (разделы на карточке, «чьи правила», поля правил) шлют
+    // PUT полной заменой, каждый собирает контур из снимка списка. Сохранения
+    // идут по одному, а снимок обновляется сразу по щелчку: иначе второй
+    // переключатель, щёлкнутый до перечитывания списка, собирал контур из
+    // старого снимка и молча откатывал первый (ревью 28.09 F-83).
+    scope: { id: 'platform-save' },
+    onMutate: async ({ platform }) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.platforms });
+      const put = (status: PlatformStatus) =>
+        status.platform.id === platform.id ? { ...status, platform } : status;
+      queryClient.setQueryData<PlatformsInfo>(
+        queryKeys.platforms,
+        (info) => info && { ...info, platforms: info.platforms.map(put) },
+      );
+    },
+    // Отказ — снимок с сервера: оптимистичная правка не должна остаться на экране.
+    onError: () => void queryClient.invalidateQueries({ queryKey: queryKeys.platforms }),
     onSuccess: (_status, variables) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.platforms });
       void queryClient.invalidateQueries({

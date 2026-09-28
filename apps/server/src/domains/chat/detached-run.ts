@@ -26,7 +26,8 @@ export const DETACHED_DONE_NOTICE =
 
 export interface DetachedRunDeps {
   isAlive?: (pid: number) => boolean;
-  kill?: (pid: number) => void;
+  /** Снять дерево; номера, по которым ушёл сигнал (`killPidTree`). `void` — не известно. */
+  kill?: (pid: number) => readonly number[] | void;
   pollMs?: number;
 }
 
@@ -37,7 +38,7 @@ export interface DetachedRunDeps {
 export class DetachedRun {
   readonly pid: number;
   private readonly isAlive: (pid: number) => boolean;
-  private readonly kill: (pid: number) => void;
+  private readonly kill: (pid: number) => readonly number[] | void;
   private readonly pollMs: number;
   private readonly startedAt: number;
   private timer: ReturnType<typeof setInterval> | undefined;
@@ -47,7 +48,12 @@ export class DetachedRun {
     this.pid = pid;
     this.startedAt = startedAt;
     this.isAlive = deps.isAlive ?? isPidAlive;
-    this.kill = deps.kill ?? ((target) => killPidTree(target));
+    // Прогон усыновляют сразу после проверки «жив и похож на CLI»: этот момент —
+    // когда номер точно был нашим. CLI умер, номер занял чужой — «Остановить»
+    // его не тронет (`spawnedAt`). `startedAt` журнала для этого не годится: он
+    // бывает раньше создания самого CLI.
+    const adoptedAt = Date.now();
+    this.kill = deps.kill ?? ((target) => killPidTree(target, { spawnedAt: adoptedAt }));
     this.pollMs = deps.pollMs ?? DETACHED_POLL_MS;
   }
 
@@ -76,14 +82,25 @@ export class DetachedRun {
     });
   }
 
-  /** «Остановить»: валим дерево по pid и закрываем прогон, не дожидаясь опроса. */
-  stop(): void {
-    this.clear();
+  /**
+   * «Остановить»: валим дерево по pid и закрываем прогон, не дожидаясь опроса.
+   *
+   * `'unconfirmed'` — сигнал не ушёл никуда, а процесс жив: номер не проверить
+   * (нет снимка процессов, F-205), и чужое панель не трогает (F-145). Тогда
+   * прогон НЕ закрываем: опрос продолжается и закроет его по смерти процесса,
+   * а реестр оставит запись журнала — следующее «Остановить» или усыновление
+   * после перезапуска доведут дело. Закрыть здесь значило бы бросить живой CLI
+   * без присмотра со словом «остановлено».
+   */
+  stop(): 'unconfirmed' | void {
+    let killed: readonly number[] | void = undefined;
     try {
-      this.kill(this.pid);
+      killed = this.kill(this.pid);
     } catch {
       // Процесс уже умер — реестр всё равно закрывает прогон.
     }
+    if (killed && killed.length === 0 && this.isAlive(this.pid)) return 'unconfirmed';
+    this.clear();
     this.resolve?.();
     this.resolve = undefined;
   }

@@ -50,7 +50,7 @@ export function LoweredRunsCard() {
           )}
         </Stack>
 
-        <Typography variant="caption" color="subtle" style={{ maxWidth: 'var(--text-measure)' }}>
+        <Typography variant="caption" color="subtle" className="prose">
           {t('analytics.lowered.hint')}
         </Typography>
 

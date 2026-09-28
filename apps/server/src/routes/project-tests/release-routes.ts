@@ -13,6 +13,10 @@ import {
   exportReleasePdf,
   type ReleaseExportFormat,
 } from '../../domains/project-tests/export-release.ts';
+import {
+  exportLanguage,
+  type ExportLanguage,
+} from '../../domains/project-tests/export-run-texts.ts';
 import { guardAsync, requireRoot, type TestsDeps } from './shared.ts';
 
 /**
@@ -33,7 +37,11 @@ import { guardAsync, requireRoot, type TestsDeps } from './shared.ts';
  */
 export function registerTestReleaseRoutes(app: FastifyInstance, deps: TestsDeps): void {
   /** Сборка документа — общая для экрана, файла и печати. */
-  async function collect(root: string, release: string): Promise<ProjectTestReleaseDocument> {
+  async function collect(
+    root: string,
+    release: string,
+    lang: ExportLanguage,
+  ): Promise<ProjectTestReleaseDocument> {
     const groups = readGroups(root);
     const runs = readRuns(root, 200);
     const coverage = await buildCoverage(
@@ -41,13 +49,22 @@ export function registerTestReleaseRoutes(app: FastifyInstance, deps: TestsDeps)
       groups,
     );
     const { branch, commit } = gitContext(root);
-    return buildRelease(release, groups, runs, {
+    const doc = buildRelease(release, groups, runs, {
       coverage,
       branch,
       commit,
       now: new Date().toISOString(),
+      lang,
     });
+    // Оговорка трекера едет с кодом: по нему английский документ и экран
+    // переводят её, а русская строка остаётся запасной.
+    return coverage.warningCode
+      ? { ...doc, warningCode: coverage.warningCode, warningParams: coverage.warningParams }
+      : doc;
   }
+
+  /** Язык документа — язык интерфейса, как у отчёта по прогону. */
+  const language = (): ExportLanguage => exportLanguage(deps.ctx.store.getSettings().language);
 
   /**
    * Документ для экрана; без `release` — список вех, которые вообще есть в
@@ -63,7 +80,8 @@ export function registerTestReleaseRoutes(app: FastifyInstance, deps: TestsDeps)
         if (!release) return { releases: releaseNames(readRuns(root, 200)) };
         return {
           releases: releaseNames(readRuns(root, 200)),
-          document: await collect(root, release),
+          // Экран — на языке панели: заметку кейса карточка показывает как есть.
+          document: await collect(root, release, language()),
         };
       });
     },
@@ -88,7 +106,8 @@ export function registerTestReleaseRoutes(app: FastifyInstance, deps: TestsDeps)
         });
       }
       return guardAsync(reply, async () => {
-        const file = exportRelease(await collect(root, release), format);
+        const lang = language();
+        const file = exportRelease(await collect(root, release, lang), format, lang);
         return reply
           .header('Content-Disposition', `attachment; filename="${file.filename}"`)
           .type(file.contentType)
@@ -113,7 +132,8 @@ export function registerTestReleaseRoutes(app: FastifyInstance, deps: TestsDeps)
           .code(400)
           .send({ message: 'Не указана веха.', messageCode: 'release-unspecified' });
       return guardAsync(reply, async () => {
-        const file = await exportReleasePdf(await collect(root, release));
+        const lang = language();
+        const file = await exportReleasePdf(await collect(root, release, lang), lang);
         return reply
           .type(file.contentType)
           .header('Content-Disposition', `attachment; filename="${file.filename}"`)

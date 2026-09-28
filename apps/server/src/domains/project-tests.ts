@@ -69,11 +69,11 @@ export {
   writeRun,
 } from './project-tests/runs-store.ts';
 export { diffRuns, diffWithPrevious, failedCases } from './project-tests/compare.ts';
-export { changedFiles, gitContext, impactOf } from './project-tests/impact.ts';
+export { changedFiles, gitContext, impactOf, viewGitContext } from './project-tests/impact.ts';
 export { historyOf } from './project-tests/history.ts';
 export { ProjectTestManualRegistry, remainingPoints } from './project-tests/manual.ts';
 export { availableTargets, buildDraft, createDefect } from './project-tests/defects.ts';
-export { saveAttachment } from './project-tests/attachments.ts';
+export { attachmentFile, saveAttachment } from './project-tests/attachments.ts';
 export {
   DEFAULT_MAX_DIFF_RATIO,
   acceptBaseline,
@@ -106,5 +106,35 @@ export { DEFAULT_DIFF_RANGE, collectSource, stampOf } from './project-tests/gene
 export { buildPlanPreview, toPlan } from './project-tests/plan-recipes.ts';
 export { suggestTaxonomy } from './project-tests/taxonomy.ts';
 export { conventionFile, hasConvention, installConvention } from './project-tests/convention.ts';
-export { ProjectTestRunRegistry } from './project-tests/runs.ts';
-export { repairFutureStamps, type RepairedStamp } from './project-tests/repair.ts';
+export { ProjectTestRunRegistry, reapProjectTestOrphans } from './project-tests/runs.ts';
+export { E2E_JUNIT_REPORT, PANEL_E2E_DIR } from './project-tests/e2e-scaffold.ts';
+export {
+  chooseE2eFolder,
+  createE2eFolder,
+  e2eDirOf,
+  e2eFolderView,
+  removeE2eFolder,
+  specFiles,
+} from './project-tests/e2e-folder.ts';
+export { parseSpec } from './project-tests/e2e-parse.ts';
+export { AUTOMATION_FILE, automationCommand, readAutomation } from './project-tests/automation.ts';
+export { assertProjectOrCopy, isProjectOrCopy } from './project-tests/project-gate.ts';
+export { parsePytest } from './project-tests/e2e-parse-pytest.ts';
+export {
+  fullTestName,
+  groupIdOfFile,
+  onboardE2e,
+  parseSpecFile,
+  syncE2eFolder,
+  syncE2eIfChanged,
+} from './project-tests/e2e-sync.ts';
+export { E2eRunRegistry, e2eCommand, e2eReportPath } from './project-tests/e2e-run.ts';
+export { createE2eWatch, type E2eWatch } from './project-tests/e2e-watch.ts';
+export { buildPyramid } from './project-tests/pyramid.ts';
+export { e2eChatLine } from './project-tests/e2e-chat.ts';
+export {
+  repairFutureStamps,
+  settleOrphanRuns,
+  ORPHAN_RUN_ERROR,
+  type RepairedStamp,
+} from './project-tests/repair.ts';

@@ -68,7 +68,8 @@ export const skillsEn: typeof skillsRu = {
       pathTextText:
         'The panel writes a folder into skills/ → at session start Claude Code walks ' +
         'that directory alone and takes the name/description header out of every ' +
-        'SKILL.md → once a task matches a description, the skill body is pulled in → ' +
+        'SKILL.md, then keeps watching it: a new or edited skill arrives without a ' +
+        'restart → once a task matches a description, the skill body is pulled in → ' +
         'nested files are read only when SKILL.md links to them. Switching off means ' +
         'moving the folder into the neighbouring skills-disabled/: the files are ' +
         'intact, but Claude no longer sees them.',
@@ -123,7 +124,7 @@ export const skillsEn: typeof skillsRu = {
         '"2 files": it is a folder with modules.',
       lSearch: 'Search covers descriptions too',
       lSearchText:
-        'The query "миграции" matched no name and no description — and the page says ' +
+        'The query "миграции" (“migrations”) matched no name and no description — and the page says ' +
         'exactly that, naming the query. A missed search does not pose as an empty ' +
         'section: the sidebar counter stays at 4.',
       lFiles: 'The file counter expands into a tree',
@@ -244,15 +245,18 @@ export const skillsEn: typeof skillsRu = {
       'things and worth keeping apart.',
     assistantForm: 'The form assistant',
     assistantFormText:
-      'Fills in the name, description and skill text from your account of the task. ' +
-      'The result is visible before saving, and the dialogue can go on with ' +
-      'clarifications.',
+      'Fills in the name, description and skill text from your account of the task, ' +
+      'picks a structure template (before creation) and proposes a new folder name ' +
+      '(when editing — the Rename button applies it). The result is visible before saving, ' +
+      'and the dialogue can go on with clarifications.',
     assistantStructure: 'The structure assistant',
     assistantStructureText:
       'It returns not fields but a list of files with content and lays them out in ' +
       'the skill folder. Existing files are updated, new ones added, nothing is ' +
       'deleted on its own. It works step by step: the structure can be refined in ' +
-      'the same dialogue.',
+      'the same dialogue. Secrets in the files (tokens, keys, passwords) are never shown ' +
+      'to it — it sees a mask, and the secret goes back only if its line stayed the same; ' +
+      'otherwise the file is not written and is named under the reply.',
     assistantNote:
       "The structure assistant sees the skill's current tree and edits it " +
       'sensibly, but large files are shown to it truncated — a very long file may ' +
@@ -268,8 +272,8 @@ export const skillsEn: typeof skillsRu = {
       "edited in the Projects section; a plugin's skills live in its installation directory",
     limitReach: 'When it reaches Claude',
     limitReachValue:
-      'from the start of the next session. An open conversation will not see a new skill — ' +
-      'neither in the terminal nor in the panel chat',
+      'right away: Claude Code watches the skills/ directory and picks up a new or edited skill ' +
+      'without a restart — an open conversation too, in the terminal and in the panel chat',
     limitWhatCounts: 'What counts as a skill',
     limitWhatCountsValue:
       'a folder inside skills/ (or skills-disabled/) that contains a SKILL.md. A folder ' +
@@ -370,7 +374,8 @@ export const skillsEn: typeof skillsRu = {
     living: {
       '01-list':
         'Four skills with sizes; db-migrations is marked "Disabled" yet stays in the counter',
-      '02-search': 'The search for "миграции" found nothing — and the page says exactly that',
+      '02-search':
+        'The search for "миграции" (“migrations”) found nothing — and the page says exactly that',
       '03-files':
         'The "2 files" counter expanded into a tree: references/examples.md and references/format.md',
       '04-off':

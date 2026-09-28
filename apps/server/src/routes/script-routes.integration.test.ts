@@ -129,6 +129,27 @@ describe('роуты скриптов: работают при любом акт
    * `myscript.mjs`, а настоящий хук молча продолжал работать со старым кодом;
    * DELETE не удалял ничего и всё равно отвечал ok:true.
    */
+  // [P1] Скрипт запускается заново на каждое событие хука — правка действует со
+  // следующего события (так и сказано в справке «Скрипты»). Ответ needsRestart:true
+  // заставлял агента панели говорить «нужен перезапуск» — ложь пользователю.
+  it('[P1] создание, правка и удаление скрипта не требуют перезапуска CLI', async () => {
+    await bootWith('claude');
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/scripts',
+      payload: { name: 'fresh.mjs', content: '// 1\n' },
+    });
+    expect(created.json<{ needsRestart?: boolean }>().needsRestart).toBe(false);
+    const saved = await app.inject({
+      method: 'PUT',
+      url: '/api/scripts/fresh.mjs',
+      payload: { content: '// 2\n' },
+    });
+    expect(saved.json<{ needsRestart?: boolean }>().needsRestart).toBe(false);
+    const removed = await app.inject({ method: 'DELETE', url: '/api/scripts/fresh.mjs' });
+    expect(removed.json<{ needsRestart?: boolean }>().needsRestart).toBe(false);
+  });
+
   it('файл с пробелом в имени читается, правится и удаляется по своему id (BUG-7)', async () => {
     await bootWith('claude');
     const real = join(root, 'hooks', 'my script.mjs');

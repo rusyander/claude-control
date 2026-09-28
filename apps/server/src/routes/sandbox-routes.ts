@@ -356,7 +356,14 @@ export function registerSandboxRoutes(app: FastifyInstance, ctx: ServerContext):
       });
 
       try {
-        await run.start({ prompt, sessionId, cwd: workDir, configDir, env }, send);
+        // Только `user` — то есть каталог песочницы. Рабочая папка лежит под
+        // домашней, и слои проекта CLI собирал бы, поднимаясь по предкам до `~`:
+        // настоящий `~/.claude/CLAUDE.md` вошёл бы в прогон, который должен
+        // видеть лишь проверяемое. Своего проекта у песочницы нет — терять нечего.
+        await run.start(
+          { prompt, sessionId, cwd: workDir, configDir, settingSources: 'user', env },
+          send,
+        );
       } catch (error) {
         send({
           kind: 'error',

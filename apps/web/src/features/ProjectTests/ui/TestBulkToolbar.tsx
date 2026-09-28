@@ -5,8 +5,6 @@ import { Stack } from '@shared/ui/stack';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { Typography } from '@shared/ui/typography';
-import { SelectField } from '@shared/ui/select-field';
-import { TextField } from '@shared/ui/text-field';
 import { ConfirmDialog } from '@shared/ui/confirm-dialog';
 import type { TestBulkToolbarProps } from './TestBulkToolbar.types';
 import styles from './ProjectTests.module.scss';
@@ -75,78 +73,94 @@ export function TestBulkToolbar({
   const options = (values: readonly string[], prefix: string) =>
     values.map((item) => ({ value: item, label: t(`${prefix}.${item}`) }));
 
+  // Поля без подписей сверху — как в пульте прогона: подпись над каждым полем
+  // делала из панели блок в 80–145px, который сдвигал таблицу вниз при каждой
+  // отметке строки. Что за поле — говорят aria-label и плейсхолдер, подсказка
+  // целиком — во всплывающей подсказке.
+  const select = (label: string, current: string, items: { value: string; label: string }[]) => (
+    <select
+      className={styles.bulkControl}
+      aria-label={label}
+      title={label}
+      value={current}
+      onChange={(event) => setValue(event.target.value)}
+    >
+      {items.map((item) => (
+        <option key={item.value} value={item.value}>
+          {item.label}
+        </option>
+      ))}
+    </select>
+  );
+  const input = (label: string, hint: string) => (
+    <input
+      className={`${styles.bulkControl} ${styles.bulkInput}`}
+      type="text"
+      aria-label={label}
+      title={hint}
+      placeholder={hint}
+      value={value}
+      onChange={(event) => setValue(event.target.value)}
+    />
+  );
+
   return (
-    <Stack direction="row" gap="var(--spacing-xs)" align="end" wrap className={styles.bulk}>
+    <Stack direction="row" gap="var(--spacing-xs)" align="center" wrap className={styles.bulk}>
       <Typography variant="body-sm" weight="medium" as="span" className={styles.bulkCount}>
         {t('tests.bulk.selected', { count: checked.length })}
       </Typography>
 
-      <SelectField
-        label={t('tests.bulk.action')}
+      <select
+        className={styles.bulkControl}
+        aria-label={t('tests.bulk.action')}
+        title={t('tests.bulk.action')}
         value={action}
-        onChange={(next) => {
-          setAction(next as BulkAction);
+        onChange={(event) => {
+          setAction(event.target.value as BulkAction);
           setValue('');
         }}
-        options={options(ACTIONS, 'tests.bulk.actions')}
-      />
+      >
+        {options(ACTIONS, 'tests.bulk.actions').map((item) => (
+          <option key={item.value} value={item.value}>
+            {item.label}
+          </option>
+        ))}
+      </select>
 
-      {kind === 'text' && (
-        <TextField label={t('tests.bulk.tagValue')} value={value} onChange={setValue} />
-      )}
-      {kind === 'reason' && (
-        <TextField
-          label={t('tests.bulk.muteReason')}
-          hint={t('tests.bulk.muteReasonHint')}
-          value={value}
-          onChange={setValue}
-        />
-      )}
-      {kind === 'priority' && (
-        <SelectField
-          label={t('tests.library.priority')}
-          value={value || 'medium'}
-          onChange={setValue}
-          options={options(PRIORITIES, 'tests.priority')}
-        />
-      )}
-      {kind === 'readiness' && (
-        <SelectField
-          label={t('tests.library.readiness')}
-          value={value || 'ready'}
-          onChange={setValue}
-          options={options(READINESS, 'tests.readiness')}
-        />
-      )}
-      {kind === 'automation' && (
-        <SelectField
-          label={t('tests.library.automation')}
-          value={value || 'manual'}
-          onChange={setValue}
-          options={options(AUTOMATION, 'tests.automation')}
-        />
-      )}
-      {kind === 'section' && (
-        <TextField
-          label={t('tests.bulk.sectionValue')}
-          hint={sections.slice(0, 3).join(' · ')}
-          value={value}
-          onChange={setValue}
-        />
-      )}
-      {kind === 'group' && (
-        <SelectField
-          label={t('tests.bulk.groupValue')}
-          value={value}
-          onChange={setValue}
-          options={[
-            { value: '', label: t('tests.bulk.pickGroup') },
-            ...groups
-              .filter((group) => group.id !== groupId)
-              .map((group) => ({ value: group.id, label: group.title })),
-          ]}
-        />
-      )}
+      {kind === 'text' && input(t('tests.bulk.tagValue'), t('tests.bulk.tagValue'))}
+      {kind === 'reason' && input(t('tests.bulk.muteReason'), t('tests.bulk.muteReasonHint'))}
+      {kind === 'priority' &&
+        select(
+          t('tests.library.priority'),
+          value || 'medium',
+          options(PRIORITIES, 'tests.priority'),
+        )}
+      {kind === 'readiness' &&
+        select(
+          t('tests.library.readiness'),
+          value || 'ready',
+          options(READINESS, 'tests.readiness'),
+        )}
+      {kind === 'automation' &&
+        select(
+          t('tests.library.automation'),
+          value || 'manual',
+          options(AUTOMATION, 'tests.automation'),
+        )}
+      {kind === 'section' &&
+        input(
+          t('tests.bulk.sectionValue'),
+          sections.length > 0
+            ? `${t('tests.bulk.sectionValue')}: ${sections.slice(0, 3).join(' · ')}`
+            : t('tests.bulk.sectionValue'),
+        )}
+      {kind === 'group' &&
+        select(t('tests.bulk.groupValue'), value, [
+          { value: '', label: t('tests.bulk.pickGroup') },
+          ...groups
+            .filter((group) => group.id !== groupId)
+            .map((group) => ({ value: group.id, label: group.title })),
+        ])}
 
       <Button
         variant="primary"

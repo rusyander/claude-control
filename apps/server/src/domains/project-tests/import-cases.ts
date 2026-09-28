@@ -12,6 +12,8 @@ import type {
 } from '@agentdeck/contracts';
 import { toStatus, toSteps } from '@agentdeck/contracts/test-format';
 import { readZip } from '../../lib/zip.ts';
+import { csvCellValue } from '../../lib/csv-cell.ts';
+import { coded } from '../../lib/server-text.ts';
 import { ProjectFileError, resolveProjectPath } from '../project-files/paths.ts';
 import { ProjectTestsError } from './files.ts';
 import { findElements, textContent } from './import-xml.ts';
@@ -302,8 +304,12 @@ export function parseCsv(text: string, delimiter?: string): string[][] {
     row.push(value);
     rows.push(row);
   }
-  // Пустые хвостовые строки — обычный след редактора, а не запись.
-  return rows.filter((item) => item.some((cell) => cell.trim()));
+  // Пустые хвостовые строки — обычный след редактора, а не запись. Апостроф,
+  // которым наша выгрузка гасит формулу, снимается: иначе круг выгрузка → импорт
+  // дописывал бы его к названию.
+  return rows
+    .filter((item) => item.some((cell) => cell.trim()))
+    .map((item) => item.map((cell) => csvCellValue(cell)));
 }
 
 function detectDelimiter(source: string): string {
@@ -335,8 +341,17 @@ export function readXlsx(buffer: Buffer): string[][] {
   let entries;
   try {
     entries = readZip(buffer);
-  } catch (error) {
-    throw new ProjectTestsError(`Это не книга Excel: ${(error as Error).message}`);
+  } catch {
+    // Причина из ZIP («не найдена запись конца каталога») человеку ничего не
+    // говорит и склеивалась в «Это не книга Excel: Это не ZIP-архив: …». Нужен
+    // вывод и что делать — с кодом, чтобы английский интерфейс не показывал
+    // русский текст.
+    throw coded(
+      new ProjectTestsError(
+        'Это не книга Excel (xlsx): файл не открылся как архив. Сохраните таблицу как .xlsx или выгрузите в CSV.',
+      ),
+      'import-cases-xlsx-broken',
+    );
   }
 
   const shared = readSharedStrings(entries);

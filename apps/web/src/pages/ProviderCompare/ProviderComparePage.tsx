@@ -11,6 +11,8 @@ import { PageHeader } from '@shared/ui/page-header';
 import { SelectField } from '@shared/ui/select-field';
 import { SkeletonList } from '@shared/ui/skeleton';
 import { LoadErrorCard } from '@shared/ui/load-error';
+import { PageTabs, PageTabPanel } from '@shared/ui/page-tabs';
+import { usePageTab } from '@shared/hooks/use-page-tab';
 import { EmptyState } from '@shared/ui/empty-state';
 import { toast } from '@shared/lib/toast';
 import { useSettings } from '@entities/AppConfig';
@@ -18,6 +20,7 @@ import { useProviders } from '@entities/Provider';
 import { useProviderCompare, useMigrateProvider } from '@entities/ProviderCompare';
 import { WritePreviewDialog } from '@features/WritePreview';
 import { CompareSection } from './CompareSection';
+import { COMPARE_TABS, COMPARE_TAB_ICONS, type CompareTabId } from './model/tabs';
 import styles from './ProviderComparePage.module.scss';
 import { serverFieldText } from '@shared/config/i18n';
 
@@ -42,6 +45,7 @@ export function ProviderComparePage() {
 
   const [left, setLeft] = useState('');
   const [right, setRight] = useState('');
+  const { active: activeTab, select: selectTab } = usePageTab('compare', COMPARE_TABS);
 
   const options = useMemo(
     () => (providers?.providers ?? []).map((item) => ({ value: item.id, label: item.name })),
@@ -122,8 +126,12 @@ export function ProviderComparePage() {
 
   if (!settings || !providers) return <SkeletonList rows={4} />;
 
-  // Нижняя половина страницы: одинаковые стороны сравнивать нечего, дальше по
-  // порядку — загрузка, отказ сервера и сами секции сравнения.
+  const sections = compare.data?.sections ?? [];
+  const sectionOf = (id: CompareTabId): CompareSectionResult | undefined =>
+    sections.find((section) => section.section === id);
+
+  // Панель открытой вкладки: одинаковые стороны сравнивать нечего, дальше по
+  // порядку — загрузка, отказ сервера и сам раздел.
   const renderResult = (): ReactNode => {
     if (leftId === rightId) return <EmptyState icon="swap" title={t('providerCompare.samePair')} />;
     if (compare.isLoading) return <SkeletonList rows={4} />;
@@ -140,19 +148,34 @@ export function ProviderComparePage() {
         />
       );
     }
+    const section = sectionOf(activeTab);
+    if (!section) return <EmptyState icon="swap" title={t('providerCompare.empty')} />;
     return (
-      <Stack gap="var(--spacing-md)">
-        {compare.data?.sections.map((section: CompareSectionResult) => (
-          <CompareSection
-            key={section.section}
-            section={section}
-            busy={migrate.isPending}
-            onMigrate={askMigrate}
-          />
-        ))}
-      </Stack>
+      <CompareSection
+        key={section.section}
+        section={section}
+        busy={migrate.isPending}
+        onMigrate={askMigrate}
+      />
     );
   };
+
+  // Число на вкладке — сколько записей НЕ совпало: ради этого сравнение и
+  // открывают, и по нему видно, куда идти, не перебирая вкладки.
+  const tabs = COMPARE_TABS.map((id) => {
+    const section = leftId === rightId ? undefined : sectionOf(id);
+    return {
+      id,
+      label: t(`providerCompare.section.${id}`),
+      icon: COMPARE_TAB_ICONS[id],
+      ...(section
+        ? {
+            count: section.entries.filter((entry) => entry.state !== 'same').length,
+            countHint: t('pageTabs.compare.countHint'),
+          }
+        : {}),
+    };
+  });
 
   return (
     <Stack gap="var(--spacing-md)">
@@ -182,7 +205,17 @@ export function ProviderComparePage() {
         </Stack>
       </Card>
 
-      {renderResult()}
+      <PageTabs
+        page="compare"
+        label={t('pageTabs.compare.tabsLabel')}
+        tabs={tabs}
+        active={activeTab}
+        onSelect={selectTab}
+      />
+
+      <PageTabPanel page="compare" tab={activeTab} hint={t(`pageTabs.compare.hint.${activeTab}`)}>
+        {renderResult()}
+      </PageTabPanel>
 
       <WritePreviewDialog
         isOpen={pending !== undefined}

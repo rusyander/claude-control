@@ -1,7 +1,7 @@
-import { fileURLToPath } from 'node:url';
 import type { FastifyInstance } from 'fastify';
 import type { ServerContext } from '../../context.ts';
 import {
+  DEFAULT_HELP_WEB_SRC,
   loadHelpTopic,
   readHelpIndex,
   searchHelp,
@@ -13,8 +13,7 @@ import {
  * из действия, — чтобы действия справки шли тем же путём, что и все остальные.
  */
 
-/** Исходники веба рядом с сервером: справка живёт там и только там. */
-export const DEFAULT_HELP_WEB_SRC = fileURLToPath(new URL('../../../../web/src/', import.meta.url));
+export { DEFAULT_HELP_WEB_SRC };
 
 const toInt = (value: string | undefined, fallback: number, max: number): number => {
   const parsed = Number(value);
@@ -38,10 +37,18 @@ export function registerPanelHelpRoutes(
           .code(400)
           .send({ message: 'Пустой запрос к справке.', messageCode: 'panel-help-query-empty' });
       const language = languageOf(request.query.lang);
-      const found = await searchHelp(webSrc, language, query, {
+      const options = {
         offset: toInt(request.query.offset, 0, 1000),
         limit: toInt(request.query.limit, 5, 20) || 5,
-      });
+      };
+      const found = await searchHelp(webSrc, language, query, options);
+      // Человек спросил словами другого языка («хуки» при английской панели): те же темы
+      // есть и там, id общие — ищем там, а не отвечаем «в справке ничего нет».
+      if (found.total === 0) {
+        const other: HelpLanguage = language === 'ru' ? 'en' : 'ru';
+        const there = await searchHelp(webSrc, other, query, options);
+        if (there.total > 0) return { language: other, searchedFirst: language, ...there };
+      }
       return { language, ...found };
     },
   );

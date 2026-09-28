@@ -87,7 +87,8 @@ export function useSpeechRecognition(lang: string): SpeechRecognitionApi {
     });
     return () => {
       wantRef.current = false;
-      provider.stop();
+      // Не stop(): его сторож конца через 3 с позвал бы колбэки ушедшего хука.
+      provider.dispose();
     };
   }, [provider]);
 

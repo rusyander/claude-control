@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import type { TypographyProps } from './typography.types';
 
 /**
@@ -10,4 +11,15 @@ export function defaultTag(variant: TypographyProps['variant']): 'h1' | 'h2' | '
   if (variant === 'heading-sm') return 'h3';
   if (variant === 'caption' || variant === 'mono') return 'span';
   return 'p';
+}
+
+/**
+ * Стиль текста: свой стиль вызывающего плюс число строк обрезки. Обрезка
+ * ложится поверх — раньше `style` вызывающего приходил последним и стирал её.
+ */
+export function clampStyle(
+  clamp: number | undefined,
+  style: CSSProperties | undefined,
+): CSSProperties | undefined {
+  return clamp ? { ...style, WebkitLineClamp: clamp } : style;
 }

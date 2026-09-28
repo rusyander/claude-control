@@ -62,7 +62,12 @@ export function registerChatSplitRoutes(
     asks?: Pick<PendingAsks, 'forget'>;
   },
 ): void {
-  const tracker = deps.tracker ?? atlassianTicketTracker(ctx);
+  const tracker =
+    deps.tracker ??
+    atlassianTicketTracker(
+      () => ctx.store,
+      () => ctx.location.paths.appData,
+    );
 
   /** Родители, чей перезапуск ещё заводит копии (находка 19: ответ уходит раньше). */
   const relaunching = new Set<string>();
@@ -213,7 +218,7 @@ export function registerChatSplitRoutes(
 
       return {
         prompt: [
-          'Раздели задачи из этого разговора на независимые группы и предложи разделение.',
+          'Split the tasks of this conversation into independent groups and propose the split.',
           SPLIT_SYSTEM_PROMPT,
           cascade,
         ]
@@ -379,19 +384,29 @@ export function registerChatSplitRoutes(
       for (const [key, link] of Object.entries(links)) {
         if (link.conversation && dropped.has(link.conversation)) dropped.add(key);
       }
+      // Прежние прогоны снимаются ДО перезапуска: не подтверждённая остановка
+      // (F-145) оставила бы старый прогон писать в его копию рядом с новой
+      // жизнью группы, а его чат ушёл бы из пульта. Тогда не перезапускаем
+      // ничего и говорим человеку — снятые уже сняты, повтор их не тронет.
+      // Чат группы у чужого CLI — ключ с приставкой: его прогон гасит
+      // `providerChats`, а не реестр Claude (m2).
+      const unconfirmed = [...dropped].filter((key) => stopChatKey(deps, key) === 'unconfirmed');
+      if (unconfirmed.length > 0) {
+        relaunching.delete(parent);
+        const count = unconfirmed.length;
+        return reply.code(409).send({
+          message: `Не остановлено прогонов: ${count} — панель не смогла проверить их процессы и не тронула их. Перезапуск не начат: повторите, когда они завершатся или будут остановлены.`,
+          messageCode: 'split-relaunch-unconfirmed',
+          params: { count },
+        });
+      }
       dropFromTreePause(ctx, record.parentChatId, dropped);
       // Ответ — сразу, запуск — фоном (находка 19): копия с установкой зависимостей
       // заводится минутами, и кнопка, ждущая все копии, выглядела зависшей.
       // Ход перезапуска виден в записи конвейера (дерево родителя): группы
       // переходят в «стартует» ещё до ответа — синхронной частью `relaunch`.
       const started = conveyor.relaunch(parent, root, () => {
-        for (const key of dropped) {
-          // Чат группы у чужого CLI — ключ с приставкой: его прогон гасит
-          // `providerChats`, а не реестр Claude (m2) — иначе старая сессия
-          // дописывала бы в копию рядом с новой.
-          stopChatKey(deps, key);
-          ctx.store.retireChatLink(key);
-        }
+        for (const key of dropped) ctx.store.retireChatLink(key);
       });
       void started
         .catch((error: unknown) => app.log.warn({ err: error }, 'split relaunch failed'))

@@ -1,3 +1,4 @@
+import type { AgentImage } from '@agentdeck/contracts/agent-images';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@shared/api/client';
 import type { CodedFields } from '@agentdeck/contracts/server-messages';
@@ -63,6 +64,8 @@ function useResourceMutation<TInput, TResult = unknown>(
   id: string,
   request: (input: TInput) => Promise<TResult>,
   successMessage?: string,
+  /** Отказ показывает само место вызова, с причиной сервера: общий тост молчит. */
+  silentError = false,
 ) {
   const queryClient = useQueryClient();
 
@@ -74,7 +77,10 @@ function useResourceMutation<TInput, TResult = unknown>(
       void queryClient.invalidateQueries({ queryKey: ['skills'] });
       void queryClient.invalidateQueries({ queryKey: ['scripts'] });
     },
-    meta: successMessage ? { successMessage } : undefined,
+    meta: {
+      ...(successMessage ? { successMessage } : {}),
+      ...(silentError ? { silentError } : {}),
+    },
   });
 }
 
@@ -149,7 +155,8 @@ export function useApplyTemplate(kind: ResourceKind, id: string) {
 export interface StructureAssistReply {
   reply: string;
   applied: string[];
-  sessionId?: string;
+  /** Файлы с секретом, который помощник видел маской и не вернул на место: не записаны. */
+  kept?: string[];
 }
 
 /**
@@ -161,7 +168,12 @@ export function useStructureAssistant(kind: ResourceKind, id: string) {
   return useResourceMutation(
     kind,
     id,
-    async (input: { prompt: string; sessionId?: string }): Promise<StructureAssistReply> => {
+    async (input: {
+      prompt: string;
+      /** Прежние реплики окна: сессии у помощника нет. */
+      history?: Array<{ role: 'user' | 'assistant'; text: string }>;
+      images?: AgentImage[];
+    }): Promise<StructureAssistReply> => {
       const { data } = await apiClient.post<StructureAssistReply>(
         `/resources/${kind}/${encodeURIComponent(id)}/assist`,
         input,
@@ -169,5 +181,8 @@ export function useStructureAssistant(kind: ResourceKind, id: string) {
       );
       return data;
     },
+    undefined,
+    // Отказ (картинок больше восьми, не тот тип) помощник называет сам.
+    true,
   );
 }

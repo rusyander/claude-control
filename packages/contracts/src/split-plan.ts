@@ -1,4 +1,5 @@
 import { blockLang, blockLangPattern } from './brand.ts';
+import { ANSWER_LANGUAGE_LINE } from './model-cascade.ts';
 import { SPLIT_MAX_GROUPS } from './task-split.ts';
 /**
  * Два уровня плана ПЕРЕД работой групп разделения (Т1, 09.09.2026).
@@ -31,6 +32,10 @@ const MAX_NOTES = 2_000;
 const MAX_QUESTION = 600;
 const MAX_CONFLICTS = 40;
 const MAX_WHY = 400;
+/** Ключ группы панели (`global:<id>`): длиннее ключей не бывает. */
+const MAX_GROUP_KEY = 200;
+/** Сколько групп панели разбор видит в каталоге: дальше это уже не выбор, а простыня. */
+export const TRIAGE_CATALOG_MAX = 40;
 /** План группы: 12k знаков — дальше это не план, а второй разговор. */
 export const PLAN_MAX_CHARS = 12_000;
 /** Задание в связи: столько панель хранит, чтобы собрать первое сообщение работе. */
@@ -49,6 +54,12 @@ export interface SplitPlanGroup {
   after: number[];
   /** Вопрос человеку — группа не стартует, пока не ответят. */
   hold?: string;
+  /**
+   * Группа панели, которую разбор выбрал для этой группы по её `when` (выбор
+   * группы чата — `auto`). Ключ как есть; сверяет его с предложенным каталогом
+   * сервер — незнакомый отбрасывается.
+   */
+  groupKey?: string;
 }
 
 /** Пересечение, которое разбор кому-то отдал. */
@@ -157,6 +168,7 @@ export function parseSplitPlan(raw: unknown, titles?: readonly string[]): SplitP
           ? text((holdRaw as { question?: unknown }).question, MAX_QUESTION)
           : undefined;
     const notes = text(group.notes ?? group.note, MAX_NOTES);
+    const groupKey = text(group.groupKey, MAX_GROUP_KEY);
 
     groups.push({
       index,
@@ -165,6 +177,7 @@ export function parseSplitPlan(raw: unknown, titles?: readonly string[]): SplitP
       ...(notes ? { notes } : {}),
       after: refList(group.after ?? group.dependsOn, titles).filter((ref) => ref !== index),
       ...(hold ? { hold } : {}),
+      ...(groupKey ? { groupKey } : {}),
     });
   }
   if (groups.length === 0) return undefined;
@@ -296,6 +309,8 @@ export interface AppliedSplitGroup {
   notes?: string;
   after: number[];
   hold?: string;
+  /** Выбор разбора из каталога — как в блоке, ещё не сверенный с каталогом. */
+  groupKey?: string;
 }
 
 export interface AppliedSplitPlan {
@@ -430,6 +445,7 @@ export function applySplitPlan(
         ...(planned?.notes ? { notes: planned.notes } : {}),
         after: after[index] ?? [],
         ...(planned?.hold ? { hold: planned.hold } : {}),
+        ...(planned?.groupKey ? { groupKey: planned.groupKey } : {}),
       };
     }),
     order,
@@ -447,52 +463,99 @@ export interface TriageGroupInput {
   kind?: string;
 }
 
+/** Группа панели, которую разбор может выбрать группе разделения. */
+export interface TriageGroupCatalogEntry {
+  key: string;
+  name: string;
+  /** Когда группа подходит; нет — в каталоге одно имя. */
+  when?: string;
+  /**
+   * Сценарий: шаги — вся работа, по порядку, без стадий конвейера. Разбору это
+   * нужно знать: сценарий заменяет порядок работы группы разделения, а не
+   * дополняет его.
+   */
+  scenario?: true;
+}
+
+/**
+ * Каталог групп панели для разбора — английской инструкцией: её читает только
+ * модель. Выбирать лишь при явном совпадении `when`: промах хуже пропуска —
+ * чужая группа принесла бы группе разделения чужой порядок работы.
+ */
+function catalogLines(catalog: readonly TriageGroupCatalogEntry[]): string[] {
+  if (catalog.length === 0) return [];
+  return [
+    'Panel group catalog. A panel group is a bundle of rules, skills and path steps a split group ' +
+      'can run under. For each split group, pick one ONLY when its "when" clearly fits the ' +
+      'tasks of that group; otherwise pick none. A group listed without "when" is picked only when its ' +
+      'name alone makes the fit obvious. Never invent a key.',
+    ...catalog.slice(0, TRIAGE_CATALOG_MAX).map((entry) => {
+      const line = entry.when?.trim()
+        ? `- ${entry.key} — ${entry.name} — when: ${entry.when.trim()}`
+        : `- ${entry.key} — ${entry.name}`;
+      return entry.scenario
+        ? `${line} — scenario: its steps, in order, are the whole work of the group`
+        : line;
+    }),
+    'Put the pick as "groupKey":"<key from this list>" in the object of that group in the block; ' +
+      'leave the field out when nothing clearly fits.',
+    '',
+  ];
+}
+
 /**
  * Задание уровня 1 — разбор разделения на потолке в корне репозитория.
  *
  * Многострочность безопасна: это промпт прогона (уезжает файлом), а не
  * системная дописка в argv.
  */
-export function triageStagePrompt(input: { shared?: string; groups: TriageGroupInput[] }): string {
+export function triageStagePrompt(input: {
+  shared?: string;
+  groups: TriageGroupInput[];
+  /** Каталог групп панели; нет или пуст — разбор группу не выбирает. */
+  catalog?: readonly TriageGroupCatalogEntry[];
+}): string {
   const groups = input.groups.map((group, index) => {
     const lines = [
-      `Группа ${index + 1}: «${group.title}» (ветка ${group.branch}${group.kind ? `, класс ${group.kind}` : ''})`,
+      `Group ${index + 1}: "${group.title}" (branch ${group.branch}${group.kind ? `, class ${group.kind}` : ''})`,
       ...group.tasks.map((task, n) => `  ${n + 1}. ${task}`),
     ];
-    if (group.brief) lines.push(`  Памятка: ${group.brief}`);
+    if (group.brief) lines.push(`  Brief: ${group.brief}`);
     return lines.join('\n');
   });
 
   return [
-    'Это разбор разделения задач ПЕРЕД работой. Человек согласился развести работу по группам — ' +
-      'каждая пойдёт в своей копии репозитория и своей ветке, параллельно и не видя соседей. ' +
-      'Твоя задача — прочитать код и развести пересечения ДО старта, чтобы две ветки не перетирали ' +
-      'одну правку и одна задача не делалась дважды.',
-    'НИЧЕГО НЕ ПРАВЬ: только читай (файлы, git log, поиск по коду). Ветки, копии и чаты заводит панель.',
+    'This is the triage of a task split BEFORE the work. The human agreed to spread the work over ' +
+      'groups — each runs in its own copy of the repository and its own branch, in parallel and ' +
+      'without seeing its neighbours. Your job is to read the code and separate the overlaps BEFORE ' +
+      'the start, so that two branches do not overwrite one change and one task is not done twice.',
+    'EDIT NOTHING: only read (files, git log, code search). The panel creates branches, copies and chats.',
     '',
-    input.shared ? `Общий контекст групп:\n${input.shared}\n` : '',
-    'Группы, как их предложил агент:',
+    input.shared ? `Context shared by the groups:\n${input.shared}\n` : '',
+    'The groups as the agent proposed them:',
     ...groups,
     '',
-    'Сделай:',
-    '1. Для каждой задачи найди файлы и модули, которые она заденет.',
-    '2. Найди пересечения между группами: один файл, один модуль, один контракт у двух групп.',
-    '3. Каждое пересечение отдай ОДНОЙ группе-владельцу; соседям запиши в notes, на что полагаться ' +
-      'и чего не трогать, а если их работа невозможна без правок владельца — поставь им after.',
-    '4. Задачу, попавшую не в ту группу, перенеси: каждая задача живёт РОВНО в одной группе, ' +
-      'текст задачи переноси ДОСЛОВНО. Названия и ветки групп не меняй.',
-    '5. hold — только для вопроса, который ты решить не можешь (две несовместимые трактовки, ' +
-      'решение о продукте). Что можешь решить сам — реши и запиши в notes.',
+    'Do this:',
+    '1. For each task, find the files and modules it will touch.',
+    '2. Find the overlaps between groups: one file, one module, one contract shared by two groups.',
+    "3. Give each overlap to ONE owner group; write into the neighbours' notes what to rely on " +
+      "and what not to touch, and if their work is impossible without the owner's changes, give them after.",
+    '4. Move a task that landed in the wrong group: each task lives in EXACTLY one group, move the ' +
+      'task text VERBATIM. Do not change group names or branches.',
+    '5. hold — only for a question you cannot decide (two incompatible readings, a product ' +
+      'decision). What you can decide yourself — decide and write it into notes.',
     '',
-    `Закончи ответ РОВНО ОДНИМ блоком кода с языком ${SPLIT_PLAN_BLOCK_LANG}, внутри — JSON вида ` +
-      '{"groups":[{"index":1,"owns":["путь/или/модуль"],"tasks":["задача дословно"],' +
-      '"notes":"что делают соседи, на какие интерфейсы полагаться, чего не трогать",' +
-      '"after":[2],"hold":{"question":"вопрос человеку"}}],' +
-      '"conflicts":[{"paths":["файл"],"resolvedBy":1,"why":"почему этой группе"}],"order":[2,1,3]}. ' +
-      'Номера групп — как выше, с единицы. after — номера групп, чья работа должна лечь раньше ' +
-      '(копия этой группы ветвится от их ветки). order — порядок старта и слияния. ' +
-      'hold и after не ставь без нужды: группа без них стартует сразу.',
-    'Перед блоком коротко расскажи человеку, что пересекалось и как разведено. После блока — ничего.',
+    `End your answer with EXACTLY ONE code block in the language ${SPLIT_PLAN_BLOCK_LANG} containing JSON of the form ` +
+      '{"groups":[{"index":1,"owns":["path/or/module"],"tasks":["task verbatim"],' +
+      '"notes":"what the neighbours do, which interfaces to rely on, what not to touch",' +
+      '"after":[2],"hold":{"question":"question to the human"}}],' +
+      '"conflicts":[{"paths":["file"],"resolvedBy":1,"why":"why this group"}],"order":[2,1,3]}. ' +
+      'Group numbers as above, starting from one. after — the numbers of groups whose work must land ' +
+      "first (this group's copy branches off their branch). order — the order of start and merge. " +
+      'Do not set hold or after without need: a group without them starts at once.',
+    ...catalogLines(input.catalog ?? []),
+    'Before the block, briefly tell the human what overlapped and how it was separated. Nothing after the block.',
+    ANSWER_LANGUAGE_LINE,
   ]
     .filter((line) => line !== undefined)
     .join('\n');
@@ -535,10 +598,10 @@ function touchedFiles(item: PredecessorNote): string {
   if (shown.length === 0) {
     // Счёт без имён — законное состояние: сверка веток считает и те группы,
     // чьи пути в запись не поместились.
-    return total > 0 ? `; задето файлов: ${total}` : '';
+    return total > 0 ? `; files touched: ${total}` : '';
   }
   const rest = Math.max(0, total - shown.length);
-  return `; уже задеты: ${shown.join(', ')}${rest > 0 ? ` и ещё ${rest}` : ''}`;
+  return `; already touched: ${shown.join(', ')}${rest > 0 ? ` and ${rest} more` : ''}`;
 }
 
 /**
@@ -561,20 +624,20 @@ export function composeGroupNotes(input: {
     const names = input.predecessors
       .map((item) => {
         const state = item.failed
-          ? ', завершилась ошибкой или остановкой — проверь состояние'
+          ? ', ended with an error or a stop — check the state'
           : item.unfinished
-            ? ', цепочка НЕ кончилась — человек отпустил тебя, не дожидаясь её'
+            ? ', its chain did NOT finish — the human released you without waiting for it'
             : '';
-        return `«${item.title}» (ветка ${item.branch}${state}${touchedFiles(item)})`;
+        return `"${item.title}" (branch ${item.branch}${state}${touchedFiles(item)})`;
       })
       .join(', ');
     parts.push(
-      `Раньше этой группы работали: ${names}.${input.base ? ` Копия отведена от ветки ${input.base} — их правки уже здесь.` : ''} Слияние веток остаётся человеку.`,
+      `Before this group, these worked: ${names}.${input.base ? ` The copy branches off ${input.base} — their changes are already here.` : ''} Merging the branches stays with the human.`,
     );
   }
   if (input.holdAnswer) {
     parts.push(
-      `Вопрос разбора человеку: ${input.holdAnswer.question}\nОтвет человека: ${input.holdAnswer.answer}`,
+      `Triage question to the human: ${input.holdAnswer.question}\nThe human's answer: ${input.holdAnswer.answer}`,
     );
   }
   return parts.length > 0 ? parts.join('\n') : undefined;
@@ -584,9 +647,9 @@ export function composeGroupNotes(input: {
 function boundaries(input: { owns?: string[]; notes?: string }): string[] {
   const lines: string[] = [];
   if (input.owns && input.owns.length > 0) {
-    lines.push(`Владение этой группы (правь только здесь): ${input.owns.join(', ')}.`);
+    lines.push(`This group owns (edit only here): ${input.owns.join(', ')}.`);
   }
-  if (input.notes) lines.push(`Заметки разбора:\n${input.notes}`);
+  if (input.notes) lines.push(`Triage notes:\n${input.notes}`);
   return lines;
 }
 
@@ -606,32 +669,33 @@ export function planStagePrompt(input: {
   /** Чем пойдёт работа — планировщику полезно знать, для кого пишет. */
   workModel?: string;
 }): string {
-  const where = input.branch ? ` в ветке ${input.branch}` : '';
+  const where = input.branch ? ` on branch ${input.branch}` : '';
   return [
-    `План работы для группы «${input.title}»${where}.`,
-    'Это подготовка ПЕРЕД работой: работу сделает отдельный прогон' +
-      (input.workModel ? ` на модели ${input.workModel}` : '') +
-      ', твоего контекста у него не будет — он получит задание и твой план, и больше ничего.',
-    'НИЧЕГО НЕ ПРАВЬ: читай код, ищи, запускай проверки на чтение. Правки — не твоё звено.',
+    `Work plan for the group "${input.title}"${where}.`,
+    'This is preparation BEFORE the work: a separate run does the work' +
+      (input.workModel ? ` on the model ${input.workModel}` : '') +
+      ', it will not have your context — it gets the task and your plan, and nothing else.',
+    'EDIT NOTHING: read code, search, run read-only checks. Edits are not your stage.',
     '',
-    'Задание группы:',
+    "The group's task:",
     input.task,
     '',
     ...boundaries(input),
-    input.kind ? `Класс работы по мнению панели: ${input.kind}.` : '',
+    input.kind ? `Class of work in the panel's view: ${input.kind}.` : '',
     '',
-    'Составь план так, чтобы по нему можно было работать, не видя этого разговора:',
-    '1. Разбор кода под задачу: какие модули задеты, как они устроены, где вход и выход.',
-    '2. Эталоны в репозитории: как здесь уже делают похожее (файлы, паттерны) — работа копирует их, а не изобретает.',
-    '3. Не меньше двух подходов с сильными и слабыми сторонами и выбор сильного с обоснованием.',
-    '4. Шаги по порядку, каждый с файлами, которые он трогает, и проверкой после него (команда или что посмотреть).',
-    '5. Критерии приёмки — по чему считать сделанным.',
-    '6. «Не трогать»: границы из разбора и всё, что нашёл сам.',
-    '7. Открытые вопросы, если остались, — с твоим рекомендуемым ответом.',
+    'Write the plan so that one can work by it without seeing this conversation:',
+    '1. Code analysis for the task: which modules are touched, how they are built, where the input and output are.',
+    '2. References in the repository: how similar things are already done here (files, patterns) — the work copies them rather than inventing.',
+    '3. At least two approaches with their strengths and weaknesses, and the choice of the strong one with the reasoning.',
+    '4. Steps in order, each with the files it touches and a check after it (a command or what to look at).',
+    '5. Acceptance criteria — what counts as done.',
+    '6. "Do not touch": the boundaries from the triage and everything you found yourself.',
+    '7. Open questions, if any remain — with your recommended answer.',
     '',
-    `Закончи ответ РОВНО ОДНИМ блоком кода с языком ${PLAN_BLOCK_LANG}, внутри — план в markdown, ` +
-      `не длиннее ${Math.round(PLAN_MAX_CHARS / 1000)} тысяч знаков. Внутри плана тройные кавычки не используй ` +
-      '(команды — одинарными). После блока — ничего.',
+    `End your answer with EXACTLY ONE code block in the language ${PLAN_BLOCK_LANG} containing the plan in markdown, ` +
+      `no longer than ${Math.round(PLAN_MAX_CHARS / 1000)} thousand characters. Do not use triple backticks inside the plan ` +
+      '(commands in single ones). Nothing after the block.',
+    ANSWER_LANGUAGE_LINE,
   ]
     .filter((line) => line !== undefined)
     .join('\n');
@@ -653,11 +717,12 @@ export function workAfterPlanPrompt(input: {
     ...boundaries(input),
     '',
     input.plan
-      ? 'План составлен заранее моделью-потолком в этой же копии — следуй ему по шагам, с проверкой ' +
-        'после каждого. Отклоняйся, только если код говорит иначе, и назови отклонение в ответе.\n\n' +
-        `План:\n${input.plan}`
-      : 'План этой группы панель не получила (прогон плана не дал блока или не завершился) — ' +
-        'спланируй сам: сначала разбор кода и эталоны, потом шаги с проверкой после каждого.',
+      ? 'The plan was written in advance by the ceiling model in this same copy — follow it step by ' +
+        'step, with a check after each step. Deviate only if the code says otherwise, and name the ' +
+        'deviation in your answer.\n\n' +
+        `Plan:\n${input.plan}`
+      : "The panel did not receive this group's plan (the plan run gave no block or did not finish) — " +
+        'plan yourself: first the code analysis and references, then steps with a check after each.',
   ]
     .filter((line) => line !== undefined)
     .join('\n')

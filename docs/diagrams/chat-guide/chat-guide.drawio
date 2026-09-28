@@ -1,6 +1,6 @@
 <mxfile host="app.diagrams.net" version="24.7.7">
   <diagram id="p1" name="1. Путь одного сообщения">
-    <mxGraphModel dx="0" dy="0" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1180" pageHeight="1480" math="0" shadow="0">
+    <mxGraphModel dx="0" dy="0" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1180" pageHeight="1510" math="0" shadow="0">
       <root>
         <mxCell id="0"/>
         <mxCell id="1" parent="0"/>
@@ -22,20 +22,20 @@
         <mxCell id="p1:server:icon" value="API" style="shape=hexagon;fillColor=#FFFFFF;strokeColor=#7E57C2;html=1;whiteSpace=wrap;align=center;verticalAlign=bottom;fontSize=7;fontColor=#4527A0;informational=1;" vertex="1" parent="p1:server">
           <mxGeometry x="10" y="10" width="40" height="50" as="geometry"/>
         </mxCell>
-        <mxCell id="p1:cli" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#AD1457;text-align:left&quot;&gt;Процесс агентного CLI&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Панель запускает claude отдельным процессом в каталоге проекта — своим на каждый разговор.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Длинный системный промпт уезжает файлом, а не аргументом: в командной строке Windows его рвут кавычки.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FCE4EC;strokeColor=#EC407A;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;spacingLeft=50;informational=1;" vertex="1" parent="1">
-          <mxGeometry x="300" y="500" width="340" height="90" as="geometry"/>
+        <mxCell id="p1:cli" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#AD1457;text-align:left&quot;&gt;Процесс агентного CLI&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Панель запускает claude отдельным процессом в каталоге проекта — своим на каждый разговор. Трубы процесса держит посредник, а не сервер: перезапуск сервера процесс не трогает.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Длинный системный промпт уезжает файлом, а не аргументом: в командной строке Windows его рвут кавычки.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FCE4EC;strokeColor=#EC407A;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;spacingLeft=50;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="300" y="500" width="340" height="120" as="geometry"/>
         </mxCell>
         <mxCell id="p1:cli:icon" value="CLI" style="shape=process;fillColor=#FFFFFF;strokeColor=#EC407A;html=1;whiteSpace=wrap;align=center;verticalAlign=bottom;fontSize=7;fontColor=#AD1457;informational=1;" vertex="1" parent="p1:cli">
           <mxGeometry x="10" y="10" width="40" height="50" as="geometry"/>
         </mxCell>
         <mxCell id="p1:transcript" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#EF6C00;text-align:left&quot;&gt;Транскрипт разговора&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Строки JSON, дописываемые CLI в свой каталог конфигурации: projects/&lt;каталог проекта&gt;/&lt;разговор&gt;.jsonl.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Пишет его CLI, а не панель. Это и есть источник правды.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFF3E0;strokeColor=#FB8C00;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;spacingLeft=50;informational=1;" vertex="1" parent="1">
-          <mxGeometry x="300" y="700" width="340" height="80" as="geometry"/>
+          <mxGeometry x="300" y="730" width="340" height="80" as="geometry"/>
         </mxCell>
         <mxCell id="p1:transcript:icon" value="jsonl" style="shape=cylinder3;backgroundOutline=1;size=7;fillColor=#FFFFFF;strokeColor=#FB8C00;html=1;whiteSpace=wrap;align=center;verticalAlign=bottom;fontSize=7;fontColor=#EF6C00;informational=1;" vertex="1" parent="p1:transcript">
           <mxGeometry x="10" y="10" width="40" height="50" as="geometry"/>
         </mxCell>
         <mxCell id="p1:feed" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#1B5E20;text-align:left&quot;&gt;Лента разговора&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Идущий прогон приходит потоком GET /api/chat/:id/stream: размышление, вызовы инструментов, расход, текст ответа.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;История же читается из транскрипта — поэтому старый разговор открывается и без прогона.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#E8F5E9;strokeColor=#43A047;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;spacingLeft=50;informational=1;" vertex="1" parent="1">
-          <mxGeometry x="300" y="900" width="340" height="90" as="geometry"/>
+          <mxGeometry x="300" y="930" width="340" height="90" as="geometry"/>
         </mxCell>
         <mxCell id="p1:feed:icon" value="лента" style="shape=card;fillColor=#FFFFFF;strokeColor=#43A047;html=1;whiteSpace=wrap;align=center;verticalAlign=bottom;fontSize=7;fontColor=#1B5E20;informational=1;" vertex="1" parent="p1:feed">
           <mxGeometry x="10" y="10" width="40" height="50" as="geometry"/>
@@ -44,16 +44,16 @@
           <mxGeometry x="800" y="460" width="320" height="110" as="geometry"/>
         </mxCell>
         <mxCell id="p1:nodb" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#EF6C00;text-align:left&quot;&gt;Своей базы у панели нет&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Ни разговоров, ни сообщений она не хранит. Своё — только настройки, реестр прогонов и разборы разделения.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Поэтому разговор, начатый в терминале, виден в панели, а начатый в панели — виден в терминале.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFDE7;strokeColor=#F9A825;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="1">
-          <mxGeometry x="800" y="700" width="320" height="90" as="geometry"/>
+          <mxGeometry x="800" y="730" width="320" height="90" as="geometry"/>
         </mxCell>
-        <mxCell id="p1:ledger" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#EF6C00;text-align:left&quot;&gt;Реестр прогонов&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Файл runs.json рядом с настройками панели. Панель перезапустилась — процессы CLI живы, и прогон подхватывается как отдельный: место в списке, карточка прав и Остановить у него есть.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFF3E0;strokeColor=#FB8C00;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;spacingLeft=50;informational=1;" vertex="1" parent="1">
+        <mxCell id="p1:ledger" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#EF6C00;text-align:left&quot;&gt;Реестр прогонов&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Файл runs.json рядом с настройками панели, в записи — адрес посредника. Перезапустившийся сервер подключается к нему заново и ведёт сессию дальше: поток, карточки прав, Остановить.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFF3E0;strokeColor=#FB8C00;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;spacingLeft=50;informational=1;" vertex="1" parent="1">
           <mxGeometry x="800" y="300" width="320" height="90" as="geometry"/>
         </mxCell>
         <mxCell id="p1:ledger:icon" value="runs" style="shape=cylinder3;backgroundOutline=1;size=7;fillColor=#FFFFFF;strokeColor=#FB8C00;html=1;whiteSpace=wrap;align=center;verticalAlign=bottom;fontSize=7;fontColor=#EF6C00;informational=1;" vertex="1" parent="p1:ledger">
           <mxGeometry x="10" y="10" width="40" height="50" as="geometry"/>
         </mxCell>
         <mxCell id="p1:live" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#EF6C00;text-align:left&quot;&gt;Обрыв не теряет ответа&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Поток переподключается с последнего полученного кадра, а /api/events шлёт пустой пинг каждые 25 секунд — иначе тихо умерший сокет никто бы не заметил.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Прогон, начатый в другом окне или с телефона, подхватывается опросом /api/chat/active.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFDE7;strokeColor=#F9A825;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="1">
-          <mxGeometry x="800" y="900" width="320" height="110" as="geometry"/>
+          <mxGeometry x="800" y="930" width="320" height="110" as="geometry"/>
         </mxCell>
         <mxCell id="edge:p1:composer:p1:server" value="одно сообщение" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#1565C0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="p1:composer" target="p1:server">
           <mxGeometry relative="1" x="0" y="0" as="geometry">
@@ -88,91 +88,91 @@
         <mxCell id="edge:p1:cli:p1:feed" value="ответ кадрами, пока идёт прогон" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#78909C;dashed=1;dashPattern=6 4;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="p1:cli" target="p1:feed">
           <mxGeometry relative="1" x="0" y="0" as="geometry">
             <Array as="points">
-            <mxPoint x="150" y="545"/>
-            <mxPoint x="150" y="945"/>
+            <mxPoint x="150" y="560"/>
+            <mxPoint x="150" y="975"/>
             </Array>
           </mxGeometry>
         </mxCell>
         <mxCell id="p1:legend:title" value="Обозначения" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=11;fontColor=#37474F;fontStyle=1;" vertex="1" parent="1">
-          <mxGeometry x="60" y="1070" width="330" height="20" as="geometry"/>
+          <mxGeometry x="60" y="1100" width="330" height="20" as="geometry"/>
         </mxCell>
         <mxCell id="p1:legend:sw0" value="" style="rounded=1;arcSize=12;fillColor=#E8F5E9;strokeColor=#43A047;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
-          <mxGeometry x="60" y="1100" width="50" height="20" as="geometry"/>
-        </mxCell>
-        <mxCell id="p1:legend:cap0" value="человек и то, что он видит" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
-          <mxGeometry x="120" y="1100" width="270" height="20" as="geometry"/>
-        </mxCell>
-        <mxCell id="p1:legend:sw1" value="" style="rounded=1;arcSize=12;fillColor=#EDE7F6;strokeColor=#7E57C2;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
           <mxGeometry x="60" y="1130" width="50" height="20" as="geometry"/>
         </mxCell>
-        <mxCell id="p1:legend:cap1" value="сервер панели" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+        <mxCell id="p1:legend:cap0" value="человек и то, что он видит" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
           <mxGeometry x="120" y="1130" width="270" height="20" as="geometry"/>
         </mxCell>
-        <mxCell id="p1:legend:sw2" value="" style="rounded=1;arcSize=12;fillColor=#FCE4EC;strokeColor=#EC407A;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+        <mxCell id="p1:legend:sw1" value="" style="rounded=1;arcSize=12;fillColor=#EDE7F6;strokeColor=#7E57C2;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
           <mxGeometry x="60" y="1160" width="50" height="20" as="geometry"/>
         </mxCell>
-        <mxCell id="p1:legend:cap2" value="процесс агентного CLI" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+        <mxCell id="p1:legend:cap1" value="сервер панели" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
           <mxGeometry x="120" y="1160" width="270" height="20" as="geometry"/>
         </mxCell>
-        <mxCell id="p1:legend:sw3" value="" style="rounded=1;arcSize=12;fillColor=#FFF3E0;strokeColor=#FB8C00;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+        <mxCell id="p1:legend:sw2" value="" style="rounded=1;arcSize=12;fillColor=#FCE4EC;strokeColor=#EC407A;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
           <mxGeometry x="60" y="1190" width="50" height="20" as="geometry"/>
         </mxCell>
-        <mxCell id="p1:legend:cap3" value="файл на диске" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+        <mxCell id="p1:legend:cap2" value="процесс агентного CLI" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
           <mxGeometry x="120" y="1190" width="270" height="20" as="geometry"/>
         </mxCell>
-        <mxCell id="p1:legend:sw4" value="" style="rounded=1;arcSize=12;fillColor=#FFFDE7;strokeColor=#F9A825;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+        <mxCell id="p1:legend:sw3" value="" style="rounded=1;arcSize=12;fillColor=#FFF3E0;strokeColor=#FB8C00;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
           <mxGeometry x="60" y="1220" width="50" height="20" as="geometry"/>
         </mxCell>
-        <mxCell id="p1:legend:cap4" value="пояснение" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+        <mxCell id="p1:legend:cap3" value="файл на диске" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
           <mxGeometry x="120" y="1220" width="270" height="20" as="geometry"/>
         </mxCell>
-        <mxCell id="p1:legend:sw5" value="" style="rounded=1;arcSize=12;fillColor=#FFEBEE;strokeColor=#E53935;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+        <mxCell id="p1:legend:sw4" value="" style="rounded=1;arcSize=12;fillColor=#FFFDE7;strokeColor=#F9A825;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
           <mxGeometry x="60" y="1250" width="50" height="20" as="geometry"/>
         </mxCell>
-        <mxCell id="p1:legend:cap5" value="место, где работа останавливается и ждёт" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+        <mxCell id="p1:legend:cap4" value="пояснение" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
           <mxGeometry x="120" y="1250" width="270" height="20" as="geometry"/>
         </mxCell>
-        <mxCell id="p1:legend:sw6" value="" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#EC407A;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+        <mxCell id="p1:legend:sw5" value="" style="rounded=1;arcSize=12;fillColor=#FFEBEE;strokeColor=#E53935;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
           <mxGeometry x="60" y="1280" width="50" height="20" as="geometry"/>
         </mxCell>
-        <mxCell id="p1:legend:cap6" value="значок формы: карточка, сервер, процесс, файл" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+        <mxCell id="p1:legend:cap5" value="место, где работа останавливается и ждёт" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
           <mxGeometry x="120" y="1280" width="270" height="20" as="geometry"/>
         </mxCell>
-        <mxCell id="p1:legend:sw7" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#1565C0;sample=1;" edge="1" parent="1">
-          <mxGeometry relative="1" as="geometry">
-            <mxPoint x="60" y="1320" as="sourcePoint"/>
-            <mxPoint x="110" y="1320" as="targetPoint"/>
-          </mxGeometry>
+        <mxCell id="p1:legend:sw6" value="" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#EC407A;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1310" width="50" height="20" as="geometry"/>
         </mxCell>
-        <mxCell id="p1:legend:cap7" value="запрос вперёд" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+        <mxCell id="p1:legend:cap6" value="значок формы: карточка, сервер, процесс, файл" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
           <mxGeometry x="120" y="1310" width="270" height="20" as="geometry"/>
         </mxCell>
-        <mxCell id="p1:legend:sw8" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#78909C;dashed=1;dashPattern=6 4;sample=1;" edge="1" parent="1">
+        <mxCell id="p1:legend:sw7" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#1565C0;sample=1;" edge="1" parent="1">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="60" y="1350" as="sourcePoint"/>
             <mxPoint x="110" y="1350" as="targetPoint"/>
           </mxGeometry>
         </mxCell>
-        <mxCell id="p1:legend:cap8" value="ответ обратно" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+        <mxCell id="p1:legend:cap7" value="запрос вперёд" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
           <mxGeometry x="120" y="1340" width="270" height="20" as="geometry"/>
         </mxCell>
-        <mxCell id="p1:legend:sw9" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#6D4C41;sample=1;" edge="1" parent="1">
+        <mxCell id="p1:legend:sw8" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#78909C;dashed=1;dashPattern=6 4;sample=1;" edge="1" parent="1">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="60" y="1380" as="sourcePoint"/>
             <mxPoint x="110" y="1380" as="targetPoint"/>
           </mxGeometry>
         </mxCell>
-        <mxCell id="p1:legend:cap9" value="чтение и запись файлов" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+        <mxCell id="p1:legend:cap8" value="ответ обратно" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
           <mxGeometry x="120" y="1370" width="270" height="20" as="geometry"/>
         </mxCell>
-        <mxCell id="p1:legend:sw10" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#2E7D32;sample=1;" edge="1" parent="1">
+        <mxCell id="p1:legend:sw9" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#6D4C41;sample=1;" edge="1" parent="1">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="60" y="1410" as="sourcePoint"/>
             <mxPoint x="110" y="1410" as="targetPoint"/>
           </mxGeometry>
         </mxCell>
-        <mxCell id="p1:legend:cap10" value="решение человека" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+        <mxCell id="p1:legend:cap9" value="чтение и запись файлов" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
           <mxGeometry x="120" y="1400" width="270" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw10" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#2E7D32;sample=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="60" y="1440" as="sourcePoint"/>
+            <mxPoint x="110" y="1440" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p1:legend:cap10" value="решение человека" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1430" width="270" height="20" as="geometry"/>
         </mxCell>
       </root>
     </mxGraphModel>
@@ -189,7 +189,7 @@
           <mxGeometry x="60" y="60" width="1560" height="30" as="geometry"/>
         </mxCell>
         <mxCell id="p2:parent" value="" style="rounded=1;arcSize=2;fillColor=#E8F5E9;strokeColor=#43A047;strokeWidth=3;html=1;verticalAlign=top;align=left;container=1;collapsible=0;informational=1;" vertex="1" parent="1">
-          <mxGeometry x="60" y="150" width="380" height="440" as="geometry"/>
+          <mxGeometry x="60" y="150" width="380" height="450" as="geometry"/>
         </mxCell>
         <mxCell id="p2:parent:tab" value="Родитель&lt;div style=&quot;font-size:9px&quot;&gt;разговор, в котором всё началось&lt;/div&gt;" style="rounded=0;fillColor=#43A047;strokeColor=none;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacingLeft=10;fontSize=12;fontStyle=1;fontColor=#FFFFFF;informational=1;" vertex="1" parent="p2:parent">
           <mxGeometry x="10" y="10" width="360" height="40" as="geometry"/>
@@ -200,11 +200,11 @@
         <mxCell id="p2:decision" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#1B5E20;text-align:left&quot;&gt;Решение человека&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Разделить или делать здесь по очереди — два равных ответа. Тумблер «только завести чаты» заводит группы, не запуская агентов.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#43A047;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p2:parent">
           <mxGeometry x="20" y="160" width="340" height="70" as="geometry"/>
         </mxCell>
-        <mxCell id="p2:hub" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#1B5E20;text-align:left&quot;&gt;Сводка групп&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Карточка в ленте родителя: стадии цепочки, модель, время работы, задержка первой правки. Вопросы и запросы прав детей приходят сюда же.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#43A047;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p2:parent">
-          <mxGeometry x="20" y="250" width="340" height="70" as="geometry"/>
+        <mxCell id="p2:hub" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#1B5E20;text-align:left&quot;&gt;Сводка групп&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Карточка в ленте родителя: стадии цепочки, модель, время работы, «ждёт вас», «принято», тикеты и шаги человеку. Вопросы и запросы прав детей приходят сюда же.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#43A047;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p2:parent">
+          <mxGeometry x="20" y="250" width="340" height="80" as="geometry"/>
         </mxCell>
         <mxCell id="p2:pause" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#1B5E20;text-align:left&quot;&gt;Пауза всего дерева&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;«Остановить всё» гасит разговор вместе с потомками, «Продолжить всё» возвращает их. Считается это от корня дерева, в какой бы его ветке ни нажали.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#43A047;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p2:parent">
-          <mxGeometry x="20" y="340" width="340" height="80" as="geometry"/>
+          <mxGeometry x="20" y="350" width="340" height="80" as="geometry"/>
         </mxCell>
         <mxCell id="p2:triage" value="" style="rounded=1;arcSize=2;fillColor=#EDE7F6;strokeColor=#7E57C2;strokeWidth=3;html=1;verticalAlign=top;align=left;container=1;collapsible=0;informational=1;" vertex="1" parent="1">
           <mxGeometry x="560" y="150" width="380" height="450" as="geometry"/>
@@ -251,13 +251,13 @@
         <mxCell id="p2:review" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#00695C;text-align:left&quot;&gt;Ревью&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Работа шла ниже потолка — панель поднимает разговор на потолок и просит проверку. Замечания приходят списком; пустой список закрывает цепочку спокойно.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#26A69A;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p2:check">
           <mxGeometry x="20" y="70" width="340" height="80" as="geometry"/>
         </mxCell>
-        <mxCell id="p2:fix" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#00695C;text-align:left&quot;&gt;Исправления&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Возвращаются на ту же модель, которой делалась работа. Стадия исправлений последняя: ещё одного круга не будет.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#26A69A;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p2:check">
+        <mxCell id="p2:fix" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#00695C;text-align:left&quot;&gt;Исправления&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Возвращаются на ту же модель, которой делалась работа. Второго круга ревью не будет; дальше — звено доставки, если она включена.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#26A69A;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p2:check">
           <mxGeometry x="20" y="170" width="340" height="70" as="geometry"/>
         </mxCell>
-        <mxCell id="p2:overlap" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#00695C;text-align:left&quot;&gt;Пересечения веток&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Считаются на конце цепочки и по кнопке «Сверить ветки»: изменённые файлы каждой ветки плюс несохранённое в копии. Красным — файл вне владения группы.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#26A69A;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p2:check">
+        <mxCell id="p2:overlap" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#00695C;text-align:left&quot;&gt;Пересечения веток&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Считаются на конце цепочки, по кнопке «Сверить ветки» и сами, пока группы работают; сверяются и с основной веткой. Красным — файл вне владения группы.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#26A69A;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p2:check">
           <mxGeometry x="20" y="260" width="340" height="80" as="geometry"/>
         </mxCell>
-        <mxCell id="p2:merge" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#00695C;text-align:left&quot;&gt;Слияние — за человеком&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Панель не сливает, не перебазирует и не переключает ветки. Порядок слияния она показывает подсказкой рядом со списком — и на этом останавливается.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#26A69A;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p2:check">
+        <mxCell id="p2:merge" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#00695C;text-align:left&quot;&gt;Доставка есть, слияния нет&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Звено доставки: коммит, свежая основная, push, MR — панель сверяет это по git. Сливает MR только человек; порядок слияния панель показывает подсказкой.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#26A69A;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p2:check">
           <mxGeometry x="20" y="360" width="340" height="80" as="geometry"/>
         </mxCell>
         <mxCell id="p2:note" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#EF6C00;text-align:left&quot;&gt;Субагентов здесь нет ни одного&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Каждая группа — обычный разговор, в который человек может войти и написать сам. Уровни разбора и плана добавляют прогонов, но не создают ни одной сущности, которой нельзя было бы задать вопрос.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFDE7;strokeColor=#F9A825;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="1">
@@ -290,7 +290,7 @@
             <mxPoint x="1970" y="450"/>
             <mxPoint x="1970" y="640"/>
             <mxPoint x="30" y="640"/>
-            <mxPoint x="30" y="435"/>
+            <mxPoint x="30" y="440"/>
             </Array>
           </mxGeometry>
         </mxCell>

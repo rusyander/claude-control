@@ -1,0 +1,93 @@
+{
+  "topic": "history",
+  "frames": {
+    "trace/01-feed": {
+      "light-ru": {
+        "file": "01-feed.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "light-en": {
+        "file": "01-feed.en.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-ru": {
+        "file": "01-feed.dark.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-en": {
+        "file": "01-feed.dark.en.png",
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    "trace/02-diff": {
+      "light-ru": {
+        "file": "02-diff.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "light-en": {
+        "file": "02-diff.en.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-ru": {
+        "file": "02-diff.dark.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-en": {
+        "file": "02-diff.dark.en.png",
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    "trace/03-revert": {
+      "light-ru": {
+        "file": "03-revert.png",
+        "width": 500,
+        "height": 400
+      },
+      "light-en": {
+        "file": "03-revert.en.png",
+        "width": 500,
+        "height": 400
+      },
+      "dark-ru": {
+        "file": "03-revert.dark.png",
+        "width": 500,
+        "height": 400
+      },
+      "dark-en": {
+        "file": "03-revert.dark.en.png",
+        "width": 500,
+        "height": 400
+      }
+    },
+    "trace/04-after": {
+      "light-ru": {
+        "file": "04-after.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "light-en": {
+        "file": "04-after.en.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-ru": {
+        "file": "04-after.dark.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-en": {
+        "file": "04-after.dark.en.png",
+        "width": 1440,
+        "height": 1000
+      }
+    }
+  }
+}

@@ -89,14 +89,33 @@ export function domainsForPath(paths: ClaudePaths, changedPath: string): string[
   return ['overview'];
 }
 
-const defaultCreateWatcher = (paths: string[]): WatcherLike =>
-  watch(paths, {
-    ignoreInitial: true,
-    // Конфиги пишутся целиком, и без задержки прилетает событие на недописанный
-    // файл — читать его бессмысленно, получим то старое, то битое содержимое.
-    awaitWriteFinish: { stabilityThreshold: 300, pollInterval: 100 },
-    depth: 3,
-  });
+/** Всё, что умеет сообщить об ошибке событием, — настоящий chokidar. */
+interface ErrorSource {
+  on(event: 'error', handler: (error: unknown) => void): unknown;
+}
+
+/**
+ * Ошибка наблюдателя — в лог, а не в процесс. chokidar шлёт её событием
+ * `'error'`, и без слушателя оно бросается из необработанного промиса: одна
+ * папка без прав на чтение (EPERM/EACCES) или исчерпанный inotify (ENOSPC)
+ * роняли сервер на каждом старте. Остальные пути наблюдатель ведёт дальше.
+ */
+export function surviveWatchErrors<T extends ErrorSource>(watcher: T, label: string): T {
+  watcher.on('error', (error) => console.warn(`${label}: watcher error`, error));
+  return watcher;
+}
+
+export const defaultCreateWatcher = (paths: string[]): WatcherLike =>
+  surviveWatchErrors(
+    watch(paths, {
+      ignoreInitial: true,
+      // Конфиги пишутся целиком, и без задержки прилетает событие на недописанный
+      // файл — читать его бессмысленно, получим то старое, то битое содержимое.
+      awaitWriteFinish: { stabilityThreshold: 300, pollInterval: 100 },
+      depth: 3,
+    }),
+    'config watch',
+  );
 
 /**
  * Насколько склеивать очередь событий.

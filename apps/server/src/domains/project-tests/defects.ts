@@ -6,7 +6,7 @@ import type {
   ProjectTestPointResult,
   ProjectTestStep,
 } from '@agentdeck/contracts';
-import { stepText } from '@agentdeck/contracts/test-format';
+import { resultReason, stepText } from '@agentdeck/contracts/test-format';
 import type { AppStore } from '../../lib/app-store.ts';
 import { findCliOnPath } from '../../providers/detect.ts';
 import { toAccess } from '../integrations/atlassian/client.ts';
@@ -88,7 +88,10 @@ export function buildDraft(
   // Разбор провала — от того прохода, по которому дефект и заводят; у кейса он
   // лежит от последнего прогона и годится, когда дефект заводят из библиотеки.
   const failure = context.result?.failure ?? testCase.failure;
-  const actual = failure?.actual ?? context.result?.note ?? testCase.note ?? 'не описано';
+  // Порядок причины общий с выгрузкой и историей кейса (`resultReason`): разбор
+  // провала, потом заметка прохода, потом заметка кейса.
+  const actual =
+    resultReason({ failure, note: context.result?.note ?? testCase.note })?.text || 'не описано';
   const step = failure?.step;
   const lines = [
     `**Кейс:** ${context.groupId}/${testCase.id} — ${testCase.title}`,

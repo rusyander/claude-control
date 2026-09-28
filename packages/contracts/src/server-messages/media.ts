@@ -31,4 +31,8 @@ export const mediaMessageParams = {
   'media-deck-topic-empty': [],
   'media-deck-topic-too-long': [],
   'media-block-empty': [],
+  'media-agent-images-invalid': [],
+  'media-agent-images-too-many': ['limit'],
+  'media-agent-image-too-large': ['name', 'size', 'limit'],
+  'media-agent-image-not-image': ['name'],
 } as const satisfies Record<string, readonly string[]>;

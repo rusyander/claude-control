@@ -104,7 +104,10 @@ export function PromptsCard() {
                 </Typography>
               </Stack>
 
-              <Stack direction="row" gap="var(--spacing-xs)" align="center">
+              {/* Хвост строки не сжимается: длинная подсказка слева иначе ужимала
+                  его ниже содержимого — размер ломался в две строки, а кнопка
+                  вылезала за край карточки и вставала не в колонку соседей. */}
+              <Stack direction="row" gap="var(--spacing-xs)" align="center" flexShrink={0}>
                 {item.overridden && <Badge tone="info">{t('settings.prompts.edited')}</Badge>}
                 {/* «Встроенный изменился» — не ошибка, а повод перечитать: панель
                     обновилась, а текст человека остался прежним. */}
@@ -118,7 +121,9 @@ export function PromptsCard() {
                   variant="secondary"
                   size="sm"
                   aria-expanded={openId === item.id}
-                  aria-controls="prompt-editor"
+                  // Редактор в разметке только у открытой строки: ссылка с
+                  // остальных вела бы на несуществующий id (ревью 28.09, F-215).
+                  aria-controls={openId === item.id ? 'prompt-editor' : undefined}
                   onClick={() => setOpenId(openId === item.id ? undefined : item.id)}
                 >
                   {openId === item.id ? t('common.close') : t('settings.prompts.open')}
@@ -175,7 +180,7 @@ export function PromptsCard() {
                   variant="ghost"
                   size="sm"
                   aria-expanded={showBuiltin}
-                  aria-controls="prompt-builtin"
+                  aria-controls={showBuiltin ? 'prompt-builtin' : undefined}
                   onClick={() => setShowBuiltin((current) => !current)}
                 >
                   {showBuiltin

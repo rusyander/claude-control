@@ -18,7 +18,8 @@ function registeredActionNames(): string[] {
   for (const file of readdirSync(dir)) {
     if (!/^actions.*\.ts$/.test(file) || file.includes('.test.')) continue;
     const source = readFileSync(join(dir, file), 'utf8');
-    for (const match of source.matchAll(/definePanelAction\(\{\s*name:\s*'([a-z_]+)'/g)) {
+    // Цифры в имени бывают (`create_e2e_folder`): без них скан молча терял действие.
+    for (const match of source.matchAll(/definePanelAction\(\{\s*name:\s*'([a-z0-9_]+)'/g)) {
       if (match[1]) names.add(match[1]);
     }
     // Переключатели скиллов, MCP и прав собираются одной фабрикой — имя вторым аргументом.

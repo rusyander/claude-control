@@ -10,6 +10,11 @@ import {
 } from '../provider-permissions.ts';
 import { resolveProviderEnvTarget, readProviderEnvVars } from '../provider-env.ts';
 import { resolveInstructionsTarget } from '../instructions.ts';
+// Маска секрета — та же, что в разделе env: своя открывала начало токена (`glp…`).
+import { maskValue } from '../env.ts';
+// Секрет по имени — правило раздела env (целое слово): своя подстрока прятала
+// MAX_THINKING_TOKENS и *_PATH у чужой CLI, пока колонка Claude их показывала.
+import { isSecretEnvKey } from '@agentdeck/contracts/env-secret';
 import type { CompareDeps, Row, SideRead } from './types.ts';
 import type { ServerMessageCode } from '@agentdeck/contracts/server-messages';
 
@@ -22,9 +27,6 @@ import type { ServerMessageCode } from '@agentdeck/contracts/server-messages';
 
 /** Ключ, под которым в разделе инструкций живёт единственная запись — сам файл. */
 const INSTRUCTIONS_KEY = 'Файл инструкций';
-
-/** Имена, по которым переменная считается секретом. Тот же признак, что в разделе env. */
-const SECRET_HINT = /(TOKEN|SECRET|KEY|PASSWORD|PAT|CREDENTIAL)/i;
 
 function unsupported(note: string, noteCode: ServerMessageCode): SideRead {
   return { supported: false, note, noteCode, rows: [] };
@@ -166,7 +168,7 @@ export function envSide(providerId: string, deps: CompareDeps): SideRead {
       supported: true,
       filePath: target.filePath,
       rows: readProviderEnvVars(target).map((item) => {
-        const secret = SECRET_HINT.test(item.key);
+        const secret = isSecretEnvKey(item.key);
         return {
           key: item.key,
           display: secret ? maskValue(item.value) : item.value,
@@ -292,10 +294,4 @@ export function instructionsSide(providerId: string, deps: CompareDeps): SideRea
 function sizeOf(content: string): string {
   const bytes = Buffer.byteLength(content, 'utf8');
   return bytes < 1024 ? `${bytes} Б` : `${(bytes / 1024).toFixed(1)} КБ`;
-}
-
-/** Маска секрета: как в разделе env — видно начало и хвост, середины нет. */
-function maskValue(value: string): string {
-  if (value.length <= 8) return '••••';
-  return `${value.slice(0, 3)}••••${value.slice(-2)}`;
 }

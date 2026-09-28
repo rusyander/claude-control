@@ -1,35 +1,63 @@
+// Страница занимает всю колонку раздела — и по ширине, и по высоте: документ
+// инструкций дотягивается до низа окна, а не стоит коробкой фиксированной
+// высоты посреди пустого места. Прокрутка одна — у колонки раздела.
 .page {
-  max-width: var(--layout-content-max);
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  gap: var(--layout-section-gap);
+  min-width: 0;
 }
 
 // Мастер-деталь: слева реестр проектов, справа конфиг выбранного.
 .layout {
   display: grid;
-  grid-template-columns: 300px 1fr;
+  flex: 1 0 auto;
+  grid-template-columns: var(--layout-master-width) minmax(0, 1fr);
   gap: var(--spacing-lg);
-  align-items: start;
-}
+  align-items: stretch;
 
-// На узких экранах реестр уезжает наверх, панель — под него.
-@media (max-width: 900px) {
-  .layout {
-    grid-template-columns: 1fr;
+  // Узкий экран: реестр уезжает наверх, конфиг — под него.
+  @media (max-width: 900px) {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
+// Реестр липнет к верху прокрутки: длинный список прав не уводит выбор проекта
+// за экран.
 .registry {
+  position: sticky;
+  top: 0;
   display: flex;
   flex-direction: column;
   gap: var(--spacing-2xs);
+  align-self: start;
+  min-width: 0;
+
+  @media (max-width: 900px) {
+    position: static;
+  }
+}
+
+.registryList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 .projectButton {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   width: 100%;
+  min-width: 0;
   padding: var(--spacing-xs) var(--spacing-sm);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
   color: inherit;
   font: inherit;
   text-align: left;
@@ -39,14 +67,25 @@
     border-color var(--duration-fast);
 
   &:hover {
-    background: var(--color-bg);
-    border-color: var(--color-border-strong);
+    background: var(--color-surface-sunken);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 1px;
   }
 }
 
+// Выбранный проект — заливкой и полосой слева: одной заливкой на светлой теме
+// он почти не отличался от наведённого.
 .projectButtonActive {
-  background: var(--color-accent-subtle);
   border-color: var(--color-accent-subtle);
+  background: var(--color-accent-subtle);
+  box-shadow: inset 3px 0 0 var(--color-accent);
+
+  &:hover {
+    background: var(--color-accent-subtle);
+  }
 }
 
 .projectPath {
@@ -54,32 +93,330 @@
   font-size: 11px;
 }
 
-// Подпись «только чтение» пишется абзацем: мера строки держит его читаемым.
-.hint {
-  max-width: 72ch;
+// Правая колонка: шапка проекта, полоса вкладок и открытая вкладка, которая
+// забирает всю оставшуюся высоту.
+.detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  min-width: 0;
+
+  & > [role='tabpanel'] {
+    flex: 1 1 auto;
+  }
 }
 
-.tabs {
-  border-bottom: 1px solid var(--color-border);
-  padding-bottom: var(--spacing-2xs);
+.projectHeader {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2xs);
+  min-width: 0;
 }
 
-.editor {
-  width: 100%;
-  min-height: 420px;
-  padding: var(--spacing-sm);
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-sm);
+.projectTitleRow {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  min-width: 0;
+}
+
+.projectTitle {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.projectMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-3xs) var(--spacing-lg);
+  min-width: 0;
+}
+
+.projectRoot {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+// Строка источника: пометка «правится здесь» / «только чтение» и путь к файлу.
+// Она стоит первой на каждой вкладке — различие не угадывается по кнопкам.
+.source {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-3xs) var(--spacing-xs);
+  min-width: 0;
+}
+
+.sourceMark {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sourcePath {
+  min-width: 0;
+  font-size: var(--font-size-caption);
+  overflow-wrap: anywhere;
+}
+
+// Шапка вкладки со списком: источник и пояснение слева, «Добавить» справа.
+.sectionHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+}
+
+.sectionText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3xs);
+  min-width: 0;
+
+  // Основа ширины — только в строке шапки: в колонке та же основа стала бы
+  // высотой и отодвинула бы список на треть экрана.
+  .sectionHead > & {
+    flex: 1 1 320px;
+  }
+}
+
+.sectionHint {
+  max-width: var(--text-measure);
+}
+
+// ── Документ инструкций ────────────────────────────────────────────────────
+// Контейнер нужен запросу по ширине: раскладка файлов уходит вбок, когда
+// ширины хватает, а не по ширине окна — колонку ужимают и реестр, и окно агента.
+.docContainer {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  container-type: inline-size;
+}
+
+.doc {
+  display: grid;
+  flex: 1 1 auto;
+  grid-template-areas:
+    'toolbar'
+    'files'
+    'body'
+    'footer';
+  grid-template-rows: auto auto minmax(min(320px, 55vh), 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--spacing-sm);
+  min-width: 0;
+}
+
+@container (min-width: 1000px) {
+  .doc {
+    grid-template-areas:
+      'toolbar toolbar'
+      'body files'
+      'footer files';
+    grid-template-rows: auto minmax(320px, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) 300px;
+  }
+}
+
+// Полоса над документом липнет к верху колонки: с длинным файлом «Сохранить»
+// и «Просмотр» остаются под рукой, а не уезжают вместе с первым экраном.
+.docToolbar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  grid-area: toolbar;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-xs) var(--spacing-sm);
+  min-width: 0;
+  padding-block: var(--spacing-2xs);
+  background: var(--color-bg);
+}
+
+// Кнопки держатся правого края и тогда, когда узкая колонка переносит их на
+// вторую строку: сохранение ищут справа.
+.docActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--spacing-xs);
+  margin-left: auto;
+}
+
+.docFiles {
+  grid-area: files;
+  align-self: start;
+  min-width: 0;
+}
+
+// Тело документа: короткий файл тянется до низа окна (строка сетки `1fr`),
+// длинный растёт вместе со страницей. Своей прокрутки нет — она была бы второй
+// на странице; `clip` только обрезает углы и не делает блок прокручиваемым.
+// Колонки-флексы до самого редактора растягивают его на всю площадь, чтобы
+// щелчок под последней строкой попадал в текст, а не мимо.
+.docBody {
+  display: flex;
+  flex-direction: column;
+  grid-area: body;
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+  overflow: clip;
+}
+
+.docBodyEditing {
+  border-color: var(--color-border-strong);
   background: var(--color-surface-sunken);
-  color: var(--color-fg);
-  font-family: var(--font-mono, monospace);
-  font-size: var(--font-size-body-sm);
-  line-height: 1.5;
-  resize: vertical;
-  tab-size: 2;
 }
 
-.editor:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 1px;
+.docScroll {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+// Хост редактора держит `height: 100%` под окно кода со своей прокруткой —
+// здесь он растёт с текстом. Удвоенный класс перебивает правило фичи.
+.docBody .docEditor > * {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  height: auto;
+  min-width: 0;
+}
+
+.docBody .docEditor :global(.cm-editor),
+.docBody .docEditor :global(.cm-scroller) {
+  flex: 1 0 auto;
+  height: auto;
+}
+
+.docFooter {
+  display: flex;
+  flex-wrap: wrap;
+  grid-area: footer;
+  gap: var(--spacing-3xs) var(--spacing-md);
+}
+
+.docEmpty {
+  display: flex;
+  flex: 1 0 auto;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-lg);
+}
+
+// Просмотр: разметка как документ, а не сырой текст. Мера строки — у абзацев и
+// пунктов, а не у документа: заголовки с чертой, код и таблицы идут на всю
+// ширину поля, а текст остаётся читаемым на широком экране.
+.preview {
+  padding: var(--spacing-md) var(--spacing-lg);
+  color: var(--color-fg);
+  font-size: var(--font-size-body);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+
+  & > :first-child {
+    margin-top: 0;
+  }
+
+  :global(h1),
+  :global(h2),
+  :global(h3),
+  :global(h4) {
+    margin: 1.4em 0 0.5em;
+    line-height: 1.3;
+  }
+
+  :global(h1) {
+    font-size: var(--font-size-heading);
+  }
+
+  :global(h2) {
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--color-border);
+    font-size: var(--font-size-heading-sm);
+  }
+
+  :global(h3),
+  :global(h4) {
+    font-size: var(--font-size-body-lg);
+  }
+
+  :global(p),
+  :global(ul),
+  :global(ol),
+  :global(pre),
+  :global(blockquote),
+  :global(table) {
+    margin: 0 0 0.8em;
+  }
+
+  :global(ul),
+  :global(ol) {
+    padding-left: 1.4em;
+  }
+
+  :global(p),
+  :global(li),
+  :global(blockquote) {
+    max-width: var(--text-measure);
+  }
+
+  :global(code) {
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: var(--color-surface-sunken);
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+  }
+
+  :global(pre) {
+    padding: var(--spacing-sm);
+    border-radius: 8px;
+    background: var(--color-surface-sunken);
+    overflow-x: auto;
+
+    :global(code) {
+      padding: 0;
+      background: none;
+    }
+  }
+
+  :global(blockquote) {
+    padding-left: var(--spacing-sm);
+    border-left: 3px solid var(--color-border-strong);
+    color: var(--color-fg-muted);
+  }
+
+  :global(a) {
+    color: var(--color-accent);
+  }
+
+  :global(hr) {
+    border: 0;
+    border-top: 1px solid var(--color-border);
+  }
+
+  :global(table) {
+    border-collapse: collapse;
+
+    :global(td),
+    :global(th) {
+      padding: var(--spacing-3xs) var(--spacing-xs);
+      border: 1px solid var(--color-border);
+    }
+  }
 }

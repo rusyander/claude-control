@@ -6,66 +6,149 @@
   background-color: rgb(0 0 0 / 45%);
 }
 
+// Рядом с пристёгнутым окном агента (см. modal.tsx): затемнение и окно — слева
+// от него, на ту же ширину, на какую оно сдвигает страницу.
+.besideDock {
+  right: var(--panel-agent-dock-inset, 0px);
+}
+
+// Коробка окна не зависит от содержимого: и ширина, и высота заданы размером
+// (`.sm` … `.full`), а экран их только ограничивает сверху. Окно, чья высота
+// набегала от содержимого, прыгало на каждой смене вкладки, догрузке данных и
+// строке ошибки, а по центру прыгали сразу оба края. Что не влезло — прокручивает
+// тело; шапка и нижняя панель стоят на месте.
+//
 // Центрируем через `inset: 0` и `margin: auto`, а не через translate(-50%, -50%):
 // transform нужен анимации целиком, и центрирующий сдвиг она бы затёрла.
 .content {
+  // Зазор до края экрана по бокам и сверху-снизу.
+  --modal-gap-x: 16px;
+  --modal-gap-y: 32px;
+
   position: fixed;
   inset: 0;
   z-index: 101; // поверх затемнения
   margin: auto;
   display: flex;
   flex-direction: column;
-  height: fit-content;
-  max-height: 85vh;
-  width: calc(100vw - var(--spacing-xl));
+  width: min(var(--modal-width), 100vw - 2 * var(--modal-gap-x));
+  height: min(var(--modal-height), 100dvh - 2 * var(--modal-gap-y));
   background-color: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
+  border-radius: 14px;
   box-shadow: var(--shadow-lg);
+
+  // Короткое неизменное содержимое (выбор из двух, подтверждение): высота по
+  // содержимому, --modal-height — только потолок. Прыгать тут нечему: вкладок,
+  // догрузки и строк ошибки у таких окон нет, а фиксированная коробка оставляла
+  // под текстом пустую полосу в треть окна.
+  &.fit {
+    height: fit-content;
+    max-height: min(var(--modal-height), 100dvh - 2 * var(--modal-gap-y));
+  }
+
+  &.besideDock {
+    right: var(--panel-agent-dock-inset, 0px);
+    width: min(
+      var(--modal-width),
+      100vw - var(--panel-agent-dock-inset, 0px) - 2 * var(--modal-gap-x)
+    );
+  }
+
+  // Телефон: окно — лист во всю ширину у нижнего края. Высота та же, что у
+  // размера, пока влезает; иначе — весь экран без полоски сверху.
+  @media (max-width: 480px) {
+    --modal-gap-y: 12px;
+
+    margin: auto 0 0;
+    width: 100vw;
+    height: min(var(--modal-height), 100dvh - var(--modal-gap-y));
+    border-width: 1px 0 0;
+    border-radius: 16px 16px 0 0;
+
+    &.fit {
+      height: fit-content;
+      max-height: min(var(--modal-height), 100dvh - var(--modal-gap-y));
+    }
+
+    &.besideDock {
+      width: 100vw;
+    }
+  }
 }
 
-// У размера есть не только ширина, но и рост: окна одного размера должны
-// выглядеть одинаково, а не прыгать от одной записи к десяти. Нижняя граница
-// берётся с оглядкой на экран — на низком окне min-height не должен спорить с
-// max-height: 85vh.
+// Шкала размеров: у каждого — одна ширина и одна высота. Окна одного размера
+// выглядят одинаково, от одной записи до десяти.
 .sm {
-  max-width: 420px;
-  min-height: min(280px, 70vh);
+  --modal-width: 420px;
+  --modal-height: 320px;
 }
+
 .md {
-  max-width: 620px;
-  min-height: min(420px, 75vh);
+  --modal-width: 620px;
+  --modal-height: 560px;
 }
+
+// Та же ширина, что у md; высота — по содержимому до потолка md (см. .content.fit).
+// Только для короткого неизменного содержимого: формы и окна с вкладками — на шкале.
+.fit {
+  --modal-width: 620px;
+  --modal-height: 560px;
+}
+
 .lg {
-  max-width: 880px;
-  min-height: min(520px, 80vh);
+  --modal-width: 880px;
+  --modal-height: 720px;
 }
 
 .xl {
-  max-width: 1380px;
-  min-height: min(620px, 85vh);
+  --modal-width: 1380px;
+  --modal-height: 880px;
 }
 
-// Рабочее окно во весь экран: не «пошире», а другой режим — высота задана, а не
-// набегает от содержимого, иначе внутренним областям не от чего считать свою.
+// Рабочее окно во весь экран: дерево файлов и редактор. Не «пошире», а другой
+// режим — ему нужна вся высота, а не шкала.
 .full {
-  max-width: 1800px;
-  height: 92vh;
-  max-height: 92vh;
+  --modal-width: 1800px;
+  --modal-height: 100dvh;
+  --modal-gap-y: 24px;
 }
 
 .header {
+  flex-shrink: 0;
   padding: var(--spacing-md) var(--spacing-lg);
+  // Справа — место крестика: длинный заголовок не должен уходить под него.
+  padding-right: calc(var(--spacing-lg) + 32px);
   border-bottom: 1px solid var(--color-border);
 }
 
-// Свободную высоту забирает тело, а не нижняя панель: у окна задан минимальный
-// рост, и без этого кнопки повисали бы посреди карточки с пустотой под ними.
+// Действия над записью окна: строкой под заголовком, переносятся на узком экране.
+.headerActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-2xs);
+  padding-top: var(--spacing-xs);
+}
+
+// Свободную высоту забирает тело, а не нижняя панель: высота окна задана, и без
+// этого кнопки повисали бы посреди карточки с пустотой под ними.
+//
+// `scrollbar-gutter: stable` держит место полосы прокрутки всегда: иначе
+// появившаяся полоса сужала бы содержимое, и поля перескакивали бы влево в тот
+// момент, когда форма дорастает до края.
+// `--modal-body-padding` — одно число на отступ тела и на всё, что от него
+// считается: липкая панель внутри тела (`PathToolbar`) встаёт на `top` минус этот
+// отступ, иначе между шапкой окна и панелью остаётся щель, в которую видно
+// прокручиваемое. Нижний отступ тела — воздух под последним полем (bug 10).
 .body {
+  --modal-body-padding: var(--spacing-lg);
+
   flex: 1;
   min-height: 0;
-  padding: var(--spacing-lg);
+  padding: var(--modal-body-padding);
   overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 
 // Тело занимает остаток высоты и само не прокручивается: прокрутку берут на
@@ -82,14 +165,20 @@
   flex: 1;
   min-height: 0;
   overflow: hidden;
+  scrollbar-gutter: auto;
 }
 
 .footer {
+  flex-shrink: 0;
   display: flex;
   justify-content: flex-end;
   gap: var(--spacing-xs);
   padding: var(--spacing-md) var(--spacing-lg);
   border-top: 1px solid var(--color-border);
+
+  @media (max-width: 480px) {
+    padding-bottom: calc(var(--spacing-md) + env(safe-area-inset-bottom, 0px));
+  }
 }
 
 .closeButton {

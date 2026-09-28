@@ -9,9 +9,11 @@ import { FormWithAssistant } from '@shared/ui/form-with-assistant';
 import { Card } from '@shared/ui/card';
 import { BulkPresets } from '@shared/ui/bulk-presets';
 import { toErrorMessage } from '@shared/api/client';
+import { toLanguage } from '@shared/config/i18n';
 import { useSaveScript, useScriptContent } from '@entities/Script';
 import { useIsCapabilityReady } from '@entities/Provider';
 import { scriptTemplatesFor, newScriptTemplateFor } from '../model/ScriptTemplate';
+import { scriptAssistantSpec } from '../model/scriptAssistant';
 import type { ScriptFormModalProps } from './ScriptFormModal.types';
 import styles from './ScriptFormModal.module.scss';
 
@@ -20,7 +22,7 @@ import styles from './ScriptFormModal.module.scss';
  * с кодом: помощник пишет тело скрипта целиком, а не заполняет набор полей.
  */
 export function ScriptFormModal({ isOpen, onOpenChange, script }: ScriptFormModalProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const [name, setName] = useState('');
   const [content, setContent] = useState('');
@@ -32,14 +34,16 @@ export function ScriptFormModal({ isOpen, onOpenChange, script }: ScriptFormModa
   // Сам редактор общий для всех провайдеров, а вот заготовки и подсказка
   // помощнику говорят о хуках — их даём только там, где хуки есть (у Claude).
   const hasHooks = useIsCapabilityReady('hooks');
-  const templates = scriptTemplatesFor(hasHooks);
+  // Каркас — это и текст файла: комментарии в нём на языке интерфейса.
+  const language = toLanguage(i18n.language);
+  const templates = scriptTemplatesFor(hasHooks, language);
 
   useEffect(() => {
     if (!isOpen) return;
     setName(script?.name ?? '');
-    setContent(script ? '' : newScriptTemplateFor(hasHooks));
+    setContent(script ? '' : newScriptTemplateFor(hasHooks, language));
     setMode('constructor');
-  }, [isOpen, script, hasHooks]);
+  }, [isOpen, script, hasHooks, language]);
 
   // Содержимое приезжает вторым запросом — подставляем, когда оно готово.
   useEffect(() => {
@@ -112,19 +116,12 @@ export function ScriptFormModal({ isOpen, onOpenChange, script }: ScriptFormModa
         />
       ) : (
         <FormWithAssistant
-          kind={t('scripts.title')}
+          kind="script"
           fields={{ name, content }}
-          schema={{
-            name: 'Имя файла скрипта с расширением, например notify.mjs',
-            content: hasHooks
-              ? 'Полный код скрипта. Хуки Claude Code получают JSON на stdin и могут вернуть JSON на stdout; ' +
-                'код выхода 2 блокирует действие. Пиши на Node.js (.mjs), комментарии по-русски'
-              : 'Полный код самостоятельного скрипта: аргументы из process.argv, вывод в stdout, ' +
-                'ненулевой код возврата при ошибке. Пиши на Node.js (.mjs), комментарии по-русски',
-          }}
+          spec={scriptAssistantSpec({ hasHooks })}
           onApply={(applied) => {
-            if (typeof applied.name === 'string') setName(applied.name);
-            if (typeof applied.content === 'string') setContent(applied.content);
+            if (applied.name !== undefined) setName(applied.name);
+            if (applied.content !== undefined) setContent(applied.content);
           }}
         >
           <Stack gap="var(--spacing-md)">

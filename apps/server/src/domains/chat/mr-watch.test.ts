@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { LEARN_SIEVES_LINE } from '@agentdeck/contracts/sieves';
 import type { SplitPlanGroupRecord, SplitPlanRecord } from '../../lib/app-store/app-store.types.ts';
 import type { MrReview, MrReviewThread } from '../integrations/mr-review.ts';
 import {
@@ -199,9 +200,13 @@ describe('MrWatch: ветки ревьюера после «готово»', () 
     expect(prompt).toContain(`${MR}#note_17928`);
     expect(prompt).toContain('src/ui/Menu.tsx:42');
     expect(prompt).toContain('attachRef ломает фокус');
-    expect(prompt).toContain('перечитай ВСЕ обсуждения MR');
-    expect(prompt).toContain('Прежде чем снова сказать «готово», перечитай обсуждения MR ещё раз');
+    expect(prompt).toContain('re-read ALL MR discussions');
+    expect(prompt).toContain('Before saying "done" again, re-read the MR discussions once more');
     expect(t.group().mrWatch).toMatchObject({ checks: 1, relayed: ['d1:17928'], resumes: 1 });
+    // Тред — блокер, ушедший в MR: группа раскладывает его в сито, а ссылка,
+    // по которой панель потом примет сито, записана ровно как в задании.
+    expect(prompt).toContain(LEARN_SIEVES_LINE);
+    expect(t.group().mrWatch?.relayedLinks).toEqual([`${MR}#note_17928`]);
     // Продолжение ушло — следующего таймера этого круга нет: новый круг ставит новое «готово».
     expect(t.timers).toHaveLength(0);
   });
@@ -279,7 +284,7 @@ describe('MrWatch: один взгляд на конвейер', () => {
 
     await t.fire();
     expect(t.resumed).toHaveLength(1);
-    expect(t.resumed[0]!.prompt).toContain('Конвейер MR упал: №7763');
+    expect(t.resumed[0]!.prompt).toContain('The MR pipeline failed: #7763');
     expect(t.resumed[0]!.prompt).toContain('https://git.acme.local/p/7763');
     expect(t.group().mrWatch?.pipeline).toEqual({ id: '7763', status: 'failed' });
 

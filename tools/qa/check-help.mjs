@@ -89,11 +89,26 @@ for (const path of PAGES) {
   if (found === 0) {
     const menus = page.locator('button[aria-haspopup="dialog"]');
     for (let i = 0; i < (await menus.count()) && found === 0; i++) {
-      await menus.nth(i).click();
+      // Оверлей, открытый самим разделом (чат открывает свой), перекрывает шапку:
+      // сперва закрываем его. Клик, который всё равно не прошёл, — не «пропустить»:
+      // меню не открылось, ссылка в нём не найдена, и раздел уйдёт в «нет кнопки».
+      await page.keyboard.press('Escape');
+      const opened = await menus
+        .nth(i)
+        .click({ timeout: 5000 })
+        .then(() => true)
+        .catch(() => false);
+      if (!opened) {
+        console.log(`${path}: меню ${i} перекрыто, не открылось`);
+        continue;
+      }
       found = await link
         .waitFor({ timeout: 2000 })
         .then(() => 1)
         .catch(() => 0);
+      // Открытое меню без ссылки держит оверлей над шапкой: следующий клик по
+      // соседнему меню (агент панели и т. п.) висел до таймаута и ронял прогон.
+      if (found === 0) await page.keyboard.press('Escape');
     }
   }
 

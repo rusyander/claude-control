@@ -32,6 +32,7 @@ describe('маршруты чата: ворота ветки', () => {
   let started: { cwd: string; prompt: string; sessionId?: string }[];
   let events: ChatEvent[];
   let detach: (() => void) | undefined;
+  let stopAnswer: 'unconfirmed' | undefined;
   const CHAT = 'branch-gate-chat';
   const SESSION = 'branch-gate-session';
 
@@ -48,7 +49,8 @@ describe('маршруты чата: ворота ветки', () => {
       });
       return new Promise(() => undefined);
     },
-    stop: () => undefined,
+    // Исход остановки CLI; 'unconfirmed' — номер нечем проверить (F-145).
+    stop: () => stopAnswer,
   });
 
   const startRun = (): void => {
@@ -102,6 +104,7 @@ describe('маршруты чата: ворота ветки', () => {
     mkdirSync(join(root, 'agentdeck'), { recursive: true });
     store = new AppStore(join(root, 'agentdeck'));
     started = [];
+    stopAnswer = undefined;
     events = [];
     registry = new ChatRunRegistry(liveRun);
     session = new ChatSession(registry);
@@ -174,6 +177,85 @@ describe('маршруты чата: ворота ветки', () => {
     expect(started[1]?.cwd).toBe(copyPath);
     expect(started[1]?.sessionId).toBe(SESSION);
     expect(started[1]?.prompt).toContain(copyPath);
+  });
+
+  /**
+   * F-145, сосед: копия заведена, а остановить прежний процесс не удалось —
+   * номер нечем проверить. Раньше исход читался «остановлено»: вызов отклонялся,
+   * и тот же разговор поднимался в копии вторым процессом рядом с живым, двумя
+   * писателями в одну сессию. Теперь — отказ с кодом, карточка и прогон живы.
+   */
+  it('«завести копию», а прежний процесс не остановлен — 409, ни отказа, ни второго запуска', async () => {
+    startRun();
+    const pending = askPermission();
+    await waitForGate();
+    stopAnswer = 'unconfirmed';
+
+    const response = await decide({ toolUseId: 'tool-1', choice: 'copy', branch: 'agent/proba' });
+
+    expect(response.statusCode).toBe(409);
+    const body = response.json() as {
+      code: string;
+      messageCode: string;
+      params?: { path?: string };
+    };
+    expect(body).toMatchObject({
+      code: 'stop_unconfirmed',
+      messageCode: 'branch-stop-unconfirmed',
+    });
+    expect(body.params?.path).toContain('repo-worktrees');
+    expect(started).toHaveLength(1);
+    expect(registry.isRunning(CHAT)).toBe(true);
+    expect(events.some((event) => event.kind === 'permissionResolved')).toBe(false);
+
+    stopAnswer = undefined;
+    session.decidePermission(CHAT, 'tool-1', { behavior: 'deny', message: 'конец теста' });
+    await pending;
+  });
+
+  /**
+   * Повтор после 409 (V-fix-D): копия уже заведена, и вторую на той же ветке git
+   * не даёт — повтор упирался в 400 «ветка уже открыта копией». Теперь тем же
+   * именем занимается та же копия, а другим — прежняя снимается, не сиротеет.
+   */
+  it('повтор после 409 тем же именем — переезд в ту же копию', async () => {
+    startRun();
+    const pending = askPermission();
+    await waitForGate();
+    stopAnswer = 'unconfirmed';
+    const first = await decide({ toolUseId: 'tool-1', choice: 'copy', branch: 'agent/proba' });
+    expect(first.statusCode).toBe(409);
+    const copyPath = (first.json() as { params: { path: string } }).params.path;
+
+    stopAnswer = undefined;
+    const second = await decide({ toolUseId: 'tool-1', choice: 'copy', branch: 'agent/proba' });
+
+    expect(second.statusCode).toBe(200);
+    expect(second.json()).toMatchObject({ ok: true, path: copyPath, branch: 'agent/proba' });
+    expect(started.map((run) => run.cwd)).toEqual([repo, copyPath]);
+    await pending;
+  });
+
+  it('повтор после 409 другим именем или «писать здесь» — прежняя копия снята', async () => {
+    startRun();
+    const pending = askPermission();
+    await waitForGate();
+    stopAnswer = 'unconfirmed';
+    const first = await decide({ toolUseId: 'tool-1', choice: 'copy', branch: 'agent/proba' });
+    const firstPath = (first.json() as { params: { path: string } }).params.path;
+    const second = await decide({ toolUseId: 'tool-1', choice: 'copy', branch: 'agent/vtoraya' });
+    expect(second.statusCode).toBe(409);
+    const secondPath = (second.json() as { params: { path: string } }).params.path;
+    expect(existsSync(firstPath)).toBe(false);
+    expect(existsSync(secondPath)).toBe(true);
+
+    stopAnswer = undefined;
+    const here = await decide({ toolUseId: 'tool-1', choice: 'here' });
+    expect(here.statusCode).toBe(200);
+    expect(existsSync(secondPath)).toBe(false);
+    expect(git(repo, 'worktree', 'list')).not.toContain('agent');
+    expect(started).toHaveLength(1);
+    await pending;
   });
 
   it('«писать здесь» — правка проходит, и второй раз не спрашивают', async () => {
@@ -373,7 +455,7 @@ describe('маршруты чата: ворота ветки', () => {
       const answer = (await pending).json() as { behavior: string; message: string };
       expect(answer.behavior).toBe('deny');
       expect(answer.message).toContain('agentdeck:tell N');
-      expect(answer.message).toContain('1 — «Шапка»');
+      expect(answer.message).toContain('1 — "Шапка"');
     });
   });
 });

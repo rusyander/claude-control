@@ -1,0 +1,90 @@
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2xs);
+}
+
+.item {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-3xs) var(--spacing-xs);
+  align-items: baseline;
+}
+
+// Выученное сито: класс и охват сверху, текст задания ниже, кнопка справа.
+.learned {
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.learnedBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3xs);
+  min-width: 0;
+}
+
+// Текст сита — задание модели по-английски: переносится целиком, не обрезается.
+// Кнопки сита: переносятся под текст на узком экране, не сжимают задание.
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-2xs);
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+
+.modelText {
+  overflow-wrap: anywhere;
+}
+
+.scroll {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
+  text-align: left;
+  font-size: var(--font-size-body-sm);
+}
+
+.table th,
+.table td {
+  padding: var(--spacing-xs) var(--spacing-sm);
+}
+
+.table thead th {
+  border-bottom: 1px solid var(--color-border);
+  background-color: var(--color-surface-sunken);
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-caption);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.table tbody tr + tr th,
+.table tbody tr + tr td {
+  border-top: 1px solid var(--color-border);
+}
+
+.table tbody th {
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.table td {
+  font-variant-numeric: tabular-nums;
+}

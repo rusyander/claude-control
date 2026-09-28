@@ -27,7 +27,9 @@ function render(tools: StreamState['tools']): string {
   return renderToStaticMarkup(<ChatMessages {...props} />);
 }
 
-const badges = (html: string): number => html.match(/aria-controls=/g)?.length ?? 0;
+// Бейдж узнаётся по своей подписи: `aria-controls` у него только открытого.
+const BADGE = 'aria-label="Расход шага';
+const badges = (html: string): number => html.split(BADGE).length - 1;
 
 describe('живой поток — расход шага один раз на шаг', () => {
   it('три вызова одного шага — один бейдж, у первого вызова', () => {
@@ -39,7 +41,7 @@ describe('живой поток — расход шага один раз на �
 
     expect(badges(html)).toBe(1);
     // Бейдж стоит у первого вызова шага: он раньше имени второго в разметке.
-    expect(html.indexOf('aria-controls=')).toBeLessThan(html.indexOf('Grep'));
+    expect(html.indexOf(BADGE)).toBeLessThan(html.indexOf('Grep'));
   });
 
   it('два шага — по бейджу на каждый', () => {

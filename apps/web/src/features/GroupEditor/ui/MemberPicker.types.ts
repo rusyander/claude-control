@@ -1,11 +1,6 @@
-import type { GroupMember, GroupMemberKind } from '@agentdeck/contracts';
+import type { GroupMember, GroupScope } from '@agentdeck/contracts';
 
-/** Строка сводного списка: сущность любого вида под общим подписанным видом. */
-export interface PickerItem {
-  kind: GroupMemberKind;
-  id: string;
-  label: string;
-}
+export type { PickerItem } from '../model/memberCatalog.types';
 
 export interface MemberPickerProps {
   value: GroupMember[];
@@ -15,4 +10,6 @@ export interface MemberPickerProps {
    * из списка выбираемых групп (цикл при этом всё равно отвергнет сервер).
    */
   excludeGroupId?: string;
+  /** Область правящейся группы: выбранное из общих списков в проектной — `scope: global`. */
+  groupScope?: GroupScope;
 }

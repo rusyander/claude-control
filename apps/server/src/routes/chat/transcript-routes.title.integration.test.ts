@@ -10,7 +10,7 @@ import { workAfterPlanPrompt } from '@agentdeck/contracts/split-plan';
 import { AppStore } from '../../lib/app-store.ts';
 import type { ServerContext } from '../../context.ts';
 import { registerChatTranscriptRoutes } from './transcript-routes.ts';
-import { groupIdentityLine } from '../../domains/chat/split-conveyor.ts';
+import { groupIdentityLine } from '../../domains/chat/panel-preamble.ts';
 import { planStagePrompt } from '@agentdeck/contracts/split-plan';
 import { buildHandoffPrompt } from '@agentdeck/contracts/chat-handoff';
 

@@ -16,6 +16,22 @@
  * Луна — иначе правило его бы не нашло, и кадр показывал бы пустоту).
  */
 import { openSection, card, patchSettings, shotCard } from './access-providers-fixture.mjs';
+import { shotTheme } from './kit.mjs';
+
+/**
+ * `browser.newPage()` — свежий контекст без прогретой темы из прошлых
+ * кадров: `openSection` иногда успевает отрисовать страницу раньше, чем
+ * настройки темы дойдут до `ThemeProvider`, и кадр уходит с несовпадением.
+ * Ждём совпадения `data-theme` до 5 секунд вместо того, чтобы полагаться на
+ * фиксированную паузу `openSection`.
+ */
+async function waitForTheme(page, theme = shotTheme()) {
+  await page
+    .waitForFunction((expected) => document.documentElement.dataset.theme === expected, theme, {
+      timeout: 15000,
+    })
+    .catch(() => null);
+}
 
 const STATUS = card('Прокси');
 const GATE = card('Гейт на промпте');
@@ -58,7 +74,8 @@ export async function shootDlpFirst(browser, web, scenario, { panel, upstream, d
     // ── 01. Правил ещё нет ───────────────────────────────────────────────────
     // Пока не включено ни одно правило, прокси не запустится: пустой список
     // правил — это не «пропускать всё», а «нечего делать».
-    await openSection(page, web, '/dlp', 2500);
+    await openSection(page, web, '/dlp?tab=rules', 2500);
+    await waitForTheme(page);
     await scenario.shot(page, '01-empty');
 
     // ── 02. Готовый набор ────────────────────────────────────────────────────
@@ -88,6 +105,8 @@ export async function shootDlpFirst(browser, web, scenario, { panel, upstream, d
 
     // ── 04. Проверка на пробном тексте ───────────────────────────────────────
     // Показывает ровно то, что увидела бы модель, и никуда не ходит по сети.
+    await openSection(page, web, '/dlp?tab=check', 2000);
+    await waitForTheme(page);
     await page
       .locator(PREVIEW)
       .getByLabel(/^(Пробный текст|Sample text)$/)
@@ -103,6 +122,8 @@ export async function shootDlpFirst(browser, web, scenario, { panel, upstream, d
     await shotCard(scenario, page, '04-preview', PREVIEW);
 
     // ── 05. Прокси работает ──────────────────────────────────────────────────
+    await openSection(page, web, '/dlp?tab=proxy', 2000);
+    await waitForTheme(page);
     await page
       .locator(STATUS)
       .getByLabel(/^(Порт|Port)$/)
@@ -134,10 +155,13 @@ export async function shootDlpFirst(browser, web, scenario, { panel, upstream, d
     // срабатывает вовсе, и кадр показывал бы «пропущено» вместо отказа.
     await sendThroughProxy(dlpPort, `Ключ стенда ${['sk', 'demo', 'a41c7e9b20f3d8'].join('-')}`);
     await page.waitForTimeout(1500);
-    await openSection(page, web, '/dlp', 2500);
+    await openSection(page, web, '/dlp?tab=journal', 2500);
+    await waitForTheme(page);
     await shotCard(scenario, page, '06-journal', JOURNAL);
 
     // Счётчики на карточке — уже измерение, а не обещание.
+    await openSection(page, web, '/dlp?tab=proxy', 2000);
+    await waitForTheme(page);
     await shotCard(scenario, page, '07-counters', STATUS);
 
     await stopProxy(panel);
@@ -154,9 +178,11 @@ export async function shootDlpGate(browser, web, scenario, { panel }) {
       provider: 'claude',
       promptGate: { enabled: false, action: 'block' },
     });
+    await ensureGateRules(page, web, panel);
 
     // ── 01. Что гейт видит, а чего не видит ──────────────────────────────────
-    await openSection(page, web, '/dlp', 2500);
+    await openSection(page, web, '/dlp?tab=gate', 2500);
+    await waitForTheme(page);
     await shotCard(scenario, page, '01-gate-off', GATE);
 
     // ── 02. Установлен ───────────────────────────────────────────────────────
@@ -172,6 +198,7 @@ export async function shootDlpGate(browser, web, scenario, { panel }) {
 
     // ── 03. Тот же хук в разделе «Хуки» ──────────────────────────────────────
     await openSection(page, web, '/hooks', 3000);
+    await waitForTheme(page);
     await scenario.shot(page, '03-hook');
 
     // ── 04. Как гейт выглядит у чужого CLI ───────────────────────────────────
@@ -179,7 +206,8 @@ export async function shootDlpGate(browser, web, scenario, { panel }) {
     // нет, и хук отыгрывает надзиратель панели — тем же скриптом, по тем же
     // правилам. Меняется одна строка: где именно гейт действует.
     await patchSettings(panel, { provider: 'codex' });
-    await openSection(page, web, '/dlp', 3000);
+    await openSection(page, web, '/dlp?tab=gate', 3000);
+    await waitForTheme(page);
     await shotCard(scenario, page, '04-foreign-cli', GATE);
 
     await patchSettings(panel, { provider: 'claude' });
@@ -211,6 +239,44 @@ async function stopProxy(panel) {
 
 async function clearJournal(panel) {
   await fetch(`${panel}/api/dlp/journal`, { method: 'DELETE' }).catch(() => undefined);
+}
+
+/**
+ * Гейт без правил выключен по замыслу (тумблер гаснет при 0 правил), а правила
+ * кладёт сценарий `dlp/first`. Съёмка одного `GUIDE_ONLY=gate` находила пустой
+ * набор и снимала погасший тумблер вместо «установлен». Поэтому гейт сам
+ * доводит состояние до того, что оставляет `first`: готовый набор и свой
+ * словарь, через тот же экран — и подписи кадров («включено 21, с запретом 2»)
+ * совпадают при любом порядке съёмки.
+ */
+async function ensureGateRules(page, web, panel) {
+  const info = await fetch(`${panel}/api/dlp`).then((r) => r.json());
+  if ((info.rules ?? []).length > 0) return;
+  await openSection(page, web, '/dlp?tab=rules', 2500);
+  // Готовый набор сохраняется сразу, словарь — вторым сохранением. Каждое
+  // ждём своим ответом: иначе запоздавший первый ответ сошёл бы за второй.
+  const put = () =>
+    page.waitForResponse(
+      (r) => r.url().endsWith('/api/dlp/rules') && r.request().method() === 'PUT',
+    );
+  const saved = async (pending) => {
+    const response = await pending;
+    if (!response.ok()) throw new Error(`PUT /api/dlp/rules: ${response.status()}`);
+  };
+  const starter = put();
+  await page
+    .getByRole('button', { name: /^(Добавить готовый набор|Add the ready-made set)$/ })
+    .first()
+    .click();
+  await saved(starter);
+  const terms = page.getByLabel(/^(Словарь|Dictionary)$/).last();
+  await terms.fill(['Иван Петров', 'Проект «Ангара»', 'Северный склад'].join('\n'));
+  const dictionary = put();
+  await page
+    .getByRole('button', { name: /^(Сохранить правила|Save rules)$/ })
+    .first()
+    .click();
+  await saved(dictionary);
 }
 
 /** Правил нет — ровно то состояние, с которого раздел открывают в первый раз. */

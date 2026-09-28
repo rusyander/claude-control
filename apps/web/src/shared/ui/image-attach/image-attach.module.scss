@@ -1,0 +1,92 @@
+.hiddenInput {
+  display: none;
+}
+
+.tray {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3xs);
+  min-width: 0;
+
+  p {
+    margin: 0;
+  }
+}
+
+.list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-2xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-2xs);
+  max-width: 100%;
+  padding: 2px 2px 2px 2px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface-sunken);
+  font-size: var(--font-size-caption);
+  color: var(--color-fg);
+}
+
+// Миниатюра квадратная, картинка вписана с обрезкой: узкий длинный скриншот
+// иначе превращался бы в полоску, по которой его не узнать.
+.thumb {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: var(--color-surface);
+}
+
+.name {
+  min-width: 0;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+// Рамка при перетаскивании: без неё непонятно, что бросать сюда можно.
+.zone {
+  transition:
+    outline-color var(--duration-fast),
+    background-color var(--duration-fast);
+  outline: 2px dashed transparent;
+  outline-offset: 2px;
+}
+
+.zoneActive {
+  outline-color: var(--color-accent);
+  background-color: var(--color-accent-subtle);
+}
+
+.sent {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-3xs);
+  margin-top: var(--spacing-3xs);
+  font-size: var(--font-size-caption);
+  color: var(--color-fg-muted);
+}
+
+.sentInverse {
+  color: inherit;
+  opacity: 0.9;
+}
+
+.sentName {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px var(--spacing-2xs);
+  border: 1px solid currentColor;
+  border-radius: 999px;
+}

@@ -73,6 +73,12 @@ export async function shootFirstRun(browser, web, scenario, { panel }) {
     // Кадр на всю страницу: главное здесь — полоса разделов, а не содержимое
     // первой вкладки.
     await openSettingsTab(page, web, 'general');
+    // Список редакторов приходит отдельным запросом и всегда содержит VS Code
+    // (найден он или нет) — без этого ожидания кадр ловил карточку пустой.
+    await page
+      .getByRole('button', { name: /^VS Code\b/ })
+      .first()
+      .waitFor({ timeout: 20_000 });
     await scenario.shot(page, '05-tabs');
 
     // ── 06. Каталог конфигурации ─────────────────────────────────────────────

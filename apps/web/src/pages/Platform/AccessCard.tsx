@@ -127,7 +127,7 @@ export function AccessCard({ status }: AccessCardProps) {
           <Typography variant="body" weight="medium" as="h2">
             {t('platform.access.title', { title: platform.title })}
           </Typography>
-          <Typography variant="body-sm" color="subtle" style={{ maxWidth: 'var(--text-measure)' }}>
+          <Typography variant="body-sm" color="subtle" className="prose">
             {t('platform.access.text')}
           </Typography>
           {/* Неактивный контур не везёт никого: сказать это ДО галочек, иначе
@@ -135,7 +135,7 @@ export function AccessCard({ status }: AccessCardProps) {
           <Typography
             variant="body-sm"
             color={status.active ? 'muted' : 'warning'}
-            style={{ maxWidth: 'var(--text-measure)' }}
+            className="prose"
           >
             {status.active ? t('platform.access.active') : t('platform.access.inactive')}
           </Typography>
@@ -144,6 +144,12 @@ export function AccessCard({ status }: AccessCardProps) {
         <Stack gap="var(--spacing-2xs)">
           <Typography variant="body-sm" weight="medium" as="h3">
             {t('platform.consumersTitle')}
+          </Typography>
+          {/* Снятая галочка закрывает раздел в шлюзе на каждом запросе (баг
+              11а) — и у прогона, который уже идёт; прежний текст обещал
+              «со следующего запуска» и стал неправдой. */}
+          <Typography variant="caption" color="muted" className="prose">
+            {t('contourConfig.access.consumersHint')}
           </Typography>
           {plan.isLoading && <SkeletonList rows={3} withActions={false} />}
           {data?.consumers.map((consumer) => (
@@ -164,7 +170,7 @@ export function AccessCard({ status }: AccessCardProps) {
           <Typography variant="body-sm" weight="medium" as="h3">
             {t('platform.access.writesTitle')}
           </Typography>
-          <Typography variant="caption" color="muted" style={{ maxWidth: 'var(--text-measure)' }}>
+          <Typography variant="caption" color="muted" className="prose">
             {t('platform.access.runsNote')}
           </Typography>
 
@@ -206,7 +212,7 @@ export function AccessCard({ status }: AccessCardProps) {
 
           {!terminalOn && appliedFiles.size > 0 && (
             <Typography variant="caption" color="warning">
-              {t('platform.consumersFilesStay')}
+              {t('contourConfig.access.filesStay')}
             </Typography>
           )}
         </Stack>

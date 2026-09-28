@@ -16,9 +16,14 @@
   width: min(360px, calc(100vw - var(--spacing-xl)));
   background: var(--color-surface-raised);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border-radius: 10px;
   box-shadow: var(--shadow-lg);
   overflow: hidden;
+  // Высоту под окно ставит useAnchoredPanel: шапка пульта остаётся, ужимается
+  // только список.
+  display: flex;
+  flex-direction: column;
+  max-height: var(--panel-max-block, none);
 }
 
 .head {
@@ -52,6 +57,8 @@
 }
 
 .list {
+  flex: 1 1 auto;
+  min-height: 0;
   max-height: 50vh;
   overflow-y: auto;
   scrollbar-width: thin;

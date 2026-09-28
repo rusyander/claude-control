@@ -1,4 +1,5 @@
 import type { PanelAgentRunRefusalCode } from '@agentdeck/contracts/panel-agent';
+import { PLATFORM_ASSISTANT_CONSUMER } from '@agentdeck/contracts/platform-consumers';
 import type { AppStore } from '../../lib/app-store.ts';
 import { claudeProvider } from '../../providers/claude.ts';
 import { detectCliOnPath, findCliOnPath } from '../../providers/detect.ts';
@@ -115,7 +116,11 @@ export function resolvePanelAgentLaunch(deps: PanelAgentLaunchDeps): PanelAgentL
   }
   const env: Record<string, string> = {};
   for (const item of buildEndpointPlan(
-    targetProfile(profile, platformId, port, 'anthropic'),
+    // Раздел «Ассистент» в адресе: закрыли его на контуре — шлюз откажет и
+    // уже идущему разговору агента, а не только следующему запуску.
+    targetProfile(profile, platformId, port, 'anthropic', {
+      section: PLATFORM_ASSISTANT_CONSUMER,
+    }),
     vars,
     PLACEHOLDER_KEY,
     false,

@@ -8,6 +8,29 @@ import type {
   RunAssistantDeps,
 } from './types.ts';
 import { coded } from '../../lib/server-text.ts';
+import {
+  anthropicImageBlocks,
+  googleImageParts,
+  openAiImageParts,
+} from '../../lib/agent-images.ts';
+
+/**
+ * Содержимое реплики в форме API: без картинок — прежняя строка байт в байт,
+ * с картинками — массив частей, картинки перед текстом (так советует API).
+ */
+function anthropicContent(m: AssistantMessage): unknown {
+  if (!m.images?.length) return m.content;
+  return [...anthropicImageBlocks(m.images), { type: 'text', text: m.content }];
+}
+
+function openAiContent(m: AssistantMessage): unknown {
+  if (!m.images?.length) return m.content;
+  return [...openAiImageParts(m.images), { type: 'text', text: m.content }];
+}
+
+function googleParts(m: AssistantMessage): unknown[] {
+  return [...(m.images?.length ? googleImageParts(m.images) : []), { text: m.content }];
+}
 
 /** Актуальное поколение зашитой модели — или она сама, если каталога нет. */
 function assistantModel(deps: RunAssistantDeps, fallback: string): string {
@@ -85,7 +108,7 @@ export async function runProviderApi(
         body: JSON.stringify({
           model,
           max_tokens: 2048,
-          messages: messages.map((m) => ({ role: m.role, content: m.content })),
+          messages: messages.map((m) => ({ role: m.role, content: anthropicContent(m) })),
         }),
       });
       if (!res.ok) return apiError(provider.id, await describeHttpError(res));
@@ -111,7 +134,7 @@ export async function runProviderApi(
         body: JSON.stringify({
           contents: messages.map((m) => ({
             role: m.role === 'assistant' ? 'model' : 'user',
-            parts: [{ text: m.content }],
+            parts: googleParts(m),
           })),
         }),
       });
@@ -140,7 +163,7 @@ export async function runProviderApi(
       signal: deps.signal,
       body: JSON.stringify({
         model: endpoint ? model : (process.env.OPENAI_MODEL ?? model),
-        messages: messages.map((m) => ({ role: m.role, content: m.content })),
+        messages: messages.map((m) => ({ role: m.role, content: openAiContent(m) })),
       }),
     });
     if (!res.ok) return apiError(provider.id, await describeHttpError(res));

@@ -31,8 +31,13 @@ export const CONFIG_DIR = join(STAND, '.claude');
 /** Домашний каталог, который увидит панель: без имени человека. */
 export const HOME_DIR = join(STAND, 'home');
 
-/** Реестр MCP-серверов лежит НЕ внутри `.claude`, а рядом — так его ищет панель. */
-export const MCP_CONFIG = join(STAND, '.claude.json');
+/**
+ * Реестр MCP-серверов. При ЯВНОМ `CLAUDE_CONFIG_DIR` панель (как и CLI) ищет
+ * `.claude.json` ВНУТРИ каталога конфигурации (`resolveMcpConfig` в
+ * `claude-paths.ts`), а не рядом с ним. Файл рядом панель не читает: сценарий
+ * `mcp/trouble` писал туда свои серверы и снимал оставшиеся от `mcp/connect`.
+ */
+export const MCP_CONFIG = join(CONFIG_DIR, '.claude.json');
 
 /** Выдуманный сервер заказов: его команда видна в кадре, поэтому путь опрятный. */
 export const ORDERS_SERVER = join(STAND, 'orders-mcp', 'server.mjs').replace(/\\/g, '/');

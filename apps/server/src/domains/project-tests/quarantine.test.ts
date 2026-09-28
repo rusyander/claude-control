@@ -157,6 +157,123 @@ describe('project-tests/quarantine: постановка карантина', ()
   });
 });
 
+/**
+ * Повторы раннера (Playwright `retries`): тест, спасённый повтором, в статусе
+ * зелёный, и стабильность по статусам его не видит — 100%. Основание для
+ * карантина — число прогонов «зелёный только на повторе»; решение всё равно
+ * человека.
+ */
+describe('project-tests/quarantine: зелёный только на повторе', () => {
+  /** История из зелёных; в прогонах с номерами из `flaky` кейс спас повтор. */
+  const greenWithRetries = (count: number, flaky: number[]): ProjectTestRunRecord[] =>
+    historyOf(
+      'a',
+      Array.from({ length: count }, () => 'passed' as const),
+    ).map((run, index) => ({
+      ...run,
+      results: run.results.map((result) =>
+        flaky.includes(index) ? { ...result, flakyAttempts: 1 } : result,
+      ),
+    }));
+
+  it('предлагает карантин со 100% стабильностью по числу повторов, с порогом в отчёте', () => {
+    const groups = [group('gui', [testCase('a')])];
+    const report = buildQuarantine(
+      groups,
+      greenWithRetries(6, [0, 3]),
+      { updates: {} },
+      { now: NOW },
+    );
+
+    expect(report.thresholds.retryFlakes).toBe(2);
+    expect(report.quarantine).toHaveLength(1);
+    expect(report.quarantine[0]).toMatchObject({
+      stability: 100,
+      retryFlakes: 2,
+      messageCode: 'quarantine-suggest-retries',
+      params: { flakes: 2, runs: 6, limit: 2 },
+    });
+    expect(report.quarantine[0]?.reason).toContain('только на повторе');
+    // Причина приходит и кодом: поле ввода заполняется на языке интерфейса.
+    expect(report.quarantine[0]).toMatchObject({
+      reasonCode: 'quarantine-reason-retries',
+      reasonParams: { flakes: 2, runs: 6 },
+    });
+    // Предложение — не действие: библиотека не тронута.
+    expect(groups[0]?.cases[0]?.muted).toBeUndefined();
+  });
+
+  it('один спасённый прогон — ещё не повторяемость; порог задаётся снаружи', () => {
+    const groups = [group('gui', [testCase('a')])];
+    const runs = greenWithRetries(6, [2]);
+
+    expect(buildQuarantine(groups, runs, { updates: {} }, { now: NOW }).quarantine).toHaveLength(0);
+    const strict = buildQuarantine(groups, runs, { updates: {} }, { now: NOW, retryFlakes: 1 });
+    expect(strict.quarantine[0]?.retryFlakes).toBe(1);
+  });
+
+  it('несколько спасённых проходов одного прогона — один случай', () => {
+    const groups = [group('gui', [testCase('a')])];
+    const runs = greenWithRetries(5, []);
+    const first = runs[0]!;
+    runs[0] = {
+      ...first,
+      results: [
+        { ...first.results[0]!, pointId: 'gui:a|x', flakyAttempts: 2 },
+        { ...first.results[0]!, pointId: 'gui:a|y', flakyAttempts: 1 },
+      ],
+    };
+
+    expect(buildQuarantine(groups, runs, { updates: {} }, { now: NOW }).quarantine).toHaveLength(0);
+  });
+
+  it('упавший на всех попытках — не «на повторе»; в карантине — не предлагается', () => {
+    const failedRetries = historyOf('a', ['passed', 'passed', 'passed', 'passed']).map((run) => ({
+      ...run,
+      results: run.results.map((result) => ({
+        ...result,
+        status: 'failed' as const,
+        flakyAttempts: 3,
+      })),
+    }));
+    const quiet = buildQuarantine(
+      [group('gui', [testCase('a')])],
+      failedRetries,
+      { updates: {} },
+      { now: NOW },
+    );
+    expect(quiet.quarantine.every((item) => item.retryFlakes === undefined)).toBe(true);
+
+    const muted = buildQuarantine(
+      [group('gui', [testCase('a', { muted: true })])],
+      greenWithRetries(6, [0, 1, 2]),
+      { updates: {} },
+      { now: NOW },
+    );
+    expect(muted.quarantine).toHaveLength(0);
+  });
+
+  it('нестабильный и спасаемый повтором — одно предложение по стабильности, повторы рядом', () => {
+    const groups = [group('gui', [testCase('a')])];
+    const runs = historyOf('a', ['passed', 'failed', 'passed', 'failed', 'passed']).map(
+      (run, index) => ({
+        ...run,
+        results: run.results.map((result) =>
+          result.status === 'passed' && index < 3 ? { ...result, flakyAttempts: 1 } : result,
+        ),
+      }),
+    );
+
+    const report = buildQuarantine(groups, runs, { updates: {} }, { now: NOW });
+    expect(report.quarantine).toHaveLength(1);
+    expect(report.quarantine[0]).toMatchObject({
+      messageCode: 'quarantine-suggest',
+      reasonCode: 'quarantine-reason-unstable',
+      retryFlakes: 2,
+    });
+  });
+});
+
 describe('project-tests/quarantine: расхождение с требованием', () => {
   const linked = (over: Partial<ProjectTestCase> = {}) =>
     testCase('a', {
@@ -206,11 +323,17 @@ describe('project-tests/quarantine: расхождение с требовани
     const report = buildQuarantine(
       groups,
       runs,
-      { updates: {}, warning: 'Atlassian не подключён: даты требований не сверялись.' },
+      {
+        updates: {},
+        warning: 'Atlassian не подключён: даты требований не сверялись.',
+        warningCode: 'coverage-dates-atlassian-off',
+      },
       { now: NOW },
     );
 
     expect(report.warning).toContain('Atlassian');
+    // Код оговорки доезжает тоже — без него английский экран показывал русскую строку.
+    expect(report.warningCode).toBe('coverage-dates-atlassian-off');
     expect(report.lift).toHaveLength(1);
     expect(report.stale).toHaveLength(0);
   });

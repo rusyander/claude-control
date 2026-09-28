@@ -14,10 +14,13 @@ import { DeleteButton } from '@features/EntityDelete';
 import { DECISION_TONE } from '@entities/Permission';
 import { useProjectPermissions, useDeleteProjectPermission } from '@entities/Project';
 import { ProjectPermissionForm } from './ProjectPermissionForm';
-import type { ProjectTabProps } from './ProjectRulesTab.types';
+import { SourceLine } from './SourceLine';
+import { projectFilePath } from './lib/projectFilePath';
+import type { ProjectFileTabProps } from './ProjectRulesTab.types';
+import styles from './ProjectsPage.module.scss';
 
-/** Права проекта из его `.claude/settings.json` (+ settings.local.json). */
-export function ProjectPermissionsTab({ projectId }: ProjectTabProps) {
+/** Права проекта из его `.claude/settings.json` (+ settings.local.json) — правятся здесь. */
+export function ProjectPermissionsTab({ projectId, projectPath }: ProjectFileTabProps) {
   const { t } = useTranslation();
   const [editing, setEditing] = useState<PermissionRule | undefined>(undefined);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -37,10 +40,13 @@ export function ProjectPermissionsTab({ projectId }: ProjectTabProps) {
 
   return (
     <Stack gap="var(--spacing-sm)">
-      <Stack direction="row" justify="between" align="center" wrap gap="var(--spacing-sm)">
-        <Typography variant="caption" color="subtle">
-          {t('projectConfig.permissionsHint')}
-        </Typography>
+      <div className={styles.sectionHead}>
+        <div className={styles.sectionText}>
+          <SourceLine isEditable path={projectFilePath(projectPath, '.claude', 'settings.json')} />
+          <Typography variant="caption" color="subtle" className={styles.sectionHint}>
+            {t('projectsPage.hint.permissions')}
+          </Typography>
+        </div>
         <Button
           variant="primary"
           size="sm"
@@ -49,7 +55,7 @@ export function ProjectPermissionsTab({ projectId }: ProjectTabProps) {
         >
           {t('projectConfig.addPermission')}
         </Button>
-      </Stack>
+      </div>
 
       {isLoading && <SkeletonList rows={3} />}
 

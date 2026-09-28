@@ -64,7 +64,7 @@ export function ViolationsCard({ report, platformTitles }: ViolationsCardProps) 
           </Typography>
           {/* Главное предложение карточки: чьи это проверки и где они
               настраиваются. Без него человек ищет тумблер в панели. */}
-          <Typography variant="body-sm" color="subtle" style={{ maxWidth: 'var(--text-measure)' }}>
+          <Typography variant="body-sm" color="subtle" className="prose">
             {t('platform.violationsOwner')}
           </Typography>
         </Stack>

@@ -157,6 +157,20 @@ describe('runFormatCheck: обход реестра', () => {
     }
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
+
+  it('«схемы нет» едет с кодом и именем файла — английская панель переводит его', async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse(goodSchema));
+    const report = await runFormatCheck(at('2026-07-25T10:00:00.000Z'), fetchImpl as never);
+
+    const codex = report.providers.find((item) => item.providerId === 'codex');
+    expect(codex?.noteCode).toBe('checks-format-no-schema');
+    expect(codex?.noteParams).toEqual({ file: 'config.toml' });
+    expect(codex?.note).toContain('config.toml');
+    for (const row of report.providers.filter((item) => item.state === 'no-schema')) {
+      expect(row.noteCode).toBe('checks-format-no-schema');
+      expect(row.note).toContain(String(row.noteParams?.file));
+    }
+  });
 });
 
 describe('реестр сверки', () => {
@@ -175,7 +189,7 @@ describe('реестр сверки', () => {
   it('у провайдера без схемы есть объяснение, у провайдера со схемой — ключи', () => {
     for (const spec of FORMAT_CHECK_REGISTRY) {
       if (spec.schemaUrl) expect(spec.keys.length).toBeGreaterThan(0);
-      else expect(spec.noSchemaNote).toBeTruthy();
+      else expect(spec.noSchema?.note).toBeTruthy();
     }
   });
 });
@@ -202,6 +216,33 @@ describe('FormatCheckStore: кэш на диске', () => {
     // Свежий результат — в сеть не идём.
     expect(restored.isStale(at('2026-07-26T10:00:00.000Z'))).toBe(false);
     expect(restored.isStale(at('2026-08-25T10:00:00.000Z'))).toBe(true);
+  });
+
+  it('кэш прошлой версии без кода: «схемы нет» получает код при чтении', () => {
+    // Кэш живёт неделю: без этого английская панель показывала бы русское
+    // пояснение, пока сверка не обновится сама.
+    const appData = dir();
+    const legacy = {
+      checkedAt: '2026-07-25T10:00:00.000Z',
+      providers: [
+        {
+          providerId: 'codex',
+          state: 'no-schema',
+          keys: [],
+          note: 'Схема config.toml официально не публикуется — сверять не с чем.',
+        },
+        { providerId: 'opencode', state: 'unavailable', keys: [], note: 'HTTP 404' },
+      ],
+    };
+    writeFileSync(join(appData, 'format-check.json'), JSON.stringify(legacy), 'utf8');
+
+    const rows = new FormatCheckStore(appData).current()?.providers ?? [];
+    const codex = rows.find((row) => row.providerId === 'codex');
+    expect(codex?.noteCode).toBe('checks-format-no-schema');
+    expect(codex?.noteParams).toEqual({ file: 'config.toml' });
+    expect(codex?.note).toBe(legacy.providers[0]?.note);
+    // Чужой текст (ошибка сети) кода не получает — он показывается как есть.
+    expect(rows.find((row) => row.providerId === 'opencode')?.noteCode).toBeUndefined();
   });
 
   it('битый кэш не роняет старт: считаем, что сверки не было', () => {

@@ -13,6 +13,8 @@ import {
 } from './registry.ts';
 import { card, encode, readRoute, stateCard } from './action-kit.ts';
 import { findProject } from './actions-projects.ts';
+import { testsPage } from './actions-tests.ts';
+import { assertRegistered, registeredOnly } from './tests-block-kit.ts';
 import { dataField } from './texts.ts';
 
 /**
@@ -62,7 +64,11 @@ const projectGitStatus = definePanelAction({
   description:
     'Git state of a project directory: branch, local branches, changed files. Read-only.',
   input: z.object({ projectPath }),
-  route: (input) => ({ method: 'GET', url: `/api/project-git?${query(input.projectPath)}` }),
+  // Проект панели или его рабочая копия; чужой репозиторий — отказ до git.
+  route: async (input, inject) => {
+    await assertRegistered(inject, input.projectPath, { copies: true });
+    return { method: 'GET', url: `/api/project-git?${query(input.projectPath)}` };
+  },
   shape: (_input, body) => body as ProjectGitInfo,
   summary: 'journal-project-git-status',
 });
@@ -74,10 +80,10 @@ const listWorktrees = definePanelAction({
   description:
     'Parallel working copies of a project repository (path, branch, head, main/locked/prunable).',
   input: z.object({ projectPath }),
-  route: (input) => ({
-    method: 'GET',
-    url: `/api/project-git/worktrees?${query(input.projectPath)}`,
-  }),
+  route: async (input, inject) => {
+    await assertRegistered(inject, input.projectPath, { copies: true });
+    return { method: 'GET', url: `/api/project-git/worktrees?${query(input.projectPath)}` };
+  },
   shape: (_input, body) => {
     const info = body as ProjectWorktreesInfo;
     return {
@@ -105,10 +111,14 @@ const listTestRuns = definePanelAction({
   risk: 'read',
   description: 'Test run history of a project, newest first: id, mode, status, summary counts.',
   input: z.object({ projectPath, limit: z.number().int().min(1).max(200).default(20) }),
-  route: (input) => ({
-    method: 'GET',
-    url: `/api/project-tests/runs?${query(input.projectPath)}&limit=${input.limit}`,
-  }),
+  // Карточки у чтения нет — проект проверяется здесь (см. `registeredOnly`).
+  route: async (input, inject) => {
+    await assertRegistered(inject, input.projectPath);
+    return {
+      method: 'GET',
+      url: `/api/project-tests/runs?${query(input.projectPath)}&limit=${input.limit}`,
+    };
+  },
   shape: (_input, body) => ({
     runs: ((body as { runs?: ProjectTestRunRecord[] }).runs ?? []).map(
       ({ results, ...record }) => ({
@@ -126,10 +136,13 @@ const readTestRun = definePanelAction({
   risk: 'read',
   description: 'One test run with its per-case results (status, comment) by run id.',
   input: z.object({ projectPath, runId: z.string().min(1) }),
-  route: (input) => ({
-    method: 'GET',
-    url: `/api/project-tests/run?${query(input.projectPath)}&id=${encode(input.runId)}`,
-  }),
+  route: async (input, inject) => {
+    await assertRegistered(inject, input.projectPath);
+    return {
+      method: 'GET',
+      url: `/api/project-tests/run?${query(input.projectPath)}&id=${encode(input.runId)}`,
+    };
+  },
   summary: 'journal-read-test-run',
 });
 
@@ -140,7 +153,10 @@ const lintTests = definePanelAction({
   description:
     'Library lint of a project’s test cases: issues (missing steps, stale) and duplicates.',
   input: z.object({ projectPath }),
-  route: (input) => ({ method: 'GET', url: `/api/project-tests/lint?${query(input.projectPath)}` }),
+  route: async (input, inject) => {
+    await assertRegistered(inject, input.projectPath);
+    return { method: 'GET', url: `/api/project-tests/lint?${query(input.projectPath)}` };
+  },
   summary: 'journal-lint-tests',
 });
 
@@ -179,7 +195,7 @@ const stopTests = definePanelAction({
     const run = (body as ProjectTestsView).run;
     return { run: run ? { id: run.id, status: run.status } : null };
   },
-  page: () => ({ route: '/tests' }),
+  page: (input) => testsPage(input.projectPath, 'runs'),
 });
 
 async function findCase(inject: InjectRoute, path: string, groupId: string, caseId: string) {
@@ -217,7 +233,7 @@ const deleteTestCase = definePanelAction({
     );
   },
   shape: () => ({ deleted: true }),
-  page: (input) => ({ route: '/tests', focus: input.groupId }),
+  page: (input) => testsPage(input.projectPath, 'library'),
 });
 
 export const WORK_ACTIONS: readonly AnyPanelAction[] = [
@@ -227,6 +243,6 @@ export const WORK_ACTIONS: readonly AnyPanelAction[] = [
   listTestRuns,
   readTestRun,
   lintTests,
-  stopTests,
-  deleteTestCase,
+  // Действия раздела тестов — только в проектах панели, как весь блок.
+  ...[stopTests, deleteTestCase].map((action) => registeredOnly(action)),
 ];

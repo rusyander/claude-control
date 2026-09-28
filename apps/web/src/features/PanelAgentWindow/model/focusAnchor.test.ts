@@ -2,9 +2,12 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   ANCHOR_TIMEOUT_MS,
   TYPING_GRACE_MS,
+  WINDOW_SELECTOR,
   canTakeFocus,
+  decisionPress,
   isEditable,
   noteKeystroke,
+  noteReturnedFocus,
   resetTyping,
   typedRecently,
   watchForAnchor,
@@ -90,6 +93,10 @@ describe('политика фокуса: человек печатает', () =>
     expect(isEditable(fakeElement('TEXTAREA'))).toBe(true);
     expect(isEditable(fakeElement('INPUT', { type: 'password' }))).toBe(true);
     expect(isEditable(fakeElement('INPUT', { type: 'checkbox' }))).toBe(false);
+    // Скрытое поле и выбор файла — не поля ввода: фокус якоря на них «удавался»
+    // впустую, и подсветки не было (F-286).
+    expect(isEditable(fakeElement('INPUT', { type: 'hidden' }))).toBe(false);
+    expect(isEditable(fakeElement('INPUT', { type: 'file' }))).toBe(false);
     expect(isEditable(fakeElement('BUTTON'))).toBe(false);
     expect(canTakeFocus(fakeElement('TEXTAREA'), 10_000)).toBe(false);
   });
@@ -108,5 +115,35 @@ describe('политика фокуса: человек печатает', () =>
     expect(typedRecently(1_001)).toBe(true);
     expect(typedRecently(1_000 + TYPING_GRACE_MS)).toBe(false);
     resetTyping();
+  });
+
+  it('поле агента, куда фокус вернула сама панель, отдаёт его якорю, пока человек не печатал', () => {
+    // После «Выполнить» у эндпоинта окно возвращало фокус в своё поле, и поле
+    // ключа на странице его уже не получало: вставка уходила в чат агента.
+    resetTyping();
+    vi.stubGlobal('document', { body: {} });
+    const input = fakeElement('TEXTAREA', {
+      closest: (selector: string) => (selector === WINDOW_SELECTOR ? {} : null),
+    });
+    noteReturnedFocus(input);
+    expect(canTakeFocus(input, 10_000)).toBe(true);
+    noteKeystroke('a', 10_000);
+    expect(canTakeFocus(input, 10_000 + TYPING_GRACE_MS)).toBe(false);
+    resetTyping();
+    vi.unstubAllGlobals();
+  });
+});
+
+describe('кнопки решения в первые полсекунды', () => {
+  it('[C1] нажатие до взвода не решает, а просит объяснить задержку', () => {
+    expect(decisionPress(false, 'reject', false)).toBe('arming');
+    expect(decisionPress(false, 'approve', false)).toBe('arming');
+  });
+
+  it('[C1] после взвода решает; обрезанный предпросмотр одобрить нельзя', () => {
+    expect(decisionPress(true, 'reject', false)).toBe('decide');
+    expect(decisionPress(true, 'approve', false)).toBe('decide');
+    expect(decisionPress(true, 'approve', true)).toBe('blocked');
+    expect(decisionPress(true, 'reject', true)).toBe('decide');
   });
 });

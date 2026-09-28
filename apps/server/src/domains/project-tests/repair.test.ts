@@ -3,7 +3,8 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { repairFutureStamps } from './repair.ts';
+import { repairFutureStamps, settleOrphanRuns } from './repair.ts';
+import { readRuns, writeRun } from './runs-store.ts';
 import { createGroup, readGroups, upsertCase } from './store.ts';
 
 /**
@@ -132,5 +133,55 @@ describe('project-tests/repair: отметки из будущего', () => {
     expect(caseOf('api-001')?.lastRunAt).toBe('2026-09-08T11:00:00.000Z');
     expect(caseOf('api-002')?.lastRunAt).toBe('2026-09-08T12:00:30.000Z');
     expect(repairFutureStamps(root, runs, NOW)).toEqual([]);
+  });
+});
+
+/**
+ * Запись «идёт» без живого прогона: панель перезапустилась посреди работы
+ * агента (сохранение серверного файла, перезагрузка), процесс CLI умер вместе с
+ * ней, а запись на диске осталась «идёт» навсегда — в истории, в отчёте и в
+ * ответе агента панели «что сейчас гоняется».
+ */
+describe('project-tests/repair: прогон, переживший панель', () => {
+  let root = '';
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'cc-tests-orphan-'));
+  });
+  afterEach(() => {
+    rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  });
+
+  const running = (id: string, patch: Partial<ProjectTestRunRecord> = {}): ProjectTestRunRecord =>
+    ({
+      ...record(id, '', []),
+      finishedAt: undefined,
+      status: 'running',
+      startedAt: '2026-09-08T09:00:00.000Z',
+      ...patch,
+    }) as ProjectTestRunRecord;
+
+  it('агентский «идёт» без живого прогона — сорвался с причиной; живой и ручной не тронуты', () => {
+    writeRun(root, running('orphan-1', { mode: 'generate' }));
+    writeRun(root, running('live-2', { startedAt: '2026-09-08T10:00:00.000Z' }));
+    writeRun(
+      root,
+      running('manual-3', {
+        mode: 'manual',
+        actor: 'human',
+        startedAt: '2026-09-08T11:00:00.000Z',
+      }),
+    );
+
+    expect(settleOrphanRuns(root, readRuns(root), 'live-2')).toEqual(['orphan-1']);
+
+    const byId = new Map(readRuns(root).map((run) => [run.id, run]));
+    expect(byId.get('orphan-1')?.status).toBe('error');
+    expect(byId.get('orphan-1')?.error).toMatch(/перезапуст/);
+    // Код рядом с текстом: английский интерфейс переводит, а не показывает русский (ревью z1 C22).
+    expect(byId.get('orphan-1')?.messageCode).toBe('orphan-run-stopped');
+    expect(byId.get('live-2')?.status).toBe('running');
+    expect(byId.get('manual-3')?.status).toBe('running');
+    // Второй проход ничего не находит: запись уже не «идёт».
+    expect(settleOrphanRuns(root, readRuns(root), 'live-2')).toEqual([]);
   });
 });

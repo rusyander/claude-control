@@ -10,6 +10,12 @@ import {
   type TaskKind,
 } from '@agentdeck/contracts/model-cascade';
 import { scanPlanBlocks, workAfterPlanPrompt } from '@agentdeck/contracts/split-plan';
+import {
+  mergeSieveRows,
+  scanSieveBlocks,
+  type SieveReportRow,
+  type SieveStage,
+} from '@agentdeck/contracts/sieves';
 import type { ChatLink } from '../../lib/app-store/app-store.types.ts';
 import { initiativePrompt } from './initiative.ts';
 
@@ -97,6 +103,12 @@ export interface CascadeStageInput {
    * этого второй доставки на тот же круг не бывает (`deliveredAt`, W3-3).
    */
   redeliver?: boolean;
+  /**
+   * Абзац сит перед MR для задания звена (`sievePromptBlock`): по затронутым
+   * путям копии, выученным ситам и уже сданному отчёту. Функция, а не значение:
+   * ответ стоит запуска git, а нужен только звеньям ревью и доставки.
+   */
+  sieves?: (stage: SieveStage, done: readonly SieveReportRow[]) => string;
   /** Часы — в тесте фиксируются. */
   now?: () => Date;
 }
@@ -116,6 +128,8 @@ export interface CascadeStageInput {
 export function stageAppendPrompt(
   plan: Pick<CascadeStagePlan, 'stage' | 'link'>,
   settings: Pick<AppSettings, 'taskSplitInitiative' | 'handoffInitiative'>,
+  /** Строки группы звена (`childStageExtra`): числа группы, эскалация у работы. */
+  extra?: string,
 ): string {
   return [
     initiativePrompt(settings, { splitMuted: true }) ?? '',
@@ -130,13 +144,14 @@ export function stageAppendPrompt(
         plan.stage === 'work' && plan.link.lowered
         ? loweredWorkPrompt(plan.link.kind as TaskKind | undefined)
         : '',
+    extra ?? '',
   ]
     .filter(Boolean)
     .join(' ');
 }
 
 /** Стадия связи; пусто читается как «работа»: так выглядят связи до конвейера. */
-function stageOf(link: ChatLink): CascadeStage {
+export function stageOf(link: ChatLink): CascadeStage {
   switch (link.stage) {
     case 'triage':
     case 'plan':
@@ -159,8 +174,9 @@ function stageOf(link: ChatLink): CascadeStage {
 export function childAppendPrompt(
   link: ChatLink,
   settings: Pick<AppSettings, 'taskSplitInitiative' | 'handoffInitiative'>,
+  extra?: string,
 ): string {
-  return stageAppendPrompt({ stage: stageOf(link), link }, settings);
+  return stageAppendPrompt({ stage: stageOf(link), link }, settings, extra);
 }
 
 /** Знаков задания в связи: столько же, сколько хранит контракт плана. */
@@ -276,6 +292,7 @@ function deliverPlan(
   base: ChatLink,
   after: 'fix' | 'review' | 'work',
   context: StageContext,
+  sieves?: string,
 ): CascadeStagePlan | undefined {
   const model = link.workModel ?? link.model;
   const effort = link.workEffort ?? link.effort;
@@ -289,6 +306,7 @@ function deliverPlan(
       after,
       ...(link.branch ? { branch: link.branch } : {}),
       context,
+      ...(sieves ? { sieves } : {}),
     }),
     link: {
       ...base,
@@ -320,6 +338,7 @@ export function planCascadeStage(input: CascadeStageInput): CascadeStagePlan | u
   if (link.review) return undefined;
 
   const kind = kindOf(link);
+  const sieveRows = mergeSieveRows(link.sieveRows, scanSieveBlocks(text).rows);
   // Задание группы: записанное в связи (после плана) или промпт самой работы.
   const groupTask =
     link.task ?? (stage === 'work' && task.trim() ? task.slice(0, TASK_MAX) : undefined);
@@ -336,7 +355,12 @@ export function planCascadeStage(input: CascadeStageInput): CascadeStagePlan | u
     // звена иначе теряло их — у связи ревью задания уже не было.
     ...(groupTask ? { task: groupTask } : {}),
     ...(link.planSummary ? { planSummary: link.planSummary } : {}),
+    // Отчёт о ситах едет по цепочке: сделанное ревью доставка не повторяет, а
+    // судья доставки видит строки всех звеньев.
+    ...(sieveRows.length > 0 ? { sieveRows } : {}),
   };
+  const sievesFor = (stage: SieveStage): string | undefined =>
+    input.sieves?.(stage, sieveRows) || undefined;
   const contextAfter = (previousText: string): StageContext =>
     stageContextOf(link, groupTask, { stage, text: previousText });
 
@@ -349,7 +373,7 @@ export function planCascadeStage(input: CascadeStageInput): CascadeStagePlan | u
   // фоном, — не конец правок (Д3): доставлять недоделанное рано.
   if (stage === 'fix') {
     return input.deliver && !input.paused && !deliveredOnce(link, input)
-      ? deliverPlan(link, base, 'fix', contextAfter(text))
+      ? deliverPlan(link, base, 'fix', contextAfter(text), sievesFor('deliver'))
       : undefined;
   }
 
@@ -365,7 +389,7 @@ export function planCascadeStage(input: CascadeStageInput): CascadeStagePlan | u
     // Пустую работу не доставляем: MR без правок — не итог группы.
     const deliverNow = (): CascadeStagePlan | undefined =>
       input.deliver && !deliveredOnce(link, input) && hasWork()
-        ? deliverPlan(link, base, 'work', contextAfter(text))
+        ? deliverPlan(link, base, 'work', contextAfter(text), sievesFor('deliver'))
         : undefined;
     // Работа на потолке проверкой не усиливается: усиливать нечем.
     if (!link.lowered) return deliverNow();
@@ -377,6 +401,7 @@ export function planCascadeStage(input: CascadeStageInput): CascadeStagePlan | u
     // придётся» нельзя: проверка слабее работы это не проверка.
     if (!link.ceilingModel) return deliverNow();
     if (!hasWork()) return undefined;
+    const reviewSieves = sievesFor('review');
 
     return {
       stage: 'review',
@@ -391,6 +416,7 @@ export function planCascadeStage(input: CascadeStageInput): CascadeStagePlan | u
           ...(link.planSummary ? { plan: link.planSummary } : {}),
           ...(text.trim() ? { previous: { stage, text } } : {}),
         },
+        ...(reviewSieves ? { sieves: reviewSieves } : {}),
       }),
       link: {
         ...base,
@@ -412,7 +438,13 @@ export function planCascadeStage(input: CascadeStageInput): CascadeStagePlan | u
   // рассчитывать на ревью и не довести ветку до MR.
   if (findings.length === 0) {
     return input.deliver && !input.paused && !deliveredOnce(link, input)
-      ? deliverPlan(link, base, 'review', contextAfter(scanReviewBlocks(text).text))
+      ? deliverPlan(
+          link,
+          base,
+          'review',
+          contextAfter(scanReviewBlocks(text).text),
+          sievesFor('deliver'),
+        )
       : undefined;
   }
 

@@ -2,11 +2,14 @@ import type { TestsMessageCode } from '@agentdeck/contracts/server-messages';
 
 export const testsRu: Record<TestsMessageCode, string> = {
   'defect-case-unspecified': 'Не указан кейс, по которому заводится дефект.',
+  'case-history-case-unspecified': 'Не указан кейс, чью историю показать.',
   'defect-target-unspecified': 'Не указано, куда заводить задачу.',
   'defect-title-body-required': 'Нужен заголовок и описание.',
   'run-unspecified': 'Не указан прогон.',
   'import-results-format': 'Формат результатов: junit, playwright или allure.',
   'import-cases-format': 'Формат кейсов: csv, xlsx, testrail-csv или markdown.',
+  'import-cases-xlsx-broken':
+    'Это не книга Excel (xlsx): файл не открылся как архив. Сохраните таблицу как .xlsx или выгрузите в CSV.',
   'import-group-unspecified': 'Не указана группа, куда класть кейсы.',
   'export-run-format': 'Формат отчёта по прогону: md, csv или html.',
   'export-cases-format': 'Формат выгрузки: csv, md или xlsx.',
@@ -131,6 +134,9 @@ export const testsRu: Record<TestsMessageCode, string> = {
   'attribute-options': 'Поле «{{field}}»: допустимые значения — {{options}}.',
   'attribute-number': 'Поле «{{field}}» — это число.',
   'case-title-required': 'У теста должно быть название.',
+  'case-link-invalid': 'Ссылка «{{url}}»: нужен полный адрес, начинающийся с http:// или https://.',
+  'case-duration-invalid':
+    'Длительность «{{value}}»: целое число минут от 1 до 1440, 0 — очистить.',
   'case-id-not-in-group':
     'Кейса «{{caseId}}» в группе «{{groupId}}» нет: новый кейс сохраняют без id.',
   'case-not-in-named-group': 'Кейса «{{caseId}}» в группе «{{groupId}}» нет.',
@@ -212,6 +218,39 @@ export const testsRu: Record<TestsMessageCode, string> = {
     'Зелёных подряд: {{streak}} при пороге {{limit}}. Поломка, ради которой ставили карантин, больше не воспроизводится.',
   'quarantine-suggest':
     'Стабильность {{stability}}% на {{runs}} результатах при пороге {{limit}}%: кейс то зелёный, то красный, и его провалам никто не верит.',
+  'quarantine-suggest-retries':
+    'Прошёл только на повторе в {{flakes}} прогонах из {{runs}} при пороге {{limit}}: статус зелёный, но без повтора кейс падает.',
+  'quarantine-reason-unstable': 'Нестабилен: стабильность {{stability}}% на {{runs}} результатах.',
+  'quarantine-reason-retries':
+    'Нестабилен: проходит только на повторе в {{flakes}} из {{runs}} прогонов.',
   'tests-environment-used-by-plans':
     'На это окружение ссылаются планы: {{plans}}. Удалить всё равно — план останется без окружения.',
+  'orphan-run-stopped':
+    'Панель перезапустилась, пока шёл прогон, и агент остановился вместе с ней. Записанное им до этого осталось в файлах; черновик, если успел появиться, ждёт приёмки.',
+  'e2e-run-not-installed':
+    'Раннер автотестов не установлен, а сама панель его не ставит — скачивать сотни мегабайт без спроса она не будет. Выполните в {{dir}}: {{install}}',
+  'e2e-not-created':
+    'Эту папку e2e завела не панель: она часть проекта, и убирать её панель не будет.',
+  'e2e-folder-not-empty':
+    'В папке e2e лежат файлы, которые написала не панель ({{count}}). Убрать всё равно — они удалятся вместе с папкой.',
+  'e2e-path-taken': '«{{dir}}» в проекте уже занят файлом — папку e2e завести некуда.',
+  'e2e-missing': 'Папки e2e в проекте нет — заведите её в разделе «Тесты».',
+  'e2e-dir-unknown': 'Папки e2e «{{dir}}» в проекте нет — выберите одну из найденных панелью.',
+  'e2e-run-busy': 'Автотесты этого проекта уже идут — дождитесь конца или остановите их.',
+  'e2e-project-unregistered':
+    'Папку e2e и автотесты панель заводит только у проектов из раздела «Проекты» и копий их веток. Добавьте этот каталог проектом.',
+  'automation-not-object': 'Файл команды прогона — не объект JSON.',
+  'automation-command-missing': 'В файле команды прогона нет строки «command».',
+  'automation-command-too-long': 'Команда прогона длиннее {{max}} символов.',
+  'automation-command-multiline': 'Команда прогона — одна строка, без переводов.',
+  'automation-report-outside': 'Путь отчёта в команде прогона — от корня проекта и внутри него.',
+  'e2e-run-unknown-framework':
+    'Каркас папки e2e не распознан (не Playwright, Cypress или pytest) — команду прогона панель не угадывает. Своя команда проекта называется в .agent/tests/automation.json.',
+  'e2e-run-nothing-selected':
+    'У выбранных кейсов нет автотеста (поле automation.file) — прогонять нечего.',
+  'e2e-run-file-unsafe':
+    'В имени файла автотеста {{file}} есть символ, который оболочка раскроет (" ` $ % ! или перевод строки), — переименуйте файл или поправьте automation.file.',
+  'e2e-run-timeout':
+    'Прогон превысил timeoutMinutes из automation.json и остановлен до того, как появился отчёт.',
+  'tests-plan-number-invalid': '{{field}} должен быть числом, а пришло «{{value}}».',
 };

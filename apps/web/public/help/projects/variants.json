@@ -1,0 +1,225 @@
+{
+  "topic": "projects",
+  "frames": {
+    "local/01-tab": {
+      "light-ru": {
+        "file": "01-tab.png",
+        "width": 1440,
+        "height": 1100
+      },
+      "light-en": {
+        "file": "01-tab.en.png",
+        "width": 1440,
+        "height": 1100
+      },
+      "dark-ru": {
+        "file": "01-tab.dark.png",
+        "width": 1440,
+        "height": 1100
+      },
+      "dark-en": {
+        "file": "01-tab.dark.en.png",
+        "width": 1440,
+        "height": 1100
+      }
+    },
+    "local/02-skills": {
+      "light-ru": {
+        "file": "02-skills.png",
+        "width": 1072,
+        "height": 438
+      },
+      "light-en": {
+        "file": "02-skills.en.png",
+        "width": 1072,
+        "height": 438
+      },
+      "dark-ru": {
+        "file": "02-skills.dark.png",
+        "width": 1072,
+        "height": 438
+      },
+      "dark-en": {
+        "file": "02-skills.dark.en.png",
+        "width": 1072,
+        "height": 438
+      }
+    },
+    "local/03-hooks": {
+      "light-ru": {
+        "file": "03-hooks.png",
+        "width": 1072,
+        "height": 461
+      },
+      "light-en": {
+        "file": "03-hooks.en.png",
+        "width": 1072,
+        "height": 461
+      },
+      "dark-ru": {
+        "file": "03-hooks.dark.png",
+        "width": 1072,
+        "height": 461
+      },
+      "dark-en": {
+        "file": "03-hooks.dark.en.png",
+        "width": 1072,
+        "height": 461
+      }
+    },
+    "local/04-rules": {
+      "light-ru": {
+        "file": "04-rules.png",
+        "width": 1072,
+        "height": 537
+      },
+      "light-en": {
+        "file": "04-rules.en.png",
+        "width": 1072,
+        "height": 537
+      },
+      "dark-ru": {
+        "file": "04-rules.dark.png",
+        "width": 1072,
+        "height": 537
+      },
+      "dark-en": {
+        "file": "04-rules.dark.en.png",
+        "width": 1072,
+        "height": 537
+      }
+    },
+    "setup/01-empty": {
+      "light-ru": {
+        "file": "01-empty.png",
+        "width": 1440,
+        "height": 980
+      },
+      "light-en": {
+        "file": "01-empty.en.png",
+        "width": 1440,
+        "height": 980
+      },
+      "dark-ru": {
+        "file": "01-empty.dark.png",
+        "width": 1440,
+        "height": 980
+      },
+      "dark-en": {
+        "file": "01-empty.dark.en.png",
+        "width": 1440,
+        "height": 980
+      }
+    },
+    "setup/02-picker": {
+      "light-ru": {
+        "file": "02-picker.png",
+        "width": 740,
+        "height": 680
+      },
+      "light-en": {
+        "file": "02-picker.en.png",
+        "width": 740,
+        "height": 680
+      },
+      "dark-ru": {
+        "file": "02-picker.dark.png",
+        "width": 740,
+        "height": 680
+      },
+      "dark-en": {
+        "file": "02-picker.dark.en.png",
+        "width": 740,
+        "height": 680
+      }
+    },
+    "setup/03-rules": {
+      "light-ru": {
+        "file": "03-rules.png",
+        "width": 1440,
+        "height": 980
+      },
+      "light-en": {
+        "file": "03-rules.en.png",
+        "width": 1440,
+        "height": 980
+      },
+      "dark-ru": {
+        "file": "03-rules.dark.png",
+        "width": 1440,
+        "height": 980
+      },
+      "dark-en": {
+        "file": "03-rules.dark.en.png",
+        "width": 1440,
+        "height": 980
+      }
+    },
+    "setup/04-mcp": {
+      "light-ru": {
+        "file": "04-mcp.png",
+        "width": 1440,
+        "height": 980
+      },
+      "light-en": {
+        "file": "04-mcp.en.png",
+        "width": 1440,
+        "height": 980
+      },
+      "dark-ru": {
+        "file": "04-mcp.dark.png",
+        "width": 1440,
+        "height": 980
+      },
+      "dark-en": {
+        "file": "04-mcp.dark.en.png",
+        "width": 1440,
+        "height": 980
+      }
+    },
+    "setup/05-permissions": {
+      "light-ru": {
+        "file": "05-permissions.png",
+        "width": 1440,
+        "height": 980
+      },
+      "light-en": {
+        "file": "05-permissions.en.png",
+        "width": 1440,
+        "height": 980
+      },
+      "dark-ru": {
+        "file": "05-permissions.dark.png",
+        "width": 1440,
+        "height": 980
+      },
+      "dark-en": {
+        "file": "05-permissions.dark.en.png",
+        "width": 1440,
+        "height": 980
+      }
+    },
+    "setup/06-foreign": {
+      "light-ru": {
+        "file": "06-foreign.png",
+        "width": 1440,
+        "height": 980
+      },
+      "light-en": {
+        "file": "06-foreign.en.png",
+        "width": 1440,
+        "height": 980
+      },
+      "dark-ru": {
+        "file": "06-foreign.dark.png",
+        "width": 1440,
+        "height": 980
+      },
+      "dark-en": {
+        "file": "06-foreign.dark.en.png",
+        "width": 1440,
+        "height": 980
+      }
+    }
+  }
+}

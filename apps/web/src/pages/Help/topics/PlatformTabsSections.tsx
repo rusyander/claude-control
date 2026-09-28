@@ -46,6 +46,25 @@ export function PlatformTabsSections({ tr }: SectionProps) {
           {tr('accessInactiveText')}
         </Callout>
       </HelpSection>
+
+      {/* Баг 11: разделы и выбор правил на карточке контура. Отдельный раздел,
+          потому что у закрытия раздела есть обещание, которого у вкладки не
+          было: шлюз отказывает сразу, а не со следующего запуска. */}
+      <HelpSection title={tr('configTitle')} caption={tr('configCaption')}>
+        <FieldTable
+          nameHeader={tr('configColumn')}
+          descriptionHeader={tr('configMeaningColumn')}
+          rows={[
+            row('configSections'),
+            row('configEnforce'),
+            row('configRules'),
+            row('configOverlaps'),
+          ]}
+        />
+        <Callout tone="info" title={tr('configUntaggedTitle')}>
+          {tr('configUntaggedText')}
+        </Callout>
+      </HelpSection>
     </>
   );
 }

@@ -49,10 +49,11 @@ export const testsEn: typeof testsRu = {
       'nothing syncs back.',
     vsChat: 'Not the chat',
     vsChatText:
-      'The agent starts through the same CLI as in the chat, but there is no ' +
-      'conversation: a run has no feed, no questions to the human and no permission ' +
-      'prompts — during a run the agent may touch only test files. The other way round ' +
-      'too: cases are not kept from the chat, which the console says out loud.',
+      'The agent here is always Claude Code, even when another CLI is selected in the ' +
+      'panel: it is the only one whose run boundaries the panel can hold. There is no ' +
+      'conversation: a run has no feed and no questions to the human, permissions come from ' +
+      'the panel itself — read anything, change only test files. The other way round too: ' +
+      'cases are not kept from the chat, which the console says out loud.',
     vsCi: 'Not CI',
     vsCiText:
       'The panel runs nothing on a schedule and guards no branch. Build results arrive ' +
@@ -63,6 +64,14 @@ export const testsEn: typeof testsRu = {
       'Projects registers a repository, its branches and parallel copies. Here there is ' +
       'only the test suite of the selected project: the section takes the path and the ' +
       'current branch from the registry and then lives in .agent/tests.',
+    vsProjectsLoad: 'The registry did not load, or the project is not found',
+    vsProjectsLoadText:
+      'The registry could not be read — the section says so and offers “Retry” instead of ' +
+      '“The registry has no projects yet”: the projects are there, there is no need to add ' +
+      'them again. If project tabs are open you can work with them, and a line above the ' +
+      'picker says the list is partial. A panel agent link to a directory the panel does not ' +
+      'know is no longer silently replaced by another project: a line names the directory ' +
+      'and which project is open.',
 
     guide: {
       mapTitle: 'What actually happens here',
@@ -95,13 +104,15 @@ export const testsEn: typeof testsRu = {
       wEnvironmentText:
         'An environment is the stand address and the credentials for it; without one a ' +
         'run is blind. Once created, it closes the first step with a tick and signs it: ' +
-        '“Done: Local. Passwords for it are behind the Access button.” The passwords ' +
+        '“Done: Local. Its passwords live behind the credentials button on the run bar.” The passwords ' +
         'themselves never reach a case, an agent prompt or a report.',
       wGroup: 'Step 3. The group',
       wGroupText:
         'A group is a file. The identifier in the field (“smoke”) becomes the name ' +
         'smoke.tests.json in .agent/tests: latin letters, digits, hyphen. Everything in ' +
-        'the group travels as one file with one history.',
+        'the group travels as one file with one history. “Title” and “What the group ' +
+        'covers” are optional: an empty title is the id in capitals, hence SMOKE in the ' +
+        'group list.',
       wCase: 'Step 4. The case',
       wCaseText:
         'The form asks for more than steps. “Why” is what the steps cannot imply: “The ' +
@@ -111,13 +122,17 @@ export const testsEn: typeof testsRu = {
         'left is built from it.',
       wLibrary: 'Step 5. The library',
       wLibraryText:
-        'Six cases in the SMOKE group: the section tree on the left (Cart 3, Checkout 2, ' +
-        'Catalogue 1), filters on top by status, priority, type, readiness, automation, ' +
-        'area, tag and quarantine. The counter above the list reads at a glance: “0 ' +
-        'passed · 0 failed · 0 skipped · 6 not run”.',
+        'Six cases in the SMOKE group: on the left the list of groups with their case ' +
+        'counts, and under it the section tree (Cart 3, Checkout 2, Catalogue 1). Above ' +
+        'the table: search and a “Filters” button that opens status, priority, type, ' +
+        'readiness, automation, area, tag and quarantine. While the panel is closed, the ' +
+        'conditions set — “With findings” and the risk order included — stay visible as ' +
+        'chips, a cross removes one, and the budget result stays as a line under them. The ' +
+        'counter above the ' +
+        'list reads at a glance: “0 passed · 0 failed · 0 skipped · 6 not run”.',
       wRunner: 'Step 6. The manual run',
       wRunnerText:
-        'The “Run manually” button opens a pass over the suite: the header says “Case 1 ' +
+        'The “Run it manually” button opens a pass over the suite: the header says “Pass 1 ' +
         'of 6 · closed 0” and runs a timer. The outcome is marked per step — passed, ' +
         'failed, skipped, blocked — and the digit on a button works as a key. Inside ' +
         'input fields the keys are deliberately inert.',
@@ -127,7 +142,7 @@ export const testsEn: typeof testsRu = {
         'the step note says “The quantity stayed 1, the sum was not recalculated”, and ' +
         '“What happened” says “The plus button does not increase the quantity: the order ' +
         'sum stays the same.” That note goes into the defect if the pass failed, and it ' +
-        'is what groups “identical failures”. Next to it: attach a file, file a defect.',
+        'is what groups “Repeating failures”. Next to it: attach a file, file a defect.',
       wAfter: 'Step 8. The library after the pass',
       wAfterText:
         'The same list with real statuses: “5 passed · 1 failed · 0 skipped · 0 not ' +
@@ -136,12 +151,14 @@ export const testsEn: typeof testsRu = {
       wRecord: 'Step 9. The run record',
       wRecordText:
         'The Runs tab: “manually”, “human”, the date, branch main, environment local, ' +
-        '“passed: 5 failed: 1 skipped: 0 duration: 15 s”. The red case is marked ' +
-        'separately — “no evidence” — with “Rerun the failed (1)” and “Compare with the ' +
-        'previous” beside it.',
+        '“passed: 5 failed: 1 skipped: 0 duration: 15 s”, next to it the report as .md, ' +
+        '.csv and .pdf and “Publish report”. The red case shows the step it failed on, the ' +
+        '“What actually happened” note and an “expected: … · got: …” line built from the ' +
+        'step expectation and its note; the “Regression case” button files a case from ' +
+        'it. Above — “Rerun the failures (1)” and “Compare with the previous run”.',
       wReport: 'Step 10. The report',
       wReportText:
-        'The Report tab sums the suite up: case states, automation coverage (“autotest: ' +
+        'The Report tab sums the suite up: case states, automation coverage (“automated: ' +
         '0, to automate: 0, manual: 6”) and the totals (“Runs: 1”, the last run with its ' +
         'date). There is nothing to compare with yet, and the panel says so: “this is ' +
         'the first run with results”.',
@@ -155,15 +172,15 @@ export const testsEn: typeof testsRu = {
       hChangedText:
         '“Changed only” looks at what the working tree changed and matches the paths ' +
         'against the cases’ code links. Here the tree is clean — and the panel says so ' +
-        'plainly: “The working tree edits matched no case.” An empty list means “nothing ' +
+        'plainly: “The working copy edits did not touch any case.” An empty list means “nothing ' +
         'to attribute”, never “run everything”: a case with no code links can never land ' +
         'here.',
       hQuarantine: 'Step 2. Put a case in quarantine',
       hQuarantineText:
         'The case is ticked (“Selected: 1”), the action is “quarantine”, and the panel ' +
         'asks for a reason: “Waiting for the sum recalculation fix, defect SHOP-31 is ' +
-        'open.” The caption under the field explains why: without a reason nobody will ' +
-        'ever take the case back out.',
+        'open.” The empty field explains why, as a hint inside it and on hover: without ' +
+        'a reason nobody ever lifts it.',
       hMuted: 'Step 3. What quarantine changes in the list',
       hMutedText:
         'Nothing but one line. The case is still “failed”, still in the list and still ' +
@@ -173,29 +190,32 @@ export const testsEn: typeof testsRu = {
       hRelease: 'Step 4. The milestone verdict',
       hReleaseText:
         'The same suite and the same red case — but the verdict is now “Ready to ship”: ' +
-        '“Milestone v1.4: 5 of 6 passed, nothing the panel checks stands in the way. 1 ' +
-        'in quarantine — their failures do not count.” The failure is not hidden: it ' +
+        '“Milestone “v1.4”: passed 5 of 6, nothing the panel checks stands in the way of ' +
+        'shipping. In quarantine: 1 — their failures do not count toward the verdict.” ' +
+        'The failure is not hidden: it ' +
         'stands on its own line, “Failures in quarantine: 1”, with its reason.',
       hHealth: 'Step 5. What the failures are proven by',
       hHealthText:
-        'Further down the same tab: three counters — “red cases: 1”, “with evidence: 0”, ' +
-        '“with a step breakdown: 1” — and a “Re-run the unproven” button. Next to them ' +
+        'Further down the same tab: three counters — “red cases: 1”, “with proof: 0”, ' +
+        '“with the step analysed: 1”. The “Re-run the unproven” button appears when such ' +
+        'failures exist; here the only one has a step breakdown, so there is no button. ' +
+        'Next to them ' +
         'the suite linter (“Cases checked: 6”, 5 no-oracle notices and 1 ' +
         'no-code-paths) and the quarantine thresholds: 5 green runs in a row suggest ' +
-        'lifting it, stability below 70% suggests setting it, and the panel applies ' +
-        'nothing itself.',
+        'lifting it, stability below 70% or 2 runs “green only on a retry” suggest ' +
+        'setting it, and the panel applies nothing itself.',
       hCoverage: 'Step 6. Requirement coverage',
       hCoverageText:
         'The Coverage tab turns the suite the other way round: not “what we check” but ' +
         '“what is left unchecked”. Here two requirements come from case links (SHOP-14 ' +
-        'and SHOP-21, two cases each) and “Cases with no requirement: 2”. The honest ' +
+        'and SHOP-21, two cases each) and “Cases without a requirement: 2”. The honest ' +
         'caveat sits below: without Atlassian only requirements from case links are ' +
         'shown — a JQL query would add the issues nobody linked.',
       hExchange: 'Step 7. Importing CI results',
       hExchangeText:
         'The import dialog takes a build report: format “JUnit XML”, file in project ' +
-        '“test-results/junit.xml”. The outcome shows at once: “read: 3, matched cases: ' +
-        '2, not found: 1 — Nobody’s autotest”. A test that matched nothing spoils ' +
+        '“test-results/junit.xml”. The outcome shows at once: “read: 3, landed on cases: ' +
+        '2, not found: 1 — Ничей автотест” (the test title, “Nobody’s autotest”). A test that matched nothing spoils ' +
         'nothing and reddens nobody: it is simply named.',
       hImported: 'Step 8. Someone else’s run in the history',
       hImportedText:
@@ -223,6 +243,7 @@ export const testsEn: typeof testsRu = {
       'Everything inside the project under test. The panel keeps no database of its own: ' +
       'these files are the single source of truth.',
     storageGroup: 'Case group',
+    storageGroupValue: '<project>/.agent/tests/<group>.tests.json',
     storageShared: 'Shared steps',
     storageEnvironments: 'Environments',
     storageSchema: 'Custom fields and statuses',
@@ -238,10 +259,14 @@ export const testsEn: typeof testsRu = {
     libraryCaption:
       'What the set of checks is built from. The words are the familiar ones: groups, ' +
       'sections, cases, checklists, shared steps, parameters, attributes, tags.',
-    libraryGroups: 'Groups = files = tabs',
+    libraryGroups: 'Groups = files = the list on the left',
     libraryGroupsText:
-      'The file gui.tests.json is the "GUI" tab. Add a file — a tab appears. Groups split ' +
-      'the set coarsely: interface, end-to-end scenarios, smoke.',
+      'The file gui.tests.json is the "GUI" row in the group list on the left, with its ' +
+      'case count beside it. Add a file — a row appears. Actions on the selected group sit ' +
+      'to the right of its title. Groups split the set coarsely: interface, end-to-end ' +
+      'scenarios, smoke. “New group” asks for the id (also the file name, fixed for good), a ' +
+      'title and a description; an id already taken is refused, naming that group. Title ' +
+      'and description are changed later with “Edit group”.',
     librarySections: 'Sections — a tree inside a group',
     librarySectionsText:
       'The section field holds a path like "Chat/Attachments", and the panel draws a tree ' +
@@ -328,9 +353,13 @@ export const testsEn: typeof testsRu = {
     fieldOracle: 'What proves the result: text on screen, a database row, a network answer',
     fieldPriority: 'blocker, high, medium, low — what you sort by when there is no time for all',
     fieldReadiness: 'Readiness of the description itself: draft, ready, obsolete',
-    fieldDuration: 'Expected time to walk it through, in minutes',
+    fieldDuration:
+      'Expected time to walk it through, in minutes: a whole number from 0 to 1440; an ' +
+      'empty field removes the estimate',
     fieldTags: 'Tags: sets are assembled and the list is filtered by them',
-    fieldLinks: 'Links to a requirement, an issue, an MR or a document',
+    fieldLinks:
+      'Links to a requirement, an issue, an MR or a document — as a full http(s):// ' +
+      'address, otherwise the case is not saved',
     fieldParameters: 'Parameter names and values the passes are expanded from',
     fieldAutomation: 'manual, toAutomate, automated plus the file and the test name',
     fieldExternalId:
@@ -341,7 +370,9 @@ export const testsEn: typeof testsRu = {
       'Quarantine: the failure is known and does not colour the run. A reason is ' +
       'mandatory — in a month nobody remembers it',
     fieldDefects: 'Issues filed for a failure: the address, the key and what the tracker last said',
-    fieldCodePaths: 'Code files the case touches: the diff-based selection is computed from them',
+    fieldCodePaths:
+      'Code files the case touches: the diff-based selection is computed from them. In the ' +
+      'card it is the “Code files” field, one path from the project root per line',
     fieldStatus: 'The last result, what was actually seen and when that was',
     fieldSource: 'agent or human: the agent is forbidden to delete what a human wrote',
 
@@ -449,12 +480,17 @@ export const testsEn: typeof testsRu = {
     manualStep2: 'Start the run',
     manualStep2Text:
       'The panel expands the selection into test points and opens the first one. The session ' +
-      'lives on the server: it can be continued in another tab or from the phone.',
+      'lives on the server and on the project disk: it can be continued in another tab, from ' +
+      'the phone and after a panel restart — nothing marked is lost. “Manual run” in the ' +
+      'header without a session opens an empty console, but not a dead end: it offers to run ' +
+      'the selected group right away (the checked cases, or the visible ones when nothing is ' +
+      'checked) or to open the test plans.',
     manualStep3: 'Walk the steps',
     manualStep3Text:
       'Every step has its own mark, the pass as a whole has a status: passed, failed, ' +
       'skipped, blocked. Blocked means "someone else’s breakage is in the way, the step ' +
-      'cannot be reached", and that is not the same as a failure.',
+      'cannot be reached", and that is not the same as a failure. A parametrised case takes ' +
+      'the WORST of its points: light theme passed, dark failed — the case failed.',
     manualStep4: 'Write down what you saw',
     manualStep4Text:
       'A note and an evidence attachment (a screenshot, a piece of a log) are stored next to ' +
@@ -462,9 +498,11 @@ export const testsEn: typeof testsRu = {
       'nothing to fix from it.',
     manualStep5: 'Finish or drop',
     manualStep5Text:
-      '"Finish" writes the run into the history, "drop" throws it away. The buttons differ ' +
+      '"Finish" closes the run record as completed, "drop" closes it as stopped; what was ' +
+      'marked so far stays in the cases either way. The buttons differ ' +
       'on purpose: "I am done" and "I changed my mind" leave a different trace, and mixing ' +
-      'them means lying to the report.',
+      'them means lying to the report. You may finish without walking everything: the run ' +
+      'record names the unwalked cases, and the report says “not walked N of M planned”.',
     manualKeysTitle: 'Keys of a manual point',
     manualKeysText:
       'The digit on a button closes the point with that verdict: 1 passed, 2 failed, ' +
@@ -495,11 +533,15 @@ export const testsEn: typeof testsRu = {
     manualPhoneText:
       'The phone app opens the very same session: the result can be marked where the app is ' +
       'being looked at, not later from memory at the computer. What was started in the panel ' +
-      'continues in the hand and back — the session is one.',
+      'continues in the hand and back — the session is one. The steps on the phone are the ' +
+      'same as in the panel: shared steps expanded, parameters substituted, and the “data” and ' +
+      '“expected” labels in the app language.',
 
     agentTitle: 'Agent runs',
     agentCaption:
-      'Four different assignments, not one "start" button. The agent works on this computer: ' +
+      'Four different assignments, not one "start" button. Claude Code carries them out ' +
+      'whichever CLI is selected. A panel restart in the middle of a run stops the agent: the ' +
+      'history record closes as failed, what was written before stays. The agent works on this computer: ' +
       "it brings the app up where the code lives. Its route is the chat's route: an enabled " +
       'contour carries the run too — on its model and with the same layers switched off. The ' +
       'route is resolved on every start, so a cleared tick takes effect from the next run.',
@@ -507,7 +549,8 @@ export const testsEn: typeof testsRu = {
     agentGenerateText:
       'The agent looks around the app and proposes cases: it extends the similar ones and ' +
       'marks the stale ones. The "scope" field narrows the work to the part you need — ' +
-      '"chat and analytics only". Nothing reaches the library on its own — you accept it.',
+      '"chat and analytics only"; left empty, it means the selected group topic, and new ' +
+      'cases land in that group. Nothing reaches the library on its own — you accept it.',
     agentRun: 'Run',
     agentRunText:
       'The agent walks the cases live and writes the result into the file after EVERY one. ' +
@@ -540,7 +583,7 @@ export const testsEn: typeof testsRu = {
     agentConventionText:
       'The buttons of this section explain the format to the agent themselves. An ordinary ' +
       'conversation knows nothing about it: say "run the tests" in the chat and it will ' +
-      'check and write nothing down. The "Write into the project CLAUDE.md" button appends a ' +
+      'check and write nothing down. The “Write it into the project’s CLAUDE.md” button appends a ' +
       'block with the format and the rules to the end of the file; it is read in EVERY ' +
       'conversation. Your text is left alone, and pressing again adds nothing.',
 
@@ -571,7 +614,9 @@ export const testsEn: typeof testsRu = {
     sourceDefectText:
       'The "Regression case" button at a red result in the run history. The steps of the ' +
       "case, the runner's note and the attachments go into the task, and the new case links " +
-      'to the defect. The original case is left alone: it describes the normal scenario.',
+      'to the defect. The original case is left alone: it describes the normal scenario. ' +
+      'The new case’s tag is the one the library already uses (“регресс” or “regression”); ' +
+      'without one it follows the original case’s language.',
     sourceRefusedTitle: 'A source that did not come together does not start a run',
     sourceRefusedText:
       'Jira is not connected, the branch has no changes, the case behind the failure is ' +
@@ -626,7 +671,9 @@ export const testsEn: typeof testsRu = {
     runsSummaryText:
       'How much passed, failed, was skipped and blocked, who ran it (agent, human, CI), on ' +
       'which branch and commit. A green run from a week ago on someone else’s branch is not ' +
-      '"we are fine".',
+      '"we are fine". A stopped or crashed run is marked as such, and generation and ' +
+      'automation runs carry no tally at all — they write cases, they do not walk them. If ' +
+      'the history fails to load, the tab says so and offers “Retry” instead of “no runs yet”.',
     runsCoverage: 'Coverage by area',
     runsCoverageText:
       'How many cases each area has and how many of them are green, plus the automation ' +
@@ -636,10 +683,27 @@ export const testsEn: typeof testsRu = {
       'A case whose result jumps from run to run is computed from the history: the share of ' +
       'runs without a change of result. A flaky case is worse than a red one — people stop ' +
       'believing it.',
+    runsCaseHistory: 'Case history',
+    runsCaseHistoryText:
+      'In the case editor, under the note, the “Result history” table: one row per run that ' +
+      'went through this case, newest first. When, the result (for a parameterised case — the ' +
+      'worst of its passes and how many there were), a link to the run record and what broke ' +
+      'in one line: the step and “what happened”, or else the first line of the note. The link ' +
+      'opens the “Runs” tab with that record expanded. It answers the question asked on ' +
+      'opening a red case: red for the first time, always, or every other run.',
+    runsFlakyMark: 'The “flaky” mark in the library',
+    runsFlakyMarkText:
+      'A case row is marked when, over its last 10 runs, the result switched “passed ↔ ' +
+      'failed” 2 times or more; skips and blocks do not count. One switch is a break or a ' +
+      'fix, not a flickering test, so the mark is stricter than the list in the report, where ' +
+      'one is enough. The rule and the count are in the mark tooltip; when an agent run ' +
+      'finishes, a manual-pass result is marked or results are imported, the marks and the ' +
+      'case history are re-read on their own.',
     runsSpend: 'Time and spend',
     runsSpendText:
       'The duration of the runs and the tokens spent. Money here is an estimate at API ' +
-      'prices, not a bill: a subscription does not charge them.',
+      'prices, not a bill: a subscription does not charge them. No estimate — no cost line, ' +
+      'instead of “$0.00” next to a million tokens.',
     runsSession: 'Open a run as a conversation',
     runsSessionText:
       'An agent run has a CLI session, and it opens in the chat as an ordinary conversation: ' +
@@ -661,9 +725,11 @@ export const testsEn: typeof testsRu = {
       'that answers differently on the same code is fixed before the application is.',
     evidenceReport: 'The count in the report',
     evidenceReportText:
-      'The “How the failures are proven” card counts the NEWEST failure of each case: proven by a ' +
-      'screenshot a month ago and unproven today means unproven. The button next to it re-runs ' +
-      'exactly the unproven ones.',
+      'The “How the failures are proven” card counts the NEWEST result of each case: proven by a ' +
+      'screenshot a month ago and unproven today means unproven, and a case that passed after ' +
+      'failing is not red at all. Unproven means a failure with no attachment AND no step ' +
+      'breakdown; a breakdown without a screenshot counts as “with the step analysed”. The ' +
+      'button next to it re-runs exactly the unproven ones.',
     evidenceDefect: 'The defect draft',
     evidenceDefectText:
       'The failed step number, the expectation of that very step, the fact and the attachments go ' +
@@ -717,13 +783,17 @@ export const testsEn: typeof testsRu = {
       'project at once instead of being retyped by hand. One more format — “Manual cases ' +
       '(ТК-*.md)”: files written straight in the repository. A FOLDER is given (empty — QA), ' +
       'the number from the file name becomes the case id, folders become sections, and a ' +
-      'repeated import edits the same case instead of adding a second one.',
+      'repeated import edits the same case instead of adding a second one. A file from disk ' +
+      'and a path in the project are separate sources: an empty picked file is refused, ' +
+      'never replaced by the file at the typed path.',
     importExport: 'Export',
     importExportText:
       'A group is exported to CSV, XLSX or Markdown — to attach to a report, to review, or ' +
-      'to agree with people who have no panel. A RUN REPORT is exported separately (.md or ' +
-      '.csv), straight from the run history: the circumstances, the totals and what was seen ' +
-      'at every failure.',
+      'to agree with people who have no panel. A RUN REPORT is exported separately (.md, .csv, ' +
+      '.html or .pdf), straight from the run history: the circumstances, the state (finished, ' +
+      'stopped, error), the totals including what was not walked, and what was seen at every ' +
+      'failure with its step, expectation and actual result. Times are local with the zone, ' +
+      'as the tester remembers them.',
     importMatchTitle: 'Matched by the test name',
     importMatchText:
       'A CI result lands on a case through the automation.testName field. No match — and the ' +
@@ -801,7 +871,10 @@ export const testsEn: typeof testsRu = {
     ageingMuteText:
       'Stability below 70% over four or more results: the case flips green and red on the same ' +
       'code, and nobody believes its failures any more. The reason comes prefilled with the ' +
-      'numbers and is edited by hand — without it the button stays disabled.',
+      'numbers and is edited by hand — without it the button stays disabled. The second ' +
+      'reason is retries: a case green only on a second Playwright attempt in 2 of the last ' +
+      'hundred runs is suggested even when its stability looks healthy — such a case carries ' +
+      'an “on retry ×N” badge.',
     ageingStale: 'Drifted from the requirement',
     ageingStaleText:
       'The tracker issue was edited after the case, so the case checks yesterday’s ' +
@@ -885,11 +958,14 @@ export const testsEn: typeof testsRu = {
       'The “Release readiness” card on the report tab: the verdict on one line, then what ' +
       'blocks it (untested cases and open defects), then requirements, failures and the ' +
       'runs of the milestone. Computed from the runs of THIS milestone: a case that turned ' +
-      'green in another branch does not improve readiness.',
+      'green in another branch does not improve readiness. The verdict on the card and the ' +
+      'export (MD, HTML, PDF) are written in the interface language of the panel: an ' +
+      'English panel gives English ones, otherwise they are Russian. The screen and the ' +
+      'file share one verdict, built by the same rules.',
     releaseVerdictTitle: 'The verdict signs nothing off',
     releaseVerdictText:
       '“Ready to ship” means exactly one thing: nothing listed blocks it — no failures, no ' +
-      'untested cases, no open defects, and at least one run of the milestone happened. The ' +
+      'blocked cases, no untested cases, no open defects, and at least one run of the milestone happened. The ' +
       'decision stays with a human, so every reason is spelled out on its own line. A ' +
       'failure of a quarantined case does not colour the verdict but is stated out loud: ' +
       'its right to colour a run was removed deliberately.',
@@ -961,7 +1037,7 @@ export const testsEn: typeof testsRu = {
       'button sits next to it.',
     externalDefectState: 'Is the defect already closed?',
     externalDefectStateText:
-      'The “Check defects” button asks Jira or the forge about the issues attached to the ' +
+      'The “Refresh defect states” button asks Jira or the forge about the issues attached to the ' +
       'red cases and builds the “recheck” list. The case status is not touched: only a run ' +
       'sets it.',
     externalPublish: 'Publish the report',
@@ -994,11 +1070,16 @@ export const testsEn: typeof testsRu = {
     cliDiffText:
       'The run comparison of the history tab, as text or junit («--reporter junit»). It ' +
       'returns 1 for NEW failures only: a long-known breakage would otherwise paint every ' +
-      'later build red. Arguments in the wrong order are swapped out loud, not silently.',
+      'later build red. Arguments in the wrong order are swapped out loud, not silently. ' +
+      'One id compares that run with the nearest earlier run that has results; no ids — the ' +
+      'newest one, as on the tab. Nothing to compare (no runs with results in the history, ' +
+      'or no earlier run) — the command says so and exits with 0: the first run of a project ' +
+      'does not redden the build. A named run that does not exist is an error.',
     cliPlan: 'pnpm tests plan smoke | diff | release | flaky',
     cliPlanText:
       'A plan built by rule, with no panel and no agent: «--budget» for smoke, «--release» ' +
-      'for a milestone, «--threshold» for flaky ones. It also lists what did NOT fit and ' +
+      'for a milestone, «--threshold» for flaky ones (a share or a percentage; «abc» and zero ' +
+      'are refused, not silently replaced by the default). It also lists what did NOT fit and ' +
       'why; «--save» writes the plan into the project. Jira requirements are not consulted ' +
       'from a terminal — the token lives in the panel — and the command says so.',
 
@@ -1009,7 +1090,7 @@ export const testsEn: typeof testsRu = {
       'rather say “nothing” than pretend it counted.',
     limitColumn: 'What you saw',
     limitMeaningColumn: 'Why it is so',
-    limitChanged: '“The working tree edits matched no case”',
+    limitChanged: '“The working copy edits did not touch any case.”',
     limitChangedText:
       'That is how “Changed only” works: the panel takes the changed files of the ' +
       'working tree and matches them against the cases’ code links and area word. ' +
@@ -1022,7 +1103,8 @@ export const testsEn: typeof testsRu = {
       'files. It fingerprints the selected cases at the start and stamps the ones that ' +
       'changed at the end. A case the executor never touched is not in the record — an ' +
       'empty record means “the agent marked nothing”, not “the panel lost it”. ' +
-      'Generation and exploration produce no results at all. A run that never started is ' +
+      'Generation produces no results at all. Exploration stamps the cases it found: ' +
+      'their “failed” and “passed” stand in the session record. A run that never started is ' +
       'another matter: say a required contour is active in the panel while its gateway is ' +
       'down or its key is not saved. The agent then does not start around the contour, the ' +
       'run ends with an error, and the error names the reason and what to press.',
@@ -1036,11 +1118,13 @@ export const testsEn: typeof testsRu = {
     limitBusyText:
       'The suite is busy: a run is already going for this project, or a manual session ' +
       'is open. Two records of one suite would diverge in the files, so a second run ' +
-      'does not start until the first is closed or abandoned.',
+      'does not start until the first is closed or abandoned. If the first was started in ' +
+      'another window, from the phone or by the panel agent, the refusal re-reads the ' +
+      'screen itself: the running one appears in place of the buttons.',
     limitGenerate: 'Generation wrote nothing',
     limitGenerateText:
       'By design: proposals land in a draft, not in a group. Until you accept them one ' +
-      'by one (or turn on “accept at once”), nothing in the project files changes, and ' +
+      'by one (or turn on “Accept immediately”), nothing in the project files changes, and ' +
       'the acceptance can be undone as a whole.',
     limitCoverage: 'A requirement nobody covered is not shown',
     limitCoverageText:
@@ -1053,7 +1137,11 @@ export const testsEn: typeof testsRu = {
     limitArchivedText:
       'It is most likely archived or filtered out. The “Show archive” toggle brings ' +
       'archived cases back into view; they are out of runs and out of coverage, but ' +
-      'still in the file and one action away.',
+      'still in the file and one action away. What is filtered shows as chips above the ' +
+      'list: every selected case group gets its own chip, sections do once more than one is ' +
+      'selected; the cross on a chip removes only that filter. Opened the section from a link ' +
+      'naming a project while the project registry failed to load? The line above the list ' +
+      'says the project from the link cannot be checked and names the project opened instead.',
     limitReserved: 'A field will not save or gets renamed',
     limitReservedText:
       'The name is taken by the format: a custom field cannot be named like a system ' +
@@ -1113,7 +1201,7 @@ export const testsEn: typeof testsRu = {
       'clean working tree.',
     undoConvention: 'Remove the note from the project CLAUDE.md',
     undoConventionText:
-      '“Write into the project CLAUDE.md” adds a paragraph about where the cases live ' +
+      '“Write it into the project’s CLAUDE.md” adds a paragraph about where the cases live ' +
       'and how they are kept. It is an ordinary edit of an ordinary file: remove it by ' +
       'hand or revert it with git.',
     undoGitTitle: 'The last undo is git',
@@ -1144,6 +1232,144 @@ export const testsEn: typeof testsRu = {
       'There is deliberately no versioning mechanism of its own. An edit to a case shows in ' +
       'the diff, is discussed in an MR and is reverted like ordinary code. Old files keep ' +
       'parsing meanwhile: steps as strings, a case without a type, a status spelled ok.',
+    e2e: {
+      title: 'Autotest folder (e2e)',
+      caption:
+        'Cases describe what to check; the e2e folder holds the code that checks it. ' +
+        'The panel keeps them together: a test carrying a case id finds its case on its own.',
+      missing: 'No folder',
+      missingText:
+        'For a project without its own autotests the card above the library says so plainly. ' +
+        'A project added to the registry gets the folder by itself; one opened as a tab — with “Create folder”, ' +
+        'and what it does is written right under it. A monorepo can hold several folders: the ' +
+        'other ones found are listed as “Also matching”, and “Use …” makes the chosen one the ' +
+        'project folder — sync, runs and watching follow it from then on.',
+      created: 'Folder created and hidden from git',
+      createdText:
+        'The panel creates e2e/ with a Playwright config, its own package.json and a README and ' +
+        'hides it with a line in .git/info/exclude, not .gitignore: that is one machine’s ' +
+        'decision, not the whole team’s. The project’s own folder (e2e/, tests/e2e/, testDir ' +
+        'from playwright.config) is taken as it is — the panel creates and hides nothing in it.',
+      synced: 'The folder’s tests became cases',
+      syncedText:
+        'An agent — of a chat or of a generation — puts the spec into the folder. “Update from ' +
+        'folder” parses it without running: a file is a group, a test is a case, the [cart-001] ' +
+        'marker in the name is the case id, Given/When/Then comments are the precondition, steps ' +
+        'and expectation, @smoke and @regression are tags. A description a human edited is never ' +
+        'rewritten; a test gone from the code is named in the result, and its case stays.',
+      remove: 'Remove the folder',
+      removeText:
+        'Only a panel-created folder can be removed. Files the panel did not write — agent ' +
+        'tests, your edits, reports — are not deleted without confirmation. After removal the ' +
+        'project is byte for byte what it was before the panel, .git/info/exclude included; ' +
+        'cases stay. While an autotest run is going, the folder cannot be removed — the ' +
+        'buttons are disabled.',
+      run: 'Run the autotests',
+      runText:
+        'The button runs the folder tests with its framework command — npx --no-install playwright ' +
+        'test, npx --no-install cypress run or python -m pytest (python3 -m pytest on Linux and macOS) — with no agent and no tokens. ' +
+        'Only an installed runner is used: with none in node_modules the panel refuses before ' +
+        'starting and names the install command; it never downloads anything itself. The junit ' +
+        'report is written into the panel directory, not the project, and lands on cases by ' +
+        'their tags; the exception is a report path in the project automation.json: then the ' +
+        'report sits in the project and is erased before every run. Creating the folder and ' +
+        'running autotests work only for projects from the Projects section and their branch ' +
+        'copies — anything else, and any path with “..”, gets “Add this folder as a project”. The result under the button says how many of how many failed, names the ' +
+        'tests without a case and links “Open the run in history”; the command itself and its ' +
+        'output sit under “Command output”. A stopped Playwright run leaves no report — then ' +
+        'the card says so and the history is untouched. While an agent run is going the button ' +
+        'is closed: it writes into the same group files. Are the project checks not a ' +
+        'Playwright, Cypress or pytest folder but its own scripts or vitest suites? The project ' +
+        'names the command itself in .agent/tests/automation.json ({"version":1,"command":"…"}): ' +
+        '{files} becomes the files of the selected cases (of every automated case when none is selected), {report} and the AGENTDECK_JUNIT_REPORT ' +
+        'variable become the junit report path. The command is named under the button and ' +
+        'pnpm tests run without --cmd takes it too; a folder with tests wins over it. “Only ' +
+        '“group”” runs just the files of the open group. Cases selected but none has an ' +
+        'automated test — the panel refuses before starting: there is nothing to run.',
+      history: 'The run lands in the history',
+      historyText:
+        'Every autotest run is one record on the Runs tab labelled “autotests” · “panel”: how ' +
+        'many passed and failed, reports next to it. A build report import is labelled ' +
+        'differently — “import” · “CI” — and when the history holds both, a “Records” filter ' +
+        'appears above the list: all, panel autotests or CI import. A failed test fails its ' +
+        'case; a test without a case tag is named in the result as “without a case”. The record label ' +
+        'travels into its reports too: the MD, HTML and PDF heading (“Run: panel autotests”), the ' +
+        'last CSV column “Record” and the sides of pnpm tests diff. A report is written in the ' +
+        'interface language of whoever exports it; pnpm tests diff runs without the panel and ' +
+        'prints its labels in Russian.',
+      retry: 'Green only on retry',
+      retryText:
+        'Playwright with retries reruns a failed test, and green on the second attempt looks ' +
+        'like any other green. The panel asks it to write attempts into junit and counts them: ' +
+        'the case result in the run history carries “passed only on a retry (failed attempts: N)”, the quarantine card shows an “on ' +
+        'retry ×N” badge. Two runs out of the last hundred where the case passed only on retry ' +
+        '— and it is suggested for quarantine even when its stability looks healthy. A ' +
+        'suggestion only: a human sets it.',
+      pyramid: 'Test pyramid',
+      pyramidText:
+        'On the Report tab unit and integration tests stand next to e2e — counted from the ' +
+        'project files, without running anything. A layer is counted only when its framework ' +
+        'is named by the project itself: vitest, jest or mocha in package.json or by a config, ' +
+        'pytest, go.mod. No framework — the row says “unknown”, not zero. Unit and integration ' +
+        'are split only by the project’s own marks (*.integration.*, an integration directory, ' +
+        '@pytest.mark.integration, //go:build integration); without marks there is one “Code ' +
+        'tests” row. A test named from variables is counted separately: it cannot be known ' +
+        'without a run.',
+      chatTest: 'The chat agent writes the test',
+      chatTestText:
+        'A conversation in the project directory knows from the first message which autotest ' +
+        'folder the project has and how to name tests in it. No need to mention the folder: the ' +
+        'agent puts the spec where the panel told it to.',
+      chatCase: 'The case appears by itself',
+      chatCaseText:
+        'The panel watches the e2e folder of a registry project itself: a second and a half ' +
+        'after the last write into it — whoever wrote the file: the chat agent, an editor or ' +
+        'git checkout — the folder is synced, and the test tagged [checkout-001] becomes a case ' +
+        'with no button. The end of the agent turn syncs once more. While an agent run in the ' +
+        'section or an autotest run is going, the sync waits for it to end, and while autotests ' +
+        'are closing, an agent run does not start either. Watching is off ' +
+        'together with “Watch files for changes” in Settings. A project opened only as a tab is not ' +
+        'watched — the end of the turn and “Update from folder” remain.',
+      flowTitle: 'Who writes the tests and how they become cases',
+      generateTitle: '“Generate cases” writes test code too',
+      generateText:
+        'The agent proposes groups by user flow, writes one spec per group into the e2e folder ' +
+        'and runs them with a junit report. At the end the panel applies the draft itself (the ' +
+        'rollback stays in the draft window), syncs the folder and sets statuses from the report ' +
+        '— a report older than the generation start is ignored. No environment has a stand URL — ' +
+        'the tests get written but there is nothing to run them on; the button hint says so.',
+      chatTitle: 'The chat agent knows about the folder',
+      chatText:
+        'A conversation in the project directory knows from the first message where tests go ' +
+        'and how to name them ([group-NNN], @smoke or @regression, Given/When/Then), which ' +
+        'command syncs them with the cases and how to run them so the result lands on the case. ' +
+        'It asks once and only what is yours: the stand URL, where credentials live, which flows matter most. ' +
+        'Claude gets this as a system prompt addition; another CLI gets one line at the end of ' +
+        'your message, visible in its history. A command message (/…) gets no line. The ' +
+        'conversation never creates the folder itself: with none, the agent learns that and ' +
+        'creates e2e/ only when the task is about tests.',
+      addTitle: 'Adding a project',
+      addText:
+        'A project with its own e2e folder gets cases from its tests the moment it is added to ' +
+        'the registry. Without a folder the panel creates its own. A notification says what ' +
+        'happened: a folder created or an own one found, how many tests and new cases it holds. ' +
+        'A failure here never cancels the add — the notification suggests creating the folder with the button.',
+      cliTitle: 'Without the panel',
+      cliText:
+        'pnpm tests sync --project <dir> does the same (--dir picks the folder); pnpm tests run ' +
+        '--project <dir> [--group <group>] runs them: without --cmd it starts the folder runner ' +
+        'from the right directory with the same command as the button, takes the report of ' +
+        'THIS run only (an old report file is never picked up) and records the exit code.',
+      limitsTitle: 'What the sync cannot do',
+      limitsText:
+        'Parsing is textual, not a run: a test whose name is built from variables (a template ' +
+        'with a substitution, a loop) is not guessed and the sync result lists it as not turned ' +
+        'into a case. Playwright, Cypress (it/describe) and pytest (test_…, class Test…; the case ' +
+        'name is the first docstring line, the group name the module or first class docstring) are parsed; ' +
+        'other frameworks are not. A branch copy made by a split gets a link to the ' +
+        'panel-created folder, not a snapshot: a test written in the copy lives in the original ' +
+        'project folder, and cases are synced there too.',
+    },
   },
   shots: {
     workspace: {
@@ -1151,11 +1377,12 @@ export const testsEn: typeof testsRu = {
         'The section with no cases: the console on top and the three steps that start a suite',
       '02-environment':
         'The environment step is closed: “Local” is picked, passwords live behind “Access”',
-      '03-group': 'A group is one field: “smoke” becomes the file name smoke.tests.json',
+      '03-group':
+        'One field is required: “smoke” becomes the file name smoke.tests.json; title and description are optional',
       '04-case':
         'The whole case form: purpose, area and section, steps with expectations, oracle and tags',
       '05-library':
-        'Six cases in the library, all “not run”, with filters and the section tree on the left',
+        'Six cases in the library, all “not run”, groups and sections on the left, filters folded behind a button',
       '06-runner':
         'The manual run, case 1 of 6: steps with expectations, outcome buttons and the timer',
       '07-runner-failed':
@@ -1180,6 +1407,28 @@ export const testsEn: typeof testsRu = {
         'Importing CI results: the format, the file in the project and what the report matched',
       '08-runs-import':
         'In the run history the import is its own record, signed as someone else’s run',
+    },
+    e2e: {
+      '01-missing':
+        'The card above the library: the project has no autotest folder, one button creates it',
+      '02-created':
+        'Folder e2e/ created by the panel: Playwright, zero test files, hidden from git',
+      '03-synced':
+        'After “Update from folder”: one spec became the “Корзина” (“Cart”) group of two cases, the result under the button',
+      '04-remove-confirm':
+        'Removal hit a file the panel did not write: the card asks whether to remove it with the folder',
+      '05-run-done':
+        'The run is over: “1 of 2 failed, 1 passed” and a link to the record in the run history',
+      '06-run-history':
+        'The Runs tab: the “autotests” · “panel” record — 1 passed, 1 failed; below it a CI import and a manual run',
+      '07-chat-test':
+        'A chat in the project directory: the agent put the spec into the folder the panel named',
+      '08-chat-case':
+        'The turn ended — and the library already has the “Оформление” (“Checkout”) group with a case from that spec',
+      '09-retry-quarantine':
+        'The quarantine card after two runs: the case is green only on retry, an “on retry ×2” badge',
+      '10-pyramid':
+        'Test pyramid: e2e from the folder, integration and unit from the project files, vitest named in package.json',
     },
   },
   diagrams: {

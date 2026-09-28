@@ -5,7 +5,7 @@ import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { Typography } from '@shared/ui/typography';
 import { IntegrationLinkRows, useIntegrationLinks } from '@entities/Integration';
-import { pickLink } from '../model/linkDraft';
+import { hasLink, pickLink } from '../model/linkDraft';
 import { IntegrationLinkModal } from './IntegrationLinkModal';
 import type { IntegrationLinksBarProps } from './IntegrationLinksBar.types';
 
@@ -52,7 +52,9 @@ export function IntegrationLinksBar({
         </Button>
       </Stack>
 
-      {groupLink && (
+      {/* Строка группы — только когда у группы есть СВОЯ привязка: пустая
+          подпись «Группа «…»» ничего не сообщала и занимала строку. */}
+      {groupLink && hasLink(groupLink) && (
         <Stack direction="row" gap="var(--spacing-xs)" align="center" wrap>
           <Typography variant="caption" color="subtle" as="span">
             {t('integrations.links.barGroup', { title: groupTitle })}

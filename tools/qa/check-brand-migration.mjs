@@ -24,6 +24,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSy
 import { connect } from 'node:net';
 import { join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { killChildProcessTree } from '../../apps/server/src/lib/kill-tree.mjs';
 
 const ROOT = resolve(import.meta.dirname, '../..');
 const PORT = Number(process.env.CHECK_PORT ?? 5263);
@@ -157,9 +158,10 @@ async function boot() {
 async function stop(run) {
   if (run.child.exitCode !== null) return;
   const exited = new Promise((done) => run.child.once('exit', done));
-  if (process.platform === 'win32') {
-    spawnSync('taskkill', ['/PID', String(run.child.pid), '/T', '/F'], { stdio: 'ignore' });
-  } else run.child.kill('SIGTERM');
+  // Дерево — общим помощником, не `taskkill /T`: тот снимал чужих сирот, чей
+  // мёртвый родитель отдал номер нашему серверу (так 2026-09-27 ушёл стенд).
+  if (process.platform === 'win32') killChildProcessTree(run.child);
+  else run.child.kill('SIGTERM');
   await exited;
   while (await portOpen()) await new Promise((r) => setTimeout(r, 200));
 }

@@ -215,7 +215,7 @@ export const FS_LISTING = {
 
 /** Группа «Ревью фронтенда» — набор, который включают руками. */
 export const REVIEW_GROUP_ID = 'grp-review';
-/** Группа «Тикеты магазина» — набор с привязкой к проекту и порядком работы. */
+/** Группа «Тикеты магазина» — набор с привязкой к проекту и строкой «Когда». */
 export const TICKET_GROUP_ID = 'grp-tickets';
 
 /**
@@ -251,46 +251,12 @@ export function makeState() {
         description: 'Порядок работы над тикетом: разбор, правка, проверка.',
         color: 'accent',
         icon: 'folder',
-        members: [{ kind: 'skill', id: 'scenario-tikety-magazina' }],
+        members: [{ kind: 'skill', id: 'release-notes-user' }],
         env: {},
         projectPaths: [PROJECT.path],
-        scenario: {
-          when: 'Задача пришла тикетом с номером',
-          trigger: 'PRJ-\\d+',
-          compiledSkillId: 'scenario-tikety-magazina',
-          steps: [
-            {
-              title: 'Разобрать тикет',
-              body: 'Прочитать описание и найти в коде место, которого он касается.',
-              gate: 'Названы файл и строка, с которых начнётся правка',
-            },
-            {
-              title: 'Сделать правку',
-              body: 'Минимальную: только то, о чём просит тикет.',
-              gate: 'Правка сделана, ничего лишнего рядом не тронуто',
-            },
-            {
-              title: 'Проверить прогоном',
-              body: 'Тесты и снимки до/после, если правку видно глазами.',
-              gate: 'Прогон зелёный, снимки лежат рядом',
-            },
-          ],
-        },
+        when: 'Задача пришла тикетом с номером PROJ-',
         isEnabled: true,
         order: 1,
-      },
-    ],
-
-    automations: [
-      {
-        id: 'auto-typecheck',
-        name: 'Проверка типов после правки',
-        description: '',
-        trigger: { event: 'PostToolUse', matcher: 'Edit' },
-        action: { command: 'pnpm type-check', timeout: 120 },
-        isEnabled: true,
-        groupIds: [],
-        compiledHookId: 'automation:auto-typecheck',
       },
     ],
 
@@ -328,15 +294,6 @@ export function makeState() {
         sizeBytes: 3120,
         modifiedAt: '2026-09-02T09:00:00.000Z',
       }),
-      entity('scenario-tikety-magazina', {
-        name: 'Тикеты магазина',
-        description: 'Задача пришла тикетом с номером',
-        body: '',
-        files: ['trigger.mjs'],
-        sizeBytes: 980,
-        modifiedAt: '2026-09-10T09:00:00.000Z',
-        groupIds: [TICKET_GROUP_ID],
-      }),
       entity('release-notes-user', {
         name: 'release-notes',
         description: 'Собирает заметки к релизу.',
@@ -344,6 +301,7 @@ export function makeState() {
         files: [],
         sizeBytes: 740,
         modifiedAt: '2026-08-28T09:00:00.000Z',
+        groupIds: [TICKET_GROUP_ID],
       }),
     ],
 
@@ -362,19 +320,6 @@ export function makeState() {
         scriptPath: 'hooks/context-budget.mjs',
         scriptExists: true,
         source: 'settings',
-      }),
-      // Триггер группы «Тикеты магазина»: панель собрала его сама из сценария.
-      // Отличить собранное от написанного руками можно только по пометке в
-      // команде — она же не даёт пересборке задеть чужие хуки.
-      entity('scenario:grp-tickets', {
-        event: 'UserPromptSubmit',
-        command:
-          'node "~/.claude/skills/scenario-tikety-magazina/trigger.mjs" ' +
-          '# agentdeck:scenario:grp-tickets',
-        scriptPath: 'skills/scenario-tikety-magazina/trigger.mjs',
-        scriptExists: true,
-        source: 'settings',
-        groupIds: [TICKET_GROUP_ID],
       }),
     ],
 
@@ -568,29 +513,6 @@ export async function panelShell(page, state) {
     return route.fulfill({ json: group });
   });
 
-  await page.route('**/api/automations', (route) => {
-    const request = route.request();
-    if (request.method() !== 'POST') return route.fulfill({ json: state.automations });
-    const draft = request.postDataJSON() ?? {};
-    const automation = { id: `auto-${state.automations.length + 1}`, isEnabled: true, ...draft };
-    state.automations.push(automation);
-    // Сохранение пересобирает хуки: скомпилированная запись появляется в
-    // settings.json с пометкой в команде — по ней её и отличают от ручной.
-    state.hooks.push({
-      id: `automation:${automation.id}`,
-      event: automation.trigger.event,
-      matcher: automation.trigger.matcher,
-      command: `${automation.action.command} # agentdeck:automation:${automation.id}`,
-      timeout: automation.action.timeout,
-      scriptExists: true,
-      source: 'settings',
-      groupIds: [],
-      manualOff: false,
-      heldBy: [],
-    });
-    return route.fulfill({ json: automation });
-  });
-
   // Реестр проектов: POST добавляет запись, как это делает сервер, — пустой
   // раздел и раздел с проектом в одном сценарии иначе не снять.
   await page.route('**/api/projects', async (route) => {
@@ -672,4 +594,15 @@ export async function open(page, web, path) {
   await page.goto(`${web}${path}`, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('nav');
   await page.waitForTimeout(1500);
+}
+
+/**
+ * Закрыть уведомления «Сохранено»: они ложатся поверх нижней карточки кадра.
+ * Человек закрыл бы их так же — крестиком.
+ */
+export async function dismissToasts(page) {
+  const close = page.locator('ol li').getByRole('button', { name: /^(Закрыть|Close)$/ });
+  const count = await close.count();
+  for (let i = count - 1; i >= 0; i -= 1) await close.nth(i).click();
+  await page.waitForTimeout(400);
 }

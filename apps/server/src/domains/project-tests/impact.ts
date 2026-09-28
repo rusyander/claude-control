@@ -1,4 +1,6 @@
 import type { ProjectTestGroup, ProjectTestImpact } from '@agentdeck/contracts';
+import { join, resolve } from 'node:path';
+import { StatMemo } from '../../lib/stat-memo.ts';
 import { gitSync } from '../project-git/exec.ts';
 import { GIT_READ_TIMEOUT_MS } from '../project-git/constants.ts';
 
@@ -21,6 +23,37 @@ export function gitContext(root: string): { branch?: string; commit?: string } {
   const branch = gitSync(root, ['rev-parse', '--abbrev-ref', 'HEAD'])?.trim();
   const commit = gitSync(root, ['rev-parse', '--short', 'HEAD'])?.trim();
   return { branch: branch || undefined, commit: commit || undefined };
+}
+
+const viewContexts = new StatMemo<{ branch?: string; commit?: string }>({ ttlMs: 30_000 });
+
+/**
+ * То же для вида раздела, который опрашивается раз в пару секунд: два запуска
+ * git на каждый ответ — 45–60 мс синхронно в цикле событий. Ответ помнится,
+ * пока не сдвинулись файлы, из которых git его и читает: `HEAD` (переключение
+ * ветки, отвязанная голова), ссылка ветки и `packed-refs` (коммит, сброс).
+ * Прогоны штампуют контекст без памяти (`gitContext`): запись в историю дороже
+ * одного запуска git.
+ */
+export function viewGitContext(root: string): { branch?: string; commit?: string } {
+  return viewContexts.get(resolve(root), (touch) => {
+    // Репозиторий заведут потом — сдвинется время корня.
+    touch(resolve(root));
+    const dirs = gitSync(root, ['rev-parse', '--git-dir', '--git-common-dir'])
+      ?.split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+    const context = gitContext(root);
+    if (dirs?.length === 2) {
+      const [gitDir = '', commonDir = ''] = dirs.map((dir) => resolve(root, dir));
+      touch(join(gitDir, 'HEAD'));
+      touch(join(commonDir, 'packed-refs'));
+      if (context.branch && context.branch !== 'HEAD') {
+        touch(join(commonDir, 'refs', 'heads', ...context.branch.split('/')));
+      }
+    }
+    return context;
+  });
 }
 
 /**

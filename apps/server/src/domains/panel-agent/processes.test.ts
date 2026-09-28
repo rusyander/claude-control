@@ -4,6 +4,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { isPidAlive, RunLedger } from '../chat/run-ledger.ts';
+import { killPidTree } from '../../lib/process-tree.ts';
 import {
   PANEL_AGENT_PROCESS_LEDGER,
   PanelAgentProcesses,
@@ -54,6 +55,34 @@ describe('процессы агента панели', () => {
     expect(reapPanelAgentOrphans(appData)).toBe(1);
     expect(await waitDead(pid)).toBe(true);
     expect(new RunLedger(appData, PANEL_AGENT_PROCESS_LEDGER).read()).toEqual([]);
+  });
+
+  /**
+   * F-145 (сосед): снимка процессов нет (F-205) — снятие со сверкой времени
+   * честно не трогает номер и отдаёт `[]`. Раньше запись всё равно стиралась, и
+   * живая сирота терялась навсегда: следующий старт о ней уже не знал. Настоящие
+   * процесс, пробы и `killPidTree`; подменён только снимок.
+   */
+  it('снимка нет — сирота жива: не посчитана снятой, запись остаётся до следующего старта', () => {
+    child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });
+    const pid = child.pid!;
+    const processes = new PanelAgentProcesses(() => appData, { list: async () => [] });
+    processes.started('conv-orphan', pid, appData);
+
+    const reaped = reapPanelAgentOrphans(appData, {
+      kill: (target, startedAt) =>
+        killPidTree(
+          target,
+          { spawnedAt: startedAt },
+          { platform: 'win32', readTable: () => undefined },
+        ),
+    });
+
+    expect(isPidAlive(pid)).toBe(true);
+    expect(reaped).toBe(0);
+    expect(new RunLedger(appData, PANEL_AGENT_PROCESS_LEDGER).read()).toEqual([
+      expect.objectContaining({ key: 'conv-orphan', pid }),
+    ]);
   });
 
   it('обычный конец хода снимает запись: убивать на старте нечего', () => {

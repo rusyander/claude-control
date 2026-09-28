@@ -129,7 +129,7 @@ export function ClaudeMdTopic() {
           <Callout tone="warning" title={tr('noteRestartTitle')}>
             {tr('noteRestartText')}
           </Callout>
-          <Callout tone="danger" title={tr('noteDisabledTitle')}>
+          <Callout tone="warning" title={tr('noteDisabledTitle')}>
             {tr('noteDisabledText')}
           </Callout>
           <Callout tone="warning" title={tr('noteConflictTitle')}>

@@ -10,7 +10,8 @@ import {
 } from 'react-native';
 import { Card, Chips, Empty, Field, Loading, Mono, Muted, Row, Title } from '../../src/shared/ui';
 import { colors, font, radius, space } from '../../src/shared/config/theme';
-import { useT } from '../../src/shared/config/i18n';
+import { useLanguage, useT } from '../../src/shared/config/i18n';
+import { formatDateTime } from '../../src/shared/lib/format';
 import { isConfigured, useConnection } from '../../src/shared/api/connection';
 import { useWorkspace } from '../../src/shared/lib/workspace';
 import { useVoice } from '../../src/shared/lib/voice';
@@ -37,6 +38,8 @@ type AgentView = 'conversation' | 'history' | 'journal';
  */
 export default function AgentScreen() {
   const t = useT();
+  // Даты истории и журнала — на языке интерфейса, а не системы телефона (F-323).
+  const language = useLanguage();
   const connection = useConnection();
   const workspace = useWorkspace();
   const [view, setView] = useState<AgentView>('conversation');
@@ -235,7 +238,7 @@ export default function AgentScreen() {
                   {item.title}
                 </Text>
                 <Muted>
-                  {new Date(item.updatedAt).toLocaleString()} ·{' '}
+                  {formatDateTime(item.updatedAt, language)} ·{' '}
                   {t.agent.history.messages(item.messages)}
                 </Muted>
               </Card>
@@ -268,7 +271,7 @@ export default function AgentScreen() {
               </Row>
               <Text style={styles.bubbleText}>{entry.summary}</Text>
               <Muted>
-                {new Date(entry.at).toLocaleString()} · {t.agent.decidedBy[entry.decidedBy]}
+                {formatDateTime(entry.at, language)} · {t.agent.decidedBy[entry.decidedBy]}
               </Muted>
             </Card>
           ))}

@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useRouterState, useSearch } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
 import type { PermissionDecision, PermissionRule } from '@agentdeck/contracts';
 import { Icon } from '@shared/ui/icon';
@@ -63,6 +64,26 @@ export function PermissionsPage() {
     setIsFormOpen(open);
     if (!open) writeUrl(undefined);
   };
+
+  // Право, которое показывает агент панели (`?show=<id>`): его строка должна быть
+  // в списке — вкладка «все», фильтры сняты, список докручен, а подсветку ставит
+  // окно агента по якорю строки. Редактор не открываем: он забрал бы фокус у окна.
+  const { show } = useSearch({ strict: false }) as { show?: string };
+  // Каждый показ агента несёт свою метку в состоянии истории: повтор того же
+  // права — тот же адрес, и без метки фильтры не снимались бы второй раз (F-239).
+  // Держим последнюю увиденную: переходы самой страницы (редактор, вкладка) идут
+  // без метки и не должны сбрасывать фильтры человека.
+  const agentOpenAt = useRouterState({
+    select: (state) => (state.location.state as { agentOpenAt?: number }).agentOpenAt,
+  });
+  const [showRequest, setShowRequest] = useState(agentOpenAt);
+  if (agentOpenAt !== undefined && agentOpenAt !== showRequest) setShowRequest(agentOpenAt);
+  useEffect(() => {
+    if (!show) return;
+    setTab('all');
+    setFilter('all');
+    setQuery('');
+  }, [show, showRequest]);
 
   // Кем перекрыто каждое право: deny того же (или более широкого) шаблона
   // гасит allow, и такая строка иначе врала бы зелёной плашкой.
@@ -135,7 +156,7 @@ export function PermissionsPage() {
                 variant={filter === value ? 'primary' : 'ghost'}
                 onClick={() => setFilter(value)}
               >
-                {value === 'all' ? t('common.total') : t(`permissions.${value}`)}
+                {value === 'all' ? t('permissions.filterAll') : t(`permissions.${value}`)}
               </Button>
             ))}
           </Stack>
@@ -144,27 +165,34 @@ export function PermissionsPage() {
 
       {isLoading && <SkeletonList rows={5} />}
 
-      {tab !== 'system' && (
+      {/* Пустой отбор — без карточки: пустая рамка над подписью «Пусто» читалась
+          как сломанный список. */}
+      {tab !== 'system' && filtered.length > 0 && (
         <Card padding="none">
+          {/* Без `height`: список прокручивается вместе со страницей — одна
+              прокрутка на раздел, а не коробка в 560px с пустотой под ней. */}
           <VirtualList
             items={filtered}
-            rowHeight={41}
-            height={560}
+            // Место строки = её настоящая высота: кнопки sm (34) + отступы 8+8.
+            // Меньшее место (было 41) ставило строки внахлёст — разделитель резал
+            // соседнюю, и строка стояла не по центру своей полосы (bug 7).
+            rowHeight={50}
             getKey={(rule) => rule.id}
-            renderRow={(rule) => (
+            scrollToKey={show}
+            scrollNonce={showRequest}
+            renderRow={(rule, index) => (
               <Stack
                 direction="row"
                 align="center"
-                justify="between"
                 gap="var(--spacing-sm)"
-                className={styles.row}
+                className={index > 0 ? `${styles.row} ${styles.rowDivided}` : styles.row}
+                data-agent-anchor={rule.id}
               >
-                <TruncatedText text={rule.pattern} variant="mono" />
+                <div className={styles.pattern}>
+                  <TruncatedText text={rule.pattern} variant="mono" />
+                </div>
 
-                <Stack direction="row" align="center" gap="var(--spacing-2xs)" flexShrink={0}>
-                  <Badge tone={DECISION_TONE[rule.decision]} withDot>
-                    {t(`permissions.${rule.decision}`)}
-                  </Badge>
+                <div className={styles.meta}>
                   {/* Выключенного права в файле нет — Claude Code его не применяет.
                       Строка остаётся в списке, чтобы было видно, что погашено, и
                       чем вернуть: тумблером ниже или тумблером группы. */}
@@ -177,6 +205,15 @@ export function PermissionsPage() {
                     </Badge>
                   )}
                   <SourceBadge source={rule.source} />
+                </div>
+
+                <div className={styles.decision}>
+                  <Badge tone={DECISION_TONE[rule.decision]} withDot>
+                    {t(`permissions.${rule.decision}`)}
+                  </Badge>
+                </div>
+
+                <div className={styles.actions}>
                   {/* Перенос в противоположный файл: общий ↔ локальный. Направление
                       и подпись зависят от текущего источника права. */}
                   <Button
@@ -213,14 +250,16 @@ export function PermissionsPage() {
                   />
                   {/* Тумблер только у общих записей, как у хуков: локальный файл
                       панель правит лишь по явной просьбе (перенос, правка). */}
-                  {rule.source !== 'settings-local' && (
+                  {rule.source !== 'settings-local' ? (
                     <Toggle
                       checked={rule.isEnabled}
                       onCheckedChange={(isEnabled) => setEnabled.mutate({ id: rule.id, isEnabled })}
                       aria-label={`${t(`permissions.${rule.decision}`)}: ${rule.pattern}`}
                     />
+                  ) : (
+                    <span className={styles.toggleSlot} aria-hidden />
                   )}
-                </Stack>
+                </div>
               </Stack>
             )}
           />

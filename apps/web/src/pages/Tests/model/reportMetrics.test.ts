@@ -1,9 +1,13 @@
+import type { TFunction } from 'i18next';
 import { describe, it, expect } from 'vitest';
 import type { ProjectTestReport, ProjectTestRunRecord } from '@agentdeck/contracts';
 import {
   automationTotal,
   formatRunDuration,
+  isUnproven,
+  shownCost,
   redCases,
+  runTally,
   statusTotals,
   trendBars,
 } from './reportMetrics';
@@ -153,19 +157,113 @@ describe('redCases', () => {
 });
 
 describe('formatRunDuration', () => {
+  // Единицы — словарём языка: английская запись прогона показывала «15 с».
+  const en = ((key: string) =>
+    ({ 'common.duration.m': 'm', 'common.duration.s': 's' })[key] ?? key) as unknown as TFunction;
+
   it('идущий прогон длительности ещё не имеет', () => {
-    expect(formatRunDuration('2026-09-07T10:00:00.000Z')).toBe('—');
+    expect(formatRunDuration('2026-09-07T10:00:00.000Z', undefined, en)).toBe('—');
   });
 
-  it('секунды и минуты показываются по-разному', () => {
-    expect(formatRunDuration('2026-09-07T10:00:00.000Z', '2026-09-07T10:00:42.000Z')).toBe('42 с');
-    expect(formatRunDuration('2026-09-07T10:00:00.000Z', '2026-09-07T10:03:07.000Z')).toBe(
-      '3 мин 7 с',
+  it('секунды и минуты — единицами языка интерфейса', () => {
+    expect(formatRunDuration('2026-09-07T10:00:00.000Z', '2026-09-07T10:00:42.000Z', en)).toBe(
+      '42s',
+    );
+    expect(formatRunDuration('2026-09-07T10:00:00.000Z', '2026-09-07T10:03:07.000Z', en)).toBe(
+      '3m 07s',
     );
   });
 
   it('битые или перевёрнутые отметки времени не показываются отрицательным числом', () => {
-    expect(formatRunDuration('2026-09-07T10:05:00.000Z', '2026-09-07T10:00:00.000Z')).toBe('—');
-    expect(formatRunDuration('не дата', '2026-09-07T10:00:00.000Z')).toBe('—');
+    expect(formatRunDuration('2026-09-07T10:05:00.000Z', '2026-09-07T10:00:00.000Z', en)).toBe('—');
+    expect(formatRunDuration('не дата', '2026-09-07T10:00:00.000Z', en)).toBe('—');
+  });
+});
+
+/**
+ * Строка прогона в истории: прерванный и идущий не выглядят завершёнными,
+ * заблокированное не прячется в «пропущено», а брошенные непройденными
+ * проходы названы числом, а не пропадают из счёта.
+ */
+describe('runTally', () => {
+  const summary = { total: 6, passed: 2, failed: 2, skipped: 1, blocked: 1 };
+  const base = { id: 'r', mode: 'manual', actor: 'human', startedAt: '', results: [], summary };
+
+  it('блокировка отдельно от пропуска, непройденное названо, завершённый без пометки', () => {
+    expect(runTally({ ...base, status: 'done', planned: 7 } as ProjectTestRunRecord)).toEqual({
+      passed: 2,
+      failed: 2,
+      skipped: 1,
+      blocked: 1,
+      open: 1,
+      state: undefined,
+      counted: true,
+    });
+  });
+
+  it('прерванный, идущий и упавший прогоны помечены; без плана непройденного нет', () => {
+    const tally = (status: string) =>
+      runTally({ ...base, status } as unknown as ProjectTestRunRecord);
+    expect(tally('stopped').state).toBe('stopped');
+    expect(tally('running').state).toBe('running');
+    expect(tally('error').state).toBe('error');
+    expect(tally('stopped').open).toBe(0);
+  });
+
+  /**
+   * Генерация и автоматизация кейсы не проходят: их сводка пуста всегда, и
+   * «пройдено: 0 · провалено: 0» зелёным и красным читалось как прогон,
+   * который ничего не нашёл. Прогон кейсов с пустым итогом — счёт показывает.
+   */
+  it('у записи, которая кейсы не проходит, счёта нет; у прогона кейсов — есть даже нулевой', () => {
+    const empty = { total: 0, passed: 0, failed: 0, skipped: 0, blocked: 0 };
+    const of = (mode: string) =>
+      runTally({
+        ...base,
+        mode,
+        status: 'done',
+        summary: empty,
+      } as unknown as ProjectTestRunRecord);
+    expect(of('generate').counted).toBe(false);
+    expect(of('automate').counted).toBe(false);
+    expect(of('explore').counted).toBe(false);
+    expect(of('run').counted).toBe(true);
+    expect(of('manual').counted).toBe(true);
+    expect(
+      runTally({ ...base, mode: 'explore', status: 'done' } as unknown as ProjectTestRunRecord)
+        .counted,
+    ).toBe(true);
+  });
+});
+
+/**
+ * Пометка «нет доказательства» у прохода. Ставилась по одному признаку — нет
+ * снимка, — и красный проход с номером шага, ожиданием и фактом носил её рядом
+ * с пометкой «шаг 2»: доказан и не доказан одновременно.
+ */
+describe('isUnproven', () => {
+  const point = { pointId: 'p', groupId: 'g', caseId: 'c' };
+
+  it('красный без снимка и без разбора — не доказан; с любым из двух — доказан', () => {
+    expect(isUnproven({ ...point, status: 'failed' })).toBe(true);
+    expect(isUnproven({ ...point, status: 'failed', failure: { step: 2 } })).toBe(false);
+    expect(isUnproven({ ...point, status: 'blocked', failure: { actual: 'нет учётки' } })).toBe(
+      false,
+    );
+    expect(isUnproven({ ...point, status: 'failed', attachments: ['a.png'] })).toBe(false);
+    expect(isUnproven({ ...point, status: 'passed' })).toBe(false);
+  });
+});
+
+/**
+ * «Стоимость: $0.00» в отчёте рядом с миллионом токенов: прогоны по подписке
+ * цены не несут, и ноль значил «неизвестно», а читался «бесплатно». История
+ * прогонов ноль уже прятала — отчёт показывал.
+ */
+describe('shownCost', () => {
+  it('нулевая и отсутствующая цена не показываются, настоящая — с центами', () => {
+    expect(shownCost(0)).toBeUndefined();
+    expect(shownCost(undefined)).toBeUndefined();
+    expect(shownCost(1.234)).toBe('1.23');
   });
 });

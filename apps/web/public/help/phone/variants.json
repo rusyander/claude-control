@@ -1,0 +1,215 @@
+{
+  "topic": "phone",
+  "frames": {
+    "day/01-home": {
+      "light-ru": {
+        "file": "01-home.png",
+        "width": 540,
+        "height": 1200
+      },
+      "light-en": {
+        "file": "01-home.en.png",
+        "width": 540,
+        "height": 1200
+      }
+    },
+    "day/02-questions": {
+      "light-ru": {
+        "file": "02-questions.png",
+        "width": 540,
+        "height": 1200
+      },
+      "light-en": {
+        "file": "02-questions.en.png",
+        "width": 540,
+        "height": 1200
+      }
+    },
+    "day/03-chat": {
+      "light-ru": {
+        "file": "03-chat.png",
+        "width": 540,
+        "height": 1200
+      },
+      "light-en": {
+        "file": "03-chat.en.png",
+        "width": 540,
+        "height": 1200
+      }
+    },
+    "day/04-agent": {
+      "light-ru": {
+        "file": "04-agent.png",
+        "width": 540,
+        "height": 1200
+      },
+      "light-en": {
+        "file": "04-agent.en.png",
+        "width": 540,
+        "height": 1200
+      }
+    },
+    "day/05-projects": {
+      "light-ru": {
+        "file": "05-projects.png",
+        "width": 540,
+        "height": 1200
+      },
+      "light-en": {
+        "file": "05-projects.en.png",
+        "width": 540,
+        "height": 1200
+      }
+    },
+    "day/06-tests": {
+      "light-ru": {
+        "file": "06-tests.png",
+        "width": 540,
+        "height": 1200
+      },
+      "light-en": {
+        "file": "06-tests.en.png",
+        "width": 540,
+        "height": 1200
+      }
+    },
+    "day/07-analytics": {
+      "light-ru": {
+        "file": "07-analytics.png",
+        "width": 540,
+        "height": 1200
+      },
+      "light-en": {
+        "file": "07-analytics.en.png",
+        "width": 540,
+        "height": 1200
+      }
+    },
+    "offline/01-home-silent": {
+      "light-ru": {
+        "file": "01-home-silent.png",
+        "width": 540,
+        "height": 1200
+      },
+      "light-en": {
+        "file": "01-home-silent.en.png",
+        "width": 540,
+        "height": 1200
+      }
+    },
+    "offline/02-settings-silent": {
+      "light-ru": {
+        "file": "02-settings-silent.png",
+        "width": 540,
+        "height": 1200
+      },
+      "light-en": {
+        "file": "02-settings-silent.en.png",
+        "width": 540,
+        "height": 1200
+      }
+    },
+    "pair/01-remote-off": {
+      "light-ru": {
+        "file": "01-remote-off.png",
+        "width": 1116,
+        "height": 480
+      },
+      "light-en": {
+        "file": "01-remote-off.en.png",
+        "width": 1116,
+        "height": 460
+      },
+      "dark-ru": {
+        "file": "01-remote-off.dark.png",
+        "width": 1116,
+        "height": 480
+      },
+      "dark-en": {
+        "file": "01-remote-off.dark.en.png",
+        "width": 1116,
+        "height": 460
+      }
+    },
+    "pair/02-remote-on": {
+      "light-ru": {
+        "file": "02-remote-on.png",
+        "width": 1116,
+        "height": 480
+      },
+      "light-en": {
+        "file": "02-remote-on.en.png",
+        "width": 1116,
+        "height": 460
+      },
+      "dark-ru": {
+        "file": "02-remote-on.dark.png",
+        "width": 1116,
+        "height": 480
+      },
+      "dark-en": {
+        "file": "02-remote-on.dark.en.png",
+        "width": 1116,
+        "height": 460
+      }
+    },
+    "pair/03-pairing-code": {
+      "light-ru": {
+        "file": "03-pairing-code.png",
+        "width": 1116,
+        "height": 867
+      },
+      "light-en": {
+        "file": "03-pairing-code.en.png",
+        "width": 1116,
+        "height": 848
+      },
+      "dark-ru": {
+        "file": "03-pairing-code.dark.png",
+        "width": 1116,
+        "height": 867
+      },
+      "dark-en": {
+        "file": "03-pairing-code.dark.en.png",
+        "width": 1116,
+        "height": 848
+      }
+    },
+    "pair/04-phone-not-paired": {
+      "light-ru": {
+        "file": "04-phone-not-paired.png",
+        "width": 540,
+        "height": 1200
+      },
+      "light-en": {
+        "file": "04-phone-not-paired.en.png",
+        "width": 540,
+        "height": 1200
+      }
+    },
+    "pair/05-phone-pair-screen": {
+      "light-ru": {
+        "file": "05-phone-pair-screen.png",
+        "width": 540,
+        "height": 1200
+      },
+      "light-en": {
+        "file": "05-phone-pair-screen.en.png",
+        "width": 540,
+        "height": 1200
+      }
+    },
+    "pair/06-phone-online": {
+      "light-ru": {
+        "file": "06-phone-online.png",
+        "width": 540,
+        "height": 1200
+      },
+      "light-en": {
+        "file": "06-phone-online.en.png",
+        "width": 540,
+        "height": 1200
+      }
+    }
+  }
+}

@@ -1,0 +1,9 @@
+// Приглушённо: решение уже принято, ответа здесь никто не ждёт.
+.line {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 10px;
+  border-left: 2px solid var(--color-border);
+  border-radius: 4px;
+}

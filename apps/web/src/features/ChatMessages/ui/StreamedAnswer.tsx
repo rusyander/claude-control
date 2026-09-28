@@ -4,6 +4,8 @@ import { scanSplitBlocks } from '@agentdeck/contracts/task-split';
 import { scanHandoffBlocks } from '@agentdeck/contracts/chat-handoff';
 import { scanMediaBlocks } from '@agentdeck/contracts/media-block';
 import { withoutSplitTickets } from '@agentdeck/contracts/split-tickets';
+import { withoutEscalateBlocks } from '@agentdeck/contracts/chat-escalate';
+import { withoutSieveBlocks } from '@agentdeck/contracts/sieves';
 import { renderMarkdown } from '@shared/lib/markdown/renderMarkdown';
 import { TokenBadge } from '@shared/ui/token-badge';
 import { TaskSplitCard } from './TaskSplitCard';
@@ -29,7 +31,16 @@ export function StreamedAnswer({ stream, splitCeiling, costUnit, effort }: Strea
 
   // Разборы идут цепочкой по одному и тому же тексту — языки блоков разные, и
   // каждый скан видит только свой.
-  const split = useMemo(() => scanSplitBlocks(stream.text), [stream.text]);
+  // Блок `escalate` — служебный, и незакрытый прячется тоже: хвост JSON не для ленты.
+  const split = useMemo(
+    () =>
+      scanSplitBlocks(
+        withoutSieveBlocks(withoutEscalateBlocks(stream.text, { streaming: true }), {
+          streaming: true,
+        }),
+      ),
+    [stream.text],
+  );
   const handoff = useMemo(() => scanHandoffBlocks(split.text), [split.text]);
   // Здесь — и только здесь — разбор знает, что ответ ещё идёт: незакрытый блок
   // прячется вместе с хвостом, иначе в ленте секундами стоит простыня JSON.

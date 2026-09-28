@@ -10,7 +10,9 @@ import { VirtualList } from '@shared/ui/virtual-list';
 import { useElementHeight } from '@shared/hooks/use-element-height';
 import { useDebouncedValue } from '@shared/hooks/use-debounced-value';
 import { useChatBodySearch, MIN_CHAT_SEARCH_LENGTH } from '@entities/Chat';
+import { escalationsOf, useChatEscalations } from '@entities/ChatGroupSettings';
 import { chatListRows, matchBodyHits, rowKey } from '../lib/rows';
+import { searchView } from '../lib/searchView';
 import { ChatRow } from './ChatRow';
 import { GROUP_HEIGHT, ROW_HEIGHT } from './ChatList.constants';
 import type { ChatListProps, ChatRowData, ChatSearchMode } from './ChatList.types';
@@ -44,11 +46,16 @@ export function ChatList({
   const bodyQuery = mode === 'messages' ? debounced.trim() : '';
   const bodySearch = useChatBodySearch(bodyQuery);
   const isBodyReady = bodyQuery.length >= MIN_CHAT_SEARCH_LENGTH;
+  const view = searchView({ mode, query, bodyQuery, minLength: MIN_CHAT_SEARCH_LENGTH });
+  // Непрочитанное критичное от детей разделения — метка у главного чата дерева.
+  const escalations = useChatEscalations();
 
   const found = useMemo<ChatRowData[]>(() => {
-    if (mode === 'messages') return matchBodyHits(chats, bodySearch.data?.hits);
+    if (view.useBodyHits) return matchBodyHits(chats, bodySearch.data?.hits);
 
-    const needle = query.trim().toLowerCase();
+    // В режиме «По сообщениям» короткий или пустой запрос — весь список, а не
+    // фильтр по названию: этот режим названия не ищет.
+    const needle = mode === 'title' ? query.trim().toLowerCase() : '';
     const matched = needle
       ? chats.filter(
           (chat) =>
@@ -63,7 +70,7 @@ export function ChatList({
     return [...matched]
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
       .map((chat) => ({ chat }));
-  }, [chats, query, mode, bodySearch.data]);
+  }, [chats, query, mode, view.useBodyHits, bodySearch.data]);
 
   // Заголовки групп идут строками того же списка — иначе виртуализация и
   // разбивка по датам мешали бы друг другу. Дерево строится ДО заголовков:
@@ -118,7 +125,7 @@ export function ChatList({
         </Stack>
 
         <Typography variant="caption" color="subtle">
-          {mode === 'messages' && !isBodyReady
+          {view.showHint
             ? t('chat.searchMessagesHint')
             : t('plugins.catalogCount', { found: found.length, total: chats.length })}
         </Typography>
@@ -157,6 +164,10 @@ export function ChatList({
                 query={searchNeedle}
                 status={statuses?.get(row.data.chat.id)}
                 depth={row.data.depth}
+                unreadEscalations={
+                  escalationsOf(escalations.data, [row.data.chat.id]).filter((entry) => !entry.read)
+                    .length
+                }
                 onSelect={() => onSelect(row.data.chat)}
               />
             );

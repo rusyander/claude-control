@@ -75,6 +75,9 @@ export function RulesGuideSections({ tr }: SectionProps) {
           <GuideStep title={g('lOff')} text={g('lOffText')}>
             <HelpShot topic="rules" scenario="living" frame="03-off" side="panel" />
           </GuideStep>
+          <GuideStep title={g('lTabOff')} text={g('lTabOffText')}>
+            <HelpShot topic="rules" scenario="living" frame="06-tab-off" side="panel" />
+          </GuideStep>
           <GuideStep title={g('lFile')} text={g('lFileText')}>
             <HelpShot topic="rules" scenario="living" frame="04-file-disabled" side="panel" />
           </GuideStep>

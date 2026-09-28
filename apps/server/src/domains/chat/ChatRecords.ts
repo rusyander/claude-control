@@ -1,5 +1,7 @@
 import type { ChatSummary, ChatBlock, MessageUsage } from '@agentdeck/contracts';
 import { splitAttachments } from '@agentdeck/contracts/uploads';
+import { mediaRequestOf } from '@agentdeck/contracts/media-block';
+import { mediaTitle } from '@agentdeck/contracts/chat-title';
 import { stripChildrenBrief } from './children-brief.ts';
 import { withoutPanelPreamble } from './panel-preamble.ts';
 
@@ -218,7 +220,20 @@ export function firstMeaningfulText(
  * группы назывались «Панель подготовила эту копию: …» (`panel-preamble.ts`).
  */
 export function chatTitleText(records: Record[]): string {
-  return firstMeaningfulText(records, withoutLinks, withoutPanelPreamble);
+  return firstMeaningfulText(records, withoutLinks, (text) =>
+    withoutPanelPreamble(mediaRequestTitle(text)),
+  );
+}
+
+/**
+ * Просьба режима «Презентация»/«Картинка» — это правила из каталога плюс слова
+ * человека, и разговор звался первой строкой правил, одинаковой у всех колод
+ * (живой прогон 26.09.2026). Название берётся из слов человека.
+ */
+export function mediaRequestTitle(text: string): string {
+  const request = mediaRequestOf(text);
+  // Слово режима — по нему в списке видно, что это колода или картинка.
+  return request ? mediaTitle(request.kind, request.topic) : text;
 }
 
 /**

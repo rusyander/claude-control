@@ -38,6 +38,16 @@ const DEFAULT_STABILITY = 70;
 /** Со скольких завершённых результатов вообще можно судить о стабильности. */
 const DEFAULT_MIN_RUNS = 4;
 
+/**
+ * Во скольких прогонах кейс должен пройти только на повторе раннера, чтобы
+ * предложить карантин. Один раз — не приговор (стенд моргнул), два — уже
+ * повторяемость, которую зелёный статус прячет.
+ */
+const DEFAULT_RETRY_FLAKES = 2;
+
+/** Сколько последних прогонов кейса смотреть на повторы — та же глубина, что у стабильности. */
+const RETRY_WINDOW = 100;
+
 /** Ссылки кейса, из которых получается требование. */
 const REQUIREMENT_LINKS = new Set(['requirement', 'issue']);
 
@@ -50,6 +60,8 @@ export interface QuarantineOptions {
   stability?: number;
   /** Со скольких результатов судить о стабильности. */
   minRuns?: number;
+  /** Во скольких прогонах «зелёный на повторе» предлагает карантин. */
+  retryFlakes?: number;
 }
 
 /** Даты правки требований в трекере: ключ задачи → когда её трогали. */
@@ -57,6 +69,8 @@ export interface RequirementDates {
   updates: Record<string, { updatedAt: string; url?: string }>;
   /** Почему список пуст или неполон — показывается строкой, а не молчанием. */
   warning?: string;
+  warningCode?: string;
+  warningParams?: Record<string, string | number>;
 }
 
 /**
@@ -84,14 +98,39 @@ function finalCount(statuses: string[]): number {
   ).length;
 }
 
+/**
+ * Сколько прогонов кейс прошёл только на повторе раннера. Прогон — одна точка,
+ * как и в стабильности: у кейса с параметрами проходов несколько, и три
+ * спасённых прохода одного прогона — один случай, а не три.
+ */
+function retryFlakesOf(runs: ProjectTestRunRecord[]): Map<string, number> {
+  const flakes = new Map<string, number>();
+  const seen = new Map<string, number>();
+  for (const run of runs) {
+    const flaky = new Set<string>();
+    const touched = new Set<string>();
+    for (const result of run.results) {
+      const key = `${result.groupId}:${result.caseId}`;
+      touched.add(key);
+      if (result.status === 'passed' && (result.flakyAttempts ?? 0) > 0) flaky.add(key);
+    }
+    for (const key of touched) {
+      const depth = (seen.get(key) ?? 0) + 1;
+      seen.set(key, depth);
+      if (depth <= RETRY_WINDOW && flaky.has(key)) flakes.set(key, (flakes.get(key) ?? 0) + 1);
+    }
+  }
+  return flakes;
+}
+
 function suggestion(
   kind: ProjectTestQuarantineSuggestion['kind'],
   groupId: string,
   testCase: ProjectTestCase,
-  stats: { stability: number; runs: number; greenStreak: number },
+  stats: { stability: number; runs: number; greenStreak: number; retryFlakes: number },
   message: string,
   text: CodedMessage,
-  reason?: string,
+  reason?: { text: string } & CodedMessage,
 ): ProjectTestQuarantineSuggestion {
   return {
     kind,
@@ -100,11 +139,14 @@ function suggestion(
     title: testCase.title,
     message,
     ...text,
-    reason,
+    ...(reason
+      ? { reason: reason.text, reasonCode: reason.messageCode, reasonParams: reason.params }
+      : {}),
     muteReason: testCase.muteReason,
     stability: stats.stability,
     runs: stats.runs,
     greenStreak: stats.greenStreak,
+    retryFlakes: stats.retryFlakes > 0 ? stats.retryFlakes : undefined,
   };
 }
 
@@ -170,9 +212,11 @@ export function buildQuarantine(
     greenStreak: options.greenStreak ?? DEFAULT_GREEN_STREAK,
     stability: options.stability ?? DEFAULT_STABILITY,
     minRuns: options.minRuns ?? DEFAULT_MIN_RUNS,
+    retryFlakes: options.retryFlakes ?? DEFAULT_RETRY_FLAKES,
   };
 
   const history = caseStatusHistory(runs);
+  const retried = retryFlakesOf(runs);
   const lift: ProjectTestQuarantineSuggestion[] = [];
   const quarantine: ProjectTestQuarantineSuggestion[] = [];
 
@@ -186,6 +230,7 @@ export function buildQuarantine(
         stability,
         runs: finalCount(statuses),
         greenStreak: greenStreakOf(statuses),
+        retryFlakes: retried.get(`${group.id}:${testCase.id}`) ?? 0,
       };
 
       if (testCase.muted) {
@@ -206,7 +251,35 @@ export function buildQuarantine(
         continue;
       }
 
-      if (stats.runs < thresholds.minRuns || stability >= thresholds.stability) continue;
+      const unstable = stats.runs >= thresholds.minRuns && stability < thresholds.stability;
+      if (!unstable && stats.retryFlakes >= thresholds.retryFlakes) {
+        // Стабильность здесь 100%: повтор выдал зелёный, и счёт по статусам
+        // нестабильности не видит. Предложение — отдельным основанием.
+        quarantine.push(
+          suggestion(
+            'quarantine',
+            group.id,
+            testCase,
+            stats,
+            `Прошёл только на повторе в ${stats.retryFlakes} прогонах из ${stats.runs} при пороге ${thresholds.retryFlakes}: статус зелёный, но без повтора кейс падает.`,
+            {
+              messageCode: 'quarantine-suggest-retries',
+              params: {
+                flakes: stats.retryFlakes,
+                runs: stats.runs,
+                limit: thresholds.retryFlakes,
+              },
+            },
+            {
+              text: `Нестабилен: проходит только на повторе в ${stats.retryFlakes} из ${stats.runs} прогонов.`,
+              messageCode: 'quarantine-reason-retries',
+              params: { flakes: stats.retryFlakes, runs: stats.runs },
+            },
+          ),
+        );
+        continue;
+      }
+      if (!unstable) continue;
       quarantine.push(
         suggestion(
           'quarantine',
@@ -218,7 +291,11 @@ export function buildQuarantine(
             messageCode: 'quarantine-suggest',
             params: { stability, runs: stats.runs, limit: thresholds.stability },
           },
-          `Нестабилен: стабильность ${stability}% на ${stats.runs} результатах.`,
+          {
+            text: `Нестабилен: стабильность ${stability}% на ${stats.runs} результатах.`,
+            messageCode: 'quarantine-reason-unstable',
+            params: { stability, runs: stats.runs },
+          },
         ),
       );
     }
@@ -236,6 +313,8 @@ export function buildQuarantine(
     stale: staleCases(groups, dates),
     thresholds,
     warning: dates.warning,
+    ...(dates.warningCode ? { warningCode: dates.warningCode } : {}),
+    ...(dates.warningParams ? { warningParams: dates.warningParams } : {}),
     checkedAt,
   };
 }

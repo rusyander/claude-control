@@ -76,6 +76,35 @@ describe('resource-routes: файл в запросе не указан', () => 
     expect(response.json<{ message: string }>().message).toBe('Не указан файл');
   });
 
+  it('[P1] правка файлов скилла и hooks/ не требует перезапуска CLI', async () => {
+    // Живой прогон 26.09: SKILL.md через /api/skills отвечал «без перезапуска»,
+    // а соседний файл того же скилла здесь — «нужен перезапуск».
+    const put = await app.inject({
+      method: 'PUT',
+      url: '/api/resources/skill/demo/file',
+      payload: { file: 'notes.md', content: 'заметка' },
+    });
+    expect(put.json()).toMatchObject({ ok: true, needsRestart: false });
+    const moved = await app.inject({
+      method: 'POST',
+      url: '/api/resources/skill/demo/move',
+      payload: { from: 'notes.md', to: 'docs/notes.md' },
+    });
+    expect(moved.json()).toMatchObject({ ok: true, needsRestart: false });
+    const removed = await app.inject({
+      method: 'DELETE',
+      url: '/api/resources/skill/demo/file?file=docs/notes.md',
+    });
+    expect(removed.json()).toMatchObject({ ok: true, needsRestart: false });
+    mkdirSync(join(root, 'hooks'), { recursive: true });
+    const hook = await app.inject({
+      method: 'PUT',
+      url: '/api/resources/hook/x/file',
+      payload: { file: 'probe.mjs', content: 'console.log(1)\n' },
+    });
+    expect(hook.json()).toMatchObject({ ok: true, needsRestart: false });
+  });
+
   it('с именем файла чтение работает как прежде', async () => {
     const response = await app.inject({
       method: 'GET',

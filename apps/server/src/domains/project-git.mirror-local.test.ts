@@ -16,6 +16,7 @@ import { addWorktree, mirrorWorktree, removeWorktree } from './project-git.ts';
 import {
   MIRROR_SIZE_LIMIT,
   describeMirror,
+  mirrorLineForModel,
   globToRegExp,
   includeReaches,
   isNever,
@@ -235,6 +236,27 @@ describe('describeMirror', () => {
         kept: 3,
       }),
     ).toBe('Локальный слой: перенесено 2, без изменений 3, пропущено 1, за бортом: .venv/');
+  });
+
+  it('строка для модели переводится целиком', () => {
+    const line = describeMirror({
+      mirrored: ['a', 'b'],
+      linked: ['.claude/skills', 'e2e'],
+      kept: 2,
+      skipped: [{ path: 'x', reason: 'r' }],
+      unlisted: ['node_modules/', 'dist/'],
+    });
+    expect(mirrorLineForModel(line)).not.toMatch(/[а-яё]/i);
+  });
+
+  // Ревью 28.09 (F-310): строка резалась по словам шаблонов в любом месте, и
+  // путь «за бортом» с «, пропущено 3» разрывался и переводился кусками.
+  it('путь за бортом со словами шаблона не разрывается', () => {
+    const en = mirrorLineForModel(
+      describeMirror({ mirrored: [], kept: 0, skipped: [], unlisted: ['weird, пропущено 3/'] }),
+    );
+    expect(en).toContain('left out: weird, пропущено 3/');
+    expect(en).not.toContain('skipped');
   });
 });
 

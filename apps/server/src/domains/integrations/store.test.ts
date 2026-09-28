@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { AppStore } from '../../lib/app-store.ts';
 import { checkIntegration } from './check.ts';
-import { describeLink, dropLink, linkForCwd, readLinks, writeLink } from './links.ts';
+import { dropLink, linkForCwd, readLinks, writeLink } from './links.ts';
 import { readHealth, saveHealth } from './health.ts';
 import {
   describeIntegration,
@@ -217,13 +217,6 @@ describe('domains/integrations/links: привязка проекта', () => {
     dropLink(store, project, undefined);
     expect(readLinks(store, project)).toEqual({ project: {}, groups: {} });
     expect(linkForCwd(store, project)).toBeUndefined();
-  });
-
-  it('строка для агента собирается только из заполненного', () => {
-    expect(
-      describeLink({ jiraIssueKey: 'PRJ-1', jiraIssueTitle: 'Логин', confluencePageId: '12' }),
-    ).toBe('задача PRJ-1 — Логин; страница Confluence 12');
-    expect(describeLink({})).toBe('');
   });
 });
 

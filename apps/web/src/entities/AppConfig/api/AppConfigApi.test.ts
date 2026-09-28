@@ -1,8 +1,9 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { QueryClient } from '@tanstack/react-query';
 import { appSettingsSchema, type AppSettings } from '@agentdeck/contracts';
 import { queryKeys } from '@shared/api/query-keys';
-import { applySettingsUpdate } from './AppConfigApi';
+import { apiClient } from '@shared/api/client';
+import { applySettingsUpdate, changedSettings, refreshSettingsFromServer } from './AppConfigApi';
 
 const settings = (patch: Partial<AppSettings>): AppSettings => appSettingsSchema.parse(patch);
 
@@ -131,5 +132,36 @@ describe('applySettingsUpdate', () => {
     applySettingsUpdate(client, next, { theme: 'dark' });
 
     expect(client.getQueryData(queryKeys.settings)).toBe(next);
+  });
+});
+
+describe('настройки, сменённые снаружи (соседняя вкладка, телефон)', () => {
+  it('changedSettings — только различающиеся поля, вложенные сравниваются по значению', () => {
+    const before = settings({ language: 'ru', theme: 'light' });
+    const after = { ...settings({ language: 'en', theme: 'light' }), dlp: { ...before.dlp } };
+    expect(changedSettings(before, after)).toEqual({ language: 'en' });
+    expect(changedSettings(before, structuredClone(before))).toEqual({});
+  });
+
+  it('язык из другой вкладки попадает в кеш, смена провайдера сбрасывает разделы чужого CLI', async () => {
+    const client = seed();
+    client.setQueryData(queryKeys.settings, settings({ language: 'ru', provider: 'cursor' }));
+    const outside = settings({ language: 'en', provider: 'claude' });
+    const get = vi.spyOn(apiClient, 'get').mockResolvedValue({ data: outside });
+    await refreshSettingsFromServer(client);
+    expect(get).toHaveBeenCalledWith('/settings');
+    expect(client.getQueryData<AppSettings>(queryKeys.settings)?.language).toBe('en');
+    expect(client.getQueryData(queryKeys.providerRules)).toBeUndefined();
+    get.mockRestore();
+  });
+
+  it('своё эхо (кеш уже равен серверу) ничего не сбрасывает', async () => {
+    const client = seed();
+    const same = settings({ language: 'ru', provider: 'cursor' });
+    client.setQueryData(queryKeys.settings, same);
+    const get = vi.spyOn(apiClient, 'get').mockResolvedValue({ data: structuredClone(same) });
+    await refreshSettingsFromServer(client);
+    expect(client.getQueryData(queryKeys.providerRules)).toEqual(['cursor rule']);
+    get.mockRestore();
   });
 });

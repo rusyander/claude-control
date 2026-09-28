@@ -34,11 +34,12 @@
  * Запуск: `node tools/qa/check-platform-foreign.mjs`
  * Нужен установленный Ollama и хотя бы одна модель (`ollama pull qwen2.5:0.5b`).
  */
-import { spawn, spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { killChildProcessTree } from '../../apps/server/src/lib/kill-tree.mjs';
 
 const OLLAMA = process.env.OLLAMA_URL ?? 'http://127.0.0.1:11434';
 const PANEL_PORT = Number(process.env.FOREIGN_PANEL_PORT ?? 5188);
@@ -175,12 +176,9 @@ class NotChecked extends Error {}
  * и держала порт и память видеокарты после прогона.
  */
 function killTree(child) {
-  if (child.exitCode !== null || child.pid === undefined) return;
-  if (process.platform === 'win32') {
-    spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
-  } else {
-    child.kill();
-  }
+  // Общий помощник, не `taskkill /T`: тот снимал чужих сирот, чей мёртвый
+  // родитель отдал номер нашей оболочке. Вышедший по номеру не трогает сам.
+  killChildProcessTree(child);
 }
 
 async function main() {

@@ -49,6 +49,9 @@ export function ScriptsGuideSections({ tr }: SectionProps) {
           <GuideStep title={g('fDelete')} text={g('fDeleteText')}>
             <HelpShot topic="scripts" scenario="files" frame="04-delete" side="panel" />
           </GuideStep>
+          <GuideStep title={g('fUnused')} text={g('fUnusedText')}>
+            <HelpShot topic="scripts" scenario="files" frame="05-unused" side="panel" />
+          </GuideStep>
         </GuideSteps>
       </HelpSection>
 

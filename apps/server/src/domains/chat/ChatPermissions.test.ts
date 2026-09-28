@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { PermissionBroker, type PermissionRequest } from './ChatPermissions.ts';
+import {
+  CLI_TOOL_CAP_MS,
+  DEFAULT_TIMEOUT_MS,
+  EXPIRED_WAIT,
+  PermissionBroker,
+  permissionWaitMs,
+  type PermissionRequest,
+} from './ChatPermissions.ts';
 
 /**
  * Брокер интерактивных прав: держит ответ, пока человек не кликнет
@@ -34,6 +41,19 @@ describe('PermissionBroker', () => {
     await expect(decision).resolves.toEqual({ behavior: 'allow' });
     // После ответа висящего запроса не остаётся.
     expect(broker.hasPending('c1')).toBe(false);
+  });
+
+  it('list — висящие запросы с видом и моментом, решённый уходит из списка', () => {
+    void broker.request(REQ());
+    void broker.request(REQ({ runId: 'c2', toolUseId: 'g1', kind: 'branchGate' }));
+    expect(broker.list()).toEqual([
+      expect.objectContaining({ runId: 'c1', toolUseId: 'tool-1', toolName: 'Bash' }),
+      expect.objectContaining({ runId: 'c2', toolUseId: 'g1', kind: 'branchGate' }),
+    ]);
+    expect(Number.isNaN(Date.parse(broker.list()[0]?.askedAt ?? ''))).toBe(false);
+    broker.decide('c1', 'tool-1', { behavior: 'allow' });
+    expect(broker.list().map((item) => item.toolUseId)).toEqual(['g1']);
+    broker.cancelRun('c2');
   });
 
   it('клик «Запретить» передаёт причину отказа', async () => {
@@ -125,6 +145,34 @@ describe('PermissionBroker', () => {
       await expect(second).resolves.toEqual({ behavior: 'allow' });
     });
 
+    it('по умолчанию запрос ждёт чуть меньше жёсткого предела CLI и истекает сам', async () => {
+      // Предел CLI (MCP_TOOL_TIMEOUT) — 1e8 мс; брокер обязан ответить «истекло»
+      // РАНЬШЕ, чем CLI молча оборвёт вызов, но не раньше, чем за 10 минут.
+      expect(DEFAULT_TIMEOUT_MS).toBe(CLI_TOOL_CAP_MS - 10 * 60_000);
+      const decision = broker.request(REQ());
+      await vi.advanceTimersByTimeAsync(DEFAULT_TIMEOUT_MS - 1);
+      expect(broker.hasPending('c1')).toBe(true);
+
+      await vi.advanceTimersByTimeAsync(1);
+      await expect(decision).resolves.toEqual({
+        behavior: 'deny',
+        message: EXPIRED_WAIT,
+        expired: true,
+      });
+      expect(broker.hasPending('c1')).toBe(false);
+      // Поздний клик — «истекло», а не «нет такого».
+      expect(broker.answer('c1', 'tool-1', { behavior: 'allow' })).toBe('expired');
+    });
+
+    it('срок длиннее предела одного таймера держится нарезкой', async () => {
+      // ~24,8 суток — предел setTimeout: без нарезки срок сработал бы сразу.
+      const decision = broker.request(REQ(), 30 * 24 * 60 * 60_000);
+      await vi.advanceTimersByTimeAsync(25 * 24 * 60 * 60_000);
+      expect(broker.hasPending('c1')).toBe(true);
+      await vi.advanceTimersByTimeAsync(5 * 24 * 60 * 60_000);
+      await expect(decision).resolves.toMatchObject({ behavior: 'deny', expired: true });
+    });
+
     it('клик до таймаута отменяет отложенный отказ', async () => {
       const decision = broker.request(REQ(), 1000);
       broker.decide('c1', 'tool-1', { behavior: 'allow' });
@@ -132,6 +180,70 @@ describe('PermissionBroker', () => {
       // Даже если время «прошло» — ответ уже зафиксирован как allow.
       await vi.advanceTimersByTimeAsync(2000);
       await expect(decision).resolves.toEqual({ behavior: 'allow' });
+    });
+  });
+
+  describe('умерший запрос (CLI перестал ждать)', () => {
+    it('expire снимает висящий запрос отказом с пометкой и убирает его из списка', async () => {
+      const decision = broker.request(REQ({ toolUseId: 'toolu_dead' }));
+      broker.request(REQ({ runId: 'c2', toolUseId: 'toolu_live' }));
+
+      const gone = broker.expire('toolu_dead');
+
+      expect(gone).toMatchObject({ runId: 'c1', toolUseId: 'toolu_dead' });
+      await expect(decision).resolves.toMatchObject({ behavior: 'deny', expired: true });
+      expect(broker.list().map((item) => item.toolUseId)).toEqual(['toolu_live']);
+    });
+
+    it('ответ на умерший — «expired», на неизвестный — «unknown», на живой — «ok»', () => {
+      broker.request(REQ({ toolUseId: 'toolu_dead' }));
+      broker.request(REQ({ toolUseId: 'toolu_live' }));
+      broker.expire('toolu_dead');
+
+      expect(broker.answer('c1', 'toolu_dead', { behavior: 'allow' })).toBe('expired');
+      expect(broker.isExpired('c1', 'toolu_dead')).toBe(true);
+      expect(broker.answer('c1', 'toolu_nope', { behavior: 'allow' })).toBe('unknown');
+      expect(broker.answer('c1', 'toolu_live', { behavior: 'allow' })).toBe('ok');
+      // decide остаётся булевым: умерший — не «принято».
+      expect(broker.decide('c1', 'toolu_dead', { behavior: 'allow' })).toBe(false);
+    });
+
+    it('результат вызова без висящего запроса ничего не трогает', () => {
+      broker.request(REQ({ toolUseId: 'toolu_live' }));
+      expect(broker.expire('toolu_other')).toBeUndefined();
+      expect(broker.expire('')).toBeUndefined();
+      expect(broker.hasPending('c1')).toBe(true);
+      expect(broker.isExpired('c1', 'toolu_other')).toBe(false);
+    });
+
+    it('новый запрос под тем же ключом снимает метку «истёк»', () => {
+      broker.request(REQ({ toolUseId: 'toolu_x' }));
+      broker.expire('toolu_x');
+      broker.request(REQ({ toolUseId: 'toolu_x' }));
+      expect(broker.isExpired('c1', 'toolu_x')).toBe(false);
+      expect(broker.answer('c1', 'toolu_x', { behavior: 'allow' })).toBe('ok');
+    });
+
+    it('остановка разговора — не «истёк»: ответ после неё — unknown', () => {
+      broker.request(REQ());
+      broker.cancelRun('c1');
+      expect(broker.answer('c1', 'tool-1', { behavior: 'allow' })).toBe('unknown');
+    });
+  });
+
+  describe('permissionWaitMs — срок из окружения CLI', () => {
+    it('без MCP_TOOL_TIMEOUT — предел CLI 1e8 мс минус 10 минут', () => {
+      expect(permissionWaitMs({})).toBe(100_000_000 - 600_000);
+    });
+
+    it('убавленный человеком предел убавляет срок, запас — десятая доля', () => {
+      expect(permissionWaitMs({ MCP_TOOL_TIMEOUT: '120000' })).toBe(108_000);
+      expect(permissionWaitMs({ MCP_TOOL_TIMEOUT: '3600000' })).toBe(3_240_000);
+    });
+
+    it('мусор в переменной — предел по умолчанию', () => {
+      expect(permissionWaitMs({ MCP_TOOL_TIMEOUT: 'abc' })).toBe(99_400_000);
+      expect(permissionWaitMs({ MCP_TOOL_TIMEOUT: '-5' })).toBe(99_400_000);
     });
   });
 });

@@ -9,15 +9,31 @@
       "masked": 0,
       "width": 1440,
       "height": 1000,
-      "shotAt": "2026-09-17T20:43:46.785Z",
-      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 6 Скрипты 8 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка Плагины Наборы команд, скиллов и агентов из маркетплейсов Как это работает Установленные · 3 code-review team-tools версия 1.4.0 Разбор правок по шагам команды: чеклист, команда /code-review:review и скилл. установлен: 14 авг. 2026 г. · обновлён: 2 сент. 2026 г. sql-helper team-tools версия 0.9.2 Выключено Объясняет план запроса и подсказывает, где узкое место. установлен: 28 авг. 2026 г. docs-kit lab-kit версия 2.0.1 каталог не найден Сборка документации проекта: шаблоны страниц и проверка ссылок. установлен: 30 июл. 2026 г. Каталог Показать каталог Каталог всех плагинов из подключённых маркетплейсов. Загружается по запросу: Claude Code обновляет репозитории и это занимает до минуты. Установить плагин Создать плагин Маркетплейсы Источник маркетплейса Добавить маркетплейс team-tools team-tools/claude-plugins lab-kit lab-kit/plugins",
+      "shotAt": "2026-09-28T14:33:31.463Z",
+      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 6 Скрипты 8 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Плагины Наборы команд, скиллов и агентов из маркетплейсов Как это работает Установленные 3 Каталог Маркетплейсы 2 Свой плагин Плагины, которые уже стоят: включить, выключить, обновить или удалить. Изменения применятся после перезапуска Claude Code. code-review team-tools версия 1.4.0 Разбор правок по шагам команды: чеклист, команда /code-review:review и скилл. установлен: 14 авг. 2026 г. · обновлён: 2 сент. 2026 г. sql-helper team-tools версия 0.9.2 Выключено Объясняет план запроса и подсказывает, где узкое место. установлен: 28 авг. 2026 г. docs-kit lab-kit версия 2.0.1 каталог не найден Сборка документации проекта: шаблоны страниц и проверка ссылок. установлен: 30 июл. 2026 г.",
       "en": {
         "file": "01-installed.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-17T20:46:18.590Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 6 Scripts 8 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Plugins Bundles of commands, skills and agents from marketplaces How it works Installed · 3 code-review team-tools version 1.4.0 Разбор правок по шагам команды: чеклист, команда /code-review:review и скилл. installed: Aug 14, 2026 · updated: Sep 2, 2026 sql-helper team-tools version 0.9.2 Disabled Объясняет план запроса и подсказывает, где узкое место. installed: Aug 28, 2026 docs-kit lab-kit version 2.0.1 folder missing Сборка документации проекта: шаблоны страниц и проверка ссылок. installed: Jul 30, 2026 Catalogue Show catalogue Every plugin from the connected marketplaces. Loaded on request: Claude Code refreshes the repositories, which takes up to a minute. Install a plugin Create a plugin Marketplaces Marketplace source Add marketplace team-tools team-tools/claude-plugins lab-kit lab-kit/plugins"
+        "shotAt": "2026-09-28T14:35:54.580Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 6 Scripts 8 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Plugins Bundles of commands, skills and agents from marketplaces How it works Installed 3 Catalogue Marketplaces 2 Own plugin Plugins already in place: enable, disable, update or remove. Changes apply after Claude Code restarts. code-review team-tools version 1.4.0 Разбор правок по шагам команды: чеклист, команда /code-review:review и скилл. installed: Aug 14, 2026 · updated: Sep 2, 2026 sql-helper team-tools version 0.9.2 Disabled Объясняет план запроса и подсказывает, где узкое место. installed: Aug 28, 2026 docs-kit lab-kit version 2.0.1 folder missing Сборка документации проекта: шаблоны страниц и проверка ссылок. installed: Jul 30, 2026"
+      },
+      "dark": {
+        "file": "01-installed.dark.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 1000,
+        "shotAt": "2026-09-28T14:38:17.225Z",
+        "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 6 Скрипты 8 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Плагины Наборы команд, скиллов и агентов из маркетплейсов Как это работает Установленные 3 Каталог Маркетплейсы 2 Свой плагин Плагины, которые уже стоят: включить, выключить, обновить или удалить. Изменения применятся после перезапуска Claude Code. code-review team-tools версия 1.4.0 Разбор правок по шагам команды: чеклист, команда /code-review:review и скилл. установлен: 14 авг. 2026 г. · обновлён: 2 сент. 2026 г. sql-helper team-tools версия 0.9.2 Выключено Объясняет план запроса и подсказывает, где узкое место. установлен: 28 авг. 2026 г. docs-kit lab-kit версия 2.0.1 каталог не найден Сборка документации проекта: шаблоны страниц и проверка ссылок. установлен: 30 июл. 2026 г."
+      },
+      "darkEn": {
+        "file": "01-installed.dark.en.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 1000,
+        "shotAt": "2026-09-28T14:40:37.086Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 6 Scripts 7 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Plugins Bundles of commands, skills and agents from marketplaces How it works Installed 3 Catalogue Marketplaces 2 Own plugin Plugins already in place: enable, disable, update or remove. Changes apply after Claude Code restarts. code-review team-tools version 1.4.0 Разбор правок по шагам команды: чеклист, команда /code-review:review и скилл. installed: Aug 14, 2026 · updated: Sep 2, 2026 sql-helper team-tools version 0.9.2 Disabled Объясняет план запроса и подсказывает, где узкое место. installed: Aug 28, 2026 docs-kit lab-kit version 2.0.1 folder missing Сборка документации проекта: шаблоны страниц и проверка ссылок. installed: Jul 30, 2026"
       }
     },
     {
@@ -27,15 +43,31 @@
       "masked": 0,
       "width": 1440,
       "height": 1000,
-      "shotAt": "2026-09-17T20:43:50.138Z",
-      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 6 Скрипты 8 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка Плагины Наборы команд, скиллов и агентов из маркетплейсов Как это работает Установленные · 3 code-review team-tools версия 1.4.0 Разбор правок по шагам команды: чеклист, команда /code-review:review и скилл. установлен: 14 авг. 2026 г. · обновлён: 2 сент. 2026 г. sql-helper team-tools версия 0.9.2 Выключено Объясняет план запроса и подсказывает, где узкое место. установлен: 28 авг. 2026 г. docs-kit lab-kit версия 2.0.1 каталог не найден Сборка документации проекта: шаблоны страниц и проверка ссылок. установлен: 30 июл. 2026 г. Каталог Показано 3 из 4 playwright-runner lab-kit 2k установок Прогон сценариев браузера и разбор упавших шагов по кадрам. Установить commit-commands lab-kit 1k установок Набор команд вокруг истории правок: черновик сообщения, разбор ветки. Установить notes-sync lab-kit 310 установок Держит рабочие заметки агента в одном виде между проектами. Установить Установить плагин Создать плагин Маркетплейсы Источник маркетплейса Добавить маркетплейс team-tools team-tools/claude-plugins lab-kit lab-kit/plugins",
+      "shotAt": "2026-09-28T14:33:37.228Z",
+      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 6 Скрипты 7 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Плагины Наборы команд, скиллов и агентов из маркетплейсов Как это работает Установленные 3 Каталог Маркетплейсы 2 Свой плагин Плагины из подключённых маркетплейсов: найти и установить. Каталог открывается кнопкой «Показать каталог»; если имя уже известно, установите по идентификатору ниже. Показано 3 из 4 playwright-runner lab-kit 2k установок Прогон сценариев браузера и разбор упавших шагов по кадрам. Установить commit-commands lab-kit 1k установок Набор команд вокруг истории правок: черновик сообщения, разбор ветки. Установить notes-sync lab-kit 310 установок Держит рабочие заметки агента в одном виде между проектами. Установить Установить плагин",
       "en": {
         "file": "02-catalog.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-17T20:46:21.922Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 6 Scripts 8 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Plugins Bundles of commands, skills and agents from marketplaces How it works Installed · 3 code-review team-tools version 1.4.0 Разбор правок по шагам команды: чеклист, команда /code-review:review и скилл. installed: Aug 14, 2026 · updated: Sep 2, 2026 sql-helper team-tools version 0.9.2 Disabled Объясняет план запроса и подсказывает, где узкое место. installed: Aug 28, 2026 docs-kit lab-kit version 2.0.1 folder missing Сборка документации проекта: шаблоны страниц и проверка ссылок. installed: Jul 30, 2026 Catalogue Showing 3 of 4 playwright-runner lab-kit 2k installs Прогон сценариев браузера и разбор упавших шагов по кадрам. Install commit-commands lab-kit 1k installs Набор команд вокруг истории правок: черновик сообщения, разбор ветки. Install notes-sync lab-kit 310 installs Держит рабочие заметки агента в одном виде между проектами. Install Install a plugin Create a plugin Marketplaces Marketplace source Add marketplace team-tools team-tools/claude-plugins lab-kit lab-kit/plugins"
+        "shotAt": "2026-09-28T14:36:00.535Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 6 Scripts 8 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Plugins Bundles of commands, skills and agents from marketplaces How it works Installed 3 Catalogue Marketplaces 2 Own plugin Plugins from the connected marketplaces: find and install. The catalogue opens with «Show catalogue»; if you already know the name, install by identifier below. Showing 3 of 4 playwright-runner lab-kit 2k installs Прогон сценариев браузера и разбор упавших шагов по кадрам. Install commit-commands lab-kit 1k installs Набор команд вокруг истории правок: черновик сообщения, разбор ветки. Install notes-sync lab-kit 310 installs Держит рабочие заметки агента в одном виде между проектами. Install Install a plugin"
+      },
+      "dark": {
+        "file": "02-catalog.dark.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 1000,
+        "shotAt": "2026-09-28T14:38:22.858Z",
+        "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 6 Скрипты 8 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Плагины Наборы команд, скиллов и агентов из маркетплейсов Как это работает Установленные 3 Каталог Маркетплейсы 2 Свой плагин Плагины из подключённых маркетплейсов: найти и установить. Каталог открывается кнопкой «Показать каталог»; если имя уже известно, установите по идентификатору ниже. Показано 3 из 4 playwright-runner lab-kit 2k установок Прогон сценариев браузера и разбор упавших шагов по кадрам. Установить commit-commands lab-kit 1k установок Набор команд вокруг истории правок: черновик сообщения, разбор ветки. Установить notes-sync lab-kit 310 установок Держит рабочие заметки агента в одном виде между проектами. Установить Установить плагин"
+      },
+      "darkEn": {
+        "file": "02-catalog.dark.en.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 1000,
+        "shotAt": "2026-09-28T14:40:42.836Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 6 Scripts 7 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Plugins Bundles of commands, skills and agents from marketplaces How it works Installed 3 Catalogue Marketplaces 2 Own plugin Plugins from the connected marketplaces: find and install. The catalogue opens with «Show catalogue»; if you already know the name, install by identifier below. Showing 3 of 4 playwright-runner lab-kit 2k installs Прогон сценариев браузера и разбор упавших шагов по кадрам. Install commit-commands lab-kit 1k installs Набор команд вокруг истории правок: черновик сообщения, разбор ветки. Install notes-sync lab-kit 310 installs Держит рабочие заметки агента в одном виде между проектами. Install Install a plugin"
       }
     },
     {
@@ -45,15 +77,31 @@
       "masked": 0,
       "width": 1440,
       "height": 1000,
-      "shotAt": "2026-09-17T20:43:53.210Z",
-      "text": "AgentDeck Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 6 Скрипты 8 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка Плагины Наборы команд, скиллов и агентов из маркетплейсов Как это работает Установленные · 3 code-review team-tools версия 1.4.0 Разбор правок по шагам команды: чеклист, команда /code-review:review и скилл. установлен: 14 авг. 2026 г. · обновлён: 2 сент. 2026 г. sql-helper team-tools версия 0.9.2 Выключено Объясняет план запроса и подсказывает, где узкое место. установлен: 28 авг. 2026 г. docs-kit lab-kit версия 2.0.1 каталог не найден Сборка документации проекта: шаблоны страниц и проверка ссылок. установлен: 30 июл. 2026 г. Каталог Показано 3 из 4 playwright-runner lab-kit 2k установок Прогон сценариев браузера и разбор упавших шагов по кадрам. Установить commit-commands lab-kit 1k установок Набор команд вокруг истории правок: черновик сообщения, разбор ветки. Установить notes-sync lab-kit 310 установок Держит рабочие заметки агента в одном виде между проектами. Установить Установить плагин Идентификатор плагина Укажите имя в формате плагин@маркетплейс. Установка тянет репозиторий и занимает несколько секунд. Установить Команда завершилась с ошибкой Error: plugin \"code-review@lab-kit\" not found in marketplace \"lab-kit\". Known plugins: docs-kit, commit-commands, playwright-runner, notes-sync. Создать плагин Маркетплейсы Источник маркетплейса Добавить маркетплейс team-tools team-tools/claude-plugins lab-kit lab-kit/plugins Error: plugin \"code-review@lab-kit\" not found in marketplace \"lab-kit\". Known plugins: docs-kit, commit-commands, playwright-runner, notes-sync. Подробнее",
+      "shotAt": "2026-09-28T14:33:40.206Z",
+      "text": "AgentDeck Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 6 Скрипты 7 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Плагины Наборы команд, скиллов и агентов из маркетплейсов Как это работает Установленные 3 Каталог Маркетплейсы 2 Свой плагин Плагины из подключённых маркетплейсов: найти и установить. Каталог открывается кнопкой «Показать каталог»; если имя уже известно, установите по идентификатору ниже. Показано 3 из 4 playwright-runner lab-kit 2k установок Прогон сценариев браузера и разбор упавших шагов по кадрам. Установить commit-commands lab-kit 1k установок Набор команд вокруг истории правок: черновик сообщения, разбор ветки. Установить notes-sync lab-kit 310 установок Держит рабочие заметки агента в одном виде между проектами. Установить Установить плагин Идентификатор плагина Укажите имя в формате плагин@маркетплейс. Установка тянет репозиторий и занимает несколько секунд. Установить Команда завершилась с ошибкой Error: plugin \"code-review@lab-kit\" not found in marketplace \"lab-kit\". Known plugins: docs-kit, commit-commands, playwright-runner, notes-sync. Error: plugin \"code-review@lab-kit\" not found in marketplace \"lab-kit\". Known plugins: docs-kit, commit-commands, playwright-runner, notes-sync. Подробнее",
       "en": {
         "file": "03-install.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-17T20:46:24.904Z",
-        "text": "AgentDeck Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 6 Scripts 8 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Plugins Bundles of commands, skills and agents from marketplaces How it works Installed · 3 code-review team-tools version 1.4.0 Разбор правок по шагам команды: чеклист, команда /code-review:review и скилл. installed: Aug 14, 2026 · updated: Sep 2, 2026 sql-helper team-tools version 0.9.2 Disabled Объясняет план запроса и подсказывает, где узкое место. installed: Aug 28, 2026 docs-kit lab-kit version 2.0.1 folder missing Сборка документации проекта: шаблоны страниц и проверка ссылок. installed: Jul 30, 2026 Catalogue Showing 3 of 4 playwright-runner lab-kit 2k installs Прогон сценариев браузера и разбор упавших шагов по кадрам. Install commit-commands lab-kit 1k installs Набор команд вокруг истории правок: черновик сообщения, разбор ветки. Install notes-sync lab-kit 310 installs Держит рабочие заметки агента в одном виде между проектами. Install Install a plugin Plugin identifier Give the name as plugin@marketplace. Installation pulls the repository and takes a few seconds. Install The command failed Error: plugin \"code-review@lab-kit\" not found in marketplace \"lab-kit\". Known plugins: docs-kit, commit-commands, playwright-runner, notes-sync. Create a plugin Marketplaces Marketplace source Add marketplace team-tools team-tools/claude-plugins lab-kit lab-kit/plugins Error: plugin \"code-review@lab-kit\" not found in marketplace \"lab-kit\". Known plugins: docs-kit, commit-commands, playwright-runner, notes-sync. Details"
+        "shotAt": "2026-09-28T14:36:03.519Z",
+        "text": "AgentDeck Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 6 Scripts 8 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Plugins Bundles of commands, skills and agents from marketplaces How it works Installed 3 Catalogue Marketplaces 2 Own plugin Plugins from the connected marketplaces: find and install. The catalogue opens with «Show catalogue»; if you already know the name, install by identifier below. Showing 3 of 4 playwright-runner lab-kit 2k installs Прогон сценариев браузера и разбор упавших шагов по кадрам. Install commit-commands lab-kit 1k installs Набор команд вокруг истории правок: черновик сообщения, разбор ветки. Install notes-sync lab-kit 310 installs Держит рабочие заметки агента в одном виде между проектами. Install Install a plugin Plugin identifier Give the name as plugin@marketplace. Installation pulls the repository and takes a few seconds. Install The command failed Error: plugin \"code-review@lab-kit\" not found in marketplace \"lab-kit\". Known plugins: docs-kit, commit-commands, playwright-runner, notes-sync. Error: plugin \"code-review@lab-kit\" not found in marketplace \"lab-kit\". Known plugins: docs-kit, commit-commands, playwright-runner, notes-sync. Details"
+      },
+      "dark": {
+        "file": "03-install.dark.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 1000,
+        "shotAt": "2026-09-28T14:38:25.812Z",
+        "text": "AgentDeck Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 6 Скрипты 8 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Плагины Наборы команд, скиллов и агентов из маркетплейсов Как это работает Установленные 3 Каталог Маркетплейсы 2 Свой плагин Плагины из подключённых маркетплейсов: найти и установить. Каталог открывается кнопкой «Показать каталог»; если имя уже известно, установите по идентификатору ниже. Показано 3 из 4 playwright-runner lab-kit 2k установок Прогон сценариев браузера и разбор упавших шагов по кадрам. Установить commit-commands lab-kit 1k установок Набор команд вокруг истории правок: черновик сообщения, разбор ветки. Установить notes-sync lab-kit 310 установок Держит рабочие заметки агента в одном виде между проектами. Установить Установить плагин Идентификатор плагина Укажите имя в формате плагин@маркетплейс. Установка тянет репозиторий и занимает несколько секунд. Установить Команда завершилась с ошибкой Error: plugin \"code-review@lab-kit\" not found in marketplace \"lab-kit\". Known plugins: docs-kit, commit-commands, playwright-runner, notes-sync. Error: plugin \"code-review@lab-kit\" not found in marketplace \"lab-kit\". Known plugins: docs-kit, commit-commands, playwright-runner, notes-sync. Подробнее"
+      },
+      "darkEn": {
+        "file": "03-install.dark.en.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 1000,
+        "shotAt": "2026-09-28T14:40:45.807Z",
+        "text": "AgentDeck Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 6 Scripts 7 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Plugins Bundles of commands, skills and agents from marketplaces How it works Installed 3 Catalogue Marketplaces 2 Own plugin Plugins from the connected marketplaces: find and install. The catalogue opens with «Show catalogue»; if you already know the name, install by identifier below. Showing 3 of 4 playwright-runner lab-kit 2k installs Прогон сценариев браузера и разбор упавших шагов по кадрам. Install commit-commands lab-kit 1k installs Набор команд вокруг истории правок: черновик сообщения, разбор ветки. Install notes-sync lab-kit 310 installs Держит рабочие заметки агента в одном виде между проектами. Install Install a plugin Plugin identifier Give the name as plugin@marketplace. Installation pulls the repository and takes a few seconds. Install The command failed Error: plugin \"code-review@lab-kit\" not found in marketplace \"lab-kit\". Known plugins: docs-kit, commit-commands, playwright-runner, notes-sync. Error: plugin \"code-review@lab-kit\" not found in marketplace \"lab-kit\". Known plugins: docs-kit, commit-commands, playwright-runner, notes-sync. Details"
       }
     },
     {
@@ -62,15 +110,31 @@
       "side": "panel",
       "masked": 0,
       "width": 468,
-      "height": 378,
-      "shotAt": "2026-09-17T20:43:54.891Z",
+      "height": 368,
+      "shotAt": "2026-09-28T14:33:44.238Z",
       "text": "Удалить безвозвратно? Вместе с маркетплейсом Claude Code убирает из установленных все его плагины: code-review, sql-helper. Их команды и скиллы пропадут из палитры; вернуть можно, подключив источник и установив плагины заново. Введите «team-tools», чтобы подтвердить Отмена Удалить",
       "en": {
         "file": "04-marketplace.en.png",
         "masked": 0,
         "width": 468,
-        "height": 378,
-        "shotAt": "2026-09-17T20:46:26.545Z",
+        "height": 368,
+        "shotAt": "2026-09-28T14:36:07.961Z",
+        "text": "Delete permanently? Removing the marketplace makes Claude Code drop every plugin installed from it: code-review, sql-helper. Their commands and skills leave the palette; add the source back and reinstall to recover them. Type \"team-tools\" to confirm Cancel Delete"
+      },
+      "dark": {
+        "file": "04-marketplace.dark.png",
+        "masked": 0,
+        "width": 468,
+        "height": 368,
+        "shotAt": "2026-09-28T14:38:29.770Z",
+        "text": "Удалить безвозвратно? Вместе с маркетплейсом Claude Code убирает из установленных все его плагины: code-review, sql-helper. Их команды и скиллы пропадут из палитры; вернуть можно, подключив источник и установив плагины заново. Введите «team-tools», чтобы подтвердить Отмена Удалить"
+      },
+      "darkEn": {
+        "file": "04-marketplace.dark.en.png",
+        "masked": 0,
+        "width": 468,
+        "height": 368,
+        "shotAt": "2026-09-28T14:40:49.681Z",
         "text": "Delete permanently? Removing the marketplace makes Claude Code drop every plugin installed from it: code-review, sql-helper. Their commands and skills leave the palette; add the source back and reinstall to recover them. Type \"team-tools\" to confirm Cancel Delete"
       }
     }

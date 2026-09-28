@@ -1,5 +1,7 @@
 import { join } from 'node:path';
-import type { ProjectTestRun, ProjectTestRunRequest } from '@agentdeck/contracts';
+import type { ProjectTestRun } from '@agentdeck/contracts';
+import type { SieveReportRow, SieveStage } from '@agentdeck/contracts/sieves';
+import type { ChatLink } from '../lib/app-store/app-store.types.ts';
 import type { ServerContext } from '../context.ts';
 import { serverText } from '../lib/server-texts.ts';
 import { ChatRunRegistry, type RunNotice } from '../domains/chat/ChatRunRegistry.ts';
@@ -13,6 +15,8 @@ import {
 import { ChatSession } from '../domains/chat/ChatSession.ts';
 import { HandoffChains, HandoffChainStore } from '../domains/chat/ChatHandoff.ts';
 import { TreePause } from '../domains/chat/tree-pause.ts';
+import type { BackgroundWatcher } from '../domains/watcher/watcher.ts';
+import { createBackgroundWatcher } from './watcher.ts';
 import {
   hasParentLink,
   lastAskedInput,
@@ -22,6 +26,8 @@ import {
 } from '../domains/chat/pending-asks.ts';
 import { createTreeRuns } from '../domains/chat/tree-runs.ts';
 import { createParentNotice } from '../domains/chat/parent-notice.ts';
+import { wireChatAutonomy } from './chat-autonomy-wiring.ts';
+import { wireGroupActivation } from './group-activation-wiring.ts';
 import {
   appendMessage,
   chatTranscriptPath,
@@ -34,7 +40,14 @@ import {
 import { panelSupervisorHooks } from '../domains/portability/supervisor/panel-hooks.ts';
 import { DEFAULT_PROVIDER_ID, getProvider, isKnownProviderId } from '../providers/registry.ts';
 import { ProjectRunnerRegistry } from '../domains/project-runner.ts';
-import { ProjectTestManualRegistry, ProjectTestRunRegistry } from '../domains/project-tests.ts';
+import {
+  E2eRunRegistry,
+  ProjectTestManualRegistry,
+  ProjectTestRunRegistry,
+  createE2eWatch,
+  reapProjectTestOrphans,
+  type E2eWatch,
+} from '../domains/project-tests.ts';
 import { DlpProxy } from '../domains/dlp.ts';
 import { PlatformGateway } from '../domains/platform/gateway/listener.ts';
 import { gatewayPricing } from '../domains/platform/spend.ts';
@@ -69,6 +82,8 @@ import { projectsDir } from '../routes/chat/paths.ts';
 import { atlassianTicketTracker } from '../domains/chat/split-ticket-tracker.ts';
 import { copyRootOf, SplitConveyor } from '../domains/chat/split-conveyor.ts';
 import { MrWatch } from '../domains/chat/mr-watch.ts';
+import { SieveStore } from '../domains/chat/sieve-store.ts';
+import { sieveDeliveryGaps, sievePrompt } from '../domains/chat/sieve-gate.ts';
 import { readMergeRequestReview } from '../domains/integrations/mr-review.ts';
 import { childrenBrief } from '../domains/chat/children-brief.ts';
 import { branchGateContext } from '../domains/chat/ChatBranchGate.ts';
@@ -91,6 +106,12 @@ import { PANEL_ACTION_CONFIRM_TIMEOUT_MS } from '@agentdeck/contracts/panel-agen
 import { foreignChatKey, parseForeignChatKey } from '@agentdeck/contracts/foreign-chat-key';
 import { PanelPendingActions } from '../domains/panel-agent/pending.ts';
 import { reapPanelAgentOrphans } from '../domains/panel-agent/processes.ts';
+import { chatKnobsLine, foreignChildExtra, runPathSteps } from '../domains/chat/group-run-lines.ts';
+import { storeTreeReader } from '../domains/chat/chat-autonomy.ts';
+import { triageGroupCatalog } from '../domains/chat/group-auto-pick.ts';
+import { readChoice } from '../domains/groups/choice.ts';
+import { projectTestsBusy, wireTestsChatNote } from './tests-chat-wiring.ts';
+import { ActivatingTestRunRegistry } from './activating-test-runs.ts';
 
 /**
  * Объекты, живущие дольше запроса. Создаются при сборке приложения — только
@@ -110,6 +131,10 @@ export interface Runtime {
   projectTestRuns: ProjectTestRunRegistry;
   /** Ручные прогоны: кейсы проходит человек, панель записывает. */
   projectTestManual: ProjectTestManualRegistry;
+  /** Прогоны автотестов папки e2e самой панелью: раннер через оболочку, без агента. */
+  e2eRuns: E2eRunRegistry;
+  /** Наблюдение за папками e2e проектов: новый тест становится кейсом сам. */
+  e2eWatch: E2eWatch;
   /** Уведомления на телефон о судьбе прогона. */
   notifyRun: ReturnType<typeof createRunNotifier>;
   /** Цепочки продолжений в чистой сессии. */
@@ -145,6 +170,8 @@ export interface Runtime {
   panelPending: PanelPendingActions;
   /** Адрес самой панели: его получает переходник MCP при регистрации. */
   selfBaseUrl: string;
+  /** Фоновый наблюдатель: тумблер, кольцо сбоев, разбор моделью, отчёт. */
+  watcher: BackgroundWatcher;
   /** Погасить всё, что спавнит процессы. Идемпотентно. */
   shutdown: () => void;
 }
@@ -190,6 +217,8 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   // незакрытая сессия помечается брошенной — иначе в истории остался бы прогон,
   // который «идёт» уже после смерти процесса.
   const projectTestManual = new ProjectTestManualRegistry();
+  // Автотесты папки: раннер запущен оболочкой и с панелью сам не умирает.
+  const e2eRuns = new E2eRunRegistry();
   /**
    * Уведомления на телефон. Реестр прогонов знает, ЧТО случилось, но не знает ни
    * про устройства, ни про настройку — поэтому отправитель собирается здесь и
@@ -249,7 +278,9 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
    * и в списке чат появляется под ним. Без переноса связи ветвь дерева обрывалась
    * бы ровно в момент, когда чат становится настоящим.
    */
-  chatRuns.setSessionListener((chatId, sessionId) => ctx.store.linkChatSession(chatId, sessionId));
+  chatRuns.setSessionListener((chatId, sessionId, from) =>
+    ctx.store.linkChatSession(chatId, sessionId, from),
+  );
   // Ребёнок разделения — у кого есть связь с родителем (Д16, Д18).
   chatRuns.setChildResolver((keys) =>
     keys.some((key) => Boolean(ctx.store.getChatLink(key)?.parentChatId)),
@@ -315,6 +346,11 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
       foreignChatPrefix(
         readChatCascade(ctx.location.paths.appData, providerId, chatId),
         ctx.store.getSettings(),
+        foreignChildExtra(
+          ctx.store,
+          ctx.location.paths.appData,
+          foreignChatKey(providerId, chatId),
+        ),
       ) || undefined,
   });
   // Вопросы и запросы прав разговоров дерева — на сервере, а не во вкладке (WP9c).
@@ -370,6 +406,32 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
           content: text,
         }),
       ),
+  });
+  // Автономность чата и заметки главному чату (`chat-autonomy-wiring.ts`).
+  // Рассылка — позже в сборке, поэтому через замыкание: зовут её только прогоны.
+  const chatAutonomy = wireChatAutonomy({
+    store: ctx.store,
+    chatRuns,
+    say: (chatId, event) => sayToParent(chatId, event),
+    broadcast: (domains, path) => events.broadcast(domains, path),
+  });
+  // Выбранная группа чата — на каждом старте обоих провайдеров (`group-activation-wiring.ts`).
+  wireGroupActivation({
+    store: ctx.store,
+    paths: ctx.location.paths,
+    backupDir: ctx.backupDir,
+    chatRuns,
+    providerChats,
+    log: (message, error) => console.warn(message, error),
+  });
+  // Tests of the project (e2e folder, how a test becomes a case) on every chat start.
+  const testsChat = wireTestsChatNote({
+    appData: ctx.location.paths.appData,
+    chatRuns,
+    providerChats,
+    // Автотесты на закрытии тоже пишут в файлы групп — сверка ждёт и их.
+    isBusy: projectTestsBusy(projectTestRuns, e2eRuns),
+    log: (message, error) => console.warn(message, error),
   });
 
   const splitOverlap = new SplitOverlap({
@@ -433,7 +495,32 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   });
   splitReviewRef.current = splitReview;
 
-  const ticketTracker = atlassianTicketTracker(ctx);
+  const ticketTracker = atlassianTicketTracker(
+    () => ctx.store,
+    () => ctx.location.paths.appData,
+  );
+  // Выученные сита и счёт блокеров (решение владельца 28.09) — в каталоге
+  // данных панели; каталог может смениться переездом, поэтому по вызову.
+  const sieveStore = (): SieveStore => new SieveStore(ctx.location.paths.appData);
+  // Абзац сит для задания звена — один на Claude и чужой CLI: по путям копии,
+  // выученным ситам проекта группы и уже сданным строкам.
+  const stageSieves = (
+    cwd: string,
+    link: ChatLink,
+    stage: SieveStage,
+    done: readonly SieveReportRow[],
+  ): Promise<string> => {
+    const projectPath = link.parentChatId
+      ? ctx.store.getSplitPlan(link.parentChatId)?.projectPath
+      : undefined;
+    return sievePrompt({
+      cwd,
+      stage,
+      done,
+      store: sieveStore(),
+      ...(projectPath ? { projectPath } : {}),
+    });
+  };
   const splitConveyor = new SplitConveyor({
     store: {
       get: (parent) => ctx.store.getSplitPlan(parent),
@@ -442,6 +529,16 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
       all: () => ctx.store.getSplitPlans(),
     },
     ticketTracker: (projectPath) => ticketTracker.projectOf(projectPath),
+    // Выбор группы родителя `auto` — разбор выбирает группу каждой группе
+    // разделения из этого каталога (с учётом выбора пары в проекте).
+    groupCatalog: (record) =>
+      triageGroupCatalog({
+        reader: storeTreeReader(ctx.store),
+        groups: ctx.store.getGroups(),
+        pairChoice: readChoice(ctx.location.paths.appData, record.projectPath),
+        parentChatId: record.parentChatId,
+        projectPath: record.projectPath,
+      }),
     watchOverlap: (parentChatId) => {
       void splitOverlap.check(parentChatId).catch((error) => {
         console.warn('split overlap: check after chain end failed', error);
@@ -481,8 +578,30 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
               return readMergeRequestReview(url, token);
             })
           : {};
+        // Сита перед MR (решение владельца 28.09): механика git панели и судья
+        // отчёта группы. Сеть уже не ответила — сита ждут следующей проверки.
+        const sieves = facts.unreachable
+          ? undefined
+          : await sieveDeliveryGaps({
+              cwd: group.path,
+              ...(group.startedAt ? { startedAt: group.startedAt } : {}),
+              rows: group.sieveRows ?? [],
+            }).catch((error: unknown) => {
+              console.warn('split delivery: sieves unreadable', error);
+              return undefined;
+            });
+        if (sieves?.unchecked) {
+          console.warn(
+            `split delivery: sieves unchecked for ${group.branch}: ${sieves.unchecked.join('; ')}`,
+          );
+        }
         return {
-          missing: description.missing ? [...missing, description.missing] : missing,
+          missing: [
+            ...missing,
+            ...(description.missing ? [description.missing] : []),
+            ...(sieves?.missing ?? []),
+          ],
+          ...(sieves?.classes.length ? { sieveClasses: sieves.classes } : {}),
           ...(facts.mr ? { mr: facts.mr } : {}),
           ...(facts.unreachable ? { unreachable: facts.unreachable } : {}),
           ...(description.unchecked ? { descriptionUnchecked: true } : {}),
@@ -506,6 +625,10 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     // Ожидание сброса лимита (журнал 89): срок в записи, таймер только будит.
     schedule: (run, ms) => setTimeout(run, ms).unref(),
     notify: (parentChatId, event) => void sayToParent(parentChatId, event),
+    sieves: {
+      learn: (input) => sieveStore().learn(input),
+      caught: (classes) => sieveStore().caught(classes),
+    },
     log: (message, error) => console.warn(message, error),
   });
   // MR доставленной группы после «готово» (WP1j): ветки ревьюеров и исход
@@ -658,6 +781,8 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
       },
       hasWork: (cwd, since) => hasWorkSince(cwd, since),
       settings: () => ctx.store.getSettings(),
+      // Сита перед MR в задании звена: по путям копии и выученным ситам проекта.
+      sieves: stageSieves,
     },
     split: {
       onTriageFinished: (finished, aliases) => splitConveyor.onTriageFinished(finished, aliases),
@@ -668,10 +793,21 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     },
     // Ревью по ссылке (Т7): замечания из ответа — в связь, карточка — человеку.
     review: { onReviewFinished: (input) => splitReview.finished(input) },
+    // Свои шаги «Пути» группы, выбранной в чате (своя или от родителя), —
+    // сверенной с парой проекта прогона (`runGroupChoice`).
+    pathSteps: {
+      stepsAt: (aliases, stage, cwd) =>
+        runPathSteps(ctx.store, ctx.location.paths.appData, aliases, stage, cwd),
+    },
+    // «Числа» группы звена — только изменённые человеком (`group-knobs.ts`).
+    groupKnobs: (keys, cwd) => chatKnobsLine(ctx.store, ctx.location.paths.appData, keys, cwd),
   });
   chatRuns.setHandoffPlanner((finished) => {
+    // Агент трогал папку e2e — её тесты в кейсы сразу, без просьбы человека.
+    testsChat.finished(finished.options.cwd, finished.startedAt);
     const keys = finished.sessionId ? [finished.chatId, finished.sessionId] : [finished.chatId];
     tellsOnFinish(keys, finished.ok, finished.text);
+    chatAutonomy.finished(keys, finished.text);
     pendingAsks.finished(finished);
     // Обрыв — не упавший ход: его продолжает конвейер с восстановлением
     // состояния, и повтор надзора поверх завёл бы второй прогон той же группы.
@@ -695,6 +831,8 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
       id !== DEFAULT_PROVIDER_ID && isKnownProviderId(id) ? getProvider(id) : undefined,
     models: (provider) => ctx.models.current(provider.modelVendors ?? []).models,
     settings: () => ctx.store.getSettings(),
+    // Строки группы звена — те же, что у ребёнка Claude (`childStageExtra`).
+    childExtra: (key) => foreignChildExtra(ctx.store, ctx.location.paths.appData, key),
     hasWork: (cwd, since) => hasWorkSince(cwd, since),
     // Связи звеньев: та же группа и тот же родитель, новая стадия — без них
     // дерево чужого разделения видит одну работу.
@@ -711,6 +849,8 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     onChainEnded: (link, ok) => splitConveyor.onChainEnded(link, ok),
     // Доставка группы у чужого CLI — тем же звеном, что у Claude (W3-3).
     delivers: (link) => splitConveyor.delivers(link),
+    // Сита перед MR — тем же абзацем, что у звеньев Claude.
+    sieves: stageSieves,
     // Ревью MR по ссылке (Т6): тот же домен, что у Claude, — замечания
     // читаются один раз и ложатся в связь, а решение ждёт человека.
     onReviewFinished: (input) => splitReview.finished(input),
@@ -720,8 +860,13 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     chains: handoffChains,
   });
   providerChats.setFinishedListener((finished) => {
+    testsChat.finished(
+      readChat(ctx.location.paths.appData, finished.providerId, finished.chatId)?.workdir,
+      finished.startedAt,
+    );
     const key = foreignChatKey(finished.providerId, finished.chatId);
     tellsOnFinish([key], finished.ok, finished.text);
+    chatAutonomy.finished([key], finished.text);
     // Надзор повторов и у чужого CLI (Д10). Сессии у него нет: продолжение —
     // реплика в тот же разговор, история уезжает вместе с ней.
     const retry = retryForeignRun(
@@ -740,7 +885,7 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
         treeRuns.start(chatKey, options, meta),
       (message, error) => console.warn(message, error),
     );
-    foreignStagePlanner(retry ? { ...finished, retry } : finished);
+    void foreignStagePlanner(retry ? { ...finished, retry } : finished);
   });
   // Прокси защиты данных: тоже слушатель, тоже переживает запрос. Создаётся
   // всегда, поднимается — только если человек включил его в настройках.
@@ -819,6 +964,7 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     runRouteOf(resolveRunRoute(platformRouting, origin, asked, runTag));
   chatRuns.setPlatformRouting(runRoute);
   projectTestRuns.setPlatformRouting(() => runRoute('tests'));
+  projectTestRuns.setLanguage(() => (ctx.store.getSettings().language === 'en' ? 'en' : 'ru'));
   // Чат чужого CLI спрашивает за себя: потребитель `foreign:<cli>` собирается по
   // провайдеру разговора. Без этой строки галочка «Qwen Code» в мастере была бы
   // нарисованной — контур сохранил бы её, а прогон ушёл бы в облако вендора.
@@ -831,10 +977,10 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   providerChats.setContourSummarized((runTag) =>
     summarizedInRun(ctx.location.paths.appData, runTag),
   );
-  // Надзиратель чужого прогона (П6.2): собственные механизмы панели, написанные
-  // хуками Claude, отыгрываются у ЛЮБОГО провайдера — калитка запросов и триггер
-  // сценария группы. Спрашивается на каждом сообщении: выключенная калитка и
-  // погашенная группа обязаны перестать действовать со следующего запроса.
+  // Надзиратель чужого прогона (П6.2): собственный механизм панели, написанный
+  // хуком Claude, — калитка запросов — отыгрывается у ЛЮБОГО провайдера.
+  // Спрашивается на каждом сообщении: выключенная калитка обязана перестать
+  // действовать со следующего запроса.
   //
   // Хуков, перенесённых в файлы самой цели, здесь нет и быть не может: их
   // отыгрывает цель, и владельца события решает `hookEventOwner`.
@@ -879,6 +1025,19 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   const toolGates = new ToolGateRegistry();
   platformGateway.setToolGate((runTag) => toolGates.gateOf(runTag));
   const events = createEventHub();
+  // Папки e2e проектов реестра — под тем же тумблером, что и конфиги. Сверка
+  // ждёт, пока проект держит прогон агента или идут автотесты. Оба реестра
+  // находят проект в любом написании пути: корни здесь — как в реестре проектов.
+  const e2eWatch = createE2eWatch({
+    roots: () =>
+      ctx.store.getSettings().watchFiles
+        ? ctx.store.getProjects().map((project) => project.path)
+        : [],
+    isBusy: projectTestsBusy(projectTestRuns, e2eRuns),
+    appData: ctx.location.paths.appData,
+    broadcast: (domains, path) => events.broadcast(domains, path),
+    log: (message, error) => console.warn(message, error),
+  });
   const panelPending = new PanelPendingActions(PANEL_ACTION_CONFIRM_TIMEOUT_MS);
 
   /**
@@ -910,6 +1069,13 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   // процесс агента от прошлого запуска панели снимается, иначе он поднимал бы
   // карточки для разговора, которого уже никто не видит.
   reapPanelAgentOrphans(ctx.location.paths.appData);
+  // То же с CLI агентского прогона тестов: реестр в памяти, а сирота висел бы до
+  // суток на мёртвом приёмнике прав, пока история пишет «остановился».
+  reapProjectTestOrphans(ctx.location.paths.appData);
+  // Фоновый наблюдатель: сирота разбора прошлого запуска снимается, включённый
+  // тумблер продолжает с того, что не успел разобрать.
+  const watcher = createBackgroundWatcher(ctx);
+  watcher.resume();
   for (const entry of adopt) {
     if (entry.autoApprove) chatSession.armAutoApprove(entry.key, entry.autoApprove);
     if (!chatRuns.adopt(entry)) runLedger.remove(entry.key);
@@ -960,6 +1126,8 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     providerChats.stopAll();
     projectTestRuns.stopAll();
     projectTestManual.stopAll(new Date().toISOString());
+    e2eRuns.stopAll();
+    e2eWatch.close();
     // Хвост учёта расхода — тоже: он копится пачкой в памяти шлюза, и панель,
     // закрытая по Ctrl+C или перезапущенная сторожем, унесла бы с собой
     // последние секунды. Запись синхронная, выход она не задерживает.
@@ -971,6 +1139,9 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     // Ждущие карточки агента — ответить отменой: иначе запрос переходника висит
     // до таймаута уже мёртвого процесса.
     panelPending.cancelAll();
+    // Разбор наблюдателя — процесс CLI без сервера бессмысленен: снимаем.
+    // Тумблер остаётся как был, после старта наблюдатель продолжит.
+    watcher.shutdown();
   };
 
   return {
@@ -979,6 +1150,8 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     chatSession,
     projectTestRuns,
     projectTestManual,
+    e2eRuns,
+    e2eWatch,
     notifyRun,
     handoffChains,
     treePause,
@@ -994,32 +1167,9 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     events,
     panelPending,
     selfBaseUrl,
+    watcher,
     shutdown,
   };
-}
-
-/**
- * Реестр прогонов тестов, включающий переходник MCP на старте.
- *
- * Наследование, а не правка реестра: включение — обстоятельство внешнего мира
- * (есть ли привязка, зарегистрирован ли сервер), и реестру прогонов о нём знать
- * нечего. Включаем ДО запуска: агент стартует тут же, и запись, включённая
- * после, досталась бы только следующему прогону.
- */
-class ActivatingTestRunRegistry extends ProjectTestRunRegistry {
-  private readonly onStart: (projectPath: string) => void;
-
-  constructor(onStart: (projectPath: string) => void) {
-    super();
-    this.onStart = onStart;
-  }
-
-  override start(request: ProjectTestRunRequest, now: string): ProjectTestRun {
-    // `activateAtlassianMcp` не бросает по своему устройству: интеграция не
-    // главнее работы, и прогон обязан пойти даже с мёртвым переходником.
-    this.onStart(request.projectPath);
-    return super.start(request, now);
-  }
 }
 
 /**

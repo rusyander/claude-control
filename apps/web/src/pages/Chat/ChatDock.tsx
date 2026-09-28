@@ -1,7 +1,8 @@
 import { useTranslation } from 'react-i18next';
 import { toast } from '@shared/lib/toast';
-import { formatBytes } from '@shared/lib/format';
-import { ChatComposer, MAX_FILE_BYTES } from '@features/ChatComposer';
+import { formatBytesIn } from '@shared/lib/format';
+import { ChatComposer, MAX_FILE_BYTES, type AttachRejection } from '@features/ChatComposer';
+import { SUPPORTED_UPLOAD_EXTENSIONS } from './lib/uploads';
 import { ChatQueue } from '@features/ChatQueue';
 import { ChatProgressSheet } from '@features/ChatProgress';
 import type { ChatDockProps } from './ChatDock.types';
@@ -24,7 +25,39 @@ export function ChatDock({
   onHandoff,
   modes,
 }: ChatDockProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+
+  // Отказ при вложении: по типу и по размеру — отдельными сообщениями, у них
+  // разные причины и разный совет. Размер назван рядом с пределом: «больше
+  // 20 МБ» без самого размера не сверить.
+  const rejectFiles = ({ unsupported, tooLarge }: AttachRejection): void => {
+    const size = (bytes: number): string =>
+      formatBytesIn(
+        bytes,
+        {
+          bytes: (count) => t('common.bytes', { count }),
+          kilobytes: t('common.kilobytes'),
+          megabytes: t('common.megabytes'),
+        },
+        i18n.language,
+      );
+    if (unsupported.length > 0) {
+      toast.error(
+        t('chat.notSent.unsupportedAttach', {
+          names: unsupported.join(', '),
+          supported: SUPPORTED_UPLOAD_EXTENSIONS.join(', '),
+        }),
+      );
+    }
+    if (tooLarge.length > 0) {
+      toast.error(
+        t('chat.notSent.tooLarge', {
+          names: tooLarge.map((file) => `${file.name} — ${size(file.size)}`).join(', '),
+          limit: size(MAX_FILE_BYTES),
+        }),
+      );
+    }
+  };
 
   return (
     <>
@@ -40,16 +73,9 @@ export function ChatDock({
         onChange={onChange}
         onSend={onSend}
         onStop={onStop}
-        // Отказ по размеру идёт тем же путём, что и отказ по типу файла:
-        // одно сообщение из семейства notSent, а не второй механизм рядом.
-        onRejectFiles={(names) =>
-          toast.error(
-            t('chat.notSent.tooLarge', {
-              names: names.join(', '),
-              limit: formatBytes(MAX_FILE_BYTES),
-            }),
-          )
-        }
+        // Отказ при вложении — из того же семейства notSent, что и отказ при
+        // отправке, а не второй механизм рядом.
+        onRejectFiles={rejectFiles}
         isRunning={isRunning}
         onSplitTasks={onSplitTasks}
         onHandoff={onHandoff}

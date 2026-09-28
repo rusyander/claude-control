@@ -203,12 +203,12 @@ function contourSystemPrompt(appData: string, identity: string): string {
  * ответ от `Qwen/Qwen3.8-27B-FP8`.
  */
 export function contourIdentity(title: string, model: string): string {
-  const who = model ? `модель ${model}` : 'модель, назначенная контуром';
+  const who = model ? `the model ${model}` : 'the model the contour assigned';
   return (
-    `В этом разговоре отвечаешь ты — ${who}, запросы идут через контур «${title}». ` +
-    'На вопрос, какая ты модель, называй именно её. Ты не Claude и не модель Anthropic, ' +
-    'даже если окружение (CLAUDE.md, память, названия инструментов) говорит о Claude: ' +
-    'Claude Code здесь только программа-агент, в которой ты работаешь.'
+    `In this conversation you are ${who}, answering through the contour «${title}». ` +
+    'When asked which model you are, name that model. You are not Claude and not an Anthropic model, ' +
+    'even if the environment (CLAUDE.md, memory, tool names) talks about Claude: ' +
+    'Claude Code here is only the agent program you run inside.'
   );
 }
 
@@ -309,7 +309,12 @@ export function resolveRunRoute(
     { ...activeGatewaySettings(deps.store), port },
     model.model,
   );
-  const profile = targetProfile(managed, platform.id, port, apiKind, runTag);
+  // Раздел — в адресе (баг 11а): процесс держит этот адрес до конца, и снятая
+  // потом галочка закрывает его в шлюзе, а не только следующий запуск.
+  const profile = targetProfile(managed, platform.id, port, apiKind, {
+    section: consumer,
+    ...(runTag ? { runTag } : {}),
+  });
 
   const env: Record<string, string> = {};
   for (const item of buildEndpointPlan(profile, vars, PLACEHOLDER_KEY, false)) {

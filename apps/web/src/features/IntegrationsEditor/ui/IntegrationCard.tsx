@@ -17,7 +17,7 @@ import {
   useForgetIntegration,
   useSaveIntegration,
 } from '@entities/Integration';
-import { integrationSecretAnchor } from '@entities/PanelAgent';
+import { integrationAnchor, integrationSecretAnchor } from '@entities/PanelAgent';
 import { buildSettings, draftFrom, isDraftDirty, missingFields } from '../model/draft';
 import { IntegrationFields } from './IntegrationFields';
 import { IntegrationCardExtras } from './IntegrationCardExtras';
@@ -51,7 +51,7 @@ const STATE_TONE: Record<string, BadgeTone> = {
  * когда правят поля.
  */
 export function IntegrationCard({ id, status, settings }: IntegrationCardProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const saved = settings[id];
 
   const save = useSaveIntegration();
@@ -112,7 +112,16 @@ export function IntegrationCard({ id, status, settings }: IntegrationCardProps) 
     <Card padding="md">
       <Stack gap="var(--spacing-sm)">
         <Stack direction="row" align="center" justify="between" gap="var(--spacing-xs)" wrap>
-          <Stack direction="row" align="center" gap="var(--spacing-xs)" wrap>
+          {/* Якорь агента — на заголовке, где полей нет: на карточке целиком фокус
+              уходил в её первое поле настроек, и следующие нажатия, адресованные
+              окну агента, печатались в адрес сервиса или листали выбор. */}
+          <Stack
+            direction="row"
+            align="center"
+            gap="var(--spacing-xs)"
+            wrap
+            data-agent-anchor={integrationAnchor(id)}
+          >
             <Typography variant="body" weight="medium" as="span">
               {t(`integrations.card.${id}.title`)}
             </Typography>
@@ -256,7 +265,8 @@ export function IntegrationCard({ id, status, settings }: IntegrationCardProps) 
         {status?.checkedAt && (
           <Typography variant="caption" color="subtle">
             {t('integrations.card.checkedAt', {
-              time: new Date(status.checkedAt).toLocaleString(),
+              // Язык интерфейса, а не браузера (F-323).
+              time: new Date(status.checkedAt).toLocaleString(i18n.language),
             })}
           </Typography>
         )}

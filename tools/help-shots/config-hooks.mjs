@@ -37,7 +37,7 @@ export async function shootHooksFirst(browser, web, scenario, home) {
     // Имя файла меняем: заготовка предлагает `destructive-guard`, а такой файл
     // в каталоге уже есть — сохранение перезаписало бы его.
     await page
-      .getByRole('button', { name: 'Страж разрушительных команд', exact: true })
+      .getByRole('button', { name: /^(Страж разрушительных команд|Destructive command guard)$/ })
       .first()
       .click();
     await page.waitForTimeout(1000);
@@ -69,11 +69,11 @@ export async function shootHooksFirst(browser, web, scenario, home) {
       .click();
     await page.waitForTimeout(1000);
     await page
-      .getByRole('button', { name: /^Страж секретов/ })
+      .getByRole('button', { name: /^(Страж секретов|Secret guard)/ })
       .first()
       .click();
     await page
-      .getByRole('button', { name: /^Чек-поинт перед сжатием/ })
+      .getByRole('button', { name: /^(Чек-поинт перед сжатием|Checkpoint before compaction)/ })
       .first()
       .click();
     await page.waitForTimeout(600);

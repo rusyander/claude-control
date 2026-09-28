@@ -3,6 +3,8 @@ import { z } from 'zod';
 import type {
   AppSettings,
   ChatSummary,
+  MediaDeckPlan,
+  MediaImagePlan,
   PlatformRunPlan,
   Project,
   ProvidersResponse,
@@ -16,7 +18,7 @@ import {
   type StreamHead,
 } from './registry.ts';
 import { dataField, summaryText, textField } from './texts.ts';
-import { codeOf } from '../../lib/server-text.ts';
+import { readRoute, routeError } from './action-kit.ts';
 
 /**
  * Действия раздела «Проекты, чат» (А4): чаты, идущие прогоны и новый чат с
@@ -27,16 +29,6 @@ import { codeOf } from '../../lib/server-text.ts';
 /** Сколько чатов отдавать модели по умолчанию: список всей машины — сотни строк. */
 const CHATS_DEFAULT_LIMIT = 20;
 
-/** Ответ маршрута чтения или исключение с его текстом: карточка без данных — отказ. */
-async function readRoute<T>(inject: InjectRoute, url: string): Promise<T> {
-  const answer = await inject({ method: 'GET', url });
-  if (answer.status >= 400) {
-    const message = (answer.body as { message?: string } | undefined)?.message;
-    throw new Error(`${url} answered ${answer.status}${message ? `: ${message}` : ''}`);
-  }
-  return answer.body as T;
-}
-
 /** Проект реестра по id или абсолютному пути — тот, что увидит человек в списке. */
 export async function findProject(inject: InjectRoute, ref: string): Promise<Project> {
   const projects = await readRoute<Project[]>(inject, '/api/projects');
@@ -46,7 +38,12 @@ export async function findProject(inject: InjectRoute, ref: string): Promise<Pro
     (item) => item.id === wanted || resolve(item.path).toLowerCase() === byPath,
   );
   if (!project) {
-    throw new Error(`Project «${wanted}» is not registered. Call list_projects or create_project.`);
+    // Не «зарегистрируй»: презентация и вопрос проекта не требуют, а подсказка
+    // «create_project» здесь и толкала модель регистрировать папку ради чата.
+    throw new Error(
+      `Project «${wanted}» is not registered. A chat that needs no project files (a presentation, a picture, a question) is start_chat WITHOUT project. ` +
+        'Otherwise pick a registered one from list_projects; create_project only when the human asked to add this folder.',
+    );
   }
   return project;
 }
@@ -106,7 +103,9 @@ const listChats = definePanelAction({
   risk: 'read',
   description:
     'List CLI chats, newest first (id, title, project path, updatedAt, model). ' +
-    'Filter by project path; default limit 20.',
+    'Filter by project path — chats in its git copies count too (homeProjectPath). ' +
+    'inPanel: the chat lives in the panel itself — say it is a chat in the panel itself, never its folder path. ' +
+    'Default limit 20.',
   input: z.object({
     projectPath: z.string().trim().min(1).optional().describe('Absolute project directory'),
     limit: z.number().int().min(1).max(200).optional(),
@@ -117,7 +116,15 @@ const listChats = definePanelAction({
   shape: (input, body) => {
     const wanted = input.projectPath ? resolve(input.projectPath).toLowerCase() : undefined;
     const chats = (Array.isArray(body) ? (body as ChatSummary[]) : [])
-      .filter((chat) => !wanted || resolve(chat.projectPath).toLowerCase() === wanted)
+      // Разговор в git-копии числится и за основной копией — как во вкладке
+      // проекта; иначе «чаты проекта» теряли всё, что «первая правка» увела в копию.
+      .filter(
+        (chat) =>
+          !wanted ||
+          [chat.projectPath, chat.homeProjectPath].some(
+            (path) => path !== undefined && path !== '' && resolve(path).toLowerCase() === wanted,
+          ),
+      )
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
     const limit = input.limit ?? CHATS_DEFAULT_LIMIT;
     return {
@@ -126,6 +133,9 @@ const listChats = definePanelAction({
         id: chat.id,
         title: chat.title,
         projectPath: chat.projectPath,
+        ...(chat.homeProjectPath ? { homeProjectPath: chat.homeProjectPath } : {}),
+        // Папка песочницы — внутренность панели; человеку это «чат в панели».
+        ...(chat.isSandbox ? { inPanel: true } : {}),
         updatedAt: chat.updatedAt,
         messages: chat.messageCount,
         ...(chat.model ? { model: chat.model } : {}),
@@ -148,15 +158,94 @@ const listActiveRuns = definePanelAction({
   summary: 'journal-list-active-runs',
 });
 
+/** Режим поля ввода чата — те же три, что в меню «Режим» композера. */
+const CHAT_MODES = ['message', 'deck', 'image'] as const;
+type ChatMode = (typeof CHAT_MODES)[number];
+
 const startChatInput = z.object({
-  project: z.string().trim().min(1).describe('Project id or absolute path from list_projects'),
-  prompt: z.string().trim().min(1).max(20_000).describe('First message of the new chat'),
+  project: z
+    .string()
+    .trim()
+    .min(1)
+    .optional()
+    .describe(
+      'Project id or absolute path from list_projects. Omit for a chat without a project ' +
+        '(the Chats home tab): presentations, pictures and questions need none',
+    ),
+  prompt: z
+    .string()
+    .trim()
+    .min(1)
+    .max(20_000)
+    .describe('First message; for mode deck/image — what to make, in the human’s words'),
+  mode: z
+    .enum(CHAT_MODES)
+    .optional()
+    .describe(
+      'Composer mode: message (default); deck = presentation (the chat agent dictates it, ' +
+        'the panel builds HTML/PPTX/PDF files); image = picture',
+    ),
   model: z.string().trim().max(200).optional().describe('Model; default = chat model in settings'),
   allowEdits: z
     .boolean()
     .optional()
     .describe('Let the chat agent edit project files; default false (read-only)'),
 });
+type StartChatInput = z.infer<typeof startChatInput>;
+
+/** Ответ маршрута записи или исключение с его текстом — как `readRoute`. */
+async function postRoute<T>(inject: InjectRoute, url: string, body: unknown): Promise<T> {
+  const answer = await inject({ method: 'POST', url, body });
+  if (answer.status >= 400) throw routeError(url, answer.status, answer.body);
+  return answer.body as T;
+}
+
+/**
+ * Первое сообщение нового чата в выбранном режиме.
+ *
+ * Презентация и картинка идут ТОЙ ЖЕ дорогой, что режим композера в чате с
+ * агентом (`useChatMedia`): дорогу решает план сервера с признаком агента, а
+ * просьбу собирает `/api/media/prompt` из каталога промптов. Своя сборка здесь
+ * разошлась бы с правилами после первой правки каталога, а текст слайдов в
+ * ответе агента панели — не презентация: файлы собирает панель из блока ответа.
+ *
+ * Растровая дорога картинки (контур, эндпоинт) — платная работа, которую панель
+ * делает сама, без агента разговора; её человек запускает из композера, и
+ * действие честно говорит об этом, а не подменяет дорогу бесплатной.
+ */
+async function firstMessage(input: StartChatInput, inject: InjectRoute): Promise<string> {
+  const mode: ChatMode = input.mode ?? 'message';
+  if (mode === 'message') return input.prompt;
+  const kind = mode === 'deck' ? 'deck' : 'picture';
+  const plan = await readRoute<MediaDeckPlan | MediaImagePlan>(
+    inject,
+    `/api/media/${mode === 'deck' ? 'decks' : 'images'}/plan?agent=1`,
+  );
+  if (!plan.available) {
+    throw new Error(`Mode ${mode} is locked: ${plan.reason ?? 'unavailable'}.`);
+  }
+  if (plan.source !== 'agent') {
+    throw new Error(
+      `Mode ${mode} goes through «${plan.title}» (${plan.source}${plan.model ? `, ${plan.model}` : ''}), ` +
+        'paid work the panel does itself. Ask the human to send it from the chat composer in that mode ' +
+        '(open_page /chat).',
+    );
+  }
+  const built = await postRoute<{ prompt: string }>(inject, '/api/media/prompt', {
+    kind,
+    topic: input.prompt,
+  });
+  return built.prompt;
+}
+
+/**
+ * Временный ключ прогона по входу вызова. CLI с тяжёлой конфигурацией (хуки,
+ * MCP) называет сессию дольше срока ожидания исполнителя, и без ключа страница
+ * открывалась пустым «Новым чатом», хотя прогон уже шёл (живой прогон
+ * 26.09.2026). Ключ заводит `route`, а `shape` и `page` получают тот же объект
+ * входа — поэтому слабая карта, а не поле во входе, которое видит модель.
+ */
+const startedKeys = new WeakMap<object, string>();
 
 const startChat = definePanelAction({
   name: 'start_chat',
@@ -164,44 +253,61 @@ const startChat = definePanelAction({
   risk: 'danger',
   title: 'journal-start-chat',
   description:
-    'Start a NEW chat in a registered project with a first message: launches a CLI agent run. ' +
-    'Needs the human’s confirmation. Returns the sessionId once the CLI names it.',
+    'Start a NEW chat with a first message: launches a CLI agent run and opens the chat page in ' +
+    'the same composer mode. "Open the chat about …" asks for an EXISTING chat: find it with ' +
+    'list_chats and open_page /chat with focus = its id; start one only when none fits. ' +
+    'Without project — a chat with no project, like the New chat button. ' +
+    'A presentation or a picture = mode deck / image (never write slides or drawings yourself). ' +
+    'Needs the human’s confirmation. Returns chatKey (the run key in list_active_runs) and the ' +
+    'sessionId once the CLI names it.',
   input: startChatInput,
   // Тело — то, что шлёт окно чата при первом сообщении нового разговора:
-  // временный ключ `new-…`, каталог проекта, модель шапки (или настройки).
+  // временный ключ `new-…`, каталог проекта (без проекта — никакого, как у
+  // «Нового чата» домашней вкладки), модель шапки (или настройки).
   route: async (input, inject) => {
-    const project = await findProject(inject, input.project);
+    const project = input.project ? await findProject(inject, input.project) : undefined;
     const plan = await chatRunPlan(inject, input.model);
+    const chatId = `new-${Date.now()}`;
+    startedKeys.set(input, chatId);
     return {
       method: 'POST',
       url: '/api/chat/send',
       stream: true,
       body: {
-        chatId: `new-${Date.now()}`,
-        prompt: input.prompt,
-        projectPath: project.path,
+        chatId,
+        prompt: await firstMessage(input, inject),
+        ...(project ? { projectPath: project.path } : {}),
         ...(plan.asked ? { model: plan.asked } : {}),
         allowEdits: input.allowEdits === true,
       },
     };
   },
-  // Отпечаток — проект и план прогона (провайдер, модель из настроек, контур):
-  // сменили модель по умолчанию после карточки — запустилась бы не названная.
+  // Отпечаток — проект, план прогона (провайдер, модель из настроек, контур) и
+  // первое сообщение: правило режима в каталоге поправили после карточки —
+  // ушёл бы текст, которого человек не видел.
   fingerprint: async (input, inject) =>
     fingerprintOf({
-      project: await findProject(inject, input.project),
+      project: input.project ? await findProject(inject, input.project) : null,
       plan: await chatRunPlan(inject, input.model),
+      message: await firstMessage(input, inject),
     }),
   preview: async (input, inject) => {
-    const project = await findProject(inject, input.project);
+    const project = input.project ? await findProject(inject, input.project) : undefined;
     const plan = await chatRunPlan(inject, input.model);
+    const mode: ChatMode = input.mode ?? 'message';
     // Промпт целиком (вход ограничен 20 000 символов): хвост, обрезанный ради
     // вида карточки, запустил бы агента с текстом, которого человек не читал.
-    const prompt = input.prompt;
+    // У презентации и картинки это собранная просьба, а тема стоит отдельно.
+    const message = await firstMessage(input, inject);
     return {
-      ...summaryText('summary-start-chat', { project: project.name }),
+      ...(project
+        ? summaryText('summary-start-chat', { project: project.name })
+        : summaryText('summary-start-chat-home', {})),
       fields: [
-        dataField('label-project', `${project.name} — ${project.path}`),
+        project
+          ? dataField('label-project', `${project.name} — ${project.path}`)
+          : textField('label-project', 'value-no-project'),
+        textField('label-chat-mode', `value-mode-${mode}`),
         dataField('label-provider', plan.providerName),
         plan.model
           ? dataField('label-model', plan.model)
@@ -212,28 +318,46 @@ const startChat = definePanelAction({
           'label-file-edits',
           input.allowEdits === true ? 'value-edits-allowed' : 'value-edits-denied',
         ),
-        dataField('label-first-message', prompt),
+        ...(mode === 'message' ? [] : [dataField('label-topic', input.prompt)]),
+        dataField('label-first-message', message),
       ],
     };
   },
-  // Модели — начало прогона, а не весь поток: имя сессии, модель и отказ, если был.
-  shape: (_input, body) => {
+  // Кадр ошибки до имени сессии — CLI отказал, прогона нет. Это `failed` с его
+  // причиной: «Done.» со `started: false` модель пересказывала как успех, а
+  // человеку открывался пустой чат.
+  refusal: (body) => {
+    const error = (body as StreamHead | undefined)?.frames?.find((frame) => frame.kind === 'error');
+    if (!error) return undefined;
+    return typeof error.message === 'string' && error.message
+      ? `The chat did not start: ${error.message}`
+      : 'The chat did not start: the CLI refused.';
+  },
+  // Модели — начало прогона, а не весь поток: имя сессии и модель.
+  shape: (input, body) => {
     const head = body as StreamHead;
     const session = head.frames.find((frame) => frame.kind === 'session');
-    const error = head.frames.find((frame) => frame.kind === 'error');
+    const chatKey = startedKeys.get(input);
     return {
-      started: !error,
+      started: true,
+      ...(chatKey ? { chatKey } : {}),
       ...(session?.sessionId ? { sessionId: session.sessionId } : {}),
       ...(session?.model ? { model: session.model } : {}),
-      ...(error?.message ? { error: error.message, ...codeOf(error) } : {}),
       ...(head.timedOut && !session
         ? { note: 'The CLI has not named the session yet; see list_active_runs.' }
         : {}),
     };
   },
-  page: (_input, result) => {
-    const sessionId = (result as { sessionId?: unknown }).sessionId;
-    return { route: '/chat', ...(typeof sessionId === 'string' ? { focus: sessionId } : {}) };
+  // Режим уезжает в адрес: страница чата открывается с тем же пунктом меню
+  // «Режим», и правка колоды идёт следующим сообщением без лишнего щелчка.
+  // Фокус — имя сессии, а пока его нет — ключ прогона: страница покажет живой
+  // ход по любому из них (`runForUrl`).
+  page: (input, result) => {
+    const { sessionId, chatKey } = result as { sessionId?: unknown; chatKey?: unknown };
+    const focus =
+      typeof sessionId === 'string' ? sessionId : typeof chatKey === 'string' ? chatKey : undefined;
+    const mode = input.mode && input.mode !== 'message' ? `?mode=${input.mode}` : '';
+    return { route: `/chat${mode}`, ...(focus ? { focus } : {}) };
   },
 });
 

@@ -29,6 +29,9 @@ import { isMediaError } from '../domains/media/errors.ts';
 import { promptText } from '../domains/prompts.ts';
 import { assertId, readImageBytes, readImageRecord } from '../domains/media/store.ts';
 import { codeOf } from '../lib/server-text.ts';
+import { readAgentImages } from '../lib/agent-images.ts';
+import { storeAgentImageFiles } from '../domains/media/agent-files.ts';
+import { agentImageDirsInChats } from '../domains/provider-chat/store.ts';
 import { issueBody } from '../lib/zod-issue-codes.ts';
 import { serverText } from '../lib/server-texts.ts';
 
@@ -116,6 +119,33 @@ export function registerMediaRoutes(
       params: { reason },
     });
   };
+
+  /**
+   * Картинки агенту, который читает файлы сам (чат чужого CLI): файлы в каталоге
+   * данных, в ответ — пути для вложений сообщения. Проверка та же, что у
+   * картинок в запросе (`readAgentImages`): тип по байтам, предел, число.
+   */
+  app.post<{ Body: { images?: unknown } }>(
+    '/api/media/agent-files',
+    { bodyLimit: 48 * 1024 * 1024 },
+    (request, reply) => {
+      const images = readAgentImages(request.body?.images);
+      if (!images.ok) return reply.code(400).send(images.refusal);
+      if (images.images.length === 0) {
+        return reply.code(400).send({
+          error: 'invalid_images',
+          message: 'Картинки в запросе переданы не так, как ждёт панель.',
+          messageCode: 'media-agent-images-invalid',
+        });
+      }
+      const appData = ctx.location.paths.appData;
+      return {
+        files: storeAgentImageFiles(appData, images.images, undefined, {
+          referenced: (names) => agentImageDirsInChats(appData, names),
+        }),
+      };
+    },
+  );
 
   /**
    * Есть ли в месте, откуда спрашивают, агент. Факт от клиента: страница знает

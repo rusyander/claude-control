@@ -81,8 +81,8 @@ export function DlpLimitsSections({ tr, common }: SectionProps) {
               isMono: false,
             },
             {
-              name: tr('refusalGateProvider'),
-              description: tr('refusalGateProviderText'),
+              name: tr('refusalGateNoRules'),
+              description: tr('refusalGateNoRulesText'),
               isMono: false,
             },
             {

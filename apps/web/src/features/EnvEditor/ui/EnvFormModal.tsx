@@ -16,7 +16,14 @@ import { Badge } from '@shared/ui/badge';
 import { BulkCreate } from '@shared/ui/bulk-create';
 import { envSecretAnchor } from '@entities/PanelAgent';
 import type { EnvFormModalProps } from './EnvFormModal.types';
-import { buildEnvDraft, envFileName, looksSecret } from './EnvFormModal.lib';
+import {
+  SecretRevealError,
+  buildEnvDraft,
+  envFileName,
+  looksSecret,
+  secretValueHints,
+} from './EnvFormModal.lib';
+import { envAssistantSpec } from '../model/envAssistant';
 import styles from './EnvFormModal.module.scss';
 
 /**
@@ -28,6 +35,7 @@ import styles from './EnvFormModal.module.scss';
 export function EnvFormModal({ isOpen, onOpenChange, envVar }: EnvFormModalProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const valueHints = secretValueHints(envVar);
 
   const [key, setKey] = useState('');
   const [value, setValue] = useState('');
@@ -94,7 +102,15 @@ export function EnvFormModal({ isOpen, onOpenChange, envVar }: EnvFormModalProps
   };
 
   const canSave = key.trim().length > 0 && !save.isPending;
-  const errorText = formError ?? (save.isError ? toErrorMessage(save.error) : undefined);
+  const saveError = (): string | undefined => {
+    if (!save.isError) return undefined;
+    // Сбой дочитывания секрета — своими словами на языке интерфейса.
+    if (save.error instanceof SecretRevealError) {
+      return t('env.revealFailed', { key: save.error.key });
+    }
+    return toErrorMessage(save.error);
+  };
+  const errorText = formError ?? saveError();
 
   return (
     <Modal
@@ -182,22 +198,15 @@ export function EnvFormModal({ isOpen, onOpenChange, envVar }: EnvFormModalProps
         />
       ) : (
         <FormWithAssistant
-          kind={t('env.title')}
+          kind="environment variable"
           fields={{ key, value, source, comment }}
-          schema={{
-            key: 'Имя переменной заглавными буквами через подчёркивание',
-            value: 'Значение переменной',
-            source: 'Куда сохранить: settings (видит Claude Code) или secrets (файл токенов)',
-            comment: 'Комментарий: откуда взять значение или зачем оно',
-          }}
+          // Файл при правке определяется записью — помощнику поле закрыто.
+          spec={envAssistantSpec({ sourceLocked: Boolean(envVar) })}
           onApply={(applied) => {
-            if (typeof applied.key === 'string') setKey(applied.key);
-            if (typeof applied.value === 'string') setValue(applied.value);
-            // Файл при правке определяется записью — помощник его не меняет.
-            if (!envVar && (applied.source === 'settings' || applied.source === 'secrets')) {
-              setSource(applied.source);
-            }
-            if (typeof applied.comment === 'string') setComment(applied.comment);
+            if (applied.key !== undefined) setKey(applied.key);
+            if (applied.value !== undefined) setValue(applied.value);
+            if (applied.source !== undefined) setSource(applied.source as EnvSource);
+            if (applied.comment !== undefined) setComment(applied.comment);
             setFormError(undefined);
           }}
         >
@@ -221,8 +230,8 @@ export function EnvFormModal({ isOpen, onOpenChange, envVar }: EnvFormModalProps
                 label={t('env.varValue')}
                 value={value}
                 onChange={setValue}
-                placeholder={envVar?.isSecret ? t('env.secretHidden') : ''}
-                hint={envVar?.isSecret ? t('env.secretRewrite') : undefined}
+                placeholder={valueHints ? t(valueHints.placeholder) : ''}
+                hint={valueHints ? t(valueHints.hint) : undefined}
                 isMono
               />
             </div>

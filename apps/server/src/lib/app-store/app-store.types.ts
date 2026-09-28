@@ -29,8 +29,13 @@ import type {
   SplitOverlapView,
 } from '@agentdeck/contracts/chat-handoff';
 import type { StoredSplitSettings } from '@agentdeck/contracts/task-split';
+import type {
+  EscalationNotice,
+  StoredChatGroupSettings,
+} from '@agentdeck/contracts/chat-group-settings';
 import type { StoredSplitDefaults } from '@agentdeck/contracts/split-groups';
 import type { SplitHumanStepView, SplitTicketView } from '@agentdeck/contracts/split-tickets';
+import type { SieveReportRow } from '@agentdeck/contracts/sieves';
 
 /**
  * Откуда взялся чат: см. `AppState.chatLinks`.
@@ -66,6 +71,19 @@ export interface TreePauseRecord {
   at: string;
   chats: Record<string, PausedTreeChat>;
   pendingStarts: PendingTreeStart[];
+}
+
+/** Ход своих шагов пути в чате стадии. */
+export interface PathRun {
+  /** Шаги, уже заведённые в этом чате, — второй раз не заводятся. */
+  done: string[];
+  /** Шаг, чей ход идёт сейчас: конец хода сверяется с его проверкой. */
+  pending?: string;
+  /**
+   * Ответ и задание самой стадии, отложенные на время шагов: следующее звено
+   * (ревью, правки, доставка) решается по ним, а не по ответу последнего шага.
+   */
+  held?: { text: string; task: string };
 }
 
 export interface ChatLink {
@@ -160,6 +178,12 @@ export interface ChatLink {
    */
   deliveredAt?: string;
   /**
+   * Свои шаги «Пути» группы (`domains/chat/path-steps.ts`), идущие ходами в ЭТОМ
+   * чате после его стадии. Без записи шаг заводился бы на каждом ходу человека,
+   * а стадия за шагами читала бы ответ шага вместо ответа своей стадии.
+   */
+  pathRun?: PathRun;
+  /**
    * Задание группы целиком (с преамбулой копии) — у звеньев `plan` и `work`.
    * Хранится, потому что первое сообщение РАБОТЕ собирается после плана из
    * задания + границ + плана, а задание к тому моменту есть только здесь:
@@ -171,6 +195,13 @@ export interface ChatLink {
    * ревью, правки и доставка знали план, не видя его разговора (аудит 25.09, L238).
    */
   planSummary?: string;
+  /**
+   * Отчёт о ситах, накопленный звеньями цепочки (`@agentdeck/contracts/sieves`):
+   * ревью делает сита контракта и потребителей, доставка — остальные; строки
+   * едут по связям и в конце цепочки ложатся в запись группы, где их читает
+   * судья доставки.
+   */
+  sieveRows?: SieveReportRow[];
   /** Границы группы из разбора (Т1): чем владеет только она и заметки соседям. */
   owns?: string[];
   notes?: string;
@@ -346,6 +377,10 @@ export interface SplitPlanGroupRecord {
    * замечания прошли звено правок.
    */
   stageTrace?: SplitStageTrace[];
+  /** Отчёт о ситах группы по всем звеньям — его судит проверка доставки. */
+  sieveRows?: SieveReportRow[];
+  /** Классы сит, чьё срабатывание уже засчитано «пойманным» в счёт панели. */
+  sieveCaught?: string[];
 }
 
 /** След звена: какое звено шло; у ревью, кончившего цепочку, — сколько замечаний. */
@@ -384,6 +419,12 @@ export interface SplitMrWatch {
   checks: number;
   /** Что уже передано группе: `<ветка>:<последняя реплика>` — через все круги. */
   relayed?: string[];
+  /**
+   * Ссылки переданных тредов — ровно как в задании группе. Сито, выученное
+   * группой (`learned` блока сит), принимается, только если ссылается на одну
+   * из них: так панель знает, что блокер был, а не выдуман.
+   */
+  relayedLinks?: string[];
   /** Исход конвейера, на который панель уже посмотрела: один взгляд на конвейер. */
   pipeline?: { id: string; status: string };
   /** Сколько раз наблюдатель продолжил группу — потолок против петли. */
@@ -416,6 +457,12 @@ export interface SplitPlanRecord {
   createdAt: string;
   /** Чат разбора (уровень 1); нет — разбор не запускался (подбор выключен). */
   triageChatId?: string;
+  /**
+   * Группы панели, предложенные разбору на выбор (выбор группы родителя —
+   * `auto`). Лежит в записи, потому что ответ разбора приходит через минуты и
+   * после рестарта: сверять его выбор больше не с чем. Нет — выбора не было.
+   */
+  groupCatalog?: { key: string; name: string }[];
   /** Итог разбора: получен ли блок, что панель починила, конфликты и порядок. */
   triage?: {
     at: string;
@@ -447,6 +494,8 @@ export interface SplitPlanRecord {
       effort?: string;
       owns?: string[];
       notes?: string;
+      /** Группа панели, выбранная разбором из `groupCatalog` (выбор чата — `auto`). */
+      groupKey?: string;
       /** Группа ревьюит MR по ссылке (Т7) — копия встанет на его ветку. */
       review?: { url: string; branch?: string };
     }[];
@@ -544,6 +593,55 @@ export interface RunnerTargetMeta {
   dir?: string;
 }
 
+/** Заметка главного чата в `state.json`: ключ повтора и когда прочитана. */
+export interface StoredChatEscalation extends EscalationNotice {
+  id: string;
+  readAt?: string;
+}
+
+/**
+ * Выключенное правило CLAUDE.md: текст и место, куда оно вернётся при включении.
+ * Место — заголовки соседей в ПОЛНОМ порядке (выключенные на своих местах) и
+ * позиция на случай, если оба соседа исчезли.
+ */
+export interface DisabledRuleSnapshot {
+  title: string;
+  body: string;
+  /** Заголовок правила перед ним; `null` — стояло первым. */
+  after: string | null;
+  /** Заголовок правила после него; `null` — стояло последним. */
+  before: string | null;
+  /** Позиция в полном порядке правил при последней записи. */
+  index: number;
+}
+
+/** Чей контейнер в settings.json: завела панель при включении права или он был до неё. */
+export type PermissionContainerOwner = 'panel' | 'human';
+
+/** Контейнер прав: сам ключ `permissions` или список решения. */
+export type PermissionContainer = 'permissions' | 'allow' | 'ask' | 'deny';
+
+/** Где стоял шаблон, снятый выключением: соседи и позиция в списке. */
+export interface PermissionPatternPlace {
+  after: string | null;
+  before: string | null;
+  index: number;
+}
+
+/**
+ * Память панели об одном файле прав (`domains/permissions.ts`, F-270/F-271):
+ * кто завёл контейнеры, где стояли контейнеры, снятые выключением, и где
+ * стояли выключенные шаблоны. Без неё выключение-включение не возвращало файл
+ * байт в байт.
+ */
+export interface PermissionFilePlaces {
+  owners?: Partial<Record<PermissionContainer, PermissionContainerOwner>>;
+  /** Позиция ключа контейнера среди соседей в момент, когда выключение его сняло. */
+  at?: Partial<Record<PermissionContainer, number>>;
+  /** `decision:pattern` → место выключенного шаблона. */
+  patterns?: Record<string, PermissionPatternPlace>;
+}
+
 /**
  * Данные, которых нет в конфигах Claude Code: группы, сценарии, отметки
  * «выключено» и настройки самого приложения. Живут отдельным файлом внутри
@@ -574,6 +672,17 @@ export interface AppState {
    * хранится здесь, пока он выключен, и подмешивается обратно в список.
    */
   disabledHooks: Record<string, Hook>;
+  /**
+   * Текст выключенных правил CLAUDE.md и их место в файле (`disabled-rules.ts`).
+   * Необязательно: state.json прежних версий этого ключа не знает.
+   */
+  disabledRules?: DisabledRuleSnapshot[];
+  /**
+   * Память о контейнерах и местах прав по файлам настроек (абсолютный путь →
+   * `PermissionFilePlaces`). Необязательно: прежние state.json ключа не знают.
+   * Пути здешние — ключ машинный (`MACHINE_LOCAL_KEYS`).
+   */
+  permissionPlaces?: Record<string, PermissionFilePlaces>;
   /**
    * Какие переменные окружения применила каждая группа: id группы → имена
    * ключей, записанных ею в settings.json. По этой отметке при выключении
@@ -787,6 +896,16 @@ export interface AppState {
    * основной копии → отклонение от `SPLIT_SETTINGS_DEFAULT`.
    */
   splitSettings?: Record<string, StoredSplitSettings>;
+  /**
+   * Группа и автономность ЧАТА (не проекта): ключ разговора → своё у него.
+   * Нет записи — значения родителя по дереву разделения или умолчания
+   * (`resolveChatGroupSettings`). См. `chat-group-settings.ts`.
+   */
+  chatGroupSettings?: Record<string, StoredChatGroupSettings>;
+  /** Временный ключ разговора `new-…` → его `sessionId`: чтение по старому находит новое. */
+  chatKeyAliases?: Record<string, string>;
+  /** Критические замечания детей: главный чат дерева → заметки (с отметкой прочтения). */
+  chatEscalations?: Record<string, StoredChatEscalation[]>;
   /**
    * Общие правила групп разделения (вкладка «Группы»): разрешения, потолки
    * лёгкого и тяжёлого проекта, правило тяжести. Только отклонение от коробки.

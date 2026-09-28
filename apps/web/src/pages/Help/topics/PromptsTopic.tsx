@@ -61,6 +61,14 @@ export function PromptsTopic() {
             { name: tr('promptImage'), description: tr('promptImageText') },
             { name: tr('promptImageSvg'), description: tr('promptImageSvgText') },
             { name: tr('promptPresentation'), description: tr('promptPresentationText') },
+            { name: tr('promptGroupDiscover'), description: tr('promptGroupDiscoverText') },
+            { name: tr('promptGroupAdvice'), description: tr('promptGroupAdviceText') },
+            { name: tr('promptGroupMerge'), description: tr('promptGroupMergeText') },
+            { name: tr('promptGroupOverride'), description: tr('promptGroupOverrideText') },
+            { name: tr('promptPathStepAuthor'), description: tr('promptPathStepAuthorText') },
+            { name: tr('promptResourceSummary'), description: tr('promptResourceSummaryText') },
+            { name: tr('promptGroupKnobs'), description: tr('promptGroupKnobsText') },
+            { name: tr('promptGroupDescribe'), description: tr('promptGroupDescribeText') },
           ].map((row) => ({ ...row, isMono: false }))}
         />
       </HelpSection>

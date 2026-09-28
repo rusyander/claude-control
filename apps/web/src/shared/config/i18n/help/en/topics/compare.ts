@@ -45,8 +45,9 @@ export const compareEn: typeof compareRu = {
       'from stands above the column heading. Four sections are compared: MCP servers, ' +
       'environment variables, permissions and global instructions. Differences are ' +
       'computed per key, and values are compared by meaning — a normalised parse, not ' +
-      'file lines. Variables that look like keys and tokens are shown masked and checked ' +
-      'for presence only. Exactly two sections can cross: MCP servers, which have a ' +
+      'file lines. Variables whose name holds KEY, TOKEN, SECRET, PASSWORD, PAT or ' +
+      'CREDENTIALS as a separate word are shown masked and checked for presence only. ' +
+      'Exactly two sections can cross: MCP servers, which have a ' +
       'cross-vendor model and real write adapters, and the text of the global ' +
       'instructions, which is an ordinary file. Variables never cross (the panel does not ' +
       'write secrets into someone else’s configuration), and neither do permissions (the ' +
@@ -63,19 +64,23 @@ export const compareEn: typeof compareRu = {
       lookMcp: 'Pick the sides and the server difference is there',
       lookMcpText:
         'Above each column stands the file the values came from. A row carries one of ' +
-        'the states: same, left only, right only, differs. Under the blocked rows is the ' +
+        'the states: identical, left only, right only, differs. Under the blocked rows is the ' +
         'reason such an entry cannot cross — visible before any click.',
       lookEnv: 'Variables: presence is checked, not the value',
       lookEnvText:
         'The section is compared but never crosses, and the heading says so plainly. ' +
-        'Values that look like keys and tokens are shown masked: the panel checks that a ' +
+        'Values of variables with KEY, TOKEN, SECRET or a similar word in the name are shown masked: the panel checks that a ' +
         'variable exists on both sides without showing or comparing the secret itself.',
-      lookInstructions: 'Permissions stand side by side, instructions compare by text',
+      lookPermissions: 'Permissions stand side by side but never cross',
+      lookPermissionsText:
+        'Permissions have their own tab and the badge “different models”: every CLI ' +
+        'has its own approval model, so key names may coincide while the meaning does ' +
+        'not. The rows are shown side by side, with no checkboxes and no move buttons.',
+      lookInstructions: 'Instructions compare by text',
       lookInstructionsText:
-        'Permissions carry the badge “different models”: key names may coincide while ' +
-        'the meaning does not, so they are shown side by side and never cross. For the ' +
-        'instructions the file contents are compared, not the names: CLI file names ' +
-        'always differ, and that difference is no news.',
+        'On the Global instructions tab the file contents are compared, not the names: ' +
+        'CLI file names always differ, and that difference is no news. This file moves ' +
+        'as a whole — after the diff.',
 
       moveTitle: 'Path 2. Move: a write into another CLI’s file',
       moveCaption:
@@ -98,7 +103,7 @@ export const compareEn: typeof compareRu = {
         'computed on a temporary copy by the real write adapters, so it also shows the ' +
         'format’s side effects: rewriting a whole file can touch lines you never ' +
         'intended. “Cancel” writes nothing.',
-      moveApplied: 'After the write the row reads as the same',
+      moveApplied: 'After the write the row reads “identical”',
       moveAppliedText:
         'A toast names the number of entries moved and the comparison is recomputed: the ' +
         'entry now exists on both sides. Exactly one file changed — the receiving one.',
@@ -132,7 +137,7 @@ export const compareEn: typeof compareRu = {
     readCaption: 'The label on the right says what is wrong with the entry — or that all is well.',
     readColumn: 'Row label',
     readMeaningColumn: 'What it means',
-    readSame: 'same',
+    readSame: 'identical',
     readSameText: 'The entry exists on both sides and the values match in meaning.',
     readDiffers: 'differs',
     readDiffersText:
@@ -142,8 +147,10 @@ export const compareEn: typeof compareRu = {
     readOnlyText: 'The other side has no such entry at all — a candidate for the move.',
     readSecret: 'secret values',
     readSecretText:
-      'Variables that look like keys and tokens are shown masked and checked for presence ' +
-      'only. The panel neither shows nor compares a secret’s value.',
+      'Variables with KEY, TOKEN, SECRET, PASSWORD, PAT or CREDENTIALS as a separate word ' +
+      'in the name are shown masked and checked for presence only. The word counts whole: ' +
+      'ANTHROPIC_API_KEY is a secret, MAX_THINKING_TOKENS and GIT_BASH_PATH are not. The ' +
+      'rule is the same for both sides. The panel neither shows nor compares a secret’s value.',
     readBlocked: 'a row with no checkbox',
     readBlockedText:
       'The entry is blocked from moving, with the reason written underneath: a disabled ' +
@@ -249,11 +256,13 @@ export const compareEn: typeof compareRu = {
   shots: {
     look: {
       '01-mcp':
-        'Claude Code on the left (C:\\Users\\user\\.claude.json), Codex on the right (config.toml): catalog-mock “same”, design-mocks “left only”, docs-index “right only”, legacy-prices marked “The server is disabled” and tracker-bridge marked “The sse transport”',
+        'Claude Code on the left (C:\\Users\\user\\.claude.json), Codex on the right (config.toml): catalog-mock “identical”, design-mocks “left only”, docs-index “right only”, legacy-prices marked “The server is disabled” and tracker-bridge marked “The sse transport”',
       '02-env':
-        'The variables section: CODEX_API_TOKEN right only as dem••••00, GIT_BASH_PATH left only, MAX_THINKING_TOKENS “same” — and under every secret row “The value is secret — only its presence was checked”',
-      '03-instructions':
-        'Permissions with the “different models” badge — ten rows, not a single checkbox — and “Global instructions”: CLAUDE.md · 933 B against AGENTS.md · 226 B, labelled “differs”',
+        'The variables section: CODEX_API_TOKEN right only as ••••••••00, GIT_BASH_PATH left only, MAX_THINKING_TOKENS “identical” — and under every secret row “The value is secret — only presence was checked”',
+      '03-permissions':
+        'The Permissions 11 tab: the “different models” badge, eleven rows “left only” or “right only”, not a single checkbox',
+      '04-instructions':
+        'The Global instructions 1 tab: CLAUDE.md · 1.0 KB against AGENTS.md · 226 B, labelled “differs”',
     },
     move: {
       '01-blocked':
@@ -263,7 +272,7 @@ export const compareEn: typeof compareRu = {
       '03-preview':
         'The “What will be written” window for C:\\Users\\user\\.codex\\config.toml: “Changes: +5 / −2”, [mcp_servers.design-mocks] with its url is added, and two args lines are rewritten by the format',
       '04-applied':
-        'After “Write”: design-mocks now reads “same” on both sides, with the toast “Entries moved: 1”',
+        'After “Write”: design-mocks now reads “identical” on both sides, with the toast “Entries moved: 1”',
     },
   },
 

@@ -50,6 +50,11 @@ export interface RunScope {
   writeDir: string;
   /** Пути от корня проекта, которые режим `automate` дописывает к тестовым. */
   testFiles: string[];
+  /**
+   * Папка e2e проекта, когда генерация пишет настоящие тесты (`e2e: true`):
+   * спеки ложатся туда, а кейсы — всё равно черновиком, через панель.
+   */
+  e2eDir?: string;
 }
 
 /** Решение по одному вызову инструмента. */
@@ -101,12 +106,14 @@ export function runScope(
   root: string,
   mode: ProjectTestRunMode,
   cases: ProjectTestCase[] = [],
+  e2eDir?: string,
 ): RunScope {
   return {
     root,
     mode,
     writeDir: mode === 'generate' ? DRAFTS_WRITE_DIR : TESTS_DIR,
     testFiles: mode === 'automate' ? automationFiles(cases) : [],
+    ...(mode === 'generate' && e2eDir ? { e2eDir } : {}),
   };
 }
 
@@ -115,6 +122,11 @@ function inside(root: string, target: string, folder: string): boolean {
   const base = resolve(root, folder);
   const step = relative(base, target);
   return step === '' || (!step.startsWith('..') && !isAbsolute(step));
+}
+
+function isBelowRoot(root: string, folder: string): boolean {
+  const step = relative(resolve(root), resolve(root, folder));
+  return step !== '' && !step.startsWith('..') && !isAbsolute(step);
 }
 
 /** Путь из входа инструмента: разные инструменты называют его по-разному. */
@@ -141,6 +153,15 @@ function commandOf(input: unknown): string {
 export function isWritable(scope: RunScope, target: string): boolean {
   const path = isAbsolute(target) ? resolve(target) : resolve(scope.root, target);
   if (inside(scope.root, path, scope.writeDir || TESTS_DIR)) return true;
+  // Папка e2e пришла из конфига репозитория: корень проекта или путь наружу
+  // областью записи не становятся, даже если такая папка просочилась в выбор.
+  if (
+    scope.e2eDir &&
+    isBelowRoot(scope.root, scope.e2eDir) &&
+    inside(scope.root, path, scope.e2eDir)
+  ) {
+    return true;
+  }
   if (scope.mode !== 'automate') return false;
   return scope.testFiles.some((file) => {
     const named = resolve(scope.root, file);
@@ -153,16 +174,17 @@ export function isWritable(scope: RunScope, target: string): boolean {
 
 /** Границы словами — тот же текст уходит и в задание, и в отказ. */
 export function describeScope(scope: RunScope): string {
-  const base = `писать разрешено только внутрь ${scope.writeDir || TESTS_DIR}/`;
+  const base = `writing is allowed only inside ${scope.writeDir || TESTS_DIR}/`;
   if (scope.mode === 'generate') {
-    return `${base} — библиотеку меняет панель, применяя черновик`;
+    const e2e = scope.e2eDir ? ` and into the e2e folder ${scope.e2eDir}/ (test code)` : '';
+    return `${base}${e2e} — the panel changes the library by applying the draft`;
   }
   if (scope.mode !== 'automate') return base;
   const named = scope.testFiles.length
-    ? `, а также в файлы автотестов, названные кейсами (${scope.testFiles.slice(0, 5).join(', ')}${
+    ? `, and also into the autotest files the cases name (${scope.testFiles.slice(0, 5).join(', ')}${
         scope.testFiles.length > 5 ? ', …' : ''
       })`
-    : ', а также в файлы автотестов рядом с уже существующими тестами проекта';
+    : ", and also into autotest files next to the project's existing tests";
   return `${base}${named}`;
 }
 
@@ -177,7 +199,8 @@ export function decidePermission(
   if (toolName === 'AskUserQuestion') {
     return {
       behavior: 'deny',
-      message: 'В прогоне спрашивать некого: реши сам и запиши сомнение в note кейса.',
+      message:
+        'There is nobody to ask in this run: decide yourself and write the doubt into the case note.',
     };
   }
 
@@ -191,7 +214,7 @@ export function decidePermission(
     if (isWritable(scope, target)) return { behavior: 'allow', updatedInput: input };
     return {
       behavior: 'deny',
-      message: `Правка ${target} прогону запрещена: ${describeScope(scope)}. Нашёл проблему в коде — это результат теста (status: "failed" и что не так в note), а не повод чинить.`,
+      message: `Editing ${target} is forbidden for this run: ${describeScope(scope)}. A problem found in the code is a test result (status: "failed" and what is wrong in note), not a reason to fix it.`,
     };
   }
 
@@ -200,7 +223,8 @@ export function decidePermission(
     if (FORBIDDEN_COMMANDS.test(command)) {
       return {
         behavior: 'deny',
-        message: 'Команды, меняющие репозиторий, прогону запрещены: ничего не коммить и не пушить.',
+        message:
+          'Commands that change the repository are forbidden for this run: commit and push nothing.',
       };
     }
     return { behavior: 'allow', updatedInput: input };
@@ -254,7 +278,7 @@ export function startPermissionGate(
       const decision =
         body.runId === runId
           ? decidePermission(scope, String(body.toolName ?? ''), body.input)
-          : { behavior: 'deny' as const, message: 'Запрос не от этого прогона.' };
+          : { behavior: 'deny' as const, message: 'The request is not from this run.' };
       if (decision.behavior === 'deny')
         onDeny?.(String(body.toolName ?? ''), decision.message ?? '');
       response.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });

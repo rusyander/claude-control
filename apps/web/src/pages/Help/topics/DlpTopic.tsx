@@ -1,6 +1,15 @@
 import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
-import { HelpSection, StorageCard, FieldTable, Callout, OptionCards, StepList } from '../ui';
+import { DLP_TABS } from '@pages/Dlp/model/tabs';
+import {
+  HelpSection,
+  StorageCard,
+  FieldTable,
+  Callout,
+  OptionCards,
+  StepList,
+  PageTabsSection,
+} from '../ui';
 import { DlpGuideSections } from './DlpGuideSections';
 import { DlpLimitsSections } from './DlpLimitsSections';
 
@@ -27,6 +36,8 @@ export function DlpTopic() {
       <Callout tone="info" title={tr('guideTitle')}>
         {tr('guideText')}
       </Callout>
+
+      <PageTabsSection page="dlp" tabs={DLP_TABS} />
 
       <HelpSection title={common('whyTitle')}>
         <OptionCards

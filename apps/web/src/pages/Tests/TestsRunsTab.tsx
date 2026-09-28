@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from '@tanstack/react-router';
 import { Stack } from '@shared/ui/stack';
@@ -7,7 +7,9 @@ import { Badge } from '@shared/ui/badge';
 import { Typography } from '@shared/ui/typography';
 import { EmptyState } from '@shared/ui/empty-state';
 import { SkeletonList } from '@shared/ui/skeleton';
+import { LoadErrorCard } from '@shared/ui/load-error';
 import { CHAT_ROUTE } from '@shared/config/routes';
+import { serverFieldText } from '@shared/config/i18n';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import {
@@ -20,7 +22,11 @@ import {
 import { BaselineViewer } from '@features/TestBaselines';
 import { TestsRunPublish } from './TestsRunPublish';
 import { TestsRunDiff } from './TestsRunDiff';
-import { formatRunDuration, isRed, redCases } from './model/reportMetrics';
+import { TestsRunsOriginFilter } from './TestsRunsOriginFilter';
+import { queryView } from './model/queryView';
+import { linkedRunToFollow } from './model/runLink';
+import { visibleRuns, runLabelKeys, type RunOriginFilter } from './model/runOrigin';
+import { formatRunDuration, isUnproven, redCases, runTally } from './model/reportMetrics';
 import type { TestsRunsTabProps } from './TestsRunsTab.types';
 import styles from './TestsPage.module.scss';
 
@@ -35,10 +41,23 @@ import styles from './TestsPage.module.scss';
  * Прогон агента ссылается на разговор: там лежит полный транскрипт с командами
  * и выводом, и это единственное место, где видно, ЧТО именно агент делал.
  */
-export function TestsRunsTab({ projectPath, groups, isRunning }: TestsRunsTabProps) {
-  const { t } = useTranslation();
+export function TestsRunsTab({ projectPath, groups, isRunning, openRunId }: TestsRunsTabProps) {
+  // Дата — языком интерфейса, а не браузера: английская панель иначе
+  // показывала русские даты (F-323).
+  const { t, i18n } = useTranslation();
   const runs = useTestRuns(projectPath, true, isRunning);
-  const [openId, setOpenId] = useState('');
+  const [openId, setOpenId] = useState(openRunId ?? '');
+  // Пришли по ссылке из истории кейса — запись раскрыта; довести до неё
+  // взгляд, иначе раскрытый прогон может оказаться далеко ниже экрана. Один
+  // раз на ссылку: перечитанный список не должен снова её раскрывать.
+  const followed = useRef('');
+  useEffect(() => {
+    const target = linkedRunToFollow(openRunId, followed.current, Boolean(runs.data));
+    if (!target) return;
+    followed.current = target;
+    setOpenId(target);
+    document.getElementById(`run-card-${target}`)?.scrollIntoView({ block: 'start' });
+  }, [openRunId, runs.data]);
   const run = useTestRun(projectPath, openId || undefined);
   // Сверка эталонов открывается по КЕЙСУ: у одного кейса несколько точек, и
   // разбирают их подряд, а не по одной из разных мест.
@@ -46,15 +65,21 @@ export function TestsRunsTab({ projectPath, groups, isRunning }: TestsRunsTabPro
   // Регрессионный кейс заводят прямо у провала: там лежит и заметка, и снимки —
   // всё, из чего агенту собирать шаги воспроизведения.
   const start = useStartTestRun(projectPath);
+  const [origin, setOrigin] = useState<RunOriginFilter>('all');
 
   const titleOf = (groupId: string, caseId: string): string =>
     groups.find((group) => group.id === groupId)?.cases.find((item) => item.id === caseId)?.title ??
     caseId;
 
-  if (runs.isLoading) return <SkeletonList rows={4} />;
+  // Упавший запрос — отказ с повтором, а не «прогонов ещё нет»: пустота при
+  // живой истории зовёт запускать прогон, а не повторить запрос.
+  const view = queryView(runs, (items) => items.length === 0);
+  if (view === 'loading') return <SkeletonList rows={4} />;
+  if (view === 'failed') return <LoadErrorCard onRetry={() => void runs.refetch()} />;
 
-  const list = runs.data ?? [];
-  if (list.length === 0) {
+  const all = runs.data ?? [];
+  const { list, showFilter, origin: shownOrigin } = visibleRuns(all, origin);
+  if (view === 'empty') {
     return (
       <EmptyState icon="history" title={t('tests.runs.empty')} text={t('tests.runs.emptyHint')} />
     );
@@ -62,27 +87,39 @@ export function TestsRunsTab({ projectPath, groups, isRunning }: TestsRunsTabPro
 
   return (
     <Stack gap="var(--spacing-sm)">
+      {/* Автотесты панели и отчёт CI — оба импорт junit; отбор разводит их,
+          когда в истории есть и те и другие. */}
+      {showFilter && <TestsRunsOriginFilter value={shownOrigin} onChange={setOrigin} />}
       {list.map((record) => {
         const isOpen = record.id === openId;
+        const tally = runTally(record);
+        const label = runLabelKeys(record);
         return (
-          <Card key={record.id} padding="md" isRaised={isOpen}>
+          <Card key={record.id} id={`run-card-${record.id}`} padding="md" isRaised={isOpen}>
             <Stack gap="var(--spacing-2xs)">
               {/* aria-controls связывает заголовок с телом записи: без него
-                  «раскрыто» слышно, а ЧТО раскрылось — нет. */}
+                  «раскрыто» слышно, а ЧТО раскрылось — нет. Тело есть только у
+                  раскрытой и загруженной записи — ссылка на отсутствующий id
+                  была бы битой. */}
               <button
                 type="button"
                 className={styles.runHead}
                 aria-expanded={isOpen}
-                aria-controls={`run-body-${record.id}`}
+                aria-controls={isOpen && run.data ? `run-body-${record.id}` : undefined}
                 onClick={() => setOpenId(isOpen ? '' : record.id)}
               >
                 <Stack direction="row" gap="var(--spacing-2xs)" align="center" wrap>
                   <Badge tone={record.status === 'error' ? 'danger' : 'neutral'}>
-                    {t(`tests.runs.mode.${record.mode}`)}
+                    {t(label.mode)}
                   </Badge>
-                  <Badge tone="info">{t(`tests.runs.actor.${record.actor}`)}</Badge>
+                  <Badge tone="info">{t(label.actor)}</Badge>
+                  {tally.state && (
+                    <Badge tone={tally.state === 'running' ? 'info' : 'warning'}>
+                      {t(`tests.runs.state.${tally.state}`)}
+                    </Badge>
+                  )}
                   <Typography variant="body-sm" as="span">
-                    {new Date(record.startedAt).toLocaleString()}
+                    {new Date(record.startedAt).toLocaleString(i18n.language)}
                   </Typography>
                   {record.branch && (
                     <Typography variant="caption" color="subtle" as="span">
@@ -94,20 +131,37 @@ export function TestsRunsTab({ projectPath, groups, isRunning }: TestsRunsTabPro
               </button>
 
               <Stack direction="row" gap="var(--spacing-xs)" align="center" wrap>
-                <Typography variant="caption" color="success" as="span">
-                  {t('tests.runs.passed', { count: record.summary.passed })}
-                </Typography>
-                <Typography variant="caption" color="danger" as="span">
-                  {t('tests.runs.failed', { count: record.summary.failed })}
-                </Typography>
-                <Typography variant="caption" color="warning" as="span">
-                  {t('tests.runs.skipped', {
-                    count: record.summary.skipped + record.summary.blocked,
-                  })}
-                </Typography>
+                {/* Генерация кейсы не проходит: её нули — не итог, а зелёное
+                    «пройдено: 0» рядом с красным «провалено: 0» читалось
+                    прогоном, который ничего не нашёл. */}
+                {tally.counted && (
+                  <Typography variant="caption" color="success" as="span">
+                    {t('tests.runs.passed', { count: tally.passed })}
+                  </Typography>
+                )}
+                {tally.counted && (
+                  <Typography variant="caption" color="danger" as="span">
+                    {t('tests.runs.failed', { count: tally.failed })}
+                  </Typography>
+                )}
+                {tally.blocked > 0 && (
+                  <Typography variant="caption" color="danger" as="span">
+                    {t('tests.runs.blocked', { count: tally.blocked })}
+                  </Typography>
+                )}
+                {tally.counted && (
+                  <Typography variant="caption" color="warning" as="span">
+                    {t('tests.runs.skipped', { count: tally.skipped })}
+                  </Typography>
+                )}
+                {tally.open > 0 && (
+                  <Typography variant="caption" color="subtle" as="span">
+                    {t('tests.runs.open', { count: tally.open })}
+                  </Typography>
+                )}
                 <Typography variant="caption" color="subtle" as="span">
                   {t('tests.runs.duration', {
-                    text: formatRunDuration(record.startedAt, record.finishedAt),
+                    text: formatRunDuration(record.startedAt, record.finishedAt, t),
                   })}
                 </Typography>
                 {/* Итог генерации: сводка по кейсам у неё пустая — она их не
@@ -160,7 +214,7 @@ export function TestsRunsTab({ projectPath, groups, isRunning }: TestsRunsTabPro
 
               {record.error && (
                 <Typography variant="caption" color="danger">
-                  {record.error}
+                  {serverFieldText(record, 'error')}
                 </Typography>
               )}
 
@@ -221,7 +275,7 @@ export function TestsRunsTab({ projectPath, groups, isRunning }: TestsRunsTabPro
                         {/* Провал без доказательства — не результат, а
                             впечатление. Результат при этом остаётся: терять
                             полчаса работы агента из-за формальности дороже. */}
-                        {isRed(result.status) && (result.attachments ?? []).length === 0 && (
+                        {isUnproven(result) && (
                           <Badge tone="warning">{t('tests.evidence.missing')}</Badge>
                         )}
                         {result.failure?.step !== undefined && (
@@ -234,6 +288,13 @@ export function TestsRunsTab({ projectPath, groups, isRunning }: TestsRunsTabPro
                         )}
                         {result.failure?.retry === 'confirmed' && (
                           <Badge tone="neutral">{t('tests.evidence.confirmed')}</Badge>
+                        )}
+                        {/* Зелёный только на повторе раннера: признак числом,
+                            слова — из словаря (прежде русская фраза в заметке). */}
+                        {(result.flakyAttempts ?? 0) > 0 && (
+                          <Badge tone="warning">
+                            {t('tests.evidence.retryPass', { attempts: result.flakyAttempts })}
+                          </Badge>
                         )}
                       </Stack>
                       {result.note && (

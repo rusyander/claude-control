@@ -212,6 +212,7 @@ export function EnvPage() {
           {vars.map((item) => (
             <Stack
               key={item.id}
+              data-agent-anchor={item.id}
               direction="row"
               align="center"
               justify="between"

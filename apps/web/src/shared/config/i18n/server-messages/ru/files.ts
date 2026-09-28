@@ -19,6 +19,8 @@ export const filesRu: Record<FilesMessageCode, string> = {
   'file-changed-on-disk': 'Файл на диске изменился после открытия.',
   'runner-command-empty': 'Команда запуска пуста.',
   'runner-subdir-outside': 'Подпапка должна лежать внутри проекта: {{dir}}',
+  'runner-project-unregistered':
+    'Dev-сервер панель запускает только у проектов из раздела «Проекты», каталогов внутри них и копий их веток. Добавьте этот каталог проектом.',
   'resource-path-escapes': 'Путь выходит за пределы ресурса',
   'resource-path-invalid': 'Неверный путь',
   'resource-file-exists': 'Файл с таким именем уже существует',

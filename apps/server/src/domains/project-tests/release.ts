@@ -12,6 +12,8 @@ import type {
   ProjectTestRunRecord,
   ProjectTestStatus,
 } from '@agentdeck/contracts';
+import { reasonOf } from './point-reason.ts';
+import type { ExportLanguage } from './export-run-texts.ts';
 
 /**
  * Готовность вехи одним документом.
@@ -53,6 +55,13 @@ export interface ReleaseOptions {
   coverage?: ProjectTestCoverage;
   branch?: string;
   commit?: string;
+  /**
+   * Язык панели: на нём обвязка заметки («шаг N: … (ожидалось: …)») и вердикт
+   * — экран показывает их как есть, и в английском интерфейсе они были
+   * русскими. Файл и печать берут тот же язык (`release-routes.ts`); пусто —
+   * русский.
+   */
+  lang?: ExportLanguage;
 }
 
 /** Результат кейса у этой вехи: самый свежий из её прогонов. */
@@ -68,24 +77,24 @@ interface Outcome {
  * есть последнее слово вехи: перепрошли красный кейс — в документ идёт вторая
  * попытка, а не первая.
  */
-function outcomesOf(runs: ProjectTestRunRecord[]): Map<string, Outcome> {
+function outcomesOf(
+  runs: ProjectTestRunRecord[],
+  lang: ExportLanguage = 'ru',
+): Map<string, Outcome> {
   const byCase = new Map<string, Outcome>();
   for (const run of runs) {
     for (const result of run.results) {
       const key = `${result.groupId}:${result.caseId}`;
       if (byCase.has(key)) continue;
-      byCase.set(key, { status: result.status, note: noteOf(result) });
+      byCase.set(key, { status: result.status, note: noteOf(result, lang) });
     }
   }
   return byCase;
 }
 
-/** Что видел исполнитель: заметка, а без неё — разбор провала. */
-function noteOf(result: ProjectTestPointResult): string | undefined {
-  const note = result.note?.trim();
-  if (note) return note;
-  const actual = result.failure?.actual?.trim();
-  return actual || undefined;
+/** Что видел исполнитель — той же строкой, что в отчёте прогона (`reasonOf`). */
+function noteOf(result: ProjectTestPointResult, lang: ExportLanguage): string | undefined {
+  return reasonOf(result, lang) || undefined;
 }
 
 function toReleaseCase(
@@ -223,6 +232,43 @@ function runLine(run: ProjectTestRunRecord): ProjectTestReleaseRun {
   };
 }
 
+/** Слова вердикта. Русская половина — прежняя строка байт в байт. */
+interface VerdictTexts {
+  noRuns: string;
+  failed: (count: number) => string;
+  blocked: (count: number) => string;
+  untested: (count: number, cases: number) => string;
+  defects: (count: number) => string;
+  muted: (count: number) => string;
+  early: (release: string, blockers: string) => string;
+  ready: (release: string, passed: number, cases: number) => string;
+}
+
+const VERDICT_TEXTS: Record<ExportLanguage, VerdictTexts> = {
+  ru: {
+    noRuns: 'Прогонов вехи нет: проверять нечего.',
+    failed: (count) => `Провалов: ${count}.`,
+    blocked: (count) => `Заблокировано кейсов: ${count}.`,
+    untested: (count, cases) => `Не проверено кейсов: ${count} из ${cases}.`,
+    defects: (count) => `Незакрытых дефектов: ${count}.`,
+    muted: (count) => ` В карантине ${count} — их провалы в вердикт не идут.`,
+    early: (release, blockers) => `Веха «${release}»: отдавать рано. ${blockers}`,
+    ready: (release, passed, cases) =>
+      `Веха «${release}»: пройдено ${passed} из ${cases}, ничего из проверяемого панелью отдавать не мешает.`,
+  },
+  en: {
+    noRuns: 'The milestone has no runs: nothing to check.',
+    failed: (count) => `Failures: ${count}.`,
+    blocked: (count) => `Blocked cases: ${count}.`,
+    untested: (count, cases) => `Unchecked cases: ${count} of ${cases}.`,
+    defects: (count) => `Open defects: ${count}.`,
+    muted: (count) => ` In quarantine: ${count} — their failures do not count toward the verdict.`,
+    early: (release, blockers) => `Milestone “${release}”: too early to ship. ${blockers}`,
+    ready: (release, passed, cases) =>
+      `Milestone “${release}”: passed ${passed} of ${cases}, nothing the panel checks stands in the way of shipping.`,
+  },
+};
+
 /**
  * Вердикт: что мешает отдавать.
  *
@@ -230,29 +276,48 @@ function runLine(run: ProjectTestRunRecord): ProjectTestReleaseRun {
  * мешает», а решение остаётся человеку. Карантин в блокирующие не идёт: право
  * красить прогон у такого кейса снято осознанно, — но и молчать о нём нельзя,
  * поэтому он назван строкой.
+ *
+ * Единственный источник вердикта — и экрана, и файла (`releaseVerdict`):
+ * второй набор правил рядом расходился бы с первым при новой причине.
  */
-function verdictOf(
+export function verdictOf(
   release: string,
   counts: ProjectTestReleaseDocument['totals'] & { defects: number },
   hasRuns: boolean,
+  lang: ExportLanguage = 'ru',
 ): ProjectTestReleaseVerdict {
+  const t = VERDICT_TEXTS[lang];
   const blockers: string[] = [];
-  if (!hasRuns) blockers.push('Прогонов вехи нет: проверять нечего.');
-  if (counts.failed > 0) blockers.push(`Провалов: ${counts.failed}.`);
-  if (counts.blocked > 0) blockers.push(`Заблокировано кейсов: ${counts.blocked}.`);
-  if (counts.untested > 0)
-    blockers.push(`Не проверено кейсов: ${counts.untested} из ${counts.cases}.`);
-  if (counts.defects > 0) blockers.push(`Незакрытых дефектов: ${counts.defects}.`);
+  if (!hasRuns) blockers.push(t.noRuns);
+  if (counts.failed > 0) blockers.push(t.failed(counts.failed));
+  if (counts.blocked > 0) blockers.push(t.blocked(counts.blocked));
+  if (counts.untested > 0) blockers.push(t.untested(counts.untested, counts.cases));
+  if (counts.defects > 0) blockers.push(t.defects(counts.defects));
 
-  const muted =
-    counts.muted > 0 ? ` В карантине ${counts.muted} — их провалы в вердикт не идут.` : '';
+  const muted = counts.muted > 0 ? t.muted(counts.muted) : '';
   return {
     ready: blockers.length === 0,
     text: blockers.length
-      ? `Веха «${release}»: отдавать рано. ${blockers.join(' ')}${muted}`
-      : `Веха «${release}»: пройдено ${counts.passed} из ${counts.cases}, ничего из проверяемого панелью отдавать не мешает.${muted}`,
+      ? `${t.early(release, blockers.join(' '))}${muted}`
+      : `${t.ready(release, counts.passed, counts.cases)}${muted}`,
     blockers,
   };
+}
+
+/**
+ * Вердикт готового документа на языке `lang` — по его же числам. Им пишут
+ * файл и печать: правила те же, что у строки экрана.
+ */
+export function releaseVerdict(
+  doc: ProjectTestReleaseDocument,
+  lang: ExportLanguage,
+): ProjectTestReleaseVerdict {
+  return verdictOf(
+    doc.release,
+    { ...doc.totals, defects: doc.defects.length },
+    doc.totals.runs > 0,
+    lang,
+  );
 }
 
 /**
@@ -271,7 +336,7 @@ export function buildRelease(
 ): ProjectTestReleaseDocument {
   const name = release.trim();
   const releaseRuns = runs.filter((run) => (run.release ?? '').trim() === name);
-  const outcomes = outcomesOf(releaseRuns);
+  const outcomes = outcomesOf(releaseRuns, options.lang);
 
   const red: ProjectTestReleaseCase[] = [];
   const untested: ProjectTestReleaseCase[] = [];
@@ -319,7 +384,12 @@ export function buildRelease(
   }
 
   const defects = openDefects(groups);
-  const verdict = verdictOf(name, { ...totals, defects: defects.length }, releaseRuns.length > 0);
+  const verdict = verdictOf(
+    name,
+    { ...totals, defects: defects.length },
+    releaseRuns.length > 0,
+    options.lang,
+  );
 
   return {
     release: name,

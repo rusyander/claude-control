@@ -29,9 +29,17 @@ export class PanelAgentProcesses {
   private readonly resolve: (pid: number) => Promise<number>;
   private readonly gone = new Set<string>();
 
-  constructor(appDataDir: () => string, resolveDeps?: ResolveCliPidDeps) {
+  /**
+   * `file` — свой журнал у каждого владельца процессов: тем же приёмом убираются
+   * сироты агентского прогона тестов (`project-tests/runs.ts`).
+   */
+  constructor(
+    appDataDir: () => string,
+    resolveDeps?: ResolveCliPidDeps,
+    file: string = PANEL_AGENT_PROCESS_LEDGER,
+  ) {
     // Каталог данных читается на каждую запись: он меняется на лету (`ctx.relocate`).
-    this.ledger = () => new RunLedger(appDataDir(), PANEL_AGENT_PROCESS_LEDGER);
+    this.ledger = () => new RunLedger(appDataDir(), file);
     this.resolve = (pid) => resolveCliPid(pid, resolveDeps);
   }
 
@@ -46,7 +54,9 @@ export class PanelAgentProcesses {
     void this.resolve(pid).then((cliPid) => {
       // Процесс кончился, пока искали его номер, — запись уже снята, не воскрешаем.
       if (this.gone.has(key) || cliPid === pid) return;
-      this.ledger().upsert({ key, pid: cliPid, cwd, startedAt });
+      // Время — момента, когда CLI только что нашёлся живым: оно служит проверкой
+      // «номер всё ещё наш» при уборке, а сам CLI создан позже `startedAt` оболочки.
+      this.ledger().upsert({ key, pid: cliPid, cwd, startedAt: Date.now() });
     });
   }
 
@@ -59,23 +69,45 @@ export class PanelAgentProcesses {
 export interface ReapDeps {
   isAlive?: (pid: number) => boolean;
   looksLikeCli?: (pid: number) => boolean;
-  kill?: (pid: number) => void;
+  /**
+   * Снять дерево. Список снятых номеров (`killPidTree`): пустой у живого номера
+   * — «не снят». Замена, не вернувшая списка, считается снявшей.
+   */
+  kill?: (pid: number, startedAt: number) => unknown;
 }
 
 /**
  * Старт панели: каждый живой процесс агента из журнала — сирота прошлого
- * процесса панели, его дерево снимается. Журнал очищается целиком. Возвращает,
- * сколько процессов убито.
+ * процесса панели, его дерево снимается. Журнал очищается — кроме живых
+ * сирот, которых снять не вышло. Возвращает, сколько процессов снято.
  */
-export function reapPanelAgentOrphans(appDataDir: string, deps: ReapDeps = {}): number {
-  const ledger = new RunLedger(appDataDir, PANEL_AGENT_PROCESS_LEDGER);
+export function reapPanelAgentOrphans(
+  appDataDir: string,
+  deps: ReapDeps = {},
+  file: string = PANEL_AGENT_PROCESS_LEDGER,
+): number {
+  const ledger = new RunLedger(appDataDir, file);
   const entries = ledger.read();
+  const isAlive = deps.isAlive ?? isPidAlive;
   const { adopt: alive } = adoptableEntries(entries, {
-    isAlive: deps.isAlive ?? isPidAlive,
+    isAlive,
     looksLikeCli: deps.looksLikeCli ?? pidLooksLikeCli,
   });
-  const kill = deps.kill ?? ((pid: number) => killPidTree(pid));
-  for (const entry of alive) kill(entry.pid as number);
-  for (const entry of entries) ledger.remove(entry.key);
-  return alive.length;
+  // `startedAt` записи — момент, когда номер точно был нашим: чужой процесс,
+  // занявший номер позже, дерево не снимает.
+  const kill =
+    deps.kill ?? ((pid: number, startedAt: number) => killPidTree(pid, { spawnedAt: startedAt }));
+  const kept = new Set<string>();
+  for (const entry of alive) {
+    const pid = entry.pid as number;
+    const killed = kill(pid, entry.startedAt);
+    // Ничего не снято, а номер жив: сверить его нечем (нет снимка процессов,
+    // F-205) — вслепую не снимаем, но и запись не стираем: иначе сирота жила бы
+    // дальше без присмотра, и следующий старт о ней уже не знал бы (F-145).
+    // Номер, занятый чужим процессом, держит запись лишь пока тот жив и похож
+    // на CLI — дальше её уберёт та же проверка `adoptableEntries`.
+    if (Array.isArray(killed) && killed.length === 0 && isAlive(pid)) kept.add(entry.key);
+  }
+  for (const entry of entries) if (!kept.has(entry.key)) ledger.remove(entry.key);
+  return alive.length - kept.size;
 }

@@ -1,5 +1,5 @@
 import type { RunOptions } from './ChatRunner.ts';
-import type { RunMeta } from './ChatRunRegistry.ts';
+import type { RunMeta } from './ChatRunRegistry.types.ts';
 import { LiveSession, type LiveSessionPool } from './live-session.ts';
 import { connectRelay } from './live-transport.ts';
 import type { RunLedgerEntry } from './run-ledger.ts';
@@ -51,7 +51,7 @@ export function reattachSession(
   const relay = entry.relay;
   if (!relay || !entry.sessionId) return undefined;
   const session = LiveSession.reattach(
-    { pipe: relay.pipe, pid: relay.pid },
+    { pipe: relay.pipe, pid: relay.pid, ...(relay.token ? { token: relay.token } : {}) },
     {
       command: '',
       args: [],
@@ -77,7 +77,7 @@ export function endRelayInput(entry: RunLedgerEntry): void {
   const relay = entry.relay;
   if (!relay) return;
   const transport = connectRelay(
-    { pipe: relay.pipe, pid: relay.pid },
+    { pipe: relay.pipe, pid: relay.pid, ...(relay.token ? { token: relay.token } : {}) },
     { line: () => undefined, stderr: () => undefined, close: () => undefined },
   );
   transport.end();

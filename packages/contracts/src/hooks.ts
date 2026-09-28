@@ -1,4 +1,14 @@
-import { object, string, array, number, boolean, enum as zodEnum, type infer as Infer } from 'zod';
+import {
+  object,
+  string,
+  array,
+  number,
+  boolean,
+  record,
+  unknown,
+  enum as zodEnum,
+  type infer as Infer,
+} from 'zod';
 import { settingsSourceSchema } from './settings-source';
 
 /**
@@ -147,6 +157,14 @@ export const hookSchema = object({
   matcher: string().optional(),
   command: string(),
   timeout: number().optional(),
+  /**
+   * Поля записи из settings.json, которых панель не показывает: `type`, если
+   * он не `command` (`prompt`, `http`, `agent`…), `prompt`, `statusMessage`,
+   * `once`, `async` и всё, что Claude Code добавит потом. Писатель кладёт их
+   * обратно как были — без них перезапись файла превращала prompt-хук в
+   * команду без команды и молча теряла остальное.
+   */
+  extra: record(string(), unknown()).optional(),
   /**
    * Место среди хуков своего события на момент выключения. Есть только у
    * снимка выключенного хука в состоянии панели: по нему хук возвращается в

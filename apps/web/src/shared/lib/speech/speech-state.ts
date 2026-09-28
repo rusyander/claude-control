@@ -15,6 +15,7 @@ const MESSAGE_KEYS: Partial<Record<SpeechErrorKind, string>> = {
   'no-permission': 'assistant.speechError.noPermission',
   network: 'assistant.speechError.network',
   unsupported: 'assistant.speechError.unsupported',
+  'no-microphone': 'assistant.speechError.noMicrophone',
 };
 
 /** Ключ перевода для ошибки; null — про эту ошибку говорить не о чем. */

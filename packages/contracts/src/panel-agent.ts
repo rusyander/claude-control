@@ -1,3 +1,11 @@
+import type { AgentImage } from './agent-images';
+import { PANEL_MANAGE_TEXT_PARAMS } from './panel-agent-texts-manage.ts';
+import { TESTS_BLOCK_TEXT_PARAMS } from './panel-agent-texts-tests.ts';
+import { GROUPS_ENTITIES_TEXT_PARAMS } from './panel-agent-texts-groups-entities.ts';
+import { CHAT_TEXT_PARAMS } from './panel-agent-texts-chat.ts';
+import { PROJECT_TEXT_PARAMS } from './panel-agent-texts-projects.ts';
+import { CHAT_SANDBOX_AGENTS_TEXT_PARAMS } from './panel-agent-texts-chat-sandbox-agents.ts';
+import { GAPS_TEXT_PARAMS } from './panel-agent-texts-gaps.ts';
 /**
  * Агент панели (А0, 17.09.2026): контракт между реестром действий на сервере,
  * переходником MCP `tools/mcp/panel.mjs` и окном агента в вебе и телефоне.
@@ -67,8 +75,16 @@ export interface PanelActionPreview {
   summary: string;
   summaryCode?: PanelTextCode;
   summaryParams?: PanelTextParams;
+  /**
+   * Подстановки сводки для английского окна, когда в них двуязычные данные
+   * (заголовок шага группы): код переводится словарём, а заголовок — данные, и
+   * из `summaryParams` английская карточка читала бы русский. Нет — `summaryParams`.
+   */
+  summaryParamsEn?: PanelTextParams;
   fields: PanelActionPreviewField[];
   diff?: string;
+  /** Тот же дифф с английскими сторонами двуязычных данных; нет — `diff`. */
+  diffEn?: string;
   /**
    * Часть того, что выполнится, в карточку не поместилась (правка слишком велика
    * для диффа, тело кейсов сверх предела). Одобрить такую карточку нельзя:
@@ -77,11 +93,6 @@ export interface PanelActionPreview {
   truncated?: boolean;
 }
 
-/**
- * Поле карточки. `label`/`value` — русский запасной текст (сервер второй язык не
- * держит); коды — то, что окно переводит своим словарём. Значение без кода —
- * данные (путь, адрес, промпт) и показывается как есть.
- */
 /**
  * Заметка карточки «Кроме файла». Домен называет КОД, русский текст собирает
  * маршрут: иначе домену пришлось бы тянуть словарь окна, а английская панель
@@ -92,13 +103,48 @@ export interface PanelPreviewNote {
   params?: PanelTextParams;
 }
 
+/**
+ * Поле карточки. `label`/`value` — русский запасной текст (сервер второй язык не
+ * держит); коды — то, что окно переводит своим словарём. Значение без кода —
+ * данные (путь, адрес, промпт) и показывается как есть.
+ */
 export interface PanelActionPreviewField {
   label: string;
   value: string;
+  /**
+   * Значение-данные для английского окна, когда у данных два языка (заголовки
+   * шагов сценария и группы). Нет — `value`: старые записи и одноязычные данные.
+   */
+  valueEn?: string;
   labelCode?: PanelTextCode;
   labelParams?: PanelTextParams;
   valueCode?: PanelTextCode;
   valueParams?: PanelTextParams;
+}
+
+/** Окно на английском: `en`, `en-US`… Остальные языки читают русский запасной текст. */
+const isEnglishWindow = (language: string): boolean =>
+  language.toLowerCase().split('-')[0] === 'en';
+
+/**
+ * Предпросмотр на языке окна: английские варианты данных (`summaryParamsEn`,
+ * `valueEn`, `diffEn`) подставляются на место основных у английского окна и
+ * там, где сервер их прислал; иначе предпросмотр как есть — так читаются и
+ * записи, сделанные до вариантов. Коды дальше переводит словарь клиента.
+ */
+export function previewInLanguage(
+  preview: PanelActionPreview,
+  language: string,
+): PanelActionPreview {
+  if (!isEnglishWindow(language)) return preview;
+  return {
+    ...preview,
+    ...(preview.summaryParamsEn ? { summaryParams: preview.summaryParamsEn } : {}),
+    ...(preview.diffEn !== undefined ? { diff: preview.diffEn } : {}),
+    fields: preview.fields.map((field) =>
+      field.valueEn !== undefined ? { ...field, value: field.valueEn } : field,
+    ),
+  };
 }
 
 /**
@@ -150,6 +196,7 @@ export const panelTextParams = {
   // Сводка карточки.
   'summary-create-project': ['title'],
   'summary-start-chat': ['project'],
+  'summary-start-chat-home': [],
   'summary-draft-cases': ['count'],
   'summary-run-tests-generate': [],
   'summary-run-tests-run': ['count'],
@@ -166,18 +213,29 @@ export const panelTextParams = {
   'summary-skill-delete': ['name'],
   'summary-permission-add': ['decision', 'pattern'],
   'summary-permission-remove': ['rule'],
+  'summary-permission-add-allow': ['pattern'],
+  'summary-permission-add-deny': ['pattern'],
+  'summary-permission-add-ask': ['pattern'],
   'summary-mcp-add': ['name'],
   'summary-mcp-edit': ['name'],
   'summary-mcp-delete': ['name'],
   // Подписи полей.
   'label-directory': [],
   'label-title': [],
+  'label-e2e-folder': [],
+  'value-e2e-onboard-create': ['dir'],
+  'value-e2e-onboard-create-plain': ['dir'],
+  'value-e2e-onboard-sync': ['dir', 'count'],
+  'value-e2e-onboard-keep': ['dir'],
+  'value-e2e-onboard-maybe': [],
   'label-project': [],
   'label-provider': [],
   'label-model': [],
   'label-contour': [],
   'label-file-edits': [],
   'label-first-message': [],
+  'label-chat-mode': [],
+  'label-topic': [],
   'label-case-add': ['target'],
   'label-case-update': ['target'],
   'label-draft': [],
@@ -210,6 +268,10 @@ export const panelTextParams = {
   'value-model-default': [],
   'value-edits-allowed': [],
   'value-edits-denied': [],
+  'value-no-project': [],
+  'value-mode-message': [],
+  'value-mode-deck': [],
+  'value-mode-image': [],
   'value-cases-hidden': ['count'],
   'value-mode-generate': [],
   'value-mode-run': [],
@@ -239,6 +301,7 @@ export const panelTextParams = {
   'note-mcp-rename': ['from', 'to'],
   'note-hook-group-off': [],
   'note-hook-local-file': [],
+  'note-hook-delete-disabled': [],
   'note-copy-in-history': [],
   'note-entity-group-off': [],
   'note-folder-move': ['from', 'to'],
@@ -253,6 +316,27 @@ export const panelTextParams = {
   'label-env-keys': [],
   'journal-delete-group': [],
   'summary-group-delete': ['name'],
+  'label-group-delete-env': [],
+  'label-group-delete-back-on': [],
+  'journal-read-group': [],
+  'journal-draft-group': [],
+  'summary-group-draft': ['name'],
+  'journal-copy-group': [],
+  'summary-group-copy': ['name', 'copy'],
+  'label-group-copy-effect': [],
+  'value-group-copy-effect': [],
+  'journal-add-group-step': [],
+  'summary-group-step-add': ['name', 'title'],
+  'journal-move-group-step': [],
+  'summary-group-step-move': ['name', 'title'],
+  'journal-set-group-knobs': [],
+  'summary-group-knobs': ['name'],
+  'label-group-steps': [],
+  'journal-draft-scenario': [],
+  'summary-scenario-draft': ['name'],
+  'label-scenario-steps': [],
+  'label-group-step-prompt': [],
+  'label-group-knobs': [],
   'journal-get-settings': [],
   'journal-update-settings': [],
   'summary-settings-update': ['keys'],
@@ -277,6 +361,9 @@ export const panelTextParams = {
   'journal-save-integration': [],
   'summary-integration-save': ['id'],
   'journal-check-integration': [],
+  'summary-integration-check': ['id'],
+  'value-happens-integration-check': [],
+  'value-happens-webhook-test': [],
   'journal-forget-integration': [],
   'summary-integration-forget': ['id'],
   'journal-save-hook': [],
@@ -329,6 +416,7 @@ export const panelTextParams = {
   'journal-update-plugin': [],
   'summary-plugin-update': ['id'],
   'label-version': [],
+  'label-plugin-scope': [],
   'journal-add-marketplace': [],
   'summary-marketplace-add': ['source'],
   'journal-remove-marketplace': [],
@@ -353,6 +441,25 @@ export const panelTextParams = {
   'summary-stop-tests': ['mode'],
   'journal-delete-test-case': [],
   'summary-delete-test-case': ['title'],
+  'value-mode-explore': [],
+  'summary-run-tests-explore': [],
+  'journal-save-test-case': [],
+  'summary-save-test-case-create': ['title'],
+  'summary-save-test-case-update': ['title'],
+  'journal-save-test-group': [],
+  'summary-save-test-group-create': ['title'],
+  'summary-save-test-group-update': ['title'],
+  'journal-delete-test-group': [],
+  'summary-delete-test-group': ['title', 'count'],
+  'journal-reject-draft': [],
+  'summary-reject-draft': ['count'],
+  ...TESTS_BLOCK_TEXT_PARAMS,
+  ...PANEL_MANAGE_TEXT_PARAMS,
+  ...GROUPS_ENTITIES_TEXT_PARAMS,
+  ...CHAT_TEXT_PARAMS,
+  ...PROJECT_TEXT_PARAMS,
+  ...CHAT_SANDBOX_AGENTS_TEXT_PARAMS,
+  ...GAPS_TEXT_PARAMS,
 } as const satisfies Record<string, readonly string[]>;
 
 export type PanelTextCode = keyof typeof panelTextParams;
@@ -540,6 +647,11 @@ export interface PanelAgentRunRequest {
   /** Не задан — сервер заводит новый и называет его в кадре `start`. */
   conversationId?: string;
   context: PanelAgentPageContext;
+  /**
+   * Картинки последней реплики — в самом запросе, блоками `image`: файловой
+   * системы у агента нет. Реплика называет их строкой `AGENT_IMAGES_MARKER`.
+   */
+  images?: AgentImage[];
 }
 
 /**
@@ -565,6 +677,10 @@ export const PANEL_AGENT_RUN_REFUSALS = [
   'endpoint_unsupported',
   'contour_unreachable',
   'data_mask_broken',
+  /** Разговор продолжили в другой вкладке: история окна отстала от файла. */
+  'conversation_stale',
+  /** Разговор удалили в другой вкладке, а окно пишет в него со своей историей. */
+  'conversation_deleted',
 ] as const;
 export type PanelAgentRunRefusalCode = (typeof PANEL_AGENT_RUN_REFUSALS)[number];
 
@@ -599,7 +715,44 @@ export interface PanelAgentConversation {
   createdAt: string;
   updatedAt: string;
   context: PanelAgentPageContext;
-  messages: Array<PanelAgentMessage & { at: string }>;
+  /**
+   * `interrupted` — ответ, запечатанный панелью за оборванный ход: сказанное и
+   * выполненное до обрыва плюс пометка «не дописан». Модель ответа не закончила.
+   */
+  messages: Array<PanelAgentMessage & { at: string; interrupted?: true; seal?: PanelAgentSeal }>;
+  /**
+   * Идущий ход: что уже сказано и какие действия выполнены. Пишется по ходу,
+   * чтобы перезапуск панели посреди хода не стёр сделанное; `boot` — метка
+   * процесса панели, ход с чужой меткой умер вместе с прежним процессом.
+   */
+  openTurn?: PanelAgentOpenTurn;
+}
+
+export interface PanelAgentOpenTurn {
+  boot: string;
+  startedAt: string;
+  texts: string[];
+  /**
+   * Имя действия, у неудачного — с пометкой ` (failed)` (её читает модель, язык
+   * английский). Без ответа переходника: он может нести данные.
+   */
+  actions: string[];
+}
+
+/** Почему ход запечатан: перезапуск панели, остановка, потолок времени, сбой CLI. */
+export type PanelAgentSealReason = 'restart' | 'stopped' | 'timeout' | 'failed';
+
+/**
+ * Код запечатанного ответа. Текст реплики уходит модели следующим ходом и потому
+ * английский (D-E); пометку «ответ не дописан» окно рисует человеку своим языком
+ * по этому коду (`sealNote` в `panel-agent-feed.ts`).
+ */
+export interface PanelAgentSeal {
+  reason: PanelAgentSealReason;
+  /** Действия хода, как в `PanelAgentOpenTurn.actions`. */
+  actions: string[];
+  /** Сырая причина сбоя (текст CLI) — только у `failed`, не переводится. */
+  detail?: string;
 }
 
 /** Строка списка разговоров `GET /api/agent/conversations`. */

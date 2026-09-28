@@ -46,7 +46,25 @@
 
   --layout-sidebar-width: 260px;
   --layout-header-height: 56px;
-  --layout-content-max: 1180px;
+
+  // Раскладка раздела — одна на все страницы (28.09.2026). На широком экране
+  // раздел был колонкой в 1180px, и половина окна справа пустовала. Теперь рамка
+  // раздела — вся область контента: страница свою ширину не ограничивает, меру
+  // держат только текст (`--text-measure`) и сетки карточек (`--layout-card-min`).
+  // Токен оставлен ради старых ссылок `max-width: var(--layout-content-max)`.
+  --layout-content-max: none;
+  // Отступы колонки раздела (MainLayout `main`). Нижний — воздух под последним
+  // элементом, когда страница прокручена до конца; страницы своего не добавляют.
+  --layout-page-pad-x: var(--spacing-xl);
+  --layout-page-pad-top: var(--spacing-xl);
+  --layout-page-pad-bottom: var(--spacing-xl);
+  // Промежуток между секциями страницы: шапка, вкладки, карточки.
+  --layout-section-gap: var(--spacing-lg);
+  // Наименьшая колонка сетки карточек: на широком экране колонок больше,
+  // а не одна узкая с пустотой справа.
+  --layout-card-min: 360px;
+  // Колонка списка у страницы «список | подробности».
+  --layout-master-width: 300px;
 
   /**
    * Предельная ширина строки текста. Глаз теряет начало следующей строки,
@@ -105,6 +123,10 @@
   --series-4: #eda100;
   --series-5: #1baf7a;
   --chart-grid: #eceef2;
+
+  // Стрелка выпадающего списка — цвета fg-muted темы (картинка фона не умеет
+  // currentColor, поэтому своя на каждую тему).
+  --select-caret: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%235b616e' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
 
 :root[data-theme='dark'] {
@@ -148,6 +170,8 @@
   --series-4: #c98500;
   --series-5: #199e70;
   --chart-grid: #232830;
+
+  --select-caret: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%239aa2b1' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
 
 // Кастомный акцент поверх темы. Настройка `accent` ставит data-accent на <html>;
@@ -325,4 +349,50 @@ body {
  */
 .prose {
   max-width: var(--text-measure);
+}
+
+// На узких экранах крупный отступ раздела съедает и без того тесную ширину.
+// Нижний не опускается ниже 24px: последний элемент длинной страницы не должен
+// прилипать к краю окна (bug 10).
+@media (max-width: 900px) {
+  :root {
+    --layout-page-pad-x: var(--spacing-md);
+    --layout-page-pad-top: var(--spacing-md);
+    --layout-page-pad-bottom: var(--spacing-lg);
+  }
+}
+
+@media (max-width: 480px) {
+  :root {
+    --layout-page-pad-x: var(--spacing-sm);
+    --layout-page-pad-top: var(--spacing-sm);
+    --layout-page-pad-bottom: var(--spacing-lg);
+  }
+}
+
+/*
+ * Таблицы панели: содержимое каждой ячейки — на средней линии строки, заголовки
+ * на той же оси (bug 7). Значки статуса у верха строки, а кнопки ниже читались
+ * как сбитая вёрстка. Модули `vertical-align: top` не ставят.
+ */
+th,
+td {
+  vertical-align: middle;
+}
+
+/*
+ * Выпадающий список (bug 8). Системная стрелка стояла вплотную к правой рамке,
+ * и под неё заезжал текст. Стрелка своя — в 10px от рамки, текст кончается за
+ * 30px до края. Специфичность (0,2,1) выше модульного класса намеренно: ни один
+ * `.select { padding: …; background: … }` модуля не возвращает стрелку к рамке.
+ * Модулям — фон цветом (`background-color`), отступы слева/сверху/снизу; правый
+ * отступ, `appearance` и картинку фона они не трогают.
+ */
+select:not([multiple]):not([size]) {
+  appearance: none;
+  padding-right: 30px;
+  background-image: var(--select-caret);
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 10px 6px;
 }

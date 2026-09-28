@@ -47,8 +47,17 @@ function withDeadline<T>(work: Promise<T>, timeoutMs: number, message: string): 
   });
 }
 
+/**
+ * `authorized` — токены уже были и подошли; `not-required` — сервер ответил
+ * БЕЗ всякого входа (локальный Dev Mode, открытый SSE): входить некуда, и
+ * человеку надо сказать именно это. Раньше оба случая были одним
+ * `authorized`: карточка молча закрывала окно, значок «Авторизован» не
+ * появлялся (токенов нет), кнопка оставалась — «нажал, ничего не произошло».
+ */
 export type StartOAuthResult =
-  { status: 'authorized' } | { status: 'redirect'; authorizationUrl: string };
+  | { status: 'authorized' }
+  | { status: 'not-required' }
+  | { status: 'redirect'; authorizationUrl: string };
 
 /**
  * Начинает вход. Подключается к серверу с провайдером: если токены уже есть и
@@ -69,12 +78,14 @@ export async function startOAuth(server: McpServer, appData: string): Promise<St
   const provider = new PanelOAuthProvider(server.id, oauthStorePath(appData), oauthCallbackUrl());
   const transport = createNetworkTransport(server, provider);
   const client = new Client({ name: 'agentdeck', version: '0.1.0' }, { capabilities: {} });
+  // Были ли токены ДО подключения: успешное подключение без них значит, что
+  // сервер входа не требует вовсе, а не что вход уже выполнен.
+  const hadTokens = provider.tokens() !== undefined;
 
   try {
     await withDeadline(client.connect(transport), 20_000, serverText('mcp-oauth-timeout'));
-    // Токены уже были и подошли — вход не требуется.
     await client.close().catch(() => undefined);
-    return { status: 'authorized' };
+    return hadTokens ? { status: 'authorized' } : { status: 'not-required' };
   } catch (error) {
     if (error instanceof UnauthorizedError && provider.authorizationUrl) {
       pending.set(provider.pendingState, {

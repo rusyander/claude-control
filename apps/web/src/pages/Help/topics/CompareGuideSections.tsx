@@ -34,8 +34,11 @@ export function CompareGuideSections({ tr }: SectionProps) {
           <GuideStep title={g('lookEnv')} text={g('lookEnvText')}>
             <HelpShot topic="compare" scenario="look" frame="02-env" side="panel" />
           </GuideStep>
+          <GuideStep title={g('lookPermissions')} text={g('lookPermissionsText')}>
+            <HelpShot topic="compare" scenario="look" frame="03-permissions" side="panel" />
+          </GuideStep>
           <GuideStep title={g('lookInstructions')} text={g('lookInstructionsText')}>
-            <HelpShot topic="compare" scenario="look" frame="03-instructions" side="panel" />
+            <HelpShot topic="compare" scenario="look" frame="04-instructions" side="panel" />
           </GuideStep>
         </GuideSteps>
       </HelpSection>

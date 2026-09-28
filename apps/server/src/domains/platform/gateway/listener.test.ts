@@ -207,7 +207,7 @@ describe('порт', () => {
     expect(
       store.getSettings().endpointProfiles.find((item) => item.id === 'contour-company-dev')
         ?.baseUrl,
-    ).toBe(`http://127.0.0.1:${busy + 1}/company-dev/v1`);
+    ).toBe(`http://127.0.0.1:${busy + 1}/company-dev/_s/assistant/v1`);
   });
 });
 

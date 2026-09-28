@@ -24,6 +24,11 @@ describe('oauthStartOutcome', () => {
     expect(oauthStartOutcome({ status: 'authorized' }, true)).toEqual({ kind: 'authorized' });
   });
 
+  it('сервер без входа (Dev Mode Figma) — свой исход, не «авторизован»', () => {
+    expect(oauthStartOutcome({ status: 'not-required' }, true)).toEqual({ kind: 'notRequired' });
+    expect(oauthStartOutcome({ status: 'not-required' }, false)).toEqual({ kind: 'notRequired' });
+  });
+
   it('ответ без адреса — отдельный исход, а не тишина', () => {
     expect(oauthStartOutcome({ status: 'redirect' }, true)).toEqual({ kind: 'noUrl' });
     expect(oauthStartOutcome({ status: 'redirect' }, false)).toEqual({ kind: 'noUrl' });

@@ -13,10 +13,17 @@ import type { StartOAuthResult } from '@entities/McpServer';
  * Поэтому решение вынесено отдельно: адрес есть всегда, разница лишь в том,
  * открыть его самим или показать человеку ссылку. Отсутствие адреса — тоже
  * исход, а не молчание.
+ *
+ * `notRequired` — живой случай 28.09: локальный Dev Mode Figma отвечает без
+ * входа, старт раньше говорил «authorized», карточка молча закрывала окно, а
+ * значка «Авторизован» не появлялось (токена нет и не будет). Кнопка выглядела
+ * мёртвой. Теперь это отдельный исход со своими словами.
  */
 export type OAuthStartOutcome =
-  /** Токен уже есть — входить не нужно. */
+  /** Сохранённый токен уже подошёл — входить не нужно. */
   | { kind: 'authorized' }
+  /** Сервер отвечает без входа вовсе — авторизация ему не нужна. */
+  | { kind: 'notRequired' }
   /** Окно живо: ведём его на адрес авторизации сами. */
   | { kind: 'popup'; url: string }
   /** Окна нет (блокировщик) — адрес показываем ссылкой. */
@@ -26,6 +33,7 @@ export type OAuthStartOutcome =
 
 export function oauthStartOutcome(result: StartOAuthResult, hasPopup: boolean): OAuthStartOutcome {
   if (result.status === 'authorized') return { kind: 'authorized' };
+  if (result.status === 'not-required') return { kind: 'notRequired' };
   if (!result.authorizationUrl) return { kind: 'noUrl' };
 
   return hasPopup

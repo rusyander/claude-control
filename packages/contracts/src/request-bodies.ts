@@ -177,3 +177,20 @@ export type GitWorktreeRemoveBody = Infer<typeof gitWorktreeRemoveBodySchema>;
 export type GitWorktreeMirrorBody = Infer<typeof gitWorktreeMirrorBodySchema>;
 export type GitMirrorSettingsBody = Infer<typeof gitMirrorSettingsBodySchema>;
 export type GitWorktreeBootstrapBody = Infer<typeof gitWorktreeBootstrapBodySchema>;
+
+/**
+ * «Остановить» сессию вне панели (вкладка «Сессии» аналитики). `pid` и
+ * `startedAt` — ровно то, что человек видел в окне подтверждения: сервер
+ * снимает процесс, только если под этим номером всё ещё он. `allowPanel` —
+ * явная отмашка, когда из этой сессии запущена сама панель.
+ */
+export const sessionStopBodySchema = object({
+  pid: number().int().positive(),
+  // Не дата — кривой запрос (400), а не «номер занят другим процессом» (F-361).
+  startedAt: string()
+    .min(1)
+    .refine((value) => Number.isFinite(Date.parse(value)), 'время запуска — дата ISO'),
+  allowPanel: boolean().optional(),
+});
+
+export type SessionStopBody = Infer<typeof sessionStopBodySchema>;

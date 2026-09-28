@@ -56,6 +56,17 @@ export function PanelAgentGuideSections({ tr }: SectionProps) {
           <GuideStep title={g('firstHistory')} text={g('firstHistoryText')}>
             <HelpShot topic="panelAgent" scenario="first" frame="10-history" side="panel" />
           </GuideStep>
+          <GuideStep title={g('firstScenario')} text={g('firstScenarioText')}>
+            <HelpShot topic="panelAgent" scenario="first" frame="11-scenario-card" side="panel" />
+          </GuideStep>
+          <GuideStep title={g('firstScenarioCreated')} text={g('firstScenarioCreatedText')}>
+            <HelpShot
+              topic="panelAgent"
+              scenario="first"
+              frame="12-scenario-created"
+              side="panel"
+            />
+          </GuideStep>
         </GuideSteps>
       </HelpSection>
 

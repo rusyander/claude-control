@@ -1,0 +1,35 @@
+.stage {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding-block: 4px;
+}
+
+.line {
+  flex: 1;
+  height: 1px;
+  background: var(--color-border);
+}
+
+.label {
+  padding: 2px var(--spacing-xs);
+  border: 1px dashed var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-fg-muted);
+  font: inherit;
+  font-size: var(--font-size-caption);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--color-fg);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+}

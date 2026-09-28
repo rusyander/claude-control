@@ -103,7 +103,10 @@ describe('POST /api/chat/split/:parent/tickets/file', () => {
       store,
       backupDir: join(appData, 'backups'),
     } as unknown as ServerContext;
-    const tracker = atlassianTicketTracker(ctx);
+    const tracker = atlassianTicketTracker(
+      () => ctx.store,
+      () => ctx.location.paths.appData,
+    );
     const registry = new ChatRunRegistry((): RunLike => ({
       start: async () => undefined,
       stop: () => undefined,
@@ -182,6 +185,50 @@ describe('POST /api/chat/split/:parent/tickets/file', () => {
     expect(response.statusCode).toBe(409);
     expect(response.json()).toMatchObject({ messageCode: 'split-ticket-tracker-missing' });
     expect(calls).toEqual([]);
+  });
+
+  it('каталог конфига сменили после старта — трекер по умолчанию читает новое хранилище', async () => {
+    // Смена каталога подменяет ctx.store и ctx.location (`context.ts`); трекер,
+    // захвативший их при регистрации, заводил бы тикеты по привязкам и доступу
+    // прежнего каталога.
+    const oldData = join(root, 'old-agentdeck');
+    mkdirSync(oldData, { recursive: true });
+    const ctx = {
+      location: { paths: { root, appData: oldData, mcpConfig: join(root, '.claude.json') } },
+      store: new AppStore(oldData),
+      backupDir: join(oldData, 'backups'),
+    } as unknown as ServerContext;
+    const registry = new ChatRunRegistry((): RunLike => ({
+      start: async () => undefined,
+      stop: () => undefined,
+    }));
+    const switched = Fastify();
+    registerChatSplitRoutes(switched, ctx, {
+      runs: registry,
+      providerChats: new ProviderChatService(),
+      session: new ChatSession(registry),
+      conveyor,
+    });
+    await switched.ready();
+    try {
+      ctx.store = store;
+      ctx.location = {
+        ...ctx.location,
+        paths: { ...ctx.location.paths, appData },
+      } as ServerContext['location'];
+      writeLink(store, root, undefined, { jiraProjectKey: 'PROJ' });
+
+      const response = await switched.inject({
+        method: 'POST',
+        url: '/api/chat/split/parent-1/tickets/file',
+        payload: { key: KEY, description: 'Описание из хаба' },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({ key: 'PROJ-7', created: true });
+    } finally {
+      await switched.close();
+    }
   });
 
   it('неизвестное предложение — отказ с кодом', async () => {

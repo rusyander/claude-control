@@ -1,4 +1,5 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
+import type { AgentImage } from '@agentdeck/contracts/agent-images';
 import type {
   MediaDeck,
   MediaDeckFormat,
@@ -49,6 +50,22 @@ async function createDeck(request: {
     timeout: LONG_TIMEOUTS.mediaDeck,
   });
   return data;
+}
+
+/**
+ * Картинки для чужого CLI: панель кладёт их файлами в свой каталог данных и
+ * отдаёт пути — дальше они едут вложениями, как файл, выбранный в проводнике
+ * панели (CLI читает их сам). Проверка та же, что у картинок в запросе.
+ */
+export async function storeAgentImageFiles(
+  images: AgentImage[],
+): Promise<{ name: string; path: string }[]> {
+  const { data } = await apiClient.post<{ files: { name: string; path: string }[] }>(
+    '/media/agent-files',
+    { images },
+    { timeout: LONG_TIMEOUTS.assistantRun },
+  );
+  return data.files;
 }
 
 /** Рисунок, который агент отдал блоком: панель его проверит и положит файлом. */

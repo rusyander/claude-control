@@ -24,8 +24,15 @@ import { ruleApi } from '@entities/Rule';
 import { useClaudeMd } from '@entities/AppConfig';
 import { useProviders, activeProvider } from '@entities/Provider';
 import type { Rule } from '@agentdeck/contracts';
+import { PageTabs, PageTabPanel } from '@shared/ui/page-tabs';
+import { usePageTab } from '@shared/hooks/use-page-tab';
 import { resolveRulesEmptyState } from './model/rulesEmptyState';
+import { RULES_TABS, RULES_TAB_ICONS, rulesInTab, rulesShownInTab } from './model/tabs';
+import type { RulesTabId } from './model/tabs';
 import styles from './RulesPage.module.scss';
+
+/** Пустой набор переключённых — один на все отрисовки, чтобы useMemo не пересчитывал зря. */
+const EMPTY_IDS: ReadonlySet<string> = new Set();
 
 /** Адрес страницы файла целиком — на неё ведёт объясняющая заглушка. */
 const CLAUDE_MD_ROUTE: string = '/claude-md';
@@ -40,6 +47,27 @@ export function RulesPage() {
   const { data: rules = [], isLoading } = ruleApi.useList();
   const setEnabled = ruleApi.useSetEnabled();
   const deleteRule = ruleApi.useDelete();
+
+  const { active: chosenTab, select: selectTab } = usePageTab('rules', RULES_TABS);
+  // Без правил делить нечего: пустоту объясняют заглушки ниже, а полоса из трёх
+  // нулей только отвлекала бы от них. Адрес с ?tab= тогда показывает весь список.
+  const hasTabs = rules.length > 0;
+  const activeTab = hasTabs ? chosenTab : 'all';
+  // Переключённые на открытой вкладке: помнятся вместе с вкладкой, и уход с неё
+  // их сбрасывает — вернувшись, человек видит честный отбор. Сброс — во время
+  // отрисовки (сравнение с прошлой вкладкой), а не эффектом: эффект успел бы
+  // показать один кадр со старыми карточками.
+  const [toggled, setToggled] = useState<{ tab: RulesTabId; ids: ReadonlySet<string> }>({
+    tab: activeTab,
+    ids: EMPTY_IDS,
+  });
+  if (toggled.tab !== activeTab) setToggled({ tab: activeTab, ids: EMPTY_IDS });
+  const kept = toggled.tab === activeTab ? toggled.ids : EMPTY_IDS;
+  const inTab = useMemo(() => rulesShownInTab(rules, activeTab, kept), [rules, activeTab, kept]);
+  const toggleRule = (id: string, isEnabled: boolean): void => {
+    setToggled({ tab: activeTab, ids: new Set([...kept, id]) });
+    setEnabled.mutate({ id, isEnabled });
+  };
 
   const openCreate = (): void => {
     setEditing(undefined);
@@ -63,17 +91,21 @@ export function RulesPage() {
     if (!open) writeUrl(undefined);
   };
 
+  // Поиск идёт внутри открытой вкладки: «Выключены» + слово — это вопрос «не
+  // выключено ли вот это правило», и ответ не должен тонуть во включённых.
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    if (!needle) return rules;
-    return rules.filter(
+    if (!needle) return inTab;
+    return inTab.filter(
       (rule) =>
         rule.title.toLowerCase().includes(needle) || rule.body.toLowerCase().includes(needle),
     );
-  }, [rules, query]);
+  }, [inTab, query]);
 
   const isEmpty = !isLoading && filtered.length === 0;
   const hasQuery = query.trim().length > 0;
+  // Вкладка-отбор пуста сама по себе, а не из-за поиска: сказать это словами.
+  const isTabEmpty = isEmpty && activeTab !== 'all' && inTab.length === 0;
 
   // Тот же файл, что открыт на странице CLAUDE.md (общий ключ запроса, обновляется
   // наблюдателем вместе с правилами): по нему решаем, какую пустоту показывать.
@@ -88,21 +120,16 @@ export function RulesPage() {
     [instructions?.content],
   );
 
-  return (
-    <Stack gap="var(--spacing-lg)" className={styles.page}>
-      <PageHeader
-        title={t('rules.title')}
-        subtitle={t('rules.subtitle')}
-        helpTopic="rules"
-        actions={
-          <Button variant="primary" leftIcon={<Icon name="plus" size={24} />} onClick={openCreate}>
-            {t('rules.addRule')}
-          </Button>
-        }
-      />
+  const tabs = RULES_TABS.map((id) => ({
+    id,
+    label: t(`pageTabs.rules.tab.${id}`),
+    icon: RULES_TAB_ICONS[id],
+    count: rulesInTab(rules, id).length,
+  }));
 
-      <ExplainBox title={t('rules.explainTitle')} text={t('rules.explain')} />
-
+  // Поиск, список и пустые состояния одни и те же с вкладками и без них.
+  const listBody = (
+    <>
       <SearchField
         value={query}
         onChange={setQuery}
@@ -110,11 +137,9 @@ export function RulesPage() {
         label={t('common.search')}
       />
 
-      {isLoading && <SkeletonList rows={5} />}
-
       <Stack gap="var(--spacing-sm)">
         {filtered.map((rule) => (
-          <Card key={rule.id} padding="md">
+          <Card key={rule.id} padding="md" data-agent-anchor={rule.id}>
             <Stack direction="row" gap="var(--spacing-md)" align="start" width="100%">
               <Stack gap="var(--spacing-2xs)" flex={1} minWidth={0}>
                 <Stack direction="row" align="center" gap="var(--spacing-xs)" wrap>
@@ -151,7 +176,7 @@ export function RulesPage() {
                 />
                 <Toggle
                   checked={rule.isEnabled}
-                  onCheckedChange={(isEnabled) => setEnabled.mutate({ id: rule.id, isEnabled })}
+                  onCheckedChange={(isEnabled) => toggleRule(rule.id, isEnabled)}
                   aria-label={rule.title}
                 />
               </Stack>
@@ -168,17 +193,20 @@ export function RulesPage() {
           правилами только «## ПРАВИЛО: …» (contracts/rule-format), и голый «0»
           читался как сломанный счётчик. Поэтому здесь — сколько таких разделов
           в файле, какой заголовок ждёт панель, и куда идти править. */}
-      {isEmpty && hasQuery && (
+      {isTabEmpty && (
+        <Typography color="subtle">{t(`pageTabs.rules.empty.${activeTab}`)}</Typography>
+      )}
+      {isEmpty && hasQuery && !isTabEmpty && (
         <EmptyState
           icon="search"
           title={t('rules.noMatchTitle')}
           text={t('rules.noMatchText', { query: query.trim() })}
         />
       )}
-      {isEmpty && !hasQuery && emptyState.kind === 'blank' && (
+      {isEmpty && !hasQuery && !hasTabs && emptyState.kind === 'blank' && (
         <EmptyState icon="rules" title={t('rules.emptyTitle')} text={t('rules.emptyText')} />
       )}
-      {isEmpty && !hasQuery && emptyState.kind === 'unformatted' && (
+      {isEmpty && !hasQuery && !hasTabs && emptyState.kind === 'unformatted' && (
         <EmptyState
           icon="rules"
           title={t('rules.emptyPlainTitle')}
@@ -208,6 +236,43 @@ export function RulesPage() {
             </Stack>
           }
         />
+      )}
+    </>
+  );
+
+  return (
+    <Stack gap="var(--spacing-lg)" className={styles.page}>
+      <PageHeader
+        title={t('rules.title')}
+        subtitle={t('rules.subtitle')}
+        helpTopic="rules"
+        actions={
+          <Button variant="primary" leftIcon={<Icon name="plus" size={24} />} onClick={openCreate}>
+            {t('rules.addRule')}
+          </Button>
+        }
+      />
+
+      <ExplainBox title={t('rules.explainTitle')} text={t('rules.explain')} />
+
+      {isLoading && <SkeletonList rows={5} />}
+
+      {hasTabs && (
+        <PageTabs
+          page="rules"
+          label={t('pageTabs.rules.tabsLabel')}
+          tabs={tabs}
+          active={activeTab}
+          onSelect={selectTab}
+        />
+      )}
+
+      {hasTabs ? (
+        <PageTabPanel page="rules" tab={activeTab} hint={t(`pageTabs.rules.hint.${activeTab}`)}>
+          {listBody}
+        </PageTabPanel>
+      ) : (
+        listBody
       )}
 
       <RuleFormModal isOpen={isFormOpen} onOpenChange={closeForm} rule={editing} />

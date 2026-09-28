@@ -81,7 +81,7 @@ describe('composeUserMessage', () => {
 
   it('дописывает пути файлов отдельным блоком', () => {
     expect(composeUserMessage('Посмотри', ['/a/b.ts', ' /c/d.ts '])).toBe(
-      'Посмотри\n\nФайлы:\n/a/b.ts\n/c/d.ts',
+      'Посмотри\n\nFiles:\n/a/b.ts\n/c/d.ts',
     );
   });
 

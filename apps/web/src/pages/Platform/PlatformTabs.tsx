@@ -68,7 +68,9 @@ export function PlatformTabs({ active, onSelect }: PlatformTabsProps) {
             role="tab"
             id={platformTabDomId(tab.id)}
             aria-selected={isActive}
-            aria-controls={platformPanelDomId(tab.id)}
+            // Панель в разметке только у открытой вкладки: ссылка с остальных
+            // вела бы на несуществующий id (ревью 28.09, F-215).
+            aria-controls={isActive ? platformPanelDomId(tab.id) : undefined}
             tabIndex={isActive ? 0 : -1}
             className={`${styles.tab} ${isActive ? styles.tabActive : ''}`}
             onClick={() => onSelect(tab.id)}

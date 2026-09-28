@@ -12,8 +12,10 @@ import { Badge } from '@shared/ui/badge';
 import { FormWithAssistant } from '@shared/ui/form-with-assistant';
 import { BulkPresets } from '@shared/ui/bulk-presets';
 import { toErrorMessage } from '@shared/api/client';
+import { presetText } from '@shared/config/i18n';
 import { hookApi } from '@entities/Hook';
 import { HOOK_PRESETS, type HookPreset } from '../model/hookPresets';
+import { hookAssistantSpec } from '../model/hookAssistant';
 import { MatcherPicker } from './MatcherPicker';
 import { TemplateFields } from './TemplateFields';
 import type { HookFormModalProps } from './HookFormModal.types';
@@ -57,6 +59,12 @@ export function HookFormModal({ isOpen, onOpenChange, hook }: HookFormModalProps
     setMode('constructor');
   }, [isOpen, hook]);
 
+  /** Текст заготовки на языке интерфейса; им же заполняются поля хука. */
+  const hookPresetText = (preset: HookPreset, field: 'title' | 'description' | 'message') => {
+    const source = preset[field];
+    return source ? presetText(t, 'hook', preset.id, field, source) : '';
+  };
+
   /** Заготовка → черновик хука (для пакетного создания). */
   const draftFromPreset = (id: string) => {
     const preset = HOOK_PRESETS.find((item) => item.id === id);
@@ -68,8 +76,8 @@ export function HookFormModal({ isOpen, onOpenChange, hook }: HookFormModalProps
       groupIds: [],
       scriptName: preset.scriptName || undefined,
       template: preset.template,
-      description: preset.description,
-      message: preset.message ?? '',
+      description: hookPresetText(preset, 'description'),
+      message: hookPresetText(preset, 'message'),
       guardPatterns: (preset.guardPatterns ?? '')
         .split(',')
         .map((pattern) => pattern.trim())
@@ -86,8 +94,8 @@ export function HookFormModal({ isOpen, onOpenChange, hook }: HookFormModalProps
     setMatchers(preset.matchers);
     setTemplate(preset.template);
     setScriptName(preset.scriptName);
-    setDescription(preset.description);
-    setMessage(preset.message ?? '');
+    setDescription(hookPresetText(preset, 'description'));
+    setMessage(hookPresetText(preset, 'message'));
     setGuardPatterns(preset.guardPatterns ?? '');
     setCommand(preset.command ?? '');
   };
@@ -166,8 +174,8 @@ export function HookFormModal({ isOpen, onOpenChange, hook }: HookFormModalProps
         <BulkPresets
           items={HOOK_PRESETS.map((preset) => ({
             id: preset.id,
-            title: preset.title,
-            description: preset.description,
+            title: hookPresetText(preset, 'title'),
+            description: hookPresetText(preset, 'description'),
           }))}
           createOne={(id) => {
             const draft = draftFromPreset(id);
@@ -177,44 +185,32 @@ export function HookFormModal({ isOpen, onOpenChange, hook }: HookFormModalProps
         />
       ) : (
         <FormWithAssistant
-          kind={t('hooks.title')}
+          kind="hook"
           fields={{
             event,
-            matchers: matchers.join(','),
+            matchers,
             scriptName,
             template,
             description,
             message,
             guardPatterns,
             command,
+            timeout: timeoutSec.trim() === '' ? null : Number(timeoutSec.trim()),
           }}
-          schema={{
-            event: `Событие Claude Code, одно из: ${HOOK_EVENT_INFO.map((info) => info.event).join(', ')}`,
-            matchers: 'Инструменты через запятую, например Bash,Write',
-            scriptName: 'Имя файла скрипта без расширения, латиницей через дефис',
-            template:
-              'Тип действия: message (подсказка), guard (запрет), shell (команда), blank (пусто)',
-            description: 'Одной фразой, что делает хук',
-            message: 'Текст подсказки или сообщения при срабатывании запрета',
-            guardPatterns: 'Для типа guard: что перехватывать, через запятую',
-            command: 'Для типа shell: команда оболочки',
-          }}
+          spec={hookAssistantSpec()}
           onApply={(applied) => {
-            if (typeof applied.event === 'string') setEvent(applied.event as HookEvent);
-            if (typeof applied.matchers === 'string') {
-              setMatchers(
-                applied.matchers
-                  .split(',')
-                  .map((item) => item.trim())
-                  .filter(Boolean),
-              );
+            if (applied.event !== undefined) setEvent(applied.event as HookEvent);
+            if (applied.matchers !== undefined) setMatchers(applied.matchers);
+            if (applied.scriptName !== undefined) setScriptName(applied.scriptName);
+            if (applied.template !== undefined) setTemplate(applied.template);
+            if (applied.description !== undefined) setDescription(applied.description);
+            if (applied.message !== undefined) setMessage(applied.message);
+            if (applied.guardPatterns !== undefined) setGuardPatterns(applied.guardPatterns);
+            if (applied.command !== undefined) setCommand(applied.command);
+            // null — сброс к умолчанию Claude Code, как пустое поле у человека.
+            if (applied.timeout !== undefined) {
+              setTimeoutSec(applied.timeout === null ? '' : String(applied.timeout));
             }
-            if (typeof applied.scriptName === 'string') setScriptName(applied.scriptName);
-            if (typeof applied.template === 'string') setTemplate(applied.template);
-            if (typeof applied.description === 'string') setDescription(applied.description);
-            if (typeof applied.message === 'string') setMessage(applied.message);
-            if (typeof applied.guardPatterns === 'string') setGuardPatterns(applied.guardPatterns);
-            if (typeof applied.command === 'string') setCommand(applied.command);
           }}
         >
           <Stack gap="var(--spacing-md)">
@@ -237,9 +233,9 @@ export function HookFormModal({ isOpen, onOpenChange, hook }: HookFormModalProps
                         size="sm"
                         variant="secondary"
                         onClick={() => applyPreset(preset)}
-                        title={preset.description}
+                        title={hookPresetText(preset, 'description')}
                       >
-                        {preset.title}
+                        {hookPresetText(preset, 'title')}
                       </Button>
                     ))}
                   </Stack>
@@ -259,12 +255,12 @@ export function HookFormModal({ isOpen, onOpenChange, hook }: HookFormModalProps
                 <Stack gap="var(--spacing-2xs)">
                   <Stack direction="row" align="center" gap="var(--spacing-xs)" wrap>
                     <Typography variant="body-sm" weight="medium" as="span">
-                      {eventInfo.when}
+                      {presetText(t, 'hookEvent', eventInfo.event, 'when', eventInfo.when)}
                     </Typography>
                     {eventInfo.canBlock && <Badge tone="warning">{t('hooks.canBlock')}</Badge>}
                   </Stack>
                   <Typography variant="caption" color="muted">
-                    {eventInfo.useFor}
+                    {presetText(t, 'hookEvent', eventInfo.event, 'useFor', eventInfo.useFor)}
                   </Typography>
                 </Stack>
               </Card>

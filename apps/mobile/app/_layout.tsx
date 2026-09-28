@@ -8,7 +8,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import 'react-native-reanimated';
 import { AppSplash } from '../src/features/splash/AppSplash';
-import { loadConnection } from '../src/shared/api/connection';
+import { loadConnection, useConnection } from '../src/shared/api/connection';
+import { forgetPanelData } from '../src/shared/api/panel-cache';
 import { loadWorkspace } from '../src/shared/lib/workspace';
 import { resumeActive } from '../src/shared/lib/runs';
 import { ensureChannel } from '../src/shared/lib/notifications';
@@ -52,6 +53,7 @@ export default function RootLayout() {
   // оживляет и уходит. Приложение под ней уже смонтировано и готово.
   const [greeted, setGreeted] = useState(false);
   const appState = useRef<AppStateStatus>(AppState.currentState);
+  const connectionUrl = useConnection().url;
 
   useEffect(() => {
     void (async () => {
@@ -63,6 +65,12 @@ export default function RootLayout() {
       void resumeActive();
     })();
   }, []);
+
+  // Кэш запросов принадлежит одной панели: после «Отключить» или спаривания с другой
+  // экраны иначе показывают данные прежней, пока каждый не перезапросится сам.
+  useEffect(() => {
+    forgetPanelData(queryClient);
+  }, [connectionUrl]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (next) => {
@@ -105,6 +113,7 @@ export default function RootLayout() {
             }}
           >
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="chat" options={{ headerShown: false }} />
             <Stack.Screen name="chats" options={{ title: t.chats.title }} />
             <Stack.Screen name="code" options={{ title: t.code.projectTitle }} />
             <Stack.Screen name="tests" options={{ title: t.tests.screenTitle }} />

@@ -10,6 +10,7 @@ import { violationReport } from '../violations.ts';
 import type { PricingLookup } from '../../analytics/pricing.ts';
 import { driverOf } from '../drivers/index.ts';
 import { nativeMessagesPath } from './anthropic-native.ts';
+import { effectivePlatform } from '../rules-apply.ts';
 import { GATEWAY_ROUTES, handleGatewayRequest, type ToolCallGate } from './pipeline.ts';
 import { SpendFlusher, type BudgetCrossingNotice } from './spend-flush.ts';
 import { summarizedReport } from './summarized-ledger.ts';
@@ -312,7 +313,11 @@ export class PlatformGateway {
       : [];
     const bridged =
       enabled.length === 0 ||
-      enabled.some((platform) => !nativeMessagesPath(platform, driverOf(platform)));
+      // Действующие правила, как у конвейера: записанные инструменты платформы
+      // при «только наших правилах» не действуют, и прослойка ведёт мостом (F-272).
+      enabled.some(
+        (platform) => !nativeMessagesPath(effectivePlatform(platform), driverOf(platform)),
+      );
     return bridged
       ? GATEWAY_COMPROMISES
       : GATEWAY_COMPROMISES.filter((id) => id !== 'dialect-bridge');

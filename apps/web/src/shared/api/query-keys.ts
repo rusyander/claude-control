@@ -147,6 +147,7 @@ export const queryKeys = {
   prompt: (id: string) => ['prompts', id] as const,
   /** Удалённый доступ: токен, адрес в приватной сети и спаренные телефоны. */
   remote: ['remote'] as const,
+  watcher: ['watcher'] as const,
   /** Сверка форматов чужих CLI с их официальными схемами: кэш на неделю. */
   formatCheck: ['format-check'] as const,
   /** Резолв раннера активного провайдера (api/cli/none) — модалка ассистента. */
@@ -154,7 +155,28 @@ export const queryKeys = {
   permissions: ['permissions'] as const,
   env: ['env'] as const,
   groups: ['groups'] as const,
-  automations: ['automations'] as const,
+  /**
+   * Всё ниже вложено в `groups`: правка группы (копия в общие, слияние, импорт)
+   * меняет и путь, и находки — одна инвалидация `groups` обновляет их разом.
+   */
+  groupDiscovery: ['groups', 'discovery'] as const,
+  groupPath: (id: string) => ['groups', 'path', id] as const,
+  /** Все виды выбора пар проекта — префикс `groupChoice` любой пары. */
+  groupChoicesOf: (path: string) => ['groups', 'choice', path] as const,
+  groupChoice: (path: string, group = '') => ['groups', 'choice', path, group] as const,
+  /** «Числа» группы: у сервера выписка по хэшу скилла, у клиента — по группе. */
+  groupKnobs: (id: string) => ['groups', 'knobs', id] as const,
+  /** Участники группы одной строкой «что делает» — из их же файлов, без модели. */
+  groupMembers: (id: string) => ['groups', 'members', id] as const,
+  /** Каталог «Выбрать готовый»: общие ресурсы и — с путём — ресурсы проекта. */
+  groupResourceCatalog: (path: string) => ['groups', 'resource-catalog', path] as const,
+  /** Сводка ресурса кэшируется сервером по хэшу содержимого — у клиента ключ по типу и id. */
+  resourceSummary: (type: string, id: string) => ['resource-summary', type, id] as const,
+  /** Группа и автономность чата — по обоим ключам разговора. */
+  chatGroupSettings: (chatId: string, sessionId = '') =>
+    ['chat-group-settings', chatId, sessionId] as const,
+  /** Заметки главным чатам деревьев: один список на все, как его отдаёт сервер. */
+  chatEscalations: ['chat-escalations'] as const,
   /** Резервные копии: список обновляется после каждой записи в конфиг. */
   backups: ['backups'] as const,
   /** Лента изменений конфигурации: обновляется после каждой записи в конфиг. */
@@ -266,6 +288,16 @@ export const DOMAIN_KEYS: Record<string, readonly (readonly string[])[]> = {
   permissions: [queryKeys.permissions, queryKeys.overview, queryKeys.history, queryKeys.backups],
   env: [queryKeys.env, queryKeys.history, queryKeys.backups],
   overview: [queryKeys.overview],
+  // Ребёнок разделения сказал критичное: сервер рассылает домен сам, файла нет.
+  'chat-escalations': [queryKeys.chatEscalations],
+  // Папку e2e проекта сверил наблюдатель сервера: тест, дописанный в редакторе,
+  // стал кейсом — раздел «Тесты» перечитывает вид, историю и отчёт.
+  'project-tests': [['project-tests']],
+  // Собственное состояние панели, изменённое в другой вкладке или с телефона
+  // (сервер шлёт раздел сам, `lib/app-state-events.ts`): группы, выбор стороны
+  // пары (всё под `groups`) и группа чата — меню «Группа» открытого чата.
+  // Раздел `settings` разбирает FileWatchProvider: там мало инвалидации.
+  groups: [queryKeys.groups, ['chat-group-settings']],
   // Транскриптов здесь намеренно нет: разговоров сотни, и правка одного не
   // повод перечитывать открытый — обновление идёт адресно, по пути из события
   // (см. FileWatchProvider).

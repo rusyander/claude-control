@@ -8,35 +8,41 @@
 .row {
   display: inline-flex;
   align-items: center;
-  gap: var(--spacing-2xs);
+  gap: 2px;
 }
 
 // Один поднятый сервер: ссылка на адрес плюс кнопка остановки. В монорепе таких
-// «чипов» столько же, сколько запущено целей.
+// «чипов» столько же, сколько запущено целей. Рамки у чипа нет: в ряду шапки
+// каждая кнопка одной высоты и одного вида, а рамка давала ещё один калибр.
 .chip {
   display: inline-flex;
   align-items: center;
-  gap: var(--spacing-3xs);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding-left: var(--spacing-3xs);
+  gap: 2px;
 }
 
-// «Перейти»: внешняя ссылка target=_blank, оформленная как компактная кнопка-ghost
-// в тон соседним действиям шапки.
+// «Перейти»: внешняя ссылка target=_blank — по размеру ровно кнопка ряда шапки
+// (34px), акцентным цветом: это единственный переход наружу.
 .link {
   display: inline-flex;
   align-items: center;
   gap: var(--spacing-3xs);
-  padding: var(--spacing-3xs) var(--spacing-2xs);
-  border-radius: var(--radius-md);
+  height: 34px;
+  padding: 0 var(--spacing-2xs);
+  border-radius: 8px;
   color: var(--color-accent);
   font-size: var(--font-size-body-sm);
+  font-weight: var(--font-weight-medium);
   text-decoration: none;
+  white-space: nowrap;
   transition: background var(--duration-fast);
 
   &:hover {
     background: var(--color-accent-subtle);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 1px;
   }
 }
 
@@ -53,7 +59,8 @@
   display: inline-flex;
   align-items: center;
   gap: var(--spacing-3xs);
-  padding: var(--spacing-3xs) var(--spacing-2xs);
+  height: 34px;
+  padding: 0 var(--spacing-2xs);
   color: var(--color-fg-muted);
   font-size: var(--font-size-body-sm);
   cursor: default;
@@ -66,9 +73,8 @@
   display: inline-flex;
   align-items: center;
   gap: var(--spacing-3xs);
-  padding: var(--spacing-3xs) var(--spacing-2xs);
-  border: 1px solid var(--color-warning-border, var(--color-border));
-  border-radius: var(--radius-md);
+  padding: 0 0 0 var(--spacing-2xs);
+  border-left: 2px solid var(--color-warning);
   color: var(--color-fg-muted);
   font-size: var(--font-size-body-sm);
 }
@@ -90,32 +96,39 @@
   white-space: nowrap;
 }
 
+// Слой — числом, как у соседних поповеров шапки (60/61). Здесь стоял
+// `var(--z-dropdown)`, а такой переменной в проекте нет: z-index становился
+// недействительным, то есть `auto`, и любой позже нарисованный элемент —
+// перенесённые кнопки шапки, полоса git, поле ввода — ложился поверх поповера
+// и срезал его первую строку (владелец, 28.09).
 .backdrop {
   position: fixed;
   inset: 0;
-  z-index: var(--z-dropdown);
+  z-index: 60;
 }
 
+// Сдвиг по горизонтали и высоту под окно ставит useAnchoredPanel; здесь только
+// начальное положение и потолок.
 .panel {
   position: absolute;
-  top: calc(100% + var(--spacing-3xs));
+  top: calc(100% + 4px);
   right: 0;
-  z-index: calc(var(--z-dropdown) + 1);
+  z-index: 61;
   width: 420px;
-  max-width: calc(100vw - var(--spacing-lg));
-  background: var(--color-surface);
+  max-width: calc(100vw - 16px);
+  max-height: min(80vh, var(--panel-max-block, 80vh));
+  overflow-y: auto;
+  background: var(--color-surface-raised);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
+  border-radius: 12px;
   box-shadow: var(--shadow-lg);
 }
 
-// Целей в монорепе бывает много: список прокручивается, а поповер остаётся
-// на экране целиком.
+// Целей в монорепе бывает много: прокручивается сам поповер (его высоту
+// держит в окне useAnchoredPanel) — одна прокрутка, а не вторая внутри первой.
 .targets {
   display: flex;
   flex-direction: column;
-  max-height: 46vh;
-  overflow-y: auto;
 }
 
 .target {
@@ -142,7 +155,7 @@
   min-width: 0;
   padding: var(--spacing-3xs);
   border: none;
-  border-radius: var(--radius-sm);
+  border-radius: 6px;
   background: none;
   color: var(--color-fg);
   cursor: pointer;
@@ -181,7 +194,7 @@
   height: 30px;
   padding: 0 var(--spacing-2xs);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
+  border-radius: 6px;
   background: var(--color-surface-sunken);
   color: var(--color-fg);
   font-family: var(--font-mono);
@@ -212,7 +225,7 @@
     margin: var(--spacing-3xs) 0 0;
     overflow: auto;
     padding: var(--spacing-2xs);
-    border-radius: var(--radius-sm);
+    border-radius: 6px;
     background: var(--color-surface-sunken);
     font-family: var(--font-mono);
     white-space: pre-wrap;

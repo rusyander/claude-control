@@ -86,8 +86,6 @@ describe('маршруты: запрос без тела не даёт 500', () 
     ['PUT', `/api/groups/${'ЗАГЛУШКА'}`],
     ['POST', '/api/groups/ЗАГЛУШКА/enabled'],
     ['POST', '/api/groups/activate'],
-    ['POST', '/api/automations'],
-    ['PUT', '/api/automations/ЗАГЛУШКА'],
     ['POST', '/api/project-git/checkout'],
     ['POST', '/api/project-git/branch'],
     ['POST', '/api/project-git/commit'],
@@ -138,19 +136,6 @@ describe('маршруты: запрос без тела не даёт 500', () 
 
     const list = await app.inject({ method: 'GET', url: '/api/groups' });
     expect(list.json<{ name: string }[]>().every((group) => group.name.trim() !== '')).toBe(true);
-  });
-
-  it('пустой сценарий не заводится: он компилируется в хук настоящего конфига', async () => {
-    for (const [method, url] of [
-      ['POST', '/api/automations'],
-      ['PUT', '/api/automations/нет-такого'],
-    ] as const) {
-      const res = await app.inject({ method, url });
-      expect(res.statusCode, url).toBe(400);
-    }
-
-    const list = await app.inject({ method: 'GET', url: '/api/automations' });
-    expect(list.json()).toEqual([]);
   });
 
   it('прочие переключатели без состояния тоже отказывают, а не выбирают за человека', async () => {

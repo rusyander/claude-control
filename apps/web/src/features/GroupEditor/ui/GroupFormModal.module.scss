@@ -24,25 +24,13 @@
   }
 }
 
-.orderList {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: var(--spacing-2xs);
-  gap: var(--spacing-3xs);
-}
-
 .orderRow {
   padding: var(--spacing-2xs) var(--spacing-xs);
-  border-radius: var(--radius-sm);
+  border-radius: 6px;
 
   &:hover {
     background-color: var(--color-surface-sunken);
   }
-}
-
-/* Даём подписи сжиматься, чтобы длинное имя обрезалось, а стрелки не уезжали. */
-.orderLabel {
-  min-width: 0;
 }
 
 /* Шаг сценария — карточка: без рамки поля трёх шагов сливаются в одну простыню. */

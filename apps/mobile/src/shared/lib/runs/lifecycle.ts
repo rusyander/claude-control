@@ -48,11 +48,20 @@ async function keepStreaming(
 ): Promise<void> {
   let attempts = 0;
   let currentMode = mode;
+  // Отказ «занят» на первой отправке не отдаётся вызывающему: прогон ниже
+  // подхватывается, а сообщение встаёт в очередь — ответ принят (F-67).
+  let busyHeld: ((outcome: SendOutcome) => void) | undefined;
+  const firstSettle =
+    settle &&
+    ((outcome: SendOutcome): void => {
+      if (!outcome.ok && outcome.code === 'run_busy' && input.prompt) busyHeld = settle;
+      else settle?.(outcome);
+    });
 
   for (;;) {
     let outcome: Awaited<ReturnType<typeof openStream>>;
     try {
-      outcome = await openStream(id, input, controller, currentMode, settle);
+      outcome = await openStream(id, input, controller, currentMode, settle && firstSettle);
     } catch (error) {
       if (controller.signal.aborted) return;
       outcome = 'dirty';
@@ -76,7 +85,7 @@ async function keepStreaming(
       // или из другого окна, а телефон о нём не знал. Оставить человека с одним
       // отказом нельзя: кнопки «Стоп» у ошибки нет. Подхватываем прогон потоком
       // по ключу из отказа (`serverRunId`) — возвращаются и живой текст, и
-      // «Стоп». Набранное сообщение остаётся в поле: сервер его не принял.
+      // «Стоп». Непринятое сообщение встаёт в очередь и уходит по концу хода.
       const refused = getRun(id);
       if (
         refused.errorCode === 'run_busy' &&
@@ -93,10 +102,26 @@ async function keepStreaming(
           lastPrompt: undefined,
           lastEventAt: Date.now(),
         });
+        // Сервер сообщение не принял, а человек его отправил (ответ из «Вопросов»,
+        // поле ввода): оно уходит по концу этого хода, как у занятого агента.
+        if (busyHeld) {
+          enqueue(id, {
+            prompt: input.prompt,
+            allowEdits: input.allowEdits,
+            autoApprove: input.autoApprove,
+            model: input.model,
+            effort: input.effort,
+            files: input.files,
+          });
+          busyHeld({ ok: true });
+          busyHeld = undefined;
+        }
         emit();
         attempts = 0;
         continue;
       }
+      // Подхватить не вышло (остановлено) — отказ отдаём, как он есть.
+      busyHeld?.({ ok: false, code: 'run_busy', message: refused.error ?? '' });
       break;
     }
     if (outcome === 'gone') {
@@ -272,7 +297,16 @@ export async function stop(id: string): Promise<void> {
   stoppedByUser.add(id);
   try {
     await api.post(`/chat/${encodeURIComponent(serverKey(id))}/stop`);
-  } catch {
+  } catch (error) {
+    // Сервер не снял процесс: номер нечем проверить, а чужое он не трогает
+    // (F-145). Прогон идёт дальше — «остановлено» было бы неправдой, и поток
+    // обрывать нельзя: только из него человек увидит, что агент ещё работает.
+    if ((error as { code?: unknown } | null)?.code === 'stop_unconfirmed') {
+      stoppedByUser.delete(id);
+      setRun(id, { error: error instanceof Error ? error.message : String(error) });
+      emit();
+      return;
+    }
     // Прогона уже нет — состояние всё равно приведём к остановленному.
   }
   controllers.get(id)?.abort();

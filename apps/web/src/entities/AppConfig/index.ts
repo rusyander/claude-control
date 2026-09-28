@@ -6,4 +6,5 @@ export {
   useSetLocation,
   useClaudeMd,
   useUpdateClaudeMd,
+  refreshSettingsFromServer,
 } from './api/AppConfigApi';

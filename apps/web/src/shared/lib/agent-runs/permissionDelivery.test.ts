@@ -38,6 +38,15 @@ describe('permissionDeliveryProblem', () => {
     expect(permissionDeliveryProblem({ ok: false })).toBe('chat.permissionLost');
   });
 
+  it('410 permission_expired — запрос умер (CLI перестал ждать): «истёк», а не «нет связи»', () => {
+    const refused = { response: { status: 410, data: { code: 'permission_expired' } } };
+    expect(permissionDeliveryProblem(undefined, refused)).toBe('chat.permissionExpired');
+    // Другой отказ сервера и обрыв сети — по-прежнему «не отправлено».
+    const other = { response: { status: 500, data: { code: 'boom' } } };
+    expect(permissionDeliveryProblem(undefined, other)).toBe('chat.permissionUnreachable');
+    expect(permissionDeliveryProblem(undefined, 'network')).toBe('chat.permissionUnreachable');
+  });
+
   it('ошибка запроса важнее тела ответа', () => {
     expect(permissionDeliveryProblem({ ok: false }, new Error('offline'))).toBe(
       'chat.permissionUnreachable',

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, realpathSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { Project, ProjectLocalConfig } from '@agentdeck/contracts';
@@ -45,7 +45,8 @@ describe('project-routes: GET .claude проекта («Из проекта»)',
 
   beforeEach(async () => {
     appDataRoot = mkdtempSync(join(tmpdir(), 'cc-appdata-'));
-    projectDir = mkdtempSync(join(tmpdir(), 'cc-project-'));
+    // Реестр хранит каталог в написании на диске (короткие имена 8.3 раскрыты).
+    projectDir = realpathSync.native(mkdtempSync(join(tmpdir(), 'cc-project-')));
     store = new AppStore(appDataRoot);
 
     const ctx = {

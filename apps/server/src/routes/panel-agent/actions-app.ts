@@ -21,13 +21,17 @@ import {
   card,
   encode,
   literalSecrets,
+  MASK_REFUSAL,
   maskDeep,
   readRoute,
   routeFingerprint,
   SECRET_REFUSAL,
   stateCard,
+  unmasked,
 } from './action-kit.ts';
-import { dataField } from './texts.ts';
+import { dataField, textField } from './texts.ts';
+import { maskNamedValue, SECRET_MASK } from '../../lib/secret-mask.ts';
+import { needsToken } from '../../domains/integrations/store.ts';
 
 /**
  * Действия волны A по состоянию панели: группы, настройки, провайдер, свои
@@ -45,7 +49,8 @@ const listGroups = definePanelAction({
   section: 'groups',
   risk: 'read',
   description:
-    'List panel groups (id, name, enabled, members as kind:id, env keys, bound project paths).',
+    'List panel groups (id, name, enabled, members as kind:id, env with secret values masked, bound project paths). ' +
+    'To edit env send the whole map back: masked values are kept from disk.',
   input: z.object({}),
   route: () => ({ method: 'GET', url: '/api/groups' }),
   shape: (_input, body) => ({
@@ -55,7 +60,10 @@ const listGroups = definePanelAction({
       description: group.description,
       isEnabled: group.isEnabled,
       members: group.members.map((member) => `${member.kind}:${member.id}`),
-      envKeys: Object.keys(group.env),
+      // Значения, а не одни имена: env правки — полная замена, и у выключенной
+      // группы list_env их не видит — без них добавить ключ значило стереть прочие.
+      // Секреты — маской; назад маска возвращается значением с диска (groupDraft).
+      env: maskDeep(group.env) as Record<string, string>,
       projectPaths: group.projectPaths,
     })),
   }),
@@ -67,7 +75,7 @@ const MEMBER = z
   .regex(/^(rule|hook|skill|mcp|permission|group):.+$/)
   .describe('kind:id, e.g. "skill:review", "mcp:gitlab"');
 
-const groupInput = z.object({
+export const groupInput = z.object({
   id: z.string().min(1).optional().describe('Existing group id; omit to create'),
   name: z.string().trim().min(1).max(100),
   description: z.string().max(1000).optional(),
@@ -75,22 +83,51 @@ const groupInput = z.object({
   env: z
     .record(z.string(), z.string())
     .optional()
-    .describe('Env applied while enabled; secrets are never sent. Omit on edit to keep'),
+    .describe(
+      'Env applied while enabled; secrets are never sent. Whole map, replaces the current one: send list_groups env back with your change (masked values are kept). Omit on edit to keep',
+    ),
   projectPaths: z.array(z.string()).optional().describe('Omit on edit to keep'),
 });
 
-async function findGroup(inject: InjectRoute, id: string): Promise<Group> {
+export async function findGroup(inject: InjectRoute, id: string): Promise<Group> {
   const group = (await readRoute<Group[]>(inject, '/api/groups')).find((item) => item.id === id);
   if (!group) throw new Error(`Group «${id}» not found. Call list_groups.`);
   return group;
 }
 
+/**
+ * Значение env группы, которое модель прислала обратно. Секретное ИМЯ прячет
+ * значение целиком (`maskNamedValue`), и такую маску текстовое восстановление
+ * не сопоставит — оно ищет секреты детектором по тексту. Целая маска на месте
+ * значения, которое под этим именем и маскируется, — «оставить как было».
+ */
+function keptEnvValue(key: string, saved: string | undefined, sent: string): string {
+  if (sent === SECRET_MASK && saved !== undefined && maskNamedValue(key, saved) === SECRET_MASK) {
+    return saved;
+  }
+  return unmasked(`env.${key}`, saved, sent);
+}
+
 /** Черновик группы: всё, что модель не прислала, — из нынешней записи. */
-async function groupDraft(input: z.infer<typeof groupInput>, inject: InjectRoute) {
-  const env = input.env ?? {};
+export async function groupDraft(input: z.infer<typeof groupInput>, inject: InjectRoute) {
+  // Маска — это «оставить как было», а не живой секрет: её сверяет unmasked ниже.
+  const env = Object.fromEntries(
+    Object.entries(input.env ?? {}).filter(([, value]) => !value.includes(SECRET_MASK)),
+  );
   const secrets = literalSecrets(env);
   if (secrets.length > 0) throw new Error(`env.${secrets[0]}: ${SECRET_REFUSAL}`);
   const current = input.id === undefined ? undefined : await findGroup(inject, input.id);
+  // Значения env модель видит только маской (list_env): маска — назад значением
+  // группы с диска, а непарная или в новой группе — отказ до карточки. Иначе
+  // `••••••` молча лёг бы на место пароля, а дифф карточки маскирует обе стороны.
+  const sentEnv =
+    input.env &&
+    Object.fromEntries(
+      Object.entries(input.env).map(([key, value]) => [
+        key,
+        keptEnvValue(key, current?.env[key], value),
+      ]),
+    );
   const draft = {
     name: input.name,
     description: input.description ?? current?.description ?? '',
@@ -106,7 +143,7 @@ async function groupDraft(input: z.infer<typeof groupInput>, inject: InjectRoute
       }) ??
       current?.members ??
       [],
-    env: input.env ?? current?.env ?? {},
+    env: sentEnv ?? current?.env ?? {},
     projectPaths: input.projectPaths ?? current?.projectPaths ?? [],
     ...(current?.scenario ? { scenario: current.scenario } : {}),
     isEnabled: current?.isEnabled ?? true,
@@ -159,7 +196,11 @@ const saveGroup = definePanelAction({
       [dataField('label-members', String(draft.members.length))],
     );
   },
-  page: (input) => ({ route: '/groups', ...(input.id ? { focus: input.id } : {}) }),
+  // Новая группа получает id только в ответе POST — фокус берётся из него.
+  page: (input, result) => {
+    const id = input.id ?? (result as Partial<Group> | undefined)?.id;
+    return { route: '/groups', ...(id ? { focus: id } : {}) };
+  },
 });
 
 const toggleGroup = definePanelAction({
@@ -211,11 +252,27 @@ const deleteGroup = definePanelAction({
   fingerprint: async (input, inject) => fingerprintOf(await findGroup(inject, input.id)),
   preview: async (input, inject) => {
     const group = await findGroup(inject, input.id);
+    const members = group.members.map((member) => `${member.kind}:${member.id}`);
+    // Удаление трогает не только запись группы: снимает её env из settings.json
+    // и оживляет участников, которых гасила только она. Карточка это называет.
+    const effect = await readRoute<{ envRemoved: string[]; membersBackOn: string[] }>(
+      inject,
+      `/api/groups/${encode(group.id)}/delete-effect`,
+    );
     return stateCard(
       `state.json: groups/${group.name}`,
-      { ...group, members: group.members.map((member) => `${member.kind}:${member.id}`) },
+      { ...group, members },
       {},
       card('summary-group-delete', { name: group.name }),
+      [
+        dataField('label-members', members.join(', ') || '—'),
+        ...(effect.envRemoved.length > 0
+          ? [dataField('label-group-delete-env', effect.envRemoved.join(', '))]
+          : []),
+        ...(effect.membersBackOn.length > 0
+          ? [dataField('label-group-delete-back-on', effect.membersBackOn.join(', '))]
+          : []),
+      ],
     );
   },
   page: () => ({ route: '/groups' }),
@@ -246,6 +303,45 @@ const SETTINGS_KEYS = {
   deliverToMr: z.boolean(),
   autoUpdateModels: z.boolean(),
   previewProviderWrites: z.boolean(),
+};
+
+/**
+ * Вкладки страницы настроек (`pages/Settings/model/tabs.ts` окна): `focus`
+ * цели `/settings` окно кладёт в `?tab=`. Без вкладки страница открывалась на
+ * «Общих», а правленое поле стояло на другой — человек не видел, что поменялось.
+ */
+const SETTINGS_TAB = {
+  general: 'general',
+  providers: 'providers',
+  models: 'models',
+  integrations: 'integrations',
+  spend: 'spend',
+  safety: 'safety',
+} as const;
+
+/** Вкладка каждого ключа общего PATCH: тип требует её у нового ключа. */
+const SETTINGS_KEY_TAB: Record<keyof typeof SETTINGS_KEYS, string> = {
+  theme: SETTINGS_TAB.general,
+  language: SETTINGS_TAB.general,
+  accent: SETTINGS_TAB.general,
+  largeText: SETTINGS_TAB.general,
+  reduceMotion: SETTINGS_TAB.general,
+  highContrast: SETTINGS_TAB.general,
+  editor: SETTINGS_TAB.general,
+  costUnit: SETTINGS_TAB.spend,
+  watchFiles: SETTINGS_TAB.safety,
+  backupKeep: SETTINGS_TAB.safety,
+  previewProviderWrites: SETTINGS_TAB.safety,
+  mcpNetworkTimeoutMs: SETTINGS_TAB.models,
+  mcpAutoCheck: SETTINGS_TAB.models,
+  chatModel: SETTINGS_TAB.models,
+  chatEffort: SETTINGS_TAB.models,
+  taskSplitInitiative: SETTINGS_TAB.models,
+  handoffInitiative: SETTINGS_TAB.models,
+  handoffContextLimit: SETTINGS_TAB.models,
+  handoffAutoDefault: SETTINGS_TAB.models,
+  deliverToMr: SETTINGS_TAB.models,
+  autoUpdateModels: SETTINGS_TAB.models,
 };
 
 const HUMAN_ONLY_SETTINGS =
@@ -306,7 +402,12 @@ const updateSettings = definePanelAction({
       card('summary-settings-update', { keys: Object.keys(input).join(', ') }),
     );
   },
-  page: () => ({ route: '/settings' }),
+  // Ключи с разных вкладок — открывается вкладка первого.
+  page: (input) => ({
+    route: '/settings',
+    focus:
+      SETTINGS_KEY_TAB[Object.keys(input)[0] as keyof typeof SETTINGS_KEYS] ?? SETTINGS_TAB.general,
+  }),
 });
 
 const switchProvider = definePanelAction({
@@ -336,7 +437,7 @@ const switchProvider = definePanelAction({
       card('summary-provider-switch', { from: now?.name ?? providers.active, to: next.name }),
     );
   },
-  page: () => ({ route: '/settings' }),
+  page: () => ({ route: '/settings', focus: SETTINGS_TAB.providers }),
 });
 
 // --- Свои эндпоинты ---
@@ -385,6 +486,30 @@ async function endpointPlan(input: z.infer<typeof endpointInput>, inject: Inject
       : settings.endpointProfiles.find((item) => item.id === input.id);
   if (input.id !== undefined && !current)
     throw new Error(`Endpoint profile «${input.id}» not found. Call list_endpoints.`);
+  // Токен профиля лежит по id и едет за адресом: смена хоста отправила бы его
+  // новому (проба, чат, запись в CLI). Как у MCP-сервера с секретами — отказ.
+  if (current && hostOf(current.baseUrl) !== hostOf(input.baseUrl)) {
+    const { tokenMasks } = await readRoute<EndpointsInfo>(inject, '/api/endpoints');
+    if (tokenMasks[current.id]) {
+      throw new Error(
+        `Endpoint profile «${current.name}» has a saved token; moving it to another host through the ` +
+          'agent is refused, because the token would be sent there. Nothing was written: the human ' +
+          'changes the address in the panel, or create a new profile.',
+      );
+    }
+  }
+  // Id нового профиля выводится из имени, адреса и вида API: такой же вход дал
+  // бы второй профиль с тем же id, и карточка, поле токена и правки попадали бы
+  // в первый. Повтор — это правка существующего, а не новый профиль.
+  if (!current) {
+    const twin = settings.endpointProfiles.find((item) => item.id === newEndpointId(input));
+    if (twin) {
+      throw new Error(
+        `Endpoint profile «${twin.name}» (id ${twin.id}) already has this name, address and API kind. ` +
+          'Nothing was written; edit it by id instead of creating a copy.',
+      );
+    }
+  }
   const profile: EndpointProfile = {
     ...(current ?? { writeToken: false }),
     id: current?.id ?? newEndpointId(input),
@@ -399,6 +524,15 @@ async function endpointPlan(input: z.infer<typeof endpointInput>, inject: Inject
   return { settings, current, profile, profiles };
 }
 
+/** Кому уходит запрос: схема, хост и порт. Неразборчивый адрес сравнивается целиком. */
+function hostOf(address: string): string {
+  try {
+    return new URL(address).origin.toLowerCase();
+  } catch {
+    return address.trim().toLowerCase();
+  }
+}
+
 /**
  * Id нового профиля выводится из входа: карточка считается при показе, запись —
  * после клика, и обе обязаны назвать ОДИН профиль (и якорь поля токена).
@@ -408,6 +542,14 @@ function newEndpointId(input: { name: string; baseUrl: string; apiKind: string }
     .update([input.name, input.baseUrl, input.apiKind].join('\n'))
     .digest('hex');
   return `ep-${hash.slice(0, 12)}`;
+}
+
+/** Профили живут на вкладке моделей; `?id=` выбирает профиль в её списке. */
+function endpointsPage(id?: string) {
+  return {
+    route: id === undefined ? '/settings' : `/settings?id=${encode(id)}`,
+    focus: SETTINGS_TAB.models,
+  };
 }
 
 const saveEndpoint = definePanelAction({
@@ -444,7 +586,7 @@ const saveEndpoint = definePanelAction({
       ? { route: '/settings', focus: endpointTokenAnchor(id) }
       : undefined;
   },
-  page: () => ({ route: '/settings' }),
+  page: (input) => endpointsPage(input.id ?? newEndpointId(input)),
 });
 
 async function findProfile(inject: InjectRoute, id: string): Promise<EndpointProfile> {
@@ -529,7 +671,7 @@ const applyEndpoint = definePanelAction({
       ],
     };
   },
-  page: () => ({ route: '/settings' }),
+  page: (input) => endpointsPage(input.id),
 });
 
 const deleteEndpoint = definePanelAction({
@@ -558,7 +700,7 @@ const deleteEndpoint = definePanelAction({
       card('summary-endpoint-delete', { name: profile.name }),
     );
   },
-  page: () => ({ route: '/settings' }),
+  page: () => endpointsPage(),
 });
 
 // --- Защита данных ---
@@ -615,8 +757,39 @@ const saveDlpRules = definePanelAction({
       card('summary-dlp-rules', { count: input.rules.length }),
     );
   },
-  page: () => ({ route: '/dlp' }),
+  // Первое новое или изменённое правило (`changed` маршрута записи) — подсвечено.
+  page: (_input, result) => {
+    const id = (result as { changed?: string[] } | undefined)?.changed?.[0];
+    return id ? { route: '/dlp', focus: `dlp-rule:${id}` } : { route: '/dlp' };
+  },
 });
+
+/**
+ * Куда запущенный прокси будет пересылать запросы — или отказ ДО карточки.
+ * Запуск без включённого правила или без адреса маршрут всё равно отклонит
+ * (`buildDlpRuntime`: 400 `dlp_misconfigured`), и человек подтверждал бы
+ * заведомо пустое действие (живой прогон 26.09: «включи защиту данных» при
+ * пустом адресе). Порядок выбора адреса — как у `resolveDlpUpstream`: свой
+ * адрес, иначе адрес профиля эндпоинта; разбор адреса остаётся маршруту.
+ */
+async function dlpStartUpstream(info: DlpInfo, inject: InjectRoute): Promise<string> {
+  if (!info.rules.some((rule) => rule.enabled)) {
+    throw new Error(
+      'The proxy cannot start: no enabled data protection rule (a proxy that looks for nothing is not protection). ' +
+        'Nothing was done; add or enable a rule first (save_dlp_rules).',
+    );
+  }
+  const direct = info.settings.upstreamUrl.trim();
+  if (direct) return direct;
+  const profile = (await settingsOf(inject)).endpointProfiles.find(
+    (item) => item.id === info.settings.upstreamProfileId,
+  );
+  if (profile?.baseUrl) return profile.baseUrl;
+  throw new Error(
+    'The proxy cannot start: no upstream address (where to forward requests) is set. Nothing was done; ' +
+      'the human sets it on the Data protection page (open_page /dlp).',
+  );
+}
 
 const toggleDlpProxy = definePanelAction({
   name: 'toggle_dlp_proxy',
@@ -627,15 +800,22 @@ const toggleDlpProxy = definePanelAction({
     'Start or stop the local DLP proxy (remembered across restarts). Needs confirmation.',
   input: z.object({ running: z.boolean() }),
   route: (input) => ({ method: 'POST', url: input.running ? '/api/dlp/start' : '/api/dlp/stop' }),
+  // Сравнение идёт и по живому слушателю, а не только по флагу: прокси, упавший
+  // при `enabled: true`, иначе не запустить — «ничего не изменится».
   fingerprint: (_input, inject) =>
-    routeFingerprint(inject, '/api/dlp', (body) => (body as DlpInfo).settings),
+    routeFingerprint(inject, '/api/dlp', (body) => ({
+      settings: (body as DlpInfo).settings,
+      running: (body as DlpInfo).status.running,
+    })),
   preview: async (input, inject) => {
     const info = await readRoute<DlpInfo>(inject, '/api/dlp');
+    const upstream = input.running ? await dlpStartUpstream(info, inject) : undefined;
     return stateCard(
-      'state.json: settings.dlp.enabled',
-      { enabled: info.settings.enabled },
-      { enabled: input.running },
+      'dlp: settings.dlp.enabled + proxy',
+      { enabled: info.settings.enabled, running: info.status.running },
+      { enabled: input.running, running: input.running },
       card(input.running ? 'summary-dlp-start' : 'summary-dlp-stop'),
+      upstream ? [dataField('label-address', upstream)] : [],
     );
   },
   page: () => ({ route: '/dlp' }),
@@ -688,7 +868,75 @@ async function integrationPlan(
       `Unknown ${id} settings: ${unknownKeys.join(', ')}. Known: ${Object.keys(current).join(', ')}.`,
     );
   }
-  return { current, next: { ...current, ...patch } };
+  // Настройки модель читает маской (list_integrations): адрес с токеном в запросе
+  // приходит назад с `••••••`. Маска — назад значением с диска; лишняя или
+  // непарная — отказ до карточки, иначе маска молча стёрла бы секрет в адресе.
+  const restored = Object.fromEntries(
+    Object.entries(patch).map(([key, value]) => {
+      if (typeof value === 'string') {
+        const saved = current[key];
+        return [
+          key,
+          unmasked(`settings.${key}`, typeof saved === 'string' ? saved : undefined, value),
+        ];
+      }
+      if (JSON.stringify(value ?? null).includes(SECRET_MASK)) {
+        throw new Error(`settings.${key}: ${MASK_REFUSAL}`);
+      }
+      return [key, value];
+    }),
+  );
+  const next = { ...current, ...restored };
+  await assertIntegrationNotRetargeted(id, current, next, inject);
+  return { current, next };
+}
+
+/** Поля, от которых зависит, куда уходит токен интеграции (у форджа пустой адрес = github.com/gitlab.com). */
+const INTEGRATION_TARGET_KEYS = ['url', 'baseUrl', 'confluenceUrl', 'kind'] as const;
+
+/**
+ * Токен интеграции едет за адресом: смена хоста при сохранённом ключе отправила
+ * бы его туда, куда указала модель (проверка, выгрузка, вебхук). Как у профиля
+ * эндпоинта и MCP с секретами — отказ до карточки; адрес меняет человек.
+ */
+async function assertIntegrationNotRetargeted(
+  id: IntegrationId,
+  current: Record<string, unknown>,
+  next: Record<string, unknown>,
+  inject: InjectRoute,
+): Promise<void> {
+  const moved = INTEGRATION_TARGET_KEYS.filter((key) => {
+    if (!(key in current)) return false;
+    const before = String(current[key] ?? '');
+    const after = String(next[key] ?? '');
+    return key === 'kind' ? before !== after : hostOf(before) !== hostOf(after);
+  });
+  if (moved.length === 0) return;
+  const statuses = await readRoute<IntegrationStatus[]>(inject, '/api/integrations');
+  const status = statuses.find((item) => item.id === id);
+  if (!status?.hasToken && !status?.hasConfluenceToken) return;
+  throw new Error(
+    `Integration «${id}» has a saved token; changing its ${moved.join('/')} through the agent is ` +
+      'refused, because the token would be sent to the new host. Nothing was written: the human ' +
+      'changes the address in the panel.',
+  );
+}
+
+/** Адрес интеграции для карточки, маской: у вебхука `url`, у остальных `baseUrl`. */
+function integrationAddress(settings: Record<string, unknown>): string | undefined {
+  const address = [settings.url, settings.baseUrl].find(
+    (value): value is string => typeof value === 'string' && value !== '',
+  );
+  return address === undefined ? undefined : (maskDeep(address) as string);
+}
+
+/**
+ * Карточка интеграции на вкладке «Интеграции». Вкладки мало: карточек шесть, и
+ * последние под экраном — человек видел Jira, а агент говорил «карточка вебхука
+ * открыта». Имя якоря повторяет `integrationAnchor` веба.
+ */
+function integrationPage(id: string) {
+  return { route: '/settings', focus: `integration:${id}` };
 }
 
 const saveIntegration = definePanelAction({
@@ -712,31 +960,73 @@ const saveIntegration = definePanelAction({
     fingerprintOf((await settingsOf(inject)).integrations[input.id]),
   preview: async (input, inject) => {
     const plan = await integrationPlan(input.id, input.settings, inject);
+    // Адрес — отдельной строкой: в дифе длинный URL обрезан краем карточки, а
+    // куда панель будет слать события, человек должен прочесть целиком.
+    const address = integrationAddress(plan.next);
     return stateCard(
       `state.json: settings.integrations.${input.id}`,
       plan.current,
       plan.next,
       card('summary-integration-save', { id: input.id }),
+      address ? [dataField('label-address', address)] : [],
     );
   },
   shape: (_input, body) => ({ ...(body as IntegrationStatus), maskedToken: undefined }),
+  // Ключ просится, только когда он нужен: секрет подписи вебхука необязателен
+  // (`needsToken`), а выключение интеграции — законченная работа, а не
+  // «сохранено, нужен ключ».
   secretStep: (input, result) =>
-    (result as IntegrationStatus).hasToken
+    (result as IntegrationStatus).hasToken ||
+    !needsToken(input.id) ||
+    input.settings.enabled === false
       ? undefined
       : { route: '/settings', focus: integrationSecretAnchor(input.id) },
-  page: () => ({ route: '/settings' }),
+  page: (input) => integrationPage(input.id),
 });
 
+/**
+ * Проверка — не чтение: она ходит наружу с сохранённым токеном, вебхуку шлёт
+ * НАСТОЯЩИЙ запрос с тестовым событием, а итог пишет на диск (`health.ts`).
+ * Поэтому — карточка, как у любой записи.
+ */
 const checkIntegration = definePanelAction({
   name: 'check_integration',
   section: 'integrations',
-  risk: 'read',
+  risk: 'change',
+  title: 'journal-check-integration',
   description:
-    'Live connection check of an integration with its saved token; returns state and reason.',
+    'Live connection check of an integration with its saved token (the webhook check SENDS a test event to its address); ' +
+    'the result is saved on the integration card. Needs confirmation.',
   input: z.object({ id: z.enum(INTEGRATIONS) }),
   route: (input) => ({ method: 'POST', url: `/api/integrations/${input.id}/check` }),
+  fingerprint: async (input, inject) =>
+    fingerprintOf((await settingsOf(inject)).integrations[input.id]),
+  preview: async (input, inject) => {
+    const saved = (await settingsOf(inject)).integrations[input.id] as unknown as Record<
+      string,
+      unknown
+    >;
+    const address = integrationAddress(saved);
+    // У интеграции с полем адреса проверка без адреса обречена: карточку не
+    // показываем, иначе человек одобрял бы заведомый провал.
+    if (!address && ('url' in saved || 'baseUrl' in saved)) {
+      throw new Error(
+        `Integration «${input.id}» has no address yet — nothing to check. Ask the human for it and save it with save_integration first.`,
+      );
+    }
+    return {
+      ...card('summary-integration-check', { id: input.id }),
+      fields: [
+        ...(address ? [dataField('label-address', address)] : []),
+        textField(
+          'label-what-happens',
+          input.id === 'webhook' ? 'value-happens-webhook-test' : 'value-happens-integration-check',
+        ),
+      ],
+    };
+  },
   shape: (_input, body) => ({ ...(body as IntegrationStatus), maskedToken: undefined }),
-  summary: 'journal-check-integration',
+  page: (input) => integrationPage(input.id),
 });
 
 const forgetIntegration = definePanelAction({
@@ -764,7 +1054,7 @@ const forgetIntegration = definePanelAction({
     );
   },
   shape: (_input, body) => ({ ...(body as IntegrationStatus), maskedToken: undefined }),
-  page: () => ({ route: '/settings' }),
+  page: (input) => integrationPage(input.id),
 });
 
 export const APP_STATE_ACTIONS: readonly AnyPanelAction[] = [

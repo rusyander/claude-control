@@ -2,7 +2,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import type { TrackedFile } from '../tracked-files.ts';
 import { BACKUP_NAME, STAMP } from './constants.ts';
-import type { BaseLabel, DiffBase, Snapshot } from './types.ts';
+import type { DiffBase, Snapshot } from './types.ts';
 
 /**
  * Копии на диске: как их найти, как разобрать время и что взять базой сравнения.
@@ -64,39 +64,32 @@ export function collectSnapshots(
 
 /**
  * Что взять базой сравнения для копии по её индексу в отсортированном списке.
- * Возвращает путь к базе (undefined — базы нет) и метку.
+ *
+ * Копия снимается ПЕРЕД записью, поэтому запись ленты с её временем — это
+ * правка «копия → следующее состояние»: следующая копия, а у самой свежей —
+ * текущий файл. Прежняя база «предыдущая копия → эта» показывала под каждым
+ * временем правку, сделанную раньше, а предпоследняя правка файла не попадала
+ * в ленту вовсе (живой случай: добавленное агентом право нигде не видно).
  */
 export function resolveBase(snapshots: Snapshot[], index: number, currentPath: string): DiffBase {
-  const isNewest = index === snapshots.length - 1;
+  const next = snapshots[index + 1];
+  if (next) return { basePath: next.path, label: 'next' };
 
   // Самая свежая копия сравнивается с текущим файлом на диске.
-  if (isNewest) {
-    return existsSync(currentPath)
-      ? { basePath: currentPath, label: 'current' }
-      : { label: 'initial' };
-  }
-
-  // Прочие — с предыдущей (более старой) копией.
-  const previous = snapshots[index - 1];
-  if (previous) return { basePath: previous.path, label: 'previous' };
-
-  // Самая старая копия: предыдущей нет — первая известная версия.
-  return { label: 'initial' };
+  return existsSync(currentPath)
+    ? { basePath: currentPath, label: 'current' }
+    : { label: 'initial' };
 }
 
 /**
- * Направление диффа зависит от базы. Для «current» новее — текущий файл, а сам
- * снимок старше; для «previous» новее — сам снимок. Возвращаем пару (старое,
- * новое) для diffLines, чтобы «+/−» смотрели хронологически вперёд.
+ * Пара (старое, новое) для diffLines, чтобы «+/−» смотрели хронологически вперёд:
+ * копия всегда старше своей базы — и текущего файла, и следующей копии.
  */
 export function orderVersions(
   snapshotText: string,
   baseText: string,
-  label: BaseLabel,
 ): { before: string; after: string } {
-  return label === 'current'
-    ? { before: snapshotText, after: baseText }
-    : { before: baseText, after: snapshotText };
+  return { before: snapshotText, after: baseText };
 }
 
 export function readText(path?: string): string {

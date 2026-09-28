@@ -155,7 +155,7 @@ describe('разделение: пауза, продолжение, запуск
     await settle();
 
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ index: 0, stopped: 1 });
+    expect(res.json()).toEqual({ index: 0, stopped: 1, unconfirmed: 0 });
     expect(registry.isRunning('chat-0')).toBe(false);
     expect(group(0)?.status).toBe('paused');
     expect(group(1)?.status).toBe('started');

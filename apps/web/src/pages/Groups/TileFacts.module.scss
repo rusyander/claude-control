@@ -1,0 +1,28 @@
+.line {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3xs);
+}
+
+/* Превью шагов: номер и одна строка на шаг — длинное название режется, полное
+   видно в окне группы. */
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding-left: var(--spacing-md);
+  color: var(--color-fg);
+  font-size: var(--font-size-body-sm);
+}
+
+.step {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -98,12 +98,11 @@ describe('групповой тумблер: одна запись на общи
     await toggle(groupId, false);
 
     const markdown = readFileSync(claudeMdPath(), 'utf8');
-    const [, disabled = ''] = markdown.split(/^## .*Отключённые.*$/m);
 
-    // Оба тела — в разделе отключённых, ни одно не осталось действующим.
-    expect(disabled).toContain('Первое тело.');
-    expect(disabled).toContain('Второе тело.');
-    expect(markdown.split('Первое тело.')).toHaveLength(2);
+    // Выключенное правило уходит из CLAUDE.md целиком (владелец 28.09, текст
+    // хранит панель): ни одно из двух одноимённых не осталось действующим.
+    expect(markdown).not.toContain('Первое тело.');
+    expect(markdown).not.toContain('Второе тело.');
   });
 
   it('включение возвращает оба правила', async () => {

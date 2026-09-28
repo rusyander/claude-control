@@ -6,6 +6,7 @@ import type {
   EnvSkip,
 } from '@agentdeck/contracts/portable-env';
 import type { ConfigProvider } from '../../providers/types.ts';
+import type { DisabledRuleSnapshot } from '../../lib/app-store.ts';
 
 /**
  * Договор импорта: что импортёру дают и что он возвращает.
@@ -27,6 +28,11 @@ import type { ConfigProvider } from '../../providers/types.ts';
  */
 export interface ImportState {
   isDisabled(kind: string, id: string, legacyId?: string): boolean;
+  /**
+   * Снимки правил, выключенных панелью: в CLAUDE.md их нет, и без снимков
+   * перенос не видел их вовсе — отчёт молчал о «выключено в источнике» (F-165).
+   */
+  disabledRules?(): readonly DisabledRuleSnapshot[];
 }
 
 /**

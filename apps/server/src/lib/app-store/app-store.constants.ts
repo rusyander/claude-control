@@ -6,6 +6,7 @@ export const DEFAULT_STATE: AppState = {
   disabled: { rule: [], hook: [], skill: [], mcp: [], permission: [] },
   disabledByGroup: { rule: {}, hook: {}, skill: {}, mcp: {}, permission: {} },
   disabledHooks: {},
+  disabledRules: [],
   envByGroup: {},
   projects: [],
   runnerCommands: {},

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text } from 'react-native';
 import { Stack, router } from 'expo-router';
 import type { ProjectTestStatus, ProjectTestStepResult } from '@agentdeck/contracts';
-import { stepText, toSteps } from '@agentdeck/contracts/test-format';
+import { stepText } from '@agentdeck/contracts/test-format';
 import { Button, Card, Empty, Field, Loading, Muted, Row, Screen, Title } from '../src/shared/ui';
 import { colors, font, radius, space } from '../src/shared/config/theme';
 import { useT } from '../src/shared/config/i18n';
@@ -14,6 +14,7 @@ import {
   useSaveManualResult,
 } from '../src/entities/tests/api';
 import { STATUS_MARK, statusColor } from '../src/entities/tests/status';
+import { manualSteps, restoreStepStatuses } from '../src/entities/tests/manualSteps';
 
 /**
  * Ручной прогон: проверяет человек, панель записывает.
@@ -59,7 +60,13 @@ export default function TestRunScreen() {
     const group = tests.data?.groups.find((item) => item.id === point.groupId);
     return group?.cases.find((item) => item.id === point.caseId);
   }, [point, tests.data]);
-  const steps = useMemo(() => toSteps(testCase?.steps ?? []), [testCase]);
+  // Раскрыты и с подставленными параметрами — как у пульта в вебе: номер
+  // отметки сервер считает по раскрытому списку.
+  const sharedSteps = tests.data?.sharedSteps;
+  const steps = useMemo(
+    () => manualSteps(testCase?.steps ?? [], sharedSteps ?? [], point?.params ?? {}),
+    [testCase, sharedSteps, point?.params],
+  );
 
   // При переходе на другой поинт заметка и галочки шагов берутся из уже
   // записанного результата: вернуться назад и увидеть пустое поле там, где
@@ -67,7 +74,7 @@ export default function TestRunScreen() {
   useEffect(() => {
     const saved = data?.results.find((item) => item.pointId === point?.id);
     setNote(saved?.note ?? '');
-    setStepStatuses(steps.map((_, at) => saved?.steps?.[at]?.status ?? 'unknown'));
+    setStepStatuses(restoreStepStatuses(steps.length, saved?.steps));
   }, [data, point?.id, steps]);
 
   const cycleStep = (at: number): void =>
@@ -165,7 +172,7 @@ export default function TestRunScreen() {
                   {STATUS_MARK[stepStatuses[at] ?? 'unknown']}
                 </Text>
                 <Text style={styles.stepText}>
-                  {at + 1}. {stepText(step)}
+                  {at + 1}. {stepText(step, t.tests.stepLabels)}
                 </Text>
               </Pressable>
             ))}

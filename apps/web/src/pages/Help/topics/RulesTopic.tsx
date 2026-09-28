@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
-import { HelpSection, StorageCard, FieldTable, Callout, OptionCards } from '../ui';
+import { RULES_TABS } from '@pages/Rules/model/tabs';
+import { HelpSection, StorageCard, FieldTable, Callout, OptionCards, PageTabsSection } from '../ui';
 import { RulesGuideSections } from './RulesGuideSections';
 import { RulesLimitsSections } from './RulesLimitsSections';
 
@@ -37,6 +38,8 @@ export function RulesTopic() {
       <Callout tone="info" title={tr('guideTitle')}>
         {tr('guideText')}
       </Callout>
+
+      <PageTabsSection page="rules" tabs={RULES_TABS} />
 
       <HelpSection title={t('help.common.whyTitle')}>
         <OptionCards

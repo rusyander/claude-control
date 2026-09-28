@@ -1,4 +1,5 @@
 import { isLive, runStatus, type RunStatus } from './status';
+import { isOpenAsk } from '@shared/lib/chat-stream';
 import type { PendingPermission, StreamedTool } from './agent-runs.types';
 
 /**
@@ -76,7 +77,7 @@ export function selectActiveRuns(runs: RunLike[], now: number): ActiveRunView[] 
       ...(run.model ? { model: run.model } : {}),
       // Вопросы носим только у тех, кто спрашивал: у остальных это лишний
       // массив на каждый пересчёт пульта агентов.
-      ...(run.tools?.some((tool) => tool.name === 'AskUserQuestion') ? { tools: run.tools } : {}),
+      ...(run.tools?.some(isOpenAsk) ? { tools: run.tools } : {}),
       // Права носим только у стоящих на них — по той же причине.
       ...(run.permissions?.length ? { permissions: run.permissions } : {}),
     });

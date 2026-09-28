@@ -1,13 +1,8 @@
 import type { FastifyReply } from 'fastify';
 import type { ServerContext } from '../../context.ts';
 import type { AtlassianAccess } from '../../domains/integrations/atlassian/client.ts';
-import { toAccess } from '../../domains/integrations/atlassian/client.ts';
+import { atlassianAccessFrom } from '../../domains/integrations/atlassian/access.ts';
 import { IntegrationError, invalidField } from '../../domains/integrations/errors.ts';
-import {
-  readConfluenceToken,
-  readIntegrations,
-  requireConnected,
-} from '../../domains/integrations/store.ts';
 import { codeOf } from '../../lib/server-text.ts';
 import type { ServerMessageCode, ServerMessageParams } from '@agentdeck/contracts/server-messages';
 
@@ -30,23 +25,14 @@ export function appDataOf(deps: IntegrationsDeps): string {
   return deps.ctx.location.paths.appData;
 }
 
-/**
- * Доступ к Atlassian из настроек и сохранённых токенов — их ДВА.
- *
- * Второй (Confluence) необязателен и добирается молча: у облака его нет вовсе,
- * а на своей установке без него Confluence отвечал 401 на рабочем ключе Jira.
- * Требуем по-прежнему только основной — иначе настроенная Jira перестала бы
- * работать у всех, кто вики не пользуется.
- */
+/** Доступ к Atlassian (`atlassianAccessFrom`) для маршрутов интеграций. */
 export function atlassianAccess(deps: IntegrationsDeps): AtlassianAccess {
   return atlassianAccessOf(deps.ctx);
 }
 
 /** То же по контексту сервера — для маршрутов вне интеграций (тикеты разделения). */
 export function atlassianAccessOf(ctx: ServerContext): AtlassianAccess {
-  const appData = ctx.location.paths.appData;
-  const token = requireConnected(ctx.store, appData, 'atlassian', 'Atlassian');
-  return toAccess(readIntegrations(ctx.store).atlassian, token, readConfluenceToken(appData) ?? '');
+  return atlassianAccessFrom(ctx.store, ctx.location.paths.appData);
 }
 
 /**

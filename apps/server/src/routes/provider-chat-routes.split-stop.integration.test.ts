@@ -1,13 +1,15 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { ProviderChatSummary } from '@agentdeck/contracts';
 import { foreignChatKey } from '@agentdeck/contracts/foreign-chat-key';
+import { ESCALATE_LINE } from '@agentdeck/contracts/model-cascade';
+import { HANDOFF_DEFAULT_CHECKPOINT } from '@agentdeck/contracts/chat-handoff';
 import { AppStore } from '../lib/app-store.ts';
 import type { ServerContext } from '../context.ts';
-import { ProviderChatService } from '../domains/provider-chat.ts';
+import { ProviderChatService, appendMessage } from '../domains/provider-chat.ts';
 import type { ProviderChatRunEvent, ProviderChatRunLike } from '../domains/provider-chat.ts';
 import { HandoffChains } from '../domains/chat/ChatHandoff.ts';
 import {
@@ -139,6 +141,56 @@ describe('чужой CLI: «Стоп» в чате группы — пауза �
     expect(prefixes[0]).not.toContain('agentdeck:split');
     // Обычный разговор её получает — проверка умеет краснеть.
     expect(prefixes[1]).toContain('agentdeck:split');
+  });
+
+  // Раунд 5: ответ человека в звено работы несёт те же строки группы, что и
+  // старт звена (`foreignChildExtra`), — эскалация у работы; обычному — нет.
+  it('ответ человека в звено работы несёт строку эскалации, обычный разговор — нет', async () => {
+    prefixes.length = 0;
+    await running(true);
+    await running(false);
+
+    expect(prefixes[0]).toContain(ESCALATE_LINE);
+    expect(prefixes[1]).not.toContain(ESCALATE_LINE);
+  });
+
+  // F-48: «продолжить в новой сессии» у ребёнка без шапки стадии (дочерний
+  // не-план) — продолжение тоже звено группы: без инструкции разделения и со
+  // строками группы, как ответ человека выше.
+  it('продолжение ребёнка без шапки в новой сессии не несёт инструкции разделения', async () => {
+    const chat = (
+      await app.inject({
+        method: 'POST',
+        url: '/api/provider-chat/chats',
+        payload: { workdir: root },
+      })
+    ).json<ProviderChatSummary>();
+    const key = foreignChatKey('codex', chat.id);
+    store.setChatLink(key, {
+      parentChatId: 'codex:parent',
+      createdAt: '2026-09-25T10:00:00.000Z',
+      branch: 'feature/one',
+      groupIndex: 0,
+    });
+    const appData = join(root, 'agentdeck');
+    appendMessage(appData, 'codex', chat.id, {
+      role: 'user',
+      content: 'Работай',
+      at: '2026-09-25T10:00:00.000Z',
+    });
+    mkdirSync(join(root, '.agent'), { recursive: true });
+    writeFileSync(join(root, HANDOFF_DEFAULT_CHECKPOINT), '# Прогресс\n');
+    prefixes.length = 0;
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/provider-chat/chats/${chat.id}/restart`,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(prefixes).toHaveLength(1);
+    expect(prefixes[0]).not.toContain('agentdeck:split');
+    expect(prefixes[0]).toContain(ESCALATE_LINE);
   });
 
   it('остановленная группа встаёт на паузу, а не остаётся «работает»', async () => {

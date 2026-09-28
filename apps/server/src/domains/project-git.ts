@@ -41,7 +41,7 @@
 
 export { CHANGED_FILES_MAX, COMMIT_MESSAGE_MAX } from './project-git/constants.ts';
 export { GitError, stripGitProgress, type GitOutput } from './project-git/exec.ts';
-export { describeMirror } from './project-git/mirror-local.ts';
+export { describeMirror, mirrorLineForModel } from './project-git/mirror-local.ts';
 export { LOCKFILES, parseChurn, revertLockfileChurn } from './project-git/lockfiles.ts';
 export {
   BOOTSTRAP_TIMEOUT_MS,
@@ -64,6 +64,7 @@ export {
   readDeliveryFacts,
   type DeliveryFacts,
 } from './project-git/delivery-facts.ts';
+export { readSieveFacts, touchedPaths, type SieveFacts } from './project-git/sieve-facts.ts';
 export {
   parseBranches,
   parseNumstat,

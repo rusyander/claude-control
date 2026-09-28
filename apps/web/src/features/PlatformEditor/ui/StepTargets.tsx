@@ -57,7 +57,7 @@ export function StepTargets({ model }: WizardStepProps) {
           {t('platform.consumersTitle')}
         </Typography>
         <Typography variant="caption" color="muted">
-          {t('platform.consumersHint')}
+          {t('contourConfig.access.consumersHint')}
         </Typography>
 
         {model.plan.isLoading && <SkeletonList rows={3} withActions={false} />}
@@ -78,7 +78,7 @@ export function StepTargets({ model }: WizardStepProps) {
 
         {filesStayApplied && (
           <Typography variant="caption" color="warning">
-            {t('platform.consumersFilesStay')}
+            {t('contourConfig.access.filesStay')}
           </Typography>
         )}
       </Stack>

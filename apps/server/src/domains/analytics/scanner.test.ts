@@ -121,6 +121,27 @@ describe('scanAnalytics', () => {
     expect(result.estimatedCost).toBeGreaterThan(0);
   });
 
+  // Ревью 28.09 (F-183): список сессий урезан до последних N, и счётчик
+  // вкладки «Сессии» за насыщенный период упирался в N. Счёт за период —
+  // отдельным полем, по всем сессиям, в каком бы каталоге они ни писали.
+  it('periodSessions считает все сессии периода, а не только список', async () => {
+    for (let index = 0; index < 4; index += 1) {
+      writeTranscript('proj-a', `sess${index}`, [
+        assistant({
+          ts: recentIso(),
+          model: 'claude-opus-4-8',
+          cwd: index % 2 ? '/work/a' : '/work/b',
+          sessionId: `s${index}`,
+          input: 1,
+        }),
+      ]);
+    }
+
+    const result = await scanAnalytics(projectsDir, { days: 30, recentSessionsLimit: 2 });
+    expect(result.recentSessions).toHaveLength(2);
+    expect(result.periodSessions).toBe(4);
+  });
+
   it('группирует по моделям и сортирует по объёму токенов', async () => {
     writeTranscript('proj-a', 'sess1', [
       assistant({

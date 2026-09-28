@@ -49,5 +49,7 @@ export { scanMediaBlocks, type MediaScan, type MediaScanOptions } from './media-
 export {
   deckBlockRequest,
   deckReviseRequest,
+  mediaRequestOf,
   pictureBlockRequest,
+  type MediaRequestView,
 } from './media-block/envelopes.ts';

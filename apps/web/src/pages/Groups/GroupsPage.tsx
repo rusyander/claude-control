@@ -1,278 +1,361 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { Automation, Group } from '@agentdeck/contracts';
+import { useNavigate, useSearch } from '@tanstack/react-router';
+import { usePageTab } from '@shared/hooks/use-page-tab';
+import { scopeOf, type Group } from '@agentdeck/contracts';
 import { Stack } from '@shared/ui/stack';
-import { useEntityUrl, useEntityUrlWriter } from '@shared/hooks/use-entity-url';
+import { useEntityUrl } from '@shared/hooks/use-entity-url';
 import { SkeletonList } from '@shared/ui/skeleton';
 import { Typography } from '@shared/ui/typography';
-import { Card } from '@shared/ui/card';
-import { Badge } from '@shared/ui/badge';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { PageHeader } from '@shared/ui/page-header';
 import { ExplainBox } from '@shared/ui/explain-box';
 import { EmptyState } from '@shared/ui/empty-state';
-import { Toggle } from '@shared/ui/toggle';
-import { GroupFormModal } from '@features/GroupEditor';
-import { AutomationFormModal } from '@features/AutomationEditor';
-import { SandboxButton } from '@features/SandboxRunner';
-import { DeleteButton } from '@features/EntityDelete';
-import {
-  useGroups,
-  useAutomations,
-  useSetGroupEnabled,
-  useDeleteGroup,
-  useSaveAutomation,
-  useDeleteAutomation,
-} from '@entities/Group';
-import { selectionOfGroup } from './GroupsPage.lib';
-import { GroupProjectLocal } from './GroupProjectLocal';
+import { LoadErrorCard } from '@shared/ui/load-error';
+import { GroupFormModal, ScenarioCreateModal } from '@features/GroupEditor';
+import { useGroupDiscovery, useGroups, useRunDiscovery, type GroupListItem } from '@entities/Group';
+import { buildSections, cardOf, type GroupCardModel } from './model/sections';
+import { GROUPS_PAGE, GROUPS_TABS, type GroupsTabId } from './model/tabs';
+import { GroupTile } from './GroupTile';
+import { FoundTile } from './FoundTile';
+import { GroupDialog } from './GroupDialog';
+import { FoundDialog } from './FoundDialog';
+import { GroupsTabs } from './GroupsTabs';
+import { GroupsTabPanel } from './GroupsTabPanel';
+import { DiscoveryProgress } from './DiscoveryProgress';
+import { AdviceModal } from './AdviceModal';
+import { CopyGroupDialog } from './CopyGroupDialog';
+import type { AdviceMode } from './AdviceModal.types';
+import type { GroupsTabCount } from './GroupsTabs.types';
+import { CreateGroupChooser } from './CreateGroupChooser';
+import type { CreateGroupKind } from './CreateGroupChooser.types';
 import styles from './GroupsPage.module.scss';
 
-/** Группы и сценарии: пользовательская структура поверх сущностей Claude Code. */
+interface OpenedItem {
+  kind: 'group' | 'found';
+  id: string;
+  /** Только что созданный сценарий: окно сразу зовёт составителя первого шага. */
+  isFresh?: boolean;
+}
+
+/**
+ * Группы: четыре вкладки — глобальные, проектные, найденные и журнал
+ * обнаружения; вкладка в адресе (`?tab=`) и помнится у зрителя. Карточки —
+ * сеткой, щелчок открывает окно группы с «Порядком работы» и «Составом».
+ * Связанная пара (глобальная копия проектной группы) — одна карточка и одно
+ * окно с выбором стороны. «Создать группу» — один вход с выбором вида: сценарий
+ * (одни шаги; после создания окно открывается на составлении первого шага) или
+ * набор (участники вместе, работа по стадиям конвейера). Старый блок
+ * «Автоматизации (хуки)» снят (владелец, I1): хук добавляется шагом «Хук», а
+ * хуки settings.json видны и работают в разделе «Хуки».
+ */
 export function GroupsPage() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const search = useSearch({ strict: false }) as { tab?: string; id?: string; show?: string };
+  // Вкладка — общим механизмом разделов: адрес главнее памяти, память — прежний
+  // ключ `agentdeck.groups.tab`, так что запомненное у зрителя не теряется.
+  const pageTab = usePageTab(GROUPS_PAGE, GROUPS_TABS);
   const [editingGroup, setEditingGroup] = useState<Group | undefined>(undefined);
   const [isGroupFormOpen, setIsGroupFormOpen] = useState(false);
-  const [editingAutomation, setEditingAutomation] = useState<Automation | undefined>(undefined);
-  const [isAutomationFormOpen, setIsAutomationFormOpen] = useState(false);
+  const [isScenarioOpen, setIsScenarioOpen] = useState(false);
+  const [isChooserOpen, setIsChooserOpen] = useState(false);
+  const [advice, setAdvice] = useState<{ mode: AdviceMode; group: GroupListItem } | undefined>(
+    undefined,
+  );
+  // Открытое окно: группа по id, находка по ключу. Держим ключ, а не запись —
+  // окно показывает свежие данные списка, а удалённая группа закрывает его сама.
+  const [opened, setOpened] = useState<OpenedItem | undefined>(undefined);
+  const [copying, setCopying] = useState<GroupListItem | undefined>(undefined);
 
-  const { data: groups = [], isLoading } = useGroups();
-  const { data: automations = [] } = useAutomations();
-  const setGroupEnabled = useSetGroupEnabled();
-  const deleteGroup = useDeleteGroup();
-  const saveAutomation = useSaveAutomation();
-  const deleteAutomation = useDeleteAutomation();
+  const groups = useGroups();
+  const discovery = useGroupDiscovery();
+  const runDiscovery = useRunDiscovery();
+  const sections = buildSections(groups.data ?? [], discovery.data);
+  const isDiscovering = Boolean(discovery.data?.running) || runDiscovery.isPending;
+  const sources = discovery.data?.sources ?? [];
+  // Агент ведёт к группе (`?show=<id>`): вкладка — по области группы, а не из
+  // памяти зрителя; иначе карточка проектной группы стояла на скрытой вкладке.
+  const shown = search.show ? cardOf(sections, search.show) : undefined;
+  const tab = shown?.tab ?? pageTab.active;
+
+  // Адрес несёт и вкладку, и открытую в редакторе группу: запись одного не
+  // должна стирать другое. Замена записи истории — «назад» уводит со страницы.
+  const writeSearch = (next: { tab: GroupsTabId; id?: string }): void => {
+    void navigate({ to: '.', search: next.id ? next : { tab: next.tab }, replace: true });
+  };
+  // Память вкладки пишет `usePageTab`, когда адрес сменился.
+  const selectTab = (next: GroupsTabId): void => writeSearch({ tab: next, id: search.id });
+
+  // Вкладка найдена — `?show=` уходит из адреса: дальше страница живёт своей
+  // вкладкой, и F5 не перещёлкивал бы её снова. Группы нет в списке — тоже уходит.
+  const showDone = Boolean(search.show) && (Boolean(shown) || groups.isSuccess);
+  useEffect(() => {
+    if (!showDone) return;
+    writeSearch({ tab, id: search.id });
+    // Только по завершению поиска: вкладка и id уже в том же кадре.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showDone]);
 
   const openCreateGroup = (): void => {
     setEditingGroup(undefined);
     setIsGroupFormOpen(true);
   };
 
+  // Один вход «Создать группу»: вид выбирают в окне выбора, дальше — форма вида.
+  const pickKind = (kind: CreateGroupKind): void => {
+    setIsChooserOpen(false);
+    if (kind === 'scenario') setIsScenarioOpen(true);
+    else openCreateGroup();
+  };
+
   const openEditGroup = (group: Group): void => {
     setEditingGroup(group);
     setIsGroupFormOpen(true);
-    writeUrl(group.id);
+    writeSearch({ tab, id: group.id });
   };
 
   // Ссылка /groups?id=<uuid> открывает эту группу в редакторе.
-  const writeUrl = useEntityUrlWriter();
-  useEntityUrl<Group>({ items: groups, getId: (group) => group.id, onOpen: openEditGroup });
+  useEntityUrl<Group>({
+    items: groups.data ?? [],
+    getId: (group) => group.id,
+    onOpen: openEditGroup,
+  });
 
   const closeGroupForm = (open: boolean): void => {
     setIsGroupFormOpen(open);
-    if (!open) writeUrl(undefined);
+    if (!open) writeSearch({ tab });
   };
 
-  const openCreateAutomation = (): void => {
-    setEditingAutomation(undefined);
-    setIsAutomationFormOpen(true);
+  const openCreatedScenario = (group: Group): void => {
+    const home: GroupsTabId = scopeOf(group).kind === 'project' ? 'project' : 'global';
+    writeSearch({ tab: home });
+    setOpened({ kind: 'group', id: group.id, isFresh: true });
   };
+
+  // Копия легла выключенной — открываем её окно на её вкладке: дальше её правят.
+  const openCopied = (copy: Group): void => {
+    const home: GroupsTabId = scopeOf(copy).kind === 'project' ? 'project' : 'global';
+    writeSearch({ tab: home });
+    setCopying(undefined);
+    setOpened({ kind: 'group', id: copy.id });
+  };
+
+  const renderCards = (cards: GroupCardModel[], emptyText: string) => {
+    if (groups.isLoading) return <SkeletonList rows={3} />;
+    if (groups.isError) return <LoadErrorCard onRetry={() => void groups.refetch()} />;
+    if (cards.length === 0) {
+      return (
+        <Typography variant="body-sm" color="subtle">
+          {emptyText}
+        </Typography>
+      );
+    }
+    return (
+      <div className={styles.grid}>
+        {cards.map((card) => (
+          <GroupTile
+            key={card.group.id}
+            group={card.group}
+            pair={card.pair}
+            onOpen={() => setOpened({ kind: 'group', id: card.group.id })}
+            onCopy={() => setCopying(card.group)}
+          />
+        ))}
+      </div>
+    );
+  };
+
+  // Окно ищет карточку и по проектной половине пары: после «Скопировать в
+  // общие» открытая проектная группа становится парой глобальной копии, и поиск
+  // по одному id карточки молча закрывал окно под окном советов.
+  const openedAt = opened?.kind === 'group' ? cardOf(sections, opened.id) : undefined;
+  const openedCard = openedAt
+    ? [...sections.global, ...sections.project].find((card) => card.group.id === openedAt.cardId)
+    : undefined;
+  // Карточка открытого окна переехала на другую вкладку (копия в общие) —
+  // страница под окном идёт за ней: закрыв окно, человек видит свою группу.
+  const openedTab = openedAt?.tab;
+  useEffect(() => {
+    if (openedTab && openedTab !== tab) writeSearch({ tab: openedTab, id: search.id });
+    // Только на переезд карточки: под открытым окном вкладки человек не переключает.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openedTab]);
+  const openedFound =
+    opened?.kind === 'found'
+      ? sections.discovered.find((found) => found.key === opened.id)
+      : undefined;
+
+  const hasNoGroupsAtAll = !groups.isLoading && !groups.isError && (groups.data ?? []).length === 0;
+  const isBlank = hasNoGroupsAtAll && sections.discovered.length === 0;
 
   return (
-    <Stack gap="var(--spacing-lg)" className={styles.page}>
+    <Stack gap="var(--spacing-md)" className={styles.page}>
       <PageHeader
         title={t('groups.title')}
         subtitle={t('groups.subtitle')}
         helpTopic="groups"
         actions={
-          <Button
-            variant="primary"
-            leftIcon={<Icon name="plus" size={24} />}
-            onClick={openCreateGroup}
-          >
-            {t('groups.addGroup')}
-          </Button>
+          <Stack direction="row" gap="var(--spacing-xs)" wrap>
+            <Button
+              leftIcon={<Icon name="search" size={20} />}
+              isLoading={isDiscovering}
+              disabled={isDiscovering}
+              title={t('groupSources.discoverHint')}
+              onClick={() => runDiscovery.mutate()}
+            >
+              {isDiscovering ? t('groupSources.discovering') : t('groupSources.discover')}
+            </Button>
+            <Button
+              variant="primary"
+              leftIcon={<Icon name="plus" size={20} />}
+              onClick={() => setIsChooserOpen(true)}
+            >
+              {t('groupsPage.create.button')}
+            </Button>
+          </Stack>
         }
       />
 
       <ExplainBox title={t('groups.explainTitle')} text={t('groups.explain')} />
 
-      {isLoading && <SkeletonList rows={5} />}
+      <GroupsTabs
+        active={tab}
+        onSelect={selectTab}
+        counts={{
+          global: { count: countOf(groups, sections.global.length) },
+          project: { count: countOf(groups, sections.project.length) },
+          found: { count: countOf(discovery, sections.discovered.length) },
+          discovery: {
+            count: countOf(discovery, sources.length),
+            errors: sources.filter((source) => source.state === 'failed').length,
+          },
+        }}
+      />
 
-      <Stack gap="var(--spacing-sm)">
-        {groups.map((group) => (
-          <Card key={group.id} padding="md">
-            <Stack gap="var(--spacing-sm)">
-              <Stack
-                direction="row"
-                align="start"
-                justify="between"
-                gap="var(--spacing-md)"
-                width="100%"
-              >
-                <Stack gap="var(--spacing-2xs)">
-                  <Stack direction="row" align="center" gap="var(--spacing-xs)" wrap>
-                    <Typography variant="body" weight="medium" as="span">
-                      {group.name}
-                    </Typography>
-                    <Badge tone="accent">
-                      {group.members.length} {t('groups.members')}
-                    </Badge>
-                    {Object.keys(group.env ?? {}).length > 0 && (
-                      <Badge tone="info">env: {Object.keys(group.env ?? {}).length}</Badge>
-                    )}
-                    {/* Привязка и сценарий видны прямо на карточке: набор, который
-                      включается сам, человек обязан отличать от обычного. */}
-                    {(group.projectPaths ?? []).length > 0 && (
-                      <Badge tone="success">
-                        {t('groups.projectsBadge', { count: (group.projectPaths ?? []).length })}
-                      </Badge>
-                    )}
-                    {group.scenario && group.scenario.steps.length > 0 && (
-                      <Badge tone="warning">
-                        {t('groups.scenarioBadge', { count: group.scenario.steps.length })}
-                      </Badge>
-                    )}
-                    {!group.isEnabled && <Badge tone="neutral">{t('common.disabled')}</Badge>}
-                  </Stack>
-                  {group.description && (
-                    <Typography variant="body-sm" color="muted" className={styles.description}>
-                      {group.description}
-                    </Typography>
-                  )}
-                </Stack>
-
-                <Stack direction="row" align="center" gap="var(--spacing-2xs)" flexShrink={0}>
-                  <SandboxButton
-                    kind="group"
-                    title={group.name}
-                    selection={selectionOfGroup(group.members)}
-                  />
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    iconOnly
-                    icon={<Icon name="edit" size={24} />}
-                    aria-label={`${t('common.edit')}: ${group.name}`}
-                    onClick={() => openEditGroup(group)}
-                  />
-                  <DeleteButton
-                    entityName={group.name}
-                    description={t('common.deleteGroup')}
-                    onDelete={() => deleteGroup.mutate(group.id)}
-                    isPending={deleteGroup.isPending}
-                  />
-                  <Toggle
-                    checked={group.isEnabled}
-                    onCheckedChange={(isEnabled) =>
-                      setGroupEnabled.mutate({ id: group.id, isEnabled })
-                    }
-                    disabled={setGroupEnabled.isPending}
-                    aria-label={`${t('common.enabled')}: ${group.name}`}
-                  />
-                </Stack>
-              </Stack>
-              {/* Собственный набор привязанного проекта: без него группа с привязкой
-                выглядела пустой, хотя агент в ней работает с его правилами и скиллами. */}
-              {(group.projectPaths ?? []).length > 0 && (
-                <GroupProjectLocal paths={group.projectPaths ?? []} />
-              )}
-            </Stack>
-          </Card>
-        ))}
-      </Stack>
-
-      {!isLoading && groups.length === 0 && (
-        <EmptyState
-          icon="groups"
-          title={t('groups.emptyTitle')}
-          text={t('groups.emptyText')}
-          action={
-            <Button
-              variant="primary"
-              leftIcon={<Icon name="plus" size={20} />}
-              onClick={openCreateGroup}
-            >
-              {t('groups.addGroup')}
-            </Button>
-          }
-        />
+      {tab === 'global' && (
+        <GroupsTabPanel tab="global" hint={t('groupSources.sectionGlobalHint')}>
+          {isBlank ? (
+            <EmptyState
+              icon="groups"
+              title={t('groups.emptyTitle')}
+              text={t('groups.emptyText')}
+              action={
+                <Button
+                  variant="primary"
+                  leftIcon={<Icon name="plus" size={20} />}
+                  onClick={() => setIsChooserOpen(true)}
+                >
+                  {t('groupsPage.create.button')}
+                </Button>
+              }
+            />
+          ) : (
+            renderCards(sections.global, t('groupSources.emptyGlobal'))
+          )}
+        </GroupsTabPanel>
       )}
 
-      <Stack gap="var(--spacing-sm)" marginTop="var(--spacing-lg)">
-        <Stack direction="row" align="center" justify="between" gap="var(--spacing-md)" wrap>
-          <Typography variant="heading-sm">{t('groups.automations')}</Typography>
-          <Button leftIcon={<Icon name="plus" size={24} />} onClick={openCreateAutomation}>
-            {t('groups.addAutomation')}
-          </Button>
-        </Stack>
+      {tab === 'project' && (
+        <GroupsTabPanel tab="project" hint={t('groupSources.sectionProjectHint')}>
+          {renderCards(sections.project, t('groupSources.emptyProject'))}
+        </GroupsTabPanel>
+      )}
 
-        <ExplainBox title={t('groups.automations')} text={t('groups.automationsExplain')} />
-
-        {automations.map((automation) => (
-          <Card key={automation.id} padding="md">
-            <Stack
-              direction="row"
-              align="start"
-              justify="between"
-              gap="var(--spacing-md)"
-              width="100%"
-            >
-              <Stack gap="var(--spacing-2xs)">
-                <Stack direction="row" align="center" gap="var(--spacing-xs)" wrap>
-                  <Typography variant="body" weight="medium" as="span">
-                    {automation.name}
-                  </Typography>
-                  {!automation.isEnabled && <Badge tone="neutral">{t('common.disabled')}</Badge>}
-                </Stack>
-                <Stack direction="row" align="center" gap="var(--spacing-xs)" wrap>
-                  <Badge tone="accent">{automation.trigger.event}</Badge>
-                  {automation.trigger.matcher && (
-                    <Badge tone="neutral">{automation.trigger.matcher}</Badge>
-                  )}
-                  <Icon name="chevronRight" size={24} />
-                  <Typography variant="mono" color="subtle" as="span" truncate>
-                    {automation.action.command}
-                  </Typography>
-                </Stack>
-              </Stack>
-
-              <Stack direction="row" align="center" gap="var(--spacing-2xs)" flexShrink={0}>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  iconOnly
-                  icon={<Icon name="edit" size={24} />}
-                  aria-label={`${t('common.edit')}: ${automation.name}`}
-                  onClick={() => {
-                    setEditingAutomation(automation);
-                    setIsAutomationFormOpen(true);
-                  }}
+      {tab === 'found' && (
+        <GroupsTabPanel tab="found" hint={t('groupSources.sectionFoundHint')}>
+          {discovery.isLoading && <SkeletonList rows={2} />}
+          {discovery.isError && (
+            <LoadErrorCard
+              title={t('groupSources.discoveryError')}
+              onRetry={() => void discovery.refetch()}
+            />
+          )}
+          {discovery.data && sections.discovered.length === 0 && (
+            <Typography variant="body-sm" color="subtle">
+              {t('groupSources.emptyFound')}
+            </Typography>
+          )}
+          {sections.discovered.length > 0 && (
+            <div className={styles.grid}>
+              {sections.discovered.map((found) => (
+                <FoundTile
+                  key={found.key}
+                  found={found}
+                  onOpen={() => setOpened({ kind: 'found', id: found.key })}
                 />
-                <DeleteButton
-                  entityName={automation.name}
-                  description={t('common.deleteAutomation')}
-                  onDelete={() => deleteAutomation.mutate(automation.id)}
-                  isPending={deleteAutomation.isPending}
-                />
-                {/* Выключенный сценарий не компилируется в хук — сервер это уже
-                    умел, не хватало только переключателя. */}
-                <Toggle
-                  checked={automation.isEnabled}
-                  onCheckedChange={(isEnabled) =>
-                    saveAutomation.mutate({
-                      id: automation.id,
-                      automation: { ...automation, isEnabled },
-                    })
-                  }
-                  disabled={saveAutomation.isPending}
-                  aria-label={`${t('common.enabled')}: ${automation.name}`}
-                />
-              </Stack>
-            </Stack>
-          </Card>
-        ))}
+              ))}
+            </div>
+          )}
+        </GroupsTabPanel>
+      )}
 
-        {automations.length === 0 && <Typography color="subtle">{t('common.empty')}</Typography>}
-      </Stack>
+      {tab === 'discovery' && (
+        <GroupsTabPanel tab="discovery" hint={t('groupsPage.discovery.hint')}>
+          {discovery.isLoading && <SkeletonList rows={2} />}
+          {discovery.isError && (
+            <LoadErrorCard
+              title={t('groupSources.discoveryError')}
+              onRetry={() => void discovery.refetch()}
+            />
+          )}
+          {discovery.data && <DiscoveryProgress view={discovery.data} />}
+        </GroupsTabPanel>
+      )}
+
+      {openedCard && (
+        <GroupDialog
+          // Своё окно на каждую группу: состояние пути (составитель, удаление,
+          // открытый шаг) не переезжает к другой группе. Ключ — то, что открыл
+          // человек, а не карточка: копия в общие делает группу парой с новой
+          // карточкой, и окно с итогом копии не должно при этом пересоздаваться.
+          key={opened?.id}
+          group={openedCard.group}
+          pair={openedCard.pair}
+          startComposer={opened?.isFresh}
+          onClose={() => setOpened(undefined)}
+          onEdit={openEditGroup}
+          onAdvice={(mode, group) => setAdvice({ mode, group })}
+          onCopy={setCopying}
+        />
+      )}
+      {openedFound && <FoundDialog found={openedFound} onClose={() => setOpened(undefined)} />}
 
       <GroupFormModal isOpen={isGroupFormOpen} onOpenChange={closeGroupForm} group={editingGroup} />
-      <AutomationFormModal
-        isOpen={isAutomationFormOpen}
-        onOpenChange={setIsAutomationFormOpen}
-        automation={editingAutomation}
+      <CreateGroupChooser
+        isOpen={isChooserOpen}
+        onOpenChange={setIsChooserOpen}
+        onPick={pickKind}
       />
+      <ScenarioCreateModal
+        isOpen={isScenarioOpen}
+        onOpenChange={setIsScenarioOpen}
+        onCreated={openCreatedScenario}
+      />
+      {copying && (
+        <CopyGroupDialog
+          group={copying}
+          takenNames={(groups.data ?? []).map((group) => group.name)}
+          onClose={() => setCopying(undefined)}
+          onCopied={openCopied}
+        />
+      )}
+      {advice && (
+        <AdviceModal mode={advice.mode} group={advice.group} onClose={() => setAdvice(undefined)} />
+      )}
     </Stack>
   );
+}
+
+/** Число вкладки по состоянию запроса: пока читается или упал — не ноль. */
+function countOf(
+  query: { isPending: boolean; isError: boolean; data?: unknown },
+  count: number,
+): GroupsTabCount['count'] {
+  // Прочитанное раньше не отменяется упавшим повторным запросом.
+  if (query.data !== undefined) return count;
+  if (query.isError) return 'failed';
+  if (query.isPending) return 'loading';
+  return count;
 }

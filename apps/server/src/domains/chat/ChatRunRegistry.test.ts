@@ -165,8 +165,8 @@ describe('ChatRunRegistry', () => {
     registry.start('c1', OPTIONS, {});
     expect(registry.isRunning('c1')).toBe(true);
 
-    const ok = registry.stop('c1');
-    expect(ok).toBe(true);
+    const outcome = registry.stop('c1');
+    expect(outcome).toBe('stopped');
     expect(fake.stopped).toBe(true);
     expect(registry.has('c1')).toBe(false);
   });
@@ -274,6 +274,28 @@ describe('ChatRunRegistry — происхождение прогона и ма�
     expect(refusing.describe('r1')?.status).not.toBe('running');
   });
 
+  /** F-149. Группа включалась (запись в каталог конфига) до отказа контура. */
+  it('отказ обязательного контура: группа не включается', async () => {
+    const refusing = new ChatRunRegistry(() => new FakeRun());
+    refusing.setPlatformRouting(() => ({ env: {}, refusal: 'Контур обязателен' }));
+    const activated: string[][] = [];
+    refusing.setGroupActivation((keys) => {
+      activated.push([...keys]);
+      return undefined;
+    });
+    refusing.start('r1', OPTIONS, {});
+    await flush();
+    expect(activated).toEqual([]);
+
+    const allowed = new ChatRunRegistry(() => new FakeRun());
+    allowed.setGroupActivation((keys) => {
+      activated.push([...keys]);
+      return undefined;
+    });
+    allowed.start('a1', OPTIONS, {});
+    expect(activated).toEqual([['a1']]);
+  });
+
   it('контур подставил модель без авторежима CLI — прогон идёт в acceptEdits, Claude остаётся в auto', () => {
     const swapped = new ChatRunRegistry(() => new FakeRun());
     let model = 'qwen3-coder';
@@ -325,6 +347,28 @@ describe('ChatRunRegistry — происхождение прогона и ма�
     // Сам ТЕКСТ дописки при этом цел: снимает его запуск, а снимок параметров
     // переживает паузу дерева и перезапуск панели.
     expect(options?.appendSystemPrompt).toBe('инициатива панели');
+  });
+
+  /**
+   * Строка о тестах проекта (папка e2e, команда сверки) — на КАЖДОМ старте и
+   * по каталогу прогона: папка могла появиться между ходами. Осечка слушателя
+   * старт не срывает.
+   */
+  it('строка каталога прогона ставится на каждом старте, осечка слушателя — пустая строка', () => {
+    const asked: string[] = [];
+    registry.setWorkspaceNote((cwd) => {
+      asked.push(cwd);
+      return `QA workspace of ${cwd}`;
+    });
+    registry.start('c8', { ...OPTIONS, workspaceNote: 'прошлая жизнь' }, {});
+    expect(asked).toEqual(['/tmp/x']);
+    expect(registry.describe('c8')?.options.workspaceNote).toBe('QA workspace of /tmp/x');
+
+    registry.setWorkspaceNote(() => {
+      throw new Error('битый файл окружений');
+    });
+    registry.start('c9', { ...OPTIONS }, {});
+    expect(registry.describe('c9')?.options.workspaceNote).toBe('');
   });
 
   it('маршрута нет — флагов нет, и дописка панели остаётся как была', () => {
@@ -669,7 +713,7 @@ describe('ChatRunRegistry — emitExternal и grace-период', () => {
       expect(reg.attach('sess-1', 0, sub)).toBeTypeOf('function');
       expect(events).toHaveLength(1);
 
-      expect(reg.stop('sess-1')).toBe(true);
+      expect(reg.stop('sess-1')).toBe('stopped');
       expect(created[0]?.stopped).toBe(true);
       expect(reg.has('new-1')).toBe(false);
     });
@@ -911,14 +955,14 @@ describe('ChatRunRegistry.stopByHuman', () => {
     registry.setHumanStopListener((keys) => void stops.push([...keys]));
 
     registry.start('c1', { prompt: 'a', cwd: '/tmp/wt' }, {});
-    expect(registry.stopByHuman('c1')).toBe(true);
+    expect(registry.stopByHuman('c1')).toBe('stopped');
     expect(stops).toHaveLength(1);
 
     registry.start('c2', { prompt: 'b', cwd: '/tmp/wt' }, {});
     runs[1]?.finish();
     await flush();
     expect(registry.isRunning('c2')).toBe(false);
-    expect(registry.stopByHuman('c2')).toBe(true);
+    expect(registry.stopByHuman('c2')).toBe('stopped');
     expect(stops).toHaveLength(1);
   });
 });

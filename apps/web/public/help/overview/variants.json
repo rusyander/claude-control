@@ -1,0 +1,159 @@
+{
+  "topic": "overview",
+  "frames": {
+    "tour/01-tiles": {
+      "light-ru": {
+        "file": "01-tiles.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "light-en": {
+        "file": "01-tiles.en.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-ru": {
+        "file": "01-tiles.dark.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-en": {
+        "file": "01-tiles.dark.en.png",
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    "tour/02-section": {
+      "light-ru": {
+        "file": "02-section.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "light-en": {
+        "file": "02-section.en.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-ru": {
+        "file": "02-section.dark.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-en": {
+        "file": "02-section.dark.en.png",
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    "tour/03-quick-add": {
+      "light-ru": {
+        "file": "03-quick-add.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "light-en": {
+        "file": "03-quick-add.en.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-ru": {
+        "file": "03-quick-add.dark.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-en": {
+        "file": "03-quick-add.dark.en.png",
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    "tour/04-changes": {
+      "light-ru": {
+        "file": "04-changes.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "light-en": {
+        "file": "04-changes.en.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-ru": {
+        "file": "04-changes.dark.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-en": {
+        "file": "04-changes.dark.en.png",
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    "trouble/01-wrong-dir": {
+      "light-ru": {
+        "file": "01-wrong-dir.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "light-en": {
+        "file": "01-wrong-dir.en.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-ru": {
+        "file": "01-wrong-dir.dark.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-en": {
+        "file": "01-wrong-dir.dark.en.png",
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    "trouble/02-broken-hook": {
+      "light-ru": {
+        "file": "02-broken-hook.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "light-en": {
+        "file": "02-broken-hook.en.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-ru": {
+        "file": "02-broken-hook.dark.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-en": {
+        "file": "02-broken-hook.dark.en.png",
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    "trouble/03-hooks": {
+      "light-ru": {
+        "file": "03-hooks.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "light-en": {
+        "file": "03-hooks.en.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-ru": {
+        "file": "03-hooks.dark.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-en": {
+        "file": "03-hooks.dark.en.png",
+        "width": 1440,
+        "height": 1000
+      }
+    }
+  }
+}

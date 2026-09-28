@@ -28,6 +28,7 @@ import { mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { connect } from 'node:net';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { killChildProcessTree } from '../../apps/server/src/lib/kill-tree.mjs';
 import { startStubPlatform } from './stub-platform.mjs';
 
 const ROOT = resolve(import.meta.dirname, '../..');
@@ -102,9 +103,10 @@ async function boot() {
 async function stop(child) {
   if (!child || child.exitCode !== null) return;
   const exited = new Promise((done) => child.once('exit', done));
-  if (process.platform === 'win32') {
-    spawnSync('taskkill', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
-  } else child.kill('SIGTERM');
+  // Дерево — общим помощником, не `taskkill /T`: тот снимал чужих сирот, чей
+  // мёртвый родитель отдал номер нашему серверу (так 2026-09-27 ушёл стенд).
+  if (process.platform === 'win32') killChildProcessTree(child);
+  else child.kill('SIGTERM');
   await exited;
   while (await portOpen(PORT)) await new Promise((r) => setTimeout(r, 200));
 }

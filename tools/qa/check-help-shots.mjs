@@ -29,6 +29,15 @@
  *     команду. Гасится только руками: `node tools/help-shots/sources.mjs
  *     <раздел>` — это заявление человека, что он документ перечитал, и машине
  *     его не выдать.
+ *  8. У каждого кадра есть все ЧЕТЫРЕ варианта — светлая/тёмная тема ×
+ *     ru/en (`SHOT_VARIANTS` в `kit.mjs`). Недостающий вариант краснеет: справка
+ *     на тёмной теме показала бы светлый кадр, и заметить это можно только
+ *     глазами. Исключение одно и названо: у стороны `platform` (админка
+ *     чужого приложения) тёмного варианта не бывает, а её английский снимается
+ *     только на настоящем стенде компании — такой пробел печатается поимённо,
+ *     но не краснеет (решение владельца 27.09).
+ *  9. Опись вариантов раздела `variants.json`, по которой справка выбирает
+ *     файл, собрана из сегодняшних описей сценариев.
  *
  * Граница честности названа прямо: проверка видит то, что было в РАЗМЕТКЕ
  * снимаемой области. Секрет, нарисованный на canvas или пришедший картинкой, в
@@ -50,6 +59,11 @@ import {
   SECRET_PATTERNS,
   DIAGRAMS_MANIFEST,
   SOURCES_MANIFEST,
+  SHOT_VARIANTS,
+  VARIANT_INDEX,
+  renderVariantIndex,
+  requiredVariants,
+  variantOf,
   diagramPages,
   fingerprint,
   readSourceManifest,
@@ -85,6 +99,17 @@ const FOREIGN_HOST = /\b[a-z0-9-]+\.(ai|com|ru|io|net|org|dev|cloud|app)\b/gi;
  * и он по-прежнему краснеет.
  */
 const VENDOR_HOST = /(?<![\w.-])(?:claude\.ai|anthropic\.com)\b/gi;
+
+/**
+ * Разделы, которые снимаются ТОЛЬКО на живом стенде платформы компании: кадры
+ * `platform` показывают ответы настоящей модели стенда, и текст раздела их
+ * описывает («модель 0.5B: нумерованный список вместо вызова»). Сценарный
+ * контур дал бы другие ответы под тем же текстом — это был бы рисунок, а не
+ * снимок. Поэтому недостающий вариант здесь — названный пробел, а не краснота:
+ * закрыть его можно только прогоном на стенде
+ * (`platform-connect-panel.mjs` с `GUIDE_THEME`/`GUIDE_LANG`). Список закрытый.
+ */
+const LIVE_STAND_TOPICS = new Set(['platform']);
 
 /** Выражения, по которым ищутся утечки в тексте кадра. Имя → выражение. */
 const LEAK_PATTERNS = {
@@ -338,43 +363,63 @@ function verify(catalog, usages, dictionary, secrets, diagrams = [], freshness =
       continue;
     }
 
-    const counted = coverage.get(entry.topic) ?? { frames: 0, english: 0 };
+    const counted = coverage.get(entry.topic) ?? { frames: 0, variants: {}, gaps: [] };
     coverage.set(entry.topic, counted);
 
     const listed = new Set();
+    /** Вариант → кадры сценария без него: печатается одной строкой на пару. */
+    const missing = new Map();
     for (const frame of entry.manifest.frames) {
       listed.add(frame.file);
       known.set(`${where}/${frame.id}`, { ...frame, topic: entry.topic, scenario: entry.scenario });
       counted.frames += 1;
 
-      // Английский кадр — не отдельная запись, а вложенный `en` у русской:
-      // кадр остаётся одним кадром с одной подписью и одним номером шага.
-      // Поэтому запись БЕЗ русских полей — не «ещё не переснято», а поломка
-      // съёмки: английский прогон дописал отпечаток туда, где дописывать не к
-      // чему, и на странице такой кадр не покажется никому.
+      // Варианты — не отдельные записи, а вложенные `en`/`dark`/`darkEn` у
+      // светлой русской: кадр остаётся одним кадром с одной подписью и одним
+      // номером шага. Поэтому запись БЕЗ светлых русских полей — не «ещё не
+      // переснято», а поломка съёмки: прогон варианта дописал отпечаток туда,
+      // где дописывать не к чему.
       if (!frame.file) {
         problems.push(
-          `${where}/${frame.id}: записан только по-английски — русского оригинала в описи нет`,
+          `${where}/${frame.id}: записан только вариантами — светлого русского оригинала в описи нет`,
         );
         continue;
       }
 
-      if (frame.en) {
-        counted.english += 1;
-        listed.add(frame.en.file);
-        if (!entry.files.includes(frame.en.file)) {
-          problems.push(`${where}/${frame.id}: английский кадр в описи есть, файла нет`);
+      let broken = false;
+      const required = new Set(requiredVariants(frame.side).map((variant) => variant.key));
+      for (const variant of SHOT_VARIANTS) {
+        const taken = variantOf(frame, variant);
+        if (!taken) {
+          if (!required.has(variant.key)) continue;
+          // Чужая сторона и разделы живого стенда снимаются только на настоящем
+          // стенде компании, и их пробел — названный долг, а не поломка: он
+          // печатается, но не краснеет.
+          const gap = frame.side === 'platform' || LIVE_STAND_TOPICS.has(entry.topic);
+          const bucket = gap ? `${variant.key}:gap` : variant.key;
+          missing.set(bucket, [...(missing.get(bucket) ?? []), frame.id]);
           continue;
         }
-        // Секретный скан идёт по ОБОИМ текстам. Английский кадр снят вторым
-        // прогоном, с другой обстановкой и другими подменами: утечка в нём
-        // ничем не связана с русским и ловится только собственным осмотром.
-        const englishLeaks = auditText(frame.en.text ?? '', secrets);
-        if (englishLeaks.length) {
-          problems.push(`${where}/${frame.id} [en]: УТЕЧКА — ${englishLeaks.join('; ')}`);
+        counted.variants[variant.key] = (counted.variants[variant.key] ?? 0) + 1;
+        if (!variant.field) continue;
+        listed.add(taken.file);
+        if (!entry.files.includes(taken.file)) {
+          problems.push(`${where}/${frame.id} [${variant.key}]: вариант в описи есть, файла нет`);
+          broken = true;
           continue;
+        }
+        // Секретный скан идёт по КАЖДОМУ варианту. Вариант снят своим
+        // прогоном, с другой обстановкой и другими подменами: утечка в нём
+        // ничем не связана со светлым русским и ловится только своим осмотром.
+        const variantLeaks = auditText(taken.text ?? '', secrets);
+        if (variantLeaks.length) {
+          problems.push(
+            `${where}/${frame.id} [${variant.key}]: УТЕЧКА — ${variantLeaks.join('; ')}`,
+          );
+          broken = true;
         }
       }
+      if (broken) continue;
 
       if (!entry.files.includes(frame.file)) {
         problems.push(`${where}/${frame.id}: в описи есть, файла нет`);
@@ -402,6 +447,23 @@ function verify(catalog, usages, dictionary, secrets, diagrams = [], freshness =
 
     for (const file of entry.files) {
       if (!listed.has(file)) problems.push(`${where}/${file}: файл есть, в описи нет`);
+    }
+
+    // Недостающие варианты — строкой на пару «сценарий × вариант», с командой:
+    // до первой пересъёмки это сотни кадров, и построчный список утопил бы
+    // остальные поломки.
+    for (const [bucket, ids] of missing) {
+      const [key, gap] = bucket.split(':');
+      const variant = SHOT_VARIANTS.find((item) => item.key === key);
+      const list = `${ids.length} из ${entry.manifest.frames.length} (${ids.join(', ')})`;
+      if (gap) {
+        counted.gaps.push(`${where}: нет варианта ${key} (нужен живой стенд компании) — ${list}`);
+        continue;
+      }
+      problems.push(
+        `${where}: нет варианта ${key} у кадров ${list} — переснимите с ` +
+          `GUIDE_THEME=${variant.theme} GUIDE_LANG=${variant.lang}`,
+      );
     }
   }
 
@@ -479,34 +541,59 @@ function verify(catalog, usages, dictionary, secrets, diagrams = [], freshness =
 }
 
 /**
- * Английские кадры: строка отчёта, а НЕ краснота.
+ * Счёт вариантов: одна строка на весь каталог и по строке на раздел, где
+ * чего-то не хватает. Краснеет не он, а `verify` (недостающий вариант — это
+ * проблема); здесь — картина целиком, чтобы «переснято 3 варианта из 4» было
+ * видно одной строкой, а не по сотне проблем.
  *
- * Разделов двадцать пять, переснимают их по одному, и правило, краснеющее на
- * первом же непереснятом разделе, пришлось бы вводить выключенным — то есть
- * никогда. Поэтому здесь считают: сколько разделов переснято целиком, сколько
- * начато и скольких кадров каждому из начатых не хватает. Названный пробел
- * заставляет двигаться не хуже красноты, а ход работы виден по одной строке.
- *
- * Молчания тоже быть не должно: раздел без единого английского кадра назван
- * своим именем, иначе «25 из 25» и «0 из 25» читались бы одинаково пусто.
+ * Пробел стороны `platform` печатается поимённо: он не краснеет, и кроме этих
+ * строк о нём не скажет ничто.
  */
-function englishReport(coverage) {
+function variantReport(coverage) {
   const lines = [];
   const topics = [...coverage].sort(([a], [b]) => a.localeCompare(b));
-  const full = topics.filter(([, c]) => c.english === c.frames && c.frames > 0);
-  const partial = topics.filter(([, c]) => c.english > 0 && c.english < c.frames);
-  const none = topics.filter(([, c]) => c.english === 0);
-
-  lines.push(`Разделов с английскими кадрами: ${full.length} из ${topics.length}`);
-  for (const [topic, c] of partial) {
-    lines.push(
-      `  ${topic}: английских кадров ${c.english} из ${c.frames} — раздел переснят не весь`,
-    );
+  const frames = topics.reduce((sum, [, c]) => sum + c.frames, 0);
+  const totals = SHOT_VARIANTS.map((variant) => {
+    const count = topics.reduce((sum, [, c]) => sum + (c.variants[variant.key] ?? 0), 0);
+    return `${variant.key} ${count}`;
+  });
+  lines.push(`Кадров в каталоге: ${frames}; вариантов: ${totals.join(', ')}`);
+  for (const [topic, c] of topics) {
+    const short = SHOT_VARIANTS.filter((variant) => (c.variants[variant.key] ?? 0) < c.frames);
+    if (short.length === 0) continue;
+    const parts = short.map((variant) => `${variant.key} ${c.variants[variant.key] ?? 0}`);
+    lines.push(`  ${topic}: кадров ${c.frames}, из них ${parts.join(', ')}`);
   }
-  if (none.length) {
-    lines.push(`  без английских кадров (${none.length}): ${none.map(([t]) => t).join(', ')}`);
+  for (const [, c] of topics) {
+    for (const gap of c.gaps) lines.push(`  пробел (не краснеет): ${gap}`);
   }
   return lines;
+}
+
+/**
+ * Опись вариантов раздела против описей его сценариев. Справка выбирает файл
+ * ТОЛЬКО по ней: отставшая опись — это новый кадр, которого читатель не
+ * увидит, или вариант, который справка ищет и не находит.
+ */
+function variantIndexProblems(catalog, readIndex) {
+  const byTopic = new Map();
+  for (const entry of catalog) {
+    if (!entry.manifest) continue;
+    const list = byTopic.get(entry.topic) ?? [];
+    list.push({ scenario: entry.scenario, manifest: entry.manifest });
+    byTopic.set(entry.topic, list);
+  }
+  const problems = [];
+  for (const [topic, scenarios] of byTopic) {
+    const expected = renderVariantIndex(topic, scenarios);
+    const actual = readIndex(topic)?.replace(/\r\n/g, '\n');
+    if (actual === expected) continue;
+    problems.push(
+      `${topic}/${VARIANT_INDEX}: ${actual === undefined ? 'описи вариантов нет' : 'опись вариантов отстала от описей сценариев'}` +
+        ` — node tools/help-shots/variants.mjs ${topic}`,
+    );
+  }
+  return problems;
 }
 
 /** Сторож обязан уметь краснеть. Все образцы ниже вымышлены. */
@@ -548,10 +635,11 @@ function selftest() {
       },
       files: ['99-сирота.png'],
     },
-    // Английская половина: у кадра есть близнец, и он ломается СВОИМИ
-    // способами — файла нет, в тексте утечка, запись без русского оригинала.
+    // Варианты: у кадра есть близнецы (en, dark, darkEn), и они ломаются
+    // СВОИМИ способами — файла нет, в тексте утечка, запись без светлого
+    // русского оригинала, варианта нет вовсе.
     {
-      topic: 'перевод',
+      topic: 'варианты',
       scenario: 'проверка',
       dir: '',
       manifest: {
@@ -564,26 +652,39 @@ function selftest() {
             en: { file: '01-без-английского-файла.en.png', text: '' },
           },
           {
-            id: '02-утечка-по-английски',
-            file: '02-утечка-по-английски.png',
+            id: '02-утечка-в-тёмном',
+            file: '02-утечка-в-тёмном.png',
             side: 'panel',
             text: '',
-            en: {
-              file: '02-утечка-по-английски.en.png',
-              text: 'signed in as admin@instance.local',
-            },
+            dark: { file: '02-утечка-в-тёмном.dark.png', text: 'вошли как admin@instance.local' },
           },
           {
             id: '03-только-английский',
             side: 'panel',
             en: { file: '03-только-английский.en.png', text: '' },
           },
+          {
+            id: '04-без-тёмных',
+            file: '04-без-тёмных.png',
+            side: 'panel',
+            text: '',
+            en: { file: '04-без-тёмных.en.png', text: '' },
+          },
+          {
+            id: '05-чужая-сторона',
+            file: '05-чужая-сторона.png',
+            side: 'platform',
+            text: '',
+          },
         ],
       },
       files: [
         '01-без-английского-файла.png',
-        '02-утечка-по-английски.png',
-        '02-утечка-по-английски.en.png',
+        '02-утечка-в-тёмном.png',
+        '02-утечка-в-тёмном.dark.png',
+        '04-без-тёмных.png',
+        '04-без-тёмных.en.png',
+        '05-чужая-сторона.png',
       ],
     },
   ];
@@ -612,9 +713,11 @@ function selftest() {
   );
   const expected = [
     'в описи есть, файла нет',
-    'английский кадр в описи есть, файла нет',
-    '[en]: УТЕЧКА',
-    'русского оригинала в описи нет',
+    '[light-en]: вариант в описи есть, файла нет',
+    '[dark-ru]: УТЕЧКА',
+    'светлого русского оригинала в описи нет',
+    'нет варианта dark-ru у кадров',
+    'нет варианта dark-en у кадров',
     'файл есть, в описи нет',
     'такого кадра в каталоге нет',
     'файла схемы нет',
@@ -628,7 +731,7 @@ function selftest() {
     if (!found) failed += 1;
   }
 
-  failed += selftestEnglish();
+  failed += selftestVariants(broken, structural);
   failed += selftestSources();
 
   console.log(
@@ -640,33 +743,61 @@ function selftest() {
 }
 
 /**
- * Счёт английских кадров проверяется отдельно — и не на красноту, а на ТЕКСТ.
- *
- * Это единственная часть отчёта, которая обязана оставаться зелёной при пустом
- * результате: раздел без английских кадров — пробел, а не поломка. Проверять
- * тут нечего, кроме того, что пробел НАЗВАН: сторож, который молча печатает
- * «0 из 25», ничем не отличается от сторожа, который не считает вовсе.
+ * Варианты — отдельно, потому что здесь важны и ЗЕЛЁНЫЕ случаи: пробел чужой
+ * стороны обязан быть назван и при этом не краснеть, а верная опись вариантов
+ * (в том числе с CRLF свежего клона) — молчать.
  */
-function selftestEnglish() {
-  const report = englishReport(
-    new Map([
-      ['целиком', { frames: 3, english: 3 }],
-      ['наполовину', { frames: 4, english: 1 }],
-      ['нетронутый', { frames: 5, english: 0 }],
-    ]),
-  ).join('\n');
+function selftestVariants(broken, structural) {
+  const report = variantReport(structural.coverage).join('\n');
+  const foreignRed = structural.problems.some(
+    (problem) => problem.includes('05-чужая-сторона') && problem.includes('нет варианта'),
+  );
+  const withIndex = broken.filter((entry) => entry.topic === 'варианты');
+  const right = renderVariantIndex('варианты', [
+    { scenario: 'проверка', manifest: withIndex[0].manifest },
+  ]);
+  const indexOf = (text) => variantIndexProblems(withIndex, () => text);
+  // Раздел живого стенда: кадр панели без тёмных вариантов — пробел, не краснота.
+  const live = verify(
+    [
+      {
+        topic: 'platform',
+        scenario: 'проверка',
+        dir: '',
+        manifest: { frames: [{ id: '01-стенд', file: '01-стенд.png', side: 'panel', text: '' }] },
+        files: ['01-стенд.png'],
+      },
+    ],
+    { shots: [], diagrams: [] },
+    '',
+    [],
+  );
+  const liveReport = variantReport(live.coverage).join(' / ');
 
   const cases = [
-    ['переснятые разделы сосчитаны', 'Разделов с английскими кадрами: 1 из 3'],
-    ['начатый раздел назван с остатком', 'наполовину: английских кадров 1 из 4'],
-    ['нетронутый раздел назван по имени', 'без английских кадров (1): нетронутый'],
+    ['пробел чужой стороны назван', report.includes('нет варианта light-en (нужен живой стенд')],
+    [
+      'пробел раздела живого стенда назван',
+      liveReport.includes('platform/проверка: нет варианта dark-ru'),
+    ],
+    [
+      'пробел раздела живого стенда не краснеет',
+      !live.problems.some((p) => p.includes('нет варианта')),
+    ],
+    ['пробел чужой стороны не краснеет', !foreignRed],
+    ['счёт вариантов напечатан', /вариантов: light-ru \d+, light-en \d+, dark-ru \d+/.test(report)],
+    [
+      'нет описи вариантов — краснеет',
+      indexOf(undefined).some((p) => p.includes('описи вариантов нет')),
+    ],
+    ['опись вариантов отстала — краснеет', indexOf('{}\n').some((p) => p.includes('отстала'))],
+    ['верная опись молчит, и с CRLF', indexOf(right.replace(/\n/g, '\r\n')).length === 0],
   ];
 
   let failed = 0;
-  for (const [name, fragment] of cases) {
-    const found = report.includes(fragment);
-    console.log(`${found ? 'ок   ' : 'ПЛОХО'} называет: ${name}`);
-    if (!found) failed += 1;
+  for (const [name, good] of cases) {
+    console.log(`${good ? 'ок   ' : 'ПЛОХО'} варианты: ${name}`);
+    if (!good) failed += 1;
   }
   return failed;
 }
@@ -777,6 +908,12 @@ function main() {
   const watched = manifest.topics ?? [];
   const states = sourceStates(manifest, (path) => readRepoFile(path), readHelpTopics());
   problems.push(...sourceProblems(states));
+  problems.push(
+    ...variantIndexProblems(catalog, (topic) => {
+      const path = join(SHOTS_ROOT, topic, VARIANT_INDEX);
+      return existsSync(path) ? readFileSync(path, 'utf8') : undefined;
+    }),
+  );
 
   console.log(
     `Кадров проверено: ${ok.length}; значений из хранилища в поиске: ${secrets.length}` +
@@ -789,7 +926,7 @@ function main() {
     `Разделов сверено с кодом: ${watched.length} из ${readHelpTopics().length}` +
       ` (исходников ${states.filter((state) => state.ok).length} сходится)`,
   );
-  for (const line of englishReport(coverage)) console.log(line);
+  for (const line of variantReport(coverage)) console.log(line);
   for (const problem of problems) console.log(`  ${problem}`);
 
   console.log(

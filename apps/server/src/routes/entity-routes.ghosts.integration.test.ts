@@ -7,6 +7,7 @@ import type { Group } from '@agentdeck/contracts';
 import { AppStore } from '../lib/app-store.ts';
 import type { ServerContext } from '../context.ts';
 import { registerEntityRoutes } from './entity-routes.ts';
+import { registerCodedErrors } from '../lib/server-text.ts';
 
 /**
  * Удаление сущности любого вида не оставляет следа в state.json.
@@ -62,6 +63,8 @@ describe('маршруты сущностей: удаление не остав�
     } as unknown as ServerContext;
 
     app = Fastify();
+    // Как в сборке сервера: отказ с кодом текста отдаётся вместе с кодом.
+    registerCodedErrors(app);
     registerEntityRoutes(app, ctx);
     await app.ready();
   });
@@ -151,14 +154,23 @@ describe('маршруты сущностей: удаление не остав�
     // Удаление правила сдвигает идентификаторы: из «Стиль» и «Стиль-2»
     // уцелевший становится «Стиль». Снимать след надо ДО этого сдвига, иначе
     // стёрлись бы отметки выжившего.
-    for (let n = 0; n < 2; n += 1) {
-      const created = await app.inject({
-        method: 'POST',
-        url: '/api/rules',
-        payload: { title: 'Стиль', body: 'текст', groupIds: [] },
-      });
-      expect(created.statusCode).toBe(200);
-    }
+    // Тёзок панель больше не создаёт (D-A, отказ 409), но в файлах людей они
+    // лежат — поэтому их кладём в файл руками, как это сделал бы человек.
+    writeFileSync(
+      join(root, 'CLAUDE.md'),
+      '## ПРАВИЛО: Стиль\n\nтекст\n\n## ПРАВИЛО: Стиль\n\nтекст\n',
+    );
+    const namesake = await app.inject({
+      method: 'POST',
+      url: '/api/rules',
+      payload: { title: 'стиль ', body: 'третий', isEnabled: true, groupIds: [] },
+    });
+    expect(namesake.statusCode).toBe(409);
+    expect(namesake.json()).toMatchObject({
+      code: 'rule_title_taken',
+      messageCode: 'rule-title-taken',
+      params: { title: 'Стиль' },
+    });
 
     // Идентификатор правила — slug заголовка, спрашиваем его у самого раздела.
     const listed = await app.inject({ method: 'GET', url: '/api/rules' });

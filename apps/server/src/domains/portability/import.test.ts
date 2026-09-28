@@ -423,6 +423,38 @@ describe('правила CLAUDE.md', () => {
     expect(rules.filter((item) => item.enabled)).toHaveLength(2);
   });
 
+  // Ревью 28.09 (F-165): выключенное правило живёт в состоянии панели, не в
+  // файле, — импорт без снимков его не видел, и отчёт переноса молчал о нём.
+  it('выключенное панелью правило едет записью со снятым флагом', () => {
+    const own = mkdtempSync(join(tmpdir(), 'portability-rules-'));
+    try {
+      writeFileSync(
+        join(own, 'CLAUDE.md'),
+        '# Шапка\n\n## ПРАВИЛО: Alpha\n\nтекст alpha\n',
+        'utf8',
+      );
+      const result = importClaudeEnvironment({
+        provider: claudeProvider,
+        scope: 'global',
+        override: own,
+        state: {
+          isDisabled: () => false,
+          disabledRules: () => [
+            { title: 'Beta', body: 'текст beta', after: 'Alpha', before: null, index: 1 },
+          ],
+        },
+      });
+      const rules = itemsOf<InstructionsItem>(result.items, 'instructions').filter((item) =>
+        item.fileName.includes('#'),
+      );
+      const beta = rules.find((item) => item.raw.includes('текст beta'));
+      expect(beta?.enabled).toBe(false);
+      expect(rules.find((item) => item.raw.includes('текст alpha'))?.enabled).toBe(true);
+    } finally {
+      rmSync(own, { recursive: true, force: true });
+    }
+  });
+
   it('текст файла не едет дважды: преамбула и правила не пересекаются', () => {
     const result = importHome();
     const instructions = itemsOf<InstructionsItem>(result.items, 'instructions').filter((item) =>

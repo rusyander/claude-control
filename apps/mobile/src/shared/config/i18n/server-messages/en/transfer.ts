@@ -66,10 +66,14 @@ export const transferEn: Record<TransferMessageCode, string> = {
   'backup-restore-target-unknown': 'It is unclear where to restore the copy «{{target}}»',
   'backup-passphrase-required': 'A passphrase is needed to decrypt the copy',
   'backup-decrypt-failed': 'Decryption failed',
+  'backup-preview-encrypted':
+    'The copy is encrypted: what a restore would change shows only after decryption',
   'history-provider-copy-readonly':
     "The provider's file copy «{{file}}» is read-only — a rollback from here is not performed.",
   'history-current-file-missing': 'The current file was not found',
   'history-binary-no-hunks': 'A binary file — a line-by-line rollback is not available',
   'history-too-large-no-hunks': 'The file is too large — a line-by-line rollback is not available',
   'history-hunk-not-found': 'The change was not found',
+  'history-hunk-not-newest':
+    'Only the newest copy of a file is reverted line by line — its diff is against the current file. Open the top entry of this file or restore the copy as a whole.',
 };

@@ -94,6 +94,20 @@ const check = (ok, text) => {
  * повторяется в итоге — иначе пропуск тихо зарастает.
  */
 const skipped = [];
+
+/**
+ * Убрать временную папку прогона. На Windows вышедший CLI (и его дети) держат
+ * рабочую папку ещё секунды после остановки — EPERM здесь не про проверяемое
+ * поведение, поэтому ждём до десяти секунд, а не отпустившую папку оставляем
+ * в %TEMP% с предупреждением вместо падения всего прогона.
+ */
+function removeDir(dir) {
+  try {
+    rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 500 });
+  } catch (error) {
+    console.warn(`временная папка не удалена (${error.code ?? error.message}): ${dir}`);
+  }
+}
 const skip = (text, why) => {
   console.log(`ПРОПУСК ${text} — ${why}`);
   skipped.push(text);
@@ -386,8 +400,8 @@ async function main() {
     // которого слои снимаются флагами, а не подменой каталога: подменив его,
     // панель потеряла бы переписку, продолжение и аналитику.
     const transcripts = existsSync(join(home, 'projects'));
-    if (!tree) rmSync(work, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
-    rmSync(home, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+    if (!tree) removeDir(work);
+    removeDir(home);
     return { facts, transcripts, args: layers.args };
   };
 
@@ -442,8 +456,8 @@ async function main() {
     });
 
     const facts = factsOf(stub.seen[from]);
-    rmSync(work, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
-    rmSync(home, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+    removeDir(work);
+    removeDir(home);
     return { label, facts };
   };
 
@@ -545,7 +559,7 @@ ${MARK.ancestor}
     } finally {
       setTemp(undefined);
     }
-    rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+    removeDir(root);
     return { facts, controlFacts, command };
   };
 

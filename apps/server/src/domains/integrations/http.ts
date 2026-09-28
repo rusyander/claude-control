@@ -117,6 +117,28 @@ export async function sendRequest(request: OutboundRequest): Promise<OutboundRes
   }
 }
 
+/**
+ * Суть отказа соединения. У fetch (undici) сообщение всегда «fetch failed», а
+ * что случилось — порт закрыт, имя не разрешилось, сертификат не тот — лежит в
+ * `cause`; без неё человеку нечего проверять.
+ */
+function withCause(error: Error): string {
+  const cause = error.cause instanceof Error ? causeText(error.cause) : '';
+  return cause && !error.message.includes(cause) ? `${error.message} (${cause})` : error.message;
+}
+
+/**
+ * `localhost` пробует ::1 и 127.0.0.1, и причина — AggregateError с пустым
+ * сообщением: суть в первой из `errors` или в `code`.
+ */
+function causeText(cause: Error): string {
+  if (cause.message) return cause.message;
+  const first = cause instanceof AggregateError ? cause.errors[0] : undefined;
+  if (first instanceof Error && first.message) return first.message;
+  const code = (cause as { code?: unknown }).code;
+  return typeof code === 'string' ? code : '';
+}
+
 /** Не дошли вовсе: нет сети, не разобрался адрес, вышло время. */
 function networkFailure(system: string, error: unknown, detail: string) {
   const name = error instanceof Error ? error.name : '';
@@ -128,7 +150,7 @@ function networkFailure(system: string, error: unknown, detail: string) {
       { system, seconds },
     );
   }
-  const reason = error instanceof Error ? error.message : String(error);
+  const reason = error instanceof Error ? withCause(error) : String(error);
   return coded(unreachable(`Нет связи с ${system}: ${reason}.`, detail), 'integration-network', {
     system,
     reason,

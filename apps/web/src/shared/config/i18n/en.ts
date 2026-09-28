@@ -1,13 +1,36 @@
 import type { TranslationSchema } from './ru';
 import { serverMessagesEn } from './server-messages/en.ts';
 import { panelAgentEn } from './panel-agent/en.ts';
+import { attachEn } from './attach/en.ts';
+import { groupKnobsEn, groupPathEn, groupSourcesEn } from './groups/en.ts';
+import { groupsPageEn } from './groups/page-en.ts';
+import { groupBuilderEn } from './groups/builder-en.ts';
+import { testsE2eEn } from './tests-e2e/en.ts';
+import { pageTabsEn } from './page-tabs/en.ts';
+import { watcherEn } from './watcher/en.ts';
+import { projectsPageEn } from './projects/en.ts';
+import { contourConfigEn } from './contour-config/en.ts';
+import { presetsEn } from './presets/en.ts';
 
 /** Типизирован по русской версии: забыть ключ при переводе не получится. */
 export const en: TranslationSchema = {
   serverMessages: serverMessagesEn,
   panelAgent: panelAgentEn,
+  attach: attachEn,
+  groupPath: groupPathEn,
+  groupSources: groupSourcesEn,
+  groupKnobs: groupKnobsEn,
+  groupsPage: groupsPageEn,
+  groupBuilder: groupBuilderEn,
+  testsE2e: testsE2eEn,
+  pageTabs: pageTabsEn,
+  watcher: watcherEn,
+  projectsPage: projectsPageEn,
+  contourConfig: contourConfigEn,
+  presets: presetsEn,
   common: {
     duration: { h: 'h', m: 'm', s: 's' },
+    milliseconds: '{{ms}} ms',
     appName: 'AgentDeck',
     loadError: 'Could not load this section',
     loadErrorText: 'The server did not answer. Check that it is running and retry.',
@@ -43,6 +66,11 @@ export const en: TranslationSchema = {
     confirmTypeName: 'Type "{{name}}" to confirm',
     other: 'Other',
     close: 'Close',
+    bytes_one: '{{count}} byte',
+    bytes_few: '{{count}} bytes',
+    bytes_many: '{{count}} bytes',
+    bytes_other: '{{count}} bytes',
+    kilobytes: 'KB',
     megabytes: 'MB',
     gigabytes: 'GB',
     showAll: 'Show all ({{count}})',
@@ -64,8 +92,6 @@ export const en: TranslationSchema = {
       'An entry from settings.local.json, your personal settings file. Claude Code applies it alongside the shared ones; edits go back to that same file.',
     deleteGroup:
       'The group will be deleted. The rules, skills, hooks and servers themselves stay where they are — only the grouping disappears. If the group is currently off, its members are switched back on.',
-    deleteAutomation:
-      'The automation will be deleted and the hook compiled from it removed from settings.json. Hand-written hooks are left alone.',
   },
   nav: {
     overview: 'Overview',
@@ -101,7 +127,7 @@ export const en: TranslationSchema = {
   portability: {
     title: 'Environment passport',
     subtitle: 'What the selected CLI actually has configured — as items and named skips',
-    provider: 'Provider',
+    provider: 'Source',
     itemCount: 'Items: {{count}}',
     skipCount: 'Skips: {{count}}',
     rootUnknown: 'Provider directory not determined',
@@ -133,6 +159,7 @@ export const en: TranslationSchema = {
       disabled: 'disabled',
     },
     sectionOff: 'the whole section is switched off',
+    sharedNeeds: 'Every entry of this kind needs the same:',
     itemOff: 'switched off',
     fromPlugin: 'from plugin {{name}}',
     attachments_one: '{{count}} attachment',
@@ -148,7 +175,7 @@ export const en: TranslationSchema = {
     target: 'Transfer target',
     targetNone: 'not selected',
     scope: 'Level',
-    scopeGlobal: 'Home',
+    scopeGlobal: 'Global',
     scopeProject: 'Project',
     project: 'Project',
     projectNone: 'not selected',
@@ -487,18 +514,19 @@ export const en: TranslationSchema = {
     subtitle: 'What changed in the configuration: a timeline of edits with diffs',
     explainTitle: 'What this is',
     explain:
-      'Before every write the panel backs up the file, so the copies are snapshots over time. The timeline is built from them: which file, when, and what changed. A copy is compared against the previous copy of the same file, and the freshest one against the current file on disk. The timeline covers Claude files and the active provider files (AGENTS.md/GEMINI.md, config.toml, mcp.json, opencode.json, .aider.conf.yml). Secrets never appear: neither .mcp-secrets.env nor the provider API key store.',
+      'Before every write the panel backs up the file, so the copies are snapshots over time. The timeline is built from them: which file, when, and what changed. A copy is taken before an edit and compared against the next copy of the same file, and the freshest one against the current file on disk: that shows what each edit did. The timeline covers Claude files and the active provider files (AGENTS.md/GEMINI.md, config.toml, mcp.json, opencode.json, .aider.conf.yml). Secrets never appear: neither .mcp-secrets.env nor the provider API key store.',
     empty: 'No changes yet',
     emptyText:
       'No edit has been backed up yet. As soon as the panel writes something to the configuration, the timeline will appear here.',
     base_current: 'vs current file',
     base_previous: 'vs previous copy',
-    base_initial: 'first known version',
+    base_next: 'vs next copy',
+    base_initial: 'file deleted — no current version',
     noChanges: 'no changes',
     loadingDiff: 'Loading diff…',
     diffError: 'Failed to load the diff',
     diffLabel: 'Diff of {{file}}',
-    skip_initial: 'This is the first known version — nothing to compare against.',
+    skip_initial: 'Nothing to compare against.',
     skip_binary: 'Binary file — diff is not shown.',
     'skip_too-large': 'File is too large — diff is not shown.',
     providerFile: '{{provider}} provider file',
@@ -563,10 +591,13 @@ export const en: TranslationSchema = {
     addSection: 'Add block:',
 
     ruleTitle: 'Title',
+    ruleTitlePlaceholder: 'e.g. always answer in English',
+    bulkPlaceholder:
+      'Language :: Always answer in English\nBackend :: Do not edit the backend without permission',
     ruleBody: 'Rule text',
     emptyTitle: 'No rules yet',
     emptyText:
-      'The panel counts a section as a rule only when its heading reads «## ПРАВИЛО: …» in CLAUDE.md — the rest of the file is left alone and never listed. Add the first rule with the button above.',
+      'The panel counts a section as a rule only when its heading reads «## ПРАВИЛО: …» in CLAUDE.md — the rest of the file is left alone and never listed. Add the first rule with the button above — the «On» and «Off» tabs appear with it.',
     emptyPlainTitle: 'CLAUDE.md has no rules in the panel’s format',
     emptyPlainText_one:
       'The file is not empty: it has {{count}} «## …» section, but the panel counts a section as a rule only when its heading looks like this:',
@@ -579,7 +610,7 @@ export const en: TranslationSchema = {
     emptyPlainNoSections:
       'The file is not empty but has no «## …» headings at all, and the panel counts a section as a rule only when its heading looks like this:',
     emptyPlainHint:
-      'The rest of the file is left alone and never listed. Rename the heading of the section you need after the example, or add the first rule with the button above.',
+      'The rest of the file is left alone and never listed. Rename the heading of the section you need after the example, or add the first rule with the button above. The «On» and «Off» tabs appear with the first rule.',
     openClaudeMd: 'Open CLAUDE.md',
     openRulesHelp: 'How rules work',
     noMatchTitle: 'Nothing found',
@@ -650,7 +681,7 @@ export const en: TranslationSchema = {
   bulk: {
     modeSingle: 'One',
     modeMany: 'Several at once',
-    inputLabel: 'A list — one {{kind}} per line',
+    inputLabel: '{{kind}}: one entry per line',
     hint: 'Each line is a separate entry. Empty lines are skipped.',
     recognized: 'recognised',
     withErrors: 'with an error',
@@ -670,6 +701,7 @@ export const en: TranslationSchema = {
     contents: 'What is loaded',
     empty: 'Nothing loaded yet',
     preparing: 'Preparing the sandbox…',
+    createFailed: 'The sandbox was not created: {{reason}}',
     isolationTitle: 'Sandbox boundaries',
     isolationText:
       'A separate settings directory and its own working folder. Real settings are read-only, the token file is out of reach, and everything created is wiped when you leave the sandbox — and in any case no later than two hours of idling.',
@@ -689,6 +721,11 @@ export const en: TranslationSchema = {
     customInvalidJson: 'Could not parse JSON — check the syntax.',
     customNotObject: 'The event must be a JSON object like {"hook_event_name": "…"}.',
     timedOut: 'The hook did not answer in time and was stopped',
+    exitCode: 'exit code {{code}}',
+    outputLines_one: '{{stream}} · {{count}} line',
+    outputLines_few: '{{stream}} · {{count}} lines',
+    outputLines_many: '{{stream}} · {{count}} lines',
+    outputLines_other: '{{stream}} · {{count}} lines',
     decision: {
       block: 'stopped it',
       ask: 'asked for confirmation',
@@ -882,11 +919,17 @@ export const en: TranslationSchema = {
         },
       },
       block: {
-        picture: 'Drawing from the agent',
+        picture: 'Image from the agent',
         deck: 'Presentation from the agent',
         build: 'Build the files',
         save: 'Save as a file',
         rejected: 'Blocks the panel did not accept: {{count}} — they stay in the text as they came',
+      },
+      request: {
+        deck: 'Presentation',
+        'deck-revise': 'Presentation edit',
+        picture: 'Image',
+        rules: 'Mode rules sent to the agent',
       },
     },
     split: {
@@ -1218,6 +1261,8 @@ export const en: TranslationSchema = {
         accepted: 'accepted',
         noMr: 'no MR',
         openMr: 'Open the group MR',
+        notStoppedToast:
+          'Runs not stopped: {{count}} — the panel could not verify the process number and left it alone; the run finishes its turn. Stop it from its chat again.',
         pausedToast_one: 'Tree stopped: {{count}} run. Auto-starts are queued.',
         pausedToast_few: 'Tree stopped: {{count}} runs. Auto-starts are queued.',
         pausedToast_many: 'Tree stopped: {{count}} runs. Auto-starts are queued.',
@@ -1436,6 +1481,8 @@ export const en: TranslationSchema = {
     permissionFromChild: 'Requested by “{{title}}”',
     permissionLost:
       'The decision never reached the agent: the request had already been dropped — it timed out or the conversation was restarted. If the agent is still waiting, send the prompt again.',
+    permissionExpired:
+      'The request has already expired: the agent stopped waiting for an answer, so the decision would not run anything. If it asks again, answer the new card.',
     permissionUnreachable:
       'The decision was not sent: no connection to the panel server. The agent keeps waiting for an answer.',
     allow: 'Allow',
@@ -1529,8 +1576,40 @@ export const en: TranslationSchema = {
       'The panel itself approves anything that can be undone — commit, push, branch, moving a file, an API call. What still asks is the irreversible: deleting, wiping history, tearing down data and infrastructure, publishing — plus anything covered by ask/deny rules from settings.json. Reading files is always allowed, whatever this toggle says. This is auto mode for this chat only: on — Claude runs in CLI auto mode, and models without it get the panel’s auto-approve. The choice here beats the “Auto permission mode in every chat” setting either way.',
     menu: 'Chat settings',
     menuHint: 'Permission toggles, rules, export, refresh and help',
+    barChat: 'Conversation',
+    barProject: 'Project',
+    barEditor: 'Editor',
     menuPermissions: 'Permissions',
     menuActions: 'Conversation',
+    /** Group and autonomy of THIS chat — a header menu section. */
+    groupSettings: {
+      title: 'Group and autonomy',
+      group: 'Group',
+      auto: 'Auto — triage picks by description',
+      projectGroup: '{{name}} (project)',
+      missingGroup: 'Not in the list: {{key}}',
+      inactivePairSide: '{{name}} — the other side of the pair, not active in this project',
+      groupHint: 'A set of rules and skills enabled for the runs of this chat',
+      autonomous: 'Autonomous — pick the recommended option',
+      autonomousHint:
+        'An agent question with a "(Recommended)" option does not wait for you: that option is taken and the pick stays as a line in the feed',
+      fromParent: 'from parent: {{title}}',
+      loadFailed: 'Chat settings did not load — try reloading the page',
+      resetToParent: 'Same as parent',
+    },
+    /** A question closed by autonomy: a muted line instead of a card. */
+    autoPick: 'Auto-pick: {{label}}',
+    autoPickQuestion: 'Question: {{question}}',
+    autoPickUnparsed: 'Auto-pick: the question was closed with the recommended option',
+    /** Critical from a split child — a card in the main chat. */
+    escalation: {
+      title: 'Critical from group "{{title}}"',
+      fromBlock: 'Reported by the group itself',
+      fromAutoPick: 'Autonomy picked for you in a critical question',
+      open: 'Open the group chat',
+      unread: 'Unread critical notes: {{count}}',
+      dismiss: 'Mark as read',
+    },
     rules: {
       title: 'Approve without asking — in every project',
       modelCascade: 'Match the model to the task (this project)',
@@ -1594,6 +1673,8 @@ export const en: TranslationSchema = {
         'The panel cannot pass these attachments: {{names}}. Message not sent. Allowed extensions: {{supported}}.',
       tooLarge:
         'The panel does not pass attachments over {{limit}}, so the file was not attached: {{names}}.',
+      unsupportedAttach:
+        'The panel cannot pass these attachments, so the file was not attached: {{names}}. Allowed extensions: {{supported}}.',
       copyNotReady:
         'Message not sent: {{message}} Open this project’s git panel — under the copy it names what is missing, and the “Fill in” button is right there.',
       other: 'Message not sent: {{message}}',
@@ -1616,6 +1697,8 @@ export const en: TranslationSchema = {
     assistantPlaceholder:
       'For example: split this skill into topic modules and link them from SKILL.md',
     assistantRun: 'Build',
+    assistantKeptSecrets:
+      'Not written — they hold a secret the assistant is never shown, and the reply did not keep it: {{files}}',
     assistantWorking:
       'The assistant is building the structure — this takes up to a couple of minutes…',
 
@@ -1652,9 +1735,18 @@ export const en: TranslationSchema = {
     used: 'In use',
     unused: 'Not bound',
     test: 'Test',
-    summary: '{{total}} files · {{unused}} not bound to any event',
-    summaryAllUsed: '{{total}} files · all bound to hooks',
-    summaryNoHooks: '{{total}} files',
+    summary_one: '{{count}} file · {{unused}} not bound to any event',
+    summary_few: '{{count}} files · {{unused}} not bound to any event',
+    summary_many: '{{count}} files · {{unused}} not bound to any event',
+    summary_other: '{{count}} files · {{unused}} not bound to any event',
+    summaryAllUsed_one: '{{count}} file · bound to a hook',
+    summaryAllUsed_few: '{{count}} files · all bound to hooks',
+    summaryAllUsed_many: '{{count}} files · all bound to hooks',
+    summaryAllUsed_other: '{{count}} files · all bound to hooks',
+    summaryNoHooks_one: '{{count}} file',
+    summaryNoHooks_few: '{{count}} files',
+    summaryNoHooks_many: '{{count}} files',
+    summaryNoHooks_other: '{{count}} files',
     search: 'Search scripts',
     searchPlaceholder: 'File name or description',
     noMatches: 'Nothing found for “{{query}}”.',
@@ -1755,6 +1847,26 @@ export const en: TranslationSchema = {
     emptyTitle: 'Nothing found',
     emptyText: 'Try another query or clear the source filter.',
   },
+  resourceTemplate: {
+    'skill-minimal': {
+      title: 'Simple skill',
+      description: 'A single SKILL.md file. Fits when the rule fits on one page.',
+    },
+    'skill-references': {
+      title: 'Skill with modules',
+      description:
+        'A thin SKILL.md plus a references/ folder by topic. The shape large skills use: the entry stays short, details load when needed.',
+    },
+    'skill-full': {
+      title: 'Skill with configs and templates',
+      description:
+        'Topic modules plus config/ and templates/ — for skills that drop ready-made files into the project.',
+    },
+    'script-hook-guard': {
+      title: 'Guard script',
+      description: 'A hook template that checks an action and asks for confirmation when needed.',
+    },
+  },
   skills: {
     title: 'Skills',
     subtitle: 'Instruction sets Claude pulls in based on their description',
@@ -1762,6 +1874,7 @@ export const en: TranslationSchema = {
     explain:
       'A skill is a folder with a SKILL.md file. The description field decides when Claude applies it, so it must describe the situation precisely. A disabled skill moves to skills-disabled and becomes invisible.',
     addSkill: 'Create skill',
+    liveReload: 'Claude Code picks up the change right away — no restart needed',
     files_one: '{{count}} file',
     files_few: '{{count}} files',
     files_many: '{{count}} files',
@@ -1777,6 +1890,8 @@ export const en: TranslationSchema = {
     descriptionHint:
       'The key field: Claude uses it to decide whether to pull the skill in. Describe the situation and the wording users will come with ("Use WHEN the user asks…").',
     skillName: 'Skill name',
+    skillNamePlaceholder: 'e.g. perf-audit',
+    descriptionPlaceholder: 'Use WHEN the user asks…',
     skillNameHint: 'Latin letters with dashes — becomes the folder name in skills/',
     skillBody: 'Instructions',
     saveFrontmatter: 'Save and continue',
@@ -2534,6 +2649,7 @@ export const en: TranslationSchema = {
   },
   platform: {
     title: 'Contour',
+    spendUnreported: 'Answers the contour did not bill: {{n}} — the estimate is low.',
     subtitle:
       'A corporate platform behind one key: its models, embeddings and agents, from the panel',
     explainTitle: 'What this section does and what it does not',
@@ -2845,10 +2961,6 @@ export const en: TranslationSchema = {
     minutesAgo: '{{count}} min ago',
     hoursAgo: '{{count}} h ago',
     consumersTitle: 'Where the contour works',
-    consumersHint:
-      'A run gets the gateway address in the environment of ITS OWN process, so “chat through the contour, tests on your own key” is a choice rather than a wish. Clearing a box takes effect from the next launch; running work is left alone.',
-    consumersFilesStay:
-      'CLI files stay applied: clearing the box does not touch them. To restore the files, press “Undo apply” on the contour card.',
     consumer: {
       chat: 'Chat',
       groups: 'Split groups',
@@ -3625,6 +3737,8 @@ export const en: TranslationSchema = {
     saveFailed: 'Could not save the rules.',
     discard: 'Discard changes',
     dirtyWhileRunning: 'The proxy runs on the saved rules — your edits apply once saved.',
+    changedElsewhere:
+      'The rules changed outside this page (the agent may have written them). Saving replaces them with your edits; discarding shows the new ones.',
     previewTitle: 'Check against a sample text',
     previewHint:
       'Shows exactly what the model would see. Computed from the current edits, before saving, and it never touches the network.',
@@ -3640,7 +3754,7 @@ export const en: TranslationSchema = {
     journalTitle: 'Match journal',
     journalClear: 'Clear',
     journalEmpty: 'Empty so far.',
-    journalOff: 'The journal is switched off in the settings above.',
+    journalOff: 'The journal is off — turn on “Keep a journal” on the “Proxy” tab.',
     journalError: 'Could not read the journal.',
     decision: {
       passed: 'passed',
@@ -3653,7 +3767,7 @@ export const en: TranslationSchema = {
     installed: 'installed',
     notInstalled: 'not installed',
     scope:
-      'The UserPromptSubmit hook checks ONLY what a human typed by hand. Files the agent read, command output and subagent prompts go past it — that is what the proxy above sees. The hook cannot rewrite the prompt: the event does not allow it, so there are two actions — reject or warn.',
+      'The UserPromptSubmit hook checks ONLY what a human typed by hand. Files the agent read, command output and subagent prompts go past it — that is what the proxy sees (the “Proxy” tab). The hook cannot rewrite the prompt: the event does not allow it, so there are two actions — reject or warn.',
     action: 'On a match',
     actionBlock: 'reject the prompt',
     actionWarn: 'warn and send',
@@ -3668,7 +3782,7 @@ export const en: TranslationSchema = {
       'The script differs from the one the panel writes — it looks hand-edited. The panel leaves it alone.',
     reinstall: 'Restore the panel’s script',
     outdated:
-      'The script was built by an earlier panel version: the new built-in patterns are not in it. This is not treated as a hand edit.',
+      'The script was built by an earlier panel version or under another interface language: it lacks the new built-in patterns, or its messages are not in your language. This is not treated as a hand edit.',
     rebuild: 'Rebuild the script',
     applied: 'Gate installed.',
     removed: 'Gate removed.',
@@ -3727,7 +3841,10 @@ export const en: TranslationSchema = {
     conversations: 'Conversations',
     new: 'New',
     noConversations: 'No conversations yet.',
-    messageCount: '{{count}} messages',
+    messageCount_one: '{{count}} message',
+    messageCount_few: '{{count}} messages',
+    messageCount_many: '{{count}} messages',
+    messageCount_other: '{{count}} messages',
     startHint:
       'Start a conversation — the transcript is kept, and the provider will remember it in the next question.',
     empty: 'Type a message — the reply appears as the provider prints it.',
@@ -3789,6 +3906,11 @@ export const en: TranslationSchema = {
     popupBlocked: 'The browser blocked the sign-in window — open the authorization page yourself',
     openAuthPage: 'Open the sign-in page',
     oauthNoUrl: 'The server returned no authorization address — sign-in did not start',
+    oauthAlready: 'The saved sign-in is still valid — no need to authorize again',
+    oauthNotRequired:
+      'The server answers without sign-in — it needs no authorization, its tools work as is',
+    oauthPopupOpened: 'Finish signing in in the opened window — the status updates when it closes',
+    oauthFailed: 'Sign-in did not start: {{reason}}',
     transport: 'Transport',
     command: 'Start command',
     addServer: 'Add server',
@@ -3804,6 +3926,8 @@ export const en: TranslationSchema = {
     presetsTitle: 'Ready-made servers',
     presetsHint: 'Click one — the fields fill in. Then put in your own variable values and tokens.',
     serverName: 'Server name',
+    serverNamePlaceholder: 'e.g. {{example}}',
+    envPlaceholder: 'API_KEY=value',
     serverNameHint: 'This name goes into the config and into permission rules',
     transportHint:
       'stdio — the server runs as a process; sse and http — connect to an address already running',
@@ -3849,6 +3973,8 @@ export const en: TranslationSchema = {
     decisionHint_deny: 'Claude cannot run it at all, even with confirmation.',
     presetsTitle: 'Ready-made permissions',
     tabAll: 'All rules',
+    // Первая кнопка фильтра по решению — с заглавной, как соседние.
+    filterAll: 'All',
     tabSystem: 'System',
     tabMcp: 'MCP servers',
     systemSubtitle: 'What Claude Code does to this computer',
@@ -3887,6 +4013,9 @@ export const en: TranslationSchema = {
     varCommentPlaceholder: 'for example: token from GitLab profile settings',
     secretHidden: 'Value hidden — enter it again to change',
     secretRewrite: 'Leave empty if the value should stay as is',
+    secretEmpty: 'No value yet — enter it',
+    secretEmptyHint: 'The secret was saved without a value: you enter it, the agent never sees it',
+    revealFailed: 'Could not read the saved value of {{key}} — enter it again',
     deleteVar:
       'The variable will be removed from the file. Servers using it will stop receiving this value.',
     moveToLocal: 'To local (settings.local.json)',
@@ -3909,8 +4038,13 @@ export const en: TranslationSchema = {
     emptyTitle: 'No groups yet',
     emptyText:
       'A group bundles rules, skills, hooks and servers so you can toggle them together and set shared variables. Handy when a set of settings belongs to one task.',
-    members: 'members',
+    membersCount_one: '{{count}} member',
+    membersCount_few: '{{count}} members',
+    membersCount_many: '{{count}} members',
+    membersCount_other: '{{count}} members',
     membersTitle: 'Group contents',
+    membersGroupOff:
+      'The group is off. Whatever you add to it is switched off everywhere, not only in the group, until the group is switched on.',
     localHooksSkipped:
       'Hooks from settings.local.json are not switched by a group ({{count}}): the panel never writes that file, so they keep firing.',
     conflict:
@@ -3926,45 +4060,23 @@ export const en: TranslationSchema = {
     moveUp: 'Move up',
     moveDown: 'Move down',
     removeMember: 'Remove from group',
+    kind_all: 'All',
     kind_rule: 'Rule',
     kind_skill: 'Skill',
     kind_hook: 'Hook',
     kind_mcp: 'Server',
     kind_permission: 'Permission',
     kind_group: 'Group',
-    automations: 'Automations',
-    automationsExplain:
-      'An automation describes "when — what": for example, run a check after a skill is invoked. On save it compiles into a regular hook, so it behaves exactly like a hand-written one.',
-    addAutomation: 'Create automation',
-    automationName: 'Automation name',
-    automationTrigger: 'When to run',
-    automationAction: 'What to run',
-    compiledInto: 'Compiles into a hook',
     projectsTitle: 'Projects',
     projectsHint:
       'The group switches itself on when an agent starts working in this project — branch copies included. It never switches itself off: the config files are shared and several chats may be running at once.',
     projectsEmpty: 'No projects in the panel registry yet — add them in the Projects section.',
     projectsRemove: 'Remove binding',
     projectsBadge: 'projects: {{count}}',
-    scenarioTitle: 'Working order',
-    scenarioBadge: 'steps: {{count}}',
-    scenarioWhen: 'When to apply',
-    scenarioWhenPlaceholder: 'for example: a task with a ticket number',
-    scenarioWhenHint:
-      'This line becomes the skill description — Claude decides by it whether to follow the working order.',
-    scenarioTrigger: 'Trigger on the prompt text',
-    scenarioTriggerHint:
-      'A regular expression. Filled in — the panel adds a hook that brings the working order up itself; empty — Claude picks the skill up by its description.',
-    scenarioTriggerError: 'Not a regular expression',
-    scenarioSteps: 'Steps',
-    scenarioStepTitle: 'What to do',
-    scenarioStepBody: 'Details',
-    scenarioStepGate: 'Done when',
-    scenarioStepGateHint: 'Proof of completion: without it the agent decides on its own.',
-    scenarioStepAdd: 'Add step',
-    scenarioStepRemove: 'Remove step',
-    scenarioHint:
-      'Steps compile into a skill (skills/scenario-…): it becomes a member of the group and goes dark with it.',
+    groupWhen: 'When it fits',
+    groupWhenPlaceholder: 'for example: a task with a ticket number',
+    groupWhenHint:
+      'One line: “Auto” picks this group by it when a task is split across branches. The working order is built in the group’s window — open its card.',
   },
   credentials: {
     loadError: 'Could not read the access state — the server did not answer.',
@@ -4038,6 +4150,14 @@ export const en: TranslationSchema = {
         image: 'Image',
         'image-svg': 'Image in code',
         presentation: 'Presentation',
+        'group-discover': 'Group discovery',
+        'group-advice': 'Advice after copying a group',
+        'group-merge': 'Merging a group with its original',
+        'group-override': 'Group override in a project',
+        'path-step-author': 'Path step assistant',
+        'resource-summary': 'Resource summary',
+        'group-knobs': 'Group skill numbers',
+        'group-describe': 'Resource descriptions',
       },
       hint: {
         'tool-protocol':
@@ -4054,6 +4174,22 @@ export const en: TranslationSchema = {
           'The rules for drawing in code (SVG), which the conversation agent does itself: the file ' +
           'must stand alone — no outside links, no scripts — or the panel refuses it.',
         presentation: 'A topic becomes slides: titles, bullets, speaker notes.',
+        'group-discover':
+          'The inventory of one project or of a CLI’s shared folders becomes the sets that already live there. Cheap model, one call per source.',
+        'group-advice':
+          'After a group is copied to global: per member — use an existing resource, improve the copy or keep it. You apply.',
+        'group-merge':
+          'The original in the project moved ahead: a three-way merge — at copy time, your copy and the project now — so your edits are not lost.',
+        'group-override':
+          'The text of the local rule in a project: what of the project not to follow and which global group to follow instead.',
+        'path-step-author':
+          'Your step text becomes a step in two languages: questions, similar resources and, when it fits, an offer to make the step a global resource.',
+        'resource-summary':
+          'What a skill, hook or rule does and how it works — briefly, in two languages. Cheap model, remembered until the file changes.',
+        'group-knobs':
+          'How many runs a group skill does — review rounds, agents per round, verifiers — each with a verbatim quote from its text. Cheap model, remembered until the skill changes.',
+        'group-describe':
+          'A human name and one line on what a group member or a ready resource does — a hook from its event, filter, command and script — plus the steps of a skill, in both languages. Cheap model, in the background, remembered until the text changes.',
       },
     },
     tab_prompts: 'Prompts',
@@ -4073,6 +4209,61 @@ export const en: TranslationSchema = {
     tab_transfer: 'Transfer',
     tabHint_transfer:
       'A snapshot of the panel settings and moving a provider environment to another machine.',
+    sieves: {
+      title: 'Pre-MR sieves',
+      hint: 'Checks a group hands in before its MR with evidence — a command and its output. A sieve not handed in holds the group: it is not done, and it gets a reminder.',
+      loading: 'Loading sieves…',
+      builtinTitle: 'Built-in',
+      byPanel: 'checked by the panel',
+      builtin: {
+        'contract-by-request':
+          'Docs and contract checked by a request to a stand of this branch, not from the diff',
+        'consumers-repo-wide':
+          'Removed names and test ids are no longer used anywhere in the repository, QA included',
+        'merge-tree': 'No conflict with fresh main',
+        'foreign-removals': 'The branch removes no lines that landed on main after it started',
+        'browser-focus': 'A UI change checked in a browser: focus and keyboard',
+        'branch-backend-stand': 'The stand runs the backend of this branch, not main',
+        'boundary-negative':
+          'A value past a type or limit boundary is refused with a clear message',
+      },
+      class: {
+        contract: 'Docs ≠ code',
+        integration: 'Integration with main',
+        isolation: 'Check isolation',
+        consumers: 'Consumers outside the diff',
+        boundary: 'Boundary input',
+        other: 'Other',
+      },
+      learnedTitle: 'Learned from MR threads',
+      learnedHint:
+        'A reviewer found a blocker in an MR — the group turns its thread into a sieve. The sieve arrives proposed: it reaches group tasks only once you accept it — for its project or for all. A similar sieve is not duplicated; the same blocker in another project suggests making the sieve shared. The sieve text is a task for the model, hence English.',
+      learnedEmpty:
+        'None yet: a sieve appears once a group works through a reviewer thread in its MR.',
+      scopeGlobal: 'all projects',
+      scopeProject: 'project {{path}}',
+      seen: 'threads: {{count}}',
+      when: 'When',
+      check: 'Check',
+      remove: 'Remove',
+      proposed: 'proposed',
+      suggestedGlobal: 'suggests: all projects',
+      acceptProject: 'Accept for the project',
+      acceptGlobal: 'Accept for all',
+      makeGlobal: 'Make shared',
+      accepted: 'Sieve accepted',
+      removeTitle: 'Remove the learned sieve?',
+      removeText: 'Groups stop getting this sieve in their task. The blocker tally stays.',
+      removed: 'Sieve removed',
+      tallyTitle: 'Blocker tally',
+      tallyHint:
+        '“Escaped to MR” — a reviewer found the blocker; “caught” — the panel stopped the group before the MR. If “escaped” does not fall month to month, the sieves do not hold.',
+      tallyEmpty: 'Empty so far: the tally starts with the first caught or escaped blocker.',
+      month: 'Month',
+      classColumn: 'Blocker class',
+      escaped: 'Escaped to MR',
+      caught: 'Caught',
+    },
     groups: {
       loading: 'Loading group rules…',
       saved: 'Group rules saved — they apply from the next group request',
@@ -4168,7 +4359,7 @@ export const en: TranslationSchema = {
       'Rotation depth: more means further rollback, fewer means fewer copies (incl. secrets) on disk',
     transferTitle: 'Transfer panel settings',
     transferHint:
-      'Groups, automations, marks and panel settings — as a file snapshot and back on another machine. Your real Claude Code configs are untouched.',
+      'Groups, scenarios, marks and panel settings — as a file snapshot and back on another machine. Your real Claude Code configs are untouched.',
     transferExport: 'Download snapshot',
     transferImport: 'Load snapshot',
     transferImported: 'Panel settings imported',
@@ -4326,10 +4517,17 @@ export const en: TranslationSchema = {
         'The speech recognition service is not responding. Check the internet and try again.',
       unsupported:
         'This browser cannot recognise speech — dictation is unavailable. Type the text or open the panel in Chrome.',
+      noMicrophone:
+        'The microphone is not responding: the browser did not start recording. Check that a microphone is connected and allowed for this page, then try again.',
     },
     thinking: 'Thinking…',
     noReply: 'Done.',
     failed: 'Could not get an answer. Check that Claude Code is installed and you are signed in.',
+    missedValues: 'Not found in the panel, skipped: {{items}}',
+    missedTypes: 'Wrong kind of value, not filled: {{fields}}',
+    missedFields: 'The form has no such field, or it is locked: {{fields}}',
+    missedSecrets:
+      'Secrets are never shown to the assistant — the field was left as it was: {{fields}}',
   },
   plugins: {
     title: 'Plugins',
@@ -4337,8 +4535,6 @@ export const en: TranslationSchema = {
     explainTitle: 'How it works',
     explain:
       'A plugin adds a ready-made set of capabilities to Claude Code: commands, skills, subagents, MCP servers. It installs from a marketplace — a repository holding a plugin catalog. All operations run through the official Claude Code CLI, so the state never drifts from what Claude itself sees.',
-    installed: 'Installed',
-    marketplaces: 'Marketplaces',
     marketplaceAdd: 'Add marketplace',
     marketplaceSource: 'Marketplace source',
     marketplaceSourceHint: 'owner/repo, https://… or a path',
@@ -4356,10 +4552,9 @@ export const en: TranslationSchema = {
       'The plugin will be removed together with all its commands, skills and agents. You can install it again from the same marketplace.',
     commandFailed: 'The command failed',
     noPlugins: 'No plugins installed',
-    catalog: 'Catalogue',
     showCatalog: 'Show catalogue',
     catalogHint:
-      'Every plugin from the connected marketplaces. Loaded on request: Claude Code refreshes the repositories, which takes up to a minute.',
+      'Loading takes up to a minute: Claude Code refreshes the marketplace repositories first.',
     catalogLoading: 'Refreshing marketplace repositories — this takes up to a minute…',
     searchCatalog: 'Search the catalogue',
     searchCatalogPlaceholder: 'name or description, for example: playwright',
@@ -4578,6 +4773,7 @@ export const en: TranslationSchema = {
     topTools: 'Most used tools',
     topSkills: 'Skill usage',
     recentSessions: 'Recent sessions',
+    sessionsCountHint: 'Sessions in the period: {{total}}; the list shows the latest {{shown}}',
     liveAgents: 'Running right now',
     liveAgentsHint:
       'Claude Code processes running on this machine. There is no agent registry, so we count processes.',
@@ -4586,7 +4782,7 @@ export const en: TranslationSchema = {
       title: 'Spend through the contour',
       hint:
         'Counted by the panel itself, from the usage frames that went through its gateway — it ' +
-        'is not part of the figures above: those come from this machine’s transcripts, and work ' +
+        'is not part of the summary figures: those come from this machine’s transcripts, and work ' +
         'done through the contour has both. Added up, they would count the same tokens twice.',
       money: 'By our price book — an estimate',
       tokens: 'Tokens',
@@ -4616,8 +4812,51 @@ export const en: TranslationSchema = {
     activeSessions_many: '{{count}} active sessions',
     activeSessions_other: '{{count}} active sessions',
     memory: 'memory',
-    scanInfo: 'Scanned {{files}} files in {{ms}} ms',
+    scanInfo_one: 'Scanned {{count}} file in {{ms}} ms',
+    scanInfo_few: 'Scanned {{count}} files in {{ms}} ms',
+    scanInfo_many: 'Scanned {{count}} files in {{ms}} ms',
+    scanInfo_other: 'Scanned {{count}} files in {{ms}} ms',
     sessionActive: 'running now',
+    sessionGo: 'Go to',
+    sessionStop: 'Stop',
+    sessionLocating: 'Finding where the session runs…',
+    sessionLocateFailed: 'Could not find where the session runs: {{reason}}',
+    sessionWhereTitle: 'Where the session runs',
+    sessionWhereEditor: 'In the {{editor}} editor — outside the panel',
+    sessionWhereEditorUnknown: 'In an editor — outside the panel',
+    sessionWhereTerminal: 'In a terminal — outside the panel',
+    sessionWhereUnidentified:
+      'The transcript is being written, but its process is not identified: claude started without a session number (--resume or --session-id) does not say which session it runs. The panel will not guess — stop it where it was started.',
+    sessionFieldProcess: 'Process',
+    sessionFieldStarted: 'Started',
+    sessionFieldCommand: 'Command',
+    sessionFieldProject: 'Directory',
+    sessionOpenProject: 'Open the project',
+    sessionProjectNotAdded: 'The project is not added to the panel — nothing to open',
+    sessionStopTitle: 'Stop the session?',
+    sessionStopPanel:
+      'The panel chat run in “{{project}}” stops — exactly like the “Stop” button in the chat itself. The conversation stays and can be continued.',
+    sessionStopProcess:
+      'Process {{pid}} ({{where}}) is taken down together with its child processes. The agent’s unfinished turn is lost; the conversation itself stays in history.',
+    sessionStopOwnsPanel:
+      'The panel itself was started from this session: the panel front end and the processes the panel started stop with it. The panel’s work is interrupted.',
+    sessionStopConfirm: 'Stop',
+    sessionStopWithPanel: 'Stop together with the panel',
+    sessionStopNothing: 'Nothing to stop from here',
+    sessionFinishedNow: 'The session no longer runs — nothing to stop',
+    sessionStopped_one: 'Session stopped: {{count}} process taken down',
+    sessionStopped_few: 'Session stopped: {{count}} processes taken down',
+    sessionStopped_many: 'Session stopped: {{count}} processes taken down',
+    sessionStopped_other: 'Session stopped: {{count}} processes taken down',
+    sessionGone: 'Process {{pid}} is already gone — the session ended on its own',
+    sessionReused: 'Number {{pid}} now belongs to another process — nothing was touched',
+    sessionStillRunning: 'The signal was sent, but process {{pid}} is still alive',
+    sessionUnverified:
+      'Process {{pid}} was not stopped: its number cannot be verified right now, so the panel left it untouched — try again',
+    sessionOwnsPanelAsk: 'The panel was started from this session — confirm the stop once more',
+    sessionChatStopped: 'The panel chat stopped',
+    sessionChatNotRunning: 'The chat was no longer running — nothing to stop',
+    sessionStopFailed: 'Could not stop: {{reason}}',
     limitsTitle: 'About subscription limits',
     limitsText:
       'Claude Code limit balances live on Anthropic servers and never reach local files — they cannot be shown here. Exact figures are available via the /usage command inside Claude Code. There is also no per-model limit setting in Claude Code: the feature does not exist.',
@@ -4752,6 +4991,11 @@ export const en: TranslationSchema = {
     addGroup: 'New group',
     groupId: 'Identifier',
     groupIdHint: 'Also the file name: latin letters, digits, hyphen. For example, smoke.',
+    groupTitleHint: 'How the tab is labelled in the panel. Empty — the id in capitals.',
+    groupDescription: 'What the group covers',
+    groupExists: 'Group “{{id}}” already exists — “{{title}}”. Pick another id.',
+    editGroup: 'Edit group',
+    editGroupHint: 'The id is the file name and never changes: plans and history refer to it.',
     groupTitle: 'Title',
     removeGroup: 'Delete group',
     history: {
@@ -4765,7 +5009,7 @@ export const en: TranslationSchema = {
     removeGroupText: 'The file {{file}} goes with every case in it. This cannot be undone.',
     generate: 'Generate cases',
     generateHint:
-      'The agent looks around the app and proposes cases; it extends existing ones and marks dead ones. They reach the library once you accept them.',
+      'The agent looks around the app and proposes cases for the selected group; it extends existing ones and marks dead ones. With no wish it stays on the group topic. Cases reach the library once you accept them.',
     generateDiff: 'From the diff',
     generateDiffHint:
       'Cases for what changed in the branch against main (or in the working tree when there is only one branch): the agent reads the list of touched files instead of the whole app, and fills codePaths from it.',
@@ -4789,17 +5033,22 @@ export const en: TranslationSchema = {
     runFullHint: 'Clear the checkmarks and walk everything again.',
     stop: 'Stop',
     scope: 'What to focus on',
-    scopeHint: 'For example: chat and analytics only. Empty means everything.',
+    scopeHint: 'For example: chat and analytics only. Empty means the whole selected group.',
     running: 'Run in progress',
     runGenerate: 'The agent is writing cases',
+    runExplore: 'The agent is exploring by the charter',
+    runAutomate: 'The agent is writing autotests',
     runDone: 'Run finished',
     runStopped: 'Run stopped',
     runError: 'The run broke: {{error}}',
     log: 'Run log',
     logEmpty: 'The agent has printed nothing yet.',
     fullAccessNote:
-      'During a run the agent works with full access — there is nobody to ask in the background. ' +
-      'It is allowed to change test files only.',
+      'The run agent is always Claude Code, even when another CLI is selected in the panel. ' +
+      'Its permissions come from the panel itself: it may read the project and run commands, ' +
+      'and change only test files (.agent/tests; «Automate» also the autotest files). It cannot ' +
+      'ask a human — doubts go into the case note.',
+    fullAccessSummary: 'How the run agent works: reads the project, changes only test files',
     addCase: 'Add a test',
     editCase: 'Edit test',
     newCase: 'New test',
@@ -4847,6 +5096,14 @@ export const en: TranslationSchema = {
     dir: 'Cases: {{dir}}',
     noProjects: 'The registry has no projects yet',
     noProjectsHint: 'Add a project in the “Projects” section — the tests come from its files.',
+    registryError: 'Could not load the project registry',
+    registryErrorText:
+      'The server did not return the project list. The projects in the registry are still there — no need to add them again; retry the load.',
+    registryPartial:
+      'The project registry did not load — the list holds only the open project tabs.',
+    projectMissing: 'The project from the link was not found: {{path}}. Opened “{{name}}”.',
+    projectUnchecked:
+      'The project from the link cannot be checked until the registry loads: {{path}}. Opened “{{name}}”.',
     tab: {
       library: 'Library',
       plans: 'Plans',
@@ -4872,10 +5129,10 @@ export const en: TranslationSchema = {
       archived: 'Show archived',
       muted: 'Quarantine',
       mutedOnly: 'quarantine only',
+      filterGroup: 'Case group',
+      filterSection: 'Section',
       mutedWithout: 'without quarantine',
       reset: 'Clear the filter',
-      views: 'Saved views:',
-      viewsEmpty: 'none yet',
       viewSave: 'Save the view',
       viewSaveHint:
         'The filter is stored as a view: one click brings it back, and a dynamic test plan ' +
@@ -4895,10 +5152,34 @@ export const en: TranslationSchema = {
       columnAutomation: 'Auto',
       columnArea: 'Area',
       columnPoints: 'Points',
+      columnVariants: 'Variants',
+      columnVariantsHint:
+        'How many passes the case expands into: one per combination of its parameters',
+      flaky: 'flaky',
+      flakyHint:
+        'Switches of the result “passed ↔ failed”: {{flips}} over {{runs}} decisive runs. Rule: the last {{window}} runs of the case are taken, skips and blocks do not count; {{minFlips}} switches or more means the test flickers, one is a break or a fix.',
+      history: {
+        title: 'Result history',
+        hint: 'How the case went in runs, newest first.',
+        empty: 'The case has not been in any run yet.',
+        loadError: 'Could not load the result history.',
+        columnDate: 'When',
+        columnStatus: 'Result',
+        columnRun: 'Run',
+        columnReason: 'What broke',
+        step: 'Step {{step}}: {{text}}',
+        points: 'passes: {{count}}',
+        openRun: 'Open run',
+      },
       columnActions: 'Actions',
       empty: 'Nothing to show',
       emptyFiltered: 'No case matches the filter — drop some of the conditions.',
       emptyGroup: 'This group has no cases yet.',
+      groups: 'Groups',
+      filters: 'Filters',
+      filtersActive: 'Filters · {{count}}',
+      chipRemove: 'Remove the “{{label}}” condition',
+      groupFile: 'File: {{file}}',
     },
     bulk: {
       selected: 'Selected: {{count}}',
@@ -4942,6 +5223,9 @@ export const en: TranslationSchema = {
       postcondition: 'Postcondition',
       oracle: 'How it is proven',
       oracleHint: 'On-screen text, a database row, a network response — what the verdict rests on.',
+      codePaths: 'Code files',
+      codePathsHint:
+        'One path from the project root per line. They put the case into “run what changed”.',
       tags: 'Tags',
       tagsHint: 'Comma-separated',
       attributes: 'The project’s own fields',
@@ -5017,8 +5301,10 @@ export const en: TranslationSchema = {
       anyEnvironment: 'Not set',
       file: 'File in the project',
       fileHint: 'Path from the project root: test-results/junit.xml',
+      casesFileHint: 'Path from the project root: qa/cases.csv or qa/cases.xlsx',
       importFromProject: 'Take from the project',
       pickFile: 'Pick a file',
+      emptyFile: 'File “{{name}}” is empty — nothing to import.',
       download: 'Download',
       read: 'read: {{count}}',
       matched: 'landed on cases: {{count}}',
@@ -5048,6 +5334,8 @@ export const en: TranslationSchema = {
       subtitle: 'Mark the steps as you go — the panel records the result into the run.',
       noSession: 'No manual run is going',
       noSessionHint: 'Start one from the library or from a test plan.',
+      startGroup: 'Run “{{group}}” by hand — cases: {{count}}',
+      toPlans: 'Open test plans',
       points: 'Points',
       progress: 'Done {{done}} of {{total}}',
       position: 'Pass {{index}} of {{total}} · closed {{done}}',
@@ -5170,9 +5458,20 @@ export const en: TranslationSchema = {
         import: 'import',
       },
       actor: { agent: 'agent', human: 'human', ci: 'CI' },
+      origin: {
+        e2e: 'autotests',
+        e2eActor: 'panel',
+        filter: 'Records',
+        all: 'all',
+        onlyE2e: 'panel autotests',
+        onlyCi: 'CI import',
+      },
       passed: 'passed: {{count}}',
       failed: 'failed: {{count}}',
       skipped: 'skipped: {{count}}',
+      blocked: 'blocked: {{count}}',
+      open: 'not walked: {{count}}',
+      state: { running: 'running', stopped: 'interrupted', error: 'error' },
       duration: 'duration: {{text}}',
       tokens: 'tokens: {{count}}',
       cost: 'cost: ${{value}}',
@@ -5203,6 +5502,7 @@ export const en: TranslationSchema = {
       confirmed: 'failure confirmed',
       detail: 'expected: {{expected}} · got: {{actual}}',
       retryNote: 'second time round: {{text}}',
+      retryPass: 'passed only on a retry (failed attempts: {{attempts}})',
     },
     diff: {
       title: 'Since the previous run',
@@ -5215,7 +5515,10 @@ export const en: TranslationSchema = {
       stillFailing: 'Red again',
       added: 'Appeared in the set',
       removed: 'Gone from the set',
-      quiet: 'Nothing changed: {{count}} cases ended exactly as last time.',
+      quiet_one: 'Nothing changed: {{count}} case ended exactly as last time.',
+      quiet_few: 'Nothing changed: {{count}} cases ended exactly as last time.',
+      quiet_many: 'Nothing changed: {{count}} cases ended exactly as last time.',
+      quiet_other: 'Nothing changed: {{count}} cases ended exactly as last time.',
       transition: '{{from}} → {{to}}',
       missing: 'not run',
       rerun: 'Rerun the failures ({{count}})',
@@ -5248,7 +5551,7 @@ export const en: TranslationSchema = {
       rolledBack: 'Removed: {{removed}}, restored: {{restored}}',
       kept: '{{caseId}} left as is: {{reason}}',
       hold: 'Auto-accept left it to you: {{reason}}',
-      allAccepted: 'Every proposal in this draft is already accepted ({{count}}).',
+      allAccepted: 'Nothing left to decide in this draft; cases accepted: {{count}}.',
       auto: 'Accept immediately',
       autoHint:
         'Generation lands in the library without review, marked as a draft. Run permissions do not change: group files are written by the panel, and acceptance can always be undone.',
@@ -5264,7 +5567,8 @@ export const en: TranslationSchema = {
     },
     quarantine: {
       title: 'Quarantine and ageing',
-      hint: 'Thresholds: {{streak}} greens in a row suggest lifting quarantine, stability below {{stability}}% suggests setting it. The panel applies nothing on its own.',
+      hint: 'Thresholds: {{streak}} greens in a row suggest lifting quarantine; stability below {{stability}}% or {{retries}} runs green only on a retry suggest setting it. The panel applies nothing on its own.',
+      retryBadge: 'on retry ×{{count}}',
       clean: 'Quarantine is in order: nothing to lift or set.',
       liftTitle: 'Ready to come back: {{count}}',
       muteTitle: 'Worth muting: {{count}}',
@@ -5275,6 +5579,38 @@ export const en: TranslationSchema = {
       reasonHint: 'What it waits for and until when — without it nobody will dare lift it later.',
       mute: 'Quarantine',
       unmute: 'Lift quarantine',
+    },
+    pyramid: {
+      title: 'Test pyramid',
+      hint: 'Counted from the project files, without running anything. A layer is known only when the project itself names its framework — a config, a dependency or go.mod.',
+      recount: 'Recount',
+      tests_one: '{{count}} test',
+      tests_few: '{{count}} tests',
+      tests_many: '{{count}} tests',
+      tests_other: '{{count}} tests',
+      files_one: 'in {{count}} file',
+      files_few: 'in {{count}} files',
+      files_many: 'in {{count}} files',
+      files_other: 'in {{count}} files',
+      layer: {
+        e2e: 'E2E',
+        integration: 'Integration',
+        unit: 'Unit',
+        code: 'Code tests',
+      },
+      unknown: {
+        e2e: 'no e2e folder',
+        integration: 'unknown',
+        unit: 'unknown',
+        code: 'unknown — no test framework found in the project',
+      },
+      dynamic: 'plus {{count}} named from variables — they cannot be counted without running',
+      frameworks: 'Frameworks: {{list}}',
+      noFramework:
+        'The project names none of vitest, jest, mocha, pytest or go.mod — the panel will not count unit tests.',
+      unsplit:
+        'Unit and integration together: the project does not mark integration tests (*.integration.*, an integration folder, @pytest.mark.integration, //go:build integration), and the panel will not split them by guesswork.',
+      truncated: 'The project was not walked in full — the real numbers are no lower than shown.',
     },
     release: {
       title: 'Release readiness',
@@ -5416,6 +5752,7 @@ export const en: TranslationSchema = {
         },
         options: 'Choices',
         optionsHint: 'Comma separated',
+        optionsPlaceholder: 'smoke, regression, acceptance',
         required: 'required',
         requiredLabel: 'Required',
         removeHint: 'The column disappears; values already in the cases stay in the files',
@@ -5435,7 +5772,14 @@ export const en: TranslationSchema = {
       budget: 'Minutes',
       budgetApply: 'Fill',
       budgetHint: 'I have N minutes',
-      budgetResult:
+      budgetLeftItem: '{{title}} — {{minutes}} min',
+      budgetResult_one:
+        'Picked {{count}} case, {{minutes}} of {{budget}} min. Left out: {{left}} — hover to see the list.',
+      budgetResult_few:
+        'Picked {{count}} cases, {{minutes}} of {{budget}} min. Left out: {{left}} — hover to see the list.',
+      budgetResult_many:
+        'Picked {{count}} cases, {{minutes}} of {{budget}} min. Left out: {{left}} — hover to see the list.',
+      budgetResult_other:
         'Picked {{count}} cases, {{minutes}} of {{budget}} min. Left out: {{left}} — hover to see the list.',
       score: 'Risk {{score}}',
     },
@@ -5736,6 +6080,10 @@ export const en: TranslationSchema = {
     failed: 'Failed to start the project dev server',
     autostart: 'Autostart',
     settings: 'Run settings',
+    devServer: 'Dev server',
+    devServerHint: 'Project dev server: what to run, command, port, autostart',
+    startDevServer: 'Start the dev server',
+    startHint: 'Start the dev server: {{command}}',
     targets: 'What to run',
     root: 'root',
     chooseTarget: 'Pick what to run',
@@ -5921,9 +6269,6 @@ export const en: TranslationSchema = {
   },
   projectConfig: {
     title: 'Projects — configuration',
-    subtitle:
-      "A specific project's rules, permissions and MCP servers: its instruction file (CLAUDE.md or AGENTS.md), .claude/settings.json and .mcp.json. " +
-      'Hooks, skills and rule files from .claude are shown read-only',
     addProject: 'Add project',
     explainTitle: 'What is this',
     explain:
@@ -5935,17 +6280,8 @@ export const en: TranslationSchema = {
       'The project will be removed from the panel registry. The project files (CLAUDE.md or AGENTS.md, .claude, .mcp.json) are NOT touched — only the path is forgotten.',
     pickTitle: 'Pick a project',
     pickText: 'On the left is the list of added projects. Select one to view and edit its config.',
-    levelBadge: 'project level',
-    tab_rules: 'Rules',
-    tab_mcp: 'MCP servers',
-    tab_permissions: 'Permissions',
-    tab_local: 'From the project',
-    rulesHint: "The project's root {{file}} in full — as Claude reads it in this project.",
-    mcpHint: "The project's MCP servers from the root .mcp.json.",
     mcpEmpty: "The project's .mcp.json has no servers yet.",
     addMcp: 'Add server',
-    permissionsHint:
-      "The project's permissions from .claude/settings.json (and settings.local.json).",
     permissionsEmpty: "The project's settings.json has no permission rules yet.",
     addPermission: 'Add permission',
   },

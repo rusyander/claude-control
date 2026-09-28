@@ -40,6 +40,26 @@ describe('лента чужого провайдера — блок тикета
     expect(html).toContain('Конец.');
   });
 
+  // Итоговое ревью 25.09 (m10) у ленты Claude: человек, приславший блок
+  // (описывая формат), видит свой текст как есть. Здесь блок вырезался и у него.
+  it('в реплике человека блок не вырезается', () => {
+    const html = renderToStaticMarkup(
+      <ProviderChatMessages
+        messages={[
+          { id: 'u1', role: 'user', content: `Формат:\n\n${TICKET}`, at: '2026-09-25T00:00:00Z' },
+        ]}
+        providerName="Codex"
+        partial=""
+        isRunning={false}
+        isEmptyState={false}
+        onCreate={() => {}}
+        isCreating={false}
+      />,
+    );
+
+    expect(html).toContain('Кнопка съезжает');
+  });
+
   it('в недописанной реплике', () => {
     const html = renderForeign('', `Отчёт.\n\n<${SPLIT_TICKET_TAG}>\ntitle: Кнопка съезжает`);
 

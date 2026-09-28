@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { killChildTree, killPidTree } from '../../lib/process-tree.ts';
 import type { ChatLink, SplitPlanRecord } from '../../lib/app-store/app-store.types.ts';
 import { ChatRunRegistry, type BufferedEvent } from './ChatRunRegistry.ts';
 import { interruptOnBackgroundLost } from './background-lost.ts';
@@ -24,7 +25,7 @@ import {
  *
  * a — штатный выход сервера (Ctrl+C, SIGTERM, `exit`) не гасит CLI за
  *     посредником: прежний `stopAll` при выходе убивал их каждый раз.
- * b — `taskkill /T` сторожа по зависшему серверу не достаёт посредника: его
+ * b — снятие дерева зависшего сервера сторожем не достаёт посредника: его
  *     родитель — пусковой процесс, умерший сразу, а не сервер.
  * c — усыновлённая группа, чей процесс умер с фоном, — обрыв с продолжением, а
  *     не вечное «ждёт фон» и не провал.
@@ -41,8 +42,8 @@ let serverA: ChildProcess | undefined;
 let registry: ChatRunRegistry | undefined;
 
 function killTree(pid: number): void {
-  if (WIN) spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], { windowsHide: true });
-  else process.kill(pid);
+  // Жив сейчас — значит, номер наш сейчас: снятие сверяет время создания с этим мигом.
+  killPidTree(pid, { spawnedAt: Date.now() });
 }
 
 afterEach(() => {
@@ -177,16 +178,17 @@ describe('посредник и выход сервера', { timeout: 60_000 },
     expect(textOf(target, 'new-r')).toBe(`midturn pid ${cliPid}`);
   });
 
-  it.runIf(WIN)('b: taskkill /T по серверу не достаёт посредника и CLI', async () => {
+  it.runIf(WIN)('b: снятие дерева сервера не достаёт посредника и CLI', async () => {
     const { appData, cwd } = dataDirs();
     const { entry, cliPid } = await runServerA(appData, cwd, 'просто ход');
     const relayPid = entry.relay?.pid ?? 0;
     expect(relayPid).toBeGreaterThan(0);
     expect(entry.pid).toBe(relayPid);
 
-    // Ровно так сторож снимает зависший сервер (`tools/keepalive.mjs`, killTree).
+    // Ровно так сторож снимает зависший сервер (`tools/keepalive.mjs` — тем же
+    // снятием дерева потомков, `lib/kill-tree.mjs`).
     const child = serverA as ChildProcess;
-    spawnSync('taskkill', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true });
+    killChildTree(child);
     await exited(child);
     serverA = undefined;
     await sleep(500);
@@ -222,7 +224,7 @@ describe('посредник и выход сервера', { timeout: 60_000 },
     expect(group()?.status).toBe('awaiting');
     expect(group()?.waitingFor).toBe('interrupted');
     expect(group()?.interruptResumes).toBe(1);
-    expect(resumed[0]?.prompt).toContain('оборвался посреди хода');
+    expect(resumed[0]?.prompt).toContain('broke off in the middle of a turn');
   });
 
   it('c: остановка панелью — не обрыв: «Остановить всех» гасит процесс, группу не трогает', async () => {

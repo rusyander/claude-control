@@ -575,8 +575,8 @@ describe('POST /api/chat/send: понижённый веер', () => {
       lowered: true,
     });
 
-    expect(started[0]?.append).toContain('прогони проверки проекта');
-    expect(started[0]?.append).toContain('Ревью этой работы панель не заведёт');
+    expect(started[0]?.append).toContain('Before you say "done", run the project checks');
+    expect(started[0]?.append).toContain('The panel will not start a review of this work');
   });
 
   it('без отметки о понижении не трогается ничего: ни модель, ни задание', async () => {
@@ -588,6 +588,6 @@ describe('POST /api/chat/send: понижённый веер', () => {
     });
 
     expect(started[0]?.model).toBe('sonnet');
-    expect(started[0]?.append ?? '').not.toContain('Ревью этой работы');
+    expect(started[0]?.append ?? '').not.toContain('review of this work');
   });
 });

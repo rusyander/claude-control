@@ -95,7 +95,7 @@ export function SecretEncryptionCard() {
     <Card padding="md">
       <Stack gap="var(--spacing-sm)">
         <Stack direction="row" align="center" justify="between" gap="var(--spacing-md)">
-          <Stack gap="var(--spacing-3xs)" style={{ maxWidth: 'var(--text-measure)' }}>
+          <Stack gap="var(--spacing-3xs)" className="prose">
             <Typography variant="body-sm" as="span">
               {t('settings.encryptSecrets')}
             </Typography>

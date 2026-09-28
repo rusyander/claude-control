@@ -56,6 +56,9 @@ export function registerDlpRoutes(app: FastifyInstance, ctx: ServerContext, prox
     if (problem)
       return reply.code(400).send(attachTextCodes({ error: 'invalid_rule', message: problem }));
 
+    // Список пишется целиком — какие правила новые или изменённые, видно только
+    // здесь, сравнением с диском до записи. Агент панели открывает /dlp на первом.
+    const before = new Map(readRules(appDataDir()).map((rule) => [rule.id, JSON.stringify(rule)]));
     try {
       saveRules(appDataDir(), rules);
     } catch (error) {
@@ -71,7 +74,10 @@ export function registerDlpRoutes(app: FastifyInstance, ctx: ServerContext, prox
     // здесь, а не «применится потом»: пока не перезапустили, панель показывала
     // бы одни правила, а фильтровались бы другие.
     if (proxy.running) void restart(ctx, appDataDir(), proxy);
-    return { ok: true };
+    const changed = readRules(appDataDir())
+      .filter((rule) => before.get(rule.id) !== JSON.stringify(rule))
+      .map((rule) => rule.id);
+    return { ok: true, changed };
   });
 
   app.post<{ Body: unknown }>('/api/dlp/preview', (request, reply) => {

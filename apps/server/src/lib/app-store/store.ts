@@ -4,6 +4,11 @@ import type { EnvSubscription } from '@agentdeck/contracts/portable-subscribe';
 import type { TransferRecord } from '@agentdeck/contracts/portable-transfer';
 import type { StoredSplitSettings } from '@agentdeck/contracts/task-split';
 import type {
+  ChatEscalationEntry,
+  EscalationNotice,
+  StoredChatGroupSettings,
+} from '@agentdeck/contracts/chat-group-settings';
+import type {
   GroupPermissionLevel,
   SplitDefaults,
   StoredSplitDefaults,
@@ -74,6 +79,8 @@ import {
 } from './split-plans.ts';
 import type {
   AppState,
+  DisabledRuleSnapshot,
+  PermissionFilePlaces,
   ChatLink,
   TreePauseRecord,
   SplitPlanRecord,
@@ -148,6 +155,15 @@ import {
   setSplitDefaults as writeSplitDefaults,
 } from './split-settings.ts';
 import {
+  addChatEscalation,
+  aliasChatSession,
+  canonicalChatKey,
+  getChatGroupSettings as readChatGroupSettings,
+  listChatEscalations,
+  markChatEscalationsRead,
+  setChatGroupSettings as writeChatGroupSettings,
+} from './chat-group-settings.ts';
+import {
   forgetMcpHealth as dropMcpHealth,
   getMcpHealth as readMcpHealth,
   renameMcpHealth as moveMcpHealth,
@@ -168,6 +184,10 @@ import {
   pruneDisabledHooks as pruneHookSnapshots,
   rememberDisabledHook as rememberHookSnapshot,
 } from './disabled-hooks.ts';
+import {
+  getDisabledRules as listRuleSnapshots,
+  setDisabledRules as writeRuleSnapshots,
+} from './disabled-rules.ts';
 import {
   deleteGroup as deleteGroupRecord,
   getGroupEnvKeys as readGroupEnvKeys,
@@ -194,6 +214,18 @@ import {
   setRunnerCommand as writeRunnerCommand,
   setRunnerPort as writeRunnerPort,
 } from './runner.ts';
+
+/** Поля, которые импорт чужого снимка не заменяет (`importForeignState`). */
+const MACHINE_LOCAL_KEYS = [
+  'chatGroupSettings',
+  'chatKeyAliases',
+  'chatEscalations',
+  'secretBackupVerifier',
+  'permissionPlaces',
+] as const satisfies readonly (keyof AppState)[];
+
+/** Заголовок правила для сравнения: без регистра и лишних пробелов. */
+const titleKey = (title: string): string => title.trim().replace(/\s+/g, ' ').toLocaleLowerCase();
 
 /**
  * Состояние панели поверх файла `state.json`: единственная точка чтения и
@@ -263,6 +295,29 @@ export class AppStore {
    */
   importState(raw: unknown): void {
     this.state = mergeState((raw ?? {}) as Partial<AppState>);
+    this.persist();
+  }
+
+  /**
+   * Импорт снимка С ДРУГОЙ машины. В отличие от `importState` (откат своего же
+   * снимка) здешнее остаётся здешним: настройки и заметки разговоров этой
+   * машины (решение владельца 27.09) и отпечаток её парольной фразы. Тексты
+   * выключенных правил — единственная копия того, что вынуто из ЗДЕШНЕГО
+   * CLAUDE.md: снимок их дополняет правилами, которых тут нет, но не стирает.
+   */
+  importForeignState(raw: unknown): void {
+    const local = this.state;
+    const next = mergeState((raw ?? {}) as Partial<AppState>);
+    for (const key of MACHINE_LOCAL_KEYS) {
+      if (local[key] === undefined) delete next[key];
+      else (next as unknown as Record<string, unknown>)[key] = local[key];
+    }
+    const own = local.disabledRules ?? [];
+    const taken = new Set(own.map((rule) => titleKey(rule.title)));
+    const brought = (next.disabledRules ?? []).filter((rule) => !taken.has(titleKey(rule.title)));
+    if (own.length > 0 || brought.length > 0) next.disabledRules = [...own, ...brought];
+    else delete next.disabledRules;
+    this.state = next;
     this.persist();
   }
 
@@ -402,6 +457,32 @@ export class AppStore {
 
   pruneDisabledHooks(idsBackInFile: string[]): void {
     pruneHookSnapshots(this.state, idsBackInFile);
+    this.persist();
+  }
+
+  /** Текст и место выключенных правил CLAUDE.md (копия, не внутренний массив). */
+  getDisabledRules(): DisabledRuleSnapshot[] {
+    return listRuleSnapshots(this.state);
+  }
+
+  setDisabledRules(list: readonly DisabledRuleSnapshot[]): void {
+    writeRuleSnapshots(this.state, list);
+    this.persist();
+  }
+
+  /** Память панели о контейнерах и местах прав одного файла настроек (копия). */
+  getPermissionPlaces(file: string): PermissionFilePlaces | undefined {
+    const stored = this.state.permissionPlaces?.[file];
+    return stored && typeof stored === 'object' ? structuredClone(stored) : undefined;
+  }
+
+  /** `undefined` — помнить о файле нечего, запись уходит. */
+  setPermissionPlaces(file: string, next: PermissionFilePlaces | undefined): void {
+    const all = { ...this.state.permissionPlaces };
+    if (next) all[file] = structuredClone(next);
+    else delete all[file];
+    if (Object.keys(all).length > 0) this.state.permissionPlaces = all;
+    else delete this.state.permissionPlaces;
     this.persist();
   }
 
@@ -589,13 +670,52 @@ export class AppStore {
    * ключа. Зовётся на КАЖДОМ прогоне, поэтому молча ничего не делает, когда
    * связи нет: сохранять что-то на каждый чат панели здесь незачем.
    */
-  linkChatSession(chatId: string, sessionId: string): void {
+  linkChatSession(chatId: string, sessionId: string, from?: string): void {
     const linked = moveChatLink(this.state, chatId, sessionId);
     // Родитель, продолженный в чистой сессии, получил запись под временным
     // ключом: список знает разговор по настоящему id, и группы под `new-…`
-    // висели бы без родителя.
-    const moved = chatId.startsWith('new-') && relocateSplitPlan(this.state, [chatId], sessionId);
-    if (linked || moved) this.persist();
+    // висели бы без родителя. Ветка правки (`from` — прежняя сессия) — другой
+    // разговор: группы остаются у исходного, иначе дерево ушло бы к ветке.
+    const moved =
+      !from && chatId.startsWith('new-') && relocateSplitPlan(this.state, [chatId], sessionId);
+    // Группа и автономность, выбранные до первого хода, едут за разговором;
+    // ветке правки достаётся их копия (F-111).
+    const aliased = aliasChatSession(this.state, chatId, sessionId, from);
+    if (linked || moved || aliased) this.persist();
+  }
+
+  // --- Группа и автономность чата, заметки главному чату дерева ---
+
+  /** Настоящий ключ разговора по любому его написанию. */
+  canonicalChatKey(chatId: string): string {
+    return canonicalChatKey(this.state, chatId);
+  }
+
+  getChatGroupSettings(chatId: string): StoredChatGroupSettings | undefined {
+    return readChatGroupSettings(this.state, chatId);
+  }
+
+  setChatGroupSettings(chatId: string, settings: StoredChatGroupSettings): StoredChatGroupSettings {
+    const next = writeChatGroupSettings(this.state, chatId, settings);
+    this.persist();
+    return next;
+  }
+
+  /** `false` — такая заметка уже записана, рассылать нечего. */
+  addChatEscalation(rootChatId: string, notice: EscalationNotice): boolean {
+    const added = addChatEscalation(this.state, rootChatId, notice);
+    if (added) this.persist();
+    return added;
+  }
+
+  getChatEscalations(): Record<string, ChatEscalationEntry[]> {
+    return listChatEscalations(this.state);
+  }
+
+  markChatEscalationsRead(rootChatId: string): boolean {
+    const changed = markChatEscalationsRead(this.state, rootChatId, new Date().toISOString());
+    if (changed) this.persist();
+    return changed;
   }
 
   /** Первая правка кода в разговоре ребёнка — момент в связь; чужие прогоны молча мимо. */

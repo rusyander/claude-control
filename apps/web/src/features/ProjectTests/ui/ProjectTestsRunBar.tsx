@@ -6,7 +6,6 @@ import { Icon } from '@shared/ui/icon';
 import { Badge } from '@shared/ui/badge';
 import { Toggle } from '@shared/ui/toggle';
 import { Typography } from '@shared/ui/typography';
-import { SearchField } from '@shared/ui/search-field';
 import { SelectField } from '@shared/ui/select-field';
 import { IntegrationLinkRows, useIntegrationLinks } from '@entities/Integration';
 import { TestSecretsModal } from './TestSecretsModal';
@@ -46,6 +45,7 @@ export function ProjectTestsRunBar({
   const environment = environmentId
     ? alive.find((item) => item.id === environmentId)
     : (alive.find((item) => item.isDefault) ?? alive[0]);
+  const hasStand = alive.some((item) => Boolean(item.baseUrl));
 
   // Внешний контекст показываем ТОЛЬКО чтением: правят его в разделе тестов и
   // в карточке проекта, а из чата важно одно — увидеть, куда уедут дефекты,
@@ -78,31 +78,36 @@ export function ProjectTestsRunBar({
   };
 
   return (
-    <Stack gap="var(--spacing-xs)" className={styles.bar}>
+    <Stack gap="var(--spacing-xs)" className={`${styles.bar} ${styles.narrowable}`}>
       <Stack direction="row" gap="var(--spacing-xs)" align="center" wrap>
         {/* Поле пожелания — без подписи сверху: подпись увела бы кнопки на
             вторую строку, а пульт должен читаться одной. Что сюда писать,
             сказано плейсхолдером. */}
-        <div className={styles.scope}>
-          <SearchField
-            label={t('projectTests.scope')}
-            placeholder={t('projectTests.scopeHint')}
-            value={scope}
-            onChange={onScopeChange}
-          />
-        </div>
+        {/* Обычное поле, не поисковое: лупа читалась как «поиск по кейсам»,
+            а это задание агенту. Плейсхолдер длинный и в узком пульте
+            обрезается — целиком он в подсказке. */}
+        <input
+          className={`${styles.runInput} ${styles.scope}`}
+          type="text"
+          aria-label={t('projectTests.scope')}
+          title={t('projectTests.scopeHint')}
+          placeholder={t('projectTests.scopeHint')}
+          value={scope}
+          onChange={(event) => onScopeChange(event.target.value)}
+        />
 
         {/* Веха прогона: `v1.4`, «спринт 12». Пусто — сервер подставит
             ближайший тег git, поэтому поле узкое и без обязательности: оно
             нужно там, где релиз называется не так, как тег. */}
-        <div className={styles.release}>
-          <SearchField
-            label={t('tests.runs.release')}
-            placeholder={t('tests.runs.releaseHint')}
-            value={release}
-            onChange={setRelease}
-          />
-        </div>
+        <input
+          className={`${styles.runInput} ${styles.release}`}
+          type="text"
+          aria-label={t('tests.runs.release')}
+          title={t('tests.runs.releaseHint')}
+          placeholder={t('tests.runs.releaseHint')}
+          value={release}
+          onChange={(event) => setRelease(event.target.value)}
+        />
 
         {onEnvironmentChange && board.environments.length > 0 && (
           <SelectField
@@ -134,13 +139,71 @@ export function ProjectTestsRunBar({
         )}
 
         <Button
+          variant="primary"
+          leftIcon={<Icon name="check" size={18} />}
+          disabled={isRunning || cases.length === 0}
+          onClick={() =>
+            board.start({
+              mode: 'run',
+              ...base,
+              caseIds: board.checked.length > 0 ? board.checked : undefined,
+            })
+          }
+        >
+          {board.checked.length > 0
+            ? t('projectTests.runSelected', { count: board.checked.length })
+            : t('projectTests.run')}
+        </Button>
+
+        <Button
           variant="secondary"
-          leftIcon={<Icon name="plus" size={18} />}
+          leftIcon={<Icon name="refresh" size={18} />}
+          disabled={isRunning || cases.length === 0}
+          title={t('projectTests.runFullHint')}
+          onClick={() => board.start({ mode: 'run', ...base, full: true })}
+        >
+          <span className={styles.narrowLabel}>{t('projectTests.runFull')}</span>
+        </Button>
+
+        {/* Отбор по диффу: гнать только то, чего касаются несохранённые правки.
+            Считает его сервер по `codePaths` кейсов — панель лишь просит. */}
+        <Button
+          variant="ghost"
+          leftIcon={<Icon name="branch" size={18} />}
+          disabled={isRunning || cases.length === 0}
+          title={t('tests.runs.changedOnlyHint')}
+          onClick={() => board.start({ mode: 'run', ...base, changedOnly: true })}
+        >
+          <span className={styles.narrowLabel}>{t('tests.runs.changedOnly')}</span>
+        </Button>
+
+        {isRunning && (
+          <Button variant="danger" leftIcon={<Icon name="stop" size={18} />} onClick={board.stop}>
+            {t('projectTests.stop')}
+          </Button>
+        )}
+      </Stack>
+
+      {/* Второй ряд — то, что агент ПИШЕТ, а не прогоняет: кейсы, находки,
+          автотесты. Кнопки меньше, чем «Прогнать»: это реже нажимают, и так
+          главное действие пульта видно с первого взгляда. Под ними — состояние
+          группы полосой: доли статусов читаются быстрее, чем строка чисел. */}
+      <Stack direction="row" gap="var(--spacing-xs)" align="center" wrap>
+        <Button
+          variant="secondary"
+          size="sm"
+          leftIcon={<Icon name="plus" size={16} />}
           disabled={isRunning}
           isLoading={board.isBusy && !isRunning}
-          title={t('projectTests.generateHint')}
+          // Решение владельца: «Сгенерировать» пишет и настоящие спеки в папку e2e.
+          title={t(hasStand ? 'testsE2e.generateHint' : 'testsE2e.noStand')}
           onClick={() =>
-            board.start({ mode: 'generate', ...base, autoAccept: board.autoAcceptDrafts })
+            board.start({
+              mode: 'generate',
+              ...base,
+              autoAccept: board.autoAcceptDrafts,
+              e2e: true,
+            })
           }
         >
           {t('projectTests.generate')}
@@ -152,7 +215,8 @@ export function ProjectTestsRunBar({
             иначе рабочая копия). */}
         <Button
           variant="ghost"
-          leftIcon={<Icon name="branch" size={18} />}
+          size="sm"
+          leftIcon={<Icon name="branch" size={16} />}
           disabled={isRunning}
           title={t('projectTests.generateDiffHint')}
           onClick={() =>
@@ -183,56 +247,20 @@ export function ProjectTestsRunBar({
           </Typography>
         </Stack>
 
-        <Button
-          variant="primary"
-          leftIcon={<Icon name="check" size={18} />}
-          disabled={isRunning || cases.length === 0}
-          onClick={() =>
-            board.start({
-              mode: 'run',
-              ...base,
-              caseIds: board.checked.length > 0 ? board.checked : undefined,
-            })
-          }
-        >
-          {board.checked.length > 0
-            ? t('projectTests.runSelected', { count: board.checked.length })
-            : t('projectTests.run')}
-        </Button>
-
-        <Button
-          variant="secondary"
-          leftIcon={<Icon name="refresh" size={18} />}
-          disabled={isRunning || cases.length === 0}
-          title={t('projectTests.runFullHint')}
-          onClick={() => board.start({ mode: 'run', ...base, full: true })}
-        >
-          {t('projectTests.runFull')}
-        </Button>
-
-        {/* Отбор по диффу: гнать только то, чего касаются несохранённые правки.
-            Считает его сервер по `codePaths` кейсов — панель лишь просит. */}
-        <Button
-          variant="ghost"
-          leftIcon={<Icon name="branch" size={18} />}
-          disabled={isRunning || cases.length === 0}
-          title={t('tests.runs.changedOnlyHint')}
-          onClick={() => board.start({ mode: 'run', ...base, changedOnly: true })}
-        >
-          {t('tests.runs.changedOnly')}
-        </Button>
-
         {/* Исследование — не прогон по списку, а поиск того, чего в списке нет.
             Без хартии кнопка не активна: сессия без неё превращается в час
             блуждания по приложению, и поле пожелания здесь и есть хартия. */}
         <Button
           variant="ghost"
-          leftIcon={<Icon name="search" size={18} />}
+          size="sm"
+          leftIcon={<Icon name="search" size={16} />}
           disabled={isRunning || scope.trim().length === 0}
           title={scope.trim() ? t('projectTests.exploreHint') : t('projectTests.exploreNeedsScope')}
           onClick={() => board.start({ mode: 'explore', ...base })}
         >
-          {t('projectTests.explore')}
+          {/* На узком пульте (1100 px) подпись уходит в имя кнопки: без неё
+              второй ряд помещается в одну строку, а лупа здесь одна. */}
+          <span className={styles.narrowLabel}>{t('projectTests.explore')}</span>
         </Button>
 
         {/* Автоматизировать можно только то, чего ещё нет в коде, — и человек
@@ -240,7 +268,8 @@ export function ProjectTestsRunBar({
             над набором, который весь уже автоматизирован. */}
         <Button
           variant="ghost"
-          leftIcon={<Icon name="scripts" size={18} />}
+          size="sm"
+          leftIcon={<Icon name="scripts" size={16} />}
           disabled={isRunning || toAutomate === 0}
           title={t('projectTests.automateHint')}
           onClick={() =>
@@ -253,15 +282,27 @@ export function ProjectTestsRunBar({
         >
           {t('projectTests.automate', { count: toAutomate })}
         </Button>
-
-        {isRunning && (
-          <Button variant="danger" leftIcon={<Icon name="stop" size={18} />} onClick={board.stop}>
-            {t('projectTests.stop')}
-          </Button>
-        )}
       </Stack>
 
       <Stack direction="row" gap="var(--spacing-xs)" align="center" wrap>
+        {cases.length > 0 && (
+          <span
+            className={styles.miniStack}
+            role="img"
+            aria-label={t('projectTests.counts', counts)}
+            title={t('projectTests.counts', counts)}
+          >
+            {STACK_PARTS.map((part) =>
+              counts[part] > 0 ? (
+                <span
+                  key={part}
+                  className={`${styles.miniStackPart} ${PART_CLASS[part]}`}
+                  style={{ flexGrow: counts[part] }}
+                />
+              ) : null,
+            )}
+          </span>
+        )}
         {cases.length > 0 && (
           <Typography variant="caption" color="subtle" as="span">
             {t('projectTests.counts', counts)}
@@ -286,37 +327,52 @@ export function ProjectTestsRunBar({
 
       <IntegrationLinkRows link={contextLink} />
 
-      <Typography variant="caption" color="subtle">
-        {t('projectTests.fullAccessNote')}
-      </Typography>
+      {/* Оговорка о доступе и соглашение CLAUDE.md — одной строкой подписи:
+          обе про то, КАК агент работает с проектом, и по отдельной строке на
+          каждую они съедали высоту, нужную списку кейсов. */}
+      <Stack direction="row" gap="var(--spacing-xs)" align="center" wrap>
+        {/* Главное об агенте — в строке-заголовке, подробности раскрываются:
+            три строки мелкого текста стояли над списком всегда и на узком
+            экране отнимали у него место. */}
+        <details className={styles.note}>
+          <summary>
+            <Typography variant="caption" color="subtle" as="span">
+              {t('projectTests.fullAccessSummary')}
+            </Typography>
+          </summary>
+          <Typography variant="caption" color="subtle">
+            {t('projectTests.fullAccessNote')}
+          </Typography>
+        </details>
 
-      {/* Кнопки этого окна отдают формат агенту сами, а просьба из чата — нет.
+        {/* Кнопки этого окна отдают формат агенту сами, а просьба из чата — нет.
           Единственное, что читает КАЖДЫЙ разговор, — CLAUDE.md проекта; туда
           соглашение и вписывается, но только по явному нажатию: файл чужой. */}
-      {board.hasConvention ? (
-        <Typography variant="caption" color="success">
-          {t('projectTests.conventionOn')}
-        </Typography>
-      ) : (
-        <Stack direction="row" gap="var(--spacing-xs)" align="center" wrap>
-          <Typography
-            variant="caption"
-            color="warning"
-            as="span"
-            title={t('projectTests.conventionOffText')}
-          >
-            {t('projectTests.conventionOff')}
+        {board.hasConvention ? (
+          <Typography variant="caption" color="success" as="span">
+            {t('projectTests.conventionOn')}
           </Typography>
-          <Button
-            variant="ghost"
-            size="sm"
-            title={t('projectTests.conventionInstallText')}
-            onClick={board.installConvention}
-          >
-            {t('projectTests.conventionInstall')}
-          </Button>
-        </Stack>
-      )}
+        ) : (
+          <Stack direction="row" gap="var(--spacing-xs)" align="center" wrap>
+            <Typography
+              variant="caption"
+              color="warning"
+              as="span"
+              title={t('projectTests.conventionOffText')}
+            >
+              {t('projectTests.conventionOff')}
+            </Typography>
+            <Button
+              variant="ghost"
+              size="sm"
+              title={t('projectTests.conventionInstallText')}
+              onClick={board.installConvention}
+            >
+              {t('projectTests.conventionInstall')}
+            </Button>
+          </Stack>
+        )}
+      </Stack>
 
       {environment && (
         <TestSecretsModal
@@ -341,11 +397,27 @@ export function ProjectTestsRunBar({
   );
 }
 
+/** Доли полосы состояния — в том же порядке, что и числа в подписи. */
+const STACK_PARTS = ['passed', 'failed', 'skipped', 'rest'] as const;
+
+const PART_CLASS: Record<(typeof STACK_PARTS)[number], string | undefined> = {
+  passed: styles.miniStackPassed,
+  failed: styles.miniStackFailed,
+  skipped: styles.miniStackSkipped,
+  rest: styles.miniStackRest,
+};
+
 /** Подпись прогона одним ключом словаря: вложенные тернарники здесь запрещены. */
+const RUNNING_KEY: Record<string, string> = {
+  generate: 'projectTests.runGenerate',
+  explore: 'projectTests.runExplore',
+  automate: 'projectTests.runAutomate',
+};
+
 function runKey(status: string, mode: string): string {
-  if (status === 'running') {
-    return mode === 'generate' ? 'projectTests.runGenerate' : 'projectTests.running';
-  }
+  // У каждого режима агента своя подпись: «Прогон идёт» над исследованием или
+  // автоматизацией обещал галочки в библиотеке, которых этот режим не ставит.
+  if (status === 'running') return RUNNING_KEY[mode] ?? 'projectTests.running';
   if (status === 'stopped') return 'projectTests.runStopped';
   if (status === 'error') return 'projectTests.runError';
   return 'projectTests.runDone';

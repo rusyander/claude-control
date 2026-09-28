@@ -1,6 +1,5 @@
-import type { CSSProperties } from 'react';
 import styles from './typography.module.scss';
-import { defaultTag } from './typography.lib';
+import { clampStyle, defaultTag } from './typography.lib';
 import type { TypographyProps } from './typography.types';
 
 /**
@@ -19,6 +18,7 @@ export function Typography({
   clamp,
   as,
   className,
+  style,
   children,
   ...rest
 }: TypographyProps) {
@@ -37,10 +37,8 @@ export function Typography({
     .filter(Boolean)
     .join(' ');
 
-  const style = clamp ? ({ WebkitLineClamp: clamp } as CSSProperties) : undefined;
-
   return (
-    <Component className={classes} style={style} {...rest}>
+    <Component className={classes} style={clampStyle(clamp, style)} {...rest}>
       {children}
     </Component>
   );

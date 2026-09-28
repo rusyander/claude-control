@@ -41,7 +41,7 @@ function Demo({ compact }: { compact: boolean }) {
         Сломать компонент
       </Button>
       <ErrorBoundary
-        scope="витрина"
+        scope="showcase"
         fallback={(error, reset) => (
           <CrashCard
             compact={compact}

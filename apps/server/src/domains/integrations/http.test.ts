@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { createServer } from 'node:net';
+import type { AddressInfo } from 'node:net';
 import { IntegrationError } from './errors.ts';
 import { describeFailure, ensureOk, parseJson, requestJson, sendRequest } from './http.ts';
 
@@ -177,5 +179,26 @@ describe('domains/integrations/http', () => {
     const response = await sendRequest({ url: 'https://x', system: 'CI', binary: true });
     expect(response.bytes?.length).toBeGreaterThan(0);
     expect(response.text).toBe('');
+  });
+});
+
+describe('domains/integrations/http — настоящий отказ соединения', () => {
+  it('«fetch failed» не приходит голым: причина называет, что именно не так с адресом', async () => {
+    // Настоящий fetch и закрытый порт: undici прячет суть (ECONNREFUSED) в cause,
+    // а человек видел одно «Нет связи с Вебхук: fetch failed».
+    const server = createServer();
+    await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
+    const { port } = server.address() as AddressInfo;
+    await new Promise((done) => server.close(done));
+
+    await expect(
+      sendRequest({ url: `http://127.0.0.1:${port}/hook`, system: 'Вебхук' }),
+    ).rejects.toMatchObject({ message: expect.stringContaining('ECONNREFUSED') });
+
+    // localhost пробует ::1 и 127.0.0.1: причина — AggregateError с ПУСТЫМ
+    // сообщением, суть лежит в code и errors (ревью 26.09).
+    await expect(
+      sendRequest({ url: `http://localhost:${port}/hook`, system: 'Вебхук' }),
+    ).rejects.toMatchObject({ message: expect.stringContaining('ECONNREFUSED') });
   });
 });

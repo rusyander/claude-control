@@ -66,6 +66,50 @@ export function findRunKey(...names: (string | undefined)[]): string | undefined
   return undefined;
 }
 
+/**
+ * Под каким ключом экран разговора читает прогон, открытый под ЛЮБЫМ именем.
+ *
+ * Разговор, начатый во вкладке панели или разделением, идёт на сервере под
+ * временным `new-…`, а телефон открывает его по сессии — из списка разговоров
+ * или по памяти о прошлом открытии. Чтение по одному точному ключу находило
+ * пустую запись, и экран показывал «молчит» у работающего агента: ни «Стоп», ни
+ * живого текста, ни опроса прогресса (живой прогон 28.09, 1b). Идущий прогон
+ * важнее законченного под тем же именем; дальше — точный ключ, потом любой.
+ */
+export function runKeyFor(id: string): string {
+  let exact: string | undefined;
+  let alias: string | undefined;
+  for (const [key, run] of runs) {
+    const named = key === id || run.sessionId === id || run.serverRunId === id;
+    if (!named) continue;
+    if (run.status === 'running') return key;
+    if (key === id) exact = key;
+    else alias ??= key;
+  }
+  return exact ?? alias ?? id;
+}
+
+/** Ключ прогона разговора с подпиской: сменится, как только опрос подхватит ход. */
+export function useRunKey(id: string): string {
+  useSyncExternalStore(subscribe, getVersion, getVersion);
+  return runKeyFor(id);
+}
+
+/** Прогон, известный под одним из имён разговора; идущий — первым (точки списков). */
+export function runNamed(
+  list: readonly AgentRun[],
+  ...names: (string | undefined)[]
+): AgentRun | undefined {
+  const wanted = names.filter((name): name is string => Boolean(name));
+  const named = list.filter(
+    (run) =>
+      wanted.includes(run.id) ||
+      (run.sessionId !== undefined && wanted.includes(run.sessionId)) ||
+      (run.serverRunId !== undefined && wanted.includes(run.serverRunId)),
+  );
+  return named.find((run) => run.status === 'running') ?? named[0];
+}
+
 /** Хук подписки: возвращает прогон и перерисовывает экран на каждое событие. */
 export function useRun(id: string): AgentRun {
   useSyncExternalStore(subscribe, getVersion, getVersion);
@@ -142,6 +186,7 @@ export function applyEvent(id: string, event: ChatEvent): void {
           input: JSON.stringify(event.input),
           id: event.id || undefined,
           usage: event.id ? pendingUsage.get(id)?.get(event.id) : undefined,
+          at: Date.now(),
         },
       ];
       break;
@@ -199,6 +244,20 @@ export function applyEvent(id: string, event: ChatEvent): void {
     case 'permissionResolved':
       next.permissions = run.permissions.filter((item) => item.toolUseId !== event.toolUseId);
       break;
+    case 'autoPick': {
+      // Вопрос закрыт автономией: вызов получает след выбора, а «ждёт вас»
+      // снимается, если открытых вопросов в ходе не осталось.
+      const tools = run.tools.map((tool) =>
+        tool.id === event.toolUseId ? { ...tool, autoPicks: event.picks } : tool,
+      );
+      next.tools = tools;
+      next.askedQuestion = tools.some(
+        // Закрыт самим фактом автовыбора, как на сервере: пустой список — выбор,
+        // который прогон не разобрал, а не открытый вопрос (F-132).
+        (tool) => tool.name === 'AskUserQuestion' && tool.autoPicks === undefined,
+      );
+      break;
+    }
     case 'handoff':
       // Продолжение заведено сервером — запоминаем, куда: экран разговора
       // переключится по окончании этого прогона. Отказ (`reason` без `chatId`)

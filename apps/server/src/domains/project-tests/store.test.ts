@@ -12,6 +12,7 @@ import {
   removeCase,
   removeGroup,
   resetStatuses,
+  updateGroup,
   upsertCase,
 } from './store.ts';
 import { saveSharedStep } from './library.ts';
@@ -492,5 +493,24 @@ describe('project-tests store: строгость на входе', () => {
     );
 
     expect(only(root).cases[0]?.attachments).toEqual(['a.png', 'b.png']);
+  });
+});
+
+// Окно правки подставляет описание и зовёт стереть его, а сервер подменял пустое
+// старым (`description?.trim() || group.description`): стереть было нельзя, окно
+// при этом закрывалось как успех.
+describe('правка группы', () => {
+  let root: string;
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'cc-tests-group-edit-'));
+  });
+  afterEach(() => rmSync(root, { recursive: true, force: true }));
+
+  it('пустое описание стирает его, отсутствующее — не трогает', () => {
+    createGroup(root, 'smoke', 'Smoke', 'old description');
+    expect(updateGroup(root, 'smoke', 'Smoke', undefined).description).toBe('old description');
+    expect(updateGroup(root, 'smoke', 'Smoke', '  ').description).toBeUndefined();
+    expect(only(root).description).toBeUndefined();
+    expect(updateGroup(root, 'smoke', '', 'new').title).toBe('Smoke');
   });
 });

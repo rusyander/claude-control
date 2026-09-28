@@ -27,6 +27,49 @@
   flex-direction: column;
 }
 
+// Заголовок вида — кнопка «развернуть»: вся строка, а не значок, чтобы попасть
+// по ней и пальцем, и с клавиатуры (Enter/Space, `aria-expanded`).
+.kindHeading {
+  margin: 0;
+}
+
+.kindHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-xs);
+  width: 100%;
+  padding: var(--spacing-3xs) 0;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+}
+
+// Требование, общее для всего вида: одна строка над списком вместо повтора в каждой.
+.sharedNeeds {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-3xs) var(--spacing-xs);
+  padding: var(--spacing-2xs) var(--spacing-xs);
+  border-radius: 8px;
+  background: var(--color-surface-sunken);
+
+  > * {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+}
+
 // Число сводки — кнопка, а не подпись: она открывает записи своего уровня.
 // Кнопкой, а не кликабельным бейджем, — ради клавиатуры и озвучивания
 // состояния (`aria-pressed`); вид целиком несёт бейдж внутри.

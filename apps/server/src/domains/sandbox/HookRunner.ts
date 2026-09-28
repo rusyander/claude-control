@@ -6,6 +6,35 @@ import { CUSTOM_FIXTURE_ID, TIMEOUT_MS, isWindows } from './HookProbe.constants.
 import type { EventFixture, ProbeResult } from './HookProbe.types.ts';
 import { serverText } from '../../lib/server-texts.ts';
 
+/**
+ * Итог закрывшегося процесса хука. Кода выхода нет и таймаута не было — хук
+ * убит сигналом извне (нехватка памяти, `kill`): `code ?? 0` выдавал это за
+ * чистое «пропустил». Своё убийство по таймауту остаётся прежним — его
+ * показывает `timedOut`.
+ */
+export function closedVerdict(
+  code: number | null,
+  signal: NodeJS.Signals | null,
+  timedOut: boolean,
+  parsed: unknown,
+): Pick<
+  ProbeResult,
+  'exitCode' | 'decision' | 'reason' | 'reasonCode' | 'reasonParams' | 'addedContext' | 'signal'
+> {
+  if (code === null && signal && !timedOut) {
+    return {
+      exitCode: -1,
+      signal,
+      decision: 'error',
+      reason: `Хук убит сигналом ${signal}`,
+      reasonCode: 'sandbox-hook-signal',
+      reasonParams: { signal },
+    };
+  }
+  const exitCode = code ?? 0;
+  return { exitCode, ...readDecision(exitCode, parsed) };
+}
+
 export async function runHookProbe(
   command: string,
   fixture: EventFixture,
@@ -68,21 +97,21 @@ export async function runHookProbe(
       });
     });
 
-    child.on('close', (code) => {
+    child.on('close', (code, signal) => {
       clearTimeout(timer);
 
-      const exitCode = code ?? 0;
       const parsed = tryParse(stdout);
-      const { decision, reason, addedContext } = readDecision(exitCode, parsed);
+      const { exitCode, ...verdict } = closedVerdict(code, signal, timedOut, parsed);
+      const { decision } = verdict;
 
       resolve({
         fixtureId: fixture.id,
         exitCode,
         stdout: stdout.slice(0, 20_000),
         stderr: stderr.slice(0, 20_000),
-        decision,
-        reason,
-        addedContext,
+        // Вместе с кодом текста: без него английский интерфейс показывал
+        // русскую причину, написанную панелью.
+        ...verdict,
         // Требование подтверждения — тоже вмешательство: действие не пройдёт
         // молча. Несостоявшийся прогон (`error`) ожиданию не соответствует
         // никогда: хук ничего не ответил, сверять не с чем.

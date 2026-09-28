@@ -134,9 +134,13 @@ export const hooksEn: typeof hooksRu = {
         'switching it back on restores exactly what was there.',
       lEdit: 'A ready hook exposes its command',
       lEditText:
-        'The file holds only the command and the timeout — that is what the form ' +
-        'shows; presets are not offered here, so nothing configured gets ' +
-        'overwritten. The timeout hint names the CLI default: empty means 60 seconds.',
+        'The form shows the command and the timeout; presets are not offered here, so ' +
+        'nothing configured gets overwritten. The timeout hint names the CLI default: ' +
+        'empty means 60 seconds. Fields of the entry the form does not show ' +
+        '(statusMessage, async and others) stay as they were on save — and on any other ' +
+        'write of the file by the panel too. A hook of another type (prompt, http, agent) ' +
+        'becomes a command when edited in the form: its prompt text has nothing to do ' +
+        'with a command and is dropped.',
 
       shotsTitle: 'The screenshots are real',
       shotsText:
@@ -310,8 +314,10 @@ export const hooksEn: typeof hooksRu = {
     fieldTemplate: 'What the hook does: message, guard, shell command, or a blank scaffold.',
     fieldDescription:
       'One sentence about what the hook is for. It goes into the header of the ' +
-      'created script.',
-    fieldMessage: 'The text of the message, or the explanation given when blocking.',
+      'created script as a comment — one per line, so a line break never leaks into code.',
+    fieldMessage:
+      'The text of the message, or the explanation given when blocking. It goes into the ' +
+      'script as a string, verbatim: quotes, backslashes and ${…} never become code.',
     fieldGuardPatterns:
       'What to intercept — patterns separated by commas. For the guard template only.',
     fieldCommand: 'A ready command, when no script file needs to be created.',
@@ -358,7 +364,12 @@ export const hooksEn: typeof hooksRu = {
     recipe3: 'Save and run it in the sandbox',
     recipe3Text:
       'The direct-run tab has prepared events: a safe command, a destructive one, a ' +
-      'git push. You see at once what the hook caught and what it let through.',
+      'git push. You see at once what the hook caught and what it let through. ' +
+      'Each run shows the decision, the exit code and what the hook printed to stdout ' +
+      'and stderr — exactly what Claude Code receives. Long output is collapsed, its ' +
+      'label says how many lines it has. A hook killed by a signal from outside (out ' +
+      'of memory, kill) shows as an error, “The hook was killed by signal …” naming the ' +
+      'signal, not as a clean pass.',
     recipe4: 'Restart Claude Code',
     recipe4Text: 'Hooks are read at startup — in an open session a new hook is not active yet.',
 

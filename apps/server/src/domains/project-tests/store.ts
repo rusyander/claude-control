@@ -3,6 +3,7 @@ import type {
   ProjectTestBulkInput,
   ProjectTestCase,
   ProjectTestCaseInput,
+  ProjectTestSource,
   ProjectTestDefect,
   ProjectTestDefectState,
   ProjectTestFailure,
@@ -26,6 +27,7 @@ import {
   stringList,
   text,
 } from './files.ts';
+import { legacyRetryAttempts, parseRetryPass } from './retry-pass.ts';
 import {
   SECTION_SPLIT_THRESHOLD,
   assertNotPart,
@@ -232,6 +234,16 @@ export function parseCase(raw: unknown, index: number): ProjectTestCase | undefi
   const steps = toSteps(item.steps) as ProjectTestStep[];
   const duration = Number(item.duration);
   const maxDiffRatio = Number(item.maxDiffRatio);
+  const note = optional(item.note);
+  // Старая запись: «прошёл на повторе» лежал русской фразой в заметке. Фраза
+  // панели читается полем и из заметки уходит; чужая заметка остаётся как есть.
+  const legacyAttempts = legacyRetryAttempts(note);
+  const lastRunId = optional(item.lastRunId);
+  const flaky =
+    parseRetryPass(item.flaky) ??
+    (legacyAttempts !== undefined
+      ? { attempts: legacyAttempts, ...(lastRunId ? { runId: lastRunId } : {}) }
+      : undefined);
 
   return {
     id: text(item.id).trim() || `case-${index + 1}`,
@@ -266,10 +278,11 @@ export function parseCase(raw: unknown, index: number): ProjectTestCase | undefi
     statusId: optional(item.statusId),
     muted: item.muted === true ? true : undefined,
     muteReason: optional(item.muteReason),
-    note: optional(item.note),
+    note: legacyAttempts === undefined ? note : undefined,
     failure: parseFailure(item.failure),
+    flaky,
     lastRunAt: optional(item.lastRunAt),
-    lastRunId: optional(item.lastRunId),
+    lastRunId,
     source: text(item.source) === 'human' ? 'human' : 'agent',
     updatedAt: optional(item.updatedAt),
     archived: item.archived === true ? true : undefined,
@@ -408,10 +421,13 @@ export function updateGroup(
       { id },
     );
   }
+  // Описание, в отличие от названия, стирается: пустое — стереть, отсутствующее — не
+  // трогать. Окно правки подставляет текущее и шлёт его всегда.
+  const cleared = description === undefined ? group.description : description.trim();
   const next: ProjectTestGroup = {
     ...group,
     title: title?.trim() || group.title,
-    description: description?.trim() || group.description,
+    description: cleared || undefined,
   };
   writeGroup(root, next);
   return next;
@@ -528,6 +544,60 @@ function patchList<T>(value: T[] | undefined, previous?: T[]): T[] | undefined {
   return value.length > 0 ? value : undefined;
 }
 
+/** Сутки — потолок одного кейса: больше — это опечатка, а не план прохода. */
+const MAX_CASE_MINUTES = 1440;
+
+/**
+ * Вход панели (форма, телефон, API) строже чтения файла. Раньше `priority:
+ * "urgent"` ложился в файл и молча пропадал при чтении — клиент думал, что
+ * сохранил; ссылка «не адрес» становилась строкой матрицы покрытия. Файлы
+ * агента по-прежнему читаются снисходительно — строгость только здесь.
+ */
+function assertCaseInput(input: ProjectTestCaseInput, existing?: ProjectTestCase): void {
+  if (input.type !== undefined) strictValue(input.type, KINDS, 'Тип');
+  if (input.priority !== undefined) strictValue(input.priority, PRIORITIES, 'Приоритет');
+  if (input.readiness !== undefined) strictValue(input.readiness, READINESS, 'Готовность');
+  if (input.automation !== undefined)
+    strictValue(input.automation.status, AUTOMATION, 'Статус автоматизации');
+  // Уже лежащее в кейсе (файл агента, импорт CSV) читается снисходительно, и
+  // форма шлёт его обратно при любой правке: строгость — только к новому.
+  // Прощается только лежащее КАК лежит: смена типа у сохранённого адреса —
+  // уже новое значение, и мусорный тип иначе уходил в файл. Сам адрес при этом
+  // остаётся прощённым — его человек не трогал.
+  const keyOf = (link: { type: unknown; url: unknown }): string =>
+    JSON.stringify([link.type, link.url]);
+  const stored = new Set((existing?.links ?? []).map(keyOf));
+  const storedUrls = new Set((existing?.links ?? []).map((link) => link.url));
+  for (const link of input.links ?? []) {
+    if (stored.has(keyOf(link))) continue;
+    strictValue(link.type, LINK_TYPES, 'Тип ссылки');
+    if (storedUrls.has(link.url)) continue;
+    if (!/^https?:\/\/[^\s/]+\S*$/i.test(text(link.url).trim())) {
+      throw coded(
+        new ProjectTestsError(
+          `Ссылка «${text(link.url).trim()}»: нужен полный адрес, начинающийся с http:// или https://.`,
+        ),
+        'case-link-invalid',
+        { url: text(link.url).trim() },
+      );
+    }
+  }
+  const minutes = input.duration;
+  if (
+    minutes !== undefined &&
+    minutes !== existing?.duration &&
+    (!Number.isInteger(minutes) || minutes < 0 || minutes > MAX_CASE_MINUTES)
+  ) {
+    throw coded(
+      new ProjectTestsError(
+        `Длительность «${String(minutes)}»: целое число минут от 1 до ${MAX_CASE_MINUTES}, 0 — очистить.`,
+      ),
+      'case-duration-invalid',
+      { value: String(minutes) },
+    );
+  }
+}
+
 /**
  * Создать или обновить кейс. Правка из панели помечает кейс человеческим:
  * агенту велено такие не удалять, иначе он снесёт то, что человек только что
@@ -536,19 +606,24 @@ function patchList<T>(value: T[] | undefined, previous?: T[]): T[] | undefined {
  * Правка сводится ПО `id` с тем, что лежит на диске ПРЯМО СЕЙЧАС, а не заменяет
  * кейс целиком: результат прогона (`status`, `note`, `lastRunAt`, вложения,
  * дефекты) принадлежит тому, кто гонял, и сохранение описания его не стирает.
+ *
+ * `author: 'agent'` — кейс написал агент панели по подтверждённой карточке. Это
+ * та же приёмка, что у черновика генерации: новый кейс — агентский, у
+ * существующего автор не меняется (кейс человека остаётся под защитой).
  */
 export function upsertCase(
   root: string,
   groupId: string,
   input: ProjectTestCaseInput,
   now: string,
+  author: ProjectTestSource = 'human',
 ): ProjectTestCase {
   const title = input.title?.trim();
   if (!title)
     throw coded(new ProjectTestsError('У теста должно быть название.'), 'case-title-required');
-
   const group = requireGroup(root, groupId);
   const existing = input.id ? group.cases.find((item) => item.id === input.id) : undefined;
+  assertCaseInput(input, existing);
   // `id` в запросе значит «правлю этот кейс»: нет такого — значит, его удалили,
   // пока форма была открыта, и молча завести его заново было бы ошибкой. Новый
   // кейс сохраняют без id, идентификатор выдаёт панель.
@@ -579,7 +654,8 @@ export function upsertCase(
     oracle: patchText(input.oracle, existing?.oracle),
     priority: input.priority ?? existing?.priority,
     readiness: input.readiness ?? existing?.readiness,
-    duration: input.duration ?? existing?.duration,
+    // 0 — явное «очисти»: пустое поле формы иначе не отличить от «не трогай».
+    duration: input.duration === undefined ? existing?.duration : input.duration || undefined,
     tags: patchList(input.tags, existing?.tags),
     links: patchList(input.links, existing?.links),
     attributes:
@@ -607,9 +683,10 @@ export function upsertCase(
     // Разбор провала принадлежит прогону, как и `note`: правка описания кейса
     // из панели не должна стирать номер шага, на котором он лёг.
     failure: existing?.failure,
+    flaky: existing?.flaky,
     lastRunAt: existing?.lastRunAt,
     lastRunId: existing?.lastRunId,
-    source: 'human',
+    source: author === 'agent' ? (existing?.source ?? 'agent') : 'human',
     updatedAt: now,
     archived: input.archived ?? existing?.archived,
   };
@@ -648,6 +725,7 @@ export function resetStatuses(root: string, groupId: string, caseIds?: string[])
           status: 'unknown',
           note: undefined,
           failure: undefined,
+          flaky: undefined,
           lastRunAt: undefined,
           lastRunId: undefined,
         };
@@ -668,6 +746,8 @@ export interface CaseResultPatch {
   defect?: { url: string; title?: string; createdAt?: string };
   /** Доказательства прохода — пути от корня проекта; в кейсе копятся, не заменяются. */
   attachments?: string[];
+  /** Упавшие попытки перед зелёной — признак «прошёл только на повторе». */
+  flakyAttempts?: number;
 }
 
 /**
@@ -713,6 +793,12 @@ export function applyResults(root: string, patches: CaseResultPatch[], now: stri
           : item.attachments,
         lastRunAt: patch.at ?? now,
         lastRunId: patch.runId ?? item.lastRunId,
+        // Признак повтора описывает ЭТОТ результат: следующий проход без повтора
+        // его снимает, а не наследует, как наследовалась старая заметка.
+        flaky:
+          patch.status === 'passed' && (patch.flakyAttempts ?? 0) > 0
+            ? { attempts: patch.flakyAttempts!, ...(patch.runId ? { runId: patch.runId } : {}) }
+            : undefined,
         defects,
       };
     });
@@ -925,6 +1011,7 @@ export function bulkCases(root: string, input: ProjectTestBulkInput, now: string
         title: `${item.title} (копия)`,
         status: 'unknown',
         note: undefined,
+        flaky: undefined,
         lastRunAt: undefined,
         lastRunId: undefined,
         source: 'human',

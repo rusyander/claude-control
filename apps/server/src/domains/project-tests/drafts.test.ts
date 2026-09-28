@@ -122,6 +122,28 @@ describe('project-tests drafts', () => {
     expect(draft?.warnings?.[0]).toContain('удаление');
   });
 
+  it('причина отброшенной правки переживает запись черновика: частичную приёмку и перенос в группу (X-1)', () => {
+    writeGroupFile(root, 'gui', []);
+    writeGroupFile(root, 'api', []);
+    writeDraftFile(root, RUN, [
+      { op: 'delete', groupId: 'gui', caseId: 'gui-001', case: proposedCase('gui-001', 'Вход') },
+      { op: 'add', groupId: 'gui', caseId: 'gui-002', case: proposedCase('gui-002', 'Выход') },
+      { op: 'add', groupId: 'gui', caseId: 'gui-003', case: proposedCase('gui-003', 'Поиск') },
+    ]);
+    const refused = readDraft(root, RUN)?.warnings ?? [];
+    expect(refused).toHaveLength(1);
+
+    // Конец прогона: перенос в выбранную группу переписывает файл.
+    confineDraft(root, readDraft(root, RUN)!, 'api');
+    const moved = readDraft(root, RUN)?.warnings ?? [];
+    expect(moved).toContain(refused[0]);
+    expect(moved.join(' ')).toMatch(/перенесено в группу «api»: 2/);
+
+    // Частичная приёмка — ещё одна запись; повтор чтения не множит строки.
+    applyDraft(root, RUN, { now: NOW, caseIds: ['api-001'] });
+    expect(readDraft(root, RUN)?.warnings).toEqual(moved);
+  });
+
   it('приёмка выборочная: отмеченный кейс уходит в библиотеку, остальные ждут', () => {
     writeDraftFile(root, RUN, [
       { op: 'add', groupId: 'gui', caseId: 'gui-001', case: proposedCase('gui-001', 'Вход') },

@@ -1,0 +1,15 @@
+{
+  "topic": "phone",
+  "source": "docs/diagrams/phone-guide/phone-guide.drawio",
+  "pages": [
+    {
+      "name": "phone-path",
+      "file": "phone-path.png",
+      "page": 1,
+      "source": "9c837c4716d5bef4",
+      "width": 1897,
+      "height": 1178,
+      "exportedAt": "2026-09-28T09:16:48.240Z"
+    }
+  ]
+}

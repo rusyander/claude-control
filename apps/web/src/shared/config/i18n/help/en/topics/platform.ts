@@ -54,7 +54,8 @@ export const platformEn: typeof platformRu = {
       'Cards of every connected contour, the active one first: connection, what the probe ' +
       'found, where it is applied, journal, budget and spend. “Make active”, “Check”, ' +
       '“Configure” and delete live here too, and under the cards — the decisions taken and the ' +
-      'list of signed compromises.',
+      'list of signed compromises. The card also carries the sections through the contour and ' +
+      'the “whose rules apply” choice (see “Configuration on the contour card” below).',
     tabModel: 'Model',
     tabModelText:
       'Default model, per-consumer model, name map and reasoning depth — of the selected contour.',
@@ -62,8 +63,9 @@ export const platformEn: typeof platformRu = {
     tabRulesText:
       'Two columns. On the left, “Platform rules”: the request fields the panel passes to the ' +
       'contour and what the contour does itself. On the right, “Our layers”: the tool shim, the ' +
-      'data mask and the ~/.claude layers in a run. Under the columns, the conflict matrix ' +
-      'between the sides.',
+      'data mask and the ~/.claude layers in a run. Above the columns, the “whose rules apply” ' +
+      'choice; on the rows, overlap marks; under the columns, the conflict matrix and who wins ' +
+      'each conflict.',
     tabAccess: 'Section access',
     tabAccessText:
       'Which panel sections go through the selected contour and what gets written for that — ' +
@@ -112,6 +114,52 @@ export const platformEn: typeof platformRu = {
       'choice is kept, and writing to the assistant and CLI files is skipped with a reason. ' +
       'Activation does not repeat the writes: once the contour is active, press “Save and ' +
       'apply” again.',
+
+    configTitle: 'Configuration on the contour card',
+    configCaption:
+      'Two choices that used to live only on the tabs are on the contour card as well: which ' +
+      'sections go through it and whose rules apply. Both are saved at once, without a button; ' +
+      'while a contour save is in progress the toggles wait for it — a second quick click does ' +
+      'not roll the first one back.',
+    configColumn: 'On the card',
+    configMeaningColumn: 'How it works',
+    configSections: 'Sections through this contour',
+    configSectionsText:
+      'A switch for every section: chat, split groups, the tests agent, foreign CLI chats, the ' +
+      'panel assistant and “Terminal”. The first four open and close right here. The assistant ' +
+      'and the terminal can only be closed here: opening them means writing the address into ' +
+      'the assistant profile or into CLI files, and the button leads to the “Section access” ' +
+      'tab. Images and presentations are a row without a switch: they always go through the ' +
+      'active contour.',
+    configEnforce: 'Closed means closed in the gateway',
+    configEnforceText:
+      'Every section gets a gateway address with its own mark (/<contour>/_s/<section>/…). The ' +
+      'gateway checks the mark against the choice on every request: a closed section gets a 403 ' +
+      'naming the section, and nothing goes to the contour. So closing takes effect at once — ' +
+      'for a run started earlier and for CLI files that still point at the contour.',
+    configRules: 'Whose rules apply',
+    configRulesText:
+      '“Both sets” — the contour rules go into the request, our layers into the run. “Contour ' +
+      'rules only” — our layers (personal rules, hooks, permissions, skills, MCP, the prompt ' +
+      'addition) are removed from runs through the contour. “Ours only” — the contour rules do ' +
+      'not go into the request; the contour only receives “no contour tools”. The values of the ' +
+      'removed side are kept: switch back to “Both sets” and you will find them in place. Under ' +
+      '“Contour rules only” the “Removed by the … choice” mark sits on the layers block of the “Our layers” ' +
+      'column, not on the whole column: the data mask and the tool shim keep working.',
+    configOverlaps: 'Overlaps and who wins',
+    configOverlapsText:
+      'Where a contour rule and ours touch the same thing, both columns of the “Rules” tab carry ' +
+      'an “overlap” mark, and the matrix says who wins: the contour for the tool set and history ' +
+      'compaction, both sides for data substitution and guardrails, ours first. A column removed ' +
+      'by the choice has a dashed border, and its conflict is marked as removed: it does not ' +
+      'happen in the run.',
+    configUntaggedTitle: 'The gateway lets an address without a section mark through',
+    configUntaggedText:
+      'Panel checks and images go that way. So did CLI files written before this version: apply ' +
+      'them again — the old address will show as a conflict, the new one gets the “Terminal” ' +
+      'mark. The data mask, the tool shim and what the contour owner turns on at their side ' +
+      '(checks, data substitution, knowledge base, history compaction) are not removed by the ' +
+      'rules choice.',
 
     screenTitle: 'What the section shows',
     screenCaption:
@@ -480,7 +528,9 @@ export const platformEn: typeof platformRu = {
       '“tool_choice: none” upstream, asking the contour not to use its own tools at all: staying ' +
       'silent would leave that to its default. While the tool shim is on, the field is locked: two ' +
       'sets on one turn argue with each other — and the shim itself is switched off right here, ' +
-      'in the neighbouring “Our layers” column.',
+      'in the neighbouring “Our layers” column. The other way round too: with tools written, the ' +
+      'shim cannot be switched on. The lock follows the effective rules: under “Ours only” the ' +
+      'contour rules do not go into the request, nothing argues — and nothing is locked.',
     rulesMode: 'Platform call loop',
     rulesModeText:
       '“loop” — the contour runs the call/result cycle itself and returns a finished answer; ' +
@@ -977,7 +1027,8 @@ export const platformEn: typeof platformRu = {
       'no tools field in the request at all, and no client tool choice either. The company platform gets ' +
       'tool choice switched off: the platform picks its own set, and left on it would ' +
       'override the protocol we just taught the model. A compatible gateway gets nothing ' +
-      'beyond the text.',
+      'beyond the text. The protocol text is English whatever the panel language: the model ' +
+      'reads it, not you.',
     shimDown: 'What comes back',
     shimDownText:
       'The panel parses the call block out of the model’s answer and hands your CLI a real ' +
@@ -1106,9 +1157,10 @@ export const platformEn: typeof platformRu = {
       'Four different actions, and they remove different things. Top to bottom, gentlest first.',
     disableStep0: 'Untick a consumer',
     disableStep0Text:
-      'The narrowest action of all: “Configure” → “Where the contour works” → clear the tick. It ' +
-      'takes effect from the NEXT start — runs already going are left alone, the panel will ' +
-      'not stop someone’s work over a setting. The other consumers stay on the contour, and ' +
+      'The narrowest action of all: the section switch on the contour card or the “Section ' +
+      'access” tab. It takes effect AT ONCE: the gateway closes the section on every request, ' +
+      'and a run started earlier gets a refusal on its very next call to the model — the panel ' +
+      'does not stop the process itself. The other consumers stay on the contour, and ' +
       'no CLI file changes at all. Two caveats, both stated on screen: clearing “Panel ' +
       'assistant” moves the assistant back to its previous profile at once — that is a panel ' +
       'setting, not a run variable, and it has no next launch to wait for; and if the same ' +
@@ -1271,7 +1323,9 @@ export const platformEn: typeof platformRu = {
         'chats of foreign CLIs and “Terminal”. Only the assistant is ticked by default — it ' +
         'is the one thing that works through a contour in full; everything else is switched ' +
         'on by hand, and every run row carries the note that a CLI behind the gateway has no ' +
-        'tools of its own. Each row says HOW it travels: “per run” — the address goes into ' +
+        'tools of its own. Images and presentations are not in the list: they go through the ' +
+        'active contour whichever rows are ticked. Each row says HOW it travels: “per run” — ' +
+        'the address goes into ' +
         'that one process’s environment and nowhere else — “through the panel profile”, or ' +
         '“written into the CLI config”. An unavailable consumer is a dash with a reason, not ' +
         'a checkbox: Codex and Continue keep the address in their own file, one per machine, ' +
@@ -1298,8 +1352,9 @@ export const platformEn: typeof platformRu = {
       pGatewayText:
         'The “Raise the gateway” button sits on the same step. Once up, it names its address ' +
         '— http://127.0.0.1:5179 on the screenshot — and that is what lands in the ' +
-        'consumers’ configs, with the contour identifier appended: ' +
-        'http://127.0.0.1:5179/company-stand/v1. The dashes next to the consumers stay to the very ' +
+        'consumers’ configs, with the contour identifier and the section mark appended — for ' +
+        'CLI files that is http://127.0.0.1:5179/company-stand/_s/terminal/v1. The dashes next ' +
+        'to the consumers stay to the very ' +
         'end: the contour is switched on only by “Done”, and until then the row honestly says ' +
         'there is nothing to apply yet. A forgotten button does not break the connection: ' +
         'activation raises a stopped gateway itself, and one that fails to start names the reason ' +

@@ -276,22 +276,22 @@ export function cascadeSystemPrompt(ceiling: CascadeCeiling): string {
   const models = assignableModelsUpTo(ceiling.model);
   if (models.length === 0) return '';
 
-  const top = ceiling.model || 'модель по умолчанию';
+  const top = ceiling.model || 'the default model';
   return (
-    'Модель для каждой группы подбирает панель, а не ты: у группы укажи поле kind — ' +
-    'mechanical (переименования, одна и та же правка во многих файлах, формат, переносы), ' +
-    'implementation (понятная правка или фича с готовыми критериями приёмки), ' +
-    'tests (тесты по готовой спецификации), ' +
-    'investigation (причина неизвестна: плавающий баг, производительность, разбор чужого кода), ' +
-    'design (архитектура, контракты, миграции, безопасность, необратимое), ' +
-    'review (проверка чужой работы). ' +
-    `Потолок этого разговора — ${top}, выше него не поднимается ничто. ` +
-    'Считаешь группу сложнее её класса — добавь ей model и effort повыше ' +
-    `(модели: ${models.join(', ')}; глубина: ${assignableEffortsUpTo(ceiling.effort).join(', ')}); ` +
-    'понизить ниже своего класса группа не может. ' +
-    'Сомневаешься в классе — не указывай kind вовсе: такая группа пойдёт на потолке. ' +
-    'Группе слабее потолка панель сама поднимет планку сдачи и после её работы заведёт ревью ' +
-    `на ${top} по тому же диффу — закладывать на это в задании ничего не надо.`
+    'The panel, not you, picks the model for each group: give every group the field kind — ' +
+    'mechanical (renames, one edit repeated across many files, formatting, moves), ' +
+    'implementation (a clear fix or feature with ready acceptance criteria), ' +
+    'tests (tests against a ready specification), ' +
+    'investigation (cause unknown: flaky bug, performance, reading unfamiliar code), ' +
+    'design (architecture, contracts, migrations, security, anything irreversible), ' +
+    'review (checking the work of someone else). ' +
+    `The ceiling of this conversation is ${top}; nothing goes above it. ` +
+    'If a group is harder than its class, add a higher model and effort to it ' +
+    `(models: ${models.join(', ')}; effort: ${assignableEffortsUpTo(ceiling.effort).join(', ')}); ` +
+    'a group cannot go below its class. ' +
+    'Unsure about the class — omit kind entirely: such a group runs at the ceiling. ' +
+    'For a group below the ceiling the panel itself raises the bar for done and, after its work, ' +
+    `starts a review on ${top} over the same diff — nothing about that belongs in the task.`
   );
 }
 
@@ -332,31 +332,33 @@ export function loweredWorkPrompt(
     reviewer?: 'ceiling' | 'cli';
   } = {},
 ): string {
-  const named = kind ? `«${kind}»` : 'простую работу';
+  const named = kind ? `"${kind}"` : 'simple work';
   const review = options.review ?? true;
   const foreign = options.reviewer === 'cli';
   return (
     (foreign
-      ? 'Эту работу ведёт модель НИЖЕ той, которой CLI работает по своей настройке: ' +
-        'панель подобрала её по роду задачи. '
-      : 'Эту работу ведёт модель НИЖЕ потолка разговора: панель подобрала её по роду задачи. ') +
-    'Прежде чем сказать «готово», прогони проверки проекта (типы, линт, тесты — что в нём есть) ' +
-    'и сверь сделанное с заданием по пунктам. ' +
-    `Если по ходу выяснится, что задача сложнее, чем ${named}, — нужны решения об архитектуре, ` +
-    'контрактах, миграциях или причина сбоя неизвестна, — не выкручивайся: опиши, во что упёрся, ' +
-    'и заверши ход, работу продолжат на более сильной модели. ' +
-    'Незаконченное называй незаконченным: остановка с честным списком того, что осталось, стоит ' +
-    'дешевле правдоподобного «готово», за которым правок больше, чем было работы.' +
+      ? 'This work runs on a model BELOW the one the CLI uses by its own setting: ' +
+        'the panel picked it by the kind of task. '
+      : 'This work runs on a model BELOW the ceiling of the conversation: the panel picked it by ' +
+        'the kind of task. ') +
+    'Before you say "done", run the project checks (types, lint, tests — whatever it has) ' +
+    'and compare what you did with the task point by point. ' +
+    `If it turns out the task is harder than ${named} — decisions about architecture, ` +
+    'contracts or migrations are needed, or the cause of a failure is unknown — do not improvise: ' +
+    'describe what you hit and end the turn; the work continues on a stronger model. ' +
+    'Call unfinished work unfinished: stopping with an honest list of what is left costs less ' +
+    'than a plausible "done" followed by more fixes than there was work.' +
     (review
       ? foreign
-        ? ' Когда ты закончишь, панель сама заведёт ревью твоего диффа — прогоном без ' +
-          'подобранной ступени, то есть настроенной моделью самого CLI; его замечания ' +
-          'вернутся отдельным заданием.'
-        : ' Когда ты закончишь, панель сама заведёт ревью твоего диффа на модели-потолке; ' +
-          'его замечания вернутся сюда же отдельным заданием.'
+        ? ' When you finish, the panel itself starts a review of your diff — a run without ' +
+          'a picked tier, i.e. on the model the CLI itself is configured with; its findings come ' +
+          'back as a ' +
+          'separate task.'
+        : ' When you finish, the panel itself starts a review of your diff on the ceiling model; ' +
+          'its findings come back here as a separate task.'
       : // Проверки не будет — значит проверять себя некому, кроме самого агента,
         // и сказать это надо прямо, а не умолчать про отсутствующее звено.
-        ' Ревью этой работы панель не заведёт: проверить сделанное некому, кроме тебя.')
+        ' The panel will not start a review of this work: nobody checks it but you.')
   );
 }
 
@@ -529,14 +531,35 @@ export interface StageContext {
   previous?: { stage: CascadeStage; text: string };
 }
 
+/**
+ * Промпты звеньев английские (модели инструкции даются по-английски), а человек
+ * читает ответ по-русски: язык ответа — язык задания, а не язык промпта.
+ */
+export const ANSWER_LANGUAGE_LINE =
+  'Write your answer in the language of the task text (the human reads it), not in the ' +
+  'language of these instructions.';
+
+/** Язык блока критического замечания — его разбор живёт в `chat-group-settings.ts`. */
+export const ESCALATE_BLOCK = blockLang('escalate');
+
+/**
+ * Критическое уходит в ГЛАВНЫЙ чат дерева, остальное остаётся в звене. Порог
+ * назван прямо, иначе блок стал бы вторым каналом для всего подряд.
+ */
+export const ESCALATE_LINE =
+  'Only if something is CRITICAL — data loss, a security hole, or a decision that blocks the ' +
+  'whole task and only the owner can take — also add a code block in the language ' +
+  `${ESCALATE_BLOCK} with JSON {"severity":"critical","text":"one paragraph"}: it goes to the ` +
+  'main chat. Everything else stays in this answer.';
+
 const STAGE_NAMES: Record<CascadeStage, string> = {
-  triage: 'разбор',
-  plan: 'план',
-  work: 'работа',
-  review: 'ревью',
-  fix: 'правки',
-  deliver: 'доставка',
-  push: 'пуш',
+  triage: 'triage',
+  plan: 'plan',
+  work: 'work',
+  review: 'review',
+  fix: 'fixes',
+  deliver: 'delivery',
+  push: 'push',
 };
 
 function excerpt(text: string, limit: number, fromEnd = false): string {
@@ -549,22 +572,24 @@ function excerpt(text: string, limit: number, fromEnd = false): string {
 export function stageContextBlock(context: StageContext | undefined): string {
   if (!context) return '';
   const lines: string[] = [];
-  if (context.branch) lines.push(`Ветка группы: ${context.branch}.`);
+  if (context.branch) lines.push(`Group branch: ${context.branch}.`);
   if (context.task?.trim()) {
-    lines.push('Задание группы:', excerpt(context.task, TASK_EXCERPT));
+    lines.push('Group task:', excerpt(context.task, TASK_EXCERPT));
   }
   if (context.plan?.trim()) {
-    lines.push('План группы (выжимка):', excerpt(context.plan, CONTEXT_EXCERPT));
+    lines.push('Group plan (summary):', excerpt(context.plan, CONTEXT_EXCERPT));
   }
   if (context.previous?.text.trim()) {
     // Хвост, а не начало: итог и вывод звено пишет в конце ответа.
     lines.push(
-      `Итог прошлого звена (${STAGE_NAMES[context.previous.stage]}):`,
+      `Outcome of the previous stage (${STAGE_NAMES[context.previous.stage]}):`,
       excerpt(context.previous.text, CONTEXT_EXCERPT, true),
     );
   }
   if (lines.length === 0) return '';
-  return ['Контекст группы от панели (прошлых звеньев ты не видел):', ...lines].join('\n');
+  return ['Group context from the panel (you have not seen the previous stages):', ...lines].join(
+    '\n',
+  );
 }
 
 /**
@@ -592,31 +617,37 @@ export function reviewStagePrompt(input: {
   branch?: string;
   /** План группы и итог работы — задание уже выше, повторять его незачем. */
   context?: Omit<StageContext, 'task' | 'branch'>;
+  /** Абзац сит перед MR (`sievePromptBlock` из `@agentdeck/contracts/sieves`). */
+  sieves?: string;
 }): string {
   const task = input.task.trim().slice(0, TASK_EXCERPT);
-  const by = input.model ? ` моделью ${input.model}` : ' моделью слабее тебя';
-  const where = input.branch ? ` в ветке ${input.branch}` : ' в этой рабочей копии';
+  const by = input.model ? ` by the model ${input.model}` : ' by a model weaker than you';
+  const where = input.branch ? ` on the branch ${input.branch}` : ' in this working copy';
 
   return [
-    `Это новая сессия: работа велась${by}${where}, её контекста у тебя нет — читай код и дифф.`,
+    `This is a new session: the work was done${by}${where}; you do not have its context — read ` +
+      'the code and the diff.',
     '',
-    'Проверь сделанное против задания. Посмотри незакоммиченные изменения и коммиты этой ветки ' +
-      '(git status, git diff, git log), прочитай затронутые файлы целиком, при необходимости ' +
-      'прогони проверки проекта (типы, линт, тесты).',
-    'НИЧЕГО НЕ ПРАВЬ: твоя работа — прочитать и назвать. Правки сделает следующее звено.',
+    'Check what was done against the task. Look at the uncommitted changes and the commits of ' +
+      'this branch (git status, git diff, git log), read the touched files in full, and run the ' +
+      'project checks (types, lint, tests) if needed.',
+    'EDIT NOTHING: your job is to read and name. The next stage makes the fixes.',
     '',
-    input.kind ? `Класс работы по мнению панели: ${input.kind}.` : '',
-    'Задание, с которого шла работа:',
+    input.kind ? `Class of work according to the panel: ${input.kind}.` : '',
+    'The task the work started from:',
     task,
     '',
-    'Замечанием считается только то, что надо ИСПРАВИТЬ: невыполненный пункт задания, ошибка, ' +
-      'сломанная проверка, опасное или необратимое действие. Вкусовые предпочтения, «можно было ' +
-      'бы красивее» и переписывание работающего кода замечаниями не являются.',
-    `Закончи ответ РОВНО ОДНИМ блоком кода с языком ${REVIEW_BLOCK_LANG}, внутри — JSON вида ` +
-      '{"findings":["что и где исправить, одной строкой", "…"]}. Замечаний нет — выведи ' +
-      '{"findings":[]}: пустой список это законный и лучший ответ. Каждое замечание пиши так, ' +
-      'чтобы его можно было исполнить, не видя этого разговора: путь к файлу, что не так, что ' +
-      'должно быть.',
+    'A finding is only something that must be FIXED: an unmet point of the task, a bug, ' +
+      'a broken check, a dangerous or irreversible action. Taste, "could be prettier" and ' +
+      'rewriting working code are not findings.',
+    `End the answer with EXACTLY ONE code block in the language ${REVIEW_BLOCK_LANG} containing ` +
+      'JSON like {"findings":["what to fix and where, one line", "…"]}. No findings — output ' +
+      '{"findings":[]}: an empty list is a legitimate and the best answer. Write every finding so ' +
+      'it can be carried out without seeing this conversation: file path, what is wrong, what it ' +
+      'should be.',
+    input.sieves ? `\n${input.sieves}` : '',
+    ANSWER_LANGUAGE_LINE,
+    ESCALATE_LINE,
     '',
     stageContextBlock(input.context),
   ]
@@ -656,29 +687,31 @@ export function fixStagePrompt(
 ): string {
   const { branch, reviewer = 'ceiling', deliver = false } = options;
   const context = stageContextBlock(options.context);
-  const where = branch ? ` в ветке ${branch}` : ' в этой рабочей копии';
-  const who = reviewer === 'cli' ? 'другая модель' : 'модель сильнее';
+  const where = branch ? ` on the branch ${branch}` : ' in this working copy';
+  const who = reviewer === 'cli' ? 'another model' : 'a stronger model';
 
   return [
-    `Это новая сессия: работу${where} проверила ${who} — вот её замечания.`,
+    `This is a new session: ${who} reviewed the work${where} — here are its findings.`,
     '',
     ...findings.map((finding, index) => `${index + 1}. ${finding}`),
     '',
-    'Исправь каждое. Порядок свой, но пройди список целиком и по каждому пункту скажи, что ' +
-      'сделал; с чем не согласен — не молчи, объясни, почему оставил как было.',
-    'Код сверх списка не переделывай: это правки по ревью, а не второй заход на задачу.',
+    'Fix each one. Any order, but go through the whole list and say for every point what you ' +
+      'did; if you disagree with one, do not stay silent — explain why you left it as it was.',
+    'Do not rework code beyond the list: these are review fixes, not a second pass at the task.',
     ...(deliver
       ? [
-          'Это ограничение — про код, не про доставку: коммит, пуш и MR им не запрещены. Доведёт ' +
-            'ветку до MR звено доставки, которое панель заведёт после твоего хода, — не спрашивай ' +
-            'на них разрешения и не останавливайся ради них.',
+          'That limit is about code, not delivery: commit, push and MR are not forbidden by it. ' +
+            'The delivery stage the panel starts after your turn takes the branch to an MR — do ' +
+            'not ask permission for them and do not stop for them.',
         ]
       : []),
     // Не воспроизвелось — не повод тянуть инфраструктуру (аудит 25.09, L258).
-    'Замечание, которое у тебя не воспроизвелось, — не повод менять инфраструктуру: без новых ' +
-      'зависимостей, правок CI, tsconfig и тестовой обвязки. Скажи, что не воспроизвелось и сколько ' +
-      'понадобится добавить, и спроси человека инструментом AskUserQuestion.',
-    'Перед тем как сказать «готово», прогони проверки проекта (типы, линт, тесты — что в нём есть).',
+    'A finding that does not reproduce for you is no reason to change infrastructure: no new ' +
+      'dependencies, CI, tsconfig or test harness edits. Say what did not reproduce and how much ' +
+      'would have to be added, and ask the human with the AskUserQuestion tool.',
+    'Before you say "done", run the project checks (types, lint, tests — whatever it has).',
+    ANSWER_LANGUAGE_LINE,
+    ESCALATE_LINE,
     ...(context ? ['', context] : []),
   ].join('\n');
 }
@@ -717,56 +750,68 @@ export function deliverStagePrompt(input: {
   foreign?: boolean;
   /** Задание, план и итог прошлого звена — доставка прошлых звеньев не видела. */
   context?: StageContext;
+  /**
+   * Абзац сит перед MR (`sievePromptBlock`). Строкой, а не импортом: сабпаты
+   * контрактов друг друга не импортируют.
+   */
+  sieves?: string;
 }): string {
-  const branch = input.branch ? `ветки ${input.branch}` : 'ветки этой копии';
+  const branch = input.branch ? `the branch ${input.branch}` : 'the branch of this copy';
   const context = stageContextBlock(input.context);
   const target = input.branch ?? 'HEAD';
   const ask = input.foreign
-    ? 'вопрос человеку последней строкой ответа'
-    : 'вопрос человеку инструментом AskUserQuestion';
+    ? 'a question to the human as the last line of the answer'
+    : 'a question to the human with the AskUserQuestion tool';
   const before =
     input.after === 'fix'
-      ? 'работу этой группы проверило ревью, и правки по его замечаниям сделаны'
+      ? 'the work of this group was reviewed and the fixes for its findings are done'
       : input.after === 'review'
-        ? 'работу этой группы проверило ревью и замечаний не нашло'
-        : 'работа этой группы закончена, отдельного ревью у неё нет';
+        ? 'the work of this group was reviewed and the review found nothing'
+        : 'the work of this group is finished; it has no separate review';
 
   return [
-    `Это новая сессия: ${before}. Твоё звено — доставка ${branch} до готового MR; ` +
+    `This is a new session: ${before}. Your stage is delivering ${branch} to a ready MR; ` +
       (context
-        ? 'что панель знает о прошлых звеньях — в конце задания; остальное читай в копии, git и ' +
-          'файлах-опорах в .agent/.'
-        : 'контекста прошлых звеньев у тебя нет — читай копию, git и файлы-опоры в .agent/.'),
+        ? 'what the panel knows about the previous stages is at the end of the task; read the ' +
+          'rest in the copy, git and the checkpoint files in .agent/.'
+        : 'you have no context of the previous stages — read the copy, git and the checkpoint ' +
+          'files in .agent/.'),
     '',
-    '1. `git status`: закоммить работу группы по соглашению проекта о сообщениях; временные ' +
-      'файлы, снимки и заметки .agent/ в коммит не клади.',
-    '2. Свежая основная ветка: `git fetch origin`, имя основной — `git symbolic-ref ' +
-      'refs/remotes/origin/HEAD`, затем `git rebase origin/<основная>` — и когда ветка ещё не ' +
-      'отправлена, и когда уже отправлена, но отстала от основной.',
-    '3. Конфликт при rebase ещё не отправленной ветки внутри задач группы реши сам. Ветка уже ' +
-      `была отправлена — конфликт этого rebase: ${ask} с рекомендуемым вариантом ` +
-      '(`git rebase --abort` вернёт ветку как была). Решение за человеком или за другую группу ' +
-      `(чужой код, продуктовый выбор) — тоже ${ask}, а не отчёт.`,
-    '4. Прогони проверки проекта; красное почини, не выходя за задачи группы.',
-    `5. Отправь ветку: впервые — обычным push (\`git push -u origin ${target}\`); уже ` +
-      `отправленную после rebase — \`git push --force-with-lease origin ${target}\`, и только ` +
-      'свою ветку группы, никогда основную, защищённую или ветку другой группы. Открой MR по ' +
-      'навыку доставки проекта (или обнови открытый): ключи задач — в описании, решения, ' +
-      'принятые без человека, — там же списком. Не пройденные ещё этапы навыка (живая ' +
-      'проверка после правок, снимки до/после, трекер) — тоже твои.',
+    '1. `git status`: commit the work of the group following the project convention for ' +
+      'messages; do not put temporary files, screenshots or .agent/ notes into the commit.',
+    '2. Fresh main branch: `git fetch origin`, the name of the main branch is `git symbolic-ref ' +
+      'refs/remotes/origin/HEAD`, then `git rebase origin/<main>` — both when the branch is not ' +
+      'pushed yet and when it is pushed but behind the main branch.',
+    '3. A rebase conflict of a not-yet-pushed branch within the tasks of the group — resolve it ' +
+      `yourself. The branch was already pushed — a conflict of that rebase: ${ask} with a ` +
+      'recommended option (`git rebase --abort` returns the branch as it was). A decision that ' +
+      `belongs to the human or to another group (foreign code, a product choice) — also ${ask}, ` +
+      'not a report.',
+    '4. Run the project checks; fix what is red without going beyond the tasks of the group.',
+    `5. Push the branch: the first time with a plain push (\`git push -u origin ${target}\`); ` +
+      `a pushed branch after the rebase — \`git push --force-with-lease origin ${target}\`, and ` +
+      "only your own group branch, never the main, a protected or another group's branch. Open " +
+      'the MR by the project delivery skill (or update the open one): task keys in the ' +
+      'description, decisions taken without the human listed there too. Stages of the skill not ' +
+      'passed yet (live check after the edits, before/after shots, tracker) are yours as well.',
     // Итог по MR без его обсуждений (аудит 25.09, L199): ревьюер оставил тред,
     // группа сказала «готово», а тред так и висел открытым.
-    '6. Перед «готово» перечитай ВСЕ обсуждения MR (треды и комментарии ревьюеров): ' +
-      'нерешённое — исправь в этой ветке; то, что не исправил, перечисли в ответе как ' +
-      '«не исправлено» с причиной — молча оставленный тред итогом не считается.',
+    '6. Before "done" re-read ALL discussions of the MR (threads and reviewer comments): ' +
+      'fix what is unresolved in this branch; list what you did not fix in the answer as ' +
+      '"not fixed" with the reason — a thread left silently is not an outcome.',
     // Автономия группы держится на границе задания (аудит 25.09, L163): без
     // сверки в MR уезжали правки «заодно», которых задание не просило.
-    '7. Сверь дифф ветки с основной (`git diff --stat origin/<основная>...HEAD`) с заданием ' +
-      'группы: каждое изменение должно следовать из её задач. Лишнее — откати; шаг, который ' +
-      `выходит за задачи группы (чужой модуль, миграция, инфраструктура), не делай — ${ask}.`,
+    '7. Compare the diff of the branch against main (`git diff --stat origin/<main>...HEAD`) ' +
+      'with the task of the group: every change must follow from its tasks. Revert the extra; a ' +
+      'step beyond the tasks of the group (a foreign module, a migration, infrastructure) — do ' +
+      `not do it, ${ask}.`,
+    ...(input.sieves ? ['', input.sieves] : []),
     '',
-    'Код сверх нужного для доставки не меняй. Слияние MR и удаление веток запрещены; force-push ' +
-      'без аренды (`--force`) запрещён всегда. Последней строкой ответа — ссылка на MR.',
+    'Do not change code beyond what delivery needs. Merging the MR and deleting branches are ' +
+      'forbidden; force-push without a lease (`--force`) is always forbidden. The last line of ' +
+      'the answer is the link to the MR.',
+    ANSWER_LANGUAGE_LINE,
+    ESCALATE_LINE,
     ...(context ? ['', context] : []),
   ].join('\n');
 }
@@ -822,32 +867,33 @@ export function reviewLinkPrompt(input: {
     // Пустые строки здесь не разделители, а мусор: `filter(Boolean)` их
     // выбрасывает — как и в соседних заданиях звеньев.
     shared ?? '',
-    `Это новая сессия: отревьюй запрос на слияние ${url}.`,
+    `This is a new session: review the merge request ${url}.`,
     branch && onMrBranch && detached
-      ? `Рабочая копия стоит в detached HEAD на ${remote ?? 'origin'}/${branch} — голове этого MR ` +
-        '(сама ветка открыта другой копией); дифф читается прямо здесь.'
+      ? `The working copy is in detached HEAD at ${remote ?? 'origin'}/${branch} — the head of ` +
+        'this MR (the branch itself is checked out by another copy); read the diff right here.'
       : branch && onMrBranch
-        ? `Рабочая копия уже стоит на его ветке ${branch} — дифф читается прямо здесь.`
-        : '⚠ Копию на ветке этого MR завести не удалось: она отведена от базовой ветки. ' +
-          'Возьми дифф из самого MR по ссылке, а не из этой копии.',
-    'Используй скилл deep-review по этой ссылке: он и есть способ прочитать MR целиком. ' +
-      'Нет скилла — читай дифф MR и затронутые файлы сам, тем же порядком.',
-    'НИЧЕГО НЕ ПРАВЬ и ничего не пиши в MR: решение, чинить или отписать, принимает человек ' +
-      'по карточке панели.',
+        ? `The working copy is already on its branch ${branch} — read the diff right here.`
+        : '⚠ A copy on the branch of this MR could not be made: it is branched from the base. ' +
+          'Take the diff from the MR itself by the link, not from this copy.',
+    'Use the deep-review skill on this link: it is the way to read the MR in full. ' +
+      'No such skill — read the MR diff and the touched files yourself, in the same order.',
+    'EDIT NOTHING and write nothing into the MR: whether to fix or reply is decided by the human ' +
+      'on the panel card.',
     // Задачи группы пишет агент родителя, и в них попадает «закоммить и
     // запушь» (инцидент 23.09). Без этой оговорки задание спорило само с собой.
     tasks.length > 0
-      ? 'На что просили посмотреть особо (это пункты ПРОВЕРКИ: слова «исправь», «закоммить», ' +
-        '«запушь» в них читай как «проверь, нужно ли это», а делать ничего не надо):'
+      ? 'What you were asked to look at especially (these are points to CHECK: read "fix", ' +
+        '"commit", "push" in them as "check whether this is needed", and do nothing):'
       : '',
     ...tasks.map((task, index) => `${index + 1}. ${task}`),
-    'Замечанием считается только то, что надо ИСПРАВИТЬ: ошибка, невыполненное требование, ' +
-      'сломанная проверка, опасное или необратимое действие. Вкусовщина и «можно было бы ' +
-      'красивее» замечаниями не являются.',
-    `Закончи ответ РОВНО ОДНИМ блоком кода с языком ${REVIEW_BLOCK_LANG}, внутри — JSON вида ` +
-      '{"findings":["файл:строка — что не так и что должно быть", "…"]}. Замечаний нет — выведи ' +
-      '{"findings":[]}: пустой список это законный и лучший ответ. Каждое замечание пиши так, ' +
-      'чтобы его понял и тот, кто этого разговора не видел: панель отправит их в MR как есть.',
+    'A finding is only something that must be FIXED: a bug, an unmet requirement, a broken ' +
+      'check, a dangerous or irreversible action. Taste and "could be prettier" are not findings.',
+    `End the answer with EXACTLY ONE code block in the language ${REVIEW_BLOCK_LANG} containing ` +
+      'JSON like {"findings":["file:line — what is wrong and what it should be", "…"]}. No ' +
+      'findings — output {"findings":[]}: an empty list is a legitimate and the best answer. Write ' +
+      'every finding so that someone who has not seen this conversation understands it: the panel ' +
+      'posts them into the MR as they are.',
+    ANSWER_LANGUAGE_LINE,
   ]
     .filter(Boolean)
     .join('\n');
@@ -868,18 +914,18 @@ export function mergeRequestWorkPreamble(input: {
 }): string {
   const { url, branch, onMrBranch = true, detached, remote } = input;
   return [
-    `Эта сессия работает в запросе на слияние ${url}.`,
+    `This session works in the merge request ${url}.`,
     branch && onMrBranch && detached
-      ? `Рабочая копия стоит в detached HEAD на ${remote ?? 'origin'}/${branch} — голове этого MR ` +
-        `(сама ветка ${branch} открыта другой копией). Правки делай здесь и коммить; отправлять — ` +
-        `только \`${mergeRequestPushTarget({ branch, ...(remote ? { remote } : {}), detached })}\`, ` +
-        'новых веток не заводи.'
+      ? `The working copy is in detached HEAD at ${remote ?? 'origin'}/${branch} — the head of ` +
+        `this MR (the branch ${branch} itself is checked out by another copy). Edit and commit ` +
+        `here; push only with \`${mergeRequestPushTarget({ branch, ...(remote ? { remote } : {}), detached })}\`, ` +
+        'do not create new branches.'
       : branch && onMrBranch
-        ? `Рабочая копия уже стоит на его ветке ${branch}: правки делай здесь и коммить в неё.`
-        : '⚠ Копию на ветке этого MR завести не удалось: она отведена от базовой ветки. ' +
-          'Сначала переключись на ветку MR (узнай её по ссылке) и только потом правь.',
-    'Push, комментарии и правка описания в MR — только после явного согласия человека: ' +
-      'спроси вопросом с вариантами, когда дойдёшь до этого шага.',
+        ? `The working copy is already on its branch ${branch}: edit here and commit into it.`
+        : '⚠ A copy on the branch of this MR could not be made: it is branched from the base. ' +
+          'First switch to the MR branch (find it by the link) and only then edit.',
+    'Push, comments and editing the MR description — only after the explicit consent of the ' +
+      'human: ask with a question with options when you reach that step.',
   ]
     .filter(Boolean)
     .join('\n');
@@ -907,12 +953,15 @@ export function reviewPushPrompt(input: {
   const command = mergeRequestPushTarget(input);
 
   return [
-    `Человек нажал «Закоммитить и отправить в MR» — это явное согласие на коммит и push в ветку ${input.branch}.`,
-    `Закоммить сделанные по ревью правки одним осмысленным коммитом и отправь их командой \`${command}\` ` +
-      `— это ветка ${input.url}. В другую ветку не отправляй и новых веток не заводи.`,
-    'Ничего не сливай и не закрывай MR: слияние остаётся человеку.',
-    'Перед коммитом прогони проверки проекта (типы, линт, тесты — что в нём есть) и скажи, что ' +
-      'ушло в MR.',
+    `The human pressed "Commit and push to MR" — this is explicit consent to commit and push ` +
+      `to the branch ${input.branch}.`,
+    `Commit the review fixes as one meaningful commit and push them with \`${command}\` ` +
+      `— that is the branch of ${input.url}. Do not push to another branch and do not create ` +
+      'new branches.',
+    'Merge nothing and do not close the MR: merging stays with the human.',
+    'Before committing, run the project checks (types, lint, tests — whatever it has) and say ' +
+      'what went into the MR.',
+    ANSWER_LANGUAGE_LINE,
   ].join('\n');
 }
 
@@ -924,13 +973,14 @@ export function reviewPushPrompt(input: {
  */
 export function reviewRetryPrompt(): string {
   return [
-    `Твой прошлый ответ кончился без блока итога ${REVIEW_BLOCK_LANG} — панель не знает, ` +
-      'есть ли замечания, и человек видит «итога нет».',
-    'Ревью заново не начинай: по уже прочитанному выведи итог РОВНО ОДНИМ блоком кода с ' +
-      `языком ${REVIEW_BLOCK_LANG}, внутри — JSON вида {"findings":["файл:строка — что не так ` +
-      'и что должно быть", "…"]}. Замечаний нет — {"findings":[]}. Не дочитал — дочитай, ' +
-      'но закончи ответ этим блоком.',
-    'НИЧЕГО НЕ ПРАВЬ и ничего не пиши в MR.',
+    `Your previous answer ended without the outcome block ${REVIEW_BLOCK_LANG} — the panel ` +
+      'does not know whether there are findings, and the human sees "no outcome".',
+    'Do not start the review again: from what you have already read, output the outcome as ' +
+      `EXACTLY ONE code block in the language ${REVIEW_BLOCK_LANG} containing JSON like ` +
+      '{"findings":["file:line — what is wrong and what it should be", "…"]}. No findings — ' +
+      '{"findings":[]}. Not finished reading — finish, but end the answer with this block.',
+    'EDIT NOTHING and write nothing into the MR.',
+    ANSWER_LANGUAGE_LINE,
   ].join('\n');
 }
 

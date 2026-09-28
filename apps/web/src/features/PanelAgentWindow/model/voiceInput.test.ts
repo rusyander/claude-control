@@ -19,11 +19,14 @@ describe('микрофон окна агента', () => {
     expect(isDictating('idle')).toBe(false);
   });
 
-  it('отказ разрешения, сеть и прочее различаются', () => {
+  it('[C1] отказ разрешения, сеть, нет микрофона и прочее различаются', () => {
     expect(voiceView({ ...base, state: 'error', error: 'no-permission' })).toBe('denied');
     expect(voiceView({ ...base, state: 'error', error: 'network' })).toBe('network');
     expect(voiceView({ ...base, state: 'error', error: 'unsupported' })).toBe('unsupported');
     expect(voiceView({ ...base, state: 'error', error: 'aborted' })).toBe('error');
+    // Нет микрофона — своя строка: «нажмите ещё раз» тут не поможет.
+    expect(voiceView({ ...base, state: 'error', error: 'no-microphone' })).toBe('microphone');
+    expect(isVoiceProblem('microphone')).toBe(true);
     expect(isVoiceProblem('denied')).toBe(true);
     expect(isVoiceProblem('listening')).toBe(false);
     expect(isVoiceProblem('idle')).toBe(false);

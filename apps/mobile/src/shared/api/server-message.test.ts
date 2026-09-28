@@ -60,4 +60,14 @@ describe('тексты сервера по коду на телефоне', () =
     ).toBe('Skill «x» already exists');
     expect(serverField({ output: '[main 1a2b] fix' }, 'output')).toBe('[main 1a2b] fix');
   });
+
+  it('запись прогона, остановленная перезапуском, — на языке телефона (F-360)', () => {
+    language = 'en';
+    const record = {
+      id: 'run-1',
+      error: 'Панель перезапустилась во время прогона.',
+      messageCode: 'orphan-run-stopped',
+    };
+    expect(serverField(record, 'error')).toMatch(/^The panel restarted while the run was going/);
+  });
 });

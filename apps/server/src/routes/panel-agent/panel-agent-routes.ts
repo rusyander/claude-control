@@ -21,6 +21,14 @@ import { PANEL_ACTIONS } from './actions.ts';
 import { describeAction, type AnyPanelAction, type InjectRoute } from './registry.ts';
 import { panelTextRu } from './texts.ts';
 import { registerPanelHelpRoutes } from './help-routes.ts';
+import { withoutRoutes } from './action-kit.ts';
+import {
+  capabilityRefusal,
+  ROUTE_LEDGER,
+  type CapabilityPhase,
+  type RouteLedger,
+} from './capability-ledger.ts';
+import { netMessage, netPreview, netResult } from './result-net.ts';
 
 export interface PanelAgentRouteDeps {
   hub: EventHub;
@@ -32,8 +40,12 @@ export interface PanelAgentRouteDeps {
   };
   /** Подмена набора — для тестов реестра; по умолчанию стартовый набор. */
   actions?: readonly AnyPanelAction[];
+  /** Подмена реестра возможностей — для тестов своих действий; по умолчанию `ROUTE_LEDGER`. */
+  ledger?: RouteLedger;
   /** Каталог исходников веба со справкой; по умолчанию соседний apps/web/src. */
   helpWebSrc?: string;
+  /** Срок ожидания кадра сессии у потоковых действий — для тестов; по умолчанию 20 с. */
+  streamHeadTimeoutMs?: number;
 }
 
 const callSchema = z.object({
@@ -59,7 +71,17 @@ export function registerPanelAgentRoutes(
 ): void {
   const actions = deps.actions ?? PANEL_ACTIONS;
   const byName = new Map(actions.map((action) => [action.name, action]));
-  const inject: InjectRoute = createRouteInjector(app, deps.access);
+  const inject: InjectRoute = createRouteInjector(app, deps.access, deps.streamHeadTimeoutMs);
+  const ledger = deps.ledger ?? ROUTE_LEDGER;
+  // Каждый внутренний вызов действия — через реестр возможностей (G4): чего в
+  // нём нет, что человеческое или отдано не этому действию и не этому шагу, не
+  // исполняется вовсе — маршрут не зовётся.
+  const injectFor =
+    (action: AnyPanelAction, phase: CapabilityPhase): InjectRoute =>
+    (request) => {
+      const refused = capabilityRefusal(ledger, action.name, phase, request);
+      return refused === undefined ? inject(request) : Promise.reject(new Error(refused));
+    };
   // Каталог данных читается на каждую запись: он меняется на лету (`ctx.relocate`).
   const journal = (entry: PanelActionJournalEntry): void => {
     appendAgentJournal(ctx.location.paths.appData, entry);
@@ -125,10 +147,13 @@ export function registerPanelAgentRoutes(
         // Отпечаток — ДО предпросмотра: правка между ними даст ложное «устарело»
         // (безопасно), а отпечаток после показа мог бы молча принять правку,
         // которой в карточке нет.
-        fingerprint = action.fingerprint ? await action.fingerprint(input, inject) : undefined;
-        preview = action.preview
-          ? await action.preview(input, inject)
-          : { summary: action.name, fields: [] };
+        const cardInject = injectFor(action, 'card');
+        fingerprint = action.fingerprint ? await action.fingerprint(input, cardInject) : undefined;
+        preview = netPreview(
+          action.preview
+            ? await action.preview(input, cardInject)
+            : { summary: action.name, fields: [] },
+        );
       } catch (error) {
         return { outcome: 'failed', message: messageOf(error) };
       }
@@ -274,7 +299,7 @@ export function registerPanelAgentRoutes(
     let now: string | undefined;
     let reason = 'the target changed';
     try {
-      now = await action.fingerprint(input, inject);
+      now = await action.fingerprint(input, injectFor(action, 'card'));
     } catch (error) {
       reason = `the target can no longer be read (${messageOf(error)})`;
     }
@@ -309,19 +334,27 @@ export function registerPanelAgentRoutes(
               : undefined,
         });
       } else if (action.route) {
-        const answer = await inject(await action.route(input, inject));
+        const request = await action.route(input, injectFor(action, 'prep'));
+        const answer = await injectFor(action, 'execute')(request);
         status = answer.status;
         const refused = answer.status < 400 ? action.refusal?.(answer.body) : undefined;
         outcome = answer.status < 400 && refused === undefined ? 'done' : 'failed';
         let body = refused === undefined ? answer.body : { message: refused };
         if (outcome === 'done' && action.afterRoute) {
           try {
-            body = await action.afterRoute(input, body, inject);
+            body = await action.afterRoute(input, body, injectFor(action, 'after'));
           } catch (error) {
             return { outcome: 'failed', status, message: messageOf(error) };
           }
         }
-        payload = outcome === 'done' && action.shape ? action.shape(input, body) : body;
+        if (outcome === 'done' && action.shape) {
+          try {
+            payload = action.shape(input, body);
+          } catch (error) {
+            // Ответ маршрута не той формы — модели словами, не ошибкой JS (ревью U0, m6).
+            return { outcome: 'failed', status, message: shapeMessage(action, error) };
+          }
+        } else payload = body;
       } else {
         return { outcome: 'failed', message: 'Action has no executor.' };
       }
@@ -350,7 +383,9 @@ export function registerPanelAgentRoutes(
     }
     return {
       outcome: secretPage ? 'needs-secret' : outcome,
-      result: payload,
+      // Сетка (D8): последний шаг перед моделью у каждого действия, с маской по
+      // месту или без неё (`result-net.ts`).
+      result: netResult(action.name, payload),
       ...(status === undefined ? {} : { status }),
       ...(page ? { page } : {}),
       ...(secretPage
@@ -399,16 +434,46 @@ function decidedByOf(settlement: string): PanelActionJournalEntry['decidedBy'] {
   return 'human';
 }
 
+/**
+ * Текст отказа уходит модели — без адресов маршрутов (`withoutRoutes`) и без
+ * секретов (`netMessage`): маршрут вправе процитировать в отказе то, что ему прислали.
+ */
 function routeMessage(body: unknown, status: number | undefined): string {
   if (body && typeof body === 'object') {
     const record = body as { message?: unknown; error?: unknown };
-    if (typeof record.message === 'string') return record.message;
-    if (typeof record.error === 'string') return record.error;
+    if (typeof record.message === 'string') return modelText(record.message);
+    if (typeof record.error === 'string') return modelText(record.error);
   }
-  if (typeof body === 'string' && body.trim()) return body.slice(0, 500);
+  if (typeof body === 'string' && body.trim()) return modelText(body.slice(0, 500));
   return `HTTP ${status ?? '?'}`;
 }
 
 function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  if (isEngineError(error)) {
+    return 'The panel could not finish this step because of an internal error. Tell the human; do not retry blindly.';
+  }
+  return modelText(error instanceof Error ? error.message : String(error));
 }
+
+/**
+ * Ошибка движка JS (`TypeError`: «Cannot read properties of undefined») — след кода
+ * панели, а не текст для модели: она не знает, что с ним делать, и видит внутренности
+ * (ревью U0, m6). Своё `new Error('…')` действия — слова для модели, оно проходит.
+ */
+const isEngineError = (error: unknown): boolean =>
+  error instanceof TypeError ||
+  error instanceof RangeError ||
+  error instanceof ReferenceError ||
+  error instanceof SyntaxError;
+
+/** Проекция ответа (`shape`) упала: маршрут отработал, а ответ не той формы. */
+function shapeMessage(action: AnyPanelAction, error: unknown): string {
+  if (error instanceof Error && !isEngineError(error)) return messageOf(error);
+  return action.risk === 'read'
+    ? `The panel answered ${action.name}, but in an unexpected form, so nothing from the answer can be ` +
+        'shown. Check the id or name you passed (take it from the list the panel gave).'
+    : `${action.name} ran and the panel answered, but in an unexpected form, so its result cannot be ` +
+        'shown. Do not repeat it: read the current state first.';
+}
+
+const modelText = (text: string): string => withoutRoutes(netMessage(text));

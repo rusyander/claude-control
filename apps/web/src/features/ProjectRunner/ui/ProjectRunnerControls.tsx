@@ -6,6 +6,7 @@ import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { toast } from '@shared/lib/toast';
 import { toErrorMessage } from '@shared/api/client';
+import { useAnchoredPanel } from '@shared/hooks/use-anchored-panel';
 import { useProjectRuns, useProjectRunnerInfo, useStartRunner } from '@entities/ProjectRunner';
 import { sourceHint } from '../lib/runnerHints';
 import { BusyPortNotice } from './BusyPortNotice';
@@ -26,10 +27,17 @@ import styles from './ProjectRunnerControls.module.scss';
  * вывода — поэтому ссылка появляется не мгновенно, а следующим опросом статуса.
  * Сервер, который адреса не печатает, остаётся работать без ссылки, и порт ему
  * можно закрепить руками в поповере настроек.
+ *
+ * Группа всегда начинается подписанной кнопкой «Dev-сервер» со своим значком:
+ * она и называет группу, и открывает настройки. Раньше это была голая
+ * шестерёнка вплотную к шестерёнке «Настроек чата» — две одинаковые кнопки
+ * рядом, и какая из них чья, было не понять (владелец, 28.09).
  */
 export function ProjectRunnerControls({ path }: ProjectRunnerControlsProps) {
   const { t } = useTranslation();
   const [isOpen, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const { panelRef, panelStyle } = useAnchoredPanel<HTMLDivElement>(isOpen);
 
   const info = useProjectRunnerInfo(path);
   const runs = useProjectRuns(path);
@@ -76,9 +84,41 @@ export function ProjectRunnerControls({ path }: ProjectRunnerControlsProps) {
     );
   };
 
+  const close = (): void => {
+    setOpen(false);
+    triggerRef.current?.focus();
+  };
+
+  const [firstIdle] = idle;
+  const startHint =
+    idle.length === 1 && firstIdle?.command
+      ? t('runner.startHint', { command: firstIdle.command })
+      : t('runner.chooseTarget');
+
   return (
-    <div className={styles.wrap}>
+    <div
+      className={styles.wrap}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape' && isOpen) {
+          event.stopPropagation();
+          close();
+        }
+      }}
+    >
       <div className={styles.row}>
+        <Button
+          ref={triggerRef}
+          variant="ghost"
+          size="sm"
+          leftIcon={<Icon name="server" size={20} />}
+          aria-expanded={isOpen}
+          aria-haspopup="dialog"
+          title={t('runner.devServerHint')}
+          onClick={() => setOpen((value) => !value)}
+        >
+          {t('runner.devServer')}
+        </Button>
+
         {live.map((run) => (
           <RunnerChip key={run.path} path={path} run={run} withName={targets.length > 1} />
         ))}
@@ -94,33 +134,28 @@ export function ProjectRunnerControls({ path }: ProjectRunnerControlsProps) {
 
         {idle.length > 0 && (
           <Button
-            variant="secondary"
+            variant="ghost"
             size="sm"
-            leftIcon={<Icon name="send" size={18} />}
+            iconOnly
+            icon={<Icon name="play" size={20} />}
+            aria-label={t('runner.startDevServer')}
             isLoading={start.isPending}
             onClick={onStart}
-            title={idle.length === 1 ? idle[0]?.command : t('runner.chooseTarget')}
-          >
-            {t('runner.start')}
-          </Button>
+            title={startHint}
+          />
         )}
-
-        <Button
-          variant="ghost"
-          size="sm"
-          iconOnly
-          icon={<Icon name="settings" size={18} />}
-          aria-label={t('runner.settings')}
-          aria-expanded={isOpen}
-          title={t('runner.settings')}
-          onClick={() => setOpen((value) => !value)}
-        />
       </div>
 
       {isOpen && (
         <>
           <div className={styles.backdrop} onClick={() => setOpen(false)} aria-hidden="true" />
-          <div className={styles.panel} role="dialog" aria-label={t('runner.settings')}>
+          <div
+            ref={panelRef}
+            className={styles.panel}
+            style={panelStyle}
+            role="dialog"
+            aria-label={t('runner.settings')}
+          >
             <Stack gap="var(--spacing-sm)" padding="var(--spacing-sm)">
               <Stack gap="var(--spacing-3xs)">
                 <Typography variant="body-sm" weight="medium">

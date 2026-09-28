@@ -87,7 +87,7 @@ export function ProjectMcpForm({ isOpen, onOpenChange, projectId, server }: Proj
           label={t('mcp.serverName')}
           value={name}
           onChange={setName}
-          placeholder="например: playwright"
+          placeholder={t('mcp.serverNamePlaceholder', { example: 'playwright' })}
           hint={t('mcp.serverNameHint')}
           isMono
           autoFocus={!server}

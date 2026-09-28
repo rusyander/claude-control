@@ -9,10 +9,12 @@ import { Typography } from '@shared/ui/typography';
 import { TextField } from '@shared/ui/text-field';
 import { SelectField } from '@shared/ui/select-field';
 import { toErrorMessage } from '@shared/api/client';
+import { retryPassAttempts } from '@agentdeck/contracts/test-format';
 import { useCaseDraft } from '../model/useCaseDraft';
 import { TestCaseSteps } from './TestCaseSteps';
 import { TestCaseParams } from './TestCaseParams';
 import { TestCaseLinks } from './TestCaseLinks';
+import { TestCaseResults } from './TestCaseResults';
 import type { TestCaseEditorProps } from './TestCaseEditor.types';
 import styles from './ProjectTests.module.scss';
 
@@ -32,6 +34,9 @@ export function TestCaseEditor({
   isOpen,
   onOpenChange,
   testCase,
+  projectPath,
+  runStamp,
+  groupId,
   sharedSteps,
   schema,
   sections,
@@ -102,6 +107,24 @@ export function TestCaseEditor({
             multiline
             rows={2}
             readOnly
+          />
+        )}
+        {testCase && retryPassAttempts(testCase) !== undefined && (
+          <Stack direction="row">
+            <Badge tone="warning">
+              {t('tests.evidence.retryPass', { attempts: retryPassAttempts(testCase) })}
+            </Badge>
+          </Stack>
+        )}
+
+        {/* История по прогонам — сразу под последним результатом: «красный
+            впервые или через раз» решает, чинить продукт или тест. */}
+        {testCase && groupId && (
+          <TestCaseResults
+            projectPath={projectPath}
+            groupId={groupId}
+            caseId={testCase.id}
+            {...(runStamp ? { runStamp } : {})}
           />
         )}
 
@@ -212,6 +235,18 @@ export function TestCaseEditor({
           hint={t('tests.editor.tagsHint')}
           value={draft.tags}
           onChange={(value) => patch({ tags: value })}
+        />
+
+        {/* Файлы кода: «Здоровье» требует их у каждого кейса, а заполнить их,
+            кроме как руками в JSON, было негде. */}
+        <TextField
+          label={t('tests.editor.codePaths')}
+          hint={t('tests.editor.codePathsHint')}
+          value={draft.codePaths}
+          onChange={(value) => patch({ codePaths: value })}
+          multiline
+          rows={2}
+          isMono
         />
 
         <TestCaseLinks links={draft.links} onChange={(links) => patch({ links })} />

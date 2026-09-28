@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
+  closedVerdict,
   readDecision,
   scriptCommand,
   runHookProbe,
@@ -151,6 +152,39 @@ describe('EVENT_FIXTURES', () => {
  * Прогон настоящего процесса хука. Здесь важна не столько логика, сколько
  * живучесть: стенд запускает чужие программы, и их поведение непредсказуемо.
  */
+/**
+ * Ревью 28.09 (F-177): процесс, убитый сигналом, закрывается с `code === null`,
+ * и `code ?? 0` выдавал его за чистое «пропустил». Сам сигнал — внешняя граница
+ * (на Windows его не бывает), поэтому проверяем разбор закрытия.
+ */
+describe('HookProbe.closedVerdict', () => {
+  it('убит сигналом без таймаута — error с названным сигналом, а не «пропустил»', () => {
+    expect(closedVerdict(null, 'SIGKILL', false, undefined)).toEqual({
+      exitCode: -1,
+      signal: 'SIGKILL',
+      decision: 'error',
+      reason: 'Хук убит сигналом SIGKILL',
+      reasonCode: 'sandbox-hook-signal',
+      reasonParams: { signal: 'SIGKILL' },
+    });
+  });
+
+  it('своё убийство по таймауту остаётся прежним — его показывает timedOut', () => {
+    expect(closedVerdict(null, 'SIGTERM', true, undefined)).toMatchObject({
+      exitCode: 0,
+      decision: 'pass',
+    });
+  });
+
+  it('обычный код выхода разбирается как раньше', () => {
+    expect(closedVerdict(2, null, false, undefined)).toMatchObject({
+      exitCode: 2,
+      decision: 'block',
+      reasonCode: 'sandbox-hook-exit-2',
+    });
+  });
+});
+
 describe('HookProbe.runHookProbe', () => {
   let dir: string;
 
@@ -227,6 +261,23 @@ describe('HookProbe.runHookProbe', () => {
     );
     expect(result.exitCode).toBe(2);
     expect(result.decision).toBe('block');
+    // Ревью 28.09: код текста терялся по дороге — английский интерфейс
+    // показывал русскую причину, написанную панелью.
+    expect(result.reasonCode).toBe('sandbox-hook-exit-2');
+  });
+
+  it('хук без решения с ненулевым кодом несёт код текста и параметр', async () => {
+    const script = join(dir, 'exit3.mjs');
+    writeFileSync(script, 'process.exit(3);\n');
+
+    const result = await runHookProbe(
+      `node "${script}"`,
+      bigFixture({ hook_event_name: 'PreToolUse' }),
+      dir,
+    );
+    expect(result.decision).toBe('error');
+    expect(result.reasonCode).toBe('sandbox-hook-no-decision');
+    expect(result.reasonParams).toEqual({ code: 3 });
   });
 
   it('хук возвращает permissionDecision в JSON — разбирается из stdout', async () => {

@@ -10,6 +10,11 @@ export interface TestCaseEditorProps {
   onOpenChange: (isOpen: boolean) => void;
   /** Не задан — форма заводит новый кейс. */
   testCase?: ProjectTestCase;
+  /** Проект и группа кейса — по ним карточка показывает историю результатов. */
+  projectPath?: string;
+  groupId?: string;
+  /** Подпись последнего прогона агента: сменилась — история кейса перечитана. */
+  runStamp?: string;
   sharedSteps: ProjectTestSharedStep[];
   /** Свои поля проекта: из них строятся дополнительные поля формы. */
   schema: ProjectTestSchema;

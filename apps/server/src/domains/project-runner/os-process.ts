@@ -1,4 +1,5 @@
 import { spawn, spawnSync } from 'node:child_process';
+import { killChildTree, killPidTree, type KillableChild } from '../../lib/process-tree.ts';
 import { isWindows } from './project-runner.constants.ts';
 
 /**
@@ -13,21 +14,18 @@ export function runLines(file: string, args: string[]): string[] {
   return result.stdout.split(/\r?\n/).filter((line) => line.trim().length > 0);
 }
 
-/** Убить дерево процессов: Windows — taskkill /T /F, POSIX — по группе. */
+/**
+ * Убить дерево процессов по номеру: Windows — обход по времени создания
+ * (`lib/process-tree.ts`, без `taskkill /T`, который снимал чужих сирот),
+ * POSIX — по группе: серверы проекта запускаются `detached`.
+ */
 export function killTree(pid: number): void {
-  if (isWindows) {
-    spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], { windowsHide: true });
-    return;
-  }
-  try {
-    process.kill(-pid, 'SIGTERM');
-  } catch {
-    try {
-      process.kill(pid, 'SIGKILL');
-    } catch {
-      // Процесса уже нет — нечего убивать.
-    }
-  }
+  killPidTree(pid, { group: !isWindows });
+}
+
+/** Убить дерево запущенного нами сервера; вышедший по номеру не трогаем — номер мог стать чужим. */
+export function killChildProcessTree(child: KillableChild): void {
+  killChildTree(child, { group: !isWindows });
 }
 
 /** Открыть URL в браузере ОС. Инъектируется в реестр — тест подставит заглушку. */

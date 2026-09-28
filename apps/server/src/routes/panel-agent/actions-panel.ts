@@ -18,8 +18,12 @@ import {
   type AnyPanelAction,
   type InjectRoute,
 } from './registry.ts';
-import { card, encode, readRoute, stateCard } from './action-kit.ts';
+import { card, encode, listPage, OFFSET_DESCRIPTION, readRoute, stateCard } from './action-kit.ts';
+import { maskSecretsInText } from '../../lib/secret-mask.ts';
+import { safePluginId } from '../../lib/cli-args.ts';
+import { isMarketplaceSource } from '../../domains/plugins/actions.ts';
 import { dataField } from './texts.ts';
+import { assertRegistered } from './registered-folder.ts';
 
 /**
  * Действия волны A по разделам без собственной записи в конфиг агента:
@@ -27,6 +31,8 @@ import { dataField } from './texts.ts';
  * Плагины исполняет CLI за маршрутом: он отвечает 200 и `ok: false` на отказ,
  * и `refusal` превращает такой ответ в честный `failed`.
  */
+
+const offset = z.number().int().min(0).default(0).describe(OFFSET_DESCRIPTION);
 
 const language = z
   .enum(['ru', 'en'])
@@ -41,7 +47,9 @@ const searchHelp = definePanelAction({
   risk: 'read',
   description:
     'Search the in-panel help (the same documents the human reads). Returns topics with matching ' +
-    'lines (key + text). Use it to answer «how do I…» questions, then read_help_topic for detail.',
+    'lines (key + text). Use it to answer «how do I…» questions, then read_help_topic for detail. ' +
+    'Nothing in the panel language → it searches the other one and says so (searchedFirst); ' +
+    'topic ids are shared, so read the topic in the human’s language.',
   input: z.object({
     query: z.string().trim().min(1).max(300),
     language,
@@ -116,21 +124,26 @@ const searchPanel = definePanelAction({
   risk: 'read',
   description:
     'Search the configuration (rules, skills, hooks, MCP, env keys — never secret values, …). ' +
-    'projectPath adds that project’s test cases.',
+    'projectPath adds that project’s test cases. Paged: follow nextOffset.',
   input: z.object({
     query: z.string().trim().min(2).max(200),
     projectPath: z.string().trim().min(1).optional(),
+    offset,
     limit: z.number().int().min(1).max(100).default(30),
   }),
-  route: (input) => ({
-    method: 'GET',
-    url:
-      `/api/search?q=${encode(input.query)}` +
-      (input.projectPath ? `&path=${encode(input.projectPath)}` : ''),
-  }),
+  // Кейсы — только проекта панели: чужую папку поиск не читает.
+  route: async (input, inject) => {
+    if (input.projectPath) await assertRegistered(inject, input.projectPath);
+    return {
+      method: 'GET',
+      url:
+        `/api/search?q=${encode(input.query)}` +
+        (input.projectPath ? `&path=${encode(input.projectPath)}` : ''),
+    };
+  },
   shape: (input, body) => {
-    const { results } = body as SearchResponse;
-    return { total: results.length, results: results.slice(0, input.limit) };
+    const { meta, slice } = listPage((body as SearchResponse).results, input.offset, input.limit);
+    return { ...meta, results: slice };
   },
   summary: 'journal-search-panel',
 });
@@ -167,32 +180,53 @@ const analyticsSummary = definePanelAction({
   summary: 'journal-analytics-summary',
 });
 
+/** Записей раздела сравнения на страницу: дальше — по `entriesNextOffset`. */
+const COMPARE_ENTRIES_LIMIT = 50;
+
 const compareProviders = definePanelAction({
   name: 'compare_providers',
   section: 'compare',
   risk: 'read',
   description:
-    'Compare two CLI providers side by side (sections, entries present on each side). Read-only.',
-  input: z.object({ left: z.string().min(1), right: z.string().min(1) }),
+    'Compare two CLI providers side by side (sections, entries present on each side). Read-only. ' +
+    `Entries are paged by ${COMPARE_ENTRIES_LIMIT} per section: pass section and offset = entriesNextOffset for the rest.`,
+  input: z.object({
+    left: z.string().min(1),
+    right: z.string().min(1),
+    section: z.string().min(1).optional().describe('Only this section (e.g. "mcp")'),
+    offset: offset.describe('Skip this many entries in each section; pass entriesNextOffset'),
+  }),
   route: (input) => ({
     method: 'GET',
     url: `/api/provider-compare?left=${encode(input.left)}&right=${encode(input.right)}`,
   }),
-  shape: (_input, body) => {
+  shape: (input, body) => {
     const data = body as ProviderCompareResponse;
+    // Опечатка в разделе давала пустой список — модель читала его как «различий нет».
+    if (input.section && !data.sections.some((section) => section.section === input.section)) {
+      const known = data.sections.map((section) => section.section).join(', ');
+      throw new Error(`No section «${input.section}» in this comparison; known: ${known}.`);
+    }
     return {
       left: data.left,
       right: data.right,
-      sections: data.sections.map((section) => ({
-        section: section.section,
-        comparable: section.comparable,
-        migratable: section.migratable,
-        // Откуда прочитано: сторона Claude — из места конфигурации панели, чужой
-        // CLI — из своего каталога (дом процесса панели или его переменная).
-        files: { left: section.left.filePath ?? null, right: section.right.filePath ?? null },
-        entries: section.entries.slice(0, 50),
-        ...(section.note ? { note: section.note } : {}),
-      })),
+      sections: data.sections
+        .filter((section) => !input.section || section.section === input.section)
+        .map((section) => {
+          const { meta, slice } = listPage(section.entries, input.offset, COMPARE_ENTRIES_LIMIT);
+          return {
+            section: section.section,
+            comparable: section.comparable,
+            migratable: section.migratable,
+            // Откуда прочитано: сторона Claude — из места конфигурации панели, чужой
+            // CLI — из своего каталога (дом процесса панели или его переменная).
+            files: { left: section.left.filePath ?? null, right: section.right.filePath ?? null },
+            entries: slice,
+            entriesTotal: meta.total,
+            ...(meta.nextOffset === undefined ? {} : { entriesNextOffset: meta.nextOffset }),
+            ...(section.note ? { note: section.note } : {}),
+          };
+        }),
     };
   },
   summary: 'journal-compare-providers',
@@ -320,24 +354,31 @@ const listAvailablePlugins = definePanelAction({
   name: 'list_available_plugins',
   section: 'plugins',
   risk: 'read',
-  description: 'Plugins available in the connected marketplaces (slow: the CLI refreshes them).',
-  input: z.object({ query: z.string().max(100).optional() }),
+  description:
+    'Plugins available in the connected marketplaces (slow: the CLI refreshes them). Paged: follow nextOffset.',
+  input: z.object({
+    query: z.string().max(100).optional(),
+    offset,
+    limit: z.number().int().min(1).max(100).default(50),
+  }),
   route: () => ({ method: 'GET', url: '/api/plugins/available' }),
   shape: (input, body) => {
     const needle = input.query?.toLowerCase();
-    return (body as Plugin[])
-      .filter(
-        (plugin) =>
-          !needle ||
-          plugin.id.toLowerCase().includes(needle) ||
-          (plugin.description ?? '').toLowerCase().includes(needle),
-      )
-      .slice(0, 50)
-      .map((plugin) => ({
+    const found = (body as Plugin[]).filter(
+      (plugin) =>
+        !needle ||
+        plugin.id.toLowerCase().includes(needle) ||
+        (plugin.description ?? '').toLowerCase().includes(needle),
+    );
+    const { meta, slice } = listPage(found, input.offset, input.limit);
+    return {
+      ...meta,
+      plugins: slice.map((plugin) => ({
         id: plugin.id,
         description: plugin.description,
         isInstalled: plugin.isInstalled,
-      }));
+      })),
+    };
   },
   summary: 'journal-list-available-plugins',
 });
@@ -357,15 +398,40 @@ const installPlugin = definePanelAction({
   fingerprint: async (_input, inject) =>
     fingerprintOf((await pluginsOf(inject)).installed.map(pluginView)),
   preview: async (input, inject) => {
-    if ((await pluginsOf(inject)).installed.some((item) => item.id === input.id)) {
+    // Несбыточное отсекается до карточки: кривой id домен отвергнет, а плагин
+    // неподключённого маркетплейса CLI не найдёт — оба уже после «Одобрить».
+    // Отказ `safePluginId` — русский, для человека; агенту — английский.
+    try {
+      safePluginId(input.id);
+    } catch {
+      throw new Error(
+        `«${input.id}» is not a valid plugin id: use name@marketplace (letters, digits, . _ @ / -).`,
+      );
+    }
+    const { installed, marketplaces } = await pluginsOf(inject);
+    if (installed.some((item) => item.id === input.id)) {
       throw new Error(`Plugin «${input.id}» is already installed.`);
     }
-    return stateCard(
+    const at = input.id.lastIndexOf('@');
+    const market = at > 0 ? input.id.slice(at + 1) : '';
+    // Пустой список — состояние не прочиталось; решать за CLI тогда не берёмся.
+    if (market && marketplaces.length > 0 && !marketplaces.some((item) => item.name === market)) {
+      const connected = marketplaces.map((item) => item.name).join(', ');
+      throw new Error(
+        `Marketplace «${market}» is not connected (connected: ${connected}). ` +
+          'Call list_available_plugins, or add_plugin_marketplace first.',
+      );
+    }
+    const preview = stateCard(
       `plugins/${input.id}`,
       undefined,
       { id: input.id, installed: true },
       card('summary-plugin-install', { id: input.id }),
     );
+    // Опасна установка тем, что потом исполнится чужой код, — карточка называет,
+    // из какого репозитория он придёт.
+    const source = marketplaces.find((item) => item.name === market)?.source;
+    return source ? { ...preview, fields: [dataField('label-address', source)] } : preview;
   },
   page: () => ({ route: '/plugins' }),
 });
@@ -436,7 +502,10 @@ const updatePlugin = definePanelAction({
     const plugin = await findPlugin(inject, input.id);
     return {
       ...card('summary-plugin-update', { id: plugin.id }),
-      fields: [dataField('label-version', plugin.version), dataField('label-scope', plugin.scope)],
+      fields: [
+        dataField('label-version', plugin.version),
+        dataField('label-plugin-scope', plugin.scope),
+      ],
     };
   },
   page: () => ({ route: '/plugins' }),
@@ -458,6 +527,12 @@ const addMarketplace = definePanelAction({
   refusal: pluginRefusal,
   fingerprint: async (_input, inject) => fingerprintOf((await pluginsOf(inject)).marketplaces),
   preview: async (input, inject) => {
+    if (!isMarketplaceSource(input.source)) {
+      throw new Error(
+        `Source «${input.source}» is not a GitHub owner/repo, URL or path ` +
+          '(no spaces or shell characters).',
+      );
+    }
     const { marketplaces } = await pluginsOf(inject);
     if (marketplaces.some((item) => item.source === input.source)) {
       throw new Error(`Marketplace «${input.source}» is already connected.`);
@@ -499,23 +574,47 @@ const removeMarketplace = definePanelAction({
 
 // --- История и резервные копии ---
 
+/**
+ * Время так, как его показывает страница истории: местное время машины (панель
+ * локальная — сервер и окно в одном часовом поясе). Модель, прочитав UTC из
+ * `at`, называла человеку «20:52», а на странице стояло «23:52».
+ */
+function localTime(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return (
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ` +
+    `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+  );
+}
+
 const listHistory = definePanelAction({
   name: 'list_history',
   section: 'history',
   risk: 'read',
   description:
-    'Feed of config edits, newest first: backup name (id for history_diff), file, +/- lines, canRevert.',
-  input: z.object({ limit: z.number().int().min(1).max(200).default(30) }),
+    'Feed of config edits, newest first: backup name (id for history_diff), file, +/- lines, canRevert, ' +
+    'label ("current" = the newest copy of that file, diffed against the live file — the only one revert_history_hunk takes). ' +
+    'Name times by localTime — the History page shows local time, `at` is UTC. Paged: follow nextOffset.',
+  input: z.object({ offset, limit: z.number().int().min(1).max(200).default(30) }),
   route: () => ({ method: 'GET', url: '/api/history' }),
   shape: (input, body) => {
-    const items = (body as HistoryResponse).items;
-    return { total: items.length, items: items.slice(0, input.limit) };
+    const { meta, slice } = listPage((body as HistoryResponse).items, input.offset, input.limit);
+    return { ...meta, items: slice.map((item) => ({ ...item, localTime: localTime(item.at) })) };
   },
   summary: 'journal-list-history',
 });
 
 const historyDiffOf = (inject: InjectRoute, name: string) =>
   readRoute<HistoryDiff>(inject, `/api/history/diff?name=${encode(name)}`);
+
+/**
+ * Строки диффа истории для модели и карточки — маской: маршрут окна отдаёт их
+ * как есть, а в правке человека бывает ключ. Номера ханков остаются.
+ */
+const maskedLines = (lines: HistoryDiff['lines']): HistoryDiff['lines'] =>
+  lines.map((line) => ({ ...line, text: maskSecretsInText(line.text) }));
 
 const historyDiff = definePanelAction({
   name: 'history_diff',
@@ -525,6 +624,10 @@ const historyDiff = definePanelAction({
     'Full line diff of one history entry. Lines carry `hunk` numbers used by revert_history_hunk.',
   input: z.object({ name: z.string().min(1) }),
   route: (input) => ({ method: 'GET', url: `/api/history/diff?name=${encode(input.name)}` }),
+  shape: (_input, body) => {
+    const diff = body as HistoryDiff;
+    return { ...diff, lines: maskedLines(diff.lines) };
+  },
   summary: 'journal-history-diff',
 });
 
@@ -534,7 +637,8 @@ const revertHistoryHunk = definePanelAction({
   risk: 'danger',
   title: 'journal-revert-hunk',
   description:
-    'Revert ONE hunk of a history entry into the current config file (a backup of the current state is taken). Needs confirmation.',
+    'Revert ONE hunk of the NEWEST history entry of a file (label "current": its diff is against the live file) ' +
+    '(a backup of the current state is taken). An older entry is refused — use restore_backup for it. Needs confirmation.',
   input: z.object({ name: z.string().min(1), hunk: z.number().int().min(0) }),
   route: (input) => ({
     method: 'POST',
@@ -546,7 +650,15 @@ const revertHistoryHunk = definePanelAction({
     const diff = await historyDiffOf(inject, input.name);
     if (!diff.canRevert)
       throw new Error(`«${diff.file}» is a provider file: view only, no revert.`);
-    const lines = diff.lines.filter((line) => line.hunk === input.hunk);
+    // Дифф старой копии показан против СЛЕДУЮЩЕЙ копии, а откат считает «копия →
+    // текущий файл»: тот же номер ханка вернул бы другие строки, чем на карточке.
+    if (diff.label !== 'current') {
+      throw new Error(
+        `«${input.name}» is not the newest copy of ${diff.file}: only the newest entry of a file is reverted by hunk. ` +
+          'Revert the matching lines of the newest entry, or restore_backup this copy as a whole.',
+      );
+    }
+    const lines = maskedLines(diff.lines.filter((line) => line.hunk === input.hunk));
     if (lines.length === 0)
       throw new Error(`Hunk ${input.hunk} is not in «${input.name}». Call history_diff.`);
     // Откат ханка возвращает строки копии: добавленное правкой уходит, удалённое возвращается.
@@ -572,19 +684,40 @@ const listBackups = definePanelAction({
   section: 'history',
   risk: 'read',
   description:
-    'Backup copies of config files: name, target file, time, size, restorable, encrypted.',
-  input: z.object({ limit: z.number().int().min(1).max(200).default(30) }),
+    'Backup copies of config files: name, target file, time, size, restorable, encrypted. Paged: follow nextOffset.',
+  input: z.object({ offset, limit: z.number().int().min(1).max(200).default(30) }),
   route: () => ({ method: 'GET', url: '/api/backups' }),
   shape: (input, body) => {
     const info = body as BackupsInfo;
+    const { meta, slice } = listPage(info.items, input.offset, input.limit);
     return {
       isEnabled: info.isEnabled,
-      total: info.items.length,
-      items: info.items.slice(0, input.limit),
+      ...meta,
+      items: slice.map((item) => ({ ...item, localTime: localTime(item.createdAt) })),
     };
   },
   summary: 'journal-list-backups',
 });
+
+/** Ответ `/api/backups/:name/preview`: дифф по файлу, секреты в строках уже замаскированы. */
+interface RestorePreviewDiff {
+  path: string;
+  diff: string;
+  added: number;
+  removed: number;
+  truncated: boolean;
+  /** Двоичный файл, который откат заменит: строк нет, есть факт замены. */
+  binary?: boolean;
+}
+
+/** Дифф отката: у двоичного файла вместо строк — пометка на языке окна. */
+function binaryAware(files: readonly RestorePreviewDiff[], binaryNote: string): string {
+  return files
+    .map((file) =>
+      file.binary ? `--- a/${file.path}\n+++ b/${file.path}\n(${binaryNote})` : file.diff,
+    )
+    .join('\n');
+}
 
 async function findBackup(inject: InjectRoute, name: string): Promise<BackupEntry> {
   const entry = (await readRoute<BackupsInfo>(inject, '/api/backups')).items.find(
@@ -614,6 +747,14 @@ const restoreBackup = definePanelAction({
       feed: (await readRoute<HistoryResponse>(inject, '/api/history')).items.map(
         (item) => item.name,
       ),
+      // Дифф «файл → копия» из карточки: правка файла мимо панели копии не
+      // заводит, а меняет, что снесёт откат, — клик по старой карточке запрещён.
+      files: (
+        await readRoute<{ files: RestorePreviewDiff[] }>(
+          inject,
+          `/api/backups/${encode(input.name)}/preview`,
+        )
+      ).files,
     }),
   preview: async (input, inject) => {
     const entry = await findBackup(inject, input.name);
@@ -623,13 +764,51 @@ const restoreBackup = definePanelAction({
         'Encrypted backup: the passphrase is entered only by the human on the History page.',
       );
     }
+    // Откат пишет файл целиком: дифф «сейчас → станет» показывает и правки,
+    // сделанные после копии, — они уйдут вместе с откатом.
+    const { files } = await readRoute<{ files: RestorePreviewDiff[] }>(
+      inject,
+      `/api/backups/${encode(input.name)}/preview`,
+    );
+    const changed = files.filter((file) => file.truncated || file.binary || file.diff !== '');
+    if (changed.length === 0) {
+      throw new Error(
+        `«${entry.target}» already matches backup «${entry.name}»: nothing to restore.`,
+      );
+    }
+    // Карточку с неполным диффом одобрить нельзя (маршрут решения отвечает 409),
+    // а откат на части не делится: без этого отказа агент выкладывал карточку-
+    // тупик и узнавал об этом только по истечении ожидания (ревью z2 C17).
+    const oversized = changed.filter((file) => file.truncated).map((file) => `«${file.path}»`);
+    if (oversized.length > 0) {
+      throw new Error(
+        `The change to ${oversized.join(', ')} is too large to show line by line, so a ` +
+          `confirmation card for it could not be approved. Tell the human to restore backup ` +
+          `«${entry.name}» on the History page.`,
+      );
+    }
     return {
       ...card('summary-restore-backup', { target: entry.target }),
       fields: [
         dataField('label-backup', entry.name),
-        dataField('label-file', entry.target),
-        dataField('label-created', entry.createdAt),
+        ...changed.map((file) =>
+          dataField(
+            'label-file',
+            file.binary ? file.path : `${file.path} (+${file.added} −${file.removed})`,
+          ),
+        ),
+        dataField('label-created', localTime(entry.createdAt)),
       ],
+      diff: binaryAware(changed, 'двоичный файл: откат заменит его копией целиком'),
+      // Строка о двоичном файле — текст карточки, а не дифф: английскому окну своя.
+      ...(changed.some((file) => file.binary)
+        ? {
+            diffEn: binaryAware(
+              changed,
+              'binary file: the restore replaces it with the copy whole',
+            ),
+          }
+        : {}),
     };
   },
   shape: (_input, body) => {

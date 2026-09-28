@@ -1,5 +1,5 @@
 /**
- * Кадры путеводителя «Чат»: два сценария одной съёмкой.
+ * Кадры путеводителя «Чат»: три сценария одной съёмкой.
  *
  * `basics` — путь ОДНОГО разговора: пустой чат проекта, вопрос с вложением,
  * живой ответ с шагами и расходом, запрос прав, вопрос агента, пульт git,
@@ -8,6 +8,9 @@
  * `split` — путь, на котором один разговор становится несколькими: карточка
  * разделения, дерево чатов, сводка групп у родителя, вопросы и права детей,
  * сверка веток, пауза дерева и параллельные копии репозитория.
+ *
+ * `autonomy` — группа и автономность чата: меню «из родителя», строка
+ * автовыбора и карточка критичного в главном чате.
  *
  * Разделены они не по объёму, а по входу: человек, который никогда не делит
  * задачи, второй сценарий не откроет вовсе, а первый читает подряд с первого
@@ -31,6 +34,7 @@ import { chromium } from 'playwright';
 import { openScenario, applyShotLanguage } from './kit.mjs';
 import { shootBasics } from './chat-basics.mjs';
 import { shootSplit } from './chat-split.mjs';
+import { shootAutonomy } from './chat-autonomy.mjs';
 
 const PANEL_PORT = Number(process.env.GUIDE_PANEL_PORT ?? 5193);
 const WEB_PORT = Number(process.env.GUIDE_WEB_PORT ?? 8901);
@@ -120,6 +124,13 @@ try {
       console.log('\nсценарий split');
       await shootSplit(browser, WEB, split);
       split.finish();
+    }
+
+    if (!only || only === 'autonomy') {
+      const autonomy = openScenario('chat', 'autonomy');
+      console.log('\nсценарий autonomy');
+      await shootAutonomy(browser, WEB, autonomy);
+      autonomy.finish();
     }
   } finally {
     await browser.close();

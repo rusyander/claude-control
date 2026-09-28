@@ -1,0 +1,112 @@
+// Строка повторяет пункты боковой панели (колокольчик, агент панели): тот же
+// отступ, скругление и наведение — чтобы встать в общий ряд.
+.trigger {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  width: 100%;
+  padding: var(--spacing-xs) var(--spacing-xs);
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: var(--font-size-body);
+  text-align: left;
+  cursor: pointer;
+  border-radius: 8px;
+  color: var(--color-fg-muted);
+  transition:
+    background-color var(--duration-fast) ease,
+    color var(--duration-fast) ease;
+
+  &:hover,
+  &[aria-expanded='true'] {
+    background-color: var(--color-surface-sunken);
+    color: var(--color-fg);
+  }
+}
+
+.iconWrap {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+// Точка «идёт работа» на значке — видна и в свёрнутой панели. Пульсирует,
+// только пока модель действительно разбирает сбой.
+.dot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background-color: var(--color-success, var(--color-accent));
+  box-shadow: 0 0 0 2px var(--color-surface);
+}
+
+.analyzing {
+  animation: watcher-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes watcher-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .analyzing {
+    animation: none;
+  }
+}
+
+.label {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  justify-content: space-between;
+  gap: var(--spacing-2xs);
+  white-space: nowrap;
+}
+
+.time {
+  font-variant-numeric: tabular-nums;
+  color: var(--color-fg-subtle);
+  font-size: var(--font-size-caption);
+}
+
+// Подложка ловит клик мимо окна: окно закрывается, как по Escape.
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+}
+
+// Окно стоит у правого края боковой панели на высоте строки. `fixed`, а не
+// `absolute`: панель обрезает содержимое (`overflow: clip`), а окну нужно
+// выйти за её край. Координаты считает компонент в момент открытия.
+.popover {
+  position: fixed;
+  z-index: 61;
+  width: min(320px, calc(100vw - var(--spacing-xl)));
+  padding: var(--spacing-sm);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+}
+
+.problem {
+  padding: var(--spacing-2xs) var(--spacing-xs);
+  border-radius: 8px;
+  background: var(--color-warning-subtle, var(--color-surface-sunken));
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

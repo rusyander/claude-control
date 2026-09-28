@@ -92,11 +92,15 @@ export function HooksPage() {
           </Typography>
 
           {eventHooks.map((hook, index) => (
-            <Card key={hook.id} padding="md">
+            <Card key={hook.id} padding="md" data-agent-anchor={hook.id}>
               <Stack direction="row" gap="var(--spacing-md)" align="start" width="100%">
                 <Stack gap="var(--spacing-2xs)" flex={1} minWidth={0}>
                   <Stack direction="row" align="center" gap="var(--spacing-xs)" wrap>
-                    {hook.matcher && <Badge tone="accent">{hook.matcher}</Badge>}
+                    {hook.matcher && (
+                      <Badge tone="accent" className={styles.matcher}>
+                        {hook.matcher}
+                      </Badge>
+                    )}
                     {!hook.isEnabled && <Badge tone="neutral">{t('common.disabled')}</Badge>}
                     {hook.scriptExists === false && (
                       <Badge tone="danger" withDot>

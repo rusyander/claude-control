@@ -62,8 +62,8 @@ describe('POST /api/chat/split — уровни у чужого провайде
     ],
   };
 
-  const TRIAGE_MARK = 'Это разбор разделения задач';
-  const PLAN_MARK = 'План работы для группы';
+  const TRIAGE_MARK = 'This is the triage of a task split';
+  const PLAN_MARK = 'Work plan for the group';
 
   /** Блок разбора: вторая группа ждёт первую, третья стоит с вопросом. */
   const triagePlan = JSON.stringify({
@@ -91,6 +91,15 @@ describe('POST /api/chat/split — уровни у чужого провайде
     'Готов план.\n\n```agentdeck:plan\n1. Прочитать src/read.ts\n2. Починить разбор строк\n```\n';
 
   const sleep = (ms = 60): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+  // Звенья идут фоном: ждём состояния, а не фиксированный срок — 60 мс под
+  // нагрузкой полного прогона не хватало (29.09, «плана не получено»).
+  const until = async (ready: () => unknown, ms = 5_000): Promise<void> => {
+    for (const end = Date.now() + ms; !ready() && Date.now() < end;) await sleep(20);
+  };
+  const notices = (title: string) =>
+    (readChat(appData, 'codex', chatByTitle(title)?.id ?? '')?.messages ?? []).filter(
+      (message) => message.role === 'notice',
+    );
 
   beforeEach(async () => {
     root = mkdtempSync(join(tmpdir(), 'cc-split-levels-'));
@@ -222,7 +231,7 @@ describe('POST /api/chat/split — уровни у чужого провайде
     expect(runs).toHaveLength(1);
     expect(runs[0]?.model).toBe(undefined);
     expect(runs[0]?.history.at(-1)?.content).toContain(TRIAGE_MARK);
-    expect(runs[0]?.history.at(-1)?.content).toContain('НИЧЕГО НЕ ПРАВЬ');
+    expect(runs[0]?.history.at(-1)?.content).toContain('EDIT NOTHING');
 
     // Связь разбора — именованным ключом и под именованным родителем.
     const link = store.getChatLink(`codex:${triage?.id}`);
@@ -232,7 +241,7 @@ describe('POST /api/chat/split — уровни у чужого провайде
   it('блок разбора применяется: owns и notes в связи, after ждёт, hold стоит без чата', async () => {
     reply = (prompt) => (prompt.includes(TRIAGE_MARK) ? triageAnswer : null);
     await split();
-    await sleep();
+    await until(() => store.getChatLink(`codex:${chatByTitle('Чтение')?.id}`)?.owns);
 
     const record = store.getSplitPlan('codex:qa1');
     expect(record?.groups.map((group) => group.status)).toEqual(['started', 'waiting', 'held']);
@@ -251,7 +260,7 @@ describe('POST /api/chat/split — уровни у чужого провайде
     });
     expect(runs.at(-1)?.history.at(-1)?.content).toContain(PLAN_MARK);
     // План идёт на потолке: планка сдачи его не касается — она про работу.
-    expect(runs.at(-1)?.systemPrefix ?? '').not.toContain('НИЖЕ той, которой CLI работает');
+    expect(runs.at(-1)?.systemPrefix ?? '').not.toContain('runs on a model BELOW');
 
     // Границы и заметки разбора уехали в связь: по ним соберётся работа.
     const link = store.getChatLink(`codex:${plan?.id}`);
@@ -268,7 +277,7 @@ describe('POST /api/chat/split — уровни у чужого провайде
           ? planAnswer
           : 'сделал';
     await split();
-    await sleep();
+    await until(() => readChat(appData, 'codex', chatByTitle('Чтение · работа')?.id ?? ''));
 
     const work = chatByTitle('Чтение · работа');
     expect(work?.model).toBe('gpt-5.3-codex-spark');
@@ -289,21 +298,18 @@ describe('POST /api/chat/split — уровни у чужого провайде
     reply = (prompt) =>
       prompt.includes(TRIAGE_MARK) ? triageAnswer : 'посмотрел, но блока не дам';
     await split();
-    await sleep();
+    await until(() => chatByTitle('Чтение · работа') && notices('Чтение').length > 0);
 
     expect(chatByTitle('Чтение · работа')).toBeTruthy();
-    const plan = chatByTitle('Чтение');
-    const notices = (readChat(appData, 'codex', plan?.id ?? '')?.messages ?? []).filter(
-      (message) => message.role === 'notice',
-    );
-    expect(notices).toHaveLength(1);
-    expect(notices[0]?.content).toContain('План не получен');
+    const said = notices('Чтение');
+    expect(said).toHaveLength(1);
+    expect(said[0]?.content).toContain('План не получен');
   });
 
   it('разбора не получено — группы идут как предложено, а в ленте разбора сказано почему', async () => {
     reply = (prompt) => (prompt.includes(TRIAGE_MARK) ? 'ничего не понял' : 'сделал');
     await split();
-    await sleep();
+    await until(() => chatByTitle('Отчёт') && notices('Разбор разделения').length > 0);
 
     const record = store.getSplitPlan('codex:qa1');
     expect(record?.triage?.received).toBe(false);
@@ -328,7 +334,9 @@ describe('POST /api/chat/split — уровни у чужого провайде
           ? planAnswer
           : 'сделал';
     await split();
-    await sleep(200);
+    await until(
+      () => chatByTitle('Запись') && store.getSplitPlan('codex:qa1')?.groups[1]?.startedAt,
+    );
 
     // Первая группа прошла план → работу → ревью и закрылась; вторая ждала её и
     // завелась ПОСЛЕ этого — своим планом, как и первая.
@@ -345,7 +353,7 @@ describe('POST /api/chat/split — уровни у чужого провайде
   it('ответ на вопрос разбора заводит стоявшую группу', async () => {
     reply = (prompt) => (prompt.includes(TRIAGE_MARK) ? triageAnswer : null);
     await split();
-    await sleep();
+    await until(() => store.getSplitPlan('codex:qa1')?.groups[2]?.status === 'held');
 
     const response = await app.inject({
       method: 'POST',
@@ -353,7 +361,7 @@ describe('POST /api/chat/split — уровни у чужого провайде
       payload: { index: 2, answer: 'Колонки в CSV' },
     });
     expect(response.statusCode).toBe(200);
-    await sleep();
+    await until(() => store.getChatLink(`codex:${chatByTitle('Отчёт')?.id}`)?.notes);
 
     expect(chatByTitle('Отчёт')).toBeTruthy();
     // Ответ человека уехал группе заметкой — иначе спрашивать было незачем.

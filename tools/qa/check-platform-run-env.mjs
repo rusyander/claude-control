@@ -45,6 +45,20 @@ const MODEL = 'qwen2.5:7b';
 const DUMP = 'cc-env-dump.txt';
 /** Ключ строки с argv в том же файле: разбор у него общий с переменными. */
 const ARGV_KEY = 'CC_ARGV';
+
+/**
+ * Убрать временную папку прогона. На Windows вышедший CLI (и его дети) держат
+ * рабочую папку ещё секунды после остановки — EPERM здесь не про проверяемое
+ * поведение, поэтому ждём до десяти секунд, а не отпустившую папку оставляем
+ * в %TEMP% с предупреждением вместо падения всего прогона.
+ */
+function removeDir(dir) {
+  try {
+    rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 500 });
+  } catch (error) {
+    console.warn(`временная папка не удалена (${error.code ?? error.message}): ${dir}`);
+  }
+}
 /** Копия системного промпта, снятая фальшивым CLI, пока файл панели ещё жив. */
 const SYSTEM_PROMPT_COPY = 'cc-system-prompt.txt';
 /** Чужой CLI для проверки: у него задокументирован и неинтерактивный флаг, и раздел переменных. */
@@ -70,11 +84,17 @@ function dumpOf(dir) {
 }
 
 async function waitForDump(dir, seconds = 30) {
+  // Фальшивый CLI пишет выгрузку в два шага: окружение, затем строку argv.
+  // Файл появляется после первого — ждём последнюю строку, иначе argv
+  // читается пустым у того прогона, которому не повезло с моментом.
+  const file = join(dir, DUMP);
   for (let i = 0; i < seconds * 4; i += 1) {
-    if (existsSync(join(dir, DUMP))) return dumpOf(dir);
+    if (existsSync(file) && readFileSync(file, 'utf8').includes(`${ARGV_KEY}=`)) {
+      return dumpOf(dir);
+    }
     await wait(250);
   }
-  return undefined;
+  return existsSync(file) ? dumpOf(dir) : undefined;
 }
 
 /**
@@ -234,7 +254,7 @@ async function main() {
 
     if (chat) {
       check(
-        chat.env.get('ANTHROPIC_BASE_URL') === `http://127.0.0.1:${port}/${CONTOUR}`,
+        chat.env.get('ANTHROPIC_BASE_URL') === `http://127.0.0.1:${port}/${CONTOUR}/_s/chat`,
         `адрес живого шлюза в окружении процесса: ${chat.env.get('ANTHROPIC_BASE_URL')}`,
       );
       check(
@@ -321,7 +341,7 @@ async function main() {
       // выполнит.
       check(!argv.includes('--effort'), `глубина не отправлена: ${argv}`);
     }
-    rmSync(askedDir, { recursive: true, force: true });
+    removeDir(askedDir);
 
     // ── 2а'. Понижённая ступень: полное имя модели и журнал понижений ──────────
     // Ступень разделения и веера уезжает РАЗВЁРНУТЫМ именем (`claude-sonnet-5`),
@@ -355,7 +375,7 @@ async function main() {
       record?.model === MAPPED && record?.effort === '',
       `журнал понижений пишет модель контура и не пишет глубину: ${JSON.stringify(record && { model: record.model, effort: record.effort })}`,
     );
-    rmSync(loweredDir, { recursive: true, force: true });
+    removeDir(loweredDir);
 
     // ── 2б. Наши слои (Т8): снятое доезжает до argv, а брокер прав — переживает ──
     // `layers.test.ts` проверяет, ЧТО панель решила; что из решения доехало до
@@ -413,7 +433,7 @@ async function main() {
         `конфиг брокера прав едет вместе со снятием MCP: ${argv}`,
       );
     }
-    rmSync(layersDir, { recursive: true, force: true });
+    removeDir(layersDir);
 
     // И обратная сторона: слои на месте — ни одного флага снятия, дописка едет.
     const keptDir = mkdtempSync(join(tmpdir(), 'cc-t8-kept-'));
@@ -427,15 +447,19 @@ async function main() {
     check(Boolean(kept), 'фальшивый CLI запустился и у прогона с полным набором слоёв');
     if (kept) {
       const argv = kept.env.get(ARGV_KEY) ?? '';
+      // `--setting-sources user` при своём каталоге конфигурации — не снятие
+      // слоя, а изоляция песочницы (ChatRunner): «user» и есть её каталог.
+      // Снятие слоёв контура — только `local` / `project,local`.
+      const sources = /--setting-sources (\S+)/.exec(argv)?.[1];
       check(
-        !argv.includes('--setting-sources') &&
+        (sources === undefined || sources === 'user') &&
           !argv.includes('--disable-slash-commands') &&
           !argv.includes('--strict-mcp-config'),
         `флагов снятия нет ни одного: ${argv}`,
       );
       check(argv.includes('--append-system-prompt'), 'дописка панели едет как обычно');
     }
-    rmSync(keptDir, { recursive: true, force: true });
+    removeDir(keptDir);
 
     // И третья сторона, найденная ревью Т8 (MAJOR-4): прогон продолжают
     // СОХРАНЁННЫМИ параметрами (пауза дерева переживает и перезапуск панели).
@@ -457,7 +481,7 @@ async function main() {
         );
       }
     }
-    rmSync(resumeDir, { recursive: true, force: true });
+    removeDir(resumeDir);
 
     chatRuns.stopAll?.();
 
@@ -485,7 +509,7 @@ async function main() {
     check(Boolean(tests), 'фальшивый CLI запустился и у агента тестов');
     if (tests) {
       check(
-        tests.env.get('ANTHROPIC_BASE_URL') === `http://127.0.0.1:${port}/${CONTOUR}`,
+        tests.env.get('ANTHROPIC_BASE_URL') === `http://127.0.0.1:${port}/${CONTOUR}/_s/tests`,
         `галочка «Тесты» доводит адрес до своего прогона: ${tests.env.get('ANTHROPIC_BASE_URL')}`,
       );
       check(!tests.raw.includes(SECRET), 'ключа контура нет и в окружении агента тестов');
@@ -529,7 +553,7 @@ async function main() {
     if (foreign) {
       const url = foreign.env.get('OPENAI_BASE_URL');
       check(
-        url === `http://127.0.0.1:${port}/${CONTOUR}/v1`,
+        url === `http://127.0.0.1:${port}/${CONTOUR}/_s/foreign/${FOREIGN}/v1`,
         `адрес шлюза в переменных чужого CLI: ${url ?? '—'}`,
       );
       check(!foreign.raw.includes(SECRET), 'ключа контура нет и в окружении чужого CLI');

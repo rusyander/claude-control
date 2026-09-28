@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { ProjectTestCase } from '@agentdeck/contracts';
-import { stepText, toSteps } from '@agentdeck/contracts/test-format';
+import { retryPassAttempts, stepText, toSteps } from '@agentdeck/contracts/test-format';
 import { Muted, Row } from '../../shared/ui';
 import { colors, font, radius, space } from '../../shared/config/theme';
-import { useT } from '../../shared/config/i18n';
+import { useLanguage, useT } from '../../shared/config/i18n';
 import { STATUS_MARK, formatWhen, statusColor } from '../../entities/tests/status';
 
 /**
@@ -29,8 +29,10 @@ export function TestCaseRow({
   onRemove: () => void;
 }) {
   const t = useT();
+  const language = useLanguage();
   const [isOpen, setOpen] = useState(false);
   const steps = toSteps(testCase.steps);
+  const retryAttempts = retryPassAttempts(testCase);
 
   return (
     <View style={[styles.case, testCase.status === 'failed' && styles.caseFailed]}>
@@ -66,7 +68,7 @@ export function TestCaseRow({
           ) : null}
           {steps.map((step, index) => (
             <Text key={index} style={styles.step}>
-              {index + 1}. {stepText(step)}
+              {index + 1}. {stepText(step, t.tests.stepLabels)}
             </Text>
           ))}
           {testCase.expected ? <Muted>→ {testCase.expected}</Muted> : null}
@@ -83,9 +85,13 @@ export function TestCaseRow({
               {testCase.note}
             </Text>
           ) : null}
+          {/* Зелёный только на повторе — числом из файла, словами из словаря. */}
+          {retryAttempts !== undefined ? (
+            <Text style={styles.warn}>{t.tests.retryPass(retryAttempts)}</Text>
+          ) : null}
           <Muted>
             {testCase.lastRunAt
-              ? t.tests.lastRun(formatWhen(testCase.lastRunAt))
+              ? t.tests.lastRun(formatWhen(testCase.lastRunAt, language))
               : t.tests.lastRunNever}
           </Muted>
           <Muted>
@@ -136,6 +142,7 @@ const styles = StyleSheet.create({
   details: { gap: space.xs },
   step: { color: colors.textDim, fontSize: font.small },
   note: { color: colors.textDim, fontSize: font.small },
+  warn: { color: colors.warning, fontSize: font.small },
   action: { color: colors.accent, fontSize: font.small },
   bad: { color: colors.danger, fontSize: font.small },
 });

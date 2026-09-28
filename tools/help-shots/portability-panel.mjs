@@ -76,9 +76,19 @@ const TEXT = {
 const LAYER = { skill: /^(Скиллы|Skills)$/, hook: /^(Хуки|Hooks)$/ };
 
 const rows = [];
+/** Страница съёмки: красная проверка снимает экран, если задан GUIDE_DEBUG_DIR. */
+let debugPage = null;
 const check = (what, expected, seen, ok) => {
   rows.push({ what, ok });
   console.log(`${ok ? 'OK  ' : 'FAIL'} | ${what} | ждали: ${expected} | видно: ${seen}`);
+  if (!ok && debugPage && process.env.GUIDE_DEBUG_DIR) {
+    void debugPage
+      .screenshot({
+        path: `${process.env.GUIDE_DEBUG_DIR}/fail-${rows.length}.png`,
+        fullPage: false,
+      })
+      .catch(() => null);
+  }
 };
 
 async function waitFor(url, seconds) {
@@ -184,7 +194,9 @@ try {
       {
         cwd: join(ROOT, 'apps', 'web'),
         // BROWSER=none — иначе Vite откроет окно поверх съёмки.
-        env: { ...env, API_PORT: String(PANEL_PORT), BROWSER: 'none' },
+        // VITE_NO_RELOAD — без слежения за файлами: чужая правка в дереве не
+        // перезагружает страницу посреди сценария (vite.config.ts).
+        env: { ...env, API_PORT: String(PANEL_PORT), BROWSER: 'none', VITE_NO_RELOAD: '1' },
         stdio: 'ignore',
         shell: false,
       },
@@ -200,26 +212,107 @@ try {
 
   try {
     const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+    debugPage = page;
     const button = (name) => page.getByRole('button', { name }).first();
     /** Карточку под кадр поднимаем к верху окна: кадр — это ответ, а не страница. */
     const focus = async (locator) => {
-      await locator.scrollIntoViewIfNeeded();
-      await page.mouse.wheel(0, -120);
-      await pause(400);
+      // Именно к верху: scrollIntoViewIfNeeded не двигает уже видимое, и карточка
+      // у нижнего края снималась обрезанной — без плана и без кнопки отмены.
+      // Прокрутку повторяем, пока карточка не встанет: отчёт над ней дорисовывается
+      // после «тишины» сети, и одна прокрутка оставляла её у нижнего края.
+      for (let attempt = 0; attempt < 6; attempt += 1) {
+        // Прокрутку ставим самой области прокрутки: scrollIntoView на этой
+        // странице оставлял карточку у нижнего края (под прилипшей полосой
+        // вкладок браузер считал её уже видимой).
+        const top = await locator.evaluate((node) => {
+          // Только предок, который на самом деле прокручивается: у области с
+          // overflow auto без лишней высоты scrollTop молчит.
+          const scrolls = (el) =>
+            ['auto', 'scroll'].includes(getComputedStyle(el).overflowY) &&
+            el.scrollHeight > el.clientHeight + 1;
+          let scroller = node.parentElement;
+          while (scroller && !scrolls(scroller)) scroller = scroller.parentElement;
+          const root = scroller ?? document.scrollingElement;
+          const offset = node.getBoundingClientRect().top - root.getBoundingClientRect().top;
+          // 180 — место под прилипшую полосу вкладок и воздух над карточкой.
+          root.scrollTop += offset - 180;
+          return node.getBoundingClientRect().top;
+        });
+        await pause(400);
+        const settled = await locator.evaluate((node) => node.getBoundingClientRect().top);
+        if (Math.abs(settled - top) < 2) break;
+      }
+      // Отступ сверху задан самой прокруткой, а не колесом вверх: у конца
+      // страницы колесо опускало последнюю карточку к нижнему краю кадра
+      // (27.09.2026: «Перенос в …» снимался с обрезанной кнопкой отмены).
     };
 
-    await page.goto(`${WEB}/portability`, { waitUntil: 'domcontentloaded' });
+    /**
+     * Ответ, а не секунды: запрос ушёл, скелеты сменились данными. Фиксированные
+     * паузы краснели на машине под нагрузкой — каждый прогон в новом месте.
+     */
+    const quiet = async (min = 800) => {
+      await pause(min);
+      await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => null);
+      await page
+        .waitForFunction(
+          (selector) => !document.querySelector(selector),
+          '[role="status"][aria-label]:not([aria-label=""])',
+          { timeout: 30000 },
+        )
+        .catch(() => null);
+    };
+    /** Ждать, пока на экране не появится одна из строк (отказ идёт после повторов запроса). */
+    const textAppears = (patterns) =>
+      page
+        .waitForFunction(
+          (sources) => sources.some((source) => new RegExp(source).test(document.body.innerText)),
+          patterns.map((pattern) => pattern.source),
+          { timeout: 30000 },
+        )
+        .catch(() => null);
+
+    /** Вкладка раздела; выбранные источник, цель и уровень при переходе остаются. */
+    const openTab = async (name) => {
+      await page.getByRole('tab', { name }).click();
+      await quiet();
+    };
+
+    await page.goto(`${WEB}/portability?tab=passport`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('nav');
-    await pause(4000);
-    // Цель — второй выпадающий список шапки: провайдер, цель, уровень.
-    await page.locator('select').nth(1).selectOption(TARGET);
-    await pause(4000);
+    await quiet();
 
     // ── transfer/01. Паспорт: что у источника есть ───────────────────────────
+    // Паспорт — про источник, цель ему не нужна: поля цели на вкладке нет.
+    // Виды свёрнуты до заголовков; в кадре один развёрнут — как это выглядит.
+    const kindHeads = page.locator('[role="tabpanel"] button[aria-expanded]');
+    const collapsed = await page.locator('[role="tabpanel"] button[aria-expanded="false"]').count();
+    check(
+      'виды паспорта свёрнуты до заголовков',
+      'все заголовки свёрнуты',
+      `${collapsed} из ${await kindHeads.count()}`,
+      collapsed > 0 && collapsed === (await kindHeads.count()),
+    );
+    await kindHeads.first().click();
+    await pause(400);
+    const expanded = await kindHeads.first().getAttribute('aria-expanded');
+    check(
+      'вид разворачивается щелчком',
+      'aria-expanded=true',
+      String(expanded),
+      expanded === 'true',
+    );
     await transfer.shot(page, '01-passport', { side: 'panel' });
+
+    // Цель выбирается на вкладке, которая про цель, — полем по имени.
+    await openTab(/^(Перенос|Transfer)/);
+    await page.getByLabel(/^(Цель переноса|Transfer target)$/).selectOption(TARGET);
+    await quiet();
 
     // ── transfer/02. Отчёт верности: что доедет ──────────────────────────────
     const fidelity = page.getByText(/(Верность переноса|Transfer fidelity)/).first();
+    // Отчёт считается на сервере после выбора цели — ждём его, а не тишину сети.
+    await fidelity.waitFor({ timeout: 45000 }).catch(() => null);
     check(
       'отчёт верности на экране до переноса',
       'заголовок отчёта',
@@ -232,7 +325,11 @@ try {
     // ── transfer/03. План: что именно изменится в файлах ─────────────────────
     await focus(button(BUTTON.transferPlan));
     await button(BUTTON.transferPlan).click();
-    await pause(5000);
+    // План гоняет настоящие адаптеры: ждём саму кнопку, а не тишину сети.
+    await button(BUTTON.transfer)
+      .waitFor({ timeout: 60000 })
+      .catch(() => null);
+    await quiet();
     const applyCount = await button(BUTTON.transfer).count();
     check(
       'кнопка переноса появилась ПОСЛЕ плана',
@@ -248,7 +345,10 @@ try {
     await page.waitForSelector('[role="dialog"]');
     await pause(600);
     await page.locator('[role="dialog"]').getByRole('button', { name: BUTTON.transfer }).click();
-    await pause(6000);
+    // Запись идёт настоящими адаптерами: под нагрузкой стенда шести секунд бывает мало.
+    await button(BUTTON.revert)
+      .waitFor({ timeout: 30000 })
+      .catch(() => null);
     const revertCount = await button(BUTTON.revert).count();
     check(
       'после применения на месте плана — след и отмена',
@@ -259,7 +359,17 @@ try {
     await focus(page.getByText(/(Перенос в|Transfer to)/).first());
     await transfer.shot(page, '04-applied', { side: 'panel' });
 
+    // ── transfer/05. Проба цели: доехало ли на самом деле ────────────────────
+    // Кадр — до запуска: проба поднимает настоящий CLI цели во временном доме,
+    // а на машине съёмки его может не быть. Вкладка и так говорит, что проверит.
+    await openTab(/^(Проба цели|Target probe)/);
+    await transfer.shot(page, '05-probe', { side: 'panel' });
+
+    // Подписка — своя вкладка, цель та же.
+    await openTab(/^(Подписка|Subscription)/);
+
     // ── subscribe/01. Слои: пока не подписан ни один ─────────────────────────
+    await textAppears([TEXT.noLayers]);
     const noLayers = page.getByText(TEXT.noLayers).first();
     check(
       'без слоёв сказано словами, а не пустым местом',
@@ -274,7 +384,7 @@ try {
       String(planBefore),
       planBefore === 0,
     );
-    await focus(page.getByText(/(Подписка|Subscription of)/).first());
+    await focus(page.getByText(/(Подписка .+ на канон|Subscription of)/).first());
     await subscribe.shot(page, '01-layers', { side: 'panel' });
 
     // ── subscribe/02. План пересборки ────────────────────────────────────────
@@ -294,13 +404,13 @@ try {
 
     await focus(button(BUTTON.rebuildPlan));
     await button(BUTTON.rebuildPlan).click();
-    await pause(5000);
-    await focus(page.getByText(/(Подписка|Subscription of)/).first());
+    await quiet();
+    await focus(page.getByText(/(Подписка .+ на канон|Subscription of)/).first());
     await subscribe.shot(page, '02-plan', { side: 'panel' });
 
     // ── subscribe/03. Файл тронут руками ─────────────────────────────────────
     await button(BUTTON.rebuild).click();
-    await pause(6000);
+    await quiet();
     const afterSync = await (await fetch(`${PANEL}/api/portability/subscriptions`)).json();
     const synced = afterSync.items.find((item) => item.target === TARGET);
     const written = Object.keys(synced?.files ?? {});
@@ -317,7 +427,7 @@ try {
 
     await focus(button(BUTTON.rebuildPlan));
     await button(BUTTON.rebuildPlan).click();
-    await pause(5000);
+    await quiet();
 
     const driftSeen = await page.getByText(TEXT.drift).first().isVisible();
     check(
@@ -349,7 +459,11 @@ try {
 
     // ── subscribe/04. Исход сделан ───────────────────────────────────────────
     await button(BUTTON.projection).click();
-    await pause(4000);
+    await quiet();
+    // План исхода приходит отдельным запросом после выбора — ждём кнопку, а не паузу.
+    await button(BUTTON.resolve)
+      .waitFor({ timeout: 30000 })
+      .catch(() => null);
     const resolveCount = await button(BUTTON.resolve).count();
     check(
       'исход не делается без показанного плана',
@@ -358,7 +472,12 @@ try {
       resolveCount === 1,
     );
     await button(BUTTON.resolve).click();
-    await pause(6000);
+    await quiet();
+    // Исход пишет файлы настоящими адаптерами: под нагрузкой ответ приходит позже
+    // «тишины» сети — ждём саму кнопку, иначе счёт ниже краснел на медленном прогоне.
+    await button(BUTTON.rebuildPlan)
+      .waitFor({ timeout: 30000 })
+      .catch(() => null);
 
     // Устаревший план обязан уйти: он перечислял расхождение, которого больше
     // нет, а подставлять свежий вместо прочитанного человеком нельзя.
@@ -369,14 +488,14 @@ try {
       String(planGone),
       planGone === 1,
     );
-    await focus(page.getByText(/(Подписка|Subscription of)/).first());
+    await focus(page.getByText(/(Подписка .+ на канон|Subscription of)/).first());
     await subscribe.shot(page, '04-resolved', { side: 'panel' });
 
     // Продуктовая правда исхода: расхождения по файлу больше нет. Раздел панели
     // пересобран из канона, а текст человека ЗА пределами раздела остался —
     // панель ведёт в чужом файле только свой блок.
     await button(BUTTON.rebuildPlan).click();
-    await pause(5000);
+    await quiet();
     const driftLeft = await page.getByText(TEXT.drift).count();
     check(
       'после исхода расхождение по файлу закрыто',
@@ -405,9 +524,10 @@ try {
       ),
       'разберись, почему падает оплата картой',
     );
+    await openTab(/^(Незакрытая работа|Unfinished work)/);
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.waitForSelector('nav');
-    await pause(5000);
+    await quiet();
 
     const carryCard = page.getByText(TEXT.carry).first();
     check(
@@ -442,7 +562,7 @@ try {
     );
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.waitForSelector('nav');
-    await pause(5000);
+    await quiet();
 
     const refusal = page.getByText(TEXT.noCheckpoint).first();
     check(
@@ -476,45 +596,73 @@ try {
       await route.continue();
     };
     await page.route('**/api/**', slow);
+    // Разделы теперь на своих вкладках: каждый проверяется там, где его видит
+    // человек. Перезагрузка оставляет вкладку «Незакрытая работа» (?tab=carry).
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.waitForSelector('nav');
     await pause(2000);
-    await page.locator('select').nth(1).selectOption(TARGET);
+    const WAITING = '[role="status"][aria-label]:not([aria-label=""])';
+    const carryInFlight = await page.evaluate(() => document.body.innerText);
+    const carryWaiting = await page.locator(WAITING).count();
+    // Цель браузер помнит и после перезагрузки, так что запрос подписки уходит
+    // сразу с открытием вкладки. Вкладку открываем щелчком БЕЗ ожидания тишины:
+    // quiet() дождался бы конца задержки, и смотреть было бы уже не на что.
+    await page.getByRole('tab', { name: /^(Подписка|Subscription)/ }).click();
     await pause(1500);
-    const inFlight = await page.evaluate(() => document.body.innerText);
+    const subInFlight = await page.evaluate(() => document.body.innerText);
     // Ожидание на экране — это скелет: `role="status"` с подписью «загрузка».
     // Голый `role="status"` брать нельзя — в оболочке панели постоянно висит
     // пустой sr-only диктор с той же ролью, и он один давал бы «ожидание» на
     // любом экране, включая дочитанный.
-    const WAITING = '[role="status"][aria-label]:not([aria-label=""])';
-    const waiting = await page.locator(WAITING).count();
+    const subWaiting = await page.locator(WAITING).count();
     check(
       'ответ в пути: экран ждёт, а не утверждает «работы нет» и «слои не подписаны»',
-      'ни одного утверждения о пустоте, на экране — ожидание',
-      `${TEXT.carryEmpty.test(inFlight) ? 'ЛОЖЬ: «незакрытых разговоров нет»; ' : ''}` +
-        `${TEXT.noLayers.test(inFlight) ? 'ЛОЖЬ: «ни один слой не подписан»; ' : ''}` +
-        `ожиданий на экране ${waiting}`,
-      !TEXT.carryEmpty.test(inFlight) && !TEXT.noLayers.test(inFlight) && waiting > 0,
+      'ни одного утверждения о пустоте, на обеих вкладках — ожидание',
+      `${TEXT.carryEmpty.test(carryInFlight) ? 'ЛОЖЬ: «незакрытых разговоров нет»; ' : ''}` +
+        `${TEXT.noLayers.test(subInFlight) ? 'ЛОЖЬ: «ни один слой не подписан»; ' : ''}` +
+        `ожиданий: работа ${carryWaiting}, подписка ${subWaiting}`,
+      !TEXT.carryEmpty.test(carryInFlight) &&
+        !TEXT.noLayers.test(subInFlight) &&
+        carryWaiting > 0 &&
+        subWaiting > 0,
     );
     // Ожидание обязано КОНЧИТЬСЯ ответом: экран, застрявший в скелете, врёт
     // человеку не меньше пустого списка — просто молча.
-    await pause(12000);
-    const settled = await page.evaluate(() => document.body.innerText);
+    // Ждём ответ, а не секунды: под нагрузкой машины съёмки задержка в 9 с
+    // доезжала позже фиксированной паузы, и проверка краснела на пустом месте.
+    // Ждать нужно конца ВСЕХ ожиданий, а не заголовка: заголовок подписки стоит
+    // раньше, чем доедет список слоёв.
+    const settle = () =>
+      page
+        .waitForFunction((selector) => !document.querySelector(selector), WAITING, {
+          timeout: 30000,
+        })
+        .catch(() => null);
+    await settle();
     // Застрявшее ожидание надо НАЗВАТЬ: «осталось одно» не говорит, какой
     // раздел не дождался ответа, и следующий прогон начинал бы разбор заново.
-    const stillWaiting = await page.evaluate(
-      (selector) =>
-        [...document.querySelectorAll(selector)].map((node) => {
-          const near = node.parentElement?.parentElement?.textContent?.trim().slice(0, 60) ?? '';
-          return `«${node.getAttribute('aria-label')}» рядом: ${near}`;
-        }),
-      WAITING,
-    );
+    const waitingNow = () =>
+      page.evaluate(
+        (selector) =>
+          [...document.querySelectorAll(selector)].map((node) => {
+            const near = node.parentElement?.parentElement?.textContent?.trim().slice(0, 60) ?? '';
+            return `«${node.getAttribute('aria-label')}» рядом: ${near}`;
+          }),
+        WAITING,
+      );
+    const subSettled = await page.getByText(/(Подписка .+ на канон|Subscription of)/).count();
+    const subStill = await waitingNow();
+    await openTab(/^(Незакрытая работа|Unfinished work)/);
+    // Уход с вкладки отменил запрос в пути: вернувшись, раздел ждёт ответ заново.
+    await settle();
+    const carrySettled = await page.evaluate(() => document.body.innerText);
+    const carryStill = await waitingNow();
+    const stillWaiting = [...subStill, ...carryStill];
     check(
       'задержанный ответ доезжает: ожидание сменилось данными',
-      'ответ на экране, ожиданий нет',
-      `${TEXT.carryTarget.test(settled) ? 'ответ на экране' : 'ответа нет'}, ожиданий ${stillWaiting.length}${stillWaiting.length ? `: ${stillWaiting.join(' · ')}` : ''}`,
-      TEXT.carryTarget.test(settled) && stillWaiting.length === 0,
+      'ответ на обеих вкладках, ожиданий нет',
+      `подписка ${subSettled > 0 ? 'на экране' : 'не пришла'}, работа ${TEXT.carryTarget.test(carrySettled) ? 'на экране' : 'не пришла'}, ожиданий ${stillWaiting.length}${stillWaiting.length ? `: ${stillWaiting.join(' · ')}` : ''}`,
+      subSettled > 0 && TEXT.carryTarget.test(carrySettled) && stillWaiting.length === 0,
     );
     await page.unroute('**/api/**', slow);
 
@@ -534,15 +682,18 @@ try {
       }
       await route.continue();
     });
+    // Перезагрузка — на вкладке «Незакрытая работа»: её отказ читается там.
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.waitForSelector('nav');
-    await pause(3000);
-    // Цель после перезагрузки выбирается заново: без неё раздела подписки на
-    // экране нет вовсе, и проверка «слои не показаны погашенными» проверяла бы
-    // пустое место.
-    await page.locator('select').nth(1).selectOption(TARGET);
-    await pause(4000);
+    await textAppears([TEXT.carryFailed, TEXT.carryEmpty]);
     const broken = await page.evaluate(() => document.body.innerText);
+    // Цель браузер помнит; выбор повторяется на случай недоступной памяти: без
+    // цели раздела подписки на экране нет вовсе, и проверка «слои не показаны
+    // погашенными» проверяла бы пустое место.
+    await openTab(/^(Подписка|Subscription)/);
+    await page.getByLabel(/^(Цель переноса|Transfer target)$/).selectOption(TARGET);
+    await textAppears([TEXT.subscriptionsFailed, TEXT.noLayers]);
+    const brokenSub = await page.evaluate(() => document.body.innerText);
 
     check(
       'незакрытая работа: отказ чтения назван, а не «работы нет»',
@@ -557,12 +708,12 @@ try {
     check(
       'подписки: отказ чтения назван, а не «ни один слой не подписан»',
       'строка об отказе',
-      TEXT.subscriptionsFailed.test(broken)
+      TEXT.subscriptionsFailed.test(brokenSub)
         ? 'названа'
-        : TEXT.noLayers.test(broken)
+        : TEXT.noLayers.test(brokenSub)
           ? 'ЛОЖЬ: слои показаны погашенными'
           : 'ни того, ни другого',
-      TEXT.subscriptionsFailed.test(broken),
+      TEXT.subscriptionsFailed.test(brokenSub),
     );
   } finally {
     transfer.finish();

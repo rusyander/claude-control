@@ -62,5 +62,5 @@ export function composeUserMessage(text: string, attachments: string[] = []): st
   const paths = attachments.map((path) => path.trim()).filter(Boolean);
   if (paths.length === 0) return text.trim();
 
-  return [text.trim(), '', 'Файлы:', ...paths.map((path) => path)].join('\n').trim();
+  return [text.trim(), '', 'Files:', ...paths.map((path) => path)].join('\n').trim();
 }

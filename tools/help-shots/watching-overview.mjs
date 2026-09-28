@@ -13,22 +13,40 @@
 import { settings, location, emptyConfig, open, frame } from './watching-stubs.mjs';
 
 export async function shootTour(browser, web, scenario) {
-  const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+  // ── 01. Весь раздел: каталог, сводка изменений и плитки ──────────────────
+  // Копии в стенде датированы 7–10 сентября, а «Изменения за 7 дн.» считает
+  // браузер от своего «сейчас»: без переведённых часов кадр показывал 0 в
+  // любой день позже 14-го. Часы переводятся только здесь: на переведённых
+  // часах следующий вход на страницу оставлял `main` пустым.
+  const clocked = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+  try {
+    await clocked.clock.install({ time: new Date('2026-09-11T09:00:00Z') });
+    await clocked.clock.resume();
+    await settings(clocked);
+    await location(clocked);
+    await open(clocked, web, '/');
+    await clocked
+      .getByText(/Изменения за|Changes in/)
+      .first()
+      .waitFor({ timeout: 30_000 });
+    await clocked.waitForTimeout(800);
+    await frame(scenario, clocked, '01-tiles');
+  } finally {
+    await clocked.close();
+  }
 
+  const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   try {
     await settings(page);
     await location(page);
 
-    // ── 01. Весь раздел: каталог, сводка изменений и плитки ──────────────────
-    await open(page, web, '/');
-    await frame(scenario, page, '01-tiles');
-
     // ── 02. Плитка — дверь: число сходится со списком раздела ────────────────
+    await open(page, web, '/');
     await page
       .getByRole('link', { name: /Правила|Rules/ })
       .first()
       .click();
-    await page.waitForTimeout(1600);
+    await settled(page);
     await frame(scenario, page, '02-section');
 
     // ── 03. Быстрое действие ведёт сразу в форму создания ────────────────────
@@ -37,7 +55,7 @@ export async function shootTour(browser, web, scenario) {
       .getByRole('link', { name: /Добавить|Add/ })
       .nth(1)
       .click();
-    await page.waitForTimeout(1600);
+    await settled(page);
     await frame(scenario, page, '03-quick-add');
 
     // ── 04. Сводка изменений ведёт в историю ─────────────────────────────────
@@ -46,7 +64,7 @@ export async function shootTour(browser, web, scenario) {
       .getByRole('link', { name: /Изменения за|Changes in/ })
       .first()
       .click();
-    await page.waitForTimeout(1600);
+    await settled(page);
     await frame(scenario, page, '04-changes');
   } finally {
     await page.close();
@@ -90,4 +108,20 @@ export async function shootTrouble(browser, web, scenario) {
   } finally {
     await page.close();
   }
+}
+
+/**
+ * Переход дорисован: в `main` есть текст. Холодный Vite одноразовой панели
+ * собирает ленивый маршрут дольше фиксированной паузы, и кадр выходил пустым.
+ */
+async function settled(page) {
+  // Клик уводит с обзора не сразу: без ожидания адреса текст в `main` — ещё
+  // старой страницы.
+  await page.waitForURL((url) => url.pathname !== '/', { timeout: 30_000 });
+  await page.waitForFunction(
+    () => (document.querySelector('main')?.textContent ?? '').trim().length > 40,
+    null,
+    { timeout: 30_000 },
+  );
+  await page.waitForTimeout(800);
 }

@@ -108,6 +108,7 @@ export function buildResult(
     byProject,
     byHour,
     recentSessions,
+    periodSessions: acc.sessions.size,
     topTools,
     activeSessions: [...acc.sessions.values()].filter((session) => session.isActive).length,
     scannedFiles,

@@ -25,7 +25,9 @@ import { serverFieldText } from '@shared/config/i18n';
  * как есть, без повторов.
  */
 export function TestsRunDiff({ projectPath, runId, isOpenByDefault = false }: TestsRunDiffProps) {
-  const { t } = useTranslation();
+  // Дата — языком интерфейса, а не браузера: английская панель иначе
+  // показывала русские даты (F-323).
+  const { t, i18n } = useTranslation();
   const [isOpen, setIsOpen] = useState(isOpenByDefault);
   const diff = useTestRunDiff(projectPath, runId, undefined, isOpen);
 
@@ -72,7 +74,9 @@ export function TestsRunDiff({ projectPath, runId, isOpenByDefault = false }: Te
     <Stack gap="var(--spacing-2xs)">
       <Stack direction="row" gap="var(--spacing-2xs)" align="center" wrap>
         <Typography variant="caption" color="subtle" as="span">
-          {t('tests.diff.base', { date: new Date(data.from.startedAt).toLocaleString() })}
+          {t('tests.diff.base', {
+            date: new Date(data.from.startedAt).toLocaleString(i18n.language),
+          })}
         </Typography>
         {!isOpenByDefault && (
           <Button variant="ghost" size="sm" onClick={() => setIsOpen(false)}>
@@ -147,6 +151,11 @@ function DiffList({
           </Typography>
           {item.to && (
             <Badge tone={STATUS_TONE[item.to]}>{t(`projectTests.status.${item.to}`)}</Badge>
+          )}
+          {(item.flakyAttempts ?? 0) > 0 && (
+            <Badge tone="warning">
+              {t('tests.evidence.retryPass', { attempts: item.flakyAttempts })}
+            </Badge>
           )}
           {item.note && (
             <Typography variant="caption" color="subtle" as="span">

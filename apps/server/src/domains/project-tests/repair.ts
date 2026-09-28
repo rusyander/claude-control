@@ -1,5 +1,6 @@
 import type { ProjectTestCase, ProjectTestRunRecord } from '@agentdeck/contracts';
 import { readGroups, writeGroup } from './store.ts';
+import { writeRun } from './runs-store.ts';
 
 /**
  * Починка отметок прогона «из будущего».
@@ -89,4 +90,37 @@ export function repairFutureStamps(
     repaired.push(...fixes.values());
   }
   return repaired;
+}
+
+/** Что пишется в запись, пережившую панель: человек читает это в истории. */
+export const ORPHAN_RUN_ERROR =
+  'Панель перезапустилась, пока шёл прогон, и агент остановился вместе с ней. ' +
+  'Записанное им до этого осталось в файлах; черновик, если успел появиться, ждёт приёмки.';
+
+/**
+ * Запись агентского прогона «идёт», у которой нет живого прогона в этом процессе.
+ *
+ * Реестр прогонов живёт в памяти: перезапуск панели (сохранение серверного
+ * файла, перезагрузка машины) убивает процесс CLI вместе с ней, а запись на
+ * диске остаётся «идёт» навсегда — история, отчёт и агент панели продолжают
+ * докладывать о работе, которой нет. Ручной проход не трогаем: его ведёт
+ * человек, и у него своя судьба после перезапуска.
+ */
+export function settleOrphanRuns(
+  root: string,
+  runs: ProjectTestRunRecord[],
+  liveId: string | undefined,
+): string[] {
+  const settled: string[] = [];
+  for (const run of runs) {
+    if (run.status !== 'running' || run.actor !== 'agent' || run.id === liveId) continue;
+    writeRun(root, {
+      ...run,
+      status: 'error',
+      error: ORPHAN_RUN_ERROR,
+      messageCode: 'orphan-run-stopped',
+    });
+    settled.push(run.id);
+  }
+  return settled;
 }

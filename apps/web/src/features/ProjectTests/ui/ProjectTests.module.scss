@@ -19,17 +19,72 @@
   flex: none;
 }
 
+// Узкое место (1100px с боковой панелью, окно тестов в чате): у второстепенных
+// кнопок пульта и группы остаётся только значок, подпись уходит в доступное имя
+// и во всплывающую подсказку. Иначе пульт ложился в 4–6 строк и уводил таблицу
+// за низ экрана. Меряется ширина самого блока, а не окна: в окне чата он узкий
+// при любом экране.
+.narrowable {
+  container-type: inline-size;
+}
+
+@container (max-width: 1000px) {
+  .narrowLabel {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+// Оговорка об агенте прогона: заголовок строкой, текст по раскрытию.
+.note {
+  max-width: var(--text-measure, 72ch);
+
+  summary {
+    cursor: pointer;
+  }
+}
+
+// Полоса состояния группы в пульте: доли статусов без подписей внутри —
+// числа стоят рядом строкой, а полоса читается с одного взгляда.
+.miniStack {
+  display: inline-flex;
+  width: 120px;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--color-surface-sunken);
+}
+
+.miniStackPart {
+  display: block;
+  height: 100%;
+  flex-basis: 0;
+}
+
+.miniStackPassed {
+  background: var(--color-success);
+}
+
+.miniStackFailed {
+  background: var(--color-danger);
+}
+
+.miniStackSkipped {
+  background: var(--color-warning);
+}
+
+.miniStackRest {
+  background: var(--color-border);
+}
+
 // Поле пожелания растягивается, кнопки прогона держат свою ширину справа.
 .scope {
   flex: 1;
   min-width: 220px;
-
-  // Поле само по себе держит ширину «поиска»; здесь оно должно занять всё
-  // свободное место, иначе подсказка обрезается на полуслове.
-  > * {
-    width: 100%;
-    max-width: none;
-  }
 }
 
 // Веха — короткая строка («v1.4», «спринт 12»), и растягивать её незачем:
@@ -37,10 +92,28 @@
 .release {
   flex: none;
   width: 160px;
+}
 
-  > * {
-    width: 100%;
-    max-width: none;
+// Поля пульта — обычный ввод той же высоты, что кнопки рядом, без лупы:
+// это задание агенту и имя вехи, а не поиск по списку.
+.runInput {
+  box-sizing: border-box;
+  height: 36px;
+  padding: 0 var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background-color: var(--color-surface);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-body);
+  text-overflow: ellipsis;
+
+  &::placeholder {
+    color: var(--color-fg-subtle);
+  }
+
+  &:hover {
+    border-color: var(--color-border-strong);
   }
 }
 
@@ -74,14 +147,27 @@
 // Общая прокрутка увела бы дерево вверх ровно тогда, когда по нему выбирают.
 .libraryBody {
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
+  grid-template-columns: 240px minmax(0, 1fr);
   gap: var(--spacing-sm);
   flex: 1;
   min-height: 0;
 }
 
 .tree {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
   overflow: auto;
+
+  // Групп бывает два десятка: список групп берёт не больше половины колонки и
+  // прокручивается сам, иначе дерево секций уезжало под него за низ экрана.
+  > nav:first-child {
+    flex: none;
+    max-height: 50%;
+    overflow: auto;
+    scrollbar-width: thin;
+  }
+
   scrollbar-width: thin;
   min-height: 0;
   padding-right: var(--spacing-3xs);
@@ -111,6 +197,50 @@
 
 .filters {
   flex: none;
+}
+
+// Имя открытой группы в её шапке: сжимается первым, чтобы кнопки действий над
+// группой оставались в одной строке с ним, а не уезжали на вторую.
+.groupHead {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.spacer {
+  flex: 1;
+}
+
+// Колонка названия не уже этого: на узком экране значки статуса и важности не
+// переносятся, и без нижней границы название складывалось в столбик по слову.
+.cellTitle {
+  min-width: 240px;
+}
+
+// Условия отбора плашками в свёрнутой строке: подпись и крестик одной кнопкой.
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-3xs);
+  padding: 2px var(--spacing-2xs);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface-sunken);
+  color: var(--color-fg);
+  font: inherit;
+  font-size: var(--font-size-caption);
+  cursor: pointer;
+
+  &:hover {
+    border-color: var(--color-border-strong);
+  }
+}
+
+// Раскрытая панель фильтров — в рамке: иначе её поля читаются как продолжение
+// строки поиска, и непонятно, где кончается отбор и начинается список.
+.filterPanel {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
 }
 
 .query {
@@ -166,6 +296,43 @@
   white-space: nowrap;
 }
 
+// Поля панели выделения — одной высоты с кнопками и без подписей сверху (см.
+// `TestBulkToolbar`): так панель остаётся одной строкой и не двигает таблицу.
+.bulkControl {
+  box-sizing: border-box;
+  height: 32px;
+  max-width: 100%;
+  padding: 0 var(--spacing-xs);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background-color: var(--color-surface);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-body-sm);
+  text-overflow: ellipsis;
+
+  &::placeholder {
+    color: var(--color-fg-subtle);
+  }
+
+  &:hover {
+    border-color: var(--color-border-strong);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 1px;
+  }
+}
+
+// Поле значения тянется и сжимается: на узком экране оно уступает место
+// кнопкам, а не выталкивает их на вторую строку.
+.bulkInput {
+  flex: 1 1 200px;
+  min-width: 140px;
+  max-width: 360px;
+}
+
 // Строка дерева секций: подпись слева, счётчик справа, отступ задаёт глубину.
 .section {
   display: flex;
@@ -219,7 +386,8 @@
   td {
     padding: var(--spacing-3xs) var(--spacing-2xs);
     text-align: left;
-    vertical-align: top;
+    // Средняя линия строки — от глобальной основы таблиц (global.scss): значки
+    // статуса, текст и кнопки строки стоят на одной оси с заголовком.
     border-bottom: 1px solid var(--color-border);
   }
 
@@ -412,6 +580,13 @@
 // Первые шаги в пустом наборе: карточка вместо пустого списка. Ширина
 // ограничена, иначе строка объяснения растягивается на весь экран и читается
 // хуже, чем список кейсов, ради которого сюда и пришли.
+// Строка папки e2e над библиотекой: заметная, но не громче пульта прогона.
+.e2eCard {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 8px;
+}
+
 .onboarding {
   max-width: 720px;
   padding: var(--spacing-md);
@@ -455,4 +630,45 @@
   border: 1px solid var(--color-border-warning, var(--color-border));
   border-radius: 8px;
   background: var(--color-surface-sunken);
+}
+
+// История результатов кейса: компактная таблица с горизонтальной прокруткой
+// на узком экране — модалка кейса не должна расползаться вширь.
+.resultsScroll {
+  overflow-x: auto;
+}
+
+.resultsTable {
+  width: 100%;
+  border-collapse: collapse;
+
+  th {
+    padding: var(--spacing-2xs) var(--spacing-xs);
+    color: var(--color-fg-subtle);
+    font-size: var(--font-size-caption);
+    font-weight: 500;
+    text-align: left;
+    white-space: nowrap;
+  }
+
+  td {
+    padding: var(--spacing-2xs) var(--spacing-xs);
+    border-top: 1px solid var(--color-border);
+  }
+}
+
+.resultsRun {
+  color: var(--color-accent);
+  font-size: var(--font-size-caption);
+  white-space: nowrap;
+}
+
+// Причина — одной строкой; целиком в подсказке.
+.resultsReason {
+  display: inline-block;
+  max-width: 420px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
 }

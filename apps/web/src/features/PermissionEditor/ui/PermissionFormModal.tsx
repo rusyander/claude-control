@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { permissionPatternWellFormed } from '@agentdeck/contracts/permission-pattern';
 import {
   PERMISSION_PRESETS,
   type PermissionDecision,
@@ -14,6 +15,7 @@ import { Card } from '@shared/ui/card';
 import { Badge } from '@shared/ui/badge';
 import { FormWithAssistant } from '@shared/ui/form-with-assistant';
 import { toErrorMessage } from '@shared/api/client';
+import { presetText } from '@shared/config/i18n';
 import {
   permissionApi,
   PERMISSION_DECISIONS,
@@ -24,6 +26,7 @@ import {
 import { BulkCreate } from '@shared/ui/bulk-create';
 import type { PermissionFormModalProps } from './PermissionFormModal.types';
 import { looksLikePermission } from '../model/looksLikePermission';
+import { permissionAssistantSpec } from '../model/permissionAssistant';
 import styles from './PermissionFormModal.module.scss';
 
 /**
@@ -153,10 +156,10 @@ export function PermissionFormModal({
           }
           parseLine={(line) => {
             // Правило доступа — это имя инструмента, возможно с уточнением.
-            // Проверяем только, что скобки парные: остальное решает Claude Code.
-            const open = (line.match(/\(/g) ?? []).length;
-            const close = (line.match(/\)/g) ?? []).length;
-            if (open !== close) return { raw: line, error: t('bulk.unbalanced') };
+            // Проверяем только, что Claude Code разберёт скобки: остальное решает он.
+            if (!permissionPatternWellFormed(line)) {
+              return { raw: line, error: t('bulk.unbalanced') };
+            }
             if (findDuplicate({ pattern: line, decision, source: 'settings' }, rules)) {
               return { raw: line, error: t('permissions.formDuplicate') };
             }
@@ -177,21 +180,12 @@ export function PermissionFormModal({
         />
       ) : (
         <FormWithAssistant
-          kind={t('permissions.title')}
+          kind="permission rule"
           fields={{ pattern, decision }}
-          schema={{
-            pattern:
-              'Правило доступа: имя инструмента целиком (Bash, Read, WebFetch) или с уточнением — Bash(git push:*), mcp__сервер__инструмент',
-            decision: 'Решение: allow (делать без вопросов), ask (спрашивать), deny (запретить)',
-          }}
+          spec={permissionAssistantSpec(PERMISSION_DECISIONS)}
           onApply={(applied) => {
-            if (typeof applied.pattern === 'string') setPattern(applied.pattern);
-            if (
-              typeof applied.decision === 'string' &&
-              PERMISSION_DECISIONS.includes(applied.decision as PermissionDecision)
-            ) {
-              setDecision(applied.decision as PermissionDecision);
-            }
+            if (applied.pattern !== undefined) setPattern(applied.pattern);
+            if (applied.decision !== undefined) setDecision(applied.decision as PermissionDecision);
           }}
         >
           <Stack gap="var(--spacing-md)">
@@ -234,14 +228,20 @@ export function PermissionFormModal({
                         <Stack gap="var(--spacing-3xs)">
                           <Stack direction="row" align="center" gap="var(--spacing-xs)" wrap>
                             <Typography variant="body-sm" weight="medium" as="span">
-                              {preset.title}
+                              {presetText(t, 'permission', preset.id, 'title', preset.title)}
                             </Typography>
                             <Badge tone={RISK_TONE[preset.risk]}>
                               {t(`permissions.risk_${preset.risk}`)}
                             </Badge>
                           </Stack>
                           <Typography variant="caption" color="subtle" as="span">
-                            {preset.description}
+                            {presetText(
+                              t,
+                              'permission',
+                              preset.id,
+                              'description',
+                              preset.description,
+                            )}
                           </Typography>
                         </Stack>
 

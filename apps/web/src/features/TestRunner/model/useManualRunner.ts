@@ -97,6 +97,26 @@ export function formatElapsed(ms: number): string {
   return `${minutes}:${seconds}`;
 }
 
+/**
+ * Куда вести после отметки: к следующему НЕОТМЕЧЕННОМУ проходу, потом к
+ * первому открытому сначала; всё отмечено — остаться на месте.
+ *
+ * Соседний проход годится только при проходе подряд. Человек, вернувшийся
+ * перепройти пятый из семи, после отметки попадал на уже закрытый шестой и
+ * листал до места, где остановился, руками.
+ */
+export function nextOpenPoint(
+  points: { id: string }[],
+  results: { pointId: string }[],
+  from: number,
+): number {
+  const done = new Set(results.map((item) => item.pointId));
+  const ahead = points.findIndex((item, index) => index > from && !done.has(item.id));
+  if (ahead >= 0) return ahead;
+  const first = points.findIndex((item) => !done.has(item.id));
+  return first >= 0 ? first : from;
+}
+
 /** То, что уже отмечено по поинту: с ним человек и возвращается к пройденному. */
 export interface SavedPoint {
   steps: ProjectTestStepResult[];
@@ -202,7 +222,7 @@ export function useManualRunner(
 
   const submit = async (status: ProjectTestStatus): Promise<void> => {
     if (!session || !point) return;
-    await save.mutateAsync({
+    const saved = await save.mutateAsync({
       runId: session.runId,
       pointId: point.id,
       status,
@@ -211,7 +231,7 @@ export function useManualRunner(
       attachments,
       durationMs: Date.now() - startedAt,
     });
-    setCursor((value) => Math.min(value + 1, points.length - 1));
+    setCursor((value) => nextOpenPoint(points, saved?.results ?? [], value));
   };
 
   const attach = async (file: File): Promise<void> => {

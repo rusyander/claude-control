@@ -1,5 +1,5 @@
 /**
- * Кадры путеводителей «Проекты» и «Группы»: четыре сценария одной съёмкой.
+ * Кадры путеводителей «Проекты» и «Группы»: шесть сценариев одной съёмкой.
  *
  * Разделы сняты вместе потому, что у них один стенд и одни данные: группа
  * привязывается к проекту из того же реестра, а собственный `.claude` проекта
@@ -15,7 +15,10 @@
  *                    и почему панель его не правит;
  *   groups/bundle  — набор под задачу, который включают руками;
  *   groups/auto    — то же, но чтобы включалось само: привязка к проекту,
- *                    порядок работы и сценарий-автоматизация.
+ *                    строка «Когда» и сценарий из одних шагов;
+ *   groups/sources — откуда группы берутся: обнаружение, пара
+ *                    глобальная↔проектная, копия в общие, слияние;
+ *   groups/path    — «Путь» группы и окно шага с ассистентом.
  *
  * ПАНЕЛЬ ОДНОРАЗОВАЯ: каталог конфигурации во временной папке, свои порты, свой
  * фронт. Рабочий стенд не трогается, настоящий `~/.claude` не читается.
@@ -26,7 +29,7 @@
  *
  * Запуск: node tools/help-shots/projects-panel.mjs
  * Переменные: GUIDE_PANEL_PORT (5195), GUIDE_WEB_PORT (8905),
- *             GUIDE_ONLY — снять один сценарий (setup|local|bundle|auto).
+ *             GUIDE_ONLY — снять один сценарий (setup|local|bundle|auto|sources|path).
  */
 import { spawn } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
@@ -38,6 +41,8 @@ import { shootSetup } from './projects-setup.mjs';
 import { shootLocal } from './projects-local.mjs';
 import { shootBundle } from './groups-bundle.mjs';
 import { shootAuto } from './groups-auto.mjs';
+import { shootSources } from './groups-sources.mjs';
+import { shootPath } from './groups-path.mjs';
 
 const PANEL_PORT = Number(process.env.GUIDE_PANEL_PORT ?? 5195);
 const WEB_PORT = Number(process.env.GUIDE_WEB_PORT ?? 8905);
@@ -62,6 +67,8 @@ const SCENARIOS = [
   { only: 'local', topic: 'projects', name: 'local', shoot: shootLocal },
   { only: 'bundle', topic: 'groups', name: 'bundle', shoot: shootBundle },
   { only: 'auto', topic: 'groups', name: 'auto', shoot: shootAuto },
+  { only: 'sources', topic: 'groups', name: 'sources', shoot: shootSources },
+  { only: 'path', topic: 'groups', name: 'path', shoot: shootPath },
 ];
 
 const started = [];

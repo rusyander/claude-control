@@ -192,7 +192,7 @@ describe('терпимость разбора к именам полей', () =>
     // Название группы становится её единственной задачей: терять группу из-за
     // поля, которое человек и так читает в заголовке карточки, нельзя.
     expect(parsed?.groups[0]?.tasks).toEqual(['Документация: переписать README.md']);
-    expect(parsed?.groups[1]?.brief).toBe('Границы группы: src/index.test.js');
+    expect(parsed?.groups[1]?.brief).toBe('Group scope: src/index.test.js');
   });
 
   it('shared списком строк склеивается в общий контекст, а не теряется', () => {
@@ -292,7 +292,7 @@ describe('потолки предложения', () => {
   });
 
   it('потолок назван агенту в инструкции', () => {
-    expect(SPLIT_SYSTEM_PROMPT).toContain(`Групп не больше ${SPLIT_MAX_GROUPS}`);
+    expect(SPLIT_SYSTEM_PROMPT).toContain(`At most ${SPLIT_MAX_GROUPS} groups`);
     expect(SPLIT_SYSTEM_PROMPT).not.toContain('\n');
   });
 });
@@ -379,12 +379,14 @@ describe('разделение задач по чатам', () => {
     });
 
     expect(prompts).toHaveLength(2);
-    expect(prompts[0]).toContain('Доставка до готового MR');
+    expect(prompts[0]).toContain('Delivering a ready MR');
     expect(prompts[0]).toContain('ticket-delivery');
     // Ветка — та, что завёл git, с суффиксом, а не имя из предложения.
-    expect(prompts[0]).toContain('Ветку копии панель уже завела: feature/login-2.');
+    expect(prompts[0]).toContain(
+      "The panel has already created the copy's branch: feature/login-2.",
+    );
     // Задание группы при этом цело и идёт после преамбулы.
-    expect(prompts[0]).toMatch(/Доставка до готового MR[\s\S]*починить валидацию/);
+    expect(prompts[0]).toMatch(/Delivering a ready MR[\s\S]*починить валидацию/);
   });
 
   /**
@@ -414,7 +416,7 @@ describe('разделение задач по чатам', () => {
     expect(await run({ groupQuestions: 'human' })).toContain(GROUP_QUESTIONS_HUMAN_LINE);
     const byPlan = await run({ deliver: true });
     expect(byPlan).not.toContain(GROUP_QUESTIONS_HUMAN_LINE);
-    expect(byPlan).toContain('Развилку, для которой у тебя есть рекомендуемый вариант, решай сам');
+    expect(byPlan).toContain('Decide a fork for which you have a recommended option yourself');
     expect(byPlan).toContain(UNCONFIRMED_FINDING_LINE);
   });
 
@@ -432,7 +434,7 @@ describe('разделение задач по чатам', () => {
       },
     });
 
-    expect(prompts.some((prompt) => prompt.includes('Доставка до готового MR'))).toBe(false);
+    expect(prompts.some((prompt) => prompt.includes('Delivering a ready MR'))).toBe(false);
   });
 
   it('занятое имя ветки получает суффикс, а не отказ', async () => {
@@ -568,16 +570,16 @@ describe('разделение задач по чатам', () => {
     });
 
     expect(result.chats.every((chat) => chat.started)).toBe(true);
-    expect(prompts[0]).toContain('⚠ Подготовка копии');
-    expect(prompts[0]).toContain('кодом 1');
+    expect(prompts[0]).toContain('⚠ Copy preparation');
+    expect(prompts[0]).toContain('with code 1');
     expect(prompts[0]).toContain('ERR_PNPM_OUTDATED_LOCKFILE');
     expect(prompts[0]).toContain('починить валидацию');
     // Провал — не «окружение готово» (Д13): зависимости могут отсутствовать.
-    expect(prompts[0]).not.toContain('Окружение готово');
+    expect(prompts[0]).not.toContain('The environment is ready');
     // Удачная подготовка — в преамбуле как сделанное, без предупреждения.
-    expect(prompts[1]).not.toContain('Подготовка копии');
-    expect(prompts[1]).toContain('зависимости установлены');
-    expect(prompts[1]).toContain('начинай сразу с задачи');
+    expect(prompts[1]).not.toContain('Copy preparation');
+    expect(prompts[1]).toContain('dependencies installed');
+    expect(prompts[1]).toContain('start with the task right away');
     expect(result.chats[0]?.prompt).toBe(prompts[0]);
   });
 
@@ -611,17 +613,18 @@ describe('разделение задач по чатам', () => {
     });
 
     const [first] = prompts;
-    expect(first?.startsWith('Панель подготовила эту копию: Локальный слой: перенесено 3;')).toBe(
-      true,
-    );
-    expect(first).toContain('зависимости установлены командой «pnpm install --frozen-lockfile»');
-    expect(first).toContain('lock-файлы откачены: pnpm-lock.yaml');
-    expect(first).toContain('Окружение готово — не проверяй и не настраивай');
+    // Строка зеркала — по-английски, как всё задание (D-E): шаблон переведён.
+    expect(first?.startsWith('The panel prepared this copy: Local layer: 3 copied;')).toBe(true);
+    expect(first).toContain('dependencies installed with "pnpm install --frozen-lockfile"');
+    expect(first).toContain('lock files rewritten by the install were reverted: pnpm-lock.yaml');
+    expect(first).toContain('The environment is ready — do not check or set it up');
     // Само задание — после преамбулы, целиком.
     const task = PROPOSAL.groups[0]?.tasks[0] ?? '';
     expect(task).not.toBe('');
     expect(first).toContain(task);
-    expect(first?.indexOf('начинай сразу с задачи')).toBeLessThan(first?.indexOf(task) ?? -1);
+    expect(first?.indexOf('start with the task right away')).toBeLessThan(
+      first?.indexOf(task) ?? -1,
+    );
   });
 
   it('подготовка не настроена — преамбула прямо говорит, что зависимости не ставились (Д13)', async () => {
@@ -641,10 +644,10 @@ describe('разделение задач по чатам', () => {
     const [first] = prompts;
     // Так было в живом проекте: «готово» при пустых node_modules — и 5–10 минут
     // установки, дев-серверы и четыре переписанных lock-файла у детей.
-    expect(first).not.toContain('Окружение готово');
-    expect(first).toContain('Зависимости панель НЕ ставила');
-    expect(first).toContain('без запуска дев-серверов');
-    expect(first).toContain('lock-файлы');
+    expect(first).not.toContain('The environment is ready');
+    expect(first).toContain('The panel did NOT install dependencies');
+    expect(first).toContain('without starting dev servers');
+    expect(first).toContain('lock files');
   });
 
   it('группа в общем каталоге преамбулы не получает', async () => {
@@ -659,7 +662,9 @@ describe('разделение задач по чатам', () => {
         return true;
       },
     });
-    expect(prompts.every((prompt) => !prompt.includes('Панель'))).toBe(true);
+    expect(prompts.every((prompt) => !/The panel (prepared|created) this copy/.test(prompt))).toBe(
+      true,
+    );
   });
 
   it('подготовка копий идёт параллельно и ждётся до запуска', async () => {
@@ -910,7 +915,7 @@ describe('группа ревью по ссылке', () => {
     // Ветки MR не знает никто — копия от базы под именем из блока.
     expect(git.added).toEqual(['review/mr-42']);
     expect(started[0]?.review).toEqual({ url: MR, onMrBranch: false });
-    expect(started[0]?.prompt).toContain('отведена от базовой ветки');
+    expect(started[0]?.prompt).toContain('it is branched from the base');
   });
 
   it('задание — ревью MR, а не задание группы: править и писать в MR запрещено прямо', async () => {
@@ -918,7 +923,7 @@ describe('группа ревью по ссылке', () => {
 
     expect(started[0]?.prompt).toContain(MR);
     expect(started[0]?.prompt).toContain('deep-review');
-    expect(started[0]?.prompt).toContain('НИЧЕГО НЕ ПРАВЬ');
+    expect(started[0]?.prompt).toContain('EDIT NOTHING');
     expect(started[0]?.prompt).toContain('посмотри на обработку ошибок');
     expect(started[0]?.prompt).toContain('agentdeck:review');
   });
@@ -1030,15 +1035,15 @@ describe('работа в нескольких MR', () => {
 
     expect(git.added).toEqual(['feat/a', 'feat/b']);
     const [work, review] = started;
-    expect(work?.prompt).toContain(`работает в запросе на слияние ${MR1}`);
+    expect(work?.prompt).toContain(`works in the merge request ${MR1}`);
     expect(work?.prompt).toContain('реши конфликты с main');
-    expect(work?.prompt).not.toContain('НИЧЕГО НЕ ПРАВЬ');
+    expect(work?.prompt).not.toContain('EDIT NOTHING');
     // Работа идёт обычными стадиями и карточку решения по замечаниям не заводит.
     expect(work?.stage).toBe('plan');
     expect(work?.review).toBeUndefined();
     expect(linked[0]?.review).toBeUndefined();
     // Ревью соседнего MR — прежнее, только чтение.
-    expect(review?.prompt).toContain('НИЧЕГО НЕ ПРАВЬ');
+    expect(review?.prompt).toContain('EDIT NOTHING');
     expect(review?.review).toMatchObject({ url: MR2 });
   });
 });

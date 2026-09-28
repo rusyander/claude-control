@@ -1,23 +1,20 @@
 import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { EnvItem, EnvItemKind, EnvSkip } from '@agentdeck/contracts/portable-env';
+import type { EnvItemKind } from '@agentdeck/contracts/portable-env';
 import { Stack } from '@shared/ui/stack';
-import { Card } from '@shared/ui/card';
-import { Badge } from '@shared/ui/badge';
 import { PageHeader } from '@shared/ui/page-header';
-import { SelectField } from '@shared/ui/select-field';
 import { SkeletonList } from '@shared/ui/skeleton';
 import { LoadErrorCard } from '@shared/ui/load-error';
+import { PageTabs, PageTabPanel } from '@shared/ui/page-tabs';
+import { usePageTab } from '@shared/hooks/use-page-tab';
 import { EmptyState } from '@shared/ui/empty-state';
-import { Typography } from '@shared/ui/typography';
 import { useSettings } from '@entities/AppConfig';
 import { useProviders } from '@entities/Provider';
 import { useProjectRegistry } from '@entities/Project';
 import {
   usePortabilityPassport,
   useFidelityReport,
-  KIND_ORDER,
   kindLabelKey,
   usableTarget,
   type PortabilityLevel,
@@ -28,7 +25,10 @@ import { TransferSection } from './TransferSection';
 import { SubscriptionSection } from './SubscriptionSection';
 import { CarrySection } from './CarrySection';
 import { ProbeSection } from './ProbeSection';
-import styles from './PortabilityPage.module.scss';
+import { PortabilityPicker } from './PortabilityPicker';
+import { passportSections } from './model/passport-sections';
+import { PORTABILITY_TABS, PORTABILITY_TAB_ICONS, TARGET_TABS } from './model/tabs';
+import { readRememberedTarget, rememberTarget } from './model/target-memory';
 
 /**
  * Паспорт среды: что у человека НА САМОМ ДЕЛЕ настроено у одного CLI (П0.3).
@@ -55,6 +55,7 @@ export function PortabilityPage() {
   const { data: providers, isError: providersFailed, refetch: refetchProviders } = useProviders();
 
   const [chosen, setChosen] = useState('');
+  const { active: activeTab, select: selectTab } = usePageTab('portability', PORTABILITY_TABS);
 
   // Уровень записи. Дом по умолчанию — не «для удобства»: страница отвечает на
   // вопрос «что у меня настроено», а настроенное у человека в первую очередь
@@ -83,13 +84,34 @@ export function PortabilityPage() {
   // человек оставляет в состоянии цель, которой при новом источнике нет.
   // Действующую считает `usableTarget`, и дальше по экрану идёт только она —
   // список, запрос и таблица обязаны отвечать об одной и той же цели.
-  const [picked, setPicked] = useState('');
+  //
+  // Выбор помнит браузер зрителя: без памяти цель терялась при перезагрузке и
+  // после записи переноса, и три вкладки из пяти встречали пустыми.
+  const [picked, setPickedState] = useState(readRememberedTarget);
+  const setPicked = (value: string): void => {
+    rememberTarget(value);
+    setPickedState(value);
+  };
+
+  // Развёрнутые виды паспорта. Живут на странице, а не в карточке: уйдя на
+  // другую вкладку и вернувшись, человек видит паспорт тем, каким оставил.
+  const [openKinds, setOpenKinds] = useState<ReadonlySet<EnvItemKind>>(() => new Set());
+  const toggleKind = (kind: EnvItemKind): void => {
+    setOpenKinds((prev) => {
+      const next = new Set(prev);
+      if (next.has(kind)) next.delete(kind);
+      else next.add(kind);
+      return next;
+    });
+  };
   const target = usableTarget(
     picked,
     providerId,
     options.map((option) => option.value),
   );
-  const fidelity = useFidelityReport(providerId, target, level);
+  // Прогноз нужен только вкладке переноса: запомненная цель иначе заказывала
+  // отчёт на каждом открытии паспорта, где его никто не видит (F-247).
+  const fidelity = useFidelityReport(providerId, activeTab === 'transfer' ? target : '', level);
 
   /** Цели — все провайдеры, кроме источника: перенос в самого себя не перенос. */
   const targetOptions = useMemo(
@@ -101,12 +123,6 @@ export function PortabilityPage() {
   );
 
   const targetName = targetOptions.find((option) => option.value === target)?.label ?? target;
-
-  /** Уровни — ровно два; третьего у канона нет. */
-  const scopeOptions = [
-    { value: 'global', label: t('portability.scopeGlobal') },
-    { value: 'project', label: t('portability.scopeProject') },
-  ];
 
   /**
    * Проекты — из РЕЕСТРА панели: сервер принимает идентификатор записи, а не
@@ -124,43 +140,7 @@ export function PortabilityPage() {
   /** Уровень проекта выбран, а проект — нет: спрашивать сервер не о чем. */
   const levelReady = scope === 'global' || Boolean(project);
 
-  /** Записи по видам в порядке `KIND_ORDER`; вид без записей секции не рисует. */
-  const sections = useMemo(() => {
-    const items = passport.data?.items ?? [];
-    const skipped = passport.data?.skipped ?? [];
-
-    const byKind = new Map<EnvItemKind, EnvItem[]>();
-    for (const item of items) {
-      const list = byKind.get(item.kind);
-      if (list) list.push(item);
-      else byKind.set(item.kind, [item]);
-    }
-
-    const skipsByKind = new Map<EnvItemKind, EnvSkip[]>();
-    for (const skip of skipped) {
-      const list = skipsByKind.get(skip.kind);
-      if (list) list.push(skip);
-      else skipsByKind.set(skip.kind, [skip]);
-    }
-
-    // Вид, которого нет в порядке показа, всё равно попадает на экран — хвостом
-    // за известными. Потерять его значило бы показать среду без него.
-    const known = new Set<EnvItemKind>(KIND_ORDER);
-    const tail = [...byKind.keys(), ...skipsByKind.keys()].filter((kind) => !known.has(kind));
-
-    // Рубильник раздела: состояние источника, а не запись. Ищется по виду —
-    // список короткий и почти всегда пуст.
-    const states = passport.data?.sectionStates ?? [];
-
-    return [...KIND_ORDER, ...new Set(tail)]
-      .map((kind) => ({
-        kind,
-        items: byKind.get(kind) ?? [],
-        skipped: skipsByKind.get(kind) ?? [],
-        state: states.find((candidate) => candidate.kind === kind),
-      }))
-      .filter((section) => section.items.length > 0 || section.skipped.length > 0);
-  }, [passport.data]);
+  const sections = useMemo(() => passportSections(passport.data), [passport.data]);
 
   // Отказ сервера — не вечный скелет: заголовок с «?» и кнопка повторить.
   if ((settingsFailed || providersFailed) && (!settings || !providers)) {
@@ -213,11 +193,41 @@ export function PortabilityPage() {
             items={section.items}
             skipped={section.skipped}
             sectionState={section.state}
+            open={openKinds.has(section.kind)}
+            onToggle={() => toggleKind(section.kind)}
+            bodyId={`portability-kind-${section.kind}`}
           />
         ))}
       </Stack>
     );
   };
+
+  const usesTarget = TARGET_TABS.includes(activeTab);
+
+  /**
+   * Вкладка про конкретную цель без выбранной цели — не пустое место, а
+   * подсказка, чего не хватает: пустой экран читался бы как «переносить нечего».
+   */
+  const renderTargetTab = (content: ReactNode): ReactNode => {
+    if (!levelReady) return null;
+    if (!target) {
+      return (
+        <EmptyState
+          icon="swap"
+          title={t('pageTabs.portability.needsTarget')}
+          text={t('pageTabs.portability.needsTargetText')}
+        />
+      );
+    }
+    return content;
+  };
+
+  const tabs = PORTABILITY_TABS.map((id) => ({
+    id,
+    label: t(`pageTabs.portability.tab.${id}`),
+    icon: PORTABILITY_TAB_ICONS[id],
+    ...(id === 'passport' && passport.data ? { count: passport.data.items.length } : {}),
+  }));
 
   return (
     <Stack gap="var(--spacing-md)">
@@ -227,131 +237,88 @@ export function PortabilityPage() {
         helpTopic="portability"
       />
 
-      <Card padding="md">
-        <Stack gap="var(--spacing-sm)">
-          <Stack direction="row" gap="var(--spacing-sm)" align="end" className={styles.picker}>
-            <SelectField
-              label={t('portability.provider')}
-              value={providerId}
-              onChange={setChosen}
-              options={options}
-            />
-            <SelectField
-              label={t('portability.target')}
-              value={target}
-              onChange={setPicked}
-              options={targetOptions}
-            />
-            <SelectField
-              label={t('portability.scope')}
-              value={scope}
-              onChange={(value) => setScope(value === 'project' ? 'project' : 'global')}
-              options={scopeOptions}
-            />
-            {scope === 'project' && (
-              <SelectField
-                label={t('portability.project')}
-                value={project}
-                onChange={setProject}
-                options={projectOptions}
+      <PageTabs
+        page="portability"
+        label={t('pageTabs.portability.tabsLabel')}
+        tabs={tabs}
+        active={activeTab}
+        onSelect={selectTab}
+      />
+
+      <PageTabPanel
+        page="portability"
+        tab={activeTab}
+        hint={t(`pageTabs.portability.hint.${activeTab}`)}
+      >
+        {/* Выбор источника и уровня общий для всех вкладок, кроме незакрытой
+            работы: у неё своя цель — активный CLI, и чужие поля над ней читались
+            бы как её настройки. Цель переноса видна только там, где о ней речь. */}
+        {activeTab !== 'carry' && (
+          <PortabilityPicker
+            providerId={providerId}
+            onProvider={setChosen}
+            providerOptions={options}
+            showTarget={usesTarget}
+            target={target}
+            onTarget={setPicked}
+            targetOptions={targetOptions}
+            scope={scope}
+            onScope={setScope}
+            project={project}
+            onProject={setProject}
+            projectOptions={projectOptions}
+            levelReady={levelReady}
+            passport={activeTab === 'passport' ? passport.data : undefined}
+          />
+        )}
+
+        {activeTab === 'passport' && renderPassport()}
+
+        {/* Прогноз «что доедет» и сам перенос — одна вкладка: решение о переносе
+            принимается после прогноза, а не до него. Ждать отчёт при этом
+            незачем — след прошлого переноса и кнопка отмены нужны и тогда, когда
+            прогноз не посчитался. */}
+        {activeTab === 'transfer' &&
+          renderTargetTab(
+            <>
+              {fidelity.isError && (
+                <LoadErrorCard
+                  title={t('portability.fidelity.loadError')}
+                  text={t('portability.fidelity.loadErrorText')}
+                  onRetry={() => {
+                    void fidelity.refetch();
+                  }}
+                />
+              )}
+              {fidelity.isLoading && <SkeletonList rows={3} />}
+              {fidelity.data && <FidelityTable answer={fidelity.data} targetName={targetName} />}
+              <TransferSection
+                source={providerId}
+                target={target}
+                targetName={targetName}
+                level={level}
               />
-            )}
-          </Stack>
-
-          {/* Уровень проекта без проекта — не пустой экран молча: сказано, чего
-              не хватает, иначе человек читает отсутствие паспорта как «в этом
-              проекте ничего не настроено». */}
-          {!levelReady && (
-            <Typography variant="caption" color="muted">
-              {t('portability.projectNeeded')}
-            </Typography>
+            </>,
           )}
 
-          {passport.data && (
-            <Stack direction="row" gap="var(--spacing-xs)" className={styles.summary}>
-              <Badge tone="accent">
-                {t('portability.itemCount', { count: passport.data.items.length })}
-              </Badge>
-              {/* Цвет несёт только непрочитанное: пустой раздел — законная
-                  часть обычного дома, и красить из-за него весь паспорт значило
-                  бы приучить к предупреждению, которое ничего не значит. */}
-              <Badge
-                tone={
-                  passport.data.skipped.some((skip) => skip.reason !== 'empty')
-                    ? 'warning'
-                    : 'neutral'
-                }
-              >
-                {t('portability.skipCount', { count: passport.data.skipped.length })}
-              </Badge>
-              {/* Корень паспорта — тот самый каталог, из которого всё прочитано;
-                  без него человек не знает, чью среду он видит. */}
-              <Typography variant="caption" color="muted" className={styles.root}>
-                {passport.data.root || t('portability.rootUnknown')}
-              </Typography>
-            </Stack>
+        {activeTab === 'subscription' &&
+          renderTargetTab(
+            <SubscriptionSection
+              source={providerId}
+              target={target}
+              targetName={targetName}
+              level={level}
+            />,
           )}
-        </Stack>
-      </Card>
 
-      {/* Отчёт верности стоит НАД паспортом: выбрав цель, человек спрашивает
-          «что доедет», и ответ на этот вопрос не должен лежать под списком из
-          двух сотен записей. */}
-      {target && levelReady && fidelity.isError && (
-        <LoadErrorCard
-          title={t('portability.fidelity.loadError')}
-          text={t('portability.fidelity.loadErrorText')}
-          onRetry={() => {
-            void fidelity.refetch();
-          }}
-        />
-      )}
-      {target && levelReady && fidelity.isLoading && <SkeletonList rows={3} />}
-      {target && levelReady && fidelity.data && (
-        <FidelityTable answer={fidelity.data} targetName={targetName} />
-      )}
+        {activeTab === 'probe' &&
+          renderTargetTab(<ProbeSection target={target} targetName={targetName} scope={scope} />)}
 
-      {/* Перенос — под отчётом верности и над паспортом: решение принимается
-          после прогноза «что доедет», а не до него. Ждать отчёт при этом
-          незачем — след прошлого переноса и кнопка отмены нужны человеку, даже
-          когда прогноз не посчитался. */}
-      {target && levelReady && (
-        <TransferSection
-          source={providerId}
-          target={target}
-          targetName={targetName}
-          level={level}
-        />
-      )}
-
-      {/* Подписка — ПОД разовым переносом: сначала человек учится переносить
-          один раз и видит, что из этого выходит, и только потом решает, держать
-          ли цель согласованной дальше. Порядок здесь — порядок разговора, а не
-          порядок появления тикетов. */}
-      {target && levelReady && (
-        <SubscriptionSection
-          source={providerId}
-          target={target}
-          targetName={targetName}
-          level={level}
-        />
-      )}
-
-      {/* Перенос незакрытой работы (П6.1) — ПОД переносом среды и подпиской, и
-          цели у них разные: среда едет в выбранную цель, работа — к АКТИВНОМУ
-          CLI. Раздел называет свою цель сам и не зависит от выбора выше, чтобы
-          эта разница не читалась как одно и то же решение. Цели переноса среды
-          он не ждёт: незакрытые разговоры есть и когда цель не выбрана. */}
-      <CarrySection providers={options} />
-
-      {/* Проба — ПОД переносом: она отвечает на вопрос «а доехало ли на самом
-          деле», который возникает после применения. Стоять над ним она не может
-          и по смыслу: до переноса сверять с прогнозом нечего. */}
-      {target && levelReady && (
-        <ProbeSection target={target} targetName={targetName} scope={scope} />
-      )}
-
-      {renderPassport()}
+        {/* Перенос незакрытой работы (П6.1): цель у него своя — АКТИВНЫЙ CLI, и
+            раздел называет её сам. Выбор цели переноса среды он не ждёт:
+            незакрытые разговоры есть и когда цель не выбрана. */}
+        {activeTab === 'carry' && <CarrySection providers={options} />}
+      </PageTabPanel>
     </Stack>
   );
 }

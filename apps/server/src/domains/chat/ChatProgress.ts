@@ -45,9 +45,10 @@ export function buildProgress(records: TranscriptRecord[]): ChatProgress {
   for (const record of records) {
     const content = record.message?.content;
     if (record.timestamp) updatedAt = record.timestamp;
-    // Итог фоновой команды приходит отдельной репликой-уведомлением, строкой.
+    // Итог фоновой команды или субагента приходит отдельной репликой-уведомлением, строкой.
     if (typeof content === 'string') {
       shells.notice(content);
+      applyAgentNotices(content, agents);
       continue;
     }
     if (!Array.isArray(content)) continue;
@@ -61,8 +62,10 @@ export function buildProgress(records: TranscriptRecord[]): ChatProgress {
         applyToolResult(block, agents);
         shells.result(block, resultText(block));
       }
-      if (block.type === 'text' && record.type === 'user' && typeof block.text === 'string')
+      if (block.type === 'text' && record.type === 'user' && typeof block.text === 'string') {
         shells.notice(block.text);
+        applyAgentNotices(block.text, agents);
+      }
     }
   }
 
@@ -220,6 +223,30 @@ function applyToolResult(block: TranscriptBlock, agents: Map<string, ProgressAge
     status: block.is_error ? 'failed' : 'done',
     result: publicResult(text) || undefined,
   });
+}
+
+const TASK_NOTICE = /<task-notification>([\s\S]*?)<\/task-notification>/g;
+
+/**
+ * Итог фонового субагента. Вызов `Agent` отвечает распиской, а сам итог CLI
+ * пишет позже репликой `<task-notification>`, где `<tool-use-id>` — id вызова
+ * (claude 2.1.282, замер 28.09). Без этого субагент оставался «работающим»
+ * навсегда. Уведомлений в реплике бывает несколько — закрываем каждое своё.
+ */
+function applyAgentNotices(text: string, agents: Map<string, ProgressAgent>): void {
+  if (!text.includes('<task-notification>')) return;
+  for (const [, body = ''] of text.matchAll(TASK_NOTICE)) {
+    const id = /<tool-use-id>([^<]+)<\/tool-use-id>/.exec(body)?.[1]?.trim();
+    const agent = id ? agents.get(id) : undefined;
+    if (!id || !agent || agent.status !== 'running') continue;
+    const status = /<status>([^<]+)<\/status>/.exec(body)?.[1]?.trim();
+    const summary = /<summary>([\s\S]*?)<\/summary>/.exec(body)?.[1]?.trim();
+    agents.set(id, {
+      ...agent,
+      status: status === 'completed' ? 'done' : 'failed',
+      ...(agent.result || !summary ? {} : { result: summary }),
+    });
+  }
 }
 
 /** Расписка о запуске фонового субагента — не результат работы. */

@@ -10,6 +10,7 @@ import { Toggle } from '@shared/ui/toggle';
 import { TextField } from '@shared/ui/text-field';
 import { SelectField } from '@shared/ui/select-field';
 import { DLP_BUILTINS, builtinAsRegex, isRuleComplete, type BuiltinNames } from '@entities/Dlp';
+import { dlpRuleAnchor } from '@entities/PanelAgent';
 
 interface Props {
   rule: DlpRule;
@@ -60,7 +61,7 @@ export function DlpRuleRow({
   };
 
   return (
-    <Card padding="md">
+    <Card padding="md" data-agent-anchor={dlpRuleAnchor(rule.id)}>
       <Stack gap="var(--spacing-sm)">
         <Stack direction="row" align="center" justify="between" gap="var(--spacing-sm)" wrap>
           <Stack direction="row" align="center" gap="var(--spacing-xs)" minWidth={0}>

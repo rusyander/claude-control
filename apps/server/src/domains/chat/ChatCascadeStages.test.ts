@@ -95,7 +95,7 @@ describe('planCascadeStage: после работы', () => {
 
     expect(staged?.stage).toBe('deliver');
     expect(staged?.model).toBe('sonnet');
-    expect(staged?.prompt).toContain('отдельного ревью у неё нет');
+    expect(staged?.prompt).toContain('it has no separate review');
     expect(staged?.link).toMatchObject({ stage: 'deliver', parentChatId: 'parent' });
   });
 
@@ -201,8 +201,8 @@ describe('stageAppendPrompt', () => {
       text: REVIEW_BLOCK('{"findings":["поправь"]}'),
     });
 
-    expect(review && stageAppendPrompt(review, settings)).not.toContain('НИЖЕ потолка');
-    expect(fix && stageAppendPrompt(fix, settings)).toContain('НИЖЕ потолка');
+    expect(review && stageAppendPrompt(review, settings)).not.toContain('BELOW the ceiling');
+    expect(fix && stageAppendPrompt(fix, settings)).toContain('BELOW the ceiling');
   });
 
   it('делить звено дальше не предлагается: чат уже выделен под одну группу', () => {
@@ -262,7 +262,7 @@ describe('planCascadeStage: после плана и разбора', () => {
 
     expect(noBlock?.stage).toBe('work');
     expect(noBlock?.planMissing).toBe(true);
-    expect(noBlock?.prompt).toContain('панель не получила');
+    expect(noBlock?.prompt).toContain('The panel did not receive');
     expect(failed?.stage).toBe('work');
     expect(failed?.planMissing).toBe(true);
   });
@@ -276,7 +276,7 @@ describe('planCascadeStage: после плана и разбора', () => {
     expect(staged?.link.lowered).toBeUndefined();
     expect(
       staged && stageAppendPrompt(staged, { taskSplitInitiative: true, handoffInitiative: true }),
-    ).not.toContain('НИЖЕ потолка');
+    ).not.toContain('BELOW the ceiling');
   });
 
   it('понижённая работа после плана получает планку сдачи', () => {
@@ -284,7 +284,7 @@ describe('planCascadeStage: после плана и разбора', () => {
 
     expect(
       staged && stageAppendPrompt(staged, { taskSplitInitiative: true, handoffInitiative: true }),
-    ).toContain('НИЖЕ потолка');
+    ).toContain('BELOW the ceiling');
   });
 
   it('план отработан один раз: с отметкой plannedAt вторая работа не заводится', () => {
@@ -344,15 +344,15 @@ describe('planCascadeStage: контекст следующего звена', (
       deliver: true,
     });
     expect(staged?.stage).toBe('fix');
-    expect(staged?.prompt).toContain('Задание группы:');
+    expect(staged?.prompt).toContain('Group task:');
     expect(staged?.prompt).toContain('Переименуй foo в bar');
     expect(staged?.prompt).toContain('2. Заменить на bar');
-    expect(staged?.prompt).toContain('Ветка группы: split/rename.');
-    expect(staged?.prompt).toContain('Итог прошлого звена (ревью):');
+    expect(staged?.prompt).toContain('Group branch: split/rename.');
+    expect(staged?.prompt).toContain('Outcome of the previous stage (review):');
     expect(staged?.prompt).toContain('переименование неполное');
     expect(staged?.link).toMatchObject({ task: 'Переименуй foo в bar', planSummary: PLAN });
     // Аудит 25.09, L258: не воспроизвелось — не повод тянуть инфраструктуру.
-    expect(staged?.prompt).toContain('не повод менять инфраструктуру');
+    expect(staged?.prompt).toContain('is no reason to change infrastructure');
   });
 
   it('доставка после правок знает задание и итог правок и перечитывает обсуждения MR', () => {
@@ -363,14 +363,76 @@ describe('planCascadeStage: контекст следующего звена', (
     });
     expect(staged?.stage).toBe('deliver');
     expect(staged?.prompt).toContain('Переименуй foo в bar');
-    expect(staged?.prompt).toContain('Итог прошлого звена (правки):');
+    expect(staged?.prompt).toContain('Outcome of the previous stage (fixes):');
     expect(staged?.prompt).toContain('Поправил b.ts');
     // Аудит 25.09, L199: «готово» по MR — только после всех его обсуждений.
-    expect(staged?.prompt).toContain('перечитай ВСЕ обсуждения MR');
+    expect(staged?.prompt).toContain('re-read ALL discussions of the MR');
     // Аудит 25.09, L163: дифф сверяется с заданием, шаг за его границу — вопросом.
-    expect(staged?.prompt).toContain('Сверь дифф ветки с основной');
-    expect(staged?.prompt).toContain('выходит за задачи группы');
+    expect(staged?.prompt).toContain('Compare the diff of the branch against main');
+    expect(staged?.prompt).toContain('a step beyond the tasks of the group');
     // Контекст есть — «контекста у тебя нет» задание не говорит.
-    expect(staged?.prompt).not.toContain('контекста прошлых звеньев у тебя нет');
+    expect(staged?.prompt).not.toContain('you have no context of the previous stages');
+  });
+});
+
+describe('planCascadeStage: сита перед MR', () => {
+  const SIEVES = (body: string): string => ['```agentdeck:sieves', body, '```'].join('\n');
+  const calls: { stage: string; done: string[] }[] = [];
+  const sieves = (stage: 'review' | 'deliver', done: readonly { id: string }[]): string => {
+    calls.push({ stage, done: done.map((row) => row.id) });
+    return `SIEVES-${stage.toUpperCase()}`;
+  };
+
+  it('ревью получает абзац своих сит, строки работы едут в связь ревью', () => {
+    calls.length = 0;
+    const staged = plan({
+      text: `Сделал.\n${SIEVES('{"sieves":[{"id":"merge-tree","status":"pass","evidence":"git merge-tree → clean"}]}')}`,
+      sieves,
+    });
+    expect(staged?.stage).toBe('review');
+    expect(staged?.prompt).toContain('SIEVES-REVIEW');
+    expect(calls).toEqual([{ stage: 'review', done: ['merge-tree'] }]);
+    expect(staged?.link.sieveRows?.map((row) => row.id)).toEqual(['merge-tree']);
+  });
+
+  it('правки несут строки ревью дальше, доставка видит все и получает свой абзац', () => {
+    calls.length = 0;
+    const review = [
+      'Проверил дифф.',
+      '```agentdeck:review',
+      '{"findings":["a.ts:3 — off by one"]}',
+      '```',
+      SIEVES(
+        '{"sieves":[{"id":"contract-by-request","status":"pass","evidence":"curl /api/x → 404 as in docs"}]}',
+      ),
+    ].join('\n');
+    const fix = plan({
+      link: workLink({
+        stage: 'review',
+        workModel: 'sonnet',
+        sieveRows: [{ id: 'merge-tree', status: 'pass', evidence: 'git merge-tree → clean' }],
+      }),
+      text: review,
+      deliver: true,
+      sieves,
+    });
+    expect(fix?.stage).toBe('fix');
+    expect(fix?.link.sieveRows?.map((row) => row.id)).toEqual([
+      'merge-tree',
+      'contract-by-request',
+    ]);
+    if (!fix) return;
+    const deliver = plan({ link: fix.link, text: 'Поправил a.ts.', deliver: true, sieves });
+    expect(deliver?.stage).toBe('deliver');
+    expect(deliver?.prompt).toContain('SIEVES-DELIVER');
+    expect(calls.at(-1)).toEqual({
+      stage: 'deliver',
+      done: ['merge-tree', 'contract-by-request'],
+    });
+    expect(deliver?.link.sieveRows).toHaveLength(2);
+  });
+
+  it('без поставщика сит задание звена прежнее', () => {
+    expect(plan()?.prompt).not.toContain('SIEVES-');
   });
 });

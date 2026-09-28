@@ -7,7 +7,9 @@
  * CLI установлен на машине, — то есть был бы невоспроизводим.
  *
  * Проверяется то, ради чего этот чат сделан: разговоры в списке, ответ по мере
- * печати, остановка, и что переписка после ответа перечитывается.
+ * печати, остановка, и что переписка после ответа перечитывается. И что отказ
+ * 409 «ответ ещё идёт» (ход начат не этой вкладкой) не гасит индикатор: вкладка
+ * подключается к идущему ходу и дожидается его ответа (F-370).
  *
  * Запуск: `node tools/qa/check-provider-chat.mjs` при поднятом `pnpm dev`.
  */
@@ -32,6 +34,8 @@ const CHAT = {
 /** Переписка растёт по ходу прогона — как на настоящем сервере. */
 const messages = [];
 let isRunning = false;
+// Ход, начатый не этой вкладкой (другая вкладка, автомат): отправка получает 409.
+let busyElsewhere = false;
 let partial = '';
 
 const browser = await chromium.launch();
@@ -62,6 +66,13 @@ await page.route('**/api/provider-chat/chats/qa1/status', (route) =>
 );
 
 await page.route('**/api/provider-chat/chats/qa1/send', async (route) => {
+  if (busyElsewhere) {
+    return json(
+      route,
+      { message: 'Ответ на предыдущий вопрос ещё идёт', messageCode: 'foreign-answer-running' },
+      409,
+    );
+  }
   const body = JSON.parse(route.request().postData() ?? '{}');
   const message = {
     id: `u${messages.length}`,
@@ -97,6 +108,35 @@ let answered = 0;
 
 // Поток ответа: куски идут с паузами — ровно так его печатает настоящий CLI.
 await page.route('**/api/provider-chat/chats/qa1/stream', async (route) => {
+  if (busyElsewhere) {
+    // Чужой ход допечатывается не сразу: индикатор обязан держаться всё это время.
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+    const tail = ' — дописан';
+    messages.push({
+      id: `a${messages.length}`,
+      role: 'assistant',
+      content: `${partial}${tail}`,
+      at: new Date().toISOString(),
+      transport: 'stream',
+    });
+    busyElsewhere = false;
+    isRunning = false;
+    const frames = [
+      `data: ${JSON.stringify({ type: 'delta', text: tail })}
+
+`,
+      `data: ${JSON.stringify({ type: 'done' })}
+
+`,
+    ];
+    return route
+      .fulfill({
+        status: 200,
+        headers: { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' },
+        body: frames.join(''),
+      })
+      .catch(() => {});
+  }
   const chunks = ['Первая ', 'часть ', 'ответа'];
   const frames = chunks.map((text) => `data: ${JSON.stringify({ type: 'delta', text })}\n\n`);
   partial = chunks.join('');
@@ -138,6 +178,8 @@ await page.route('**/api/platform-run-plan/**', (route) => json(route, routedPla
 
 const errors = [];
 page.on('console', (message) => {
+  // 409 сценария «ход уже идёт» — ожидаемая строка консоли, не ошибка страницы.
+  if (message.text().includes('status of 409')) return;
   if (message.type() === 'error') errors.push(message.text());
 });
 
@@ -196,6 +238,28 @@ check(
   'у второго ответа время шага и сумма по разговору',
 );
 
+// Ход начат не этой вкладкой: сервер уже печатает, а вкладка об этом не знает.
+// Отправка получает 409 — индикатор не гаснет, вкладка подключается к ходу.
+busyElsewhere = true;
+isRunning = true;
+partial = 'Чужой ход идёт';
+await composer.fill('Третий вопрос');
+await page.getByRole('button', { name: 'Отправить' }).click();
+await page.waitForTimeout(1200);
+const duringBusy = await page.textContent('body');
+check(
+  (await page.getByRole('button', { name: 'Остановить' }).count()) >= 1,
+  '409 «ответ ещё идёт» — индикатор хода не погас (кнопка «Остановить» на месте)',
+);
+check(duringBusy.includes('Чужой ход идёт'), 'напечатанное идущим ходом видно');
+await page.waitForTimeout(3500);
+const afterBusy = await page.textContent('body');
+check(afterBusy.includes('Чужой ход идёт — дописан'), 'ответ идущего хода пришёл без перезагрузки');
+check(
+  (await page.getByRole('button', { name: 'Остановить' }).count()) === 0,
+  'ход кончился — индикатор погас',
+);
+
 // Ответ ревьюера из конвейера звеньев: блок вердикта служебный — по нему панель
 // заводит правки, а человеку в ленте нужен разбор словами. У Claude блок убирает
 // `MessageBubble`, у чужого чата своя лента, и до 08.09.2026 она показывала
@@ -213,6 +277,21 @@ messages.push({
   at: new Date().toISOString(),
   transport: 'stream',
 });
+// Заметка главному чату (`agentdeck:escalate`) — тоже служебный блок: её
+// показывает карточка у родителя, в ленте ребёнка сырой JSON не нужен (F-49).
+messages.push({
+  id: 'a-escalate',
+  role: 'assistant',
+  content: [
+    'Сделал миграцию.',
+    '',
+    '```agentdeck:escalate',
+    JSON.stringify({ severity: 'critical', text: 'Миграция удалит колонку' }),
+    '```',
+  ].join('\n'),
+  at: new Date().toISOString(),
+  transport: 'stream',
+});
 await page.reload({ waitUntil: 'domcontentloaded' });
 await page.waitForSelector('nav');
 await page.waitForTimeout(1500);
@@ -222,6 +301,11 @@ check(afterReview.includes('Два пункта требуют правки'), '
 check(
   !afterReview.includes('agentdeck:review') && !afterReview.includes('"findings"'),
   'служебный блок вердикта в ленте не показывается',
+);
+check(afterReview.includes('Сделал миграцию.'), 'текст вокруг заметки главному чату на месте');
+check(
+  !afterReview.includes('agentdeck:escalate') && !afterReview.includes('"severity"'),
+  'блок заметки главному чату в ленте не показывается',
 );
 // Реплика без времени — запись, сделанная до появления поля. Строки времени у
 // неё нет вовсе: выдуманный ноль хуже пустого места.

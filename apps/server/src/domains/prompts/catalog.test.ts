@@ -47,6 +47,6 @@ describe('промпт рисунка кодом', () => {
     expect(scan.pictures).toEqual([]);
     expect(scan.rejected).toBe(0);
     // Текст просьбы доезжает целиком: пример остаётся на виду у модели.
-    expect(scan.text).toContain('<title>Заявка проходит проверку</title>');
+    expect(scan.text).toContain('<title>A request goes through review</title>');
   });
 });

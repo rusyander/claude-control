@@ -28,6 +28,7 @@ import {
   contourEntryName,
   describeContourTargets,
   targetProfile,
+  TERMINAL_ROUTE,
   type ContourTarget,
 } from './targets.ts';
 
@@ -113,7 +114,13 @@ function writeTarget(
 
   if (write.kind === 'endpoint-env') {
     const previous = previousEnvValues(target, deps);
-    const profile = targetProfile(managed, platform.id, gateway.port, write.apiKind);
+    const profile = targetProfile(
+      managed,
+      platform.id,
+      gateway.port,
+      write.apiKind,
+      TERMINAL_ROUTE,
+    );
     // Токеном сюда идёт ЗАГЛУШКА — настоящего ключа этот код не видит вовсе.
     const result = applyEndpointProfile(
       profile,
@@ -145,7 +152,7 @@ function writeTarget(
   }
 
   const name = contourEntryName(platform.id);
-  const baseUrl = gatewayUrlFor(gateway.port, platform.id, write.apiKind);
+  const baseUrl = gatewayUrlFor(gateway.port, platform.id, write.apiKind, TERMINAL_ROUTE);
   const result: FileWriteResult =
     write.file.format === 'codex-toml'
       ? applyCodexEndpoint(write.filePath, name, baseUrl, deps.backupDir, write.file.wireApi)

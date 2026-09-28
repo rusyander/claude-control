@@ -89,7 +89,8 @@ export function createTreeRuns(deps: TreeRunsDeps): TreeRuns {
     stop: (chatId) => {
       const foreign = parseForeignChatKey(chatId);
       if (!foreign) return deps.registry.stop(chatId);
-      return deps.chats.stop(foreign.chatId);
+      // Остановка чужого CLI неподтверждённого исхода не знает: «да» или «нечего».
+      return deps.chats.stop(foreign.chatId) ? 'stopped' : 'absent';
     },
 
     isRunning: (chatId, sessionId) => {

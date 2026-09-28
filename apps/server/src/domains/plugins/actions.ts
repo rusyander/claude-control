@@ -31,6 +31,11 @@ async function runPluginCommand(command: string, args: string[]): Promise<Comman
  */
 const MARKETPLACE_SOURCE = /^[A-Za-z0-9._~:/@\\-]{1,300}$/;
 
+/** Годен ли источник для команды — агент панели спрашивает это до карточки. */
+export function isMarketplaceSource(source: string): boolean {
+  return MARKETPLACE_SOURCE.test(source);
+}
+
 /** Добавить маркетплейс: `claude plugin marketplace add <источник>`. */
 export function addMarketplace(
   source: string,

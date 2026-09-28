@@ -29,10 +29,15 @@ interface BridgeReply {
 }
 
 /** Запускает мост, зовёт `approve` один раз, возвращает решение. */
-function callBridge(port: number): Promise<BridgeReply> {
+function callBridge(port: number, extra: Record<string, string> = {}): Promise<BridgeReply> {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [BRIDGE], {
-      env: { ...process.env, PERM_RUN_ID: 'run-1', PERM_BASE_URL: `http://127.0.0.1:${port}` },
+      env: {
+        ...process.env,
+        PERM_RUN_ID: 'run-1',
+        PERM_BASE_URL: `http://127.0.0.1:${port}`,
+        ...extra,
+      },
       stdio: ['pipe', 'pipe', 'inherit'],
     });
     let buffer = '';
@@ -99,6 +104,45 @@ describe('мост разрешений переживает перезапус�
     } finally {
       server.close();
     }
+  }, 20_000);
+
+  it('панель лежит дольше прежних восьми повторов (~45 с) — мост всё равно дожидается', async () => {
+    // Сломанная правка ждёт исправления, сервер падает при загрузке: панель
+    // лежит минуту. Прежде мост сдавался через 45 с и отказывал за человека.
+    const port = await freePort();
+    let hits = 0;
+    const pending = callBridge(port);
+    await new Promise((done) => setTimeout(done, 47_000));
+    const server = await answerWith(port, { behavior: 'allow', updatedInput: { a: 1 } }, () => {
+      hits += 1;
+    });
+    try {
+      const reply = await pending;
+      expect(reply.behavior).toBe('allow');
+      expect(hits).toBe(1);
+    } finally {
+      server.close();
+    }
+  }, 90_000);
+
+  it('срок ожидания всё же кончается — отказ с причиной, а не вечное ожидание', async () => {
+    const port = await freePort();
+    const started = Date.now();
+    const reply = await callBridge(port, { PERM_RETRY_WINDOW_MS: '1500' });
+    expect(reply).toEqual({
+      behavior: 'deny',
+      message: 'Could not reach the AgentDeck panel to confirm the permission.',
+    });
+    expect(Date.now() - started).toBeLessThan(10_000);
+  }, 20_000);
+
+  it('срок по умолчанию следует пределу вызова у CLI: дольше него ждать незачем', async () => {
+    // MCP_TOOL_TIMEOUT 2 с → срок 1,8 с: CLI оборвал бы вызов сам, молча.
+    const port = await freePort();
+    const started = Date.now();
+    const reply = await callBridge(port, { MCP_TOOL_TIMEOUT: '2000' });
+    expect(reply.behavior).toBe('deny');
+    expect(Date.now() - started).toBeLessThan(10_000);
   }, 20_000);
 
   it('отказ, который вернул сам сервер, не повторяется', async () => {

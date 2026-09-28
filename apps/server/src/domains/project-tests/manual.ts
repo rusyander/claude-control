@@ -6,15 +6,24 @@ import type {
   ProjectTestPoint,
   ProjectTestPointResult,
   ProjectTestRunRecord,
+  ProjectTestUnwalkedPoint,
 } from '@agentdeck/contracts';
-import { summarize } from '@agentdeck/contracts/test-format';
-import { ProjectTestsError, ProjectTestsNotFoundError } from './files.ts';
+import { applyParams, expandSteps, summarize } from '@agentdeck/contracts/test-format';
+import {
+  ProjectTestsError,
+  ProjectTestsLockedError,
+  ProjectTestsNotFoundError,
+  readJson,
+  testsPath,
+  writeJson,
+} from './files.ts';
 import { applyResults, readGroups, selectCases } from './store.ts';
-import { readEnvironments } from './library.ts';
+import { readEnvironments, readSharedSteps } from './library.ts';
 import { buildPoints, planCases, readPlan } from './plans.ts';
 import { gitContext, releaseTag } from './impact.ts';
-import { writeRun } from './runs-store.ts';
+import { readRun, readRuns, writeRun } from './runs-store.ts';
 import { coded } from '../../lib/server-text.ts';
+import { removeEntry } from '../../lib/safe-io.ts';
 
 /**
  * Ручной прогон: кейсы проходит ЧЕЛОВЕК, панель записывает.
@@ -30,10 +39,27 @@ import { coded } from '../../lib/server-text.ts';
  */
 export class ProjectTestManualRegistry {
   private readonly sessions = new Map<string, ProjectTestManualSession>();
+  /** Проекты, чью сессию уже пробовали поднять с диска в этом процессе. */
+  private readonly restored = new Set<string>();
 
-  /** Идущая сессия проекта. */
+  /**
+   * Идущая сессия проекта.
+   *
+   * После перезапуска панели память пуста, а человек посреди прохода: сессия
+   * поднимается из `runs/manual.session.json`. Без этого рестарт (обновление,
+   * dev-watch, перезагрузка) обрывал проход — отметить следующий кейс было
+   * нельзя, а запись прогона навсегда оставалась «идёт».
+   */
   get(projectPath: string): ProjectTestManualSession | undefined {
-    return this.sessions.get(projectPath);
+    const live = this.sessions.get(projectPath);
+    if (this.restored.has(projectPath)) return live;
+    const session = live ?? restoreSession(projectPath);
+    if (session && !live) this.sessions.set(projectPath, session);
+    // «Поднят» — только когда закрытие брошенных записей прошло: упало (EPERM
+    // от антивируса) — следующий get() попробует снова. Раньше отметка стояла
+    // до подъёма, и сбой терял идущую сессию до конца процесса (F-352).
+    if (closeAbandoned(projectPath, session?.runId)) this.restored.add(projectPath);
+    return session;
   }
 
   /** Начать ручной прогон по плану, группе или отобранным кейсам. */
@@ -43,10 +69,11 @@ export class ProjectTestManualRegistry {
     now: string,
     assertUnlocked?: (groupId: string) => void,
   ): ProjectTestManualSession {
-    const active = this.sessions.get(root);
+    const active = this.get(root);
     if (active && !active.finishedAt) {
+      // Как у прогона агента: занято — 409 с id идущего прохода.
       throw coded(
-        new ProjectTestsError('Ручной прогон по этому проекту уже идёт.'),
+        new ProjectTestsLockedError('Ручной прогон по этому проекту уже идёт.', active.runId),
         'manual-already-running',
       );
     }
@@ -122,7 +149,7 @@ export class ProjectTestManualRegistry {
     // результат прохода. Запись прогона состоит из этих результатов, а «чем
     // доказаны провалы» читает именно её — пока разбор был только в кейсе,
     // честно отмеченный красный шаг с заметкой числился «с разбором шага: 0».
-    const failure = failureOf(input);
+    const failure = failureOf(input, expectedOf(root, point));
     const result: ProjectTestPointResult = {
       pointId: point.id,
       groupId: point.groupId,
@@ -145,19 +172,25 @@ export class ProjectTestManualRegistry {
       ? session.results.map((item) => (item.pointId === result.pointId ? result : item))
       : [...session.results, result];
 
-    // Статус кейса — это ПОСЛЕДНИЙ результат, поэтому пишем его сразу, а не в
-    // конце: человек может закрыть окно на середине прогона, и половина
-    // проверенного не должна пропасть.
+    // Статус кейса пишем сразу, а не в конце: человек может закрыть окно на
+    // середине прогона, и половина проверенного не должна пропасть. У кейса с
+    // параметрами проходов несколько, и статус — ХУДШИЙ из них в этом прогоне:
+    // по последнему зелёный второй проход прятал красный первый.
+    const decisive = worstOf(
+      session.results.filter(
+        (item) => item.groupId === result.groupId && item.caseId === result.caseId,
+      ),
+    );
     applyResults(
       root,
       [
         {
           groupId: result.groupId,
           caseId: result.caseId,
-          status: result.status,
-          statusId: result.statusId,
-          note: result.note,
-          failure,
+          status: decisive.status,
+          statusId: decisive.statusId,
+          note: decisive.note,
+          failure: decisive.failure,
           attachments: result.attachments,
           runId: session.runId,
           at: now,
@@ -189,7 +222,7 @@ export class ProjectTestManualRegistry {
    * переписать её на «stopped» значило бы соврать в истории.
    */
   cancel(root: string, runId: string, now: string): void {
-    const session = this.sessions.get(root);
+    const session = this.get(root);
     if (!session || session.runId !== runId) return;
     if (!session.finishedAt) {
       session.finishedAt = now;
@@ -198,19 +231,18 @@ export class ProjectTestManualRegistry {
     this.sessions.delete(root);
   }
 
-  /** Погасить все сессии — вызывается при выходе сервера панели. */
-  stopAll(now: string): void {
-    for (const [root, session] of this.sessions) {
-      if (!session.finishedAt) {
-        session.finishedAt = now;
-        this.persist(root, session, 'stopped');
-      }
-    }
+  /**
+   * Выход сервера панели: идущий проход НЕ бросается. Его сессия уже на диске,
+   * и следующий запуск панели поднимет её — человек продолжит с того же кейса,
+   * а не начнёт заново. Параметр времени оставлен ради прежней подписи.
+   */
+  stopAll(_now: string): void {
     this.sessions.clear();
+    this.restored.clear();
   }
 
   private require(root: string, runId: string): ProjectTestManualSession {
-    const session = this.sessions.get(root);
+    const session = this.get(root);
     if (!session)
       throw coded(new ProjectTestsNotFoundError('Ручной прогон не начат.'), 'manual-not-started');
     if (session.runId !== runId)
@@ -240,9 +272,91 @@ export class ProjectTestManualRegistry {
       finishedAt: session.finishedAt,
       results: session.results,
       summary: summarize(session.results),
+      planned: session.points.length,
+      unwalked: unwalkedOf(session),
     };
     writeRun(root, record);
+    // Сессия лежит рядом с записью, пока проход идёт: по ней рестарт панели
+    // продолжает его. Закрытому проходу поднимать нечего — файл убирается.
+    if (status === 'running') writeJson(root, SESSION_FILE, session);
+    // Поштучное удаление, не rmSync: на путях не латиницей тот рапортует успех,
+    // оставляя файл (.claude/gotchas.md, «Windows filesystem»), — а забытая
+    // сессия воскресила бы закрытый проход при следующем старте.
+    else {
+      try {
+        removeEntry(testsPath(root, SESSION_FILE));
+      } catch {
+        // Запись уже закрыта; EBUSY на удалении — не ошибка завершения:
+        // оставшийся файл при подъёме сверяется с записью и не воскрешает
+        // законченный проход (F-353).
+      }
+    }
   }
+}
+
+/** Идущая ручная сессия проекта на диске — одна, как и в памяти. */
+const SESSION_FILE = 'runs/manual.session.json';
+
+/**
+ * Поднять идущую сессию с диска после перезапуска панели.
+ *
+ * Заодно закрываются записи ручных прогонов, которые остались «идёт» без
+ * сессии (панель погасла до этой правки или файл сессии потерян): продолжить
+ * их нельзя, а «идёт» в истории — неправда, которая к тому же никогда не
+ * кончится. Закрываются как брошенные, временем последней отметки.
+ */
+function restoreSession(root: string): ProjectTestManualSession | undefined {
+  const session = parseSession(readJson(root, SESSION_FILE).data);
+  if (!session) return undefined;
+  // Файл сессии, чья запись уже закрыта (удаление после «done» не удалось), —
+  // остаток, а не идущий проход.
+  const record = readRun(root, session.runId);
+  return record && record.status !== 'running' ? undefined : session;
+}
+
+/** Закрыть брошенные записи; false — запись не удалась, попробовать позже. */
+function closeAbandoned(root: string, liveRunId: string | undefined): boolean {
+  try {
+    for (const run of readRuns(root, 200)) {
+      if (run.mode !== 'manual' || run.status !== 'running' || run.id === liveRunId) continue;
+      const last = run.results
+        .map((item) => item.finishedAt ?? '')
+        .sort()
+        .at(-1);
+      writeRun(root, { ...run, status: 'stopped', finishedAt: last || run.startedAt });
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Разбор файла сессии: битый или чужой файл — сессии нет, а не исключение. */
+function parseSession(data: unknown): ProjectTestManualSession | undefined {
+  if (!data || typeof data !== 'object') return undefined;
+  const session = data as Partial<ProjectTestManualSession>;
+  if (typeof session.runId !== 'string' || typeof session.startedAt !== 'string') return undefined;
+  if (!Array.isArray(session.points) || session.finishedAt) return undefined;
+  return {
+    ...session,
+    runId: session.runId,
+    startedAt: session.startedAt,
+    points: session.points,
+    results: Array.isArray(session.results) ? session.results : [],
+    index: typeof session.index === 'number' ? session.index : 0,
+  };
+}
+
+/** Непройденные проходы именами — для записи; пусто — поля нет. */
+function unwalkedOf(session: ProjectTestManualSession): ProjectTestUnwalkedPoint[] | undefined {
+  const open = remainingPoints(session).map((point) => ({
+    pointId: point.id,
+    groupId: point.groupId,
+    caseId: point.caseId,
+    title: point.title,
+    ...(point.params && Object.keys(point.params).length > 0 ? { params: point.params } : {}),
+  }));
+  return open.length > 0 ? open : undefined;
 }
 
 /** Сколько проходов осталось — панель показывает это полосой прогресса. */
@@ -257,10 +371,40 @@ export function remainingPoints(session: ProjectTestManualSession): ProjectTestP
  * Агент пишет `failure` сам, тестировщик ставит галочки — и без этого ручной
  * провал в отчёте числился «недоказанным», хотя шаг и причина были отмечены.
  */
-function failureOf(input: ProjectTestManualResultInput): ProjectTestFailure | undefined {
+function failureOf(
+  input: ProjectTestManualResultInput,
+  expected: (index: number) => string | undefined,
+): ProjectTestFailure | undefined {
   if (input.status !== 'failed' && input.status !== 'blocked') return undefined;
   const red = input.steps?.find((step) => step.status === 'failed' || step.status === 'blocked');
   const actual = red?.note?.trim() || input.note?.trim() || undefined;
   if (!red && !actual) return undefined;
-  return { step: red ? red.index + 1 : undefined, actual };
+  const wanted = red ? expected(red.index) : undefined;
+  return { step: red ? red.index + 1 : undefined, ...(wanted ? { expected: wanted } : {}), actual };
+}
+
+/**
+ * Ожидание шага прохода так, как его видел человек: общие шаги раскрыты,
+ * параметры подставлены. Номер шага в отметке считается по раскрытому списку —
+ * тому же, что рисует пульт.
+ */
+function expectedOf(root: string, point: ProjectTestPoint): (index: number) => string | undefined {
+  return (index) => {
+    const testCase = readGroups(root)
+      .find((group) => group.id === point.groupId)
+      ?.cases.find((item) => item.id === point.caseId);
+    if (!testCase) return undefined;
+    const step = expandSteps(testCase.steps, readSharedSteps(root))[index];
+    return step?.expected ? applyParams(step.expected, point.params ?? {}) : undefined;
+  };
+}
+
+/** Чем тяжелее исход, тем раньше он решает статус кейса. */
+const SEVERITY: Record<string, number> = { failed: 4, blocked: 3, skipped: 2, passed: 1 };
+
+/** Решающий проход кейса: худший, при равенстве — последний отмеченный. */
+function worstOf(results: ProjectTestPointResult[]): ProjectTestPointResult {
+  return results.reduce((worst, item) =>
+    (SEVERITY[item.status] ?? 0) >= (SEVERITY[worst.status] ?? 0) ? item : worst,
+  );
 }

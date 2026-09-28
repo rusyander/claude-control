@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { GroupMember, GroupScenario } from '@agentdeck/contracts';
+import type { GroupDraft, GroupMember } from '@agentdeck/contracts';
+import { toErrorMessage } from '@shared/api/client';
 import { Stack } from '@shared/ui/stack';
 import { Modal } from '@shared/ui/modal';
 import { Button } from '@shared/ui/button';
@@ -9,11 +10,12 @@ import { Typography } from '@shared/ui/typography';
 import { FormWithAssistant } from '@shared/ui/form-with-assistant';
 import { useSaveGroup } from '@entities/Group';
 import { permissionApi } from '@entities/Permission';
+import { useProjectRegistry } from '@entities/Project';
 import { envToText, textToEnv } from '@shared/lib/env-text';
+import { groupAssistantSpec, memberRef, membersFromRefs } from '../model/groupAssistant';
+import { useMemberCatalog } from '../model/useMemberCatalog';
 import { MemberPicker } from './MemberPicker';
 import { ProjectBinding } from './ProjectBinding';
-import { ScenarioFields } from './ScenarioFields';
-import { EMPTY_SCENARIO } from './ScenarioFields.constants';
 import type { GroupFormModalProps } from './GroupFormModal.types';
 
 /**
@@ -28,10 +30,16 @@ export function GroupFormModal({ isOpen, onOpenChange, group }: GroupFormModalPr
   const [members, setMembers] = useState<GroupMember[]>([]);
   const [envText, setEnvText] = useState('');
   const [projectPaths, setProjectPaths] = useState<string[]>([]);
-  const [scenario, setScenario] = useState<GroupScenario>(EMPTY_SCENARIO);
+  const [when, setWhen] = useState('');
 
-  const saveGroup = useSaveGroup();
+  // Отказ — одной строкой в окне с причиной сервера: общий тост рядом с
+  // «не сохранилось» давал два сообщения, и нужное пряталось.
+  const saveGroup = useSaveGroup({ silentError: true });
+  const [failure, setFailure] = useState('');
   const { data: permissions = [] } = permissionApi.useList();
+  // Помощник выбирает участников и проекты из того же, что видит человек.
+  const { items: catalog } = useMemberCatalog(group?.id);
+  const { data: projects = [] } = useProjectRegistry();
 
   // Конфликт внутри группы: два участника-права с одним шаблоном, но разными
   // решениями (allow и deny разом). Claude Code возьмёт какое-то одно, а группа
@@ -58,29 +66,40 @@ export function GroupFormModal({ isOpen, onOpenChange, group }: GroupFormModalPr
     setMembers(group?.members ?? []);
     setEnvText(group ? envToText(group.env) : '');
     setProjectPaths(group?.projectPaths ?? []);
-    setScenario(group?.scenario ?? EMPTY_SCENARIO);
+    setWhen(group?.when ?? group?.scenario?.when ?? '');
+    setFailure('');
   }, [isOpen, group]);
 
   const canSave = name.trim().length > 0 && !saveGroup.isPending;
 
   const handleSave = (): void => {
+    setFailure('');
+    const draft: GroupDraft = {
+      name: name.trim(),
+      description: description.trim(),
+      color: group?.color ?? 'accent',
+      icon: group?.icon ?? 'folder',
+      members,
+      env: textToEnv(envText),
+      projectPaths,
+      // Порядок работы переехал во вкладку «Путь»; старый сценарий форма больше
+      // не правит, но и не теряет — его переносит сервер, а не сохранение формы.
+      scenario: group?.scenario,
+      // Область не правится формой: без неё проектная группа при сохранении
+      // молча стала бы глобальной.
+      scope: group?.scope,
+      // Строкой, а не `|| undefined`: сервер отличает «поля не прислали»
+      // (прежнее «Когда» остаётся) от «прислали пустое» (стёрли). С
+      // `undefined` ключ выпадал из JSON, и очистка молча не работала.
+      when: when.trim(),
+      isEnabled: group?.isEnabled ?? true,
+    };
     saveGroup.mutate(
+      { id: group?.id, draft },
       {
-        id: group?.id,
-        draft: {
-          name: name.trim(),
-          description: description.trim(),
-          color: group?.color ?? 'accent',
-          icon: group?.icon ?? 'folder',
-          members,
-          env: textToEnv(envText),
-          projectPaths,
-          // Пустой сценарий не сохраняем: он завёл бы скилл без шагов.
-          scenario: scenario.steps.length > 0 ? scenario : undefined,
-          isEnabled: group?.isEnabled ?? true,
-        },
+        onSuccess: () => onOpenChange(false),
+        onError: (error) => setFailure(toErrorMessage(error) || t('errors.saveFailed')),
       },
-      { onSuccess: () => onOpenChange(false) },
     );
   };
 
@@ -88,7 +107,7 @@ export function GroupFormModal({ isOpen, onOpenChange, group }: GroupFormModalPr
     <Modal
       isOpen={isOpen}
       onOpenChange={onOpenChange}
-      title={group ? `${t('common.edit')}: ${group.name}` : t('groups.addGroup')}
+      title={group ? `${t('common.edit')}: ${group.name}` : t('groupsPage.create.bundleTitle')}
       size="xl"
       footer={
         <>
@@ -105,17 +124,23 @@ export function GroupFormModal({ isOpen, onOpenChange, group }: GroupFormModalPr
       }
     >
       <FormWithAssistant
-        kind={t('groups.title')}
-        fields={{ name, description, envText }}
-        schema={{
-          name: 'Название группы',
-          description: 'Для чего эта группа',
-          envText: 'Переменные окружения группы по строке в формате KEY=VALUE',
+        kind="group"
+        fields={{
+          name,
+          description,
+          when,
+          envText,
+          members: members.map(memberRef),
+          projectPaths,
         }}
+        spec={groupAssistantSpec({ catalog, members, projects, projectPaths })}
         onApply={(applied) => {
-          if (typeof applied.name === 'string') setName(applied.name);
-          if (typeof applied.description === 'string') setDescription(applied.description);
-          if (typeof applied.envText === 'string') setEnvText(applied.envText);
+          if (applied.name !== undefined) setName(applied.name);
+          if (applied.description !== undefined) setDescription(applied.description);
+          if (applied.when !== undefined) setWhen(applied.when);
+          if (applied.envText !== undefined) setEnvText(applied.envText);
+          if (applied.members) setMembers(membersFromRefs(applied.members, members, group?.scope));
+          if (applied.projectPaths) setProjectPaths(applied.projectPaths);
         }}
       >
         <Stack gap="var(--spacing-md)">
@@ -135,11 +160,32 @@ export function GroupFormModal({ isOpen, onOpenChange, group }: GroupFormModalPr
             rows={2}
           />
 
+          <TextField
+            label={t('groups.groupWhen')}
+            value={when}
+            onChange={setWhen}
+            placeholder={t('groups.groupWhenPlaceholder')}
+            hint={t('groups.groupWhenHint')}
+          />
+
           <Stack gap="var(--spacing-2xs)">
             <Typography variant="body-sm" weight="medium">
               {t('groups.membersTitle')}
             </Typography>
-            <MemberPicker value={members} onChange={setMembers} excludeGroupId={group?.id} />
+            {/* Как у выбора шага (F-100): новый участник выключенной группы
+                выключается не в группе, а везде (`reconcileMembers` на сервере) —
+                человек узнаёт это до того, как отметит. */}
+            {group && !group.isEnabled && (
+              <Typography variant="body-sm" color="warning" data-group-off-warning>
+                {t('groups.membersGroupOff')}
+              </Typography>
+            )}
+            <MemberPicker
+              value={members}
+              onChange={setMembers}
+              excludeGroupId={group?.id}
+              groupScope={group?.scope}
+            />
             {conflicts.length > 0 && (
               <Typography variant="caption" color="warning" as="span">
                 {t('groups.conflict', { patterns: conflicts.join(', ') })}
@@ -154,13 +200,6 @@ export function GroupFormModal({ isOpen, onOpenChange, group }: GroupFormModalPr
             <ProjectBinding value={projectPaths} onChange={setProjectPaths} />
           </Stack>
 
-          <Stack gap="var(--spacing-2xs)">
-            <Typography variant="body-sm" weight="medium">
-              {t('groups.scenarioTitle')}
-            </Typography>
-            <ScenarioFields value={scenario} onChange={setScenario} />
-          </Stack>
-
           <TextField
             label={t('groups.groupEnv')}
             value={envText}
@@ -172,9 +211,9 @@ export function GroupFormModal({ isOpen, onOpenChange, group }: GroupFormModalPr
             isMono
           />
 
-          {saveGroup.isError && (
-            <Typography variant="body-sm" color="danger">
-              {t('errors.saveFailed')}
+          {failure && (
+            <Typography variant="body-sm" color="danger" role="alert">
+              {failure}
             </Typography>
           )}
         </Stack>

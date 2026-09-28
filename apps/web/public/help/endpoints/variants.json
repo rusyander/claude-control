@@ -1,0 +1,159 @@
+{
+  "topic": "endpoints",
+  "frames": {
+    "local/01-empty": {
+      "light-ru": {
+        "file": "01-empty.png",
+        "width": 1116,
+        "height": 230
+      },
+      "light-en": {
+        "file": "01-empty.en.png",
+        "width": 1116,
+        "height": 210
+      },
+      "dark-ru": {
+        "file": "01-empty.dark.png",
+        "width": 1116,
+        "height": 230
+      },
+      "dark-en": {
+        "file": "01-empty.dark.en.png",
+        "width": 1116,
+        "height": 210
+      }
+    },
+    "local/02-profile": {
+      "light-ru": {
+        "file": "02-profile.png",
+        "width": 1116,
+        "height": 1870
+      },
+      "light-en": {
+        "file": "02-profile.en.png",
+        "width": 1116,
+        "height": 1851
+      },
+      "dark-ru": {
+        "file": "02-profile.dark.png",
+        "width": 1116,
+        "height": 1870
+      },
+      "dark-en": {
+        "file": "02-profile.dark.en.png",
+        "width": 1116,
+        "height": 1851
+      }
+    },
+    "local/03-probe": {
+      "light-ru": {
+        "file": "03-probe.png",
+        "width": 1116,
+        "height": 1869
+      },
+      "light-en": {
+        "file": "03-probe.en.png",
+        "width": 1116,
+        "height": 1849
+      },
+      "dark-ru": {
+        "file": "03-probe.dark.png",
+        "width": 1116,
+        "height": 1869
+      },
+      "dark-en": {
+        "file": "03-probe.dark.en.png",
+        "width": 1116,
+        "height": 1849
+      }
+    },
+    "local/04-token": {
+      "light-ru": {
+        "file": "04-token.png",
+        "width": 1116,
+        "height": 1869
+      },
+      "light-en": {
+        "file": "04-token.en.png",
+        "width": 1116,
+        "height": 1849
+      },
+      "dark-ru": {
+        "file": "04-token.dark.png",
+        "width": 1116,
+        "height": 1869
+      },
+      "dark-en": {
+        "file": "04-token.dark.en.png",
+        "width": 1116,
+        "height": 1849
+      }
+    },
+    "local/05-targets": {
+      "light-ru": {
+        "file": "05-targets.png",
+        "width": 1082,
+        "height": 1849
+      },
+      "light-en": {
+        "file": "05-targets.en.png",
+        "width": 1082,
+        "height": 1849
+      },
+      "dark-ru": {
+        "file": "05-targets.dark.png",
+        "width": 1082,
+        "height": 1849
+      },
+      "dark-en": {
+        "file": "05-targets.dark.en.png",
+        "width": 1082,
+        "height": 1849
+      }
+    },
+    "local/06-applied": {
+      "light-ru": {
+        "file": "06-applied.png",
+        "width": 1400,
+        "height": 1900
+      },
+      "light-en": {
+        "file": "06-applied.en.png",
+        "width": 1400,
+        "height": 1900
+      },
+      "dark-ru": {
+        "file": "06-applied.dark.png",
+        "width": 1400,
+        "height": 1900
+      },
+      "dark-en": {
+        "file": "06-applied.dark.en.png",
+        "width": 1400,
+        "height": 1900
+      }
+    },
+    "local/07-assistant": {
+      "light-ru": {
+        "file": "07-assistant.png",
+        "width": 1116,
+        "height": 1870
+      },
+      "light-en": {
+        "file": "07-assistant.en.png",
+        "width": 1116,
+        "height": 1851
+      },
+      "dark-ru": {
+        "file": "07-assistant.dark.png",
+        "width": 1116,
+        "height": 1870
+      },
+      "dark-en": {
+        "file": "07-assistant.dark.en.png",
+        "width": 1116,
+        "height": 1851
+      }
+    }
+  }
+}

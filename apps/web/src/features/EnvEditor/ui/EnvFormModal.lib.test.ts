@@ -10,7 +10,13 @@ vi.mock('@shared/api/client', () => ({
 
 import { apiClient } from '@shared/api/client';
 import type { EnvVar } from '@agentdeck/contracts';
-import { buildEnvDraft, envFileName, looksSecret } from './EnvFormModal.lib';
+import {
+  SecretRevealError,
+  buildEnvDraft,
+  envFileName,
+  looksSecret,
+  secretValueHints,
+} from './EnvFormModal.lib';
 
 /**
  * Правка секрета не должна стирать его значение.
@@ -96,6 +102,34 @@ describe('buildEnvDraft', () => {
     await expect(
       buildEnvDraft({ key: 'GITLAB_TOKEN', value: '', source: 'secrets', comment: '' }, secret),
     ).rejects.toThrow('GITLAB_TOKEN');
+  });
+
+  // Ревью 28.09 (F-224): причина уходит в форму кодом, а не русской строкой —
+  // английский интерфейс переводит её сам.
+  it('сбой дочитывания — типизированная ошибка с именем ключа', async () => {
+    get.mockResolvedValue({ data: '' } as never);
+
+    const failure = await buildEnvDraft(
+      { key: 'GITLAB_TOKEN', value: '', source: 'secrets', comment: '' },
+      secret,
+    ).catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(SecretRevealError);
+    expect((failure as SecretRevealError).key).toBe('GITLAB_TOKEN');
+  });
+
+  // Ревью 28.09 (F-224): секрет, заведённый агентом без значения, дочитывать
+  // нечего — сервер отдаёт пустоту, и форма падала «не удалось прочитать».
+  it('пустой секрет, оставленный пустым, сохраняется без дочитывания', async () => {
+    const empty: EnvVar = { ...secret, value: '' };
+
+    const draft = await buildEnvDraft(
+      { key: 'GITLAB_TOKEN', value: '', source: 'secrets', comment: 'позже' },
+      empty,
+    );
+
+    expect(draft.value).toBe('');
+    expect(draft.comment).toBe('позже');
+    expect(get).not.toHaveBeenCalled();
   });
 
   it('введённое значение секрета уходит как есть, без лишнего запроса', async () => {
@@ -200,5 +234,33 @@ describe('envFileName', () => {
     expect(envFileName('settings-local')).toBe('settings.local.json');
     expect(envFileName('secrets')).toBe('.mcp-secrets.env');
     expect(envFileName('group')).toBe('group');
+  });
+});
+
+describe('[P3] secretValueHints — подсказки поля значения секрета', () => {
+  const secret = (value: string): EnvVar => ({
+    id: 'settings:AGENTDECK_PROBE_P3_API_KEY',
+    key: 'AGENTDECK_PROBE_P3_API_KEY',
+    value,
+    isSecret: true,
+    source: 'settings',
+  });
+
+  it('пустой секрет (агент сохранил без значения) — «ещё не задано», а не «скрыто»', () => {
+    // Живой прогон: форма, открытая агентом для ввода, обещала «Значение скрыто —
+    // введите заново» и «Оставьте пустым…» — человек решал, что значение уже есть.
+    expect(secretValueHints(secret(''))).toEqual({
+      placeholder: 'env.secretEmpty',
+      hint: 'env.secretEmptyHint',
+    });
+  });
+
+  it('заданный секрет — прежние «скрыто» и «оставьте пустым»; не секрет — без подсказок', () => {
+    expect(secretValueHints(secret('ab••••yz'))).toEqual({
+      placeholder: 'env.secretHidden',
+      hint: 'env.secretRewrite',
+    });
+    expect(secretValueHints({ ...secret('x'), isSecret: false })).toBeUndefined();
+    expect(secretValueHints(undefined)).toBeUndefined();
   });
 });

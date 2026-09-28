@@ -17,6 +17,7 @@ export const sandboxRu: Record<SandboxMessageCode, string> = {
   'sandbox-hook-exit-2': 'Хук вышел с кодом 2',
   'sandbox-hook-no-decision': 'Хук завершился с кодом {{code}} и решения не вернул',
   'sandbox-hook-not-started': 'Хук не запустился',
+  'sandbox-hook-signal': 'Хук убит сигналом {{signal}}',
   'sandbox-wipe-failed': 'Не удалось очистить прежнюю песочницу: {{reason}}',
   'sandbox-remove-failed':
     'Песочницу не удалось удалить ({{reason}}). В ней осталась копия доступа к аккаунту — удалите папку {{path}} вручную.',

@@ -23,6 +23,7 @@ export const checksRu: Record<ChecksMessageCode, string> = {
     'Ни один из путей конфигурации не найден ({{paths}}). Обычно они появляются после первого запуска CLI.',
   'checks-config-present': 'Конфигурация на месте: {{paths}}.',
   'checks-format-rejected': 'Формат файла не принят: {{reason}}',
+  'checks-format-no-schema': 'Схема {{file}} официально не публикуется — сверять не с чем.',
   'checks-mcp-reread-missing':
     'Запись пробного сервера прошла, но при перечитывании его нет — формат файла разобран не полностью.',
   'checks-mcp-neighbours':

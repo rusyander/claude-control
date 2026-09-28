@@ -6,6 +6,13 @@
   min-height: 0;
 }
 
+// Путь проекта и каталог кейсов под ним: столбик высотой с поле выбора, чтобы
+// обе строки стояли вровень с ним, а не ниже середины.
+.projectMeta {
+  max-width: 420px;
+  padding-bottom: 2px;
+}
+
 .libraryTab {
   display: flex;
   flex-direction: column;
@@ -116,4 +123,15 @@
 .failureRow {
   padding: var(--spacing-2xs) 0;
   border-top: 1px solid var(--color-border-subtle);
+}
+
+// Кейс плашкой на вкладке покрытия: длинное название обрезается многоточием, иначе
+// одна плашка растягивалась шире карточки и уходила за её край.
+.coverageCaseTitle {
+  display: inline-block;
+  max-width: 360px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
 }

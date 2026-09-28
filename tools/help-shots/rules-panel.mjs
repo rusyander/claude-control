@@ -29,7 +29,7 @@
  *
  * Запуск: node tools/help-shots/rules-panel.mjs
  * Переменные: GUIDE_PANEL_PORT (5191), GUIDE_WEB_PORT (8901),
- *             GUIDE_ONLY (имя одного сценария).
+ *             GUIDE_ONLY (сценарии через запятую).
  */
 import { spawn } from 'node:child_process';
 import { rmSync } from 'node:fs';
@@ -119,7 +119,7 @@ try {
   // иначе проверяется полным прогоном всех четырёх.
   const only = process.env.GUIDE_ONLY ?? '';
   const run = async (topic, name, shoot) => {
-    if (only && only !== name) return;
+    if (only && !only.split(',').includes(name)) return;
     const scenario = openScenario(topic, name);
     console.log(`\nсценарий ${topic}/${name}`);
     await shoot(browser, WEB, scenario, home, lang);

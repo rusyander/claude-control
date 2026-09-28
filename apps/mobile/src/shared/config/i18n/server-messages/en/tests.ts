@@ -2,11 +2,14 @@ import type { TestsMessageCode } from '@agentdeck/contracts/server-messages';
 
 export const testsEn: Record<TestsMessageCode, string> = {
   'defect-case-unspecified': 'No case specified to file the defect against.',
+  'case-history-case-unspecified': 'No case specified to show the history of.',
   'defect-target-unspecified': 'No destination for the issue specified.',
   'defect-title-body-required': 'A title and a description are required.',
   'run-unspecified': 'No run specified.',
   'import-results-format': 'Results format: junit, playwright or allure.',
   'import-cases-format': 'Case format: csv, xlsx, testrail-csv or markdown.',
+  'import-cases-xlsx-broken':
+    'This is not an Excel workbook (xlsx): the file did not open as an archive. Save the sheet as .xlsx or export it to CSV.',
   'import-group-unspecified': 'No group specified to put the cases in.',
   'export-run-format': 'Run report format: md, csv or html.',
   'export-cases-format': 'Export format: csv, md or xlsx.',
@@ -137,6 +140,8 @@ export const testsEn: Record<TestsMessageCode, string> = {
   'attribute-options': 'Field “{{field}}”: allowed values are {{options}}.',
   'attribute-number': 'Field “{{field}}” is a number.',
   'case-title-required': 'A test must have a name.',
+  'case-link-invalid': 'Link “{{url}}”: needs a full address starting with http:// or https://.',
+  'case-duration-invalid': 'Duration “{{value}}”: whole minutes from 1 to 1440, 0 clears it.',
   'case-id-not-in-group':
     'Case “{{caseId}}” is not in group “{{groupId}}”: a new case is saved without an id.',
   'case-not-in-named-group': 'Case “{{caseId}}” is not in group “{{groupId}}”.',
@@ -218,6 +223,42 @@ export const testsEn: Record<TestsMessageCode, string> = {
     'Green in a row: {{streak}} with a threshold of {{limit}}. The breakage the quarantine was set for no longer reproduces.',
   'quarantine-suggest':
     'Stability {{stability}}% over {{runs}} results with a threshold of {{limit}}%: the case flips between green and red, and nobody trusts its failures.',
+  'quarantine-suggest-retries':
+    'Passed only on a retry in {{flakes}} runs out of {{runs}} with a threshold of {{limit}}: the status is green, but without the retry the case fails.',
+  'quarantine-reason-unstable': 'Unstable: stability {{stability}}% over {{runs}} results.',
+  'quarantine-reason-retries': 'Unstable: passes only on retry in {{flakes}} of {{runs}} runs.',
   'tests-environment-used-by-plans':
     'These plans refer to this environment: {{plans}}. Delete anyway — the plan will be left without an environment.',
+  'orphan-run-stopped':
+    'The panel restarted while the run was going, and the agent stopped with it. What it had written stays in the files; a draft, if one appeared, is waiting for review.',
+  'e2e-run-not-installed':
+    'The autotest runner is not installed, and the panel does not install it itself — it will not download hundreds of megabytes unasked. Run in {{dir}}: {{install}}',
+  'e2e-not-created':
+    'This e2e folder was not created by the panel: it belongs to the project, and the panel will not remove it.',
+  'e2e-folder-not-empty':
+    'The e2e folder holds files the panel did not write ({{count}}). Remove anyway — they are deleted along with the folder.',
+  'e2e-path-taken':
+    '“{{dir}}” is already a file in the project — there is nowhere to create the e2e folder.',
+  'e2e-missing': 'The project has no e2e folder — create it in the Tests section.',
+  'e2e-dir-unknown':
+    'There is no e2e folder “{{dir}}” in the project — pick one of the folders the panel found.',
+  'e2e-run-busy':
+    'This project’s autotests are already running — wait for them to finish or stop them.',
+  'e2e-project-unregistered':
+    'The panel sets up an e2e folder and runs autotests only for projects from the Projects section and copies of their branches. Add this folder as a project.',
+  'automation-not-object': 'The run command file is not a JSON object.',
+  'automation-command-missing': 'The run command file has no “command” string.',
+  'automation-command-too-long': 'The run command is longer than {{max}} characters.',
+  'automation-command-multiline': 'The run command is a single line, without line breaks.',
+  'automation-report-outside':
+    'The report path in the run command is relative to the project root and stays inside it.',
+  'e2e-run-unknown-framework':
+    'The e2e folder’s framework is not recognised (not Playwright, Cypress or pytest) — the panel does not guess a run command. The project’s own command goes into .agent/tests/automation.json.',
+  'e2e-run-nothing-selected':
+    'The selected cases have no autotest (the automation.file field) — there is nothing to run.',
+  'e2e-run-file-unsafe':
+    'The autotest file {{file}} contains a character the shell would expand (" ` $ % ! or a line break) — rename the file or fix automation.file.',
+  'e2e-run-timeout':
+    'The run exceeded timeoutMinutes from automation.json and was stopped before the report appeared.',
+  'tests-plan-number-invalid': '{{field}} must be a number, got «{{value}}».',
 };

@@ -8,7 +8,7 @@ import {
   readSync,
   closeSync,
 } from 'node:fs';
-import { basename, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import {
   backupEntry,
   removeEntry,
@@ -21,6 +21,8 @@ import {
 import { isEncryptedBackup, decryptSecret } from '../lib/secret-crypto.ts';
 import { SKILLS_DISABLED_DIR } from './skills.ts';
 import { codeOf } from '../lib/server-text.ts';
+import { MAX_DIFF_BYTES } from './history/constants.ts';
+import { SECRET_MASK } from '../lib/secret-mask.ts';
 
 /**
  * Резервные копии и откат к ним.
@@ -378,4 +380,176 @@ export function deleteBackup(backupDir: string, name: string): boolean {
 
   removeEntry(join(backupDir, name));
   return true;
+}
+
+/** Файл, который откат перепишет: как он лежит сейчас и каким станет. */
+export interface RestorePreviewFile {
+  /** Путь для глаз: имя файла или `<скилл>/<файл>` у папки. */
+  path: string;
+  before: string;
+  after: string;
+  /**
+   * Содержимое не сравнивается построчно: двоичный файл или больше предела
+   * ленты истории. `before`/`after` тогда пусты, а `differs` говорит, заменит
+   * ли откат этот файл (ревью z1 C2: папка читалась целиком как текст).
+   */
+  skipped?: 'binary' | 'too-large';
+  differs?: boolean;
+}
+
+export type RestorePreview =
+  | { ok: true; files: RestorePreviewFile[] }
+  | ({
+      ok: false;
+      notFound?: boolean;
+      encrypted?: boolean;
+      error: string;
+    } & Required<Pick<CodedMessage, 'messageCode'>> &
+      Pick<CodedMessage, 'params'>);
+
+/**
+ * Файлы папки относительными путями (прямой слеш), рекурсивно. Нет папки — пусто.
+ * Ссылка на каталог (симлинк, junction) не обходится: читалась как файл и роняла
+ * предпросмотр 500 (EISDIR), а обход по ней мог уйти в петлю.
+ */
+function listFiles(dir: string, prefix = ''): string[] {
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir, { withFileTypes: true }).flatMap((item) => {
+    if (item.isDirectory()) return listFiles(join(dir, item.name), `${prefix}${item.name}/`);
+    if (item.isSymbolicLink() && isDirectoryLink(join(dir, item.name))) return [];
+    return [`${prefix}${item.name}`];
+  });
+}
+
+function isDirectoryLink(path: string): boolean {
+  try {
+    return statSync(path).isDirectory();
+  } catch {
+    // Битая ссылка — не каталог; превью покажет её как отсутствующий файл.
+    return false;
+  }
+}
+
+/**
+ * В файле секретов секрет — каждое значение, а не только то, что узнаёт
+ * детектор по имени: `X_API=…` иначе шло открытым текстом. Одинаковые значения
+ * получают одну метку, разные — разные, поэтому дифф по-прежнему говорит, какой
+ * ключ откат изменит, не показывая ни значения, ни его длины.
+ */
+const ENV_LINE = /^(\s*(?:export\s+)?[^#=\s][^=]*=)(.+)$/gm;
+
+function maskEnvPair(before: string, after: string): { before: string; after: string } {
+  const labels = new Map<string, string>();
+  const label = (value: string): string => {
+    const known = labels.get(value);
+    if (known) return known;
+    const next = `${SECRET_MASK}${labels.size + 1}`;
+    labels.set(value, next);
+    return next;
+  };
+  // `КЛЮЧ=значение` (и `export КЛЮЧ=…`); комментарии и пустые строки как есть.
+  const mask = (text: string): string =>
+    text.replace(ENV_LINE, (_line, key: string, value: string) => `${key}${label(value)}`);
+  return { before: mask(before), after: mask(after) };
+}
+
+const readBytes = (path: string): Buffer =>
+  existsSync(path) ? readFileSync(path) : Buffer.alloc(0);
+
+/**
+ * Пара «сейчас → станет» для одного файла. Двоичное (NUL-байт) и то, что
+ * больше предела ленты истории, не разбирается построчно: откат их заменит, но
+ * карточке нечего показать строками, кроме факта замены.
+ */
+function previewFile(path: string, now: string, then: string): RestorePreviewFile {
+  const size = (file: string): number => (existsSync(file) ? statSync(file).size : 0);
+  if (size(now) > MAX_DIFF_BYTES || size(then) > MAX_DIFF_BYTES) {
+    return {
+      path,
+      before: '',
+      after: '',
+      skipped: 'too-large',
+      differs: !readBytes(now).equals(readBytes(then)),
+    };
+  }
+  const before = readBytes(now);
+  const after = readBytes(then);
+  if (before.includes(0) || after.includes(0)) {
+    return { path, before: '', after: '', skipped: 'binary', differs: !before.equals(after) };
+  }
+  return { path, before: before.toString('utf8'), after: after.toString('utf8') };
+}
+
+/**
+ * Что сделает откат к копии — ДО отката: пары «сейчас → станет» по каждому
+ * файлу. Откат переписывает файл целиком, то есть уносит и правки, сделанные
+ * ПОСЛЕ копии; карточка подтверждения без этого называла только имя копии.
+ * Зашифрованную копию без фразы не прочесть — отказ, как и у самого отката.
+ */
+export function restorePreview(
+  backupDir: string,
+  name: string,
+  knownPaths: Record<string, string>,
+  skillsDir?: string,
+): RestorePreview {
+  const source = join(backupDir, name);
+  const entry = BACKUP_NAME.test(name)
+    ? listBackups(backupDir, knownPaths, skillsDir).find((item) => item.name === name)
+    : undefined;
+  if (!entry || !existsSync(source))
+    return {
+      ok: false,
+      notFound: true,
+      error: 'Копия не найдена',
+      messageCode: 'backup-copy-not-found',
+    };
+  if (entry.encrypted)
+    return {
+      ok: false,
+      encrypted: true,
+      error: 'Копия зашифрована: что изменит откат, видно только после расшифровки',
+      messageCode: 'backup-preview-encrypted',
+    };
+
+  const isDirectory = statSync(source).isDirectory();
+  const target = resolveBackupTarget(entry.target, isDirectory, knownPaths, skillsDir);
+  if (!target)
+    return {
+      ok: false,
+      error: `Непонятно, куда возвращать копию «${entry.target}»`,
+      messageCode: 'backup-restore-target-unknown',
+      params: { target: entry.target },
+    };
+  if (!isDirectory) {
+    const file = previewFile(basename(target), target, source);
+    const secrets = target === knownPaths.secretsEnv && !file.skipped;
+    return {
+      ok: true,
+      files: [secrets ? { ...file, ...maskEnvPair(file.before, file.after) } : file],
+    };
+  }
+  const folder = basename(target);
+  const paths = [...new Set([...listFiles(target), ...listFiles(source)])].sort();
+  // Откат папки скилла убирает тот же id из соседнего каталога (skills/ против
+  // skills-disabled/, см. restoreBackup): карточка обязана назвать и это.
+  const sibling = resolveSkillRestore(entry.target, skillsDir)?.sibling;
+  const removed =
+    sibling && existsSync(sibling)
+      ? listFiles(sibling).map((path) =>
+          previewFile(
+            `${basename(dirname(sibling))}/${basename(sibling)}/${path}`,
+            join(sibling, path),
+            '',
+          ),
+        )
+      : [];
+  return {
+    ok: true,
+    files: [
+      ...paths.map((path) =>
+        previewFile(`${folder}/${path}`, join(target, path), join(source, path)),
+      ),
+      ...removed,
+    ],
+  };
 }

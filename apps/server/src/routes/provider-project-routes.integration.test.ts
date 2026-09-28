@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
 import {
   mkdtempSync,
+  realpathSync,
   rmSync,
   readFileSync,
   writeFileSync,
@@ -60,7 +61,8 @@ describe('provider-project-routes: проектный уровень прова�
 
   beforeEach(() => {
     appDataRoot = mkdtempSync(join(tmpdir(), 'cc-appdata-'));
-    projectDir = mkdtempSync(join(tmpdir(), 'cc-project-'));
+    // Реестр пишет путь написанием на диске (F-134): tmpdir на Windows даёт 8.3.
+    projectDir = realpathSync.native(mkdtempSync(join(tmpdir(), 'cc-project-')));
   });
 
   afterEach(async () => {

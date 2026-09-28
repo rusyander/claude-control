@@ -1,8 +1,10 @@
 import type { FastifyInstance } from 'fastify';
 import type { ServerContext } from '../context.ts';
-import type {
-  ProjectTestManualRegistry,
-  ProjectTestRunRegistry,
+import {
+  E2eRunRegistry,
+  type E2eWatch,
+  type ProjectTestManualRegistry,
+  type ProjectTestRunRegistry,
 } from '../domains/project-tests.ts';
 import { registerTestLibraryRoutes } from './project-tests/library-routes.ts';
 import { registerTestPlanRoutes } from './project-tests/plan-routes.ts';
@@ -15,6 +17,8 @@ import { registerTestDraftRoutes } from './project-tests/draft-routes.ts';
 import { registerTestHealthRoutes } from './project-tests/health-routes.ts';
 import { registerTestReleaseRoutes } from './project-tests/release-routes.ts';
 import { registerTestSecretRoutes } from './project-tests/secret-routes.ts';
+import { registerTestCaseHistoryRoutes } from './project-tests/case-history-routes.ts';
+import { registerTestE2eRoutes } from './project-tests/e2e-routes.ts';
 import type { TestsDeps } from './project-tests/shared.ts';
 
 /**
@@ -36,8 +40,17 @@ export function registerProjectTestsRoutes(
   ctx: ServerContext,
   runs: ProjectTestRunRegistry,
   manual: ProjectTestManualRegistry,
+  // Автотесты и наблюдение за папкой — тоже из `runtime`: раннер гаснет при
+  // выходе только там. Без них (тесты маршрутов) — свой реестр и без наблюдения.
+  e2e: { e2eRuns?: E2eRunRegistry; e2eWatch?: E2eWatch } = {},
 ): void {
-  const deps: TestsDeps = { ctx, runs, manual };
+  const deps: TestsDeps = {
+    ctx,
+    runs,
+    manual,
+    e2eRuns: e2e.e2eRuns ?? new E2eRunRegistry(),
+    e2eWatch: e2e.e2eWatch,
+  };
   registerTestLibraryRoutes(app, deps);
   // Доступы стенда: имя в файле проекта, значение — в шифрованном хранилище.
   registerTestSecretRoutes(app, deps);
@@ -51,6 +64,10 @@ export function registerProjectTestsRoutes(
   registerTestManualRoutes(app, deps);
   registerTestDefectRoutes(app, deps);
   registerTestCoverageRoutes(app, deps);
+  // История кейса и отметки нестабильности только читают записи прогонов.
+  registerTestCaseHistoryRoutes(app, deps);
+  // Папка настоящих автотестов и её сверка с кейсами.
+  registerTestE2eRoutes(app, deps);
   // Импорт и выгрузка ходят только по пути проекта, реестры им не нужны.
   registerProjectTestsImportRoutes(app, ctx);
 }

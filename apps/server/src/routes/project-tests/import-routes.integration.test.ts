@@ -29,6 +29,7 @@ const JUNIT =
 describe('project-tests import routes', () => {
   let app: FastifyInstance;
   let project = '';
+  let language = 'ru';
 
   beforeEach(async () => {
     project = mkdtempSync(join(tmpdir(), 'cc-tests-io-'));
@@ -43,7 +44,9 @@ describe('project-tests import routes', () => {
     );
 
     app = Fastify();
-    registerProjectTestsImportRoutes(app, {} as unknown as ServerContext);
+    language = 'ru';
+    const ctx = { store: { getSettings: () => ({ language }) } };
+    registerProjectTestsImportRoutes(app, ctx as unknown as ServerContext);
     await app.ready();
   });
 
@@ -63,6 +66,28 @@ describe('project-tests import routes', () => {
     const body = response.json<ProjectTestImportResult>();
     expect(body).toMatchObject({ format: 'junit', read: 2, matched: 1, unmatched: ['чужой'] });
     expect(body.runId).toBeTruthy();
+  });
+
+  it('отчёт по прогону уходит на языке интерфейса того, кто выгружает', async () => {
+    const imported = await app.inject({
+      method: 'POST',
+      url: '/api/project-tests/import/results',
+      payload: { path: project, format: 'junit', content: JUNIT },
+    });
+    const { runId } = imported.json<ProjectTestImportResult>();
+    const exportMd = () =>
+      app.inject({
+        method: 'GET',
+        url: '/api/project-tests/run/export',
+        query: { path: project, id: runId ?? '', format: 'md' },
+      });
+
+    expect((await exportMd()).body).toContain('# Прогон: импорт из CI');
+    language = 'en';
+    const english = await exportMd();
+    expect(english.statusCode).toBe(200);
+    expect(english.body).toContain('# Run: import from CI');
+    expect(english.body).not.toContain('Прогон');
   });
 
   it('кейсы из CSV приезжают в указанную группу', async () => {

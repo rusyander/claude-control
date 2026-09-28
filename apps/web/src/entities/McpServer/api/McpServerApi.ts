@@ -12,9 +12,13 @@ export const mcpServerApi = createEntityApi<McpServer, McpServerDraft>({
   kind: 'mcp',
 });
 
-/** Что вернул старт входа: токен уже есть или надо открыть адрес авторизации. */
+/**
+ * Что вернул старт входа: `authorized` — сохранённый токен уже подошёл,
+ * `not-required` — сервер ответил без входа вовсе (локальный Dev Mode Figma),
+ * `redirect` — надо открыть адрес авторизации.
+ */
 export interface StartOAuthResult {
-  status: 'authorized' | 'redirect';
+  status: 'authorized' | 'not-required' | 'redirect';
   authorizationUrl?: string;
 }
 
@@ -31,6 +35,8 @@ export function useStartOAuth() {
       );
       return data;
     },
+    // Отказ карточка показывает сама, словами у кнопки — общий тост был бы вторым.
+    meta: { silentError: true },
   });
 }
 

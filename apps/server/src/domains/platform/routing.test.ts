@@ -100,7 +100,7 @@ describe('прогон через контур', () => {
     expect(decision.platformId).toBe('company-dev');
     // Клиент anthropic дописывает `/v1` сам: адрес с версией дал бы
     // `/v1/v1/messages` на первом же запросе.
-    expect(decision.env.ANTHROPIC_BASE_URL).toBe('http://127.0.0.1:5179/company-dev');
+    expect(decision.env.ANTHROPIC_BASE_URL).toBe('http://127.0.0.1:5179/company-dev/_s/chat');
     expect(decision.env.ANTHROPIC_MODEL).toBe('qwen2.5:7b');
     // Настоящий ключ контура не уходит в окружение НИКОГДА: его подставляет
     // шлюз, в этом весь смысл конструкции.
@@ -117,7 +117,7 @@ describe('прогон через контур', () => {
     // Текст ровно тот, которым панель работает: правка человека в разделе
     // «Промпты» меняет и его, поэтому сверяем с каталогом, а не с образцом.
     expect(decision.systemPrompt).toContain(promptText(dir, 'contour-agent').trim());
-    expect(decision.systemPrompt).toContain('инструмент');
+    expect(decision.systemPrompt).toContain('tool');
   });
 
   /**
@@ -145,9 +145,9 @@ describe('прогон через контур', () => {
     connect();
     const decision = resolveRunRoute(deps, 'chat', 'qwen-test');
     if (!decision.routed) throw new Error('маршрут не собран');
-    expect(decision.systemPrompt).toContain('модель qwen-test');
+    expect(decision.systemPrompt).toContain('the model qwen-test');
     expect(decision.systemPrompt).toContain(`«${PLATFORM.title}»`);
-    expect(decision.systemPrompt).toContain('Ты не Claude');
+    expect(decision.systemPrompt).toContain('You are not Claude');
   });
 
   it('правка человека в каталоге едет прогону, а не встроенный текст', () => {
@@ -185,7 +185,7 @@ describe('прогон через контур', () => {
     connect(PLATFORM, 5182);
     const decision = resolveRunRoute(deps, 'chat');
     expect(decision.routed && decision.env.ANTHROPIC_BASE_URL).toBe(
-      'http://127.0.0.1:5182/company-dev',
+      'http://127.0.0.1:5182/company-dev/_s/chat',
     );
   });
 
@@ -287,7 +287,7 @@ describe('прогон через контур', () => {
     // У qwen задокументирован openai-совместимый раздел, и шлюзу он родной:
     // адрес отдаётся вместе с версией.
     expect(decision.routed && decision.env.OPENAI_BASE_URL).toBe(
-      'http://127.0.0.1:5179/company-dev/v1',
+      'http://127.0.0.1:5179/company-dev/_s/foreign/qwen/v1',
     );
   });
 
@@ -335,7 +335,7 @@ describe('прогон через контур', () => {
       const decision = resolveRunRoute(deps, 'chat', 'sonnet');
       const route = runRouteOf(decision);
 
-      expect(route.env.ANTHROPIC_BASE_URL).toBe('http://127.0.0.1:5179/company-dev');
+      expect(route.env.ANTHROPIC_BASE_URL).toBe('http://127.0.0.1:5179/company-dev/_s/chat');
       expect(route.model).toEqual(decision.routed && decision.model);
       expect(route.effort).toBe(decision.routed && decision.effort);
       expect(route.systemPrompt).toContain('Отвечай коротко.');

@@ -6,6 +6,7 @@ import type {
 } from '@agentdeck/contracts';
 import type { PlatformDriver } from './drivers/driver.ts';
 import { serverText } from '../../lib/server-texts.ts';
+import { contourRulesOn, effectivePlatformRules, ourRulesOn } from './rules-apply.ts';
 
 /**
  * Правила контура и матрица конфликтов (Т7, решение Р5).
@@ -105,7 +106,10 @@ export function ruleConflicts(
   driver: PlatformDriver,
   ours: OurRulesState,
 ): PlatformRuleConflict[] {
-  const rules = platform.rules.platform;
+  // ДЕЙСТВУЮЩИЕ правила, а не записанные (баг 11б): выбор «только наши» снимает
+  // набор инструментов контура из запроса, и взаимное исключение, которого в
+  // прогоне нет, не должно ни подсвечиваться, ни запирать сохранение.
+  const rules = effectivePlatformRules(platform);
   const rows: PlatformRuleConflict[] = [];
 
   // Взаимное исключение — единственное на всю матрицу: два набора инструментов
@@ -125,6 +129,10 @@ export function ruleConflicts(
       title: serverText('contour-conflict-tools-title'),
       detail: serverText('contour-conflict-tools-detail'),
       active: rules.platformTools.length > 0 && ours.toolShim,
+      // Верх берёт контур: при его наборе инструментов прослойка не включается
+      // вовсе (`chooseToolRoute`), это решает сборка запроса, а не порядок слоёв.
+      winner: 'contour',
+      ...(contourRulesOn(platform) ? {} : { offBy: 'contour' as const }),
     });
   }
 
@@ -156,6 +164,10 @@ export function ruleConflicts(
       // «включены обе» тут не утверждается (ревью Т7, M3).
       active: false,
       oursOnly: ours.dlp,
+      // Обе действуют по очереди: наша маска — до отправки, подмена контура — у
+      // него. Маска — защита, а не правило, и выбор «чьи правила» её не снимает;
+      // подмену владелец включает у себя, панели её не выключить.
+      winner: 'both',
     });
   }
 
@@ -174,6 +186,9 @@ export function ruleConflicts(
       // пробы (`limits.managedContext`), а контрольные точки в панели есть
       // всегда. Это единственная из трёх строк, где видно обе половины.
       active: ours.managedContext,
+      // Верх берёт контур: он сжимает историю у себя, и наши контрольные точки
+      // этого не отменяют — они только перестают совпадать с тем, что видит модель.
+      winner: 'contour',
     });
   }
 
@@ -192,6 +207,11 @@ export function ruleConflicts(
       // видны они панели только когда сработают (451 в журнале нарушений).
       active: false,
       oursOnly: ours.promptGate,
+      // Обе, наша первой: гейт отказывает до отправки, гардрейлы контура — у него.
+      // Гейт — наш хук в личных настройках, и выбор «только правила контура»
+      // снимает его вместе со слоем.
+      winner: 'both',
+      ...(ourRulesOn(platform) ? {} : { offBy: 'ours' as const }),
     });
   }
 
@@ -234,7 +254,9 @@ export function applyManagedRules(
   platform: Platform,
   driver: PlatformDriver,
 ): Record<string, unknown> {
-  const rules = platform.rules.platform;
+  // Действующие: при выборе «только наши» уходят умолчания, то есть одно
+  // `whenEmpty` («инструментов контура не надо») и ничего больше (баг 11б).
+  const rules = effectivePlatformRules(platform);
   const next = { ...body };
 
   for (const control of driver.controls) {

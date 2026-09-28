@@ -1,11 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { MutationObserver } from '@tanstack/react-query';
-import { queryClient } from '@app/queryClient';
+import { MutationObserver, QueryClient } from '@tanstack/react-query';
 import { apiClient } from '@shared/api/client';
 import { cleanupGroupMutation } from './ChatTreeApi';
 
 /**
- * Уборка копии (Д19) на настоящем общем клиенте запросов. Группа прошлого
+ * Уборка копии (Д19). Группа прошлого
  * разделения (F5.2) адресуется чатом: её номер от старого плана занят новой
  * группой, и по номеру ушла бы не та копия.
  */
@@ -16,7 +15,7 @@ describe('убрать копию группы', () => {
     const post = vi
       .spyOn(apiClient, 'post')
       .mockResolvedValue({ data: { at: '2026-09-26T10:00:00.000Z', branch: 'kept' } });
-    const observer = new MutationObserver(queryClient, {
+    const observer = new MutationObserver(new QueryClient(), {
       ...cleanupGroupMutation,
       meta: { silentError: true },
     });

@@ -1,5 +1,9 @@
+import type { PanelAgentRunRefusalCode } from '@agentdeck/contracts/panel-agent';
 import type { Dictionary } from './ru';
 import { serverMessagesEn } from './server-messages/en.ts';
+import { panelTextsEn } from './panel-texts/texts.en.ts';
+import { homeEn } from './home/en.ts';
+import { watcherEn } from './watcher/en.ts';
 
 /**
  * English mirrors `ru.ts` and is typed against it: a missing or renamed key
@@ -7,7 +11,11 @@ import { serverMessagesEn } from './server-messages/en.ts';
  */
 export const en: Dictionary = {
   serverMessages: serverMessagesEn,
+  panelTexts: panelTextsEn,
+  home: homeEn,
+  watcher: watcherEn,
   tabs: {
+    home: 'Home',
     chat: 'Chat',
     projects: 'Projects',
     analytics: 'Analytics',
@@ -31,6 +39,7 @@ export const en: Dictionary = {
 
   chat: {
     title: 'Chat',
+    titleWord: { deck: 'Presentation', 'deck-revise': 'Presentation edit', picture: 'Image' },
     conversations: 'Conversations',
     code: 'Code',
     tests: 'Tests',
@@ -38,6 +47,17 @@ export const en: Dictionary = {
     blank: 'Empty. Write a task — it goes to the agent on your computer.',
     queued: (prompt: string) => `Queued: ${prompt} ✕`,
     image: '[image]',
+    autoPick: (label: string) => `Auto-pick: ${label}`,
+    autoPickUnparsed: 'Auto-pick: the question was closed with the recommended option',
+    groupLine: (group: string, autonomous: boolean) =>
+      `Group: ${group} · ${autonomous ? 'autonomous' : 'ask me'}`,
+    groupAuto: 'auto',
+    escalation: {
+      title: (title: string) => `Critical from group "${title}"`,
+      fromBlock: 'Reported by the group itself',
+      fromAutoPick: 'Autonomy picked for you in a critical question',
+      dismiss: 'Mark as read',
+    },
     contextSummarized:
       'The contour compressed the history before this answer: the model saw a summary of the ' +
       'start of the conversation, not the full text. What went into the summary the panel cannot ' +
@@ -47,13 +67,24 @@ export const en: Dictionary = {
     offerSplit: 'The agent offered to split the tasks across chats — decide in the panel.',
     offerHandoff: 'The agent offered to continue in a clean session — decide in the panel.',
     picture: {
-      title: 'Agent drawing',
-      broken: 'The drawing could not be rendered on the phone — open it in the panel.',
+      title: 'Agent image',
+      broken: 'The image could not be rendered on the phone — open it in the panel.',
     },
     offerDeck: 'The agent dictated a presentation — the card is in the panel.',
     blocksRejected: (count: number) => `Blocks the panel did not accept: ${count} — shown as is.`,
     plan: (done: number, total: number) => `Plan ${done}/${total}`,
-    subagents: (count: number) => `Subagents: ${count}`,
+    subagents: (running: number, finished: number) =>
+      running > 0
+        ? `Subagents: ${running} running, ${finished} finished`
+        : `Subagents: ${finished} finished`,
+    activeTool: (name: string, summary: string) =>
+      summary ? `Now: ${name} · ${summary}` : `Now: ${name}`,
+    taskNotice: {
+      completed: 'Background task finished',
+      failed: 'Background task failed',
+      killed: 'Background task stopped',
+      other: 'Background task notice',
+    },
     permission: 'Permission needed',
     allow: 'Allow',
     deny: 'Deny',
@@ -280,6 +311,58 @@ export const en: Dictionary = {
       issue: 'Issue',
       page: 'Requirements',
     },
+    e2e: {
+      title: 'Autotests',
+      missing: 'The project has no e2e folder.',
+      folder: (dir: string, created: boolean) =>
+        created ? `Folder ${dir} (created by the panel)` : `Folder ${dir}`,
+      framework: {
+        playwright: 'Playwright',
+        cypress: 'Cypress',
+        pytest: 'pytest',
+        unknown: 'framework not recognised',
+      },
+      specs: (count: number) => `${count} test file${count === 1 ? '' : 's'}`,
+      running: (command: string) => `Running: ${command}`,
+      stopped: 'Stopped. Whatever reached the report was applied.',
+      stoppedNoReport: 'Stopped before the report — no results were applied.',
+      resultGreen: (passed: number, total: number) => `All passed: ${passed} of ${total}.`,
+      resultRed: (failed: number, total: number, passed: number) =>
+        `${failed} of ${total} failed, ${passed} passed.`,
+      resultSkipped: (count: number) => `Skipped: ${count}.`,
+      resultEmpty: 'The report holds no tests.',
+      unmatched: (count: number) => `Without a case: ${count}.`,
+      exitOdd: (code: number) =>
+        `The command exited with code ${code} although no test failed — check the command output.`,
+      error: {
+        'e2e-run-no-report':
+          'No report appeared — the command was not found or failed before the tests.',
+        'e2e-run-spawn': 'The command could not be started.',
+        'e2e-run-import': 'The report exists but could not be parsed.',
+        'e2e-run-not-installed':
+          'The autotest runner is not installed, and the panel does not install it itself. Install it on the computer.',
+      },
+      notInstalledAt: (dir: string, install: string) =>
+        `The autotest runner is not installed, and the panel does not install it itself. On the computer, run in ${dir}: ${install}`,
+      onComputer: 'Autotests are run and synced in the panel on the computer.',
+      own: (command: string) => `The project’s own command: ${command}`,
+    },
+    pyramid: {
+      title: 'Test pyramid',
+      layers: {
+        e2e: 'E2E',
+        integration: 'Integration',
+        unit: 'Unit',
+        code: 'Code tests',
+      } as Record<'e2e' | 'integration' | 'unit' | 'code', string>,
+      count: (tests: number, files: number) =>
+        `${tests} ${tests === 1 ? 'test' : 'tests'} in ${files} ${files === 1 ? 'file' : 'files'}`,
+      unknown: 'unknown',
+      noFolder: 'no e2e folder',
+      noFramework: 'The project names no unit test framework — the panel does not count them.',
+      unsplit: 'The project does not mark integration tests — they are counted with unit tests.',
+      truncated: 'The project was not walked in full — the numbers are no lower than shown.',
+    },
     running: 'Run in progress',
     generating: 'The agent is writing cases',
     done: 'Run finished',
@@ -334,8 +417,10 @@ export const en: Dictionary = {
     },
     lastRun: (when: string) => `Last run: ${when}`,
     lastRunNever: 'Never run',
+    stepLabels: { data: 'data', expected: 'expected' },
     muted: 'quarantine',
     muteReason: (reason: string) => `Quarantine: ${reason}`,
+    retryPass: (attempts: number) => `Passed only on a retry (failed attempts: ${attempts})`,
     selected: (count: number) => `Selected: ${count}`,
     clearSelection: 'Clear the selection',
     runs: {
@@ -353,6 +438,8 @@ export const en: Dictionary = {
         import: 'CI import',
       },
       actor: { agent: 'agent', human: 'human', ci: 'CI' },
+      e2e: 'panel autotests',
+      e2eActor: 'panel',
       state: {
         running: 'in progress',
         done: 'finished',
@@ -521,10 +608,28 @@ export const en: Dictionary = {
     toolFailed: (name: string) => `Action failed: ${name}`,
     stopped: 'Turn stopped.',
     runFailed: (message: string) => `The agent did not answer: ${message}`,
+    openFailed: (message: string) => `The conversation did not open: ${message}`,
     cut: 'The connection dropped before the turn ended — the agent was stopped. What was said is kept in history.',
+    streamLost:
+      'The connection to the panel dropped mid-turn (the panel most likely restarted). The conversation was reloaded: what was said and done before the break is above; repeat the request if you still need it.',
+    sealed: {
+      actions: (list: string) => `Actions performed: ${list}.`,
+      failed: (name: string) => `${name} (failed)`,
+      notFinished: (reason: string) => `The answer was not finished. ${reason}`,
+      reason: {
+        restart: 'The panel restarted mid-turn.',
+        stopped: 'The turn was stopped.',
+        timeout: 'The agent did not finish the turn within the time limit.',
+        failed: 'The turn broke off.',
+      },
+    },
     refusal: {
       invalid_body: 'Message not accepted: the server did not understand the request.',
       busy: 'The agent is still answering in this conversation — wait for the turn to end.',
+      conversation_stale:
+        'This conversation was continued in another window — showing it again. Your message was not sent: repeat it if you still need it.',
+      conversation_deleted:
+        'This conversation was deleted in another window. Your message was not sent — the next one starts a new conversation.',
       provider_unsupported:
         'The panel agent works only with Claude Code for now: the active CLI is different.',
       cli_not_found:
@@ -535,7 +640,7 @@ export const en: Dictionary = {
         'The assistant goes through a contour, but the gateway is down or has no key — no silent fallback to the vendor cloud.',
       data_mask_broken:
         'The data masking rules are broken: without the mask no message goes to the agent.',
-    } as Record<string, string>,
+    } satisfies Record<PanelAgentRunRefusalCode, string> as Record<string, string>,
     card: {
       heading: 'The agent asks for confirmation',
       dangerHeading: 'Dangerous action — check carefully',

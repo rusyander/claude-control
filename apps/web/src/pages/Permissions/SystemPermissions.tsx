@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { PERMISSION_PRESETS, type PermissionRule } from '@agentdeck/contracts';
 import { apiClient } from '@shared/api/client';
+import { presetText } from '@shared/config/i18n';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Card } from '@shared/ui/card';
@@ -85,14 +86,14 @@ export function SystemPermissions({ rules, onEdit, onCreate }: SystemPermissions
                     <Stack gap="var(--spacing-2xs)" className={styles.systemInfo}>
                       <Stack direction="row" align="center" gap="var(--spacing-xs)" wrap>
                         <Typography variant="body" weight="medium" as="span">
-                          {preset.title}
+                          {presetText(t, 'permission', preset.id, 'title', preset.title)}
                         </Typography>
                         <Badge tone={RISK_TONE[preset.risk]}>
                           {t(`permissions.risk_${preset.risk}`)}
                         </Badge>
                       </Stack>
                       <Typography variant="body-sm" color="muted">
-                        {preset.description}
+                        {presetText(t, 'permission', preset.id, 'description', preset.description)}
                       </Typography>
                       <Typography variant="mono" color="subtle" as="span">
                         {preset.pattern}

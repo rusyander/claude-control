@@ -32,6 +32,8 @@ export type HookDecision = 'block' | 'ask' | 'pass' | 'error';
 export interface ProbeResult {
   fixtureId: string;
   exitCode: number;
+  /** Сигнал, которым процесс убит извне (тогда `exitCode` = -1). */
+  signal?: string;
   stdout: string;
   stderr: string;
   decision: HookDecision;

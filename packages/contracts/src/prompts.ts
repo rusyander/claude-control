@@ -38,6 +38,19 @@ export const PROMPT_IDS = [
   'image',
   'image-svg',
   'presentation',
+  // Группы (26.09.2026): обнаружение наборов, советы после копирования, слияние
+  // с оригиналом, файл переопределения в проекте, ассистент шага «Пути» и
+  // сводка ресурса. Их читает только модель — поэтому по-английски.
+  'group-discover',
+  'group-advice',
+  'group-merge',
+  'group-override',
+  'path-step-author',
+  'resource-summary',
+  // «Числа» группы (26.09.2026): сколько прогонов делает скилл-участник.
+  'group-knobs',
+  // Описания участников и готовых ресурсов на языке интерфейса (26.09.2026).
+  'group-describe',
 ] as const;
 
 export type PromptId = (typeof PROMPT_IDS)[number];

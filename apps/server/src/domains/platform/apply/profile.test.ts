@@ -78,7 +78,7 @@ describe('профиль контура', () => {
     expect(profile).toEqual({
       id: 'contour-company-dev',
       name: 'Контур · Company · dev',
-      baseUrl: 'http://127.0.0.1:5179/company-dev/v1',
+      baseUrl: 'http://127.0.0.1:5179/company-dev/_s/assistant/v1',
       apiKind: 'openai-compat',
       model: 'gpt-4o',
       // Ключ контура живёт в панели, подставляет его шлюз. Галочка «писать
@@ -138,7 +138,7 @@ describe('сверка управляемых профилей', () => {
 
     expect(reconcileManagedProfiles(store)).toEqual([]);
     expect(store.getSettings().endpointProfiles[0]?.baseUrl).toBe(
-      'http://127.0.0.1:5200/company-dev/v1',
+      'http://127.0.0.1:5200/company-dev/_s/assistant/v1',
     );
   });
 
@@ -152,7 +152,7 @@ describe('сверка управляемых профилей', () => {
 
     reconcileManagedProfiles(store);
     const profile = store.getSettings().endpointProfiles[0];
-    expect(profile?.baseUrl).toBe('http://127.0.0.1:5179/company-dev/v1');
+    expect(profile?.baseUrl).toBe('http://127.0.0.1:5179/company-dev/_s/assistant/v1');
     expect(profile?.name).toBe('Контур · Company · dev');
     // Модель выбирает человек — терять её при каждой записи настроек было бы
     // ровно тем поведением, за которое ругают «умные» панели.

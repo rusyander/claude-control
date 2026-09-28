@@ -92,6 +92,11 @@ export const scriptsEn: typeof scriptsRu = {
         'The dialog does not ask "are you sure?"; it says what will happen: ' +
         'destructive-guard.mjs is called by a hook, the hook will stay in ' +
         'settings.json and will silently stop working, because the file will not be found.',
+      fUnused: 'What is forgotten — one tab away',
+      fUnusedText:
+        'The Not bound tab keeps only the files no hook runs and no bound script imports: ' +
+        'here that is notify.ps1. Tests do not land here — they have their own tab and are not ' +
+        'bound to hooks. The tab counters add up to All, and search looks inside the open tab.',
 
       newTitle: 'The file does not exist yet: creating it',
       newCaption:
@@ -319,6 +324,8 @@ export const scriptsEn: typeof scriptsRu = {
       '02-content': 'Content expands in the list: a shared module in a nested folder',
       '03-search': 'A missed search names the query instead of claiming there are no files',
       '04-delete': 'The dialog states the consequence: the hook stays and silently stops working',
+      '05-unused':
+        'The Not bound 1 tab: the list holds notify.ps1 alone; beside it All 7, In use 5, Tests 1',
     },
     new: {
       '01-form': 'Four scaffolds instead of an empty file — offered when creating only',

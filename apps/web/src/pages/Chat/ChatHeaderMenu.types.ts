@@ -1,4 +1,7 @@
 export interface ChatHeaderMenuProps {
+  /** Разговор — группа и автономность живут у него; нет — секции нет. */
+  chatId?: string;
+  sessionId?: string;
   /** Тумблер правок показывается только в разговоре о настоящем проекте. */
   allowEdits?: boolean;
   onAllowEditsChange?: (value: boolean) => void;

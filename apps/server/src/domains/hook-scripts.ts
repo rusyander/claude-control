@@ -27,17 +27,22 @@ try {
 `;
 
 function header(description: string, event: string): string {
-  const text = description.trim() || 'Хук Claude Code.';
+  // Каждая строка описания — своим комментарием: перенос строки не выводит текст в код.
+  // Концом строки JavaScript считает и одиночный CR, и U+2028/U+2029 — делим по всем.
+  const text = (description.trim() || 'Хук Claude Code.')
+    .split(/\r\n|[\n\r\u2028\u2029]/)
+    .join('\n// ');
   // Описание — отдельным блоком: карточка хука показывает первый блок
   // комментария, и служебная строка про событие ей не нужна.
   return `// ${text}\n\n// Событие: ${event}. Файл создан через AgentDeck, его можно свободно править.\n\n`;
 }
 
 function buildMessage(draft: HookDraft): string {
-  const message = (draft.message ?? '').replace(/`/g, '\\`');
+  // JSON-литерал: `${…}`, обратная косая и кавычки из текста не становятся кодом.
+  const message = JSON.stringify(draft.message ?? '');
 
   return `${header(draft.description ?? '', draft.event)}// Выводит подсказку в контекст агента.
-process.stdout.write(\`${message}\`);
+process.stdout.write(${message});
 process.exit(0);
 `;
 }
@@ -45,7 +50,7 @@ process.exit(0);
 function buildGuard(draft: HookDraft): string {
   const patterns = draft.guardPatterns.filter(Boolean);
   const list = patterns.map((pattern) => JSON.stringify(pattern)).join(', ');
-  const message = (draft.message ?? 'Действие требует подтверждения.').replace(/`/g, '\\`');
+  const message = JSON.stringify(draft.message ?? 'This action needs confirmation.');
 
   return `${header(draft.description ?? '', draft.event)}${PREAMBLE}
 // Что считается опасным. Список можно дополнять.
@@ -55,7 +60,7 @@ const command = payload.tool_input?.command ?? payload.tool_input?.file_path ?? 
 
 if (PATTERNS.some((pattern) => String(command).includes(pattern))) {
   // Код возврата 2 останавливает действие и требует подтверждения пользователя.
-  process.stderr.write(\`${message}\`);
+  process.stderr.write(${message});
   process.exit(2);
 }
 

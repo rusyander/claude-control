@@ -1,6 +1,8 @@
 import { integrationKeys } from '@entities/Integration';
 import { pluginsKey } from '@entities/Plugin';
 import { projectsKey } from '@entities/Project';
+import { projectGitKey } from '@entities/ProjectGit';
+import { projectRunnerKey } from '@entities/ProjectRunner';
 import { testKeys } from '@entities/ProjectTest';
 import { scriptsKey } from '@entities/Script';
 import { DOMAIN_KEYS, queryKeys } from '@shared/api/query-keys';
@@ -37,21 +39,49 @@ export const SECTION_QUERY_KEYS: Readonly<Record<string, Keys>> = {
   // Скрипт хука живёт рядом с хуками: удаление скрипта меняет и их карточки.
   scripts: [scriptsKey, queryKeys.hooks],
   // Группа несёт правила, скиллы, MCP и env: включение пишет их все.
-  groups: [queryKeys.groups, queryKeys.automations, ...CONFIG_FILE_KEYS],
+  groups: [queryKeys.groups, ...CONFIG_FILE_KEYS],
   // Плагин приносит свои скиллы, команды и MCP-серверы.
   plugins: [pluginsKey, queryKeys.skills, queryKeys.mcp, queryKeys.overview],
   history: [queryKeys.history, queryKeys.backups, queryKeys.claudeMd, ...CONFIG_FILE_KEYS],
   settings: [queryKeys.settings],
   // Смена провайдера меняет содержимое почти каждой страницы — перечитываем всё.
   provider: [[]],
-  endpoints: [queryKeys.endpoints('').slice(0, 1), queryKeys.settings],
+  // Применение профиля пишет переменные в конфиг CLI (у Claude — env в
+  // settings.json): без env страница переменных стояла бы на старом снимке.
+  endpoints: [
+    queryKeys.endpoints('').slice(0, 1),
+    queryKeys.settings,
+    ...(DOMAIN_KEYS.env ?? [queryKeys.env]),
+  ],
   integrations: [integrationKeys.root, queryKeys.settings],
   dlp: [queryKeys.dlp, queryKeys.settings],
   // Список проектов живёт под двумя ключами: реестр и выбор проекта в чате,
   // а новый чат агента — в дереве `chats`.
-  projects: [queryKeys.projects, projectsKey, ['chats']],
+  projects: [
+    queryKeys.projects,
+    projectsKey,
+    ['chats'],
+    // Git, копии, их настройки и dev-серверы проекта — действия агента над проектом.
+    projectGitKey,
+    projectRunnerKey,
+    queryKeys.groupChoicesOf('').slice(0, 2),
+  ],
   tests: [testKeys.root],
   contour: [queryKeys.platforms],
+  // Действия агента над чатами: список и лента, дерево и план разделения,
+  // группа чата, заметки главным чатам деревьев.
+  chat: [
+    ['chats'],
+    ['chat'],
+    ['chat-tree'],
+    ['split'],
+    ['chat-group-settings'],
+    queryKeys.chatEscalations,
+  ],
+  // Стоп сессии вне панели: список идущих и сессий аналитики.
+  analytics: [['analytics']],
+  // Перенос и его отмена: след переноса, подписки, верность и паспорт цели.
+  portability: [['portability']],
 };
 
 /** Ключи раздела; неизвестный раздел — пусто, ничего не перечитываем. */

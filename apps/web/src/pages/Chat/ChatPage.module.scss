@@ -146,12 +146,109 @@ $thread-min: 420px;
   min-height: 0;
 }
 
+// Шапка чата: ряд «разговор» и под ним ряд «проект» (ChatHeader). Контейнер
+// запросов — ширина колонки разговора, а не окна: на 1280 с открытым превью
+// колонка уже, чем телефон.
 .header {
+  container: chat-header / inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-sm) var(--spacing-xl);
   border-bottom: 1px solid var(--color-border);
+
+  @media (max-width: 640px) {
+    padding: var(--spacing-xs) var(--spacing-sm);
+  }
 }
 
+// Название слева, пульт разговора справа; не влезают — пульт уходит строкой ниже
+// целиком, а не по кнопке.
+.headRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-xs) var(--spacing-md);
+}
+
+// Название уступает место пульту раньше, чем пульт уходит строкой ниже: на
+// 1280 колонка разговора ~670px, и лишняя строка шапки дороже усечённого
+// названия (оно целиком видно во вкладке и в списке слева).
 .headerText {
+  flex: 1 1 100px;
   min-width: 0;
+}
+
+// Ряд групп. Выровнен по верху: у группы модели под select'ами бывают подписи
+// контура, и по центру остальные кнопки съехали бы с её средней линии. Все
+// элементы — 34px, так что по верху значит и на одной средней линии.
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  // Промежуток между группами — место под черту. Сама черта ширины не берёт
+  // (absolute): иначе её снятие у начала строки меняло бы ширину группы, та
+  // возвращалась бы на прежнюю строку, и метка качалась бы туда-обратно.
+  gap: var(--spacing-xs) 19px;
+  min-width: 0;
+}
+
+// Группа переносится в ряду целиком: строку она уступает соседке, а не делится
+// с ней. Внутри себя кнопки переносятся, только если группа шире всего ряда
+// (телефон: «Код проекта · Тесты · Редактор» в 330px не влезают). Пустая
+// (кнопка доставки не нужна вне репозитория) места не занимает.
+.group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-xs) 2px;
+  position: relative;
+  min-width: 0;
+  min-height: 34px;
+
+  &:empty {
+    display: none;
+  }
+
+  // Черта между группами: той же высоты, что значки кнопок, по средней линии
+  // 34-пиксельного ряда (а не всей группы — группа модели бывает выше). У
+  // группы, открывающей строку, черты нет (`data-line-start`, useLineStarts).
+  &:not([data-line-start])::before {
+    content: '';
+    position: absolute;
+    top: 7px;
+    left: -10px;
+    width: 1px;
+    height: 20px;
+    background: var(--color-border);
+  }
+}
+
+// Группа модели: select'ы и под ними подписи контура — выравнивание по верху.
+.group:has(select) {
+  align-items: flex-start;
+}
+
+// Узкая колонка (телефон, планшет, 1280 с превью): у кнопок, чей значок говорит
+// сам за себя (код, тесты, редактор, агенты, настройки чата), подпись уходит —
+// иначе шапка вырастала в пять строк и съедала разговор. Скрыта визуально, а не
+// из дерева: имя кнопки для диктора остаётся, подсказка — в title. Подписи
+// «До MR» и «Dev-сервер» остаются: первая — состояние, вторая — единственное,
+// что отличает её от «Настроек чата».
+@container chat-header (max-width: 479px) {
+  .header [data-bar-label] {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .header button:has(> [data-bar-label]) {
+    padding-inline: 7px;
+  }
 }
 
 .title {

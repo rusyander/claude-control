@@ -73,6 +73,51 @@ export function foreignProviderId(consumer: string): string | undefined {
 }
 
 /**
+ * Отметка раздела в адресе шлюза: `/<контур>/_s/<раздел>/v1/...` (баг 11а).
+ *
+ * ЗАЧЕМ. Закрытый раздел обязан быть закрыт на деле, а не подписью. Решение при
+ * запуске (`routing.ts`) не видит того, что уже идёт: процесс, запущенный при
+ * открытом разделе, держит адрес шлюза до конца, настройка ассистента и файлы
+ * CLI указывают на шлюз, пока их не переписали. Отметка в адресе — единственный
+ * канал от процесса к шлюзу, который есть у ЛЮБОГО клиента (заголовки у чужих
+ * CLI не задокументированы), и по ней шлюз отказывает закрытому разделу сам, на
+ * каждом запросе.
+ *
+ * Чужой CLI — двумя сегментами (`foreign/codex`), а не `foreign:codex`: двоеточие
+ * в пути законно, но часть клиентов склеивает базовый адрес по-своему, и
+ * проверять это на каждом CLI нечем.
+ */
+export const SECTION_SEGMENT = '_s';
+
+/** Раздел в адресе: `chat` → `chat`, `foreign:codex` → `foreign/codex`. */
+export function sectionPath(consumer: PlatformConsumerId): string {
+  const foreign = foreignProviderId(consumer);
+  return foreign === undefined ? consumer : `foreign/${foreign}`;
+}
+
+/**
+ * Раздел из сегментов адреса, начиная с позиции `at` (сразу за `_s`). Возвращает
+ * потребителя и сколько сегментов он занял; мусор — undefined. Шлюз такой адрес
+ * за адрес без отметки не принимает: незнакомый раздел получает отказ, иначе
+ * опечатка в отметке открывала бы закрытое.
+ */
+export function parseSectionPath(
+  parts: readonly string[],
+  at: number,
+): { consumer: PlatformConsumerId; used: number } | undefined {
+  const head = parts[at];
+  if (head === undefined) return undefined;
+  if (head === 'foreign') {
+    const cli = parts[at + 1];
+    const consumer = cli === undefined ? '' : foreignConsumerId(cli);
+    return platformConsumerPattern.test(consumer) ? { consumer, used: 2 } : undefined;
+  }
+  return platformConsumerPattern.test(head) && foreignProviderId(head) === undefined
+    ? { consumer: head, used: 1 }
+    : undefined;
+}
+
+/**
  * Что получает НОВЫЙ контур. Только ассистент панели — тот единственный
  * сценарий, который через контур работает целиком: у CLI через шлюз нет своих
  * инструментов (подпись `no-client-tools`), и молча увести туда рабочий чат

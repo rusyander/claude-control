@@ -136,6 +136,35 @@ describe('project-tests/library', () => {
     expect(issues).toHaveLength(1);
     expect(issues[0]?.file).toBe('.agent/tests/schema.json');
     expect(issues[0]?.error).toMatch(/не разобрался/);
+    // F-356: причина едет кодом — окно настроек называет её на языке интерфейса.
+    expect(issues[0]).toMatchObject({ messageCode: 'file-unparsed' });
+    expect(issues[0]?.params?.reason).toBeTruthy();
+  });
+
+  it('команда прогона без «command» — неполадка с кодом, не только русской строкой', () => {
+    mkdirSync(join(project, '.agent', 'tests'), { recursive: true });
+    const file = join(project, '.agent', 'tests', 'automation.json');
+    const cases: [string, string, Record<string, unknown> | undefined][] = [
+      ['[]', 'automation-not-object', undefined],
+      ['{"report":"r.xml"}', 'automation-command-missing', undefined],
+      [JSON.stringify({ command: 'x'.repeat(2001) }), 'automation-command-too-long', { max: 2000 }],
+      [JSON.stringify({ command: 'a\nb' }), 'automation-command-multiline', undefined],
+      [
+        JSON.stringify({ command: 'a', report: '../r.xml' }),
+        'automation-report-outside',
+        undefined,
+      ],
+    ];
+    for (const [content, code, params] of cases) {
+      writeFileSync(file, content);
+      const [issue] = readLibraryIssues(project);
+      expect(issue, content).toMatchObject({
+        file: '.agent/tests/automation.json',
+        messageCode: code,
+        ...(params ? { params } : {}),
+      });
+      expect(issue?.error, content).toBeTruthy();
+    }
   });
 
   it('своё поле проверяется при записи: ключ, повтор и выбор без вариантов', () => {

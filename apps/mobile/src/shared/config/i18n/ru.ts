@@ -1,4 +1,8 @@
+import type { PanelAgentRunRefusalCode } from '@agentdeck/contracts/panel-agent';
 import { serverMessagesRu } from './server-messages/ru.ts';
+import { panelTextsRu } from './panel-texts/texts.ru.ts';
+import { homeRu } from './home/ru.ts';
+import { watcherRu } from './watcher/ru.ts';
 
 /**
  * Русский словарь — источник истины. Английский типизирован по нему, поэтому
@@ -7,11 +11,27 @@ import { serverMessagesRu } from './server-messages/ru.ts';
  * Строка с подстановкой — функция: собирать её конкатенацией на месте значит
  * разложить фразу по кускам, а порядок слов в языках разный.
  */
+/** Форма слова по числу: 1 тест, 2 теста, 5 тестов (11–14 — всегда третья). */
+function ruForm(count: number, one: string, few: string, many: string): string {
+  const tail = count % 10;
+  const tens = count % 100;
+  if (tail === 1 && tens !== 11) return one;
+  if (tail >= 2 && tail <= 4 && (tens < 12 || tens > 14)) return few;
+  return many;
+}
+
 export const ru = {
   // Тексты сервера по коду: шаблоны `{{имя}}`, а не функции — список кодов и
   // подстановок общий с панелью (`contracts/server-messages.ts`).
   serverMessages: serverMessagesRu,
+  // Тексты карточки агента по коду — копия словаря окна панели (`panel-texts/`).
+  panelTexts: panelTextsRu,
+  // Главный экран — отдельным модулем (`home/`).
+  home: homeRu,
+  // Фоновый наблюдатель панели — отдельным модулем (`watcher/`).
+  watcher: watcherRu,
   tabs: {
+    home: 'Главная',
     chat: 'Чат',
     projects: 'Проекты',
     analytics: 'Аналитика',
@@ -35,6 +55,8 @@ export const ru = {
 
   chat: {
     title: 'Чат',
+    // Слово режима в названии разговора («Картинка: …»), как в меню отправки панели.
+    titleWord: { deck: 'Презентация', 'deck-revise': 'Правка презентации', picture: 'Картинка' },
     conversations: 'Разговоры',
     code: 'Код',
     tests: 'Тесты',
@@ -42,6 +64,20 @@ export const ru = {
     blank: 'Пусто. Напишите задачу — она уйдёт агенту на компьютере.',
     queued: (prompt: string) => `В очереди: ${prompt} ✕`,
     image: '[изображение]',
+    // Вопрос, закрытый автономией чата, — та же строка, что в ленте панели.
+    autoPick: (label: string) => `Автовыбор: ${label}`,
+    autoPickUnparsed: 'Автовыбор: вопрос закрыт рекомендованным вариантом',
+    // Группа и автономность чата: здесь только видны, меняются в меню чата панели.
+    groupLine: (group: string, autonomous: boolean) =>
+      `Группа: ${group} · ${autonomous ? 'автономно' : 'спрашивать'}`,
+    groupAuto: 'авто',
+    // Критичное от ребёнка разделения — карточка в главном чате.
+    escalation: {
+      title: (title: string) => `Критично от группы «${title}»`,
+      fromBlock: 'Группа сообщила сама',
+      fromAutoPick: 'Автономия выбрала за вас в критичном вопросе',
+      dismiss: 'Прочитано',
+    },
     // Та же подпись, что у ответа в веб-чате (`context-managed`).
     contextSummarized:
       'Контур сжал историю перед этим ответом: модель видела пересказ начала разговора, а не весь ' +
@@ -53,14 +89,26 @@ export const ru = {
     // Рисунок агента блоком `agentdeck:svg` — карточкой, как в панели; колоду
     // телефон не собирает, но и JSON вместо неё не показывает.
     picture: {
-      title: 'Рисунок агента',
-      broken: 'Рисунок не отрисовался на телефоне — откройте его в панели.',
+      title: 'Картинка агента',
+      broken: 'Картинка не отрисовалась на телефоне — откройте её в панели.',
     },
     offerDeck: 'Агент продиктовал презентацию — карточка в панели.',
     blocksRejected: (count: number) =>
       `Панель не приняла блоков: ${count} — они показаны как есть.`,
     plan: (done: number, total: number) => `План ${done}/${total}`,
-    subagents: (count: number) => `Субагентов: ${count}`,
+    // Сколько субагентов ещё работает — ради этого и смотрят на ход с телефона.
+    subagents: (running: number, finished: number) =>
+      running > 0
+        ? `Субагенты: работают ${running}, закончили ${finished}`
+        : `Субагенты: закончили ${finished}`,
+    activeTool: (name: string, summary: string) =>
+      summary ? `Сейчас: ${name} · ${summary}` : `Сейчас: ${name}`,
+    taskNotice: {
+      completed: 'Фоновая задача закончилась',
+      failed: 'Фоновая задача завершилась ошибкой',
+      killed: 'Фоновая задача остановлена',
+      other: 'Уведомление о фоновой задаче',
+    },
     permission: 'Нужно разрешение',
     allow: 'Разрешить',
     deny: 'Запретить',
@@ -306,6 +354,72 @@ export const ru = {
       issue: 'Задача',
       page: 'Требования',
     },
+    // Папка автотестов и прогон её тестов панелью — на телефоне только итог.
+    e2e: {
+      title: 'Автотесты',
+      missing: 'Папки e2e в проекте нет.',
+      folder: (dir: string, created: boolean) =>
+        created ? `Папка ${dir} (заведена панелью)` : `Папка ${dir}`,
+      framework: {
+        playwright: 'Playwright',
+        cypress: 'Cypress',
+        pytest: 'pytest',
+        unknown: 'фреймворк не распознан',
+      } as Record<'playwright' | 'cypress' | 'pytest' | 'unknown', string>,
+      specs: (count: number) => {
+        const tail = count % 10;
+        const tens = count % 100;
+        const word =
+          tail === 1 && tens !== 11
+            ? 'файл'
+            : tail >= 2 && tail <= 4 && (tens < 12 || tens > 14)
+              ? 'файла'
+              : 'файлов';
+        return `${count} ${word} тестов`;
+      },
+      running: (command: string) => `Идёт прогон: ${command}`,
+      // Итог словами тестировщика, как в панели: сперва «прошло или упало».
+      stopped: 'Остановлено. Легло то, что успело попасть в отчёт.',
+      stoppedNoReport: 'Остановлено до отчёта — результаты не легли.',
+      resultGreen: (passed: number, total: number) => `Прошли все: ${passed} из ${total}.`,
+      resultRed: (failed: number, total: number, passed: number) =>
+        `Упало ${failed} из ${total}, прошло ${passed}.`,
+      resultSkipped: (count: number) => `Пропущено: ${count}.`,
+      resultEmpty: 'В отчёте нет ни одного теста.',
+      unmatched: (count: number) => `Без кейса: ${count}.`,
+      exitOdd: (code: number) =>
+        `Команда завершилась с кодом ${code}, хотя упавших тестов нет, — смотрите вывод команды.`,
+      error: {
+        'e2e-run-no-report': 'Отчёт не появился — команда не нашлась или упала до тестов.',
+        'e2e-run-spawn': 'Команду не удалось запустить.',
+        'e2e-run-import': 'Отчёт есть, но разобрать его не вышло.',
+        'e2e-run-not-installed':
+          'Раннер автотестов не установлен, а панель сама его не ставит. Поставьте его на компьютере.',
+      } as Record<
+        'e2e-run-no-report' | 'e2e-run-spawn' | 'e2e-run-import' | 'e2e-run-not-installed',
+        string
+      >,
+      notInstalledAt: (dir: string, install: string) =>
+        `Раннер автотестов не установлен, а панель сама его не ставит. На компьютере выполните в ${dir}: ${install}`,
+      onComputer: 'Прогоняют и сверяют автотесты в панели на компьютере.',
+      own: (command: string) => `Своя команда проекта: ${command}`,
+    },
+    pyramid: {
+      title: 'Пирамида тестов',
+      layers: {
+        e2e: 'E2E',
+        integration: 'Интеграционные',
+        unit: 'Модульные',
+        code: 'Тесты кода',
+      } as Record<'e2e' | 'integration' | 'unit' | 'code', string>,
+      count: (tests: number, files: number) =>
+        `${tests} ${ruForm(tests, 'тест', 'теста', 'тестов')} в ${files} ${ruForm(files, 'файле', 'файлах', 'файлах')}`,
+      unknown: 'не известно',
+      noFolder: 'папки e2e нет',
+      noFramework: 'Каркас модульных тестов в проекте не назван — панель их не считает.',
+      unsplit: 'Интеграционные не помечены проектом — считаются вместе с модульными.',
+      truncated: 'Проект обойдён не целиком — числа не меньше показанных.',
+    },
     running: 'Прогон идёт',
     generating: 'Агент пишет кейсы',
     done: 'Прогон закончен',
@@ -360,10 +474,12 @@ export const ru = {
     },
     lastRun: (when: string) => `Последний прогон: ${when}`,
     lastRunNever: 'Ещё не гоняли',
+    stepLabels: { data: 'данные', expected: 'ожидание' },
     // Красный кейс в карантине и просто красный — разные факты: первый уже
     // известен и никого не держит, и на телефоне это должно быть видно сразу.
     muted: 'карантин',
     muteReason: (reason: string) => `Карантин: ${reason}`,
+    retryPass: (attempts: number) => `Прошёл только на повторе (упавших попыток: ${attempts})`,
     selected: (count: number) => `Отмечено: ${count}`,
     clearSelection: 'Снять отметки',
     runs: {
@@ -381,6 +497,8 @@ export const ru = {
         import: 'импорт из CI',
       },
       actor: { agent: 'агент', human: 'человек', ci: 'CI' },
+      e2e: 'автотесты панели',
+      e2eActor: 'панель',
       state: {
         running: 'идёт',
         done: 'закончен',
@@ -549,10 +667,30 @@ export const ru = {
     toolFailed: (name: string) => `Действие не удалось: ${name}`,
     stopped: 'Ход остановлен.',
     runFailed: (message: string) => `Агент не ответил: ${message}`,
+    openFailed: (message: string) => `Разговор не открылся: ${message}`,
     cut: 'Связь оборвалась до конца хода — агент остановлен. Сказанное сохранено в истории.',
+    /** Поток хода пропал (панель перезапустилась) — разговор перечитан с сервера. */
+    streamLost:
+      'Связь с панелью пропала посреди хода (панель, скорее всего, перезапустилась). Разговор перечитан: сказанное и сделанное до обрыва — выше; повторите просьбу, если она ещё нужна.',
+    /** Пометка запечатанного ответа: в файле хвост английский (его читает модель). */
+    sealed: {
+      actions: (list: string) => `Выполненные действия: ${list}.`,
+      failed: (name: string) => `${name} (ошибка)`,
+      notFinished: (reason: string) => `Ответ не дописан. ${reason}`,
+      reason: {
+        restart: 'Панель перезапустилась посреди хода.',
+        stopped: 'Ход остановлен.',
+        timeout: 'Агент не закончил ход за отведённое время.',
+        failed: 'Ход оборвался.',
+      },
+    },
     refusal: {
       invalid_body: 'Сообщение не принято: сервер не понял запрос.',
       busy: 'В этом разговоре агент ещё отвечает — дождитесь конца хода.',
+      conversation_stale:
+        'Этот разговор продолжили в другом окне — показываю его заново. Ваше сообщение не отправлено: повторите его, если оно ещё нужно.',
+      conversation_deleted:
+        'Этот разговор удалили в другом окне. Ваше сообщение не отправлено — следующее начнёт новый разговор.',
       provider_unsupported: 'Агент панели пока работает только с Claude Code: активный CLI другой.',
       cli_not_found: 'Claude Code не найден в PATH компьютера: агенту нечем работать.',
       endpoint_unsupported:
@@ -561,7 +699,9 @@ export const ru = {
         'Ассистент идёт через контур, а шлюз не поднят или нет ключа — в облако вендора молча не уходим.',
       data_mask_broken:
         'Правила маскирования данных сломаны: без маски сообщение агенту не уходит.',
-    } as Record<string, string>,
+      // Ключи сверены со списком кодов сервера: новый отказ без текста ломает
+      // сборку, а не показывает на телефоне русскую строку сервера.
+    } satisfies Record<PanelAgentRunRefusalCode, string> as Record<string, string>,
     card: {
       heading: 'Агент просит подтвердить',
       dangerHeading: 'Опасное действие — проверьте внимательно',

@@ -58,7 +58,8 @@ export function NotificationCenter({ isCollapsed = false }: NotificationCenterPr
             </span>
           )}
         </span>
-        <span className={styles.label}>{t('notifications.title')}</span>
+        {/* Свёрнутая панель уже подписи: первая буква торчала у её края («У»). */}
+        {!isCollapsed && <span className={styles.label}>{t('notifications.title')}</span>}
       </button>
 
       <Modal
@@ -66,7 +67,7 @@ export function NotificationCenter({ isCollapsed = false }: NotificationCenterPr
         onOpenChange={setIsOpen}
         title={t('notifications.title')}
         description={t('notifications.subtitle')}
-        size="sm"
+        size="md"
         bodyFill
         footer={
           entries.length > 0 ? (

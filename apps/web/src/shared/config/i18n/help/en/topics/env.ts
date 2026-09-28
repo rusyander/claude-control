@@ -26,8 +26,9 @@ export const envEn: typeof envRu = {
       'show, export or copy that configuration without carrying keys along.',
     whyMasked: 'The value is never revealed by accident',
     whyMaskedText:
-      'Secrets arrive from the server already masked — only the start and the tail are ' +
-      'visible. The full value is fetched separately and only on your action.',
+      'Secrets arrive from the server already masked — only dots and the last two ' +
+      'characters are visible, and a value shorter than eight characters shows none at all. ' +
+      'The full value is fetched separately and only on your action.',
     whyBulk: 'A whole .env moves at once',
     whyBulkText:
       'A batch of variables can be pasted line by line as is. The panel files secrets ' +
@@ -94,7 +95,8 @@ export const envEn: typeof envRu = {
         'explains where to reissue the key.',
       secretMasked: 'The secret is masked in the list',
       secretMaskedText:
-        'Only the start and the tail: whk_••••••••••••a1d2. Beside it the comment “Warehouse ' +
+        'Only dots and the last two characters: ••••••••d2. There are always eight dots, so ' +
+        'the mask does not give away the length either. Beside it the comment “Warehouse ' +
         'account → Access → Create token”, stored in the file above the variable’s line and ' +
         'surviving every rewrite.',
       secretReveal: 'Revealing the value is a separate action',
@@ -104,8 +106,10 @@ export const envEn: typeof envRu = {
       secretEdit: 'Editing a secret: the value field is empty',
       secretEditText:
         'The panel received the value masked and cannot put it back — a string of dots ' +
-        'would end up in the file. “Leave empty if the value should stay.” The file is ' +
-        'fixed by the record: the variable returns where it came from.',
+        'would end up in the file. “Leave empty if the value should stay.” The exception ' +
+        'is a secret the panel agent saved without a value: the field says “No value yet — ' +
+        'enter it”, and you enter it. The file is fixed by the record: the variable ' +
+        'returns where it came from.',
 
       bulkTitle: 'Path 2. Move a batch: a whole .env, local and group variables',
       bulkCaption:
@@ -119,8 +123,8 @@ export const envEn: typeof envRu = {
         'three go to settings.json.',
       bulkList: 'The list after creation',
       bulkListText:
-        'Ordinary variables show their values, secrets show masks whk_••••••••••••a1d2 and ' +
-        'dl_7•••••••aa93. Each row carries its own file, and that is what answers “why is ' +
+        'Ordinary variables show their values, secrets show masks ••••••••d2 and ' +
+        '••••••••93. Each row carries its own file, and that is what answers “why is ' +
         'one visible and the other not”.',
       bulkMove: 'Moving between settings.json and the personal file',
       bulkMoveText:
@@ -143,7 +147,9 @@ export const envEn: typeof envRu = {
     canReveal: 'Reveal the full value of a secret with a button',
     canBulkAdd: 'Paste a batch of KEY=value lines, up to a whole .env',
     canComment: 'Leave a comment: where the value comes from or what it is for',
-    canAssistant: 'Fill the form with the assistant by describing the variable in words',
+    canAssistant:
+      'Fill the form with the assistant by describing the variable in words. The value of a secret ' +
+      'variable (token, key, password) is never shown to it — it sees a mask, and the value stays as it was',
     canAuto:
       'Rely on detection when adding in bulk: a name carrying TOKEN goes to the secrets file',
     canMove: 'Move a variable between settings.json and settings.local.json with a button',
@@ -312,7 +318,7 @@ export const envEn: typeof envRu = {
       '02-form':
         'The single-variable form: “Where to save” proposes .mcp-secrets.env, with the comment field beside it',
       '03-list-masked':
-        'The secret in the list: the mask whk_••••••••••••a1d2 and a comment on where to issue the token',
+        'The secret in the list: the mask ••••••••d2 and a comment on where to issue the token',
       '04-revealed':
         'After the reveal press the value is shown whole — fetched by a separate request',
       '05-secret-edit':

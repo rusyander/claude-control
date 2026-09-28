@@ -148,6 +148,30 @@ describe('project-tests/manual', () => {
     expect(() => manual.start(project, { groupId: 'gui' }, now)).toThrow(ProjectTestsError);
   });
 
+  /**
+   * «Завершить» при непройденных проходах: запись знала только отмеченное, и
+   * брошенный кейс пропадал из счёта — прогон 6 из 7 читался как полный.
+   */
+  it('запись прогона помнит, сколько проходов было задумано', () => {
+    const session = manual.start(project, { groupId: 'gui' }, now);
+    manual.record(
+      project,
+      { runId: session.runId, pointId: session.points[0]!.id, status: 'passed' },
+      now,
+    );
+    manual.finish(project, session.runId, '2026-09-07T11:00:00.000Z');
+
+    const [run] = readRuns(project);
+    expect(run?.planned).toBe(2);
+    expect(run?.summary.total).toBe(1);
+    // Число без имён — полдела: агент панели, прочитав запись, так и ответил —
+    // «один кейс остался без результата, какой именно, по данным не видно».
+    const open = session.points[1]!;
+    expect(run?.unwalked).toEqual([
+      { pointId: open.id, groupId: open.groupId, caseId: open.caseId, title: open.title },
+    ]);
+  });
+
   it('завершённый прогон отпускает проект', () => {
     const session = manual.start(project, { groupId: 'gui' }, now);
     manual.finish(project, session.runId, '2026-09-07T11:00:00.000Z');
@@ -202,6 +226,52 @@ describe('project-tests/manual', () => {
     expect(() =>
       manual.record(project, { runId: session.runId, pointId: 'чужой', status: 'passed' }, now),
     ).toThrow(ProjectTestsNotFoundError);
+  });
+  /**
+   * Панель перезапускается (обновление, dev-watch, перезагрузка машины), а
+   * человек посреди прохода. Сессия жила только в памяти: после рестарта
+   * кнопка «Ручной проход» открывала пустоту, отметить следующий кейс было
+   * нельзя, а запись прогона навсегда оставалась «идёт».
+   */
+  it('проход переживает перезапуск панели: сессия поднимается с диска и продолжается', () => {
+    const session = manual.start(project, { groupId: 'gui' }, now);
+    manual.record(
+      project,
+      { runId: session.runId, pointId: session.points[0]!.id, status: 'passed' },
+      '2026-09-07T10:05:00.000Z',
+    );
+    manual.stopAll('2026-09-07T10:06:00.000Z');
+
+    const restarted = new ProjectTestManualRegistry();
+    const restored = restarted.get(project);
+    expect(restored?.runId).toBe(session.runId);
+    expect(restored?.results).toHaveLength(1);
+    expect(restored?.index).toBe(1);
+
+    restarted.record(
+      project,
+      { runId: session.runId, pointId: session.points[1]!.id, status: 'failed', note: 'упало' },
+      '2026-09-07T10:10:00.000Z',
+    );
+    restarted.finish(project, session.runId, '2026-09-07T10:11:00.000Z');
+    expect(readRuns(project)[0]?.status).toBe('done');
+    expect(readRuns(project)[0]?.summary.failed).toBe(1);
+    expect(new ProjectTestManualRegistry().get(project)).toBeUndefined();
+  });
+
+  it('запись прохода, чью сессию уже не поднять, закрывается как брошенная, а не висит «идёт»', () => {
+    const session = manual.start(project, { groupId: 'gui' }, now);
+    manual.record(
+      project,
+      { runId: session.runId, pointId: session.points[0]!.id, status: 'passed' },
+      '2026-09-07T10:05:00.000Z',
+    );
+    rmSync(join(project, '.agent', 'tests', 'runs', 'manual.session.json'), { force: true });
+
+    expect(new ProjectTestManualRegistry().get(project)).toBeUndefined();
+    const [run] = readRuns(project);
+    expect(run?.status).toBe('stopped');
+    expect(run?.finishedAt).toBe('2026-09-07T10:05:00.000Z');
   });
 });
 
@@ -284,5 +354,73 @@ describe('project-tests/manual: замок группы и доказатель�
 
     manual.record(project, { runId: session.runId, pointId: point.id, status: 'passed' }, now);
     expect(gui(project)[0]?.failure).toBeUndefined();
+  });
+
+  /**
+   * «Шаг / ожидалось / получилось» — три части разбора, а ручной провал нёс
+   * только две: ожидание красного шага лежит в самом кейсе, человек его не
+   * перепечатывает, и дефект уходил без строки «ожидалось».
+   */
+  it('красный шаг несёт в разбор своё ожидание — с подставленным параметром', () => {
+    upsertCase(
+      project,
+      'api',
+      {
+        title: 'Тема',
+        parameters: [{ name: 'theme', values: ['light'] }],
+        steps: [{ action: 'включить %theme', expected: 'фон %theme' }],
+      },
+      now,
+    );
+    const session = manual.start(project, { groupId: 'api' }, now);
+    const point = session.points.find((item) => item.params?.theme === 'light')!;
+
+    manual.record(
+      project,
+      {
+        runId: session.runId,
+        pointId: point.id,
+        status: 'failed',
+        steps: [{ index: 0, status: 'failed', note: 'фон не сменился' }],
+      },
+      now,
+    );
+
+    const result = manual.get(project)?.results[0];
+    expect(result?.failure).toEqual({ step: 1, expected: 'фон light', actual: 'фон не сменился' });
+  });
+
+  /**
+   * Параметризованный кейс — несколько проходов. Статус кейса писался по
+   * ПОСЛЕДНЕМУ отмеченному, и зелёный второй проход прятал красный первый:
+   * в библиотеке кейс «пройден», хотя на одной из тем он упал.
+   */
+  it('статус параметризованного кейса — худший из его проходов, а не последний', () => {
+    upsertCase(
+      project,
+      'api',
+      {
+        title: 'Тема',
+        parameters: [{ name: 'theme', values: ['light', 'dark'] }],
+        steps: [{ action: 'включить %theme' }],
+      },
+      now,
+    );
+    const session = manual.start(project, { groupId: 'api' }, now);
+    const points = session.points.filter((item) => item.params?.theme);
+    const [light, dark] = points;
+
+    manual.record(
+      project,
+      { runId: session.runId, pointId: light!.id, status: 'failed', note: 'светлая сломана' },
+      now,
+    );
+    manual.record(project, { runId: session.runId, pointId: dark!.id, status: 'passed' }, now);
+
+    const api = readGroups(project).find((group) => group.id === 'api')!;
+    const theme = api.cases.find((item) => item.id === light!.caseId);
+    expect(theme?.status).toBe('failed');
+    expect(theme?.note).toBe('светлая сломана');
+    expect(theme?.failure?.actual).toBe('светлая сломана');
   });
 });

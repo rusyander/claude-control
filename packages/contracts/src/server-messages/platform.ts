@@ -46,6 +46,7 @@ export const platformMessageParams = {
   'oauth-network-only': [],
   'oauth-session-missing': [],
   'assistant-timeout': [],
+  'assistant-request-invalid': ['detail'],
   'assistant-empty-reply': [],
   'manifest-invalid-object': ['field'],
   'manifest-invalid-client-tools': ['field'],

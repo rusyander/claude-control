@@ -82,4 +82,4 @@ export function planSubagentRun(request: SubagentRunRequest): SubagentRunPlan | 
   };
 }
 
-const SUBAGENT_SKILLS_HEADING = 'Доступные тебе скиллы (имя: назначение):';
+const SUBAGENT_SKILLS_HEADING = 'Skills available to you (name: purpose):';

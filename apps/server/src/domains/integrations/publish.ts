@@ -2,7 +2,8 @@ import type { IntegrationPublishResult } from '@agentdeck/contracts';
 import type { AppStore } from '../../lib/app-store.ts';
 import { readGroups } from '../project-tests/store.ts';
 import { readRun } from '../project-tests/runs-store.ts';
-import { runToMarkdown } from '../project-tests/export-run.ts';
+import { exportLanguage, runToMarkdown } from '../project-tests/export-run.ts';
+import { RUN_TEXTS, type ExportLanguage } from '../project-tests/export-run-texts.ts';
 import { IntegrationError, invalidField } from './errors.ts';
 import { linkForCwd } from './links.ts';
 import { readConfluenceToken, readIntegrations, requireConnected } from './store.ts';
@@ -92,6 +93,7 @@ export async function publishRun(
   const markdown = runToMarkdown(
     run,
     readGroups(root).filter((group) => !group.error),
+    exportLanguage(deps.store.getSettings().language),
   );
 
   if (request.target === 'jira') {
@@ -134,7 +136,11 @@ export async function publishRun(
 
   const created = await createPage(access, {
     spaceKey: parent.spaceKey,
-    title: pageTitle(run.startedAt, parent.title),
+    title: pageTitle(
+      run.startedAt,
+      parent.title,
+      exportLanguage(deps.store.getSettings().language),
+    ),
     body: markdownToStorage(markdown),
     parentId,
   });
@@ -146,12 +152,12 @@ export async function publishRun(
  * Confluence откажет 400 на второй публикации, — поэтому в него входит время
  * начала прогона: два прогона в одну секунду с одной машины не бывают.
  */
-function pageTitle(startedAt: string, parentTitle: string): string {
+function pageTitle(startedAt: string, parentTitle: string, lang: ExportLanguage): string {
   const stamp = startedAt
     .replace('T', ' ')
     .replace(/\.\d+Z?$/, '')
     .replace(/Z$/, '');
-  return `Прогон тестов ${stamp} — ${parentTitle}`.slice(0, 250);
+  return `${RUN_TEXTS[lang].pageTitle} ${stamp} — ${parentTitle}`.slice(0, 250);
 }
 
 /**
@@ -163,8 +169,20 @@ function pageTitle(startedAt: string, parentTitle: string): string {
  * комментарий открывают; полный отчёт лежит файлом и страницей.
  */
 export function commentText(markdown: string): string {
-  const at = markdown.indexOf('\n## Проходы');
-  return (at === -1 ? markdown : markdown.slice(0, at)).trim();
+  // Отчёт бывает на любом из языков интерфейса — таблицу ищем под обоими именами.
+  // Ищем раздел целиком — заголовок И строку шапки таблицы (или «результатов
+  // нет»): одна строка «## Проходы» в заметке кейса обрывала комментарий
+  // посреди списка упавшего (F-266).
+  const at = Math.min(
+    ...Object.values(RUN_TEXTS)
+      .flatMap((texts) => {
+        const head = `\n## ${texts.passesHeading}\n\n`;
+        return [`${head}| ${texts.columns.join(' | ')} |`, `${head}${texts.noResults}`];
+      })
+      .map((section) => markdown.indexOf(section))
+      .filter((index) => index !== -1),
+  );
+  return (Number.isFinite(at) ? markdown.slice(0, at) : markdown).trim();
 }
 
 /** Экранирование для storage-формата: он XHTML, и `&` в заметке ломает страницу. */

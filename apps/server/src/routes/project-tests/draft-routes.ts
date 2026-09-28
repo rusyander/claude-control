@@ -47,6 +47,16 @@ function withSimilar(root: string, draft: ProjectTestDraft): ProjectTestDraft {
   };
 }
 
+/**
+ * Черновик так, как его отдаёт `GET /drafts`: похожие посчитаны панелью, у
+ * предупреждений есть коды. Ответы приёмки, отказа и отката кладутся клиентом
+ * прямо в кэш окна (перечитать архивный черновик нельзя — 404), и сырой файл
+ * там показывал `similarTo` агента и русские предупреждения в английском окне.
+ */
+function draftView(root: string, draft: ProjectTestDraft): ProjectTestDraft {
+  return attachTextCodes(withSimilar(root, draft), ['warnings']);
+}
+
 export function registerTestDraftRoutes(app: FastifyInstance, deps: TestsDeps): void {
   /** Черновики проекта целиком — окно приёмки открывает один из них. */
   app.get<{ Querystring: { path?: string; runId?: string } }>(
@@ -69,13 +79,10 @@ export function registerTestDraftRoutes(app: FastifyInstance, deps: TestsDeps): 
             'draft-not-found',
             { runId },
           );
-        return attachTextCodes(
-          {
-            drafts: [withSimilar(root, draft)],
-            autoAccept: deps.ctx.store.isTestsAutoAccept(root),
-          },
-          ['warnings'],
-        );
+        return {
+          drafts: [draftView(root, draft)],
+          autoAccept: deps.ctx.store.isTestsAutoAccept(root),
+        };
       });
     },
   );
@@ -110,7 +117,7 @@ export function registerTestDraftRoutes(app: FastifyInstance, deps: TestsDeps): 
         // быть непокрытой» не должно зависеть от памяти модели.
         stamp: readRun(root, runId)?.generate,
       });
-      return { ...result, view: buildView(root, deps) };
+      return { ...result, draft: draftView(root, result.draft), view: buildView(root, deps) };
     });
   });
 
@@ -126,7 +133,7 @@ export function registerTestDraftRoutes(app: FastifyInstance, deps: TestsDeps): 
           .code(400)
           .send({ message: 'Не указан прогон.', messageCode: 'run-unspecified' });
       return guard(reply, () => ({
-        draft: rejectDraft(root, runId),
+        draft: draftView(root, rejectDraft(root, runId)),
         view: buildView(root, deps),
       }));
     },
@@ -145,7 +152,7 @@ export function registerTestDraftRoutes(app: FastifyInstance, deps: TestsDeps): 
           .send({ message: 'Не указан прогон.', messageCode: 'run-unspecified' });
       return guard(reply, () => {
         const result = rollbackDraft(root, runId, (groupId) => assertUnlocked(deps, root, groupId));
-        return { ...result, view: buildView(root, deps) };
+        return { ...result, draft: draftView(root, result.draft), view: buildView(root, deps) };
       });
     },
   );

@@ -2,6 +2,8 @@ import type { FastifyInstance, FastifyReply } from 'fastify';
 import type {
   McpServerDraft,
   PermissionDraft,
+  ProjectAdded,
+  ProjectE2eOnboarding,
   Project,
   ProjectDraft,
   SettingsSource,
@@ -29,9 +31,11 @@ import {
 import {
   checkProjectDraft,
   makeProject,
+  findProjectOnDisk,
   resolveProjectPaths,
   type ProjectPaths,
 } from '../domains/projects.ts';
+import { onboardE2e } from '../domains/project-tests.ts';
 import { requireProject as requireProjectAccess, type ErrorReply } from './project-access.ts';
 import { done } from './write-result.ts';
 import { codeOf } from '../lib/server-text.ts';
@@ -100,7 +104,13 @@ export function registerProjectRoutes(app: FastifyInstance, ctx: ServerContext):
     const draft = request.body;
     // Повтор того же каталога — не «создано»: раньше ответ 200 возвращал старую
     // запись и молча переименовывал её, а панель показывала тост о создании.
-    const existing = ctx.store.getProjectByPath(draft.path);
+    // Сверка и по написанию на диске: реестр хранит его, а ввести тот же каталог
+    // могли коротким именем 8.3.
+    const candidate = makeProject(draft);
+    const existing =
+      ctx.store.getProjectByPath(draft.path) ??
+      ctx.store.getProjectByPath(candidate.path) ??
+      findProjectOnDisk(ctx.store.getProjects(), candidate.path);
     if (existing) {
       return reply.code(409).send({
         error: 'project_exists',
@@ -111,7 +121,21 @@ export function registerProjectRoutes(app: FastifyInstance, ctx: ServerContext):
       });
     }
 
-    return ctx.store.addProject(makeProject(draft));
+    const project = ctx.store.addProject(candidate);
+    // Правило владельца: у каждого проекта есть папка e2e. Своя — её тесты сразу
+    // становятся кейсами раздела «Тесты»; нет своей — панель заводит, спрятав от
+    // git. Сбой здесь не отменяет добавление: проект уже в реестре, а папку
+    // человек заведёт кнопкой в разделе. Итог уходит в ответ: человек видит, что
+    // сделалось с его проектом, а не находит папку в каталоге сам.
+    let e2e: ProjectE2eOnboarding | undefined;
+    try {
+      e2e = onboardE2e(ctx.location.paths.appData, project.path, new Date().toISOString());
+    } catch (error) {
+      console.warn('e2e folder onboarding failed', error);
+      e2e = { state: 'failed' };
+    }
+    const added: ProjectAdded = { ...project, ...(e2e ? { e2e } : {}) };
+    return added;
   });
 
   app.delete<{ Params: { id: string } }>('/api/projects/:id', (request, reply) => {

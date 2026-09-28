@@ -162,7 +162,7 @@ describe('tree-runs', () => {
 
       expect(live.isRunning(key)).toBe(true);
       expect(live.describe(key)).toMatchObject({ status: 'running' });
-      expect(live.stop(key)).toBe(true);
+      expect(live.stop(key)).toBe('stopped');
       expect(live.isRunning(key)).toBe(false);
     });
 

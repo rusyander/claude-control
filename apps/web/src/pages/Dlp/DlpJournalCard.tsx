@@ -27,7 +27,7 @@ const TONES = { blocked: 'danger', masked: 'warning', passed: 'neutral' } as con
  * как «Пока пусто», и сломанный журнал был неотличим от чистого.
  */
 export function DlpJournalCard({ enabled, live }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { data: entries = [], isError, isLoading, refetch } = useDlpJournal(enabled, live);
   const clear = useClearDlpJournal();
 
@@ -61,7 +61,8 @@ export function DlpJournalCard({ enabled, live }: Props) {
           >
             <Badge tone={TONES[entry.decision]}>{t(`dlp.decision.${entry.decision}`)}</Badge>
             <Typography variant="caption" color="subtle">
-              {new Date(entry.at).toLocaleString()}
+              {/* Язык интерфейса, а не браузера (F-323). */}
+              {new Date(entry.at).toLocaleString(i18n.language)}
             </Typography>
             <Typography variant="caption" truncate>
               {entry.path}

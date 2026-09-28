@@ -1,5 +1,12 @@
 import axios from 'axios';
 import { serverMessageFromPayload } from '@shared/config/i18n';
+import { WATCH_SEEN_HEADER } from '@agentdeck/contracts';
+import {
+  isWatchCaptureEnabled,
+  looksLikeWrongShape,
+  reportApiFailure,
+  reportContractMismatch,
+} from '@shared/lib/watch-capture';
 
 /**
  * Клиент локального API. Базовый путь относительный — Vite проксирует /api
@@ -10,6 +17,40 @@ export const apiClient = axios.create({
   baseURL: '/api',
   timeout: 60_000,
 });
+
+/**
+ * Фоновому наблюдателю (если он включён): отказ, которого сервер не видел
+ * (обрыв сети, 5xx прокси; видел — в ответе его заголовок), и ответ не того
+ * вида — HTML вместо JSON. Отказ остаётся отказом, ответ — ответом: перехватчик
+ * только смотрит и передаёт дальше. Отменённый запрос (ушли со страницы) — не сбой.
+ */
+apiClient.interceptors.response.use(
+  (response) => {
+    const contentType = String(response.headers?.['content-type'] ?? '');
+    if (isWatchCaptureEnabled() && looksLikeWrongShape(response.data, contentType)) {
+      reportContractMismatch({
+        method: response.config?.method,
+        url: response.config?.url,
+        status: response.status,
+        contentType,
+        body: response.data,
+      });
+    }
+    return response;
+  },
+  (error: unknown) => {
+    if (axios.isAxiosError(error) && !axios.isCancel(error)) {
+      reportApiFailure({
+        method: error.config?.method,
+        url: error.config?.url,
+        status: error.response?.status,
+        message: messageFromPayload(error.response?.data) ?? error.message,
+        seenByServer: Boolean(error.response?.headers?.[WATCH_SEEN_HEADER]),
+      });
+    }
+    return Promise.reject(error);
+  },
+);
 
 /**
  * Долгие маршруты: клиентский таймаут обязан перекрывать бюджет сервера, иначе
@@ -92,4 +133,13 @@ export function toErrorMessage(error: unknown): string {
     return messageFromPayload(error.response?.data) ?? error.message;
   }
   return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * Отказ 409 — «занято»: сервер отверг запрос не из-за его формы, а потому что
+ * состояние ушло вперёд (прогон уже идёт, группу держит чужой прогон). Экран,
+ * получивший такой отказ, устарел и должен перечитать состояние.
+ */
+export function isConflict(error: unknown): boolean {
+  return axios.isAxiosError(error) && error.response?.status === 409;
 }

@@ -1,4 +1,10 @@
 import { panelTextsRu } from './texts.ru.ts';
+import { panelActionsChatRu } from './actions-chat.ru.ts';
+import { panelActionsGroupsEntitiesRu } from './actions-groups-entities.ru.ts';
+import { panelActionsProjectsRu } from './actions-projects.ru.ts';
+import { panelActionsChatSandboxAgentsRu } from './actions-chat-sandbox-agents.ru.ts';
+import { panelActionsManageRu } from './actions-manage.ru.ts';
+import { panelActionsGapsRu } from './actions-gaps.ru.ts';
 
 /**
  * Окно агента панели (А3). Отдельный модуль, а не ветка в `ru.ts`: словарь
@@ -22,6 +28,7 @@ export const panelAgentRu = {
   emptyConversation: 'Например: «Перейди в проекты и создай проект C:/work/demo».',
   inputLabel: 'Сообщение агенту панели',
   inputPlaceholder: 'Что сделать в панели?',
+  resize: 'Ширина окна агента',
   voice: {
     start: 'Надиктовать голосом',
     stop: 'Остановить диктовку',
@@ -33,20 +40,55 @@ export const panelAgentRu = {
       'Микрофон недоступен: браузер запретил запись. Разрешите её в настройках сайта и нажмите снова.',
     network: 'Служба распознавания не отвечает. Проверьте интернет и попробуйте снова.',
     error: 'Диктовка прервалась. Нажмите микрофон ещё раз.',
+    microphone:
+      'Микрофон не отвечает: браузер не начал запись. Проверьте, что микрофон подключён и разрешён для этой страницы, и нажмите снова — или наберите текст.',
   },
   send: 'Отправить',
   stop: 'Остановить',
   newConversation: 'Новый разговор',
+  foreign: {
+    title: 'Ждут решения в других разговорах',
+    hint: 'Эти карточки просил не этот разговор. Решайте, только если знаете, чьи они.',
+    badge: 'Другой разговор',
+    from: 'Из разговора «{{title}}»',
+    open: 'Открыть этот разговор',
+  },
   thinking: 'Агент думает…',
   toolCalled: 'Действие: {{name}}',
   toolFailed: 'Действие не удалось: {{name}}',
   stopped: 'Ход остановлен.',
   runFailed: 'Агент не ответил: {{message}}',
   noReply: 'Агент закончил ход без текста.',
+  // Пометка запечатанного ответа: в файле хвост английский (его читает модель),
+  // окно рисует его этими словами по коду.
+  sealed: {
+    actions: 'Выполненные действия: {{list}}.',
+    failed: '{{name}} (ошибка)',
+    notFinished: 'Ответ не дописан. {{reason}}',
+    reason: {
+      restart: 'Панель перезапустилась посреди хода.',
+      stopped: 'Ход остановлен.',
+      timeout: 'Агент не закончил ход за отведённое время.',
+      failed: 'Ход оборвался.',
+    },
+  },
+  interruptedByReload:
+    'Страница перезагрузилась посреди хода — ход оборвался, ждавшая карточка снята. Сказанное и сделанное до обрыва — выше; повторите просьбу, если она ещё нужна.',
+  streamLost:
+    'Связь с панелью пропала посреди хода (панель, скорее всего, перезапустилась). Разговор перечитан: сказанное и сделанное до обрыва — выше; повторите просьбу, если она ещё нужна.',
+  staleReloaded:
+    'Этот разговор продолжили в другой вкладке — показываю его заново. Ваше сообщение не отправлено: «{{text}}». Отправьте его ещё раз, если оно ещё нужно.',
+  deletedElsewhere:
+    'Этот разговор удалили в другой вкладке. Ваше сообщение не отправлено: «{{text}}». Следующее сообщение начнёт новый разговор.',
   /** Отказ до запуска по коду сервера (`PANEL_AGENT_RUN_REFUSALS`). */
   refusal: {
+    stream_lost: 'связь с панелью пропала посреди хода — повторите просьбу.',
     invalid_body: 'Сообщение не принято: сервер не понял запрос.',
     busy: 'В этом разговоре агент ещё отвечает — дождитесь конца хода.',
+    conversation_stale:
+      'Этот разговор продолжили в другой вкладке — откройте его заново из «Истории».',
+    conversation_deleted:
+      'Этот разговор удалили в другой вкладке — следующее сообщение начнёт новый.',
     provider_unsupported: 'Агент панели пока работает только с Claude Code: активный CLI другой.',
     cli_not_found: 'Claude Code не найден в PATH: агенту нечем работать.',
     endpoint_unsupported:
@@ -66,6 +108,8 @@ export const panelAgentRu = {
     reject: 'Отклонить',
     deciding: 'Решение отправлено, ждём итог…',
     expires: 'Ждёт до {{time}}',
+    armHint:
+      'Карточка только что появилась — кнопки включатся через мгновение, чтобы случайный клик ничего не решил.',
     decideFailed: 'Решение не принято: {{message}}',
     diff: 'Что изменится',
     truncated:
@@ -139,7 +183,14 @@ export const panelAgentRu = {
     list_groups: 'Список групп',
     save_group: 'Сохранить группу',
     toggle_group: 'Включить или выключить группу',
+    copy_group: 'Копировать группу',
     delete_group: 'Удалить группу',
+    read_group: 'Прочитать группу',
+    draft_group: 'Набросать группу',
+    draft_scenario: 'Набросать сценарий',
+    add_group_step: 'Добавить шаг в порядок работы',
+    move_group_step: 'Переставить шаг порядка работы',
+    set_group_knobs: 'Выставить числа скиллов группы',
     get_settings: 'Настройки панели',
     update_settings: 'Изменить настройки панели',
     switch_provider: 'Сменить провайдера CLI',
@@ -163,6 +214,33 @@ export const panelAgentRu = {
     lint_tests: 'Проверить кейсы',
     stop_tests: 'Остановить прогон тестов',
     delete_test_case: 'Удалить тест-кейс',
+    save_test_case: 'Записать тест-кейс',
+    save_test_group: 'Записать группу тестов',
+    delete_test_group: 'Удалить группу тестов',
+    accept_baseline: 'Принять снимок визуальной проверки эталоном',
+    attach_test_note: 'Приложить текстовый файл к кейсу',
+    build_test_plan: 'Собрать и сохранить план тестов',
+    bulk_delete_cases: 'Удалить несколько кейсов',
+    bulk_edit_cases: 'Изменить несколько кейсов',
+    delete_shared_step: 'Удалить общий шаг',
+    delete_test_environment: 'Удалить тестовое окружение',
+    delete_test_plan: 'Удалить план тестов',
+    delete_test_view: 'Удалить сохранённый фильтр кейсов',
+    install_test_convention: 'Добавить правила тест-кейсов в инструкции проекта',
+    read_tests_report: 'Отчёт раздела «Тесты»',
+    record_manual_result: 'Записать итог ручной проверки',
+    rollback_draft: 'Откатить принятый черновик тестов',
+    run_e2e_tests: 'Запустить автотесты e2e',
+    save_shared_step: 'Записать общий шаг',
+    save_test_environment: 'Записать тестовое окружение',
+    save_test_plan: 'Записать план тестов',
+    save_test_schema: 'Записать свои поля и статусы кейсов',
+    save_test_view: 'Записать фильтр кейсов',
+    set_draft_auto_accept: 'Принимать черновики тестов сразу',
+    start_manual_run: 'Начать ручной прогон',
+    stop_e2e_tests: 'Остановить автотесты e2e',
+    sync_e2e_tests: 'Сверить папку e2e с кейсами',
+    reject_draft: 'Отклонить черновик тестов',
     search_help: 'Поиск по справке',
     read_help_topic: 'Прочитать раздел справки',
     list_help_topics: 'Разделы справки',
@@ -184,6 +262,12 @@ export const panelAgentRu = {
     revert_history_hunk: 'Откатить блок правки',
     list_backups: 'Резервные копии',
     restore_backup: 'Восстановить из копии',
+    ...panelActionsChatRu,
+    ...panelActionsGroupsEntitiesRu,
+    ...panelActionsProjectsRu,
+    ...panelActionsChatSandboxAgentsRu,
+    ...panelActionsManageRu,
+    ...panelActionsGapsRu,
   },
   decidedLine: '{{name}}: {{outcome}}',
   /** Дописывается к итогу, только когда якорь поля ключа действительно нашёлся. */
@@ -215,6 +299,13 @@ export const panelAgentRu = {
     messages: 'Сообщений: {{count}}',
     open: 'Открыть разговор',
     loadFailed: 'Не удалось загрузить разговоры',
+    busy: 'Агент отвечает. Другой разговор откроется, когда ход закончится или вы его остановите.',
+    openFailed: 'Не удалось открыть разговор. Попробуйте ещё раз.',
+    delete: 'Удалить разговор «{{title}}»',
+    deleteConfirm: 'Удалить этот разговор из истории? След действий останется.',
+    deleteYes: 'Удалить',
+    deleteNo: 'Отмена',
+    deleteFailed: 'Не удалось удалить: {{message}}',
   },
   journal: {
     empty: 'Действий пока не было',

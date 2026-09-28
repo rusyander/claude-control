@@ -611,7 +611,7 @@ export async function removeWorktree(
 
   // Ссылки снимаются ДО git: он про них не знает и оставил бы их на диске, а
   // человек прочитал бы «копия убрана» и не смог завести ту же ветку снова.
-  unlinkSharedDirs(entry.path);
+  unlinkSharedDirs(entry.path, projectDir);
 
   // Своя же грязь вопросом человеку быть не должна.
   const forced = force || (await dirtIsOnlyLocalLayer(entry.path, mirror));

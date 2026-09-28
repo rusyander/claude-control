@@ -23,8 +23,12 @@ describe('строки разрешений групп', () => {
         onChange={() => {}}
       />,
     );
-    expect(html.split('role="radio"').length - 1).toBe(6);
-    const checked = [...html.matchAll(/role="radio" aria-checked="true"[^>]*>([^<]*)/g)].map(
+    // Кнопки-переключатели в группе, а не радио: у радио обещаны стрелки и один
+    // шаг табом на группу, которых нет (ревью 28.09, F-244).
+    expect(html).not.toContain('role="radio');
+    expect(html.split('role="group"').length - 1).toBe(2);
+    expect(html.split('aria-pressed=').length - 1).toBe(6);
+    const checked = [...html.matchAll(/aria-pressed="true"[^>]*>([^<]*)/g)].map(
       (match) => match[1],
     );
     expect(checked).toEqual([

@@ -182,7 +182,7 @@ describe('лимит подписки у группы разделения пе�
     expect(t.resumed).toEqual([]);
     await t.advance(1);
     expect(t.resumed.map((item) => item.index)).toEqual([0]);
-    expect(t.resumed[0]?.prompt).toMatch(/лимит/);
+    expect(t.resumed[0]?.prompt).toMatch(/subscription limit/);
     // Второй прогон — не от таймера надзора: его старт шёл бы через реестр.
     expect(t.runs).toHaveLength(1);
   });

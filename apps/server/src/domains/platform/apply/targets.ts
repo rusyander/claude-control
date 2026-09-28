@@ -5,6 +5,7 @@ import type {
   PlatformVarPlan,
 } from '@agentdeck/contracts';
 import { PLATFORM_ASSISTANT_TARGET } from '@agentdeck/contracts/platform';
+import { PLATFORM_TERMINAL_CONSUMER } from '@agentdeck/contracts/platform-consumers';
 import { listProviders } from '../../../providers/registry.ts';
 import type {
   ConfigProvider,
@@ -13,7 +14,7 @@ import type {
 } from '../../../providers/types.ts';
 import { buildEndpointPlan, resolveEndpointVars } from '../../endpoints/endpoint-plan.ts';
 import { resolveProviderEnvTargetFor } from '../../provider-env.ts';
-import { gatewayUrlFor, PLACEHOLDER_KEY } from './profile.ts';
+import { gatewayUrlFor, PLACEHOLDER_KEY, type GatewayUrlRoute } from './profile.ts';
 import { GATEWAY_ROUTES } from '../gateway/pipeline.ts';
 import { serverText } from '../../../lib/server-texts.ts';
 
@@ -107,6 +108,13 @@ export function pickApiKind(provider: ConfigProvider): EndpointApiKind | undefin
 }
 
 /**
+ * Отметка раздела у всего, что пишется в файлы CLI: этот адрес читает и ручной
+ * запуск в консоли, то есть раздел «Терминал» (баг 11а). Снятая галочка
+ * закрывает его в шлюзе сразу, не дожидаясь, пока файлы перепишут.
+ */
+export const TERMINAL_ROUTE: GatewayUrlRoute = { section: PLATFORM_TERMINAL_CONSUMER };
+
+/**
  * Профиль, которым цель применяется. От хранимого управляемого профиля
  * отличается двумя полями: диалектом (у каждого CLI свой) и галочкой «писать
  * токен» — в файл уходит ЗАГЛУШКА, а не ключ, и без галочки её не написать.
@@ -116,12 +124,13 @@ export function targetProfile(
   platformId: string,
   gatewayPort: number,
   apiKind: EndpointApiKind,
-  runTag = '',
+  /** Раздел и метка прогона — см. `GatewayUrlRoute`. */
+  route: GatewayUrlRoute = {},
 ): EndpointProfile {
   return {
     ...managed,
     apiKind,
-    baseUrl: gatewayUrlFor(gatewayPort, platformId, apiKind, runTag),
+    baseUrl: gatewayUrlFor(gatewayPort, platformId, apiKind, route),
     writeToken: true,
   };
 }
@@ -148,7 +157,7 @@ export function filePlanFor(
   model: string,
 ): PlatformVarPlan[] {
   const name = contourEntryName(platformId);
-  const baseUrl = gatewayUrlFor(gatewayPort, platformId, file.apiKind);
+  const baseUrl = gatewayUrlFor(gatewayPort, platformId, file.apiKind, TERMINAL_ROUTE);
 
   if (file.format === 'codex-toml') {
     return [
@@ -201,7 +210,7 @@ export function describeContourTargets(
     const apiKind = pickApiKind(provider);
 
     if (apiKind) {
-      const profile = targetProfile(managed, platformId, gatewayPort, apiKind);
+      const profile = targetProfile(managed, platformId, gatewayPort, apiKind, TERMINAL_ROUTE);
       const filePath =
         provider.id === 'claude'
           ? paths.claudeSettings

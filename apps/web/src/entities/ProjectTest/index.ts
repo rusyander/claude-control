@@ -79,6 +79,18 @@ export {
   useTestTaxonomy,
 } from './api/ProjectTestHealthApi';
 
+export { useTestCaseHistory, useTestFlakyMarks } from './api/ProjectTestCaseHistoryApi';
+
+export {
+  useCreateE2eFolder,
+  useE2eRunSettled,
+  useRemoveE2eFolder,
+  useRunE2eTests,
+  useStopE2eTests,
+  useSyncE2eFolder,
+  useTestPyramid,
+} from './api/ProjectTestE2eApi';
+
 export { useTestRelease, releaseExportUrl } from './api/ProjectTestReleaseApi';
 export type { ReleaseExportFormat } from './api/ProjectTestReleaseApi';
 

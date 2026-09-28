@@ -5,6 +5,7 @@ import type { ProjectTestPointResult, ProjectTestRunRecord } from '@agentdeck/co
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   buildReport,
+  caseStatusHistory,
   evidenceOf,
   failureGroups,
   flakyCases,
@@ -94,6 +95,47 @@ describe('project-tests/runs-store', () => {
     expect(flaky.map((item) => item.caseId)).toEqual(['gui-001']);
     expect(flaky[0]?.flips).toBe(2);
     expect(flaky[0]?.stability).toBeLessThan(100);
+  });
+
+  /**
+   * Кейс с параметрами даёт в ОДНОМ прогоне несколько результатов. История
+   * складывала их подряд, и кейс, который всегда падает на светлой теме и всегда
+   * проходит на тёмной, числился мигающим «на 2 прогонах» после одного прогона:
+   * детерминированная поломка выдавалась за сломанный тест.
+   */
+  it('проходы одного прогона — одна точка истории: параметр, падающий всегда, не мигает', () => {
+    const themed = (id: string, startedAt: string) =>
+      record(id, startedAt, [
+        { pointId: 'gui:gui-001:light', status: 'failed' },
+        { pointId: 'gui:gui-001:dark', caseId: 'gui-001', status: 'passed' },
+      ]);
+    const runs = [
+      themed('r2', '2026-09-02T10:00:00.000Z'),
+      themed('r1', '2026-09-01T10:00:00.000Z'),
+    ];
+
+    expect(flakyCases(runs, [])).toEqual([]);
+  });
+
+  /**
+   * Ревью z1 C28: пропуск стоял тяжелее прохода, и прогон «один параметр прошёл,
+   * другой пропущен» становился точкой `skipped`, которую стабильность выбрасывает
+   * как нерешающую, — случившийся проход терялся из истории.
+   */
+  it('проход и пропуск в одном прогоне — точка «прошёл», а не «пропущен»', () => {
+    const mixed = (id: string, startedAt: string) =>
+      record(id, startedAt, [
+        { pointId: 'gui:gui-001:light', status: 'passed' },
+        { pointId: 'gui:gui-001:dark', caseId: 'gui-001', status: 'skipped' },
+      ]);
+    const runs = [
+      mixed('r3', '2026-09-03T10:00:00.000Z'),
+      record('r2', '2026-09-02T10:00:00.000Z', [{ pointId: 'gui:gui-001', status: 'failed' }]),
+      record('r1', '2026-09-01T10:00:00.000Z', [{ pointId: 'gui:gui-001', status: 'skipped' }]),
+    ];
+
+    // Прогон из одних пропусков — по-прежнему пропуск; провал тяжелее всего.
+    expect(caseStatusHistory(runs).get('gui:gui-001')).toEqual(['skipped', 'failed', 'passed']);
   });
 
   /**
@@ -207,6 +249,45 @@ describe('project-tests/runs-store', () => {
     expect(summary.failed).toBe(2);
   });
 
+  /**
+   * «Не доказаны ничем» по контракту — ни снимка, ни номера шага. Считалось
+   * только вложение, и ручной провал с шагом, ожиданием и фактом стоял в списке
+   * «не доказаны ничем» рядом со счётчиком «с разбором шага: 3» — те же три кейса.
+   */
+  it('провал с разбором шага без снимка — не «ничем не доказан»', () => {
+    const summary = evidenceOf(
+      [
+        record('r1', '2026-09-05T10:00:00.000Z', [
+          { status: 'failed', failure: { step: 2, actual: 'кнопка серая' } },
+          { status: 'failed' },
+        ]),
+      ],
+      [],
+    );
+
+    expect(summary.failed).toBe(2);
+    expect(summary.detailed).toBe(1);
+    expect(summary.missing.map((item) => item.caseId)).toEqual(['gui-002']);
+  });
+
+  /**
+   * Последнее слово кейса — последний результат, а не последний провал: кейс,
+   * который упал вчера и прошёл сегодня, не красный, и перепроходить его как
+   * «недоказанный» — тратить прогон на починенное.
+   */
+  it('кейс, прошедший после провала, в красные не попадает', () => {
+    const summary = evidenceOf(
+      [
+        record('r2', '2026-09-06T10:00:00.000Z', [{ status: 'passed' }]),
+        record('r1', '2026-09-05T10:00:00.000Z', [{ status: 'failed' }]),
+      ],
+      [],
+    );
+
+    expect(summary.failed).toBe(0);
+    expect(summary.missing).toEqual([]);
+  });
+
   it('название кейса подтягивается из библиотеки: в записи прогона его нет', () => {
     const summary = evidenceOf(
       [record('r1', '2026-09-05T10:00:00.000Z', [{ status: 'failed' }])],
@@ -241,5 +322,27 @@ describe('project-tests/runs-store', () => {
     } as ProjectTestRunRecord);
 
     expect(readRuns(project).map((run) => run.id)).toEqual(['gggggggg']);
+  });
+
+  it('источник импорта: старая запись без поля и мусор — CI, автотесты панели — e2e, не импорт — без поля', () => {
+    const imported = (id: string, day: string, origin?: string): ProjectTestRunRecord =>
+      ({
+        ...record(id, `2026-09-${day}T10:00:00.000Z`),
+        mode: 'import',
+        actor: 'ci',
+        origin,
+      }) as unknown as ProjectTestRunRecord;
+    writeRun(project, imported('i1000000', '01'));
+    writeRun(project, imported('i2000000', '02', 'e2e'));
+    writeRun(project, imported('i3000000', '03', 'пайплайн'));
+    writeRun(project, { ...record('r4000000', '2026-09-04T10:00:00.000Z'), origin: 'e2e' });
+
+    const origins = Object.fromEntries(readRuns(project).map((run) => [run.id, run.origin]));
+    expect(origins).toEqual({
+      i1000000: 'ci',
+      i2000000: 'e2e',
+      i3000000: 'ci',
+      r4000000: undefined,
+    });
   });
 });

@@ -19,7 +19,7 @@ import {
   PermissionNotFoundError,
   savePermission,
 } from './permissions.ts';
-import { deleteRule, readRules, saveRule } from './rules.ts';
+import { assertRuleTitleFree, deleteRule, readRules, saveRule } from './rules.ts';
 import { assertSkillId, saveSkill } from './skills.ts';
 import { disabledSkillsDir } from './skills/paths.ts';
 import { configSourceFingerprint } from './config-preview/fingerprint.ts';
@@ -135,6 +135,9 @@ function previewRule(
   }
 
   if (request.action === 'save') {
+    // Тот же отказ D-A, что у маршрута: карточка агента не должна обещать
+    // запись, которую маршрут потом отвергнет.
+    assertRuleTitleFree(readRules(paths.claudeMd, state), request.id ?? '', request.draft.title);
     return {
       files: [
         onCopy(paths.claudeMd, (copy) =>

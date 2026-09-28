@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
-import type { PromptGateAction } from '@agentdeck/contracts';
+import { buildEnglishGateScript } from './script-en.ts';
+import type { GateScriptConfig } from './script.types.ts';
 
 /**
  * Сборка скрипта хука.
@@ -15,19 +16,7 @@ import type { PromptGateAction } from '@agentdeck/contracts';
  * увозил бы с собой фамилии и телефоны.
  */
 
-export interface GateScriptConfig {
-  /** Откуда читать правила — тот же файл, что у прокси. */
-  rulesPath: string;
-  /** Куда писать журнал; пусто — не писать вовсе. */
-  journalPath: string;
-  /**
-   * `state.json` панели: тумблер «Вести журнал» читается отсюда в момент
-   * срабатывания, а не зашивается в скрипт — иначе каждое переключение
-   * оставляло бы на диске устаревший файл. Пусто — журнал ведётся всегда.
-   */
-  statePath?: string;
-  action: PromptGateAction;
-}
+export type { GateScriptConfig } from './script.types.ts';
 
 /**
  * Ядро читается из файлов рядом: одна копия логики и одна копия образцов на
@@ -43,6 +32,7 @@ export function coreSource(): string {
 }
 
 export function buildGateScript(config: GateScriptConfig): string {
+  if (config.language === 'en') return buildEnglishGateScript(config, coreSource());
   return `// Гейт на промпте — сгенерирован AgentDeck.
 // Событие: UserPromptSubmit. Смотрит на текст, НАБРАННЫЙ ЧЕЛОВЕКОМ, до отправки.
 //

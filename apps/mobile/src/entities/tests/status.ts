@@ -1,5 +1,7 @@
 import type { ProjectTestStatus } from '@agentdeck/contracts';
 import { colors } from '../../shared/config/theme';
+import type { Language } from '../../shared/config/i18n';
+import { formatDateTime } from '../../shared/lib/format';
 
 /**
  * Как статус выглядит на телефоне. Отдельно от экранов: их теперь три (список,
@@ -27,9 +29,11 @@ export function statusColor(status: ProjectTestStatus): string {
   return colors.textFaint;
 }
 
-/** Момент прогона человеческим текстом. Пустая строка — прогона не было. */
-export function formatWhen(iso: string | undefined): string {
+/**
+ * Момент прогона человеческим текстом на языке интерфейса (F-323). Пустая
+ * строка — прогона не было; битое значение показывается как пришло.
+ */
+export function formatWhen(iso: string | undefined, language: Language): string {
   if (!iso) return '';
-  const date = new Date(iso);
-  return Number.isNaN(date.getTime()) ? iso : date.toLocaleString();
+  return formatDateTime(iso, language) || iso;
 }

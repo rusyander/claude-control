@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type { ConfluencePage, IntegrationLinks, JiraIssue } from '@agentdeck/contracts';
 import {
   cleanLink,
+  hasLink,
   pickLink,
   withConfluencePage,
   withJiraIssue,
@@ -79,5 +80,24 @@ describe('cleanLink', () => {
 
   it('полностью пустая привязка остаётся пустым объектом', () => {
     expect(cleanLink({})).toEqual({});
+  });
+});
+
+describe('hasLink', () => {
+  // Строка «Группа «…»» без единой привязки после неё — пустая подпись: у группы
+  // своей привязки нет, и показывать её незачем.
+  it('пустая и состоящая из пробелов привязка — это «нет привязки»', () => {
+    expect(hasLink({})).toBe(false);
+    expect(hasLink({ jiraIssueKey: '  ' })).toBe(false);
+  });
+
+  it('хоть одно заполненное поле — привязка есть', () => {
+    expect(hasLink({ jiraIssueKey: 'QA-1' })).toBe(true);
+  });
+
+  // F-283: одни заголовки без ключа строк не дают — подпись группы снова была бы пустой.
+  it('заголовок без ключа или id — не привязка', () => {
+    expect(hasLink({ jiraIssueTitle: 'Задача' })).toBe(false);
+    expect(hasLink({ confluencePageTitle: 'Страница' })).toBe(false);
   });
 });

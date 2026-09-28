@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readdirSync, existsSync 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { AppStore } from '../lib/app-store.ts';
-import { restoreBackup } from './backups.ts';
+import { restoreBackup, restorePreview } from './backups.ts';
 import { readSkills } from './skills.ts';
 
 /**
@@ -78,6 +78,42 @@ describe('backups: откат копии скилла', () => {
     // Соседа не осталось — иначе список показывал бы «review» дважды.
     expect(existsSync(join(disabledDir, 'review'))).toBe(false);
     expect(readSkills(skillsDir, store).filter((skill) => skill.id === 'review')).toHaveLength(1);
+  });
+
+  it('предпросмотр отката называет и удаляемого соседа из другого каталога', () => {
+    // Откат уберёт skills-disabled/review (см. тест выше): карточка, молчащая
+    // об этом, показывала бы не всё, что сделает кнопка.
+    putSkillDir(disabledDir, 'review', 'новое тело');
+    const name = putBackup('skills-review', 'review', 'старое тело');
+
+    const preview = restorePreview(backupDir, name, {}, skillsDir);
+
+    expect(preview.ok).toBe(true);
+    const files = preview.ok ? preview.files : [];
+    expect(files).toContainEqual(expect.objectContaining({ path: 'review/SKILL.md', before: '' }));
+    const removed = files.find((file) => file.path === 'skills-disabled/review/SKILL.md');
+    expect(removed?.before).toContain('новое тело');
+    expect(removed?.after).toBe('');
+  });
+
+  // Ревью z1 C2: папка скилла читалась целиком как текст — двоичный файл уходил
+  // в дифф мусором с NUL-байтами. Двоичное названо, содержимое не сравнивается.
+  it('двоичный файл в папке скилла назван, а не разобран построчно', () => {
+    putSkillDir(skillsDir, 'review', 'тело');
+    writeFileSync(join(skillsDir, 'review', 'logo.png'), Buffer.from([0x89, 0x50, 0, 1, 2]));
+    const name = putBackup('skills-review', 'review', 'тело');
+    writeFileSync(join(backupDir, name, 'logo.png'), Buffer.from([0x89, 0x50, 0, 9, 9]));
+
+    const preview = restorePreview(backupDir, name, {}, skillsDir);
+
+    const files = preview.ok ? preview.files : [];
+    expect(files).toContainEqual({
+      path: 'review/logo.png',
+      before: '',
+      after: '',
+      skipped: 'binary',
+      differs: true,
+    });
   });
 
   /**

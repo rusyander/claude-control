@@ -218,3 +218,30 @@ describe('chainOutcomeOf: лимит на исходе и вердикт рев�
     expect(chainOutcomeOf({ link: WORK, ok: true, text }).reviewFindings).toBeUndefined();
   });
 });
+
+describe('chainOutcomeOf: отчёт о ситах', () => {
+  const block = [
+    '```agentdeck:sieves',
+    '{"sieves":[{"id":"browser-focus","status":"pass","evidence":"npx playwright test focus → 3 passed"}],' +
+      '"learned":[{"thread":"https://gitlab.com/t/a/-/merge_requests/9#note_5","class":"contract","scope":"project",' +
+      '"trigger":"a handler status code changes","check":"curl the endpoint on the branch stand and compare with docs"}]}',
+    '```',
+  ].join('\n');
+
+  it('строки и выученное едут в итог; блок не становится хвостом и не прячет вопрос', () => {
+    const outcome = chainOutcomeOf({
+      link: WORK,
+      ok: true,
+      text: `Сделал форму.\n\nОставить старый маршрут или убрать?\n\n${block}`,
+      hasWork: () => true,
+    });
+    expect(outcome.status).toBe('awaiting');
+    expect(outcome.sieveRows).toEqual([
+      { id: 'browser-focus', status: 'pass', evidence: 'npx playwright test focus → 3 passed' },
+    ]);
+    expect(outcome.learnedSieves?.[0]).toMatchObject({ class: 'contract', scope: 'project' });
+    expect(outcome.tail).toContain('Оставить старый маршрут');
+    // Ссылка треда в блоке — не MR группы.
+    expect(outcome.mr).toBeUndefined();
+  });
+});

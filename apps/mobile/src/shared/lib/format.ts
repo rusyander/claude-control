@@ -1,3 +1,5 @@
+import type { Language } from '../config/i18n';
+
 /**
  * Числа на экран. Ровно те же правила, что в панели: телефон и браузер смотрят
  * на один и тот же расход, и разные округления читались бы как разные цифры.
@@ -27,4 +29,35 @@ export type CostUnit = 'tokens' | 'money';
  */
 export function shortModel(model: string): string {
   return model.startsWith('claude-') ? model.slice('claude-'.length) : model;
+}
+
+/** Момент из ISO-строки или миллисекунд; битое значение — `undefined`. */
+function moment(at: string | number): Date | undefined {
+  const ms = typeof at === 'number' ? at : Date.parse(at);
+  return Number.isNaN(ms) ? undefined : new Date(ms);
+}
+
+/**
+ * Время суток на языке ИНТЕРФЕЙСА приложения, а не системы телефона: русский
+ * интерфейс на английском телефоне показывал «03:04 PM» (F-323). Битое значение
+ * даёт пустоту, не «Invalid Date».
+ */
+export function formatClock(
+  at: string | number,
+  language: Language,
+  { seconds = false }: { seconds?: boolean } = {},
+): string {
+  const date = moment(at);
+  if (!date) return '';
+  return date.toLocaleTimeString(language, {
+    hour: '2-digit',
+    minute: '2-digit',
+    ...(seconds ? { second: '2-digit' as const } : {}),
+  });
+}
+
+/** Дата со временем на языке интерфейса — та же граница, что у `formatClock`. */
+export function formatDateTime(at: string | number, language: Language): string {
+  const date = moment(at);
+  return date ? date.toLocaleString(language) : '';
 }

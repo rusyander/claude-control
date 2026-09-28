@@ -18,6 +18,7 @@ export const filesMessageParams = {
   'file-changed-on-disk': [],
   'runner-command-empty': [],
   'runner-subdir-outside': ['dir'],
+  'runner-project-unregistered': [],
   'resource-path-escapes': [],
   'resource-path-invalid': [],
   'resource-file-exists': [],

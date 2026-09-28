@@ -18,6 +18,7 @@ export function ChatRow({
   snippet,
   matchCount,
   query,
+  unreadEscalations,
   status,
   depth,
 }: ChatRowProps) {
@@ -79,6 +80,19 @@ export function ChatRow({
           {chat.paused && (
             <Typography variant="caption" color="subtle" as="span" className={styles.stage}>
               {t('chat.cascade.tree.paused')}
+            </Typography>
+          )}
+          {/* Критичное от группы — метка у главного чата, пока человек не прочтёт. */}
+          {Boolean(unreadEscalations) && (
+            <Typography
+              variant="caption"
+              color="danger"
+              as="span"
+              className={styles.stage}
+              data-chat-escalations={unreadEscalations}
+              title={t('chat.escalation.unread', { count: unreadEscalations })}
+            >
+              {`! ${unreadEscalations}`}
             </Typography>
           )}
           {/* Ждёт человека и принятая группа — те же слова, что в сводке хаба:

@@ -6,6 +6,13 @@ import {
   type PanelTextCountCode,
   type PanelTextParams,
 } from '@agentdeck/contracts/panel-agent';
+import { TESTS_BLOCK_TEXTS_RU } from './texts-tests-block.ts';
+import { PANEL_MANAGE_TEXTS_RU } from './texts-manage.ts';
+import { GROUPS_ENTITIES_TEXTS_RU } from './texts-groups-entities.ts';
+import { CHAT_TEXTS_RU } from './texts-chat.ts';
+import { PROJECT_TEXTS_RU } from './texts-projects.ts';
+import { CHAT_SANDBOX_AGENTS_TEXTS_RU } from './texts-chat-sandbox-agents.ts';
+import { GAPS_TEXTS_RU } from './texts-gaps.ts';
 
 /**
  * Русские тексты карточки и следа — запасные к кодам `panelTextParams`.
@@ -66,6 +73,7 @@ export const PANEL_TEXTS_RU: PanelTextsRu = {
   'fact-stale': 'не выполнено: цель изменилась после показа карточки',
   'summary-create-project': 'Добавить проект «{{title}}» в реестр панели',
   'summary-start-chat': 'Запустить агента: новый чат в проекте «{{project}}»',
+  'summary-start-chat-home': 'Запустить агента: новый чат без проекта',
   'summary-draft-cases': {
     one: 'Записать {{count}} кейс из черновика в библиотеку тестов',
     few: 'Записать {{count}} кейса из черновика в библиотеку тестов',
@@ -92,17 +100,37 @@ export const PANEL_TEXTS_RU: PanelTextsRu = {
   'summary-skill-delete': 'Удалить скилл «{{name}}»',
   'summary-permission-add': 'Добавить право {{decision}}: {{pattern}}',
   'summary-permission-remove': 'Удалить право {{rule}}',
+  'summary-permission-add-allow': 'Разрешить: {{pattern}}',
+  'summary-permission-add-deny': 'Запретить: {{pattern}}',
+  'summary-permission-add-ask': 'Спрашивать перед: {{pattern}}',
   'summary-mcp-add': 'Добавить MCP-сервер «{{name}}»',
   'summary-mcp-edit': 'Изменить MCP-сервер «{{name}}»',
   'summary-mcp-delete': 'Удалить MCP-сервер «{{name}}»',
   'label-directory': 'Каталог',
   'label-title': 'Название',
+  'label-e2e-folder': 'Папка e2e',
+  'value-e2e-onboard-create':
+    'своей нет — панель заведёт заготовку Playwright в {{dir}}/ и спрячет её от git строкой в .git/info/exclude',
+  'value-e2e-onboard-create-plain':
+    'своей нет — панель заведёт заготовку Playwright в {{dir}}/ (проект не под git, прятать не от кого)',
+  'value-e2e-onboard-sync': {
+    one: 'своя папка {{dir}}: {{count}} файл тестов станет кейсами раздела «Тесты» (.agent/tests)',
+    few: 'своя папка {{dir}}: {{count}} файла тестов станут кейсами раздела «Тесты» (.agent/tests)',
+    many: 'своя папка {{dir}}: {{count}} файлов тестов станут кейсами раздела «Тесты» (.agent/tests)',
+    other:
+      'своя папка {{dir}}: {{count}} файла тестов станут кейсами раздела «Тесты» (.agent/tests)',
+  },
+  'value-e2e-onboard-keep': 'своя папка {{dir}} остаётся как есть: файлов тестов в ней нет',
+  'value-e2e-onboard-maybe':
+    'своя папка e2e сведётся в кейсы раздела «Тесты»; нет своей — панель заведёт заготовку e2e/, спрятав её от git',
   'label-project': 'Проект',
   'label-provider': 'Провайдер',
   'label-model': 'Модель',
   'label-contour': 'Контур',
   'label-file-edits': 'Правки файлов',
   'label-first-message': 'Первое сообщение',
+  'label-chat-mode': 'Режим',
+  'label-topic': 'Тема',
   'label-case-add': 'Добавить · {{target}}',
   'label-case-update': 'Изменить · {{target}}',
   'label-draft': 'Черновик',
@@ -134,6 +162,10 @@ export const PANEL_TEXTS_RU: PanelTextsRu = {
   'value-model-default': 'по умолчанию CLI',
   'value-edits-allowed': 'разрешены',
   'value-edits-denied': 'нет — только чтение',
+  'value-no-project': 'без проекта — вкладка «Чаты»',
+  'value-mode-message': 'Сообщение',
+  'value-mode-deck': 'Презентация',
+  'value-mode-image': 'Картинка',
   'value-cases-hidden': {
     one: 'ещё {{count}} кейс не поместился в карточку — одобрить нельзя, выберите часть через caseIds',
     few: 'ещё {{count}} кейса не поместились в карточку — одобрить нельзя, выберите часть через caseIds',
@@ -170,6 +202,8 @@ export const PANEL_TEXTS_RU: PanelTextsRu = {
   'note-mcp-rename': 'Переименование: отметки и вход OAuth переезжают с «{{from}}» на «{{to}}».',
   'note-hook-group-off': 'Хук остаётся выключенным: его гасит группа.',
   'note-hook-local-file': 'Хук из settings.local.json панель не переключает: файл не изменится.',
+  'note-hook-delete-disabled':
+    'Хук выключен и хранится в панели: settings.json не изменится, стирается сохранённая команда.',
   'note-copy-in-history': 'Копия файла остаётся в истории.',
   'note-entity-group-off': 'Остаётся выключенным: его гасит группа.',
   'note-folder-move': 'Папка {{from}} переносится в {{to}}.',
@@ -184,6 +218,28 @@ export const PANEL_TEXTS_RU: PanelTextsRu = {
   'label-env-keys': 'Переменные',
   'journal-delete-group': 'Удаление группы',
   'summary-group-delete': 'Удалить группу «{{name}}»',
+  'label-group-delete-env': 'Уйдут из settings.json',
+  'label-group-delete-back-on': 'Снова включатся',
+  'journal-read-group': 'Разбор группы',
+  'journal-draft-group': 'Черновик группы',
+  'summary-group-draft': 'Создать группу «{{name}}» (выключенной)',
+  'journal-copy-group': 'Копия группы',
+  'summary-group-copy': 'Копировать группу «{{name}}» как «{{copy}}» (выключенной)',
+  'label-group-copy-effect': 'Что будет',
+  'value-group-copy-effect':
+    'Шаги, числа и «Когда» копируются, у шагов новые id; привязка к проектам не копируется. Выключенная копия ничего не гасит, оригинал не меняется.',
+  'journal-add-group-step': 'Шаг пути группы',
+  'summary-group-step-add': 'Добавить шаг «{{title}}» в путь группы «{{name}}»',
+  'journal-move-group-step': 'Перенос шага пути',
+  'summary-group-step-move': 'Перенести шаг «{{title}}» в пути группы «{{name}}»',
+  'journal-set-group-knobs': 'Числа группы',
+  'summary-group-knobs': 'Изменить числа группы «{{name}}»',
+  'label-group-steps': 'Шаги пути',
+  'journal-draft-scenario': 'Черновик сценария',
+  'summary-scenario-draft': 'Создать сценарий «{{name}}» (выключенным)',
+  'label-scenario-steps': 'Шаги сценария',
+  'label-group-step-prompt': 'Задание шага',
+  'label-group-knobs': 'Числа',
   'journal-get-settings': 'Настройки панели',
   'journal-update-settings': 'Изменение настроек панели',
   'summary-settings-update': 'Изменить настройки панели: {{keys}}',
@@ -213,6 +269,11 @@ export const PANEL_TEXTS_RU: PanelTextsRu = {
   'journal-save-integration': 'Сохранение интеграции',
   'summary-integration-save': 'Изменить настройки интеграции {{id}}',
   'journal-check-integration': 'Проверка интеграции',
+  'summary-integration-check': 'Проверить связь интеграции {{id}}',
+  'value-happens-integration-check':
+    'запрос «кто я» с сохранённым токеном; итог сохраняется на карточке',
+  'value-happens-webhook-test':
+    'на адрес уходит настоящий запрос с тестовым событием; итог сохраняется на карточке',
   'journal-forget-integration': 'Отключение интеграции',
   'summary-integration-forget': 'Забыть интеграцию {{id}}: стереть токен и выключить',
   'journal-save-hook': 'Сохранение хука',
@@ -265,6 +326,7 @@ export const PANEL_TEXTS_RU: PanelTextsRu = {
   'journal-update-plugin': 'Обновление плагина',
   'summary-plugin-update': 'Обновить плагин {{id}}',
   'label-version': 'Версия',
+  'label-plugin-scope': 'Где установлен',
   'journal-add-marketplace': 'Подключение маркетплейса',
   'summary-marketplace-add': 'Подключить маркетплейс {{source}}',
   'journal-remove-marketplace': 'Отключение маркетплейса',
@@ -289,6 +351,35 @@ export const PANEL_TEXTS_RU: PanelTextsRu = {
   'summary-stop-tests': 'Остановить идущий прогон тестов ({{mode}})',
   'journal-delete-test-case': 'Удаление тест-кейса',
   'summary-delete-test-case': 'Удалить кейс «{{title}}»',
+  'value-mode-explore': 'исследование по хартии',
+  'summary-run-tests-explore': 'Запустить агента тестов: исследование по хартии',
+  'journal-save-test-case': 'Запись тест-кейса',
+  'summary-save-test-case-create': 'Добавить кейс «{{title}}»',
+  'summary-save-test-case-update': 'Изменить кейс «{{title}}»',
+  'journal-save-test-group': 'Запись группы тестов',
+  'summary-save-test-group-create': 'Создать группу тестов «{{title}}»',
+  'summary-save-test-group-update': 'Изменить группу тестов «{{title}}»',
+  'journal-delete-test-group': 'Удаление группы тестов',
+  'summary-delete-test-group': {
+    one: 'Удалить группу «{{title}}» вместе с {{count}} кейсом',
+    few: 'Удалить группу «{{title}}» вместе с {{count}} кейсами',
+    many: 'Удалить группу «{{title}}» вместе с {{count}} кейсами',
+    other: 'Удалить группу «{{title}}» вместе с {{count}} кейсами',
+  },
+  'journal-reject-draft': 'Отклонение черновика тестов',
+  'summary-reject-draft': {
+    one: 'Отклонить черновик: {{count}} кейс не попадёт в библиотеку',
+    few: 'Отклонить черновик: {{count}} кейса не попадут в библиотеку',
+    many: 'Отклонить черновик: {{count}} кейсов не попадут в библиотеку',
+    other: 'Отклонить черновик: {{count}} кейса не попадут в библиотеку',
+  },
+  ...TESTS_BLOCK_TEXTS_RU,
+  ...PANEL_MANAGE_TEXTS_RU,
+  ...GROUPS_ENTITIES_TEXTS_RU,
+  ...CHAT_TEXTS_RU,
+  ...PROJECT_TEXTS_RU,
+  ...CHAT_SANDBOX_AGENTS_TEXTS_RU,
+  ...GAPS_TEXTS_RU,
 };
 
 const ruPlural = new Intl.PluralRules('ru');
@@ -305,10 +396,38 @@ export function panelTextRu(code: PanelTextCode, params?: PanelTextParams): stri
   return formatPanelText(panelTemplateRu(code, params), params);
 }
 
-/** Сводка карточки: русский запасной текст и код с подстановками. */
-export function summaryText(code: PanelTextCode, params: PanelTextParams = {}) {
-  return { summary: panelTextRu(code, params), summaryCode: code, summaryParams: params };
+/**
+ * Сводка карточки: русский запасной текст и код с подстановками. `paramsEn` —
+ * подстановки английского окна, когда в них двуязычные данные (заголовок шага).
+ */
+export function summaryText(
+  code: PanelTextCode,
+  params: PanelTextParams = {},
+  paramsEn?: PanelTextParams,
+) {
+  return {
+    summary: panelTextRu(code, params),
+    summaryCode: code,
+    summaryParams: params,
+    ...(paramsEn ? { summaryParamsEn: paramsEn } : {}),
+  };
 }
+
+/** Двуязычные данные (заголовок шага): у каждой стороны запасная — другой язык. */
+export interface BilingualText {
+  ru: string;
+  en: string;
+}
+
+/**
+ * Стороны для показа: русская у шага может быть пустой (схема требует только
+ * en), английская — у шага, записанного окном по-русски. Пустой стороной
+ * карточка не показывается ни на одном языке.
+ */
+export const bothSides = (text: BilingualText): BilingualText => ({
+  ru: text.ru || text.en,
+  en: text.en || text.ru,
+});
 
 /** Поле с данными: подпись кодом, значение как есть (путь, адрес, промпт). */
 export function dataField(
@@ -322,6 +441,15 @@ export function dataField(
     ...(labelParams ? { labelParams } : {}),
     value,
   };
+}
+
+/** Поле с двуязычными данными: `value` — русская сторона, `valueEn` — английская. */
+export function bilingualField(
+  labelCode: PanelTextCode,
+  value: BilingualText,
+  labelParams?: PanelTextParams,
+): PanelActionPreviewField {
+  return { ...dataField(labelCode, value.ru, labelParams), valueEn: value.en };
 }
 
 /** Поле, значение которого пишет сама панель: и подпись, и значение кодом. */

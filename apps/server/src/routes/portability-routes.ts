@@ -1305,5 +1305,6 @@ function scopeOf(raw: string | undefined): EnvScope | undefined {
 function panelState(ctx: ServerContext): ImportState {
   return {
     isDisabled: (kind, id, legacyId) => ctx.store.isDisabled(kind as EntityKind, id, legacyId),
+    disabledRules: () => ctx.store.getDisabledRules(),
   };
 }

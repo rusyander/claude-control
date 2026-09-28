@@ -13,6 +13,12 @@ import {
   TASK_MAX_CHARS,
 } from '@agentdeck/contracts/split-plan';
 import { foreignChatKey } from '@agentdeck/contracts/foreign-chat-key';
+import {
+  mergeSieveRows,
+  scanSieveBlocks,
+  type SieveReportRow,
+  type SieveStage,
+} from '@agentdeck/contracts/sieves';
 import type { ChatLink } from '../../lib/app-store/app-store.types.ts';
 import { carriedLink } from '../../lib/app-store/chat-links.ts';
 import type { ConfigProvider } from '../../providers/types.ts';
@@ -20,6 +26,7 @@ import type { RunOptions } from '../chat/ChatRunner.ts';
 import type { RunMeta } from '../chat/ChatRunRegistry.ts';
 import type { ChatEvent } from '../chat/chat-events.ts';
 import type { TreeStartGate } from '../chat/tree-pause.ts';
+import { fillSieveSlot, SIEVE_SLOT, type SieveAsk } from '../chat/sieve-gate.ts';
 import { initiativePrompt } from '../chat/initiative.ts';
 import { reviewNoticeText } from '../chat/split-review.ts';
 import { chainOutcomeOf, endsWithQuestion, type ChainOutcomeInput } from '../chat/chain-outcome.ts';
@@ -81,6 +88,8 @@ export interface ForeignStagePlan {
    * ленте надо, иначе «план был» и «плана не было» выглядят одинаково.
    */
   planMissing?: boolean;
+  /** Отчёт о ситах всех звеньев группы — в связь следующего (как у Claude). */
+  sieveRows?: SieveReportRow[];
 }
 
 export interface ForeignStageInput {
@@ -109,6 +118,11 @@ export interface ForeignStageInput {
   deliver?: boolean;
   /** Человек сам попросил доставить снова — отметка `deliveredAt` не держит. */
   redeliver?: boolean;
+  /**
+   * Абзац сит перед MR (решение владельца 28.09) — тот же, что у Claude: по
+   * затронутым путям копии, выученным ситам и уже сданным строкам.
+   */
+  sieves?: (stage: SieveStage, done: readonly SieveReportRow[]) => string;
 }
 
 const STAGE_WORDS: Record<ForeignStagePlan['stage'], string> = {
@@ -133,10 +147,12 @@ function foreignDeliverPlan(
   cascade: ProviderChatCascade,
   input: ForeignStageInput,
   after: 'fix' | 'review' | 'work',
+  sieveRows: SieveReportRow[],
 ): ForeignStagePlan | undefined {
   if (!input.deliver) return undefined;
   if (cascade.deliveredAt && !input.redeliver) return undefined;
   const model = cascade.workModel;
+  const sieves = input.sieves?.('deliver', sieveRows);
   return {
     stage: 'deliver',
     title: stageTitle(cascade, 'deliver'),
@@ -144,7 +160,9 @@ function foreignDeliverPlan(
       after,
       foreign: true,
       ...(cascade.branch ? { branch: cascade.branch } : {}),
+      ...(sieves ? { sieves } : {}),
     }),
+    ...(sieveRows.length > 0 ? { sieveRows } : {}),
     ...(model ? { model } : {}),
     ...(cascade.workEffort ? { effort: cascade.workEffort } : {}),
     cascade: {
@@ -223,8 +241,11 @@ export function planForeignStage(input: ForeignStageInput): ForeignStagePlan | u
   // План — единственное звено, после которого следующее стартует и при неудаче.
   if (cascade.stage === 'plan') return afterForeignPlan(cascade, input.link, ok, text);
   if (!ok || input.paused) return undefined;
+  // Отчёт о ситах едет по цепочке: сданное ревью доставка не повторяет.
+  const sieveRows = mergeSieveRows(input.link?.sieveRows, scanSieveBlocks(text).rows);
+  const carried = sieveRows.length > 0 ? { sieveRows } : {};
   // После правок ревью второго круга панель не заводит — только доставку.
-  if (cascade.stage === 'fix') return foreignDeliverPlan(cascade, input, 'fix');
+  if (cascade.stage === 'fix') return foreignDeliverPlan(cascade, input, 'fix', sieveRows);
 
   const kind = cascade.kind as TaskKind | undefined;
   const base: ProviderChatCascade = {
@@ -239,12 +260,15 @@ export function planForeignStage(input: ForeignStageInput): ForeignStagePlan | u
     // Ревью ей не будет, и группа с доставкой идёт в доставку сразу (M8, зеркало
     // Claude); пустую работу не доставляем.
     if (!cascade.lowered) {
-      return input.deliver && hasWork() ? foreignDeliverPlan(cascade, input, 'work') : undefined;
+      return input.deliver && hasWork()
+        ? foreignDeliverPlan(cascade, input, 'work', sieveRows)
+        : undefined;
     }
     // Ревью на работу заводится один раз. Без отметки второе сообщение человека
     // в тот же разговор заводило бы ещё одну проверку — и так на каждый ход.
     if (cascade.reviewedAt) return undefined;
     if (!hasWork()) return undefined;
+    const sieves = input.sieves?.('review', sieveRows);
 
     return {
       stage: 'review',
@@ -254,7 +278,9 @@ export function planForeignStage(input: ForeignStageInput): ForeignStagePlan | u
         ...(cascade.workModel ? { model: cascade.workModel } : {}),
         ...(kind ? { kind } : {}),
         ...(cascade.branch ? { branch: cascade.branch } : {}),
+        ...(sieves ? { sieves } : {}),
       }),
+      ...carried,
       // Ни модели, ни глубины: это и есть «на потолке» для чужого CLI.
       cascade: {
         ...base,
@@ -271,7 +297,7 @@ export function planForeignStage(input: ForeignStageInput): ForeignStagePlan | u
   const findings = scanReviewBlocks(text).findings;
   if (!findings) return undefined;
   // Замечаний нет — чинить нечего, а доставлять группе с доставкой есть что.
-  if (findings.length === 0) return foreignDeliverPlan(cascade, input, 'review');
+  if (findings.length === 0) return foreignDeliverPlan(cascade, input, 'review', sieveRows);
 
   const model = cascade.workModel;
   if (!model) return undefined;
@@ -287,6 +313,7 @@ export function planForeignStage(input: ForeignStageInput): ForeignStagePlan | u
     model,
     ...(cascade.workEffort ? { effort: cascade.workEffort } : {}),
     findings,
+    ...carried,
     cascade: {
       ...base,
       stage: 'fix',
@@ -311,8 +338,9 @@ export function planForeignStage(input: ForeignStageInput): ForeignStagePlan | u
 export function foreignStagePrefix(
   plan: ForeignStagePlan,
   settings: Pick<AppSettings, 'taskSplitInitiative' | 'handoffInitiative'>,
+  childExtra?: string,
 ): string {
-  return foreignChatPrefix(plan.cascade, settings);
+  return foreignChatPrefix(plan.cascade, settings, childExtra);
 }
 
 /**
@@ -327,6 +355,8 @@ export function foreignStagePrefix(
 export function foreignChatPrefix(
   cascade: ProviderChatCascade | undefined,
   settings: Pick<AppSettings, 'taskSplitInitiative' | 'handoffInitiative'>,
+  /** Строки группы звена (`foreignChildExtra`): числа группы, эскалация у работы. */
+  childExtra?: string,
 ): string {
   // Планку сдачи получают только те звенья, которые ИДУТ ниже настройки CLI:
   // работа и правки. Ревью идёт на потолке; разбор и план (Т3) — тоже, и
@@ -342,9 +372,25 @@ export function foreignChatPrefix(
           ...(lowered.stage === 'fix' ? { review: false } : {}),
         })
       : '',
+    childExtra ?? '',
   ]
     .filter(Boolean)
     .join(' ');
+}
+
+/**
+ * Дописка продолжения чужого разговора в новой сессии. Шапка стадии ИЛИ связь
+ * группы — это звено дерева: «без разделения» и строки группы, как на его
+ * старте (дочерний не-план заводится без шапки, `split-launch.ts`). Ни того ни
+ * другого — обычный разговор: ровно то, что получил бы новый чат того же CLI.
+ */
+export function foreignContinuationPrefix(
+  header: ProviderChatCascade | undefined,
+  settings: Pick<AppSettings, 'taskSplitInitiative' | 'handoffInitiative'>,
+  child: { linked: boolean; extra?: string | undefined },
+): string | undefined {
+  if (header || child.linked) return foreignChatPrefix(header, settings, child.extra) || undefined;
+  return initiativePrompt(settings, { foreign: true });
 }
 
 /** Разговор чужого CLI, у которого закончился ответ. */
@@ -373,6 +419,11 @@ export interface ForeignStagePlannerDeps {
   models: (provider: ConfigProvider) => ModelInfo[];
   /** Настройки: из них собирается системная дописка звена. */
   settings: () => Pick<AppSettings, 'taskSplitInitiative' | 'handoffInitiative'>;
+  /**
+   * Строки группы звена по ключу чата (`foreignChildExtra`) — те же, что у
+   * ребёнка Claude. Не задан — звено идёт без них.
+   */
+  childExtra?: (chatKey: string) => string | undefined;
   /** Изменила ли работа что-нибудь в копии: пустой дифф проверять незачем. */
   hasWork: (cwd: string, since?: string) => boolean;
   /**
@@ -404,6 +455,13 @@ export interface ForeignStagePlannerDeps {
   onChainEnded?: (link: ChatLink, outcome: ChainOutcome) => void;
   /** Группа связи доводит работу до MR — за правками идёт доставка (W3-3). */
   delivers?: (link: ChatLink) => boolean;
+  /** Абзац сит для задания звена в копии `cwd` (как у Claude). Не задан — без сит. */
+  sieves?: (
+    cwd: string,
+    link: ChatLink,
+    stage: SieveStage,
+    done: readonly SieveReportRow[],
+  ) => Promise<string>;
   /**
    * Ревью чужого MR по ссылке (Т6) кончилось: замечания — в связь, решение —
    * человеку. Отвечает событием, которое лента чужого разговора показывает
@@ -458,9 +516,11 @@ function foreignHandoffDeps(
       // Дописка собирается по стадии — той же функцией, что у звена. Стадии нет
       // (обычный разговор) — продолжение получает ровно то, что получил бы новый
       // чат того же CLI: инициативы панели и никакой планки сдачи.
-      const prefix = header
-        ? foreignChatPrefix(header, deps.settings())
-        : initiativePrompt(deps.settings(), { foreign: true });
+      const key = foreignChatKey(providerId, chatId);
+      const prefix = foreignContinuationPrefix(header, deps.settings(), {
+        linked: Boolean(deps.linkOf?.(key)),
+        extra: deps.childExtra?.(key),
+      });
       deps.chats.send(
         appDataDir,
         providerId,
@@ -488,8 +548,9 @@ function foreignHandoffDeps(
  */
 export function createForeignStagePlanner(
   deps: ForeignStagePlannerDeps,
-): (finished: ForeignRunFinished) => void {
-  return (finished) => {
+): (finished: ForeignRunFinished) => Promise<void> {
+  // Асинхронен ровно на одном шаге — абзаце сит; до него всё решается сразу.
+  return async (finished) => {
     try {
       const { appDataDir, providerId, chatId } = finished;
       const chatKey = foreignChatKey(providerId, chatId);
@@ -608,6 +669,9 @@ export function createForeignStagePlanner(
       // Повтор доставки на тот же круг — только по ПОСЛЕДНЕЙ реплике человека:
       // она и завела этот ход (W3-3).
       const said = chat.messages.findLast((message) => message.role === 'user')?.content ?? '';
+      // Абзац сит план получает меткой (см. `SIEVE_SLOT`): пути копии читаются
+      // асинхронно, и подставляются перед запуском звена.
+      let sieveAsk = undefined as SieveAsk | undefined;
       const plan = planForeignStage({
         cascade,
         ok: finished.ok,
@@ -618,6 +682,15 @@ export function createForeignStagePlanner(
         ...(paused ? { paused } : {}),
         ...(link?.parentChatId && deps.delivers?.(link) ? { deliver: true } : {}),
         ...(cascade.deliveredAt && asksDelivery(said) ? { redeliver: true } : {}),
+        // Сита — только группе с доставкой: судит их отчёт она (ревью сит, 28.09).
+        ...(link?.parentChatId && deps.delivers?.(link) && deps.sieves
+          ? {
+              sieves: (stage, done) => {
+                sieveAsk = { stage, done };
+                return SIEVE_SLOT;
+              },
+            }
+          : {}),
       });
       if (!plan) {
         // Звена больше не будет — цепочка группы кончилась. План сюда не
@@ -684,8 +757,18 @@ export function createForeignStagePlanner(
           ...(plan.model ? { model: plan.model } : {}),
           ...(plan.effort ? { effort: plan.effort } : {}),
           ...(plan.cascade.lowered ? { lowered: true } : {}),
+          ...(plan.sieveRows ? { sieveRows: plan.sieveRows } : {}),
         });
       }
+
+      const ask = sieveAsk;
+      const prompt =
+        ask && link && deps.sieves
+          ? fillSieveSlot(
+              plan.prompt,
+              await deps.sieves(cwd, link, ask.stage, ask.done).catch(() => ''),
+            )
+          : plan.prompt;
 
       // Дерево стоит — звено заведено, но не запущено: старт лёг в очередь и
       // уйдёт по «Продолжить всё».
@@ -693,20 +776,21 @@ export function createForeignStagePlanner(
         deps.gate?.defer(
           'stage',
           stageKey,
-          { prompt: plan.prompt, cwd } as RunOptions,
+          { prompt, cwd } as RunOptions,
           { projectPath: cwd } as RunMeta,
         )
       ) {
         return;
       }
 
-      const prefix = foreignStagePrefix(plan, deps.settings());
+      // Связь звена уже записана выше — дополнение читается по ней.
+      const prefix = foreignStagePrefix(plan, deps.settings(), deps.childExtra?.(stageKey));
       const runDeps: ProviderChatRunDeps = {
         provider,
         models: deps.models(provider),
         ...(prefix ? { systemPrefix: prefix } : {}),
       };
-      deps.chats.send(appDataDir, providerId, created.id, { text: plan.prompt }, runDeps);
+      deps.chats.send(appDataDir, providerId, created.id, { text: prompt }, runDeps);
     } catch (error) {
       // Звено — надстройка над ответом, который уже записан в переписку. Упасть
       // здесь значит уронить обработчик завершения чужого прогона, а с ним и

@@ -6,7 +6,7 @@ import type { ProviderCheckDeps } from './types.ts';
 import { serverText } from '../../lib/server-texts.ts';
 
 /** Промпт проверки: ответ короткий, стоит копейки, по нему видно, что канал жив. */
-const PROBE_PROMPT = 'Ответь ровно одним словом: готов. Ничего больше не пиши и ничего не делай.';
+const PROBE_PROMPT = 'Reply with exactly one word: ready. Write nothing else and do nothing.';
 
 const ASSISTANT_TIMEOUT_MS = 90_000;
 

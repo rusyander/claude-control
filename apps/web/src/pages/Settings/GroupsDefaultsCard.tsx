@@ -86,7 +86,9 @@ export function GroupsDefaultsCard() {
           <Stack
             direction="row"
             gap="var(--spacing-3xs)"
-            role="radiogroup"
+            // Кнопки-переключатели в группе, а не радиогруппа: радио обещает стрелки и
+            // один шаг табом на группу, а здесь каждая кнопка — свой шаг (ревью 28.09, F-244).
+            role="group"
             aria-label={t('settings.groups.questionsTitle')}
             wrap
           >
@@ -95,8 +97,7 @@ export function GroupsDefaultsCard() {
                 key={mode}
                 size="sm"
                 variant={defaults.groupQuestions === mode ? 'primary' : 'ghost'}
-                role="radio"
-                aria-checked={defaults.groupQuestions === mode}
+                aria-pressed={defaults.groupQuestions === mode}
                 disabled={save.isPending}
                 onClick={() =>
                   defaults.groupQuestions !== mode && put({ ...defaults, groupQuestions: mode })

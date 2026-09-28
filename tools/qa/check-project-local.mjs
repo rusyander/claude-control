@@ -132,15 +132,44 @@ page.on('response', (response) => {
 });
 
 await page.route('**/api/projects', (route) => route.fulfill({ json: [PROJECT] }));
-// Панель открывается на вкладке «Правила» и сразу читает CLAUDE.md проекта, которого
+// Панель открывается на вкладке «Инструкции» и сразу читает CLAUDE.md проекта, которого
 // на живом сервере нет: без заглушки прогон видел бы чужой 404.
 await page.route(`**/api/projects/${PROJECT.id}/rules`, (route) =>
-  route.fulfill({ json: { content: '' } }),
+  route.fulfill({
+    json: {
+      content: '',
+      fileName: 'CLAUDE.md',
+      filePath: `${PROJECT.path}/CLAUDE.md`,
+      instructionFiles: {
+        mode: 'default',
+        source: 'default',
+        read: [],
+        ignored: [],
+        choices: [],
+        proposed: true,
+        notes: [],
+      },
+    },
+  }),
 );
 await page.route(`**/api/projects/${PROJECT.id}/local`, (route) => route.fulfill({ json: LOCAL }));
 await page.route('**/api/projects/local?*', (route) => route.fulfill({ json: LOCAL }));
 await page.route('**/api/groups', (route) => route.fulfill({ json: [GROUP] }));
-await page.route('**/api/automations', (route) => route.fulfill({ json: [] }));
+// Карточка группы открывается на вкладке «Путь», и путь читается сразу.
+await page.route(`**/api/groups/${GROUP.id}/path`, (route) =>
+  route.fulfill({ json: { groupId: GROUP.id, entries: [] } }),
+);
+await page.route('**/api/groups/discovery', (route) =>
+  route.fulfill({ json: { groups: [], sources: [], running: false } }),
+);
+// Окно группы читает ещё описания участников и числа скиллов: пустые ответы —
+// ни описаний, ни чисел. Без подмены стенд отвечал 404, и это считалось ошибкой.
+await page.route(`**/api/groups/${GROUP.id}/members`, (route) =>
+  route.fulfill({ json: { groupId: GROUP.id, members: [], steps: [] } }),
+);
+await page.route(`**/api/groups/${GROUP.id}/knobs`, (route) =>
+  route.fulfill({ json: { groupId: GROUP.id, knobs: [] } }),
+);
 
 let bad = 0;
 const check = (ok, text) => {
@@ -154,7 +183,8 @@ await page.goto(`${BASE}/projects?id=${PROJECT.id}`);
 await page.waitForSelector('nav');
 await page.waitForTimeout(1200);
 
-const tab = page.getByRole('button', { name: 'Из проекта', exact: true });
+// Вкладка — роль tab; в имени за подписью идёт счётчик набора.
+const tab = page.getByRole('tab', { name: /^Из проекта/ });
 check(await visible(tab), 'у проекта есть вкладка «Из проекта»');
 await tab.click();
 await page.waitForTimeout(1000);
@@ -217,11 +247,26 @@ await page.waitForSelector('nav');
 await page.waitForTimeout(1200);
 
 check(await visible(page.getByText(GROUP.name, { exact: true })), 'карточка группы на экране');
+// Набор проекта — во вкладке «Состав» окна группы: карточка открывает окно
+// щелчком по имени, окно открывается на «Порядке работы».
+await page
+  .getByRole('heading', { name: GROUP.name, exact: true })
+  .getByRole('button', { name: GROUP.name, exact: true })
+  .click();
+const groupDialog = page.getByRole('dialog', { name: GROUP.name, exact: true });
+await groupDialog.waitFor({ timeout: 8000 });
+await groupDialog.getByRole('tab', { name: 'Состав', exact: true }).click();
+await page.waitForTimeout(400);
 check(
   await visible(page.getByText('Из проекта', { exact: true })),
   'на карточке есть блок «Из проекта»',
 );
-check(await visible(page.getByText(PROJECT.path, { exact: true })), 'блок подписан путём проекта');
+// Путь стоит дважды: в «Используется в» вкладки «Состав» и подписью блока.
+check(
+  (await groupDialog.getByText(PROJECT.path, { exact: true }).count()) === 2 &&
+    (await visible(groupDialog.getByText(PROJECT.path, { exact: true }).last())),
+  'блок подписан путём проекта (и путь есть в «Используется в»)',
+);
 for (const text of ['скиллов: 2', 'хуков: 2', 'правил: 2']) {
   check(
     await visible(page.getByText(text, { exact: true })),

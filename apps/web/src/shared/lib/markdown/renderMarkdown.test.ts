@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { renderMarkdown, renderMarkdownInline } from './renderMarkdown';
+import { renderDocumentMarkdown, renderMarkdown, renderMarkdownInline } from './renderMarkdown';
 
 /**
  * Разметка ответов модели.
@@ -177,5 +177,24 @@ describe('renderMarkdown: безопасность и обычная разме�
     const html = renderMarkdownInline('просто **текст**');
     expect(html).not.toContain('<p>');
     expect(html).toContain('<strong>текст</strong>');
+  });
+});
+
+describe('renderDocumentMarkdown — файл из репозитория (F-21)', () => {
+  it('картинка — ссылка с подписью, а не <img>: чужой адрес панель не запрашивает', () => {
+    const html = renderDocumentMarkdown('![пиксель](https://tracker.example.com/p.png)');
+    expect(html).not.toContain('<img');
+    expect(html).toContain('href="https://tracker.example.com/p.png"');
+    expect(html).toContain('>пиксель</a>');
+  });
+
+  it('без подписи ссылка называется адресом; кавычки в адресе экранированы', () => {
+    const html = renderDocumentMarkdown('![](https://x.example.com/a"b.png)');
+    expect(html).not.toContain('<img');
+    expect(html).toContain('https://x.example.com/a%22b.png</a>');
+  });
+
+  it('ответ модели рисует картинку, как раньше', () => {
+    expect(renderMarkdown('![a](https://x.example.com/a.png)')).toContain('<img');
   });
 });

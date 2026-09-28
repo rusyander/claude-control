@@ -90,14 +90,16 @@ export function ResourceFileTree({ kind, id }: ResourceFileTreeProps) {
                   <Stack direction="row" align="center" gap="var(--spacing-2xs)">
                     <Icon name="skills" size={16} />
                     <Typography variant="body-sm" weight="medium" as="span">
-                      {template.title}
+                      {t(`resourceTemplate.${template.id}.title`, { defaultValue: template.title })}
                     </Typography>
                     <Typography variant="caption" color="subtle" as="span">
                       {template.fileCount} · {template.paths.join(', ')}
                     </Typography>
                   </Stack>
                   <Typography variant="caption" color="muted">
-                    {template.description}
+                    {t(`resourceTemplate.${template.id}.description`, {
+                      defaultValue: template.description,
+                    })}
                   </Typography>
                 </Stack>
               </button>

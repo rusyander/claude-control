@@ -6,7 +6,7 @@ import type {
   ProjectTestRunRecord,
   ProjectTestStatus,
 } from '@agentdeck/contracts';
-import { summarize } from '@agentdeck/contracts/test-format';
+import { runOrigin, summarize } from '@agentdeck/contracts/test-format';
 import { ProjectTestsNotFoundError } from './files.ts';
 import { readRun, readRuns } from './runs-store.ts';
 import { coded } from '../../lib/server-text.ts';
@@ -64,6 +64,7 @@ function sideOf(record: ProjectTestRunRecord): ProjectTestRunDiffSide {
     id: record.id,
     startedAt: record.startedAt,
     mode: record.mode,
+    origin: runOrigin(record),
     planId: record.planId,
     environmentId: record.environmentId,
     release: record.release,
@@ -122,6 +123,7 @@ export function diffRuns(
       from: old?.status,
       to: result.status,
       note: result.note,
+      ...(result.flakyAttempts ? { flakyAttempts: result.flakyAttempts } : {}),
     };
 
     if (!old) {

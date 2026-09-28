@@ -56,6 +56,11 @@ export interface ImportedTestResult {
   /** Другие написания того же имени: с классом, с файлом, с сюитами. */
   aliases?: string[];
   /**
+   * Голый classname — общий у всех тестов одного файла, поэтому слабее метки
+   * `[id]` в имени и проверяется после неё (точные написания — до).
+   */
+  owner?: string;
+  /**
    * Устойчивый ключ теста, если отчёт его принёс: свойство junit, метка allure,
    * аннотация Playwright. Сильнее любого имени и проверяется первым.
    */
@@ -64,6 +69,8 @@ export interface ImportedTestResult {
   durationMs?: number;
   /** Текст падения — он ложится в заметку кейса. */
   message?: string;
+  /** Упавшие попытки перед зелёной (повторы раннера); только у `passed`. */
+  flakyAttempts?: number;
 }
 
 /** Что и откуда импортировать. Либо содержимое, либо путь внутри проекта. */
@@ -75,6 +82,12 @@ export interface ImportResultsInput {
   environmentId?: string;
   /** Момент импорта; передаётся снаружи, чтобы тест был воспроизводим. */
   now?: string;
+  /** Чей отчёт: `e2e` — прогон тестов папки (`tests-cli run`), иначе сборка. */
+  origin?: ProjectTestRunRecord['origin'];
+  /** Что именно запускали — строка истории; без неё «Импорт результатов». */
+  scope?: string;
+  /** Код выхода команды, чей это отчёт: красный набор и упавший раннер — не одно. */
+  exitCode?: number;
 }
 
 /** Насколько результат «хуже»: при двух результатах на кейс побеждает худший. */
@@ -89,6 +102,9 @@ const SEVERITY: Record<string, number> = {
 
 /** Хвост чужого текста падения: полный стек в заметке кейса не нужен. */
 const MAX_MESSAGE = 400;
+/** Провал — длиннее: в нём ожидание, полученное и место в коде. */
+const MAX_FAILURE = 1200;
+const FAILURE_LINES = 12;
 
 /** Слова Playwright, которых нет в общем словаре статусов. */
 const PLAYWRIGHT_WORDS: Record<string, string> = {
@@ -101,6 +117,9 @@ const PLAYWRIGHT_WORDS: Record<string, string> = {
   timedout: 'failed',
   interrupted: 'failed',
 };
+
+/** Исходы попытки Playwright, которые считаются упавшей попыткой. */
+const RED_ATTEMPTS = new Set(['failed', 'timedout', 'interrupted']);
 
 /** Ссылка на кейс: группа плюс идентификатор внутри неё. */
 interface CaseRef {
@@ -133,6 +152,9 @@ function junitCase(
 ): ImportedTestResult {
   const name = (attributes.name ?? '').trim();
   const className = (attributes.classname ?? attributes.class ?? '').trim();
+  // `<error>` — провал, а не «заблокирован»: тест запустился и упал на
+  // неожиданном исключении. «Заблокирован» значит «не удалось запустить», и
+  // так его понимают инструменты JUnit; иначе падение прятало бы дефект.
   const failure = findElements(body, 'failure')[0] ?? findElements(body, 'error')[0];
   const externalId = junitProperty(body) ?? markerIn(name);
   const skipped = findElements(body, 'skipped')[0];
@@ -144,18 +166,50 @@ function junitCase(
 
   const seconds = Number(attributes.time);
   const detail = failure ?? skipped;
-  const message = detail
-    ? (detail.attributes.message ?? '').trim() || textContent(detail.body)
-    : undefined;
+  // Повторы Playwright (`includeRetries`): упавшие попытки зелёного теста лежат
+  // `<flakyFailure>`/`<flakyError>` рядом с ним. Без их счёта кейс, спасённый
+  // повтором, выглядел в истории честно зелёным, и карантин о нём не знал.
+  const flakyAttempts =
+    status === 'passed'
+      ? findElements(body, 'flakyFailure').length + findElements(body, 'flakyError').length
+      : 0;
+  // Зелёный на повторе заметки не получает: признак — число `flakyAttempts`,
+  // слова к нему каждая сторона берёт из своего словаря (F-355).
+  let message: string | undefined;
+  if (failure) message = failureText(failure);
+  else if (detail) message = (detail.attributes.message ?? '').trim() || textContent(detail.body);
 
   return {
     name,
     aliases: nameAliases(name, className, suiteName),
+    ...(className ? { owner: className } : {}),
     externalId,
     status,
     durationMs: Number.isFinite(seconds) && seconds >= 0 ? Math.round(seconds * 1000) : undefined,
-    message: message ? message.slice(0, MAX_MESSAGE) : undefined,
+    message: message ? message.slice(0, failure ? MAX_FAILURE : MAX_MESSAGE) : undefined,
+    flakyAttempts: flakyAttempts > 0 ? flakyAttempts : undefined,
   };
+}
+
+/** Управляющие последовательности цвета терминала: в заметке они — мусор. */
+// eslint-disable-next-line no-control-regex
+const ANSI = /\u001b\[[0-9;]*[A-Za-z]/g;
+
+/**
+ * Текст провала: заголовок и первые строки тела. Одного заголовка мало —
+ * Playwright кладёт в `message` «expect(locator).toHaveText(expected) failed», а
+ * ожидание и полученное (`Expected:`/`Received:`) — в тело; без них заметка
+ * кейса не говорит, ЧТО сломалось.
+ */
+function failureText(failure: { attributes: Record<string, string>; body: string }): string {
+  const headline = (failure.attributes.message ?? '').replace(ANSI, '').trim();
+  const lines = textContent(failure.body)
+    .replace(ANSI, '')
+    .split(/\r?\n/)
+    .map((line) => line.trimEnd())
+    .filter((line) => line.trim() && line.trim() !== headline)
+    .slice(0, FAILURE_LINES);
+  return [headline, ...lines].filter(Boolean).join('\n').trim();
 }
 
 /**
@@ -266,10 +320,21 @@ function playwrightSpec(spec: PlaywrightSpec, titles: string[], file: string): I
   const failed = attempts
     .flatMap((attempt) => attempt.results ?? [])
     .find((item) => item.error?.message ?? item.errors?.[0]?.message);
+  // Повторы одного теста — `results` его попытки; упавшие до зелёной и есть
+  // признак нестабильности, который статус «flaky» → passed иначе стирает.
+  const redAttempts =
+    status === 'passed'
+      ? attempts
+          .flatMap((attempt) => attempt.results ?? [])
+          .filter((item) => RED_ATTEMPTS.has(String(item.status).toLowerCase())).length
+      : 0;
+  // Слово «flaky» без приложенных попыток — хотя бы одна упавшая была: иначе
+  // раннер не назвал бы тест так. Текст ошибки упавшей попытки зелёному кейсу в
+  // заметку не идёт — признак несёт число, слова даёт словарь стороны (F-355).
+  const namedFlaky = String(word).toLowerCase() === 'flaky' ? 1 : 0;
+  const flakyAttempts = redAttempts > 0 ? redAttempts : namedFlaky;
   const note =
-    String(word).toLowerCase() === 'flaky'
-      ? 'Нестабильный: прошёл только на повторе.'
-      : (failed?.error?.message ?? failed?.errors?.[0]?.message);
+    flakyAttempts > 0 ? undefined : (failed?.error?.message ?? failed?.errors?.[0]?.message);
 
   const path = [...titles, name].filter(Boolean).join(' › ');
   return {
@@ -284,6 +349,7 @@ function playwrightSpec(spec: PlaywrightSpec, titles: string[], file: string): I
     status,
     durationMs: duration > 0 ? Math.round(duration) : undefined,
     message: note ? note.slice(0, MAX_MESSAGE) : undefined,
+    flakyAttempts: flakyAttempts > 0 ? flakyAttempts : undefined,
   };
 }
 
@@ -344,6 +410,7 @@ export function parseAllure(contents: string[]): ImportedTestResult[] {
       results.push({
         name,
         aliases: nameAliases(name, record.fullName ?? '', suite),
+        ...(record.fullName ? { owner: record.fullName } : {}),
         externalId: allureId(record) ?? markerIn(name),
         status: toStatus(record.status) as ProjectTestStatus,
         durationMs,
@@ -361,6 +428,64 @@ export function parseAllure(contents: string[]): ImportedTestResult[] {
  * кейсе всегда указывал на существующий файл истории.
  */
 export function importResults(root: string, input: ImportResultsInput): ProjectTestImportResult {
+  const runId = randomUUID();
+  const { result, points, now, apply } = prepareResultsForRun(root, input, runId);
+  const record: ProjectTestRunRecord = {
+    id: runId,
+    mode: 'import',
+    actor: 'ci',
+    origin: input.origin ?? 'ci',
+    environmentId: input.environmentId,
+    ...gitContext(root),
+    scope: input.scope ?? `Импорт результатов (${input.format})`,
+    ...(input.exitCode !== undefined ? { exitCode: input.exitCode } : {}),
+    status: 'done',
+    startedAt: now,
+    finishedAt: now,
+    results: points,
+    summary: summarize(points),
+  };
+  writeRun(root, record);
+  return { ...result, matched: apply() };
+}
+
+/** Разобранный отчёт, ещё не записанный в кейсы. */
+export interface PreparedRunResults {
+  result: ProjectTestImportResult;
+  points: ProjectTestPointResult[];
+  now: string;
+  /** Проставить статусы в кейсы — ТОЛЬКО после записи прогона `runId`. Возвращает, сколько легло. */
+  apply: () => number;
+}
+
+/**
+ * Результаты отчёта — на кейсы, под чужим `runId` и БЕЗ своей записи в истории:
+ * её пишет тот, кому результаты принадлежат (генерация с кодом тестов, прогон
+ * автотестов панелью). Так один запуск — одна строка истории, а не две.
+ *
+ * Статусы кладутся сразу — годится, только когда запись прогона `runId` уже
+ * лежит на диске (прогон агента пишет её на старте). Кто пишет запись сам и
+ * позже — берёт `prepareResultsForRun` и зовёт `apply` после `writeRun`.
+ */
+export function importResultsIntoRun(
+  root: string,
+  input: ImportResultsInput,
+  runId: string,
+): { result: ProjectTestImportResult; points: ProjectTestPointResult[]; now: string } {
+  const { result, points, now, apply } = prepareResultsForRun(root, input, runId);
+  return { result: { ...result, matched: apply() }, points, now };
+}
+
+/**
+ * Разобрать отчёт и сопоставить с кейсами, ничего не записывая: сбой записи
+ * прогона после `applyResults` оставлял кейсы с `lastRunId` на прогон, которого
+ * нет в истории.
+ */
+export function prepareResultsForRun(
+  root: string,
+  input: ImportResultsInput,
+  runId: string,
+): PreparedRunResults {
   const now = input.now ?? new Date().toISOString();
   const sources = readSources(root, input);
   const parsed = parseByFormat(input.format, sources);
@@ -381,12 +506,16 @@ export function importResults(root: string, input: ImportResultsInput): ProjectT
     // Один кейс мог получить несколько результатов (параметризованный тест,
     // прогон на нескольких браузерах). Побеждает худший: «где-то упало» — это
     // падение, а не «в одном месте прошло».
-    if (!previous || severity(result.status) > severity(previous.result.status)) {
-      matched.set(key, { ref, result });
-    }
+    // При равной тяжести сохраняется тот, что прошёл на повторе: «где-то
+    // спасал только повтор» — сведение о нестабильности, терять его нельзя.
+    const heavier = !previous || severity(result.status) > severity(previous.result.status);
+    const sameButFlakier =
+      previous &&
+      severity(result.status) === severity(previous.result.status) &&
+      (result.flakyAttempts ?? 0) > (previous.result.flakyAttempts ?? 0);
+    if (heavier || sameButFlakier) matched.set(key, { ref, result });
   }
 
-  const runId = randomUUID();
   const points: ProjectTestPointResult[] = [...matched.values()].map(({ ref, result }) => ({
     pointId: pointId(ref.groupId, ref.caseId, input.environmentId),
     groupId: ref.groupId,
@@ -397,22 +526,8 @@ export function importResults(root: string, input: ImportResultsInput): ProjectT
     startedAt: now,
     finishedAt: now,
     durationMs: result.durationMs,
+    flakyAttempts: result.flakyAttempts,
   }));
-
-  const record: ProjectTestRunRecord = {
-    id: runId,
-    mode: 'import',
-    actor: 'ci',
-    environmentId: input.environmentId,
-    ...gitContext(root),
-    scope: `Импорт результатов (${input.format})`,
-    status: 'done',
-    startedAt: now,
-    finishedAt: now,
-    results: points,
-    summary: summarize(points),
-  };
-  writeRun(root, record);
 
   const patches: CaseResultPatch[] = points.map((point) => ({
     groupId: point.groupId,
@@ -421,16 +536,21 @@ export function importResults(root: string, input: ImportResultsInput): ProjectT
     note: point.note,
     runId,
     at: now,
+    flakyAttempts: point.flakyAttempts,
   }));
-  const applied = applyResults(root, patches, now);
 
   return {
-    format: input.format,
-    read: parsed.length,
-    matched: applied,
-    created: 0,
-    unmatched,
-    runId,
+    result: {
+      format: input.format,
+      read: parsed.length,
+      matched: patches.length,
+      created: 0,
+      unmatched,
+      runId,
+    },
+    points,
+    now,
+    apply: () => applyResults(root, patches, now),
   };
 }
 
@@ -532,30 +652,67 @@ function matchCase(result: ImportedTestResult, index: CaseIndex): CaseRef | unde
     const hit = index.byExternalId.get(normalize(result.externalId));
     if (hit) return hit;
   }
+  // Точное имя теста — раньше метки: pytest пишет набор данных как `test_x[1]`,
+  // а id из CSV бывают числами — хвост параметров не должен уводить провал на
+  // ручной кейс «1», когда у автотеста testName совпал целиком.
   for (const name of names) {
     const hit = index.byTestName.get(normalize(name));
     if (hit) return hit;
   }
+  const dotted = dottedSuffixMatch(result, index);
+  if (dotted) return dotted;
+  // Явная метка `[id]` — раньше голого classname: он у двух кейсов одного файла
+  // общий. Когда testName кейса g-001 равнялся файлу, провал `[g-002] …` из того
+  // же файла ложился на g-001 — метка, поставленная ради точности, проигрывала догадке.
   for (const name of names) {
     for (const marker of name.matchAll(/\[([^\]]{1,60})]/g)) {
       const hit = index.byId.get(normalize(marker[1] ?? ''));
       if (hit) return hit;
     }
   }
-  for (const name of names) {
+  const loose = result.owner ? [...names, result.owner] : names;
+  if (result.owner) {
+    const hit = index.byTestName.get(normalize(result.owner));
+    if (hit) return hit;
+  }
+  for (const name of loose) {
     const hit = index.byTitle.get(normalize(name));
     if (hit) return hit;
   }
   return undefined;
 }
 
+/**
+ * `classname.name` против testName с точностью до префикса модуля. pytest пишет
+ * classname от своей корневой папки — ближайшего pytest.ini/pyproject.toml, — а
+ * testName кейса считан от корня проекта: ini внутри e2e даёт classname короче
+ * (`test_checkout`), ini над проектом — длиннее (`shop.tests.e2e.test_checkout`).
+ * Совпадение — только по границе точки и только единственное: два кандидата —
+ * догадка, её не делаем.
+ */
+function dottedSuffixMatch(result: ImportedTestResult, index: CaseIndex): CaseRef | undefined {
+  if (!result.owner) return undefined;
+  const bare = result.name.replace(/\[[^\]]*\]$/, '');
+  const wanted = [...new Set([`${result.owner}.${result.name}`, `${result.owner}.${bare}`])].map(
+    normalize,
+  );
+  const hits = new Set<CaseRef>();
+  for (const [key, ref] of index.byTestName) {
+    if (wanted.some((name) => key.endsWith(`.${name}`) || name.endsWith(`.${key}`))) hits.add(ref);
+  }
+  return hits.size === 1 ? [...hits][0] : undefined;
+}
+
 /** Написания одного имени, по которым стоит попробовать сопоставление. */
 function nameAliases(name: string, owner: string, suite: string): string[] {
+  // pytest пишет параметризованный тест как `test_add[1-2]`: у кейса одно имя
+  // на все наборы данных, и сравнивается оно без хвоста параметров.
+  const bare = name.replace(/\[[^\]]*\]$/, '');
   return [
     owner && name ? `${owner}.${name}` : '',
+    owner && bare && bare !== name ? `${owner}.${bare}` : '',
     owner && name ? `${owner} › ${name}` : '',
     suite && name ? `${suite} › ${name}` : '',
-    owner,
   ].filter(Boolean);
 }
 

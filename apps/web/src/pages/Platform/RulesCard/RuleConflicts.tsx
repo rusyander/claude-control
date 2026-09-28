@@ -5,6 +5,7 @@ import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
 import { Badge } from '@shared/ui/badge';
 import { blockingConflict, conflictTone, withRule } from '../lib/rulesView';
+import { winnerKey } from '../lib/contourConfigView';
 import { serverFieldText } from '@shared/config/i18n';
 
 interface RuleConflictsProps {
@@ -39,7 +40,13 @@ export function RuleConflicts({
             {t('platform.rulesConflicts')}
           </Typography>
           {conflicts.map((conflict) => (
-            <Stack key={conflict.id} gap="var(--spacing-3xs)">
+            <Stack
+              key={conflict.id}
+              gap="var(--spacing-3xs)"
+              data-conflict={conflict.id}
+              data-conflict-winner={conflict.winner ?? ''}
+              data-conflict-off={conflict.offBy ?? ''}
+            >
               <Stack direction="row" align="center" gap="var(--spacing-2xs)" wrap>
                 <Badge tone={conflictTone(conflict.level)}>
                   {t(`platform.rulesLevel.${conflict.level}`)}
@@ -58,14 +65,13 @@ export function RuleConflicts({
                   </Typography>
                 )}
               </Stack>
-              <Typography
-                variant="caption"
-                color="muted"
-                as="span"
-                style={{ maxWidth: 'var(--text-measure)' }}
-              >
+              <Typography variant="caption" color="muted" as="span" className="prose">
                 {serverFieldText(conflict, 'detail')}
               </Typography>
+              {/* Кто берёт верх — отдельной строкой (баг 11в): «спорит» без
+                  ответа, чья сторона действует, оставлял человеку гадать. Снятая
+                  выбором сторона — ответ сильнее: спора в прогоне нет вовсе. */}
+              <ConflictVerdict conflict={conflict} />
             </Stack>
           ))}
         </Stack>
@@ -103,5 +109,22 @@ export function RuleConflicts({
         </Stack>
       )}
     </>
+  );
+}
+
+/** Строка «кто берёт верх» или «спор снят выбором» под ячейкой матрицы. */
+function ConflictVerdict({ conflict }: { conflict: PlatformRuleConflict }) {
+  const { t } = useTranslation();
+  const winner = winnerKey(conflict);
+  if (!conflict.offBy && !winner) return null;
+  return (
+    <Typography
+      variant="caption"
+      color={conflict.offBy ? 'muted' : 'default'}
+      as="span"
+      className="prose"
+    >
+      {conflict.offBy ? t(`contourConfig.offBy.${conflict.offBy}`) : winner && t(winner)}
+    </Typography>
   );
 }

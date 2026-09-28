@@ -25,62 +25,65 @@ const MARKER = '<!-- agentdeck:tests -->';
 const LEGACY_MARKER = `<!-- ${LEGACY_BRAND_SLUG}:tests -->`;
 
 const BLOCK = `${MARKER}
-## Тест-кейсы проекта
+## Project test cases
 
-Кейсы по интерфейсу лежат в \`${TESTS_DIR}/\` — по файлу на группу
-(\`gui.tests.json\`, \`e2e.tests.json\`). Панель показывает их списком и по ним же
-гоняет прогоны, поэтому веди их и когда просьба пришла из обычного разговора.
+UI test cases live in \`${TESTS_DIR}/\` — one file per group
+(\`gui.tests.json\`, \`e2e.tests.json\`). The panel lists them and runs them, so keep
+them up to date also when the request came from an ordinary conversation.
 
-Формат файла:
+File format:
 
 \`\`\`json
 {
   "version": 1,
   "title": "GUI",
-  "description": "о чём эта группа",
+  "description": "what this group is about",
   "cases": [
     {
       "id": "gui-001",
       "type": "case | checklist",
-      "title": "коротко, что проверяем",
-      "purpose": "зачем этот тест нужен",
-      "area": "зона приложения",
-      "section": "путь в дереве: Чат/Вложения",
-      "precondition": "с какого состояния начинать",
-      "steps": [{ "action": "что нажать", "data": "что ввести", "expected": "что видно" }],
-      "expected": "что должно получиться",
-      "oracle": "чем доказывается результат",
+      "title": "briefly, what is checked",
+      "purpose": "why this test is needed",
+      "area": "area of the app",
+      "section": "path in the tree: Chat/Attachments",
+      "precondition": "which state to start from",
+      "steps": [{ "action": "what to press", "data": "what to enter", "expected": "what is visible" }],
+      "expected": "what should come out",
+      "oracle": "what proves the result",
       "priority": "blocker | high | medium | low",
       "tags": ["smoke"],
-      "parameters": [{ "name": "role", "values": ["админ", "гость"] }],
+      "parameters": [{ "name": "role", "values": ["admin", "guest"] }],
       "codePaths": ["src/pages/Chat"],
       "automation": { "status": "manual | toAutomate | automated", "file": "…", "testName": "…" },
       "status": "unknown | passed | failed | skipped | blocked",
-      "note": "что увидел на самом деле",
-      "attachments": ["${TESTS_DIR}/attachments/gui-001/скриншот.png"],
-      "lastRunAt": "ISO-время прогона",
+      "note": "what was actually seen",
+      "attachments": ["${TESTS_DIR}/attachments/gui-001/screenshot.png"],
+      "lastRunAt": "ISO time of the run",
       "source": "agent | human"
     }
   ]
 }
 \`\`\`
 
-Рядом лежат \`_shared.steps.json\` (общие шаги, ссылка из кейса — \`{"ref": "login"}\`),
-\`environments.json\`, \`schema.json\`, \`views.json\`, \`plans/\` и \`runs/\` — их ведёт панель.
+Next to them lie \`_shared.steps.json\` (shared steps, referenced from a case as \`{"ref": "login"}\`),
+\`environments.json\`, \`schema.json\`, \`views.json\`, \`plans/\` and \`runs/\` — the panel keeps those.
 
-Правила:
+Rules:
 
-- проверил что-то в интерфейсе — заведи или обнови кейс; результат пиши сразу
-  после КАЖДОГО кейса (\`status\`, \`note\`, \`lastRunAt\`), а не пачкой в конце;
-- \`id\` не меняй: по нему панель сводит правки;
-- кейсы с \`"source": "human"\` дополняй, но не удаляй и не переписывай;
-- пиши границы и негативные проверки, а не только счастливый путь; повторяющиеся
-  шаги выноси в общий шаг, почти одинаковые кейсы — в \`parameters\` (в тексте шага
-  параметр пишется как \`%role\`);
-- \`blocked\` — до проверки не дойти из-за чужой поломки, \`skipped\` — проверять нечем;
-- функции в приложении не стало — пометь её кейсы \`"readiness": "obsolete"\` или убери;
-- найденный баг — это \`status: "failed"\` и причина в \`note\`, а не повод чинить код
-  без отдельной просьбы.
+- checked something in the UI — create or update a case; write the result right
+  after EACH case (\`status\`, \`note\`, \`lastRunAt\`), not in a batch at the end;
+- do not change \`id\`: the panel merges edits by it;
+- cases with \`"source": "human"\` may be extended, but not deleted or rewritten;
+- write boundaries and negative checks, not only the happy path; move repeated
+  steps into a shared step and nearly identical cases into \`parameters\` (in a step's
+  text a parameter is written as \`%role\`);
+- \`blocked\` — the check cannot be reached because of someone else's breakage,
+  \`skipped\` — nothing to check with;
+- a feature is gone from the app — mark its cases \`"readiness": "obsolete"\` or remove them;
+- a bug found is \`status: "failed"\` with the reason in \`note\`, not a reason to fix the
+  code without a separate request;
+- write the case texts in the language of the existing cases; with none yet — in the
+  language the human uses.
 `;
 
 /**
@@ -95,13 +98,55 @@ export function conventionFile(root: string, userSettingsPath?: string): string 
   return projectInstructionTarget(root, userSettingsPath).filePath;
 }
 
-/** Вписано ли соглашение в файл инструкций проекта. */
+/**
+ * Где в тексте лежит вписанный блок. Любая его версия устроена одинаково:
+ * маркер, заголовок, формат в блоке кода и список правил последним — блок
+ * кончается с последним пунктом этого списка. Всё, что человек дописал после
+ * (текст, заголовок), в блок не входит и при замене остаётся на месте.
+ */
+function blockSpan(text: string): { start: number; end: number } | undefined {
+  const start = [MARKER, LEGACY_MARKER]
+    .map((marker) => text.indexOf(marker))
+    .filter((index) => index >= 0)
+    .sort((a, b) => a - b)[0];
+  if (start === undefined) return undefined;
+  let offset = start;
+  let fences = 0;
+  let inList = false;
+  for (const line of text.slice(start).split('\n')) {
+    if (line.startsWith('```')) fences += 1;
+    else if (fences >= 2 && line.startsWith('- ')) inList = true;
+    else if (inList && !line.startsWith('  ')) return { start, end: offset };
+    offset += line.length + 1;
+  }
+  return { start, end: text.length };
+}
+
+/** Заголовок нынешнего блока — по нему версия блока и опознаётся. */
+const HEADING = BLOCK.split('\n')[1]!;
+
+/**
+ * Блок под нынешним маркером и с нынешним заголовком. Правку человека внутри
+ * блока это не отменяет — заменяется только блок прежней версии.
+ */
+function isCurrentBlock(text: string): boolean {
+  const span = blockSpan(text);
+  if (!span) return false;
+  const [marker, heading] = text.slice(span.start, span.end).split('\n');
+  return marker === MARKER && heading === HEADING;
+}
+
+/**
+ * Вписано ли НЫНЕШНЕЕ соглашение. Блок прежней версии (русский, до перевода
+ * агентских текстов на английский) — не вписано: кнопка снова доступна и
+ * заменяет его на месте, иначе старый текст оставался в файле навсегда.
+ */
 export function hasConvention(root: string, userSettingsPath?: string): boolean {
   const path = conventionFile(root, userSettingsPath);
   if (!existsSync(path)) return false;
   try {
-    const text = readFileSync(path, 'utf8');
-    return text.includes(MARKER) || text.includes(LEGACY_MARKER);
+    const text = readFileSync(path, 'utf8').replace(/\r\n/g, '\n');
+    return isCurrentBlock(text);
   } catch {
     return false;
   }
@@ -119,7 +164,18 @@ export function installConvention(
 ): boolean {
   if (hasConvention(root, userSettingsPath)) return false;
   const path = conventionFile(root, userSettingsPath);
-  const current = existsSync(path) ? readFileSync(path, 'utf8') : '';
+  const current = existsSync(path) ? readFileSync(path, 'utf8').replace(/\r\n/g, '\n') : '';
+  const span = blockSpan(current);
+  if (span) {
+    // Блок прежней версии — заменить на месте, сохранив всё до и после него.
+    const after = current.slice(span.end);
+    writeTextFile(
+      path,
+      `${current.slice(0, span.start)}${BLOCK}${after ? `\n${after}` : ''}`,
+      backupDir ? { backupDir, backupName } : {},
+    );
+    return true;
+  }
   const separator = current.length === 0 || current.endsWith('\n\n') ? '' : '\n';
   // Тот же файл правит вкладка «Правила» — с резервной копией и под ИМЕНЕМ
   // проектной копии (`project-<id>-CLAUDE.md`), а не пользовательской; дописывать

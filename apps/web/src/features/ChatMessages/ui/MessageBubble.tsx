@@ -9,8 +9,10 @@ import { scanSplitBlocks } from '@agentdeck/contracts/task-split';
 import { scanHandoffBlocks } from '@agentdeck/contracts/chat-handoff';
 import { scanReviewBlocks } from '@agentdeck/contracts/model-cascade';
 import { scanPlanBlocks, scanSplitPlanBlocks } from '@agentdeck/contracts/split-plan';
-import { scanMediaBlocks } from '@agentdeck/contracts/media-block';
+import { mediaRequestOf, scanMediaBlocks } from '@agentdeck/contracts/media-block';
 import { withoutSplitTickets } from '@agentdeck/contracts/split-tickets';
+import { withoutEscalateBlocks } from '@agentdeck/contracts/chat-escalate';
+import { withoutSieveBlocks } from '@agentdeck/contracts/sieves';
 import { attachmentBasename, splitAttachments } from '@agentdeck/contracts/uploads';
 import { markQuestionAnswered, useAnsweredQuestions } from '@shared/lib/agent-runs';
 import { ContextSummarizedNote } from '@entities/Platform';
@@ -18,12 +20,14 @@ import { parseQuestions } from '../lib/parseQuestions';
 import { questionKey } from '../lib/questionKey';
 import { taskNoticesOf } from '../lib/taskNotice';
 import { QuestionCard } from './QuestionCard';
+import { AutoPickLine } from './AutoPickLine';
 import { TaskSplitCard } from './TaskSplitCard';
 import { HandoffCard } from './HandoffCard';
 import { ReviewCard } from './ReviewCard';
 import { TriageCard } from './TriageCard';
 import { PlanCard } from './PlanCard';
 import { MediaFeedCard } from './MediaFeedCard';
+import { MediaRequestText } from './MediaRequestText';
 import type { MessageBubbleProps } from './ChatMessages.types';
 import styles from './ChatMessages.module.scss';
 
@@ -159,7 +163,11 @@ export function MessageBubble({
             // не читается, а решение принимается по составу, не по формату.
             // Порядок разборов не важен — языки блоков разные, и каждый скан
             // видит только свой.
-            const split = scanSplitBlocks(block.text);
+            // Блок `escalate` — служебный: заметку главному чату рисует его карточка.
+            // Только у ответа агента: человек, описавший формат, видит свой пример.
+            const split = scanSplitBlocks(
+              isUser ? block.text : withoutSieveBlocks(withoutEscalateBlocks(block.text)),
+            );
             const handoffScan = scanHandoffBlocks(split.text);
             const review = scanReviewBlocks(handoffScan.text);
             // Уровни разделения (Т1): блок разбора и блок плана группы.
@@ -177,13 +185,15 @@ export function MessageBubble({
             // остаётся полным — агент получал именно его.
             const attachments = isUser ? splitAttachments(media.text) : undefined;
             const bodyText = attachments ? attachments.text : media.text;
+            const request = isUser ? mediaRequestOf(bodyText) : undefined;
 
             return (
               <div key={index} className={styles.block}>
                 {/* Текст и карточки — одной колонкой: соседом карточка попадала
                     в колонку расхода и сжималась в узкий столбик. */}
                 <div className={styles.blockBody}>
-                  {bodyText && (
+                  {request && <MediaRequestText request={request} text={bodyText} />}
+                  {bodyText && !request && (
                     <div
                       className={styles.text}
                       // markdown-it с выключенным сырым html — теги из ответа
@@ -331,6 +341,15 @@ export function MessageBubble({
           }
 
           if (block.type === 'tool') {
+            // Вопрос, закрытый автономией чата, — след выбора, а не форма ответа.
+            if (block.autoPicks !== undefined) {
+              return (
+                <div key={index} className={styles.block}>
+                  <AutoPickLine picks={block.autoPicks} />
+                  {spend}
+                </div>
+              );
+            }
             // Вопрос с вариантами показываем карточкой, а не строкой вызова:
             // это не техническая подробность, а место, где ждут ответа.
             const questions =

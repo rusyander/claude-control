@@ -225,6 +225,14 @@ export function readDraft(root: string, runId: string): ProjectTestDraft | undef
   const items = rawItems
     .map((item, index) => parseItem(item, index, warnings))
     .filter((item): item is ProjectTestDraftItem => item !== undefined);
+  // Записанные раньше причины: первая же запись файла (время панели, перенос в
+  // группу, частичная приёмка) убирает отброшенную правку, и без этого её
+  // причину человек не увидел бы никогда.
+  for (const stored of Array.isArray(source.warnings) ? source.warnings : []) {
+    if (typeof stored === 'string' && stored.trim() && !warnings.includes(stored)) {
+      warnings.push(stored);
+    }
+  }
 
   return {
     version: 1,
@@ -274,10 +282,13 @@ export function readDraftSummaries(root: string): ProjectTestDraftSummary[] {
   return readDrafts(root).map(summarizeDraft);
 }
 
-/** Запись черновика: панель дописывает в него решения человека. */
+/**
+ * Запись черновика: панель дописывает в него решения человека. Предупреждения
+ * пишутся с ним — отброшенной правки в файле после записи уже нет.
+ */
 export function writeDraft(root: string, draft: ProjectTestDraft): void {
-  const { file: _file, error: _error, warnings: _warnings, ...rest } = draft;
-  writeJson(root, draftRelativePath(draft.runId), rest);
+  const { file: _file, error: _error, warnings, ...rest } = draft;
+  writeJson(root, draftRelativePath(draft.runId), warnings?.length ? { ...rest, warnings } : rest);
 }
 
 /**

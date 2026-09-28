@@ -1,5 +1,11 @@
 import type { panelAgentRu } from './ru.ts';
 import { panelTextsEn } from './texts.en.ts';
+import { panelActionsChatEn } from './actions-chat.en.ts';
+import { panelActionsGroupsEntitiesEn } from './actions-groups-entities.en.ts';
+import { panelActionsProjectsEn } from './actions-projects.en.ts';
+import { panelActionsChatSandboxAgentsEn } from './actions-chat-sandbox-agents.en.ts';
+import { panelActionsManageEn } from './actions-manage.en.ts';
+import { panelActionsGapsEn } from './actions-gaps.en.ts';
 
 /** English texts of the panel agent window; typed against the Russian module. */
 export const panelAgentEn: typeof panelAgentRu = {
@@ -19,6 +25,7 @@ export const panelAgentEn: typeof panelAgentRu = {
   emptyConversation: 'For example: “Go to projects and create project C:/work/demo”.',
   inputLabel: 'Message to the panel agent',
   inputPlaceholder: 'What should be done in the panel?',
+  resize: 'Panel agent window width',
   voice: {
     start: 'Dictate by voice',
     stop: 'Stop dictation',
@@ -30,19 +37,51 @@ export const panelAgentEn: typeof panelAgentRu = {
       'The microphone is unavailable: the browser denied recording. Allow it in the site settings and press again.',
     network: 'The speech recognition service is not responding. Check the internet and try again.',
     error: 'Dictation stopped. Press the microphone again.',
+    microphone:
+      'The microphone is not responding: the browser did not start recording. Check that a microphone is connected and allowed for this page, then press again — or type the text.',
   },
   send: 'Send',
   stop: 'Stop',
   newConversation: 'New conversation',
+  foreign: {
+    title: 'Waiting in other conversations',
+    hint: 'This conversation did not ask for these cards. Decide only if you know whose they are.',
+    badge: 'Other conversation',
+    from: 'From the conversation «{{title}}»',
+    open: 'Open that conversation',
+  },
   thinking: 'The agent is thinking…',
   toolCalled: 'Action: {{name}}',
   toolFailed: 'Action failed: {{name}}',
   stopped: 'Turn stopped.',
   runFailed: 'The agent did not answer: {{message}}',
   noReply: 'The agent finished the turn without text.',
+  sealed: {
+    actions: 'Actions performed: {{list}}.',
+    failed: '{{name}} (failed)',
+    notFinished: 'The answer was not finished. {{reason}}',
+    reason: {
+      restart: 'The panel restarted mid-turn.',
+      stopped: 'The turn was stopped.',
+      timeout: 'The agent did not finish the turn within the time limit.',
+      failed: 'The turn broke off.',
+    },
+  },
+  interruptedByReload:
+    'The page reloaded mid-turn — the turn stopped and the waiting card was withdrawn. What was said and done before the break is above; repeat the request if you still need it.',
+  streamLost:
+    'The connection to the panel dropped mid-turn (the panel most likely restarted). The conversation was reloaded: what was said and done before the break is above; repeat the request if you still need it.',
+  staleReloaded:
+    'This conversation was continued in another tab — showing it afresh. Your message was not sent: «{{text}}». Send it again if you still need it.',
+  deletedElsewhere:
+    'This conversation was deleted in another tab. Your message was not sent: «{{text}}». Your next message starts a new conversation.',
   refusal: {
+    stream_lost: 'the connection to the panel dropped mid-turn — repeat the request.',
     invalid_body: 'Message not accepted: the server did not understand the request.',
     busy: 'The agent is still answering in this conversation — wait for the turn to end.',
+    conversation_stale: 'This conversation was continued in another tab — reopen it from History.',
+    conversation_deleted:
+      'This conversation was deleted in another tab — your next message starts a new one.',
     provider_unsupported:
       'The panel agent works only with Claude Code for now: another CLI is active.',
     cli_not_found: 'Claude Code is not in PATH: the agent has nothing to run with.',
@@ -63,6 +102,8 @@ export const panelAgentEn: typeof panelAgentRu = {
     reject: 'Reject',
     deciding: 'Decision sent, waiting for the result…',
     expires: 'Waits until {{time}}',
+    armHint:
+      'The card has just appeared — its buttons unlock in a moment so a stray click decides nothing.',
     decideFailed: 'Decision not accepted: {{message}}',
     diff: 'What will change',
     truncated:
@@ -132,7 +173,14 @@ export const panelAgentEn: typeof panelAgentRu = {
     list_groups: 'List groups',
     save_group: 'Save a group',
     toggle_group: 'Enable or disable a group',
+    copy_group: 'Copy a group',
     delete_group: 'Delete a group',
+    read_group: 'Read a group',
+    draft_group: 'Draft a group',
+    draft_scenario: 'Draft a scenario',
+    add_group_step: 'Add a working-order step',
+    move_group_step: 'Move a working-order step',
+    set_group_knobs: 'Set the group’s skill numbers',
     get_settings: 'Panel settings',
     update_settings: 'Change panel settings',
     switch_provider: 'Switch the CLI provider',
@@ -156,6 +204,33 @@ export const panelAgentEn: typeof panelAgentRu = {
     lint_tests: 'Lint test cases',
     stop_tests: 'Stop a test run',
     delete_test_case: 'Delete a test case',
+    save_test_case: 'Save a test case',
+    save_test_group: 'Save a test group',
+    delete_test_group: 'Delete a test group',
+    accept_baseline: 'Accept a visual check snapshot as the baseline',
+    attach_test_note: 'Attach a text file to a case',
+    build_test_plan: 'Build and save a test plan',
+    bulk_delete_cases: 'Delete several cases',
+    bulk_edit_cases: 'Edit several cases',
+    delete_shared_step: 'Delete a shared step',
+    delete_test_environment: 'Delete a test environment',
+    delete_test_plan: 'Delete a test plan',
+    delete_test_view: 'Delete a saved case filter',
+    install_test_convention: 'Add test-case rules to the project instructions',
+    read_tests_report: 'Testing section report',
+    record_manual_result: 'Record a manual check result',
+    rollback_draft: 'Roll back an accepted test draft',
+    run_e2e_tests: 'Run e2e autotests',
+    save_shared_step: 'Save a shared step',
+    save_test_environment: 'Save a test environment',
+    save_test_plan: 'Save a test plan',
+    save_test_schema: 'Save custom case fields and statuses',
+    save_test_view: 'Save a case filter',
+    set_draft_auto_accept: 'Accept test drafts at once',
+    start_manual_run: 'Start a manual run',
+    stop_e2e_tests: 'Stop e2e autotests',
+    sync_e2e_tests: 'Sync the e2e folder with cases',
+    reject_draft: 'Reject a test draft',
     search_help: 'Search help',
     read_help_topic: 'Read a help topic',
     list_help_topics: 'Help topics',
@@ -177,6 +252,12 @@ export const panelAgentEn: typeof panelAgentRu = {
     revert_history_hunk: 'Revert a hunk',
     list_backups: 'Backups',
     restore_backup: 'Restore a backup',
+    ...panelActionsChatEn,
+    ...panelActionsGroupsEntitiesEn,
+    ...panelActionsProjectsEn,
+    ...panelActionsChatSandboxAgentsEn,
+    ...panelActionsManageEn,
+    ...panelActionsGapsEn,
   },
   secretFieldShown: 'The key field is open in the panel.',
   text: panelTextsEn,
@@ -202,6 +283,13 @@ export const panelAgentEn: typeof panelAgentRu = {
     messages: 'Messages: {{count}}',
     open: 'Open conversation',
     loadFailed: 'Could not load conversations',
+    busy: 'The agent is answering. Another conversation opens once the turn ends or you stop it.',
+    openFailed: 'Could not open the conversation. Try again.',
+    delete: 'Delete conversation “{{title}}”',
+    deleteConfirm: 'Delete this conversation from history? The action trail stays.',
+    deleteYes: 'Delete',
+    deleteNo: 'Cancel',
+    deleteFailed: 'Could not delete: {{message}}',
   },
   journal: {
     empty: 'No actions yet',

@@ -11,6 +11,10 @@ export interface StreamedTool {
   input: string;
   id?: string;
   usage?: MessageUsage;
+  /** Вопрос, закрытый автономией чата: что выбрано за человека. */
+  autoPicks?: { question: string; label: string }[];
+  /** Когда вызов дошёл до телефона — порядок карточек вопроса, пока их нет в сводке. */
+  at?: number;
 }
 
 /** Запрос агента на разрешение инструмента — ждёт ответа человека. */
@@ -136,6 +140,8 @@ export type ChatEvent =
   | { kind: 'error'; message: string; retriable?: boolean }
   | { kind: 'permission'; toolName: string; input: unknown; toolUseId: string }
   | { kind: 'permissionResolved'; toolUseId: string; behavior: 'allow' | 'deny' }
+  /** Вопрос агента закрыла автономия чата — ответа человека он больше не ждёт. */
+  | { kind: 'autoPick'; toolUseId: string; picks: { question: string; label: string }[] }
   /**
    * Работа продолжена в чистой сессии (или не продолжена — тогда есть `reason`).
    * Приходит последним кадром закрываемого прогона; по `chatId` экран уходит в

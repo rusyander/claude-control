@@ -77,11 +77,14 @@ describe('Выборочный откат ханка', () => {
     expect(readFileSync(settingsPath, 'utf8')).toBe('a\nB\nc\nd\ne\n');
   });
 
-  it('откат обоих ханков по очереди приводит файл к состоянию копии', () => {
+  it('после отката копия уже не свежая: второй откат по ней — отказ, файл не тронут', () => {
     revertHunk(backupDir, NAME, 0, knownPaths, backupDir);
-    // После первого отката индексы ханков пересчитываются: остаётся один блок (0).
-    revertHunk(backupDir, NAME, 0, knownPaths, backupDir);
-    expect(readFileSync(settingsPath, 'utf8')).toBe(SNAPSHOT);
+    // Откат сам снял копию — теперь свежая она, и лента показывает у NAME дифф
+    // против неё. Номер ханка «против файла» у NAME больше не то, что видно.
+    const second = revertHunk(backupDir, NAME, 0, knownPaths, backupDir);
+    expect(second.ok).toBe(false);
+    expect(second.messageCode).toBe('history-hunk-not-newest');
+    expect(readFileSync(settingsPath, 'utf8')).toBe('a\nb\nc\nD\ne\n');
   });
 
   it('сам откат обратим: состояние до сохраняется копией', () => {
@@ -100,6 +103,19 @@ describe('Выборочный откат ханка', () => {
   it('обход пути в имени копии отклоняется, ничего не пишется', () => {
     const result = revertHunk(backupDir, '../../evil', 0, knownPaths, backupDir);
     expect(result.ok).toBe(false);
+    expect(readFileSync(settingsPath, 'utf8')).toBe(CURRENT);
+  });
+
+  it('[P3] откат ханка старой копии — отказ: её дифф показан против СЛЕДУЮЩЕЙ копии, а не против файла', () => {
+    // Старая копия: «a b c d e»; свежая — «a B c d e»; текущий файл — «a B c D e».
+    // В ленте у старой копии ханк 0 = b→B, а откат считал бы «старая → текущий»
+    // и вернул бы ханк 0 того диффа — другой набор строк, чем на карточке.
+    const older = 'settings.json.2026-07-19T09-00-00-000Z.bak';
+    writeFileSync(join(backupDir, older), SNAPSHOT);
+    writeFileSync(join(backupDir, NAME), 'a\nB\nc\nd\ne\n');
+    const result = revertHunk(backupDir, older, 0, knownPaths, backupDir);
+    expect(result.ok).toBe(false);
+    expect(result.messageCode).toBe('history-hunk-not-newest');
     expect(readFileSync(settingsPath, 'utf8')).toBe(CURRENT);
   });
 });

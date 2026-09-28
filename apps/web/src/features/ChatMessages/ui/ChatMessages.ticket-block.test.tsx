@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { ChatMessage } from '@agentdeck/contracts';
+import { ESCALATE_LANG } from '@agentdeck/contracts/chat-escalate';
 import { SPLIT_TICKET_TAG } from '@agentdeck/contracts/split-tickets';
 import type { StreamState } from '@shared/lib/chat-stream';
 import { ChatMessages } from './ChatMessages';
@@ -70,5 +71,30 @@ describe('лента — блок тикета группы не показыв�
     const html = render([{ ...answer(`Формат:\n\n${TICKET}`), id: 'u1', role: 'user' }]);
 
     expect(html).toContain('Кнопка съезжает');
+  });
+
+  // Ревью 28.09 (F-226): блок эскалации вырезался и из текста человека — тот,
+  // кто описывал формат, видел свой пример пустым.
+  it('в сообщении человека блок эскалации не вырезается', () => {
+    const escalate = [
+      `\`\`\`${ESCALATE_LANG}`,
+      '{"severity":"critical","text":"Сборка упала на проде"}',
+      '```',
+    ].join('\n');
+    const html = render([{ ...answer(`Формат:\n\n${escalate}`), id: 'u2', role: 'user' }]);
+
+    expect(html).toContain('Сборка упала на проде');
+  });
+
+  it('в ответе агента блок эскалации по-прежнему служебный', () => {
+    const escalate = [
+      `\`\`\`${ESCALATE_LANG}`,
+      '{"severity":"critical","text":"Сборка упала на проде"}',
+      '```',
+    ].join('\n');
+    const html = render([answer(`Итог.\n\n${escalate}`)]);
+
+    expect(html).not.toContain('Сборка упала на проде');
+    expect(html).toContain('Итог.');
   });
 });

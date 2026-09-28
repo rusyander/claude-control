@@ -1,0 +1,247 @@
+{
+  "topic": "dlp",
+  "frames": {
+    "first/01-empty": {
+      "light-ru": {
+        "file": "01-empty.png",
+        "width": 1400,
+        "height": 1500
+      },
+      "light-en": {
+        "file": "01-empty.en.png",
+        "width": 1400,
+        "height": 1500
+      },
+      "dark-ru": {
+        "file": "01-empty.dark.png",
+        "width": 1400,
+        "height": 1500
+      },
+      "dark-en": {
+        "file": "01-empty.dark.en.png",
+        "width": 1400,
+        "height": 1500
+      }
+    },
+    "first/02-starter": {
+      "light-ru": {
+        "file": "02-starter.png",
+        "width": 1400,
+        "height": 1500
+      },
+      "light-en": {
+        "file": "02-starter.en.png",
+        "width": 1400,
+        "height": 1500
+      },
+      "dark-ru": {
+        "file": "02-starter.dark.png",
+        "width": 1400,
+        "height": 1500
+      },
+      "dark-en": {
+        "file": "02-starter.dark.en.png",
+        "width": 1400,
+        "height": 1500
+      }
+    },
+    "first/03-terms": {
+      "light-ru": {
+        "file": "03-terms.png",
+        "width": 1400,
+        "height": 1500
+      },
+      "light-en": {
+        "file": "03-terms.en.png",
+        "width": 1400,
+        "height": 1500
+      },
+      "dark-ru": {
+        "file": "03-terms.dark.png",
+        "width": 1400,
+        "height": 1500
+      },
+      "dark-en": {
+        "file": "03-terms.dark.en.png",
+        "width": 1400,
+        "height": 1500
+      }
+    },
+    "first/04-preview": {
+      "light-ru": {
+        "file": "04-preview.png",
+        "width": 1116,
+        "height": 475
+      },
+      "light-en": {
+        "file": "04-preview.en.png",
+        "width": 1116,
+        "height": 475
+      },
+      "dark-ru": {
+        "file": "04-preview.dark.png",
+        "width": 1116,
+        "height": 475
+      },
+      "dark-en": {
+        "file": "04-preview.dark.en.png",
+        "width": 1116,
+        "height": 475
+      }
+    },
+    "first/05-running": {
+      "light-ru": {
+        "file": "05-running.png",
+        "width": 1116,
+        "height": 710
+      },
+      "light-en": {
+        "file": "05-running.en.png",
+        "width": 1116,
+        "height": 693
+      },
+      "dark-ru": {
+        "file": "05-running.dark.png",
+        "width": 1116,
+        "height": 710
+      },
+      "dark-en": {
+        "file": "05-running.dark.en.png",
+        "width": 1116,
+        "height": 693
+      }
+    },
+    "first/06-journal": {
+      "light-ru": {
+        "file": "06-journal.png",
+        "width": 1116,
+        "height": 172
+      },
+      "light-en": {
+        "file": "06-journal.en.png",
+        "width": 1116,
+        "height": 172
+      },
+      "dark-ru": {
+        "file": "06-journal.dark.png",
+        "width": 1116,
+        "height": 172
+      },
+      "dark-en": {
+        "file": "06-journal.dark.en.png",
+        "width": 1116,
+        "height": 172
+      }
+    },
+    "first/07-counters": {
+      "light-ru": {
+        "file": "07-counters.png",
+        "width": 1116,
+        "height": 710
+      },
+      "light-en": {
+        "file": "07-counters.en.png",
+        "width": 1116,
+        "height": 693
+      },
+      "dark-ru": {
+        "file": "07-counters.dark.png",
+        "width": 1116,
+        "height": 710
+      },
+      "dark-en": {
+        "file": "07-counters.dark.en.png",
+        "width": 1116,
+        "height": 693
+      }
+    },
+    "gate/01-gate-off": {
+      "light-ru": {
+        "file": "01-gate-off.png",
+        "width": 1116,
+        "height": 381
+      },
+      "light-en": {
+        "file": "01-gate-off.en.png",
+        "width": 1116,
+        "height": 381
+      },
+      "dark-ru": {
+        "file": "01-gate-off.dark.png",
+        "width": 1116,
+        "height": 381
+      },
+      "dark-en": {
+        "file": "01-gate-off.dark.en.png",
+        "width": 1116,
+        "height": 381
+      }
+    },
+    "gate/02-gate-on": {
+      "light-ru": {
+        "file": "02-gate-on.png",
+        "width": 1116,
+        "height": 381
+      },
+      "light-en": {
+        "file": "02-gate-on.en.png",
+        "width": 1116,
+        "height": 381
+      },
+      "dark-ru": {
+        "file": "02-gate-on.dark.png",
+        "width": 1116,
+        "height": 381
+      },
+      "dark-en": {
+        "file": "02-gate-on.dark.en.png",
+        "width": 1116,
+        "height": 381
+      }
+    },
+    "gate/03-hook": {
+      "light-ru": {
+        "file": "03-hook.png",
+        "width": 1400,
+        "height": 1300
+      },
+      "light-en": {
+        "file": "03-hook.en.png",
+        "width": 1400,
+        "height": 1300
+      },
+      "dark-ru": {
+        "file": "03-hook.dark.png",
+        "width": 1400,
+        "height": 1300
+      },
+      "dark-en": {
+        "file": "03-hook.dark.en.png",
+        "width": 1400,
+        "height": 1300
+      }
+    },
+    "gate/04-foreign-cli": {
+      "light-ru": {
+        "file": "04-foreign-cli.png",
+        "width": 1116,
+        "height": 452
+      },
+      "light-en": {
+        "file": "04-foreign-cli.en.png",
+        "width": 1116,
+        "height": 452
+      },
+      "dark-ru": {
+        "file": "04-foreign-cli.dark.png",
+        "width": 1116,
+        "height": 452
+      },
+      "dark-en": {
+        "file": "04-foreign-cli.dark.en.png",
+        "width": 1116,
+        "height": 452
+      }
+    }
+  }
+}

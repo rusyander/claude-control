@@ -2,6 +2,16 @@
   max-width: var(--layout-content-max);
 }
 
+/*
+ * Matcher — список инструментов через «|» без пробелов: в одну строку он
+ * уезжал под кнопки карточки и за её край. Переносим по любому месту.
+ */
+.matcher {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 .description {
   max-width: var(--text-measure);
 }

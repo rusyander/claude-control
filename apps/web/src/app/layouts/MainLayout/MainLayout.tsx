@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Outlet, useRouterState } from '@tanstack/react-router';
 import { motion } from 'motion/react';
 import { DURATION, EASE, RISE, withReducedMotion } from '@shared/lib/motion';
@@ -32,6 +32,11 @@ export function MainLayout() {
   // Ключом служит адрес: при переходе в раздел React пересоздаёт блок, и
   // содержимое проявляется, а не возникает рывком.
   const path = useRouterState({ select: (state) => state.location.pathname });
+  // Раздел, который сам держит свои прокрутки (чат, библиотека тестов), —
+  // флаг маршрута `staticData.layout`. Остальные растут с содержимым.
+  const isFill = useRouterState({
+    select: (state) => state.matches.some((match) => match.staticData?.layout === 'fill'),
+  });
   const isReduced = useReducedMotion();
 
   // На узких экранах панель не должна съедать ширину контента: до 900px её
@@ -40,18 +45,23 @@ export function MainLayout() {
   const isNarrow = useMediaQuery('(max-width: 900px)');
   const effectiveCollapsed = isCollapsed || isNarrow;
 
-  // Точка на значке вкладки и в её заголовке, пока агент где-то ждёт ответа.
+  // Точка на значке вкладки и в её заголовке — за неувиденный повод (`shared/lib/attention`).
   // Живёт в каркасе, а не в чате: уйти в другой раздел и не узнать, что тебя
   // спросили, — ровно тот случай, ради которого метка и заводилась. Сюда же
   // сходятся разговоры, стоящие на вопросе по данным транскрипта: их агента
   // панель не запускала, и без этого списка о них некому было сообщить.
+  // Время последней записи — часть повода: новый вопрос того же чата зовёт заново.
   const awaiting = useAwaitingAlarm();
-  useAttentionBadge(awaiting.map((chat) => chat.id));
+  const awaitingMarks = useMemo(
+    () => awaiting.map((chat) => ({ id: chat.id, since: chat.updatedAt })),
+    [awaiting],
+  );
+  useAttentionBadge(awaitingMarks);
 
   return (
     <Stack direction="row" className={styles.root}>
       <Sidebar isCollapsed={effectiveCollapsed} onToggle={toggle} isNarrow={isNarrow} />
-      <Stack as="main" className={styles.content}>
+      <Stack as="main" className={styles.content} data-page-fill={isFill || undefined}>
         {/* Бейдж доверия виден в КАЖДОМ разделе, а не только на странице выбора
             (IDEA-9): настройки чужого CLI правятся здесь, и знать, чей формат
             панель пишет и проверялся ли он на этой машине, нужно именно здесь.
@@ -64,6 +74,8 @@ export function MainLayout() {
           // Обёртка не должна менять раскладку: страницы вроде чата занимают
           // всю высоту и рассчитывают быть полноценным блоком колонки.
           className={styles.page}
+          data-layout-page
+          data-page-fill={isFill || undefined}
           variants={RISE}
           initial="hidden"
           animate="visible"

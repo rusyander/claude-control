@@ -1,0 +1,121 @@
+// Полоса липнет к верху прокрутки `.content` MainLayout. Отступ колонки лежит
+// ВНУТРИ области прокрутки, поэтому над прилипшей полосой оставалась бы щель, в
+// которой проезжает содержимое: её закрывает тень без размытия цвета фона —
+// высотой ровно в отступ колонки на каждой ширине (те же ступени, что у настроек).
+.tabs {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-3xs);
+  padding-bottom: var(--spacing-2xs);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg);
+
+  // Только у прилипшей (`data-stuck` ставит `markWhenStuck`): на нулевой
+  // прокрутке тень срезала бы низ карточки над полосой.
+  // Узкий экран: одна строка с прокруткой вбок вместо трёх-четырёх рядов —
+  // прилипшая полоса в 121 px съедала треть экрана телефона. Поля по краям —
+  // место для кольца фокуса, которое прокрутка иначе срезала бы.
+  @media (max-width: 720px) {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding: 4px 4px var(--spacing-2xs);
+    scrollbar-width: thin;
+    overscroll-behavior-x: contain;
+  }
+
+  &[data-stuck='true'] {
+    box-shadow: 0 calc(var(--spacing-xl) * -1) 0 var(--color-bg);
+
+    @media (max-width: 900px) {
+      box-shadow: 0 calc(var(--spacing-md) * -1) 0 var(--color-bg);
+    }
+
+    @media (max-width: 480px) {
+      box-shadow: 0 calc(var(--spacing-sm) * -1) 0 var(--color-bg);
+    }
+  }
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-3xs);
+  padding: var(--spacing-2xs) var(--spacing-sm);
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-fg-muted);
+  font: inherit;
+  font-size: var(--font-size-body-sm);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background var(--duration-fast),
+    color var(--duration-fast);
+
+  &:hover {
+    background: var(--color-surface-sunken);
+    color: var(--color-fg);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+}
+
+.tabActive {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+
+  &:hover {
+    background: var(--color-accent-subtle);
+    color: var(--color-accent);
+  }
+}
+
+.count {
+  min-width: 20px;
+  padding: 0 var(--spacing-2xs);
+  border-radius: 999px;
+  background: var(--color-surface-sunken);
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-caption);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.countWarning {
+  background: var(--color-warning-subtle);
+  color: var(--color-warning);
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  min-width: 0;
+
+  &:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 4px;
+    border-radius: 8px;
+  }
+}
+
+.hint {
+  max-width: 72ch;
+}
+
+// Смысл числа для чтеца: виден только ему, зрячему — подсказкой при наведении.
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

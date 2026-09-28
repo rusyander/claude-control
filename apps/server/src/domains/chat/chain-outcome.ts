@@ -4,6 +4,7 @@ import {
   withoutSplitTickets,
 } from '@agentdeck/contracts/split-tickets';
 import { scanReviewBlocks } from '@agentdeck/contracts/model-cascade';
+import { scanSieveBlocks, withoutSieveBlocks } from '@agentdeck/contracts/sieves';
 import type { ChatLink } from '../../lib/app-store/app-store.types.ts';
 import type { ChainOutcome } from './split-conveyor.ts';
 
@@ -146,9 +147,10 @@ export interface ChainOutcomeInput {
  */
 export function chainOutcomeOf(input: ChainOutcomeInput): ChainOutcome {
   const { link, ok } = input;
-  // Итог читается по тексту БЕЗ блоков тикетов (95b): блок в конце ответа
-  // иначе стал бы хвостом, вопросом или ссылкой на MR группы.
-  const text = withoutSplitTickets(input.text);
+  // Итог читается по тексту БЕЗ блоков тикетов (95b) и отчёта о ситах: блок в
+  // конце ответа иначе стал бы хвостом, вопросом или ссылкой на MR группы (у
+  // выученного сита ссылка треда — тоже `merge_requests/N`).
+  const text = withoutSieveBlocks(withoutSplitTickets(input.text));
   const tail = replyTail(text);
   const mr = lastMergeRequestUrl(text);
   // Дефекты вне задач группы (95b) едут с любым итогом хода: находка не
@@ -164,6 +166,9 @@ export function chainOutcomeOf(input: ChainOutcomeInput): ChainOutcome {
       : undefined;
   // Ревью своей работы кончило цепочку: сколько замечаний в вердикте (L110).
   const findings = link.stage === 'review' ? scanReviewBlocks(input.text).findings : undefined;
+  // Отчёт о ситах и выученные сита (решение владельца 28.09) едут с любым
+  // итогом: строка сита, сданная ходом, кончившимся вопросом, не пропадает.
+  const sieves = scanSieveBlocks(input.text);
   const withTail = {
     ...(warningAt ? { limitWarningUntil: new Date(warningAt * 1000).toISOString() } : {}),
     ...(findings ? { reviewFindings: findings.length } : {}),
@@ -171,6 +176,8 @@ export function chainOutcomeOf(input: ChainOutcomeInput): ChainOutcome {
     ...(mr ? { mr } : {}),
     ...(tickets.length > 0 ? { tickets } : {}),
     ...(humanSteps.length > 0 ? { humanSteps } : {}),
+    ...(sieves.rows.length > 0 ? { sieveRows: sieves.rows } : {}),
+    ...(sieves.learned.length > 0 ? { learnedSieves: sieves.learned } : {}),
   };
   if (!ok) {
     // Повтор назначен — группа не сдалась, она ждёт (Д10): ждавшие её не

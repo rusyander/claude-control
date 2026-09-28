@@ -22,6 +22,7 @@ import {
   type AnyPanelAction,
   type InjectRoute,
 } from './registry.ts';
+import { readRoute } from './action-kit.ts';
 import { dataField, summaryText, textField } from './texts.ts';
 
 /**
@@ -96,9 +97,7 @@ const idSchema = z
 
 /** Прочитать карточки тем же маршрутом, что и раздел «Контур». */
 async function readContours(inject: InjectRoute): Promise<PlatformsInfo> {
-  const answer = await inject({ method: 'GET', url: '/api/platforms' });
-  if (answer.status >= 400) throw new Error(`GET /api/platforms → HTTP ${answer.status}`);
-  return answer.body as PlatformsInfo;
+  return readRoute<PlatformsInfo>(inject, '/api/platforms');
 }
 
 function findStatus(info: PlatformsInfo, id: string): PlatformStatus | undefined {
@@ -208,7 +207,7 @@ const draftSchema = z.object({
     .max(20)
     .optional()
     .describe(
-      '«Где работает»: consumer ids (assistant, terminal, chat, groups, tests, foreign:<cli>)',
+      'The card\'s "where it works" list: consumer ids (assistant, terminal, chat, groups, tests, foreign:<cli>)',
     ),
 });
 type DraftInput = z.infer<typeof draftSchema>;
@@ -385,7 +384,7 @@ const saveContourDraft = definePanelAction({
     return {
       saved: true,
       ...contourView(status),
-      ...(status.hasToken ? { note: 'ключ сохранён' } : {}),
+      ...(status.hasToken ? { note: 'key saved' } : {}),
       ...(status.consumersApplied ? { consumersApplied: status.consumersApplied } : {}),
     };
   },

@@ -2189,12 +2189,12 @@ check(
 // Цифры контура стоят там ОТДЕЛЬНО и в общий расход не входят: выше собраны
 // транскрипты этой машины, здесь — кадры через наш шлюз, и у работы через контур
 // есть и то и другое. Сложенные, они посчитали бы одни токены дважды.
-await goto(`${BASE}/analytics`);
+await goto(`${BASE}/analytics?tab=live`);
 await page.waitForTimeout(1500);
 const analytics = await page.locator('body').innerText();
 check(analytics.includes('Расход через контур'), 'расход контура показан своей карточкой');
 check(
-  analytics.includes('в цифры выше это не входит'),
+  analytics.includes('в цифры сводки это не входит'),
   'сказано, что складывать эти цифры с общими нельзя',
 );
 check(
@@ -2210,7 +2210,7 @@ check(
 // «хоть что-то прошло». Сдвинув «считать с» на сегодня, человек уносил с экрана
 // историю, которая есть, — и без единого слова о том, куда она делась.
 platforms = [cardOf({ periodSpend: { ...PERIOD_SPEND, requests: 0 } })];
-await goto(`${BASE}/analytics`);
+await goto(`${BASE}/analytics?tab=live`);
 await page.waitForTimeout(1500);
 const shifted = await page.locator('body').innerText();
 check(

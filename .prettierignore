@@ -15,3 +15,5 @@ apps/mobile/expo-env.d.ts
 # Prettier переформатировал бы отступы примера JSON внутри текста, и модель получила бы
 # не тот пример, который человек видит в панели.
 apps/server/src/domains/prompts/catalog/
+# Личные черновики в корне (`.vsc-tmp.mjs` и т. п.) — не код проекта.
+/.*-tmp.mjs

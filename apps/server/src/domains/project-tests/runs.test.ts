@@ -9,6 +9,7 @@ import {
   collectResults,
   fingerprintCases,
   pickEnvironmentId,
+  recordsResults,
   stampRunResults,
 } from './runs.ts';
 import { createGroup, readGroups, upsertCase } from './store.ts';
@@ -210,5 +211,19 @@ describe('project-tests/runs: штамп результатов', () => {
     expect(stampRunResults(root, scoped, snapshot, finishedAt)).toBe(1);
     expect(caseOf('api-001')?.lastRunId).toBeUndefined();
     expect(collectResults(root, scoped).map((r) => r.caseId)).toEqual(['api-002']);
+  });
+
+  it('находка исследования попадает в запись прогона, а не теряется за «0 из 0»', () => {
+    const explore = view({ mode: 'explore' });
+    const snapshot = fingerprintCases(readGroups(root), explore);
+    upsertCase(root, 'api', { title: 'Пустое имя', steps: ['x'] }, startedAt);
+    write('api-004', { status: 'failed', note: 'пропустило пустое', lastRunAt: finishedAt });
+
+    expect(recordsResults('explore')).toBe(true);
+    expect(recordsResults('generate')).toBe(false);
+    expect(stampRunResults(root, explore, snapshot, finishedAt)).toBe(1);
+    expect(collectResults(root, explore).map((r) => [r.caseId, r.status])).toEqual([
+      ['api-004', 'failed'],
+    ]);
   });
 });

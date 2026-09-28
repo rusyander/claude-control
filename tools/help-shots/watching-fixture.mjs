@@ -12,8 +12,10 @@
  * пишутся НАСТОЯЩИЕ файлы во временный каталог, а панель поднимается поверх.
  *
  * Настоящий `~/.claude` не читается и не трогается: `CLAUDE_CONFIG_DIR`
- * указывает сюда, `~/.claude.json` берётся РЯДОМ с каталогом (поэтому корень
- * вложен в свою папку), а чужой CLI уводится в свой `CODEX_HOME`.
+ * указывает сюда, а `.claude.json` при ЯВНОМ каталоге лежит ВНУТРИ него — так
+ * его читают CLI и панель (`resolveMcpConfig`). Файл рядом с каталогом панель
+ * не видела: кадры показывали «MCP-серверы 0» и пустую статистику скиллов.
+ * Чужой CLI уводится в свой `CODEX_HOME`.
  *
  * ИМЕНА И ПУТИ ВЫМЫШЛЕНЫ и подобраны без доменов первого уровня и почтовых
  * адресов: `tools/qa/check-help-shots.mjs` считает такой текст на кадре утечкой
@@ -159,6 +161,12 @@ const MCP_CONFIG = {
     'legacy-import': { usageCount: 4 },
   },
 };
+
+/** Та же регистрация до подключения моста трекера — копия для ленты истории. */
+const MCP_CONFIG_PREVIOUS = (() => {
+  const { 'tracker-bridge': _added, ...servers } = MCP_CONFIG.mcpServers;
+  return { ...MCP_CONFIG, mcpServers: servers };
+})();
 
 /** Скиллы: два включённых и один выключенный — у обзора сходятся «всего» и «включено». */
 const SKILLS = [
@@ -339,23 +347,23 @@ function writeBackups(root) {
     '2026-09-09T11:27:15.050Z',
     `${JSON.stringify(previousSettings(root), null, 2)}\n`,
   );
-  put('.claude.json', '2026-09-07T16:03:52.700Z', `${JSON.stringify(MCP_CONFIG, null, 2)}\n`);
+  // Копия — редакция до подключения моста трекера: у записи ленты есть дифф
+  // против текущего файла, а не «первая известная версия».
+  put(
+    '.claude.json',
+    '2026-09-07T16:03:52.700Z',
+    `${JSON.stringify(MCP_CONFIG_PREVIOUS, null, 2)}\n`,
+  );
 }
 
-/**
- * Собрать каталог конфигурации целиком и вернуть пути.
- *
- * Корень вложен в свою папку (`<tmp>/.claude`) намеренно: регистрация
- * MCP-серверов лежит РЯДОМ с каталогом (`../.claude.json`), и без вложенности
- * она уехала бы во временный каталог системы, к чужим файлам.
- */
+/** Собрать каталог конфигурации целиком (`<home>/.claude`) и вернуть пути. */
 export function buildFixture(home) {
   const root = join(home, '.claude');
   mkdirSync(join(root, 'agentdeck'), { recursive: true });
 
   writeFileSync(join(root, 'CLAUDE.md'), CLAUDE_MD, 'utf8');
   healHook(root);
-  writeFileSync(join(home, '.claude.json'), `${JSON.stringify(MCP_CONFIG, null, 2)}\n`, 'utf8');
+  writeFileSync(join(root, '.claude.json'), `${JSON.stringify(MCP_CONFIG, null, 2)}\n`, 'utf8');
   writeFileSync(
     join(root, '.mcp-secrets.env'),
     `# Ключ витрины: выдаётся в админке магазина\nSHOP_API_TOKEN=${DEMO_VALUE}\n`,

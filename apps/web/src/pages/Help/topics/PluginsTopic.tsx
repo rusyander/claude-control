@@ -1,6 +1,15 @@
 import { useTranslation } from 'react-i18next';
 import { FlowDiagram } from '@shared/ui/diagram';
-import { HelpSection, StorageCard, FieldTable, StepList, Callout, OptionCards } from '../ui';
+import { PLUGINS_TABS } from '@pages/Plugins/model/tabs';
+import {
+  HelpSection,
+  StorageCard,
+  FieldTable,
+  StepList,
+  Callout,
+  OptionCards,
+  PageTabsSection,
+} from '../ui';
 import { PluginsGuideSections } from './PluginsGuideSections';
 import { PluginsLimitsSections } from './PluginsLimitsSections';
 
@@ -33,6 +42,8 @@ export function PluginsTopic() {
       <Callout tone="info" title={tr('guideTitle')}>
         {tr('guideText')}
       </Callout>
+
+      <PageTabsSection page="plugins" tabs={PLUGINS_TABS} />
 
       <HelpSection title={t('help.common.whyTitle')}>
         <OptionCards

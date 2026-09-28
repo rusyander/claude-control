@@ -24,11 +24,13 @@ export async function shootPluginsInstall(browser, web, scenario) {
     // Выключенный плагин показан выключенным, а пропавший каталог назван
     // пометкой: CLI перечисляет такой плагин как установленный, и без пометки
     // он выглядел бы рабочим.
-    await openSection(page, web, '/plugins', 2500);
+    await openSection(page, web, '/plugins?tab=installed', 2500);
     await scenario.shot(page, '01-installed');
 
     // ── 02. Каталог маркетплейсов ────────────────────────────────────────────
     // Загружается по запросу: за ним CLI обновляет репозитории и ходит в сеть.
+    // Каталог и установка по имени живут на своей вкладке.
+    await openSection(page, web, '/plugins?tab=catalog', 1500);
     await page
       .getByRole('button', { name: /^(Показать каталог|Show catalogue)$/ })
       .first()
@@ -71,6 +73,7 @@ export async function shootPluginsInstall(browser, web, scenario) {
     // ── 04. Отключение источника ─────────────────────────────────────────────
     // Вместе с маркетплейсом Claude Code убирает и его плагины — диалог
     // перечисляет поимённо, что пропадёт.
+    await openSection(page, web, '/plugins?tab=marketplaces', 1500);
     await page
       .getByRole('button', { name: /^(Удалить|Delete): team-tools$/ })
       .first()
@@ -95,12 +98,12 @@ export async function shootPluginsOwn(browser, web, scenario) {
     // ── 01. CLI не ответил ───────────────────────────────────────────────────
     // Причина названа строкой. Молчаливый ноль читался бы как «плагинов нет» и
     // отправил бы человека искать пропавшие команды.
-    await openSection(page, web, '/plugins', 2500);
+    await openSection(page, web, '/plugins?tab=installed', 2500);
     await scenario.shot(page, '01-no-cli');
 
     await plugins(page);
     await folderPicker(page, PLUGINS_DIR);
-    await openSection(page, web, '/plugins', 2500);
+    await openSection(page, web, '/plugins?tab=scaffold', 2500);
 
     // ── 02. Каркас плагина ───────────────────────────────────────────────────
     // Манифест и README пишутся всегда, остальные части — по выбору: пустые

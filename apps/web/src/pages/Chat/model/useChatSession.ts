@@ -12,7 +12,7 @@ import {
   tabContaining,
   HOME_TAB_ID,
 } from '@shared/lib/workspace';
-import { useAgentRun } from '@shared/lib/agent-runs';
+import { useActiveRuns, useAgentRun } from '@shared/lib/agent-runs';
 import { migrateDraft } from '@shared/lib/draft';
 import { useRefreshChat } from '@entities/Chat';
 import type { ProjectInfo } from '@entities/Project';
@@ -20,7 +20,7 @@ import { useClearRunnerAutostart } from '@entities/ProjectRunner';
 import { useForgetProjectCodeView } from '@entities/ProjectFile';
 import { draftKeyFor } from '../lib/draftKey';
 import { visibleChats } from '../lib/visibleChats';
-import { childOfRun, runViewChat } from '../lib/runViewChat';
+import { childOfRun, runForUrl, runViewChat } from '../lib/runViewChat';
 
 export interface ChatSessionInput {
   /** Все разговоры из истории Claude Code — по ним находится «повзрослевший» чат. */
@@ -341,6 +341,24 @@ export function useChatSession({ chats }: ChatSessionInput): ChatSession {
       showRun(activeRun.id);
     }
   };
+
+  // Адрес назвал разговор, чей первый ход ещё идёт (его начал агент панели):
+  // показываем живой прогон, как по клику в пульте агентов, — один раз на id.
+  // Конец хода доведёт вид до настоящего разговора эффектом «взросления».
+  const activeRuns = useActiveRuns();
+  const urlRunRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (!urlId || urlRunRef.current === urlId) return;
+    const run = runForUrl(urlId, chats, activeRuns);
+    if (!run) return;
+    urlRunRef.current = urlId;
+    viewRun({
+      id: run.id,
+      sessionId: run.sessionId,
+      ...(run.projectPath ? { projectPath: run.projectPath } : {}),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlId, chats, activeRuns]);
 
   // Папка, выбранная через файловую систему: открываем её как проект, даже если
   // Claude там ещё не работал (в истории её нет — таб всё равно заведётся).

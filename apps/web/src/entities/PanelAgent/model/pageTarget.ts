@@ -8,6 +8,7 @@ import type { PanelPageTarget } from '@agentdeck/contracts/panel-agent';
  */
 const FOCUS_AS_SEARCH: Record<string, 'id' | 'tab'> = {
   '/chat': 'id',
+  '/projects': 'id',
   '/tests': 'tab',
   '/settings': 'tab',
 };
@@ -73,11 +74,38 @@ export function integrationSecretAnchor(id: string): string {
 }
 
 /**
+ * Якорь карточки интеграции целиком — куда ведут сохранение, проверка и
+ * «забыть». Имя повторяет `integrationPage` реестра сервера (`actions-app.ts`).
+ * Не секрет: фокус не ставится в поле ключа.
+ */
+export const INTEGRATION_CARD_PREFIX = 'integration:';
+
+export function integrationAnchor(id: string): string {
+  return `${INTEGRATION_CARD_PREFIX}${id}`;
+}
+
+/**
+ * Якорь строки правила защиты данных. Имя повторяет `page` действия
+ * `save_dlp_rules` реестра сервера (`actions-app.ts`): /dlp подсвечивает первое
+ * новое или изменённое правило.
+ */
+export const DLP_RULE_PREFIX = 'dlp-rule:';
+
+export function dlpRuleAnchor(id: string): string {
+  return `${DLP_RULE_PREFIX}${id}`;
+}
+
+/**
  * Вкладки настроек, где живут поля токенов. Имена — из `pages/Settings/model/tabs.ts`;
  * сущность страницу не импортирует, поэтому строки повторены здесь.
  */
 const SETTINGS_ENDPOINTS_TAB = 'models';
 const SETTINGS_INTEGRATIONS_TAB = 'integrations';
+/** Вкладка правил /dlp — из `pages/Dlp/model/tabs.ts`. */
+const DLP_RULES_TAB = 'rules';
+/** Вкладка-отбор «Все» правил и скриптов (`pages/{Rules,Scripts}/model/tabs.ts`). */
+const LIST_ALL_TAB = 'all';
+const LIST_ALL_TAB_PAGES = new Set(['/rules', '/scripts']);
 
 /** Фокус чата «проект»: агент создал проект и просил открыть его чат. */
 export const CHAT_PROJECT_PREFIX = 'project:';
@@ -105,12 +133,36 @@ export interface PageNavigation {
    * передать: проект чата — вкладка рабочего места, а не параметр запроса.
    */
   project?: string;
+  /**
+   * Режим композера, в котором открыть чат (`/chat?mode=deck`). Адресом страница
+   * его не читает: режим — состояние поля ввода, а не ссылка, и после F5 он не
+   * должен навязываться снова.
+   */
+  composerMode?: ChatComposerMode;
+}
+
+/** Режимы композера, которые агент вправе заказать странице чата. */
+export type ChatComposerMode = 'deck' | 'image';
+
+function composerModeOf(value: string | undefined): ChatComposerMode | undefined {
+  return value === 'deck' || value === 'image' ? value : undefined;
+}
+
+function queryOf(search: Record<string, string>): string {
+  const query = new URLSearchParams(search).toString();
+  return query ? `?${query}` : '';
 }
 
 /** Цель агента → переход роутера: путь, запрос и оставшийся якорь. */
 export function pageNavigation(page: PanelPageTarget): PageNavigation {
   const [path = '/', query = ''] = page.route.split('?');
   const search = Object.fromEntries(new URLSearchParams(query));
+  if (path === '/chat' && 'mode' in search) {
+    const composerMode = composerModeOf(search.mode);
+    delete search.mode;
+    const rest = pageNavigation({ ...page, route: path + queryOf(search) });
+    return composerMode ? { ...rest, composerMode } : rest;
+  }
   // Поля ключа нет в разметке, пока мастер закрыт: адрес велит странице открыть
   // мастер этого контура на шаге ключа, а якорь потом доводит фокус до поля.
   if (path === '/platform' && page.focus?.startsWith(CONTOUR_KEY_PREFIX)) {
@@ -131,13 +183,36 @@ export function pageNavigation(page: PanelPageTarget): PageNavigation {
     const id = page.focus.slice(ENDPOINT_TOKEN_PREFIX.length);
     return { to: path, search: { ...search, id, tab: SETTINGS_ENDPOINTS_TAB }, anchor: page.focus };
   }
-  if (path === '/settings' && page.focus?.startsWith(INTEGRATION_SECRET_PREFIX)) {
+  if (
+    path === '/settings' &&
+    (page.focus?.startsWith(INTEGRATION_SECRET_PREFIX) ||
+      page.focus?.startsWith(INTEGRATION_CARD_PREFIX))
+  ) {
     return { to: path, search: { ...search, tab: SETTINGS_INTEGRATIONS_TAB }, anchor: page.focus };
   }
   // Созданный проект открывается вкладкой чата: адрес без id — черновик нового
   // разговора в этом проекте, а не `?id=project:…`, которого нет ни в одном списке.
   if (path === '/chat' && page.focus?.startsWith(CHAT_PROJECT_PREFIX)) {
     return { to: path, search, project: page.focus.slice(CHAT_PROJECT_PREFIX.length) };
+  }
+  // Список прав виртуальный: строки вне экрана нет в DOM, и якорь не нашёлся бы.
+  // `?show=` велит странице снять фильтры и докрутить до строки, якорь — подсветить.
+  if (path === '/permissions' && page.focus) {
+    return { to: path, search: { ...search, show: page.focus }, anchor: page.focus };
+  }
+  // Вкладка раздела помнится у зрителя, и строка, стоящая на другой вкладке,
+  // не нашлась бы — подсветка молча не срабатывала. Правила DLP живут на своей
+  // вкладке; правило и скрипт есть на «Все» при любом их состоянии.
+  if (path === '/dlp' && page.focus?.startsWith(DLP_RULE_PREFIX)) {
+    return { to: path, search: { ...search, tab: DLP_RULES_TAB }, anchor: page.focus };
+  }
+  if (LIST_ALL_TAB_PAGES.has(path) && page.focus) {
+    return { to: path, search: { ...search, tab: LIST_ALL_TAB }, anchor: page.focus };
+  }
+  // Вкладку группы (глобальные или проектные) знает только страница — по
+  // области группы; `?show=` просит её выбрать, якорь подсвечивает карточку.
+  if (path === '/groups' && page.focus) {
+    return { to: path, search: { ...search, show: page.focus }, anchor: page.focus };
   }
   const key = FOCUS_AS_SEARCH[path];
   if (page.focus && key) return { to: path, search: { ...search, [key]: page.focus } };

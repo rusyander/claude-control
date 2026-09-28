@@ -6,6 +6,7 @@ import type {
   SplitPlanCancelled,
 } from '@agentdeck/contracts/chat-handoff';
 import type { ServerContext } from '../../context.ts';
+import type { StopOutcome } from '../../domains/chat/ChatRunRegistry.ts';
 import type { SplitConveyor } from '../../domains/chat/split-conveyor.ts';
 import type { PendingAsks } from '../../domains/chat/pending-asks.ts';
 import { acceptSplitGroup } from '../../domains/chat/split-acceptance.ts';
@@ -57,13 +58,25 @@ export function registerSplitControlRoutes(
   const refuse = (reply: FastifyReply, error: unknown) =>
     reply.code(409).send({ message: (error as Error).message, ...codeOf(error) });
 
-  /** Остановить прогоны разговора группы — у Claude и у чужого CLI. */
-  const stopConversation = (chatId: string): boolean => {
-    let stopped = false;
-    for (const key of [chatId, ...conversationKeys(ctx.store.getChatLinks(), chatId)]) {
-      stopped = stopChatKey(deps, key) || stopped;
-    }
-    return stopped;
+  /**
+   * Остановить прогоны разговора группы — у Claude и у чужого CLI. Разговор не
+   * остановлен, пока жив хоть один его процесс: неподтверждённый исход по любому
+   * ключу весит больше «остановлено» по другому (F-145).
+   */
+  const stopConversation = (chatId: string): StopOutcome => {
+    const outcomes = [chatId, ...conversationKeys(ctx.store.getChatLinks(), chatId)].map((key) =>
+      stopChatKey(deps, key),
+    );
+    if (outcomes.includes('unconfirmed')) return 'unconfirmed';
+    return outcomes.includes('stopped') ? 'stopped' : 'absent';
+  };
+  /** Исходы остановки разговоров — числами для ответа человеку. */
+  const stopEach = (chatIds: readonly string[]): { stopped: number; unconfirmed: number } => {
+    const outcomes = chatIds.map((chatId) => stopConversation(chatId));
+    return {
+      stopped: outcomes.filter((outcome) => outcome === 'stopped').length,
+      unconfirmed: outcomes.filter((outcome) => outcome === 'unconfirmed').length,
+    };
   };
 
   app.post<{ Params: { parent: string }; Body: { index?: number } }>(
@@ -73,10 +86,7 @@ export function registerSplitControlRoutes(
       if (!found) return reply;
       try {
         const { chatIds } = found.conveyor.pause(request.params.parent, found.index);
-        const body: SplitGroupPaused = {
-          index: found.index,
-          stopped: chatIds.filter((chatId) => stopConversation(chatId)).length,
-        };
+        const body: SplitGroupPaused = { index: found.index, ...stopEach(chatIds) };
         return body;
       } catch (error) {
         return refuse(reply, error);
@@ -180,11 +190,7 @@ export function registerSplitControlRoutes(
     }
     try {
       const { chatIds, cancelled, paths } = deps.conveyor.cancel(request.params.parent);
-      const body: SplitPlanCancelled = {
-        stopped: chatIds.filter((chatId) => stopConversation(chatId)).length,
-        cancelled,
-        chatIds,
-      };
+      const body: SplitPlanCancelled = { ...stopEach(chatIds), cancelled, chatIds };
       // Процессы CLI, ждущие следующего хода в копиях отменённого плана, держат
       // копии своим cwd, и «Убрать копию» спотыкалась о них (F4c). Занятые ходом
       // или фоном остаются: их прогон гасит остановка выше или человек.
@@ -201,14 +207,17 @@ export function registerSplitControlRoutes(
   });
 }
 
-/** Остановить прогон по одному ключу: чужой CLI — своим хранилищем, Claude — реестром. */
+/**
+ * Остановить прогон по одному ключу: чужой CLI — своим хранилищем, Claude —
+ * реестром. Исход, а не «да/нет»: `unconfirmed` — процесс жив и не снят (F-145).
+ */
 export function stopChatKey(
   deps: Pick<SplitLaunchDeps, 'runs' | 'providerChats'>,
   key: string,
-): boolean {
+): StopOutcome {
   const foreign = parseForeignChatKey(key);
-  if (foreign) return deps.providerChats.stop(foreign.chatId);
-  return deps.runs.isRunning(key) ? deps.runs.stop(key) : false;
+  if (foreign) return deps.providerChats.stop(foreign.chatId) ? 'stopped' : 'absent';
+  return deps.runs.isRunning(key) ? deps.runs.stop(key) : 'absent';
 }
 
 /**

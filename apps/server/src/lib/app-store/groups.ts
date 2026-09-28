@@ -1,4 +1,5 @@
 import type { EntityKind, Group } from '@agentdeck/contracts';
+import { inClaudeGlobals } from '@agentdeck/contracts/group-sources';
 import type { AppState } from './app-store.types.ts';
 
 export function listGroups(state: AppState): Group[] {
@@ -16,12 +17,19 @@ export function groupIdsFor(
   id: string,
   legacyId?: string,
 ): string[] {
+  // Проектная группа и проектный участник держат файлы проекта, а не общие:
+  // «погашено группой» у глобальной сущности от них быть не может. Копия для
+  // другой CLI — тоже: её участники — файлы той CLI.
   return state.groups
-    .filter((group) =>
-      group.members.some(
-        (member) =>
-          member.kind === kind && (member.id === id || (legacyId && member.id === legacyId)),
-      ),
+    .filter(
+      (group) =>
+        inClaudeGlobals(group.scope) &&
+        group.members.some(
+          (member) =>
+            (!member.scope || inClaudeGlobals(member.scope)) &&
+            member.kind === kind &&
+            (member.id === id || (legacyId && member.id === legacyId)),
+        ),
     )
     .map((group) => group.id);
 }

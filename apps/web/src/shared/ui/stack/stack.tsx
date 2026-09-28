@@ -25,6 +25,7 @@ export function Stack({
   as,
   className,
   children,
+  style: ownStyle,
   ...rest
 }: StackProps) {
   const Component = as ?? 'div';
@@ -49,6 +50,9 @@ export function Stack({
     minWidth: toCss(minWidth),
     flex,
     flexShrink,
+    // Свой `style` вызывающего дополняет раскладку, а не заменяет её: раньше он
+    // приходил в `rest` после неё и молча снимал `gap`/`padding` из пропов.
+    ...ownStyle,
   };
 
   return (

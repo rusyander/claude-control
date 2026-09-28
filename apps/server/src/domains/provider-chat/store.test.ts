@@ -3,6 +3,7 @@ import { appendFileSync, mkdtempSync, readFileSync, rmSync, existsSync } from 'n
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
+  agentImageDirsInChats,
   appendMessage,
   createChat,
   deleteChat,
@@ -166,6 +167,23 @@ describe('provider-chat store', () => {
       .split('\n')
       .filter(Boolean);
     expect(lines).toHaveLength(3);
+  });
+
+  // Ревью 28.09 (F-267): каталог картинки, на который ссылается разговор, не
+  // удаляется — путь в файле экранирован по-JSON, и Windows-путь тоже находится.
+  it('находит каталоги картинок, упомянутые разговорами, и только спрошенные', () => {
+    createChat(dir, 'codex', { id: 'win' });
+    appendMessage(dir, 'codex', 'win', {
+      role: 'user',
+      content: ['C:', 'app', 'agent-images', 'dir-a', '1.png'].join('\\'),
+    });
+    createChat(dir, 'qwen', { id: 'posix' });
+    appendMessage(dir, 'qwen', 'posix', { role: 'user', content: '/app/agent-images/dir-b/1.png' });
+    expect([...agentImageDirsInChats(dir, ['dir-a', 'dir-b', 'dir-c'])].sort()).toEqual([
+      'dir-a',
+      'dir-b',
+    ]);
+    expect([...agentImageDirsInChats(dir, ['dir-c'])]).toEqual([]);
   });
 
   it('обрезает длинное название до читаемой длины', () => {

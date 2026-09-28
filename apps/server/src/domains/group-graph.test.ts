@@ -83,6 +83,26 @@ describe('collectLeafMembers', () => {
   });
 });
 
+// Ревью 28.09 (F-186): `byId` по голому id — проектная группа с тем же id,
+// что у вложенной общей, заслоняла её, и листья общей подгруппы терялись.
+describe('collectLeafMembers: тёзка по id в проекте', () => {
+  it('общая подгруппа разворачивается, даже если проектная носит тот же id', () => {
+    const global = group('x', [{ kind: 'skill', id: 's1' }]);
+    const project = {
+      ...group('x', [{ kind: 'skill', id: 'p1' }]),
+      scope: {
+        kind: 'project' as const,
+        path: 'C:/p',
+        provider: 'claude' as const,
+      },
+    };
+    const root: GroupMember[] = [{ kind: 'group', id: 'x' }];
+    expect(collectLeafMembers([global, project as Group], root)).toEqual([
+      { kind: 'skill', id: 's1' },
+    ]);
+  });
+});
+
 describe('wouldCreateCycle', () => {
   it('прямая ссылка на себя — цикл', () => {
     expect(wouldCreateCycle([], 'A', [{ kind: 'group', id: 'A' }])).toBe(true);

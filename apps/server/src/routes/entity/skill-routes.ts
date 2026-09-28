@@ -9,7 +9,7 @@ import {
   SkillExistsError,
 } from '../../domains/skills.ts';
 import { readCommands } from '../../domains/commands.ts';
-import { done } from '../write-result.ts';
+import { live } from '../write-result.ts';
 import type { ClaudePaths } from './shared.ts';
 import { codeOf } from '../../lib/server-text.ts';
 import { attachTextCodes } from '../../lib/server-texts.ts';
@@ -19,6 +19,8 @@ import { attachTextCodes } from '../../lib/server-texts.ts';
  *
  * Файлы внутри скилла живут на общих ресурсных маршрутах
  * (`/api/resources/skill/:id/file`) — там же, где файлы остальных видов.
+ * Ответы на запись — live(): Claude Code подхватывает skills/ без перезапуска.
+ *
  * Отдельного набора для скиллов больше нет: две почти одинаковые реализации
  * расходились, и правка попадала не туда, куда ходит интерфейс.
  */
@@ -38,7 +40,7 @@ export function registerSkillRoutes(app: FastifyInstance, ctx: ServerContext): v
 
   app.post<{ Body: SkillDraft }>('/api/skills', (request, reply) => {
     try {
-      return done(saveSkill(paths().skills, null, request.body, ctx.backupDir));
+      return live(saveSkill(paths().skills, null, request.body, ctx.backupDir));
     } catch (error) {
       // Имя занято выключенным скиллом: молча писать поверх — потеря чужого
       // скилла, поэтому отвечаем конфликтом и оставляем решение человеку.
@@ -52,7 +54,7 @@ export function registerSkillRoutes(app: FastifyInstance, ctx: ServerContext): v
   });
 
   app.put<{ Params: { id: string }; Body: SkillDraft }>('/api/skills/:id', (request) =>
-    done(saveSkill(paths().skills, request.params.id, request.body, ctx.backupDir)),
+    live(saveSkill(paths().skills, request.params.id, request.body, ctx.backupDir)),
   );
 
   app.delete<{ Params: { id: string } }>('/api/skills/:id', (request) => {
@@ -61,7 +63,7 @@ export function registerSkillRoutes(app: FastifyInstance, ctx: ServerContext): v
     // ключуются именем папки, и новый скилл с тем же именем наследовал бы их.
     ctx.store.removeEntity('skill', request.params.id);
 
-    return done(backupPath);
+    return live(backupPath);
   });
 
   // Переименование скилла: имя папки — это идентификатор, поэтому меняется папка,
@@ -74,7 +76,7 @@ export function registerSkillRoutes(app: FastifyInstance, ctx: ServerContext): v
       const newId = request.body?.newId ?? request.body?.newName ?? '';
 
       try {
-        return done(
+        return live(
           renameSkill(paths().skills, request.params.id, newId, ctx.store, ctx.backupDir),
         );
       } catch (error) {

@@ -49,9 +49,9 @@ describe('абзац о блоке тикета в задании группы',
       expect(prompt).toContain('title:');
       expect(prompt).toContain('where:');
       expect(prompt).toContain('why:');
-      expect(prompt).toContain('тикет в трекере не заводи');
+      expect(prompt).toContain('do not file a tracker ticket');
       expect(prompt).toContain(`<${SPLIT_HUMAN_TAG}>`);
-      expect(prompt).toContain('«Сделать человеку»');
+      expect(prompt).toContain('"For you to do"');
       // Последний абзац: задачи и доставка — выше, блоки панели их не разрывают.
       expect(prompt.trimEnd().endsWith(`</${SPLIT_HUMAN_TAG}>`)).toBe(true);
     }

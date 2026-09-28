@@ -22,3 +22,9 @@ export interface HealthResult {
   /** Когда проверка проводилась (ISO); нет у отказа, собранного на клиенте. */
   checkedAt?: string;
 }
+
+/** Ответ кнопки «Авторизоваться» словами у карточки; тон — цвет подписи. */
+export interface AuthNotice {
+  tone: 'success' | 'subtle' | 'danger';
+  text: string;
+}

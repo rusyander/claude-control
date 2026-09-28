@@ -78,7 +78,8 @@ export const rulesEn: typeof rulesRu = {
       fEmpty: 'The empty section explains the format',
       fEmptyText:
         'The “No rules yet” placeholder names what counts as a rule right away: a ' +
-        'section headed “## ПРАВИЛО: …”. The sidebar shows 0 next to “Rules”.',
+        'section headed “## ПРАВИЛО: …”. The sidebar shows 0 next to “Rules”. ' +
+        'There are no All / On / Off tabs yet: there is nothing to split.',
       fForm: 'Simple mode: title and text',
       fFormText:
         'The “Add rule” button opens the form. Title and rule text on the left, the ' +
@@ -92,8 +93,9 @@ export const rulesEn: typeof rulesRu = {
       fAssistantText:
         'Describe the task in plain words — for example “always answer in Russian, ' +
         'including choice options”. The reply shows which fields it changed: the ' +
-        'title and body badges. The file is still untouched: saving is a separate ' +
-        'button.',
+        'title and body badges; whatever the form did not accept (a wrong kind of ' +
+        'value, a field it does not have) is named on the line below. The file is ' +
+        'still untouched: saving is a separate button.',
       fCard: 'The rule in the list, and a copy of the file',
       fCardText:
         'After saving, the section counter becomes 1 and the toast names the backup ' +
@@ -126,15 +128,21 @@ export const rulesEn: typeof rulesRu = {
         'sidebar counter still reads 4.',
       lOff: 'Switching off is not deleting',
       lOffText:
-        'The toggle is off and the rule is marked “Switched off”. It did not vanish ' +
+        'The toggle is off and the rule is marked “Disabled”. It did not vanish ' +
         'from the list or the counter: the text is intact, Claude just no longer ' +
-        'reads it.',
+        'reads it — the rule is removed from CLAUDE.md entirely.',
+      lTabOff: 'The switched-off ones — one tab away',
+      lTabOffText:
+        'The Off tab keeps only the rules that are not in CLAUDE.md right now: the agent ' +
+        'does not see them, and the panel keeps their text. The tab counters add up to All, and search looks inside the open tab. ' +
+        'A rule switched on here does not leave the list at once — it goes when you ' +
+        'change the tab.',
       lFile: 'What happened to the file',
       lFileText:
-        'The same moment on the CLAUDE.md page: the rule text moved under “### ' +
-        'Коммиты только по просьбе” into the service section “## Отключённые правила ' +
-        '(AgentDeck)” at the end of the file. The panel rebuilds that section on ' +
-        'every write.',
+        'The same moment on the CLAUDE.md page: the section “Коммиты только по просьбе” ' +
+        'is not in the file at all. Claude Code reads the whole file, and switched-off text ' +
+        'would cost tokens on every turn, so the panel removes it and keeps the rule text ' +
+        'and its place itself. The toggle puts the rule back exactly where it stood.',
       lZero: '“Zero rules” in a file that is not empty',
       lZeroText:
         'If the file is marked up with ordinary “## ” sections there will be no ' +
@@ -178,9 +186,9 @@ export const rulesEn: typeof rulesRu = {
     storageReaderValue: 'Claude Code at session start, in full',
     storageDisabled: 'Switched off',
     storageDisabledValue:
-      'a “### Title” inside the “## Отключённые правила (AgentDeck)” section at the end of the ' +
-      'file; a file switched off before the rename carries the heading with the former name — it ' +
-      'is still read, and there is no need to rewrite it by hand',
+      'not in CLAUDE.md: the text and place of each one (neighbours and position) live in the ' +
+      'panel’s state.json. A “## Отключённые правила (…)” section left by earlier panel versions ' +
+      'is still read and leaves the file on the first write',
     storageMarks: 'The panel’s own marks',
     storageMarksValue:
       'what is switched off and which groups contain what — in the panel’s state.json; Claude Code never reads that file',
@@ -211,7 +219,7 @@ export const rulesEn: typeof rulesRu = {
       'The rule title. Becomes the ## heading in the file, and the identifier for links like /rules?id=… is derived from it',
     fieldBody: 'The rule text in markdown: what to do, what not to do, how to verify the result.',
     fieldEnabled:
-      'Whether the rule is on. A switched-off rule is not deleted but moved to the end of the file.',
+      'Whether the rule is on. A switched-off rule is removed from the file but not lost: switching it on puts it back where it stood.',
     fieldGroups:
       'Groups the rule belongs to. Through a group it can be switched on and off ' +
       'together with other settings.',
@@ -231,19 +239,19 @@ export const rulesEn: typeof rulesRu = {
       '“## ПРАВИЛО: …” — the word in any case, the colon required. “## Title” and “### ПРАВИЛО: …” are ordinary text',
     limitDuplicate: 'Identical titles',
     limitDuplicateValue:
-      'a second rule with the same title gets the suffix “-2”, a third “-3”: the identifier is derived from the title',
+      'a title another rule already has (on or off) is refused on create and on rename, and the refusal names the taken title; case and extra spaces do not count. Namesakes already in the file are read as before: the second gets the suffix “-2” in its identifier',
     limitBackups: 'Copies of the file',
     limitBackupsValue:
       'while “Back up before writing” is on in Settings (it is on by default) — a copy before every write; ten are kept, and the depth is changed there too (1 to 100). With the toggle off nothing is copied at all',
     limitSandbox: 'Sandbox',
     limitSandboxValue:
-      'a separate config directory and its own working folder; the real settings are read-only, and everything created is removed no later than two hours of idling',
+      'a separate config directory and its own working folder; only the attached rules reach the conversation — your personal ~/.claude/CLAUDE.md and rule files in folders above the working one are not read; the real settings are read-only, and everything created is removed no later than two hours of idling',
 
     undoTitle: 'How to undo',
     undoCaption: 'Action by action: what exactly comes back, and where to go for it.',
     undoToggle: 'Switched off the wrong rule',
     undoToggleText:
-      'Put the toggle back — the text sat in the service section of the file all along and returns to its place.',
+      'Put the toggle back — the panel kept the text all along, and the rule returns to the file exactly where it stood.',
     undoEdit: 'The form is not saved yet',
     undoEditText:
       'Close the window with “Cancel”: until the save button is pressed CLAUDE.md does not change.',
@@ -267,10 +275,11 @@ export const rulesEn: typeof rulesRu = {
       'The identifier is derived from the title. After a rename a link like ' +
       '/rules?id=old-name stops opening the rule; the marks for switching off and ' +
       'group membership are carried over by the panel itself.',
-    noteSectionTitle: 'The service section at the end of the file is not junk',
+    noteSectionTitle: 'A switched-off rule lives only in the panel',
     noteSectionText:
-      'It holds the text of switched-off rules. Erase it by hand on the CLAUDE.md ' +
-      'page and the text is gone — the toggle can no longer bring it back.',
+      'It is not in CLAUDE.md — the panel’s state.json in its data folder holds it. ' +
+      'Delete that folder and switched-off rules are gone; the toggle can no longer bring ' +
+      'them back. A settings export carries them along.',
     noteDeleteTitle: 'Deleting cuts the section out of the file',
     noteDeleteText:
       'A copy of the file stays in agentdeck/backups, but the rule is gone from ' +
@@ -319,9 +328,11 @@ export const rulesEn: typeof rulesRu = {
     living: {
       '01-list': 'Four rules: sandbox, edit, delete and a toggle on each',
       '02-search': 'The search for “миграции” found nothing — and the page says exactly that',
-      '03-off': 'The toggle is off: marked “Switched off”, still in the list and in the counter',
+      '03-off': 'The toggle is off: marked “Disabled”, still in the list and in the counter',
       '04-file-disabled':
-        'The same moment in the file: the text moved under “## Отключённые правила (AgentDeck)”',
+        'The same moment in the file: the section “Коммиты только по просьбе” is gone from CLAUDE.md',
+      '06-tab-off':
+        'The Off 1 tab: the list holds one rule, “Коммиты только по просьбе”; beside it All 4, On 3',
       '05-zero':
         '“0 rules” in a non-empty file: 3 ordinary sections and a sample of the right heading',
     },

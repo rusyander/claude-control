@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { Project, ProjectDraft } from '@agentdeck/contracts';
+import type { Project, ProjectAdded, ProjectDraft } from '@agentdeck/contracts';
 import { apiClient } from '@shared/api/client';
 import { queryKeys } from '@shared/api/query-keys';
 
@@ -20,12 +20,15 @@ export function useProjectRegistry() {
   return useQuery({ queryKey: queryKeys.projects, queryFn: fetchProjectRegistry });
 }
 
-/** Добавить проект в реестр по пути к его каталогу. */
+/**
+ * Добавить проект в реестр по пути к его каталогу. Ответ несёт и итог папки e2e
+ * (`ProjectAdded.e2e`): завела её панель, нашлась своя или не вышло.
+ */
 export function useAddProject() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (draft: ProjectDraft) => {
-      const { data } = await apiClient.post<Project>('/projects', draft);
+      const { data } = await apiClient.post<ProjectAdded>('/projects', draft);
       return data;
     },
     onSuccess: () => {

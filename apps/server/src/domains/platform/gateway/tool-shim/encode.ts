@@ -58,9 +58,9 @@ export function encodeToolResult(
   names: ReadonlyMap<string, string>,
 ): { text: string; dropped: boolean } {
   const id = typeof block.tool_use_id === 'string' ? block.tool_use_id : '';
-  const name = names.get(id) ?? (typeof block.name === 'string' ? block.name : id || 'инструмент');
+  const name = names.get(id) ?? (typeof block.name === 'string' ? block.name : id || 'tool');
   const body = resultText(block.content);
-  const failed = block.is_error === true ? 'ошибка: ' : '';
+  const failed = block.is_error === true ? 'error: ' : '';
   return {
     text: `${resultOpen(name)}\n${failed}${body.text}\n${RESULT_CLOSE}`,
     dropped: body.dropped,
@@ -199,10 +199,7 @@ export function shimOpenAiRequest(
     if (message.role === 'tool') {
       const id = typeof message.tool_call_id === 'string' ? message.tool_call_id : '';
       const name =
-        (typeof message.name === 'string' ? message.name : '') ||
-        names.get(id) ||
-        id ||
-        'инструмент';
+        (typeof message.name === 'string' ? message.name : '') || names.get(id) || id || 'tool';
       const result = resultText(message.content);
       dropped = dropped || result.dropped;
       messages.push({

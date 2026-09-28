@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type {
@@ -342,6 +342,37 @@ describe('project-tests-routes: рабочее место', () => {
     expect(history.runs[0]?.summary.failed).toBe(1);
   });
 
+  it('история без полного вида: сирота прошлой жизни панели не числится идущей', async () => {
+    // Агент панели спрашивает историю (`last_run`, `list_test_runs`), не открывая
+    // раздел: живой прогон 26.09 — после перезапуска генерация висела «идёт», пока
+    // кто-нибудь не открыл страницу.
+    // Свой каталог: общий проект раздел уже читал в beforeEach, а починка идёт раз на
+    // проект за жизнь процесса — ровно как после настоящего перезапуска.
+    const fresh = mkdtempSync(join(tmpdir(), 'cc-tests-orphan-'));
+    const runs = join(fresh, '.agent', 'tests', 'runs');
+    mkdirSync(runs, { recursive: true });
+    writeFileSync(
+      join(runs, '20260925210000-orph.run.json'),
+      JSON.stringify({
+        id: 'orphan-gen',
+        mode: 'generate',
+        actor: 'agent',
+        status: 'running',
+        startedAt: '2026-09-25T21:00:00.000Z',
+        results: [],
+      }),
+    );
+
+    try {
+      const history = (await get(`/api/project-tests/runs?path=${encodeURIComponent(fresh)}`)) as {
+        runs: { id: string; status: string }[];
+      };
+      expect(history.runs.find((run) => run.id === 'orphan-gen')?.status).toBe('error');
+    } finally {
+      rmSync(fresh, { recursive: true, force: true });
+    }
+  });
+
   it('неизвестный статус результата не принимается', async () => {
     const started = (await post('/api/project-tests/manual/start', {
       path: project,
@@ -374,6 +405,65 @@ describe('project-tests-routes: рабочее место', () => {
 
     expect(current.session?.runId).toBe(started.session.runId);
   });
+
+  it('второй ручной прогон, пока идёт первый, — 409 с id идущего', async () => {
+    const started = (await post('/api/project-tests/manual/start', {
+      path: project,
+      groupId: 'gui',
+    })) as { session: ProjectTestManualSession };
+
+    const second = await app.inject({
+      method: 'POST',
+      url: '/api/project-tests/manual/start',
+      payload: { path: project, groupId: 'gui' },
+    });
+    expect(second.statusCode).toBe(409);
+    expect(second.json()).toMatchObject({
+      messageCode: 'manual-already-running',
+      runId: started.session.runId,
+    });
+  });
+
+  /**
+   * Один проект — одна сессия, в каком бы написании пришёл путь. Реестры
+   * держались ключом «как пришло»: веб шлёт путь из реестра (`C:\…`), агент
+   * панели и терминал — как написали (`c:/…`), и проход, начатый одним, другой
+   * не видел — а второй «единственный» проход по тому же файлу начинался.
+   */
+  it.runIf(process.platform === 'win32')(
+    'путь проекта в другом написании (регистр диска, слэши) — та же сессия',
+    async () => {
+      const other = project
+        .replace(
+          /^([A-Za-z]):\\/,
+          (_, drive: string) =>
+            `${drive === drive.toUpperCase() ? drive.toLowerCase() : drive.toUpperCase()}:/`,
+        )
+        .replace(/\\/g, '/');
+      const started = (await post('/api/project-tests/manual/start', {
+        path: other,
+        groupId: 'gui',
+      })) as { session: ProjectTestManualSession };
+
+      const current = (await get(`/api/project-tests/manual?path=${path()}`)) as {
+        session?: ProjectTestManualSession;
+      };
+      expect(current.session?.runId).toBe(started.session.runId);
+
+      const second = await app.inject({
+        method: 'POST',
+        url: '/api/project-tests/manual/start',
+        payload: { path: project, groupId: 'gui' },
+      });
+      // Занято — конфликт (409) с именем идущего прохода, как у замка группы:
+      // клиент по коду понимает «уже идёт», а не «запрос кривой».
+      expect(second.statusCode).toBe(409);
+      expect(second.json()).toMatchObject({
+        messageCode: 'manual-already-running',
+        runId: started.session.runId,
+      });
+    },
+  );
 
   it('вложение ложится в папку кейса и возвращает путь от корня проекта', async () => {
     const body = (await post('/api/project-tests/attachment', {
@@ -500,5 +590,19 @@ describe('project-tests-routes: рабочее место', () => {
 
     expect(response.statusCode).toBe(400);
     expect((response.json() as { message: string }).message).toContain('не задели');
+  });
+
+  /**
+   * Запрос прогона без id — ошибка вызова, а не «такого прогона нет»: 404 с
+   * «Прогона «» в истории нет.» отправлял искать пустое имя в истории, хотя
+   * соседние маршруты (сравнение, выгрузка) отвечают на то же «Не указан прогон.».
+   */
+  it('прогон без id — 400 «не указан», как у сравнения и выгрузки', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: `/api/project-tests/run?path=${path()}`,
+    });
+    expect(response.statusCode).toBe(400);
+    expect((response.json() as { messageCode?: string }).messageCode).toBe('run-unspecified');
   });
 });

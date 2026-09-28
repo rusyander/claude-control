@@ -83,8 +83,8 @@ export const commandsEn: typeof commandsRu = {
         '("see also").',
       fSearch: 'Search over descriptions, not just names',
       fSearchText:
-        'The query "релиз" finds /release-notes even though the word is not in ' +
-        'the name: the description matched. The row carries the "skill" badge, the ' +
+        'The query "релиз" (Russian for “release”; the sample descriptions are Russian) finds ' +
+        '/release-notes even though that word is not in the name: the description matched. The row carries the "skill" badge, the ' +
         'skills/ owner and the full path to the folder on disk.',
       fBuiltin: 'Built-ins only',
       fBuiltinText:
@@ -285,7 +285,7 @@ export const commandsEn: typeof commandsRu = {
   shots: {
     find: {
       '01-list': 'The whole set: 111 commands and source filters with counters',
-      '02-search': 'The query "релиз" found /release-notes by description, not by name',
+      '02-search': 'The query "релиз" (“release”) found /release-notes by description, not by name',
       '03-builtin': 'Built-ins only: 101 commands, whose catalog the panel keeps itself',
       '04-plugin': "Commands of two plugins; the disabled plugin's ones are marked",
     },

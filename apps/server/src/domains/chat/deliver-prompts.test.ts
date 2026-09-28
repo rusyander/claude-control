@@ -16,8 +16,8 @@ describe('правки группы с доставкой (журнал 59d)', (
     const prompt = fixStagePrompt(['поправь a.ts:1'], { branch: 'split/x', deliver: true });
 
     expect(prompt).not.toContain('Ничего сверх списка');
-    expect(prompt).toContain('Код сверх списка не переделывай');
-    expect(prompt).toContain('коммит, пуш и MR им не запрещены');
+    expect(prompt).toContain('Do not rework code beyond the list');
+    expect(prompt).toContain('commit, push and MR are not forbidden by it');
   });
 
   it('правки без доставки про доставку не говорят ничего (ревью по ссылке, Т7)', () => {
@@ -32,9 +32,9 @@ describe('звено доставки (журнал 59a, 61b)', () => {
 
   it('свежая основная ветка до пуша: fetch и rebase неотправленной ветки', () => {
     expect(prompt).toContain('git fetch origin');
-    expect(prompt).toContain('git rebase origin/<основная>');
+    expect(prompt).toContain('git rebase origin/<main>');
     // Отправленную отставшую — тоже, но пуш только с арендой (W3-3); `--force` — никогда.
-    expect(prompt).toContain('force-push без аренды (`--force`) запрещён всегда');
+    expect(prompt).toContain('force-push without a lease (`--force`) is always forbidden');
   });
 
   it('конфликт с решением за человеком — вопрос инструментом, а не отчёт', () => {
@@ -45,26 +45,26 @@ describe('звено доставки (журнал 59a, 61b)', () => {
     const preamble = deliveryPreamble({ branch: 'fix-PROJ-7' });
 
     expect(preamble).toContain('git fetch origin');
-    expect(preamble).toContain('rebase ветки на свежую основную');
+    expect(preamble).toContain('rebase the branch onto the fresh main branch');
   });
 
   it('пуш своей ветки обычным push, MR и ссылка последней строкой', () => {
     expect(prompt).toContain('git push -u origin fix-PROJ-7');
-    expect(prompt).toContain('Последней строкой ответа — ссылка на MR');
+    expect(prompt).toContain('The last line of the answer is the link to the MR');
   });
 });
 
 describe('группа решает сама (журнал 78, T24)', () => {
   it('правила ребёнка велят брать рекомендуемый вариант и называть его', () => {
-    expect(CHILD_PROMPT).toContain('рекомендуемый');
-    expect(CHILD_PROMPT).toContain('необратим');
+    expect(CHILD_PROMPT).toContain('recommended option');
+    expect(CHILD_PROMPT).toContain('irreversible');
   });
 
   it('доставка группы не останавливается на «неясно, чего хотят», если есть рекомендация', () => {
     const preamble = deliveryPreamble({ branch: 'fix-PROJ-7' });
 
-    expect(preamble).toContain('рекомендуемый');
-    expect(preamble).not.toContain('неясно, чего хотят) — вопрос человеку');
+    expect(preamble).toContain('recommended option');
+    expect(preamble).not.toContain('unclear what is wanted) — a question to the human');
   });
 });
 

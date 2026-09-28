@@ -91,7 +91,6 @@ export const composedEn: Record<ComposedMessageCode, string> = {
   'group-by-id-absent': 'There is no group «{{id}}».',
   'group-name-taken':
     'The group «{{name}}» already exists — it is found and deleted by name, and there must not be two of them.',
-  'automation-not-found': 'There is no automation «{{id}}».',
   'group-env-key-invalid':
     'The variable name «{{key}}» will not do: latin letters, digits and underscore, not starting with a digit.',
   'tests-lint-no-oracle': 'Nothing to prove the result with',
@@ -132,6 +131,10 @@ export const composedEn: Record<ComposedMessageCode, string> = {
     'Group processes were cut short mid-turn: {{groups}}. The panel resumes them itself with a state rebuild (resumed: {{resumed}}); the rest wait for the «Resume» button in the hub.',
   'child-tell-notice':
     'The parent wrote to its groups. Delivered: {{sent}} · queued until their turn ends: {{queued}} · not delivered (the group has no chat or copy): {{refused}}.',
+  'split-triage-groups-picked-notice': 'The triage picked panel groups: {{picks}}.',
+  'path-step-started-notice': 'Group path step “{{step}}” runs in this chat.',
+  'path-gate-failed-notice':
+    'Path step “{{step}}” did not pass its check: {{note}}. The chain waits for an answer in this chat.',
   'split-limit-wait-notice':
     'Split groups hit the subscription limit and wait for its reset at {{until}}: they resume by themselves, and the queue does not start until then.',
   'split-limit-warning-notice':
@@ -142,6 +145,10 @@ export const composedEn: Record<ComposedMessageCode, string> = {
     'Group «{{group}}»: the MR watcher for {{mr}} has resumed it {{resumes}} times and stops resuming it by itself — new reviewer threads and pipeline failures wait for you.',
   'split-default-drift-notice':
     'Group «{{group}}»: {{target}} moved ahead and touched its files ({{count}}): {{files}}. The panel leaves the branch alone mid-work — the delivery rebase moves it.',
+  'chat-autonomy-deferred-notice':
+    "The agent's background commands are still running ({{count}}): the chat process restarts with the new autonomy setting once they finish — restarting now would kill them. Until then the process itself keeps its previous autonomy marker.",
+  'chat-stop-unconfirmed-notice':
+    "The agent process ({{pid}}) could not be stopped: without a process snapshot the panel cannot verify that this number is still the agent's, and it never touches a foreign process. The run stays running — press Stop again; after a panel restart it is picked up again.",
   'split-group-run-not-started': 'the run did not start',
   'split-group-chain-failed': 'the chain ended with an error or a stop',
   'split-group-plan-cancelled': 'the plan was cancelled by a human',
@@ -165,4 +172,15 @@ export const composedEn: Record<ComposedMessageCode, string> = {
     'review findings ({{count}}) are not fixed: the fix stage did not run after the review',
   'delivery-gap-mr-description': 'MR {{mr}} has an empty description',
   'delivery-gap-no-copy': 'the group has no copy',
+  'sieve-gap-conflicts':
+    'integration sieve: merging with fresh main conflicts in {{files}} — rebase the branch onto fresh main and resolve the conflict',
+  'sieve-gap-foreign-removals':
+    'foreign-removals sieve: the branch deletes lines that landed in main after the group started: {{files}} — restore them or name every file in the foreign-removals row of the sieve report with the reason',
+  'sieve-gap-consumers':
+    'consumers sieve: removed names ({{tokens}}) are still used in {{files}} — fix the consumers or name every file in the consumers-repo-wide row of the sieve report with the reason',
+  'sieve-gap-unreported':
+    'sieve {{sieve}} is not reported: a row is needed in a {{lang}} block — {"sieves":[{"id":"…","status":"pass|fail|n/a","evidence":"the command and a line of its output, or the reason"}]}',
+  'sieve-gap-no-evidence':
+    'sieve {{sieve}} is marked without evidence: the command and a line of its output, or the reason, are needed',
+  'sieve-gap-failed': 'sieve {{sieve}} failed: {{evidence}}',
 };

@@ -1,0 +1,15 @@
+.hint {
+  display: block;
+}
+
+/* Раздел скилла и текст шага — как написаны: переносы строк значимы. */
+.full {
+  display: block;
+  max-width: 72ch;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.fallback {
+  font-style: italic;
+}

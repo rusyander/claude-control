@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { projectFileRawUrl } from '@entities/ProjectFile';
-import { renderMarkdown } from '@shared/lib/markdown/renderMarkdown';
+import { renderDocumentMarkdown } from '@shared/lib/markdown/renderMarkdown';
 import { Typography } from '@shared/ui/typography';
 import type { ProjectCodePreviewProps } from './ProjectCodePreview.types';
 import styles from './ProjectCode.module.scss';
@@ -29,7 +29,7 @@ export function ProjectCodePreview({ projectPath, file, text }: ProjectCodePrevi
   );
 
   const documentHtml = useMemo(
-    () => (file.preview === 'markdown' ? renderMarkdown(text) : ''),
+    () => (file.preview === 'markdown' ? renderDocumentMarkdown(text) : ''),
     [file.preview, text],
   );
 

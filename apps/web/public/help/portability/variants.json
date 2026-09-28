@@ -1,0 +1,247 @@
+{
+  "topic": "portability",
+  "frames": {
+    "carry/01-list": {
+      "light-ru": {
+        "file": "01-list.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "light-en": {
+        "file": "01-list.en.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-ru": {
+        "file": "01-list.dark.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-en": {
+        "file": "01-list.dark.en.png",
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    "carry/02-refusal": {
+      "light-ru": {
+        "file": "02-refusal.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "light-en": {
+        "file": "02-refusal.en.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-ru": {
+        "file": "02-refusal.dark.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-en": {
+        "file": "02-refusal.dark.en.png",
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    "subscribe/01-layers": {
+      "light-ru": {
+        "file": "01-layers.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "light-en": {
+        "file": "01-layers.en.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-ru": {
+        "file": "01-layers.dark.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-en": {
+        "file": "01-layers.dark.en.png",
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    "subscribe/02-plan": {
+      "light-ru": {
+        "file": "02-plan.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "light-en": {
+        "file": "02-plan.en.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-ru": {
+        "file": "02-plan.dark.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-en": {
+        "file": "02-plan.dark.en.png",
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    "subscribe/03-drift": {
+      "light-ru": {
+        "file": "03-drift.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "light-en": {
+        "file": "03-drift.en.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-ru": {
+        "file": "03-drift.dark.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-en": {
+        "file": "03-drift.dark.en.png",
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    "subscribe/04-resolved": {
+      "light-ru": {
+        "file": "04-resolved.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "light-en": {
+        "file": "04-resolved.en.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-ru": {
+        "file": "04-resolved.dark.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-en": {
+        "file": "04-resolved.dark.en.png",
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    "transfer/01-passport": {
+      "light-ru": {
+        "file": "01-passport.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "light-en": {
+        "file": "01-passport.en.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-ru": {
+        "file": "01-passport.dark.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-en": {
+        "file": "01-passport.dark.en.png",
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    "transfer/02-fidelity": {
+      "light-ru": {
+        "file": "02-fidelity.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "light-en": {
+        "file": "02-fidelity.en.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-ru": {
+        "file": "02-fidelity.dark.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-en": {
+        "file": "02-fidelity.dark.en.png",
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    "transfer/03-plan": {
+      "light-ru": {
+        "file": "03-plan.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "light-en": {
+        "file": "03-plan.en.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-ru": {
+        "file": "03-plan.dark.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-en": {
+        "file": "03-plan.dark.en.png",
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    "transfer/04-applied": {
+      "light-ru": {
+        "file": "04-applied.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "light-en": {
+        "file": "04-applied.en.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-ru": {
+        "file": "04-applied.dark.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-en": {
+        "file": "04-applied.dark.en.png",
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    "transfer/05-probe": {
+      "light-ru": {
+        "file": "05-probe.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "light-en": {
+        "file": "05-probe.en.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-ru": {
+        "file": "05-probe.dark.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-en": {
+        "file": "05-probe.dark.en.png",
+        "width": 1440,
+        "height": 1000
+      }
+    }
+  }
+}

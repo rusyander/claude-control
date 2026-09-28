@@ -1,12 +1,22 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
-import { mkdtempSync, rmSync, existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import {
+  mkdtempSync,
+  realpathSync,
+  rmSync,
+  existsSync,
+  readFileSync,
+  readdirSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { McpServer, PermissionRule, Project } from '@agentdeck/contracts';
 import { AppStore } from '../lib/app-store.ts';
 import type { ServerContext } from '../context.ts';
 import { registerProjectRoutes } from './project-routes.ts';
+import { spawnSync } from 'node:child_process';
+import { makeProject } from '../domains/projects.ts';
 
 /**
  * Проектный уровень конфигурации: реестр проектов и правка их файлов
@@ -30,7 +40,8 @@ describe('project-routes: реестр и конфиги проекта', () => 
 
   beforeEach(async () => {
     appDataRoot = mkdtempSync(join(tmpdir(), 'cc-appdata-'));
-    projectDir = mkdtempSync(join(tmpdir(), 'cc-project-'));
+    // Реестр хранит каталог в написании на диске (короткие имена 8.3 раскрыты).
+    projectDir = realpathSync.native(mkdtempSync(join(tmpdir(), 'cc-project-')));
     store = new AppStore(appDataRoot);
 
     // `location` нужен по-настоящему: имя файла правил проекта решается по ключу
@@ -101,6 +112,32 @@ describe('project-routes: реестр и конфиги проекта', () => 
     expect(list).toHaveLength(1);
     expect(list[0]?.name).not.toBe('Другое имя');
   });
+
+  /**
+   * F-134 (сосед): запись реестра, сделанная ДО правки, хранит короткое имя 8.3.
+   * Сверка «как ввели» с сырыми записями её не видела — повтор длинным написанием
+   * давал 200 и второй проект на тот же каталог.
+   */
+  it.runIf(process.platform === 'win32')(
+    'старая запись реестра в коротком имени 8.3 — повтор длинным тоже 409',
+    async (ctx) => {
+      const short = spawnSync(
+        'cmd.exe',
+        ['/d', '/s', '/c', `for %I in ("${projectDir}") do @echo %~sI`],
+        { encoding: 'utf8', windowsVerbatimArguments: true },
+      ).stdout.trim();
+      if (!short || short.toLowerCase() === projectDir.toLowerCase()) return ctx.skip();
+      store.addProject({ ...makeProject({ path: projectDir }), path: short });
+
+      const again = await app.inject({
+        method: 'POST',
+        url: '/api/projects',
+        payload: { path: projectDir },
+      });
+      expect(again.statusCode).toBe(409);
+      expect((await app.inject({ method: 'GET', url: '/api/projects' })).json()).toHaveLength(1);
+    },
+  );
 
   it('нестроковое имя → 400, а не 500', async () => {
     const res = await app.inject({

@@ -139,6 +139,74 @@ describe('живая сессия разговора', { timeout: 30_000 }, () =
     expect(registry.livePool.size).toBe(1);
   });
 
+  /**
+   * Ревью 28.09 (F-31): метка автономии — часть окружения процесса, и её смена
+   * перезапускала живой CLI вместе с фоновыми командами агента — ровно тем, ради
+   * чего процесс и живёт между ходами. Пока фон идёт, перезапуск ждёт его конца,
+   * а человек узнаёт об этом из ленты; без фона галочка действует сразу.
+   */
+  describe('галочка автономии и фоновые команды (F-31)', () => {
+    let autonomous = true;
+    const withResolver = (): void => {
+      autonomous = true;
+      registry.setAutonomyResolver(() => autonomous);
+    };
+    const deferredNotice = (chatId: string) =>
+      eventsOf(chatId).find(
+        (event) => event.kind === 'notice' && event.code === 'autonomyDeferred',
+      );
+
+    it('фон идёт — процесс тот же, в ленте сказано, что перезапуск после фона', async () => {
+      fresh();
+      withResolver();
+      const first = await turn('new-a1', 'HOLDBG');
+      autonomous = false;
+      const second = await turn(SESSION, 'дальше', { sessionId: SESSION });
+      expect(pidIn(second)).toBe(pidIn(first));
+      expect(deferredNotice(SESSION)).toMatchObject({
+        textCode: 'chat-autonomy-deferred-notice',
+        textParams: { count: '1' },
+      });
+    });
+
+    // Отложить можно только метку автономии: смена модели при идущем фоне —
+    // тоже новый процесс, иначе ход ушёл бы в CLI с чужими параметрами.
+    it('фон идёт, но сменилась модель — новый процесс, без заметки об отсрочке', async () => {
+      fresh();
+      withResolver();
+      const first = await turn('new-a4', 'HOLDBG');
+      expect(registry.livePool.backgroundOf(SESSION)).toBe(true);
+      const second = await turn(SESSION, 'другой моделью', { sessionId: SESSION, model: 'opus' });
+      expect(pidIn(second)).not.toBe(pidIn(first));
+      expect(deferredNotice(SESSION)).toBeUndefined();
+    });
+
+    it('фона нет — галочка действует сразу: новый процесс, без заметки', async () => {
+      fresh();
+      withResolver();
+      const first = await turn('new-a2', 'привет');
+      autonomous = false;
+      const second = await turn(SESSION, 'дальше', { sessionId: SESSION });
+      expect(pidIn(second)).not.toBe(pidIn(first));
+      expect(deferredNotice(SESSION)).toBeUndefined();
+    });
+
+    it('фон кончился — следующий ход идёт уже новым процессом', async () => {
+      fresh();
+      withResolver();
+      const first = await turn('new-a3', 'LATEWAKE');
+      autonomous = false;
+      // Фон ещё идёт: ход в тот же процесс.
+      const during = await turn(SESSION, 'пока фон', { sessionId: SESSION });
+      expect(pidIn(during)).toBe(pidIn(first));
+      // Фон кончился (CLI сам начал ход с итогом) — перезапуск больше ничего не рвёт.
+      await waitFor(() => !registry.livePool.backgroundOf(SESSION) && !registry.isRunning(SESSION));
+      await waitFor(() => !registry.isRunning(SESSION));
+      const after = await turn(SESSION, 'после фона', { sessionId: SESSION });
+      expect(pidIn(after)).not.toBe(pidIn(first));
+    });
+  });
+
   it('брокер прав получает ключ ТЕКУЩЕГО хода, а не первого', async () => {
     fresh();
     const broker = (runId: string) => ({

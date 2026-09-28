@@ -17,7 +17,7 @@ import {
 } from './project-runner.types.ts';
 import { extractBusyPort, extractServerPort, lastLines } from './output.ts';
 import { isPortBusy } from './ports.ts';
-import { killTree, openBrowser } from './os-process.ts';
+import { killChildProcessTree, openBrowser } from './os-process.ts';
 import { readPackageJson, resolveRunCommand } from './stack.ts';
 import { checkDir, normalizePath, resolveTargetDir } from './targets.ts';
 
@@ -299,7 +299,7 @@ export class ProjectRunnerRegistry {
   private killEntry(entry: RunEntry): void {
     entry.stopping = true;
     entry.status = 'stopped';
-    if (entry.child?.pid) killTree(entry.child.pid);
+    if (entry.child) killChildProcessTree(entry.child);
   }
 
   private view(entry: RunEntry): ProjectRunnerView {

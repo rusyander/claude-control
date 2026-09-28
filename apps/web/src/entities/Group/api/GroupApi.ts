@@ -1,20 +1,21 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import type { Automation, Group, GroupDraft } from '@agentdeck/contracts';
+import type {
+  Group,
+  GroupDraft,
+  GroupDuplicateRequest,
+  GroupDuplicateResult,
+} from '@agentdeck/contracts';
 import { apiClient } from '@shared/api/client';
 import { queryKeys } from '@shared/api/query-keys';
 import { toast } from '@shared/lib/toast';
+import type { GroupListItem } from '../model/types';
 
-// Группы и сценарии живут в данных приложения, а не в конфигах Claude Code,
+// Группы живут в данных приложения, а не в конфигах Claude Code,
 // поэтому у них свой набор запросов, а не общая CRUD-фабрика сущностей.
 
-async function listGroups(): Promise<Group[]> {
-  const { data } = await apiClient.get<Group[]>('/groups');
-  return data;
-}
-
-async function listAutomations(): Promise<Automation[]> {
-  const { data } = await apiClient.get<Automation[]>('/automations');
+async function listGroups(): Promise<GroupListItem[]> {
+  const { data } = await apiClient.get<GroupListItem[]>('/groups');
   return data;
 }
 
@@ -22,11 +23,12 @@ export function useGroups() {
   return useQuery({ queryKey: queryKeys.groups, queryFn: listGroups });
 }
 
-export function useAutomations() {
-  return useQuery({ queryKey: queryKeys.automations, queryFn: listAutomations });
-}
-
-export function useSaveGroup() {
+export function useSaveGroup({
+  silentError = false,
+}: {
+  /** Отказ показывает окно само — с причиной сервера; общий тост промолчит. */
+  silentError?: boolean;
+} = {}) {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -37,11 +39,17 @@ export function useSaveGroup() {
         : await apiClient.post<Group>('/groups', draft);
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (saved) => {
+      // Сохранённая группа — в список сразу, до перечитывания: следующая правка,
+      // собранная из списка (быстрый выбор шага), иначе строилась бы по старому
+      // составу и молча теряла только что добавленного участника.
+      queryClient.setQueryData<Group[]>(queryKeys.groups, (list) =>
+        list?.map((item) => (item.id === saved.id ? saved : item)),
+      );
       void queryClient.invalidateQueries({ queryKey: queryKeys.groups });
       void queryClient.invalidateQueries({ queryKey: queryKeys.overview });
     },
-    meta: { successMessage: 'toasts.saved' },
+    meta: { successMessage: 'toasts.saved', silentError },
   });
 }
 
@@ -88,6 +96,28 @@ export function useSetGroupEnabled() {
   });
 }
 
+/**
+ * «Копировать группу»: независимая выключенная копия рядом с оригиналом.
+ * Имя уходит готовым — окно показывает ровно то, под которым копия ляжет.
+ * Участники копии не гасятся (сервер кладёт запись без отметок), поэтому
+ * устаревает только список групп.
+ */
+export function useDuplicateGroup() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { id: string } & GroupDuplicateRequest) => {
+      const { id, ...body } = input;
+      const { data } = await apiClient.post<GroupDuplicateResult>(`/groups/${id}/duplicate`, body);
+      return data;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.groups });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.overview });
+    },
+  });
+}
+
 export function useDeleteGroup() {
   const queryClient = useQueryClient();
 
@@ -98,41 +128,6 @@ export function useDeleteGroup() {
     // Удаление выключенной группы отпускает её участников, поэтому обновляем
     // их списки тем же способом, что и переключатель.
     onSuccess: () => invalidateGroupMembers(queryClient),
-    meta: { successMessage: 'toasts.deleted' },
-  });
-}
-
-export function useSaveAutomation() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (input: { id?: string; automation: Omit<Automation, 'id'> }) => {
-      const { id, automation } = input;
-      const { data } = id
-        ? await apiClient.put<Automation>(`/automations/${id}`, { ...automation, id })
-        : await apiClient.post<Automation>('/automations', automation);
-      return data;
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.automations });
-      // Сценарий компилируется в хук, поэтому список хуков тоже устаревает.
-      void queryClient.invalidateQueries({ queryKey: queryKeys.hooks });
-    },
-    meta: { successMessage: 'toasts.saved' },
-  });
-}
-
-export function useDeleteAutomation() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (id: string) => {
-      await apiClient.delete(`/automations/${id}`);
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.automations });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.hooks });
-    },
     meta: { successMessage: 'toasts.deleted' },
   });
 }

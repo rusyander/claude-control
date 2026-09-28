@@ -115,6 +115,28 @@ await page.route('**/api/project-git*', async (route) =>
   }),
 );
 
+// Настройки доставки проекта (разделение задач) спрашиваются по пути проекта;
+// выдуманный путь проверки настоящий сервер отбивает 400 — в консоль.
+await page.route('**/api/project-git/split-settings*', async (route) =>
+  route.fulfill({
+    json: {
+      deliver: false,
+      parallel: 1,
+      parallelAuto: true,
+      profile: {
+        enabled: false,
+        repo: false,
+        remote: false,
+        bootstrap: '',
+        bootstrapConfigured: false,
+        heavy: false,
+      },
+      permissions: {},
+      permissionsOwn: [],
+    },
+  }),
+);
+
 await page.route('**/api/chats/projects*', async (route) =>
   route.fulfill({
     json: [
@@ -271,6 +293,16 @@ await page.route('**/api/project-tests?*', async (route) => {
   }
   return route.fulfill({ json: view });
 });
+// История кейса и отметки «нестабилен» библиотеки — свои ручки; без заглушки
+// запрос ушёл бы на реальный стенд с выдуманным путём проекта.
+await page.route('**/api/project-tests/flaky*', async (route) =>
+  route.fulfill({ json: { window: 10, minFlips: 2, cases: [] } }),
+);
+await page.route('**/api/project-tests/case-history*', async (route) =>
+  route.fulfill({
+    json: { groupId: '', caseId: '', entries: [], flaky: { isFlaky: false, flips: 0, runs: 0 } },
+  }),
+);
 
 let bad = 0;
 const check = (ok, text) => {
@@ -291,18 +323,21 @@ const anyOf = async (scope, names) => {
 // подставляет `panel-pages.mjs`: так проверка не зависит ни от какой истории и
 // не открывает настоящий проект.
 await page.goto(`${BASE}/`, { waitUntil: 'domcontentloaded' });
-await page.evaluate(
-  (project) =>
-    localStorage.setItem(
-      'agentdeck:workspace',
-      JSON.stringify({
-        projectTabs: [{ id: project.path.toLowerCase(), path: project.path, name: project.name }],
-        activeTabId: project.path.toLowerCase(),
-        views: {},
-      }),
-    ),
-  PROJECT,
-);
+// Выбор проекта в разделе тестов — свой, в `agentdeck:tests-project`, а не
+// активная вкладка: без него раздел открывает запомненный или ПЕРВЫЙ проект
+// списка, а первым идёт настоящий реестр стенда — и запуск уходил не в тот
+// проект. Закрепляем проверочный явно.
+await page.evaluate((project) => {
+  localStorage.setItem(
+    'agentdeck:workspace',
+    JSON.stringify({
+      projectTabs: [{ id: project.path.toLowerCase(), path: project.path, name: project.name }],
+      activeTabId: project.path.toLowerCase(),
+      views: {},
+    }),
+  );
+  localStorage.setItem('agentdeck:tests-project', project.path.toLowerCase());
+}, PROJECT);
 
 await page.goto(`${BASE}/tests`, { waitUntil: 'domcontentloaded' });
 await page.waitForSelector('nav');
@@ -318,9 +353,17 @@ if (!opened) {
 
 const main = page.getByRole('main').or(page.locator('body')).first();
 
-// Вкладки-группы: файл — это и есть вкладка, счётчик кейсов в названии.
-check((await main.getByText(/GUI\s*\(3\)/).count()) > 0, 'вкладка GUI со счётом');
-check((await main.getByText(/E2E\s*\(1\)/).count()) > 0, 'вкладка E2E со счётом');
+// Группы — списком слева: файл — это и есть группа, счётчик кейсов рядом с
+// названием. Ряд вкладок на двух десятках групп уводил кейсы за низ экрана.
+const groupNav = main.getByRole('navigation', { name: 'Группы' });
+check(
+  (await groupNav.getByRole('button', { name: /^GUI\s*3$/ }).count()) > 0,
+  'группа GUI в списке слева со счётом',
+);
+check(
+  (await groupNav.getByRole('button', { name: /^E2E\s*1$/ }).count()) > 0,
+  'группа E2E в списке слева со счётом',
+);
 
 // Атрибуты, по которым отбирают, видны без раскрытия кейса.
 check((await main.getByText('блокер', { exact: false }).count()) > 0, 'важность видна в списке');
@@ -340,6 +383,11 @@ check((await main.getByText('провален', { exact: false }).count()) > 0, 
 // Отбор: по статусу список сужается, сброс возвращает всё. Статус выбирают
 // списком, а не рядом кнопок: статусов шесть, и ряд кнопок съел бы всю строку
 // отбора, в которой кроме него ещё тип, важность, метки и поиск.
+// Списки отбора живут в раскрывающейся панели «Фильтры»: закрытой она не
+// занимает строк над списком, а выбранное видно плашками.
+const filtersToggle = main.getByRole('button', { name: /^Фильтры/ }).first();
+check((await filtersToggle.count()) > 0, 'кнопка «Фильтры» в строке отбора');
+await filtersToggle.click();
 const statusFilter = main.getByLabel('Статус').first();
 if ((await statusFilter.count()) > 0) {
   await statusFilter.selectOption('failed');
@@ -348,6 +396,23 @@ if ((await statusFilter.count()) > 0) {
     (await main.getByText('Отправка сообщения').count()) === 0,
     'отбор по статусу убирает пройденные кейсы',
   );
+  check(
+    /Фильтры · 1/.test(await filtersToggle.innerText()),
+    'на кнопке «Фильтры» видно, сколько условий стоит',
+  );
+  // Панель закрыли — условие осталось плашкой, и её крестик снимает ровно его.
+  await filtersToggle.click();
+  const chip = main.getByRole('button', { name: /Снять условие «Статус: провален»/ });
+  check((await chip.count()) === 1, 'закрытая панель показывает условие плашкой');
+  await chip.click();
+  await page.waitForTimeout(600);
+  check(
+    (await main.getByText('Отправка сообщения').count()) > 0,
+    'крестик на плашке снимает условие',
+  );
+  await filtersToggle.click();
+  await statusFilter.selectOption('failed');
+  await page.waitForTimeout(600);
   const reset = await anyOf(main, [/Сбросить отбор/, /Сбросить/, /Сброс/]);
   if (reset) await reset.click();
   await page.waitForTimeout(600);

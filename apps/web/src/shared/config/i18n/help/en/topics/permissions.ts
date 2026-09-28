@@ -4,7 +4,8 @@ import type { permissionsRu } from '../../ru/topics/permissions';
 export const permissionsEn: typeof permissionsRu = {
   topic: {
     title: 'Permissions',
-    summary: 'What Claude does without asking, what it asks about, and what it never does',
+    summary:
+      'What Claude does without asking, what it asks about, and what it is forbidden to do — deleting files included',
     lead:
       'A permission is a tool pattern plus a decision about it: allow, ask, or deny. ' +
       'Rules and skills explain to Claude how to behave; permissions draw a line it ' +
@@ -97,7 +98,9 @@ export const permissionsEn: typeof permissionsRu = {
       setupWarning: 'The pattern is checked for typos',
       setupWarningText:
         'Type a wish in words and the form warns: “does not look like the known forms”. ' +
-        'That is a hint, not a block — you may save it, but such a rule will never fire.',
+        'That is a hint, not a block — you may save it, but such a rule will never fire. ' +
+        'An unmatched parenthesis is a refusal: Bash(git status without the closing one is ' +
+        'saved neither from the form nor by the agent.',
       setupBulk: 'Enter the routine as a batch',
       setupBulkText:
         'The “Several at once” tab: one decision for the whole list, then one pattern ' +
@@ -186,7 +189,13 @@ export const permissionsEn: typeof permissionsRu = {
     storageId: 'Rule identifier',
     storageIdValue: 'the decision and the pattern together — it changes with the decision',
     storageMove: 'Changing the decision',
-    storageMoveValue: 'the rule physically moves between the three lists',
+    storageMoveValue:
+      'the rule physically moves between the three lists; a list that a move, a switch-off ' +
+      'or a deletion emptied leaves the file entirely — the panel leaves no empty “ask: []” ' +
+      'behind, and an empty list you put there yourself is left alone. Switching off and ' +
+      'back on returns the file byte for byte: the rule goes back between its old ' +
+      'neighbours, a dropped list or permissions key returns to its old place, and a list ' +
+      'or an empty permissions that existed before the panel stays where it was',
     storageOff: 'A disabled permission',
     storageOffValue:
       'the line is cut from the file, and the mark that can restore it lives in ' +
@@ -268,6 +277,13 @@ export const permissionsEn: typeof permissionsRu = {
       'The “Rule” field holds a wish in words, not a pattern. The panel will let you ' +
       'save it, but such a rule covers no call at all: make it Bash(…), Read(…) or ' +
       'mcp__server__tool.',
+    refusalParen: 'An unmatched parenthesis in the pattern',
+    refusalParenText:
+      'A refusal, not a warning: Claude Code cannot parse such a specifier, and the rule ' +
+      'would silently never fire. Close the parenthesis — Bash(git status:*). Bulk adding ' +
+      'and the panel agent refuse it the same way. A lone parenthesis inside the ' +
+      'specifier — Bash(echo "(":*) — is fine: Claude Code takes everything between the ' +
+      'first ( and the last ) as the specifier.',
     refusalNotSet: 'Still “not set” although the rule exists',
     refusalNotSetText:
       'The System tab matches patterns literally: Bash(git push:*) and ' +

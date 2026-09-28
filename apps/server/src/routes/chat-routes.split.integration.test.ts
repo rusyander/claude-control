@@ -12,7 +12,11 @@ import { ChatRunRegistry, type RunLike } from '../domains/chat/ChatRunRegistry.t
 import { ChatSession } from '../domains/chat/ChatSession.ts';
 import { ProviderChatService } from '../domains/provider-chat.ts';
 import { copyRootOf, SplitConveyor } from '../domains/chat/split-conveyor.ts';
+import { triageGroupCatalog } from '../domains/chat/group-auto-pick.ts';
+import { storeTreeReader } from '../domains/chat/chat-autonomy.ts';
+import { readChoice, writeChoice } from '../domains/groups/choice.ts';
 import { createSplitLauncher, launchFromRecord } from './chat/split-launch.ts';
+import { wireGroupActivation } from '../bootstrap/group-activation-wiring.ts';
 import type { ChatLink } from '../lib/app-store/app-store.types.ts';
 import {
   GROUP_QUESTIONS_HUMAN_LINE,
@@ -20,6 +24,9 @@ import {
   scanSplitBlocks,
 } from '@agentdeck/contracts/task-split';
 import { SPLIT_DEFAULTS_BUILTIN } from '@agentdeck/contracts/split-groups';
+import { ESCALATE_LINE } from '@agentdeck/contracts/model-cascade';
+import { childAppendPrompt, stageOf } from '../domains/chat/ChatCascadeStages.ts';
+import { chatKnobsLine, childStageExtra } from '../domains/chat/group-run-lines.ts';
 
 /**
  * Маршрут разделения задач по чатам. Каталог берём обычный (не репозиторий) —
@@ -45,6 +52,10 @@ describe('POST /api/chat/split', () => {
     permissionMode?: string;
     /** Родитель, известный хранилищу В МОМЕНТ запуска, — см. тест про гонку. */
     parentAtStart?: string;
+    /** Свой выбор группы чата В МОМЕНТ запуска — автовыбор разбора ложится до него. */
+    groupChoiceAtStart?: string;
+    /** Включённые группы В МОМЕНТ запуска. */
+    enabledAtStart?: string[];
   }[];
 
   beforeEach(async () => {
@@ -69,6 +80,13 @@ describe('POST /api/chat/split', () => {
           ...(store.getChatLink(chatId)?.parentChatId
             ? { parentAtStart: store.getChatLink(chatId)?.parentChatId }
             : {}),
+          ...(store.getChatGroupSettings(chatId)?.groupChoice
+            ? { groupChoiceAtStart: store.getChatGroupSettings(chatId)?.groupChoice }
+            : {}),
+          enabledAtStart: store
+            .getGroups()
+            .filter((group) => group.isEnabled)
+            .map((group) => group.id),
         });
       },
       stop: () => undefined,
@@ -92,6 +110,13 @@ describe('POST /api/chat/split', () => {
       backupDir: join(root, 'agentdeck', 'backups'),
       models: { current: () => ({ models: [] }) },
     } as unknown as ServerContext;
+    // Как в runtime: выбранная группа включается на старте реестра, а не в маршруте.
+    wireGroupActivation({
+      store,
+      paths: ctx.location.paths,
+      backupDir: ctx.backupDir,
+      chatRuns: registry,
+    });
 
     app = Fastify();
     session = new ChatSession(registry);
@@ -192,8 +217,8 @@ describe('POST /api/chat/split', () => {
     expect(response.statusCode).toBe(200);
     expect(started).toHaveLength(2);
     for (const run of started) {
-      expect(run.prompt).toContain('работает в запросе на слияние');
-      expect(run.prompt).not.toContain('НИЧЕГО НЕ ПРАВЬ');
+      expect(run.prompt).toContain('This session works in the merge request');
+      expect(run.prompt).not.toContain('EDIT NOTHING');
     }
   });
 
@@ -279,6 +304,45 @@ describe('POST /api/chat/split', () => {
 
     expect(started).toHaveLength(2);
     for (const run of started) expect(run.parentAtStart).toBe('parent');
+  });
+
+  // Раунд 4: ребёнок родителя с явной группой стартовал без неё — включение жило
+  // только в маршруте отправки, а первый прогон ребёнка идёт мимо него.
+  it('явная группа родителя включена до первого прогона ребёнка', async () => {
+    store.saveGroup({
+      id: 'x',
+      name: 'Набор X',
+      description: '',
+      color: 'accent',
+      icon: 'folder',
+      members: [],
+      env: {},
+      isEnabled: false,
+      order: 0,
+      projectPaths: [],
+    });
+    store.setChatGroupSettings('parent', { groupChoice: 'global:x' });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/chat/split',
+      payload: { projectPath: project, proposal, startRuns: true, parentChatId: 'parent' },
+    });
+
+    expect(started).toHaveLength(2);
+    expect(started[0]?.enabledAtStart).toContain('x');
+    // Заметка в ленте первого ребёнка — без неё агент с новыми правилами загадка.
+    const first = (response.json() as { chats: { chatId: string }[] }).chats[0]?.chatId ?? '';
+    const codes: string[] = [];
+    registry.attach(first, 0, {
+      send: ({ event }) => {
+        if (event.kind === 'notice' && event.code) codes.push(event.code);
+      },
+      close: () => undefined,
+    });
+    expect(codes).toContain('groupsActivated');
+    // Выбор унаследован, а не переписан ребёнку.
+    for (const run of started) expect(run).not.toHaveProperty('groupChoiceAtStart');
   });
 
   // Живой прогон 25.09 (F5): второй план того же разговора вклеивал в свои
@@ -396,6 +460,68 @@ describe('POST /api/chat/split', () => {
     expect(appended).toContain('AskUserQuestion');
   });
 
+  // Раунд 3: «числа» группы родителя и строка эскалации работы — в дописке
+  // старта ребёнка, и ровно та же дописка у его следующего хода: иначе ход не
+  // совпал бы подписью с живым процессом звена.
+  it('ребёнок-работа: числа группы и эскалация, старт и следующий ход совпадают', async () => {
+    store.saveGroup({
+      id: 'fleet',
+      name: 'Fleet',
+      description: '',
+      color: 'accent',
+      icon: 'folder',
+      members: [{ kind: 'skill', id: 'fleet-review' }],
+      env: {},
+      projectPaths: [],
+      isEnabled: false,
+      order: 0,
+      knobs: { 'fleet-review:review-rounds': 4 },
+    } as Parameters<typeof store.saveGroup>[0]);
+    writeFileSync(
+      join(root, 'agentdeck', 'skill-knobs.json'),
+      JSON.stringify({
+        'global|skill:fleet-review': {
+          hash: 'h',
+          knobs: [
+            {
+              key: 'review-rounds',
+              skillId: 'fleet-review',
+              label: { ru: 'Кругов ревью', en: 'Review rounds' },
+              default: 2,
+              min: 1,
+              max: 6,
+              quote: 'Run 2 review rounds.',
+            },
+          ],
+        },
+      }),
+      'utf8',
+    );
+    store.setChatGroupSettings('parent-1', { groupChoice: 'global:fleet' });
+
+    await app.inject({
+      method: 'POST',
+      url: '/api/chat/split',
+      payload: { projectPath: project, proposal, startRuns: true, parentChatId: 'parent-1' },
+    });
+
+    const first = started[0]!;
+    const link = store.getChatLink(first.chatId)!;
+    expect(link.parentChatId).toBe('parent-1');
+    const appended = first.appendSystemPrompt ?? '';
+    expect(appended).toContain('fleet-review — Review rounds: 4 (skill default 2)');
+    expect(appended).toContain(ESCALATE_LINE);
+    const next = childAppendPrompt(
+      link,
+      store.getSettings(),
+      childStageExtra(
+        stageOf(link),
+        chatKnobsLine(store, join(root, 'agentdeck'), [first.chatId], first.cwd),
+      ),
+    );
+    expect(appended).toBe(next);
+  });
+
   /**
    * Отказ «работаем здесь» гасит инициативу и в РОДИТЕЛЬСКОМ разговоре: реплика
    * отказа живёт один ход, а инструкция дописывается к каждому прогону.
@@ -447,8 +573,8 @@ describe('POST /api/chat/split', () => {
       expect(started[1]?.model).toBe('claude-opus-5');
       // Понижение оплачивается проверкой: работе слабее потолка дописывается
       // планка сдачи, работе на потолке — нет, усиливать нечем.
-      expect(started[0]?.appendSystemPrompt).toContain('НИЖЕ потолка');
-      expect(started[1]?.appendSystemPrompt).not.toContain('НИЖЕ потолка');
+      expect(started[0]?.appendSystemPrompt).toContain('BELOW the ceiling');
+      expect(started[1]?.appendSystemPrompt).not.toContain('BELOW the ceiling');
 
       const body = response.json() as { chats: { model?: string; kind?: string }[] };
       expect(body.chats[0]).toMatchObject({ model: 'sonnet', kind: 'mechanical' });
@@ -523,7 +649,7 @@ describe('POST /api/chat/split', () => {
       expect(response.statusCode).toBe(200);
       // Оба ребёнка — на выбранной человеком модели, без пометок и без класса.
       expect(started.map((run) => run.model)).toEqual(['claude-opus-5', 'claude-opus-5']);
-      expect(started[0]?.appendSystemPrompt).not.toContain('НИЖЕ потолка');
+      expect(started[0]?.appendSystemPrompt).not.toContain('BELOW the ceiling');
       const body = response.json() as { chats: { model?: string; kind?: string }[] };
       expect(body.chats[0]?.model).toBeUndefined();
       expect(body.chats[0]?.kind).toBeUndefined();
@@ -563,8 +689,21 @@ describe('POST /api/chat/split', () => {
       ],
     };
 
-    function withConveyor(): SplitConveyor {
+    function withConveyor(options: { autoPick?: boolean } = {}): SplitConveyor {
       const conveyor = new SplitConveyor({
+        // Как в `runtime.ts`: каталог по дереву выбора и выбору пары проекта.
+        ...(options.autoPick
+          ? {
+              groupCatalog: (record: { parentChatId: string; projectPath: string }) =>
+                triageGroupCatalog({
+                  reader: storeTreeReader(store),
+                  groups: store.getGroups(),
+                  pairChoice: readChoice(ctx.location.paths.appData, record.projectPath),
+                  parentChatId: record.parentChatId,
+                  projectPath: record.projectPath,
+                }),
+            }
+          : {}),
         store: {
           get: (parent) => store.getSplitPlan(parent),
           set: (record) => store.setSplitPlan(record),
@@ -636,7 +775,7 @@ describe('POST /api/chat/split', () => {
         // Человека у разбора нет: при default каждый `cd … && grep` ждал кнопки (живой прогон 24.09).
         permissionMode: 'auto',
       });
-      expect(started[0]?.prompt).toContain('разбор разделения');
+      expect(started[0]?.prompt).toContain('triage of a task split');
       expect(started[0]?.prompt).toContain('agentdeck:split-plan');
       // Связь разбора — под родителем, со стадией; запись конвейера — под родителем.
       expect(store.getChatLink(body.triage?.chatId ?? '')).toMatchObject({
@@ -696,7 +835,7 @@ describe('POST /api/chat/split', () => {
       expect(event).toMatchObject({ kind: 'notice', code: 'triageApplied' });
       // Стартовала только первая группа; вторая ждёт её цепочки.
       expect(started).toHaveLength(1);
-      expect(started[0]?.prompt).toContain('План работы для группы «Раз»');
+      expect(started[0]?.prompt).toContain('Work plan for the group "Раз"');
       expect(started[0]?.prompt).toContain('src/rename.ts');
       // План — на потолке, хотя работа механики пойдёт ниже.
       expect(started[0]?.model).toBe('claude-opus-5');
@@ -718,8 +857,171 @@ describe('POST /api/chat/split', () => {
       await new Promise((done) => setTimeout(done, 30));
       expect(started).toHaveLength(2);
       expect(store.getChatLink(started[1]?.chatId ?? '')?.notes).toContain(
-        'Раньше этой группы работали: «Раз»',
+        'Before this group, these worked: "Раз"',
       );
+    });
+
+    /**
+     * Автовыбор группы (выбор чата `auto`): каталог — в промпт разбора, выбор
+     * разбора — своим выбором ребёнка ДО его первого прогона, глобальная группа
+     * к этому моменту уже включена. Весь путь настоящий: маршрут → конвейер →
+     * запуск из записи → реестр; подменён только процесс CLI.
+     */
+    async function autoPickRun(parentChoice?: string) {
+      store.saveGroup({
+        id: 'review',
+        name: 'Review loop',
+        description: '',
+        color: 'accent',
+        icon: 'folder',
+        members: [],
+        env: {},
+        projectPaths: [],
+        isEnabled: false,
+        order: 0,
+        when: 'reviewing a merge request',
+      } as Parameters<typeof store.saveGroup>[0]);
+      if (parentChoice) {
+        store.setChatGroupSettings('parent-1', {
+          groupChoice: parentChoice as `global:${string}`,
+        });
+      }
+      const conveyor = withConveyor({ autoPick: true });
+      const instance = await withRoutes(conveyor);
+      const first = await instance.inject({
+        method: 'POST',
+        url: '/api/chat/split',
+        payload: {
+          projectPath: project,
+          proposal,
+          startRuns: true,
+          parentChatId: 'parent-1',
+          ...ceiling,
+        },
+      });
+      await instance.close();
+      const triageId = (first.json() as { triage: { chatId: string } }).triage.chatId;
+      const triagePrompt = started[0]?.prompt ?? '';
+      started.length = 0;
+      const block = [
+        '```agentdeck:split-plan',
+        JSON.stringify({ groups: [{ index: 1, groupKey: 'global:review' }, { index: 2 }] }),
+        '```',
+      ].join('\n');
+      conveyor.onTriageFinished(
+        {
+          chatId: triageId,
+          projectPath: project,
+          text: `Развёл.\n${block}`,
+          ok: true,
+          startedAt: 1,
+          options: { prompt: '', cwd: project },
+          contextTokens: 0,
+        },
+        [triageId],
+      );
+      await new Promise((done) => setTimeout(done, 30));
+      return triagePrompt;
+    }
+
+    it('автовыбор: выбор разбора — у ребёнка до первого прогона, группа уже включена', async () => {
+      const triagePrompt = await autoPickRun();
+      expect(triagePrompt).toContain(
+        '- global:review — Review loop — when: reviewing a merge request',
+      );
+      const one = started.find((run) => run.prompt.includes('"Раз"'));
+      const two = started.find((run) => run.prompt.includes('"Два"'));
+      expect(one).toMatchObject({ groupChoiceAtStart: 'global:review' });
+      expect(one?.enabledAtStart).toContain('review');
+      // Второй группе разбор ничего не выбрал — своего выбора у неё нет.
+      expect(two).toBeDefined();
+      expect(two).not.toHaveProperty('groupChoiceAtStart');
+    });
+
+    /**
+     * F-107 на запуске: разбор выбрал сторону пары, какую ему предложил каталог,
+     * а до запуска группы (ждущая группа стартует через часы) человек сменил
+     * сторону на странице групп. Ребёнку ложится ДЕЙСТВУЮЩАЯ сторона той же
+     * пары — ровно её каталог предложил бы сейчас; неактивную не закрепляет и
+     * запуск разделения (как не даёт закрепить её `PUT group-settings`).
+     */
+    it('автовыбор: сторона пары сменилась между разбором и запуском — ложится действующая', async () => {
+      const base = {
+        description: '',
+        color: 'accent',
+        icon: 'folder',
+        members: [],
+        env: {},
+        projectPaths: [],
+        isEnabled: false,
+        order: 0,
+        when: 'any task here',
+      };
+      const inProject = { kind: 'project', path: project, provider: 'claude' } as const;
+      store.saveGroup({
+        ...base,
+        id: 'mine',
+        name: 'Project flow',
+        scope: inProject,
+      } as unknown as Parameters<typeof store.saveGroup>[0]);
+      store.saveGroup({
+        ...base,
+        id: 'mine-copy',
+        name: 'Project flow (copy)',
+        origin: { groupId: 'mine', scope: inProject, hash: 'h' },
+      } as unknown as Parameters<typeof store.saveGroup>[0]);
+      const conveyor = withConveyor({ autoPick: true });
+      const instance = await withRoutes(conveyor);
+      const first = await instance.inject({
+        method: 'POST',
+        url: '/api/chat/split',
+        payload: {
+          projectPath: project,
+          proposal,
+          startRuns: true,
+          parentChatId: 'parent-1',
+          ...ceiling,
+        },
+      });
+      await instance.close();
+      const triageId = (first.json() as { triage: { chatId: string } }).triage.chatId;
+      // Каталог разбора снят при действующей проектной стороне.
+      expect(started[0]?.prompt).toContain('- project:mine — Project flow');
+      expect(started[0]?.prompt).not.toContain('global:mine-copy');
+      started.length = 0;
+      // Между разбором и запуском человек переключил пару на глобальную копию.
+      writeChoice(ctx.location.paths.appData, store.getGroups(), project, 'global:mine-copy');
+      const block = [
+        '```agentdeck:split-plan',
+        JSON.stringify({ groups: [{ index: 1, groupKey: 'project:mine' }, { index: 2 }] }),
+        '```',
+      ].join('\n');
+      conveyor.onTriageFinished(
+        {
+          chatId: triageId,
+          projectPath: project,
+          text: `Развёл.\n${block}`,
+          ok: true,
+          startedAt: 1,
+          options: { prompt: '', cwd: project },
+          contextTokens: 0,
+        },
+        [triageId],
+      );
+      await new Promise((done) => setTimeout(done, 30));
+      const one = started.find((run) => run.prompt.includes('"Раз"'));
+      expect(one).toBeDefined();
+      expect(one).toMatchObject({ groupChoiceAtStart: 'global:mine-copy' });
+      // Действующая сторона — глобальная копия, и включена к старту она.
+      expect(one?.enabledAtStart).toContain('mine-copy');
+    });
+
+    it('автовыбор: явная группа родителя — каталога нет, ребёнку ничего не пишется', async () => {
+      const triagePrompt = await autoPickRun('global:elsewhere');
+      expect(triagePrompt).not.toContain('Panel group catalog');
+      expect(started.length).toBeGreaterThan(0);
+      for (const run of started) expect(run).not.toHaveProperty('groupChoiceAtStart');
+      expect(store.getGroups().find((group) => group.id === 'review')?.isEnabled).toBe(false);
     });
 
     /**
@@ -785,8 +1087,8 @@ describe('POST /api/chat/split', () => {
       ).toEqual([1]);
       expect(started).toHaveLength(1);
       // Агент узнаёт из задания и базу, и то, что работа предшественника не легла.
-      expect(started[0]?.prompt).toContain('цепочка НЕ кончилась');
-      expect(store.getChatLink(started[0]?.chatId ?? '')?.notes).toContain('цепочка НЕ кончилась');
+      expect(started[0]?.prompt).toContain('chain did NOT finish');
+      expect(store.getChatLink(started[0]?.chatId ?? '')?.notes).toContain('chain did NOT finish');
       expect(store.getSplitPlan('parent-1')?.groups[1]).toMatchObject({
         released: true,
         status: 'started',
@@ -852,7 +1154,7 @@ describe('POST /api/chat/split', () => {
         (answered.json() as { chats: { index: number }[] }).chats.map((chat) => chat.index),
       ).toEqual([1]);
       expect(started).toHaveLength(1);
-      expect(started[0]?.prompt).toContain('Ответ человека: как в шапке');
+      expect(started[0]?.prompt).toContain("The human's answer: как в шапке");
       expect(store.getSplitPlan('parent-1')?.groups[1]).toMatchObject({
         status: 'started',
         holdAnswer: 'как в шапке',
@@ -1067,6 +1369,51 @@ describe('POST /api/chat/split', () => {
         const after = store.getSplitPlan('parent-1');
         expect(norm(after?.projectPath ?? '')).toBe(norm(sub));
         expect(norm(after ? copyRootOf(after) : '')).toBe(norm(project));
+      }, 20_000);
+
+      it('прежний прогон не остановлен — перезапуск не начат, группы и звенья на месте', async () => {
+        const conveyor = withConveyor();
+        const triageId = await startTriage(conveyor, project);
+        started.length = 0;
+        finishTriage(conveyor, triageId);
+        await waitStarts(2);
+        const old = started.map((run) => run.chatId);
+        const before = store.getSplitPlan('parent-1')?.groups.map((group) => group.status);
+
+        // Реестр, который не может подтвердить остановку (F-145): номер нечем сверить.
+        let released = false;
+        const stuck = Object.assign(Object.create(registry) as typeof registry, {
+          isRunning: () => !released,
+          stop: () => 'unconfirmed' as const,
+        });
+        const instance = Fastify();
+        registerChatSplitRoutes(instance, ctx, { ...launchDeps(), runs: stuck, conveyor });
+        await instance.ready();
+        started.length = 0;
+        const response = await instance.inject({
+          method: 'POST',
+          url: '/api/chat/split/parent-1/relaunch',
+        });
+
+        expect(response.statusCode).toBe(409);
+        expect(response.json()).toMatchObject({
+          messageCode: 'split-relaunch-unconfirmed',
+          params: { count: 2 },
+        });
+        await new Promise((done) => setTimeout(done, 200));
+        expect(started).toHaveLength(0);
+        for (const chatId of old) expect(store.getChatLink(chatId)?.parentChatId).toBe('parent-1');
+        expect(store.getSplitPlan('parent-1')?.groups.map((group) => group.status)).toEqual(before);
+
+        // Отказ отпускает замок перезапуска: прежние прогоны кончились — повтор идёт.
+        released = true;
+        const retry = await instance.inject({
+          method: 'POST',
+          url: '/api/chat/split/parent-1/relaunch',
+        });
+        expect(retry.statusCode).toBe(202);
+        await waitStarts(2);
+        await instance.close();
       }, 20_000);
 
       /**

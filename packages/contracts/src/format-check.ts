@@ -1,3 +1,5 @@
+import type { ServerMessageCode, ServerMessageParams } from './server-messages';
+
 /**
  * Сверка форматов чужих CLI с их официальными схемами (IDEA-3).
  *
@@ -39,6 +41,13 @@ export interface FormatCheckProvider {
   keys: FormatCheckKey[];
   /** Почему сверки нет или она не вышла. */
   note?: string;
+  /**
+   * Код пояснения для перевода (`server-messages.ts`): «схемы нет» —
+   * `checks-format-no-schema` с именем файла. У отказа сети кода нет — там чужой
+   * текст, он показывается как есть.
+   */
+  noteCode?: ServerMessageCode;
+  noteParams?: ServerMessageParams;
 }
 
 export interface FormatCheckReport {

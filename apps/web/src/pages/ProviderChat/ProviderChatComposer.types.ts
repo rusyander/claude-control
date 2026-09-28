@@ -1,4 +1,5 @@
 import type { ComposerModeState } from '@entities/Media';
+import type { AgentImage } from '@agentdeck/contracts/agent-images';
 
 export interface ProviderChatComposerProps {
   /** Пути прикреплённых файлов: CLI читает их сам, содержимое не вкладывается. */
@@ -9,7 +10,7 @@ export interface ProviderChatComposerProps {
    * Отправка. `false` (в том числе через промис) означает, что текст не приняли, —
    * тогда поле не чистится: описание картинки переписывают, а не набирают заново.
    */
-  onSend: (text: string) => void | boolean | Promise<void | boolean>;
+  onSend: (text: string, images: AgentImage[]) => void | boolean | Promise<void | boolean>;
   isRunning: boolean;
   /** Ни CLI, ни ключа — отправлять некуда. */
   isBlocked: boolean;

@@ -18,11 +18,13 @@
  * Строки `{"type":"relay_…"}` — служебные в обе стороны; CLI их не видит.
  * Обычный Node без зависимостей: исполняется голым `node`, без разбора типов.
  */
-/* global process, setInterval, setTimeout */
-import { spawn, spawnSync } from 'node:child_process';
+/* global process, setInterval, setTimeout, clearTimeout, Buffer */
+import { spawn } from 'node:child_process';
+import { timingSafeEqual } from 'node:crypto';
 import { readFileSync, rmSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { createInterface } from 'node:readline';
+import { killChildProcessTree } from '../../lib/kill-tree.mjs';
 
 const specFile = process.argv[2] ?? '';
 const spec = JSON.parse(readFileSync(specFile, 'utf8'));
@@ -132,13 +134,19 @@ function onClient(socket) {
     socket.end(() => process.exit(0));
     return;
   }
-  createInterface({ input: socket }).on('line', (line) => {
-    if (!line.trim() || client !== socket) return;
-    if (line.startsWith('{"type":"relay_')) return control(line);
-    // Сообщение человека начинает ход раньше, чем CLI ответит `init`.
-    busy = true;
-    child.stdin.write(`${line}\n`);
-  });
+  createInterface({ input: socket })
+    .on('line', (line) => {
+      if (!line.trim() || client !== socket) return;
+      if (line.startsWith('{"type":"relay_')) return control(line);
+      // Сообщение человека начинает ход раньше, чем CLI ответит `init`.
+      busy = true;
+      child.stdin.write(`${line}\n`);
+    })
+    // Клиент, ушедший сразу после подключения (сервер убит посреди него), даёт
+    // EPIPE на первой записи, и readline повторяет ошибку сокета на себе. Без
+    // обработчика здесь она необработанная: посредник падал и уносил CLI с
+    // ходом — ровно то, от чего он существует.
+    .on('error', () => undefined);
 }
 
 function control(line) {
@@ -147,17 +155,11 @@ function control(line) {
 }
 
 function killTree() {
-  if (!child.pid) return;
-  if (process.platform === 'win32') {
-    // На Windows CLI живёт под `cmd.exe`: сигнал оболочке его не снимает.
-    spawnSync('taskkill', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true });
-    return;
-  }
-  try {
-    child.kill('SIGTERM');
-  } catch {
-    // Уже вышел.
-  }
+  // На Windows CLI живёт под `cmd.exe`: сигнал оболочке его не снимает — снимаем
+  // дерево, но только своих потомков (время создания не раньше родителя) и
+  // только пока CLI не вышел: `/T` по номеру прихватывал и чужие процессы с
+  // унаследованным номером родителя (`lib/kill-tree.mjs`).
+  killChildProcessTree(child);
 }
 
 function exitLine() {
@@ -191,7 +193,60 @@ const idleTimer = setInterval(() => {
 }, spec.idleCheckMs ?? 60_000);
 idleTimer.unref();
 
-const server = createServer(onClient);
+/**
+ * Ключ канала из описания запуска. Имя канала видно любому процессу машины, а
+ * подключившийся становится единственным клиентом: получает накопленный вывод
+ * и пишет в stdin CLI — ходы агента от чужого имени. Поэтому с ключом клиентом
+ * становится только тот, чья первая строка — `relay_hello` с этим ключом;
+ * прежний клиент до этого не трогается. Без ключа в описании (сервер старой
+ * версии) — пускаем всех, как раньше.
+ */
+const TOKEN = typeof spec.token === 'string' ? spec.token : '';
+const HELLO_MS = 5_000;
+const HELLO_MAX = 4096;
+
+function tokenMatches(given) {
+  const expected = Buffer.from(TOKEN, 'utf8');
+  const actual = Buffer.from(typeof given === 'string' ? given : '', 'utf8');
+  return actual.length === expected.length && timingSafeEqual(actual, expected);
+}
+
+function onConnection(socket) {
+  if (!TOKEN) return onClient(socket);
+  let head = Buffer.alloc(0);
+  const refuse = () => {
+    socket.removeListener('data', onData);
+    socket.destroy();
+  };
+  const timer = setTimeout(refuse, HELLO_MS);
+  timer.unref();
+  socket.on('error', () => undefined);
+  function onData(chunk) {
+    head = Buffer.concat([head, chunk]);
+    const end = head.indexOf(10);
+    if (end < 0) {
+      if (head.length > HELLO_MAX) refuse();
+      return;
+    }
+    clearTimeout(timer);
+    let hello;
+    try {
+      hello = JSON.parse(head.subarray(0, end).toString('utf8'));
+    } catch {
+      hello = undefined;
+    }
+    if (hello?.type !== 'relay_hello' || !tokenMatches(hello.token)) return refuse();
+    socket.removeListener('data', onData);
+    socket.pause();
+    // Строки, пришедшие одним куском с приветствием, — уже ввод клиента.
+    const rest = head.subarray(end + 1);
+    if (rest.length) socket.unshift(rest);
+    onClient(socket);
+  }
+  socket.on('data', onData);
+}
+
+const server = createServer(onConnection);
 server.on('error', (error) => {
   // Канал не поднялся — сервер к CLI не подключится никогда, держать его незачем.
   stderr = `${stderr}\nrelay: ${error.message}`.slice(-STDERR_TAIL);

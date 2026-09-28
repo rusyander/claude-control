@@ -1,7 +1,10 @@
-import type {
-  PanelActionOutcome,
-  PanelAgentPageContext,
-  PanelPendingAction,
+import {
+  previewInLanguage,
+  type PanelActionOutcome,
+  type PanelActionPreview,
+  type PanelAgentPageContext,
+  type PanelPendingAction,
+  type PanelTextParams,
 } from '@agentdeck/contracts/panel-agent';
 
 /**
@@ -61,18 +64,48 @@ export interface CardField {
   long: boolean;
 }
 
+/** Текст по коду словарём телефона; без кода — русский запасной текст сервера. */
+export type CardText = (
+  code: string | undefined,
+  params: PanelTextParams | undefined,
+  fallback: string,
+) => string;
+
 /**
- * Поля карточки. Текст — запасной русский сервера (`label`/`value`): словари
- * кодов живут в вебе, телефону их не прочесть, а данные (путь, промпт) и так
- * без перевода. Значение показывается ЦЕЛИКОМ — решение принимают по тому, что
- * будет выполнено, а не по началу строки.
+ * Поля карточки. Подпись и значение с кодом — словарём телефона (`text`), без
+ * кода — русский запасной текст сервера; данные (путь, промпт) кода не несут и
+ * не переводятся. Значение показывается ЦЕЛИКОМ — решение принимают по тому,
+ * что будет выполнено, а не по началу строки. Двуязычные данные (заголовки
+ * шагов) — стороной языка телефона, см. `cardPreview`.
  */
-export function cardFields(pending: PanelPendingAction): CardField[] {
-  return pending.preview.fields.map((field) => ({
-    label: field.label,
-    value: field.value,
-    long: field.value.length > 160 || field.value.includes('\n'),
-  }));
+export function cardFields(
+  pending: PanelPendingAction,
+  text: CardText = (_code, _params, fallback) => fallback,
+  language = 'ru',
+): CardField[] {
+  return cardPreview(pending, language).fields.map((field) => {
+    const value = text(field.valueCode, field.valueParams, field.value);
+    return {
+      label: text(field.labelCode, field.labelParams, field.label),
+      value,
+      long: value.length > 160 || value.includes('\n'),
+    };
+  });
+}
+
+/**
+ * Предпросмотр на языке телефона: у английского — английские стороны
+ * двуязычных данных, когда сервер их прислал (заголовки шагов в сводке, полях и
+ * диффе); иначе как пришёл — так читаются и старые записи.
+ */
+export function cardPreview(pending: PanelPendingAction, language: string): PanelActionPreview {
+  return previewInLanguage(pending.preview, language);
+}
+
+/** Сводка карточки на языке телефона: код — словарём, подстановки — стороной языка. */
+export function cardSummary(pending: PanelPendingAction, text: CardText, language: string): string {
+  const preview = cardPreview(pending, language);
+  return text(preview.summaryCode, preview.summaryParams, preview.summary);
 }
 
 /** Опасное действие: отказ — по умолчанию, «Выполнить» не первой кнопкой. */

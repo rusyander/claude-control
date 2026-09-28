@@ -4,13 +4,15 @@ import type {
   ProjectTestFailureGroup,
   ProjectTestFlaky,
   ProjectTestGroup,
+  ProjectTestPointResult,
   ProjectTestReleaseSummary,
   ProjectTestReport,
   ProjectTestRunRecord,
   ProjectTestRunSummary,
 } from '@agentdeck/contracts';
-import { stabilityOf, summarize } from '@agentdeck/contracts/test-format';
+import { runOrigin, stabilityOf, summarize } from '@agentdeck/contracts/test-format';
 import { listFiles, optional, readJson, testsPath, writeJson } from './files.ts';
+import { withLegacyRetry } from './retry-pass.ts';
 
 /**
  * История прогонов: файлы `runs/<id>.run.json` в самом проекте.
@@ -89,15 +91,21 @@ function parseRun(data: unknown, fileId: string): ProjectTestRunRecord | undefin
   const startedAt = optional(record.startedAt);
   if (!startedAt) return undefined;
 
+  // Старые записи несли «прошёл на повторе» русской фразой в заметке прохода —
+  // она читается числом `flakyAttempts` (F-355).
   const results = Array.isArray(record.results)
-    ? (record.results as ProjectTestRunRecord['results'])
+    ? (record.results as ProjectTestRunRecord['results']).map(withLegacyRetry)
     : [];
   const summary = (record.summary ?? summarize(results)) as ProjectTestRunSummary;
 
+  const mode = (optional(record.mode) ?? 'run') as ProjectTestRunRecord['mode'];
   return {
     id: optional(record.id) ?? fileId,
-    mode: (optional(record.mode) ?? 'run') as ProjectTestRunRecord['mode'],
+    mode,
     actor: (optional(record.actor) ?? 'agent') as ProjectTestRunRecord['actor'],
+    // Старый импорт без поля — из CI; мусор в поле — тоже: подписать чужой
+    // отчёт прогоном панели хуже, чем наоборот.
+    origin: runOrigin({ mode, origin: optional(record.origin) }),
     groupId: optional(record.groupId),
     planId: optional(record.planId),
     environmentId: optional(record.environmentId),
@@ -109,11 +117,15 @@ function parseRun(data: unknown, fileId: string): ProjectTestRunRecord | undefin
     startedAt,
     finishedAt: optional(record.finishedAt),
     error: optional(record.error),
+    messageCode: optional(record.messageCode),
+    exitCode: typeof record.exitCode === 'number' ? record.exitCode : undefined,
     tokens: typeof record.tokens === 'number' ? record.tokens : undefined,
     costUsd: typeof record.costUsd === 'number' ? record.costUsd : undefined,
     sessionId: optional(record.sessionId),
     results,
     summary,
+    planned: typeof record.planned === 'number' ? record.planned : undefined,
+    unwalked: parseUnwalked(record.unwalked),
     draft: parseDraftOutcome(record.draft),
     generate: parseStamp(record.generate),
     tms: parseTms(record.tms),
@@ -161,6 +173,35 @@ function parseStamp(raw: unknown): ProjectTestRunRecord['generate'] {
   };
 }
 
+/** Непройденные проходы записи: чужая строка без ключа или названия пропускается. */
+function parseUnwalked(raw: unknown): ProjectTestRunRecord['unwalked'] {
+  if (!Array.isArray(raw)) return undefined;
+  const points = raw.flatMap((item) => {
+    if (!item || typeof item !== 'object') return [];
+    const value = item as Record<string, unknown>;
+    const pointId = optional(value.pointId);
+    const groupId = optional(value.groupId);
+    const caseId = optional(value.caseId);
+    if (!pointId || !groupId || !caseId) return [];
+    const params =
+      value.params && typeof value.params === 'object'
+        ? Object.fromEntries(
+            Object.entries(value.params as Record<string, unknown>).map(([k, v]) => [k, String(v)]),
+          )
+        : undefined;
+    return [
+      {
+        pointId,
+        groupId,
+        caseId,
+        title: optional(value.title) ?? caseId,
+        ...(params ? { params } : {}),
+      },
+    ];
+  });
+  return points.length > 0 ? points : undefined;
+}
+
 /** Итог генерации в записи прогона: сколько предложено, сколько принято и кем. */
 function parseDraftOutcome(raw: unknown): ProjectTestRunRecord['draft'] {
   if (!raw || typeof raw !== 'object') return undefined;
@@ -195,15 +236,40 @@ function durationOf(run: ProjectTestRunRecord): number {
 export function caseStatusHistory(runs: ProjectTestRunRecord[]): Map<string, string[]> {
   const byCase = new Map<string, string[]>();
   for (const run of [...runs].reverse()) {
+    // Прогон — ОДНА точка истории кейса: у кейса с параметрами проходов
+    // несколько, и выложенные подряд они делали из поломки на одном значении
+    // (светлая тема падает всегда, тёмная всегда проходит) «мигающий» кейс
+    // уже после первого прогона. Точка прогона — худший из его проходов.
+    const worst = new Map<string, string>();
     for (const result of run.results) {
       const key = `${result.groupId}:${result.caseId}`;
+      const seen = worst.get(key);
+      if (
+        seen === undefined ||
+        (HISTORY_SEVERITY[result.status] ?? 0) > (HISTORY_SEVERITY[seen] ?? 0)
+      )
+        worst.set(key, result.status);
+    }
+    for (const [key, status] of worst) {
       const list = byCase.get(key) ?? [];
-      if (list.length < STABILITY_WINDOW) list.push(result.status);
+      if (list.length < STABILITY_WINDOW) list.push(status);
       byCase.set(key, list);
     }
   }
   return byCase;
 }
+
+/**
+ * Тяжесть исхода прохода: решающий в прогоне — худший. Пропуск легче прохода:
+ * «это значение не гоняли» ничего не говорит о кейсе, а случившийся проход
+ * говорит, — иначе серия зелёных и стабильность теряли его (ревью z1 C28).
+ */
+export const HISTORY_SEVERITY: Record<string, number> = {
+  failed: 4,
+  blocked: 3,
+  passed: 2,
+  skipped: 1,
+};
 
 /**
  * Нестабильные кейсы по истории.
@@ -323,10 +389,15 @@ export function failureGroups(
     .sort((left, right) => right.count - left.count || right.cases.length - left.cases.length);
 }
 
+/** Красный исход: провал или блокировка — результата у кейса нет. */
+function isRedStatus(status: string): boolean {
+  return status === 'failed' || status === 'blocked';
+}
+
 /**
  * Чем доказаны провалы.
  *
- * Считается по САМОМУ СВЕЖЕМУ провалу каждого кейса, а не по всем подряд:
+ * Считается по САМОМУ СВЕЖЕМУ вердикту каждого кейса, а не по всем подряд:
  * провал, доказанный снимком месяц назад и голословный сегодня, — это
  * голословный провал, и перепройти надо именно его.
  *
@@ -353,22 +424,41 @@ export function evidenceOf(
 
   // Прогоны идут от новых к старым — первый встреченный результат кейса и есть
   // его последнее слово.
+  //
+  // Последнее слово — последний ВЕРДИКТ, а не последний провал: кейс, прошедший
+  // после провала, починен и в красные не идёт. Пропуск вердиктом не считается —
+  // «в этот раз не проверяли» старый провал не отменяет. Внутри прогона кейс с
+  // параметрами решается худшим проходом, как и в истории стабильности.
   for (const run of runs) {
+    const decisive = new Map<string, ProjectTestPointResult>();
     for (const result of run.results) {
-      if (result.status !== 'failed' && result.status !== 'blocked') continue;
+      if (result.status !== 'passed' && !isRedStatus(result.status)) continue;
       const key = `${result.groupId}:${result.caseId}`;
+      const current = decisive.get(key);
+      if (
+        !current ||
+        (HISTORY_SEVERITY[result.status] ?? 0) > (HISTORY_SEVERITY[current.status] ?? 0)
+      )
+        decisive.set(key, result);
+    }
+    for (const [key, result] of decisive) {
       if (seen.has(key)) continue;
       seen.add(key);
+      if (!isRedStatus(result.status)) continue;
 
       const row = {
         groupId: result.groupId,
         caseId: result.caseId,
         title: titles.get(key) ?? result.caseId,
       };
+      const proven = (result.attachments ?? []).length > 0;
+      const detailed = result.failure?.step !== undefined || Boolean(result.failure?.actual);
       summary.failed += 1;
-      if ((result.attachments ?? []).length > 0) summary.proven += 1;
-      else summary.missing.push(row);
-      if (result.failure?.step !== undefined || result.failure?.actual) summary.detailed += 1;
+      if (proven) summary.proven += 1;
+      if (detailed) summary.detailed += 1;
+      // «Не доказан ничем» — ни снимка, ни разбора: по шагу с ожиданием и фактом
+      // провал воспроизводится и заводится дефектом и без картинки.
+      if (!proven && !detailed) summary.missing.push(row);
       if (result.failure?.retry === 'flaky') summary.flaky.push(row);
     }
   }
@@ -398,7 +488,10 @@ export function buildReport(
       if (testCase.archived) continue;
       liveCases += 1;
       if (testCase.muted) muted += 1;
-      const key = testCase.area ?? 'без зоны';
+      // Кейс без зоны — пустой ключ: слово «без зоны» подставляет экран на языке
+      // панели (`tests.report.areaNone`). Русское слово ключом шло в английский
+      // интерфейс как есть (живой обход 28.09).
+      const key = testCase.area ?? '';
       const row = areas.get(key) ?? { total: 0, passed: 0, failed: 0, unknown: 0 };
       row.total += 1;
       if (testCase.status === 'passed') row.passed += 1;

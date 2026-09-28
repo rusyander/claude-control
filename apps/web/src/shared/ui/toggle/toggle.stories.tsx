@@ -122,7 +122,7 @@ export const СПодписью: Story = {
     ] as const;
 
     return (
-      <Card padding="md" style={{ maxWidth: 'var(--text-measure)' }}>
+      <Card padding="md" className="prose">
         <Stack gap="var(--spacing-md)">
           {rows.map(([key, label, hint]) => (
             <Stack

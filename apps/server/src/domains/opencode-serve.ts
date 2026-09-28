@@ -1,5 +1,6 @@
 import { spawn as nodeSpawn, type ChildProcess } from 'node:child_process';
 import { createServer } from 'node:net';
+import { killChildTree } from '../lib/process-tree.ts';
 
 /**
  * Сессионный режим OpenCode (IDEA-8) — вторая, более богатая форма ассистента
@@ -82,7 +83,6 @@ const isWindows = (): boolean => process.platform === 'win32';
  */
 export class OpencodeServe {
   private child: ChildProcess | undefined;
-  private killWith: typeof nodeSpawn | undefined;
   private baseUrl: string | undefined;
   private starting: Promise<string | undefined> | undefined;
   private readonly sessions = new Map<string, string>();
@@ -136,12 +136,11 @@ export class OpencodeServe {
     const baseUrl = `http://127.0.0.1:${port}`;
     const ready = await this.waitHealthy(baseUrl, deps);
     if (!ready) {
-      killTree(child, spawnImpl);
+      killTree(child);
       return undefined;
     }
 
     this.child = child;
-    this.killWith = spawnImpl;
     this.baseUrl = baseUrl;
     return baseUrl;
   }
@@ -272,7 +271,7 @@ export class OpencodeServe {
 
   /** Погасить сервер (выход панели, смена провайдера, тесты). */
   dispose(): void {
-    if (this.child) killTree(this.child, this.killWith);
+    if (this.child) killTree(this.child);
     this.forget();
   }
 
@@ -284,18 +283,12 @@ export class OpencodeServe {
 
 /**
  * Снять сервер ЦЕЛИКОМ. На Windows CLI запущен через `cmd.exe /c`, и `kill()`
- * убил бы только оболочку — настоящий процесс остался бы держать порт.
+ * убил бы только оболочку — настоящий процесс остался бы держать порт. Дерево
+ * снимает общий `killChildTree` (без `taskkill /T`, который цеплял чужих сирот);
+ * подделка из теста без кодов выхода по номеру не снимается вовсе.
  */
-function killTree(child: ChildProcess, spawnImpl: typeof nodeSpawn = nodeSpawn): void {
-  try {
-    if (isWindows() && child.pid) {
-      spawnImpl('taskkill', ['/pid', String(child.pid), '/T', '/F'], { windowsHide: true });
-    } else {
-      child.kill();
-    }
-  } catch {
-    // Снятие процесса не должно ронять ответ пользователю.
-  }
+function killTree(child: ChildProcess): void {
+  killChildTree(child);
 }
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));

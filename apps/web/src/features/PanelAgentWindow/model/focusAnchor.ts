@@ -1,5 +1,3 @@
-const FOCUSABLE = 'input, textarea, select, button, a[href], [tabindex]';
-
 /**
  * Потолок ожидания якоря. Ленивая страница рисует разметку после загрузки
  * модуля и ответа API; на медленном диске или большом репозитории это секунды,
@@ -33,15 +31,44 @@ export const TYPING_GRACE_MS = 2_000;
 /** Кнопки решения глухи столько после появления карточки: палец уже летел. */
 export const DECISION_ARM_MS = 500;
 
+/**
+ * Что делает нажатие кнопки решения. `arming` — карточка моложе
+ * `DECISION_ARM_MS`: решения нет, но и молчать нельзя — клик, который тихо
+ * пропал, человек принимает за сломанную кнопку. Карточка говорит почему.
+ */
+export function decisionPress(
+  armed: boolean,
+  decision: 'approve' | 'reject',
+  cannotApprove: boolean,
+): 'decide' | 'arming' | 'blocked' {
+  if (!armed) return 'arming';
+  if (decision === 'approve' && cannotApprove) return 'blocked';
+  return 'decide';
+}
+
 /** Клавиши, которые не набор текста: ими ходят по панели, а не пишут. */
 const NAVIGATION_KEYS = new Set(['Tab', 'Escape', 'Shift', 'Control', 'Alt', 'Meta', 'CapsLock']);
 
 let lastTypedAt = Number.NEGATIVE_INFINITY;
 
+/**
+ * Поле, куда фокус вернула сама панель (кадр итога снял карточку вместе с
+ * кнопкой). Это не «человек печатает»: иначе поле ключа, которое открывает
+ * действие, фокус не получало, и вставленный ключ уходил в чат агента.
+ * Первое нажатие клавиши делает поле снова человеческим.
+ */
+let returnedFocus: Element | null = null;
+
+/** Отметить поле, в которое фокус вернула панель, а не человек. */
+export function noteReturnedFocus(element: Element | null): void {
+  returnedFocus = element;
+}
+
 /** Отметить нажатие клавиши (слушатель документа ставит окно агента). */
 export function noteKeystroke(key: string, now: number = Date.now()): void {
   if (NAVIGATION_KEYS.has(key)) return;
   lastTypedAt = now;
+  returnedFocus = null;
 }
 
 /** Слушать клавиатуру всего документа; возвращает отписку. */
@@ -59,13 +86,16 @@ export function typedRecently(now: number = Date.now()): boolean {
 /** Для тестов: забыть последнее нажатие. */
 export function resetTyping(): void {
   lastTypedAt = Number.NEGATIVE_INFINITY;
+  returnedFocus = null;
 }
 
+/** Поля, в которые не печатают. Один список и для «человек печатает», и для фокуса на якоре. */
 const NON_TEXT_INPUTS = new Set([
   'button',
   'checkbox',
   'color',
   'file',
+  'hidden',
   'image',
   'radio',
   'range',
@@ -96,7 +126,7 @@ export function canTakeFocus(
   now: number = Date.now(),
 ): boolean {
   if (typedRecently(now)) return false;
-  if (isEditable(active)) return false;
+  if (isEditable(active) && active !== returnedFocus) return false;
   return isFocusFree(active);
 }
 
@@ -118,7 +148,11 @@ export function findAnchor(root: ParentNode, focus: string): HTMLElement | null 
   const byId = (root as Document).getElementById?.(focus) ?? null;
   if (byId) return byId;
   const escaped = focus.replace(/["\\]/g, '\\$&');
-  return root.querySelector<HTMLElement>(`[data-agent-anchor="${escaped}"]`);
+  // Второе имя того же места: у связанной пары групп одна карточка на двоих, и
+  // проектная половина своей разметки не имеет.
+  return root.querySelector<HTMLElement>(
+    `[data-agent-anchor="${escaped}"], [data-agent-anchor-alias="${escaped}"]`,
+  );
 }
 
 export interface AnchorWatch<T> {
@@ -195,18 +229,33 @@ function focusHeldByAnchorDialog(anchor: HTMLElement, active: Element | null): b
   return Boolean(dialog?.contains(anchor));
 }
 
-/** Фокус в якорь: у обёртки поля (поле ключа в мастере) — самому полю внутри. */
-function focusElement(element: HTMLElement): void {
-  element.scrollIntoView({ block: 'center' });
-  const field = element.matches(FOCUSABLE)
-    ? element
-    : element.querySelector<HTMLElement>(FOCUSABLE);
-  if (field) {
-    field.focus();
-    return;
+/**
+ * Поле, которое ждёт ввода. Кнопки, ссылки и переключатели сюда не входят: у
+ * строки списка первый фокусируемый — «Тест» или тумблер, и следующий Enter или
+ * пробел человека нажал бы их вместо того, чтобы что-то напечатать. Отбор — тем
+ * же `isEditable`: свой список типов у селектора расходился с ним и пропускал
+ * скрытое поле и выбор файла — фокус «удавался» впустую, и подсветки не было.
+ */
+const FIELD_CANDIDATES = 'input, textarea, select';
+
+function typingField(element: HTMLElement): HTMLElement | null {
+  if (element.matches(FIELD_CANDIDATES) && isEditable(element)) return element;
+  for (const candidate of element.querySelectorAll<HTMLElement>(FIELD_CANDIDATES)) {
+    if (isEditable(candidate)) return candidate;
   }
-  element.setAttribute('tabindex', '-1');
-  element.focus();
+  return null;
+}
+
+/**
+ * Фокус в поле якоря (поле ключа в мастере, секрет в форме). Поля нет — это
+ * строка списка или раздел: `false`, и якорь показывают подсветкой.
+ */
+function focusElement(element: HTMLElement): boolean {
+  const field = typingField(element);
+  if (!field) return false;
+  element.scrollIntoView({ block: 'center' });
+  field.focus();
+  return true;
 }
 
 /**
@@ -234,7 +283,7 @@ export function focusAnchor(
         childList: true,
         subtree: true,
         attributes: true,
-        attributeFilter: ['id', 'data-agent-anchor'],
+        attributeFilter: ['id', 'data-agent-anchor', 'data-agent-anchor-alias'],
       });
       return () => observer.disconnect();
     },
@@ -246,8 +295,8 @@ export function focusAnchor(
           onFound?.();
           const active = document.activeElement;
           const typing = typedRecently();
-          if (!typing && (canTakeFocus(active) || focusHeldByAnchorDialog(anchor, active))) {
-            focusElement(anchor);
+          const mayTake = canTakeFocus(active) || focusHeldByAnchorDialog(anchor, active);
+          if (!typing && mayTake && focusElement(anchor)) {
             onFocused?.();
             return;
           }

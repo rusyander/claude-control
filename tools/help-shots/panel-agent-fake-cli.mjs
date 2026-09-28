@@ -133,6 +133,60 @@ const outcomeReply = (result, done) => {
 
 const SCRIPTS = [
   {
+    // Первым: реплика про сценарий называет шаги, и слова шагов не должны
+    // увести её в чужой сценарий ниже.
+    when: /сценари|scenario/i,
+    async run() {
+      say(
+        t(
+          'Соберу сценарий одной карточкой — подтвердите её.',
+          'I will draft the scenario as one card — please confirm it.',
+        ),
+      );
+      const step = (ruTitle, enTitle, ruPrompt, enPrompt, ruGate, enGate) => ({
+        title: { ru: ruTitle, en: enTitle },
+        prompt: { ru: ruPrompt, en: enPrompt },
+        gate: { ru: ruGate, en: enGate },
+      });
+      const result = await tool('draft_scenario', {
+        name: t('Выпуск', 'Release'),
+        description: t('Сборка, проверка и выпуск версии', 'Build, check and ship a version'),
+        when: t('Когда просят выпустить версию', 'When asked to ship a version'),
+        steps: [
+          step(
+            'Собрать',
+            'Build',
+            'Соберите проект командой сборки из package.json.',
+            'Build the project with the build script from package.json.',
+            'Сборка прошла без ошибок',
+            'The build finished without errors',
+          ),
+          step(
+            'Прогнать проверки',
+            'Run the checks',
+            'Запустите тесты и линтер, почините красное.',
+            'Run the tests and the linter, fix what is red.',
+            'Тесты и линтер зелёные',
+            'Tests and linter are green',
+          ),
+          step(
+            'Описать изменения',
+            'Describe the changes',
+            'Соберите список изменений с прошлой версии.',
+            'Collect the changes since the previous version.',
+            'Список изменений готов',
+            'The change list is ready',
+          ),
+        ],
+      });
+      if (result.isError || !/^Done/.test(result.text)) return outcomeReply(result, '');
+      return t(
+        'Сценарий «Выпуск» создан выключенным, три шага по порядку; открыл раздел «Группы».',
+        'Scenario “Release” created switched off, three steps in order; I opened Groups.',
+      );
+    },
+  },
+  {
     when: /проект|project/i,
     async run() {
       const path = request.match(/[A-Za-z]:[\\/][^\s«»"]+/)?.[0] ?? '';

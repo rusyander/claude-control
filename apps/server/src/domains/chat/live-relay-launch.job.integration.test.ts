@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 import { RELAY_SCRIPT } from './live-transport.ts';
+import { killPidTree } from '../../lib/process-tree.ts';
 
 const LAUNCHER = join(import.meta.dirname, 'live-relay-launch.mjs');
 const FAKE_CLI = join(import.meta.dirname, '__fixtures__', 'fake-live-cli.mjs');
@@ -23,10 +24,22 @@ describe.skipIf(process.platform !== 'win32')('посредник выходит
   let root: string;
   let relayPid = 0;
 
-  afterEach(() => {
-    if (relayPid > 0) spawnSync('taskkill', ['/PID', String(relayPid), '/T', '/F']);
+  afterEach(async () => {
+    // Снятие по номеру не ждёт выхода, а каталог — рабочая папка CLI — Windows
+    // отпускает не сразу после его смерти: встроенные повторы `rmSync` на EPERM
+    // сдаются раньше. Повторяем сами, до срока.
+    if (relayPid > 0) killPidTree(relayPid, { spawnedAt: Date.now() });
     relayPid = 0;
-    rmSync(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
+    const until = Date.now() + 10_000;
+    for (;;) {
+      try {
+        rmSync(root, { recursive: true, force: true });
+        return;
+      } catch (error) {
+        if (Date.now() > until) throw error;
+        await new Promise((done) => setTimeout(done, 200));
+      }
+    }
   });
 
   const alive = (pid: number): boolean => {

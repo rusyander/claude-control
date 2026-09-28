@@ -2,17 +2,22 @@
   max-width: 44ch;
 }
 
-// Компактный select под шапку: неброский, но кликабельный. Цвет наследуем явно —
-// у select свои системные значения.
+// Select под шапку: неброский, но кликабельный. Цвет наследуем явно — у select
+// свои системные значения. Высота и кегль — ровно как у кнопок ряда (34px,
+// body-sm): мелкий select рядом с кнопками читался другим калибром и стоял
+// ниже их средней линии (владелец, 28.09). Отступ под стрелку — общий стиль
+// select'ов (L1), здесь его не трогаем.
 .select {
-  max-width: 130px;
+  box-sizing: border-box;
+  height: 34px;
+  max-width: 150px;
   padding: 4px var(--spacing-2xs);
   border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-sm);
+  border-radius: 8px;
   background: var(--color-surface-sunken);
   color: var(--color-fg);
   font-family: inherit;
-  font-size: var(--font-size-caption);
+  font-size: var(--font-size-body-sm);
   cursor: pointer;
 }
 

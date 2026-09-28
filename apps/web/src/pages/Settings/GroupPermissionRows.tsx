@@ -41,7 +41,7 @@ export function GroupPermissionRows({
             justify="between"
             gap="var(--spacing-md)"
           >
-            <Stack gap="var(--spacing-3xs)" style={{ maxWidth: 'var(--text-measure)' }}>
+            <Stack gap="var(--spacing-3xs)" className="prose">
               <Stack direction="row" align="center" gap="var(--spacing-xs)" wrap>
                 <Typography variant="body-sm" as="span">
                   {t(keys.label)}
@@ -59,7 +59,9 @@ export function GroupPermissionRows({
             <Stack
               direction="row"
               gap="var(--spacing-3xs)"
-              role="radiogroup"
+              // Кнопки-переключатели в группе, а не радиогруппа: радио обещает стрелки и
+              // один шаг табом на группу, а здесь каждая кнопка — свой шаг (ревью 28.09, F-244).
+              role="group"
               aria-label={t(keys.label)}
               wrap
             >
@@ -68,8 +70,7 @@ export function GroupPermissionRows({
                   key={level}
                   size="sm"
                   variant={row.level === level ? 'primary' : 'ghost'}
-                  role="radio"
-                  aria-checked={row.level === level}
+                  aria-pressed={row.level === level}
                   disabled={disabled}
                   onClick={() => row.level !== level && onChange(row.id, level)}
                 >

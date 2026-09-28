@@ -197,8 +197,8 @@ describe('SplitConveyor: пауза группы (журнал 81a)', () => {
 
     expect(t.conveyor.resumePaused(PARENT, 0, true)).toBe('sent');
     expect(t.resumed[0]?.index).toBe(0);
-    expect(t.resumed[0]?.prompt).toMatch(/^Ветка группы: feature\/one\. Задачи группы: PROJ-1\./);
-    expect(t.resumed[0]?.prompt).toMatch(/поставил группу на паузу/);
+    expect(t.resumed[0]?.prompt).toMatch(/^Group branch: feature\/one\. Group tasks: PROJ-1\./);
+    expect(t.resumed[0]?.prompt).toMatch(/paused the group/);
   });
 
   it('«Продолжить» при свободном месте — сразу; не на паузе — отказ', async () => {
@@ -333,7 +333,7 @@ describe('SplitConveyor: лимит подписки (журнал 81b, 89)', ()
 
     await t.advance(1);
     expect(t.resumed.map((item) => item.index)).toEqual([0]);
-    expect(t.resumed[0]?.prompt).toMatch(/лимит/);
+    expect(t.resumed[0]?.prompt).toMatch(/subscription limit/);
     expect(t.launches).toEqual([[0, 1], [2]]);
     expect(t.records.get(PARENT)?.limitUntil).toBeUndefined();
   });
@@ -442,7 +442,7 @@ describe('SplitConveyor: продолжение доставленной гру�
     t.conveyor.onChainEnded(t.link(1), { status: 'done' });
     await t.flush();
     expect(t.resumed.map((item) => item.index)).toEqual([0]);
-    expect(t.resumed[0]?.prompt).toMatch(/^Ветка группы: feature\/one\./);
+    expect(t.resumed[0]?.prompt).toMatch(/^Group branch: feature\/one\./);
     expect(t.group(0)?.parked).toBeUndefined();
   });
 

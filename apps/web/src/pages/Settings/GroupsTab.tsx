@@ -1,10 +1,11 @@
 import { Stack } from '@shared/ui/stack';
 import { GroupsDefaultsCard } from './GroupsDefaultsCard';
 import { GroupsProjectCard } from './GroupsProjectCard';
+import { SievesCard } from './SievesCard';
 
 /**
  * Раздел «Группы»: одно место для работы с разделением. Сверху — общие
- * правила, снизу — проект, который их переопределяет. Хранит всё сервер:
+ * правила, ниже — проект, который их переопределяет, и сита перед MR. Хранит всё сервер:
  * группы работают без браузера, и решать за них по вкладке нельзя.
  */
 export function GroupsTab() {
@@ -12,6 +13,7 @@ export function GroupsTab() {
     <Stack gap="var(--spacing-lg)">
       <GroupsDefaultsCard />
       <GroupsProjectCard />
+      <SievesCard />
     </Stack>
   );
 }

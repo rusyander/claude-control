@@ -3,10 +3,16 @@ export {
   useDecidePanelAction,
   usePanelAgentJournal,
   usePanelAgentConversations,
+  useDeletePanelAgentConversation,
   fetchPanelAgentConversation,
   isPreviewTruncatedRefusal,
 } from './api/PanelAgentApi';
-export { runPanelAgent, splitRunFrames, type PanelAgentRunOutcome } from './api/runStream';
+export {
+  runPanelAgent,
+  splitRunFrames,
+  STREAM_LOST,
+  type PanelAgentRunOutcome,
+} from './api/runStream';
 export {
   isPanelAgentEvent,
   publishPanelAgentEvent,
@@ -14,7 +20,7 @@ export {
   usePanelAgentEvents,
 } from './model/events';
 export { withPending, withoutPending, initialDecision } from './model/pending';
-export { buildPageContext, sectionLabelKey } from './model/pageContext';
+export { buildPageContext, contextProject, sectionLabelKey } from './model/pageContext';
 export {
   pageNavigation,
   contourKeyAnchor,
@@ -26,5 +32,7 @@ export {
   ENV_SECRET_TAB,
   endpointTokenAnchor,
   integrationSecretAnchor,
+  integrationAnchor,
+  dlpRuleAnchor,
   type PageNavigation,
 } from './model/pageTarget';

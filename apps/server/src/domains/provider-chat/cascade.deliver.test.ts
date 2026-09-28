@@ -6,7 +6,7 @@ import { REVIEW_BLOCK_LANG } from '@agentdeck/contracts/model-cascade';
 import type { ChatLink } from '../../lib/app-store/app-store.types.ts';
 import type { ConfigProvider } from '../../providers/types.ts';
 import type { ChainOutcome } from '../chat/split-conveyor.ts';
-import { createForeignStagePlanner } from './cascade.ts';
+import { createForeignStagePlanner, type ForeignStagePlannerDeps } from './cascade.ts';
 import { appendMessage, createChat, readChat, readChatCascade } from './store.ts';
 import type { ProviderChatCascade } from './store.ts';
 import type { ProviderChatService } from './ProviderChatService.ts';
@@ -61,7 +61,7 @@ describe('чужой CLI: звено доставки группы', () => {
     rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   });
 
-  function planner(delivers = true) {
+  function planner(delivers = true, sieves?: ForeignStagePlannerDeps['sieves']) {
     return createForeignStagePlanner({
       chats: { send } as unknown as ProviderChatService,
       provider: (id) => (id === 'codex' ? provider : undefined),
@@ -71,6 +71,7 @@ describe('чужой CLI: звено доставки группы', () => {
       linkOf: (key) => links[key],
       saveLink: (key, link) => void (links[key] = link),
       delivers: () => delivers,
+      ...(sieves ? { sieves } : {}),
       onChainEnded: (link: ChatLink, outcome: ChainOutcome) =>
         void ended.push({ ...(link.stage ? { stage: link.stage } : {}), status: outcome.status }),
     });
@@ -135,7 +136,7 @@ describe('чужой CLI: звено доставки группы', () => {
     const [id] = deliveries();
     expect(id).toBeDefined();
     const prompt = (send.mock.calls[0]?.[3] as { text: string }).text;
-    expect(prompt).toContain('отдельного ревью у неё нет');
+    expect(prompt).toContain('it has no separate review');
     expect(readChatCascade(dir, 'codex', 'work')?.deliveredAt).toBeTruthy();
     expect(ended).toEqual([]);
   });
@@ -155,7 +156,7 @@ describe('чужой CLI: звено доставки группы', () => {
     planner()(finish('review', reviewBlock(['поправь a.ts:1'])));
 
     const prompt = (send.mock.calls[0]?.[3] as { text: string }).text;
-    expect(prompt).toContain('коммит, пуш и MR им не запрещены');
+    expect(prompt).toContain('commit, push and MR are not forbidden by it');
   });
 
   it('конец доставки — конец цепочки: итог уходит конвейеру, звеньев больше нет', () => {
@@ -189,5 +190,56 @@ describe('чужой CLI: звено доставки группы', () => {
 
     expect(send).not.toHaveBeenCalled();
     expect(ended).toEqual([{ stage: 'fix', status: 'done' }]);
+  });
+
+  // Сита перед MR (решение владельца 28.09) — тем же абзацем, что у Claude.
+  it('доставка получает абзац сит; строки правок и прежних звеньев едут в её связь', async () => {
+    chat('fix', FIX, 'fix');
+    links['codex:fix'] = {
+      ...LINK,
+      sieveRows: [{ id: 'merge-tree', status: 'pass', evidence: 'git merge-tree → clean' }],
+    };
+    const asked: { cwd: string; stage: string; done: string[] }[] = [];
+    const text = [
+      'Поправил.',
+      '```agentdeck:sieves',
+      '{"sieves":[{"id":"consumers-repo-wide","status":"pass","evidence":"git grep oldName → 0 hits"}]}',
+      '```',
+    ].join('\n');
+
+    const planned = planner(true, async (cwd, _link, stage, done) => {
+      asked.push({ cwd, stage, done: done.map((row) => row.id) });
+      return 'SIEVES-PARAGRAPH';
+    })(finish('fix', text));
+    // Абзац читается асинхронно (git не держит сервер): до него звено не стартует.
+    expect(send).not.toHaveBeenCalled();
+    await planned;
+
+    const [id] = deliveries();
+    const prompt = (send.mock.calls[0]?.[3] as { text: string }).text;
+    expect(prompt).toContain('SIEVES-PARAGRAPH');
+    expect(asked).toEqual([
+      { cwd: dir, stage: 'deliver', done: ['merge-tree', 'consumers-repo-wide'] },
+    ]);
+    expect(links[`codex:${id}`]?.sieveRows?.map((row) => row.id)).toEqual([
+      'merge-tree',
+      'consumers-repo-wide',
+    ]);
+  });
+
+  // Ревью сит, 28.09: без доставки отчёт сит никто не судит — абзац обещал бы ложь.
+  it('без доставки абзаца сит нет: его отчёт никто не проверил бы', () => {
+    // Работа на пониженной модели заводит ревью — звено, которому сита положены.
+    chat('work', { ...FIX, stage: 'work' }, 'work');
+    links['codex:work'] = { ...LINK, stage: 'work' };
+    const asked: string[] = [];
+    planner(false, async (_cwd, _link, stage) => {
+      asked.push(stage);
+      return 'SIEVES-PARAGRAPH';
+    })(finish('work', 'Сделал.'));
+
+    expect(send).toHaveBeenCalled();
+    expect(asked).toEqual([]);
+    expect(JSON.stringify(send.mock.calls)).not.toContain('SIEVES-PARAGRAPH');
   });
 });

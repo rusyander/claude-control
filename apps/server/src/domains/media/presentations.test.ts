@@ -272,13 +272,13 @@ describe('generateDeck: свой запрос через шлюз', () => {
       stream: false,
       messages: [
         { role: 'system', content: promptText(appData, 'presentation') },
-        { role: 'user', content: expect.stringContaining('Тема: итоги квартала') },
+        { role: 'user', content: expect.stringContaining('Topic: итоги квартала') },
       ],
     });
     // Вопросов на этой дороге быть не может: разговора нет, и ответить на них
     // некому — вопрос вместо колоды стал бы отказом «модель ответила не колодой».
     const asked = String((seen[0]?.body.messages as Array<{ content: string }>)[1]?.content ?? '');
-    expect(asked).toContain('Вопросов не задавай');
+    expect(asked).toContain('Ask no questions');
     expect(asked).toContain('agentdeck:deck');
     expect(deck).toMatchObject({
       chatId: 'chat-1',
@@ -437,10 +437,10 @@ describe('правка колоды: панель помнит вместо аг
     expect(prompt).toContain('Итоги квартала');
     expect(prompt).toContain('выросла вдвое');
     expect(prompt).toContain('третий слайд короче');
-    expect(prompt).toContain('ВСЯ колода после правки');
+    expect(prompt).toContain('the WHOLE deck after the revision');
     // Правила режима из каталога — в той же просьбе: у агента системного
     // сообщения нет, и второго места для правил не существует.
-    expect(prompt).toContain('Раскладки');
+    expect(prompt).toContain('## Layouts');
   });
 
   it('колоды на диске уже нет — 404 словами, а не молчаливая новая колода', () => {

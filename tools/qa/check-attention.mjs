@@ -23,6 +23,16 @@ const WAITING_LABEL = 'агент ждёт ответа';
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1500, height: 950 } });
 await bypassOnboarding(page);
+// Метка в заголовке зовёт только за НЕувиденный повод: окно в фокусе = увидено
+// (`shared/lib/attention`). Безголовый браузер считает вкладку в фокусе всегда,
+// поэтому человек здесь «в другой программе» — граница, а не логика панели.
+await page.addInitScript(() => {
+  Document.prototype.hasFocus = () => false;
+  Object.defineProperty(Document.prototype, 'visibilityState', {
+    configurable: true,
+    get: () => 'hidden',
+  });
+});
 
 let awaiting = true;
 let target;
@@ -85,7 +95,12 @@ if (!target) {
 
 const dots = page.getByRole('img', { name: WAITING_LABEL });
 check((await dots.count()) === 1, 'точка «ждёт ответа» стоит ровно у одного чата');
-check((await page.title()).startsWith('●'), `метка в заголовке вкладки: ${await page.title()}`);
+// Счёт в заголовке: «● N · …» — N, «● …» — 1, без точки — 0. На живом стенде
+// зовут и чужие неувиденные поводы, поэтому сверяется разница, а не чистота.
+const titleCount = (title) =>
+  title.startsWith('● ') ? Number(/^● (\d+) · /.exec(title)?.[1] ?? 1) : 0;
+const countBefore = titleCount(await page.title());
+check(countBefore >= 1, `метка в заголовке вкладки: ${await page.title()}`);
 
 // Человек ответил — файл больше не ждёт, сигнал обязан погаснуть сам.
 awaiting = false;
@@ -94,6 +109,9 @@ await page.waitForSelector('nav');
 await page.waitForTimeout(3000);
 
 check((await dots.count()) === 0, 'после ответа точка снята');
-check(!(await page.title()).startsWith('●'), 'после ответа заголовок вкладки чист');
+check(
+  titleCount(await page.title()) === countBefore - 1,
+  `после ответа в заголовке на один повод меньше: ${countBefore} → ${await page.title()}`,
+);
 
 await finish(bad === 0 ? 0 : 1, bad === 0 ? 'Сигнал ожидания работает' : `Проблем: ${bad}`);

@@ -1,11 +1,12 @@
 /**
- * Кадры справки раздела «Тесты» — два сценария одной съёмкой.
+ * Кадры справки раздела «Тесты» — три сценария одной съёмкой.
  *
  * `workspace` — путь от пустого проекта до прочитанной записи прогона: его
  * проходит один раз всякий, кто заводит набор. `health` — то, что делают с
  * набором, который УЖЕ живёт: карантин, покрытие, отбор по правкам, обмен с CI;
- * его проходят регулярно и обычно другим человеком. Один сценарий = один путь
- * человека от начала до конца, поэтому их два, а не один длинный и не восемь
+ * его проходят регулярно и обычно другим человеком. `e2e` — папка настоящих
+ * автотестов: завести, сверить с кейсами, убрать. Один сценарий = один путь
+ * человека от начала до конца, поэтому их три, а не один длинный и не восемь
  * коротких.
  *
  * Панель поднимается СВОЯ, одноразовая: каталог конфигурации во временной папке,
@@ -14,10 +15,14 @@
  * перезапускал бы сервер на каждой записи) и не во временной папке профиля (её
  * путь содержит имя пользователя, а оно уехало бы в кадр).
  *
- * CLI НЕ НУЖЕН и не запускается: всё, что здесь снято, панель делает сама —
- * ручной проход пишет настоящие результаты и настоящую запись прогона, импорт из
- * CI читает настоящий junit.xml, а «Только изменённое» отказывается ДО запуска
- * агента. Ни один кадр не изображает экран, которого нет.
+ * Установленный CLI НЕ НУЖЕН: всё, что здесь снято, панель делает сама — ручной
+ * проход пишет настоящие результаты и настоящую запись прогона, импорт из CI
+ * читает настоящий junit.xml, а «Только изменённое» отказывается ДО запуска
+ * агента. Сценарий `e2e` кладёт в PATH панели два подменыша — `claude`
+ * (tests-e2e-fake-cli.mjs, подменена только модель) и `npx` (fake-npx.mjs,
+ * пишет junit вместо браузеров); строку о папке, сверку по концу хода, прогон
+ * и запись истории делает настоящая панель. Ни один кадр не изображает экран,
+ * которого нет.
  *
  * Запуск: node tools/help-shots/tests-panel.mjs
  * Переменные: GUIDE_PANEL_PORT, GUIDE_WEB_PORT, GUIDE_TESTS_PROJECT.
@@ -25,7 +30,7 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { delimiter, join, resolve } from 'node:path';
 import { chromium } from 'playwright';
 import { openScenario, applyShotLanguage, shotLanguage } from './kit.mjs';
 
@@ -59,7 +64,13 @@ const SEEDED = [
       { action: 'Нажать «плюс» в строке товара', expected: 'Количество 2, сумма удвоилась' },
     ],
     expected: 'Сумма заказа пересчитана по новому количеству',
-    links: [{ type: 'requirement', url: 'SHOP-14', title: 'Корзина: правка количества' }],
+    links: [
+      {
+        type: 'requirement',
+        url: 'https://tracker.example.com/browse/SHOP-14',
+        title: 'Корзина: правка количества',
+      },
+    ],
     codePaths: ['src/cart'],
   },
   {
@@ -74,7 +85,13 @@ const SEEDED = [
       { action: 'Удалить вторую строку', expected: 'Осталась одна строка' },
     ],
     expected: 'В корзине один товар, сумма равна его цене',
-    links: [{ type: 'requirement', url: 'SHOP-14', title: 'Корзина: правка количества' }],
+    links: [
+      {
+        type: 'requirement',
+        url: 'https://tracker.example.com/browse/SHOP-14',
+        title: 'Корзина: правка количества',
+      },
+    ],
     codePaths: ['src/cart'],
   },
   {
@@ -89,7 +106,13 @@ const SEEDED = [
       { action: 'Выбрать доставку курьером и подтвердить', expected: 'Показан номер заказа' },
     ],
     expected: 'Заказ создан, номер показан на экране',
-    links: [{ type: 'requirement', url: 'SHOP-21', title: 'Оформление заказа' }],
+    links: [
+      {
+        type: 'requirement',
+        url: 'https://tracker.example.com/browse/SHOP-21',
+        title: 'Оформление заказа',
+      },
+    ],
     codePaths: ['src/checkout'],
   },
   {
@@ -104,7 +127,13 @@ const SEEDED = [
       { action: 'Применить код', expected: 'Итоговая сумма уменьшилась на размер скидки' },
     ],
     expected: 'Скидка показана отдельной строкой и вычтена из суммы',
-    links: [{ type: 'requirement', url: 'SHOP-21', title: 'Оформление заказа' }],
+    links: [
+      {
+        type: 'requirement',
+        url: 'https://tracker.example.com/browse/SHOP-21',
+        title: 'Оформление заказа',
+      },
+    ],
     codePaths: ['src/checkout'],
   },
   {
@@ -155,6 +184,73 @@ async function post(path, body) {
 }
 
 /** Чистый проект под съёмку: репозиторий с одним коммитом и меткой вехи. */
+/**
+ * Подменены только модель и сам раннер тестов — ради кадров «Прогнать автотесты»
+ * и «агент чата написал тест». `claude` — `tests-e2e-fake-cli.mjs` (читает
+ * строку о папке из дописки панели и кладёт тест туда), `npx` — раннер из
+ * фикстур сервера (пишет junit туда, куда панель велела, и выходит с кодом 1,
+ * как Playwright с одним красным тестом). Команду, отчёт, историю и сверку по
+ * концу хода панель делает по-настоящему.
+ */
+function fakeBin(home) {
+  const bin = join(home, 'bin');
+  mkdirSync(bin, { recursive: true });
+  const scripts = {
+    claude: join(ROOT, 'tools', 'help-shots', 'tests-e2e-fake-cli.mjs'),
+    npx: join(
+      ROOT,
+      'apps',
+      'server',
+      'src',
+      'domains',
+      'project-tests',
+      '__fixtures__',
+      'fake-npx.mjs',
+    ),
+  };
+  for (const [name, script] of Object.entries(scripts)) {
+    if (process.platform === 'win32') {
+      writeFileSync(
+        join(bin, `${name}.cmd`),
+        `@echo off\r\n"${process.execPath}" "${script}" %*\r\n`,
+      );
+    } else {
+      writeFileSync(join(bin, name), `#!/bin/sh\nexec "${process.execPath}" "${script}" "$@"\n`, {
+        mode: 0o755,
+      });
+    }
+  }
+  return bin;
+}
+
+/**
+ * Отчёт фальшивого раннера: два теста спеки корзины, второй красный, а первый
+ * зелёный только со второй попытки (`<flakyFailure>` — так Playwright пишет
+ * ретрай в junit, когда панель просит его об этом). Два таких прогона — и
+ * карточка карантина предлагает кейс по повторам.
+ */
+const RUN_JUNIT =
+  '<testsuites><testsuite name="cart.spec.ts">' +
+  '<testcase name="Корзина › [cart-001] товар добавляется в корзину @smoke" classname="cart.spec.ts" time="1.4">' +
+  '<flakyFailure message="Timeout 5000ms: счётчик корзины не обновился"/></testcase>' +
+  '<testcase name="Корзина › [cart-002] пустая корзина не пускает к оплате @regression" classname="cart.spec.ts" time="0.6">' +
+  '<failure message="кнопка «Оплатить» доступна при пустой корзине"/></testcase>' +
+  '</testsuite></testsuites>';
+
+/** Окружение сервера: один ключ PATH (на Windows их бывает два — `Path` и `PATH`). */
+function standEnv(env, bin) {
+  const inherited = Object.fromEntries(
+    Object.entries(env).filter(([key]) => key.toUpperCase() !== 'PATH'),
+  );
+  const path = Object.entries(env).find(([key]) => key.toUpperCase() === 'PATH')?.[1] ?? '';
+  return {
+    ...inherited,
+    PATH: `${bin}${delimiter}${path}`,
+    FAKE_E2E_JUNIT: RUN_JUNIT,
+    FAKE_E2E_EXIT: '1',
+  };
+}
+
 function buildProject() {
   rmSync(PROJECT, { recursive: true, force: true });
   mkdirSync(PROJECT, { recursive: true });
@@ -169,6 +265,36 @@ function buildProject() {
   for (const area of ['cart', 'checkout', 'catalog']) {
     writeFileSync(join(PROJECT, 'src', area, 'index.js'), `export const ${area} = {};\n`, 'utf8');
   }
+  // Каркас назван самим проектом (vitest в package.json), интеграционные помечены
+  // именем файла — ради кадра пирамиды: без этого она честно сказала бы «не известно».
+  writeFileSync(
+    join(PROJECT, 'package.json'),
+    `${JSON.stringify({ name: 'shop', private: true, devDependencies: { vitest: '^3.2.0', '@playwright/test': '^1.55.0' } }, null, 2)}\n`,
+    'utf8',
+  );
+  const unit = (names) =>
+    [
+      "import { describe, it, expect } from 'vitest';",
+      '',
+      "describe('модуль', () => {",
+      ...names.map((name) => `  it('${name}', () => expect(true).toBe(true));`),
+      '});',
+      '',
+    ].join('\n');
+  const tests = {
+    'cart/cart.test.js': [
+      'складывает позиции',
+      'пересчитывает сумму',
+      'убирает пустую строку',
+      'не уходит в минус',
+    ],
+    'checkout/promo.test.js': ['применяет промокод', 'отклоняет просроченный', 'округляет скидку'],
+    'catalog/search.test.js': ['ищет по части названия', 'не различает регистр'],
+    'checkout/order.integration.test.js': ['заказ пишется в базу', 'оплата уходит в шлюз'],
+  };
+  for (const [file, names] of Object.entries(tests)) {
+    writeFileSync(join(PROJECT, 'src', ...file.split('/')), unit(names), 'utf8');
+  }
   git('init', '-q', '-b', 'main');
   git('config', 'user.name', 'QA');
   git('config', 'user.email', 'qa@local');
@@ -181,6 +307,14 @@ const home = mkdtempSync(join(tmpdir(), 'cc-help-tests-'));
 mkdirSync(join(home, 'agentdeck'), { recursive: true });
 writeFileSync(join(home, 'settings.json'), '{}\n', 'utf8');
 writeFileSync(join(home, 'CLAUDE.md'), '# путеводитель\n', 'utf8');
+// Проект — в реестре «Проектов»: папку e2e и автотесты панель заводит только
+// проектам оттуда и копиям их веток (`project-gate.ts`), и кадры папки e2e на
+// незарегистрированном проекте показали бы отказ, а не работу.
+writeFileSync(
+  join(home, 'agentdeck', 'state.json'),
+  `${JSON.stringify({ projects: [{ id: 'shop', name: PROJECT_NAME, path: PROJECT }] }, null, 2)}\n`,
+  'utf8',
+);
 
 const started = [];
 try {
@@ -193,12 +327,14 @@ try {
     PORT: String(PANEL_PORT),
     WEB_PORT: String(WEB_PORT),
   };
+  // Сервер панели видит фальшивые `claude` и `npx` раньше настоящих; фронту они не нужны.
+  const serverEnv = standEnv(env, fakeBin(home));
 
   started.push(
     spawn(
       process.execPath,
       ['--experimental-strip-types', '--no-warnings', 'apps/server/src/index.ts'],
-      { cwd: ROOT, env, stdio: 'ignore', shell: false },
+      { cwd: ROOT, env: serverEnv, stdio: 'ignore', shell: false },
     ),
   );
   if (!(await waitFor(`${PANEL}/api/system`, 40)))
@@ -272,6 +408,7 @@ async function shoot() {
 
     await workspace(page);
     await health(page);
+    await e2e(page);
   } finally {
     await browser.close();
   }
@@ -281,6 +418,13 @@ async function shoot() {
 async function openTests(page, tab = 'library') {
   await page.goto(`${WEB}/tests?tab=${tab}`, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('nav');
+  // Язык приходит из /api/settings; сервер, занятый концом прогона, отвечает
+  // позже фиксированной паузы — и кадр снялся бы на языке по умолчанию.
+  await page.waitForFunction(
+    (lang) => document.documentElement.lang.startsWith(lang),
+    shotLanguage(),
+    { timeout: 15_000 },
+  );
   await page.waitForTimeout(2600);
 }
 
@@ -318,7 +462,7 @@ async function workspace(page) {
   // ── Первый кейс руками ────────────────────────────────────────────────────
   // Окно кейса выше экрана: на 900px под срез уходят шаги, ради которых кейс и
   // заводят, и кадр обещал бы меньше, чем форма просит.
-  await page.setViewportSize({ width: 1440, height: 1500 });
+  await page.setViewportSize({ width: 1440, height: 2000 });
   await main
     .getByRole('button', { name: /^(Добавить тест|Add a test)$/ })
     .first()
@@ -552,6 +696,148 @@ async function health(page) {
   await page.waitForTimeout(1000);
   await openTests(page, 'runs');
   await scenario.shot(page, '08-runs-import');
+
+  scenario.finish();
+}
+
+/**
+ * Папка e2e: завести, сверить с кейсами, убрать. Всё настоящее — папку и строку
+ * в `.git/info/exclude` пишет панель, спеку кладёт сценарий (как её положил бы
+ * агент чата), сверка читает её с диска, уборка упирается в чужой файл.
+ */
+async function e2e(page) {
+  const scenario = openScenario('tests', 'e2e');
+  const card = '[data-testid="tests-e2e-card"]';
+  const within = page.locator(card);
+
+  await openTests(page);
+  await scenario.shot(page, '01-missing', { clip: card, padding: 8 });
+
+  await within.getByRole('button', { name: /^(Создать папку|Create folder)$/ }).click();
+  await page.waitForTimeout(1500);
+  await scenario.shot(page, '02-created', { clip: card, padding: 8 });
+  // «npm install» в заготовке: без раннера в node_modules/.bin панель отказывает
+  // до запуска (ничего не качает сама), а раннер здесь — подменный npx из PATH.
+  const bin = join(PROJECT, 'e2e', 'node_modules', '.bin');
+  mkdirSync(bin, { recursive: true });
+  for (const name of ['playwright', 'playwright.cmd']) writeFileSync(join(bin, name), '');
+
+  writeFileSync(
+    join(PROJECT, 'e2e', 'cart.spec.ts'),
+    [
+      "import { test, expect } from '@playwright/test';",
+      '',
+      "test.describe('Корзина', () => {",
+      "  test('[cart-001] товар добавляется в корзину @smoke', async ({ page }) => {",
+      '    // Given открыт каталог',
+      "    await page.goto('/catalog');",
+      '    // When нажимает «В корзину» у первого товара',
+      "    await page.getByRole('button', { name: 'В корзину' }).first().click();",
+      '    // Then счётчик корзины показывает 1',
+      "    await expect(page.getByTestId('cart-count')).toHaveText('1');",
+      '  });',
+      '',
+      "  test('[cart-002] пустая корзина не пускает к оплате @regression', async ({ page }) => {",
+      '    // Given корзина пуста',
+      "    await page.goto('/cart');",
+      '    // Then кнопка оплаты недоступна',
+      "    await expect(page.getByRole('button', { name: 'Оплатить' })).toBeDisabled();",
+      '  });',
+      '});',
+      '',
+    ].join('\n'),
+    'utf8',
+  );
+  await within.getByRole('button', { name: /^(Обновить из папки|Update from folder)$/ }).click();
+  await page.waitForTimeout(2200);
+  await scenario.shot(page, '03-synced');
+
+  // «Прогнать автотесты»: команда каркаса без агента, итог — на кейсы и в историю.
+  await within.getByRole('button', { name: /^(Прогнать автотесты|Run autotests)$/ }).click();
+  await within
+    .getByText(/(Упало \d+ из|of \d+ failed|Прошли все|All passed)/)
+    .first()
+    .waitFor({ timeout: 30_000 });
+  await page.waitForTimeout(800);
+  await scenario.shot(page, '05-run-done', { clip: card, padding: 8 });
+  await openTests(page, 'runs');
+  await scenario.shot(page, '06-run-history');
+
+  // Второй прогон того же отчёта: [cart-001] снова зелёный только на повторе —
+  // два прогона из двух, и карточка карантина предлагает его по повторам.
+  await openTests(page);
+  const runButton = within.getByRole('button', { name: /^(Прогнать автотесты|Run autotests)$/ });
+  await runButton.click();
+  await page.waitForTimeout(1500);
+  await page.waitForFunction(
+    () =>
+      [...document.querySelectorAll('[data-testid="tests-e2e-card"] button')].some(
+        (button) =>
+          /^(Прогнать автотесты|Run autotests)$/.test(button.textContent?.trim() ?? '') &&
+          !button.disabled,
+      ),
+    undefined,
+    { timeout: 30_000 },
+  );
+  await page.waitForTimeout(800);
+  await openTests(page, 'report');
+  const quarantine = '[data-testid="tests-quarantine-card"]';
+  await page.locator(quarantine).scrollIntoViewIfNeeded();
+  await page
+    .locator(quarantine)
+    .getByText(/(на повторе|on retry) ×2/)
+    .first()
+    .waitFor({ timeout: 15_000 });
+  await page.waitForTimeout(600);
+  await scenario.shot(page, '09-retry-quarantine', { clip: quarantine, padding: 8 });
+
+  // Пирамида: модульные и интеграционные посчитаны по файлам проекта рядом с e2e.
+  const pyramid = '[data-testid="tests-pyramid-card"]';
+  await page.locator(pyramid).scrollIntoViewIfNeeded();
+  await page.locator(pyramid).getByText(/^E2E$/).first().waitFor({ timeout: 15_000 });
+  await page.waitForTimeout(600);
+  await scenario.shot(page, '10-pyramid', { clip: pyramid, padding: 8 });
+
+  // Сторона чата: агент обычного разговора узнал папку из строки панели и
+  // положил туда тест; кейс завела сама панель по концу хода.
+  await page.goto(`${WEB}/chat`, { waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('nav');
+  await page.waitForTimeout(2000);
+  await page
+    .getByRole('button', { name: /^(Новый чат|New chat)/ })
+    .first()
+    .click();
+  await page.waitForTimeout(1500);
+  const input = page.locator('textarea[data-chat-input]');
+  await input.fill(
+    shotLanguage() === 'en'
+      ? 'Write an e2e test: an order is paid by card.'
+      : 'Напиши e2e-тест: заказ оплачивается картой.',
+  );
+  await input.press('Enter');
+  await page
+    .getByText(/checkout\.spec\.ts —/)
+    .first()
+    .waitFor({ timeout: 30_000 });
+  await page.waitForTimeout(1500);
+  await scenario.shot(page, '07-chat-test');
+  await openTests(page);
+  // Группу завела сверка по концу хода; её заголовок — describe спеки.
+  await page.getByText('Оформление', { exact: true }).first().click();
+  await page.waitForTimeout(1200);
+  await page
+    .getByText(/заказ оплачивается картой/i)
+    .first()
+    .waitFor({ timeout: 15_000 });
+  await scenario.shot(page, '08-chat-case');
+  await openTests(page);
+
+  await within.getByRole('button', { name: /^(Убрать папку|Remove folder)$/ }).click();
+  await page.waitForTimeout(1500);
+  await scenario.shot(page, '04-remove-confirm', { clip: card, padding: 8 });
+
+  await within.getByRole('button', { name: /^(Убрать вместе с ними|Remove them too)$/ }).click();
+  await page.waitForTimeout(1500);
 
   scenario.finish();
 }

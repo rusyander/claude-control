@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   Artifact,
@@ -8,6 +9,7 @@ import type {
   ChatSummary,
 } from '@agentdeck/contracts';
 import type { ChatAwaitingView } from '@agentdeck/contracts/chat-handoff';
+import { localizeMediaTitle } from '@agentdeck/contracts/chat-title';
 import { apiClient } from '@shared/api/client';
 
 /** Размер окна ленты и шаг подгрузки более ранних сообщений. */
@@ -67,12 +69,24 @@ export function useAwaitingAsks() {
 }
 
 export function useChats() {
+  const { t } = useTranslation();
+  // Слово режима в названии («Картинка: …») сервер пишет по-русски — одно
+  // название на все клиенты; интерфейс ставит своё (`localizeMediaTitle`).
+  const select = useCallback(
+    (chats: ChatSummary[]): ChatSummary[] =>
+      chats.map((chat) => {
+        const title = localizeMediaTitle(chat.title, (mode) => t(`chat.mode.request.${mode}`));
+        return title === chat.title ? chat : { ...chat, title };
+      }),
+    [t],
+  );
   return useQuery({
     queryKey: chatKeys.list,
     queryFn: async () => {
       const { data } = await apiClient.get<ChatSummary[]>('/chats', { timeout: 120_000 });
       return data;
     },
+    select,
   });
 }
 
@@ -96,8 +110,10 @@ export function useChatBodySearch(query: string) {
     },
     enabled,
     // Прежние совпадения держим на экране, пока грузятся новые — список не мигает
-    // пустотой на каждый набранный символ.
-    placeholderData: keepPreviousData,
+    // пустотой на каждый набранный символ. Но только пока запрос действует:
+    // у выключенного (поле стёрли) прежний ответ выдавался бы за ответ на
+    // пустой запрос, и после «кактуса» в списке оставался один разговор.
+    placeholderData: enabled ? keepPreviousData : undefined,
   });
 }
 

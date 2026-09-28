@@ -102,7 +102,7 @@ export function McpProbePanel({ mcpId }: McpProbePanelProps) {
 
             {call.data && (
               <Typography variant="caption" color="subtle" as="span">
-                {call.data.durationMs} мс
+                {t('common.milliseconds', { ms: call.data.durationMs })}
               </Typography>
             )}
           </Stack>

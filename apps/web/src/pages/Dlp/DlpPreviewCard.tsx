@@ -53,7 +53,7 @@ export function DlpPreviewCard({ rules }: Props) {
         <Typography variant="body" weight="medium">
           {t('dlp.previewTitle')}
         </Typography>
-        <Typography variant="body-sm" color="subtle" style={{ maxWidth: 'var(--text-measure)' }}>
+        <Typography variant="body-sm" color="subtle" className="prose">
           {t('dlp.previewHint')}
         </Typography>
 

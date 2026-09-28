@@ -1,5 +1,6 @@
 import type { ChatSummary } from '@agentdeck/contracts';
 import type { ActiveRunView } from '@shared/lib/agent-runs';
+import { isOpenAsk } from '@shared/lib/chat-stream';
 import type { ChildQuestion } from '@features/ChatMessages';
 
 /**
@@ -41,9 +42,7 @@ export function collectChildQuestions(
   for (const run of runs) {
     const child = children.find((chat) => chat.id === run.id || chat.id === run.sessionId);
     if (!child) continue;
-    const asked = [...(run.tools ?? [])]
-      .reverse()
-      .find((tool) => tool.name === 'AskUserQuestion' && tool.input);
+    const asked = [...(run.tools ?? [])].reverse().find((tool) => isOpenAsk(tool) && tool.input);
     if (!asked) continue;
     found.push({
       chatId: run.id,

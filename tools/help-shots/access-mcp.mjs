@@ -14,6 +14,8 @@
  * переменной — отвергнутый токен; `crm` — 401 от процесса, который на всё
  * отвечает 401.
  */
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   ORDERS_SERVER,
   closeModal,
@@ -38,11 +40,19 @@ const card = (name) => `xpath=//span[normalize-space(text())="${name}"]/ancestor
  * сходить ещё и за описанием своей авторизации.
  */
 async function check(page, name, wait = 12_000) {
-  await page
-    .locator(card(name))
-    .getByRole('button', { name: /^(Проверить|Check)$/ })
-    .first()
-    .click();
+  try {
+    await page
+      .locator(card(name))
+      .getByRole('button', { name: /^(Проверить|Check)$/ })
+      .first()
+      .click();
+  } catch (error) {
+    // Кадр места падения: без него причину пришлось бы угадывать по тексту ошибки.
+    const shot = join(tmpdir(), `cc-guide-mcp-${name}.png`);
+    await page.screenshot({ path: shot, fullPage: true }).catch(() => undefined);
+    console.log(`«Проверить» у ${name} не нажалось, экран: ${shot}`);
+    throw error;
+  }
   await page.waitForTimeout(wait);
 }
 

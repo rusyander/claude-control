@@ -15,4 +15,4 @@ export type { EventFixture, HookDecision, ProbeResult } from './HookProbe.types.
 export { CUSTOM_FIXTURE_ID } from './HookProbe.constants.ts';
 export { EVENT_FIXTURES, isEventObject, parseCustomEvent } from './HookEvents.ts';
 export { readDecision, tryParse } from './HookDecision.ts';
-export { runCustomHookProbe, runHookProbe, scriptCommand } from './HookRunner.ts';
+export { closedVerdict, runCustomHookProbe, runHookProbe, scriptCommand } from './HookRunner.ts';

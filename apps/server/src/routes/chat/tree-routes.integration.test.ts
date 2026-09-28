@@ -55,7 +55,9 @@ describe('маршруты паузы дерева', () => {
       },
     }));
     store = new AppStore(join(root, 'agentdeck'));
-    registry.setSessionListener((chatId, sessionId) => store.linkChatSession(chatId, sessionId));
+    registry.setSessionListener((chatId, sessionId, from) =>
+      store.linkChatSession(chatId, sessionId, from),
+    );
     const tree = new TreePause({
       links: () => store.getChatLinks(),
       runs: registry,
@@ -114,6 +116,7 @@ describe('маршруты паузы дерева', () => {
     expect(paused.json<ChatTreePaused>()).toEqual({
       root: 'parent',
       stopped: 3,
+      unconfirmed: 0,
       chats: 3,
       alreadyPaused: false,
     });

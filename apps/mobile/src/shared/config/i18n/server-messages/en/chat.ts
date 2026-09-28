@@ -13,6 +13,8 @@ export const chatEn: Record<ChatMessageCode, string> = {
   'branch-name-required': 'No branch name given — there is nothing to create the copy under.',
   'branch-run-gone':
     'The run waiting on the branch decision has finished: there is no one to create the copy for.',
+  'permission-expired':
+    'This permission request has expired: the agent stopped waiting for an answer, so the decision would not run anything. If it asks again, answer the new request.',
   'editor-not-found': 'Code editor not found. Set it in the settings or install code/cursor.',
   'handoff-proposal-invalid':
     'The proposal could not be parsed: “what is done” and “how to continue” are required',
@@ -23,6 +25,8 @@ export const chatEn: Record<ChatMessageCode, string> = {
     'The panel runs Claude Code {{current}}, but the model needs version {{required}} or newer. Update the CLI.',
   'prompt-too-long':
     'The conversation context is full: it will not accept another message. Compact the context or continue in a new session.',
+  'chat-process-lost':
+    'The chat process was lost: it was ended outside the panel. The conversation is saved — send a message and it continues where it stopped.',
   'conversation-unspecified': 'No conversation specified',
   'split-proposal-invalid':
     'The split could not be parsed: at least two groups with tasks are required',
@@ -50,6 +54,8 @@ export const chatEn: Record<ChatMessageCode, string> = {
   'panel-card-not-found': 'There is no such card — it may already have been withdrawn.',
   'panel-card-decided': 'A decision on this card has already been made.',
   'panel-conversation-not-found': 'There is no such conversation.',
+  'panel-conversation-running':
+    'A turn is running in this conversation — delete it after the agent answers.',
   'foreign-chat-not-for-claude': 'Claude has its own chat — these routes are not for it.',
   'conversation-create-failed': 'Could not create the conversation',
   'request-empty': 'Empty request',
@@ -62,6 +68,9 @@ export const chatEn: Record<ChatMessageCode, string> = {
   'panel-help-topic-missing': 'There is no help topic “{{id}}”. Available: {{known}}.',
   'panel-agent-busy':
     'The agent is still answering in this conversation — wait for the turn to end.',
+  'panel-agent-not-running': 'No turn is running in this conversation.',
+  'panel-agent-bad-from-seq': 'The frame number (fromSeq) must be a number.',
+  'panel-agent-turn-gone': 'The start of the turn is no longer kept — open the conversation again.',
   'split-hold-not-waiting':
     'The group is not waiting for an answer: there is no question or it was already answered',
   'split-release-not-waiting':
@@ -70,6 +79,8 @@ export const chatEn: Record<ChatMessageCode, string> = {
   'split-ticket-missing': 'This split has no such suggested ticket',
   'split-ticket-tracker-missing': 'No tracker is linked to the project: nowhere to file the ticket',
   'split-relaunch-running': 'This split is already being relaunched',
+  'split-relaunch-unconfirmed':
+    'Runs not stopped: {{count}} — the panel could not verify their processes and left them alone. The relaunch did not start: retry once they finish or are stopped.',
   'split-plan-running':
     'The split of this conversation is still running — wait for its groups to finish or cancel the plan',
   'split-cleanup-nothing':
@@ -89,4 +100,10 @@ export const chatEn: Record<ChatMessageCode, string> = {
   'split-plan-cancel-unknown': 'This conversation has no split',
   'split-plan-cancelled': 'The plan is cancelled: its groups are closed — start a new split',
   'split-group-cleanup-failed': 'The copy could not be removed: {{detail}}',
+  'chat-group-pair-inactive-side':
+    'Group “{{group}}” is the inactive side of its pair in this project: the other side is in effect. Pick that one, or switch the pair side on the Groups page.',
+  'chat-stop-unconfirmed':
+    "The agent process was not stopped: the panel could not verify that the number is still the agent's, so it left it alone. The run goes on — try Stop again.",
+  'branch-stop-unconfirmed':
+    'The copy {{path}} was created, but the agent process was not stopped: the panel could not verify the number still belongs to it and left it alone. The conversation stays in the main copy; the agent waits at the same card.',
 };

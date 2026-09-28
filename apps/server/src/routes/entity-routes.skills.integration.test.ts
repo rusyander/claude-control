@@ -129,4 +129,41 @@ describe('/api/skills с id вне skills/', () => {
     expect(existsSync(join(root, 'skills', 'good'))).toBe(false);
     expect(backups().length).toBeGreaterThan(0);
   });
+
+  // [P1] Claude Code подхватывает skills/ на лету (hot-reload с 2.1.0): новый
+  // скилл виден в уже открытой сессии. needsRestart:true заставлял агента панели
+  // говорить «заработает после перезапуска» — неправда пользователю.
+  it('[P1] создание, правка, переименование и удаление скилла не требуют перезапуска', async () => {
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/skills',
+      payload: { ...draft, name: 'fresh' },
+    });
+    expect(created.json<{ needsRestart?: boolean }>().needsRestart).toBe(false);
+    const put = await app.inject({ method: 'PUT', url: '/api/skills/fresh', payload: draft });
+    expect(put.json<{ needsRestart?: boolean }>().needsRestart).toBe(false);
+    const renamed = await app.inject({
+      method: 'POST',
+      url: '/api/skills/good/rename',
+      payload: { newId: 'good2' },
+    });
+    expect(renamed.json<{ needsRestart?: boolean }>().needsRestart).toBe(false);
+    const del = await app.inject({ method: 'DELETE', url: '/api/skills/good2' });
+    expect(del.json<{ needsRestart?: boolean }>().needsRestart).toBe(false);
+  });
+
+  // Ревью 28.09 (F-232): правка скилла отвечала «на лету», а переключение —
+  // «нужен перезапуск», хотя это тот же перенос папки из skills/, который CLI
+  // подхватывает так же, как удаление.
+  it('включение и выключение скилла тоже не требуют перезапуска', async () => {
+    for (const isEnabled of [false, true]) {
+      const toggled = await app.inject({
+        method: 'POST',
+        url: '/api/entities/skill/good/enabled',
+        payload: { isEnabled },
+      });
+      expect(toggled.statusCode).toBe(200);
+      expect(toggled.json<{ needsRestart?: boolean }>().needsRestart).toBe(false);
+    }
+  });
 });

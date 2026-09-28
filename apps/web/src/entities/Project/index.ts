@@ -28,8 +28,16 @@ export {
 // Проект, над которым работают в разделе тестирования: реестр плюс открытые
 // вкладки, выбор запоминается браузером. Живёт здесь, а не на странице тестов,
 // потому что тот же выбор нужен общему поиску — он ищет и по кейсам проекта.
-export { useTestsProject, mergeProjects, resolveSelected } from './model/useTestedProject';
+export {
+  useTestsProject,
+  mergeProjects,
+  projectByPath,
+  resolveSelected,
+} from './model/useTestedProject';
 export type { TestsProject } from './model/useTestedProject';
+// Выбор раздела тестирования в момент вызова: копия хука в другом месте
+// (окно агента) держит своё состояние и узнала бы о смене выбора с опозданием.
+export { readStored as readTestsProjectId } from './model/useTestedProject';
 
 // Конфиги конкретного проекта: CLAUDE.md, MCP-серверы, права.
 export {

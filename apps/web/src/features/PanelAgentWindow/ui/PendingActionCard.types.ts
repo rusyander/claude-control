@@ -14,4 +14,9 @@ export interface PendingActionCardProps {
   onDecide: (decision: 'approve' | 'reject') => void;
   /** Первая карточка в окне забирает фокус на кнопку по умолчанию. */
   autoFocus: boolean;
+  /**
+   * Карточка другого разговора: помечена, фокус не берёт. `origin` — название того
+   * разговора, когда оно известно; `onOpenConversation` — перейти туда.
+   */
+  foreign?: { origin?: string; onOpenConversation?: () => void };
 }

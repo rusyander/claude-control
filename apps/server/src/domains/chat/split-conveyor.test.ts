@@ -19,7 +19,7 @@ import {
 } from './split-conveyor.ts';
 
 /** Первая строка сообщений панели в чат группы 0 (журнал 98). */
-const IDENTITY = 'Ветка группы: feature/login. Задачи группы: PROJ-101, PROJ-102.';
+const IDENTITY = 'Group branch: feature/login. Group tasks: PROJ-101, PROJ-102.';
 
 const DONE: ChainOutcome = { status: 'done' };
 const FAILED: ChainOutcome = { status: 'failed' };
@@ -1167,10 +1167,10 @@ describe('SplitConveyor: ветка и задачи группы', () => {
 
     expect(conveyor.identityOf(link(0))).toBe(IDENTITY);
     expect(conveyor.identityOf({ ...link(0), branch: 'feature/header' })).toBe(
-      'Ветка группы: feature/header.',
+      'Group branch: feature/header.',
     );
     expect(conveyor.identityOf({ ...link(0), groupIndex: 2, branch: 'feature/login' })).toBe(
-      'Ветка группы: feature/tests.',
+      'Group branch: feature/tests.',
     );
     expect(conveyor.identityOf({ ...link(0), parentChatId: 'чужой' })).toBeUndefined();
     expect(conveyor.identityOf({ ...link(0), branch: 'feature/нет' })).toBeUndefined();

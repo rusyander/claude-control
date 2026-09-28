@@ -252,11 +252,20 @@ export class LiveSession {
     setTimeout(() => this.kill(), 10_000).unref();
   }
 
-  /** Убить деревом: на Windows CLI живёт под `cmd.exe`. */
-  kill(): void {
+  /**
+   * Убить деревом: на Windows CLI живёт под `cmd.exe`. `'unconfirmed'` —
+   * процесс жив и не снят (номер не сверить, F-145): сессия остаётся как была,
+   * повторное «Остановить» попробует снова.
+   */
+  kill(): 'unconfirmed' | void {
     if (this.closed) return;
+    const released = this.released;
     this.released = true;
-    this.transport.kill();
+    if (this.transport.kill() === 'unconfirmed') {
+      // Панель процесс не отпустила: уйдёт сам — это обрыв, как и было бы.
+      this.released = released;
+      return 'unconfirmed';
+    }
   }
 
   /**
@@ -409,6 +418,21 @@ export const DEFAULT_LIVE_LIMITS: LivePoolLimits = {
  * поднят с теми же параметрами; иначе прежний закрывается, а ход идёт новым
  * процессом с `--resume` — как было до пула.
  */
+/**
+ * Разделитель подписи запуска: `<жёсткая>~<отложимая>`. Жёсткая — то, без чего
+ * ход в прежнем процессе был бы ходом с чужими параметрами (модель, права,
+ * промпт, папка). Отложимая — то, смена чего может подождать конца фоновых
+ * команд агента (метка автономии, F-31): перезапуск ради неё убил бы их. Подпись
+ * без разделителя (журнал прежней версии) — целиком жёсткая.
+ */
+export const SIGNATURE_DEFERRABLE = '~';
+
+/** Жёсткая часть подписи запуска (см. `SIGNATURE_DEFERRABLE`). */
+export function hardSignature(signature: string): string {
+  const at = signature.indexOf(SIGNATURE_DEFERRABLE);
+  return at < 0 ? signature : signature.slice(0, at);
+}
+
 export class LiveSessionPool {
   /** Ход, начатый самим CLI: реестр заводит под него прогон (см. `ChatRunRegistry.wake`). */
   onWake?: (sessionId: string) => void;
@@ -474,6 +498,17 @@ export class LiveSessionPool {
       return undefined;
     }
     if (session.busy) return undefined;
+    // Разошлась только отложимая часть, а процесс держит фоновые команды агента:
+    // перезапуск убил бы их (F-31). Ход идёт в прежний процесс; как только фона
+    // не станет, следующий `take` увидит ту же разницу и перезапустит. Что
+    // перезапуск отложен, вызывающий видит по `session.signature !== signature`.
+    if (
+      session.signature !== signature &&
+      session.hasBackgroundWork &&
+      hardSignature(session.signature) === hardSignature(signature)
+    ) {
+      return session;
+    }
     if (session.signature !== signature) {
       this.sessions.delete(sessionId);
       session.close();

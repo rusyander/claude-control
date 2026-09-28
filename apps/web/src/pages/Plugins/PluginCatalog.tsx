@@ -53,10 +53,11 @@ export function PluginCatalog({
       </Typography>
 
       <Card padding="none">
+        {/* Без `height`: каталог прокручивается вместе со страницей — одна
+            прокрутка на раздел, а не коробка фиксированной высоты. */}
         <VirtualList
           items={found}
           rowHeight={84}
-          height={620}
           getKey={(plugin) => plugin.id}
           renderRow={(plugin) => (
             <CatalogRow

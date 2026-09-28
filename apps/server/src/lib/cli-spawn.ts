@@ -1,5 +1,8 @@
 import { spawn as nodeSpawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import { errorMonitor } from 'node:events';
+import { StringDecoder } from 'node:string_decoder';
 import { shellArgs } from './cli-args.ts';
+import { wasStoppedOnPurpose } from './process-tree.ts';
 import { resolveWindowsExecutable, cmdWouldTruncate } from './win-exec.ts';
 
 /**
@@ -81,10 +84,141 @@ export type CliSpawnOutcome =
   | { child: ChildProcessWithoutNullStreams; error?: undefined }
   | { child?: undefined; error: Error };
 
+/**
+ * Наблюдатель за НЕУДАВШИМИСЯ запусками — для фонового наблюдателя панели:
+ * «CLI не запустился» — один из сбоев, о которых он пишет отчёт. Один на
+ * процесс, по умолчанию его нет, и тогда запуск ничем не отличается от
+ * прежнего. Ошибку процесса смотрим через `errorMonitor`: обычный слушатель
+ * `error` проглотил бы её у вызывающего, который своего не повесил, и поменял
+ * бы поведение — падение превратилось бы в тишину.
+ */
+export type SpawnFailureObserver = (command: string, error: Error) => void;
+let spawnFailureObserver: SpawnFailureObserver | undefined;
+
+export function observeSpawnFailures(observer: SpawnFailureObserver | undefined): void {
+  spawnFailureObserver = observer;
+}
+
+function notifySpawnFailure(command: string, error: Error): void {
+  try {
+    spawnFailureObserver?.(command, error);
+  } catch {
+    // Наблюдатель не имеет права ронять запуск.
+  }
+}
+
+/**
+ * Наблюдатель за CLI, завершившимися с НЕНУЛЕВЫМ кодом, — так до фонового
+ * наблюдателя доходят и ошибки провайдера: CLI сообщает о них кодом выхода.
+ * Снятые нарочно (стоп, выключение, таймаут) не в счёт: сигнал выхода, флаг
+ * `killed` или отметка `process-tree` о снятии дерева. Слушатель `exit` ничего
+ * не меняет у вызывающего: у события нет поведения по умолчанию.
+ */
+export interface CliExit {
+  command: string;
+  args: readonly string[];
+  code: number;
+  pid?: number;
+  /**
+   * Конец stderr (до `STDERR_TAIL_MAX` знаков) — то, что прочитал вызывающий;
+   * непрочитанное дочитывает сам Node на выходе процесса, и оно тоже здесь.
+   */
+  stderr?: string;
+}
+const STDERR_TAIL_MAX = 4000;
+export type CliExitObserver = (exit: CliExit) => void;
+let cliExitObserver: CliExitObserver | undefined;
+
+export function observeCliExits(observer: CliExitObserver | undefined): void {
+  cliExitObserver = observer;
+}
+
+/**
+ * Хвост stderr без вмешательства в поток: подсматривается `emit('data')`, а
+ * не вешается слушатель — слушатель перевёл бы поток в «течёт», и вызывающий,
+ * который читает позже, потерял бы начало. Данные видны ровно тогда, когда их
+ * читает сам вызывающий.
+ */
+function stderrTail(child: ChildProcessWithoutNullStreams): () => string {
+  let tail = '';
+  // Декодер держит недописанные байты буквы до следующего куска: `String(chunk)`
+  // по кускам превращал разрезанную русскую букву в U+FFFD (F-207).
+  const decoder = new StringDecoder('utf8');
+  const stream = child.stderr as (NodeJS.ReadableStream & { emit?: unknown }) | undefined;
+  if (!stream || typeof stream.emit !== 'function') return () => tail;
+  const emit = stream.emit.bind(stream) as (event: string | symbol, ...rest: unknown[]) => boolean;
+  (stream as { emit: typeof emit }).emit = (event, ...rest) => {
+    if (event === 'data') {
+      try {
+        const chunk = Buffer.isBuffer(rest[0]) ? decoder.write(rest[0]) : String(rest[0]);
+        tail = (tail + chunk).slice(-STDERR_TAIL_MAX);
+      } catch {
+        // Хвост — улика, а не условие работы.
+      }
+    }
+    return emit(event, ...rest);
+  };
+  return () => tail;
+}
+
+/**
+ * Тот же присмотр за выходом для CLI, запущенного мимо `spawnCliProcess`
+ * (свой `spawn` у чата): ненулевой код и хвост stderr уходят наблюдателю.
+ * Без наблюдателя — ничего не вешает. Вызывать сразу после `spawn`, до чтения
+ * stderr, — иначе начало хвоста мимо.
+ */
+export function watchCliChild(
+  command: string,
+  args: readonly string[],
+  child: ChildProcessWithoutNullStreams,
+): void {
+  if (cliExitObserver) watchExit(command, args, child);
+}
+
+function watchExit(
+  command: string,
+  args: readonly string[],
+  child: ChildProcessWithoutNullStreams,
+): void {
+  const tail = stderrTail(child);
+  // `close`, а не `exit`: к нему потоки уже дочитаны — хвост stderr полный.
+  child.on?.('close', (code: number | null, signal: NodeJS.Signals | null) => {
+    if (!cliExitObserver || code === null || code === 0 || signal !== null) return;
+    if (child.killed || (child.pid !== undefined && wasStoppedOnPurpose(child.pid))) return;
+    try {
+      const stderr = tail().trim();
+      cliExitObserver({
+        command,
+        args,
+        code,
+        ...(child.pid !== undefined ? { pid: child.pid } : {}),
+        ...(stderr ? { stderr } : {}),
+      });
+    } catch {
+      // Наблюдатель не имеет права ронять запуск.
+    }
+  });
+}
+
 export function spawnCliProcess(
   command: string,
   args: string[],
   options: CliSpawnOptions = {},
+): CliSpawnOutcome {
+  const outcome = spawnUnobserved(command, args, options);
+  if (!spawnFailureObserver && !cliExitObserver) return outcome;
+  if (outcome.error) notifySpawnFailure(command, outcome.error);
+  else {
+    outcome.child.on?.(errorMonitor, (error: Error) => notifySpawnFailure(command, error));
+    watchExit(command, args, outcome.child);
+  }
+  return outcome;
+}
+
+function spawnUnobserved(
+  command: string,
+  args: string[],
+  options: CliSpawnOptions,
 ): CliSpawnOutcome {
   const spawnImpl = options.spawnImpl ?? nodeSpawn;
 

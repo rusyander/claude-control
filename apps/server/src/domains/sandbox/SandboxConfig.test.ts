@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { ClaudeLocation } from '@agentdeck/contracts';
 import { AppStore } from '../../lib/app-store.ts';
+import { readHooks } from '../hooks.ts';
 import { createSandbox, removeSandbox, sandboxPaths, stopSandboxSweeper } from './SandboxConfig.ts';
 
 /**
@@ -54,6 +55,19 @@ describe('SandboxConfig', () => {
     stopSandboxSweeper();
     removeSandbox(sandboxId);
     rmSync(root, { recursive: true, force: true });
+  });
+
+  it('сборка, упавшая после копии доступа, не оставляет её на диске (ревью 28.09, m9)', () => {
+    // Хранилище ломается на первом же обращении — это уже ПОСЛЕ записи .credentials.json.
+    const broken = new Proxy(store, {
+      get: () => {
+        throw new Error('store down');
+      },
+    });
+    expect(() => createSandbox(sandboxId, { ruleIds: ['any'] }, location, broken)).toThrow(
+      'store down',
+    );
+    expect(existsSync(sandboxPaths(sandboxId).root)).toBe(false);
   });
 
   it('создаёт каталог конфигурации и рабочую папку', () => {
@@ -131,6 +145,27 @@ describe('SandboxConfig', () => {
 
     expect(existsSync(join(sandbox.configDir, 'hooks', 'guard.mjs'))).toBe(true);
     expect(sandbox.description.scripts).toContain('guard.mjs');
+  });
+
+  // Ревью 28.09 (F-120, сосед): песочница собирала хук как `{type:'command', command}` —
+  // prompt-хук становился командой без команды, таймаут и statusMessage терялись.
+  it('выбранные хуки едут в песочницу со всеми своими полями', () => {
+    const prompt = { type: 'prompt', prompt: 'Check done', timeout: 30 };
+    const guard = { type: 'command', command: 'echo g', timeout: 5, statusMessage: 'Guarding' };
+    writeFileSync(
+      location.paths.settings,
+      JSON.stringify({
+        hooks: { Stop: [{ hooks: [prompt] }], PreToolUse: [{ matcher: 'Bash', hooks: [guard] }] },
+      }),
+    );
+    const hookIds = readHooks(location.paths.settings, store).map((hook) => hook.id);
+
+    const sandbox = createSandbox(sandboxId, { hookIds }, location, store);
+    const saved = JSON.parse(readFileSync(join(sandbox.configDir, 'settings.json'), 'utf8')) as {
+      hooks: Record<string, { hooks: unknown[] }[]>;
+    };
+    expect(saved.hooks.Stop?.[0]?.hooks).toEqual([prompt]);
+    expect(saved.hooks.PreToolUse?.[0]?.hooks).toEqual([guard]);
   });
 
   it('рабочая папка едет в sandbox.env, а не в глобальный process.env', () => {

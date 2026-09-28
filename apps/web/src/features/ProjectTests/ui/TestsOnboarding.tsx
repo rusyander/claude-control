@@ -59,6 +59,7 @@ export function TestsOnboarding({ board, scope, environmentId }: TestsOnboarding
           scope,
           environmentId: environmentId || undefined,
           autoAccept: board.autoAcceptDrafts,
+          e2e: true,
         }),
     },
     {

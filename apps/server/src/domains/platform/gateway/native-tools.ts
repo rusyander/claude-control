@@ -136,6 +136,6 @@ export function collectNativeTrace(block: Record<string, unknown>, traces: Nativ
   traces.results.push({
     role: 'tool',
     tool_call_id: typeof block.tool_use_id === 'string' ? block.tool_use_id : '',
-    content: `${block.is_error === true ? 'ошибка: ' : ''}${body.text}`,
+    content: `${block.is_error === true ? 'error: ' : ''}${body.text}`,
   });
 }

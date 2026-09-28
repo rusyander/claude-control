@@ -36,7 +36,9 @@ interface FidelityTableProps {
  *     возможности спросить «какие именно» — то же, что число без основания.
  */
 export function FidelityTable({ answer, targetName }: FidelityTableProps) {
-  const { t } = useTranslation();
+  // Дата — языком интерфейса, а не браузера: английская панель иначе
+  // показывала русские даты (F-323).
+  const { t, i18n } = useTranslation();
   const { report } = answer;
   const [openLevel, setOpenLevel] = useState<FidelityLevel | null>(null);
 
@@ -93,7 +95,7 @@ export function FidelityTable({ answer, targetName }: FidelityTableProps) {
         {answer.previous && !sameSummary(answer.previous.summary, summary) && (
           <Typography variant="caption" color="muted">
             {t('portability.fidelity.previous', {
-              date: new Date(answer.previous.computedAt).toLocaleDateString(),
+              date: new Date(answer.previous.computedAt).toLocaleDateString(i18n.language),
             })}
             {!answer.previous.readable && ` ${t('portability.fidelity.previousOtherCanon')}`}
           </Typography>

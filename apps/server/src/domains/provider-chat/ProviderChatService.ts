@@ -77,6 +77,21 @@ function refusedRun(refusal: string): ProviderChatRunLike {
   return { start: () => Promise.reject(new Error(refusal)), stop: () => {} };
 }
 
+/**
+ * Строка о каталоге — хвостом реплики, одной строкой и в своей обёртке. Команда
+ * CLI (`/compact`) остаётся как есть: хвост превратил бы её аргументы в текст.
+ *
+ * Реплика в одну строку остаётся одной строкой (многострочный запрос через
+ * `.cmd` Windows не проходит). Многострочная — это вложения: последняя строка
+ * там путь файла, и строка через пробел приклеилась бы к нему, — ей своя строка.
+ */
+export function withWorkspaceNote(content: string, note: string): string {
+  const line = note.replace(/[\r\n]+/g, ' ').trim();
+  if (!line || content.trimStart().startsWith('/')) return content;
+  const joint = /[\r\n]/.test(content) ? '\n' : ' ';
+  return `${content}${joint}<agentdeck-workspace>${line}</agentdeck-workspace>`;
+}
+
 /** След остановленного прогона, который не успел ответить ни словом. */
 const STOPPED_TEXT = serverText('chat-run-stopped-no-answer');
 
@@ -157,6 +172,18 @@ export class ProviderChatService {
 
   private onStarted?: (providerId: string, chatId: string) => void;
 
+  private groupActivationOf?: (providerId: string, chatId: string, workdir?: string) => void;
+
+  /**
+   * Выбранная группа разговора — включить к началу ответа, тем же вопросом,
+   * что и реестр Claude (`setGroupActivation`): одна точка на все отправки.
+   */
+  setGroupActivation(
+    activate: (providerId: string, chatId: string, workdir?: string) => void,
+  ): void {
+    this.groupActivationOf = activate;
+  }
+
   /** Кому сообщать, что ответ начался: группа снова «работает» (Д3). */
   setStartListener(listener: (providerId: string, chatId: string) => void): void {
     this.onStarted = listener;
@@ -235,6 +262,31 @@ export class ProviderChatService {
 
   private childrenBriefOf?: (providerId: string, chatId: string) => string | undefined;
 
+  /**
+   * Строка о каталоге разговора (тесты проекта, папка e2e) — той же функцией,
+   * что у реестра Claude (`ChatRunRegistry.setWorkspaceNote`). У чужого CLI
+   * системной строки нет, и едет она хвостом ПОСЛЕДНЕЙ реплики этого хода, в
+   * ту же строку: отдельная реплика (`systemPrefix`) сделала бы запрос
+   * многострочным, а многострочный запрос через `.cmd`-обёртку Windows не
+   * пропускает (`cli-spawn.ts`) — первый же вопрос такого CLI упал бы. В
+   * переписку она не пишется и спрашивается на КАЖДОМ сообщении; осечка
+   * решателя отправку не срывает.
+   */
+  setWorkspaceNote(resolve: (cwd: string) => string | undefined): void {
+    this.workspaceNoteOf = resolve;
+  }
+
+  private workspaceNoteOf?: (cwd: string) => string | undefined;
+
+  private workspaceNote(workdir: string | undefined): string {
+    if (!workdir) return '';
+    try {
+      return this.workspaceNoteOf?.(workdir) ?? '';
+    } catch {
+      return '';
+    }
+  }
+
   /** Задать вопрос: реплика пользователя пишется сразу, ответ идёт потоком. */
   send(
     appDataDir: string,
@@ -275,6 +327,11 @@ export class ProviderChatService {
     } catch {
       // Слушатель не должен ронять отправку, реплика уже записана.
     }
+    try {
+      this.groupActivationOf?.(providerId, chatId, chat.workdir);
+    } catch {
+      // Группа не главнее разговора: осечка включения отправку не срывает.
+    }
 
     const brief = this.childrenBriefOf?.(providerId, chatId);
     const history = [
@@ -314,6 +371,12 @@ export class ProviderChatService {
       ...(chat.workdir ? { workdir: chat.workdir } : {}),
       starting: chat.messages.length === 0,
     });
+
+    const note = this.workspaceNote(chat.workdir);
+    const last = history.at(-1);
+    if (note && last) {
+      history[history.length - 1] = { ...last, content: withWorkspaceNote(last.content, note) };
+    }
 
     void live.run
       .start(

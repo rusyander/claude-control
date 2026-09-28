@@ -1,25 +1,45 @@
 import type { ActiveRunView } from '@shared/lib/agent-runs';
 
 /**
- * Что показывать в заголовке вкладки и на значке сайта: агент где-то ждёт ответа
- * или упал, а человек, возможно, смотрит в другую вкладку. Отдельного «списка
- * уведомлений» тут нет намеренно — источник тот же, что и у точек на табах:
- * статус прогона. Пока агент ждёт, он ждёт; выдумывать этому вторую жизнь в
- * параллельном хранилище значило бы завести два расходящихся источника правды.
+ * Что показывать в заголовке вкладки и на значке сайта: человека ждёт что-то
+ * НОВОЕ — агент спросил, просит права или упал, — а человек, возможно, смотрит
+ * в другую программу. Отдельного «списка уведомлений» тут нет намеренно —
+ * источник тот же, что и у точек на табах: статус прогона и вопрос в
+ * транскрипте.
  *
- * Гасится не временем, а действием: человек открыл этот чат при активном окне —
- * значит, увидел. Отметка снимается сама, если статус прогона потом изменится
- * (агент снова заработал и снова спросил) — то есть каждый новый повод зовёт
- * заново.
+ * Правило (владелец 28.09 — точка горела ВСЕГДА: четыре брошенных вопроса
+ * трёхдневной давности звали при каждом открытии панели):
+ * - повод — прогон ждёт ответа или упал, либо разговор стоит на вопросе;
+ * - у повода есть ключ, меняющийся вместе с поводом: статус прогона, время
+ *   последней записи разговора — новый вопрос того же чата зовёт заново;
+ * - повод УВИДЕН, если окно панели было на виду и в фокусе, пока он был (или
+ *   его чат открыли); увиденное помнится между перезагрузками;
+ * - метка = число неувиденных поводов; нет их — нет ни точки, ни счёта.
+ *
+ * Сам повод при этом не исчезает: точки в списке чатов и на табах проектов
+ * держатся, пока на вопрос не ответят. Гаснет только зов «посмотри сюда».
  */
 
 export type AttentionTone = 'warning' | 'danger';
 
 export interface AttentionView {
-  /** Сколько прогонов зовут человека прямо сейчас. */
+  /** Сколько неувиденных поводов зовут человека прямо сейчас. */
   count: number;
   /** Худший повод: упавший агент важнее ждущего. */
   tone?: AttentionTone;
+}
+
+/** Один повод позвать человека. */
+export interface AttentionReason {
+  /** Ключ повода: тот же повод — тот же ключ; новый повод — новый ключ. */
+  key: string;
+  tone: AttentionTone;
+}
+
+/** Разговор на вопросе без живого прогона: id и время последней записи. */
+export interface AwaitingMark {
+  id: string;
+  since: string;
 }
 
 /** Прогон зовёт человека, если ждёт ответа или упал; работающий — нет. */
@@ -27,35 +47,59 @@ export function callsForAttention(status: ActiveRunView['status']): boolean {
   return status === 'waiting' || status === 'error';
 }
 
-/**
- * Свести активные прогоны к одному сигналу. `dismissed` — карта «прогон → статус,
- * в котором его уже видели»: совпал статус, значит человек этот повод закрыл.
- *
- * `awaiting` — разговоры, где вопрос агента висит без ответа по данным самого
- * транскрипта. Такой повод не гасится показом: пока не ответишь, ждут по
- * -настоящему, а прогона за ним может и не быть — агента могли запустить в
- * терминале, и в память вкладки он не попал.
- */
-export function selectAttention(
-  runs: ActiveRunView[],
-  dismissed: ReadonlyMap<string, string>,
-  awaiting: readonly string[] = [],
-): AttentionView {
-  const calling = runs.filter(
-    (run) => callsForAttention(run.status) && dismissed.get(run.id) !== run.status,
-  );
-  const counted = new Set(calling.flatMap((run) => [run.id, run.sessionId ?? run.id]));
-  const extra = awaiting.filter((id) => !counted.has(id));
+/** Префикс ключей одного прогона — по нему забывается его прошлый повод. */
+export const runKeyPrefix = (runId: string): string => `run:${runId}:`;
 
-  const count = calling.length + extra.length;
-  if (count === 0) return { count: 0 };
+/**
+ * Поводы из прогонов вкладки и разговоров, стоящих на вопросе. Разговор, за
+ * которым уже числится зовущий прогон, второй раз не считается.
+ */
+export function attentionReasons(
+  runs: readonly ActiveRunView[],
+  awaiting: readonly AwaitingMark[] = [],
+): AttentionReason[] {
+  const calling = runs.filter((run) => callsForAttention(run.status));
+  const counted = new Set(calling.flatMap((run) => [run.id, run.sessionId ?? run.id]));
+  return [
+    ...calling.map((run) => ({
+      key: `${runKeyPrefix(run.id)}${run.status}`,
+      tone: run.status === 'error' ? ('danger' as const) : ('warning' as const),
+    })),
+    ...awaiting
+      .filter((chat) => !counted.has(chat.id))
+      .map((chat) => ({ key: `chat:${chat.id}:${chat.since}`, tone: 'warning' as const })),
+  ];
+}
+
+/**
+ * Прогоны, чей прошлый повод пора забыть: прогон жив и больше не зовёт. Тогда
+ * следующее «ждёт» у него — уже новый повод (ключ по статусу совпал бы со
+ * старым, увиденным). Отсутствующий прогон не трогаем: до его подхвата после
+ * перезагрузки список пуст, и забытое снова звало бы.
+ */
+export function quietRunIds(runs: readonly ActiveRunView[]): string[] {
+  return runs.filter((run) => !callsForAttention(run.status)).map((run) => run.id);
+}
+
+/** Свести поводы к метке: считаются только неувиденные. */
+export function selectAttention(
+  reasons: readonly AttentionReason[],
+  seen: ReadonlySet<string>,
+): AttentionView {
+  const unseen = reasons.filter((reason) => !seen.has(reason.key));
+  if (unseen.length === 0) return { count: 0 };
   return {
-    count,
-    tone: calling.some((run) => run.status === 'error') ? 'danger' : 'warning',
+    count: unseen.length,
+    tone: unseen.some((reason) => reason.tone === 'danger') ? 'danger' : 'warning',
   };
 }
 
-/** Заголовок вкладки с меткой: сколько агентов зовут — видно, не переключаясь. */
+/** Смотрит ли человек на панель: окно на виду и в фокусе. */
+export function isLookingAt(doc: Pick<Document, 'visibilityState' | 'hasFocus'>): boolean {
+  return doc.visibilityState === 'visible' && doc.hasFocus();
+}
+
+/** Заголовок вкладки с меткой: сколько поводов зовут — видно, не переключаясь. */
 export function attentionTitle(base: string, count: number): string {
   if (count <= 0) return base;
   return count > 1 ? `● ${count} · ${base}` : `● ${base}`;

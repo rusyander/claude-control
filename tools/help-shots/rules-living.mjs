@@ -19,7 +19,7 @@ export async function shootLiving(browser, web, scenario, home) {
     setClaudeMd(home, RULES_CLAUDE_MD);
 
     // ── 01. Список правил ────────────────────────────────────────────────────
-    await openSection(page, web, '/rules');
+    await openSection(page, web, '/rules?tab=all');
     await scenario.shot(page, '01-list');
 
     // ── 02. Поиск не нашёл ───────────────────────────────────────────────────
@@ -43,9 +43,18 @@ export async function shootLiving(browser, web, scenario, home) {
     await page.waitForTimeout(2500);
     await scenario.shot(page, '03-off');
 
+    // ── 06. Вкладка «Выключены» ──────────────────────────────────────────────
+    // Номер после 05 — кадр добавлен позже; снят здесь, пока правило выключено.
+    // Отбор по вопросу «что агент сейчас не видит» — одним щелчком.
+    await page.getByRole('tab', { name: /^(Выключены|Off)/ }).click();
+    await page.waitForTimeout(1200);
+    await scenario.shot(page, '06-tab-off');
+    await page.getByRole('tab', { name: /^(Все|All)/ }).click();
+    await page.waitForTimeout(600);
+
     // ── 04. Что стало с файлом ───────────────────────────────────────────────
-    // Текст выключенного правила не пропал: панель перенесла его в служебный
-    // раздел в конце файла. Поле прокручено вниз — именно туда, где он теперь.
+    // Выключенного правила в файле нет вовсе (F1): текст и место держит панель.
+    // Поле прокручено вниз — видно, что хвост файла кончается включёнными правилами.
     await openSection(page, web, '/claude-md', 2500);
     const editor = page.locator('textarea').first();
     await editor.evaluate((node) => node.scrollTo(0, node.scrollHeight));
@@ -56,7 +65,7 @@ export async function shootLiving(browser, web, scenario, home) {
     // Файл размечен обычными «## » разделами: карточек нет, и страница обязана
     // объяснить это сама, а не показать пустой счётчик.
     setClaudeMd(home, PLAIN_CLAUDE_MD);
-    await openSection(page, web, '/rules', 2500);
+    await openSection(page, web, '/rules?tab=all', 2500);
     await scenario.shot(page, '05-zero');
   } finally {
     await page.close();

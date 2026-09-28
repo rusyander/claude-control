@@ -8,16 +8,17 @@ export const promptsEn: typeof promptsRu = {
     lead:
       'Besides what you write to the agent yourself, the panel sends the model texts of ' +
       'its own: how to call tools, how to behave inside a corporate contour, what to treat ' +
-      'an image description as and how to lay a topic out as slides. Such a text used to live as a string in ' +
+      'an image description as, how to lay a topic out as slides and how to assemble and ' +
+      'reconcile groups. Such a text used to live as a string in ' +
       'the code — there was nowhere to read it and no way to adjust it to your contour. ' +
-      'The «Settings → Prompts» tab shows all six in full and lets you rewrite any of ' +
+      'The «Settings → Prompts» tab shows them all in full and lets you rewrite any of ' +
       'them without losing the built-in one.',
 
     guideTitle: 'What this article covers',
     guideText:
       'First, why these texts are kept separately and which two layers they are made of. ' +
       'Then how to rewrite a prompt and how to bring the built-in one back, in frames of ' +
-      'the real tab. After that: which six prompts exist and who reads each of them, ' +
+      'the real tab. After that: which prompts exist and who reads each of them, ' +
       'what the section is NOT, what lands on disk, the limits, moving prompts to another ' +
       'machine and the refusals word for word.',
 
@@ -46,7 +47,9 @@ export const promptsEn: typeof promptsRu = {
     layerBuiltinTitle: 'The built-in text — the repository',
     layerBuiltinText:
       'It ships with the panel and is updated together with it. It carries a version ' +
-      'number — a marker for a human: «the built-in text has been rewritten since».',
+      'number — a marker for a human: «the built-in text has been rewritten since». ' +
+      'Built-in texts are written in English: only the model reads them, and it takes ' +
+      'the answer language from your message. Your edit may be in any language.',
     layerOverrideTitle: 'Your edit — the panel data directory',
     layerOverrideText:
       'It appears the moment you press «Save», and from then on the panel works with it. ' +
@@ -63,7 +66,7 @@ export const promptsEn: typeof promptsRu = {
         'right after saving.',
       list: 'Open the «Prompts» tab',
       listText:
-        'Five rows: the name, what the text is for, its size and an «Open» button. The ' +
+        'A row per prompt: the name, what the text is for, its size and an «Open» button. The ' +
         'list is deliberately cheap — it holds no texts, they load one by one.',
       open: 'Open the prompt you need',
       openText:
@@ -86,7 +89,7 @@ export const promptsEn: typeof promptsRu = {
 
     catalogTitle: 'Which prompts exist',
     catalogCaption:
-      'Six texts, and each one is read by exactly one place in the panel. Rewrite a ' +
+      'Each text is read by exactly one place in the panel. Rewrite a ' +
       'text and the behaviour of that place changes — and nothing else.',
     catalogColumn: 'Prompt',
     catalogWhoColumn: 'Who reads it',
@@ -129,6 +132,42 @@ export const promptsEn: typeof promptsRu = {
       'code and for the description of a photographic image the panel will draw, and the ' +
       'duty of the agent to ask about the size of the deck first. The panel ceilings are ' +
       'listed too: the trimming is done by the panel, not by the model.',
+    promptGroupDiscover: 'Group discovery',
+    promptGroupDiscoverText:
+      'Finding sets in the «Groups» section: the inventory of one project or of a CLI’s ' +
+      'shared folders becomes the sets that already live there. Cheap model, one call per source.',
+    promptGroupAdvice: 'Advice after copying a group',
+    promptGroupAdviceText:
+      'A group copied to global: per member — use an existing resource, improve the copy or ' +
+      'keep it as it is. You apply, and the edits land in the copy only.',
+    promptGroupMerge: 'Merging a group with its original',
+    promptGroupMergeText:
+      'The original in the project moved ahead: a three-way merge — at copy time, your copy ' +
+      'and the project now — so your edits are not lost.',
+    promptGroupOverride: 'Group override in a project',
+    promptGroupOverrideText:
+      'The text of the local rule a global-group override puts into a project: what of the ' +
+      'project not to follow and which global group to follow instead.',
+    promptPathStepAuthor: 'Path step assistant',
+    promptPathStepAuthorText:
+      'A group «Path» step: your step text becomes a step in two languages — questions, ' +
+      'similar resources (each with what it does, in both languages) and, when it fits, an ' +
+      'offer to make the step a global resource: a skill, hook, rule or script.',
+    promptResourceSummary: 'Resource summary',
+    promptResourceSummaryText:
+      'What a skill, hook or rule does and how it works — briefly, in two languages. Cheap ' +
+      'model, remembered until the file changes.',
+    promptGroupKnobs: 'Group skill numbers',
+    promptGroupKnobsText:
+      'How many runs a group skill does — review rounds, agents per round, verifiers — each ' +
+      'with a verbatim quote from its text; a number without such a quote is dropped by the ' +
+      'panel. Cheap model, remembered until the skill changes.',
+    promptGroupDescribe: 'Resource descriptions',
+    promptGroupDescribeText:
+      'A name and a «what it does» line for a group member and for a ready resource in the ' +
+      'step picker, in both languages; a hook from its event, filter, command and the text of ' +
+      'its script, a skill with its numbered steps too. Cheap model, in the background, at ' +
+      'most two calls at once; secrets in the text are masked, remembered until the text changes.',
 
     notTitle: 'What this is not',
     notCaption:
@@ -173,8 +212,7 @@ export const promptsEn: typeof promptsRu = {
       'On the next request of that mode: the text is read per request, no panel restart ' +
       'needed.',
 
-    canRead:
-      'Read any of the six prompts in full — the working text and the built-in one beside it',
+    canRead: 'Read any prompt in full — the working text and the built-in one beside it',
     canEdit: 'Rewrite a text and save it for this machine',
     canReset: 'Bring the built-in text back with one button',
     canNotice: 'See that a panel update rewrote the built-in text',
@@ -260,7 +298,7 @@ export const promptsEn: typeof promptsRu = {
   shots: {
     library: {
       '01-list':
-        'The «Prompts» tab: six texts, each with what it is for, its size and an «Open» button',
+        'The «Prompts» tab: a row per text, each with what it is for, its size and an «Open» button',
       '02-builtin':
         '«Agent behind a contour» is open: the built-in text in full, «Reset to built-in» disabled — there is no edit',
       '03-edited':

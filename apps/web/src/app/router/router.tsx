@@ -89,6 +89,13 @@ const rootRoute = createRootRoute({
   errorComponent: RouteErrorPage,
 });
 
+/**
+ * Режим раскладки раздела (MainLayout). По умолчанию страница растёт с
+ * содержимым и прокручивается колонкой раздела — одна прокрутка на страницу.
+ * `fill` — страница ровно в высоту колонки и сама держит свои прокрутки.
+ */
+const FILL = { layout: 'fill' } as const;
+
 /** Маршруты объявлены кодом: страниц немного, генератор файловых роутов избыточен. */
 const routes = [
   // Панель-level разделы — без гейта: видны и работают при любом провайдере.
@@ -106,7 +113,9 @@ const routes = [
   { path: '/help', component: HelpPage, loader: () => loadHelp(toLanguage(i18n.language)) },
   // Разделы провайдера — под гейтом возможностей (для Claude всё `ready`).
   { path: '/analytics', component: gated('analytics', AnalyticsPage) },
-  { path: '/chat', component: gated('chat', ChatSection) },
+  // Чат сам держит свои прокрутки (лента, список разговоров): его обёртка — ровно
+  // высота колонки раздела, а не растущая с содержимым страница.
+  { path: '/chat', component: gated('chat', ChatSection), staticData: FILL },
   { path: '/rules', component: gated('rules', RulesPage) },
   { path: '/claude-md', component: gated('globalInstructions', InstructionsSection) },
   { path: '/hooks', component: gated('hooks', HooksSection) },
@@ -120,7 +129,7 @@ const routes = [
   { path: '/projects', component: gated('projects', ProjectsPage) },
   // Тестирование живёт над реестром проектов и запускает прогоны через CLI,
   // поэтому гейтится той же возможностью, что и сам реестр.
-  { path: '/tests', component: gated('projects', TestsPage) },
+  { path: '/tests', component: gated('projects', TestsPage), staticData: FILL },
 ].map((route) => createRoute({ getParentRoute: () => rootRoute, validateSearch, ...route }));
 
 export const router = createRouter({
@@ -135,5 +144,9 @@ export const router = createRouter({
 declare module '@tanstack/react-router' {
   interface Register {
     router: typeof router;
+  }
+  interface StaticDataRouteOption {
+    /** См. `FILL`: страница сама держит свои прокрутки. */
+    layout?: 'fill';
   }
 }

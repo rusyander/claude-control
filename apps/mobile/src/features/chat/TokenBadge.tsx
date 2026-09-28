@@ -3,8 +3,8 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { MessageUsage } from '@agentdeck/contracts';
 import { formatDurationWith } from '@agentdeck/contracts/chat-timing';
 import { colors, font, radius, space } from '../../shared/config/theme';
-import { useT } from '../../shared/config/i18n';
-import { compact, type CostUnit } from '../../shared/lib/format';
+import { useLanguage, useT } from '../../shared/config/i18n';
+import { compact, formatClock, type CostUnit } from '../../shared/lib/format';
 
 /**
  * Расход токенов на один шаг агента — тот же смысл, что в панели.
@@ -43,6 +43,9 @@ export function TokenBadge({
   runTotalMs?: number;
 }) {
   const t = useT();
+  const language = useLanguage();
+  // Язык интерфейса, а не системы телефона (F-323).
+  const clock = (iso: string): string => formatClock(iso, language, { seconds: true });
   const [open, setOpen] = useState(false);
   const time =
     durationMs === undefined ? undefined : formatDurationWith(durationMs, t.common.duration);
@@ -163,17 +166,6 @@ export function TokenBadge({
       ) : null}
     </View>
   );
-}
-
-/** Время суток из ISO: границы шага; дата не нужна, шаг длиннее суток не бывает. */
-function clock(iso: string): string {
-  const at = Date.parse(iso);
-  if (Number.isNaN(at)) return '';
-  return new Date(at).toLocaleTimeString(undefined, {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  });
 }
 
 const styles = StyleSheet.create({

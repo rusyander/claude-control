@@ -67,18 +67,68 @@ export function maskPanelAgentMessages(
   let masked = 0;
   const out = messages.map((message) => {
     if (message.role !== 'user') return message;
-    const result = maskText(message.content, rules, vault);
-    // Второй проход — детектор секретов панели: встроенные образцы DLP знают
-    // только ключи с префиксом вендора, а ключ контура, 32 hex, `key=…` и
-    // «пароль …» уходили в модель и в файл разговора как есть (ревью 17.09.2026).
-    // Метка — из того же словаря хода, чтобы один ключ везде назывался одинаково.
-    const text = replaceSecrets(
-      result.text,
-      (value) => vault.placeholderFor('КЛЮЧ', value, value) || '[КЛЮЧ]',
-    );
+    const text = maskUserText(message.content, rules, vault);
     if (text === message.content) return message;
     masked += 1;
     return { ...message, content: text };
   });
   return { ok: true, messages: out, masked };
+}
+
+function maskUserText(content: string, rules: DlpRule[], vault: AliasVault): string {
+  const result = maskText(content, rules, vault);
+  // Второй проход — детектор секретов панели: встроенные образцы DLP знают
+  // только ключи с префиксом вендора, а ключ контура, 32 hex, `key=…` и
+  // «пароль …» уходили в модель и в файл разговора как есть (ревью 17.09.2026).
+  // Метка — из того же словаря хода, чтобы один ключ везде назывался одинаково.
+  return replaceSecrets(
+    result.text,
+    (value) => vault.placeholderFor('КЛЮЧ', value, value) || '[КЛЮЧ]',
+  );
+}
+
+/**
+ * Метка маски в тексте: `[ФАМИЛИЯ_1]`, `[КЛЮЧ_2.3]`, `[КЛЮЧ]` — форма `AliasVault`.
+ * Без флага `g`: `split` берёт её как есть, а `test` со своим `lastIndex` отвечал бы через раз.
+ */
+const PLACEHOLDER = /\[[\p{L}\d_]+(?:\.\d+)?\]/u;
+
+/** Сошёлся ли текст с образцом, где каждая метка — «любой непустой кусок». */
+function fitsPattern(pattern: string, text: string): boolean {
+  const literals = pattern.split(new RegExp(PLACEHOLDER.source, 'gu'));
+  if (literals.length === 1) return pattern === text;
+  const first = literals[0]!;
+  const last = literals.at(-1)!;
+  if (!text.startsWith(first) || !text.endsWith(last)) return false;
+  // Самое левое вхождение каждого среднего куска — классический разбор образца
+  // со звёздочками: жадность здесь ничего не теряет. Метка съедает хотя бы знак.
+  let at = first.length;
+  for (const literal of literals.slice(1, -1)) {
+    const found = text.indexOf(literal, at + 1);
+    if (found < 0) return false;
+    at = found + literal.length;
+  }
+  return text.length - last.length >= at + 1;
+}
+
+/**
+ * Одна ли это реплика человека, замаскированная правилами РАЗНЫХ ходов (F-121).
+ *
+ * Файл разговора хранит реплику с маской её хода, а маршрут маскирует присланную
+ * историю правилами этой минуты. Правило добавили — в новой маске метка там, где
+ * в старой текст; сняли — наоборот. Поэтому старая реплика маскируется
+ * НЫНЕШНИМИ правилами (добавленное правило ставит метку на своё место), и
+ * каждая метка в ней — «любой кусок» (снятое правило оставило метку, а в новой
+ * — исходный текст). Номера меток сравнению не мешают: они считаются по ходу.
+ * Правила не читаются — остаётся точное сравнение, как было.
+ */
+export function panelAgentMaskTolerantEquals(
+  appDataDir: string,
+): (stored: string, incoming: string) => boolean {
+  const rules = agentRules(appDataDir);
+  return (stored, incoming) => {
+    if (stored === incoming) return true;
+    if (typeof rules === 'string') return false;
+    return fitsPattern(maskUserText(stored, rules, new AliasVault()), incoming);
+  };
 }

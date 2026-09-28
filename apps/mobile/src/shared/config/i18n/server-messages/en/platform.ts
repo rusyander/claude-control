@@ -55,6 +55,7 @@ export const platformEn: Record<PlatformMessageCode, string> = {
   'oauth-network-only': 'OAuth is available only for network servers (http/sse)',
   'oauth-session-missing': 'The authorization session was not found or expired',
   'assistant-timeout': 'The assistant did not answer in the allotted time',
+  'assistant-request-invalid': 'The assistant request was not accepted: {{detail}}',
   'assistant-empty-reply': 'The model returned an empty answer.',
   'manifest-invalid-object': 'Request rejected: overrides must be an object of fields ({{field}}).',
   'manifest-invalid-client-tools':

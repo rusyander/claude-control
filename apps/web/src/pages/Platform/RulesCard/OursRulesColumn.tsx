@@ -6,15 +6,22 @@ import type {
   OurRules,
   Platform,
   PlatformDataMask,
+  PlatformRuleConflict,
+  PlatformRuleRow,
+  PlatformRulesApplies,
   PlatformRunLayers,
 } from '@agentdeck/contracts';
 import { Stack } from '@shared/ui/stack';
 import { CodeText, Typography } from '@shared/ui/typography';
 import { Toggle } from '@shared/ui/toggle';
 import { CompromiseMark } from '@shared/ui/compromise-mark';
+import { serverFieldText } from '@shared/config/i18n';
 import { DataMaskRow } from '../DataMaskRow';
 import styles from '../PlatformPage.module.scss';
 import { layerOn, ourRules, withOurRule } from '../lib/rulesView';
+import { overlapsByOurRule } from '../lib/contourConfigView';
+import { OverlapMark } from './OverlapMark';
+import { SideOffNote } from './SideOffNote';
 
 interface OursRulesColumnProps {
   platform: Platform;
@@ -24,7 +31,16 @@ interface OursRulesColumnProps {
   /** Прослойку не включить, пока у контура записан свой набор инструментов. */
   shimLocked: boolean;
   update: (next: Platform) => void;
+  /** Правила контура — чтобы назвать другую сторону пересечения её именем. */
+  rules: readonly PlatformRuleRow[];
+  /** Пересечения с правилами контура — отметка под строкой, которой касаются. */
+  conflicts: readonly PlatformRuleConflict[];
+  /** Колонка снята выбором «чьи правила действуют» — каким именно. */
+  offBy: PlatformRulesApplies | undefined;
 }
+
+/** Наши правила пересечений, у которых в этой колонке нет своей строки. */
+const ELSEWHERE = ['checkpoints', 'promptGate'] as const;
 
 /**
  * Правая колонка — что панель везёт в прогон ОТ СЕБЯ: маска данных, прослойка
@@ -41,8 +57,23 @@ export function OursRulesColumn({
   dataMask,
   shimLocked,
   update,
+  rules,
+  conflicts,
+  offBy,
 }: OursRulesColumnProps) {
   const { t } = useTranslation();
+  const overlaps = overlapsByOurRule(conflicts);
+
+  /** Сторона контура пересечения — именем его правила, без него — заголовком ячейки. */
+  const contourName = (cell: PlatformRuleConflict): string => {
+    const row = rules.find((rule) => rule.id === cell.platformRule);
+    return row ? serverFieldText(row, 'title') : serverFieldText(cell, 'title');
+  };
+  const mark = (ourRule: string) => {
+    const cell = overlaps.get(ourRule);
+    return cell ? <OverlapMark cell={cell} what={contourName(cell)} /> : null;
+  };
+  const elsewhere = ELSEWHERE.filter((name) => overlaps.has(name));
 
   /**
    * Наши слои (Т8). Общий выключатель сильнее частных галочек — ровно как на
@@ -68,6 +99,10 @@ export function OursRulesColumn({
       className={`${styles.rulesColumn} ${styles.rulesColumnOurs}`}
       aria-labelledby={`rules-ours-${platform.id}`}
       data-rules-side="ours"
+      // Выбор «только правила контура» снимает наши СЛОИ, а маска данных и
+      // прослойка инструментов действуют и дальше (`rules-apply.ts`): колонка,
+      // перечёркнутая целиком, обещала бы обратное (ревью 28.09, F-243).
+      data-side-off={offBy ? 'layers' : 'false'}
     >
       <Stack gap="var(--spacing-sm)">
         <Stack gap="var(--spacing-3xs)">
@@ -83,6 +118,7 @@ export function OursRulesColumn({
             {t('platform.rulesOurs')}
           </Typography>
           <DataMaskRow platform={platform} mask={dataMask} onChange={update} />
+          {mark('dlp')}
           <Stack direction="row" align="start" gap="var(--spacing-xs)" className={styles.toggleRow}>
             <Toggle
               checked={platform.toolShim}
@@ -94,25 +130,26 @@ export function OursRulesColumn({
               <Typography variant="body-sm" as="span">
                 {t('platform.rulesShim')}
               </Typography>
-              <Typography
-                variant="caption"
-                color="muted"
-                as="span"
-                style={{ maxWidth: 'var(--text-measure)' }}
-              >
+              <Typography variant="caption" color="muted" as="span" className="prose">
                 {shimLocked ? t('platform.rulesShimBlocked') : t('platform.rulesShimText')}
               </Typography>
             </Stack>
           </Stack>
+          {mark('toolShim')}
 
           {/* Наши слои (Т8): что из `~/.claude` поедет в прогон через ЭТОТ
             контур. Общий выключатель первым — им человек снимает всё разом,
             не разбираясь в четырёх галочках. */}
-          <Stack gap="var(--spacing-2xs)">
+          <Stack
+            gap="var(--spacing-2xs)"
+            className={offBy ? styles.layersOff : undefined}
+            data-our-layers
+          >
             <Typography variant="body-sm" weight="medium">
               {t('platform.layersTitle')}
             </Typography>
-            <Typography variant="caption" color="muted" style={{ maxWidth: 'var(--text-measure)' }}>
+            <SideOffNote offBy={offBy} />
+            <Typography variant="caption" color="muted" className="prose">
               <CodeText text={t('platform.layersText')} />
             </Typography>
 
@@ -131,12 +168,7 @@ export function OursRulesColumn({
                 <Typography variant="body-sm" as="span">
                   {t('platform.layersAll')}
                 </Typography>
-                <Typography
-                  variant="caption"
-                  color="muted"
-                  as="span"
-                  style={{ maxWidth: 'var(--text-measure)' }}
-                >
+                <Typography variant="caption" color="muted" as="span" className="prose">
                   {/* Причина запертых галочек стоит НАД ними: запертый тумблер
                     выброшен из обхода табом, и объяснение под ним человек с
                     клавиатуры не прочитал бы вовсе (урок ревью Т7, m3). */}
@@ -152,11 +184,7 @@ export function OursRulesColumn({
             {/* Флаги показываются настоящие: «личные правила сняты» без того,
               чем именно, — это просьба верить на слово. Считает их сервер. */}
             {layers && (
-              <Typography
-                variant="caption"
-                color="muted"
-                style={{ maxWidth: 'var(--text-measure)' }}
-              >
+              <Typography variant="caption" color="muted" className="prose">
                 {layers.args.length > 0
                   ? t('platform.layersFlags', { args: layers.args.join(' ') })
                   : t('platform.layersFlagsNone')}
@@ -168,10 +196,29 @@ export function OursRulesColumn({
             {/* Три соседние настройки, которых здесь НЕТ и не будет: человек,
               не нашедший галочки, должен прочитать почему, а не решить, что
               панель потеряла слой. */}
-            <Typography variant="caption" color="muted" style={{ maxWidth: 'var(--text-measure)' }}>
+            <Typography variant="caption" color="muted" className="prose">
               <CodeText text={t('platform.layersNotes')} />
             </Typography>
           </Stack>
+
+          {/* Контрольные точки и гейт промпта настраиваются не здесь, но
+              задевают правила контура — пересечение называется и у них, иначе
+              отметка стояла бы только на одной стороне спора. */}
+          {elsewhere.length > 0 && (
+            <Stack gap="var(--spacing-2xs)">
+              <Typography variant="body-sm" weight="medium">
+                {t('contourConfig.overlap.elsewhere')}
+              </Typography>
+              {elsewhere.map((name) => (
+                <Stack key={name} gap="var(--spacing-3xs)" data-rule-row={name}>
+                  <Typography variant="body-sm" as="span">
+                    {t(`contourConfig.overlap.oursTitle.${name}`)}
+                  </Typography>
+                  {mark(name)}
+                </Stack>
+              ))}
+            </Stack>
+          )}
         </Stack>
       </Stack>
     </section>
@@ -205,12 +252,7 @@ function LayerRow({ id, platform, ours, update }: LayerRowProps) {
               права снимаются вместе, потому что у CLI это один источник. */}
           {id === 'settings' && <CompromiseMark id="rules-partial" />}
         </Stack>
-        <Typography
-          variant="caption"
-          color="muted"
-          as="span"
-          style={{ maxWidth: 'var(--text-measure)' }}
-        >
+        <Typography variant="caption" color="muted" as="span" className="prose">
           <CodeText text={t(`platform.layerText.${id}`)} />
         </Typography>
       </Stack>

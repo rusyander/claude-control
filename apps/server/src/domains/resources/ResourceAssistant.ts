@@ -1,11 +1,11 @@
-import { spawn } from 'node:child_process';
 import type { ClaudeLocation } from '@agentdeck/contracts';
 import { listResourceFiles, readResourceFile, isWritable } from './ResourceFiles.ts';
 import type { ResourceKind } from './registry.ts';
-import { safeSessionId } from '../../lib/cli-args.ts';
-import { killChildTree } from '../../lib/process-tree.ts';
 import { defaultCliCommand } from '../../providers/cli.ts';
-import { coded } from '../../lib/server-text.ts';
+import { historyLines, runClaudeOneShot, type AssistTurn } from '../assistant.ts';
+import { maskAssistText } from '../assistant-secrets.ts';
+import { SECRET_MASK, maskSecretsInText, restoreMaskedSecrets } from '../../lib/secret-mask.ts';
+import type { AgentImage } from '../../lib/agent-images.ts';
 import type { ServerMessageCode, ServerMessageParams } from '@agentdeck/contracts/server-messages';
 
 /**
@@ -16,9 +16,20 @@ import type { ServerMessageCode, ServerMessageParams } from '@agentdeck/contract
  * модель возвращает список файлов с путями и содержимым, а применяются они
  * слиянием — существующее обновляется, новое добавляется, ничего не
  * удаляется само.
+ *
+ * Запуск — то же лёгкое окно, что у помощника формы (`runClaudeOneShot`): без
+ * инструментов, сессии и наших слоёв. Разговор продолжается историей в запросе
+ * (её держит окно помощника), а текущее дерево файлов приходит заново каждый ход.
+ *
+ * Секреты в файлах (U6, 28.09): модель видит содержимое через маску, а ответ
+ * пишется на диск сразу — поэтому маска в ответе возвращается секретом файла
+ * только в строке, слово в слово равной прочитанной (`restoreMaskedSecrets`).
+ * Не сошлось (строка переписана, маска в новом файле) — файл не пишется и
+ * называется в `kept`: записать маску значит молча стереть секрет.
  */
 
-const isWindows = process.platform === 'win32';
+/** Помощник структуры пишет файлы целиком — ему дают больше времени, чем форме. */
+const STRUCTURE_TIMEOUT_MS = 240_000;
 
 export interface AssistFile {
   path: string;
@@ -28,7 +39,8 @@ export interface AssistFile {
 export interface StructureAssistResult {
   reply: string;
   files: AssistFile[];
-  sessionId?: string;
+  /** Файлы, где маску секрета вернуть некуда: не записаны. */
+  kept?: string[];
   error?: string;
   messageCode?: ServerMessageCode;
   params?: ServerMessageParams;
@@ -40,7 +52,8 @@ export async function assistStructure(
   prompt: string,
   location: ClaudeLocation,
   command: string = defaultCliCommand(),
-  sessionId?: string,
+  history: readonly AssistTurn[] = [],
+  images: readonly AgentImage[] = [],
 ): Promise<StructureAssistResult> {
   if (!isWritable(kind)) {
     return {
@@ -52,41 +65,91 @@ export async function assistStructure(
   }
 
   try {
-    const stdout = await runClaude(buildPrompt(kind, id, prompt, location), command, sessionId);
-    const envelope = JSON.parse(stdout) as { result?: string; session_id?: string };
+    const current = readCurrent(kind, id, location);
+    const stdout = await runClaudeOneShot(
+      buildPrompt(kind, prompt, current, history),
+      command,
+      images,
+      STRUCTURE_TIMEOUT_MS,
+    );
+    const envelope = JSON.parse(stdout) as { result?: string };
     const parsed = extractJson(envelope.result ?? '');
 
     if (!parsed) {
       // Модель ответила текстом без разметки — показываем его как реплику,
       // файлов в этот раз нет.
-      return { reply: envelope.result ?? '', files: [], sessionId: envelope.session_id };
+      return { reply: envelope.result ?? '', files: [] };
     }
 
+    const restored = restoreFileSecrets(
+      current,
+      parsed.files.filter((file) => file.path && typeof file.content === 'string'),
+    );
     return {
       reply: parsed.reply,
-      files: parsed.files.filter((file) => file.path && typeof file.content === 'string'),
-      sessionId: envelope.session_id,
+      files: restored.files,
+      ...(restored.kept.length > 0 ? { kept: restored.kept } : {}),
     };
   } catch (error) {
     return { reply: '', files: [], error: error instanceof Error ? error.message : String(error) };
   }
 }
 
+/** Текстовые файлы ресурса как есть — для задания (через маску) и для возврата секретов. */
+function readCurrent(kind: ResourceKind, id: string, location: ClaudeLocation): AssistFile[] {
+  return listResourceFiles(kind, id, location)
+    .filter((file) => !file.isBinary)
+    .map((file) => ({
+      path: file.path,
+      content: readResourceFile(kind, id, file.path, location).content,
+    }));
+}
+
+/** Путь от модели и путь дерева: разделитель и ведущее `./` не делают файл другим. */
+function samePath(a: string, b: string): boolean {
+  const norm = (path: string): string => path.replace(/\\/g, '/').replace(/^\.\//, '');
+  return norm(a) === norm(b);
+}
+
+/**
+ * Файлы ответа → файлы для записи. Без маски — как прислала модель; с маской —
+ * секреты прочитанного файла на место масок (строка должна совпасть с
+ * прочитанной); иначе файл в `kept` и не пишется.
+ */
+export function restoreFileSecrets(
+  current: readonly AssistFile[],
+  files: readonly AssistFile[],
+): { files: AssistFile[]; kept: string[] } {
+  const out: AssistFile[] = [];
+  const kept: string[] = [];
+  for (const file of files) {
+    if (!file.content.includes(SECRET_MASK)) {
+      out.push(file);
+      continue;
+    }
+    const saved = current.find((item) => samePath(item.path, file.path))?.content;
+    const content = saved === undefined ? undefined : restoreMaskedSecrets(saved, file.content);
+    if (content === undefined) kept.push(file.path);
+    else out.push({ path: file.path, content });
+  }
+  return { files: out, kept };
+}
+
 /**
  * Промпт помощнику. В него кладётся текущее дерево с содержимым: без этого
  * модель не знает, что уже есть, и либо дублирует, либо переписывает заново.
+ * Содержимое — через маску секретов, и маска ставится ДО обрезки: обрезка по
+ * символам разрезала бы секрет, и его начало ушло бы модели.
  */
 function buildPrompt(
   kind: ResourceKind,
-  id: string,
   userPrompt: string,
-  location: ClaudeLocation,
+  files: readonly AssistFile[],
+  history: readonly AssistTurn[],
 ): string {
-  const files = listResourceFiles(kind, id, location);
   const current = files
-    .filter((file) => !file.isBinary)
     .map((file) => {
-      const { content } = readResourceFile(kind, id, file.path, location);
+      const content = maskSecretsInText(file.content);
       // Длинные файлы обрезаем: модели нужен контекст, а не всё содержимое,
       // и промпт не должен раздуваться на мегабайты.
       const shown = content.length > 4000 ? `${content.slice(0, 4000)}\n…` : content;
@@ -94,27 +157,29 @@ function buildPrompt(
     })
     .join('\n\n');
 
-  const kindName = kind === 'skill' ? 'скилла' : kind === 'script' ? 'скрипта' : 'ресурса';
+  const kindName = kind === 'skill' ? 'a skill' : kind === 'script' ? 'a script' : 'a resource';
 
   return [
-    `Ты помогаешь собрать структуру ${kindName} для Claude Code.`,
+    `You help build the structure of ${kindName} for Claude Code.`,
     kind === 'skill'
-      ? 'Скилл — это папка с SKILL.md (YAML-frontmatter с полями name и description, затем тело) ' +
-        'и вложенными файлами. Важно: Claude Code не читает вложенные файлы сам — на них должны ' +
-        'быть ссылки из SKILL.md. description должен ясно описывать, когда скилл применять.'
+      ? 'A skill is a folder with SKILL.md (YAML frontmatter with the fields name and description, ' +
+        'then the body) and nested files. Important: Claude Code does not read the nested files by ' +
+        'itself — SKILL.md must link to them. description must say clearly when to apply the skill.'
       : '',
     '',
-    files.length > 0 ? `Текущие файлы:\n\n${current}` : 'Файлов пока нет.',
+    files.length > 0 ? `Current files:\n\n${current}` : 'No files yet.',
     '',
-    `Задача пользователя: ${userPrompt}`,
+    ...historyLines(history),
+    `The user's current task: ${maskAssistText(userPrompt)}`,
     '',
-    'Ответь СТРОГО одним JSON-объектом без пояснений вокруг:',
-    '{"reply": "короткий рассказ, что ты сделал",',
-    ' "files": [{"path": "путь/от/корня", "content": "полное содержимое файла"}]}',
+    'Answer STRICTLY with one JSON object, with no explanations around it:',
+    '{"reply": "a short account of what you did, in the language of the user\'s task",',
+    ' "files": [{"path": "path/from/root", "content": "the full content of the file"}]}',
     '',
-    'В files клади только те файлы, которые нужно создать или переписать целиком, ' +
-      'с готовым содержимым. Не трогай файлы, которые менять не нужно. ' +
-      'Пути — от корня ресурса, через прямой слэш.',
+    'Put into files only the files that must be created or rewritten in full, with ready ' +
+      'content. Do not touch files that need no change. Paths are relative to the resource ' +
+      'root, with forward slashes. Write the content of the files in the language of the ' +
+      "user's task unless the existing files use another.",
   ]
     .filter((line) => line !== undefined)
     .join('\n');
@@ -134,47 +199,4 @@ function extractJson(text: string): { reply: string; files: AssistFile[] } | nul
   } catch {
     return null;
   }
-}
-
-/** Запуск CLI по подписке — так же, как помощник форм. */
-function runClaude(prompt: string, command: string, sessionId?: string): Promise<string> {
-  const args = ['-p', '--output-format', 'json'];
-  const safeId = safeSessionId(sessionId);
-  if (safeId) args.push('--resume', safeId);
-
-  return new Promise((resolve, reject) => {
-    const child = spawn(command, args, {
-      shell: isWindows,
-      windowsHide: true,
-    });
-
-    let stdout = '';
-    let stderr = '';
-    const timer = setTimeout(() => {
-      // Дерево, а не сам процесс: под `cmd.exe` обычный kill оставил бы CLI жить.
-      killChildTree(child);
-      reject(coded(new Error('Помощник не ответил за отведённое время'), 'assistant-timeout'));
-    }, 240_000);
-
-    child.stdout.on('data', (chunk: Buffer) => {
-      stdout += chunk.toString();
-    });
-    child.stderr.on('data', (chunk: Buffer) => {
-      stderr += chunk.toString();
-    });
-
-    child.on('error', (error) => {
-      clearTimeout(timer);
-      reject(error);
-    });
-
-    child.on('close', (code) => {
-      clearTimeout(timer);
-      if (code === 0) resolve(stdout);
-      else reject(new Error(stderr.slice(0, 500) || `CLI завершился с кодом ${code}`));
-    });
-
-    child.stdin.write(prompt);
-    child.stdin.end();
-  });
 }

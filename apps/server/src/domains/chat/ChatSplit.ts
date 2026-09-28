@@ -21,6 +21,7 @@ import {
   addMergeRequestWorktree,
   addWorktree,
   describeMirror,
+  mirrorLineForModel,
   isGitRepo,
   listWorktrees,
   readProjectGit,
@@ -516,7 +517,7 @@ export async function splitTasks({
     // провал подготовки (с хвостом лога) и прямое «начинай с задачи». Группа в
     // общем каталоге работает в окружении человека — ей преамбула не нужна.
     const prompt = isWorktree
-      ? `${environmentPreamble({ ...(mirror ? { mirror } : {}), ...(bootstrap ? { bootstrap } : {}) })}\n\n${withTickets}`
+      ? `${environmentPreamble({ ...(mirror ? { mirror: mirrorLineForModel(mirror) } : {}), ...(bootstrap ? { bootstrap } : {}) })}\n\n${withTickets}`
       : withTickets;
 
     // Ключ чата — тот же временный вид, что и у разговора, начатого из панели:

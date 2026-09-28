@@ -19,6 +19,9 @@ import { SandboxButton } from '@features/SandboxRunner';
 import { ResourceFileTree } from '@features/ResourceFiles';
 import { useScripts, useDeleteScript, type ScriptFile } from '@entities/Script';
 import { useIsCapabilityReady } from '@entities/Provider';
+import { PageTabs, PageTabPanel } from '@shared/ui/page-tabs';
+import { usePageTab } from '@shared/hooks/use-page-tab';
+import { SCRIPTS_TABS, SCRIPTS_TAB_ICONS, scriptsInTab } from './model/tabs';
 import styles from './ScriptsPage.module.scss';
 
 /**
@@ -45,6 +48,12 @@ export function ScriptsPage() {
   const hasHooks = useIsCapabilityReady('hooks');
   const hasSandbox = useIsCapabilityReady('sandbox');
 
+  const { active: chosenTab, select: selectTab } = usePageTab('scripts', SCRIPTS_TABS);
+  // Без хуков отбору не по чему делить: «используется» берётся из привязки к
+  // хуку. Тогда вкладок нет вовсе, а адрес с ?tab= показывает весь список.
+  const hasTabs = hasHooks && scripts.length > 0;
+  const activeTab = hasTabs ? chosenTab : 'all';
+
   const openForm = (script?: ScriptFile): void => {
     setEditing(script);
     setIsFormOpen(true);
@@ -66,19 +75,22 @@ export function ScriptsPage() {
   // привязано. Тесты и фикстуры в «не привязано» не входят — их и не привязывают.
   const unusedCount = scripts.filter((script) => !script.isUsed && !script.isTest).length;
   const summary = ((): string => {
-    if (!hasHooks) return t('scripts.summaryNoHooks', { total: scripts.length });
-    if (unusedCount === 0) return t('scripts.summaryAllUsed', { total: scripts.length });
-    return t('scripts.summary', { total: scripts.length, unused: unusedCount });
+    if (!hasHooks) return t('scripts.summaryNoHooks', { count: scripts.length });
+    if (unusedCount === 0) return t('scripts.summaryAllUsed', { count: scripts.length });
+    return t('scripts.summary', { count: scripts.length, unused: unusedCount });
   })();
 
+  // Поиск идёт внутри открытой вкладки: «Не привязаны» + имя — это вопрос
+  // «забыт ли вот этот файл», и ответ не должен тонуть в привязанных.
+  const inTab = scriptsInTab(scripts, activeTab);
   const needle = query.trim().toLowerCase();
   const visible = needle
-    ? scripts.filter(
+    ? inTab.filter(
         (script) =>
           script.name.toLowerCase().includes(needle) ||
           (script.description ?? '').toLowerCase().includes(needle),
       )
-    : scripts;
+    : inTab;
 
   // «Используется» — про привязку к хуку; тест помечен отдельно, чтобы не
   // читаться забытым файлом; без хуков отметке неоткуда взяться.
@@ -90,30 +102,16 @@ export function ScriptsPage() {
     return { tone: 'neutral', label: t('scripts.unused') };
   };
 
-  return (
-    <Stack gap="var(--spacing-lg)" className={styles.page}>
-      <PageHeader
-        title={t('scripts.title')}
-        subtitle={hasHooks ? t('scripts.subtitle') : t('scripts.subtitleNoHooks')}
-        helpTopic="scripts"
-        actions={
-          <Button
-            variant="primary"
-            leftIcon={<Icon name="plus" size={24} />}
-            onClick={() => openForm()}
-          >
-            {t('scripts.addScript')}
-          </Button>
-        }
-      />
+  const tabs = SCRIPTS_TABS.map((id) => ({
+    id,
+    label: t(`pageTabs.scripts.tab.${id}`),
+    icon: SCRIPTS_TAB_ICONS[id],
+    count: scriptsInTab(scripts, id).length,
+  }));
 
-      <ExplainBox
-        title={t('scripts.explainTitle')}
-        text={hasHooks ? t('scripts.explain') : t('scripts.explainNoHooks')}
-      />
-
-      {isLoading && <SkeletonList rows={5} />}
-
+  // Поиск, список и пустые состояния одни и те же с вкладками и без них.
+  const listBody = (
+    <>
       {!isLoading && scripts.length > 0 && (
         <Stack direction="row" align="center" justify="between" gap="var(--spacing-sm)" wrap>
           <div className={styles.search}>
@@ -139,6 +137,7 @@ export function ScriptsPage() {
               return (
                 <Stack
                   key={script.id}
+                  data-agent-anchor={script.id}
                   direction="row"
                   align="center"
                   justify="between"
@@ -219,12 +218,60 @@ export function ScriptsPage() {
         </Card>
       )}
 
+      {activeTab !== 'all' && scripts.length > 0 && inTab.length === 0 && (
+        <Typography color="subtle">{t(`pageTabs.scripts.empty.${activeTab}`)}</Typography>
+      )}
+
       {!isLoading && scripts.length === 0 && (
         <Typography color="subtle">{t('common.empty')}</Typography>
       )}
 
-      {scripts.length > 0 && visible.length === 0 && (
+      {inTab.length > 0 && visible.length === 0 && (
         <Typography color="subtle">{t('scripts.noMatches', { query: query.trim() })}</Typography>
+      )}
+    </>
+  );
+
+  return (
+    <Stack gap="var(--spacing-lg)" className={styles.page}>
+      <PageHeader
+        title={t('scripts.title')}
+        subtitle={hasHooks ? t('scripts.subtitle') : t('scripts.subtitleNoHooks')}
+        helpTopic="scripts"
+        actions={
+          <Button
+            variant="primary"
+            leftIcon={<Icon name="plus" size={24} />}
+            onClick={() => openForm()}
+          >
+            {t('scripts.addScript')}
+          </Button>
+        }
+      />
+
+      <ExplainBox
+        title={t('scripts.explainTitle')}
+        text={hasHooks ? t('scripts.explain') : t('scripts.explainNoHooks')}
+      />
+
+      {isLoading && <SkeletonList rows={5} />}
+
+      {hasTabs && (
+        <PageTabs
+          page="scripts"
+          label={t('pageTabs.scripts.tabsLabel')}
+          tabs={tabs}
+          active={activeTab}
+          onSelect={selectTab}
+        />
+      )}
+
+      {hasTabs ? (
+        <PageTabPanel page="scripts" tab={activeTab} hint={t(`pageTabs.scripts.hint.${activeTab}`)}>
+          {listBody}
+        </PageTabPanel>
+      ) : (
+        listBody
       )}
 
       <ScriptFormModal isOpen={isFormOpen} onOpenChange={closeForm} script={editing} />

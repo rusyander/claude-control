@@ -4,6 +4,12 @@ import type {
   Platform,
   PlatformGatewaySettings,
 } from '@agentdeck/contracts';
+import {
+  PLATFORM_ASSISTANT_CONSUMER,
+  SECTION_SEGMENT,
+  sectionPath,
+  type PlatformConsumerId,
+} from '@agentdeck/contracts/platform-consumers';
 import type { AppStore } from '../../../lib/app-store.ts';
 
 /**
@@ -56,15 +62,29 @@ export function gatewayUrlFor(
   port: number,
   platformId: string,
   apiKind: EndpointApiKind,
-  /**
-   * Метка ОДНОГО прогона (`/<контур>/_run/<метка>`). Только для окружения
-   * прогона чужого CLI: в файлы и в управляемый профиль она не попадает никогда —
-   * там адрес общий на все запуски.
-   */
-  runTag = '',
+  route: GatewayUrlRoute = {},
 ): string {
-  const root = `http://127.0.0.1:${port}/${platformId}${runTag ? `/_run/${runTag}` : ''}`;
+  const section = route.section ? `/${SECTION_SEGMENT}/${sectionPath(route.section)}` : '';
+  const tag = route.runTag ? `/_run/${route.runTag}` : '';
+  const root = `http://127.0.0.1:${port}/${platformId}${section}${tag}`;
   return apiKind === 'openai-compat' ? `${root}/v1` : root;
+}
+
+/** Кто пойдёт по адресу и какой прогон — то, что адрес несёт кроме контура. */
+export interface GatewayUrlRoute {
+  /**
+   * Раздел панели (`/<контур>/_s/<раздел>`, баг 11а): по нему шлюз отказывает
+   * разделу, закрытому на этом контуре, — и тому процессу, который получил адрес,
+   * пока раздел был открыт. Пусто — адрес без отметки: свои проверки панели и
+   * корень контура, который никому не выдаётся.
+   */
+  section?: PlatformConsumerId;
+  /**
+   * Метка ОДНОГО прогона (`/_run/<метка>`). Только для окружения прогона чужого
+   * CLI: в файлы и в управляемый профиль она не попадает никогда — там адрес
+   * общий на все запуски.
+   */
+  runTag?: string;
 }
 
 /**
@@ -101,7 +121,11 @@ export function buildManagedProfile(
   return {
     id: managedProfileId(platform.id),
     name: `Контур · ${platform.title}`,
-    baseUrl: gatewayUrlFor(gateway.port, platform.id, 'openai-compat'),
+    // Отметка ассистента: профиль — дорога ассистента панели, и шлюз закрывает
+    // её, как только раздел снят на карточке, даже если адрес ещё где-то выбран.
+    baseUrl: gatewayUrlFor(gateway.port, platform.id, 'openai-compat', {
+      section: PLATFORM_ASSISTANT_CONSUMER,
+    }),
     apiKind: 'openai-compat',
     model: model.trim(),
     // Токена у профиля нет вовсе: ключ контура живёт в панели, а шлюз

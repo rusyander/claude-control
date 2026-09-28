@@ -35,12 +35,15 @@ export function ProjectCodeEditor({
   showDiff,
   onChange,
   onSave,
+  ariaLabel,
+  autoFocus = false,
 }: ProjectCodeEditorProps) {
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView>(null);
   const language = useRef(new Compartment()).current;
   const merge = useRef(new Compartment()).current;
   const writable = useRef(new Compartment()).current;
+  const label = useRef(new Compartment()).current;
 
   // Колбэки читаются из ref: иначе каждый ререндер родителя пересобирал бы
   // состояние редактора — вместе с курсором и историей отмен.
@@ -75,6 +78,7 @@ export function ProjectCodeEditor({
           language.of([]),
           merge.of([]),
           writable.of([]),
+          label.of(labelExtension(ariaLabel)),
           EditorView.lineWrapping,
           // Приоритет выше стандартного набора: иначе Ctrl+S перехватил бы
           // браузер и предложил сохранить страницу.
@@ -99,6 +103,7 @@ export function ProjectCodeEditor({
       }),
     });
     view.current = instance;
+    if (autoFocus) instance.focus();
 
     return () => {
       instance.destroy();
@@ -145,6 +150,11 @@ export function ProjectCodeEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditable]);
 
+  useEffect(() => {
+    view.current?.dispatch({ effects: label.reconfigure(labelExtension(ariaLabel)) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ariaLabel]);
+
   // Грамматика приезжает отдельным куском и может опоздать: пока её нет, файл
   // читается как обычный текст. Ответ на устаревший путь отбрасываем — иначе
   // быстрое переключение файлов оставило бы чужую подсветку.
@@ -162,4 +172,9 @@ export function ProjectCodeEditor({
   }, [path]);
 
   return <div ref={host} className={styles.editor} data-testid="project-code-editor" />;
+}
+
+/** Имя поля правки — атрибутом на самом редактируемом узле, где его ищет скринридер. */
+function labelExtension(ariaLabel: string | undefined) {
+  return ariaLabel ? EditorView.contentAttributes.of({ 'aria-label': ariaLabel }) : [];
 }

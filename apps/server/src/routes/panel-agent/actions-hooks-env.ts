@@ -1,19 +1,26 @@
 import { z } from 'zod';
 import type { CommandsResponse, EnvVar, Hook } from '@agentdeck/contracts';
 import type { ConfigPreviewRequest } from '../../domains/config-preview.ts';
-import { isSecretName, maskSecretsInText } from '../../lib/secret-mask.ts';
+import { isSecretEnvKey } from '@agentdeck/contracts/env-secret';
+import { maskSecretsInText, SECRET_MASK } from '../../lib/secret-mask.ts';
 import { definePanelAction, type AnyPanelAction, type InjectRoute } from './registry.ts';
 import { assertClaude, permissionId } from './actions-config.ts';
 import {
   card,
   encode,
+  encodePathId,
   fileCard,
   fileFingerprint,
+  listPage,
   literalSecrets,
   maskDeep,
+  OFFSET_DESCRIPTION,
   readRoute,
+  savedId,
   SECRET_REFUSAL,
   textWindow,
+  unmasked,
+  withSavedId,
 } from './action-kit.ts';
 import { dataField } from './texts.ts';
 
@@ -45,10 +52,18 @@ const hookInput = z.object({
   event: z.enum(HOOK_EVENTS),
   matchers: z
     .array(z.string().trim().min(1))
-    .default([])
-    .describe('Tool names the hook filters on, e.g. ["Bash"]; empty = every tool'),
+    .optional()
+    .describe(
+      'Tool names the hook filters on, e.g. ["Bash"]; [] = every tool; omit on edit to keep the current matcher',
+    ),
   command: z.string().trim().min(1).max(4000).describe('Shell command the hook runs'),
-  timeout: z.number().int().positive().max(3600).optional().describe('Seconds'),
+  timeout: z
+    .number()
+    .int()
+    .positive()
+    .max(3600)
+    .optional()
+    .describe('Seconds; omit on edit to keep the current timeout'),
 });
 
 /** Хук по id — правка сохраняет включённость и группы: их меняют не здесь. */
@@ -68,21 +83,31 @@ async function hookRequest(
   const secrets = literalSecrets({ command: input.command });
   if (secrets.length > 0) throw new Error(`command: ${SECRET_REFUSAL} Use a \${VAR} reference.`);
   const current = input.id === undefined ? undefined : await findHook(inject, input.id);
+  // list_hooks отдаёт команду маской: правка возвращает секрет, а не пишет маску.
+  const command = unmasked('command', current?.command, input.command);
+  // Правка одной команды не должна молча расширять хук на все инструменты и
+  // снимать таймаут: вживую карточка «поменяй команду» теряла `"timeout": 30`.
+  const matchers = input.matchers ?? current?.matcher?.split('|').filter(Boolean) ?? [];
+  const timeout = input.timeout ?? current?.timeout;
   return {
     kind: 'hook',
     action: 'save',
     ...(current ? { id: current.id } : {}),
     draft: {
       event: input.event,
-      matchers: input.matchers,
-      command: input.command,
-      ...(input.timeout === undefined ? {} : { timeout: input.timeout }),
+      matchers,
+      command,
+      ...(timeout === undefined ? {} : { timeout }),
       isEnabled: current?.isEnabled ?? true,
       groupIds: current?.groupIds ?? [],
       guardPatterns: [],
     },
   };
 }
+
+/** Черновик, который `save_hook` отдал маршруту, — по объекту ввода этого вызова. */
+const writtenHooks = new WeakMap<object, HookDraftOf>();
+type HookDraftOf = Awaited<ReturnType<typeof hookRequest>>['draft'];
 
 const saveHook = definePanelAction({
   name: 'save_hook',
@@ -95,6 +120,7 @@ const saveHook = definePanelAction({
   input: hookInput,
   route: async (input, inject) => {
     const request = await hookRequest(input, inject);
+    writtenHooks.set(input, request.draft);
     return request.id === undefined
       ? { method: 'POST', url: '/api/hooks', body: request.draft }
       : { method: 'PUT', url: `/api/hooks/${encode(request.id)}`, body: request.draft };
@@ -109,12 +135,34 @@ const saveHook = definePanelAction({
       }),
       [
         dataField('label-command', maskSecretsInText(input.command)),
-        ...(input.matchers.length > 0
-          ? [dataField('label-matchers', input.matchers.join(' | '))]
+        ...((input.matchers ?? []).length > 0
+          ? [dataField('label-matchers', (input.matchers ?? []).join(' | '))]
           : []),
       ],
     ),
-  page: (input) => ({ route: '/hooks', ...(input.id ? { focus: input.id } : {}) }),
+  // Id хука считается от события, matcher и команды: и новый, и правленый хук
+  // получают его только после записи. Точное совпадение содержимого — он; иначе
+  // (команда пришла маской и не менялась) прежний id, если он жив.
+  // Сверка — с ТЕМ, что записал маршрут (`writtenHooks`), а не с вводом модели:
+  // команда из list_hooks приходит маской, matcher может быть опущен, и сравнение
+  // с вводом промахивалось — фокус указывал на исчезнувший id или чужой хук.
+  afterRoute: (input, body, inject) =>
+    withSavedId<Hook>(inject, '/api/hooks', body, (hooks) => {
+      const draft = writtenHooks.get(input);
+      const matcher = draft?.matchers.filter(Boolean).join('|') || undefined;
+      const same = hooks.filter(
+        (hook) =>
+          draft !== undefined &&
+          hook.event === draft.event &&
+          (hook.matcher || undefined) === matcher &&
+          hook.command === draft.command,
+      );
+      return same.at(-1) ?? hooks.find((hook) => hook.id === input.id);
+    }),
+  page: (input, result) => {
+    const id = savedId(result) ?? input.id;
+    return { route: '/hooks', ...(id ? { focus: id } : {}) };
+  },
 });
 
 const toggleHook = definePanelAction({
@@ -226,12 +274,14 @@ const envInput = z.object({
 });
 
 /**
- * Секрет — это имя-секрет или файл секретов. Значение такого ключа агент не
+ * Секрет — это имя-секрет или файл секретов. Имя решает правило раздела
+ * «Переменные» (слово целиком), а не подстрочное маскирование: иначе
+ * MAX_THINKING_TOKENS агенту не поставить, хотя экран держит его открытым. Значение такого ключа агент не
  * присылает и не затирает: существующий секрет меняет только человек.
  */
 async function envRequest(input: z.infer<typeof envInput>, inject: InjectRoute) {
   await assertClaude(inject);
-  const secret = input.source === 'secrets' || isSecretName(input.key);
+  const secret = input.source === 'secrets' || isSecretEnvKey(input.key);
   if (secret && input.value !== '') throw new Error(`value: ${SECRET_REFUSAL}`);
   if (!secret && literalSecrets({ value: input.value }).length > 0) {
     throw new Error(`value: ${SECRET_REFUSAL}`);
@@ -285,10 +335,11 @@ const setEnv = definePanelAction({
   },
   shape: (input) => ({ saved: input.key, source: input.source }),
   secretStep: (input) =>
-    input.source === 'secrets' || isSecretName(input.key)
+    input.source === 'secrets' || isSecretEnvKey(input.key)
       ? { route: '/env', focus: envSecretAnchor(input.key) }
       : undefined,
-  page: (input) => ({ route: '/env', focus: input.key }),
+  // Строка списка зовётся `источник:ключ` — одинаковый ключ живёт в нескольких файлах.
+  page: (input) => ({ route: '/env', focus: `${input.source}:${input.key}` }),
 });
 
 const deleteEnv = definePanelAction({
@@ -328,7 +379,7 @@ const readClaudeMd = definePanelAction({
   section: 'claude-md',
   risk: 'read',
   description:
-    'Read the global instructions file of the active CLI (CLAUDE.md for Claude) in windows of 20000 chars; ' +
+    'Read the global instructions file of the active CLI (CLAUDE.md for Claude) in windows (up to ~15000 chars); ' +
     'pass nextOffset to continue. Secret values are masked.',
   input: z.object({ offset: z.number().int().nonnegative().default(0) }),
   route: () => ({ method: 'GET', url: '/api/claude-md' }),
@@ -343,6 +394,14 @@ const readClaudeMd = definePanelAction({
   summary: 'journal-read-claude-md',
 });
 
+/** Новый текст CLAUDE.md: без литералов секретов, маски из read_claude_md — секретами с диска. */
+async function claudeMdContent(content: string, inject: InjectRoute): Promise<string> {
+  if (literalSecrets({ content }).length > 0) throw new Error(`content: ${SECRET_REFUSAL}`);
+  if (!content.includes(SECRET_MASK)) return content;
+  const saved = await readRoute<{ content: string }>(inject, '/api/claude-md');
+  return unmasked('content', saved.content, content);
+}
+
 const saveClaudeMd = definePanelAction({
   name: 'save_claude_md',
   section: 'claude-md',
@@ -352,45 +411,75 @@ const saveClaudeMd = definePanelAction({
     'Replace the WHOLE global instructions file with `content`. Read it first and send the full new text; ' +
     'for one rule prefer save_rule. Needs confirmation; the card shows the diff.',
   input: z.object({ content: z.string().max(400_000) }),
-  route: async (input) => {
-    if (literalSecrets({ content: input.content }).length > 0)
-      throw new Error(`content: ${SECRET_REFUSAL}`);
-    return { method: 'PUT', url: '/api/claude-md', body: { content: input.content } };
-  },
-  fingerprint: (input, inject) =>
-    fileFingerprint(inject, { kind: 'instructions', action: 'save', content: input.content }),
-  preview: (input, inject) => {
-    if (literalSecrets({ content: input.content }).length > 0)
-      throw new Error(`content: ${SECRET_REFUSAL}`);
-    return fileCard(
+  route: async (input, inject) => ({
+    method: 'PUT',
+    url: '/api/claude-md',
+    body: { content: await claudeMdContent(input.content, inject) },
+  }),
+  fingerprint: async (input, inject) =>
+    fileFingerprint(inject, {
+      kind: 'instructions',
+      action: 'save',
+      content: await claudeMdContent(input.content, inject),
+    }),
+  preview: async (input, inject) =>
+    fileCard(
       inject,
-      { kind: 'instructions', action: 'save', content: input.content },
+      {
+        kind: 'instructions',
+        action: 'save',
+        content: await claudeMdContent(input.content, inject),
+      },
       card('summary-claude-md-save'),
-    );
-  },
+    ),
   page: () => ({ route: '/claude-md' }),
 });
 
 // --- Скрипты и команды ---
 
+/** Скриптов на страницу и символов описания: страница с запасом влезает в 20 000 моста. */
+const SCRIPTS_PAGE = 40;
+const SCRIPT_ABOUT_MAX = 240;
+
 const listScripts = definePanelAction({
   name: 'list_scripts',
   section: 'scripts',
   risk: 'read',
-  description: 'List scripts under the hooks/ folder (id = relative path, used by a hook or not).',
-  input: z.object({}),
+  description:
+    'List scripts under the hooks/ folder (id = relative path, used by a hook or not, test or not), ' +
+    'a page at a time: total, nextOffset. Descriptions are cut; read_script gives the whole file.',
+  input: z.object({
+    offset: z.number().int().nonnegative().default(0).describe(OFFSET_DESCRIPTION),
+  }),
   route: async (_input, inject) => {
     await assertClaude(inject);
     return { method: 'GET', url: '/api/scripts' };
   },
-  shape: (_input, body) => ({
-    scripts: (body as Array<Record<string, unknown>>).map((item) => ({
-      id: item.id,
-      description: item.description,
-      isUsed: item.isUsed,
-      sizeBytes: item.sizeBytes,
-    })),
-  }),
+  // Страница и обрезанное описание: у живого конфига 87 скриптов дали 55 000
+  // символов, переходник резал ответ на 20 000 — хвост списка модель не видела.
+  shape: (input, body) => {
+    const { meta, slice } = listPage(
+      body as Array<Record<string, unknown>>,
+      input.offset,
+      SCRIPTS_PAGE,
+    );
+    return {
+      ...meta,
+      scripts: slice.map((item) => {
+        const description = typeof item.description === 'string' ? item.description : '';
+        return {
+          id: item.id,
+          ...(description
+            ? // Маска ДО среза: срезанный токен детектор уже не узнаёт.
+              { description: maskSecretsInText(description).slice(0, SCRIPT_ABOUT_MAX) }
+            : {}),
+          isUsed: item.isUsed,
+          ...(item.isTest ? { isTest: true } : {}),
+          sizeBytes: item.sizeBytes,
+        };
+      }),
+    };
+  },
   summary: 'journal-list-scripts',
 });
 
@@ -402,16 +491,26 @@ const readScript = definePanelAction({
   input: z.object({ id: z.string().min(1), offset: z.number().int().nonnegative().default(0) }),
   route: async (input, inject) => {
     await assertClaude(inject);
-    return { method: 'GET', url: `/api/scripts/${input.id.split('/').map(encode).join('/')}` };
+    return { method: 'GET', url: scriptUrl(input.id) };
   },
-  shape: (input, body) => ({
-    id: input.id,
-    ...textWindow(maskSecretsInText((body as { content: string }).content), input.offset),
-  }),
+  shape: (input, body) => {
+    // Ответ без текста — не скрипт (ревью U0, m6: модель получала «Cannot read
+    // properties of undefined (reading 'matchAll')»).
+    const content = (body as { content?: unknown } | undefined)?.content;
+    if (typeof content !== 'string') {
+      throw new Error(
+        `The panel returned no script text for «${input.id}». Take the id from list_scripts.`,
+      );
+    }
+    return { id: input.id, ...textWindow(maskSecretsInText(content), input.offset) };
+  },
   summary: 'journal-read-script',
 });
 
-const scriptUrl = (id: string): string => `/api/scripts/${id.split('/').map(encode).join('/')}`;
+/** Адрес скрипта: сегменты id закодированы, `.`/`..`/пустой — отказ (`encodePathId`). */
+function scriptUrl(id: string): string {
+  return `/api/scripts/${encodePathId(id)}`;
+}
 
 async function scriptRequest(
   input: { id: string; content: string },
@@ -423,11 +522,16 @@ async function scriptRequest(
   const exists = (await readRoute<Array<{ id: string }>>(inject, '/api/scripts')).some(
     (item) => item.id === input.id,
   );
+  // read_script отдаёт текст маской: замена возвращает секреты скрипта с диска.
+  const saved =
+    exists && input.content.includes(SECRET_MASK)
+      ? (await readRoute<{ content: string }>(inject, scriptUrl(input.id))).content
+      : undefined;
   return {
     kind: 'script',
     action: exists ? 'save' : 'create',
     id: input.id,
-    content: input.content,
+    content: unmasked('content', saved, input.content),
   };
 }
 
@@ -443,8 +547,8 @@ const saveScript = definePanelAction({
   route: async (input, inject) => {
     const request = await scriptRequest(input, inject);
     return request.action === 'create'
-      ? { method: 'POST', url: '/api/scripts', body: { name: input.id, content: input.content } }
-      : { method: 'PUT', url: scriptUrl(input.id), body: { content: input.content } };
+      ? { method: 'POST', url: '/api/scripts', body: { name: input.id, content: request.content } }
+      : { method: 'PUT', url: scriptUrl(input.id), body: { content: request.content } };
   },
   fingerprint: async (input, inject) => fileFingerprint(inject, await scriptRequest(input, inject)),
   preview: async (input, inject) => {

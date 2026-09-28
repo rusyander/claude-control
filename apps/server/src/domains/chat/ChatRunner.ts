@@ -11,10 +11,20 @@ import { killChildTree } from '../../lib/process-tree.ts';
 import { defaultCliCommand } from '../../providers/cli.ts';
 import { TurnTracker } from './stream-usage.ts';
 import { userMemorySettings } from '../platform/layers.ts';
-import { LiveSession, type LiveSessionPool, type TurnOutcome } from './live-session.ts';
+import {
+  LiveSession,
+  SIGNATURE_DEFERRABLE,
+  type LiveSessionPool,
+  type TurnOutcome,
+} from './live-session.ts';
+import { isRelayLost } from './live-transport.ts';
+import { serverText } from '../../lib/server-texts.ts';
+import { watchCliChild } from '../../lib/cli-spawn.ts';
 import type { LedgerRelay } from './run-ledger.ts';
 import { CHILD_DENIED_TOOLS, childAppend } from './initiative.ts';
 import { SyntheticGate } from './synthetic-gate.ts';
+import { autoPickResults, picksFor } from './auto-pick.ts';
+import { AUTONOMOUS_ENV } from '@agentdeck/contracts/chat-group-settings';
 
 /** Путь к мини-MCP-серверу прав рядом с этим модулем. */
 const PERMISSION_SERVER = fileURLToPath(new URL('./permission-prompt-server.mjs', import.meta.url));
@@ -30,6 +40,22 @@ const PERMISSION_SERVER = fileURLToPath(new URL('./permission-prompt-server.mjs'
  */
 
 const isWindows = process.platform === 'win32';
+
+/**
+ * Дописка к системному промпту ровно в том виде, в каком её получит процесс:
+ * текст панели (ребёнку — с его правилами) и строка о тестах проекта. Её же
+ * берёт подпись живой сессии — иначе процесс из пула держал бы старый промпт.
+ */
+function appendedOf(options: RunOptions): string {
+  if (options.platformDropAppend) return '';
+  return [
+    options.child ? childAppend(options.appendSystemPrompt) : (options.appendSystemPrompt ?? ''),
+    options.workspaceNote ?? '',
+  ]
+    .filter((part) => part.trim())
+    .join('\n\n')
+    .trim();
+}
 
 /** Подпись запуска живой сессии — отпечатком (см. `ChatRun.prepareSignature`). */
 function signatureOf(snapshot: unknown): string {
@@ -90,6 +116,14 @@ export interface RunOptions {
    * действует, а всё остальное из реальной конфигурации не подключается.
    */
   configDir?: string;
+  /**
+   * `--setting-sources` прогона. Просит его песочница (`user`): её рабочая папка
+   * лежит под домом, и без сужения CLI находил бы поиском вверх личный
+   * `~/.claude/CLAUDE.md`. Не выводится из `configDir`: свой каталог конфигурации
+   * сам по себе не значит «без слоёв проекта» — иначе прогон со своим каталогом
+   * терял бы `CLAUDE.md`, скиллы и MCP репозитория (`check-run-layers.mjs`).
+   */
+  settingSources?: string;
   /**
    * Дополнительные переменные окружения. Нужны песочнице: доступ к аккаунту
    * может быть не файлом, а ключом API — его передают именно так.
@@ -163,15 +197,20 @@ export interface RunOptions {
    * Дописка к системному промпту: правда про вопрос человеку, разделение задач
    * по чатам и продолжение в чистой сессии — тем составом, который включён.
    *
-   * ОДНА СТРОКА, без переводов строки: на Windows аргументы уезжают через
-   * оболочку, а перевод строки внутри аргумента cmd.exe разрывает командную
-   * строку — остаток инструкции выполнился бы как отдельная команда.
-   *
-   * Кавычки внутри одной строки та же оболочка тоже не переживает, поэтому на
-   * Windows значение уходит ФАЙЛОМ (`--append-system-prompt-file`) — разбор
-   * этого случая в `run()`.
+   * Переводы строки сохраняются: на Windows значение уходит ФАЙЛОМ
+   * (`--append-system-prompt-file`) — ни перевод строки, ни кавычки через
+   * cmd.exe не проходят, а файл оболочка не разбирает вовсе (разбор в `run()`);
+   * в остальных ОС процесс запускается без оболочки, и аргумент доезжает как
+   * есть. Сценарий из 80 шагов одной строкой модель читала бы сплошной стеной.
    */
   appendSystemPrompt?: string;
+  /**
+   * Правда о рабочем каталоге — сейчас это тесты проекта (папка e2e, как тест
+   * становится кейсом). Отдельным полем, а не внутри `appendSystemPrompt`: её
+   * реестр пересчитывает на КАЖДОМ старте, а дописка переживает продолжение, и
+   * склейка там задвоила бы строку на втором ходу.
+   */
+  workspaceNote?: string;
   /**
    * Команда запуска CLI активного провайдера. Задаётся маршрутом чата через
    * реестр провайдеров; по умолчанию — команда провайдера Claude. Имя больше не
@@ -246,6 +285,7 @@ export class ChatRun {
     return {
       pipe: relay.pipe,
       pid: relay.pid,
+      ...(relay.token ? { token: relay.token } : {}),
       signature: session.signature,
       ...session.files,
       background: session.backgroundCount,
@@ -332,18 +372,16 @@ export class ChatRun {
       args.push('--system-prompt-file', file);
     }
 
-    // Переводы строки вырезаем здесь, а не полагаемся на дисциплину вызывающего:
-    // на Windows такой аргумент разорвал бы командную строку (см. RunOptions).
+    // Переводы строки остаются: на Windows дописка едет файлом, в других ОС —
+    // аргументом без оболочки (см. RunOptions). Вырезались они, пока на Windows
+    // дописка шла аргументом через cmd.exe.
     // Слой Т8 снимает дописку ЗДЕСЬ, а не затиранием текста в параметрах:
     // сохранённый снимок прогона переживает паузу дерева и перезапуск панели, и
     // затёртую строку было бы неоткуда вернуть, когда галочку включат обратно.
     // Ребёнку разделения — его правила и НЕ совет уводить гейты в фон (журнал
     // 60b): фон группы гибнет со сменой процесса, а конвейер по концу хода
     // решает судьбу группы.
-    const own = options.child
-      ? childAppend(options.appendSystemPrompt)
-      : (options.appendSystemPrompt ?? '');
-    const appended = options.platformDropAppend ? '' : own.replace(/[\r\n]+/g, ' ').trim();
+    const appended = appendedOf(options);
     if (appended) {
       if (isWindows) {
         // ФАЙЛОМ, а не аргументом, и это не перестраховка. Замерено 2 сентября
@@ -376,8 +414,22 @@ export class ChatRun {
     // запрос прав стал бы молчаливым отказом посреди работы.
     if (options.platformArgs?.length) args.push(...options.platformArgs);
 
+    // Свой каталог конфигурации (песочница) — единственный источник настроек.
+    // Её рабочая папка лежит под домом, и CLI, ища `CLAUDE.md` вверх от неё,
+    // находил на `~` личный `~/.claude/CLAUDE.md` и читал его правилами проекта:
+    // в «изоляцию» приезжали все правила владельца (замерено 26.09.2026
+    // настоящим `claude` против стаба). `user` при `CLAUDE_CONFIG_DIR` — это и
+    // есть каталог песочницы; флаг контура, если он есть, решает сам.
+    if (options.settingSources && !options.platformArgs?.includes('--setting-sources')) {
+      args.push('--setting-sources', options.settingSources);
+    }
+
+    // Метка автономии — только от реестра этого прогона (`options.env`): панель,
+    // сама запущенная из автономного прогона, не должна передать её каждому
+    // чату, где человек автономию выключил.
+    const { [AUTONOMOUS_ENV]: _inherited, ...parentEnv } = process.env;
     const env = {
-      ...process.env,
+      ...parentEnv,
       ...(options.child ? childTestWorkers(process.env) : {}),
       ...(options.configDir ? { CLAUDE_CONFIG_DIR: options.configDir } : {}),
       ...options.env,
@@ -437,6 +489,11 @@ export class ChatRun {
                   ? { PERM_TOKEN_FILE: options.permissionPrompt.tokenFile }
                   : {}),
                 ...(runIdFile ? { PERM_RUN_ID_FILE: runIdFile } : {}),
+                // Частота сигнала «жду человека» (`permission-prompt-server.mjs`);
+                // задаётся только проверкой, которой нужен запрос БЕЗ сигнала.
+                ...(process.env.AGENTDECK_PERM_PROGRESS_MS !== undefined
+                  ? { PERM_PROGRESS_MS: process.env.AGENTDECK_PERM_PROGRESS_MS }
+                  : {}),
               },
             },
           },
@@ -527,6 +584,7 @@ export class ChatRun {
     } else {
       // Тот же отказ, что в `prepare`, — без нового процесса его некому сказать.
       this.modelNotice(options, onEvent);
+      if (launch && session.signature !== launch) this.deferredNotice(session, onEvent);
     }
     this.session = session;
     const outcome = await session.turn(options.prompt, runId, onRaw);
@@ -542,6 +600,23 @@ export class ChatRun {
         text: `Имя модели «${options.model.slice(0, 80)}» не прошло проверку аргументов командной строки и до CLI не доехало: прогон идёт моделью, которую CLI выбрал сам. Имя из каталога контура обычно проходит — здесь в нём знак, который оболочка Windows приняла бы за команду.`,
       });
     }
+  }
+
+  /**
+   * Пул отдал прежний процесс, хотя разошлась отложимая часть подписи (метка
+   * автономии): процесс держит фоновые команды, и перезапуск оборвал бы их
+   * (F-31). Человек переключил галочку и вправе знать, почему она ещё не
+   * действует у самого процесса и когда подействует.
+   */
+  private deferredNotice(session: LiveSession, onEvent: (event: ChatEvent) => void): void {
+    const params = { count: String(session.backgroundCount) };
+    onEvent({
+      kind: 'notice',
+      code: 'autonomyDeferred',
+      text: serverText('chat-autonomy-deferred-notice', params),
+      textCode: 'chat-autonomy-deferred-notice',
+      textParams: params,
+    });
   }
 
   /** Конец хода живой сессии: процесс жив — в пул, умер — причина в ленту. */
@@ -570,6 +645,13 @@ export class ChatRun {
    * меняются).
    */
   private prepareSignature(options: RunOptions): string {
+    // Метка автономии — отложимая часть подписи (`SIGNATURE_DEFERRABLE`, F-31):
+    // её смена не повод рвать фоновые команды агента, перезапуск ждёт их конца.
+    const { [AUTONOMOUS_ENV]: autonomy, ...env } = options.env ?? {};
+    return `${this.hardSignature(options, env)}${SIGNATURE_DEFERRABLE}autonomous=${autonomy ? 1 : 0}`;
+  }
+
+  private hardSignature(options: RunOptions, env: Record<string, string>): string {
     // Отпечаток, а не сам снимок: подпись едет в журнал прогонов на диске
     // (подхват после перезапуска), а в окружении — ключи контура.
     return signatureOf({
@@ -579,13 +661,14 @@ export class ChatRun {
       effort: safeEffort(options.effort) ?? '',
       permissionMode: options.permissionMode ?? 'acceptEdits',
       configDir: options.configDir ?? '',
-      env: options.env ?? {},
+      env,
       platformEnv: options.platformEnv ?? {},
       platformSystemPrompt: options.platformSystemPrompt?.trim() ?? '',
       platformArgs: options.platformArgs ?? [],
-      append: options.platformDropAppend
-        ? ''
-        : (options.appendSystemPrompt?.replace(/[\r\n]+/g, ' ').trim() ?? ''),
+      // Та же дописка, что уходит процессу, — со строкой о тестах проекта и
+      // переводами строки: папка e2e, появившаяся между ходами, меняет промпт, и
+      // живой процесс со старым промптом отдавать ходу нельзя.
+      append: appendedOf(options),
       child: Boolean(options.child),
       broker: options.permissionPrompt
         ? [options.permissionPrompt.baseUrl, options.permissionPrompt.tokenFile ?? '']
@@ -606,6 +689,8 @@ export class ChatRun {
       windowsHide: true,
       env,
     });
+    // Ненулевой выход чатового CLI — фоновому наблюдателю; до чтения stderr.
+    watchCliChild(command, args, child);
     this.child = child;
 
     // Сбой запуска (пользователь выбрал провайдера, чей CLI не установлен →
@@ -682,15 +767,16 @@ export class ChatRun {
    * снял бы только оболочку — прогон бы продолжался, тратя токены, при
    * «остановленном» статусе в панели.
    */
-  stop(): void {
+  stop(): 'unconfirmed' | void {
+    // Живую сессию — тоже деревом: «Остановить» гасит и фоновые команды агента,
+    // как гасил их разовый процесс. Не снята (номер посредника не сверить,
+    // F-145) — прогон НЕ трогаем: ни «остановлен», ни вон из пула, ни уборки
+    // папки (в ней конфиг брокера прав живого CLI). Реестр оставит прогон
+    // идущим и скажет человеку, а повторное «Остановить» попробует снова.
+    if (this.session?.kill() === 'unconfirmed') return 'unconfirmed';
     this.isStopped = true;
     if (this.child) killChildTree(this.child);
-    // Живую сессию — тоже деревом и из пула вон: «Остановить» гасит и фоновые
-    // команды агента, как гасил их разовый процесс.
-    if (this.session) {
-      this.pool?.forget(this.session);
-      this.session.kill();
-    }
+    if (this.session) this.pool?.forget(this.session);
     this.cleanup();
   }
 
@@ -735,12 +821,19 @@ export class ChatRun {
  * и без этой ветки прогон выглядел бы как удачный, но пустой ответ. Причину,
  * которую CLI уже назвал потоком (`result` с `is_error`), ненулевой код не
  * затирает.
+ *
+ * Пропавший посредник — не сбой запуска: CLI был поднят и работал, потерян
+ * процесс, а разговор цел, и следующий ход продолжит сессию. Строка
+ * «Не удалось запустить «claude»: relay closed» читалась как поломка установки.
  */
-function exitFailure(
+export function exitFailure(
   command: string,
   exit: { spawnError?: Error | undefined; code?: number | undefined; stderr: string },
   streamError: boolean,
 ): ChatEvent | undefined {
+  if (exit.spawnError && isRelayLost(exit.spawnError)) {
+    return { kind: 'error', message: serverText('chat-process-lost') };
+  }
   if (exit.spawnError) {
     return {
       kind: 'error',
@@ -801,6 +894,24 @@ export function translate(raw: RawEvent): ChatEvent[] {
         input: block.input,
         id: block.id ?? '',
       }));
+  }
+
+  // Результат вызова, закрытого автовыбором (хук или брокер под автономией):
+  // лента рисует его строкой, реестр снимает «агент ждёт ответа» (`auto-pick.ts`).
+  if (raw.type === 'user') {
+    const picks: ChatEvent[] = autoPickResults(raw.message?.content).map(({ toolUseId, text }) => ({
+      kind: 'autoPick',
+      toolUseId,
+      picks: picksFor(undefined, text),
+    }));
+    // Каждый результат вызова — реестру: по нему снимается запрос прав, которого
+    // CLI уже не ждёт (`toolResult` в `chat-events.ts`). Содержимое бывает строкой
+    // (уведомление между ходами), а живой путь исключений не ловит — процесс падал.
+    const content = raw.message?.content;
+    const results: ChatEvent[] = (Array.isArray(content) ? content : [])
+      .filter((block) => block.type === 'tool_result' && block.tool_use_id)
+      .map((block) => ({ kind: 'toolResult', toolUseId: block.tool_use_id ?? '' }));
+    return [...picks, ...results];
   }
 
   if (raw.type === 'rate_limit_event' && raw.rate_limit_info) {

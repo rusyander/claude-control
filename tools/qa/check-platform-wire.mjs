@@ -48,6 +48,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createServer } from 'node:net';
 import { REWRITTEN_FINAL, startStubPlatform } from './stub-platform.mjs';
+import { killChildProcessTree } from '../../apps/server/src/lib/kill-tree.mjs';
 
 /**
  * Свободный порт у системы. Прежде здесь стояли числа 5191/5192, и это давало
@@ -204,7 +205,9 @@ async function main() {
   // `finally` ниже не выполняется, когда процесс уносят снаружи: Ctrl-C, taskkill,
   // падение самого узла. Без этих трёх строк одноразовая панель переживала свой
   // прогон — тот самый случай, ради которого порт выше стал случайным.
-  const reap = () => panel.kill();
+  // Деревом, а не одним `kill()`: у панели свои дети (шлюз, CLI) — без этого
+  // они переживали прогон. Общий помощник, не `taskkill /T` (чужие сироты).
+  const reap = () => killChildProcessTree(panel);
   process.once('exit', reap);
   process.once('SIGINT', () => {
     reap();
@@ -222,7 +225,7 @@ async function main() {
     console.log(`Стаб-контур: ${stub.url}\nПанель: ${PANEL}\n`);
     await run(stub);
   } finally {
-    panel.kill();
+    reap();
     await stub.close();
     rmSync(home, { recursive: true, force: true });
   }

@@ -1,5 +1,6 @@
 import { apiClient } from '@shared/api/client';
 import { i18n } from '@shared/config/i18n';
+import { isOpenAsk } from '@shared/lib/chat-stream';
 import { MAX_AUTO_RETRIES, MAX_RECONNECT } from './agent-runs.constants';
 import {
   autoRetries,
@@ -71,7 +72,7 @@ export function finalize(id: string): void {
   // показывается в РОДИТЕЛЬСКОМ разговоре, а тот про чужой транскрипт ничего не
   // знает — вычисти мы здесь всё, вопрос ребёнка исчез бы у родителя ровно в тот
   // момент, когда ребёнок замолчал и ответа ждать стало некому.
-  const asked = run.tools.filter((tool) => tool.name === 'AskUserQuestion');
+  const asked = run.tools.filter(isOpenAsk);
   // Связь с потоком так и не восстановилась. Набранное в пузыре оборвано на
   // полуслове, а полный ответ агент дописал в транскрипт — там теперь и правда.
   // Поэтому такой прогон убираем, как фоновый: пузырь исчезает, лента перестаёт

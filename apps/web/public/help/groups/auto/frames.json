@@ -8,142 +8,134 @@
       "side": "panel",
       "masked": 0,
       "width": 1440,
-      "height": 1015,
-      "shotAt": "2026-09-17T20:55:35.373Z",
-      "text": "Редактировать: Тикеты магазина Название Описание Состав группы всего Правило Скилл Хук Сервер Право Группа Правило Отвечай диффом Правило Новых зависимостей не заводить Правило Отвечай по-русски Скилл shots-before-after Скилл Тикеты магазина Скилл release-notes Хук PreToolUse · Bash Хук SessionStart Хук UserPromptSubmit Сервер design-mocks Сервер catalog-mock Право deny · Bash(git push:*) Право allow · Bash(git push:*) Право allow · Bash(pnpm test:*) Группа Ревью фронтенда Порядок применения 1 Скилл Тикеты магазина Выбрано: 1 Проекты Витрина магазина C:/work/shop-front Админка магазина C:/work/shop-admin Группа включится сама, когда агент начнёт работать в этом проекте — и в копиях его веток. Обратно сама не выключается: файлы конфигурации общие, а чатов может идти несколько сразу. Порядок работы Когда применять Эта строка становится описанием скилла — по ней Claude решает, браться ли за порядок работы. Триггер по тексту запроса Регулярное выражение. Заполнено — панель ставит хук, который напомнит о порядке работы сам; пусто — Claude подключает скилл по описанию. Шаги 1 Что сделать Подробности Готово, когда Признак выполнения: без него агент сам решит, что шаг сделан. 2 Что сделать Подробности Готово, когда Признак выполнения: без него агент сам решит, что шаг сделан. 3 Что сделать Подробности Готово, когда Признак выполнения: без него агент сам решит, что шаг сделан. Добавить шаг Шаги компилируются в скилл (skills/scenario-…): он становится участником группы и гаснет вместе с ней. Переменные окружения группы Попадут в settings.json, пока группа включена. Удобно держать наборы настроек и переключать их целиком. Помощник Опишите словами, что нужно — поля заполнятся сами Например: «хочу правило, чтобы перед словами о готовности всегда прогонялись тесты». Можно надиктовать голосом. Отмена Сохранить",
+      "height": 960,
+      "shotAt": "2026-09-28T14:33:07.844Z",
+      "text": "Редактировать: Тикеты магазина Название Описание Когда уместна Одна строка: по ней «Авто» выбирает эту группу, когда задачу делят по веткам. Порядок работы собирают в окне группы — откройте её карточку. Состав группы Все Правило Скилл Хук Сервер Право Группа Правило Отвечай диффом Правило Новых зависимостей не заводить Правило Отвечай по-русски Скилл shots-before-after Скилл release-notes Хук PreToolUse · Bash Хук SessionStart Сервер design-mocks Сервер catalog-mock Право deny · Bash(git push:*) Право allow · Bash(git push:*) Право allow · Bash(pnpm test:*) Группа Ревью фронтенда Порядок применения 1 Скилл release-notes Собирает заметки к релизу. release-notes-user Выбрано: 1 Проекты Витрина магазина C:/work/shop-front Админка магазина C:/work/shop-admin Группа включится сама, когда агент начнёт работать в этом проекте — и в копиях его веток. Обратно сама не выключается: файлы конфигурации общие, а чатов может идти несколько сразу. Переменные окружения группы Попадут в settings.json, пока группа включена. Удобно держать наборы настроек и переключать их целиком. Помощник Опишите словами, что нужно — поля заполнятся сами Например: «хочу правило, чтобы перед словами о готовности всегда прогонялись тесты». Можно надиктовать голосом. Отмена Сохранить",
       "en": {
         "file": "01-binding.en.png",
         "masked": 0,
         "width": 1440,
-        "height": 1015,
-        "shotAt": "2026-09-17T20:56:42.021Z",
-        "text": "Edit: Тикеты магазина Name Description Group contents total Rule Skill Hook Server Permission Group Rule Отвечай диффом Rule Новых зависимостей не заводить Rule Отвечай по-русски Skill shots-before-after Skill Тикеты магазина Skill release-notes Hook PreToolUse · Bash Hook SessionStart Hook UserPromptSubmit Server design-mocks Server catalog-mock Permission deny · Bash(git push:*) Permission allow · Bash(git push:*) Permission allow · Bash(pnpm test:*) Group Ревью фронтенда Apply order 1 Skill Тикеты магазина Selected: 1 Projects Витрина магазина C:/work/shop-front Админка магазина C:/work/shop-admin The group switches itself on when an agent starts working in this project — branch copies included. It never switches itself off: the config files are shared and several chats may be running at once. Working order When to apply This line becomes the skill description — Claude decides by it whether to follow the working order. Trigger on the prompt text A regular expression. Filled in — the panel adds a hook that brings the working order up itself; empty — Claude picks the skill up by its description. Steps 1 What to do Details Done when Proof of completion: without it the agent decides on its own. 2 What to do Details Done when Proof of completion: without it the agent decides on its own. 3 What to do Details Done when Proof of completion: without it the agent decides on its own. Add step Steps compile into a skill (skills/scenario-…): it becomes a member of the group and goes dark with it. Group environment variables Applied to settings.json while the group is enabled. Handy for keeping sets of settings and switching them as a whole. Assistant Describe what you need — the fields fill themselves For example: \"I want a rule that tests are always run before claiming something is done\". You can dictate it by voice. Cancel Save"
+        "height": 960,
+        "shotAt": "2026-09-28T14:35:15.602Z",
+        "text": "Edit: Тикеты магазина Name Description When it fits One line: “Auto” picks this group by it when a task is split across branches. The working order is built in the group’s window — open its card. Group contents All Rule Skill Hook Server Permission Group Rule Отвечай диффом Rule Новых зависимостей не заводить Rule Отвечай по-русски Skill shots-before-after Skill release-notes Hook PreToolUse · Bash Hook SessionStart Server design-mocks Server catalog-mock Permission deny · Bash(git push:*) Permission allow · Bash(git push:*) Permission allow · Bash(pnpm test:*) Group Ревью фронтенда Apply order 1 Skill release-notes Собирает заметки к релизу. release-notes-user Selected: 1 Projects Витрина магазина C:/work/shop-front Админка магазина C:/work/shop-admin The group switches itself on when an agent starts working in this project — branch copies included. It never switches itself off: the config files are shared and several chats may be running at once. Group environment variables Applied to settings.json while the group is enabled. Handy for keeping sets of settings and switching them as a whole. Assistant Describe what you need — the fields fill themselves For example: \"I want a rule that tests are always run before claiming something is done\". You can dictate it by voice. Cancel Save"
+      },
+      "dark": {
+        "file": "01-binding.dark.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 960,
+        "shotAt": "2026-09-28T14:37:22.772Z",
+        "text": "Редактировать: Тикеты магазина Название Описание Когда уместна Одна строка: по ней «Авто» выбирает эту группу, когда задачу делят по веткам. Порядок работы собирают в окне группы — откройте её карточку. Состав группы Все Правило Скилл Хук Сервер Право Группа Правило Отвечай диффом Правило Новых зависимостей не заводить Правило Отвечай по-русски Скилл shots-before-after Скилл release-notes Хук PreToolUse · Bash Хук SessionStart Сервер design-mocks Сервер catalog-mock Право deny · Bash(git push:*) Право allow · Bash(git push:*) Право allow · Bash(pnpm test:*) Группа Ревью фронтенда Порядок применения 1 Скилл release-notes Собирает заметки к релизу. release-notes-user Выбрано: 1 Проекты Витрина магазина C:/work/shop-front Админка магазина C:/work/shop-admin Группа включится сама, когда агент начнёт работать в этом проекте — и в копиях его веток. Обратно сама не выключается: файлы конфигурации общие, а чатов может идти несколько сразу. Переменные окружения группы Попадут в settings.json, пока группа включена. Удобно держать наборы настроек и переключать их целиком. Помощник Опишите словами, что нужно — поля заполнятся сами Например: «хочу правило, чтобы перед словами о готовности всегда прогонялись тесты». Можно надиктовать голосом. Отмена Сохранить"
+      },
+      "darkEn": {
+        "file": "01-binding.dark.en.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 960,
+        "shotAt": "2026-09-28T14:39:27.411Z",
+        "text": "Edit: Тикеты магазина Name Description When it fits One line: “Auto” picks this group by it when a task is split across branches. The working order is built in the group’s window — open its card. Group contents All Rule Skill Hook Server Permission Group Rule Отвечай диффом Rule Новых зависимостей не заводить Rule Отвечай по-русски Skill shots-before-after Skill release-notes Hook PreToolUse · Bash Hook SessionStart Server design-mocks Server catalog-mock Permission deny · Bash(git push:*) Permission allow · Bash(git push:*) Permission allow · Bash(pnpm test:*) Group Ревью фронтенда Apply order 1 Skill release-notes Собирает заметки к релизу. release-notes-user Selected: 1 Projects Витрина магазина C:/work/shop-front Админка магазина C:/work/shop-admin The group switches itself on when an agent starts working in this project — branch copies included. It never switches itself off: the config files are shared and several chats may be running at once. Group environment variables Applied to settings.json while the group is enabled. Handy for keeping sets of settings and switching them as a whole. Assistant Describe what you need — the fields fill themselves For example: \"I want a rule that tests are always run before claiming something is done\". You can dictate it by voice. Cancel Save"
       }
     },
     {
-      "id": "02-steps",
-      "file": "02-steps.png",
+      "id": "02-when",
       "side": "panel",
+      "file": "02-when.png",
       "masked": 0,
       "width": 1440,
-      "height": 1015,
-      "shotAt": "2026-09-17T20:55:36.038Z",
-      "text": "Редактировать: Тикеты магазина Название Описание Состав группы всего Правило Скилл Хук Сервер Право Группа Правило Отвечай диффом Правило Новых зависимостей не заводить Правило Отвечай по-русски Скилл shots-before-after Скилл Тикеты магазина Скилл release-notes Хук PreToolUse · Bash Хук SessionStart Хук UserPromptSubmit Сервер design-mocks Сервер catalog-mock Право deny · Bash(git push:*) Право allow · Bash(git push:*) Право allow · Bash(pnpm test:*) Группа Ревью фронтенда Порядок применения 1 Скилл Тикеты магазина Выбрано: 1 Проекты Витрина магазина C:/work/shop-front Админка магазина C:/work/shop-admin Группа включится сама, когда агент начнёт работать в этом проекте — и в копиях его веток. Обратно сама не выключается: файлы конфигурации общие, а чатов может идти несколько сразу. Порядок работы Когда применять Эта строка становится описанием скилла — по ней Claude решает, браться ли за порядок работы. Триггер по тексту запроса Регулярное выражение. Заполнено — панель ставит хук, который напомнит о порядке работы сам; пусто — Claude подключает скилл по описанию. Шаги 1 Что сделать Подробности Готово, когда Признак выполнения: без него агент сам решит, что шаг сделан. 2 Что сделать Подробности Готово, когда Признак выполнения: без него агент сам решит, что шаг сделан. 3 Что сделать Подробности Готово, когда Признак выполнения: без него агент сам решит, что шаг сделан. Добавить шаг Шаги компилируются в скилл (skills/scenario-…): он становится участником группы и гаснет вместе с ней. Переменные окружения группы Попадут в settings.json, пока группа включена. Удобно держать наборы настроек и переключать их целиком. Помощник Опишите словами, что нужно — поля заполнятся сами Например: «хочу правило, чтобы перед словами о готовности всегда прогонялись тесты». Можно надиктовать голосом. Отмена Сохранить",
+      "height": 960,
+      "shotAt": "2026-09-28T14:33:08.549Z",
+      "text": "Редактировать: Тикеты магазина Название Описание Когда уместна Одна строка: по ней «Авто» выбирает эту группу, когда задачу делят по веткам. Порядок работы собирают в окне группы — откройте её карточку. Состав группы Все Правило Скилл Хук Сервер Право Группа Правило Отвечай диффом Правило Новых зависимостей не заводить Правило Отвечай по-русски Скилл shots-before-after Скилл release-notes Хук PreToolUse · Bash Хук SessionStart Сервер design-mocks Сервер catalog-mock Право deny · Bash(git push:*) Право allow · Bash(git push:*) Право allow · Bash(pnpm test:*) Группа Ревью фронтенда Порядок применения 1 Скилл release-notes Собирает заметки к релизу. release-notes-user Выбрано: 1 Проекты Витрина магазина C:/work/shop-front Админка магазина C:/work/shop-admin Группа включится сама, когда агент начнёт работать в этом проекте — и в копиях его веток. Обратно сама не выключается: файлы конфигурации общие, а чатов может идти несколько сразу. Переменные окружения группы Попадут в settings.json, пока группа включена. Удобно держать наборы настроек и переключать их целиком. Помощник Опишите словами, что нужно — поля заполнятся сами Например: «хочу правило, чтобы перед словами о готовности всегда прогонялись тесты». Можно надиктовать голосом. Отмена Сохранить",
       "en": {
-        "file": "02-steps.en.png",
+        "file": "02-when.en.png",
         "masked": 0,
         "width": 1440,
-        "height": 1015,
-        "shotAt": "2026-09-17T20:56:42.702Z",
-        "text": "Edit: Тикеты магазина Name Description Group contents total Rule Skill Hook Server Permission Group Rule Отвечай диффом Rule Новых зависимостей не заводить Rule Отвечай по-русски Skill shots-before-after Skill Тикеты магазина Skill release-notes Hook PreToolUse · Bash Hook SessionStart Hook UserPromptSubmit Server design-mocks Server catalog-mock Permission deny · Bash(git push:*) Permission allow · Bash(git push:*) Permission allow · Bash(pnpm test:*) Group Ревью фронтенда Apply order 1 Skill Тикеты магазина Selected: 1 Projects Витрина магазина C:/work/shop-front Админка магазина C:/work/shop-admin The group switches itself on when an agent starts working in this project — branch copies included. It never switches itself off: the config files are shared and several chats may be running at once. Working order When to apply This line becomes the skill description — Claude decides by it whether to follow the working order. Trigger on the prompt text A regular expression. Filled in — the panel adds a hook that brings the working order up itself; empty — Claude picks the skill up by its description. Steps 1 What to do Details Done when Proof of completion: without it the agent decides on its own. 2 What to do Details Done when Proof of completion: without it the agent decides on its own. 3 What to do Details Done when Proof of completion: without it the agent decides on its own. Add step Steps compile into a skill (skills/scenario-…): it becomes a member of the group and goes dark with it. Group environment variables Applied to settings.json while the group is enabled. Handy for keeping sets of settings and switching them as a whole. Assistant Describe what you need — the fields fill themselves For example: \"I want a rule that tests are always run before claiming something is done\". You can dictate it by voice. Cancel Save"
+        "height": 960,
+        "shotAt": "2026-09-28T14:35:16.289Z",
+        "text": "Edit: Тикеты магазина Name Description When it fits One line: “Auto” picks this group by it when a task is split across branches. The working order is built in the group’s window — open its card. Group contents All Rule Skill Hook Server Permission Group Rule Отвечай диффом Rule Новых зависимостей не заводить Rule Отвечай по-русски Skill shots-before-after Skill release-notes Hook PreToolUse · Bash Hook SessionStart Server design-mocks Server catalog-mock Permission deny · Bash(git push:*) Permission allow · Bash(git push:*) Permission allow · Bash(pnpm test:*) Group Ревью фронтенда Apply order 1 Skill release-notes Собирает заметки к релизу. release-notes-user Selected: 1 Projects Витрина магазина C:/work/shop-front Админка магазина C:/work/shop-admin The group switches itself on when an agent starts working in this project — branch copies included. It never switches itself off: the config files are shared and several chats may be running at once. Group environment variables Applied to settings.json while the group is enabled. Handy for keeping sets of settings and switching them as a whole. Assistant Describe what you need — the fields fill themselves For example: \"I want a rule that tests are always run before claiming something is done\". You can dictate it by voice. Cancel Save"
+      },
+      "dark": {
+        "file": "02-when.dark.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 960,
+        "shotAt": "2026-09-28T14:37:23.474Z",
+        "text": "Редактировать: Тикеты магазина Название Описание Когда уместна Одна строка: по ней «Авто» выбирает эту группу, когда задачу делят по веткам. Порядок работы собирают в окне группы — откройте её карточку. Состав группы Все Правило Скилл Хук Сервер Право Группа Правило Отвечай диффом Правило Новых зависимостей не заводить Правило Отвечай по-русски Скилл shots-before-after Скилл release-notes Хук PreToolUse · Bash Хук SessionStart Сервер design-mocks Сервер catalog-mock Право deny · Bash(git push:*) Право allow · Bash(git push:*) Право allow · Bash(pnpm test:*) Группа Ревью фронтенда Порядок применения 1 Скилл release-notes Собирает заметки к релизу. release-notes-user Выбрано: 1 Проекты Витрина магазина C:/work/shop-front Админка магазина C:/work/shop-admin Группа включится сама, когда агент начнёт работать в этом проекте — и в копиях его веток. Обратно сама не выключается: файлы конфигурации общие, а чатов может идти несколько сразу. Переменные окружения группы Попадут в settings.json, пока группа включена. Удобно держать наборы настроек и переключать их целиком. Помощник Опишите словами, что нужно — поля заполнятся сами Например: «хочу правило, чтобы перед словами о готовности всегда прогонялись тесты». Можно надиктовать голосом. Отмена Сохранить"
+      },
+      "darkEn": {
+        "file": "02-when.dark.en.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 960,
+        "shotAt": "2026-09-28T14:39:28.089Z",
+        "text": "Edit: Тикеты магазина Name Description When it fits One line: “Auto” picks this group by it when a task is split across branches. The working order is built in the group’s window — open its card. Group contents All Rule Skill Hook Server Permission Group Rule Отвечай диффом Rule Новых зависимостей не заводить Rule Отвечай по-русски Skill shots-before-after Skill release-notes Hook PreToolUse · Bash Hook SessionStart Server design-mocks Server catalog-mock Permission deny · Bash(git push:*) Permission allow · Bash(git push:*) Permission allow · Bash(pnpm test:*) Group Ревью фронтенда Apply order 1 Skill release-notes Собирает заметки к релизу. release-notes-user Selected: 1 Projects Витрина магазина C:/work/shop-front Админка магазина C:/work/shop-admin The group switches itself on when an agent starts working in this project — branch copies included. It never switches itself off: the config files are shared and several chats may be running at once. Group environment variables Applied to settings.json while the group is enabled. Handy for keeping sets of settings and switching them as a whole. Assistant Describe what you need — the fields fill themselves For example: \"I want a rule that tests are always run before claiming something is done\". You can dictate it by voice. Cancel Save"
       }
     },
     {
-      "id": "03-trigger-error",
-      "file": "03-trigger-error.png",
+      "id": "03-details",
       "side": "panel",
+      "file": "03-details.png",
       "masked": 0,
-      "width": 1440,
-      "height": 1015,
-      "shotAt": "2026-09-17T20:55:37.241Z",
-      "text": "Редактировать: Тикеты магазина Название Описание Состав группы всего Правило Скилл Хук Сервер Право Группа Правило Отвечай диффом Правило Новых зависимостей не заводить Правило Отвечай по-русски Скилл shots-before-after Скилл Тикеты магазина Скилл release-notes Хук PreToolUse · Bash Хук SessionStart Хук UserPromptSubmit Сервер design-mocks Сервер catalog-mock Право deny · Bash(git push:*) Право allow · Bash(git push:*) Право allow · Bash(pnpm test:*) Группа Ревью фронтенда Порядок применения 1 Скилл Тикеты магазина Выбрано: 1 Проекты Витрина магазина C:/work/shop-front Админка магазина C:/work/shop-admin Группа включится сама, когда агент начнёт работать в этом проекте — и в копиях его веток. Обратно сама не выключается: файлы конфигурации общие, а чатов может идти несколько сразу. Порядок работы Когда применять Эта строка становится описанием скилла — по ней Claude решает, браться ли за порядок работы. Триггер по тексту запроса Это не регулярное выражение Шаги 1 Что сделать Подробности Готово, когда Признак выполнения: без него агент сам решит, что шаг сделан. 2 Что сделать Подробности Готово, когда Признак выполнения: без него агент сам решит, что шаг сделан. 3 Что сделать Подробности Готово, когда Признак выполнения: без него агент сам решит, что шаг сделан. Добавить шаг Шаги компилируются в скилл (skills/scenario-…): он становится участником группы и гаснет вместе с ней. Переменные окружения группы Попадут в settings.json, пока группа включена. Удобно держать наборы настроек и переключать их целиком. Помощник Опишите словами, что нужно — поля заполнятся сами Например: «хочу правило, чтобы перед словами о готовности всегда прогонялись тесты». Можно надиктовать голосом. Отмена Сохранить",
+      "width": 928,
+      "height": 768,
+      "shotAt": "2026-09-28T14:33:10.527Z",
+      "text": "Тикеты магазина Редактировать Копировать Когда: Задача пришла тикетом с номером PROJ- Порядок работы Состав Порядок работы над тикетом: разбор, правка, проверка. Состав Скилл release-notes release-notes-user Собирает заметки к релизу. Используется в C:/work/shop-front Из проекта C:/work/shop-front скиллов: 2 хуков: 2 правил: 2 Показать набор",
       "en": {
-        "file": "03-trigger-error.en.png",
+        "file": "03-details.en.png",
         "masked": 0,
-        "width": 1440,
-        "height": 1015,
-        "shotAt": "2026-09-17T20:56:43.920Z",
-        "text": "Edit: Тикеты магазина Name Description Group contents total Rule Skill Hook Server Permission Group Rule Отвечай диффом Rule Новых зависимостей не заводить Rule Отвечай по-русски Skill shots-before-after Skill Тикеты магазина Skill release-notes Hook PreToolUse · Bash Hook SessionStart Hook UserPromptSubmit Server design-mocks Server catalog-mock Permission deny · Bash(git push:*) Permission allow · Bash(git push:*) Permission allow · Bash(pnpm test:*) Group Ревью фронтенда Apply order 1 Skill Тикеты магазина Selected: 1 Projects Витрина магазина C:/work/shop-front Админка магазина C:/work/shop-admin The group switches itself on when an agent starts working in this project — branch copies included. It never switches itself off: the config files are shared and several chats may be running at once. Working order When to apply This line becomes the skill description — Claude decides by it whether to follow the working order. Trigger on the prompt text Not a regular expression Steps 1 What to do Details Done when Proof of completion: without it the agent decides on its own. 2 What to do Details Done when Proof of completion: without it the agent decides on its own. 3 What to do Details Done when Proof of completion: without it the agent decides on its own. Add step Steps compile into a skill (skills/scenario-…): it becomes a member of the group and goes dark with it. Group environment variables Applied to settings.json while the group is enabled. Handy for keeping sets of settings and switching them as a whole. Assistant Describe what you need — the fields fill themselves For example: \"I want a rule that tests are always run before claiming something is done\". You can dictate it by voice. Cancel Save"
+        "width": 928,
+        "height": 768,
+        "shotAt": "2026-09-28T14:35:18.271Z",
+        "text": "Тикеты магазина Edit Copy When: Задача пришла тикетом с номером PROJ- Working order Members Порядок работы над тикетом: разбор, правка, проверка. Members Skill release-notes release-notes-user Собирает заметки к релизу. Used in C:/work/shop-front From the project C:/work/shop-front skills: 2 hooks: 2 rules: 2 Show the set"
+      },
+      "dark": {
+        "file": "03-details.dark.png",
+        "masked": 0,
+        "width": 928,
+        "height": 768,
+        "shotAt": "2026-09-28T14:37:25.469Z",
+        "text": "Тикеты магазина Редактировать Копировать Когда: Задача пришла тикетом с номером PROJ- Порядок работы Состав Порядок работы над тикетом: разбор, правка, проверка. Состав Скилл release-notes release-notes-user Собирает заметки к релизу. Используется в C:/work/shop-front Из проекта C:/work/shop-front скиллов: 2 хуков: 2 правил: 2 Показать набор"
+      },
+      "darkEn": {
+        "file": "03-details.dark.en.png",
+        "masked": 0,
+        "width": 928,
+        "height": 768,
+        "shotAt": "2026-09-28T14:39:30.075Z",
+        "text": "Тикеты магазина Edit Copy When: Задача пришла тикетом с номером PROJ- Working order Members Порядок работы над тикетом: разбор, правка, проверка. Members Skill release-notes release-notes-user Собирает заметки к релизу. Used in C:/work/shop-front From the project C:/work/shop-front skills: 2 hooks: 2 rules: 2 Show the set"
       }
     },
     {
-      "id": "04-card",
-      "file": "04-card.png",
+      "id": "07-scenario",
       "side": "panel",
+      "file": "07-scenario.png",
       "masked": 0,
-      "width": 1440,
-      "height": 1100,
-      "shotAt": "2026-09-17T20:55:38.456Z",
-      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 3 CLAUDE.md Скиллы 3 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 2 Права 3 Переменные Проекты Тестирование Приложение Группы 2 История изменений Сравнение Настройки Защита данных Контур Справка Группы Свой порядок поверх правил, хуков, скиллов и серверов Создать группу Зачем это Ревью фронтенда 5 участников env: 1 Всё, что нужно на разборе чужой ветки, и ничего сверх того. Тикеты магазина 1 участников проектов: 1 шагов: 3 Порядок работы над тикетом: разбор, правка, проверка. Из проекта C:/work/shop-front скиллов: 2 хуков: 2 правил: 2 Показать набор Сценарии Создать сценарий Сценарии Пусто",
+      "width": 700,
+      "height": 640,
+      "shotAt": "2026-09-28T14:33:11.574Z",
+      "text": "Новый сценарий Сценарий — группа из одних шагов: они идут по порядку, и это вся работа. После создания откроется её «Порядок работы» — первый шаг опишите словами или выберите готовый. Название Когда уместен Одна строка: по ней «Авто» выбирает этот сценарий, когда задачу делят по веткам. Можно оставить пустой. Где живёт Глобальный — в любом проекте Проект Витрина магазина Проект Админка магазина Отмена Создать и открыть",
       "en": {
-        "file": "04-card.en.png",
+        "file": "07-scenario.en.png",
         "masked": 0,
-        "width": 1440,
-        "height": 1100,
-        "shotAt": "2026-09-17T20:56:45.143Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 3 CLAUDE.md Skills 3 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 2 Permissions 3 Environment Projects Testing Application Groups 2 Change history Comparison Settings Data protection Contour Help Groups Your own structure across rules, hooks, skills and servers Create group Why this exists Ревью фронтенда 5 members env: 1 Всё, что нужно на разборе чужой ветки, и ничего сверх того. Тикеты магазина 1 members projects: 1 steps: 3 Порядок работы над тикетом: разбор, правка, проверка. From the project C:/work/shop-front skills: 2 hooks: 2 rules: 2 Show the set Automations Create automation Automations Empty"
-      }
-    },
-    {
-      "id": "05-skill",
-      "file": "05-skill.png",
-      "side": "panel",
-      "masked": 0,
-      "width": 1440,
-      "height": 1100,
-      "shotAt": "2026-09-17T20:55:40.741Z",
-      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 3 CLAUDE.md Скиллы 3 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 2 Права 3 Переменные Проекты Тестирование Приложение Группы 2 История изменений Сравнение Настройки Защита данных Контур Справка Скиллы Наборы инструкций, которые Claude подключает по описанию Создать скилл Как это работает shots-before-after 1 файл 3.0 KB Снимает экран до и после правки, которую видно глазами. Тикеты магазина 1 файл 980 B Задача пришла тикетом с номером release-notes 740 B Собирает заметки к релизу.",
-      "en": {
-        "file": "05-skill.en.png",
+        "width": 700,
+        "height": 640,
+        "shotAt": "2026-09-28T14:35:19.315Z",
+        "text": "New scenario A scenario is a group made only of steps: they run in order, and that is the whole job. Once created, its Working order opens — describe the first step in words or pick a ready one. Name When it fits One line: “Auto” picks this scenario by it when a task is split across branches. May stay empty. Where it lives Global — in any project Project Витрина магазина Project Админка магазина Cancel Create and open"
+      },
+      "dark": {
+        "file": "07-scenario.dark.png",
         "masked": 0,
-        "width": 1440,
-        "height": 1100,
-        "shotAt": "2026-09-17T20:56:47.482Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 3 CLAUDE.md Skills 3 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 2 Permissions 3 Environment Projects Testing Application Groups 2 Change history Comparison Settings Data protection Contour Help Skills Instruction sets Claude pulls in based on their description Create skill How it works shots-before-after 1 file 3.0 KB Снимает экран до и после правки, которую видно глазами. Тикеты магазина 1 file 980 B Задача пришла тикетом с номером release-notes 740 B Собирает заметки к релизу."
-      }
-    },
-    {
-      "id": "06-automation-form",
-      "file": "06-automation-form.png",
-      "side": "panel",
-      "masked": 0,
-      "width": 1440,
-      "height": 824,
-      "shotAt": "2026-09-17T20:55:43.967Z",
-      "text": "Создать сценарий Сценарий описывает «когда — что»: например, после вызова скилла запустить проверку. При сохранении он превращается в обычный хук, поэтому работает ровно так же, как написанный руками. Название сценария Когда запускать Событие PreToolUse PostToolUse UserPromptSubmit Notification Stop SubagentStop SessionStart SessionEnd PreCompact Фильтр Ограничивает событие: имя инструмента или несколько через вертикальную черту. Пусто — срабатывает всегда. Скилл: всего shots-before-after Тикеты магазина release-notes Что выполнить Команда Команда оболочки. Код возврата 2 останавливает действие и требует подтверждения, остальные коды — просто сообщение. Помощник Опишите словами, что нужно — поля заполнятся сами Например: «хочу правило, чтобы перед словами о готовности всегда прогонялись тесты». Можно надиктовать голосом. Отмена Сохранить",
-      "en": {
-        "file": "06-automation-form.en.png",
+        "width": 700,
+        "height": 640,
+        "shotAt": "2026-09-28T14:37:26.548Z",
+        "text": "Новый сценарий Сценарий — группа из одних шагов: они идут по порядку, и это вся работа. После создания откроется её «Порядок работы» — первый шаг опишите словами или выберите готовый. Название Когда уместен Одна строка: по ней «Авто» выбирает этот сценарий, когда задачу делят по веткам. Можно оставить пустой. Где живёт Глобальный — в любом проекте Проект Витрина магазина Проект Админка магазина Отмена Создать и открыть"
+      },
+      "darkEn": {
+        "file": "07-scenario.dark.en.png",
         "masked": 0,
-        "width": 1440,
-        "height": 824,
-        "shotAt": "2026-09-17T20:56:50.629Z",
-        "text": "Create automation An automation describes \"when — what\": for example, run a check after a skill is invoked. On save it compiles into a regular hook, so it behaves exactly like a hand-written one. Automation name When to run Event PreToolUse PostToolUse UserPromptSubmit Notification Stop SubagentStop SessionStart SessionEnd PreCompact Matcher Narrows the event: a tool name, or several separated by a pipe. Empty means it always fires. Skill: total shots-before-after Тикеты магазина release-notes What to run Command Shell command. Exit code 2 blocks the action and asks for confirmation; other codes just report. Assistant Describe what you need — the fields fill themselves For example: \"I want a rule that tests are always run before claiming something is done\". You can dictate it by voice. Cancel Save"
-      }
-    },
-    {
-      "id": "07-automation-card",
-      "file": "07-automation-card.png",
-      "side": "panel",
-      "masked": 0,
-      "width": 1440,
-      "height": 1100,
-      "shotAt": "2026-09-17T20:55:46.187Z",
-      "text": "AgentDeck Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 3 CLAUDE.md Скиллы 3 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 2 Права 3 Переменные Проекты Тестирование Приложение Группы 2 История изменений Сравнение Настройки Защита данных Контур Справка Группы Свой порядок поверх правил, хуков, скиллов и серверов Создать группу Зачем это Ревью фронтенда 5 участников env: 1 Всё, что нужно на разборе чужой ветки, и ничего сверх того. Тикеты магазина 1 участников проектов: 1 шагов: 3 Порядок работы над тикетом: разбор, правка, проверка. Из проекта C:/work/shop-front скиллов: 2 хуков: 2 правил: 2 Показать набор Сценарии Создать сценарий Сценарии Проверка типов после правки PostToolUse Edit pnpm type-check Сохранено",
-      "en": {
-        "file": "07-automation-card.en.png",
-        "masked": 0,
-        "width": 1440,
-        "height": 1100,
-        "shotAt": "2026-09-17T20:56:52.827Z",
-        "text": "AgentDeck Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 3 CLAUDE.md Skills 3 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 2 Permissions 3 Environment Projects Testing Application Groups 2 Change history Comparison Settings Data protection Contour Help Groups Your own structure across rules, hooks, skills and servers Create group Why this exists Ревью фронтенда 5 members env: 1 Всё, что нужно на разборе чужой ветки, и ничего сверх того. Тикеты магазина 1 members projects: 1 steps: 3 Порядок работы над тикетом: разбор, правка, проверка. From the project C:/work/shop-front skills: 2 hooks: 2 rules: 2 Show the set Automations Create automation Automations Проверка типов после правки PostToolUse Edit pnpm type-check Saved"
-      }
-    },
-    {
-      "id": "08-hooks",
-      "file": "08-hooks.png",
-      "side": "panel",
-      "masked": 0,
-      "width": 1440,
-      "height": 1100,
-      "shotAt": "2026-09-17T20:55:48.402Z",
-      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 3 CLAUDE.md Скиллы 3 Команды Хуки 4 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 2 Права 3 Переменные Проекты Тестирование Приложение Группы 2 История изменений Сравнение Настройки Защита данных Контур Справка Хуки Команды, которые запускаются на событиях Claude Code Добавить хук Как это работает PreToolUse Bash node ~/.claude/hooks/no-push.mjs SessionStart node ~/.claude/hooks/context-budget.mjs UserPromptSubmit node \"~/.claude/skills/scenario-tikety-magazina/trigger.mjs\" # agentdeck:scenario:grp-tickets PostToolUse Edit pnpm type-check # agentdeck:automation:auto-1",
-      "en": {
-        "file": "08-hooks.en.png",
-        "masked": 0,
-        "width": 1440,
-        "height": 1100,
-        "shotAt": "2026-09-17T20:56:55.038Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 3 CLAUDE.md Skills 3 Commands Hooks 4 Scripts 0 Plugins Integrations and access MCP servers 2 Permissions 3 Environment Projects Testing Application Groups 2 Change history Comparison Settings Data protection Contour Help Hooks Commands that run on Claude Code events Add hook How it works PreToolUse Bash node ~/.claude/hooks/no-push.mjs SessionStart node ~/.claude/hooks/context-budget.mjs UserPromptSubmit node \"~/.claude/skills/scenario-tikety-magazina/trigger.mjs\" # agentdeck:scenario:grp-tickets PostToolUse Edit pnpm type-check # agentdeck:automation:auto-1"
+        "width": 700,
+        "height": 640,
+        "shotAt": "2026-09-28T14:39:31.088Z",
+        "text": "New scenario A scenario is a group made only of steps: they run in order, and that is the whole job. Once created, its Working order opens — describe the first step in words or pick a ready one. Name When it fits One line: “Auto” picks this scenario by it when a task is split across branches. May stay empty. Where it lives Global — in any project Project Витрина магазина Project Админка магазина Cancel Create and open"
       }
     }
   ]

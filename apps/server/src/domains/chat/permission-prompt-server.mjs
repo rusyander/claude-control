@@ -25,7 +25,7 @@
 // не может. Ошибку связи повторяем (панель перезапускается секунды), и лишь
 // исчерпав повторы, трактуем как «запретить» — это безопасный дефолт.
 
-/* global process, Buffer, URL, setTimeout */
+/* global process, Buffer, URL, setTimeout, setInterval, clearInterval */
 import readline from 'node:readline';
 import { readFileSync } from 'node:fs';
 import { request as httpRequest } from 'node:http';
@@ -98,15 +98,37 @@ function postJson(url, body) {
 
 /**
  * Пауза между повторами: панель после перезапуска поднимается секунды, а не
- * миллисекунды, и первые попытки упираются в закрытый порт.
+ * миллисекунды, и первые попытки упираются в закрытый порт. Потолок — две
+ * секунды: отказ закрытого локального порта ничего не стоит, а карточка в
+ * открытой вкладке видна раньше, чем вопрос дойдёт до нового сервера, — чем
+ * дольше пауза, тем дольше клик человека ждёт повтора (`AnswerOptions.hold`).
  */
-const RETRY_DELAYS_MS = [1000, 2000, 3000, 5000, 8000, 8000, 8000, 10000];
+const RETRY_DELAYS_MS = [500, 1000, 2000];
+/**
+ * Сколько мост ждёт панель, прежде чем сдаться. Раньше повторов было восемь
+ * (около 45 с), и панель, лежащая дольше (сломанная правка ждёт исправления,
+ * сервер падает при загрузке), получала «запретить» за человека, который
+ * ничего не нажимал. Теперь срок — тот же, что приложение держит карточку
+ * человека (`permissionWaitMs` в `ChatPermissions.ts`: жёсткий предел вызова
+ * у CLI, `MCP_TOOL_TIMEOUT`, за вычетом запаса): лежащая панель — не повод
+ * отказать раньше, чем отказал бы сам человек, а дольше предела CLI ждать
+ * незачем — он оборвёт вызов сам. Простой вызова CLI не рвёт — его держит
+ * сигнал жизни ниже. `PERM_RETRY_WINDOW_MS` — для проверки, что срок кончается.
+ */
+const CLI_TOOL_CAP_MS = 100_000_000;
+const RETRY_WINDOW_MS = (() => {
+  const raw = Number(process.env.PERM_RETRY_WINDOW_MS);
+  if (Number.isFinite(raw) && raw >= 0) return raw;
+  const cap = Number(process.env.MCP_TOOL_TIMEOUT);
+  const limit = Number.isFinite(cap) && cap > 0 ? cap : CLI_TOOL_CAP_MS;
+  return Math.max(1_000, limit - Math.min(10 * 60_000, limit / 10));
+})();
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * Спросить у приложения решение пользователя (длинный запрос — держит ответ).
  *
- * Сетевая ошибка — не решение. Панель перезапускается (`node --watch`, правка
+ * Сетевая ошибка — не решение. Панель перезапускается (dev-сторож, правка
  * сервера, обновление), и в это окно попадают два случая: запрос ушёл в закрытый
  * порт, или соединение с карточкой, ждавшей человека, оборвалось вместе со
  * старым процессом. Прежде оба означали «запретить», и агент терял ход, хотя
@@ -125,12 +147,14 @@ function currentRunId() {
   }
 }
 
+// Тексты отказов уходят агенту результатом вызова — по-английски (D-E), как
+// `EXPIRED_WAIT` брокера; человек их видит только в стенограмме.
 async function askUser(args) {
   const runId = currentRunId();
   if (!BASE_URL || !runId) {
     return {
       behavior: 'deny',
-      message: 'Некому подтвердить разрешение (нет связи с приложением).',
+      message: 'Nobody can confirm the permission: no connection to the AgentDeck panel.',
     };
   }
   const body = {
@@ -139,16 +163,17 @@ async function askUser(args) {
     input: args.input ?? {},
     toolUseId: args.tool_use_id ?? '',
   };
+  const startedAt = Date.now();
   for (let attempt = 0; ; attempt += 1) {
     let outcome;
     try {
       outcome = await postJson(`${BASE_URL}/api/chat/permission-request`, body);
     } catch {
-      const delay = RETRY_DELAYS_MS[attempt];
-      if (delay === undefined) {
+      const delay = RETRY_DELAYS_MS[Math.min(attempt, RETRY_DELAYS_MS.length - 1)];
+      if (Date.now() - startedAt + delay > RETRY_WINDOW_MS) {
         return {
           behavior: 'deny',
-          message: 'Не удалось связаться с приложением для подтверждения.',
+          message: 'Could not reach the AgentDeck panel to confirm the permission.',
         };
       }
       await sleep(delay);
@@ -156,13 +181,52 @@ async function askUser(args) {
     }
     const { status, json: decision } = outcome;
     if (status < 200 || status >= 300) {
-      return { behavior: 'deny', message: `Не удалось запросить разрешение (${status}).` };
+      return { behavior: 'deny', message: `The permission request failed (HTTP ${status}).` };
     }
     if (decision && decision.behavior === 'allow') {
       return { behavior: 'allow', updatedInput: decision.updatedInput ?? args.input ?? {} };
     }
-    return { behavior: 'deny', message: decision?.message ?? 'Пользователь отклонил действие.' };
+    return { behavior: 'deny', message: decision?.message ?? 'The user denied this action.' };
   }
+}
+
+/**
+ * Как часто подавать CLI признак жизни, пока человек думает.
+ *
+ * CLI рвёт вызов MCP-инструмента, от которого нет ни ответа, ни прогресса
+ * дольше `CLAUDE_CODE_MCP_TOOL_IDLE_TIMEOUT` (по умолчанию 30 минут), — и
+ * запрос прав тоже: агент получал ошибку вызова, а карточка у человека
+ * оставалась, и ответ на неё уже ничего не запускал (проверено живьём на
+ * claude 2.1.282: без прогресса обрыв ровно на сроке, с прогрессом ответ через
+ * полтора срока исполняется). Уведомление `notifications/progress` с токеном
+ * из самого вызова этот счётчик сбрасывает — только оно, чужой токен не
+ * считается. Раз в 20 секунд — с запасом даже под срок, убавленный человеком
+ * до минуты, а цена — строка в канале, которой модель не видит. Менять сам срок
+ * переменной окружения нельзя: он общий для всех MCP-серверов человека.
+ * `PERM_PROGRESS_MS=0` выключает сигнал — так проверка доказывает, что без него
+ * запрос умирает.
+ */
+const PROGRESS_MS = (() => {
+  const raw = Number(process.env.PERM_PROGRESS_MS);
+  return Number.isFinite(raw) && raw >= 0 ? raw : 20_000;
+})();
+
+/** Слать прогресс по токену вызова, пока не придёт решение. Возвращает «стоп». */
+function startHeartbeat(progressToken) {
+  // Нет токена — CLI прогресса по этому вызову не ждёт, и слать его некуда.
+  if (progressToken === undefined || progressToken === null || PROGRESS_MS === 0) {
+    return () => {};
+  }
+  let beats = 0;
+  const timer = setInterval(() => {
+    beats += 1;
+    send({
+      jsonrpc: '2.0',
+      method: 'notifications/progress',
+      params: { progressToken, progress: beats, message: 'Waiting for the human decision' },
+    });
+  }, PROGRESS_MS);
+  return () => clearInterval(timer);
 }
 
 const rl = readline.createInterface({ input: process.stdin });
@@ -211,13 +275,22 @@ rl.on('line', (line) => {
     });
   } else if (method === 'tools/call') {
     const args = (params && params.arguments) || {};
-    void askUser(args).then((decision) => {
-      send({
-        jsonrpc: '2.0',
-        id,
-        result: { content: [{ type: 'text', text: JSON.stringify(decision) }] },
+    const stopBeat = startHeartbeat(params && params._meta && params._meta.progressToken);
+    // Сбой вне предусмотренного — тоже ответ: без него пульс шёл бы вечно, а
+    // CLI ждал бы решения, которого не будет.
+    void askUser(args)
+      .catch(() => ({
+        behavior: 'deny',
+        message: 'The permission request failed inside the AgentDeck bridge.',
+      }))
+      .then((decision) => {
+        stopBeat();
+        send({
+          jsonrpc: '2.0',
+          id,
+          result: { content: [{ type: 'text', text: JSON.stringify(decision) }] },
+        });
       });
-    });
   } else if (id !== undefined) {
     send({ jsonrpc: '2.0', id, error: { code: -32601, message: 'Method not found' } });
   }

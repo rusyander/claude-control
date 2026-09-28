@@ -1,6 +1,12 @@
-import type { ProjectTestPlan, ProjectTestPlanBuildRequest } from '@agentdeck/contracts';
+import type {
+  ProjectTestPlan,
+  ProjectTestPlanBuildRequest,
+  ProjectTestPlanPreview,
+  ProjectTestPlanRecipe,
+} from '@agentdeck/contracts';
 import type { FastifyInstance } from 'fastify';
 import {
+  ProjectTestsError,
   ProjectTestsNotFoundError,
   buildPlanPreview,
   buildPoints,
@@ -31,6 +37,43 @@ import { coded } from '../../lib/server-text.ts';
  * и именно у него есть результат: один кейс, прогнанный на двух браузерах,
  * должен давать два независимых результата, а не затирать сам себя.
  */
+/**
+ * Отбор правилом «сейчас» — только чтение: библиотека, прогоны, дифф, покрытие.
+ * Каждому правилу нужны свои данные, и читает их маршрут: сам сборщик ничего не
+ * знает ни про файлы, ни про git, ни про Jira — потому и проверяется тестом
+ * целиком. Записи здесь нет и быть не должно: этим же отбором живёт GET
+ * предпросмотра, который зовёт карточка агента.
+ */
+async function previewFor(
+  deps: TestsDeps,
+  root: string,
+  body: ProjectTestPlanBuildRequest,
+): Promise<ProjectTestPlanPreview> {
+  const groups = readGroups(root);
+  return buildPlanPreview({
+    recipe: body.recipe,
+    budget: body.budget,
+    release: body.release,
+    threshold: body.threshold,
+    environmentId: body.environmentId,
+    title: body.title,
+    groups,
+    impact: body.recipe === 'diff' ? impactOf(root, groups) : undefined,
+    runs: body.recipe === 'release' || body.recipe === 'flaky' ? readRuns(root) : undefined,
+    coverage:
+      body.recipe === 'release'
+        ? await buildCoverage(
+            {
+              store: deps.ctx.store,
+              appDataDir: deps.ctx.location.paths.appData,
+              root,
+            },
+            groups,
+          )
+        : undefined,
+  });
+}
+
 export function registerTestPlanRoutes(app: FastifyInstance, deps: TestsDeps): void {
   /** Планы проекта. */
   app.get<{ Querystring: { path?: string } }>('/api/project-tests/plans', (request, reply) => {
@@ -95,33 +138,7 @@ export function registerTestPlanRoutes(app: FastifyInstance, deps: TestsDeps): v
       const body = request.body;
 
       return guardAsync(reply, async () => {
-        const groups = readGroups(root);
-        // Каждому правилу нужны свои данные, и читает их маршрут: сам сборщик
-        // ничего не знает ни про файлы, ни про git, ни про Jira — потому и
-        // проверяется тестом целиком.
-        const preview = buildPlanPreview({
-          recipe: body.recipe,
-          budget: body.budget,
-          release: body.release,
-          threshold: body.threshold,
-          environmentId: body.environmentId,
-          title: body.title,
-          groups,
-          impact: body.recipe === 'diff' ? impactOf(root, groups) : undefined,
-          runs: body.recipe === 'release' || body.recipe === 'flaky' ? readRuns(root) : undefined,
-          coverage:
-            body.recipe === 'release'
-              ? await buildCoverage(
-                  {
-                    store: deps.ctx.store,
-                    appDataDir: deps.ctx.location.paths.appData,
-                    root,
-                  },
-                  groups,
-                )
-              : undefined,
-        });
-
+        const preview = await previewFor(deps, root, body);
         if (body.save !== true) return { preview };
         const saved = savePlan(
           root,
@@ -132,6 +149,51 @@ export function registerTestPlanRoutes(app: FastifyInstance, deps: TestsDeps): v
       });
     },
   );
+
+  /**
+   * Тот же отбор правилом — только чтение. Его зовёт карточка агента: сборка
+   * карточки не смеет писать (реестр возможностей), а POST выше пишет при
+   * `save`. Здесь нет ни параметра сохранения, ни вызова записи: лишний `save`
+   * в запросе просто не читается.
+   */
+  app.get<{
+    Querystring: {
+      path?: string;
+      recipe?: string;
+      budget?: string;
+      release?: string;
+      threshold?: string;
+      environmentId?: string;
+      title?: string;
+    };
+  }>('/api/project-tests/plan/preview', async (request, reply) => {
+    const root = requireRoot(request.query.path, reply);
+    if (!root) return reply;
+    const query = request.query;
+    // «abc» раньше становилось NaN и молча подменялось умолчанием сборщика —
+    // карточка показывала отбор не по тому числу, что просили.
+    const number = (field: 'budget' | 'threshold'): number | undefined => {
+      const value = query[field];
+      if (value === undefined || value === '') return undefined;
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) return parsed;
+      throw coded(
+        new ProjectTestsError(`${field} должен быть числом, а пришло «${value}».`),
+        'tests-plan-number-invalid',
+        { field, value },
+      );
+    };
+    return guardAsync(reply, async () => ({
+      preview: await previewFor(deps, root, {
+        recipe: String(query.recipe ?? '') as ProjectTestPlanRecipe,
+        budget: number('budget'),
+        release: query.release || undefined,
+        threshold: number('threshold'),
+        environmentId: query.environmentId || undefined,
+        title: query.title || undefined,
+      }),
+    }));
+  });
 
   /**
    * Тест-поинты плана: что именно предстоит пройти.

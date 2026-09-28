@@ -12,6 +12,7 @@ export const configEn: Record<ConfigMessageCode, string> = {
   'mcp-server-not-found': 'Server not found',
   'instructions-global-missing': 'The active provider has no global instructions section.',
   'rule-not-found': 'Rule not found',
+  'rule-title-taken': 'A rule named “{{title}}” already exists — choose another title',
   'content-must-be-string': 'The content field must be a string (an empty string is allowed).',
   'instructions-file-name-must-be-string': 'The instructions file name must be a string.',
   'instructions-file-name-unknown':
@@ -19,8 +20,35 @@ export const configEn: Record<ConfigMessageCode, string> = {
   'instructions-file-exists':
     'An instructions file already exists ({{current}}) — the panel neither renames it nor creates a second one.',
   'group-cycle': 'Group nesting forms a cycle',
+  'sieve-not-found': 'This learned sieve is already gone',
   'group-not-found': 'Group not found',
   'group-state-unspecified': 'No group state specified',
+  'group-request-invalid': 'Malformed request: {{detail}}',
+  'group-path-steps-invalid': 'Path steps not saved: {{detail}}',
+  'group-path-step-not-found': 'Path step not found',
+  'group-pair-both-active':
+    'Both groups of the pair would be active in the project — choose one first',
+  'group-not-paired': 'This group is not a side of a pair in this project',
+  'group-not-project': 'This is not a project group',
+  'group-not-global': 'This is not a global group',
+  'group-already-copied':
+    'This group already has a global copy — update it by merging with the original',
+  'group-origin-missing': 'The group has no project original',
+  'group-advice-empty': 'No advice is waiting to be applied',
+  'group-advice-masked':
+    'The model replacement carries hidden values that could not be put back — the advice was not applied',
+  'group-model-failed': 'The model did not answer: {{reason}}',
+  'group-model-unreadable': 'The model answer could not be read',
+  'group-override-foreign-file':
+    'The project already has its own {{file}} — the panel does not overwrite it',
+  'group-override-claude-only': 'Project override exists for Claude only',
+  'group-project-missing': 'Project directory not found',
+  'group-discovery-not-found': 'Finding not found — run discovery again',
+  'group-discovery-provider-source':
+    'A bundle from provider directories cannot be imported — it is already global',
+  'group-promote-invalid': 'Resource not created: {{detail}}',
+  'group-copy-target-unknown': 'Provider “{{provider}}” is unknown to the panel',
+  'resource-not-found': 'Resource not found',
   'config-format-unrecognized':
     'The configuration file format is not recognized — writing is disabled.',
   'plugin-unspecified': 'No plugin specified',
@@ -134,9 +162,6 @@ export const configEn: Record<ConfigMessageCode, string> = {
   'provider-unknown': 'The panel does not know provider “{{id}}”.',
   'config-dir-unsuitable': 'The configuration folder is not suitable.',
   'config-preview-field-missing': 'This action is missing a field (id, draft or isEnabled).',
-  'automation-name-missing': 'No scenario name specified',
-  'automation-event-missing': 'No scenario event specified',
-  'automation-command-missing': 'No scenario command specified',
   'scenario-trigger-not-regex': 'The trigger expression is not a regular expression',
   'env-body-empty': 'The request body is empty: key, value and source are required.',
   'env-value-string': 'The variable value is a string.',
@@ -162,6 +187,8 @@ export const configEn: Record<ConfigMessageCode, string> = {
   'mcp-url-required': '{{transport}} needs a server address.',
   'mcp-url-invalid': 'Address “{{url}}” does not parse as an http(s) URL.',
   'permission-pattern-empty': 'Empty permission pattern',
+  'permission-pattern-unbalanced':
+    'The pattern “{{pattern}}” has an unmatched parenthesis. A qualifier is written like Bash(git status:*).',
   'permission-decision-unknown': 'Unknown decision: {{decision}}',
   'compare-self': 'There is nothing to compare a provider with itself.',
   'migrate-same': 'Source and target are the same.',

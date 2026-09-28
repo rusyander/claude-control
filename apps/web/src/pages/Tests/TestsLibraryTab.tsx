@@ -7,6 +7,7 @@ import { Typography } from '@shared/ui/typography';
 import {
   ProjectTestsRunBar,
   TestDraftModal,
+  TestE2eCard,
   TestLibrary,
   TestsOnboarding,
 } from '@features/ProjectTests';
@@ -80,6 +81,9 @@ export function TestsLibraryTab({
         environmentId={environmentId}
         onEnvironmentChange={onEnvironmentChange}
       />
+
+      {/* Папка настоящих автотестов: сюда пишут агенты, отсюда кейсы узнают о коде. */}
+      <TestE2eCard board={board} environmentId={environmentId} />
 
       <TestLibrary
         board={board}

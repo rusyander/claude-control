@@ -17,6 +17,8 @@ export default tseslint.config(
       '**/storybook-static/**',
       '.qa-screenshots/**',
       '.agent/**',
+      // Личные черновики в корне (`.vsc-tmp.mjs` и т. п.) — не код проекта.
+      '.*-tmp.mjs',
     ],
   },
   js.configs.recommended,
@@ -113,6 +115,13 @@ export default tseslint.config(
         {
           selector: 'ExportDefaultDeclaration',
           message: 'Named-экспорты (ADR-003): default запрещён (кроме требуемых фреймворком мест).',
+        },
+        // Русская строка прямо в разметке видна и английскому интерфейсу: так
+        // подсказки форм и пути в справке годами шли по-русски в en.
+        {
+          selector:
+            'JSXAttribute > Literal[value=/[А-Яа-яЁё]/], JSXAttribute > JSXExpressionContainer > Literal[value=/[А-Яа-яЁё]/], JSXText[value=/[А-Яа-яЁё]/]',
+          message: 'Текст интерфейса — через i18n (t/tr), не русской строкой в разметке.',
         },
       ],
 

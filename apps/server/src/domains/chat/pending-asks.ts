@@ -65,6 +65,11 @@ export class PendingAsks {
       this.drop((record) => record.kind === 'permission' && record.toolUseId === event.toolUseId);
       return;
     }
+    // Вопрос закрыт автовыбором: хабу отвечать не на что.
+    if (event.kind === 'autoPick') {
+      this.drop((record) => record.kind === 'question' && record.toolUseId === event.toolUseId);
+      return;
+    }
     if (!this.deps.isTreeChat(keys)) return;
     if (event.kind === 'tool' && event.name === 'AskUserQuestion') {
       this.put(keys, {

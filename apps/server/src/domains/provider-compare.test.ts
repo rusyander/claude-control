@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { EnvVar, McpServer, PermissionRule } from '@agentdeck/contracts';
 import { removeEntry } from '../lib/safe-io.ts';
+import { maskValue } from './env.ts';
 import {
   compareProviders,
   migrateProvider,
@@ -270,5 +271,37 @@ describe('compareProviders / migrateProvider', () => {
       ).toThrow(CompareRequestError);
     }
     expect(readFileSync(join(home, 'config.toml'), 'utf8')).toBe(before);
+  });
+
+  // Ревью 28.09 (F-18): маска секрета чужой CLI показывала три первых символа
+  // (`glp…` — чей токен) рядом с разделом env, где их уже не видно.
+  it('секрет чужой CLI замаскирован так же, как в разделе env', () => {
+    writeFileSync(
+      join(home, 'config.toml'),
+      `${CODEX_CONFIG}\n[shell_environment_policy.set]\nGITLAB_TOKEN = "glpat-abcdefghijkl"\n`,
+    );
+    const result = compareProviders('claude', 'codex', { claude: claudeSide() });
+    const env = result.sections.find((section) => section.section === 'env');
+    const token = env?.entries.find((entry) => entry.key === 'GITLAB_TOKEN');
+    expect(token?.right).toBe(maskValue('glpat-abcdefghijkl'));
+    expect(token?.right).not.toContain('glp');
+  });
+
+  // Секрет по имени — то же правило, что у раздела env (`isSecretEnvKey`,
+  // целое слово): своя подстрока прятала MAX_THINKING_TOKENS и *_PATH у чужой
+  // CLI, пока колонка Claude показывала их открыто.
+  it('секрет чужой CLI узнаётся по целому слову имени, как в разделе env', () => {
+    writeFileSync(
+      join(home, 'config.toml'),
+      `${CODEX_CONFIG}\n[shell_environment_policy.set]\n` +
+        'MAX_THINKING_TOKENS = "31999"\nGIT_BASH_PATH = "C:/Git/bin/bash.exe"\n' +
+        'GITHUB_PAT = "ghp_abcdefghijklmnop"\n',
+    );
+    const result = compareProviders('claude', 'codex', { claude: claudeSide() });
+    const env = result.sections.find((section) => section.section === 'env');
+    const entry = (key: string) => env?.entries.find((one) => one.key === key);
+    expect(entry('MAX_THINKING_TOKENS')?.right).toBe('31999');
+    expect(entry('GIT_BASH_PATH')?.right).toBe('C:/Git/bin/bash.exe');
+    expect(entry('GITHUB_PAT')?.right).toBe(maskValue('ghp_abcdefghijklmnop'));
   });
 });

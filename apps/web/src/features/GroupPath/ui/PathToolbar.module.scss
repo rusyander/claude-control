@@ -1,0 +1,45 @@
+/* Прилипает к верху прокручиваемого тела окна: при восьмидесяти шагах поиск и
+   «Добавить» не должны уезжать вместе со списком. `top: 0` липнет к краю
+   СОДЕРЖИМОГО, то есть ниже отступа тела окна, — в этой щели над панелью
+   прокручивались шаги (28.09). Отрицательный отступ тела ставит панель вплотную
+   под шапку; `--modal-body-padding` — если окно когда-нибудь его объявит. */
+.toolbar {
+  position: sticky;
+  top: calc(-1 * var(--modal-body-padding, var(--spacing-lg)));
+  z-index: 6;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-xs) var(--spacing-sm);
+  padding: var(--spacing-xs) 0;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.search {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.count {
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-caption);
+  white-space: nowrap;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-2xs);
+  margin-left: auto;
+}
+
+/* Живая область видна только диктору. */
+.live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

@@ -50,7 +50,7 @@ export function DataMaskRow({ platform, mask, onChange }: Props) {
           variant="caption"
           color={mask.rules === 'broken' && mask.on ? 'danger' : 'muted'}
           as="span"
-          style={{ maxWidth: 'var(--text-measure)' }}
+          className="prose"
         >
           {reason} {mask.on && t(`platform.dataMaskRules.${mask.rules}`, { count: mask.count })}{' '}
           <Link to={DLP_ROUTE} className={styles.link}>

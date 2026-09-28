@@ -102,6 +102,8 @@ export const analyticsSchema = object({
   byProject: array(projectUsageSchema),
   byHour: array(hourlyActivitySchema),
   recentSessions: array(sessionUsageSchema),
+  /** Сколько сессий было за период — все, а не только последние из `recentSessions`. */
+  periodSessions: number(),
   topTools: array(toolUsageSchema),
   topSkills: array(toolUsageSchema),
   runningAgents: array(runningAgentSchema),
@@ -114,3 +116,58 @@ export const analyticsSchema = object({
 });
 
 export type Analytics = Infer<typeof analyticsSchema>;
+
+/**
+ * Где идёт сессия из вкладки «Сессии» — ответ на «Перейти» и основа «Остановить».
+ *
+ * - `panel` — прогон чата самой панели: переход открывает чат, стоп — обычный
+ *   стоп чата;
+ * - `process` — процесс CLI вне панели, опознанный по номеру сессии в его
+ *   командной строке (`--resume <id>`, `--session-id <id>`): редактор или
+ *   терминал. `startedAt` — время создания процесса; стоп сверяет его, чтобы не
+ *   снять чужой процесс, занявший освободившийся номер;
+ * - `unidentified` — транскрипт пишется, но процесс не опознан: `claude`,
+ *   запущенный без номера сессии, не сообщает, какую сессию ведёт;
+ * - `finished` — сессия не идёт: переход открывает её разговор.
+ */
+export type SessionWhere =
+  | { kind: 'panel'; chatId: string; detached?: boolean }
+  | {
+      kind: 'process';
+      pid: number;
+      startedAt: string;
+      /** `editor` — CLI внутри расширения редактора, `terminal` — всё остальное. */
+      host: 'editor' | 'terminal';
+      /** Имя редактора, если распознано по пути (VS Code, Cursor…). */
+      editor?: string;
+      /** Командная строка, укороченная до читаемого. */
+      command: string;
+      /** Сервер панели — потомок этого процесса: стоп заденет и саму панель. */
+      ownsPanel: boolean;
+    }
+  | { kind: 'unidentified' }
+  | { kind: 'finished' };
+
+export interface SessionLocation {
+  sessionId: string;
+  /** Рабочий каталог сессии из транскрипта; нет — транскрипт не найден. */
+  projectPath?: string;
+  where: SessionWhere;
+}
+
+/**
+ * Итог «Остановить» для процесса вне панели: `stopped` — снят вместе с
+ * потомками и проверено, что его нет; `gone` — к моменту стопа процесса уже не
+ * было; `reused` — номер занят другим процессом (не та сессия или создан
+ * позже) — ничего не тронуто; `still-running` — сигнал отправлен, но процесс
+ * жив; `unverified` — процесс жив, но номер сейчас нечем сверить (нет снимка
+ * или списка процессов, либо номера нет среди CLI) — ничего не тронуто, стоп
+ * можно повторить; `owns-panel` — нужна
+ * явная отмашка: стоп заденет саму панель.
+ */
+export type SessionStopResult = {
+  result: 'stopped' | 'gone' | 'reused' | 'still-running' | 'unverified' | 'owns-panel';
+  pid: number;
+  /** Сколько процессов снято вместе с корнем. */
+  killed?: number;
+};

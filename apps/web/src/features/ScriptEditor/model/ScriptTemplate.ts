@@ -1,3 +1,14 @@
+import type { Language } from '@shared/config/i18n';
+import type { ScriptTemplate } from './ScriptTemplate.types';
+import {
+  GENERIC_SCRIPT_TEMPLATE_EN,
+  GENERIC_SCRIPT_TEMPLATES_EN,
+  NEW_SCRIPT_TEMPLATE_EN,
+  SCRIPT_TEMPLATES_EN,
+} from './ScriptTemplate.en';
+
+export type { ScriptTemplate } from './ScriptTemplate.types';
+
 /**
  * Каркас нового скрипта. Хук получает событие JSON-ом на stdin, поэтому пустой
  * файл почти всегда переписывается одним и тем же началом — сразу его и даём.
@@ -57,14 +68,6 @@ process.exit(0);
  * переписывают одним из этих каркасов, поэтому предлагаем их сразу — остаётся
  * поправить условие и текст.
  */
-export interface ScriptTemplate {
-  id: string;
-  title: string;
-  description: string;
-  fileName: string;
-  content: string;
-}
-
 export const SCRIPT_TEMPLATES: ScriptTemplate[] = [
   {
     id: 'blank',
@@ -201,12 +204,19 @@ process.exit(result.status ?? 1);
   },
 ];
 
-/** Набор заготовок под активного провайдера: с хуками — Claude-каркасы, без — общие. */
-export function scriptTemplatesFor(hasHooks: boolean): ScriptTemplate[] {
+/**
+ * Набор заготовок под активного провайдера и язык интерфейса: с хуками —
+ * Claude-каркасы, без — общие. Заготовка — это и подпись кнопки, и текст файла
+ * с комментариями, поэтому у английской панели свой набор (`ScriptTemplate.en.ts`):
+ * раньше она создавала скрипт с русскими комментариями (кадр справки, 28.09).
+ */
+export function scriptTemplatesFor(hasHooks: boolean, language: Language = 'ru'): ScriptTemplate[] {
+  if (language === 'en') return hasHooks ? SCRIPT_TEMPLATES_EN : GENERIC_SCRIPT_TEMPLATES_EN;
   return hasHooks ? SCRIPT_TEMPLATES : GENERIC_SCRIPT_TEMPLATES;
 }
 
-/** Каркас нового скрипта под активного провайдера. */
-export function newScriptTemplateFor(hasHooks: boolean): string {
+/** Каркас нового скрипта под активного провайдера и язык интерфейса. */
+export function newScriptTemplateFor(hasHooks: boolean, language: Language = 'ru'): string {
+  if (language === 'en') return hasHooks ? NEW_SCRIPT_TEMPLATE_EN : GENERIC_SCRIPT_TEMPLATE_EN;
   return hasHooks ? NEW_SCRIPT_TEMPLATE : GENERIC_SCRIPT_TEMPLATE;
 }

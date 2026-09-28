@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
-import { HelpSection, FieldTable, Callout, OptionCards } from '../ui';
+import { ANALYTICS_TABS } from '@pages/Analytics/model/tabs';
+import { HelpSection, FieldTable, Callout, OptionCards, PageTabsSection } from '../ui';
 import { AnalyticsGuideSections } from './AnalyticsGuideSections';
 import { AnalyticsLimitsSections } from './AnalyticsLimitsSections';
 
@@ -27,6 +28,8 @@ export function AnalyticsTopic() {
       <Callout tone="info" title={tr('guideTitle')}>
         {tr('guideText')}
       </Callout>
+
+      <PageTabsSection page="analytics" tabs={ANALYTICS_TABS} />
 
       <HelpSection title={common('whyTitle')}>
         <OptionCards

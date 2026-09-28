@@ -27,6 +27,15 @@ import {
   storedSecretPaths,
 } from './actions-config-secrets.ts';
 import { dataField, summaryText, textField } from './texts.ts';
+import {
+  OFFSET_DESCRIPTION,
+  readRoute,
+  savedId,
+  textWindow,
+  unmasked,
+  withSavedId,
+} from './action-kit.ts';
+import { maskSecretsInText, SECRET_MASK } from '../../lib/secret-mask.ts';
 
 /**
  * Действия раздела «Конфигурация» (А7): правила, скиллы, хуки, MCP, права —
@@ -43,16 +52,6 @@ import { dataField, summaryText, textField } from './texts.ts';
 const RULE_BODY_MAX = 1500;
 
 const encode = encodeURIComponent;
-
-/** Ответ маршрута чтения или исключение с его текстом: действие без данных — отказ. */
-async function readRoute<T>(inject: InjectRoute, url: string): Promise<T> {
-  const answer = await inject({ method: 'GET', url });
-  if (answer.status >= 400) {
-    const message = (answer.body as { message?: string } | undefined)?.message;
-    throw new Error(`${url} answered ${answer.status}${message ? `: ${message}` : ''}`);
-  }
-  return answer.body as T;
-}
 
 /**
  * Эти маршруты правят файлы Claude Code. При другом активном CLI человек смотрит
@@ -143,37 +142,98 @@ const listRules = definePanelAction({
   name: 'list_rules',
   section: 'rules',
   risk: 'read',
-  description: 'List rules of the global CLAUDE.md (id, title, enabled, body head).',
-  input: z.object({}),
+  description:
+    'List rules of the global CLAUDE.md (id, title, enabled, body head). A rule marked bodyTruncated ' +
+    'must be read whole before save_rule: pass its id (and nextOffset) to get the full body.',
+  input: z.object({
+    id: z.string().min(1).optional().describe('Rule id: return this rule with its full body'),
+    offset: z.number().int().nonnegative().default(0),
+  }),
   route: async (_input, inject) => {
     await assertClaude(inject);
     return { method: 'GET', url: '/api/rules' };
   },
-  shape: (_input, body) => ({
-    rules: (body as Rule[]).map((rule) => ({
-      id: rule.id,
-      title: rule.title,
-      isEnabled: rule.isEnabled,
-      groupIds: rule.groupIds,
-      body: rule.body.slice(0, RULE_BODY_MAX).split('\n').map(maskSecretsInLine).join('\n'),
-      ...(rule.body.length > RULE_BODY_MAX ? { bodyTruncated: true } : {}),
-    })),
-  }),
+  shape: (input, body) => {
+    if (input.id !== undefined) {
+      const rule = (body as Rule[]).find((item) => item.id === input.id);
+      if (!rule) throw new Error(`Rule «${input.id}» not found. Call list_rules.`);
+      return {
+        id: rule.id,
+        title: rule.title,
+        isEnabled: rule.isEnabled,
+        groupIds: rule.groupIds,
+        body: textWindow(maskSecretsInText(rule.body), input.offset),
+      };
+    }
+    return listedRules(body as Rule[]);
+  },
   summary: 'journal-list-rules',
 });
+
+function listedRules(rules: Rule[]) {
+  return {
+    rules: rules.map((rule) => {
+      // Флаг меряет ПОКАЗАННЫЙ текст: маска короче секрета, и сырой длины
+      // хватало, чтобы назвать обрезанным тело, отданное целиком.
+      const shown = maskSecretsInText(rule.body);
+      return {
+        id: rule.id,
+        title: rule.title,
+        isEnabled: rule.isEnabled,
+        groupIds: rule.groupIds,
+        body: shown.slice(0, RULE_BODY_MAX),
+        ...(shown.length > RULE_BODY_MAX ? { bodyTruncated: true } : {}),
+      };
+    }),
+  };
+}
+
+/**
+ * Маска в тексте, который модель пишет обратно, — не повод отказываться от правки:
+ * `unmasked` вернёт секреты с диска. Без этой строки агент вживую отвечал «сам
+ * безопасно не могу» и отсылал человека править руками.
+ */
+export const MASK_ROUNDTRIP_HINT =
+  `A ${SECRET_MASK} is a masked secret: keep each line carrying one exactly as the read showed ` +
+  'it — the panel puts the real value back on save, so a mask is no reason to refuse an edit.';
 
 const listSkills = definePanelAction({
   name: 'list_skills',
   section: 'skills',
   risk: 'read',
-  description: 'List skills (id = folder name, name, description, enabled, extra files).',
-  input: z.object({}),
+  description:
+    'List skills (id = folder name, name, description, enabled, extra files). Pass id to read that ' +
+    'skill with its SKILL.md body (and nextOffset to continue) — needed before editing the body.',
+  input: z.object({
+    id: z.string().min(1).optional().describe('Skill id: return this skill with its full body'),
+    offset: z.number().int().nonnegative().default(0),
+  }),
   route: async (_input, inject) => {
     await assertClaude(inject);
     return { method: 'GET', url: '/api/skills' };
   },
-  shape: (_input, body) => ({
-    skills: (body as Skill[]).map((skill) => ({
+  shape: (input, body) => {
+    if (input.id !== undefined) {
+      const skill = (body as Skill[]).find((item) => item.id === input.id);
+      if (!skill) throw new Error(`Skill «${input.id}» not found. Call list_skills.`);
+      return {
+        id: skill.id,
+        name: skill.name,
+        description: maskSecretsInLine(skill.description),
+        isEnabled: skill.isEnabled,
+        files: skill.files,
+        groupIds: skill.groupIds,
+        body: textWindow(maskSecretsInText(skill.body), input.offset),
+      };
+    }
+    return listedSkills(body as Skill[]);
+  },
+  summary: 'journal-list-skills',
+});
+
+function listedSkills(skills: Skill[]) {
+  return {
+    skills: skills.map((skill) => ({
       id: skill.id,
       name: skill.name,
       description: maskSecretsInLine(skill.description),
@@ -181,9 +241,8 @@ const listSkills = definePanelAction({
       files: skill.files,
       groupIds: skill.groupIds,
     })),
-  }),
-  summary: 'journal-list-skills',
-});
+  };
+}
 
 const listHooks = definePanelAction({
   name: 'list_hooks',
@@ -201,6 +260,7 @@ const listHooks = definePanelAction({
       event: hook.event,
       ...(hook.matcher ? { matcher: hook.matcher } : {}),
       command: maskSecretsInLine(hook.command),
+      ...(hook.timeout === undefined ? {} : { timeout: hook.timeout }),
       isEnabled: hook.isEnabled,
       source: hook.source,
       ...(hook.description ? { description: hook.description } : {}),
@@ -224,26 +284,86 @@ const listMcp = definePanelAction({
   summary: 'journal-list-mcp',
 });
 
+/**
+ * Страница прав для модели. Мост режет ответ на 20 000 символов JSON, а у
+ * человека прав бывает полторы сотни с длинными именами MCP-инструментов:
+ * целиком список приходил обрезанным, и модель честно отвечала «остальные не
+ * видел». Страница набирается, пока влезает в бюджет, итоги по решениям — по
+ * всему файлу, чтобы «сколько запрещающих» не требовало листать.
+ */
+const PERMISSIONS_PAGE_BUDGET = 14_000;
+
+type PermissionForModel = {
+  id: string;
+  decision: PermissionRule['decision'];
+  pattern: string;
+  source: PermissionRule['source'];
+  isEnabled: boolean;
+};
+
+const permissionForModel = (rule: PermissionRule): PermissionForModel => ({
+  id: permissionIdForModel(rule.id, fingerprintOf),
+  decision: rule.decision,
+  pattern: maskSecretsInLine(rule.pattern),
+  source: rule.source,
+  isEnabled: rule.isEnabled,
+});
+
+export function permissionsPage(
+  rules: readonly PermissionRule[],
+  input: { decision?: PermissionRule['decision']; query?: string; offset: number; limit: number },
+) {
+  const needle = input.query?.trim().toLowerCase() ?? '';
+  const matched = rules.filter(
+    (rule) =>
+      (input.decision === undefined || rule.decision === input.decision) &&
+      // Ищем по тому, что модель видит: сырой шаблон превращал фильтр в оракул
+      // подстрок замаскированного токена — посимвольный подбор по счётчику total.
+      (needle === '' || maskSecretsInLine(rule.pattern).toLowerCase().includes(needle)),
+  );
+  const permissions: PermissionForModel[] = [];
+  let size = 0;
+  for (const rule of matched.slice(input.offset, input.offset + input.limit)) {
+    const shown = permissionForModel(rule);
+    size += JSON.stringify(shown).length + 1;
+    if (permissions.length > 0 && size > PERMISSIONS_PAGE_BUDGET) break;
+    permissions.push(shown);
+  }
+  const end = input.offset + permissions.length;
+  const count = (decision: PermissionRule['decision']) =>
+    rules.filter((rule) => rule.decision === decision).length;
+  return {
+    total: matched.length,
+    counts: {
+      allow: count('allow'),
+      ask: count('ask'),
+      deny: count('deny'),
+      disabled: rules.filter((rule) => !rule.isEnabled).length,
+    },
+    offset: input.offset,
+    ...(end < matched.length ? { nextOffset: end } : {}),
+    permissions,
+  };
+}
+
 const listPermissions = definePanelAction({
   name: 'list_permissions',
   section: 'permissions',
   risk: 'read',
   description:
-    'List permission rules (id, decision, pattern, source file, enabled). Ids with "local:" live in settings.local.json.',
-  input: z.object({}),
+    'List permission rules (id, decision, pattern, source file, enabled) with counts per decision over ALL rules. ' +
+    'Paged: follow nextOffset. Filter by decision and/or a pattern substring. Ids with "local:" live in settings.local.json.',
+  input: z.object({
+    decision: z.enum(['allow', 'ask', 'deny']).optional(),
+    query: z.string().max(200).optional().describe('Case-insensitive substring of the pattern'),
+    offset: z.number().int().min(0).default(0).describe(OFFSET_DESCRIPTION),
+    limit: z.number().int().min(1).max(200).default(100),
+  }),
   route: async (_input, inject) => {
     await assertClaude(inject);
     return { method: 'GET', url: '/api/permissions' };
   },
-  shape: (_input, body) => ({
-    permissions: (body as PermissionRule[]).map((rule) => ({
-      id: permissionIdForModel(rule.id, fingerprintOf),
-      decision: rule.decision,
-      pattern: maskSecretsInLine(rule.pattern),
-      source: rule.source,
-      isEnabled: rule.isEnabled,
-    })),
-  }),
+  shape: (input, body) => permissionsPage(body as PermissionRule[], input),
   summary: 'journal-list-permissions',
 });
 
@@ -258,7 +378,7 @@ const ruleInput = z.object({
 /**
  * Черновик правила. Правка сохраняет включённость и группы правила — их модель
  * меняет не здесь (включённость — `toggle_rule`), иначе правка текста молча
- * переносила бы правило в раздел выключенных.
+ * выключала бы правило — убирала его из CLAUDE.md.
  */
 /**
  * Правило по id — ради заголовка в карточке: id — это слаг заголовка
@@ -272,13 +392,15 @@ async function findRule(inject: InjectRoute, id: string): Promise<Rule> {
 
 async function ruleDraft(input: z.infer<typeof ruleInput>, inject: InjectRoute) {
   if (input.id === undefined) {
-    return { title: input.title, body: input.body, isEnabled: true, groupIds: [] as string[] };
+    const body = unmasked('body', undefined, input.body);
+    return { title: input.title, body, isEnabled: true, groupIds: [] as string[] };
   }
   const rule = (await readRoute<Rule[]>(inject, '/api/rules')).find((item) => item.id === input.id);
   if (!rule) throw new Error(`Rule «${input.id}» not found. Call list_rules.`);
   return {
     title: input.title,
-    body: input.body,
+    // Тело правила модель видит маской: секреты возвращаются с диска.
+    body: unmasked('body', rule.body, input.body),
     isEnabled: rule.isEnabled,
     groupIds: rule.groupIds,
   };
@@ -290,7 +412,8 @@ const saveRule = definePanelAction({
   risk: 'change',
   title: 'journal-save-rule',
   description:
-    'Create a rule in the global CLAUDE.md, or replace title/body of an existing one (by id). Needs confirmation; the card shows the file diff.',
+    'Create a rule in the global CLAUDE.md, or replace title/body of an existing one (by id). Needs confirmation; the card shows the file diff. ' +
+    MASK_ROUNDTRIP_HINT,
   input: ruleInput,
   route: async (input, inject) => {
     await assertClaude(inject);
@@ -318,7 +441,18 @@ const saveRule = definePanelAction({
         ...(input.id === undefined ? [] : [dataField('label-id', input.id)]),
       ],
     ),
-  page: (input) => ({ route: '/rules', ...(input.id ? { focus: input.id } : {}) }),
+  // Id правила — слаг заголовка: новое и переименованное получают его только
+  // после записи. Прежний id с тем же заголовком — он; иначе последний тёзка
+  // (новое правило ложится в конец файла).
+  afterRoute: (input, body, inject) =>
+    withSavedId<Rule>(inject, '/api/rules', body, (rules) => {
+      const named = rules.filter((rule) => rule.title === input.title);
+      return named.find((rule) => rule.id === input.id) ?? named.at(-1);
+    }),
+  page: (input, result) => {
+    const id = savedId(result) ?? input.id;
+    return { route: '/rules', ...(id ? { focus: id } : {}) };
+  },
 });
 
 const toggleRule = definePanelAction({
@@ -327,7 +461,7 @@ const toggleRule = definePanelAction({
   risk: 'change',
   title: 'journal-toggle-rule',
   description:
-    'Enable or disable a rule (a disabled rule moves to the service section of CLAUDE.md). Needs confirmation.',
+    'Enable or disable a rule (a disabled rule is removed from CLAUDE.md; the panel keeps its text and puts it back in its original place on enable). Needs confirmation.',
   input: z.object({ id: z.string().min(1), isEnabled: z.boolean() }),
   route: async (input, inject) => {
     await assertClaude(inject);
@@ -402,8 +536,8 @@ async function skillDraft(input: z.infer<typeof skillInput>, inject: InjectRoute
   if (input.id === undefined) {
     return {
       name: input.name,
-      description: input.description,
-      body: input.body ?? '',
+      description: unmasked('description', undefined, input.description),
+      body: unmasked('body', undefined, input.body ?? ''),
       groupIds: [] as string[],
     };
   }
@@ -411,10 +545,12 @@ async function skillDraft(input: z.infer<typeof skillInput>, inject: InjectRoute
     (item) => item.id === input.id,
   );
   if (!skill) throw new Error(`Skill «${input.id}» not found. Call list_skills.`);
+  // Описание и тело модель читает маской (list_skills): секреты возвращаются с
+  // диска, иначе правка одного шага записала бы «••••••» вместо ключа.
   return {
     name: input.name,
-    description: input.description,
-    body: input.body ?? skill.body,
+    description: unmasked('description', skill.description, input.description),
+    body: input.body === undefined ? skill.body : unmasked('body', skill.body, input.body),
     groupIds: skill.groupIds,
   };
 }
@@ -425,7 +561,9 @@ const saveSkill = definePanelAction({
   risk: 'change',
   title: 'journal-save-skill',
   description:
-    'Create a skill (folder from the name) or edit name/description/body of an existing one. Needs confirmation; the card shows the SKILL.md diff.',
+    'Create a skill (folder from the name) or edit name/description/body of an existing one. Needs confirmation; the card shows the SKILL.md diff. ' +
+    'To change the body, read it first (list_skills with id) and send it whole. ' +
+    MASK_ROUNDTRIP_HINT,
   input: skillInput,
   route: async (input, inject) => {
     await assertClaude(inject);
@@ -450,7 +588,17 @@ const saveSkill = definePanelAction({
         : summaryText('summary-skill-edit', { name: input.id }),
       [dataField('label-skill-name', input.name)],
     ),
-  page: (input) => ({ route: '/skills', ...(input.id ? { focus: input.id } : {}) }),
+  // Папка нового скилла выводится из имени на сервере — фокус берём из списка.
+  afterRoute: (input, body, inject) =>
+    withSavedId<Skill>(inject, '/api/skills', body, (skills) =>
+      input.id === undefined
+        ? skills.filter((skill) => skill.name === input.name).at(-1)
+        : skills.find((skill) => skill.id === input.id),
+    ),
+  page: (input, result) => {
+    const id = savedId(result) ?? input.id;
+    return { route: '/skills', ...(id ? { focus: id } : {}) };
+  },
 });
 
 const deleteSkill = definePanelAction({
@@ -503,13 +651,14 @@ const addPermissionRule = definePanelAction({
     filePreview(
       inject,
       { kind: 'permission', action: 'add', draft: { ...input, groupIds: [] } },
-      summaryText('summary-permission-add', {
-        decision: input.decision,
-        pattern: input.pattern,
-      }),
+      // Решение — словом в самом заголовке: «Добавить право deny» оставлял ключ
+      // файла посреди русской карточки.
+      summaryText(`summary-permission-add-${input.decision}`, { pattern: input.pattern }),
       [],
     ),
-  page: () => ({ route: '/permissions' }),
+  // Прав бывает полторы сотни: без фокуса новое право терялось за экраном.
+  // Id права — `решение:шаблон` (маршрут обрезает пробелы, как и вход).
+  page: (input) => ({ route: '/permissions', focus: `${input.decision}:${input.pattern}` }),
 });
 
 /** Id из `list_permissions` (возможно, непрозрачный) → настоящий id права. */
@@ -558,7 +707,7 @@ const removePermissionRule = definePanelAction({
 // --- MCP ---
 
 const record = z.record(z.string(), z.string());
-const mcpInput = z
+export const mcpInput = z
   .object({
     id: z.string().min(1).optional().describe('Current server name when editing; omit to create'),
     name: z.string().trim().min(1).max(100),
@@ -582,45 +731,74 @@ const mcpInput = z
     }
   });
 
-type McpInput = z.infer<typeof mcpInput>;
+export type McpInput = z.infer<typeof mcpInput>;
 
 /**
  * Черновик сервера. У правки всё, что модель не прислала, берётся из нынешней
  * записи, а пустое значение секретного ключа НЕ затирает сохранённый секрет:
  * модель видит его замаскированным и прислать настоящий не может.
  */
-async function mcpDraft(input: McpInput, inject: InjectRoute): Promise<McpServerDraft> {
+export async function mcpDraft(
+  input: McpInput,
+  inject: InjectRoute,
+  // Список, из которого берётся нынешняя запись: `.mcp.json` проекта читает свой маршрут.
+  list: { url: string; action: string } = { url: '/api/mcp', action: 'list_mcp' },
+): Promise<McpServerDraft> {
   const current =
     input.id === undefined
       ? undefined
-      : (await readRoute<McpServer[]>(inject, '/api/mcp')).find((item) => item.id === input.id);
+      : (await readRoute<McpServer[]>(inject, list.url)).find((item) => item.id === input.id);
   if (input.id !== undefined && !current) {
-    throw new Error(`MCP server «${input.id}» not found. Call list_mcp.`);
+    throw new Error(`MCP server «${input.id}» not found. Call ${list.action}.`);
   }
-  if (current) assertNotRetargeted(input, current);
+  // list_mcp показывает секреты маской, и модель присылает запись обратно с ней.
+  // Поле ровно как в прочитанном — «оставить как было». Правленое поле с маской —
+  // отказ, а не подстановка: `postgres://u:••••@другой-хост` унёс бы пароль туда,
+  // куда указала модель, — значение с секретом меняет человек.
+  const listed = current ? (maskMcpServer(current) as Partial<McpServerDraft>) : {};
+  const kept = (field: string, sent: string, saved?: string, shown?: string): string => {
+    if (sent.trim() === '' && saved) return saved;
+    if (saved !== undefined && sent === shown) return saved;
+    if (sent.includes(SECRET_MASK)) throw new Error(`${field}: ${MCP_MASK_REFUSAL}`);
+    return sent;
+  };
   const keep = (
+    field: 'env' | 'headers',
     next: Record<string, string> | undefined,
-    saved: Record<string, string> = {},
-  ): Record<string, string> =>
-    next === undefined
-      ? saved
-      : Object.fromEntries(
-          Object.entries(next).map(([key, value]) => [
-            key,
-            value.trim() === '' && saved[key] ? saved[key] : value,
-          ]),
-        );
-  return {
+  ): Record<string, string> => {
+    const saved = current?.[field] ?? {};
+    if (next === undefined) return saved;
+    return Object.fromEntries(
+      Object.entries(next).map(([key, value]) => [
+        key,
+        kept(`${field}.${key}`, value, saved[key], listed[field]?.[key]),
+      ]),
+    );
+  };
+  const optional = (field: 'command' | 'url', sent: string | undefined) =>
+    sent === undefined ? current?.[field] : kept(field, sent, current?.[field], listed[field]);
+  const args =
+    input.args === undefined || JSON.stringify(input.args) === JSON.stringify(listed.args)
+      ? (current?.args ?? input.args ?? [])
+      : input.args.map((arg, index) => kept(`args.${index}`, arg, current?.args[index]));
+  const draft: McpServerDraft = {
     name: input.name,
     transport: input.transport,
-    command: input.command ?? current?.command,
-    args: input.args ?? current?.args ?? [],
-    url: input.url ?? current?.url,
-    env: keep(input.env, current?.env),
-    headers: keep(input.headers, current?.headers),
+    command: optional('command', input.command),
+    args,
+    url: optional('url', input.url),
+    env: keep('env', input.env),
+    headers: keep('headers', input.headers),
     groupIds: current?.groupIds ?? [],
   };
+  // Сравнивается черновик, а не присланное: маска в адресе — не смена адреса.
+  if (current) assertNotRetargeted(draft, current);
+  return draft;
 }
+
+const MCP_MASK_REFUSAL =
+  `carries ${SECRET_MASK} (a masked secret) but differs from what list_mcp showed. Send the ` +
+  'field back exactly as read, or leave it out; a value holding a secret is changed by the human on the MCP page.';
 
 /**
  * Смена адреса или команды сервера, у которого УЖЕ лежат секреты (заголовки,
@@ -631,16 +809,14 @@ async function mcpDraft(input: McpInput, inject: InjectRoute): Promise<McpServer
  * говорит, что его теперь получит другой хост. То же правило, что у контура
  * (`actions-contour.ts → planDraft`).
  */
-function assertNotRetargeted(input: McpInput, current: McpServer): void {
+function assertNotRetargeted(draft: McpServerDraft, current: McpServer): void {
   const secrets = storedSecretPaths(current);
   if (secrets.length === 0) return;
   const moved = [
-    input.transport !== current.transport ? 'transport' : '',
-    input.url !== undefined && input.url !== (current.url ?? '') ? 'url' : '',
-    input.command !== undefined && input.command !== (current.command ?? '') ? 'command' : '',
-    input.args !== undefined && JSON.stringify(input.args) !== JSON.stringify(current.args)
-      ? 'args'
-      : '',
+    draft.transport !== current.transport ? 'transport' : '',
+    (draft.url ?? '') !== (current.url ?? '') ? 'url' : '',
+    (draft.command ?? '') !== (current.command ?? '') ? 'command' : '',
+    JSON.stringify(draft.args) !== JSON.stringify(current.args) ? 'args' : '',
   ].filter(Boolean);
   if (moved.length === 0) return;
   throw new Error(

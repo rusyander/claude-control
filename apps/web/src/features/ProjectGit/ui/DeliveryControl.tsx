@@ -5,6 +5,7 @@ import { useSplitSettings } from '@entities/ProjectGit';
 import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
+import { useAnchoredPanel } from '@shared/hooks/use-anchored-panel';
 import { SplitSettings } from './SplitSettings';
 import type { DeliveryControlProps } from './SplitSettings.types';
 import styles from './DeliveryControl.module.scss';
@@ -28,6 +29,7 @@ export function DeliveryControl({ path, groupDeliver }: DeliveryControlProps) {
   const query = useSplitSettings(enabled ? path : undefined);
   const [isOpen, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const { panelRef, panelStyle } = useAnchoredPanel<HTMLDivElement>(isOpen);
 
   const view = query.data;
   if (!enabled || !view || !view.profile.repo) return null;
@@ -55,7 +57,10 @@ export function DeliveryControl({ path, groupDeliver }: DeliveryControlProps) {
     >
       <Button
         ref={triggerRef}
-        variant={deliver && view.profile.remote ? 'secondary' : 'ghost'}
+        // Вид — как у всех кнопок шапки; состояние говорит подпись («вкл»,
+        // «выкл», «некуда»). Обведённая кнопка была единственной в ряду и
+        // читалась другим калибром (владелец, 28.09).
+        variant="ghost"
         size="sm"
         leftIcon={<Icon name="branch" size={20} />}
         onClick={() => setOpen((value) => !value)}
@@ -71,7 +76,13 @@ export function DeliveryControl({ path, groupDeliver }: DeliveryControlProps) {
       {isOpen && (
         <>
           <div className={styles.backdrop} onClick={() => setOpen(false)} aria-hidden="true" />
-          <div className={styles.panel} role="dialog" aria-label={t('chat.delivery.title')}>
+          <div
+            ref={panelRef}
+            className={styles.panel}
+            style={panelStyle}
+            role="dialog"
+            aria-label={t('chat.delivery.title')}
+          >
             <Typography variant="caption" color="subtle" as="span" className={styles.title}>
               {t('chat.delivery.title')}
             </Typography>

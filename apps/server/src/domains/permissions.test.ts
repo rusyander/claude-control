@@ -11,6 +11,7 @@ import {
   movePermission,
   setPermissionsEnabled,
   createGuardedPatternsReader,
+  assertPermissionDraft,
 } from './permissions.ts';
 
 /**
@@ -260,7 +261,7 @@ describe('permissions', () => {
       );
 
       const saved = JSON.parse(readFileSync(settingsPath, 'utf8'));
-      expect(saved.permissions.allow).toEqual([]);
+      expect(saved.permissions.allow).toBeUndefined(); // опустевший список уходит из файла
       expect(saved.permissions.deny).toEqual(['Bash(ls:*)']);
     });
 
@@ -275,7 +276,7 @@ describe('permissions', () => {
       );
 
       const saved = JSON.parse(readFileSync(settingsPath, 'utf8'));
-      expect(saved.permissions.allow).toEqual([]);
+      expect(saved.permissions.allow).toBeUndefined(); // опустевший список уходит из файла
       expect(saved.permissions.ask).toEqual(['Bash(git push:*)']);
     });
 
@@ -341,12 +342,12 @@ describe('permissions', () => {
 
       // settings.json -> settings.local.json (id без префикса)
       movePermission(settingsPath, localPath, 'allow:Bash(ls:*)');
-      expect(read(settingsPath).permissions.allow).toEqual([]);
+      expect(read(settingsPath).permissions).toBeUndefined(); // опустевший permissions уходит целиком
       expect(read(localPath).permissions.allow).toEqual(['Bash(ls:*)']);
 
       // обратно: у локального права id с префиксом local:
       movePermission(settingsPath, localPath, 'local:allow:Bash(ls:*)');
-      expect(read(localPath).permissions.allow).toEqual([]);
+      expect(read(localPath).permissions).toBeUndefined(); // опустевший permissions уходит целиком
       expect(read(settingsPath).permissions.allow).toEqual(['Bash(ls:*)']);
     });
 
@@ -355,7 +356,7 @@ describe('permissions', () => {
 
       movePermission(settingsPath, localPath, 'deny:Bash(git push:*)');
 
-      expect(read(settingsPath).permissions.deny).toEqual([]);
+      expect(read(settingsPath).permissions).toBeUndefined(); // опустевший permissions уходит целиком
       expect(read(localPath).permissions.deny).toEqual(['Bash(git push:*)']);
     });
 
@@ -379,7 +380,7 @@ describe('permissions', () => {
         { id: 'deny:Bash(rm:*)', isEnabled: false },
         { id: 'deny:Bash(sudo:*)', isEnabled: false },
       ]);
-      expect(read(settingsPath).permissions.deny).toEqual([]);
+      expect(read(settingsPath).permissions.deny).toBeUndefined(); // опустевший список уходит из файла
       // Чужие списки не задеты.
       expect(read(settingsPath).permissions.allow).toEqual(['Read(a)']);
 
@@ -396,7 +397,7 @@ describe('permissions', () => {
 
       setPermissionsEnabled(settingsPath, [{ id: 'ask:Bash(git push:*)', isEnabled: false }]);
 
-      expect(read(settingsPath).permissions.ask).toEqual([]);
+      expect(read(settingsPath).permissions).toBeUndefined(); // опустевший permissions уходит целиком
     });
 
     it('без изменений файл не переписывается', () => {
@@ -455,5 +456,114 @@ describe('permissions', () => {
       current = other;
       expect(guarded()).toEqual(['Write(x)']);
     });
+  });
+});
+
+describe('[P3] assertPermissionDraft: шаблон со скобками без пары', () => {
+  it('отказ с понятным текстом и кодом; парные скобки проходят', () => {
+    for (const pattern of [
+      'Bash(agentdeck-probe',
+      'Bash)x(',
+      'Bash(x) tail',
+      'Ba)sh(x)',
+      '(x)',
+      'Bash(x\\)',
+    ]) {
+      expect(() => assertPermissionDraft({ decision: 'allow', pattern })).toThrow(/скобк/);
+    }
+    expect(assertPermissionDraft({ decision: 'deny', pattern: ' Bash(echo (hi):*) ' })).toEqual({
+      decision: 'deny',
+      pattern: 'Bash(echo (hi):*)',
+      groupIds: [],
+    });
+  });
+
+  // F-122: CLI берёт уточнение между первой `(` и последней `)` — скобка без
+  // пары внутри законна, и отказывать в ней панель не должна.
+  it('скобка без пары внутри уточнения — законное правило, как у CLI', () => {
+    for (const pattern of ['Bash(echo "(":*)', 'Bash(grep -E ")" :*)', 'Read(a))', 'Bash(x\\()']) {
+      expect(assertPermissionDraft({ decision: 'allow', pattern }).pattern).toBe(pattern);
+    }
+  });
+});
+
+describe('[P3] опустевший список решения уходит из settings.json', () => {
+  it('добавить право в новый список → выключить / удалить: файл байт в байт как был', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'cc-perms-empty-'));
+    try {
+      const path = join(dir, 'settings.json');
+      const original = `${JSON.stringify({ permissions: { allow: ['Read'] } }, null, 2)}\n`;
+      writeFileSync(path, original);
+      const add = { pattern: 'Bash(probe:*)', decision: 'ask' as const, groupIds: [] };
+
+      savePermission(path, null, add);
+      expect(readFileSync(path, 'utf8')).toContain('"ask"');
+      setPermissionsEnabled(path, [{ id: 'ask:Bash(probe:*)', isEnabled: false }]);
+      expect(readFileSync(path, 'utf8')).toBe(original);
+
+      savePermission(path, null, add);
+      deletePermission(path, 'ask:Bash(probe:*)');
+      expect(readFileSync(path, 'utf8')).toBe(original);
+
+      // Правка решения переносит шаблон: прежний список, опустев, тоже уходит.
+      savePermission(path, null, add);
+      savePermission(path, 'ask:Bash(probe:*)', { ...add, decision: 'deny' });
+      expect(JSON.parse(readFileSync(path, 'utf8'))).toEqual({
+        permissions: { allow: ['Read'], deny: ['Bash(probe:*)'] },
+      });
+
+      // Пустой список, который положил сам человек, панель не трогает.
+      writeFileSync(
+        path,
+        `${JSON.stringify({ permissions: { allow: ['Read'], ask: [] } }, null, 2)}\n`,
+      );
+      // Выключение шаблона, которого в пустом списке нет, доходит до самой
+      // уборки списка (у deletePermission ранний выход) — и список остаётся.
+      setPermissionsEnabled(path, [{ id: 'ask:Nothing', isEnabled: false }]);
+      expect(JSON.parse(readFileSync(path, 'utf8')).permissions.ask).toEqual([]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('файл без ключа permissions: добавить → удалить / выключить — байт в байт как был', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'cc-perms-absent-'));
+    try {
+      const path = join(dir, 'settings.json');
+      const original = `${JSON.stringify({ model: 'sonnet' }, null, 2)}\n`;
+      writeFileSync(path, original);
+      const add = { pattern: 'Bash(probe:*)', decision: 'ask' as const, groupIds: [] };
+
+      savePermission(path, null, add);
+      deletePermission(path, 'ask:Bash(probe:*)');
+      expect(readFileSync(path, 'utf8')).toBe(original);
+
+      savePermission(path, null, add);
+      setPermissionsEnabled(path, [{ id: 'ask:Bash(probe:*)', isEnabled: false }]);
+      expect(readFileSync(path, 'utf8')).toBe(original);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('правка единственного шаблона списка на месте не двигает список в конец permissions', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'cc-perms-order-'));
+    try {
+      const path = join(dir, 'settings.json');
+      writeFileSync(
+        path,
+        `${JSON.stringify({ permissions: { ask: ['Bash(a:*)'], deny: ['Bash(rm:*)'] } }, null, 2)}\n`,
+      );
+      savePermission(path, 'ask:Bash(a:*)', {
+        pattern: 'Bash(b:*)',
+        decision: 'ask',
+        groupIds: [],
+      });
+      const saved = JSON.parse(readFileSync(path, 'utf8'));
+      expect(Object.keys(saved.permissions)).toEqual(['ask', 'deny']);
+      expect(saved.permissions.ask).toEqual(['Bash(b:*)']);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

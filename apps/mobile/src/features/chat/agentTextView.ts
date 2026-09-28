@@ -2,6 +2,8 @@ import { scanSplitBlocks } from '@agentdeck/contracts/task-split';
 import { scanHandoffBlocks } from '@agentdeck/contracts/chat-handoff';
 import { scanMediaBlocks } from '@agentdeck/contracts/media-block';
 import { withoutSplitTickets } from '@agentdeck/contracts/split-tickets';
+import { withoutEscalateBlocks } from '@agentdeck/contracts/chat-escalate';
+import { withoutSieveBlocks } from '@agentdeck/contracts/sieves';
 
 /** Слова, которыми телефон говорит о блоках, которые он не показывает карточкой. */
 export interface AgentTextWords {
@@ -39,13 +41,26 @@ export interface PictureView {
 export function agentTextView(
   text: string,
   words: AgentTextWords,
-  options: { streaming?: boolean } = {},
+  options: { streaming?: boolean; fromUser?: boolean } = {},
 ): AgentTextView {
-  const split = scanSplitBlocks(text);
+  // Служебные блоки вырезаются только из ответа агента, как в ленте панели:
+  // человек, описавший формат, видит свой пример (ревью 28.09, F-226).
+  const agent = !options.fromUser;
+  // Блок `escalate` — служебный, как в ленте панели: заметку главному чату
+  // показывает его карточка, а незакрытый блок прячется вместе с хвостом.
+  const split = scanSplitBlocks(
+    agent
+      ? withoutSieveBlocks(withoutEscalateBlocks(text, { streaming: options.streaming }), {
+          streaming: options.streaming,
+        })
+      : text,
+  );
   const handoff = scanHandoffBlocks(split.text);
   // Блок тикета группы (95b) — служебный, как в ленте панели: список держит хаб
   // (итоговое ревью 25.09, m9 — телефон показывал сырой тег с полями).
-  const tickets = withoutSplitTickets(handoff.text, { streaming: options.streaming });
+  const tickets = agent
+    ? withoutSplitTickets(handoff.text, { streaming: options.streaming })
+    : handoff.text;
   const media = scanMediaBlocks(tickets, { streaming: options.streaming });
   const notes = [
     ...split.proposals.map(() => words.offerSplit),

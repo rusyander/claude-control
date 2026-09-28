@@ -9,10 +9,22 @@ import { PictureCard } from './PictureCard';
 /**
  * Текст агента: Markdown, карточки рисунков и строки о предложениях панели.
  * Одна отрисовка на транскрипт и на живой поток (см. `agentTextView`).
+ * `fromUser` — реплика человека: служебные блоки в ней не вырезаются.
  */
-export function AgentText({ text, streaming = false }: { text: string; streaming?: boolean }) {
+export function AgentText({
+  text,
+  streaming = false,
+  fromUser = false,
+}: {
+  text: string;
+  streaming?: boolean;
+  fromUser?: boolean;
+}) {
   const t = useT();
-  const view = useMemo(() => agentTextView(text, t.chat, { streaming }), [text, t.chat, streaming]);
+  const view = useMemo(
+    () => agentTextView(text, t.chat, { streaming, fromUser }),
+    [text, t.chat, streaming, fromUser],
+  );
   return (
     <View style={styles.root}>
       {view.markdown ? <Markdown>{view.markdown}</Markdown> : null}

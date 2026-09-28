@@ -150,7 +150,18 @@ describe('POST /api/chat/split/:parent/cleanup', () => {
   afterEach(async () => {
     await app.close();
     registry.livePool.closeAll();
-    for (const child of holders.splice(0)) child.kill();
+    // Каталог отпускается, только когда держатель вышел: `kill` лишь шлёт сигнал, и
+    // под нагрузкой полного прогона удаление успевало раньше — EPERM под Windows.
+    await Promise.all(
+      holders.splice(0).map(
+        (child) =>
+          new Promise<void>((done) => {
+            if (child.exitCode !== null || child.signalCode !== null) return done();
+            child.once('exit', () => done());
+            child.kill();
+          }),
+      ),
+    );
     rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   });
 

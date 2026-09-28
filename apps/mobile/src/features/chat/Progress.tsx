@@ -3,32 +3,50 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { ChatProgress } from '@agentdeck/contracts';
 import { colors, font, radius, space } from '../../shared/config/theme';
 import { useT } from '../../shared/config/i18n';
+import { progressHead } from './progressView';
 
 /**
  * План агента и его субагенты — то же, что показывает панель, и так же только
  * для чтения: чекпоинты это вызовы TodoWrite из транскрипта, а не наша модель
  * задач. Править их значило бы врать агенту о его же состоянии.
  */
-export function Progress({ progress }: { progress: ChatProgress | undefined }) {
+export function Progress({
+  progress,
+  isRunning = false,
+}: {
+  progress: ChatProgress | undefined;
+  /** Идёт ли прогон: субагенты и текущий вызов живы только у идущего. */
+  isRunning?: boolean;
+}) {
   const t = useT();
   const [open, setOpen] = useState(false);
   if (!progress) return null;
 
   const tasks = progress.tasks ?? [];
   const agents = progress.agents ?? [];
-  if (tasks.length === 0 && agents.length === 0) return null;
-
-  const done = tasks.filter((task) => task.status === 'completed').length;
-  const current = tasks.find((task) => task.status === 'in_progress');
+  const head = progressHead(progress, isRunning);
+  if (tasks.length === 0 && agents.length === 0 && !head.activeTool) return null;
 
   return (
     <Pressable onPress={() => setOpen((value) => !value)} style={styles.root}>
       <View style={styles.head}>
-        <Text style={styles.counter}>{t.chat.plan(done, tasks.length)}</Text>
+        {head.total > 0 ? (
+          <Text style={styles.counter}>{t.chat.plan(head.done, head.total)}</Text>
+        ) : null}
         <Text style={styles.current} numberOfLines={1}>
-          {current?.text ?? (agents.length > 0 ? t.chat.subagents(agents.length) : '')}
+          {head.current ?? (agents.length > 0 ? t.chat.subagents(head.running, head.finished) : '')}
         </Text>
       </View>
+      {head.current && agents.length > 0 ? (
+        <Text style={styles.current} numberOfLines={1}>
+          {t.chat.subagents(head.running, head.finished)}
+        </Text>
+      ) : null}
+      {head.activeTool ? (
+        <Text style={styles.current} numberOfLines={1} testID="active-tool">
+          {t.chat.activeTool(head.activeTool.name, head.activeTool.summary)}
+        </Text>
+      ) : null}
 
       {open ? (
         <View style={styles.list}>
@@ -42,14 +60,20 @@ export function Progress({ progress }: { progress: ChatProgress | undefined }) {
           ))}
           {agents.map((agent) => (
             <Text key={agent.id} style={styles.agent} numberOfLines={2}>
-              {agent.status === 'done' ? '✓' : agent.status === 'failed' ? '✕' : '▸'} {agent.kind}:{' '}
-              {agent.description}
+              {agentMark(agent.status, isRunning)} {agent.kind}: {agent.description}
             </Text>
           ))}
         </View>
       ) : null}
     </Pressable>
   );
+}
+
+/** Значок субагента: «идёт» только у идущего прогона — оборванный не работает. */
+function agentMark(status: string, isRunning: boolean): string {
+  if (status === 'done') return '✓';
+  if (status === 'failed') return '✕';
+  return isRunning ? '▸' : '·';
 }
 
 const styles = StyleSheet.create({

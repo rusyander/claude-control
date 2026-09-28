@@ -10,17 +10,45 @@
  *
  * `?tab=…` — вкладка внутри страницы (настройки). Отдельно от `id`: тот
  * указывает на элемент списка, а этот — на часть самой страницы.
+ *
+ * `?run=…` — запись прогона тестов, раскрытая на вкладке прогонов: на неё
+ * ведёт строка истории кейса. Отдельно от `id`: на странице тестов `id`
+ * адресует кейс и открывает библиотеку.
+ *
+ * `?project=…` — каталог проекта для раздела тестов: с ним приходят агент
+ * панели и история кейса из окна тестов чата. Раздел выбирает проект и снимает
+ * параметр; держать его здесь нужно, чтобы переход по ссылке его не терял.
  */
+/**
+ * Непустая строка или `undefined`. Число (`?tab=1` роутер разбирает числом)
+ * отбрасывается, а не становится строкой: строка из числа при следующем
+ * переходе уходила обратно в адрес, и роутер писал её в кавычках —
+ * `?tab=%221%22`. Непрошеную вкладку снимает общий хук вкладок по сырому
+ * адресу (`unknownTabParam`), ему разобранное значение не нужно (F-337).
+ */
+function text(value: unknown): string | undefined {
+  return typeof value === 'string' && value ? value : undefined;
+}
+
 export function validateSearch(search: Record<string, unknown>): {
   id?: string;
   topic?: string;
   tab?: string;
+  run?: string;
+  project?: string;
   create?: boolean;
 } {
+  const id = text(search.id);
+  const topic = text(search.topic);
+  const tab = text(search.tab);
+  const run = text(search.run);
+  const project = text(search.project);
   return {
-    ...(typeof search.id === 'string' && search.id ? { id: search.id } : {}),
-    ...(typeof search.topic === 'string' && search.topic ? { topic: search.topic } : {}),
-    ...(typeof search.tab === 'string' && search.tab ? { tab: search.tab } : {}),
+    ...(id ? { id } : {}),
+    ...(topic ? { topic } : {}),
+    ...(tab ? { tab } : {}),
+    ...(run ? { run } : {}),
+    ...(project ? { project } : {}),
     // `?create=1` — быстрое действие «Добавить» с обзора: раздел открывает свою
     // форму создания (см. useCreateParam). Держим булевым флагом, а не строкой.
     ...(search.create ? { create: true } : {}),

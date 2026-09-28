@@ -1,217 +1,74 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-// Своя KeyboardAvoidingView, а не та, что в react-native. Начиная с
-// edge-to-edge (Expo SDK 54+) окно под клавиатуру больше не сжимается: системная
-// `adjustResize` меняет только отступы, и родная реализация на Android просто
-// ничего не делала — поле ввода оставалось ЗА клавиатурой. Эта следит за
-// клавиатурой напрямую и работает одинаково на обеих системах.
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { useEffect, useMemo, useState } from 'react';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { useQueryClient } from '@tanstack/react-query';
-import type { ChatMessage } from '@agentdeck/contracts';
-import { Empty, Loading, Mono, Row, StatusDot } from '../../src/shared/ui';
+import type { InboxChat } from '@agentdeck/contracts/chat-inbox';
+import { Button, Empty, Loading, Muted } from '../../src/shared/ui';
 import { colors, font, space } from '../../src/shared/config/theme';
 import { useT } from '../../src/shared/config/i18n';
 import { isConfigured, useConnection } from '../../src/shared/api/connection';
 import { newChatId, openChat, useWorkspace } from '../../src/shared/lib/workspace';
+import { usePullRefresh } from '../../src/shared/lib/pull-refresh';
 import {
-  cancelQueued,
-  restoreQueue,
-  quietRun,
-  send,
-  stop,
-  useRun,
-  visibleStatus,
-} from '../../src/shared/lib/runs';
-import { chatMessagesQuery, useChatMessages, useChatProgress } from '../../src/entities/chat/api';
-import { useCostUnit } from '../../src/entities/settings/api';
-import { formatSpend, shortModel } from '../../src/shared/lib/format';
-import { Composer, type ComposerValue } from '../../src/features/chat/Composer';
-import { MediaImageCard } from '../../src/features/chat/MediaImageCard';
-import { useImageMode } from '../../src/features/chat/useImageMode';
-import { Markdown } from '../../src/features/chat/Markdown';
-import { AgentText } from '../../src/features/chat/AgentText';
-import { PermissionCard } from '../../src/features/chat/PermissionCard';
-import { Progress } from '../../src/features/chat/Progress';
-import { TokenBadge } from '../../src/features/chat/TokenBadge';
-import { ToolCall } from '../../src/features/chat/ToolCall';
-import { RunTimer } from '../../src/features/chat/RunTimer';
-import { Transcript, UserBubble } from '../../src/features/chat/Transcript';
+  pendingCount,
+  projectGroups,
+  stableChatKey,
+  questionCards,
+  staleSent,
+  type QuestionCardData,
+} from '../../src/entities/inbox/model';
+import { ActiveChats } from '../../src/features/inbox/ActiveChats';
+import { AskCard } from '../../src/features/inbox/AskCard';
+import { localChatKey } from '../../src/features/inbox/chatKey';
+import { forgetSent, useSent } from '../../src/features/inbox/sent';
+import { useInboxChats } from '../../src/features/inbox/useInboxChats';
+import { WatcherChip } from '../../src/features/watcher/WatcherChip';
+
+type HomeTab = 'chats' | 'questions';
+
+/** Раз в полминуты: «5 мин» не должны стоять на экране, пока прошло полчаса. */
+const CLOCK_MS = 30_000;
 
 /**
- * Разговор — то, ради чего приложение существует: видеть, что делает агент,
- * отвечать на его вопросы и ставить новую задачу с телефона, пока он работает
- * на машине дома.
+ * Главная: что идёт и кто ждёт — по всем проектам сразу.
  *
- * Лента склеена из двух источников, и это не небрежность. Прошлое приходит из
- * транскрипта (сервер уже разложил его по сообщениям), настоящее — из живого
- * потока, где транскрипт ещё не дописан. Сводить их в одну структуру пришлось бы
- * через третье представление, которого нет ни у сервера, ни у потока.
+ * Телефон берут в руки, чтобы узнать, не стоит ли где работа на ответе
+ * человека, и ответить. Раньше для этого приходилось открывать разговоры по
+ * одному; здесь они собраны двумя вкладками: «Проекты и чаты» — живые
+ * разговоры по проектам, «Вопросы» — всё, что ждёт ответа, по карточке на чат.
  */
-export default function ChatScreen() {
+export default function HomeScreen() {
   const t = useT();
   const router = useRouter();
   const connection = useConnection();
   const workspace = useWorkspace();
-  const queryClient = useQueryClient();
-  const scrollRef = useRef<ScrollView>(null);
+  const configured = isConfigured(connection);
+  // Ответ сервера плюс вопросы идущих ходов из их потоков — см. `withLiveAsks`.
+  const inbox = useInboxChats(configured);
+  const pull = usePullRefresh(inbox.refetch);
+  const sent = useSent();
+  const [tab, setTab] = useState<HomeTab>('chats');
+  const now = useClock();
 
-  // Разговор без id — ещё не начатый: заводим временный, настоящий придёт от
-  // сервера первым же событием потока.
+  const chats = useMemo(() => inbox.data ?? [], [inbox.data]);
+  const groups = useMemo(() => projectGroups(chats, sent), [chats, sent]);
+  const cards = useMemo(() => questionCards(chats, sent), [chats, sent]);
+  const pending = useMemo(() => pendingCount(chats, sent), [chats, sent]);
+
+  // Сервер перестал отдавать отправленный вопрос — ответ дошёл, помнить его незачем.
+  // Сверка — с той же сводкой, что на экране: вопрос из потока сервер ещё не
+  // отдаёт, и сверка с одним ответом сервера сбросила бы его отметку сразу.
   useEffect(() => {
-    if (workspace.ready && !workspace.chatId) openChat(newChatId());
-  }, [workspace.ready, workspace.chatId]);
+    if (!inbox.data) return;
+    forgetSent(staleSent(inbox.data, sent));
+  }, [inbox.data, sent]);
 
-  const chatId = workspace.chatId;
-  const run = useRun(chatId);
+  const open = (chat: InboxChat): void => {
+    openChat(localChatKey(chat), chat.projectPath);
+    router.push('/chat');
+  };
 
-  // Очередь дописанного пережила перезапуск приложения: досылаем, если агент
-  // свободен, иначе показываем — она уйдёт по концу хода.
-  useEffect(() => {
-    if (chatId) void restoreQueue(chatId);
-  }, [chatId]);
-  const status = visibleStatus(run);
-  const isRunning = run.status === 'running';
-
-  const messages = useChatMessages(chatId);
-  const progress = useChatProgress(run.sessionId ?? chatId, isRunning);
-  // Единицы расхода выбираются один раз в самой панели — телефон им следует.
-  const costUnit = useCostUnit();
-
-  const [value, setValue] = useState<ComposerValue>({
-    text: '',
-    allowEdits: true,
-    // Авторежим не задан: сервер возьмёт выбор этого чата или глобальную
-    // настройку панели. Явное `true` здесь каждой отправкой перекрывало бы
-    // выключенное в панели — телефон решал бы за человека.
-    model: '',
-    effort: '',
-    files: [],
-  });
-  // Выбор авторежима принадлежит чату: переход в другой разговор его снимает,
-  // иначе первая же отправка там записала бы чужой выбор новому чату.
-  useEffect(() => {
-    setValue((current) =>
-      current.autoApprove === undefined ? current : { ...current, autoApprove: undefined },
-    );
-  }, [chatId]);
-  const [busy, setBusy] = useState(false);
-  const [failed, setFailed] = useState('');
-
-  // Ход закончился — транскрипт дописан, и его пора перечитать: иначе ответ
-  // останется только в живом потоке и пропадёт при перезапуске приложения.
-  //
-  // Тогда же начатый здесь разговор становится настоящим: временный `new-*` id
-  // меняется на сессию, которую выдал Claude Code. Пока этого не сделано, чат
-  // существует только в памяти приложения — транскрипт по временному id не
-  // читается, а следующее сообщение уходило бы БЕЗ `--resume`, начиная новый
-  // разговор вместо продолжения. Подменяем id, лишь когда лента новой сессии
-  // действительно прочиталась: иначе экран на миг остаётся пустым — живой
-  // прогон уже не наш, а истории ещё нет.
-  const wasRunning = useRef(isRunning);
-  const finishedAt = useRef(0);
-  useEffect(() => {
-    if (wasRunning.current && !isRunning) {
-      finishedAt.current = Date.now();
-      void queryClient.invalidateQueries({ queryKey: ['chat'] });
-      void queryClient.invalidateQueries({ queryKey: ['chats'] });
-      void queryClient.invalidateQueries({ queryKey: ['project-files'] });
-      void queryClient.invalidateQueries({ queryKey: ['project-git'] });
-
-      // Работа продолжена чистой сессией — уходим в новый разговор, как вкладка
-      // панели: оставаться на закрытом значило бы смотреть на его конец, пока
-      // агент работает в другом месте. Сам прогон подхватит опрос `/chat/active`.
-      const handoffTo = run.handoffTo;
-      const sessionId = run.sessionId;
-      if (handoffTo) {
-        openChat(handoffTo, run.projectPath ?? workspace.projectPath);
-      } else if (sessionId && sessionId !== chatId && isDraft(chatId)) {
-        void queryClient
-          .fetchQuery(chatMessagesQuery(sessionId))
-          .then(() => openChat(sessionId))
-          .catch(() => undefined);
-      }
-    }
-    wasRunning.current = isRunning;
-  }, [
-    isRunning,
-    queryClient,
-    chatId,
-    run.sessionId,
-    run.handoffTo,
-    run.projectPath,
-    workspace.projectPath,
-  ]);
-
-  // Лента перечиталась уже после конца хода и ответ в ней есть — значит поток
-  // договорил своё и обязан замолчать: иначе один и тот же ответ стоит на
-  // экране дважды, из транскрипта и из потока.
-  const messagesUpdatedAt = messages.dataUpdatedAt;
-  useEffect(() => {
-    if (isRunning || !run.text) return;
-    if (!finishedAt.current || messagesUpdatedAt <= finishedAt.current) return;
-    if (!messages.data?.messages.some((message) => message.role === 'assistant')) return;
-    quietRun(chatId);
-  }, [messagesUpdatedAt, messages.data, isRunning, run.text, chatId]);
-
-  const image = useImageMode(chatId);
-
-  /** Отправить агенту текст. Истина — сервер сообщение принял. */
-  const dispatch = useCallback(
-    (prompt: string): Promise<boolean> =>
-      send({
-        chatId,
-        prompt,
-        // Разговор продолжается только с `--resume`, а сессия для него — либо та,
-        // что пришла потоком, либо сам id открытого чата: у чата из списка он и
-        // есть id сессии. Без второго слагаемого сообщение в старый разговор
-        // начинало новый, и ответ уходил мимо той переписки, что человек видел.
-        sessionId: run.sessionId ?? (isDraft(chatId) ? undefined : chatId),
-        projectPath: workspace.projectPath || undefined,
-        allowEdits: value.allowEdits,
-        autoApprove: value.autoApprove,
-        model: value.model || undefined,
-        effort: value.effort || undefined,
-        files: value.files.length > 0 ? value.files : undefined,
-      }).then((outcome) => {
-        if (!outcome.ok) setFailed(outcome.message);
-        return outcome.ok;
-      }),
-    [chatId, run.sessionId, value, workspace.projectPath],
-  );
-
-  const onSend = useCallback(() => {
-    const prompt = value.text.trim();
-    if (!prompt) return;
-    setFailed('');
-    // Режим «Картинка»: дорогу решает план сервера — панель рисует сама (файл и
-    // карточка) или просит агента обычным сообщением, собранным сервером.
-    if (image.mode === 'image') {
-      void image.submit(prompt, dispatch).then((road) => {
-        // Вложения уехали только с сообщением агенту; панели, рисующей самой,
-        // они не нужны — и стирать их тогда нельзя.
-        if (road === 'agent') setValue((state) => ({ ...state, text: '', files: [] }));
-        if (road === 'image') setValue((state) => ({ ...state, text: '' }));
-      });
-      return;
-    }
-    setBusy(true);
-    void dispatch(prompt)
-      .then((ok) => {
-        // Поле очищается, только когда сервер ПРИНЯЛ сообщение: иначе отказ
-        // уничтожает набранный текст и печатать приходится заново.
-        if (ok) setValue((state) => ({ ...state, text: '', files: [] }));
-      })
-      .finally(() => setBusy(false));
-  }, [value.text, dispatch, image]);
-
-  const projectName = useMemo(() => {
-    if (!workspace.projectPath) return t.chat.homeChat;
-    return workspace.projectPath.split(/[\\/]/).filter(Boolean).pop() ?? workspace.projectPath;
-  }, [workspace.projectPath, t]);
-
-  if (!isConfigured(connection)) {
+  if (!configured) {
     return (
       <SafeAreaView style={styles.screen} edges={['top']}>
         <Empty text={t.common.notConnectedChat} />
@@ -219,187 +76,206 @@ export default function ChatScreen() {
     );
   }
 
-  const history = messages.data?.messages ?? [];
-  const isBlank = history.length === 0 && !run.text && !run.thinking && !isRunning;
-  // Транскрипт перечитывается только по окончании хода, поэтому своя задача
-  // показывается из состояния прогона — и убирается, как только доехала лента.
-  const sent =
-    run.lastPrompt && run.status !== 'idle' && !inHistory(history, run.lastPrompt)
-      ? run.lastPrompt
-      : '';
+  const failed = inbox.isError;
+  const loaded = inbox.data !== undefined;
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
-      <View style={styles.header}>
-        <Row gap={space.sm} style={styles.headerMain}>
-          <StatusDot status={status} />
-          <Text style={styles.project} numberOfLines={1}>
-            {projectName}
-          </Text>
-        </Row>
-        <Row gap={space.xs}>
-          {/* Чем ведут прогон. Имя приходит от самого CLI (событие `session`), а
-              не из того, что телефон отправил: по умолчанию он не шлёт ничего, а
-              чат, заведённый разделением, панель ведёт подобранной моделью — и
-              без этой подписи на телефоне не видно, слабее она потолка или нет. */}
-          {run.model ? (
-            <Text style={styles.model} numberOfLines={1}>
-              {shortModel(run.model)}
-            </Text>
-          ) : null}
-          {/* Итог хода — рядом с названием проекта, как в шапке чата панели:
-              сумма шагов сама по себе нигде больше не видна. */}
-          {run.tokens > 0 ? (
-            <Text style={styles.spend}>{formatSpend(costUnit, run.tokens, run.costUsd ?? 0)}</Text>
-          ) : null}
-          <Pressable onPress={() => router.push('/chats')} style={styles.headerButton}>
-            <Text style={styles.headerButtonText}>{t.chat.conversations}</Text>
-          </Pressable>
-          {workspace.projectPath ? (
-            <Pressable onPress={() => router.push('/code')} style={styles.headerButton}>
-              <Text style={styles.headerButtonText}>{t.chat.code}</Text>
-            </Pressable>
-          ) : null}
-          {/* Тесты рядом с кодом: оба отвечают на вопрос «в каком состоянии
-              проект», просто с разных сторон. */}
-          {workspace.projectPath ? (
-            <Pressable onPress={() => router.push('/tests')} style={styles.headerButton}>
-              <Text style={styles.headerButtonText}>{t.chat.tests}</Text>
-            </Pressable>
-          ) : null}
-        </Row>
+      {/* Фоновый наблюдатель панели: виден, только пока включён. */}
+      <WatcherChip enabled={configured} />
+      <View style={styles.tabs} accessibilityRole="tablist">
+        <Segment
+          label={t.home.tabChats}
+          selected={tab === 'chats'}
+          onPress={() => setTab('chats')}
+        />
+        <Segment
+          label={t.home.tabQuestions}
+          a11y={t.home.tabQuestionsA11y(pending)}
+          badge={pending}
+          selected={tab === 'questions'}
+          onPress={() => setTab('questions')}
+        />
       </View>
 
-      {/* Вкладки при открытой клавиатуре прячутся (`tabBarHideOnKeyboard`),
-          поэтому смещение под них не нужно: лишний отступ оставил бы под полем
-          пустую полосу. */}
-      <KeyboardAvoidingView style={styles.flex} behavior="padding" keyboardVerticalOffset={0}>
-        <ScrollView
-          ref={scrollRef}
-          style={styles.flex}
-          contentContainerStyle={styles.feed}
-          onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}
-          keyboardShouldPersistTaps="handled"
-        >
-          {messages.isLoading ? <Loading /> : null}
-          <Transcript messages={history} costUnit={costUnit} isRunning={isRunning} />
-
-          {sent ? (
-            <UserBubble>
-              <Markdown>{sent}</Markdown>
-            </UserBubble>
-          ) : null}
-
-          {run.thinking ? (
-            <Text style={styles.thinking} numberOfLines={8}>
-              {run.thinking}
-            </Text>
-          ) : null}
-
-          {run.tools.map((tool, index) => (
-            <ToolCall key={tool.id ?? `tool-${index}`} tool={tool} costUnit={costUnit} />
-          ))}
-
-          {/* Тот же разбор, что у транскрипта: рисунок агента — карточкой уже
-              в потоке, недописанный блок спрятан, пока ответ печатается. */}
-          {run.text ? <AgentText text={run.text} streaming={isRunning} /> : null}
-          {/* Расход ответа виден сразу, а не только после того, как ход
-              закончится и лента перечитается из транскрипта. */}
-          {run.text && run.textUsage ? (
-            <TokenBadge usage={run.textUsage} unit={costUnit} label={t.chat.usage.answer} />
-          ) : null}
-          {/* Живой таймер прогона: сколько агент уже работает над этим ходом. */}
-          {isRunning && run.startedAt !== undefined ? <RunTimer since={run.startedAt} /> : null}
-
-          {run.permissions.map((permission) => (
-            <PermissionCard key={permission.toolUseId} chatId={chatId} permission={permission} />
-          ))}
-
-          {run.error ? <Text style={styles.error}>{run.error}</Text> : null}
-          {/* Мёртвый сокет неотличим от думающего агента — говорим словами. */}
-          {run.stalled ? <Text style={styles.thinking}>{t.run.reconnecting}</Text> : null}
-          {failed ? <Text style={styles.error}>{failed}</Text> : null}
-
-          {isBlank ? <Empty text={t.chat.blank} /> : null}
-        </ScrollView>
-
-        {run.queued.length > 0 ? (
-          <View style={styles.queue}>
-            {run.queued.map((item) => (
-              <Pressable key={item.id} onPress={() => cancelQueued(chatId, item.id)}>
-                <Mono numberOfLines={1}>{t.chat.queued(item.prompt)}</Mono>
-              </Pressable>
-            ))}
+      <ScrollView
+        style={styles.flex}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={pull.refreshing}
+            onRefresh={pull.onRefresh}
+            tintColor={colors.accent}
+          />
+        }
+      >
+        {failed && loaded ? <Text style={styles.failed}>{t.home.failed}</Text> : null}
+        {failed && !loaded ? (
+          <View style={styles.center}>
+            <Muted style={styles.centerText}>{t.home.failedEmpty}</Muted>
+            <Button title={t.home.retry} onPress={() => void inbox.refetch()} />
           </View>
         ) : null}
+        {!loaded && !failed ? <Loading /> : null}
 
-        <Progress progress={progress.data} />
+        {loaded && tab === 'chats' ? (
+          <>
+            <View style={styles.actions}>
+              <Button
+                title={t.home.newChat}
+                tone="accent"
+                style={styles.grow}
+                onPress={() => {
+                  openChat(newChatId(), workspace.projectPath);
+                  router.push('/chat');
+                }}
+              />
+              <Button
+                title={t.home.allChats}
+                style={styles.grow}
+                onPress={() => router.push('/chats')}
+              />
+            </View>
+            {groups.length === 0 ? (
+              <EmptyState title={t.home.activeEmpty} hint={t.home.activeEmptyHint} />
+            ) : (
+              <ActiveChats groups={groups} now={now} onOpen={open} />
+            )}
+          </>
+        ) : null}
 
-        {image.shown ? <MediaImageCard image={image.shown} onClose={image.close} /> : null}
-
-        <Composer
-          chatId={chatId}
-          sessionId={run.sessionId ?? (isDraft(chatId) ? undefined : chatId)}
-          image={image}
-          value={value}
-          onChange={setValue}
-          onSend={onSend}
-          onStop={() => void stop(chatId)}
-          isRunning={isRunning}
-          busy={busy}
-        />
-      </KeyboardAvoidingView>
+        {loaded && tab === 'questions' ? (
+          <QuestionsTab cards={cards} now={now} onOpen={open} />
+        ) : null}
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
-/** Ещё не начатый разговор: id временный, сессии за ним не стоит. */
-function isDraft(chatId: string): boolean {
-  return chatId.startsWith('new-');
+/** Вкладка «Вопросы» — карточка на чат или пустое состояние. */
+function QuestionsTab({
+  cards,
+  now,
+  onOpen,
+}: {
+  cards: readonly QuestionCardData[];
+  now: number;
+  onOpen: (chat: InboxChat) => void;
+}) {
+  const t = useT();
+  if (cards.length === 0) {
+    return <EmptyState title={t.home.noQuestions} hint={t.home.noQuestionsHint} />;
+  }
+  return (
+    <>
+      {cards.map((card) => (
+        <AskCard
+          key={stableChatKey(card.chat)}
+          chat={card.chat}
+          asks={card.asks}
+          now={now}
+          onOpen={() => onOpen(card.chat)}
+        />
+      ))}
+    </>
+  );
 }
 
-/**
- * Доехал ли отправленный текст до транскрипта. Смотрим хвост, а не всю ленту:
- * сервер дописывает сообщение в конец, и сравнивать сотни старых незачем.
- */
-function inHistory(messages: ChatMessage[], prompt: string): boolean {
-  return messages
-    .slice(-8)
-    .some(
-      (message) =>
-        message.role === 'user' &&
-        message.blocks.some((block) => block.type === 'text' && block.text.trim() === prompt),
-    );
+function Segment({
+  label,
+  a11y,
+  badge = 0,
+  selected,
+  onPress,
+}: {
+  label: string;
+  a11y?: string;
+  badge?: number;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="tab"
+      accessibilityLabel={a11y ?? label}
+      accessibilityState={{ selected }}
+      onPress={onPress}
+      style={[styles.segment, selected && styles.segmentOn]}
+    >
+      <Text style={[styles.segmentText, selected && styles.segmentTextOn]} numberOfLines={1}>
+        {label}
+      </Text>
+      {badge > 0 ? (
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>{badge > 99 ? '99+' : badge}</Text>
+        </View>
+      ) : null}
+    </Pressable>
+  );
+}
+
+function EmptyState({ title, hint }: { title: string; hint: string }) {
+  return (
+    <View style={styles.center}>
+      <Text style={styles.emptyTitle}>{title}</Text>
+      <Muted style={styles.centerText}>{hint}</Muted>
+    </View>
+  );
+}
+
+function useClock(): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), CLOCK_MS);
+    return () => clearInterval(timer);
+  }, []);
+  return now;
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   flex: { flex: 1 },
-  header: {
+  grow: { flex: 1 },
+  tabs: {
+    flexDirection: 'row',
+    gap: space.xs,
+    marginHorizontal: space.lg,
+    marginTop: space.sm,
+    marginBottom: space.xs,
+    padding: 3,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+  },
+  segment: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: space.md,
-    paddingVertical: space.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    backgroundColor: colors.surface,
-    gap: space.sm,
+    justifyContent: 'center',
+    gap: space.xs,
+    minHeight: 38,
+    paddingHorizontal: space.sm,
+    borderRadius: 8,
   },
-  headerMain: { flex: 1 },
-  project: { color: colors.text, fontSize: font.title, fontWeight: '600', flex: 1 },
-  spend: { color: colors.textFaint, fontSize: font.small, fontFamily: font.mono },
-  model: { color: colors.textFaint, fontSize: font.small, fontFamily: font.mono, maxWidth: 120 },
-  headerButton: { paddingHorizontal: space.sm, paddingVertical: space.xs },
-  headerButtonText: { color: colors.accent, fontSize: font.small },
-  feed: { padding: space.md, gap: space.sm },
-  thinking: { color: colors.textFaint, fontSize: font.small, fontStyle: 'italic', lineHeight: 18 },
-  error: { color: colors.danger, fontSize: font.body },
-  queue: {
-    paddingHorizontal: space.md,
-    paddingVertical: space.xs,
-    backgroundColor: colors.surface,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
+  segmentOn: { backgroundColor: colors.accentDim },
+  segmentText: { color: colors.textDim, fontSize: font.body, fontWeight: '600', flexShrink: 1 },
+  segmentTextOn: { color: colors.text },
+  badge: {
+    minWidth: 20,
+    height: 20,
+    paddingHorizontal: 5,
+    borderRadius: 999,
+    backgroundColor: colors.waiting,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
+  badgeText: { color: colors.bg, fontSize: 11, fontWeight: '700' },
+  content: { padding: space.lg, paddingTop: space.sm, gap: space.md },
+  actions: { flexDirection: 'row', gap: space.sm },
+  failed: { color: colors.danger, fontSize: font.small },
+  center: { paddingVertical: space.xl, alignItems: 'center', gap: space.md },
+  centerText: { textAlign: 'center', lineHeight: 18 },
+  emptyTitle: { color: colors.text, fontSize: font.title, fontWeight: '600' },
 });

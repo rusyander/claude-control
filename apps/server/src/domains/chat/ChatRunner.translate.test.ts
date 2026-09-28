@@ -141,10 +141,39 @@ describe('translate — разбор потока CLI', () => {
     ).toEqual([{ kind: 'error', message: 'Запрос не выполнен (error_max_turns)' }]);
   });
 
+  it('строка user с результатами вызовов → toolResult на каждый (внутреннее событие реестра)', () => {
+    expect(
+      translate(
+        raw({
+          type: 'user',
+          message: {
+            content: [
+              { type: 'tool_result', tool_use_id: 'toolu_a', content: 'ok' },
+              { type: 'text', text: 'не результат' },
+              { type: 'tool_result', tool_use_id: 'toolu_b', content: 'err' },
+              { type: 'tool_result', content: 'без id' },
+            ],
+          },
+        }),
+      ),
+    ).toEqual([
+      { kind: 'toolResult', toolUseId: 'toolu_a' },
+      { kind: 'toolResult', toolUseId: 'toolu_b' },
+    ]);
+  });
+
   it('незнакомый тип события → пусто (шум CLI отбрасывается)', () => {
     expect(translate(raw({ type: 'system', subtype: 'other' }))).toEqual([]);
     expect(translate(raw({ type: 'user' }))).toEqual([]);
     expect(translate(raw({ type: 'unknown' }))).toEqual([]);
+  });
+
+  // Живой путь (readline → LiveSession.deliver) не ловит исключений: брошенный здесь
+  // TypeError ронял процесс панели. CLI шлёт `user` со строкой, например уведомление.
+  it('user со строкой вместо блоков → пусто, без исключения', () => {
+    expect(translate(raw({ type: 'user', message: { content: '<task-notification>' } }))).toEqual(
+      [],
+    );
   });
 
   it('единственный tool_use возвращается одним элементом массива', () => {

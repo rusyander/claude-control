@@ -1,0 +1,38 @@
+/* Номер строки — маркер списка ol: он и читается скринридером как «1 из 5». */
+.row {
+  padding-block: var(--spacing-3xs);
+}
+
+/* Вид, имя, id и метки переносятся: на 400px длинный id не съедает имя. */
+.line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-3xs) var(--spacing-xs);
+  min-width: 0;
+}
+
+.label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* id второстепенен: его ищут глазами, когда нужно найти файл, а не читают. */
+.id {
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
+
+/* Сводка — своей строкой под именем, не больше двух строк. */
+.summary {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow-wrap: anywhere;
+}
+
+/* Заглушка вместо описания — тише настоящей строки, чтобы их не путали. */
+.fallback {
+  font-style: italic;
+}

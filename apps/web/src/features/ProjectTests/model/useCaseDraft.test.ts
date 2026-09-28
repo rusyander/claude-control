@@ -122,10 +122,12 @@ describe('toInput', () => {
     expect(input.expected).toBe('готово');
   });
 
-  it('оценка длительности уходит только числом больше нуля', () => {
-    expect(toInput(draftOf({ duration: '' })).duration).toBeUndefined();
-    expect(toInput(draftOf({ duration: 'десять' })).duration).toBeUndefined();
-    expect(toInput(draftOf({ duration: '0' })).duration).toBeUndefined();
+  it('оценка длительности уходит числом, а пустое поле — нулём, то есть «очисти»', () => {
+    // Живая проверка 26.09: поле «Минут» стирали, сохраняли — а на диске
+    // оставалось старое число, потому что отсутствующее поле значит «не трогай».
+    expect(toInput(draftOf({ duration: '' })).duration).toBe(0);
+    expect(toInput(draftOf({ duration: 'десять' })).duration).toBe(0);
+    expect(toInput(draftOf({ duration: '0' })).duration).toBe(0);
     expect(toInput(draftOf({ duration: '7' })).duration).toBe(7);
   });
 
@@ -184,5 +186,27 @@ describe('toInput', () => {
     expect(again.duration).toBe('3');
     expect(again.automationStatus).toBe('automated');
     expect(again.steps).toEqual([{ action: 'нажать' }]);
+  });
+});
+
+describe('файлы кода кейса', () => {
+  // Живая проверка 26.09: «Здоровье» требовало `codePaths` («в отбор прогнать
+  // задетое не попадёт»), а в форме кейса такого поля не было вовсе.
+  it('читаются строками и уходят списком без пустых и пробелов', () => {
+    const draft = fromCase({
+      id: 'a',
+      type: 'case',
+      title: 'x',
+      steps: [],
+      status: 'unknown',
+      source: 'human',
+      codePaths: ['apps/web/src/pages/Tests/', 'tools/tests-cli.mjs'],
+    });
+    expect(draft.codePaths).toBe('apps/web/src/pages/Tests/\ntools/tests-cli.mjs');
+    expect(toInput(draftOf({ codePaths: ' a/b.ts \n\n c/ \r\n' })).codePaths).toEqual([
+      'a/b.ts',
+      'c/',
+    ]);
+    expect(toInput(draftOf({ codePaths: '' })).codePaths).toEqual([]);
   });
 });

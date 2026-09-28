@@ -9,15 +9,31 @@
       "masked": 0,
       "width": 1440,
       "height": 1000,
-      "shotAt": "2026-09-17T20:26:47.662Z",
-      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 3 Команды Хуки 3 Скрипты 4 Плагины Интеграции и доступы MCP-серверы 4 Права 7 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка История изменений Что менялось в конфигурации: временная лента правок с диффом Что это CLAUDE.md 10 сент. 2026 г., 23:41 против текущего файла +4 -1 CLAUDE.md 9 сент. 2026 г., 19:05 против предыдущей копии +3 settings.json 9 сент. 2026 г., 16:27 против текущего файла +2 -1 CLAUDE.md 8 сент. 2026 г., 14:12 первая известная версия Это первая известная версия — сравнивать не с чем. .claude.json 7 сент. 2026 г., 21:03 против текущего файла без изменений",
+      "shotAt": "2026-09-28T14:33:15.228Z",
+      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 3 Команды Хуки 3 Скрипты 4 Плагины Интеграции и доступы MCP-серверы 4 Права 7 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка История изменений Что менялось в конфигурации: временная лента правок с диффом Что это CLAUDE.md 10 сент. 2026 г., 23:41 против текущего файла +4 -1 CLAUDE.md 9 сент. 2026 г., 19:05 против следующей копии без изменений settings.json 9 сент. 2026 г., 16:27 против текущего файла +2 -1 CLAUDE.md 8 сент. 2026 г., 14:12 против следующей копии +3 .claude.json 7 сент. 2026 г., 21:03 против текущего файла +13 -1",
       "en": {
         "file": "01-feed.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-17T20:28:20.899Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 3 Commands Hooks 3 Scripts 4 Plugins Integrations and access MCP servers 4 Permissions 7 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Change history What changed in the configuration: a timeline of edits with diffs What this is CLAUDE.md Sep 10, 2026, 11:41 PM vs current file +4 -1 CLAUDE.md Sep 9, 2026, 07:05 PM vs previous copy +3 settings.json Sep 9, 2026, 04:27 PM vs current file +2 -1 CLAUDE.md Sep 8, 2026, 02:12 PM first known version This is the first known version — nothing to compare against. .claude.json Sep 7, 2026, 09:03 PM vs current file no changes"
+        "shotAt": "2026-09-28T14:34:50.430Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 3 Commands Hooks 3 Scripts 4 Plugins Integrations and access MCP servers 4 Permissions 7 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Change history What changed in the configuration: a timeline of edits with diffs What this is CLAUDE.md Sep 10, 2026, 11:41 PM vs current file +4 -1 CLAUDE.md Sep 9, 2026, 07:05 PM vs next copy no changes settings.json Sep 9, 2026, 04:27 PM vs current file +2 -1 CLAUDE.md Sep 8, 2026, 02:12 PM vs next copy +3 .claude.json Sep 7, 2026, 09:03 PM vs current file +13 -1"
+      },
+      "dark": {
+        "file": "01-feed.dark.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 1000,
+        "shotAt": "2026-09-28T14:36:19.927Z",
+        "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 3 Команды Хуки 3 Скрипты 4 Плагины Интеграции и доступы MCP-серверы 4 Права 7 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка История изменений Что менялось в конфигурации: временная лента правок с диффом Что это CLAUDE.md 10 сент. 2026 г., 23:41 против текущего файла +4 -1 CLAUDE.md 9 сент. 2026 г., 19:05 против следующей копии без изменений settings.json 9 сент. 2026 г., 16:27 против текущего файла +2 -1 CLAUDE.md 8 сент. 2026 г., 14:12 против следующей копии +3 .claude.json 7 сент. 2026 г., 21:03 против текущего файла +13 -1"
+      },
+      "darkEn": {
+        "file": "01-feed.dark.en.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 1000,
+        "shotAt": "2026-09-28T14:37:52.308Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 3 Commands Hooks 3 Scripts 4 Plugins Integrations and access MCP servers 4 Permissions 7 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Change history What changed in the configuration: a timeline of edits with diffs What this is CLAUDE.md Sep 10, 2026, 11:41 PM vs current file +4 -1 CLAUDE.md Sep 9, 2026, 07:05 PM vs next copy no changes settings.json Sep 9, 2026, 04:27 PM vs current file +2 -1 CLAUDE.md Sep 8, 2026, 02:12 PM vs next copy +3 .claude.json Sep 7, 2026, 09:03 PM vs current file +13 -1"
       }
     },
     {
@@ -27,15 +43,31 @@
       "masked": 0,
       "width": 1440,
       "height": 1000,
-      "shotAt": "2026-09-17T20:26:49.275Z",
-      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 3 Команды Хуки 3 Скрипты 4 Плагины Интеграции и доступы MCP-серверы 4 Права 7 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка История изменений Что менялось в конфигурации: временная лента правок с диффом Что это CLAUDE.md 10 сент. 2026 г., 23:41 против текущего файла +4 -1 # Личные правила Общий файл: его читает сам Claude Code при старте сессии. ## ПРАВИЛО: Отвечать по-русски Ответы и пояснения — по-русски, имена файлов и команд оставлять как есть. ## ПРАВИЛО: Правки точечные Менять только то, о чём попросили. Соседние файлы не переписывать. ## ПРАВИЛО: Перед сдачей прогонять проверки - Прогонять тесты. Вернуть это изменение + Типы, линтер и тесты — одной командой, результат называть в отчёте. + ## ПРАВИЛО: Не трогать каталог migrations Вернуть это изменение + Им владеет команда бэкенда: правки туда идут отдельной задачей. Вернуть это изменение + ## Как читать этот файл Обычный раздел без слова ПРАВИЛО панель в список не берёт. CLAUDE.md 9 сент. 2026 г., 19:05 против предыдущей копии +3 settings.json 9 сент. 2026 г., 16:27 против текущего файла +2 -1 CLAUDE.md 8 сент. 2026 г., 14:12 первая известная версия Это первая известная версия — сравнивать не с чем. .claude.json 7 сент. 2026 г., 21:03 против текущего файла без изменений",
+      "shotAt": "2026-09-28T14:33:16.807Z",
+      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 3 Команды Хуки 3 Скрипты 4 Плагины Интеграции и доступы MCP-серверы 4 Права 7 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка История изменений Что менялось в конфигурации: временная лента правок с диффом Что это CLAUDE.md 10 сент. 2026 г., 23:41 против текущего файла +4 -1 # Личные правила Общий файл: его читает сам Claude Code при старте сессии. ## ПРАВИЛО: Отвечать по-русски Ответы и пояснения — по-русски, имена файлов и команд оставлять как есть. ## ПРАВИЛО: Правки точечные Менять только то, о чём попросили. Соседние файлы не переписывать. ## ПРАВИЛО: Перед сдачей прогонять проверки - Прогонять тесты. Вернуть это изменение + Типы, линтер и тесты — одной командой, результат называть в отчёте. + ## ПРАВИЛО: Не трогать каталог migrations Вернуть это изменение + Им владеет команда бэкенда: правки туда идут отдельной задачей. Вернуть это изменение + ## Как читать этот файл Обычный раздел без слова ПРАВИЛО панель в список не берёт. CLAUDE.md 9 сент. 2026 г., 19:05 против следующей копии без изменений settings.json 9 сент. 2026 г., 16:27 против текущего файла +2 -1 CLAUDE.md 8 сент. 2026 г., 14:12 против следующей копии +3 .claude.json 7 сент. 2026 г., 21:03 против текущего файла +13 -1",
       "en": {
         "file": "02-diff.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-17T20:28:22.493Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 3 Commands Hooks 3 Scripts 4 Plugins Integrations and access MCP servers 4 Permissions 7 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Change history What changed in the configuration: a timeline of edits with diffs What this is CLAUDE.md Sep 10, 2026, 11:41 PM vs current file +4 -1 # Личные правила Общий файл: его читает сам Claude Code при старте сессии. ## ПРАВИЛО: Отвечать по-русски Ответы и пояснения — по-русски, имена файлов и команд оставлять как есть. ## ПРАВИЛО: Правки точечные Менять только то, о чём попросили. Соседние файлы не переписывать. ## ПРАВИЛО: Перед сдачей прогонять проверки - Прогонять тесты. Revert this change + Типы, линтер и тесты — одной командой, результат называть в отчёте. + ## ПРАВИЛО: Не трогать каталог migrations Revert this change + Им владеет команда бэкенда: правки туда идут отдельной задачей. Revert this change + ## Как читать этот файл Обычный раздел без слова ПРАВИЛО панель в список не берёт. CLAUDE.md Sep 9, 2026, 07:05 PM vs previous copy +3 settings.json Sep 9, 2026, 04:27 PM vs current file +2 -1 CLAUDE.md Sep 8, 2026, 02:12 PM first known version This is the first known version — nothing to compare against. .claude.json Sep 7, 2026, 09:03 PM vs current file no changes"
+        "shotAt": "2026-09-28T14:34:52.005Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 3 Commands Hooks 3 Scripts 4 Plugins Integrations and access MCP servers 4 Permissions 7 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Change history What changed in the configuration: a timeline of edits with diffs What this is CLAUDE.md Sep 10, 2026, 11:41 PM vs current file +4 -1 # Личные правила Общий файл: его читает сам Claude Code при старте сессии. ## ПРАВИЛО: Отвечать по-русски Ответы и пояснения — по-русски, имена файлов и команд оставлять как есть. ## ПРАВИЛО: Правки точечные Менять только то, о чём попросили. Соседние файлы не переписывать. ## ПРАВИЛО: Перед сдачей прогонять проверки - Прогонять тесты. Revert this change + Типы, линтер и тесты — одной командой, результат называть в отчёте. + ## ПРАВИЛО: Не трогать каталог migrations Revert this change + Им владеет команда бэкенда: правки туда идут отдельной задачей. Revert this change + ## Как читать этот файл Обычный раздел без слова ПРАВИЛО панель в список не берёт. CLAUDE.md Sep 9, 2026, 07:05 PM vs next copy no changes settings.json Sep 9, 2026, 04:27 PM vs current file +2 -1 CLAUDE.md Sep 8, 2026, 02:12 PM vs next copy +3 .claude.json Sep 7, 2026, 09:03 PM vs current file +13 -1"
+      },
+      "dark": {
+        "file": "02-diff.dark.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 1000,
+        "shotAt": "2026-09-28T14:36:21.541Z",
+        "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 3 Команды Хуки 3 Скрипты 4 Плагины Интеграции и доступы MCP-серверы 4 Права 7 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка История изменений Что менялось в конфигурации: временная лента правок с диффом Что это CLAUDE.md 10 сент. 2026 г., 23:41 против текущего файла +4 -1 # Личные правила Общий файл: его читает сам Claude Code при старте сессии. ## ПРАВИЛО: Отвечать по-русски Ответы и пояснения — по-русски, имена файлов и команд оставлять как есть. ## ПРАВИЛО: Правки точечные Менять только то, о чём попросили. Соседние файлы не переписывать. ## ПРАВИЛО: Перед сдачей прогонять проверки - Прогонять тесты. Вернуть это изменение + Типы, линтер и тесты — одной командой, результат называть в отчёте. + ## ПРАВИЛО: Не трогать каталог migrations Вернуть это изменение + Им владеет команда бэкенда: правки туда идут отдельной задачей. Вернуть это изменение + ## Как читать этот файл Обычный раздел без слова ПРАВИЛО панель в список не берёт. CLAUDE.md 9 сент. 2026 г., 19:05 против следующей копии без изменений settings.json 9 сент. 2026 г., 16:27 против текущего файла +2 -1 CLAUDE.md 8 сент. 2026 г., 14:12 против следующей копии +3 .claude.json 7 сент. 2026 г., 21:03 против текущего файла +13 -1"
+      },
+      "darkEn": {
+        "file": "02-diff.dark.en.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 1000,
+        "shotAt": "2026-09-28T14:37:53.908Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 3 Commands Hooks 3 Scripts 4 Plugins Integrations and access MCP servers 4 Permissions 7 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Change history What changed in the configuration: a timeline of edits with diffs What this is CLAUDE.md Sep 10, 2026, 11:41 PM vs current file +4 -1 # Личные правила Общий файл: его читает сам Claude Code при старте сессии. ## ПРАВИЛО: Отвечать по-русски Ответы и пояснения — по-русски, имена файлов и команд оставлять как есть. ## ПРАВИЛО: Правки точечные Менять только то, о чём попросили. Соседние файлы не переписывать. ## ПРАВИЛО: Перед сдачей прогонять проверки - Прогонять тесты. Revert this change + Типы, линтер и тесты — одной командой, результат называть в отчёте. + ## ПРАВИЛО: Не трогать каталог migrations Revert this change + Им владеет команда бэкенда: правки туда идут отдельной задачей. Revert this change + ## Как читать этот файл Обычный раздел без слова ПРАВИЛО панель в список не берёт. CLAUDE.md Sep 9, 2026, 07:05 PM vs next copy no changes settings.json Sep 9, 2026, 04:27 PM vs current file +2 -1 CLAUDE.md Sep 8, 2026, 02:12 PM vs next copy +3 .claude.json Sep 7, 2026, 09:03 PM vs current file +13 -1"
       }
     },
     {
@@ -44,15 +76,31 @@
       "side": "panel",
       "masked": 0,
       "width": 500,
-      "height": 360,
-      "shotAt": "2026-09-17T20:26:49.979Z",
+      "height": 400,
+      "shotAt": "2026-09-28T14:33:17.518Z",
       "text": "Вернуть только это изменение? В файле CLAUDE.md этот один блок вернётся к состоянию из копии; остальные изменения останутся на месте. Текущее состояние сохранится отдельной копией — откат тоже обратим. Правка вступит в силу после перезапуска Claude Code. Отмена Вернуть это изменение",
       "en": {
         "file": "03-revert.en.png",
         "masked": 0,
         "width": 500,
-        "height": 360,
-        "shotAt": "2026-09-17T20:28:23.208Z",
+        "height": 400,
+        "shotAt": "2026-09-28T14:34:52.697Z",
+        "text": "Revert only this change? In CLAUDE.md this one block will return to the copied state; the other changes stay as they are. The current state is saved as a separate copy — the revert is reversible too. The edit takes effect after Claude Code restarts. Cancel Revert this change"
+      },
+      "dark": {
+        "file": "03-revert.dark.png",
+        "masked": 0,
+        "width": 500,
+        "height": 400,
+        "shotAt": "2026-09-28T14:36:22.260Z",
+        "text": "Вернуть только это изменение? В файле CLAUDE.md этот один блок вернётся к состоянию из копии; остальные изменения останутся на месте. Текущее состояние сохранится отдельной копией — откат тоже обратим. Правка вступит в силу после перезапуска Claude Code. Отмена Вернуть это изменение"
+      },
+      "darkEn": {
+        "file": "03-revert.dark.en.png",
+        "masked": 0,
+        "width": 500,
+        "height": 400,
+        "shotAt": "2026-09-28T14:37:54.605Z",
         "text": "Revert only this change? In CLAUDE.md this one block will return to the copied state; the other changes stay as they are. The current state is saved as a separate copy — the revert is reversible too. The edit takes effect after Claude Code restarts. Cancel Revert this change"
       }
     },
@@ -63,15 +111,31 @@
       "masked": 0,
       "width": 1440,
       "height": 1000,
-      "shotAt": "2026-09-17T20:26:52.578Z",
-      "text": "AgentDeck Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 3 Команды Хуки 3 Скрипты 4 Плагины Интеграции и доступы MCP-серверы 4 Права 7 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Настройки Защита данных Контур Справка История изменений Что менялось в конфигурации: временная лента правок с диффом Что это CLAUDE.md 18 сент. 2026 г., 01:26 против текущего файла +1 -1 CLAUDE.md 10 сент. 2026 г., 23:41 против предыдущей копии без изменений # Личные правила Общий файл: его читает сам Claude Code при старте сессии. ## ПРАВИЛО: Отвечать по-русски Ответы и пояснения — по-русски, имена файлов и команд оставлять как есть. ## ПРАВИЛО: Правки точечные Менять только то, о чём попросили. Соседние файлы не переписывать. ## ПРАВИЛО: Перед сдачей прогонять проверки Прогонять тесты. ## Как читать этот файл Обычный раздел без слова ПРАВИЛО панель в список не берёт. CLAUDE.md 9 сент. 2026 г., 19:05 против предыдущей копии +3 settings.json 9 сент. 2026 г., 16:27 против текущего файла +2 -1 CLAUDE.md 8 сент. 2026 г., 14:12 первая известная версия Это первая известная версия — сравнивать не с чем. .claude.json 7 сент. 2026 г., 21:03 против текущего файла без изменений Файл восстановлен из копии · копия: CLAUDE.md.2026-09-17T20-26-50-023Z.bak",
+      "shotAt": "2026-09-28T14:33:20.107Z",
+      "text": "AgentDeck Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 3 Команды Хуки 3 Скрипты 4 Плагины Интеграции и доступы MCP-серверы 4 Права 7 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка История изменений Что менялось в конфигурации: временная лента правок с диффом Что это CLAUDE.md 28 сент. 2026 г., 19:33 против текущего файла +1 -1 CLAUDE.md 10 сент. 2026 г., 23:41 против следующей копии +4 -1 # Личные правила Общий файл: его читает сам Claude Code при старте сессии. ## ПРАВИЛО: Отвечать по-русски Ответы и пояснения — по-русски, имена файлов и команд оставлять как есть. ## ПРАВИЛО: Правки точечные Менять только то, о чём попросили. Соседние файлы не переписывать. ## ПРАВИЛО: Перед сдачей прогонять проверки - Прогонять тесты. + Типы, линтер и тесты — одной командой, результат называть в отчёте. + ## ПРАВИЛО: Не трогать каталог migrations + Им владеет команда бэкенда: правки туда идут отдельной задачей. + ## Как читать этот файл Обычный раздел без слова ПРАВИЛО панель в список не берёт. CLAUDE.md 9 сент. 2026 г., 19:05 против следующей копии без изменений settings.json 9 сент. 2026 г., 16:27 против текущего файла +2 -1 CLAUDE.md 8 сент. 2026 г., 14:12 против следующей копии +3 .claude.json 7 сент. 2026 г., 21:03 против текущего файла +13 -1 Файл восстановлен из копии · копия: CLAUDE.md.2026-09-28T14-33-17-562Z.bak",
       "en": {
         "file": "04-after.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-17T20:28:25.803Z",
-        "text": "AgentDeck Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 3 Commands Hooks 3 Scripts 4 Plugins Integrations and access MCP servers 4 Permissions 7 Environment Projects Testing Application Groups 0 Change history Comparison Settings Data protection Contour Help Change history What changed in the configuration: a timeline of edits with diffs What this is CLAUDE.md Sep 18, 2026, 01:28 AM vs current file +1 -1 CLAUDE.md Sep 10, 2026, 11:41 PM vs previous copy no changes # Личные правила Общий файл: его читает сам Claude Code при старте сессии. ## ПРАВИЛО: Отвечать по-русски Ответы и пояснения — по-русски, имена файлов и команд оставлять как есть. ## ПРАВИЛО: Правки точечные Менять только то, о чём попросили. Соседние файлы не переписывать. ## ПРАВИЛО: Перед сдачей прогонять проверки Прогонять тесты. ## Как читать этот файл Обычный раздел без слова ПРАВИЛО панель в список не берёт. CLAUDE.md Sep 9, 2026, 07:05 PM vs previous copy +3 settings.json Sep 9, 2026, 04:27 PM vs current file +2 -1 CLAUDE.md Sep 8, 2026, 02:12 PM first known version This is the first known version — nothing to compare against. .claude.json Sep 7, 2026, 09:03 PM vs current file no changes File restored from a backup · backup: CLAUDE.md.2026-09-17T20-28-23-251Z.bak"
+        "shotAt": "2026-09-28T14:34:55.287Z",
+        "text": "AgentDeck Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 3 Commands Hooks 3 Scripts 4 Plugins Integrations and access MCP servers 4 Permissions 7 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Change history What changed in the configuration: a timeline of edits with diffs What this is CLAUDE.md Sep 28, 2026, 07:34 PM vs current file +1 -1 CLAUDE.md Sep 10, 2026, 11:41 PM vs next copy +4 -1 # Личные правила Общий файл: его читает сам Claude Code при старте сессии. ## ПРАВИЛО: Отвечать по-русски Ответы и пояснения — по-русски, имена файлов и команд оставлять как есть. ## ПРАВИЛО: Правки точечные Менять только то, о чём попросили. Соседние файлы не переписывать. ## ПРАВИЛО: Перед сдачей прогонять проверки - Прогонять тесты. + Типы, линтер и тесты — одной командой, результат называть в отчёте. + ## ПРАВИЛО: Не трогать каталог migrations + Им владеет команда бэкенда: правки туда идут отдельной задачей. + ## Как читать этот файл Обычный раздел без слова ПРАВИЛО панель в список не берёт. CLAUDE.md Sep 9, 2026, 07:05 PM vs next copy no changes settings.json Sep 9, 2026, 04:27 PM vs current file +2 -1 CLAUDE.md Sep 8, 2026, 02:12 PM vs next copy +3 .claude.json Sep 7, 2026, 09:03 PM vs current file +13 -1 File restored from a backup · backup: CLAUDE.md.2026-09-28T14-34-52-741Z.bak"
+      },
+      "dark": {
+        "file": "04-after.dark.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 1000,
+        "shotAt": "2026-09-28T14:36:24.858Z",
+        "text": "AgentDeck Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 3 Команды Хуки 3 Скрипты 4 Плагины Интеграции и доступы MCP-серверы 4 Права 7 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка История изменений Что менялось в конфигурации: временная лента правок с диффом Что это CLAUDE.md 28 сент. 2026 г., 19:36 против текущего файла +1 -1 CLAUDE.md 10 сент. 2026 г., 23:41 против следующей копии +4 -1 # Личные правила Общий файл: его читает сам Claude Code при старте сессии. ## ПРАВИЛО: Отвечать по-русски Ответы и пояснения — по-русски, имена файлов и команд оставлять как есть. ## ПРАВИЛО: Правки точечные Менять только то, о чём попросили. Соседние файлы не переписывать. ## ПРАВИЛО: Перед сдачей прогонять проверки - Прогонять тесты. + Типы, линтер и тесты — одной командой, результат называть в отчёте. + ## ПРАВИЛО: Не трогать каталог migrations + Им владеет команда бэкенда: правки туда идут отдельной задачей. + ## Как читать этот файл Обычный раздел без слова ПРАВИЛО панель в список не берёт. CLAUDE.md 9 сент. 2026 г., 19:05 против следующей копии без изменений settings.json 9 сент. 2026 г., 16:27 против текущего файла +2 -1 CLAUDE.md 8 сент. 2026 г., 14:12 против следующей копии +3 .claude.json 7 сент. 2026 г., 21:03 против текущего файла +13 -1 Файл восстановлен из копии · копия: CLAUDE.md.2026-09-28T14-36-22-304Z.bak"
+      },
+      "darkEn": {
+        "file": "04-after.dark.en.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 1000,
+        "shotAt": "2026-09-28T14:37:57.198Z",
+        "text": "AgentDeck Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 3 Commands Hooks 3 Scripts 4 Plugins Integrations and access MCP servers 4 Permissions 7 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Change history What changed in the configuration: a timeline of edits with diffs What this is CLAUDE.md Sep 28, 2026, 07:37 PM vs current file +1 -1 CLAUDE.md Sep 10, 2026, 11:41 PM vs next copy +4 -1 # Личные правила Общий файл: его читает сам Claude Code при старте сессии. ## ПРАВИЛО: Отвечать по-русски Ответы и пояснения — по-русски, имена файлов и команд оставлять как есть. ## ПРАВИЛО: Правки точечные Менять только то, о чём попросили. Соседние файлы не переписывать. ## ПРАВИЛО: Перед сдачей прогонять проверки - Прогонять тесты. + Типы, линтер и тесты — одной командой, результат называть в отчёте. + ## ПРАВИЛО: Не трогать каталог migrations + Им владеет команда бэкенда: правки туда идут отдельной задачей. + ## Как читать этот файл Обычный раздел без слова ПРАВИЛО панель в список не берёт. CLAUDE.md Sep 9, 2026, 07:05 PM vs next copy no changes settings.json Sep 9, 2026, 04:27 PM vs current file +2 -1 CLAUDE.md Sep 8, 2026, 02:12 PM vs next copy +3 .claude.json Sep 7, 2026, 09:03 PM vs current file +13 -1 File restored from a backup · backup: CLAUDE.md.2026-09-28T14-37-54-650Z.bak"
       }
     }
   ]

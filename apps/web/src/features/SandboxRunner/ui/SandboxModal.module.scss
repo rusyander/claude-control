@@ -2,7 +2,6 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
   gap: var(--spacing-md);
-  min-height: 460px;
 }
 
 // Состав песочницы: что именно подключено к прогону.
@@ -109,6 +108,40 @@
   word-break: break-word;
   max-height: 160px;
   overflow-y: auto;
+}
+
+// Вывод процесса хука: подпись потока над коротким выводом, длинный — под
+// раскрытием с числом строк, чтобы было видно, сколько там, не открывая.
+.outputShort {
+  display: flex;
+  flex-direction: column;
+  margin-top: var(--spacing-3xs);
+
+  .output {
+    margin: 0;
+  }
+}
+
+.outputLabel {
+  color: var(--color-fg-subtle);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+}
+
+.outputDetails {
+  margin-top: var(--spacing-3xs);
+
+  summary {
+    color: var(--color-fg-subtle);
+    font-family: var(--font-mono);
+    font-size: var(--font-size-caption);
+    cursor: pointer;
+  }
+
+  .output {
+    max-height: 320px;
+    margin: var(--spacing-3xs) 0 0;
+  }
 }
 
 .answer {

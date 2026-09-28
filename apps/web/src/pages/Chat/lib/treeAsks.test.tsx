@@ -4,7 +4,7 @@ import type { ChatSummary } from '@agentdeck/contracts';
 import type { ChatTreeAsk, ChatTreeNode, ChatTreeView } from '@agentdeck/contracts/chat-handoff';
 import { agentRuns, type ActiveRunView } from '@shared/lib/agent-runs';
 import { i18n } from '@shared/config/i18n';
-import { ChildBlocks } from '@features/ChatMessages/ui/ChildBlocks';
+import { ChildBlocks } from '@features/ChatMessages';
 import { collectChildQuestions } from './childQuestions';
 import { collectChildPermissions } from './childPermissions';
 import { collectTreeAsks, withTreeAsks } from './treeAsks';

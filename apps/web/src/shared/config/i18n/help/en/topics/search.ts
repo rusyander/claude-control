@@ -239,13 +239,13 @@ export const searchEn: typeof searchRu = {
   shots: {
     find: {
       '01-prompt':
-        'The section is open with an empty line: “Start typing a query — it searches every configuration section at once. Two characters are enough”',
+        'The section is open with an empty line: “Start typing a query. Searches every configuration section at once. Two characters are enough.”',
       '02-two-sections':
-        '“Found: 2” for the word migrations: “Rules 1” — the rule “Do not touch the migrations directory”, “Permissions 1” — deny: Edit(migrations/**)',
+        '“Found: 2” for the word migrations: “Rules 1” — the rule “Не трогать каталог migrations” (“Do not touch the migrations directory”), “Permissions 1” — deny: Edit(migrations/**)',
       '03-variables':
         '“Found: 2” for the word TOKEN, both hits in “Environment variables”: MAX_THINKING_TOKENS and SHOP_API_TOKEN — the card carries the key name only',
       '04-empty':
-        '“Nothing found. No matches for “выгрузка склада”” — the screen names the query itself',
+        '“Nothing found. No matches for "выгрузка склада"” (a sample query, “warehouse export”) — the screen names the query itself',
     },
   },
 

@@ -127,17 +127,22 @@ describe('маршруты групп: форма тела, 404/409 и согл�
       expect(res.statusCode).toBe(404);
     });
 
-    it('PUT и DELETE неизвестного сценария-автоматизации', async () => {
-      const putRes = await app.inject({
-        method: 'PUT',
-        url: '/api/automations/нет-такого',
-        payload: { name: 'a', trigger: { event: 'Stop' }, action: { command: 'echo' } },
-      });
-      const delRes = await app.inject({ method: 'DELETE', url: '/api/automations/нет-такого' });
-
-      expect(putRes.statusCode).toBe(404);
-      expect(delRes.statusCode).toBe(404);
-      expect((await app.inject({ method: 'GET', url: '/api/automations' })).json()).toEqual([]);
+    // Автоматизации разово переносятся в хуки при старте (F-99): записать новую
+    // в settings.json панели больше нечем — ни одного из прежних маршрутов нет.
+    it('маршрутов автоматизаций больше нет', async () => {
+      for (const [method, url] of [
+        ['GET', '/api/automations'],
+        ['POST', '/api/automations'],
+        ['PUT', '/api/automations/a1'],
+        ['DELETE', '/api/automations/a1'],
+      ] as const) {
+        const res = await app.inject({
+          method,
+          url,
+          payload: { name: 'a', trigger: { event: 'Stop' }, action: { command: 'echo' } },
+        });
+        expect(res.statusCode, `${method} ${url}`).toBe(404);
+      }
     });
   });
 

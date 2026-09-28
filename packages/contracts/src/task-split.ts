@@ -161,6 +161,12 @@ export interface TaskSplitGroup {
   owns?: string[];
   notes?: string;
   /**
+   * Группа панели, выбранная разбором по её `when` (выбор чата — `auto`). Тоже
+   * дописывает панель после уровня 1 — уже сверенной с каталогом; ребёнок
+   * получает её своим выбором группы до первого прогона.
+   */
+  groupKey?: string;
+  /**
    * Группа ревьюит запрос на слияние по ссылке (Т7), а не делает задачу.
    *
    * Меняет три вещи разом, и все три — намеренно: копия ветвится ОТ ветки MR
@@ -272,64 +278,66 @@ export interface TaskSplitResult {
  * оболочку, а перевод строки внутри аргумента cmd.exe разрывает командную строку.
  */
 export const SPLIT_SYSTEM_PROMPT =
-  'Если в одном сообщении пришло три или более независимых задач, не берись за них подряд — ' +
-  'сначала предложи разделение. ' +
+  'If one message brings three or more independent tasks, do not take them one after another — ' +
+  'first propose a split. ' +
   // Планка занижалась на живых прогонах до абсурда: «убрать лишние импорты в
   // трёх файлах» уезжало тремя задачами, и человек получал предложение делить
   // на каждый чих. Задача — то, что решается отдельно и своим решением; одна и
   // та же правка в десяти файлах остаётся ОДНОЙ задачей, сколько бы файлов ни
   // задела. Предлагать разделение чаще одного раза за разговор нельзя: человек,
   // отказавшийся один раз, отказался не от этой формулировки, а от дробления.
-  'Независимых — значит разных по сути, каждую можно сдать отдельно, и решение одной ничего не ' +
-  'решает в другой. Одна и та же правка во многих файлах — ОДНА задача, сколько бы файлов она ни ' +
-  'задела; перечисление файлов, шагов одной работы или пунктов одного рефакторинга задачами не ' +
-  'считается. Предложи не больше одного раза за разговор: отказались или промолчали — работай ' +
-  'дальше сам и больше не спрашивай, пока не попросят. ' +
-  'Сгруппируй задачи так, чтобы группы не пересекались по файлам, ' +
-  `и выведи РОВНО ОДИН блок кода с языком ${SPLIT_BLOCK_LANG}, внутри — JSON вида ` +
-  '{"shared":"общий контекст для всех","groups":[{"title":"название","branch":"feature/имя",' +
-  '"tasks":["задача","задача"],"brief":"что важно этой группе"}]}. ' +
+  'Independent means different in substance: each can be delivered on its own, and solving one ' +
+  'settles nothing in another. The same change across many files is ONE task, however many files ' +
+  'it touches; a list of files, of steps of one piece of work or of items of one refactoring does ' +
+  'not count as tasks. Propose at most once per conversation: declined or ignored — keep working ' +
+  'yourself and do not ask again until asked. ' +
+  'Group the tasks so that the groups do not overlap in files, ' +
+  `and output EXACTLY ONE code block in the language ${SPLIT_BLOCK_LANG} containing JSON of the form ` +
+  '{"shared":"context common to all","groups":[{"title":"name","branch":"feature/name",' +
+  '"tasks":["task","task"],"brief":"what matters to this group"}]}. ' +
   // Формат придуман этой панелью, снаружи его не существует: модель не может
   // «вспомнить» его правильно и раз за разом подменяет имена полей (files,
   // prompt, name). Разбор такие подмены переживает, но карточка честнее, когда
   // поля названы как надо, — поэтому имена перечислены явно и закрыто.
-  'Имена полей ровно эти и никакие другие: у группы — title, branch, tasks, brief; ' +
-  'tasks — всегда МАССИВ строк, по строке на задачу, даже если задача одна; shared — СТРОКА. ' +
+  'The field names are exactly these and no others: a group has title, branch, tasks, brief; ' +
+  'tasks is always an ARRAY of strings, one string per task, even for a single task; shared is a STRING. ' +
   // Порождённый чат — чистая сессия в другом каталоге: этого разговора он не
   // видит вовсе. Живой прогон показал, чем это кончается: модель складывает
   // смысл в заголовок («Тесты: src/index.test.js»), tasks не пишет, и агент в
   // новой ветке получает вместо задания название колонки.
-  'Задачу в tasks пиши ЦЕЛИКОМ, своими словами и со всеми условиями: новый чат — чистая ' +
-  'сессия в своей копии репозитория, этого разговора он не увидит, и кроме shared и tasks ' +
-  'у него не будет ничего. Название группы — не задание. ' +
-  'Ветку называй короткой латиницей, имена групп — на языке собеседника. ' +
-  'Панель покажет человеку карточку выбора вместо этого блока, поэтому не пересказывай JSON словами. ' +
-  'Заводить ветки, копии репозитория и чаты самому НЕ нужно и нечем: всё это делает панель, ' +
-  'когда человек нажмёт кнопку в карточке. ' +
-  `Групп не больше ${SPLIT_MAX_GROUPS}, задач в группе не больше ${SPLIT_MAX_TASKS_PER_GROUP}: сверх этого панель ` +
-  'группы не заведёт. Каждая группа станет своей веткой и своим запросом на слияние — группируй то, что ' +
-  'ревьюить и вливать вместе, а не просто похожее по теме. Задачу из трекера пиши с её ключом (ABC-123) и ' +
-  'ссылкой: по ним группа возьмёт задачу в работу. ' +
-  'После блока остановись и жди решения. ' +
+  'Write each task in tasks IN FULL, in your own words and with all its conditions: the new chat ' +
+  'is a clean session in its own copy of the repository, it will not see this conversation, and ' +
+  'apart from shared and tasks it will have nothing. A group name is not a task. ' +
+  'Name the branch in short Latin characters; write group names, tasks and shared in the ' +
+  'language the human uses. ' +
+  'The panel shows the human a choice card instead of this block, so do not retell the JSON in words. ' +
+  'You do NOT need to create branches, repository copies or chats yourself, and you have no means ' +
+  'to: the panel does all of that when the human presses the button on the card. ' +
+  `At most ${SPLIT_MAX_GROUPS} groups and at most ${SPLIT_MAX_TASKS_PER_GROUP} tasks per group: beyond ` +
+  'that the panel will not create the groups. Each group becomes its own branch and its own merge ' +
+  'request — group what is reviewed and merged together, not merely what is similar in topic. Write ' +
+  'a tracker task with its key (ABC-123) and link: the group takes the task into work by them. ' +
+  'After the block, stop and wait for the decision. ' +
   // Ревью по ссылке (Т7) — единственный случай, когда одна группа законна:
   // MR и есть отдельная работа в своей копии на его ветке. Без этой оговорки
   // модель послушно требовала трёх задач и ревьюила один MR прямо в разговоре.
-  'Отдельный случай — ссылки на запросы на слияние (MR/PR) с просьбой их отревьюить: тогда сделай ' +
-  'по группе на КАЖДУЮ ссылку, и одна ссылка тоже даёт разделение — правило про три задачи здесь не ' +
-  'действует. У такой группы kind: "review", review: {"url":"ссылка целиком"}, title — заголовок MR ' +
-  'или его номер, tasks — что именно проверить. Ветку MR и копию на ней заведёт панель по ссылке. ' +
+  'A special case — links to merge requests (MR/PR) with a request to review them: then make one ' +
+  'group per EACH link, and a single link also makes a split — the three-task rule does not apply ' +
+  'here. Such a group has kind: "review", review: {"url":"the full link"}, title — the MR title or ' +
+  'its number, tasks — what exactly to check. The panel creates the MR branch and a copy on it from ' +
+  'the link. ' +
   // Несколько MR на работу (конфликты, замечания, rebase) — второй такой
   // случай: человек хочет видеть каждый MR своим чатом, а в одном разговоре
   // они шли вперемешку и вслепую. Одну ссылку «на фикс» не делим — это и есть
   // обычная работа в этом разговоре.
-  'Второй отдельный случай — ДВЕ и больше ссылок на разные MR/PR, с которыми надо что-то СДЕЛАТЬ ' +
-  '(решить конфликты, влить свежую основную ветку, поправить по замечаниям, обновить описание): ' +
-  'тоже предложи разделение, по группе на каждый MR, даже если задач меньше трёх, — человек выберет ' +
-  'в карточке, делить или делать всё здесь по очереди. У такой группы review: {"url":"ссылка ' +
-  'целиком","action":"work"}, kind — класс работы (не "review"), tasks — что сделать в этом MR. ' +
-  'Ревью и работа в одном сообщении — разные группы с action "review" и "work". ' +
-  'Кроме этих двух случаев со ссылками: если задачи связаны между собой или их меньше трёх — ' +
-  'блока не выводи и работай как обычно.';
+  'The second special case — TWO or more links to different MRs/PRs that need something DONE ' +
+  '(resolve conflicts, merge in the fresh main branch, fix review comments, update the description): ' +
+  'propose a split as well, one group per MR, even with fewer than three tasks — the human chooses ' +
+  'on the card whether to split or do it all here one by one. Such a group has review: {"url":"the ' +
+  'full link","action":"work"}, kind — the class of work (not "review"), tasks — what to do in this ' +
+  'MR. Review and work in one message are different groups with action "review" and "work". ' +
+  'Apart from these two link cases: if the tasks are related to each other or there are fewer than ' +
+  'three — output no block and work as usual.';
 
 /** Строка нужной длины или undefined: пустое поле лучше пустой строки. */
 function text(value: unknown, limit: number): string | undefined {
@@ -449,7 +457,7 @@ function briefOf(group: Record<string, unknown>): string | undefined {
     ? raw.map((file) => text(file, MAX_TITLE)).filter((file): file is string => Boolean(file))
     : [text(raw, MAX_BRIEF)].filter((file): file is string => Boolean(file));
 
-  const scope = files.length > 0 ? `Границы группы: ${files.join(', ')}` : undefined;
+  const scope = files.length > 0 ? `Group scope: ${files.join(', ')}` : undefined;
   const parts = [own, scope].filter(Boolean);
   return parts.length > 0 ? parts.join('\n\n').slice(0, MAX_BRIEF) : undefined;
 }
@@ -739,41 +747,41 @@ export function environmentPreamble(input: EnvironmentPreambleInput): string {
   if (input.mirror) done.push(input.mirror);
   const boot = input.bootstrap;
   if (boot?.status === 'ok') {
-    done.push(`зависимости установлены командой «${boot.command}»`);
+    done.push(`dependencies installed with "${boot.command}"`);
   }
   if (boot?.reverted && boot.reverted.length > 0) {
-    done.push(`переписанные установкой lock-файлы откачены: ${boot.reverted.join(', ')}`);
+    done.push(`lock files rewritten by the install were reverted: ${boot.reverted.join(', ')}`);
   }
   lines.push(
     done.length > 0
-      ? `Панель подготовила эту копию: ${done.join('; ')}.`
-      : 'Панель завела эту копию репозитория.',
+      ? `The panel prepared this copy: ${done.join('; ')}.`
+      : 'The panel created this copy of the repository.',
   );
   if (boot && boot.status !== 'ok') {
     const why = boot.timedOut
-      ? 'остановлена по потолку в 10 минут'
-      : `завершилась с кодом ${boot.exitCode ?? '?'}`;
+      ? 'was stopped at the 10-minute ceiling'
+      : `exited with code ${boot.exitCode ?? '?'}`;
     const tail = boot.logTail.trim();
     lines.push(
-      `⚠ Подготовка копии: команда «${boot.command}» ${why}. Зависимости могут быть не установлены — реши сам: повтори установку или обойдись без неё.${
-        tail ? `\nХвост лога:\n${tail}` : ''
+      `⚠ Copy preparation: the command "${boot.command}" ${why}. Dependencies may not be installed — decide yourself: repeat the install or do without it.${
+        tail ? `\nLog tail:\n${tail}` : ''
       }`,
     );
   }
   if (boot?.status === 'ok') {
     lines.push(
-      'Окружение готово — не проверяй и не настраивай его (MCP, локальный слой, зависимости), начинай сразу с задачи.',
+      'The environment is ready — do not check or set it up (MCP, local layer, dependencies), start with the task right away.',
     );
   } else {
     if (!boot) {
       lines.push(
-        'Зависимости панель НЕ ставила: подготовка копии в настройках проекта не задана. Задаче они не нужны — не ставь. Нужны — поставь сам одной командой установки без запуска дев-серверов и сборки, а переписанные установкой lock-файлы не коммить.',
+        'The panel did NOT install dependencies: copy preparation is not set in the project settings. If the task does not need them, do not install them. If it does, install them yourself with one install command, without starting dev servers or a build, and do not commit lock files the install rewrote.',
       );
     }
     lines.push(
       input.mirror
-        ? 'MCP и локальный слой не настраивай — начинай с задачи.'
-        : 'MCP не настраивай — начинай с задачи.',
+        ? 'Do not set up MCP or the local layer — start with the task.'
+        : 'Do not set up MCP — start with the task.',
     );
   }
   return lines.join('\n');
@@ -786,9 +794,10 @@ export function environmentPreamble(input: EnvironmentPreambleInput): string {
  * агент выбирал бы между двумя правилами сам.
  */
 export const GROUP_QUESTIONS_HUMAN_LINE =
-  'Развилки этой группы решает человек (так выбрано в настройках панели, и это главнее правила ' +
-  '«работай автономно»): любую развилку — даже с рекомендуемым вариантом — выноси вопросом ' +
-  'инструментом AskUserQuestion с вариантами и рекомендацией, жди ответа и продолжай с того же этапа.';
+  'The human decides the forks of this group (chosen in the panel settings, and this overrides the ' +
+  '"work autonomously" rule): take every fork — even one with a recommended option — to the human ' +
+  'as a question with the AskUserQuestion tool, with options and your recommendation, wait for the ' +
+  'answer and continue from the same stage.';
 
 /**
  * Находка, которая не воспроизвелась (аудит 25.09, L258): группа, получив
@@ -797,9 +806,9 @@ export const GROUP_QUESTIONS_HUMAN_LINE =
  * инфраструктура — решение человека: сперва объём и вопрос.
  */
 export const UNCONFIRMED_FINDING_LINE =
-  'Находка, которая у тебя не воспроизвелась, — не повод менять инфраструктуру: без новых ' +
-  'зависимостей, правок CI, tsconfig и тестовой обвязки. Сначала скажи, что не воспроизвелось и ' +
-  'сколько понадобится добавить, и спроси человека инструментом AskUserQuestion.';
+  'A finding you could not reproduce is no reason to change the infrastructure: no new ' +
+  'dependencies, no CI, tsconfig or test-harness edits. First say what did not reproduce and how ' +
+  'much would have to be added, and ask the human with the AskUserQuestion tool.';
 
 /**
  * Доставка группы до готового MR (настройка проекта `SplitSettings.deliver`).
@@ -820,43 +829,44 @@ export function deliveryPreamble(input: {
   questions?: 'plan' | 'human';
 }): string {
   return [
-    'Доставка до готового MR — обязанность этой группы: человек включил её на проекте, и это его ' +
-      'разрешение на коммит, пуш, создание и обновление MR и шаги в трекере по задачам группы. ' +
-      'Слияние и удаление веток по-прежнему запрещены; force-push — тоже, кроме одного случая ' +
-      'ниже, про свою ветку.',
-    'Проведи задачи группы по навыку доставки задач (проектный вариант, например ' +
-      '`<проект>-ticket-delivery`, главнее общего `ticket-delivery`; навыка нет — пройди те же этапы ' +
-      'сам): задачи трекера — в работу на себя, правка, проверки проекта, коммит, пуш, черновик MR, ' +
-      'ревью, живая проверка, сверка с дизайном, если к задаче приложен макет, исправление ' +
-      'найденного, описание MR — и снять черновик, когда всё чисто.',
-    'Все задачи группы — ОДНА ветка и ОДИН MR: ключи задач — в описании MR, из каждой задачи — ' +
-      'ссылка на MR.',
+    "Delivering a ready MR is this group's duty: the human enabled it on the project, and that is " +
+      'their permission to commit, push, create and update the MR and to move the tracker tasks of ' +
+      'this group. Merging and deleting branches stay forbidden; so does force-push, except for the ' +
+      'one case below about your own branch.',
+    "Take the group's tasks through the task delivery skill (a project variant, e.g. " +
+      '`<project>-ticket-delivery`, wins over the general `ticket-delivery`; no skill — go through ' +
+      "the same stages yourself): tracker tasks into work on yourself, the change, the project's " +
+      'checks, commit, push, draft MR, review, live check, design comparison if a mockup is attached ' +
+      'to the task, fixing what was found, the MR description — and take the draft off when all is clean.',
+    'All tasks of the group are ONE branch and ONE MR: task keys go into the MR description, and ' +
+      'each task links to the MR.',
     input.mergeRequest
-      ? `MR уже есть: ${input.mergeRequest}. Новый не создавай — пушь в его ветку и обнови описание.`
-      : `Ветку копии панель уже завела: ${input.branch}. Новую не заводи; требует соглашение ` +
-        'проекта другого имени — переименуй эту до первого пуша (`git branch -m`).',
+      ? `The MR already exists: ${input.mergeRequest}. Do not create a new one — push to its branch and update the description.`
+      : `The panel has already created the copy's branch: ${input.branch}. Do not create another; if ` +
+        'the project convention requires a different name, rename this one before the first push (`git branch -m`).',
     // Свежая основная до первого пуша (журнал 61b): основная уходит вперёд, пока
     // группы работают, и конфликт, найденный при слиянии, стоит человеку дороже.
-    'Перед первым пушем — `git fetch origin` и rebase ветки на свежую основную ветку удалённого; ' +
-      'конфликт внутри задач группы реши сам.',
+    'Before the first push — `git fetch origin` and rebase the branch onto the fresh main branch of ' +
+      "the remote; resolve a conflict within the group's tasks yourself.",
     // Отправленная и отставшая ветка (решение владельца, W3-3): ветка группы —
     // её собственная, и переписать её арендой не значит тронуть общую историю.
-    'Ветка уже отправлена и отстала от основной — тот же rebase, затем ' +
-      '`git push --force-with-lease origin <ветка группы>`: только свою ветку, никогда основную, ' +
-      'защищённую или ветку другой группы; конфликт при таком rebase — вопрос человеку с ' +
-      'рекомендуемым вариантом.',
+    'If the branch is already pushed and has fallen behind main — the same rebase, then ' +
+      '`git push --force-with-lease origin <group branch>`: only your own branch, never the main, ' +
+      "a protected branch or another group's branch; a conflict in such a rebase is a question to " +
+      'the human with a recommended option.',
     // Автономия по умолчанию (журнал 78, T24): группа стояла на развилке, для
     // которой сама назвала рекомендацию, пока человека не было у панели. Кто
     // решает развилки, выбирает человек во вкладке «Группы» (аудит 25.09, L40).
     input.questions === 'human'
       ? GROUP_QUESTIONS_HUMAN_LINE
-      : 'Развилку, для которой у тебя есть рекомендуемый вариант, решай сам: бери его и запиши в ' +
-        'описание MR как решение для ревью. Вопрос человеку инструментом AskUserQuestion — только ' +
-        'когда шаг необратим или выходит за задачи группы (задача чужая, нужна миграция БД, ' +
-        'рекомендовать нечего); получив ответ, продолжай с того же этапа.',
+      : 'Decide a fork for which you have a recommended option yourself: take it and record it in ' +
+        'the MR description as a decision for the review. A question to the human with the ' +
+        "AskUserQuestion tool — only when the step is irreversible or goes beyond the group's tasks " +
+        "(someone else's task, a DB migration is needed, nothing to recommend); once answered, " +
+        'continue from the same stage.',
     UNCONFIRMED_FINDING_LINE,
-    'Последней строкой ответа — ссылка на MR.',
-    'Звено плана этот раздел только учитывает в плане; выполняет его звено работы.',
+    'The last line of your answer is the MR link.',
+    'The plan stage only takes this section into account in the plan; the work stage carries it out.',
   ].join('\n');
 }
 
@@ -871,21 +881,23 @@ export function deliveryPreamble(input: {
  */
 export function splitTicketPreamble(): string {
   return [
-    'Дефект вне задач этой группы, замеченный по ходу работы, не чини и тикет в трекере не заводи — ' +
-      'опиши его в ответе блоком, панель покажет его человеку списком «Предложить тикет»:',
+    "A defect outside this group's tasks, noticed along the way: do not fix it and do not file a " +
+      'tracker ticket — describe it in your answer as a block, and the panel shows it to the human ' +
+      'in the "Suggested tickets" list:',
     `<${SPLIT_TICKET_TAG}>`,
-    'title: коротко, что сломано',
-    'where: файл со строкой, экран или маршрут',
-    'why: чем это плохо и как воспроизвести',
+    'title: briefly, what is broken',
+    'where: file with line, screen or route',
+    'why: why it is bad and how to reproduce it',
     `</${SPLIT_TICKET_TAG}>`,
-    'Один блок — один дефект. Дефекты своих задач чини сам, блоком их не описывай.',
-    'Шаг, который нужен для доставки, но тебе недоступен (зависимость между MR, доступ, ' +
-      'настройка чужого сервиса), не обходи прямыми запросами — опиши блоком, панель покажет его ' +
-      'человеку списком «Сделать человеку»:',
+    'One block — one defect. Fix defects of your own tasks yourself, do not describe them as a block. ' +
+      'Write the values of both blocks in the language of the task text: the human reads them.',
+    'A step needed for delivery that you cannot do (a dependency between MRs, access, the setup of ' +
+      "someone else's service): do not work around it with direct requests — describe it as a " +
+      'block, and the panel shows it to the human in the "For you to do" list:',
     `<${SPLIT_HUMAN_TAG}>`,
-    'action: что сделать',
-    'where: ссылка или место, где это делается',
-    'why: зачем и почему ты не можешь сам',
+    'action: what to do',
+    'where: a link or the place where it is done',
+    'why: why it is needed and why you cannot do it yourself',
     `</${SPLIT_HUMAN_TAG}>`,
   ].join('\n');
 }
@@ -901,19 +913,21 @@ export function splitTicketPreamble(): string {
  */
 export function chatDeliveryPrompt(input: { skill?: string; foreign?: boolean }): string {
   const skill = input.skill
-    ? `по навыку проекта \`${input.skill}\``
-    : 'по навыку доставки задач (проектный вариант, например `<проект>-ticket-delivery`, главнее ' +
-      'общего `ticket-delivery`; навыка нет — пройди те же этапы сам)';
-  const ask = input.foreign ? 'вопрос человеку' : 'вопрос человеку инструментом AskUserQuestion';
+    ? `with the project skill \`${input.skill}\``
+    : 'with the task delivery skill (a project variant, e.g. `<project>-ticket-delivery`, wins over ' +
+      'the general `ticket-delivery`; no skill — go through the same stages yourself)';
+  const ask = input.foreign
+    ? 'a question to the human'
+    : 'a question to the human with the AskUserQuestion tool';
   return (
-    'Доставка до MR на этом проекте включена человеком в панели. Если сообщение — задача на ' +
-    'изменение кода (тикет, баг, фича, правки с ревью) и работа готова, доведи её до готового ' +
-    `MR ${skill}: отдельная ветка, не основная; проверки проекта, коммит, пуш, черновик MR, ` +
-    'ревью, живая проверка, описание MR — и снять черновик, когда всё чисто; последней строкой ' +
-    'ответа — ссылка на MR. Включение — разрешение человека на коммит, пуш, создание и ' +
-    'обновление MR по этой задаче; слияние, удаление веток и force-push запрещены. Вопрос, ' +
-    'объяснение, ревью и исследование без правок MR не требуют. Остановка навыка (задача ' +
-    `чужая, нужна миграция БД, неясно, чего хотят) — ${ask}.`
+    'The human enabled delivery up to an MR on this project in the panel. If the message is a ' +
+    'code-change task (ticket, bug, feature, review fixes) and the work is ready, take it to a ' +
+    `ready MR ${skill}: a separate branch, not the main one; the project's checks, commit, push, ` +
+    'draft MR, review, live check, MR description — and take the draft off when all is clean; the ' +
+    "last line of the answer is the MR link. Enabling it is the human's permission to commit, " +
+    'push, create and update the MR for this task; merging, deleting branches and force-push are ' +
+    'forbidden. A question, an explanation, a review or research without edits needs no MR. A ' +
+    `stop of the skill (someone else's task, a DB migration is needed, unclear what is wanted) — ${ask}.`
   );
 }
 

@@ -5,6 +5,7 @@ import type { TaskSplitReviewDecision } from './task-split';
 import type { CodedFields, CodedList } from './server-messages';
 import type { SplitHumanStepView, SplitTicketView } from './split-tickets';
 import { blockLang, blockLangPattern } from './brand.ts';
+import { ANSWER_LANGUAGE_LINE } from './model-cascade.ts';
 
 /**
  * Передача работы в чистую сессию («автоклир») — формат канала и его разбор.
@@ -76,6 +77,13 @@ export const HANDOFF_GROUP_MAX_CHAIN = 3;
  * новая сессия читает файл-опору, а задание нужно ей как ориентир, не как текст.
  */
 export const HANDOFF_ROOT_TASK_MAX = 8_000;
+
+/**
+ * Заголовок исходного задания в продолжении. Экспортирован для названия чата:
+ * название — что делать дальше, а заголовок и всё после него — справка панели.
+ */
+export const HANDOFF_ROOT_TASK_LINE =
+  'The original task of the whole work — for orientation; do not redo what is already done by it:';
 
 const MAX_DONE = 400;
 const MAX_NEXT = 4_000;
@@ -161,19 +169,21 @@ export type HandoffVerdict =
  * — сначала вычистить и записать, и только потом предлагать очистку.
  */
 export const HANDOFF_SYSTEM_PROMPT =
-  'Контекст разговора дорожает с каждым ходом, поэтому работа идёт этапами, а каждый следующий — ' +
-  'в чистой сессии. Повод закрыть этап: задача закрыта и проверена; сделана заметная часть, а ' +
-  'впереди ещё много; окно контекста стало тяжёлым; скилл или инструкция просят /clear — эта ' +
-  'команда тебе недоступна, её заменяет блок ниже. Сначала приведи в порядок рабочие файлы ' +
-  `агента — из ${HANDOFF_DEFAULT_CHECKPOINT} убери закрытое и устаревшее, из TASKS.md — сделанное, ` +
-  'перенеся каждый пункт одной строкой в .agent/ARCHIVE.md; оставь только незакрытое, принятые ' +
-  'решения и пути к коду, после чего запиши туда актуальное состояние работы и КОНКРЕТНЫЙ ' +
-  `следующий шаг. Затем выведи РОВНО ОДИН блок кода с языком ${HANDOFF_BLOCK_LANG}, внутри — JSON ` +
-  'вида {"done":"что закрыто","next":"чем продолжить — конкретный следующий шаг, а не «продолжай»",' +
-  `"checkpoint":"${HANDOFF_DEFAULT_CHECKPOINT}","pruned":"что вычищено"}. Панель покажет человеку ` +
-  'карточку вместо этого блока и продолжит работу в чистой сессии сама, поэтому не пересказывай ' +
-  'JSON словами. Блока не выводи, пока файл-опора не обновлён в этом же прогоне, и не выводи его, ' +
-  'если ты ждёшь ответа человека.';
+  'The conversation context gets more expensive with every turn, so the work goes in stages, each ' +
+  'next one in a clean session. Reasons to close a stage: the task is closed and verified; a ' +
+  'notable part is done and much is still ahead; the context window has grown heavy; a skill or ' +
+  'an instruction asks for /clear — that command is not available to you, the block below ' +
+  "replaces it. First tidy up the agent's working files — remove what is closed and stale from " +
+  `${HANDOFF_DEFAULT_CHECKPOINT} and what is done from TASKS.md, moving each item as one line into ` +
+  '.agent/ARCHIVE.md; keep only what is open, the decisions taken and the code paths, then write ' +
+  'the current state of the work and a SPECIFIC next step there. Then output EXACTLY ONE code ' +
+  `block in the language ${HANDOFF_BLOCK_LANG} containing JSON of the form {"done":"what is ` +
+  'closed","next":"how to continue — a specific next step, not just continue",' +
+  `"checkpoint":"${HANDOFF_DEFAULT_CHECKPOINT}","pruned":"what was cleaned out"}. The panel shows ` +
+  'the human a card instead of this block and continues the work in a clean session itself, so do ' +
+  'not retell the JSON in words. Write the done, next and pruned values in the language the human ' +
+  'uses. Do not output the block until the checkpoint file has been updated in this same run, and ' +
+  "do not output it while you are waiting for the human's answer.";
 
 /**
  * Порог контекста «по умолчанию, когда включают»: панель не следит за размером
@@ -200,9 +210,17 @@ export function contextHandoffProposal(
 ): HandoffProposal {
   return {
     done: `Окно контекста выросло до ${Math.round(tokens / 1000)}k токенов`,
-    next: `Продолжай работу по ${checkpoint}: прочитай файл и делай следующий шаг из «в работе».`,
+    next: continueFromCheckpoint(checkpoint),
     checkpoint,
   };
+}
+
+/**
+ * Следующий шаг, собранный панелью, а не агентом: читать файл-опору. Модели —
+ * по-английски, как и всё, что панель ей шлёт (решение владельца D-E).
+ */
+export function continueFromCheckpoint(checkpoint: string): string {
+  return `Continue the work from ${checkpoint}: read the file and do the next step from "in progress".`;
 }
 
 /** Строка нужной длины или undefined: пустое поле лучше пустой строки. */
@@ -380,7 +398,7 @@ export function scanHandoffProse(source: string): HandoffProposal | undefined {
   const file = checkpoint ?? HANDOFF_DEFAULT_CHECKPOINT;
   return {
     done: 'Агент попросил перезапустить сессию',
-    next: `Продолжай работу по ${file}: прочитай файл и делай следующий шаг из «в работе».`,
+    next: continueFromCheckpoint(file),
     checkpoint: file,
   };
 }
@@ -413,32 +431,31 @@ export function buildHandoffPrompt(
   // повод искать следующий шаг.
   if (options.group && task) {
     return [
-      `Это новая сессия группы разделения: прошлый разговор закрыт, его контекста у тебя нет.`,
-      `Сначала прочитай ${proposal.checkpoint} — там состояние работы.`,
+      `This is a new session of a split group: the previous conversation is closed, you do not have its context.`,
+      `First read ${proposal.checkpoint} — the state of the work is there.`,
       '',
-      'Задание группы ниже — граница всей работы: правь только файлы её владения, задачи других групп не бери, коммит, пуш и MR — только если задание их называет.',
-      'Если задание группы уже выполнено и проверено — ничего не продолжай: ответь коротким итогом без блока продолжения.',
+      'The group task below is the boundary of all the work: edit only the files it owns, do not take tasks of other groups, commit, push and MR only if the task names them.',
+      'If the group task is already done and verified, continue nothing: answer with a short summary without a continuation block.',
       '',
-      'Предложение прошлой сессии — выполняй только в этих границах:',
+      "The previous session's proposal — carry it out only within these boundaries:",
       proposal.next,
       '',
-      'Задание группы:',
+      'Group task:',
       task.slice(0, HANDOFF_ROOT_TASK_MAX),
+      '',
+      ANSWER_LANGUAGE_LINE,
     ].join('\n');
   }
   const lines = [
-    `Это новая сессия: прошлый разговор закрыт, его контекста у тебя нет.`,
-    `Сначала прочитай ${proposal.checkpoint} — там состояние работы.`,
+    `This is a new session: the previous conversation is closed, you do not have its context.`,
+    `First read ${proposal.checkpoint} — the state of the work is there.`,
     '',
     proposal.next,
   ];
   if (task) {
-    lines.push(
-      '',
-      'Исходное задание всей работы — для ориентира, сделанное по нему не переделывай:',
-      task.slice(0, HANDOFF_ROOT_TASK_MAX),
-    );
+    lines.push('', HANDOFF_ROOT_TASK_LINE, task.slice(0, HANDOFF_ROOT_TASK_MAX));
   }
+  lines.push('', ANSWER_LANGUAGE_LINE);
   return lines.join('\n');
 }
 
@@ -458,7 +475,7 @@ export function restartHandoffProposal(
 ): HandoffProposal {
   return {
     done: options.foreign ? 'Разговор перезапущен по кнопке' : 'Сессия перезапущена по кнопке',
-    next: `Продолжай работу по ${checkpoint}: прочитай файл и делай следующий шаг из «в работе».`,
+    next: continueFromCheckpoint(checkpoint),
     checkpoint,
   };
 }
@@ -477,10 +494,10 @@ export function overflowHandoffProposal(
   return {
     done: 'Контекст прошлого разговора переполнен — он больше не принимал сообщений',
     next: options.splitParent
-      ? 'Работа этого разговора идёт в группах разделения, их состояние — в сводке выше. ' +
-        'Дождись слова человека: отвечай о группах по сводке и передавай им указания ' +
-        'блоком agentdeck:tell.'
-      : `Продолжай работу по ${checkpoint}: прочитай файл и делай следующий шаг из «в работе».`,
+      ? 'The work of this conversation goes on in split groups, their state is in the summary ' +
+        "above. Wait for the human's word: answer about the groups from the summary and pass " +
+        `instructions to them with an ${blockLang('tell')} block.`
+      : continueFromCheckpoint(checkpoint),
     checkpoint,
   };
 }
@@ -488,8 +505,8 @@ export function overflowHandoffProposal(
 /** Просьба по кнопке, когда файл-опора старше последней реплики человека. */
 export function restartRequestPrompt(checkpoint: string): string {
   return (
-    `Обнови ${checkpoint} актуальным состоянием работы и конкретным следующим шагом, затем ` +
-    `выведи блок ${HANDOFF_BLOCK_LANG} — панель перезапустит разговор сама. ` +
+    `Update ${checkpoint} with the current state of the work and a specific next step, then ` +
+    `output the ${HANDOFF_BLOCK_LANG} block — the panel restarts the conversation itself. ` +
     HANDOFF_SYSTEM_PROMPT
   );
 }
@@ -839,6 +856,11 @@ export interface SplitPlanView {
 /** Итог «Отменить план»: сколько прогонов остановлено и сколько групп закрыто. */
 export interface SplitPlanCancelled {
   stopped: number;
+  /**
+   * Сколько прогонов остановить НЕ удалось: процесс жив, а номер нечем проверить
+   * (F-145) — панель его не тронула, он доходит свой ход. Не входит в `stopped`.
+   */
+  unconfirmed: number;
   cancelled: number;
   /**
    * Разговоры групп отменённого плана. Вкладка гасит по ним свою очередь
@@ -852,6 +874,11 @@ export interface SplitPlanCancelled {
 export interface SplitGroupPaused {
   index: number;
   stopped: number;
+  /**
+   * Сколько прогонов остановить НЕ удалось: процесс жив, а номер нечем проверить
+   * (F-145) — панель его не тронула, он доходит свой ход. Не входит в `stopped`.
+   */
+  unconfirmed: number;
 }
 
 /** Итог «Продолжить» группы на паузе: `queued` — слово уйдёт после текущего хода. */
@@ -935,6 +962,11 @@ export interface ChatTreePaused {
   root: string;
   /** Прогонов остановлено ЭТИМ нажатием. */
   stopped: number;
+  /**
+   * Сколько прогонов остановить НЕ удалось: процесс жив, а номер нечем проверить
+   * (F-145) — панель его не тронула, он доходит свой ход. Не входит ни в `stopped`, ни в `chats`.
+   */
+  unconfirmed: number;
   /** Всего разговоров дерева, ждущих продолжения (с учётом прежней паузы). */
   chats: number;
   alreadyPaused: boolean;
@@ -957,7 +989,7 @@ export interface ChatTreeResumed {
  */
 export function buildTreeResumePrompt(): string {
   return [
-    'Прогон был остановлен панелью на паузу и сейчас продолжен в той же сессии.',
-    'Последний инструмент мог не выполниться — проверь состояние файлов и продолжай работу с того места, где остановился.',
+    'The panel paused this run and has now resumed it in the same session.',
+    'The last tool may not have run — check the state of the files and continue the work from where you stopped.',
   ].join(' ');
 }

@@ -37,7 +37,7 @@ export function parseTells(text: string): ChildTell[] {
 
 /** Как сообщение выглядит у ребёнка: откуда оно, чтобы не принять его за слово человека. */
 export function tellPrompt(text: string): string {
-  return `Сообщение от родительского разговора (передано панелью):\n\n${text}`;
+  return `Message from the parent conversation (passed on by the panel):\n\n${text}`;
 }
 
 /** Что панель запускает — тот же старт продолжения, что у push и повтора ревью (Д8, Д4). */

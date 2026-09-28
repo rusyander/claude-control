@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
@@ -10,6 +10,7 @@ import { useChatPrefs, MIN_SOUND_VOLUME, MAX_SOUND_VOLUME } from '@shared/lib/ch
 import { playNotification } from '@shared/lib/notify-sound';
 import { formatSpend } from '@shared/lib/format';
 import { isLive } from '@shared/lib/agent-runs';
+import { useAnchoredPanel } from '@shared/hooks/use-anchored-panel';
 import { worstTone } from '../lib/worstTone';
 import { AgentRow } from './AgentRow';
 import type { AgentsPanelProps } from './AgentsPanel.types';
@@ -31,6 +32,8 @@ export function AgentsPanel({
 }: AgentsPanelProps) {
   const { t } = useTranslation();
   const [isOpen, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const { panelRef, panelStyle } = useAnchoredPanel<HTMLDivElement>(isOpen);
   const { sound, setSound, soundVolume, setSoundVolume } = useChatPrefs();
 
   // Молчащий — тоже работает: процесс жив, просто событий давно не было.
@@ -38,15 +41,31 @@ export function AgentsPanel({
   const worst = worstTone(activeRuns);
 
   return (
-    <div className={styles.wrap}>
+    <div
+      className={styles.wrap}
+      onKeyDown={(event) => {
+        // Escape закрывает пульт и возвращает фокус на кнопку — как у соседних
+        // поповеров шапки; без возврата клавиатура оказывалась в начале страницы.
+        if (event.key === 'Escape' && isOpen) {
+          event.stopPropagation();
+          setOpen(false);
+          triggerRef.current?.focus();
+        }
+      }}
+    >
       <Button
+        ref={triggerRef}
         variant="ghost"
         size="sm"
         leftIcon={<Icon name="analytics" size={20} />}
         onClick={() => setOpen((value) => !value)}
         aria-expanded={isOpen}
+        aria-haspopup="dialog"
+        title={t('agents.title')}
       >
-        {t('agents.title')}
+        {/* data-bar-label: в узкой шапке чата подпись уходит, остаётся значок
+            (подпись при этом читает диктор — она скрыта визуально, не из дерева). */}
+        <span data-bar-label="">{t('agents.title')}</span>
         {activeRuns.length > 0 && (
           <Badge tone={worst}>{running > 0 ? running : activeRuns.length}</Badge>
         )}
@@ -55,7 +74,13 @@ export function AgentsPanel({
       {isOpen && (
         <>
           <div className={styles.backdrop} onClick={() => setOpen(false)} aria-hidden="true" />
-          <div className={styles.panel} role="dialog" aria-label={t('agents.title')}>
+          <div
+            ref={panelRef}
+            className={styles.panel}
+            style={panelStyle}
+            role="dialog"
+            aria-label={t('agents.title')}
+          >
             <Stack
               direction="row"
               align="center"

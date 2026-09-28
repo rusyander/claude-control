@@ -64,7 +64,7 @@ describe('доставка до MR: профиль проекта', () => {
     const withRemote = resolveProjectDelivery(source(), dir);
     expect(withRemote.view.profile.remote).toBe(true);
     expect(withRemote.active).toBe(true);
-    expect(chatDeliveryFor(source(), dir)).toContain('Доставка до MR');
+    expect(chatDeliveryFor(source(), dir)).toContain('delivery up to an MR');
   });
 
   it('не репозиторий — так и сказано, доставки нет', () => {

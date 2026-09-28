@@ -2,6 +2,7 @@ import type { Platform, PlatformSmokeTools } from '@agentdeck/contracts';
 import { looksLikeToolCall } from '@agentdeck/contracts/platform-tool-hint';
 import type { PlatformFetch } from './ca-fetch.ts';
 import { toolRouteOf } from './models.ts';
+import { effectivePlatformRules } from './rules-apply.ts';
 import { serverText } from '../../lib/server-texts.ts';
 
 /**
@@ -34,7 +35,7 @@ export interface SmokeToolsInput {
 /** `undefined` — спрашивать не о чем: прослойка включена или у контура свои инструменты. */
 export async function smokeTools(input: SmokeToolsInput): Promise<PlatformSmokeTools | undefined> {
   const { platform } = input;
-  if (platform.rules.platform.platformTools.length > 0) return undefined;
+  if (effectivePlatformRules(platform).platformTools.length > 0) return undefined;
   const route = toolRouteOf(platform);
   if (route === 'shim') return undefined;
   if (route === 'none') {
@@ -131,7 +132,7 @@ export function shimFromProbe(
 ): boolean {
   if (!tools || tools.ok) return false;
   if (platform.toolShim || platform.toolShimFromProbe) return false;
-  if (platform.rules.platform.platformTools.length > 0) return false;
+  if (effectivePlatformRules(platform).platformTools.length > 0) return false;
   return SHIM_REASONS.has(tools.reason ?? '');
 }
 

@@ -27,7 +27,7 @@
  *
  * Запуск: node tools/help-shots/watching-panel.mjs
  * Переменные: GUIDE_PANEL_PORT (5198), GUIDE_WEB_PORT (8908),
- *             GUIDE_ONLY — снять один сценарий (tour|trouble|find|report|live|
+ *             GUIDE_ONLY — снять сценарии через запятую (tour|trouble|find|report|live|
  *             trace|look|move).
  */
 import { spawn } from 'node:child_process';
@@ -138,7 +138,7 @@ try {
   const only = process.env.GUIDE_ONLY ?? '';
   try {
     for (const item of SCENARIOS) {
-      if (only && only !== item.only) continue;
+      if (only && !only.split(',').includes(item.only)) continue;
       const scenario = openScenario(item.topic, item.name);
       console.log(`\nсценарий ${item.topic}/${item.name}`);
       if (item.breaks) breakHook(fixture.root);

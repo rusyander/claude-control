@@ -23,14 +23,14 @@ function diffSnapshot(
   snapshot: Snapshot,
   base: DiffBase,
 ): { added: number; removed: number; lines: DiffLine[]; skipped: boolean; reason?: string } {
-  // Базы нет (первая известная версия) — сравнивать не с чем.
+  // Базы нет (самая свежая копия, а файла уже нет) — сравнивать не с чем.
   if (base.label === 'initial') {
     return { added: 0, removed: 0, lines: [], skipped: true, reason: 'initial' };
   }
 
   const snapshotText = readText(snapshot.path);
   const baseText = readText(base.basePath);
-  const { before, after } = orderVersions(snapshotText, baseText, base.label);
+  const { before, after } = orderVersions(snapshotText, baseText);
 
   if (isBinary(before) || isBinary(after)) {
     return { added: 0, removed: 0, lines: [], skipped: true, reason: 'binary' };

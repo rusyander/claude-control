@@ -11,6 +11,8 @@ export interface ChatHeaderProps {
   groupDeliver?: boolean;
   /** Есть ли что открывать/обновлять: id разговора или черновика. */
   chatId?: string;
+  /** Настоящий ключ разговора — для настроек чата в меню. */
+  sessionId?: string;
 
   activeRuns: ActiveRunView[];
   totalCost: number;

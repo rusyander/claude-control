@@ -57,4 +57,6 @@ export interface ChatRowProps {
   status?: RunStatus;
   /** Уровень вложенности в дереве: отступ и ветвь рисуются по нему. */
   depth?: number;
+  /** Непрочитанные критичные заметки детей разделения — только у главного чата. */
+  unreadEscalations?: number;
 }

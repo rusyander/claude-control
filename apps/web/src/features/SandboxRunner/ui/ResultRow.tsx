@@ -4,11 +4,13 @@ import { Typography } from '@shared/ui/typography';
 import { Badge } from '@shared/ui/badge';
 import { serverFieldText } from '@shared/config/i18n';
 import { toneOf } from '../lib/decisionTone';
+import { resultView } from '../model/resultView';
 import type { ResultRowProps } from './ResultRow.types';
 import styles from './SandboxModal.module.scss';
 
 export function ResultRow({ result, title }: ResultRowProps) {
   const { t } = useTranslation();
+  const { exitCode, outputs } = resultView(result);
 
   const className = {
     block: styles.resultBlock,
@@ -29,8 +31,15 @@ export function ResultRow({ result, title }: ResultRowProps) {
 
           <Stack direction="row" align="center" gap="var(--spacing-3xs)">
             <Badge tone={toneOf(result.decision)}>{t(`sandbox.decision.${result.decision}`)}</Badge>
+            {/* Код выхода — половина ответа хука для Claude Code (0 — пропустить,
+                2 — остановить), поэтому он стоит рядом с решением, а не в подробностях. */}
+            {exitCode !== undefined && (
+              <Typography variant="caption" color="subtle" as="span">
+                {t('sandbox.exitCode', { code: exitCode })}
+              </Typography>
+            )}
             <Typography variant="caption" color="subtle" as="span">
-              {result.durationMs} мс
+              {t('common.milliseconds', { ms: result.durationMs })}
             </Typography>
           </Stack>
         </Stack>
@@ -45,7 +54,27 @@ export function ResultRow({ result, title }: ResultRowProps) {
 
         {result.addedContext && <div className={styles.output}>{result.addedContext}</div>}
 
-        {result.stderr && <div className={styles.output}>{result.stderr}</div>}
+        {/* Вывод процесса как есть: именно его прочитает Claude Code. Длинный
+            свёрнут, чтобы один болтливый хук не выталкивал соседние прогоны. */}
+        {outputs.map((output) =>
+          output.collapsed ? (
+            <details key={output.stream} className={styles.outputDetails}>
+              <summary>
+                {t('sandbox.outputLines', { stream: output.stream, count: output.lines })}
+              </summary>
+              <pre className={styles.output} data-stream={output.stream}>
+                {output.text}
+              </pre>
+            </details>
+          ) : (
+            <div key={output.stream} className={styles.outputShort}>
+              <span className={styles.outputLabel}>{output.stream}</span>
+              <pre className={styles.output} data-stream={output.stream}>
+                {output.text}
+              </pre>
+            </div>
+          ),
+        )}
 
         {result.timedOut && (
           <Typography variant="caption" color="danger">

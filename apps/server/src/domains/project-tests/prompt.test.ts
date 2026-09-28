@@ -37,29 +37,29 @@ describe('project-tests/prompt', () => {
     for (const mode of ['generate', 'run', 'explore'] as const) {
       const prompt = buildPrompt([group], { projectPath: '/p', mode });
       expect(prompt).toContain('.agent/tests');
-      expect(prompt).toContain('не повод чинить');
-      expect(prompt).toContain('не коммить');
+      expect(prompt).toContain('not a reason to fix it');
+      expect(prompt).toContain('commit nothing');
     }
   });
 
   it('генерация требует приёмов тест-дизайна, а не счастливых путей', () => {
     const prompt = buildPrompt([group], { projectPath: '/p', mode: 'generate' });
 
-    expect(prompt).toContain('классы эквивалентности');
-    expect(prompt).toContain('границы');
-    expect(prompt).toContain('Негативные проверки'.toLowerCase());
-    expect(prompt).toContain('приоритет по риску');
+    expect(prompt).toContain('equivalence classes');
+    expect(prompt).toContain('boundaries');
+    expect(prompt).toContain('negative checks');
+    expect(prompt).toContain('priority by risk');
     expect(prompt).toContain('codePaths');
   });
 
   it('прогон велит писать результат после КАЖДОГО кейса и различать blocked/skipped', () => {
     const prompt = buildPrompt([group], { projectPath: '/p', mode: 'run' });
 
-    expect(prompt).toContain('после КАЖДОГО кейса');
+    expect(prompt).toContain('after EACH case');
     expect(prompt).toContain('blocked');
     expect(prompt).toContain('skipped');
     expect(prompt).toContain('Отправка сообщения');
-    expect(prompt).toContain('оракул');
+    expect(prompt).toContain('oracle:');
   });
 
   it('недостающую проверку прогон кладёт в черновик, а не в файл группы', () => {
@@ -70,10 +70,10 @@ describe('project-tests/prompt', () => {
     );
 
     // Библиотеку меняет человек через приёмку: прогон предлагает, не записывает.
-    expect(prompt).toContain('в файл группы её НЕ пиши');
+    expect(prompt).toContain('do NOT write it into the group file');
     expect(prompt).toContain('.agent/tests/drafts/run-7.draft.json');
     expect(prompt).toContain('"source":"run"');
-    expect(prompt).not.toContain('добавь новый кейс со `status: "unknown"`');
+    expect(prompt).not.toContain('add a new case with `status: "unknown"`');
 
     // Без имени файла (старый вызов) подсказка всё равно ведёт в папку черновиков.
     const bare = buildPrompt([group], { projectPath: '/p', mode: 'run' });
@@ -140,7 +140,7 @@ describe('project-tests/prompt', () => {
     );
 
     expect(prompt).toContain('STAND_LOGIN, STAND_PASSWORD');
-    expect(prompt).toContain('переменных окружения');
+    expect(prompt).toContain('environment variables');
     // Значений у задания нет физически: их знает только процесс прогона.
     expect(prompt).not.toContain('Пароль');
   });
@@ -148,10 +148,10 @@ describe('project-tests/prompt', () => {
   it('автоматизация пишет тесты в идиоме проекта и не заводит новый фреймворк', () => {
     const prompt = buildPrompt([group], { projectPath: '/p', mode: 'automate' });
 
-    expect(prompt).toContain('Новый фреймворк не заводи');
+    expect(prompt).toContain('Do not introduce a new framework');
     expect(prompt).toContain('automation');
     // Ровно здесь единственное исключение из «трогать только .agent/tests».
-    expect(prompt).toContain('ФАЙЛЫ ТЕСТОВ');
+    expect(prompt).toContain('TEST FILES');
   });
 
   it('автоматизация обязана оставить кейсу ключ, по которому сойдётся импорт из CI', () => {
@@ -161,14 +161,49 @@ describe('project-tests/prompt', () => {
     // в «нераспознанные», и автоматизация окажется работой впустую.
     expect(prompt).toContain('externalId');
     expect(prompt).toContain('[gui-001]');
-    expect(prompt).toContain('нераспознанные');
+    expect(prompt).toContain('unrecognised');
+  });
+
+  it('пустое пожелание при выбранной группе — тема группы, а не всё приложение в неё', () => {
+    // Кнопка в разделе всегда шлёт выбранную группу: «покрывай приложение целиком»
+    // сваливало весь проект в одну группу, какой бы узкой она ни была.
+    const scoped = buildPrompt([{ ...group, description: 'Отправка из поля ввода' }], {
+      projectPath: '/p',
+      mode: 'generate',
+      groupId: 'gui',
+    });
+    expect(scoped).toContain('No wishes — cover the topic of the group "GUI"');
+    expect(scoped).toContain('the group "GUI" (Отправка из поля ввода)');
+    expect(scoped).not.toContain('cover the whole application');
+
+    const whole = buildPrompt([group], { projectPath: '/p', mode: 'generate' });
+    expect(whole).toContain('cover the whole application');
   });
 
   it('исследование ограничено хартией и туры перечислены', () => {
     const prompt = buildPrompt([group], { projectPath: '/p', mode: 'explore', scope: 'вложения' });
 
-    expect(prompt).toContain('Хартия сессии: вложения');
-    expect(prompt).toContain('тур «плохой ввод»');
+    expect(prompt).toContain('Session charter: вложения');
+    expect(prompt).toContain('the "bad input" tour');
+  });
+
+  it('находка исследования записана так, чтобы её можно было воспроизвести и отличить', () => {
+    const prompt = buildPrompt([group], {
+      projectPath: '/p',
+      mode: 'explore',
+      scope: 'вложения',
+      groupId: 'gui',
+    });
+
+    // Без разбора провала находку не воспроизвести, без UTC история путает часы,
+    // а без source её не отличить от кейса, написанного человеком.
+    expect(prompt).toContain('`failure`');
+    expect(prompt).toContain('date -u +%FT%TZ');
+    expect(prompt).toContain('Do not fill in `lastRunId`');
+    expect(prompt).toContain('"source": "agent"');
+    expect(prompt).toContain('do not change the status of existing cases');
+    expect(prompt).toContain('only into the group "gui"');
+    expect(prompt).toContain('.agent/tests/attachments/');
   });
 
   it('задание предупреждает, что границы держит панель, а спрашивать некого', () => {
@@ -177,8 +212,8 @@ describe('project-tests/prompt', () => {
     // работы стоит ей целого хода и выглядит как поломка инструмента.
     for (const mode of ['generate', 'run', 'explore', 'automate'] as const) {
       const prompt = buildPrompt([group], { projectPath: '/p', mode });
-      expect(prompt).toContain('панель отклоняет');
-      expect(prompt).toContain('Спрашивать разрешение');
+      expect(prompt).toContain('the panel refuses');
+      expect(prompt).toContain('There is nobody to ask for');
       expect(prompt).toContain('note');
     }
   });
@@ -230,7 +265,7 @@ describe('project-tests/prompt: источник генерации', () => {
       'requirement',
     );
 
-    expect(prompt).toContain('ТРЕБОВАНИЕ QA-42');
+    expect(prompt).toContain('REQUIREMENT QA-42');
     expect(prompt).toContain('Ссылка живёт 15 минут.');
     expect(prompt).toContain('"type": "requirement"');
     expect(prompt).toContain('https://acme.atlassian.net/browse/QA-42');
@@ -247,7 +282,7 @@ describe('project-tests/prompt: источник генерации', () => {
       'diff',
     );
 
-    expect(prompt).toContain('ИЗМЕНЕНИЯ origin/main..HEAD');
+    expect(prompt).toContain('CHANGES origin/main..HEAD');
     expect(prompt).toContain('- src/Chat/Send.tsx');
     expect(prompt).toContain('codePaths');
   });
@@ -269,16 +304,43 @@ describe('project-tests/prompt: источник генерации', () => {
       'defect',
     );
 
-    expect(prompt).toContain('ПРОВАЛ кейса gui/gui-001');
+    expect(prompt).toContain('FAILURE of the case gui/gui-001');
     expect(prompt).toContain('сообщение пропало после перезагрузки');
-    expect(prompt).toContain('ОДИН регрессионный кейс');
-    expect(prompt).toContain('Исходный кейс не трогай');
-    expect(prompt).toContain('"регресс"');
+    expect(prompt).toContain('ONE regression case');
+    expect(prompt).toContain('Do not touch the original case');
+    // Метка регресса — на языке библиотеки: русский кейс получает «регресс»,
+    // иначе он не попадёт в планы и наборы, отобранные по этой метке.
+    expect(prompt).toContain('tags: ["регресс"]');
+  });
+
+  it('метка регресса: английская библиотека — regression, уже принятая метка библиотеки — она', () => {
+    const defect = (title: string) => ({
+      source: 'defect' as const,
+      defect: { groupId: 'gui', caseId: 'gui-001', title, steps: [], attachments: [] },
+    });
+    expect(build(defect('Send a message'), 'defect')).toContain('tags: ["regression"]');
+    const tagged: ProjectTestGroup = {
+      ...group,
+      cases: [
+        {
+          id: 'gui-009',
+          title: 'Старый регресс',
+          tags: ['regression'],
+          steps: [],
+        } as unknown as ProjectTestGroup['cases'][number],
+      ],
+    };
+    const prompt = buildPrompt(
+      [tagged],
+      { projectPath: '/p', mode: 'generate', source: 'defect' },
+      { shared: [], material: defect('Отправка сообщения') },
+    );
+    expect(prompt).toContain('tags: ["regression"]');
   });
 
   it('без материала задание остаётся обычной генерацией по коду', () => {
     const prompt = buildPrompt([group], { projectPath: '/p', mode: 'generate' });
-    expect(prompt).not.toContain('Источник —');
+    expect(prompt).not.toContain('Source —');
     expect(prompt).toContain('"source": "code"');
   });
 });

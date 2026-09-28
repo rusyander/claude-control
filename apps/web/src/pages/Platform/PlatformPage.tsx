@@ -133,7 +133,7 @@ export function PlatformPage() {
 
   /** Пустая вкладка говорит почему, а не показывает белый лист. */
   const emptyTab = (text: string): ReactNode => (
-    <Typography variant="body-sm" color="muted" style={{ maxWidth: 'var(--text-measure)' }}>
+    <Typography variant="body-sm" color="muted" className="prose">
       {text}
     </Typography>
   );
@@ -177,18 +177,14 @@ export function PlatformPage() {
             aria-labelledby={platformTabDomId(activeTab)}
           >
             {/* Подпись вкладки: полоса отвечает «где я», строка — «что здесь». */}
-            <Typography
-              variant="body-sm"
-              color="subtle"
-              style={{ maxWidth: 'var(--text-measure)' }}
-            >
+            <Typography variant="body-sm" color="subtle" className="prose">
               {t(`platform.tabHint.${activeTab}`)}
             </Typography>
 
             {/* Выбор контура — только у вкладок одного контура и только когда
                 выбирать есть из чего. */}
             {PER_CONTOUR_TABS.includes(activeTab) && selected && platforms.length > 1 && (
-              <div style={{ maxWidth: 'var(--text-measure)' }} data-contour-picker="">
+              <div className="prose" data-contour-picker="">
                 <SelectField
                   label={t('platform.contourPicker')}
                   value={selected.platform.id}

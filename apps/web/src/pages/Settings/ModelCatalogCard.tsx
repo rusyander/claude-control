@@ -100,7 +100,7 @@ export function ModelCatalogCard() {
             на всю карточку и читается хуже (ловится аудитом раскладки). */}
         {/* Пояснение зависит от источника: «панель спрашивает раз в сутки» —
             правда про models.dev и неправда про контур, куда она сама не ходит. */}
-        <Typography variant="body-sm" color="subtle" style={{ maxWidth: 'var(--text-measure)' }}>
+        <Typography variant="body-sm" color="subtle" className="prose">
           {t(catalog.source === 'platform' ? 'models.hintPlatform' : 'models.hint')}
         </Typography>
 

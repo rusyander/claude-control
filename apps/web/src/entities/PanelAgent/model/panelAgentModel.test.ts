@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { PanelPendingAction } from '@agentdeck/contracts/panel-agent';
 import { splitRunFrames } from '../api/runStream';
-import { buildPageContext, sectionLabelKey } from './pageContext';
+import { buildPageContext, contextProject, sectionLabelKey } from './pageContext';
 import {
   contourKeyAnchor,
+  dlpRuleAnchor,
   endpointTokenAnchor,
   envSecretAnchor,
   integrationSecretAnchor,
@@ -30,8 +31,52 @@ describe('pageNavigation', () => {
     });
   });
 
+  it('право списка: ?show= докручивает виртуальный список, якорь подсвечивает строку', () => {
+    expect(pageNavigation({ route: '/permissions', focus: 'allow:Read' })).toEqual({
+      to: '/permissions',
+      search: { show: 'allow:Read' },
+      anchor: 'allow:Read',
+    });
+    expect(pageNavigation({ route: '/permissions' })).toEqual({ to: '/permissions', search: {} });
+  });
+
+  it('тесты: проект из адреса доезжает до страницы вместе с вкладкой', () => {
+    expect(pageNavigation({ route: '/tests?project=C%3A%2Fwork%2Fapp', focus: 'library' })).toEqual(
+      { to: '/tests', search: { project: 'C:/work/app', tab: 'library' } },
+    );
+  });
+
+  it('режим композера из адреса чата уходит в composerMode, а не в search', () => {
+    expect(pageNavigation({ route: '/chat?mode=deck', focus: 'abc' })).toEqual({
+      to: '/chat',
+      search: { id: 'abc' },
+      composerMode: 'deck',
+    });
+    expect(pageNavigation({ route: '/chat?mode=image' })).toEqual({
+      to: '/chat',
+      search: {},
+      composerMode: 'image',
+    });
+    // Чужое значение не заказывает режим и не доезжает до адреса страницы.
+    expect(pageNavigation({ route: '/chat?mode=text', focus: 'abc' })).toEqual({
+      to: '/chat',
+      search: { id: 'abc' },
+    });
+  });
+
   it('переводит focus тестов и настроек во вкладку', () => {
     expect(pageNavigation({ route: '/tests', focus: 'report' }).search).toEqual({ tab: 'report' });
+    expect(pageNavigation({ route: '/settings', focus: 'integration:webhook' })).toEqual({
+      to: '/settings',
+      search: { tab: 'integrations' },
+      anchor: 'integration:webhook',
+    });
+    expect(isSecretAnchor('integration:webhook')).toBe(false);
+    // «Открой проект X» открывало список без выбора: страница проектов читает `?id=`.
+    expect(pageNavigation({ route: '/projects', focus: 'p-42' })).toEqual({
+      to: '/projects',
+      search: { id: 'p-42' },
+    });
     expect(pageNavigation({ route: '/settings?x=1', focus: 'prompts' }).search).toEqual({
       x: '1',
       tab: 'prompts',
@@ -103,12 +148,46 @@ describe('pageNavigation', () => {
   });
 
   it('прочие разделы: focus остаётся якорем, без focus якоря нет', () => {
-    expect(pageNavigation({ route: '/rules', focus: 'r1' })).toEqual({
-      to: '/rules',
+    expect(pageNavigation({ route: '/hooks', focus: 'h1' })).toEqual({
+      to: '/hooks',
       search: {},
-      anchor: 'r1',
+      anchor: 'h1',
     });
     expect(pageNavigation({ route: '/platform' })).toEqual({ to: '/platform', search: {} });
+  });
+
+  // Ревью 28.09 F-79/F-80: вкладка бралась из памяти, и строка на другой вкладке
+  // не находилась — подсветка молча не срабатывала.
+  it('правило и скрипт открываются на «Все»: там есть любой элемент списка', () => {
+    expect(pageNavigation({ route: '/rules', focus: 'r1' })).toEqual({
+      to: '/rules',
+      search: { tab: 'all' },
+      anchor: 'r1',
+    });
+    expect(pageNavigation({ route: '/scripts', focus: 'hooks/x.mjs' })).toEqual({
+      to: '/scripts',
+      search: { tab: 'all' },
+      anchor: 'hooks/x.mjs',
+    });
+    expect(pageNavigation({ route: '/rules' })).toEqual({ to: '/rules', search: {} });
+  });
+
+  it('правило DLP открывается на вкладке правил', () => {
+    expect(pageNavigation({ route: '/dlp', focus: dlpRuleAnchor('r1') })).toEqual({
+      to: '/dlp',
+      search: { tab: 'rules' },
+      anchor: 'dlp-rule:r1',
+    });
+    expect(pageNavigation({ route: '/dlp' })).toEqual({ to: '/dlp', search: {} });
+  });
+
+  it('группа: ?show= велит странице выбрать вкладку по области группы', () => {
+    expect(pageNavigation({ route: '/groups', focus: 'g-1' })).toEqual({
+      to: '/groups',
+      search: { show: 'g-1' },
+      anchor: 'g-1',
+    });
+    expect(pageNavigation({ route: '/groups' })).toEqual({ to: '/groups', search: {} });
   });
 });
 
@@ -154,5 +233,17 @@ describe('splitRunFrames', () => {
     const { events, rest } = splitRunFrames(buffer);
     expect(events).toEqual([{ kind: 'text', text: 'привет' }]);
     expect(rest).toBe('data: {"kind":"done","reply":"при');
+  });
+});
+
+describe('проект в контексте агента', () => {
+  it('на «Тестировании» — проект, выбранный в разделе, а не проект рабочей области', () => {
+    // «Что упало в последнем прогоне» на /tests уходило без проекта раздела, и
+    // агент отвечал про самый свежий прогон любого проекта.
+    expect(contextProject('/tests', 'C:/work/a', 'C:/work/b')).toBe('C:/work/b');
+    expect(contextProject('/tests/x', undefined, 'C:/work/b')).toBe('C:/work/b');
+    expect(contextProject('/tests', 'C:/work/a', undefined)).toBe('C:/work/a');
+    expect(contextProject('/rules', 'C:/work/a', 'C:/work/b')).toBe('C:/work/a');
+    expect(contextProject('/testsuite', 'C:/work/a', 'C:/work/b')).toBe('C:/work/a');
   });
 });

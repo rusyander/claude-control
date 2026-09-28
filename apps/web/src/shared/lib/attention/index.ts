@@ -1,10 +1,12 @@
-export { selectAttention, attentionTitle, callsForAttention } from './attention';
-export type { AttentionView, AttentionTone } from './attention';
 export {
-  dismissAttention,
-  getDismissed,
-  subscribeDismissed,
-  resetDismissed,
-} from './attentionStore';
-export { useAttention, useAttentionBadge } from './useAttention';
+  selectAttention,
+  attentionTitle,
+  attentionReasons,
+  callsForAttention,
+  isLookingAt,
+  quietRunIds,
+} from './attention';
+export type { AttentionView, AttentionTone, AttentionReason, AwaitingMark } from './attention';
+export { dismissAttention, getSeen, subscribeSeen, markSeen, resetSeen } from './attentionStore';
+export { useAttentionBadge } from './useAttention';
 export { applyFaviconBadge } from './favicon';

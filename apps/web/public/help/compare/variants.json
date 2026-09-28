@@ -1,0 +1,181 @@
+{
+  "topic": "compare",
+  "frames": {
+    "look/01-mcp": {
+      "light-ru": {
+        "file": "01-mcp.png",
+        "width": 1440,
+        "height": 1100
+      },
+      "light-en": {
+        "file": "01-mcp.en.png",
+        "width": 1440,
+        "height": 1100
+      },
+      "dark-ru": {
+        "file": "01-mcp.dark.png",
+        "width": 1440,
+        "height": 1100
+      },
+      "dark-en": {
+        "file": "01-mcp.dark.en.png",
+        "width": 1440,
+        "height": 1100
+      }
+    },
+    "look/02-env": {
+      "light-ru": {
+        "file": "02-env.png",
+        "width": 1440,
+        "height": 1100
+      },
+      "light-en": {
+        "file": "02-env.en.png",
+        "width": 1440,
+        "height": 1100
+      },
+      "dark-ru": {
+        "file": "02-env.dark.png",
+        "width": 1440,
+        "height": 1100
+      },
+      "dark-en": {
+        "file": "02-env.dark.en.png",
+        "width": 1440,
+        "height": 1100
+      }
+    },
+    "look/03-permissions": {
+      "light-ru": {
+        "file": "03-permissions.png",
+        "width": 1440,
+        "height": 1100
+      },
+      "light-en": {
+        "file": "03-permissions.en.png",
+        "width": 1440,
+        "height": 1100
+      },
+      "dark-ru": {
+        "file": "03-permissions.dark.png",
+        "width": 1440,
+        "height": 1100
+      },
+      "dark-en": {
+        "file": "03-permissions.dark.en.png",
+        "width": 1440,
+        "height": 1100
+      }
+    },
+    "look/04-instructions": {
+      "light-ru": {
+        "file": "04-instructions.png",
+        "width": 1440,
+        "height": 1100
+      },
+      "light-en": {
+        "file": "04-instructions.en.png",
+        "width": 1440,
+        "height": 1100
+      },
+      "dark-ru": {
+        "file": "04-instructions.dark.png",
+        "width": 1440,
+        "height": 1100
+      },
+      "dark-en": {
+        "file": "04-instructions.dark.en.png",
+        "width": 1440,
+        "height": 1100
+      }
+    },
+    "move/01-blocked": {
+      "light-ru": {
+        "file": "01-blocked.png",
+        "width": 1440,
+        "height": 1100
+      },
+      "light-en": {
+        "file": "01-blocked.en.png",
+        "width": 1440,
+        "height": 1100
+      },
+      "dark-ru": {
+        "file": "01-blocked.dark.png",
+        "width": 1440,
+        "height": 1100
+      },
+      "dark-en": {
+        "file": "01-blocked.dark.en.png",
+        "width": 1440,
+        "height": 1100
+      }
+    },
+    "move/02-selected": {
+      "light-ru": {
+        "file": "02-selected.png",
+        "width": 1440,
+        "height": 1100
+      },
+      "light-en": {
+        "file": "02-selected.en.png",
+        "width": 1440,
+        "height": 1100
+      },
+      "dark-ru": {
+        "file": "02-selected.dark.png",
+        "width": 1440,
+        "height": 1100
+      },
+      "dark-en": {
+        "file": "02-selected.dark.en.png",
+        "width": 1440,
+        "height": 1100
+      }
+    },
+    "move/03-preview": {
+      "light-ru": {
+        "file": "03-preview.png",
+        "width": 960,
+        "height": 800
+      },
+      "light-en": {
+        "file": "03-preview.en.png",
+        "width": 960,
+        "height": 800
+      },
+      "dark-ru": {
+        "file": "03-preview.dark.png",
+        "width": 960,
+        "height": 800
+      },
+      "dark-en": {
+        "file": "03-preview.dark.en.png",
+        "width": 960,
+        "height": 800
+      }
+    },
+    "move/04-applied": {
+      "light-ru": {
+        "file": "04-applied.png",
+        "width": 1440,
+        "height": 1100
+      },
+      "light-en": {
+        "file": "04-applied.en.png",
+        "width": 1440,
+        "height": 1100
+      },
+      "dark-ru": {
+        "file": "04-applied.dark.png",
+        "width": 1440,
+        "height": 1100
+      },
+      "dark-en": {
+        "file": "04-applied.dark.en.png",
+        "width": 1440,
+        "height": 1100
+      }
+    }
+  }
+}

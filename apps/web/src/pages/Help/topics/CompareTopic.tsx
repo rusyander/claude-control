@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
-import { HelpSection, Callout, OptionCards, FieldTable } from '../ui';
+import { COMPARE_TABS } from '@pages/ProviderCompare/model/tabs';
+import { HelpSection, Callout, OptionCards, FieldTable, PageTabsSection } from '../ui';
 import { CompareGuideSections } from './CompareGuideSections';
 import { CompareLimitsSections } from './CompareLimitsSections';
 
@@ -23,6 +24,12 @@ export function CompareTopic() {
       <Callout tone="info" title={tr('guideTitle')}>
         {tr('guideText')}
       </Callout>
+
+      <PageTabsSection
+        page="compare"
+        tabs={COMPARE_TABS}
+        labelOf={(id) => t(`providerCompare.section.${id}`)}
+      />
 
       <HelpSection title={common('whyTitle')}>
         <OptionCards

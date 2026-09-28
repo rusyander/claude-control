@@ -92,6 +92,37 @@
   }
 }
 
+/* Действия строки сессии: объём и кнопки — одной группой справа. */
+.sessionTail {
+  flex-shrink: 0;
+}
+
+.sessionActions {
+  flex-shrink: 0;
+}
+
+/* Невидимая копия «Остановить»: держит ширину, не фокусируется и не читается. */
+.stopSlot {
+  visibility: hidden;
+}
+
+/* Поля «где идёт»: подпись над значением, длинная команда переносится. */
+.sessionFields {
+  display: grid;
+  gap: var(--spacing-sm);
+  margin: 0;
+}
+
+.sessionField {
+  display: grid;
+  gap: var(--spacing-3xs);
+
+  dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .report {
     transition: none;
@@ -103,4 +134,13 @@
   border-left: 3px solid var(--color-info);
   padding-left: var(--spacing-sm);
   max-width: 78ch;
+}
+
+// Обёртка кнопок периода и выгрузки: только ради disabled на вкладке «live»,
+// своей рамки и отступов у неё нет.
+.headerControls {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
 }

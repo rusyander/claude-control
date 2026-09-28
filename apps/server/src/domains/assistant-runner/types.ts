@@ -1,11 +1,18 @@
 import type { spawn as nodeSpawn } from 'node:child_process';
 import type { AssistantRunReason, AssistantRunResult, ModelInfo } from '@agentdeck/contracts';
 import type { OpencodeServe } from '../opencode-serve.ts';
+import type { AgentImage } from '../../lib/agent-images.ts';
 
 /** Роль реплики в мультимодельном чате. */
 export interface AssistantMessage {
   role: 'user' | 'assistant';
   content: string;
+  /**
+   * Картинки реплики человека — в самом запросе, в форме каждого получателя
+   * (`lib/agent-images.ts`). Чужой CLI без входа для картинки получает их
+   * файлами и путями в тексте.
+   */
+  images?: readonly AgentImage[];
 }
 
 /**
@@ -66,6 +73,12 @@ export interface RunAssistantDeps {
    * и обычный порядок «CLI → ключ → отказ».
    */
   endpoint?: AssistantEndpoint;
+  /**
+   * Модель one-shot запуска CLI (алиас Claude или имя из каталога у чужого).
+   * Нужна служебным вызовам, которым хватает дешёвой ступени (опись групп,
+   * сводки ресурсов). Не задана — CLI идёт своей настройкой, как раньше.
+   */
+  model?: string;
 }
 
 /** Исход one-shot запуска CLI до превращения в результат ассистента. */

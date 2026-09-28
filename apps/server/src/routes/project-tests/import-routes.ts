@@ -1,7 +1,11 @@
 import type { FastifyInstance } from 'fastify';
 import type { ServerContext } from '../../context.ts';
 import { exportGroup, type ExportFormat } from '../../domains/project-tests/export-cases.ts';
-import { exportRun, type RunExportFormat } from '../../domains/project-tests/export-run.ts';
+import {
+  exportLanguage,
+  exportRun,
+  type RunExportFormat,
+} from '../../domains/project-tests/export-run.ts';
 import { importCases } from '../../domains/project-tests/import-cases.ts';
 import { importManualCases } from '../../domains/project-tests/import-manual-cases.ts';
 import { importResults } from '../../domains/project-tests/import-results.ts';
@@ -19,7 +23,7 @@ import { guard, requireRoot } from './shared.ts';
  * — вкладку открывают на любом каталоге, и в реестре панели его может не быть.
  * Параметр объявлен ради общей формы регистрации (`RouteRegistrar`).
  */
-export function registerProjectTestsImportRoutes(app: FastifyInstance, _ctx: ServerContext): void {
+export function registerProjectTestsImportRoutes(app: FastifyInstance, ctx: ServerContext): void {
   /**
    * Результаты прогона из CI → статусы кейсов. Отчёт приходит содержимым
    * (`content`) или путём внутри проекта (`file`); для Allure путь может
@@ -131,7 +135,8 @@ export function registerProjectTestsImportRoutes(app: FastifyInstance, _ctx: Ser
           .send({ message: 'Не указан прогон.', messageCode: 'run-unspecified' });
 
       return guard(reply, () => {
-        const file = exportRun(root, id, format);
+        // Отчёт уходит наружу на языке интерфейса того, кто его выгружает.
+        const file = exportRun(root, id, format, exportLanguage(ctx.store.getSettings().language));
         return reply
           .header('Content-Disposition', `attachment; filename="${file.filename}"`)
           .type(file.contentType)

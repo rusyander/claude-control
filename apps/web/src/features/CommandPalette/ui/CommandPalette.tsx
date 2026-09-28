@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { AnimatePresence, motion } from 'motion/react';
 import { DIALOG, FADE, DURATION, EASE, withReducedMotion } from '@shared/lib/motion';
 import { useReducedMotion } from '@shared/hooks/use-reduced-motion';
+import { useBesideDockDialog } from '@shared/hooks/use-beside-dock-dialog';
 import { useDebouncedValue } from '@shared/hooks/use-debounced-value';
 import { NAV_ITEMS } from '@shared/config/navigation';
 import { KIND_ICON } from '@shared/config/search-kind-icon';
@@ -122,21 +123,35 @@ export function CommandPalette({ isOpen, onOpenChange }: CommandPaletteProps) {
   const fade = withReducedMotion({ duration: DURATION.normal, ease: EASE }, isReduced);
   const dialog = withReducedMotion({ duration: DURATION.normal, ease: EASE }, isReduced);
 
+  // Открыто окно агента на широком экране — палитра встаёт слева от него, как
+  // модальные окна страницы, а не закрывает его затемнением (ревью Z5-13).
+  const { besideDock, onInteractOutside, onEscapeKeyDown } = useBesideDockDialog(isOpen);
+  const besideClass = besideDock ? styles.besideDock : undefined;
+  const overlayMotion = {
+    variants: FADE,
+    initial: 'hidden',
+    animate: 'visible',
+    exit: 'hidden',
+    transition: fade,
+  } as const;
+
   return (
-    <Root open={isOpen} onOpenChange={onOpenChange}>
+    <Root open={isOpen} onOpenChange={onOpenChange} modal={!besideDock}>
       <AnimatePresence>
         {isOpen && (
           <Portal forceMount>
-            <Overlay asChild forceMount>
+            {besideDock ? (
+              // Без режима модальности Radix затемнение не рисует — своё, слева от окна.
               <motion.div
-                className={styles.overlay}
-                variants={FADE}
-                initial="hidden"
-                animate="visible"
-                exit="hidden"
-                transition={fade}
+                className={[styles.overlay, besideClass].join(' ')}
+                aria-hidden="true"
+                {...overlayMotion}
               />
-            </Overlay>
+            ) : (
+              <Overlay asChild forceMount>
+                <motion.div className={styles.overlay} {...overlayMotion} />
+              </Overlay>
+            )}
 
             <Content
               asChild
@@ -145,6 +160,8 @@ export function CommandPalette({ isOpen, onOpenChange }: CommandPaletteProps) {
               // Описания у палитры нет — само поле объясняет назначение; явный
               // undefined снимает предупреждение Radix об отсутствии Description.
               aria-describedby={undefined}
+              onInteractOutside={onInteractOutside}
+              onEscapeKeyDown={onEscapeKeyDown}
               onOpenAutoFocus={(event) => {
                 // Фокус ведём на поле сами: по умолчанию Radix отдаёт его первому
                 // элементу, а нам нужно печатать сразу.
@@ -152,7 +169,7 @@ export function CommandPalette({ isOpen, onOpenChange }: CommandPaletteProps) {
               }}
             >
               <motion.div
-                className={styles.panel}
+                className={[styles.panel, besideClass].filter(Boolean).join(' ')}
                 variants={DIALOG}
                 initial="hidden"
                 animate="visible"

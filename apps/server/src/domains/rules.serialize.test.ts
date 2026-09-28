@@ -168,8 +168,8 @@ describe('rules parse/serialize', () => {
     });
   });
 
-  describe('выключенные правила в служебном разделе', () => {
-    it('выключенное правило пишется в служебный раздел и читается обратно', () => {
+  describe('выключенные правила (F1)', () => {
+    it('выключенное правило в файл не пишется вовсе — ни раздела, ни текста', () => {
       const rules = parseRules(
         ['## ПРАВИЛО: живое', '', 'Живой текст.'].join('\n'),
         'global',
@@ -177,12 +177,22 @@ describe('rules parse/serialize', () => {
       ).rules;
       const off = [{ ...rules[0]!, isEnabled: false }];
 
-      const out = serializeRules('# Шапка', off);
-      expect(out).toContain('## Отключённые правила (AgentDeck)');
-      expect(out).toContain('### живое');
+      expect(serializeRules('# Шапка', off)).toBe('# Шапка\n');
+    });
 
-      const restored = parseRules(out, 'global', store);
-      const revived = restored.rules.find((r) => r.title === 'живое');
+    it('прежний служебный раздел в файле человека по-прежнему читается выключенным', () => {
+      const legacy = [
+        '# Шапка',
+        '',
+        '## Отключённые правила (AgentDeck)',
+        '',
+        'Правила ниже выключены.',
+        '',
+        '### живое',
+        '',
+        'Живой текст.',
+      ].join('\n');
+      const revived = parseRules(legacy, 'global', store).rules.find((r) => r.title === 'живое');
       expect(revived?.isEnabled).toBe(false);
       expect(revived?.body).toBe('Живой текст.');
     });

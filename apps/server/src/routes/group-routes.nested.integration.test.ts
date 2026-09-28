@@ -93,6 +93,40 @@ describe('маршруты групп: вложенность, циклы и п�
     expect(store.disablingGroups('skill', 'skill-b')).toEqual([outer]);
   });
 
+  // Ревью 28.09 (F-38): участник без `scope` живёт там же, где группа. Обход
+  // смотрел только на поле участника — выключение проектной группы гасило
+  // глобального тёзку, а метки «погашено группой» у него не было видно.
+  it('проектная группа с участником без области не гасит глобального тёзку', async () => {
+    const project = mkdtempSync(join(tmpdir(), 'cc-group-nested-proj-'));
+    try {
+      const saved = store.saveGroup({
+        id: 'proj-g',
+        name: 'Проектная',
+        description: '',
+        color: 'accent',
+        icon: 'folder',
+        // skill-b выбран из общих явно — тумблер проектной группы его тоже не
+        // трогает: метки «погашено группой» от проектной группы не бывает.
+        members: [
+          { kind: 'skill', id: 'skill-a' },
+          { kind: 'skill', id: 'skill-b', scope: { kind: 'global' } },
+        ],
+        env: {},
+        projectPaths: [],
+        scope: { kind: 'project', path: project, provider: 'claude' },
+        isEnabled: true,
+        order: 0,
+      });
+      const res = await toggle(saved.id, false);
+      expect(res.statusCode).toBe(200);
+      expect(existsSync(skillPath('skill-a'))).toBe(true);
+      expect(store.isDisabled('skill', 'skill-a')).toBe(false);
+      expect(existsSync(skillPath('skill-b'))).toBe(true);
+    } finally {
+      rmSync(project, { recursive: true, force: true });
+    }
+  });
+
   it('включение родителя возвращает потомков вложенной группы', async () => {
     const inner = await createGroup('Вложенная', [{ kind: 'skill', id: 'skill-b' }]);
     const outer = await createGroup('Родитель', [{ kind: 'group', id: inner }]);

@@ -1,9 +1,10 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { killPidTree } from '../../lib/process-tree.ts';
 import { ChatRunRegistry, type BufferedEvent } from './ChatRunRegistry.ts';
 import {
   adoptableEntries,
@@ -42,11 +43,7 @@ afterEach(() => {
     for (const entry of new RunLedger(dir).read()) {
       const pid = entry.relay?.pid;
       if (pid === undefined || !isPidAlive(pid)) continue;
-      if (process.platform === 'win32') {
-        spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], { windowsHide: true });
-      } else {
-        process.kill(pid);
-      }
+      killPidTree(pid, { spawnedAt: Date.now() });
     }
   }
   for (const dir of dirs) {

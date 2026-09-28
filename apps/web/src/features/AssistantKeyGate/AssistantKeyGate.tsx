@@ -65,7 +65,7 @@ export function AssistantKeyGate() {
           ? t('assistantKey.unsupported', { provider: runner.providerName })
           : t('assistantKey.description', { provider: runner.providerName })
       }
-      size="sm"
+      size="md"
       footer={
         <>
           <Button variant="secondary" onClick={() => setDismissed(true)}>

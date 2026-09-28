@@ -38,7 +38,7 @@ export async function shootFirst(browser, web, scenario, home) {
     await sandbox(page, SANDBOX_ANSWER);
 
     // ── 01. Пустой раздел ────────────────────────────────────────────────────
-    await openSection(page, web, '/rules');
+    await openSection(page, web, '/rules?tab=all');
     await scenario.shot(page, '01-empty');
 
     // ── 02. Форма: простой текст ─────────────────────────────────────────────
@@ -116,7 +116,7 @@ export async function shootFirst(browser, web, scenario, home) {
     await closeModal(page);
 
     // ── 07. Проверка в песочнице ─────────────────────────────────────────────
-    await openSection(page, web, '/rules');
+    await openSection(page, web, '/rules?tab=all');
     await page
       .getByRole('button', { name: /^(Песочница|Sandbox): / })
       .first()

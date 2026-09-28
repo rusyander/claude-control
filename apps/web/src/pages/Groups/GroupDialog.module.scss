@@ -1,0 +1,21 @@
+/* «Когда» — одна строка, по которой чат выбирает группу; мера строки держит
+   длинное условие читаемым. */
+.when {
+  max-width: 72ch;
+}
+
+.whenLabel {
+  font-weight: 600;
+}
+
+.changed {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: 8px;
+  background: var(--color-warning-subtle);
+}
+
+.changedText {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}

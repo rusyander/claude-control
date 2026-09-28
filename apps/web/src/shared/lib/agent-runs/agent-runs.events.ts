@@ -4,6 +4,7 @@ import { callbacks, emit, pendingUsage, runs } from './agent-runs.state';
 import { rebuildStatuses } from './agent-runs.statuses';
 import type { AgentRun, ChatEvent, HandoffEvent } from './agent-runs.types';
 import { addUsage } from './agent-runs.usage';
+import { isOpenAsk } from '@shared/lib/chat-stream';
 
 /**
  * Применить одно событие потока к прогону. Обновления иммутабельны (новый объект
@@ -41,6 +42,19 @@ export function applyEvent(id: string, event: ChatEvent): void {
       ];
       // Вопрос человеку — повод для жёлтой точки, когда ход завершится.
       if (event.name === 'AskUserQuestion') next.askedQuestion = true;
+      break;
+    case 'autoPick':
+      // Вопрос закрыла автономия: строка «Автовыбор» на своём вызове, и
+      // «ждёт человека» — только если остался другой, не закрытый вопрос.
+      next.tools = run.tools.map((tool) =>
+        tool.id === event.toolUseId
+          ? {
+              ...tool,
+              autoPicks: event.picks.map(({ question, label }) => ({ question, label })),
+            }
+          : tool,
+      );
+      next.askedQuestion = next.tools.some(isOpenAsk);
       break;
     case 'limit':
       next.limitResetsAt = event.resetsAt;
@@ -174,7 +188,8 @@ export function applyEvent(id: string, event: ChatEvent): void {
     event.kind === 'branchGate' ||
     event.kind === 'permissionResolved' ||
     event.kind === 'usage' ||
-    (event.kind === 'tool' && event.name === 'AskUserQuestion');
+    (event.kind === 'tool' && event.name === 'AskUserQuestion') ||
+    event.kind === 'autoPick';
   if (shownInSnapshot) rebuildStatuses();
   emit();
   if (firePermission) callbacks.onPermissionRequest?.(next);

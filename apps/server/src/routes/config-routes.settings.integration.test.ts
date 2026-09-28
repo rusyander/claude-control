@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
-import { mkdtempSync, rmSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, rmSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { AppSettings } from '@agentdeck/contracts';
@@ -8,6 +8,7 @@ import { AppStore } from '../lib/app-store.ts';
 import { getStoredKey, setStoredKey } from '../lib/provider-keys.ts';
 import type { ServerContext } from '../context.ts';
 import { registerConfigRoutes } from './config-routes.ts';
+import { applyPromptGate, describePromptGate, gateScriptPath } from '../domains/prompt-gate.ts';
 
 /**
  * Серверная валидация настроек и импорта состояния. Тело этих маршрутов приходит
@@ -82,6 +83,25 @@ describe('config-routes: валидация настроек и импорта',
       expect((await getSettings()).theme).toBe('dark');
     });
 
+    it('смена языка сразу пересобирает свой гейт на промпте на новом языке', async () => {
+      // Сообщения гейта человек читает в CLI: без пересборки английский
+      // интерфейс оставлял бы на диске русский скрипт до следующего тумблера.
+      mkdirSync(join(root, 'hooks'), { recursive: true });
+      writeFileSync(join(root, 'settings.json'), '{}', 'utf8');
+      const gate = {
+        hooksDir: join(root, 'hooks'),
+        settingsPath: join(root, 'settings.json'),
+        appDataDir: join(root, 'agentdeck'),
+      };
+      store.updateSettings({ promptGate: { enabled: true, action: 'block' } });
+      applyPromptGate(store, gate, { enabled: true, action: 'block' });
+      expect(readFileSync(gateScriptPath(gate.hooksDir), 'utf8')).toContain('Гейт на промпте');
+
+      expect((await patch({ language: 'en' })).statusCode).toBe(200);
+      expect(readFileSync(gateScriptPath(gate.hooksDir), 'utf8')).toContain('Prompt gate');
+      expect(describePromptGate(store, gate).outdated).toBe(false);
+    });
+
     it('невалидное значение enum отклоняется 400 и не пишется', async () => {
       const res = await patch({ theme: 'неон' });
       expect(res.statusCode).toBe(400);
@@ -133,6 +153,42 @@ describe('config-routes: валидация настроек и импорта',
       const res = await importState(snapshot);
       expect(res.statusCode).toBe(200);
       expect(res.json<{ ok: boolean }>().ok).toBe(true);
+    });
+
+    // Ревью 28.09 (F-35, F-364) и решение владельца 27.09: разговоры, отпечаток
+    // парольной фразы и тексты выключенных правил — этой машины; снимок с другой
+    // их не стирает (правила только дополняет недостающими).
+    it('здешнее остаётся здешним: разговоры, verifier, выключенные правила', async () => {
+      const rule = (title: string, body: string) => ({
+        title,
+        body,
+        after: null,
+        before: null,
+        index: 0,
+      });
+      const state = store.getState();
+      state.chatGroupSettings = { 'chat-local': { autonomous: true } } as never;
+      state.chatKeyAliases = { 'new-1': 'session-local' };
+      state.chatEscalations = { 'chat-local': [] } as never;
+      state.secretBackupVerifier = 'local-verifier';
+      state.disabledRules = [rule('Local', 'only here')];
+
+      const res = await importState({
+        groups: [],
+        disabledRules: [rule('local ', 'foreign twin'), rule('Foreign', 'brought')],
+        settings: { theme: 'dark' },
+      });
+      expect(res.statusCode).toBe(200);
+      const after = store.getState();
+      expect(after.chatGroupSettings).toEqual({ 'chat-local': { autonomous: true } });
+      expect(after.chatKeyAliases).toEqual({ 'new-1': 'session-local' });
+      expect(after.chatEscalations).toEqual({ 'chat-local': [] });
+      expect(after.secretBackupVerifier).toBe('local-verifier');
+      expect(after.disabledRules?.map((item) => [item.title, item.body])).toEqual([
+        ['Local', 'only here'],
+        ['Foreign', 'brought'],
+      ]);
+      expect(after.settings.theme).toBe('dark');
     });
 
     it('валидный частичный снимок применяется', async () => {
@@ -246,7 +302,7 @@ describe('config-routes: валидация настроек и импорта',
       await patch({ platformGateway: { enabled: true, port: 5200, forceStream: true } });
 
       expect((await getSettings()).endpointProfiles[0]?.baseUrl).toBe(
-        'http://127.0.0.1:5200/company-dev/v1',
+        'http://127.0.0.1:5200/company-dev/_s/assistant/v1',
       );
     });
 

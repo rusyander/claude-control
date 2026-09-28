@@ -55,6 +55,7 @@ export const platformRu: Record<PlatformMessageCode, string> = {
   'oauth-network-only': 'OAuth доступен только у сетевых серверов (http/sse)',
   'oauth-session-missing': 'Сессия авторизации не найдена или истекла',
   'assistant-timeout': 'Помощник не ответил за отведённое время',
+  'assistant-request-invalid': 'Запрос помощнику не принят: {{detail}}',
   'assistant-empty-reply': 'Модель вернула пустой ответ.',
   'manifest-invalid-object': 'Запрос не принят: переопределения — объект полей ({{field}}).',
   'manifest-invalid-client-tools':

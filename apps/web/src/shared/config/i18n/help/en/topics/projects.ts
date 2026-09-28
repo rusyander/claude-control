@@ -88,13 +88,23 @@ export const projectsEn: typeof projectsRu = {
         'Drives and directories are read by the panel’s server, not by the browser: any ' +
         'folder on the machine is reachable, even one where Claude Code has never run. ' +
         '«Open this folder» takes the current directory — C:/work in the frame.',
-      sRules: 'Project rules: its whole instructions file',
+      sRules: 'Project instructions: the whole file, as a document',
       sRulesText:
-        'On top, the line about the layout of names: which file the CLI itself reads — ' +
-        'CLAUDE.md or AGENTS.md — and which lies beside it unread. Below, one text field, ' +
-        'a character counter (307 in the frame) and a reminder that changes apply after ' +
-        'Claude Code restarts. The project level has no separate rules, toggles or ' +
-        'groups: the file is edited as a whole.',
+        'The Instructions tab opens as a document to read: the file’s headings and lists ' +
+        'are rendered, and above it sit the «edited here» mark and the file path. Beside ' +
+        'it, a card about the layout of names: which file the CLI itself reads — ' +
+        'CLAUDE.md or AGENTS.md — and which lies beside it unread. «Edit» opens the same ' +
+        'file in a highlighting editor; «Save» and «Revert changes» stay above the text ' +
+        'while you scroll, and Ctrl+S saves too. Under the document — a character counter ' +
+        '(307 in the frame) and a reminder that changes apply after Claude Code restarts. ' +
+        'The project level has no separate rules, toggles or groups: the file is edited ' +
+        'as a whole. While you have not edited anything, the document picks up new text ' +
+        'written to disk past the panel by itself. If the file changed while you were ' +
+        'editing (an agent may have written it), «<file> changed outside the panel…» ' +
+        'appears above the document: «Save» replaces that text with yours, «Revert ' +
+        'changes» shows the new one. Each project keeps its own unsaved edit — moving to ' +
+        'another project does not throw it away. Images in the file are shown as links: ' +
+        'the panel does not request a foreign address by itself.',
       sMcp: 'The project’s MCP servers',
       sMcpText:
         'Read from the .mcp.json in the repository root. The forms are the same as on ' +
@@ -108,7 +118,7 @@ export const projectsEn: typeof projectsRu = {
       sForeignText:
         'The registry is shared, and the tabs are named after the active CLI’s files: ' +
         'for Codex that is AGENTS.md and .codex/config.toml. The banner says plainly ' +
-        'that foreign CLIs are experimental, and the line under the editor names which ' +
+        'that foreign CLIs are experimental, and the line under the document names which ' +
         'CLI has to be restarted.',
 
       localTitle: 'Path two: the repository already has its own .claude',
@@ -145,6 +155,11 @@ export const projectsEn: typeof projectsRu = {
     },
 
     storageRegistry: 'The project registry',
+    storageDir: '<project>/',
+    storageRulesValue: '<project>/CLAUDE.md · <project>/AGENTS.md',
+    storageMcpValue: '<project>/.mcp.json',
+    storagePermsValue: '<project>/.claude/settings.json · settings.local.json',
+    storageBackupValue: '~/.claude/agentdeck/backups/project-<id>-<file>',
     storageRules: 'Rules',
     storageMcp: 'MCP servers',
     storagePerms: 'Permissions',
@@ -186,7 +201,7 @@ export const projectsEn: typeof projectsRu = {
       'one directory. The settings apply when the agent works in it or in a folder below it',
     limitTabs: 'Tabs under Claude',
     limitTabsValue:
-      'four: Rules, MCP servers, Permissions, From the project. Another CLI gets only ' +
+      'four: Instructions, MCP servers, Permissions, From the project. Another CLI gets only ' +
       'the ones it supports; none of them has «From the project»',
     limitReadOnly: 'Read-only',
     limitReadOnlyValue:
@@ -256,8 +271,9 @@ export const projectsEn: typeof projectsRu = {
     undoCaption: 'One case per line — undo is looked up after the fact, not before.',
     undoEdit: 'An edit to a project file',
     undoEditText:
-      '«Discard changes» returns the field to what is on disk, as long as you have not ' +
-      'saved. After a save — the backup in «Change history», or a git checkout of that ' +
+      '«Revert changes» returns the text to what is on disk, as long as you have not ' +
+      'saved; an unsaved edit shows from the other tabs too, as «unsaved» on ' +
+      'Instructions. After a save — the backup in «Change history», or a git checkout of that ' +
       'file: it is an ordinary repository file after all.',
     undoRemove: 'A project dropped from the list',
     undoRemoveText:
@@ -280,7 +296,7 @@ export const projectsEn: typeof projectsRu = {
       '02-picker':
         'The server’s folder browser: drives, the C:/work directories and «Open this folder» at the bottom',
       '03-rules':
-        'The project’s whole CLAUDE.md: 307 characters, «Discard changes» and the restart reminder',
+        'The project’s CLAUDE.md as a document: «edited here», the path, «Edit», 307 characters and the restart',
       '04-mcp':
         'The project’s MCP servers from its .mcp.json: stdio catalog-mock and http design-mocks',
       '05-permissions':

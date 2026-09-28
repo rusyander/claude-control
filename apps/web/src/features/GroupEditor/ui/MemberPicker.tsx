@@ -4,17 +4,14 @@ import type { GroupMember, GroupMemberKind } from '@agentdeck/contracts';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
-import { Icon } from '@shared/ui/icon';
 import { SearchField } from '@shared/ui/search-field';
 import { Badge } from '@shared/ui/badge';
-import { ruleApi } from '@entities/Rule';
-import { skillApi } from '@entities/Skill';
-import { hookApi } from '@entities/Hook';
-import { mcpServerApi } from '@entities/McpServer';
-import { permissionApi } from '@entities/Permission';
-import { useGroups } from '@entities/Group';
-import type { MemberPickerProps, PickerItem } from './MemberPicker.types';
+import { memberLivesIn, pickedMember, useGroupMembers } from '@entities/Group';
+import { hookLabel } from '../model/memberCatalog';
+import { useMemberCatalog } from '../model/useMemberCatalog';
+import type { MemberPickerProps } from './MemberPicker.types';
 import { KIND_FILTERS } from './MemberPicker.constants';
+import { MemberOrderList } from './MemberOrderList';
 import styles from './GroupFormModal.module.scss';
 
 /**
@@ -23,46 +20,28 @@ import styles from './GroupFormModal.module.scss';
  * одном месте с фильтром по типу.
  *
  * Порядок участников значим (задаёт порядок обхода), поэтому под списком выбора
- * идёт упорядоченный список выбранного со стрелками ↑/↓ — там его и меняют.
+ * идёт упорядоченный список выбранного: словами, со стрелками ↑/↓ и «+» между
+ * строками — отмеченный после «+» участник встаёт на это место, а не в конец.
  */
-export function MemberPicker({ value, onChange, excludeGroupId }: MemberPickerProps) {
+function insertMember(
+  value: GroupMember[],
+  ref: GroupMember,
+  at: number | undefined,
+): GroupMember[] {
+  if (at === undefined || at >= value.length) return [...value, ref];
+  return [...value.slice(0, at), ref, ...value.slice(at)];
+}
+
+export function MemberPicker({ value, onChange, excludeGroupId, groupScope }: MemberPickerProps) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const [kindFilter, setKindFilter] = useState<GroupMemberKind | 'all'>('all');
+  const [insertAt, setInsertAt] = useState<number | undefined>(undefined);
+  // Описания словами есть только у сохранённой группы; у новой — имена из списков.
+  const described = useGroupMembers(excludeGroupId ?? '', Boolean(excludeGroupId)).data;
 
-  const rules = ruleApi.useList().data ?? [];
-  const skills = skillApi.useList().data ?? [];
-  const hooks = hookApi.useList().data ?? [];
-  const servers = mcpServerApi.useList().data ?? [];
-  const permissions = permissionApi.useList().data ?? [];
-  const { data: groups = [] } = useGroups();
-
-  const hookLabel = (item: { event: string; matcher?: string }): string =>
-    `${item.event}${item.matcher ? ` · ${item.matcher}` : ''}`;
-
-  const items: PickerItem[] = [
-    ...rules.map((item) => ({ kind: 'rule' as const, id: item.id, label: item.title })),
-    ...skills.map((item) => ({ kind: 'skill' as const, id: item.id, label: item.name })),
-    // Хук из settings.local.json в группу не берём: панель в этот файл не пишет,
-    // выключить его группой нечем — участник выглядел бы погашенным, продолжая
-    // срабатывать. Уже добавленные такие участники остаются в составе, но при
-    // переключении группы честно пропускаются (см. POST /groups/:id/enabled).
-    ...hooks
-      .filter((item) => item.source !== 'settings-local')
-      .map((item) => ({ kind: 'hook' as const, id: item.id, label: hookLabel(item) })),
-    ...servers.map((item) => ({ kind: 'mcp' as const, id: item.id, label: item.name })),
-    // Право — пятый вид участника: группа снимает его из settings.json и
-    // возвращает, как и остальных. Подпись — решение и шаблон, id здесь нечитаем.
-    ...permissions.map((item) => ({
-      kind: 'permission' as const,
-      id: item.id,
-      label: `${item.decision} · ${item.pattern}`,
-    })),
-    // Себя в участники добавить нельзя — исключаем правящуюся группу из списка.
-    ...groups
-      .filter((item) => item.id !== excludeGroupId)
-      .map((item) => ({ kind: 'group' as const, id: item.id, label: item.name })),
-  ];
+  // Каталог общий с помощником формы: он предлагает ровно то, что можно отметить здесь.
+  const { items, skills, hooks, groups } = useMemberCatalog(excludeGroupId);
 
   // Подписи упорядоченного списка — по ВСЕМ сущностям, а не только по тем, что
   // предлагает выбор: локальный хук в выбор не попадает, но, будучи уже в
@@ -72,6 +51,16 @@ export function MemberPicker({ value, onChange, excludeGroupId }: MemberPickerPr
   const labelOf = (member: GroupMember): string =>
     labelByKey.get(`${member.kind}:${member.id}`) ?? member.id;
 
+  // Строка из самого файла участника — пока модель не описала его словами.
+  const rawLineOf = (member: GroupMember): string => {
+    if (member.kind === 'skill')
+      return skills.find((item) => item.id === member.id)?.description ?? '';
+    if (member.kind === 'hook') return hooks.find((item) => item.id === member.id)?.command ?? '';
+    if (member.kind === 'group')
+      return groups.find((item) => item.id === member.id)?.description ?? '';
+    return '';
+  };
+
   const needle = query.trim().toLowerCase();
   const filtered = items.filter((item) => {
     const matchesKind = kindFilter === 'all' || item.kind === kindFilter;
@@ -79,15 +68,23 @@ export function MemberPicker({ value, onChange, excludeGroupId }: MemberPickerPr
     return matchesKind && matchesQuery;
   });
 
+  // Списки здесь — общие: проектный тёзка того же id выбранным не считается.
+  const isRef = (member: GroupMember, ref: { kind: GroupMemberKind; id: string }): boolean =>
+    member.kind === ref.kind &&
+    member.id === ref.id &&
+    memberLivesIn(groupScope, member) === 'global';
   const isSelected = (ref: { kind: GroupMemberKind; id: string }): boolean =>
-    value.some((member) => member.kind === ref.kind && member.id === ref.id);
+    value.some((member) => isRef(member, ref));
 
   const toggle = (ref: GroupMember): void => {
     onChange(
       isSelected(ref)
-        ? value.filter((member) => !(member.kind === ref.kind && member.id === ref.id))
-        : [...value, ref],
+        ? value.filter((member) => !isRef(member, ref))
+        : insertMember(value, pickedMember(groupScope, ref.kind, ref.id, 'global'), insertAt),
     );
+    // Место вставки — номер позиции: после любого изменения списка он указывал бы
+    // на другого соседа, и следующий выбор встал бы не туда, куда метили.
+    setInsertAt(undefined);
   };
 
   const move = (index: number, delta: number): void => {
@@ -100,10 +97,12 @@ export function MemberPicker({ value, onChange, excludeGroupId }: MemberPickerPr
     next[index] = neighbour;
     next[target] = current;
     onChange(next);
+    setInsertAt(undefined);
   };
 
   const removeAt = (index: number): void => {
     onChange(value.filter((_, position) => position !== index));
+    setInsertAt(undefined);
   };
 
   return (
@@ -123,7 +122,7 @@ export function MemberPicker({ value, onChange, excludeGroupId }: MemberPickerPr
               variant={kindFilter === kind ? 'primary' : 'ghost'}
               onClick={() => setKindFilter(kind)}
             >
-              {kind === 'all' ? t('common.total') : t(`groups.kind_${kind}`)}
+              {t(`groups.kind_${kind}`)}
             </Button>
           ))}
         </Stack>
@@ -156,61 +155,16 @@ export function MemberPicker({ value, onChange, excludeGroupId }: MemberPickerPr
           <Typography variant="caption" color="subtle">
             {t('groups.orderTitle')}
           </Typography>
-          <Stack className={styles.orderList}>
-            {value.map((member, index) => (
-              <Stack
-                key={`${member.kind}:${member.id}`}
-                direction="row"
-                align="center"
-                justify="between"
-                gap="var(--spacing-xs)"
-                className={styles.orderRow}
-              >
-                <Stack
-                  direction="row"
-                  align="center"
-                  gap="var(--spacing-xs)"
-                  className={styles.orderLabel}
-                >
-                  <Typography variant="caption" color="subtle" as="span">
-                    {index + 1}
-                  </Typography>
-                  <Badge tone="neutral">{t(`groups.kind_${member.kind}`)}</Badge>
-                  <Typography variant="body-sm" as="span" truncate>
-                    {labelOf(member)}
-                  </Typography>
-                </Stack>
-                <Stack direction="row" gap="var(--spacing-2xs)" flexShrink={0}>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    iconOnly
-                    icon={<Icon name="chevronUp" size={20} />}
-                    disabled={index === 0}
-                    onClick={() => move(index, -1)}
-                    aria-label={t('groups.moveUp')}
-                  />
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    iconOnly
-                    icon={<Icon name="chevronDown" size={20} />}
-                    disabled={index === value.length - 1}
-                    onClick={() => move(index, 1)}
-                    aria-label={t('groups.moveDown')}
-                  />
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    iconOnly
-                    icon={<Icon name="close" size={20} />}
-                    onClick={() => removeAt(index)}
-                    aria-label={t('groups.removeMember')}
-                  />
-                </Stack>
-              </Stack>
-            ))}
-          </Stack>
+          <MemberOrderList
+            value={value}
+            labelOf={labelOf}
+            rawLineOf={rawLineOf}
+            described={described}
+            insertAt={insertAt}
+            onInsertAt={setInsertAt}
+            onMove={move}
+            onRemove={removeAt}
+          />
         </Stack>
       )}
 

@@ -4,8 +4,10 @@ import { writeJsonFile } from '../../lib/safe-io.ts';
 import type { ChatRunRegistry } from './ChatRunRegistry.ts';
 import {
   PermissionBroker,
+  type PendingPermissionInfo,
   type PermissionRequest,
   type ChatPermissionReply,
+  type PermissionDecideOutcome,
 } from './ChatPermissions.ts';
 
 /**
@@ -144,6 +146,12 @@ export class ChatSession {
     this.saved = this.togglesPath ? readToggles(this.togglesPath) : new Map();
     this.overridesPath = appDataDir ? join(appDataDir, AUTO_MODE_FILE) : undefined;
     this.overrides = this.overridesPath ? readOverrides(this.overridesPath) : new Map();
+    // Результат вызова от CLI при висящем запросе прав = CLI этот запрос оборвал:
+    // снимаем его как истёкший, иначе карточка висела бы, а ответ на неё ничего
+    // не запускал (`PermissionBroker.expire`).
+    registry.setToolResultListener((_runKey, toolUseId) => {
+      this.permissions.expire(toolUseId);
+    });
   }
 
   /**
@@ -332,13 +340,51 @@ export class ChatSession {
     return this.branchGateSettled.has(this.registry.resolveKey(chatId));
   }
 
-  /** Запросить решение пользователя; ждёт клика в интерфейсе. */
+  /**
+   * Запросить решение пользователя; ждёт клика в интерфейсе.
+   *
+   * Брокер хранит запрос только под ключом реестра (F-103): мост прав читает
+   * ключ хода из файла, и неудавшаяся запись оставляет ему прошлый — `sessionId`
+   * разговора. Ответ, остановка и сводка телефона ищут запрос по ключу прогона,
+   * и запрос под синонимом не снимал бы никто.
+   */
   requestPermission(request: PermissionRequest): Promise<ChatPermissionReply> {
-    return this.permissions.request(request);
+    return this.permissions.request({
+      ...request,
+      runId: this.registry.resolveKey(request.runId),
+    });
+  }
+
+  /** Висящие запросы прав всех разговоров — для сводки ожиданий телефона. */
+  pendingPermissions(): PendingPermissionInfo[] {
+    return this.permissions.list();
   }
 
   /** Ответить на запрос (клик пользователя). false — если запрос уже снят. */
   decidePermission(runId: string, toolUseId: string, reply: ChatPermissionReply): boolean {
-    return this.permissions.decide(this.registry.resolveKey(runId), toolUseId, reply);
+    const outcome = this.answerPermission(runId, toolUseId, reply);
+    return outcome === 'ok' || outcome === 'held';
+  }
+
+  /**
+   * Ответить и узнать исход: принят, запрос умер (CLI его оборвал, срок вышел)
+   * или его нет. Маршрут отвечает человеку по-разному — «истекло» нельзя
+   * выдавать за «принято».
+   */
+  answerPermission(
+    runId: string,
+    toolUseId: string,
+    reply: ChatPermissionReply,
+  ): PermissionDecideOutcome {
+    // Разговор жив, а запроса нет — панель только что поднялась, и мост прав
+    // повторит вопрос: ответ ждёт его (`AnswerOptions.hold`), а не пропадает.
+    return this.permissions.answer(this.registry.resolveKey(runId), toolUseId, reply, {
+      hold: this.registry.isRunning(runId),
+    });
+  }
+
+  /** Умер ли запрос прав: CLI его оборвал или истёк срок брокера. */
+  isPermissionExpired(runId: string, toolUseId: string): boolean {
+    return this.permissions.isExpired(this.registry.resolveKey(runId), toolUseId);
   }
 }

@@ -79,4 +79,14 @@ describe('карточка ошибки — известные ошибки CLI'
     expect(html).not.toContain(i18n.t('chat.overflow.compact'));
     expect(html).not.toContain(i18n.t('chat.overflow.fresh'));
   });
+
+  it('потерянный процесс чата: одна фраза без «relay closed», продолжение доступно', () => {
+    const lost = i18n.t('serverMessages.chat-process-lost');
+    const html = render({ error: lost, errorCode: 'chat-process-lost' });
+
+    // Текст панели совпадает с объяснением — показан один раз.
+    expect(html.split(lost)).toHaveLength(2);
+    expect(html).not.toMatch(/relay closed/i);
+    expect(html).toContain(`${i18n.t('chat.continue')}</button>`);
+  });
 });

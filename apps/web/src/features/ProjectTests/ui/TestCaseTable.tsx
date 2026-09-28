@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import type { ProjectTestCase } from '@agentdeck/contracts';
+import { FLAKY_MIN_FLIPS, FLAKY_WINDOW, type ProjectTestCase } from '@agentdeck/contracts';
 import { combineParams } from '@agentdeck/contracts/test-format';
 import { Stack } from '@shared/ui/stack';
 import { Button } from '@shared/ui/button';
@@ -34,6 +34,7 @@ export function TestCaseTable({
   onRemove,
   withGroup,
   risk,
+  flaky,
 }: TestCaseTableProps) {
   const { t } = useTranslation();
 
@@ -65,14 +66,20 @@ export function TestCaseTable({
                 aria-label={t('tests.library.checkAll')}
               />
             </th>
-            <th scope="col">{t('tests.library.columnTitle')}</th>
+            <th scope="col" className={styles.cellTitle}>
+              {t('tests.library.columnTitle')}
+            </th>
             {withGroup && <th scope="col">{t('tests.library.columnGroup')}</th>}
             <th scope="col">{t('tests.library.columnStatus')}</th>
             <th scope="col">{t('tests.library.columnPriority')}</th>
             <th scope="col">{t('tests.library.columnReadiness')}</th>
             <th scope="col">{t('tests.library.columnAutomation')}</th>
             <th scope="col">{t('tests.library.columnArea')}</th>
-            <th scope="col">{t('tests.library.columnPoints')}</th>
+            {/* «Проходы» читались как «сколько раз гоняли»; число здесь — на
+                сколько комбинаций параметров кейс разворачивается. */}
+            <th scope="col" title={t('tests.library.columnVariantsHint')}>
+              {t('tests.library.columnVariants')}
+            </th>
             {attributes.map((attribute) => (
               <th scope="col" key={attribute.key}>
                 {attribute.title}
@@ -87,6 +94,7 @@ export function TestCaseTable({
           {rows.map((row) => {
             const item = row.testCase;
             const rowRisk = risk?.get(`${row.groupId}:${item.id}`);
+            const rowFlaky = flaky?.get(`${row.groupId}:${item.id}`);
             return (
               <tr
                 key={`${row.groupId}:${item.id}`}
@@ -124,6 +132,22 @@ export function TestCaseTable({
                       <Badge tone="info">
                         <span title={rowRisk.reason}>
                           {t('tests.risk.score', { score: rowRisk.score })}
+                        </span>
+                      </Badge>
+                    )}
+                    {/* Нестабильность — по истории прогонов, с правилом в
+                        подсказке: без него «нестабилен» читается как мнение. */}
+                    {rowFlaky && (
+                      <Badge tone="warning">
+                        <span
+                          title={t('tests.library.flakyHint', {
+                            flips: rowFlaky.flips,
+                            runs: rowFlaky.runs,
+                            window: FLAKY_WINDOW,
+                            minFlips: FLAKY_MIN_FLIPS,
+                          })}
+                        >
+                          {t('tests.library.flaky')}
                         </span>
                       </Badge>
                     )}

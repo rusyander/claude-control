@@ -56,6 +56,7 @@ export function PanelAgentLimitsSections({ tr }: SectionProps) {
             row('limitPhone'),
             row('limitMask'),
             row('limitVoice'),
+            row('limitImages'),
             row('limitWindow'),
             row('limitCode'),
           ]}

@@ -36,7 +36,7 @@ export function TokenBadge({
   runTotalMs,
   className,
 }: TokenBadgeProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [hovered, setHovered] = useState(false);
   const [pinned, setPinned] = useState(false);
   const rootRef = useRef<HTMLSpanElement>(null);
@@ -87,7 +87,8 @@ export function TokenBadge({
         type="button"
         className={styles.badge}
         aria-expanded={isOpen}
-        aria-controls={panelId}
+        // Панель рисуется только открытой: закрытая ссылка вела бы в пустоту.
+        aria-controls={isOpen ? panelId : undefined}
         aria-label={
           time === undefined
             ? t('chat.usage.badgeLabel', { total: formatTokens(total) })
@@ -179,7 +180,10 @@ export function TokenBadge({
               </span>
               {from && to && (
                 <span className={styles.note}>
-                  {t('chat.usage.span', { from: formatClock(from), to: formatClock(to) })}
+                  {t('chat.usage.span', {
+                    from: formatClock(from, i18n.language),
+                    to: formatClock(to, i18n.language),
+                  })}
                 </span>
               )}
               {runTotal !== undefined && (

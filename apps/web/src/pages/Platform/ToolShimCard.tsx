@@ -44,7 +44,7 @@ export function ToolShimCard({ report }: ToolShimCardProps) {
                 едет текстом, и это решение, а не поломка. */}
             <CompromiseMark id="tool-shim" />
           </Stack>
-          <Typography variant="body-sm" color="subtle" style={{ maxWidth: 'var(--text-measure)' }}>
+          <Typography variant="body-sm" color="subtle" className="prose">
             {t('platform.toolShimText')}
           </Typography>
         </Stack>

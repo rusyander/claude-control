@@ -190,6 +190,13 @@ export const chatBlockSchema = union([
     name: string(),
     input: string(),
     isError: boolean().optional(),
+    /**
+     * Вопрос `AskUserQuestion`, который закрыла автономия чата: что за человека
+     * выбрано. Сервер узнаёт это по метке в результате вызова
+     * (`AUTONOMOUS_PICK_MARKER`), лента рисует приглушённую строку вместо
+     * карточки вопроса.
+     */
+    autoPicks: array(object({ question: string(), label: string() })).optional(),
   }),
   object({ type: literal('image'), source: string() }),
 ]);
@@ -436,6 +443,11 @@ export interface ChatAutoModeView {
   enabled: boolean;
   override?: boolean;
   global: boolean;
+  /**
+   * Право правок файлов, с которым шёл последний прогон чата (тумблер человека).
+   * Нет — неизвестно: чат остановлен или панель его не запускала.
+   */
+  allowEdits?: boolean;
 }
 
 /** Одна копия CLI в PATH. Версии нет — копия не ответила на `--version`. */

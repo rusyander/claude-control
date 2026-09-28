@@ -47,7 +47,7 @@ export function TestsQuarantineCard({ projectPath }: { projectPath: string | und
     `${item.groupId}:${item.caseId}`;
 
   const reasonOf = (item: ProjectTestQuarantineSuggestion): string =>
-    reasons[keyOf(item)] ?? item.reason ?? '';
+    reasons[keyOf(item)] ?? serverFieldText(item, 'reason');
 
   const row = (item: ProjectTestQuarantineSuggestion, action: 'mute' | 'unmute') => {
     const reason = reasonOf(item);
@@ -57,6 +57,13 @@ export function TestsQuarantineCard({ projectPath }: { projectPath: string | und
           <Badge tone={action === 'unmute' ? 'success' : 'warning'}>
             {action === 'unmute' ? item.greenStreak : `${item.stability}%`}
           </Badge>
+          {/* Зелёный на повторе раннера: стабильность по статусам его не видит,
+              поэтому число повторов стоит рядом отдельной меткой. */}
+          {action === 'mute' && item.retryFlakes !== undefined && (
+            <Badge tone="warning">
+              {t('tests.quarantine.retryBadge', { count: item.retryFlakes })}
+            </Badge>
+          )}
           <button
             type="button"
             className={styles.runHead}
@@ -108,7 +115,7 @@ export function TestsQuarantineCard({ projectPath }: { projectPath: string | und
   };
 
   return (
-    <Card padding="md">
+    <Card padding="md" data-testid="tests-quarantine-card">
       <Stack gap="var(--spacing-2xs)">
         <Typography variant="body-sm" weight="medium">
           {t('tests.quarantine.title')}
@@ -117,6 +124,7 @@ export function TestsQuarantineCard({ projectPath }: { projectPath: string | und
           {t('tests.quarantine.hint', {
             streak: data.thresholds.greenStreak,
             stability: data.thresholds.stability,
+            retries: data.thresholds.retryFlakes,
           })}
         </Typography>
 

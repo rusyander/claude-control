@@ -35,7 +35,7 @@ describe('следы вызовов в истории', () => {
       { tool_use_id: 'x', content: 'нет такого файла', is_error: true },
       new Map(),
     );
-    expect(text).toContain('ошибка: нет такого файла');
+    expect(text).toContain('error: нет такого файла');
   });
 
   it('картинка внутри результата названа потерей, а не выброшена молча', () => {

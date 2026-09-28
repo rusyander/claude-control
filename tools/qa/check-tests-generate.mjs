@@ -140,6 +140,14 @@ await page.route('**/api/project-git*', async (route) =>
   }),
 );
 
+// Раздел берёт проект из реестра: без него открылся бы реальный проект стенда, и
+// приёмка ушла бы не туда, куда смотрит проверка.
+await page.route('**/api/projects', async (route) =>
+  route.request().method() === 'GET'
+    ? route.fulfill({ json: [{ id: 'qa-project', name: PROJECT.name, path: PROJECT.path }] })
+    : route.fallback(),
+);
+
 await page.route('**/api/chats/projects*', async (route) =>
   route.fulfill({
     json: [
@@ -282,6 +290,16 @@ await page.route('**/api/project-tests/draft/auto*', async (route) => {
 });
 
 await page.route('**/api/project-tests?*', async (route) => route.fulfill({ json: buildView() }));
+// История кейса и отметки «нестабилен» библиотеки — свои ручки; без заглушки
+// запрос ушёл бы на реальный стенд с выдуманным путём проекта.
+await page.route('**/api/project-tests/flaky*', async (route) =>
+  route.fulfill({ json: { window: 10, minFlips: 2, cases: [] } }),
+);
+await page.route('**/api/project-tests/case-history*', async (route) =>
+  route.fulfill({
+    json: { groupId: '', caseId: '', entries: [], flaky: { isFlaky: false, flips: 0, runs: 0 } },
+  }),
+);
 
 let bad = 0;
 const check = (ok, text) => {
@@ -327,7 +345,7 @@ const main = page.getByRole('main').or(page.locator('body')).first();
 
 // Черновик ждёт — и об этом сказано во вкладке, а не только в файле.
 check(
-  (await main.getByText(/предложила правок/i).count()) > 0,
+  (await main.getByText(/предложил[аи]? правок/i).count()) > 0,
   'плашка называет, сколько правок ждут решения',
 );
 // Библиотека до приёмки не изменилась: предложенных кейсов в списке нет.
@@ -399,7 +417,7 @@ await page.keyboard.press('Escape');
 await page.waitForTimeout(900);
 check((await main.getByText('Вход без пароля').count()) > 0, 'принятый кейс виден в библиотеке');
 check(
-  (await main.getByText(/предложила правок: 1/i).count()) > 0,
+  (await main.getByText(/предложил[аи]? правок: 1/i).count()) > 0,
   'плашка пересчитала остаток предложений',
 );
 const reopen = await anyOf(main, [/Посмотреть/]);
@@ -417,7 +435,7 @@ if (!applyAll) {
   await page.waitForTimeout(1500);
   check(applyBody?.caseIds === undefined, 'приёмка остатка идёт без перечисления кейсов');
   check(
-    (await modal.getByText(/Все предложения этого черновика уже приняты/).count()) > 0,
+    (await modal.getByText(/Решать в этом черновике больше нечего/).count()) > 0,
     'разобранный черновик так и говорит',
   );
 }

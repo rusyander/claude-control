@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
-vi.mock('@shared/api/client', () => ({
+vi.mock('@shared/api/client', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@shared/api/client')>()),
   apiClient: {
     defaults: { baseURL: '/api' },
     post: vi.fn(async () => ({ data: {} })),

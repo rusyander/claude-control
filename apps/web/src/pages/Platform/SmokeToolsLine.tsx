@@ -5,7 +5,7 @@ import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
 import { StatusDot } from '@shared/ui/status-dot';
 import { toast } from '@shared/lib/toast';
-import { useSavePlatform } from '@entities/Platform';
+import { useIsPlatformSaving, useSavePlatform } from '@entities/Platform';
 import { smokeToolsLineKind } from './lib/toolShimView';
 
 interface SmokeToolsLineProps {
@@ -35,6 +35,8 @@ interface SmokeToolsLineProps {
 export function SmokeToolsLine({ platform, tools }: SmokeToolsLineProps) {
   const { t } = useTranslation();
   const save = useSavePlatform({ silentError: true });
+  // Любая запись контура, не только своя: щелчок собирает контур целиком.
+  const saving = useIsPlatformSaving();
 
   const setShim = (toolShim: boolean): void => {
     save.mutate(
@@ -58,12 +60,7 @@ export function SmokeToolsLine({ platform, tools }: SmokeToolsLineProps) {
             reason: t(`platform.smokeTools.${tools.reason ?? 'no-call'}`),
           })}
         </Typography>
-        <Button
-          size="sm"
-          variant="secondary"
-          onClick={() => setShim(false)}
-          disabled={save.isPending}
-        >
+        <Button size="sm" variant="secondary" onClick={() => setShim(false)} disabled={saving}>
           {t('platform.disableShim')}
         </Button>
       </Stack>
@@ -87,7 +84,7 @@ export function SmokeToolsLine({ platform, tools }: SmokeToolsLineProps) {
       <Typography variant="body-sm" style={{ flex: '1 1 16rem' }}>
         {t(`platform.smokeTools.${tools.reason ?? 'no-call'}`)}
       </Typography>
-      <Button size="sm" variant="secondary" onClick={() => setShim(true)} disabled={save.isPending}>
+      <Button size="sm" variant="secondary" onClick={() => setShim(true)} disabled={saving}>
         {t('platform.enableShim')}
       </Button>
     </Stack>

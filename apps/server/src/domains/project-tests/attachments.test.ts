@@ -41,6 +41,22 @@ describe('project-tests/attachments', () => {
     expect(existsSync(join(project, first))).toBe(true);
   });
 
+  it('то же имя в то же время другого дня — второй файл, первый цел', () => {
+    const monday = saveAttachment(project, 'gui-001', 'shot.png', png, '2026-09-07T10:11:12.000Z');
+    const other = Buffer.from('другой день').toString('base64');
+    const tuesday = saveAttachment(
+      project,
+      'gui-001',
+      'shot.png',
+      other,
+      '2026-09-08T10:11:12.000Z',
+    );
+
+    expect(tuesday).not.toBe(monday);
+    expect(readFileSync(join(project, monday), 'utf8')).toBe('картинка');
+    expect(readFileSync(join(project, tuesday), 'utf8')).toBe('другой день');
+  });
+
   it('путь в имени файла не выводит из папки кейса', () => {
     const file = saveAttachment(project, 'gui-001', '../../../evil.png', png, now);
 

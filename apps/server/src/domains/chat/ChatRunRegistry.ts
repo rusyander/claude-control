@@ -22,7 +22,16 @@ import {
   type LedgerRelay,
   type RunLedgerEntry,
 } from './run-ledger.ts';
+import type { RunMeta } from './ChatRunRegistry.types.ts';
 import { endRelayInput, ledgerRunMeta, ledgerRunOptions, reattachSession } from './run-reattach.ts';
+import {
+  AUTONOMOUS_ENV,
+  pickRecommended,
+  type RecommendedPick,
+} from '@agentdeck/contracts/chat-group-settings';
+import { picksFor } from './auto-pick.ts';
+import { withAutonomy } from './chat-autonomy.ts';
+import { serverText } from '../../lib/server-texts.ts';
 
 /**
  * Реестр прогонов Claude Code, отвязанный от HTTP-запроса.
@@ -150,37 +159,7 @@ export interface RunSubscriber {
   close: (reason?: 'stopped') => void;
 }
 
-/** Сведения о прогоне для группировки и переподключения (в т.ч. после F5). */
-export interface RunMeta {
-  /**
-   * Откуда прогон: обычный чат (`chat`, умолчание) или группа разделения
-   * (`groups`). Это же — ПОТРЕБИТЕЛЬ маршрута контура (Т3): реестр знает
-   * происхождение каждого прогона, и список «Где работает контур» строится по
-   * нему, а не по списку пожеланий.
-   */
-  origin?: PlatformRunConsumer;
-  /** Каталог проекта (для группировки статусов); undefined — песочница/дом. */
-  projectPath?: string;
-  /** Идентификатор сессии на старте (для продолжения разговора). */
-  sessionId?: string;
-  /**
-   * Прогон уехал ступенью НИЖЕ потолка разговора (веер параллельного запуска).
-   * Само присутствие поля и означает понижение; внутри — чем именно ведут, уже
-   * развёрнутым именем. По этой отметке прогон попадает в журнал сдачи: без неё
-   * `lowered` умирал в маршруте, и спросить «окупается ли понижение» было не у
-   * кого.
-   */
-  lowered?: {
-    model: string;
-    effort: string;
-    /**
-     * Класс работы, из-за которого ступень и понизили. Есть у детей разделения
-     * и у звена правок; у ручного веера его нет вовсе — там ступень выбрал
-     * человек, и рода работы никто не называл.
-     */
-    kind?: string;
-  };
-}
+export type { RunMeta };
 
 /**
  * Минимум, что реестру нужно от прогона: запуститься с колбэком событий и уметь
@@ -189,7 +168,11 @@ export interface RunMeta {
  */
 export interface RunLike {
   start(options: RunOptions, onEvent: (event: ChatEvent) => void): Promise<void>;
-  stop(): void;
+  /**
+   * Остановить процесс. `'unconfirmed'` — процесс жив и не снят: номер нечем
+   * проверить (F-145); прогон тогда остаётся идущим.
+   */
+  stop(): 'unconfirmed' | void;
   /** PID процесса, известный сразу после `start()`; нет — прогон не усыновить. */
   readonly pid?: number | undefined;
   /** Живая сессия за посредником — в журнал, чтобы подключиться после перезапуска. */
@@ -205,6 +188,12 @@ export interface RunLike {
 type RunFactory = () => RunLike;
 
 type RunStatus = 'running' | 'done' | 'error' | 'stopped';
+
+/**
+ * Итог «Остановить»: `absent` — прогона нет; `unconfirmed` — процесс жив и не
+ * снят (номер нечем проверить, F-145), прогон и запись журнала оставлены.
+ */
+export type StopOutcome = 'stopped' | 'absent' | 'unconfirmed';
 
 /**
  * С какого номера нумерует события усыновлённый прогон. Вкладка, открытая на
@@ -245,6 +234,21 @@ interface RegisteredRun {
   limit?: { resetsAt: number; status: string };
   /** Ход звал `AskUserQuestion` — см. `RunFinished.asked`. */
   asked?: boolean;
+  /** Тела вызовов `AskUserQuestion` по id: по ним автовыбор узнаёт `critical`. */
+  askInputs?: Map<string, unknown>;
+  /** Вызовы, закрытые автовыбором: вопрос не висит, ждать человека нечего. */
+  autoPicked?: Set<string>;
+  /**
+   * Был вопрос без id: автовыбор узнаётся по id вызова, такой ему не закрыть —
+   * признак `asked` пересчётом по `askInputs` не снимается.
+   */
+  askedUnkeyed?: boolean;
+  /**
+   * Вопросы, которые автономия ДОЛЖНА закрыть сама, — сигнал «ждёт человека»
+   * отложен до результата вызова. Результат без автовыбора (bypass: вызов не
+   * дошёл до prompt-tool) или конец хода без результата поднимают его.
+   */
+  expectedPicks?: Map<string, ChatEvent>;
   sessionId?: string;
   /** Момент первой правки кода (мс) — слушателю сообщается один раз. */
   firstEditAt?: number;
@@ -457,7 +461,7 @@ export class ChatRunRegistry {
    * переносит на настоящий ключ связь «родитель → потомок», иначе дерево чатов
    * распадалось бы ровно в тот момент, когда временный ключ сменяется живым.
    */
-  private onSession?: (chatId: string, sessionId: string) => void;
+  private onSession?: (chatId: string, sessionId: string, from?: string) => void;
 
   /**
    * Маршрут контура: по происхождению прогона — переменные его окружения (Т3),
@@ -479,7 +483,7 @@ export class ChatRunRegistry {
 
   private platformRouting?: (origin: PlatformRunConsumer, asked: string) => PlatformRunRoute;
 
-  setSessionListener(listener: (chatId: string, sessionId: string) => void): void {
+  setSessionListener(listener: (chatId: string, sessionId: string, from?: string) => void): void {
     this.onSession = listener;
   }
 
@@ -543,6 +547,16 @@ export class ChatRunRegistry {
   }
 
   /**
+   * CLI вернул результат вызова. Слушатель — брокер прав (`ChatSession`): запрос
+   * по этому вызову, если ещё висит, мёртв — CLI его оборвал и ответа не ждёт.
+   */
+  private onToolResult?: (runKey: string, toolUseId: string) => void;
+
+  setToolResultListener(listener: (runKey: string, toolUseId: string) => void): void {
+    this.onToolResult = listener;
+  }
+
+  /**
    * Ребёнок ли разговор разделения (Д16, Д18) — по связи, которую знает
    * хранилище, а реестр нет. Спрашивается на каждом старте по обоим ключам.
    */
@@ -550,6 +564,65 @@ export class ChatRunRegistry {
 
   setChildResolver(resolver: (keys: readonly string[]) => boolean): void {
     this.childOf = resolver;
+  }
+
+  /**
+   * Автономен ли разговор (своё или от родителя, `chat-autonomy.ts`) —
+   * спрашивается на КАЖДОМ старте (метка в окружении CLI) и на каждом вопросе
+   * агента: выбор человека в меню действует со следующего же события.
+   */
+  private autonomousOf?: (keys: readonly string[]) => boolean;
+
+  setAutonomyResolver(resolver: (keys: readonly string[]) => boolean): void {
+    this.autonomousOf = resolver;
+  }
+
+  /**
+   * Выбранная группа разговора (своя или от родителя) — включить к старту. Одна
+   * точка на ВСЕ старты: отправка человека, звенья конвейера, дети разделения,
+   * ревью, слово родителя; маршруты по отдельности кто-нибудь да пропускал
+   * (дети разделения стартовали без группы родителя). Зовётся ДО подъёма
+   * процесса, синхронно; вернула заметку — та ложится в ленту прогона.
+   */
+  private groupActivationOf?: (keys: readonly string[], cwd: string) => ChatEvent | undefined;
+
+  setGroupActivation(
+    activate: (keys: readonly string[], cwd: string) => ChatEvent | undefined,
+  ): void {
+    this.groupActivationOf = activate;
+  }
+
+  /**
+   * Правда о каталоге прогона к системному промпту (тесты проекта, папка e2e).
+   * Одна точка на все старты — по той же причине, что и включение группы выше.
+   */
+  private workspaceNoteOf?: (cwd: string) => string | undefined;
+
+  setWorkspaceNote(resolve: (cwd: string) => string | undefined): void {
+    this.workspaceNoteOf = resolve;
+  }
+
+  /** Осечка чужого слушателя старт не срывает — прогон уходит без строки. */
+  private workspaceNoteSafe(cwd: string): string {
+    try {
+      return this.workspaceNoteOf?.(cwd) ?? '';
+    } catch {
+      return '';
+    }
+  }
+
+  /** Автономен ли идущий разговор — брокеру прав, тем же ответом, что и старту. */
+  isAutonomous(chatId: string): boolean {
+    const run = this.runs.get(this.resolveKey(chatId));
+    const keys = run?.sessionId ? [run.chatId, run.sessionId] : [run?.chatId ?? chatId];
+    return this.autonomousOf?.(keys) ?? false;
+  }
+
+  /** Вопрос закрыт автовыбором — главному чату дерева говорят о критичных. */
+  private onAutoPick?: (keys: readonly string[], picks: RecommendedPick[]) => void;
+
+  setAutoPickListener(listener: (keys: readonly string[], picks: RecommendedPick[]) => void): void {
+    this.onAutoPick = listener;
   }
 
   /**
@@ -964,7 +1037,16 @@ export class ChatRunRegistry {
       // затёртый, он не вернулся бы после паузы дерева (ревью Т8, MAJOR-4).
       platformArgs: route.layers?.args ?? [],
       platformDropAppend: route.layers ? !route.layers.systemPrompt : false,
+      // Пересчитывается на каждом старте: папка e2e могла появиться между ходами.
+      workspaceNote: this.workspaceNoteSafe(options.cwd),
       child: this.childOf?.(meta.sessionId ? [chatId, meta.sessionId] : [chatId]) ?? false,
+      // Метка автономии решается на КАЖДОМ старте и кладётся или снимается
+      // безусловно: продолжение приходит со старыми параметрами, и метка прошлой
+      // жизни пережила бы снятую галочку.
+      env: withAutonomy(
+        options.env,
+        this.autonomousOf?.(meta.sessionId ? [chatId, meta.sessionId] : [chatId]) ?? false,
+      ),
       prompt: withChildrenBrief(
         options.prompt,
         this.briefOf?.(meta.sessionId ? [chatId, meta.sessionId] : [chatId]),
@@ -1007,6 +1089,19 @@ export class ChatRunRegistry {
       this.onRunStart?.(meta.sessionId ? [chatId, meta.sessionId] : [chatId]);
     } catch {
       // Слушатель чужой: его сбой не имеет права сорвать старт прогона.
+    }
+    // Отказанный контуром прогон не стартует вовсе — и группу включать не за
+    // чем: включение пишет в каталог конфига и пережило бы несостоявшийся ход.
+    try {
+      const notice = route.refusal
+        ? undefined
+        : this.groupActivationOf?.(
+            meta.sessionId ? [chatId, meta.sessionId] : [chatId],
+            options.cwd,
+          );
+      if (notice) this.emit(registered, notice);
+    } catch {
+      // Группа не главнее разговора: осечка включения старт не срывает.
     }
 
     // Отказ обязательного контура — ошибка прогона тем же путём, что и сбой
@@ -1074,8 +1169,36 @@ export class ChatRunRegistry {
     return true;
   }
 
+  /**
+   * Отложенный вопрос автономного чата: автовыбор не случился, выбирать
+   * некому, — поднять тот же сигнал, что у обычного вопроса (точка, пуш, хаб).
+   */
+  private raiseQuestion(run: RegisteredRun, event: ChatEvent): void {
+    run.asked = true;
+    this.notify?.({ kind: 'question', chatId: run.chatId, projectPath: run.meta.projectPath });
+    try {
+      this.onAsk?.(run.sessionId ? [run.chatId, run.sessionId] : [run.chatId], event);
+    } catch {
+      // Молча: запись вопроса — для хаба, а поток прогона обязан идти дальше.
+    }
+  }
+
   /** Записать событие в буфер и разослать живым слушателям. */
   private emit(run: RegisteredRun, event: ChatEvent): void {
+    // Внутреннее событие: вкладкам и буферу его знать незачем.
+    if (event.kind === 'toolResult') {
+      const deferred = run.expectedPicks?.get(event.toolUseId);
+      if (deferred) {
+        run.expectedPicks?.delete(event.toolUseId);
+        if (!run.autoPicked?.has(event.toolUseId)) this.raiseQuestion(run, deferred);
+      }
+      try {
+        this.onToolResult?.(run.chatId, event.toolUseId);
+      } catch {
+        // Слушатель чужой: поток прогона обязан идти дальше.
+      }
+      return;
+    }
     // Запоминаем sessionId — его отдаёт /chat/active для переподключения после F5.
     const knownSession = run.sessionId;
     if (event.kind === 'session') run.sessionId = event.sessionId;
@@ -1084,7 +1207,9 @@ export class ChatRunRegistry {
     // на диске тоже узнаёт второе написание: после перезапуска по нему находят
     // прогон вкладки, знающие разговор по sessionId.
     if (run.sessionId && run.sessionId !== knownSession) {
-      this.onSession?.(run.chatId, run.sessionId);
+      // Прежняя сессия — правка сообщения ответвила разговор (`--fork-session`):
+      // слушателю это другое событие, чем первый ход временного ключа (F-111).
+      this.onSession?.(run.chatId, run.sessionId, knownSession);
       this.persist(run.chatId);
     }
     if (event.kind === 'error') {
@@ -1092,7 +1217,45 @@ export class ChatRunRegistry {
       run.lastError = event.message;
     }
     if (event.kind === 'limit') run.limit = { resetsAt: event.resetsAt, status: event.status };
-    if (event.kind === 'tool' && event.name === 'AskUserQuestion') run.asked = true;
+    // Вопрос, который автономия закроет сама (есть рекомендация на каждый), —
+    // не ожидание человека: ни точки, ни пуша, ни записи для хаба. Но только
+    // пока автовыбор не опроверг себя: сигнал отложен до результата вызова.
+    // Автономия — нынешняя ИЛИ та, с меткой которой процесс стартовал: галочку
+    // сняли посреди хода, а метку в окружении процесса читает хук, — пуш,
+    // ушедший раньше его автовыбора, назад не вернуть. Отложить же ничего не
+    // стоит: результат без автовыбора поднимает сигнал сам.
+    const expectedPick =
+      event.kind === 'tool' &&
+      event.name === 'AskUserQuestion' &&
+      (this.autonomousOf?.(run.sessionId ? [run.chatId, run.sessionId] : [run.chatId]) === true ||
+        run.options.env?.[AUTONOMOUS_ENV] === '1') &&
+      pickRecommended(event.input) !== null;
+    if (event.kind === 'tool' && event.name === 'AskUserQuestion') {
+      if (event.id) (run.askInputs ??= new Map()).set(event.id, event.input);
+      if (!event.id) run.askedUnkeyed = true;
+      if (!expectedPick) run.asked = true;
+      else if (event.id) (run.expectedPicks ??= new Map()).set(event.id, event);
+      else run.asked = true;
+    }
+    // Автовыбор узнан по результату вызова: `critical` знает только тело
+    // вопроса, поэтому выбор пересчитывается по нему, если панель его видела.
+    let picked: Extract<ChatEvent, { kind: 'autoPick' }> | undefined;
+    if (event.kind === 'autoPick') {
+      if (run.autoPicked?.has(event.toolUseId)) return;
+      (run.autoPicked ??= new Set()).add(event.toolUseId);
+      run.expectedPicks?.delete(event.toolUseId);
+      const input = run.askInputs?.get(event.toolUseId);
+      picked = { ...event, picks: input === undefined ? event.picks : picksFor(input, '') };
+      if (picked.picks.length === 0) picked = event;
+      run.asked =
+        run.askedUnkeyed === true ||
+        [...(run.askInputs?.keys() ?? [])].some((id) => !run.autoPicked?.has(id));
+      try {
+        this.onAutoPick?.(run.sessionId ? [run.chatId, run.sessionId] : [run.chatId], picked.picks);
+      } catch {
+        // Слушатель чужой: заметка главному чату не главнее потока прогона.
+      }
+    }
     // Текст копим ХВОСТОМ: планировщику продолжения нужен конец ответа, а не
     // весь разговор (см. TEXT_TAIL).
     if (event.kind === 'text') {
@@ -1103,7 +1266,7 @@ export class ChatRunRegistry {
     // обнуляется при перезагрузке вкладки, как и сами прогоны. Дублируем вклад в
     // самом прогоне (spent*) — чтобы при ретрае упавшей попытки откатить именно
     // её долю из общего счётчика, а не гадать.
-    let outgoing = event;
+    let outgoing = picked ?? event;
     // Время старта уезжает вкладке вместе с ключом сессии: по нему лента
     // отличает ход, который прямо сейчас рисует поток, от записанного в
     // транскрипт раньше. Часы серверные — те же, что у транскрипта; часам
@@ -1145,14 +1308,15 @@ export class ChatRunRegistry {
         toolName: event.toolName,
       });
     }
-    if (event.kind === 'tool' && event.name === 'AskUserQuestion') {
+    if (event.kind === 'tool' && event.name === 'AskUserQuestion' && !expectedPick) {
       this.notify?.({ kind: 'question', chatId: run.chatId, projectPath: run.meta.projectPath });
     }
     if (
       this.onAsk &&
       (event.kind === 'permission' ||
         event.kind === 'permissionResolved' ||
-        (event.kind === 'tool' && event.name === 'AskUserQuestion'))
+        event.kind === 'autoPick' ||
+        (event.kind === 'tool' && event.name === 'AskUserQuestion' && !expectedPick))
     ) {
       try {
         this.onAsk(run.sessionId ? [run.chatId, run.sessionId] : [run.chatId], event);
@@ -1251,7 +1415,8 @@ export class ChatRunRegistry {
     const clipped = !run.detached && run.text.length >= TEXT_TAIL;
     const closing = run.detached || inherited || clipped ? this.closingTurnOf(run) : undefined;
     const text = run.detached ? (closing?.text ?? '') : (closing?.text ?? run.text);
-    const asked = run.asked || Boolean(closing?.asked);
+    // Ожидаемый автовыбор так и не пришёл до конца хода — вопрос висит.
+    const asked = run.asked || Boolean(closing?.asked) || (run.expectedPicks?.size ?? 0) > 0;
     // Закрывающего хода нет — процесс умер посреди него. Раньше здесь молчали,
     // и группа разделения стояла «работает» навсегда (журнал 39, 110); теперь
     // планировщик узнаёт обрыв и ничего, кроме него, не решает. Усыновлённый без
@@ -1355,16 +1520,38 @@ export class ChatRunRegistry {
     return () => run.subscribers.delete(subscriber);
   }
 
-  /** Остановить прогон по кнопке: убить процесс и убрать из реестра. */
-  stop(chatId: string): boolean {
+  /**
+   * Остановить прогон: убить процесс и убрать из реестра. Отдаёт исход, а не
+   * «да/нет»: `unconfirmed` (процесс жив, номер нечем проверить) булевым читался
+   * «остановлено» — пауза дерева записывала живой прогон остановленным, а
+   * счётчики «остановлено прогонов» врали (F-145). Каждый вызывающий решает сам.
+   */
+  stop(chatId: string): StopOutcome {
+    return this.halt(chatId);
+  }
+
+  private halt(chatId: string): StopOutcome {
     // Ключ-синоним: «Остановить» из вкладки, знающей разговор по sessionId,
     // обязано убить процесс, поднятый под временным `new-…`, — иначе кнопка
     // молча отвечала бы «прогона нет», а агент продолжал работать.
     const key = this.resolveKey(chatId);
     const run = this.runs.get(key);
-    if (!run) return false;
+    if (!run) return 'absent';
     try {
-      run.run.stop();
+      if (run.run.stop() === 'unconfirmed') {
+        // Процесс жив, а снять его панель не вправе: номер нечем проверить. Прогон
+        // и запись журнала остаются — иначе CLI работал бы без присмотра, а
+        // человек видел бы «остановлено» (F-145).
+        const params = { pid: String(run.run.pid ?? '') };
+        this.emit(run, {
+          kind: 'notice',
+          code: 'stopUnconfirmed',
+          text: serverText('chat-stop-unconfirmed-notice', params),
+          textCode: 'chat-stop-unconfirmed-notice',
+          textParams: params,
+        });
+        return 'unconfirmed';
+      }
     } catch {
       // Убить процесс не вышло (уже умер, отказано в доступе) — но реестр и
       // подписчиков всё равно закрываем: иначе исключение отсюда оставило бы
@@ -1374,24 +1561,24 @@ export class ChatRunRegistry {
     if (run.status === 'running') run.status = 'stopped';
     for (const subscriber of run.subscribers) subscriber.close('stopped');
     this.remove(key);
-    return true;
+    return 'stopped';
   }
 
   /** «Стоп» человека: слушатель узнаёт ДО остановки — конец хода застанет паузу. */
-  stopByHuman(chatId: string): boolean {
+  stopByHuman(chatId: string): StopOutcome {
     const key = this.resolveKey(chatId);
     const run = this.runs.get(key);
-    if (!run) return false;
+    if (!run) return 'absent';
     // Ход уже кончился (прогон лишь в буфере после завершения): «Стоп» ничего
     // не остановил, и ставить группу на паузу не за что (итоговое ревью 25.09, m3).
-    if (run.status !== 'running') return this.stop(chatId);
+    if (run.status !== 'running') return this.halt(chatId);
     const keys = [...new Set([chatId, key, ...(run.sessionId ? [run.sessionId] : [])])];
     try {
       this.onHumanStop?.(keys);
     } catch {
       // Слушатель чужой: его сбой не имеет права сорвать остановку.
     }
-    return this.stop(chatId);
+    return this.halt(chatId);
   }
 
   /** Остановить все прогоны разом. */

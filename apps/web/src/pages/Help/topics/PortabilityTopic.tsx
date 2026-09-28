@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
-import { HelpSection, Callout, OptionCards } from '../ui';
+import { PORTABILITY_TABS } from '@pages/Portability/model/tabs';
+import { HelpSection, Callout, OptionCards, PageTabsSection } from '../ui';
 import { PortabilityGuideSections } from './PortabilityGuideSections';
 import { PortabilityLimitsSections } from './PortabilityLimitsSections';
 
@@ -24,6 +25,8 @@ export function PortabilityTopic() {
       <Callout tone="info" title={tr('guideTitle')}>
         {tr('guideText')}
       </Callout>
+
+      <PageTabsSection page="portability" tabs={PORTABILITY_TABS} />
 
       <HelpSection title={common('whyTitle')}>
         <OptionCards

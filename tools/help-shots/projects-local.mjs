@@ -32,7 +32,7 @@ export async function shootLocal(browser, web, scenario) {
     await panelShell(page, state);
 
     await open(page, web, `/projects?id=${PROJECT.id}`);
-    await page.getByRole('button', { name: /^(Из проекта|From the project)$/ }).click();
+    await page.getByRole('tab', { name: /^(Из проекта|From the project)/ }).click();
     await page.waitForTimeout(1000);
 
     // ── 01. Вкладка целиком: три раздела и пометка «только чтение» ───────────

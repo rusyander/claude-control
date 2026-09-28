@@ -1,0 +1,25 @@
+/* Описание пишет человек, и длина его ничем не ограничена: мера строки, а не
+   длина текста держит его читаемым на широком экране (audit-layout ловит
+   слишком широкий текст). */
+.description {
+  max-width: 72ch;
+}
+
+.members {
+  margin: 0;
+  padding-left: var(--spacing-lg);
+}
+
+/* «Найдено в» / «Используется в» — пары «подпись — значение» в две колонки. */
+.facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--spacing-2xs) var(--spacing-md);
+  margin: 0;
+
+  dd {
+    margin: 0;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+}

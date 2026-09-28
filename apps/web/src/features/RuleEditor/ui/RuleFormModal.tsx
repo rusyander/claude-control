@@ -9,6 +9,7 @@ import { Badge } from '@shared/ui/badge';
 import { FormWithAssistant } from '@shared/ui/form-with-assistant';
 import { BulkCreate } from '@shared/ui/bulk-create';
 import { ruleApi } from '@entities/Rule';
+import { toErrorMessage } from '@shared/api/client';
 import { RuleBuilder } from './RuleBuilder';
 import {
   defaultSections,
@@ -16,6 +17,7 @@ import {
   hasContent,
   type RuleSection,
 } from '../model/ruleSections';
+import { ruleAssistantSpec } from '../model/ruleAssistant';
 import type { Mode, RuleFormModalProps } from './RuleFormModal.types';
 import styles from './RuleFormModal.module.scss';
 
@@ -109,9 +111,7 @@ export function RuleFormModal({ isOpen, onOpenChange, rule }: RuleFormModalProps
       {mode === 'bulk' ? (
         <BulkCreate
           kindLabel={t('rules.title')}
-          placeholder={
-            'Язык общения :: Всегда отвечать по-русски\nБэкенд :: Не править бэкенд без разрешения'
-          }
+          placeholder={t('rules.bulkPlaceholder')}
           parseLine={(line) => {
             // Строка формата «Заголовок :: текст». Без разделителя вся строка —
             // заголовок, тело пустое.
@@ -143,17 +143,14 @@ export function RuleFormModal({ isOpen, onOpenChange, rule }: RuleFormModalProps
         />
       ) : (
         <FormWithAssistant
-          kind={t('rules.title')}
+          kind="rule"
           fields={{ title, body: effectiveBody }}
-          schema={{
-            title: 'Короткий заголовок правила',
-            body: 'Текст правила в markdown: что делать, чего не делать, как проверять',
-          }}
+          spec={ruleAssistantSpec()}
           onApply={(applied) => {
-            if (typeof applied.title === 'string') setTitle(applied.title);
+            if (applied.title !== undefined) setTitle(applied.title);
             // Помощник заполняет текст — переключаемся в простой режим, чтобы
             // его правку было видно, а не поверх неё стояли блоки конструктора.
-            if (typeof applied.body === 'string') {
+            if (applied.body !== undefined) {
               setBody(applied.body);
               setMode('simple');
             }
@@ -164,7 +161,7 @@ export function RuleFormModal({ isOpen, onOpenChange, rule }: RuleFormModalProps
               label={t('rules.ruleTitle')}
               value={title}
               onChange={setTitle}
-              placeholder="например: язык общения — всегда русский"
+              placeholder={t('rules.ruleTitlePlaceholder')}
               autoFocus
             />
 
@@ -189,9 +186,11 @@ export function RuleFormModal({ isOpen, onOpenChange, rule }: RuleFormModalProps
               />
             )}
 
+            {/* Причину отказа называет сервер (занятый заголовок — D-A): общий
+                «не сохранилось» не говорил, что поправить. */}
             {(create.isError || update.isError) && (
-              <Typography variant="body-sm" color="danger">
-                {t('errors.saveFailed')}
+              <Typography variant="body-sm" color="danger" role="alert">
+                {toErrorMessage(create.error ?? update.error) || t('errors.saveFailed')}
               </Typography>
             )}
           </Stack>

@@ -1,0 +1,70 @@
+// Фальшивый `claude -p --output-format json` для проверок наблюдателя.
+// Читает промпт из stdin, пишет свой argv и промпт в `fake-argv.json` рабочего
+// каталога, по `fake-config.json` там же спит, падает или отвечает находкой на
+// каждый `id:` из промпта. Имена своего окружения — туда же: проверка того,
+// что сервер ему НЕ передал. Сеть не трогает, токенов не тратит.
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import process from 'node:process';
+import { setTimeout } from 'node:timers';
+
+const config = existsSync('fake-config.json')
+  ? JSON.parse(readFileSync('fake-config.json', 'utf8'))
+  : {};
+let prompt = '';
+process.stdin.setEncoding('utf8');
+process.stdin.on('data', (chunk) => (prompt += chunk));
+process.stdin.on('end', () => {
+  // Системный промпт — текстом: временную папку разбор снимает сразу после конца.
+  const at = process.argv.indexOf('--append-system-prompt-file');
+  const systemPromptFile = at > 0 ? process.argv[at + 1] : undefined;
+  writeFileSync(
+    'fake-argv.json',
+    JSON.stringify({
+      argv: process.argv.slice(2),
+      prompt,
+      systemPrompt:
+        systemPromptFile && existsSync(systemPromptFile)
+          ? readFileSync(systemPromptFile, 'utf8')
+          : '',
+      pid: process.pid,
+      envNames: Object.keys(process.env),
+    }),
+  );
+  setTimeout(() => {
+    if (config.fail) {
+      process.stderr.write('fake failure');
+      process.exit(3);
+    }
+    const ids = [...prompt.matchAll(/^id: ([0-9a-f]+)$/gm)].map((match) => match[1]);
+    const findings = ids.map((id) => ({
+      id,
+      title: `Находка ${id}`,
+      happened: config.happened ?? 'Маршрут упал.',
+      context: 'Открыт раздел настроек.',
+      verdict: config.verdict ?? 'confirmed',
+      location: 'apps/server/src/index.ts:1',
+      fix: 'Поймать ошибку.',
+      // Второй и дальше id пачки — «та же причина, что первый», если так велено.
+      ...(config.mergeIntoFirst && id !== ids[0] ? { sameAs: ids[0] } : {}),
+    }));
+    // Замечания — как есть из конфига: проверка решает, что модель «заметила».
+    const items = [...findings, ...(config.remarks ?? []).map((r) => ({ kind: 'remark', ...r }))];
+    const result = '```agentdeck-watch\n' + JSON.stringify(items) + '\n```';
+    process.stdout.write(
+      JSON.stringify({
+        type: 'result',
+        is_error: false,
+        result,
+        usage: { input_tokens: 1, output_tokens: 1 },
+        modelUsage: {
+          'claude-haiku-4-5': {
+            inputTokens: 100,
+            outputTokens: 20,
+            cacheReadInputTokens: 1000,
+            cacheCreationInputTokens: 50,
+          },
+        },
+      }) + '\n',
+    );
+  }, config.sleepMs ?? 0);
+});

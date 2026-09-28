@@ -46,6 +46,9 @@ export function PlanCancel({ split }: PlanCancelProps) {
               stopped: result.stopped,
             }),
           );
+          if (result.unconfirmed > 0) {
+            toast.warning(t('chat.cascade.tree.notStoppedToast', { count: result.unconfirmed }));
+          }
           void queryClient.invalidateQueries({ queryKey: chatTreeKeys.all });
         },
         onError: (error) =>

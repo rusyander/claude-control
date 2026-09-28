@@ -77,9 +77,9 @@ describe('OpencodeServe: локальный сервер и сессии', () =>
     const child = fakeChild();
     const kill = vi.spyOn(child, 'kill');
     const serve = new OpencodeServe();
-    // Снятие процесса тоже идёт через подменённый spawn: под Windows это
-    // `taskkill` (иначе `cmd.exe` умер бы, а сам CLI остался держать порт), на
-    // POSIX — обычный сигнал. Настоящих процессов тест не запускает ни там, ни там.
+    // Снятие идёт через общий `killChildTree`. У подделки нет кодов выхода, и
+    // по номеру 4242 она не снимается (иначе тест снял бы настоящий процесс с
+    // этим номером) — остаётся `child.kill()`. `taskkill` больше не зовётся вовсе.
     const spawnImpl = vi.fn(() => child);
 
     const result = await serve.ask('conv-1', 'вопрос', {
@@ -93,10 +93,11 @@ describe('OpencodeServe: локальный сервер и сессии', () =>
     });
 
     expect(result).toBeUndefined();
-    const killedViaTaskkill = (spawnImpl.mock.calls as unknown as unknown[][]).some(
+    const spawnedTaskkill = (spawnImpl.mock.calls as unknown as unknown[][]).some(
       (call) => call[0] === 'taskkill',
     );
-    expect(kill.mock.calls.length > 0 || killedViaTaskkill).toBe(true);
+    expect(kill).toHaveBeenCalled();
+    expect(spawnedTaskkill).toBe(false);
   });
 
   it('ответ не той формы (нет текстовых частей) → undefined, сессия забыта', async () => {

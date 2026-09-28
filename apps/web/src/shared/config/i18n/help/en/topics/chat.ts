@@ -44,9 +44,11 @@ export const chatEn: typeof chatRu = {
       'several agents, and it is visible which one is waiting for an answer',
     canVolume:
       'Hear the agent louder: the agents panel has a notification volume (200% by ' +
-      'default), and the browser tab is marked with a dot while an agent waits',
+      'default), and the browser tab icon and title get a dot when an agent asks, ' +
+      'needs a permission or fails while you are in another app; looking at the ' +
+      'panel clears it, a new reason sets it again',
     canOpenFolder: 'Open any folder as a project, even one Claude has never worked in',
-    canAttach: 'Attach files by dragging them in or with the paperclip',
+    canAttach: 'Attach files by dragging them in, with the paperclip or by pasting a shot (Ctrl+V)',
     canVoice: 'Dictate a request by voice',
     canStop: 'Stop one agent or all of them at once',
     canEditor: 'Open the project in your code editor with one button',
@@ -144,7 +146,13 @@ export const chatEn: typeof chatRu = {
       'notes; the files themselves are assembled on your machine: HTML to show, PPTX for ' +
       'PowerPoint and PDF. The shown page has no network and no outside fonts — the HTML is ' +
       'served forbidding every external resource. The PDF is printed by the system browser, and ' +
-      'if there is none it says so: HTML and PPTX do not disappear with it.',
+      'if there is none it says so: HTML and PPTX do not disappear with it. The HTML is ' +
+      'always light: a dark browser theme or Dark Reader does not recolour it, and the lock ' +
+      'is added to decks built earlier as they are served. The mode request shows short in ' +
+      'the feed — «Presentation: topic», «Presentation edit: request» or «Image: topic», ' +
+      'with its rules ' +
+      'folded under a click; the chat is named the same. The panel agent starts such a chat ' +
+      'too when asked for a presentation or a picture — without a project.',
     deckAsk: 'You are asked how extensive it should be first',
     deckAskText:
       'You name the topic — and the agent asks one short question: a full deck (14–18 slides: ' +
@@ -159,7 +167,7 @@ export const chatEn: typeof chatRu = {
       'two to four numbers with captions, two columns of comparison, a quote, a dark section ' +
       'divider and a full-slide diagram. The deck colour is its choice as well, but out of six ' +
       'moods — the actual colours are the panel’s, so a deck never arrives unreadable. The rules ' +
-      'behind all those decisions live in «Промпты», in the «Презентация» text, and you can ' +
+      'behind all those decisions live in «Prompts», in the «Presentation» text, and you can ' +
       'rewrite them.',
     deckPictures: 'The model draws diagrams, the panel draws photos',
     deckPicturesText:
@@ -171,7 +179,7 @@ export const chatEn: typeof chatRu = {
       'and the card says what exactly was in the way.',
     deckRevise: 'Rework: the panel remembers, not the agent',
     deckReviseText:
-      'The «Переделать» button on a deck card turns the field into a rework: «make the third slide ' +
+      'The «Rework» button on a deck card turns the field into a rework: «make the third slide ' +
       'shorter», «add a diagram at the end». The panel keeps the previous deck’s structure on disk ' +
       'and sends it to the model together with your request — so the agent loses nothing even ' +
       'after the conversation is restarted, and pictures already drawn carry over without ' +
@@ -299,7 +307,20 @@ export const chatEn: typeof chatRu = {
         'transcript on disk and returns the answer as frames the panel shows at ' +
         'once. The panel keeps no database of conversations: history is read from ' +
         'the transcript, which is why a terminal conversation shows up here and one ' +
-        'started here shows up in the terminal. One exception: a run routed to a ' +
+        'started here shows up in the terminal. There is one CLI process for the ' +
+        'whole conversation: the next message goes into the same process, and a new ' +
+        'one starts only on Stop or when the launch itself changes (model, effort, ' +
+        'permissions, group, autonomy). That is why an agent’s background ' +
+        'command survives the end of a ' +
+        'turn: when it finishes, the CLI starts a turn with its result on its own, ' +
+        'and that turn lands in this same conversation. On every start the agent ' +
+        'also gets a short note about its folder — where the project’s autotests ' +
+        'live and how a test becomes a case (the “Tests” section). A sandbox with ' +
+        'its own config directory takes settings from that directory only: the ' +
+        'personal CLAUDE.md in your home folder does not reach it, even though the ' +
+        'sandbox folder sits under home. The autonomy mark is its own too — set by ' +
+        'this conversation’s choice, not by the environment the panel itself was ' +
+        'started from. One exception: a run routed to a ' +
         'contour starts with the panel’s short system prompt INSTEAD of the CLI’s ' +
         '(a switch on the contour itself, the “Contour” section), because the large ' +
         'prompt drowns a mid-range model. The same card also drops our layers: such ' +
@@ -341,7 +362,9 @@ export const chatEn: typeof chatRu = {
       bPermissionText:
         'The "agent asks for permission" card shows the tool and the command itself ' +
         '— here rm -rf dist. Until you press Allow or Deny the agent stands on that ' +
-        'call: the card is a fork, not a notification.',
+        'call: the card is a fork, not a notification. It waits for almost a day — as ' +
+        'long as the CLI holds one call; if the CLI stopped waiting earlier, an answer ' +
+        'to the card gets "The request has already expired" and starts nothing.',
       bQuestion: 'Answer the agent',
       bQuestionText:
         'The heading "your choice is needed" and the counter "question 1 of 3": ' +
@@ -462,16 +485,27 @@ export const chatEn: typeof chatRu = {
 
     toolsTitle: 'The project row: dev server and git',
     toolsCaption:
-      'All of it lives in the project tab header and works against the real directory ' +
-      'on disk — the panel keeps no copy of the state.',
+      'The project tab header has two rows. The top one is the conversation: model and ' +
+      'effort, “Agents”, “Chat settings”. The bottom one is the project: “To MR”, ' +
+      '“Project code”, “Tests”, “Editor” and “Dev server”. All of it works against the ' +
+      'real directory on disk — the panel keeps no copy of the state. In a narrow ' +
+      'column the buttons whose icon speaks for itself drop their label and keep the ' +
+      'icon and a hover hint.',
     toolsRun: 'Starting the dev server',
     toolsRunText:
-      'The “Start” button runs the command from package.json (dev, otherwise start) or ' +
+      'The “Dev server” button (a server-rack icon) opens the run settings: what to run, ' +
+      'the command, the port and “Autostart”. The ▶ triangle next to it runs the ' +
+      'command from package.json (dev, otherwise start) or ' +
       'your own — with the package manager the project actually uses: pnpm, yarn or npm. ' +
       'The panel does NOT assign the port: the app comes up on its own, the panel reads ' +
       'the address from its output and opens the browser once the port answers. A ' +
-      'monorepo has several targets — the gear next to the button lists the packages, and ' +
-      'they can run at the same time.',
+      'monorepo has several targets — “Dev server” lists them, and they can run at the ' +
+      'same time. A running server shows in the same row as an “Open :port” link and a ' +
+      'stop button. The panel starts it only for projects in the Projects section, ' +
+      'folders inside them and copies of their branches: in any other folder ▶ answers ' +
+      'with a refusal, “Add this folder as a project”, and the command does not run. A path ' +
+      'with “..” gets the same refusal even when it starts with the project path: the panel ' +
+      'does not guess where it really leads. Autostart on panel start is checked the same way.',
     toolsPort: 'Port already taken',
     toolsPortText:
       'When the server refuses to start (“Port 5173 is already in use”), the panel shows ' +
@@ -483,7 +517,10 @@ export const chatEn: typeof chatRu = {
     toolsAutostartText:
       'It is not about now but about the panel’s next start: a ticked target comes up ' +
       'by itself, with no browser window and no navigation. Close the project tab and the ' +
-      'toggle clears on all of its targets.',
+      'toggle clears on all of its targets. It can be switched on within the same bound ' +
+      'as ▶: only for a project in the Projects section or its copy. A mark left on a ' +
+      'folder outside the projects does not start at launch: the panel server’s output ' +
+      'shows an autostart failure naming the folder and asking to add it as a project.',
     toolsGit: 'Branch, files, commit, pull and push',
     toolsGitText:
       'A strip above the message feed carries the current branch — it is there only when ' +
@@ -544,7 +581,13 @@ export const chatEn: typeof chatRu = {
       'from the current HEAD; a local branch — the copy checks it out; a branch that ' +
       'exists only on the remote — it is created with tracking (that is how you take ' +
       'apart someone else’s merge request). The directory appears next to the ' +
-      'project: <project>-worktrees/<branch>. A finished copy opens as a tab at once.',
+      'project: <project>-worktrees/<branch>. A finished copy opens as a tab at once. The chat ' +
+      'offers a copy by itself too: when the agent is about to edit files in the main copy for ' +
+      'the first time, the feed shows a “First edit — where do we work?” card, and “Create the ' +
+      'copy and continue there” moves the conversation over. If the previous agent process ' +
+      'could not be stopped (its number cannot be verified), the copy stays created and the ' +
+      'conversation stays in the main copy: the panel does not start a second process on the ' +
+      'same session, refuses with the reason, and the agent waits at the same card.',
     parallelWork: 'Working in a copy',
     parallelWorkText:
       'The copy’s tab is an ordinary project tab: its own chat list, its own agent, ' +
@@ -608,10 +651,16 @@ export const chatEn: typeof chatRu = {
       'once, including the one an agent is working in right now — and skills drifting ' +
       'between copies is exactly an agent working by yesterday’s rules. The flip side is ' +
       'the same: editing a skill “inside the copy” changes the original, because it is one ' +
-      'directory. The list is deliberately short — a copy’s settings.json is never a link, ' +
+      'directory. The e2e autotest folder comes as a link too when the panel created it: ' +
+      'it is hidden from git, so a test written in the copy would otherwise vanish with ' +
+      'the copy — as a link it lands in the original’s folder and becomes a case there. ' +
+      'A project’s own folder in git arrives with the checkout and is never a link. ' +
+      'The list is deliberately short — a copy’s settings.json is never a link, ' +
       'or a permission granted in one copy would silently appear in all of them. The ' +
       'mirror report names the linked directories on their own line; if linking failed ' +
-      '(file system, rights) the files travel as a copy and the report says so.',
+      '(file system, rights) the files travel as a copy and the report says so. A ' +
+      'linked directory never shows under “left behind”: it is in the copy, just ' +
+      'shared with the original.',
     parallelAccess: 'Trust and MCP: every copy gets its own entry',
     parallelAccessText:
       'The answers to “do you trust the files in this folder” and “enable the servers from ' +
@@ -711,7 +760,10 @@ export const chatEn: typeof chatRu = {
       'suffix rather than a refusal — except for MR groups: their copy sits on the ' +
       'MR branch itself. If the project is not a repository, the chats ' +
       'are created in the same directory, with no copies. One group failing does ' +
-      'not cancel the rest: a separate toast says so, and the other chats stay.',
+      'not cancel the rest: a separate toast says so, and the other chats stay. ' +
+      'Groups run in parallel and each runs the checks of its own copy, so each ' +
+      'group’s vitest gets a quarter of the machine’s cores (VITEST_MAX_WORKERS and ' +
+      'its siblings) — unless you set your own cap in the panel’s environment.',
     splitDeliver: 'Up to a ready MR, and the group queue',
     splitDeliverText:
       'The “To MR” button in a project chat header shows how a task will end: “on”, ' +
@@ -722,11 +774,34 @@ export const chatEn: typeof chatRu = {
       'code-change task to an MR — branch, checks, commit, push, MR, review, ' +
       'description — while questions and reviews without edits open no MR; in a split ' +
       'each group is one branch and one MR, and the group summary shows its link as ' +
-      '“MR !N”. The panel picks “Split groups at once” by itself: 4 when copy ' +
-      'preparation is heavy (several installs or a build), otherwise 8; your own number ' +
-      'goes up to 30, “Pick automatically” brings the automatic value back. The rest ' +
+      '“MR !N”. “Split groups at once” depends on whether copy preparation is heavy (by ' +
+      'default — more than one install, or an install plus a build). The number comes ' +
+      'from the shared rules (“Settings” → “Groups”: 8 on a light project, 4 on a heavy ' +
+      'one), and the project’s “To MR” window shows which the project was judged to be; ' +
+      'your own number goes up to 30, “Reset to shared” brings the shared one back, and ' +
+      'a raised number releases queued groups at once. In the chat of a copy or a group ' +
+      'the button shows and changes the setting of the project’s main copy — a copy has ' +
+      'none of its own. The rest ' +
       'wait “queued” and start as slots free up. One proposal holds at most 30 groups ' +
       'and 50 tasks per group: anything beyond is dropped, and the card says how much.',
+    splitSieves: 'Pre-MR sieves',
+    splitSievesText:
+      'The review and delivery stages get a list of sieves in their task — checks chosen ' +
+      'by the paths the branch touched: docs verified against the stand, removed names and ' +
+      'test ids found nowhere in the repository, no conflict with a fresh main, a UI edit ' +
+      'checked in a browser, a wrong value refused with a clear message. The group passes ' +
+      'each sieve with evidence — a command and its output. A conflict with a fresh main ' +
+      'and removal of other people’s lines the panel checks itself from the copy’s git, and ' +
+      'consumers of removed names it re-checks: the group still hands in its own search. A ' +
+      'sieve not passed holds the group: “done” does not ' +
+      'come and the group gets a reminder, as with an unpushed branch. When a reviewer ' +
+      'finds a blocker in an MR thread, the group turns it into a new sieve — a proposed ' +
+      'one: it reaches group tasks only once you accept it in “Settings” → “Groups” → ' +
+      '“Pre-MR sieves”, for its project or for all. The model writes the sieve text from ' +
+      'a commenter’s reply, so only a human can accept it, not the panel agent. The same ' +
+      'blocker in another project only suggests making the sieve shared. The blocker tally ' +
+      '(“escaped to MR” against “caught before the MR”) is there too, and a learned sieve ' +
+      'can be removed there.',
     splitReview: 'Reviewing someone else’s merge requests',
     splitReviewText:
       'Drop MR (or PR) links into the chat and ask for a review — the split creates ' +
@@ -786,9 +861,11 @@ export const chatEn: typeof chatRu = {
       'A child’s permission request arrives the same way — Allow/Deny right here, ' +
       'labelled with who is asking. It matters more than a question: on a question ' +
       'the agent keeps working, on a permission it STOPS, and without a shared hub ' +
-      'you learn about the halt only by opening its tab. Auto-approval is inherited ' +
-      'from the parent, so only dangerous calls and whatever your rules mark as ' +
-      '“ask” reach you. A child asks only through the card: a question typed at the ' +
+      'you learn about the halt only by opening its tab. What a group allows itself ' +
+      'and what it brings to you is decided by the rows of “Settings” → “Groups” (see ' +
+      '“What a group decides on its own”); an auto-approval toggle you switched on in ' +
+      'the group’s chat yourself beats the rows, while one inherited from the parent ' +
+      'does not get in their way. A child asks only through the card: a question typed at the ' +
       'end of its answer is invisible from the parent, and it is told so. Children ' +
       'cannot strike deals with each other — the session messaging tools are closed ' +
       'to them, and a fork becomes a question to you. The parent, in turn, knows its ' +
@@ -804,7 +881,10 @@ export const chatEn: typeof chatRu = {
       'in the feed indefinitely, and without this check a second press would create ' +
       'the same copies again — under a suffixed branch name. The panel sees it is ' +
       'done from the conversation’s children: their branches are matched against the ' +
-      'branches of the groups.',
+      'branches of the groups. A new split of the same conversation (after “Cancel ' +
+      'plan”, say) starts a new plan, while groups of the old one whose copy is not yet ' +
+      'removed or that carry the “accepted” mark stay in the summary — their copy can ' +
+      'be removed from there too.',
     splitButton: 'Create the chats only',
     splitButtonText:
       'A toggle in the card. On, the copies, branches and chats appear but no agent ' +
@@ -875,6 +955,13 @@ export const chatEn: typeof chatRu = {
       'runs at the ceiling in the project root — one for the whole split, read-only: ' +
       'who owns which files, where the groups overlap and who gets the contested ' +
       'ones, who must wait for whom, and what to ask you before a group starts. ' +
+      'If the chat’s group is “Auto”, the triage also sees the group catalog — ' +
+      'global ones and this project’s, with their “When” — and may assign a group ' +
+      'to each part: the pick lands in the child’s own field before its first run, ' +
+      'the group is switched on at the start, and the parent’s feed gets a line ' +
+      'about it. A key missing from the catalog is dropped. When the parent (or ' +
+      'anyone above it in the tree) has an explicit group, the triage sees no ' +
+      'catalog and the children take that group from the parent. ' +
       'On its verdict the panel creates the copies: groups with no waits right ' +
       'away, waiting ones once their predecessor’s chain ends (the copy then ' +
       'branches from ITS branch, not the main one), held ones after your answer ' +
@@ -924,6 +1011,53 @@ export const chatEn: typeof chatRu = {
       'up to three times with a pause, and on a limit at the moment it resets; the ' +
       'row says “waiting for a retry”. A real error is not retried, and a group that ' +
       'gave up shows the reason and the number of retries.',
+    cascadeDelivery: 'Delivery is checked by git, “accepted” is yours to set',
+    cascadeDeliveryText:
+      'With delivery on, the work (and the review with its fixes) is followed by a ' +
+      '“delivery” link on the work model: commit, fresh main branch, push of its own ' +
+      'branch, MR. The panel does not take the agent’s word for it: when the link ends ' +
+      'it checks the git facts — is there a commit, was the branch pushed, is there an ' +
+      'MR whose head is the group’s copy — and the “MR !N” line leads to the MR found ' +
+      'that way. Something missing — the row says “missing for the MR: …” and the ' +
+      'group gets a reminder, two at most; the remote not answering — the check ' +
+      'repeats (after one minute, five, fifteen, then every fifteen minutes for up to ' +
+      'four hours) and only then gives up with the reason. The “Accept” button in a ' +
+      'group’s row is your “I looked at the delivery and agree” mark: the panel never ' +
+      'sets it by itself. Defects outside the tasks that groups found along the way ' +
+      'collect in “Suggested tickets: N” — copy them, or “File in ‹project›” through ' +
+      'the tracker integration, only after you confirm. Steps a group cannot take (a ' +
+      'dependency between MRs, access, someone else’s service) collect in “For you to ' +
+      'do: N” — the panel does not carry them out.',
+    cascadeControl: 'One group and the whole plan',
+    cascadeControlText:
+      'A group’s row has “Pause” (its queue slot goes to the next one), “Resume” in the ' +
+      'same session and “Start now” past the queue. The summary line above the groups ' +
+      'counts them by state: running, waiting for you, queued, done, accepted, failed. ' +
+      'A group process cut off mid-turn (a panel restart, a CLI death) the panel ' +
+      'resumes by itself up to twice, first asking the agent to restore its state from ' +
+      'git and the transcript; after that — the “Resume” or “Resume interrupted (N)” ' +
+      'button. “Cancel plan” stops every group of the split and closes the plan after ' +
+      'asking for confirmation: chats, copies and branches stay, and after cancelling ' +
+      'you can split again. A cancelled plan does not come back to life on a restart. ' +
+      'Chats of groups dropped by a split relaunch are collected separately — ' +
+      '“Inactive: N”.',
+    cascadeRules: 'What a group decides on its own — “Settings” → “Groups”',
+    cascadeRulesText:
+      'A group has no human by construction, so its permissions are decided by the ' +
+      'tab’s rows, each in one of three positions: “Itself”, “With a note” (also on ' +
+      'its own, but the parent’s summary keeps an “Allowed automatically” line you can ' +
+      '“Dismiss”) and “Human” — a card and a wait. Out of the box a group does by ' +
+      'itself ordinary work, writes to git, the MR and the tracker, and deletes files ' +
+      'in its own copy; a human gets git history rewrites, databases, infrastructure, ' +
+      'package publishing, deletion on the hosting and running downloaded code. The ' +
+      'single exception is a lease push of the group’s OWN branch after a rebase. ' +
+      '“Group decision points”: decide by the plan itself (the recommended option, ' +
+      'with the decision written into the MR) or ask you and wait. The same tab holds ' +
+      'how many groups run at once on a light and a heavy project and what counts as ' +
+      'heavy; a project can set its own, and a row without its own is marked “as ' +
+      'shared”. A group stopped on a question or a permission is marked “waits for ' +
+      'you” in the chat list and the summary, and the panel calls you with a toast, a ' +
+      'sound and — on a hidden tab — a system notification.',
     cascadeOverlap: 'Branch overlap after the work',
     cascadeOverlapText:
       'Triage splits the groups by ownership IN ADVANCE — and gets it wrong in ' +
@@ -939,7 +1073,13 @@ export const chatEn: typeof chatRu = {
       'a group branched from its predecessor’s branch receives the list of files ' +
       'that predecessor touched — up to twenty names, the rest as a number. ' +
       'A new overlap is announced once: a ' +
-      'recount after every chain does not repeat what was already said. A branch ' +
+      'recount after every chain does not repeat what was already said. While ' +
+      'groups work the count also repeats by itself — at most once every ten minutes ' +
+      'per split, by the commit the copy stands on rather than the branch name. It is ' +
+      'checked against the main branch too: if that rewrote the same file while the ' +
+      'group worked, the group gets a mark and the parent a note, once per set of ' +
+      'files. The panel does not rebuild a branch mid-work: catching up with main is ' +
+      'the job of the “delivery” link. A branch ' +
       'that could not be read is named separately — “no overlap” in place of ' +
       'something unread would be a lie. Before the first check the section says so.',
     cascadePause: 'Stop the whole tree at once',
@@ -954,7 +1094,10 @@ export const chatEn: typeof chatRu = {
       'stages are started from the top, so everything has to stand still. Paused chats ' +
       'carry a “paused” chip in the summary and in the list. Anything you type into a ' +
       'paused chat yourself is sent as usual — the pause mutes only the panel’s auto-starts. ' +
-      'The pause survives a panel restart.',
+      'The pause survives a panel restart. If the panel could not verify the process number of ' +
+      'some run at that moment, it leaves that process alone and says so: “Runs not stopped: N” ' +
+      '— such a run finishes its turn; stop it from its chat again. The group pause and “Cancel ' +
+      'plan” answer the same way.',
     cascadeManual: 'Changing a group’s model',
     cascadeManualText:
       'Each group on the split card carries two dropdowns — model and depth. Your ' +
@@ -1106,7 +1249,11 @@ export const chatEn: typeof chatRu = {
       'run failed, the checkpoint was not updated or did not change, the chain ran ' +
       'out. Turn it off per conversation with the toggle, or everywhere in Settings ' +
       '→ “Continue on its own in every conversation”; one switched off by hand ' +
-      'stays off. Neither of them waives the safeguards.',
+      'stays off. Neither of them waives the safeguards. A split group has its own ' +
+      'order: its continuation (except for plan and triage) the panel carries out ' +
+      'without the toggle — a group has no human — its cap is three continuations, and ' +
+      'the task in the continuation prompt is a boundary for it rather than a guide. ' +
+      'Past the cap the turn ends, and the pipeline takes the group from there.',
     handoffTidy: 'Tidying the working files — half the point',
     handoffTidyText:
       'A clean session reads exactly the checkpoint file (.agent/PROGRESS.md by ' +
@@ -1133,6 +1280,54 @@ export const chatEn: typeof chatRu = {
       'and the “the agent is going in circles” stop do not start counting again. ' +
       'A chain nobody came back to for a day is forgotten. The “every ' +
       'conversation” setting is the toggle’s default value, not an order.',
+
+    autonomyTitle: 'Chat group and autonomy',
+    autonomyCaption:
+      'Every conversation has its own group (a set of rules and skills) and its own ' +
+      'autonomy. Split children take both from the parent until they are given their own.',
+    autonomyMenu: 'Where to change it',
+    autonomyMenuText:
+      'The “Chat settings” menu → “Group and autonomy”. “Group” is the group switched ' +
+      'on for this chat’s runs: “Auto” leaves the choice to task triage, a specific ' +
+      'group is switched on when any run starts — split children and conveyor ' +
+      'stages included — and switches nothing else off. Project ' +
+      'groups show only in a chat of their own project. Under a child’s field it ' +
+      'says “from parent: …” while the value is inherited; a click in the child ' +
+      'changes only its own field, and “Same as parent” brings inheritance back. ' +
+      'For a group pair the menu offers only the side active in the project; the server ' +
+      'refuses the inactive side too (409) and says where to switch the pair side. A branch ' +
+      'made by editing a message takes the group and autonomy along. Switched autonomy while ' +
+      'the agent’s background commands are running? The process is not restarted so they are ' +
+      'not killed: the feed says how many are still running, and the new marker takes effect ' +
+      'once they finish.',
+    autonomyPick: 'An automatic pick instead of a question',
+    autonomyPickText:
+      'With “Autonomous — pick the recommended option” on (the default), an agent ' +
+      'question with a “(Recommended)” option does not wait for you: that option is ' +
+      'taken, and a muted “Auto-pick: …” line stays where the question card would ' +
+      'be. It cannot be clicked — the answer has already gone; if you disagree, tell ' +
+      'the agent in an ordinary message. A question without a recommended option ' +
+      'waits for you as usual. The switch takes effect from the next turn: the CLI ' +
+      'process restarts with the new value.',
+    autonomyEscalation: 'Critical goes to the main chat',
+    autonomyEscalationText:
+      'A group that runs into something it must not decide without a human writes ' +
+      'it in a special block; its own feed hides the block, and the MAIN chat of the ' +
+      'tree shows a “Critical from group …” card with an “Open the group chat” ' +
+      'button. The card also appears when autonomy picked for you in a question ' +
+      'marked critical. The main chat carries a “! N” mark in the list on the left — ' +
+      'the number of unread notes. Opening the chat is not reading it: the card and ' +
+      'the mark stay until you press “Mark as read”.',
+    autonomyWhere: 'Where it is kept',
+    autonomyWhereText:
+      'In the panel’s state, per conversation: split children’s runs are started by ' +
+      'the panel itself, with no browser tab, and a choice kept only in the browser ' +
+      'would never reach them. Claude Code’s files are not changed; switching a group ' +
+      'on is the same write the Groups section makes.',
+    autonomyNote:
+      'Autonomy answers only questions with an explicitly recommended option and ' +
+      'never approves actions for you: permission cards still wait for you or for ' +
+      'the “Approve without asking” rules.',
 
     codeTitle: 'Project code: what the agent changed, and editing on the spot',
     codeCaption:
@@ -1263,6 +1458,17 @@ export const chatEn: typeof chatRu = {
       'full answer is being written to the transcript the feed reads from. If the ' +
       'reconnects do not help, instead of silence you get “show from the history” — ' +
       'reread the conversation, where the answer already is.',
+    failTitle: 'A turn failed — the card says why and what to do',
+    failText:
+      'Under the error text sit “Retry” (the task again) and “Continue” (finish from ' +
+      'where it broke off). A failure of the CLI itself, with no model answer, shows ' +
+      'its reason rather than a bare “Request failed”. Two errors the panel explains ' +
+      'in words. An outdated CLI: the card names the version the panel runs and the ' +
+      'one the model needs, shows the CLI path, a newer copy if there is one further ' +
+      'down PATH, and an “Update CLI” button. An overflowing context: the same ' +
+      'conversation will accept neither a retry nor a continuation, so in their place ' +
+      'come “Compact context” and “Continue in a new session”; for a split parent the ' +
+      'groups move to the new conversation with it.',
     askOldTitle: 'Your answer closes the question — the agent’s next message does not',
     askOldText:
       'Having asked, the agent keeps writing: it does not wait for the answer, and ' +
@@ -1362,9 +1568,15 @@ export const chatEn: typeof chatRu = {
       'where the browser supports speech recognition — otherwise the button is off.',
     composerFiles: 'Attachments',
     composerFilesText:
-      'The paperclip or a drag onto the field. Up to 20 MB per file; images, PDF, ' +
+      'The paperclip, a drag onto the field or a paste from the clipboard (Ctrl+V): ' +
+      'a screenshot without a name becomes a pasted-<date>-<time>.png chip, and ' +
+      'clipboard text is pasted as usual. Up to 20 MB per file; images, PDF, ' +
       'markdown, text, tables, code. The file is stored in a panel folder, and ' +
-      'Claude gets the path and reads it from disk itself.',
+      'Claude gets the path and reads it from disk itself. An unsuitable file is ' +
+      'refused right away, at attach time, and never becomes a chip: a type the ' +
+      'panel does not pass (an .exe, say) gets a message listing the allowed ' +
+      'extensions; a file over the limit gets a message with its size next to the ' +
+      'limit, “big.pdf — 25 MB”.',
     composerChips: 'Quick action chips',
     composerChipsText:
       'In an empty chat — ready-made openings: in a project that means review, ' +
@@ -1579,21 +1791,36 @@ export const chatEn: typeof chatRu = {
       'of megabytes, and there is nothing to read them whole with in a browser.',
     noteRestartTitle: 'A panel server restart does not kill the agent — the run is picked up',
     noteRestartText:
-      'Agent processes outlive a restart of the panel server, while the run registry ' +
-      'used to live only in memory: after a restart every permission request was ' +
-      'refused with "Conversation not found" and no card appeared in the chat. Running ' +
-      'runs are now recorded in a ledger on disk (runs.json in the panel data folder), ' +
-      'and on start the server picks up the ones whose process is alive: permission ' +
-      'cards are drawn in their chats, Stop works, the end is detected by the process ' +
-      'dying. What a picked-up run lacks is its output stream: the answer is read from ' +
-      'the conversation, and the feed says so in a line. When the run ends the panel ' +
+      'The CLI process is held not by the panel server but by a separate relay, so a ' +
+      'server restart does not touch it. Running runs are recorded in a ledger on disk ' +
+      '(runs.json in the panel data folder) together with the relay’s address, and on ' +
+      'start the server connects to it again: it receives the output gathered without ' +
+      'it and carries the session on as its own — the stream in the feed, permission ' +
+      'cards, Stop, waking up after background commands. A run without a relay is ' +
+      'picked up by its process being alive, but without an output stream: the answer ' +
+      'is read from the conversation, and the feed says so in a line. A process that ' +
+      'left mid-turn taking background commands with it counts as cut off, not ' +
+      'finished: its answer does not know the results of that background work. When ' +
+      'the run ends the panel ' +
       "reads the agent's last completed turn out of the conversation — both a clean " +
       'session continuation and the work → review → fix pipeline follow from it; a turn ' +
       'cut short on a tool call does not count as a closing one, and then there is ' +
       'nothing to decide by. A run missing from the ledger is looked up there once more ' +
       'right on the permission request, and only then refused — "the panel restarted, ' +
       'send the message again" — the same text showing in the conversation as the call ' +
-      'result.',
+      'result. A permission request made while the server is down waits for it to ' +
+      'come back as long as a card waits for a human decision — ' +
+      'instead of refusing on the human’s behalf. Allow pressed in the first seconds ' +
+      'after a restart, before the request reached the new server, is not lost: the ' +
+      'answer waits for the request to be repeated and goes to the agent with it. ' +
+      'Under "pnpm dev" the server watcher ' +
+      'tries the new build before restarting: an edit the server would not start with ' +
+      'leaves the previous server running, and the file and error line go to the ' +
+      'watcher log; a server that crashed on its own is started again. Only the panel ' +
+      'server can connect to a relay — the channel is locked with a key from the run ' +
+      'ledger. If the relay was ended from outside, the feed says "The chat process was ' +
+      'lost": the conversation is intact, and the next message continues it in the ' +
+      'same session.',
     noteLiveTitle: 'A conversation running outside the panel is picked up on its own',
     noteLiveText:
       'The same chat can be driven from a terminal or an editor extension — such a ' +
@@ -1640,6 +1867,11 @@ export const chatEn: typeof chatRu = {
       '05-overlap': 'Branch overlap: a shared file and a file taken outside the group it owns',
       '06-paused': 'The tree on pause: a mark on every group and the resume button',
       '07-worktrees': 'Parallel copies of the repository: path, install trace and removal',
+    },
+    autonomy: {
+      '01-escalation': 'The main chat: a critical card from a group and the button to it',
+      '02-auto-pick': 'The group’s feed: an “Auto-pick: …” line in place of the question',
+      '03-menu': 'The child’s menu: group and autonomy “from parent”',
     },
   },
   diagrams: {

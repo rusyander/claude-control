@@ -459,7 +459,7 @@ describe('отправка правок в MR', () => {
 
     expect(started).toHaveLength(1);
     expect(started[0]?.stage).toBe('push');
-    expect(started[0]?.prompt).toContain('явное согласие');
+    expect(started[0]?.prompt).toContain('this is explicit consent to commit and push');
     expect(started[0]?.prompt).toContain('feature/login');
     expect(outcome.applied[0]?.pushChatId).toBe(started[0]?.chatId);
     expect(links.fix?.review?.pushedAt).toBe('2026-09-09T12:00:00.000Z');

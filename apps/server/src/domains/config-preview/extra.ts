@@ -194,7 +194,9 @@ function previewHook(
       files: onCopies(paths, ['settings', 'settingsLocal'], (sandbox) => {
         deleteHook(sandbox.settings, id, state, undefined, target(sandbox));
       }),
-      notes: [],
+      // Выключенный хук лежит снимком в панели, а не в settings.json: без заметки
+      // дифф пуст и карточка «нечего менять» — удалить его было бы нельзя.
+      notes: found && !found.isEnabled ? [{ code: 'note-hook-delete-disabled' }] : [],
     };
   }
 

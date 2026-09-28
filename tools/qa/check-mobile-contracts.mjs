@@ -57,6 +57,19 @@ const CODE = /\.(ts|tsx|js|jsx)$/;
 /** Словари серверных текстов: панельный оригинал и копия телефона. */
 const WEB_DICT = 'apps/web/src/shared/config/i18n/server-messages';
 const MOBILE_DICT = 'apps/mobile/src/shared/config/i18n/server-messages';
+/** Тексты карточки агента по коду (`panelTextParams`): у телефона — та же копия, файл в файл. */
+const WEB_PANEL_TEXTS = 'apps/web/src/shared/config/i18n/panel-agent';
+const MOBILE_PANEL_TEXTS = 'apps/mobile/src/shared/config/i18n/panel-texts';
+const PANEL_TEXT_FILES = [
+  'texts.ru.ts',
+  'texts.en.ts',
+  'texts-groups-entities.ru.ts',
+  'texts-groups-entities.en.ts',
+  'texts-tests.ru.ts',
+  'texts-tests.en.ts',
+  'texts-gaps.ru.ts',
+  'texts-gaps.en.ts',
+];
 
 /** Список VALUE_MODULES читается из самого конфига — второй копии быть не должно. */
 function readValueModules(metroText) {
@@ -96,6 +109,10 @@ function importsOf(text) {
     const head = Math.max(text.lastIndexOf('import', m.index), text.lastIndexOf('export', m.index));
     if (head < 0) continue;
     const clause = text.slice(head, m.index);
+    // Слово `from` внутри строки (английский текст промпта: «… a copy on it
+    // from ' +») — не импорт: настоящий оператор стоит с начала строки, а между
+    // ним и `from` нет ни кавычки, ни точки с запятой.
+    if ((head > 0 && text[head - 1] !== '\n') || /['"`;]/.test(clause)) continue;
     // `import { type A, type B } from` — тоже только типы: каждое имя помечено.
     const names = [...clause.matchAll(/[{,]\s*(type\s+)?[A-Za-z_$][\w$]*/g)];
     const typeOnly =
@@ -217,6 +234,14 @@ function check() {
   // 4. Словари серверных текстов у телефона — копия панельных.
   const drift = dictionaryProblems(WEB_DICT, MOBILE_DICT);
   problems.push(...drift);
+  for (const name of PANEL_TEXT_FILES) {
+    const webFile = join(WEB_PANEL_TEXTS, name);
+    const mobileFile = join(MOBILE_PANEL_TEXTS, name);
+    if (!existsSync(mobileFile)) problems.push(`${mobileFile}: словаря нет, а у панели он есть`);
+    else if (readFileSync(webFile, 'utf8') !== readFileSync(mobileFile, 'utf8')) {
+      problems.push(`${mobileFile}: разошёлся с ${webFile} — копия словаря отстала`);
+    }
+  }
   console.log(
     `словарей серверных текстов сверено: ${readdirSync(join(WEB_DICT, 'ru')).length} × 2`,
   );
@@ -298,6 +323,13 @@ function selftest() {
       () =>
         valueImports(
           "import { ourLayerIds, type OurLayerId } from '@agentdeck/contracts/platform-layers';",
+        ).length === 1,
+    ],
+    [
+      'слово from в строковом литерале — не импорт',
+      () =>
+        importsOf(
+          "import { a } from './brand.ts';\nconst t =\n  'a copy on it from ' +\n  'the link.';\n",
         ).length === 1,
     ],
     [

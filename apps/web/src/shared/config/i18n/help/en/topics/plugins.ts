@@ -90,7 +90,10 @@ export const pluginsEn: typeof pluginsRu = {
       iInstallText:
         'Installing by identifier is collapsed and sits after the catalogue on ' +
         "purpose: check the list first. The error is shown in the CLI's own words — " +
-        'here it spells out which plugins that marketplace actually has.',
+        'here it spells out which plugins that marketplace actually has. A command’s ' +
+        'outcome sits on the tab where it was given: enable, disable, update and uninstall ' +
+        'answer on “Installed” — with the CLI’s output on an error or a restart reminder ' +
+        'on success — and the catalogue form shows only the outcome of an install.',
       iMarketplace: 'Removing a source states the consequences',
       iMarketplaceText:
         'When Claude Code removes a marketplace it drops every plugin from it — with ' +

@@ -1,0 +1,15 @@
+.box {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: 8px;
+  background: var(--color-surface-sunken);
+}
+
+/* Две кнопки выбора стоят вплотную — это один переключатель, а не два действия. */
+.segments {
+  display: inline-flex;
+  gap: var(--spacing-3xs);
+}
+
+.hint {
+  max-width: 72ch;
+}

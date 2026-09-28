@@ -416,6 +416,47 @@ function isListening(port: number): Promise<boolean> {
   });
 }
 
+/**
+ * Номер порта, который только что никто не слушал: занять порт 0 и отпустить.
+ * Зашитые номера краснели, стоило на машине жить чему-то на них.
+ */
+async function freeTcpPort(): Promise<number> {
+  const probe = createServer();
+  const port = await new Promise<number>((ready, fail) => {
+    probe.once('error', fail);
+    probe.listen(0, '127.0.0.1', () => {
+      const address = probe.address();
+      ready(typeof address === 'object' && address ? address.port : 0);
+    });
+  });
+  await new Promise((done) => probe.close(() => done(undefined)));
+  return port;
+}
+
+/**
+ * Реестры теста. Деревья гасятся в afterEach, а не в конце теста: упавшее
+ * утверждение до своего stop оставляло dev-сервер сиротой на порту — такие
+ * сироты из cc-runner-* жили часами и мешали следующим прогонам.
+ */
+function trackRegistries(): {
+  tracked: (
+    options: ConstructorParameters<typeof ProjectRunnerRegistry>[0],
+  ) => ProjectRunnerRegistry;
+  stopTracked: () => void;
+} {
+  const registries: ProjectRunnerRegistry[] = [];
+  return {
+    tracked: (options) => {
+      const registry = new ProjectRunnerRegistry(options);
+      registries.push(registry);
+      return registry;
+    },
+    stopTracked: () => {
+      for (const registry of registries.splice(0)) registry.stopAll();
+    },
+  };
+}
+
 /** Ждать условия с опросом (готовность/смерть процесса). */
 async function until(
   predicate: () => Promise<boolean> | boolean,
@@ -461,7 +502,11 @@ describe(
       writeFileSync(join(dir, 'server.mjs'), DEV_SERVER);
       opened.length = 0;
     });
-    afterEach(() => dropTemp(dir));
+    const { tracked, stopTracked } = trackRegistries();
+    afterEach(() => {
+      stopTracked();
+      dropTemp(dir);
+    });
 
     /** Запуск node напрямую — без npm, чтобы тест был быстрым и надёжным. */
     const launch = (target: string): LaunchSpec => ({
@@ -471,7 +516,7 @@ describe(
     });
 
     it('старт → адрес из вывода → running → браузер открыт на нём же', async () => {
-      const registry = new ProjectRunnerRegistry({
+      const registry = tracked({
         openBrowser: (url) => opened.push(url),
         resolveLaunch: launch,
       });
@@ -494,7 +539,7 @@ describe(
 
     it('найденный порт уходит в память панели через колбэк', async () => {
       const remembered: { projectPath: string; dir: string; port: number }[] = [];
-      const registry = new ProjectRunnerRegistry({
+      const registry = tracked({
         openBrowser: () => {},
         resolveLaunch: launch,
         onPortDiscovered: (run) => remembered.push(run),
@@ -518,7 +563,7 @@ describe(
       writeFileSync(join(web, 'server.mjs'), DEV_SERVER);
       writeFileSync(join(api, 'server.mjs'), DEV_SERVER);
 
-      const registry = new ProjectRunnerRegistry({ openBrowser: () => {}, resolveLaunch: launch });
+      const registry = tracked({ openBrowser: () => {}, resolveLaunch: launch });
       try {
         await registry.start({ projectPath: dir, dir: 'apps/web' });
         await registry.start({ projectPath: dir, dir: 'apps/api' });
@@ -542,7 +587,7 @@ describe(
       mkdirSync(web, { recursive: true });
       writeFileSync(join(web, 'server.mjs'), DEV_SERVER);
 
-      const registry = new ProjectRunnerRegistry({ openBrowser: () => {}, resolveLaunch: launch });
+      const registry = tracked({ openBrowser: () => {}, resolveLaunch: launch });
       try {
         await registry.start({ projectPath: dir });
         await registry.start({ projectPath: dir, dir: 'apps/web' });
@@ -557,7 +602,7 @@ describe(
     });
 
     it('стоп → процесс мёртв (порт больше не слушается)', async () => {
-      const registry = new ProjectRunnerRegistry({ openBrowser: () => {}, resolveLaunch: launch });
+      const registry = tracked({ openBrowser: () => {}, resolveLaunch: launch });
       await registry.start({ projectPath: dir });
       await until(() => registry.get({ projectPath: dir })?.status === 'running');
       const port = registry.get({ projectPath: dir })!.port!;
@@ -569,8 +614,8 @@ describe(
     });
 
     it('закреплённый порт уходит в PORT и там же ждём', async () => {
-      const registry = new ProjectRunnerRegistry({ openBrowser: () => {}, resolveLaunch: launch });
-      const wanted = 4737;
+      const registry = tracked({ openBrowser: () => {}, resolveLaunch: launch });
+      const wanted = await freeTcpPort();
       const started = await registry.start({ projectPath: dir }, { port: wanted });
       expect(started.port).toBe(wanted);
 
@@ -582,8 +627,8 @@ describe(
     });
 
     it('закреплённый порт уже занят → RunnerError(port-busy), а не ложное «работает»', async () => {
-      const registry = new ProjectRunnerRegistry({ openBrowser: () => {}, resolveLaunch: launch });
-      const wanted = 4738;
+      const registry = tracked({ openBrowser: () => {}, resolveLaunch: launch });
+      const wanted = await freeTcpPort();
       await registry.start({ projectPath: dir }, { port: wanted });
       expect(await until(() => registry.get({ projectPath: dir })?.status === 'running')).toBe(
         true,
@@ -603,7 +648,7 @@ describe(
 
     it('сервер молчит про адрес, но жив → running без ссылки, процесс не убит', async () => {
       writeFileSync(join(dir, 'server.mjs'), QUIET_SERVER);
-      const registry = new ProjectRunnerRegistry({
+      const registry = tracked({
         openBrowser: (url) => opened.push(url),
         resolveLaunch: launch,
         readyTimeoutMs: 1_200,
@@ -622,21 +667,21 @@ describe(
     });
 
     it('path-safety: несуществующий каталог → RunnerError(bad-path)', async () => {
-      const registry = new ProjectRunnerRegistry({ openBrowser: () => {}, resolveLaunch: launch });
+      const registry = tracked({ openBrowser: () => {}, resolveLaunch: launch });
       await expect(registry.start({ projectPath: dir, dir: 'nope' })).rejects.toBeInstanceOf(
         RunnerError,
       );
     });
 
     it('path-safety: подпапка вне проекта → RunnerError(bad-path)', async () => {
-      const registry = new ProjectRunnerRegistry({ openBrowser: () => {}, resolveLaunch: launch });
+      const registry = tracked({ openBrowser: () => {}, resolveLaunch: launch });
       await expect(
         registry.start({ projectPath: dir, dir: '../elsewhere' }),
       ).rejects.toBeInstanceOf(RunnerError);
     });
 
     it('повторный старт запущенного не плодит второй процесс', async () => {
-      const registry = new ProjectRunnerRegistry({ openBrowser: () => {}, resolveLaunch: launch });
+      const registry = tracked({ openBrowser: () => {}, resolveLaunch: launch });
       const first = await registry.start({ projectPath: dir });
       const second = await registry.start({ projectPath: dir });
       expect(second.startedAt).toBe(first.startedAt);
@@ -644,7 +689,7 @@ describe(
     });
 
     it('openBrowser:false — сервер поднялся, окно браузера не открылось', async () => {
-      const registry = new ProjectRunnerRegistry({
+      const registry = tracked({
         openBrowser: (url) => opened.push(url),
         resolveLaunch: launch,
       });
@@ -662,7 +707,7 @@ describe(
       // закреплённого порта поднимался на порту панели — то есть не поднимался.
       const saved = process.env.PORT;
       process.env.PORT = '5178';
-      const registry = new ProjectRunnerRegistry({ openBrowser: () => {}, resolveLaunch: launch });
+      const registry = tracked({ openBrowser: () => {}, resolveLaunch: launch });
       try {
         await registry.start({ projectPath: dir });
         expect(await until(() => registry.get({ projectPath: dir })?.status === 'running')).toBe(
@@ -686,14 +731,16 @@ describe(
         launched += 1;
         return launch(target);
       };
-      const registry = new ProjectRunnerRegistry({
+      const registry = tracked({
         openBrowser: () => {},
         resolveLaunch: counting,
       });
+      // Свободный номер, а не зашитый: чужой процесс на 4739 давал port-busy.
+      const port = await freeTcpPort();
       try {
         const [a, b] = await Promise.all([
-          registry.start({ projectPath: dir }, { port: 4739 }),
-          registry.start({ projectPath: dir }, { port: 4739 }),
+          registry.start({ projectPath: dir }, { port }),
+          registry.start({ projectPath: dir }, { port }),
         ]);
         expect(launched).toBe(1);
         expect(registry.list()).toHaveLength(1);
@@ -708,7 +755,7 @@ describe(
         join(dir, 'server.mjs'),
         "console.error('EADDRINUSE: порт занят');\nprocess.exit(1);\n",
       );
-      const registry = new ProjectRunnerRegistry({ openBrowser: () => {}, resolveLaunch: launch });
+      const registry = tracked({ openBrowser: () => {}, resolveLaunch: launch });
       await registry.start({ projectPath: dir });
 
       expect(await until(() => registry.get({ projectPath: dir })?.status === 'error')).toBe(true);
@@ -729,7 +776,11 @@ describe(
       writeFileSync(join(dir, 'server.mjs'), DEV_SERVER);
       opened.length = 0;
     });
-    afterEach(() => dropTemp(dir));
+    const { tracked, stopTracked } = trackRegistries();
+    afterEach(() => {
+      stopTracked();
+      dropTemp(dir);
+    });
 
     const launch = (target: string): LaunchSpec => ({
       file: process.execPath,
@@ -738,7 +789,7 @@ describe(
     });
 
     it('поднимает цель и НЕ открывает браузер', async () => {
-      const registry = new ProjectRunnerRegistry({
+      const registry = tracked({
         openBrowser: (url) => opened.push(url),
         resolveLaunch: launch,
       });
@@ -761,7 +812,7 @@ describe(
       mkdirSync(web, { recursive: true });
       writeFileSync(join(web, 'server.mjs'), DEV_SERVER);
 
-      const registry = new ProjectRunnerRegistry({ openBrowser: () => {}, resolveLaunch: launch });
+      const registry = tracked({ openBrowser: () => {}, resolveLaunch: launch });
       const report = await autostartProjects(registry, {
         listAutostartProjects: () => [{ path: web, projectPath: dir, dir: 'apps/web' }],
       });
@@ -771,8 +822,28 @@ describe(
       registry.stopAll();
     });
 
+    // F-16: отметка автозапуска у каталога вне проектов панели (записанная до
+    // границы или руками в файле) не исполняет его команду при старте панели.
+    it('цель вне проектов панели не поднимается, а попадает в отчёт отказом', async () => {
+      const registry = tracked({ openBrowser: () => {}, resolveLaunch: launch });
+      const foreign = join(dir, 'foreign');
+      mkdirSync(foreign, { recursive: true });
+      writeFileSync(join(foreign, 'server.mjs'), DEV_SERVER);
+      const report = await autostartProjects(
+        registry,
+        { listAutostartProjects: () => [{ path: foreign }, { path: dir }] },
+        (path) => path === dir,
+      );
+
+      expect(report.failed.map((item) => item.path)).toEqual([foreign]);
+      expect(report.failed[0]?.message).toContain('«Проекты»');
+      expect(report.started.map((item) => item.path)).toEqual([dir]);
+      expect(registry.get({ projectPath: foreign })).toBeUndefined();
+      registry.stopAll();
+    });
+
     it('неудача одной цели не роняет остальные и попадает в отчёт', async () => {
-      const registry = new ProjectRunnerRegistry({ openBrowser: () => {}, resolveLaunch: launch });
+      const registry = tracked({ openBrowser: () => {}, resolveLaunch: launch });
       const missing = join(dir, 'nope');
       const report = await autostartProjects(registry, {
         listAutostartProjects: () => [{ path: missing }, { path: dir }],

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { shellView, summarizeProgress } from './progressView';
+import { clockTicks, shellView, summarizeProgress } from './progressView';
 
 /**
  * Свёрнутая полоса прогресса отвечает на единственный вопрос: «сколько сделано и
@@ -87,5 +87,59 @@ describe('summarizeProgress', () => {
       hasAnything: true,
     });
     expect(summarizeProgress(progress, false).hasAnything).toBe(false);
+  });
+});
+
+/**
+ * Живой прогон 29.09: агент сам погасил свой dev-сервер при уборке, а полоса
+ * писала «Фон оборван» красным. Остановленное агентом — не обрыв.
+ */
+describe('summarizeProgress — фон, остановленный агентом', () => {
+  it('killed не считается ни идущим, ни оборванным', () => {
+    const progress = {
+      tasks: [],
+      agents: [],
+      shells: [
+        { id: 'v', command: 'npx vite --port 9123', status: 'killed' as const },
+        { id: 'c', command: 'pnpm test', status: 'stopped' as const },
+      ],
+      processAlive: false,
+    };
+    const summary = summarizeProgress(progress, false);
+    expect([summary.shellsRunning, summary.shellsLost]).toEqual([0, 1]);
+  });
+});
+
+describe('clockTicks', () => {
+  const shell = { id: 'v', command: 'npx vite', status: 'running' as const };
+
+  it('между ходами фон жив — часы тикают', () => {
+    const summary = summarizeProgress({
+      tasks: [],
+      agents: [],
+      shells: [shell],
+      processAlive: true,
+    });
+    expect(clockTicks(summary, false)).toBe(true);
+  });
+
+  it('процесс умер — фон оборван, часы стоят', () => {
+    const summary = summarizeProgress({
+      tasks: [],
+      agents: [],
+      shells: [shell],
+      processAlive: false,
+    });
+    expect(clockTicks(summary, false)).toBe(false);
+  });
+
+  it('ход идёт с текущим вызовом — тикают; без хода текущего вызова нет', () => {
+    const progress = {
+      tasks: [],
+      agents: [],
+      activeTool: { name: 'Bash', summary: 'x', startedAt: '2026-09-29T10:00:00Z' },
+    };
+    expect(clockTicks(summarizeProgress(progress, true), true)).toBe(true);
+    expect(clockTicks(summarizeProgress(progress, false), false)).toBe(false);
   });
 });

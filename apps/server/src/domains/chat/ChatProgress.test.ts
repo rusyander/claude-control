@@ -173,3 +173,57 @@ describe('buildProgress', () => {
     expect(progress.agents).toEqual([]);
   });
 });
+
+/** Холодная проверка 29.09 (N4): навык утренней задачи — не шаг нынешней. */
+describe('buildProgress: навык как шаг группы', () => {
+  const skill = (name: string) => ({
+    type: 'tool_use',
+    name: 'Skill',
+    id: `s-${name}`,
+    input: { skill: name },
+  });
+  const meta = (text: string) =>
+    ({ ...user([{ type: 'text', text }]), isMeta: true }) as TranscriptRecord;
+
+  it('вызванный навык и его тело (служебная реплика) — шаг идёт', () => {
+    const progress = buildProgress([
+      assistant([skill('deep-review')]),
+      user([{ type: 'tool_result', tool_use_id: 's-deep-review', content: 'Launching skill' }]),
+      meta('Base directory for this skill: …'),
+      assistant([{ type: 'text', text: 'читаю дифф' }]),
+    ]);
+    expect(progress.skill?.name).toBe('deep-review');
+  });
+
+  it('после нового слова человека прежний навык шагом не зовётся', () => {
+    const progress = buildProgress([
+      assistant([skill('deep-review')]),
+      user([{ type: 'tool_result', tool_use_id: 's-deep-review', content: 'Launching skill' }]),
+      user([{ type: 'text', text: 'теперь поправь заголовок' }]),
+      assistant([{ type: 'text', text: 'правлю' }]),
+    ]);
+    expect(progress.skill).toBeUndefined();
+  });
+
+  it('уведомление фоновой задачи — не слово человека, навык остаётся', () => {
+    const progress = buildProgress([
+      assistant([skill('deep-review')]),
+      user([{ type: 'text', text: '<task-notification>готово</task-notification>' }]),
+    ]);
+    expect(progress.skill?.name).toBe('deep-review');
+  });
+});
+
+// Ревью r2 (R3): сводка сжатия и реплика субагента навык не сбрасывают.
+describe('buildProgress: служебные реплики и навык', () => {
+  it.each([['isCompactSummary'], ['isSidechain']])('%s — навык остаётся', (flag) => {
+    const progress = buildProgress([
+      assistant([{ type: 'tool_use', name: 'Skill', id: 's', input: { skill: 'deep-review' } }]),
+      {
+        ...user([{ type: 'text', text: 'This session is being continued…' }]),
+        [flag]: true,
+      } as TranscriptRecord,
+    ]);
+    expect(progress.skill?.name).toBe('deep-review');
+  });
+});

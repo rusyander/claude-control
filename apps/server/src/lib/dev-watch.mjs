@@ -18,7 +18,8 @@
  *   посредники живых сессий (`live-relay.mjs`) отвязаны и переживают
  *   перезапуск вместе с CLI; запущенный с IPC уходит вместе с родителем;
  * - откладывает перезапуск, пока в журнале прогонов есть идущий ход с живым
- *   процессом (не дольше `DEFER_CAP_MS`): поток хода не рвётся на середине.
+ *   процессом или группа разделения готовит копию (не дольше `DEFER_CAP_MS`):
+ *   поток хода и `npm ci` копии не рвутся на середине.
  *   `AGENTDECK_DEV_DEFER=0` — перезапускать сразу;
  * - прежде чем погасить работающий сервер, пробует новую сборку
  *   (`dev-boot-probe.mjs`): не поднимается — прежний сервер работает дальше,
@@ -154,13 +155,42 @@ export function busyRun(entries, isAlive) {
   );
 }
 
-function readEntries(file) {
+/** Подготовка копии старше этого — след процесса, умершего без перезапуска. */
+const SETUP_STALE_MS = 30 * 60_000;
+
+/**
+ * Идёт ли подготовка копии у группы разделения: группа «стартует», а чата ещё
+ * нет — панель заводит ветку и ставит зависимости (`npm ci` — минуты). В
+ * журнале прогонов её не видно, прогона ещё нет; перезапуск посреди неё
+ * оставлял группы без чата и с полузаведёнными копиями (живой прогон 29.09).
+ */
+export function splitSetupRunning(state, now) {
+  const plans = state && typeof state === 'object' ? state.splitPlans : undefined;
+  if (!plans || typeof plans !== 'object') return false;
+  return Object.values(plans).some(
+    (record) =>
+      record &&
+      !record.cancelledAt &&
+      Array.isArray(record.groups) &&
+      record.groups.some((group) => {
+        if (!group || group.status !== 'started' || group.chatId) return false;
+        const at = Date.parse(group.startedAt ?? '');
+        return Number.isFinite(at) && now - at < SETUP_STALE_MS;
+      }),
+  );
+}
+
+function readJson(file) {
   try {
-    const parsed = JSON.parse(readFileSync(file, 'utf8'));
-    return Array.isArray(parsed) ? parsed : [];
+    return JSON.parse(readFileSync(file, 'utf8'));
   } catch {
-    return [];
+    return undefined;
   }
+}
+
+function readEntries(file) {
+  const parsed = readJson(file);
+  return Array.isArray(parsed) ? parsed : [];
 }
 
 function pidAlive(pid) {
@@ -223,6 +253,7 @@ function main() {
   ];
   const configRoot = process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude');
   const ledgerFile = join(appDataDirOf(configRoot), 'runs.json');
+  const stateFile = join(appDataDirOf(configRoot), 'state.json');
   const defer = process.env.AGENTDECK_DEV_DEFER !== '0';
   const log = (line) => console.log(`[dev-watch] ${line}`);
   const pending = new Set();
@@ -290,11 +321,16 @@ function main() {
       return;
     }
     const now = Date.now();
-    if (defer && busyRun(readEntries(ledgerFile), pidAlive)) {
+    if (
+      defer &&
+      (busyRun(readEntries(ledgerFile), pidAlive) || splitSetupRunning(readJson(stateFile), now))
+    ) {
       deferredSince ??= now;
       if (now - deferredSince < DEFER_CAP_MS) {
         if (now === deferredSince)
-          log(`правки ждут конца идущих ходов (до ${DEFER_CAP_MS / 60_000} мин)`);
+          log(
+            `правки ждут конца идущих ходов и подготовки копий (до ${DEFER_CAP_MS / 60_000} мин)`,
+          );
         timer = setTimeout(restart, DEFER_POLL_MS);
         return;
       }

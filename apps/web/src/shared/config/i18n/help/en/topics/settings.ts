@@ -618,7 +618,7 @@ export const settingsEn: typeof settingsRu = {
         'Server: 5xx responses; 4xx responses that mean a bug in its own interface (400 and ' +
         '422 — the body failed the schema, 404 on a path with no route, a 409 repeated three ' +
         'times within a minute); log errors and warnings; responses slower than the ' +
-        'threshold; failed CLI launches and CLI runs that exited with an error, with the tail ' +
+        'threshold (except streams — a chat, panel-agent or sandbox turn is long by nature); failed CLI launches and CLI runs that exited with an error, with the tail ' +
         'of their stderr (provider errors arrive this way too, and the line naming the ' +
         'cause sits right in the message). Page: errors and rejected promises, render crashes, ' +
         'console errors and warnings (React ones included), requests the server never saw ' +

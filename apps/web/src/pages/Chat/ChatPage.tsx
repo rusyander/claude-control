@@ -458,6 +458,7 @@ export function ChatPage() {
           <ChatDock
             progress={progress.data}
             isRunning={isRunning}
+            awaiting={run.status === 'waiting' || Boolean(activeChat?.awaitingReply)}
             queued={run.queued}
             onCancelQueued={(queuedId) => chatId && agentRuns.cancelQueued(chatId, queuedId)}
             value={input}

@@ -1050,9 +1050,16 @@ export const en: TranslationSchema = {
         title_other: 'Split groups: {{count}}',
         running: 'run in progress',
         idle: 'no run in progress',
-        firstEdit: 'first edit after {{time}}',
-        work: 'worked {{time}}',
-        workTime: 'worked {{time}}',
+        meta: {
+          model: 'Model',
+          firstEdit: 'To first edit',
+          workTime: 'Run time',
+        },
+        step: 'Step {{current}} of {{total}}',
+        stepAgents_one: '{{count}} agent',
+        stepAgents_few: '{{count}} agents',
+        stepAgents_many: '{{count}} agents',
+        stepAgents_other: '{{count}} agents',
         triageRunningFor: 'triage in progress · {{time}}',
         summary: {
           accepted_one: 'accepted: {{count}}',
@@ -1089,7 +1096,7 @@ export const en: TranslationSchema = {
           idle_other: 'stopped: {{count}}',
           elapsed: 'elapsed {{time}}',
           idleHint:
-            'Has a chat, no run, no outcome: waiting on background work, a retry, delivery, or stopped',
+            'No run and no outcome: waiting on background work, a retry or delivery, stopped, or paused before its chat',
         },
         inactive: 'Inactive: {{count}}',
         inactiveHint: 'Chats of groups discarded by a split relaunch: their work does not continue',
@@ -1101,6 +1108,10 @@ export const en: TranslationSchema = {
         repairs: 'repaired by the panel: {{count}}',
         pending: 'waiting for the triage',
         queued: 'queued — starts when a slot frees up',
+        /** Started, no chat yet: copy and dependency install (live run 29.09). */
+        setup: 'preparing the copy — branch and dependency install, this takes minutes',
+        pausedNoChat: 'paused',
+        interruptedNoChat: 'cut before its chat existed — nothing to resume',
         mr: 'MR !{{id}}',
         waiting: 'waiting for: {{names}}',
         held: 'waiting for your answer',
@@ -1142,12 +1153,26 @@ export const en: TranslationSchema = {
         control: {
           pause: 'Pause',
           pauseHint:
-            'Stop the group and give its slot to the next one in the queue; groups waiting for it keep waiting',
+            'Stop the group or hold it in the queue. A running group keeps its slot: pausing does not move the queue, and groups waiting for it keep waiting',
           resume: 'Resume',
-          resumeHint: 'Resume the group where it stopped, in the same session; takes a queue slot',
+          resumeHint:
+            'Resume the group where it stopped, in the same session (one paused during preparation starts in its copy, or from scratch if the copy does not exist yet); its slot is already held',
+          requeueHint: 'Put the group back in the queue: it starts when its turn and a slot come',
           start: 'Start now',
           startHint: 'Start the group without waiting for the queue',
+          restart: 'Start again',
+          restartHint:
+            'Start the group again in its copy (preparation repeats); no copy — in a new one. The previous start was cut before the chat',
+          drop: 'Remove',
+          dropHint:
+            'Close the group: groups waiting for it move on, its slot goes to the queue; the copy can be removed separately afterwards',
+          dropConfirm:
+            'Remove the group? It closes for good: groups waiting for it no longer wait, and if it held a slot, the slot goes to the queue',
+          dropYes: 'Yes, remove',
           paused: 'Group paused',
+          requeued: 'Group is back in the queue',
+          restarted: 'Group is starting again',
+          dropped: 'Group removed',
           resumed: 'Group resumed',
           resumeQueued: 'The resume goes out after the group’s current turn',
           started: 'Group started',
@@ -1414,6 +1439,7 @@ export const en: TranslationSchema = {
       now: 'Now: {{what}}',
       shells: 'Background commands',
       shellsRunning: 'In background: {{count}}',
+      awaiting: 'Waiting for your answer',
       shellsLost: 'Background lost: {{count}}',
       shellsLostHint:
         'A background command lives as long as the conversation’s CLI process. When that process is replaced — Stop, another model or permission mode, a panel restart, a long idle — the command goes with the old one. There will be no result; the agent sees this at the start of its next turn.',
@@ -1423,6 +1449,7 @@ export const en: TranslationSchema = {
         failed: 'failed',
         stopped: 'stopped',
         lost: 'lost with the old process',
+        killed: 'stopped by the agent',
       },
     },
     questionTitle: 'Your choice is needed',

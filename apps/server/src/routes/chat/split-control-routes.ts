@@ -21,7 +21,7 @@ import type { SplitLaunchDeps } from './split-launch.ts';
  *
  * Пауза сперва пишет запись, потом останавливает прогон: конец остановленного
  * хода застаёт группу уже на паузе и не пишет ей «сбой» (`onChainEnded` паузу
- * не трогает), а место под потолком тут же отдаётся следующей из очереди.
+ * не трогает). Место под потолком пауза держит (живой прогон 29.09).
  *
  * Потолок и лимит подписки — отказ 409 с числами; клиент спрашивает человека и
  * повторяет с `force` — решение «сверх потолка» за человеком, а не за панелью.
@@ -124,6 +124,40 @@ export function registerSplitControlRoutes(
           found.index,
           request.body?.force === true,
         );
+      } catch (error) {
+        return refuse(reply, error);
+      }
+    },
+  );
+
+  // Группа, оборванная до своего чата (живой прогон 29.09): «Завести заново» в
+  // её копии или «Убрать». Продолжать ей нечего — сессии нет.
+  app.post<{ Params: { parent: string }; Body: { index?: number; force?: boolean } }>(
+    '/api/chat/split/:parent/restart-group',
+    async (request, reply) => {
+      const found = target(reply, request.body?.index);
+      if (!found) return reply;
+      try {
+        await found.conveyor.restartGroup(
+          request.params.parent,
+          found.index,
+          request.body?.force === true,
+        );
+        return { index: found.index };
+      } catch (error) {
+        return refuse(reply, error);
+      }
+    },
+  );
+
+  app.post<{ Params: { parent: string }; Body: { index?: number } }>(
+    '/api/chat/split/:parent/drop-group',
+    (request, reply) => {
+      const found = target(reply, request.body?.index);
+      if (!found) return reply;
+      try {
+        found.conveyor.dropGroup(request.params.parent, found.index);
+        return { index: found.index };
       } catch (error) {
         return refuse(reply, error);
       }

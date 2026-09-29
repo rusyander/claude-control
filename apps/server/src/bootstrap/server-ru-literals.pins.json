@@ -764,8 +764,8 @@
     "why": "path-rejection detail composed inside an error class"
   },
   "lib/server-texts/templates.ts": {
-    "n": 373,
-    "why": "RU side of the server text table: every line here IS a code, this is the one file where a Russian literal is the data. The generator and its manifest are gone from the tree (see the file header) — a new code is written by hand and `n` rises with it; +6 sieve-gap-* codes of the pre-MR sieves (28.09)"
+    "n": 374,
+    "why": "RU side of the server text table: every line here IS a code, this is the one file where a Russian literal is the data. The generator and its manifest are gone from the tree (see the file header) — a new code is written by hand and `n` rises with it; +6 sieve-gap-* codes of the pre-MR sieves (28.09); +1 split drop/restart/no-slot-paused codes (29.09)"
   },
   "providers/catalog/kimi.ts": {
     "n": 1,
@@ -888,8 +888,8 @@
     "why": "fallback RU table of U5c panel-agent codes (chat session and files, editor, sandbox, contour agents and embeddings): each line is addressed by PanelTextCode and translated by the window"
   },
   "routes/panel-agent/texts-chat.ts": {
-    "n": 46,
-    "why": "fallback RU table of panel-agent codes: each line is addressed by PanelTextCode and translated by the window (U1 chat actions)"
+    "n": 49,
+    "why": "fallback RU table of panel-agent codes: each line is addressed by PanelTextCode and translated by the window (U1 chat actions); +1 value-split-requeue-effect, +2 value-split-resume-fresh-effect / value-split-pause-queued-effect (29.09)"
   },
   "routes/panel-agent/texts-gaps.ts": {
     "n": 57,

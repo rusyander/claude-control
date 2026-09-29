@@ -1227,6 +1227,10 @@ export const serverTextTemplates = {
     en: "The agent process ({{pid}}) could not be stopped: without a process snapshot the panel cannot verify that this number is still the agent's, and it never touches a foreign process. The run stays running — press Stop again; after a panel restart it is picked up again.",
   },
   'split-group-run-not-started': { ru: 'прогон не запустился', en: 'the run did not start' },
+  'split-group-dropped': {
+    ru: 'группа убрана человеком',
+    en: 'the group was removed by a human',
+  },
   'split-group-plan-cancelled': {
     ru: 'план отменён человеком',
     en: 'the plan was cancelled by a human',

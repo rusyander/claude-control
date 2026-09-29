@@ -146,6 +146,7 @@ export const composedRu: Record<ComposedMessageCode, string> = {
   'chat-stop-unconfirmed-notice':
     'Остановить процесс агента ({{pid}}) не удалось: без снимка процессов панель не может проверить, что этот номер всё ещё его, а чужой процесс не трогает. Прогон остаётся идущим — нажмите «Остановить» ещё раз; после перезапуска панели он будет подхвачен снова.',
   'split-group-run-not-started': 'прогон не запустился',
+  'split-group-dropped': 'группа убрана человеком',
   'split-group-chain-failed': 'цепочка кончилась ошибкой или остановкой',
   'split-group-plan-cancelled': 'план отменён человеком',
   'split-delivery-unverifiable':

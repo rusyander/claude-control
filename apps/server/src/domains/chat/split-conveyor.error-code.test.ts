@@ -127,6 +127,22 @@ describe('SplitConveyor: причина сбоя группы — с кодом'
     expect(view()).toMatchObject({ status: 'failed', errorCode: 'split-group-chain-failed' });
   });
 
+  // Живой прогон 29.09: группа отправила ветку под именем по правилу проекта.
+  it('доставлено на своей ветке группы — запись переходит на неё', async () => {
+    const own = 'fix-PROJ-1,PROJ-2/login';
+    const h = deliveryHarness([
+      { missing: [], mr: 'https://git.example.com/a/b/-/merge_requests/4', branch: own },
+    ]);
+    const { start, conveyor, link, wait, view, records } = build({ delivery: h.delivery });
+    await start();
+
+    conveyor.onChainEnded(link, { status: 'done' });
+    await wait();
+
+    expect(view()).toMatchObject({ status: 'done', branch: own });
+    expect(records.get('родитель')?.groups[0]?.branch).toBe(own);
+  });
+
   it('доставка не доведена — вложенные коды по каждому пробелу, и в причине, и в списке', async () => {
     const gaps = missingDelivery({ dirty: ['a.ts'], pushed: false }, 'feature/login');
     const h = deliveryHarness([{ missing: gaps }, { missing: gaps }]);

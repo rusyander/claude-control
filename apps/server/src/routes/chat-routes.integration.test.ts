@@ -579,7 +579,9 @@ describe('POST /api/chat/send: понижённый веер', () => {
     expect(started[0]?.append).toContain('The panel will not start a review of this work');
   });
 
-  it('без отметки о понижении не трогается ничего: ни модель, ни задание', async () => {
+  // Алиас из шапки разворачивается так же: «Sonnet» человек читает как «свежий
+  // Sonnet» (живой прогон 29.09). Планку сдачи без понижения не дописываем.
+  it('без отметки о понижении алиас свежий, а задание не тронуто', async () => {
     await send({
       chatId: 'fan-3',
       prompt: 'прогони линт',
@@ -587,7 +589,7 @@ describe('POST /api/chat/send: понижённый веер', () => {
       model: 'sonnet',
     });
 
-    expect(started[0]?.model).toBe('sonnet');
+    expect(started[0]?.model).toBe('claude-sonnet-5');
     expect(started[0]?.append ?? '').not.toContain('review of this work');
   });
 });

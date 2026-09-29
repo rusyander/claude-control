@@ -120,6 +120,103 @@ describe('доставка по фактам git', () => {
     expect(missingDelivery(facts, 'fix/PROJ-1')[0]).toContain('a.ts');
   });
 
+  /**
+   * Живой прогон 29.09: панель назвала ветку `fix-GOR-1485-…-2`, а группа по
+   * правилу проекта (ключи через запятую) завела и отправила свою. Проверка
+   * искала панельное имя на удалённом и не нашла бы никогда.
+   */
+  describe('ветка, которую группа завела сама', () => {
+    const own = 'fix-PROJ-1,PROJ-2/policies';
+
+    it('отправлена с головой копии — принимается, доставка по ней', async () => {
+      gitIn(work, ['switch', '-q', '-c', own]);
+      gitIn(work, ['push', '-q', 'origin', own]);
+      mrRef(4, head());
+
+      const facts = await readDeliveryFacts({ cwd: work, branch: 'fix-PROJ-1-PROJ-2/policies-2' });
+
+      expect(facts).toMatchObject({ pushed: true, branch: own, mr: `${WEB}/-/merge_requests/4` });
+      expect(missingDelivery(facts, facts.branch ?? '')).toEqual([]);
+    });
+
+    it('не отправлена — не принимается: имя панели остаётся, «не отправлено»', async () => {
+      gitIn(work, ['switch', '-q', '-c', own]);
+
+      const facts = await readDeliveryFacts({ cwd: work, branch: 'fix/PROJ-1' });
+
+      expect(facts.pushed).toBe(false);
+      expect(facts.branch).toBeUndefined();
+    });
+
+    // Ревью 29.09 (A6): копия на чужой отправленной ветке при отправленной своей.
+    it('ветка панели уже отправлена — чужая ветка копии не принимается', async () => {
+      gitIn(work, ['push', '-q', 'origin', 'fix/PROJ-1']);
+      gitIn(work, ['switch', '-q', '-c', 'develop']);
+      gitIn(work, ['push', '-q', 'origin', 'develop']);
+
+      const facts = await readDeliveryFacts({ cwd: work, branch: 'fix/PROJ-1' });
+
+      expect(facts.branch).toBeUndefined();
+      expect(facts.pushed).toBe(true);
+    });
+
+    it('в своей ветке нет ни одного ключа задачи из имени панели — не принимается', async () => {
+      gitIn(work, ['switch', '-q', '-c', 'feature/other-work']);
+      gitIn(work, ['push', '-q', 'origin', 'feature/other-work']);
+
+      const facts = await readDeliveryFacts({ cwd: work, branch: 'fix-PROJ-1-PROJ-2/policies' });
+
+      expect(facts.branch).toBeUndefined();
+      expect(facts.pushed).toBe(false);
+    });
+
+    // Холодная проверка 29.09 (N1): имя панели без ключа сверять не с чем.
+    it('в имени панели нет ключа — отправленный develop с MR не принимается', async () => {
+      gitIn(work, ['switch', '-q', '-c', 'develop']);
+      gitIn(work, ['push', '-q', 'origin', 'develop']);
+      mrRef(7, head());
+
+      const facts = await readDeliveryFacts({ cwd: work, branch: 'feature/login' });
+
+      expect(facts.branch).toBeUndefined();
+      expect(facts.pushed).toBe(false);
+    });
+
+    // N2: ветка предшественника с тем же ключом — чужая, как и его MR.
+    it('ветка другой группы плана с тем же ключом не принимается', async () => {
+      gitIn(work, ['push', '-q', 'origin', 'fix/PROJ-1']);
+      mrRef(7, head());
+
+      const facts = await readDeliveryFacts({
+        cwd: work,
+        branch: 'fix/PROJ-1-tests',
+        claimed: ['fix/PROJ-1'],
+      });
+
+      expect(facts.branch).toBeUndefined();
+      expect(facts.pushed).toBe(false);
+    });
+
+    // N3: ключ сверяется целиком, а не как начало большего номера.
+    it('PROJ-12 в имени панели не совпадает с PROJ-123 в своей ветке', async () => {
+      gitIn(work, ['switch', '-q', '-c', 'fix/PROJ-123-other']);
+      gitIn(work, ['push', '-q', 'origin', 'fix/PROJ-123-other']);
+
+      const facts = await readDeliveryFacts({ cwd: work, branch: 'fix/PROJ-12' });
+
+      expect(facts.branch).toBeUndefined();
+    });
+
+    it('копия стоит на основной ветке удалённого — это не доставка группы', async () => {
+      gitIn(work, ['switch', '-q', 'main']);
+
+      const facts = await readDeliveryFacts({ cwd: work, branch: 'fix/PROJ-1' });
+
+      expect(facts.pushed).toBe(false);
+      expect(facts.branch).toBeUndefined();
+    });
+  });
+
   it('удалённый не отвечает — факт неизвестен, а не отрицателен', async () => {
     gitIn(work, ['config', '--unset', `url.${bare.replace(/\\/g, '/')}.insteadOf`]);
     gitIn(work, [

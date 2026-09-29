@@ -5,7 +5,7 @@ import { Typography } from '@shared/ui/typography';
 import { Icon } from '@shared/ui/icon';
 import { Badge } from '@shared/ui/badge';
 import { formatDuration } from '@shared/lib/format-duration';
-import { elapsedMs, summarizeProgress } from '../model/progressView';
+import { elapsedMs, summarizeProgress, clockTicks } from '../model/progressView';
 import { useNow } from '../model/useNow';
 import { TaskRow } from './TaskRow';
 import { AgentRow } from './AgentRow';
@@ -29,13 +29,18 @@ import styles from './ChatProgressSheet.module.scss';
  * минут тишины без этой строки не отличить от зависания, а фоновая команда,
  * умершая вместе с процессом разговора, выглядела бы идущей.
  */
-export function ChatProgressSheet({ progress, isRunning = false }: ChatProgressSheetProps) {
+export function ChatProgressSheet({
+  progress,
+  isRunning = false,
+  awaiting = false,
+}: ChatProgressSheetProps) {
   const { t } = useTranslation();
   const [isOpen, setOpen] = useState(false);
   const summary = summarizeProgress(progress, isRunning);
-  const now = useNow(isRunning && (Boolean(summary.activeTool) || summary.shellsRunning > 0));
+  const now = useNow(clockTicks(summary, isRunning));
+  const waiting = awaiting && !isRunning;
 
-  if (!summary.hasAnything) return null;
+  if (!summary.hasAnything && !waiting) return null;
 
   const active = summary.activeTool;
   const activeElapsed = active ? elapsedMs(active.startedAt, now) : undefined;
@@ -59,6 +64,14 @@ export function ChatProgressSheet({ progress, isRunning = false }: ChatProgressS
         <Typography variant="body-sm" weight="medium" as="span">
           {t('chat.progress.title')}
         </Typography>
+
+        {/* Ждёт ответа — первым: это единственное состояние, после которого
+            работа не пойдёт сама, и оно не должно тонуть за счётчиками. */}
+        {waiting && (
+          <Badge tone="warning" data-progress-awaiting>
+            {t('chat.progress.awaiting')}
+          </Badge>
+        )}
 
         {summary.total > 0 && (
           <Badge tone={summary.done === summary.total ? 'success' : 'info'}>

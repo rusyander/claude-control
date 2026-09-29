@@ -145,6 +145,7 @@ function groupRow(
     ...workTime(ordered),
     ...chainSpan(ordered),
     ...(last.model ? { model: last.model } : {}),
+    ...(last.effort ? { effort: last.effort } : {}),
     // Ключ прогона сверяется дважды: разговор, заведённый панелью, живёт под
     // временным `new-…`, пока CLI не назовёт настоящий `sessionId`.
     isRunning,

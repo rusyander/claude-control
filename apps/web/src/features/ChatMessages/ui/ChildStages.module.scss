@@ -61,9 +61,60 @@
 }
 
 // Хвост ответа — цитата, а не состояние: курсивом, чтобы не сливался со строкой
-// ветки и звеньев над ним.
+// ветки и звеньев над ним. Две строки, а не одна (живой прогон 29.09): одной
+// строкой вопрос группы обрывался раньше, чем становилось понятно, о чём он.
 .tail {
+  display: -webkit-box;
+  overflow: hidden;
   font-style: italic;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow-wrap: anywhere;
+  line-clamp: 2;
+}
+
+// Длинные ветки и списки переносятся, а не режутся многоточием: имя ветки без
+// пробелов переносится по любому месту, иначе распирает карточку.
+.wrap {
+  overflow-wrap: anywhere;
+}
+
+// Шаг по плану агента: номер жирнее — это первое, что ищут глазами.
+.step {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--spacing-2xs);
+  min-width: 0;
+}
+
+.stepNo {
+  flex: none;
+  font-weight: 600;
+}
+
+// Колонки группы: подпись над значением. Переносятся колонками целиком, так
+// что на узком экране встают друг под друга, а не режутся посередине.
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px var(--spacing-sm);
+  margin: 2px 0;
+}
+
+.metaCell {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+
+  dt,
+  dd {
+    margin: 0;
+  }
+}
+
+.metaValue {
+  overflow-wrap: anywhere;
 }
 
 .mr {

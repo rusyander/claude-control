@@ -131,7 +131,7 @@ const limitOutcome = (at: number): ChainOutcome => ({
 });
 
 describe('SplitConveyor: пауза группы (журнал 81a)', () => {
-  it('пауза отдаёт место: следующая из очереди стартует, ждавшие стоят', async () => {
+  it('пауза держит место: очередь стоит, пока цепочка не кончится (живой прогон 29.09)', async () => {
     const t = build({ parallel: 1 });
     await t.begin();
     expect(t.launches).toEqual([[0]]);
@@ -142,8 +142,9 @@ describe('SplitConveyor: пауза группы (журнал 81a)', () => {
     expect(paused.chatIds).toEqual(['chat-0']);
     expect(t.group(0)?.status).toBe('paused');
     expect(t.group(0)?.pausedAt).toBe(new Date(START).toISOString());
-    // Место свободно — очередь двинулась.
-    expect(t.launches).toEqual([[0], [1]]);
+    // До 29.09 пауза отдавала место (журнал 81a), и остановка всех групп
+    // заводила очередь. Теперь место держит пауза.
+    expect(t.launches).toEqual([[0]]);
     expect(t.conveyor.view([PARENT])?.groups[0]).toMatchObject({ status: 'paused' });
   });
 
@@ -166,8 +167,9 @@ describe('SplitConveyor: пауза группы (журнал 81a)', () => {
     await t.flush();
     expect(t.group(0)?.status).toBe('paused');
     expect(t.conveyor.isPaused(t.link(0))).toBe(true);
-    expect(t.launches).toEqual([[0], [1]]);
+    expect(t.launches).toEqual([[0]]);
     // Закрытую группу пауза не трогает.
+    await t.conveyor.startNow(PARENT, 1, true);
     t.conveyor.onChainEnded(t.link(1), { status: 'done' });
     expect(t.conveyor.pauseByLink(t.link(1))).toBe(false);
   });
@@ -175,27 +177,22 @@ describe('SplitConveyor: пауза группы (журнал 81a)', () => {
   it('паузить нечего — отказ с кодом', async () => {
     const t = build({ parallel: 1 });
     await t.begin();
-    expect(() => t.conveyor.pause(PARENT, 2)).toThrow(
+    t.conveyor.onChainEnded(t.link(0), { status: 'done' });
+    expect(() => t.conveyor.pause(PARENT, 0)).toThrow(
       expect.objectContaining({ messageCode: 'split-pause-not-running' }),
     );
   });
 
-  it('«Продолжить» занимает место: потолок полон — отказ с числами, с согласием — сверх', async () => {
+  it('«Продолжить» — своё место: потолок, занятый другими сверх него, не держит', async () => {
     const t = build({ parallel: 1 });
     await t.begin();
     t.conveyor.pause(PARENT, 0);
     await t.flush();
+    // Человек запустил вторую сверх потолка, пока первая стояла.
+    await t.conveyor.startNow(PARENT, 1, true);
     expect(t.group(1)?.status).toBe('started');
 
-    expect(() => t.conveyor.resumePaused(PARENT, 0)).toThrow(
-      expect.objectContaining({
-        messageCode: 'split-group-no-slot',
-        params: { running: '1', limit: '1' },
-      }),
-    );
-    expect(t.resumed).toEqual([]);
-
-    expect(t.conveyor.resumePaused(PARENT, 0, true)).toBe('sent');
+    expect(t.conveyor.resumePaused(PARENT, 0)).toBe('sent');
     expect(t.resumed[0]?.index).toBe(0);
     expect(t.resumed[0]?.prompt).toMatch(/^Group branch: feature\/one\. Group tasks: PROJ-1\./);
     expect(t.resumed[0]?.prompt).toMatch(/paused the group/);

@@ -38,7 +38,9 @@ export const chatEn: typeof chatRu = {
     canProgress:
       "Watch the agent's plan: the strip above the input shows its own checkpoints " +
       '(done, in progress) and the tree of subagents it handed work to, together ' +
-      'with what each one returned',
+      'with what each one returned. When a turn ended with a question to you, the strip ' +
+      'leads with “Waiting for your answer”. A background command the agent stopped itself ' +
+      '(cleaning up a dev server) reads “stopped by the agent”, not “lost”',
     canChatDots:
       'Tell conversations apart by the dots in the chat list: a project can hold ' +
       'several agents, and it is visible which one is waiting for an answer',
@@ -720,8 +722,10 @@ export const chatEn: typeof chatRu = {
       'direct “the environment is ready — do not check or set it up, start with the task”. ' +
       'Before it, an agent in a fresh copy brought up MCP itself, mirrored .claude/, ' +
       'installed dependencies and reverted lockfiles — minutes and context on every child. ' +
-      'How much that helped shows in the parent’s group summary: “first edit after 1m 12s” ' +
-      '— from the work link’s creation to the agent’s first Edit/Write call. A group working ' +
+      'How much that helped shows in the parent’s group summary: the “To first edit” column ' +
+      '— from the work link’s creation to the agent’s first Edit/Write call. Next to it: the ' +
+      'model with its reasoning effort, the run time and “Step 8 of 14” from the group agent’s ' +
+      'plan, with the step name and its subagent count. A group working ' +
       'in the shared directory gets no preamble: that environment is yours.',
 
     splitTitle: 'Splitting tasks across chats: the agent proposes, you decide',
@@ -1030,8 +1034,19 @@ export const chatEn: typeof chatRu = {
       'do: N” — the panel does not carry them out.',
     cascadeControl: 'One group and the whole plan',
     cascadeControlText:
-      'A group’s row has “Pause” (its queue slot goes to the next one), “Resume” in the ' +
-      'same session and “Start now” past the queue. The summary line above the groups ' +
+      'A group’s row has “Pause”, “Resume” in the same session and “Start now” past ' +
+      'the queue. Pausing a running group does not give away its slot: the queue moves ' +
+      'when a group finishes, not when you stop it, so stopping every group starts ' +
+      'nothing new. A queued group can be paused too — it does not start until you ' +
+      '“Resume” it back into the queue. While the panel prepares a copy (branch and ' +
+      'dependency install — minutes) the row says “preparing the copy”; a pause holds ' +
+      'during it, and “Resume” later starts the group in the ready copy. A paused ' +
+      'group holds its slot, so next to “Resume” it has “Remove” — close a group you ' +
+      'no longer need without cancelling the whole plan; the “all slots are taken” ' +
+      'refusal names such pauses separately. A group cut ' +
+      'before its chat existed (say, a panel restart mid-preparation) gets “Start ' +
+      'again” (in its copy if it has one; otherwise in a new one) and “Remove”. ' +
+      '“Remove” asks for confirmation in the same row. The summary line above the groups ' +
       'counts them by state: running, waiting for you, queued, done, accepted, failed. ' +
       'A group process cut off mid-turn (a panel restart, a CLI death) the panel ' +
       'resumes by itself up to twice, first asking the agent to restore its state from ' +

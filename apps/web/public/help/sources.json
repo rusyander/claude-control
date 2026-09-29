@@ -250,12 +250,12 @@
         {
           "path": "apps/server/src/domains/chat/ChatSplit.ts",
           "why": "«Разделить»: карточка предложения, дерево, группы",
-          "sha": "cc4ebbe167c3bbd5"
+          "sha": "901e4eaf1a658ca0"
         },
         {
           "path": "apps/server/src/domains/chat/split-conveyor.ts",
           "why": "«Что запускает „Разделить“»: разбор в корне, план в копии, порядок after и hold",
-          "sha": "12693960350d8b9b"
+          "sha": "d015925f65eee28a"
         },
         {
           "path": "apps/server/src/domains/chat/split-overlap.ts",
@@ -318,7 +318,7 @@
           "sha": "a94b640e72eed66f"
         }
       ],
-      "confirmedAt": "2026-09-28T17:00:45.929Z"
+      "confirmedAt": "2026-09-29T18:11:51.228Z"
     },
     {
       "topic": "tests",
@@ -1012,7 +1012,7 @@
     {
       "topic": "settings",
       "document": "apps/web/src/pages/Help/topics/SettingsTopic.tsx",
-      "confirmedAt": "2026-09-28T10:55:34.463Z",
+      "confirmedAt": "2026-09-29T17:24:46.279Z",
       "sources": [
         {
           "path": "apps/server/src/lib/safe-io.ts",
@@ -1057,7 +1057,7 @@
         {
           "path": "apps/server/src/bootstrap/watcher-capture.ts",
           "why": "«Что попадает в отчёт»: серверные сигналы — 5xx, правила 4xx, ошибки и предупреждения журнала, медленные ответы, запуски CLI с ошибкой",
-          "sha": "9b740692629ac1b1"
+          "sha": "07538fd8190df858"
         },
         {
           "path": "apps/web/src/shared/lib/watch-capture/watch-capture.ts",
@@ -1458,7 +1458,7 @@
         {
           "path": "apps/server/src/routes/panel-agent/actions-chat-control.ts",
           "why": "«Чаты»: сообщение в чат, просьба о разделении, группа чата, стоп, пульт разделения — риск и что остаётся человеку",
-          "sha": "78898d8b54a92dfe"
+          "sha": "a5cf185d6597fbd5"
         },
         {
           "path": "apps/server/src/routes/panel-agent/actions-chat-kit.ts",
@@ -1536,7 +1536,7 @@
           "sha": "541fd63004e4136e"
         }
       ],
-      "confirmedAt": "2026-09-28T18:36:30.002Z"
+      "confirmedAt": "2026-09-29T18:11:51.314Z"
     },
     {
       "topic": "portability",
@@ -1760,7 +1760,7 @@
     {
       "topic": "phone",
       "document": "apps/web/src/pages/Help/topics/PhoneTopic.tsx",
-      "confirmedAt": "2026-09-28T12:56:09.422Z",
+      "confirmedAt": "2026-09-29T17:55:43.927Z",
       "sources": [
         {
           "path": "apps/server/src/lib/access-gate.ts",
@@ -1790,7 +1790,7 @@
         {
           "path": "apps/server/src/domains/chat/chat-inbox.ts",
           "why": "«Главная»: работает / ждёт вас / молчит и число ожидающих ответа",
-          "sha": "7adfae5e75b05d6a"
+          "sha": "b9c9d962876f3a35"
         },
         {
           "path": "apps/server/src/routes/chat/inbox-routes.ts",

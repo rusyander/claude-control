@@ -10,7 +10,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { SourceWatcher, busyRun, isWatched } from './dev-watch.mjs';
+import { SourceWatcher, busyRun, isWatched, splitSetupRunning } from './dev-watch.mjs';
 
 /**
  * Dev-сторож сервера на настоящей файловой системе и настоящем `fs.watch`.
@@ -91,5 +91,26 @@ describe('dev-сторож сервера', () => {
     expect(busyRun([{ key: 'a', pid: 10, idle: true }], alive)).toBe(false);
     expect(busyRun([{ key: 'a', pid: 11 }], alive)).toBe(false);
     expect(busyRun([{ key: 'a' }], alive)).toBe(false);
+  });
+
+  // Живой прогон 29.09, 07:37: правка сервера перезапустила панель посреди
+  // `npm ci` четырёх групп — прогонов в журнале ещё не было, и ждать было нечего.
+  it('подготовка копии группы разделения — тоже идущая работа', () => {
+    const now = Date.parse('2026-09-29T07:40:00.000Z');
+    const plan = (group: Record<string, unknown>, extra: Record<string, unknown> = {}) => ({
+      splitPlans: { p: { parentChatId: 'p', groups: [{ index: 0, ...group }], ...extra } },
+    });
+    const setup = { status: 'started', startedAt: '2026-09-29T07:37:44.000Z' };
+    expect(splitSetupRunning(plan(setup), now)).toBe(true);
+    // Чат уже есть — дальше решает журнал прогонов.
+    expect(splitSetupRunning(plan({ ...setup, chatId: 'new-1-0' }), now)).toBe(false);
+    expect(splitSetupRunning(plan({ ...setup, status: 'paused' }), now)).toBe(false);
+    expect(splitSetupRunning(plan(setup, { cancelledAt: '2026-09-29T07:38:00.000Z' }), now)).toBe(
+      false,
+    );
+    // Застрявшая запись (процесс умер, перезапуска не было) не держит вечно.
+    expect(splitSetupRunning(plan(setup), now + 60 * 60_000)).toBe(false);
+    expect(splitSetupRunning({}, now)).toBe(false);
+    expect(splitSetupRunning(null, now)).toBe(false);
   });
 });

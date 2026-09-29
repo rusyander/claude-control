@@ -511,16 +511,17 @@ export function registerChatRunRoutes(
               .filter(Boolean)
               .join(' ')) || undefined;
 
-      // Ступень лестницы приходит алиасом, а алиас CLI — это «рекомендованная
-      // модель уровня», не последняя в семействе: `--model sonnet` уводил прогон
-      // на прошлое поколение при свежем в каталоге. Разворачиваем сами, ровно как
-      // разделение (`expandAssignedModel` в `split-routes.ts`). Только у
-      // понижённого: модель, выбранная человеком в шапке, — его выбор, и
-      // подменять её нечем и незачем.
-      const runModel = lowered
+      // Алиас CLI — это «рекомендованная модель уровня», не последняя в
+      // семействе: `--model sonnet` уводил прогон на прошлое поколение при
+      // свежем в каталоге. Разворачиваем сами, ровно как разделение
+      // (`expandAssignedModel` в `split-launch.ts`), — и у понижённой ступени,
+      // и у выбора человека в шапке: пункт «Sonnet» человек читает как «свежий
+      // Sonnet» (живой прогон 29.09: выбран Sonnet, шёл Sonnet 5 при вышедшем
+      // 5.5). Конкретное имя модели — его точный выбор, оно едет как есть.
+      const runModel = model
         ? expandAssignedModel(
             ctx.models.current(getActiveProvider(ctx.store).modelVendors ?? []).models,
-            model ?? '',
+            model,
           )
         : model;
 

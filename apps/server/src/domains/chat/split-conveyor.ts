@@ -97,7 +97,12 @@ export interface SplitConveyorDeps {
     record: SplitPlanRecord,
     groups: number[],
     context: SplitGroupContext | undefined,
-    claimBranch: (index: number, branch: string) => void,
+    claimBranch: (index: number, branch: string, path?: string) => void,
+    /**
+     * Спрашивается после подготовки копий, прямо перед стартом прогона: группа
+     * всё ещё «стартует»? Пауза или отмена за время `npm ci` — нет (живой прогон 29.09).
+     */
+    startable?: (index: number) => boolean,
   ) => Promise<TaskSplitResult>;
   /**
    * Запустить разбор (уровень 1); `deferred` — дерево на паузе, старт отложен.
@@ -187,6 +192,8 @@ export interface DeliveryVerdict {
    * сеть ни при чём — группа закрывается сбоем с причиной (m5).
    */
   failed?: string;
+  /** Ветка, которую группа завела и отправила сама вместо названной панелью. */
+  branch?: string;
 }
 
 export interface SplitDeliveryDeps {
@@ -194,6 +201,8 @@ export interface SplitDeliveryDeps {
     group: SplitPlanGroupRecord,
     mrHint: string | undefined,
     projectPath: string,
+    /** Ветки других групп плана и основания копий — не своя ветка группы. */
+    claimed: string[],
   ) => Promise<DeliveryVerdict>;
   /**
    * Продолжить разговор группы сообщением панели — тем же путём, что слово
@@ -245,6 +254,23 @@ export function retiredGroupsOf(previous: SplitPlanRecord | undefined): SplitPla
 /** Каталог, от которого заводятся копии группы: верх репозитория, если он свой (m6). */
 export function copyRootOf(record: Pick<SplitPlanRecord, 'projectPath' | 'copyRoot'>): string {
   return record.copyRoot ?? record.projectPath;
+}
+
+/**
+ * Ветки, которые группе `index` своими не считать: ветки остальных групп плана
+ * и основания всех копий, плюс ветки групп прежнего плана. Предшественник с
+ * тем же ключом задачи (`fix/PROJ-1` у `fix/PROJ-1-tests`) иначе отдал бы
+ * группе свою ветку и свой MR (ревью 29.09).
+ */
+export function claimedBranches(record: SplitPlanRecord, index: number): string[] {
+  const claimed = new Set<string>();
+  record.groups.forEach((group, at) => {
+    if (at !== index) claimed.add(group.branch);
+    if (group.base) claimed.add(group.base);
+  });
+  // Группы прежнего плана того же разговора (F5.2) держат свои ветки и MR.
+  for (const group of record.retiredGroups ?? []) claimed.add(group.branch);
+  return [...claimed];
 }
 
 /**
@@ -322,6 +348,19 @@ export function pauseResumePrompt(branch: string): string {
 
 /** Группы, которые можно поставить на паузу: работают или ждут. */
 const PAUSABLE: readonly SplitPlanGroupRecord['status'][] = ['started', 'background', 'awaiting'];
+/**
+ * Кнопкой хаба — ещё и группу из очереди (живой прогон 29.09): человек держит её,
+ * пока доработают остальные. Остановка в чате её не касается — чата у неё нет.
+ */
+const PAUSABLE_BY_HUB: readonly SplitPlanGroupRecord['status'][] = [...PAUSABLE, 'pending'];
+
+/**
+ * Группа хоть раз стартовала — на паузе она держит своё место (живой прогон
+ * 29.09). Поставленная на паузу из очереди стартовой отметки не имеет.
+ */
+function seated(group: SplitPlanGroupRecord): boolean {
+  return Boolean(group.startedAt || group.chatId || group.path);
+}
 
 /** Предел таймера Node (~24.8 суток): дальше `setTimeout` срабатывает сразу. */
 const MAX_TIMER_MS = 2 ** 31 - 1;
@@ -379,6 +418,13 @@ function absorb(record: SplitPlanRecord, result: TaskSplitResult, at: string): v
   for (const chat of result.chats) {
     const group = record.groups.find((item) => item.index === chat.index);
     if (!group) continue;
+    // Прогон не пускали (пауза или отмена во время подготовки): копия есть,
+    // чата нет, статус уже решил человек.
+    if (chat.held) {
+      group.path = chat.path;
+      group.branch = chat.branch;
+      continue;
+    }
     group.chatId = chat.chatId;
     group.path = chat.path;
     group.branch = chat.branch;
@@ -396,7 +442,9 @@ function absorb(record: SplitPlanRecord, result: TaskSplitResult, at: string): v
   }
   for (const failure of result.failures) {
     const group = record.groups.find((item) => item.index === failure.index);
-    if (!group) continue;
+    // Как и у брошенного запуска: пауза, «Убрать» и отмена плана, решённые
+    // человеком за время подготовки, ошибкой копии не перетираются (N9).
+    if (!group || record.cancelledAt || group.status !== 'started') continue;
     group.status = 'failed';
     group.error = failure.message;
     group.doneAt = at;
@@ -428,6 +476,14 @@ function holdCode(text: string): Pick<SplitPlanView['groups'][number], 'holdCode
 
 export class SplitConveyor {
   private readonly now: () => Date;
+  /**
+   * Группы, чей запуск идёт прямо сейчас (`${родитель}:${номер}`): копия ещё
+   * заводится. «Продолжить» такую группу не заводит второй запуск — только
+   * возвращает ей «стартует», и идущий запуск пускает прогон сам. Счётчик, а
+   * не множество: перезапуск посреди подготовки заводит второй запуск той же
+   * группы, и конец первого не должен снять отметку, нужную второму.
+   */
+  private readonly inFlight = new Map<string, number>();
   private readonly deps: SplitConveyorDeps;
   /** Когда поставлен таймер сброса лимита (мс); таймер один на все записи. */
   private limitWakeAt: number | undefined;
@@ -855,7 +911,7 @@ export class SplitConveyor {
     const group = this.deliveryPending(parentChatId, index);
     if (!delivery || !record || !group) return;
     void delivery
-      .facts(group, outcome.mr ?? group.mr, copyRootOf(record))
+      .facts(group, outcome.mr ?? group.mr, copyRootOf(record), claimedBranches(record, index))
       .catch((error: unknown): DeliveryVerdict => {
         // Недоступный удалённый приходит ответом (`unreachable` от ls-remote), а
         // не исключением. Исключение — это сама копия: git status/rev-parse не
@@ -883,6 +939,16 @@ export class SplitConveyor {
     const record = this.deps.store.get(parentChatId);
     const group = record?.groups[index];
     if (!record || !group || !this.deliveryPending(parentChatId, index)) return;
+    // Группа отправила ветку под своим именем (живой прогон 29.09: правило
+    // проекта — ключи через запятую): запись переходит на него, иначе хаб,
+    // наблюдатель MR и повторные проверки смотрели бы на ветку, которой нет.
+    if (verdict.branch && verdict.branch !== group.branch) {
+      this.deps.log(
+        `split conveyor: group «${group.title}» delivered on its own branch ${verdict.branch} (panel named ${group.branch})`,
+      );
+      group.branch = verdict.branch;
+      this.deps.store.set(record);
+    }
     const schedule = this.deps.delivery?.schedule ?? setTimeout;
     const again = (asSettled: boolean, ms: number): void => {
       schedule(() => this.verifyDelivery(parentChatId, index, outcome, asSettled), ms);
@@ -1600,6 +1666,7 @@ export class SplitConveyor {
         ...(group.interruptResumes ? { interruptResumes: group.interruptResumes } : {}),
         ...(group.cleaned ? { cleaned: group.cleaned } : {}),
         ...(group.pausedAt ? { pausedAt: group.pausedAt } : {}),
+        ...(seated(group) ? { seated: true } : {}),
         ...(group.limitUntil ? { limitUntil: group.limitUntil } : {}),
         ...(group.parked ? { parkedAt: group.parked.at } : {}),
         ...(group.acceptedAt ? { acceptedAt: group.acceptedAt } : {}),
@@ -1630,7 +1697,7 @@ export class SplitConveyor {
    * (`awaiting`) — чего угодно, человека тоже (M7): ответ человека стартует
    * прогон в её чате, и отданное очереди место подняло бы число работающих над
    * потолком, а останавливать уже идущий разговор ради очереди нельзя. Пауза
-   * место отдаёт (журнал 81a) — её продолжение спрашивает место заново.
+   * место держит тоже (живой прогон 29.09; до него — отдавала, журнал 81a).
    */
   private slots(record: SplitPlanRecord): number {
     const limit = this.deps.parallel?.(record);
@@ -1644,9 +1711,14 @@ export class SplitConveyor {
     // и сброс лимита (журнал 89) панель продолжит сама, вопрос и решение —
     // человек (M7). К продолжению её место должно быть свободно — иначе оно
     // подняло бы число работающих над потолком.
+    // Пауза человека место тоже держит (живой прогон 29.09), кроме паузы из
+    // очереди — та места не занимала.
     return record.groups.filter(
       (group) =>
-        group.status === 'started' || group.status === 'background' || group.status === 'awaiting',
+        group.status === 'started' ||
+        group.status === 'background' ||
+        group.status === 'awaiting' ||
+        (group.status === 'paused' && seated(group)),
     ).length;
   }
 
@@ -1676,9 +1748,13 @@ export class SplitConveyor {
     const plain = ready.filter((index) => !record.groups[index]?.holdAnswer);
     const answered = ready.filter((index) => record.groups[index]?.holdAnswer);
     const results: TaskSplitResult[] = [];
-    if (plain.length > 0) results.push(await this.runPortion(record, plain, undefined));
+    if (plain.length > 0) {
+      results.push(await this.runPortion(record, plain, undefined, ['pending']));
+    }
     for (const index of answered) {
-      results.push(await this.runPortion(record, [index], this.contextFor(record, index)));
+      results.push(
+        await this.runPortion(record, [index], this.contextFor(record, index), ['pending']),
+      );
     }
     return {
       chats: results.flatMap((result) => result.chats),
@@ -1701,7 +1777,9 @@ export class SplitConveyor {
       // подписки держит её так же — до сброса (журнал 81b).
       if (this.slots(record) === 0 || this.limitedUntil(providerOf(record))) break;
       results.push(
-        await this.runPortion(record, [group.index], this.contextFor(record, group.index)),
+        await this.runPortion(record, [group.index], this.contextFor(record, group.index), [
+          'waiting',
+        ]),
       );
     }
     return {
@@ -1754,11 +1832,35 @@ export class SplitConveyor {
    * (у чужого CLI прогон падает на первом же вздохе), `onChainEnded` не находил
    * группу по ветке, и всё, что её ждало, стояло навсегда.
    */
-  private claimBranch(record: SplitPlanRecord, index: number, branch: string): void {
+  private claimBranch(
+    portion: SplitPlanRecord,
+    index: number,
+    branch: string,
+    path?: string,
+  ): void {
+    // Запись — свежая: пока шёл `worktree add`, человек мог поставить паузу.
+    const record = this.deps.store.get(portion.parentChatId) ?? portion;
     const group = record.groups[index];
-    if (!group || !branch || group.branch === branch) return;
+    if (!group || !branch) return;
+    // Копия — туда же и тогда же (живой прогон 29.09): панель, перезапущенная
+    // посреди подготовки, иначе теряла, где она лежит, и группу без чата нельзя
+    // было ни завести в той же копии, ни убрать её.
+    if (group.branch === branch && (!path || group.path === path)) return;
     group.branch = branch;
+    if (path) group.path = path;
     this.deps.store.set(record);
+    // Снимок порции тоже: по нему запуск договаривает остальное.
+    const own = portion.groups[index];
+    if (own && own !== group) {
+      own.branch = branch;
+      if (path) own.path = path;
+    }
+  }
+
+  /** Группа всё ещё «стартует» — её прогон можно пускать (см. `SplitConveyorDeps.launch`). */
+  private startable(parentChatId: string, index: number): boolean {
+    const record = this.deps.store.get(parentChatId);
+    return Boolean(record && !record.cancelledAt && record.groups[index]?.status === 'started');
   }
 
   /**
@@ -1781,41 +1883,79 @@ export class SplitConveyor {
     };
   }
 
+  /**
+   * `from` — из каких статусов вызывающий заводит группы. Сверяется по ЖИВОЙ
+   * записи: порции одного насоса идут друг за другом, и пока предыдущая
+   * заводит копию, человек мог поставить следующую группу на паузу или убрать
+   * её — такую группу запуск пропускает, а не переписывает в «стартует».
+   */
   private async runPortion(
     record: SplitPlanRecord,
     groups: number[],
     context: SplitGroupContext | undefined,
+    from: readonly SplitPlanGroupRecord['status'][],
   ): Promise<TaskSplitResult> {
     // Статус «стартует» ставится ДО запуска: копии заводятся секунды, и второй
     // вызов за это время (ещё один конец цепочки) не должен завести те же группы.
     const at = this.now().toISOString();
-    for (const index of groups) {
-      const group = record.groups[index];
-      if (!group) continue;
+    const live = this.deps.store.get(record.parentChatId) ?? record;
+    const own = groups.filter((index) => {
+      const group = live.groups[index];
+      return Boolean(group && from.includes(group.status));
+    });
+    if (own.length === 0) return { chats: [], failures: [] };
+    for (const index of own) {
+      const group = live.groups[index] as SplitPlanGroupRecord;
       group.status = 'started';
       group.startedAt = at;
+      delete group.pausedAt;
       if (context?.base) group.base = context.base;
     }
-    this.deps.store.set(record);
+    this.deps.store.set(live);
+    // Вызывающий дальше считает места по своему снимку — он обязан видеть старт.
+    if (live !== record) Object.assign(record, live);
 
-    let result: TaskSplitResult;
+    const keys = own.map((index) => `${record.parentChatId}:${index}`);
+    for (const key of keys) this.inFlight.set(key, (this.inFlight.get(key) ?? 0) + 1);
     try {
-      result = await this.deps.launch(record, groups, context, (index, branch) =>
-        this.claimBranch(record, index, branch),
-      );
-    } catch (error) {
-      for (const index of groups) {
-        const group = record.groups[index];
-        if (!group) continue;
-        group.status = 'failed';
-        group.error = error instanceof Error ? error.message : String(error);
+      let result: TaskSplitResult;
+      try {
+        result = await this.deps.launch(
+          record,
+          own,
+          context,
+          (index, branch, path) => this.claimBranch(record, index, branch, path),
+          (index) => this.startable(record.parentChatId, index),
+        );
+      } catch (error) {
+        const fresh = this.deps.store.get(record.parentChatId) ?? record;
+        for (const index of own) {
+          const group = fresh.groups[index];
+          // Статус, который за время подготовки решил человек (пауза, «Убрать»)
+          // или отмена плана, сбой запуска не перетирает.
+          if (!group || fresh.cancelledAt || group.status !== 'started') continue;
+          group.status = 'failed';
+          group.error = error instanceof Error ? error.message : String(error);
+        }
+        this.deps.store.set(fresh);
+        throw error;
       }
-      this.deps.store.set(record);
-      throw error;
+      // Запуск шёл минутами (копии, `npm ci`), и запись за это время меняли
+      // другие: пауза, отмена, обрыв при перезапуске. Итог ложится на СВЕЖУЮ
+      // запись — старый снимок молча вернул бы группе на паузе «стартует»
+      // (живой прогон 29.09).
+      const fresh = this.deps.store.get(record.parentChatId) ?? record;
+      absorb(fresh, result, at);
+      this.deps.store.set(fresh);
+      if (fresh !== record) Object.assign(record, fresh);
+      return result;
+    } finally {
+      for (const key of keys) {
+        const left = (this.inFlight.get(key) ?? 1) - 1;
+        if (left > 0) this.inFlight.set(key, left);
+        else this.inFlight.delete(key);
+      }
     }
-    absorb(record, result, at);
-    this.deps.store.set(record);
-    return result;
   }
 
   /**
@@ -1917,14 +2057,17 @@ export class SplitConveyor {
   }
 
   /**
-   * Пауза группы человеком (журнал 81a). Место под потолком освобождается
-   * сразу — следующая из очереди стартует; ждавшие её остаются ждать: пауза не
-   * «готово». Возвращает чаты группы — их прогон маршрут остановит сам.
+   * Пауза группы человеком (журнал 81a). Ждавшие её остаются ждать: пауза не
+   * «готово». Место под потолком группа ДЕРЖИТ (живой прогон 29.09: владелец
+   * остановил все группы, а освободившиеся места тут же завели две из очереди) —
+   * очередь двигает конец цепочки, а не пауза. Группа из очереди (`pending`)
+   * места не держала и не держит: она просто пропускается, пока на паузе.
+   * Возвращает чаты группы — их прогон маршрут остановит сам.
    */
   pause(parentChatId: string, index: number): { chatIds: string[] } {
     const record = this.deps.store.get(parentChatId);
     const group = record?.groups[index];
-    if (!record || !group || !PAUSABLE.includes(group.status)) {
+    if (!record || !group || !PAUSABLE_BY_HUB.includes(group.status)) {
       throw coded(
         new Error('Группа сейчас не работает — ставить на паузу нечего'),
         'split-pause-not-running',
@@ -1956,8 +2099,13 @@ export class SplitConveyor {
   }
 
   /**
-   * «Продолжить» группу с паузы. Занимает место: потолок полон или лимит
-   * исчерпан — отказ с числами, а с согласием человека (`force`) — сверх.
+   * «Продолжить» группу с паузы. Место она держала сама (`occupied`), поэтому
+   * потолок её не останавливает; лимит подписки — отказ со сроком, а с
+   * согласием человека (`force`) — всё равно.
+   *
+   * Три вида паузы — три продолжения: из очереди — назад в очередь (`queued`,
+   * стартует, как дойдёт черёд); во время подготовки копии — старт прогона в
+   * этой копии; с разговором — той же сессией.
    */
   resumePaused(parentChatId: string, index: number, force = false): 'sent' | 'queued' {
     const record = this.deps.store.get(parentChatId);
@@ -1965,7 +2113,38 @@ export class SplitConveyor {
     if (!record || !group || group.status !== 'paused') {
       throw coded(new Error('Группа не на паузе — продолжать нечего'), 'split-resume-not-paused');
     }
-    if (!force) this.admit(record);
+    if (!seated(group)) {
+      group.status = 'pending';
+      delete group.pausedAt;
+      this.deps.store.set(record);
+      void this.launchNext(record).catch((error) => {
+        this.deps.log('split conveyor: launch after unpause failed', error);
+      });
+      return 'queued';
+    }
+    if (!force) this.admitLimit(record);
+    if (!group.chatId && this.inFlight.has(`${parentChatId}:${index}`)) {
+      // Пауза пришла, пока копия ещё заводится: запуск жив и сам пустит прогон,
+      // если группа снова «стартует». Второй запуск завёл бы вторую копию.
+      group.status = 'started';
+      delete group.pausedAt;
+      this.deps.store.set(record);
+      return 'sent';
+    }
+    if (!group.chatId && group.path) {
+      void this.startInCopy(record, group);
+      return 'sent';
+    }
+    if (!group.chatId) {
+      // Место есть, а копии не записано (пауза до `worktree add`, потом
+      // перезапуск панели): продолжать нечего — группа заводится заново.
+      void this.runPortion(record, [index], this.contextFor(record, index), ['paused']).catch(
+        (error) => {
+          this.deps.log('split conveyor: start after unpause failed', error);
+        },
+      );
+      return 'sent';
+    }
     const prompt = this.withIdentity(record, group, pauseResumePrompt(group.branch));
     const outcome =
       this.deps.resume && group.chatId && group.path ? this.deps.resume(group, prompt) : 'refused';
@@ -1993,7 +2172,105 @@ export class SplitConveyor {
       record,
       [index],
       group.holdAnswer ? this.contextFor(record, index) : undefined,
+      ['pending'],
     );
+  }
+
+  /**
+   * Группа, оборванная до своего чата (живой прогон 29.09: перезапуск панели
+   * посреди `npm ci`), — «Завести заново». Продолжать ей нечего: сессии нет.
+   * Копия известна — прогон стартует в ней (подготовка повторяется: прежняя
+   * могла оборваться); неизвестна (запись старше 29.09) — заводится новая.
+   * Место группа держала сама, поэтому потолок её не держит; лимит — как у
+   * «Продолжить». Ответ — сразу, как у «Продолжить»: подготовка копии идёт
+   * минутами, и кнопка не должна висеть всё это время.
+   */
+  async restartGroup(parentChatId: string, index: number, force = false): Promise<void> {
+    const { record, group } = this.cutGroup(parentChatId, index);
+    if (!force) this.admitLimit(record);
+    if (group.path) {
+      void this.startInCopy(record, group);
+      return;
+    }
+    void this.runPortion(record, [index], this.contextFor(record, index), ['awaiting']).catch(
+      (error) => {
+        this.deps.log('split conveyor: restart failed', error);
+      },
+    );
+  }
+
+  /**
+   * «Убрать» группу: оборванную до своего чата или на паузе — закрыть её сбоем
+   * с причиной. Пауза держит место под потолком, и без «Убрать» ненужную
+   * группу на паузе было не отпустить, кроме как отменой всего плана. Место
+   * уходит очереди, ждавшие её — дальше (как после любого сбоя); копия, если
+   * она есть, убирается обычной кнопкой уборки закрытой группы.
+   */
+  dropGroup(parentChatId: string, index: number): void {
+    const record = this.deps.store.get(parentChatId);
+    const group = record?.groups[index];
+    const droppable =
+      record &&
+      !record.cancelledAt &&
+      group &&
+      (group.status === 'paused' ||
+        (group.status === 'awaiting' && group.waitingFor === 'interrupted' && !group.chatId));
+    if (!record || !group || !droppable) {
+      throw coded(
+        new Error('Убирать нечего: группа не на паузе и не оборвана до своего чата'),
+        'split-drop-nothing',
+      );
+    }
+    this.apply(group, { status: 'failed', error: serverText('split-group-dropped') });
+    group.doneAt = this.now().toISOString();
+    delete group.interruptedAt;
+    delete group.interruptResumes;
+    delete group.pausedAt;
+    this.deps.store.set(record);
+    void this.launchNext(record).catch((error) => {
+      this.deps.log('split conveyor: launch after drop failed', error);
+    });
+  }
+
+  /** Оборванная группа без чата — иначе отказ: у группы с чатом есть «Продолжить». */
+  private cutGroup(
+    parentChatId: string,
+    index: number,
+  ): { record: SplitPlanRecord; group: SplitPlanGroupRecord } {
+    const record = this.deps.store.get(parentChatId);
+    const group = record?.groups[index];
+    if (
+      !record ||
+      record.cancelledAt ||
+      !group ||
+      group.status !== 'awaiting' ||
+      group.waitingFor !== 'interrupted' ||
+      group.chatId
+    ) {
+      throw coded(
+        new Error('Группа не оборвана до своего чата — заводить заново нечего'),
+        'split-restart-not-cut',
+      );
+    }
+    return { record, group };
+  }
+
+  /**
+   * Прогон группы в уже заведённой копии — без новой копии и новой ветки.
+   * Статус «стартует» `runPortion` ставит синхронно, до первого ожидания.
+   */
+  private async startInCopy(record: SplitPlanRecord, group: SplitPlanGroupRecord): Promise<void> {
+    const path = group.path as string;
+    try {
+      await this.runPortion(
+        record,
+        [group.index],
+        { ...this.contextFor(record, group.index), copy: { path, branch: group.branch } },
+        ['paused', 'awaiting'],
+      );
+    } catch (error) {
+      this.deps.log('split conveyor: start in copy failed', error);
+    }
   }
 
   /**
@@ -2030,9 +2307,6 @@ export class SplitConveyor {
     delete group.parked;
     delete group.interruptedAt;
     this.deps.store.set(record);
-    void this.launchNext(record).catch((error) => {
-      this.deps.log('split conveyor: launch after pause failed', error);
-    });
   }
 
   /** Есть ли место для работы сейчас: лимит подписки, потом потолок. */
@@ -2040,19 +2314,44 @@ export class SplitConveyor {
     record: SplitPlanRecord,
   ):
     | { kind: 'ok' }
-    | { kind: 'ceiling'; running: number; limit: number }
+    | { kind: 'ceiling'; running: number; paused: number; limit: number }
     | { kind: 'limit'; until: string } {
     const until = this.limitedUntil(providerOf(record));
     if (until) return { kind: 'limit', until };
     const limit = this.deps.parallel?.(record);
     if (!limit || limit < 1) return { kind: 'ok' };
-    const running = this.occupied(record);
-    return running >= limit ? { kind: 'ceiling', running, limit } : { kind: 'ok' };
+    const taken = this.occupied(record);
+    if (taken < limit) return { kind: 'ok' };
+    const paused = record.groups.filter(
+      (group) => group.status === 'paused' && seated(group),
+    ).length;
+    return { kind: 'ceiling', running: taken - paused, paused, limit };
+  }
+
+  /** Только лимит подписки: своё место группа уже держит. */
+  private admitLimit(record: SplitPlanRecord): void {
+    if (this.admission(record).kind === 'limit') this.admit(record);
   }
 
   /** Отказ человеку, когда места нет, — с числами, чтобы он решил про «сверх». */
   private admit(record: SplitPlanRecord): void {
     const verdict = this.admission(record);
+    if (verdict.kind === 'ceiling' && verdict.paused > 0) {
+      // Место держат паузы (живой прогон 29.09): «работает 0 из 1» без них
+      // читалось как ошибка панели — человеку надо видеть, что их можно убрать.
+      const params = {
+        running: String(verdict.running),
+        paused: String(verdict.paused),
+        limit: String(verdict.limit),
+      };
+      throw coded(
+        new Error(
+          `Все места заняты: работает ${params.running}, на паузе ${params.paused} из ${params.limit}`,
+        ),
+        'split-group-no-slot-paused',
+        params,
+      );
+    }
     if (verdict.kind === 'ceiling') {
       const params = { running: String(verdict.running), limit: String(verdict.limit) };
       throw coded(

@@ -267,7 +267,7 @@ function closes(content: unknown, toolUseId: string): boolean {
  */
 const CLI_NOTICE = /^\s*<task-notification>/;
 
-function isHumanPrompt(content: unknown): boolean {
+export function isHumanPrompt(content: unknown): boolean {
   if (typeof content === 'string') return content.trim().length > 0 && !CLI_NOTICE.test(content);
   return (
     Array.isArray(content) &&

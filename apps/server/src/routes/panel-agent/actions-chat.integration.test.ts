@@ -684,6 +684,39 @@ describe('panel-agent actions: chats', () => {
       expect(group(2)?.status).toBe('started');
     });
 
+    it('продолжение паузы из очереди честно говорит: группа вернётся в очередь', async () => {
+      const plan = store.getSplitPlan(ids.parent);
+      const queued = plan?.groups[2];
+      if (!plan || !queued) throw new Error('нет группы');
+      queued.status = 'pending';
+      delete queued.hold;
+      delete queued.startedAt;
+      delete queued.chatId;
+      delete queued.path;
+      store.setSplitPlan(plan);
+      const pause = await decided('split_control', {
+        chat: ids.parent,
+        mode: 'pause_group',
+        group: 2,
+      });
+      // N7: у группы из очереди прогонов нет — карточка не обещает их остановить.
+      expect(field(pause.card, 'label-what-happens')?.valueCode).toBe(
+        'value-split-pause-queued-effect',
+      );
+      expect(pause.result.outcome).toBe('done');
+
+      const resume = await decided('split_control', {
+        chat: ids.parent,
+        mode: 'resume_group',
+        group: 2,
+      });
+      expect(field(resume.card, 'label-what-happens')?.valueCode).toBe(
+        'value-split-requeue-effect',
+      );
+      expect(resume.result.outcome).toBe('done');
+      expect(group(2)?.status).not.toBe('paused');
+    });
+
     it('пауза и продолжение всего дерева', async () => {
       const pauseAll = await decided('split_control', { chat: ids.parent, mode: 'pause_all' });
       expect(pauseAll.card?.preview.summaryCode).toBe('summary-tree-pause');
@@ -701,7 +734,7 @@ describe('panel-agent actions: chats', () => {
       expect(store.getTreePause(ids.parent)).toBeUndefined();
     });
 
-    it('продолжение не идёт сверх потолка: force не уходит ни группе, ни дереву', async () => {
+    it('force не уходит ни группе, ни дереву; пауза продолжается своим местом', async () => {
       const pause = await decided('split_control', {
         chat: ids.parent,
         mode: 'pause_group',
@@ -710,7 +743,8 @@ describe('panel-agent actions: chats', () => {
       expect(pause.result.outcome).toBe('done');
       expect(group(0)?.status).toBe('paused');
 
-      // Место под потолком занято идущей группой: без согласия человека — отказ.
+      // Потолок полон, но пауза держит своё место (живой прогон 29.09): группа
+      // продолжается без согласия, и согласия агент всё равно не шлёт.
       ceiling = 1;
       const resume = await decided('split_control', {
         chat: ids.parent,
@@ -720,9 +754,8 @@ describe('panel-agent actions: chats', () => {
       const toGroup = outgoing.filter((call) => call.url.endsWith('/resume-paused'));
       expect(toGroup).toHaveLength(1);
       expect((toGroup[0]?.body as { force?: unknown }).force).toBeUndefined();
-      expect(resume.result.outcome).toBe('failed');
-      expect(resumed).toEqual([]);
-      expect(group(0)?.status).toBe('paused');
+      expect(resume.result.outcome).toBe('done');
+      expect(resumed).toHaveLength(1);
 
       const pauseAll = await decided('split_control', { chat: ids.parent, mode: 'pause_all' });
       expect(pauseAll.result.outcome).toBe('done');

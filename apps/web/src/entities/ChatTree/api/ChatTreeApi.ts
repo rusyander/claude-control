@@ -268,6 +268,37 @@ export function useStartGroupNow() {
 }
 
 /**
+ * Группа, оборванная до своего чата (живой прогон 29.09): «Завести заново» в её
+ * копии. Потолок её не держит — место она держала сама; лимит — 409 со сроком.
+ */
+export function useRestartGroup() {
+  return useMutation({
+    meta: { silentError: true },
+    mutationFn: async (input: { parentChatId: string; index: number; force?: boolean }) => {
+      const { data } = await apiClient.post<{ index: number }>(
+        `/chat/split/${encodeURIComponent(input.parentChatId)}/restart-group`,
+        { index: input.index, ...(input.force ? { force: true } : {}) },
+      );
+      return data;
+    },
+  });
+}
+
+/** «Убрать» оборванную до чата группу: закрыть её сбоем с причиной. */
+export function useDropGroup() {
+  return useMutation({
+    meta: { silentError: true },
+    mutationFn: async (input: { parentChatId: string; index: number }) => {
+      const { data } = await apiClient.post<{ index: number }>(
+        `/chat/split/${encodeURIComponent(input.parentChatId)}/drop-group`,
+        { index: input.index },
+      );
+      return data;
+    },
+  });
+}
+
+/**
  * «Отменить план» разделения (W3-5): сервер останавливает прогоны групп и
  * закрывает план; чаты и ветки остаются, разделить можно заново.
  */

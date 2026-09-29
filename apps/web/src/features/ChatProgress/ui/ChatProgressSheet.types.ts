@@ -9,6 +9,8 @@ export interface ChatProgressSheetProps {
   progress?: ChatProgress;
   /** Агент ещё работает — показываем это в шапке панели. */
   isRunning?: boolean;
+  /** Ход кончился вопросом человеку, и ответа ещё нет. */
+  awaiting?: boolean;
 }
 
 export interface TaskRowProps {

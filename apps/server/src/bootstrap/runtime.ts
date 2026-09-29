@@ -547,8 +547,8 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
       // `mrWatch` объявлен ниже: к первому концу цепочки он уже есть.
       mrWatch.sync(parentChatId);
     },
-    launch: (record, groups, context, claimBranch) =>
-      launchFromRecord(ctx, launchDeps, record, groups, context, claimBranch),
+    launch: (record, groups, context, claimBranch, startable) =>
+      launchFromRecord(ctx, launchDeps, record, groups, context, claimBranch, startable),
     startTriage: (record, prompt, claim) =>
       createSplitLauncher(ctx, launchDeps, {
         projectPath: copyRootOf(record),
@@ -561,15 +561,16 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     // Доставка группы по фактам git (WP1b): «готово» — только когда ветка на
     // удалённом и MR с той же головой; иначе напоминание группе её же сессией.
     delivery: {
-      facts: async (group, mr, projectPath) => {
+      facts: async (group, mr, projectPath, claimed) => {
         if (!group.path) return { missing: [serverText('delivery-gap-no-copy')] };
         const facts = await readDeliveryFacts({
           cwd: group.path,
           branch: group.branch,
           ...(mr ? { mr } : {}),
           mirror: ctx.store.getWorktreeMirror(projectPath),
+          claimed,
         });
-        const missing = missingDelivery(facts, group.branch);
+        const missing = missingDelivery(facts, facts.branch ?? group.branch);
         // Описание MR читается форджем только у найденного по голове MR.
         const description = facts.mr
           ? await mrDescriptionGap(facts.mr, async (url) => {
@@ -603,6 +604,7 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
           ],
           ...(sieves?.classes.length ? { sieveClasses: sieves.classes } : {}),
           ...(facts.mr ? { mr: facts.mr } : {}),
+          ...(facts.branch ? { branch: facts.branch } : {}),
           ...(facts.unreachable ? { unreachable: facts.unreachable } : {}),
           ...(description.unchecked ? { descriptionUnchecked: true } : {}),
         };

@@ -21,6 +21,14 @@ import { parseDirtyPaths } from './read.ts';
  *   только если её голова совпала; чужой MR с другой головой не засчитывается.
  */
 
+/** Ключ задачи трекера в имени ветки: `GOR-1485`, `PROJ-1`. */
+const TICKET_KEY = /[A-Z][A-Z0-9]+-\d+/g;
+
+/** Ключ стоит в имени отдельно: не хвост другого ключа и не начало большего номера. */
+function hasKey(name: string, key: string): boolean {
+  return new RegExp(`(?<![A-Z0-9])${key}(?!\\d)`).test(name);
+}
+
 /** Сетевой потолок одного `ls-remote`: чуть меньше, чем ждёт человек у хаба. */
 const LS_REMOTE_TIMEOUT_MS = 30_000;
 
@@ -34,6 +42,11 @@ export interface DeliveryFacts {
   mr?: string;
   /** Удалённый не ответил — факты сети неизвестны, а не отрицательны. */
   unreachable?: string;
+  /**
+   * Ветка, которую группа завела и отправила сама вместо названной панелью, —
+   * факты выше уже про неё. Нет — доставка по имени панели.
+   */
+  branch?: string;
 }
 
 /**
@@ -111,12 +124,20 @@ export async function readDeliveryFacts(input: {
   /** Ссылка на MR из ответа группы — подсказка, не факт. */
   mr?: string;
   mirror?: WorktreeMirrorSettings;
+  /** Ветки других групп плана и основания копий: своей группе их не брать. */
+  claimed?: readonly string[];
 }): Promise<DeliveryFacts> {
   const { cwd, branch } = input;
   const include = effectiveSettings(input.mirror).include;
   const status = await git(cwd, ['status', '--porcelain=v1', '-z', '-uall']);
   const dirty = parseDirtyPaths(status).filter((path) => !listed(path, include));
   const head = (await git(cwd, ['rev-parse', 'HEAD'])).trim();
+  // На какой ветке стоит копия: группа могла завести свою по правилу проекта
+  // (живой прогон 29.09 — ключи через запятую вместо имени панели).
+  const current = (
+    await git(cwd, ['symbolic-ref', '--quiet', '--short', 'HEAD']).catch(() => '')
+  ).trim();
+  const own = current && current !== branch ? current : undefined;
 
   const remote = pickRemote(await git(cwd, ['remote']));
   if (!remote) return { dirty, head, pushed: false };
@@ -135,6 +156,7 @@ export async function readDeliveryFacts(input: {
         remote,
         'HEAD',
         `refs/heads/${branch}`,
+        ...(own ? [`refs/heads/${own}`] : []),
         'refs/merge-requests/*/head',
         'refs/pull/*/head',
       ],
@@ -145,9 +167,26 @@ export async function readDeliveryFacts(input: {
     return { dirty, head, pushed: false, unreachable: reason.slice(0, 300) || remote };
   }
   const refs = parseLsRemote(listing);
-  const pushed = refs.get(`refs/heads/${branch}`) === head;
+  // Свою ветку группы принимаем, только когда ветки панели на удалённом нет
+  // вовсе, своя отправлена с головой копии, это не основная ветка удалённого и
+  // в её имени есть ключ задачи из имени панели — целиком, а не как начало
+  // большего номера (PROJ-12 не PROJ-123), и это не ветка другой группы плана и
+  // не основание копии. Иначе копия, переключённая на develop или на ветку
+  // предшественника с тем же ключом, увела бы группу на чужую ветку и чужой MR
+  // (ревью 29.09). Ключа в имени панели нет — сверять не с чем, не берём.
+  const keys = branch.match(TICKET_KEY) ?? [];
+  const adopted =
+    own &&
+    keys.some((key) => hasKey(own, key)) &&
+    !(input.claimed ?? []).includes(own) &&
+    !refs.has(`refs/heads/${branch}`) &&
+    refs.get(`refs/heads/${own}`) === head &&
+    refs.get('HEAD') !== head
+      ? own
+      : undefined;
+  const pushed = refs.get(`refs/heads/${adopted ?? branch}`) === head;
   const mr = pickDeliveredMr(refs, head, base, input.mr);
-  return { dirty, head, pushed, ...(mr ? { mr } : {}) };
+  return { dirty, head, pushed, ...(mr ? { mr } : {}), ...(adopted ? { branch: adopted } : {}) };
 }
 
 /**

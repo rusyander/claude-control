@@ -124,8 +124,10 @@ export interface SplitLauncher {
       context?: SplitGroupContext;
       /** С какого звена стартуют чаты; нет — с работы, как до Т1. Уровни ставит конвейер. */
       stage?: 'plan' | 'work';
-      /** Настоящее имя ветки группы — конвейеру, до старта её прогона. */
-      claimBranch?: (index: number, branch: string) => void;
+      /** Настоящее имя ветки группы (и её копия) — конвейеру, до старта её прогона. */
+      claimBranch?: (index: number, branch: string, path?: string) => void;
+      /** Можно ли ещё стартовать прогон группы после подготовки копии (см. `splitTasks`). */
+      startable?: (index: number) => boolean;
     },
   ) => Promise<TaskSplitResult>;
   /**
@@ -702,6 +704,7 @@ export function createSplitLauncher(
         stage: options.stage === 'plan' && canPlan ? 'plan' : 'work',
         ...(options.context ? { context: options.context } : {}),
         ...(options.claimBranch ? { claimBranch: options.claimBranch } : {}),
+        ...(options.startable ? { startable: options.startable } : {}),
         // Главный выключатель, проект и удалённый репозиторий — вместе.
         deliver: resolveProjectDelivery(ctx.store, settingsDir).active,
         // Кто решает развилки групп — общая строка вкладки «Группы».
@@ -939,7 +942,8 @@ export function launchFromRecord(
   record: SplitPlanRecord,
   groups: number[],
   context?: SplitGroupContext,
-  claimBranch?: (index: number, branch: string) => void,
+  claimBranch?: (index: number, branch: string, path?: string) => void,
+  startable?: (index: number) => boolean,
 ): Promise<TaskSplitResult> {
   const launcher = createSplitLauncher(ctx, deps, {
     projectPath: copyRootOf(record),
@@ -956,5 +960,6 @@ export function launchFromRecord(
     stage: 'plan',
     ...(context ? { context } : {}),
     ...(claimBranch ? { claimBranch } : {}),
+    ...(startable ? { startable } : {}),
   });
 }

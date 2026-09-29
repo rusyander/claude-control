@@ -193,6 +193,13 @@ export interface SplitGroupContext {
   predecessors?: { title: string; branch: string; failed?: boolean }[];
   /** Вопрос разбора и ответ человека, если группу держали. */
   holdAnswer?: { question: string; answer: string };
+  /**
+   * Копия группы уже есть — завести прогон в ней, а не новую (живой прогон
+   * 29.09): группу остановили во время подготовки или оборвали до её чата, и
+   * новая копия дала бы ветку `-2` рядом с пустой прежней. Только для порции из
+   * одной группы.
+   */
+  copy?: { path: string; branch: string };
 }
 
 /**
@@ -264,7 +271,15 @@ export interface SplitTasksInput {
    * получает суффикс, а цепочка группы вправе кончиться раньше, чем вернётся
    * вся порция, — и искать её тогда будут по этому имени.
    */
-  claimBranch?: (index: number, branch: string) => void;
+  claimBranch?: (index: number, branch: string, path?: string) => void;
+  /**
+   * Можно ли ещё стартовать прогон группы — спрашивается ПОСЛЕ подготовки копии
+   * (установка зависимостей идёт минутами), прямо перед связью и стартом. Нет —
+   * человек за это время поставил группу на паузу или отменил план: копия
+   * остаётся, чата и прогона нет, группа уходит в ответ с `held` (живой прогон
+   * 29.09: пауза во время `npm ci` не держалась).
+   */
+  startable?: (index: number) => boolean;
   /** От какой ветки отвести копии этой порции и что группы знают о предшественниках. */
   context?: SplitGroupContext;
   /**
@@ -366,6 +381,7 @@ export async function splitTasks({
   context,
   resolveReview,
   claimBranch,
+  startable,
   deliver = false,
   groupQuestions = 'plan',
 }: SplitTasksInput): Promise<TaskSplitResult> {
@@ -422,6 +438,24 @@ export async function splitTasks({
     let isWorktree = false;
     let mirror: string | undefined;
 
+    const reuse = context?.copy;
+    if (isRepo && reuse) {
+      // Копия уже заведена и ветка её — занята ею же: ни `worktree add`, ни
+      // суффикса. Подготовка ниже идёт заново — прежняя могла оборваться.
+      // Ревью-группа и в прежней копии остаётся ревью: без предмета задание
+      // стало бы обычной работой по её задачам.
+      prepared.push({
+        index,
+        group,
+        branch: reuse.branch,
+        cwd: reuse.path,
+        isWorktree: true,
+        ...(review ? { review } : {}),
+      });
+      taken.add(reuse.branch);
+      claimBranch?.(index, reuse.branch, reuse.path);
+      continue;
+    }
     if (isRepo) {
       try {
         // Ветка MR — ровно она, без суффикса и без базы предшественников: занятая
@@ -452,7 +486,7 @@ export async function splitTasks({
     // Имя ветки известно и больше не изменится — отдаём его СЕЙЧАС, до
     // подготовки копии и до старта прогона: дальше начинается время, за которое
     // цепочка группы успевает и начаться, и кончиться.
-    claimBranch?.(index, branch);
+    claimBranch?.(index, branch, isWorktree ? cwd : undefined);
   }
 
   const bootstraps = await Promise.all(
@@ -524,6 +558,22 @@ export async function splitTasks({
     // настоящим id разговор станет, когда CLI выдаст сессию. Иначе вкладка
     // помнила бы ключ, которого в истории никогда не появится.
     const chatId = `new-${stamp}-${index}`;
+    if (startRuns && startable && !startable(index)) {
+      // Ни связи, ни чата: разговора не было, и в дереве ему взяться неоткуда.
+      chats.push({
+        index,
+        title: group.title,
+        branch,
+        chatId,
+        path: cwd,
+        isWorktree,
+        started: false,
+        held: true,
+        prompt,
+        stage: groupStage,
+      });
+      continue;
+    }
     // Чем делать эту группу — решается ОДИН раз и уходит сразу в связь, в
     // прогон и в ответ: три расчёта одного и того же разошлись бы, и человек
     // видел бы в карточке не то, что запустилось.

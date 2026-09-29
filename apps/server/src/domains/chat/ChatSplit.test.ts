@@ -928,6 +928,19 @@ describe('группа ревью по ссылке', () => {
     expect(started[0]?.prompt).toContain('agentdeck:review');
   });
 
+  it('заводится заново в прежней копии — всё равно ревью, а не задание группы', async () => {
+    const { git, started } = await split({
+      groups: [0],
+      context: { copy: { path: '/copies/review-42', branch: 'feature/login' } },
+      resolveReview: async () => ({ branch: 'feature/login' }),
+    });
+
+    expect(git.added).toEqual([]);
+    expect(started[0]?.cwd).toBe('/copies/review-42');
+    expect(started[0]?.review).toMatchObject({ url: MR, branch: 'feature/login' });
+    expect(started[0]?.prompt).toContain('EDIT NOTHING');
+  });
+
   it('план ревью-группе не заводится: планировать нечего, она ничего не делает', async () => {
     const { started, linked } = await split({ stage: 'plan' });
 
@@ -1045,5 +1058,64 @@ describe('работа в нескольких MR', () => {
     // Ревью соседнего MR — прежнее, только чтение.
     expect(review?.prompt).toContain('EDIT NOTHING');
     expect(review?.review).toMatchObject({ url: MR2 });
+  });
+});
+
+describe('пауза во время подготовки и копия, заведённая раньше (живой прогон 29.09)', () => {
+  it('группу, которую нельзя больше стартовать, не связывают и не запускают', async () => {
+    const git = fakeGit({ bootstrap: async () => undefined });
+    const started: string[] = [];
+    const linked: string[] = [];
+    const claimed: [number, string, string | undefined][] = [];
+
+    const result = await splitTasks({
+      projectPath: '/repo',
+      proposal: PROPOSAL,
+      startRuns: true,
+      git,
+      now: () => 1000,
+      startable: (index) => index !== 1,
+      claimBranch: (index, branch, path) => void claimed.push([index, branch, path]),
+      link: ({ chatId }) => void linked.push(chatId),
+      start: ({ chatId }) => {
+        started.push(chatId);
+        return true;
+      },
+    });
+
+    expect(started).toEqual(['new-1000-0']);
+    expect(linked).toEqual(['new-1000-0']);
+    expect(result.chats[1]).toMatchObject({
+      started: false,
+      held: true,
+      path: '/copies/feature-header',
+    });
+    // Копия названа конвейеру сразу, до подготовки: после перезапуска он знает, где она.
+    expect(claimed).toEqual([
+      [0, 'feature/login', '/copies/feature-login'],
+      [1, 'feature/header', '/copies/feature-header'],
+    ]);
+  });
+
+  it('копия уже есть — ни `worktree add`, ни суффикса: прогон идёт в ней', async () => {
+    const git = fakeGit({ takenBranches: async () => ['feature/header'] });
+    const cwds: string[] = [];
+
+    const result = await splitTasks({
+      projectPath: '/repo',
+      proposal: PROPOSAL,
+      startRuns: true,
+      git,
+      groups: [1],
+      context: { copy: { path: '/copies/old-header', branch: 'feature/header' } },
+      start: ({ cwd }) => {
+        cwds.push(cwd);
+        return true;
+      },
+    });
+
+    expect(git.added).toEqual([]);
+    expect(cwds).toEqual(['/copies/old-header']);
+    expect(result.chats[0]).toMatchObject({ branch: 'feature/header', started: true });
   });
 });

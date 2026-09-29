@@ -1,6 +1,6 @@
 import type { SplitPlanView } from '@agentdeck/contracts/chat-handoff';
 import type { ChildStageGroup } from '../ui/ChildStages.types';
-import type { GroupControlState } from '../ui/GroupControl.types';
+import type { GroupControlAction } from '../ui/GroupControl.types';
 import { acceptanceOf } from './groupAcceptance';
 
 /**
@@ -113,7 +113,7 @@ export function mergeSplitGroups(
           : {}),
         // Пауза одной группы (журнал 81a) — метка строки и кнопка «Продолжить».
         ...(group.status === 'paused' ? { isPaused: true } : {}),
-        ...controlOf(group, split),
+        ...controlOf(group, split, true),
         // Ручная приёмка доставленной группы (TK-accepted).
         ...acceptanceOf(group, split, found.row.isRunning),
         // Разрешённое по строке «с отметкой» — и у идущего звена: это то, что
@@ -183,12 +183,19 @@ function pendingRow(group: SplitPlanView['groups'][number], split: SplitPlanView
   // Ждущее состояние конвейера — как есть; всё остальное («pending», а также
   // «started»/«done» у группы, чей чат до списка ещё не доехал) читается как
   // «ждёт итога разбора»: строке нужно сказать, почему группы не видно.
-  const known = ['held', 'waiting', 'failed'] as const;
+  const known = ['held', 'waiting', 'failed', 'paused'] as const;
   // Разбор уже применён, а группа всё ещё `pending` — она ждёт места: сколько
   // групп идёт разом, решает настройка проекта.
   const pending: ChildStageGroup['pending'] =
     known.find((status) => status === group.status) ??
-    (group.status === 'pending' && split.triage ? 'queued' : 'pending');
+    (group.status === 'pending' && split.triage ? 'queued' : undefined) ??
+    // Стартовала, а чата нет: идёт подготовка копии (живой прогон 29.09 —
+    // минуты `npm ci` читались как «ничего не запустилось»).
+    // Только без чата: чат, не доехавший до списка, — не подготовка и не обрыв.
+    (group.status === 'started' && !group.chatId ? 'setup' : undefined) ??
+    (group.status === 'awaiting' && group.waitingFor === 'interrupted' && !group.chatId
+      ? 'interrupted'
+      : 'pending');
   return {
     chatId: '',
     title: group.title,
@@ -215,41 +222,64 @@ function pendingRow(group: SplitPlanView['groups'][number], split: SplitPlanView
     ...(group.holdAnswer ? { holdAnswered: true } : {}),
     ...(group.base ? { base: group.base } : {}),
     ...errorOf(group),
-    ...(pending === 'queued' ? controlOf(group, split) : {}),
+    // Закрытая группа с копией и без чата (убранная человеком после обрыва):
+    // её копию тоже можно убрать.
+    ...(group.path && group.status === 'failed'
+      ? {
+          copy: {
+            index: group.index,
+            ...(group.cleaned ? { cleaned: group.cleaned.branch } : {}),
+          },
+        }
+      : {}),
+    ...(pending !== 'pending' ? controlOf(group, split, false) : {}),
   };
 }
 
 /**
  * Что можно сделать с группой из строки (журнал 81, 89): работающую или
  * ждущую — на паузу, остановленную — продолжить, ждущую места — запустить
- * сейчас. Оборванной своя кнопка «Продолжить» (WP1c), и вторая ей не нужна.
+ * сейчас или придержать (живой прогон 29.09). Оборванной с чатом своя кнопка
+ * «Продолжить» (WP1c), и вторая ей не нужна; оборванной ДО чата продолжать
+ * нечего — «Завести заново» или «Убрать», иначе строка — тупик.
  * Срок сброса лимита — у самой группы, у очереди — общий по разделению.
  */
 function controlOf(
   group: SplitPlanView['groups'][number],
   split: SplitPlanView,
+  hasChat: boolean,
 ): Pick<ChildStageGroup, 'control'> {
-  const action = controlAction(group);
-  if (!action) return {};
+  const actions = controlActions(group, hasChat);
+  if (actions.length === 0) return {};
   const limitUntil = group.waitingFor === 'limit' ? group.limitUntil : undefined;
-  const queueLimit = action === 'start' ? split.limitUntil : undefined;
+  const queueLimit = actions[0] === 'start' ? split.limitUntil : undefined;
   const until = limitUntil ?? queueLimit;
+  // Пауза из очереди: места группа не держит — «Продолжить» вернёт её в
+  // очередь. Решает сервер: старт до записи копии место уже держит.
+  const fromQueue = group.status === 'paused' && !group.seated;
   return {
     control: {
       parentChatId: split.parentChatId,
       index: group.index,
-      action,
+      actions,
+      ...(fromQueue ? { fromQueue: true } : {}),
       ...(until ? { limitUntil: until } : {}),
     },
   };
 }
 
-function controlAction(
+function controlActions(
   group: SplitPlanView['groups'][number],
-): GroupControlState['action'] | undefined {
-  if (group.status === 'paused') return 'resume';
-  if (group.status === 'pending') return 'start';
+  hasChat: boolean,
+): GroupControlAction[] {
+  // Пауза держит место под потолком: ненужную группу человек убирает, не
+  // отменяя весь план.
+  if (group.status === 'paused') return ['resume', 'drop'];
+  if (group.status === 'pending') return ['start', 'pause'];
+  if (group.status === 'awaiting' && group.waitingFor === 'interrupted') {
+    return hasChat || group.chatId ? [] : ['restart', 'drop'];
+  }
   const working =
     group.status === 'started' || group.status === 'background' || group.status === 'awaiting';
-  return working && group.waitingFor !== 'interrupted' ? 'pause' : undefined;
+  return working ? ['pause'] : [];
 }

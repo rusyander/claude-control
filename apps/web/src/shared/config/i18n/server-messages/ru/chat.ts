@@ -84,9 +84,13 @@ export const chatRu: Record<ChatMessageCode, string> = {
   'split-pause-not-running': 'Группа сейчас не работает — ставить на паузу нечего',
   'split-resume-not-paused': 'Группа не на паузе — продолжать нечего',
   'split-resume-refused': 'Продолжить группу нечем: у неё нет разговора или копии',
+  'split-restart-not-cut': 'Группа не оборвана до своего чата — заводить заново нечего',
   'split-start-not-queued': 'Группа не в очереди — запускать нечего',
   'split-accept-not-done': 'Принять нечего: группы нет или она ещё не доставлена',
   'split-group-no-slot': 'Все места заняты: работает {{running}} из {{limit}}',
+  'split-group-no-slot-paused':
+    'Все места заняты: работает {{running}}, на паузе {{paused}} из {{limit}} — место освободит «Продолжить» или «Убрать» у группы на паузе',
+  'split-drop-nothing': 'Убирать нечего: группа не на паузе и не оборвана до своего чата',
   'split-limit-active': 'Лимит подписки исчерпан до {{until}}',
   'split-plan-cancel-nothing': 'Отменять нечего: разделение этого разговора уже закончилось',
   'split-plan-cancel-unknown': 'Разделения с этим разговором нет',

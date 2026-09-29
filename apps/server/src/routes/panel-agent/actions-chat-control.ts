@@ -604,6 +604,27 @@ const MODE_EFFECT = {
   resume_all: 'value-tree-resume-effect',
 } as const;
 
+/**
+ * Что будет — по тому, где группа стоит, а не только по режиму: карточка
+ * обязана сказать правду (ревью 29.09, A14 и N7). Пауза из очереди места не
+ * держит, и «Продолжить» вернёт её в очередь; у группы, чья копия ещё
+ * готовилась, сессии нет, и она стартует в копии; у группы из очереди нет
+ * прогонов, которые пауза остановила бы.
+ */
+export function controlEffect(
+  mode: keyof typeof MODE_EFFECT,
+  group: { status: string; seated?: boolean; chatId?: string } | undefined,
+) {
+  if (mode === 'resume_group' && group?.status === 'paused') {
+    if (!group.seated) return 'value-split-requeue-effect';
+    if (!group.chatId) return 'value-split-resume-fresh-effect';
+  }
+  if (mode === 'pause_group' && group && !group.seated && !group.chatId) {
+    return 'value-split-pause-queued-effect';
+  }
+  return MODE_EFFECT[mode];
+}
+
 const splitControl = definePanelAction({
   name: 'split_control',
   section: 'chat',
@@ -663,7 +684,7 @@ const splitControl = definePanelAction({
       fields.push(dataField('label-question', target.group.hold));
       fields.push(dataField('label-answer', input.answer ?? ''));
     }
-    fields.push(textField('label-what-happens', MODE_EFFECT[input.mode]));
+    fields.push(textField('label-what-happens', controlEffect(input.mode, target.group)));
     return {
       ...summaryText(MODE_SUMMARY[input.mode], {
         chat: maskedTitle(target.chat),

@@ -58,6 +58,12 @@ export const panelTextsChatEn = {
     'The chat agent will not propose a split on its own again; the “Split tasks across chats” button still works',
   'value-split-pause-effect': 'The group’s runs stop; the group waits for “Resume”',
   'value-split-resume-effect': 'The group continues in its own session',
+  'value-split-requeue-effect':
+    'The group was queued — it goes back to the queue and starts when its turn comes',
+  'value-split-resume-fresh-effect':
+    'The group has no session yet — it starts in its copy, or sets the copy up afresh',
+  'value-split-pause-queued-effect':
+    'The queued group will not start until resumed; it holds no slot',
   'value-split-release-effect': 'The group starts now, merging nothing from its predecessors',
   'value-split-answer-effect': 'The answer goes to the group, and it starts',
   'value-tree-pause-effect': 'Every run of this request stops, auto-starts freeze',

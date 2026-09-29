@@ -94,7 +94,8 @@ describe('хаб разделения — разбор', () => {
       groups: [],
     });
 
-    expect(textOf(html)).toContain('время работы 21м 57с');
+    // Колонка «Время работы» (живой прогон 29.09): подпись над значением.
+    expect(textOf(html)).toMatch(/Время работы\|*21м 57с/);
     expect(textOf(html)).not.toContain('в работе 21м');
   });
 
@@ -320,5 +321,64 @@ describe('хаб разделения — сводка после отмены �
 
     expect(summary).toContain('отменена: 1');
     expect(summary).toContain('упала: 1');
+  });
+});
+
+/**
+ * Живой прогон 29.09: строка группы одной строкой через «·» резалась
+ * многоточием на полуслове, глубины не было вовсе, а на каком шаге группа —
+ * только открыв её чат. Теперь колонки (модель с глубиной, до первой правки,
+ * время работы) и «Шаг N из M» с именем шага из плана агента группы.
+ */
+describe('хаб разделения — колонки и шаг группы', () => {
+  const work = chat({
+    id: 'g0',
+    stage: 'work',
+    groupTitle: 'CP-admin-UI',
+    branch: 'fix-GOR-1409-GOR-1334/cp-clients-instances-2',
+    model: 'claude-opus-5-5',
+    effort: 'high',
+    firstEditAt: '2026-09-24T10:03:10.000Z',
+    updatedAt: '2026-09-24T11:58:00.000Z',
+  });
+
+  function renderWith(progress: unknown): string {
+    const client = new QueryClient();
+    client.setQueryData(['chats', 'g0', 'progress'], progress);
+    return renderToStaticMarkup(
+      <QueryClientProvider client={client}>
+        <ChildStages groups={collectChildStages([work], 'parent', [])} onOpen={() => {}} />
+      </QueryClientProvider>,
+    );
+  }
+
+  it('модель идёт вместе с глубиной, время — отдельными колонками, ветка не режется', () => {
+    const html = renderWith({ tasks: [], agents: [] });
+    expect(section(html, 'data-hub-meta-cell="model"')).toContain('claude-opus-5-5 · Высокая');
+    expect(textOf(html)).toMatch(/До первой правки\|*3м 10с/);
+    expect(html).toContain('data-hub-meta-cell="workTime"');
+    expect(textOf(html)).toContain('fix-GOR-1409-GOR-1334/cp-clients-instances-2');
+    // Многоточие обрезало строку на полуслове — у строк группы его больше нет.
+    expect(section(html, 'data-hub-meta')).not.toContain('truncate');
+  });
+
+  it('шаг по плану агента: «Шаг 8 из 14», имя шага и живые субагенты', () => {
+    const tasks = [
+      ...Array.from({ length: 7 }, (_, i) => ({ text: `s${i}`, status: 'completed' })),
+      { text: 'Ревью', status: 'in_progress' },
+      ...Array.from({ length: 6 }, (_, i) => ({ text: `p${i}`, status: 'pending' })),
+    ];
+    const agents = [
+      { description: 'lane A', status: 'running' },
+      { description: 'lane B', status: 'running' },
+    ];
+    const html = renderWith({ tasks, agents });
+    expect(html).toContain('data-hub-step="8/14"');
+    expect(textOf(html)).toContain('Шаг 8 из 14');
+    expect(textOf(html)).toContain('Ревью · 2 агента');
+  });
+
+  it('плана нет — строки шага нет', () => {
+    expect(renderWith({ tasks: [], agents: [] })).not.toContain('data-hub-step');
   });
 });

@@ -56,6 +56,9 @@ export type ChatTextCode =
   | 'value-split-decline-effect'
   | 'value-split-pause-effect'
   | 'value-split-resume-effect'
+  | 'value-split-requeue-effect'
+  | 'value-split-resume-fresh-effect'
+  | 'value-split-pause-queued-effect'
   | 'value-split-release-effect'
   | 'value-split-answer-effect'
   | 'value-tree-pause-effect'
@@ -108,6 +111,12 @@ export const CHAT_TEXTS_RU: Pick<ChatTexts, ChatTextCode> = {
     'Сам агент чата больше не предложит разделение; кнопка «Разделить задачи по чатам» работает по-прежнему',
   'value-split-pause-effect': 'Прогоны группы остановятся, группа ждёт «Продолжить»',
   'value-split-resume-effect': 'Группа продолжит работу своей сессией',
+  'value-split-requeue-effect':
+    'Группа стояла в очереди — вернётся в неё и стартует, когда дойдёт черёд',
+  'value-split-resume-fresh-effect':
+    'Сессии у группы ещё нет — она стартует в своей копии, а без копии заведёт её заново',
+  'value-split-pause-queued-effect':
+    'Группа из очереди не стартует, пока её не продолжат; место она не держит',
   'value-split-release-effect': 'Группа стартует сейчас, ничего не сливая от предшественников',
   'value-split-answer-effect': 'Ответ уйдёт группе, и она стартует',
   'value-tree-pause-effect': 'Остановятся все прогоны этой просьбы, автостарты замрут',

@@ -38,7 +38,7 @@ describe('mergeSplitGroups — управление группой', () => {
       new Map([chatRow(0, true)]),
       plan([group(0, { status: 'started' })]),
     );
-    expect(rows[0]?.control).toEqual({ parentChatId: 'parent', index: 0, action: 'pause' });
+    expect(rows[0]?.control).toEqual({ parentChatId: 'parent', index: 0, actions: ['pause'] });
     expect(rows[0]?.isPaused).toBeUndefined();
   });
 
@@ -48,7 +48,7 @@ describe('mergeSplitGroups — управление группой', () => {
       plan([group(1, { status: 'paused', pausedAt: '2026-09-25T10:05:00.000Z' })]),
     );
     expect(rows[0]?.isPaused).toBe(true);
-    expect(rows[0]?.control?.action).toBe('resume');
+    expect(rows[0]?.control?.actions).toEqual(['resume', 'drop']);
   });
 
   it('группа ждёт лимита — срок сброса её собственный', () => {
@@ -62,12 +62,12 @@ describe('mergeSplitGroups — управление группой', () => {
     expect(rows[0]?.control).toEqual({
       parentChatId: 'parent',
       index: 2,
-      action: 'pause',
+      actions: ['pause'],
       limitUntil: '2026-09-25T15:00:00Z',
     });
   });
 
-  it('ждущая места без чата — «Запустить сейчас» со сроком лимита очереди', () => {
+  it('ждущая места без чата — «Запустить сейчас» со сроком лимита очереди и «Пауза»', () => {
     const rows = mergeSplitGroups(
       new Map(),
       plan([group(3)], { limitUntil: '2026-09-25T18:00:00Z' }),
@@ -76,7 +76,7 @@ describe('mergeSplitGroups — управление группой', () => {
     expect(rows[0]?.control).toEqual({
       parentChatId: 'parent',
       index: 3,
-      action: 'start',
+      actions: ['start', 'pause'],
       limitUntil: '2026-09-25T18:00:00Z',
     });
   });
@@ -103,6 +103,67 @@ describe('mergeSplitGroups — управление группой', () => {
     );
     expect(interrupted[0]?.control).toBeUndefined();
     expect(interrupted[0]?.interrupted?.index).toBe(6);
+  });
+
+  it('пауза до своего чата — метка и «Продолжить»; из очереди — с пометкой', () => {
+    const queued = mergeSplitGroups(new Map(), plan([group(8, { status: 'paused' })]));
+    expect(queued[0]?.pending).toBe('paused');
+    expect(queued[0]?.control).toEqual({
+      parentChatId: 'parent',
+      index: 8,
+      actions: ['resume', 'drop'],
+      fromQueue: true,
+    });
+
+    // Остановлена во время подготовки ДО записи копии: пути нет, а место
+    // группа держит — это решает сервер (`seated`), не догадка по `path`.
+    const setup = mergeSplitGroups(new Map(), plan([group(9, { status: 'paused', seated: true })]));
+    expect(setup[0]?.control?.fromQueue).toBeUndefined();
+    expect(setup[0]?.control?.actions).toEqual(['resume', 'drop']);
+  });
+
+  it('чат группы ещё не доехал до списка — не «подготовка» и не «оборвана до чата»', () => {
+    const started = mergeSplitGroups(
+      new Map(),
+      plan([group(11, { status: 'started', chatId: 'c-11' })]),
+    );
+    expect(started[0]?.pending).toBe('pending');
+    const cut = mergeSplitGroups(
+      new Map(),
+      plan([group(12, { status: 'awaiting', waitingFor: 'interrupted', chatId: 'c-12' })]),
+    );
+    expect(cut[0]?.pending).toBe('pending');
+    expect(cut[0]?.control).toBeUndefined();
+  });
+
+  it('стартовала, чата ещё нет — подготовка копии видна, её можно поставить на паузу', () => {
+    const rows = mergeSplitGroups(new Map(), plan([group(10, { status: 'started' })]));
+    expect(rows[0]?.pending).toBe('setup');
+    expect(rows[0]?.control?.actions).toEqual(['pause']);
+  });
+
+  it('оборвалась до своего чата — «Завести заново» и «Убрать», а не тупик', () => {
+    const rows = mergeSplitGroups(
+      new Map(),
+      plan([
+        group(11, {
+          status: 'awaiting',
+          waitingFor: 'interrupted',
+          interruptedAt: '2026-09-29T07:37:44.000Z',
+        }),
+      ]),
+    );
+    expect(rows[0]?.pending).toBe('interrupted');
+    expect(rows[0]?.control?.actions).toEqual(['restart', 'drop']);
+  });
+
+  it('убранная без чата группа с копией — кнопка уборки копии', () => {
+    const rows = mergeSplitGroups(
+      new Map(),
+      plan([group(12, { status: 'failed', path: 'C:/copies/12', error: 'x' })]),
+    );
+    expect(rows[0]?.copy).toEqual({ index: 12 });
+    expect(rows[0]?.control).toBeUndefined();
   });
 
   it('закрытая группа — кнопки нет', () => {

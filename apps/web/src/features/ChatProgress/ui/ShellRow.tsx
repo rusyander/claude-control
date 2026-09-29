@@ -7,13 +7,17 @@ import { elapsedMs, shellView, type ShellView } from '../model/progressView';
 import type { ShellRowProps } from './ChatProgressSheet.types';
 import styles from './ChatProgressSheet.module.scss';
 
-/** Идёт — жёлтая с пульсом, готово — зелёная, упала или оборвана — красная. */
-const SHELL_TONE: Record<ShellView, 'danger' | 'success' | 'warning'> = {
+/**
+ * Идёт — жёлтая с пульсом, готово — зелёная, упала или оборвана — красная,
+ * остановлена самим агентом — серая: это его уборка, тревожить нечем.
+ */
+const SHELL_TONE: Record<ShellView, 'danger' | 'success' | 'warning' | 'neutral'> = {
   running: 'warning',
   done: 'success',
   failed: 'danger',
   stopped: 'danger',
   lost: 'danger',
+  killed: 'neutral',
 };
 
 export function ShellRow({ shell, isRunning, processAlive, now }: ShellRowProps) {

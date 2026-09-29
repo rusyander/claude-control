@@ -111,6 +111,7 @@ export const composedMessageParams = {
   'chat-autonomy-deferred-notice': ['count'],
   'chat-stop-unconfirmed-notice': ['pid'],
   'split-group-run-not-started': [],
+  'split-group-dropped': [],
   'split-group-chain-failed': [],
   'split-group-plan-cancelled': [],
   'split-delivery-unverifiable': ['checks', 'reason'],

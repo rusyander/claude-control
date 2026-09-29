@@ -158,6 +158,26 @@ await page.route('**/api/project-git*', (route) =>
     json: { isRepo: false, detached: false, unborn: false, branches: [], changes: [] },
   }),
 );
+// Настройки разделения шапка чата спрашивает подпутём — `project-git*` его не
+// ловит, и выдуманный путь уходил настоящему серверу (400 в консоли).
+await page.route('**/api/project-git/split-settings*', (route) =>
+  route.fulfill({
+    json: {
+      deliver: false,
+      parallel: 2,
+      parallelAuto: false,
+      profile: {
+        enabled: true,
+        repo: true,
+        remote: false,
+        bootstrapConfigured: false,
+        heavy: false,
+      },
+      permissions: {},
+      permissionsOwn: [],
+    },
+  }),
+);
 await page.route('**/api/chats/projects*', (route) =>
   route.fulfill({
     json: [
@@ -318,12 +338,14 @@ check(
     JSON.stringify(['Разбор разделения', 'Форма входа', 'Шапка', 'Тесты']),
   `порядок строк — разбор, затем группы по порядку разбора: ${JSON.stringify(titlesInOrder)}`,
 );
+// Строка группы — отдельными элементами (ветка, звенья, колонки времени), а не
+// одной строкой через «·»: проверяем строки текста, а не их склейку.
+const linesOf = (text) => (text ?? '').split('\n').map((line) => line.trim());
+const hasLines = (text, ...wanted) =>
+  wanted.every((line) => linesOf(text).some((own) => own.startsWith(line)));
+check(hasLines(rowTexts[0], 'разбор'), `строка разбора подписана звеном: ${rowTexts[0]}`);
 check(
-  rowTexts[0]?.split('\n')[1]?.startsWith('разбор') === true,
-  `строка разбора подписана звеном: ${rowTexts[0]}`,
-);
-check(
-  rowTexts[1]?.includes('feature/login · план'),
+  hasLines(rowTexts[1], 'feature/login', 'план'),
   `стартовавшая группа стоит на плане: ${rowTexts[1]}`,
 );
 check(
@@ -368,7 +390,10 @@ check(
 );
 check((await hub.locator('[data-hold-form]').count()) === 0, 'после ответа форма убрана');
 const answered = await hub.locator('[data-hub-row]').nth(3).innerText();
-check(answered.includes('feature/tests · план'), `группа после ответа стоит на плане: ${answered}`);
+check(
+  hasLines(answered, 'feature/tests', 'план'),
+  `группа после ответа стоит на плане: ${answered}`,
+);
 await shot('02_ответ-на-вопрос-разбора_AFTER');
 
 // 3а. Лента разбора: карточка вместо JSON и заметка сервера.

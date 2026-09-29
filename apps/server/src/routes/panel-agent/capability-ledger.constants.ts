@@ -86,6 +86,8 @@ export const ROUTE_LEDGER: RouteLedger = {
   'POST /api/chat/split/:parent/pause': 'action:split_control',
   'POST /api/chat/split/:parent/resume-paused': 'action:split_control',
   'POST /api/chat/split/:parent/start-now': 'human:split-apply',
+  'POST /api/chat/split/:parent/restart-group': 'human:split-apply',
+  'POST /api/chat/split/:parent/drop-group': 'human:split-apply',
   // chat/split-routes.ts
   'GET /api/chat/split/:parent/overlap': 'action:read_split_overlap',
   'GET /api/chat/split/request': 'action:request_split',

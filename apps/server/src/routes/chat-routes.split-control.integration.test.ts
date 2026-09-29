@@ -16,8 +16,9 @@ import { SplitConveyor } from '../domains/chat/split-conveyor.ts';
 
 /**
  * Управление группой из хаба по HTTP (журнал 81, 89): пауза останавливает
- * прогон и отдаёт место очереди, «Продолжить» и «Запустить сейчас» упираются в
- * потолок с числами и проходят с согласием, «Стоп» в чате группы — та же пауза.
+ * прогон и держит место (живой прогон 29.09), «Запустить сейчас» упирается в
+ * потолок с числами и проходит с согласием, «Стоп» в чате группы — та же пауза,
+ * группа из очереди встаёт на паузу и возвращается в очередь.
  *
  * Путь настоящий: маршрут → конвейер → реестр прогонов → хранилище на диске.
  * Подменены только процесс CLI (прогон, который идёт, пока его не остановят) и
@@ -147,7 +148,7 @@ describe('разделение: пауза, продолжение, запуск
       payload,
     });
 
-  it('пауза: прогон остановлен, группа на паузе, место ушло следующей из очереди', async () => {
+  it('пауза: прогон остановлен, группа на паузе, очередь не двигается', async () => {
     expect(registry.isRunning('chat-0')).toBe(true);
     expect(group(1)?.status).toBe('pending');
 
@@ -158,26 +159,31 @@ describe('разделение: пауза, продолжение, запуск
     expect(res.json()).toEqual({ index: 0, stopped: 1, unconfirmed: 0 });
     expect(registry.isRunning('chat-0')).toBe(false);
     expect(group(0)?.status).toBe('paused');
-    expect(group(1)?.status).toBe('started');
-    expect(registry.isRunning('chat-1')).toBe(true);
+    expect(group(1)?.status).toBe('pending');
+    expect(registry.isRunning('chat-1')).toBe(false);
   });
 
-  it('«Продолжить» при полном потолке — 409 с числами; с согласием — продолжение', async () => {
+  it('«Продолжить» — своим местом, без вопроса о потолке', async () => {
     await post('pause', { index: 0 });
     await settle();
 
-    const refused = await post('resume-paused', { index: 0 });
-    expect(refused.statusCode).toBe(409);
-    expect(refused.json()).toMatchObject({
-      messageCode: 'split-group-no-slot',
-      params: { running: '1', limit: '1' },
-    });
-    expect(resumed).toEqual([]);
-
-    const forced = await post('resume-paused', { index: 0, force: true });
-    expect(forced.statusCode).toBe(200);
-    expect(forced.json()).toEqual({ index: 0, outcome: 'sent' });
+    const res = await post('resume-paused', { index: 0 });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ index: 0, outcome: 'sent' });
     expect(resumed[0]?.index).toBe(0);
+  });
+
+  it('группа из очереди: пауза держит её, «Продолжить» — назад в очередь', async () => {
+    const paused = await post('pause', { index: 1 });
+    expect(paused.statusCode).toBe(200);
+    expect(paused.json()).toEqual({ index: 1, stopped: 0, unconfirmed: 0 });
+    expect(group(1)?.status).toBe('paused');
+
+    const back = await post('resume-paused', { index: 1 });
+    expect(back.json()).toEqual({ index: 1, outcome: 'queued' });
+    await settle();
+    // Место занято первой — вторая ждёт в очереди.
+    expect(group(1)?.status).toBe('pending');
   });
 
   it('«Запустить сейчас» третью мимо второй: 409 без согласия, старт с ним', async () => {
@@ -197,7 +203,7 @@ describe('разделение: пауза, продолжение, запуск
     await settle();
     expect(res.json()).toEqual({ ok: true });
     expect(group(0)?.status).toBe('paused');
-    expect(group(1)?.status).toBe('started');
+    expect(group(1)?.status).toBe('pending');
   });
 
   it('номер не тот — 400; группа не в том состоянии — 409 с кодом', async () => {
@@ -205,5 +211,15 @@ describe('разделение: пауза, продолжение, запуск
     const notQueued = await post('start-now', { index: 0 });
     expect(notQueued.statusCode).toBe(409);
     expect(notQueued.json()).toMatchObject({ messageCode: 'split-start-not-queued' });
+    // Работающая группа с чатом не «оборвана до чата» и не на паузе: заводить
+    // заново и убирать — нечего.
+    for (const [path, code] of [
+      ['restart-group', 'split-restart-not-cut'],
+      ['drop-group', 'split-drop-nothing'],
+    ] as const) {
+      const refused = await post(path, { index: 0 });
+      expect(refused.statusCode).toBe(409);
+      expect(refused.json()).toMatchObject({ messageCode: code });
+    }
   });
 });

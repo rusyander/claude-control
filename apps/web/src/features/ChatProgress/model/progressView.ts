@@ -31,6 +31,11 @@ export interface ProgressSummary {
  */
 export type ShellView = ProgressShell['status'] | 'lost';
 
+/** Фон, который кончился не сам и не по воле агента, — его результата не будет. */
+export function isLostShell(view: ShellView): boolean {
+  return view === 'lost' || view === 'stopped';
+}
+
 export function shellView(
   shell: ProgressShell,
   isRunning: boolean,
@@ -60,9 +65,20 @@ export function summarizeProgress(
     agentsTotal: agents.length,
     ...(activeTool ? { activeTool } : {}),
     shellsRunning: shells.filter((status) => status === 'running').length,
-    shellsLost: shells.filter((status) => status === 'lost' || status === 'stopped').length,
+    // Остановленное агентом (`killed`) — не обрыв: это его уборка за собой.
+    shellsLost: shells.filter(isLostShell).length,
     hasAnything: tasks.length > 0 || agents.length > 0 || shells.length > 0 || Boolean(activeTool),
   };
+}
+
+/**
+ * Тикают ли часы полосы. Фон живёт дольше хода, поэтому таймер идущей фоновой
+ * команды тикает и между ходами (живой прогон 29.09: он застывал на конце хода,
+ * и «В фоне · 12м 11с» читалось как зависание). Фон мёртвого процесса уже
+ * «оборван» (`shellView`) и не тикает; текущий вызов — только у живого хода.
+ */
+export function clockTicks(summary: ProgressSummary, isRunning: boolean): boolean {
+  return (isRunning && Boolean(summary.activeTool)) || summary.shellsRunning > 0;
 }
 
 /** Сколько идёт то, что стартовало в `startedAt`, — к моменту `now`. */

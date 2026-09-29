@@ -30,6 +30,8 @@ describe('маршрут отправки: потребитель контура
   let asked: PlatformRunConsumer[];
   let prompts: (string | undefined)[];
   let modes: (string | undefined)[];
+  let runModels: (string | undefined)[];
+  let catalog: unknown[];
   const PLAIN = 'run-origin-plain';
   const CHILD = 'run-origin-child';
 
@@ -41,6 +43,8 @@ describe('маршрут отправки: потребитель контура
     asked = [];
     prompts = [];
     modes = [];
+    runModels = [];
+    catalog = [];
     store = new AppStore(join(root, 'agentdeck'));
     // Прогон-заглушка: называет сессию и сразу заканчивается, иначе поток SSE
     // остался бы открытым и запрос не вернулся бы вовсе.
@@ -48,6 +52,7 @@ describe('маршрут отправки: потребитель контура
       start: (options, onEvent) => {
         prompts.push(options.appendSystemPrompt);
         modes.push(options.permissionMode);
+        runModels.push(options.model);
         onEvent({
           kind: 'session',
           sessionId: options.sessionId ?? 'sess',
@@ -74,7 +79,7 @@ describe('маршрут отправки: потребитель контура
       },
       backupDir: join(root, 'backups'),
       pricing: { current: () => ({ entries: [] }) },
-      models: { current: () => ({ models: [] }) },
+      models: { current: () => ({ models: catalog }) },
     } as unknown as ServerContext;
     app = Fastify();
     registerChatRunRoutes(app, ctx, registry, new ChatSession(registry));
@@ -96,6 +101,49 @@ describe('маршрут отправки: потребитель контура
       url: '/api/chat/send',
       payload: { chatId, prompt: 'привет', projectPath: join(root, 'work') },
     });
+
+  /**
+   * Живой прогон 29.09: в шапке выбран «Sonnet», а шёл Sonnet 5 — вышедший
+   * накануне Sonnet 5.5 CLI по алиасу не берёт. Алиас разворачивает панель.
+   */
+  describe('модель из шапки', () => {
+    const family = (id: string, releaseDate: string) => ({
+      id,
+      name: id,
+      family: 'claude-sonnet',
+      vendor: 'anthropic',
+      releaseDate,
+    });
+    const sendModel = (model: string) =>
+      app.inject({
+        method: 'POST',
+        url: '/api/chat/send',
+        payload: { chatId: PLAIN, prompt: 'привет', projectPath: join(root, 'work'), model },
+      });
+
+    it('алиас «sonnet» уходит свежей моделью семейства из каталога', async () => {
+      catalog = [
+        family('claude-sonnet-5', '2026-05-01'),
+        family('claude-sonnet-5-5', '2026-09-28'),
+      ];
+      await sendModel('sonnet');
+      expect(runModels).toEqual(['claude-sonnet-5-5']);
+    });
+
+    it('конкретное имя — точный выбор человека, едет как есть', async () => {
+      catalog = [
+        family('claude-sonnet-5', '2026-05-01'),
+        family('claude-sonnet-5-5', '2026-09-28'),
+      ];
+      await sendModel('claude-sonnet-5');
+      expect(runModels).toEqual(['claude-sonnet-5']);
+    });
+
+    it('каталога нет — алиас едет как есть: прогон с ним заведомо запустится', async () => {
+      await sendModel('sonnet');
+      expect(runModels).toEqual(['sonnet']);
+    });
+  });
 
   it('обычный разговор идёт потребителем «Чат»', async () => {
     const response = await send(PLAIN);

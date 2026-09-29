@@ -11,6 +11,7 @@ import {
   type TranscriptRecord,
   type TranscriptBlock,
 } from './ChatHistory.ts';
+import { isHumanPrompt } from './chat-inbox.ts';
 
 /**
  * Прогресс агента по его собственному следу в транскрипте.
@@ -41,10 +42,17 @@ export function buildProgress(records: TranscriptRecord[]): ChatProgress {
   const agents = new Map<string, ProgressAgent>();
   const shells = new Shells();
   let updatedAt: string | undefined;
+  let skill: ChatProgress['skill'];
 
   for (const record of records) {
     const content = record.message?.content;
     if (record.timestamp) updatedAt = record.timestamp;
+    // Новое слово человека — новая задача: навык прошлой ей не шаг. Иначе хаб
+    // часами звал бы шагом навык, вызванный утром (холодная проверка 29.09, N4).
+    // Тело навыка CLI пишет служебной репликой (isMeta) — она не сброс.
+    // Сводка сжатия и реплики субагента — тоже не слово человека (ревью r2, R3).
+    const service = record.isMeta || record.isCompactSummary || record.isSidechain;
+    if (record.type === 'user' && !service && isHumanPrompt(content)) skill = undefined;
     // Итог фоновой команды или субагента приходит отдельной репликой-уведомлением, строкой.
     if (typeof content === 'string') {
       shells.notice(content);
@@ -57,6 +65,7 @@ export function buildProgress(records: TranscriptRecord[]): ChatProgress {
       if (block.type === 'tool_use') {
         applyToolUse(block, agents, (next) => (tasks = next));
         shells.use(block, record.timestamp);
+        skill = skillOf(block, record.timestamp) ?? skill;
       }
       if (block.type === 'tool_result') {
         applyToolResult(block, agents);
@@ -75,8 +84,21 @@ export function buildProgress(records: TranscriptRecord[]): ChatProgress {
     agents: [...agents.values()],
     ...(listed.length > 0 ? { shells: listed } : {}),
     ...(shells.active ? { activeTool: shells.active } : {}),
+    ...(skill ? { skill } : {}),
     updatedAt,
   };
+}
+
+/**
+ * Навык, которым агент ведёт работу, — шаг его пути без плана (ревью 29.09:
+ * агенты групп TodoWrite не зовут вовсе, и шаг по плану не появлялся никогда,
+ * а вызов навыка — `deep-review`, `live-check` — есть в каждом шаге).
+ */
+function skillOf(block: TranscriptBlock, at: string | undefined): ChatProgress['skill'] {
+  if (block.name !== 'Skill') return undefined;
+  const name = (block.input as { skill?: unknown } | undefined)?.skill;
+  if (typeof name !== 'string' || !name.trim()) return undefined;
+  return { name: name.trim(), ...(at ? { startedAt: at } : {}) };
 }
 
 /** Сколько фоновых команд держать в панели: хвост, а не история разговора. */
@@ -89,17 +111,38 @@ class Shells {
   private readonly byTask = new Map<string, string>();
   private readonly pending = new Map<string, ProgressActiveTool>();
   private readonly commands = new Map<string, string>();
+  /** Вызовы, гасящие процессы по порту, — до их ответа. */
+  private readonly kills = new Map<string, Set<string>>();
+  /** Вызовы, которые только ищут процесс по порту, — до их ответа (PID в нём). */
+  private readonly lookups = new Map<string, { ports: Set<string>; bare: boolean }>();
+  /** PID → порт, напечатанные поиском: гасят их часто следующим вызовом. */
+  private readonly pidPorts = new Map<string, string>();
+  /** Полный текст фоновых команд: порт бывает не в первой строке. */
+  private readonly fullCommands = new Map<string, string>();
 
   use(block: TranscriptBlock, at: string | undefined): void {
     if (!block.id || !block.name) return;
     const input = (block.input ?? {}) as Record<string, unknown>;
     const summary = toolSummary(input);
     this.pending.set(block.id, { name: block.name, summary, ...(at ? { startedAt: at } : {}) });
+    if (STOP_TOOLS.has(block.name)) {
+      this.stopTask(input);
+      return;
+    }
     if (block.name !== 'Bash') return;
     // В строке фона нужна сама команда: описание «Install deps» не скажет,
     // что именно висит двадцать минут.
     const command = typeof input.command === 'string' ? firstLine(input.command) : summary;
     this.commands.set(block.id, command);
+    if (typeof input.command === 'string') {
+      this.fullCommands.set(block.id, input.command);
+      const ports = killedPorts(input.command, this.pidPorts);
+      const found = lookupPorts(input.command);
+      if (ports.size > 0) this.kills.set(block.id, ports);
+      else if (found.size > 0) {
+        this.lookups.set(block.id, { ports: found, bare: onlyLookups(input.command) });
+      }
+    }
     if (input.run_in_background === true) {
       this.byUse.set(block.id, {
         id: block.id,
@@ -115,6 +158,20 @@ class Shells {
     if (!id) return;
     const started = this.pending.get(id);
     this.pending.delete(id);
+    // Погашение засчитывается по ответу, а не по вызову: упавший kill сервер
+    // не остановил.
+    const ports = this.kills.get(id);
+    if (ports) {
+      this.kills.delete(id);
+      if (!block.is_error) this.stopByPort(ports, id);
+    }
+    const found = this.lookups.get(id);
+    if (found) {
+      this.lookups.delete(id);
+      for (const [pid, port] of pidsOf(text, found.ports, found.bare)) {
+        this.pidPorts.set(pid, port);
+      }
+    }
     // Вызов, уведённый в фон, ответил распиской с id задачи: сам он кончился, а
     // команда живёт дальше — и по таймауту тоже, хотя агент фон не просил.
     const task = /(?:background with ID|background \(ID):\s*([\w-]+)/i.exec(text)?.[1];
@@ -138,7 +195,42 @@ class Shells {
     const id = task ? this.byTask.get(task) : undefined;
     const shell = id ? this.byUse.get(id) : undefined;
     if (!id || !shell) return;
+    // Итог задачи, которую агент уже погасил сам, — след его же уборки (ревью
+    // 29.09: он возвращал «оборвана»).
+    if (shell.status === 'killed') return;
     this.byUse.set(id, { ...shell, status: shellStatus(status) });
+  }
+
+  /**
+   * Агент сам остановил фоновую задачу инструментом (TaskStop/KillShell) —
+   * это его решение, а не обрыв (живой прогон 29.09: уборка агента за собой
+   * читалась человеком как «фон оборван»).
+   */
+  private stopTask(input: Record<string, unknown>): void {
+    const task = [input.task_id, input.shell_id].find((v) => typeof v === 'string') as
+      string | undefined;
+    const id = task ? this.byTask.get(task) : undefined;
+    const shell = id ? this.byUse.get(id) : undefined;
+    if (id && shell?.status === 'running') this.byUse.set(id, { ...shell, status: 'killed' });
+  }
+
+  /**
+   * Агент погасил фоновый сервер командой по его порту (`taskkill` по PID из
+   * `netstat … :9123`, `kill $(lsof -ti:9123)`): CLI об этом не узнаёт, и без
+   * этой сверки dev-сервер, убранный агентом, числился идущим или оборванным.
+   * Только порт: по нему агент и находит процесс, а имя команды у всех
+   * dev-серверов одинаковое. Сам гасящий вызов не в счёт: фоновое «освободи
+   * порт и подними сервер» (`kill-port 9123 && npm run dev -- --port 9123`)
+   * гасит прежний сервер, а не себя (ревью r2, R1).
+   */
+  private stopByPort(ports: ReadonlySet<string>, killer: string): void {
+    for (const [id, shell] of this.byUse) {
+      if (id === killer || shell.status !== 'running') continue;
+      const command = this.fullCommands.get(id) ?? shell.command;
+      if ([...portsOf(command)].some((port) => ports.has(port))) {
+        this.byUse.set(id, { ...shell, status: 'killed' });
+      }
+    }
   }
 
   list(): ProgressShell[] {
@@ -151,9 +243,122 @@ class Shells {
   }
 }
 
+/** Инструменты, которыми агент сам останавливает фоновую задачу. */
+const STOP_TOOLS = new Set(['TaskStop', 'KillShell', 'KillBash']);
+
+/**
+ * Команда, которая гасит процесс, — словом команды, а не словом в тексте: в
+ * начале строки, после `;`/`&`/`|`/`(`/`{`, внутри `$(`, после `do`/`xargs`.
+ * Кавычки перед проверкой вырезаются: `echo "kill"` и `grep "kill"` — не kill.
+ */
+const KILL_COMMAND =
+  /(?:^|[;&|(`\n{]|\$\(|\bdo\b|\bxargs\b)\s*(?:sudo\s+)?(?:taskkill|kill|pkill|killall|Stop-Process|fuser|(?:npx\s+)?kill-port)\b/i;
+
+/** Чем агент находит процесс по порту: без поиска порт в команде — просто адрес. */
+const PORT_LOOKUP = /\b(?:netstat|lsof|fuser|Get-NetTCPConnection|kill-port|ss)\b|-LocalPort\b/i;
+
+/**
+ * Гасит ли команда процесс. Кавычки вырезаются (`echo "kill"` — не kill), но
+ * тело `powershell -Command "…"` и `bash -c "…"` — сама команда, и в Windows
+ * это обычный вид погашения (холодная проверка 29.09, N5).
+ */
+function kills(command: string): boolean {
+  // Кавычки заменяются номерами: снаружи их текст не команда, а тело оболочки
+  // потом достаётся по номеру.
+  const quoted: string[] = [];
+  const outer = command.replace(/"([^"]*)"|'([^']*)'/g, (_m, dq?: string, sq?: string) => {
+    quoted.push(dq ?? sq ?? '');
+    return `"${quoted.length - 1}"`;
+  });
+  if (KILL_COMMAND.test(outer)) return true;
+  // Только тело оболочки, стоящей словом команды: `grep -c "kill"` — счёт
+  // строк, `./check.sh` — файл, `echo "bash -c '…'"` — текст (ревью r2, R2).
+  const bodies =
+    /(?:^|[;&|(\n])\s*(?:sudo\s+)?(?:pwsh|powershell|bash|sh|zsh|cmd)(?:\.exe)?(?=\s)[^"\n;&|]*?\s(?:-Command|-c|\/c)\s+"(\d+)"/gi;
+  for (const match of outer.matchAll(bodies)) {
+    if (kills(quoted[Number(match[1])] ?? '')) return true;
+  }
+  return false;
+}
+
+/** Команда — только поиск по порту: каждая её часть что-то ищет. */
+function onlyLookups(command: string): boolean {
+  return command
+    .split(/;|&&|\|\||\n/)
+    .filter((clause) => clause.trim())
+    .every((clause) => PORT_LOOKUP.test(clause));
+}
+
+/**
+ * Порты из тех частей команды, что ищут процесс, — не из всей строки:
+ * `lsof -ti:3000 | xargs kill; curl localhost:9123` гасит 3000, а 9123 лишь
+ * спрашивает. Части делятся по `;`, `&&`, `||` и строкам; труба остаётся одной
+ * частью — поиск и kill в ней связаны.
+ */
+function lookupPorts(command: string): Set<string> {
+  const ports = new Set<string>();
+  for (const clause of command.split(/;|&&|\|\||\n/)) {
+    if (PORT_LOOKUP.test(clause)) for (const port of portsOf(clause)) ports.add(port);
+  }
+  return ports;
+}
+
+/**
+ * Порты, которые команда гасит; пусто — никого по порту не гасит. Поиск и kill в
+ * одной команде — порты поиска; kill без поиска — по PID, которые напечатал
+ * поиск прошлым вызовом (`netstat`, затем `taskkill /PID 4567`).
+ */
+function killedPorts(command: string, pidPorts: ReadonlyMap<string, string>): Set<string> {
+  if (!kills(command)) return new Set();
+  if (PORT_LOOKUP.test(command)) return lookupPorts(command);
+  const ports = new Set<string>();
+  for (const match of command.matchAll(/\b(\d{2,7})\b/g)) {
+    const port = pidPorts.get(match[1] ?? '');
+    if (port) ports.add(port);
+  }
+  return ports;
+}
+
+/**
+ * PID из ответа поиска: строка `netstat -ano` (`TCP 0.0.0.0:9123 … LISTENING
+ * 4567`) — порт из самой строки; голый PID (`lsof -ti:9123`) — порт поиска, если
+ * он один и вызов ничего, кроме поиска, не печатал: `curl -w "%{http_code}"`
+ * рядом дал бы «PID 200» (ревью r2, R2).
+ */
+function pidsOf(text: string, ports: ReadonlySet<string>, bare: boolean): [string, string][] {
+  const pairs: [string, string][] = [];
+  const only = bare && ports.size === 1 ? [...ports][0] : undefined;
+  for (const line of text.split(/\r?\n/)) {
+    const row = /:(\d{2,5})\b.*?\s(\d{2,7})\s*$/.exec(line);
+    if (row?.[1] && row[2] && ports.has(row[1])) pairs.push([row[2], row[1]]);
+    else if (only && /^\s*\d{2,7}\s*$/.test(line)) pairs.push([line.trim(), only]);
+  }
+  return pairs;
+}
+
+/**
+ * Порты в команде: `--port 9123`, `--port=9123`, `:9123`, `PORT=9123`,
+ * `-ti:9123`, `9123/tcp` (fuser), `-LocalPort 9123`, `kill-port 9123`.
+ */
+function portsOf(text: string): Set<string> {
+  const ports = new Set<string>();
+  // Адрес — обращение к серверу, а не сам сервер: `wait-on
+  // http://localhost:9123` вместе с ним не гаснет (N5).
+  const command = text.replace(/\b[a-z][\w+.-]*:\/\/\S+/gi, '');
+  const forms =
+    /(?:--port[=\s]|PORT=|:|-LocalPort\s+|kill-port\s+)(\d{2,5})\b|\b(\d{2,5})\/tcp\b/gi;
+  for (const match of command.matchAll(forms)) {
+    const port = match[1] ?? match[2];
+    if (port) ports.add(port);
+  }
+  return ports;
+}
+
 function shellStatus(status: string | undefined): ProgressShell['status'] {
   if (status === 'completed') return 'done';
   if (status === 'failed') return 'failed';
+  // CLI гасит задачу так по TaskStop/KillShell — это решение, а не обрыв.
+  if (status === 'killed') return 'killed';
   return 'stopped';
 }
 

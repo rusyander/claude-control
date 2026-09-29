@@ -15,6 +15,7 @@ import type { ChatDockProps } from './ChatDock.types';
 export function ChatDock({
   progress,
   isRunning,
+  awaiting,
   queued,
   onCancelQueued,
   value,
@@ -62,7 +63,11 @@ export function ChatDock({
   return (
     <>
       {/* План агента и дерево субагентов — read-only, из транскрипта. */}
-      <ChatProgressSheet progress={progress} isRunning={isRunning} />
+      <ChatProgressSheet
+        progress={progress}
+        isRunning={isRunning}
+        {...(awaiting ? { awaiting } : {})}
+      />
 
       {/* Дописанное, пока агент занят: видно, что уйдёт следующим, и можно
           передумать до отправки. */}

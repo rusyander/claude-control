@@ -397,9 +397,16 @@ export const progressShellSchema = object({
   /**
    * `running` — идёт или, если ход уже кончился, оборвана вместе с ним: это
    * решает интерфейс по статусу прогона. `stopped` — CLI сам сообщил, что
-   * команда не дожила до конца прежнего процесса.
+   * команда не дожила до конца прежнего процесса. `killed` — агент сам её
+   * остановил (TaskStop или команда по её порту): уборка, а не обрыв.
    */
-  status: union([literal('running'), literal('done'), literal('failed'), literal('stopped')]),
+  status: union([
+    literal('running'),
+    literal('done'),
+    literal('failed'),
+    literal('stopped'),
+    literal('killed'),
+  ]),
 });
 
 export type ProgressShell = Infer<typeof progressShellSchema>;
@@ -423,6 +430,8 @@ export const chatProgressSchema = object({
   shells: array(progressShellSchema).optional(),
   /** Последний вызов без результата — идёт прямо сейчас, если прогон жив. */
   activeTool: progressActiveToolSchema.optional(),
+  /** Последний навык, вызванный агентом (`Skill`), — шаг его пути, когда плана нет. */
+  skill: object({ name: string(), startedAt: string().optional() }).optional(),
   /** Время последней записи в транскрипт, по которой собран прогресс. */
   updatedAt: string().optional(),
   /**

@@ -7,6 +7,8 @@ export interface ChatDockProps {
   /** План агента и дерево субагентов — read-only, из транскрипта. */
   progress?: ChatProgress;
   isRunning: boolean;
+  /** Ход кончился вопросом человеку — панель прогресса говорит это первым. */
+  awaiting?: boolean;
   /** Дописанное, что уйдёт агенту, когда он закончит текущий ход. */
   queued: QueuedMessage[];
   onCancelQueued: (id: string) => void;

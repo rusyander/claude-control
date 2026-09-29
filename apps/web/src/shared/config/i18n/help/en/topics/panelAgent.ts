@@ -397,7 +397,8 @@ export const panelAgentEn: typeof panelAgentRu = {
       'waits for its turn to end. Splitting by the proposal is yours: the «Split into N chats» ' +
       'button under the agent’s answer. «Work here», the chat’s group and autonomy, stopping the ' +
       'agent in a chat, pausing and resuming a split group or the whole tree, releasing a group ' +
-      'and answering a triage question — change. Cancelling the plan, cleaning up copies, ' +
+      'and answering a triage question — change. Resuming a group paused while still queued puts it back ' +
+      'in the queue rather than starting it. Cancelling the plan, removing a group, cleaning up copies, ' +
       'permission and branch-gate decisions, auto-approve and starting past the parallel-group ' +
       'limit stay yours. ' +
       'Chat modes (stage auto-continue, the session chain, the permission mode and file ' +

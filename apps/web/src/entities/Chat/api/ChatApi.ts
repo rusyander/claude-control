@@ -261,7 +261,16 @@ export function useArtifacts(chatId: string | undefined) {
  * Между ходами — реже и только пока в фоне что-то идёт: процесс разговора
  * живёт дальше, и фон может как кончиться, так и оборваться вместе с ним.
  */
-export function useChatProgress(chatId: string | undefined, isRunning: boolean) {
+export function useChatProgress(
+  chatId: string | undefined,
+  isRunning: boolean,
+  /**
+   * Как часто перечитывать идущий прогон. Строке группы в хабе родителя
+   * хватает раза в 15 с: шаг меняется за минуты, а шесть групп по 4 с — это
+   * полтора синхронных разбора транскрипта в секунду на сервере (ревью 29.09).
+   */
+  runningPollMs = 4000,
+) {
   return useQuery({
     queryKey: chatKeys.progress(chatId ?? ''),
     queryFn: async () => {
@@ -270,7 +279,7 @@ export function useChatProgress(chatId: string | undefined, isRunning: boolean) 
     },
     enabled: Boolean(chatId),
     refetchInterval: (query) => {
-      if (isRunning) return 4000;
+      if (isRunning) return runningPollMs;
       const data = query.state.data;
       const backgroundAlive =
         data?.processAlive === true &&

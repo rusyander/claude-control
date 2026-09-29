@@ -345,6 +345,28 @@ describe('m5: копия не читается при проверке дост�
   }, 20_000);
 });
 
+// Ревью r2 (R5): проверка доставки получает чужие ветки плана — без них
+// ветку предшественника группа приняла бы своей.
+describe('проверка доставки: чужие ветки плана', () => {
+  it('facts получает ветки остальных групп, но не свою', async () => {
+    const seen: string[][] = [];
+    const delivery: SplitDeliveryDeps = {
+      facts: async (_group, _mr, _path, claimed) => {
+        seen.push(claimed);
+        return { missing: [] };
+      },
+      nudge: () => 'sent',
+      schedule: () => undefined,
+    };
+    const t = build({ parallel: 1, groups: 2, delivery });
+    await t.begin();
+    t.conveyor.onChainEnded(t.link(0), { status: 'done' });
+    for (let i = 0; i < 50 && seen.length === 0; i += 1) await t.flush();
+    expect(seen[0]).toContain('feature/two');
+    expect(seen[0]).not.toContain('feature/one');
+  });
+});
+
 describe('m11: лимит подписки — у каждого провайдера свой', () => {
   it('лимит Claude не держит очередь плана чужого CLI', async () => {
     const t = build({ parallel: 1 });

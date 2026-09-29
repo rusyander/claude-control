@@ -49,6 +49,7 @@ describe('хаб разделения — управление группой', 
       limitUntil: '2026-09-25T18:00:00.000Z',
     });
     expect(html).toContain('data-group-control="start"');
+    expect(html).toContain('data-group-control="pause"');
     expect(html).toContain('data-limit-until="2026-09-25T18:00:00.000Z"');
     expect(textOf(html)).toContain('|Запустить сейчас|');
     expect(textOf(html)).toMatch(/ждёт лимита до \d{2}:\d{2}/);
@@ -91,6 +92,31 @@ describe('хаб разделения — управление группой', 
     expect(html).toContain('data-group-control="resume"');
     expect(textOf(html)).toContain('|Пауза|');
     expect(textOf(html)).toContain('|Продолжить|');
+    expect(html).not.toContain('chat.cascade.hub');
+  });
+
+  // Живой прогон 29.09: подготовка копии читалась как «ничего не запустилось»,
+  // а оборванная до чата группа была тупиком без кнопок.
+  it('подготовка копии названа словами; оборванная до чата — «Завести заново» и «Убрать»', () => {
+    const html = render(new Map(), {
+      parentChatId: 'parent',
+      triage: { at: '2026-09-25T10:00:00.000Z', received: true, repairs: [], conflicts: [] },
+      order: [0, 1],
+      groups: [
+        group(0, { status: 'started' }),
+        group(1, {
+          status: 'awaiting',
+          waitingFor: 'interrupted',
+          interruptedAt: '2026-09-29T07:37:44.000Z',
+        }),
+      ],
+    });
+    expect(textOf(html)).toContain('готовит копию');
+    expect(textOf(html)).toContain('оборвалась до своего чата');
+    expect(textOf(html)).toContain('|Завести заново|');
+    expect(textOf(html)).toContain('|Убрать|');
+    expect(html).toContain('data-group-control="restart"');
+    expect(html).toContain('data-group-control="drop"');
     expect(html).not.toContain('chat.cascade.hub');
   });
 });

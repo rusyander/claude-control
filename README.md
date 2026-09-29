@@ -162,13 +162,13 @@ The full section-by-section breakdown is in [LIMITATIONS.md](docs/LIMITATIONS.md
 
 ## License
 
-[GNU AGPL-3.0-or-later](LICENSE). Copyright (C) 2026 Rustam Urmanov.
+[PolyForm Strict 1.0.0](LICENSE). Copyright (C) 2026 Rustam Urmanov.
 
-Use, modify and redistribute it freely, at home and at work, inside a company and in commercial
-projects. The one condition that matters here: if you change it and let others use your version
-over a network, you must offer them the source of that version under the same license
-(section 13). The software comes with no warranty.
+You may run the panel for personal and other noncommercial purposes. You may not change the
+source, build on it, copy it into other projects or redistribute it. Commercial use, including
+use at work inside a company, needs a separate permission from the author. The software comes
+with no warranty.
 
-Earlier snapshots shipped under MIT and, from 2026-08-05, under PolyForm Perimeter 1.0.1; those
-grants stay with the commits that carried them. Use under other terms is negotiated with the
-author separately.
+Earlier snapshots shipped under MIT, from 2026-08-05 under PolyForm Perimeter 1.0.1 and later
+under AGPL-3.0-or-later; those grants stay with the commits that carried them and do not extend
+to later versions.

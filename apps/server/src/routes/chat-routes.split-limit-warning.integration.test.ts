@@ -123,12 +123,14 @@ describe('лимит «на исходе» в ходе группы раздел
     await new Promise((done) => setTimeout(done, 20));
   };
 
-  it('allowed_warning: ход закрыт, а запись разделения держит очередь до сброса', async () => {
+  it('allowed_warning: ход закрыт, срок записан как предупреждение, очередь не держит', async () => {
     limit = { resetsAt: RESETS_AT, status: 'allowed_warning' };
     await turn('Переименовал все вызовы.');
     expect(conveyor.view([PARENT])?.groups[0]?.status).toBe('done');
     expect(store.getSplitPlan(PARENT)?.limitUntil).toBe(new Date(RESETS_AT * 1000).toISOString());
-    expect(conveyor.view([PARENT])?.limitWarning).toBe(true);
+    expect(store.getSplitPlan(PARENT)?.limitWarning).toBe(true);
+    // Решение владельца 29.09: предупреждение очередь не держит, держит только отказ.
+    expect(conveyor.view([PARENT])?.limitUntil).toBeUndefined();
   });
 
   it('обычное allowed очередь не держит', async () => {

@@ -821,9 +821,8 @@ export class SplitConveyor {
     this.apply(group, outcome);
     this.deps.store.set(record);
     if (group.limitUntil) this.noteLimit(record, group.limitUntil);
-    // Лимит на исходе (аудит 25.09, L63): тот же путь, что у отказа, — очередь
-    // до сброса не заводит новых групп и сама продолжится после него, — но
-    // идущие группы не останавливаются: их ход прошёл.
+    // Лимит на исходе (аудит 25.09, L63): только заметка родителю — очередь
+    // не держит (решение владельца 29.09, см. `limitHorizons`).
     else if (outcome.limitWarningUntil) this.noteLimit(record, outcome.limitWarningUntil, true);
     // Группа ждёт (человека, фон, повтор) — место она держит (M7): ответ
     // человека продолжит её в этом же месте, а не сверх потолка. Ждавших её это
@@ -2007,6 +2006,18 @@ export class SplitConveyor {
     this.armLimitWake(true);
     for (const record of Object.values(this.deps.store.all())) {
       if (record.groups.some((group) => group.parked)) this.drainParked(record.parentChatId);
+      // Очередь, которую держал срок из предупреждения (до 29.09 он держал),
+      // не будит ни таймер, ни событие: после перезапуска запускаем её сами.
+      // Места и порядок проверяет `launchNext`.
+      if (
+        !record.cancelledAt &&
+        !this.limitedUntil(providerOf(record)) &&
+        record.groups.some((group) => group.status === 'pending')
+      ) {
+        void this.launchNext(record).catch((error) => {
+          this.deps.log('split conveyor: launch after restart failed', error);
+        });
+      }
     }
   }
 
@@ -2069,7 +2080,11 @@ export class SplitConveyor {
     const horizons = new Map<string, number>();
     for (const record of Object.values(this.deps.store.all())) {
       const provider = providerOf(record);
-      const dates = [record.limitUntil];
+      // Срок из предупреждения «на исходе» очередь не держит (живой прогон 29.09):
+      // недельное предупреждение со сроком через двое суток, записанное старым
+      // разделением, стопорило все новые. Держит только настоящий отказ — он
+      // придёт сам, если лимит и правда кончится, и очередь дождётся сброса.
+      const dates = record.limitWarning ? [] : [record.limitUntil];
       for (const group of record.groups) {
         if (group.status === 'awaiting' && group.waitingFor === 'limit') {
           dates.push(group.limitUntil ?? new Date(0).toISOString());

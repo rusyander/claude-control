@@ -282,10 +282,11 @@ describe('SplitConveyor: лимит подписки (журнал 81b, 89)', ()
    * Аудит 25.09, L63: `allowed_warning` — лимит ещё не кончился, но на исходе.
    * Ход прошёл, а очередь раньше заводила новые группы прямо в стену отказа.
    */
-  it('лимит на исходе: ход закрыт, новые группы ждут сброса, заметка своя', async () => {
+  // Живой прогон 29.09: недельное предупреждение держало очередь двое суток.
+  it('лимит на исходе: заметка родителю, очередь идёт дальше, карточка не «ждёт лимита»', async () => {
     const t = build({ parallel: 2 });
     await t.begin();
-    const reset = START + 30 * 60_000;
+    const reset = START + 2 * 24 * 60 * 60_000;
     t.conveyor.onChainEnded(t.link(0), {
       status: 'done',
       limitWarningUntil: new Date(reset).toISOString(),
@@ -293,18 +294,26 @@ describe('SplitConveyor: лимит подписки (журнал 81b, 89)', ()
     await t.flush();
 
     expect(t.group(0)?.status).toBe('done');
-    expect(t.launches).toEqual([[0, 1]]);
+    expect(t.launches).toEqual([[0, 1], [2]]);
     expect(t.notices.map((notice) => notice.event)).toEqual([
       expect.objectContaining({ code: 'groupsLimited', textCode: 'split-limit-warning-notice' }),
     ]);
-    expect(t.conveyor.view([PARENT])).toMatchObject({
-      limitUntil: new Date(reset).toISOString(),
-      limitWarning: true,
-    });
+    expect(t.conveyor.view([PARENT])?.limitUntil).toBeUndefined();
+  });
 
-    await t.advance(30 * 60_000);
-    expect(t.launches).toEqual([[0, 1], [2]]);
-    expect(t.records.get(PARENT)?.limitWarning).toBeUndefined();
+  it('предупреждение старого разделения не держит новое', async () => {
+    const t = build({ parallel: 2 });
+    t.records.set('old-parent', {
+      parentChatId: 'old-parent',
+      createdAt: new Date(START - 5 * 24 * 60 * 60_000).toISOString(),
+      groups: [],
+      limitUntil: new Date(START + 2 * 24 * 60 * 60_000).toISOString(),
+      limitWarning: true,
+    } as unknown as SplitPlanRecord);
+    await t.begin();
+    await t.flush();
+    expect(t.launches).toEqual([[0, 1]]);
+    expect(t.conveyor.view([PARENT])?.limitUntil).toBeUndefined();
   });
 
   it('срок предупреждения в прошлом очередь не держит', async () => {
@@ -362,6 +371,21 @@ describe('SplitConveyor: лимит подписки (журнал 81b, 89)', ()
     expect(t.timers).toHaveLength(1);
     await t.advance(30 * 60_000);
     expect(t.resumed.map((item) => item.index)).toEqual([0]);
+  });
+
+  // Живой прогон 29.09: очередь держал срок из предупреждения, после правки
+  // её не будил ни таймер, ни событие — группы стояли «в очереди» до кнопки.
+  it('перезапуск: очередь без лимита и с местом запускается сама', async () => {
+    const t = build({ parallel: 2 });
+    await t.begin();
+    expect(t.launches).toEqual([[0, 1]]);
+    const record = t.records.get(PARENT)!;
+    for (const index of [0, 1]) record.groups[index]!.status = 'done';
+    t.records.set(PARENT, record);
+
+    new SplitConveyor(t.deps).recoverLimitWaits();
+    await t.flush();
+    expect(t.launches).toEqual([[0, 1], [2]]);
   });
 
   it('сброс уже прошёл к перезапуску — продолжает сразу', async () => {

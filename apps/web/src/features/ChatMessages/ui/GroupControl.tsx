@@ -12,6 +12,7 @@ import { toErrorMessage } from '@shared/api/client';
 import { toast } from '@shared/lib/toast';
 import { Button } from '@shared/ui/button';
 import { Typography } from '@shared/ui/typography';
+import { limitTime } from '../lib/limitTime';
 import type { GroupControlProps } from './GroupControl.types';
 import styles from './GroupControl.module.scss';
 
@@ -91,13 +92,7 @@ export function GroupControl({ control }: GroupControlProps) {
     }
   };
 
-  const time = control.limitUntil
-    ? // Язык интерфейса, а не браузера (F-323).
-      new Date(control.limitUntil).toLocaleTimeString(i18n.language, {
-        hour: '2-digit',
-        minute: '2-digit',
-      })
-    : undefined;
+  const time = control.limitUntil ? limitTime(control.limitUntil, i18n.language) : undefined;
 
   return (
     <div className={styles.control} data-group-control={control.action}>

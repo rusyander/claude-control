@@ -133,9 +133,21 @@ describe('сбор сигналов сервера для наблюдателя
       await pause();
       return reply.type('text/event-stream').send('data: x\n\n');
     });
+    // Так открывают поток чат, панельный агент и песочница: заголовки уходят
+    // мимо Fastify, `reply.getHeader` их не видит (живой прогон 29.09: каждый ход
+    // чата дольше 5 с шёл в отчёт «медленным ответом» и в платный разбор).
+    app.get('/api/raw-stream', async (_request, reply) => {
+      reply.raw.writeHead(200, { 'Content-Type': 'text/event-stream' });
+      await pause();
+      reply.raw.end('data: x\n\n');
+    });
     await app.inject({ method: 'GET', url: '/api/slow/3' });
     await app.inject({ method: 'GET', url: '/api/fast' });
     await app.inject({ method: 'GET', url: '/api/stream' });
+    // Через настоящий сокет: `inject` показывает заголовки writeHead и прятал дефект.
+    await app.listen({ port: 0, host: '127.0.0.1' });
+    const { port } = app.server.address() as { port: number };
+    await fetch(`http://127.0.0.1:${port}/api/raw-stream`).then((r) => r.text());
     await app.close();
     expect(seen).toHaveLength(1);
     expect(seen[0]).toMatchObject({ kind: 'slow-request', path: '/api/slow/:id', status: 200 });

@@ -215,8 +215,36 @@ export function createWatchCapture(
     return undefined;
   };
 
+  const isEventStreamHeaders = (headers: unknown): boolean => {
+    if (!headers || typeof headers !== 'object') return false;
+    // writeHead принимает объект, массив пар или плоский массив «имя, значение, …».
+    const pairs: unknown[][] = [];
+    if (!Array.isArray(headers)) pairs.push(...Object.entries(headers));
+    else if (headers.every(Array.isArray)) pairs.push(...(headers as unknown[][]));
+    else for (let i = 0; i < headers.length; i += 2) pairs.push([headers[i], headers[i + 1]]);
+    return pairs.some(
+      ([name, value]) =>
+        String(name).toLowerCase() === 'content-type' &&
+        String(value).includes('text/event-stream'),
+    );
+  };
+
   const registerHooks = (app: FastifyInstance): void => {
     const errors = new WeakMap<object, Error>();
+    // Чат, панельный агент и песочница открывают поток через `reply.raw.writeHead`
+    // мимо Fastify: на настоящем сокете ни `reply.getHeader`, ни `raw.getHeader`
+    // такой заголовок не видят. Без этой пометки каждый ход чата дольше порога
+    // шёл «медленным ответом» в отчёт и в платный разбор (живой прогон 29.09).
+    const rawStreams = new WeakSet<object>();
+    app.addHook('onRequest', (_request, reply, done) => {
+      const raw = reply.raw;
+      const writeHead = raw.writeHead;
+      raw.writeHead = function (this: typeof raw, ...args: unknown[]) {
+        if (args.some(isEventStreamHeaders)) rawStreams.add(raw);
+        return (writeHead as (...a: unknown[]) => typeof raw).apply(this, args);
+      } as typeof raw.writeHead;
+      done();
+    });
     app.addHook('onError', (request, _reply, error, done) => {
       errors.set(request, error);
       done();
@@ -232,7 +260,8 @@ export function createWatchCapture(
       const limit = sink?.thresholds?.slowRequestMs;
       const type = String(reply.getHeader('content-type') ?? '');
       // Поток событий открыт, пока открыта страница, — его длительность не медлительность.
-      if (limit && reply.elapsedTime > limit && !type.includes('text/event-stream')) {
+      const stream = type.includes('text/event-stream') || rawStreams.has(reply.raw);
+      if (limit && reply.elapsedTime > limit && !stream) {
         send(sink, {
           source: 'server',
           kind: 'slow-request',

@@ -98,7 +98,11 @@ import {
   createSplitLauncher,
   launchFromRecord,
 } from '../routes/chat/split-launch.ts';
-import { commentMergeRequestByUrl, parseMergeRequestUrl } from '../domains/integrations/forge.ts';
+import {
+  commentMergeRequestByUrl,
+  parseMergeRequestUrl,
+  readMergeRequestByUrl,
+} from '../domains/integrations/forge.ts';
 import { readIntegrations, readToken } from '../domains/integrations/store.ts';
 import { carriedLink, conversationKeys } from '../lib/app-store/chat-links.ts';
 import { createEventHub, type EventHub } from '../lib/event-hub.ts';
@@ -569,6 +573,14 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
           ...(mr ? { mr } : {}),
           mirror: ctx.store.getWorktreeMirror(projectPath),
           claimed,
+          ...(group.base ? { forkedFrom: group.base } : {}),
+          // MR выбирается по ветке группы, а не по одной голове (ревью 29.09):
+          // ветку-источник знает только фордж, без него — «неизвестно».
+          branchOfMr: async (url) => {
+            const token = forgeToken();
+            if (!token || !readIntegrations(ctx.store).forge.enabled) return undefined;
+            return (await readMergeRequestByUrl(url, token))?.branch;
+          },
         });
         const missing = missingDelivery(facts, facts.branch ?? group.branch);
         // Описание MR читается форджем только у найденного по голове MR.

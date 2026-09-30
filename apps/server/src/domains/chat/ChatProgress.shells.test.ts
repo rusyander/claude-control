@@ -322,6 +322,70 @@ describe('buildProgress — фон и текущий вызов', () => {
       expect(progress.shells?.[0]?.status).toBe('running');
     });
 
+    // Ревью разделения 29.09: порт через переменную — тот же порт.
+    it.each([
+      ['P=9123 && kill $(lsof -ti:$P)', 'P=9123 && kill $(lsof -ti:$P)'],
+      ['export PORT; ${PORT}', 'export PORT=9123; lsof -ti:${PORT} | xargs kill -9'],
+      [
+        'PowerShell $port',
+        '$port = 9123; Stop-Process -Id (Get-NetTCPConnection -LocalPort $port).OwningProcess',
+      ],
+    ])('порт в переменной: %s — killed', (_name, command) => {
+      expect(statusAfter(command)).toBe('killed');
+    });
+
+    it('переменная цикла не подменяется одноимённой другого регистра', () => {
+      expect(
+        statusAfter('P=5173; for p in $(lsof -ti:$P); do kill $p; done', [result('k', '4567')]),
+      ).toBe('running');
+    });
+
+    // Ревью разделения 29.09: `|| true` глушит отказ — успех без найденного
+    // процесса ничего не доказывает.
+    it.each([
+      ['kill … || true', 'kill $(lsof -ti:9123) 2>/dev/null || true'],
+      ['xargs -r', 'lsof -ti:9123 | xargs -r kill'],
+      ['цикл по пустому поиску', 'for p in $(lsof -ti:9123); do kill -9 $p; done'],
+      [
+        'Stop-Process -ErrorAction SilentlyContinue',
+        'Stop-Process -Id (Get-NetTCPConnection -LocalPort 9123).OwningProcess -ErrorAction SilentlyContinue',
+      ],
+    ])('%s с пустым ответом — на порту никого, сервер идёт', (_name, command) => {
+      expect(statusAfter(command)).toBe('running');
+    });
+
+    it('xargs с ключами перед kill — тоже погашение', () => {
+      expect(statusAfter('lsof -ti:9123 | xargs -0 kill -9')).toBe('killed');
+    });
+
+    it('kill … || true по PID, найденному поиском, — killed', () => {
+      const progress = buildProgress([
+        ...vite,
+        assistant(2, [bash('n', 'lsof -ti:9123')]),
+        user(2, [result('n', '4567\n')]),
+        assistant(3, [bash('k', 'kill -9 4567 2>/dev/null || true')]),
+        user(3, [result('k', '')]),
+      ]);
+      expect(progress.shells?.[0]?.status).toBe('killed');
+    });
+
+    it.each([
+      ['PID в ответе', 'lsof -ti:9123 | tee /dev/stderr | xargs -r kill', '4567'],
+      ['fuser печатает найденный', 'fuser -k 9123/tcp || true', '9123/tcp:            4567'],
+    ])('%s — след процесса, killed', (_name, command, answer) => {
+      expect(statusAfter(command, [result('k', answer)])).toBe('killed');
+    });
+
+    it('после kill … || true сервер упал — это погашение, killed', () => {
+      const progress = buildProgress([
+        ...vite,
+        assistant(2, [bash('k', 'kill $(lsof -ti:9123) 2>/dev/null || true')]),
+        user(2, [result('k', '')]),
+        user(3, notification('bvite', 'failed')),
+      ]);
+      expect(progress.shells?.[0]?.status).toBe('killed');
+    });
+
     it('голый PID от чистого поиска гасится следующим вызовом', () => {
       const progress = buildProgress([
         ...vite,

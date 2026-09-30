@@ -17,8 +17,9 @@ import { parseDirtyPaths } from './read.ts';
  * - ветка на удалённом указывает на HEAD копии — `ls-remote`, не локальная
  *   ссылка отслеживания: та врёт, когда push ушёл в другое имя;
  * - есть MR, чья голова (`refs/merge-requests/<iid>/head`, у GitHub
- *   `refs/pull/<n>/head`) — тот же коммит. Ссылка из ответа агента берётся,
- *   только если её голова совпала; чужой MR с другой головой не засчитывается.
+ *   `refs/pull/<n>/head`) — тот же коммит, а ветка-источник — ветка группы.
+ *   Ссылка из ответа агента берётся, только если её голова совпала; чужой MR с
+ *   другой головой или другой веткой не засчитывается.
  */
 
 /** Ключ задачи трекера в имени ветки: `GOR-1485`, `PROJ-1`. */
@@ -96,26 +97,65 @@ function urlOfRef(ref: string, base: string): string | undefined {
   return undefined;
 }
 
+/** Как выбрать MR группы из тех, чья голова совпала с копией. */
+export interface DeliveredMrOptions {
+  /** Ссылка из ответа агента — подсказка, не факт. */
+  hint?: string;
+  /** Ветка группы — та, чей MR ищется. */
+  branch: string;
+  /**
+   * Ветка-источник MR по его адресу — у форджа. `undefined` — фордж не
+   * подключён или не ответил: ветка неизвестна, а не другая.
+   */
+  branchOfMr?: (url: string) => Promise<string | undefined>;
+  /**
+   * Голова совпала с веткой, от которой копия отведена (предшественник): у
+   * группы нет своих коммитов, и MR с этой головой — его, а не её.
+   */
+  sharedWithBase?: boolean;
+}
+
 /**
- * MR, чья голова — `head`. Сперва названный агентом (`hint`), потом любой; из
- * нескольких — последний заведённый. Голова, совпавшая с HEAD удалённого
- * (`main`), MR группы не доказывает: это MR без своих коммитов.
+ * MR группы — MR её ветки, а не любой MR с той же головой (ревью разделения
+ * 29.09: копия на голове предшественника подхватывала его MR). Кандидаты — MR,
+ * чья голова `head`: сперва названный агентом (`hint`), потом остальные, из
+ * нескольких — последний заведённый. Ветку-источник кандидата знает фордж — MR
+ * чужой ветки не берётся. Без форджа ветку не узнать, и голова, общая с
+ * основанием копии, MR не доказывает: он с тем же успехом предшественника.
+ * Голова, совпавшая с HEAD удалённого (`main`), — MR без своих коммитов.
  */
-export function pickDeliveredMr(
+export async function pickDeliveredMr(
   refs: Map<string, string>,
   head: string,
   base: string | undefined,
-  hint?: string,
-): string | undefined {
+  options: DeliveredMrOptions,
+): Promise<string | undefined> {
   if (refs.get('HEAD') === head) return undefined;
+  const candidates: string[] = [];
+  const { hint } = options;
   const hinted = hint ? mergeRequestRef(hint) : undefined;
-  if (hinted && refs.get(hinted) === head) return hint;
-  if (!base) return undefined;
-  const matching = [...refs]
-    .filter(([ref, sha]) => sha === head && urlOfRef(ref, base))
-    .map(([ref]) => ref)
-    .sort((a, b) => Number(/\d+/.exec(b)?.[0] ?? 0) - Number(/\d+/.exec(a)?.[0] ?? 0));
-  return matching[0] ? urlOfRef(matching[0], base) : undefined;
+  if (hint && hinted && refs.get(hinted) === head) candidates.push(hint);
+  if (base) {
+    const matching = [...refs]
+      .filter(([ref, sha]) => sha === head && ref !== hinted && urlOfRef(ref, base))
+      .map(([ref]) => ref)
+      .sort((a, b) => Number(/\d+/.exec(b)?.[0] ?? 0) - Number(/\d+/.exec(a)?.[0] ?? 0));
+    for (const ref of matching) {
+      const url = urlOfRef(ref, base);
+      if (url) candidates.push(url);
+    }
+  }
+  for (const url of candidates) {
+    const source = options.branchOfMr
+      ? await options.branchOfMr(url).catch(() => undefined)
+      : undefined;
+    if (source !== undefined) {
+      if (source === options.branch) return url;
+      continue;
+    }
+    if (!options.sharedWithBase) return url;
+  }
+  return undefined;
 }
 
 export async function readDeliveryFacts(input: {
@@ -126,6 +166,10 @@ export async function readDeliveryFacts(input: {
   mirror?: WorktreeMirrorSettings;
   /** Ветки других групп плана и основания копий: своей группе их не брать. */
   claimed?: readonly string[];
+  /** Ветка, от которой отведена копия группы, — предшественник (ревью 29.09). */
+  forkedFrom?: string;
+  /** Ветка-источник MR у форджа; нет форджа — `undefined`. */
+  branchOfMr?: (url: string) => Promise<string | undefined>;
 }): Promise<DeliveryFacts> {
   const { cwd, branch } = input;
   const include = effectiveSettings(input.mirror).include;
@@ -157,6 +201,7 @@ export async function readDeliveryFacts(input: {
         'HEAD',
         `refs/heads/${branch}`,
         ...(own ? [`refs/heads/${own}`] : []),
+        ...(input.forkedFrom ? [`refs/heads/${input.forkedFrom}`] : []),
         'refs/merge-requests/*/head',
         'refs/pull/*/head',
       ],
@@ -185,8 +230,38 @@ export async function readDeliveryFacts(input: {
       ? own
       : undefined;
   const pushed = refs.get(`refs/heads/${adopted ?? branch}`) === head;
-  const mr = pickDeliveredMr(refs, head, base, input.mr);
+  const mr = await pickDeliveredMr(refs, head, base, {
+    ...(input.mr ? { hint: input.mr } : {}),
+    branch: adopted ?? branch,
+    ...(input.branchOfMr ? { branchOfMr: input.branchOfMr } : {}),
+    sharedWithBase: await sharesBaseHead(cwd, refs, head, input.forkedFrom, branch),
+  });
   return { dirty, head, pushed, ...(mr ? { mr } : {}), ...(adopted ? { branch: adopted } : {}) };
+}
+
+/**
+ * Голова копии — голова ветки, от которой её отвели: на удалённом или у
+ * общего с другими копиями репозитория (ветку предшественника после слияния
+ * MR на удалённом часто удаляют, а локально она остаётся).
+ */
+async function sharesBaseHead(
+  cwd: string,
+  refs: Map<string, string>,
+  head: string,
+  forkedFrom: string | undefined,
+  branch: string,
+): Promise<boolean> {
+  if (!forkedFrom || forkedFrom === branch) return false;
+  if (refs.get(`refs/heads/${forkedFrom}`) === head) return true;
+  const local = await git(cwd, [
+    'rev-parse',
+    '--verify',
+    '--quiet',
+    `refs/heads/${forkedFrom}^{commit}`,
+  ])
+    .then((out) => out.trim())
+    .catch(() => '');
+  return local === head;
 }
 
 /**

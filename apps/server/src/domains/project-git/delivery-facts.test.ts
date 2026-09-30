@@ -217,6 +217,96 @@ describe('доставка по фактам git', () => {
     });
   });
 
+  /**
+   * Ревью разделения 29.09: копия группы отведена от ветки предшественника и
+   * своих коммитов не имеет — голова та же, и MR по голове был его, а не её.
+   */
+  describe('MR выбирается по ветке группы, а не по голове', () => {
+    beforeEach(() => {
+      // Предшественник: своя ветка и MR на той же голове.
+      gitIn(work, ['push', '-q', 'origin', 'fix/PROJ-1']);
+      mrRef(7, head());
+      gitIn(work, ['switch', '-q', '-c', 'fix/PROJ-1-tests']);
+      gitIn(work, ['push', '-q', 'origin', 'fix/PROJ-1-tests']);
+    });
+
+    it('без форджа голова основания MR не доказывает', async () => {
+      const facts = await readDeliveryFacts({
+        cwd: work,
+        branch: 'fix/PROJ-1-tests',
+        forkedFrom: 'fix/PROJ-1',
+        claimed: ['fix/PROJ-1'],
+      });
+
+      expect(facts.pushed).toBe(true);
+      expect(facts.mr).toBeUndefined();
+    });
+
+    it('ссылка агента на MR предшественника — тоже не его', async () => {
+      const facts = await readDeliveryFacts({
+        cwd: work,
+        branch: 'fix/PROJ-1-tests',
+        forkedFrom: 'fix/PROJ-1',
+        mr: `${WEB}/-/merge_requests/7`,
+      });
+
+      expect(facts.mr).toBeUndefined();
+    });
+
+    it('ветка основания удалена на удалённом — голова сверяется с локальной', async () => {
+      gitIn(work, ['push', '-q', 'origin', '--delete', 'fix/PROJ-1']);
+
+      const facts = await readDeliveryFacts({
+        cwd: work,
+        branch: 'fix/PROJ-1-tests',
+        forkedFrom: 'fix/PROJ-1',
+      });
+
+      expect(facts.mr).toBeUndefined();
+    });
+
+    it('фордж назвал ветку MR — берётся MR ветки группы', async () => {
+      mrRef(9, head());
+      const sources: Record<string, string> = {
+        [`${WEB}/-/merge_requests/7`]: 'fix/PROJ-1',
+        [`${WEB}/-/merge_requests/9`]: 'fix/PROJ-1-tests',
+      };
+
+      const facts = await readDeliveryFacts({
+        cwd: work,
+        branch: 'fix/PROJ-1-tests',
+        forkedFrom: 'fix/PROJ-1',
+        branchOfMr: async (url) => sources[url],
+      });
+
+      expect(facts.mr).toBe(`${WEB}/-/merge_requests/9`);
+    });
+
+    it('фордж: MR с этой головой только у предшественника — MR нет', async () => {
+      const facts = await readDeliveryFacts({
+        cwd: work,
+        branch: 'fix/PROJ-1-tests',
+        branchOfMr: async () => 'fix/PROJ-1',
+      });
+
+      expect(facts.mr).toBeUndefined();
+    });
+
+    it('свой коммит поверх основания — MR по голове снова доказывает', async () => {
+      gitIn(work, ['commit', '-q', '--allow-empty', '-m', 'tests']);
+      gitIn(work, ['push', '-q', 'origin', 'fix/PROJ-1-tests']);
+      mrRef(11, head());
+
+      const facts = await readDeliveryFacts({
+        cwd: work,
+        branch: 'fix/PROJ-1-tests',
+        forkedFrom: 'fix/PROJ-1',
+      });
+
+      expect(facts.mr).toBe(`${WEB}/-/merge_requests/11`);
+    });
+  });
+
   it('удалённый не отвечает — факт неизвестен, а не отрицателен', async () => {
     gitIn(work, ['config', '--unset', `url.${bare.replace(/\\/g, '/')}.insteadOf`]);
     gitIn(work, [

@@ -112,13 +112,18 @@ class Shells {
   private readonly pending = new Map<string, ProgressActiveTool>();
   private readonly commands = new Map<string, string>();
   /** Вызовы, гасящие процессы по порту, — до их ответа. */
-  private readonly kills = new Map<string, Set<string>>();
+  private readonly kills = new Map<string, KilledPorts>();
   /** Вызовы, которые только ищут процесс по порту, — до их ответа (PID в нём). */
   private readonly lookups = new Map<string, { ports: Set<string>; bare: boolean }>();
   /** PID → порт, напечатанные поиском: гасят их часто следующим вызовом. */
   private readonly pidPorts = new Map<string, string>();
   /** Полный текст фоновых команд: порт бывает не в первой строке. */
   private readonly fullCommands = new Map<string, string>();
+  /**
+   * Фон, который, возможно, погашен вызовом без доказательства (`kill … || true`
+   * с пустым ответом): погашенным он станет, только если после этого упадёт.
+   */
+  private readonly suspects = new Set<string>();
 
   use(block: TranscriptBlock, at: string | undefined): void {
     if (!block.id || !block.name) return;
@@ -135,12 +140,14 @@ class Shells {
     const command = typeof input.command === 'string' ? firstLine(input.command) : summary;
     this.commands.set(block.id, command);
     if (typeof input.command === 'string') {
-      this.fullCommands.set(block.id, input.command);
-      const ports = killedPorts(input.command, this.pidPorts);
-      const found = lookupPorts(input.command);
-      if (ports.size > 0) this.kills.set(block.id, ports);
+      // Порт через переменную (`P=9123 && kill $(lsof -ti:$P)`) — тот же порт.
+      const full = expandVars(input.command);
+      this.fullCommands.set(block.id, full);
+      const kill = killedPorts(full, this.pidPorts);
+      const found = lookupPorts(full);
+      if (kill.ports.size > 0) this.kills.set(block.id, kill);
       else if (found.size > 0) {
-        this.lookups.set(block.id, { ports: found, bare: onlyLookups(input.command) });
+        this.lookups.set(block.id, { ports: found, bare: onlyLookups(full) });
       }
     }
     if (input.run_in_background === true) {
@@ -159,11 +166,19 @@ class Shells {
     const started = this.pending.get(id);
     this.pending.delete(id);
     // Погашение засчитывается по ответу, а не по вызову: упавший kill сервер
-    // не остановил.
-    const ports = this.kills.get(id);
-    if (ports) {
+    // не остановил. А вызов, чей отказ заглушён (`kill … || true`), успехом
+    // ничего не доказывает — нужен найденный процесс (ревью разделения 29.09):
+    // PID от прошлого поиска или след процесса в ответе.
+    const kill = this.kills.get(id);
+    if (kill) {
       this.kills.delete(id);
-      if (!block.is_error) this.stopByPort(ports, id);
+      if (!block.is_error) {
+        const proven = !kill.masked || kill.found || FOUND_PROCESS.test(text);
+        for (const shell of this.onPorts(kill.ports, id)) {
+          if (proven) this.stop(shell);
+          else this.suspects.add(shell);
+        }
+      }
     }
     const found = this.lookups.get(id);
     if (found) {
@@ -198,7 +213,12 @@ class Shells {
     // Итог задачи, которую агент уже погасил сам, — след его же уборки (ревью
     // 29.09: он возвращал «оборвана»).
     if (shell.status === 'killed') return;
-    this.byUse.set(id, { ...shell, status: shellStatus(status) });
+    // Упал сразу после погашения без доказательства — значит, погашение нашло его.
+    const next = shellStatus(status);
+    this.byUse.set(id, {
+      ...shell,
+      status: next === 'failed' && this.suspects.has(id) ? 'killed' : next,
+    });
   }
 
   /**
@@ -223,14 +243,19 @@ class Shells {
    * порт и подними сервер» (`kill-port 9123 && npm run dev -- --port 9123`)
    * гасит прежний сервер, а не себя (ревью r2, R1).
    */
-  private stopByPort(ports: ReadonlySet<string>, killer: string): void {
+  private onPorts(ports: ReadonlySet<string>, killer: string): string[] {
+    const ids: string[] = [];
     for (const [id, shell] of this.byUse) {
       if (id === killer || shell.status !== 'running') continue;
       const command = this.fullCommands.get(id) ?? shell.command;
-      if ([...portsOf(command)].some((port) => ports.has(port))) {
-        this.byUse.set(id, { ...shell, status: 'killed' });
-      }
+      if ([...portsOf(command)].some((port) => ports.has(port))) ids.push(id);
     }
+    return ids;
+  }
+
+  private stop(id: string): void {
+    const shell = this.byUse.get(id);
+    if (shell) this.byUse.set(id, { ...shell, status: 'killed' });
   }
 
   list(): ProgressShell[] {
@@ -248,11 +273,12 @@ const STOP_TOOLS = new Set(['TaskStop', 'KillShell', 'KillBash']);
 
 /**
  * Команда, которая гасит процесс, — словом команды, а не словом в тексте: в
- * начале строки, после `;`/`&`/`|`/`(`/`{`, внутри `$(`, после `do`/`xargs`.
+ * начале строки, после `;`/`&`/`|`/`(`/`{`, внутри `$(`, после `do`/`xargs`
+ * (и его ключей: `xargs -r kill`, `xargs -0 kill`).
  * Кавычки перед проверкой вырезаются: `echo "kill"` и `grep "kill"` — не kill.
  */
 const KILL_COMMAND =
-  /(?:^|[;&|(`\n{]|\$\(|\bdo\b|\bxargs\b)\s*(?:sudo\s+)?(?:taskkill|kill|pkill|killall|Stop-Process|fuser|(?:npx\s+)?kill-port)\b/i;
+  /(?:^|[;&|(`\n{]|\$\(|\bdo\b|\bxargs(?:\s+-\S+)*)\s*(?:sudo\s+)?(?:taskkill|kill|pkill|killall|Stop-Process|fuser|(?:npx\s+)?kill-port)\b/i;
 
 /** Чем агент находит процесс по порту: без поиска порт в команде — просто адрес. */
 const PORT_LOOKUP = /\b(?:netstat|lsof|fuser|Get-NetTCPConnection|kill-port|ss)\b|-LocalPort\b/i;
@@ -303,20 +329,78 @@ function lookupPorts(command: string): Set<string> {
   return ports;
 }
 
+/** Что гасит вызов и чем доказано, что на порту был процесс. */
+interface KilledPorts {
+  ports: Set<string>;
+  /** Процесс найден прошлым поиском: kill идёт по напечатанному им PID. */
+  found: boolean;
+  /** Отказ погашения не доходит до кода выхода — успех ничего не доказывает. */
+  masked: boolean;
+}
+
+/**
+ * Отказ погашения заглушён: `kill … || true`, цикл по найденным PID (ноль
+ * оборотов — тоже успех), `xargs -r`, `-ErrorAction SilentlyContinue`, хвост
+ * `; true` / `& exit 0`. Когда на порту никого нет, такой вызов всё равно
+ * отвечает успехом (ревью разделения 29.09).
+ */
+const MASKED_FAILURE =
+  /\|\||\bfor\b[^;\n]*\bin\b|\bwhile\s+read\b|\bxargs\s+(?:-\w*r\w*|--no-run-if-empty)\b|-(?:ErrorAction|ea)\s+(?:SilentlyContinue|Ignore|0)\b|[;&]\s*(?:true|:|exit\s+(?:\/b\s+)?0)\s*$/i;
+
+/**
+ * След найденного процесса в ответе: PID строкой, `SUCCESS` и «has been
+ * terminated» у taskkill, `9123/tcp: 4567` у fuser, «Process on port 9123
+ * killed» у kill-port.
+ */
+const FOUND_PROCESS =
+  /^\s*\d{2,7}\s*$|\bSUCCESS\b|has been terminated|\/tcp:\s*\d{2,7}|on port \d{2,5} killed/im;
+
 /**
  * Порты, которые команда гасит; пусто — никого по порту не гасит. Поиск и kill в
  * одной команде — порты поиска; kill без поиска — по PID, которые напечатал
  * поиск прошлым вызовом (`netstat`, затем `taskkill /PID 4567`).
  */
-function killedPorts(command: string, pidPorts: ReadonlyMap<string, string>): Set<string> {
-  if (!kills(command)) return new Set();
-  if (PORT_LOOKUP.test(command)) return lookupPorts(command);
+function killedPorts(command: string, pidPorts: ReadonlyMap<string, string>): KilledPorts {
+  const masked = MASKED_FAILURE.test(command);
+  if (!kills(command)) return { ports: new Set(), found: false, masked };
+  if (PORT_LOOKUP.test(command)) return { ports: lookupPorts(command), found: false, masked };
   const ports = new Set<string>();
   for (const match of command.matchAll(/\b(\d{2,7})\b/g)) {
     const port = pidPorts.get(match[1] ?? '');
     if (port) ports.add(port);
   }
-  return ports;
+  return { ports, found: ports.size > 0, masked };
+}
+
+/**
+ * Подставляет переменные, заданные в самой команде: `P=9123 && kill $(lsof
+ * -ti:$P)`, `export PORT=9123; …`, `set P=9123 & … %P%`, PowerShell `$p = 9123;
+ * …`. Порт через переменную — обычный вид у агента (ревью разделения 29.09), а
+ * без подстановки ни поиск, ни погашение его порта не видели. Незаданные
+ * переменные (`$p` цикла, `$5` awk) остаются как есть.
+ */
+function expandVars(command: string): string {
+  const shell = new Map<string, string>();
+  // Имена PowerShell регистр не различают, оболочки — различают: `$p` цикла
+  // не станет портом из `P=9123`.
+  const powershell = new Map<string, string>();
+  const unquote = (raw: string): string => raw.replace(/^(["'])(.*)\1$/, '$2');
+  const shellAssign =
+    /(?:^|[;&|\n(]|\b(?:export|set|local|declare|readonly)\s)\s*([A-Za-z_]\w*)=("[^"\n]*"|'[^'\n]*'|[^\s;&|)]*)/g;
+  for (const [, name = '', raw = ''] of command.matchAll(shellAssign))
+    shell.set(name, unquote(raw));
+  const psAssign = /\$([A-Za-z_]\w*)\s*=\s*("[^"\n]*"|'[^'\n]*'|\d+)/g;
+  for (const [, name = '', raw = ''] of command.matchAll(psAssign)) {
+    powershell.set(name.toLowerCase(), unquote(raw));
+  }
+  if (shell.size === 0 && powershell.size === 0) return command;
+  return command.replace(
+    /\$\{([A-Za-z_]\w*)\}|\$([A-Za-z_]\w*)|%([A-Za-z_]\w*)%/g,
+    (whole: string, braced?: string, bare?: string, cmd?: string) => {
+      const name = braced ?? bare ?? cmd ?? '';
+      return shell.get(name) ?? powershell.get(name.toLowerCase()) ?? whole;
+    },
+  );
 }
 
 /**

@@ -583,9 +583,14 @@ export const testsEn: typeof testsRu = {
       'It is a cheap way to check only what was touched.',
     agentConventionTitle: 'Asking from the chat',
     agentConventionText:
-      'The buttons of this section explain the format to the agent themselves. An ordinary ' +
-      'conversation knows nothing about it: say "run the tests" in the chat and it will ' +
-      'check and write nothing down. The “Write it into the project’s CLAUDE.md” button appends a ' +
+      'The buttons of this section explain the format to the agent themselves. A project ' +
+      'chat knows about the section too: the panel appends a line to each of its agents saying ' +
+      'where the cases live and how to keep them. Changing how the product behaves — not only ' +
+      'when asked to "write tests" — the agent adds or updates the case for the change on its ' +
+      'own (tests-cli case) and records what it verified as a run (tests-cli record or run): ' +
+      '“tested” becomes a record in the history, not words in a reply. A case you wrote the ' +
+      'agent does not rewrite — its edit arrives as a draft for you to accept. The “Write it ' +
+      'into the project’s CLAUDE.md” button appends a ' +
       'block with the format and the rules to the end of the file; it is read in EVERY ' +
       'conversation. Your text is left alone, and pressing again adds nothing.',
 

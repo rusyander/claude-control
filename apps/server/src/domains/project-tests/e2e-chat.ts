@@ -19,6 +19,12 @@ import { TESTS_DIR } from './files.ts';
  * e2e/ с Playwright» уводил агента писать чужой проекту каркас. Ему названа его
  * же команда и то, как проверку привязать к кейсу (`automation.file`).
  *
+ * Блок участвует в работе над продуктом, а не только в задачах «про тесты»
+ * (решение владельца 30.09): правя поведение продукта, агент сам заводит или
+ * обновляет кейс на изменённое (`tests-cli case`) и записывает проверенное
+ * (`tests-cli record` или `run`) — «проверено» становится записью в истории,
+ * которую видят раздел и проверка доставки группы.
+ *
  * По-английски: это текст для модели. Одна строка — таково правило склейки
  * дописки (`domains/chat/initiative.ts`): на Windows перевод строки рвёт аргумент.
  */
@@ -73,7 +79,25 @@ export function e2eChatLine(input: {
     'THIS run, so results land on the cases; a runner is never installed on the fly — if it is',
     'missing, pass on the install command it prints). A red test is a finding to report, never a',
     'reason to weaken it.',
+    ownWorkLine(root, cli),
     `Ask the user once, at task start and in one question, only what is theirs: ${askOf(input)}.`,
+  ].join(' ');
+}
+
+/**
+ * Кейсы и записи на любой задаче, меняющей поведение продукта: агент ведёт блок
+ * сам, а кейс человека правит только предложением (черновиком на приёмку).
+ */
+function ownWorkLine(root: string, cli: string): string {
+  return [
+    'Beyond test tasks: whenever you change how the product behaves, keep this Tests section in',
+    'step on your own — add or update the case that covers the change',
+    `(${cli} case --project "${root}" --group <group> --json`,
+    '\'{"title":"…","steps":["…"],"expected":"…","codePaths":["<changed path>"]}\';',
+    'pass "id" to update; a case a human wrote becomes a draft they accept) and record what you',
+    `actually verified (${cli} record --project "${root}" <group>:<case>=passed|failed|blocked`,
+    '--note "<how you checked>") or run the automated ones as above. Never call the work tested',
+    'without a recorded run.',
   ].join(' ');
 }
 
@@ -109,6 +133,7 @@ function ownCommandLine(
     `Run them: ${cli} run --project "${root}" [--group <group>]`,
     '(no --cmd: it runs the command above with the files of those cases and imports only the',
     'report of THIS run). A red check is a finding to report, never a reason to weaken it.',
+    ownWorkLine(root, cli),
     `Ask the user once, at task start and in one question, only what is theirs: ${askOf(input)}.`,
   ].join(' ');
 }

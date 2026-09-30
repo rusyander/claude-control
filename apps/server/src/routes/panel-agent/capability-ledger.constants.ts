@@ -514,6 +514,7 @@ export const ROUTE_LEDGER: RouteLedger = {
   'PUT /api/prompts/:id': 'human:prompts',
   // provider-chat-routes.ts
   'DELETE /api/provider-chat/chats/:id': 'foreign-cli',
+  'DELETE /api/provider-chat/chats/:id/queue/:queuedId': 'foreign-cli',
   'GET /api/provider-chat/chats': 'foreign-cli',
   'GET /api/provider-chat/chats/:id': 'foreign-cli',
   'GET /api/provider-chat/chats/:id/status': 'foreign-cli',

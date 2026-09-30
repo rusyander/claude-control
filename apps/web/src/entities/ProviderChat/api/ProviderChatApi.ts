@@ -3,6 +3,7 @@ import type {
   ProviderChatDetail,
   ProviderChatEvent,
   ProviderChatMessage,
+  ProviderChatQueued,
   ProviderChatStatus,
   ProviderChatSummary,
 } from '@agentdeck/contracts';
@@ -118,16 +119,27 @@ export function useRestartProviderChat() {
   });
 }
 
-/** Задать вопрос. Ответ придёт потоком — здесь возвращается записанная реплика. */
+/**
+ * Задать вопрос. Ответ придёт потоком — здесь возвращается записанная реплика.
+ * Разговор занят, а `queueIfBusy` — сервер ставит сообщение в очередь (202) и
+ * возвращает её элемент: сообщение уйдёт само по концу идущего ответа.
+ */
 export async function sendProviderChatMessage(
   chatId: string,
-  input: { text: string; attachments?: string[] },
-): Promise<ProviderChatMessage> {
-  const { data } = await apiClient.post<{ message: ProviderChatMessage }>(
-    `/provider-chat/chats/${chatId}/send`,
-    input,
+  input: { text: string; attachments?: string[]; queueIfBusy?: boolean },
+): Promise<{ message: ProviderChatMessage } | { queued: ProviderChatQueued }> {
+  const { data } = await apiClient.post<
+    { message: ProviderChatMessage } | { queued: ProviderChatQueued }
+  >(`/provider-chat/chats/${chatId}/send`, input);
+  return data;
+}
+
+/** Убрать сообщение из очереди; `false` — оно уже ушло. */
+export async function cancelProviderChatQueued(chatId: string, queuedId: string): Promise<boolean> {
+  const { data } = await apiClient.delete<{ cancelled: boolean }>(
+    `/provider-chat/chats/${chatId}/queue/${queuedId}`,
   );
-  return data.message;
+  return data.cancelled;
 }
 
 export async function stopProviderChat(chatId: string): Promise<void> {

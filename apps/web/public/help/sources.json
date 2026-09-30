@@ -310,7 +310,7 @@
         {
           "path": "packages/contracts/src/sieves/judge.ts",
           "why": "«Сита перед MR»: что держит «готово» — механика панели, названные файлы и команды, свежесть строки, прогон блока «Тесты»",
-          "sha": "f30bbff0809a4439"
+          "sha": "7d4801d81162d78e"
         },
         {
           "path": "apps/server/src/domains/chat/sieve-gate.ts",
@@ -323,7 +323,7 @@
           "sha": "4ee5ccbcebfc6f2a"
         }
       ],
-      "confirmedAt": "2026-09-30T15:34:21.201Z"
+      "confirmedAt": "2026-09-30T16:40:09.736Z"
     },
     {
       "topic": "tests",

@@ -1639,7 +1639,11 @@ export const chatEn: typeof chatRu = {
       'not send: you can add to it first. Next to them sits a separate “Open in ' +
       'editor” chip — not about the conversation, it just opens the project.',
     composerStop: 'Stop',
-    composerStopText: 'While an answer is streaming, the send button becomes a stop button.',
+    composerStopText:
+      'While an answer is streaming, “Stop” sits next to send (in another CLI’s chat — in ' +
+      'the conversation header). Sending is not locked meanwhile: Claude gets the message ' +
+      'mid-turn, another CLI gets it as a queue that goes out by itself as soon as the ' +
+      'answer ends; a queued message can be removed with the cross on its bubble.',
 
     editsTitle: 'Edit mode: what the agent may change',
     editsCaption:

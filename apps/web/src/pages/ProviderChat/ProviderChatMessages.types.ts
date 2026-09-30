@@ -1,4 +1,4 @@
-import type { ProviderChatMessage } from '@agentdeck/contracts';
+import type { ProviderChatMessage, ProviderChatQueued } from '@agentdeck/contracts';
 import type { TaskSplitProposal, TaskSplitReviewDecision } from '@agentdeck/contracts/task-split';
 import type { ChatTreeView, HandoffProposal } from '@agentdeck/contracts/chat-handoff';
 import type { ChildStageGroup, ReviewDecisionItem } from '@features/ChatMessages';
@@ -10,6 +10,10 @@ export interface ProviderChatMessagesProps {
   /** Текст, напечатанный к этому моменту: показывается отдельной репликой. */
   partial: string;
   isRunning: boolean;
+  /** Очередь сервера: дописанное, пока шёл ответ, — уйдёт по его концу. */
+  queued?: ProviderChatQueued[];
+  /** Убрать сообщение из очереди, пока оно не ушло. */
+  onCancelQueued?: (queuedId: string) => void;
   /** Нет разговоров вовсе — подсказка отличается от «разговор пустой». */
   isEmptyState: boolean;
   /** Начать разговор прямо из пустого экрана. */

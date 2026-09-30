@@ -3,7 +3,7 @@
 // каталога, по `fake-config.json` там же спит, падает или отвечает находкой на
 // каждый `id:` из промпта. Имена своего окружения — туда же: проверка того,
 // что сервер ему НЕ передал. Сеть не трогает, токенов не тратит.
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import process from 'node:process';
 import { setTimeout } from 'node:timers';
 
@@ -17,8 +17,11 @@ process.stdin.on('end', () => {
   // Системный промпт — текстом: временную папку разбор снимает сразу после конца.
   const at = process.argv.indexOf('--append-system-prompt-file');
   const systemPromptFile = at > 0 ? process.argv[at + 1] : undefined;
+  // Через временный файл и переименование: тест ждёт ПОЯВЛЕНИЯ файла и сразу
+  // его читает, а запись на месте под нагрузкой успевала показать пустой файл
+  // («Unexpected end of JSON input»).
   writeFileSync(
-    'fake-argv.json',
+    'fake-argv.json.tmp',
     JSON.stringify({
       argv: process.argv.slice(2),
       prompt,
@@ -30,6 +33,7 @@ process.stdin.on('end', () => {
       envNames: Object.keys(process.env),
     }),
   );
+  renameSync('fake-argv.json.tmp', 'fake-argv.json');
   setTimeout(() => {
     if (config.fail) {
       process.stderr.write('fake failure');

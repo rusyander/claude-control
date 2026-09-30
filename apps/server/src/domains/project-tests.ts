@@ -145,3 +145,10 @@ export {
   ORPHAN_RUN_ERROR,
   type RepairedStamp,
 } from './project-tests/repair.ts';
+export {
+  MutationChecks,
+  breakFile,
+  casesForFile,
+  mutationCandidates,
+} from './project-tests/mutation.ts';
+export { agentUpsertCase, recordAgentResults } from './project-tests/agent-write.ts';

@@ -72,6 +72,16 @@ export const testsEn: Record<TestsMessageCode, string> = {
     'Conversation “{{chatId}}” was not found — there is nothing to build the case from.',
   'draft-chat-no-steps':
     'The conversation has no human messages, commands or edits — there is nothing to build the case from.',
+  'mutation-busy': 'A mutation check is already running.',
+  'mutation-file-invalid': '“{{file}}” is not a project file.',
+  'mutation-no-cases':
+    'No automated case is linked to “{{file}}” (codePaths) — nothing to check with.',
+  'mutation-unbreakable': 'Nothing to flip in “{{file}}” — choose the coarse breakage.',
+  'mutation-no-command':
+    'The project has no command to run its automated tests (e2e folder or automation.json).',
+  'mutation-no-report': 'The run in the copy left no report — see the command output.',
+  'mutation-failed': 'The mutation check broke off — the reason is in the output.',
+  'mutation-spawn': 'The run command could not be started.',
   'draft-case-human-written':
     'The case was written by a person — an edit to it is accepted by hand.',
   'draft-revert-case-gone': 'The case is no longer in the library.',

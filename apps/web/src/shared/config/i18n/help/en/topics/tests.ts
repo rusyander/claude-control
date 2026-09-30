@@ -580,7 +580,14 @@ export const testsEn: typeof testsRu = {
     agentChangedText:
       'A run can be narrowed to the cases touched by the uncommitted changes of the working ' +
       'tree: the panel matches changed files against the codePaths field and the case area. ' +
-      'It is a cheap way to check only what was touched.',
+      'It is a cheap way to check only what was touched. The opposite question — will the ' +
+      'cases catch a regression — is asked by the “Mutation check of the case set” in the ' +
+      'autotests card: in a separate copy of the repository the chosen file is broken ' +
+      '(coarsely — the module fails on load, or subtly — the first comparison is flipped), ' +
+      'the automated cases linked to it through codePaths are run, and the card names which ' +
+      'went red. None — the file is not protected by cases. It is an autotest run in a copy, ' +
+      'minutes or more, so only by the button; your working copy, library and history do ' +
+      'not change.',
     agentConventionTitle: 'Asking from the chat',
     agentConventionText:
       'The buttons of this section explain the format to the agent themselves. A project ' +

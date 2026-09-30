@@ -63,6 +63,7 @@ export * from './project-git';
 export * from './project-files';
 export * from './project-tests';
 export * from './project-tests-e2e';
+export * from './project-tests-mutation';
 export * from './project-test-case-history';
 export * from './search';
 export * from './history';

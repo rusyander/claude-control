@@ -43,6 +43,7 @@ import { DEFAULT_PROVIDER_ID, getProvider, isKnownProviderId } from '../provider
 import { ProjectRunnerRegistry } from '../domains/project-runner.ts';
 import {
   E2eRunRegistry,
+  MutationChecks,
   ProjectTestManualRegistry,
   ProjectTestRunRegistry,
   createE2eWatch,
@@ -143,6 +144,8 @@ export interface Runtime {
   projectTestManual: ProjectTestManualRegistry;
   /** Прогоны автотестов папки e2e самой панелью: раннер через оболочку, без агента. */
   e2eRuns: E2eRunRegistry;
+  /** Проверки набора кейсов поломкой: прогон в копии по кнопке человека. */
+  mutationChecks: MutationChecks;
   /** Наблюдение за папками e2e проектов: новый тест становится кейсом сам. */
   e2eWatch: E2eWatch;
   /** Уведомления на телефон о судьбе прогона. */
@@ -229,6 +232,7 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   const projectTestManual = new ProjectTestManualRegistry();
   // Автотесты папки: раннер запущен оболочкой и с панелью сам не умирает.
   const e2eRuns = new E2eRunRegistry();
+  const mutationChecks = new MutationChecks();
   /**
    * Уведомления на телефон. Реестр прогонов знает, ЧТО случилось, но не знает ни
    * про устройства, ни про настройку — поэтому отправитель собирается здесь и
@@ -1162,6 +1166,7 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     projectTestRuns.stopAll();
     projectTestManual.stopAll(new Date().toISOString());
     e2eRuns.stopAll();
+    mutationChecks.stopAll();
     e2eWatch.close();
     // Хвост учёта расхода — тоже: он копится пачкой в памяти шлюза, и панель,
     // закрытая по Ctrl+C или перезапущенная сторожем, унесла бы с собой
@@ -1186,6 +1191,7 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     projectTestRuns,
     projectTestManual,
     e2eRuns,
+    mutationChecks,
     e2eWatch,
     notifyRun,
     handoffChains,

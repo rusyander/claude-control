@@ -41,6 +41,8 @@ import type { AnyPanelAction } from './registry.ts';
 const PINNED_HUMAN: Readonly<Record<string, RouteClass>> = {
   // Решение владельца 30.09: перезапуск dev-сервера обрывает живые ходы.
   'POST /api/dev-restart': 'human:dev-restart',
+  // Решение владельца 30.09: проверка поломкой правит код в копии и тратит время.
+  'POST /api/project-tests/mutation': 'human:code-write',
   'DELETE /api/credentials': 'human:secret',
   'DELETE /api/endpoints/:id/token': 'human:secret',
   'DELETE /api/mcp/:id/oauth': 'human:consent',

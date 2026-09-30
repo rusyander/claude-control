@@ -428,6 +428,10 @@ export const ROUTE_LEDGER: RouteLedger = {
   'POST /api/project-tests/draft/from-chat': 'gap:P3',
   'POST /api/project-tests/draft/reject': 'action:reject_draft',
   'POST /api/project-tests/draft/rollback': 'action:rollback_draft',
+  // project-tests/mutation-routes.ts
+  'GET /api/project-tests/mutation': 'internal:ui-state',
+  'POST /api/project-tests/mutation': 'human:code-write',
+  'POST /api/project-tests/mutation/stop': 'internal:ui-state',
   // project-tests/e2e-routes.ts
   'DELETE /api/project-tests/e2e': 'action:remove_e2e_folder',
   'GET /api/project-tests/e2e': 'action:read_tests_report',

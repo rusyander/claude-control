@@ -7,6 +7,7 @@ import { spelledOnDisk } from '../../lib/disk-spelling.ts';
 import {
   type E2eRunRegistry,
   type E2eWatch,
+  type MutationChecks,
   ProjectTestManualRegistry,
   ProjectTestRunRegistry,
   ProjectTestsError,
@@ -56,6 +57,8 @@ export interface TestsDeps {
   e2eRuns?: E2eRunRegistry;
   /** Наблюдение за папкой e2e: заведённую или убранную папку перечитать сразу. */
   e2eWatch?: E2eWatch;
+  /** Проверки набора поломкой — по кнопке человека, одна на проект. */
+  mutations?: MutationChecks;
 }
 
 /**

@@ -89,6 +89,7 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
     projectTestRuns,
     projectTestManual,
     e2eRuns,
+    mutationChecks,
     e2eWatch,
     dlpProxy,
     platformGateway,
@@ -210,6 +211,7 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
       registerProjectTestsRoutes(instance, context, projectTestRuns, projectTestManual, {
         e2eRuns,
         e2eWatch,
+        mutations: mutationChecks,
       }),
     // Публикация отчёта наружу — часть интеграций, а не раздела тестов: ей нужны
     // токен, привязка и живая сеть, а раздел обязан работать и без всего этого.

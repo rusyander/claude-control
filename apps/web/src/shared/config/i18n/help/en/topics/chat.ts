@@ -806,14 +806,32 @@ export const chatEn: typeof chatRu = {
       'by the paths the branch touched: docs verified against the stand, removed names and ' +
       'test ids found nowhere in the repository, no conflict with a fresh main, a UI edit ' +
       'checked in a browser, a wrong value refused with a clear message. The group passes ' +
-      'each sieve with evidence — a command and its output. A conflict with a fresh main ' +
-      'and removal of other people’s lines the panel checks itself from the copy’s git, and ' +
-      'consumers of removed names it re-checks: the group still hands in its own search. A ' +
-      'sieve not passed holds the group: “done” does not ' +
+      'each sieve with evidence — a command and its output. The project’s own checks ' +
+      '(lint, types, tests) the panel finds in its manifests, and the evidence must name ' +
+      'every one; changed code with not a single test changed in the branch is a gap too, ' +
+      'until the group names the test that covers it. Migrations and schemas get a ' +
+      'compatibility-and-rollback sieve, and a change to sign-in, permissions, money, data ' +
+      'or a very large diff also needs a rollback plan with a production failure signal. ' +
+      'Without a model, from the copy’s git, the panel checks by itself: a conflict with a ' +
+      'fresh main, removal of other people’s lines, keys and tokens in added lines, .only, ' +
+      'debugger and conflict markers, committed .env files, keys, ignored and large files, ' +
+      'a dependency manifest without its lockfile, new environment variables declared ' +
+      'neither in config nor in docs, and destructive statements in migrations. Such a ' +
+      'finding is cleared only by a report row that names every file or name — “checked, ' +
+      'all fine” does not pass; a conflict only by a rebase. Consumers of removed names the ' +
+      'panel re-checks, and the group still hands in its own search. A row counts for the ' +
+      'code it was written on: if the branch changed the code the sieve covers after it, ' +
+      'the row is stale and the sieve has to be passed again. When the copy has a Tests ' +
+      'block, live checks (browser, boundary input, a request to the stand, a migration) ' +
+      'are proved by a recorded run: the group cites run:<id>, and the panel opens that run ' +
+      'in the history itself — it must be finished, have no red case and be no older than ' +
+      'the last change to the covered code. A sieve not passed holds the group: “done” does not ' +
       'come and the group gets a reminder, as with an unpushed branch. When a reviewer ' +
       'finds a blocker in an MR thread, the group turns it into a new sieve — a proposed ' +
-      'one: it reaches group tasks only once you accept it in “Settings” → “Groups” → ' +
-      '“Pre-MR sieves”, for its project or for all. The model writes the sieve text from ' +
+      'one, with the code area where the blocker was found (from the thread’s file). It ' +
+      'reaches group tasks only once you accept it in “Settings” → “Groups” → “Pre-MR ' +
+      'sieves”, for its project or for all, and only tasks whose diff touches that area ' +
+      '(a shared one reaches all). The model writes the sieve text from ' +
       'a commenter’s reply, so only a human can accept it, not the panel agent. The same ' +
       'blocker in another project only suggests making the sieve shared. The blocker tally ' +
       '(“escaped to MR” against “caught before the MR”) is there too, and a learned sieve ' +

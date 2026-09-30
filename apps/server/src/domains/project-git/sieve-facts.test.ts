@@ -99,8 +99,10 @@ describe('механика сит на настоящем git', () => {
     const { work } = repo({ 'old.ts': 'const keep = 1;\nconst drop = 2;\n' });
     commit(work, { 'old.ts': 'const keep = 1;\n' }, STARTED);
     const facts = await readSieveFacts({ cwd: work, startedAt: STARTED });
-    expect(facts.mechanics).toEqual({});
+    // Git-механика молчит; остаётся только «код без тестов» — тестов ветка не трогала.
+    expect(facts.mechanics).toEqual({ untestedCode: ['old.ts'] });
     expect(facts.unchecked).toBeUndefined();
+    expect(facts.commits?.[0]?.paths).toEqual(['old.ts']);
   });
 
   it('чужие «−»: ветка перенесена на свежую основную и удалила пришедшее после старта', async () => {

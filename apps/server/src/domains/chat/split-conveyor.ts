@@ -827,6 +827,7 @@ export class SplitConveyor {
       const outcome = sieves.learn({
         rows,
         relayed: group.mrWatch?.relayedLinks ?? [],
+        ...(group.mrWatch?.relayedPaths ? { paths: group.mrWatch.relayedPaths } : {}),
         projectPath: record.projectPath,
         ...(group.mr ? { mr: group.mr } : {}),
       });

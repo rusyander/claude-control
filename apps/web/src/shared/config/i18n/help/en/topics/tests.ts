@@ -1362,10 +1362,14 @@ export const testsEn: typeof testsRu = {
         'It asks once and only what is yours: the stand URL, where credentials live, which flows matter most. ' +
         'Claude gets this as a system prompt addition; another CLI gets one line at the end of ' +
         'your message, visible in its history. A command message (/…) gets no line. The ' +
-        'conversation never creates the folder itself: with none, the agent learns that and ' +
-        'creates e2e/ only when the task is about tests. Changing how the product behaves, it ' +
-        'adds or updates the case for the change on its own (tests-cli case) and records what ' +
-        'it verified (tests-cli record or run); a case you wrote arrives as a draft edit to accept.',
+        'conversation never creates the folder itself, and the agent will not create it ' +
+        'silently either: with none and a task that needs tests, it asks in that same single ' +
+        'question whether to keep them in the Tests section. Changing how the product behaves, ' +
+        'it adds or updates the case for the change on its own (tests-cli case) and records ' +
+        'what it verified (tests-cli record or run); a case you wrote arrives as a draft edit to ' +
+        'accept. When it cannot run commands or write files (for another CLI that is decided by ' +
+        'its rights in the “Permissions” section), it says so and hands you the exact command ' +
+        'instead of reporting a run that never happened.',
       addTitle: 'Adding a project',
       addText:
         'A project with its own e2e folder gets cases from its tests the moment it is added to ' +

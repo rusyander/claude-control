@@ -42,7 +42,18 @@ describe('применимость сит по путям', () => {
   it('пустой дифф — ни одного сита; любой дифф — интеграционные всегда', () => {
     expect(applicableSieves([])).toEqual([]);
     const ids = applicableSieves(['README.md']).map((sieve) => sieve.id);
-    expect(ids).toEqual(['contract-by-request', 'merge-tree', 'foreign-removals']);
+    // Механика панели идёт на любой дифф: секреты, lockfile, остатки отладки,
+    // лишнее в git и новые переменные ищутся везде, где что-то добавлено.
+    expect(ids).toEqual([
+      'contract-by-request',
+      'merge-tree',
+      'foreign-removals',
+      'lockfile-sync',
+      'secrets',
+      'debug-leftovers',
+      'committed-artifacts',
+      'env-config',
+    ]);
   });
 
   it('UI-правка тянет браузерный фокус, бэкенд — стенд своей ветки', () => {
@@ -259,6 +270,9 @@ describe('абзац сит в задании звена', () => {
     expect(deliver).toContain('[browser-focus]');
     expect(deliver).not.toContain('[contract-by-request]');
     expect(deliver).toContain(SIEVE_LANG);
+    // Механику панель проверяет сама — списком, без пункта и без строки отчёта.
+    expect(deliver).not.toContain('[secrets]');
+    expect(deliver).toMatch(/The panel itself checks[^\n]*secrets/);
   });
 
   it('выученные сита идут в задание с числом повторов', () => {

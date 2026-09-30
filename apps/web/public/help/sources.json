@@ -255,7 +255,7 @@
         {
           "path": "apps/server/src/domains/chat/split-conveyor.ts",
           "why": "«Что запускает „Разделить“»: разбор в корне, план в копии, порядок after и hold",
-          "sha": "9c4aded2f883a417"
+          "sha": "9de60f6c23b63c4d"
         },
         {
           "path": "apps/server/src/domains/chat/split-overlap.ts",
@@ -303,22 +303,27 @@
           "sha": "3486cc3492ef1771"
         },
         {
-          "path": "packages/contracts/src/sieves.ts",
-          "why": "«Сита перед MR»: встроенные сита, какие панель проверяет сама, что держит «готово», точная сверка треда",
-          "sha": "fba9e2cfbd40c837"
+          "path": "packages/contracts/src/sieves/catalog.ts",
+          "why": "«Сита перед MR»: встроенные сита, виды путей, уровень риска и план отката",
+          "sha": "a8592a6468c86001"
+        },
+        {
+          "path": "packages/contracts/src/sieves/judge.ts",
+          "why": "«Сита перед MR»: что держит «готово» — механика панели, названные файлы и команды, свежесть строки, прогон блока «Тесты»",
+          "sha": "f30bbff0809a4439"
         },
         {
           "path": "apps/server/src/domains/chat/sieve-gate.ts",
           "why": "«Сита перед MR»: абзац сит только группе с доставкой, пробелы становятся напоминанием доставки",
-          "sha": "4cd664253cb7ee7c"
+          "sha": "47572adbc74dae3d"
         },
         {
           "path": "apps/server/src/domains/chat/sieve-store.ts",
           "why": "«Сита перед MR»: выученное сито приходит предложенным, принять и сделать общим может только человек",
-          "sha": "a94b640e72eed66f"
+          "sha": "4ee5ccbcebfc6f2a"
         }
       ],
-      "confirmedAt": "2026-09-30T14:49:15.139Z"
+      "confirmedAt": "2026-09-30T15:34:21.201Z"
     },
     {
       "topic": "tests",
@@ -387,7 +392,7 @@
         {
           "path": "apps/server/src/domains/project-tests/e2e-chat.ts",
           "why": "«Агент чата знает о папке»: что агент чата узнаёт и о чём спрашивает",
-          "sha": "0f38d06214a8e559"
+          "sha": "2d470c41e9a0263f"
         },
         {
           "path": "apps/web/src/features/ProjectTests/ui/TestE2eCard.tsx",
@@ -435,7 +440,7 @@
           "sha": "cbcfeac115c88427"
         }
       ],
-      "confirmedAt": "2026-09-30T13:22:50.116Z"
+      "confirmedAt": "2026-09-30T15:35:37.143Z"
     },
     {
       "topic": "rules",

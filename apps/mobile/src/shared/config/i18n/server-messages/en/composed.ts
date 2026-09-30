@@ -184,6 +184,32 @@ export const composedEn: Record<ComposedMessageCode, string> = {
   'sieve-gap-no-evidence':
     'sieve {{sieve}} is marked without evidence: the command and a line of its output, or the reason, are needed',
   'sieve-gap-failed': 'sieve {{sieve}} failed: {{evidence}}',
+  'sieve-gap-lockfile':
+    'lockfile sieve: a dependency manifest changed without its lockfile: {{files}} — regenerate the lock with the project package manager or name every manifest in the lockfile-sync row of the sieve report with the reason',
+  'sieve-gap-secrets':
+    'secrets sieve: a key, token or private key in added lines: {{files}} — remove it from the branch and rotate it (a secret removed from the branch has still leaked) or name every file in the secrets row of the sieve report with why it is not a real secret',
+  'sieve-gap-debug':
+    'debug-leftovers sieve: .only, debugger or a conflict marker in added lines: {{files}} — remove them or name every file in the debug-leftovers row of the sieve report with the reason',
+  'sieve-gap-artifacts':
+    'committed-artifacts sieve: files that do not belong in git were added (ignored, .env, keys, over 5 MB): {{files}} — remove them from the branch or name each in the committed-artifacts row of the sieve report with the reason',
+  'sieve-gap-env':
+    'env-config sieve: the code started reading environment variables declared nowhere: {{names}} — add them to .env.example, the deployment config or the docs, or name each in the env-config row of the sieve report with the reason',
+  'sieve-gap-untested':
+    'tests-alongside sieve: code changed ({{files}}) but no test changed in the branch — add a test for the changed behaviour or report the tests-alongside row: which test covers it, or n/a with the reason',
+  'sieve-gap-checks':
+    'sieve {{sieve}}: the evidence does not name the project checks {{commands}} — run each on the final commit and name it with its output line; one that could not run is a fail with the reason, not an n/a',
+  'sieve-gap-destructive':
+    'migration-safety sieve: destructive statements (DROP, TRUNCATE, rename, type narrowing) in {{files}} — the migration-safety row must name every file with its data-preserving and rollback plan',
+  'sieve-gap-stale':
+    'sieve {{sieve}}: the branch changed the code this sieve covers after the row was reported ({{files}}) — check again on the final commit and report the row again',
+  'sieve-gap-no-run':
+    'sieve {{sieve}}: the project has a Tests section — record the live check as a run (tests-cli run or tests-cli record) and cite it in the evidence as run:<id>',
+  'sieve-gap-run-missing':
+    'sieve {{sieve}}: run {{run}} is not in the Tests history of the copy or did not finish — record the run and cite its id',
+  'sieve-gap-run-red':
+    'sieve {{sieve}}: run {{run}} has red cases: {{cases}} — fix them and record a new run',
+  'sieve-gap-run-stale':
+    'sieve {{sieve}}: run {{run}} is older than the change to the code this sieve covers ({{files}}) — run it again on the final commit',
   'tests-gap-no-run':
     'Tests block of the copy: no run has been recorded since the group started — run the cases for the changed files ({{cases}}) and record the run: {{command}}',
   'tests-gap-unrun':

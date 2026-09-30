@@ -4264,6 +4264,16 @@ export const en: TranslationSchema = {
         'branch-backend-stand': 'The stand runs the backend of this branch, not main',
         'boundary-negative':
           'A value past a type or limit boundary is refused with a clear message',
+        'project-checks': 'Every project check (lint, types, tests) ran on the final commit',
+        'tests-alongside': 'The changed behaviour is covered by a test in the same branch',
+        'lockfile-sync': 'A dependency manifest changed together with its lockfile',
+        secrets: 'No keys, tokens or private keys in added lines',
+        'debug-leftovers': 'No .only, debugger or conflict markers',
+        'committed-artifacts': 'No .env, keys, ignored or large files committed',
+        'env-config': 'New environment variables are declared in config or docs',
+        'migration-safety':
+          'The migration is compatible with old code, reversible and tried on a schema copy',
+        'rollback-plan': 'High risk: a rollback plan and a production failure signal exist',
       },
       class: {
         contract: 'Docs ≠ code',
@@ -4271,6 +4281,10 @@ export const en: TranslationSchema = {
         isolation: 'Check isolation',
         consumers: 'Consumers outside the diff',
         boundary: 'Boundary input',
+        security: 'Security',
+        data: 'Data and migrations',
+        hygiene: 'Branch hygiene',
+        release: 'Release and rollback',
         other: 'Other',
       },
       learnedTitle: 'Learned from MR threads',

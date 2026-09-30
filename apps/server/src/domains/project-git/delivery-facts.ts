@@ -134,10 +134,23 @@ export async function pickDeliveredMr(
   const candidates: string[] = [];
   const { hint } = options;
   const hinted = hint ? mergeRequestRef(hint) : undefined;
-  if (hint && hinted && refs.get(hinted) === head) candidates.push(hint);
+  // Подсказка агента — только адрес MR ЭТОГО проекта, собранный заново по его
+  // служебной ссылке: по чужому хосту с тем же номером фордж-клиент унёс бы
+  // токен туда, куда указала модель (ревью 30.09).
+  const own = hinted && base ? urlOfRef(hinted, base) : undefined;
+  const clean = (url: string): string =>
+    (url.trim().split(/[?#]/)[0] ?? '').replace(/\/+$/, '').toLowerCase();
+  if (hint && own && clean(hint) === clean(own) && refs.get(hinted as string) === head) {
+    candidates.push(own);
+  }
   if (base) {
     const matching = [...refs]
-      .filter(([ref, sha]) => sha === head && ref !== hinted && urlOfRef(ref, base))
+      .filter(
+        ([ref, sha]) =>
+          sha === head &&
+          urlOfRef(ref, base) &&
+          !candidates.includes(urlOfRef(ref, base) as string),
+      )
       .map(([ref]) => ref)
       .sort((a, b) => Number(/\d+/.exec(b)?.[0] ?? 0) - Number(/\d+/.exec(a)?.[0] ?? 0));
     for (const ref of matching) {

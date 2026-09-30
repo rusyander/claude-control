@@ -98,6 +98,26 @@ describe('доставка по фактам git', () => {
     expect(facts.mr).toBe(`${WEB}/-/merge_requests/9`);
   });
 
+  // Ревью 30.09: номер совпал, хост — чужой; фордж-клиент унёс бы туда токен.
+  it('ссылка агента на MR с тем же номером на чужом хосте не берётся и не спрашивается', async () => {
+    gitIn(work, ['push', '-q', 'origin', 'fix/PROJ-1']);
+    mrRef(7, head());
+    const asked: string[] = [];
+
+    const facts = await readDeliveryFacts({
+      cwd: work,
+      branch: 'fix/PROJ-1',
+      mr: 'https://evil.example.com/x/y/-/merge_requests/7',
+      branchOfMr: async (url) => {
+        asked.push(url);
+        return 'fix/PROJ-1';
+      },
+    });
+
+    expect(asked).toEqual([`${WEB}/-/merge_requests/7`]);
+    expect(facts.mr).toBe(`${WEB}/-/merge_requests/7`);
+  });
+
   it('коммит после push — ветка на удалённом отстаёт, MR старой головы не в счёт', async () => {
     gitIn(work, ['push', '-q', 'origin', 'fix/PROJ-1']);
     mrRef(7, head());

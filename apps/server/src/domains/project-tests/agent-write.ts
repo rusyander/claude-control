@@ -103,6 +103,8 @@ export function recordAgentResults(
     id,
     mode: 'run',
     actor: 'agent',
+    // Проверено руками агента, не командой: автокейсу это прогон не заменяет.
+    attested: true,
     ...gitContext(root),
     status: 'done',
     startedAt: now,

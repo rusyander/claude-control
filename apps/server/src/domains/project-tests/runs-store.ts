@@ -122,6 +122,7 @@ function parseRun(data: unknown, fileId: string): ProjectTestRunRecord | undefin
     tokens: typeof record.tokens === 'number' ? record.tokens : undefined,
     costUsd: typeof record.costUsd === 'number' ? record.costUsd : undefined,
     sessionId: optional(record.sessionId),
+    ...(record.attested === true ? { attested: true } : {}),
     results,
     summary,
     planned: typeof record.planned === 'number' ? record.planned : undefined,

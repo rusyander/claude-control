@@ -94,6 +94,10 @@ export function judgeTests(input: {
     })
     .sort((a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt));
   const latest = latestResults(own);
+  // Автоматический кейс засчитывается только исполненным прогоном: запись
+  // «проверил» от агента (`tests-cli record`) — слово, а не команда (ревью 30.09).
+  const executed = own.filter((run) => !run.attested);
+  const latestExecuted = latestResults(executed);
   const byKey = new Map(all.map((item) => [`${item.group}:${item.testCase.id}`, item]));
 
   const touched = casesTouching(input.paths, live).cases.map(
@@ -110,7 +114,7 @@ export function judgeTests(input: {
     missing.push(serverText('tests-gap-uncovered', { files: named(code) }));
   }
 
-  if (automated.length > 0 && own.length === 0) {
+  if (automated.length > 0 && executed.length === 0) {
     missing.push(
       serverText('tests-gap-no-run', {
         cases: named(automated.map((key) => key.split(':')[1] ?? key)),
@@ -119,7 +123,7 @@ export function judgeTests(input: {
     );
   } else {
     const unrun = automated.filter((key) => {
-      const status = latest.get(key)?.status;
+      const status = latestExecuted.get(key)?.status;
       return !status || status === 'skipped' || status === 'unknown';
     });
     if (unrun.length > 0) {
@@ -139,8 +143,8 @@ export function judgeTests(input: {
     .map(([key]) => key.split(':')[1] ?? key);
   if (red.length > 0) missing.push(serverText('tests-gap-failed', { cases: named(red) }));
 
-  const passed = automated.filter((key) => latest.get(key)?.status === 'passed').length;
-  const last = own[0];
+  const passed = automated.filter((key) => latestExecuted.get(key)?.status === 'passed').length;
+  const last = executed[0] ?? own[0];
   return {
     missing,
     verdict: {

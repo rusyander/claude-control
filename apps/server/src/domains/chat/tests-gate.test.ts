@@ -168,4 +168,21 @@ describe('вердикт группы из блока «Тесты»', () => {
     });
     expect(verdict).toEqual({ missing: [], verdict: { cases: 0, passed: 0 } });
   });
+
+  // Ревью 30.09: «проверил» агента — слово, а не прогон автокейса.
+  it('запись агента без команды автоматический кейс не закрывает', () => {
+    const attested = {
+      ...run('a1', '2026-09-30T10:30:00.000Z', [['auth-001', 'passed']]),
+      attested: true,
+    };
+    const verdict = judgeTests({
+      groups: groups([login]),
+      runs: [attested],
+      paths: ['src/auth/login.ts'],
+      startedAt: STARTED,
+      command: COMMAND,
+    });
+    expect(verdict.missing).toEqual([expect.stringContaining(COMMAND)]);
+    expect(verdict.verdict).toMatchObject({ cases: 1, passed: 0 });
+  });
 });

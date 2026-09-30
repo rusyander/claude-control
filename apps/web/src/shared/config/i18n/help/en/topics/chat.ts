@@ -725,7 +725,9 @@ export const chatEn: typeof chatRu = {
       'How much that helped shows in the parent’s group summary: the “To first edit” column ' +
       '— from the work link’s creation to the agent’s first Edit/Write call. Next to it: the ' +
       'model with its reasoning effort, the run time and “Step 8 of 14” from the group agent’s ' +
-      'plan, with the step name and its subagent count. A group working ' +
+      'plan, with the step name and its subagent count. A group without a plan still gets a ' +
+      'number when the project skill writes .agent/steps.json in the copy — { "current": 8, ' +
+      '"total": 14, "title": "Run the tests" }: the file wins over the agent’s plan. A group working ' +
       'in the shared directory gets no preamble: that environment is yours.',
 
     splitTitle: 'Splitting tasks across chats: the agent proposes, you decide',

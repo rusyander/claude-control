@@ -71,4 +71,22 @@ describe('groupStep', () => {
     const progress = { tasks: [], agents: [agent('running')] } as ChatProgress;
     expect(groupStep(progress, true)).toEqual({ name: 'r', agents: 1 });
   });
+
+  // Решение владельца 29.09: файл шагов в копии группы сильнее плана агента.
+  it('файл шагов идёт первым — и поверх плана, и у стоящей группы', () => {
+    const steps = { current: 8, total: 14, title: 'Прогон тестов' };
+    const withPlan = {
+      tasks: [task('a', 'in_progress'), task('b', 'pending')],
+      agents: [agent('running')],
+      steps,
+    } as ChatProgress;
+    expect(groupStep(withPlan, true)).toEqual({
+      current: 8,
+      total: 14,
+      name: 'Прогон тестов',
+      agents: 1,
+    });
+    const idle = { tasks: [], agents: [], steps: { current: 3, total: 5 } } as ChatProgress;
+    expect(groupStep(idle, false)).toEqual({ current: 3, total: 5, agents: 0 });
+  });
 });

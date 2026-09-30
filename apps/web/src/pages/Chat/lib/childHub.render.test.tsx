@@ -378,6 +378,19 @@ describe('хаб разделения — колонки и шаг группы'
     expect(textOf(html)).toContain('Ревью · 2 агента');
   });
 
+  // Решение владельца 29.09: группа без плана агента, навык проекта пишет
+  // `.agent/steps.json` в копии — хаб показывает шаг из файла.
+  it('файл шагов без плана агента: «Шаг 8 из 14» и название шага', () => {
+    const html = renderWith({
+      tasks: [],
+      agents: [],
+      steps: { current: 8, total: 14, title: 'Прогон тестов' },
+    });
+    expect(html).toContain('data-hub-step="8/14"');
+    expect(textOf(html)).toContain('Шаг 8 из 14');
+    expect(textOf(html)).toContain('Прогон тестов');
+  });
+
   it('плана нет — строки шага нет', () => {
     expect(renderWith({ tasks: [], agents: [] })).not.toContain('data-hub-step');
   });

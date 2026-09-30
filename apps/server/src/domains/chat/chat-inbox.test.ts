@@ -192,11 +192,14 @@ describe('buildInbox', () => {
   });
 
   it('ворота ветки — свой вид и свой ключ', () => {
+    // Путь прогона сводка проверяет на диске (основная копия git), поэтому он
+    // абсолютный на ЛЮБОЙ ОС: `C:/work/app` вне Windows — относительный, и
+    // разрешался от каталога запуска тестов — внутри git-копии это давало имя
+    // её основного репозитория вместо `app`.
+    const app = join(tmpdir(), 'cc-inbox-no-such-dir', 'app');
     const inbox = buildInbox(
       sources({
-        runs: [
-          { key: 'k', startedAt: NOW, projectPath: 'C:/work/app', prompt: 'Почини\nподробно' },
-        ],
+        runs: [{ key: 'k', startedAt: NOW, projectPath: app, prompt: 'Почини\nподробно' }],
         permissions: [
           {
             runId: 'k',

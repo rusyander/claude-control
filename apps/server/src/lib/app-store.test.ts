@@ -253,9 +253,12 @@ describe('AppStore', () => {
     it('оверрайд из старой карты runnerCommands не теряется при обновлении панели', () => {
       const dir = join(dirA, 'agentdeck');
       mkdirSync(dir, { recursive: true });
+      // Старая карта хранила ключ нормализованным: на Windows — в нижнем
+      // регистре, в других ОС регистр пути значим и остаётся как есть.
+      const legacyKey = process.platform === 'win32' ? 'c:/work/mono' : 'C:/work/mono';
       writeFileSync(
         join(dir, 'state.json'),
-        JSON.stringify({ runnerCommands: { 'c:/work/mono': 'pnpm start' } }),
+        JSON.stringify({ runnerCommands: { [legacyKey]: 'pnpm start' } }),
       );
 
       const a = new AppStore(dir);

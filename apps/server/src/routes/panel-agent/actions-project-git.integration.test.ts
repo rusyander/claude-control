@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   GIT_AVAILABLE,
@@ -107,6 +107,13 @@ describe.skipIf(!GIT_AVAILABLE)('panel-agent actions: project git', () => {
     git(projectDir, 'add', '.gitignore');
     git(projectDir, 'commit', '-m', 'ignore');
     writeFileSync(join(projectDir, 'local.cfg'), 'v1\n');
+    // Зеркало считает файл копии свежим, пока он не старее оригинала больше чем
+    // на секунду (грубые метки времени ФС), а копия наследует метку оригинала.
+    // Первая версия — заведомо в прошлом: иначе v2 ниже отличалась бы от неё
+    // только временем прохода теста, и на быстрой машине (Linux) зеркало честно
+    // оставляло v1 — тест держался на медлительности Windows.
+    const past = new Date(Date.now() - 60_000);
+    utimesSync(join(projectDir, 'local.cfg'), past, past);
 
     const settings = await stand.decided('save_project_mirror_settings', {
       project: stand.projectId,
@@ -139,7 +146,6 @@ describe.skipIf(!GIT_AVAILABLE)('panel-agent actions: project git', () => {
     await settled(copy);
 
     // Зеркало переносит только то, что в копии старее.
-    await new Promise((done) => setTimeout(done, 20));
     writeFileSync(join(projectDir, 'local.cfg'), 'v2\n');
     const mirrored = await stand.decided('mirror_worktree', { project: stand.projectId, copy });
     expect(mirrored.result.outcome).toBe('done');

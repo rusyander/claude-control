@@ -139,8 +139,11 @@ describe('readCaCert: нечитаемый файл — ошибка НАСТР�
 
 describe('createCaFetch: своя реализация нужна только там, где без неё нельзя', () => {
   it('без сертификата отдаётся встроенный fetch — второй транспорт не заводится', () => {
-    expect(createCaFetch('')).toBe(globalThis.fetch);
-    expect(createCaFetch('   ')).toBe(globalThis.fetch);
+    // Окружение — явно пустое: прокси в окружении прогона (`HTTPS_PROXY` сессии
+    // или корпоративной машины) законно требует своей реализации, и тест
+    // проверял бы уже не «без сертификата», а чужую сеть.
+    expect(createCaFetch('', {})).toBe(globalThis.fetch);
+    expect(createCaFetch('   ', {})).toBe(globalThis.fetch);
   });
 
   it('нечитаемый сертификат ломается СРАЗУ при создании, до первого запроса', () => {

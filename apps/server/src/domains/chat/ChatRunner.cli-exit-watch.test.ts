@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { observeCliExits, type CliExit } from '../../lib/cli-spawn.ts';
 import { ChatRun } from './ChatRunner.ts';
 import { spawnDirect } from './live-transport.ts';
@@ -32,7 +32,20 @@ function fakeCli(code: number): string {
   return script;
 }
 
-const quoted = (path: string) => (process.platform === 'win32' ? `"${path}"` : path);
+/**
+ * `command` у прогона — ИМЯ исполняемого файла (claude / claude.cmd), а не
+ * командная строка: на Windows его разворачивает cmd.exe (`shell: true`), на
+ * остальных системах `spawn` запускает его без оболочки, и «node скрипт» одной
+ * строкой там — несуществующий файл (ENOENT, код −2). Поэтому на POSIX фальшивый
+ * CLI — исполняемая обёртка с тем же поведением, как и настоящий `claude` в PATH.
+ */
+function cliCommand(script: string): string {
+  if (process.platform === 'win32') return `"${process.execPath}" "${script}"`;
+  const wrapper = join(dirname(script), 'fake-cli');
+  writeFileSync(wrapper, `#!/bin/sh\nexec "${process.execPath}" "${script}" "$@"\n`);
+  chmodSync(wrapper, 0o755);
+  return wrapper;
+}
 
 async function until(check: () => boolean, ms = 10_000): Promise<void> {
   const deadline = Date.now() + ms;
@@ -52,7 +65,7 @@ describe('ненулевой выход чатового CLI доходит до
       {
         prompt: 'привет',
         cwd: dir as string,
-        command: `${quoted(process.execPath)} ${quoted(script)}`,
+        command: cliCommand(script),
       },
       () => undefined,
     );
@@ -71,7 +84,7 @@ describe('ненулевой выход чатового CLI доходит до
       {
         prompt: 'привет',
         cwd: dir as string,
-        command: `${quoted(process.execPath)} ${quoted(script)}`,
+        command: cliCommand(script),
       },
       () => undefined,
     );

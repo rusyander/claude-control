@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { homedir } from 'node:os';
+import { describe, it, expect, vi } from 'vitest';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { claudeProvider } from './claude.ts';
 import { CAPABILITIES, type CapabilityMap } from './types.ts';
@@ -22,6 +23,26 @@ function fakeStore(provider: string): SettingsSource {
 
 /** Ожидаемая команда CLI под текущую ОС — тот же критерий, что и в провайдере. */
 const expectedClaudeCommand = process.platform === 'win32' ? 'claude.cmd' : 'claude';
+
+/**
+ * Каталог конфигурации Claude с готовым `CLAUDE.md` на время проверки.
+ *
+ * Файл инструкций Claude — не константа (П2.7): где своего `CLAUDE.md` нет,
+ * резолвер предлагает `AGENTS.md`. Настоящий `~/.claude` тут не годится: на
+ * машине разработчика `CLAUDE.md` есть, на чистом раннере CI — нет, и ответ
+ * зависел бы от машины, а не от кода.
+ */
+function withClaudeMd(check: (dir: string) => void): void {
+  const dir = mkdtempSync(join(tmpdir(), 'cc-providers-'));
+  try {
+    writeFileSync(join(dir, 'CLAUDE.md'), '# правила\n');
+    vi.stubEnv('CLAUDE_CONFIG_DIR', dir);
+    check(dir);
+  } finally {
+    vi.unstubAllEnvs();
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
 
 /** Провайдеры, которые обязаны быть в реестре на этой фазе. */
 const EXPECTED_IDS = [
@@ -775,7 +796,9 @@ describe('реестр провайдеров', () => {
   });
 
   it('instructionsFile задан у claude/codex/gemini/opencode и указывает на верный файл', () => {
-    expect(claudeProvider.instructionsFile?.()).toBe(join(homedir(), '.claude', 'CLAUDE.md'));
+    withClaudeMd((dir) => {
+      expect(claudeProvider.instructionsFile?.()).toBe(join(dir, 'CLAUDE.md'));
+    });
     expect(getProvider('codex').instructionsFile?.()).toBe(join(homedir(), '.codex', 'AGENTS.md'));
     expect(getProvider('gemini').instructionsFile?.()).toBe(
       join(homedir(), '.gemini', 'GEMINI.md'),
@@ -792,12 +815,15 @@ describe('реестр провайдеров', () => {
   });
 
   it('имя файла инструкций уходит клиенту вместе с моделью — меню подписывает раздел им', () => {
-    const names = Object.fromEntries(
-      describeProviders(fakeStore('claude')).providers.map((info) => [
-        info.id,
-        info.instructionsFileName,
-      ]),
-    );
+    let names: Record<string, string | undefined> = {};
+    withClaudeMd(() => {
+      names = Object.fromEntries(
+        describeProviders(fakeStore('claude')).providers.map((info) => [
+          info.id,
+          info.instructionsFileName,
+        ]),
+      );
+    });
     expect(names.claude).toBe('CLAUDE.md');
     expect(names.codex).toBe('AGENTS.md');
     expect(names.gemini).toBe('GEMINI.md');

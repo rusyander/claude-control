@@ -118,6 +118,7 @@ describe('PermissionBroker', () => {
 
     afterEach(() => {
       vi.useRealTimers();
+      vi.unstubAllEnvs();
     });
 
     it('по истечении времени сам отклоняет запрос', async () => {
@@ -149,6 +150,11 @@ describe('PermissionBroker', () => {
       // Предел CLI (MCP_TOOL_TIMEOUT) — 1e8 мс; брокер обязан ответить «истекло»
       // РАНЬШЕ, чем CLI молча оборвёт вызов, но не раньше, чем за 10 минут.
       expect(DEFAULT_TIMEOUT_MS).toBe(CLI_TOOL_CAP_MS - 10 * 60_000);
+      // «По умолчанию» — это без MCP_TOOL_TIMEOUT в окружении. Срок читается из
+      // окружения процесса на каждом запросе, а тесты, запущенные из сессии
+      // Claude Code, наследуют её собственный MCP_TOOL_TIMEOUT (например 60000):
+      // с ним запрос истёк бы через 54 с, и тест проверял бы чужую настройку.
+      vi.stubEnv('MCP_TOOL_TIMEOUT', undefined);
       const decision = broker.request(REQ());
       await vi.advanceTimersByTimeAsync(DEFAULT_TIMEOUT_MS - 1);
       expect(broker.hasPending('c1')).toBe(true);

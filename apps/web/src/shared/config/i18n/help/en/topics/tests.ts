@@ -53,7 +53,9 @@ export const testsEn: typeof testsRu = {
       'panel: it is the only one whose run boundaries the panel can hold. There is no ' +
       'conversation: a run has no feed and no questions to the human, permissions come from ' +
       'the panel itself — read anything, change only test files. The other way round too: ' +
-      'cases are not kept from the chat, which the console says out loud.',
+      'a chat conversation does not write to the library by itself — “Make a case” in the ' +
+      'chat menu builds a DRAFT from it (the steps are your messages, commands and file ' +
+      'edits), and you accept or edit it here.',
     vsCi: 'Not CI',
     vsCiText:
       'The panel runs nothing on a schedule and guards no branch. Build results arrive ' +

@@ -60,6 +60,8 @@ export const testsMessageParams = {
   'defect-cli-no-url': ['command'],
   'draft-id-invalid': ['runId'],
   'draft-not-found': ['runId'],
+  'draft-chat-not-found': ['chatId'],
+  'draft-chat-no-steps': [],
   'draft-case-human-written': [],
   'draft-revert-case-gone': [],
   'draft-revert-case-run': [],

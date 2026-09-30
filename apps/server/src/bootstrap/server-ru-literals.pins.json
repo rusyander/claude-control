@@ -39,6 +39,10 @@
     "n": 5,
     "why": "run errors shown in the chat feed (model name rejected, spawn failed, exit code, request failed); +1 the `modelDropped` feed notice — the code travels for translation"
   },
+  "domains/chat/chat-case-draft.ts": {
+    "n": 10,
+    "why": "text of the draft test case built from a chat (step labels, title and purpose) — data written into the project's test library, reviewed by the human at acceptance, not UI text"
+  },
   "domains/chat/detached-run.ts": {
     "n": 2,
     "why": "feed notices of a run picked up after a panel restart (the human reads them)"

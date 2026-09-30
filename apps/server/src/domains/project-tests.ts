@@ -94,6 +94,7 @@ export {
   readDraft,
   readDraftSummaries,
   readDrafts,
+  writeDraft,
   rejectDraft,
   rollbackDraft,
   summarizeDraft,

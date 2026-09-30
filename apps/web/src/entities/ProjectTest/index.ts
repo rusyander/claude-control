@@ -70,6 +70,7 @@ export {
   useRejectTestDraft,
   useRollbackTestDraft,
   useSetTestDraftAuto,
+  useDraftFromChat,
 } from './api/ProjectTestDraftApi';
 
 export {

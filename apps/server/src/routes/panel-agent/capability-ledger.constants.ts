@@ -425,6 +425,7 @@ export const ROUTE_LEDGER: RouteLedger = {
   'GET /api/project-tests/drafts': 'action:list_test_drafts',
   'POST /api/project-tests/draft/apply': 'action:draft_cases',
   'POST /api/project-tests/draft/auto': 'action:set_draft_auto_accept',
+  'POST /api/project-tests/draft/from-chat': 'gap:P3',
   'POST /api/project-tests/draft/reject': 'action:reject_draft',
   'POST /api/project-tests/draft/rollback': 'action:rollback_draft',
   // project-tests/e2e-routes.ts

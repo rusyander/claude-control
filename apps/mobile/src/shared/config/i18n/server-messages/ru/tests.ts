@@ -65,6 +65,9 @@ export const testsRu: Record<TestsMessageCode, string> = {
   'defect-cli-no-url': '{{command}} не вернул ссылку на задачу.',
   'draft-id-invalid': 'Черновик «{{runId}}»: неверный идентификатор.',
   'draft-not-found': 'Черновика «{{runId}}» в проекте нет.',
+  'draft-chat-not-found': 'Разговора «{{chatId}}» не нашлось — кейс собирать не из чего.',
+  'draft-chat-no-steps':
+    'В разговоре нет ни реплик человека, ни команд и правок — кейс собирать не из чего.',
   'draft-case-human-written': 'Кейс написан человеком — правку к нему принимают руками.',
   'draft-revert-case-gone': 'Кейса в библиотеке уже нет.',
   'draft-revert-case-run': 'Кейс успели прогнать — результат дороже отката.',

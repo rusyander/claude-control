@@ -68,6 +68,10 @@ export const testsEn: Record<TestsMessageCode, string> = {
   'defect-cli-no-url': '{{command}} did not return an issue link.',
   'draft-id-invalid': 'Draft “{{runId}}”: invalid id.',
   'draft-not-found': 'Draft “{{runId}}” is not in the project.',
+  'draft-chat-not-found':
+    'Conversation “{{chatId}}” was not found — there is nothing to build the case from.',
+  'draft-chat-no-steps':
+    'The conversation has no human messages, commands or edits — there is nothing to build the case from.',
   'draft-case-human-written':
     'The case was written by a person — an edit to it is accepted by hand.',
   'draft-revert-case-gone': 'The case is no longer in the library.',

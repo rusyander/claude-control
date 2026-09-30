@@ -1,9 +1,12 @@
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from '@tanstack/react-router';
+import { Link, useNavigate } from '@tanstack/react-router';
 import { PERMISSION_RULE_IDS, resolvePermissionRules } from '@agentdeck/contracts';
 import { useSettings, useUpdateSettings } from '@entities/AppConfig';
 import { useCascadeRule, useSetCascadeRule } from '@entities/ChatSplit';
+import { useDraftFromChat } from '@entities/ProjectTest';
+import { toErrorMessage } from '@shared/api/client';
+import { toast } from '@shared/lib/toast';
 import { HELP_ROUTE } from '@shared/config/routes';
 import { useAnchoredPanel } from '@shared/hooks/use-anchored-panel';
 import { Stack } from '@shared/ui/stack';
@@ -14,6 +17,8 @@ import { Toggle } from '@shared/ui/toggle';
 import { ChatGroupSettingsMenu } from './ChatGroupSettingsMenu';
 import type { ChatHeaderMenuProps } from './ChatHeaderMenu.types';
 import styles from './ChatHeaderMenu.module.scss';
+
+const TESTS_ROUTE: string = '/tests';
 
 /**
  * Меню шапки чата: тумблеры прав, выгрузка разговора, обновление и справка.
@@ -39,6 +44,8 @@ export function ChatHeaderMenu({
   restartBlocked,
 }: ChatHeaderMenuProps) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const draftFromChat = useDraftFromChat();
   const [isOpen, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const { panelRef, panelStyle } = useAnchoredPanel<HTMLDivElement>(isOpen);
@@ -247,6 +254,39 @@ export function ChatHeaderMenu({
               >
                 <Icon name="swap" size={20} />
                 {t('chat.handoff.restart')}
+              </button>
+            )}
+
+            {/* Кейс из разговора: сценарий, который человек только что прошёл с
+                агентом, — черновиком в «Тесты» проекта; принимает его человек. */}
+            {canExport && projectPath && (sessionId ?? chatId) && (
+              <button
+                type="button"
+                className={styles.item}
+                disabled={draftFromChat.isPending}
+                onClick={() => {
+                  const id = sessionId ?? chatId;
+                  if (!id) return;
+                  draftFromChat.mutate(
+                    { path: projectPath, chatId: id },
+                    {
+                      onSuccess: () => {
+                        toast.success(t('chat.caseDraftCreated'));
+                        void navigate({
+                          to: TESTS_ROUTE,
+                          search: { tab: 'library', project: projectPath },
+                        });
+                      },
+                      onError: (error) =>
+                        toast.error(t('chat.caseDraftFailed', { message: toErrorMessage(error) })),
+                    },
+                  );
+                  close();
+                }}
+                title={t('chat.caseDraftHint')}
+              >
+                <Icon name="file" size={20} />
+                {t('chat.caseDraft')}
               </button>
             )}
 

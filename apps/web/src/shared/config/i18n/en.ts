@@ -1693,6 +1693,11 @@ export const en: TranslationSchema = {
     loadOlder: 'Load older',
     export: 'Export',
     exportHint: 'Download the conversation as a file (Markdown)',
+    caseDraft: 'Make a case',
+    caseDraftHint:
+      'Build a draft test case for the project’s Tests section from this conversation: the steps are your messages, commands and file edits. The case reaches the library only once you accept it',
+    caseDraftCreated: 'The draft case is waiting for review in Tests — accept or edit it',
+    caseDraftFailed: 'Could not build the case: {{message}}',
     deleteArtifact: 'Delete file “{{name}}”',
     deleteArtifactTitle: 'Delete file?',
     deleteArtifactConfirm:

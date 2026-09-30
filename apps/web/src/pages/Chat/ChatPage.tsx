@@ -4,6 +4,7 @@ import { useWorkspace } from '@shared/lib/workspace';
 import { isStreamShown } from '@shared/lib/chat-stream';
 import {
   agentRuns,
+  pendingBubbles,
   useAgentRun,
   useActiveRuns,
   useTotalCost,
@@ -417,7 +418,7 @@ export function ChatPage() {
             chatId={chatId}
             permissions={run.permissions}
             branchGates={run.branchGates}
-            queued={run.queued}
+            queued={pendingBubbles(run)}
             onCancelQueued={(queuedId) => chatId && agentRuns.cancelQueued(chatId, queuedId)}
             child={child}
             // Звено открывается ЗДЕСЬ же, как и переход к ребёнку из тоста:

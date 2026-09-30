@@ -73,8 +73,9 @@ export function answerChild(
       ...(chat && !chat.isSandbox && chat.projectPath ? { projectPath: chat.projectPath } : {}),
       // Вкладка не видит прогона ребёнка, но он может идти: отцепленная группа,
       // прогон конвейера или другой вкладки. Тогда ответ ставит в очередь сервер,
-      // а не отказ 409 съедает его (W3-5).
+      // а не отказ 409 съедает его (W3-5). Живому ходу — сразу, посреди хода.
       queueIfBusy: true,
+      steer: true,
     })
     .then((outcome) => {
       if (outcome.ok) input.notify?.(title, outcome.queued === true);

@@ -237,14 +237,19 @@ export async function openStream(
     settle?.({ ok: false, code: refusal.code, message: refusal.message, files: refusal.files });
     return 'refused';
   }
-  // 202 — разговор занят, сообщение встало в очередь сервера (`queueIfBusy`).
+  // 202 — разговор занят, сообщение встало в очередь сервера (`queueIfBusy`)
+  // или уже передано агенту на ходу (`steer`).
   // Потока этого сообщения ещё нет: подключаемся к ИДУЩЕМУ прогону по его
   // ключу (`dirty` — обычный повод переподключиться), а новый ход вкладки
   // подхватят опросом идущих, когда сервер его запустит.
   if (mode === 'send' && response.status === 202) {
-    const queued = (await response.json().catch(() => ({}))) as { runId?: string };
+    const queued = (await response.json().catch(() => ({}))) as {
+      runId?: string;
+      steered?: boolean;
+    };
     setRun(id, { serverRunId: queued.runId ?? runs.get(id)?.serverRunId });
-    settle?.({ ok: true, queued: true });
+    // `steered` — сообщение уже у агента посреди хода (`steer`), не в очереди.
+    settle?.({ ok: true, queued: queued.steered !== true });
     return 'dirty';
   }
   if (!response.body) {

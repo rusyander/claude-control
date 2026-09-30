@@ -230,6 +230,23 @@ export class LiveSession {
   }
 
   /**
+   * Сообщение человека посреди идущего хода: пишется в stdin сразу, без своего
+   * ожидания конца. CLI (замер 2.1.285) отдаёт его модели на ближайшем шаге —
+   * внутри результата текущего вызова, «The user sent a new message while you
+   * were working», — и ход продолжается с ним; `result` у хода один. Шагов
+   * больше не будет — CLI кончает ход и сам начинает следующий с этим
+   * сообщением: для панели это ход без хозяина, его забирает `onWake`.
+   * `false` — хода нет или процесс закрыт: сообщение уходит обычным ходом.
+   */
+  inject(prompt: string): boolean {
+    if (this.closed || !this.sink) return false;
+    this.transport.write(
+      JSON.stringify({ type: 'user', message: { role: 'user', content: prompt } }) + '\n',
+    );
+    return true;
+  }
+
+  /**
    * Забрать ход, начатый самим CLI: сначала отдаются события, пришедшие до
    * этого, потом живые. `undefined` — такого хода нет (уже кончился).
    */

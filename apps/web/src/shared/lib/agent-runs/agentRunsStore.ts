@@ -1,3 +1,4 @@
+import { steer } from './agent-runs.steer';
 import {
   cancelQueued,
   clearRun,
@@ -45,6 +46,7 @@ ensureSlotsWatch();
 export const agentRuns = {
   start: startRun,
   enqueue,
+  steer,
   cancelQueued,
   restoreQueue,
   resumeActive,

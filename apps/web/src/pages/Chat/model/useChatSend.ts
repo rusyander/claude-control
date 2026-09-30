@@ -166,12 +166,11 @@ export function useChatSend({
       return false;
     }
 
-    // Агент ещё занят — не отказываем, а дописываем в очередь: уйдёт само, как
-    // только он закончит текущий ход, в тот же разговор. Прервать чужой ход
-    // нельзя (CLI доводит его до конца), но и ждать конца, ничего не сказав,
-    // человек не обязан.
+    // Агент ещё занят — слово уходит ему сразу, как в самом Claude Code: он
+    // дочитает текущий шаг, увидит сообщение и учтёт его, не дожидаясь конца
+    // всей работы. Не вышло (вложения, прогон не живой) — очередь, как раньше.
     if (isRunning && chatId) {
-      agentRuns.enqueue(chatId, {
+      void agentRuns.steer(chatId, {
         prompt: plan.prompt,
         files,
         allowEdits,
@@ -198,14 +197,14 @@ export function useChatSend({
    * возвращает ошибку (см. `QUESTION_PROMPT` на сервере), агент задаёт вопрос
    * ПОСРЕДИ работы и продолжает писать код ещё минуту. Всё это время человек
    * видел «нужен ваш выбор», по которому нельзя щёлкнуть, а к концу хода про
-   * вопрос уже никто не помнил. Занятому агенту ответ уходит в очередь — тем же
-   * путём, что и обычное сообщение, дописанное в занятый прогон.
+   * вопрос уже никто не помнил. Занятому агенту ответ уходит сразу, на ходу, —
+   * тем же путём, что и обычное сообщение; не вышло — в очередь.
    */
   const answerQuestion = (answer: string): void => {
     const prompt = answer.trim();
     if (!prompt) return;
     if (isRunning && chatId) {
-      agentRuns.enqueue(chatId, { prompt, files: [], allowEdits, autoApprove, model, effort });
+      void agentRuns.steer(chatId, { prompt, files: [], allowEdits, autoApprove, model, effort });
       return;
     }
     void dispatch(prompt, []);

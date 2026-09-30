@@ -31,10 +31,14 @@ export const chatEn: typeof chatRu = {
 
     canParallel: 'Hold several conversations at once, across different projects',
     canQueue:
-      'Add messages while the agent is busy: the send button no longer locks, the ' +
-      'addition shows both as a strip above the input and in the feed itself — a ' +
-      'faint bubble marked “goes out next” — survives a page reload, and goes into ' +
-      'the same conversation as soon as the current turn ends',
+      'Write to the agent while it works, as in Claude Code itself: the message goes ' +
+      'out at once, the agent reads it at its next step (after the current tool ' +
+      'call), answers, adds it to the plan or changes course, and carries on with the ' +
+      'same turn — no waiting for it to end. In the feed such a message is a faint ' +
+      'bubble marked “passed to the agent — it takes it into account at the next ' +
+      'step”. A message with attachments and a ' +
+      'conversation with another CLI queue up instead: a bubble marked “goes out ' +
+      'next” that survives a page reload and goes out as soon as the current turn ends',
     canProgress:
       "Watch the agent's plan: the strip above the input shows its own checkpoints " +
       '(done, in progress) and the tree of subagents it handed work to, together ' +
@@ -101,8 +105,10 @@ export const chatEn: typeof chatRu = {
       'the panel shows their trace from the transcript — a tick here would drift ' +
       'from its own state',
     cantInterrupt:
-      'Interrupt the current turn with an added message: the CLI runs the turn to ' +
-      'the end, so the addition goes out at the turn boundary — wait, or press Stop',
+      'Cut short a step already under way with an added message: the agent reads ' +
+      'it after the current tool call, so a long command runs to its end — only ' +
+      'Stop halts it at once. With other CLIs the addition goes out only when the ' +
+      'turn ends',
     cantGallery:
       'Keep a gallery of images and presentations: the panel holds the last hundred of each on ' +
       'disk and shows no history of them — save what you need with «Download» right away',
@@ -119,6 +125,10 @@ export const chatEn: typeof chatRu = {
     storageDecksValue: '~/.agentdeck/media/decks/<id>.{json,html,pptx,pdf}',
     storageStream: 'How the answer arrives',
     storageStreamValue: 'as an SSE stream — text appears as it is generated',
+    storageSteer: 'A message mid-turn',
+    storageSteerValue:
+      'a line on the stdin of the same process; the transcript holds an attachment ' +
+      'record of type queued_command, and the feed shows it as an ordinary message',
 
     imageTitle: 'Images and presentations: the panel assembles the file',
     imageCaption:
@@ -865,7 +875,7 @@ export const chatEn: typeof chatRu = {
       'A split spreads the work across several agents, but you are still one ' +
       'person. So a question asked by a child chat also shows up in the parent, ' +
       'labelled with who is asking. The answer goes INTO THAT CHAT as the next ' +
-      'message: if the child is busy it queues up and arrives when its turn ends; ' +
+      'message: if the child is busy it reads it at the next step of the same turn; ' +
       'if it is idle it goes out at once, continuing the same session in the same ' +
       'copy of the repository. The parent conversation spends nothing — no turn, no ' +
       'reply — and walking six chats for one and the same choice is not needed. ' +
@@ -1461,7 +1471,7 @@ export const chatEn: typeof chatRu = {
     askSent: 'Sent — and it shows',
     askSentText:
       'Once sent, the card dims and says what became of the answer: “the agent is ' +
-      'thinking” or “queued — it will be sent when the agent finishes its turn”, and ' +
+      'thinking” or “the agent is busy — it reads the answer at its next step”, and ' +
       'once the answer has arrived and the agent carries on, a tick and “Answer ' +
       'received”. The ' +
       'note appears on the click, not on the server reply: the agent answers in tens ' +
@@ -1472,8 +1482,10 @@ export const chatEn: typeof chatRu = {
     askBusyText:
       'The question arrives MID-turn: the agent asks it and goes right back to ' +
       'writing code. That is why the options are not dimmed while a run is going — ' +
-      'the choice is needed exactly now. An answer to a busy agent queues up above ' +
-      'the composer and is sent as soon as the turn ends; the turn is not interrupted.',
+      'the choice is needed exactly now. An answer to a busy agent goes to it at ' +
+      'once: the agent reads it after the current step and carries on with the same ' +
+      'turn. Where that is impossible (another CLI) the answer queues up and goes ' +
+      'out when the turn ends.',
     lostTitle: 'The connection to a run can be lost — and you will be told',
     lostText:
       'The event stream lives in the browser while the agent lives on the server, so ' +

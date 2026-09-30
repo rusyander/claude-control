@@ -63,6 +63,8 @@ export interface AgentRun {
   askedQuestion: boolean;
   permissions: PendingPermission[];
   queued: QueuedMessage[];
+  /** Слова, переданные агенту посреди хода: он учтёт их на ближайшем шаге. */
+  steered?: string[];
   lastPrompt?: string;
   allowEdits?: boolean;
   autoApprove?: boolean;
@@ -120,6 +122,8 @@ export interface ActiveRunInfo {
 export type ChatEvent =
   | { kind: 'session'; sessionId: string; model: string; tools: number; startedAt?: number }
   | { kind: 'text'; text: string }
+  /** Слово человека ушло агенту посреди хода (с любого устройства). */
+  | { kind: 'steer'; text: string; at: string }
   | { kind: 'thinking'; text: string }
   | { kind: 'tool'; name: string; input: unknown; id: string }
   | { kind: 'limit'; resetsAt: number; type: string; status: string }

@@ -173,6 +173,11 @@ export function applyEvent(id: string, event: ChatEvent): void {
     case 'text':
       if (!tailOnly) next.text = run.text + event.text;
       break;
+    case 'steer':
+      if (!(run.steered ?? []).includes(event.text)) {
+        next.steered = [...(run.steered ?? []), event.text];
+      }
+      break;
     case 'thinking':
       if (!tailOnly) next.thinking = run.thinking + event.text;
       break;

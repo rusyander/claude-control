@@ -24,6 +24,7 @@ import {
   isDialogMessage,
   isSyntheticReply,
   lastValue,
+  normalizeRecord,
   opensWithPanel,
   toBlocks,
   toUsage,
@@ -215,7 +216,7 @@ export async function readChatMessages(
 
     let record: Record;
     try {
-      record = JSON.parse(trimmed) as Record;
+      record = normalizeRecord(JSON.parse(trimmed) as Record);
     } catch {
       continue;
     }

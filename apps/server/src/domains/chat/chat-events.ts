@@ -24,6 +24,12 @@ export type ChatEvent =
       startedAt?: number;
     }
   | { kind: 'text'; text: string }
+  /**
+   * Человек написал посреди хода, и сообщение ушло агенту сразу: CLI отдаст его
+   * модели на ближайшем шаге работы (вместе с результатом текущего вызова), а
+   * если шагов больше не будет — следующим ходом сразу за этим.
+   */
+  | { kind: 'steer'; text: string; at: string }
   | { kind: 'thinking'; text: string }
   | { kind: 'tool'; name: string; input: unknown; id: string }
   | { kind: 'limit'; resetsAt: number; type: string; status: string }

@@ -814,11 +814,12 @@ export const en: TranslationSchema = {
     clearInput: 'Clear the field',
     queue: {
       title: 'Queued: {{count}}',
-      add: 'Add to the queue',
-      hint: 'The agent is busy — the message goes out as soon as the current turn ends',
+      add: 'Send to the agent now',
+      hint: 'The agent is working — the message reaches it right away: it finishes the current step, reads it and takes it into account without waiting for the whole task to end',
       cancel: 'Remove from the queue',
       next: 'Goes out next',
       later: 'Goes out after that',
+      steered: 'Passed to the agent — it takes it into account at the next step',
     },
     mode: {
       title: 'What sending does',
@@ -1471,9 +1472,10 @@ export const en: TranslationSchema = {
     questionSentNote: 'Answer sent — the agent is thinking',
     questionDeliveredNote: 'Answer received — the agent carries on',
     questionDeliveredToNote: 'Answer received in “{{title}}”',
-    questionQueuedNote: 'Answer queued — it will be sent when the agent finishes its turn',
+    questionQueuedNote:
+      'The agent is busy — it reads the answer at its next step, not at the end of the turn',
     questionSentToNote: 'Answer sent to “{{title}}” — the agent is thinking',
-    questionQueuedToNote: 'Answer queued for “{{title}}” — it goes out at the end of the turn',
+    questionQueuedToNote: '“{{title}}” is busy — it reads the answer at its next step',
     questionFromChild: 'Asked by “{{title}}”',
     textQuestion: {
       title: 'Asked in plain text — reply here',

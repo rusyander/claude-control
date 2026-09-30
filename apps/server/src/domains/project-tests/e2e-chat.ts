@@ -12,7 +12,14 @@ import { TESTS_DIR } from './files.ts';
  * прогнать, чтобы результат лёг на кейс.
  *
  * Вопрос человеку — один и в начале задачи, и только его: адрес стенда, где
- * доступы, какие сценарии важны. Остальное агент находит сам.
+ * доступы, какие сценарии важны. Остальное агент находит сам. У проекта без
+ * папки e2e в тот же вопрос входит «вести ли тесты в блоке «Тесты»»: папку
+ * заводит человек или его «да», не агент молча (то же решение владельца, что
+ * запрещает старту чата писать на диск, — `tests-chat-wiring.ts`).
+ *
+ * Чужой CLI работает с правами, выставленными ему в разделе «Права», и может
+ * не уметь запускать команды вовсе. Тогда агент говорит об этом и отдаёт
+ * человеку команду — «прогнал» без прогона хуже, чем честное «не могу».
  *
  * Проект, назвавший свою команду (`automation.json`), а папки с тестами не
  * имеющий, получает другую строку: его проверки — свои скрипты, и совет «заведи
@@ -54,7 +61,9 @@ export function e2eChatLine(input: {
     folder.dir && folder.state !== 'missing'
       ? `e2e folder "${folder.dir}" (${folder.framework}, ${folder.specs} spec files` +
         `${folder.state === 'created' ? ', created by the panel and hidden from git' : ''})`
-      : 'no e2e folder yet — if tests are needed, create "e2e/" with a Playwright config';
+      : 'no e2e folder yet — do not create one on your own: when the task needs tests, ask' +
+        ' the user (in the one question below) whether to keep them in this Tests section' +
+        ' ("e2e/" with a Playwright config) or only in the checks the project already has';
   return [
     `QA workspace of this project (AgentDeck Tests section): ${where};`,
     `test cases live in ${TESTS_DIR}/<group>.tests.json and the panel shows them as groups.`,
@@ -97,13 +106,15 @@ function ownWorkLine(root: string, cli: string): string {
     'pass "id" to update; a case a human wrote becomes a draft they accept) and record what you',
     `actually verified (${cli} record --project "${root}" <group>:<case>=passed|failed|blocked`,
     '--note "<how you checked>") or run the automated ones as above. Never call the work tested',
-    'without a recorded run.',
+    'without a recorded run. If your tools here cannot run commands or write files, say so and',
+    'hand the user the exact command instead of reporting a run that did not happen.',
   ].join(' ');
 }
 
 /** Что спросить у человека — одним вопросом в начале задачи. */
-function askOf(input: { hasStandUrl: boolean }): string {
+function askOf(input: { hasStandUrl: boolean; folder?: ProjectTestE2eFolder }): string {
   return [
+    input.folder?.state === 'missing' ? 'whether tests belong in this Tests section' : '',
     input.hasStandUrl ? '' : 'the stand URL',
     'where credentials live (variable names, never values)',
     'which flows matter most',

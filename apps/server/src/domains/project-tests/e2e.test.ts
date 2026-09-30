@@ -493,5 +493,11 @@ describe('генерация с кодом тестов', () => {
     });
     expect(missing).toContain('no e2e folder yet');
     expect(missing).toContain('the stand URL');
+    // Без папки агент её не заводит молча, а спрашивает в том же вопросе.
+    expect(missing).toContain('do not create one on your own');
+    expect(missing).toMatch(/Ask the user once[^.]*whether tests belong in this Tests section/);
+    expect(line).not.toContain('whether tests belong');
+    // Нет прав на команды — честное «не могу» и команда человеку.
+    expect(line).toContain('hand the user the exact command');
   });
 });

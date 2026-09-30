@@ -136,6 +136,8 @@ export function useDraftFromChat() {
       );
       return data;
     },
+    // Отказ называет меню чата своим тостом — общий дал бы второй.
+    meta: { silentError: true },
     onSuccess: (_data, input) => {
       // Плашка «предложения ждут» едет с видом раздела — он должен перечитаться.
       void client.invalidateQueries({ queryKey: testKeys.view(input.path) });

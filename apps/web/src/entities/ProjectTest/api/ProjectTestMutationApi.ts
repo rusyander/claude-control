@@ -32,6 +32,8 @@ export function useStartMutationCheck(path: string | undefined) {
       });
       return data;
     },
+    // Отказ карточка показывает строкой под кнопкой — общий тост был бы вторым.
+    meta: { silentError: true },
     onSuccess: (data) => client.setQueryData(testKeys.mutation(path), data),
   });
 }
@@ -46,6 +48,8 @@ export function useStopMutationCheck(path: string | undefined) {
       );
       return data;
     },
+    // Отказ карточка показывает строкой под кнопкой — общий тост был бы вторым.
+    meta: { silentError: true },
     onSuccess: (data) => client.setQueryData(testKeys.mutation(path), data),
   });
 }

@@ -35,6 +35,8 @@ export function useRequestDevRestart() {
       const { data } = await apiClient.post<DevRestartStatus>('/dev-restart');
       return data;
     },
+    // Отказ называет сама плашка своим тостом — общий дал бы второй.
+    meta: { silentError: true },
     onSuccess: (status) => queryClient.setQueryData(queryKeys.devRestart, status),
   });
 }

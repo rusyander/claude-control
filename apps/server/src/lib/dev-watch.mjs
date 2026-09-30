@@ -283,6 +283,9 @@ function main() {
     child = spawn(process.execPath, ['--experimental-strip-types', 'src/index.ts'], {
       cwd: serverDir,
       stdio: 'inherit',
+      // Сервер читает состояние отсрочки там же, где его пишет сторож: его
+      // собственный каталог данных может переехать настройкой.
+      env: { ...process.env, AGENTDECK_DEV_RESTART_DIR: appData },
     });
     const current = child;
     current.on('exit', (code, signal) => {
@@ -334,7 +337,10 @@ function main() {
     }
     const now = Date.now();
     // Человек нажал «перезапустить сейчас» — ходы оборвутся, это его решение.
-    const forced = takeRestartRequest(appData);
+    // Запрос в счёт только посреди отсрочки: оставшийся от прошлой (сторож
+    // успел перезапустить сам) иначе сорвал бы следующую, и живые ходы
+    // оборвались бы без клика (ревью 30.09).
+    const forced = takeRestartRequest(appData) && deferredSince !== undefined;
     const waitingFor =
       defer && !forced
         ? deferReason(

@@ -44,7 +44,6 @@ describe('кейс из разговора', () => {
       { action: 'Выполнить: pnpm test login', expected: '✓ 3 passed' },
     ]);
     expect(testCase).toMatchObject({
-      id: 'chat-abcdef123456',
       title: 'Кнопка «Войти» не реагирует на Enter почини',
       expected: 'Готово: Enter отправляет форму.',
       codePaths: ['src/login.tsx'],
@@ -75,9 +74,13 @@ describe('кейс из разговора', () => {
       version: 1,
       source: 'chat',
       status: 'pending',
-      items: [{ op: 'add', groupId: 'chat', caseId: 'chat-abcdef123456', state: 'pending' }],
+      items: [{ op: 'add', groupId: 'chat', state: 'pending' }],
     });
-    expect(draft?.runId).toMatch(/^chat-abcdef123456-[a-z0-9]+$/);
+    expect(draft?.runId).toMatch(/^chat-abcdef12-[a-z0-9]+$/);
+    expect(draft?.items[0]?.caseId).toBe(draft?.runId);
+    // Второй кейс из того же чата — новый, а не правка первого.
+    const later = chatCaseDraft(records, { ...INPUT, now: '2026-09-30T12:05:00.000Z' });
+    expect(later?.items[0]?.caseId).not.toBe(draft?.items[0]?.caseId);
     expect(chatCaseDraft(records, { ...INPUT, groupId: 'auth' })?.items[0]?.groupId).toBe('auth');
   });
 });

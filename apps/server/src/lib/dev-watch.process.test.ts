@@ -277,6 +277,9 @@ describe('dev-сторож как процесс', () => {
     };
     await until(() => launches()[0], 30_000, `первый запуск\n${log}`);
 
+    // Запрос, оставшийся от прошлой отсрочки (сторож успел перезапустить сам),
+    // новую отсрочку не срывает (ревью 30.09).
+    writeFileSync(join(appData, 'dev-restart.request'), new Date().toISOString());
     writeFileSync(join(lib, 'part.ts'), "export const part: string = 'v2';\n");
     const stateFile = join(appData, 'dev-restart.json');
     const state = await until(

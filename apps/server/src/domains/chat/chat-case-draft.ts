@@ -81,6 +81,22 @@ export interface ChatCaseDraftInput {
   chatTitle?: string;
 }
 
+/** Начало id чата в id кейса: латиница и цифры, восемь знаков. */
+function chatSlug(chatId: string): string {
+  return (
+    chatId
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '')
+      .slice(0, 8) || 'case'
+  );
+}
+
+/** Метка времени в id: base36 от миллисекунд — коротко и растёт со временем. */
+function stampOf(now: string): string {
+  const at = Date.parse(now);
+  return (Number.isFinite(at) ? at : Date.now()).toString(36);
+}
+
 /** Кейс из транскрипта: шаги, ожидаемый итог, затронутые файлы. Шагов нет — `undefined`. */
 export function caseFromChat(
   records: readonly Record[],
@@ -133,12 +149,9 @@ export function caseFromChat(
   const kept = steps.slice(0, MAX_STEPS);
   const expected = lastAnswer ? oneLine(lastAnswer.split(/\n\s*\n/)[0] ?? lastAnswer, 400) : '';
   return {
-    id: `chat-${
-      input.chatId
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, '')
-        .slice(0, 12) || 'case'
-    }`,
+    // Своя метка времени у каждого кейса: второй «Сделать кейс» из того же чата —
+    // новый кейс, а не правка первого поверх того, что человек в нём дописал.
+    id: `chat-${chatSlug(input.chatId)}-${stampOf(input.now)}`,
     type: 'case',
     title:
       title || oneLine(input.chatTitle ?? '', 90) || `Сценарий из чата ${input.chatId.slice(0, 8)}`,
@@ -163,8 +176,7 @@ export function chatCaseDraft(
 ): ProjectTestDraft | undefined {
   const testCase = caseFromChat(records, input);
   if (!testCase) return undefined;
-  const stamp = Date.parse(input.now);
-  const runId = `${testCase.id}-${(Number.isFinite(stamp) ? stamp : Date.now()).toString(36)}`;
+  const runId = testCase.id;
   const groupId = input.groupId ?? CHAT_CASES_GROUP;
   return {
     version: 1,

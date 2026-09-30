@@ -55,7 +55,7 @@ export function buildProgress(records: TranscriptRecord[]): ChatProgress {
     if (record.type === 'user' && !service && isHumanPrompt(content)) skill = undefined;
     // Итог фоновой команды или субагента приходит отдельной репликой-уведомлением, строкой.
     if (typeof content === 'string') {
-      shells.notice(content);
+      shells.notice(content, record.timestamp);
       applyAgentNotices(content, agents);
       continue;
     }
@@ -69,10 +69,10 @@ export function buildProgress(records: TranscriptRecord[]): ChatProgress {
       }
       if (block.type === 'tool_result') {
         applyToolResult(block, agents);
-        shells.result(block, resultText(block));
+        shells.result(block, resultText(block), record.timestamp);
       }
       if (block.type === 'text' && record.type === 'user' && typeof block.text === 'string') {
-        shells.notice(block.text);
+        shells.notice(block.text, record.timestamp);
         applyAgentNotices(block.text, agents);
       }
     }
@@ -101,6 +101,9 @@ function skillOf(block: TranscriptBlock, at: string | undefined): ChatProgress['
   return { name: name.trim(), ...(at ? { startedAt: at } : {}) };
 }
 
+/** Сколько после погашения без доказательства падение фона ещё приписывается ему. */
+const SUSPECT_WINDOW_MS = 2 * 60_000;
+
 /** Сколько фоновых команд держать в панели: хвост, а не история разговора. */
 const SHELL_LIMIT = 8;
 
@@ -123,7 +126,7 @@ class Shells {
    * Фон, который, возможно, погашен вызовом без доказательства (`kill … || true`
    * с пустым ответом): погашенным он станет, только если после этого упадёт.
    */
-  private readonly suspects = new Set<string>();
+  private readonly suspects = new Map<string, number>();
 
   use(block: TranscriptBlock, at: string | undefined): void {
     if (!block.id || !block.name) return;
@@ -160,7 +163,7 @@ class Shells {
     }
   }
 
-  result(block: TranscriptBlock, text: string): void {
+  result(block: TranscriptBlock, text: string, at?: string): void {
     const id = block.tool_use_id;
     if (!id) return;
     const started = this.pending.get(id);
@@ -176,7 +179,7 @@ class Shells {
         const proven = !kill.masked || kill.found || FOUND_PROCESS.test(text);
         for (const shell of this.onPorts(kill.ports, id)) {
           if (proven) this.stop(shell);
-          else this.suspects.add(shell);
+          else this.suspects.set(shell, at ? Date.parse(at) : Number.NaN);
         }
       }
     }
@@ -203,7 +206,7 @@ class Shells {
   }
 
   /** `<task-notification>` — итог фоновой задачи, пришедший репликой. */
-  notice(text: string): void {
+  notice(text: string, at?: string): void {
     if (!text.includes('<task-notification>')) return;
     const task = /<task-id>([^<]+)<\/task-id>/.exec(text)?.[1]?.trim();
     const status = /<status>([^<]+)<\/status>/.exec(text)?.[1]?.trim();
@@ -213,12 +216,15 @@ class Shells {
     // Итог задачи, которую агент уже погасил сам, — след его же уборки (ревью
     // 29.09: он возвращал «оборвана»).
     if (shell.status === 'killed') return;
-    // Упал сразу после погашения без доказательства — значит, погашение нашло его.
+    // Упал вскоре после погашения без доказательства — значит, погашение нашло
+    // его. Упавший часы спустя упал сам: подозрение живёт недолго и один раз.
     const next = shellStatus(status);
-    this.byUse.set(id, {
-      ...shell,
-      status: next === 'failed' && this.suspects.has(id) ? 'killed' : next,
-    });
+    const killedAt = this.suspects.get(id);
+    this.suspects.delete(id);
+    const soon =
+      killedAt !== undefined &&
+      (!at || !Number.isFinite(killedAt) || Date.parse(at) - killedAt <= SUSPECT_WINDOW_MS);
+    this.byUse.set(id, { ...shell, status: next === 'failed' && soon ? 'killed' : next });
   }
 
   /**

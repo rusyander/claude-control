@@ -386,6 +386,16 @@ describe('buildProgress — фон и текущий вызов', () => {
       expect(progress.shells?.[0]?.status).toBe('killed');
     });
 
+    it('после kill … || true сервер упал часы спустя — сам упал, failed', () => {
+      const progress = buildProgress([
+        ...vite,
+        assistant(2, [bash('k', 'kill $(lsof -ti:9123) 2>/dev/null || true')]),
+        user(2, [result('k', '')]),
+        { ...user(3, notification('bvite', 'failed')), timestamp: '2026-09-23T11:00:00.000Z' },
+      ]);
+      expect(progress.shells?.[0]?.status).toBe('failed');
+    });
+
     it('голый PID от чистого поиска гасится следующим вызовом', () => {
       const progress = buildProgress([
         ...vite,

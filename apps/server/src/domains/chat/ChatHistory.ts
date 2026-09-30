@@ -311,6 +311,16 @@ export function findSessionCwd(projectsDir: string, sessionId: string): string |
 }
 
 /**
+ * Когда разговор начался — время первой записи транскрипта. По нему файл шагов,
+ * оставшийся от прежней задачи в той же папке, отличается от своего.
+ */
+export function findSessionStart(projectsDir: string, sessionId: string): string | undefined {
+  const path = findTranscript(projectsDir, sessionId);
+  if (!path) return undefined;
+  return firstValue(readHeadRecords(path), (record) => record.timestamp);
+}
+
+/**
  * Разобранный транскрипт для соседних разборщиков (прогресс агента). Читает тем
  * же способом, что и лента: маленький файл целиком, у большого — начало и хвост.
  */

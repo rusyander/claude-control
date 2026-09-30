@@ -7,6 +7,7 @@ import {
   readChatMessages,
   findTranscript,
   findSessionCwd,
+  findSessionStart,
 } from '../../domains/chat/ChatHistory.ts';
 import { summarizedMessageIds } from '../../domains/platform/gateway/summarized-ledger.ts';
 import { readChatProgress } from '../../domains/chat/ChatProgress.ts';
@@ -241,7 +242,14 @@ export function registerChatTranscriptRoutes(
     const progress = readChatProgress(projectsDir(ctx), request.params.chatId);
     // Файл шагов в рабочей папке разговора (у группы — её копия): «Шаг N из M»
     // без плана агента (решение владельца 29.09).
-    const steps = readStepsFile(findSessionCwd(projectsDir(ctx), request.params.chatId));
+    // Файл, записанный раньше начала разговора, — от прежней задачи в той же
+    // папке, а не его шаг (ревью 30.09).
+    const file = readStepsFile(findSessionCwd(projectsDir(ctx), request.params.chatId));
+    const start = findSessionStart(projectsDir(ctx), request.params.chatId);
+    const steps =
+      file && start && file.updatedAt && Date.parse(file.updatedAt) < Date.parse(start)
+        ? undefined
+        : file;
     // Фон в транскрипте числится идущим и после смерти процесса: уведомление об
     // обрыве пишет только СЛЕДУЮЩИЙ процесс. Правду знает реестр.
     return {

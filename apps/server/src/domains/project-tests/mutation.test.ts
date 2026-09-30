@@ -1,9 +1,17 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { MutationChecks, breakFile, mutationCandidates } from './mutation.ts';
+import { MutationChecks, breakFile, mutationCandidates, sweepMutationCopies } from './mutation.ts';
 
 /**
  * Проверка набора поломкой на настоящем git и настоящей команде прогона:
@@ -152,5 +160,50 @@ describe('проверка набора поломкой', () => {
     });
     expect(breakFile('const a = 1; // a === b', 'a.ts', 'subtle')).toBeUndefined();
     expect(breakFile('if (a === b) go();', 'a.ts', 'subtle')?.text).toBe('if (a !== b) go();');
+  });
+
+  // Ревью 30.09: запись по ссылке ушла бы в настоящий файл вне копии.
+  it('файл-ссылка и файл зависимостей не ломаются', () => {
+    const { dir, appData } = project();
+    const outside = join(root as string, 'outside.mjs');
+    writeFileSync(outside, MATH);
+    symlinkSync(outside, join(dir, 'src', 'linked.mjs'));
+    const checks = new MutationChecks();
+    for (const file of ['src/linked.mjs', 'node_modules/x/index.js']) {
+      expect(() => checks.start({ root: dir, appData, file })).toThrow(
+        expect.objectContaining({ messageCode: 'mutation-file-invalid' }),
+      );
+    }
+    expect(readFileSync(outside, 'utf8')).toBe(MATH);
+  });
+
+  it('новый, ещё не добавленный в git модуль едет в копию — проверка не падает на импорте', async () => {
+    const { dir, appData } = project();
+    writeFileSync(join(dir, 'src', 'extra.mjs'), 'export const extra = 1;\n');
+    writeFileSync(
+      join(dir, 'src', 'math.mjs'),
+      `import { extra } from './extra.mjs';\n${MATH}export const one = extra;\n`,
+    );
+    const checks = new MutationChecks();
+    checks.start({ root: dir, appData, file: 'src/math.mjs', mode: 'subtle' });
+    const check = await finished(checks, dir);
+    // Импорт нового модуля в копии цел: покраснел кейс поведения, дымовой — нет.
+    expect(check).toMatchObject({ status: 'done', caught: 1, missed: 1 });
+  }, 90_000);
+
+  it('уборка при старте снимает копии прошлого процесса вместе с записью worktree', async () => {
+    const { dir, appData } = project();
+    const copy = join(appData, 'mutation-copies', 'stale');
+    mkdirSync(join(appData, 'mutation-copies'), { recursive: true });
+    gitIn(dir, ['worktree', 'add', '--detach', copy, 'HEAD']);
+    mkdirSync(join(dir, 'node_modules', 'pkg'), { recursive: true });
+    writeFileSync(join(dir, 'node_modules', 'pkg', 'index.js'), 'keep');
+    symlinkSync(join(dir, 'node_modules'), join(copy, 'node_modules'));
+
+    expect(await sweepMutationCopies(appData)).toBe(1);
+    expect(existsSync(copy)).toBe(false);
+    expect(gitIn(dir, ['worktree', 'list']).split('\n')).toHaveLength(1);
+    // Ссылка снята, оригинал её цели цел.
+    expect(readFileSync(join(dir, 'node_modules', 'pkg', 'index.js'), 'utf8')).toBe('keep');
   });
 });

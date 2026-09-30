@@ -1,13 +1,18 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import {
+  cpSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   readdirSync,
   readFileSync,
+  realpathSync,
+  rmdirSync,
   rmSync,
   statSync,
   symlinkSync,
+  unlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { dirname, extname, isAbsolute, join, normalize, relative, sep } from 'node:path';
@@ -50,6 +55,11 @@ const DEFAULT_TIMEOUT_MINUTES = 30;
 const DEPENDENCY_DIRS = new Set(['node_modules', '.venv', 'venv']);
 /** Насколько глубоко искать их в оригинале (монорепозиторий: apps/x/node_modules). */
 const DEPENDENCY_DEPTH = 3;
+
+/** Сколько ждать выхода команды после мягкой остановки, прежде чем снять её жёстко. */
+const KILL_GRACE_MS = 5_000;
+/** Каталог копий проверок в каталоге данных панели. */
+const COPIES_DIR = 'mutation-copies';
 
 const SCRIPT = new Set(['.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', '.cjs']);
 
@@ -210,8 +220,97 @@ interface Live {
   view: ProjectTestMutationCheck;
   child?: ChildProcess;
   copy?: string;
+  /** Ссылки, заведённые в копии, — снимаются первыми, до удаления копии. */
+  links: string[];
   timer?: NodeJS.Timeout;
   stopped?: boolean;
+}
+
+/** Ссылка в копию: каталог — `junction` на Windows, запоминается для уборки. */
+function link(live: Live, from: string, to: string): void {
+  mkdirSync(dirname(to), { recursive: true });
+  symlinkSync(from, to, process.platform === 'win32' ? 'junction' : 'dir');
+  live.links.push(to);
+}
+
+/** Снять ссылку, не трогая то, на что она указывает. */
+function unlink(path: string): void {
+  try {
+    unlinkSync(path);
+  } catch {
+    try {
+      rmdirSync(path);
+    } catch {
+      // Ссылки уже нет.
+    }
+  }
+}
+
+/** Ссылки внутри копии — чтобы снять их, не зная, кто их завёл (копия прошлого запуска). */
+function linksIn(dir: string, depth = 0, out: string[] = []): string[] {
+  let entries;
+  try {
+    entries = readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return out;
+  }
+  for (const entry of entries) {
+    const path = join(dir, entry.name);
+    if (entry.isSymbolicLink()) out.push(path);
+    else if (entry.isDirectory() && depth < DEPENDENCY_DEPTH + 2 && entry.name !== '.git') {
+      linksIn(path, depth + 1, out);
+    }
+  }
+  return out;
+}
+
+/** Удалить копию: сперва ссылки (без захода по ним), потом worktree, потом каталог. */
+async function dropCopy(root: string | undefined, copy: string, links: string[]): Promise<void> {
+  for (const path of [...links, ...linksIn(copy)]) unlink(path);
+  if (root) await git(root, ['worktree', 'remove', '--force', copy]).catch(() => '');
+  try {
+    rmSync(copy, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+  } catch {
+    // Занят (антивирус, снятый процесс) — останется до следующей уборки при старте.
+  }
+  if (root) await git(root, ['worktree', 'prune']).catch(() => '');
+}
+
+/** Репозиторий, чья это копия: `.git` копии — файл `gitdir: <repo>/.git/worktrees/<id>`. */
+function repoOfCopy(copy: string): string | undefined {
+  try {
+    const pointer = /^gitdir:\s*(.+)$/m.exec(readFileSync(join(copy, '.git'), 'utf8'))?.[1];
+    const at = pointer?.trim().replace(/\\/g, '/').lastIndexOf('/.git/worktrees/');
+    return pointer && at !== undefined && at > 0 ? pointer.trim().slice(0, at) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Уборка при старте панели: копии проверок, оборванных выходом панели или её
+ * падением. Без неё в репозитории человека копились бы записи worktree, а в
+ * каталоге данных — копии со ссылками на его `node_modules`.
+ */
+export async function sweepMutationCopies(appData: string): Promise<number> {
+  const dir = join(appData, COPIES_DIR);
+  let entries;
+  try {
+    entries = readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return 0;
+  }
+  let swept = 0;
+  for (const entry of entries) {
+    const path = join(dir, entry.name);
+    if (!entry.isDirectory()) {
+      rmSync(path, { force: true });
+      continue;
+    }
+    await dropCopy(repoOfCopy(path), path, []);
+    swept += 1;
+  }
+  return swept;
 }
 
 export class MutationChecks {
@@ -244,13 +343,18 @@ export class MutationChecks {
     if (!file || isAbsolute(file) || inside.startsWith('..') || inside.split(sep)[0] === '.git') {
       throw failure(`Not a project file: ${file}`, 'mutation-file-invalid', { file });
     }
+    // Только обычный файл самого проекта: не ссылка (запись прошла бы по ней в
+    // настоящий файл) и не файл зависимостей (они в копии — ссылки на оригинал).
     let isFile = false;
     try {
-      isFile = statSync(absolute).isFile();
+      isFile = lstatSync(absolute).isFile();
     } catch {
       // Нет файла — отказ ниже.
     }
-    if (!isFile) throw failure(`Not a project file: ${file}`, 'mutation-file-invalid', { file });
+    const inDependencies = file.split('/').some((part) => DEPENDENCY_DIRS.has(part));
+    if (!isFile || inDependencies) {
+      throw failure(`Not a project file: ${file}`, 'mutation-file-invalid', { file });
+    }
     const cases = casesForFile(root, file);
     if (cases.length === 0) {
       throw failure(`No automated case is linked to ${file}.`, 'mutation-no-cases', { file });
@@ -274,7 +378,7 @@ export class MutationChecks {
       caught: 0,
       missed: 0,
     };
-    const live: Live = { view };
+    const live: Live = { view, links: [] };
     this.checks.set(root, live);
     void this.run(root, input.appData, live, broken.text, now).catch((error: unknown) => {
       this.fail(live, (error as Error).message, 'mutation-failed', now);
@@ -287,7 +391,20 @@ export class MutationChecks {
     if (!live || live.view.status !== 'running') return live?.view;
     live.stopped = true;
     live.view.status = 'stopped';
-    if (live.child) killChildTree(live.child, { group: process.platform !== 'win32' });
+    const child = live.child;
+    if (child) {
+      killChildTree(child, { group: process.platform !== 'win32' });
+      // Команда, пропустившая мягкий сигнал, держала бы проверку и копию вечно.
+      setTimeout(() => {
+        if (child.exitCode === null && child.signalCode === null) {
+          try {
+            child.kill('SIGKILL');
+          } catch {
+            // Уже вышла.
+          }
+        }
+      }, KILL_GRACE_MS).unref?.();
+    }
     return live.view;
   }
 
@@ -315,33 +432,52 @@ export class MutationChecks {
   ): Promise<void> {
     const { view } = live;
     const id = randomUUID().slice(0, 8);
-    const copy = join(appData, 'mutation-copies', id);
+    const copy = join(appData, COPIES_DIR, id);
     mkdirSync(dirname(copy), { recursive: true });
     try {
       await git(root, ['worktree', 'add', '--detach', copy, 'HEAD']);
       live.copy = copy;
       // Незакоммиченные правки — поверх: проверяется код, который человек видит.
-      const diff = await git(root, ['diff', '--binary', 'HEAD']).catch(() => '');
+      // Не легла правка — отказ: иначе проверка шла бы по другому коду, и
+      // упавший на импорте кейс читался бы как «поймал».
+      const diff = await git(root, ['diff', '--binary', 'HEAD']);
       if (diff.trim()) {
         const patch = join(copy, '.agentdeck-mutation.patch');
         writeFileSync(patch, diff);
-        await git(copy, ['apply', '--whitespace=nowarn', patch]).catch(() => '');
+        await git(copy, ['apply', '--whitespace=nowarn', patch]);
         rmSync(patch, { force: true });
+      }
+      // Новые файлы, ещё не добавленные в git, — тоже: без них копия не собиралась бы.
+      const untracked = await git(root, ['ls-files', '--others', '--exclude-standard', '-z']);
+      for (const path of untracked.split('\0').filter(Boolean)) {
+        const from = join(root, path);
+        if (!lstatSync(from).isFile()) continue;
+        mkdirSync(dirname(join(copy, path)), { recursive: true });
+        cpSync(from, join(copy, path));
       }
       for (const dir of dependencyDirs(root)) {
         const target = join(copy, dir);
         if (existsSync(target) || !existsSync(dirname(target))) continue;
-        symlinkSync(join(root, dir), target, process.platform === 'win32' ? 'junction' : 'dir');
+        link(live, join(root, dir), target);
       }
       if (live.stopped) return;
 
       view.stage = 'break';
-      writeFileSync(join(copy, view.file), brokenText);
+      // Пишется только обычный файл внутри копии: по ссылке запись ушла бы в оригинал.
+      const target = join(copy, view.file);
+      const real = realpathSync(target);
+      const inside = relative(realpathSync(copy), real);
+      if (!lstatSync(target).isFile() || inside.startsWith('..') || isAbsolute(inside)) {
+        throw failure(`Not a project file: ${view.file}`, 'mutation-file-invalid', {
+          file: view.file,
+        });
+      }
+      writeFileSync(target, brokenText);
 
       view.stage = 'run';
       const files = [...new Set(view.cases.map((item) => item.automationFile))];
-      const report = join(appData, 'mutation-copies', `${id}.junit.xml`);
-      const command = this.command(root, copy, appData, files, report);
+      const report = join(appData, COPIES_DIR, `${id}.junit.xml`);
+      const command = this.command(root, copy, appData, files, report, live);
       view.command = command.line;
       const code = await this.exec(live, command, now);
       if (live.stopped) return;
@@ -377,11 +513,8 @@ export class MutationChecks {
       rmSync(command.report, { force: true });
     } finally {
       view.stage = view.status === 'running' ? 'cleanup' : view.stage;
-      if (live.copy) {
-        await git(root, ['worktree', 'remove', '--force', live.copy]).catch(() => '');
-      }
-      rmSync(copy, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
-      await git(root, ['worktree', 'prune']).catch(() => '');
+      await dropCopy(root, copy, live.links);
+      rmSync(join(appData, COPIES_DIR, `${id}.junit.xml`), { force: true });
       if (view.status === 'running') {
         this.fail(live, 'The check ended without a report.', 'mutation-no-report', now);
       }
@@ -396,17 +529,24 @@ export class MutationChecks {
     appData: string,
     files: string[],
     report: string,
+    live: Live,
   ): { line: string; cwd: string; env: Record<string, string>; report: string; timeout: number } {
     const folder = e2eFolderView(root, appData);
     const prefix = folder.dir ? `${folder.dir.replace(/\/+$/, '')}/` : '';
     const inFolder = prefix !== '' && files.every((file) => file.startsWith(prefix));
     const { automation } = readAutomation(root);
     if (folder.state !== 'missing' && folder.dir && (!automation || inFolder)) {
-      // Папка, спрятанная от git (её завела панель), в копию не приезжает — ссылкой.
+      // Папка, спрятанная от git (её завела панель), в копию не приезжает сама.
+      // Копией, а не ссылкой: по ссылке импорты тестов разрешались бы в оригинал,
+      // и поломка копии была бы им не видна. Зависимости папки — ссылкой.
       const dir = join(copy, folder.dir);
-      if (!existsSync(dir) && existsSync(join(root, folder.dir))) {
-        mkdirSync(dirname(dir), { recursive: true });
-        symlinkSync(join(root, folder.dir), dir, process.platform === 'win32' ? 'junction' : 'dir');
+      const source = join(root, folder.dir);
+      if (!existsSync(dir) && existsSync(source)) {
+        cpSync(source, dir, {
+          recursive: true,
+          filter: (path) => !path.split(/[\\/]/).some((part) => DEPENDENCY_DIRS.has(part)),
+        });
+        for (const deps of dependencyDirs(source)) link(live, join(source, deps), join(dir, deps));
       }
       const command = e2eCommand(copy, folder, report, files);
       if (command) {

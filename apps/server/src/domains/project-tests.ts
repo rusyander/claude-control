@@ -150,5 +150,6 @@ export {
   breakFile,
   casesForFile,
   mutationCandidates,
+  sweepMutationCopies,
 } from './project-tests/mutation.ts';
 export { agentUpsertCase, recordAgentResults } from './project-tests/agent-write.ts';

@@ -44,6 +44,7 @@ import { ProjectRunnerRegistry } from '../domains/project-runner.ts';
 import {
   E2eRunRegistry,
   MutationChecks,
+  sweepMutationCopies,
   ProjectTestManualRegistry,
   ProjectTestRunRegistry,
   createE2eWatch,
@@ -233,6 +234,10 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   // Автотесты папки: раннер запущен оболочкой и с панелью сам не умирает.
   const e2eRuns = new E2eRunRegistry();
   const mutationChecks = new MutationChecks();
+  // Копии проверок поломкой, оборванных выходом или падением прежнего процесса.
+  void sweepMutationCopies(ctx.location.paths.appData).catch((error: unknown) => {
+    console.warn('mutation check: sweep of old copies failed', error);
+  });
   /**
    * Уведомления на телефон. Реестр прогонов знает, ЧТО случилось, но не знает ни
    * про устройства, ни про настройку — поэтому отправитель собирается здесь и

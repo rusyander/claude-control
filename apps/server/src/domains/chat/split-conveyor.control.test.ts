@@ -313,6 +313,43 @@ describe('SplitConveyor: лимит подписки (журнал 81b, 89)', ()
     expect(t.conveyor.view([PARENT])?.limitUntil).toBeUndefined();
   });
 
+  // Ревью 30.09: срок «на исходе» не становится сроком настоящего отказа.
+  it('отказ после предупреждения со сроком позже — очередь ждёт срок отказа', async () => {
+    const t = build({ parallel: 2 });
+    await t.begin();
+    const warned = START + 2 * 24 * 60 * 60_000;
+    const reset = START + 3 * 60 * 60_000;
+    t.conveyor.onChainEnded(t.link(0), {
+      status: 'done',
+      limitWarningUntil: new Date(warned).toISOString(),
+    });
+    await t.flush();
+    t.conveyor.onChainEnded(t.link(1), limitOutcome(reset));
+    await t.flush();
+
+    expect(t.conveyor.view([PARENT])?.limitUntil).toBe(new Date(reset).toISOString());
+    expect(t.notices.map((notice) => (notice.event as { textCode?: string }).textCode)).toEqual([
+      'split-limit-warning-notice',
+      'split-limit-wait-notice',
+    ]);
+  });
+
+  it('предупреждение после отказа отказ не подменяет — очередь ждёт', async () => {
+    const t = build({ parallel: 2 });
+    await t.begin();
+    const reset = START + 3 * 60 * 60_000;
+    t.conveyor.onChainEnded(t.link(0), limitOutcome(reset));
+    await t.flush();
+    t.conveyor.onChainEnded(t.link(1), {
+      status: 'done',
+      limitWarningUntil: new Date(START + 2 * 24 * 60 * 60_000).toISOString(),
+    });
+    await t.flush();
+
+    expect(t.conveyor.view([PARENT])?.limitUntil).toBe(new Date(reset).toISOString());
+    expect(t.launches).toEqual([[0, 1]]);
+  });
+
   it('срок предупреждения в прошлом очередь не держит', async () => {
     const t = build({ parallel: 2 });
     await t.begin();

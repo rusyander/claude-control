@@ -472,3 +472,68 @@ describe('claimedBranches', () => {
     expect(claimedBranches(record, 0)).toEqual(['fix/PROJ-1']);
   });
 });
+
+describe('ревью 30.09: разбор, перезапуск и «Завести заново»', () => {
+  const beginWithoutTriageEnd = async (t: ReturnType<typeof build>): Promise<void> => {
+    await t.conveyor.begin({
+      parentChatId: PARENT,
+      projectPath: 'C:/repo',
+      proposal: { groups: GROUPS },
+      request: {},
+    });
+    await t.flush();
+  };
+
+  it('перезапуск панели посреди разбора групп не заводит — их заводит разбор, один раз', async () => {
+    const t = build({ parallel: 2 });
+    await beginWithoutTriageEnd(t);
+    expect(t.launches).toEqual([]);
+
+    t.conveyor.recoverLimitWaits();
+    await t.flush();
+    expect(t.launches).toEqual([]);
+
+    t.conveyor.onTriageFinished({ ok: true, text: 'без блока' }, ['triage']);
+    await t.flush();
+    expect(t.launches.map((launch) => launch.groups)).toEqual([[0, 1]]);
+  });
+
+  it('пауза и «Продолжить» группы из очереди посреди разбора её не заводят', async () => {
+    const t = build({ parallel: 2 });
+    await beginWithoutTriageEnd(t);
+    t.conveyor.pause(PARENT, 0);
+    expect(t.conveyor.resumePaused(PARENT, 0)).toBe('queued');
+    await t.flush();
+    expect(t.launches).toEqual([]);
+  });
+
+  it('«Завести заново», пока прежний запуск ещё готовит копию, — второго прогона нет', async () => {
+    const t = build({ parallel: 1 });
+    t.holdSetup();
+    await t.begin();
+    t.conveyor.recoverInterruptedGroups(() => false);
+    expect(t.group(0)).toMatchObject({ status: 'awaiting', waitingFor: 'interrupted' });
+
+    await t.conveyor.restartGroup(PARENT, 0);
+    await t.flush();
+    expect(t.launches).toHaveLength(1);
+    await t.finishSetup();
+    expect(t.started).toEqual([0]);
+    expect(t.group(0)).toMatchObject({ status: 'started', chatId: 'chat-0' });
+    expect(t.group(0)?.waitingFor).toBeUndefined();
+  });
+
+  it('заведённая заново группа не несёт метку обрыва', async () => {
+    const t = build({ parallel: 1 });
+    t.holdSetup();
+    await t.begin();
+    t.conveyor.recoverInterruptedGroups(() => false);
+    await t.finishSetup();
+
+    await t.conveyor.restartGroup(PARENT, 0);
+    await t.flush();
+    expect(t.group(0)?.status).toBe('started');
+    expect(t.group(0)?.waitingFor).toBeUndefined();
+    expect(t.group(0)?.interruptedAt).toBeUndefined();
+  });
+});

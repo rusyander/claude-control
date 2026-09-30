@@ -1109,8 +1109,6 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   splitConveyor.recoverDeliveryChecks();
   // Наблюдение за MR доставленных групп (WP1j): таймеры жили в прежнем процессе.
   mrWatch.recover();
-  // Ожидание сброса лимита подписки (журнал 89a): таймер жил в прежнем процессе.
-  splitConveyor.recoverLimitWaits();
   // Группы, чей прогон не пережил перезапуск, — прерваны и продолжаются (WP1c).
   // Тоже после усыновления: живой усыновлённый прогон — не обрыв.
   const groupAlive = (group: { chatId?: string }): boolean => {
@@ -1126,6 +1124,10 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   for (const { parentChatId, event } of splitConveyor.recoverInterruptedGroups(groupAlive)) {
     sayToParent(parentChatId, event);
   }
+  // Ожидание сброса лимита подписки (журнал 89a): таймер жил в прежнем процессе.
+  // ПОСЛЕ обрывов: запуск очереди отсюда синхронно ставит группам «стартует»
+  // без чата, и сверка обрывов звала бы их оборванными (ревью 30.09).
+  splitConveyor.recoverLimitWaits();
 
   // Спавненные dev-серверы проектов, CLI чатов и прогоны тестов живут в памяти
   // процесса. Гасим их при выходе, чтобы дочерние процессы не осиротели и не

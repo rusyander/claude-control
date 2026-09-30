@@ -1263,7 +1263,9 @@ export const testsEn: typeof testsRu = {
         'The panel creates e2e/ with a Playwright config, its own package.json and a README and ' +
         'hides it with a line in .git/info/exclude, not .gitignore: that is one machine’s ' +
         'decision, not the whole team’s. The project’s own folder (e2e/, tests/e2e/, testDir ' +
-        'from playwright.config) is taken as it is — the panel creates and hides nothing in it.',
+        'from playwright.config) is taken as it is — the panel creates and hides nothing in it. ' +
+        'The same card holds the “Mutation check of the case set”: will the automated cases ' +
+        'linked to a file catch it being broken.',
       synced: 'The folder’s tests became cases',
       syncedText:
         'An agent — of a chat or of a generation — puts the spec into the folder. “Update from ' +
@@ -1361,7 +1363,9 @@ export const testsEn: typeof testsRu = {
         'Claude gets this as a system prompt addition; another CLI gets one line at the end of ' +
         'your message, visible in its history. A command message (/…) gets no line. The ' +
         'conversation never creates the folder itself: with none, the agent learns that and ' +
-        'creates e2e/ only when the task is about tests.',
+        'creates e2e/ only when the task is about tests. Changing how the product behaves, it ' +
+        'adds or updates the case for the change on its own (tests-cli case) and records what ' +
+        'it verified (tests-cli record or run); a case you wrote arrives as a draft edit to accept.',
       addTitle: 'Adding a project',
       addText:
         'A project with its own e2e folder gets cases from its tests the moment it is added to ' +

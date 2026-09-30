@@ -994,7 +994,8 @@ export const chatEn: typeof chatRu = {
       'waiting for your answer. That question and the notice in the parent feed are ' +
       'written by the panel itself, not by the agent, so both are shown in the ' +
       'interface language; a question the agent asked stays as it asked it. ' +
-      'A task lost in the triage is returned home, a circular ' +
+      'While the triage is running no group is started — neither by a panel restart nor by a ' +
+      'pause and “Resume”: its block decides the order. A task lost in the triage is returned home, a circular ' +
       'wait is cut, and the summary labels that “repaired by the panel”. In the ' +
       'chat list the links are labelled “triage” and “plan”; “Only create the ' +
       'chats” gets no levels.',

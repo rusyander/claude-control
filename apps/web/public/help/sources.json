@@ -255,7 +255,7 @@
         {
           "path": "apps/server/src/domains/chat/split-conveyor.ts",
           "why": "«Что запускает „Разделить“»: разбор в корне, план в копии, порядок after и hold",
-          "sha": "d015925f65eee28a"
+          "sha": "9c4aded2f883a417"
         },
         {
           "path": "apps/server/src/domains/chat/split-overlap.ts",
@@ -318,7 +318,7 @@
           "sha": "a94b640e72eed66f"
         }
       ],
-      "confirmedAt": "2026-09-29T18:11:51.228Z"
+      "confirmedAt": "2026-09-30T13:22:50.025Z"
     },
     {
       "topic": "tests",
@@ -332,7 +332,7 @@
         {
           "path": "apps/server/src/domains/project-tests/impact.ts",
           "why": "«Только изменённое»: git status → codePaths → area, пусто ≠ всё",
-          "sha": "367825e40e7967ba"
+          "sha": "f8d0e359a5f9e924"
         },
         {
           "path": "apps/server/src/domains/project-tests/manual.ts",
@@ -387,12 +387,12 @@
         {
           "path": "apps/server/src/domains/project-tests/e2e-chat.ts",
           "why": "«Агент чата знает о папке»: что агент чата узнаёт и о чём спрашивает",
-          "sha": "0a449e222c17cd9a"
+          "sha": "0f38d06214a8e559"
         },
         {
           "path": "apps/web/src/features/ProjectTests/ui/TestE2eCard.tsx",
           "why": "«Папка автотестов (e2e)»: состояния карточки, кнопки и подтверждение уборки",
-          "sha": "187cfcbf800dd09d"
+          "sha": "415098da4e1c9376"
         },
         {
           "path": "apps/server/src/domains/project-tests/e2e-run.ts",
@@ -435,7 +435,7 @@
           "sha": "cbcfeac115c88427"
         }
       ],
-      "confirmedAt": "2026-09-28T07:23:58.023Z"
+      "confirmedAt": "2026-09-30T13:22:50.116Z"
     },
     {
       "topic": "rules",
@@ -1493,7 +1493,7 @@
         {
           "path": "apps/server/src/routes/panel-agent/actions-misc-extra.ts",
           "why": "«Аналитика и перенос», «История и копии», «Плагины»: идущие агенты, где идёт сессия, стоп вне панели, удаление копии, каркас плагина",
-          "sha": "8311ba8f27f79cd5"
+          "sha": "f3096244a931bc47"
         },
         {
           "path": "apps/server/src/routes/panel-agent/actions-gaps-chat.ts",
@@ -1536,7 +1536,7 @@
           "sha": "541fd63004e4136e"
         }
       ],
-      "confirmedAt": "2026-09-29T18:11:51.314Z"
+      "confirmedAt": "2026-09-30T13:22:50.232Z"
     },
     {
       "topic": "portability",

@@ -15,6 +15,8 @@ export const testKeys = {
   /** Всё поддерево тестов — для сброса разом. */
   root: [ROOT],
   view: (path: string | undefined) => [ROOT, 'view', path ?? ''],
+  /** Проверка набора поломкой: последняя проверка и файлы-кандидаты. */
+  mutation: (path: string | undefined) => [ROOT, 'mutation', path ?? ''],
   plans: (path: string | undefined) => [ROOT, 'plans', path ?? ''],
   points: (path: string | undefined, planId: string | undefined, environmentId?: string) => [
     ROOT,

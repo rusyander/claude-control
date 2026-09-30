@@ -17,35 +17,47 @@ import styles from './ChatMessages.module.scss';
  *
  * Дубля не будет: как только сообщение уходит, оно покидает очередь — и пузырь
  * вместе с ней, — а в ленте появляется обычной репликой.
+ *
+ * Сообщение, переданное агенту на ходу (`steered`), подписано иначе: оно уже у
+ * агента, отменять нечего, а обычной репликой оно станет с концом хода.
  */
+/** Подпись под пузырём: передано на ходу, уйдёт следующим или следом. */
+function footKey(steered: boolean, queueIndex: number): string {
+  if (steered) return 'chat.queue.steered';
+  return queueIndex === 0 ? 'chat.queue.next' : 'chat.queue.later';
+}
+
 export function QueuedBubbles({ items, onCancel }: QueuedBubblesProps) {
   const { t } = useTranslation();
   if (items.length === 0) return null;
 
   return (
     <>
-      {items.map((item, index) => (
-        <div key={item.id} className={`${styles.row} ${styles.rowUser}`}>
-          <div className={`${styles.bubble} ${styles.bubbleQueued}`} data-queued-message>
-            <div className={styles.queuedText}>{item.prompt}</div>
-            <div className={styles.queuedFoot}>
-              <Typography as="span" variant="caption" color="subtle">
-                {index === 0 ? t('chat.queue.next') : t('chat.queue.later')}
-              </Typography>
-              {onCancel && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  iconOnly
-                  icon={<Icon name="close" size={14} />}
-                  aria-label={t('chat.queue.cancel')}
-                  onClick={() => onCancel(item.id)}
-                />
-              )}
+      {items.map((item, index) => {
+        const queueIndex = index - items.filter((other) => other.steered).length;
+        return (
+          <div key={item.id} className={`${styles.row} ${styles.rowUser}`}>
+            <div className={`${styles.bubble} ${styles.bubbleQueued}`} data-queued-message>
+              <div className={styles.queuedText}>{item.prompt}</div>
+              <div className={styles.queuedFoot}>
+                <Typography as="span" variant="caption" color="subtle">
+                  {t(footKey(item.steered === true, queueIndex))}
+                </Typography>
+                {onCancel && !item.steered && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    iconOnly
+                    icon={<Icon name="close" size={14} />}
+                    aria-label={t('chat.queue.cancel')}
+                    onClick={() => onCancel(item.id)}
+                  />
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </>
   );
 }

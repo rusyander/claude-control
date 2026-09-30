@@ -63,6 +63,7 @@ export const ru = {
     homeChat: 'Домашний чат',
     blank: 'Пусто. Напишите задачу — она уйдёт агенту на компьютере.',
     queued: (prompt: string) => `В очереди: ${prompt} ✕`,
+    steered: (prompt: string) => `Передано агенту: ${prompt}`,
     image: '[изображение]',
     // Вопрос, закрытый автономией чата, — та же строка, что в ленте панели.
     autoPick: (label: string) => `Автовыбор: ${label}`,
@@ -134,7 +135,7 @@ export const ru = {
 
   composer: {
     ask: 'Что сделать?',
-    queue: 'Дописать в очередь…',
+    queue: 'Сказать агенту на ходу…',
     send: 'Отправить',
     stop: 'Стоп',
     settings: 'Настройки отправки',

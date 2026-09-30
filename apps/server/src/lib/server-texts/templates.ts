@@ -1320,4 +1320,72 @@ export const serverTextTemplates = {
     ru: 'сито {{sieve}} не пройдено: {{evidence}}',
     en: 'sieve {{sieve}} failed: {{evidence}}',
   },
+  'sieve-gap-lockfile': {
+    ru: 'сито «lockfile»: манифест зависимостей изменён без своего лок-файла: {{files}} — пересоберите лок штатным менеджером пакетов проекта или назовите каждый манифест в строке lockfile-sync отчёта о ситах с причиной',
+    en: 'lockfile sieve: a dependency manifest changed without its lockfile: {{files}} — regenerate the lock with the project package manager or name every manifest in the lockfile-sync row of the sieve report with the reason',
+  },
+  'sieve-gap-secrets': {
+    ru: 'сито «секреты»: в добавленных строках ключ, токен или приватный ключ: {{files}} — уберите его из ветки и замените (удалённый из ветки секрет всё равно утёк) или назовите каждый файл в строке secrets отчёта о ситах, объяснив, почему это не настоящий секрет',
+    en: 'secrets sieve: a key, token or private key in added lines: {{files}} — remove it from the branch and rotate it (a secret removed from the branch has still leaked) or name every file in the secrets row of the sieve report with why it is not a real secret',
+  },
+  'sieve-gap-debug': {
+    ru: 'сито «остатки отладки»: .only, debugger или маркер конфликта в добавленном: {{files}} — уберите их или назовите каждый файл в строке debug-leftovers отчёта о ситах с причиной',
+    en: 'debug-leftovers sieve: .only, debugger or a conflict marker in added lines: {{files}} — remove them or name every file in the debug-leftovers row of the sieve report with the reason',
+  },
+  'sieve-gap-artifacts': {
+    ru: 'сито «лишнее в git»: добавлены файлы, которым не место в репозитории (игнорируемые, .env, ключи, крупнее 5 МБ): {{files}} — уберите их из ветки или назовите каждый в строке committed-artifacts отчёта о ситах с причиной',
+    en: 'committed-artifacts sieve: files that do not belong in git were added (ignored, .env, keys, over 5 MB): {{files}} — remove them from the branch or name each in the committed-artifacts row of the sieve report with the reason',
+  },
+  'sieve-gap-env': {
+    ru: 'сито «конфигурация»: код начал читать переменные окружения, которые нигде не объявлены: {{names}} — добавьте их в .env.example, конфигурацию развёртывания или документацию или назовите каждую в строке env-config отчёта о ситах с причиной',
+    en: 'env-config sieve: the code started reading environment variables declared nowhere: {{names}} — add them to .env.example, the deployment config or the docs, or name each in the env-config row of the sieve report with the reason',
+  },
+  'sieve-gap-untested': {
+    ru: 'сито «тесты рядом с кодом»: изменён код ({{files}}), а ни один тест в ветке не изменён — добавьте тест на изменённое поведение или сдайте строку tests-alongside: какой тест его покрывает, либо n/a с причиной',
+    en: 'tests-alongside sieve: code changed ({{files}}) but no test changed in the branch — add a test for the changed behaviour or report the tests-alongside row: which test covers it, or n/a with the reason',
+  },
+  'sieve-gap-checks': {
+    ru: 'сито {{sieve}}: в доказательстве нет проверок проекта {{commands}} — прогоните каждую на последнем коммите и назовите её со строкой вывода; не запустилась — это fail с причиной, а не n/a',
+    en: 'sieve {{sieve}}: the evidence does not name the project checks {{commands}} — run each on the final commit and name it with its output line; one that could not run is a fail with the reason, not an n/a',
+  },
+  'sieve-gap-destructive': {
+    ru: 'сито «миграции»: разрушающие операторы (DROP, TRUNCATE, переименование, сужение типа) в {{files}} — строка migration-safety должна назвать каждый файл и план сохранения данных и отката',
+    en: 'migration-safety sieve: destructive statements (DROP, TRUNCATE, rename, type narrowing) in {{files}} — the migration-safety row must name every file with its data-preserving and rollback plan',
+  },
+  'sieve-gap-stale': {
+    ru: 'сито {{sieve}}: после сдачи строки ветка меняла задетый ситом код ({{files}}) — проверьте заново на последнем коммите и сдайте строку снова',
+    en: 'sieve {{sieve}}: the branch changed the code this sieve covers after the row was reported ({{files}}) — check again on the final commit and report the row again',
+  },
+  'sieve-gap-no-run': {
+    ru: 'сито {{sieve}}: в проекте есть блок «Тесты» — запишите живую проверку прогоном (tests-cli run или tests-cli record) и укажите его в доказательстве как run:<id>',
+    en: 'sieve {{sieve}}: the project has a Tests section — record the live check as a run (tests-cli run or tests-cli record) and cite it in the evidence as run:<id>',
+  },
+  'sieve-gap-run-missing': {
+    ru: 'сито {{sieve}}: прогона {{run}} нет в истории блока «Тесты» копии или он не закончен — запишите прогон и укажите его номер',
+    en: 'sieve {{sieve}}: run {{run}} is not in the Tests history of the copy or did not finish — record the run and cite its id',
+  },
+  'sieve-gap-run-red': {
+    ru: 'сито {{sieve}}: в прогоне {{run}} красные кейсы: {{cases}} — почините и запишите новый прогон',
+    en: 'sieve {{sieve}}: run {{run}} has red cases: {{cases}} — fix them and record a new run',
+  },
+  'sieve-gap-run-stale': {
+    ru: 'сито {{sieve}}: прогон {{run}} старше правки задетого ситом кода ({{files}}) — прогоните заново на последнем коммите',
+    en: 'sieve {{sieve}}: run {{run}} is older than the change to the code this sieve covers ({{files}}) — run it again on the final commit',
+  },
+  'tests-gap-no-run': {
+    ru: 'блок «Тесты» копии: после старта группы не записано ни одного прогона — прогоните кейсы по изменённым файлам ({{cases}}) и запишите прогон: {{command}}',
+    en: 'Tests block of the copy: no run has been recorded since the group started — run the cases for the changed files ({{cases}}) and record the run: {{command}}',
+  },
+  'tests-gap-unrun': {
+    ru: 'блок «Тесты» копии: кейсы по изменённым файлам не прогнаны после старта группы: {{cases}} — запишите прогон: {{command}}',
+    en: 'Tests block of the copy: cases for the changed files were not run since the group started: {{cases}} — record a run: {{command}}',
+  },
+  'tests-gap-failed': {
+    ru: 'блок «Тесты» копии: красные кейсы в прогонах группы: {{cases}} — почините и прогоните снова',
+    en: 'Tests block of the copy: red cases in the group’s runs: {{cases}} — fix them and run again',
+  },
+  'tests-gap-uncovered': {
+    ru: 'блок «Тесты» копии: изменённые файлы не покрыты ни одним кейсом ({{files}}) — заведите кейс с codePaths на них',
+    en: 'Tests block of the copy: the changed files are not covered by any case ({{files}}) — add a case with codePaths pointing at them',
+  },
 } as const satisfies Record<string, { ru: string; en: string }>;

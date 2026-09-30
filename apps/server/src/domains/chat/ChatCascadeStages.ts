@@ -15,6 +15,7 @@ import {
   scanSieveBlocks,
   type SieveReportRow,
   type SieveStage,
+  stampSieveRows,
 } from '@agentdeck/contracts/sieves';
 import type { ChatLink } from '../../lib/app-store/app-store.types.ts';
 import { initiativePrompt } from './initiative.ts';
@@ -338,7 +339,10 @@ export function planCascadeStage(input: CascadeStageInput): CascadeStagePlan | u
   if (link.review) return undefined;
 
   const kind = kindOf(link);
-  const sieveRows = mergeSieveRows(link.sieveRows, scanSieveBlocks(text).rows);
+  const sieveRows = mergeSieveRows(
+    link.sieveRows,
+    stampSieveRows(scanSieveBlocks(text).rows, new Date().toISOString()),
+  );
   // Задание группы: записанное в связи (после плана) или промпт самой работы.
   const groupTask =
     link.task ?? (stage === 'work' && task.trim() ? task.slice(0, TASK_MAX) : undefined);

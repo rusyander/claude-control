@@ -623,6 +623,11 @@ export interface ProjectTestRunRecord {
   tokens?: number;
   costUsd?: number;
   sessionId?: string;
+  /**
+   * Результаты — слово агента (`tests-cli record`), а не исполненная команда:
+   * автоматическому кейсу такая запись прогон не заменяет (ревью 30.09).
+   */
+  attested?: boolean;
   results: ProjectTestPointResult[];
   summary: ProjectTestRunSummary;
   /**

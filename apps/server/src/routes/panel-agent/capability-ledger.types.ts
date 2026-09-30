@@ -21,7 +21,9 @@ export type HumanReason =
   | 'code-write'
   | 'upload'
   | 'download'
-  | 'paid';
+  | 'paid'
+  /** Перезапуск dev-сервера посреди живых ходов обрывает их — решение человека. */
+  | 'dev-restart';
 
 /** Служебные маршруты: их зовёт само окно, поток или процесс, а не человек кнопкой. */
 export type InternalKind =

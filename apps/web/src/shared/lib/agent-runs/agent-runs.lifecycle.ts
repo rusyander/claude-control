@@ -87,6 +87,8 @@ export function finalize(id: string): void {
           permissions: [],
           stalled: undefined,
           sentFromQueue: undefined,
+          // Переданное на ходу теперь в транскрипте — на своём месте, не дублем.
+          steered: undefined,
           // Законченному поток не нужен — из очереди за ним выходит.
           parked: undefined,
           // Подхваченный без потока закончился — строка про подхват больше не нужна.
@@ -102,6 +104,7 @@ export function finalize(id: string): void {
           permissions: [],
           stalled: undefined,
           sentFromQueue: undefined,
+          steered: undefined,
           parked: undefined,
           detached: undefined,
           ...outcomeNotice(run),

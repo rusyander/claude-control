@@ -21,6 +21,8 @@
  *   node tools/tests-cli.mjs import --format junit --file test-results/junit.xml
  *   node tools/tests-cli.mjs export --group gui --format md --out gui.md
  *   node tools/tests-cli.mjs report --reporter junit --out report.xml
+ *   node tools/tests-cli.mjs case --group auth --json '{"title":"…","steps":["…"],"codePaths":["src/auth"]}'
+ *   node tools/tests-cli.mjs record auth:auth-001=passed auth:auth-002=failed --note "…"
  *
  * Коды возврата рассчитаны на CI: `report` отвечает 1, если есть провалённые
  * или заблокированные кейсы ВНЕ карантина, `run` — кодом самой команды прогона,
@@ -73,6 +75,9 @@ const HELP = `Тест-кейсы проекта без панели.
   lint      замечания набора: дубликаты, черновики, кейсы без ожидания
   diff      что изменилось между прогонами: diff <база> <новый>
   plan      собрать план правилом: plan smoke | diff | release | flaky
+  case      завести или обновить кейс (агент чата): --group <g> --json '<кейс>' | --file <f.json>
+            кейс человека не переписывается — правка уходит черновиком на приёмку
+  record    записать проверенное прогоном в историю: record <группа>:<кейс>=passed|failed|blocked|skipped …
 
 Опции:
   --project <dir>   каталог проекта (по умолчанию текущий)
@@ -92,6 +97,8 @@ const HELP = `Тест-кейсы проекта без панели.
   --release <веха>  для plan release: чью веху собирать
   --threshold <ч>   для plan flaky: порог стабильности, доля 0–1 или проценты
   --save            для plan: записать план в проект, а не только показать
+  --json '<кейс>'   для case: кейс JSON-объектом (title, steps, expected, codePaths, automation, id — для правки)
+  --note "<текст>"  для record: что именно проверено (ляжет заметкой на каждый кейс записи)
 `;
 
 main().catch((error) => {
@@ -121,6 +128,8 @@ async function main() {
   if (command === 'lint') return await lint(project, options);
   if (command === 'diff') return await diff(project, options, positional);
   if (command === 'plan') return await plan(project, options, positional);
+  if (command === 'case') return await saveCase(project, options);
+  if (command === 'record') return await recordResults(project, options, positional);
   throw new Error(`Неизвестная команда «${command}». Список — node tools/tests-cli.mjs help`);
 }
 
@@ -216,6 +225,76 @@ async function listCases(project, options) {
   }
   console.log('');
   console.log(summaryLine(groups));
+}
+
+/**
+ * Кейс от агента чата: блок «Тесты» участвует в работе над продуктом, а не
+ * только в прогонах раздела (решение владельца 30.09). Статус правкой описания
+ * не ставится — его пишет `record`.
+ */
+async function saveCase(project, options) {
+  const group = typeof options.group === 'string' ? options.group : '';
+  if (!group) throw new Error("Нужна группа: case --group <id> --json '<кейс>'");
+  const raw =
+    typeof options.json === 'string'
+      ? options.json
+      : typeof options.file === 'string'
+        ? readFileSync(resolve(project, options.file), 'utf8')
+        : '';
+  if (!raw) throw new Error("Нужен кейс: --json '<кейс>' или --file <файл.json>");
+  let input;
+  try {
+    input = JSON.parse(raw);
+  } catch (error) {
+    throw new Error(`Кейс не разобрался как JSON: ${error.message}`, { cause: error });
+  }
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    throw new Error('Кейс — JSON-объект с полем title');
+  }
+  const { agentUpsertCase } = await domain('agent-write');
+  const result = agentUpsertCase(project, group, input, new Date().toISOString());
+  if (result.kind === 'draft') {
+    console.log(
+      `Кейс ${result.caseId} написан человеком и не переписан: правка ушла черновиком ${result.runId} — её примет человек в разделе «Тесты».`,
+    );
+    return;
+  }
+  console.log(
+    `${result.created ? 'Заведён' : 'Обновлён'} кейс ${group}:${result.testCase.id} — ${result.testCase.title}`,
+  );
+}
+
+/**
+ * Записать проверенное агентом чата прогоном в историю блока: «проверил» —
+ * запись, которую видит раздел и проверка доставки группы, а не слова в ответе.
+ */
+async function recordResults(project, options, positional) {
+  if (positional.length === 0) {
+    throw new Error('Нужны результаты: record <группа>:<кейс>=passed|failed|blocked|skipped …');
+  }
+  const statuses = new Set(['passed', 'failed', 'blocked', 'skipped']);
+  const note = typeof options.note === 'string' ? options.note.trim() : '';
+  const results = positional.map((item) => {
+    const match = /^([a-z0-9][a-z0-9-]*):([^=\s]+)=([a-z]+)$/.exec(item);
+    if (!match || !statuses.has(match[3])) {
+      throw new Error(
+        `Не результат: «${item}». Вид — <группа>:<кейс>=passed|failed|blocked|skipped`,
+      );
+    }
+    return {
+      groupId: match[1],
+      caseId: match[2],
+      status: match[3],
+      ...(note ? { note } : {}),
+    };
+  });
+  const { recordAgentResults } = await domain('agent-write');
+  const run = recordAgentResults(project, results, new Date().toISOString());
+  const { passed, failed, blocked, skipped } = run.summary;
+  console.log(
+    `Прогон ${run.id} записан: зелёных ${passed}, красных ${failed}, заблокировано ${blocked}, пропущено ${skipped}.`,
+  );
+  if (failed + blocked > 0) process.exitCode = 1;
 }
 
 async function showCase(project, caseId) {

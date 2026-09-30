@@ -1,5 +1,6 @@
 import { EventEmitter } from 'node:events';
 import { readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { PassThrough } from 'node:stream';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 
@@ -63,6 +64,11 @@ async function runOn(
   },
 ): Promise<SpawnCall> {
   const original = Object.getOwnPropertyDescriptor(process, 'platform');
+  // `os.tmpdir()` смотрит на платформу при каждом вызове, и под win32 берёт
+  // папку из TEMP/TMP/SystemRoot. На настоящей Windows они есть всегда, а на
+  // Linux их нет — получилось бы `undefined\temp`. Подставляем настоящую
+  // временную папку этой машины, снятую ДО подмены платформы.
+  if (platform === 'win32') vi.stubEnv('TEMP', tmpdir());
   Object.defineProperty(process, 'platform', { value: platform, configurable: true });
 
   const call: SpawnCall = { args: [], fileContents: {} };
@@ -92,18 +98,22 @@ async function runOn(
     spawnSync: () => ({ status: 0 }),
   }));
 
-  const { ChatRun } = await import('./ChatRunner.ts');
-  await new ChatRun().start(
-    { prompt: 'настоящая задача', cwd: process.cwd(), ...extra },
-    () => undefined,
-  );
-
-  if (original) Object.defineProperty(process, 'platform', original);
+  try {
+    const { ChatRun } = await import('./ChatRunner.ts');
+    await new ChatRun().start(
+      { prompt: 'настоящая задача', cwd: process.cwd(), ...extra },
+      () => undefined,
+    );
+  } finally {
+    // Упавший прогон не имеет права оставить подменённую платформу следующим тестам.
+    if (original) Object.defineProperty(process, 'platform', original);
+  }
   return call;
 }
 
 afterEach(() => {
   vi.doUnmock('node:child_process');
+  vi.unstubAllEnvs();
   vi.resetModules();
 });
 

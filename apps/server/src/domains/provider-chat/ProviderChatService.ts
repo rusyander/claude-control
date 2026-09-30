@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type {
   ProviderChatEvent,
   ProviderChatMessage,
+  ProviderChatQueued,
   ProviderChatStatus,
   ProviderChatTransport,
 } from '@agentdeck/contracts';
@@ -17,6 +18,7 @@ import { appendMessage, dropMessage, readChat } from './store.ts';
 import { composeUserMessage } from './prompt.ts';
 import { withChildrenBrief } from '../chat/children-brief.ts';
 import { serverText } from '../../lib/server-texts.ts';
+import { ForeignSendQueue } from './queue.ts';
 
 /**
  * Живые ответы чужих провайдеров: прогон принадлежит серверу, а не запросу.
@@ -149,6 +151,7 @@ export interface SendOutcome {
 
 export class ProviderChatService {
   private runs = new Map<string, LiveRun>();
+  private readonly queue = new ForeignSendQueue<ProviderChatRunDeps>();
   private readonly createRun: () => ProviderChatRunLike;
   private onFinished?: (finished: ProviderChatFinished) => void;
 
@@ -481,15 +484,79 @@ export class ProviderChatService {
     return () => live.subscribers.delete(subscriber);
   }
 
-  /** Состояние разговора: идёт ли ответ и что уже напечатано. */
+  /** Состояние разговора: идёт ли ответ, что уже напечатано и что ждёт очереди. */
   status(chatId: string): ProviderChatStatus {
     const live = this.runs.get(chatId);
+    const queued = this.queue.list(chatId);
     return {
       chatId,
       isRunning: Boolean(live?.isRunning),
       partial: live?.partial ?? '',
       ...(live?.transport ? { transport: live.transport } : {}),
+      ...(queued.length > 0 ? { queued } : {}),
     };
+  }
+
+  /**
+   * Сообщение занятому разговору — в очередь (`queue.ts`), по концу ответа оно
+   * уйдёт само. `undefined` — ответа не идёт, и отправлять надо обычным путём:
+   * очередь без хода, который её отпустит, ждала бы вечно.
+   */
+  enqueue(
+    appDataDir: string,
+    providerId: string,
+    chatId: string,
+    input: { text: string; attachments?: string[] },
+    deps: ProviderChatRunDeps,
+  ): ProviderChatQueued | undefined {
+    if (!this.runs.get(chatId)?.isRunning) return undefined;
+    return this.queue.add(chatId, {
+      providerId,
+      appDataDir,
+      text: input.text,
+      ...(input.attachments?.length ? { attachments: input.attachments } : {}),
+      deps,
+    });
+  }
+
+  /** Убрать сообщение из очереди, пока оно не ушло. */
+  cancelQueued(chatId: string, queuedId: string): boolean {
+    return this.queue.cancel(chatId, queuedId);
+  }
+
+  /** Разговор удалён: его очереди больше некуда уходить. */
+  discard(chatId: string): void {
+    this.stop(chatId);
+    this.queue.clear(chatId);
+  }
+
+  /**
+   * Конец ответа — отпустить следующее сообщение очереди, по одному: второе
+   * дождётся конца хода, который сейчас начнётся. Разговор успел занять кто-то
+   * другой (звено конвейера из слушателя конца) — сообщение возвращается в
+   * начало и уйдёт по концу ТОГО хода; разговора больше нет — очередь снимается.
+   */
+  private drainQueue(chatId: string): void {
+    const next = this.queue.shift(chatId);
+    if (!next) return;
+    let outcome: SendOutcome;
+    try {
+      outcome = this.send(
+        next.appDataDir,
+        next.providerId,
+        chatId,
+        { text: next.text, ...(next.attachments ? { attachments: next.attachments } : {}) },
+        next.deps,
+      );
+    } catch {
+      // Досылка идёт из колбэка прогона: исключение вернулось бы в него и
+      // дописало бы в переписку чужую ошибку. Сообщение остаётся первым.
+      this.queue.unshift(chatId, next);
+      return;
+    }
+    if (outcome.ok) return;
+    if (outcome.reason === 'already_running') this.queue.unshift(chatId, next);
+    else this.queue.clear(chatId);
   }
 
   /**
@@ -551,23 +618,28 @@ export class ProviderChatService {
     }, GRACE_MS);
     live.cleanupTimer.unref?.();
 
-    if (!this.onFinished) return;
-    try {
-      this.onFinished({
-        providerId: live.providerId,
-        appDataDir: live.appDataDir,
-        chatId,
-        startedAt: live.startedAt,
-        ok: event.type === 'done' && !live.stopped,
-        text: event.type === 'done' ? (event.message?.content ?? live.partial) : '',
-        ...(event.type === 'error' ? { error: event.error } : {}),
-        ...(live.stopped ? { stopped: true } : {}),
-      });
-    } catch {
-      // Слушатель зовётся ИЗ колбэка прогона: брошенное отсюда исключение
-      // вернулось бы в него, а оттуда — в `.catch` запуска, который дописал бы в
-      // переписку вторую реплику об ошибке. Ответ уже записан и разослан; о
-      // своих бедах слушатель сообщает сам (`onError` планировщика).
+    if (this.onFinished) {
+      try {
+        this.onFinished({
+          providerId: live.providerId,
+          appDataDir: live.appDataDir,
+          chatId,
+          startedAt: live.startedAt,
+          ok: event.type === 'done' && !live.stopped,
+          text: event.type === 'done' ? (event.message?.content ?? live.partial) : '',
+          ...(event.type === 'error' ? { error: event.error } : {}),
+          ...(live.stopped ? { stopped: true } : {}),
+        });
+      } catch {
+        // Слушатель зовётся ИЗ колбэка прогона: брошенное отсюда исключение
+        // вернулось бы в него, а оттуда — в `.catch` запуска, который дописал бы в
+        // переписку вторую реплику об ошибке. Ответ уже записан и разослан; о
+        // своих бедах слушатель сообщает сам (`onError` планировщика).
+      }
     }
+
+    // Остановленному ответу очередь не досылается: человек остановил, панель
+    // закрывается или разговор удалён — сообщения ждут следующего конца хода.
+    if (!live.stopped) this.drainQueue(chatId);
   }
 }

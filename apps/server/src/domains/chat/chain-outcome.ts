@@ -4,7 +4,7 @@ import {
   withoutSplitTickets,
 } from '@agentdeck/contracts/split-tickets';
 import { scanReviewBlocks } from '@agentdeck/contracts/model-cascade';
-import { scanSieveBlocks, withoutSieveBlocks } from '@agentdeck/contracts/sieves';
+import { scanSieveBlocks, stampSieveRows, withoutSieveBlocks } from '@agentdeck/contracts/sieves';
 import type { ChatLink } from '../../lib/app-store/app-store.types.ts';
 import type { ChainOutcome } from './split-conveyor.ts';
 
@@ -176,7 +176,10 @@ export function chainOutcomeOf(input: ChainOutcomeInput): ChainOutcome {
     ...(mr ? { mr } : {}),
     ...(tickets.length > 0 ? { tickets } : {}),
     ...(humanSteps.length > 0 ? { humanSteps } : {}),
-    ...(sieves.rows.length > 0 ? { sieveRows: sieves.rows } : {}),
+    // Штамп прочтения: по нему доставка судит, не устарела ли строка.
+    ...(sieves.rows.length > 0
+      ? { sieveRows: stampSieveRows(sieves.rows, new Date().toISOString()) }
+      : {}),
     ...(sieves.learned.length > 0 ? { learnedSieves: sieves.learned } : {}),
   };
   if (!ok) {

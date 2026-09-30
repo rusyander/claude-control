@@ -69,6 +69,12 @@ beforeEach(async () => {
   mkdirSync(appData, { recursive: true });
   store = new AppStore(appData);
 
+  // Прокси из окружения прогона (сессия агента, корпоративная машина) увёл бы
+  // пробу мимо подменённого `fetch` в настоящую сеть: с прокси контур по плану
+  // §3 ходит своим туннелем. Тест про панель без прокси — окружение чистим.
+  for (const name of ['https_proxy', 'HTTPS_PROXY', 'http_proxy', 'HTTP_PROXY']) {
+    vi.stubEnv(name, undefined);
+  }
   calls = [];
   vi.stubGlobal('fetch', (url: string) => {
     calls.push(String(url));
@@ -99,6 +105,7 @@ afterEach(async () => {
   await gateway.stop();
   await app.close();
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
   rmSync(root, { recursive: true, force: true });
 });
 

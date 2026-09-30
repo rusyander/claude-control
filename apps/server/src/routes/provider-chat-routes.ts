@@ -148,8 +148,9 @@ export function registerProviderChatRoutes(
     const providerId = requireProvider(reply);
     if (!providerId) return reply;
 
-    // Идущий ответ снимаем: иначе он допишется в файл, которого уже нет.
-    chats.stop(request.params.id);
+    // Идущий ответ снимаем: иначе он допишется в файл, которого уже нет. Очередь
+    // — вместе с ним: ей больше некуда уходить.
+    chats.discard(request.params.id);
 
     return deleteChat(appData(), providerId, request.params.id)
       ? { ok: true }
@@ -204,17 +205,30 @@ export function registerProviderChatRoutes(
         ]
           .filter(Boolean)
           .join(' ') || undefined;
+      const runDeps = {
+        provider,
+        // Только кэш: чат не должен ждать сеть ради имени модели.
+        models: ctx.models.current(provider.modelVendors ?? []).models,
+        ...(initiative ? { systemPrefix: initiative } : {}),
+      };
+      // Ответ ещё идёт, а просили не отказывать — сообщение ждёт его конца на
+      // сервере и уйдёт само: входа посреди ответа у одноразового CLI нет.
+      if (request.body?.queueIfBusy) {
+        const queued = chats.enqueue(
+          appData(),
+          providerId,
+          request.params.id,
+          { text, attachments },
+          runDeps,
+        );
+        if (queued) return reply.code(202).send({ queued });
+      }
       const outcome = chats.send(
         appData(),
         providerId,
         request.params.id,
         { text, attachments },
-        {
-          provider,
-          // Только кэш: чат не должен ждать сеть ради имени модели.
-          models: ctx.models.current(provider.modelVendors ?? []).models,
-          ...(initiative ? { systemPrefix: initiative } : {}),
-        },
+        runDeps,
       );
 
       if (!outcome.ok) {
@@ -364,6 +378,16 @@ export function registerProviderChatRoutes(
     // Кнопка человека: группа разделения встаёт на паузу, как у Claude (89c).
     return { stopped: chats.stopByHuman(request.params.id) };
   });
+
+  /** Убрать сообщение из очереди, пока оно не ушло; `false` — уже ушло или нет такого. */
+  app.delete<{ Params: { id: string; queuedId: string } }>(
+    '/api/provider-chat/chats/:id/queue/:queuedId',
+    (request, reply) => {
+      const providerId = requireProvider(reply);
+      if (!providerId) return reply;
+      return { cancelled: chats.cancelQueued(request.params.id, request.params.queuedId) };
+    },
+  );
 
   /** Что происходит прямо сейчас — этим вкладка догоняет пропущенное после F5. */
   app.get<{ Params: { id: string } }>('/api/provider-chat/chats/:id/status', (request, reply) => {

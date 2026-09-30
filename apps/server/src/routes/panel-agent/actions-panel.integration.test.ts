@@ -139,6 +139,12 @@ describe('panel-agent actions: help, overview, plugins, history', () => {
     forgetInstalledPlugins();
 
     const store = new AppStore(appData);
+    // Каталог конфигурации — тот же, что в `location`, и ручной настройкой:
+    // паспорт среды находит его так же, как сервер при старте (ручной каталог →
+    // CLAUDE_CONFIG_DIR → ~/.claude), а не по `location` стенда. Без этого он
+    // читал настоящий ~/.claude машины — у разработчика там свои ключи, на
+    // раннере CI каталога нет вовсе.
+    store.updateSettings({ claudeDirOverride: root });
     mkdirSync(join(base, 'proj'), { recursive: true });
     store.addProject({ id: 'p-panel', name: 'proj', path: join(base, 'proj') });
     pending = new PanelPendingActions(10_000);

@@ -309,6 +309,16 @@ export class ChatRun {
     return session.childPid;
   }
 
+  /**
+   * Сообщение человека посреди хода — в живую сессию сразу (см.
+   * `LiveSession.inject`). `false` — сессии нет (разовый `claude -p`) или ход
+   * уже кончился: сообщение уходит обычным путём.
+   */
+  steer(prompt: string): boolean {
+    if (this.isStopped) return false;
+    return this.session?.inject(prompt) ?? false;
+  }
+
   /** Запускает CLI и вызывает onEvent по мере поступления событий. */
   async start(options: RunOptions, onEvent: (event: ChatEvent) => void): Promise<void> {
     try {

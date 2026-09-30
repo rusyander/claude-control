@@ -10,7 +10,11 @@ import {
   rejectDraft,
   rollbackDraft,
   similarTo,
+  writeDraft,
 } from '../../domains/project-tests.ts';
+import { findTranscript, readTranscriptRecords } from '../../domains/chat/ChatHistory.ts';
+import { chatCaseDraft } from '../../domains/chat/chat-case-draft.ts';
+import { projectsDir } from '../chat/paths.ts';
 import { assertUnlocked, buildView, guard, idList, requireRoot, type TestsDeps } from './shared.ts';
 import { coded } from '../../lib/server-text.ts';
 import { attachTextCodes } from '../../lib/server-texts.ts';
@@ -58,6 +62,52 @@ function draftView(root: string, draft: ProjectTestDraft): ProjectTestDraft {
 }
 
 export function registerTestDraftRoutes(app: FastifyInstance, deps: TestsDeps): void {
+  /**
+   * «Сделать кейс» из разговора: реплики человека и вызовы инструментов →
+   * черновик с одним кейсом. Библиотеку он не меняет — человек принимает или
+   * правит его в окне приёмки, как любую генерацию (решение владельца 30.09).
+   */
+  app.post<{ Body: { path?: string; chatId?: string; groupId?: string; chatTitle?: string } }>(
+    '/api/project-tests/draft/from-chat',
+    (request, reply) => {
+      const root = requireRoot(request.body?.path, reply);
+      if (!root) return reply;
+      const chatId = request.body?.chatId?.trim() ?? '';
+      return guard(reply, () => {
+        const transcript = /^[\w-]{1,128}$/.test(chatId)
+          ? findTranscript(projectsDir(deps.ctx), chatId)
+          : undefined;
+        if (!transcript) {
+          throw coded(
+            new ProjectTestsNotFoundError(`Разговора «${chatId}» не нашлось.`),
+            'draft-chat-not-found',
+            { chatId },
+          );
+        }
+        const groupId = request.body?.groupId?.trim();
+        const draft = chatCaseDraft(readTranscriptRecords(transcript), {
+          chatId,
+          projectPath: root,
+          now: new Date().toISOString(),
+          ...(groupId ? { groupId } : {}),
+          ...(request.body?.chatTitle ? { chatTitle: request.body.chatTitle } : {}),
+        });
+        if (!draft) {
+          return reply.code(422).send({
+            message: 'В разговоре нет шагов для кейса.',
+            messageCode: 'draft-chat-no-steps',
+          });
+        }
+        if (groupId) assertUnlocked(deps, root, groupId);
+        writeDraft(root, draft);
+        return {
+          runId: draft.runId,
+          draft: draftView(root, readDraft(root, draft.runId) ?? draft),
+        };
+      });
+    },
+  );
+
   /** Черновики проекта целиком — окно приёмки открывает один из них. */
   app.get<{ Querystring: { path?: string; runId?: string } }>(
     '/api/project-tests/drafts',

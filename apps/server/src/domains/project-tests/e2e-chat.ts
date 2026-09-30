@@ -12,12 +12,25 @@ import { TESTS_DIR } from './files.ts';
  * прогнать, чтобы результат лёг на кейс.
  *
  * Вопрос человеку — один и в начале задачи, и только его: адрес стенда, где
- * доступы, какие сценарии важны. Остальное агент находит сам.
+ * доступы, какие сценарии важны. Остальное агент находит сам. У проекта без
+ * папки e2e в тот же вопрос входит «вести ли тесты в блоке «Тесты»»: папку
+ * заводит человек или его «да», не агент молча (то же решение владельца, что
+ * запрещает старту чата писать на диск, — `tests-chat-wiring.ts`).
+ *
+ * Чужой CLI работает с правами, выставленными ему в разделе «Права», и может
+ * не уметь запускать команды вовсе. Тогда агент говорит об этом и отдаёт
+ * человеку команду — «прогнал» без прогона хуже, чем честное «не могу».
  *
  * Проект, назвавший свою команду (`automation.json`), а папки с тестами не
  * имеющий, получает другую строку: его проверки — свои скрипты, и совет «заведи
  * e2e/ с Playwright» уводил агента писать чужой проекту каркас. Ему названа его
  * же команда и то, как проверку привязать к кейсу (`automation.file`).
+ *
+ * Блок участвует в работе над продуктом, а не только в задачах «про тесты»
+ * (решение владельца 30.09): правя поведение продукта, агент сам заводит или
+ * обновляет кейс на изменённое (`tests-cli case`) и записывает проверенное
+ * (`tests-cli record` или `run`) — «проверено» становится записью в истории,
+ * которую видят раздел и проверка доставки группы.
  *
  * По-английски: это текст для модели. Одна строка — таково правило склейки
  * дописки (`domains/chat/initiative.ts`): на Windows перевод строки рвёт аргумент.
@@ -48,7 +61,9 @@ export function e2eChatLine(input: {
     folder.dir && folder.state !== 'missing'
       ? `e2e folder "${folder.dir}" (${folder.framework}, ${folder.specs} spec files` +
         `${folder.state === 'created' ? ', created by the panel and hidden from git' : ''})`
-      : 'no e2e folder yet — if tests are needed, create "e2e/" with a Playwright config';
+      : 'no e2e folder yet — do not create one on your own: when the task needs tests, ask' +
+        ' the user (in the one question below) whether to keep them in this Tests section' +
+        ' ("e2e/" with a Playwright config) or only in the checks the project already has';
   return [
     `QA workspace of this project (AgentDeck Tests section): ${where};`,
     `test cases live in ${TESTS_DIR}/<group>.tests.json and the panel shows them as groups.`,
@@ -73,13 +88,33 @@ export function e2eChatLine(input: {
     'THIS run, so results land on the cases; a runner is never installed on the fly — if it is',
     'missing, pass on the install command it prints). A red test is a finding to report, never a',
     'reason to weaken it.',
+    ownWorkLine(root, cli),
     `Ask the user once, at task start and in one question, only what is theirs: ${askOf(input)}.`,
   ].join(' ');
 }
 
-/** Что спросить у человека — одним вопросом в начале задачи. */
-function askOf(input: { hasStandUrl: boolean }): string {
+/**
+ * Кейсы и записи на любой задаче, меняющей поведение продукта: агент ведёт блок
+ * сам, а кейс человека правит только предложением (черновиком на приёмку).
+ */
+function ownWorkLine(root: string, cli: string): string {
   return [
+    'Beyond test tasks: whenever you change how the product behaves, keep this Tests section in',
+    'step on your own — add or update the case that covers the change',
+    `(${cli} case --project "${root}" --group <group> --json`,
+    '\'{"title":"…","steps":["…"],"expected":"…","codePaths":["<changed path>"]}\';',
+    'pass "id" to update; a case a human wrote becomes a draft they accept) and record what you',
+    `actually verified (${cli} record --project "${root}" <group>:<case>=passed|failed|blocked`,
+    '--note "<how you checked>") or run the automated ones as above. Never call the work tested',
+    'without a recorded run. If your tools here cannot run commands or write files, say so and',
+    'hand the user the exact command instead of reporting a run that did not happen.',
+  ].join(' ');
+}
+
+/** Что спросить у человека — одним вопросом в начале задачи. */
+function askOf(input: { hasStandUrl: boolean; folder?: ProjectTestE2eFolder }): string {
+  return [
+    input.folder?.state === 'missing' ? 'whether tests belong in this Tests section' : '',
     input.hasStandUrl ? '' : 'the stand URL',
     'where credentials live (variable names, never values)',
     'which flows matter most',
@@ -109,6 +144,7 @@ function ownCommandLine(
     `Run them: ${cli} run --project "${root}" [--group <group>]`,
     '(no --cmd: it runs the command above with the files of those cases and imports only the',
     'report of THIS run). A red check is a finding to report, never a reason to weaken it.',
+    ownWorkLine(root, cli),
     `Ask the user once, at task start and in one question, only what is theirs: ${askOf(input)}.`,
   ].join(' ');
 }

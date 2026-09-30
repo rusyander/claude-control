@@ -39,7 +39,7 @@ default and the only verified one. No database — **source of truth = Claude Co
   intermediates in `node_modules/*/android/{build,.cxx}` — ~10 GB per release build, in neither APK
   nor repo; the build sweeps them itself, `--keep-build` opts out, `--dry` measures),
   `make-mobile-icons.mjs` (one SVG mark → every icon/splash size, so launcher, splash and favicon
-  cannot drift), `tests-cli.mjs` (`pnpm tests list|show|run|import|export|report|lint|diff|plan` —
+  cannot drift), `tests-cli.mjs` (`pnpm tests list|show|run|import|export|report|lint|diff|plan|case|record` —
   the QA workspace of a project without the panel; CI gates on the exit code: `report` 1 on a failure
   outside quarantine, `diff` 1 on NEW failures only, `lint` 1 only when asked via `--fail-on`),
   `docs/` — the human's PDF guides, two of them: `shots-chat-guide.mjs` (14 frames) and

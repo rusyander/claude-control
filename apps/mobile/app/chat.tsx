@@ -373,8 +373,13 @@ export default function ChatScreen() {
           {isBlank ? <Empty text={t.chat.blank} /> : null}
         </ScrollView>
 
-        {run.queued.length > 0 ? (
+        {(run.steered?.length ?? 0) > 0 || run.queued.length > 0 ? (
           <View style={styles.queue}>
+            {(run.steered ?? []).map((prompt) => (
+              <Mono key={`steered-${prompt}`} numberOfLines={1}>
+                {t.chat.steered(prompt)}
+              </Mono>
+            ))}
             {run.queued.map((item) => (
               <Pressable key={item.id} onPress={() => cancelQueued(runKey, item.id)}>
                 <Mono numberOfLines={1}>{t.chat.queued(item.prompt)}</Mono>

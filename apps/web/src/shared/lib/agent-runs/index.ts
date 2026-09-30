@@ -10,6 +10,7 @@ export {
   markQuestionAnswered,
   EMPTY_RUN,
 } from './agentRunsStore';
+export { pendingBubbles } from './agent-runs.steer';
 export type {
   AgentRun,
   StartInput,

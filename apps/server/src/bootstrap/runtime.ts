@@ -1,4 +1,5 @@
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { ProjectTestRun } from '@agentdeck/contracts';
 import type { SieveReportRow, SieveStage } from '@agentdeck/contracts/sieves';
 import type { ChatLink } from '../lib/app-store/app-store.types.ts';
@@ -42,6 +43,8 @@ import { DEFAULT_PROVIDER_ID, getProvider, isKnownProviderId } from '../provider
 import { ProjectRunnerRegistry } from '../domains/project-runner.ts';
 import {
   E2eRunRegistry,
+  MutationChecks,
+  sweepMutationCopies,
   ProjectTestManualRegistry,
   ProjectTestRunRegistry,
   createE2eWatch,
@@ -84,6 +87,7 @@ import { copyRootOf, SplitConveyor } from '../domains/chat/split-conveyor.ts';
 import { MrWatch } from '../domains/chat/mr-watch.ts';
 import { SieveStore } from '../domains/chat/sieve-store.ts';
 import { sieveDeliveryGaps, sievePrompt } from '../domains/chat/sieve-gate.ts';
+import { testsDeliveryGaps } from '../domains/chat/tests-gate.ts';
 import { readMergeRequestReview } from '../domains/integrations/mr-review.ts';
 import { childrenBrief } from '../domains/chat/children-brief.ts';
 import { branchGateContext } from '../domains/chat/ChatBranchGate.ts';
@@ -98,7 +102,11 @@ import {
   createSplitLauncher,
   launchFromRecord,
 } from '../routes/chat/split-launch.ts';
-import { commentMergeRequestByUrl, parseMergeRequestUrl } from '../domains/integrations/forge.ts';
+import {
+  commentMergeRequestByUrl,
+  parseMergeRequestUrl,
+  readMergeRequestByUrl,
+} from '../domains/integrations/forge.ts';
 import { readIntegrations, readToken } from '../domains/integrations/store.ts';
 import { carriedLink, conversationKeys } from '../lib/app-store/chat-links.ts';
 import { createEventHub, type EventHub } from '../lib/event-hub.ts';
@@ -120,6 +128,10 @@ import { ActivatingTestRunRegistry } from './activating-test-runs.ts';
  * реестр, до которого никто снаружи не дотянется, при выходе осиротит свои
  * процессы.
  */
+
+/** CLI блока «Тесты»: им группа записывает прогон в блок своей копии. */
+const TESTS_CLI = fileURLToPath(new URL('../../../../tools/tests-cli.mjs', import.meta.url));
+
 export interface Runtime {
   /** Dev-серверы проектов: спавненные процессы и порты, которые они назвали. */
   projectRunner: ProjectRunnerRegistry;
@@ -133,6 +145,8 @@ export interface Runtime {
   projectTestManual: ProjectTestManualRegistry;
   /** Прогоны автотестов папки e2e самой панелью: раннер через оболочку, без агента. */
   e2eRuns: E2eRunRegistry;
+  /** Проверки набора кейсов поломкой: прогон в копии по кнопке человека. */
+  mutationChecks: MutationChecks;
   /** Наблюдение за папками e2e проектов: новый тест становится кейсом сам. */
   e2eWatch: E2eWatch;
   /** Уведомления на телефон о судьбе прогона. */
@@ -219,6 +233,11 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   const projectTestManual = new ProjectTestManualRegistry();
   // Автотесты папки: раннер запущен оболочкой и с панелью сам не умирает.
   const e2eRuns = new E2eRunRegistry();
+  const mutationChecks = new MutationChecks();
+  // Копии проверок поломкой, оборванных выходом или падением прежнего процесса.
+  void sweepMutationCopies(ctx.location.paths.appData).catch((error: unknown) => {
+    console.warn('mutation check: sweep of old copies failed', error);
+  });
   /**
    * Уведомления на телефон. Реестр прогонов знает, ЧТО случилось, но не знает ни
    * про устройства, ни про настройку — поэтому отправитель собирается здесь и
@@ -569,6 +588,14 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
           ...(mr ? { mr } : {}),
           mirror: ctx.store.getWorktreeMirror(projectPath),
           claimed,
+          ...(group.base ? { forkedFrom: group.base } : {}),
+          // MR выбирается по ветке группы, а не по одной голове (ревью 29.09):
+          // ветку-источник знает только фордж, без него — «неизвестно».
+          branchOfMr: async (url) => {
+            const token = forgeToken();
+            if (!token || !readIntegrations(ctx.store).forge.enabled) return undefined;
+            return (await readMergeRequestByUrl(url, token))?.branch;
+          },
         });
         const missing = missingDelivery(facts, facts.branch ?? group.branch);
         // Описание MR читается форджем только у найденного по голове MR.
@@ -596,12 +623,25 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
             `split delivery: sieves unchecked for ${group.branch}: ${sieves.unchecked.join('; ')}`,
           );
         }
+        // Вердикт группы — из кейсов и записанных прогонов блока «Тесты» в её
+        // копии, а не из её слов (решение владельца 29.09). Блока в копии нет —
+        // проверять нечем, группу это не держит.
+        const tests = await testsDeliveryGaps({
+          cwd: group.path,
+          ...(group.startedAt ? { startedAt: group.startedAt } : {}),
+          command: `node "${TESTS_CLI}" run --project .`,
+        }).catch((error: unknown) => {
+          console.warn('split delivery: tests block unreadable', error);
+          return undefined;
+        });
         return {
           missing: [
             ...missing,
             ...(description.missing ? [description.missing] : []),
             ...(sieves?.missing ?? []),
+            ...(tests?.missing ?? []),
           ],
+          ...(tests?.verdict ? { tests: tests.verdict } : {}),
           ...(sieves?.classes.length ? { sieveClasses: sieves.classes } : {}),
           ...(facts.mr ? { mr: facts.mr } : {}),
           ...(facts.branch ? { branch: facts.branch } : {}),
@@ -1097,8 +1137,6 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   splitConveyor.recoverDeliveryChecks();
   // Наблюдение за MR доставленных групп (WP1j): таймеры жили в прежнем процессе.
   mrWatch.recover();
-  // Ожидание сброса лимита подписки (журнал 89a): таймер жил в прежнем процессе.
-  splitConveyor.recoverLimitWaits();
   // Группы, чей прогон не пережил перезапуск, — прерваны и продолжаются (WP1c).
   // Тоже после усыновления: живой усыновлённый прогон — не обрыв.
   const groupAlive = (group: { chatId?: string }): boolean => {
@@ -1114,6 +1152,10 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   for (const { parentChatId, event } of splitConveyor.recoverInterruptedGroups(groupAlive)) {
     sayToParent(parentChatId, event);
   }
+  // Ожидание сброса лимита подписки (журнал 89a): таймер жил в прежнем процессе.
+  // ПОСЛЕ обрывов: запуск очереди отсюда синхронно ставит группам «стартует»
+  // без чата, и сверка обрывов звала бы их оборванными (ревью 30.09).
+  splitConveyor.recoverLimitWaits();
 
   // Спавненные dev-серверы проектов, CLI чатов и прогоны тестов живут в памяти
   // процесса. Гасим их при выходе, чтобы дочерние процессы не осиротели и не
@@ -1129,6 +1171,7 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     projectTestRuns.stopAll();
     projectTestManual.stopAll(new Date().toISOString());
     e2eRuns.stopAll();
+    mutationChecks.stopAll();
     e2eWatch.close();
     // Хвост учёта расхода — тоже: он копится пачкой в памяти шлюза, и панель,
     // закрытая по Ctrl+C или перезапущенная сторожем, унесла бы с собой
@@ -1153,6 +1196,7 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     projectTestRuns,
     projectTestManual,
     e2eRuns,
+    mutationChecks,
     e2eWatch,
     notifyRun,
     handoffChains,

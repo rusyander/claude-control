@@ -74,23 +74,27 @@ const WEB_PORT = Number(process.env.RESTART_WEB_PORT ?? 8981);
 const PANEL = `http://127.0.0.1:${PANEL_PORT}`;
 const WEB = `http://127.0.0.1:${WEB_PORT}`;
 /**
- * Сценарий R — НАСТОЯЩИЙ `claude` вместо фальшивого (`RESTART_REAL_CLI=1`). Сценарии
- * A–D держатся на протоколе фальшивого CLI, поэтому в этом режиме по умолчанию
- * идёт только R. Модель — стаб в этом процессе (`ANTHROPIC_BASE_URL`): токенов не
- * тратится, а поведение CLI, моста прав и сигнала «жду человека» — настоящее.
+ * Сценарий R — вопрос прав, сервер убит жёстко, сигнал «жду человека» × срок
+ * молчания MCP-вызова. По умолчанию его ведёт ФАЛЬШИВЫЙ CLI, который обрывает
+ * вызов прав так же, как настоящий: без `notifications/progress` с токеном вызова
+ * дольше срока молчания — вызов считается упавшим (`FAKE_MCP_IDLE_MS`). Так R
+ * идёт вместе с A–D без установленного CLI. `RESTART_REAL_CLI=1` — НАСТОЯЩИЙ
+ * `claude` и стаб модели в этом процессе (`ANTHROPIC_BASE_URL`): токенов не
+ * тратится, в этом режиме по умолчанию идёт только R.
  */
 const REAL = process.env.RESTART_REAL_CLI === '1';
 /**
  * Срок молчания MCP-вызова у CLI — ускорен, чтобы удержание его перекрывало. Меньше
- * 30 с CLI 2.1.282 не берёт (обрыв без сигнала пришёл ровно на 30 с при заданных 20).
+ * 30 с CLI 2.1.282 не берёт (обрыв без сигнала пришёл ровно на 30 с при заданных 20);
+ * фальшивому хватает восьми.
  */
-const REAL_IDLE_MS = Number(process.env.RESTART_REAL_IDLE_MS ?? 30_000);
+const REAL_IDLE_MS = Number(process.env.RESTART_REAL_IDLE_MS ?? (REAL ? 30_000 : 8_000));
 /** Сколько карточка ждёт ответа от первого показа — дольше срока молчания. */
-const REAL_HOLD_MS = Number(process.env.RESTART_REAL_HOLD_MS ?? 45_000);
+const REAL_HOLD_MS = Number(process.env.RESTART_REAL_HOLD_MS ?? (REAL ? 45_000 : 14_000));
 /** Номер настоящего CLI сценария R — для уборки: в его команде нет папки прогона. */
 let realCliPid = 0;
 const ONLY = new Set(
-  (process.env.RESTART_ONLY ?? (REAL ? 'R' : 'A,B,C,D'))
+  (process.env.RESTART_ONLY ?? (REAL ? 'R' : 'A,B,C,D,R'))
     .split(',')
     .map((part) => part.trim().toUpperCase())
     .filter(Boolean),
@@ -116,7 +120,7 @@ const check = (ok, text, detail = '') => {
  */
 const FAKE_CLI = String.raw`
 import { spawn } from 'node:child_process';
-import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { createInterface } from 'node:readline';
@@ -129,6 +133,8 @@ if (!argv.includes('--input-format')) {
 }
 const STATE = process.env.FAKE_STATE_DIR;
 const BG_MS = Number(process.env.FAKE_BG_MS ?? 15000);
+// Срок молчания MCP-вызова, как у настоящего CLI: без прогресса дольше — обрыв.
+const IDLE_MS = Number(process.env.FAKE_MCP_IDLE_MS ?? 0);
 const unq = (value) => (value === undefined ? undefined : value.replace(/^"|"$/g, ''));
 const flag = (name) => {
   const at = argv.indexOf(name);
@@ -156,6 +162,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 let mcp;
 let nextId = 1;
 const waiting = new Map();
+const progressWatch = new Map();
 function rpc(method, params) {
   const id = nextId++;
   mcp.stdin.write(JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n');
@@ -169,6 +176,10 @@ if (mcpFile) {
     createInterface({ input: mcp.stdout }).on('line', (line) => {
       let message;
       try { message = JSON.parse(line); } catch { return; }
+      if (message.method === 'notifications/progress') {
+        progressWatch.get(message.params?.progressToken)?.();
+        return;
+      }
       const resolve = waiting.get(message.id);
       if (resolve) { waiting.delete(message.id); resolve(message); }
     });
@@ -179,6 +190,27 @@ async function approve(tool_name, input, tool_use_id) {
   if (!mcp) return { behavior: 'deny', message: 'no broker' };
   const reply = await rpc('tools/call', { name: 'approve', arguments: { tool_name, input, tool_use_id } });
   return JSON.parse(reply.result?.content?.[0]?.text ?? '{}');
+}
+// Вызов прав со сроком молчания, как у настоящего CLI: каждый прогресс с
+// токеном САМОГО вызова продлевает срок; тишина дольше — вызов оборван.
+async function approveWatched(tool_name, input, tool_use_id) {
+  if (!mcp) return { behavior: 'deny', message: 'no broker' };
+  const token = 'tok-' + tool_use_id;
+  return await new Promise((resolve) => {
+    let timer;
+    const arm = () => {
+      clearTimeout(timer);
+      if (IDLE_MS > 0) timer = setTimeout(() => { progressWatch.delete(token); resolve({ aborted: true }); }, IDLE_MS);
+    };
+    progressWatch.set(token, arm);
+    arm();
+    void rpc('tools/call', { name: 'approve', arguments: { tool_name, input, tool_use_id }, _meta: { progressToken: token } })
+      .then((reply) => {
+        clearTimeout(timer);
+        progressWatch.delete(token);
+        resolve(JSON.parse(reply.result?.content?.[0]?.text ?? '{}'));
+      });
+  });
 }
 
 let cost = 0;
@@ -227,6 +259,27 @@ async function runTurn(content) {
   record('user', { role: 'user', content });
   init();
   const scenario = content.startsWith('WAKE') ? 'W' : (/SCENARIO:([A-Z])/.exec(content)?.[1] ?? 'E');
+  if (scenario === 'R') {
+    const toolUse = { type: 'tool_use', id: 'toolu_restart_r1', name: 'Bash', input: { command: 'rm -rf r-build && echo restart-ok > r-marker.txt', description: 'Clean the build, write the marker' } };
+    assistant([toolUse]);
+    const decision = await approveWatched('Bash', toolUse.input, toolUse.id);
+    let text = String(decision.message ?? 'denied');
+    let isError = true;
+    if (decision.aborted) text = 'MCP tool call timed out: no progress from the permission server';
+    else if (decision.behavior === 'allow') {
+      rmSync(join(cwd, 'r-build'), { recursive: true, force: true });
+      writeFileSync(join(cwd, 'r-marker.txt'), 'restart-ok\n');
+      text = 'restart-ok';
+      isError = false;
+    }
+    appendFileSync(join(STATE, 'r-results.jsonl'), JSON.stringify({ id: toolUse.id, error: isError, text }) + '\n');
+    const toolResult = { role: 'user', content: [{ type: 'tool_result', tool_use_id: toolUse.id, content: text, is_error: isError }] };
+    out({ type: 'user', message: toolResult, session_id: session });
+    record('user', toolResult);
+    assistant([{ type: 'text', text: 'R-FINISHED-7' }]);
+    result();
+    return;
+  }
   if (scenario === 'A') {
     const head = await stream('a', 1, 8, 250);
     const toolUse = { type: 'tool_use', id: 'toolu_restart_a', name: 'Bash', input: { command: 'rm -rf ./scratch-a', description: 'cleanup' } };
@@ -1018,10 +1071,21 @@ function runPids(appData, keys) {
   return entry ? { pid: entry.pid, relay: entry.relay?.pid } : {};
 }
 
+/** Результаты инструмента в ходе R: у настоящего CLI — со стаба модели, у фальшивого — из его файла. */
+function rResults(ctx) {
+  if (ctx.stub) return ctx.stub.seen.flatMap((request) => request.results);
+  const file = join(ctx.state, 'r-results.jsonl');
+  if (!existsSync(file)) return [];
+  return readFileSync(file, 'utf8')
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => JSON.parse(line));
+}
+
 async function scenarioR(ctx) {
   const { page, work, appData, stub } = ctx;
   console.log(
-    '\n— R: настоящий CLI ждёт разрешения, сервер убит жёстко, сигнал «жду» × перезапуск',
+    `\n— R: ${REAL ? 'настоящий' : 'фальшивый'} CLI ждёт разрешения, сервер убит жёстко, сигнал «жду» × перезапуск`,
   );
   mkdirSync(join(work, 'r-build'), { recursive: true });
   writeFileSync(join(work, 'r-build', 'out.txt'), 'delete me', 'utf8');
@@ -1039,7 +1103,7 @@ async function scenarioR(ctx) {
       : undefined;
     return found;
   }, 60);
-  if (!run) throw new NotChecked('настоящий CLI не начал ход (нет sessionId)');
+  if (!run) throw new NotChecked('CLI не начал ход (нет sessionId)');
   ctx.sid = run.sessionId;
   await page.goto(`${WEB}/chat?id=${run.sessionId}`, { waitUntil: 'domcontentloaded' });
   const allow = page.getByRole('button', { name: 'Разрешить', exact: true });
@@ -1047,15 +1111,15 @@ async function scenarioR(ctx) {
   const cardAt = Date.now();
   check(
     Boolean(card),
-    'карточка прав настоящего CLI видна до перезапуска',
+    'карточка прав CLI видна до перезапуска',
     card
       ? ''
-      : `модель: ${JSON.stringify(stub.seen)}; входящие: ${(await api('GET', '/api/chat/inbox')).text.slice(0, 400)}; лента: ${(await feedText(page)).replace(/s+/g, ' ').slice(-600)}`,
+      : `модель: ${JSON.stringify(stub?.seen ?? rResults(ctx))}; входящие: ${(await api('GET', '/api/chat/inbox')).text.slice(0, 400)}; лента: ${(await feedText(page)).replace(/s+/g, ' ').slice(-600)}`,
   );
   if (!card) throw new NotChecked('карточки нет');
   const before = runPids(appData, [run.chatId, run.sessionId, 'new-restart-r']);
   const cliPid = before.pid;
-  realCliPid = cliPid ?? 0;
+  if (REAL) realCliPid = cliPid ?? 0;
   check(Boolean(cliPid && alive(cliPid)), 'процесс CLI записан в журнале и жив', `pid ${cliPid}`);
 
   const table = processTable();
@@ -1086,7 +1150,7 @@ async function scenarioR(ctx) {
     `вопрос прав ждал дольше срока молчания CLI (${REAL_IDLE_MS} мс)`,
     `${Date.now() - cardAt} мс`,
   );
-  const aborted = stub.seen.flatMap((request) => request.results).filter((result) => result.error);
+  const aborted = rResults(ctx).filter((result) => result.error);
   check(
     aborted.length === 0,
     'CLI не оборвал вызов прав за время перезапуска и ожидания',
@@ -1117,13 +1181,15 @@ async function scenarioR(ctx) {
   page.off('response', onAnswer);
   check(
     Boolean(ran),
-    '«Разрешить» из интерфейса дошло до настоящего CLI: команда выполнилась',
+    '«Разрешить» из интерфейса дошло до CLI: команда выполнилась',
     ran ? '' : `метки нет; сервер на клик: ${answers.join(' | ') || 'запроса не было'}`,
   );
-  const result = stub.seen
-    .flatMap((request) => request.results)
-    .find((item) => item.id === R_TOOL && !item.error);
-  check(Boolean(result), 'модель получила результат команды без ошибки', JSON.stringify(stub.seen));
+  const result = rResults(ctx).find((item) => item.id === R_TOOL && !item.error);
+  check(
+    Boolean(result),
+    'модель получила результат команды без ошибки',
+    JSON.stringify(rResults(ctx)),
+  );
   check(Boolean(await waitToken(page, R_DONE, 45)), 'ответ конца хода виден в ленте');
   check(Boolean(await runDone(run.sessionId, 45)), 'ход R закончился');
   const after = runPids(appData, [run.chatId, run.sessionId, 'new-restart-r']);
@@ -1193,6 +1259,14 @@ const watch = spawn(process.execPath, [join(serverDir, 'src', 'lib', 'dev-watch.
     AGENTDECK_DEV_DEFER: '0',
     FAKE_STATE_DIR: state,
     FAKE_BG_MS: String(BG_MS),
+    // Фальшивый CLI сценария R обрывает вызов прав по тишине, как настоящий; мост
+    // шлёт «жду человека» чаще срока — иначе обрыв и был бы находкой.
+    ...(REAL
+      ? {}
+      : {
+          FAKE_MCP_IDLE_MS: String(REAL_IDLE_MS),
+          AGENTDECK_PERM_PROGRESS_MS: process.env.RESTART_PERM_PROGRESS_MS ?? '2000',
+        }),
     ...(stub
       ? {
           ANTHROPIC_BASE_URL: stub.url,

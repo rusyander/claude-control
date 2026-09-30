@@ -27,6 +27,16 @@ interface Entry<T> {
   at: number;
 }
 
+/**
+ * Насколько время правки файла может ОТСТАВАТЬ от `Date.now()`. Метку ставит
+ * грубые часы ядра, а не точные: Linux берёт её из часов, обновляемых раз в
+ * тик (до 10 мс при HZ=100), Windows — из системного времени с шагом ~15,6 мс.
+ * Файл, правленный сразу после начала обхода, получает метку РАНЬШЕ этого
+ * начала, и запас в 1 мс гонку не видел: результат запоминался вместе со
+ * старым содержимым. Запас с избытком стоит лишь лишнего пересчёта.
+ */
+const FS_CLOCK_SLACK_MS = 50;
+
 /** Время правки пути; нет пути — `-1`, и его появление тоже меняет подпись. */
 function stampOf(path: string): number {
   try {
@@ -60,7 +70,7 @@ export class StatMemo<T> {
     const stamps = new Map([...paths].map((path) => [path, stampOf(path)] as const));
     // Правка посреди обхода: подпись снята ПОСЛЕ чтения и уже совпала бы с
     // изменённым диском, а результат — нет. Такой результат не запоминается.
-    const racing = [...stamps.values()].some((stamp) => stamp >= startedAt - 1);
+    const racing = [...stamps.values()].some((stamp) => stamp >= startedAt - FS_CLOCK_SLACK_MS);
     if (!racing) {
       this.entries.set(key, { value: structuredClone(value), stamps, at: this.now() });
       while (this.entries.size > this.maxEntries) {

@@ -78,8 +78,10 @@ on, so Vite will not silently slide to 8889; free 8888 the same way.
 >
 > The watcher restarts the server only on a real edit (file write time or size), and ignores tests,
 > fixtures and `.md`. It kills only the server itself: live-session relays and their CLIs survive the
-> restart, and the new server reconnects to them. While an agent turn is running the restart waits —
-> for 10 minutes at most; `AGENTDECK_DEV_DEFER=0` turns the wait off.
+> restart, and the new server reconnects to them. While an agent turn is running or a split group is
+> preparing its copy, the restart waits — with no limit: the panel shows a "Server edits are waiting
+> for a restart" banner with a "Restart now" button (running turns will be cut off).
+> `AGENTDECK_DEV_DEFER=0` turns the wait off.
 
 ### `pnpm: command not found`
 

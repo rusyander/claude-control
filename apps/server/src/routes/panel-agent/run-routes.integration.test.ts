@@ -340,10 +340,16 @@ describe('POST /api/agent/run', () => {
         name.toLowerCase(),
       ),
     );
-    // Их дописывает сама Windows при старте процесса, а не панель.
-    const cmdOwn = new Set(['prompt', 'logonserver', 'userdomain', 'userdomain_roamingprofile']);
+    // Их дописывает сама Windows при старте процесса, а не панель. Вне Windows
+    // то же делает `/bin/sh` обёртки фальшивого CLI: dash (Ubuntu) экспортирует
+    // PWD, bash (macOS) — ещё SHLVL и `_`.
+    const shellOwn = new Set([
+      ...(isWindows
+        ? ['prompt', 'logonserver', 'userdomain', 'userdomain_roamingprofile']
+        : ['pwd', 'shlvl', '_']),
+    ]);
     const extra = names.filter(
-      (name) => !allowed.has(name) && !cmdOwn.has(name) && !name.startsWith('='),
+      (name) => !allowed.has(name) && !shellOwn.has(name) && !name.startsWith('='),
     );
     expect(extra).toEqual([]);
   });

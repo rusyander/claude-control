@@ -88,6 +88,7 @@ export function mergeSplitGroups(
         // группа сейчас доделывает по напоминанию панели.
         ...deliveryMissingOf(group),
         ...(group.deliveryNudges ? { deliveryNudges: group.deliveryNudges } : {}),
+        ...(group.testsVerdict ? { testsVerdict: group.testsVerdict } : {}),
         // Оборванная группа (WP1c): идущему звену кнопка не нужна — его уже
         // продолжили.
         ...(!found.row.isRunning && group.waitingFor === 'interrupted' && group.interruptedAt

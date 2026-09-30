@@ -18,6 +18,7 @@ import {
   scanSieveBlocks,
   type SieveReportRow,
   type SieveStage,
+  stampSieveRows,
 } from '@agentdeck/contracts/sieves';
 import type { ChatLink } from '../../lib/app-store/app-store.types.ts';
 import { carriedLink } from '../../lib/app-store/chat-links.ts';
@@ -242,7 +243,10 @@ export function planForeignStage(input: ForeignStageInput): ForeignStagePlan | u
   if (cascade.stage === 'plan') return afterForeignPlan(cascade, input.link, ok, text);
   if (!ok || input.paused) return undefined;
   // Отчёт о ситах едет по цепочке: сданное ревью доставка не повторяет.
-  const sieveRows = mergeSieveRows(input.link?.sieveRows, scanSieveBlocks(text).rows);
+  const sieveRows = mergeSieveRows(
+    input.link?.sieveRows,
+    stampSieveRows(scanSieveBlocks(text).rows, new Date().toISOString()),
+  );
   const carried = sieveRows.length > 0 ? { sieveRows } : {};
   // После правок ревью второго круга панель не заводит — только доставку.
   if (cascade.stage === 'fix') return foreignDeliverPlan(cascade, input, 'fix', sieveRows);

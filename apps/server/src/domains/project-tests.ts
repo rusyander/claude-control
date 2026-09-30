@@ -69,7 +69,13 @@ export {
   writeRun,
 } from './project-tests/runs-store.ts';
 export { diffRuns, diffWithPrevious, failedCases } from './project-tests/compare.ts';
-export { changedFiles, gitContext, impactOf, viewGitContext } from './project-tests/impact.ts';
+export {
+  casesTouching,
+  changedFiles,
+  gitContext,
+  impactOf,
+  viewGitContext,
+} from './project-tests/impact.ts';
 export { historyOf } from './project-tests/history.ts';
 export { ProjectTestManualRegistry, remainingPoints } from './project-tests/manual.ts';
 export { availableTargets, buildDraft, createDefect } from './project-tests/defects.ts';
@@ -88,6 +94,7 @@ export {
   readDraft,
   readDraftSummaries,
   readDrafts,
+  writeDraft,
   rejectDraft,
   rollbackDraft,
   summarizeDraft,
@@ -138,3 +145,11 @@ export {
   ORPHAN_RUN_ERROR,
   type RepairedStamp,
 } from './project-tests/repair.ts';
+export {
+  MutationChecks,
+  breakFile,
+  casesForFile,
+  mutationCandidates,
+  sweepMutationCopies,
+} from './project-tests/mutation.ts';
+export { agentUpsertCase, recordAgentResults } from './project-tests/agent-write.ts';

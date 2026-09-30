@@ -31,10 +31,14 @@ export const chatEn: typeof chatRu = {
 
     canParallel: 'Hold several conversations at once, across different projects',
     canQueue:
-      'Add messages while the agent is busy: the send button no longer locks, the ' +
-      'addition shows both as a strip above the input and in the feed itself — a ' +
-      'faint bubble marked “goes out next” — survives a page reload, and goes into ' +
-      'the same conversation as soon as the current turn ends',
+      'Write to the agent while it works, as in Claude Code itself: the message goes ' +
+      'out at once, the agent reads it at its next step (after the current tool ' +
+      'call), answers, adds it to the plan or changes course, and carries on with the ' +
+      'same turn — no waiting for it to end. In the feed such a message is a faint ' +
+      'bubble marked “passed to the agent — it takes it into account at the next ' +
+      'step”. A message with attachments and a ' +
+      'conversation with another CLI queue up instead: a bubble marked “goes out ' +
+      'next” that survives a page reload and goes out as soon as the current turn ends',
     canProgress:
       "Watch the agent's plan: the strip above the input shows its own checkpoints " +
       '(done, in progress) and the tree of subagents it handed work to, together ' +
@@ -101,8 +105,10 @@ export const chatEn: typeof chatRu = {
       'the panel shows their trace from the transcript — a tick here would drift ' +
       'from its own state',
     cantInterrupt:
-      'Interrupt the current turn with an added message: the CLI runs the turn to ' +
-      'the end, so the addition goes out at the turn boundary — wait, or press Stop',
+      'Cut short a step already under way with an added message: the agent reads ' +
+      'it after the current tool call, so a long command runs to its end — only ' +
+      'Stop halts it at once. With other CLIs the addition goes out only when the ' +
+      'turn ends',
     cantGallery:
       'Keep a gallery of images and presentations: the panel holds the last hundred of each on ' +
       'disk and shows no history of them — save what you need with «Download» right away',
@@ -119,6 +125,10 @@ export const chatEn: typeof chatRu = {
     storageDecksValue: '~/.agentdeck/media/decks/<id>.{json,html,pptx,pdf}',
     storageStream: 'How the answer arrives',
     storageStreamValue: 'as an SSE stream — text appears as it is generated',
+    storageSteer: 'A message mid-turn',
+    storageSteerValue:
+      'a line on the stdin of the same process; the transcript holds an attachment ' +
+      'record of type queued_command, and the feed shows it as an ordinary message',
 
     imageTitle: 'Images and presentations: the panel assembles the file',
     imageCaption:
@@ -725,7 +735,9 @@ export const chatEn: typeof chatRu = {
       'How much that helped shows in the parent’s group summary: the “To first edit” column ' +
       '— from the work link’s creation to the agent’s first Edit/Write call. Next to it: the ' +
       'model with its reasoning effort, the run time and “Step 8 of 14” from the group agent’s ' +
-      'plan, with the step name and its subagent count. A group working ' +
+      'plan, with the step name and its subagent count. A group without a plan still gets a ' +
+      'number when the project skill writes .agent/steps.json in the copy — { "current": 8, ' +
+      '"total": 14, "title": "Run the tests" }: the file wins over the agent’s plan. A group working ' +
       'in the shared directory gets no preamble: that environment is yours.',
 
     splitTitle: 'Splitting tasks across chats: the agent proposes, you decide',
@@ -794,18 +806,43 @@ export const chatEn: typeof chatRu = {
       'by the paths the branch touched: docs verified against the stand, removed names and ' +
       'test ids found nowhere in the repository, no conflict with a fresh main, a UI edit ' +
       'checked in a browser, a wrong value refused with a clear message. The group passes ' +
-      'each sieve with evidence — a command and its output. A conflict with a fresh main ' +
-      'and removal of other people’s lines the panel checks itself from the copy’s git, and ' +
-      'consumers of removed names it re-checks: the group still hands in its own search. A ' +
-      'sieve not passed holds the group: “done” does not ' +
+      'each sieve with evidence — a command and its output. The project’s own checks ' +
+      '(lint, types, tests) the panel finds in its manifests, and the evidence must name ' +
+      'every one; changed code with not a single test changed in the branch is a gap too, ' +
+      'until the group names the test that covers it. Migrations and schemas get a ' +
+      'compatibility-and-rollback sieve, and a change to sign-in, permissions, money, data ' +
+      'or a very large diff also needs a rollback plan with a production failure signal. ' +
+      'Without a model, from the copy’s git, the panel checks by itself: a conflict with a ' +
+      'fresh main, removal of other people’s lines, keys and tokens in added lines, .only, ' +
+      'debugger and conflict markers, committed .env files, keys, ignored and large files, ' +
+      'a dependency manifest without its lockfile, new environment variables declared ' +
+      'neither in config nor in docs, and destructive statements in migrations. Such a ' +
+      'finding is cleared only by a report row that names every file or name — “checked, ' +
+      'all fine” does not pass; a conflict only by a rebase. Consumers of removed names the ' +
+      'panel re-checks, and the group still hands in its own search. A row counts for the ' +
+      'code it was written on: if the branch changed the code the sieve covers after it, ' +
+      'the row is stale and the sieve has to be passed again. When the copy has a Tests ' +
+      'block, live checks (browser, boundary input, a request to the stand, a migration) ' +
+      'are proved by a recorded run: the group cites run:<id>, and the panel opens that run ' +
+      'in the history itself — it must be finished, have no red case and be no older than ' +
+      'the last change to the covered code. A sieve not passed holds the group: “done” does not ' +
       'come and the group gets a reminder, as with an unpushed branch. When a reviewer ' +
       'finds a blocker in an MR thread, the group turns it into a new sieve — a proposed ' +
-      'one: it reaches group tasks only once you accept it in “Settings” → “Groups” → ' +
-      '“Pre-MR sieves”, for its project or for all. The model writes the sieve text from ' +
+      'one, with the code area where the blocker was found (from the thread’s file). It ' +
+      'reaches group tasks only once you accept it in “Settings” → “Groups” → “Pre-MR ' +
+      'sieves”, for its project or for all, and only tasks whose diff touches that area ' +
+      '(a shared one reaches all). The model writes the sieve text from ' +
       'a commenter’s reply, so only a human can accept it, not the panel agent. The same ' +
       'blocker in another project only suggests making the sieve shared. The blocker tally ' +
       '(“escaped to MR” against “caught before the MR”) is there too, and a learned sieve ' +
-      'can be removed there.',
+      'can be removed there. When the copy has a Tests block, it is the block that says ' +
+      '“verified” for the group: the cases its diff touches (by codePaths) must be run by a ' +
+      'run recorded after the group started, and their latest result must not be red ' +
+      '(quarantine does not hold). No run, a touched case not run, a red case, or a diff ' +
+      'covered by no case while cases are linked to files — the group gets a reminder with ' +
+      'the command that records a run, and the group row in the hub reads “Tests block: N ' +
+      'of M green”. No cases in the copy at all — nothing to check with, and it does not ' +
+      'hold the group.',
     splitReview: 'Reviewing someone else’s merge requests',
     splitReviewText:
       'Drop MR (or PR) links into the chat and ask for a review — the split creates ' +
@@ -856,7 +893,7 @@ export const chatEn: typeof chatRu = {
       'A split spreads the work across several agents, but you are still one ' +
       'person. So a question asked by a child chat also shows up in the parent, ' +
       'labelled with who is asking. The answer goes INTO THAT CHAT as the next ' +
-      'message: if the child is busy it queues up and arrives when its turn ends; ' +
+      'message: if the child is busy it reads it at the next step of the same turn; ' +
       'if it is idle it goes out at once, continuing the same session in the same ' +
       'copy of the repository. The parent conversation spends nothing — no turn, no ' +
       'reply — and walking six chats for one and the same choice is not needed. ' +
@@ -985,7 +1022,8 @@ export const chatEn: typeof chatRu = {
       'waiting for your answer. That question and the notice in the parent feed are ' +
       'written by the panel itself, not by the agent, so both are shown in the ' +
       'interface language; a question the agent asked stays as it asked it. ' +
-      'A task lost in the triage is returned home, a circular ' +
+      'While the triage is running no group is started — neither by a panel restart nor by a ' +
+      'pause and “Resume”: its block decides the order. A task lost in the triage is returned home, a circular ' +
       'wait is cut, and the summary labels that “repaired by the panel”. In the ' +
       'chat list the links are labelled “triage” and “plan”; “Only create the ' +
       'chats” gets no levels.',
@@ -1451,7 +1489,7 @@ export const chatEn: typeof chatRu = {
     askSent: 'Sent — and it shows',
     askSentText:
       'Once sent, the card dims and says what became of the answer: “the agent is ' +
-      'thinking” or “queued — it will be sent when the agent finishes its turn”, and ' +
+      'thinking” or “the agent is busy — it reads the answer at its next step”, and ' +
       'once the answer has arrived and the agent carries on, a tick and “Answer ' +
       'received”. The ' +
       'note appears on the click, not on the server reply: the agent answers in tens ' +
@@ -1462,8 +1500,10 @@ export const chatEn: typeof chatRu = {
     askBusyText:
       'The question arrives MID-turn: the agent asks it and goes right back to ' +
       'writing code. That is why the options are not dimmed while a run is going — ' +
-      'the choice is needed exactly now. An answer to a busy agent queues up above ' +
-      'the composer and is sent as soon as the turn ends; the turn is not interrupted.',
+      'the choice is needed exactly now. An answer to a busy agent goes to it at ' +
+      'once: the agent reads it after the current step and carries on with the same ' +
+      'turn. Where that is impossible (another CLI) the answer queues up and goes ' +
+      'out when the turn ends.',
     lostTitle: 'The connection to a run can be lost — and you will be told',
     lostText:
       'The event stream lives in the browser while the agent lives on the server, so ' +
@@ -1599,7 +1639,11 @@ export const chatEn: typeof chatRu = {
       'not send: you can add to it first. Next to them sits a separate “Open in ' +
       'editor” chip — not about the conversation, it just opens the project.',
     composerStop: 'Stop',
-    composerStopText: 'While an answer is streaming, the send button becomes a stop button.',
+    composerStopText:
+      'While an answer is streaming, “Stop” sits next to send (in another CLI’s chat — in ' +
+      'the conversation header). Sending is not locked meanwhile: Claude gets the message ' +
+      'mid-turn, another CLI gets it as a queue that goes out by itself as soon as the ' +
+      'answer ends; a queued message can be removed with the cross on its bubble.',
 
     editsTitle: 'Edit mode: what the agent may change',
     editsCaption:

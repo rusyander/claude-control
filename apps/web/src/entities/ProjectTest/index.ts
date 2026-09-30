@@ -70,6 +70,7 @@ export {
   useRejectTestDraft,
   useRollbackTestDraft,
   useSetTestDraftAuto,
+  useDraftFromChat,
 } from './api/ProjectTestDraftApi';
 
 export {
@@ -120,3 +121,9 @@ export {
   AUTOMATION_TONE,
   percentOf,
 } from './lib/caseTone';
+
+export {
+  useMutationCheck,
+  useStartMutationCheck,
+  useStopMutationCheck,
+} from './api/ProjectTestMutationApi';

@@ -96,6 +96,7 @@ export function ChatTopic() {
             { label: tr('storageImages'), value: tr('storageImagesValue'), isMono: true },
             { label: tr('storageDecks'), value: tr('storageDecksValue'), isMono: true },
             { label: tr('storageStream'), value: tr('storageStreamValue') },
+            { label: tr('storageSteer'), value: tr('storageSteerValue') },
           ]}
         />
       </HelpSection>

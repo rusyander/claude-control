@@ -294,7 +294,10 @@ describe('m1/m2/m6: перезапуск из итога разбора', () => 
   it('begin: верх репозитория помнится, только если он другой', async () => {
     const t = build();
     await t.begin(PARENT, { copyRoot: 'C:/repo' });
-    await t.begin('второй', { copyRoot: 'c:\\repo\\app' });
+    // Тот же каталог в другом написании: регистр и `\\` одинаковы только на
+    // Windows — на Linux (CI) другое написание там же — хвостовой `/`.
+    const same = process.platform === 'win32' ? 'c:\\repo\\app' : 'C:/repo/app/';
+    await t.begin('второй', { copyRoot: same });
     expect(t.records.get(PARENT)?.copyRoot).toBe('C:/repo');
     expect(t.records.get('второй')).not.toHaveProperty('copyRoot');
   });

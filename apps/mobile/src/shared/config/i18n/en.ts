@@ -46,6 +46,7 @@ export const en: Dictionary = {
     homeChat: 'Home chat',
     blank: 'Empty. Write a task — it goes to the agent on your computer.',
     queued: (prompt: string) => `Queued: ${prompt} ✕`,
+    steered: (prompt: string) => `Passed to the agent: ${prompt}`,
     image: '[image]',
     autoPick: (label: string) => `Auto-pick: ${label}`,
     autoPickUnparsed: 'Auto-pick: the question was closed with the recommended option',
@@ -111,7 +112,7 @@ export const en: Dictionary = {
 
   composer: {
     ask: 'What should be done?',
-    queue: 'Add to the queue…',
+    queue: 'Tell the agent now…',
     send: 'Send',
     stop: 'Stop',
     settings: 'Sending options',

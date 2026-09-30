@@ -9,6 +9,7 @@ import { controllers, emit, findRunKey, forgetRun, getRun, lastSeqs, runs, setRu
 import {
   EMPTY_RUN,
   type ActiveRunInfo,
+  type AgentRun,
   type QueuedMessage,
   type SendOutcome,
   type StartInput,
@@ -149,7 +150,8 @@ function finish(id: string): void {
   const run = getRun(id);
   const status = stoppedByUser.has(id) ? 'stopped' : run.error ? 'error' : 'done';
   const wasStopped = stoppedByUser.has(id);
-  setRun(id, { status, stalled: undefined });
+  // Переданное на ходу теперь в транскрипте — строкой в ленте, не дублем.
+  setRun(id, { status, stalled: undefined, steered: undefined });
   controllers.delete(id);
   stoppedByUser.delete(id);
   emit();
@@ -177,6 +179,28 @@ function finish(id: string): void {
   void flushQueue(id);
 }
 
+/** Слово агенту посреди хода; `false` — сервер не принял на ходу (дальше очередь). */
+async function steer(run: AgentRun, input: StartInput): Promise<boolean> {
+  try {
+    const reply = await api.post<{ steered?: boolean }>('/chat/send', {
+      chatId: run.serverRunId ?? run.id,
+      ...(run.sessionId ? { sessionId: run.sessionId } : {}),
+      ...(run.projectPath ? { projectPath: run.projectPath } : {}),
+      prompt: input.prompt,
+      steer: true,
+    });
+    if (!reply?.steered) return false;
+    const current = runs.get(run.id);
+    if (current && !(current.steered ?? []).includes(input.prompt)) {
+      setRun(run.id, { steered: [...(current.steered ?? []), input.prompt] });
+      emit();
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Отправить сообщение. Возвращает, ПРИНЯТО ли оно: поле ввода очищается только
  * после этого, иначе отказ уничтожает набранный текст.
@@ -185,8 +209,10 @@ export async function send(input: StartInput): Promise<SendOutcome> {
   const id = input.chatId;
   const existing = runs.get(id);
   if (existing?.status === 'running') {
-    // Агент занят — сообщение уходит в очередь, а не теряется и не плодит
-    // второй процесс на тот же разговор.
+    // Агент занят — слово уходит ему сразу, как в самом Claude Code: он учтёт
+    // его на ближайшем шаге, не дожидаясь конца всей работы. Вложения и прогон
+    // без живой сессии — в очередь: не теряется и не плодит второй процесс.
+    if ((input.files?.length ?? 0) === 0 && (await steer(existing, input))) return { ok: true };
     enqueue(id, {
       prompt: input.prompt,
       allowEdits: input.allowEdits,

@@ -1,4 +1,4 @@
-import { isAbsolute, join, posix, sep } from 'node:path';
+import { isAbsolute, join, posix } from 'node:path';
 import type { CodedMessage, ProjectTestAutomationCommand } from '@agentdeck/contracts';
 import { readJson } from './files.ts';
 import { shellArg } from './e2e-command.ts';
@@ -74,7 +74,10 @@ export function readAutomation(root: string): AutomationRead {
   return {
     automation: {
       command,
-      ...(report ? { report: report.split(sep).join(posix.sep) } : {}),
+      // Разделители — оба, на любой ОС, как и в проверке выше: файл лежит в
+      // репозитории проекта, и `out\junit.xml`, записанный на Windows, на
+      // Linux по `sep` остался бы именем файла с обратным слэшем внутри.
+      ...(report ? { report: report.split(/[\\/]/).join(posix.sep) } : {}),
       ...(timeoutMinutes ? { timeoutMinutes } : {}),
     },
   };

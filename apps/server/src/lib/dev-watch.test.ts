@@ -11,6 +11,13 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { SourceWatcher, busyRun, isWatched, splitSetupRunning } from './dev-watch.mjs';
+import {
+  deferReason,
+  readRestartState,
+  requestRestart,
+  takeRestartRequest,
+  writeRestartState,
+} from './dev-restart.mjs';
 
 /**
  * Dev-сторож сервера на настоящей файловой системе и настоящем `fs.watch`.
@@ -112,5 +119,50 @@ describe('dev-сторож сервера', () => {
     expect(splitSetupRunning(plan(setup), now + 60 * 60_000)).toBe(false);
     expect(splitSetupRunning({}, now)).toBe(false);
     expect(splitSetupRunning(null, now)).toBe(false);
+  });
+});
+
+// Решение 30.09: перезапуск ждёт живые ходы без предела, панель видит ожидание.
+describe('отложенный перезапуск — общий файл сторожа и сервера', () => {
+  let dir: string | undefined;
+  afterEach(() => {
+    if (dir) rmSync(dir, { recursive: true, force: true });
+    dir = undefined;
+  });
+
+  it('чего ждёт: ходов, копий, обоих — или ничего', () => {
+    expect(deferReason(true, false)).toBe('runs');
+    expect(deferReason(false, true)).toBe('setup');
+    expect(deferReason(true, true)).toBe('both');
+    expect(deferReason(false, false)).toBeUndefined();
+  });
+
+  it('состояние живого сторожа видно, оставшееся от мёртвого — нет', () => {
+    dir = mkdtempSync(join(tmpdir(), 'dev-restart-'));
+    expect(readRestartState(dir)).toEqual({ pending: false });
+    writeRestartState(dir, {
+      pid: 42,
+      since: '2026-09-30T10:00:00.000Z',
+      files: ['apps/server/src/index.ts'],
+      waitingFor: 'setup',
+    });
+    expect(readRestartState(dir, (pid) => pid === 42)).toEqual({
+      pending: true,
+      since: '2026-09-30T10:00:00.000Z',
+      files: ['apps/server/src/index.ts'],
+      waitingFor: 'setup',
+      requested: false,
+    });
+    expect(readRestartState(dir, () => false)).toEqual({ pending: false });
+  });
+
+  it('запрос «перезапустить сейчас» виден и забирается один раз', () => {
+    dir = mkdtempSync(join(tmpdir(), 'dev-restart-'));
+    writeRestartState(dir, { pid: 1, since: 'x', files: [], waitingFor: 'runs' });
+    requestRestart(dir);
+    expect(readRestartState(dir, () => true).requested).toBe(true);
+    expect(takeRestartRequest(dir)).toBe(true);
+    expect(takeRestartRequest(dir)).toBe(false);
+    expect(readRestartState(dir, () => true).requested).toBe(false);
   });
 });

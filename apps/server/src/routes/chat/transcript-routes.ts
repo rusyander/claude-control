@@ -2,9 +2,16 @@ import { statSync } from 'node:fs';
 import type { FastifyInstance } from 'fastify';
 import type { ChatSummary } from '@agentdeck/contracts';
 import type { ServerContext } from '../../context.ts';
-import { readChats, readChatMessages, findTranscript } from '../../domains/chat/ChatHistory.ts';
+import {
+  readChats,
+  readChatMessages,
+  findTranscript,
+  findSessionCwd,
+  findSessionStart,
+} from '../../domains/chat/ChatHistory.ts';
 import { summarizedMessageIds } from '../../domains/platform/gateway/summarized-ledger.ts';
 import { readChatProgress } from '../../domains/chat/ChatProgress.ts';
+import { readStepsFile } from '../../domains/chat/steps-file.ts';
 import { searchChats } from '../../domains/chat/ChatSearch.ts';
 import { listProjects } from '../../domains/chat/ChatProjects.ts';
 import { buildChatExport, type ExportFormat } from '../../domains/chat/ChatExport.ts';
@@ -233,9 +240,23 @@ export function registerChatTranscriptRoutes(
    */
   app.get<{ Params: { chatId: string } }>('/api/chat/:chatId/progress', (request) => {
     const progress = readChatProgress(projectsDir(ctx), request.params.chatId);
+    // Файл шагов в рабочей папке разговора (у группы — её копия): «Шаг N из M»
+    // без плана агента (решение владельца 29.09).
+    // Файл, записанный раньше начала разговора, — от прежней задачи в той же
+    // папке, а не его шаг (ревью 30.09).
+    const file = readStepsFile(findSessionCwd(projectsDir(ctx), request.params.chatId));
+    const start = findSessionStart(projectsDir(ctx), request.params.chatId);
+    const steps =
+      file && start && file.updatedAt && Date.parse(file.updatedAt) < Date.parse(start)
+        ? undefined
+        : file;
     // Фон в транскрипте числится идущим и после смерти процесса: уведомление об
     // обрыве пишет только СЛЕДУЮЩИЙ процесс. Правду знает реестр.
-    return { ...progress, processAlive: isProcessAlive(request.params.chatId) };
+    return {
+      ...progress,
+      ...(steps ? { steps } : {}),
+      processAlive: isProcessAlive(request.params.chatId),
+    };
   });
 
   /**

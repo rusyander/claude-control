@@ -126,7 +126,9 @@ export const phoneEn: typeof phoneRu = {
       'its ending to the phone for one more minute, after that only «History» has it.',
     offlineQueue: 'A message while the agent is busy',
     offlineQueueText:
-      'Goes into a queue and is sent when the turn ends. The queue lives on the phone and ' +
+      'Goes to the agent at once: it reads it at its next step and carries on with the same ' +
+      'turn. Offline, with an attachment or with another CLI it goes into a queue that is ' +
+      'sent when the turn ends. The queue lives on the phone and ' +
       'survives an app restart, but only for 2 hours: anything older is dropped so that the ' +
       'agent does not receive something long out of date.',
     offlineAnswered: 'An answer to a question',
@@ -298,7 +300,8 @@ export const phoneEn: typeof phoneRu = {
       dayChat: 'Chat: the same conversation as at the desk',
       dayChatText:
         'The messages, the agent question right in the feed and the input field. While the ' +
-        'agent is busy, what you write is queued and goes out when the turn ends.',
+        'agent is busy, what you write goes to it at once and is taken into account at its ' +
+        'next step, without waiting for the turn to end.',
       dayAgent: 'The panel agent',
       dayAgentText:
         'A request in words becomes an action in the panel. Changes wait for your decision as a ' +

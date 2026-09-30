@@ -108,7 +108,21 @@ function wordsOf(file: string): string[] {
 
 /** Кейсы, задетые изменениями рабочей копии. */
 export function impactOf(root: string, groups: ProjectTestGroup[]): ProjectTestImpact {
-  const files = changedFiles(root).filter((file) => !file.startsWith('.agent/tests/'));
+  return casesTouching(changedFiles(root), groups);
+}
+
+/**
+ * Кейсы, задетые данными файлами: по `codePaths`, а без них — по зоне в пути.
+ * Отдельно от git: группа разделения считает задетое по своему диффу от
+ * основной, а не по незакоммиченному (у доставленной группы его нет).
+ */
+export function casesTouching(
+  changed: readonly string[],
+  groups: ProjectTestGroup[],
+): ProjectTestImpact {
+  const files = changed
+    .map((file) => file.replace(/\\/g, '/'))
+    .filter((file) => !file.startsWith('.agent/tests/'));
   const cases: ProjectTestImpact['cases'] = [];
   if (files.length === 0) return { files, cases };
 

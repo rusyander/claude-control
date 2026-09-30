@@ -2,7 +2,9 @@ import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import {
   acceptLearned,
+  areaOf,
   checkSimilarity,
+  learnedAppliesTo,
   SAME_SIEVE_SIMILARITY,
   type LearnedRejection,
   type LearnedSieve,
@@ -103,6 +105,8 @@ export class SieveStore {
   learn(input: {
     rows: readonly LearnedSieveRow[];
     relayed: readonly string[];
+    /** Файл каждого пересланного треда по ссылке — область сита (`areaOf`). */
+    paths?: Readonly<Record<string, string>>;
     projectPath: string;
     mr?: string;
   }): LearnOutcome {
@@ -128,6 +132,8 @@ export class SieveStore {
         this.bump(data, row.class, 'escaped');
       }
       const source = { thread: row.thread, ...(input.mr ? { mr: input.mr } : {}), at };
+      const file = input.paths?.[row.thread];
+      const area = file === undefined ? undefined : areaOf(file);
       // Похожее ищется по ВСЕМ проектам: тот же блокер в соседнем проекте — не
       // новое сито, а повод предложить прежнее общим (ниже).
       const same = data.learned.find(
@@ -138,6 +144,9 @@ export class SieveStore {
       if (same) {
         if (!same.sources.some((item) => item.thread === row.thread)) {
           same.sources = [...same.sources, source].slice(-SOURCES_MAX);
+          // Тред без файла — блокер не привязан к месту: сито больше не сужается.
+          if (area === undefined) delete same.areas;
+          else if (same.areas && !same.areas.includes(area)) same.areas = [...same.areas, area];
         }
         same.lastSeenAt = at;
         // Проект, где тот же блокер всплыл снова, — повод предложить сито общим.
@@ -159,6 +168,7 @@ export class SieveStore {
         ...(row.scope === 'global' ? { suggestedScope: 'global' as const } : {}),
         trigger: row.trigger,
         check: row.check,
+        ...(area === undefined ? {} : { areas: [area] }),
         sources: [source],
         createdAt: at,
         lastSeenAt: at,
@@ -183,13 +193,21 @@ export class SieveStore {
     this.write(data);
   }
 
-  /** Сита для задания звена в этом проекте: принятые общие и свои, чаще виденные первыми. */
-  forProject(projectPath: string, limit = LEARNED_IN_PROMPT): LearnedSieve[] {
+  /**
+   * Сита для задания звена в этом проекте: принятые общие и свои, чаще виденные
+   * первыми. С `touched` — проектные только те, чью область дифф задел.
+   */
+  forProject(
+    projectPath: string,
+    limit = LEARNED_IN_PROMPT,
+    touched?: readonly string[],
+  ): LearnedSieve[] {
     return this.read()
       .learned.filter(
         (sieve) =>
           sieve.status === 'active' &&
-          (sieve.scope === 'global' || sieve.projectPath === projectPath),
+          (sieve.scope === 'global' || sieve.projectPath === projectPath) &&
+          (!touched || learnedAppliesTo(sieve, touched)),
       )
       .sort(
         (a, b) => b.sources.length - a.sources.length || b.lastSeenAt.localeCompare(a.lastSeenAt),

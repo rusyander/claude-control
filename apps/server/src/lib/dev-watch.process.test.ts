@@ -33,6 +33,7 @@ import { join } from 'node:path';
 const DEV_WATCH = new URL('./dev-watch.mjs', import.meta.url);
 const PROBE = new URL('./dev-boot-probe.mjs', import.meta.url);
 const BRAND = new URL('./brand.mjs', import.meta.url);
+const RESTART = new URL('./dev-restart.mjs', import.meta.url);
 
 const FAKE_SERVER = `import { spawn } from 'node:child_process';
 import { appendFileSync } from 'node:fs';
@@ -93,6 +94,7 @@ describe('dev-сторож как процесс', () => {
     copyFileSync(DEV_WATCH, join(lib, 'dev-watch.mjs'));
     copyFileSync(PROBE, join(lib, 'dev-boot-probe.mjs'));
     copyFileSync(BRAND, join(lib, 'brand.mjs'));
+    copyFileSync(RESTART, join(lib, 'dev-restart.mjs'));
     writeFileSync(join(lib, 'part.ts'), "export const part: string = 'v1';\n");
     writeFileSync(join(serverDir, 'src', 'index.ts'), FAKE_SERVER);
     const pidsFile = join(root, 'pids.txt');
@@ -179,6 +181,7 @@ describe('dev-сторож как процесс', () => {
     copyFileSync(DEV_WATCH, join(lib, 'dev-watch.mjs'));
     copyFileSync(PROBE, join(lib, 'dev-boot-probe.mjs'));
     copyFileSync(BRAND, join(lib, 'brand.mjs'));
+    copyFileSync(RESTART, join(lib, 'dev-restart.mjs'));
     // Каталог с точкой сторож не наблюдает: его файл пропадает и возвращается без правки.
     const gateFile = join(gate, 'gate.mjs');
     writeFileSync(gateFile, 'export const gate = 1;\n');
@@ -221,5 +224,77 @@ describe('dev-сторож как процесс', () => {
     writeFileSync(gateFile, 'export const gate = 2;\n');
     const second = await until(() => launches()[1], 60_000, `подъём без правки\n${log}`);
     expect(second.split(' ')[1]).toBe('2');
+  }, 120_000);
+
+  /**
+   * Решение 30.09: пока идёт ход, правка сервера ждёт без предела (прежний
+   * потолок в 10 минут рвал ход), панель видит ожидание в `dev-restart.json`,
+   * а запрос «перезапустить сейчас» исполняется при ближайшей сверке.
+   */
+  it('правка ждёт живой ход, пока человек не попросит перезапуск', async () => {
+    root = mkdtempSync(join(tmpdir(), 'dev-watch-defer-'));
+    const serverDir = join(root, 'apps', 'server');
+    const lib = join(serverDir, 'src', 'lib');
+    mkdirSync(lib, { recursive: true });
+    mkdirSync(join(root, 'packages', 'contracts', 'src'), { recursive: true });
+    copyFileSync(DEV_WATCH, join(lib, 'dev-watch.mjs'));
+    copyFileSync(PROBE, join(lib, 'dev-boot-probe.mjs'));
+    copyFileSync(BRAND, join(lib, 'brand.mjs'));
+    copyFileSync(RESTART, join(lib, 'dev-restart.mjs'));
+    writeFileSync(join(lib, 'part.ts'), "export const part: string = 'v1';\n");
+    writeFileSync(
+      join(serverDir, 'src', 'index.ts'),
+      `import { appendFileSync } from 'node:fs';\nimport { part } from './lib/part.ts';\nappendFileSync(process.env.PIDS_FILE as string, \`\${process.pid} \${part}\\n\`);\nsetInterval(() => {}, 1000);\n`,
+    );
+    const config = join(root, 'config');
+    const { appDataDirOf } = (await import(BRAND.href)) as {
+      appDataDirOf: (configRoot: string) => string;
+    };
+    const appData = appDataDirOf(config);
+    mkdirSync(appData, { recursive: true });
+    // Идущий ход: запись журнала не ждущая, её процесс — сам тест, он жив.
+    writeFileSync(join(appData, 'runs.json'), JSON.stringify([{ key: 'k', pid: process.pid }]));
+    const pidsFile = join(root, 'pids.txt');
+    let log = '';
+    watch = spawn(process.execPath, [join(lib, 'dev-watch.mjs')], {
+      cwd: serverDir,
+      env: {
+        ...process.env,
+        CLAUDE_CONFIG_DIR: config,
+        AGENTDECK_DEV_DEFER_POLL_MS: '200',
+        PIDS_FILE: pidsFile,
+      },
+      stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
+      windowsHide: true,
+    });
+    watch.stdout?.on('data', (chunk: Buffer) => (log += chunk.toString()));
+    watch.stderr?.on('data', (chunk: Buffer) => (log += chunk.toString()));
+    const launches = (): string[] => {
+      if (!existsSync(pidsFile)) return [];
+      const rows = readFileSync(pidsFile, 'utf8').split(/\r?\n/).filter(Boolean);
+      for (const row of rows) recorded.add(Number(row.split(' ')[0]));
+      return rows;
+    };
+    await until(() => launches()[0], 30_000, `первый запуск\n${log}`);
+
+    writeFileSync(join(lib, 'part.ts'), "export const part: string = 'v2';\n");
+    const stateFile = join(appData, 'dev-restart.json');
+    const state = await until(
+      () => (existsSync(stateFile) ? JSON.parse(readFileSync(stateFile, 'utf8')) : undefined),
+      30_000,
+      `состояние ожидания\n${log}`,
+    );
+    expect(state).toMatchObject({ waitingFor: 'runs', files: ['apps/server/src/lib/part.ts'] });
+    expect(log).toMatch(/без предела/);
+    // Десятки сверок подряд — сервер тот же: ход не рвётся.
+    await pause(3_000);
+    expect(launches()).toHaveLength(1);
+
+    writeFileSync(join(appData, 'dev-restart.request'), new Date().toISOString());
+    const second = await until(() => launches()[1], 60_000, `перезапуск по запросу\n${log}`);
+    expect(second.split(' ')[1]).toBe('v2');
+    expect(log).toMatch(/по просьбе из панели/);
+    expect(existsSync(stateFile)).toBe(false);
+    expect(existsSync(join(appData, 'dev-restart.request'))).toBe(false);
   }, 120_000);
 });

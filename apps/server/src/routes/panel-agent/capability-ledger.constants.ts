@@ -649,6 +649,9 @@ export const ROUTE_LEDGER: RouteLedger = {
   'GET /api/sieves': 'action:read_sieves',
   'DELETE /api/sieves/learned/:id': 'action:delete_learned_sieve',
   'POST /api/sieves/learned/:id/accept': 'human:prompts',
+  // dev-restart-routes.ts
+  'GET /api/dev-restart': 'internal:ui-state',
+  'POST /api/dev-restart': 'human:dev-restart',
   // watcher-routes.ts
   'GET /api/watcher': 'action:watcher_status',
   'POST /api/watcher': 'action:set_watcher',

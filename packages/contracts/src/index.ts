@@ -71,3 +71,4 @@ export * from './compromises';
 export * from './api';
 export * from './server-messages';
 export * from './watcher';
+export * from './dev-restart';

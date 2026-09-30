@@ -7,6 +7,7 @@ import { groupBuilderRu } from './groups/builder-ru.ts';
 import { testsE2eRu } from './tests-e2e/ru.ts';
 import { pageTabsRu } from './page-tabs/ru.ts';
 import { watcherRu } from './watcher/ru.ts';
+import { devRestartRu } from './dev-restart/ru.ts';
 import { projectsPageRu } from './projects/ru.ts';
 import { contourConfigRu } from './contour-config/ru.ts';
 import { presetsRu } from './presets/ru.ts';
@@ -30,6 +31,8 @@ export const ru = {
   pageTabs: pageTabsRu,
   /** Фоновый наблюдатель: карточка настроек и индикатор — `watcher/ru.ts`. */
   watcher: watcherRu,
+  /** Плашка «правки сервера ждут перезапуска» — `dev-restart/ru.ts`. */
+  devRestart: devRestartRu,
   /** Раздел «Проекты — конфигурация»: шапка проекта, вкладки, документ инструкций — `projects/ru.ts`. */
   projectsPage: projectsPageRu,
   /** Контур: разделы на карточке, чьи правила действуют, кто берёт верх — `contour-config/ru.ts`. */

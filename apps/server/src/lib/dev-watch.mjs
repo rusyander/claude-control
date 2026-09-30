@@ -18,8 +18,10 @@
  *   посредники живых сессий (`live-relay.mjs`) отвязаны и переживают
  *   перезапуск вместе с CLI; запущенный с IPC уходит вместе с родителем;
  * - откладывает перезапуск, пока в журнале прогонов есть идущий ход с живым
- *   процессом или группа разделения готовит копию (не дольше `DEFER_CAP_MS`):
- *   поток хода и `npm ci` копии не рвутся на середине.
+ *   процессом или группа разделения готовит копию, — без предела: поток хода и
+ *   `npm ci` копии не рвутся на середине (прежний потолок в 10 минут рвал их,
+ *   решение 30.09). Пока правки ждут, панель видит это (`dev-restart.json`) и
+ *   может попросить перезапуск сейчас (`dev-restart.request`).
  *   `AGENTDECK_DEV_DEFER=0` — перезапускать сразу;
  * - прежде чем погасить работающий сервер, пробует новую сборку
  *   (`dev-boot-probe.mjs`): не поднимается — прежний сервер работает дальше,
@@ -31,16 +33,21 @@
 import { spawn } from 'node:child_process';
 import { readdirSync, readFileSync, statSync, watch } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, extname, join, resolve } from 'node:path';
+import { dirname, extname, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { appDataDirOf } from './brand.mjs';
+import {
+  clearRestartState,
+  deferReason,
+  takeRestartRequest,
+  writeRestartState,
+} from './dev-restart.mjs';
 
 const CODE = new Set(['.ts', '.mts', '.mjs', '.js', '.json']);
 const SKIP_DIRS = new Set(['node_modules', '__fixtures__', 'coverage', 'dist']);
 const TEST_FILE = /\.(test|spec)\.[cm]?[jt]s$/;
 const DEBOUNCE_MS = 300;
-const DEFER_POLL_MS = 5_000;
-const DEFER_CAP_MS = 10 * 60_000;
+const DEFER_POLL_MS = Number(process.env.AGENTDECK_DEV_DEFER_POLL_MS) || 5_000;
 
 /** Правка этого файла может изменить поведение сервера. */
 export function isWatched(path) {
@@ -252,8 +259,13 @@ function main() {
     resolve(serverDir, '..', '..', 'packages', 'contracts', 'src'),
   ];
   const configRoot = process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude');
-  const ledgerFile = join(appDataDirOf(configRoot), 'runs.json');
-  const stateFile = join(appDataDirOf(configRoot), 'state.json');
+  const appData = appDataDirOf(configRoot);
+  const ledgerFile = join(appData, 'runs.json');
+  const stateFile = join(appData, 'state.json');
+  const repoRoot = resolve(serverDir, '..', '..');
+  // Прошлый сторож мог оставить и состояние, и запрос: новый начинает с чистого.
+  clearRestartState(appData);
+  takeRestartRequest(appData);
   const defer = process.env.AGENTDECK_DEV_DEFER !== '0';
   const log = (line) => console.log(`[dev-watch] ${line}`);
   const pending = new Set();
@@ -321,21 +333,32 @@ function main() {
       return;
     }
     const now = Date.now();
-    if (
-      defer &&
-      (busyRun(readEntries(ledgerFile), pidAlive) || splitSetupRunning(readJson(stateFile), now))
-    ) {
-      deferredSince ??= now;
-      if (now - deferredSince < DEFER_CAP_MS) {
-        if (now === deferredSince)
-          log(
-            `правки ждут конца идущих ходов и подготовки копий (до ${DEFER_CAP_MS / 60_000} мин)`,
-          );
-        timer = setTimeout(restart, DEFER_POLL_MS);
-        return;
+    // Человек нажал «перезапустить сейчас» — ходы оборвутся, это его решение.
+    const forced = takeRestartRequest(appData);
+    const waitingFor =
+      defer && !forced
+        ? deferReason(
+            busyRun(readEntries(ledgerFile), pidAlive),
+            splitSetupRunning(readJson(stateFile), now),
+          )
+        : undefined;
+    if (waitingFor) {
+      if (deferredSince === undefined) {
+        deferredSince = now;
+        log('правки ждут конца идущих ходов и подготовки копий — перезапуск без предела отложен');
       }
+      writeRestartState(appData, {
+        pid: process.pid,
+        since: new Date(deferredSince).toISOString(),
+        files: [...pending].map((file) => relative(repoRoot, file).replace(/\\/g, '/')),
+        waitingFor,
+      });
+      timer = setTimeout(restart, DEFER_POLL_MS);
+      return;
     }
+    if (forced && deferredSince !== undefined) log('перезапуск по просьбе из панели');
     deferredSince = undefined;
+    clearRestartState(appData);
     const files = [...pending];
     pending.clear();
     const named = `${files.slice(0, 3).join(', ')}${files.length > 3 ? ` и ещё ${files.length - 3}` : ''}`;
@@ -379,6 +402,7 @@ function main() {
     const current = child;
     child = undefined;
     clearTimeout(relaunchTimer);
+    clearRestartState(appData);
     current?.kill();
     process.exit(0);
   };

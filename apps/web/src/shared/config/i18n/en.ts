@@ -8,6 +8,7 @@ import { groupBuilderEn } from './groups/builder-en.ts';
 import { testsE2eEn } from './tests-e2e/en.ts';
 import { pageTabsEn } from './page-tabs/en.ts';
 import { watcherEn } from './watcher/en.ts';
+import { devRestartEn } from './dev-restart/en.ts';
 import { projectsPageEn } from './projects/en.ts';
 import { contourConfigEn } from './contour-config/en.ts';
 import { presetsEn } from './presets/en.ts';
@@ -25,6 +26,7 @@ export const en: TranslationSchema = {
   testsE2e: testsE2eEn,
   pageTabs: pageTabsEn,
   watcher: watcherEn,
+  devRestart: devRestartEn,
   projectsPage: projectsPageEn,
   contourConfig: contourConfigEn,
   presets: presetsEn,

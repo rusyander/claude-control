@@ -135,4 +135,8 @@ export const composedMessageParams = {
   'sieve-gap-unreported': ['sieve', 'lang'],
   'sieve-gap-no-evidence': ['sieve'],
   'sieve-gap-failed': ['sieve', 'evidence'],
+  'tests-gap-no-run': ['cases', 'command'],
+  'tests-gap-unrun': ['cases', 'command'],
+  'tests-gap-failed': ['cases'],
+  'tests-gap-uncovered': ['files'],
 } as const satisfies Record<string, readonly string[]>;

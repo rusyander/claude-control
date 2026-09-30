@@ -1140,6 +1140,8 @@ export const en: TranslationSchema = {
         stopped: 'stopped: {{message}}',
         deliveryMissing: 'missing for the MR: {{list}}',
         deliveryNudges: 'delivery reminders: {{count}}',
+        testsVerdict: 'Tests block: {{passed}} of {{count}} green',
+        testsNone: 'Tests block: the diff touched no automated cases',
         interruptedAt: 'process cut short at {{time}}',
         interruptResumes: 'resumed by the panel: {{count}}',
         autoNotices: 'Allowed automatically: {{list}}',

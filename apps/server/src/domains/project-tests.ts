@@ -69,7 +69,13 @@ export {
   writeRun,
 } from './project-tests/runs-store.ts';
 export { diffRuns, diffWithPrevious, failedCases } from './project-tests/compare.ts';
-export { changedFiles, gitContext, impactOf, viewGitContext } from './project-tests/impact.ts';
+export {
+  casesTouching,
+  changedFiles,
+  gitContext,
+  impactOf,
+  viewGitContext,
+} from './project-tests/impact.ts';
 export { historyOf } from './project-tests/history.ts';
 export { ProjectTestManualRegistry, remainingPoints } from './project-tests/manual.ts';
 export { availableTargets, buildDraft, createDefect } from './project-tests/defects.ts';

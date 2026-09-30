@@ -30,6 +30,17 @@ export function GroupText({ group, step }: { group: ChildStageGroup; step?: Reac
   if (group.deliveryNudges) {
     parts.push(t('chat.cascade.hub.deliveryNudges', { count: group.deliveryNudges }));
   }
+  // Вердикт — из блока «Тесты» копии, а не из слов группы (решение 29.09).
+  if (group.testsVerdict) {
+    parts.push(
+      group.testsVerdict.cases > 0
+        ? t('chat.cascade.hub.testsVerdict', {
+            passed: group.testsVerdict.passed,
+            count: group.testsVerdict.cases,
+          })
+        : t('chat.cascade.hub.testsNone'),
+    );
+  }
   // Когда оборвалась и сколько раз панель уже продолжала сама: кончились
   // попытки — это видно, а не угадывается по тишине.
   if (group.interrupted) {

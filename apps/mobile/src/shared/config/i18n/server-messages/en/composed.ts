@@ -184,4 +184,12 @@ export const composedEn: Record<ComposedMessageCode, string> = {
   'sieve-gap-no-evidence':
     'sieve {{sieve}} is marked without evidence: the command and a line of its output, or the reason, are needed',
   'sieve-gap-failed': 'sieve {{sieve}} failed: {{evidence}}',
+  'tests-gap-no-run':
+    'Tests block of the copy: no run has been recorded since the group started — run the cases for the changed files ({{cases}}) and record the run: {{command}}',
+  'tests-gap-unrun':
+    'Tests block of the copy: cases for the changed files were not run since the group started: {{cases}} — record a run: {{command}}',
+  'tests-gap-failed':
+    'Tests block of the copy: red cases in the group’s runs: {{cases}} — fix them and run again',
+  'tests-gap-uncovered':
+    'Tests block of the copy: the changed files are not covered by any case ({{files}}) — add a case with codePaths pointing at them',
 };

@@ -1245,6 +1245,8 @@ export const ru = {
         stopped: 'остановлена: {{message}}',
         deliveryMissing: 'не хватает для MR: {{list}}',
         deliveryNudges: 'напоминаний о доставке: {{count}}',
+        testsVerdict: 'блок «Тесты»: зелёных {{passed}} из {{count}}',
+        testsNone: 'блок «Тесты»: дифф не задел автоматических кейсов',
         interruptedAt: 'процесс оборвался в {{time}}',
         interruptResumes: 'панель продолжала сама: {{count}}',
         autoNotices: 'Разрешено автоматически: {{list}}',

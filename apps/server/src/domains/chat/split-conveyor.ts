@@ -35,6 +35,7 @@ import type { ChatEvent } from './ChatRunner.ts';
 import type { RunFinished } from './ChatRunRegistry.ts';
 import type { SplitGroupContext } from './ChatSplit.ts';
 import { coded } from '../../lib/server-text.ts';
+import type { GroupTestsVerdict } from './tests-gate.ts';
 import { normalizePath } from '../project-runner/targets.ts';
 import { localizeText, matchText, serverText } from '../../lib/server-texts.ts';
 import {
@@ -194,6 +195,8 @@ export interface DeliveryVerdict {
   failed?: string;
   /** Ветка, которую группа завела и отправила сама вместо названной панелью. */
   branch?: string;
+  /** Вердикт блока «Тесты» копии: задетые кейсы и их итог в прогонах группы. */
+  tests?: GroupTestsVerdict;
 }
 
 export interface SplitDeliveryDeps {
@@ -1030,6 +1033,11 @@ export class SplitConveyor {
         textParams: { group: group.title, mr: verdict.mr },
       });
     }
+    // Вердикт блока «Тесты» — на группу: хаб показывает, чем проверена работа.
+    if (verdict.tests) {
+      group.testsVerdict = verdict.tests;
+      this.deps.store.set(record);
+    }
     // Готовность по следам звеньев — вместе с фактами git (аудит 25.09, L110).
     verdict = { ...verdict, missing: [...verdict.missing, ...stageTraceGaps(group.stageTrace)] };
     // Сработавшее сито — блокер, пойманный до MR: в счёт панели раз на группу
@@ -1666,6 +1674,7 @@ export class SplitConveyor {
             }
           : {}),
         ...(group.deliveryNudges ? { deliveryNudges: group.deliveryNudges } : {}),
+        ...(group.testsVerdict ? { testsVerdict: group.testsVerdict } : {}),
         ...(group.deliver !== undefined ? { deliver: group.deliver } : {}),
         ...(group.interruptedAt ? { interruptedAt: group.interruptedAt } : {}),
         ...(group.interruptResumes ? { interruptResumes: group.interruptResumes } : {}),

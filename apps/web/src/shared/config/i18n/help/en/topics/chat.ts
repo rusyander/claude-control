@@ -807,7 +807,14 @@ export const chatEn: typeof chatRu = {
       'a commenter’s reply, so only a human can accept it, not the panel agent. The same ' +
       'blocker in another project only suggests making the sieve shared. The blocker tally ' +
       '(“escaped to MR” against “caught before the MR”) is there too, and a learned sieve ' +
-      'can be removed there.',
+      'can be removed there. When the copy has a Tests block, it is the block that says ' +
+      '“verified” for the group: the cases its diff touches (by codePaths) must be run by a ' +
+      'run recorded after the group started, and their latest result must not be red ' +
+      '(quarantine does not hold). No run, a touched case not run, a red case, or a diff ' +
+      'covered by no case while cases are linked to files — the group gets a reminder with ' +
+      'the command that records a run, and the group row in the hub reads “Tests block: N ' +
+      'of M green”. No cases in the copy at all — nothing to check with, and it does not ' +
+      'hold the group.',
     splitReview: 'Reviewing someone else’s merge requests',
     splitReviewText:
       'Drop MR (or PR) links into the chat and ask for a review — the split creates ' +

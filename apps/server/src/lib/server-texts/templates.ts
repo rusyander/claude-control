@@ -1320,4 +1320,20 @@ export const serverTextTemplates = {
     ru: 'сито {{sieve}} не пройдено: {{evidence}}',
     en: 'sieve {{sieve}} failed: {{evidence}}',
   },
+  'tests-gap-no-run': {
+    ru: 'блок «Тесты» копии: после старта группы не записано ни одного прогона — прогоните кейсы по изменённым файлам ({{cases}}) и запишите прогон: {{command}}',
+    en: 'Tests block of the copy: no run has been recorded since the group started — run the cases for the changed files ({{cases}}) and record the run: {{command}}',
+  },
+  'tests-gap-unrun': {
+    ru: 'блок «Тесты» копии: кейсы по изменённым файлам не прогнаны после старта группы: {{cases}} — запишите прогон: {{command}}',
+    en: 'Tests block of the copy: cases for the changed files were not run since the group started: {{cases}} — record a run: {{command}}',
+  },
+  'tests-gap-failed': {
+    ru: 'блок «Тесты» копии: красные кейсы в прогонах группы: {{cases}} — почините и прогоните снова',
+    en: 'Tests block of the copy: red cases in the group’s runs: {{cases}} — fix them and run again',
+  },
+  'tests-gap-uncovered': {
+    ru: 'блок «Тесты» копии: изменённые файлы не покрыты ни одним кейсом ({{files}}) — заведите кейс с codePaths на них',
+    en: 'Tests block of the copy: the changed files are not covered by any case ({{files}}) — add a case with codePaths pointing at them',
+  },
 } as const satisfies Record<string, { ru: string; en: string }>;

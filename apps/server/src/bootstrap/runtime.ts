@@ -1,4 +1,5 @@
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { ProjectTestRun } from '@agentdeck/contracts';
 import type { SieveReportRow, SieveStage } from '@agentdeck/contracts/sieves';
 import type { ChatLink } from '../lib/app-store/app-store.types.ts';
@@ -84,6 +85,7 @@ import { copyRootOf, SplitConveyor } from '../domains/chat/split-conveyor.ts';
 import { MrWatch } from '../domains/chat/mr-watch.ts';
 import { SieveStore } from '../domains/chat/sieve-store.ts';
 import { sieveDeliveryGaps, sievePrompt } from '../domains/chat/sieve-gate.ts';
+import { testsDeliveryGaps } from '../domains/chat/tests-gate.ts';
 import { readMergeRequestReview } from '../domains/integrations/mr-review.ts';
 import { childrenBrief } from '../domains/chat/children-brief.ts';
 import { branchGateContext } from '../domains/chat/ChatBranchGate.ts';
@@ -124,6 +126,10 @@ import { ActivatingTestRunRegistry } from './activating-test-runs.ts';
  * реестр, до которого никто снаружи не дотянется, при выходе осиротит свои
  * процессы.
  */
+
+/** CLI блока «Тесты»: им группа записывает прогон в блок своей копии. */
+const TESTS_CLI = fileURLToPath(new URL('../../../../tools/tests-cli.mjs', import.meta.url));
+
 export interface Runtime {
   /** Dev-серверы проектов: спавненные процессы и порты, которые они назвали. */
   projectRunner: ProjectRunnerRegistry;
@@ -608,12 +614,25 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
             `split delivery: sieves unchecked for ${group.branch}: ${sieves.unchecked.join('; ')}`,
           );
         }
+        // Вердикт группы — из кейсов и записанных прогонов блока «Тесты» в её
+        // копии, а не из её слов (решение владельца 29.09). Блока в копии нет —
+        // проверять нечем, группу это не держит.
+        const tests = await testsDeliveryGaps({
+          cwd: group.path,
+          ...(group.startedAt ? { startedAt: group.startedAt } : {}),
+          command: `node "${TESTS_CLI}" run --project .`,
+        }).catch((error: unknown) => {
+          console.warn('split delivery: tests block unreadable', error);
+          return undefined;
+        });
         return {
           missing: [
             ...missing,
             ...(description.missing ? [description.missing] : []),
             ...(sieves?.missing ?? []),
+            ...(tests?.missing ?? []),
           ],
+          ...(tests?.verdict ? { tests: tests.verdict } : {}),
           ...(sieves?.classes.length ? { sieveClasses: sieves.classes } : {}),
           ...(facts.mr ? { mr: facts.mr } : {}),
           ...(facts.branch ? { branch: facts.branch } : {}),

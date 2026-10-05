@@ -88,6 +88,9 @@ export const ROUTE_LEDGER: RouteLedger = {
   'POST /api/chat/split/:parent/start-now': 'human:split-apply',
   'POST /api/chat/split/:parent/restart-group': 'human:split-apply',
   'POST /api/chat/split/:parent/drop-group': 'human:split-apply',
+  'POST /api/chat/split/:parent/continue-group': 'human:split-apply',
+  // Группа отвечает ревьюеру в MR и отправляет ветку — наружу.
+  'POST /api/chat/split/:parent/recheck': 'human:outward',
   // chat/split-routes.ts
   'GET /api/chat/split/:parent/overlap': 'action:read_split_overlap',
   'GET /api/chat/split/request': 'action:request_split',

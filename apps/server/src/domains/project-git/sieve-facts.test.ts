@@ -95,6 +95,14 @@ describe('механика сит на настоящем git', () => {
     expect(git(work, ['rev-parse', '--abbrev-ref', 'HEAD']).trim()).toBe('grp');
   });
 
+  // Ревью PR #1: git брал кириллическое имя в восьмеричные кавычки — механика его теряла.
+  it('файл с кириллицей в имени — механика видит его под настоящим путём', async () => {
+    const { work } = repo({ 'a.txt': 'one\n' });
+    commit(work, { 'src/страница.ts': 'export const a = 1;\ndebugger;\n' }, STARTED);
+    const facts = await readSieveFacts({ cwd: work, startedAt: STARTED });
+    expect(facts.mechanics.debugLeftovers).toEqual(['src/страница.ts']);
+  });
+
   it('без конфликта — пусто, и старые строки основной чужими не считаются', async () => {
     const { work } = repo({ 'old.ts': 'const keep = 1;\nconst drop = 2;\n' });
     commit(work, { 'old.ts': 'const keep = 1;\n' }, STARTED);
@@ -192,5 +200,26 @@ describe('разбор диффа без контекста', () => {
     ]);
     // `goneNameX` — другое имя: удалённое `goneName` осталось удалённым.
     expect(removedTokens(diff)).toEqual([{ token: 'goneName', kind: 'name' }]);
+  });
+
+  // Ревью PR #1: строка «++ x» в ханке приходит как «+++ x» и уводила следующие в чужой путь.
+  it('добавленная «++ …» и удалённая «-- …» внутри ханка — строки, а не заголовки', () => {
+    const diff = parseZeroContextDiff(
+      [
+        '--- a/q.sql',
+        '+++ b/q.sql',
+        '@@ -1 +1,2 @@',
+        '--- old comment',
+        '+++ i;',
+        '+debugger;',
+      ].join('\n'),
+    );
+    expect(diff.additions).toEqual([
+      { path: 'q.sql', text: '++ i;' },
+      { path: 'q.sql', text: 'debugger;' },
+    ]);
+    expect(diff.removed).toEqual([
+      { path: 'q.sql', start: 1, count: 1, lines: ['-- old comment'] },
+    ]);
   });
 });

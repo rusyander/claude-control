@@ -3,6 +3,8 @@ import type { ChatMessageCode } from '@agentdeck/contracts/server-messages';
 export const chatEn: Record<ChatMessageCode, string> = {
   'run-busy':
     'The previous answer in this conversation is still being generated. Wait for it to finish or press “Stop” — the message was not sent.',
+  'run-steer-ended':
+    'The turn has already ended — the mid-turn message was not sent; the panel will send it the usual way.',
   'run-empty-prompt': 'The message is empty — nothing to send.',
   'run-unsupported-upload':
     'Unsupported attachments: {{names}}. The message was not sent. Allowed extensions: {{supported}}.',
@@ -93,11 +95,18 @@ export const chatEn: Record<ChatMessageCode, string> = {
   'split-resume-refused': 'Nothing to resume the group with: it has no conversation or copy',
   'split-restart-not-cut': 'The group was not cut before its chat — nothing to start again',
   'split-start-not-queued': 'The group is not queued — nothing to start',
+  'split-start-triage':
+    'Task triage is still running — it decides the group order; starting becomes available after it',
   'split-accept-not-done': 'Nothing to accept: the group does not exist or is not delivered yet',
   'split-group-no-slot': 'All slots are taken: {{running}} of {{limit}} running',
   'split-group-no-slot-paused':
     'All slots are taken: {{running}} running, {{paused}} paused, of {{limit}} — Resume or Remove on a paused group frees a slot',
   'split-drop-nothing': 'Nothing to remove: the group is neither paused nor cut before its chat',
+  'split-continue-nothing': 'Nothing to continue: the group did not stop unfinished',
+  'split-recheck-nothing':
+    'Nothing to recheck: the group has no delivered MR or its copy was removed',
+  'split-recheck-merged': 'The MR is already merged — nothing to recheck',
+  'split-recheck-closed': 'The MR is closed — nothing to recheck',
   'split-limit-active': 'The subscription limit is exhausted until {{until}}',
   'split-plan-cancel-nothing':
     'Nothing to cancel: the split of this conversation has already finished',

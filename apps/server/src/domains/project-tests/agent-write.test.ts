@@ -6,7 +6,7 @@ import { agentUpsertCase, recordAgentResults } from './agent-write.ts';
 import { readDraft } from './drafts.ts';
 import { e2eChatLine } from './e2e-chat.ts';
 import { readRuns } from './runs-store.ts';
-import { readGroup, upsertCase } from './store.ts';
+import { applyResults, readGroup, upsertCase } from './store.ts';
 
 /**
  * Агент чата ведёт блок «Тесты» сам (решение владельца 30.09): заводит кейс на
@@ -74,6 +74,37 @@ describe('запись в блок «Тесты» от агента чата', (
       ['auth-002', 'failed', run.id],
     ]);
     expect(cases[0]?.note).toBe('в браузере');
+  });
+
+  // Ревью PR #1: слово агента не заменяет прогон автокейса — и статус в библиотеке
+  // ему не переписывает; в истории запись остаётся, помеченная как слово.
+  it('автокейс: записанное словом не трогает его статус в библиотеке', () => {
+    root = mkdtempSync(join(tmpdir(), 'agent-write-'));
+    agentUpsertCase(root, 'auth', { title: 'заготовка' }, NOW);
+    upsertCase(
+      root,
+      'auth',
+      {
+        id: 'auth-001',
+        title: 'Авто',
+        automation: { status: 'automated', file: 'e2e/auth.spec.ts' },
+      },
+      NOW,
+      'human',
+    );
+    applyResults(
+      root,
+      [{ groupId: 'auth', caseId: 'auth-001', status: 'failed', runId: 'real-run', at: NOW }],
+      NOW,
+    );
+    const run = recordAgentResults(
+      root,
+      [{ groupId: 'auth', caseId: 'auth-001', status: 'passed' }],
+      NOW,
+    );
+    expect(run.attested).toBe(true);
+    expect(readGroup(root, 'auth').cases[0]).toMatchObject({ status: 'failed' });
+    expect(readGroup(root, 'auth').cases[0]?.lastRunId).not.toBe(run.id);
   });
 
   it('результат для несуществующего кейса — отказ до записи', () => {

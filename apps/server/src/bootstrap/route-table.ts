@@ -85,6 +85,7 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
     splitConveyor,
     splitOverlap,
     splitReview,
+    recheckMr,
     projectRunner,
     projectTestRuns,
     projectTestManual,
@@ -187,6 +188,7 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
         conveyor: splitConveyor,
         overlap: splitOverlap,
         review: splitReview,
+        recheckMr,
         asks: pendingAsks,
       }),
     // Пауза дерева: «Остановить всё» / «Продолжить всё» у родителя и само

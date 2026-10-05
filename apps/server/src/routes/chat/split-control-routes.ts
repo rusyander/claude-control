@@ -1,7 +1,9 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { foreignChatKey, parseForeignChatKey } from '@agentdeck/contracts/foreign-chat-key';
 import type {
+  SplitGroupContinued,
   SplitGroupPaused,
+  SplitGroupRechecked,
   SplitGroupResumed,
   SplitPlanCancelled,
 } from '@agentdeck/contracts/chat-handoff';
@@ -33,6 +35,8 @@ export function registerSplitControlRoutes(
     conveyor?: SplitConveyor;
     /** Записанные вопросы деревьев: отмена плана снимает вопросы его групп. */
     asks?: Pick<PendingAsks, 'forget'>;
+    /** «Перепроверить MR» доставленной группы (`split-recheck.ts`). */
+    recheckMr?: (parentChatId: string, index: number) => Promise<SplitGroupRechecked>;
   },
 ): void {
   /** Номер группы из тела; нет конвейера или номера — ответ уже отправлен. */
@@ -158,6 +162,47 @@ export function registerSplitControlRoutes(
       try {
         found.conveyor.dropGroup(request.params.parent, found.index);
         return { index: found.index };
+      } catch (error) {
+        return refuse(reply, error);
+      }
+    },
+  );
+
+  // «Продолжить» группу, остановившуюся недоделанной (владелец 05.10): сбой,
+  // кончившиеся повторы, ход без вердикта ревью. Потолок — отказ с числами.
+  app.post<{ Params: { parent: string }; Body: { index?: number; force?: boolean } }>(
+    '/api/chat/split/:parent/continue-group',
+    (request, reply) => {
+      const found = target(reply, request.body?.index);
+      if (!found) return reply;
+      try {
+        const outcome = found.conveyor.continueGroup(
+          request.params.parent,
+          found.index,
+          request.body?.force === true,
+        );
+        const body: SplitGroupContinued = { index: found.index, outcome };
+        return body;
+      } catch (error) {
+        return refuse(reply, error);
+      }
+    },
+  );
+
+  // «Перепроверить MR» доставленной группы: конфликты, замечания, конвейер,
+  // готовность задач — группа правит найденное и доставляет заново.
+  app.post<{ Params: { parent: string }; Body: { index?: number } }>(
+    '/api/chat/split/:parent/recheck',
+    async (request, reply) => {
+      const found = target(reply, request.body?.index);
+      if (!found) return reply;
+      if (!deps.recheckMr) {
+        return reply
+          .code(404)
+          .send({ message: 'Конвейер уровней выключен', messageCode: 'split-conveyor-off' });
+      }
+      try {
+        return await deps.recheckMr(request.params.parent, found.index);
       } catch (error) {
         return refuse(reply, error);
       }

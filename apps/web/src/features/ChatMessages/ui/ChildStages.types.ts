@@ -9,6 +9,7 @@ import type {
 import type { CodedFields, CodedList } from '@agentdeck/contracts/server-messages';
 import type { GroupControlState } from './GroupControl.types';
 import type { GroupAcceptanceState } from './GroupAcceptance.types';
+import type { GroupRecheckState } from './GroupRecheck.types';
 import type { GroupAutoNoticesState } from './GroupAutoNotices.types';
 
 /**
@@ -144,6 +145,14 @@ export interface ChildStageGroup {
    * конвейер закрыл «готово», или у уже принятой. `acceptedAt` — когда приняли.
    */
   acceptance?: GroupAcceptanceState;
+  /**
+   * «Перепроверить MR» доставленной группы (владелец 05.10): есть у группы с
+   * доставленным MR и живой копией. Идёт перепроверка — `requestedAt`; последняя
+   * кончилась доставкой — `checkedAt`, и кнопка зелёная с этим временем.
+   */
+  recheck?: GroupRecheckState;
+  /** MR группы влит или закрыт — по чтению форджа. */
+  mrClosed?: 'merged' | 'closed';
 }
 
 export type SplitGroupResult = NonNullable<SplitPlanView['groups'][number]['result']>;

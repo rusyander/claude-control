@@ -146,6 +146,7 @@ export const composedMessageParams = {
   'sieve-gap-stale': ['sieve', 'files'],
   'sieve-gap-no-run': ['sieve'],
   'sieve-gap-run-missing': ['sieve', 'run'],
+  'sieve-gap-run-empty': ['sieve', 'run'],
   'sieve-gap-run-red': ['sieve', 'run', 'cases'],
   'sieve-gap-run-stale': ['sieve', 'run', 'files'],
   'tests-gap-no-run': ['cases', 'command'],

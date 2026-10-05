@@ -61,9 +61,11 @@ async function runFact(
   const red = (record.results ?? [])
     .filter((result) => result.status === 'failed' || result.status === 'blocked')
     .map((result) => result.caseId);
+  const passed = (record.results ?? []).filter((result) => result.status === 'passed').length;
   return {
     found: true,
     red: [...new Set(red)],
+    passed,
     changedAfter: await changedSinceCommit(cwd, record.commit, branchPaths),
   };
 }

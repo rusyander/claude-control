@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Fastify from 'fastify';
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -10,7 +10,14 @@ import { registerDevRestartRoutes } from './dev-restart-routes.ts';
 /** Отложенный перезапуск dev-сервера: статус для панели и запрос сторожу (решение 30.09). */
 describe('/api/dev-restart', () => {
   let appData: string | undefined;
+  // Под сторожем dev-сервера переменная указывает на НАСТОЯЩИЙ каталог панели: агент,
+  // запустивший тесты из чата, оставил бы там запрос, и сторож перезапустил бы панель
+  // посреди живых ходов (ревью PR #1). Тест ходит только во временный каталог.
+  beforeEach(() => {
+    vi.stubEnv('AGENTDECK_DEV_RESTART_DIR', '');
+  });
   afterEach(() => {
+    vi.unstubAllEnvs();
     if (appData) rmSync(appData, { recursive: true, force: true });
     appData = undefined;
   });

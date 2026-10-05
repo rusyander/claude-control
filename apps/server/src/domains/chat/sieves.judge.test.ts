@@ -58,6 +58,24 @@ describe('механика панели: снимается только наз�
     });
   }
 
+  // Ревью PR #1: имя внутри другого имени — не то имя.
+  it('имя внутри другого — не названо: src/data.ts не снимает src/a.ts, FOOBAR — FOO', () => {
+    const other = (id: string, evidence: string, mechanics: SieveMechanics) =>
+      codes(
+        judgeSieves({ applicable: [], rows: [row(id, evidence, { status: 'n/a' })], mechanics }),
+      );
+    expect(
+      other('secrets', 'n/a: src/data.ts is a test fixture', { secrets: ['src/a.ts'] }),
+    ).toEqual(['sieve-gap-secrets']);
+    expect(other('env-config', 'n/a: FOOBAR is documented', { envVars: ['FOO'] })).toEqual([
+      'sieve-gap-env',
+    ]);
+    // Путь в кавычках, с ./ или под абсолютным корнем — по-прежнему назван.
+    expect(
+      other('secrets', 'n/a: `./src/a.ts` holds a test fixture', { secrets: ['src/a.ts'] }),
+    ).toEqual([]);
+  });
+
   it('fail по механике не снимает срабатывание, даже с именем файла', () => {
     const gaps = judgeSieves({
       applicable: [],

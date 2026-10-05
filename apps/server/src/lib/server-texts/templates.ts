@@ -1364,6 +1364,10 @@ export const serverTextTemplates = {
     ru: 'сито {{sieve}}: прогона {{run}} нет в истории блока «Тесты» копии или он не закончен — запишите прогон и укажите его номер',
     en: 'sieve {{sieve}}: run {{run}} is not in the Tests history of the copy or did not finish — record the run and cite its id',
   },
+  'sieve-gap-run-empty': {
+    ru: 'сито {{sieve}}: прогон {{run}} ничего не проверил — все кейсы пропущены или результатов нет; поднимите стенд и запишите новый прогон',
+    en: 'sieve {{sieve}}: run {{run}} checked nothing — every case was skipped or it has no results; bring the stand up and record a new run',
+  },
   'sieve-gap-run-red': {
     ru: 'сито {{sieve}}: в прогоне {{run}} красные кейсы: {{cases}} — почините и запишите новый прогон',
     en: 'sieve {{sieve}}: run {{run}} has red cases: {{cases}} — fix them and record a new run',

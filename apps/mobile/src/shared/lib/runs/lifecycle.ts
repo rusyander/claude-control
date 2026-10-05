@@ -221,6 +221,8 @@ export async function send(input: StartInput): Promise<SendOutcome> {
       effort: input.effort,
       files: input.files,
     });
+    // Ход кончился, пока шёл запрос «на ходу»: конец хода очередь уже не снимет.
+    if (getRun(id).status !== 'running') void flushQueue(id);
     return { ok: true };
   }
 

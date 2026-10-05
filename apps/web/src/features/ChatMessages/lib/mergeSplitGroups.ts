@@ -2,6 +2,7 @@ import type { SplitPlanView } from '@agentdeck/contracts/chat-handoff';
 import type { ChildStageGroup } from '../ui/ChildStages.types';
 import type { GroupControlAction } from '../ui/GroupControl.types';
 import { acceptanceOf } from './groupAcceptance';
+import { recheckOf } from './groupRecheck';
 
 /**
  * Ключ строки хаба для звена группы. Номер группы из связи — первым (Д12):
@@ -117,6 +118,9 @@ export function mergeSplitGroups(
         ...controlOf(group, split, true),
         // Ручная приёмка доставленной группы (TK-accepted).
         ...acceptanceOf(group, split, found.row.isRunning),
+        // «Перепроверить MR» доставленной группы (владелец 05.10).
+        ...recheckOf(group, split, found.row.isRunning),
+        ...(group.mrClosed ? { mrClosed: group.mrClosed } : {}),
         // Разрешённое по строке «с отметкой» — и у идущего звена: это то, что
         // прошло без человека прямо сейчас.
         ...(group.autoNotices?.length
@@ -250,7 +254,7 @@ function controlOf(
   split: SplitPlanView,
   hasChat: boolean,
 ): Pick<ChildStageGroup, 'control'> {
-  const actions = controlActions(group, hasChat);
+  const actions = controlActions(group, hasChat, Boolean(split.cancelledAt));
   if (actions.length === 0) return {};
   const limitUntil = group.waitingFor === 'limit' ? group.limitUntil : undefined;
   const queueLimit = actions[0] === 'start' ? split.limitUntil : undefined;
@@ -272,10 +276,24 @@ function controlOf(
 function controlActions(
   group: SplitPlanView['groups'][number],
   hasChat: boolean,
+  cancelled: boolean,
 ): GroupControlAction[] {
   // Пауза держит место под потолком: ненужную группу человек убирает, не
   // отменяя весь план.
   if (group.status === 'paused') return ['resume', 'drop'];
+  // Остановилась недоделанной (владелец 05.10): сдалась на сбое — доступ CLI
+  // кончился, повторы исчерпаны, доставка не сошлась — или ход без итога ревью.
+  // Строка сдавшейся группы была без единой кнопки. Продолжать можно, пока
+  // есть разговор и копия, а план не отменён.
+  const unfinished =
+    group.status === 'failed' ||
+    (group.status === 'awaiting' && group.waitingFor === 'review-missing');
+  // «Убрать» — без возврата: убранной группе «Продолжить» нет (ревью R3).
+  const continuable =
+    !cancelled && !group.droppedAt && (hasChat || group.chatId) && group.path && !group.cleaned;
+  if (unfinished && continuable) {
+    return group.status === 'failed' ? ['continue'] : ['continue', 'pause'];
+  }
   if (group.status === 'pending') return ['start', 'pause'];
   if (group.status === 'awaiting' && group.waitingFor === 'interrupted') {
     return hasChat || group.chatId ? [] : ['restart', 'drop'];

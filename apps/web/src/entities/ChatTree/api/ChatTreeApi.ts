@@ -5,7 +5,9 @@ import type {
   ChatTreeView,
   SplitGroupAccepted,
   SplitGroupCleaned,
+  SplitGroupContinued,
   SplitGroupPaused,
+  SplitGroupRechecked,
   SplitGroupResumed,
   SplitOverlapView,
   SplitPlanCancelled,
@@ -291,6 +293,34 @@ export function useDropGroup() {
     mutationFn: async (input: { parentChatId: string; index: number }) => {
       const { data } = await apiClient.post<{ index: number }>(
         `/chat/split/${encodeURIComponent(input.parentChatId)}/drop-group`,
+        { index: input.index },
+      );
+      return data;
+    },
+  });
+}
+
+/** «Продолжить» группу, остановившуюся недоделанной: сбой, кончились повторы, нет итога ревью. */
+export function useContinueGroup() {
+  return useMutation({
+    meta: { silentError: true },
+    mutationFn: async (input: { parentChatId: string; index: number; force?: boolean }) => {
+      const { data } = await apiClient.post<SplitGroupContinued>(
+        `/chat/split/${encodeURIComponent(input.parentChatId)}/continue-group`,
+        { index: input.index, ...(input.force ? { force: true } : {}) },
+      );
+      return data;
+    },
+  });
+}
+
+/** «Перепроверить MR» доставленной группы: конфликты, замечания, конвейер, готовность задач. */
+export function useRecheckGroup() {
+  return useMutation({
+    meta: { silentError: true },
+    mutationFn: async (input: { parentChatId: string; index: number }) => {
+      const { data } = await apiClient.post<SplitGroupRechecked>(
+        `/chat/split/${encodeURIComponent(input.parentChatId)}/recheck`,
         { index: input.index },
       );
       return data;

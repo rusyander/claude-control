@@ -112,6 +112,52 @@ function excerpt(text: string, limit = 300): string {
   return flat.length > limit ? `${flat.slice(0, limit)}…` : flat;
 }
 
+/** Ветки ревьюера строками задания: кто, где, ссылка, первая и последняя реплика. */
+export function threadLines(threads: readonly MrReviewThread[], mr: string): string[] {
+  const lines: string[] = [];
+  for (const thread of threads) {
+    const first = thread.notes[0];
+    const last = thread.notes[thread.notes.length - 1];
+    if (!first || !last) continue;
+    const where = thread.path ? ` · ${thread.path}${thread.line ? `:${thread.line}` : ''}` : '';
+    const reply =
+      last !== first ? ` — last reply by ${last.author}: "${excerpt(last.body, 200)}"` : '';
+    lines.push(
+      `- ${first.author}${where} · ${threadLink(thread, mr)}: "${excerpt(first.body)}"${reply}`,
+    );
+  }
+  return lines;
+}
+
+/**
+ * Переданные группе ветки — в запись наблюдения: второй раз их не передают, а
+ * по ссылкам и файлам панель сверяет выученное из них сито.
+ */
+export function noteRelayed(
+  watch: SplitMrWatch,
+  threads: readonly MrReviewThread[],
+  mr: string,
+): void {
+  // Перепроверка шлёт и уже переданное — повтором в памяти оно не встаёт.
+  const known = new Set(watch.relayed ?? []);
+  const fresh = threads.map(relayKey).filter((key) => !known.has(key));
+  watch.relayed = [...(watch.relayed ?? []), ...fresh].slice(-MAX_RELAYED);
+  const links = threads.map((thread) => threadLink(thread, mr)).filter(Boolean) as string[];
+  if (links.length === 0) return;
+  const seen = new Set(watch.relayedLinks ?? []);
+  const added = links.filter((link) => !seen.has(link));
+  watch.relayedLinks = [...(watch.relayedLinks ?? []), ...added].slice(-MAX_RELAYED);
+  // Файл треда — область выученного из него сита: держим только пересланное.
+  const paths = { ...watch.relayedPaths };
+  for (const thread of threads) {
+    const link = threadLink(thread, mr);
+    if (link && thread.path) paths[link] = thread.path;
+  }
+  const kept = new Set(watch.relayedLinks);
+  const entries = Object.entries(paths).filter(([link]) => kept.has(link));
+  if (entries.length > 0) watch.relayedPaths = Object.fromEntries(entries);
+}
+
 /**
  * Продолжение группы по её MR. Кроме списка — две вещи, ради которых он и
  * пишется (журнал 104b): перечитать ВСЕ обсуждения до работы и ещё раз перед
@@ -129,16 +175,7 @@ export function mrWatchPrompt(input: {
   ];
   if (input.threads.length > 0) {
     lines.push('', `Unresolved reviewer threads waiting for an answer (${input.threads.length}):`);
-    for (const thread of input.threads) {
-      const first = thread.notes[0];
-      const last = thread.notes[thread.notes.length - 1];
-      if (!first || !last) continue;
-      const where = thread.path ? ` · ${thread.path}${thread.line ? `:${thread.line}` : ''}` : '';
-      const reply =
-        last !== first ? ` — last reply by ${last.author}: "${excerpt(last.body, 200)}"` : '';
-      const link = threadLink(thread, input.mr);
-      lines.push(`- ${first.author}${where} · ${link}: "${excerpt(first.body)}"${reply}`);
-    }
+    lines.push(...threadLines(input.threads, input.mr));
   }
   if (input.red) {
     lines.push(
@@ -291,6 +328,7 @@ export class MrWatch {
     }
     if (review.state !== 'open') {
       watch.stopped = review.state;
+      group.mrClosed = review.state;
       this.deps.store.set(record);
       return;
     }
@@ -331,20 +369,7 @@ export class MrWatch {
 
     // Запись — ДО продолжения: старт прогона тут же переводит группу в
     // «работает», и после него круг уже не наш.
-    watch.relayed = [...(watch.relayed ?? []), ...threads.map(relayKey)].slice(-MAX_RELAYED);
-    const links = threads.map((thread) => threadLink(thread, mr)).filter(Boolean) as string[];
-    if (links.length > 0) {
-      watch.relayedLinks = [...(watch.relayedLinks ?? []), ...links].slice(-MAX_RELAYED);
-      // Файл треда — область выученного из него сита: держим только пересланное.
-      const paths = { ...watch.relayedPaths };
-      for (const thread of threads) {
-        const link = threadLink(thread, mr);
-        if (link && thread.path) paths[link] = thread.path;
-      }
-      const kept = new Set(watch.relayedLinks);
-      const entries = Object.entries(paths).filter(([link]) => kept.has(link));
-      if (entries.length > 0) watch.relayedPaths = Object.fromEntries(entries);
-    }
+    noteRelayed(watch, threads, mr);
     watch.resumes = resumes + 1;
     this.deps.store.set(record);
     const sent = this.deps.resume(

@@ -20,9 +20,12 @@
   margin-bottom: var(--spacing-3xs);
 }
 
+// Подпись тянется до кнопок: мера строки прозы (78ch) обрывала её посреди
+// широкой карточки, и кнопки шапки висели в середине (владелец 05.10).
 .headText {
   flex: 1;
   min-width: 0;
+  max-width: none;
 }
 
 // Сводка под шапкой (L37): счётчики-капсулы одной строкой, переносятся на
@@ -73,10 +76,17 @@
   line-clamp: 2;
 }
 
-// Длинные ветки и списки переносятся, а не режутся многоточием: имя ветки без
-// пробелов переносится по любому месту, иначе распирает карточку.
+// Строки состояния переносятся, а не режутся многоточием. Это данные, не проза:
+// мера строки (78ch) резала их посреди широкой карточки (владелец 05.10).
 .wrap {
+  max-width: none;
   overflow-wrap: anywhere;
+}
+
+// Ветка — одной строкой, целиком по наведению.
+.branch {
+  display: block;
+  max-width: 100%;
 }
 
 // Шаг по плану агента: номер жирнее — это первое, что ищут глазами.
@@ -130,6 +140,7 @@
   min-width: 0;
 }
 
+// Строка отброшенного чата («Неактивно»): кликабельна, наведение видно в обеих темах.
 .row {
   display: flex;
   align-items: center;
@@ -143,8 +154,6 @@
   text-align: left;
   cursor: pointer;
 
-  // Строка кликабельна, поэтому наведение обязано быть видно в ОБЕИХ темах:
-  // «утопленная» поверхность темнее карточки на свету и на тёмном.
   &:hover {
     background: var(--color-surface-sunken);
   }
@@ -155,23 +164,128 @@
   }
 }
 
-// Длинное имя ветки не должно распирать карточку: строка ужимается, а не
+// Длинное имя ветки не должно распирать карточку: текст ужимается, а не
 // растягивает ленту вбок.
 .text {
   min-width: 0;
   flex: 1;
 }
 
-// Строка группы, у которой чата ещё нет (конвейер уровней, Т1): та же сетка,
-// что у кликабельной строки, но без наведения и без курсора — открывать нечего,
-// и обещать клик было бы враньём.
-.rowStatic {
+// Карточки групп (владелец 05.10): между ними отступ, кнопки каждой — внутри.
+.groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  margin-top: var(--spacing-2xs);
+}
+
+.group {
+  position: relative;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface-sunken);
+}
+
+// Карточка с чатом кликабельна целиком, поэтому наведение видно в ОБЕИХ темах.
+.groupOpenable {
+  cursor: pointer;
+
+  &:hover {
+    border-color: var(--color-border-strong);
+  }
+}
+
+// Текст слева, кнопки справа сверху. Тесно — кнопки переносятся в своём же
+// блоке, оставаясь справа; под текст уходят только на узком экране.
+.groupBody {
   display: flex;
   align-items: flex-start;
+  gap: var(--spacing-2xs) var(--spacing-sm);
+
+  @media (max-width: 640px) {
+    flex-wrap: wrap;
+  }
+}
+
+.groupMain {
+  display: flex;
+  flex: 1 1 240px;
+  align-items: flex-start;
   gap: var(--spacing-2xs);
-  width: 100%;
-  padding: var(--spacing-3xs) var(--spacing-3xs);
-  border-radius: 8px;
+  min-width: 0;
+}
+
+// Точка — по строке названия, а не по середине карточки.
+.groupDot {
+  display: inline-flex;
+  flex: none;
+  margin-top: 6px;
+}
+
+// Растянутая кнопка: её ::after накрывает карточку, так что открывает клик в
+// любом месте; кнопки и формы стоят над ним (z-index), и их клик — свой.
+.groupOpen {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  &::after {
+    position: absolute;
+    inset: 0;
+    border-radius: 8px;
+    content: '';
+  }
+
+  &:focus-visible {
+    outline: none;
+  }
+
+  &:focus-visible::after {
+    outline: 2px solid var(--color-accent);
+    outline-offset: -2px;
+  }
+}
+
+.groupActions {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--spacing-2xs);
+  max-width: 65%;
+  margin-left: auto;
+
+  @media (max-width: 640px) {
+    max-width: none;
+  }
+
+  &:empty {
+    display: none;
+  }
+
+  // Обёртки кнопок несут свой верхний отступ для жизни под строкой — в ряду
+  // кнопок он сбивал их по высоте.
+  &.groupActions > * {
+    margin-top: 0;
+  }
+}
+
+.groupFoot {
+  position: relative;
+  z-index: 1;
+  margin-top: var(--spacing-2xs);
+  padding-left: calc(8px + var(--spacing-2xs));
 }
 
 // Форма ответа на вопрос разбора — под строкой группы, в её же отступе: вопрос
@@ -187,6 +301,20 @@
   display: flex;
   justify-content: flex-end;
   margin-top: var(--spacing-2xs);
+}
+
+// «Перепроверить MR»: время последней проверки — рядом с кнопкой, а не под ней.
+.recheckTime {
+  align-self: center;
+  margin-right: var(--spacing-2xs);
+}
+
+// Перепроверка кончилась доставкой — кнопка зелёная, пока новая работа группы
+// отметку не снимет (владелец 05.10).
+.recheckChecked {
+  color: var(--color-success);
+  background: var(--color-success-subtle);
+  border-color: var(--color-success);
 }
 
 // Пересечения веток (Т6). Раздел карточки, а не отдельная карточка: вопрос

@@ -107,7 +107,27 @@ export function parseZeroContextDiff(diff: string): ParsedDiff {
   let path: string | undefined;
   let target: string | undefined;
   let hunk: RemovedHunk | undefined;
+  // Строки, ещё не прочитанные в ханке: внутри него `+++ x` — добавленная строка
+  // «++ x», а не заголовок файла (ревью PR #1: она уводила следующие строки в чужой путь).
+  let oldLeft = 0;
+  let newLeft = 0;
   for (const line of diff.split('\n')) {
+    if (oldLeft > 0 || newLeft > 0) {
+      if (line.startsWith('-') && oldLeft > 0) {
+        oldLeft -= 1;
+        hunk?.lines.push(line.slice(1));
+        continue;
+      }
+      if (line.startsWith('+') && newLeft > 0) {
+        newLeft -= 1;
+        added.push(line.slice(1));
+        if (target) additions.push({ path: target, text: line.slice(1) });
+        continue;
+      }
+      if (line.startsWith('\\')) continue;
+      oldLeft = 0;
+      newLeft = 0;
+    }
     if (line.startsWith('--- ')) {
       const name = line.slice(4).trim();
       path = name === '/dev/null' ? undefined : name.replace(/^a\//, '');
@@ -119,9 +139,11 @@ export function parseZeroContextDiff(diff: string): ParsedDiff {
       target = name === '/dev/null' ? undefined : name.replace(/^b\//, '');
       continue;
     }
-    const head = /^@@ -(\d+)(?:,(\d+))? \+\d+(?:,\d+)? @@/.exec(line);
+    const head = /^@@ -(\d+)(?:,(\d+))? \+\d+(?:,(\d+))? @@/.exec(line);
     if (head) {
       const count = head[2] === undefined ? 1 : Number(head[2]);
+      oldLeft = count;
+      newLeft = head[3] === undefined ? 1 : Number(head[3]);
       hunk = path && count > 0 ? { path, start: Number(head[1]), count, lines: [] } : undefined;
       if (hunk) removed.push(hunk);
       continue;
@@ -315,8 +337,20 @@ export async function readSieveFacts(input: {
   }
 
   const diff = parseZeroContextDiff(
-    (await run(cwd, ['diff', '-U0', '--no-color', '--no-ext-diff', '--no-renames', base, 'HEAD']))
-      .stdout,
+    // Имена не в восьмеричных кавычках: «src/страница.ts», а не "b/src/\\321…" (ревью PR #1).
+    (
+      await run(cwd, [
+        '-c',
+        'core.quotePath=false',
+        'diff',
+        '-U0',
+        '--no-color',
+        '--no-ext-diff',
+        '--no-renames',
+        base,
+        'HEAD',
+      ])
+    ).stdout,
   );
   if (input.startedAt) {
     const foreign = await foreignRemovalsOf(cwd, {

@@ -18,6 +18,7 @@ import {
 import {
   splitPlanRunning,
   type SplitGroupCleaned,
+  type SplitGroupRechecked,
   type SplitPlanView,
 } from '@agentdeck/contracts/chat-handoff';
 import {
@@ -44,6 +45,7 @@ import {
   errorCodeOf,
 } from './split-group-texts.ts';
 import { groupIdentityLine } from './panel-preamble.ts';
+import { continuable, continuePrompt } from './split-continue.ts';
 
 /**
  * Конвейер уровней разделения (Т1): разбор ПЕРЕД копиями, порции запуска
@@ -629,7 +631,10 @@ export class SplitConveyor {
         }
         state.after = group.after;
         if (group.hold) state.hold = group.hold;
-        state.status = group.hold ? 'held' : group.after.length > 0 ? 'waiting' : 'pending';
+        // Пауза и «Убрать» человека посреди разбора блоком не отменяются (ревью PR #1).
+        if (state.status === 'pending') {
+          state.status = group.hold ? 'held' : group.after.length > 0 ? 'waiting' : 'pending';
+        }
       }
     }
     record.triage = {
@@ -855,6 +860,13 @@ export class SplitConveyor {
     if (outcome.status === 'done' || outcome.status === 'failed') {
       group.doneAt = this.now().toISOString();
     } else delete group.doneAt;
+    // «Перепроверить MR» (владелец 05.10): ход, НЕСУЩИЙ перепроверку, кончился
+    // доставкой — отметка со временем; сбоем — перепроверка снята. Другой ход,
+    // кончившийся, пока перепроверка ждёт места, её не засчитывает (ревью R1).
+    if (group.recheckRunning && outcome.status === 'done') {
+      group.recheckedAt = this.now().toISOString();
+      dropRecheck(group);
+    } else if (outcome.status === 'failed') dropRecheck(group);
     // Ход дошёл до конца — обрыв позади, и счёт самостоятельных продолжений
     // начинается заново.
     if (outcome.waitingFor !== 'interrupted') {
@@ -1101,6 +1113,16 @@ export class SplitConveyor {
    */
   recoverDeliveryChecks(): void {
     for (const record of Object.values(this.deps.store.all())) {
+      // Перепроверка, отданная сессии, но не начатая, жила в очереди прежнего
+      // процесса и умерла с ним — иначе «Перепроверяется…» навсегда (ревью R2).
+      const lost = record.groups.filter(
+        (group) => group.recheckRequestedAt && !group.parked?.recheck && !group.recheckRunning,
+      );
+      for (const group of lost) dropRecheck(group);
+      // Так же умерло «Продолжить» из очереди сессии — кнопка снова работает.
+      const queued = record.groups.filter((group) => group.continueQueuedAt);
+      for (const group of queued) delete group.continueQueuedAt;
+      if (lost.length > 0 || queued.length > 0) this.deps.store.set(record);
       for (const group of record.groups) {
         if (group.status === 'awaiting' && group.waitingFor === 'delivery') {
           this.verifyDelivery(record.parentChatId, group.index, {
@@ -1354,6 +1376,13 @@ export class SplitConveyor {
     delete group.blockedSince;
     // Принимали прошлую работу: новый ход её меняет, отметка снимается.
     delete group.acceptedAt;
+    // Проверяли тоже прошлую: зелёная отметка уходит, идущая перепроверка — нет.
+    delete group.recheckedAt;
+    // Слово перепроверки уже у сессии — этот ход и есть перепроверка.
+    if (group.recheckSentAt) group.recheckRunning = true;
+    // Отложенное «Продолжить» дошло — этот ход и есть оно.
+    delete group.continueQueuedAt;
+    delete group.droppedAt;
     this.deps.store.set(record);
   }
 
@@ -1544,6 +1573,13 @@ export class SplitConveyor {
         'cleaned',
         'mrWatch',
         'acceptedAt',
+        'recheckRequestedAt',
+        'recheckSentAt',
+        'recheckRunning',
+        'continueQueuedAt',
+        'recheckedAt',
+        'mrClosed',
+        'droppedAt',
         'tickets',
         'humanSteps',
         'interruptedAt',
@@ -1685,6 +1721,11 @@ export class SplitConveyor {
         ...(group.limitUntil ? { limitUntil: group.limitUntil } : {}),
         ...(group.parked ? { parkedAt: group.parked.at } : {}),
         ...(group.acceptedAt ? { acceptedAt: group.acceptedAt } : {}),
+        ...(group.recheckRequestedAt ? { recheckRequestedAt: group.recheckRequestedAt } : {}),
+        ...(group.recheckedAt ? { recheckedAt: group.recheckedAt } : {}),
+        ...(group.mrClosed ? { mrClosed: group.mrClosed } : {}),
+        ...(record.proposal.groups[group.index]?.review ? { review: true as const } : {}),
+        ...(group.droppedAt ? { droppedAt: group.droppedAt } : {}),
         ...(group.tickets?.length ? { tickets: group.tickets } : {}),
         ...(group.humanSteps?.length ? { humanSteps: group.humanSteps } : {}),
         ...(group.autoNotices?.length ? { autoNotices: group.autoNotices } : {}),
@@ -1999,6 +2040,7 @@ export class SplitConveyor {
     parentChatId: string,
     index: number,
     prompt: string,
+    recheck = false,
   ): 'sent' | 'queued' | 'refused' {
     const record = this.deps.store.get(parentChatId);
     const group = record?.groups[index];
@@ -2019,13 +2061,142 @@ export class SplitConveyor {
       group.parked = parked
         ? { prompt: `${parked.prompt}\n\n${prompt}`, at: parked.at }
         : { prompt: this.withIdentity(record, group, prompt), at: this.now().toISOString() };
+      if (recheck || parked?.recheck) group.parked.recheck = true;
       this.deps.store.set(record);
       if (this.admission(record).kind !== 'ok') return 'queued';
       // Итог — настоящий (m12): продолжение могли и не принять, и тогда
       // наблюдатель MR должен знать, что слово не дошло.
       return this.drainParked(parentChatId).get(index) ?? 'queued';
     }
-    return this.deps.resume(group, this.withIdentity(record, group, prompt));
+    return this.send(parentChatId, group, this.withIdentity(record, group, prompt), recheck);
+  }
+
+  /**
+   * Слово сессии группы. Несёт перепроверку — отметка «отдано» ставится ДО
+   * отдачи: старт хода (`onChainResumed`) приходит изнутри `resume` и должен её
+   * застать. Не приняли — снимается вместе с самой перепроверкой (ревью R2).
+   */
+  private send(
+    parentChatId: string,
+    group: SplitPlanGroupRecord,
+    prompt: string,
+    recheck: boolean,
+  ): 'sent' | 'queued' | 'refused' {
+    if (!this.deps.resume || !group.chatId || !group.path) return 'refused';
+    if (recheck) {
+      const record = this.deps.store.get(parentChatId);
+      const own = record?.groups[group.index];
+      if (record && own) {
+        own.recheckSentAt = this.now().toISOString();
+        this.deps.store.set(record);
+      }
+    }
+    const outcome = this.deps.resume(
+      this.deps.store.get(parentChatId)?.groups[group.index] ?? group,
+      prompt,
+    );
+    if (recheck && outcome === 'refused') {
+      const record = this.deps.store.get(parentChatId);
+      const own = record?.groups[group.index];
+      if (record && own) {
+        dropRecheck(own);
+        this.deps.store.set(record);
+      }
+    }
+    return outcome;
+  }
+
+  /**
+   * «Перепроверить MR» (владелец 05.10): отметка «перепроверяется» и слово
+   * доставленной группе (`split-recheck.ts` собирает его по MR). Слово ждёт
+   * места, как у наблюдателя MR (`queued`); не дошло — отметка откатывается.
+   */
+  recheckDelivered(parentChatId: string, index: number, prompt: string): SplitGroupRechecked {
+    const record = this.deps.store.get(parentChatId);
+    const group = record?.groups[index];
+    if (!record || !group) {
+      throw coded(
+        new Error('Перепроверять нечего: у группы нет доставленного MR или её копия убрана'),
+        'split-recheck-nothing',
+      );
+    }
+    // Перепроверка уже ждёт (вторая вкладка, телефон) — второго слова нет (ревью G1).
+    if (group.recheckRequestedAt && (group.parked?.recheck || group.recheckSentAt)) {
+      return {
+        index,
+        outcome: group.recheckRunning ? 'sent' : 'queued',
+        requestedAt: group.recheckRequestedAt,
+      };
+    }
+    // Прежняя зелёная отметка живёт до старта хода перепроверки: не дошло слово —
+    // она на месте.
+    const requestedAt = this.now().toISOString();
+    group.recheckRequestedAt = requestedAt;
+    this.deps.store.set(record);
+    const outcome = this.resumeDelivered(parentChatId, index, prompt, true);
+    if (outcome !== 'refused') return { index, outcome, requestedAt };
+    const fresh = this.deps.store.get(parentChatId);
+    const same = fresh?.groups[index];
+    if (fresh && same) {
+      dropRecheck(same);
+      this.deps.store.set(fresh);
+    }
+    throw coded(
+      new Error('Продолжить группу нечем: у неё нет разговора или копии'),
+      'split-resume-refused',
+    );
+  }
+
+  /**
+   * «Продолжить» группу, остановившуюся недоделанной (владелец 05.10): сдалась
+   * на сбое — повторы кончились, доступ CLI пропал, доставка не сошлась — или
+   * кончила ход без вердикта ревью. Раньше у сдавшейся группы с чатом не было
+   * ни одной кнопки, и продолжить её можно было только словом в её чат.
+   *
+   * Сбой место под потолком отдал — продолжение занимает его снова (отказ с
+   * числами, с согласием — сверх); ждущая держит своё, ей — только лимит.
+   * Счёт повторов и напоминаний о доставке начинается заново: человек сказал
+   * пробовать ещё.
+   */
+  continueGroup(parentChatId: string, index: number, force = false): 'sent' | 'queued' {
+    const record = this.deps.store.get(parentChatId);
+    const group = record?.groups[index];
+    if (!record || !group || !continuable(record, group)) {
+      throw coded(
+        new Error('Продолжать нечего: группа не остановилась недоделанной'),
+        'split-continue-nothing',
+      );
+    }
+    // Задание уже ждёт в очереди сессии (вторая вкладка, повторный клик) —
+    // второго нет: сессия выполнила бы оба (ревью G2).
+    if (group.continueQueuedAt) return 'queued';
+    if (!force) {
+      if (group.status === 'failed') this.admit(record);
+      else this.admitLimit(record);
+    }
+    const prompt = continuePrompt({
+      branch: group.branch,
+      deliver: group.deliver === true,
+      ...(group.error ? { error: group.error } : {}),
+    });
+    const outcome = this.deps.resume
+      ? this.deps.resume(group, this.withIdentity(record, group, prompt))
+      : 'refused';
+    if (outcome === 'refused') {
+      throw coded(
+        new Error('Продолжить группу нечем: у неё нет разговора или копии'),
+        'split-resume-refused',
+      );
+    }
+    const fresh = this.deps.store.get(parentChatId);
+    const same = fresh?.groups[index];
+    if (fresh && same) {
+      delete same.retries;
+      delete same.deliveryNudges;
+      if (outcome === 'queued') same.continueQueuedAt = this.now().toISOString();
+      this.deps.store.set(fresh);
+    }
+    return outcome;
   }
 
   /**
@@ -2192,6 +2363,15 @@ export class SplitConveyor {
     if (!record || !group || group.status !== 'pending') {
       throw coded(new Error('Группа не в очереди — запускать нечего'), 'split-start-not-queued');
     }
+    // Посреди разбора группу заводит его блок: запуск сейчас дал бы ей вторую копию (ревью PR #1).
+    if (triagePending(record)) {
+      throw coded(
+        new Error(
+          'Разбор задач ещё идёт — порядок групп решит он; запуск станет доступен после него',
+        ),
+        'split-start-triage',
+      );
+    }
     if (!force) this.admit(record);
     return this.runPortion(
       record,
@@ -2259,6 +2439,8 @@ export class SplitConveyor {
     }
     this.apply(group, { status: 'failed', error: serverText('split-group-dropped') });
     group.doneAt = this.now().toISOString();
+    // «Убрать» — без возврата: «Продолжить» такой группе не положено (ревью R3).
+    group.droppedAt = group.doneAt;
     delete group.interruptedAt;
     delete group.interruptResumes;
     delete group.pausedAt;
@@ -2340,6 +2522,7 @@ export class SplitConveyor {
     group.pausedAt = this.now().toISOString();
     delete group.waitingFor;
     delete group.limitUntil;
+    if (group.parked?.recheck) dropRecheck(group);
     delete group.parked;
     delete group.interruptedAt;
     this.deps.store.set(record);
@@ -2583,13 +2766,10 @@ export class SplitConveyor {
       if (!current || !group?.parked) continue;
       const busy = group.status === 'started' || group.status === 'background';
       if (!busy && this.admission(current).kind !== 'ok') return outcomes;
-      const prompt = group.parked.prompt;
+      const { prompt, recheck } = group.parked;
       delete group.parked;
       this.deps.store.set(current);
-      const outcome =
-        this.deps.resume && group.chatId && group.path
-          ? this.deps.resume(group, prompt)
-          : 'refused';
+      const outcome = this.send(parentChatId, group, prompt, Boolean(recheck));
       outcomes.set(index, outcome);
       if (outcome === 'refused') {
         this.deps.log(`split conveyor: parked resume refused (${parentChatId}#${index})`);
@@ -2597,6 +2777,13 @@ export class SplitConveyor {
     }
     return outcomes;
   }
+}
+
+/** Перепроверка снята: ход кончился, слово не дошло или потерялось. */
+function dropRecheck(group: SplitPlanGroupRecord): void {
+  delete group.recheckRequestedAt;
+  delete group.recheckSentAt;
+  delete group.recheckRunning;
 }
 
 /** Отказ оживить отменённый план — перезапуском или «Продолжить» (m1, D6). */

@@ -115,6 +115,8 @@ const PINNED_HUMAN: Readonly<Record<string, RouteClass>> = {
   'POST /api/chat/split/:parent/relaunch': 'human:split-apply',
   'POST /api/chat/split/:parent/restart-group': 'human:split-apply',
   'POST /api/chat/split/:parent/drop-group': 'human:split-apply',
+  'POST /api/chat/split/:parent/continue-group': 'human:split-apply',
+  'POST /api/chat/split/:parent/recheck': 'human:outward',
   'POST /api/project-tests/baseline': 'human:upload',
 };
 

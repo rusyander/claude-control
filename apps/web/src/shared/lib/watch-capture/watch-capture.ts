@@ -156,6 +156,11 @@ export function reportApiFailure(input: {
   seenByServer?: boolean;
 }): void {
   if (input.seenByServer) return;
+  // Страница под автоматизацией (Playwright, проверки панели): отказ, которого
+  // сервер не видел, — подменённый проверкой ответ или закрытый ею браузер, а не
+  // сбой панели. Живой прогон наблюдателя 05.10: «500 boom» заглушки и обрыв при
+  // закрытии вкладки легли в отчёт сбоями. Ошибки страницы и консоли — уходят.
+  if (typeof navigator !== 'undefined' && navigator.webdriver) return;
   const status = input.status ?? 0;
   if (status > 0 && status < 500) return;
   const path = apiPath(input.url);

@@ -3,6 +3,8 @@ import type { ChatMessageCode } from '@agentdeck/contracts/server-messages';
 export const chatRu: Record<ChatMessageCode, string> = {
   'run-busy':
     'Предыдущий ответ в этом разговоре ещё генерируется. Дождитесь его окончания или нажмите «Остановить» — сообщение не отправлено.',
+  'run-steer-ended':
+    'Ход уже закончился — сообщение посреди хода не отправлено; панель отправит его обычным порядком.',
   'run-empty-prompt': 'Сообщение пустое — отправлять нечего.',
   'run-unsupported-upload':
     'Не поддерживаются вложения: {{names}}. Сообщение не отправлено. Допустимые расширения: {{supported}}.',
@@ -86,11 +88,18 @@ export const chatRu: Record<ChatMessageCode, string> = {
   'split-resume-refused': 'Продолжить группу нечем: у неё нет разговора или копии',
   'split-restart-not-cut': 'Группа не оборвана до своего чата — заводить заново нечего',
   'split-start-not-queued': 'Группа не в очереди — запускать нечего',
+  'split-start-triage':
+    'Разбор задач ещё идёт — порядок групп решит он; запуск станет доступен после него',
   'split-accept-not-done': 'Принять нечего: группы нет или она ещё не доставлена',
   'split-group-no-slot': 'Все места заняты: работает {{running}} из {{limit}}',
   'split-group-no-slot-paused':
     'Все места заняты: работает {{running}}, на паузе {{paused}} из {{limit}} — место освободит «Продолжить» или «Убрать» у группы на паузе',
   'split-drop-nothing': 'Убирать нечего: группа не на паузе и не оборвана до своего чата',
+  'split-continue-nothing': 'Продолжать нечего: группа не остановилась недоделанной',
+  'split-recheck-nothing':
+    'Перепроверять нечего: у группы нет доставленного MR или её копия убрана',
+  'split-recheck-merged': 'MR уже влит — перепроверять нечего',
+  'split-recheck-closed': 'MR закрыт — перепроверять нечего',
   'split-limit-active': 'Лимит подписки исчерпан до {{until}}',
   'split-plan-cancel-nothing': 'Отменять нечего: разделение этого разговора уже закончилось',
   'split-plan-cancel-unknown': 'Разделения с этим разговором нет',

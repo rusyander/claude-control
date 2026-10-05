@@ -184,6 +184,10 @@ export function mergeSieveRows(
   next: readonly SieveReportRow[],
 ): SieveReportRow[] {
   const byId = new Map((previous ?? []).map((row) => [row.id, row]));
-  for (const row of next) byId.set(row.id, row);
+  // Удалить перед записью: свежая строка встаёт в конец и не уходит под обрезку первой.
+  for (const row of next) {
+    byId.delete(row.id);
+    byId.set(row.id, row);
+  }
   return [...byId.values()].slice(-ROWS_MAX);
 }

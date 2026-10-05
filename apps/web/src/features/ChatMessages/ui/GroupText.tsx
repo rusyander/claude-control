@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
+import { TruncatedText } from '@shared/ui/truncated-text';
 import { cn } from '@shared/lib/cn';
 import { serverFieldList, serverFieldText } from '@shared/config/i18n';
 import { GroupMeta } from './GroupMeta';
@@ -87,6 +88,18 @@ export function GroupText({ group, step }: { group: ChildStageGroup; step?: Reac
             {t('chat.cascade.hub.accept.marker')}
           </Typography>
         )}
+        {/* MR влит или закрыт — перепроверять его нечего, и строка это говорит. */}
+        {group.mrClosed && (
+          <Typography
+            variant="caption"
+            color="subtle"
+            as="span"
+            className={styles.chip}
+            data-hub-mr-closed={group.mrClosed}
+          >
+            {t(`chat.cascade.hub.mrClosed.${group.mrClosed}`)}
+          </Typography>
+        )}
         {group.isPaused && (
           <Typography variant="caption" color="subtle" as="span" className={styles.chip}>
             {t('chat.cascade.tree.paused')}
@@ -110,29 +123,15 @@ export function GroupText({ group, step }: { group: ChildStageGroup; step?: Reac
       </span>
       {step}
       <GroupMeta group={group} />
-      {/* Ветка и звенья — переносом, не многоточием (живой прогон 29.09):
-          обрезанное на полуслове имя ветки не читалось вовсе. */}
+      {/* Ветка — одной строкой (владелец 05.10): имя из десятка тикетов
+          переносом съедало две строки карточки. Целиком — по наведению. */}
       {branch && (
-        <Typography variant="caption" color="subtle" as="span" className={styles.wrap}>
-          {branch}
-        </Typography>
+        <TruncatedText text={branch} variant="caption" color="subtle" className={styles.branch} />
       )}
       {parts.length > 0 && (
         <Typography variant="caption" color="subtle" as="span" className={styles.wrap}>
           {parts.join(' · ')}
         </Typography>
-      )}
-      {/* MR группы (доставка): из хаба — прямо в него, а не через чат группы. */}
-      {group.mr && (
-        <a
-          className={styles.mr}
-          href={group.mr}
-          target="_blank"
-          rel="noreferrer noopener"
-          data-hub-mr
-        >
-          {t('chat.cascade.hub.mr', { id: group.mr.match(/(\d+)$/)?.[1] ?? '' })}
-        </a>
       )}
       {/* Чего не хватило до доставки по фактам git: без этого «ждёт» у группы,
           которой панель напомнила доделать MR, не объяснял ничего. */}

@@ -58,6 +58,8 @@ const DEPENDENCY_DEPTH = 3;
 
 /** Сколько ждать выхода команды после мягкой остановки, прежде чем снять её жёстко. */
 const KILL_GRACE_MS = 5_000;
+/** Сколько дочитывать вывод после выхода команды, если его держит её помощник. */
+const EXIT_DRAIN_MS = 2_000;
 /** Каталог копий проверок в каталоге данных панели. */
 const COPIES_DIR = 'mutation-copies';
 
@@ -224,6 +226,8 @@ interface Live {
   links: string[];
   timer?: NodeJS.Timeout;
   stopped?: boolean;
+  /** Копия снимается (или остановленный прогон ещё до неё не дошёл): папка и запись worktree заняты. */
+  cleaning?: boolean;
 }
 
 /** Ссылка в копию: каталог — `junction` на Windows, запоминается для уборки. */
@@ -322,7 +326,11 @@ export class MutationChecks {
   }
 
   status(root: string): ProjectTestMutationCheck | undefined {
-    return this.checks.get(normalize(root))?.view;
+    const live = this.checks.get(normalize(root));
+    if (!live) return undefined;
+    // Итог объявляется после уборки копии: раньше него новая проверка пошла бы
+    // поверх недоснятого worktree, а на Windows занятая папка не удаляется.
+    return live.cleaning ? { ...live.view, status: 'running', stage: 'cleanup' } : live.view;
   }
 
   isRunning(root: string): boolean {
@@ -391,6 +399,9 @@ export class MutationChecks {
     if (!live || live.view.status !== 'running') return live?.view;
     live.stopped = true;
     live.view.status = 'stopped';
+    // Прогон ещё может заводить копию (`git worktree add`) — до его уборки
+    // проверка занята: новая пошла бы поверх, а папку под ним не удалить (ревью PR #1).
+    live.cleaning = true;
     const child = live.child;
     if (child) {
       killChildTree(child, { group: process.platform !== 'win32' });
@@ -479,6 +490,9 @@ export class MutationChecks {
       const report = join(appData, COPIES_DIR, `${id}.junit.xml`);
       const command = this.command(root, copy, appData, files, report, live);
       view.command = command.line;
+      // Отчёт по постоянному пути (`automation.report`) мог приехать в копию от
+      // прошлого прогона человека: упавшая команда читалась бы его итогом (ревью PR #1).
+      rmSync(command.report, { force: true });
       const code = await this.exec(live, command, now);
       if (live.stopped) return;
 
@@ -511,9 +525,23 @@ export class MutationChecks {
       view.status = 'done';
       view.finishedAt = now();
       rmSync(command.report, { force: true });
+    } catch (error) {
+      // Причина — до уборки: иначе finally подменил бы её на «отчёта нет».
+      const code = (error as { messageCode?: string }).messageCode;
+      this.fail(
+        live,
+        (error as Error).message,
+        code?.startsWith('mutation-') ? (code as MutationCode) : 'mutation-failed',
+        now,
+      );
     } finally {
       view.stage = view.status === 'running' ? 'cleanup' : view.stage;
-      await dropCopy(root, copy, live.links);
+      live.cleaning = true;
+      try {
+        await dropCopy(root, copy, live.links);
+      } finally {
+        live.cleaning = false;
+      }
       rmSync(join(appData, COPIES_DIR, `${id}.junit.xml`), { force: true });
       if (view.status === 'running') {
         this.fail(live, 'The check ended without a report.', 'mutation-no-report', now);
@@ -592,11 +620,25 @@ export class MutationChecks {
         killChildTree(child, { group: process.platform !== 'win32' });
       }, command.timeout * 60_000);
       live.timer.unref?.();
-      child.on('close', (code) => {
+      let settled = false;
+      const settle = (code: number | null): void => {
+        if (settled) return;
+        settled = true;
         live.child = undefined;
         if (live.timer) clearTimeout(live.timer);
         done(code);
+      };
+      // Помощник команды (dev-сервер, наблюдатель), унаследовавший её вывод, держит
+      // `close` до своего конца — проверка висела бы после выхода самой команды
+      // (ревью PR #1). По выходу — короткий дочит вывода, и итог.
+      child.on('exit', (code) => {
+        setTimeout(() => {
+          child.stdout?.destroy();
+          child.stderr?.destroy();
+          settle(code);
+        }, EXIT_DRAIN_MS).unref?.();
       });
+      child.on('close', (code) => settle(code));
     });
   }
 }

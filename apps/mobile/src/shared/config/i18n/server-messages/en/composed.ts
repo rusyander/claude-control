@@ -206,6 +206,8 @@ export const composedEn: Record<ComposedMessageCode, string> = {
     'sieve {{sieve}}: the project has a Tests section — record the live check as a run (tests-cli run or tests-cli record) and cite it in the evidence as run:<id>',
   'sieve-gap-run-missing':
     'sieve {{sieve}}: run {{run}} is not in the Tests history of the copy or did not finish — record the run and cite its id',
+  'sieve-gap-run-empty':
+    'sieve {{sieve}}: run {{run}} checked nothing — every case was skipped or it has no results; bring the stand up and record a new run',
   'sieve-gap-run-red':
     'sieve {{sieve}}: run {{run}} has red cases: {{cases}} — fix them and record a new run',
   'sieve-gap-run-stale':

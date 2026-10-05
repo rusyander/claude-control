@@ -139,12 +139,73 @@ describe('проверка набора поломкой', () => {
       expect.objectContaining({ messageCode: 'mutation-busy' }),
     );
     checks.stop(dir);
-    // Остановленная проверка ещё убирает копию — дождаться, чтобы не убрать каталог под ней.
-    await vi.waitFor(() => expect(gitIn(dir, ['worktree', 'list']).split('\n')).toHaveLength(1), {
-      timeout: 30_000,
-      interval: 100,
+    // Остановленная, она ещё может заводить копию — и занята, пока её не уберёт:
+    // вторая проверка поверх неё — отказ (ревью PR #1: стоп сразу после старта).
+    expect(checks.status(dir)?.status).toBe('running');
+    expect(() => checks.start({ root: dir, appData, file: 'src/math.mjs' })).toThrow(
+      expect.objectContaining({ messageCode: 'mutation-busy' }),
+    );
+    expect(await finished(checks, dir)).toMatchObject({ status: 'stopped' });
+    expect(gitIn(dir, ['worktree', 'list']).split('\n')).toHaveLength(1);
+  }, 60_000);
+
+  // Ревью PR #1: ошибка внутри прогона подменялась «отчёта нет» с пустым журналом.
+  it('нет команды прогона — человек видит эту причину, а не «отчёта нет»', async () => {
+    const { dir, appData } = project();
+    rmSync(join(dir, '.agent', 'tests', 'automation.json'));
+    const checks = new MutationChecks();
+    checks.start({ root: dir, appData, file: 'src/math.mjs' });
+    expect(await finished(checks, dir)).toMatchObject({
+      status: 'error',
+      errorCode: 'mutation-no-command',
     });
-    expect(checks.status(dir)?.status).toBe('stopped');
+    expect(gitIn(dir, ['worktree', 'list']).split('\n')).toHaveLength(1);
+  }, 60_000);
+
+  // Ревью PR #1: отчёт по постоянному пути от прошлого прогона человека читался
+  // как итог этой проверки — команда упала, а вердикт «не заметили».
+  it('старый отчёт по пути automation.report не читается как итог проверки', async () => {
+    const { dir, appData } = project();
+    writeFileSync(
+      join(dir, '.agent', 'tests', 'automation.json'),
+      JSON.stringify({ command: 'node -e "process.exit(3)"', report: 'out/junit.xml' }),
+    );
+    mkdirSync(join(dir, 'out'));
+    writeFileSync(
+      join(dir, 'out', 'junit.xml'),
+      '<?xml version="1.0"?><testsuite><testcase name="[math-001] add and big"/></testsuite>',
+    );
+    const checks = new MutationChecks();
+    checks.start({ root: dir, appData, file: 'src/math.mjs' });
+    expect(await finished(checks, dir)).toMatchObject({
+      status: 'error',
+      errorCode: 'mutation-no-report',
+    });
+  }, 60_000);
+
+  // Ревью PR #1: помощник команды, унаследовавший её вывод, держал проверку
+  // «идёт» до своего конца — уже после выхода самой команды.
+  it('команда вышла — проверка кончается, даже если её помощник держит вывод', async () => {
+    const { dir, appData } = project();
+    const pidFile = join(root as string, 'helper.pid');
+    // Помощник пишет свой pid наружу — тест гасит его сам: сироту проверка не убирает.
+    const helper = [
+      "const kid = require('child_process').spawn(process.execPath, ['-e', 'setTimeout(() => {}, 15000)'], { stdio: 'inherit', detached: true });",
+      "require('fs').writeFileSync(" + JSON.stringify(pidFile) + ', String(kid.pid));',
+      'kid.unref(); process.exit(0);',
+    ].join('\n');
+    writeFileSync(join(dir, 'helper.cjs'), helper);
+    writeFileSync(
+      join(dir, '.agent', 'tests', 'automation.json'),
+      JSON.stringify({ command: 'node helper.cjs' }),
+    );
+    const checks = new MutationChecks();
+    const startedAt = Date.now();
+    checks.start({ root: dir, appData, file: 'src/math.mjs' });
+    expect(await finished(checks, dir)).toMatchObject({ status: 'error' });
+    expect(Date.now() - startedAt).toBeLessThan(10_000);
+    process.kill(Number(readFileSync(pidFile, 'utf8')));
+    await new Promise((done) => setTimeout(done, 500));
   }, 60_000);
 
   it('кандидаты — файлы codePaths автокейсов, каталог не ломается целиком', () => {
@@ -162,8 +223,9 @@ describe('проверка набора поломкой', () => {
     expect(breakFile('if (a === b) go();', 'a.ts', 'subtle')?.text).toBe('if (a !== b) go();');
   });
 
-  // Ревью 30.09: запись по ссылке ушла бы в настоящий файл вне копии.
-  it('файл-ссылка и файл зависимостей не ломаются', () => {
+  // Ревью 30.09: запись по ссылке ушла бы в настоящий файл вне копии. Ссылку на
+  // файл под Windows без прав администратора не завести — там тест пропускается.
+  it.skipIf(process.platform === 'win32')('файл-ссылка и файл зависимостей не ломаются', () => {
     const { dir, appData } = project();
     const outside = join(root as string, 'outside.mjs');
     writeFileSync(outside, MATH);
@@ -198,7 +260,12 @@ describe('проверка набора поломкой', () => {
     gitIn(dir, ['worktree', 'add', '--detach', copy, 'HEAD']);
     mkdirSync(join(dir, 'node_modules', 'pkg'), { recursive: true });
     writeFileSync(join(dir, 'node_modules', 'pkg', 'index.js'), 'keep');
-    symlinkSync(join(dir, 'node_modules'), join(copy, 'node_modules'));
+    // Тот же вид ссылки, что заводит сама проверка: junction под Windows.
+    symlinkSync(
+      join(dir, 'node_modules'),
+      join(copy, 'node_modules'),
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
 
     expect(await sweepMutationCopies(appData)).toBe(1);
     expect(existsSync(copy)).toBe(false);

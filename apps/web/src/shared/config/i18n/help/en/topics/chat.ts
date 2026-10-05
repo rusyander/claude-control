@@ -824,7 +824,8 @@ export const chatEn: typeof chatRu = {
       'the row is stale and the sieve has to be passed again. When the copy has a Tests ' +
       'block, live checks (browser, boundary input, a request to the stand, a migration) ' +
       'are proved by a recorded run: the group cites run:<id>, and the panel opens that run ' +
-      'in the history itself — it must be finished, have no red case and be no older than ' +
+      'in the history itself — it must be finished, have at least one green case and no red ' +
+      'one, and be no older than ' +
       'the last change to the covered code. A sieve not passed holds the group: “done” does not ' +
       'come and the group gets a reminder, as with an unpushed branch. When a reviewer ' +
       'finds a blocker in an MR thread, the group turns it into a new sieve — a proposed ' +
@@ -1023,16 +1024,20 @@ export const chatEn: typeof chatRu = {
       'written by the panel itself, not by the agent, so both are shown in the ' +
       'interface language; a question the agent asked stays as it asked it. ' +
       'While the triage is running no group is started — neither by a panel restart nor by a ' +
-      'pause and “Resume”: its block decides the order. A task lost in the triage is returned home, a circular ' +
+      'pause and “Resume”, nor by “Start now” (the button answers that the triage is still ' +
+      'running): its block decides the order. A pause or “Remove” made during the triage is not ' +
+      'undone by its block. A task lost in the triage is returned home, a circular ' +
       'wait is cut, and the summary labels that “repaired by the panel”. In the ' +
       'chat list the links are labelled “triage” and “plan”; “Only create the ' +
       'chats” gets no levels.',
     cascadeHub: 'Where to see which stage a group is on',
     cascadeHubText:
       'In the conversation you split the tasks from. Under the agent’s answer sits ' +
-      'a summary of the groups: one row per group with its branch, the path it has ' +
+      'a summary of the groups: one card per group with its branch on one line (a ' +
+      'long one is cut, the full name is in the hint), the path it has ' +
       'walked (“work › review › fixes”) and the model of the current stage; a ' +
-      'running stage carries a pulsing dot, a click opens its chat. The chat list ' +
+      'running stage carries a pulsing dot. A click on the card opens the group’s ' +
+      'chat, and the group’s buttons sit in its top right corner. The chat list ' +
       'shows CONVERSATIONS, and the pipeline adds up to three per group — nine rows ' +
       'do not tell you the state of three groups. The agents panel (the “Agents” ' +
       'button in the header) now also says what each running run is being driven ' +
@@ -1059,8 +1064,10 @@ export const chatEn: typeof chatRu = {
       '“delivery” link on the work model: commit, fresh main branch, push of its own ' +
       'branch, MR. The panel does not take the agent’s word for it: when the link ends ' +
       'it checks the git facts — is there a commit, was the branch pushed, is there an ' +
-      'MR whose head is the group’s copy — and the “MR !N” line leads to the MR found ' +
-      'that way. Something missing — the row says “missing for the MR: …” and the ' +
+      'MR whose head is the group’s copy — and the “MR !N” button in the card’s ' +
+      'corner opens the MR found that way in a new tab — only that button, a click ' +
+      'on the rest of the card goes to the chat. Something missing — the row says ' +
+      '“missing for the MR: …” and the ' +
       'group gets a reminder, two at most; the remote not answering — the check ' +
       'repeats (after one minute, five, fifteen, then every fifteen minutes for up to ' +
       'four hours) and only then gives up with the reason. The “Accept” button in a ' +
@@ -1069,7 +1076,19 @@ export const chatEn: typeof chatRu = {
       'collect in “Suggested tickets: N” — copy them, or “File in ‹project›” through ' +
       'the tracker integration, only after you confirm. Steps a group cannot take (a ' +
       'dependency between MRs, access, someone else’s service) collect in “For you to ' +
-      'do: N” — the panel does not carry them out.',
+      'do: N” — the panel does not carry them out. A delivered group has “Recheck ' +
+      'MR”: the panel reads the MR — conflicts with the target branch, every pending ' +
+      'reviewer comment, a red pipeline — and hands that to the group’s own ' +
+      'conversation together with a request to check every task is done; what is ' +
+      'found the group fixes and delivers again, and finding nothing it touches ' +
+      'nothing. The MR could not be read — the agent reads it itself. A merged or ' +
+      'closed MR has nothing to recheck — a refusal with the reason, and the card is ' +
+      'marked “MR merged” or “MR closed”. A merged one loses the button; a closed one ' +
+      'keeps it — it may be reopened. A review-by-link group has no button: it looks ' +
+      'at someone else’s MR. While the turn ' +
+      'runs the row says “Rechecking…”; once it ends in a delivery the button turns ' +
+      'green, “MR checked” with the check time beside it, and stays so until new ' +
+      'work on the group clears it. It can be clicked again while green.',
     cascadeControl: 'One group and the whole plan',
     cascadeControlText:
       'A group’s row has “Pause”, “Resume” in the same session and “Start now” past ' +
@@ -1089,7 +1108,15 @@ export const chatEn: typeof chatRu = {
       'A group process cut off mid-turn (a panel restart, a CLI death) the panel ' +
       'resumes by itself up to twice, first asking the agent to restore its state from ' +
       'git and the transcript; after that — the “Resume” or “Resume interrupted (N)” ' +
-      'button. “Cancel plan” stops every group of the split and closes the plan after ' +
+      'button. A group that gave up on a failure (say, the CLI login ran out and the ' +
+      'retries were spent) or a turn without a review verdict also gets “Continue”: ' +
+      'the same session first checks the state against git, the MR and the ' +
+      'transcript, then finishes and delivers. The button is there while the group’s ' +
+      'conversation and copy live and the plan is not cancelled; a group taken away ' +
+      'with “Remove” has none — a removed group does not come back. The group’s ' +
+      'conversation is busy — “Continue” joins its queue, and a second click adds no ' +
+      'second task. A group that gave ' +
+      'up passes the slot limit like a new one. “Cancel plan” stops every group of the split and closes the plan after ' +
       'asking for confirmation: chats, copies and branches stay, and after cancelling ' +
       'you can split again. A cancelled plan does not come back to life on a restart. ' +
       'Chats of groups dropped by a split relaunch are collected separately — ' +

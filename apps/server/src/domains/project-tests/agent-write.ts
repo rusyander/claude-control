@@ -87,8 +87,12 @@ export function recordAgentResults(
   results: readonly AgentResult[],
   now: string,
 ): ProjectTestRunRecord {
+  const automated = new Set<string>();
   for (const result of results) {
-    if (!readGroup(root, result.groupId).cases.some((item) => item.id === result.caseId)) {
+    const found = readGroup(root, result.groupId).cases.find((item) => item.id === result.caseId);
+    if (found?.automation?.status === 'automated')
+      automated.add(`${result.groupId}:${result.caseId}`);
+    if (!found) {
       throw coded(
         new ProjectTestsNotFoundError(`No case "${result.caseId}" in group "${result.groupId}".`),
         'case-not-in-named-group',
@@ -126,16 +130,20 @@ export function recordAgentResults(
     },
   };
   writeRun(root, record);
+  // Автокейсу слово прогон не заменяет — и статус в библиотеке ему не переписывает:
+  // в истории запись есть (помечена `attested`), статус ставит только исполненный прогон.
   applyResults(
     root,
-    results.map((result) => ({
-      groupId: result.groupId,
-      caseId: result.caseId,
-      status: result.status,
-      ...(result.note ? { note: result.note } : {}),
-      runId: id,
-      at: now,
-    })),
+    results
+      .filter((result) => !automated.has(`${result.groupId}:${result.caseId}`))
+      .map((result) => ({
+        groupId: result.groupId,
+        caseId: result.caseId,
+        status: result.status,
+        ...(result.note ? { note: result.note } : {}),
+        runId: id,
+        at: now,
+      })),
     now,
   );
   return record;

@@ -169,4 +169,45 @@ describe('normalizeRecord', () => {
     } as Record;
     expect(normalizeRecord(empty)).toBe(empty);
   });
+
+  // Ревью PR #1: та же вставка несёт уведомления CLI и отчёты субагентов — это не
+  // слова человека. Форма записей — из настоящих транскриптов (CLI 2.1.285).
+  it('уведомление CLI и отчёт субагента не становятся репликой человека', () => {
+    const notice = {
+      type: 'attachment',
+      attachment: {
+        type: 'queued_command',
+        commandMode: 'task-notification',
+        prompt: '<task-notification>done</task-notification>',
+      },
+    } as Record;
+    const peer = {
+      type: 'attachment',
+      attachment: {
+        type: 'queued_command',
+        commandMode: 'prompt',
+        origin: { kind: 'peer' },
+        isMeta: true,
+        prompt: '<agent-message from="a1">report</agent-message>',
+      },
+    } as Record;
+    expect(normalizeRecord(notice)).toBe(notice);
+    expect(normalizeRecord(peer)).toBe(peer);
+  });
+
+  it('сообщение человека блоками (расширение VS Code) — тоже реплика', () => {
+    const blocks = {
+      type: 'attachment',
+      attachment: {
+        type: 'queued_command',
+        commandMode: 'prompt',
+        origin: { kind: 'human' },
+        prompt: [{ type: 'text', text: 'посмотри ещё' }],
+      },
+    } as Record;
+    expect(normalizeRecord(blocks)).toMatchObject({
+      type: 'user',
+      message: { role: 'user', content: [{ type: 'text', text: 'посмотри ещё' }] },
+    });
+  });
 });

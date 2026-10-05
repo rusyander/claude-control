@@ -10,7 +10,11 @@ import type { ServerContext } from '../../context.ts';
 import type { SplitConveyor } from '../../domains/chat/split-conveyor.ts';
 import type { SplitOverlap } from '../../domains/chat/split-overlap.ts';
 import type { SplitReview } from '../../domains/chat/split-review.ts';
-import { splitPlanRunning, type SplitReviewRefusal } from '@agentdeck/contracts/chat-handoff';
+import {
+  splitPlanRunning,
+  type SplitGroupRechecked,
+  type SplitReviewRefusal,
+} from '@agentdeck/contracts/chat-handoff';
 import { checkProjectDir } from '../../domains/projects.ts';
 import { createSplitLauncher, type SplitLaunchDeps } from './split-launch.ts';
 import { registerSplitControlRoutes, stopChatKey } from './split-control-routes.ts';
@@ -56,6 +60,8 @@ export function registerChatSplitRoutes(
     overlap?: SplitOverlap;
     /** Решения по ревью MR (Т7); нет — карточка решения отвечает 404. */
     review?: SplitReview;
+    /** «Перепроверить MR» доставленной группы; нет — кнопка отвечает 404. */
+    recheckMr?: (parentChatId: string, index: number) => Promise<SplitGroupRechecked>;
     /** Трекер для тикетов групп (L277); по умолчанию — Jira из интеграций. */
     tracker?: SplitTicketTracker;
     /** Записанные вопросы деревьев: отмена плана снимает вопросы его групп. */

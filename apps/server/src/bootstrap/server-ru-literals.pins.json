@@ -768,8 +768,8 @@
     "why": "path-rejection detail composed inside an error class"
   },
   "lib/server-texts/templates.ts": {
-    "n": 391,
-    "why": "RU side of the server text table: every line here IS a code, this is the one file where a Russian literal is the data. The generator and its manifest are gone from the tree (see the file header) — a new code is written by hand and `n` rises with it; +6 sieve-gap-* codes of the pre-MR sieves (28.09); +1 split drop/restart/no-slot-paused codes (29.09); +4 tests-gap-* codes of the group verdict from the Tests block (30.09); +13 sieve-gap-* codes of the panel mechanics, freshness and Tests-run proof (30.09)"
+    "n": 392,
+    "why": "RU side of the server text table: every line here IS a code, this is the one file where a Russian literal is the data. The generator and its manifest are gone from the tree (see the file header) — a new code is written by hand and `n` rises with it; +6 sieve-gap-* codes of the pre-MR sieves (28.09); +1 split drop/restart/no-slot-paused codes (29.09); +4 tests-gap-* codes of the group verdict from the Tests block (30.09); +13 sieve-gap-* codes of the panel mechanics, freshness and Tests-run proof (30.09); +1 sieve-gap-run-empty, a run that checked nothing (review PR #1, 05.10)"
   },
   "providers/catalog/kimi.ts": {
     "n": 1,

@@ -1116,6 +1116,9 @@ export const en: TranslationSchema = {
         pausedNoChat: 'paused',
         interruptedNoChat: 'cut before its chat existed — nothing to resume',
         mr: 'MR !{{id}}',
+        mrOpenHint: 'Open the group’s MR in a new tab',
+        mrClosed: { merged: 'MR merged', closed: 'MR closed' },
+        openHint: 'Open the group’s chat',
         waiting: 'waiting for: {{names}}',
         held: 'waiting for your answer',
         holdAnswered: 'answered',
@@ -1168,6 +1171,9 @@ export const en: TranslationSchema = {
           restart: 'Start again',
           restartHint:
             'Start the group again in its copy (preparation repeats); no copy — in a new one. The previous start was cut before the chat',
+          continue: 'Continue',
+          continueHint:
+            'The group’s work is unfinished (a failure, retries ran out, no review verdict). The same session continues it: the agent first checks the state against git, the MR and the transcript, then finishes and delivers',
           drop: 'Remove',
           dropHint:
             'Close the group: groups waiting for it move on, its slot goes to the queue; the copy can be removed separately afterwards',
@@ -1177,6 +1183,7 @@ export const en: TranslationSchema = {
           paused: 'Group paused',
           requeued: 'Group is back in the queue',
           restarted: 'Group is starting again',
+          continued: 'The group continues its work',
           dropped: 'Group removed',
           resumed: 'Group resumed',
           resumeQueued: 'The resume goes out after the group’s current turn',
@@ -1226,6 +1233,19 @@ export const en: TranslationSchema = {
           undo: 'Remove mark',
           undoHint: 'Remove the «accepted» mark from the group',
           marker: 'accepted',
+          failed: 'Failed: {{message}}',
+        },
+        recheck: {
+          action: 'Recheck MR',
+          hint: 'The group checks its MR: conflicts with the target branch, reviewer comments, the pipeline and whether every task is done. Finds something — fixes it and delivers again; finds nothing — touches nothing',
+          pending: 'Rechecking…',
+          pendingHint:
+            'The group is rechecking its MR; the button turns green once the turn ends in a delivery',
+          checked: 'MR checked',
+          checkedAt: 'checked {{time}}',
+          checkedHint: 'The last recheck ended in a delivery. Click to recheck again',
+          sent: 'The group is rechecking its MR',
+          queued: 'The recheck goes out once a slot frees up',
           failed: 'Failed: {{message}}',
         },
         tickets: {

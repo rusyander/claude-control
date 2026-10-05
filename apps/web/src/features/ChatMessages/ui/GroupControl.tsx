@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import {
   chatTreeKeys,
+  useContinueGroup,
   useDropGroup,
   usePauseGroup,
   useRestartGroup,
@@ -50,12 +51,18 @@ export function GroupControl({ control }: GroupControlProps) {
   const start = useStartGroupNow();
   const restart = useRestartGroup();
   const drop = useDropGroup();
+  const proceed = useContinueGroup();
   const [consent, setConsent] = useState<{ action: GroupControlAction; reason: string }>();
   // «Убрать» закрывает группу без возврата — подтверждение в той же строке,
   // как у «Отменить план»: случайный клик стоил бы работы группы.
   const [askingDrop, setAskingDrop] = useState(false);
   const busy =
-    pause.isPending || resume.isPending || start.isPending || restart.isPending || drop.isPending;
+    pause.isPending ||
+    resume.isPending ||
+    start.isPending ||
+    restart.isPending ||
+    drop.isPending ||
+    proceed.isPending;
 
   const settled = (message: string): void => {
     setConsent(undefined);
@@ -118,6 +125,19 @@ export function GroupControl({ control }: GroupControlProps) {
           onError,
         });
         return;
+      case 'continue':
+        proceed.mutate(input, {
+          onSuccess: (result) =>
+            settled(
+              t(
+                result.outcome === 'queued'
+                  ? 'chat.cascade.hub.control.resumeQueued'
+                  : 'chat.cascade.hub.control.continued',
+              ),
+            ),
+          onError,
+        });
+        return;
       case 'drop':
         drop.mutate(input, {
           onSuccess: () => settled(t('chat.cascade.hub.control.dropped')),
@@ -136,7 +156,11 @@ export function GroupControl({ control }: GroupControlProps) {
   const [primary] = control.actions;
 
   return (
-    <div className={styles.control} data-group-control-row={primary}>
+    <div
+      className={styles.control}
+      data-group-control-row={primary}
+      data-group-index={control.index}
+    >
       {time && (
         <Typography
           variant="caption"

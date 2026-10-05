@@ -37,7 +37,15 @@ export interface Record {
   toolUseResult?: unknown;
   isSidechain?: boolean;
   /** Служебная вставка CLI; `queued_command` — сообщение человека посреди хода. */
-  attachment?: { type?: string; prompt?: unknown };
+  attachment?: {
+    type?: string;
+    prompt?: unknown;
+    /** `prompt` — слова человека; `task-notification` — уведомление CLI. */
+    commandMode?: string;
+    /** `peer` — отчёт субагента, а не человек. */
+    origin?: { kind?: string };
+    isMeta?: boolean;
+  };
   message?: {
     /** Ход модели: его блоки лежат отдельными строками с одним `id`. */
     id?: string;
@@ -79,10 +87,23 @@ export interface ContentBlock {
  * собственных слов. Здесь оно становится обычной репликой человека на своём месте.
  */
 export function normalizeRecord(record: Record): Record {
-  if (record.type !== 'attachment' || record.attachment?.type !== 'queued_command') return record;
-  const prompt = record.attachment.prompt;
-  if (typeof prompt !== 'string' || !prompt.trim()) return record;
-  return { ...record, type: 'user', message: { role: 'user', content: prompt } };
+  const attachment = record.attachment;
+  if (record.type !== 'attachment' || attachment?.type !== 'queued_command') return record;
+  // Та же вставка несёт уведомления CLI и отчёты субагентов — не слова человека (ревью PR #1).
+  if ((attachment.commandMode ?? 'prompt') !== 'prompt') return record;
+  if (attachment.isMeta || attachment.origin?.kind === 'peer') return record;
+  const prompt = attachment.prompt;
+  if (typeof prompt === 'string') {
+    if (!prompt.trim()) return record;
+    return { ...record, type: 'user', message: { role: 'user', content: prompt } };
+  }
+  // Расширение VS Code пишет слова блоками.
+  if (!Array.isArray(prompt)) return record;
+  const blocks = (prompt as ContentBlock[]).filter(
+    (block) => block?.type !== 'text' || Boolean(block.text?.trim()),
+  );
+  if (blocks.length === 0) return record;
+  return { ...record, type: 'user', message: { role: 'user', content: blocks } };
 }
 
 /** Вопрос старше суток — брошенный разговор, а не ожидание ответа. */

@@ -255,7 +255,12 @@
         {
           "path": "apps/server/src/domains/chat/split-conveyor.ts",
           "why": "«Что запускает „Разделить“»: разбор в корне, план в копии, порядок after и hold",
-          "sha": "9de60f6c23b63c4d"
+          "sha": "f1ef16c67e7bd865"
+        },
+        {
+          "path": "apps/server/src/domains/chat/split-recheck.ts",
+          "why": "«Перепроверить MR»: что панель читает из MR и когда отказывает",
+          "sha": "b29dc46bbd845560"
         },
         {
           "path": "apps/server/src/domains/chat/split-overlap.ts",
@@ -310,7 +315,7 @@
         {
           "path": "packages/contracts/src/sieves/judge.ts",
           "why": "«Сита перед MR»: что держит «готово» — механика панели, названные файлы и команды, свежесть строки, прогон блока «Тесты»",
-          "sha": "7d4801d81162d78e"
+          "sha": "4b43ad08c8accf04"
         },
         {
           "path": "apps/server/src/domains/chat/sieve-gate.ts",
@@ -323,7 +328,7 @@
           "sha": "4ee5ccbcebfc6f2a"
         }
       ],
-      "confirmedAt": "2026-09-30T16:40:09.736Z"
+      "confirmedAt": "2026-10-05T11:01:55.524Z"
     },
     {
       "topic": "tests",
@@ -1017,7 +1022,7 @@
     {
       "topic": "settings",
       "document": "apps/web/src/pages/Help/topics/SettingsTopic.tsx",
-      "confirmedAt": "2026-09-29T17:24:46.279Z",
+      "confirmedAt": "2026-10-05T10:57:19.819Z",
       "sources": [
         {
           "path": "apps/server/src/lib/safe-io.ts",
@@ -1067,7 +1072,7 @@
         {
           "path": "apps/web/src/shared/lib/watch-capture/watch-capture.ts",
           "why": "«Что попадает в отчёт»: сбои страницы, консоль, ответы не того вида, зависшие загрузки, записанное сервером не шлётся повторно",
-          "sha": "42b4a8aa8f1483cd"
+          "sha": "c8c1e39781739690"
         },
         {
           "path": "apps/web/src/features/WatcherIndicator/ui/WatcherIndicator.tsx",

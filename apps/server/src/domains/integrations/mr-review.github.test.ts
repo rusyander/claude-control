@@ -69,6 +69,7 @@ function page(input: {
   rollup?: string | null;
   threads: unknown[];
   next?: string;
+  mergeable?: string;
 }): unknown {
   return {
     data: {
@@ -78,6 +79,7 @@ function page(input: {
           url: `${base}/o/r/pull/5`,
           author: human('group-bot-user'),
           body: 'Что и зачем.',
+          ...(input.mergeable ? { mergeable: input.mergeable } : {}),
           commits: {
             nodes: [
               {
@@ -121,6 +123,7 @@ describe('readMergeRequestReview (GitHub)', () => {
         : page({
             rollup: 'FAILURE',
             next: 'page-2',
+            mergeable: 'CONFLICTING',
             threads: [
               {
                 id: 'T1',
@@ -158,6 +161,8 @@ describe('readMergeRequestReview (GitHub)', () => {
       state: 'open',
       author: 'group-bot-user',
       description: 'Что и зачем.',
+      // Конфликт с целевой веткой — для «Перепроверить MR» (владелец 05.10).
+      conflicts: true,
     });
     expect(review?.pipeline).toEqual({
       id: 'abc123',

@@ -44,6 +44,8 @@ export interface SieveRunFact {
   found: boolean;
   /** Красные кейсы прогона (`failed`/`blocked`). */
   red: string[];
+  /** Зелёных результатов в прогоне; 0 — прогон ничего не проверил (всё пропущено или пусто). */
+  passed?: number;
   /** Пути, изменённые в ветке ПОСЛЕ коммита прогона (коммита нет в ветке — все её пути). */
   changedAfter: string[];
 }
@@ -82,6 +84,7 @@ export interface SieveGap {
     | 'sieve-gap-stale'
     | 'sieve-gap-no-run'
     | 'sieve-gap-run-missing'
+    | 'sieve-gap-run-empty'
     | 'sieve-gap-run-red'
     | 'sieve-gap-run-stale';
   params: Record<string, string>;
@@ -92,6 +95,16 @@ export interface SieveGap {
  * Имя файла без пути годится, только если оно среди отмеченных одно: иначе
  * «index.ts» снимал бы разом `apps/a/index.ts` и `apps/b/index.ts` (ревью сит).
  */
+/** Имя стоит в тексте отдельным словом: `src/a.ts` не прячется внутри `src/data.ts`, `FOO` — внутри `FOOBAR` (ревью PR #1). */
+function mentions(text: string, name: string): boolean {
+  for (let at = text.indexOf(name); at >= 0; at = text.indexOf(name, at + 1)) {
+    const before = text[at - 1] ?? ' ';
+    const after = text[at + name.length] ?? ' ';
+    if (!/[\w.-]/.test(before) && !/[\w-]/.test(after)) return true;
+  }
+  return false;
+}
+
 function namesAll(evidence: string, files: readonly string[]): boolean {
   const low = evidence.replace(/\\/g, '/').toLowerCase();
   const paths = files.map((file) => file.replace(/\\/g, '/').toLowerCase());
@@ -100,7 +113,7 @@ function namesAll(evidence: string, files: readonly string[]): boolean {
   return paths.every((path) => {
     const base = baseOf(path);
     const unique = bases.filter((other) => other === base).length === 1;
-    return low.includes(path) || (unique && low.includes(base));
+    return mentions(low, path) || (unique && mentions(low, base));
   });
 }
 
@@ -185,6 +198,9 @@ function runGap(sieve: SieveDef, id: string, fact: SieveRunFact | undefined): Si
       params: { sieve: sieve.id, run: id, cases: named(fact.red) },
     };
   }
+  // Ревью PR #1: прогон из одних пропусков или без результатов ничего не проверил.
+  if (fact.passed === 0)
+    return { code: 'sieve-gap-run-empty', params: { sieve: sieve.id, run: id } };
   const touched = touchesSieve(sieve, fact.changedAfter);
   if (touched.length > 0) {
     return {

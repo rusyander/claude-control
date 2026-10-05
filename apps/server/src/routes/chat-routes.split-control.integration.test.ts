@@ -7,6 +7,7 @@ import type { TaskSplitResult } from '@agentdeck/contracts/task-split';
 import { AppStore } from '../lib/app-store.ts';
 import type { ServerContext } from '../context.ts';
 import { registerChatSplitRoutes } from './chat/split-routes.ts';
+import { recheckDeliveredMr } from '../domains/chat/split-recheck.ts';
 import { registerChatRunRoutes } from './chat/run-routes.ts';
 import { pauseOnHumanStop } from './chat/split-control-routes.ts';
 import { ChatRunRegistry, type RunLike } from '../domains/chat/ChatRunRegistry.ts';
@@ -113,6 +114,20 @@ describe('разделение: пауза, продолжение, запуск
       providerChats: new ProviderChatService(),
       session,
       conveyor,
+      recheckMr: (parent, index) =>
+        recheckDeliveredMr(
+          {
+            store: {
+              get: (key) => store.getSplitPlan(key),
+              set: (record) => store.setSplitPlan(record),
+            },
+            read: async () => ({ state: 'open', threads: [] }),
+            recheck: (key, at, prompt) => conveyor.recheckDelivered(key, at, prompt),
+            log: () => undefined,
+          },
+          parent,
+          index,
+        ),
     });
     registerChatRunRoutes(app, ctx, registry, session);
     await app.ready();
@@ -206,6 +221,26 @@ describe('разделение: пауза, продолжение, запуск
     expect(group(1)?.status).toBe('pending');
   });
 
+  it('«Продолжить» сдавшуюся группу: место отдано — 409 с числами, с согласием — слово группе', async () => {
+    const link = store.getChatLink('chat-0');
+    expect(link).toBeDefined();
+    conveyor.onChainEnded(link!, { status: 'failed', error: 'Not logged in · Please run /login' });
+    await settle();
+    expect(group(0)?.status).toBe('failed');
+    // Место ушло второй — потолок 1 полон.
+    expect(group(1)?.status).toBe('started');
+
+    const refused = await post('continue-group', { index: 0 });
+    expect(refused.statusCode).toBe(409);
+    expect(refused.json()).toMatchObject({ messageCode: 'split-group-no-slot' });
+
+    const forced = await post('continue-group', { index: 0, force: true });
+    expect(forced.statusCode).toBe(200);
+    expect(forced.json()).toEqual({ index: 0, outcome: 'sent' });
+    expect(resumed.at(-1)?.index).toBe(0);
+    expect(resumed.at(-1)?.prompt).toContain('Not logged in · Please run /login');
+  });
+
   it('номер не тот — 400; группа не в том состоянии — 409 с кодом', async () => {
     expect((await post('pause', { index: -1 })).statusCode).toBe(400);
     const notQueued = await post('start-now', { index: 0 });
@@ -216,6 +251,8 @@ describe('разделение: пауза, продолжение, запуск
     for (const [path, code] of [
       ['restart-group', 'split-restart-not-cut'],
       ['drop-group', 'split-drop-nothing'],
+      ['continue-group', 'split-continue-nothing'],
+      ['recheck', 'split-recheck-nothing'],
     ] as const) {
       const refused = await post(path, { index: 0 });
       expect(refused.statusCode).toBe(409);

@@ -834,6 +834,24 @@ export interface SplitPlanView {
        * Новый ход группы отметку снимает: принимали не эту работу.
        */
       acceptedAt?: string;
+      /**
+       * Человек нажал «Перепроверить MR» (ISO): группа сверяет MR — конфликты,
+       * замечания ревьюера, готовность задач — и правит найденное. Снимается,
+       * когда ход кончился доставкой (`recheckedAt`) или сбоем.
+       */
+      recheckRequestedAt?: string;
+      /**
+       * Последняя перепроверка MR кончилась доставкой (ISO): кнопка зелёная и
+       * с этим временем. Новая работа группы (ответ ревьюеру, продолжение)
+       * отметку снимает — проверяли не её.
+       */
+      recheckedAt?: string;
+      /** MR группы влит или закрыт — перепроверять влитой нечего. */
+      mrClosed?: 'merged' | 'closed';
+      /** Группа смотрит чужой MR по ссылке (Т7): своего MR у неё нет, перепроверять нечего. */
+      review?: true;
+      /** Человек убрал группу «Убрать»: закрыта без возврата. */
+      droppedAt?: string;
       /** Дефекты вне задач группы, которые она предложила завести тикетом (95b). */
       tickets?: SplitTicketView[];
       /**
@@ -897,6 +915,22 @@ export interface SplitGroupPaused {
 export interface SplitGroupResumed {
   index: number;
   outcome: 'sent' | 'queued';
+}
+
+/** Итог «Продолжить» недоделанной группы: `queued` — слово уйдёт после текущего хода. */
+export interface SplitGroupContinued {
+  index: number;
+  outcome: 'sent' | 'queued';
+}
+
+/**
+ * Итог «Перепроверить MR»: слово ушло группе (`sent`) или ждёт места под
+ * потолком (`queued`); `requestedAt` — отметка, которую строка покажет.
+ */
+export interface SplitGroupRechecked {
+  index: number;
+  outcome: 'sent' | 'queued';
+  requestedAt: string;
 }
 
 /** Итог «Принять» / «Снять отметку»: `acceptedAt` нет — отметка снята. */

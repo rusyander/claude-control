@@ -83,6 +83,16 @@ describe('сбои страницы для наблюдателя', () => {
     ]);
   });
 
+  it('под автоматизацией отказ, которого сервер не видел, — не сбой; ошибка страницы — сбой', async () => {
+    vi.stubGlobal('navigator', { webdriver: true });
+    const capture = await load();
+    capture.setWatchCaptureEnabled(true);
+    capture.reportApiFailure({ url: '/chat/x/group-settings', status: 500, message: 'boom' });
+    capture.reportApiFailure({ url: '/chat/awaiting', message: 'Network Error' });
+    capture.reportClientSignal({ kind: 'window-error', message: 'real', route: '/x' });
+    expect(sentBodies().map((body) => body.kind)).toEqual(['window-error']);
+  });
+
   it('слушатели окна: ошибка и отказ промиса (текст, объект) уходят сигналами', async () => {
     const target = Object.assign(new EventTarget(), { location: { pathname: '/skills' } });
     vi.stubGlobal('window', target);

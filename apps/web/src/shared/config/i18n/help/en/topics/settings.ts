@@ -628,7 +628,9 @@ export const settingsEn: typeof settingsRu = {
         'section: a refusal reported by both the server and the page counts in one section, ' +
         'and the model may merge a section it proves has the same cause. The watcher’s own ' +
         'CLI runs never land in the report: a failed analysis is a problem on the card, not ' +
-        'a new section.',
+        'a new section. A page under automation (the panel’s Playwright checks) does not ' +
+        'send request failures the server never saw: those are responses the check stubbed ' +
+        'and tabs it closed; its page and console errors are still sent.',
       read: 'How to read the report',
       readText:
         'WATCH-REPORT.md in the app root — the card shows the path. On top sits an index ' +

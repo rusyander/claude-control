@@ -126,6 +126,15 @@ describe('маршрут отправки: сообщение агенту по�
     expect(steerEvents()).toEqual([]);
   });
 
+  // Ревью PR #1: ход кончился между проверкой вкладки и сервера — новый прогон
+  // здесь же, а вкладка ставила то же слово в очередь: оно уходило дважды.
+  it('ход уже кончился — слово на ходу не заводит прогон: 409, решает вкладка', async () => {
+    const reply = await send('поздно', { steer: true });
+    expect(reply.statusCode).toBe(409);
+    expect(reply.json()).toMatchObject({ messageCode: 'run-steer-ended' });
+    expect(prompts).toEqual([]);
+  });
+
   it('с вложением — не на ходу: картинка идёт своим ходом', async () => {
     void send('первое');
     await until(() => prompts.length === 1 && registry.isRunning(CHAT));

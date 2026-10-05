@@ -21,6 +21,7 @@ const QUERY = `query($owner: String!, $name: String!, $number: Int!, $cursor: St
       state
       url
       body
+      mergeable
       author { login }
       commits(last: 1) { nodes { commit { oid statusCheckRollup { state } } } }
       reviewThreads(first: 100, after: $cursor) {
@@ -64,6 +65,8 @@ interface GhThread {
 
 interface GhPullRequest {
   state?: string;
+  /** `MERGEABLE` · `CONFLICTING` · `UNKNOWN` (GitHub ещё считает). */
+  mergeable?: string;
   url?: string;
   body?: string | null;
   author?: GhAuthor | null;
@@ -164,6 +167,8 @@ export async function readGithubReview(
     state: toState(pr.state),
     ...(pr.author?.login ? { author: pr.author.login } : {}),
     description: pr.body ?? '',
+    ...(pr.mergeable === 'CONFLICTING' ? { conflicts: true } : {}),
+    ...(pr.mergeable === 'MERGEABLE' ? { conflicts: false } : {}),
     threads,
     ...(pipeline ? { pipeline } : {}),
   };

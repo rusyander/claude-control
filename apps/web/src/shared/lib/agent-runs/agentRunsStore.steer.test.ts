@@ -75,6 +75,31 @@ describe('agentRuns — слово агенту на ходу', () => {
     stream.close();
   });
 
+  // Ревью PR #1: ход кончился, пока шёл запрос «на ходу», — слово не должно
+  // застрять в очереди уже закончившегося хода: досылается сразу, один раз.
+  it('ход кончился во время запроса — слово досылается сразу, один раз', async () => {
+    void agentRuns.start({ chatId: 'st-late', prompt: 'первое', projectPath: '/p' });
+    stream.push('{"kind":"session","sessionId":"sess-l","model":"m","tools":0,"seq":1}');
+    await settle();
+    const fetchMock = vi.mocked(fetch);
+    const started = fetchMock.mock.calls.length;
+    const first = stream;
+    post.mockImplementationOnce(async () => {
+      first.push('{"kind":"done","costUsd":0,"durationMs":1,"sessionId":"sess-l","seq":2}');
+      first.close();
+      await settle();
+      throw Object.assign(new Error('409'), { response: { status: 409 } });
+    });
+    stream = openStream();
+
+    expect(await agentRuns.steer('st-late', { prompt: 'поздно' })).toBe('queued');
+    await settle();
+
+    expect(fetchMock.mock.calls.length - started).toBe(1);
+    expect(getRun('st-late').queued).toEqual([]);
+    stream.close();
+  });
+
   it('событие steer кладёт реплику в ленту хода, конец хода её снимает', async () => {
     void agentRuns.start({ chatId: 'st-2', prompt: 'первое' });
     stream.push('{"kind":"steer","text":"добавь пункт","at":"2026-09-30T10:00:00.000Z","seq":1}');

@@ -1,6 +1,7 @@
 /** Коды текстов сервера, раздел «chat»: Чат, разделение, передача и чат чужого CLI. Сборка всех — `../server-messages.ts`. */
 export const chatMessageParams = {
   'run-busy': [],
+  'run-steer-ended': [],
   'run-empty-prompt': [],
   'run-unsupported-upload': ['names', 'supported'],
   'run-workspace-missing': ['cwd'],
@@ -68,10 +69,15 @@ export const chatMessageParams = {
   'split-resume-refused': [],
   'split-restart-not-cut': [],
   'split-start-not-queued': [],
+  'split-start-triage': [],
   'split-accept-not-done': [],
   'split-group-no-slot': ['running', 'limit'],
   'split-group-no-slot-paused': ['running', 'paused', 'limit'],
   'split-drop-nothing': [],
+  'split-continue-nothing': [],
+  'split-recheck-nothing': [],
+  'split-recheck-merged': [],
+  'split-recheck-closed': [],
   'split-limit-active': ['until'],
   'split-plan-cancel-nothing': [],
   'split-plan-cancel-unknown': [],

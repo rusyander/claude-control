@@ -48,7 +48,9 @@ export function TestMutationCheck({ path, isBusy }: TestMutationCheckProps) {
   const isRunning = check?.status === 'running';
   const failure = start.error ?? stop.error;
   const checkError =
-    check?.status === 'error' ? (serverMessageText(check.errorCode) ?? check.error ?? '') : '';
+    check?.status === 'error'
+      ? (serverMessageText(check.errorCode, { file: check.file }) ?? check.error ?? '')
+      : '';
 
   return (
     <Stack gap="var(--spacing-xs)" data-testid="tests-mutation">

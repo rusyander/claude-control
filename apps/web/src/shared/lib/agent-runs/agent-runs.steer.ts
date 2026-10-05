@@ -1,5 +1,6 @@
 import { apiClient } from '@shared/api/client';
 import { enqueue } from './agent-runs.commands';
+import { drainQueue } from './agent-runs.lifecycle';
 import { findKey, runs } from './agent-runs.state';
 import type { AgentRun, QueuedMessage } from './agent-runs.types';
 
@@ -36,9 +37,11 @@ export async function steer(
     });
     if (data?.steered) return 'steered';
   } catch {
-    // Занят без живой сессии (409) или сеть — дальше очередь.
+    // Занят без живой сессии (409), ход кончился или сеть — дальше очередь.
   }
   enqueue(id, message);
+  // Ход кончился, пока шёл запрос: конец хода очередь уже не снимет — дослать сейчас.
+  if (runs.get(key)?.status !== 'running') drainQueue(key);
   return 'queued';
 }
 

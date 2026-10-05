@@ -160,7 +160,7 @@ describe('доставка: свежесть отчёта и прогоны бл
       })
     ).missing.filter((line) => line.includes('browser-focus'));
 
-  function recordRun(work: string, id: string, status: 'passed' | 'failed'): void {
+  function recordRun(work: string, id: string, status: 'passed' | 'failed' | 'skipped'): void {
     const commitSha = git(work, ['rev-parse', '--short', 'HEAD']).trim();
     writeRun(work, {
       id,
@@ -175,7 +175,7 @@ describe('доставка: свежесть отчёта и прогоны бл
         total: 1,
         passed: status === 'passed' ? 1 : 0,
         failed: status === 'failed' ? 1 : 0,
-        skipped: 0,
+        skipped: status === 'skipped' ? 1 : 0,
         blocked: 0,
       },
     } as Parameters<typeof writeRun>[1]);
@@ -198,6 +198,15 @@ describe('доставка: свежесть отчёта и прогоны бл
     recordRun(work, 'run-red-01', 'failed');
     expect((await focusGaps(work, 'focus run:run-red-01')).join('\n')).toContain(caseId);
     expect((await focusGaps(work, 'focus run:run-made-up')).join('\n')).toContain('нет в истории');
+  });
+
+  // Ревью PR #1: прогон, где всё пропущено, ничего не проверил — не доказательство.
+  it('прогон из одних пропусков — пробел, а не доказательство', async () => {
+    const work = uiBranch();
+    recordRun(work, 'run-skip-1', 'skipped');
+    expect((await focusGaps(work, 'focus run:run-skip-1')).join('\n')).toContain(
+      'ничего не проверил',
+    );
   });
 
   it('после прогона и отчёта интерфейс правили — и строка, и прогон устарели', async () => {

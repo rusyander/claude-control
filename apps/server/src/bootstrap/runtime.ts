@@ -2,6 +2,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ProjectTestRun } from '@agentdeck/contracts';
 import type { SieveReportRow, SieveStage } from '@agentdeck/contracts/sieves';
+import type { SplitGroupRechecked } from '@agentdeck/contracts/chat-handoff';
 import type { ChatLink } from '../lib/app-store/app-store.types.ts';
 import type { ServerContext } from '../context.ts';
 import { serverText } from '../lib/server-texts.ts';
@@ -85,6 +86,7 @@ import { projectsDir } from '../routes/chat/paths.ts';
 import { atlassianTicketTracker } from '../domains/chat/split-ticket-tracker.ts';
 import { copyRootOf, SplitConveyor } from '../domains/chat/split-conveyor.ts';
 import { MrWatch } from '../domains/chat/mr-watch.ts';
+import { recheckDeliveredMr } from '../domains/chat/split-recheck.ts';
 import { SieveStore } from '../domains/chat/sieve-store.ts';
 import { sieveDeliveryGaps, sievePrompt } from '../domains/chat/sieve-gate.ts';
 import { testsDeliveryGaps } from '../domains/chat/tests-gate.ts';
@@ -164,6 +166,8 @@ export interface Runtime {
   splitOverlap: SplitOverlap;
   /** Ревью MR по ссылке (Т7): решение человека и его исполнение. */
   splitReview: SplitReview;
+  /** «Перепроверить MR» доставленной группы: чтение MR форджем и слово группе. */
+  recheckMr: (parentChatId: string, index: number) => Promise<SplitGroupRechecked>;
   /** Прокси защиты данных; поднимается отдельно, если включён в настройках. */
   dlpProxy: DlpProxy;
   /** Шлюз контуров: тот же порядок — создаётся всегда, поднимается по настройке. */
@@ -676,17 +680,18 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   // MR доставленной группы после «готово» (WP1j): ветки ревьюеров и исход
   // конвейера — по расписанию, только чтением; нашлось — группа продолжается.
   // Интеграция выключена или токена нет — читать нечем, наблюдатель молчит.
+  const readMr = async (url: string) => {
+    const token = forgeToken();
+    if (!token || !readIntegrations(ctx.store).forge.enabled) return undefined;
+    return readMergeRequestReview(url, token);
+  };
   const mrWatch = new MrWatch({
     store: {
       get: (parent) => ctx.store.getSplitPlan(parent),
       set: (record) => ctx.store.setSplitPlan(record),
       all: () => ctx.store.getSplitPlans(),
     },
-    read: async (url) => {
-      const token = forgeToken();
-      if (!token || !readIntegrations(ctx.store).forge.enabled) return undefined;
-      return readMergeRequestReview(url, token);
-    },
+    read: readMr,
     resume: (parentChatId, index, prompt) =>
       splitConveyor.resumeDelivered(parentChatId, index, prompt),
     schedule: (run, ms) => setTimeout(run, ms).unref(),
@@ -1206,6 +1211,20 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     splitConveyor,
     splitOverlap,
     splitReview,
+    recheckMr: (parentChatId, index) =>
+      recheckDeliveredMr(
+        {
+          store: {
+            get: (parent) => ctx.store.getSplitPlan(parent),
+            set: (record) => ctx.store.setSplitPlan(record),
+          },
+          read: readMr,
+          recheck: (parent, at, prompt) => splitConveyor.recheckDelivered(parent, at, prompt),
+          log: (message, error) => console.warn(message, error),
+        },
+        parentChatId,
+        index,
+      ),
     dlpProxy,
     platformGateway,
     platformGatewayAutoStart,

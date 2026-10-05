@@ -173,4 +173,130 @@ describe('mergeSplitGroups — управление группой', () => {
     );
     expect(rows[0]?.control).toBeUndefined();
   });
+
+  it('сдавшаяся группа с разговором и копией — «Продолжить» (владелец 05.10)', () => {
+    const rows = mergeSplitGroups(
+      new Map([chatRow(8, false)]),
+      plan([group(8, { status: 'failed', path: 'C:/copies/8', error: 'Not logged in' })]),
+    );
+    expect(rows[0]?.control?.actions).toEqual(['continue']);
+  });
+
+  it('ход без итога ревью — «Продолжить» и «Пауза»', () => {
+    const rows = mergeSplitGroups(
+      new Map([chatRow(9, false)]),
+      plan([group(9, { status: 'awaiting', waitingFor: 'review-missing', path: 'C:/copies/9' })]),
+    );
+    expect(rows[0]?.control?.actions).toEqual(['continue', 'pause']);
+  });
+
+  it('продолжать негде — убранная копия, отменённый план, нет копии', () => {
+    const cleaned = mergeSplitGroups(
+      new Map([chatRow(10, false)]),
+      plan([
+        group(10, {
+          status: 'failed',
+          path: 'C:/copies/10',
+          cleaned: { at: '2026-10-05T10:00:00Z' } as Group['cleaned'],
+        }),
+      ]),
+    );
+    expect(cleaned[0]?.control?.actions ?? []).not.toContain('continue');
+    const cancelled = mergeSplitGroups(
+      new Map([chatRow(11, false)]),
+      plan([group(11, { status: 'failed', path: 'C:/copies/11' })], {
+        cancelledAt: '2026-10-05T10:00:00Z',
+      }),
+    );
+    expect(cancelled[0]?.control?.actions ?? []).not.toContain('continue');
+    const noCopy = mergeSplitGroups(
+      new Map([chatRow(13, false)]),
+      plan([group(13, { status: 'failed' })]),
+    );
+    expect(noCopy[0]?.control?.actions ?? []).not.toContain('continue');
+  });
+
+  it('убранная «Убрать» группа — без «Продолжить»: убрана без возврата (ревью R3)', () => {
+    const rows = mergeSplitGroups(
+      new Map([chatRow(14, false)]),
+      plan([
+        group(14, {
+          status: 'failed',
+          path: 'C:/copies/14',
+          droppedAt: '2026-10-05T10:00:00Z',
+        }),
+      ]),
+    );
+    expect(rows[0]?.control?.actions ?? []).not.toContain('continue');
+  });
+});
+
+/**
+ * «Перепроверить MR» (владелец 05.10): кнопка есть только у доставленной группы
+ * с MR и копией; зелёная отметка — время последней проверки, «перепроверяется»
+ * — пока ход идёт.
+ */
+describe('mergeSplitGroups — перепроверка MR', () => {
+  const delivered = (extra: Partial<Group> = {}): Group =>
+    group(4, {
+      status: 'done',
+      deliver: true,
+      mr: 'https://tracker.example.com/mr/4',
+      path: 'C:/copies/4',
+      chatId: 'c4',
+      ...extra,
+    });
+
+  it('до первой проверки — кнопка без отметок', () => {
+    const rows = mergeSplitGroups(new Map([chatRow(4, false)]), plan([delivered()]));
+    expect(rows[0]?.recheck).toEqual({ parentChatId: 'parent', index: 4 });
+  });
+
+  it('проверка идёт — «перепроверяется» и во время хода', () => {
+    const rows = mergeSplitGroups(
+      new Map([chatRow(4, true)]),
+      plan([delivered({ status: 'started', recheckRequestedAt: '2026-10-05T11:00:00Z' })]),
+    );
+    expect(rows[0]?.recheck?.requestedAt).toBe('2026-10-05T11:00:00Z');
+  });
+
+  it('закрытый MR — кнопка есть (его могут открыть), строка несёт состояние', () => {
+    const rows = mergeSplitGroups(
+      new Map([chatRow(4, false)]),
+      plan([delivered({ mrClosed: 'closed' })]),
+    );
+    expect(rows[0]?.recheck).toBeDefined();
+    expect(rows[0]?.mrClosed).toBe('closed');
+  });
+
+  it('проверка кончилась доставкой — время последней проверки', () => {
+    const rows = mergeSplitGroups(
+      new Map([chatRow(4, false)]),
+      plan([delivered({ recheckedAt: '2026-10-05T11:30:00Z' })]),
+    );
+    expect(rows[0]?.recheck).toEqual({
+      parentChatId: 'parent',
+      index: 4,
+      checkedAt: '2026-10-05T11:30:00Z',
+    });
+  });
+
+  it('кнопки нет: другая работа идёт, нет MR, копия убрана, план отменён, не доставка', () => {
+    const cases: Array<[Group, boolean, Partial<SplitPlanView>]> = [
+      [delivered(), true, {}],
+      [delivered({ mr: undefined }), false, {}],
+      [delivered({ cleaned: { at: 'x' } as Group['cleaned'] }), false, {}],
+      [delivered(), false, { cancelledAt: '2026-10-05T10:00:00Z' }],
+      [delivered({ deliver: undefined }), false, {}],
+      // Влитой MR перепроверять нечего — сервер откажет на каждое нажатие (ревью R4).
+      [delivered({ mrClosed: 'merged' }), false, {}],
+      [delivered({ chatId: undefined }), false, {}],
+      // Ревью по ссылке смотрит чужой MR — сервер отказал бы всегда (ревью Q1).
+      [delivered({ review: true }), false, {}],
+    ];
+    for (const [item, running, extra] of cases) {
+      const rows = mergeSplitGroups(new Map([chatRow(4, running)]), plan([item], extra));
+      expect(rows[0]?.recheck).toBeUndefined();
+    }
+  });
 });

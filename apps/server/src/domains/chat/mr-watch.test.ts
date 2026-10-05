@@ -207,6 +207,8 @@ describe('MrWatch: ветки ревьюера после «готово»', () 
     // по которой панель потом примет сито, записана ровно как в задании.
     expect(prompt).toContain(LEARN_SIEVES_LINE);
     expect(t.group().mrWatch?.relayedLinks).toEqual([`${MR}#note_17928`]);
+    // Файл треда — область сита, которое из него выучат (сито по путям).
+    expect(t.group().mrWatch?.relayedPaths).toEqual({ [`${MR}#note_17928`]: 'src/ui/Menu.tsx' });
     // Продолжение ушло — следующего таймера этого круга нет: новый круг ставит новое «готово».
     expect(t.timers).toHaveLength(0);
   });

@@ -4,7 +4,10 @@
 // (0.01 per turn, as the real CLI reports it). A message containing WAKE makes the
 // process start one more turn by itself 150 ms after the result — the shape the real
 // CLI shows when a background task finishes. ARGV dumps argv for signature checks.
-/* global process, setTimeout */
+// STEER / STEERLATE model a message written to stdin mid-turn (claude 2.1.285, measured
+// 30.09): STEER absorbs it into the open turn (one result, the text names it); STEERLATE
+// has no step left — the turn ends and the CLI starts the next turn with it by itself.
+/* global process, setTimeout, clearTimeout */
 import { createInterface } from 'node:readline';
 
 const SESSION = 'live-session-0001';
@@ -28,10 +31,48 @@ function runTurn(text) {
   });
 }
 
+/** Open STEER turn: a line arriving now is absorbed into it (or deferred for STEERLATE). */
+let steer;
+
+function steerTurn(late) {
+  turn += 1;
+  out({ type: 'system', subtype: 'init', session_id: SESSION, model: 'fake', tools: [] });
+  out({
+    type: 'stream_event',
+    event: { type: 'content_block_delta', delta: { type: 'text_delta', text: 'working ' } },
+  });
+  const finish = (seen) => {
+    steer = undefined;
+    clearTimeout(timer);
+    if (seen && !late) {
+      out({
+        type: 'stream_event',
+        event: { type: 'content_block_delta', delta: { type: 'text_delta', text: `saw ${seen}` } },
+      });
+    }
+    out({ type: 'result', subtype: 'success', total_cost_usd: 0, session_id: SESSION });
+    if (seen && late) setTimeout(() => runTurn(`next turn got ${seen}`), 50);
+  };
+  const timer = setTimeout(() => finish(undefined), 8_000);
+  steer = finish;
+}
+
 createInterface({ input: process.stdin }).on('line', (line) => {
   if (!line.trim()) return;
   const message = JSON.parse(line);
   const content = String(message.message?.content ?? '');
+  if (steer) {
+    steer(content);
+    return;
+  }
+  if (content.includes('STEERLATE')) {
+    steerTurn(true);
+    return;
+  }
+  if (content.includes('STEER')) {
+    steerTurn(false);
+    return;
+  }
   if (content.includes('ARGV')) {
     runTurn(`argv ${JSON.stringify(process.argv.slice(2))}`);
     return;

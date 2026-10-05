@@ -7,7 +7,13 @@ import {
   mediaRequestOf,
   pictureBlockRequest,
 } from '@agentdeck/contracts/media-block';
-import { chatTitleText, firstMeaningfulText, type Record } from './ChatRecords.ts';
+import {
+  chatTitleText,
+  firstMeaningfulText,
+  isDialogMessage,
+  normalizeRecord,
+  type Record,
+} from './ChatRecords.ts';
 
 const user = (content: string): Record => ({
   type: 'user',
@@ -135,5 +141,32 @@ describe('слово режима в названии на языке клиен
   it('обычное название не трогает', () => {
     expect(localizeMediaTitle('Почини тесты', english)).toBe('Почини тесты');
     expect(localizeMediaTitle('Картинка без двоеточия', english)).toBe('Картинка без двоеточия');
+  });
+});
+
+// Сообщение посреди хода (CLI 2.1.285) пишется вставкой `queued_command`, а не
+// репликой: без перевода оно пропадало бы из ленты после перезагрузки.
+describe('normalizeRecord', () => {
+  it('queued_command — реплика человека на своём месте, прочее как есть', () => {
+    const queued = {
+      type: 'attachment',
+      uuid: 'u1',
+      timestamp: '2026-09-30T14:09:35.000Z',
+      attachment: { type: 'queued_command', prompt: 'нашёл баг' },
+    } as Record;
+    expect(normalizeRecord(queued)).toMatchObject({
+      type: 'user',
+      uuid: 'u1',
+      message: { role: 'user', content: 'нашёл баг' },
+    });
+    expect(isDialogMessage(normalizeRecord(queued))).toBe(true);
+
+    const other = { type: 'attachment', attachment: { type: 'date' } } as Record;
+    expect(normalizeRecord(other)).toBe(other);
+    const empty = {
+      type: 'attachment',
+      attachment: { type: 'queued_command', prompt: ' ' },
+    } as Record;
+    expect(normalizeRecord(empty)).toBe(empty);
   });
 });

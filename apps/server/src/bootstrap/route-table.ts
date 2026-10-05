@@ -62,6 +62,7 @@ import { registerPromptRoutes } from '../routes/prompt-routes.ts';
 import { registerRemoteRoutes } from '../routes/remote-routes.ts';
 import { registerEventsRoutes } from '../routes/events-routes.ts';
 import { registerWatcherRoutes } from '../routes/watcher-routes.ts';
+import { registerDevRestartRoutes } from '../routes/dev-restart-routes.ts';
 import { registerPanelAgentRoutes } from '../routes/panel-agent/panel-agent-routes.ts';
 import { registerPanelAgentRunRoutes } from '../routes/panel-agent/run-routes.ts';
 import type { AccessGateDeps } from '../lib/access-gate.ts';
@@ -88,6 +89,7 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
     projectTestRuns,
     projectTestManual,
     e2eRuns,
+    mutationChecks,
     e2eWatch,
     dlpProxy,
     platformGateway,
@@ -209,6 +211,7 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
       registerProjectTestsRoutes(instance, context, projectTestRuns, projectTestManual, {
         e2eRuns,
         e2eWatch,
+        mutations: mutationChecks,
       }),
     // Публикация отчёта наружу — часть интеграций, а не раздела тестов: ей нужны
     // токен, привязка и живая сеть, а раздел обязан работать и без всего этого.
@@ -250,6 +253,8 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
     // Фоновый наблюдатель: тумблер, статус и сбои со страницы. Сам объект живёт
     // дольше запроса — его разбор идёт, пока тумблер включён.
     (instance, context) => registerWatcherRoutes(instance, context, runtime.watcher),
+    // Отложенный перезапуск dev-сервера: правки ждут живых ходов, панель это видит.
+    registerDevRestartRoutes,
     // Агент панели: действия исполняются настоящими маршрутами через `inject`,
     // поэтому ему нужен тот же гейт доступа (токен при удалённом доступе), а
     // решению по карточке — список своих источников.

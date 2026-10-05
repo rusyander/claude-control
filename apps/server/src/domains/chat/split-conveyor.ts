@@ -35,6 +35,7 @@ import type { ChatEvent } from './ChatRunner.ts';
 import type { RunFinished } from './ChatRunRegistry.ts';
 import type { SplitGroupContext } from './ChatSplit.ts';
 import { coded } from '../../lib/server-text.ts';
+import type { GroupTestsVerdict } from './tests-gate.ts';
 import { normalizePath } from '../project-runner/targets.ts';
 import { localizeText, matchText, serverText } from '../../lib/server-texts.ts';
 import {
@@ -194,6 +195,8 @@ export interface DeliveryVerdict {
   failed?: string;
   /** Ветка, которую группа завела и отправила сама вместо названной панелью. */
   branch?: string;
+  /** Вердикт блока «Тесты» копии: задетые кейсы и их итог в прогонах группы. */
+  tests?: GroupTestsVerdict;
 }
 
 export interface SplitDeliveryDeps {
@@ -271,6 +274,11 @@ export function claimedBranches(record: SplitPlanRecord, index: number): string[
   // Группы прежнего плана того же разговора (F5.2) держат свои ветки и MR.
   for (const group of record.retiredGroups ?? []) claimed.add(group.branch);
   return [...claimed];
+}
+
+/** Разбор разделения заведён и ещё не кончился — группы ждут его блока. */
+function triagePending(record: SplitPlanRecord): boolean {
+  return Boolean(record.triageChatId && !record.triage);
 }
 
 /**
@@ -819,6 +827,7 @@ export class SplitConveyor {
       const outcome = sieves.learn({
         rows,
         relayed: group.mrWatch?.relayedLinks ?? [],
+        ...(group.mrWatch?.relayedPaths ? { paths: group.mrWatch.relayedPaths } : {}),
         projectPath: record.projectPath,
         ...(group.mr ? { mr: group.mr } : {}),
       });
@@ -1024,6 +1033,11 @@ export class SplitConveyor {
         textCode: 'split-delivery-description-unchecked-notice',
         textParams: { group: group.title, mr: verdict.mr },
       });
+    }
+    // Вердикт блока «Тесты» — на группу: хаб показывает, чем проверена работа.
+    if (verdict.tests) {
+      group.testsVerdict = verdict.tests;
+      this.deps.store.set(record);
     }
     // Готовность по следам звеньев — вместе с фактами git (аудит 25.09, L110).
     verdict = { ...verdict, missing: [...verdict.missing, ...stageTraceGaps(group.stageTrace)] };
@@ -1661,6 +1675,7 @@ export class SplitConveyor {
             }
           : {}),
         ...(group.deliveryNudges ? { deliveryNudges: group.deliveryNudges } : {}),
+        ...(group.testsVerdict ? { testsVerdict: group.testsVerdict } : {}),
         ...(group.deliver !== undefined ? { deliver: group.deliver } : {}),
         ...(group.interruptedAt ? { interruptedAt: group.interruptedAt } : {}),
         ...(group.interruptResumes ? { interruptResumes: group.interruptResumes } : {}),
@@ -1736,6 +1751,10 @@ export class SplitConveyor {
     // Лимит подписки исчерпан (журнал 81b): старт сгорел бы на первом же вызове
     // модели. Очередь ждёт сброса — его будит `wakeFromLimit`.
     if (this.limitedUntil(providerOf(record))) return { chats: [], failures: [] };
+    // Разбор ещё идёт: порядок и места групп решит его блок. Иначе перезапуск
+    // панели, пауза или «Убрать» посреди разбора заводили группы, а разбор потом
+    // заводил их второй раз (ревью 30.09).
+    if (triagePending(record)) return { chats: [], failures: [] };
     const ready = this.ordered(record)
       .filter((group) => group.status === 'pending' && this.unmet(record, group).length === 0)
       .map((group) => group.index)
@@ -1769,6 +1788,7 @@ export class SplitConveyor {
    * заметках, чтобы агент знал, где искать их правки).
    */
   private async launchUnblocked(record: SplitPlanRecord): Promise<TaskSplitResult> {
+    if (triagePending(record)) return { chats: [], failures: [] };
     const results: TaskSplitResult[] = [];
     for (const group of this.ordered(record)) {
       if (group.status !== 'waiting' || this.unmet(record, group).length > 0) continue;
@@ -1909,6 +1929,11 @@ export class SplitConveyor {
       group.status = 'started';
       group.startedAt = at;
       delete group.pausedAt;
+      // «Завести заново» оборванную группу: метка обрыва осталась бы на идущей
+      // группе, и хаб звал бы «Продолжить», которое ничего не делает (ревью 30.09).
+      delete group.waitingFor;
+      delete group.interruptedAt;
+      delete group.interruptResumes;
       if (context?.base) group.base = context.base;
     }
     this.deps.store.set(live);
@@ -2188,6 +2213,17 @@ export class SplitConveyor {
   async restartGroup(parentChatId: string, index: number, force = false): Promise<void> {
     const { record, group } = this.cutGroup(parentChatId, index);
     if (!force) this.admitLimit(record);
+    if (this.inFlight.has(`${parentChatId}:${index}`)) {
+      // Прежний запуск ещё заводит копию (обрыв записан под ним): он жив и сам
+      // пустит прогон, если группа снова «стартует». Второй запуск в той же
+      // копии дал бы два прогона группы (ревью 30.09).
+      group.status = 'started';
+      delete group.waitingFor;
+      delete group.interruptedAt;
+      delete group.interruptResumes;
+      this.deps.store.set(record);
+      return;
+    }
     if (group.path) {
       void this.startInCopy(record, group);
       return;
@@ -2409,9 +2445,19 @@ export class SplitConveyor {
   /** Ход группы упёрся в лимит: срок — в запись, таймер, заметка родителю. */
   private noteLimit(record: SplitPlanRecord, until: string, warning = false): void {
     const at = Date.parse(until);
-    if (!Number.isFinite(at) || (warning && at <= this.now().getTime())) return;
+    const now = this.now().getTime();
+    if (!Number.isFinite(at) || (warning && at <= now)) return;
     const known = record.limitUntil ? Date.parse(record.limitUntil) : 0;
-    if (at > known) {
+    // Предупреждение не подменяет идущий отказ: очередь держит отказ, а срок
+    // «на исходе» её не держит — подмена отпустила бы её в стену (ревью 30.09).
+    if (warning && !record.limitWarning && known > now) {
+      this.armLimitWake();
+      return;
+    }
+    // Отказ сильнее предупреждения при любом сроке: прежний срок «на исходе»
+    // (недельный — через двое суток) иначе становился сроком настоящего отказа,
+    // и очередь ждала двое суток вместо трёх часов (ревью 30.09).
+    if (at > known || (!warning && record.limitWarning)) {
       record.limitUntil = new Date(at).toISOString();
       // Отказ сильнее предупреждения: срок, поставленный отказом, — уже не
       // «на исходе», а «исчерпан».
@@ -2429,9 +2475,6 @@ export class SplitConveyor {
         textCode,
         textParams: { until: record.limitUntil },
       });
-    } else if (!warning && record.limitWarning) {
-      delete record.limitWarning;
-      this.deps.store.set(record);
     }
     this.armLimitWake();
   }

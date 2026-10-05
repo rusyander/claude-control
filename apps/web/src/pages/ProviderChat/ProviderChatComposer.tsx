@@ -44,9 +44,14 @@ export function ProviderChatComposer({
   const sendingRef = useRef(false);
   const [isSending, setIsSending] = useState(false);
 
+  // Пока идёт ответ, обычное сообщение встаёт в очередь сервера и уйдёт само
+  // по его концу; картинку и презентацию панель собирает отдельным ходом — им
+  // ждать.
+  const isHeld = isRunning && isMedia;
+
   const submit = (): void => {
     const text = input.trim();
-    if (!text || sendingRef.current || isRunning || isBlocked || isDrawing || attach.isPreparing) {
+    if (!text || sendingRef.current || isHeld || isBlocked || isDrawing || attach.isPreparing) {
       return;
     }
     sendingRef.current = true;
@@ -90,11 +95,13 @@ export function ProviderChatComposer({
     // предложение собрать новую колоду вместо этой.
     if (isDeck && modes?.reviseTitle) return t('chat.mode.revisePlaceholder');
     if (isDeck) return t('chat.mode.deckPlaceholder');
+    if (isRunning) return t('providerChat.queuePlaceholder');
     return t('providerChat.placeholder');
   })();
   const sendLabel = ((): string => {
     if (isImage) return t('chat.mode.draw');
     if (isDeck) return t('chat.mode.build');
+    if (isRunning) return t('providerChat.queueSend');
     return t('providerChat.send');
   })();
 
@@ -188,7 +195,7 @@ export function ProviderChatComposer({
         <Button
           variant="primary"
           onClick={submit}
-          disabled={!input.trim() || isRunning || isBlocked || isDrawing || attach.isPreparing}
+          disabled={!input.trim() || isHeld || isBlocked || isDrawing || attach.isPreparing}
           isLoading={isDrawing || isSending}
           leftIcon={<Icon name={isMedia ? 'image' : 'send'} size={18} />}
         >

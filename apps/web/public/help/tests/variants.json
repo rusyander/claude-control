@@ -27,22 +27,22 @@
       "light-ru": {
         "file": "02-created.png",
         "width": 1132,
-        "height": 176
+        "height": 289
       },
       "light-en": {
         "file": "02-created.en.png",
         "width": 1132,
-        "height": 176
+        "height": 289
       },
       "dark-ru": {
         "file": "02-created.dark.png",
         "width": 1132,
-        "height": 176
+        "height": 289
       },
       "dark-en": {
         "file": "02-created.dark.en.png",
         "width": 1132,
-        "height": 176
+        "height": 289
       }
     },
     "e2e/03-synced": {
@@ -71,44 +71,44 @@
       "light-ru": {
         "file": "04-remove-confirm.png",
         "width": 1132,
-        "height": 281
+        "height": 394
       },
       "light-en": {
         "file": "04-remove-confirm.en.png",
         "width": 1132,
-        "height": 281
+        "height": 394
       },
       "dark-ru": {
         "file": "04-remove-confirm.dark.png",
         "width": 1132,
-        "height": 281
+        "height": 394
       },
       "dark-en": {
         "file": "04-remove-confirm.dark.en.png",
         "width": 1132,
-        "height": 281
+        "height": 394
       }
     },
     "e2e/05-run-done": {
       "light-ru": {
         "file": "05-run-done.png",
         "width": 1132,
-        "height": 265
+        "height": 378
       },
       "light-en": {
         "file": "05-run-done.en.png",
         "width": 1132,
-        "height": 265
+        "height": 378
       },
       "dark-ru": {
         "file": "05-run-done.dark.png",
         "width": 1132,
-        "height": 265
+        "height": 378
       },
       "dark-en": {
         "file": "05-run-done.dark.en.png",
         "width": 1132,
-        "height": 265
+        "height": 378
       }
     },
     "e2e/06-run-history": {

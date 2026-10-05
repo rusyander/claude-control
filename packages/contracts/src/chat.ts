@@ -432,6 +432,18 @@ export const chatProgressSchema = object({
   activeTool: progressActiveToolSchema.optional(),
   /** Последний навык, вызванный агентом (`Skill`), — шаг его пути, когда плана нет. */
   skill: object({ name: string(), startedAt: string().optional() }).optional(),
+  /**
+   * Файл шагов в рабочей папке разговора (`.agent/steps.json`): номер шага,
+   * всего и название — пишет навык проекта, панель его только читает. Сильнее
+   * плана агента: группы, которые плана не ведут, так всё равно дают «Шаг 8 из 14».
+   */
+  steps: object({
+    current: number(),
+    total: number(),
+    title: string().optional(),
+    /** Когда файл записан — время правки файла (ISO). */
+    updatedAt: string().optional(),
+  }).optional(),
   /** Время последней записи в транскрипт, по которой собран прогресс. */
   updatedAt: string().optional(),
   /**

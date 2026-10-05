@@ -1,4 +1,5 @@
 export { ChatMessages } from './ui/ChatMessages';
+export { QueuedBubbles } from './ui/QueuedBubbles';
 /**
  * Карточка предложения разделить задачи. Наружу выставлена потому, что лент
  * переписки в панели ДВЕ — своя у Claude и своя у чужого провайдера, — а

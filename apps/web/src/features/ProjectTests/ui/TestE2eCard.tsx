@@ -8,6 +8,7 @@ import { Typography } from '@shared/ui/typography';
 import { toErrorMessage } from '@shared/api/client';
 import { useCreateE2eFolder, useRemoveE2eFolder, useSyncE2eFolder } from '@entities/ProjectTest';
 import { TestE2eRun } from './TestE2eRun';
+import { TestMutationCheck } from './TestMutationCheck';
 import type { TestE2eCardProps } from './TestE2eCard.types';
 import styles from './ProjectTests.module.scss';
 
@@ -255,6 +256,13 @@ export function TestE2eCard({ board, environmentId }: TestE2eCardProps) {
               paths: automatedFiles(board.active),
             }
           }
+        />
+      )}
+
+      {(folder.state !== 'missing' || board.automation) && (
+        <TestMutationCheck
+          path={board.path}
+          isBusy={isRunning || board.e2eRun?.status === 'running'}
         />
       )}
     </Stack>

@@ -148,6 +148,8 @@ export const queryKeys = {
   /** Удалённый доступ: токен, адрес в приватной сети и спаренные телефоны. */
   remote: ['remote'] as const,
   watcher: ['watcher'] as const,
+  /** Отложенный перезапуск dev-сервера: ждут ли правки живых ходов. */
+  devRestart: ['dev-restart'] as const,
   /** Сверка форматов чужих CLI с их официальными схемами: кэш на неделю. */
   formatCheck: ['format-check'] as const,
   /** Резолв раннера активного провайдера (api/cli/none) — модалка ассистента. */

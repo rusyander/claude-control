@@ -24,6 +24,7 @@ import {
   isDialogMessage,
   isSyntheticReply,
   lastValue,
+  normalizeRecord,
   opensWithPanel,
   toBlocks,
   toUsage,
@@ -215,7 +216,7 @@ export async function readChatMessages(
 
     let record: Record;
     try {
-      record = JSON.parse(trimmed) as Record;
+      record = normalizeRecord(JSON.parse(trimmed) as Record);
     } catch {
       continue;
     }
@@ -308,6 +309,16 @@ export function findSessionCwd(projectsDir: string, sessionId: string): string |
 
   const records = readRecords(path, statSync(path).size);
   return firstValue(records, (record) => record.cwd);
+}
+
+/**
+ * Когда разговор начался — время первой записи транскрипта. По нему файл шагов,
+ * оставшийся от прежней задачи в той же папке, отличается от своего.
+ */
+export function findSessionStart(projectsDir: string, sessionId: string): string | undefined {
+  const path = findTranscript(projectsDir, sessionId);
+  if (!path) return undefined;
+  return firstValue(readHeadRecords(path), (record) => record.timestamp);
 }
 
 /**

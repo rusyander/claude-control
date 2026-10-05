@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { FastifyInstance, InjectOptions } from 'fastify';
-import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { delimiter, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
   PANEL_AGENT_HEADER,
@@ -137,7 +137,15 @@ beforeAll(async () => {
   process.env.CLAUDE_CONFIG_DIR = config;
   process.env.USERPROFILE = home;
   process.env.HOME = home;
-  const path = pathWithoutAgentClis();
+  // Редактор в PATH — свой, фальшивый: строка `open_project_in_editor` ждёт
+  // карточку, а до неё доходит только там, где редактор найден. У разработчика
+  // VS Code стоит, на раннере CI — нет, и строка краснела бы от машины. Карточку
+  // здесь не одобряют, так что сам файл не запускается никогда.
+  const editorBin = join(home, 'bin');
+  mkdirSync(editorBin);
+  writeFileSync(join(editorBin, 'code.cmd'), '@echo off\r\n');
+  writeFileSync(join(editorBin, 'code'), '#!/bin/sh\n', { mode: 0o755 });
+  const path = `${editorBin}${delimiter}${pathWithoutAgentClis()}`;
   process.env.PATH = path;
   if (process.env.Path !== undefined) process.env.Path = path;
   seedFiles(config, project);

@@ -119,6 +119,11 @@ export type ProviderChatPatchRequest = Infer<typeof providerChatPatchRequestSche
 export const providerChatSendRequestSchema = object({
   text: string(),
   attachments: array(string()).optional(),
+  /**
+   * Ответ ещё идёт — поставить сообщение в очередь сервера (202 с элементом
+   * очереди) вместо отказа 409. Уходит само по концу ответа.
+   */
+  queueIfBusy: boolean().optional(),
 });
 export type ProviderChatSendRequest = Infer<typeof providerChatSendRequestSchema>;
 
@@ -135,6 +140,16 @@ export const providerChatEventSchema = object({
 });
 export type ProviderChatEvent = Infer<typeof providerChatEventSchema>;
 
+/** Сообщение, ждущее конца идущего ответа (`queueIfBusy`). */
+export const providerChatQueuedSchema = object({
+  id: string(),
+  text: string(),
+  attachments: array(string()).optional(),
+  /** Когда поставлено, ISO-8601. */
+  at: string(),
+});
+export type ProviderChatQueued = Infer<typeof providerChatQueuedSchema>;
+
 /** Что сейчас происходит с разговором — для восстановления после перезагрузки. */
 export const providerChatStatusSchema = object({
   chatId: string(),
@@ -142,5 +157,7 @@ export const providerChatStatusSchema = object({
   /** Уже напечатанный кусок ответа: по нему вкладка догоняет пропущенное. */
   partial: string(),
   transport: zodEnum(providerChatTransports).optional(),
+  /** Очередь разговора по порядку отправки; пусто — поля нет. */
+  queued: array(providerChatQueuedSchema).optional(),
 });
 export type ProviderChatStatus = Infer<typeof providerChatStatusSchema>;

@@ -46,7 +46,9 @@ describe('AppStore: снимок окна кода', () => {
     const store = new AppStore(appData());
     store.setCodeView('C:/work/Project', view);
 
-    expect(store.getCodeView('c:\\work\\project\\')?.file).toBe('src/app.ts');
+    // Регистр путей не различает только Windows; слэши и хвостовой слэш ключ сводит везде.
+    const same = process.platform === 'win32' ? 'c:\\work\\project\\' : 'C:\\work\\Project\\';
+    expect(store.getCodeView(same)?.file).toBe('src/app.ts');
   });
 
   it('закрытие таба стирает запись', () => {

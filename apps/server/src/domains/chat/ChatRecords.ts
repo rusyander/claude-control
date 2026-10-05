@@ -36,6 +36,8 @@ export interface Record {
   isApiErrorMessage?: boolean;
   toolUseResult?: unknown;
   isSidechain?: boolean;
+  /** Служебная вставка CLI; `queued_command` — сообщение человека посреди хода. */
+  attachment?: { type?: string; prompt?: unknown };
   message?: {
     /** Ход модели: его блоки лежат отдельными строками с одним `id`. */
     id?: string;
@@ -67,6 +69,20 @@ export interface ContentBlock {
   is_error?: boolean;
   source?: { type?: string; media_type?: string; data?: string };
   title?: string;
+}
+
+/**
+ * Запись транскрипта в том виде, в каком её читает панель. Сообщение человека,
+ * написанное посреди хода и отданное модели внутри него (замер CLI 2.1.285),
+ * CLI пишет не репликой, а вставкой `attachment` вида `queued_command`: без
+ * перевода оно пропадало бы из ленты после перезагрузки — человек не видел бы
+ * собственных слов. Здесь оно становится обычной репликой человека на своём месте.
+ */
+export function normalizeRecord(record: Record): Record {
+  if (record.type !== 'attachment' || record.attachment?.type !== 'queued_command') return record;
+  const prompt = record.attachment.prompt;
+  if (typeof prompt !== 'string' || !prompt.trim()) return record;
+  return { ...record, type: 'user', message: { role: 'user', content: prompt } };
 }
 
 /** Вопрос старше суток — брошенный разговор, а не ожидание ответа. */

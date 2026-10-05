@@ -65,6 +65,19 @@ export const testsRu: Record<TestsMessageCode, string> = {
   'defect-cli-no-url': '{{command}} не вернул ссылку на задачу.',
   'draft-id-invalid': 'Черновик «{{runId}}»: неверный идентификатор.',
   'draft-not-found': 'Черновика «{{runId}}» в проекте нет.',
+  'draft-chat-not-found': 'Разговора «{{chatId}}» не нашлось — кейс собирать не из чего.',
+  'draft-chat-no-steps':
+    'В разговоре нет ни реплик человека, ни команд и правок — кейс собирать не из чего.',
+  'mutation-busy': 'Проверка поломкой уже идёт.',
+  'mutation-file-invalid': '«{{file}}» — не файл проекта.',
+  'mutation-no-cases':
+    'К «{{file}}» не привязан ни один автоматический кейс (codePaths) — проверять нечем.',
+  'mutation-unbreakable': 'В «{{file}}» нечего перевернуть — выберите грубую поломку.',
+  'mutation-no-command':
+    'У проекта нет команды прогона автотестов (папка e2e или automation.json).',
+  'mutation-no-report': 'Прогон в копии не оставил отчёта — смотрите вывод команды.',
+  'mutation-failed': 'Проверка поломкой оборвалась — причина в выводе.',
+  'mutation-spawn': 'Команду прогона не удалось запустить.',
   'draft-case-human-written': 'Кейс написан человеком — правку к нему принимают руками.',
   'draft-revert-case-gone': 'Кейса в библиотеке уже нет.',
   'draft-revert-case-run': 'Кейс успели прогнать — результат дороже отката.',

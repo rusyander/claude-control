@@ -19,7 +19,7 @@ export interface GroupStep {
  * этапе группа» и открывал каждый чат). План — чекпоинты, которые агент сам
  * себе ставит по правилам своей задачи, поэтому «8 из 14» считается по ним, а не
  * по звеньям конвейера: звеньев четыре, шагов у доставки тикета — четырнадцать.
- * Плана нет — шага нет, а не «0 из 0».
+ * Плана нет — шага нет, а не «0 из 0». Файл шагов в копии группы сильнее плана.
  */
 export function groupStep(
   progress: ChatProgress | undefined,
@@ -28,6 +28,17 @@ export function groupStep(
   const tasks = progress?.tasks ?? [];
   const running = (progress?.agents ?? []).filter((agent) => agent.status === 'running');
   const agents = running.length;
+  // Файл шагов (`.agent/steps.json`) пишет навык проекта — он знает свой путь
+  // лучше, чем план агента, поэтому идёт первым (решение владельца 29.09).
+  const steps = progress?.steps;
+  if (steps) {
+    return {
+      current: steps.current,
+      total: steps.total,
+      ...(steps.title ? { name: steps.title } : {}),
+      agents,
+    };
+  }
   if (tasks.length === 0) {
     // Ревью 29.09: агенты групп плана (TodoWrite) не ведут вовсе. Тогда шаг —
     // навык, которым агент работает, а без него — задача живых субагентов;

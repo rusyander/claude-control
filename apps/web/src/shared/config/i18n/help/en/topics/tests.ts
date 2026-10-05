@@ -53,7 +53,9 @@ export const testsEn: typeof testsRu = {
       'panel: it is the only one whose run boundaries the panel can hold. There is no ' +
       'conversation: a run has no feed and no questions to the human, permissions come from ' +
       'the panel itself — read anything, change only test files. The other way round too: ' +
-      'cases are not kept from the chat, which the console says out loud.',
+      'a chat conversation does not write to the library by itself — “Make a case” in the ' +
+      'chat menu builds a DRAFT from it (the steps are your messages, commands and file ' +
+      'edits), and you accept or edit it here.',
     vsCi: 'Not CI',
     vsCiText:
       'The panel runs nothing on a schedule and guards no branch. Build results arrive ' +
@@ -578,12 +580,24 @@ export const testsEn: typeof testsRu = {
     agentChangedText:
       'A run can be narrowed to the cases touched by the uncommitted changes of the working ' +
       'tree: the panel matches changed files against the codePaths field and the case area. ' +
-      'It is a cheap way to check only what was touched.',
+      'It is a cheap way to check only what was touched. The opposite question — will the ' +
+      'cases catch a regression — is asked by the “Mutation check of the case set” in the ' +
+      'autotests card: in a separate copy of the repository the chosen file is broken ' +
+      '(coarsely — the module fails on load, or subtly — the first comparison is flipped), ' +
+      'the automated cases linked to it through codePaths are run, and the card names which ' +
+      'went red. None — the file is not protected by cases. It is an autotest run in a copy, ' +
+      'minutes or more, so only by the button; your working copy, library and history do ' +
+      'not change.',
     agentConventionTitle: 'Asking from the chat',
     agentConventionText:
-      'The buttons of this section explain the format to the agent themselves. An ordinary ' +
-      'conversation knows nothing about it: say "run the tests" in the chat and it will ' +
-      'check and write nothing down. The “Write it into the project’s CLAUDE.md” button appends a ' +
+      'The buttons of this section explain the format to the agent themselves. A project ' +
+      'chat knows about the section too: the panel appends a line to each of its agents saying ' +
+      'where the cases live and how to keep them. Changing how the product behaves — not only ' +
+      'when asked to "write tests" — the agent adds or updates the case for the change on its ' +
+      'own (tests-cli case) and records what it verified as a run (tests-cli record or run): ' +
+      '“tested” becomes a record in the history, not words in a reply. A case you wrote the ' +
+      'agent does not rewrite — its edit arrives as a draft for you to accept. The “Write it ' +
+      'into the project’s CLAUDE.md” button appends a ' +
       'block with the format and the rules to the end of the file; it is read in EVERY ' +
       'conversation. Your text is left alone, and pressing again adds nothing.',
 
@@ -1249,7 +1263,9 @@ export const testsEn: typeof testsRu = {
         'The panel creates e2e/ with a Playwright config, its own package.json and a README and ' +
         'hides it with a line in .git/info/exclude, not .gitignore: that is one machine’s ' +
         'decision, not the whole team’s. The project’s own folder (e2e/, tests/e2e/, testDir ' +
-        'from playwright.config) is taken as it is — the panel creates and hides nothing in it.',
+        'from playwright.config) is taken as it is — the panel creates and hides nothing in it. ' +
+        'The same card holds the “Mutation check of the case set”: will the automated cases ' +
+        'linked to a file catch it being broken.',
       synced: 'The folder’s tests became cases',
       syncedText:
         'An agent — of a chat or of a generation — puts the spec into the folder. “Update from ' +
@@ -1346,8 +1362,14 @@ export const testsEn: typeof testsRu = {
         'It asks once and only what is yours: the stand URL, where credentials live, which flows matter most. ' +
         'Claude gets this as a system prompt addition; another CLI gets one line at the end of ' +
         'your message, visible in its history. A command message (/…) gets no line. The ' +
-        'conversation never creates the folder itself: with none, the agent learns that and ' +
-        'creates e2e/ only when the task is about tests.',
+        'conversation never creates the folder itself, and the agent will not create it ' +
+        'silently either: with none and a task that needs tests, it asks in that same single ' +
+        'question whether to keep them in the Tests section. Changing how the product behaves, ' +
+        'it adds or updates the case for the change on its own (tests-cli case) and records ' +
+        'what it verified (tests-cli record or run); a case you wrote arrives as a draft edit to ' +
+        'accept. When it cannot run commands or write files (for another CLI that is decided by ' +
+        'its rights in the “Permissions” section), it says so and hands you the exact command ' +
+        'instead of reporting a run that never happened.',
       addTitle: 'Adding a project',
       addText:
         'A project with its own e2e folder gets cases from its tests the moment it is added to ' +

@@ -77,6 +77,12 @@ export const chatSendBodySchema = object({
    * 409 здесь терял бы ответ человека. Ответ — 202 `{ queued: true, runId }`.
    */
   queueIfBusy: boolean().optional(),
+  /**
+   * Сообщение посреди хода — сразу агенту (живая сессия Claude): CLI отдаёт его
+   * модели на ближайшем шаге, вместе с результатом текущего вызова, и ход
+   * продолжается с ним. Не вышло (прогон не живой, вложения) — как без поля.
+   */
+  steer: boolean().optional(),
 });
 export type ChatSendBody = Infer<typeof chatSendBodySchema>;
 

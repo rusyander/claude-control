@@ -8,6 +8,8 @@ import {
   GIT_TIMEOUT_MS,
 } from './constants.ts';
 import { pickRemote } from './parse.ts';
+import type { Addition } from './sieve-scan.ts';
+import { commitsOf, scanMechanics, type BranchCommit } from './sieve-facts-scan.ts';
 
 /**
  * Механические сита перед MR (`@agentdeck/contracts/sieves`) — то, что git
@@ -32,9 +34,13 @@ export interface SieveFacts {
   mechanics: SieveMechanics;
   /** Часть проверок не сделана — почему (сеть, нет удалённого, старый git). */
   unchecked?: string[];
+  /** Развилка со свежей основной — от неё считаются коммиты ветки. */
+  base?: string;
+  /** Коммиты ветки (новые первыми) и их файлы — по ним судится свежесть отчёта. */
+  commits?: BranchCommit[];
 }
 
-interface Run {
+export interface Run {
   code: number;
   stdout: string;
   stderr: string;
@@ -44,7 +50,7 @@ interface Run {
  * Запуск git с кодом выхода: у `merge-tree` и `merge-base --is-ancestor` код 1 —
  * это ответ, а не сбой, и общий `git()` его бы выбросил.
  */
-function run(cwd: string, args: string[], timeout = GIT_TIMEOUT_MS): Promise<Run> {
+export function run(cwd: string, args: string[], timeout = GIT_TIMEOUT_MS): Promise<Run> {
   const long = process.platform === 'win32' ? ['-c', 'core.longpaths=true'] : [];
   return new Promise((done) => {
     execFile(
@@ -89,13 +95,17 @@ export interface ParsedDiff {
   removed: RemovedHunk[];
   /** Все добавленные строки — по ним видно, что имя не удалено, а переехало. */
   added: string[];
+  /** Добавленные строки с их файлом — вход механики сит (`sieve-scan.ts`). */
+  additions: Addition[];
 }
 
 /** Разбор `git diff -U0 --no-color --no-ext-diff`. */
 export function parseZeroContextDiff(diff: string): ParsedDiff {
   const removed: RemovedHunk[] = [];
   const added: string[] = [];
+  const additions: Addition[] = [];
   let path: string | undefined;
+  let target: string | undefined;
   let hunk: RemovedHunk | undefined;
   for (const line of diff.split('\n')) {
     if (line.startsWith('--- ')) {
@@ -104,7 +114,11 @@ export function parseZeroContextDiff(diff: string): ParsedDiff {
       hunk = undefined;
       continue;
     }
-    if (line.startsWith('+++ ')) continue;
+    if (line.startsWith('+++ ')) {
+      const name = line.slice(4).trim();
+      target = name === '/dev/null' ? undefined : name.replace(/^b\//, '');
+      continue;
+    }
     const head = /^@@ -(\d+)(?:,(\d+))? \+\d+(?:,\d+)? @@/.exec(line);
     if (head) {
       const count = head[2] === undefined ? 1 : Number(head[2]);
@@ -113,9 +127,12 @@ export function parseZeroContextDiff(diff: string): ParsedDiff {
       continue;
     }
     if (line.startsWith('-')) hunk?.lines.push(line.slice(1));
-    else if (line.startsWith('+')) added.push(line.slice(1));
+    else if (line.startsWith('+')) {
+      added.push(line.slice(1));
+      if (target) additions.push({ path: target, text: line.slice(1) });
+    }
   }
-  return { removed, added };
+  return { removed, added, additions };
 }
 
 const DECLARATION =
@@ -313,8 +330,17 @@ export async function readSieveFacts(input: {
   }
   const consumers = await consumersOf(cwd, removedTokens(diff));
   if (consumers.length > 0) mechanics.consumers = consumers;
+  Object.assign(mechanics, await scanMechanics({ run, cwd, base, paths, diff }));
+  const commits = await commitsOf(run, cwd, base);
 
-  return { mainRef, paths, mechanics, ...(unchecked.length > 0 ? { unchecked } : {}) };
+  return {
+    mainRef,
+    paths,
+    mechanics,
+    base,
+    commits,
+    ...(unchecked.length > 0 ? { unchecked } : {}),
+  };
 }
 
 /**
@@ -325,6 +351,11 @@ export async function readSieveFacts(input: {
  * только незакоммиченное и последний коммит: сит тогда меньше, но не ноль.
  */
 export async function touchedPaths(cwd: string): Promise<string[]> {
+  return (await touchedFacts(cwd)).paths;
+}
+
+/** То же с развилкой: от неё задание считает коммиты ветки (свежесть отчёта). */
+export async function touchedFacts(cwd: string): Promise<{ paths: string[]; base?: string }> {
   const read = async (args: string[]): Promise<string> => {
     const out = await run(cwd, args, GIT_READ_TIMEOUT_MS);
     return out.code === 0 ? out.stdout : '';
@@ -353,5 +384,5 @@ export async function touchedPaths(cwd: string): Promise<string[]> {
   add(branch);
   add(uncommitted);
   add(untracked);
-  return [...paths];
+  return { paths: [...paths], ...(base ? { base } : {}) };
 }

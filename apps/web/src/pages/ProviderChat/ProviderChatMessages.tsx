@@ -14,6 +14,7 @@ import {
   ChildStages,
   MediaFeedCard,
   MediaRequestText,
+  QueuedBubbles,
   ReviewDecisionCard,
   waitsDecision,
 } from '@features/ChatMessages';
@@ -35,6 +36,8 @@ export function ProviderChatMessages({
   providerName,
   partial,
   isRunning,
+  queued,
+  onCancelQueued,
   isEmptyState,
   onCreate,
   isCreating,
@@ -356,6 +359,11 @@ export function ProviderChatMessages({
               </Typography>
             </Stack>
           )}
+          {/* Дописанное, пока шёл ответ, — там, где встанет, когда уйдёт. */}
+          <QueuedBubbles
+            items={(queued ?? []).map((item) => ({ id: item.id, prompt: item.text }))}
+            {...(onCancelQueued ? { onCancel: onCancelQueued } : {})}
+          />
         </Stack>
       )}
     </div>

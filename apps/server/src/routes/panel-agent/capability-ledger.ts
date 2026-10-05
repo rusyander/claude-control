@@ -43,6 +43,7 @@ export const HUMAN_REASONS: Readonly<Record<HumanReason, string>> = {
   upload: 'importing a file is the human’s: they pick the file',
   download: 'exports and downloads are the human’s',
   paid: 'paid generation is started only by the human',
+  'dev-restart': 'restarting the dev server cuts off running turns — only the human decides',
 };
 
 /** Действия, которым строка отдаёт маршрут. */

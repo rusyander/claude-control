@@ -39,6 +39,10 @@
     "n": 5,
     "why": "run errors shown in the chat feed (model name rejected, spawn failed, exit code, request failed); +1 the `modelDropped` feed notice — the code travels for translation"
   },
+  "domains/chat/chat-case-draft.ts": {
+    "n": 10,
+    "why": "text of the draft test case built from a chat (step labels, title and purpose) — data written into the project's test library, reviewed by the human at acceptance, not UI text"
+  },
   "domains/chat/detached-run.ts": {
     "n": 2,
     "why": "feed notices of a run picked up after a panel restart (the human reads them)"
@@ -764,8 +768,8 @@
     "why": "path-rejection detail composed inside an error class"
   },
   "lib/server-texts/templates.ts": {
-    "n": 374,
-    "why": "RU side of the server text table: every line here IS a code, this is the one file where a Russian literal is the data. The generator and its manifest are gone from the tree (see the file header) — a new code is written by hand and `n` rises with it; +6 sieve-gap-* codes of the pre-MR sieves (28.09); +1 split drop/restart/no-slot-paused codes (29.09)"
+    "n": 391,
+    "why": "RU side of the server text table: every line here IS a code, this is the one file where a Russian literal is the data. The generator and its manifest are gone from the tree (see the file header) — a new code is written by hand and `n` rises with it; +6 sieve-gap-* codes of the pre-MR sieves (28.09); +1 split drop/restart/no-slot-paused codes (29.09); +4 tests-gap-* codes of the group verdict from the Tests block (30.09); +13 sieve-gap-* codes of the panel mechanics, freshness and Tests-run proof (30.09)"
   },
   "providers/catalog/kimi.ts": {
     "n": 1,

@@ -99,11 +99,19 @@ describe('project-routes: реестр и конфиги проекта', () => 
 
   it('один и тот же каталог не заводится дважды: повтор → 409, имя не переписывается', async () => {
     await addProject();
-    // Тот же каталог другим регистром и слэшами, с новым именем.
+    // Тот же каталог другим написанием, с новым именем. Регистр путей не
+    // различает только Windows — вне её каталог в верхнем регистре просто не
+    // существует, и там написание расходится хвостовым слэшем и `.`-сегментом.
     const again = await app.inject({
       method: 'POST',
       url: '/api/projects',
-      payload: { path: projectDir.toUpperCase().replace(/\\/g, '/'), name: 'Другое имя' },
+      payload: {
+        path:
+          process.platform === 'win32'
+            ? projectDir.toUpperCase().replace(/\\/g, '/')
+            : `${projectDir}/./`,
+        name: 'Другое имя',
+      },
     });
     expect(again.statusCode).toBe(409);
     expect(again.json<{ error: string; project: Project }>().error).toBe('project_exists');

@@ -236,8 +236,14 @@ describe('chainOutcomeOf: отчёт о ситах', () => {
       hasWork: () => true,
     });
     expect(outcome.status).toBe('awaiting');
+    // Строка получает штамп прочтения панели — по нему доставка судит свежесть.
     expect(outcome.sieveRows).toEqual([
-      { id: 'browser-focus', status: 'pass', evidence: 'npx playwright test focus → 3 passed' },
+      {
+        id: 'browser-focus',
+        status: 'pass',
+        evidence: 'npx playwright test focus → 3 passed',
+        at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+      },
     ]);
     expect(outcome.learnedSieves?.[0]).toMatchObject({ class: 'contract', scope: 'project' });
     expect(outcome.tail).toContain('Оставить старый маршрут');

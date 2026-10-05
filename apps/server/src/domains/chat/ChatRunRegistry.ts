@@ -183,6 +183,8 @@ export interface RunLike {
   detach?(): void;
   /** Процесс ушёл сам, держа фоновые задачи агента, — обрыв, а не провал (W3-4c). */
   readonly lostBackground?: boolean;
+  /** Сообщение человека посреди хода — агенту сразу; `false` — не вышло. */
+  steer?(prompt: string): boolean;
 }
 
 type RunFactory = () => RunLike;
@@ -938,6 +940,21 @@ export class ChatRunRegistry {
     }
     const sessionId = this.runs.get(this.resolveKey(chatId, chatId))?.sessionId ?? chatId;
     return this.livePool.has(sessionId) || this.livePool.has(chatId);
+  }
+
+  /**
+   * Сообщение человека посреди идущего хода — агенту сразу, а не после конца
+   * хода: агент дочитывает текущий шаг, видит сообщение и учитывает его, как в
+   * самом Claude Code. Событие `steer` уходит в поток прогона — вкладки
+   * показывают сообщение сразу. `false` — прогона нет, он не живой или процесс
+   * не принял сообщение: вызывающий ставит его в очередь, как раньше.
+   */
+  steer(chatId: string, sessionId: string | undefined, prompt: string): boolean {
+    const run = this.runs.get(this.resolveKey(chatId, sessionId));
+    if (!run || run.status !== 'running' || !prompt.trim()) return false;
+    if (!run.run.steer?.(prompt)) return false;
+    this.emit(run, { kind: 'steer', text: prompt, at: new Date().toISOString() });
+    return true;
   }
 
   isRunning(chatId: string, sessionId?: string): boolean {

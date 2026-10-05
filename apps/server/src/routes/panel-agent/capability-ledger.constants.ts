@@ -425,8 +425,13 @@ export const ROUTE_LEDGER: RouteLedger = {
   'GET /api/project-tests/drafts': 'action:list_test_drafts',
   'POST /api/project-tests/draft/apply': 'action:draft_cases',
   'POST /api/project-tests/draft/auto': 'action:set_draft_auto_accept',
+  'POST /api/project-tests/draft/from-chat': 'gap:P3',
   'POST /api/project-tests/draft/reject': 'action:reject_draft',
   'POST /api/project-tests/draft/rollback': 'action:rollback_draft',
+  // project-tests/mutation-routes.ts
+  'GET /api/project-tests/mutation': 'internal:ui-state',
+  'POST /api/project-tests/mutation': 'human:code-write',
+  'POST /api/project-tests/mutation/stop': 'internal:ui-state',
   // project-tests/e2e-routes.ts
   'DELETE /api/project-tests/e2e': 'action:remove_e2e_folder',
   'GET /api/project-tests/e2e': 'action:read_tests_report',
@@ -509,6 +514,7 @@ export const ROUTE_LEDGER: RouteLedger = {
   'PUT /api/prompts/:id': 'human:prompts',
   // provider-chat-routes.ts
   'DELETE /api/provider-chat/chats/:id': 'foreign-cli',
+  'DELETE /api/provider-chat/chats/:id/queue/:queuedId': 'foreign-cli',
   'GET /api/provider-chat/chats': 'foreign-cli',
   'GET /api/provider-chat/chats/:id': 'foreign-cli',
   'GET /api/provider-chat/chats/:id/status': 'foreign-cli',
@@ -649,6 +655,9 @@ export const ROUTE_LEDGER: RouteLedger = {
   'GET /api/sieves': 'action:read_sieves',
   'DELETE /api/sieves/learned/:id': 'action:delete_learned_sieve',
   'POST /api/sieves/learned/:id/accept': 'human:prompts',
+  // dev-restart-routes.ts
+  'GET /api/dev-restart': 'internal:ui-state',
+  'POST /api/dev-restart': 'human:dev-restart',
   // watcher-routes.ts
   'GET /api/watcher': 'action:watcher_status',
   'POST /api/watcher': 'action:set_watcher',

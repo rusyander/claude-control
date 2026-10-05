@@ -335,6 +335,15 @@ export class MrWatch {
     const links = threads.map((thread) => threadLink(thread, mr)).filter(Boolean) as string[];
     if (links.length > 0) {
       watch.relayedLinks = [...(watch.relayedLinks ?? []), ...links].slice(-MAX_RELAYED);
+      // Файл треда — область выученного из него сита: держим только пересланное.
+      const paths = { ...watch.relayedPaths };
+      for (const thread of threads) {
+        const link = threadLink(thread, mr);
+        if (link && thread.path) paths[link] = thread.path;
+      }
+      const kept = new Set(watch.relayedLinks);
+      const entries = Object.entries(paths).filter(([link]) => kept.has(link));
+      if (entries.length > 0) watch.relayedPaths = Object.fromEntries(entries);
     }
     watch.resumes = resumes + 1;
     this.deps.store.set(record);

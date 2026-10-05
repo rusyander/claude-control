@@ -7,6 +7,7 @@ import { groupBuilderRu } from './groups/builder-ru.ts';
 import { testsE2eRu } from './tests-e2e/ru.ts';
 import { pageTabsRu } from './page-tabs/ru.ts';
 import { watcherRu } from './watcher/ru.ts';
+import { devRestartRu } from './dev-restart/ru.ts';
 import { projectsPageRu } from './projects/ru.ts';
 import { contourConfigRu } from './contour-config/ru.ts';
 import { presetsRu } from './presets/ru.ts';
@@ -30,6 +31,8 @@ export const ru = {
   pageTabs: pageTabsRu,
   /** Фоновый наблюдатель: карточка настроек и индикатор — `watcher/ru.ts`. */
   watcher: watcherRu,
+  /** Плашка «правки сервера ждут перезапуска» — `dev-restart/ru.ts`. */
+  devRestart: devRestartRu,
   /** Раздел «Проекты — конфигурация»: шапка проекта, вкладки, документ инструкций — `projects/ru.ts`. */
   projectsPage: projectsPageRu,
   /** Контур: разделы на карточке, чьи правила действуют, кто берёт верх — `contour-config/ru.ts`. */
@@ -818,12 +821,14 @@ export const ru = {
     /** Очередь дописанного: агент занят, но сказать ему можно уже сейчас. */
     queue: {
       title: 'В очереди: {{count}}',
-      add: 'Дописать в очередь',
-      hint: 'Агент занят — сообщение уйдёт, как только он закончит текущий ход',
+      add: 'Отправить агенту на ходу',
+      hint: 'Агент работает — сообщение уйдёт ему сразу: он закончит текущий шаг, прочитает его и учтёт, не дожидаясь конца всей работы',
       cancel: 'Убрать из очереди',
       /** Подписи под пузырём-призраком в самой ленте. */
       next: 'Уйдёт следующим',
       later: 'Уйдёт следом',
+      /** Сообщение уже у агента посреди хода — он учтёт его на ближайшем шаге. */
+      steered: 'Передано агенту — учтёт на ближайшем шаге',
     },
     /**
      * Режим отправки: сказать агенту, попросить картинку (Т9) или презентацию
@@ -1242,6 +1247,8 @@ export const ru = {
         stopped: 'остановлена: {{message}}',
         deliveryMissing: 'не хватает для MR: {{list}}',
         deliveryNudges: 'напоминаний о доставке: {{count}}',
+        testsVerdict: 'блок «Тесты»: зелёных {{passed}} из {{count}}',
+        testsNone: 'блок «Тесты»: дифф не задел автоматических кейсов',
         interruptedAt: 'процесс оборвался в {{time}}',
         interruptResumes: 'панель продолжала сама: {{count}}',
         autoNotices: 'Разрешено автоматически: {{list}}',
@@ -1610,9 +1617,9 @@ export const ru = {
     questionSentNote: 'Ответ отправлен — агент думает',
     questionDeliveredNote: 'Ответ получен — агент работает дальше',
     questionDeliveredToNote: 'Ответ получен в «{{title}}»',
-    questionQueuedNote: 'Ответ в очереди — уйдёт, как только агент закончит ход',
+    questionQueuedNote: 'Агент занят — ответ он прочтёт на ближайшем шаге, не дожидаясь конца хода',
     questionSentToNote: 'Ответ отправлен в «{{title}}» — агент думает',
-    questionQueuedToNote: 'Ответ в очереди для «{{title}}» — уйдёт по концу хода',
+    questionQueuedToNote: '«{{title}}» занят — ответ он прочтёт на ближайшем шаге',
     questionFromChild: 'Спрашивает «{{title}}»',
     textQuestion: {
       title: 'Вопрос словами — ответьте здесь',
@@ -1864,6 +1871,11 @@ export const ru = {
     loadOlder: 'Загрузить ещё',
     export: 'Экспортировать',
     exportHint: 'Скачать разговор файлом (Markdown)',
+    caseDraft: 'Сделать кейс',
+    caseDraftHint:
+      'Собрать из разговора черновик кейса для раздела «Тесты» проекта: шаги — ваши реплики, команды и правки файлов. Кейс попадёт в библиотеку, только когда вы его примете',
+    caseDraftCreated: 'Черновик кейса ждёт приёмки в «Тестах» — примите или поправьте его',
+    caseDraftFailed: 'Не удалось собрать кейс: {{message}}',
     deleteArtifact: 'Удалить файл «{{name}}»',
     deleteArtifactTitle: 'Удалить файл?',
     deleteArtifactConfirm: 'Файл «{{name}}» будет удалён из папки чата. Это действие необратимо.',
@@ -4104,7 +4116,9 @@ export const ru = {
       'Начните разговор — переписка сохранится, и провайдер будет помнить её в следующем вопросе.',
     empty: 'Напишите сообщение — ответ появится по мере того, как провайдер его печатает.',
     placeholder: 'Сообщение провайдеру…',
+    queuePlaceholder: 'Дописать — уйдёт, как только кончится ответ…',
     send: 'Отправить',
+    queueSend: 'В очередь',
     stop: 'Остановить',
     thinking: 'Провайдер думает…',
     failed: 'ошибка',
@@ -4485,6 +4499,16 @@ export const ru = {
         'browser-focus': 'Правка интерфейса проверена в браузере: фокус и клавиатура',
         'branch-backend-stand': 'Стенд поднят на бэкенде этой ветки, а не основной',
         'boundary-negative': 'Значение за границей типа или лимита отклоняется понятным сообщением',
+        'project-checks': 'Все проверки проекта (lint, типы, тесты) прогнаны на последнем коммите',
+        'tests-alongside': 'Изменённое поведение покрыто тестом в этой же ветке',
+        'lockfile-sync': 'Манифест зависимостей изменён вместе с лок-файлом',
+        secrets: 'В добавленных строках нет ключей, токенов и приватных ключей',
+        'debug-leftovers': 'Нет .only, debugger и маркеров конфликта',
+        'committed-artifacts': 'В git не попали .env, ключи, игнорируемые и крупные файлы',
+        'env-config': 'Новые переменные окружения объявлены в конфигурации или документации',
+        'migration-safety':
+          'Миграция совместима со старым кодом, откатывается и проверена на копии схемы',
+        'rollback-plan': 'Высокий риск: есть план отката и сигнал поломки в проде',
       },
       class: {
         contract: 'Документы ≠ код',
@@ -4492,6 +4516,10 @@ export const ru = {
         isolation: 'Изоляция проверки',
         consumers: 'Потребители вне диффа',
         boundary: 'Граничный ввод',
+        security: 'Безопасность',
+        data: 'Данные и миграции',
+        hygiene: 'Гигиена ветки',
+        release: 'Выпуск и откат',
         other: 'Другое',
       },
       learnedTitle: 'Выученные по тредам MR',

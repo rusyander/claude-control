@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import type { ProviderChatQueued } from '@agentdeck/contracts';
 import { toErrorMessage } from '@shared/api/client';
 import {
+  cancelProviderChatQueued,
   openProviderChatStream,
   providerChatKeys,
   readProviderChatStatus,
@@ -25,8 +27,15 @@ export interface ProviderChatRunState {
   isRunning: boolean;
   /** Текст ошибки последнего ответа: показывается один раз, до нового вопроса. */
   error?: string;
+  /**
+   * Дописанное, пока шёл ответ, — очередь сервера по порядку: уйдёт само по
+   * концу ответа. Серверная, поэтому одна на все вкладки и телефон.
+   */
+  queued: ProviderChatQueued[];
   send: (text: string, attachments?: string[]) => Promise<void>;
   stop: () => Promise<void>;
+  /** Убрать сообщение из очереди, пока оно не ушло. */
+  cancelQueued: (queuedId: string) => Promise<void>;
 }
 
 export function useProviderChatRun(chatId: string | undefined): ProviderChatRunState {
@@ -34,7 +43,13 @@ export function useProviderChatRun(chatId: string | undefined): ProviderChatRunS
   const [partial, setPartial] = useState('');
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
+  const [queued, setQueued] = useState<ProviderChatQueued[]>([]);
   const abortRef = useRef<AbortController | undefined>(undefined);
+  // Ответ идёт — следующее сообщение ставится в очередь; ref, чтобы второе
+  // нажатие до перерисовки тоже знало об этом.
+  const runningRef = useRef(false);
+  runningRef.current = isRunning;
+  const attachRef = useRef<((id: string) => Promise<void>) | undefined>(undefined);
 
   /** Ответ кончился: перечитываем переписку и сверяемся с сервером. */
   const settle = useCallback(
@@ -46,6 +61,10 @@ export function useProviderChatRun(chatId: string | undefined): ProviderChatRunS
         const status = await readProviderChatStatus(id);
         setIsRunning(status.isRunning);
         setPartial(status.isRunning ? status.partial : '');
+        setQueued(status.queued ?? []);
+        // Конец ответа отпустил очередь: сервер уже начал следующий ход —
+        // подключаемся к нему, иначе его текст появился бы только после F5.
+        if (status.isRunning) void attachRef.current?.(id);
       } catch {
         setIsRunning(false);
         setPartial('');
@@ -83,6 +102,8 @@ export function useProviderChatRun(chatId: string | undefined): ProviderChatRunS
     [settle],
   );
 
+  attachRef.current = attach;
+
   /**
    * Подхватить ход, идущий на сервере: напечатанное к этому моменту берём из
    * статуса (поток шлёт только новые куски), дальше — поток. Хода уже нет —
@@ -108,13 +129,16 @@ export function useProviderChatRun(chatId: string | undefined): ProviderChatRunS
     setPartial('');
     setIsRunning(false);
     setError(undefined);
+    setQueued([]);
     if (!chatId) return;
 
     let cancelled = false;
     void (async () => {
       try {
         const status = await readProviderChatStatus(chatId);
-        if (cancelled || !status.isRunning) return;
+        if (cancelled) return;
+        setQueued(status.queued ?? []);
+        if (!status.isRunning) return;
         setPartial(status.partial);
         setIsRunning(true);
         void attach(chatId);
@@ -133,6 +157,29 @@ export function useProviderChatRun(chatId: string | undefined): ProviderChatRunS
   const send = useCallback(
     async (text: string, attachments?: string[]) => {
       if (!chatId) return;
+
+      // Ответ идёт: сообщение ждёт его конца в очереди сервера, а не отказ.
+      // Идущий ход не трогаем — ни индикатор, ни напечатанное.
+      if (runningRef.current) {
+        try {
+          const reply = await sendProviderChatMessage(chatId, {
+            text,
+            ...(attachments?.length ? { attachments } : {}),
+            queueIfBusy: true,
+          });
+          if ('queued' in reply) {
+            setQueued((items) => [...items, reply.queued]);
+            return;
+          }
+          // Ответ успел кончиться — сообщение ушло сразу, как обычное.
+          setPartial('');
+          void queryClient.invalidateQueries({ queryKey: providerChatKeys.detail(chatId) });
+          await attach(chatId);
+        } catch (cause) {
+          setError(toErrorMessage(cause));
+        }
+        return;
+      }
 
       setError(undefined);
       setIsRunning(true);
@@ -173,5 +220,18 @@ export function useProviderChatRun(chatId: string | undefined): ProviderChatRunS
     }
   }, [chatId]);
 
-  return { partial, isRunning, ...(error ? { error } : {}), send, stop };
+  const cancelQueued = useCallback(
+    async (queuedId: string) => {
+      if (!chatId) return;
+      setQueued((items) => items.filter((item) => item.id !== queuedId));
+      try {
+        await cancelProviderChatQueued(chatId, queuedId);
+      } catch {
+        // Не снялось на сервере — сверка по концу ответа вернёт его в список.
+      }
+    },
+    [chatId],
+  );
+
+  return { partial, isRunning, ...(error ? { error } : {}), queued, send, stop, cancelQueued };
 }

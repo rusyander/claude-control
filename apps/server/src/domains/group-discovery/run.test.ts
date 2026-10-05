@@ -351,6 +351,15 @@ describe('прогон обнаружения', () => {
 });
 
 describe('ключи кэша обнаружения', () => {
+  /**
+   * Тот же каталог старым написанием. Регистр путей не различает только
+   * Windows: на Linux и macOS `c:/work/p` и `C:/work/p` — два разных каталога,
+   * и склеивать их там было бы ошибкой. Слэши и хвостовой слэш ключ сводит
+   * везде — ими старое написание и задаётся вне Windows.
+   */
+  const win = process.platform === 'win32';
+  const OLD = win ? 'c:/work/p' : 'C:/work/p/';
+  const OLD_BACKSLASH = win ? 'c:\\work\\p' : 'C:\\work\\p\\';
   const found = (source: string, name: string): DiscoveredGroup =>
     ({ key: `${source}#${name}`, name, foundIn: source }) as DiscoveredGroup;
   const entry = (source: string, name: string) => ({
@@ -360,14 +369,14 @@ describe('ключи кэша обнаружения', () => {
   });
 
   it('запись под другим написанием пути переезжает к живому ключу вместе с находками', () => {
-    const cache: DiscoveryCache = { version: 1, sources: { 'c:/work/p': entry('c:/work/p', 'x') } };
+    const cache: DiscoveryCache = { version: 1, sources: { [OLD]: entry(OLD, 'x') } };
     const renamed = settleCacheKeys(cache, [{ source: 'C:/work/p' }]);
     expect(Object.keys(cache.sources)).toEqual(['C:/work/p']);
     expect(cache.sources['C:/work/p']!.groups[0]).toMatchObject({
       key: 'C:/work/p#x',
       foundIn: 'C:/work/p',
     });
-    expect(renamed?.get('c:/work/p#x')).toBe('C:/work/p#x');
+    expect(renamed?.get(`${OLD}#x`)).toBe('C:/work/p#x');
   });
 
   it('дубль под старым написанием выбрасывается, живая запись не перезаписывается', () => {
@@ -375,7 +384,7 @@ describe('ключи кэша обнаружения', () => {
       version: 1,
       sources: {
         'C:/work/p': entry('C:/work/p', 'fresh'),
-        'c:\\work\\p': entry('c:\\work\\p', 'stale'),
+        [OLD_BACKSLASH]: entry(OLD_BACKSLASH, 'stale'),
       },
     };
     settleCacheKeys(cache, [{ source: 'C:/work/p' }]);
@@ -389,10 +398,10 @@ describe('ключи кэша обнаружения', () => {
   it('выброшенный дубль тоже отдаёт свои ключи импорта живому написанию', () => {
     const cache: DiscoveryCache = {
       version: 1,
-      sources: { 'C:/p': entry('C:/p', 'review'), 'c:/p': entry('c:/p', 'review') },
+      sources: { 'C:/work/p': entry('C:/work/p', 'review'), [OLD]: entry(OLD, 'review') },
     };
-    const renamed = settleCacheKeys(cache, [{ source: 'C:/p' }]);
-    expect(renamed?.get('c:/p#review')).toBe('C:/p#review');
+    const renamed = settleCacheKeys(cache, [{ source: 'C:/work/p' }]);
+    expect(renamed?.get(`${OLD}#review`)).toBe('C:/work/p#review');
   });
 
   it('импорт находки переезжает на новый ключ в group-sources.json', () => {
@@ -400,11 +409,11 @@ describe('ключи кэша обнаружения', () => {
     try {
       const cache: DiscoveryCache = {
         version: 1,
-        sources: { 'c:/work/p': entry('c:/work/p', 'x') },
+        sources: { [OLD]: entry(OLD, 'x') },
       };
       writeFileSync(join(root, DISCOVERY_FILE), JSON.stringify(cache), 'utf8');
       updateGroupSources(root, (state) => {
-        state.imported['c:/work/p#x'] = 'group-1';
+        state.imported[`${OLD}#x`] = 'group-1';
       });
       const live = [{ source: 'C:/work/p' } as DiscoverySpec];
       discoveryView(root, live);

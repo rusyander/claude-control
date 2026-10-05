@@ -260,6 +260,8 @@ export function ProviderChatPage() {
             providerName={providerName}
             partial={run.partial}
             isRunning={run.isRunning}
+            queued={run.queued}
+            onCancelQueued={(queuedId) => void run.cancelQueued(queuedId)}
             isEmptyState={!activeChatId}
             onCreate={startChat}
             isCreating={create.isPending}

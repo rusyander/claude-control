@@ -40,18 +40,12 @@ let partial = '';
 
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1500, height: 950 } });
-await bypassOnboarding(page);
+// Активный провайдер — чужой: подмена ответа, а не настроек на диске, и тем же
+// перехватом, что обход мастера (второй маршрут настроек отменил бы его).
+await bypassOnboarding(page, { provider: 'codex' });
 
 const json = (route, body, status = 200) =>
   route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
-
-// Активный провайдер — чужой. Подменяем ответ сервера, а не настройки на диске.
-await page.route('**/api/settings', async (route) => {
-  if (route.request().method() !== 'GET') return route.continue();
-  const response = await route.fetch();
-  const settings = await response.json();
-  await route.fulfill({ response, json: { ...settings, provider: 'codex' } });
-});
 
 await page.route('**/api/provider-runner', (route) =>
   json(route, { providerId: 'codex', providerName: 'Codex', mode: 'cli' }),

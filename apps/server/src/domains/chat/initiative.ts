@@ -173,6 +173,24 @@ export const QUESTION_DENIED =
  * каждая группа своим заданием, и MR родителя поверх них был бы третьим на ту
  * же работу.
  */
+/**
+ * Сообщение человека посреди хода (решение владельца 30.09): панель отдаёт его
+ * CLI сразу, и тот показывает его модели внутри результата очередного вызова
+ * («The user sent a new message while you were working»). Сам CLI велит «учесть
+ * и продолжить»; строка здесь говорит, КАК — ровно так, как работает агентский
+ * чат: дожать текущий маленький шаг, ответить на вопрос, добавить новое в план,
+ * сменить курс, если сказано, — и продолжить, не дожидаясь конца всей работы.
+ * Чужому CLI не адресовано: у его прогонов сообщения идут очередью.
+ */
+export const STEER_PROMPT =
+  'The human can write to you while you are working: such a message reaches you inside a tool ' +
+  'result as "The user sent a new message while you were working". Finish the small step you ' +
+  'are on (never leave a half-made edit), then take the message into account right away instead ' +
+  'of at the end of the whole task: answer a question briefly in text and keep going; add a new ' +
+  'request to your plan (TodoWrite) and do it now or right after the current item, whichever ' +
+  'fits; if it reports a bug or changes the direction of what you are doing, adjust course first. ' +
+  'Do not stop the work unless the message asks you to.';
+
 export const DELIVERY_AFTER_SPLIT =
   'The delivery below is only for work you do yourself, without a split: if you propose a ' +
   'split, deliver nothing — the panel takes each group to its MR.';
@@ -202,7 +220,7 @@ export function initiativePrompt(
     delivery?: string;
   } = {},
 ): string | undefined {
-  const parts: string[] = options.foreign ? [] : [QUESTION_PROMPT, BACKGROUND_PROMPT];
+  const parts: string[] = options.foreign ? [] : [QUESTION_PROMPT, BACKGROUND_PROMPT, STEER_PROMPT];
   const splitOffered = settings.taskSplitInitiative && !options.splitMuted;
   // Две инициативы рядом без старшинства — развилка для агента: «доставь сам»
   // и «сперва предложи разделение» об одном и том же сообщении из пяти тикетов

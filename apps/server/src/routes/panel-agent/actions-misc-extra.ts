@@ -122,7 +122,18 @@ const stopSession = definePanelAction({
   },
   fingerprint: async (input, inject) => {
     const where = await stoppable(inject, input.sessionId);
-    return fingerprintOf({ pid: where.pid, startedAt: where.startedAt });
+    // Время создания — в отпечатке только там, где оно точное (Windows отдаёт
+    // его из CIM). Вне Windows это `сейчас − возраст из ps` с точностью до
+    // секунды: два чтения подряд дают разные миллисекунды, и отпечаток карточки
+    // не сходился с отпечатком исполнения НИКОГДА — одобренный стоп всегда
+    // уходил в «цель изменилась». Там номер сверяется с командой (в ней id
+    // сессии, её же видел человек в карточке); время с допуском перед самим
+    // снятием сверяет ещё и маршрут стопа.
+    return fingerprintOf({
+      pid: where.pid,
+      command: where.command,
+      ...(process.platform === 'win32' ? { startedAt: where.startedAt } : {}),
+    });
   },
   preview: async (input, inject) => {
     const where = await stoppable(inject, input.sessionId);

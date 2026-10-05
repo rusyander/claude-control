@@ -9,6 +9,7 @@ import { useAttentionBadge } from '@shared/lib/attention';
 import { useAwaitingAlarm } from '@entities/Chat';
 import { OnboardingWizard } from '@app/onboarding/OnboardingWizard';
 import { ProviderTrustBadge } from '@features/ProviderTrust';
+import { DevRestartBanner } from '@features/DevRestartBanner';
 import { Sidebar } from './Sidebar';
 import { AppShortcuts } from './AppShortcuts';
 import styles from './MainLayout.module.scss';
@@ -68,6 +69,8 @@ export function MainLayout() {
             Для Claude компонент возвращает null — постоянная плашка у дефолтного
             провайдера была бы шумом. */}
         <ProviderTrustBadge />
+        {/* Правки сервера ждут конца живых ходов (dev-сторож): видно в любом разделе. */}
+        <DevRestartBanner />
 
         <motion.div
           key={path}

@@ -9,7 +9,7 @@ import {
 } from 'node:fs';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
-import type { Record } from './ChatRecords.ts';
+import { normalizeRecord, type Record } from './ChatRecords.ts';
 
 /**
  * Файл транскрипта: где он лежит и как его прочитать.
@@ -84,7 +84,7 @@ function parseLines(text: string): Record[] {
     if (!trimmed.startsWith('{')) continue;
 
     try {
-      records.push(JSON.parse(trimmed) as Record);
+      records.push(normalizeRecord(JSON.parse(trimmed) as Record));
     } catch {
       // Обрезанная строка на границе куска — пропускаем.
     }

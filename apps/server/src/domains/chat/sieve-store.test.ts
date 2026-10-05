@@ -178,3 +178,45 @@ describe('выученные сита', () => {
     expect(readFileSync(join(dir, 'sieves.json'), 'utf8')).toBe('{broken');
   });
 });
+
+describe('выученные сита по областям', () => {
+  it('сито из треда с файлом получает область и идёт только в задания, задевшие её', () => {
+    const { store: sieves } = store();
+    sieves.learn({
+      rows: [row()],
+      relayed: [`${MR}#note_1`],
+      paths: { [`${MR}#note_1`]: 'apps/server/src/routes/items.ts' },
+      projectPath: '/p',
+    });
+    const [learned] = sieves.list().learned;
+    expect(learned?.areas).toEqual(['apps/server']);
+    sieves.accept(learned!.id, 'project');
+    expect(sieves.forProject('/p', 8, ['apps/server/src/a.ts'])).toHaveLength(1);
+    expect(sieves.forProject('/p', 8, ['apps/web/src/a.tsx'])).toHaveLength(0);
+    // Без путей диффа — как раньше: все принятые проекта.
+    expect(sieves.forProject('/p')).toHaveLength(1);
+  });
+
+  it('тот же блокер в другой области расширяет сито; тред без файла снимает сужение', () => {
+    const { store: sieves } = store();
+    sieves.learn({
+      rows: [row()],
+      relayed: [`${MR}#note_1`],
+      paths: { [`${MR}#note_1`]: 'apps/server/src/routes/items.ts' },
+      projectPath: '/p',
+    });
+    sieves.learn({
+      rows: [row({ thread: `${MR}#note_2` })],
+      relayed: [`${MR}#note_2`],
+      paths: { [`${MR}#note_2`]: 'apps/web/src/api/items.ts' },
+      projectPath: '/p',
+    });
+    expect(sieves.list().learned[0]?.areas).toEqual(['apps/server', 'apps/web']);
+    sieves.learn({
+      rows: [row({ thread: `${MR}#note_3` })],
+      relayed: [`${MR}#note_3`],
+      projectPath: '/p',
+    });
+    expect(sieves.list().learned[0]?.areas).toBeUndefined();
+  });
+});

@@ -123,6 +123,8 @@ export interface ChildStageGroup {
   /** Коды строк `deliveryMissing` по индексу — показ `serverFieldList`. */
   deliveryMissingCodes?: CodedList<'deliveryMissing'>['deliveryMissingCodes'];
   deliveryNudges?: number;
+  /** Чем проверена работа: блок «Тесты» копии группы (решение владельца 29.09). */
+  testsVerdict?: { cases: number; passed: number; runId?: string; runAt?: string };
   /**
    * Копия закрытой группы (Д19): её можно убрать кнопкой, адресуясь родителю с
    * номером группы. `cleaned` — уже убрана, и чем кончилось с веткой.

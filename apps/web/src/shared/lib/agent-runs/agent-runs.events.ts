@@ -29,6 +29,12 @@ export function applyEvent(id: string, event: ChatEvent): void {
     case 'thinking':
       if (!run.tailOnly) next.thinking = run.thinking + event.text;
       break;
+    case 'steer':
+      // Та же реплика могла прийти повтором буфера при переподключении — второй раз не кладём.
+      if (!(run.steered ?? []).some((item) => item.at === event.at && item.text === event.text)) {
+        next.steered = [...(run.steered ?? []), { text: event.text, at: event.at }];
+      }
+      break;
     case 'tool':
       next.tools = [
         ...run.tools,

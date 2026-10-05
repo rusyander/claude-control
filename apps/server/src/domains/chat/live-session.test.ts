@@ -241,4 +241,37 @@ describe('живая сессия разговора', { timeout: 30_000 }, () =
     });
     expect(registry.livePool.size).toBe(0);
   });
+
+  // Решение владельца 30.09: сообщение посреди хода — агенту сразу, а не после
+  // конца всей работы (как в самом Claude Code).
+  it('сообщение посреди хода уходит в тот же процесс и учитывается этим же ходом', async () => {
+    fresh();
+    registry.start('new-7', { prompt: 'STEER', cwd, command: COMMAND }, {});
+    await waitFor(() => textOf('new-7').startsWith('working'));
+
+    expect(registry.steer('new-7', undefined, 'нашёл баг в форме')).toBe(true);
+    await waitFor(() => !registry.isRunning('new-7'));
+
+    expect(textOf('new-7')).toBe('working saw нашёл баг в форме');
+    const steered = eventsOf('new-7').filter((event) => event.kind === 'steer');
+    expect(steered).toEqual([{ kind: 'steer', text: 'нашёл баг в форме', at: expect.any(String) }]);
+    expect(eventsOf('new-7').filter((event) => event.kind === 'done')).toHaveLength(1);
+  });
+
+  it('шагов в ходе не осталось — CLI сам начинает следующий ход с сообщением', async () => {
+    fresh();
+    registry.start('new-8', { prompt: 'STEERLATE', cwd, command: COMMAND }, {});
+    await waitFor(() => textOf('new-8').startsWith('working'));
+
+    expect(registry.steer('new-8', undefined, 'добавь ещё пункт')).toBe(true);
+    // Ход без хозяина — прогон того же разговора (как пробуждение по фону).
+    await waitFor(() => textOf('new-8').includes('next turn got добавь ещё пункт'));
+  });
+
+  it('хода нет — сообщение агенту не уходит, отправитель ставит его в очередь', async () => {
+    fresh();
+    await turn('new-9', 'привет');
+    expect(registry.steer('new-9', undefined, 'поздно')).toBe(false);
+    expect(registry.steer('unknown', undefined, 'некому')).toBe(false);
+  });
 });

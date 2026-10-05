@@ -261,6 +261,12 @@ export function registerChatRunRoutes(
       // отказ, которому нечего противопоставить, кроме перезагрузки страницы.
       if (registry.isRunning(chatId, sessionId)) {
         const runId = registry.resolveKey(chatId, sessionId);
+        // Сообщение посреди хода — агенту сразу (живая сессия Claude): он увидит
+        // его на ближайшем шаге и учтёт, не дожидаясь конца всей работы.
+        // Вложения так не едут — они идут своим ходом, через очередь.
+        if (body.steer && (files ?? []).length === 0 && registry.steer(chatId, sessionId, prompt)) {
+          return reply.code(202).send({ steered: true, runId });
+        }
         // Просили не отказывать (ответ из хаба ребёнку, чей прогон вкладка не
         // знает): сообщение ждёт конца хода на сервере и уходит тем же маршрутом
         // — со всеми его проверками, — а не теряется в 409.

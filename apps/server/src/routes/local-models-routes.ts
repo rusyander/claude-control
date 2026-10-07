@@ -1,6 +1,8 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import {
+  localClaudeBodySchema,
   localConnectBodySchema,
+  localDeviceBodySchema,
   localKitBodySchema,
   localPullBodySchema,
 } from '@agentdeck/contracts/local-models';
@@ -143,6 +145,26 @@ export function registerLocalModelsRoutes(
     try {
       await local.disconnect(injectFor(request));
       return await local.describeConnect(injectFor(request));
+    } catch (error) {
+      return refuse(reply, error);
+    }
+  });
+
+  app.put<{ Body: unknown }>('/api/local-models/device', async (request, reply) => {
+    const body = parseBody(localDeviceBodySchema, request.body, reply);
+    if (!body) return reply;
+    try {
+      return await local.setDevice(body.device);
+    } catch (error) {
+      return refuse(reply, error);
+    }
+  });
+
+  app.put<{ Body: unknown }>('/api/local-models/claude', async (request, reply) => {
+    const body = parseBody(localClaudeBodySchema, request.body, reply);
+    if (!body) return reply;
+    try {
+      return await local.setClaude(body.on, body.tag);
     } catch (error) {
       return refuse(reply, error);
     }

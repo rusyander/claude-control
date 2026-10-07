@@ -26,6 +26,7 @@ export const localEn: Record<LocalMessageCode, string> = {
   'local-kit-provider': 'the panel kit is not supported for {{provider}}',
   'local-import-failed': 'could not take {{tag}} from the system Ollama: {{reason}}',
   'local-job-unknown': 'no such download',
+  'local-claude-settings-broken': 'Claude settings.json is not valid JSON — fix the file: {{path}}',
   'kit-item-unknown': 'The panel kit has no such item',
   'kit-mode-unsupported': 'This CLI does not support that kit mode',
   'kit-global-missing': 'The global layer has no such item',

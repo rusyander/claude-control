@@ -169,6 +169,10 @@ export const ru = {
     platformLocked: (title: string) =>
       `Чат идёт через контур «${title}»: модель и глубину задаёт он. Сменить — в разделе «Контур» панели или вернуть провайдер по умолчанию.`,
     platformModelNone: 'модель контура',
+    localLocked: (title: string) =>
+      `Claude Code переключён на локальную модель «${title}»: отвечает она, какую модель ни выбери. Выключается в разделе «Локальные модели» панели.`,
+    localCaption: (title: string) =>
+      `Отвечает локальная модель ${title} — Claude Code переключён на неё`,
     platformEffortOff: 'не отправляется',
     platformRefused: (title: string, reason: string, fix: string) =>
       `Контур «${title}» обязателен, а ${reason}: сообщение будет отклонено — ни в контур, ни в облако вендора оно не уйдёт. ${fix}`,

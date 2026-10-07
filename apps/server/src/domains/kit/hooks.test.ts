@@ -215,3 +215,29 @@ describe('session-rules: правила набора контекстом сес
     }
   });
 });
+
+describe('spawn-cost-guard: субагент на локальной модели', () => {
+  const SPAWN = join(HOOKS, 'spawn-cost-guard.mjs');
+  // Форма вызова — как её отдал хуку qwen-code 0.25.0 в живом прогоне 08.10.
+  const input = JSON.stringify({
+    hook_event_name: 'PreToolUse',
+    tool_name: 'agent',
+    tool_input: { description: 'Fix money.js module', prompt: 'Fix src/money.js' },
+    session_id: 's1',
+  });
+  const state = mkdtempSync(join(realpathSync(tmpdir()), 'kit-spawn-'));
+
+  it('в облаке субагент без модели — вопрос', () => {
+    const out = runNode(SPAWN, input, { AGENTDECK_KIT_STATE: state });
+    expect(JSON.parse(out.stdout).hookSpecificOutput.permissionDecision).toBe('ask');
+  });
+
+  it('AGENTDECK_KIT_VARIANT=local — без вопроса: платить не за что, меньшей модели нет', () => {
+    const out = runNode(SPAWN, input, {
+      AGENTDECK_KIT_STATE: state,
+      AGENTDECK_KIT_VARIANT: 'local',
+    });
+    expect(out.status).toBe(0);
+    expect(out.stdout.trim()).toBe('');
+  });
+});

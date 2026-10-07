@@ -4,7 +4,7 @@
     {
       "topic": "platform",
       "document": "apps/web/src/pages/Help/topics/PlatformTopic.tsx",
-      "confirmedAt": "2026-10-07T16:26:42.731Z",
+      "confirmedAt": "2026-10-07T19:38:44.476Z",
       "sources": [
         {
           "path": "packages/contracts/src/compromises.ts",
@@ -64,7 +64,7 @@
         {
           "path": "packages/contracts/src/platform-models.ts",
           "why": "«Модель и глубина продумывания»: порядок выбора модели прогона и подмена незнакомого имени",
-          "sha": "e595224b0acb453f"
+          "sha": "dd863eda1bda0c03"
         },
         {
           "path": "apps/web/src/pages/Platform/ModelCard.tsx",
@@ -79,7 +79,7 @@
         {
           "path": "apps/server/src/domains/platform/routing.ts",
           "why": "«Модель и глубина продумывания»: чем пойдёт прогон и что отвечает шапке чата",
-          "sha": "48b8df9879a79d3a"
+          "sha": "9fff522ed25e8bf6"
         },
         {
           "path": "packages/contracts/src/platform-consumers.ts",
@@ -2032,49 +2032,59 @@
     {
       "topic": "localModels",
       "document": "apps/web/src/pages/Help/topics/LocalModelsTopic.tsx",
-      "confirmedAt": "2026-10-07T16:26:43.013Z",
+      "confirmedAt": "2026-10-07T21:25:00.590Z",
       "sources": [
         {
           "path": "packages/contracts/src/local-models.ts",
           "why": "«Пометки каталога»: уровни «влезает / частично / не влезет», причины «не агент» и «короткий контекст», подбор «Рекомендуем»",
-          "sha": "cd5708a52850d144"
+          "sha": "7fb6fb5e5add3598"
         },
         {
           "path": "apps/server/src/domains/local-models/server.ts",
-          "why": "«Контекст — на весь сервер», «Видеопамять возвращается сама»: окружение сервера (контекст, простой 10 минут, порт)",
-          "sha": "5733c237141d1c0e"
+          "why": "«Контекст — на весь сервер», «Видеопамять возвращается сама»: окружение сервера (контекст, простой 10 минут, порт); «Где считать»: процессор — скрытые видеокарты в окружении сервера",
+          "sha": "9128188963f1e21b"
         },
         {
           "path": "apps/server/src/domains/kit/service.ts",
           "why": "«Чей набор у агента»: что каждый режим добавляет или снимает у Claude Code и Qwen Code (runExtras)",
-          "sha": "894ccb160ca17b82"
+          "sha": "b28e6d184ef4a5d3"
         },
         {
           "path": "apps/server/src/domains/local-models/connect.ts",
           "why": "«Куда идёт запрос»: контур локальной модели, режим «обязательно», кому отдаётся маршрут",
-          "sha": "588e37b72d0feed8"
+          "sha": "1d40980592c45723"
         },
         {
           "path": "apps/server/src/domains/local-models/paths.ts",
           "why": "«Где что лежит»: раскладка папки .local-models",
-          "sha": "a97278f16062b95e"
+          "sha": "c3dfd0c17b3e65d6"
         },
         {
           "path": "apps/server/src/domains/local-models/store.ts",
           "why": "«Где что лежит»: перенос из системного Ollama жёсткой ссылкой, копия на другом диске",
           "sha": "78bc61e5e6e7977e"
+        },
+        {
+          "path": "apps/server/src/domains/local-models/claude-switch.ts",
+          "why": "«Claude Code на этой модели»: какие переменные пишутся в settings.json, что возвращает выключение, правка руками",
+          "sha": "3d40b6160df007b6"
+        },
+        {
+          "path": "apps/server/src/domains/local-models/hardware.ts",
+          "why": "«Mac с чипом M»: скорость памяти чипа из справочника и прикидка для чипа, которого там нет",
+          "sha": "9db7f04ef49d9acf"
         }
       ]
     },
     {
       "topic": "kit",
       "document": "apps/web/src/pages/Help/topics/KitTopic.tsx",
-      "confirmedAt": "2026-10-07T09:34:30.952Z",
+      "confirmedAt": "2026-10-07T21:35:01.149Z",
       "sources": [
         {
           "path": "apps/server/src/domains/kit/service.ts",
           "why": "«Как набор доезжает до прогона», «Режимы», «Какой CLI что умеет»: runExtras, отказы, сброс в архив",
-          "sha": "894ccb160ca17b82"
+          "sha": "b28e6d184ef4a5d3"
         },
         {
           "path": "apps/server/src/domains/kit/compose.ts",
@@ -2089,7 +2099,7 @@
         {
           "path": "apps/server/src/bootstrap/runtime.ts",
           "why": "«Не собралось — прогон не запускается»: отказ при сбое сборки набора",
-          "sha": "96f0673c0daeffd6"
+          "sha": "9458e7601262d510"
         },
         {
           "path": "apps/web/src/pages/Kit/KitGlobalActions.tsx",

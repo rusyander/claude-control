@@ -1,16 +1,25 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync, existsSync, statSync } from 'node:fs';
+import {
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+  existsSync,
+  statSync,
+} from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { fitModel, type LocalJob, type LocalModelsInfo } from '@agentdeck/contracts/local-models';
 import type { ServerContext } from '../context.ts';
 import { createLocalModels, loadCatalog } from '../domains/local-models/service.ts';
-import { localPaths, readState } from '../domains/local-models/paths.ts';
+import { localPaths, readState, updateState } from '../domains/local-models/paths.ts';
 import { manifestPathOf, blobPathOf } from '../domains/local-models/store.ts';
 import { LOCAL_PLATFORM_ID } from '../domains/local-models/connect.ts';
 import { KitService } from '../domains/kit/service.ts';
+import { platformSchema } from '../providers/settings-validation.ts';
 import { registerLocalModelsRoutes } from './local-models-routes.ts';
 
 /**
@@ -120,6 +129,10 @@ beforeAll(async () => {
     spawnServer: () => {
       throw new Error('the service must reuse the running stub, not spawn a server');
     },
+    claude: {
+      settingsPath: () => join(root, 'claude', 'settings.json'),
+      backupDir: () => undefined,
+    },
   });
 
   // Запись о сервере с тем контекстом, который сервис выберет для TAG на этой
@@ -146,11 +159,18 @@ beforeAll(async () => {
     activePlatformId: platforms.activePlatformId,
     platforms: platforms.saved ? [{ platform: platforms.saved }] : [],
   }));
-  app.put<{ Body: { settings: Record<string, unknown> } }>('/api/platforms/:id', (request) => {
-    platformCalls.push({ method: 'PUT', url: request.url, body: request.body });
-    platforms.saved = request.body.settings;
-    return { ok: true };
-  });
+  app.put<{ Body: { settings: Record<string, unknown> } }>(
+    '/api/platforms/:id',
+    (request, reply) => {
+      platformCalls.push({ method: 'PUT', url: request.url, body: request.body });
+      // Тело — той же схемой, что у настоящего маршрута: заглушка, принимавшая
+      // любое тело, держала зелёным подключение, которое настоящий контур отвергал.
+      const parsed = platformSchema.safeParse(request.body.settings);
+      if (!parsed.success) return reply.code(400).send({ code: 'invalid_body', message: 'схема' });
+      platforms.saved = request.body.settings;
+      return { ok: true };
+    },
+  );
   app.get('/api/platforms/:id/apply', () => ({
     consumers: [{ id: 'foreign:qwen' }, { id: 'foreign:codex', reason: 'нет' }],
   }));
@@ -249,6 +269,32 @@ describe('раздел «Локальные модели» по настояще
     expect(body.gpu).toBe('NVIDIA GeForce RTX 4090');
     const state = readState(localPaths(root, { AGENTDECK_LOCAL_MODELS_DIR: join(root, 'lm') }));
     expect(state.bench[TAG]?.tokensPerSec).toBe(42);
+    expect(state.bench[TAG]?.device).toBe('gpu');
+  });
+
+  it('замер на процессоре помечен процессором, а не именем карты', async () => {
+    // Состояние «сервер уже перезапущен на процессоре»: смена устройства в этой
+    // сборке недоступна — заглушке нельзя поднимать сервер, а смена обязана.
+    const paths = localPaths(root, { AGENTDECK_LOCAL_MODELS_DIR: join(root, 'lm') });
+    const record = readFileSync(paths.pidFile, 'utf8');
+    const setDevice = (device: 'cpu' | 'gpu'): void => {
+      updateState(paths, (state) => {
+        state.device = device;
+      });
+      writeFileSync(paths.pidFile, JSON.stringify({ ...JSON.parse(record), device }));
+    };
+    setDevice('cpu');
+    try {
+      const { body } = await api<{ gpu: string; device: string }>(
+        'POST',
+        '/api/local-models/bench',
+        { tag: TAG },
+      );
+      expect(body).toMatchObject({ gpu: 'cpu', device: 'cpu' });
+    } finally {
+      setDevice('gpu');
+      writeFileSync(paths.pidFile, record);
+    }
   });
 
   it('перенос из системного Ollama — без второй копии на диске', async () => {
@@ -257,6 +303,51 @@ describe('раздел «Локальные модели» по настояще
     expect(job.state).toBe('done');
     const copied = blobPathOf(join(root, 'lm', 'models'), 'sha256:w4');
     expect(statSync(copied).nlink).toBeGreaterThanOrEqual(2);
+  });
+
+  it('Claude Code на модели: галочка пишет settings.json, выключение возвращает прежнее', async () => {
+    const settingsPath = join(root, 'claude', 'settings.json');
+    mkdirSync(join(root, 'claude'), { recursive: true });
+    const before = { model: 'opus', env: { DISABLE_TELEMETRY: '1' } };
+    writeFileSync(settingsPath, JSON.stringify(before, null, 2));
+    const file = (): { model?: string; env?: Record<string, string> } =>
+      JSON.parse(readFileSync(settingsPath, 'utf8')) as { env?: Record<string, string> };
+
+    const missing = await api<{ messageCode?: string }>('PUT', '/api/local-models/claude', {
+      on: true,
+      tag: 'nope:1b',
+    });
+    expect(missing.status).toBe(409);
+    expect(missing.body.messageCode).toBe('local-model-missing');
+    expect(file()).toEqual(before);
+    expect((await api('PUT', '/api/local-models/claude', { on: 'yes' })).status).toBe(400);
+
+    const on = await api<LocalModelsInfo['claude']>('PUT', '/api/local-models/claude', {
+      on: true,
+      tag: TAG,
+    });
+    expect(on.status).toBe(200);
+    expect(on.body).toMatchObject({ on: true, model: TAG, settingsPath, drift: [] });
+    const env = file().env ?? {};
+    expect(env.ANTHROPIC_BASE_URL).toBe(`http://127.0.0.1:${stub.port}`);
+    expect(env.ANTHROPIC_MODEL).toBe(TAG);
+    expect(env.ANTHROPIC_DEFAULT_OPUS_MODEL).toBe(TAG);
+    expect(env.DISABLE_TELEMETRY).toBe('1');
+    const snapshot = await api<LocalModelsInfo>('GET', '/api/local-models');
+    expect(env.CLAUDE_CODE_MAX_CONTEXT_TOKENS).toBe(String(snapshot.body.server.context));
+    expect(snapshot.body.claude.on).toBe(true);
+
+    const off = await api<LocalModelsInfo['claude']>('PUT', '/api/local-models/claude', {
+      on: false,
+    });
+    expect(off.body.on).toBe(false);
+    expect(file()).toEqual(before);
+  });
+
+  it('устройство: неверное значение отклоняется, снимок называет выбранное', async () => {
+    expect((await api('PUT', '/api/local-models/device', { device: 'tpu' })).status).toBe(400);
+    const { body } = await api<LocalModelsInfo>('GET', '/api/local-models');
+    expect(body.device).toBe('gpu');
   });
 
   it('удаление идёт через работающий сервер', async () => {

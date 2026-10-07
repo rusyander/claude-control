@@ -1628,6 +1628,9 @@ export const en: TranslationSchema = {
     platformLocked:
       'This chat runs through the "{{title}}" contour: it sets the model and effort. Change them in the Contour section or return to the default provider.',
     platformModelNone: 'contour model',
+    localLocked:
+      'Claude Code is switched to the local model "{{title}}": it answers whatever model you pick. Turn it off in the Local models section.',
+    localCaption: 'The local model {{title}} answers — Claude Code is switched to it',
     platformEffortOff: 'not sent',
     platformRefused:
       'The "{{title}}" contour is required, but {{reason}}: the message will be refused — it goes neither to the contour nor to the vendor cloud. {{fix}}',

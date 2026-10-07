@@ -12,7 +12,7 @@ export type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
 export interface OllamaClient {
   version(): Promise<string>;
   tags(): Promise<{ name: string; size: number; modified_at: string }[]>;
-  ps(): Promise<{ name: string; size_vram: number; expires_at: string }[]>;
+  ps(): Promise<{ name: string; size: number; size_vram: number; expires_at: string }[]>;
   pull(tag: string, onProgress: (event: PullEvent) => void, signal?: AbortSignal): Promise<void>;
   remove(tag: string): Promise<void>;
   unload(tag: string): Promise<void>;
@@ -94,9 +94,9 @@ export function ollamaClient(baseUrl: string, fetchImpl: FetchLike = fetch): Oll
     async ps() {
       return (
         (
-          await json<{ models?: { name: string; size_vram: number; expires_at: string }[] }>(
-            '/api/ps',
-          )
+          await json<{
+            models?: { name: string; size: number; size_vram: number; expires_at: string }[];
+          }>('/api/ps')
         ).models ?? []
       );
     },

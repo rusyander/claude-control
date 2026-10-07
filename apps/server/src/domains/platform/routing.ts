@@ -62,6 +62,40 @@ export interface PlatformRoutingDeps {
    * и в активации: записанный в состоянии порт — след прошлого запуска.
    */
   gatewayPort: () => number;
+  /**
+   * Настройка самого Claude, уводящая его прогоны мимо шлюза: `env` из
+   * settings.json перекрывает окружение процесса (замер 07.10, claude 2.1.286), и
+   * адрес контура в окружении прогона тогда молча не действует. Сейчас её ставит
+   * переключатель «Claude Code на локальной модели»: отдаёт имя настройки и
+   * контур, который ведёт туда же, куда она (ему уводить нечего).
+   */
+  claudeSettingsRoute?: () =>
+    | {
+        setting: string;
+        platformId: string;
+        /** Локальная модель, на которую уведён Claude, и её имя для подписи. */
+        model?: string;
+        title?: string;
+      }
+    | undefined;
+}
+
+/**
+ * Прогон Claude мимо контура, уведённый переключателем на локальную модель, —
+ * и какая модель ответит. Нужен и запуску (имя модели Claude ушло бы в Ollama
+ * флагом `--model` и перебило бы адрес из settings.json: у Ollama такой модели
+ * нет), и шапке чата — одним расчётом.
+ */
+export function localClaudeRun(
+  deps: PlatformRoutingDeps,
+  consumer: string,
+  decision: PlatformRouteDecision,
+): { model: string; title: string } | undefined {
+  if (decision.routed || decision.refusal) return undefined;
+  if (providerOf(consumer)?.id !== 'claude') return undefined;
+  const redirect = deps.claudeSettingsRoute?.();
+  if (!redirect?.model) return undefined;
+  return { model: redirect.model, title: redirect.title || redirect.model };
 }
 
 /** Почему прогон пошёл провайдером по умолчанию. */
@@ -317,6 +351,10 @@ export function resolveRunRoute(
   const unsupported = routeReason(provider);
   if (unsupported) return { routed: false, reason: unsupported };
 
+  const redirect = provider.id === 'claude' ? deps.claudeSettingsRoute?.() : undefined;
+  if (redirect && redirect.platformId !== platform.id)
+    return configBypass(platform, redirect.setting, deps.store.getSettings().language);
+
   const port = deps.gatewayPort();
   if (port <= 0) return unreachable(platform, 'gateway_down', deps.store.getSettings().language);
   // Ключ читается ТОЛЬКО чтобы ответить «он есть»: в окружение прогона уходит
@@ -434,7 +472,9 @@ export function describeRunPlan(deps: PlatformRoutingDeps, consumer: string): Pl
   const decision = resolveRunRoute(deps, consumer);
   const platform = activePlatform(deps.store);
   if (!decision.routed || !platform) {
+    const local = localClaudeRun(deps, consumer, decision);
     return {
+      ...(local ? { local } : {}),
       routed: false,
       title: platform?.title ?? '',
       ...(decision.routed ? {} : { reason: decision.reason }),

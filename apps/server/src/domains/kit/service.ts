@@ -403,7 +403,8 @@ export class KitService {
         true,
         qwenVariantDir(),
       );
-      return { args: [], env: { QWEN_HOME: home } };
+      // Признак локального прогона — хукам набора тоже (правила сессии, сторож субагентов).
+      return { args: [], env: { QWEN_HOME: home, [KIT_VARIANT_ENV]: 'local' } };
     }
     if (input.provider === 'codex' && mode === 'hybrid') {
       // Весь набор («Наши»), а не уступки «оба набора» у Claude: одноимённые

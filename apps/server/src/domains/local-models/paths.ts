@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { KitMode, ModelBench } from '@agentdeck/contracts/local-models';
+import type { KitMode, LocalDevice, ModelBench } from '@agentdeck/contracts/local-models';
 import { writeTextFile } from '../../lib/safe-io.ts';
 
 /**
@@ -68,6 +68,33 @@ export interface LocalState {
   preferPanelRuntime: boolean;
   bench: Record<string, ModelBench>;
   kit: { claude: KitMode; qwen: KitMode; variant: 'standard' | 'local' };
+  /** Где считать: видеокарта (умолчание) или процессор. */
+  device: LocalDevice;
+  /** Claude Code уведён на локальную модель; нет записи — выключено. */
+  claude?: ClaudeSwitchRecord;
+}
+
+/**
+ * Что включение записало в settings.json и что там стояло до него. По `previous`
+ * выключение возвращает файл как был (`null` — переменной не было), по
+ * `written` узнаёт, что человек поменял руками после включения.
+ */
+export interface ClaudeSwitchRecord {
+  model: string;
+  settingsPath: string;
+  written: Record<string, string>;
+  previous: Record<string, string | null>;
+  /**
+   * Строка выбора модели (`modelPicker`): что записано и что стояло до включения
+   * (`null` — ключа не было). Нет поля — запись старше подписи в выборе модели.
+   */
+  picker?: { written: ClaudeModelPicker; previous: unknown };
+}
+
+/** Ключ `modelPicker` пользовательского settings.json Claude Code (v2.1.242+). */
+export interface ClaudeModelPicker {
+  options: { model: string; label?: string; description?: string }[];
+  replaceBuiltInOptions?: boolean;
 }
 
 export function defaultState(): LocalState {
@@ -76,6 +103,7 @@ export function defaultState(): LocalState {
     preferPanelRuntime: false,
     bench: {},
     kit: { claude: 'global', qwen: 'global', variant: 'local' },
+    device: 'gpu',
   };
 }
 
@@ -89,6 +117,8 @@ export function readState(paths: LocalPaths): LocalState {
       preferPanelRuntime: raw.preferPanelRuntime ?? base.preferPanelRuntime,
       bench: raw.bench ?? base.bench,
       kit: { ...base.kit, ...(raw.kit ?? {}) },
+      device: raw.device === 'cpu' ? 'cpu' : 'gpu',
+      ...(raw.claude ? { claude: raw.claude } : {}),
     };
   } catch {
     // Испорченный файл состояния не должен запирать раздел: начинаем с умолчаний.

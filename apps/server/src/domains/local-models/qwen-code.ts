@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
-import { delimiter, dirname, join } from 'node:path';
+import { delimiter, join, posix, win32 } from 'node:path';
 import type { QwenCodeInfo } from '@agentdeck/contracts/local-models';
 import { localError } from './errors.ts';
 import type { JobHandle } from './jobs.ts';
@@ -97,10 +97,12 @@ export function npmCliPath(
   execPath = process.execPath,
   os: NodeJS.Platform = process.platform,
 ): string {
-  const base = dirname(execPath);
+  // Правила путей — той ОС, о которой спрошено, а не той, где идёт процесс.
+  const path = os === 'win32' ? win32 : posix;
+  const base = path.dirname(execPath);
   return os === 'win32'
-    ? join(base, 'node_modules', 'npm', 'bin', 'npm-cli.js')
-    : join(base, '..', 'lib', 'node_modules', 'npm', 'bin', 'npm-cli.js');
+    ? path.join(base, 'node_modules', 'npm', 'bin', 'npm-cli.js')
+    : path.join(base, '..', 'lib', 'node_modules', 'npm', 'bin', 'npm-cli.js');
 }
 
 /** Строки `npm http fetch GET 200 …` — каждый полученный пакет; ими и меряем ход установки. */

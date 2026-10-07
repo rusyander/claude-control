@@ -27,6 +27,8 @@ export const localRu: Record<LocalMessageCode, string> = {
   'local-kit-provider': 'набор панели для {{provider}} не поддерживается',
   'local-import-failed': 'не удалось забрать {{tag}} из системного Ollama: {{reason}}',
   'local-job-unknown': 'такой загрузки нет',
+  'local-claude-settings-broken':
+    'settings.json Claude не читается как JSON — исправьте файл: {{path}}',
   'kit-item-unknown': 'В наборе панели нет такого элемента',
   'kit-mode-unsupported': 'Этот CLI такой режим набора не поддерживает',
   'kit-global-missing': 'В глобальном слое нет такого элемента',

@@ -40,8 +40,9 @@ interface PlatformsInfoLite {
 }
 
 function reasonOf(answer: InjectAnswer): string {
-  const body = answer.body as { error?: string } | undefined;
-  return body?.error ?? `HTTP ${answer.status}`;
+  // Маршруты контура отвечают `{code, message}` (проверка тела), прочие — `{error}`.
+  const body = answer.body as { error?: string; message?: string } | undefined;
+  return body?.message ?? body?.error ?? `HTTP ${answer.status}`;
 }
 
 function fail(code: LocalMessageCode, step: string, answer: InjectAnswer): Error {
@@ -62,7 +63,14 @@ export function localPlatformSettings(input: {
     // Адрес с версией: так его ждёт пресет `ollama` (`/v1`), а путь Anthropic
     // шлюз строит сам.
     baseUrl: `${input.baseUrl.replace(/\/$/, '')}/v1`,
+    enabled: true,
     mode: 'required',
+    // Схема сохранения контура требует эти поля без умолчаний (мастер шлёт их
+    // всегда); без них «Отдать агентам» ловил 400. Файлами контур не применяется
+    // — только окружением прогона, поэтому целей и проектов нет.
+    targets: [],
+    projectPaths: [],
+    caCertPath: '',
     capabilities: ['models', 'chat', 'client-tools'],
     consumers: input.consumers,
     defaultModel: input.model,

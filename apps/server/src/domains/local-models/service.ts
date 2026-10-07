@@ -4,25 +4,39 @@ import { arch, platform } from 'node:os';
 import { join } from 'node:path';
 import {
   AGENT_MIN_CONTEXT,
+  deviceGpu,
   fitModel,
   gpuTableSchema,
   modelCatalogSchema,
+  heldVramBytes,
   recommendModel,
+  withOwnHeldVram,
   type CatalogModel,
   type HardwareInfo,
   type InstalledModel,
   type KitMode,
+  type KvCacheType,
+  type LocalClaudeInfo,
+  type LocalDevice,
   type LocalJob,
   type LocalModelsInfo,
   type LocalRuntimeInfo,
   type LocalServerInfo,
   type ModelBench,
   type ModelCatalog,
+  type ModelFit,
 } from '@agentdeck/contracts/local-models';
+import {
+  claudeSwitchEnv,
+  claudeSwitchPicker,
+  describeClaudeSwitch,
+  switchClaudeOff,
+  switchClaudeOn,
+} from './claude-switch.ts';
 import { connectLocal, describeConnect, disconnectLocal, type Inject } from './connect.ts';
 import { localError } from './errors.ts';
 import { detectHardware, type RunCommand } from './hardware.ts';
-import { LocalJobs } from './jobs.ts';
+import { type JobHandle, LocalJobs } from './jobs.ts';
 import { ollamaClient, type FetchLike, type PullEvent } from './ollama-client.ts';
 import {
   LOCAL_SERVER_PORT,
@@ -67,6 +81,16 @@ const DATA = new URL('./data/', import.meta.url);
 /** Железо меряется не на каждый опрос страницы: `nvidia-smi` и PowerShell — сотни миллисекунд. */
 const HARDWARE_TTL_MS = 15_000;
 const RELEASE_TTL_MS = 60 * 60_000;
+
+/** Что задаётся всему серверу моделей сразу: окно контекста и тип его кеша. */
+interface ServerShape {
+  context: number;
+  kvCache: KvCacheType;
+}
+
+function shapeOf(fit: ModelFit): ServerShape {
+  return { context: fit.context, kvCache: fit.kvCache ?? 'q8_0' };
+}
 
 export function loadCatalog(): ModelCatalog {
   return modelCatalogSchema.parse(
@@ -132,6 +156,11 @@ export interface LocalModelsDeps {
   os?: NodeJS.Platform;
   /** Подмена запуска сервера для проверок. */
   spawnServer?: Parameters<typeof startServer>[0]['spawnImpl'];
+  /**
+   * settings.json Claude для переключателя «Claude Code на локальной модели» и
+   * каталог копий. Функциями: каталог конфигурации меняется на лету.
+   */
+  claude?: { settingsPath: () => string; backupDir: () => string | undefined };
 }
 
 export type LocalModels = ReturnType<typeof createLocalModels>;
@@ -152,7 +181,8 @@ export function createLocalModels(deps: LocalModelsDeps) {
   addQwenToPath(paths, env);
 
   async function readHardware(force = false): Promise<HardwareInfo> {
-    if (!force && hardware && Date.now() - hardware.at < HARDWARE_TTL_MS) return hardware.value;
+    if (!force && hardware && Date.now() - hardware.at < HARDWARE_TTL_MS)
+      return creditOwnModels(hardware.value);
     const value = await detectHardware({
       table,
       platform: os,
@@ -160,7 +190,33 @@ export function createLocalModels(deps: LocalModelsDeps) {
       ...(deps.run ? { run: deps.run } : {}),
     });
     hardware = { at: Date.now(), value };
-    return value;
+    return creditOwnModels(value);
+  }
+
+  /**
+   * Свободная память карты плюс то, что держит наш же сервер: модель, загруженная
+   * им, при перезапуске сервера освободится, значит, подбору она не помеха.
+   */
+  async function creditOwnModels(value: HardwareInfo): Promise<HardwareInfo> {
+    const [gpu, ...rest] = value.gpus;
+    if (!gpu || (await probe(port, fetchImpl)) === undefined) return value;
+    let held: number;
+    try {
+      const loaded = (await client.ps()).map((model) => ({
+        tag: model.name,
+        vramBytes: model.size_vram,
+        sizeBytes: model.size,
+      }));
+      const record = readRecord(paths);
+      held = heldVramBytes(loaded, catalog.models, record?.context ?? 0, record?.kvCache ?? 'q8_0');
+    } catch {
+      return value;
+    }
+    return held > 0 ? { ...value, gpus: [withOwnHeldVram(gpu, held), ...rest] } : value;
+  }
+
+  function device(): LocalDevice {
+    return readState(paths).device;
   }
 
   function runtimeBinary(): { source: LocalRuntimeInfo['source']; binary: string; system: string } {
@@ -168,6 +224,17 @@ export function createLocalModels(deps: LocalModelsDeps) {
     const panel = findPanelBinary(paths, os);
     const picked = pickRuntime(system, panel, readState(paths).preferPanelRuntime);
     return { ...picked, system };
+  }
+
+  async function provisionRuntime(handle: JobHandle): Promise<void> {
+    const hw = await readHardware();
+    ensureDirs(paths);
+    await installPanelRuntime({ paths, os, cpu: arch(), gpus: hw.gpus, handle, fetchImpl });
+    // Своя сборка поставлена панелью — ею и пользоваться, даже если в системе
+    // найдётся другая.
+    updateState(paths, (state) => {
+      state.preferPanelRuntime = true;
+    });
   }
 
   async function latestRelease(): Promise<{ version: string; sizeBytes: number } | undefined> {
@@ -213,6 +280,8 @@ export function createLocalModels(deps: LocalModelsDeps) {
       baseUrl: baseUrlOf(port),
       loaded: [],
       context: record?.context ?? 0,
+      device: version !== undefined && record ? (record.device ?? 'gpu') : device(),
+      ...(version !== undefined && record ? { kvCache: record.kvCache ?? 'q8_0' } : {}),
       ...(record?.pid ? { pid: record.pid } : {}),
     };
     if (version === undefined) return base;
@@ -230,6 +299,7 @@ export function createLocalModels(deps: LocalModelsDeps) {
         loaded: loaded.map((model) => ({
           tag: model.name,
           vramBytes: model.size_vram,
+          sizeBytes: model.size,
           until: model.expires_at,
         })),
       };
@@ -263,27 +333,44 @@ export function createLocalModels(deps: LocalModelsDeps) {
     return catalog.models.find((model) => model.tag === tag);
   }
 
-  /** Контекст, с которым модель встанет на эту карту; чужая модель — агентский минимум. */
-  async function contextFor(tag: string): Promise<number> {
+  /** Контекст и кеш, с которыми модель встанет на эту карту; чужая модель — агентский минимум. */
+  async function contextFor(tag: string): Promise<ServerShape> {
     const hw = await readHardware(true);
     const model = catalogModel(tag);
-    if (!model) return AGENT_MIN_CONTEXT;
-    return fitModel(model, hw.gpus[0], hw.ramGb).context;
+    if (!model) return { context: AGENT_MIN_CONTEXT, kvCache: 'q8_0' };
+    return shapeOf(fitModel(model, deviceGpu(hw, device()), hw.ramGb));
   }
 
-  async function recommendedContext(): Promise<number> {
+  async function recommendedContext(): Promise<ServerShape> {
     const hw = await readHardware();
-    return recommendModel(catalog.models, hw.gpus[0], hw.ramGb)?.fit.context ?? AGENT_MIN_CONTEXT;
+    const best = recommendModel(catalog.models, deviceGpu(hw, device()), hw.ramGb);
+    return best ? shapeOf(best.fit) : { context: AGENT_MIN_CONTEXT, kvCache: 'q8_0' };
+  }
+
+  /** С чем поднят идущий сервер — чтобы скачивание и замер его не перезапускали. */
+  function runningShape(): ServerShape | undefined {
+    const record = readRecord(paths);
+    return record?.context
+      ? { context: record.context, kvCache: record.kvCache ?? 'q8_0' }
+      : undefined;
   }
 
   /**
-   * Поднять сервер с нужным контекстом. Контекст задаётся на весь сервер, поэтому
-   * другой контекст = перезапуск; тот же — сервер подхватывается как есть.
+   * Поднять сервер с нужным контекстом и кешем. Оба задаются на весь сервер,
+   * поэтому другой контекст или кеш = перезапуск; те же — сервер подхватывается как есть.
    */
-  async function ensureServer(context: number): Promise<void> {
+  async function ensureServer({ context, kvCache }: ServerShape): Promise<void> {
     const record = readRecord(paths);
     const running = (await probe(port, fetchImpl)) !== undefined;
-    if (running && record && record.context === context) return;
+    const wanted = device();
+    if (
+      running &&
+      record &&
+      record.context === context &&
+      (record.kvCache ?? 'q8_0') === kvCache &&
+      (record.device ?? 'gpu') === wanted
+    )
+      return;
     if (running && record) await stopServer(paths, port, fetchImpl);
     const { binary } = runtimeBinary();
     if (!binary)
@@ -295,6 +382,8 @@ export function createLocalModels(deps: LocalModelsDeps) {
       binary,
       port,
       context,
+      device: wanted,
+      kvCache,
       fetchImpl,
       ...(deps.spawnServer ? { spawnImpl: deps.spawnServer } : {}),
     });
@@ -302,6 +391,33 @@ export function createLocalModels(deps: LocalModelsDeps) {
       updateState(paths, (state) => {
         state.versions[binary] = started.version;
       });
+    // Окно контекста Claude — окно сервера: сервер поднялся с другим, значит, и
+    // включённый Claude Code должен сжимать историю по новому.
+    const claude = readState(paths).claude;
+    if (claude) writeClaude(claude.model, context);
+  }
+
+  function writeClaude(model: string, context: number): void {
+    if (!deps.claude) return;
+    const record = switchClaudeOn({
+      settingsPath: deps.claude.settingsPath(),
+      model,
+      vars: claudeSwitchEnv({ baseUrl: baseUrlOf(port), model, context }),
+      picker: claudeSwitchPicker({
+        model,
+        title: catalogModel(model)?.title ?? model,
+        baseUrl: baseUrlOf(port),
+      }),
+      current: readState(paths).claude,
+      backupDir: deps.claude.backupDir(),
+    });
+    updateState(paths, (state) => {
+      state.claude = record;
+    });
+  }
+
+  function describeClaude(): LocalClaudeInfo {
+    return describeClaudeSwitch(readState(paths).claude, deps.claude?.settingsPath() ?? '');
   }
 
   async function connect(inject: Inject, tag: string): Promise<unknown> {
@@ -338,6 +454,8 @@ export function createLocalModels(deps: LocalModelsDeps) {
         importable: await importable(own),
         jobs: jobs.list(),
         connect: { configured: false, active: false, model: '' },
+        device: state.device,
+        claude: describeClaude(),
         qwenCode: describeQwenCode(paths, env),
         kit: state.kit,
         diskUsedBytes: await dirSize(paths.root),
@@ -349,16 +467,7 @@ export function createLocalModels(deps: LocalModelsDeps) {
     refreshHardware: () => readHardware(true),
 
     installRuntime(): LocalJob {
-      return jobs.start('runtime', 'ollama', async (handle) => {
-        const hw = await readHardware();
-        ensureDirs(paths);
-        await installPanelRuntime({ paths, os, cpu: arch(), gpus: hw.gpus, handle, fetchImpl });
-        // Своя сборка поставлена по кнопке — ею и пользоваться, даже если в
-        // системе найдётся другая.
-        updateState(paths, (state) => {
-          state.preferPanelRuntime = true;
-        });
-      });
+      return jobs.start('runtime', 'ollama', provisionRuntime);
     },
 
     async startServer(tag?: string): Promise<LocalServerInfo> {
@@ -378,10 +487,13 @@ export function createLocalModels(deps: LocalModelsDeps) {
       if (!catalogModel(tag))
         throw localError('local-model-unknown', `модели ${tag} нет в каталоге`, { tag });
       return jobs.start('model', tag, async (handle) => {
+        // Одна кнопка на чистой машине: сервера моделей нет — ставим свой в той
+        // же работе, иначе «Скачать и подключить» падала бы на первом шаге.
+        if (!runtimeBinary().binary) await provisionRuntime(handle);
         handle.progress({ phase: 'server' });
         // Скачиванию контекст безразличен: идущий сервер не перезапускаем ради
         // него (это выгрузило бы модель, с которой сейчас работает агент).
-        await ensureServer(readRecord(paths)?.context || (await contextFor(tag)));
+        await ensureServer(runningShape() ?? (await contextFor(tag)));
         const layers = new Map<string, { total: number; completed: number }>();
         await client.pull(
           tag,
@@ -421,9 +533,15 @@ export function createLocalModels(deps: LocalModelsDeps) {
     },
 
     async bench(tag: string): Promise<ModelBench> {
-      await ensureServer(readRecord(paths)?.context ?? (await contextFor(tag)));
+      await ensureServer(runningShape() ?? (await contextFor(tag)));
       const hw = await readHardware();
-      const result = benchOf(await client.bench(tag), hw.gpus[0]?.name ?? 'cpu');
+      // Замер на процессоре — не замер карты: иначе каталог в режиме «процессор»
+      // показывал бы 98 ток/с видеокарты рядом с оценкой 3–5.
+      const where = device();
+      const result = {
+        ...benchOf(await client.bench(tag), where === 'cpu' ? 'cpu' : (hw.gpus[0]?.name ?? 'cpu')),
+        device: where,
+      };
       updateState(paths, (state) => {
         state.bench[tag] = result;
       });
@@ -433,6 +551,69 @@ export function createLocalModels(deps: LocalModelsDeps) {
     connect,
 
     disconnect: (inject: Inject) => disconnectLocal(inject),
+
+    /**
+     * Где считать. Идущий сервер перезапускается сразу: устройство задаётся
+     * всему серверу, и выбор, вступающий в силу «когда-нибудь», человек не
+     * отличит от несработавшего.
+     */
+    async setDevice(next: LocalDevice): Promise<LocalServerInfo> {
+      updateState(paths, (state) => {
+        state.device = next;
+      });
+      if ((await probe(port, fetchImpl)) !== undefined) {
+        const tag = readState(paths).claude?.model ?? (await client.ps())[0]?.name;
+        await ensureServer(tag ? await contextFor(tag) : await recommendedContext());
+      }
+      return describeServer();
+    },
+
+    /**
+     * «Claude Code на локальной модели». Включение поднимает сервер (иначе первый
+     * же сеанс Claude упал бы отказом соединения) и пишет settings.json;
+     * выключение возвращает прежнее и сервер не трогает — им пользуются агенты.
+     */
+    async setClaude(on: boolean, tag?: string): Promise<LocalClaudeInfo> {
+      if (!deps.claude) throw localError('local-server-down', 'переключатель Claude недоступен');
+      if (!on) {
+        const record = readState(paths).claude;
+        if (record) switchClaudeOff(record, deps.claude.backupDir());
+        updateState(paths, (state) => {
+          delete state.claude;
+        });
+        return describeClaude();
+      }
+      const model = tag ?? readState(paths).claude?.model ?? '';
+      const own = await listStoredModels(paths.models);
+      if (!model || !own.some((item) => item.tag === model))
+        throw localError('local-model-missing', `модель ${model || '—'} не скачана`, {
+          tag: model || '—',
+        });
+      const shape = await contextFor(model);
+      await ensureServer(shape);
+      writeClaude(model, readRecord(paths)?.context ?? shape.context);
+      return describeClaude();
+    },
+
+    /** Claude уведён переключателем — для маршрутизации контура. */
+    claudeRedirected: (): boolean => Boolean(readState(paths).claude),
+
+    /** На какую модель уведён Claude и как её подписать; выключено — нет. */
+    claudeModel: (): { model: string; title: string } | undefined => {
+      const claude = readState(paths).claude;
+      return claude
+        ? { model: claude.model, title: catalogModel(claude.model)?.title ?? claude.model }
+        : undefined;
+    },
+
+    /**
+     * После перезапуска панели: включённому Claude нужен живой сервер, иначе
+     * первый сеанс в терминале получит отказ соединения.
+     */
+    async resume(): Promise<void> {
+      const claude = readState(paths).claude;
+      if (claude) await ensureServer(await contextFor(claude.model));
+    },
 
     installQwen(): LocalJob {
       return jobs.start('qwen-code', 'qwen-code', async (handle) => {

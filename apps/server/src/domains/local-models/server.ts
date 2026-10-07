@@ -11,7 +11,9 @@ import {
 import { dirname } from 'node:path';
 import { killProcessTree } from '../../lib/kill-tree.mjs';
 import { localError } from './errors.ts';
+import { launchHidden, pidAlive } from './hidden-launch.ts';
 import { ollamaClient, type FetchLike } from './ollama-client.ts';
+import type { KvCacheType, LocalDevice } from '@agentdeck/contracts/local-models';
 import type { LocalPaths } from './paths.ts';
 
 /**
@@ -34,6 +36,10 @@ export interface ServerRecord {
   port: number;
   binary: string;
   context: number;
+  /** Нет поля — запись старше выбора устройства, сервер шёл на видеокарте. */
+  device?: LocalDevice;
+  /** Нет поля — запись старше выбора кеша, кеш был q8_0. */
+  kvCache?: KvCacheType;
   startedAt: number;
 }
 
@@ -41,8 +47,24 @@ export interface ServerEnvInput {
   paths: LocalPaths;
   port: number;
   context: number;
+  device?: LocalDevice;
+  kvCache?: KvCacheType;
   base?: NodeJS.ProcessEnv;
 }
+
+/**
+ * Счёт на процессоре: карты прячутся от сервера переменными видимости каждого
+ * движка (CUDA, ROCm/HIP, Vulkan). Замер 07.10 на Ollama 0.35 с RTX 4090:
+ * `size_vram=0`, видеопамять не сдвинулась, журнал — `library=cpu`. У Metal на
+ * Mac такой переменной нет: там сервер может положить модель в объединённую
+ * память всё равно — экран сверяет это по `/api/ps` и говорит, а не верит.
+ */
+export const CPU_ONLY_ENV: Record<string, string> = {
+  CUDA_VISIBLE_DEVICES: '-1',
+  HIP_VISIBLE_DEVICES: '-1',
+  ROCR_VISIBLE_DEVICES: '-1',
+  GGML_VK_VISIBLE_DEVICES: '-1',
+};
 
 /** Окружение сервера: всё, что раньше человек прописывал руками. */
 export function serverEnv(input: ServerEnvInput): NodeJS.ProcessEnv {
@@ -55,8 +77,9 @@ export function serverEnv(input: ServerEnvInput): NodeJS.ProcessEnv {
     // меньше одного системного промпта агента.
     OLLAMA_CONTEXT_LENGTH: String(input.context),
     OLLAMA_FLASH_ATTENTION: '1',
-    // Кеш контекста в q8_0 — вдвое меньше памяти при неотличимом качестве.
-    OLLAMA_KV_CACHE_TYPE: 'q8_0',
+    // Кеш контекста в q8_0 — вдвое меньше памяти при неотличимом качестве;
+    // q4_0 — только когда без него не влезает 128K (подбор `fitModel`).
+    OLLAMA_KV_CACHE_TYPE: input.kvCache ?? 'q8_0',
     // Простаивающая модель уходит из видеопамяти сама: машина владельца — не
     // сервер, ей нужна карта для остального.
     OLLAMA_KEEP_ALIVE: '10m',
@@ -65,6 +88,7 @@ export function serverEnv(input: ServerEnvInput): NodeJS.ProcessEnv {
     // Без чистки слоёв при старте: недокачанная модель докачивается с места и
     // после перезапуска сервера, а не заново с нуля.
     OLLAMA_NOPRUNE: '1',
+    ...(input.device === 'cpu' ? CPU_ONLY_ENV : {}),
   };
 }
 
@@ -108,15 +132,66 @@ export async function probe(
   }
 }
 
+/**
+ * Сколько ждать ответа сервера. Ollama отвечает только после поиска видеокарт, а
+ * тот длится и 6 с, и 51 с (замер 07.10, 4090, сразу после снятия прежнего сервера).
+ */
+export const START_TIMEOUT_MS = 120_000;
+
 export interface StartInput {
   paths: LocalPaths;
   binary: string;
   port: number;
   context: number;
+  device?: LocalDevice;
+  kvCache?: KvCacheType;
   fetchImpl?: FetchLike;
   /** Подменяемый запуск — проверки поднимают заглушку вместо настоящего Ollama. */
   spawnImpl?: typeof spawn;
   timeoutMs?: number;
+  /** Подменяемое снятие процесса — проверки не трогают чужие номера. */
+  kill?: (pid: number, startedAt: number) => void;
+}
+
+interface Launched {
+  pid: number;
+  /** Код выхода, если процесс уже завершился; жив — null. */
+  exited: () => number | null;
+}
+
+/**
+ * Запустить `ollama serve` отдельно от панели. Windows без подменённого запуска —
+ * через скрытую консоль (`hidden-launch.ts`: иначе вкладка терминала на каждый
+ * служебный процесс Ollama); остальное — detached, вывод дописывается в журнал.
+ */
+async function launch(input: StartInput, env: NodeJS.ProcessEnv): Promise<Launched> {
+  const fail = (): never => {
+    throw localError('local-start-failed', `не удалось запустить ${input.binary}`, {
+      binary: input.binary,
+    });
+  };
+  if (!input.spawnImpl && process.platform === 'win32') {
+    const pid = await launchHidden(input.binary, ['serve'], env, {
+      out: input.paths.serverLog.replace(/\.log$/, '.out.log'),
+      err: input.paths.serverLog,
+    }).catch(fail);
+    return { pid, exited: () => (pidAlive(pid) ? null : -1) };
+  }
+  const log = openSync(input.paths.serverLog, 'a');
+  const child = (input.spawnImpl ?? spawn)(input.binary, ['serve'], {
+    env,
+    detached: true,
+    stdio: ['ignore', log, log],
+    windowsHide: true,
+  });
+  closeSync(log);
+  if (!child.pid) return fail();
+  child.unref();
+  let code: number | null = null;
+  child.once('exit', (exitCode) => {
+    code = exitCode ?? -1;
+  });
+  return { pid: child.pid, exited: () => code };
 }
 
 /** Поднять сервер и дождаться ответа. Возвращает версию. */
@@ -135,39 +210,42 @@ export async function startServer(
     );
   }
   mkdirSync(dirname(input.paths.serverLog), { recursive: true });
-  const log = openSync(input.paths.serverLog, 'a');
-  const child = (input.spawnImpl ?? spawn)(input.binary, ['serve'], {
-    env: serverEnv({ paths: input.paths, port: input.port, context: input.context }),
-    detached: true,
-    stdio: ['ignore', log, log],
-    windowsHide: true,
+  const env = serverEnv({
+    paths: input.paths,
+    port: input.port,
+    context: input.context,
+    device: input.device ?? 'gpu',
+    kvCache: input.kvCache ?? 'q8_0',
   });
-  closeSync(log);
-  if (!child.pid)
-    throw localError('local-start-failed', `не удалось запустить ${input.binary}`, {
-      binary: input.binary,
-    });
-  child.unref();
+  const launched = await launch(input, env);
   const record: ServerRecord = {
-    pid: child.pid,
+    pid: launched.pid,
     port: input.port,
     binary: input.binary,
     context: input.context,
+    device: input.device ?? 'gpu',
+    kvCache: input.kvCache ?? 'q8_0',
     startedAt: Date.now(),
   };
   writeRecord(input.paths, record);
 
+  const timeoutMs = input.timeoutMs ?? START_TIMEOUT_MS;
+  const deadline = Date.now() + timeoutMs;
   let exited: number | null = null;
-  child.once('exit', (code) => {
-    exited = code ?? -1;
-  });
-  const deadline = Date.now() + (input.timeoutMs ?? 30_000);
   while (Date.now() < deadline) {
     const version = await probe(input.port, fetchImpl);
     if (version !== undefined) return { version, record };
+    exited = launched.exited();
     if (exited !== null) break;
     await new Promise((resolve) => setTimeout(resolve, 300));
   }
+  // Не ответил — снять: иначе процесс без записи держит порт, и следующий запуск
+  // натыкается на «порт занят» сиротой, которую панель уже не видит.
+  if (exited === null)
+    (input.kill ?? ((pid, startedAt) => killProcessTree(pid, { spawnedAt: startedAt })))(
+      launched.pid,
+      record.startedAt,
+    );
   rmSync(input.paths.pidFile, { force: true });
   const logPath = input.paths.serverLog;
   if (exited !== null) {
@@ -177,7 +255,7 @@ export async function startServer(
       { code: exited, log: logPath },
     );
   }
-  const seconds = Math.round((input.timeoutMs ?? 30_000) / 1000);
+  const seconds = Math.round(timeoutMs / 1000);
   throw localError(
     'local-timeout',
     `сервер моделей не ответил за ${seconds} с — журнал: ${logPath}`,

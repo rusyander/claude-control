@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
+  LocalClaudeInfo,
   LocalConnectInfo,
+  LocalDevice,
   LocalJob,
   LocalModelsInfo,
   LocalServerInfo,
@@ -18,6 +20,11 @@ async function getLocalModels(): Promise<LocalModelsInfo> {
 
 async function post<T>(path: string, body?: unknown): Promise<T> {
   const { data } = await apiClient.post<T>(path, body ?? {});
+  return data;
+}
+
+async function put<T>(path: string, body: unknown): Promise<T> {
+  const { data } = await apiClient.put<T>(path, body);
   return data;
 }
 
@@ -89,6 +96,16 @@ export const useConnectLocal = () =>
 
 export const useDisconnectLocal = () =>
   useLocalAction<void, LocalConnectInfo>(() => post('/local-models/disconnect'));
+
+/** Где считать: идущий сервер перезапускается с новым устройством сразу. */
+export const useSetLocalDevice = () =>
+  useLocalAction<LocalDevice, LocalServerInfo>((device) => put('/local-models/device', { device }));
+
+/** «Claude Code на локальной модели»: settings.json Claude, выключение возвращает прежнее. */
+export const useSetLocalClaude = () =>
+  useLocalAction<{ on: boolean; tag?: string }, LocalClaudeInfo>((body) =>
+    put('/local-models/claude', body),
+  );
 
 export const useInstallQwenCode = () =>
   useLocalAction<void, LocalJob>(() => post('/local-models/qwen-code/install'));

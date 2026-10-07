@@ -24,6 +24,14 @@ const MODEL = CATALOG.models.find((model) => model.tag === TAG);
 const ROOT = 'D:\\agentdeck\\.local-models';
 const RUNTIME = `${ROOT}\\runtime\\ollama-0.35.1\\ollama.exe`;
 const NOW = '2026-10-05T16:20:00.000Z';
+/** «Claude Code на этой модели» — выключено, как по умолчанию. */
+const CLAUDE_OFF = {
+  on: false,
+  model: '',
+  settingsPath: 'C:\\Users\\you\\.claude\\settings.json',
+  vars: [],
+  drift: [],
+};
 
 const base = () => ({
   root: ROOT,
@@ -58,6 +66,7 @@ const base = () => ({
     baseUrl: 'http://127.0.0.1:11435',
     loaded: [],
     context: 0,
+    device: 'gpu',
   },
   catalog: CATALOG,
   installed: [],
@@ -66,6 +75,8 @@ const base = () => ({
   connect: { configured: false, active: false, model: '' },
   qwenCode: { binary: '', version: '', source: 'none' },
   kit: { claude: 'global', qwen: 'global', variant: 'local' },
+  device: 'gpu',
+  claude: CLAUDE_OFF,
   diskUsedBytes: 0,
 });
 
@@ -76,6 +87,9 @@ const runningServer = (loaded = []) => ({
   pid: 18244,
   loaded,
   context: 131072,
+  device: 'gpu',
+  // 27B на 4090: 128K влезают в карту только со сжатым кешем.
+  kvCache: 'q4_0',
 });
 const panelRuntime = {
   source: 'panel',
@@ -116,7 +130,12 @@ export const STATES = {
     ...base(),
     runtime: panelRuntime,
     server: runningServer([
-      { tag: TAG, vramBytes: 21_300_000_000, until: '2026-10-05T16:40:00.000Z' },
+      {
+        tag: TAG,
+        vramBytes: 21_300_000_000,
+        sizeBytes: 21_300_000_000,
+        until: '2026-10-05T16:40:00.000Z',
+      },
     ]),
     installed: [
       {

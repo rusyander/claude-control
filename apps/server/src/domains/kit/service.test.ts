@@ -363,7 +363,7 @@ describe('runExtras: что получает прогон', () => {
     service().setMode('qwen', 'ours');
     const result = extras('qwen', true);
     const home = join(appData, 'kit', 'qwen-home');
-    expect(result).toEqual({ args: [], env: { QWEN_HOME: home } });
+    expect(result).toEqual({ args: [], env: { QWEN_HOME: home, AGENTDECK_KIT_VARIANT: 'local' } });
     const rules = readFileSync(join(home, 'QWEN.md'), 'utf8');
     expect(rules).toContain('agentdeck kit rules');
     expect(rules).toContain('One tool call per step');

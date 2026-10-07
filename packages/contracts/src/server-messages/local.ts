@@ -25,6 +25,7 @@ export const localMessageParams = {
   'local-kit-provider': ['provider'],
   'local-import-failed': ['tag', 'reason'],
   'local-job-unknown': [],
+  'local-claude-settings-broken': ['path'],
   'kit-item-unknown': [],
   'kit-mode-unsupported': [],
   'kit-global-missing': [],

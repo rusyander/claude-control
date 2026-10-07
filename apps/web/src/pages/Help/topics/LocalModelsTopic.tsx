@@ -92,8 +92,40 @@ export function LocalModelsTopic() {
             },
             { name: tr('fitNoTools'), description: tr('fitNoToolsText'), isMono: false },
             { name: tr('fitSmall'), description: tr('fitSmallText'), isMono: false },
+            { name: tr('fitCpu'), description: tr('fitCpuText'), isMono: false },
           ]}
         />
+      </HelpSection>
+
+      <HelpSection title={tr('deviceTitle')} caption={tr('deviceCaption')}>
+        <Stack gap="var(--spacing-xs)">
+          <OptionCards
+            items={[
+              { title: tr('deviceGpu'), text: tr('deviceGpuText') },
+              { title: tr('deviceCpu'), text: tr('deviceCpuText') },
+            ]}
+          />
+          <Callout tone="info" title={tr('deviceRestart')}>
+            {tr('deviceRestartText')}
+          </Callout>
+          <Callout tone="warning" title={tr('deviceMac')}>
+            {tr('deviceMacText')}
+          </Callout>
+        </Stack>
+      </HelpSection>
+
+      <HelpSection title={tr('claudeTitle')} caption={tr('claudeCaption')}>
+        <Stack gap="var(--spacing-xs)">
+          <OptionCards
+            items={[
+              { title: tr('claudeOn'), text: tr('claudeOnText') },
+              { title: tr('claudeOff'), text: tr('claudeOffText') },
+            ]}
+          />
+          <Callout tone="warning" title={tr('claudeWhile')}>
+            {tr('claudeWhileText')}
+          </Callout>
+        </Stack>
       </HelpSection>
 
       <HelpSection title={tr('kitTitle')} caption={tr('kitCaption')}>

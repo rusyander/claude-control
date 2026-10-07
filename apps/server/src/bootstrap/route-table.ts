@@ -249,7 +249,14 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
     // слушатель шлюза — он переживает запрос и потому приходит извне. Адрес
     // панели нужен по той же причине, что и интеграциям: переходник MCP ходит
     // не в контур, а сюда, и в его записи лежит только этот адрес.
-    (instance, context) => registerPlatformRoutes(instance, context, platformGateway, selfBaseUrl),
+    (instance, context) =>
+      registerPlatformRoutes(
+        instance,
+        context,
+        platformGateway,
+        selfBaseUrl,
+        runtime.claudeSettingsRoute,
+      ),
     // Локальные модели: работы с прогрессом переживают запрос, объект — из runtime.
     (instance, context) => registerLocalModelsRoutes(instance, context, localModels, kit),
     // Картинки из чата (Т9). Порт спрашивается у ЖИВОГО слушателя, а не у

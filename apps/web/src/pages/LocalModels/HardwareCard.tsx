@@ -27,6 +27,14 @@ export function HardwareCard({ hardware, onRefresh, isRefreshing }: HardwareCard
     }
     if (gpu.freeGb === undefined)
       return t('localModels.hardware.vramNoFree', { total: gpu.vramGb });
+    const usable = Math.round(usableVramGb(gpu) * 10) / 10;
+    // Строка о вытеснении — только когда оно заметно меняет картину, а не на десятые.
+    if (usable - gpu.freeGb >= 1)
+      return t('localModels.hardware.vramPageable', {
+        total: gpu.vramGb,
+        free: gpu.freeGb,
+        usable,
+      });
     return t('localModels.hardware.vram', { total: gpu.vramGb, free: gpu.freeGb });
   };
   return (

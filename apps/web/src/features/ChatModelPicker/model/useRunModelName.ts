@@ -25,6 +25,7 @@ export function useRunModelName({
 }: RunModelNameInput): string {
   const { t } = useTranslation();
   const plan = usePlatformRunPlan(consumer);
+  if (plan.data?.local) return plan.data.local.title;
   if (plan.data?.routed === true) {
     return platformRunChoice(plan.data.rules, model, defaultModel).model || plan.data.title;
   }

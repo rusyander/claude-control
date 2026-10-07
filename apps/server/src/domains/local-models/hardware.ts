@@ -77,10 +77,46 @@ export function guessBandwidth(vendor: GpuVendor, vramGb: number): number {
   return 900;
 }
 
+/** «Apple M4 Pro» → поколение 4, уровень pro; базовый чип — уровень base. */
+function appleChip(name: string): { gen: number; tier: string } | undefined {
+  const match = /\bM(\d+)(?:\s+(Pro|Max|Ultra))?\b/i.exec(name);
+  if (!match) return undefined;
+  return { gen: Number(match[1]), tier: (match[2] ?? 'base').toLowerCase() };
+}
+
+/**
+ * Чип Apple — по поколению И уровню. Общее «самое длинное совпадение» отдавало
+ * «M5 Pro», которого нет в справочнике, строке базового M5 с пометкой «из
+ * справочника», хотя у Pro память вдвое быстрее. Нет точной строки (новый чип:
+ * M5 Max, M6, M7) — новейшее известное поколение того же уровня, как прикидка:
+ * поколения растут, и это нижняя, а не выдуманная оценка.
+ */
+export function appleBandwidth(
+  name: string,
+  table: GpuSpec[],
+): { bandwidthGbs: number; bandwidthFrom: HardwareGpu['bandwidthFrom'] } | undefined {
+  const chip = appleChip(name);
+  if (!chip) return undefined;
+  const known = table
+    .filter((spec) => spec.vendor === 'apple')
+    .map((spec) => ({ spec, chip: appleChip(spec.name) }))
+    .filter((entry) => entry.chip?.tier === chip.tier);
+  const exact = known.find((entry) => entry.chip?.gen === chip.gen);
+  if (exact) return { bandwidthGbs: exact.spec.bandwidthGbs, bandwidthFrom: 'table' };
+  const older = known
+    .filter((entry) => (entry.chip?.gen ?? 0) < chip.gen)
+    .sort((x, y) => (y.chip?.gen ?? 0) - (x.chip?.gen ?? 0))[0];
+  return older ? { bandwidthGbs: older.spec.bandwidthGbs, bandwidthFrom: 'guess' } : undefined;
+}
+
 function withBandwidth(
   base: Omit<HardwareGpu, 'bandwidthGbs' | 'bandwidthFrom'>,
   table: GpuSpec[],
 ): HardwareGpu {
+  if (base.vendor === 'apple') {
+    const apple = appleBandwidth(base.name, table);
+    if (apple) return { ...base, ...apple };
+  }
   const spec = matchGpuSpec(base.name, table);
   // У ноутбучной версии та же марка, но память медленнее — примерно на четверть.
   const laptop = /laptop|mobile|max-q/i.test(base.name) ? 0.75 : 1;
@@ -205,7 +241,10 @@ export async function detectGpus(
     '--format=csv,noheader,nounits',
   ]);
   const fromNvidia = nvidia ? parseNvidiaSmi(nvidia, deps.table) : [];
-  if (fromNvidia.length) return { gpus: fromNvidia, detectedBy: 'nvidia-smi' };
+  // Windows (WDDM) вытесняет чужую видеопамять, когда модели она нужна.
+  const pageable = os === 'win32' ? { pageable: true } : {};
+  if (fromNvidia.length)
+    return { gpus: fromNvidia.map((gpu) => ({ ...gpu, ...pageable })), detectedBy: 'nvidia-smi' };
 
   if (os === 'darwin') {
     const out = await tryRun(run, 'sysctl', ['-n', 'machdep.cpu.brand_string', 'hw.memsize']);

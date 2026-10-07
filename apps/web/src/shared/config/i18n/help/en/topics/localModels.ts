@@ -31,8 +31,9 @@ export const localModelsEn: typeof localModelsRu = {
       'an interrupted download resumes where it stopped.',
     whyBack: 'The cloud is one click away',
     whyBackText:
-      'Agents are switched through the contour, per run. Nothing is written to ~/.claude, and ' +
-      '“Back to the cloud” restores everything as it was.',
+      'Agents are switched through the contour, per run: the contour writes nothing to ' +
+      '~/.claude, and “Back to the cloud” restores everything as it was. Only the “Claude Code ' +
+      'on this model” checkbox writes there, and only if you turn it on.',
 
     mapTitle: 'Where an agent’s request goes',
     mapCaption:
@@ -49,8 +50,8 @@ export const localModelsEn: typeof localModelsRu = {
       firstTitle: 'Frame by frame: the section itself',
       firstCaption:
         'From the first visit to agents on your card. There are three buttons: “Download” for the ' +
-        'server, “Download” for the model and “Hand to agents”; “Download and connect” under the ' +
-        'chat does all three in a row.',
+        'server, “Download” for the model and “Hand to agents”; “Download and connect” in the line ' +
+        'at the top of the section does all three in a row — on a clean machine it installs the server too.',
       firstMachine: 'First visit: card detected, no server yet',
       firstMachineText:
         'On the left is your machine: the card, its video memory and how much is free, bandwidth, ' +
@@ -70,10 +71,12 @@ export const localModelsEn: typeof localModelsRu = {
       firstReadyText:
         'The server is running and holds the model in memory — you can see how much video memory ' +
         'it takes. “Measure” measures the real speed and shows it next to the estimate. “Used by ' +
-        'agents” means this model is answering chats right now.',
+        'agents” means this model is answering chats right now. “Where to compute” is the video ' +
+        'card or the processor, and the “In memory” line tells where the model actually went.',
       firstAgents: 'Agents and the kit',
       firstAgentsText:
-        'Which model the agents use now, and the “Back to the cloud” button. Below are Qwen Code ' +
+        'Which model the agents use now, and the “Back to the cloud” button. The “Claude Code on ' +
+        'this model” checkbox (off) sends Claude Code itself there too. Below are Qwen Code ' +
         'and the kit choice: whose skills, hooks and rules the agent gets while it runs on the ' +
         'local model.',
     },
@@ -101,6 +104,57 @@ export const localModelsEn: typeof localModelsRu = {
     fitSmallText:
       'Fits only with a context smaller than an agent needs: the system prompt and the files it ' +
       'reads will not fit.',
+    fitCpu: 'On the processor',
+    fitCpuText:
+      'Computing on the processor is selected: the model sits fully in RAM, the card takes no ' +
+      'part. It works, but tens of times slower than the card: Qwen3.6 27B on a Ryzen 9 7950X ' +
+      'gives 4 to 9 tokens per second against 107 on an RTX 4090. Fine for questions; an agent needs 8 or more.',
+
+    deviceTitle: 'Where to compute: video card or processor',
+    deviceCaption: 'The switch is in the model server card. The video card by default.',
+    deviceGpu: 'Video card',
+    deviceGpuText:
+      'Tens of times faster than the processor. The catalog is marked by the card video memory, ' +
+      'and the memory a loaded model already holds is credited to it — the marks do not turn red ' +
+      'just because the model is running.',
+    deviceCpu: 'Processor',
+    deviceCpuText:
+      'When the card is busy with something else (a game, a render) or the model does not fit. ' +
+      'The model server starts with the video cards hidden, the model goes fully into RAM, and ' +
+      'the catalog is marked by RAM.',
+    deviceRestart: 'Switching restarts the server',
+    deviceRestartText:
+      'The device is set when the server starts: switching restarts it and unloads the model. ' +
+      'The “In memory” line shows where the model actually went — from the server answer, not ' +
+      'from the choice: fully on the card, on the processor, or a share on the card.',
+    deviceMac: 'Mac with an M chip',
+    deviceMacText:
+      'On a Mac (M1 and newer) the “video card” is the chip GPU on unified memory. There is no ' +
+      'way to hide it from the server, so the “processor” choice may have no effect on a Mac — ' +
+      'the section says so plainly. The chip memory bandwidth comes from the reference table; a ' +
+      'chip not in it yet (M6, M7…) takes the newest known chip of the same tier (base, Pro, ' +
+      'Max, Ultra), marked as an estimate.',
+
+    claudeTitle: 'Claude Code on this model',
+    claudeCaption: 'A checkbox in the agents card. Off by default.',
+    claudeOn: 'Turn on',
+    claudeOnText:
+      'The panel writes into the env section of Claude settings.json the model server address, ' +
+      'the model for every role (subagents included) and the server context window. Claude Code ' +
+      'itself — terminal, editor chat, panel chats — goes to the local model. The model choice in ' +
+      'Claude Code (/model in the terminal, the list in the editor) shows one row with its name ' +
+      'instead of Opus and Sonnet. New sessions pick it up at once; start an open session again.',
+    claudeOff: 'Turn off',
+    claudeOffText:
+      'Restores these variables exactly as they were before switching on; nothing else in the ' +
+      'file is touched. A variable you changed by hand after switching on is left as it is and ' +
+      'named.',
+    claudeWhile: 'While on',
+    claudeWhileText:
+      'settings.json beats launch variables, so a Claude run through another contour is refused ' +
+      'with an explanation instead of silently going to the local model. The panel chat header ' +
+      'locks the model choice to its name: Opus cannot be picked, it would answer anyway. Change ' +
+      'the model or the device and the panel rewrites the context window itself.',
 
     kitTitle: 'Whose kit the agent gets',
     kitCaption:
@@ -129,7 +183,7 @@ export const localModelsEn: typeof localModelsRu = {
     fileDownloads: 'Partial downloads',
     fileTools: 'Qwen Code and its kit',
     fileLogs: 'Server log',
-    fileRecord: 'Running server: port and context',
+    fileRecord: 'Running server: port, context, device and context cache',
     fileState: 'Measurements and kit choice',
     fileImport:
       'A model from the system Ollama is moved by a hard link — no second copy on disk. If the ' +
@@ -143,7 +197,10 @@ export const localModelsEn: typeof localModelsRu = {
     limitContextTitle: 'Context is per server',
     limitContextText:
       'The context is set when the server starts. Another model with another context means a ' +
-      'server restart, and the previously loaded model is unloaded.',
+      'server restart, and the previously loaded model is unloaded. The context cache is normally ' +
+      'q8_0; it is compressed to q4_0 when that fits a longer context entirely on the GPU, and a ' +
+      'note under the «Context» line says so. On Windows the memory held by the browser and other ' +
+      'programs is handed to the model on demand, so the fit does not cut the context because of it.',
     limitEstimateTitle: 'An estimate is not a measurement',
     limitEstimateText:
       'The catalog speed is computed from the card’s bandwidth. The real number depends on the ' +
@@ -161,7 +218,9 @@ export const localModelsEn: typeof localModelsRu = {
     datasetsText:
       'No. The catalog models are already trained to write code and work as agents. Fine-tuning ' +
       'on a home card does not make the agent noticeably better, and the agent learns the project ' +
-      'by reading the repository and the rules.',
+      'by reading the repository and the rules. Sampling settings (temperature, top_p) are ' +
+      'already set in the model by its authors, and Claude Code does not override them — there ' +
+      'is nothing to tune.',
   },
 
   shots: {
@@ -172,14 +231,9 @@ export const localModelsEn: typeof localModelsRu = {
         'The catalog: “Recommended” on Qwen3.6 27B Coding, “partly in system memory” on the big ones, “not an agent” on models without tools',
       '03-pulling': 'Downloading a model: the bar, 7.1 of 16.5 GB, speed and time left',
       '04-ready':
-        'Ready: the server on port 11435 holds the model in video memory, measured 61.4 tok/s, “Used by agents”',
+        'Ready: the server on port 11435, “Where to compute” set to the video card, the model fully on it, measured 61.4 tok/s, “Used by agents”',
       '05-agents':
-        'Agents on the local model, “Back to the cloud”, Qwen Code and the kit choice for each CLI',
-    },
-    chat: {
-      '01-hint':
-        'Under the chat field: which model runs on this card and the “Download and connect” button',
-      '02-busy': 'Download started from the chat: agents switch on their own when it finishes',
+        'Agents on the local model, “Back to the cloud”, the “Claude Code on this model” checkbox off, Qwen Code and the kit',
     },
   },
 

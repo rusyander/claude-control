@@ -26,6 +26,7 @@ interface ModelRowProps {
 const FIT_TONE: Record<CatalogRow['fit']['level'], BadgeTone> = {
   gpu: 'success',
   partial: 'warning',
+  cpu: 'warning',
   none: 'neutral',
 };
 
@@ -47,10 +48,19 @@ export function ModelRow({
   onCancel,
 }: ModelRowProps) {
   const { t } = useTranslation();
-  const { model, fit, installed, job } = row;
+  const { model, fit, installed, job, benchOn } = row;
   const running = job?.state === 'running';
   const usable = fit.level !== 'none';
   const [low, high] = fit.tokensPerSec;
+  const tokensPerSec = installed?.bench?.tokensPerSec;
+  let measured = '';
+  if (tokensPerSec !== undefined)
+    measured = benchOn
+      ? t('localModels.catalog.measuredOn', {
+          value: tokensPerSec,
+          where: t(`localModels.catalog.measuredWhere.${benchOn}`),
+        })
+      : t('localModels.catalog.measured', { value: tokensPerSec });
 
   return (
     <div className={styles.modelRow}>
@@ -79,9 +89,7 @@ export function ModelRow({
             usable && high > 0
               ? `${t('localModels.catalog.speed', { low, high })} (${t('localModels.catalog.speedEstimate')})`
               : '',
-            installed?.bench
-              ? t('localModels.catalog.measured', { value: installed.bench.tokensPerSec })
-              : '',
+            measured,
           ]
             .filter(Boolean)
             // Перенос — только между частями: внутри «61.4 ток/с» косая черта

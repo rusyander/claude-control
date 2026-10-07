@@ -128,6 +128,20 @@ export function runPlanView(
     lines.push({ text: words.platformNoEffort(routed.title), warn: false });
   }
 
+  // Claude уведён на локальную модель: ответит она — шапка называет её, а не «Opus».
+  const local = routed ? undefined : plan?.local;
+  if (local) {
+    lines.push({ text: words.localCaption(local.title), warn: false });
+    return {
+      locked: {
+        model: local.title,
+        effort: chosen.effort || words.modelDefault,
+        hint: words.localLocked(local.title),
+      },
+      lines,
+    };
+  }
+
   if (!routed || !choice) return { lines };
   return {
     locked: {

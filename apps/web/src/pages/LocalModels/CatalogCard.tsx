@@ -1,6 +1,10 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { InstalledModel, LocalModelsInfo } from '@agentdeck/contracts/local-models';
+import type {
+  InstalledModel,
+  LocalModelsInfo,
+  ModelBench,
+} from '@agentdeck/contracts/local-models';
 import { Card } from '@shared/ui/card';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
@@ -10,6 +14,7 @@ import { ConfirmDialog } from '@shared/ui/confirm-dialog';
 import { toast } from '@shared/lib/toast';
 import { formatDate } from '@shared/lib/format';
 import {
+  benchElsewhere,
   catalogRows,
   foreignInstalled,
   toGb,
@@ -38,6 +43,15 @@ export function CatalogCard({ info }: CatalogCardProps) {
   const cancel = useCancelLocalJob();
   const [toRemove, setToRemove] = useState<InstalledModel | undefined>(undefined);
   const rows = catalogRows(info);
+  const measuredText = (bench: ModelBench): string => {
+    const where = benchElsewhere(bench, info.device);
+    return where
+      ? t('localModels.catalog.measuredOn', {
+          value: bench.tokensPerSec,
+          where: t(`localModels.catalog.measuredWhere.${where}`),
+        })
+      : t('localModels.catalog.measured', { value: bench.tokensPerSec });
+  };
   const foreign = foreignInstalled(info);
   const canRun = info.runtime.source !== 'none';
   const inUse = (tag: string): boolean => info.connect.active && info.connect.model === tag;
@@ -103,9 +117,7 @@ export function CatalogCard({ info }: CatalogCardProps) {
                   <Typography variant="caption" color="muted">
                     {[
                       t('localModels.catalog.size', { size: toGb(model.sizeBytes) }),
-                      model.bench
-                        ? t('localModels.catalog.measured', { value: model.bench.tokensPerSec })
-                        : '',
+                      model.bench ? measuredText(model.bench) : '',
                     ]
                       .filter(Boolean)
                       .join(' · ')}

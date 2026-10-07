@@ -76,7 +76,9 @@ export const kitEn: typeof kitRu = {
       '«Panel kit only» while Qwen Code runs on a local model. Qwen Code has no per-launch layer, ' +
       'so it receives its own home directory: the rules in QWEN.md, the skills, commands, ' +
       'subagents and hooks as a kit extension. «Both» cannot be assembled without touching ' +
-      '`~/.qwen`.',
+      '`~/.qwen`. The kit hooks know the run is local: the guard lets a single subagent through ' +
+      'without asking, since on your own card it spends no subscription limit; a fan-out of many ' +
+      'agents still asks.',
     cliCodex: 'Codex',
     cliCodexText:
       '«Yours only» and «Yours and the panel kit». Rules and skills get through: the rules via ' +

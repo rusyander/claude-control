@@ -127,6 +127,8 @@ export const ROUTE_LEDGER: RouteLedger = {
   'POST /api/local-models/bench': 'human:consent',
   'POST /api/local-models/connect': 'human:consent',
   'POST /api/local-models/disconnect': 'human:consent',
+  'PUT /api/local-models/device': 'human:consent',
+  'PUT /api/local-models/claude': 'human:consent',
   // kit-routes.ts (В2): набор панели живёт в сторе панели, не в ~/.claude — чтение и правка копии «моё» пока пробел агента.
   'GET /api/kit': 'action:kit_status',
   'GET /api/kit/item': 'gap:P3',

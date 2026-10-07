@@ -140,6 +140,10 @@ export const en: Dictionary = {
     platformLocked: (title: string) =>
       `This chat goes through the contour “${title}”: it sets the model and depth. Change it in the panel's “Contour” section or return to the default provider.`,
     platformModelNone: 'contour model',
+    localLocked: (title: string) =>
+      `Claude Code is switched to the local model "${title}": it answers whatever model you pick. Turn it off in the panel's Local models section.`,
+    localCaption: (title: string) =>
+      `The local model ${title} answers — Claude Code is switched to it`,
     platformEffortOff: 'not sent',
     platformRefused: (title: string, reason: string, fix: string) =>
       `The contour “${title}” is required, but ${reason}: the message will be refused — it goes neither to the contour nor to the vendor cloud. ${fix}`,

@@ -211,7 +211,9 @@ export const platformEn: typeof platformRu = {
       'then a dash with a reason, and a chat through a required contour refuses, naming the ' +
       'security.auth.selectedType setting. The same goes for Kimi Code with ' +
       '[secondary_model] and Goose with GOOSE_LEAD_PROVIDER: part of their run would go ' +
-      'past the contour.',
+      'past the contour. So does Claude Code itself while the “Claude Code on this model” ' +
+      'checkbox is on in “Local models”: its settings.json beats the run environment, so any ' +
+      'other contour refuses, naming that setting.',
     screenJournal: 'Apply journal',
     screenJournalText:
       'One entry is one target, with its date and its own rollback button. A rollback removes ' +
@@ -471,7 +473,9 @@ export const platformEn: typeof platformRu = {
       'back once the contour is turned off. The waiting caption names the same model ' +
       '(“Qwen/Qwen3.8-27B-FP8 is thinking”), and the contour prompt tells the model who it is ' +
       'and which contour the request goes through: without that line the model assembles ' +
-      'itself from the Claude Code environment and calls itself Claude.',
+      'itself from the Claude Code environment and calls itself Claude. The model pick is ' +
+      'locked the same way when Claude Code itself is switched to a local model («Local ' +
+      'models»): that model answers, and the header names it.',
     modelsColumn: 'On the card',
     modelsMeaningColumn: 'What it means',
     modelsDefault: 'The contour’s model',

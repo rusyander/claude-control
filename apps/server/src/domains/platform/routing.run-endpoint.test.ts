@@ -10,6 +10,7 @@ import { gooseConfigDir, kimiCodeHome } from '../../providers/catalog/config-dir
 import { writePlatform, writeToken } from './store.ts';
 import {
   describeRunPlan,
+  localClaudeRun,
   listConsumerOptions,
   resolveRunRoute,
   type PlatformRoutingDeps,
@@ -274,5 +275,81 @@ describe('модель — только окружением', () => {
       // Имя флагом — псевдоним из конфига человека, а не модель контура.
       expect(args?.join(' ')).not.toContain('contour-model-x');
     }
+  });
+});
+
+describe('Claude, уведённый settings.json мимо контура (07.10.2026)', () => {
+  // `env` из settings.json перекрывает окружение прогона (замер на claude 2.1.286):
+  // адрес контура в окружении тогда молча не действует.
+  const SETTING = 'settings.json → env.ANTHROPIC_BASE_URL';
+  const withRedirect = (platformId: string): PlatformRoutingDeps => ({
+    ...deps,
+    claudeSettingsRoute: () => ({ setting: SETTING, platformId }),
+  });
+
+  it('обязательный чужой контур — отказ с именем настройки', () => {
+    connect({ ...PLATFORM, consumers: ['chat'] });
+    const decision = resolveRunRoute(withRedirect('local-ollama'), 'chat');
+    expect(decision).toMatchObject({
+      routed: false,
+      reason: 'cli_config_bypass',
+      setting: SETTING,
+    });
+    expect(!decision.routed && decision.refusal).toContain(SETTING);
+  });
+
+  it('«по возможности» — мимо контура, без отказа', () => {
+    connect({ ...PLATFORM, consumers: ['chat'], mode: 'best-effort' });
+    expect(resolveRunRoute(withRedirect('local-ollama'), 'chat')).toEqual({
+      routed: false,
+      reason: 'cli_config_bypass',
+      setting: SETTING,
+    });
+  });
+
+  it('контур, ведущий туда же, куда настройка, — маршрут есть; чужому CLI настройка Claude не мешает', () => {
+    connect({ ...PLATFORM, consumers: ['chat', 'foreign:kimi'] });
+    expect(resolveRunRoute(withRedirect(PLATFORM.id), 'chat').routed).toBe(true);
+    expect(resolveRunRoute(withRedirect('local-ollama'), 'foreign:kimi').routed).toBe(true);
+  });
+
+  it('без настройки — маршрут как был', () => {
+    connect({ ...PLATFORM, consumers: ['chat'] });
+    expect(resolveRunRoute(deps, 'chat').routed).toBe(true);
+  });
+});
+
+describe('шапка чата при Claude, уведённом на локальную модель', () => {
+  const LOCAL = { model: 'qwen3.6:27b-coding', title: 'Qwen3.6 27B Coding' };
+  const withLocal = (platformId: string): PlatformRoutingDeps => ({
+    ...deps,
+    claudeSettingsRoute: () => ({
+      setting: 'settings.json → env.ANTHROPIC_BASE_URL',
+      platformId,
+      ...LOCAL,
+    }),
+  });
+
+  it('контура нет — план называет локальную модель для прогонов Claude, но не для чужого CLI', () => {
+    const plan = describeRunPlan(withLocal('local-ollama'), 'chat');
+    expect(plan).toMatchObject({ routed: false, reason: 'no_active_platform', local: LOCAL });
+    expect(describeRunPlan(withLocal('local-ollama'), 'foreign:kimi').local).toBeUndefined();
+    expect(describeRunPlan(deps, 'chat').local).toBeUndefined();
+  });
+
+  it('«по возможности» мимо чужого контура — тоже локальная; обязательный — отказ, не локальная', () => {
+    connect({ ...PLATFORM, consumers: ['chat'], mode: 'best-effort' });
+    expect(describeRunPlan(withLocal('local-ollama'), 'chat').local).toEqual(LOCAL);
+    connect({ ...PLATFORM, consumers: ['chat'] });
+    const refused = describeRunPlan(withLocal('local-ollama'), 'chat');
+    expect(refused.refused).toBe(true);
+    expect(refused.local).toBeUndefined();
+  });
+
+  it('контур, ведущий туда же, ведёт сам — локальной подписи нет', () => {
+    connect({ ...PLATFORM, consumers: ['chat'] });
+    const decision = resolveRunRoute(withLocal(PLATFORM.id), 'chat');
+    expect(decision.routed).toBe(true);
+    expect(localClaudeRun(withLocal(PLATFORM.id), 'chat', decision)).toBeUndefined();
   });
 });

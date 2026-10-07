@@ -29,6 +29,24 @@ const texts = (view: ReturnType<typeof runPlanView>): string[] =>
   view.lines.map((line) => line.text);
 
 describe('runPlanView', () => {
+  it('Claude уведён на локальную модель — выбор заперт её именем, а не «Opus»', () => {
+    const view = runPlanView(
+      plan({
+        routed: false,
+        title: '',
+        local: { model: 'qwen3.6:27b-coding', title: 'Qwen3.6 27B Coding' },
+      }),
+      { model: 'claude-opus-5-5', effort: 'high' },
+      words,
+    );
+    expect(view.locked).toEqual({
+      model: 'Qwen3.6 27B Coding',
+      effort: 'high',
+      hint: words.localLocked('Qwen3.6 27B Coding'),
+    });
+    expect(texts(view)).toEqual([words.localCaption('Qwen3.6 27B Coding')]);
+  });
+
   it('молчит и не запирает выбор, когда контур прогон не ведёт', () => {
     const view = runPlanView(
       plan({ routed: false, title: '' }),

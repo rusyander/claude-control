@@ -14,7 +14,9 @@ import {
 } from 'node:fs';
 import { delimiter, join } from 'node:path';
 import { pipeline } from 'node:stream/promises';
-import { createZstdDecompress } from 'node:zlib';
+// Пространством имён, а не именованным импортом: `createZstdDecompress` есть с Node 22.15,
+// а на 22.6–22.14 именованный импорт ронял загрузку всего сервера на любой системе.
+import * as zlib from 'node:zlib';
 import type { HardwareGpu, RuntimeSource } from '@agentdeck/contracts/local-models';
 import { localError } from './errors.ts';
 import type { JobHandle } from './jobs.ts';
@@ -253,13 +255,20 @@ const run = (cmd: string, args: string[]): Promise<void> =>
 /**
  * Распаковать системным `tar`: он есть везде — на Windows 10+ это bsdtar,
  * который понимает и zip. `.tar.zst` сначала разжимается своим zlib (Node 22.15+):
- * GNU tar без программы zstd его не откроет.
+ * GNU tar без программы zstd его не откроет. На Node постарше — `tar --zstd`: ему нужна
+ * программа zstd в системе.
  */
 export async function extractArchive(archive: string, dest: string): Promise<void> {
   mkdirSync(dest, { recursive: true });
   if (archive.endsWith('.tar.zst')) {
+    const decompress = (zlib as { createZstdDecompress?: () => NodeJS.ReadWriteStream })
+      .createZstdDecompress;
+    if (!decompress) {
+      await run('tar', ['--zstd', '-xf', archive, '-C', dest]);
+      return;
+    }
     const tar = archive.slice(0, -'.zst'.length);
-    await pipeline(createReadStream(archive), createZstdDecompress(), createWriteStream(tar));
+    await pipeline(createReadStream(archive), decompress(), createWriteStream(tar));
     try {
       await run('tar', ['-xf', tar, '-C', dest]);
     } finally {

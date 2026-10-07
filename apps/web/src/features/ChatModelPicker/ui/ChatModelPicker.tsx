@@ -83,6 +83,8 @@ export function ChatModelPicker({
   // 14.09.2026). Сохранённый выбор чата не стирается — выключенный контур
   // возвращает его как был. Один пункт в заблокированном select, а не текст:
   // место и порядок в шапке остаются теми же, и диктор читает то же поле.
+  // Claude уведён на локальную модель: ответит она, и шапка говорит это, а не «Opus».
+  const local = routed ? undefined : plan.data?.local;
   const locked = routed && choice;
   const lockedTitle = routed ? t('chat.platformLocked', { title: routed.title }) : undefined;
   const lockedModel = choice?.model || t('chat.platformModelNone');
@@ -118,19 +120,31 @@ export function ChatModelPicker({
 
         {!locked && (
           <>
-            <select
-              className={styles.select}
-              value={model}
-              onChange={(event) => onModelChange(event.target.value)}
-              aria-label={t('chat.model')}
-              title={t('chat.modelHint')}
-            >
-              {modelOptions.map((option) => (
-                <option key={option.value || 'default'} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+            {local ? (
+              <select
+                className={styles.select}
+                value="local"
+                disabled
+                aria-label={t('chat.model')}
+                title={t('chat.localLocked', { title: local.title })}
+              >
+                <option value="local">{local.title}</option>
+              </select>
+            ) : (
+              <select
+                className={styles.select}
+                value={model}
+                onChange={(event) => onModelChange(event.target.value)}
+                aria-label={t('chat.model')}
+                title={t('chat.modelHint')}
+              >
+                {modelOptions.map((option) => (
+                  <option key={option.value || 'default'} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            )}
 
             <select
               className={styles.select}
@@ -163,6 +177,12 @@ export function ChatModelPicker({
           aria-live="polite"
         >
           {t(caption.key, caption.params)}
+        </Typography>
+      )}
+
+      {local && (
+        <Typography variant="caption" color="muted" as="span" role="status" aria-live="polite">
+          {t('chat.localCaption', { title: local.title })}
         </Typography>
       )}
 

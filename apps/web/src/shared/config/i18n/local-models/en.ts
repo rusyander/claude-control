@@ -13,6 +13,8 @@ export const localModelsEn: typeof localModelsRu = {
       'No GPU detected. Models will run on the CPU, slowly; the estimates below are for system memory.',
     vram: 'Video memory: {{total}} GB, {{free}} GB free',
     vramNoFree: 'Video memory: {{total}} GB',
+    vramPageable:
+      'Video memory: {{total}} GB, {{free}} GB free. Windows desktop programs give way to a model up to {{usable}} GB.',
     unified: 'Apple unified memory: about {{usable}} GB available to a model',
     bandwidth: 'Memory bandwidth: {{value}} GB/s',
     bandwidthGuess: 'Memory bandwidth: ~{{value}} GB/s (a guess, this card is not in the table)',
@@ -37,7 +39,9 @@ export const localModelsEn: typeof localModelsRu = {
     running: 'Running on port {{port}}',
     stopped: 'Stopped',
     context: 'Context: {{value}} tokens',
-    loaded: 'In memory: {{tag}}, {{size}} GB of video memory',
+    contextQ4:
+      'Context cache compressed to q4_0: that is how a longer context fits entirely on the GPU. Quality is slightly below q8_0, speed is nearly the same.',
+    loaded: 'In memory: {{tag}}, {{size}} GB, {{where}}',
     nothingLoaded: 'No model is loaded into memory right now.',
     start: 'Start',
     stop: 'Stop and free memory',
@@ -58,6 +62,7 @@ export const localModelsEn: typeof localModelsRu = {
     fit: {
       gpu: 'Fits the GPU',
       partial: 'Partly in system memory, slow',
+      cpu: 'On the processor, fully in RAM',
       none: 'Does not fit',
     },
     reason: {
@@ -65,6 +70,7 @@ export const localModelsEn: typeof localModelsRu = {
       'no-tools': 'Not an agent: it never calls tools; fine for questions and completion',
       'small-context': 'Fits only with a short context, too little for an agent',
       partial: 'Too slow for an agent',
+      'cpu-slow': 'Too slow for an agent on the processor — fine for questions',
     },
     size: 'Size {{size}} GB',
     contextLine: 'Context {{value}}K',
@@ -72,6 +78,8 @@ export const localModelsEn: typeof localModelsRu = {
     speed: '≈{{low}}\u2060–\u2060{{high}}\u00a0tok/\u2060s',
     speedEstimate: 'estimate',
     measured: 'Measured: {{value}}\u00a0tok/\u2060s',
+    measuredOn: 'Measured on the {{where}}: {{value}}\u00a0tok/\u2060s',
+    measuredWhere: { gpu: 'video card', cpu: 'processor' },
     download: 'Download',
     import: 'Take from system Ollama',
     importHint:
@@ -117,7 +125,7 @@ export const localModelsEn: typeof localModelsRu = {
   },
   connect: {
     title: 'Agents on the local model',
-    what: 'Claude chats, groups and tests go to the local model through the local model contour. Nothing is written to ~/.claude; one button brings the cloud back.',
+    what: 'Claude chats, groups and tests go to the local model through the local model contour. The contour writes nothing to ~/.claude: “Back to the cloud” restores everything with one button.',
     active: 'Agents are running on {{model}} now.',
     inactive: 'Agents are running in the cloud now.',
     otherActive:
@@ -125,6 +133,35 @@ export const localModelsEn: typeof localModelsRu = {
     disconnect: 'Back to the cloud',
     connected: 'Agents switched to {{model}}',
     disconnected: 'Agents are back in the cloud',
+  },
+  device: {
+    title: 'Where to compute',
+    what: 'The video card by default: tens of times faster. The processor — when the card is busy with something else or the model does not fit; the model then sits fully in RAM.',
+    whatApple:
+      'By default the chip GPU (Metal) on unified memory: the fastest option. The processor on a Mac is slower and saves no memory — the memory is shared.',
+    gpu: 'Video card',
+    cpu: 'Processor',
+    switched: 'Model server restarted: computing on {{device}}',
+    onGpu: 'fully on the video card',
+    onCpu: 'on the processor',
+    split: '{{percent}}% on the video card, the rest on the processor',
+    cpuIgnored:
+      'The processor is selected, but the server put {{size}} GB into video memory: the choice has no effect on this system (this happens with Metal on a Mac).',
+    spilled:
+      'The model did not fit into video memory entirely — part of it runs on the processor, which is slow. Free the card or take a smaller model.',
+  },
+  claude: {
+    toggle: 'Claude Code on this model',
+    what: 'Turn it on and Claude Code itself (terminal, editor chat, panel chats) goes to the local model: the panel writes it into Claude settings.json. Turn it off and the usual Claude is back, previous settings intact. Off by default.',
+    on: 'On: Claude Code runs on {{model}}. New sessions pick it up at once; start an open session again.',
+    off: 'Off: Claude Code works as usual.',
+    noModel: 'Download a model first — there is nothing to switch to yet.',
+    enabled: 'Claude Code switched to {{model}}',
+    disabled: 'Claude Code is back to normal',
+    drift:
+      'Changed by hand after switching on: {{vars}}. Switching off leaves these variables alone — restore them yourself if needed.',
+    contour:
+      'While on, Claude runs through another contour are refused: settings.json sends them here, past the contour.',
   },
   qwen: {
     title: 'Qwen Code',

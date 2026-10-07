@@ -13,6 +13,8 @@ export {
   useDisconnectLocal,
   useInstallQwenCode,
   useCancelLocalJob,
+  useSetLocalDevice,
+  useSetLocalClaude,
 } from './api/LocalModelsApi';
 export {
   toGb,
@@ -23,6 +25,9 @@ export {
   chatHint,
   jobShare,
   jobEtaSec,
+  placementOf,
+  claudeModelOf,
+  benchElsewhere,
   type CatalogRow,
   type ChatHint,
 } from './model/view';

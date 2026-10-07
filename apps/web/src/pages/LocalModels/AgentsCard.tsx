@@ -15,6 +15,7 @@ import {
   useDisconnectLocal,
   useInstallQwenCode,
 } from '@entities/LocalModels';
+import { ClaudeSwitch } from './ClaudeSwitch';
 
 interface AgentsCardProps {
   info: LocalModelsInfo;
@@ -73,6 +74,8 @@ export function AgentsCard({ info }: AgentsCardProps) {
             </Typography>
           ) : null}
         </Stack>
+
+        <ClaudeSwitch info={info} />
 
         <Stack gap="var(--spacing-xs)">
           <Typography variant="heading-sm" as="h3">

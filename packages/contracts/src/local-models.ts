@@ -93,6 +93,11 @@ export interface HardwareGpu {
   bandwidthFrom: 'table' | 'guess';
   /** Объединённая память Apple: видеокарта делит её с системой. */
   unified?: boolean;
+  /**
+   * Чужая видеопамять вытесняется по требованию (Windows, WDDM): занятое
+   * программами рабочего стола — не жёсткий предел для модели.
+   */
+  pageable?: boolean;
 }
 
 export interface HardwareInfo {
@@ -109,10 +114,44 @@ export interface HardwareInfo {
 
 /** Сколько памяти держит рабочий стол сверх модели — когда драйвер свободное не сказал. */
 export const DESKTOP_RESERVE_GB = 1;
-/** Служебное сверх весов и кеша: буферы вычислений, проектор картинок. */
-export const RUNTIME_OVERHEAD_GB = 0.9;
+/**
+ * Сколько рабочий стол Windows удерживает на карте, когда модели нужна память.
+ * Замер 08.10 (4090): Figma, Chrome, Docker и прочие держали 4,1 ГБ, подбор по
+ * «свободно» давал 27B лишь 16K; сервер на 131072 с q4_0 встал на карту целиком
+ * (120 ток/с), рабочий стол ужался до ~2,4 ГБ.
+ */
+export const PAGEABLE_DESKTOP_GB = 2.4;
+/**
+ * Служебное сверх весов и кеша, занятое на деле: контекст CUDA, буферы
+ * вычислений, проектор картинок. Замер 07.10 (4090, qwen3.6:27b-coding, 98304):
+ * карта занята на 21,1 ГиБ больше фона — на 1,4 больше весов и кеша.
+ */
+export const RUNTIME_OVERHEAD_GB = 1.4;
+/**
+ * Свободное, которое Ollama оставляет на карте сам: модель, которой без него
+ * впритык, он молча делит с процессором. С подбором «впритык» при 22,3 ГиБ
+ * свободных сервер поднялся с 131072, и Ollama положил на карту 15,1 из 17,6 ГиБ —
+ * 4,4 ток/с вместо 107. Не занято, поэтому в зачёт памяти своего сервера не входит.
+ */
+export const OLLAMA_GPU_RESERVE_GB = 0.6;
 /** Кеш ключей и значений в q8_0 (OLLAMA_KV_CACHE_TYPE) занимает ~0.53 от f16. */
 export const KV_Q8_FACTOR = 0.53;
+/**
+ * Кеш в q4_0 — по замеру, а не по разрядности: 4,5 бита из 16 дали бы 0,28, но
+ * 27B при 131072 заняла на карте 20,75 ГиБ сверх фона (07.10), то есть ~0,35; берётся
+ * 0,36, чтобы оценка не оказалась ниже замера.
+ */
+export const KV_Q4_FACTOR = 0.36;
+/** Тип кеша контекста на сервере: q8_0 почти без потерь, q4_0 — вдвое меньше и чуть хуже. */
+export const kvCacheTypes = ['q8_0', 'q4_0'] as const;
+export type KvCacheType = (typeof kvCacheTypes)[number];
+const KV_FACTOR: Record<KvCacheType, number> = { q8_0: KV_Q8_FACTOR, q4_0: KV_Q4_FACTOR };
+/**
+ * Контекст, к которому стремится подбор (владелец 06.10: агенту на
+ * qwen3.6:27b-coding — не меньше 128K). Кеш сжимается до q4_0, когда это даёт
+ * контекст длиннее, чем q8_0; если q8_0 и так дотягивает — остаётся q8_0.
+ */
+export const TARGET_CONTEXT = 131_072;
 /**
  * Наименьший контекст, с которым модель годится агенту: системный промпт Claude
  * Code с описанием инструментов сам занимает около 20 тысяч токенов.
@@ -126,7 +165,15 @@ export const DENSE_EFFICIENCY = 0.7;
 export const MOE_EFFICIENCY = 0.35;
 export const MTP_SPEEDUP = 1.6;
 
-export type ModelFitLevel = 'gpu' | 'partial' | 'none';
+/** `cpu` — модель целиком в оперативной памяти: выбран счёт на процессоре или карты нет. */
+export type ModelFitLevel = 'gpu' | 'partial' | 'cpu' | 'none';
+
+/**
+ * Скорость, ниже которой агенту на процессоре не дождаться ответа, ток/с. Агент
+ * пишет тысячи токенов на шаг: при 3 ток/с один шаг — четверть часа. Плотные
+ * 27B на процессоре дают 2–4, смеси экспертов с 3B активных — десятки.
+ */
+export const CPU_AGENT_MIN_TPS = 8;
 
 export interface ModelFit {
   tag: string;
@@ -142,15 +189,21 @@ export interface ModelFit {
   /** Годится ли агенту: зовёт инструменты и влезает с контекстом ≥ AGENT_MIN_CONTEXT. */
   agentReady: boolean;
   /** Почему не годится — код причины для словаря экрана. */
-  reason?: 'too-big' | 'no-tools' | 'small-context' | 'partial';
+  reason?: 'too-big' | 'no-tools' | 'small-context' | 'partial' | 'cpu-slow';
+  /** Тип кеша контекста, с которым сервер поднимется под эту модель; нет — q8_0. */
+  kvCache?: KvCacheType;
 }
 
 const GB = 1024 ** 3;
 
 /** Память под модель с контекстом `context`, ГБ. */
-export function modelNeedGb(model: CatalogModel, context: number): number {
+export function modelNeedGb(
+  model: CatalogModel,
+  context: number,
+  kvCache: KvCacheType = 'q8_0',
+): number {
   const weights = model.sizeBytes / GB;
-  const kv = (model.kvBytesPerToken * context * KV_Q8_FACTOR) / GB;
+  const kv = (model.kvBytesPerToken * context * KV_FACTOR[kvCache]) / GB;
   return weights + kv + RUNTIME_OVERHEAD_GB;
 }
 
@@ -183,36 +236,133 @@ export function estimateTokensPerSec(
   const gpuSeconds = (perToken * (1 - share)) / (gpu.bandwidthGbs * efficiency);
   const cpuSeconds = (perToken * share) / (RAM_BANDWIDTH_GBS * efficiency);
   let rate = 1 / (gpuSeconds + cpuSeconds);
-  if (model.mtp && share === 0) rate *= MTP_SPEEDUP;
+  // Предсказание нескольких токенов ускоряет, когда модель целиком на одном
+  // устройстве — и на процессоре тоже (замер 07.10, 7950X: 3,9–8,9 ток/с при
+  // оценке без него 2–3). Разделённая между картой и процессором — без поправки.
+  if (model.mtp && (share === 0 || share === 1)) rate *= MTP_SPEEDUP;
   return [round(rate * 0.75), round(rate * 1.15)];
 }
 
 /** Память, доступная модели на карте: свободная, если известна, иначе вся минус стол. */
-export function usableVramGb(gpu: Pick<HardwareGpu, 'vramGb' | 'freeGb' | 'unified'>): number {
+export function usableVramGb(
+  gpu: Pick<HardwareGpu, 'vramGb' | 'freeGb' | 'unified' | 'pageable'>,
+): number {
   // Объединённой памятью Apple видеокарта владеет не целиком: macOS по умолчанию
   // отдаёт ей около трёх четвертей.
   if (gpu.unified) return gpu.vramGb * 0.72;
-  if (gpu.freeGb !== undefined) return gpu.freeGb;
+  if (gpu.freeGb !== undefined) {
+    return gpu.pageable ? Math.max(gpu.freeGb, gpu.vramGb - PAGEABLE_DESKTOP_GB) : gpu.freeGb;
+  }
   return Math.max(0, gpu.vramGb - DESKTOP_RESERVE_GB);
 }
 
-/** Как модель ляжет на эту карту и при этой оперативной памяти. */
+/**
+ * Видеопамять карты с учётом нашего же сервера: модель, которую он держит
+ * загруженной, освободится при его перезапуске, значит, для подбора она свободна.
+ * Без этого загруженная 27B «съедала» свою же память: подбор видел 0,7 ГБ
+ * свободных, писал «частично в оперативной памяти, 2–3 ток/с» при замере 98, а
+ * сервер при подключении поднимался с урезанным контекстом.
+ */
+export function withOwnHeldVram(gpu: HardwareGpu, heldBytes: number): HardwareGpu {
+  if (gpu.freeGb === undefined || gpu.unified || heldBytes <= 0) return gpu;
+  const free = Math.min(gpu.vramGb, gpu.freeGb + heldBytes / GB);
+  return { ...gpu, freeGb: Math.round(free * 10) / 10 };
+}
+
+/**
+ * Сколько видеопамяти держит наш сервер, байт. `size_vram` Ollama меньше правды:
+ * контекст CUDA и рабочие буферы исполнителя в него не входят (замер 07.10:
+ * `size_vram` 16,4 ГиБ, карта занята на 21,1 ГиБ больше, чем без модели). Для
+ * модели каталога целиком на карте берётся наша же оценка при контексте сервера
+ * — та, по которой сервер и поднимался; разделённая с процессором — как есть.
+ */
+export function heldVramBytes(
+  loaded: { tag: string; vramBytes: number; sizeBytes: number }[],
+  catalog: CatalogModel[],
+  context: number,
+  kvCache: KvCacheType = 'q8_0',
+): number {
+  let held = 0;
+  for (const item of loaded) {
+    const model = catalog.find((entry) => entry.tag === item.tag);
+    const whole = item.sizeBytes > 0 && item.vramBytes >= item.sizeBytes * 0.99;
+    const estimate = model && whole && context > 0 ? modelNeedGb(model, context, kvCache) * GB : 0;
+    held += Math.max(item.vramBytes, estimate);
+  }
+  return held;
+}
+
+/** Память, которую модель может занять в оперативной, оставив системе четверть. */
+function ramForModelGb(ramGb: number): number {
+  return Math.max(0, ramGb * 0.75 - 4);
+}
+
+/** Модель целиком в оперативной памяти: самый длинный контекст, который туда ляжет. */
+function fitOnCpu(model: CatalogModel, ramGb: number): ModelFit {
+  const ram = ramForModelGb(ramGb);
+  const steps = CONTEXT_STEPS.filter((step) => step <= model.contextMax);
+  const context = steps.find((step) => modelNeedGb(model, step) <= ram);
+  if (context === undefined) {
+    const smallest = Math.min(AGENT_MIN_CONTEXT, model.contextMax);
+    const need = modelNeedGb(model, smallest);
+    return {
+      tag: model.tag,
+      level: 'none',
+      context: smallest,
+      needGb: need,
+      offloadGb: need,
+      tokensPerSec: [0, 0],
+      agentReady: false,
+      reason: 'too-big',
+    };
+  }
+  const need = modelNeedGb(model, context);
+  const tokensPerSec = estimateTokensPerSec(model, { bandwidthGbs: RAM_BANDWIDTH_GBS }, need);
+  const fast = tokensPerSec[0] >= CPU_AGENT_MIN_TPS;
+  const agentReady = model.agentic && context >= AGENT_MIN_CONTEXT && fast;
+  const reason = !model.agentic ? 'no-tools' : !fast ? 'cpu-slow' : 'small-context';
+  return {
+    tag: model.tag,
+    level: 'cpu',
+    context,
+    needGb: need,
+    offloadGb: need,
+    tokensPerSec,
+    agentReady,
+    ...(agentReady ? {} : { reason }),
+  };
+}
+
+/**
+ * Как модель ляжет на эту карту и при этой оперативной памяти. Карты нет (или
+ * выбран счёт на процессоре — `deviceGpu`) — модель целиком в оперативной.
+ */
 export function fitModel(
   model: CatalogModel,
   gpu: HardwareGpu | undefined,
   ramGb: number,
 ): ModelFit {
-  const vram = gpu ? usableVramGb(gpu) : 0;
+  if (!gpu) return fitOnCpu(model, ramGb);
+  const vram = usableVramGb(gpu);
   const steps = CONTEXT_STEPS.filter((step) => step <= model.contextMax);
-  const onGpu = steps.find((step) => modelNeedGb(model, step) <= vram);
+  const fits = (context: number, kvCache: KvCacheType): boolean =>
+    modelNeedGb(model, context, kvCache) + OLLAMA_GPU_RESERVE_GB <= vram;
+  const onGpuQ8 = steps.find((step) => fits(step, 'q8_0'));
+  const onGpuQ4 = steps.find((step) => fits(step, 'q4_0'));
   const base = { tag: model.tag };
-  if (onGpu !== undefined && gpu) {
-    const agentReady = model.agentic && onGpu >= AGENT_MIN_CONTEXT;
+  if (onGpuQ4 !== undefined) {
+    // q4_0 — всякий раз, когда он даёт контекст длиннее q8_0 (владелец 08.10: 16K
+    // агенту мало, лучше чуть грубее кеш, чем обрезанный промпт).
+    const lift = onGpuQ8 === undefined || onGpuQ4 > onGpuQ8;
+    const context = lift ? onGpuQ4 : onGpuQ8;
+    const kvCache: KvCacheType = lift ? 'q4_0' : 'q8_0';
+    const agentReady = model.agentic && context >= AGENT_MIN_CONTEXT;
     return {
       ...base,
       level: 'gpu',
-      context: onGpu,
-      needGb: modelNeedGb(model, onGpu),
+      context,
+      kvCache,
+      needGb: modelNeedGb(model, context, kvCache),
       offloadGb: 0,
       tokensPerSec: estimateTokensPerSec(model, gpu),
       agentReady,
@@ -223,8 +373,8 @@ export function fitModel(
   // четверть памяти — иначе машина начнёт свопить и встанет вся.
   const context = Math.min(AGENT_MIN_CONTEXT, model.contextMax);
   const need = modelNeedGb(model, context);
-  const ramForModel = Math.max(0, ramGb * 0.75 - 4);
-  const offload = Math.max(0, need - vram);
+  const ramForModel = ramForModelGb(ramGb);
+  const offload = Math.max(0, need + OLLAMA_GPU_RESERVE_GB - vram);
   if (offload <= ramForModel && offload < need) {
     return {
       ...base,
@@ -232,11 +382,7 @@ export function fitModel(
       context,
       needGb: need,
       offloadGb: offload,
-      tokensPerSec: estimateTokensPerSec(
-        model,
-        gpu ?? { bandwidthGbs: RAM_BANDWIDTH_GBS },
-        offload,
-      ),
+      tokensPerSec: estimateTokensPerSec(model, gpu, offload),
       agentReady: false,
       reason: model.agentic ? 'partial' : 'no-tools',
     };
@@ -270,6 +416,25 @@ export function recommendModel(
   return undefined;
 }
 
+// ── Устройство счёта ──────────────────────────────────────────────────────
+
+/**
+ * Где считает модель. Умолчание — видеокарта (на Mac — Metal на объединённой
+ * памяти); процессор — по выбору человека: карта занята другим, драйвер капризит
+ * или модель в карту не влезает вовсе.
+ */
+export const localDevices = ['gpu', 'cpu'] as const;
+export type LocalDevice = (typeof localDevices)[number];
+export const localDeviceBodySchema = object({ device: zodEnum(localDevices) });
+
+/** Карта, на которую считать подбор: при счёте на процессоре — никакая. */
+export function deviceGpu(
+  hardware: Pick<HardwareInfo, 'gpus'>,
+  device: LocalDevice,
+): HardwareGpu | undefined {
+  return device === 'cpu' ? undefined : hardware.gpus[0];
+}
+
 // ── Ответ раздела ─────────────────────────────────────────────────────────
 
 /** Наименьшая версия Ollama, которую панель поднимает без предупреждения: её знает весь каталог. */
@@ -299,9 +464,13 @@ export interface LocalServerInfo {
   baseUrl: string;
   pid?: number;
   /** Модели, загруженные в память сейчас (`/api/ps`). */
-  loaded: { tag: string; vramBytes: number; until: string }[];
+  loaded: { tag: string; vramBytes: number; sizeBytes: number; until: string }[];
   /** Контекст, с которым поднят сервер. */
   context: number;
+  /** Тип кеша контекста запущенного сервера; не поднят — нет. */
+  kvCache?: KvCacheType;
+  /** Устройство, с которым поднят сервер; не поднят — выбранное. */
+  device: LocalDevice;
   error?: string;
 }
 
@@ -320,6 +489,8 @@ export interface ModelBench {
   promptTokensPerSec: number;
   measuredAt: string;
   gpu: string;
+  /** Где считал сервер при замере; у замеров до 07.10 нет — то была видеокарта. */
+  device?: LocalDevice;
 }
 
 export const localJobKinds = ['runtime', 'model', 'qwen-code'] as const;
@@ -379,6 +550,30 @@ export interface QwenCodeInfo {
   source: 'panel' | 'system' | 'none';
 }
 
+/**
+ * «Claude Code на локальной модели»: блок `env` в settings.json Claude, который
+ * уводит САМ Claude Code (терминал, расширение редактора, чаты панели) на сервер
+ * моделей. Выключено — прежние значения возвращены, как были.
+ */
+export interface LocalClaudeInfo {
+  on: boolean;
+  /** Модель, на которую уведён Claude; выключено — пусто. */
+  model: string;
+  /** Файл, куда пишется переключатель. */
+  settingsPath: string;
+  /** Переменные, которые переключатель ставит (и снимает). */
+  vars: string[];
+  /**
+   * Записанное панелью кто-то сменил руками после включения: такие переменные
+   * выключение не трогает, чтобы не стереть чужую правку.
+   */
+  drift: string[];
+}
+export const localClaudeBodySchema = object({
+  on: boolean(),
+  tag: string().min(1).max(200).optional(),
+});
+
 export interface LocalModelsInfo {
   root: string;
   hardware: HardwareInfo;
@@ -390,6 +585,9 @@ export interface LocalModelsInfo {
   importable: { tag: string; sizeBytes: number }[];
   jobs: LocalJob[];
   connect: LocalConnectInfo;
+  /** Выбранное устройство счёта (умолчание — видеокарта). */
+  device: LocalDevice;
+  claude: LocalClaudeInfo;
   qwenCode: QwenCodeInfo;
   kit: { claude: KitMode; qwen: KitMode; variant: 'standard' | 'local' };
   /** Сколько занимает весь каталог `.local-models`, байт. */

@@ -54,6 +54,7 @@ import { KitService } from '../domains/kit/service.ts';
 import { kitComposeRefusal } from '../domains/kit/codex.ts';
 import { codexHome } from '../providers/catalog/config-dirs.ts';
 import { LOCAL_PLATFORM_ID } from '../domains/local-models/connect.ts';
+import { CLAUDE_SWITCH_SETTING } from '../domains/local-models/claude-switch.ts';
 import { localPaths, readState as readLocalState } from '../domains/local-models/paths.ts';
 import { ProjectRunnerRegistry } from '../domains/project-runner.ts';
 import {
@@ -74,6 +75,7 @@ import { PlatformWatch } from '../domains/platform/watch.ts';
 import { summarizedInRun } from '../domains/platform/gateway/summarized-ledger.ts';
 import { ToolGateRegistry } from '../domains/portability/wire/tool-gate.ts';
 import {
+  localClaudeRun,
   resolveRunRoute,
   runRouteOf,
   type PlatformRoutingDeps,
@@ -225,6 +227,8 @@ export interface Runtime {
   runRoute: (origin: string) => PlatformRunRoute;
   /** Порт живого шлюза контуров; 0 — не поднят. */
   gatewayPort: () => number;
+  /** Куда уведён сам Claude настройкой settings.json — для шапки чата. */
+  claudeSettingsRoute: PlatformRoutingDeps['claudeSettingsRoute'];
   /** Погасить всё, что спавнит процессы. Идемпотентно. */
   shutdown: () => void;
 }
@@ -1061,10 +1065,26 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
    * слушателя — записанный в состоянии остался бы от прошлого запуска, и
    * прогон ушёл бы тому процессу, который занял порт после панели.
    */
+  // Корень приложения, а не каталог настроек: гигабайты моделей человек видит
+  // рядом с панелью и удаляет вместе с ней (решение владельца 05.10).
+  const localModels = createLocalModels({
+    appRoot: appRootDir(),
+    claude: { settingsPath: () => ctx.location.paths.settings, backupDir: () => ctx.backupDir },
+  });
+  // Включённому «Claude на локальной модели» нужен живой сервер с первого сеанса.
+  void localModels.resume().catch((error: unknown) => {
+    console.warn('local models: server for the Claude switch did not start', error);
+  });
   const platformRouting: PlatformRoutingDeps = {
     store: ctx.store,
     appDataDir: ctx.location.paths.appData,
     gatewayPort: () => (platformGateway.status().running ? platformGateway.status().port : 0),
+    claudeSettingsRoute: () => {
+      const model = localModels.claudeModel();
+      return model
+        ? { setting: CLAUDE_SWITCH_SETTING, platformId: LOCAL_PLATFORM_ID, ...model }
+        : undefined;
+    },
   };
   // Набор панели (В2) решается на КАЖДОМ старте, как и маршрут: режим, сменённый
   // на странице, действует со следующего сообщения. Едет и мимо контура —
@@ -1082,8 +1102,22 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   });
   const runRoute = (origin: string, asked = '', runTag = ''): PlatformRunRoute => {
     const decision = resolveRunRoute(platformRouting, origin, asked, runTag);
-    const route = runRouteOf(decision);
-    if (route.refusal) return route;
+    const routeOf = runRouteOf(decision);
+    if (routeOf.refusal) return routeOf;
+    // Claude уведён на локальную модель: выбор шапки («opus», «claude-opus-5-5»)
+    // уехал бы флагом `--model` в Ollama, а такой модели там нет.
+    const local = localClaudeRun(platformRouting, origin, decision);
+    const route: PlatformRunRoute = local
+      ? {
+          ...routeOf,
+          model: {
+            model: local.model,
+            asked,
+            source: 'local',
+            replaced: Boolean(asked) && asked !== local.model,
+          },
+        }
+      : routeOf;
     let extras: ReturnType<KitService['runExtras']>;
     try {
       extras = kit.runExtras({
@@ -1262,9 +1296,6 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   // Спавненные dev-серверы проектов, CLI чатов и прогоны тестов живут в памяти
   // процесса. Гасим их при выходе, чтобы дочерние процессы не осиротели и не
   // держали занятыми порты.
-  // Корень приложения, а не каталог настроек: гигабайты моделей человек видит
-  // рядом с панелью и удаляет вместе с ней (решение владельца 05.10).
-  const localModels = createLocalModels({ appRoot: appRootDir() });
   // Пути читаются на каждый вызов: каталог конфигурации меняется на лету.
   const globalLayer = createGlobalLayer({
     read: () => ({
@@ -1356,6 +1387,7 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     kit,
     runRoute: (origin) => runRoute(origin),
     gatewayPort: platformRouting.gatewayPort,
+    claudeSettingsRoute: platformRouting.claudeSettingsRoute,
     shutdown,
   };
 }

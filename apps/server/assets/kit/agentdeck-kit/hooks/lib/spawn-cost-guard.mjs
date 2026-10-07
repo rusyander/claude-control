@@ -51,6 +51,10 @@ export default function spawnCostGuard(input) {
 }
 
 function oneAgent(arg, input) {
+  // Local model run (AGENTDECK_KIT_VARIANT=local): nothing is billed and the CLI cannot pick a
+  // smaller model, so the question has no answer; headless it turned into a denial and stopped
+  // every subagent (live Qwen Code run 08.10). Workflow fan-outs still ask.
+  if ((process.env.AGENTDECK_KIT_VARIANT ?? '').trim() === 'local') return null;
   const model = String(arg.model ?? '');
   if (model && !TOP.test(model)) return null; // explicit cheaper model — nothing to warn about
   // Ticket pipeline review pass: both agents are named in the skill and granted with the ticket.

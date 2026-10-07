@@ -41,7 +41,7 @@ import {
   PLATFORM_MCP_ID,
 } from '../domains/platform/mcp-bridge.ts';
 import { embedTexts, EmbeddingError } from '../domains/platform/embeddings.ts';
-import { describeRunPlan } from '../domains/platform/routing.ts';
+import { describeRunPlan, type PlatformRoutingDeps } from '../domains/platform/routing.ts';
 import { driverOf } from '../domains/platform/drivers/index.ts';
 import { brokenExclusion } from '../domains/platform/rules-matrix.ts';
 import {
@@ -92,6 +92,8 @@ export function registerPlatformRoutes(
    * известен лишь при сборке, поэтому приходит извне.
    */
   selfBaseUrl = 'http://127.0.0.1:5178',
+  /** Куда уведён сам Claude настройкой settings.json — шапка чата говорит это. */
+  claudeSettingsRoute?: PlatformRoutingDeps['claudeSettingsRoute'],
 ): void {
   const appData = (): string => ctx.location.paths.appData;
 
@@ -207,6 +209,7 @@ export function registerPlatformRoutes(
         store: ctx.store,
         appDataDir: appData(),
         gatewayPort: () => (gateway.status().running ? gateway.status().port : 0),
+        ...(claudeSettingsRoute ? { claudeSettingsRoute } : {}),
       },
       request.params.consumer,
     ),

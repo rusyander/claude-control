@@ -17,6 +17,7 @@ import {
   useStartLocalServer,
   useStopLocalServer,
 } from '@entities/LocalModels';
+import { DeviceChoice } from './DeviceChoice';
 
 interface RuntimeCardProps {
   info: LocalModelsInfo;
@@ -149,19 +150,19 @@ export function RuntimeCard({ info }: RuntimeCardProps) {
                 {t('localModels.runtime.context', { value: server.context })}
               </Typography>
             ) : null}
+            {server.kvCache === 'q4_0' ? (
+              <Typography variant="caption" color="muted">
+                {t('localModels.runtime.contextQ4')}
+              </Typography>
+            ) : null}
             {server.loaded.length === 0 ? (
               <Typography variant="caption" color="muted">
                 {t('localModels.runtime.nothingLoaded')}
               </Typography>
-            ) : (
-              server.loaded.map((model) => (
-                <Typography key={model.tag} variant="caption" color="muted">
-                  {t('localModels.runtime.loaded', { tag: model.tag, size: toGb(model.vramBytes) })}
-                </Typography>
-              ))
-            )}
+            ) : null}
           </Stack>
         ) : null}
+        <DeviceChoice info={info} />
         <Typography variant="caption" color="muted">
           {[
             t('localModels.runtime.folder', { path: info.root }),

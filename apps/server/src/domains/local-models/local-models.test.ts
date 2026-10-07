@@ -15,7 +15,8 @@ import { benchOf, loadCatalog, pullPhase, pullProgress } from './service.ts';
 import { countFetches, npmCliPath } from './qwen-code.ts';
 import { assetsFor, compareVersions, parseSha256Sums, pickRuntime } from './runtime.ts';
 import { parseNvidiaSmi } from './hardware.ts';
-import { localPlatformSettings, LOCAL_PLATFORM_ID } from './connect.ts';
+import { connectLocal, localPlatformSettings, LOCAL_PLATFORM_ID } from './connect.ts';
+import { platformSchema } from '../../providers/settings-validation.ts';
 
 const dirs: string[] = [];
 const temp = (): string => {
@@ -268,14 +269,44 @@ describe('мелочи разбора', () => {
   });
 
   it('npm: путь к самому npm рядом с node; счёт пакетов по строкам журнала', () => {
+    // Ответ не зависит от ОС прогона: тест идёт и на Linux, и на Windows.
     expect(npmCliPath('C:\\node\\node.exe', 'win32')).toBe(
-      join('C:\\node', 'node_modules', 'npm', 'bin', 'npm-cli.js'),
+      'C:\\node\\node_modules\\npm\\bin\\npm-cli.js',
+    );
+    expect(npmCliPath('/usr/local/bin/node', 'linux')).toBe(
+      '/usr/local/lib/node_modules/npm/bin/npm-cli.js',
     );
     expect(
       countFetches(
         'npm http fetch GET 200 https://r/a 12ms\nnpm http fetch GET 304 https://r/b\nother',
       ),
     ).toBe(2);
+  });
+
+  it('контур локальной модели проходит ту же схему, что и маршрут сохранения контура', () => {
+    // Схема сервера требует enabled/targets/projectPaths/caCertPath без умолчаний —
+    // мастер их шлёт всегда, «Отдать агентам» не слал, и сохранение ловило 400.
+    const parsed = platformSchema.safeParse(
+      localPlatformSettings({
+        baseUrl: 'http://127.0.0.1:11435',
+        model: 'qwen3.6:27b-coding',
+        title: 'Q',
+        consumers: ['chat'],
+      }),
+    );
+    expect(parsed.success ? [] : parsed.error.issues.map((issue) => issue.path.join('.'))).toEqual(
+      [],
+    );
+  });
+
+  it('отказ маршрута контура показывается его текстом, а не голым кодом', async () => {
+    const inject = async () => ({
+      status: 400,
+      body: { code: 'invalid_body', message: 'Запрос не принят: неверно задано enabled.' },
+    });
+    await expect(
+      connectLocal(inject, { baseUrl: 'http://127.0.0.1:1', model: 'm', title: 't' }),
+    ).rejects.toThrow('сохранение контура: Запрос не принят: неверно задано enabled.');
   });
 
   it('контур локальной модели — драйвер ollama, адрес с /v1, обязательный режим', () => {

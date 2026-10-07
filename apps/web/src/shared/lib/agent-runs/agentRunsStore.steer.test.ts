@@ -10,6 +10,7 @@ vi.mock('@shared/api/client', () => ({
 }));
 
 import { agentRuns, getRun } from './agentRunsStore';
+import { pendingBubbles } from './agent-runs.steer';
 
 /**
  * Слово агенту посреди хода (решение владельца 30.09): как в самом Claude Code —
@@ -97,6 +98,54 @@ describe('agentRuns — слово агенту на ходу', () => {
 
     expect(fetchMock.mock.calls.length - started).toBe(1);
     expect(getRun('st-late').queued).toEqual([]);
+    stream.close();
+  });
+
+  // Ф12: запрос «на ходу» под нагрузкой идёт до минуты — всё это время слова не
+  // было ни в очереди, ни в ленте.
+  it('пока запрос «на ходу» в пути — пузырь «Передаётся…»; ответ его снимает без дубля', async () => {
+    void agentRuns.start({ chatId: 'st-wait', prompt: 'первое', projectPath: '/p' });
+    stream.push('{"kind":"session","sessionId":"sess-w","model":"m","tools":0,"seq":1}');
+    await settle();
+    let answer!: (value: { data: { steered: boolean } }) => void;
+    post.mockImplementationOnce(() => new Promise((done) => (answer = done)));
+
+    const outcome = agentRuns.steer('st-wait', { prompt: 'нашёл баг' });
+    await settle();
+    expect(pendingBubbles(getRun('st-wait'))).toEqual([
+      expect.objectContaining({ prompt: 'нашёл баг', sending: true }),
+    ]);
+
+    // Событие потока пришло раньше ответа — пузырь один, уже «передано».
+    stream.push('{"kind":"steer","text":"нашёл баг","at":"2026-10-05T10:00:00.000Z","seq":2}');
+    await settle();
+    expect(pendingBubbles(getRun('st-wait'))).toEqual([
+      expect.objectContaining({ prompt: 'нашёл баг', steered: true }),
+    ]);
+
+    answer({ data: { steered: true } });
+    expect(await outcome).toBe('steered');
+    expect(getRun('st-wait').steering).toBeUndefined();
+    expect(pendingBubbles(getRun('st-wait'))).toHaveLength(1);
+    stream.close();
+  });
+
+  it('запрос «на ходу» отказан — «Передаётся…» сменяется очередью', async () => {
+    void agentRuns.start({ chatId: 'st-wait-2', prompt: 'первое' });
+    await settle();
+    let refuse!: (error: Error) => void;
+    post.mockImplementationOnce(() => new Promise((_, fail) => (refuse = fail)));
+
+    const outcome = agentRuns.steer('st-wait-2', { prompt: 'поздно' });
+    await settle();
+    expect(pendingBubbles(getRun('st-wait-2'))[0]).toMatchObject({ sending: true });
+
+    refuse(Object.assign(new Error('busy'), { status: 409 }));
+    expect(await outcome).toBe('queued');
+    const bubbles = pendingBubbles(getRun('st-wait-2'));
+    expect(bubbles).toHaveLength(1);
+    expect(bubbles[0]).toMatchObject({ prompt: 'поздно' });
+    expect(bubbles[0]?.sending).toBeUndefined();
     stream.close();
   });
 

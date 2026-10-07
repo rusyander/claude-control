@@ -81,6 +81,8 @@ interface MetaRecord {
   effort?: string;
   /** Конвейер подбора модели (07.09.2026): какое это звено и чем его платить. */
   cascade?: ProviderChatCascade;
+  /** «Разрешить правки»: нет поля — вопрос человеку на каждую просьбу CLI. */
+  allowEdits?: boolean;
 }
 
 interface MessageRecord extends ProviderChatMessage {
@@ -200,6 +202,7 @@ function toSummary(meta: MetaRecord, messages: ProviderChatMessage[]): ProviderC
     ...(meta.workdir ? { workdir: meta.workdir } : {}),
     ...(meta.model ? { model: meta.model } : {}),
     ...(meta.effort ? { effort: meta.effort } : {}),
+    ...(meta.allowEdits === undefined ? {} : { allowEdits: meta.allowEdits }),
   };
 }
 
@@ -217,6 +220,8 @@ export function createChat(
     effort?: string;
     /** Звено конвейера, если разговор заведён им, а не человеком. */
     cascade?: ProviderChatCascade;
+    /** «Разрешить правки»; не задано — вопрос человеку. */
+    allowEdits?: boolean;
   } = {},
 ): ProviderChatSummary | undefined {
   const dir = providerDir(appDataDir, providerId);
@@ -235,6 +240,7 @@ export function createChat(
     ...(options.model ? { model: options.model } : {}),
     ...(options.effort ? { effort: options.effort } : {}),
     ...(options.cascade ? { cascade: options.cascade } : {}),
+    ...(options.allowEdits === undefined ? {} : { allowEdits: options.allowEdits }),
   };
 
   mkdirSync(dir, { recursive: true });
@@ -357,12 +363,12 @@ function writeMeta(file: string, meta: MetaRecord, messages: ProviderChatMessage
   renameSync(temp, file);
 }
 
-/** Переименовать разговор или сменить его рабочий каталог. */
+/** Переименовать разговор, сменить его рабочий каталог или «Разрешить правки». */
 export function patchChat(
   appDataDir: string,
   providerId: string,
   chatId: string,
-  patch: { title?: string; workdir?: string },
+  patch: { title?: string; workdir?: string; allowEdits?: boolean },
 ): ProviderChatSummary | undefined {
   const file = chatFile(appDataDir, providerId, chatId);
   if (!file || !existsSync(file)) return undefined;
@@ -376,6 +382,7 @@ export function patchChat(
     ...(title ? { title } : {}),
     // Пустая строка — осознанное «без каталога», поэтому отличается от «поле не прислали».
     ...(patch.workdir === undefined ? {} : patch.workdir ? { workdir: patch.workdir } : {}),
+    ...(patch.allowEdits === undefined ? {} : { allowEdits: patch.allowEdits }),
   };
   if (patch.workdir === '') delete next.workdir;
 

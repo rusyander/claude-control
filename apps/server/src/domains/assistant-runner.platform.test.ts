@@ -257,7 +257,7 @@ describe('spawn one-shot по платформам', () => {
   it('macOS/Linux: CLI зовётся напрямую, без cmd.exe и без оболочки', async () => {
     for (const platform of ['darwin', 'linux'] as const) {
       withPlatform(platform);
-      const spawn = fakeSpawn({ chunks: [Buffer.from('ok')] });
+      const spawn = fakeSpawn({ chunks: [Buffer.from(geminiOut('ok'))] });
 
       const res = await runAssistant(getProvider('gemini'), [{ role: 'user', content: 'привет' }], {
         appDataDir: dir,
@@ -267,18 +267,23 @@ describe('spawn one-shot по платформам', () => {
 
       expect(res.ok).toBe(true);
       expect(spawn.calls[0]!.cmd).toBe('gemini');
-      expect(spawn.calls[0]!.args).toEqual(['-p', 'привет']);
+      expect(spawn.calls[0]!.args).toEqual(['-o', 'stream-json', '-p', 'привет']);
       vi.unstubAllGlobals();
     }
   });
 });
 
+/** Строка вывода gemini `-o stream-json` (0.62.0): так он печатает кусок ответа. */
+const geminiOut = (text: string): string =>
+  `${JSON.stringify({ type: 'message', role: 'assistant', content: text, delta: true })}
+`;
+
 describe('устойчивость обёртки spawn', () => {
   it('русский ответ, разрезанный по границе UTF-8, склеивается без «крокозябр»', async () => {
     withPlatform('linux');
     // Рвём буфер посередине многобайтового символа — так и делает реальный поток.
-    const full = Buffer.from('Привет, это ответ модели', 'utf8');
-    const cut = 5;
+    const full = Buffer.from(geminiOut('Привет, это ответ модели'), 'utf8');
+    const cut = full.indexOf(Buffer.from('П', 'utf8')) + 1;
     const spawn = fakeSpawn({ chunks: [full.subarray(0, cut), full.subarray(cut)] });
 
     const res = await runAssistant(getProvider('gemini'), [{ role: 'user', content: 'п' }], {

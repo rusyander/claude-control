@@ -3,6 +3,7 @@ import type {
   ProviderChatCreateRequest,
   ProviderChatEvent,
   ProviderChatPatchRequest,
+  ProviderChatPermissionAnswer,
   ProviderChatSendRequest,
 } from '@agentdeck/contracts';
 import {
@@ -13,9 +14,9 @@ import {
 import { foreignChatKey } from '@agentdeck/contracts/foreign-chat-key';
 import type { ServerContext } from '../context.ts';
 import { initiativePrompt } from '../domains/chat/initiative.ts';
-import { foreignChildExtra } from '../domains/chat/group-run-lines.ts';
+import { chatKnobsLine, foreignChildExtra } from '../domains/chat/group-run-lines.ts';
 import { checkpointInside, statMtime, type HandoffChains } from '../domains/chat/ChatHandoff.ts';
-import { getActiveProvider } from '../providers/registry.ts';
+import { getActiveProvider, isKnownProviderId } from '../providers/registry.ts';
 import {
   appendMessage,
   createChat,
@@ -31,6 +32,8 @@ import {
 } from '../domains/provider-chat.ts';
 import { checkProjectDir } from '../domains/projects.ts';
 import { chatDeliveryFor } from '../domains/project-git.ts';
+import { registerProviderChatProjectsRoute } from './provider-chat-projects-route.ts';
+import { refuseUnlessReady } from './provider-guard.ts';
 
 /**
  * Чат чужого провайдера: список разговоров, переписка, вопрос, поток ответа и
@@ -43,6 +46,9 @@ import { chatDeliveryFor } from '../domains/project-git.ts';
  */
 
 /** Заголовки SSE: поток держим открытым, ничего не кэшируем. */
+/** Предел длинного опроса состояния: короче таймаутов прокси между телефоном и панелью. */
+const STATUS_WAIT_MAX_MS = 25_000;
+
 const SSE_HEADERS = {
   'Content-Type': 'text/event-stream',
   'Cache-Control': 'no-cache',
@@ -75,7 +81,65 @@ export function registerProviderChatRoutes(
     return provider.id;
   };
 
+  /**
+   * То же плюс готовый чат у активного CLI — для маршрутов, которые заводят
+   * разговор или запускают ход. У Cursor неинтерактивного запуска нет: без этой
+   * проверки разговор заводился, а первый же вопрос падал «нет ни ключа, ни CLI»,
+   * хотя дело не в ключе. Читать, переименовать и удалить уже лежащий на диске
+   * разговор можно по-прежнему — процесса это не запускает.
+   */
+  const requireChatProvider = (reply: FastifyReply): string | undefined => {
+    const providerId = requireProvider(reply);
+    if (!providerId) return undefined;
+    return refuseUnlessReady(ctx.store, 'chat', reply) ? undefined : providerId;
+  };
+
   const appData = (): string => ctx.location.paths.appData;
+
+  /**
+   * Опции отправки разговору — в момент отправки: обычной, из очереди по кнопке
+   * «Отправить» (Ф13) и досылки после перезапуска панели.
+   */
+  const buildRunDeps = (providerId: string, chatId: string) => {
+    const provider = getActiveProvider(ctx.store);
+    // Инициативы панели — у чужого CLI это первая реплика переписки, а не
+    // флаг: системного промпта у них нет. Правило про AskUserQuestion сюда не
+    // идёт: такого инструмента у чужого CLI нет вовсе.
+    // Доставка до MR — как у чата Claude: обычному разговору проекта, не
+    // ребёнку разделения (его доставка — в задании группы).
+    const workdir = readChat(appData(), providerId, chatId)?.workdir;
+    const child = ctx.store.getChatLink(foreignChatKey(providerId, chatId));
+    const delivery =
+      workdir && !child ? chatDeliveryFor(ctx.store, workdir, { foreign: true }) : undefined;
+    const initiative =
+      [
+        initiativePrompt(ctx.store.getSettings(), {
+          foreign: true,
+          // Чат группы делить дальше не предлагается — ни звену, ни ответу
+          // человека в него (живой прогон 25.09: ответ в группу получал
+          // инструкцию разделения, которой у звена нет).
+          ...(child ? { splitMuted: true } : {}),
+          ...(delivery ? { delivery } : {}),
+        }),
+        // Строки группы звена — те же, что на его старте (`foreignChildExtra`);
+        // обычному разговору — «числа» и вставки выбранной группы, как чату
+        // Claude (`chatKnobsLine`): без них скилл группы спрашивал бы заново.
+        child
+          ? foreignChildExtra(ctx.store, appData(), foreignChatKey(providerId, chatId))
+          : chatKnobsLine(ctx.store, appData(), [foreignChatKey(providerId, chatId)], workdir),
+      ]
+        .filter(Boolean)
+        .join(' ') || undefined;
+    return {
+      provider,
+      // Только кэш: чат не должен ждать сеть ради имени модели.
+      models: ctx.models.current(provider.modelVendors ?? []).models,
+      ...(initiative ? { systemPrefix: initiative } : {}),
+    };
+  };
+
+  // Проекты всех провайдеров — своим модулем: этот файл и так велик.
+  registerProviderChatProjectsRoute(app, ctx);
 
   app.get('/api/provider-chat/chats', (_request, reply) => {
     const providerId = requireProvider(reply);
@@ -84,7 +148,7 @@ export function registerProviderChatRoutes(
   });
 
   app.post<{ Body: ProviderChatCreateRequest }>('/api/provider-chat/chats', (request, reply) => {
-    const providerId = requireProvider(reply);
+    const providerId = requireChatProvider(reply);
     if (!providerId) return reply;
 
     const workdir = request.body?.workdir?.trim();
@@ -106,16 +170,25 @@ export function registerProviderChatRoutes(
     );
   });
 
-  app.get<{ Params: { id: string } }>('/api/provider-chat/chats/:id', (request, reply) => {
-    const providerId = requireProvider(reply);
-    if (!providerId) return reply;
+  app.get<{ Params: { id: string }; Querystring: { provider?: string } }>(
+    '/api/provider-chat/chats/:id',
+    (request, reply) => {
+      // Телефон открывает чат по уведомлению, когда активным может быть уже другой
+      // CLI: прочитать разговор того CLI можно, писать в него — только активным.
+      const asked = request.query.provider;
+      const providerId =
+        asked && asked !== 'claude' && isKnownProviderId(asked) ? asked : requireProvider(reply);
+      if (!providerId) return reply;
 
-    const chat = readChat(appData(), providerId, request.params.id);
-    return (
-      chat ??
-      reply.code(404).send({ message: 'Разговор не найден', messageCode: 'conversation-not-found' })
-    );
-  });
+      const chat = readChat(appData(), providerId, request.params.id);
+      return (
+        chat ??
+        reply
+          .code(404)
+          .send({ message: 'Разговор не найден', messageCode: 'conversation-not-found' })
+      );
+    },
+  );
 
   app.patch<{ Params: { id: string }; Body: ProviderChatPatchRequest }>(
     '/api/provider-chat/chats/:id',
@@ -133,6 +206,9 @@ export function registerProviderChatRoutes(
       const chat = patchChat(appData(), providerId, request.params.id, {
         ...(request.body?.title === undefined ? {} : { title: request.body.title }),
         ...(workdir === undefined ? {} : { workdir: workdir.trim() }),
+        ...(typeof request.body?.allowEdits === 'boolean'
+          ? { allowEdits: request.body.allowEdits }
+          : {}),
       });
 
       return (
@@ -149,7 +225,8 @@ export function registerProviderChatRoutes(
     if (!providerId) return reply;
 
     // Идущий ответ снимаем: иначе он допишется в файл, которого уже нет. Очередь
-    // — вместе с ним: ей больше некуда уходить.
+    // — вместе с ним: ей больше некуда уходить (и с диска тоже, Ф13).
+    chats.hydrate(appData(), providerId, request.params.id);
     chats.discard(request.params.id);
 
     return deleteChat(appData(), providerId, request.params.id)
@@ -166,8 +243,8 @@ export function registerProviderChatRoutes(
    */
   app.post<{ Params: { id: string }; Body: ProviderChatSendRequest }>(
     '/api/provider-chat/chats/:id/send',
-    (request, reply) => {
-      const providerId = requireProvider(reply);
+    async (request, reply) => {
+      const providerId = requireChatProvider(reply);
       if (!providerId) return reply;
 
       const text = typeof request.body?.text === 'string' ? request.body.text.trim() : '';
@@ -178,42 +255,20 @@ export function registerProviderChatRoutes(
         ? request.body.attachments.filter((path): path is string => typeof path === 'string')
         : [];
 
-      const provider = getActiveProvider(ctx.store);
-      // Инициативы панели — у чужого CLI это первая реплика переписки, а не
-      // флаг: системного промпта у них нет. Правило про AskUserQuestion сюда не
-      // идёт: такого инструмента у чужого CLI нет вовсе.
-      // Доставка до MR — как у чата Claude: обычному разговору проекта, не
-      // ребёнку разделения (его доставка — в задании группы).
-      const workdir = readChat(appData(), providerId, request.params.id)?.workdir;
-      const child = ctx.store.getChatLink(foreignChatKey(providerId, request.params.id));
-      const delivery =
-        workdir && !child ? chatDeliveryFor(ctx.store, workdir, { foreign: true }) : undefined;
-      const initiative =
-        [
-          initiativePrompt(ctx.store.getSettings(), {
-            foreign: true,
-            // Чат группы делить дальше не предлагается — ни звену, ни ответу
-            // человека в него (живой прогон 25.09: ответ в группу получал
-            // инструкцию разделения, которой у звена нет).
-            ...(child ? { splitMuted: true } : {}),
-            ...(delivery ? { delivery } : {}),
-          }),
-          // Строки группы звена — те же, что на его старте (`foreignChildExtra`).
-          child
-            ? foreignChildExtra(ctx.store, appData(), foreignChatKey(providerId, request.params.id))
-            : undefined,
-        ]
-          .filter(Boolean)
-          .join(' ') || undefined;
-      const runDeps = {
-        provider,
-        // Только кэш: чат не должен ждать сеть ради имени модели.
-        models: ctx.models.current(provider.modelVendors ?? []).models,
-        ...(initiative ? { systemPrefix: initiative } : {}),
-      };
-      // Ответ ещё идёт, а просили не отказывать — сообщение ждёт его конца на
-      // сервере и уйдёт само: входа посреди ответа у одноразового CLI нет.
+      const runDeps = buildRunDeps(providerId, request.params.id);
+      chats.hydrate(appData(), providerId, request.params.id);
+      // Ответ ещё идёт, а просили не отказывать. Есть вход посреди ответа (В1) —
+      // реплику подхватывает тот же ход; нет — сообщение ждёт его конца на
+      // сервере и уйдёт само.
       if (request.body?.queueIfBusy) {
+        const steered = await chats.steer(
+          appData(),
+          providerId,
+          request.params.id,
+          { text, attachments },
+          runDeps,
+        );
+        if (steered) return reply.send({ message: steered, steered: true });
         const queued = chats.enqueue(
           appData(),
           providerId,
@@ -258,7 +313,7 @@ export function registerProviderChatRoutes(
    * второй раз, когда агент допишет опору, незачем.
    */
   app.post<{ Params: { id: string } }>('/api/provider-chat/chats/:id/restart', (request, reply) => {
-    const providerId = requireProvider(reply);
+    const providerId = requireChatProvider(reply);
     if (!providerId) return reply;
 
     const chatId = request.params.id;
@@ -314,6 +369,7 @@ export function registerProviderChatRoutes(
         proposal: restartHandoffProposal(HANDOFF_DEFAULT_CHECKPOINT, { foreign: true }),
         ...(chat.model ? { model: chat.model } : {}),
         ...(chat.effort ? { effort: chat.effort } : {}),
+        ...(chat.allowEdits === undefined ? {} : { allowEdits: chat.allowEdits }),
         ...(cascade ? { cascade } : {}),
         ...(ctx.store.getChatLink(key) ? { link: ctx.store.getChatLink(key) } : {}),
       },
@@ -326,6 +382,7 @@ export function registerProviderChatRoutes(
             ...(input.model ? { model: input.model } : {}),
             ...(input.effort ? { effort: input.effort } : {}),
             ...(input.cascade ? { cascade: input.cascade } : {}),
+            ...(input.allowEdits === undefined ? {} : { allowEdits: input.allowEdits }),
           })?.id,
         run: (nextId, prompt, header) => {
           // Ребёнок без шапки (дочерний не-план) — тоже звено: «без разделения»
@@ -385,16 +442,86 @@ export function registerProviderChatRoutes(
     (request, reply) => {
       const providerId = requireProvider(reply);
       if (!providerId) return reply;
+      chats.hydrate(appData(), providerId, request.params.id);
       return { cancelled: chats.cancelQueued(request.params.id, request.params.queuedId) };
     },
   );
 
+  /**
+   * «Отправить» у ждущей очереди (Ф13): ход остановили или панель
+   * перезапускалась — само сообщение не уйдёт. Ответ — записанная реплика, как
+   * у обычной отправки; идёт ответ — 409, сообщения уже нет — 404.
+   */
+  app.post<{ Params: { id: string; queuedId: string } }>(
+    '/api/provider-chat/chats/:id/queue/:queuedId/send',
+    (request, reply) => {
+      const providerId = requireChatProvider(reply);
+      if (!providerId) return reply;
+      const chatId = request.params.id;
+      const outcome = chats.sendQueued(
+        appData(),
+        providerId,
+        chatId,
+        request.params.queuedId,
+        buildRunDeps(providerId, chatId),
+      );
+      if (outcome.ok) return { message: outcome.message };
+      if (outcome.reason === 'already_running') {
+        return reply.code(409).send({
+          message: 'Ответ на предыдущий вопрос ещё идёт',
+          messageCode: 'foreign-answer-running',
+        });
+      }
+      return reply
+        .code(404)
+        .send(
+          outcome.missing
+            ? { message: 'Сообщения в очереди уже нет', messageCode: 'foreign-queued-gone' }
+            : { message: 'Разговор не найден', messageCode: 'conversation-not-found' },
+        );
+    },
+  );
+
   /** Что происходит прямо сейчас — этим вкладка догоняет пропущенное после F5. */
-  app.get<{ Params: { id: string } }>('/api/provider-chat/chats/:id/status', (request, reply) => {
-    const providerId = requireProvider(reply);
-    if (!providerId) return reply;
-    return chats.status(request.params.id);
-  });
+  /**
+   * Ответ человека на просьбу CLI о разрешении (карточка в ленте). Просьбы уже
+   * нет — 404 с кодом: ход кончился или ответили в другой вкладке.
+   */
+  app.post<{ Params: { id: string; askId: string }; Body: ProviderChatPermissionAnswer }>(
+    '/api/provider-chat/chats/:id/permissions/:askId',
+    (request, reply) => {
+      const providerId = requireProvider(reply);
+      if (!providerId) return reply;
+      const decision = request.body?.decision;
+      if (decision !== 'allow' && decision !== 'deny') {
+        return reply
+          .code(400)
+          .send({ message: 'decision: allow | deny', messageCode: 'request-empty' });
+      }
+      return chats.answerPermission(request.params.id, request.params.askId, decision)
+        ? { ok: true }
+        : reply.code(404).send({
+            message: 'Этот вопрос о разрешении уже закрыт',
+            messageCode: 'foreign-permission-gone',
+          });
+    },
+  );
+
+  /**
+   * `wait=<мс>` — длинный опрос: ответ приходит, когда ход кончился или сменились
+   * просьбы о разрешении (не позже 25 с). Им пользуется телефон в фоне.
+   */
+  app.get<{ Params: { id: string }; Querystring: { wait?: string } }>(
+    '/api/provider-chat/chats/:id/status',
+    async (request, reply) => {
+      const providerId = requireProvider(reply);
+      if (!providerId) return reply;
+      chats.hydrate(appData(), providerId, request.params.id);
+      const wait = Math.min(Number(request.query.wait) || 0, STATUS_WAIT_MAX_MS);
+      if (wait > 0) await chats.waitForChange(request.params.id, wait);
+      return chats.status(request.params.id);
+    },
+  );
 
   /**
    * Поток ответа. Обрыв соединения отцепляет слушателя и НЕ трогает прогон:

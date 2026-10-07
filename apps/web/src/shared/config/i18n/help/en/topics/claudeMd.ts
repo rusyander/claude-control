@@ -290,7 +290,16 @@ export const claudeMdEn: typeof claudeMdRu = {
       'an “always attach” flag, markdown below. There the section becomes a directory ' +
       'manager: list, create, edit, delete; subdirectories are supported, while a plain ' +
       '.md is not read by Cursor — the panel shows such files separately and leaves ' +
-      'them alone. Details are in the “Providers” document.',
+      'them alone. Qwen Code has a rules directory ~/.qwen/rules IN ADDITION to ' +
+      'QWEN.md, and with Qwen active the “Rules” section manages it: every .md is a ' +
+      'rule, the header is optional; without paths patterns a rule is permanent, with ' +
+      'patterns it is attached when a matching file comes into play. Qwen has no ' +
+      '“always attach” flag — that is simply a rule without patterns. A limit of the CLI ' +
+      'itself (qwen 0.25): rules with patterns are attached only by the terminal qwen, ' +
+      'while the panel chat runs through qwen serve, which skips them — permanent rules ' +
+      'arrive either way. Continue has no global instructions at all: its rules live ' +
+      'only in a project (<project>/.continue/rules, the project tab), and the section ' +
+      'shows a placeholder for it. Details are in the “Providers” document.',
   },
 
   shots: {

@@ -10,7 +10,9 @@
  * `claude`, панель и Vite на свободных портах, снятие деревом. Двадцать копий
  * этой обвязки разъехались бы первой же правкой — здесь она одна.
  *
- * Что подменено: только дом процесса и PATH. Панель — настоящий
+ * Что подменено: только дом процесса и PATH; переменные дома чужих CLI из
+ * оболочки человека (`XDG_*`, `CODEX_HOME`, `GOOSE_*`…) отрезаны, свои проверка
+ * кладёт сама или передаёт `env`. Панель — настоящий
  * `apps/server/src/index.ts`, фронт — настоящий Vite из `apps/web`, запросы
  * идут через его прокси так же, как у человека.
  *
@@ -22,15 +24,17 @@
 import { spawn } from 'node:child_process';
 import {
   existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
   realpathSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
 import { createServer } from 'node:net';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { delimiter, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { brandEnvName, legacyEnvName } from '../../apps/server/src/lib/brand.mjs';
@@ -41,6 +45,137 @@ const PANEL_ENV_PREFIXES = [brandEnvName(''), legacyEnvName('')];
 
 export const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const IS_WIN = process.platform === 'win32';
+
+/**
+ * Окружение, с которым процесс проверки пришёл из оболочки человека. Снято при
+ * загрузке модуля: статические импорты исполняются раньше кода проверки, так что
+ * всё, что проверка потом кладёт в `process.env` сама, сюда не попадает.
+ */
+const SHELL_ENV = { ...process.env };
+/** Настоящий дом человека — до того, как кто-либо в процессе тронул HOME. */
+export const REAL_HOME = homedir();
+
+// Переменные, которыми чужой CLI находит свой дом и конфиг. Пришедшая из оболочки
+// направила бы настоящий CLI на стенде в настоящий дом человека: подмена
+// HOME/APPDATA её не перекрывает. Имена — `.agent/universal-providers.agent.md`
+// (документированные переопределения) и `--help` самих CLI.
+const PROVIDER_ENV_PREFIXES = [
+  'XDG_',
+  'GOOSE_',
+  'OPENCODE_CONFIG',
+  'GEMINI_CLI_',
+  'KIMI_',
+  'QWEN_CODE_',
+];
+const PROVIDER_ENV_NAMES = [
+  'CODEX_HOME',
+  'QWEN_HOME',
+  'KIMI_CODE_HOME',
+  'GEMINI_CLI_HOME',
+  'CONTINUE_GLOBAL_DIR',
+];
+
+/** Переменная дома/конфига чужого CLI (без учёта регистра — Windows). */
+export function isProviderEnvKey(key) {
+  const upper = key.toUpperCase();
+  return (
+    PROVIDER_ENV_NAMES.includes(upper) ||
+    PROVIDER_ENV_PREFIXES.some((prefix) => upper.startsWith(prefix))
+  );
+}
+
+/**
+ * Переменная пришла из оболочки, и проверка её не переставляла — в стенд она не
+ * идёт. Проверка, задавшая свою (`process.env.CODEX_HOME = tmp` до `startStand`,
+ * как делают `check-foreign-steer` и соседи), своё значение сохраняет: оно уже не
+ * равно снятому из оболочки.
+ */
+function shellLeak(key, value) {
+  return isProviderEnvKey(key) && SHELL_ENV[key] === value;
+}
+
+/**
+ * Настоящие каталоги CLI человека, которые проверка обязана оставить как были.
+ * Только список путей: ни один не создаётся и не пишется.
+ */
+export function realProviderDirs(home = REAL_HOME) {
+  let top = [];
+  try {
+    top = readdirSync(home);
+  } catch {
+    // дом не читается — проверять нечего, кроме фиксированных имён
+  }
+  const named = top.filter((name) => name.startsWith('.claude') || name.startsWith('.aider'));
+  const fixed = [
+    '.codex',
+    '.qwen',
+    '.gemini',
+    join('.config', 'goose'),
+    join('.config', 'opencode'),
+    '.kimi',
+    '.continue',
+    '.agents',
+  ];
+  const dirs = [...new Set([...named, ...fixed])].map((rel) => join(home, rel));
+  // Goose на Windows держит конфиг в %APPDATA%\Block\goose, а не в ~/.config.
+  if (IS_WIN && SHELL_ENV.APPDATA) dirs.push(join(SHELL_ENV.APPDATA, 'Block', 'goose'));
+  return dirs;
+}
+
+/**
+ * Что живая сессия Claude Code человека пишет сама, пока идёт проверка, — без
+ * этого исключения любая проверка на машине с открытым чатом краснела бы.
+ * Пути — с прямыми слэшами, от дома.
+ */
+export const LIVE_SESSION_CHURN = [
+  /\/\.claude\.json(\.[^/]*)?$/,
+  /\/\.claude\/(history\.jsonl|backups|cache|sessions|projects|todos|shell-snapshots|statsig|session-env|file-history|debug|ide|plans|paste-cache|telemetry)(\/|$)/,
+];
+
+/**
+ * Снимок mtime/размера настоящих каталогов CLI человека: сам каталог и записи до
+ * глубины `depth`. ТОЛЬКО `lstat`/`readdir` — ничего не создаётся и не пишется,
+ * ссылки не разыменовываются. Сравнить — `diffRealProviderDirs(before, after)`.
+ */
+export function snapshotRealProviderDirs({ dirs = realProviderDirs(), depth = 2 } = {}) {
+  const entries = {};
+  const visit = (path, level) => {
+    let stat;
+    try {
+      stat = lstatSync(path);
+    } catch (error) {
+      entries[path] = error?.code === 'ENOENT' ? 'absent' : `unreadable:${error?.code}`;
+      return;
+    }
+    entries[path] = `${stat.mtimeMs}:${stat.size}`;
+    if (level >= depth || !stat.isDirectory()) return;
+    let names;
+    try {
+      names = readdirSync(path);
+    } catch {
+      return;
+    }
+    for (const name of names) visit(join(path, name), level + 1);
+  };
+  for (const dir of dirs) visit(dir, 0);
+  return { at: Date.now(), entries };
+}
+
+/**
+ * Записи, что изменились, появились или пропали между двумя снимками. `ignore` —
+ * регулярки по пути с прямыми слэшами; по умолчанию — шум живой сессии Claude.
+ */
+export function diffRealProviderDirs(before, after, { ignore = LIVE_SESSION_CHURN } = {}) {
+  const paths = new Set([...Object.keys(before.entries), ...Object.keys(after.entries)]);
+  return [...paths]
+    .filter((path) => (before.entries[path] ?? 'absent') !== (after.entries[path] ?? 'absent'))
+    .filter((path) => !ignore.some((pattern) => pattern.test(path.replaceAll('\\', '/'))))
+    .map((path) => ({
+      path,
+      before: before.entries[path] ?? 'absent',
+      after: after.entries[path] ?? 'absent',
+    }));
+}
 
 export class NotChecked extends Error {}
 
@@ -122,16 +257,24 @@ export async function startStand({
   label = 'stand',
   fakeCli = {},
   serverDir = join(REPO, 'apps/server'),
+  // Машина без Claude Code: ни `~/.claude`, ни CLAUDE_CONFIG_DIR; состояние
+  // панели — в `~/.agentdeck/data` (так его ищет сама панель без каталога Claude).
+  noClaude = false,
+  // Каталоги в КОНЕЦ PATH панели (настоящий CLI другого провайдера).
+  extraPath = [],
+  // Окружение панели сверх унаследованного (дом и конфиг чужого CLI, ключ
+  // заглушки). Явное — поэтому чистка `shellLeak` его не трогает; дом и PATH
+  // стенда всё равно главнее.
+  env: extraEnv = {},
 } = {}) {
   const root = realpathSync.native(mkdtempSync(join(tmpdir(), `cc-${label}-`)));
   const home = join(root, 'home');
   const cfg = join(home, '.claude');
   const appData = join(home, 'AppData', 'Roaming');
   const localAppData = join(home, 'AppData', 'Local');
-  for (const dir of [cfg, join(cfg, 'agentdeck'), appData, localAppData]) {
-    mkdirSync(dir, { recursive: true });
-  }
-  writeFileSync(join(cfg, 'settings.json'), '{}\n', 'utf8');
+  const stateDir = noClaude ? join(home, '.agentdeck', 'data') : join(cfg, 'agentdeck');
+  for (const dir of [stateDir, appData, localAppData]) mkdirSync(dir, { recursive: true });
+  if (!noClaude) writeFileSync(join(cfg, 'settings.json'), '{}\n', 'utf8');
   // Шлюз и DLP-прокси по умолчанию слушают 5179 — порт живого стенда человека.
   // Проверка, включившая их на одноразовом стенде без своего порта, заняла бы
   // чужой адрес (или, пока живой стенд перезапускается, приняла бы его трафик).
@@ -149,7 +292,7 @@ export async function startStand({
     },
   };
   writeFileSync(
-    join(cfg, 'agentdeck', 'state.json'),
+    join(stateDir, 'state.json'),
     `${JSON.stringify({ settings: { onboardingDone: true, language: 'ru', theme: 'light', ...isolated, ...settings } })}\n`,
     'utf8',
   );
@@ -185,23 +328,30 @@ export async function startStand({
   const homeEnv = {
     HOME: home,
     USERPROFILE: home,
-    CLAUDE_CONFIG_DIR: cfg,
+    ...(noClaude ? {} : { CLAUDE_CONFIG_DIR: cfg }),
     APPDATA: appData,
     LOCALAPPDATA: localAppData,
   };
   // Переменные панели человека (AGENTDECK_*, прежнее имя) увели бы одноразовый
   // стенд в его каталоги — поэтому не наследуются.
+  // Переменные дома чужих CLI, пришедшие из оболочки человека, — тоже (`shellLeak`).
   const base = Object.fromEntries(
     Object.entries(process.env).filter(
-      ([key]) =>
+      ([key, value]) =>
         !PANEL_ENV_PREFIXES.some((prefix) => key.toUpperCase().startsWith(prefix)) &&
-        !['PATH', 'PORT', 'API_PORT', ...Object.keys(homeEnv)].includes(key.toUpperCase()),
+        !['PATH', 'PORT', 'API_PORT', 'CLAUDE_CONFIG_DIR', ...Object.keys(homeEnv)].includes(
+          key.toUpperCase(),
+        ) &&
+        !shellLeak(key, value),
     ),
   );
   const env = {
     ...base,
+    ...extraEnv,
     ...homeEnv,
-    PATH: fakeNames.length > 0 ? `${bin}${delimiter}${pathWithoutClaude()}` : pathWithoutClaude(),
+    PATH: [...(fakeNames.length > 0 ? [bin] : []), pathWithoutClaude(), ...extraPath].join(
+      delimiter,
+    ),
   };
 
   const apiPort = await freePort();

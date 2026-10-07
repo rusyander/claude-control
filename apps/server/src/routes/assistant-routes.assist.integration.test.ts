@@ -5,6 +5,9 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { registerAssistantRoutes } from './assistant-routes.ts';
 
+/** Маршрут окна для проверок, которым он не важен: контура нет, шлюз не поднят. */
+const NO_ROUTE = { runRoute: () => ({ env: {} }), gatewayPort: () => 0 };
+
 /**
  * `POST /api/assist` целиком через настоящий маршрут (U6, 28.09): тело
  * проверяется схемой, история едет в запросе, запуск — лёгкое окно, секреты
@@ -18,6 +21,7 @@ const isWindows = process.platform === 'win32';
 
 const FAKE = `
 import { readFileSync, writeFileSync } from 'node:fs';
+
 const argv = process.argv.slice(2);
 const chunks = [];
 for await (const chunk of process.stdin) chunks.push(chunk);
@@ -45,7 +49,14 @@ beforeEach(() => {
   const system = isWindows ? join(process.env.SystemRoot ?? 'C:\\Windows', 'System32') : '/bin';
   process.env.PATH = [dir, system].join(isWindows ? ';' : ':');
   app = Fastify();
-  registerAssistantRoutes(app, { store: { getSettings: () => ({ provider: 'claude' }) } } as never);
+  registerAssistantRoutes(
+    app,
+    {
+      store: { getSettings: () => ({ provider: 'claude' }) },
+      location: { paths: { appData: join(dir, 'agentdeck') } },
+    } as never,
+    NO_ROUTE,
+  );
 });
 
 afterEach(async () => {

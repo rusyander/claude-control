@@ -279,6 +279,7 @@ function CoverageRow({
           <Button
             variant="ghost"
             size="sm"
+            className={styles.coverAction}
             leftIcon={<Icon name="plus" size={16} />}
             onClick={onCover}
             disabled={isStarting}

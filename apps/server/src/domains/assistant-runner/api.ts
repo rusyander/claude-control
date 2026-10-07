@@ -8,6 +8,8 @@ import type {
   RunAssistantDeps,
 } from './types.ts';
 import { coded } from '../../lib/server-text.ts';
+import { serverText } from '../../lib/server-texts.ts';
+import { vendorApiRefusal } from '../provider-keys.ts';
 import {
   anthropicImageBlocks,
   googleImageParts,
@@ -49,6 +51,30 @@ function apiError(providerId: string, message: string): AssistantRunResult {
   };
 }
 
+/**
+ * Отказ без запроса: ключ этого провайдера некуда отправить, не отдав его чужому
+ * вендору (`vendorApiRefusal`). Режим `none` — вызова не было вовсе.
+ */
+function vendorRefused(
+  provider: ConfigProvider,
+  code: 'assistant-api-base-unknown',
+): AssistantRunResult {
+  const params = { provider: provider.name };
+  return coded(
+    {
+      ok: false,
+      providerId: provider.id,
+      mode: 'none',
+      reply: '',
+      experimental: false,
+      reason: 'unsupported',
+      error: serverText(code, params),
+    },
+    code,
+    params,
+  );
+}
+
 /** Базовый адрес без хвостовых слэшей — их дописывает уже путь запроса. */
 function trimBase(baseUrl: string): string {
   return baseUrl.trim().replace(/\/+$/, '');
@@ -87,6 +113,10 @@ export async function runProviderApi(
 ): Promise<AssistantRunResult> {
   const fetchImpl = deps.fetchImpl ?? globalThis.fetch;
   const endpoint = deps.endpoint;
+  // Облако вендора — только своему провайдеру и только по адресу из каталога.
+  // Проверка ДО любого запроса: отказ после него ключ уже не вернул бы.
+  const refusal = endpoint ? undefined : vendorApiRefusal(provider);
+  if (refusal) return vendorRefused(provider, refusal);
   const apiKind = endpoint ? endpoint.apiKind : (provider.assistant?.apiKind ?? 'none');
   // У своего эндпоинта ключ — его собственный токен; ключ провайдера сюда не
   // подставляем: он от другого сервиса и на чужом адресе бесполезен.
@@ -149,11 +179,14 @@ export async function runProviderApi(
       return finalizeApi(provider.id, reply);
     }
 
-    // openai + openai-compat → chat/completions (base URL: OpenAI по умолчанию).
+    // openai → облако OpenAI; openai-compat → адрес вендора из каталога
+    // (`assistant.apiBaseUrl`, без него отказ выше). `OPENAI_BASE_URL` процесса
+    // сюда не попадает: её завели для другого инструмента, и ключ чужого вендора
+    // уехал бы по ней туда, куда его не посылали.
     const model = endpoint?.model || assistantModel(deps, MODELS.openai);
-    const url = endpoint
-      ? endpointUrl(endpoint, model)
-      : `${apiKind === 'openai-compat' ? (process.env.OPENAI_BASE_URL ?? OPENAI_BASE) : OPENAI_BASE}/chat/completions`;
+    const vendorBase =
+      apiKind === 'openai-compat' ? trimBase(provider.assistant?.apiBaseUrl ?? '') : OPENAI_BASE;
+    const url = endpoint ? endpointUrl(endpoint, model) : `${vendorBase}/chat/completions`;
     const headers: Record<string, string> = { 'content-type': 'application/json' };
     if (credential) headers.authorization = `Bearer ${credential}`;
 

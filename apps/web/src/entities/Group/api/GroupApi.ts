@@ -77,12 +77,17 @@ export function useSetGroupEnabled() {
   const { t } = useTranslation();
 
   return useMutation({
-    mutationFn: async (input: { id: string; isEnabled: boolean }) => {
+    mutationFn: async (input: { id: string; isEnabled: boolean; provider?: string }) => {
+      // `provider` — чей тумблер: без него сервер берёт активный CLI, и щелчок,
+      // сделанный до смены CLI, ушёл бы не тому (F1).
       const { data } = await apiClient.post<{
         ok: true;
         affected: number;
         skippedLocalHooks?: number;
-      }>(`/groups/${input.id}/enabled`, { isEnabled: input.isEnabled });
+      }>(`/groups/${input.id}/enabled`, {
+        isEnabled: input.isEnabled,
+        ...(input.provider ? { provider: input.provider } : {}),
+      });
       return data;
     },
     onSuccess: (data) => {

@@ -8,7 +8,10 @@ import type {
   PanelAgentRunEvent,
   PanelAgentRunRefusal,
 } from '@agentdeck/contracts/panel-agent';
-import { PANEL_AGENT_CONVERSATION_ID } from '@agentdeck/contracts/panel-agent';
+import {
+  PANEL_AGENT_CONVERSATION_ID,
+  panelAgentConfirmTimeoutMs,
+} from '@agentdeck/contracts/panel-agent';
 import type { ServerContext } from '../../context.ts';
 import {
   closePanelAgentTurn,
@@ -163,10 +166,15 @@ export function registerPanelAgentRunRoutes(
     code: PanelAgentRunRefusal['error'],
     message: string,
     messageCode?: ServerMessageCode,
-  ): PanelAgentRunRefusal & { messageCode?: ServerMessageCode } => ({
+    params?: Record<string, string>,
+  ): PanelAgentRunRefusal & {
+    messageCode?: ServerMessageCode;
+    params?: Record<string, string>;
+  } => ({
     error: code,
     message,
     ...(messageCode ? { messageCode } : {}),
+    ...(params ? { params } : {}),
   });
 
   app.post<{ Body: unknown }>(
@@ -204,7 +212,11 @@ export function registerPanelAgentRunRoutes(
         gatewayPort: deps.gatewayPort,
         detect: deps.detect,
       });
-      if (!launch.ok) return reply.code(409).send(refuse(launch.code, launch.message));
+      if (!launch.ok) {
+        return reply
+          .code(409)
+          .send(refuse(launch.code, launch.message, launch.messageCode, launch.params));
+      }
 
       // Маска — до ВСЕГО, что уносит текст из запроса: и до модели, и до файла
       // разговора. Ключ, вставленный в сообщение, не должен лечь и на диск панели.
@@ -294,8 +306,12 @@ export function registerPanelAgentRunRoutes(
         ...(launch.contourId ? { contourId: launch.contourId } : {}),
       });
 
+      // Срок карточек хода — по CLI: у Goose вызов переходника ждёт 300 с, и
+      // карточка, обещающая 10 минут, снималась бы обрывом посреди ожидания.
+      deps.pending?.setDeadline(conversationId, panelAgentConfirmTimeoutMs(launch.dialect));
       const run = startPanelAgentRun({
         command: launch.command,
+        dialect: launch.dialect,
         env: launch.env,
         selfBaseUrl: deps.selfBaseUrl,
         conversationId,
@@ -343,6 +359,7 @@ export function registerPanelAgentRunRoutes(
         }
       } finally {
         running.delete(conversationId);
+        deps.pending?.clearDeadline(conversationId);
         clearInterval(heartbeat);
         clearTimeout(turn.graceTimer);
         feed.end();

@@ -88,7 +88,8 @@ export const providersEn: typeof providersRu = {
     mapInstructions: 'Global instructions',
     mapInstructionsValue:
       'Works everywhere, in three different models. ONE FILE: Claude (CLAUDE.md), Codex ' +
-      'and OpenCode (AGENTS.md), Gemini (GEMINI.md), Qwen Code (QWEN.md). LIST OF ' +
+      'and OpenCode (AGENTS.md), Gemini (GEMINI.md), Qwen Code (QWEN.md, plus a rules ' +
+      'directory ~/.qwen/rules/*.md — one rule per file, the Rules section). LIST OF ' +
       'REFERENCES: Aider has no ' +
       'single file — the panel edits the list of attached files (the read option in ' +
       '.aider.conf.yml) and, separately, the contents of an already existing listed file. ' +
@@ -143,15 +144,20 @@ export const providersEn: typeof providersRu = {
     mapChat: 'Chat and assistant',
     mapChatValue:
       'The full chat with streaming, attachments and parallel agents is Claude only. ' +
-      'Codex, Gemini, Qwen Code, Continue, Goose, Kimi Code, OpenCode and Aider get a basic experimental assistant: one ' +
-      'question, one answer (codex exec, gemini -p, qwen -p, cn -p, opencode run "<prompt>", ' +
-      'aider --message, goose run --no-session -t "<prompt>", kimi -p). ' +
-      'The Aider, OpenCode, Continue, Goose and Kimi Code assistants are built from the docs and have not been exercised ' +
-      'live: those CLIs are not installed on the development machine. Cursor has no model ' +
-      'API of its own.',
+      'Codex, Gemini, Qwen Code, Continue, Goose, Kimi Code, OpenCode and Aider get a ' +
+      'simpler chat of their own: the panel keeps the conversation, and every answer is a ' +
+      'separate CLI run (codex exec, gemini -p, qwen -p, cn -p, opencode run, ' +
+      'aider --message, goose run --no-session, kimi -p). For Codex, Qwen Code, Goose and ' +
+      'Kimi Code the answer goes through the CLI’s own server mode, for OpenCode its ' +
+      'opencode serve holds the conversation — with these five a message can be passed in ' +
+      'right in the middle of an answer; if the server does not come up, the answer runs ' +
+      'as an ordinary one-off launch. All eight have the “Allow edits” toggle, and what it ' +
+      'means for each is described in the “Chat” document. All eight have been run live ' +
+      'with the real CLI against a stand-in model; not with a real account of each ' +
+      'provider. Cursor has no model API of its own.',
     mapHooks: 'Hooks',
     mapHooksValue:
-      'Works for Claude, Qwen Code, Kimi Code and OpenCode, but the models do not match. ' +
+      'Works for Claude, Qwen Code, Kimi Code, Codex and OpenCode, but the models do not match. ' +
       'Claude has nine events (PreToolUse, PostToolUse and others) with tool matchers and ' +
       'shell commands in settings.json; two of them can block the action. Qwen Code has ' +
       'the root hooks key of settings.json (global and per-project), eighteen events, an ' +
@@ -167,10 +173,14 @@ export const providersEn: typeof providersRu = {
       'disappeared from both the reference and the published schema, and experimental ' +
       'itself is closed to unknown keys — the panel shows what is already in the file but ' +
       'does not write; the documented way to attach an action to an event in OpenCode is ' +
-      'now plugins alone. Codex, Gemini, Continue, Goose, Cursor and Aider have no hooks.',
+      'now plugins alone. Codex has a separate file ~/.codex/hooks.json (and ' +
+      '.codex/hooks.json in a project) of the same shape as Qwen’s, twelve events, the ' +
+      'timeout in seconds (at most 3 for SessionEnd and Interrupt); Codex runs a written ' +
+      'hook only after it is approved in /hooks inside the CLI — the panel says so on a ' +
+      'card. Gemini, Continue, Goose, Cursor and Aider have no hooks.',
     mapPlugins: 'Plugins',
     mapPluginsValue:
-      'Works for Claude, OpenCode and Kimi Code, and they are different things. Claude ' +
+      'Works for Claude, OpenCode, Kimi Code, Qwen Code and Codex, and they are different things. Claude ' +
       'gets the panel’s own extensions and marketplaces (a wrapper around claude plugin). ' +
       'OpenCode gets plugins of its own CLI: JS/TS files in the plugins directory ' +
       '(global ~/.config/opencode/plugins/ and per-project ' +
@@ -180,11 +190,15 @@ export const providersEn: typeof providersRu = {
       'reads the manifests in ~/.kimi-code/plugins/managed/ and shows what each plugin ' +
       'brings (skills, a session-start skill, MCP servers, how many hooks, whether it has ' +
       'commands), while installing and enabling happens in the CLI itself via /plugins — ' +
-      'the shape of its installed.json registry is undocumented. The others have no such ' +
-      'section.',
+      'the shape of its installed.json registry is undocumented. Qwen Code gets its CLI’s ' +
+      'extensions: the panel installs, enables, disables and removes them through qwen ' +
+      'extensions commands and never edits their files. Codex gets marketplaces and ' +
+      'plugins: a marketplace is added and refreshed with codex plugin marketplace, a ' +
+      'plugin is installed with codex plugin add, and enabling is one enabled line in ' +
+      'config.toml. The others have no such section.',
     mapSkills: 'Skills',
     mapSkillsValue:
-      'Works for Claude, OpenCode, Qwen Code and Kimi Code, and the concept is the same — a folder with a ' +
+      'Works for Claude, OpenCode, Qwen Code, Kimi Code and Codex, and the concept is the same — a folder with a ' +
       'SKILL.md and YAML front matter — but the directories and fields differ. Claude has ' +
       'its rich section (file tree per skill, enable by moving into skills-disabled, groups, ' +
       'templates). OpenCode keeps skills in ~/.config/opencode/skills/<name>/SKILL.md (and ' +
@@ -197,7 +211,10 @@ export const providersEn: typeof providersRu = {
       '~/.kimi-code/skills/ and <project>/.kimi-code/skills/ for Kimi (which also picks up ' +
       'the shared ~/.agents/skills). One difference: Kimi’s docs cap description at 240 ' +
       'characters. The panel holds skill names to the strictest of the rules, so the same ' +
-      'skill is valid in any of these CLIs. The other CLIs have no such section.',
+      'skill is valid in any of these CLIs. Codex keeps personal skills in ' +
+      '~/.agents/skills/ (.agents/skills/ in a project), names at most 64 characters; it ' +
+      'also reads the older ~/.codex/skills, which the panel names but leaves alone. The ' +
+      'other CLIs have no such section.',
     mapCommands: 'Commands',
     mapCommandsValue:
       'Works for Claude, Gemini, Qwen Code and OpenCode. For Claude the list is assembled ' +
@@ -215,14 +232,16 @@ export const providersEn: typeof providersRu = {
     mapProjects: 'Projects',
     mapProjectsValue:
       'Works everywhere, but differently. Claude gets the project’s rules, MCP servers ' +
-      'and permissions. Codex and OpenCode get project instructions (AGENTS.md) and MCP ' +
-      'servers from the project file; after Claude, OpenCode has the widest project ' +
+      'and permissions. Codex gets project instructions (AGENTS.md), MCP servers from the ' +
+      'project file, hooks in .codex/hooks.json and skills in .agents/skills/; OpenCode ' +
+      'gets AGENTS.md and MCP too, and after Claude, OpenCode has the widest project ' +
       'level — instructions (AGENTS.md), MCP, permissions and hooks all in ' +
       '<project>/opencode.json, plus plugins (the <project>/.opencode/plugins/ ' +
       'directory and the plugin key). Gemini adds the project’s environment ' +
       'variables (.gemini/.env) and permissions (.gemini/settings.json); Qwen Code does ' +
       'the same in its own files (QWEN.md, .qwen/settings.json, .qwen/.env) plus hooks in ' +
-      'that same .qwen/settings.json and skills in .qwen/skills/. ' +
+      'that same .qwen/settings.json, skills in .qwen/skills/ and the rules directory ' +
+      '.qwen/rules/*.md. ' +
       'Continue lives at the project level only: the rules directory ' +
       '<project>/.continue/rules/*.md, the MCP file .continue/mcpServers/mcp.json and the ' +
       '.continue/.env variables. Goose’s project level is the <project>/.goosehints file. ' +
@@ -236,15 +255,22 @@ export const providersEn: typeof providersRu = {
       'attached files and the set-env variables.',
     mapClaudeOnly: 'Claude only',
     mapClaudeOnlyValue:
-      'Rules, token analytics, the sandbox and plugin marketplaces. This is not ' +
+      'Rules, the sandbox and plugin marketplaces. This is not ' +
       '“we did not get to it”: the other CLIs either have no such entity or build it on ' +
-      'different lines. Hooks, skills and plugins are the exception: Qwen Code, Kimi Code ' +
-      'and OpenCode have them, each in its own model, and the panel opens dedicated ' +
-      'screens for them.',
+      'different lines. Hooks, skills and plugins are the exception: Qwen Code, Kimi Code, ' +
+      'OpenCode and Codex have them, each in its own model, and the panel opens dedicated ' +
+      'screens for them. A rules directory exists for Qwen Code (~/.qwen/rules/ and ' +
+      '.qwen/rules/), Cursor and Continue too — again a screen of its own, in each one’s ' +
+      'format. Token analytics also exists for Codex and Qwen Code — the panel reads ' +
+      'their own session files; for the other CLIs the section shows an “unavailable” ' +
+      'placeholder.',
     mapPanel: 'Always available',
     mapPanelValue:
       'Overview, search, groups, history, settings and help are the panel’s own ' +
-      'sections and do not depend on the provider.',
+      'sections and do not depend on the provider. A group does not act the same ' +
+      'everywhere, though: Claude reads it from its own directories, Codex and Qwen Code ' +
+      'get the chosen groups as a layer on every run, and on the other CLIs a group does ' +
+      'not act — the panel says so on its card.',
 
     gapTitle: 'Why a section exists for one CLI and not for another',
     gapCaption:
@@ -252,7 +278,7 @@ export const providersEn: typeof providersRu = {
       'describes. Four live examples of what the rule looks like in practice.',
     gapNone: 'The entity does not exist at all',
     gapNoneText:
-      'Codex and Gemini have no notion of a “skill”: there is nowhere to put a SKILL.md ' +
+      'Gemini has no notion of a “skill”: there is nowhere to put a SKILL.md ' +
       'folder for the CLI to read. The section is not hidden “for now” — there would ' +
       'literally be nowhere to write. Qwen Code, Kimi Code and OpenCode do document such a ' +
       'folder, so the skills section is there and runs on the same code as Claude’s.',
@@ -327,6 +353,14 @@ export const providersEn: typeof providersRu = {
       'tests, but the first real write into each newly touched file is worth opening and ' +
       'looking at. The backup of the previous version is already taken, so there is ' +
       'somewhere to roll back to.',
+    noteCliTitle: 'Version and “Update CLI” follow the chosen provider',
+    noteCliText:
+      'Under the selection card the panel shows which copy of the chosen provider’s CLI it ' +
+      'runs, its version, and a newer copy if one sits on PATH. “Update CLI” runs that very ' +
+      'copy’s update subcommand and exists only for CLIs where the subcommand is checked: ' +
+      'Claude Code, Qwen Code, Codex. The others get no button — update them the way you ' +
+      'installed them. Working with another CLI needs no ~/.claude folder: without it the ' +
+      'panel keeps its data in ~/.agentdeck/data.',
 
     guideTitle: 'What this document holds',
     guideText:

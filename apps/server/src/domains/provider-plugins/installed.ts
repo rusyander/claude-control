@@ -117,6 +117,10 @@ export function readInstalledPluginsInfo(
     preservedPackages: [],
     packagesReadOnly: true,
     installed,
+    installedActions: false,
+    available: [],
+    marketplaces: [],
+    marketplaceActions: false,
     ...(target.registryPath ? { installedRegistryPath: target.registryPath } : {}),
     ...(installedError ? { installedError } : {}),
   };

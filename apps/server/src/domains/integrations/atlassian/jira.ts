@@ -197,11 +197,17 @@ export async function listTransitions(
   access: AtlassianAccess,
   key: string,
 ): Promise<JiraTransition[]> {
-  const payload = await call<{ transitions?: { id: string; name: string }[] }>(access, {
+  const payload = await call<{
+    transitions?: { id: string; name: string; to?: { name?: string } }[];
+  }>(access, {
     url: `${jiraApi(access)}/issue/${encodeURIComponent(key)}/transitions`,
     system: 'Jira',
   });
-  return (payload.transitions ?? []).map((item) => ({ id: String(item.id), name: item.name }));
+  return (payload.transitions ?? []).map((item) => ({
+    id: String(item.id),
+    name: item.name,
+    ...(item.to?.name ? { to: item.to.name } : {}),
+  }));
 }
 
 /**

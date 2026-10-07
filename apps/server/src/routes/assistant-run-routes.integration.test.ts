@@ -9,6 +9,9 @@ import type { ServerContext } from '../context.ts';
 import type { AssistantRunResult } from '@agentdeck/contracts';
 import { registerAssistantRoutes } from './assistant-routes.ts';
 
+/** Маршрут окна для проверок, которым он не важен: контура нет, шлюз не поднят. */
+const NO_ROUTE = { runRoute: () => ({ env: {} }), gatewayPort: () => 0 };
+
 /**
  * Роут `POST /api/assistant/run` (Ф6b). Проверяем структуру ответа без реальной
  * сети/spawn: cursor всегда резолвится в `none/unsupported` — раннеры не
@@ -43,7 +46,7 @@ describe('POST /api/assistant/run', () => {
 
   it('cursor (unsupported) → 200, ok=false, mode none, вызова модели нет', async () => {
     app = Fastify();
-    registerAssistantRoutes(app, makeCtx(root, 'cursor'));
+    registerAssistantRoutes(app, makeCtx(root, 'cursor'), NO_ROUTE);
     await app.ready();
 
     const res = await app.inject({

@@ -49,10 +49,21 @@ export function ProviderHookRulesEditor({ data, projectId }: ProviderHookRulesEd
   const patch = (id: number, next: Partial<RuleRow>): void =>
     setRows((prev) => prev.map((row) => (row.id === id ? { ...row, ...next } : row)));
 
-  const timeoutLabel = t(
-    data.timeoutUnit === 's' ? 'providerHooks.rules.timeoutSec' : 'providerHooks.rules.timeoutMs',
-    { min: data.timeoutMin, max: data.timeoutMax, default: data.timeoutDefault },
-  );
+  // Свои границы события (Codex: SessionEnd/Interrupt не дольше 3 с) важнее
+  // общих: подпись и подсказка поля берут их, если сервер их прислал.
+  const eventInfo = (event: string) => data.events.find((item) => item.name === event);
+  const timeoutDefaultOf = (event: string) =>
+    eventInfo(event)?.timeoutDefault ?? data.timeoutDefault;
+  const timeoutLabel = (event: string): string =>
+    t(
+      data.timeoutUnit === 's' ? 'providerHooks.rules.timeoutSec' : 'providerHooks.rules.timeoutMs',
+      {
+        min: data.timeoutMin,
+        max: eventInfo(event)?.timeoutMax ?? data.timeoutMax,
+        default: timeoutDefaultOf(event),
+      },
+    );
+  const codex = data.format === 'codex-json';
 
   return (
     <Stack gap="var(--spacing-md)">
@@ -84,7 +95,29 @@ export function ProviderHookRulesEditor({ data, projectId }: ProviderHookRulesEd
           <Stack direction="row" align="center" gap="var(--spacing-xs)">
             <Icon name="warning" size={18} />
             <Typography variant="body-sm" color="warning">
-              {t('providerHooks.rules.disabledAll')}
+              {t(
+                codex ? 'providerHooks.rules.disabledAllCodex' : 'providerHooks.rules.disabledAll',
+              )}
+            </Typography>
+          </Stack>
+        </Card>
+      )}
+
+      {data.trustRequired && (
+        <Card padding="sm">
+          <Stack direction="row" align="center" gap="var(--spacing-xs)">
+            <Icon name="info" size={18} />
+            <Typography variant="body-sm">{t('providerHooks.rules.trustRequired')}</Typography>
+          </Stack>
+        </Card>
+      )}
+
+      {data.alsoDefinedIn && (
+        <Card padding="sm">
+          <Stack direction="row" align="center" gap="var(--spacing-xs)">
+            <Icon name="warning" size={18} />
+            <Typography variant="body-sm" color="warning">
+              {t('providerHooks.rules.alsoDefinedIn', { path: data.alsoDefinedIn })}
             </Typography>
           </Stack>
         </Card>
@@ -164,10 +197,10 @@ export function ProviderHookRulesEditor({ data, projectId }: ProviderHookRulesEd
                   </Stack>
                   <Stack flex={1} minWidth={0}>
                     <TextField
-                      label={timeoutLabel}
+                      label={timeoutLabel(row.event)}
                       value={row.timeout}
                       onChange={(value) => patch(row.id, { timeout: value })}
-                      placeholder={String(data.timeoutDefault ?? '')}
+                      placeholder={String(timeoutDefaultOf(row.event) ?? '')}
                       isMono
                       disabled={readOnly}
                     />

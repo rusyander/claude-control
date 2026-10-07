@@ -247,6 +247,8 @@ export const groupSourcesEn: typeof groupSourcesRu = {
   warning_renamed: '“{{member}}”: the name is taken in global, used “{{to}}”',
   warning_skipped: '“{{member}}” not carried: {{detail}}',
   warning_failed: '“{{member}}” failed to write: {{detail}}',
+  warning_approve:
+    '“{{member}}” carried, but works only after it is approved in {{detail}} itself (the /hooks command)',
   warningDetail_kind: 'a “{{kind}}” member does not carry over to global',
   warningDetail_projectRelative: 'a path inside the project — outside it, it points nowhere',
   warningDetail_missing: 'the file is missing',

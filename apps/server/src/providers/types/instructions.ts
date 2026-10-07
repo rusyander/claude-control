@@ -52,3 +52,14 @@ export interface ProviderInstructionsRulesLocation {
   /** Абсолютный путь КАТАЛОГА правил (`~/.cursor/rules`). */
   dir: (override?: string) => string;
 }
+
+/**
+ * Каталог правил ОТДЕЛЬНО от инструкций (MAP 24): у CLI есть и свой файл
+ * инструкций, и каталог правил рядом — раздел «Правила», а не «Инструкции».
+ * Сейчас так у Qwen Code (`~/.qwen/rules/*.md`, формат `qwen-md`).
+ */
+export interface ProviderRulesConfigLocation {
+  format: 'qwen-md';
+  /** Абсолютный путь КАТАЛОГА правил (`~/.qwen/rules`). */
+  dir: (override?: string) => string;
+}

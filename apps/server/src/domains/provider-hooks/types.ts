@@ -61,7 +61,12 @@ export type HooksInfoBase = Pick<
 
 /** Границы и словарь событий формата — из адаптеров, а не из головы. */
 export interface RulesMeta {
-  events: { name: string; supportsMatcher: boolean }[];
+  events: {
+    name: string;
+    supportsMatcher: boolean;
+    timeoutMax?: number;
+    timeoutDefault?: number;
+  }[];
   timeoutUnit: 'ms' | 's';
   timeoutMin: number;
   timeoutMax: number;

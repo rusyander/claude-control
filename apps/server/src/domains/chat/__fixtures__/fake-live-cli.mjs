@@ -12,9 +12,11 @@ import { createInterface } from 'node:readline';
 
 const SESSION = 'live-session-0001';
 let turn = 0;
+// A turn the CLI starts itself after a background task closes with this origin (2.1.286).
+const NOTIFIED = { kind: 'task-notification', producer: 'session-task' };
 const out = (event) => process.stdout.write(JSON.stringify(event) + '\n');
 
-function runTurn(text) {
+function runTurn(text, origin) {
   turn += 1;
   out({ type: 'system', subtype: 'init', session_id: SESSION, model: 'fake', tools: [] });
   out({
@@ -28,6 +30,7 @@ function runTurn(text) {
     total_cost_usd: Number((0.01 * turn).toFixed(2)),
     duration_ms: 1,
     session_id: SESSION,
+    ...(origin ? { origin } : {}),
   });
 }
 
@@ -131,6 +134,26 @@ createInterface({ input: process.stdin }).on('line', (line) => {
     runTurn(`turn ${turn + 1} pid ${process.pid}`);
     return;
   }
+  if (content.includes('GHOST')) {
+    // Resume over a background task the previous process died with (claude 2.1.286,
+    // measured 06.10): the CLI first closes its own notification turn — init, then a
+    // `result` with origin task-notification, no model call, empty text — and only then
+    // runs the turn carrying this message.
+    out({ type: 'system', subtype: 'task_notification', status: 'stopped' });
+    out({ type: 'system', subtype: 'init', session_id: SESSION, model: 'fake', tools: [] });
+    out({
+      type: 'result',
+      subtype: 'success',
+      is_error: false,
+      num_turns: 0,
+      result: '',
+      origin: { kind: 'task-notification' },
+      total_cost_usd: Number((0.01 * turn).toFixed(2)),
+      session_id: SESSION,
+    });
+    runTurn(`turn ${turn + 1} pid ${process.pid}`);
+    return;
+  }
   if (content.includes('HOLDBG')) {
     // Background task that never finishes: the process holds it until it dies.
     out({ type: 'system', subtype: 'background_tasks_changed', tasks: [{ id: 'bg-hold' }] });
@@ -144,7 +167,7 @@ createInterface({ input: process.stdin }).on('line', (line) => {
     setTimeout(() => {
       out({ type: 'system', subtype: 'background_tasks_changed', tasks: [] });
       out({ type: 'system', subtype: 'task_notification', status: 'completed' });
-      runTurn(`woke pid ${process.pid}`);
+      runTurn(`woke pid ${process.pid}`, NOTIFIED);
     }, 3_000);
     return;
   }
@@ -152,7 +175,7 @@ createInterface({ input: process.stdin }).on('line', (line) => {
   if (content.includes('WAKE')) {
     setTimeout(() => {
       out({ type: 'system', subtype: 'task_notification', status: 'completed' });
-      runTurn(`woke pid ${process.pid}`);
+      runTurn(`woke pid ${process.pid}`, NOTIFIED);
     }, 150);
   }
 });

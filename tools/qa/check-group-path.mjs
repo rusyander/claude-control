@@ -33,9 +33,30 @@ import {
 const SHOTS = '.agent/screenshots/before-after/group-cards';
 const { check, openPage, finish } = await startRun(SHOTS);
 
+/**
+ * «Наш» скилл — тот, что лежит в каталоге скиллов стенда. Без подмены вид шага
+ * зависел от настоящего `~/.claude`: на стенде человека `ticket-delivery` есть,
+ * на одноразовом — нет, и тот же шаг становился «чужим».
+ */
+const OUR_SKILLS = ['ticket-delivery', 'release-notes'].map((id) => ({
+  id,
+  name: id,
+  description: `${id} — скилл стенда`,
+  body: '',
+  files: [],
+  sizeBytes: 0,
+  modifiedAt: '2026-09-26T09:00:00.000Z',
+  groupIds: [],
+  isEnabled: true,
+}));
+const stubOurSkills = (page) =>
+  page.route(/\/api\/skills(\?|$)/, (route) =>
+    route.request().method() === 'GET' ? route.fulfill({ json: OUR_SKILLS }) : route.fallback(),
+  );
+
 // ---------- 1. Строки, метки, подсказки, «Состав», перенос и удаление ----------
 {
-  const { page, state, errors, requests, close, open } = await openPage();
+  const { page, state, errors, requests, close, open } = await openPage({ patch: stubOurSkills });
   const dialog = await open(PAIR);
   const list = pathList(dialog);
   await list.waitFor({ timeout: 15000 });
@@ -72,11 +93,14 @@ const { check, openPage, finish } = await startRun(SHOTS);
     (await block.getAttribute('aria-expanded')) === 'true',
     'шаги скилла — один блок с его id, раскрыт',
   );
+  const skillStep = list.getByRole('button', { name: /^Взять тикет и завести ветку/ });
   check(
     (await list
       .getByRole('button', { name: /^Взять тикет и завести ветку наш скилл$/ })
       .count()) === 1,
     'шаг скилла помечен видом «наш скилл»',
+    // Красный без имени, которое кнопка носит на деле, не разобрать.
+    (await skillStep.allTextContents()).join(' | '),
   );
   check(
     (await list.getByRole('button', { name: /Править шаг «Взять тикет/ }).count()) === 0,

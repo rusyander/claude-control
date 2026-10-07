@@ -8,7 +8,9 @@
  * 2. Доставленная группа с MR — «Перепроверить MR» обычного цвета; щелчок
  *    уходит родителю, строка говорит «перепроверяется»; когда проверка
  *    кончилась доставкой — кнопка зелёная и с временем последней проверки.
- * 3. Отказ сервера (MR уже влит) — тост с причиной, кнопка остаётся обычной.
+ * 3. MR уже влит (отказ сервера с кодом `split-recheck-merged`) — не сбой, а
+ *    ответ: тост успеха, кнопки нет, карточка перекрашена и стоит в самом низу,
+ *    ниже доставленных, но не влитых (владелец 06.10.2026).
  *
  * Данные подменяются целиком: ни копий, ни прогонов прогон не создаёт.
  *
@@ -335,6 +337,36 @@ check(
   (await hub.locator('[data-hub-mr-closed="merged"]').count()) === 1,
   'строка говорит «MR влит»',
 );
+// Тон тоста — по роли: ошибка панели — `alert`, успех — `status` (`TONE_ROLE`).
+const toastTypes = await page
+  .locator('li[role]')
+  .evaluateAll((els) => els.map((el) => `${el.getAttribute('role')}:${el.textContent ?? ''}`));
+check(
+  toastTypes.some((text) => /^status:.*MR уже влит/.test(text)) &&
+    !toastTypes.some((text) => /^alert:.*влит/.test(text)),
+  `«влит» — тост успеха, а не ошибки: ${JSON.stringify(toastTypes).slice(0, 200)}`,
+);
+const order = await hub
+  .locator('[data-hub-row]')
+  .evaluateAll((els) =>
+    els.map((el) => `${el.getAttribute('data-hub-settled') ?? '-'}:${el.textContent ?? ''}`),
+  );
+const last = order.at(-1) ?? '';
+check(
+  /^merged:.*Экспорт/.test(last) && order.filter((row) => row.startsWith('merged:')).length === 1,
+  `влитая группа — последней карточкой: ${JSON.stringify(order.map((row) => row.slice(0, 24)))}`,
+);
+const tint = await hub.locator('[data-hub-row]').evaluateAll((els) => {
+  const merged = els.find((el) => el.getAttribute('data-hub-settled') === 'merged');
+  const plain = els.find((el) => !el.hasAttribute('data-hub-settled'));
+  const bg = (el) => (el ? getComputedStyle(el).backgroundColor : '');
+  return { merged: bg(merged), plain: bg(plain) };
+});
+check(
+  Boolean(tint.merged) && tint.merged !== tint.plain,
+  `влитая карточка перекрашена: ${tint.merged} против ${tint.plain}`,
+);
+await shot('03b-hub-merged-bottom');
 
 // Сервер кончил перепроверку доставкой: группа снова «готово», с отметкой.
 Object.assign(split.groups[1], { status: 'done', recheckedAt: CHECKED_AT });

@@ -4,8 +4,10 @@ import type {
   ProjectTestStatus,
 } from '@agentdeck/contracts';
 import { serverText } from '../../lib/server-texts.ts';
+import { statSync } from 'node:fs';
+import { join } from 'node:path';
 import { casesTouching, readGroups, readRuns } from '../project-tests.ts';
-import { touchedPaths } from '../project-git/sieve-facts.ts';
+import { run as git, touchedPaths } from '../project-git/sieve-facts.ts';
 
 /**
  * Группа разделения проверяет свою работу через блок «Тесты» (решение
@@ -16,7 +18,9 @@ import { touchedPaths } from '../project-git/sieve-facts.ts';
  * Что требуется перед «доставлено»:
  * - задетые диффом группы кейсы находятся по `codePaths` (или зоне);
  * - автоматические среди них прогнаны прогоном, записанным ПОСЛЕ старта
- *   группы, и последний их результат не красный (карантин не держит);
+ *   группы и после её последней правки кода (Ф23, проект
+ *   `.agent/item17-tests-block-design.agent.md`: «no run recorded after its last
+ *   commit»), и последний их результат не красный (карантин не держит);
  * - красный кейс любого прогона группы — тоже пробел, даже не задетый диффом;
  * - проект, где кейсы привязаны к файлам, но дифф группы не покрыт ни одним, —
  *   пробел «заведите кейс».
@@ -75,6 +79,8 @@ export function judgeTests(input: {
   runs: readonly ProjectTestRunRecord[];
   paths: readonly string[];
   startedAt?: string;
+  /** Последняя правка кода группы: коммит или файл рабочего дерева. */
+  changedAt?: string;
   command: string;
 }): TestsDeliveryGaps {
   const live = input.groups.filter((group) => !group.error);
@@ -97,7 +103,10 @@ export function judgeTests(input: {
   // Автоматический кейс засчитывается только исполненным прогоном: запись
   // «проверил» от агента (`tests-cli record`) — слово, а не команда (ревью 30.09).
   const executed = own.filter((run) => !run.attested);
-  const latestExecuted = latestResults(executed);
+  // Прогон до последней правки не видел того, что группа сдаёт (Ф23).
+  const changed = input.changedAt ? Date.parse(input.changedAt) : Number.NEGATIVE_INFINITY;
+  const fresh = executed.filter((run) => Date.parse(run.startedAt) >= changed);
+  const latestExecuted = latestResults(fresh);
   const byKey = new Map(all.map((item) => [`${item.group}:${item.testCase.id}`, item]));
 
   const touched = casesTouching(input.paths, live).cases.map(
@@ -118,6 +127,14 @@ export function judgeTests(input: {
     missing.push(
       serverText('tests-gap-no-run', {
         cases: named(automated.map((key) => key.split(':')[1] ?? key)),
+        command: input.command,
+      }),
+    );
+  } else if (automated.length > 0 && fresh.length === 0) {
+    missing.push(
+      serverText('tests-gap-stale', {
+        run: executed[0]?.id ?? '',
+        files: named(code),
         command: input.command,
       }),
     );
@@ -155,6 +172,31 @@ export function judgeTests(input: {
   };
 }
 
+/**
+ * Последняя правка кода группы (Ф23): время коммита HEAD и mtime файлов,
+ * изменённых в рабочем дереве поверх него. Коммит старше старта группы ничего
+ * не сдвигает — свежесть меряется от позднего из двух.
+ */
+async function lastChangeAt(cwd: string, paths: readonly string[]): Promise<string | undefined> {
+  const head = await git(cwd, ['log', '-1', '--format=%cI', 'HEAD']);
+  let latest = head.code === 0 ? Date.parse(head.stdout.trim()) : Number.NaN;
+  const dirty = await git(cwd, ['status', '--porcelain', '-z', '--untracked-files=all']);
+  if (dirty.code === 0) {
+    const touched = new Set(paths);
+    for (const entry of dirty.stdout.split(' ')) {
+      const path = entry.slice(3).trim();
+      if (!path || !touched.has(path)) continue;
+      try {
+        const mtime = statSync(join(cwd, path)).mtimeMs;
+        if (!(latest >= mtime)) latest = mtime;
+      } catch {
+        // Удалённый файл — времени правки нет; его покрывает коммит или старт.
+      }
+    }
+  }
+  return Number.isFinite(latest) ? new Date(latest).toISOString() : undefined;
+}
+
 /** Пробелы блока «Тесты» в копии группы: кейсы и прогоны читаются с диска копии. */
 export async function testsDeliveryGaps(input: {
   cwd: string;
@@ -166,11 +208,14 @@ export async function testsDeliveryGaps(input: {
   if (!groups.some((group) => group.cases.length > 0)) {
     return { missing: [], unchecked: 'no-cases' };
   }
+  const paths = await touchedPaths(input.cwd);
+  const changedAt = await lastChangeAt(input.cwd, paths);
   return judgeTests({
     groups,
     runs: readRuns(input.cwd),
-    paths: await touchedPaths(input.cwd),
+    paths,
     ...(input.startedAt ? { startedAt: input.startedAt } : {}),
+    ...(changedAt ? { changedAt } : {}),
     command: input.command,
   });
 }

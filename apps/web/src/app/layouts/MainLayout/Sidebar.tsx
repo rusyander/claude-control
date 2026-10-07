@@ -45,12 +45,14 @@ export function Sidebar({ isCollapsed, onToggle, isNarrow = false }: SidebarProp
   const active = activeProvider(providers);
 
   const counts: Record<string, number | undefined> = {
-    rules: overview?.rules.total,
-    hooks: overview?.hooks.total,
-    skills: overview?.skills.total,
+    // Счётчики — по активному провайдеру (сервер считает его файлы); `null` —
+    // раздел им не посчитан, и число у пункта не рисуется.
+    rules: overview?.rules?.total,
+    hooks: overview?.hooks?.total,
+    skills: overview?.skills?.total,
     scripts: overview?.scripts.total,
-    mcp: overview?.mcp.total,
-    permissions: overview
+    mcp: overview?.mcp?.total,
+    permissions: overview?.permissions
       ? overview.permissions.allow + overview.permissions.ask + overview.permissions.deny
       : undefined,
     groups: overview?.groups.total,

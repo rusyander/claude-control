@@ -6,6 +6,8 @@ import { readSkills } from './skills.ts';
 import { readMcpServers } from './mcp.ts';
 import { readPermissions } from './permissions.ts';
 import { readScripts } from './scripts.ts';
+import { getActiveProvider } from '../providers/registry.ts';
+import { buildProviderSectionCounts, overviewProvider } from './overview-provider.ts';
 
 /**
  * Сводка главной страницы: сколько чего заведено и сколько из этого действует.
@@ -15,6 +17,20 @@ import { readScripts } from './scripts.ts';
  * счётчики, и гнать через сеть весь конфиг ради них незачем.
  */
 export function buildOverview(paths: ClaudePaths, store: AppStore): Overview {
+  const provider = getActiveProvider(store);
+  // Активен другой CLI — разделы считаются по ЕГО файлам. Раньше обзор под Qwen
+  // показывал цифры из `~/.claude`, а на машине без Claude — нули с чужой подписью.
+  // «Скрипты» и группы — разделы самой панели, они от провайдера не зависят.
+  if (provider.id !== 'claude') {
+    return {
+      provider: overviewProvider(provider),
+      ...buildProviderSectionCounts(store),
+      // Привязку скрипта к событию знают только хуки Claude — «не привязан»
+      // под другим CLI был бы ложной тревогой, поэтому только общее число.
+      scripts: { total: readScripts(paths.hooks, []).length, unused: 0 },
+      groups: { total: store.getGroups().length },
+    };
+  }
   const rules = readRules(paths.claudeMd, store);
   // Обзор отвечает на вопрос «что сейчас действует», поэтому локальные
   // настройки считаются наравне с основными.
@@ -28,6 +44,7 @@ export function buildOverview(paths: ClaudePaths, store: AppStore): Overview {
   );
 
   return {
+    provider: overviewProvider(provider),
     rules: { total: rules.length, enabled: rules.filter((item) => item.isEnabled).length },
     hooks: {
       total: hooks.length,
@@ -36,11 +53,7 @@ export function buildOverview(paths: ClaudePaths, store: AppStore): Overview {
       broken: hooks.filter((item) => item.scriptPath && item.scriptExists === false).length,
     },
     skills: { total: skills.length, enabled: skills.filter((item) => item.isEnabled).length },
-    scripts: {
-      total: scripts.length,
-      // Тесты и фикстуры к хукам не привязывают по замыслу — они не «забытые».
-      unused: scripts.filter((item) => !item.isUsed && !item.isTest).length,
-    },
+    scripts: countScripts(scripts),
     mcp: {
       total: servers.length,
       enabled: servers.filter((item) => item.isEnabled).length,
@@ -53,5 +66,13 @@ export function buildOverview(paths: ClaudePaths, store: AppStore): Overview {
       deny: permissions.filter((item) => item.decision === 'deny').length,
     },
     groups: { total: store.getGroups().length },
+  };
+}
+
+function countScripts(scripts: ReturnType<typeof readScripts>): Overview['scripts'] {
+  return {
+    total: scripts.length,
+    // Тесты и фикстуры к хукам не привязывают по замыслу — они не «забытые».
+    unused: scripts.filter((item) => !item.isUsed && !item.isTest).length,
   };
 }

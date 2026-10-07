@@ -1,0 +1,6 @@
+{"type":"init","timestamp":"2026-10-06T19:26:36.786Z","session_id":"f4c1d7ec-4fd6-43bc-90a4-f672aacd1435","model":"gemini-2.5-flash"}
+{"type":"message","timestamp":"2026-10-06T19:26:36.787Z","role":"user","content":"QA_WRITE"}
+{"type":"tool_use","timestamp":"2026-10-06T19:26:36.850Z","tool_name":"write_file","tool_id":"write_file__write_file_1791314796819_0","parameters":{"file_path":"p.txt","content":"X"}}
+{"type":"tool_result","timestamp":"2026-10-06T19:26:36.892Z","tool_id":"write_file__write_file_1791314796819_0","status":"success"}
+{"type":"message","timestamp":"2026-10-06T19:26:36.902Z","role":"assistant","content":"AFTER_TOOL","delta":true}
+{"type":"result","timestamp":"2026-10-06T19:26:36.904Z","status":"success","stats":{"total_tokens":14,"input_tokens":10,"output_tokens":4,"cached":0,"input":10,"duration_ms":118,"tool_calls":1,"models":{"gemini-2.5-flash":{"total_tokens":14,"input_tokens":10,"output_tokens":4,"cached":0,"input":10}}}}

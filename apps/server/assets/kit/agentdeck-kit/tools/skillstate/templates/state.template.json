@@ -1,0 +1,10 @@
+{
+  "task": "<one line: what this batch does — the worker reads it as the header of Σ>",
+  "units_pending": ["<unit id, or an object with an `id` field plus whatever the procedure needs>"],
+  "units_done": [],
+  "units_failed": [],
+  "decisions": {},
+  "conventions": {},
+  "blockers": [],
+  "notes": {}
+}

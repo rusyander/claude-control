@@ -7,7 +7,8 @@ import type {
 } from '@agentdeck/contracts';
 import { readTextFile } from '../../lib/safe-io.ts';
 import { SECTION_MAX_FILE_BYTES, fileSizeOf, walkSectionFiles } from '../../lib/section-fs.ts';
-import { MdcFormatError, readMdcRule } from '../../lib/cursor-mdc.ts';
+import { MdcFormatError } from '../../lib/cursor-mdc.ts';
+import { ruleCodec } from './codec.ts';
 import { RuleNotEditableError, RuleNotFoundError } from './errors.ts';
 import { resolveRulePath, ruleExtension, toRelative } from './paths.ts';
 import type { ProviderRulesTarget } from './types.ts';
@@ -30,7 +31,7 @@ function summarize(target: ProviderRulesTarget, fullPath: string): ProviderRuleS
     size: fileSizeOf(fullPath),
   };
   try {
-    const { fields } = readMdcRule(readTextFile(fullPath));
+    const { fields } = ruleCodec(target.format).read(readTextFile(fullPath));
     return { ...base, ...fields, frontmatterOk: true };
   } catch (error) {
     if (error instanceof MdcFormatError) {
@@ -107,7 +108,7 @@ export function readProviderRule(target: ProviderRulesTarget, rawPath: string): 
   const text = readTextFile(fullPath);
   const base = { path: toRelative(target, fullPath), fullPath };
   try {
-    const rule = readMdcRule(text);
+    const rule = ruleCodec(target.format).read(text);
     return { ...base, ...rule.fields, body: rule.body, otherKeys: rule.otherKeys, readOnly: false };
   } catch (error) {
     if (error instanceof MdcFormatError) {

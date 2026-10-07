@@ -95,6 +95,9 @@ export function ChatGuideSections({ tr }: SectionProps) {
           <GuideStep title={g('sWorktrees')} text={g('sWorktreesText')}>
             <HelpShot topic="chat" scenario="split" frame="07-worktrees" side="panel" />
           </GuideStep>
+          <GuideStep title={g('sMoveTasks')} text={g('sMoveTasksText')}>
+            <HelpShot topic="chat" scenario="split" frame="08-move-tasks" side="panel" />
+          </GuideStep>
         </GuideSteps>
       </HelpSection>
 

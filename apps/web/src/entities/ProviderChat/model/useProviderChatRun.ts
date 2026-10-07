@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import type { ProviderChatQueued } from '@agentdeck/contracts';
+import type { ProviderChatPermission, ProviderChatQueued } from '@agentdeck/contracts';
 import { toErrorMessage } from '@shared/api/client';
 import {
+  answerProviderChatPermission,
   cancelProviderChatQueued,
   openProviderChatStream,
   providerChatKeys,
   readProviderChatStatus,
   sendProviderChatMessage,
+  sendProviderChatQueued,
   stopProviderChat,
 } from '../api/ProviderChatApi';
 import { isAnswerRunningRefusal } from './sendRefusal';
@@ -25,6 +27,11 @@ export interface ProviderChatRunState {
   /** Текст, напечатанный к этому моменту (пустой — ответа сейчас нет). */
   partial: string;
   isRunning: boolean;
+  /**
+   * Идущий ход принимает сообщения посреди ответа (В1): отправленное сейчас
+   * уйдёт в этот же ход. `false` — дождётся конца ответа в очереди.
+   */
+  isSteerable: boolean;
   /** Текст ошибки последнего ответа: показывается один раз, до нового вопроса. */
   error?: string;
   /**
@@ -32,18 +39,34 @@ export interface ProviderChatRunState {
    * концу ответа. Серверная, поэтому одна на все вкладки и телефон.
    */
   queued: ProviderChatQueued[];
+  /**
+   * Очередь стоит: ход остановили или панель перезапускалась — сама она не
+   * уйдёт, нужна кнопка «Отправить» (Ф13).
+   */
+  queueHeld: boolean;
+  /**
+   * Просьбы CLI о разрешении, ждущие человека («Разрешить правки» выключен).
+   * Серверные: одни на все вкладки и телефон, ответ в одной снимает их везде.
+   */
+  permissions: ProviderChatPermission[];
+  answerPermission: (askId: string, decision: 'allow' | 'deny') => Promise<void>;
   send: (text: string, attachments?: string[]) => Promise<void>;
   stop: () => Promise<void>;
   /** Убрать сообщение из очереди, пока оно не ушло. */
   cancelQueued: (queuedId: string) => Promise<void>;
+  /** Отправить ждущее сообщение очереди. */
+  sendQueued: (queuedId: string) => Promise<void>;
 }
 
 export function useProviderChatRun(chatId: string | undefined): ProviderChatRunState {
   const queryClient = useQueryClient();
   const [partial, setPartial] = useState('');
   const [isRunning, setIsRunning] = useState(false);
+  const [isSteerable, setIsSteerable] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
   const [queued, setQueued] = useState<ProviderChatQueued[]>([]);
+  const [queueHeld, setQueueHeld] = useState(false);
+  const [permissions, setPermissions] = useState<ProviderChatPermission[]>([]);
   const abortRef = useRef<AbortController | undefined>(undefined);
   // Ответ идёт — следующее сообщение ставится в очередь; ref, чтобы второе
   // нажатие до перерисовки тоже знало об этом.
@@ -60,14 +83,19 @@ export function useProviderChatRun(chatId: string | undefined): ProviderChatRunS
       try {
         const status = await readProviderChatStatus(id);
         setIsRunning(status.isRunning);
+        setIsSteerable(Boolean(status.steerable));
         setPartial(status.isRunning ? status.partial : '');
         setQueued(status.queued ?? []);
+        setQueueHeld(Boolean(status.queueHeld));
+        setPermissions(status.permissions ?? []);
         // Конец ответа отпустил очередь: сервер уже начал следующий ход —
         // подключаемся к нему, иначе его текст появился бы только после F5.
         if (status.isRunning) void attachRef.current?.(id);
       } catch {
         setIsRunning(false);
+        setIsSteerable(false);
         setPartial('');
+        setPermissions([]);
       }
     },
     [queryClient],
@@ -85,6 +113,13 @@ export function useProviderChatRun(chatId: string | undefined): ProviderChatRunS
           (event) => {
             if (event.type === 'delta') setPartial((prev) => prev + (event.text ?? ''));
             else if (event.type === 'error') setError(event.error);
+            else if (event.type === 'steerable') setIsSteerable(true);
+            else if (event.type === 'permissions') setPermissions(event.permissions ?? []);
+            // Реплику подхватил идущий ход (В1) — она уже в переписке, и её видят
+            // все вкладки, а не только та, что её отправила.
+            else if (event.type === 'steered') {
+              void queryClient.invalidateQueries({ queryKey: providerChatKeys.detail(id) });
+            }
           },
           controller.signal,
         );
@@ -99,7 +134,7 @@ export function useProviderChatRun(chatId: string | undefined): ProviderChatRunS
       if (abortRef.current === controller) abortRef.current = undefined;
       await settle(id);
     },
-    [settle],
+    [settle, queryClient],
   );
 
   attachRef.current = attach;
@@ -116,6 +151,8 @@ export function useProviderChatRun(chatId: string | undefined): ProviderChatRunS
         if (!status.isRunning) return settle(id);
         setPartial(status.partial);
         setIsRunning(true);
+        setIsSteerable(Boolean(status.steerable));
+        setPermissions(status.permissions ?? []);
       } catch {
         return settle(id);
       }
@@ -128,8 +165,11 @@ export function useProviderChatRun(chatId: string | undefined): ProviderChatRunS
   useEffect(() => {
     setPartial('');
     setIsRunning(false);
+    setIsSteerable(false);
     setError(undefined);
     setQueued([]);
+    setQueueHeld(false);
+    setPermissions([]);
     if (!chatId) return;
 
     let cancelled = false;
@@ -138,9 +178,12 @@ export function useProviderChatRun(chatId: string | undefined): ProviderChatRunS
         const status = await readProviderChatStatus(chatId);
         if (cancelled) return;
         setQueued(status.queued ?? []);
+        setQueueHeld(Boolean(status.queueHeld));
         if (!status.isRunning) return;
         setPartial(status.partial);
         setIsRunning(true);
+        setIsSteerable(Boolean(status.steerable));
+        setPermissions(status.permissions ?? []);
         void attach(chatId);
       } catch {
         // Разговора нет или сервер недоступен — показывать нечего.
@@ -158,8 +201,9 @@ export function useProviderChatRun(chatId: string | undefined): ProviderChatRunS
     async (text: string, attachments?: string[]) => {
       if (!chatId) return;
 
-      // Ответ идёт: сообщение ждёт его конца в очереди сервера, а не отказ.
-      // Идущий ход не трогаем — ни индикатор, ни напечатанное.
+      // Ответ идёт: сообщение уходит в этот же ход, если у CLI есть вход посреди
+      // ответа (В1), иначе ждёт его конца в очереди сервера. Идущий ход не
+      // трогаем — ни индикатор, ни напечатанное.
       if (runningRef.current) {
         try {
           const reply = await sendProviderChatMessage(chatId, {
@@ -169,6 +213,10 @@ export function useProviderChatRun(chatId: string | undefined): ProviderChatRunS
           });
           if ('queued' in reply) {
             setQueued((items) => [...items, reply.queued]);
+            return;
+          }
+          if (reply.steered) {
+            void queryClient.invalidateQueries({ queryKey: providerChatKeys.detail(chatId) });
             return;
           }
           // Ответ успел кончиться — сообщение ушло сразу, как обычное.
@@ -183,6 +231,7 @@ export function useProviderChatRun(chatId: string | undefined): ProviderChatRunS
 
       setError(undefined);
       setIsRunning(true);
+      setIsSteerable(false);
       try {
         await sendProviderChatMessage(chatId, {
           text,
@@ -233,5 +282,61 @@ export function useProviderChatRun(chatId: string | undefined): ProviderChatRunS
     [chatId],
   );
 
-  return { partial, isRunning, ...(error ? { error } : {}), queued, send, stop, cancelQueued };
+  const sendQueued = useCallback(
+    async (queuedId: string) => {
+      if (!chatId) return;
+      setError(undefined);
+      setIsRunning(true);
+      setIsSteerable(false);
+      setQueueHeld(false);
+      setQueued((items) => items.filter((item) => item.id !== queuedId));
+      try {
+        await sendProviderChatQueued(chatId, queuedId);
+      } catch (cause) {
+        setError(toErrorMessage(cause));
+        // Ход уже идёт (другая вкладка) — подключаемся; иначе сверка вернёт
+        // очередь как есть.
+        if (isAnswerRunningRefusal(cause)) return followRunning(chatId);
+        setIsRunning(false);
+        return settle(chatId);
+      }
+      setPartial('');
+      void queryClient.invalidateQueries({ queryKey: providerChatKeys.detail(chatId) });
+      await attach(chatId);
+    },
+    [chatId, attach, followRunning, settle, queryClient],
+  );
+
+  /**
+   * Ответ на просьбу о разрешении. Карточка снимается сразу; не дошло (ход
+   * кончился, ответили в другой вкладке) — ошибка показывается, а список сверит
+   * событие сервера.
+   */
+  const answerPermission = useCallback(
+    async (askId: string, decision: 'allow' | 'deny') => {
+      if (!chatId) return;
+      setPermissions((items) => items.filter((item) => item.id !== askId));
+      try {
+        await answerProviderChatPermission(chatId, askId, decision);
+      } catch (cause) {
+        setError(toErrorMessage(cause));
+      }
+    },
+    [chatId],
+  );
+
+  return {
+    partial,
+    isRunning,
+    isSteerable,
+    ...(error ? { error } : {}),
+    queued,
+    queueHeld,
+    permissions,
+    answerPermission,
+    send,
+    stop,
+    cancelQueued,
+    sendQueued,
+  };
 }

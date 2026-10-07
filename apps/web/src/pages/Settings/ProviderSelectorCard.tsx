@@ -17,6 +17,7 @@ import {
   activeCliHint,
 } from '@entities/Provider';
 import { useProviderChecks, findCheck, trustBadge } from '@entities/ProviderCheck';
+import { CliInfoPanel } from '@entities/ChatCli';
 import styles from './SettingsPage.module.scss';
 
 /**
@@ -88,6 +89,9 @@ export function ProviderSelectorCard() {
             </Typography>
           </div>
         )}
+
+        {/* Версия и «Обновить CLI» — того CLI, которым панель сейчас работает. */}
+        {!cliHint && <CliInfoPanel withUpdate providerId={activeId} />}
 
         <Stack gap="var(--spacing-xs)">
           {data.providers.map((provider) => {

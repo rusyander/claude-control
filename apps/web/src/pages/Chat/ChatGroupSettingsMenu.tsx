@@ -1,25 +1,16 @@
 import { useTranslation } from 'react-i18next';
 import type { ChatGroupChoice } from '@agentdeck/contracts/chat-group-settings';
-import type { GroupKey } from '@agentdeck/contracts/group-sources';
-import {
-  groupKeyOf,
-  inactivePairSides,
-  isForeignGlobal,
-  pairsOf,
-  scopeOf,
-} from '@agentdeck/contracts/group-sources';
+import { ChatGroupPicker } from '@features/ChatGroupPicker';
 import { useChats } from '@entities/Chat';
-import { useGroups, useProjectGroupChoice } from '@entities/Group';
 import {
   ownSettings,
   useChatGroupSettings,
   useSetChatGroupSettings,
 } from '@entities/ChatGroupSettings';
-import { SelectField } from '@shared/ui/select-field';
 import { Stack } from '@shared/ui/stack';
 import { Toggle } from '@shared/ui/toggle';
 import { Typography } from '@shared/ui/typography';
-import { groupScopePath, samePath } from './lib/groupScopePath';
+import { groupScopePath } from './lib/groupScopePath';
 import type { ChatGroupSettingsMenuProps } from './ChatGroupSettingsMenu.types';
 import styles from './ChatHeaderMenu.module.scss';
 
@@ -39,7 +30,6 @@ export function ChatGroupSettingsMenu({
   const { t } = useTranslation();
   const settings = useChatGroupSettings(chatId, sessionId);
   const save = useSetChatGroupSettings();
-  const groups = useGroups();
   const chats = useChats();
   const view = settings.data;
 
@@ -69,47 +59,6 @@ export function ChatGroupSettingsMenu({
       settings: { ...base, ...patch },
     });
   };
-  // Из пары «проектная — её глобальная копия» в проекте действует одна сторона;
-  // другую закрепить нельзя — то же правило, что у каталога разбора на сервере
-  // (F-107). Выбор не прочитался — действует проектная, как и у сервера.
-  const pairChoice = useProjectGroupChoice(scopePath);
-  const inactive = inactivePairSides(
-    scopePath ? pairsOf(groups.data ?? [], (path) => samePath(path, scopePath)) : [],
-    pairChoice.data?.choices ?? null,
-  );
-  const options = [
-    { value: 'auto', label: t('chat.groupSettings.auto') },
-    ...(groups.data ?? [])
-      .filter((group) => {
-        // Глобальная копия для другой CLI держит её сущности — чату Claude не годится.
-        if (isForeignGlobal(group.scope)) return false;
-        if (inactive.has(groupKeyOf(group))) return false;
-        const scope = scopeOf(group);
-        return scope.kind === 'global' || (scopePath ? samePath(scope.path, scopePath) : false);
-      })
-      .map((group) => ({
-        value: groupKeyOf(group),
-        label:
-          scopeOf(group).kind === 'project'
-            ? t('chat.groupSettings.projectGroup', { name: group.name })
-            : group.name,
-      })),
-  ];
-  // Выбранная группа могла исчезнуть (удалена, другой проект) — значение
-  // остаётся видимым, иначе select молча показал бы «Авто», а прогон шёл бы иначе.
-  // Закреплённая раньше неактивная сторона пары названа так, а не «нет в списке».
-  if (view && !options.some((option) => option.value === view.groupChoice)) {
-    const hidden = inactive.has(view.groupChoice as GroupKey)
-      ? groups.data?.find((group) => groupKeyOf(group) === view.groupChoice)
-      : undefined;
-    options.push({
-      value: view.groupChoice,
-      label: hidden
-        ? t('chat.groupSettings.inactivePairSide', { name: hidden.name })
-        : t('chat.groupSettings.missingGroup', { key: view.groupChoice }),
-    });
-  }
-
   const hasOwn = Boolean(view && view.parentChatId && Object.keys(ownSettings(view)).length > 0);
   const failed = settings.isError;
   // Вид не загрузился — значение неизвестно: включённая галочка утверждала бы
@@ -136,11 +85,10 @@ export function ChatGroupSettingsMenu({
 
       {view && (
         <div className={styles.row}>
-          <SelectField
-            label={t('chat.groupSettings.group')}
-            value={view.groupChoice}
-            onChange={(value) => write({ groupChoice: value as ChatGroupChoice })}
-            options={options}
+          <ChatGroupPicker
+            view={view}
+            scopePath={scopePath}
+            onChange={(groupChoice) => write({ groupChoice })}
             hint={view.groupChoiceInherited ? fromParent : t('chat.groupSettings.groupHint')}
           />
         </div>

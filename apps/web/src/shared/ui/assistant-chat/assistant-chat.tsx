@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation } from '@tanstack/react-query';
 import { apiClient } from '@shared/api/client';
+import { serverFieldText } from '@shared/config/i18n';
 import { useSpeechRecognition } from '@shared/hooks/use-speech-recognition';
 import { useMicLevels } from '@shared/hooks/use-mic-levels';
 import { speechErrorMessageKey } from '@shared/lib/speech';
@@ -35,18 +36,29 @@ interface AssistResponse {
   /** Поля, где маску секрета вернуть не удалось: форма их не трогает. */
   kept?: string[];
   error?: string;
+  /** Код отказа маршрута провайдера: причина называется словарём клиента. */
+  messageCode?: string;
+  params?: Record<string, string | number>;
 }
 
 /**
- * Чат-помощник рядом с формой. Работает через сам Claude Code по вашей
- * подписке, поэтому отдельных ключей не требует. Ответ приходит структурой
+ * Чат-помощник рядом с формой. Идёт маршрутом активного провайдера (профиль
+ * «Ассистент панели», Claude Code по подписке или чужой CLI с маршрутом его
+ * чата), а не может — отказывает кодом с причиной. Ответ приходит структурой
  * «пояснение + значения полей», и поля применяются к форме сразу.
  *
  * Переписка живёт только пока открыто окно: помощник нужен для одного
  * заполнения, а не для длинной истории. Сессии у помощника нет (лёгкое окно,
  * D4 28.09) — прежние реплики едут в каждом запросе (`history`).
  */
-export function AssistantChat({ kind, fields, schema, onApply, placeholder }: AssistantChatProps) {
+export function AssistantChat({
+  kind,
+  fields,
+  schema,
+  onApply,
+  placeholder,
+  loading = false,
+}: AssistantChatProps) {
   const { t, i18n } = useTranslation();
   const [messages, setMessages] = useState<AssistantMessage[]>([]);
   const [input, setInput] = useState('');
@@ -77,6 +89,11 @@ export function AssistantChat({ kind, fields, schema, onApply, placeholder }: As
   useEffect(() => {
     feedRef.current?.scrollTo({ top: feedRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages]);
+
+  // Отказ с кодом (чужой CLI, контур, нет ключа) называется как есть: общее
+  // «проверьте Claude Code» при активном Qwen посылало бы чинить не то.
+  const failureText = (data: AssistResponse): string =>
+    data.messageCode ? serverFieldText(data, 'error') : t('assistant.failed');
 
   const ask = useMutation({
     mutationFn: async ({
@@ -118,7 +135,7 @@ export function AssistantChat({ kind, fields, schema, onApply, placeholder }: As
         {
           id: `a-${Date.now()}`,
           role: 'assistant',
-          text: data.error ? t('assistant.failed') : data.reply || t('assistant.noReply'),
+          text: data.error ? failureText(data) : data.reply || t('assistant.noReply'),
           ...(data.error ? { failed: true } : {}),
           changedFields: changed,
           ...(missed.length > 0 ? { missed } : {}),
@@ -131,7 +148,7 @@ export function AssistantChat({ kind, fields, schema, onApply, placeholder }: As
 
   const send = (): void => {
     const text = input.trim();
-    if (!text || ask.isPending || attach.isPreparing) return;
+    if (!text || loading || ask.isPending || attach.isPreparing) return;
 
     const images = attach.images;
     // История — до этой реплики: сама просьба едет отдельным полем.
@@ -254,6 +271,17 @@ export function AssistantChat({ kind, fields, schema, onApply, placeholder }: As
             </Typography>
           )}
 
+          {loading && (
+            <Typography
+              variant="caption"
+              color="muted"
+              className={styles.loadingHint}
+              data-assistant-loading
+            >
+              {t('assistant.loadingLists')}
+            </Typography>
+          )}
+
           <ImageAttachTray attach={attach} className={styles.attachTray} />
           <ImageAttachZone attach={attach} className={styles.composer}>
             <textarea
@@ -295,7 +323,7 @@ export function AssistantChat({ kind, fields, schema, onApply, placeholder }: As
                 icon={<Icon name="send" size={24} />}
                 aria-label={t('assistant.send')}
                 onClick={send}
-                disabled={!input.trim() || ask.isPending || attach.isPreparing}
+                disabled={!input.trim() || loading || ask.isPending || attach.isPreparing}
                 isLoading={ask.isPending}
               />
             </div>

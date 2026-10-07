@@ -1,7 +1,7 @@
 import { createReadStream } from 'node:fs';
 import { createInterface } from 'node:readline';
 import { basename } from 'node:path';
-import { estimateCost } from '../pricing.ts';
+import { estimateCost, findPricing } from '../pricing.ts';
 import { localDay, normalizeProject, shortenProject } from './keys.ts';
 import { addUsage, cacheCreationTokens, emptyTotals, upsert } from './totals.ts';
 import type { Accumulator, RawEntry, RawUsage, ScanOptions } from './types.ts';
@@ -18,16 +18,41 @@ import type { Accumulator, RawEntry, RawUsage, ScanOptions } from './types.ts';
 /** Сессия считается активной, если её файл менялся за последние 10 минут. */
 const ACTIVE_WINDOW_MS = 10 * 60 * 1000;
 
+/** Строки транскрипта Claude Code — записи как есть; недописанная строка пропускается. */
+async function* claudeEntries(lines: AsyncIterable<string>): AsyncGenerator<RawEntry> {
+  for await (const line of lines) {
+    if (!line.trim()) continue;
+    try {
+      yield JSON.parse(line) as RawEntry;
+    } catch {
+      // недописанная строка активной сессии
+    }
+  }
+}
+
+/** Построчное чтение файла потоком. */
+export function fileLines(path: string): AsyncIterable<string> {
+  const stream = createReadStream(path, { encoding: 'utf8' });
+  return createInterface({ input: stream, crlfDelay: Infinity });
+}
+
+/**
+ * Записи одного файла сессии в форме транскрипта Claude Code. Чужой CLI
+ * (`foreign.ts`) переводит свои строки в эту же форму — дальше один и тот же
+ * учёт: период, повторы ответа, проект, сессия, инструменты.
+ */
+export type EntrySource = (lines: AsyncIterable<string>) => AsyncIterable<RawEntry>;
+
 export async function scanFile(
   file: { path: string; mtimeMs: number },
   since: number,
   until: number,
   acc: Accumulator,
-  options: Pick<ScanOptions, 'pricing' | 'pricingEntries'>,
+  options: Pick<ScanOptions, 'pricing' | 'pricingEntries' | 'strictPricing'>,
+  source: EntrySource = claudeEntries,
 ): Promise<void> {
   const isActive = Date.now() - file.mtimeMs < ACTIVE_WINDOW_MS;
-  const stream = createReadStream(file.path, { encoding: 'utf8' });
-  const lines = createInterface({ input: stream, crlfDelay: Infinity });
+  const lines = source(fileLines(file.path));
   /**
    * Отложенные ответы этого файла: ключ — сам ответ модели, значение — САМАЯ
    * ПОЛНАЯ его строка.
@@ -72,11 +97,12 @@ export async function scanFile(
     // Цену берём НА МОМЕНТ записи, а не на сегодня: у части моделей цена
     // менялась по расписанию (вводная цена Sonnet 5), и пересчёт старого
     // расхода по сегодняшнему прайсу дал бы неверную историю.
-    const cost = estimateCost(model, tokens, {
-      overrides: options.pricing,
-      entries: options.pricingEntries,
-      at: time,
-    });
+    const lookup = { overrides: options.pricing, entries: options.pricingEntries, at: time };
+    // Модель чужого CLI без цены в прайсе — ноль и пометка «без цены», а не
+    // запасная ставка Claude: расход GPT по тарифу Sonnet — выдуманные деньги.
+    const unpriced = options.strictPricing === true && !findPricing(model, lookup);
+    if (unpriced) acc.unpriced.add(model);
+    const cost = unpriced ? 0 : estimateCost(model, tokens, lookup);
 
     addUsage(acc.overall, usage);
     acc.cost += cost;
@@ -98,17 +124,16 @@ export async function scanFile(
     trackSession(acc, entry, cwd, usage, cost, model, isActive, file.path);
   };
 
-  for await (const line of lines) {
-    if (!line.trim()) continue;
-
-    let entry: RawEntry;
-    try {
-      entry = JSON.parse(line) as RawEntry;
-    } catch {
-      continue; // недописанная строка активной сессии
-    }
-
+  for await (const entry of lines) {
     launchCwd ??= entry.cwd;
+
+    // Заголовок разговора лежит в записи без метки времени, поэтому читается ДО
+    // отсечки по периоду: иначе он не доберётся ни до одной сессии. Побеждает
+    // последний — CLI переименовывает разговор по мере работы.
+    if (entry.type === 'ai-title' && entry.aiTitle) {
+      acc.sessionTitles.set(sessionKey(entry, file.path), entry.aiTitle);
+      continue;
+    }
 
     // Период отсекается ДО счётчика инструментов. Раньше инструменты считались
     // по всем строкам файлов, переживших фильтр по mtime: долгоживущий транскрипт
@@ -122,7 +147,7 @@ export async function scanFile(
     const time = new Date(stamp).getTime();
     if (Number.isNaN(time) || time < since || time > until) continue;
 
-    countTools(entry, acc);
+    countTools(entry, acc, file.path);
 
     const usage = entry.message?.usage;
     if (entry.type !== 'assistant' || !usage) continue;
@@ -184,7 +209,7 @@ function trackSession(
   isActive: boolean,
   filePath: string,
 ): void {
-  const sessionId = entry.sessionId ?? basename(filePath, '.jsonl');
+  const sessionId = sessionKey(entry, filePath);
   const existing = acc.sessions.get(sessionId);
 
   if (!existing) {
@@ -214,10 +239,23 @@ function trackSession(
   }
 }
 
-/** Считает вызовы инструментов: видно, чем агент реально пользуется. */
-function countTools(entry: RawEntry, acc: Accumulator): void {
+/** Ключ сессии: номер из записи, а у старых транскриптов без него — имя файла. */
+function sessionKey(entry: RawEntry, filePath: string): string {
+  return entry.sessionId ?? basename(filePath, '.jsonl');
+}
+
+/**
+ * Считает вызовы инструментов: видно, чем агент реально пользуется — по всему
+ * периоду и отдельно по сессии (из них собирается `topTools` сессии).
+ */
+function countTools(entry: RawEntry, acc: Accumulator, filePath: string): void {
   for (const part of entry.message?.content ?? []) {
     if (part.type !== 'tool_use' || !part.name) continue;
     acc.tools.set(part.name, (acc.tools.get(part.name) ?? 0) + 1);
+
+    const key = sessionKey(entry, filePath);
+    const own = acc.sessionTools.get(key) ?? new Map<string, number>();
+    own.set(part.name, (own.get(part.name) ?? 0) + 1);
+    acc.sessionTools.set(key, own);
   }
 }

@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import type { Analytics } from '@agentdeck/contracts';
 import { buildResult } from './report.ts';
 import { scanFile } from './scan-file.ts';
+import { collectForeignFiles, entriesOf } from './foreign.ts';
 import { emptyTotals } from './totals.ts';
 import type { Accumulator, ScanOptions } from './types.ts';
 
@@ -31,13 +32,20 @@ export async function scanAnalytics(
     byHour: new Map(),
     sessions: new Map(),
     tools: new Map(),
+    sessionTools: new Map(),
+    sessionTitles: new Map(),
+    unpriced: new Set(),
   };
 
   const until =
     options.until !== undefined && Number.isFinite(options.until) ? options.until : Date.now();
 
-  const files = collectTranscripts(projectsDir, since);
-  for (const file of files) await scanFile(file, since, until, accumulator, options);
+  const source = options.source;
+  const files = source
+    ? collectForeignFiles(source, since)
+    : collectTranscripts(projectsDir, since);
+  const entries = source ? entriesOf(source) : undefined;
+  for (const file of files) await scanFile(file, since, until, accumulator, options, entries);
 
   return buildResult(accumulator, options, files.length, Date.now() - startedAt, since, until);
 }

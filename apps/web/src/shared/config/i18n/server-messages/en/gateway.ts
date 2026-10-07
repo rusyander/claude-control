@@ -48,6 +48,13 @@ export const gatewayEn: Record<GatewayMessageCode, string> = {
     'The gateway address carries an unknown section mark — the request was not sent. Apply the contour again to rewrite the address',
   'gateway-body-too-large': 'The request body is over 32 MB — the gateway does not accept it',
   'gateway-body-not-json': 'The request body does not parse as JSON',
+  'gateway-responses-previous-id':
+    'The gateway does not support previous_response_id: send the whole conversation in input (store: false)',
+  'gateway-responses-not-request':
+    'A /v1/responses body without model or input is not a Responses request',
+  'gateway-google-not-request':
+    'A Gemini request body without contents is not a generateContent request',
+  'gateway-google-empty': 'The Gemini request has no message to answer',
   'gateway-answer-not-model':
     'The contour did not answer with a stream, and its body does not parse as a model answer',
   'gateway-client-gone': 'The client disconnected before the answer ended',

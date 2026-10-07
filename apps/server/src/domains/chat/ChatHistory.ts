@@ -9,6 +9,7 @@ import {
   FULL_READ_LIMIT,
   fileSessionId,
   findTranscript,
+  readAllRecords,
   readHeadRecords,
   readRecords,
   streamLines,
@@ -327,6 +328,14 @@ export function findSessionStart(projectsDir: string, sessionId: string): string
  */
 export function readTranscriptRecords(path: string): TranscriptRecord[] {
   return readRecords(path, 0);
+}
+
+/**
+ * Транскрипт целиком, любого размера — для разбора, которому нужна середина
+ * («Сделать кейс», Ф15). Ленте и спискам хватает `readTranscriptRecords`.
+ */
+export function readWholeTranscriptRecords(path: string): TranscriptRecord[] {
+  return readAllRecords(path);
 }
 
 /**

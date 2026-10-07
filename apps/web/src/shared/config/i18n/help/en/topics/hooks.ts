@@ -231,7 +231,16 @@ export const hooksEn: typeof hooksRu = {
       'block the action with exit code 2. Kimi has no project hooks at all. The guard is ' +
       'stricter than Qwen’s: a flat TOML array cannot be rewritten partially without ' +
       'losing foreign entries, so any deviation from the documented shape turns THE WHOLE ' +
-      'section read-only. With the OpenCode provider the ' +
+      'section read-only. With the Codex provider it is the same rule list in a ' +
+      'separate file, ~/.codex/hooks.json (.codex/hooks.json in a project), with the ' +
+      'timeout in SECONDS: 600 by default, while SessionEnd and Interrupt have their ' +
+      'own limit of at most 3 s, 1 by default; the panel will not write more, because ' +
+      'Codex would silently cut it to three. There are twelve events. The main ' +
+      'difference: Codex runs a written hook only once it is approved — open /hooks ' +
+      'inside Codex and approve the rule; approval is tied to the content, so every ' +
+      'edit needs it again. The panel also names two things in the neighbouring ' +
+      'config.toml it does not edit: the [features] hooks = false switch and the ' +
+      '[[hooks.…]] tables Codex reads together with hooks.json. With the OpenCode provider the ' +
       'section opens a different screen, because its hooks are built differently: they ' +
       'are the experimental.hook key of opencode.json (global and per-project), and ' +
       'there are exactly two events. "File edited" (file_edited) maps a file pattern to ' +

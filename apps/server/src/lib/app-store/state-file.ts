@@ -40,6 +40,7 @@ export function mergeState(input: Partial<AppState>): AppState {
     projectCascade: { ...base.projectCascade, ...loaded.projectCascade },
     chatLinks: { ...base.chatLinks, ...loaded.chatLinks },
     treePause: { ...base.treePause, ...loaded.treePause },
+    chatPins: { ...base.chatPins, ...loaded.chatPins },
     splitPlans: { ...base.splitPlans, ...loaded.splitPlans },
     integrationHealth: { ...base.integrationHealth, ...loaded.integrationHealth },
     platformHealth: { ...base.platformHealth, ...loaded.platformHealth },

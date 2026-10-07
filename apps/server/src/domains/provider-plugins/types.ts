@@ -9,7 +9,7 @@ export interface ProviderPluginsSettingsSource {
 /** Разрешённая цель раздела: провайдер + каталог файлов + конфиг npm-списка. */
 export interface ProviderPluginsTarget {
   provider: ConfigProvider;
-  format: 'opencode-plugins' | 'kimi-plugins';
+  format: 'opencode-plugins' | 'kimi-plugins' | 'qwen-extensions' | 'codex-plugins';
   scope: ProviderPluginsScope;
   /** Абсолютный путь каталога плагинов (у Kimi — `plugins/managed`). */
   pluginsDir: string;

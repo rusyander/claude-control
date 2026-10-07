@@ -1,6 +1,6 @@
 /** Типы для `dev-restart.mjs` — общий файл dev-сторожа и сервера. */
 
-export type DevRestartWait = 'runs' | 'setup' | 'both';
+export type DevRestartWait = 'runs' | 'setup' | 'checks' | 'both';
 
 export interface DevRestartFileState {
   pid: number;
@@ -31,4 +31,5 @@ export declare function takeRestartRequest(appData: string): boolean;
 export declare function deferReason(
   runsBusy: boolean,
   setupBusy: boolean,
+  checksBusy?: boolean,
 ): DevRestartWait | undefined;

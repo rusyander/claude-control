@@ -294,6 +294,8 @@ export interface RawEvent {
   /** Заполнен у строк субагента: ход принадлежит вложенному прогону, не этому. */
   parent_tool_use_id?: string | null;
   rate_limit_info?: { resetsAt?: number; rateLimitType?: string; status?: string };
+  /** У `result` хода, начатого самим CLI (уведомление о фоне), — откуда он; у хода по сообщению нет. */
+  origin?: { kind?: string };
   total_cost_usd?: number;
   duration_ms?: number;
   is_error?: boolean;

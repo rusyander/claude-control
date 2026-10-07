@@ -31,6 +31,8 @@ process.stdin.on('end', () => {
           : '',
       pid: process.pid,
       envNames: Object.keys(process.env),
+      // Адрес модели — значением: проверка маршрута контура смотрит, КУДА ушёл бы запрос.
+      baseUrl: process.env.ANTHROPIC_BASE_URL ?? '',
     }),
   );
   renameSync('fake-argv.json.tmp', 'fake-argv.json');

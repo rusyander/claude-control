@@ -4,7 +4,15 @@ import { apiClient } from '@shared/api/client';
 import { serverMessageFromPayload } from '@shared/config/i18n';
 
 export type PanelAgentRunOutcome =
-  { ok: true } | { ok: false; code?: string; message: string; aborted?: boolean };
+  | { ok: true }
+  | {
+      ok: false;
+      code?: string;
+      message: string;
+      aborted?: boolean;
+      /** Сервер прислал код текста (`messageCode`): `message` уже на языке окна и точнее кода отказа. */
+      localized?: boolean;
+    };
 
 /**
  * Сколько поток хода может молчать. Сервер шлёт `: ping` каждые 10 с, так что
@@ -46,13 +54,16 @@ function readWithin<T>(
 // Разбор кадров общий с телефоном — в контрактах.
 export { splitRunFrames };
 
-async function readRefusal(response: Response): Promise<{ code?: string; message: string }> {
+async function readRefusal(
+  response: Response,
+): Promise<{ code?: string; message: string; localized?: boolean }> {
   try {
     const body = (await response.json()) as { error?: string; message?: string };
+    const localized = serverMessageFromPayload(body);
     return {
       code: body.error,
-      message:
-        serverMessageFromPayload(body) || body.message || `Сервер ответил ${response.status}`,
+      message: localized || body.message || `Сервер ответил ${response.status}`,
+      ...(localized ? { localized: true } : {}),
     };
   } catch {
     return { message: `Сервер ответил ${response.status}` };

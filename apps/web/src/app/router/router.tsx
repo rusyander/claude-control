@@ -32,6 +32,11 @@ const PlatformPage = lazyRouteComponent(
   () => import('@pages/Platform/PlatformPage'),
   'PlatformPage',
 );
+const KitPage = lazyRouteComponent(() => import('@pages/Kit/KitPage'), 'KitPage');
+const LocalModelsPage = lazyRouteComponent(
+  () => import('@pages/LocalModels/LocalModelsPage'),
+  'LocalModelsPage',
+);
 const ProviderComparePage = lazyRouteComponent(
   () => import('@pages/ProviderCompare/ProviderComparePage'),
   'ProviderComparePage',
@@ -45,7 +50,7 @@ const AnalyticsPage = lazyRouteComponent(
   () => import('@pages/Analytics/AnalyticsPage'),
   'AnalyticsPage',
 );
-const RulesPage = lazyRouteComponent(() => import('@pages/Rules/RulesPage'), 'RulesPage');
+const RulesSection = lazyRouteComponent(() => import('@pages/Rules/RulesSection'), 'RulesSection');
 const InstructionsSection = lazyRouteComponent(
   () => import('@pages/ClaudeMd/InstructionsSection'),
   'InstructionsSection',
@@ -106,6 +111,8 @@ const routes = [
   { path: '/settings', component: SettingsPage },
   { path: '/dlp', component: DlpPage },
   { path: '/platform', component: PlatformPage },
+  { path: '/local-models', component: LocalModelsPage },
+  { path: '/kit', component: KitPage },
   { path: '/compare', component: ProviderComparePage },
   { path: '/portability', component: PortabilityPage },
   // Словарь справки — отдельный чанк; лоадер дотягивает его до первого
@@ -116,7 +123,7 @@ const routes = [
   // Чат сам держит свои прокрутки (лента, список разговоров): его обёртка — ровно
   // высота колонки раздела, а не растущая с содержимым страница.
   { path: '/chat', component: gated('chat', ChatSection), staticData: FILL },
-  { path: '/rules', component: gated('rules', RulesPage) },
+  { path: '/rules', component: gated('rules', RulesSection) },
   { path: '/claude-md', component: gated('globalInstructions', InstructionsSection) },
   { path: '/hooks', component: gated('hooks', HooksSection) },
   { path: '/skills', component: gated('skills', SkillsSection) },

@@ -32,7 +32,7 @@ Everything needed to get AgentDeck running. Not running — [Troubleshooting](TR
 | ------------------- | ---------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
 | **Node.js**         | **22.6**   | `node --version`   | Below that the server does not start at all — [why](TROUBLESHOOTING.md#the-server-exits-with-bad-option---experimental-strip-types) |
 | **pnpm**            | 10         | `pnpm --version`   | `npm install -g pnpm`                                                                                                               |
-| **Claude Code CLI** | any recent | `claude --version` | Must be on `PATH` and logged in                                                                                                     |
+| **Claude Code CLI** | any recent | `claude --version` | On `PATH` and logged in; without it — the CLI you chose, see [first run](#first-run)                                                |
 | **Git**             | any        | `git --version`    | Only needed for plugin marketplaces                                                                                                 |
 
 The repo ships an `.nvmrc`, so `nvm use` picks the right Node by itself.
@@ -247,6 +247,12 @@ Configuration directory: C:\Users\you\.claude (source: home)
 
 `source` names the rule that fired: `manual` (set in the panel), `env` (`CLAUDE_CONFIG_DIR`),
 `home` (the default) or `not-found`.
+
+**A machine without Claude Code.** The panel does not need a `.claude` directory: it keeps its own
+state in `~/.agentdeck/data`, and `source: not-found` is not an error here. First-run onboarding
+asks which CLI to use; with another CLI it has three steps — the Claude access step is gone. The
+directory card on Overview is grey, "Claude Code not in use", not red. `pnpm doctor` passes once the
+chosen CLI is found.
 
 ## Verifying it works
 

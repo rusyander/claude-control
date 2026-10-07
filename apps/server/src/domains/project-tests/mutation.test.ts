@@ -5,6 +5,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -204,9 +205,90 @@ describe('проверка набора поломкой', () => {
     checks.start({ root: dir, appData, file: 'src/math.mjs' });
     expect(await finished(checks, dir)).toMatchObject({ status: 'error' });
     expect(Date.now() - startedAt).toBeLessThan(10_000);
-    process.kill(Number(readFileSync(pidFile, 'utf8')));
+    // Помощник ушёл раньше первого снимка дерева — его гасит тест.
+    try {
+      process.kill(Number(readFileSync(pidFile, 'utf8')));
+    } catch {
+      // Уже снят.
+    }
     await new Promise((done) => setTimeout(done, 500));
   }, 60_000);
+
+  // Ф9: помощник на stdio команды, переживший её, держал папку копии (Windows её
+  // не удаляет) до следующего запуска панели и висел сам.
+  it('помощник, переживший команду, снят в том же прогоне, копия убрана', async () => {
+    const { dir, appData } = project();
+    const pidFile = join(root as string, 'helper.pid');
+    // Помощник сидит в каталоге копии (cwd) и держит вывод команды; команда
+    // живёт 2 с, как настоящий прогон, и выходит, не дожидаясь его.
+    const helper = [
+      "const kid = require('child_process').spawn(process.execPath, ['-e', 'setTimeout(() => {}, 60000)'], { stdio: 'inherit', detached: true });",
+      "require('fs').writeFileSync(" + JSON.stringify(pidFile) + ', String(kid.pid));',
+      'kid.unref(); setTimeout(() => process.exit(0), 2000);',
+    ].join('\n');
+    writeFileSync(join(dir, 'helper.cjs'), helper);
+    writeFileSync(
+      join(dir, '.agent', 'tests', 'automation.json'),
+      JSON.stringify({ command: 'node helper.cjs' }),
+    );
+    const checks = new MutationChecks(undefined, { pollMs: 200 });
+    checks.start({ root: dir, appData, file: 'src/math.mjs' });
+    const check = await finished(checks, dir);
+    const kid = Number(readFileSync(pidFile, 'utf8'));
+    const alive = (): boolean => {
+      try {
+        process.kill(kid, 0);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+    try {
+      await vi.waitFor(() => expect(alive()).toBe(false), { timeout: 5_000, interval: 100 });
+      expect(check?.cleanupError).toBeUndefined();
+      const copies = join(appData, 'mutation-copies');
+      const left = existsSync(copies)
+        ? readdirSync(copies, { withFileTypes: true }).filter((entry) => entry.isDirectory())
+        : [];
+      expect(left).toEqual([]);
+      expect(gitIn(dir, ['worktree', 'list']).split('\n')).toHaveLength(1);
+    } finally {
+      if (alive()) process.kill(kid);
+    }
+  }, 90_000);
+
+  it('копию не убрать — удаление повторено, причина в отчёте', async () => {
+    const { dir, appData } = project();
+    let attempts = 0;
+    const checks = new MutationChecks(undefined, {
+      retryMs: 10,
+      remove: () => {
+        attempts += 1;
+        throw Object.assign(new Error('busy'), { code: 'EBUSY' });
+      },
+    });
+    checks.start({ root: dir, appData, file: 'src/math.mjs' });
+    const check = await finished(checks, dir);
+    expect(check).toMatchObject({ status: 'done', caught: 1, cleanupError: 'EBUSY' });
+    expect(attempts).toBe(3);
+  }, 90_000);
+
+  // Ф10: отчёт без строк о кейсах — «нет результата», а не «не защищён».
+  it('отчёт не сказал ни про один кейс — счёт «нет результата», ни пойманных, ни пропущенных', async () => {
+    const { dir, appData } = project();
+    writeFileSync(
+      join(dir, 'check.mjs'),
+      "import { writeFileSync } from 'node:fs';\nwriteFileSync(process.env.AGENTDECK_JUNIT_REPORT, '<?xml version=\"1.0\"?><testsuite></testsuite>');\n",
+    );
+    const checks = new MutationChecks();
+    checks.start({ root: dir, appData, file: 'src/math.mjs' });
+    expect(await finished(checks, dir)).toMatchObject({
+      status: 'done',
+      caught: 0,
+      missed: 0,
+      noResult: 2,
+    });
+  }, 90_000);
 
   it('кандидаты — файлы codePaths автокейсов, каталог не ломается целиком', () => {
     const { dir } = project();
@@ -218,9 +300,15 @@ describe('проверка набора поломкой', () => {
     expect(breakFile('{"a":1}', 'a.json', 'break')).toEqual({
       text: '',
       description: 'file emptied',
+      code: 'file-emptied',
     });
     expect(breakFile('const a = 1; // a === b', 'a.ts', 'subtle')).toBeUndefined();
-    expect(breakFile('if (a === b) go();', 'a.ts', 'subtle')?.text).toBe('if (a !== b) go();');
+    // Что сломано — ещё и кодом с параметрами: интерфейс пишет это на своём языке.
+    expect(breakFile('if (a === b) go();', 'a.ts', 'subtle')).toMatchObject({
+      text: 'if (a !== b) go();',
+      code: 'line-flip',
+      params: { line: 1, from: 'if (a === b) go();', to: 'if (a !== b) go();' },
+    });
   });
 
   // Ревью 30.09: запись по ссылке ушла бы в настоящий файл вне копии. Ссылку на
@@ -251,6 +339,56 @@ describe('проверка набора поломкой', () => {
     const check = await finished(checks, dir);
     // Импорт нового модуля в копии цел: покраснел кейс поведения, дымовой — нет.
     expect(check).toMatchObject({ status: 'done', caught: 1, missed: 1 });
+  }, 90_000);
+
+  // Ф7: пакет рабочего пространства тесты видят через `node_modules/@demo/lib` —
+  // ссылку на `packages/lib`. В копии она обязана вести в копию, иначе поломка
+  // пакета до тестов не доходит и кейс выглядит «не защищён».
+  it('монорепо: поломка пакета рабочего пространства ловится через его ссылку в node_modules', async () => {
+    const { dir, appData } = project();
+    mkdirSync(join(dir, 'packages', 'lib'), { recursive: true });
+    writeFileSync(join(dir, 'packages', 'lib', 'index.mjs'), MATH);
+    writeFileSync(
+      join(dir, 'packages', 'lib', 'package.json'),
+      JSON.stringify({ name: '@demo/lib', type: 'module', exports: './index.mjs' }),
+    );
+    mkdirSync(join(dir, 'node_modules', '@demo'), { recursive: true });
+    symlinkSync(
+      join(dir, 'packages', 'lib'),
+      join(dir, 'node_modules', '@demo', 'lib'),
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
+    // Внешний пакет рядом — он по-прежнему берётся из оригинала.
+    mkdirSync(join(dir, 'node_modules', 'ext'), { recursive: true });
+    writeFileSync(join(dir, 'node_modules', 'ext', 'index.js'), 'module.exports = 1;\n');
+    writeFileSync(join(dir, '.gitignore'), '.agent\nnode_modules\n');
+    writeFileSync(
+      join(dir, 'check.mjs'),
+      CHECK.replace("'./src/math.mjs'", "'@demo/lib'").replace(
+        "import { writeFileSync } from 'node:fs';",
+        "import { writeFileSync } from 'node:fs';\nimport { createRequire } from 'node:module';\nconst ext = createRequire(import.meta.url)('ext');\nif (ext !== 1) throw new Error('ext');",
+      ),
+    );
+    const suite = join(dir, '.agent', 'tests', 'math.tests.json');
+    writeFileSync(
+      suite,
+      readFileSync(suite, 'utf8').replace(
+        '"codePaths":["src/math.mjs"]',
+        '"codePaths":["packages/lib/index.mjs"]',
+      ),
+    );
+    gitIn(dir, ['add', '.']);
+    gitIn(dir, ['commit', '-q', '-m', 'monorepo']);
+
+    const checks = new MutationChecks();
+    checks.start({ root: dir, appData, file: 'packages/lib/index.mjs' });
+    const check = await finished(checks, dir);
+    expect(check).toMatchObject({ status: 'done', caught: 1, missed: 0 });
+    // Пакет и его ссылка в оригинале целы, копия убрана.
+    expect(readFileSync(join(dir, 'packages', 'lib', 'index.mjs'), 'utf8')).toBe(MATH);
+    expect(readFileSync(join(dir, 'node_modules', '@demo', 'lib', 'index.mjs'), 'utf8')).toBe(MATH);
+    expect(readFileSync(join(dir, 'node_modules', 'ext', 'index.js'), 'utf8')).toContain('1');
+    expect(gitIn(dir, ['worktree', 'list']).split('\n')).toHaveLength(1);
   }, 90_000);
 
   it('уборка при старте снимает копии прошлого процесса вместе с записью worktree', async () => {

@@ -195,7 +195,13 @@ function codexTranscript(): Record<string, unknown>[] {
     {
       instructions: `## Право: запрещено \`Read(${PROBE_MARKS.deniedFile})\``,
       tools: [],
-      input: [{ type: 'message', role: 'user', content: 'проба' }],
+      input: [
+        // Скилл у Codex с MAP 26 нативный: CLI называет модели имя и описание
+        // скилла, а описание несёт метку. Где именно — проба не различает: она
+        // ищет метку во всём первом запросе.
+        { type: 'message', role: 'developer', content: `- agentdeck-probe: ${PROBE_MARKS.skill}` },
+        { type: 'message', role: 'user', content: 'проба' },
+      ],
     },
     {
       input: [
@@ -225,13 +231,36 @@ describe('цель с ручкой /responses', () => {
   it('реплики берутся по ИМЕНИ поля — иначе ответы инструментов не находятся вовсе', () => {
     const rows = probeRowsFrom(codexTranscript(), getProvider('codex'), 'global');
 
-    // Хук у codex обещан «невозможно», и запрещённый вызов обязан был
-    // отработать. Читай наблюдение только `messages`, ответов инструментов оно
-    // не нашло бы — и «вывод не появился» дало бы ЗЕЛЁНЫЙ хук там, где его
-    // никто не останавливал.
-    expect(row(rows, 'hook').observed).toBe('absent');
-    expect(row(rows, 'hook').verdict).toBe('match');
+    // Эхо переменной лежит в ответе инструмента (`function_call_output`). Читай
+    // наблюдение только `messages`, оно бы его не нашло — и переменная, которая
+    // доехала, объявлялась бы потерянной.
     expect(row(rows, 'envVar').observed).toBe('present');
+    expect(row(rows, 'envVar').verdict).toBe('match');
+  });
+
+  it('хук Codex обещан при одобрении в /hooks — проба его не меряет, а не красит', () => {
+    // Запрещённый вызов отработал: одобрения нет, и хук честно не исполнился.
+    // Красный здесь обвинил бы перенос, зелёный — обещал бы непроверенное.
+    const rows = probeRowsFrom(codexTranscript(), getProvider('codex'), 'global');
+    expect(row(rows, 'hook').promised).toBe('native');
+    expect(row(rows, 'hook').verdict).toBe('not_checked');
+    expect(row(rows, 'hook').skip).toBe('needs_cli_approval');
+  });
+
+  it('личный скилл Codex на Windows берётся из НАСТОЯЩЕГО дома — проба его не судит', () => {
+    // Скилл в разговоре есть, но доказать, что он из временного дома, нельзя:
+    // codex читает `~/.agents/skills` через профиль ОС мимо HOME/USERPROFILE.
+    const global = probeRowsFrom(codexTranscript(), getProvider('codex'), 'global');
+    const project = probeRowsFrom(codexTranscript(), getProvider('codex'), 'project');
+    if (process.platform === 'win32') {
+      expect(row(global, 'skill').verdict).toBe('not_checked');
+      expect(row(global, 'skill').skip).toBe('target_reads_real_home');
+    } else {
+      expect(row(global, 'skill').verdict).toBe('match');
+    }
+    // Проектный `.agents/skills` лежит в рабочем каталоге пробы — судится всегда.
+    expect(row(project, 'skill').skip).toBeNull();
+    expect(row(project, 'skill').verdict).toBe('match');
   });
 
   it('право, обещанное ТЕКСТОМ, судится присутствием запрета, а не отказом', () => {
@@ -251,7 +280,10 @@ describe('цель с ручкой /responses', () => {
     transcript[0] = {
       instructions: '## Проба: право обязано отказать в чтении условленного файла.',
       tools: [],
-      input: [{ type: 'message', role: 'user', content: 'проба' }],
+      input: [
+        { type: 'message', role: 'developer', content: `- agentdeck-probe: ${PROBE_MARKS.skill}` },
+        { type: 'message', role: 'user', content: 'проба' },
+      ],
     };
 
     const rows = probeRowsFrom(transcript, getProvider('codex'), 'global', true);

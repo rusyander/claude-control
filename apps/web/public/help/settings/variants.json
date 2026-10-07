@@ -177,6 +177,94 @@
         "height": 460
       }
     },
+    "global-layer/01-verdict": {
+      "light-ru": {
+        "file": "01-verdict.png",
+        "width": 1082,
+        "height": 953
+      },
+      "light-en": {
+        "file": "01-verdict.en.png",
+        "width": 1082,
+        "height": 854
+      },
+      "dark-ru": {
+        "file": "01-verdict.dark.png",
+        "width": 1082,
+        "height": 953
+      },
+      "dark-en": {
+        "file": "01-verdict.dark.en.png",
+        "width": 1082,
+        "height": 854
+      }
+    },
+    "global-layer/02-cases": {
+      "light-ru": {
+        "file": "02-cases.png",
+        "width": 1082,
+        "height": 772
+      },
+      "light-en": {
+        "file": "02-cases.en.png",
+        "width": 1082,
+        "height": 654
+      },
+      "dark-ru": {
+        "file": "02-cases.dark.png",
+        "width": 1082,
+        "height": 772
+      },
+      "dark-en": {
+        "file": "02-cases.dark.en.png",
+        "width": 1082,
+        "height": 654
+      }
+    },
+    "global-layer/03-changed": {
+      "light-ru": {
+        "file": "03-changed.png",
+        "width": 1082,
+        "height": 1421
+      },
+      "light-en": {
+        "file": "03-changed.en.png",
+        "width": 1082,
+        "height": 1269
+      },
+      "dark-ru": {
+        "file": "03-changed.dark.png",
+        "width": 1082,
+        "height": 1421
+      },
+      "dark-en": {
+        "file": "03-changed.dark.en.png",
+        "width": 1082,
+        "height": 1269
+      }
+    },
+    "global-layer/04-proposal": {
+      "light-ru": {
+        "file": "04-proposal.png",
+        "width": 1082,
+        "height": 639
+      },
+      "light-en": {
+        "file": "04-proposal.en.png",
+        "width": 1082,
+        "height": 639
+      },
+      "dark-ru": {
+        "file": "04-proposal.dark.png",
+        "width": 1082,
+        "height": 639
+      },
+      "dark-en": {
+        "file": "04-proposal.dark.en.png",
+        "width": 1082,
+        "height": 639
+      }
+    },
     "safety/01-safety": {
       "light-ru": {
         "file": "01-safety.png",

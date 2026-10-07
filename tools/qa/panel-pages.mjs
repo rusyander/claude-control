@@ -147,9 +147,28 @@ export const PANEL_PAGES = [
       // текущей ветки, которое у каждого проекта своё.
       const open = page.locator('button[title^="Git проекта"]').first();
       if ((await open.count()) === 0) return;
-      await open.click();
+      // На стенде без входа в CLI чат сам открывает окно «Ассистенту … нужен
+      // доступ» — оно приходит вслед за ответом сервера и перехватывает клик.
+      // Успел клик раньше окна или нет — гонка, а не свойство раздела, поэтому
+      // окно закрывается, где бы оно ни встало: до клика или поверх git.
+      const gate = page.getByRole('dialog').filter({ hasText: 'нужен доступ' });
+      const dismissGate = async () => {
+        if (!(await gate.isVisible().catch(() => false))) return;
+        await page.keyboard.press('Escape');
+        await gate.waitFor({ state: 'hidden', timeout: 5000 });
+      };
+      for (let attempt = 0; ; attempt++) {
+        await dismissGate();
+        try {
+          await open.click({ timeout: 5000 });
+          break;
+        } catch (error) {
+          if (attempt >= 3) throw error;
+        }
+      }
       await page.waitForSelector('[role="dialog"][aria-label="Git проекта"]', { timeout: 10000 });
       await page.waitForTimeout(1200);
+      await dismissGate();
     },
   },
   { path: '/rules', name: 'Правила' },
@@ -400,6 +419,27 @@ export const PANEL_PAGES = [
       await page.waitForTimeout(300);
     },
   },
+  { path: '/local-models', name: 'Локальные модели' },
+  // Набор панели: вкладка на тип элемента, режимы по CLI сверху. Окно правки
+  // открывается чтением файла — записи нет, обходу можно.
+  { path: '/kit', name: 'Набор панели' },
+  { path: '/kit?tab=command', name: 'Набор панели — пайплайны' },
+  { path: '/kit?tab=rule', name: 'Набор панели — правила' },
+  {
+    path: '/kit?tab=hook',
+    name: 'Набор панели — хуки, окно правки',
+    slug: 'kit-editor',
+    interact: async (page) => {
+      await page
+        .getByRole('button', { name: /^(Открыть|Open)$/ })
+        .first()
+        .click();
+      await page
+        .getByRole('dialog')
+        .waitFor({ timeout: 5000 })
+        .catch(() => undefined);
+    },
+  },
   { path: '/search', name: 'Поиск' },
   { path: '/history', name: 'История изменений' },
   { path: '/settings', name: 'Настройки' },
@@ -410,6 +450,13 @@ export const PANEL_PAGES = [
   // «Промпты» — единственная вкладка настроек с редактором текста: свой список,
   // своё многострочное поле и две кнопки у каждого промпта.
   { path: '/settings?tab=prompts', name: 'Настройки — промпты' },
+  // «Глобальный слой» — таблица сит с кнопками переноса и раскрывающимися
+  // случаями; карточка есть всегда, таблица — после первой сверки.
+  {
+    path: '/settings?tab=globalLayer',
+    name: 'Настройки — глобальный слой',
+    ready: '[data-global-pair]',
+  },
   // Карточка наблюдателя во вкладке «Общие», индикатор в боковой панели и его
   // окно: всё это видно, только пока наблюдатель включён (подмена статуса).
   {

@@ -50,6 +50,14 @@ function fakeSpawn(options: { chunks?: string[]; stderr?: string; code?: number 
   return { fn, handles };
 }
 
+/**
+ * Строка вывода gemini `-o stream-json` (0.62.0): так он печатает кусок ответа.
+ * Образец-CLI этих тестов — gemini, и подменённый процесс говорит его языком.
+ */
+const geminiOut = (text: string): string =>
+  `${JSON.stringify({ type: 'message', role: 'assistant', content: text, delta: true })}
+`;
+
 function history(text: string): ProviderChatMessage[] {
   return [{ id: 'm1', role: 'user', content: text, at: '2026-01-01T00:00:00.000Z' }];
 }
@@ -177,7 +185,7 @@ process.stdin.on('end', () => {
   });
 
   it('отдаёт текст кусками по мере печати', async () => {
-    const spawn = fakeSpawn({ chunks: ['Пер', 'вый ответ'] });
+    const spawn = fakeSpawn({ chunks: [geminiOut('Пер'), geminiOut('вый ответ')] });
 
     const events = await collect('gemini', { detect: yesCli, spawnImpl: spawn.fn });
 
@@ -247,8 +255,9 @@ process.stdin.on('end', () => {
 
     // Режем по живому байту посреди буквы: без потокового декодера здесь были
     // бы «крокозябры» ровно на стыке кусков.
-    const bytes = Buffer.from('Ответ модели', 'utf8');
-    const halves = [bytes.subarray(0, 5), bytes.subarray(5)];
+    const bytes = Buffer.from(geminiOut('Ответ модели'), 'utf8');
+    const cut = bytes.indexOf(Buffer.from('О', 'utf8')) + 1;
+    const halves = [bytes.subarray(0, cut), bytes.subarray(cut)];
     const spawnImpl = (() => {
       const child = new EventEmitter() as EventEmitter & {
         stdout: EventEmitter;
@@ -307,7 +316,7 @@ process.stdin.on('end', () => {
       child.stderr = new EventEmitter();
       child.kill = () => child.emit('close', null);
       setTimeout(() => {
-        child.stdout.emit('data', Buffer.from('Половина ответа'));
+        child.stdout.emit('data', Buffer.from(geminiOut('Половина ответа')));
         // Дальше процесс живёт, пока его не снимут кнопкой.
         run.stop();
       }, 0);
@@ -446,6 +455,10 @@ process.stdin.on('end', () => {
 
     expect(sawSignal?.aborted).toBe(true);
     expect(spawn.handles).toHaveLength(0);
-    expect(events).toEqual([{ type: 'done', reply: '', transport: 'session' }]);
+    // Сессия OpenCode принимает сообщения посреди ответа (В1) — об этом событие до конца.
+    expect(events).toEqual([
+      { type: 'steerable' },
+      { type: 'done', reply: '', transport: 'session' },
+    ]);
   });
 });

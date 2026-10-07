@@ -5,34 +5,51 @@ import { Icon } from '@shared/ui/icon';
 import { Badge } from '@shared/ui/badge';
 import { Typography } from '@shared/ui/typography';
 import { ExplainBox } from '@shared/ui/explain-box';
+import { ProviderInstalledPluginRow } from './ProviderInstalledPluginRow';
+import { ProviderExtensionInstall } from './ProviderExtensionInstall';
+import { ProviderCodexMarketplaces } from './ProviderCodexMarketplaces';
+import { ProviderCodexAvailable } from './ProviderCodexAvailable';
 import type { ProviderInstalledPluginsProps } from './ProviderInstalledPlugins.types';
 
 /**
- * Плагины Kimi Code (KIMI-3) — ТОЛЬКО ПОКАЗ.
+ * Установленное у чужого CLI — две модели на одном экране, различает их
+ * `installedActions` от сервера, а не имя провайдера.
  *
- * Задокументировано: плагин лежит в `plugins/managed/<id>/`, его манифест —
- * JSON (`kimi.plugin.json` либо `.kimi-plugin/plugin.json`), а список
- * установленного и признак «включён» — в `plugins/installed.json`, форма
- * которого НЕ описана. Ставят, включают и выключают плагины командой `/plugins`
- * внутри CLI.
+ * Kimi Code (KIMI-3) — ТОЛЬКО ПОКАЗ: список установленного и признак «включён»
+ * лежат в `plugins/installed.json`, форма которого не описана, а ставят и
+ * включают плагины командой `/plugins` внутри CLI. Кнопок записи нет.
  *
- * Поэтому здесь нет ни одной кнопки записи: панель показывает, что установлено
- * и что плагин приносит (скиллы, MCP-серверы, хуки, команды), и не притворяется,
- * будто умеет этим управлять. Угадывать форму реестра запрещено тем же
- * правилом, по которому панель перестала писать `experimental.hook` у OpenCode.
+ * Qwen Code (MAP 25) — расширения: установить, включить, выключить, удалить.
+ * Панель ничего не пишет сама, сервер зовёт `qwen extensions …`; `update` и
+ * `link` всегда спрашивают [Y/n] в терминале, поэтому здесь их нет — пояснение
+ * отсылает к терминалу.
+ *
+ * Codex (MAP 25) — плагины с рынков: рынки, «можно поставить», поставленные.
+ * Ставит и удаляет `codex plugin …`, включение — строка `enabled` в config.toml.
  */
+/** Модель раздела: Codex (рынки), Qwen (команды CLI) или Kimi (только показ). */
+function sectionModel(data: ProviderInstalledPluginsProps['data']): string {
+  if (data.format === 'codex-plugins') return 'codex';
+  return data.installedActions ? 'extensions' : 'installed';
+}
+
 export function ProviderInstalledPlugins({ data }: ProviderInstalledPluginsProps) {
   const { t } = useTranslation();
+  const actions = data.installedActions;
+  const codex = data.format === 'codex-plugins';
+  const params = { provider: data.providerName, pluginsDir: data.pluginsDir };
+  const model = sectionModel(data);
+  const explain = t(`providerPlugins.${model}.explain`, params);
+  const uninstallConfirm = t(
+    codex
+      ? 'providerPlugins.codex.uninstallConfirm'
+      : 'providerPlugins.extensions.uninstallConfirm',
+  );
+  const emptyText = t(`providerPlugins.${model}.empty`);
 
   return (
     <Stack gap="var(--spacing-md)">
-      <ExplainBox
-        title={t('providerPlugins.explainTitle')}
-        text={t('providerPlugins.installed.explain', {
-          provider: data.providerName,
-          pluginsDir: data.pluginsDir,
-        })}
-      />
+      <ExplainBox title={t('providerPlugins.explainTitle')} text={explain} />
 
       <Card padding="sm">
         <Stack direction="row" align="center" gap="var(--spacing-xs)" wrap>
@@ -47,14 +64,23 @@ export function ProviderInstalledPlugins({ data }: ProviderInstalledPluginsProps
         </Stack>
       </Card>
 
-      <Card padding="sm">
-        <Stack direction="row" align="center" gap="var(--spacing-xs)">
-          <Icon name="info" size={18} />
-          <Typography variant="body-sm" color="muted">
-            {t('providerPlugins.installed.readOnly')}
-          </Typography>
-        </Stack>
-      </Card>
+      {codex && (
+        <>
+          <ProviderCodexMarketplaces marketplaces={data.marketplaces} />
+          <ProviderCodexAvailable plugins={data.available} />
+        </>
+      )}
+      {actions && !codex && <ProviderExtensionInstall />}
+      {!actions && (
+        <Card padding="sm">
+          <Stack direction="row" align="center" gap="var(--spacing-xs)">
+            <Icon name="info" size={18} />
+            <Typography variant="body-sm" color="muted">
+              {t('providerPlugins.installed.readOnly')}
+            </Typography>
+          </Stack>
+        </Card>
+      )}
 
       {data.installedError && (
         <Card padding="sm">
@@ -67,64 +93,38 @@ export function ProviderInstalledPlugins({ data }: ProviderInstalledPluginsProps
         </Card>
       )}
 
+      {data.installedStateError && (
+        <Card padding="sm">
+          <Stack direction="row" align="center" gap="var(--spacing-xs)">
+            <Icon name="warning" size={18} />
+            <Typography variant="body-sm" color="warning">
+              {t(
+                codex
+                  ? 'providerPlugins.codex.stateUnknown'
+                  : 'providerPlugins.extensions.stateUnknown',
+                { reason: data.installedStateError },
+              )}
+            </Typography>
+          </Stack>
+        </Card>
+      )}
+
       {data.installed.length > 0 ? (
         <Card padding="none">
           <Stack>
             {data.installed.map((plugin) => (
-              <Stack key={plugin.id} gap="var(--spacing-2xs)" padding="var(--spacing-sm)">
-                <Stack direction="row" align="center" gap="var(--spacing-xs)" wrap>
-                  <Typography variant="body" weight="medium">
-                    {plugin.displayName ?? plugin.name ?? plugin.id}
-                  </Typography>
-                  {plugin.version && <Badge tone="neutral">{plugin.version}</Badge>}
-                  {plugin.error && (
-                    <Badge tone="warning">{t('providerPlugins.installed.broken')}</Badge>
-                  )}
-                </Stack>
-
-                {plugin.description && (
-                  <Typography variant="body-sm" color="subtle">
-                    {plugin.description}
-                  </Typography>
-                )}
-
-                <Typography variant="mono" color="subtle" as="span" truncate>
-                  {plugin.manifestPath}
-                </Typography>
-
-                <Stack direction="row" gap="var(--spacing-2xs)" wrap>
-                  {plugin.hasSkills && (
-                    <Badge tone="neutral">{t('providerPlugins.installed.skills')}</Badge>
-                  )}
-                  {plugin.sessionStartSkill && (
-                    <Badge tone="neutral">
-                      {t('providerPlugins.installed.sessionSkill', {
-                        skill: plugin.sessionStartSkill,
-                      })}
-                    </Badge>
-                  )}
-                  {plugin.mcpServers.length > 0 && (
-                    <Badge tone="neutral">
-                      {t('providerPlugins.installed.mcp', {
-                        list: plugin.mcpServers.join(', '),
-                      })}
-                    </Badge>
-                  )}
-                  {plugin.hookCount > 0 && (
-                    <Badge tone="neutral">
-                      {t('providerPlugins.installed.hooks', { count: plugin.hookCount })}
-                    </Badge>
-                  )}
-                  {plugin.hasCommands && (
-                    <Badge tone="neutral">{t('providerPlugins.installed.commands')}</Badge>
-                  )}
-                </Stack>
-              </Stack>
+              <ProviderInstalledPluginRow
+                key={plugin.id}
+                plugin={plugin}
+                actions={actions}
+                actionId={codex ? plugin.id : (plugin.name ?? plugin.id)}
+                uninstallConfirm={uninstallConfirm}
+              />
             ))}
           </Stack>
         </Card>
       ) : (
-        <Typography color="subtle">{t('providerPlugins.installed.empty')}</Typography>
+        <Typography color="subtle">{emptyText}</Typography>
       )}
 
       {data.installedRegistryPath && (

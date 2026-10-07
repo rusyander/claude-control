@@ -12,6 +12,8 @@ export interface ProviderChatComposerProps {
    */
   onSend: (text: string, images: AgentImage[]) => void | boolean | Promise<void | boolean>;
   isRunning: boolean;
+  /** Идущий ход примет сообщение посреди ответа (В1) — подписи говорят об этом. */
+  isSteerable?: boolean;
   /** Ни CLI, ни ключа — отправлять некуда. */
   isBlocked: boolean;
   /**

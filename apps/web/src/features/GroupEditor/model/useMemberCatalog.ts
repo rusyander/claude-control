@@ -8,15 +8,27 @@ import { memberCatalog } from './memberCatalog';
 
 /** Списки сущностей и собранный из них выбор участников группы. */
 export function useMemberCatalog(excludeGroupId?: string) {
-  const rules = ruleApi.useList().data ?? [];
-  const skills = skillApi.useList().data ?? [];
-  const hooks = hookApi.useList().data ?? [];
-  const servers = mcpServerApi.useList().data ?? [];
-  const permissions = permissionApi.useList().data ?? [];
-  const { data: groups = [] } = useGroups();
+  const queries = [
+    ruleApi.useList(),
+    skillApi.useList(),
+    hookApi.useList(),
+    mcpServerApi.useList(),
+    permissionApi.useList(),
+    useGroups(),
+  ] as const;
+  const [ruleQ, skillQ, hookQ, serverQ, permissionQ, groupQ] = queries;
+  const rules = ruleQ.data ?? [];
+  const skills = skillQ.data ?? [];
+  const hooks = hookQ.data ?? [];
+  const servers = serverQ.data ?? [];
+  const permissions = permissionQ.data ?? [];
+  const groups = groupQ.data ?? [];
+  // Пока хоть один список не пришёл, выбор участников неполон: помощник по
+  // нему отвечал бы «участников нет», а не выбирал из настоящих.
+  const loading = queries.some((query) => query.isPending);
   const items = memberCatalog(
     { rules, skills, hooks, servers, permissions, groups },
     excludeGroupId,
   );
-  return { items, rules, skills, hooks, servers, permissions, groups };
+  return { items, rules, skills, hooks, servers, permissions, groups, loading };
 }

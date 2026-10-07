@@ -58,7 +58,7 @@ export function readRestartState(appData, isAlive = pidAlive) {
   const files = Array.isArray(parsed.files)
     ? parsed.files.filter((file) => typeof file === 'string').slice(0, 20)
     : [];
-  const waitingFor = ['runs', 'setup', 'both'].includes(parsed.waitingFor)
+  const waitingFor = ['runs', 'setup', 'checks', 'both'].includes(parsed.waitingFor)
     ? parsed.waitingFor
     : 'runs';
   return {
@@ -83,13 +83,13 @@ export function takeRestartRequest(appData) {
 }
 
 /**
- * Чего ждёт перезапуск: идущих ходов, подготовки копий, того и другого — или
- * ничего (`undefined`). Предела у ожидания нет: оборванный ход или `npm ci`
- * копии дороже правки, которая подождёт; нетерпеливому — кнопка в панели.
+ * Чего ждёт перезапуск: идущих ходов, подготовки копий, автотестов и проверок
+ * поломкой проектов (`checks`, Ф11), нескольких из них сразу (`both`) — или
+ * ничего (`undefined`). Предела у ожидания нет: оборванный ход, `npm ci` копии
+ * или прогон тестов дороже правки, которая подождёт; нетерпеливому — кнопка в панели.
  */
-export function deferReason(runsBusy, setupBusy) {
-  if (runsBusy && setupBusy) return 'both';
-  if (runsBusy) return 'runs';
-  if (setupBusy) return 'setup';
-  return undefined;
+export function deferReason(runsBusy, setupBusy, checksBusy = false) {
+  const busy = [runsBusy && 'runs', setupBusy && 'setup', checksBusy && 'checks'].filter(Boolean);
+  if (busy.length > 1) return 'both';
+  return busy[0] || undefined;
 }

@@ -211,8 +211,11 @@ export const endpointsEn: typeof endpointsRu = {
       localAssistantText:
         'The “Panel assistant” switch chooses between the vendor cloud “as before” and ' +
         'the profile. With the profile picked, the hints in forms go to that address, ' +
-        'bypassing both the cloud and the provider’s CLI. It does not follow what was ' +
-        'applied to a CLI: these are different jobs.',
+        'bypassing both the cloud and the provider’s CLI. Without a profile the hints go ' +
+        'through the active CLI: Claude Code on its subscription, another CLI along its ' +
+        'chat’s route (through the contour when it is ticked there); when it cannot, the ' +
+        'helper refuses with the reason instead of falling back to Claude. It does not ' +
+        'follow what was applied to a CLI: these are different jobs.',
     },
 
     notTitle: 'What this block is not',

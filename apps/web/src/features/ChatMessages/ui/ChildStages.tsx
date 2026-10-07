@@ -2,9 +2,12 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@shared/ui/button';
 import { Typography } from '@shared/ui/typography';
 import { countedGroups, triageElapsedMs, triageLive } from '../lib/hubSummary';
+import { orderHubGroups } from '../lib/hubOrder';
+import { hubCardKey } from '../lib/mergeSplitGroups';
 import { useTickingNow } from '../lib/useTickingNow';
 import { SplitOverlapPanel } from './SplitOverlapPanel';
 import { PlanCancel } from './PlanCancel';
+import { SplitTasksMove } from './SplitTasksMove';
 import { HubSummary } from './HubSummary';
 import { RetiredChats } from './RetiredChats';
 import { GroupCard } from './GroupCard';
@@ -54,7 +57,9 @@ export function ChildStages({
 
   // Отброшенные перезапуском чаты (L20) — не группы: ни в счёт, ни в строки.
   const retired = groups.filter((group) => group.retired);
-  const live = groups.filter((group) => !group.retired);
+  // В работе — сверху, законченные — ниже (G2): ждущая ответа группа не тонет
+  // под доставленными.
+  const live = orderHubGroups(groups.filter((group) => !group.retired));
   const interrupted = live.filter((group) => group.interrupted).length;
   const paused = tree?.paused;
   const canPause = !paused && (tree?.running ?? 0) > 0 && Boolean(onPauseAll);
@@ -126,6 +131,10 @@ export function ChildStages({
             {t('chat.cascade.hub.resumeAllInterrupted', { count: interrupted })}
           </Button>
         )}
+        {/* «Перевести задачи» всех групп и их вложенных разделений (G4). */}
+        {split && split.groups.some((group) => group.taskKeys?.length) && (
+          <SplitTasksMove parentChatId={split.parentChatId} connected={Boolean(split.jiraTasks)} />
+        )}
         {split && <PlanCancel split={split} />}
       </div>
 
@@ -136,7 +145,7 @@ export function ChildStages({
       <div className={styles.groups}>
         {live.map((group) => (
           <GroupCard
-            key={group.chatId ?? group.title}
+            key={hubCardKey(group)}
             group={group}
             {...(split?.parentChatId ? { parentChatId: split.parentChatId } : {})}
             onOpen={onOpen}

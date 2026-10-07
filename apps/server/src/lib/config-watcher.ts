@@ -66,6 +66,9 @@ export function watchedPaths(paths: ClaudePaths): string[] {
     paths.claudeMd,
     paths.secretsEnv,
     paths.skills,
+    // Скрипты хуков: часть их — пары сверки с панелью (В5), и правка такого
+    // файла должна дойти до карточки «Глобальный слой» без перезагрузки.
+    paths.hooks,
     paths.mcpConfig,
     projectsPath(paths),
   ];
@@ -77,7 +80,9 @@ export function domainsForPath(paths: ClaudePaths, changedPath: string): string[
   // его вернула система, и на Windows он смешивает разделители.
   const slashed = (value: string): string => value.replace(/\\/g, '/');
   if (slashed(changedPath).startsWith(slashed(projectsPath(paths)))) return ['chats'];
-  if (changedPath.startsWith(paths.skills)) return ['skills'];
+  // Навык тоже может быть половиной пары сверки (таблица сит `prepare-mr`).
+  if (changedPath.startsWith(paths.skills)) return ['skills', 'globalLayer'];
+  if (changedPath.startsWith(paths.hooks)) return ['globalLayer'];
   if (changedPath === paths.claudeMd) return ['rules'];
   if (changedPath === paths.mcpConfig) return ['mcp'];
   if (changedPath === paths.secretsEnv) return ['env'];

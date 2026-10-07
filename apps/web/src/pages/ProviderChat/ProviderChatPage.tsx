@@ -8,12 +8,14 @@ import { ConfirmDialog } from '@shared/ui/confirm-dialog';
 import { toast } from '@shared/lib/toast';
 import { FolderPicker } from '@features/FolderPicker';
 import { useProviderRunner } from '@entities/ProviderKeys';
+import { activeProvider, useProviders } from '@entities/Provider';
 import {
   providerChatKeys,
   useCreateProviderChat,
   useDeleteProviderChat,
   usePatchProviderChat,
   useProviderChat,
+  useProviderChatProjects,
   useProviderChatRun,
   useProviderChats,
   useRestartProviderChat,
@@ -22,11 +24,12 @@ import { useStartHandoff } from '@entities/ChatHandoff';
 import { MediaDeckCard, storeAgentImageFiles, useChatMedia } from '@entities/Media';
 import type { AgentImage } from '@agentdeck/contracts/agent-images';
 import { toErrorMessage } from '@shared/api/client';
-import { MediaFeedCard } from '@features/ChatMessages';
+import { MediaFeedCard, PermissionCard } from '@features/ChatMessages';
 import { TurnToolHintLine, useTurnToolHint } from '@entities/Platform';
 import { foreignConsumerId } from '@agentdeck/contracts/platform-consumers';
 import { ProviderChatSidebar } from './ProviderChatSidebar';
 import { ProviderChatHeader } from './ProviderChatHeader';
+import { ProviderChatGroupPicker } from './ProviderChatGroupPicker';
 import { ProviderChatMessages } from './ProviderChatMessages';
 import { ProviderChatComposer } from './ProviderChatComposer';
 import { useForeignSplitHub } from './model/useForeignSplitHub';
@@ -45,7 +48,10 @@ export function ProviderChatPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { data: runner } = useProviderRunner();
+  // Группа едет к чужому CLI только слоем: у CLI без слоя выбирать её незачем.
+  const groupsModel = activeProvider(useProviders().data)?.groupsModel;
   const { data: chats = [], isLoading } = useProviderChats();
+  const { data: projects = [], isLoading: isProjectsLoading } = useProviderChatProjects();
   const [activeChatId, setActiveChatId] = useState<string | undefined>(undefined);
   const [attachments, setAttachments] = useState<string[]>([]);
   const [picker, setPicker] = useState<'none' | 'workdir' | 'file'>('none');
@@ -92,6 +98,22 @@ export function ProviderChatPage() {
       {
         onSuccess: (created) => setActiveChatId(created.id),
         onError: () => toast.error(t('providerChat.createFailed')),
+      },
+    );
+  };
+
+  /**
+   * Новый разговор активного провайдера в каталоге проекта — в том числе
+   * проекта, где до сих пор работал только Claude. Каталог проверяет сервер
+   * (тот же `POST`, что у кнопки «Новый»); отказ называется, а не глотается.
+   */
+  const startInProject = (path: string): void => {
+    create.mutate(
+      { workdir: path },
+      {
+        onSuccess: (created) => setActiveChatId(created.id),
+        onError: (error) =>
+          toast.error(t('providerChat.projects.startFailed', { message: toErrorMessage(error) })),
       },
     );
   };
@@ -177,6 +199,7 @@ export function ProviderChatPage() {
     ...(runner?.providerId ? { providerId: runner.providerId } : {}),
     ...(activeChatId ? { activeChatId } : {}),
     ...(chat?.workdir ? { workdir: chat.workdir } : {}),
+    allowEdits: chat?.allowEdits === true,
   });
 
   /**
@@ -195,7 +218,8 @@ export function ProviderChatPage() {
         ...(activeChatId ? { chatId: activeChatId } : {}),
         proposal,
         startRun: options.startRun,
-        allowEdits: true,
+        // Права продолжения — переключатель ЭТОГО разговора, как у Claude.
+        allowEdits: chat?.allowEdits === true,
       },
       {
         onSuccess: (started) => {
@@ -228,6 +252,11 @@ export function ProviderChatPage() {
           onSelect={setActiveChatId}
           onCreate={startChat}
           isCreating={create.isPending}
+          projects={projects}
+          isProjectsLoading={isProjectsLoading}
+          providerId={runner?.providerId ?? ''}
+          providerName={providerName}
+          onStartInProject={startInProject}
         />
 
         <div className={styles.conversation}>
@@ -245,7 +274,23 @@ export function ProviderChatPage() {
             onStop={() => void run.stop()}
             {...(chat?.workdir ? { onRestart: restartSession } : {})}
             isRestarting={restart.isPending}
+            {...(runner?.editsToggle && activeChatId
+              ? {
+                  allowEdits: chat?.allowEdits === true,
+                  onAllowEditsChange: (next: boolean) =>
+                    patch.mutate({ chatId: activeChatId, allowEdits: next }),
+                  ...(runner.editsWhenOff ? { editsWhenOff: runner.editsWhenOff } : {}),
+                }
+              : {})}
           />
+
+          {groupsModel === 'run-layer' && activeChatId && runner?.providerId && (
+            <ProviderChatGroupPicker
+              providerId={runner.providerId}
+              chatId={activeChatId}
+              workdir={chat?.workdir}
+            />
+          )}
 
           {isBlocked && (
             <Stack padding="var(--spacing-2xs) var(--spacing-xl)">
@@ -262,6 +307,8 @@ export function ProviderChatPage() {
             isRunning={run.isRunning}
             queued={run.queued}
             onCancelQueued={(queuedId) => void run.cancelQueued(queuedId)}
+            queueHeld={run.queueHeld}
+            onSendQueued={(queuedId) => void run.sendQueued(queuedId)}
             isEmptyState={!activeChatId}
             onCreate={startChat}
             isCreating={create.isPending}
@@ -277,6 +324,21 @@ export function ProviderChatPage() {
             {...(media.topic ? { mediaTopic: media.topic } : {})}
             mediaRevision={media.revision}
           />
+
+          {/* Просьбы CLI о разрешении — той же карточкой, что у Claude: работа
+              стоит, пока человек не решит. */}
+          {run.permissions.length > 0 && (
+            <Stack padding="0 var(--spacing-xl)">
+              <PermissionCard
+                permissions={run.permissions.map((ask) => ({
+                  toolUseId: ask.id,
+                  toolName: ask.tool ?? providerName,
+                  input: { command: ask.title ?? ask.tool ?? providerName },
+                }))}
+                onDecide={(askId, decision) => void run.answerPermission(askId, decision)}
+              />
+            </Stack>
+          )}
 
           {toolHint && (
             <Stack padding="0 var(--spacing-xl)">
@@ -307,6 +369,7 @@ export function ProviderChatPage() {
             // агента это всё равно обычное сообщение, но собранное сервером.
             onSend={media.isMediaMode ? (text) => media.submit(text) : send}
             isRunning={run.isRunning}
+            isSteerable={run.isSteerable}
             isBlocked={isBlocked || !activeChatId}
             modes={media.modes}
           />

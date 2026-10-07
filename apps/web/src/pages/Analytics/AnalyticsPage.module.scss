@@ -28,7 +28,8 @@
 
 // Процессы свёрнуты: развёрнутый список PID занимал весь первый экран и
 // отодвигал вниз расход и графики — то, ради чего на страницу заходят.
-.agents {
+.agents,
+.sessionMore {
   summary {
     display: inline-flex;
     align-items: center;
@@ -64,8 +65,22 @@
   }
 }
 
-.agentsBody {
+.agentsBody,
+.sessionMoreBody {
   margin-top: var(--spacing-xs);
+}
+
+// Сводка «длительность · запросы» не разрывается посреди числа и подписи.
+.nowrap {
+  white-space: nowrap;
+}
+
+// Цифры сессии: подпись над значением, сетка подстраивается под ширину строки.
+.sessionStats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--spacing-sm);
+  margin: 0;
 }
 
 .agentRow {
@@ -90,6 +105,11 @@
   &:not(:last-child) {
     border-bottom: 1px solid var(--color-border);
   }
+}
+
+// Строка внутри карточки без полей (окно проекта): без отступа текст липнет к рамке.
+.sessionRowInset {
+  padding-inline: var(--spacing-sm);
 }
 
 /* Действия строки сессии: объём и кнопки — одной группой справа. */

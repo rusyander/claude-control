@@ -83,8 +83,14 @@ function refuse(text) {
   return { content: [{ type: 'text', text }], isError: true };
 }
 
-/** Запрос к панели: `{ ok, status, data, message }`, никогда не бросает. */
-async function call(method, path, body, timeout) {
+/**
+ * Запрос к панели: `{ ok, status, data, message }`, никогда не бросает.
+ * `cancel` — сигнал отмены вызова от CLI (`notifications/cancelled`, в том числе
+ * по его собственному таймауту инструмента): запрос обрывается, и панель снимает
+ * карточку. Иначе клик после того, как модели уже сказали «ошибка», выполнил бы
+ * действие, об исходе которого никто не узнает.
+ */
+async function call(method, path, body, timeout, cancel) {
   const token = panelToken();
   let response;
   try {
@@ -97,7 +103,9 @@ async function call(method, path, body, timeout) {
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: body === undefined ? undefined : JSON.stringify(body),
-      signal: AbortSignal.timeout(timeout),
+      signal: cancel
+        ? AbortSignal.any([AbortSignal.timeout(timeout), cancel])
+        : AbortSignal.timeout(timeout),
     });
   } catch (error) {
     // «Ничего не сделано» верно, только когда соединения не было. Таймаут и обрыв
@@ -230,7 +238,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
   };
 });
 
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
+server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
   try {
     const name = String(request.params.name ?? '');
     if (name === 'panel_unavailable') {
@@ -247,6 +255,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         ...(CONVERSATION ? { conversationId: CONVERSATION } : {}),
       },
       CALL_TIMEOUT_MS,
+      extra.signal,
     );
     if (!answer.ok) return refuse(answer.message);
     return renderOutcome(answer.data ?? {});

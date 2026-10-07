@@ -21,29 +21,50 @@ import styles from './ChatMessages.module.scss';
  * Сообщение, переданное агенту на ходу (`steered`), подписано иначе: оно уже у
  * агента, отменять нечего, а обычной репликой оно станет с концом хода.
  */
-/** Подпись под пузырём: передано на ходу, уйдёт следующим или следом. */
-function footKey(steered: boolean, queueIndex: number): string {
-  if (steered) return 'chat.queue.steered';
+/** Подпись под пузырём: передаётся, передано на ходу, уйдёт следующим или следом. */
+function footKey(
+  item: { steered?: boolean; sending?: boolean },
+  queueIndex: number,
+  held: boolean,
+): string {
+  if (item.sending) return 'chat.queue.sending';
+  if (item.steered) return 'chat.queue.steered';
+  // Стоящая очередь не «уйдёт следующей» — без кнопки она не уйдёт вовсе.
+  if (held) return queueIndex === 0 ? 'chat.queue.held' : 'chat.queue.later';
   return queueIndex === 0 ? 'chat.queue.next' : 'chat.queue.later';
 }
 
-export function QueuedBubbles({ items, onCancel }: QueuedBubblesProps) {
+export function QueuedBubbles({ items, onCancel, held = false, onSend }: QueuedBubblesProps) {
   const { t } = useTranslation();
   if (items.length === 0) return null;
 
   return (
     <>
       {items.map((item, index) => {
-        const queueIndex = index - items.filter((other) => other.steered).length;
+        const queueIndex = index - items.filter((other) => other.steered || other.sending).length;
         return (
           <div key={item.id} className={`${styles.row} ${styles.rowUser}`}>
-            <div className={`${styles.bubble} ${styles.bubbleQueued}`} data-queued-message>
+            <div
+              className={`${styles.bubble} ${styles.bubbleQueued}`}
+              data-queued-message
+              {...(item.sending ? { 'data-steer-sending': true } : {})}
+            >
               <div className={styles.queuedText}>{item.prompt}</div>
               <div className={styles.queuedFoot}>
                 <Typography as="span" variant="caption" color="subtle">
-                  {t(footKey(item.steered === true, queueIndex))}
+                  {t(footKey(item, queueIndex, held))}
                 </Typography>
-                {onCancel && !item.steered && (
+                {held && onSend && queueIndex === 0 && !item.steered && !item.sending && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    data-queued-send
+                    onClick={() => onSend(item.id)}
+                  >
+                    {t('chat.queue.sendHeld')}
+                  </Button>
+                )}
+                {onCancel && !item.steered && !item.sending && (
                   <Button
                     size="sm"
                     variant="ghost"

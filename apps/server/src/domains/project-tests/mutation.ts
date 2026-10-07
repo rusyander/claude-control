@@ -25,6 +25,7 @@ import type {
 import { coded } from '../../lib/server-text.ts';
 import type { ServerMessageCode } from '@agentdeck/contracts';
 import { killChildTree } from '../../lib/process-tree.ts';
+import { watchDescendants, type DescendantWatch } from '../../lib/process-watch.ts';
 import { git } from '../project-git/exec.ts';
 import { automationCommand, readAutomation } from './automation.ts';
 import { e2eCommand } from './e2e-command.ts';
@@ -32,6 +33,9 @@ import { e2eFolderView } from './e2e-folder.ts';
 import { ProjectTestsError } from './files.ts';
 import { prepareResultsForRun } from './import-results.ts';
 import { readGroups } from './store.ts';
+import { mutationStand } from './mutation-stand.ts';
+import { MUTATION_PROCESS_LEDGER, type RunSecretsResolver } from './runs.ts';
+import { PanelAgentProcesses } from '../panel-agent/processes.ts';
 
 /**
  * Проверка набора кейсов поломкой (решение владельца 30.09). Единственный
@@ -43,7 +47,8 @@ import { readGroups } from './store.ts';
  * Дорого по времени, поэтому только по кнопке человека и по одной на проект.
  * Рабочая копия человека не трогается: копия — `git worktree --detach` в каталоге
  * данных панели с незакоммиченными правками поверх, зависимости — ссылками на
- * `node_modules`/`.venv` оригинала. Библиотека и история не меняются: отчёт
+ * `node_modules`/`.venv` оригинала, а пакеты рабочего пространства — ссылками
+ * на свой путь в копии. Библиотека и история не меняются: отчёт
  * живёт в памяти панели, статусы кейсов остаются от настоящих прогонов.
  */
 
@@ -62,6 +67,9 @@ const KILL_GRACE_MS = 5_000;
 const EXIT_DRAIN_MS = 2_000;
 /** Каталог копий проверок в каталоге данных панели. */
 const COPIES_DIR = 'mutation-copies';
+/** Сколько раз пробовать убрать копию, добивая между попытками пережившее команду (Ф9). */
+const REMOVE_ATTEMPTS = 3;
+const REMOVE_RETRY_MS = 1_000;
 
 const SCRIPT = new Set(['.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', '.cjs']);
 
@@ -138,6 +146,14 @@ export function mutationCandidates(root: string): ProjectTestMutationCandidate[]
     .sort((a, b) => b.cases - a.cases || a.file.localeCompare(b.file));
 }
 
+/** Сломанный текст файла и что именно сломано — строкой и кодом для интерфейса. */
+interface BrokenFile {
+  text: string;
+  description: string;
+  code: NonNullable<ProjectTestMutationCheck['mutationCode']>;
+  params?: NonNullable<ProjectTestMutationCheck['mutationParams']>;
+}
+
 /**
  * Заведомая поломка файла. `break` — грубая: модуль падает при загрузке (у
  * кода) или файл пустеет (у данных) — её обязан поймать любой кейс, который этот
@@ -149,7 +165,7 @@ export function breakFile(
   text: string,
   file: string,
   mode: ProjectTestMutationMode,
-): { text: string; description: string } | undefined {
+): BrokenFile | undefined {
   const ext = extname(file).toLowerCase();
   if (mode === 'subtle') {
     const flips: [RegExp, (match: string) => string][] = [
@@ -167,9 +183,13 @@ export function breakFile(
         if (!match) continue;
         const next = `${line.slice(0, match.index)}${flip(match[0])}${line.slice(match.index + match[0].length)}`;
         lines[index] = next;
+        const from = line.trim().slice(0, 120);
+        const to = next.trim().slice(0, 120);
         return {
           text: lines.join('\n'),
-          description: `line ${index + 1}: ${line.trim().slice(0, 120)} → ${next.trim().slice(0, 120)}`,
+          description: `line ${index + 1}: ${from} → ${to}`,
+          code: 'line-flip',
+          params: { line: index + 1, from, to },
         };
       }
     }
@@ -179,15 +199,17 @@ export function breakFile(
     return {
       text: `throw new Error('agentdeck mutation check: ${file} is broken on purpose');\n${text}`,
       description: 'module throws on load',
+      code: 'module-throws',
     };
   }
   if (ext === '.py') {
     return {
       text: `raise RuntimeError("agentdeck mutation check: ${file} is broken on purpose")\n${text}`,
       description: 'module raises on import',
+      code: 'module-raises',
     };
   }
-  return { text: '', description: 'file emptied' };
+  return { text: '', description: 'file emptied', code: 'file-emptied' };
 }
 
 /** Каталоги зависимостей оригинала — по относительному пути. */
@@ -215,6 +237,10 @@ export interface MutationStart {
   /** Файл от корня проекта. */
   file: string;
   mode?: ProjectTestMutationMode;
+  /** Окружение стенда для ветки e2e; без него — окружение по умолчанию (Ф8). */
+  environmentId?: string;
+  /** Доступы стенда — как у прогона e2e раздела. */
+  secrets?: RunSecretsResolver;
   now?: () => string;
 }
 
@@ -228,6 +254,26 @@ interface Live {
   stopped?: boolean;
   /** Копия снимается (или остановленный прогон ещё до неё не дошёл): папка и запись worktree заняты. */
   cleaning?: boolean;
+  /** Стенд для ветки e2e — из заявки старта. */
+  stand: Pick<MutationStart, 'environmentId' | 'secrets'>;
+  /** Затирает доступы стенда в выводе команды. */
+  hide?: (text: string) => string;
+  /** Дерево процессов команды, записанное за прогон (Ф9). */
+  watch?: DescendantWatch;
+}
+
+/** Подмены для тестов: опрос дерева процессов и удаление копии (граница ФС). */
+export interface MutationOptions {
+  pollMs?: number;
+  remove?: (dir: string) => void;
+  retryMs?: number;
+}
+
+interface DropOptions {
+  remove?: (dir: string) => void;
+  retryMs?: number;
+  /** Между попытками: добить то, что держит папку. */
+  beforeRetry?: () => void;
 }
 
 /** Ссылка в копию: каталог — `junction` на Windows, запоминается для уборки. */
@@ -235,6 +281,81 @@ function link(live: Live, from: string, to: string): void {
   mkdirSync(dirname(to), { recursive: true });
   symlinkSync(from, to, process.platform === 'win32' ? 'junction' : 'dir');
   live.links.push(to);
+}
+
+/** Путь внутри каталога (не он сам и не выше), относительный, — или `undefined`. */
+function insideDir(dir: string, path: string): string | undefined {
+  const rel = relative(dir, path);
+  return rel && !rel.startsWith('..') && !isAbsolute(rel) ? rel : undefined;
+}
+
+/**
+ * Куда должна вести ссылка зависимости в копии. Пакет рабочего пространства
+ * (ссылка `node_modules/@scope/pkg` → `packages/pkg` оригинала) — в ТОТ ЖЕ путь
+ * копии (Ф7): иначе тесты копии брали бы пакет из оригинала, и поломка пакета в
+ * копии до них не доходила — ложное «не защищён». Остальное — в оригинал.
+ */
+function workspaceTarget(root: string, copy: string, entry: string): string | undefined {
+  let real: string;
+  try {
+    if (!lstatSync(entry).isSymbolicLink()) return undefined;
+    real = realpathSync(entry);
+  } catch {
+    return undefined;
+  }
+  const rel = insideDir(realpathSync(root), real);
+  if (!rel || rel.split(sep).some((part) => DEPENDENCY_DIRS.has(part))) return undefined;
+  return join(copy, rel);
+}
+
+/** Записи каталога зависимостей с пакетами областей (`@scope/pkg`) — по одной. */
+function dependencyEntries(dir: string): string[] {
+  const out: string[] = [];
+  let entries;
+  try {
+    entries = readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return out;
+  }
+  for (const entry of entries) {
+    const path = join(dir, entry.name);
+    if (entry.name.startsWith('@') && entry.isDirectory()) {
+      for (const scoped of readdirSync(path)) out.push(join(path, scoped));
+    } else out.push(path);
+  }
+  return out;
+}
+
+/**
+ * Каталог зависимостей оригинала — в копию. Без пакетов рабочего пространства
+ * — одной ссылкой, как раньше. С ними — настоящим каталогом, где каждая запись —
+ * своя ссылка: внешние пакеты ведут в оригинал, пакеты рабочего пространства —
+ * в копию; файлы верхнего уровня (`.modules.yaml`) копируются.
+ */
+function linkDependencies(live: Live, root: string, copy: string, from: string, to: string): void {
+  const entries = dependencyEntries(from);
+  if (!entries.some((entry) => workspaceTarget(root, copy, entry))) {
+    link(live, from, to);
+    return;
+  }
+  for (const entry of entries) {
+    const target = join(to, relative(from, entry));
+    const own = workspaceTarget(root, copy, entry);
+    if (own) {
+      link(live, own, target);
+      continue;
+    }
+    let isFile: boolean;
+    try {
+      isFile = lstatSync(entry).isFile();
+    } catch {
+      continue;
+    }
+    if (isFile) {
+      mkdirSync(dirname(target), { recursive: true });
+      cpSync(entry, target);
+    } else link(live, entry, target);
+  }
 }
 
 /** Снять ссылку, не трогая то, на что она указывает. */
@@ -261,23 +382,46 @@ function linksIn(dir: string, depth = 0, out: string[] = []): string[] {
   for (const entry of entries) {
     const path = join(dir, entry.name);
     if (entry.isSymbolicLink()) out.push(path);
-    else if (entry.isDirectory() && depth < DEPENDENCY_DEPTH + 2 && entry.name !== '.git') {
+    else if (entry.isDirectory() && depth < DEPENDENCY_DEPTH + 3 && entry.name !== '.git') {
       linksIn(path, depth + 1, out);
     }
   }
   return out;
 }
 
-/** Удалить копию: сперва ссылки (без захода по ним), потом worktree, потом каталог. */
-async function dropCopy(root: string | undefined, copy: string, links: string[]): Promise<void> {
+const removeDir = (dir: string): void =>
+  rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+
+/**
+ * Удалить копию: сперва ссылки (без захода по ним), потом worktree, потом
+ * каталог — с повторами (Ф9). Ответ — причина, если папку так и не убрать
+ * (её держит процесс, антивирус): она уйдёт в отчёт, а копия — в уборку при старте.
+ */
+async function dropCopy(
+  root: string | undefined,
+  copy: string,
+  links: string[],
+  options: DropOptions = {},
+): Promise<string | undefined> {
   for (const path of [...links, ...linksIn(copy)]) unlink(path);
   if (root) await git(root, ['worktree', 'remove', '--force', copy]).catch(() => '');
-  try {
-    rmSync(copy, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
-  } catch {
-    // Занят (антивирус, снятый процесс) — останется до следующей уборки при старте.
+  const remove = options.remove ?? removeDir;
+  let reason: string | undefined;
+  for (let attempt = 1; attempt <= REMOVE_ATTEMPTS; attempt += 1) {
+    try {
+      remove(copy);
+      reason = undefined;
+      break;
+    } catch (error) {
+      reason = (error as NodeJS.ErrnoException).code ?? (error as Error).message;
+    }
+    if (attempt < REMOVE_ATTEMPTS) {
+      options.beforeRetry?.();
+      await new Promise((done) => setTimeout(done, options.retryMs ?? REMOVE_RETRY_MS));
+    }
   }
   if (root) await git(root, ['worktree', 'prune']).catch(() => '');
+  return reason;
 }
 
 /** Репозиторий, чья это копия: `.git` копии — файл `gitdir: <repo>/.git/worktrees/<id>`. */
@@ -320,9 +464,11 @@ export async function sweepMutationCopies(appData: string): Promise<number> {
 export class MutationChecks {
   private readonly checks = new Map<string, Live>();
   private readonly spawnImpl: Spawner;
+  private readonly options: MutationOptions;
 
-  constructor(spawnImpl: Spawner = defaultSpawn) {
+  constructor(spawnImpl: Spawner = defaultSpawn, options: MutationOptions = {}) {
     this.spawnImpl = spawnImpl;
+    this.options = options;
   }
 
   status(root: string): ProjectTestMutationCheck | undefined {
@@ -380,13 +526,20 @@ export class MutationChecks {
       file,
       mode,
       mutation: broken.description,
+      mutationCode: broken.code,
+      ...(broken.params ? { mutationParams: broken.params } : {}),
       startedAt: now(),
       log: '',
       cases,
       caught: 0,
       missed: 0,
+      noResult: 0,
     };
-    const live: Live = { view, links: [] };
+    const live: Live = {
+      view,
+      links: [],
+      stand: { environmentId: input.environmentId, secrets: input.secrets },
+    };
     this.checks.set(root, live);
     void this.run(root, input.appData, live, broken.text, now).catch((error: unknown) => {
       this.fail(live, (error as Error).message, 'mutation-failed', now);
@@ -424,12 +577,19 @@ export class MutationChecks {
     for (const root of this.checks.keys()) this.stop(root);
   }
 
-  private fail(live: Live, message: string, code: MutationCode, now: () => string): void {
+  private fail(
+    live: Live,
+    message: string,
+    code: MutationCode,
+    now: () => string,
+    params?: Record<string, string>,
+  ): void {
     if (live.view.status !== 'running') return;
     Object.assign(live.view, {
       status: 'error',
       error: message,
       errorCode: code,
+      ...(params ? { params } : {}),
       finishedAt: now(),
     });
   }
@@ -469,7 +629,7 @@ export class MutationChecks {
       for (const dir of dependencyDirs(root)) {
         const target = join(copy, dir);
         if (existsSync(target) || !existsSync(dirname(target))) continue;
-        link(live, join(root, dir), target);
+        linkDependencies(live, root, copy, join(root, dir), target);
       }
       if (live.stopped) return;
 
@@ -493,7 +653,7 @@ export class MutationChecks {
       // Отчёт по постоянному пути (`automation.report`) мог приехать в копию от
       // прошлого прогона человека: упавшая команда читалась бы его итогом (ревью PR #1).
       rmSync(command.report, { force: true });
-      const code = await this.exec(live, command, now);
+      const code = await this.exec(live, command, now, appData);
       if (live.stopped) return;
 
       view.stage = 'report';
@@ -522,23 +682,37 @@ export class MutationChecks {
         (item) => item.status === 'failed' || item.status === 'blocked',
       ).length;
       view.missed = view.cases.filter((item) => item.status === 'passed').length;
+      view.noResult = view.cases.filter((item) => item.status === 'no-result').length;
       view.status = 'done';
       view.finishedAt = now();
       rmSync(command.report, { force: true });
     } catch (error) {
       // Причина — до уборки: иначе finally подменил бы её на «отчёта нет».
-      const code = (error as { messageCode?: string }).messageCode;
+      const { messageCode: code, params } = error as {
+        messageCode?: string;
+        params?: Record<string, string>;
+      };
       this.fail(
         live,
         (error as Error).message,
         code?.startsWith('mutation-') ? (code as MutationCode) : 'mutation-failed',
         now,
+        code?.startsWith('mutation-') ? params : undefined,
       );
     } finally {
       view.stage = view.status === 'running' ? 'cleanup' : view.stage;
       live.cleaning = true;
       try {
-        await dropCopy(root, copy, live.links);
+        // Помощник, переживший команду, держит папку копии (на Windows её не
+        // удалить) и порт — добивается по дереву, записанному за прогон (Ф9).
+        await live.watch?.stop();
+        live.watch?.killLeftovers();
+        const cleanupError = await dropCopy(root, copy, live.links, {
+          remove: this.options.remove,
+          retryMs: this.options.retryMs,
+          beforeRetry: () => live.watch?.killLeftovers(),
+        });
+        if (cleanupError) view.cleanupError = cleanupError;
       } finally {
         live.cleaning = false;
       }
@@ -574,11 +748,21 @@ export class MutationChecks {
           recursive: true,
           filter: (path) => !path.split(/[\\/]/).some((part) => DEPENDENCY_DIRS.has(part)),
         });
-        for (const deps of dependencyDirs(source)) link(live, join(source, deps), join(dir, deps));
+        for (const deps of dependencyDirs(source)) {
+          linkDependencies(live, root, copy, join(source, deps), join(dir, deps));
+        }
       }
       const command = e2eCommand(copy, folder, report, files);
       if (command) {
-        return { ...command, env: command.env ?? {}, report, timeout: DEFAULT_TIMEOUT_MINUTES };
+        // Без стенда e2e упали бы все, и это читалось бы как «поймали» (Ф8).
+        const stand = mutationStand({ root, cwd: command.cwd, ...live.stand });
+        live.hide = stand.hide;
+        return {
+          ...command,
+          env: { ...stand.env, ...command.env },
+          report,
+          timeout: DEFAULT_TIMEOUT_MINUTES,
+        };
       }
     }
     if (automation) {
@@ -598,10 +782,12 @@ export class MutationChecks {
     live: Live,
     command: { line: string; cwd: string; env: Record<string, string>; timeout: number },
     now: () => string,
+    appData: string,
   ): Promise<number | null> {
     return new Promise((done) => {
       const append = (chunk: Buffer | string): void => {
-        live.view.log = `${live.view.log}${chunk.toString()}`.slice(-LOG_LIMIT);
+        const text = live.hide ? live.hide(chunk.toString()) : chunk.toString();
+        live.view.log = `${live.view.log}${text}`.slice(-LOG_LIMIT);
       };
       let child: ChildProcess;
       try {
@@ -612,6 +798,13 @@ export class MutationChecks {
         return;
       }
       live.child = child;
+      // Журнал процессов (Ф11): dev-сторож ждёт конца проверки, а не рвёт её.
+      const ledger = new PanelAgentProcesses(() => appData, undefined, MUTATION_PROCESS_LEDGER);
+      const key = `mutation:${randomUUID()}`;
+      if (child.pid) {
+        live.watch = watchDescendants(child.pid, Date.now(), { intervalMs: this.options.pollMs });
+        ledger.started(key, child.pid, command.cwd);
+      }
       child.stdout?.on('data', append);
       child.stderr?.on('data', append);
       child.on('error', (error) => append(`\n${error.message}\n`));
@@ -625,6 +818,7 @@ export class MutationChecks {
         if (settled) return;
         settled = true;
         live.child = undefined;
+        ledger.exited(key);
         if (live.timer) clearTimeout(live.timer);
         done(code);
       };

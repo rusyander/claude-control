@@ -31,9 +31,11 @@ export const providerChatRoles = ['user', 'assistant', 'notice'] as const;
  * Чем именно отработал ответ:
  * - `stream` — CLI запущен на один вопрос, текст показывается по мере печати;
  * - `session` — диалог держит локальный сервер CLI (сейчас только OpenCode);
- * - `api` — прямой вызов модельного API по ключу (CLI не установлен).
+ * - `api` — прямой вызов модельного API по ключу (CLI не установлен);
+ * - `live` — CLI в своём серверном режиме на один ответ: сообщение посреди хода
+ *   уходит в этот же ход (В1).
  */
-export const providerChatTransports = ['stream', 'session', 'api'] as const;
+export const providerChatTransports = ['stream', 'session', 'api', 'live'] as const;
 export type ProviderChatTransport = (typeof providerChatTransports)[number];
 
 /** Одна реплика разговора. */
@@ -46,6 +48,12 @@ export const providerChatMessageSchema = object({
   transport: zodEnum(providerChatTransports).optional(),
   /** Ответ не получен: в реплике текст ошибки, а не ответ модели. */
   failed: boolean().optional(),
+  /**
+   * Реплика человека, написанная посреди ответа и подхваченная ТЕМ ЖЕ ходом CLI
+   * (В1), — а не отправленная после него. Ответ, который идёт следом, отвечает и
+   * на неё.
+   */
+  steered: boolean().optional(),
   /**
    * Сколько шёл прогон, миллисекунды. Меряет ПАНЕЛЬ по своему процессу, а не
    * парсит вывод CLI: расход в ответе отдают не все и по-разному, а часы есть
@@ -87,6 +95,12 @@ export const providerChatSummarySchema = object({
   model: string().optional(),
   /** Аналог глубины к той же модели; понимает его только Codex. */
   effort: string().optional(),
+  /**
+   * «Разрешить правки» разговора: `true` — CLI правит без вопроса, иначе каждая
+   * просьба CLI о разрешении приходит человеку карточкой. Нет поля (разговор
+   * заведён до переключателя) — тоже вопрос: ни молчаливого «да», ни отказа всем.
+   */
+  allowEdits: boolean().optional(),
 });
 export type ProviderChatSummary = Infer<typeof providerChatSummarySchema>;
 
@@ -96,6 +110,50 @@ export const providerChatDetailSchema = providerChatSummarySchema.extend({
 });
 export type ProviderChatDetail = Infer<typeof providerChatDetailSchema>;
 
+/**
+ * Чем каталог непригоден для нового разговора — кодом, а текст у интерфейса: те
+ * же причины, что проверяет сервер при создании разговора с рабочим каталогом.
+ */
+export const projectDirProblems = [
+  'empty',
+  'relative',
+  'missing',
+  'not-dir',
+  'unreadable',
+] as const;
+export type ProjectDirProblemCode = (typeof projectDirProblems)[number];
+
+/** Провайдер, у которого в проекте есть разговоры. */
+export const providerChatProjectProviderSchema = object({
+  id: string(),
+  /** Человекочитаемое имя — для бейджа («Claude Code», «Codex»). */
+  name: string(),
+  chatCount: number(),
+  /** Последняя активность этого провайдера в проекте, ISO. */
+  lastActivity: string(),
+});
+export type ProviderChatProjectProvider = Infer<typeof providerChatProjectProviderSchema>;
+
+/**
+ * Проект в чате чужого провайдера: каталог, в котором работали ХОТЬ ОДНИМ CLI —
+ * Claude (по его транскриптам) или любым другим (по рабочему каталогу разговоров
+ * панели). Один каталог — одна строка, сколько бы провайдеров в нём ни было:
+ * иначе при смене провайдера проекты, начатые с Claude, просто исчезали.
+ */
+export const providerChatProjectSchema = object({
+  /** Абсолютный путь — как записан у самого свежего источника. */
+  path: string(),
+  /** Короткое имя для интерфейса — два последних сегмента пути. */
+  name: string(),
+  /** Последняя активность по всем провайдерам, ISO. */
+  lastActivity: string(),
+  /** Провайдеры с разговорами в этом каталоге, свежие первыми. */
+  providers: array(providerChatProjectProviderSchema),
+  /** Новый разговор здесь начать нельзя — причина; нет поля — можно. */
+  startProblem: zodEnum(projectDirProblems).optional(),
+});
+export type ProviderChatProject = Infer<typeof providerChatProjectSchema>;
+
 /** Создание разговора. Название и каталог необязательны. */
 export const providerChatCreateRequestSchema = object({
   title: string().optional(),
@@ -103,10 +161,11 @@ export const providerChatCreateRequestSchema = object({
 });
 export type ProviderChatCreateRequest = Infer<typeof providerChatCreateRequestSchema>;
 
-/** Правка разговора: переименование и смена рабочего каталога. */
+/** Правка разговора: переименование, смена рабочего каталога, «Разрешить правки». */
 export const providerChatPatchRequestSchema = object({
   title: string().optional(),
   workdir: string().optional(),
+  allowEdits: boolean().optional(),
 });
 export type ProviderChatPatchRequest = Infer<typeof providerChatPatchRequestSchema>;
 
@@ -127,16 +186,41 @@ export const providerChatSendRequestSchema = object({
 });
 export type ProviderChatSendRequest = Infer<typeof providerChatSendRequestSchema>;
 
+/**
+ * Просьба чужого CLI о разрешении, ждущая человека. Только то, что CLI прислал
+ * по проводу: имя инструмента и его описание действия, если он их дал.
+ */
+export const providerChatPermissionSchema = object({
+  id: string(),
+  tool: string().optional(),
+  title: string().optional(),
+  /** Когда пришла, ISO-8601. */
+  at: string(),
+});
+export type ProviderChatPermission = Infer<typeof providerChatPermissionSchema>;
+
+/** Ответ человека на просьбу о разрешении. */
+export const providerChatPermissionAnswerSchema = object({
+  decision: zodEnum(['allow', 'deny']),
+});
+export type ProviderChatPermissionAnswer = Infer<typeof providerChatPermissionAnswerSchema>;
+
 /** Событие потока ответа. */
 export const providerChatEventSchema = object({
-  type: zodEnum(['delta', 'done', 'error', 'stopped']),
+  type: zodEnum(['delta', 'done', 'error', 'stopped', 'steered', 'steerable', 'permissions']),
   /** `delta` — очередной кусок текста. */
   text: string().optional(),
-  /** `done` — готовая реплика ассистента (она же записана в переписку). */
+  /**
+   * `done` — готовая реплика ассистента (она же записана в переписку);
+   * `steered` — реплика человека, подхваченная идущим ходом (В1). `steerable`
+   * полей не несёт: ход начат и с этой минуты принимает сообщения посреди ответа.
+   */
   message: providerChatMessageSchema.optional(),
   /** `error` — текст для показа и машинная причина. */
   error: string().optional(),
   reason: zodEnum(assistantRunReasons).optional(),
+  /** `permissions` — ВСЕ просьбы о разрешении, ждущие сейчас (пусто — ответили). */
+  permissions: array(providerChatPermissionSchema).optional(),
 });
 export type ProviderChatEvent = Infer<typeof providerChatEventSchema>;
 
@@ -157,7 +241,19 @@ export const providerChatStatusSchema = object({
   /** Уже напечатанный кусок ответа: по нему вкладка догоняет пропущенное. */
   partial: string(),
   transport: zodEnum(providerChatTransports).optional(),
+  /**
+   * Идущий ход принимает сообщения посреди ответа (В1): отправленное сейчас уйдёт
+   * в этот же ход, а не будет ждать его конца. Нет поля — ждёт в очереди.
+   */
+  steerable: boolean().optional(),
   /** Очередь разговора по порядку отправки; пусто — поля нет. */
   queued: array(providerChatQueuedSchema).optional(),
+  /**
+   * Очередь есть, а хода, который её отпустит, нет: ответ остановили или панель
+   * перезапускалась (Ф13). Сама она не уйдёт — нужна кнопка «Отправить».
+   */
+  queueHeld: boolean().optional(),
+  /** Просьбы CLI о разрешении, ждущие ответа человека; нет — поля нет. */
+  permissions: array(providerChatPermissionSchema).optional(),
 });
 export type ProviderChatStatus = Infer<typeof providerChatStatusSchema>;

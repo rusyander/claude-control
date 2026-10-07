@@ -2,6 +2,7 @@ import { basename } from 'node:path';
 import type { AppSettings, ProviderInfo, ProvidersResponse } from '@agentdeck/contracts';
 import { claudeProvider } from './claude.ts';
 import { CATALOG_PROVIDERS } from './catalog.ts';
+import { providerEditsWhenOff } from './edits-control.ts';
 import type { ConfigProvider } from './types.ts';
 
 /**
@@ -71,6 +72,17 @@ export function providerSettingsSource(
   };
 }
 
+/**
+ * Модель раздела плагинов: `panel` — плагины Claude Code на `/api/plugins*`
+ * (CLI `claude plugin …` и каталог плагинов Claude), `files` — свой адаптер CLI
+ * на `/api/provider/plugins`, `none` — раздела нет. Одно правило на карточку
+ * провайдера и на отказ маршрутов: разойдись они, страница открылась бы там,
+ * где сервер отказывает, или наоборот.
+ */
+export function pluginsModelOf(provider: ConfigProvider): ProviderInfo['pluginsModel'] {
+  return provider.pluginsConfig ? 'files' : provider.id === 'claude' ? 'panel' : 'none';
+}
+
 /** Полезная нагрузка `GET /api/providers`: активный id и карточки провайдеров. */
 export function describeProviders(store: SettingsSource): ProvidersResponse {
   return {
@@ -102,10 +114,20 @@ export function describeProviders(store: SettingsSource): ProvidersResponse {
       // npm. Провайдер без адаптера получает `none` и до страницы не доходит
       // вовсе: его гейт всё равно вернёт заглушку (fail-closed).
       hooksModel: provider.hooksConfig ? 'config' : provider.id === 'claude' ? 'claude' : 'none',
-      pluginsModel: provider.pluginsConfig ? 'files' : provider.id === 'claude' ? 'panel' : 'none',
+      pluginsModel: pluginsModelOf(provider),
       // Скиллы (OPENCODE-5) — тем же правилом: у Claude раздел свой и богатый, у
       // OpenCode каталог `skills/` со `SKILL.md`, у остальных раздела нет.
       skillsModel: provider.skillsConfig ? 'files' : provider.id === 'claude' ? 'claude' : 'none',
+      // Правила (MAP 24) — тем же правилом: свой богатый раздел у Claude, каталог
+      // правил CLI рядом с его инструкциями (Qwen), у остальных раздела нет.
+      rulesModel: provider.rulesConfig ? 'files' : provider.id === 'claude' ? 'claude' : 'none',
+      // Переключатель «Разрешить правки» показывается лишь там, где CLI его видит.
+      editsControl: provider.assistant?.editsControl ?? 'none',
+      ...(providerEditsWhenOff(provider) ? { editsWhenOff: providerEditsWhenOff(provider) } : {}),
+      // Группы — тоже МОДЕЛЬЮ: Claude читает свои каталоги, CLI со слоем
+      // получает группу на каждый прогон, у остальных она не действует.
+      groupsModel:
+        provider.id === 'claude' ? 'claude-files' : provider.groupLayer ? 'run-layer' : 'none',
     })),
   };
 }

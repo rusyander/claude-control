@@ -7,6 +7,8 @@ import type {
 } from '@agentdeck/contracts';
 import { spawnCliProcess } from '../../lib/cli-spawn.ts';
 import { killChildTree } from '../../lib/process-tree.ts';
+import { serverText } from '../../lib/server-texts.ts';
+import { withCodexKit } from '../kit/codex.ts';
 import type { ConfigProvider } from '../../providers/types.ts';
 import { providerCliCommand } from '../../providers/cli.ts';
 import { resolveRunner, getRawKey } from '../provider-keys.ts';
@@ -24,6 +26,12 @@ import {
   type SkillBodySource,
 } from '../portability/supervisor/skills-router.ts';
 import { buildPrompt } from './prompt.ts';
+import { createLiveTurn } from './live/index.ts';
+import type { LivePermissionPolicy, LiveTurn } from './live/types.ts';
+
+/** У прогона есть своё окружение (контур, набор, слой группы). */
+const hasEnv = (env: Record<string, string> | undefined): boolean =>
+  env !== undefined && Object.keys(env).length > 0;
 
 /** Откуда прогон берёт каталог скиллов и тело названного (П3.4). */
 export interface SkillTurnSource {
@@ -45,6 +53,8 @@ export interface SkillTurnSource {
  *    кого, а поток байтов есть у всех.
  *  - `session` — диалог держит локальный сервер CLI (сейчас только OpenCode).
  *    Ответ приходит целиком, зато контекст не пересылается заново.
+ *  - `live` — CLI запущен в своём серверном режиме на один ответ (В1: Codex,
+ *    Qwen Code): у хода есть вход, и сообщение посреди ответа уходит в него же.
  *  - `api` — прямой вызов модельного API по ключу, когда CLI не установлен.
  *
  * Claude сюда не попадает никогда: у него свой богатый чат, и эта ветка его не
@@ -55,6 +65,8 @@ const DEFAULT_TIMEOUT_MS = 300_000;
 
 export type ProviderChatRunEvent =
   | { type: 'delta'; text: string }
+  /** Ход начат и принимает сообщения посреди ответа (В1). */
+  | { type: 'steerable' }
   | { type: 'done'; reply: string; transport: ProviderChatTransport }
   | { type: 'error'; error: string; reason: AssistantRunReason };
 
@@ -87,6 +99,13 @@ export interface ProviderChatRunOptions {
    */
   model?: string;
   effort?: string;
+  /**
+   * Права прогона по «Разрешить правки» разговора. Живой ход отдаёт просьбы CLI
+   * о разрешении решению `decidePermission` (включено — «да», иначе вопрос
+   * человеку); одиночный запуск — флагами CLI, где они проверены
+   * (`oneShotArgs`, `allowEdits`). Нет поля — как до переключателя.
+   */
+  permission?: LivePermissionPolicy;
   /**
    * Маршрут контура для ЭТОГО прогона (Т3): адрес локального шлюза в
    * переменных одного процесса. Собирает служба чатов на каждом запуске —
@@ -134,6 +153,12 @@ export interface ProviderChatRunOptions {
   fetchImpl?: typeof fetch;
   detect?: (command: string) => boolean;
   sessionServe?: OpencodeServe;
+  /**
+   * Подмена живого хода (В1). Подменённый `spawnImpl` без неё живой путь
+   * отключает: подделка процесса говорит протоколом одиночного запуска, а не
+   * серверного режима, и иначе её бы спросили не тем языком.
+   */
+  liveTurn?: (kind: NonNullable<ConfigProvider['assistant']>['liveServer']) => LiveTurn | undefined;
 }
 
 export interface ProviderChatRunLike {
@@ -142,6 +167,11 @@ export interface ProviderChatRunLike {
     onEvent: (event: ProviderChatRunEvent) => void,
   ): Promise<void>;
   stop(): void;
+  /**
+   * Сообщение в идущий ответ (В1). `false` — у этого пути входа посреди хода
+   * нет или ход его не принял: сообщение ждёт в очереди.
+   */
+  steer?(text: string): Promise<boolean>;
 }
 
 /** Синтетическая реплика с указанием: в файл разговора она не попадает. */
@@ -151,9 +181,12 @@ function prefixMessage(content: string): ProviderChatMessage {
 
 export class ProviderChatRun implements ProviderChatRunLike {
   private child?: ChildProcessWithoutNullStreams;
+  private liveTurn?: LiveTurn;
   private stopped = false;
   /** Отмена HTTP-путей (`api`, `session`): у них нет процесса, который можно снять. */
   private readonly abort = new AbortController();
+  /** Куда идёт сообщение посреди хода: живой ход или сессия OpenCode. */
+  private steerTarget?: (text: string) => Promise<boolean>;
 
   async start(
     options: ProviderChatRunOptions,
@@ -244,7 +277,10 @@ export class ProviderChatRun implements ProviderChatRunLike {
     const resolution = resolveRunner(provider, appDataDir, options.detect);
 
     if (resolution.mode === 'cli') {
-      const session = await this.runSession(options, resolution.cliCommandFound);
+      if (await this.runLive(options, resolution.cliCommandFound, onEvent)) return;
+      const session = await this.runSession(options, resolution.cliCommandFound, () =>
+        onEvent({ type: 'steerable' }),
+      );
       // Остановили, пока сессия отвечала: разговор закрыт тем, что успело
       // прийти (обычно ничем), и ни к одиночному запуску, ни к API дальше не идём.
       if (this.stopped) {
@@ -257,12 +293,17 @@ export class ProviderChatRun implements ProviderChatRunLike {
         return;
       }
 
-      const args = provider.assistant?.oneShotArgs?.(buildPrompt(options.history).text, {
+      const run = {
         ...(options.model ? { model: options.model } : {}),
         ...(options.effort ? { effort: options.effort } : {}),
-      });
+        ...(options.permission ? { allowEdits: options.permission.allowEdits } : {}),
+        ...(options.workdir ? { workdir: options.workdir } : {}),
+      };
+      const args = provider.assistant?.oneShotArgs?.(buildPrompt(options.history).text, run);
       if (args) {
-        await this.runStreaming(options, args, resolution.cliCommandFound, onEvent);
+        // Режим прогона окружением — у CLI без флага режима (Goose: `GOOSE_MODE`).
+        const runEnv = provider.assistant?.oneShotEnv?.(run);
+        await this.runStreaming(options, args, resolution.cliCommandFound, onEvent, runEnv);
         return;
       }
       // CLI есть, но неинтерактивный флаг не задокументирован — придумывать его
@@ -290,9 +331,15 @@ export class ProviderChatRun implements ProviderChatRunLike {
    * HTTP-запрос к модели или к сессии обрывается — иначе ответ пришёл бы после
    * остановки и лёг в переписку так, будто её и не было.
    */
+  async steer(text: string): Promise<boolean> {
+    if (this.stopped || !this.steerTarget) return false;
+    return this.steerTarget(text);
+  }
+
   stop(): void {
     this.stopped = true;
     this.abort.abort();
+    this.liveTurn?.stop();
     if (this.child) killChildTree(this.child);
   }
 
@@ -401,24 +448,102 @@ export class ProviderChatRun implements ProviderChatRunLike {
   private async runSession(
     options: ProviderChatRunOptions,
     cliCommand?: string,
+    onSteerable?: () => void,
   ): Promise<string | undefined> {
     const { provider } = options;
     if (provider.assistant?.sessionServer !== 'opencode') return undefined;
+    // Сервер сессий общий на все разговоры: окружение ЭТОГО прогона (адрес
+    // контура в `OPENCODE_CONFIG_CONTENT`) до него не доходит, и ход ушёл бы
+    // провайдером человека. С окружением — только одиночный запуск.
+    if (hasEnv(options.platformEnv)) return undefined;
 
     const lastUser = [...options.history].reverse().find((message) => message.role === 'user');
     const text = lastUser?.content.trim();
     if (!text) return undefined;
 
     const serve = options.sessionServe ?? opencodeServe;
+    this.steerTarget = (steered) =>
+      serve.steer(options.chatId, steered, { fetchImpl: options.fetchImpl });
+    onSteerable?.();
     const result = await serve.ask(options.chatId, text, {
       command: cliCommand ?? providerCliCommand(provider),
       spawnImpl: options.spawnImpl,
       fetchImpl: options.fetchImpl,
       requestTimeoutMs: options.timeoutMs,
       signal: this.abort.signal,
+      // Каталог разговора и «Разрешить правки» — сессия работает в проекте
+      // разговора, а просьбы CLI о разрешении решает `decidePermission` (D2).
+      ...(options.workdir ? { workdir: options.workdir } : {}),
+      ...(options.permission ? { permission: options.permission } : {}),
     });
 
+    this.steerTarget = undefined;
     return result?.reply;
+  }
+
+  /**
+   * Живой ход (В1). `true` — ход отыгран здесь (ответом или ошибкой); `false` —
+   * серверного режима нет или он не поднялся, и ответ идёт дальше по старым путям
+   * так, будто этой попытки не было: до начала хода живой путь ничего не печатает.
+   */
+  private async runLive(
+    options: ProviderChatRunOptions,
+    cliCommand: string | undefined,
+    onEvent: (event: ProviderChatRunEvent) => void,
+  ): Promise<boolean> {
+    const kind = options.provider.assistant?.liveServer;
+    if (!kind || this.stopped) return false;
+    // Контур окружением прогона (`runEndpoint`: Kimi Code, Goose): живые серверы
+    // с адресом контура не проверены, а `kimi web` вдобавок берёт модель из своего
+    // `/config`, то есть из конфига человека. Ход идёт одиночным запуском — этот
+    // путь проверен живьём (`check-run-endpoint-cli.mjs`).
+    if (options.provider.runEndpoint && hasEnv(options.platformEnv)) return false;
+    const factory = options.liveTurn ?? (options.spawnImpl ? undefined : createLiveTurn);
+    const turn = factory?.(kind);
+    if (!turn) return false;
+
+    this.liveTurn = turn;
+    this.steerTarget = (text) => turn.steer(text);
+    const result = await turn.run(
+      {
+        command: cliCommand ?? providerCliCommand(options.provider),
+        prompt: buildPrompt(options.history).text,
+        timeoutMs: options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+        ...(options.workdir ? { workdir: options.workdir } : {}),
+        ...(options.platformEnv && Object.keys(options.platformEnv).length > 0
+          ? { env: options.platformEnv }
+          : {}),
+        ...(options.portableEnv ? { portableEnv: options.portableEnv } : {}),
+        ...(options.model ? { model: options.model } : {}),
+        ...(options.effort ? { effort: options.effort } : {}),
+        ...(options.fetchImpl ? { fetchImpl: options.fetchImpl } : {}),
+        ...(options.permission ? { permission: options.permission } : {}),
+      },
+      (text) => onEvent({ type: 'delta', text }),
+      () => onEvent({ type: 'steerable' }),
+    );
+    this.liveTurn = undefined;
+    this.steerTarget = undefined;
+
+    if (this.stopped) {
+      onEvent({
+        type: 'done',
+        reply: result.kind === 'done' ? result.reply : '',
+        transport: 'live',
+      });
+      return true;
+    }
+    if (result.kind === 'unavailable') return false;
+    if (result.kind === 'error') {
+      onEvent({ type: 'error', error: result.error, reason: 'cli_error' });
+      return true;
+    }
+    if (!result.reply) {
+      onEvent({ type: 'error', error: 'CLI закончил ход без ответа', reason: 'cli_error' });
+      return true;
+    }
+    onEvent({ type: 'done', reply: result.reply, transport: 'live' });
+    return true;
   }
 
   /** Прямой вызов модельного API: ответ приходит целиком, поток эмулируется одним куском. */
@@ -477,6 +602,7 @@ export class ProviderChatRun implements ProviderChatRunLike {
     args: string[],
     cliCommand: string | undefined,
     onEvent: (event: ProviderChatRunEvent) => void,
+    runEnv?: Record<string, string>,
   ): Promise<void> {
     // Остановили раньше, чем процесс успел стартовать, — стартовать уже незачем.
     if (this.stopped) {
@@ -485,12 +611,29 @@ export class ProviderChatRun implements ProviderChatRunLike {
     }
 
     const command = cliCommand ?? providerCliCommand(options.provider);
-    const spawned = spawnCliProcess(command, args, {
+    // Набор панели в Codex (`domains/kit/codex.ts`) — без переменной наложения ничего не меняет.
+    const kit = withCodexKit(args, options.platformEnv, 'exec');
+    if (kit.missing || kit.refusal) {
+      onEvent({
+        type: 'error',
+        error: kit.refusal ?? serverText('kit-compose-failed'),
+        reason: 'cli_error',
+      });
+      return Promise.resolve();
+    }
+    // Режим прогона — поверх контура и слоя группы: это решение человека на этот ход.
+    // `PWD` — вслед за `cwd`: унаследованный от оболочки панели, он указывал бы на
+    // её каталог, а `opencode run` берёт каталог проекта из `PWD`, а не из `cwd`
+    // (проверено 1.18.34) — и правил файлы мимо разговора.
+    const env = {
+      ...kit.env,
+      ...runEnv,
+      ...(options.workdir ? { PWD: options.workdir } : {}),
+    };
+    const spawned = spawnCliProcess(command, kit.args, {
       spawnImpl: options.spawnImpl,
       ...(options.workdir ? { cwd: options.workdir } : {}),
-      ...(options.platformEnv && Object.keys(options.platformEnv).length > 0
-        ? { env: options.platformEnv }
-        : {}),
+      ...(Object.keys(env).length > 0 ? { env } : {}),
       // Канон ложится ПОД `env`: адрес контура собран для этого прогона и обязан
       // побеждать. Значения секретов живут только в окружении процесса — на диск
       // из этого пути не попадает ничего.
@@ -504,10 +647,18 @@ export class ProviderChatRun implements ProviderChatRunLike {
 
     const child = spawned.child;
     this.child = child;
+    // Промпт — в argv, stdin этому прогону не нужен, и его надо ЗАКРЫТЬ: CLI,
+    // читающий stdin, когда это не терминал (`opencode run`, проверено 1.18.34),
+    // иначе ждёт его конца вечно. Ошибка потока (CLI уже вышел) — не событие.
+    child.stdin?.on('error', () => {});
+    child.stdin?.end();
 
     return new Promise<void>((resolve) => {
       const outDecoder = new TextDecoder('utf8');
       const errDecoder = new TextDecoder('utf8');
+      // Свой разбор stdout — у CLI, что печатает вокруг ответа служебный вывод или
+      // отвечает потоком JSON. Не задан — stdout и есть ответ.
+      const parser = options.provider.assistant?.parseStdout?.();
       let reply = '';
       let errorText = '';
       let timedOut = false;
@@ -528,7 +679,8 @@ export class ProviderChatRun implements ProviderChatRunLike {
       }, options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
 
       child.stdout?.on('data', (chunk: Buffer) => {
-        const text = outDecoder.decode(chunk, { stream: true });
+        const raw = outDecoder.decode(chunk, { stream: true });
+        const text = parser && raw ? parser.push(raw) : raw;
         if (!text) return;
         reply += text;
         onEvent({ type: 'delta', text });
@@ -543,7 +695,8 @@ export class ProviderChatRun implements ProviderChatRunLike {
       );
 
       child.on('close', (code) => {
-        const tail = outDecoder.decode();
+        const rest = outDecoder.decode();
+        const tail = parser ? `${rest ? parser.push(rest) : ''}${parser.end()}` : rest;
         if (tail) {
           reply += tail;
           onEvent({ type: 'delta', text: tail });
@@ -566,7 +719,9 @@ export class ProviderChatRun implements ProviderChatRunLike {
         }
 
         const text = reply.trim();
-        if (code !== 0 || !text) {
+        // CLI сам сказал «ход удался» (`settled`) — ненулевой код после этого
+        // сбой выхода процесса, ответ цел (gemini 0.62 на win32, см. gemini-stream.ts).
+        if ((code !== 0 && !parser?.settled?.()) || !text) {
           finish({
             type: 'error',
             error: errorText.trim().slice(0, 500) || `CLI завершился с кодом ${code}`,

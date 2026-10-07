@@ -1,7 +1,7 @@
 import { SIEVE_LANG, type RiskAssessment, type SieveDef, type SieveStage } from './catalog.ts';
-import { needsRow, type SieveMechanics } from './judge.ts';
+import { needsRow, rowGap, type SieveMechanics, type SieveProofFacts } from './judge.ts';
 import type { LearnedSieve } from './learned.ts';
-import { EVIDENCE_MIN, type SieveReportRow } from './report.ts';
+import type { SieveReportRow } from './report.ts';
 
 // ---------------------------------------------------------------- задания
 
@@ -9,13 +9,14 @@ import { EVIDENCE_MIN, type SieveReportRow } from './report.ts';
 function mechanicsLines(mechanics: SieveMechanics | undefined): string[] {
   if (!mechanics) return [];
   const lines: string[] = [];
-  const list = (items: readonly string[] | undefined): string =>
-    (items ?? []).slice(0, 10).join(', ');
+  // Список целиком (Ф2): судья снимает срабатывание, только если названы ВСЕ
+  // отмеченные файлы, — урезанный список требовал назвать то, чего группа не видела.
+  const list = (items: readonly string[] | undefined): string => (items ?? []).join(', ');
   if (mechanics.consumers?.length) {
     lines.push(
       'The panel found removed names still used outside the diff — fix each consumer or name ' +
         'every file in the consumers-repo-wide row with why it is not a consumer:',
-      ...mechanics.consumers.slice(0, 10).map((hit) => `- ${hit.token}: ${hit.files.join(', ')}`),
+      ...mechanics.consumers.map((hit) => `- ${hit.token}: ${hit.files.join(', ')}`),
     );
   }
   if (mechanics.foreignRemovals?.length) {
@@ -60,6 +61,11 @@ export function sievePromptBlock(input: {
   done?: readonly SieveReportRow[];
   /** Сита, чья сданная строка устарела (код менялся после неё) — делать заново. */
   stale?: readonly string[];
+  /**
+   * Проверяемость сданного — те же факты, что получит судья доставки: строка,
+   * которую он отклонит (нет прогона, устарела), в задании остаётся открытой.
+   */
+  proof?: SieveProofFacts;
   /** Риск правки: на высоком задание называет причины. */
   risk?: RiskAssessment;
   /** В копии есть блок «Тесты» — живую проверку доказывают его прогоном. */
@@ -68,15 +74,14 @@ export function sievePromptBlock(input: {
   const { stage, applicable } = input;
   if (applicable.length === 0 && !input.learned?.length) return '';
   const stale = new Set(input.stale ?? []);
-  const done = new Set(
-    (input.done ?? [])
-      .filter(
-        (row) => row.status !== 'fail' && row.evidence.length >= EVIDENCE_MIN && !stale.has(row.id),
-      )
-      .map((row) => row.id),
-  );
+  const rows = new Map((input.done ?? []).map((row) => [row.id, row]));
+  // Сдано ровно то, что примет судья (Ф1): `rowGap` — его же решение по строке,
+  // а не длина доказательства. Отклонённая строка в задании не выглядит сданной.
+  const accepted = (sieve: SieveDef): boolean =>
+    !stale.has(sieve.id) &&
+    rowGap(sieve, rows.get(sieve.id), input.mechanics ?? {}, input.proof) === undefined;
   const mine = applicable.filter((sieve) => stage === 'deliver' || sieve.stage === 'review');
-  const own = mine.filter((sieve) => needsRow(sieve) && !done.has(sieve.id));
+  const own = mine.filter((sieve) => needsRow(sieve) && !accepted(sieve));
   const panel = mine.filter((sieve) => !needsRow(sieve));
   const lines = [
     'Sieves before the MR — each comes from a real reviewer blocker or a class of production ' +

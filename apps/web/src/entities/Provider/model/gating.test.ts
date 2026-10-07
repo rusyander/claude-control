@@ -52,6 +52,7 @@ function response(activeId: string): ProvidersResponse {
         hooksModel: 'claude',
         pluginsModel: 'panel',
         skillsModel: 'claude',
+        rulesModel: 'claude',
       },
       {
         id: 'codex',
@@ -62,6 +63,7 @@ function response(activeId: string): ProvidersResponse {
         hooksModel: 'none',
         pluginsModel: 'none',
         skillsModel: 'none',
+        rulesModel: 'none',
       },
     ],
   };

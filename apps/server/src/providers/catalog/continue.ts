@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import { buildCapabilities, type ConfigProvider } from '../types.ts';
 import { continueHome, unimplementedPaths } from './config-dirs.ts';
+import { continueOneShotArgs } from './continue-args.ts';
 
 /**
  * Continue: `~/.continue/config.yaml` (MCP) + `~/.continue/permissions.yaml` (права).
@@ -83,14 +84,22 @@ export const continueProvider: ConfigProvider = {
   },
   // Детект «конфиг найден» (Ф7): каталог ~/.continue. Только проверка существования.
   configLocations: () => [continueHome()],
-  // Ассистент Continue: CLI логинится в аккаунт Continue либо работает по ключу
-  // Anthropic; своего единого модельного API у панели тут нет → раннер `cli`.
+  // Ассистент Continue — только через `cn`: модель, адрес и ключ у Continue свои
+  // в `config.yaml` (или в аккаунте Continue Hub), а СВОЕГО модельного API у
+  // Continue нет вовсе. Поэтому `apiKind: 'none'` и ни одной переменной ключа:
+  // прежний `anthropic` + `ANTHROPIC_API_KEY` при отсутствии `cn` молча отвечал
+  // моделью Claude под именем Continue (SF-1), а ключ, подставленный панелью в
+  // окружение `cn`, тот дописывал открытым текстом в `config.yaml`.
   // One-shot: `cn -p "<промпт>"` — задокументированный headless-режим.
   assistant: {
-    apiKind: 'anthropic',
-    apiKeyEnvVars: ['ANTHROPIC_API_KEY', 'CONTINUE_API_KEY'],
+    apiKind: 'none',
+    apiKeyEnvVars: [],
     cliRunnable: true,
-    oneShotArgs: (prompt) => ['-p', prompt],
+    // `cn [--config <свой config.yaml>] [--allow|--exclude Write/Edit/MultiEdit/Bash] -p <промпт>`;
+    // почему именно так — `continue-args.ts` (каждый флаг проверен живым `cn` 1.5.47).
+    oneShotArgs: (prompt, run) => continueOneShotArgs(prompt, run),
+    // «Разрешить правки» доходит флагами прав `cn` (`--allow` / `--exclude`).
+    editsControl: 'flag',
   },
   capabilities: buildCapabilities({
     // Глобального файла/каталога инструкций у Continue не задокументировано (см.

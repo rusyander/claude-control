@@ -302,6 +302,8 @@ export interface AnalysisOptions {
   command: string;
   cwd: string;
   model?: string;
+  /** Добавка маршрута (контур профиля ассистента) к окружению процесса. */
+  env?: Record<string, string>;
   events: readonly WatchEvent[];
   /** Разделы, уже лежащие в отчёте, — для ссылок вместо дублей. */
   known?: readonly KnownSection[];
@@ -359,7 +361,7 @@ export function startAnalysis(options: AnalysisOptions): AnalysisHandle {
     spawnImpl: options.spawnImpl,
     cwd: options.cwd,
     inheritEnv: false,
-    env: panelAgentEnv(process.env, {}),
+    env: panelAgentEnv(process.env, options.env ?? {}),
   });
   if (spawned.error) {
     cleanup();

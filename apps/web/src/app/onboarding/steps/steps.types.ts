@@ -11,6 +11,11 @@ export interface LocationStepProps {
   /** Вернуться к автоопределению — кнопка есть только у каталога, заданного вручную. */
   onReset: () => void;
   isResetting: boolean;
+  /**
+   * Каталога Claude нет, но он и не нужен: выбран или найден другой CLI. Вместо
+   * красной ошибки — спокойное пояснение, что шаг можно пройти дальше.
+   */
+  claudeOptional?: boolean;
 }
 
 export interface ProvidersStepProps {

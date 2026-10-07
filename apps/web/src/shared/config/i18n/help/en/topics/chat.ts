@@ -72,6 +72,9 @@ export const chatEn: typeof chatRu = {
     canSearchMessages:
       'Search the body of a conversation, not just its title and preview: the ' +
       '“By messages” switch in the chat list, with matches highlighted',
+    canPin:
+      'Pin a top-level conversation with the pin in its row: it sits under “Pinned” above ' +
+      'everything else, and the group chats split from it ride along with it',
     canLoadMore:
       'Load earlier messages with the “Load more” button — a long conversation is ' +
       'not cut off at the last window',
@@ -457,6 +460,12 @@ export const chatEn: typeof chatRu = {
         'group: feature/orders-export has its own folder ' +
         'orders-panel-worktrees/feature-orders-export, a "dependencies installed" ' +
         'mark linking to the install log, "refresh the local layer" and Remove.',
+      sMoveTasks: 'Move the tasks in Jira',
+      sMoveTasksText:
+        'The groups delivered their MRs — the hub header has "Move group tasks". The ' +
+        'dialog reads PROJ-41, PROJ-42 and PROJ-43 in Jira, shows where each one ' +
+        'stands and offers only statuses all three can reach. Press Move and the ' +
+        'panel moves them itself; the result per task stays in the dialog.',
 
       shotsTitle: 'The screenshots are taken on an invented project',
       shotsText:
@@ -611,7 +620,9 @@ export const chatEn: typeof chatRu = {
     parallelRemoveText:
       'The “Remove” button deletes the copy through git. While an agent works there ' +
       'the button is disabled and the server refuses too: deleting the directory from ' +
-      'under a live process loses its work silently. Uncommitted changes inside are ' +
+      'under a live process loses its work silently. An agent that finished its turn ' +
+      'and waits for the next message does not block it: the panel closes its idle ' +
+      'process itself. Uncommitted changes inside are ' +
       'not surrendered by git either — a second button appears, “Remove with its ' +
       'changes”. The main copy is never removed.',
     parallelNote:
@@ -803,10 +814,13 @@ export const chatEn: typeof chatRu = {
     splitSieves: 'Pre-MR sieves',
     splitSievesText:
       'The review and delivery stages get a list of sieves in their task — checks chosen ' +
-      'by the paths the branch touched: docs verified against the stand, removed names and ' +
+      'by the paths the branch touched (the file extension decides the path kind; a file is ' +
+      'a test by its name, a tests/ folder alone does not make it one): docs verified against the stand, removed names and ' +
       'test ids found nowhere in the repository, no conflict with a fresh main, a UI edit ' +
       'checked in a browser, a wrong value refused with a clear message. The group passes ' +
-      'each sieve with evidence — a command and its output. The project’s own checks ' +
+      'each sieve with evidence — a command and its output. The task shows exactly the rows ' +
+      'and every file the report check will demand — the list is not cut, and a refused row ' +
+      'stays open in it. The project’s own checks ' +
       '(lint, types, tests) the panel finds in its manifests, and the evidence must name ' +
       'every one; changed code with not a single test changed in the branch is a gap too, ' +
       'until the group names the test that covers it. Migrations and schemas get a ' +
@@ -821,7 +835,10 @@ export const chatEn: typeof chatRu = {
       'all fine” does not pass; a conflict only by a rebase. Consumers of removed names the ' +
       'panel re-checks, and the group still hands in its own search. A row counts for the ' +
       'code it was written on: if the branch changed the code the sieve covers after it, ' +
-      'the row is stale and the sieve has to be passed again. When the copy has a Tests ' +
+      'the row is stale and the sieve has to be passed again; this holds for a row that ' +
+      'cleared a mechanical finding too. Freshness is judged by what the branch held at the ' +
+      'moment of the row, so a rebase without edits to the covered code does not age it. ' +
+      'When the copy has a Tests ' +
       'block, live checks (browser, boundary input, a request to the stand, a migration) ' +
       'are proved by a recorded run: the group cites run:<id>, and the panel opens that run ' +
       'in the history itself — it must be finished, have at least one green case and no red ' +
@@ -836,10 +853,13 @@ export const chatEn: typeof chatRu = {
       'a commenter’s reply, so only a human can accept it, not the panel agent. The same ' +
       'blocker in another project only suggests making the sieve shared. The blocker tally ' +
       '(“escaped to MR” against “caught before the MR”) is there too, and a learned sieve ' +
-      'can be removed there. When the copy has a Tests block, it is the block that says ' +
+      'can be removed there. There are at most 40 learned sieves: at the cap a new one ' +
+      'displaces the oldest not-accepted one, and when there is nothing to displace it is not ' +
+      'recorded and the card says so. When the copy has a Tests block, it is the block that says ' +
       '“verified” for the group: the cases its diff touches (by codePaths) must be run by a ' +
-      'run recorded after the group started, and their latest result must not be red ' +
-      '(quarantine does not hold). No run, a touched case not run, a red case, or a diff ' +
+      'run recorded after the group started and after its latest change — a commit or a ' +
+      'file in the working tree — and their latest result must not be red ' +
+      '(quarantine does not hold). No run, a run older than the change, a touched case not run, a red case, or a diff ' +
       'covered by no case while cases are linked to files — the group gets a reminder with ' +
       'the command that records a run, and the group row in the hub reads “Tests block: N ' +
       'of M green”. No cases in the copy at all — nothing to check with, and it does not ' +
@@ -1024,9 +1044,9 @@ export const chatEn: typeof chatRu = {
       'written by the panel itself, not by the agent, so both are shown in the ' +
       'interface language; a question the agent asked stays as it asked it. ' +
       'While the triage is running no group is started — neither by a panel restart nor by a ' +
-      'pause and “Resume”, nor by “Start now” (the button answers that the triage is still ' +
-      'running): its block decides the order. A pause or “Remove” made during the triage is not ' +
-      'undone by its block. A task lost in the triage is returned home, a circular ' +
+      'pause and “Resume”, nor by “Start now”: waiting groups have no “Start now” and “Pause” ' +
+      'buttons until the triage result arrives — its block decides the order. A pause or ' +
+      '“Remove” made earlier is not undone by its block. A task lost in the triage is returned home, a circular ' +
       'wait is cut, and the summary labels that “repaired by the panel”. In the ' +
       'chat list the links are labelled “triage” and “plan”; “Only create the ' +
       'chats” gets no levels.',
@@ -1037,9 +1057,26 @@ export const chatEn: typeof chatRu = {
       'long one is cut, the full name is in the hint), the path it has ' +
       'walked (“work › review › fixes”) and the model of the current stage; a ' +
       'running stage carries a pulsing dot. A click on the card opens the group’s ' +
-      'chat, and the group’s buttons sit in its top right corner. The chat list ' +
+      'chat, and the group’s buttons sit in its top right corner. Groups still in ' +
+      'progress (running, waiting for you, paused, queued) sit on top, finished ' +
+      'ones (delivered, accepted, copy removed) below, and groups whose MR is merged ' +
+      'or closed at the very bottom: a delivered but unmerged group still waits for ' +
+      'its merge. A merged group’s card is green, a closed one is dimmed; each part ' +
+      'keeps plan order. The panel learns by itself whether an MR is merged while ' +
+      'the hub is open: at most once every 5 minutes it asks the forge for the state ' +
+      'alone — one request per project, no discussions or pipeline; with the hub ' +
+      'closed or every MR already merged it does not ask at all. It needs the ' +
+      'GitLab or GitHub integration turned on. Next to the MR button is its place in the merge queue, ' +
+      '“merge 2nd of 3”: the group’s predecessors merge first — the ones it waited ' +
+      'for and the one whose branch its copy was cut from; the hint names them. ' +
+      'There is no number while a predecessor has nothing to merge yet, on a merged ' +
+      'or closed MR, and when the plan yields no order (a dependency loop). The chat list ' +
       'shows CONVERSATIONS, and the pipeline adds up to three per group — nine rows ' +
-      'do not tell you the state of three groups. The agents panel (the “Agents” ' +
+      'do not tell you the state of three groups. So under the parent the list shows ' +
+      'only the stages where something is happening now — a green, yellow or red dot — and ' +
+      'the rest fold into one “N more” row per branch: a grey dot (silent for over five ' +
+      'minutes), a stage with no run and a stopped one. A stage moves in and out of the fold ' +
+      'by itself as its status changes; the panel remembers an unfolded branch. The agents panel (the “Agents” ' +
       'button in the header) now also says what each running run is being driven ' +
       'by. A group waiting for its predecessor carries a “Release” button in its ' +
       'row: the predecessor’s chain may never end — the run was stopped, the chat ' +
@@ -1082,13 +1119,26 @@ export const chatEn: typeof chatRu = {
       'conversation together with a request to check every task is done; what is ' +
       'found the group fixes and delivers again, and finding nothing it touches ' +
       'nothing. The MR could not be read — the agent reads it itself. A merged or ' +
-      'closed MR has nothing to recheck — a refusal with the reason, and the card is ' +
-      'marked “MR merged” or “MR closed”. A merged one loses the button; a closed one ' +
+      'closed MR has nothing to recheck: the button says so with a notice, not an ' +
+      'error, and the card is marked “MR merged” or “MR closed” at once and moves ' +
+      'down. A merged one loses the button; a closed one ' +
       'keeps it — it may be reopened. A review-by-link group has no button: it looks ' +
       'at someone else’s MR. While the turn ' +
       'runs the row says “Rechecking…”; once it ends in a delivery the button turns ' +
       'green, “MR checked” with the check time beside it, and stays so until new ' +
-      'work on the group clears it. It can be clicked again while green.',
+      'work on the group clears it. It can be clicked again while green. A group ' +
+      'with tracker tasks has “Move N tasks” — no MR needed (keys ' +
+      'from its tasks, branch and title; suggested tickets are not included) — and ' +
+      'the hub header has “Move group tasks”: every group and the splits the groups ' +
+      'made themselves. The dialog reads the tasks in Jira and shows each one’s ' +
+      'status. When they stand in different statuses, “From status” narrows the move ' +
+      'to the tasks in the chosen one right now and offers the statuses those can ' +
+      'reach; “All tasks” offers the statuses all of them can reach. A task Jira did ' +
+      'not return is shown with the reason. Pressing “Move” is the consent: the ' +
+      'panel moves them itself, with no agent turn, and reports per task — moved, ' +
+      'already in that status, no transition, an error, or left alone because it ' +
+      'stands in another status. With Jira not connected in the panel the dialog points to ' +
+      'Settings, “Integrations”.',
     cascadeControl: 'One group and the whole plan',
     cascadeControlText:
       'A group’s row has “Pause”, “Resume” in the same session and “Start now” past ' +
@@ -1379,7 +1429,10 @@ export const chatEn: typeof chatRu = {
       'made by editing a message takes the group and autonomy along. Switched autonomy while ' +
       'the agent’s background commands are running? The process is not restarted so they are ' +
       'not killed: the feed says how many are still running, and the new marker takes effect ' +
-      'once they finish.',
+      'once they finish. In a Qwen Code or Codex chat the “Group” field sits right in the ' +
+      'conversation header: the chosen group rides to the CLI as a layer on every answer, ' +
+      'the Claude files do not change, and “Auto” takes those bound to the project and ' +
+      'switched on for this CLI. Other CLIs have no group layer — and no field either.',
     autonomyPick: 'An automatic pick instead of a question',
     autonomyPickText:
       'With “Autonomous — pick the recommended option” on (the default), an agent ' +
@@ -1529,8 +1582,8 @@ export const chatEn: typeof chatRu = {
       'writing code. That is why the options are not dimmed while a run is going — ' +
       'the choice is needed exactly now. An answer to a busy agent goes to it at ' +
       'once: the agent reads it after the current step and carries on with the same ' +
-      'turn. Where that is impossible (another CLI) the answer queues up and goes ' +
-      'out when the turn ends.',
+      'turn. Where that is impossible (a CLI with no mid-answer input) the answer ' +
+      'queues up and goes out when the turn ends.',
     lostTitle: 'The connection to a run can be lost — and you will be told',
     lostText:
       'The event stream lives in the browser while the agent lives on the server, so ' +
@@ -1669,8 +1722,13 @@ export const chatEn: typeof chatRu = {
     composerStopText:
       'While an answer is streaming, “Stop” sits next to send (in another CLI’s chat — in ' +
       'the conversation header). Sending is not locked meanwhile: Claude gets the message ' +
-      'mid-turn, another CLI gets it as a queue that goes out by itself as soon as the ' +
-      'answer ends; a queued message can be removed with the cross on its bubble.',
+      'mid-turn. So do Codex, Qwen, Goose, Kimi Code and OpenCode: the field reads “the CLI gets it ' +
+      'mid-answer”, the button “Pass on”, and in the feed the message is marked ' +
+      '“mid-answer” and is covered by the same answer. Other CLIs (and a CLI whose server ' +
+      'mode did not start) get it as a queue that goes out by itself as soon as the ' +
+      'answer ends; a queued message can be removed with the cross on its bubble. If the ' +
+      'answer was stopped or the panel restarted, the queue does not go out by itself: it is ' +
+      'kept, the bubble reads “Waiting to be sent”, and its “Send” button sends it.',
 
     editsTitle: 'Edit mode: what the agent may change',
     editsCaption:
@@ -1697,6 +1755,29 @@ export const chatEn: typeof chatRu = {
       'that switching it off is a deliberate act — it never returns to read-only on ' +
       'its own. The exception is the parallel launch window: it has its own toggle, ' +
       'and it opens on “edits allowed”, the same as a normal chat.',
+    editsForeignTitle: 'Edits in another CLI’s chat',
+    editsForeignText:
+      'Codex, Qwen, Goose, Kimi Code and OpenCode have their own switch in the conversation header: ' +
+      '«Ask before edits» (the default) or «Edits without asking». While it is off, every ' +
+      'request from the CLI to change something — a command, a file edit — arrives in the ' +
+      'feed as the same «Allow / Deny» card Claude uses, plus a phone notification; the ' +
+      'card survives leaving the page and F5. «Deny» reaches the CLI as a refusal, and ' +
+      '«Stop» or the end of the reply declines everything still waiting. With the switch ' +
+      'on, the panel answers «yes» itself: edits go through without cards. The position ' +
+      'is stored in the conversation; cascade stages, a clean session and parallel-launch ' +
+      'tasks take it from the conversation they started from, while task triage and ' +
+      'review by link run with edits allowed, as with Claude. If the server mode did not ' +
+      'come up and the reply goes through a one-shot run, nobody can be asked midway: ' +
+      'there the switch being off means «no edits» (Codex read-only, Qwen default mode, ' +
+      'Goose chat mode: tools are not run, the reply still arrives). Goose’s default auto ' +
+      'mode never asks at all, so with the switch off the panel moves its session to ' +
+      'approve for the length of the reply — your config.yaml is not changed. Gemini CLI, ' +
+      'Continue and Aider only answer through a one-shot run, with nobody to ask midway, so ' +
+      'there the switch being off reads «Edits blocked»: Gemini default mode, Continue ' +
+      'without its write and command tools, Aider a dry run (edits shown, not written). ' +
+      'Where the switch does not reach the CLI at all, a note stands in its place: the CLI ' +
+      'decides on edits itself, by its own settings. The phone has no switch — a line above ' +
+      'the conversation feed says what the CLI will do with a request to write.',
 
     autoApproveTitle: 'Auto-approving permissions',
     autoApproveText:
@@ -1875,6 +1956,14 @@ export const chatEn: typeof chatRu = {
     noteHistoryText:
       'Very long conversations are trimmed from the top: transcripts run to hundreds ' +
       'of megabytes, and there is nothing to read them whole with in a browser.',
+    noteCleanupTitle: 'Claude Code deletes old conversations itself — after 30 days by default',
+    noteCleanupText:
+      'The period is the cleanupPeriodDays setting in settings.json, counted from the last ' +
+      'write to the conversation file, not from its groups’ work: the main chat of a split ' +
+      'that nobody wrote to lately is erased even if its groups ran yesterday. Deleted means ' +
+      'gone — to keep history longer, raise that key in settings.json. If the main chat is ' +
+      'already erased, its groups are not scattered across dates: they sit under ' +
+      '“Parent chat deleted”.',
     noteRestartTitle: 'A panel server restart does not kill the agent — the run is picked up',
     noteRestartText:
       'The CLI process is held not by the panel server but by a separate relay, so a ' +
@@ -1918,7 +2007,11 @@ export const chatEn: typeof chatRu = {
     noteProviderText:
       'With a non-Claude provider active, the Chat section shows its own chat: a list of ' +
       'conversations, memory between questions, the reply as the CLI prints it, a working ' +
-      'directory and file attachments by path. The panel keeps the transcript there — these ' +
+      'directory and file attachments by path. Next to the conversations sits a Projects tab: ' +
+      'every folder where any CLI has worked, Claude projects included, each with badges of who ' +
+      'worked in it and a "New conversation here" button that starts a conversation of the ' +
+      'ACTIVE provider in that folder. A folder that no longer exists on disk stays in the list ' +
+      'with the button disabled and the reason shown. The panel keeps the transcript there — these ' +
       'CLIs have no readable history of their own — and the context of the next question is ' +
       'assembled from it. Every answer carries its time: how long the run took and the sum ' +
       'over the conversation. The panel measures it on its own process, so it is there for ' +
@@ -1953,6 +2046,7 @@ export const chatEn: typeof chatRu = {
       '05-overlap': 'Branch overlap: a shared file and a file taken outside the group it owns',
       '06-paused': 'The tree on pause: a mark on every group and the resume button',
       '07-worktrees': 'Parallel copies of the repository: path, install trace and removal',
+      '08-move-tasks': 'Moving the group tasks in Jira: each status and the statuses all share',
     },
     autonomy: {
       '01-escalation': 'The main chat: a critical card from a group and the button to it',

@@ -55,7 +55,7 @@ describe('provider-skills-routes: скиллы CLI провайдера', () => 
   });
 
   it('раздел доступен только у opencode: у claude и прочих — 400', async () => {
-    for (const provider of ['claude', 'codex', 'gemini', 'cursor', 'aider']) {
+    for (const provider of ['claude', 'gemini', 'cursor', 'aider']) {
       await boot(provider);
       const get = await app.inject({ method: 'GET', url: '/api/provider-skills' });
       expect(get.statusCode, provider).toBe(400);

@@ -45,13 +45,13 @@ export interface ProjectInfo {
 }
 
 /** Нормализация пути для дедупликации: один каталог пишется по-разному. */
-function normalizePath(path: string): string {
+export function normalizePath(path: string): string {
   const unified = path.replace(/\\/g, '/').replace(/\/+$/, '');
   return process.platform === 'win32' ? unified.toLowerCase() : unified;
 }
 
 /** Короткое имя проекта — два последних сегмента пути. */
-function shortName(path: string): string {
+export function shortName(path: string): string {
   const parts = path.split(/[\\/]/).filter(Boolean);
   return parts.slice(-2).join('/') || path;
 }
@@ -63,7 +63,7 @@ function shortName(path: string): string {
  *  - временные черновики агента во временном каталоге ОС и scratchpad;
  *  - служебные подкаталоги (`.agent`, скриншоты), а не корни проектов.
  */
-function isNonProject(path: string): boolean {
+export function isNonProject(path: string): boolean {
   return (
     PANEL_CHATS_DIR.test(path) ||
     /[\\/]chats[\\/](?:new|qa)-/i.test(path) ||

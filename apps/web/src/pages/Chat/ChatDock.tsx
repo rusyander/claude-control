@@ -13,6 +13,7 @@ import type { ChatDockProps } from './ChatDock.types';
  * происходит и что уйдёт следующим».
  */
 export function ChatDock({
+  focusKey,
   progress,
   isRunning,
   awaiting,
@@ -74,6 +75,7 @@ export function ChatDock({
       <ChatQueue items={queued} onCancel={onCancelQueued} />
 
       <ChatComposer
+        {...(focusKey ? { focusKey } : {})}
         value={value}
         onChange={onChange}
         onSend={onSend}

@@ -34,6 +34,8 @@ import { integrationsEn } from './en/topics/integrations';
 import { promptsEn } from './en/topics/prompts';
 import { portabilityEn } from './en/topics/portability';
 import { phoneEn } from './en/topics/phone';
+import { localModelsEn } from './en/topics/localModels';
+import { kitEn } from './en/topics/kit';
 
 /** Типизирован по русской версии: забыть ключ при переводе не получится. */
 export const helpEn: HelpSchema = {
@@ -147,6 +149,8 @@ export const helpEn: HelpSchema = {
     dlp: dlpEn.shots,
     panelAgent: panelAgentEn.shots,
     phone: phoneEn.shots,
+    localModels: localModelsEn.shots,
+    kit: kitEn.shots,
   },
 
   diagrams: {
@@ -179,6 +183,8 @@ export const helpEn: HelpSchema = {
     dlp: dlpEn.diagrams,
     panelAgent: panelAgentEn.diagrams,
     phone: phoneEn.diagrams,
+    localModels: localModelsEn.diagrams,
+    kit: kitEn.diagrams,
   },
 
   topics: {
@@ -206,6 +212,8 @@ export const helpEn: HelpSchema = {
     dlp: dlpEn.topic,
     panelAgent: panelAgentEn.topic,
     phone: phoneEn.topic,
+    localModels: localModelsEn.topic,
+    kit: kitEn.topic,
     platform: platformEn.topic,
     endpoints: endpointsEn.topic,
     providers: providersEn.topic,

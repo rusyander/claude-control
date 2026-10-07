@@ -40,13 +40,15 @@ function gatewayServes(wireApi: ProviderEndpointFile['wireApi']): boolean {
  * переменной, ни структуры чужого конфига: молча не сработавшая настройка хуже
  * честного прочерка, потому что человек считает работу сделанной.
  *
- * Прочерков четыре вида, и они разные для человека:
+ * Прочерков пять видов, и они разные для человека:
  * - `no_env_section` — писать некуда вовсе (goose, kimi, cursor, opencode);
  * - `no_documented_base_url` — файл есть, задокументированного имени нет;
  * - `gateway_dialect` — адрес задать МОЖНО, но CLI говорит на диалекте, которого
- *   шлюз не понимает. Это про gemini: его `google` шлюз не переводит (Т2 знает
- *   anthropic и openai), и записать ему адрес значило бы получить 404 на первом
- *   же запросе вместо ответа;
+ *   шлюз не понимает: записать ему адрес значило бы получить 404 на первом же
+ *   запросе вместо ответа. Сейчас таких CLI нет — с 07.10.2026 шлюз переводит и
+ *   `google` (Gemini); причина остаётся для диалекта, который появится завтра;
+ * - `cli_config_bypass` — адрес задать можно, но конфиг человека не даст CLI его
+ *   прочесть (Gemini со входом не ключом API);
  * - `gateway_down` — контур выключен или шлюз не поднят; считается выше.
  */
 
@@ -104,6 +106,8 @@ export function pickApiKind(provider: ConfigProvider): EndpointApiKind | undefin
   const config = provider.endpointConfig;
   if (config?.['openai-compat']) return 'openai-compat';
   if (config?.anthropic) return 'anthropic';
+  // Диалект Gemini шлюз переводит на краю (`google-bridge.ts`).
+  if (config?.google) return 'google';
   return undefined;
 }
 
@@ -164,8 +168,7 @@ export function filePlanFor(
       { key: `model_providers.${name}.base_url`, value: baseUrl },
       // Ручка — та, которую принимает сам CLI (`endpointFile.wireApi`), а не
       // та, которую удобно шлюзу: конфиг с чужой ручкой codex не загружает
-      // целиком. Сегодня до этой строки дело не доходит — цель стоит прочерком,
-      // пока шлюз не обслуживает `/responses`.
+      // целиком. Шлюз обслуживает `/responses` с MAP D (`responses-bridge.ts`).
       { key: `model_providers.${name}.wire_api`, value: file.wireApi },
       { key: `model_providers.${name}.env_key`, value: 'CONTOUR_API_KEY' },
       // Провайдер, которого никто не выбрал, — мёртвая запись: корневой ключ и
@@ -220,6 +223,13 @@ export function describeContourTargets(
         // Имена переменных есть, а файла нет: в реестре такого сочетания быть не
         // должно, но угадывать путь нельзя — fail-closed.
         targets.push(unsupported(provider, 'no_env_section'));
+        continue;
+      }
+      // Конфиг человека не даст CLI прочесть адрес (Gemini: вход не ключом API):
+      // записанная переменная молча не подействовала бы, а без способа входа
+      // gemini с ней не стартует вовсе — терминальный CLI сломался бы целиком.
+      if (vars.bypass?.()) {
+        targets.push(unsupported(provider, 'cli_config_bypass'));
         continue;
       }
       targets.push({

@@ -86,6 +86,12 @@ export function PluginsLimitsSections() {
           <Callout tone="info" title={tr('noteProviderTitle')}>
             {tr('noteProviderText')}
           </Callout>
+          <Callout tone="info" title={tr('noteQwenTitle')}>
+            {tr('noteQwenText')}
+          </Callout>
+          <Callout tone="info" title={tr('noteCodexTitle')}>
+            {tr('noteCodexText')}
+          </Callout>
         </Stack>
       </HelpSection>
 

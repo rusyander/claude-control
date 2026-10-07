@@ -196,6 +196,26 @@ describe('tools/mcp/panel.mjs', () => {
     expect(projects()).toHaveLength(0);
   });
 
+  it('CLI отменил вызов (свой таймаут инструмента) — карточка снята, действие не выполнено', async () => {
+    // Goose 1.53 обрывает вызов инструмента через 300 с, а карточка ждёт 10 минут:
+    // поздний клик выполнил бы действие, о котором модели уже сказали «ошибка».
+    const abort = new AbortController();
+    const call = client
+      .callTool({ name: 'create_project', arguments: { path: projectDir } }, undefined, {
+        signal: abort.signal,
+      })
+      .catch((error: unknown) => error);
+    await waitPending();
+    abort.abort('tool timeout');
+    await call;
+    const deadline = Date.now() + 5_000;
+    while (pending.list().length > 0 && Date.now() < deadline) {
+      await new Promise((done) => setTimeout(done, 50));
+    }
+    expect(pending.list()).toHaveLength(0);
+    expect(projects()).toHaveLength(0);
+  });
+
   it('неверный вход и мёртвая панель — предложение, а не исключение', async () => {
     const invalid = (await client.callTool({
       name: 'create_project',

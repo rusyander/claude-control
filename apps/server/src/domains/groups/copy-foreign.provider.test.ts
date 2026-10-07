@@ -12,6 +12,7 @@ import { assertBindingKeepsPair, pairsIn } from './choice.ts';
 import { copyGroupToGlobal } from './copy.ts';
 import { copyGroupToProvider } from './copy-foreign.ts';
 import { groupKnobsView, knobsLineForChoice } from './knobs.ts';
+import { hookContentId } from '../../lib/hook-id.ts';
 
 /**
  * Копия проектной группы для ЧУЖОГО CLI живёт в его каталогах (F-40): её
@@ -159,5 +160,55 @@ describe('копия для чужого CLI — не глобальная гр�
         projectPaths: [project],
       }),
     ).not.toThrow();
+  });
+});
+
+describe('копия хука в Codex — одобрение в самом CLI (G3)', () => {
+  const hookGroup = (): Group => {
+    writeFileSync(
+      join(project, '.claude', 'settings.json'),
+      JSON.stringify({
+        hooks: { PreToolUse: [{ hooks: [{ type: 'command', command: 'echo pre-tool' }] }] },
+      }),
+      'utf8',
+    );
+    return store.saveGroup({
+      id: 'proj-hook',
+      name: 'Hook flow',
+      description: '',
+      color: 'accent',
+      icon: 'folder',
+      members: [{ kind: 'hook', id: hookContentId('PreToolUse', undefined, 'echo pre-tool') }],
+      env: {},
+      projectPaths: [],
+      scope: { kind: 'project', path: project, provider: 'claude' },
+      isEnabled: true,
+      order: 0,
+    });
+  };
+
+  it('Codex: хук лёг, и копия говорит, что без одобрения в /hooks он не заработает', () => {
+    const { warnings } = copyGroupToProvider(
+      deps(),
+      hookGroup(),
+      provider('codex'),
+      provider('claude'),
+      { override: root },
+    );
+    expect(warnings.filter((warning) => warning.kind === 'skipped')).toEqual([]);
+    expect(warnings).toContainEqual(
+      expect.objectContaining({ kind: 'approve', detail: provider('codex').name }),
+    );
+  });
+
+  it('Qwen одобрения не просит — предупреждения нет', () => {
+    const { warnings } = copyGroupToProvider(
+      deps(),
+      hookGroup(),
+      provider('qwen'),
+      provider('claude'),
+      { override: root },
+    );
+    expect(warnings.some((warning) => warning.kind === 'approve')).toBe(false);
   });
 });

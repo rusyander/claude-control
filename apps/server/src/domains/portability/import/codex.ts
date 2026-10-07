@@ -104,7 +104,7 @@ const UNREAD = [
     key: 'skills',
     kind: 'skill' as const,
     detail:
-      'ключ [[skills.config]] в config.toml: скиллы Codex панель пока не разбирает, хотя односторонний импортёр самого CLI их переносит',
+      'ключ [[skills.config]] в config.toml: включение и выключение скиллов Codex панель пока не разбирает, хотя односторонний импортёр самого CLI их переносит',
   },
 ];
 

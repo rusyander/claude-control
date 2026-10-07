@@ -113,4 +113,19 @@ describe('project-tests/runs: второй запуск', () => {
     }
     expect(registry.holds(`${root}-other`)).toBeUndefined();
   });
+
+  /**
+   * Запуск ждёт приёмник прав и только потом стартует CLI. «Стоп» в эту паузу
+   * закрывал прогон, а запуск всё равно стартовал: настоящий `claude -p` жил
+   * без хозяина (его уже никто не останавливал), а приёмник прав — открытым
+   * портом. Так обычный прогон набора оставлял живые процессы CLI.
+   */
+  it('остановленный до старта CLI прогон CLI не запускает', async () => {
+    const start = vi.spyOn(ChatRun.prototype, 'start').mockImplementation(async () => undefined);
+    registry.start({ projectPath: root, mode: 'run', groupId: 'gui' }, '2026-09-26T00:00:00.000Z');
+    expect(registry.stop(root)).toBe(true);
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(start).not.toHaveBeenCalled();
+    expect(registry.get(root)?.status).toBe('stopped');
+  });
 });

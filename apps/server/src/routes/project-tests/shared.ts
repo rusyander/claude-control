@@ -148,6 +148,27 @@ export function assertNoE2eRun(deps: TestsDeps, root: string): void {
 }
 
 /**
+ * Проверка поломкой и автотесты проекта — по одной за раз (Ф11): обе гоняют
+ * тот же набор и тот же стенд, и вместе они делили бы порт dev-сервера, отчёт
+ * и данные стенда — итог одной читался бы по чужим падениям.
+ */
+export function assertNoMutationCheck(deps: TestsDeps, root: string): void {
+  if (!deps.mutations?.isRunning(root)) return;
+  throw coded(
+    Object.assign(new ProjectTestsError('Идёт проверка поломкой.'), { statusCode: 409 }),
+    'e2e-run-mutation-running',
+  );
+}
+
+export function assertNoE2eForMutation(deps: TestsDeps, root: string): void {
+  if (!deps.e2eRuns?.isRunning(root)) return;
+  throw coded(
+    Object.assign(new ProjectTestsError('Автотесты проекта уже идут.'), { statusCode: 409 }),
+    'mutation-e2e-running',
+  );
+}
+
+/**
  * Папку e2e заводят и автотесты гоняют только у проектов реестра и копий их
  * веток: это запись в чужое дерево и запуск его команды. Остальной
  * раздел по-прежнему открывается на любом каталоге.

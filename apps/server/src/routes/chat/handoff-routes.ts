@@ -57,7 +57,7 @@ import { createChat, type ProviderChatService } from '../../domains/provider-cha
 import { checkProjectDir } from '../../domains/projects.ts';
 import { getActiveProvider, getActiveProviderId } from '../../providers/registry.ts';
 import { supportsCliAutoMode } from '../../providers/auto-mode.ts';
-import { activeCliCommand } from '../../providers/cli.ts';
+import { providerCliCommand } from '../../providers/cli.ts';
 import { apiTokenPath } from '../../lib/api-token.ts';
 
 /**
@@ -1046,7 +1046,10 @@ export function continuationStarter(
       {
         prompt,
         cwd,
-        command: activeCliCommand(ctx.store),
+        // Команда — от того же снимка провайдера, по которому выбрана эта ветка
+        // (`provider.id === 'claude'` ниже), а не от настройки заново: иначе
+        // переключение CLI между ними дало бы чужой бинарь с флагами Claude.
+        command: providerCliCommand(provider),
         model,
         effort: source.effort || assigned?.effort || settings.chatEffort,
         permissionMode: groupEdits
@@ -1071,6 +1074,8 @@ export function continuationStarter(
     const created = createChat(appData, provider.id, {
       title: title ?? 'Продолжение',
       workdir: cwd,
+      // «Разрешить правки» — из запроса, как `permissionMode` у Claude выше.
+      allowEdits: source.allowEdits,
     });
     if (!created) return false;
     // У чужого CLI инициатива — первая реплика переписки, а не флаг запуска:
@@ -1093,12 +1098,17 @@ export function continuationStarter(
   return ({ chatId: nextId, prompt, cwd, title }) => {
     // Продолжение идёт в том же каталоге, и набор проекта нужен ему ровно так
     // же, как исходному разговору: иначе после «чистой сессии» правила и скиллы
-    // молча переставали действовать.
-    const activated = activateGroupsQuietly(
-      { paths: ctx.location.paths, store: ctx.store, backupDir: ctx.backupDir },
-      cwd,
-      (error) => app.log.warn({ err: error }, 'group activation failed'),
-    );
+    // молча переставали действовать. Тумблер каталогов — только у Claude: чужой
+    // CLI файлов Claude не читает, привязанные группы он получает слоем на
+    // прогон при отправке (`group-activation-wiring`), а `~/.claude` не трогается.
+    const activated =
+      provider.id === 'claude'
+        ? activateGroupsQuietly(
+            { paths: ctx.location.paths, store: ctx.store, backupDir: ctx.backupDir },
+            cwd,
+            (error) => app.log.warn({ err: error }, 'group activation failed'),
+          )
+        : [];
     const started =
       provider.id === 'claude'
         ? startClaude(nextId, prompt, cwd)

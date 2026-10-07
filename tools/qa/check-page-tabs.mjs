@@ -25,7 +25,14 @@ const PAGES = {
   },
   '/compare': { key: 'compare', tabs: ['mcp', 'env', 'permissions', 'instructions'] },
   '/plugins': { key: 'plugins', tabs: ['installed', 'catalog', 'marketplaces', 'scaffold'] },
-  '/scripts': { key: 'scripts', tabs: ['all', 'used', 'unused', 'test'] },
+  // Полоса скриптов, как и полоса правил, есть только при непустом списке: на
+  // чистом одноразовом стенде её не было, и проверка падала на ожидании вкладок.
+  // Список подменяется на время прогона, файлы не трогаются.
+  '/scripts': {
+    key: 'scripts',
+    tabs: ['all', 'used', 'unused', 'test'],
+    stub: { url: '**/api/scripts', body: stubScripts() },
+  },
   '/analytics': {
     key: 'analytics',
     tabs: ['overview', 'breakdown', 'activity', 'sessions', 'live'],
@@ -53,6 +60,24 @@ function stubRules() {
     rule(0, 'Отвечать по-русски', true),
     rule(1, 'Не коммитить сам', true),
     rule(2, 'Старое правило', false),
+  ];
+}
+
+function stubScripts() {
+  const script = (name, isUsed, isTest) => ({
+    id: `qa/${name}`,
+    name,
+    extension: '.mjs',
+    path: `hooks/qa/${name}`,
+    sizeBytes: 512,
+    modifiedAt: '2026-10-05T10:00:00.000Z',
+    isUsed,
+    isTest,
+  });
+  return [
+    script('guard.mjs', true, false),
+    script('old-helper.mjs', false, false),
+    script('guard.test.mjs', false, true),
   ];
 }
 

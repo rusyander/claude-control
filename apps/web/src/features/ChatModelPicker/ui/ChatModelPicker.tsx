@@ -170,7 +170,9 @@ export function ChatModelPicker({
         <Typography variant="caption" color="warning" as="span" role="status" aria-live="polite">
           {t(refusal.key, {
             title: refusal.params.title,
-            reason: t(`chat.platformRefusedReason.${refusal.params.reason}`),
+            reason: t(`chat.platformRefusedReason.${refusal.params.reason}`, {
+              setting: refusal.params.setting,
+            }),
             fix: t(`chat.platformRefusedFix.${refusal.params.reason}`),
           })}
         </Typography>
@@ -180,7 +182,9 @@ export function ChatModelPicker({
         <Typography variant="caption" color="warning" as="span" role="status" aria-live="polite">
           {t(bypass.key, {
             title: bypass.params.title,
-            reason: t(`chat.platformRefusedReason.${bypass.params.reason}`),
+            reason: t(`chat.platformRefusedReason.${bypass.params.reason}`, {
+              setting: bypass.params.setting,
+            }),
             fix: t(`chat.platformRefusedFix.${bypass.params.reason}`),
           })}
         </Typography>

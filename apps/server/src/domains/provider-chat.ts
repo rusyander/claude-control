@@ -11,7 +11,8 @@
  * `ProviderChatRun.ts` — один ответ (поток CLI, сессия, API),
  * `ProviderChatService.ts` — живые прогоны, подписка и запись результата,
  * `cascade.ts` — конвейер «работа → ревью → правки» над понижёнными прогонами,
- * `handoff.ts` — продолжение работы в новом разговоре (у чужого CLI сессии нет).
+ * `handoff.ts` — продолжение работы в новом разговоре (у чужого CLI сессии нет),
+ * `projects.ts` — проекты всех провайдеров одним списком.
  */
 
 export {
@@ -27,6 +28,7 @@ export {
   titleFromText,
   type ProviderChatCascade,
 } from './provider-chat/store.ts';
+export { listAllProjects, type ProjectsSources } from './provider-chat/projects.ts';
 export {
   createForeignStagePlanner,
   foreignStagePrefix,

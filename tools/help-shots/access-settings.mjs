@@ -69,7 +69,7 @@ export async function shootFirstRun(browser, web, scenario, { panel }) {
       .click();
     await page.waitForTimeout(2000);
 
-    // ── 05. Восемь вкладок ───────────────────────────────────────────────────
+    // ── 05. Полоса вкладок ───────────────────────────────────────────────────
     // Кадр на всю страницу: главное здесь — полоса разделов, а не содержимое
     // первой вкладки.
     await openSettingsTab(page, web, 'general');

@@ -3,6 +3,8 @@ import { join } from 'node:path';
 import { stringify as stringifyToml } from 'smol-toml';
 import { spliceCodexTableRegion, upsertCodexRootScalar } from '../../lib/codex-toml.ts';
 import type { ProviderEndpointApiKind } from '../../providers/types/assistant.ts';
+import type { EnvScope } from '@agentdeck/contracts/portable-env';
+import type { ProbeLayer } from '@agentdeck/contracts/portable-probe';
 
 /**
  * РЕЦЕПТЫ ПРИЁМОЧНОЙ ПРОБЫ: как запустить каждый целевой CLI без диалога и
@@ -34,6 +36,12 @@ export interface ProbeRecipe {
   readonly commandPrompt: string;
   /** Подготовить временный дом до запуска: снять мастера первого запуска и т.п. */
   prepare?(home: string, workdir: string): void;
+  /**
+   * Слои, чей каталог цель находит по профилю ОС, а не по `HOME`: временный дом
+   * пробы их подменить не может, и цель читала бы настоящий дом человека.
+   * Строка такого слоя — «не проверено», а не красный перенос.
+   */
+  realHomeLayers?(scope: EnvScope): readonly ProbeLayer[];
 }
 
 /**
@@ -114,6 +122,12 @@ export const PROBE_RECIPES: Readonly<Record<string, ProbeRecipe>> = {
     readTool: { name: 'exec_command', call: (path) => ({ cmd: readFileCommand(path) }) },
     commandPrompt: '/agentdeck-probe-command',
     prepare: prepareCodexHome,
+    // Личный каталог скиллов `~/.agents/skills` codex на Windows берёт из профиля
+    // ОС мимо `HOME`/`USERPROFILE` (живая проба 07.10.2026, codex-cli 0.160):
+    // скилл из временного дома он не увидит. Проектный `.agents/skills` лежит в
+    // рабочем каталоге пробы и подменяется честно.
+    realHomeLayers: (scope) =>
+      process.platform === 'win32' && scope === 'global' ? ['skill'] : [],
   },
   qwen: {
     // Из ДВУХ протоколов каталога взят Anthropic: на нём говорит заглушка, и

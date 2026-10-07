@@ -3,6 +3,7 @@ import { serverMessagesRu } from './server-messages/ru.ts';
 import { panelTextsRu } from './panel-texts/texts.ru.ts';
 import { homeRu } from './home/ru.ts';
 import { watcherRu } from './watcher/ru.ts';
+import { foreignChatRu } from './foreign-chat/ru.ts';
 
 /**
  * Русский словарь — источник истины. Английский типизирован по нему, поэтому
@@ -30,6 +31,8 @@ export const ru = {
   home: homeRu,
   // Фоновый наблюдатель панели — отдельным модулем (`watcher/`).
   watcher: watcherRu,
+  // Разговор с чужим CLI — отдельным модулем (`foreign-chat/`).
+  foreignChat: foreignChatRu,
   tabs: {
     home: 'Главная',
     chat: 'Чат',
@@ -692,8 +695,9 @@ export const ru = {
         'Этот разговор продолжили в другом окне — показываю его заново. Ваше сообщение не отправлено: повторите его, если оно ещё нужно.',
       conversation_deleted:
         'Этот разговор удалили в другом окне. Ваше сообщение не отправлено — следующее начнёт новый разговор.',
-      provider_unsupported: 'Агент панели пока работает только с Claude Code: активный CLI другой.',
-      cli_not_found: 'Claude Code не найден в PATH компьютера: агенту нечем работать.',
+      provider_unsupported:
+        'Агент панели не работает с активным CLI: он идёт через Claude Code, Qwen Code, Codex, Gemini CLI, OpenCode, Goose или Kimi Code.',
+      cli_not_found: 'CLI активного провайдера не найден в PATH компьютера: агенту нечем работать.',
       endpoint_unsupported:
         'Ассистенту выбран свой эндпоинт: его ключ пришлось бы отдать процессу агента.',
       contour_unreachable:

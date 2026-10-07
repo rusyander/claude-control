@@ -141,7 +141,12 @@ export const portabilityEn = {
         'another CLI it stays there for good, while with Claude the feed is its own ' +
         'transcript, which the panel never writes into — it can only speak into a ' +
         'RUNNING run, and a conversation without one says so in the outcome instead ' +
-        'of passing it over in silence.',
+        'of passing it over in silence. Groups bound to the directory are not ' +
+        'switched on with Claude’s toggle for the new CLI — it does not read Claude’s ' +
+        'files: Codex and Qwen Code get them as a layer on every run, and for the ' +
+        'other CLIs the new conversation’s feed shows a note that the group does not ' +
+        'act. With Claude the new conversation takes the project set the same way a ' +
+        'clean-session continuation does.',
       carryRefusal: 'Why a row cannot be picked',
       carryRefusalText:
         'The safeguards are the same as for a clean-session continuation, and they ' +
@@ -234,7 +239,9 @@ export const portabilityEn = {
     levelNative: 'Natively',
     levelNativeText:
       'The target has the same mechanism and the entry becomes its entry. This is ' +
-      'the only level at which nothing is lost.',
+      'the only level at which nothing is lost. It can carry a condition: Codex runs a ' +
+      'carried hook only after it is approved in /hooks inside the CLI — the row says so, ' +
+      '“once approved inside the CLI”.',
     levelEmulated: 'Emulated',
     levelEmulatedText:
       'The target has no such mechanism, but the panel achieves the same ' +
@@ -257,7 +264,9 @@ export const portabilityEn = {
     levelImpossibleText:
       'The reason is named exactly: the target has no such event, the entity ' +
       'lives inside a foreign process, the body of the entry is synced with an ' +
-      'account and is not on disk. There is no "text is probably enough" here.',
+      'account and is not on disk, a plugin at the target is installed only by its store ' +
+      'or the CLI’s own command (Qwen Code and Codex work that way). There is no "text is ' +
+      'probably enough" here.',
 
     limitsTitle: 'Limits and refusals',
     limitsCaption:

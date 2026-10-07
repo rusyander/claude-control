@@ -4,6 +4,8 @@ import {
   applicableSieves,
   BUILTIN_SIEVES,
   checkSimilarity,
+  isProductCode,
+  isTestPath,
   judgeSieves,
   LEARN_SIEVES_LINE,
   mergeSieveRows,
@@ -28,11 +30,41 @@ describe('применимость сит по путям', () => {
   it('UI, бэкенд, контракт и код различаются по пути', () => {
     expect([...touchKinds(['apps/web/src/Button.tsx'])].sort()).toEqual(['code', 'ui']);
     expect([...touchKinds(['svc/handler.go'])].sort()).toEqual(['backend', 'code']);
-    expect([...touchKinds(['apps/server/src/routes/a.ts'])].sort()).toEqual(['backend', 'code']);
+    // Вид решает расширение (Ф3): TS сервера — код, бэкенд — по языку бэкенда.
+    expect([...touchKinds(['apps/server/src/routes/a.ts'])].sort()).toEqual(['code']);
     expect([...touchKinds(['docs/api.md'])]).toEqual(['contract']);
     expect([...touchKinds(['api/openapi.yaml'])]).toContain('contract');
     expect([...touchKinds(['packages/contracts/src/chat.ts'])]).toContain('contract');
   });
+
+  // Ф3: папка `tests/`/`qa/` не делает код тестом, `api/`/`services/` — бэкендом.
+  const kindsTable: [string, string[], boolean][] = [
+    ['apps/mobile/src/entities/tests/model.ts', ['code'], false],
+    ['apps/mobile/src/features/tests/ui/List.tsx', ['code', 'ui'], false],
+    ['tools/qa/check-help.mjs', ['code'], false],
+    ['apps/web/src/shared/api/client.ts', ['code'], false],
+    ['apps/web/src/entities/Chat/services/stream.ts', ['code'], false],
+    ['services/billing/charge.go', ['backend', 'code'], false],
+    ['server/api.py', ['backend', 'code'], false],
+    ['tests/fixtures/data.json', [], false],
+    ['docs/api_spec.yaml', ['contract'], false],
+    ['src/a.test.ts', [], true],
+    ['e2e/login.spec.ts', [], true],
+    ['cypress/e2e/login.cy.ts', [], true],
+    ['pkg/handler_test.go', [], true],
+    ['tests/test_api.py', [], true],
+    ['spec/models/user_spec.rb', [], true],
+    ['src/test/java/UserServiceTest.java', [], true],
+    ['src/__tests__/list.js', [], true],
+    ['src/Button.stories.tsx', [], true],
+  ];
+  for (const [path, kinds, test] of kindsTable) {
+    it(`вид пути: ${path} → [${kinds.join(', ')}]${test ? ', тест' : ''}`, () => {
+      expect([...touchKinds([path])].sort()).toEqual(kinds);
+      expect(isTestPath(path)).toBe(test);
+      expect(isProductCode(path)).toBe(!test && kinds.includes('code'));
+    });
+  }
 
   it('тесты, служебные каталоги агентов и .agent/ ничего не включают', () => {
     expect([...touchKinds(['e2e/login.spec.ts', 'src/a.test.tsx'])]).toEqual([]);

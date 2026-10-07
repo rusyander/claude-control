@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { chatTreeKeys, useRecheckGroup } from '@entities/ChatTree';
-import { toErrorMessage } from '@shared/api/client';
+import { messageCodeOf, toErrorMessage } from '@shared/api/client';
 import { toast } from '@shared/lib/toast';
 import { Button } from '@shared/ui/button';
 import { Typography } from '@shared/ui/typography';
@@ -59,8 +59,14 @@ export function GroupRecheck({ recheck }: GroupRecheckProps) {
           void queryClient.invalidateQueries({ queryKey: chatTreeKeys.all });
         },
         onError: (error) => {
-          toast.error(t('chat.cascade.hub.recheck.failed', { message: toErrorMessage(error) }));
-          // Отказ «влит/закрыт» сервер записал в группу — строка скажет это сама.
+          // «Влит/закрыт» — не сбой, а ответ: сервер записал состояние в группу,
+          // карточка перекрасится и уедет вниз (владелец 06.10.2026).
+          const code = messageCodeOf(error);
+          if (code === 'split-recheck-merged') toast.success(t('chat.cascade.hub.recheck.merged'));
+          else if (code === 'split-recheck-closed')
+            toast.info(t('chat.cascade.hub.recheck.closed'));
+          else
+            toast.error(t('chat.cascade.hub.recheck.failed', { message: toErrorMessage(error) }));
           void queryClient.invalidateQueries({ queryKey: chatTreeKeys.all });
         },
       },

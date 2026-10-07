@@ -148,7 +148,9 @@ export function useAgentSession(projectPath?: string) {
       }
 
       if (!outcome.ok) {
-        const refusal = outcome.code ? t.agent.refusal[outcome.code] : undefined;
+        // Текст с кодом сервера называет провайдера и причину — точнее строки по коду.
+        const refusal =
+          outcome.code && !outcome.localized ? t.agent.refusal[outcome.code] : undefined;
         const detail =
           refusal ?? (outcome.message || (outcome.status ? t.run.answered(outcome.status) : ''));
         const kind: 'notice' | 'error' = outcome.aborted ? 'notice' : 'error';

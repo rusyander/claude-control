@@ -9,14 +9,14 @@
       "masked": 0,
       "width": 880,
       "height": 181,
-      "shotAt": "2026-09-28T09:28:50.448Z",
+      "shotAt": "2026-10-05T18:06:35.653Z",
       "text": "Критично от группы «Перенос заказов» Старая таблица orders_v1 удаляется миграцией — выгрузки из неё перестанут работать Группа сообщила сама Открыть чат группы Прочитано",
       "en": {
         "file": "01-escalation.en.png",
         "masked": 0,
         "width": 880,
         "height": 181,
-        "shotAt": "2026-09-28T09:30:12.730Z",
+        "shotAt": "2026-10-05T18:09:34.445Z",
         "text": "Critical from group \"Перенос заказов\" Старая таблица orders_v1 удаляется миграцией — выгрузки из неё перестанут работать Reported by the group itself Open the group chat Mark as read"
       },
       "dark": {
@@ -24,7 +24,7 @@
         "masked": 0,
         "width": 880,
         "height": 181,
-        "shotAt": "2026-09-28T09:31:34.258Z",
+        "shotAt": "2026-10-05T18:08:00.665Z",
         "text": "Критично от группы «Перенос заказов» Старая таблица orders_v1 удаляется миграцией — выгрузки из неё перестанут работать Группа сообщила сама Открыть чат группы Прочитано"
       },
       "darkEn": {
@@ -32,7 +32,7 @@
         "masked": 0,
         "width": 880,
         "height": 181,
-        "shotAt": "2026-09-28T09:32:54.003Z",
+        "shotAt": "2026-10-05T18:10:58.659Z",
         "text": "Critical from group \"Перенос заказов\" Старая таблица orders_v1 удаляется миграцией — выгрузки из неё перестанут работать Reported by the group itself Open the group chat Mark as read"
       }
     },
@@ -43,14 +43,14 @@
       "masked": 0,
       "width": 825,
       "height": 288,
-      "shotAt": "2026-09-28T09:28:52.646Z",
+      "shotAt": "2026-10-05T18:06:37.851Z",
       "text": "Автовыбор: Партиями (Recommended) — Вопрос: Как переносить заказы в новую таблицу?",
       "en": {
         "file": "02-auto-pick.en.png",
         "masked": 0,
         "width": 825,
         "height": 270,
-        "shotAt": "2026-09-28T09:30:14.963Z",
+        "shotAt": "2026-10-05T18:09:36.628Z",
         "text": "Auto-pick: Партиями (Recommended) — Question: Как переносить заказы в новую таблицу?"
       },
       "dark": {
@@ -58,7 +58,7 @@
         "masked": 0,
         "width": 825,
         "height": 288,
-        "shotAt": "2026-09-28T09:31:36.458Z",
+        "shotAt": "2026-10-05T18:08:02.850Z",
         "text": "Автовыбор: Партиями (Recommended) — Вопрос: Как переносить заказы в новую таблицу?"
       },
       "darkEn": {
@@ -66,7 +66,7 @@
         "masked": 0,
         "width": 825,
         "height": 270,
-        "shotAt": "2026-09-28T09:32:56.174Z",
+        "shotAt": "2026-10-05T18:11:00.858Z",
         "text": "Auto-pick: Партиями (Recommended) — Question: Как переносить заказы в новую таблицу?"
       }
     },
@@ -77,31 +77,31 @@
       "masked": 0,
       "width": 376,
       "height": 646,
-      "shotAt": "2026-09-28T09:28:53.969Z",
-      "text": "Группа и автономность Группа Авто — разбор выберет по описанию Миграции БД из родителя: Работа по заказам Автономно — выбирать рекомендованное из родителя: Работа по заказам Права Права автоматом Правки разрешены Разрешать без вопроса — во всех проектах Подбирать модель под задачу (этот проект) Панель ставит группе разделения модель по роду её работы — не выше выбранной вами; работе на более слабой модели поднимается планка сдачи: проверки проекта прогнаны, сделанное сверено с заданием. Выключено — все дети работают на выбранной вами модели Записи во внешние сервисы Комментарии и треды в MR, тикеты Jira, страницы вики — через MCP Коммиты, ветки, обычный push commit, push, branch, rebase, cherry-pick, revert Удаление файлов rm, del, shred, dd, Remove-Item, reg delete Затирание истории git reset --hard, clean, restore, branch -D, stash drop, push --force Снос данных в БД DROP, TRUNCATE, DELETE FROM, откат миграций Контейнеры и инфраструктура docker prune, kubectl delete, helm uninstall, terraform destroy, reboot Публикация пакетов npm/pnpm/yarn publish, unpublish, deprecate Удаление и слияние во внешних сервисах Слить MR, удалить тикет или страницу вики — отсюда это не вернуть Опасные сетевые команды curl | sh — исполнение скачанного, curl -X DELETE Правки в основной копии проекта Выключено — перед первой правкой панель предлагает завести копию со своей веткой и продолжает разговор в ней: каталог у git один на все чаты проекта Разговор Перезапустить сессию Экспортировать Обновить Справка по разделу",
+      "shotAt": "2026-10-05T18:06:39.189Z",
+      "text": "Группа и автономность Группа Авто — разбор выберет по описанию Миграции БД из родителя: Работа по заказам Автономно — выбирать рекомендованное из родителя: Работа по заказам Права Права автоматом Правки разрешены Разрешать без вопроса — во всех проектах Подбирать модель под задачу (этот проект) Панель ставит группе разделения модель по роду её работы — не выше выбранной вами; работе на более слабой модели поднимается планка сдачи: проверки проекта прогнаны, сделанное сверено с заданием. Выключено — все дети работают на выбранной вами модели Записи во внешние сервисы Комментарии и треды в MR, тикеты Jira, страницы вики — через MCP Коммиты, ветки, обычный push commit, push, branch, rebase, cherry-pick, revert Удаление файлов rm, del, shred, dd, Remove-Item, reg delete Затирание истории git reset --hard, clean, restore, branch -D, stash drop, push --force Снос данных в БД DROP, TRUNCATE, DELETE FROM, откат миграций Контейнеры и инфраструктура docker prune, kubectl delete, helm uninstall, terraform destroy, reboot Публикация пакетов npm/pnpm/yarn publish, unpublish, deprecate Удаление и слияние во внешних сервисах Слить MR, удалить тикет или страницу вики — отсюда это не вернуть Опасные сетевые команды curl | sh — исполнение скачанного, curl -X DELETE Правки в основной копии проекта Выключено — перед первой правкой панель предлагает завести копию со своей веткой и продолжает разговор в ней: каталог у git один на все чаты проекта Разговор Перезапустить сессию Сделать кейс Экспортировать Обновить Справка по разделу",
       "en": {
         "file": "03-menu.en.png",
         "masked": 0,
         "width": 376,
         "height": 646,
-        "shotAt": "2026-09-28T09:30:16.334Z",
-        "text": "Group and autonomy Group Auto — triage picks by description Миграции БД from parent: Работа по заказам Autonomous — pick the recommended option from parent: Работа по заказам Permissions Permissions auto Edits allowed Approve without asking — in every project Match the model to the task (this project) The panel gives each split group a model that fits its kind of work — never above the one you picked; work on a weaker model gets a higher bar: project checks run, result matched against the task. Off — every child runs on the model you picked Writes to external services MR comments and threads, Jira tickets, wiki pages — over MCP Commits, branches, plain push commit, push, branch, rebase, cherry-pick, revert Deleting files rm, del, shred, dd, Remove-Item, reg delete Wiping git history reset --hard, clean, restore, branch -D, stash drop, push --force Tearing down database data DROP, TRUNCATE, DELETE FROM, migration rollback Containers and infrastructure docker prune, kubectl delete, helm uninstall, terraform destroy, reboot Publishing packages npm/pnpm/yarn publish, unpublish, deprecate Deleting and merging in external services Merging an MR, deleting a ticket or a wiki page — not undoable here Dangerous network commands curl | sh — running what was downloaded, curl -X DELETE Edits in the project main copy Off — before the first edit the panel offers a copy on its own branch and moves the conversation there: one git directory is shared by every chat of the project Conversation Restart the session Export Refresh Help for this section"
+        "shotAt": "2026-10-05T18:09:37.967Z",
+        "text": "Group and autonomy Group Auto — triage picks by description Миграции БД from parent: Работа по заказам Autonomous — pick the recommended option from parent: Работа по заказам Permissions Permissions auto Edits allowed Approve without asking — in every project Match the model to the task (this project) The panel gives each split group a model that fits its kind of work — never above the one you picked; work on a weaker model gets a higher bar: project checks run, result matched against the task. Off — every child runs on the model you picked Writes to external services MR comments and threads, Jira tickets, wiki pages — over MCP Commits, branches, plain push commit, push, branch, rebase, cherry-pick, revert Deleting files rm, del, shred, dd, Remove-Item, reg delete Wiping git history reset --hard, clean, restore, branch -D, stash drop, push --force Tearing down database data DROP, TRUNCATE, DELETE FROM, migration rollback Containers and infrastructure docker prune, kubectl delete, helm uninstall, terraform destroy, reboot Publishing packages npm/pnpm/yarn publish, unpublish, deprecate Deleting and merging in external services Merging an MR, deleting a ticket or a wiki page — not undoable here Dangerous network commands curl | sh — running what was downloaded, curl -X DELETE Edits in the project main copy Off — before the first edit the panel offers a copy on its own branch and moves the conversation there: one git directory is shared by every chat of the project Conversation Restart the session Make a case Export Refresh Help for this section"
       },
       "dark": {
         "file": "03-menu.dark.png",
         "masked": 0,
         "width": 376,
         "height": 646,
-        "shotAt": "2026-09-28T09:31:37.795Z",
-        "text": "Группа и автономность Группа Авто — разбор выберет по описанию Миграции БД из родителя: Работа по заказам Автономно — выбирать рекомендованное из родителя: Работа по заказам Права Права автоматом Правки разрешены Разрешать без вопроса — во всех проектах Подбирать модель под задачу (этот проект) Панель ставит группе разделения модель по роду её работы — не выше выбранной вами; работе на более слабой модели поднимается планка сдачи: проверки проекта прогнаны, сделанное сверено с заданием. Выключено — все дети работают на выбранной вами модели Записи во внешние сервисы Комментарии и треды в MR, тикеты Jira, страницы вики — через MCP Коммиты, ветки, обычный push commit, push, branch, rebase, cherry-pick, revert Удаление файлов rm, del, shred, dd, Remove-Item, reg delete Затирание истории git reset --hard, clean, restore, branch -D, stash drop, push --force Снос данных в БД DROP, TRUNCATE, DELETE FROM, откат миграций Контейнеры и инфраструктура docker prune, kubectl delete, helm uninstall, terraform destroy, reboot Публикация пакетов npm/pnpm/yarn publish, unpublish, deprecate Удаление и слияние во внешних сервисах Слить MR, удалить тикет или страницу вики — отсюда это не вернуть Опасные сетевые команды curl | sh — исполнение скачанного, curl -X DELETE Правки в основной копии проекта Выключено — перед первой правкой панель предлагает завести копию со своей веткой и продолжает разговор в ней: каталог у git один на все чаты проекта Разговор Перезапустить сессию Экспортировать Обновить Справка по разделу"
+        "shotAt": "2026-10-05T18:08:04.204Z",
+        "text": "Группа и автономность Группа Авто — разбор выберет по описанию Миграции БД из родителя: Работа по заказам Автономно — выбирать рекомендованное из родителя: Работа по заказам Права Права автоматом Правки разрешены Разрешать без вопроса — во всех проектах Подбирать модель под задачу (этот проект) Панель ставит группе разделения модель по роду её работы — не выше выбранной вами; работе на более слабой модели поднимается планка сдачи: проверки проекта прогнаны, сделанное сверено с заданием. Выключено — все дети работают на выбранной вами модели Записи во внешние сервисы Комментарии и треды в MR, тикеты Jira, страницы вики — через MCP Коммиты, ветки, обычный push commit, push, branch, rebase, cherry-pick, revert Удаление файлов rm, del, shred, dd, Remove-Item, reg delete Затирание истории git reset --hard, clean, restore, branch -D, stash drop, push --force Снос данных в БД DROP, TRUNCATE, DELETE FROM, откат миграций Контейнеры и инфраструктура docker prune, kubectl delete, helm uninstall, terraform destroy, reboot Публикация пакетов npm/pnpm/yarn publish, unpublish, deprecate Удаление и слияние во внешних сервисах Слить MR, удалить тикет или страницу вики — отсюда это не вернуть Опасные сетевые команды curl | sh — исполнение скачанного, curl -X DELETE Правки в основной копии проекта Выключено — перед первой правкой панель предлагает завести копию со своей веткой и продолжает разговор в ней: каталог у git один на все чаты проекта Разговор Перезапустить сессию Сделать кейс Экспортировать Обновить Справка по разделу"
       },
       "darkEn": {
         "file": "03-menu.dark.en.png",
         "masked": 0,
         "width": 376,
         "height": 646,
-        "shotAt": "2026-09-28T09:32:57.525Z",
-        "text": "Group and autonomy Group Auto — triage picks by description Миграции БД from parent: Работа по заказам Autonomous — pick the recommended option from parent: Работа по заказам Permissions Permissions auto Edits allowed Approve without asking — in every project Match the model to the task (this project) The panel gives each split group a model that fits its kind of work — never above the one you picked; work on a weaker model gets a higher bar: project checks run, result matched against the task. Off — every child runs on the model you picked Writes to external services MR comments and threads, Jira tickets, wiki pages — over MCP Commits, branches, plain push commit, push, branch, rebase, cherry-pick, revert Deleting files rm, del, shred, dd, Remove-Item, reg delete Wiping git history reset --hard, clean, restore, branch -D, stash drop, push --force Tearing down database data DROP, TRUNCATE, DELETE FROM, migration rollback Containers and infrastructure docker prune, kubectl delete, helm uninstall, terraform destroy, reboot Publishing packages npm/pnpm/yarn publish, unpublish, deprecate Deleting and merging in external services Merging an MR, deleting a ticket or a wiki page — not undoable here Dangerous network commands curl | sh — running what was downloaded, curl -X DELETE Edits in the project main copy Off — before the first edit the panel offers a copy on its own branch and moves the conversation there: one git directory is shared by every chat of the project Conversation Restart the session Export Refresh Help for this section"
+        "shotAt": "2026-10-05T18:11:02.179Z",
+        "text": "Group and autonomy Group Auto — triage picks by description Миграции БД from parent: Работа по заказам Autonomous — pick the recommended option from parent: Работа по заказам Permissions Permissions auto Edits allowed Approve without asking — in every project Match the model to the task (this project) The panel gives each split group a model that fits its kind of work — never above the one you picked; work on a weaker model gets a higher bar: project checks run, result matched against the task. Off — every child runs on the model you picked Writes to external services MR comments and threads, Jira tickets, wiki pages — over MCP Commits, branches, plain push commit, push, branch, rebase, cherry-pick, revert Deleting files rm, del, shred, dd, Remove-Item, reg delete Wiping git history reset --hard, clean, restore, branch -D, stash drop, push --force Tearing down database data DROP, TRUNCATE, DELETE FROM, migration rollback Containers and infrastructure docker prune, kubectl delete, helm uninstall, terraform destroy, reboot Publishing packages npm/pnpm/yarn publish, unpublish, deprecate Deleting and merging in external services Merging an MR, deleting a ticket or a wiki page — not undoable here Dangerous network commands curl | sh — running what was downloaded, curl -X DELETE Edits in the project main copy Off — before the first edit the panel offers a copy on its own branch and moves the conversation there: one git directory is shared by every chat of the project Conversation Restart the session Make a case Export Refresh Help for this section"
       }
     }
   ]

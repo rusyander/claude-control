@@ -10,7 +10,18 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { SourceWatcher, busyRun, isWatched, splitSetupRunning } from './dev-watch.mjs';
+import {
+  CHECK_LEDGERS,
+  SourceWatcher,
+  busyRun,
+  isWatched,
+  splitSetupRunning,
+} from './dev-watch.mjs';
+import {
+  E2E_RUN_PROCESS_LEDGER,
+  MUTATION_PROCESS_LEDGER,
+  PROJECT_TEST_PROCESS_LEDGER,
+} from '../domains/project-tests/runs.ts';
 import {
   deferReason,
   readRestartState,
@@ -135,6 +146,19 @@ describe('отложенный перезапуск — общий файл ст
     expect(deferReason(false, true)).toBe('setup');
     expect(deferReason(true, true)).toBe('both');
     expect(deferReason(false, false)).toBeUndefined();
+  });
+
+  // Ф11: автотесты и проверка поломкой — тоже повод ждать; несколько поводов — `both`.
+  it('проверки проекта: свой повод, вместе с другими — «несколько»', () => {
+    expect(deferReason(false, false, true)).toBe('checks');
+    expect(deferReason(true, false, true)).toBe('both');
+    expect(deferReason(false, true, true)).toBe('both');
+  });
+
+  it('сторож читает те же журналы процессов, что пишут прогоны проверок', () => {
+    expect([...CHECK_LEDGERS].sort()).toEqual(
+      [E2E_RUN_PROCESS_LEDGER, PROJECT_TEST_PROCESS_LEDGER, MUTATION_PROCESS_LEDGER].sort(),
+    );
   });
 
   it('состояние живого сторожа видно, оставшееся от мёртвого — нет', () => {

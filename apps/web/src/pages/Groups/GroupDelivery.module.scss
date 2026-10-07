@@ -1,0 +1,10 @@
+.box {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: 8px;
+  background: var(--color-surface-sunken);
+}
+
+.list {
+  margin: 0;
+  padding-left: var(--spacing-md);
+}

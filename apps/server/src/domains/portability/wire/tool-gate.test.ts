@@ -19,19 +19,19 @@ import {
  * запуск значило бы проверить вызов функции, а вопрос — что до скрипта доехало.
  */
 
-function codex(): ConfigProvider {
-  const found = CATALOG_PROVIDERS.find((candidate) => candidate.id === 'codex');
-  if (!found) throw new Error('в каталоге нет цели codex');
+function wireTarget(): ConfigProvider {
+  const found = CATALOG_PROVIDERS.find((candidate) => candidate.id === 'continue');
+  if (!found) throw new Error('в каталоге нет цели continue');
   return found;
 }
 
 const RUN = {
-  provider: codex(),
+  provider: wireTarget(),
   run: {
-    providerId: 'codex',
+    providerId: 'continue',
     sessionId: 'chat-1',
     cwd: process.cwd(),
-    transcriptPath: 'C:/appdata/provider-chats/codex/chat-1.jsonl',
+    transcriptPath: 'C:/appdata/provider-chats/continue/chat-1.jsonl',
   },
   hooks: [
     {

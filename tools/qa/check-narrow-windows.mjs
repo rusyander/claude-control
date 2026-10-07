@@ -112,7 +112,9 @@ try {
       if (url.pathname === '/api/settings') {
         const response = await route.fetch();
         const body = await response.json();
-        return route.fulfill({ response, json: { ...body, theme } });
+        // Этот перехват — последний и отменяет обход мастера из bypassOnboarding:
+        // на стенде, где онбординг не пройден, мастер накрывал окно агента.
+        return route.fulfill({ response, json: { ...body, theme, onboardingDone: true } });
       }
       if (url.pathname === '/api/watcher') return route.fulfill({ json: watcherStatus() });
       return route.fallback();

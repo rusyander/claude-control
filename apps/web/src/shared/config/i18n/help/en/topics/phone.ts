@@ -76,7 +76,11 @@ export const phoneEn: typeof phoneRu = {
       'The same conversation as in the panel: the messages, the agent turn live, which agents ' +
       'and subagents are running, the model and the spend. You can write, stop, queue a ' +
       'message while the agent is busy and attach files. Proposal cards are not shown — one ' +
-      'line stands in for them.',
+      'line stands in for them. With another CLI active in the panel (Codex, Qwen Code and ' +
+      'others) the project’s conversation list gets a «<CLI> conversations» block: a new ' +
+      'conversation, the messages, «Pass into the answer» in the middle of an answer where ' +
+      'the CLI can take it, a queue, the «The CLI asks for permission» card and a line saying how the CLI ' +
+      'will treat edits. A conversation of a CLI that is not active in the panel is read-only.',
     screenAgent: 'Agent',
     screenAgentText:
       'The panel agent: a request in words becomes an action in the panel. Anything that ' +
@@ -139,7 +143,13 @@ export const phoneEn: typeof phoneRu = {
     offlinePush: 'Notifications',
     offlinePushText:
       'The panel sends them. If the panel is asleep nothing arrives, even if an agent is ' +
-      'waiting somewhere: the phone does not poll the computer in the background.',
+      'waiting somewhere. Tapping a notification opens its conversation: a Claude chat in its ' +
+      'project, another CLI’s conversation on its own screen. The phone itself polls the ' +
+      'computer in the background in one case only: you left an open conversation of another ' +
+      'CLI in the middle of an answer — then the end of the answer and a permission request ' +
+      'come as the phone’s own notification. Android 15 cuts the app’s connection a few ' +
+      'seconds into the background, so this catches only a short answer; a long one only ' +
+      'the panel’s notification does.',
     offlineAwake: 'Keeping the panel awake',
     offlineAwakeText:
       'The computer must not go to sleep, and the panel itself should not run unattended: the ' +

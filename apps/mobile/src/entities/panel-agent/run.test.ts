@@ -13,6 +13,11 @@ import type { PanelAgentRunEvent } from '@agentdeck/contracts/panel-agent';
 
 const fetchMock = vi.fn();
 vi.mock('expo/fetch', () => ({ fetch: (...args: unknown[]) => fetchMock(...args) }));
+// Текст отказа по коду — настоящий словарь телефона; подменён только выбор языка.
+vi.mock('../../shared/config/i18n', async () => {
+  const { en } = await import('../../shared/config/i18n/en');
+  return { dict: () => en };
+});
 vi.mock('../../shared/api/client', () => ({
   apiUrl: (path: string) => `http://panel/api${path}`,
   authHeaders: () => ({ Authorization: 'Bearer phone-token' }),
@@ -86,6 +91,27 @@ describe('ход агента панели с телефона', () => {
       status: 409,
       message: 'нет claude',
     });
+  });
+
+  it('отказ с кодом текста — на языке телефона, с именем CLI', async () => {
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          error: 'provider_unsupported',
+          message: 'Агент панели не работает с Goose',
+          messageCode: 'panel-agent-provider-unsupported',
+          params: { provider: 'Goose' },
+        }),
+        { status: 409 },
+      ),
+    );
+    const outcome = await runPanelAgent(
+      { messages: [{ role: 'user', content: 'x' }], context: { route: 'phone' } },
+      () => undefined,
+      new AbortController().signal,
+    );
+    expect(outcome).toMatchObject({ ok: false, code: 'provider_unsupported', localized: true });
+    expect(outcome.ok ? '' : outcome.message).toMatch(/^The panel agent does not work with Goose:/);
   });
 
   it('поток без итогового кадра (панель перезапустилась) — обрыв связи, а не успех', async () => {

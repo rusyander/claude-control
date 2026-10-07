@@ -37,7 +37,12 @@ import { object, string, array, boolean, number, enum as zodEnum, type infer as 
  */
 
 /** Формат раздела плагинов: файлы+npm у OpenCode, список установленного у Kimi. */
-export const providerPluginsFormats = ['opencode-plugins', 'kimi-plugins'] as const;
+export const providerPluginsFormats = [
+  'opencode-plugins',
+  'kimi-plugins',
+  'qwen-extensions',
+  'codex-plugins',
+] as const;
 
 /**
  * Половины раздела. У OpenCode их две (`files` + `packages`), у Kimi одна
@@ -45,7 +50,7 @@ export const providerPluginsFormats = ['opencode-plugins', 'kimi-plugins'] as co
  */
 export const providerPluginsSections = ['files', 'packages', 'installed'] as const;
 
-/** Установленный плагин Kimi: манифест, прочитанный только для показа. */
+/** Установленный плагин Kimi или расширение Qwen: манифест, прочитанный для показа. */
 export const providerInstalledPluginSchema = object({
   /** Имя каталога в `plugins/managed/` — оно же id для команд `/plugins`. */
   id: string(),
@@ -69,6 +74,21 @@ export const providerInstalledPluginSchema = object({
   hasCommands: boolean(),
   /** Манифест не найден или не разобран — плагин показан одним именем каталога. */
   error: string().optional(),
+  /**
+   * Включено ли расширение (Qwen): по отметке ✓/✗ из `qwen extensions list`.
+   * Нет поля — состояние не известно (CLI не запустился); у Kimi не бывает.
+   */
+  enabled: boolean().optional(),
+  /** Откуда поставлено (Qwen `.qwen-extension-install.json`): путь, адрес, пакет. */
+  source: string().optional(),
+  /** Вид источника по словам CLI: `local`, `git`, `github-release`… */
+  sourceType: string().optional(),
+  /** Файлы контекста, которые расширение добавляет в каждую сессию (Qwen). */
+  contextFiles: array(string()).optional(),
+  /** Расширение приносит субагентов (каталог `agents/`). */
+  hasAgents: boolean().optional(),
+  /** Рынок, из которого поставлен плагин (Codex: `имя@рынок`, здесь — `рынок`). */
+  marketplace: string().optional(),
 });
 
 export type ProviderInstalledPlugin = Infer<typeof providerInstalledPluginSchema>;
@@ -97,6 +117,18 @@ export const providerPluginPreservedEntrySchema = object({
   index: number(),
   value: string(),
 });
+
+/**
+ * Рынок плагинов Codex (`codex plugin marketplace list`): имя и где лежит его
+ * снимок. Рынки ставит и убирает сам CLI — панель их только называет.
+ */
+export const providerPluginMarketplaceSchema = object({
+  name: string(),
+  /** Корень рынка на диске: локальная папка или снимок git. */
+  root: string().optional(),
+});
+
+export type ProviderPluginMarketplace = Infer<typeof providerPluginMarketplaceSchema>;
 
 /**
  * Сводка раздела плагинов. Две независимые половины (файлы и npm-список) могут
@@ -143,6 +175,23 @@ export const providerPluginsInfoSchema = object({
   installedRegistryPath: string().optional(),
   /** Каталог установленного не читается — текст ошибки. */
   installedError: string().optional(),
+  /**
+   * Панель умеет менять установленное командами самого CLI (Qwen: `qwen
+   * extensions install|enable|disable|uninstall`). Нет — только показ (Kimi).
+   */
+  installedActions: boolean().default(false),
+  /** Состояние «включено» не прочитано (CLI не запустился) — текст причины. */
+  installedStateError: string().optional(),
+
+  /**
+   * Codex: плагины подключённых рынков, ещё не поставленные (`codex plugin list
+   * --available`). Ставятся по `id` = `имя@рынок`.
+   */
+  available: array(providerInstalledPluginSchema).default([]),
+  /** Codex: подключённые рынки плагинов. */
+  marketplaces: array(providerPluginMarketplaceSchema).default([]),
+  /** Панель умеет подключать и убирать рынки (Codex). */
+  marketplaceActions: boolean().default(false),
 });
 
 export type ProviderPluginsInfo = Infer<typeof providerPluginsInfoSchema>;
@@ -167,3 +216,10 @@ export const providerPluginFileDraftSchema = object({
 });
 
 export type ProviderPluginFileDraft = Infer<typeof providerPluginFileDraftSchema>;
+
+/** Поставить расширение (Qwen): источник — как у `qwen extensions install <source>`. */
+export const providerExtensionInstallSchema = object({
+  source: string(),
+});
+
+export type ProviderExtensionInstall = Infer<typeof providerExtensionInstallSchema>;

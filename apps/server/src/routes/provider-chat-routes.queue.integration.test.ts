@@ -146,4 +146,60 @@ describe('чужой CLI: очередь занятого разговора ч�
     runs[0]!.emit({ type: 'done', reply: 'ответ', transport: 'stream' });
     expect(runs).toHaveLength(1);
   });
+
+  // Ф13: перезапуск панели снимал идущий ответ вместе с очередью — написанное
+  // человеком пропадало. Теперь новая панель видит её ждущей и шлёт по кнопке.
+  it('после перезапуска очередь «ждёт отправки», кнопка её шлёт; второй раз — 404', async () => {
+    const id = await busyChat();
+    const { queued } = (
+      await app.inject({
+        method: 'POST',
+        url: `/api/provider-chat/chats/${id}/send`,
+        payload: { text: 'до перезапуска', queueIfBusy: true },
+      })
+    ).json<{ queued: ProviderChatQueued }>();
+
+    // «Перезапуск»: новый сервис и новые маршруты над тем же каталогом данных.
+    chats.stopAll();
+    await app.close();
+    const appData = join(root, 'agentdeck');
+    const store = new AppStore(appData);
+    chats = new ProviderChatService(() => new ManualRun() as unknown as ProviderChatRunLike);
+    app = Fastify();
+    registerProviderChatRoutes(
+      app,
+      {
+        location: { paths: { root, appData } },
+        store,
+        models: { current: () => ({ models: [] }) },
+        backupDir: join(appData, 'backups'),
+      } as unknown as ServerContext,
+      chats,
+      new HandoffChains(),
+    );
+    await app.ready();
+
+    expect(await status(id)).toMatchObject({
+      isRunning: false,
+      queueHeld: true,
+      queued: [expect.objectContaining({ id: queued.id, text: 'до перезапуска' })],
+    });
+    const before = runs.length;
+    const sent = await app.inject({
+      method: 'POST',
+      url: `/api/provider-chat/chats/${id}/queue/${queued.id}/send`,
+    });
+    expect(sent.statusCode).toBe(200);
+    expect(runs).toHaveLength(before + 1);
+    expect(runs.at(-1)!.prompt).toContain('до перезапуска');
+    expect((await status(id)).queued).toBeUndefined();
+
+    runs.at(-1)!.emit({ type: 'done', reply: 'ответ', transport: 'stream' });
+    const again = await app.inject({
+      method: 'POST',
+      url: `/api/provider-chat/chats/${id}/queue/${queued.id}/send`,
+    });
+    expect(again.statusCode).toBe(404);
+    expect(again.json()).toMatchObject({ messageCode: 'foreign-queued-gone' });
+  });
 });

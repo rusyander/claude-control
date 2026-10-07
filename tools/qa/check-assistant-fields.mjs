@@ -35,6 +35,8 @@
  * `--prompts-out <файл>` — задания, собранные сервером для модели, одной строкой
  * JSON на форму: их можно отдать настоящему `claude` и проверить, что настоящая
  * модель отвечает в виде, который форма примет (здесь модель подменена).
+ * `--race-discovery` — перед первым ходом запустить поиск групп и дождаться его
+ * задания: так гонка, покрасившая прогон 05.10, воспроизводится каждый раз.
  */
 import { chromium } from 'playwright';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -50,6 +52,8 @@ const SHOTS = argOf('--shots');
 const TAG = argOf('--tag') ?? 'run';
 const PROMPTS_OUT = argOf('--prompts-out');
 const SERVER_DIR = argOf('--server-dir');
+const RACE_DISCOVERY = process.argv.includes('--race-discovery');
+let raced = false;
 if (SHOTS) mkdirSync(SHOTS, { recursive: true });
 
 const MISSING_RULE = 'rule:qa-missing-rule';
@@ -299,6 +303,11 @@ await runOnStand(
         replyText = `QA-REPLY ${kind}`,
       ) => {
         const before = prompts().length;
+        if (RACE_DISCOVERY && !raced) {
+          raced = true;
+          await stand.api('/groups/discovery/run', { method: 'POST', body: {} });
+          for (let i = 0; i < 50 && prompts().length === before; i += 1) await wait(100);
+        }
         await dialog.locator('textarea[data-assistant-input]').fill(text);
         await dialog.getByRole('button', { name: 'Отправить' }).click();
         const answered = await dialog
@@ -309,7 +318,14 @@ await runOnStand(
           .catch(() => false);
         check(`ответ помощника пришёл: «${text}»`, answered);
         await wait(300);
-        return prompts()[before]?.prompt ?? '';
+        // Задание этого хода — по виду формы и тексту просьбы, не по порядку: первый
+        // заход на «Группы» сам запускает поиск групп (group-discover), и его задание
+        // ложится в тот же prompts.jsonl в любой момент хода (красный прогон 05.10).
+        return (
+          prompts()
+            .slice(before)
+            .find((item) => item.kind === kind && item.request.includes(text))?.prompt ?? ''
+        );
       };
       /** Поля, отмеченные под последним ответом помощника. */
       const lastChips = (dialog) =>
@@ -350,7 +366,41 @@ await runOnStand(
       // ── 1. Группа: состав и проекты ──────────────────────────────────────
       console.log('\n── Группа («Набор»)');
       {
+        // Тайминг: реестр проектов придержан. Пока он не пришёл, задание собралось
+        // бы по пустому списку («none exist yet») — под нагрузкой так и красилось
+        // «настоящие id» (form-assistant-001, 06.10). Помощник обязан ждать.
+        let releaseProjects = () => undefined;
+        const projectsHeld = new Promise((resolve) => (releaseProjects = resolve));
+        const projectsRoute = /\/api\/projects(\?|$)/;
+        await page.route(projectsRoute, async (route) => {
+          if (route.request().method() === 'GET') await projectsHeld;
+          await route.continue();
+        });
         const dialog = await openForm('/groups', 'Создать группу', /^Набор/);
+        await dialog.locator('textarea[data-assistant-input]').fill('QA: рано');
+        const hint = dialog.locator('[data-assistant-loading]');
+        check('списки грузятся — помощник говорит, что ждёт', await hint.isVisible());
+        check(
+          'списки грузятся — отправка закрыта',
+          await dialog.getByRole('button', { name: 'Отправить' }).isDisabled(),
+        );
+        const sentEarly = prompts().some((item) => item.request.includes('QA: рано'));
+        await page.keyboard.press('Enter');
+        await wait(500);
+        check(
+          'Enter до списков ничего не отправил',
+          !sentEarly && !prompts().some((item) => item.request.includes('QA: рано')),
+        );
+        // Перехват остаётся до конца прогона: отпущенный, он пропускает запросы
+        // сразу, а unroute при ждущих обработчиках рвёт их («already handled»).
+        releaseProjects();
+        check(
+          'списки пришли — подсказка ушла',
+          await hint
+            .waitFor({ state: 'detached', timeout: 10000 })
+            .then(() => true)
+            .catch(() => false),
+        );
         if (SHOTS) await page.screenshot({ path: join(SHOTS, `${TAG}-group-empty.png`) });
         const prompt = await ask(dialog, 'group');
         check(
@@ -363,6 +413,12 @@ await runOnStand(
           // Значения в задании — строками JSON: обратные косые пути Windows удвоены.
           members.every((ref) => prompt.includes(JSON.stringify(ref))) &&
             prompt.includes(JSON.stringify(project.path)),
+          [...members, project.path]
+            .filter((ref) => !prompt.includes(JSON.stringify(ref)))
+            .map((ref) => `нет ${JSON.stringify(ref)}`)
+            .concat(prompt.split('\n').filter((line) => /- (members|projectPaths):/.test(line)))
+            .join(' | ')
+            .slice(0, 900),
         );
         check('имя стоит', await shows(dialog, 'QA bundle'));
         check('«Когда» стоит', await shows(dialog, 'QA work'));

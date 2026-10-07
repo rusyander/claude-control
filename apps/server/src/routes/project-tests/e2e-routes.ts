@@ -12,6 +12,7 @@ import {
 import { coded } from '../../lib/server-text.ts';
 import {
   assertNoE2eRun,
+  assertNoMutationCheck,
   assertOwnProject,
   assertUnlocked,
   buildView,
@@ -149,6 +150,7 @@ export function registerTestE2eRoutes(app: FastifyInstance, deps: TestsDeps): vo
           { runId },
         );
       }
+      assertNoMutationCheck(deps, root);
       deps.e2eRuns?.start({
         root,
         appData,

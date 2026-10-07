@@ -69,6 +69,14 @@ export interface QueuedMessage {
   effort?: string;
   /** Показ в ленте: сообщение уже передано агенту на ходу, а не ждёт в очереди. */
   steered?: boolean;
+  /** Показ в ленте: запрос «на ходу» ещё в пути — пузырь «Передаётся…» (Ф12). */
+  sending?: boolean;
+}
+
+/** Слово «на ходу», чей запрос к серверу ещё не ответил. */
+export interface SteeringMessage {
+  id: string;
+  text: string;
 }
 
 /** Слово человека, переданное агенту посреди хода: он учтёт его на ближайшем шаге. */
@@ -93,6 +101,11 @@ export interface AgentRun {
    * дальше они в транскрипте на своём месте, и лента показывает их оттуда.
    */
   steered?: SteeredMessage[];
+  /**
+   * Слова «на ходу», чей запрос ещё в пути (до минуты под нагрузкой). Без них
+   * сообщения на это время не было бы ни в очереди, ни в ленте (Ф12).
+   */
+  steering?: SteeringMessage[];
   status: RunStatus;
   text: string;
   thinking: string;

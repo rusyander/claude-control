@@ -2,6 +2,8 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { buildCapabilities, type ConfigProvider } from '../types.ts';
 import { unimplementedPaths } from './config-dirs.ts';
+import { geminiContourBypass } from './gemini-contour.ts';
+import { createGeminiStreamParser } from './gemini-stream.ts';
 
 /** Каталог конфигурации Gemini: переопределения документация не заявляет. */
 const geminiHome = (): string => join(homedir(), '.gemini');
@@ -70,7 +72,29 @@ export const geminiProvider: ConfigProvider = {
     // Подбор модели (Т12): `-m/--model` задокументирован («Specify the model»)
     // и работает вместе с `-p`. Аналога глубины у Gemini CLI нет — `run.effort`
     // здесь не участвует вовсе, и придумывать ему флаг нельзя.
-    oneShotArgs: (prompt, run) => [...(run?.model ? ['-m', run.model] : []), '-p', prompt],
+    // «Разрешить правки» (`gemini --help` 0.62.0: `--approval-mode
+    // default|auto_edit|yolo|plan`). Включено — `yolo`, как у qwen и живого хода:
+    // каждая просьба получает «да». Выключено — `default`: в `-p` спросить
+    // некого, и CLI не объявляет модели инструменты записи вовсе (живьём:
+    // `write_file` → «Tool not found», файл цел), даже если в настройках стоит
+    // `auto_edit`. Без политики (ассистент формы, разбор групп) флага нет —
+    // решают настройки CLI. Вывод — `-o stream-json`: на win32 после хода с
+    // инструментом gemini 0.62.0 печатает ответ и падает на выходе (0xC0000409),
+    // и только событие `result: success` в потоке отличает такой ответ от сбоя
+    // (см. gemini-stream.ts).
+    oneShotArgs: (prompt, run) => [
+      ...(run?.model ? ['-m', run.model] : []),
+      ...(run?.allowEdits === undefined
+        ? []
+        : ['--approval-mode', run.allowEdits ? 'yolo' : 'default']),
+      '-o',
+      'stream-json',
+      '-p',
+      prompt,
+    ],
+    parseStdout: createGeminiStreamParser,
+    // Переключатель правок доходит флагом `--approval-mode` (см. `oneShotArgs`).
+    editsControl: 'flag',
   },
   // Свой эндпоинт: задокументированная переменная `GOOGLE_GEMINI_BASE_URL`
   // («Overrides the default base URL for Gemini API requests») — она же
@@ -83,6 +107,8 @@ export const geminiProvider: ConfigProvider = {
       baseUrlEnv: 'GOOGLE_GEMINI_BASE_URL',
       modelEnv: 'GEMINI_MODEL',
       credentialEnv: 'GEMINI_API_KEY',
+      // Адрес читается только при входе ключом API (`gemini-contour.ts`).
+      bypass: () => geminiContourBypass(geminiSettings()),
     },
   },
   capabilities: buildCapabilities({

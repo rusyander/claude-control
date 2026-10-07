@@ -18,6 +18,9 @@ import { registerEntityRoutes } from '../entity-routes.ts';
 import { registerResourceRoutes } from '../resource-routes.ts';
 import { registerPanelAgentRoutes } from './panel-agent-routes.ts';
 
+/** Маршрут окна для проверок, которым он не важен: контура нет, шлюз не поднят. */
+const NO_ROUTE = { runRoute: () => ({ env: {} }), gatewayPort: () => 0 };
+
 /**
  * Действия строк сущностей (имя скилла, порядок хуков, файл переменной и
  * права, правка права, MCP, файлы структуры скилла) на настоящих маршрутах окна
@@ -121,7 +124,7 @@ describe('panel-agent actions: entity rows and skill structure', () => {
     registerEmptyBodyGuard(app);
     registerConfigRoutes(app, ctx);
     registerEntityRoutes(app, ctx);
-    registerResourceRoutes(app, ctx);
+    registerResourceRoutes(app, ctx, NO_ROUTE);
     registerPanelAgentRoutes(app, ctx, { hub: createEventHub(), pending, access });
     await app.ready();
   });

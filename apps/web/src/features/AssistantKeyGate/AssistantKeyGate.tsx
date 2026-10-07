@@ -8,6 +8,14 @@ import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
 import { TextField } from '@shared/ui/text-field';
 import { useProviderRunner, useSaveProviderKey } from '@entities/ProviderKeys';
+import { gateKind, type GateKind } from './model/gateKind';
+
+/** Подпись модалки по виду гейта; `hidden` модалку не показывает вовсе. */
+const DESCRIPTION_KEY: Record<Exclude<GateKind, 'hidden'>, string> = {
+  key: 'assistantKey.description',
+  cliOnly: 'assistantKey.cliOnly',
+  unsupported: 'assistantKey.unsupported',
+};
 
 /**
  * Гейт ключа ассистента на входе в чат (Ф6a).
@@ -22,6 +30,8 @@ import { useProviderRunner, useSaveProviderKey } from '@entities/ProviderKeys';
  * Модалку можно закрыть: она не блокирует интерфейс, а лишь подсказывает. Для
  * провайдера без модельного API (Cursor, apiKind `none`) поле ввода не
  * показывается — только предложение выбрать другого провайдера в настройках.
+ * Исключение — такой провайдер со скриптуемым CLI (Continue): ключ ему не
+ * поможет, а установленный CLI — да, поэтому модалка зовёт поставить CLI.
  */
 export function AssistantKeyGate() {
   const { t } = useTranslation();
@@ -36,9 +46,11 @@ export function AssistantKeyGate() {
     setDismissed(false);
   }, [runner?.providerId, runner?.mode]);
 
-  if (!runner || runner.mode !== 'none') return null;
+  const kind = gateKind(runner);
+  if (!runner || kind === 'hidden') return null;
 
-  const isUnsupported = runner.reason === 'unsupported' || runner.apiKind === 'none';
+  const cliOnly = kind === 'cliOnly';
+  const isUnsupported = kind === 'unsupported';
   const isOpen = !dismissed;
 
   const submit = (): void => {
@@ -60,11 +72,10 @@ export function AssistantKeyGate() {
       isOpen={isOpen}
       onOpenChange={(open) => !open && setDismissed(true)}
       title={t('assistantKey.title', { provider: runner.providerName })}
-      description={
-        isUnsupported
-          ? t('assistantKey.unsupported', { provider: runner.providerName })
-          : t('assistantKey.description', { provider: runner.providerName })
-      }
+      description={t(DESCRIPTION_KEY[kind], {
+        provider: runner.providerName,
+        command: runner.cliCommand,
+      })}
       size="md"
       footer={
         <>
@@ -79,7 +90,7 @@ export function AssistantKeyGate() {
           >
             <Button variant="ghost">{t('assistantKey.openSettings')}</Button>
           </Link>
-          {!isUnsupported && (
+          {!isUnsupported && !cliOnly && (
             <Button onClick={submit} isLoading={save.isPending} disabled={!key.trim()}>
               {t('common.save')}
             </Button>
@@ -112,21 +123,23 @@ export function AssistantKeyGate() {
           )}
 
           {/* Шаг 2 — ФОЛБЭК: платный API-ключ (только если подписки/CLI нет). */}
-          <Stack gap="var(--spacing-3xs)">
-            <Typography variant="body-sm" weight="medium">
-              {t('assistantKey.apiTitle')}
-            </Typography>
-            <Typography variant="caption" color="subtle">
-              {t([`assistantKey.apiKeyHow.${runner.apiKind}`, 'assistantKey.apiKeyHowGeneric'])}
-            </Typography>
-            <TextField
-              label={t('assistantKey.inputLabel', { provider: runner.providerName })}
-              type="password"
-              value={key}
-              onChange={setKey}
-              placeholder={t('assistantKey.inputPlaceholder')}
-            />
-          </Stack>
+          {!cliOnly && (
+            <Stack gap="var(--spacing-3xs)">
+              <Typography variant="body-sm" weight="medium">
+                {t('assistantKey.apiTitle')}
+              </Typography>
+              <Typography variant="caption" color="subtle">
+                {t([`assistantKey.apiKeyHow.${runner.apiKind}`, 'assistantKey.apiKeyHowGeneric'])}
+              </Typography>
+              <TextField
+                label={t('assistantKey.inputLabel', { provider: runner.providerName })}
+                type="password"
+                value={key}
+                onChange={setKey}
+                placeholder={t('assistantKey.inputPlaceholder')}
+              />
+            </Stack>
+          )}
         </Stack>
       )}
     </Modal>

@@ -9,6 +9,7 @@ import type { ServerContext } from '../context.ts';
 import { ProviderChatService } from '../domains/provider-chat.ts';
 import type { ProviderChatRunEvent, ProviderChatRunLike } from '../domains/provider-chat.ts';
 import { HandoffChains } from '../domains/chat/ChatHandoff.ts';
+import { writePanelJson } from '../lib/app-store/group-sources.ts';
 import { registerProviderChatRoutes } from './provider-chat-routes.ts';
 
 /**
@@ -22,12 +23,17 @@ import { registerProviderChatRoutes } from './provider-chat-routes.ts';
 class FakeRun implements ProviderChatRunLike {
   static last: FakeRun | undefined;
   emit: ((event: ProviderChatRunEvent) => void) | undefined;
+  options: { systemPrefix?: string } | undefined;
 
   constructor() {
     FakeRun.last = this;
   }
 
-  start(_options: unknown, onEvent: (event: ProviderChatRunEvent) => void): Promise<void> {
+  start(
+    options: { systemPrefix?: string },
+    onEvent: (event: ProviderChatRunEvent) => void,
+  ): Promise<void> {
+    this.options = options;
     this.emit = onEvent;
     return new Promise<void>(() => {
       // Ответ завершает тест, вызывая emit — сам по себе прогон не кончается.
@@ -54,11 +60,13 @@ describe('provider-chat роуты', () => {
   let root: string;
   let app: FastifyInstance;
   let chats: ProviderChatService;
+  let ctx: ServerContext;
 
   const boot = async (provider: string): Promise<void> => {
     app = Fastify();
     chats = new ProviderChatService(() => new FakeRun());
-    registerProviderChatRoutes(app, makeCtx(root, provider), chats, new HandoffChains());
+    ctx = makeCtx(root, provider);
+    registerProviderChatRoutes(app, ctx, chats, new HandoffChains());
     await app.ready();
   };
 
@@ -111,6 +119,24 @@ describe('provider-chat роуты', () => {
     await boot('gemini');
     const list = await app.inject({ method: 'GET', url: '/api/provider-chat/chats' });
     expect(list.json<ProviderChatSummary[]>()).toEqual([]);
+  });
+
+  it('разговор другого CLI читается по ?provider= (телефон по уведомлению), без него — нет', async () => {
+    await boot('codex');
+    const chat = await createChat();
+    await app.close();
+
+    await boot('qwen');
+    const url = `/api/provider-chat/chats/${chat.id}`;
+    const named = await app.inject({ method: 'GET', url: `${url}?provider=codex` });
+    const bare = await app.inject({ method: 'GET', url });
+    // Claude и незнакомое имя — не адрес чужого чата: решает активный CLI.
+    const claude = await app.inject({ method: 'GET', url: `${url}?provider=claude` });
+    const unknown = await app.inject({ method: 'GET', url: `${url}?provider=nope` });
+
+    expect(named.statusCode).toBe(200);
+    expect(named.json<ProviderChatSummary>().providerId).toBe('codex');
+    expect([bare.statusCode, claude.statusCode, unknown.statusCode]).toEqual([404, 404, 404]);
   });
 
   it('несуществующий разговор — 404, а не пустой ответ', async () => {
@@ -178,6 +204,57 @@ describe('provider-chat роуты', () => {
     expect(detail.json<ProviderChatDetail>().messages).toHaveLength(1);
   });
 
+  // Числа группы доезжали только до звена разделения: обычный разговор чужого
+  // CLI с выбранной группой шёл без них, и скилл спрашивал то, что уже задано.
+  it('обычный разговор получает «числа» выбранной группы, без выбора — нет', async () => {
+    await boot('qwen');
+    const appData = join(root, 'agentdeck');
+    ctx.store.saveGroup({
+      id: 'x',
+      name: 'Набор X',
+      description: '',
+      color: 'accent',
+      icon: 'folder',
+      members: [{ kind: 'skill', id: 'ladder' }],
+      env: {},
+      projectPaths: [],
+      knobs: { 'ladder:review-rounds': 4 },
+      isEnabled: false,
+      order: 0,
+    });
+    writePanelJson(appData, 'skill-knobs.json', {
+      'global|skill:ladder': {
+        hash: 'h',
+        knobs: [
+          {
+            key: 'review-rounds',
+            skillId: 'ladder',
+            label: { ru: 'Круги ревью', en: 'Review rounds' },
+            default: 2,
+            min: 1,
+            max: 5,
+            quote: 'Run 2 review rounds.',
+          },
+        ],
+      },
+    });
+    const send = async (id: string) => {
+      await app.inject({
+        method: 'POST',
+        url: `/api/provider-chat/chats/${id}/send`,
+        payload: { text: 'Проверь' },
+      });
+      return FakeRun.last?.options?.systemPrefix ?? '';
+    };
+
+    const plain = await createChat();
+    expect(await send(plain.id)).not.toContain('Review rounds');
+
+    const chosen = await createChat();
+    ctx.store.setChatGroupSettings(`qwen:${chosen.id}`, { groupChoice: 'global:x' });
+    expect(await send(chosen.id)).toContain('ladder — Review rounds: 4 (skill default 2)');
+  });
+
   it('пустой вопрос отклоняется', async () => {
     await boot('codex');
     const chat = await createChat();
@@ -230,6 +307,43 @@ describe('provider-chat роуты', () => {
       url: `/api/provider-chat/chats/${chat.id}/status`,
     });
     expect(res.json()).toMatchObject({ isRunning: true, partial: 'Половина' });
+  });
+
+  it('длинный опрос отвечает на конце хода, а не по истечении ожидания', async () => {
+    await boot('codex');
+    const chat = await createChat();
+    await app.inject({
+      method: 'POST',
+      url: `/api/provider-chat/chats/${chat.id}/send`,
+      payload: { text: 'Вопрос' },
+    });
+
+    const started = Date.now();
+    const waiting = app.inject({
+      method: 'GET',
+      url: `/api/provider-chat/chats/${chat.id}/status?wait=20000`,
+    });
+    // Ответ не должен прийти раньше конца хода: дельта — не повод будить телефон.
+    FakeRun.last?.emit?.({ type: 'delta', text: 'Половина' });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    FakeRun.last?.emit?.({ type: 'done', reply: 'Готово', transport: 'stream' });
+
+    const res = await waiting;
+    expect(res.json()).toMatchObject({ isRunning: false });
+    expect(Date.now() - started).toBeLessThan(5_000);
+    expect(Date.now() - started).toBeGreaterThanOrEqual(40);
+  });
+
+  it('длинный опрос без идущего хода отвечает сразу', async () => {
+    await boot('codex');
+    const chat = await createChat();
+    const started = Date.now();
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/provider-chat/chats/${chat.id}/status?wait=20000`,
+    });
+    expect(res.json()).toMatchObject({ isRunning: false });
+    expect(Date.now() - started).toBeLessThan(2_000);
   });
 
   it('остановка гасит идущий ответ и честно отвечает, когда гасить нечего', async () => {

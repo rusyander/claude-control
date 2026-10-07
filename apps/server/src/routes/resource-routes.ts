@@ -11,7 +11,7 @@ import {
 import { layoutOf, type ResourceKind } from '../domains/resources/registry.ts';
 import { templatesFor, templateById } from '../domains/resources/templates.ts';
 import { assistStructure } from '../domains/resources/ResourceAssistant.ts';
-import { activeCliCommand } from '../providers/cli.ts';
+import { helperAskFor, type HelperRouteWiring } from '../domains/assistant-route.ts';
 import { readAgentImages } from '../lib/agent-images.ts';
 import { assistHistorySchema, invalidAssistBody } from './assistant-routes.ts';
 
@@ -22,7 +22,12 @@ import { assistHistorySchema, invalidAssistBody } from './assistant-routes.ts';
  * в реестре. Добавить работу с файлами для нового вида — значит дописать одну
  * запись в реестр, маршруты и интерфейс менять не нужно.
  */
-export function registerResourceRoutes(app: FastifyInstance, ctx: ServerContext): void {
+export function registerResourceRoutes(
+  app: FastifyInstance,
+  ctx: ServerContext,
+  /** Маршрут провайдера для помощника структуры — тот же, что у помощника формы. */
+  helperRoute: HelperRouteWiring,
+): void {
   type Params = { kind: string; id: string };
 
   const kindOf = (params: Params): ResourceKind | undefined => layoutOf(params.kind)?.kind;
@@ -120,12 +125,20 @@ export function registerResourceRoutes(app: FastifyInstance, ctx: ServerContext)
         request.params.id,
         request.body.prompt,
         ctx.location,
-        activeCliCommand(ctx.store),
+        helperAskFor(ctx.store, ctx.location.paths.appData, helperRoute),
         history.data,
         images.images,
       );
 
-      if (result.error) return reply.code(400).send({ message: result.error });
+      // Код причины едет рядом с текстом: отказ маршрута провайдера клиент
+      // называет на своём языке, а не русской строкой сервера.
+      if (result.error) {
+        return reply.code(400).send({
+          message: result.error,
+          ...(result.messageCode ? { messageCode: result.messageCode } : {}),
+          ...(result.params ? { params: result.params } : {}),
+        });
+      }
 
       const applied: string[] = [];
       for (const file of result.files) {

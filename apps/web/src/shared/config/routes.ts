@@ -10,3 +10,5 @@ export const SETTINGS_ROUTE: string = '/settings';
 export const CHAT_ROUTE: string = '/chat';
 /** Маска контура ссылается на правила, которыми маскирует. */
 export const DLP_ROUTE: string = '/dlp';
+/** Локальные модели — на них ссылается подсказка под чатом. */
+export const LOCAL_MODELS_ROUTE: string = '/local-models';

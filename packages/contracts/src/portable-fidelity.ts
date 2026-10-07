@@ -114,9 +114,15 @@ export type FidelityReason = (typeof fidelityReasons)[number];
  * переноса, а не после.
  *
  * - `run_through_panel` — запускать CLI из панели;
- * - `enable_contour` — включить контур/DLP-прокси в путь запроса.
+ * - `enable_contour` — включить контур/DLP-прокси в путь запроса;
+ * - `approve_in_cli` — одобрить запись в самом CLI (Codex: хук в `/hooks`): до
+ *   одобрения она лежит в файле и не исполняется.
  */
-export const fidelityConditions = ['run_through_panel', 'enable_contour'] as const;
+export const fidelityConditions = [
+  'run_through_panel',
+  'enable_contour',
+  'approve_in_cli',
+] as const;
 
 export type FidelityCondition = (typeof fidelityConditions)[number];
 

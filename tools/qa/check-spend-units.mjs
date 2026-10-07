@@ -57,6 +57,9 @@ const transcript = (sid, now) => {
 /** Все долларовые суммы на странице с текстом их карточки (до 5 уровней вверх). */
 const dollarsWithContext = (page) =>
   page.locator('main').evaluate((main) => {
+    // Свёрнутые подробности раскрываются: сумма внутри них тоже должна стоять
+    // рядом с пометкой, а innerText закрытого <details> подписи не отдаёт.
+    for (const details of main.querySelectorAll('details')) details.open = true;
     const walker = document.createTreeWalker(main, NodeFilter.SHOW_TEXT);
     const found = [];
     for (let node = walker.nextNode(); node; node = walker.nextNode()) {

@@ -12,7 +12,7 @@ import { DeleteButton } from '@features/EntityDelete';
 import { useProviderRules, useDeleteProviderRule } from '@entities/ProviderRules';
 import { ProviderRuleEditor } from './ProviderRuleEditor';
 import { ProviderRuleCreateForm } from './ProviderRuleCreateForm';
-import { ruleActionKey } from './ruleLabels';
+import { appliesAlways, ruleActionKey, ruleFormat } from './ruleLabels';
 import type { ProviderRulesPanelProps } from './ProviderRulesPanel.types';
 
 /**
@@ -36,12 +36,13 @@ export function ProviderRulesPanel({ projectId }: ProviderRulesPanelProps) {
   if (isLoading || !data) return <SkeletonList rows={5} />;
 
   const { rules, ignored, readOnly } = data;
+  const traits = ruleFormat(data.format);
 
   return (
     <Stack gap="var(--spacing-md)">
       <ExplainBox
         title={t('providerRules.explainTitle')}
-        text={t('providerRules.explain', { provider: data.providerName, rulesDir: data.rulesDir })}
+        text={t(traits.text('explain'), { provider: data.providerName, rulesDir: data.rulesDir })}
       />
 
       <Card padding="sm">
@@ -85,8 +86,8 @@ export function ProviderRulesPanel({ projectId }: ProviderRulesPanelProps) {
                       <Typography variant="mono" weight="medium" as="span">
                         {rule.path}
                       </Typography>
-                      {rule.alwaysApply && (
-                        <Badge tone="accent">{t('providerRules.badgeAlwaysApply')}</Badge>
+                      {rule.frontmatterOk && appliesAlways(traits, rule) && (
+                        <Badge tone="accent">{t(traits.text('badgeAlwaysApply'))}</Badge>
                       )}
                       {!rule.frontmatterOk && (
                         <Badge tone="warning">
@@ -136,6 +137,7 @@ export function ProviderRulesPanel({ projectId }: ProviderRulesPanelProps) {
                 {openRule === rule.path && (
                   <ProviderRuleEditor
                     path={rule.path}
+                    format={data.format}
                     projectId={projectId}
                     onClose={() => setOpenRule(undefined)}
                   />
@@ -147,7 +149,7 @@ export function ProviderRulesPanel({ projectId }: ProviderRulesPanelProps) {
       )}
 
       {rules.length === 0 && !readOnly && (
-        <Typography color="subtle">{t('providerRules.empty')}</Typography>
+        <Typography color="subtle">{t(traits.text('empty'))}</Typography>
       )}
 
       {ignored.length > 0 && (
@@ -156,11 +158,11 @@ export function ProviderRulesPanel({ projectId }: ProviderRulesPanelProps) {
             <Stack direction="row" align="center" gap="var(--spacing-xs)">
               <Icon name="info" size={18} />
               <Typography variant="body-sm" color="muted">
-                {t('providerRules.ignoredTitle')}
+                {t(traits.text('ignoredTitle'))}
               </Typography>
             </Stack>
             <Typography variant="caption" color="subtle">
-              {t('providerRules.ignoredExplain')}
+              {t(traits.text('ignoredExplain'))}
             </Typography>
             {ignored.map((file) => (
               <Typography key={file.path} variant="mono" color="subtle" as="span" truncate>
@@ -174,6 +176,7 @@ export function ProviderRulesPanel({ projectId }: ProviderRulesPanelProps) {
       {!readOnly && (
         <ProviderRuleCreateForm
           rulesDir={data.rulesDir}
+          format={data.format}
           existing={rules.map((rule) => rule.path)}
           projectId={projectId}
           onCreated={setOpenRule}

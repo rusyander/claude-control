@@ -21,6 +21,7 @@ import { LoweredRunsCard } from './LoweredRunsCard';
 import { ContourSpendCard } from './ContourSpendCard';
 import { DetailModal } from './DetailModal';
 import { SessionsTab } from './SessionsTab';
+import { SourceNote } from './SourceNote';
 import type { DetailKind } from './DetailModal.types';
 import { buildReportCsv, buildJson } from './model/report';
 import { ANALYTICS_TABS, ANALYTICS_TAB_ICONS, isReportTab } from './model/tabs';
@@ -166,6 +167,7 @@ export function AnalyticsPage() {
 
         {isReportTab(activeTab) && data && data.overall.requests > 0 && (
           <Stack gap="var(--spacing-lg)" className={styles.report} data-stale={isPlaceholderData}>
+            <SourceNote providerId={data.providerId} unpricedModels={data.unpricedModels} />
             {activeTab === 'overview' && (
               <>
                 <div className={styles.statGrid}>
@@ -396,7 +398,11 @@ export function AnalyticsPage() {
             )}
 
             {activeTab === 'sessions' && (
-              <SessionsTab sessions={data.recentSessions} locale={locale} />
+              <SessionsTab
+                sessions={data.recentSessions}
+                locale={locale}
+                providerId={data.providerId}
+              />
             )}
 
             {/* Строка сканирования — про весь отчёт, поэтому стоит под каждым его разрезом. */}

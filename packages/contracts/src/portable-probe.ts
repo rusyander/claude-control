@@ -77,6 +77,13 @@ export type ProbeObservation = (typeof probeObservations)[number];
  * - `needs_panel_runtime` — обещан уровень «эмуляция»: он держится запуском CLI
  *   через панель, и надзиратель рантайма — отдельная волна (П3);
  * - `needs_wire` — обещан уровень «провод»: нужен контур в пути запроса (П4);
+ * - `needs_cli_approval` — обещан уровень «нативно» при одобрении в самом CLI
+ *   (Codex: хук в `/hooks`). Одобрение — поступок человека; проба его не
+ *   подделывает (обход доверия мерил бы не ту среду, что достанется человеку), а
+ *   без него хук не исполняется — ни красного, ни зелёного тут взять неоткуда;
+ * - `target_reads_real_home` — каталог слоя цель находит по профилю ОС мимо
+ *   `HOME` (codex на Windows: `~/.agents/skills`): временный дом пробы его не
+ *   подменяет, а читать настоящий дом человека проба не вправе;
  * - `target_defers_tools` — цель ЗАБРАЛА запись, но модели заранее её не
  *   называет: инструменты MCP она объявляет по запросу, а не списком в запросе.
  *   Живой прогон 22.09.2026 (`codex-cli 0.155.1`): его MCP-клиент пробный сервер
@@ -95,6 +102,8 @@ export const probeSkipReasons = [
   'no_stub_endpoint',
   'needs_panel_runtime',
   'needs_wire',
+  'needs_cli_approval',
+  'target_reads_real_home',
   'target_defers_tools',
   'emit_failed',
   'run_failed',

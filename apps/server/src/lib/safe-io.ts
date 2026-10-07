@@ -15,7 +15,7 @@
  */
 
 export { assertValidJson, readJsonFile, readTextFile, readTextForm } from './safe-io/read.ts';
-export { writeBinaryFile, writeJsonFile, writeTextFile } from './safe-io/write.ts';
+export { renameWithRetry, writeBinaryFile, writeJsonFile, writeTextFile } from './safe-io/write.ts';
 export type { WriteOptions } from './safe-io/safe-io.types.ts';
 export {
   MAX_BACKUP_KEEP,

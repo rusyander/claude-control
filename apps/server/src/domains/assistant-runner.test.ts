@@ -12,6 +12,11 @@ import { runAssistant, type RunAssistantDeps } from './assistant-runner.ts';
  * Мультимодельный раннер ассистента (Ф6b). Реальной сети НЕТ (мокаем fetch),
  * реального spawn НЕТ (мокаем child_process). appData — изолированный tmp.
  */
+/** Строка вывода gemini `-o stream-json` (0.62.0): так он печатает кусок ответа. */
+const geminiOut = (text: string): string =>
+  `${JSON.stringify({ type: 'message', role: 'assistant', content: text, delta: true })}
+`;
+
 const noCli = (): boolean => false;
 const yesCli = (): boolean => true;
 
@@ -82,7 +87,7 @@ describe('runAssistant: CLI one-shot', () => {
 
   it('gemini → argv [-p, prompt] отдельным элементом, stdout → ответ', async () => {
     const gemini = getProvider('gemini');
-    const spawn = fakeSpawn({ stdout: 'привет из gemini' });
+    const spawn = fakeSpawn({ stdout: geminiOut('привет из gemini') });
     const prompt = 'скажи привет; echo PWNED';
     const res = await runAssistant(gemini, [{ role: 'user', content: prompt }], {
       appDataDir: dir,

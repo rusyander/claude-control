@@ -1,0 +1,38 @@
+import type { LocalMessageCode } from '@agentdeck/contracts/server-messages';
+
+export const localEn: Record<LocalMessageCode, string> = {
+  'local-port-busy': 'port {{port}} is taken by another server — stop it or free the port',
+  'local-start-failed': 'could not start {{binary}}',
+  'local-exited': 'the model server exited right after start (code {{code}}) — log: {{log}}',
+  'local-timeout': 'the model server did not answer within {{seconds}} s — log: {{log}}',
+  'local-stop-failed': 'the server on port {{port}} did not stop',
+  'local-release-http': 'GitHub answered {{status}} to the Ollama release request',
+  'local-asset-missing': 'Ollama release {{version}} has no file {{name}}',
+  'local-sums-missing': 'Ollama release {{version}} has no sha256sum.txt',
+  'local-download-http': 'download failed: HTTP {{status}}',
+  'local-download-cut': 'download was cut: {{done}} of {{size}} bytes — press again, it resumes',
+  'local-download-cancelled': 'download cancelled',
+  'local-checksum-missing': 'the release has no checksum for {{name}}',
+  'local-checksum-mismatch': 'checksum of {{name}} did not match — file removed, press again',
+  'local-binary-missing': 'the unpacked archive has no ollama executable',
+  'local-runtime-missing': 'the model server is not installed — press «Install» first',
+  'local-server-down': 'the model server is not running',
+  'local-model-unknown': 'model {{tag}} is not in the panel catalog',
+  'local-model-missing': 'model {{tag}} is not downloaded',
+  'local-contour-save': 'saving the contour: {{reason}}',
+  'local-contour-activate': 'activating the contour: {{reason}}',
+  'local-contour-deactivate': 'deactivating the contour: {{reason}}',
+  'local-npm-failed': 'Qwen Code install failed: {{reason}}',
+  'local-kit-provider': 'the panel kit is not supported for {{provider}}',
+  'local-import-failed': 'could not take {{tag}} from the system Ollama: {{reason}}',
+  'local-job-unknown': 'no such download',
+  'kit-item-unknown': 'The panel kit has no such item',
+  'kit-mode-unsupported': 'This CLI does not support that kit mode',
+  'kit-global-missing': 'The global layer has no such item',
+  'kit-global-unsupported': 'Only skills, commands and subagents move to and from the global layer',
+  'kit-hooks-invalid': 'hooks.json not saved: it is not JSON of the form {"hooks": {…}}',
+  'kit-compose-failed':
+    'Run not started: the panel kit failed to build. Switch the kit mode to «Yours only» or retry',
+  'kit-codex-too-large':
+    'Run not started: the panel kit rules and skills for Codex take {{size}} characters, and the Codex command line holds no more than {{limit}}. Nothing was trimmed: switch some kit items off or switch the kit mode to «Yours only»',
+};

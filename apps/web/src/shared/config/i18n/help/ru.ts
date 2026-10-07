@@ -41,6 +41,8 @@ import { integrationsRu } from './ru/topics/integrations';
 import { promptsRu } from './ru/topics/prompts';
 import { portabilityRu } from './ru/topics/portability';
 import { phoneRu } from './ru/topics/phone';
+import { localModelsRu } from './ru/topics/localModels';
+import { kitRu } from './ru/topics/kit';
 export const helpRu = {
   index: {
     subtitle: 'Как работает каждый раздел панели',
@@ -161,6 +163,8 @@ export const helpRu = {
     dlp: dlpRu.shots,
     panelAgent: panelAgentRu.shots,
     phone: phoneRu.shots,
+    localModels: localModelsRu.shots,
+    kit: kitRu.shots,
   },
 
   /**
@@ -199,6 +203,8 @@ export const helpRu = {
     dlp: dlpRu.diagrams,
     panelAgent: panelAgentRu.diagrams,
     phone: phoneRu.diagrams,
+    localModels: localModelsRu.diagrams,
+    kit: kitRu.diagrams,
   },
 
   topics: {
@@ -226,6 +232,8 @@ export const helpRu = {
     dlp: dlpRu.topic,
     panelAgent: panelAgentRu.topic,
     phone: phoneRu.topic,
+    localModels: localModelsRu.topic,
+    kit: kitRu.topic,
     platform: platformRu.topic,
     endpoints: endpointsRu.topic,
     providers: providersRu.topic,

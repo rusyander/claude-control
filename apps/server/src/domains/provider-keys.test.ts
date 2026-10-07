@@ -14,7 +14,10 @@ import {
   saveProviderKey,
   deleteProviderKey,
   ProviderKeyError,
+  vendorApiRefusal,
 } from './provider-keys.ts';
+import { listProviders } from '../providers/registry.ts';
+import type { ConfigProvider, ProviderAssistant } from '../providers/types.ts';
 
 /**
  * Резолвинг ключей и раннера ассистента (Ф6a). Ключи кладём в изолированный
@@ -162,6 +165,25 @@ describe('describe/мутации ключей', () => {
     expect(info.cliRunnable).toBe(true);
   });
 
+  it('describeActiveRunner: переключатель правок — у каждого CLI, до которого он доходит', () => {
+    const edits = (id: string) => {
+      const info = describeActiveRunner(fakeStore(id), dir, noCli);
+      return [info.editsToggle, info.editsWhenOff];
+    };
+    // Живой или сессионный сервер: выключенный переключатель — карточка человеку.
+    expect(edits('qwen')).toEqual([true, 'ask']);
+    expect(edits('codex')).toEqual([true, 'ask']);
+    expect(edits('goose')).toEqual([true, 'ask']);
+    expect(edits('kimi')).toEqual([true, 'ask']);
+    expect(edits('opencode')).toEqual([true, 'ask']); // сессия `opencode serve`
+    // Только одиночный запуск: флаг доходит, но спросить некого — запись закрыта.
+    expect(edits('gemini')).toEqual([true, 'deny']);
+    expect(edits('continue')).toEqual([true, 'deny']);
+    expect(edits('aider')).toEqual([true, 'deny']);
+    // До Cursor не доходит ничего — переключателя нет, решают его настройки.
+    expect(edits('cursor')).toEqual([undefined, undefined]);
+  });
+
   it('saveProviderKey → api после сохранения, статус маскирован', () => {
     const status = saveProviderKey(dir, 'codex', 'sk-stored-abcdef123');
     expect(status.present).toBe(true);
@@ -198,6 +220,85 @@ describe('describe/мутации ключей', () => {
       saveProviderKey(dir, 'codex', '   ');
     } catch (e) {
       expect((e as ProviderKeyError).code).toBe('invalid_key');
+    }
+  });
+});
+
+/** Тот же провайдер с другим блоком ассистента — правило судит только объявление. */
+function withAssistant(
+  provider: ConfigProvider,
+  patch: Partial<ProviderAssistant>,
+): ConfigProvider {
+  return { ...provider, assistant: { ...provider.assistant!, ...patch } };
+}
+
+describe('vendorApiRefusal: ключ уходит только своему вендору (06.10, SF-1/D1)', () => {
+  const kimi = getProvider('kimi');
+
+  it('anthropic разрешён одному claude: у чужого CLI это молчаливый чат Claude', () => {
+    expect(vendorApiRefusal(claudeProvider)).toBeUndefined();
+    expect(vendorApiRefusal(withAssistant(kimi, { apiKind: 'anthropic' }))).toBe(
+      'assistant-api-base-unknown',
+    );
+    // Адрес из каталога anthropic не спасает: дело не в адресе, а в том, что это Claude.
+    expect(
+      vendorApiRefusal(
+        withAssistant(kimi, { apiKind: 'anthropic', apiBaseUrl: 'https://api.anthropic.com' }),
+      ),
+    ).toBe('assistant-api-base-unknown');
+  });
+
+  it('openai-compat без адреса вендора — отказ; с адресом — можно', () => {
+    expect(
+      vendorApiRefusal(withAssistant(kimi, { apiKind: 'openai-compat', apiBaseUrl: undefined })),
+    ).toBe('assistant-api-base-unknown');
+    expect(
+      vendorApiRefusal(withAssistant(kimi, { apiKind: 'openai-compat', apiBaseUrl: '   ' })),
+    ).toBe('assistant-api-base-unknown');
+    expect(
+      vendorApiRefusal(
+        withAssistant(kimi, {
+          apiKind: 'openai-compat',
+          apiBaseUrl: 'https://vendor.example.com/v1',
+        }),
+      ),
+    ).toBeUndefined();
+  });
+
+  it('OPENAI_BASE_URL процесса правило не открывает', () => {
+    const saved = process.env.OPENAI_BASE_URL;
+    process.env.OPENAI_BASE_URL = 'https://elsewhere.example.com/v1';
+    try {
+      expect(
+        vendorApiRefusal(withAssistant(kimi, { apiKind: 'openai-compat', apiBaseUrl: undefined })),
+      ).toBe('assistant-api-base-unknown');
+    } finally {
+      if (saved === undefined) delete process.env.OPENAI_BASE_URL;
+      else process.env.OPENAI_BASE_URL = saved;
+    }
+  });
+
+  it('облака по своему виду (openai, google) и none — не отказ', () => {
+    expect(vendorApiRefusal(codex)).toBeUndefined();
+    expect(vendorApiRefusal(getProvider('gemini'))).toBeUndefined();
+    expect(vendorApiRefusal(cursor)).toBeUndefined();
+  });
+
+  it('каталог: ни один чужой провайдер не дойдёт ключом до Anthropic или до угаданного адреса', () => {
+    for (const provider of listProviders()) {
+      const kind = provider.assistant?.apiKind;
+      const reachesAnthropic = kind === 'anthropic' && provider.id !== 'claude';
+      const guessesBase = kind === 'openai-compat' && !provider.assistant?.apiBaseUrl?.trim();
+      expect(
+        { id: provider.id, refusal: vendorApiRefusal(provider) },
+        `${provider.id}: ${kind}`,
+      ).toEqual({
+        id: provider.id,
+        refusal: reachesAnthropic || guessesBase ? 'assistant-api-base-unknown' : undefined,
+      });
+      if (provider.assistant?.apiBaseUrl) {
+        expect(provider.assistant.apiBaseUrl, provider.id).toMatch(/^https:\/\//);
+      }
     }
   });
 });

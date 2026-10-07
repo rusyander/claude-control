@@ -7,7 +7,14 @@ import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { ownStepCount } from '@features/GroupPath';
 import { useGroupMembers, useGroupPath, useSetGroupEnabled } from '@entities/Group';
-import { describedStepTitle, previewSteps, projectOnlyLines, type StepPreview } from './model/tile';
+import { activeProvider, useProviders } from '@entities/Provider';
+import {
+  describedStepTitle,
+  previewSteps,
+  projectOnlyLines,
+  tileToggle,
+  type StepPreview,
+} from './model/tile';
 import { TileFacts } from './TileFacts';
 import { usePairSide } from './model/usePairSide';
 import { TileFrame } from './TileFrame';
@@ -22,6 +29,7 @@ import type { GroupTileProps } from './GroupTile.types';
 export function GroupTile({ group, pair, onOpen, onCopy }: GroupTileProps) {
   const { t, i18n } = useTranslation();
   const setGroupEnabled = useSetGroupEnabled();
+  const toggle = tileToggle(group, activeProvider(useProviders().data));
   const side = usePairSide(group, pair);
   const { shown } = side;
   const path = useGroupPath(shown.id);
@@ -84,7 +92,7 @@ export function GroupTile({ group, pair, onOpen, onCopy }: GroupTileProps) {
           <Badge tone={scope.kind === 'project' ? 'info' : 'accent'}>{scopeLabel(t, scope)}</Badge>
           {isScenario && <Badge tone="accent">{t('groupsPage.tile.scenarioBadge')}</Badge>}
           {pair && <Badge tone="info">{t('groupSources.pairBadge')}</Badge>}
-          {!group.isEnabled && <Badge tone="neutral">{t('common.disabled')}</Badge>}
+          {toggle.shown && !toggle.checked && <Badge tone="neutral">{t('common.disabled')}</Badge>}
         </>
       }
       aside={
@@ -98,12 +106,18 @@ export function GroupTile({ group, pair, onOpen, onCopy }: GroupTileProps) {
             title={t('groupsPage.copy.tileAria', { name: group.name })}
             onClick={onCopy}
           />
-          {/* Копия для другой CLI держит файлы той CLI: тумблер панели двигает
-              только сущности Claude, и здесь он ничего бы не включил. */}
-          {!isForeignGlobal(group.scope) && (
+          {/* Чей тумблер — активного CLI (`tileToggle`): у CLI со слоем он
+              включает группу для его прогонов, у CLI без слоя его нет. */}
+          {toggle.shown && (
             <Toggle
-              checked={group.isEnabled}
-              onCheckedChange={(isEnabled) => setGroupEnabled.mutate({ id: group.id, isEnabled })}
+              checked={toggle.checked}
+              onCheckedChange={(isEnabled) =>
+                setGroupEnabled.mutate({
+                  id: group.id,
+                  isEnabled,
+                  ...(toggle.provider ? { provider: toggle.provider } : {}),
+                })
+              }
               disabled={setGroupEnabled.isPending}
               aria-label={`${t('common.enabled')}: ${group.name}`}
             />

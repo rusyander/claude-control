@@ -140,6 +140,22 @@ export const serverTextTemplates = {
     ru: 'Тело запроса больше 32 МБ — шлюз его не принимает',
     en: 'The request body is over 32 MB — the gateway does not accept it',
   },
+  'gateway-responses-previous-id': {
+    ru: 'previous_response_id шлюз не поддерживает: пришлите весь разговор в input (store: false)',
+    en: 'The gateway does not support previous_response_id: send the whole conversation in input (store: false)',
+  },
+  'gateway-responses-not-request': {
+    ru: 'Тело запроса /v1/responses без model или input — это не запрос Responses',
+    en: 'A /v1/responses body without model or input is not a Responses request',
+  },
+  'gateway-google-not-request': {
+    ru: 'Тело запроса Gemini без contents — это не запрос generateContent',
+    en: 'A Gemini request body without contents is not a generateContent request',
+  },
+  'gateway-google-empty': {
+    ru: 'В запросе Gemini нет ни одного сообщения, на которое можно ответить',
+    en: 'The Gemini request has no message to answer',
+  },
   'gateway-body-not-json': {
     ru: 'Тело запроса не разбирается как JSON',
     en: 'The request body does not parse as JSON',
@@ -357,6 +373,14 @@ export const serverTextTemplates = {
   'proxy-stopped-unparsed': {
     ru: 'AgentDeck: {{reason}}, запрос остановлен (настройка «пропускать неразобранное» выключена)',
     en: 'AgentDeck: {{reason}}, the request was stopped (the “Pass through unparsed bodies” setting is off)',
+  },
+  'kit-compose-failed': {
+    ru: 'Прогон не запущен: набор панели не собрался. Переключите режим набора на «Только ваши» или повторите',
+    en: 'Run not started: the panel kit failed to build. Switch the kit mode to «Yours only» or retry',
+  },
+  'kit-codex-too-large': {
+    ru: 'Прогон не запущен: правила и навыки набора панели для Codex — {{size}} знаков, а командная строка Codex вмещает не больше {{limit}}. Ничего не обрезано: выключите часть элементов набора или переключите режим набора на «Только ваши»',
+    en: 'Run not started: the panel kit rules and skills for Codex take {{size}} characters, and the Codex command line holds no more than {{limit}}. Nothing was trimmed: switch some kit items off or switch the kit mode to «Yours only»',
   },
   'proxy-upstream-unreachable': {
     ru: 'AgentDeck: адрес модели не отвечает ({{reason}})',
@@ -653,6 +677,10 @@ export const serverTextTemplates = {
   'contour-required-no-token': {
     ru: 'Контур «{{title}}» обязателен, а ключ контура не сохранён — прогон не запущен, чтобы не уйти в облако вендора. Сохраните ключ («Настроить» на карточке контура → шаг «Ключ») либо верните провайдер по умолчанию.',
     en: 'The contour «{{title}}» is required, and its key is not saved — the run was not started, so that it would not slip into the vendor cloud. Save the key («Configure» on the contour card → the «Key» step) or switch the provider back to the default one.',
+  },
+  'contour-required-cli-config': {
+    ru: 'Контур «{{title}}» обязателен, а в конфиге CLI стоит {{setting}} — с ней прогон или его часть ушли бы мимо контура, а окружением CLI её не перебить. Прогон не запущен. Исправьте эту настройку в конфиге CLI либо верните провайдер по умолчанию.',
+    en: 'The contour «{{title}}» is required, and the CLI config has {{setting}} — with it the run or part of it would bypass the contour, and the CLI offers no environment variable to override it. The run was not started. Fix that setting in the CLI config or switch the provider back to the default one.',
   },
   'contour-target-assistant': { ru: 'Ассистент панели', en: 'Panel assistant' },
   'contour-bridge-script-missing': {
@@ -1380,6 +1408,10 @@ export const serverTextTemplates = {
     ru: 'блок «Тесты» копии: после старта группы не записано ни одного прогона — прогоните кейсы по изменённым файлам ({{cases}}) и запишите прогон: {{command}}',
     en: 'Tests block of the copy: no run has been recorded since the group started — run the cases for the changed files ({{cases}}) and record the run: {{command}}',
   },
+  'tests-gap-stale': {
+    ru: 'блок «Тесты» копии: прогон {{run}} записан раньше последней правки ({{files}}) — прогоните кейсы заново и запишите прогон: {{command}}',
+    en: 'Tests block of the copy: run {{run}} was recorded before the latest change ({{files}}) — run the cases again and record the run: {{command}}',
+  },
   'tests-gap-unrun': {
     ru: 'блок «Тесты» копии: кейсы по изменённым файлам не прогнаны после старта группы: {{cases}} — запишите прогон: {{command}}',
     en: 'Tests block of the copy: cases for the changed files were not run since the group started: {{cases}} — record a run: {{command}}',
@@ -1391,5 +1423,161 @@ export const serverTextTemplates = {
   'tests-gap-uncovered': {
     ru: 'блок «Тесты» копии: изменённые файлы не покрыты ни одним кейсом ({{files}}) — заведите кейс с codePaths на них',
     en: 'Tests block of the copy: the changed files are not covered by any case ({{files}}) — add a case with codePaths pointing at them',
+  },
+  'assistant-route-refused': {
+    ru: 'Помощник не запущен: {{reason}}',
+    en: 'The helper did not start: {{reason}}',
+  },
+  'assistant-provider-unsupported': {
+    ru: 'У {{provider}} нет ни неинтерактивного запуска, ни API — помощнику нечем ответить. Переключите активный CLI или выберите профиль «Ассистент панели»',
+    en: '{{provider}} has neither a non-interactive mode nor an API — the helper has nothing to answer with. Switch the active CLI or pick a «Panel assistant» profile',
+  },
+  'assistant-provider-unavailable': {
+    ru: '{{provider}} не найден в PATH процесса панели, а ключа API нет — помощнику нечем ответить. Установите CLI или сохраните ключ',
+    en: '{{provider}} is not on the panel process PATH and there is no API key — the helper has nothing to answer with. Install the CLI or save a key',
+  },
+  'assistant-contour-cli-missing': {
+    ru: '{{provider}} идёт через контур, а CLI не найден в PATH процесса панели — помощник не запущен, чтобы не уйти в облако вендора мимо контура',
+    en: '{{provider}} goes through the contour, but the CLI is not on the panel process PATH — the helper did not start, so as not to reach the vendor cloud past the contour',
+  },
+  'assistant-contour-gateway-down': {
+    ru: 'Ассистент панели идёт через контур «{{title}}», а шлюз панели не поднят — запрос не отправлен, чтобы не уйти в облако вендора. Нажмите «Поднять шлюз» на карточке контура',
+    en: 'The panel assistant goes through the contour «{{title}}», but the panel gateway is not running — the request was not sent, so as not to reach the vendor cloud. Press «Start gateway» on the contour card',
+  },
+  'assistant-contour-no-token': {
+    ru: 'Ассистент панели идёт через контур «{{title}}», а ключ контура не сохранён — шлюзу нечего подставить. Сохраните ключ на карточке контура',
+    en: 'The panel assistant goes through the contour «{{title}}», but the contour key is not saved — the gateway has nothing to insert. Save the key on the contour card',
+  },
+  'watcher-provider-unsupported': {
+    ru: 'Наблюдатель разбирает сбои только через Claude Code: запуск «только чтение» описан лишь у него, а активный CLI — {{provider}}. Разбор не запущен',
+    en: 'The watcher analyses failures only through Claude Code: a read-only launch is described for it alone, and the active CLI is {{provider}}. Analysis did not start',
+  },
+  'watcher-endpoint-unsupported': {
+    ru: 'Ассистенту панели выбран свой эндпоинт «{{name}}» — наблюдателю пришлось бы отдать его токен процессу CLI, этого панель не делает. Разбор не запущен',
+    en: 'The panel assistant uses its own endpoint «{{name}}» — the watcher would have to hand its token to a CLI process, which the panel does not do. Analysis did not start',
+  },
+  'provider-chat-unsupported': {
+    ru: 'У {{provider}} нет неинтерактивного запуска — чат панели с ним не работает. Разговор не создан: переключите активный CLI',
+    en: '{{provider}} has no non-interactive mode — the panel chat cannot work with it. The conversation was not created: switch the active CLI',
+  },
+  'analytics-provider-unsupported': {
+    ru: 'Аналитика читает журналы только Claude Code, Codex и Qwen Code, а активный CLI — {{provider}}. Данные Claude под ним не показываются',
+    en: 'Analytics reads the logs of Claude Code, Codex and Qwen Code only, and the active CLI is {{provider}}. Claude data is not shown under it',
+  },
+  'analytics-live-foreign': {
+    ru: 'Процессы на машине панель опознаёт только у Claude Code, а активный CLI — {{provider}}. Список пуст, чтобы не выдавать процессы claude за его собственные',
+    en: 'The panel recognises running processes of Claude Code only, and the active CLI is {{provider}}. The list stays empty rather than pass claude processes off as its own',
+  },
+  'groups-foreign-not-delivered': {
+    ru: 'Группы панели живут в настройках Claude Code, а {{provider}} их не читает — до его запусков группа не доходит',
+    en: 'Panel groups live in the Claude Code settings, and {{provider}} does not read them — the group does not reach its runs',
+  },
+  'plugins-provider-unsupported': {
+    ru: 'Раздел плагинов Claude Code работает только через claude, а активный CLI — {{provider}}. Команда не запущена',
+    en: 'The Claude Code plugins section works through claude only, and the active CLI is {{provider}}. The command did not run',
+  },
+  'sandbox-provider-unsupported': {
+    ru: 'Песочница запускает только Claude Code, а активный CLI — {{provider}}. Прогон не запущен',
+    en: 'The sandbox runs Claude Code only, and the active CLI is {{provider}}. The run did not start',
+  },
+  'assistant-api-base-unknown': {
+    ru: 'Адрес модельного API {{provider}} панели не известен — ключ никуда не отправлен, чтобы не уйти к чужому вендору. Установите CLI или выберите свой эндпоинт',
+    en: 'The panel does not know the model API address of {{provider}} — the key was sent nowhere, so as not to reach another vendor. Install the CLI or pick your own endpoint',
+  },
+  'group-layer-permission': {
+    ru: 'Разрешения группы в {{cli}} не переносятся: у {{cli}} своя схема прав, и перевод вслепую выдал бы права, которых не просили. Задайте их в разделе «Разрешения» {{cli}}.',
+    en: "Group permissions are not carried to {{cli}}: it has its own permission model, and a blind translation could grant rights nobody asked for. Set them in {{cli}}'s Permissions section.",
+  },
+  'group-layer-mcp-sse': {
+    ru: 'MCP «{{id}}» работает через SSE — Codex такой транспорт не поддерживает.',
+    en: 'MCP "{{id}}" uses SSE, a transport Codex does not support.',
+  },
+  'group-layer-mcp-name': {
+    ru: 'Имя MCP «{{id}}» содержит точку — Codex читает её как вложенный ключ настроек.',
+    en: 'MCP name "{{id}}" contains a dot, which Codex reads as a nested settings key.',
+  },
+  'group-layer-mcp-secret-header': {
+    ru: 'Заголовки MCP «{{id}}» несут секрет, а передать его Codex можно только в командной строке — панель этого не делает.',
+    en: 'MCP "{{id}}" headers carry a secret that could only reach Codex on the command line; the panel will not do that.',
+  },
+  'group-layer-mcp-shape': {
+    ru: 'Запись MCP «{{id}}» в файлах Claude незнакомой формы — переносить нечего.',
+    en: 'The entry of MCP "{{id}}" in Claude\'s files has an unknown shape; nothing to carry.',
+  },
+  'group-layer-skill-name': {
+    ru: 'Имя скилла «{{id}}» длиннее 64 знаков — Codex его не загрузит.',
+    en: 'Skill name "{{id}}" is longer than 64 characters; Codex will not load it.',
+  },
+  'group-layer-hook-event': {
+    ru: 'Хук на событие {{event}} в {{cli}} не срабатывает: панель проигрывает только начало сессии, отправку сообщения и конец ответа.',
+    en: 'A hook on {{event}} does not fire in {{cli}}: the panel plays only session start, prompt submit and stop.',
+  },
+  'group-layer-hook-event-native': {
+    ru: 'Хук на событие {{event}} в {{cli}} не срабатывает: у {{cli}} такого события нет.',
+    en: 'A hook on {{event}} does not fire in {{cli}}: {{cli}} has no such event.',
+  },
+  'group-layer-missing': {
+    ru: 'Участник «{{id}}» не найден в файлах Claude — перенести нечего.',
+    en: 'Member "{{id}}" was not found in Claude\'s files; nothing to carry.',
+  },
+  'group-layer-duplicate': {
+    ru: '«{{id}}» уже едет с группой «{{group}}» — вторая копия не подаётся.',
+    en: '"{{id}}" already rides with group "{{group}}"; the second copy is not delivered.',
+  },
+  'group-layer-none': {
+    ru: '{{cli}} файлы Claude не читает, а слоя группы для него у панели нет — группа на этот прогон не действует.',
+    en: "{{cli}} does not read Claude's files and the panel has no group layer for it; the group does not apply to this run.",
+  },
+  'group-layer-too-large': {
+    ru: 'Правила группы и набора вместе длиннее предела Codex ({{limit}} знаков) — прогон не запущен, ничего не обрезано.',
+    en: "Group and kit rules together exceed Codex's limit ({{limit}} chars); the run was refused, nothing was truncated.",
+  },
+  'group-layer-notice': {
+    ru: 'Группы на этом прогоне {{cli}}: {{groups}}.',
+    en: 'Groups on this {{cli}} run: {{groups}}.',
+  },
+  'group-layer-notice-delivered': {
+    ru: 'Едет слоем на прогон — {{members}}.',
+    en: 'Delivered to the run as a layer — {{members}}.',
+  },
+  'group-layer-notice-nothing': {
+    ru: 'Ни один участник до прогона не доехал.',
+    en: 'No member reached the run.',
+  },
+  'group-layer-notice-refused': {
+    ru: 'Не едет:',
+    en: 'Not delivered:',
+  },
+  'group-layer-kind-rule': {
+    ru: 'правила: {{names}}',
+    en: 'rules: {{names}}',
+  },
+  'group-layer-kind-skill': {
+    ru: 'скиллы: {{names}}',
+    en: 'skills: {{names}}',
+  },
+  'group-layer-kind-mcp': {
+    ru: 'MCP: {{names}}',
+    en: 'MCP: {{names}}',
+  },
+  'group-layer-kind-hook': {
+    ru: 'хуки: {{names}}',
+    en: 'hooks: {{names}}',
+  },
+  'group-layer-kind-env': {
+    ru: 'переменные: {{names}}',
+    en: 'variables: {{names}}',
+  },
+  'group-layer-enabled-for': {
+    ru: 'Группа включена для прогонов {{cli}} — едет слоем на каждый, файлы Claude не менялись.',
+    en: "The group is on for {{cli}} runs — it rides as a layer on each, Claude's files did not change.",
+  },
+  'group-layer-disabled-for': {
+    ru: 'Группа выключена для прогонов {{cli}}; файлы Claude не менялись.',
+    en: "The group is off for {{cli}} runs; Claude's files did not change.",
+  },
+  'provider-unknown': {
+    ru: 'Провайдер «{{id}}» неизвестен панели.',
+    en: 'The panel does not know provider “{{id}}”.',
   },
 } as const satisfies Record<string, { ru: string; en: string }>;

@@ -15,6 +15,7 @@ const NAMED_FILES = 3;
 const WAITING_KEY = {
   runs: 'devRestart.waitingRuns',
   setup: 'devRestart.waitingSetup',
+  checks: 'devRestart.waitingChecks',
   both: 'devRestart.waitingBoth',
 } as const;
 

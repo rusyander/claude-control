@@ -120,7 +120,7 @@ Keys you do enter are stored encrypted (AES-256-GCM) in `agentdeck/provider-keys
 
 ## Quick start
 
-**Requirements:** Node.js 22.6+ (for TypeScript type stripping), pnpm 10+, and the `claude` CLI installed, logged in, and on your `PATH`.
+**Requirements:** Node.js 22.6+ (for TypeScript type stripping), pnpm 10+, and an agent CLI on your `PATH` — by default `claude`, installed and logged in. A machine without Claude Code only needs the CLI you chose, Qwen Code for example: see [first run](docs/SETUP.md#first-run).
 
 **On Windows, one more line, once per machine:** `git config --global core.longpaths true`. Parallel working copies live at a path longer than the original, and without permission for long paths git reports real files as deleted — `git add -A` inside such a copy would record those deletions. `pnpm doctor` checks this and tells you if it is off; the full story is in [TROUBLESHOOTING.md → Parallel copies show files as deleted](docs/TROUBLESHOOTING.md#parallel-copies-show-files-as-deleted).
 

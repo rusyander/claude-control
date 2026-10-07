@@ -21,6 +21,7 @@ export function ChatRow({
   unreadEscalations,
   status,
   depth,
+  onTogglePin,
 }: ChatRowProps) {
   const { t } = useTranslation();
 
@@ -40,149 +41,167 @@ export function ChatRow({
     return projectName(chat.projectPath, chat.project);
   };
 
+  const pinned = Boolean(chat.pinnedAt);
+
   return (
-    <button
-      type="button"
-      className={`${styles.item} ${isActive ? styles.itemActive : ''} ${depth ? styles.itemChild : ''}`}
-      onClick={onSelect}
-      title={chat.projectPath || chat.project}
-    >
-      <Stack gap="var(--spacing-3xs)">
-        <Stack direction="row" align="center" gap="var(--spacing-2xs)">
-          {/* Точка у разговора, а не только у проекта: агентов в проекте может
+    <div className={`${styles.rowWrap} ${pinned ? styles.rowPinned : ''}`}>
+      <button
+        type="button"
+        className={`${styles.item} ${isActive ? styles.itemActive : ''} ${depth ? styles.itemChild : ''}`}
+        onClick={onSelect}
+        title={chat.projectPath || chat.project}
+      >
+        <Stack gap="var(--spacing-3xs)">
+          <Stack direction="row" align="center" gap="var(--spacing-2xs)">
+            {/* Точка у разговора, а не только у проекта: агентов в проекте может
               быть несколько, и «кто-то ждёт ответа» без адреса бесполезно.
               Пульсирует — тот же язык, что и в пульте агентов. */}
-          {status && (
-            <StatusDot
-              tone={statusTone(status)}
-              // Молчащий не пульсирует: событий нет — и точка стоит ровно.
-              pulse={status !== 'quiet'}
-              label={t(`workspace.status.${status}`)}
-            />
-          )}
-          <Typography variant="body-sm" weight="medium" className={styles.title}>
-            {chat.title}
-          </Typography>
-          {/* Звено конвейера. У работы метки нет: она и так подразумевается, а
+            {status && (
+              <StatusDot
+                tone={statusTone(status)}
+                // Молчащий не пульсирует: событий нет — и точка стоит ровно.
+                pulse={status !== 'quiet'}
+                label={t(`workspace.status.${status}`)}
+              />
+            )}
+            <Typography variant="body-sm" weight="medium" className={styles.title}>
+              {chat.title}
+            </Typography>
+            {/* Звено конвейера. У работы метки нет: она и так подразумевается, а
               подписать каждый второй чат «работа» значит спрятать те, ради
               которых метка и заведена. */}
-          {(chat.stage === 'triage' ||
-            chat.stage === 'plan' ||
-            chat.stage === 'review' ||
-            chat.stage === 'fix' ||
-            chat.stage === 'deliver') && (
-            <Typography variant="caption" color="subtle" as="span" className={styles.stage}>
-              {t(`chat.cascade.stage.${chat.stage}`)}
-            </Typography>
-          )}
-          {/* Дерево разговора стоит на паузе: в списке иначе остановленный
+            {(chat.stage === 'triage' ||
+              chat.stage === 'plan' ||
+              chat.stage === 'review' ||
+              chat.stage === 'fix' ||
+              chat.stage === 'deliver') && (
+              <Typography variant="caption" color="subtle" as="span" className={styles.stage}>
+                {t(`chat.cascade.stage.${chat.stage}`)}
+              </Typography>
+            )}
+            {/* Дерево разговора стоит на паузе: в списке иначе остановленный
               ребёнок неотличим от просто молчащего. */}
-          {chat.paused && (
-            <Typography variant="caption" color="subtle" as="span" className={styles.stage}>
-              {t('chat.cascade.tree.paused')}
-            </Typography>
-          )}
-          {/* Критичное от группы — метка у главного чата, пока человек не прочтёт. */}
-          {Boolean(unreadEscalations) && (
-            <Typography
-              variant="caption"
-              color="danger"
-              as="span"
-              className={styles.stage}
-              data-chat-escalations={unreadEscalations}
-              title={t('chat.escalation.unread', { count: unreadEscalations })}
-            >
-              {`! ${unreadEscalations}`}
-            </Typography>
-          )}
-          {/* Ждёт человека и принятая группа — те же слова, что в сводке хаба:
+            {chat.paused && (
+              <Typography variant="caption" color="subtle" as="span" className={styles.stage}>
+                {t('chat.cascade.tree.paused')}
+              </Typography>
+            )}
+            {/* Критичное от группы — метка у главного чата, пока человек не прочтёт. */}
+            {Boolean(unreadEscalations) && (
+              <Typography
+                variant="caption"
+                color="danger"
+                as="span"
+                className={styles.stage}
+                data-chat-escalations={unreadEscalations}
+                title={t('chat.escalation.unread', { count: unreadEscalations })}
+              >
+                {`! ${unreadEscalations}`}
+              </Typography>
+            )}
+            {/* Ждёт человека и принятая группа — те же слова, что в сводке хаба:
               иначе в списке их не отличить от просто молчащих чатов. */}
-          {chat.awaitsYou && (
-            <Typography variant="caption" color="warning" as="span" className={styles.stage}>
-              {t('chat.cascade.tree.awaitsYou')}
-            </Typography>
-          )}
-          {chat.accepted && (
-            <Typography variant="caption" color="success" as="span" className={styles.stage}>
-              {t('chat.cascade.tree.accepted')}
-            </Typography>
-          )}
-          {/* MR группы — прямо из списка (живой прогон 25.09): иначе, дошла ли
+            {chat.awaitsYou && (
+              <Typography variant="caption" color="warning" as="span" className={styles.stage}>
+                {t('chat.cascade.tree.awaitsYou')}
+              </Typography>
+            )}
+            {chat.accepted && (
+              <Typography variant="caption" color="success" as="span" className={styles.stage}>
+                {t('chat.cascade.tree.accepted')}
+              </Typography>
+            )}
+            {/* MR группы — прямо из списка (живой прогон 25.09): иначе, дошла ли
               группа до MR, видно только в хабе родителя. Строка — кнопка, и
               вложенная ссылка в ней недопустима: чип открывает MR сам и не
               даёт клику выбрать чат. */}
-          {chat.mergeRequest && (
-            <Typography
-              variant="caption"
-              color="accent"
-              as="span"
-              className={`${styles.stage} ${styles.mrChip}`}
-              role="link"
-              title={t('chat.cascade.tree.openMr')}
-              data-row-mr
-              onClick={(event) => {
-                event.stopPropagation();
-                window.open(chat.mergeRequest, '_blank', 'noopener,noreferrer');
-              }}
-            >
-              {t('chat.cascade.hub.mr', { id: chat.mergeRequest.match(/(\d+)$/)?.[1] ?? '' })}
-            </Typography>
-          )}
-          {chat.mergeRequestPending && (
-            <Typography variant="caption" color="subtle" as="span" className={styles.stage}>
-              {t('chat.cascade.tree.noMr')}
-            </Typography>
-          )}
-        </Stack>
-
-        {snippet ? (
-          <Typography variant="caption" color="subtle" className={styles.preview} as="div">
-            {highlightSnippet(snippet, query ?? '').map((part, index) =>
-              part.match ? (
-                <mark key={index} className={styles.mark}>
-                  {part.text}
-                </mark>
-              ) : (
-                <span key={index}>{part.text}</span>
-              ),
+            {chat.mergeRequest && (
+              <Typography
+                variant="caption"
+                color="accent"
+                as="span"
+                className={`${styles.stage} ${styles.mrChip}`}
+                role="link"
+                title={t('chat.cascade.tree.openMr')}
+                data-row-mr
+                onClick={(event) => {
+                  event.stopPropagation();
+                  window.open(chat.mergeRequest, '_blank', 'noopener,noreferrer');
+                }}
+              >
+                {t('chat.cascade.hub.mr', { id: chat.mergeRequest.match(/(\d+)$/)?.[1] ?? '' })}
+              </Typography>
             )}
-          </Typography>
-        ) : (
-          <Typography variant="caption" color="subtle" className={styles.preview}>
-            {subtitle()}
-          </Typography>
-        )}
+            {chat.mergeRequestPending && (
+              <Typography variant="caption" color="subtle" as="span" className={styles.stage}>
+                {t('chat.cascade.tree.noMr')}
+              </Typography>
+            )}
+          </Stack>
 
-        <Stack direction="row" align="center" gap="var(--spacing-3xs)">
-          <Typography variant="caption" color="subtle" as="span">
-            {formatWhen(chat.updatedAt, language, t)}
-          </Typography>
-          <span className={styles.dot}>·</span>
-          {/* Иконка снимает догадку: число рядом с ней читается как «сообщений». */}
-          <Icon name="chat" size={14} />
-          {/* «+» у длинного разговора: список читает большой транскрипт началом
+          {snippet ? (
+            <Typography variant="caption" color="subtle" className={styles.preview} as="div">
+              {highlightSnippet(snippet, query ?? '').map((part, index) =>
+                part.match ? (
+                  <mark key={index} className={styles.mark}>
+                    {part.text}
+                  </mark>
+                ) : (
+                  <span key={index}>{part.text}</span>
+                ),
+              )}
+            </Typography>
+          ) : (
+            <Typography variant="caption" color="subtle" className={styles.preview}>
+              {subtitle()}
+            </Typography>
+          )}
+
+          <Stack direction="row" align="center" gap="var(--spacing-3xs)">
+            <Typography variant="caption" color="subtle" as="span">
+              {formatWhen(chat.updatedAt, language, t)}
+            </Typography>
+            <span className={styles.dot}>·</span>
+            {/* Иконка снимает догадку: число рядом с ней читается как «сообщений». */}
+            <Icon name="chat" size={14} />
+            {/* «+» у длинного разговора: список читает большой транскрипт началом
               и хвостом, поэтому точного итога у него нет — и выдавать неполное
               число за итог нечестно. Пояснение — в подсказке. */}
-          <Typography
-            variant="caption"
-            color="subtle"
-            as="span"
-            title={chat.messageCountPartial ? t('chat.messageCountPartial') : undefined}
-          >
-            {chat.messageCount}
-            {chat.messageCountPartial ? '+' : ''}
-          </Typography>
-          {matchCount !== undefined && (
-            <>
-              <span className={styles.dot}>·</span>
-              <Icon name="search" size={14} />
-              <Typography variant="caption" color="subtle" as="span">
-                {matchCount}
-              </Typography>
-            </>
-          )}
+            <Typography
+              variant="caption"
+              color="subtle"
+              as="span"
+              title={chat.messageCountPartial ? t('chat.messageCountPartial') : undefined}
+            >
+              {chat.messageCount}
+              {chat.messageCountPartial ? '+' : ''}
+            </Typography>
+            {matchCount !== undefined && (
+              <>
+                <span className={styles.dot}>·</span>
+                <Icon name="search" size={14} />
+                <Typography variant="caption" color="subtle" as="span">
+                  {matchCount}
+                </Typography>
+              </>
+            )}
+          </Stack>
         </Stack>
-      </Stack>
-    </button>
+      </button>
+      {/* Соседом строки, а не внутри: строка — кнопка, вложенная недопустима. */}
+      {onTogglePin && (
+        <button
+          type="button"
+          className={styles.pin}
+          aria-pressed={pinned}
+          aria-label={t(pinned ? 'chat.unpinChat' : 'chat.pinChat')}
+          title={t(pinned ? 'chat.unpinChat' : 'chat.pinChat')}
+          data-chat-pin={chat.id}
+          onClick={onTogglePin}
+        >
+          <Icon name="pin" size={16} />
+        </button>
+      )}
+    </div>
   );
 }

@@ -242,7 +242,31 @@ describe('platformBypassCaption', () => {
         rules: { ...RULES, catalog: [] },
         effort: true,
       }),
-    ).toEqual({ key: 'chat.platformBypassed', params: { title: 'Company', reason: 'no_token' } });
+    ).toEqual({
+      key: 'chat.platformBypassed',
+      params: { title: 'Company', reason: 'no_token', setting: '' },
+    });
+  });
+
+  it('уход из-за настройки CLI называет саму настройку', () => {
+    expect(
+      platformBypassCaption({
+        routed: false,
+        title: 'Company',
+        reason: 'cli_config_bypass',
+        setting: 'security.auth.selectedType',
+        bypassed: true,
+        rules: { ...RULES, catalog: [] },
+        effort: true,
+      }),
+    ).toEqual({
+      key: 'chat.platformBypassed',
+      params: {
+        title: 'Company',
+        reason: 'cli_config_bypass',
+        setting: 'security.auth.selectedType',
+      },
+    });
   });
 
   it('без признака ухода — молчит: снятая галочка и отказ обязательного не уход', () => {

@@ -9,8 +9,9 @@ import type { ProviderRulesSettingsSource, ProviderRulesTarget } from './types.t
 
 /**
  * Цель глобального раздела правил — или `undefined`, если активный провайдер
- * этой моделью не пользуется (маршрут ответит 4xx). Поддержан, только когда
- * `globalInstructions` = `ready` И задан `instructionsRules`.
+ * этой моделью не пользуется (маршрут ответит 4xx). Поддержан, когда
+ * `globalInstructions` = `ready` и задан `instructionsRules` (Cursor) ЛИБО
+ * `rules` = `ready` и задан `rulesConfig` (Qwen: правила рядом с QWEN.md).
  */
 export function resolveProviderRulesTarget(
   store: ProviderRulesSettingsSource,
@@ -30,26 +31,30 @@ export function resolveProviderRulesTargetFor(
   provider: ConfigProvider,
   override?: string,
 ): ProviderRulesTarget | undefined {
-  if (provider.capabilities.globalInstructions !== 'ready' || !provider.instructionsRules) {
-    return undefined;
-  }
+  const location =
+    provider.capabilities.globalInstructions === 'ready' && provider.instructionsRules
+      ? provider.instructionsRules
+      : provider.capabilities.rules === 'ready'
+        ? provider.rulesConfig
+        : undefined;
+  if (!location) return undefined;
 
   return {
     provider,
-    format: provider.instructionsRules.format,
+    format: location.format,
     scope: 'global',
-    rulesDir: resolve(provider.instructionsRules.dir(override)),
+    rulesDir: resolve(location.dir(override)),
     backupPrefix: `${provider.id}-`,
   };
 }
 
 /**
  * Расширение файла правила у формата каталога. У Cursor это `.mdc` (обычный
- * `.md` он игнорирует), у Continue правила — обыкновенные `.md`. Расширение
+ * `.md` он игнорирует), у Continue и Qwen правила — обыкновенные `.md`. Расширение
  * решает и что считать правилом при обходе каталога, и что принимать на запись.
  */
 export function ruleExtension(format: ProviderRulesFormat): string {
-  return format === 'continue-md' ? '.md' : MDC_EXTENSION;
+  return format === 'cursor-mdc' ? MDC_EXTENSION : '.md';
 }
 
 // --- Безопасность путей ------------------------------------------------------

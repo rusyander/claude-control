@@ -315,7 +315,7 @@ const cliVersion = definePanelAction({
   section: 'settings',
   risk: 'read',
   description:
-    'Which Claude CLI the panel runs for chats: path, version, every copy in PATH, and a newer copy ' +
+    'Which CLI of the active provider the panel runs for chats: path, version, every copy in PATH, and a newer copy ' +
     'if the panel runs an older one.',
   input: z.object({
     refresh: z.boolean().default(false).describe('Ask each copy for --version again'),
@@ -334,7 +334,7 @@ const updateCli = definePanelAction({
   risk: 'danger',
   title: 'journal-update-cli',
   description:
-    'Run `claude update` for the copy the panel runs (up to 5 minutes). Needs the human’s ' +
+    'Run the active provider CLI’s `update` subcommand for the copy the panel runs (up to 5 minutes; refused with a code for a CLI without a checked one). Needs the human’s ' +
     'confirmation. The result names the version after the update.',
   input: z.object({}),
   route: () => ({ method: 'POST', url: `${CLI_URL}/update` }),
@@ -345,7 +345,9 @@ const updateCli = definePanelAction({
   preview: async (_input, inject) => {
     const info = await readCli(inject);
     if (!info.path) {
-      throw new Error('The Claude CLI is not found in PATH: there is nothing to update.');
+      throw new Error(
+        'The active provider’s CLI is not found in PATH: there is nothing to update.',
+      );
     }
     return {
       ...card('summary-update-cli'),

@@ -14,6 +14,7 @@ import { ProvidersTab } from './ProvidersTab';
 import { ModelsTab } from './ModelsTab';
 import { PromptsTab } from './PromptsTab';
 import { GroupsTab } from './GroupsTab';
+import { GlobalLayerTab } from './GlobalLayerTab';
 import { IntegrationsTab } from './IntegrationsTab';
 import { SpendTab } from './SpendTab';
 import { SafetyTab } from './SafetyTab';
@@ -93,6 +94,7 @@ export function SettingsPage() {
           {activeTab === 'models' && <ModelsTab settings={settings} patch={patch} />}
           {activeTab === 'prompts' && <PromptsTab />}
           {activeTab === 'groups' && <GroupsTab />}
+          {activeTab === 'globalLayer' && <GlobalLayerTab />}
           {activeTab === 'integrations' && <IntegrationsTab />}
           {activeTab === 'spend' && <SpendTab settings={settings} patch={patch} />}
           {activeTab === 'safety' && <SafetyTab settings={settings} patch={patch} />}

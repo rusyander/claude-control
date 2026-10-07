@@ -372,15 +372,11 @@ describe('прогон через контур', () => {
   });
 
   it('CLI, который держит адрес в файле, отказывает с «только глобально»', () => {
-    connect({ ...PLATFORM, consumers: ['foreign:codex', 'foreign:gemini'] });
+    connect({ ...PLATFORM, consumers: ['foreign:codex'] });
     // Файл один на машину: «включить только для чата» там не получается
-    // физически, и панель говорит это словом.
+    // физически, и панель говорит это словом. Gemini с 07.10.2026 идёт через
+    // диалект `google` — `routing.run-endpoint.test.ts`.
     expect(resolveRunRoute(deps, 'foreign:codex')).toEqual({ routed: false, reason: 'file_only' });
-    // Gemini — другое: адрес задать можно, но шлюз его диалекта не знает.
-    expect(resolveRunRoute(deps, 'foreign:gemini')).toEqual({
-      routed: false,
-      reason: 'gateway_dialect',
-    });
   });
 
   it('CLI без своего чата в панели маршрута не получает — тем же правилом, что и каталог', () => {

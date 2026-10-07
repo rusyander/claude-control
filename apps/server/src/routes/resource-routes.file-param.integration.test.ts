@@ -6,6 +6,9 @@ import { tmpdir } from 'node:os';
 import type { ServerContext } from '../context.ts';
 import { registerResourceRoutes } from './resource-routes.ts';
 
+/** Маршрут окна для проверок, которым он не важен: контура нет, шлюз не поднят. */
+const NO_ROUTE = { runRoute: () => ({ env: {} }), gatewayPort: () => 0 };
+
 /**
  * Имя файла — обязательный параметр запроса, а не «как получится».
  *
@@ -41,7 +44,7 @@ describe('resource-routes: файл в запросе не указан', () => 
     } as unknown as ServerContext;
 
     app = Fastify();
-    registerResourceRoutes(app, ctx);
+    registerResourceRoutes(app, ctx, NO_ROUTE);
     await app.ready();
   });
 

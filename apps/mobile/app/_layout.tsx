@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
-import { Stack } from 'expo-router';
+import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -10,9 +10,10 @@ import 'react-native-reanimated';
 import { AppSplash } from '../src/features/splash/AppSplash';
 import { loadConnection, useConnection } from '../src/shared/api/connection';
 import { forgetPanelData } from '../src/shared/api/panel-cache';
-import { loadWorkspace } from '../src/shared/lib/workspace';
+import { loadWorkspace, openChat } from '../src/shared/lib/workspace';
 import { resumeActive } from '../src/shared/lib/runs';
-import { ensureChannel } from '../src/shared/lib/notifications';
+import { ensureChannel, useNotificationOpen } from '../src/shared/lib/notifications';
+import { notificationTarget } from '../src/entities/provider-chat/model';
 import { colors } from '../src/shared/config/theme';
 import { loadLanguage, useT } from '../src/shared/config/i18n';
 
@@ -54,6 +55,24 @@ export default function RootLayout() {
   const [greeted, setGreeted] = useState(false);
   const appState = useRef<AppStateStatus>(AppState.currentState);
   const connectionUrl = useConnection().url;
+
+  // Нажатие на уведомление — в его разговор: чужой CLI открывается своим экраном,
+  // разговор Claude — обычным чатом своего проекта.
+  const openFromNotification = useCallback((data: unknown) => {
+    const target = notificationTarget(data);
+    if (!target) return;
+    if (target.kind === 'foreign') {
+      router.push({
+        pathname: '/foreign-chat',
+        params: { provider: target.providerId, id: target.chatId },
+      });
+      return;
+    }
+    openChat(target.chatId, target.projectPath || undefined);
+    router.push('/chat');
+  }, []);
+  // Ждёт, пока смонтирован стек и показана заставка: раньше переходить некуда.
+  useNotificationOpen(openFromNotification, ready && greeted);
 
   useEffect(() => {
     void (async () => {
@@ -115,6 +134,7 @@ export default function RootLayout() {
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="chat" options={{ headerShown: false }} />
             <Stack.Screen name="chats" options={{ title: t.chats.title }} />
+            <Stack.Screen name="foreign-chat" options={{ title: '' }} />
             <Stack.Screen name="code" options={{ title: t.code.projectTitle }} />
             <Stack.Screen name="tests" options={{ title: t.tests.screenTitle }} />
             <Stack.Screen name="test-run" options={{ title: t.tests.manual.title }} />

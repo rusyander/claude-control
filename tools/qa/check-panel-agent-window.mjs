@@ -250,6 +250,27 @@ await trigger.waitFor({ timeout: 30_000 });
 await trigger.click();
 await input.waitFor();
 
+// ── Открытие и закрытие с клавиатуры (panel-agent-001) ─────────────────────
+if (wants('focus')) {
+  const focusIn = (selector) =>
+    page.evaluate((sel) => document.activeElement?.matches(sel) === true, selector);
+  let typed = false;
+  for (let i = 0; i < 20 && !typed; i += 1) {
+    typed = await focusIn('[data-agent-input]');
+    if (!typed) await page.waitForTimeout(100);
+  }
+  check(typed, 'окно открылось с фокусом в поле ввода');
+  await page.keyboard.press('Escape');
+  await win.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => undefined);
+  check(!(await win.isVisible()), 'Escape закрывает окно');
+  check(
+    await focusIn('[data-panel-agent-trigger]'),
+    'после Escape фокус вернулся на «Агент панели»',
+  );
+  await trigger.click();
+  await input.waitFor();
+}
+
 // ── Ответ разметкой ──────────────────────────────────────────────────────────
 if (wants('markdown')) {
   await send('QA: сколько правил?');

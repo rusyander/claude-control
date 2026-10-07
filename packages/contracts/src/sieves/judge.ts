@@ -1,4 +1,10 @@
-import { SIEVE_LANG, touchesSieve, type BuiltinSieveId, type SieveDef } from './catalog.ts';
+import {
+  BUILTIN_SIEVES,
+  SIEVE_LANG,
+  touchesSieve,
+  type BuiltinSieveId,
+  type SieveDef,
+} from './catalog.ts';
 import { EVIDENCE_MIN, evidenceRunIds, type SieveReportRow } from './report.ts';
 
 // ---------------------------------------------------------------- судья
@@ -189,6 +195,28 @@ const FLAGS: readonly {
   },
 ];
 
+/**
+ * Снятие механики привязано к содержимому отмеченного (Ф5): строка, назвавшая
+ * файл с секретом, отладкой, артефактом или манифест без лок-файла, не в счёт,
+ * если ЭТОТ файл правили после неё. Переменные окружения названы именами — их
+ * снимает правка любого кода, который сито покрывает.
+ */
+function movedSinceRow(
+  flag: (typeof FLAGS)[number],
+  items: readonly string[],
+  proof: SieveProofFacts | undefined,
+): string[] {
+  const changed = proof?.changedAfterRow?.[flag.id] ?? [];
+  if (changed.length === 0) return [];
+  if (flag.param === 'names') {
+    const sieve = BUILTIN_SIEVES.find((item) => item.id === flag.id);
+    return sieve ? touchesSieve(sieve, changed) : [];
+  }
+  const key = (path: string): string => path.replace(/\\/g, '/').toLowerCase();
+  const flagged = new Set(items.map(key));
+  return changed.filter((path) => flagged.has(key(path)));
+}
+
 /** Пробел доказательства прогоном: нет прогона, он красный или старше правки. */
 function runGap(sieve: SieveDef, id: string, fact: SieveRunFact | undefined): SieveGap | undefined {
   if (!fact?.found) return { code: 'sieve-gap-run-missing', params: { sieve: sieve.id, run: id } };
@@ -263,6 +291,60 @@ function contentGap(
 }
 
 /**
+ * Пробел, который судья запишет по строке сита, сдаваемого группой
+ * (`needsRow`), или `undefined` — строку он примет как есть. Одна функция на
+ * судью и на задание звена (Ф1): задание не может счесть сданной строку,
+ * которую судья потом отклонит, — раньше оно мерило только длину доказательства.
+ */
+export function rowGap(
+  sieve: SieveDef,
+  row: SieveReportRow | undefined,
+  mechanics: SieveMechanics,
+  proof?: SieveProofFacts,
+): SieveGap | undefined {
+  if (!row) return { code: 'sieve-gap-unreported', params: { sieve: sieve.id, lang: SIEVE_LANG } };
+  if (row.status === 'fail') {
+    return { code: 'sieve-gap-failed', params: { sieve: sieve.id, evidence: row.evidence } };
+  }
+  if (row.evidence.length < EVIDENCE_MIN) {
+    return { code: 'sieve-gap-no-evidence', params: { sieve: sieve.id } };
+  }
+  if (sieve.id === 'consumers-repo-wide') {
+    const gap = consumersGap(mechanics, row);
+    if (gap) return gap;
+  }
+  return contentGap(sieve, row, mechanics) ?? proofGap(sieve, row, proof);
+}
+
+/** Потребители удалённого вне диффа, не названные строкой поиска потребителей. */
+function consumersGap(
+  mechanics: SieveMechanics,
+  row: SieveReportRow | undefined,
+): SieveGap | undefined {
+  const consumers = mechanics.consumers ?? [];
+  const files = [...new Set(consumers.flatMap((hit) => hit.files))];
+  if (files.length === 0) return undefined;
+  if (
+    row &&
+    row.status !== 'fail' &&
+    row.evidence.length >= EVIDENCE_MIN &&
+    namesAll(row.evidence, files)
+  ) {
+    return undefined;
+  }
+  return {
+    code: 'sieve-gap-consumers',
+    params: {
+      tokens: consumers
+        .slice(0, NAMED_MAX)
+        .map((hit) => hit.token)
+        .join(', '),
+      files: named(files),
+    },
+  };
+}
+
+/**
  * Судья сит перед «доставлено». Пусто — все применимые сита пройдены.
  *
  * - конфликт со свежей основной не снимается ничем: только rebase;
@@ -304,41 +386,25 @@ export function judgeSieves(input: {
   }
   for (const flag of FLAGS) {
     const items = flag.items(mechanics);
-    if (items.length === 0 || cleared(flag.id, items, flag.id !== 'tests-alongside')) continue;
-    gaps.push({ code: flag.code, params: { [flag.param]: named(items) } });
+    if (items.length === 0) continue;
+    if (!cleared(flag.id, items, flag.id !== 'tests-alongside')) {
+      gaps.push({ code: flag.code, params: { [flag.param]: named(items) } });
+      continue;
+    }
+    const moved = movedSinceRow(flag, items, input.proof);
+    if (moved.length > 0) {
+      gaps.push({ code: 'sieve-gap-stale', params: { sieve: flag.id, files: named(moved) } });
+    }
   }
-  const consumers = mechanics.consumers ?? [];
-  const consumerFiles = [...new Set(consumers.flatMap((hit) => hit.files))];
-  const consumersFlagged =
-    consumerFiles.length > 0 && !cleared('consumers-repo-wide', consumerFiles, true);
-  if (consumersFlagged) {
-    gaps.push({
-      code: 'sieve-gap-consumers',
-      params: {
-        tokens: consumers
-          .slice(0, NAMED_MAX)
-          .map((hit) => hit.token)
-          .join(', '),
-        files: named(consumerFiles),
-      },
-    });
-  }
+  const consumers = consumersGap(mechanics, rows.get('consumers-repo-wide'));
+  if (consumers) gaps.push(consumers);
 
   for (const sieve of input.applicable) {
     // Механику панель судит сама выше (`needsRow`).
     if (!needsRow(sieve)) continue;
-    if (sieve.id === 'consumers-repo-wide' && consumersFlagged) continue;
-    const row = rows.get(sieve.id);
-    if (!row) {
-      gaps.push({ code: 'sieve-gap-unreported', params: { sieve: sieve.id, lang: SIEVE_LANG } });
-    } else if (row.status === 'fail') {
-      gaps.push({ code: 'sieve-gap-failed', params: { sieve: sieve.id, evidence: row.evidence } });
-    } else if (row.evidence.length < EVIDENCE_MIN) {
-      gaps.push({ code: 'sieve-gap-no-evidence', params: { sieve: sieve.id } });
-    } else {
-      const gap = contentGap(sieve, row, mechanics) ?? proofGap(sieve, row, input.proof);
-      if (gap) gaps.push(gap);
-    }
+    if (sieve.id === 'consumers-repo-wide' && consumers) continue;
+    const gap = rowGap(sieve, rows.get(sieve.id), mechanics, input.proof);
+    if (gap) gaps.push(gap);
   }
   return gaps;
 }

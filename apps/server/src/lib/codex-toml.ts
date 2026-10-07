@@ -253,3 +253,85 @@ export function spliceCodexTableRegion(original: string, block: string, prefix: 
   const merged = [...before, ...blockLines, ...separator, ...after];
   return merged.join('\n');
 }
+
+/** Путь ключей заголовка таблицы `[a."b.c"]` → `['a', 'b.c']`; не заголовок → `undefined`. */
+function tableHeaderPath(line: string): string[] | undefined {
+  const body = line.replace(/\r$/, '');
+  if (!/^\s*\[(?!\[)/.test(body)) return undefined;
+  let node: unknown;
+  try {
+    node = parseToml(body.replace(/#.*$/, ''));
+  } catch {
+    return undefined;
+  }
+  const path: string[] = [];
+  while (node && typeof node === 'object' && !Array.isArray(node)) {
+    const keys = Object.keys(node as Record<string, unknown>);
+    if (keys.length !== 1) break;
+    path.push(keys[0]!);
+    node = (node as Record<string, unknown>)[keys[0]!];
+  }
+  return path;
+}
+
+const samePath = (a: readonly string[], b: readonly string[]): boolean =>
+  a.length === b.length && a.every((key, index) => key === b[index]);
+
+/**
+ * Поставить логический ключ ВНУТРИ таблицы (`[plugins."имя@рынок"]` →
+ * `enabled = false`). Таблица находится по смыслу заголовка, а не по его
+ * написанию: кавычки и пробелы в `[plugins . "x"]` не мешают. Меняется одна
+ * строка присваивания (отступ и хвостовой комментарий целы) или, если ключа нет,
+ * добавляется строка сразу под заголовком. Всё прочее — байт-в-байт.
+ *
+ * Fail-closed: таблицы с таким заголовком нет (её задали dotted-ключами или
+ * inline) либо после правки разбор не показывает ровно записанное значение —
+ * `UnrecognizedFormatError`, текст не возвращается.
+ */
+export function setCodexTableBoolean(
+  original: string,
+  tablePath: readonly string[],
+  key: string,
+  value: boolean,
+): string {
+  parseCodexToml(original);
+  const lines = original.split('\n');
+  const header = lines.findIndex((line) => {
+    const path = tableHeaderPath(line);
+    return path !== undefined && samePath(path, tablePath);
+  });
+  if (header === -1) throw new UnrecognizedFormatError();
+
+  let end = lines.length;
+  for (let i = header + 1; i < lines.length; i += 1) {
+    if (/^\s*\[/.test(lines[i]!.replace(/\r$/, ''))) {
+      end = i;
+      break;
+    }
+  }
+
+  const keyName = `(?:${escapeRegExp(key)}|"${escapeRegExp(key)}")`;
+  const assignRe = new RegExp(`^(\\s*${keyName}\\s*=\\s*)(.*?)(\\s*(?:#.*)?)$`);
+  let done = false;
+  for (let i = header + 1; i < end && !done; i += 1) {
+    const raw = lines[i]!;
+    const lineCr = raw.endsWith('\r') ? '\r' : '';
+    const match = assignRe.exec(lineCr ? raw.slice(0, -1) : raw);
+    if (match) {
+      lines[i] = `${match[1]}${value}${match[3]}${lineCr}`;
+      done = true;
+    }
+  }
+  if (!done) {
+    const cr = lines[header]!.endsWith('\r') ? '\r' : '';
+    lines.splice(header + 1, 0, `${key} = ${value}${cr}`);
+  }
+
+  const next = lines.join('\n');
+  let node: unknown = parseCodexToml(next);
+  for (const part of tablePath) node = (node as Record<string, unknown> | undefined)?.[part];
+  if ((node as Record<string, unknown> | undefined)?.[key] !== value) {
+    throw new UnrecognizedFormatError();
+  }
+  return next;
+}

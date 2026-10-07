@@ -168,7 +168,9 @@ export async function runProbe(deps: ProbeDeps): Promise<ProbeReport> {
         );
       }
 
-      return report(observe(stub.requests, promised, existsSync(scripts.mcpAskedPath)));
+      return report(
+        judge(stub.requests, target, deps.scope, promised, existsSync(scripts.mcpAskedPath)),
+      );
     } finally {
       await stub.close();
     }
@@ -256,7 +258,33 @@ export function probeRowsFrom(
    */
   mcpAsked = false,
 ): readonly ProbeRow[] {
-  return observe(requests, promisedLevels(target, scope), mcpAsked);
+  return judge(requests, target, scope, promisedLevels(target, scope), mcpAsked);
+}
+
+/**
+ * Приговоры по разговору — ОДНИ и для прогона, и для таблицы: слой, который цель
+ * берёт из настоящего дома мимо подменённого (`realHomeLayers` рецепта), не
+ * судится вовсе. Его «не доехало» обвинило бы перенос, а «доехало» могло бы
+ * прийти из чужого настоящего скилла.
+ */
+function judge(
+  requests: readonly Record<string, unknown>[],
+  target: ConfigProvider,
+  scope: EnvScope,
+  promised: ReturnType<typeof promisedLevels>,
+  mcpAsked: boolean,
+): readonly ProbeRow[] {
+  const realHome = new Set(PROBE_RECIPES[target.id]?.realHomeLayers?.(scope) ?? []);
+  return observe(requests, promised, mcpAsked).map((row) =>
+    realHome.has(row.layer) ? skipped(row.layer, promised, 'target_reads_real_home', '') : row,
+  );
+}
+
+/** Обещание по слою: уровень и условие, при котором он держится. */
+interface LayerPromise {
+  level: ReturnType<typeof level>['level'];
+  condition: ReturnType<typeof level>['condition'];
+  itemId: string;
 }
 
 /**
@@ -267,7 +295,7 @@ export function probeRowsFrom(
 function promisedLevels(
   target: ConfigProvider,
   scope: EnvScope,
-): ReadonlyMap<ProbeLayer, { level: ReturnType<typeof level>['level']; itemId: string }> {
+): ReadonlyMap<ProbeLayer, LayerPromise> {
   const scripts = {
     hookPath: '',
     mcpPath: '',
@@ -283,10 +311,15 @@ function promisedLevels(
     scripts,
     capturedAt: new Date(0).toISOString(),
   });
-  const map = new Map<ProbeLayer, { level: ReturnType<typeof level>['level']; itemId: string }>();
+  const map = new Map<ProbeLayer, LayerPromise>();
   for (const item of env.items) {
     if (!(probeLayers as readonly string[]).includes(item.kind)) continue;
-    map.set(item.kind as ProbeLayer, { level: level(item, target).level, itemId: item.id });
+    const verdict = level(item, target);
+    map.set(item.kind as ProbeLayer, {
+      level: verdict.level,
+      condition: verdict.condition,
+      itemId: item.id,
+    });
   }
   return map;
 }
@@ -545,6 +578,21 @@ function decide(
   const promise = promised.get(layer);
   const promisedLevel = promise?.level ?? 'impossible';
   const expected = expectedObservation(layer, promisedLevel);
+
+  // Одобрение внутри CLI — поступок человека: без него хук лежит и не
+  // исполняется, а обход доверия мерил бы среду, которой у человека не будет.
+  if (promise?.condition === 'approve_in_cli') {
+    return {
+      layer,
+      itemId: promise.itemId,
+      promised: promisedLevel,
+      expected: 'unknown',
+      observed: 'unknown',
+      verdict: 'not_checked',
+      skip: 'needs_cli_approval',
+      detail: '',
+    };
+  }
 
   // Уровни «эмуляция» и «провод» измеряет не проба: до надзирателя рантайма
   // (П3) и провода (П4) строка честно не проверена, а не зелена.

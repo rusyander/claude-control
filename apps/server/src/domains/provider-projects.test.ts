@@ -55,13 +55,14 @@ describe('provider-projects: резолв цели по провайдеру', (
     expect(resolveProviderProjectTarget(fakeStore('claude'), root)).toBeUndefined();
   });
 
-  it('codex/opencode — инструкции + MCP, gemini ещё env и права, cursor — каталог правил + MCP', () => {
+  it('codex — инструкции, MCP, хуки и скиллы, opencode ещё права и плагины, gemini ещё env и права, cursor — каталог правил + MCP', () => {
     const sections = (provider: string): string[] => {
       const target = resolveProviderProjectTarget(fakeStore(provider), root);
       expect(target, provider).toBeDefined();
       return providerProjectSections(target!);
     };
-    expect(sections('codex')).toEqual(['instructions', 'mcp']);
+    // MAP 26: у Codex проектные хуки `.codex/hooks.json` и скиллы `.agents/skills`.
+    expect(sections('codex')).toEqual(['instructions', 'mcp', 'hooks', 'skills']);
     // GEMINI-2/3: у Gemini задокументированы ещё .gemini/.env и .gemini/settings.json.
     expect(sections('gemini')).toEqual(['instructions', 'mcp', 'env', 'permissions']);
     // OPENCODE-1/3/4: у OpenCode проектные права и ХУКИ — ключи того же

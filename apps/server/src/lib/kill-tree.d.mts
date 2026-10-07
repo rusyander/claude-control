@@ -103,3 +103,17 @@ export declare function killChildProcessTree(
   options?: TreeKillOptions,
   impl?: TreeKillImpl,
 ): number[];
+
+export declare const WATCH_SLACK_MS: number;
+/** План добивания пережившего команду: `known` — `pid → created` замеченных потомков (Ф9). */
+export declare function planLeftoverKill(
+  table: readonly ProcessRow[],
+  known: ReadonlyMap<number, bigint>,
+  options?: { slackMs?: number; selfPid?: number },
+): number[];
+export declare function readProcessTableAsync(platform?: string): Promise<ProcessRow[] | undefined>;
+export declare function killLeftovers(
+  known: ReadonlyMap<number, bigint>,
+  options?: { slackMs?: number; selfPid?: number },
+  impl?: TreeKillImpl,
+): number[];

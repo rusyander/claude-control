@@ -1,4 +1,5 @@
 import type { PanelAgentRunRefusalCode } from '@agentdeck/contracts/panel-agent';
+import type { ServerMessageCode } from '@agentdeck/contracts/server-messages';
 import { PLATFORM_ASSISTANT_CONSUMER } from '@agentdeck/contracts/platform-consumers';
 import type { AppStore } from '../../lib/app-store.ts';
 import { claudeProvider } from '../../providers/claude.ts';
@@ -10,6 +11,7 @@ import { PLACEHOLDER_KEY } from '../platform/apply/profile.ts';
 import { targetProfile } from '../platform/apply/targets.ts';
 import { contourRunPrompt } from '../platform/routing.ts';
 import { readPlatforms, readToken } from '../platform/store.ts';
+import { panelAgentDialectOf, type PanelAgentDialect } from './foreign-cli.ts';
 
 /**
  * Чем пойдёт ход агента панели — решение ДО запуска, без сети и без записи.
@@ -39,6 +41,8 @@ export type PanelAgentLaunch =
   | {
       ok: true;
       providerId: string;
+      /** Чей CLI запускается — от этого argv и разбор вывода (`foreign-cli.ts`). */
+      dialect: PanelAgentDialect;
       command: string;
       /** Добавка к окружению процесса. Ключа контура среди неё нет никогда. */
       env: Record<string, string>;
@@ -49,29 +53,72 @@ export type PanelAgentLaunch =
        */
       contourPrompt?: string;
     }
-  | { ok: false; code: PanelAgentRunRefusalCode; message: string };
+  | {
+      ok: false;
+      code: PanelAgentRunRefusalCode;
+      message: string;
+      /** Текст с кодом — клиент покажет его на своём языке с именем провайдера. */
+      messageCode?: ServerMessageCode;
+      params?: Record<string, string>;
+    };
 
 function refuse(code: PanelAgentRunRefusalCode, message: string): PanelAgentLaunch {
   return { ok: false, code, message };
 }
 
+function refuseCoded(
+  code: PanelAgentRunRefusalCode,
+  message: string,
+  messageCode: ServerMessageCode,
+  params: Record<string, string>,
+): PanelAgentLaunch {
+  return { ok: false, code, message, messageCode, params };
+}
+
+/**
+ * Почему до контура профиля ассистента сейчас не дойти: шлюз не поднят или ключ
+ * не сохранён; undefined — дойти есть чем.
+ *
+ * Одна проверка на всех, кто идёт профилем «Ассистент панели» (агент панели,
+ * помощники формы и структуры, фоновый наблюдатель): вторая копия разошлась бы
+ * с первой на первом же новом условии, и один из них ушёл бы в облако вендора,
+ * пока остальные честно отказывают.
+ */
+export function contourUnreachable(
+  deps: Pick<PanelAgentLaunchDeps, 'store' | 'appDataDir' | 'gatewayPort'>,
+  platformId: string,
+): { cause: 'gateway_down' | 'no_token'; title: string } | undefined {
+  const title =
+    readPlatforms(deps.store).find((item) => item.id === platformId)?.title ?? platformId;
+  if (deps.gatewayPort() <= 0) return { cause: 'gateway_down', title };
+  // Ключ читается только чтобы ответить «он есть»: в процесс уходит заглушка.
+  if (!readToken(deps.appDataDir, platformId)) return { cause: 'no_token', title };
+  return undefined;
+}
+
 export function resolvePanelAgentLaunch(deps: PanelAgentLaunchDeps): PanelAgentLaunch {
   const provider = getActiveProvider(deps.store);
-  if (provider.id !== claudeProvider.id) {
-    // Чужой CLI с MCP получил бы тот же
-    // переходник своим писателем конфига, API-режим — цикл инструментов на
-    // сервере. Пока ни того, ни другого нет — честный отказ, а не агент без рук.
-    return refuse(
+  // Агент идёт CLI выбранного провайдера (Claude, Qwen Code, Codex, Gemini CLI,
+  // OpenCode, Goose, Kimi Code) — у них
+  // есть запуск, где у агента только переходник панели (`foreign-cli.ts`). У
+  // прочих такого запуска нет — честный отказ с именем CLI, а не Claude молчком.
+  const dialect = panelAgentDialectOf(provider.id);
+  if (dialect === undefined) {
+    return refuseCoded(
       'provider_unsupported',
-      `Агент панели пока работает только с Claude Code, а активный CLI — ${provider.name}. Переключите активный CLI в настройках.`,
+      `Агент панели не работает с ${provider.name}: у этого CLI нет запуска, в котором агент действует только инструментами панели. Агент работает с Claude Code, Qwen Code, Codex, Gemini CLI, OpenCode, Goose и Kimi Code.`,
+      'panel-agent-provider-unsupported',
+      { provider: provider.name },
     );
   }
 
   const command = findCliOnPath(providerCliCandidates(provider), deps.detect ?? detectCliOnPath);
   if (command === undefined) {
-    return refuse(
+    return refuseCoded(
       'cli_not_found',
-      'Claude Code не найден в PATH процесса панели — агенту нечем работать. Без CLI у агента нет инструментов панели, ключ API здесь не поможет.',
+      `${provider.name} не найден в PATH процесса панели — агенту нечем работать. Без CLI у агента нет инструментов панели, ключ API здесь не поможет.`,
+      'panel-agent-cli-not-found',
+      { provider: provider.name },
     );
   }
 
@@ -80,7 +127,7 @@ export function resolvePanelAgentLaunch(deps: PanelAgentLaunchDeps): PanelAgentL
     ? settings.endpointProfiles.find((item) => item.id === settings.assistantEndpointId)
     : undefined;
   // Выбранного профиля больше нет — как у ассистента: облако вендора по умолчанию.
-  if (!profile) return { ok: true, providerId: provider.id, command, env: {} };
+  if (!profile) return { ok: true, providerId: provider.id, dialect, command, env: {} };
 
   if (!profile.ownerPlatformId) {
     return refuse(
@@ -89,23 +136,32 @@ export function resolvePanelAgentLaunch(deps: PanelAgentLaunchDeps): PanelAgentL
     );
   }
 
+  // Контур у агента собирается окружением `claude` (ниже); для чужого CLI такой
+  // сборки нет — отказ, а не ход в облако вендора мимо выбранного контура.
+  if (dialect !== 'claude') {
+    return refuseCoded(
+      'provider_unsupported',
+      `Через контур агент панели ходит только с Claude Code, а активный CLI — ${provider.name}. Ход не запущен, чтобы не уйти в облако вендора.`,
+      'panel-agent-contour-foreign',
+      { provider: provider.name },
+    );
+  }
   const platformId = profile.ownerPlatformId;
   const platform = readPlatforms(deps.store).find((item) => item.id === platformId);
-  const title = platform?.title ?? platformId;
+  const unreachable = contourUnreachable(deps, platformId);
+  if (unreachable?.cause === 'gateway_down') {
+    return refuse(
+      'contour_unreachable',
+      `Агент панели идёт через контур «${unreachable.title}», а шлюз панели не поднят — ход не запущен, чтобы не уйти в облако вендора. Нажмите «Поднять шлюз» на карточке контура.`,
+    );
+  }
+  if (unreachable) {
+    return refuse(
+      'contour_unreachable',
+      `Агент панели идёт через контур «${unreachable.title}», а ключ контура не сохранён — шлюзу нечего подставить. Сохраните ключ на карточке контура.`,
+    );
+  }
   const port = deps.gatewayPort();
-  if (port <= 0) {
-    return refuse(
-      'contour_unreachable',
-      `Агент панели идёт через контур «${title}», а шлюз панели не поднят — ход не запущен, чтобы не уйти в облако вендора. Нажмите «Поднять шлюз» на карточке контура.`,
-    );
-  }
-  // Ключ читается только чтобы ответить «он есть»: в процесс уходит заглушка.
-  if (!readToken(deps.appDataDir, platformId)) {
-    return refuse(
-      'contour_unreachable',
-      `Агент панели идёт через контур «${title}», а ключ контура не сохранён — шлюзу нечего подставить. Сохраните ключ на карточке контура.`,
-    );
-  }
 
   const vars = claudeProvider.endpointConfig?.anthropic;
   if (!vars) {
@@ -135,6 +191,7 @@ export function resolvePanelAgentLaunch(deps: PanelAgentLaunchDeps): PanelAgentL
   return {
     ok: true,
     providerId: provider.id,
+    dialect,
     command,
     env,
     contourId: platformId,

@@ -352,6 +352,8 @@ export const ROWS: Readonly<Record<string, Row>> = {
   analytics_summary: [['done']],
   analytics_live: [['done']],
   compare_providers: [['done', { left: 'claude', right: 'codex' }]],
+  local_models_status: [['done']],
+  kit_status: [['done']],
   read_env_passport: [['done']],
   read_split_defaults: [['done']],
   save_split_defaults: [['card', { parallelLight: 2 }]],

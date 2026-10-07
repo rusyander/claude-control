@@ -3,6 +3,7 @@ import { ProviderSelectorCard } from './ProviderSelectorCard';
 import { ProviderCheckCard } from './ProviderCheckCard';
 import { ProviderKeysCard } from './ProviderKeysCard';
 import { FormatCheckCard } from './FormatCheckCard';
+import { KitModesSection } from './KitModesSection';
 
 /**
  * Раздел «Провайдеры»: каким CLI управляет панель, стоит ли он в системе, чем
@@ -16,6 +17,7 @@ export function ProvidersTab() {
       <ProviderSelectorCard />
       <ProviderCheckCard />
       <ProviderKeysCard />
+      <KitModesSection />
       <FormatCheckCard />
     </Stack>
   );

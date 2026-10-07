@@ -1,4 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { defaultOurRules, defaultPlatformRules } from '@agentdeck/contracts/platform';
 import type { Platform } from '@agentdeck/contracts';
 import { PLATFORM_ASSISTANT_TARGET } from '@agentdeck/contracts/platform';
@@ -140,17 +143,16 @@ describe('цели с переменными окружения', () => {
 });
 
 describe('цели с куском конфигурации', () => {
-  it('codex: цель НЕ предлагается — его ручку шлюз не обслуживает', () => {
-    // Живая проба 22.09.2026 на `codex-cli 0.155.1`: конфиг, написанный панелью
-    // с `wire_api = "chat"`, этот CLI не загружает ЦЕЛИКОМ — падает любой его
-    // запуск, а не только запрос через контур. Пока у шлюза нет `/v1/responses`,
-    // предложить такую цель значит сломать человеку CLI ради неработающего
-    // контура, поэтому здесь прочерк с причиной, а не план записи.
+  it('codex: цель предлагается — шлюз обслуживает его ручку /v1/responses (MAP D)', () => {
+    // До MAP D здесь стоял прочерк `gateway_dialect`: конфиг с `wire_api = "chat"`
+    // codex не загружает целиком (живая проба 22.09.2026), а `/responses` шлюз
+    // не обслуживал. Маршрут появился — цель поднялась из прочерков сама, по
+    // списку маршрутов шлюза, без второго перечня.
     const codex = byId('codex');
-    expect(codex.reason).toBe('gateway_dialect');
-    expect(codex.write).toBeUndefined();
-    expect(codex.plan).toEqual([]);
-    expect(codex.filePath).toBe('');
+    expect(codex.reason).toBeUndefined();
+    expect(codex.write?.kind).toBe('endpoint-file');
+    expect(codex.filePath.endsWith('config.toml')).toBe(true);
+    expect(codex.plan.map((item) => item.key)).toContain('model_provider');
   });
 
   it('план codex, когда ручка появится, несёт ручку САМОГО CLI, а не удобную шлюзу', () => {
@@ -187,10 +189,54 @@ describe('цели с куском конфигурации', () => {
 });
 
 describe('прочерки', () => {
-  it('gemini — не «писать некуда», а диалект, которого шлюз не знает', () => {
-    // Переменная адреса у gemini есть и задокументирована; беда не в ней, и
-    // записать туда адрес значило бы получить 404 на первом же запросе.
-    expect(byId('gemini').reason).toBe('gateway_dialect');
+  describe('gemini: адрес пишется, только если CLI его прочтёт', () => {
+    let home = '';
+    /** Временный дом с настройками Gemini; системные — тоже во временном. */
+    const geminiHome = (settings?: unknown): void => {
+      home = mkdtempSync(join(tmpdir(), 'cc-targets-gemini-'));
+      vi.stubEnv('USERPROFILE', home);
+      vi.stubEnv('HOME', home);
+      vi.stubEnv('GEMINI_CLI_SYSTEM_SETTINGS_PATH', join(home, 'system', 'settings.json'));
+      vi.stubEnv('GEMINI_CLI_SYSTEM_DEFAULTS_PATH', join(home, 'system', 'defaults.json'));
+      if (settings === undefined) return;
+      mkdirSync(join(home, '.gemini'), { recursive: true });
+      writeFileSync(join(home, '.gemini', 'settings.json'), JSON.stringify(settings));
+    };
+    afterEach(() => {
+      vi.unstubAllEnvs();
+      rmSync(home, { recursive: true, force: true });
+    });
+
+    it('вход ключом API — цель в .env: корень шлюза без /v1, CLI сам допишет /v1beta', () => {
+      geminiHome({ security: { auth: { selectedType: 'gemini-api-key' } } });
+      const target = byId('gemini');
+      expect(target.reason).toBeUndefined();
+      expect(planValue(target, 'GOOGLE_GEMINI_BASE_URL')).toBe(
+        'http://127.0.0.1:5179/company-dev/_s/terminal',
+      );
+      expect(planValue(target, 'GEMINI_API_KEY')).toBe(PLACEHOLDER_KEY);
+    });
+
+    it.each([
+      ['способ входа не задан — с переменной адреса gemini не стартует', {}],
+      [
+        'вход Google-аккаунтом идёт своим сервером',
+        { security: { auth: { selectedType: 'oauth-personal' } } },
+      ],
+    ])('%s → прочерк cli_config_bypass', (_name, settings) => {
+      geminiHome(settings);
+      expect(byId('gemini').reason).toBe('cli_config_bypass');
+    });
+
+    it('системные настройки сильнее пользовательских', () => {
+      geminiHome({ security: { auth: { selectedType: 'gemini-api-key' } } });
+      mkdirSync(join(home, 'system'), { recursive: true });
+      writeFileSync(
+        join(home, 'system', 'settings.json'),
+        JSON.stringify({ security: { auth: { selectedType: 'vertex-ai' } } }),
+      );
+      expect(byId('gemini').reason).toBe('cli_config_bypass');
+    });
   });
 
   it.each(['goose', 'kimi', 'cursor', 'opencode'])('%s — писать некуда, и это сказано', (id) => {

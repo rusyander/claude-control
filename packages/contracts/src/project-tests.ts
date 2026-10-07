@@ -584,9 +584,20 @@ export interface ProjectTestRun {
   /** Хвост вывода агента — полный лог прогона в модалке. */
   log: string;
   error?: string;
+  /** Код текста `error` для перевода; `error` — запасной русский текст. */
+  messageCode?: string;
+  params?: Record<string, string | number>;
   tokens: number;
   costUsd: number;
-  /** Сессия CLI: по ней прогон открывается в чате как обычный разговор. */
+  /**
+   * CLI, которым шёл агент (`claude`, `qwen`, `codex`); пусто — Claude Code
+   * (записи до чужих CLI).
+   */
+  provider?: string;
+  /**
+   * Сессия CLI: по ней прогон открывается в чате как обычный разговор. У чужого
+   * CLI её нет — прогон идёт без записи разговора.
+   */
   sessionId?: string;
   /** Результаты по тест-поинтам — заполняются по ходу. */
   results?: ProjectTestPointResult[];
@@ -618,6 +629,10 @@ export interface ProjectTestRunRecord {
   error?: string;
   /** Код текста `error` для перевода; `error` — запасной русский текст. */
   messageCode?: string;
+  /** Подстановки текста по `messageCode` (имя CLI, инструмент). */
+  params?: Record<string, string | number>;
+  /** CLI агента (`claude`, `qwen`, `codex`); пусто — Claude Code или не агент. */
+  provider?: string;
   /** Код выхода команды прогона (автотесты, `tests-cli run`); у агента и человека — нет. */
   exitCode?: number;
   tokens?: number;

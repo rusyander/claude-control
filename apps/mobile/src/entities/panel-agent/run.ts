@@ -1,9 +1,20 @@
 import { fetch as streamingFetch } from 'expo/fetch';
 import type { PanelAgentRunEvent, PanelAgentRunRequest } from '@agentdeck/contracts/panel-agent';
+import type { ServerMessageNestedParams } from '@agentdeck/contracts/server-messages';
 import { apiUrl, authHeaders } from '../../shared/api/client';
+import { serverMessage } from '../../shared/api/server-message';
 
 export type PanelAgentRunOutcome =
-  { ok: true } | { ok: false; code?: string; status?: number; message: string; aborted?: boolean };
+  | { ok: true }
+  | {
+      ok: false;
+      code?: string;
+      status?: number;
+      message: string;
+      aborted?: boolean;
+      /** Сервер прислал код текста (`messageCode`): `message` уже на языке телефона. */
+      localized?: boolean;
+    };
 
 /**
  * Сколько поток хода может молчать — как у окна на компьютере. Сервер шлёт
@@ -108,14 +119,27 @@ async function readRun(
   if (!response.ok) {
     let code: string | undefined;
     let message = '';
+    let localized = '';
     try {
-      const refusal = (await response.json()) as { error?: string; message?: string };
+      const refusal = (await response.json()) as {
+        error?: string;
+        message?: string;
+        messageCode?: unknown;
+        params?: ServerMessageNestedParams;
+      };
       code = refusal.error;
-      message = refusal.message ?? '';
+      localized = serverMessage(refusal.messageCode, refusal.params) ?? '';
+      message = localized || refusal.message || '';
     } catch {
       // Тело не JSON — остаётся статус.
     }
-    return { ok: false, code, status: response.status, message };
+    return {
+      ok: false,
+      code,
+      status: response.status,
+      message,
+      ...(localized ? { localized: true } : {}),
+    };
   }
   if (!response.body) return { ok: false, message: '' };
 

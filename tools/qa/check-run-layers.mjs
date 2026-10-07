@@ -54,7 +54,17 @@
  */
 import { createServer } from 'node:http';
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -77,6 +87,20 @@ const MARK = {
   // личные правила в запросе через вторую дверь (П2.7).
   homeAgents: 'T8HOMEAGENTSMARKER',
   mono: 'T8MONOMARKER',
+  // Набор панели (В2): заголовок его правил — первая строка `rules/standard.md`,
+  // взятая из самого файла, чтобы правка правил не сделала метку чужой. Доезжает
+  // выводом его хука SessionStart, то есть доказывает и подключение плагина, и
+  // исполнение его хука.
+  kitRule: readFileSync(
+    fileURLToPath(
+      new URL('../../apps/server/assets/kit/agentdeck-kit/rules/standard.md', import.meta.url),
+    ),
+    'utf8',
+  )
+    .split(/\r?\n/)[0]
+    .replace(/^#\s*/, '')
+    .trim(),
+  kitSkill: 'read-before-edit',
 };
 
 /** Сервер MCP с одной меткой: он же лежит рядом с пробой, откуда эта проверка выросла. */
@@ -108,6 +132,25 @@ function removeDir(dir) {
     console.warn(`временная папка не удалена (${error.code ?? error.message}): ${dir}`);
   }
 }
+/**
+ * Папки прошлых прогонов, которые Windows тогда не отпустил: к следующему
+ * запуску их уже никто не держит. Только свои (`cc-layers-`) и старше часа —
+ * параллельный прогон этой же проверки свои свежие папки сохранит.
+ */
+function sweepStale() {
+  const hourAgo = Date.now() - 60 * 60 * 1000;
+  for (const name of readdirSync(tmpdir())) {
+    if (!name.startsWith('cc-layers-')) continue;
+    const dir = join(tmpdir(), name);
+    try {
+      if (statSync(dir).mtimeMs < hourAgo) rmSync(dir, { recursive: true, force: true });
+    } catch {
+      // Всё ещё занята — уберёт следующий запуск.
+    }
+  }
+}
+sweepStale();
+
 const skip = (text, why) => {
   console.log(`ПРОПУСК ${text} — ${why}`);
   skipped.push(text);
@@ -312,6 +355,8 @@ function factsOf(body) {
     home: text.includes(MARK.home),
     homeAgents: text.includes(MARK.homeAgents),
     mono: text.includes(MARK.mono),
+    kitRule: text.includes(MARK.kitRule),
+    kitSkill: text.includes(MARK.kitSkill),
     text,
     tools,
   };
@@ -332,6 +377,17 @@ async function main() {
   const { AppStore } = await import('../../apps/server/src/lib/app-store.ts');
   const { defaultOurRules, defaultPlatformRules } =
     await import('../../packages/contracts/src/platform.ts');
+  const { KitService } = await import('../../apps/server/src/domains/kit/service.ts');
+
+  // Набор панели (В2): данные панели — свой временный каталог, каталог Claude —
+  // одноразовый каталог конфигурации прогона (он же решает конфликты гибрида).
+  const kitData = realpathSync.native(mkdtempSync(join(tmpdir(), 'cc-layers-kit-')));
+  let kitClaudeDir = '';
+  const kit = new KitService({
+    appDataDir: kitData,
+    claudeDir: () => kitClaudeDir,
+    providers: () => [{ id: 'claude', name: 'Claude Code' }],
+  });
 
   const stub = await startStub();
   console.log(`CLI: ${exe}\nСтаб: ${stub.url}\n`);
@@ -347,6 +403,19 @@ async function main() {
       rules: { platform: defaultPlatformRules(), ours: { ...defaultOurRules(), ...ours } },
     };
     const layers = runLayers(platform);
+
+    // Набор — тем же `KitService.runExtras`, что зовёт `runRoute` сборки панели,
+    // и с тем же `hasSources`: флаги и окружение не переписаны здесь второй раз.
+    let kitExtras;
+    if (tree?.kit) {
+      kitClaudeDir = home;
+      kit.setMode('claude', tree.kit);
+      kitExtras = kit.runExtras({
+        provider: 'claude',
+        local: false,
+        hasSources: layers.args.includes('--setting-sources'),
+      });
+    }
 
     const runs = new ChatRunRegistry();
     runs.setPlatformRouting(() => ({
@@ -370,6 +439,7 @@ async function main() {
         ...tree?.env,
       },
       layers,
+      ...(kitExtras ? { kit: kitExtras } : {}),
     }));
 
     const from = stub.seen.length;
@@ -400,9 +470,9 @@ async function main() {
     // которого слои снимаются флагами, а не подменой каталога: подменив его,
     // панель потеряла бы переписку, продолжение и аналитику.
     const transcripts = existsSync(join(home, 'projects'));
-    if (!tree) removeDir(work);
+    if (!tree?.work) removeDir(work);
     removeDir(home);
-    return { facts, transcripts, args: layers.args };
+    return { facts, transcripts, args: layers.args, kitArgs: kitExtras?.args ?? [] };
   };
 
   /** Прямой запуск CLI — только ради поведения самого CLI (случай 6). */
@@ -807,8 +877,63 @@ ${MARK.ancestor}
         check(agentsOff.facts.project, 'под домом (AGENTS.md): AGENTS.md проекта остаётся');
       }
     }
+
+    // ── 10. Набор панели (В2): три режима страницы «Набор панели» ─────────────
+    // Флаги даёт настоящий `KitService.runExtras` над временными данными панели,
+    // плагин собран им же; что набор доехал — только по телу запроса. «Глобальные»
+    // — контроль: без него «метка набора есть» могло бы значить, что CLI нашёл
+    // её где-то ещё.
+    check(
+      Boolean(MARK.kitRule),
+      `метка правил набора прочитана из rules/standard.md: «${MARK.kitRule}»`,
+    );
+    const kitGlobal = await runCase('kit-global', {}, { kit: 'global' });
+    check(Boolean(kitGlobal.facts), 'набор «глобальные»: запрос записан');
+    if (kitGlobal.facts) {
+      check(
+        kitGlobal.kitArgs.length === 0,
+        `набор «глобальные»: флагов нет: ${JSON.stringify(kitGlobal.kitArgs)}`,
+      );
+      check(!kitGlobal.facts.kitRule, 'набор «глобальные»: правил набора в запросе нет');
+      check(kitGlobal.facts.rules, 'набор «глобальные»: личный CLAUDE.md на месте');
+    }
+    const kitHybrid = await runCase('kit-hybrid', {}, { kit: 'hybrid' });
+    check(Boolean(kitHybrid.facts), 'набор «оба»: запрос записан');
+    if (kitHybrid.facts) {
+      check(
+        kitHybrid.kitArgs[0] === '--plugin-dir',
+        `набор «оба»: флаг плагина: ${JSON.stringify(kitHybrid.kitArgs)}`,
+      );
+      check(
+        kitHybrid.facts.kitRule,
+        'набор «оба»: правила набора доехали (хук SessionStart плагина)',
+      );
+      check(kitHybrid.facts.kitSkill, 'набор «оба»: навык набора в перечне');
+      check(kitHybrid.facts.rules, 'набор «оба»: личный CLAUDE.md тоже на месте');
+      check(
+        kitHybrid.facts.skill && kitHybrid.facts.hook,
+        'набор «оба»: личные навык и хук на месте',
+      );
+    }
+    const kitOurs = await runCase('kit-ours', {}, { kit: 'ours' });
+    check(Boolean(kitOurs.facts), 'набор «только наш»: запрос записан');
+    if (kitOurs.facts) {
+      check(
+        kitOurs.kitArgs.includes('--setting-sources'),
+        `набор «только наш»: источник user снят: ${JSON.stringify(kitOurs.kitArgs)}`,
+      );
+      check(kitOurs.facts.kitRule, 'набор «только наш»: правила набора доехали');
+      check(kitOurs.facts.kitSkill, 'набор «только наш»: навык набора в перечне');
+      check(!kitOurs.facts.rules, 'набор «только наш»: личного CLAUDE.md в запросе нет');
+      check(
+        !kitOurs.facts.skill && !kitOurs.facts.hook,
+        'набор «только наш»: ни личного навыка, ни личного хука',
+      );
+      check(kitOurs.facts.project, 'набор «только наш»: проектный CLAUDE.md остаётся');
+    }
   } finally {
     stub.close();
+    removeDir(kitData);
   }
 
   console.log(

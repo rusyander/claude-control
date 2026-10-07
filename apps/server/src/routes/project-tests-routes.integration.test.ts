@@ -1,12 +1,38 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+  realpathSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { ProjectTestsView } from '@agentdeck/contracts';
 import type { ServerContext } from '../context.ts';
 import { ProjectTestManualRegistry, ProjectTestRunRegistry } from '../domains/project-tests.ts';
 import { registerProjectTestsRoutes } from './project-tests-routes.ts';
+import { QwenTestsRun } from '../domains/project-tests/agent/qwen-run.ts';
+import { createGroup, upsertCase } from '../domains/project-tests/store.ts';
+
+/**
+ * Поиск CLI в PATH — подменён только для Qwen и Codex: ответ «есть ли CLI на
+ * этой машине» не должен решать исход теста. Прочие имена ищутся по-настоящему.
+ */
+const detected = vi.hoisted(() => ({ found: new Set<string>() }));
+vi.mock('../providers/detect.ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../providers/detect.ts')>();
+  return {
+    ...actual,
+    detectCliOnPath: (command: string) =>
+      /^(qwen|codex)(\.cmd|\.exe)?$/i.test(command)
+        ? detected.found.has(command)
+        : actual.detectCliOnPath(command),
+  };
+});
 
 /**
  * Маршруты тест-кейсов. Прогон агента здесь не запускается: он спавнит
@@ -19,6 +45,8 @@ describe('project-tests-routes', () => {
   let project = '';
   let backupDir = '';
   let runs: ProjectTestRunRegistry;
+  /** Активный провайдер панели; не задан — Claude по умолчанию. */
+  let activeProvider: string | undefined;
 
   const view = async (path = project): Promise<ProjectTestsView> => {
     const response = await app.inject({
@@ -28,8 +56,16 @@ describe('project-tests-routes', () => {
     return response.json() as ProjectTestsView;
   };
 
+  let ceilingBefore: string | undefined;
+
   beforeEach(async () => {
+    // Проект теста — «вне репозитория»: git не поднимается выше temp. Без этого
+    // temp внутри чужого репозитория делал дифф сравнимым, и маршрут запускал
+    // настоящую генерацию — живой claude на машине прогона.
+    ceilingBefore = process.env.GIT_CEILING_DIRECTORIES;
+    process.env.GIT_CEILING_DIRECTORIES = realpathSync.native(tmpdir());
     project = mkdtempSync(join(tmpdir(), 'cc-tests-routes-'));
+    activeProvider = undefined;
     backupDir = mkdtempSync(join(tmpdir(), 'cc-tests-backups-'));
     app = Fastify();
     runs = new ProjectTestRunRegistry();
@@ -43,7 +79,10 @@ describe('project-tests-routes', () => {
           isTestsAutoAccept: () => false,
           // Настройки спрашивают источники генерации: без них не ответить, что
           // Jira не подключена, — а это отказ прогона, а не поломка панели.
-          getSettings: () => ({ integrations: { atlassian: { enabled: false } } }),
+          getSettings: () => ({
+            integrations: { atlassian: { enabled: false } },
+            provider: activeProvider,
+          }),
         },
         // Каталог данных панели нужен источникам генерации: в нём лежит токен
         // трекера, и без него «покрыть требование» не собралось бы.
@@ -56,6 +95,8 @@ describe('project-tests-routes', () => {
   });
 
   afterEach(async () => {
+    if (ceilingBefore === undefined) delete process.env.GIT_CEILING_DIRECTORIES;
+    else process.env.GIT_CEILING_DIRECTORIES = ceilingBefore;
     await app.close();
     rmSync(project, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
     rmSync(backupDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
@@ -128,6 +169,90 @@ describe('project-tests-routes', () => {
 
     expect(body.groups).toHaveLength(1);
     expect(body.groups[0]?.error).toBeTruthy();
+  });
+
+  // Выбор провайдера один на всю панель: прогон агента тестов через Claude при
+  // выбранном другом CLI — это «молча через Claude», запрещённое владельцем
+  // (07.10). Qwen Code и Codex идут сами, с проверкой прав; прочие — отказ.
+  describe('агент на чужом CLI', () => {
+    const withCase = async (): Promise<void> => {
+      createGroup(project, 'gui');
+      upsertCase(project, 'gui', { title: 'Вход', steps: ['x'] }, '2026-10-06T00:00:00.000Z');
+    };
+    const start = () =>
+      app.inject({
+        method: 'POST',
+        url: '/api/project-tests/run',
+        payload: { path: project, mode: 'run', groupId: 'gui' },
+      });
+
+    afterEach(() => {
+      runs.stop(project);
+      detected.found.clear();
+      vi.restoreAllMocks();
+    });
+
+    it('Qwen Code в PATH — прогон начат его запуском, вид знает CLI', async () => {
+      activeProvider = 'qwen';
+      detected.found.add(process.platform === 'win32' ? 'qwen.cmd' : 'qwen');
+      const qwen = vi
+        .spyOn(QwenTestsRun.prototype, 'start')
+        .mockImplementation(() => new Promise(() => {}));
+      await withCase();
+
+      const response = await start();
+
+      expect(response.statusCode).toBe(200);
+      await vi.waitFor(() => expect(qwen).toHaveBeenCalledTimes(1));
+      expect((await view()).run).toMatchObject({ status: 'running', provider: 'qwen' });
+    });
+
+    it('CLI нет в PATH — 409 cli-not-found, прогон не начат', async () => {
+      activeProvider = 'codex';
+      await withCase();
+
+      const response = await start();
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toMatchObject({
+        error: 'cli_not_found',
+        messageCode: 'tests-agent-cli-not-found',
+        params: { provider: 'Codex (OpenAI)' },
+      });
+      expect((await view()).run).toBeUndefined();
+    });
+
+    it('агент тестов идёт через контур — 409 contour-foreign, прогон не начат', async () => {
+      activeProvider = 'codex';
+      detected.found.add(process.platform === 'win32' ? 'codex.cmd' : 'codex');
+      runs.setPlatformRouting(() => ({ env: { ANTHROPIC_BASE_URL: 'http://127.0.0.1:1' } }));
+      await withCase();
+
+      const response = await start();
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toMatchObject({
+        error: 'contour_foreign',
+        messageCode: 'tests-agent-contour-foreign',
+        params: { provider: 'Codex (OpenAI)' },
+      });
+      expect((await view()).run).toBeUndefined();
+    });
+
+    it('CLI без проверяемого запуска (Gemini) — 409 unsupported с именем CLI', async () => {
+      activeProvider = 'gemini';
+      await withCase();
+
+      const response = await start();
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toMatchObject({
+        error: 'provider_unsupported',
+        messageCode: 'tests-agent-provider-unsupported',
+        params: { provider: 'Gemini CLI' },
+      });
+      expect((await view()).run).toBeUndefined();
+    });
   });
 
   it('прогон по проекту без кейсов не запускается', async () => {

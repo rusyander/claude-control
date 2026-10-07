@@ -81,7 +81,9 @@ export class LiveSession {
   private readonly transport: LiveTransport;
   private readonly now: () => number;
   private readonly launch: LiveLaunch;
-  private sink: { onRaw: RawSink; resolve: (outcome: TurnOutcome) => void } | undefined;
+  /** `prompt` — ход по сообщению панели (`turn`), а не забранный ход самого CLI (`claimWake`). */
+  private sink:
+    { onRaw: RawSink; resolve: (outcome: TurnOutcome) => void; prompt: boolean } | undefined;
   private waking: RawEvent[] | undefined;
   private closed = false;
   private exitCode: number | undefined;
@@ -222,7 +224,7 @@ export class LiveSession {
   turn(prompt: string, runId: string | undefined, onRaw: RawSink): Promise<TurnOutcome> {
     if (this.closed) return Promise.resolve(this.outcome());
     this.writeRunId(runId);
-    const done = this.expect(onRaw);
+    const done = this.expect(onRaw, true);
     this.transport.write(
       JSON.stringify({ type: 'user', message: { role: 'user', content: prompt } }) + '\n',
     );
@@ -255,7 +257,7 @@ export class LiveSession {
     if (!buffered) return undefined;
     this.writeRunId(runId);
     this.waking = undefined;
-    const done = this.expect(onRaw);
+    const done = this.expect(onRaw, false);
     for (const raw of buffered) this.deliver(raw);
     return done;
   }
@@ -335,9 +337,9 @@ export class LiveSession {
     sink?.resolve({ closed: false, stderr: '' });
   }
 
-  private expect(onRaw: RawSink): Promise<TurnOutcome> {
+  private expect(onRaw: RawSink, prompt: boolean): Promise<TurnOutcome> {
     return new Promise<TurnOutcome>((resolve) => {
-      this.sink = { onRaw, resolve };
+      this.sink = { onRaw, resolve, prompt };
     });
   }
 
@@ -378,6 +380,15 @@ export class LiveSession {
   private deliver(raw: RawEvent): void {
     const sink = this.sink;
     if (!sink) return;
+    // Возобновлённая сессия, чей прежний процесс умер с фоновой командой (claude
+    // 2.1.286, замер 06.10): CLI сперва закрывает СВОЙ ход уведомления — `init` и
+    // пустой `result` с `origin.kind: 'task-notification'`, без вызова модели, — и
+    // лишь затем идёт ход с нашим сообщением. Приняв первый `result` за конец хода
+    // человека, панель закрывала прогон пустым ответом: конвейер заводил по нему
+    // доставку, а настоящий ход уходил пробуждением в тот же чат — две сессии в
+    // одной копии (живой прогон 06.10). Забранный ход самого CLI этим `result`
+    // как раз кончается — поэтому только для хода по сообщению.
+    if (raw.type === 'result' && sink.prompt && raw.origin?.kind === 'task-notification') return;
     sink.onRaw(raw);
     if (raw.type !== 'result') return;
     this.sink = undefined;

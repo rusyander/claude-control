@@ -9,13 +9,14 @@ import { SearchField } from '@shared/ui/search-field';
 import { VirtualList } from '@shared/ui/virtual-list';
 import { useElementHeight } from '@shared/hooks/use-element-height';
 import { useDebouncedValue } from '@shared/hooks/use-debounced-value';
-import { useChatBodySearch, MIN_CHAT_SEARCH_LENGTH } from '@entities/Chat';
+import { useChatBodySearch, useChats, usePinChat, MIN_CHAT_SEARCH_LENGTH } from '@entities/Chat';
 import { escalationsOf, useChatEscalations } from '@entities/ChatGroupSettings';
 import { chatListRows, matchBodyHits, rowKey } from '../lib/rows';
 import { searchView } from '../lib/searchView';
+import { useExpandedBranches } from '../model/expandedBranches';
 import { ChatRow } from './ChatRow';
-import { GROUP_HEIGHT, ROW_HEIGHT } from './ChatList.constants';
-import type { ChatListProps, ChatRowData, ChatSearchMode } from './ChatList.types';
+import { GROUP_HEIGHT, MORE_HEIGHT, ROW_HEIGHT } from './ChatList.constants';
+import type { ChatListProps, ChatRowData, ChatSearchMode, ListGroup, Row } from './ChatList.types';
 import styles from './ChatList.module.scss';
 
 /**
@@ -49,6 +50,14 @@ export function ChatList({
   const view = searchView({ mode, query, bodyQuery, minLength: MIN_CHAT_SEARCH_LENGTH });
   // Непрочитанное критичное от детей разделения — метка у главного чата дерева.
   const escalations = useChatEscalations();
+  // Все разговоры на диске, а не только этой вкладки: по ним сирота отличает
+  // «родитель удалён» от «родитель в другом проекте».
+  const everything = useChats();
+  const known = useMemo(
+    () => (everything.data ? new Set(everything.data.map((chat) => chat.id)) : undefined),
+    [everything.data],
+  );
+  const pinChat = usePinChat();
 
   const found = useMemo<ChatRowData[]>(() => {
     if (view.useBodyHits) return matchBodyHits(chats, bodySearch.data?.hits);
@@ -82,7 +91,15 @@ export function ChatList({
   // (`inWork`: между стадиями группы прогона нет, а работа идёт). Вопрос из
   // транскрипта (жёлтая точка без прогона) наверх не поднимает: такие висят и
   // неделями.
-  const rows = useMemo(() => chatListRows(found, statuses), [found, statuses]);
+  //
+  // Не идущие дети ветви свёрнуты в гармошку «Ещё N» (G1); раскрытое помнится
+  // на родителя. Пока идёт поиск, гармошек нет: найденное обязано быть видно.
+  const { expanded, toggle } = useExpandedBranches();
+  const searching = view.useBodyHits || (mode === 'title' && query.trim().length > 0);
+  const rows = useMemo(
+    () => chatListRows(found, statuses, { expanded, searching, known }),
+    [found, statuses, expanded, searching, known],
+  );
 
   const showSkeleton = isLoading || (mode === 'messages' && isBodyReady && bodySearch.isLoading);
   const searchNeedle = mode === 'messages' ? bodyQuery : '';
@@ -136,15 +153,30 @@ export function ChatList({
 
         <VirtualList
           items={rows}
-          rowHeight={(row) => (row.kind === 'chat' ? ROW_HEIGHT : GROUP_HEIGHT)}
+          rowHeight={rowHeight}
           height={height}
           getKey={rowKey}
           renderRow={(row) => {
             if (row.kind === 'header') {
               return (
                 <Typography variant="caption" color="subtle" className={styles.group} as="div">
-                  {t(row.group === 'running' ? 'chat.runningNow' : `chat.${row.group}`)}
+                  {t(groupLabel(row.group))}
                 </Typography>
+              );
+            }
+            if (row.kind === 'more') {
+              return (
+                <button
+                  type="button"
+                  className={styles.more}
+                  aria-expanded={row.expanded}
+                  title={t(row.expanded ? 'chat.branchFoldHint' : 'chat.branchUnfoldHint')}
+                  data-chat-more={row.parentId}
+                  onClick={() => toggle(row.parentId)}
+                >
+                  <Icon name={row.expanded ? 'chevronDown' : 'chevronRight'} size={14} />
+                  {t('chat.branchMore', { count: row.count })}
+                </button>
               );
             }
             if (row.kind === 'inactive') {
@@ -154,6 +186,25 @@ export function ChatList({
                 </Typography>
               );
             }
+            if (row.data.lostParent) {
+              return (
+                <div
+                  className={styles.lostParent}
+                  title={t('chat.lostParentHint')}
+                  data-chat-lost-parent={row.data.chat.id}
+                >
+                  <Stack gap="var(--spacing-3xs)">
+                    <Typography variant="body-sm" weight="medium" className={styles.title}>
+                      {t('chat.lostParent')}
+                    </Typography>
+                    <Typography variant="caption" color="subtle" className={styles.preview}>
+                      {t('chat.lostParentNote')}
+                    </Typography>
+                  </Stack>
+                </div>
+              );
+            }
+            const { chat } = row.data;
             return (
               <ChatRow
                 chat={row.data.chat}
@@ -169,6 +220,12 @@ export function ChatList({
                     .length
                 }
                 onSelect={() => onSelect(row.data.chat)}
+                {...(row.data.depth
+                  ? {}
+                  : {
+                      onTogglePin: () =>
+                        pinChat.mutate({ chatId: chat.id, pinned: !chat.pinnedAt }),
+                    })}
               />
             );
           }}
@@ -176,4 +233,18 @@ export function ChatList({
       </div>
     </Stack>
   );
+}
+
+/** Подпись заголовка: «Закреплённые», «Сейчас работают» или дата. */
+function groupLabel(group: ListGroup): string {
+  if (group === 'pinned') return 'chat.pinnedGroup';
+  if (group === 'running') return 'chat.runningNow';
+  return `chat.${group}`;
+}
+
+/** Высота строки виртуального списка по её виду — ровно та, что нарисована. */
+function rowHeight(row: Row): number {
+  if (row.kind === 'chat') return ROW_HEIGHT;
+  if (row.kind === 'more') return MORE_HEIGHT;
+  return GROUP_HEIGHT;
 }

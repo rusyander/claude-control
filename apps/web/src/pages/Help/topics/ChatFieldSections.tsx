@@ -121,6 +121,10 @@ export function ChatFieldSections() {
           {tr('editsResetText')}
         </Callout>
 
+        <Callout tone="info" title={tr('editsForeignTitle')}>
+          {tr('editsForeignText')}
+        </Callout>
+
         <Callout tone="info" title={tr('autoApproveTitle')}>
           {tr('autoApproveText')}
         </Callout>

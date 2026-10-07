@@ -28,4 +28,10 @@ export interface AssistantChatProps {
   onApply: (fields: Record<string, unknown>) => AssistantApplyReport | void;
   /** Подсказка в пустом чате: пример запроса для этого раздела. */
   placeholder?: string;
+  /**
+   * Списки, из которых модель выбирает значения, ещё не пришли. Отправка
+   * закрыта: задание, собранное по пустым спискам, говорит модели «вариантов
+   * нет», и она честно не выбирает ничего.
+   */
+  loading?: boolean;
 }

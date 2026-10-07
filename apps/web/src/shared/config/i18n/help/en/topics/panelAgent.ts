@@ -105,8 +105,15 @@ export const panelAgentEn: typeof panelAgentRu = {
       'The model only asks. The panel executes, and a changing action waits for your click',
     pathTextTitle: 'The same path in words',
     pathTextText:
-      'The message passes the data mask, then the panel starts Claude Code with no built-in ' +
-      'tools: all it has is the bridge to the panel’s actions. The model picks an action. A ' +
+      'The message passes the data mask, then the panel starts the active CLI — ' +
+      'Claude Code, Qwen Code, Codex, Gemini CLI, OpenCode, Goose or Kimi Code — with no ' +
+      'built-in tools and none of your personal CLI settings (hooks, skills, own MCP servers, ' +
+      'AGENTS.md; Codex without your config.toml, Gemini CLI, OpenCode, Goose and Kimi Code with ' +
+      'their own one-turn directory that receives only the model and the login): all ' +
+      'it has is the bridge to the panel’s actions, and the turn itself never lands in the ' +
+      'CLI’s session history — the panel keeps the conversation. With Gemini CLI, OpenCode, ' +
+      'Goose and Kimi Code the turn also checks every call: should the model ask for a tool ' +
+      'beyond the bridge, the turn stops. The model picks an action. A ' +
       'read runs at once; a change or a dangerous action is shown as a card with a preview and ' +
       'waits up to 10 minutes. After «Run» the panel checks the target has not changed, runs the ' +
       'action through the section’s route, opens the page with the result and writes a line to ' +
@@ -310,7 +317,9 @@ export const panelAgentEn: typeof panelAgentRu = {
       'any answer.',
     secTests: 'Testing',
     secTestsText:
-      'Groups, cases, coverage, runs, case lint — read. Asked «what failed», the agent takes ' +
+      'Groups, cases, coverage, runs, case lint — read. «Open testing of project X» opens ' +
+      'the section on X itself, not on the project this browser picked last. Asked «what ' +
+      'failed», the agent takes ' +
       'the newest run that CHECKED cases, not a generation, and names the red cases in words, ' +
       'with the step and the note. Adding or editing a case, creating or renaming a group, ' +
       'accepting or rejecting a draft, stopping a run — change: the card shows the case before ' +
@@ -379,6 +388,19 @@ export const panelAgentEn: typeof panelAgentRu = {
       'scripts — danger: the command and the question run on this computer, the question spends ' +
       'the subscription limit. The sandbox is built for one call and removed right after it. ' +
       'Calling an MCP server tool from the sandbox stays yours: it may write to the outside.',
+    secKit: 'Panel kit',
+    secKitText:
+      'What the kit holds — skills, commands, agents, rules and hooks, which are on, where each ' +
+      'differs from the same-named item in your global layer, what exists only there, and each ' +
+      "CLI's mode — read. Switching modes, editing, «To global» and «From global» stay your " +
+      'buttons on that page: they change what every run receives or write your global layer.',
+    secLocalModels: 'Local models',
+    secLocalModelsText:
+      'What is on the machine — GPU and memory, runtime version, whether the model server runs ' +
+      'and what it has loaded, installed models with their speed benchmark, which CLI is ' +
+      'connected — read. Downloading the runtime or a model, importing a model file, starting ' +
+      'and stopping the server, the benchmark, deleting, connecting and disconnecting stay your ' +
+      'buttons in that section: they download gigabytes, load the GPU or change CLI settings.',
     secContourAgents: 'Contour agents and embeddings',
     secContourAgentsText:
       'Reading an agent session — read. Computing embeddings — change: it spends the contour ' +
@@ -458,8 +480,12 @@ export const panelAgentEn: typeof panelAgentRu = {
       'changed. The agent re-reads and shows a fresh card.',
     cardTimeout: 'Waits until…',
     cardTimeoutText:
-      'The card waits 10 minutes for a click; the end time is written on it. No decision — the ' +
-      'outcome is «timed out», nothing was run.',
+      'The card waits 10 minutes for a click, under Goose 4: Goose waits on an action call for ' +
+      'no more than 5 minutes, so the card closes earlier and the «timed out» answer still ' +
+      'reaches the model. The end time is written on the card. No decision — the outcome is ' +
+      '«timed out», nothing was run. If the CLI itself gives up waiting, the card is withdrawn ' +
+      'too, with nothing run: a later decision would land nowhere — the model has already ' +
+      'been told it failed.',
     cardOnlyWindow: 'Who decides',
     cardOnlyWindowText:
       'Only a human decides — with a click in the panel window or a button in the phone app ' +
@@ -477,11 +503,12 @@ export const panelAgentEn: typeof panelAgentRu = {
     routeWhat: 'What the agent does',
     routeDefault: 'Default provider',
     routeDefaultText:
-      'The active CLI is Claude Code; the request goes to the vendor cloud with Claude Code’s ' +
-      'own login.',
+      'The request goes to the vendor cloud with the active CLI’s own login: ' +
+      'Claude Code, Qwen Code, Codex, Gemini CLI, OpenCode, Goose or Kimi Code.',
     routeContour: 'Contour',
     routeContourText:
-      'Claude Code is pointed at the panel’s local gateway, which inserts the contour key. The ' +
+      'Claude Code only: with any other CLI a turn through the contour does not start (a ' +
+      'refusal naming the CLI). Claude Code is pointed at the panel’s local gateway, which inserts the contour key. The ' +
       'agent process gets a placeholder instead of the key. Gateway down or no key — refusal: ' +
       'no silent fallback to the vendor cloud. The agent’s address carries the Panel assistant ' +
       'section: close that section on the contour and the gateway refuses the agent’s very next ' +
@@ -595,7 +622,9 @@ export const panelAgentEn: typeof panelAgentRu = {
       'closed while a reply runs, or a mode without attachments is chosen), an image is ' +
       'attached neither by drop nor by paste: the window says “The image cannot be attached ' +
       'right now…” and names the file, and the browser does not open the dropped file — the ' +
-      'typed text stays.',
+      'typed text stays. The agent on Gemini CLI, Goose or Kimi Code takes no images: a single ' +
+      'run of these CLIs has no path for an image to the model, and a turn with one is refused ' +
+      'before the start, in words.',
     limitWindow: 'Window',
     limitWindowText:
       'The window sits on the right, 440 pixels wide by default; the page shrinks beside it and ' +
@@ -620,10 +649,11 @@ export const panelAgentEn: typeof panelAgentRu = {
       'with the reason, nothing is written',
     refusalsColumn: 'Refusal',
     refusalsMeaningColumn: 'Reason and what to do',
-    refusalProvider: 'Another CLI is active',
+    refusalProvider: 'CLI without the agent',
     refusalProviderText:
-      'The agent works only with Claude Code for now. Switch the active CLI in Settings.',
-    refusalCli: 'Claude Code not found',
+      'The agent works with Claude Code, Qwen Code, Codex, Gemini CLI, OpenCode, Goose and Kimi Code; other CLIs ' +
+      '(Continue, Cursor, Aider) have no run where the agent holds only the panel actions. The refusal names the CLI — switch the active one in Providers.',
+    refusalCli: 'CLI not found',
     refusalCliText:
       'It is not in the PATH of the panel process. Install the CLI and restart the panel; an API ' +
       'key will not help — without the CLI the agent has no actions.',
@@ -634,13 +664,18 @@ export const panelAgentEn: typeof panelAgentRu = {
     refusalContour: 'Contour unreachable',
     refusalContourText:
       'The panel gateway is down or the contour key is not saved. Start the gateway or save the ' +
-      'key on the contour card.',
+      'key on the contour card. Through a contour the agent goes with Claude Code only: with ' +
+      'another active CLI the turn does not start, and the refusal names that CLI.',
     refusalMask: 'Masking rules broken',
     refusalMaskText:
       'The Data protection rules file cannot be read. No message goes out without the mask — fix ' +
       'the rules in that section.',
     refusalBusy: 'The agent is still answering',
     refusalBusyText: 'A turn is running in this conversation. Wait for it or press «Stop».',
+    refusalLong: 'A long message on Kimi Code',
+    refusalLongText:
+      'Kimi Code takes the message only on its command line, and that has a ceiling — 24,000 ' +
+      'characters. Longer, and the turn does not start; shorten the message or split it.',
     refusalTimeout: 'Timed out',
     refusalTimeoutText:
       'The card was not decided within 10 minutes — the action did not run. Ask the agent again.',
@@ -747,14 +782,15 @@ export const panelAgentEn: typeof panelAgentRu = {
         'After saving, the panel opens the form of that server: the empty secret field is on top with the cursor already in it. ' +
         'The value is written on “Save”; the agent never sees it. The agent window says “The key field is open” ' +
         'only when the field was actually found.',
-      guardsOtherCli: 'Another CLI is active',
-      guardsOtherCliText: 'The turn does not start: the agent works only with Claude Code for now.',
+      guardsOtherCli: 'A CLI without the agent is active',
+      guardsOtherCliText:
+        'The turn does not start: the agent works with Claude Code, Qwen Code, Codex, Gemini CLI, OpenCode, Goose and Kimi Code.',
       guardsDlp: 'Masking rules broken',
       guardsDlpText:
         'Without the mask no message goes to the agent — the window names where to fix it.',
-      guardsCli: 'Claude Code not found',
+      guardsCli: 'CLI not found',
       guardsCliText:
-        'The CLI is not on the panel process PATH — the turn does not start. Install Claude Code and restart the panel.',
+        'The active provider’s CLI is not on the panel process PATH — the turn does not start. Install it and restart the panel.',
       guardsEndpoint: 'The assistant uses its own endpoint',
       guardsEndpointText:
         'The endpoint key would have to be handed to the agent process, so the turn does not start. Switch the assistant back to the default provider or to a contour.',
@@ -797,10 +833,11 @@ export const panelAgentEn: typeof panelAgentRu = {
       '06-mcp-secret':
         'Form of the gitlab server: the empty GITLAB_TOKEN secret field on top, cursor in it — the human types the value',
       '07-other-cli':
-        '«The panel agent works only with Claude Code for now: another CLI is active»',
+        'Continue is active: «The panel agent does not work with Continue… The agent works with Claude Code, Qwen Code, Codex, Gemini CLI, OpenCode, Goose and Kimi Code»',
       '08-dlp-broken':
         '«The data masking rules are broken: without the mask no message goes to the agent»',
-      '09-cli-not-found': '«Claude Code was not found in PATH: the agent has nothing to work with»',
+      '09-cli-not-found':
+        '«The active provider’s CLI is not in PATH: the agent has nothing to run with»',
       '10-endpoint-unsupported':
         '«The assistant uses its own endpoint: its key would have to be handed to the agent process»',
       '11-contour-unreachable':
@@ -811,7 +848,7 @@ export const panelAgentEn: typeof panelAgentRu = {
 
   diagrams: {
     'action-path':
-      'The path of one action: mask, Claude Code without its own tools, the action registry, the card, execution and the trail',
+      'The path of one action: mask, the active CLI without its own tools, the action registry, the card, execution and the trail',
     'keys-and-files':
       'What the agent never receives (contour key, MCP secrets, a key from chat) and which files the panel writes',
   },

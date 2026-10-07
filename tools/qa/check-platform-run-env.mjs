@@ -26,13 +26,33 @@
  *   7. снятые нами слои (Т8) доезжают до argv процесса флагами, дописка панели
  *      к системному промпту не уезжает вовсе, а брокер прав встаёт ПОСЛЕ
  *      `--strict-mcp-config` и потому переживает его. Что каждый флаг делает с
- *      настоящим CLI — отдельная проверка, `check-run-layers.mjs`.
+ *      настоящим CLI — отдельная проверка, `check-run-layers.mjs`;
+ *   8. помощник формы при активном чужом CLI идёт ТЕМ ЖЕ маршрутом, что его
+ *      чат: адрес шлюза в окружении, свой неинтерактивный флаг, ни одного флага
+ *      Claude; со снятой галочкой — без адреса;
+ *   9. фоновый наблюдатель с «Ассистентом панели» на контуре разбирает через
+ *      шлюз и без модели вендора, а при активном чужом CLI процесса не запускает
+ *      и называет причину кодом `route_refused`;
+ *  10. Kimi Code, Goose и OpenCode — CLI без переменных адреса в реестре (X7) —
+ *      получают адрес окружением прогона (`runEndpoint`) в ТЕХ переменных,
+ *      которые задокументированы у каждого, без ключа контура; настройка конфига
+ *      Kimi, уводящая часть прогона мимо контура, даёт отказ без процесса. Что
+ *      настоящий CLI с этим окружением идёт в шлюз — `check-run-endpoint-cli.mjs`.
  *
  * Запуск: node tools/qa/check-platform-run-env.mjs
  */
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { mkdtempSync, readFileSync, writeFileSync, rmSync, existsSync } from 'node:fs';
+import {
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+  rmSync,
+  existsSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { setTimeout as wait } from 'node:timers/promises';
@@ -81,6 +101,84 @@ function dumpOf(dir) {
     if (at > 0) env.set(line.slice(0, at), line.slice(at + 1));
   }
   return { raw: text, env };
+}
+
+/** Выгрузка фальшивого CLI помощника: JSON с argv и окружением. */
+const HELPER_DUMP_SCRIPT = `
+const fs = require('node:fs');
+if (process.env.CC_HELPER_DUMP) {
+  // Файл на процесс: чат чужого CLI, ещё живой с прошлого шага, тоже найдёт эту
+  // копию на PATH — общий файл два процесса испортили бы друг другу.
+  fs.writeFileSync(
+    require('node:path').join(process.env.CC_HELPER_DUMP, process.pid + '.json'),
+    JSON.stringify({ args: [...process.execArgv, ...process.argv.slice(2)], env: process.env }),
+  );
+  process.stdout.write(JSON.stringify({ reply: 'ok', fields: {} }));
+  process.exit(0);
+}
+`;
+
+/**
+ * Фальшивый чужой CLI помощника формы. Задание у окна многострочное, а
+ * `.cmd`-обёртка такой argv законно не принимает (`cli-spawn`), поэтому на
+ * Windows здесь настоящий исполняемый файл — копия node под именем CLI, а
+ * выгрузку делает `--require` из NODE_OPTIONS раньше, чем node возьмётся за
+ * `-p`. На остальных системах — скрипт, который запускает тот же код.
+ */
+function fakeHelperCli(dir, name) {
+  const script = join(dir, 'helper-dump.cjs');
+  writeFileSync(script, HELPER_DUMP_SCRIPT);
+  if (isWindows) copyFileSync(process.execPath, join(dir, `${name}.exe`));
+  else {
+    writeFileSync(join(dir, name), `#!/bin/sh\nexec "${process.execPath}" "${script}" "$@"\n`, {
+      mode: 0o755,
+    });
+  }
+  return script;
+}
+
+/**
+ * Один ответ помощника с выгрузкой процесса. Папка фальшивого CLI помощника,
+ * NODE_OPTIONS и путь выгрузки живут только на время вызова: чат чужого CLI
+ * выше проверяется своей `.cmd`-обёрткой, а не этой копией node.
+ */
+async function helperRun(dir, marker, run, resetLookup) {
+  const dump = join(dir, 'dumps');
+  rmSync(dump, { recursive: true, force: true });
+  mkdirSync(dump);
+  const saved = {
+    NODE_OPTIONS: process.env.NODE_OPTIONS,
+    CC_HELPER_DUMP: process.env.CC_HELPER_DUMP,
+    PATH: process.env.PATH,
+  };
+  process.env.CC_HELPER_DUMP = dump;
+  process.env.PATH = `${dir}${isWindows ? ';' : ':'}${process.env.PATH ?? ''}`;
+  resetLookup();
+  // Прямые косые: NODE_OPTIONS разбирает обратную косую как экранирование.
+  const preload = join(dir, 'helper-dump.cjs').replaceAll('\\', '/');
+  if (isWindows) process.env.NODE_OPTIONS = `--require "${preload}"`;
+  try {
+    const reply = await run();
+    // Своя выгрузка — та, где в задании есть просьба помощника. Разбор без
+    // печати сырого текста: в нём окружение процесса целиком.
+    for (const name of readdirSync(dump)) {
+      const raw = readFileSync(join(dump, name), 'utf8');
+      let parsed;
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        continue;
+      }
+      if (parsed.args.some((arg) => arg.includes(marker))) return { reply, raw, dump: parsed };
+    }
+    return { reply, raw: '' };
+  } finally {
+    for (const [name, value] of Object.entries(saved)) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+    resetLookup();
+  }
 }
 
 async function waitForDump(dir, seconds = 30) {
@@ -162,7 +260,8 @@ async function main() {
     await import('../../apps/server/src/domains/platform/store.ts');
   const { buildManagedProfile, PLACEHOLDER_KEY } =
     await import('../../apps/server/src/domains/platform/apply/profile.ts');
-  const { resolveRunRoute } = await import('../../apps/server/src/domains/platform/routing.ts');
+  const { resolveRunRoute, runRouteOf } =
+    await import('../../apps/server/src/domains/platform/routing.ts');
   const { promptText } = await import('../../apps/server/src/domains/prompts.ts');
   const { ChatRunRegistry } = await import('../../apps/server/src/domains/chat/ChatRunRegistry.ts');
   const { ProjectTestRunRegistry } =
@@ -171,8 +270,47 @@ async function main() {
     await import('../../apps/server/src/domains/project-tests/store.ts');
   const { ProviderChatService } =
     await import('../../apps/server/src/domains/provider-chat/ProviderChatService.ts');
-  const { createChat } = await import('../../apps/server/src/domains/provider-chat/store.ts');
+  const { createChat, readChat } =
+    await import('../../apps/server/src/domains/provider-chat/store.ts');
   const { getProvider } = await import('../../apps/server/src/providers/registry.ts');
+  const { resetCliLookupCache } = await import('../../apps/server/src/providers/detect.ts');
+  const { askAssistant } = await import('../../apps/server/src/domains/assistant.ts');
+  const { helperAskFor } = await import('../../apps/server/src/domains/assistant-route.ts');
+  const { BackgroundWatcher } = await import('../../apps/server/src/domains/watcher/watcher.ts');
+  const { backgroundWatcherDeps } = await import('../../apps/server/src/bootstrap/watcher.ts');
+
+  /**
+   * Один разбор наблюдателя: зависимости — сборкой сервера, свои только рабочая
+   * папка и отчёт (фальшивый `claude` пишет выгрузку в рабочую папку).
+   */
+  const watchRun = async (store, appData, dir, gatewayPort) => {
+    const ctx = {
+      store,
+      location: { paths: { appData } },
+      pricing: { current: () => ({ entries: [] }) },
+    };
+    const watcher = new BackgroundWatcher({
+      ...backgroundWatcherDeps(ctx, gatewayPort),
+      cwd: dir,
+      reportPath: () => join(dir, 'WATCH-REPORT.md'),
+      debounceMs: 10,
+    });
+    try {
+      watcher.setEnabled(true);
+      watcher.signal({
+        source: 'server',
+        kind: 'http-5xx',
+        method: 'GET',
+        path: '/api/qa',
+        status: 500,
+        message: 'qa failure',
+      });
+      await watcher.settled();
+      return { dump: await waitForDump(dir, 5), problem: watcher.status().problem };
+    } finally {
+      watcher.shutdown();
+    }
+  };
   const { defaultOurRules, defaultPlatformRules } =
     await import('../../packages/contracts/src/platform.ts');
 
@@ -184,11 +322,25 @@ async function main() {
   const project = mkdtempSync(join(tmpdir(), 'cc-t3-project-'));
   const foreignDir = mkdtempSync(join(tmpdir(), 'cc-t3-foreign-'));
   const foreignOffDir = mkdtempSync(join(tmpdir(), 'cc-t3-foreign-off-'));
+  const helperBin = mkdtempSync(join(tmpdir(), 'cc-t3-helper-bin-'));
+  const watchDir = mkdtempSync(join(tmpdir(), 'cc-t3-watch-'));
+  const watchOffDir = mkdtempSync(join(tmpdir(), 'cc-t3-watch-off-'));
+  // Конфиги Kimi и Goose — временные: проверка читает их (настройка мимо контура)
+  // и не должна зависеть от конфигов человека на этой машине.
+  const cliHomes = mkdtempSync(join(tmpdir(), 'cc-t3-cli-homes-'));
+  const endpointDirs = Object.fromEntries(
+    ['kimi', 'goose', 'opencode', 'kimi-bypass'].map((id) => [
+      id,
+      mkdtempSync(join(tmpdir(), `cc-t3-${id}-`)),
+    ]),
+  );
   const gateway = new PlatformGateway();
 
   try {
     fakeCli(bin, 'claude');
     fakeCli(bin, FOREIGN);
+    for (const id of ['kimi', 'goose', 'opencode']) fakeCli(bin, id);
+    fakeHelperCli(helperBin, FOREIGN);
     process.env.PATH = `${bin}${isWindows ? ';' : ':'}${process.env.PATH ?? ''}`;
 
     // ── Состояние панели: контур сохранён, активен, ключ на месте ────────────
@@ -201,6 +353,7 @@ async function main() {
     // запись в настройках — именно это отличие и стоило Т1 одного отказа.
     await gateway.start({ store, appDataDir: appData, port: 0 });
     const port = gateway.status().port;
+    const gatewayPort = () => (gateway.status().running ? gateway.status().port : 0);
     check(gateway.status().running && port > 0, `шлюз поднят на порту ${port}`);
 
     // Модель управляемого профиля — то, что человек выбрал в панели. Профиль
@@ -571,6 +724,179 @@ async function main() {
         `со снятой галочкой адреса шлюза нет: ${foreignOff.env.get('OPENAI_BASE_URL') ?? '—'}`,
       );
     }
+
+    // ── 5. Помощник формы при активном чужом CLI: тот же потребитель `foreign:<cli>`
+    // До правки окно формы запускало активный CLI с флагами Claude и без адреса
+    // контура. Путь настоящий от `askAssistant` (его зовёт `/api/assist`) до процесса.
+    store.updateSettings({ provider: FOREIGN });
+    writePlatform(store, { ...platform, consumers: [`foreign:${FOREIGN}`] });
+    const helperRequest = {
+      kind: 'rule',
+      message: 'назови правило lint',
+      fields: { title: '' },
+      schema: { title: 'Rule title.' },
+    };
+    const askOn = await helperRun(
+      helperBin,
+      helperRequest.message,
+      () => askAssistant(helperRequest, helperAskFor(store, appData, { runRoute, gatewayPort })),
+      resetCliLookupCache,
+    );
+    check(!askOn.reply.error, `помощник формы ответил без отказа: ${askOn.reply.error ?? 'ок'}`);
+    check(Boolean(askOn.dump), 'фальшивый чужой CLI помощника запустился и выгрузил окружение');
+    if (askOn.dump) {
+      const url = askOn.dump.env.OPENAI_BASE_URL;
+      check(
+        url === `http://127.0.0.1:${port}/${CONTOUR}/_s/foreign/${FOREIGN}/v1`,
+        `адрес шлюза в окружении помощника формы: ${url ?? '—'}`,
+      );
+      check(askOn.dump.args.includes('-p'), `свой неинтерактивный флаг: ${askOn.dump.args[0]}`);
+      check(
+        !askOn.dump.args.some((arg) => ['--output-format', '--tools'].includes(arg)),
+        'флагов Claude у чужого CLI помощника нет',
+      );
+      check(!askOn.raw.includes(SECRET), 'ключа контура нет в окружении помощника формы');
+    }
+    // Снятая галочка — тот же CLI своим провайдером, адреса шлюза нет.
+    writePlatform(store, { ...platform, consumers: ['chat'] });
+    const askOff = await helperRun(
+      helperBin,
+      helperRequest.message,
+      () => askAssistant(helperRequest, helperAskFor(store, appData, { runRoute, gatewayPort })),
+      resetCliLookupCache,
+    );
+    check(
+      Boolean(askOff.dump) && !askOff.dump.env.OPENAI_BASE_URL,
+      `со снятой галочкой помощник идёт без адреса шлюза: ${askOff.dump?.env.OPENAI_BASE_URL ?? '—'}`,
+    );
+
+    // ── 6. Фоновый наблюдатель: «Ассистент панели» на контуре ─────────────────
+    // Сборка зависимостей — та же, что у сервера (`backgroundWatcherDeps`); свои
+    // здесь только рабочая папка и путь отчёта, чтобы не трогать отчёт репозитория.
+    const profile = store.getSettings().endpointProfiles[0];
+    store.updateSettings({ provider: 'claude', assistantEndpointId: profile.id });
+    writePlatform(store, { ...platform, consumers: ['assistant'] });
+    const watchOn = await watchRun(store, appData, watchDir, gatewayPort);
+    check(Boolean(watchOn.dump), 'фальшивый claude разбора запустился и выгрузил окружение');
+    if (watchOn.dump) {
+      const base = watchOn.dump.env.get('ANTHROPIC_BASE_URL') ?? '';
+      check(base.includes(`127.0.0.1:${port}/`), `разбор идёт в шлюз панели: ${base || '—'}`);
+      const argv = watchOn.dump.env.get(ARGV_KEY) ?? '';
+      check(
+        !argv.includes('--model'),
+        `модель вендора разбору не отправлена: ${argv.slice(0, 80)}`,
+      );
+      check(!watchOn.dump.raw.includes(SECRET), 'ключа контура нет в окружении разбора');
+    }
+    // Активен чужой CLI — отказ кодом, процесса нет.
+    store.updateSettings({ provider: FOREIGN });
+    const watchOff = await watchRun(store, appData, watchOffDir, gatewayPort);
+    check(!watchOff.dump, 'при чужом CLI разбор не запускает процесс');
+    check(
+      watchOff.problem?.problemCode === 'route_refused',
+      `причина в статусе наблюдателя: ${watchOff.problem?.problemCode ?? '—'}`,
+    );
+
+    // ── 7. Контур окружением прогона: Kimi Code, Goose, OpenCode (X7) ────────
+    const savedEnv = { KIMI_CODE_HOME: process.env.KIMI_CODE_HOME, APPDATA: process.env.APPDATA };
+    process.env.KIMI_CODE_HOME = join(cliHomes, 'kimi-home');
+    process.env.APPDATA = join(cliHomes, 'appdata');
+    mkdirSync(process.env.KIMI_CODE_HOME, { recursive: true });
+    const endpointChats = new ProviderChatService();
+    // Проекция — та же, что у сборки сервера: `runRouteOf` везёт и отказ.
+    endpointChats.setPlatformRouting((origin, asked = '', runTag = '') =>
+      runRouteOf(resolveRunRoute(deps, origin, asked, runTag)),
+    );
+    const sendTo = async (id, dir) => {
+      writePlatform(store, { ...platform, consumers: [`foreign:${id}`] });
+      const chat = createChat(appData, id, { title: 'через контур', workdir: dir });
+      const sent = endpointChats.send(
+        appData,
+        id,
+        chat.id,
+        { text: 'привет' },
+        { provider: getProvider(id), detect: () => true },
+      );
+      check(sent.ok, `${id}: сообщение принято службой`);
+      return { chat, dump: await waitForDump(dir, 20) };
+    };
+    const runBase = (id) => `http://127.0.0.1:${port}/${CONTOUR}/_s/foreign/${id}/_run/`;
+
+    const kimi = (await sendTo('kimi', endpointDirs.kimi)).dump;
+    check(Boolean(kimi), 'kimi: фальшивый CLI запустился и выгрузил окружение');
+    if (kimi) {
+      const url = kimi.env.get('KIMI_MODEL_BASE_URL') ?? '';
+      check(
+        url.startsWith(runBase('kimi')) && url.endsWith('/v1'),
+        `kimi: адрес шлюза в KIMI_MODEL_BASE_URL: ${url || '—'}`,
+      );
+      check(kimi.env.get('KIMI_MODEL_PROVIDER_TYPE') === 'openai', 'kimi: провайдер openai');
+      check(Boolean(kimi.env.get('KIMI_MODEL_NAME')), 'kimi: имя модели в окружении');
+      check(
+        kimi.env.get('KIMI_MODEL_API_KEY') === PLACEHOLDER_KEY,
+        'kimi: в KIMI_MODEL_API_KEY заглушка, а не ключ',
+      );
+      check(!kimi.raw.includes(SECRET), 'kimi: ключа контура в окружении нет');
+    }
+
+    const goose = (await sendTo('goose', endpointDirs.goose)).dump;
+    check(Boolean(goose), 'goose: фальшивый CLI запустился и выгрузил окружение');
+    if (goose) {
+      const host = goose.env.get('OPENAI_HOST');
+      const path = goose.env.get('OPENAI_BASE_PATH') ?? '';
+      check(host === `http://127.0.0.1:${port}`, `goose: OPENAI_HOST — шлюз: ${host ?? '—'}`);
+      check(
+        `${host}/${path}`.startsWith(runBase('goose')) && path.endsWith('/v1/chat/completions'),
+        `goose: OPENAI_BASE_PATH ведёт в раздел чата Goose: ${path || '—'}`,
+      );
+      check(
+        goose.env.get('GOOSE_PROVIDER') === 'openai' &&
+          goose.env.get('GOOSE_SUBAGENT_PROVIDER') === 'openai',
+        'goose: провайдер и провайдер субагентов — openai',
+      );
+      check(!goose.raw.includes(SECRET), 'goose: ключа контура в окружении нет');
+    }
+
+    const opencode = (await sendTo('opencode', endpointDirs.opencode)).dump;
+    check(Boolean(opencode), 'opencode: фальшивый CLI запустился и выгрузил окружение');
+    if (opencode) {
+      // `set` cmd.exe и `env` печатают значение как есть: JSON одной строкой.
+      let config;
+      try {
+        config = JSON.parse(opencode.env.get('OPENCODE_CONFIG_CONTENT') ?? '');
+      } catch {
+        config = undefined;
+      }
+      check(Boolean(config), 'opencode: OPENCODE_CONFIG_CONTENT — разбираемый JSON');
+      const base = config?.provider?.contour?.options?.baseURL ?? '';
+      check(
+        base.startsWith(runBase('opencode')) && base.endsWith('/v1'),
+        `opencode: адрес шлюза у провайдера contour: ${base || '—'}`,
+      );
+      check(
+        JSON.stringify(config?.enabled_providers) === '["contour"]',
+        'opencode: разрешён только провайдер contour',
+      );
+      check(!opencode.raw.includes(SECRET), 'opencode: ключа контура в окружении нет');
+    }
+
+    // Вторая модель в конфиге Kimi ушла бы своим провайдером: обязательный
+    // контур отказывает, и процесс не поднимается вовсе.
+    writeFileSync(
+      join(process.env.KIMI_CODE_HOME, 'config.toml'),
+      '[secondary_model]\nmodel = "k2-mini"\n',
+    );
+    const bypass = await sendTo('kimi', endpointDirs['kimi-bypass']);
+    check(!bypass.dump, 'kimi с [secondary_model]: процесс не запущен');
+    const refused = JSON.stringify(readChat(appData, 'kimi', bypass.chat.id)?.messages ?? []);
+    check(
+      refused.includes('[secondary_model] model'),
+      `kimi с [secondary_model]: в переписке отказ с именем настройки: ${refused.slice(0, 120)}`,
+    );
+    for (const [key, value] of Object.entries(savedEnv)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
   } finally {
     await gateway.stop();
     await wait(500);
@@ -583,6 +909,11 @@ async function main() {
       project,
       foreignDir,
       foreignOffDir,
+      helperBin,
+      watchDir,
+      watchOffDir,
+      cliHomes,
+      ...Object.values(endpointDirs),
     ]) {
       rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
     }

@@ -182,6 +182,39 @@ export const pluginsEn: typeof pluginsRu = {
       'Installing, enabling and disabling happen in the CLI itself via /plugins: the shape ' +
       'of its installed.json registry is undocumented, and editing that state behind its ' +
       'back would be guesswork, so a write is refused.',
+    noteQwenTitle: 'Qwen Code: extensions through the CLI’s own commands',
+    noteQwenText:
+      'With the Qwen Code provider the section lists extensions from ~/.qwen/extensions/ ' +
+      '(or the QWEN_HOME directory): name, version, description, where it was installed ' +
+      'from and what the extension brings — commands, skills, subagents, MCP servers, ' +
+      'context files. The enabled or disabled mark is what qwen extensions list says; if ' +
+      'the CLI did not answer, there is no mark and the reason is shown above the list. ' +
+      'The form installs an extension: the source is a git URL, owner/repo or a folder ' +
+      'path, and the panel runs qwen extensions install --consent, i.e. it confirms the ' +
+      'install for you, so install only what you trust. Enable and Disable run qwen ' +
+      'extensions enable or disable at user level, Remove runs qwen extensions uninstall ' +
+      '(the extension directory is deleted, no backup). The panel never writes files in ' +
+      'the extensions directory itself. Updating and linking a folder (update, link) ' +
+      'always ask for confirmation in the terminal — run those yourself. Changes take ' +
+      'effect in a new CLI session.',
+    noteCodexTitle: 'Codex: marketplace plugins through codex plugin',
+    noteCodexText:
+      'With the Codex provider the section shows three blocks. Plugin marketplaces are ' +
+      'folders and git repositories with a plugin catalog; Codex reads both its own ' +
+      '.agents/plugins/marketplace.json and Claude’s .claude-plugin/marketplace.json. ' +
+      'The form adds a marketplace (a path, owner/repo[@ref], a git URL), Refresh snapshot ' +
+      'pulls a fresh version of a git marketplace, and Remove forgets it — plugins ' +
+      'installed from it stay. Available to install lists the plugins of the added ' +
+      'marketplaces; Install runs codex plugin add name@marketplace. Below are the ' +
+      'installed plugins: version, marketplace, the manifest description and what the ' +
+      'plugin brings (skills, MCP servers, hooks, commands). The lists are what codex ' +
+      'plugin list says; if the CLI did not answer, the reason is shown above the list. ' +
+      'Enable and Disable edit a single enabled line in the [plugins."name@marketplace"] ' +
+      'table of ~/.codex/config.toml (or CODEX_HOME), with a backup; the CLI has no command ' +
+      'for it. Remove runs codex plugin remove: the plugin leaves the cache and ' +
+      'config.toml, no backup. The panel never writes into the plugin cache itself. A ' +
+      'plugin’s hooks run only after you approve them in /hooks inside Codex. Changes ' +
+      'take effect in a new CLI session.',
 
     flowTitle: 'What happens on installation',
     flowCaption:

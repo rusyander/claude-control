@@ -73,11 +73,14 @@ export const analyticsEn: typeof analyticsRu = {
       reportBreakdownText:
         'Where the period’s tokens went: by model and by project, bars on one scale. ' +
         'This is where two projects are visibly sharing the spend. Every row opens the details.',
-      reportDetail: 'A click on a model row opens the details',
+      reportDetail: 'A click on a model or project row opens the details',
       reportDetailText:
-        'The window holds this model’s whole spend: its share of the total, the number ' +
+        'The window holds the row’s whole spend: its share of the total, the number ' +
         'of requests, all four kinds of tokens separately, and the cost estimate. Below ' +
-        'are the latest sessions of that model; the one running right now is marked.',
+        'are sessions: the latest ones for a model, the latest ten for a project, each ' +
+        'with its own total (volume, duration, number of requests); the one running ' +
+        'right now is marked. Every session can be expanded into its token split, as on ' +
+        'the Sessions tab.',
       reportHours: 'Hours, tools and skills are about habits, not money',
       reportHoursText:
         'The hourly chart shows when the work actually happens (in your machine’s time). ' +
@@ -86,10 +89,20 @@ export const analyticsEn: typeof analyticsRu = {
         'than recomputed.',
       reportSessions: 'Sessions and the scan line',
       reportSessionsText:
-        'Each row is a conversation: project, git branch, models and volume. Under every ' +
+        'Each row is a conversation: project, git branch, the title Claude Code gave the ' +
+        'conversation itself, models, volume, duration and number of requests. Under every ' +
         'breakdown of the report it says how many files the panel walked and in how many ' +
         'milliseconds — that line is what shows the numbers came off the disk, not out of ' +
         'somebody’s database.',
+      reportSessionsDetail: 'Expand a session: where the tokens and the time went',
+      reportSessionsDetailText:
+        'The “Tokens, time and tools” line expands the whole session at once: total ' +
+        'tokens, model requests, input, output, cache read and cache write, the API-equivalent ' +
+        'estimate, duration, start time and the number of tool calls. Below are the five ' +
+        'tools the agent used most. Duration runs from the first to the last model reply, ' +
+        'pauses included: the transcript does not record when the person stepped away, so ' +
+        'pure working time cannot be derived from it. Everything is counted from the ' +
+        'transcript — nothing is made up, and expanding sends no extra request.',
       reportSessionsGo: '“Go to”: into the conversation, or to where the session runs',
       reportSessionsGoText:
         'A panel chat opens in its chat, a finished session in a conversation carrying ' +
@@ -164,6 +177,20 @@ export const analyticsEn: typeof analyticsRu = {
       'text of the messages is not read',
     storageSkills: 'Skills',
     storageSkillsValue: 'call statistics are taken from ~/.claude.json',
+    storageForeign: 'Codex and Qwen Code',
+    storageForeignValue:
+      'the report follows the active CLI. With Codex it reads ~/.codex/sessions/**/rollout-*.jsonl ' +
+      'and archived_sessions, with Qwen Code — ~/.qwen/projects/*/chats/*.jsonl and the panel kit ' +
+      'home. Both count input together with the cache, so the cache is subtracted, and an ' +
+      'answer recorded twice is counted once. Skills are Claude Code only. The panel does not ' +
+      'recognise those CLIs’ processes, so under Codex or Qwen Code the «Running right now» ' +
+      'block on the «Agents and contour» tab is empty and says why — claude processes are not ' +
+      'shown under their name',
+    storageRefused: 'Other CLIs',
+    storageRefusedValue:
+      'the logs of Gemini CLI, Goose, Kimi Code, Cursor, OpenCode, Aider and Continue are not read: ' +
+      'the panel shows its «unavailable» placeholder instead of the section, and the phone app shows a refusal naming the CLI instead ' +
+      'of a report. Claude spend and processes are never shown under another CLI',
     storageWrites: 'What it writes',
     storageWritesValue:
       'nothing from this section: transcripts are only read. There are two panel files ' +
@@ -173,7 +200,9 @@ export const analyticsEn: typeof analyticsRu = {
     storageCache: 'Cache',
     storageCacheValue:
       'the summary is cached for a minute (the refresh button recounts), the process list ' +
-      'for ten seconds',
+      'for ten seconds. The active CLI is part of the cache key: switch the CLI and the ' +
+      'report is counted afresh for it, so the previous one’s minute-old report never ' +
+      'survives under the new one, in the panel or on the phone',
     storageClaude: 'When Claude sees it',
     storageClaudeValue: 'never — the section changes nothing in the configuration',
 
@@ -211,6 +240,11 @@ export const analyticsEn: typeof analyticsRu = {
     limitOldText:
       'Only files changed since the start of the period are opened. A long-untouched ' +
       'conversation will not appear in a short period — take a longer one or “all time”.',
+    limitUnpriced: 'A Codex or Qwen model costs 0',
+    limitUnpricedText:
+      'The model is not in the price list. For Claude an unknown model gets the fallback rate, ' +
+      'for a foreign CLI it gets zero: GPT usage at Sonnet rates would be invented money. ' +
+      'Such models are listed above the report; set your own price in Settings → Spend.',
     limitSessions: 'Fewer sessions in the list than there were',
     limitSessionsText:
       'The last twenty-five conversations of the period are shown, not all of them — and ' +
@@ -285,9 +319,10 @@ export const analyticsEn: typeof analyticsRu = {
       'full, so this is an honest measure of the work, not an estimate.',
     metricSessions: 'Sessions',
     metricSessionsText:
-      'The period’s conversations with their project, git branches and volume. Active ones ' +
-      'are marked; the list holds the latest twenty-five. Every row has “Go to”, a ' +
-      'running one also “Stop”.',
+      'The period’s conversations with their project, git branches, title and volume. ' +
+      'Active ones are marked; the list holds the latest twenty-five. Every row has “Go ' +
+      'to”, a running one also “Stop”, and “Tokens, time and tools” expands the token ' +
+      'split, duration and the session’s top tools.',
 
     loweredTitle: 'Lowered fan-out runs',
     loweredCaption:
@@ -370,6 +405,13 @@ export const analyticsEn: typeof analyticsRu = {
       'always empty although agents were working. Now the command line is parsed and such ' +
       'runs are found. The panel excludes itself from the list, and the start time is ' +
       'shown on Windows only: on other systems there is nowhere to take it from.',
+    noteSubagentsTitle: 'Sub-agent runs are not in a session’s total',
+    noteSubagentsText:
+      'When the agent launches a sub-agent (the Agent or Task tool), Claude Code writes its ' +
+      'work to a separate file next to the session, and the panel does not read those ' +
+      'files. So a session’s tokens, requests and cost are its main conversation; for ' +
+      'sessions where sub-agents did a lot, the real spend is larger than shown. How much ' +
+      'larger can be seen in those files, but the report’s numbers do not include it yet.',
     noteScopeTitle: 'Only this machine is counted',
     noteScopeText:
       'Work from another computer or from another configuration directory will not reach ' +
@@ -383,15 +425,17 @@ export const analyticsEn: typeof analyticsRu = {
       '02-month':
         'The same screen over “30 days”: 53.3 million tokens, 486 requests, 86.9 % from cache, 62.79 $ — and the daily spend chart from 08-29 to 09-26 has appeared',
       '03-detail':
-        'A click on the claude-opus-4-8 row: 19.1 million tokens (35.9 % of the total volume), 173 requests, 16.3 million read from cache, 2.4 million written, an estimate of 36.57 $ — and the latest sessions of that model',
+        'A click on the claude-opus-4-8 row: 19.1 million tokens (35.9 % of the total volume), 173 requests, 16.3 million read from cache, 2.4 million written, an estimate of 36.57 $ — and the latest sessions of that model, each with its title, duration, number of requests and a “Tokens, time and tools” line',
       '04-hours':
         'Activity by hour from 9:00 to 18:00, the most often called tools (Read 104, Task 96, WebFetch 95) and skill usage (release-notes 34, price-import 21, legacy-import 4)',
       '05-sessions':
-        'The latest sessions with their project, git branch (main, feature/roles), models, volume and a “Go to” button on every row; below them the card about subscription limits',
+        'The latest sessions with their project, git branch (main, feature/roles), title (for example “Investigate the build failure”), models, volume, duration and number of requests, a “Tokens, time and tools” line and a “Go to” button on every row; below them the card about subscription limits',
       '07-session-where':
         'The “Where the session runs” dialog: in a terminal — outside the panel, PID 41872, start time, the claude --resume command and the directory C:/work/shop-front; the project is not in the panel, so “Open the project” is unavailable',
       '08-session-stop':
         'The “Stop the session?” dialog: process 41872 (in a terminal — outside the panel) is taken down together with its child processes, below it its number, start time, command and directory; “Cancel” and “Stop” buttons',
+      '09-session-details':
+        'An expanded work/shop-front session “Fix the cart discount calculation”: 1,124,802 tokens in total, 9 model requests, 6,949 input, 14,330 generated, 981,632 cache reads, 121,891 cache writes, 0.96 $ API equivalent, duration 8h 05m, 11 tool calls; below them the tools called most — Bash, Glob, Task, WebFetch and Edit',
       '06-breakdown':
         'The Models and projects tab over 30 days: claude-opus-4-8 19.1M, claude-sonnet-5 17.3M, claude-haiku-4-5 16.9M; work/shop-front 31.7M, work/shop-admin 21.6M',
     },

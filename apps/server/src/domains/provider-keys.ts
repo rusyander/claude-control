@@ -2,6 +2,7 @@ import type {
   AppSettings,
   KeySource,
   KeyStatus,
+  ProviderEditsWhenOff,
   ProviderKeyItem,
   RunnerMode,
   RunnerReason,
@@ -22,6 +23,7 @@ import {
   MAX_KEY_LENGTH,
 } from '../lib/provider-keys.ts';
 import { detectCliOnPath, findCliOnPath } from '../providers/detect.ts';
+import { providerEditsWhenOff } from '../providers/edits-control.ts';
 import { coded } from '../lib/server-text.ts';
 
 /**
@@ -164,6 +166,31 @@ export function canHoldKey(provider: ConfigProvider): boolean {
   return provider.assistant !== undefined && provider.assistant.apiKind !== 'none';
 }
 
+/**
+ * Отказ прямому вызову модельного API, когда ключ провайдера ушёл бы НЕ его
+ * вендору (06.10): решают только вид API и адрес из каталога, не окружение.
+ *
+ * - `anthropic` — API Anthropic и есть Claude. Чужой CLI с этим видом (Continue)
+ *   без своего бинаря молча превращал чат в чат Claude, поэтому вид — только у `claude`.
+ * - `openai-compat` — «совместимый» не говорит, ЧЕЙ это сервер. Без
+ *   `assistant.apiBaseUrl` из документации вендора адреса нет: ни облако OpenAI,
+ *   ни `OPENAI_BASE_URL` (её человек завёл для другого инструмента) не годятся —
+ *   ключ Kimi ушёл бы в OpenAI.
+ *
+ * Свой эндпоинт из настроек этим правилом не судится: его адрес выбрал человек.
+ */
+export function vendorApiRefusal(
+  provider: ConfigProvider,
+): 'assistant-api-base-unknown' | undefined {
+  const assistant = provider.assistant;
+  if (!assistant) return undefined;
+  if (assistant.apiKind === 'anthropic' && provider.id !== 'claude')
+    return 'assistant-api-base-unknown';
+  if (assistant.apiKind === 'openai-compat' && !assistant.apiBaseUrl?.trim())
+    return 'assistant-api-base-unknown';
+  return undefined;
+}
+
 // --- Сводки для роутов ------------------------------------------------------
 
 /** Список провайдеров с их статусом ключей (для раздела настроек). */
@@ -188,6 +215,10 @@ export interface ActiveRunnerInfo extends RunnerResolution {
   apiKind: AssistantApiKind;
   cliRunnable: boolean;
   cliCommand: string;
+  /** «Разрешить правки» чата доходит до CLI (флагом запуска или живым сервером). */
+  editsToggle?: boolean;
+  /** Что значит выключенный переключатель: вопрос карточкой или отказ CLI в записи. */
+  editsWhenOff?: ProviderEditsWhenOff;
 }
 
 export function describeActiveRunner(
@@ -206,6 +237,14 @@ export function describeActiveRunner(
     // Показываем то имя, которое РЕАЛЬНО нашлось (на Windows это может быть
     // `codex` вместо `codex.cmd`); не нашлось — имя по умолчанию для этой ОС.
     cliCommand: resolution.cliCommandFound ?? providerCliCommand(provider),
+    // Переключатель правок действует там, где CLI его видит: флагом одиночного
+    // запуска (gemini `--approval-mode`, aider `--dry-run`…) или ответом панели
+    // на просьбы живого сервера (`live/permission.ts`). Раньше смотрели только
+    // на живой сервер — у Gemini, Continue, Aider и OpenCode переключателя не
+    // было, хотя флаг до них доходит.
+    ...(providerEditsWhenOff(provider)
+      ? { editsToggle: true, editsWhenOff: providerEditsWhenOff(provider) }
+      : {}),
   };
 }
 

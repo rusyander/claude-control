@@ -51,6 +51,7 @@ const pathsIn = (root: string): ClaudePaths =>
     claudeMd: `${root}/CLAUDE.md`,
     secretsEnv: `${root}/.mcp-secrets.env`,
     skills: `${root}/skills`,
+    hooks: `${root}/hooks`,
     mcpConfig: `${root}/.claude.json`,
     appData: `${root}/agentdeck`,
   }) as unknown as ClaudePaths;
@@ -140,7 +141,9 @@ describe('createConfigWatcher', () => {
     // Рассылка идёт через окно склейки — до его конца подписчики молчат.
     expect(broadcasts).toEqual([]);
     await settle();
-    expect(broadcasts).toEqual([{ domains: ['skills'], path: '/cfg-a/skills/my-skill/SKILL.md' }]);
+    expect(broadcasts).toEqual([
+      { domains: ['skills', 'globalLayer'], path: '/cfg-a/skills/my-skill/SKILL.md' },
+    ]);
   });
 
   it('поток правок транскрипта склеивается в одну рассылку', async () => {
@@ -164,7 +167,7 @@ describe('createConfigWatcher', () => {
     await settle();
 
     expect(broadcasts.length).toBe(1);
-    expect(broadcasts[0]!.domains.sort()).toEqual(['chats', 'skills']);
+    expect(broadcasts[0]!.domains.sort()).toEqual(['chats', 'globalLayer', 'skills']);
   });
 });
 
@@ -174,6 +177,17 @@ describe('domainsForPath', () => {
   it('настройки обновляют хуки, права и переменные', () => {
     expect(domainsForPath(paths, paths.settings)).toEqual(['hooks', 'permissions', 'env']);
     expect(domainsForPath(paths, paths.settingsLocal)).toEqual(['hooks', 'permissions', 'env']);
+  });
+
+  // В5: скрипт хука или навык может быть половиной пары сверки с панелью.
+  it('правка хука или навыка доходит до сверки с глобальным слоем', () => {
+    expect(domainsForPath(paths, `${paths.hooks}/lib/push-sieves-scan.mjs`)).toEqual([
+      'globalLayer',
+    ]);
+    expect(domainsForPath(paths, `${paths.skills}/prepare-mr/SKILL.md`)).toEqual([
+      'skills',
+      'globalLayer',
+    ]);
   });
 
   it('прочее — общая сводка', () => {

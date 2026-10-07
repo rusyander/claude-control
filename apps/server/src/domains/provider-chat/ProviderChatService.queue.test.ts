@@ -159,4 +159,61 @@ describe('ProviderChatService — очередь занятого разгово
 
     expect(service.status('chat').queued).toBeUndefined();
   });
+
+  // Ф13: остановили ход — очередь сама не уйдёт; раньше её не было видно
+  // как «ждущей», а после перезапуска панели она пропадала вовсе.
+  it('после «Стоп» очередь «ждёт отправки» и уходит по кнопке', () => {
+    send('первый');
+    const queued = enqueue('второй');
+    service.stopByHuman('chat');
+
+    expect(service.status('chat')).toMatchObject({ isRunning: false, queueHeld: true });
+    const outcome = service.sendQueued(dir, 'codex', 'chat', queued!.id, { provider: PROVIDER });
+    expect(outcome.ok).toBe(true);
+    expect(runs[1]!.prompt).toContain('второй');
+    expect(service.status('chat').queued).toBeUndefined();
+    expect(service.status('chat').queueHeld).toBeUndefined();
+  });
+
+  it('кнопка «Отправить» при идущем ответе — отказ, сообщение остаётся; нет сообщения — missing', () => {
+    send('первый');
+    const queued = enqueue('второй');
+
+    expect(service.sendQueued(dir, 'codex', 'chat', queued!.id, { provider: PROVIDER })).toEqual({
+      ok: false,
+      reason: 'already_running',
+    });
+    expect(service.status('chat').queued?.map((item) => item.text)).toEqual(['второй']);
+    service.stopByHuman('chat');
+    expect(service.sendQueued(dir, 'codex', 'chat', 'нет-такого', { provider: PROVIDER })).toEqual({
+      ok: false,
+      missing: true,
+    });
+  });
+
+  it('очередь переживает перезапуск панели: новый сервис видит её ждущей и отправляет', () => {
+    send('первый');
+    const queued = enqueue('написал до перезапуска');
+
+    const fresh = new ProviderChatService(() => {
+      const run = new FakeRun();
+      runs.push(run);
+      return run as unknown as ProviderChatRunLike;
+    });
+    fresh.hydrate(dir, 'codex', 'chat');
+    expect(fresh.status('chat')).toMatchObject({
+      isRunning: false,
+      queueHeld: true,
+      queued: [expect.objectContaining({ id: queued!.id, text: 'написал до перезапуска' })],
+    });
+    expect(fresh.sendQueued(dir, 'codex', 'chat', queued!.id, { provider: PROVIDER }).ok).toBe(
+      true,
+    );
+    expect(runs.at(-1)!.prompt).toContain('написал до перезапуска');
+
+    // Отправленное снято и с диска: третий сервис очереди уже не видит.
+    const third = new ProviderChatService(() => new FakeRun() as unknown as ProviderChatRunLike);
+    third.hydrate(dir, 'codex', 'chat');
+    expect(third.status('chat').queued).toBeUndefined();
+  });
 });

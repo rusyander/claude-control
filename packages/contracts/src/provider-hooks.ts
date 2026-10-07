@@ -39,7 +39,10 @@ import { object, string, number, array, boolean, enum as zodEnum, type infer as 
  *    `{ matcher, hooks: [ { type: "command", command, timeout } ] }`;
  *  - `kimi-toml` — МАССИВ ТАБЛИЦ `[[hooks]]` в `~/.kimi-code/config.toml`, у
  *    каждой ровно четыре задокументированных поля `event` / `matcher` /
- *    `command` / `timeout`.
+ *    `command` / `timeout`;
+ *  - `codex-json` — файл `~/.codex/hooks.json` (проектный `.codex/hooks.json`)
+ *    той же формы, что у Qwen, но со своими двенадцатью событиями и таймаутом в
+ *    секундах (по умолчанию 600, у `SessionEnd`/`Interrupt` 1, потолок 3).
  *
  * Единицы таймаута РАЗНЫЕ и это не мелочь: у Qwen — миллисекунды (по умолчанию
  * 60000), у Kimi — секунды (1–600, по умолчанию 30). Поэтому сводка несёт
@@ -47,7 +50,12 @@ import { object, string, number, array, boolean, enum as zodEnum, type infer as 
  */
 
 /** Формат хранилища хуков. */
-export const providerHooksFormats = ['opencode-json', 'qwen-json', 'kimi-toml'] as const;
+export const providerHooksFormats = [
+  'opencode-json',
+  'qwen-json',
+  'kimi-toml',
+  'codex-json',
+] as const;
 export type ProviderHooksFormat = (typeof providerHooksFormats)[number];
 
 /**
@@ -77,10 +85,16 @@ export const providerHookRuleSchema = object({
 
 export type ProviderHookRule = Infer<typeof providerHookRuleSchema>;
 
-/** Описание события в сводке: имя и поддерживает ли оно матчер. */
+/**
+ * Описание события в сводке: имя и поддерживает ли оно матчер. Свои границы
+ * таймаута — только там, где CLI держит их отдельно (Codex: `SessionEnd` и
+ * `Interrupt` не дольше 3 с); иначе действуют общие границы сводки.
+ */
 export const providerHookEventInfoSchema = object({
   name: string(),
   supportsMatcher: boolean(),
+  timeoutMax: number().optional(),
+  timeoutDefault: number().optional(),
 });
 
 /** Уровень: глобальный конфиг или конфиг проекта. */
@@ -168,6 +182,17 @@ export const providerHooksInfoSchema = object({
    * рубильник всего раздела), но обязана показать: с ним хуки не сработают.
    */
   disableAll: boolean().optional(),
+  /**
+   * Codex: записанный хук сработает только после одобрения в `/hooks` внутри CLI
+   * (доверие по отпечатку определения; правка снимает одобрение). Панель записать
+   * доверие не может — обязана сказать об этом.
+   */
+  trustRequired: boolean().optional(),
+  /**
+   * Codex: в соседнем `config.toml` есть таблицы `[[hooks.<Событие>]]` — CLI грузит
+   * их вместе с файлом раздела. Панель их не правит; путь — чтобы сказать, где они.
+   */
+  alsoDefinedIn: string().optional(),
   /** Файл не разобран ЛИБО ключ снят с записи → раздел только для чтения. */
   readOnly: boolean().default(false),
   /** Текст ошибки, если файл не разобран. */

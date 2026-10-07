@@ -24,6 +24,7 @@ export function FormWithAssistant<const S extends AssistantSpec>({
   spec,
   onApply,
   placeholder,
+  loading,
 }: FormWithAssistantProps<S>) {
   const apply = (raw: Record<string, unknown>): AssistantApplyReport => {
     const reading = readAssistantFields(spec, raw);
@@ -42,6 +43,7 @@ export function FormWithAssistant<const S extends AssistantSpec>({
           schema={assistantSchema(spec)}
           onApply={apply}
           placeholder={placeholder}
+          loading={loading}
         />
       </div>
     </div>

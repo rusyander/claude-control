@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { GroupMembersView, PathEntry } from '@agentdeck/contracts';
-import { describedStepTitle, previewSteps, projectOnlyLines } from './tile';
+import { describedStepTitle, previewSteps, projectOnlyLines, tileToggle } from './tile';
 
 const step = (index: number, title: string): PathEntry => ({
   kind: 'skill-step',
@@ -72,5 +72,46 @@ describe('участники только в проекте', () => {
       (project, names, count) => `${project}|${names}|${count}`,
     );
     expect(lines).toEqual(['shop|rule-incident-capture, figma-parity|2', 'site|site-skill|1']);
+  });
+});
+
+describe('tileToggle: чей тумблер на карточке', () => {
+  const claudeGroup = { isEnabled: true, enabledFor: { qwen: false, codex: true } };
+
+  it('у Claude и пока список CLI не пришёл — каталоги Claude', () => {
+    expect(tileToggle(claudeGroup, { id: 'claude', groupsModel: 'claude-files' })).toEqual({
+      shown: true,
+      checked: true,
+    });
+    expect(tileToggle(claudeGroup, undefined)).toEqual({ shown: true, checked: true });
+  });
+
+  it('CLI со слоем — положение этого CLI и его id для записи, не isEnabled Claude', () => {
+    expect(tileToggle(claudeGroup, { id: 'qwen', groupsModel: 'run-layer' })).toEqual({
+      shown: true,
+      checked: false,
+      provider: 'qwen',
+    });
+    expect(tileToggle(claudeGroup, { id: 'codex', groupsModel: 'run-layer' }).checked).toBe(true);
+    expect(tileToggle({ isEnabled: false }, { id: 'qwen', groupsModel: 'run-layer' }).checked).toBe(
+      false,
+    );
+  });
+
+  it('CLI без слоя и копия для другой CLI — тумблера нет', () => {
+    expect(tileToggle(claudeGroup, { id: 'goose', groupsModel: 'none' }).shown).toBe(false);
+    const copy = { isEnabled: true, scope: { kind: 'global' as const, provider: 'codex' } };
+    expect(tileToggle(copy, { id: 'codex', groupsModel: 'run-layer' }).shown).toBe(false);
+  });
+
+  it('проектная группа другого CLI — своим путём, как у сервера', () => {
+    const own = {
+      isEnabled: true,
+      scope: { kind: 'project' as const, path: 'C:/p', provider: 'qwen' },
+    };
+    expect(tileToggle(own, { id: 'qwen', groupsModel: 'run-layer' })).toEqual({
+      shown: true,
+      checked: true,
+    });
   });
 });

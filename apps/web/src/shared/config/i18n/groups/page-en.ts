@@ -119,4 +119,21 @@ export const groupsPageEn: typeof groupsPageRu = {
     cancel: 'Cancel',
     done: 'Created “{{name}}” — switched off',
   },
+  providerNote: {
+    runLayer:
+      "{{cli}} does not read Claude's files, so groups reach it as a layer on each run: the one chosen in the chat, those bound to the project and those switched on for {{cli}}. Claude's files do not change; a note in the chat feed says what did not get through.",
+    none: "{{cli}} does not read Claude's files and the panel has no group layer for it — groups do not apply to its runs and cannot be switched on for it. Claude groups are switched on while Claude Code is active.",
+  },
+  delivery: {
+    title: 'How the group reaches {{cli}}',
+    enabled: 'Switched on for {{cli}} — goes with every one of its runs.',
+    disabled:
+      'Not switched on for {{cli}} — goes only when chosen in the chat or bound to the run’s project.',
+    none: 'The panel has no group layer for {{cli}} — the group does not apply to its runs.',
+    delivered: 'Gets through ({{count}}): {{names}}',
+    nothingDelivered: 'Nothing from this group gets through to {{cli}}.',
+    refused: 'Does not get through',
+    env: 'Environment variables: {{names}}',
+    loadFailed: 'Could not find out what reaches {{cli}}.',
+  },
 };

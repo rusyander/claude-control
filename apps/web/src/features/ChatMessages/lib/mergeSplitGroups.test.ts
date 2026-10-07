@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { SplitPlanView } from '@agentdeck/contracts/chat-handoff';
 import type { ChildStageGroup } from '../ui/ChildStages.types';
-import { mergeSplitGroups, splitGroupKey } from './mergeSplitGroups';
+import { hubCardKey, mergeSplitGroups, splitGroupKey } from './mergeSplitGroups';
 
 type Group = SplitPlanView['groups'][number];
 
@@ -298,5 +298,75 @@ describe('mergeSplitGroups — перепроверка MR', () => {
       const rows = mergeSplitGroups(new Map([chatRow(4, running)]), plan([item], extra));
       expect(rows[0]?.recheck).toBeUndefined();
     }
+  });
+});
+
+/**
+ * «Перевести задачи» (G4): кнопка группы — когда сервер назвал её задачи; MR
+ * не нужен, и без Jira она видна (владелец 06.10) — окно говорит, где подключить.
+ */
+describe('mergeSplitGroups — перевод задач', () => {
+  const withTasks = (extra: Partial<Group> = {}): Group =>
+    group(4, { mr: 'https://tracker.example.com/mr/4', taskKeys: ['PROJ-1', 'PROJ-2'], ...extra });
+
+  it('задачи есть и Jira подключена — кнопка с ключами группы', () => {
+    const rows = mergeSplitGroups(
+      new Map([chatRow(4, true)]),
+      plan([withTasks()], { jiraTasks: true }),
+    );
+    expect(rows[0]?.taskMove).toEqual({ index: 4, keys: ['PROJ-1', 'PROJ-2'], connected: true });
+  });
+
+  it('Jira не подключена — кнопка есть, но помечена: окно поведёт в «Интеграции»', () => {
+    const off = mergeSplitGroups(new Map([chatRow(4, false)]), plan([withTasks()]));
+    expect(off[0]?.taskMove).toEqual({ index: 4, keys: ['PROJ-1', 'PROJ-2'], connected: false });
+  });
+
+  it('кнопки нет, когда у группы нет задач трекера', () => {
+    const none = mergeSplitGroups(
+      new Map([chatRow(4, false)]),
+      plan([withTasks({ taskKeys: [] })], { jiraTasks: true }),
+    );
+    expect(none[0]?.taskMove).toBeUndefined();
+  });
+});
+
+describe('mergeSplitGroups — очередь слияния (G3)', () => {
+  it('строка группы с чатом несёт своё место в очереди, без MR — нет', () => {
+    const mr = (index: number) => `https://forge.example.com/mr/${index}`;
+    const rows = mergeSplitGroups(
+      new Map([chatRow(0, false), chatRow(1, false), chatRow(2, false)]),
+      plan([
+        group(0, { status: 'done', mr: mr(0), after: [1] }),
+        group(1, { status: 'done', mr: mr(1) }),
+        group(2, { status: 'started' }),
+      ]),
+    );
+    expect(rows.map((row) => [row.title, row.mergeOrder])).toEqual([
+      ['Группа 0', { position: 2, total: 2, before: ['Группа 1'] }],
+      ['Группа 1', { position: 1, total: 2, before: [] }],
+      ['Группа 2', undefined],
+    ]);
+  });
+});
+
+describe('hubCardKey — ключ карточки хаба (наблюдатель WR-9)', () => {
+  it('группы без чата получают разные ключи, даже с одинаковым именем', () => {
+    const key = splitGroupKey({ groupIndex: 0, id: '' });
+    const merged = mergeSplitGroups(
+      new Map<string, ChildStageGroup>([
+        [key, { chatId: 'c0', title: 'Группа 0', stages: ['work'], isRunning: true }],
+      ]),
+      plan([
+        group(0, { status: 'started', chatId: 'c0' }),
+        group(1, { title: 'Тесты' }),
+        group(2, { title: 'Тесты', after: [1] }),
+      ]),
+    );
+    const keys = merged.map(hubCardKey);
+
+    expect(merged.filter((item) => !item.chatId)).toHaveLength(2);
+    expect(new Set(keys).size).toBe(keys.length);
+    expect(keys).toContain('c0');
   });
 });

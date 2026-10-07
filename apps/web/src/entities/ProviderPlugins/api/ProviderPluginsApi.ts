@@ -116,3 +116,118 @@ export function useSaveProviderPluginPackages({ projectId }: Scope = {}) {
     meta: { successMessage: 'toasts.saved' },
   });
 }
+
+/** Ответ действия над расширением: последние строки, что сказал CLI. */
+export interface ProviderExtensionActionResult {
+  ok: true;
+  output: string;
+  needsRestart: true;
+}
+
+/**
+ * Расширения Qwen Code (MAP 25): установить, включить/выключить, удалить. Панель
+ * только зовёт `qwen extensions …` на сервере — файлы она здесь не пишет. Уровень
+ * один, глобальный: проектного каталога расширений у Qwen нет.
+ */
+export function useInstallProviderExtension() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (source: string): Promise<ProviderExtensionActionResult> => {
+      const { data } = await apiClient.post<ProviderExtensionActionResult>(
+        '/provider-plugins/installed',
+        { source },
+      );
+      return data;
+    },
+    onSettled: () => void queryClient.invalidateQueries({ queryKey: infoKey() }),
+    meta: { successMessage: 'toasts.pluginInstalled' },
+  });
+}
+
+export function useSetProviderExtensionEnabled() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      name,
+      enabled,
+    }: {
+      name: string;
+      enabled: boolean;
+    }): Promise<ProviderExtensionActionResult> => {
+      const { data } = await apiClient.post<ProviderExtensionActionResult>(
+        `/provider-plugins/installed/${encodeURIComponent(name)}/${enabled ? 'enable' : 'disable'}`,
+      );
+      return data;
+    },
+    onSettled: () => void queryClient.invalidateQueries({ queryKey: infoKey() }),
+    meta: { successMessage: 'toasts.updated' },
+  });
+}
+
+export function useUninstallProviderExtension() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (name: string): Promise<ProviderExtensionActionResult> => {
+      const { data } = await apiClient.delete<ProviderExtensionActionResult>(
+        `/provider-plugins/installed/${encodeURIComponent(name)}`,
+      );
+      return data;
+    },
+    onSettled: () => void queryClient.invalidateQueries({ queryKey: infoKey() }),
+    meta: { successMessage: 'toasts.pluginRemoved' },
+  });
+}
+
+/** Ответ действия над рынком: последние строки CLI; перезапуск не нужен. */
+export interface ProviderMarketplaceActionResult {
+  ok: true;
+  output: string;
+  needsRestart: false;
+}
+
+/**
+ * Рынки плагинов Codex (MAP 25): подключить, обновить снимок git, отключить.
+ * Сервер зовёт `codex plugin marketplace …` — config.toml панель здесь не пишет.
+ */
+export function useAddProviderMarketplace() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (source: string): Promise<ProviderMarketplaceActionResult> => {
+      const { data } = await apiClient.post<ProviderMarketplaceActionResult>(
+        '/provider-plugins/marketplaces',
+        { source },
+      );
+      return data;
+    },
+    onSettled: () => void queryClient.invalidateQueries({ queryKey: infoKey() }),
+    meta: { successMessage: 'toasts.saved' },
+  });
+}
+
+export function useUpgradeProviderMarketplace() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (name: string): Promise<ProviderMarketplaceActionResult> => {
+      const { data } = await apiClient.post<ProviderMarketplaceActionResult>(
+        `/provider-plugins/marketplaces/${encodeURIComponent(name)}/upgrade`,
+      );
+      return data;
+    },
+    onSettled: () => void queryClient.invalidateQueries({ queryKey: infoKey() }),
+    meta: { successMessage: 'toasts.updated' },
+  });
+}
+
+export function useRemoveProviderMarketplace() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (name: string): Promise<ProviderMarketplaceActionResult> => {
+      const { data } = await apiClient.delete<ProviderMarketplaceActionResult>(
+        `/provider-plugins/marketplaces/${encodeURIComponent(name)}`,
+      );
+      return data;
+    },
+    onSettled: () => void queryClient.invalidateQueries({ queryKey: infoKey() }),
+    meta: { successMessage: 'toasts.deleted' },
+  });
+}

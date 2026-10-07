@@ -235,9 +235,11 @@ export interface ProviderHooksConfigLocation {
    * - `kimi-toml` — МАССИВ ТАБЛИЦ `[[hooks]]` в `config.toml` Kimi Code: поля
    *   `event` / `matcher` / `command` / `timeout` (СЕКУНДЫ, 1–600). Плоский
    *   массив нельзя переписать частично, поэтому любое отклонение от формы
-   *   переводит весь раздел в чтение.
+   *   переводит весь раздел в чтение;
+   * - `codex-json` — файл `hooks.json` Codex: та же форма, что `qwen-json`
+   *   (ключ корня `hooks`), свои двенадцать событий, таймаут в СЕКУНДАХ.
    */
-  format: 'opencode-json' | 'qwen-json' | 'kimi-toml';
+  format: 'opencode-json' | 'qwen-json' | 'kimi-toml' | 'codex-json';
   /** Абсолютный путь к файлу конфигурации с хуками. */
   path: (override?: string) => string;
   /**
@@ -278,6 +280,13 @@ export interface ProviderHooksConfigLocation {
    * оживает без единой правки адаптера.
    */
   writeDisabledReason?: string;
+  /**
+   * Записанный хук CLI исполняет только после одобрения человеком внутри себя
+   * (Codex: `/hooks`, доверие по отпечатку определения; правка снимает его).
+   * Панель доверие не пишет — раздел предупреждает, а отчёт переноса ставит
+   * условие `approve_in_cli`.
+   */
+  approvalRequired?: true;
 }
 
 /**
@@ -297,9 +306,12 @@ export interface ProviderPluginsConfigLocation {
    * - `opencode-plugins` — каталог файлов + массив `plugin` (правится);
    * - `kimi-plugins` — каталог `plugins/managed/<id>/` с JSON-манифестами
    *   (ТОЛЬКО ЧТЕНИЕ: форма реестра `installed.json` не задокументирована, а
-   *   ставят и включают плагины командой `/plugins` внутри CLI).
+   *   ставят и включают плагины командой `/plugins` внутри CLI);
+   * - `qwen-extensions` — `<QWEN_HOME>/extensions/<имя>/qwen-extension.json`:
+   *   манифесты панель читает сама, а ставит, включает, выключает и удаляет
+   *   ТОЛЬКО командами `qwen extensions …` (хранилище CLI внутреннее).
    */
-  format: 'opencode-plugins' | 'kimi-plugins';
+  format: 'opencode-plugins' | 'kimi-plugins' | 'qwen-extensions' | 'codex-plugins';
   /** Абсолютный путь КАТАЛОГА плагинов (`~/.config/opencode/plugins`). */
   dir: (override?: string) => string;
   /** Абсолютный путь конфигурации с массивом `plugin` — только у OpenCode. */
@@ -314,6 +326,12 @@ export interface ProviderPluginsConfigLocation {
    * верности обязана сказать это причиной, а не молчанием.
    */
   writeDisabledReason?: string;
+  /**
+   * Единица ставится ТОЛЬКО установкой командой самого CLI (Qwen: `qwen
+   * extensions install`) — файлом в каталог её не положить. Для переноса среды
+   * это «магазин»: ни модуль, ни пакет такая цель не принимает.
+   */
+  installedByCli?: true;
 }
 
 /**

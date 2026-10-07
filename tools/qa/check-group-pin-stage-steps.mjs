@@ -187,7 +187,15 @@ await runOnStand(
       const page = await openProjectChat(stand, browser, copy, 'repo-wt');
       /** Открыть ребёнка в списке чатов копии. */
       const openKid = async (kid) => {
-        await page.getByText(kid.title, { exact: true }).first().click();
+        // Дети без родителя (его транскрипта нет) — под карточкой «Родительский
+        // чат удалён», свёрнутые в «Ещё N»: раскрыть, если ребёнка не видно.
+        const row = page.getByText(kid.title, { exact: true }).first();
+        if (!(await row.isVisible()))
+          await page
+            .getByText(/^Ещё \d+$/)
+            .first()
+            .click();
+        await row.click();
         await page.locator('textarea[data-chat-input]').waitFor({ timeout: 30_000 });
         await wait(800);
       };

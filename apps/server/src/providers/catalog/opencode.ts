@@ -2,6 +2,7 @@ import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { buildCapabilities, type ConfigProvider } from '../types.ts';
 import { opencodeConfigDir, opencodeConfigFile, unimplementedPaths } from './config-dirs.ts';
+import { contourModelName } from './run-endpoint.ts';
 
 /** OpenCode: AGENTS.md + opencode.json. */
 export const opencodeProvider: ConfigProvider = {
@@ -159,13 +160,20 @@ export const opencodeProvider: ConfigProvider = {
     if (dirname(file) !== opencodeConfigDir()) locations.push(file);
     return locations;
   },
-  // Ассистент OpenCode: OpenAI-совместимый API (ключ настраивается на стороне
-  // самого OpenCode, стандартной единой env-переменной нет → apiKeyEnvVars пуст),
-  // есть рабочий CLI (`opencode`) → раннер `cli`, пока ключ не задан в панели.
+  // Ассистент OpenCode: есть рабочий CLI (`opencode`) → раннер `cli`.
+  // Прямого API у панели для OpenCode НЕТ (D1): `apiKind` остаётся
+  // `openai-compat`, но адреса (`apiBaseUrl`) нет намеренно. OpenCode — шлюз ко
+  // множеству вендоров, ключ настраивается на его стороне, и чей это ключ, по
+  // самому ключу не понять; общий запрет (`vendorApiRefusal`) отвечает отказом
+  // `assistant-api-base-unknown`, а не шлёт сохранённый ключ чужому вендору.
   // OPENCODE-7: задокументированный one-shot — подкоманда `run`, промпт идёт
-  // ПОЗИЦИОННЫМ аргументом в конце (`opencode run "<текст>"`); стандартный ввод
-  // CLI не поддерживает, поэтому передать промпт можно только так. Промпт —
-  // ОТДЕЛЬНЫЙ элемент argv, никакой сборки строки для оболочки.
+  // ПОЗИЦИОННЫМ аргументом в конце (`opencode run "<текст>"`). Промпт —
+  // ОТДЕЛЬНЫЙ элемент argv, никакой сборки строки для оболочки. Стандартный ввод
+  // `run` ЧИТАЕТ, если это не терминал, и ждёт его конца (проверено 1.18.34:
+  // открытая труба = вечное ожидание), — запускающий обязан его закрыть.
+  // Вывод — формат по умолчанию: ответ модели идёт в stdout, служебные строки
+  // (`> build · model`, вызовы инструментов, ошибки) — в stderr (проверено
+  // 1.18.34), так что «хрома» в ответе нет и без `--format json`.
   // IDEA-8: у OpenCode есть и ЗАДОКУМЕНТИРОВАННЫЙ локальный сервер
   // (`opencode serve --port <n> --hostname <адрес>`) с сессиями — диалог держит
   // сам CLI, панель шлёт только новое сообщение. Панель пробует его ПЕРВЫМ и при
@@ -174,8 +182,46 @@ export const opencodeProvider: ConfigProvider = {
     apiKind: 'openai-compat',
     apiKeyEnvVars: [],
     cliRunnable: true,
-    oneShotArgs: (prompt) => ['run', prompt],
+    // «Разрешить правки» (D2): `--auto` — «одобрять просьбы, которые не
+    // запрещены явно» (`run --help`, 1.18.34) — только при включённых правках.
+    // Без него `run` отклоняет каждую просьбу сам («auto-rejecting»). Просьбы
+    // при этом возникают лишь там, где конфигурация OpenCode говорит `ask`:
+    // его умолчание — «можно всё», и одиночный запуск слоя правил не получает.
+    // Полный переключатель — у сессии `opencode serve` (`domains/opencode-serve.ts`).
+    oneShotArgs: (prompt, run) => ['run', ...(run?.allowEdits ? ['--auto'] : []), prompt],
     sessionServer: 'opencode',
+    editsControl: 'flag',
+  },
+  // Контур (X7): `OPENCODE_CONFIG_CONTENT` — конфиг строкой, по документации
+  // старше глобального и проектного (сливается с ними). Провайдер `contour` —
+  // встроенный `@ai-sdk/openai-compatible`, и он единственный разрешённый: модель
+  // по умолчанию, малая (заголовок сессии) и модели встроенных агентов смотрят
+  // туда. Без последних `agent.build.model` человека на выключенном провайдере
+  // роняет прогон (UnknownError, живая проба).
+  runEndpoint: {
+    apiKind: 'openai-compat',
+    env: ({ baseUrl, model, key }) => {
+      const name = contourModelName(model);
+      const ref = `contour/${name}`;
+      const agent = Object.fromEntries(
+        ['build', 'plan', 'general', 'explore'].map((id) => [id, { model: ref }]),
+      );
+      return {
+        OPENCODE_CONFIG_CONTENT: JSON.stringify({
+          provider: {
+            contour: {
+              npm: '@ai-sdk/openai-compatible',
+              options: { baseURL: baseUrl, apiKey: key },
+              models: { [name]: {} },
+            },
+          },
+          model: ref,
+          small_model: ref,
+          agent,
+          enabled_providers: ['contour'],
+        }),
+      };
+    },
   },
   capabilities: buildCapabilities({
     globalInstructions: 'ready',
@@ -188,7 +234,8 @@ export const opencodeProvider: ConfigProvider = {
     env: 'unsupported',
     // OPENCODE-7: one-shot задокументирован — `opencode run "<промпт>"`. Basic-чат
     // работает через тот же раннер, что у codex/gemini/aider, и остаётся с
-    // пометкой «экспериментально»: `opencode` на этой машине не установлен.
+    // пометкой «экспериментально»; сессия, one-shot и права проверены живым
+    // прогоном opencode 1.18.34 на заглушке модели (`tools/qa/check-cli-opencode.mjs`).
     chat: 'ready',
     // Проектный уровень (COMMON-2): проектные пути задокументированы, файлы
     // пишутся теми же адаптерами, что и глобальные (см. projectConfig).

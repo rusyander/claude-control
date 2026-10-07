@@ -151,8 +151,25 @@ export interface ChildStageGroup {
    * кончилась доставкой — `checkedAt`, и кнопка зелёная с этим временем.
    */
   recheck?: GroupRecheckState;
+  /** «Перевести задачи» (G4): у группы есть MR и задачи трекера, Jira подключена. */
+  taskMove?: { index: number; keys: string[]; connected: boolean };
   /** MR группы влит или закрыт — по чтению форджа. */
   mrClosed?: 'merged' | 'closed';
+  /**
+   * Место MR группы в очереди слияния (G3): «мержить 2-м из 5». Нет — у группы
+   * нет своего MR, он влит или закрыт, либо порядок из записи не выводится.
+   */
+  mergeOrder?: GroupMergeOrder;
+}
+
+/** Место MR группы в очереди слияния и кого влить раньше. */
+export interface GroupMergeOrder {
+  /** Номер в очереди, с единицы. */
+  position: number;
+  /** Сколько MR в очереди. */
+  total: number;
+  /** Названия групп, чьи MR влить раньше этого, — в порядке очереди. */
+  before: string[];
 }
 
 export type SplitGroupResult = NonNullable<SplitPlanView['groups'][number]['result']>;

@@ -1,0 +1,175 @@
+<mxfile host="app.diagrams.net" version="24.7.7">
+  <diagram id="p1" name="Как агент попадает на вашу видеокарту">
+    <mxGraphModel dx="0" dy="0" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1730" pageHeight="1010" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="p1:title" value="Как агент попадает на вашу видеокарту" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=20;fontColor=#1A237E;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="30" width="1400" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:sub" value="Человек нажимает одну кнопку; всё, что раньше ставили и прописывали руками, панель делает сама — а запросы агента идут той же дорогой, что и через корпоративный контур." style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=11;fontColor=#546E7A;" vertex="1" parent="1">
+          <mxGeometry x="60" y="60" width="1400" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="l:section" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#1B5E20;text-align:left&quot;&gt;Раздел «Локальные модели»&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Панель читает карту сама (nvidia-smi, реестр Windows, sysctl на Mac): объём, свободную память и пропускную способность.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Каталог моделей для кода размечен под ЭТУ карту: влезет ли, с каким контекстом и с какой скоростью. Лучшая для агента помечена «Рекомендуем».&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#E8F5E9;strokeColor=#43A047;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;spacingLeft=50;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="150" width="400" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="l:section:icon" value="вы" style="shape=card;fillColor=#FFFFFF;strokeColor=#43A047;html=1;whiteSpace=wrap;align=center;verticalAlign=bottom;fontSize=7;fontColor=#1B5E20;informational=1;" vertex="1" parent="l:section">
+          <mxGeometry x="10" y="10" width="40" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="l:button" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#00695C;text-align:left&quot;&gt;«Скачать и подключить»&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Берёт системный Ollama, если он есть и не старый, иначе скачивает свою копию и сверяет контрольную сумму.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Качает модель с докачкой, поднимает сервер с нужным контекстом и заводит контур локальной модели. Работа идёт на сервере панели: закрытая вкладка её не обрывает.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#E0F2F1;strokeColor=#26A69A;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;spacingLeft=50;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="300" width="400" height="110" as="geometry"/>
+        </mxCell>
+        <mxCell id="l:button:icon" value="кнопка" style="shape=hexagon;fillColor=#FFFFFF;strokeColor=#26A69A;html=1;whiteSpace=wrap;align=center;verticalAlign=bottom;fontSize=7;fontColor=#00695C;informational=1;" vertex="1" parent="l:button">
+          <mxGeometry x="10" y="10" width="40" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="l:hint" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#4527A0;text-align:left&quot;&gt;Та же кнопка под полем чата&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Подсказка называет модель для вашей карты и её скорость. Когда модель скачана и подключена, открытый разговор продолжается сам.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#EDE7F6;strokeColor=#7E57C2;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;spacingLeft=50;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="470" width="400" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="l:hint:icon" value="чат" style="shape=card;fillColor=#FFFFFF;strokeColor=#7E57C2;html=1;whiteSpace=wrap;align=center;verticalAlign=bottom;fontSize=7;fontColor=#4527A0;informational=1;" vertex="1" parent="l:hint">
+          <mxGeometry x="10" y="10" width="40" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="l:chat" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#AD1457;text-align:left&quot;&gt;Чат, группа, тест&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Claude Code запускается как обычно; адрес модели ему подставляет панель на один прогон. В ~/.claude ничего не пишется.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Qwen Code получает тот же маршрут, если контур его принимает.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FCE4EC;strokeColor=#EC407A;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;spacingLeft=50;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="620" y="150" width="460" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="l:chat:icon" value="CLI" style="shape=process;fillColor=#FFFFFF;strokeColor=#EC407A;html=1;whiteSpace=wrap;align=center;verticalAlign=bottom;fontSize=7;fontColor=#AD1457;informational=1;" vertex="1" parent="l:chat">
+          <mxGeometry x="10" y="10" width="40" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="l:gateway" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#4527A0;text-align:left&quot;&gt;Шлюз панели — контур локальной модели&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Тот же механизм, что у корпоративного контура: режим «обязательно» (без молчаливого ухода в облако), журнал, проба при включении.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;«Вернуть облако» выключает контур одной кнопкой.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#EDE7F6;strokeColor=#7E57C2;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;spacingLeft=50;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="620" y="290" width="460" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="l:gateway:icon" value="шлюз" style="shape=hexagon;fillColor=#FFFFFF;strokeColor=#7E57C2;html=1;whiteSpace=wrap;align=center;verticalAlign=bottom;fontSize=7;fontColor=#4527A0;informational=1;" vertex="1" parent="l:gateway">
+          <mxGeometry x="10" y="10" width="40" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="l:ollama" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#1565C0;text-align:left&quot;&gt;Сервер моделей на 127.0.0.1:11435&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Свой порт и своя папка моделей — системный Ollama на 11434 не мешает. Контекст задан на весь сервер: другая модель с другим контекстом = перезапуск.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Простаивающая модель уходит из видеопамяти через 10 минут; «Остановить» освобождает её сразу.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#E3F2FD;strokeColor=#42A5F5;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;spacingLeft=50;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="620" y="430" width="460" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="l:ollama:icon" value="Ollama" style="shape=process;fillColor=#FFFFFF;strokeColor=#42A5F5;html=1;whiteSpace=wrap;align=center;verticalAlign=bottom;fontSize=7;fontColor=#1565C0;informational=1;" vertex="1" parent="l:ollama">
+          <mxGeometry x="10" y="10" width="40" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="l:gpu" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#1B5E20;text-align:left&quot;&gt;Видеокарта&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Модель целиком в видеопамяти — десятки токенов в секунду. Не влезла — часть уходит в оперативную память, и агенту это уже слишком медленно: каталог такую не рекомендует.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#E8F5E9;strokeColor=#43A047;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="1240" y="430" width="430" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="l:folder" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#EF6C00;text-align:left&quot;&gt;Папка .local-models&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;runtime — сервер, models — модели, downloads — недокачанное, tools — Qwen Code и набор, logs — журнал сервера, state.json — замеры и выбор набора.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Модель из системного Ollama переносится жёсткой ссылкой: второй копии на диске нет.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFF3E0;strokeColor=#FB8C00;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="1240" y="290" width="430" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="l:limits" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#B71C1C;text-align:left&quot;&gt;Границы&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Локальная модель слабее облачной: длинные задачи и большие правки она делает хуже. Набор панели (короткие правила и навыки) помогает ей, но не уравнивает.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Сервер слушает только 127.0.0.1 — раздать модель на команду отсюда нельзя.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFEBEE;strokeColor=#E53935;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="1240" y="150" width="430" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge:l:section:l:button" value="человек выбирает модель" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#2E7D32;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="l:section" target="l:button">
+          <mxGeometry relative="1" x="0" y="0" as="geometry">
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge:l:button:l:ollama" value="ставит и запускает" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#1565C0;exitX=1;exitY=0.8;exitDx=0;exitDy=0;entryX=0;entryY=0.3;entryDx=0;entryDy=0;" edge="1" parent="1" source="l:button" target="l:ollama">
+          <mxGeometry relative="1" x="0" y="0" as="geometry">
+            <Array as="points">
+            <mxPoint x="540" y="388"/>
+            <mxPoint x="540" y="457"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge:l:button:l:gateway" value="заводит контур" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#1565C0;exitX=1;exitY=0.2727272727272727;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="l:button" target="l:gateway">
+          <mxGeometry relative="1" x="0" y="0" as="geometry">
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge:l:chat:l:gateway" value="запрос агента" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#1565C0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="l:chat" target="l:gateway">
+          <mxGeometry relative="1" x="0" y="0" as="geometry">
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge:l:gateway:l:ollama" value="по адресу …/v1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#1565C0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="l:gateway" target="l:ollama">
+          <mxGeometry relative="1" x="0" y="0" as="geometry">
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge:l:ollama:l:gpu" value="веса в видеопамять" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#6D4C41;exitX=1;exitY=0.3888888888888889;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="l:ollama" target="l:gpu">
+          <mxGeometry relative="1" x="0" y="0" as="geometry">
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge:l:ollama:l:folder" value="модели и журнал" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#6D4C41;exitX=1;exitY=0.2;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="l:ollama" target="l:folder">
+          <mxGeometry relative="1" x="0" y="0" as="geometry">
+            <Array as="points">
+            <mxPoint x="1160" y="448"/>
+            <mxPoint x="1160" y="330"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p1:legend:title" value="Обозначения" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=11;fontColor=#37474F;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="600" width="210" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw0" value="" style="rounded=1;arcSize=12;fillColor=#E8F5E9;strokeColor=#43A047;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="630" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:cap0" value="человек и его машина" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="630" width="150" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw1" value="" style="rounded=1;arcSize=12;fillColor=#E0F2F1;strokeColor=#26A69A;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="660" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:cap1" value="работа панели" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="660" width="150" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw2" value="" style="rounded=1;arcSize=12;fillColor=#EDE7F6;strokeColor=#7E57C2;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="690" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:cap2" value="что видно на экране" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="690" width="150" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw3" value="" style="rounded=1;arcSize=12;fillColor=#FCE4EC;strokeColor=#EC407A;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="720" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:cap3" value="агент-CLI" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="720" width="150" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw4" value="" style="rounded=1;arcSize=12;fillColor=#FFF3E0;strokeColor=#FB8C00;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="750" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:cap4" value="файлы на диске" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="750" width="150" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw5" value="" style="rounded=1;arcSize=12;fillColor=#E3F2FD;strokeColor=#42A5F5;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="780" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:cap5" value="сервер моделей" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="780" width="150" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw6" value="" style="rounded=1;arcSize=12;fillColor=#FFEBEE;strokeColor=#E53935;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="810" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:cap6" value="границы" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="810" width="150" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw7" value="" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#7E57C2;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="840" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:cap7" value="значок — чья это коробка" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="840" width="150" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw8" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#1565C0;sample=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="60" y="880" as="sourcePoint"/>
+            <mxPoint x="110" y="880" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p1:legend:cap8" value="порядок" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="870" width="150" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw9" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#2E7D32;sample=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="60" y="910" as="sourcePoint"/>
+            <mxPoint x="110" y="910" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p1:legend:cap9" value="действие человека" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="900" width="150" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw10" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#6D4C41;sample=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="60" y="940" as="sourcePoint"/>
+            <mxPoint x="110" y="940" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p1:legend:cap10" value="данные" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="930" width="150" height="20" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -793,3 +793,26 @@ describe('общий каталог скиллов — это КАТАЛОГ, а
     expect(level(SKILL, shared).reason).toBe('target_shares_location');
   });
 });
+
+describe('хук у цели, которая исполняет его только после одобрения (Codex, MAP 26)', () => {
+  it('нативно — но при одобрении в CLI, а без него не исполнится вовсе', () => {
+    expect(level(TOOL_HOOK, provider('codex'))).toEqual({
+      level: 'native',
+      reason: 'target_mechanism',
+      condition: 'approve_in_cli',
+      fallback: 'impossible',
+    });
+  });
+
+  it('цель без одобрения (Qwen) того же условия не получает', () => {
+    expect(level(TOOL_HOOK, provider('qwen'))).toMatchObject({
+      level: 'native',
+      condition: null,
+    });
+  });
+
+  it('перенос Codex в сам себя условия не несёт: хук уже стоит и одобрен там', () => {
+    const own = { ...TOOL_HOOK, source: { ...TOOL_HOOK.source, provider: 'codex' } } as EnvItem;
+    expect(level(own, provider('codex'))).toMatchObject({ level: 'native', condition: null });
+  });
+});

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   BUILTIN_SIEVES,
+  LEARNED_SIEVES_MAX,
   SIEVE_CLASSES,
   type LearnedSieve,
   type SieveTally,
@@ -215,6 +216,16 @@ export function SievesCard() {
               {t('settings.sieves.learnedHint')}
             </Typography>
           </Stack>
+          {/* Принятое не вытесняется (Ф4): полное хранилище отказывает новым ситам вслух. */}
+          {query.data?.refused && (
+            <Typography variant="body-sm" color="danger" role="alert" data-sieves-refused>
+              {t('settings.sieves.refused', {
+                count: query.data.refused.count,
+                max: LEARNED_SIEVES_MAX,
+                at: new Date(query.data.refused.at).toLocaleString(),
+              })}
+            </Typography>
+          )}
           {learnedList()}
         </Stack>
 

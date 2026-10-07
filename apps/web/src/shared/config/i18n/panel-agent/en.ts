@@ -83,8 +83,8 @@ export const panelAgentEn: typeof panelAgentRu = {
     conversation_deleted:
       'This conversation was deleted in another tab — your next message starts a new one.',
     provider_unsupported:
-      'The panel agent works only with Claude Code for now: another CLI is active.',
-    cli_not_found: 'Claude Code is not in PATH: the agent has nothing to run with.',
+      'The panel agent does not work with the active CLI: it runs through Claude Code, Qwen Code, Codex, Gemini CLI, OpenCode, Goose or Kimi Code.',
+    cli_not_found: 'The active provider’s CLI is not in PATH: the agent has nothing to run with.',
     endpoint_unsupported:
       'The assistant uses its own endpoint: its key would have to be handed to the agent process.',
     data_mask_broken:
@@ -136,6 +136,8 @@ export const panelAgentEn: typeof panelAgentRu = {
     draft_cases: 'Draft cases',
     run_tests: 'Run tests',
     list_contours: 'List contours',
+    local_models_status: 'Local models status',
+    kit_status: 'Panel kit status',
     contour_status: 'Contour status',
     probe_contour_url: 'Check a contour address',
     save_contour_draft: 'Save a contour draft',

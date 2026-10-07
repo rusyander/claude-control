@@ -1,5 +1,7 @@
 import { killChildTree } from '../../lib/process-tree.ts';
 import { spawnCliProcess } from '../../lib/cli-spawn.ts';
+import { serverText } from '../../lib/server-texts.ts';
+import { withCodexKit } from '../kit/codex.ts';
 import {
   readStreamJsonResult,
   STREAM_JSON_INPUT_ARGS,
@@ -49,12 +51,21 @@ function spawnCli(
   deps: RunAssistantDeps,
   stdin?: string,
   cwd?: string,
+  runEnv?: Record<string, string>,
 ): Promise<SpawnOutcome> {
   const timeoutMs = deps.timeoutMs ?? DEFAULT_TIMEOUT;
-  const spawned = spawnCliProcess(command, args, {
-    spawnImpl: deps.spawnImpl,
-    ...(cwd ? { cwd } : {}),
-  });
+  // Набор панели в Codex (`domains/kit/codex.ts`) — без переменной наложения ничего не меняет.
+  const kit = withCodexKit(args, deps.env, 'exec');
+  // Окружение прогона от провайдера (`assistant.oneShotEnv`) — поверх набора.
+  const env = { ...kit.env, ...runEnv };
+  const spawned =
+    kit.missing || kit.refusal
+      ? { error: new Error(kit.refusal ?? serverText('kit-compose-failed')) }
+      : spawnCliProcess(command, kit.args, {
+          spawnImpl: deps.spawnImpl,
+          ...(cwd ? { cwd } : {}),
+          ...(Object.keys(env).length > 0 ? { env } : {}),
+        });
 
   if (spawned.error) {
     return Promise.resolve({
@@ -106,6 +117,11 @@ function spawnCli(
       // `error` у потока роняет весь процесс сервера. Тут это просто «не успели».
       child.stdin?.on('error', () => {});
       child.stdin?.write(stdin);
+      child.stdin?.end();
+    } else {
+      // Промпт в argv — stdin всё равно закрываем: CLI, читающий его, когда это
+      // не терминал (`opencode run`, проверено 1.18.34), иначе ждёт конца вечно.
+      child.stdin?.on('error', () => {});
       child.stdin?.end();
     }
   });
@@ -271,10 +287,12 @@ export async function runProviderCli(
   cwd?: string,
 ): Promise<AssistantRunResult> {
   const command = cliCommand ?? providerCliCommand(provider);
-  const args = provider.assistant?.oneShotArgs?.(
-    prompt,
-    deps.model ? { model: deps.model } : undefined,
-  );
+  // Каталог запуска — тоже часть прогона: Aider вне репозитория сам делает `git init`.
+  const run =
+    deps.model || cwd
+      ? { ...(deps.model ? { model: deps.model } : {}), ...(cwd ? { workdir: cwd } : {}) }
+      : undefined;
+  const args = provider.assistant?.oneShotArgs?.(prompt, run);
   if (!args) {
     // CLI установлен, но неинтерактивный флаг не задокументирован → программно
     // не запускаем (fail-closed). Вызывающий попробует api/none.
@@ -288,8 +306,23 @@ export async function runProviderCli(
       error: `Для «${provider.name}» не задан неинтерактивный флаг запуска CLI.`,
     };
   }
-  const outcome = await spawnCli(command, args, deps, undefined, cwd);
-  return outcomeToResult(provider.id, outcome, true);
+  // То же окружение прогона, что у чата (Aider: UTF-8 в трубе вместо cp1251).
+  const outcome = await spawnCli(
+    command,
+    args,
+    deps,
+    undefined,
+    cwd,
+    provider.assistant?.oneShotEnv?.(run),
+  );
+  // Тот же разбор stdout, что у чата: argv один, значит, и вывод один (у Goose — поток JSON).
+  const parser = provider.assistant?.parseStdout?.();
+  const stdout = parser ? `${parser.push(outcome.stdout)}${parser.end()}` : outcome.stdout;
+  // CLI сам сказал «ход удался» — ненулевой код после этого сбой выхода, не ответа.
+  const parsed = parser
+    ? { ...outcome, stdout, code: parser.settled?.() ? 0 : outcome.code }
+    : outcome;
+  return outcomeToResult(provider.id, parsed, true);
 }
 
 // --- Сессионный режим CLI (IDEA-8) -------------------------------------------
@@ -311,6 +344,10 @@ export async function runSessionServer(
 ): Promise<AssistantRunResult | undefined> {
   const conversationId = deps.conversationId;
   if (!conversationId || provider.assistant?.sessionServer !== 'opencode') return undefined;
+  // Сервер сессий общий на все разговоры и поднят со своим окружением: адрес
+  // контура этого прогона (`OPENCODE_CONFIG_CONTENT`) до него не дошёл бы, и ход
+  // ушёл бы провайдером человека. Прогон с окружением — только одиночным запуском.
+  if (deps.env && Object.keys(deps.env).length > 0) return undefined;
 
   const lastUser = [...messages].reverse().find((message) => message.role === 'user');
   const text = lastUser?.content.trim();

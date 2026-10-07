@@ -344,8 +344,12 @@ export const GROUP_OVERRIDE_MARKER = blockLang('group-override');
 
 /** Что копирование не смогло перенести как есть — строка предупреждения на карточке. */
 export const copyWarningSchema = object({
-  /** `renamed` — имя занято, взят суффикс; `skipped` — вид не переносится; `failed` — запись упала. */
-  kind: zodEnum(['renamed', 'skipped', 'failed']),
+  /**
+   * `renamed` — имя занято, взят суффикс; `skipped` — вид не переносится; `failed` —
+   * запись упала; `approve` — запись легла, но заработает после одобрения в самом
+   * CLI (Codex: хук в `/hooks`), `detail` — имя CLI.
+   */
+  kind: zodEnum(['renamed', 'skipped', 'failed', 'approve']),
   member: string(),
   /** Для `renamed` — новое имя. */
   to: string().optional(),

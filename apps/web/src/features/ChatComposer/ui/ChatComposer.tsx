@@ -34,6 +34,7 @@ const MEDIA_PLACEHOLDER: Partial<Record<ComposerMode, string>> = {
  * в любой момент, а не ждать его конца.
  */
 export function ChatComposer({
+  focusKey,
   value,
   onChange,
   onSend,
@@ -49,6 +50,11 @@ export function ChatComposer({
   const [isDragging, setIsDragging] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Новый черновик — курсор в поле: человек нажал «Новый чат», чтобы писать.
+  useEffect(() => {
+    if (focusKey) inputRef.current?.focus();
+  }, [focusKey]);
 
   // Режим картинки: вложения в нём не участвуют — просьба к контуру состоит из
   // одного описания. Поэтому чипы и скрепка в нём не показываются, но и не

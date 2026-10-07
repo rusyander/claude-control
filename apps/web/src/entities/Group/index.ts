@@ -25,6 +25,7 @@ export {
   type PathStepDraftResult,
 } from './api/GroupPathApi';
 export { useGroupKnobs, useSetGroupKnobs } from './api/GroupKnobsApi';
+export { useGroupDelivery } from './api/GroupDeliveryApi';
 export {
   useGroupMembers,
   useResourceCatalog,

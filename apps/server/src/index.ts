@@ -72,7 +72,11 @@ watchCapture.attach(runtime.watcher);
 // расположение подменяются целиком при смене каталога (`ctx.relocate`).
 const configWatcher = createConfigWatcher({
   read: () => ({ enabled: ctx.store.getSettings().watchFiles, paths: ctx.location.paths }),
-  broadcast: runtime.events.broadcast,
+  broadcast: (domains, path) => {
+    runtime.events.broadcast(domains, path);
+    // Правка файла пары — сверка замечает её и перезапускается сама (В5).
+    if (domains.includes('globalLayer')) runtime.globalLayer.onGlobalChanged();
+  },
 });
 
 /**

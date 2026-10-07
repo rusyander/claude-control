@@ -34,6 +34,7 @@ function provider(overrides: Partial<ProviderInfo> & Pick<ProviderInfo, 'id'>): 
     hooksModel: 'none',
     pluginsModel: 'none',
     skillsModel: 'none',
+    rulesModel: 'none',
     ...overrides,
   };
 }

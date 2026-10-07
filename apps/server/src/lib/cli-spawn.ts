@@ -4,6 +4,7 @@ import { StringDecoder } from 'node:string_decoder';
 import { shellArgs } from './cli-args.ts';
 import { wasStoppedOnPurpose } from './process-tree.ts';
 import { resolveWindowsExecutable, cmdWouldTruncate } from './win-exec.ts';
+import { resolveWindowsShim } from './win-shim.ts';
 
 /**
  * Запуск CLI провайдера без shell-интерполяции — общий для всех, кто запускает
@@ -30,10 +31,12 @@ import { resolveWindowsExecutable, cmdWouldTruncate } from './win-exec.ts';
  * Но и с идеальными кавычками cmd.exe остаётся плохим посредником: `%ИМЯ%` он
  * подставит из окружения, а на первом переводе строки ОБРЕЖЕТ команду и молча
  * (код 0) выполнит только первую строку. Поэтому сперва ищем настоящий `.exe` и
- * запускаем его БЕЗ оболочки: argv уходит как есть. Обёртка `.cmd` без `.exe`
- * рядом — единственный случай, когда cmd.exe всё ещё нужен, и там мы лучше
- * откажемся с внятной ошибкой, чем отправим обрубок промпта и выдадим ответ на
- * него за полный.
+ * запускаем его БЕЗ оболочки: argv уходит как есть. Нет `.exe` — разбираем
+ * `.cmd`-обёртку npm/pnpm/yarn (`win-shim.ts`): она лишь зовёт `node <скрипт>
+ * %*` (или нативный бинарь), и ту же цель мы запускаем сами, тоже без
+ * оболочки. cmd.exe остаётся только для обёртки, которую мы не узнали, и там
+ * многострочный промпт мы лучше отклоним с внятной ошибкой, чем отправим
+ * обрубок и выдадим ответ на него за полный.
  */
 
 /**
@@ -215,6 +218,17 @@ export function spawnCliProcess(
   return outcome;
 }
 
+/**
+ * `NODE_PATH`, который обёртка pnpm выставила бы сама: её значение, а уже
+ * заданный — следом через `;`, ровно как в её ветке `ELSE`. Окружение
+ * берётся то, что ушло бы ребёнку, — иначе `inheritEnv: false` протёк бы.
+ */
+function withNodePath<T extends { env?: NodeJS.ProcessEnv }>(base: T, nodePath: string): T {
+  const env = base.env ?? process.env;
+  const current = env.NODE_PATH;
+  return { ...base, env: { ...env, NODE_PATH: current ? `${nodePath};${current}` : nodePath } };
+}
+
 function spawnUnobserved(
   command: string,
   args: string[],
@@ -251,6 +265,19 @@ function spawnUnobserved(
     const direct = resolveWindowsExecutable(command);
     if (direct) {
       return { child: spawnImpl(direct, args, base) as ChildProcessWithoutNullStreams };
+    }
+
+    // Обёртка npm/pnpm/yarn — это `node <скрипт> %*`: тот же node с тем же
+    // скриптом запускаем сами, без cmd.exe, и argv доходит как есть.
+    const shim = resolveWindowsShim(command);
+    if (shim) {
+      return {
+        child: spawnImpl(
+          shim.file,
+          [...shim.prefix, ...args],
+          shim.nodePath === undefined ? base : withNodePath(base, shim.nodePath),
+        ) as ChildProcessWithoutNullStreams,
+      };
     }
 
     if (cmdWouldTruncate(args)) {

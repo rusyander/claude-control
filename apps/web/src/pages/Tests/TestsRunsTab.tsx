@@ -24,6 +24,7 @@ import { TestsRunPublish } from './TestsRunPublish';
 import { TestsRunDiff } from './TestsRunDiff';
 import { TestsRunsOriginFilter } from './TestsRunsOriginFilter';
 import { queryView } from './model/queryView';
+import { foreignAgentName } from './model/runAgent';
 import { linkedRunToFollow } from './model/runLink';
 import { visibleRuns, runLabelKeys, type RunOriginFilter } from './model/runOrigin';
 import { formatRunDuration, isUnproven, redCases, runTally } from './model/reportMetrics';
@@ -185,6 +186,11 @@ export function TestsRunsTab({ projectPath, groups, isRunning, openRunId }: Test
                 {Boolean(record.costUsd) && (
                   <Typography variant="caption" color="subtle" as="span">
                     {t('tests.runs.cost', { value: (record.costUsd ?? 0).toFixed(2) })}
+                  </Typography>
+                )}
+                {foreignAgentName(record.provider) && (
+                  <Typography variant="caption" color="subtle" as="span">
+                    {t('tests.runs.agentCli', { name: foreignAgentName(record.provider) })}
                   </Typography>
                 )}
                 {record.sessionId && (

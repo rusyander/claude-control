@@ -29,6 +29,7 @@ import { CopyGroupDialog } from './CopyGroupDialog';
 import type { AdviceMode } from './AdviceModal.types';
 import type { GroupsTabCount } from './GroupsTabs.types';
 import { CreateGroupChooser } from './CreateGroupChooser';
+import { GroupsProviderNote } from './GroupsProviderNote';
 import type { CreateGroupKind } from './CreateGroupChooser.types';
 import styles from './GroupsPage.module.scss';
 
@@ -219,6 +220,7 @@ export function GroupsPage() {
       />
 
       <ExplainBox title={t('groups.explainTitle')} text={t('groups.explain')} />
+      <GroupsProviderNote />
 
       <GroupsTabs
         active={tab}

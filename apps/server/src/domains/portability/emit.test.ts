@@ -716,11 +716,12 @@ describe('перенос в чужие CLI', () => {
     );
     if (!sessionHook) throw new Error('сессионного хука нет в каноне — фикстура изменилась');
 
-    const codex = PROVIDERS.find((provider) => provider.id === 'codex');
-    if (!codex) throw new Error('codex нет в каталоге');
-    expect(level(sessionHook, codex).level).toBe('emulated');
+    // Цель без хуков, которую панель умеет запускать (Codex хуки получил, MAP 26).
+    const gemini = PROVIDERS.find((provider) => provider.id === 'gemini');
+    if (!gemini) throw new Error('gemini нет в каталоге');
+    expect(level(sessionHook, gemini).level).toBe('emulated');
 
-    const plan = emitAndApply('codex');
+    const plan = emitAndApply('gemini');
     const entry = plan.entries.find((candidate) => candidate.itemId === sessionHook.id);
     expect(entry?.outcome).toBe('runtime_only');
     expect(plan.writes.some((write) => write.itemIds.includes(sessionHook.id))).toBe(false);

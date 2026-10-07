@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type {
@@ -41,7 +41,14 @@ describe('project-tests-routes: рабочее место', () => {
   };
   const path = (): string => encodeURIComponent(project);
 
+  let ceilingBefore: string | undefined;
+
   beforeEach(async () => {
+    // Проект теста — «вне репозитория»: git не поднимается выше temp. Без этого
+    // temp внутри чужого репозитория делал дифф сравнимым, и маршрут запускал
+    // настоящую генерацию — живой claude на машине прогона.
+    ceilingBefore = process.env.GIT_CEILING_DIRECTORIES;
+    process.env.GIT_CEILING_DIRECTORIES = realpathSync.native(tmpdir());
     project = mkdtempSync(join(tmpdir(), 'cc-tests-workspace-'));
     backupDir = mkdtempSync(join(tmpdir(), 'cc-tests-workspace-backups-'));
     app = Fastify();
@@ -56,7 +63,12 @@ describe('project-tests-routes: рабочее место', () => {
         // Галочку «принимать сразу» вид спрашивает у панели, а не у проекта:
         // здесь её нет, и это ровно то состояние, в котором приходит человек,
         // ни разу её не трогавший.
-        store: { getProjectByPath: () => undefined, isTestsAutoAccept: () => false },
+        // Провайдер не выбран — Claude Code по умолчанию: прогон агента разрешён.
+        store: {
+          getProjectByPath: () => undefined,
+          isTestsAutoAccept: () => false,
+          getSettings: () => ({}),
+        },
       } as unknown as ServerContext,
       new ProjectTestRunRegistry(),
       new ProjectTestManualRegistry(),
@@ -77,6 +89,8 @@ describe('project-tests-routes: рабочее место', () => {
   });
 
   afterEach(async () => {
+    if (ceilingBefore === undefined) delete process.env.GIT_CEILING_DIRECTORIES;
+    else process.env.GIT_CEILING_DIRECTORIES = ceilingBefore;
     await app.close();
     rmSync(project, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
     rmSync(backupDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });

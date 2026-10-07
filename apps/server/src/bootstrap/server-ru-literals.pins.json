@@ -27,6 +27,10 @@
     "n": 1,
     "why": "CLI exit error shown in the form-assistant reply bubble (the prompt itself is English, D-E)"
   },
+  "domains/chat/chat-case-draft.ts": {
+    "n": 10,
+    "why": "text of the draft test case built from a chat (step labels, title and purpose) — data written into the project's test library, reviewed by the human at acceptance, not UI text"
+  },
   "domains/chat/ChatExport.ts": {
     "n": 3,
     "why": "exported document / markdown written for another tool"
@@ -38,10 +42,6 @@
   "domains/chat/ChatRunner.ts": {
     "n": 5,
     "why": "run errors shown in the chat feed (model name rejected, spawn failed, exit code, request failed); +1 the `modelDropped` feed notice — the code travels for translation"
-  },
-  "domains/chat/chat-case-draft.ts": {
-    "n": 10,
-    "why": "text of the draft test case built from a chat (step labels, title and purpose) — data written into the project's test library, reviewed by the human at acceptance, not UI text"
   },
   "domains/chat/detached-run.ts": {
     "n": 2,
@@ -244,12 +244,12 @@
     "why": "internal invariant errors of the help index parser (never shown, never sent) + the Russian word endings the help search stems with (matching data, never shown)"
   },
   "domains/panel-agent/launch.ts": {
-    "n": 6,
+    "n": 4,
     "why": "launch refusals shown on the panel agent card"
   },
   "domains/panel-agent/runner.ts": {
-    "n": 4,
-    "why": "turn errors shown on the panel agent card"
+    "n": 10,
+    "why": "turn errors shown on the panel agent card (Qwen init-tools stop, foreign-tool stop, Kimi image/argv refusals) — the error event has no code channel yet"
   },
   "domains/permissions.ts": {
     "n": 1,
@@ -439,6 +439,14 @@
     "n": 3,
     "why": "log line / internal error not shown as text"
   },
+  "domains/project-tests/agent/codex-run.ts": {
+    "n": 3,
+    "why": "tests-agent run errors that carry the CLI's own failure (turn failed, exit code, turn not started): the CLI text itself has no code; it lands in the run record as error, the same class as runs.ts log notes"
+  },
+  "domains/project-tests/agent/qwen-run.ts": {
+    "n": 1,
+    "why": "tests-agent run error when Qwen exits without a result: carries the exit code of a foreign CLI, no code channel for its own text"
+  },
   "domains/project-tests/defect-status.ts": {
     "n": 9,
     "why": "exported document / markdown written for another tool"
@@ -544,7 +552,7 @@
     "why": "internal error thrown at the caller when the permission receiver got no port"
   },
   "domains/project-tests/runs.ts": {
-    "n": 24,
+    "n": 26,
     "why": "run-log notes: a free-text log of the run, kept as the agent wrote it"
   },
   "domains/project-tests/similar.ts": {
@@ -587,9 +595,29 @@
     "n": 10,
     "why": "continuation titles and the refusal / feed texts of a foreign-CLI continuation the human reads"
   },
-  "domains/provider-chat/ProviderChatRun.ts": {
+  "domains/provider-chat/live/codex-app-server.ts": {
+    "n": 5,
+    "why": "live-transport turn texts of a foreign CLI (В1, 05.10): `unavailable.why` never reaches a person (the run silently falls back to a one-shot launch, log only); `error` texts become the chat's run error — the same class as ProviderChatRun.ts, whose error event has no code channel"
+  },
+  "domains/provider-chat/live/codex-session.ts": {
+    "n": 2,
+    "why": "Codex handshake `why` texts moved out of codex-app-server.ts: the chat falls back to a one-shot launch on them (log only); the tests agent wraps them into the coded tests-agent-codex-app-server-unavailable {why}"
+  },
+  "domains/provider-chat/live/goose-acp.ts": {
     "n": 8,
-    "why": "run errors and the supervisor refusal reason a person reads in the chat when a hook denies the run (П3.2)"
+    "why": "live-transport turn texts of a foreign CLI (В1, 05.10; +session/set_mode why, L-goose 06.10): `unavailable.why` never reaches a person (the run silently falls back to a one-shot launch, log only); `error` texts become the chat's run error — the same class as ProviderChatRun.ts, whose error event has no code channel"
+  },
+  "domains/provider-chat/live/kimi-server.ts": {
+    "n": 6,
+    "why": "live-transport turn texts of a foreign CLI (В1, 05.10): `unavailable.why` never reaches a person (the run silently falls back to a one-shot launch, log only); `error` texts become the chat's run error — the same class as ProviderChatRun.ts, whose error event has no code channel"
+  },
+  "domains/provider-chat/live/qwen-serve.ts": {
+    "n": 8,
+    "why": "live-transport turn texts of a foreign CLI (В1, 05.10): `unavailable.why` never reaches a person (the run silently falls back to a one-shot launch, log only); `error` texts become the chat's run error — the same class as ProviderChatRun.ts, whose error event has no code channel"
+  },
+  "domains/provider-chat/ProviderChatRun.ts": {
+    "n": 9,
+    "why": "run errors and the supervisor refusal reason a person reads in the chat when a hook denies the run (П3.2); +1 «CLI закончил ход без ответа», a live turn that ended empty (В1, 05.10)"
   },
   "domains/provider-chat/store.ts": {
     "n": 3,
@@ -603,9 +631,13 @@
     "n": 4,
     "why": "file content / template / parsed foreign format"
   },
+  "domains/provider-plugins/codex-plugins.ts": {
+    "n": 1,
+    "why": "parse failure of codex CLI stdout; becomes the {reason} of the translated installedStateError sentence (raw CLI text sits beside it)"
+  },
   "domains/provider-plugins/errors.ts": {
-    "n": 2,
-    "why": "path-rejection detail composed inside an error class"
+    "n": 12,
+    "why": "path-rejection detail and Qwen/Codex plugin refusals composed inside error classes (the response carries a messageCode)"
   },
   "domains/provider-plugins/files.ts": {
     "n": 1,
@@ -618,6 +650,14 @@
   "domains/provider-plugins/paths.ts": {
     "n": 2,
     "why": "path-rejection detail composed inside an error class"
+  },
+  "domains/provider-plugins/plugin-cli.ts": {
+    "n": 2,
+    "why": "CLI failure reason (timeout / exit code): a {reason} param inside a translated sentence or a messageCode response"
+  },
+  "domains/provider-plugins/qwen-extensions.ts": {
+    "n": 3,
+    "why": "record field of an extension whose manifest is missing; CLI failure reason forwarded as a messageCode param"
   },
   "domains/provider-projects.ts": {
     "n": 1,
@@ -739,6 +779,10 @@
     "n": 7,
     "why": "5 = passport prose for the human (named skip detail: which instructionFiles mode hid which file), moved here from domains/portability/instruction-files.ts; 2 = RU fallback message of InstructionNameRefusedError, which carries coded() beside it (instructions-file-name-unknown / instructions-file-exists)"
   },
+  "lib/qwen-rule-md.ts": {
+    "n": 1,
+    "why": "field-type rejection detail composed inside the error class (same as lib/cursor-mdc.ts)"
+  },
   "lib/request-body.ts": {
     "n": 2,
     "why": "log line / internal error not shown as text"
@@ -768,8 +812,8 @@
     "why": "path-rejection detail composed inside an error class"
   },
   "lib/server-texts/templates.ts": {
-    "n": 392,
-    "why": "RU side of the server text table: every line here IS a code, this is the one file where a Russian literal is the data. The generator and its manifest are gone from the tree (see the file header) — a new code is written by hand and `n` rises with it; +6 sieve-gap-* codes of the pre-MR sieves (28.09); +1 split drop/restart/no-slot-paused codes (29.09); +4 tests-gap-* codes of the group verdict from the Tests block (30.09); +13 sieve-gap-* codes of the panel mechanics, freshness and Tests-run proof (30.09); +1 sieve-gap-run-empty, a run that checked nothing (review PR #1, 05.10)"
+    "n": 438,
+    "why": "RU side of the server text table: every line here IS a code, this is the one file where a Russian literal is the data. The generator and its manifest are gone from the tree (see the file header) — a new code is written by hand and `n` rises with it; +6 sieve-gap-* codes of the pre-MR sieves (28.09); +1 split drop/restart/no-slot-paused codes (29.09); +4 tests-gap-* codes of the group verdict from the Tests block (30.09); +13 sieve-gap-* codes of the panel mechanics, freshness and Tests-run proof (30.09); +1 sieve-gap-run-empty, a run that checked nothing (review PR #1, 05.10); +1 tests-gap-stale, a Tests run recorded before the group's last change (05.10); +1 kit-compose-failed (06.10); +8 assistant-*/watcher-* refusals of the provider route for the panel helpers and the watcher (06.10); +2 gateway-responses-* refusals of the /v1/responses route for Codex (06.10); +6 provider-chat/analytics/groups/plugins/sandbox refusals and assistant-api-base-unknown of the CLI pass B0 (06.10); +22 group-layer-* refusals, feed notice lines and per-CLI toggle answers of the group run layer, batch A (06.10); +1 provider-unknown, now composed by code for the group toggle and delivery routes (06.10)"
   },
   "providers/catalog/kimi.ts": {
     "n": 1,
@@ -916,8 +960,8 @@
     "why": "fallback RU table of panel-agent codes: each line is addressed by PanelTextCode and translated by the window (Tests block actions)"
   },
   "routes/panel-agent/texts.ts": {
-    "n": 312,
-    "why": "fallback RU table of panel-agent codes: each line is addressed by PanelTextCode and translated by the window; +11 note codes of the preview card; +12 group read/draft/step/knob codes; +3 scenario draft codes; +4 group copy codes; +9 e2e-folder preview codes of create_project (F-53)"
+    "n": 314,
+    "why": "fallback RU table of panel-agent codes: each line is addressed by PanelTextCode and translated by the window; +11 note codes of the preview card; +12 group read/draft/step/knob codes; +3 scenario draft codes; +4 group copy codes; +9 e2e-folder preview codes of create_project (F-53); +1 journal-local-models-status summary code (05.10); +1 journal-kit-status (06.10)"
   },
   "routes/portability-routes.ts": {
     "n": 4,

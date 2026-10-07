@@ -29,6 +29,8 @@ import { PlatformTopic } from '../topics/PlatformTopic';
 import { PromptsTopic } from '../topics/PromptsTopic';
 import { PortabilityTopic } from '../topics/PortabilityTopic';
 import { PhoneTopic } from '../topics/PhoneTopic';
+import { LocalModelsTopic } from '../topics/LocalModelsTopic';
+import { KitTopic } from '../topics/KitTopic';
 
 export { HELP_ROUTE } from '@shared/config/routes';
 
@@ -132,6 +134,17 @@ export const HELP_GROUPS: HelpGroup[] = [
       // Контур — третий документ того же вопроса: куда уходит запрос, если
       // моделью распоряжается не вендор, а компания.
       { id: 'platform', icon: 'flag', pagePath: '/platform', Content: PlatformTopic },
+      // Сразу за контуром: локальная модель подключается к агентам именно контуром,
+      // и читать про неё осмысленно, когда уже понятно, что такое контур.
+      {
+        id: 'localModels',
+        icon: 'server',
+        pagePath: '/local-models',
+        Content: LocalModelsTopic,
+      },
+      // Сразу за локальными моделями: набор панели подключается к тем же агентам,
+      // и Qwen Code получает его именно на локальной модели.
+      { id: 'kit', icon: 'skills', pagePath: '/kit', Content: KitTopic },
       // После контура намеренно: три промпта из пяти существуют ради него, и
       // читать про тексты, которыми панель разговаривает с моделью, осмысленно
       // после того, как узнал, куда эти тексты уезжают. Вкладка настроек, а не

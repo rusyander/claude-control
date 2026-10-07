@@ -3,6 +3,7 @@ import type { ChildStageGroup } from '../ui/ChildStages.types';
 import type { GroupControlAction } from '../ui/GroupControl.types';
 import { acceptanceOf } from './groupAcceptance';
 import { recheckOf } from './groupRecheck';
+import { mergeOrderOf } from './mergeOrder';
 
 /**
  * Ключ строки хаба для звена группы. Номер группы из связи — первым (Д12):
@@ -18,6 +19,17 @@ export function splitGroupKey(link: {
 }): string {
   if (typeof link.groupIndex === 'number') return `#${link.groupIndex}`;
   return link.branch || link.title || link.id;
+}
+
+/**
+ * React-ключ карточки хаба. У группы без чата `chatId` — пустая строка, не
+ * `undefined`: `chatId ?? title` давал двум ждущим группам один ключ `""`
+ * (наблюдатель WR-9, 54 повтора), и React волен был потерять или задвоить
+ * карточку. Без чата ключом служит номер группы, без номера — её имя.
+ */
+export function hubCardKey(group: ChildStageGroup): string {
+  if (group.chatId) return group.chatId;
+  return typeof group.groupIndex === 'number' ? `#${group.groupIndex}` : group.title;
 }
 
 /**
@@ -51,6 +63,8 @@ export function mergeSplitGroups(
   };
 
   take([...byKey.entries()].find(([, row]) => row.stages.includes('triage'))?.[0]);
+  // Очередь слияния считается по всему плану разом: номер группы зависит от соседей.
+  const mergeOrder = mergeOrderOf(split);
   const order = [
     ...split.order,
     ...split.groups.map((group) => group.index).filter((index) => !split.order.includes(index)),
@@ -63,6 +77,7 @@ export function mergeSplitGroups(
       findRow(byKey, group.branch || group.title, group.chatId);
     if (found) {
       taken.add(found.key);
+      const queued = mergeOrder.get(group.index);
       ordered.push({
         ...found.row,
         title: group.title || found.row.title,
@@ -120,7 +135,19 @@ export function mergeSplitGroups(
         ...acceptanceOf(group, split, found.row.isRunning),
         // «Перепроверить MR» доставленной группы (владелец 05.10).
         ...recheckOf(group, split, found.row.isRunning),
+        // «Перевести задачи» группы (G4): видна у любой группы с ключами трекера —
+        // MR не нужен, и без подключённой Jira тоже (окно скажет, где подключить).
+        ...(group.taskKeys?.length
+          ? {
+              taskMove: {
+                index: group.index,
+                keys: group.taskKeys,
+                connected: Boolean(split.jiraTasks),
+              },
+            }
+          : {}),
         ...(group.mrClosed ? { mrClosed: group.mrClosed } : {}),
+        ...(queued ? { mergeOrder: queued } : {}),
         // Разрешённое по строке «с отметкой» — и у идущего звена: это то, что
         // прошло без человека прямо сейчас.
         ...(group.autoNotices?.length
@@ -254,7 +281,14 @@ function controlOf(
   split: SplitPlanView,
   hasChat: boolean,
 ): Pick<ChildStageGroup, 'control'> {
-  const actions = controlActions(group, hasChat, Boolean(split.cancelledAt));
+  // Ф16: посреди разбора порядок групп решает он — «Запустить сейчас» сервер
+  // отказывает (`split-start-triage`), а «Пауза» ждущей группы ничего не
+  // держит: кнопки строки гаснут до итога разбора.
+  const triaging = Boolean(split.triageChatId && !split.triage);
+  const actions =
+    triaging && group.status === 'pending'
+      ? []
+      : controlActions(group, hasChat, Boolean(split.cancelledAt));
   if (actions.length === 0) return {};
   const limitUntil = group.waitingFor === 'limit' ? group.limitUntil : undefined;
   const queueLimit = actions[0] === 'start' ? split.limitUntil : undefined;

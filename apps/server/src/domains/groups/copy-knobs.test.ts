@@ -213,7 +213,7 @@ describe('числа группы в копии', () => {
     const { group, warnings } = copyGroupToProvider(
       deps(),
       projectGroup(),
-      provider('codex'),
+      provider('gemini'),
       provider('claude'),
       { override: root },
     );

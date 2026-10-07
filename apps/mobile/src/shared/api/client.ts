@@ -104,8 +104,11 @@ async function request<T>(
 }
 
 export const api = {
-  get: <T>(path: string, query?: Record<string, string | number | undefined>) =>
-    request<T>('GET', path, { query }),
+  get: <T>(
+    path: string,
+    query?: Record<string, string | number | undefined>,
+    options?: { timeoutMs?: number },
+  ) => request<T>('GET', path, { query, ...options }),
   post: <T>(path: string, body?: unknown, options?: { timeoutMs?: number }) =>
     request<T>('POST', path, { body, ...options }),
   patch: <T>(path: string, body?: unknown) => request<T>('PATCH', path, { body }),

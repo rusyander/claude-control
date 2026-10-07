@@ -85,6 +85,7 @@ export const contourMessageParams = {
   'contour-tools-failed': ['reason'],
   'contour-required-gateway-down': ['title'],
   'contour-required-no-token': ['title'],
+  'contour-required-cli-config': ['title', 'setting'],
   'contour-target-assistant': [],
   'contour-bridge-script-missing': [],
 } as const satisfies Record<string, readonly string[]>;

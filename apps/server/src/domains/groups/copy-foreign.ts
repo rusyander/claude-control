@@ -104,6 +104,14 @@ export function copyGroupToProvider(
       }
     }
     applyTransfer(plan.target, plan.root, writes, deps.backupDir);
+    // Легло, но само не заработает: Codex запускает чужой хук только после
+    // одобрения в своём `/hooks` (G3). Отчёт верности это знает, а копия молчала,
+    // и человек считал бы хук действующим.
+    for (const row of plan.report.rows) {
+      if (row.condition === 'approve_in_cli' && only.has(row.itemId) && !missed.has(row.itemId)) {
+        warnings.push({ kind: 'approve', member: row.itemId, detail: target.name });
+      }
+    }
   }
 
   // Числа — только у скиллов, которые цель приняла: у остальных их некому применить.

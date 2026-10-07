@@ -1,3 +1,5 @@
+import type { GroupsModel } from './group-delivery.ts';
+
 /**
  * Абстракция провайдера конфигурации (мульти-провайдерность).
  *
@@ -79,6 +81,33 @@ export type ProviderPluginsModel = 'panel' | 'files' | 'none';
  */
 export type ProviderSkillsModel = 'claude' | 'files' | 'none';
 
+/**
+ * Как у провайдера устроен раздел ПРАВИЛ (MAP 24):
+ * - `claude` — богатый раздел правил Claude (`~/.claude/rules`, выключение,
+ *   группы, ассистент формы). Прежняя страница без изменений;
+ * - `files` — каталог правил самого CLI отдельно от его файла инструкций (Qwen
+ *   Code: `~/.qwen/rules/*.md`, условие `paths:` во frontmatter);
+ * - `none` — раздела нет. Cursor/Continue сюда не входят: у них каталог правил
+ *   И ЕСТЬ раздел инструкций (`instructionsModel: 'rules'`).
+ */
+export type ProviderRulesModel = 'claude' | 'files' | 'none';
+
+/**
+ * Кто решает «Разрешить правки» в чате чужого CLI:
+ * - `flag` — переключатель доходит до CLI флагом одиночного запуска (и ответом
+ *   живого сервера, где он есть): codex `--sandbox`, qwen `--approval-mode`;
+ * - `live` — только живой сервер CLI отвечает на запросы разрешений; одиночный
+ *   запуск, куда разговор падает без сервера, переключатель не видит (goose, kimi);
+ * - `none` — переключатель CLI не передаётся вовсе: решают его собственные настройки.
+ */
+export type ProviderEditsControl = 'flag' | 'live' | 'none';
+
+/**
+ * Что значит выключенный «Разрешить правки»: `ask` — просьба CLI о записи
+ * приходит карточкой (живой сервер), `deny` — одиночный запуск запись закрывает.
+ */
+export type ProviderEditsWhenOff = 'ask' | 'deny';
+
 /** Краткая карточка провайдера для клиента: id, имя, статус и карта возможностей. */
 export interface ProviderInfo {
   id: string;
@@ -100,6 +129,22 @@ export interface ProviderInfo {
   pluginsModel: ProviderPluginsModel;
   /** Модель раздела скиллов: богатая claude-овская или каталог `SKILL.md` у CLI. */
   skillsModel: ProviderSkillsModel;
+  /** Модель раздела правил: богатая claude-овская или каталог правил самого CLI. */
+  rulesModel: ProviderRulesModel;
+  /**
+   * Чем CLI слушается переключателя «Разрешить правки». Нет поля (сервер старше
+   * поля) — считать `none`: обещать переключатель, которого CLI не видит, нельзя.
+   */
+  editsControl?: ProviderEditsControl;
+  /** Смысл выключенного переключателя; нет поля — переключателя нет. */
+  editsWhenOff?: ProviderEditsWhenOff;
+  /**
+   * Что значит группа для этого CLI (`group-delivery.ts`): у Claude тумблер
+   * правит его каталоги, у CLI со слоем группа едет на каждый прогон, у
+   * остальных не действует. Нет поля (сервер старше поля) — у Claude
+   * `claude-files`, у прочих `none`: обещать группу, которая не доедет, нельзя.
+   */
+  groupsModel?: GroupsModel;
 }
 
 /** Ответ `GET /api/providers`: id активного провайдера и список известных. */

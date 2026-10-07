@@ -556,6 +556,22 @@ function serverOf(watchPid, table = processTable()) {
   return undefined;
 }
 
+/**
+ * То же, но с повтором: под нагрузкой (прогон группы) снимок процессов
+ * Windows приходит пустым или без свежего ребёнка — один промах ещё не
+ * «сервера нет». Таблица отдаётся та, в которой сервер нашёлся.
+ */
+async function serverUnder(watchPid, attempts = 5) {
+  let table = new Map();
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    table = processTable();
+    const pid = serverOf(watchPid, table);
+    if (pid) return { table, pid };
+    await wait(1_000);
+  }
+  return { table, pid: undefined };
+}
+
 /** Что из прогона ещё живо: чтение по метке, для отчёта; снимать так нельзя. */
 function leftovers(mark) {
   return [...processTable().values()].filter(
@@ -716,8 +732,7 @@ async function scenarioA(ctx) {
   const cliPid = cliStarts(state)[0]?.pid;
   // Номер сервера — от сторожа (наш живой ребёнок), а не по порту: порт лишь
   // подтверждает, что это тот самый сервер.
-  const table = processTable();
-  const serverPid = serverOf(watch.pid, table);
+  const { table, pid: serverPid } = await serverUnder(watch.pid);
   if (!serverPid) throw new NotChecked('не нашёл сервер среди детей сторожа');
   check(
     serverPid === listenerPid(PANEL_PORT),
@@ -1122,8 +1137,7 @@ async function scenarioR(ctx) {
   if (REAL) realCliPid = cliPid ?? 0;
   check(Boolean(cliPid && alive(cliPid)), 'процесс CLI записан в журнале и жив', `pid ${cliPid}`);
 
-  const table = processTable();
-  const serverPid = serverOf(watch.pid, table);
+  const { table, pid: serverPid } = await serverUnder(watch.pid);
   if (!serverPid) throw new NotChecked('не нашёл сервер среди детей сторожа');
   if (!stopOwn(serverPid, 'index.ts', table)) throw new NotChecked('сервер не снялся по номеру');
   check(

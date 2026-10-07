@@ -197,6 +197,7 @@ export function SkillFormModal({ isOpen, onOpenChange, skill }: SkillFormModalPr
           editing: Boolean(skill),
           templates: templates.data ?? [],
         })}
+        loading={templates.isPending}
         onApply={(applied) => {
           if (applied.name !== undefined) setName(applied.name);
           if (applied.description !== undefined) setDescription(applied.description);

@@ -68,6 +68,7 @@ export async function sievePrompt(input: {
     mechanics: localMechanics(input.cwd, paths),
     stale: staleSieveIds(applicable, proof.changedAfterRow ?? {}),
     risk: riskTier(paths),
+    proof,
     ...(proof.testsBlock ? { testsBlock: true } : {}),
   });
 }
@@ -115,6 +116,12 @@ export function caughtClass(gap: SieveGap): SieveClass | undefined {
     case 'sieve-gap-failed':
     case 'sieve-gap-run-red':
       return BUILTIN_SIEVES.find((sieve) => sieve.id === gap.params.sieve)?.class ?? 'other';
+    case 'sieve-gap-stale': {
+      // Устаревшее снятие механики (Ф5): срабатывание панели так и стоит — это
+      // пойманный блокер; устаревшая строка обычного сита — пробел отчёта.
+      const sieve = BUILTIN_SIEVES.find((item) => item.id === gap.params.sieve);
+      return sieve?.mechanical ? sieve.class : undefined;
+    }
     default:
       // Несданная, устаревшая или недоказанная строка — пробел отчёта, а не
       // пойманный блокер.

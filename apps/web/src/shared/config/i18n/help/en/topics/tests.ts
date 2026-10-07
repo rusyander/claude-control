@@ -49,8 +49,12 @@ export const testsEn: typeof testsRu = {
       'nothing syncs back.',
     vsChat: 'Not the chat',
     vsChatText:
-      'The agent here is always Claude Code, even when another CLI is selected in the ' +
-      'panel: it is the only one whose run boundaries the panel can hold. There is no ' +
+      'The agent here is the selected CLI: Claude Code, Qwen Code or Codex. For them the ' +
+      'panel checks every write the agent makes: for Claude through the permission broker, ' +
+      'for Qwen Code through a hook on every tool call, for Codex by answering its requests ' +
+      'for edits and commands. If the check cannot be started, the run does not start at ' +
+      'all — there is no full access instead. With another CLI selected the run does not start — the panel refuses ' +
+      'naming that CLI instead of quietly running the tests through Claude. There is no ' +
       'conversation: a run has no feed and no questions to the human, permissions come from ' +
       'the panel itself — read anything, change only test files. The other way round too: ' +
       'a chat conversation does not write to the library by itself — “Make a case” in the ' +
@@ -541,11 +545,15 @@ export const testsEn: typeof testsRu = {
 
     agentTitle: 'Agent runs',
     agentCaption:
-      'Four different assignments, not one "start" button. Claude Code carries them out ' +
-      'whichever CLI is selected. A panel restart in the middle of a run stops the agent: the ' +
+      'Four different assignments, not one "start" button. The selected CLI carries them ' +
+      'out — Claude Code, Qwen Code or Codex; the others refuse with the reason. Qwen Code and ' +
+      'Codex keep no conversation session: the record is signed with the CLI name and has no ' +
+      '"Open the conversation" link. A panel restart in the middle of a run stops the agent: the ' +
       'history record closes as failed, what was written before stays. The agent works on this computer: ' +
       "it brings the app up where the code lives. Its route is the chat's route: an enabled " +
-      'contour carries the run too — on its model and with the same layers switched off. The ' +
+      'contour carries the run too — on its model and with the same layers switched off. Only ' +
+      'Claude Code goes through a contour: with Qwen Code or Codex and the "Test agent" tick ' +
+      'on the contour the run does not start, so as not to go to the vendor cloud. The ' +
       'route is resolved on every start, so a cleared tick takes effect from the next run.',
     agentGenerate: 'Generate',
     agentGenerateText:
@@ -587,7 +595,13 @@ export const testsEn: typeof testsRu = {
       'the automated cases linked to it through codePaths are run, and the card names which ' +
       'went red. None — the file is not protected by cases. It is an autotest run in a copy, ' +
       'minutes or more, so only by the button; your working copy, library and history do ' +
-      'not change.',
+      'not change. A case that produced no result is shown apart — “no result”, not “not ' +
+      'protected”. Without a stand address (or its own webServer in the Playwright config) ' +
+      'and without the environment’s secret values the check does not start and names what ' +
+      'is missing. Processes the command left behind are killed and the copy is removed in ' +
+      'the same run; if it could not be removed, the card shows it. While the check runs, e2e ' +
+      'in the same project does not start (and vice versa), and the panel’s dev-server ' +
+      'restart waits for it to end.',
     agentConventionTitle: 'Asking from the chat',
     agentConventionText:
       'The buttons of this section explain the format to the agent themselves. A project ' +
@@ -1321,6 +1335,14 @@ export const testsEn: typeof testsRu = {
         'retry ×N” badge. Two runs out of the last hundred where the case passed only on retry ' +
         '— and it is suggested for quarantine even when its stability looks healthy. A ' +
         'suggestion only: a human sets it.',
+      mutation: 'Mutation check of the case set',
+      mutationText:
+        'The same card answers “will the cases catch a regression”. Pick a file the automated ' +
+        'cases are linked to through codePaths and press “Break and run”: in a separate copy ' +
+        'of the repository the file is broken, the linked cases run against the environment’s ' +
+        'stand, and the card says how many of them went red. Not all of them red — the file is ' +
+        'only partly protected; a case with no result is shown apart. The copy is removed in ' +
+        'the same run.',
       pyramid: 'Test pyramid',
       pyramidText:
         'On the Report tab unit and integration tests stand next to e2e — counted from the ' +
@@ -1449,6 +1471,8 @@ export const testsEn: typeof testsRu = {
         'The turn ended — and the library already has the “Оформление” (“Checkout”) group with a case from that spec',
       '09-retry-quarantine':
         'The quarantine card after two runs: the case is green only on retry, an “on retry ×2” badge',
+      '11-mutation-result':
+        'The mutation check finished: the cart module was broken in a copy, one of the two linked cases went red',
       '10-pyramid':
         'Test pyramid: e2e from the folder, integration and unit from the project files, vitest named in package.json',
     },

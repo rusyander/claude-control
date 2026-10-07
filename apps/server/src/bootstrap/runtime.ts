@@ -1,11 +1,14 @@
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { appRootDir } from '../domains/watcher/report.ts';
+import { createLocalModels, type LocalModels } from '../domains/local-models/service.ts';
+import { createGlobalLayer, type GlobalLayer } from '../domains/global-layer/service.ts';
 import type { ProjectTestRun } from '@agentdeck/contracts';
 import type { SieveReportRow, SieveStage } from '@agentdeck/contracts/sieves';
-import type { SplitGroupRechecked } from '@agentdeck/contracts/chat-handoff';
+import type { SplitGroupRechecked, SplitPlanView } from '@agentdeck/contracts/chat-handoff';
 import type { ChatLink } from '../lib/app-store/app-store.types.ts';
 import type { ServerContext } from '../context.ts';
-import { serverText } from '../lib/server-texts.ts';
+import { localizeText, serverText } from '../lib/server-texts.ts';
 import { ChatRunRegistry, type RunNotice } from '../domains/chat/ChatRunRegistry.ts';
 import { appendLoweredRun } from '../domains/chat/lowered-journal.ts';
 import {
@@ -40,7 +43,18 @@ import {
   ProviderChatService,
 } from '../domains/provider-chat.ts';
 import { panelSupervisorHooks } from '../domains/portability/supervisor/panel-hooks.ts';
-import { DEFAULT_PROVIDER_ID, getProvider, isKnownProviderId } from '../providers/registry.ts';
+import {
+  DEFAULT_PROVIDER_ID,
+  getProvider,
+  isKnownProviderId,
+  listProviders,
+} from '../providers/registry.ts';
+import { foreignProviderId } from '@agentdeck/contracts/platform-consumers';
+import { KitService } from '../domains/kit/service.ts';
+import { kitComposeRefusal } from '../domains/kit/codex.ts';
+import { codexHome } from '../providers/catalog/config-dirs.ts';
+import { LOCAL_PLATFORM_ID } from '../domains/local-models/connect.ts';
+import { localPaths, readState as readLocalState } from '../domains/local-models/paths.ts';
 import { ProjectRunnerRegistry } from '../domains/project-runner.ts';
 import {
   E2eRunRegistry,
@@ -83,14 +97,19 @@ import {
 import { readLastAssistantTurn } from '../domains/chat/ChatHistory.ts';
 import { createHandoffPlanner } from '../routes/chat/handoff-routes.ts';
 import { projectsDir } from '../routes/chat/paths.ts';
-import { atlassianTicketTracker } from '../domains/chat/split-ticket-tracker.ts';
+import {
+  atlassianTaskTracker,
+  atlassianTicketTracker,
+} from '../domains/chat/split-ticket-tracker.ts';
 import { copyRootOf, SplitConveyor } from '../domains/chat/split-conveyor.ts';
 import { MrWatch } from '../domains/chat/mr-watch.ts';
+import { MrStateRefresh } from '../domains/chat/mr-state-refresh.ts';
 import { recheckDeliveredMr } from '../domains/chat/split-recheck.ts';
 import { SieveStore } from '../domains/chat/sieve-store.ts';
 import { sieveDeliveryGaps, sievePrompt } from '../domains/chat/sieve-gate.ts';
 import { testsDeliveryGaps } from '../domains/chat/tests-gate.ts';
 import { readMergeRequestReview } from '../domains/integrations/mr-review.ts';
+import { readMergeRequestStates } from '../domains/integrations/mr-state.ts';
 import { childrenBrief } from '../domains/chat/children-brief.ts';
 import { branchGateContext } from '../domains/chat/ChatBranchGate.ts';
 import { ChildTells } from '../domains/chat/child-tell.ts';
@@ -168,6 +187,8 @@ export interface Runtime {
   splitReview: SplitReview;
   /** «Перепроверить MR» доставленной группы: чтение MR форджем и слово группе. */
   recheckMr: (parentChatId: string, index: number) => Promise<SplitGroupRechecked>;
+  /** План разделения для пульта; чтение будит проверку «влит ли MR» (`mr-state-refresh.ts`). */
+  splitView: (chatIds: string[]) => SplitPlanView | undefined;
   /** Прокси защиты данных; поднимается отдельно, если включён в настройках. */
   dlpProxy: DlpProxy;
   /** Шлюз контуров: тот же порядок — создаётся всегда, поднимается по настройке. */
@@ -190,6 +211,20 @@ export interface Runtime {
   selfBaseUrl: string;
   /** Фоновый наблюдатель: тумблер, кольцо сбоев, разбор моделью, отчёт. */
   watcher: BackgroundWatcher;
+  /** Локальные модели: железо, сервер моделей, загрузки с прогрессом. */
+  localModels: LocalModels;
+  /** Сверка панели с глобальным слоем `~/.claude` (В5): пары, вердикт, перенос. */
+  globalLayer: GlobalLayer;
+  /** Встроенный набор панели (В2): режимы по CLI, копии «моё», что получает прогон. */
+  kit: KitService;
+  /**
+   * Маршрут прогона по потребителю (`foreign:<cli>`, `tests`, …) — тот же, что
+   * спрашивают чат и тесты. Нужен лёгкому окну панели (помощники формы и
+   * структуры): без него окно чужого CLI ушло бы мимо контура.
+   */
+  runRoute: (origin: string) => PlatformRunRoute;
+  /** Порт живого шлюза контуров; 0 — не поднят. */
+  gatewayPort: () => number;
   /** Погасить всё, что спавнит процессы. Идемпотентно. */
   shutdown: () => void;
 }
@@ -352,6 +387,8 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   // Заводится ДО дерева: его прогоны входят в дерево переходником
   // (`createTreeRuns`), а не отдельным деревом.
   const providerChats = new ProviderChatService();
+  // Чат чужого CLI сообщает о конце хода тем же отправителем, что и Claude.
+  providerChats.setNotifier(notifyBoth);
   // Прогоны дерева у любого провайдера: реализация выбирается по КЛЮЧУ связи —
   // именованный (`codex:c1a2…`) ведёт к чужому чату, обычный к реестру. Тем же
   // переходником повторяет упавшие ходы надзор (Д10).
@@ -522,6 +559,10 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     () => ctx.store,
     () => ctx.location.paths.appData,
   );
+  const taskTracker = atlassianTaskTracker(
+    () => ctx.store,
+    () => ctx.location.paths.appData,
+  );
   // Выученные сита и счёт блокеров (решение владельца 28.09) — в каталоге
   // данных панели; каталог может смениться переездом, поэтому по вызову.
   const sieveStore = (): SieveStore => new SieveStore(ctx.location.paths.appData);
@@ -552,6 +593,7 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
       all: () => ctx.store.getSplitPlans(),
     },
     ticketTracker: (projectPath) => ticketTracker.projectOf(projectPath),
+    tasksConnected: () => taskTracker.connected(),
     // Выбор группы родителя `auto` — разбор выбирает группу каждой группе
     // разделения из этого каталога (с учётом выбора пары в проекте).
     groupCatalog: (record) =>
@@ -685,6 +727,20 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     if (!token || !readIntegrations(ctx.store).forge.enabled) return undefined;
     return readMergeRequestReview(url, token);
   };
+  // Влит ли MR — пока хаб открыт: только состояние, запрос на проект, не чаще
+  // раза в 5 минут на план (владелец 06.10.2026).
+  const mrStateRefresh = new MrStateRefresh({
+    store: {
+      get: (parent) => ctx.store.getSplitPlan(parent),
+      set: (record) => ctx.store.setSplitPlan(record),
+    },
+    read: async (urls) => {
+      const token = forgeToken();
+      if (!token || !readIntegrations(ctx.store).forge.enabled) return undefined;
+      return readMergeRequestStates(urls, token);
+    },
+    log: (message, error) => console.warn(message, error),
+  });
   const mrWatch = new MrWatch({
     store: {
       get: (parent) => ctx.store.getSplitPlan(parent),
@@ -880,6 +936,9 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     settings: () => ctx.store.getSettings(),
     // Строки группы звена — те же, что у ребёнка Claude (`childStageExtra`).
     childExtra: (key) => foreignChildExtra(ctx.store, ctx.location.paths.appData, key),
+    // Свои шаги «Пути» группы звена — тем же чтением, что у Claude.
+    pathSteps: (aliases, stage, cwd) =>
+      runPathSteps(ctx.store, ctx.location.paths.appData, aliases, stage, cwd),
     hasWork: (cwd, since) => hasWorkSince(cwd, since),
     // Связи звеньев: та же группа и тот же родитель, новая стадия — без них
     // дерево чужого разделения видит одну работу.
@@ -1007,8 +1066,40 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     appDataDir: ctx.location.paths.appData,
     gatewayPort: () => (platformGateway.status().running ? platformGateway.status().port : 0),
   };
-  const runRoute = (origin: string, asked = '', runTag = ''): PlatformRunRoute =>
-    runRouteOf(resolveRunRoute(platformRouting, origin, asked, runTag));
+  // Набор панели (В2) решается на КАЖДОМ старте, как и маршрут: режим, сменённый
+  // на странице, действует со следующего сообщения. Едет и мимо контура —
+  // облачный Claude получает его тем же флагом плагина.
+  const kit = new KitService({
+    appDataDir: ctx.location.paths.appData,
+    claudeDir: () => ctx.location.paths.root,
+    backupDir: ctx.backupDir,
+    providers: () => listProviders().map(({ id, name }) => ({ id, name })),
+    legacyModes: () => {
+      const legacy = readLocalState(localPaths(appRootDir())).kit;
+      return { claude: legacy.claude, qwen: legacy.qwen };
+    },
+    codexHome,
+  });
+  const runRoute = (origin: string, asked = '', runTag = ''): PlatformRunRoute => {
+    const decision = resolveRunRoute(platformRouting, origin, asked, runTag);
+    const route = runRouteOf(decision);
+    if (route.refusal) return route;
+    let extras: ReturnType<KitService['runExtras']>;
+    try {
+      extras = kit.runExtras({
+        provider: foreignProviderId(origin) ?? 'claude',
+        local: decision.routed && decision.platformId === LOCAL_PLATFORM_ID,
+        hasSources: route.layers?.args.includes('--setting-sources') ?? false,
+      });
+    } catch (error) {
+      // Набор не собрался (диск, права) — прогон без него ушёл бы на глобальный
+      // слой вопреки выбранному режиму. Отказ текстом, а не падение маршрута.
+      console.warn('[kit] compose failed:', error);
+      const language = ctx.store.getSettings().language === 'en' ? 'en' : 'ru';
+      return { ...route, refusal: localizeText(kitComposeRefusal(error), language) };
+    }
+    return extras.args.length || Object.keys(extras.env).length ? { ...route, kit: extras } : route;
+  };
   chatRuns.setPlatformRouting(runRoute);
   projectTestRuns.setPlatformRouting(() => runRoute('tests'));
   projectTestRuns.setLanguage(() => (ctx.store.getSettings().language === 'en' ? 'en' : 'ru'));
@@ -1032,12 +1123,16 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   // Хуков, перенесённых в файлы самой цели, здесь нет и быть не может: их
   // отыгрывает цель, и владельца события решает `hookEventOwner`.
   providerChats.setSupervisor((run) => {
-    const hooks = panelSupervisorHooks({
-      settings: ctx.store.getSettings(),
-      groups: ctx.store.getGroups(),
-      hooksDir: ctx.location.paths.hooks,
-      skillsDir: ctx.location.paths.skills,
-    });
+    const hooks = [
+      ...panelSupervisorHooks({
+        settings: ctx.store.getSettings(),
+        groups: ctx.store.getGroups(),
+        hooksDir: ctx.location.paths.hooks,
+        skillsDir: ctx.location.paths.skills,
+      }),
+      // Хуки групп прогона (Codex): в файлах CLI их нет, играет надзиратель.
+      ...(run.layerHooks ?? []).map((hook) => ({ ...hook, owner: 'layer' as const })),
+    ];
     if (hooks.length === 0) return undefined;
 
     // Транскрипт собирает хранилище разговоров — раскладкой `provider-chats/<id>`
@@ -1121,7 +1216,9 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   reapProjectTestOrphans(ctx.location.paths.appData);
   // Фоновый наблюдатель: сирота разбора прошлого запуска снимается, включённый
   // тумблер продолжает с того, что не успел разобрать.
-  const watcher = createBackgroundWatcher(ctx);
+  // Порт шлюза — живого слушателя: разбор через контур идёт тем же маршрутом,
+  // что агент панели, и при погашенном шлюзе отказывает, а не уходит в облако.
+  const watcher = createBackgroundWatcher(ctx, platformRouting.gatewayPort);
   watcher.resume();
   for (const entry of adopt) {
     if (entry.autoApprove) chatSession.armAutoApprove(entry.key, entry.autoApprove);
@@ -1165,6 +1262,19 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   // Спавненные dev-серверы проектов, CLI чатов и прогоны тестов живут в памяти
   // процесса. Гасим их при выходе, чтобы дочерние процессы не осиротели и не
   // держали занятыми порты.
+  // Корень приложения, а не каталог настроек: гигабайты моделей человек видит
+  // рядом с панелью и удаляет вместе с ней (решение владельца 05.10).
+  const localModels = createLocalModels({ appRoot: appRootDir() });
+  // Пути читаются на каждый вызов: каталог конфигурации меняется на лету.
+  const globalLayer = createGlobalLayer({
+    read: () => ({
+      configRoot: ctx.location.paths.root,
+      appData: ctx.location.paths.appData,
+      backupDir: ctx.store.backupDir,
+    }),
+    onChange: () => events.broadcast(['globalLayer'], ''),
+  });
+
   const shutdown = (): void => {
     // Чаты Claude — НЕ гасим: CLI за посредником переживает перезапуск панели
     // вместе с фоновыми командами, и новый сервер подключается к нему по журналу
@@ -1192,6 +1302,9 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     // Разбор наблюдателя — процесс CLI без сервера бессмысленен: снимаем.
     // Тумблер остаётся как был, после старта наблюдатель продолжит.
     watcher.shutdown();
+    // Загрузки обрываются (докачаются с места), сервер моделей живёт дальше —
+    // новый процесс панели подхватит его по записи.
+    localModels.shutdown();
   };
 
   return {
@@ -1211,6 +1324,11 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     splitConveyor,
     splitOverlap,
     splitReview,
+    splitView: (chatIds) => {
+      const view = splitConveyor.view(chatIds);
+      if (view) mrStateRefresh.touch(view.parentChatId);
+      return view;
+    },
     recheckMr: (parentChatId, index) =>
       recheckDeliveredMr(
         {
@@ -1233,6 +1351,11 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     panelPending,
     selfBaseUrl,
     watcher,
+    localModels,
+    globalLayer,
+    kit,
+    runRoute: (origin) => runRoute(origin),
+    gatewayPort: platformRouting.gatewayPort,
     shutdown,
   };
 }

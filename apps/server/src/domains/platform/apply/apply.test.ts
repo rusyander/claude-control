@@ -80,7 +80,15 @@ command = "npx"
 args = ["-y", "pkg"]
 `;
 
-const HOME_VARS = ['HOME', 'USERPROFILE', 'CODEX_HOME', 'QWEN_HOME', 'XDG_CONFIG_HOME'];
+const HOME_VARS = [
+  'HOME',
+  'USERPROFILE',
+  'CODEX_HOME',
+  'QWEN_HOME',
+  'XDG_CONFIG_HOME',
+  'GEMINI_CLI_SYSTEM_SETTINGS_PATH',
+  'GEMINI_CLI_SYSTEM_DEFAULTS_PATH',
+];
 
 let root: string;
 let home: string;
@@ -116,6 +124,9 @@ beforeEach(() => {
   process.env.CODEX_HOME = join(home, '.codex');
   process.env.QWEN_HOME = join(home, '.qwen');
   process.env.XDG_CONFIG_HOME = join(home, '.config');
+  // Системные настройки Gemini — тоже во временном доме: способ входа читается и оттуда.
+  process.env.GEMINI_CLI_SYSTEM_SETTINGS_PATH = join(home, 'gemini-system', 'settings.json');
+  process.env.GEMINI_CLI_SYSTEM_DEFAULTS_PATH = join(home, 'gemini-system', 'system-defaults.json');
 
   store = new AppStore(appData);
   store.updateSettings({
@@ -315,20 +326,22 @@ describe('claude', () => {
 });
 
 describe('codex', () => {
-  it('целью не предлагается и файла не трогает — ручка шлюзу неизвестна', () => {
-    // Живая проба 22.09.2026 (`codex-cli 0.155.1`): конфиг с `wire_api = "chat"`
-    // этот CLI не загружает ЦЕЛИКОМ — падает любой его запуск. Пока у шлюза нет
-    // `/v1/responses`, записать такую цель значит сломать человеку CLI, поэтому
-    // применение до файла не доходит.
+  it('применение пишет провайдера с ручкой responses, остальной TOML цел (MAP D)', () => {
+    // Шлюз обслуживает `/v1/responses` — применение доходит до файла. Ручка —
+    // та, которую принимает сам codex: с `chat` он не загружает конфиг целиком.
     const configPath = join(home, '.codex', 'config.toml');
     mkdirSync(join(home, '.codex'), { recursive: true });
     writeFileSync(configPath, CODEX_CONFIG);
 
     const result = applyContour(deps(), PLATFORM, { targets: ['codex'], model: 'gpt-4o' });
 
-    expect(result.applied).toEqual([]);
-    expect(readFileSync(configPath, 'utf8')).toBe(CODEX_CONFIG);
-    expect(store.getPlatformApplied()['company-dev']).toBeUndefined();
+    expect(result.applied.map((item) => item.targetId)).toEqual(['codex']);
+    const text = readFileSync(configPath, 'utf8');
+    expect(text).toContain('wire_api = "responses"');
+    expect(text).toMatch(/base_url = "http:\/\/127\.0\.0\.1:\d+\/company-dev\/_s\/terminal\/v1"/);
+    expect(text).toContain('[shell_environment_policy.set]\nMY_VAR = "keep-me"');
+    expect(text).toContain('# личные настройки codex');
+    expect(store.getPlatformApplied()['company-dev']?.targets[0]?.targetId).toBe('codex');
   });
 
   it('правится только регион model_providers — остальной TOML цел', () => {
@@ -409,8 +422,9 @@ describe('занятое место и неподдержанные цели', (
 
   it('цель с прочерком пропускается со СВОЕЙ причиной', () => {
     const result = applyContour(deps(), PLATFORM, { targets: ['gemini', 'goose'] });
+    // Gemini без входа ключом API адрес не прочтёт — записи нет, причина названа.
     expect(result.skipped).toEqual([
-      { targetId: 'gemini', reason: 'gateway_dialect' },
+      { targetId: 'gemini', reason: 'cli_config_bypass' },
       { targetId: 'goose', reason: 'no_env_section' },
     ]);
   });

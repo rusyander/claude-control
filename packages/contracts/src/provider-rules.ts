@@ -30,9 +30,14 @@ import { object, string, array, boolean, number, enum as zodEnum, type infer as 
  *   ИГНОРИРУЕТ);
  * - `continue-md` — Continue, файлы `.md` в `<проект>/.continue/rules`. Тот же
  *   frontmatter (`globs`, `alwaysApply`, `description`) плюс СВОЙ ключ `name`,
- *   которым панель не управляет: он сохраняется как чужой ключ.
+ *   которым панель не управляет: он сохраняется как чужой ключ;
+ * - `qwen-md` — Qwen Code, файлы `.md` в `~/.qwen/rules` (документ CLI
+ *   `docs/users/features/rules.md`). Frontmatter НЕОБЯЗАТЕЛЕН: файл без него —
+ *   постоянное правило, а не мусор. Поля — `description` и `paths` (шаблоны,
+ *   при которых правило подключается); в контракте `paths` едет полем `globs`
+ *   той же строкой через запятую, `alwaysApply` у формата нет.
  */
-export const providerRulesFormats = ['cursor-mdc', 'continue-md'] as const;
+export const providerRulesFormats = ['cursor-mdc', 'continue-md', 'qwen-md'] as const;
 export type ProviderRulesFormat = (typeof providerRulesFormats)[number];
 
 /** Уровень каталога правил: глобальный (`~`) или каталог проекта. */

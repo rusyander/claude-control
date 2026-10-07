@@ -198,7 +198,9 @@ describe('project-tests/prompt', () => {
     // Без разбора провала находку не воспроизвести, без UTC история путает часы,
     // а без source её не отличить от кейса, написанного человеком.
     expect(prompt).toContain('`failure`');
-    expect(prompt).toContain('date -u +%FT%TZ');
+    // Время — командой node: она есть у любого CLI, а `date -u` есть только в bash.
+    expect(prompt).toContain('node -e "console.log(new Date().toISOString())"');
+    expect(prompt).not.toContain('date -u');
     expect(prompt).toContain('Do not fill in `lastRunId`');
     expect(prompt).toContain('"source": "agent"');
     expect(prompt).toContain('do not change the status of existing cases');

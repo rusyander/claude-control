@@ -62,5 +62,8 @@ export const watcherEn: typeof watcherRu = {
     hourly_cap:
       'The hourly analysis cap is reached. Problems are still written to the report as ' +
       '“checking”; the analysis resumes on its own once the hour frees a slot.',
+    route_refused:
+      'The analysis did not start: the chosen route does not allow it, and the panel will ' +
+      'not substitute another one. Problems stay in the report as “checking”. The reason is below.',
   },
 };

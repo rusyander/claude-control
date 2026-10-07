@@ -7,6 +7,7 @@ import { apiClient } from '@shared/api/client';
 import { queryKeys } from '@shared/api/query-keys';
 import { formatDate } from '@shared/lib/format';
 import { useLocation, useOverview } from '@entities/AppConfig';
+import { activeProvider, useProviders } from '@entities/Provider';
 import { LocationCard } from './LocationCard';
 import { StatTile } from './StatTile';
 import { ChangesSummary } from './ChangesSummary';
@@ -18,6 +19,10 @@ export function OverviewPage() {
   const { t, i18n } = useTranslation();
   const { data: location } = useLocation();
   const { data: overview, isLoading } = useOverview();
+  const { data: providers } = useProviders();
+  // Чей конфиг посчитан — говорит сам обзор; пока его нет, подпись по выбранному провайдеру.
+  const providerName = overview?.provider.name ?? activeProvider(providers)?.name ?? 'Claude Code';
+  const isClaude = (overview?.provider.id ?? 'claude') === 'claude';
 
   // Копии: сколько и когда снимали последнюю — раньше это было видно только в
   // настройках, а на обзоре к месту.
@@ -30,11 +35,11 @@ export function OverviewPage() {
     <Stack gap="var(--spacing-lg)" className={styles.page}>
       <PageHeader
         title={t('overview.title')}
-        subtitle={t('overview.subtitle')}
+        subtitle={t('overview.subtitle', { provider: providerName })}
         helpTopic="overview"
       />
 
-      {location && <LocationCard location={location} />}
+      {location && <LocationCard location={location} claudeInUse={isClaude} />}
 
       <ChangesSummary />
 
@@ -43,57 +48,72 @@ export function OverviewPage() {
 
       {overview && (
         <div className={styles.grid}>
-          <StatTile
-            icon="rules"
-            label={t('nav.rules')}
-            value={overview.rules.total}
-            hint={`${overview.rules.enabled} ${t('common.enabled').toLowerCase()}`}
-            to="/rules"
-            actions={[
-              {
-                label: t('overview.quickAdd'),
-                to: '/rules',
-                search: { create: true },
-                icon: 'plus',
-              },
-              { label: t('overview.quickClaudeMd'), to: '/claude-md', icon: 'edit' },
-            ]}
-          />
-          <StatTile
-            icon="skills"
-            label={t('nav.skills')}
-            value={overview.skills.total}
-            hint={`${overview.skills.enabled} ${t('common.enabled').toLowerCase()}`}
-            to="/skills"
-            actions={[
-              {
-                label: t('overview.quickAdd'),
-                to: '/skills',
-                search: { create: true },
-                icon: 'plus',
-              },
-            ]}
-          />
-          <StatTile
-            icon="hooks"
-            label={t('nav.hooks')}
-            value={overview.hooks.total}
-            hint={
-              overview.hooks.broken > 0
-                ? `${overview.hooks.broken} ${t('overview.brokenHooks')}`
-                : `${overview.hooks.enabled} ${t('common.enabled').toLowerCase()}`
-            }
-            tone={overview.hooks.broken > 0 ? 'danger' : undefined}
-            to="/hooks"
-            actions={[
-              {
-                label: t('overview.quickAdd'),
-                to: '/hooks',
-                search: { create: true },
-                icon: 'plus',
-              },
-            ]}
-          />
+          {overview.rules && (
+            <StatTile
+              icon="rules"
+              label={t('nav.rules')}
+              value={overview.rules.total}
+              hint={`${overview.rules.enabled} ${t('common.enabled').toLowerCase()}`}
+              to="/rules"
+              actions={[
+                {
+                  label: t('overview.quickAdd'),
+                  to: '/rules',
+                  search: { create: true },
+                  icon: 'plus',
+                },
+                // Быстрый переход к CLAUDE.md — только у Claude: у других CLI свой файл инструкций.
+                ...(isClaude
+                  ? [
+                      {
+                        label: t('overview.quickClaudeMd'),
+                        to: '/claude-md',
+                        icon: 'edit' as const,
+                      },
+                    ]
+                  : []),
+              ]}
+            />
+          )}
+          {overview.skills && (
+            <StatTile
+              icon="skills"
+              label={t('nav.skills')}
+              value={overview.skills.total}
+              hint={`${overview.skills.enabled} ${t('common.enabled').toLowerCase()}`}
+              to="/skills"
+              actions={[
+                {
+                  label: t('overview.quickAdd'),
+                  to: '/skills',
+                  search: { create: true },
+                  icon: 'plus',
+                },
+              ]}
+            />
+          )}
+          {overview.hooks && (
+            <StatTile
+              icon="hooks"
+              label={t('nav.hooks')}
+              value={overview.hooks.total}
+              hint={
+                overview.hooks.broken > 0
+                  ? `${overview.hooks.broken} ${t('overview.brokenHooks')}`
+                  : `${overview.hooks.enabled} ${t('common.enabled').toLowerCase()}`
+              }
+              tone={overview.hooks.broken > 0 ? 'danger' : undefined}
+              to="/hooks"
+              actions={[
+                {
+                  label: t('overview.quickAdd'),
+                  to: '/hooks',
+                  search: { create: true },
+                  icon: 'plus',
+                },
+              ]}
+            />
+          )}
           <StatTile
             icon="scripts"
             label={t('nav.scripts')}
@@ -113,39 +133,48 @@ export function OverviewPage() {
               },
             ]}
           />
-          <StatTile
-            icon="mcp"
-            label={t('nav.mcp')}
-            value={overview.mcp.total}
-            hint={
-              overview.mcp.failed > 0
-                ? `${overview.mcp.failed} ${t('overview.mcpFailed')}`
-                : `${overview.mcp.enabled} ${t('common.enabled').toLowerCase()}`
-            }
-            tone={overview.mcp.failed > 0 ? 'danger' : undefined}
-            to="/mcp"
-            actions={[
-              { label: t('overview.quickAdd'), to: '/mcp', search: { create: true }, icon: 'plus' },
-            ]}
-          />
-          <StatTile
-            icon="permissions"
-            label={t('nav.permissions')}
-            value={
-              overview.permissions.allow + overview.permissions.ask + overview.permissions.deny
-            }
-            // Раньше здесь стояло «119 / 7» — два числа без пояснения, гадать
-            // приходилось каждый раз. Подписываем; «спросить» показываем только
-            // когда такие правила есть, иначе сумма сверху не сходилась бы с подписью.
-            hint={[
-              `${overview.permissions.allow} ${t('permissions.allow').toLowerCase()}`,
-              ...(overview.permissions.ask > 0
-                ? [`${overview.permissions.ask} ${t('overview.permissionsAsk')}`]
-                : []),
-              `${overview.permissions.deny} ${t('permissions.deny').toLowerCase()}`,
-            ].join(' · ')}
-            to="/permissions"
-          />
+          {overview.mcp && (
+            <StatTile
+              icon="mcp"
+              label={t('nav.mcp')}
+              value={overview.mcp.total}
+              hint={
+                overview.mcp.failed > 0
+                  ? `${overview.mcp.failed} ${t('overview.mcpFailed')}`
+                  : `${overview.mcp.enabled} ${t('common.enabled').toLowerCase()}`
+              }
+              tone={overview.mcp.failed > 0 ? 'danger' : undefined}
+              to="/mcp"
+              actions={[
+                {
+                  label: t('overview.quickAdd'),
+                  to: '/mcp',
+                  search: { create: true },
+                  icon: 'plus',
+                },
+              ]}
+            />
+          )}
+          {overview.permissions && (
+            <StatTile
+              icon="permissions"
+              label={t('nav.permissions')}
+              value={
+                overview.permissions.allow + overview.permissions.ask + overview.permissions.deny
+              }
+              // Раньше здесь стояло «119 / 7» — два числа без пояснения, гадать
+              // приходилось каждый раз. Подписываем; «спросить» показываем только
+              // когда такие правила есть, иначе сумма сверху не сходилась бы с подписью.
+              hint={[
+                `${overview.permissions.allow} ${t('permissions.allow').toLowerCase()}`,
+                ...(overview.permissions.ask > 0
+                  ? [`${overview.permissions.ask} ${t('overview.permissionsAsk')}`]
+                  : []),
+                `${overview.permissions.deny} ${t('permissions.deny').toLowerCase()}`,
+              ].join(' · ')}
+              to="/permissions"
+            />
+          )}
           <StatTile
             icon="groups"
             label={t('nav.groups')}

@@ -12,6 +12,7 @@ import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
 import { Badge } from '@shared/ui/badge';
 import { Icon } from '@shared/ui/icon';
+import { Toggle } from '@shared/ui/toggle';
 import type { ProviderChatHeaderProps } from './ProviderChatHeader.types';
 import styles from './ProviderChatPage.module.scss';
 
@@ -35,9 +36,15 @@ export function ProviderChatHeader({
   onStop,
   onRestart,
   isRestarting,
+  allowEdits,
+  onAllowEditsChange,
+  editsWhenOff,
 }: ProviderChatHeaderProps) {
   const { t } = useTranslation();
   const transport = chat?.messages.findLast((message) => message.transport)?.transport;
+  const offLabel =
+    editsWhenOff === 'deny' ? t('providerChat.editsDenied') : t('providerChat.editsAsk');
+  const editsLabel = allowEdits === true ? t('providerChat.editsAllowed') : offLabel;
 
   // Через контур модель разговора — просьба, а не решение (Т6): имя вендора
   // контур не знает, и оно переводится картой соответствия. Считается ТОЙ ЖЕ
@@ -94,7 +101,9 @@ export function ProviderChatHeader({
           <Badge tone="warning">
             {t(refusal.key, {
               title: refusal.params.title,
-              reason: t(`chat.platformRefusedReason.${refusal.params.reason}`),
+              reason: t(`chat.platformRefusedReason.${refusal.params.reason}`, {
+                setting: refusal.params.setting,
+              }),
               fix: t(`chat.platformRefusedFix.${refusal.params.reason}`),
             })}
           </Badge>
@@ -103,7 +112,9 @@ export function ProviderChatHeader({
           <Badge tone="warning">
             {t(bypass.key, {
               title: bypass.params.title,
-              reason: t(`chat.platformRefusedReason.${bypass.params.reason}`),
+              reason: t(`chat.platformRefusedReason.${bypass.params.reason}`, {
+                setting: bypass.params.setting,
+              }),
               fix: t(`chat.platformRefusedFix.${bypass.params.reason}`),
             })}
           </Badge>
@@ -117,6 +128,32 @@ export function ProviderChatHeader({
       </Stack>
 
       <Stack direction="row" align="center" gap="var(--spacing-3xs)" wrap>
+        {/* «Разрешить правки» — тот же переключатель, что у Claude, но в шапке
+            разговора и в его шапке на диске. Выключенный значит у CLI с живым
+            сервером вопрос человеку карточкой, у одиночного запуска — запись
+            закрыта флагом: спросить там некого, обещать карточку нельзя. */}
+        {onAllowEditsChange && chat && (
+          <Stack as="label" direction="row" align="center" gap="var(--spacing-2xs)">
+            <Toggle
+              size="sm"
+              checked={allowEdits === true}
+              onCheckedChange={onAllowEditsChange}
+              aria-label={t('providerChat.allowEdits')}
+            />
+            <Typography
+              variant="body-sm"
+              color={allowEdits === true ? 'default' : 'subtle'}
+              as="span"
+            >
+              {editsLabel}
+            </Typography>
+          </Stack>
+        )}
+        {!onAllowEditsChange && chat && runner && !runner.editsToggle && (
+          <Typography variant="caption" color="subtle" as="span">
+            {t('providerChat.editsByCli', { name: runner.providerName })}
+          </Typography>
+        )}
         {isRunning && (
           <Button
             size="sm"

@@ -4,6 +4,8 @@ import { parseProviderJsonObject } from '../../lib/provider-json.ts';
 import { readOpencodeHook } from '../../lib/opencode-hook.ts';
 import { readQwenHooks } from '../../lib/qwen-hook.ts';
 import { readKimiHooks } from '../../lib/kimi-hook.ts';
+import { readCodexHooks } from '../../lib/codex-hook.ts';
+import { codexHooksSwitches } from './codex.ts';
 import { rulesMeta } from './event-rules.ts';
 import { hooksShapeOf } from './target.ts';
 import type {
@@ -54,10 +56,15 @@ function readRulesInfo(target: ProviderHooksTarget, base: HooksInfoBase): Provid
     timeoutMin: meta.timeoutMin,
     timeoutMax: meta.timeoutMax,
     timeoutDefault: meta.timeoutDefault,
+    // Одобрение внутри CLI — свойство цели из каталога, а не формата файла.
+    ...(target.provider.hooksConfig?.approvalRequired ? { trustRequired: true } : {}),
   };
 
   const text = readTextFile(target.filePath);
-  if (!text.trim()) return { ...shell, present: false, readOnly: locked };
+  if (!text.trim()) {
+    const switches = target.format === 'codex-json' ? codexHooksSwitches(target.filePath) : {};
+    return { ...shell, ...switches, present: false, readOnly: locked };
+  }
 
   try {
     if (target.format === 'kimi-toml') {
@@ -68,6 +75,17 @@ function readRulesInfo(target: ProviderHooksTarget, base: HooksInfoBase): Provid
     }
 
     const config = parseProviderJsonObject<RawQwenSettings>(text);
+    if (target.format === 'codex-json') {
+      const state = readCodexHooks(config.hooks);
+      return {
+        ...shell,
+        present: state.present,
+        rules: state.rules,
+        preservedRules: state.preservedEvents,
+        ...codexHooksSwitches(target.filePath),
+        readOnly: locked,
+      };
+    }
     const state = readQwenHooks(config.hooks);
     return {
       ...shell,

@@ -115,6 +115,29 @@ export const configEn: Record<ConfigMessageCode, string> = {
   'env-draft-invalid': 'The variable set failed validation: each needs a non-empty key and value.',
   'kimi-plugins-readonly':
     'The panel only shows Kimi Code plugins: install, enable and disable them with the /plugins command inside the CLI — the installed registry format is not documented.',
+  'qwen-extensions-files-readonly':
+    'Qwen Code extensions change only through qwen extensions commands — the panel does not write files in the extensions folder.',
+  'installed-actions-unsupported':
+    'For the active provider the panel does not change installed extensions.',
+  'installed-action-invalid': 'An extension action is enable or disable only.',
+  'qwen-extension-source-invalid':
+    'The extension source failed the check: one line up to 1000 characters, not starting with “-”.',
+  'qwen-extension-not-found': 'Extension “{{name}}” is not installed.',
+  'qwen-cli-unavailable': 'Qwen Code CLI did not start — check that qwen is on the server PATH.',
+  'qwen-extension-cli-failed': 'Qwen Code refused: {{reason}}',
+  'codex-plugins-files-readonly':
+    'Codex plugins change only through codex plugin commands — the panel does not write the plugin cache.',
+  'plugin-marketplaces-unsupported': 'The active provider has no plugin marketplaces.',
+  'codex-plugin-toggle-unrecognized':
+    'No [plugins."name@marketplace"] table found in the Codex config.toml — the switch was not written, the file is untouched.',
+  'codex-plugin-selector-invalid':
+    'A Codex plugin is named name@marketplace: one line without spaces, not starting with “-”.',
+  'codex-marketplace-source-invalid':
+    'The marketplace source failed validation: one line up to 1000 characters, not starting with “-”.',
+  'codex-plugin-not-found': 'Plugin “{{name}}” is not installed.',
+  'codex-marketplace-not-found': 'Marketplace “{{name}}” is not added.',
+  'codex-cli-unavailable': 'Codex CLI did not start — check that codex is on the server PATH.',
+  'codex-plugin-cli-failed': 'Codex refused: {{reason}}',
   'rule-draft-invalid':
     'The rule failed validation: a path inside the rules folder and a text body are required; description and globs are single-line, alwaysApply is a boolean.',
   'gemini-yolo-cli-only':
@@ -154,7 +177,7 @@ export const configEn: Record<ConfigMessageCode, string> = {
   'config-format-unrecognized-list-readonly':
     'The configuration file format is not recognized — writing is disabled (the list is read-only).',
   'hooks-draft-invalid-foreign':
-    'The hooks failed validation. OpenCode: the command is a non-empty list of non-empty arguments, the file pattern is non-empty and unique, environment variable names are non-empty and unique. Qwen and Kimi: the event comes from the documented list, the command is non-empty and single-line, a matcher only for events that support it, the timeout is an integer within the allowed bounds.',
+    'The hooks failed validation. OpenCode: the command is a non-empty list of non-empty arguments, the file pattern is non-empty and unique, environment variable names are non-empty and unique. Qwen, Kimi and Codex: the event comes from the documented list, the command is non-empty and single-line, a matcher only for events that support it, the timeout is an integer within the allowed bounds.',
   'hooks-draft-invalid':
     'The hooks failed validation: the command is a non-empty list of non-empty arguments, the file pattern is non-empty and unique, environment variable names are non-empty and unique.',
   'mcp-draft-invalid':
@@ -336,4 +359,38 @@ export const configEn: Record<ConfigMessageCode, string> = {
     'The answer is not JSON — what answers at this address is not a model API.',
   'endpoint-probe-status': 'The address answered {{status}}{{detail}}',
   'instructions-section-unsupported': 'The active CLI does not support global instructions.',
+  'group-layer-permission':
+    "Group permissions are not carried to {{cli}}: it has its own permission model, and a blind translation could grant rights nobody asked for. Set them in {{cli}}'s Permissions section.",
+  'group-layer-mcp-sse': 'MCP "{{id}}" uses SSE, a transport Codex does not support.',
+  'group-layer-mcp-name':
+    'MCP name "{{id}}" contains a dot, which Codex reads as a nested settings key.',
+  'group-layer-mcp-secret-header':
+    'MCP "{{id}}" headers carry a secret that could only reach Codex on the command line; the panel will not do that.',
+  'group-layer-mcp-shape':
+    'The entry of MCP "{{id}}" in Claude\'s files has an unknown shape; nothing to carry.',
+  'group-layer-skill-name':
+    'Skill name "{{id}}" is longer than 64 characters; Codex will not load it.',
+  'group-layer-hook-event':
+    'A hook on {{event}} does not fire in {{cli}}: the panel plays only session start, prompt submit and stop.',
+  'group-layer-hook-event-native':
+    'A hook on {{event}} does not fire in {{cli}}: {{cli}} has no such event.',
+  'group-layer-missing': 'Member "{{id}}" was not found in Claude\'s files; nothing to carry.',
+  'group-layer-duplicate':
+    '"{{id}}" already rides with group "{{group}}"; the second copy is not delivered.',
+  'group-layer-none':
+    "{{cli}} does not read Claude's files and the panel has no group layer for it; the group does not apply to this run.",
+  'group-layer-too-large':
+    "Group and kit rules together exceed Codex's limit ({{limit}} chars); the run was refused, nothing was truncated.",
+  'group-layer-notice': 'Groups on this {{cli}} run: {{groups}}.',
+  'group-layer-notice-delivered': 'Delivered to the run as a layer — {{members}}.',
+  'group-layer-notice-nothing': 'No member reached the run.',
+  'group-layer-notice-refused': 'Not delivered:',
+  'group-layer-kind-rule': 'rules: {{names}}',
+  'group-layer-kind-skill': 'skills: {{names}}',
+  'group-layer-kind-mcp': 'MCP: {{names}}',
+  'group-layer-kind-hook': 'hooks: {{names}}',
+  'group-layer-kind-env': 'variables: {{names}}',
+  'group-layer-enabled-for':
+    "The group is on for {{cli}} runs — it rides as a layer on each, Claude's files did not change.",
+  'group-layer-disabled-for': "The group is off for {{cli}} runs; Claude's files did not change.",
 };

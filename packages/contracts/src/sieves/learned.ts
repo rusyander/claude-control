@@ -10,6 +10,12 @@ import { LEARNED_TEXT_MAX, LEARNED_TEXT_MIN, type LearnedSieveRow } from './repo
  */
 export type LearnedSieveStatus = 'proposed' | 'active';
 
+/**
+ * Потолок хранилища выученных сит: больше — задание звена превращается в
+ * простыню. Вытесняется давно не виденное непринятое; принятое — никогда (Ф4).
+ */
+export const LEARNED_SIEVES_MAX = 40;
+
 /** Выученное сито в хранилище панели. */
 export interface LearnedSieve {
   id: string;
@@ -51,6 +57,12 @@ export type SieveTally = Record<string, Partial<Record<SieveClass, SieveTallyCel
 export interface SievesView {
   learned: LearnedSieve[];
   tally: SieveTally;
+  /**
+   * Новые сита не записаны: хранилище полно, и все сита в нём приняты
+   * человеком (Ф4) — принятое не вытесняется никогда. Сколько отказано и когда
+   * последний раз; снимается, когда человек убирает сито.
+   */
+  refused?: { count: number; at: string };
 }
 
 /** Слова для сравнения: нижний регистр, буквы и цифры, без коротких связок. */
@@ -77,7 +89,7 @@ export function checkSimilarity(a: string, b: string): number {
 export const SAME_SIEVE_SIMILARITY = 0.5;
 
 /** Почему выученное сито не принято — код для журнала и теста. */
-export type LearnedRejection = 'unknown-thread' | 'too-short' | 'too-long';
+export type LearnedRejection = 'unknown-thread' | 'too-short' | 'too-long' | 'store-full';
 
 /**
  * Принять выученное сито. Главное условие — тред: он должен быть среди тех,

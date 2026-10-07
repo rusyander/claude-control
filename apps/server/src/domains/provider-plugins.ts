@@ -57,3 +57,28 @@ export {
   parseProviderPluginPackagesDraft,
   saveProviderPluginPackages,
 } from './provider-plugins/packages.ts';
+export {
+  parseExtensionSource,
+  withQwenEnabledState,
+  installQwenExtension,
+  setQwenExtensionEnabled,
+  uninstallQwenExtension,
+} from './provider-plugins/qwen-extensions.ts';
+export {
+  parseCodexPluginSelector,
+  parseCodexMarketplaceSource,
+  withCodexPluginState,
+  installCodexPlugin,
+  uninstallCodexPlugin,
+  setCodexPluginEnabled,
+  addCodexMarketplace,
+  removeCodexMarketplace,
+  upgradeCodexMarketplace,
+} from './provider-plugins/codex-plugins.ts';
+export {
+  createQwenCliRun,
+  createCodexPluginRun,
+  type PluginCliRun,
+  type QwenCliRun,
+  type QwenCliResult,
+} from './provider-plugins/plugin-cli.ts';

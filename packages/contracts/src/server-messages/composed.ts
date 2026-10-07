@@ -150,6 +150,7 @@ export const composedMessageParams = {
   'sieve-gap-run-red': ['sieve', 'run', 'cases'],
   'sieve-gap-run-stale': ['sieve', 'run', 'files'],
   'tests-gap-no-run': ['cases', 'command'],
+  'tests-gap-stale': ['run', 'files', 'command'],
   'tests-gap-unrun': ['cases', 'command'],
   'tests-gap-failed': ['cases'],
   'tests-gap-uncovered': ['files'],

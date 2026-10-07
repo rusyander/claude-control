@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
-import { execFileSync } from 'node:child_process';
-import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
-import { basename, dirname, join } from 'node:path';
+import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
+import { existsSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { basename, dirname, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import type {
   ProjectGitInfo,
@@ -42,6 +42,17 @@ function hasGit(): boolean {
 
 const GIT_AVAILABLE = hasGit();
 
+/** Временные каталоги теста помимо `dir`: сносятся в каждом afterEach, иначе копятся в temp сотнями. */
+const extraTemps: string[] = [];
+function extraTemp(prefix: string): string {
+  const made = mkdtempSync(join(tmpdir(), prefix));
+  extraTemps.push(made);
+  return made;
+}
+function dropExtraTemps(): void {
+  for (const made of extraTemps.splice(0)) dropTemp(made);
+}
+
 /**
  * Из контекста маршрутам нужны две вещи: шаблоны зеркала копий по проекту и
  * путь к `.claude.json` — по нему копия получает запись доступа (доверие и
@@ -58,7 +69,7 @@ function storeContext(claudeJsonPath: string): ServerContext {
   const mirrors = new Map<string, WorktreeMirrorSettings>();
   const splits = new Map<string, unknown>();
   return {
-    worktreeBootstraps: new WorktreeBootstraps(mkdtempSync(join(tmpdir(), 'cc-wt-boot-'))),
+    worktreeBootstraps: new WorktreeBootstraps(extraTemp('cc-wt-boot-')),
     location: { paths: { mcpConfig: claudeJsonPath } },
     store: {
       getSettings: () => ({ deliverToMr: false }),
@@ -81,7 +92,7 @@ describe('project-git-routes', () => {
 
   beforeEach(async () => {
     dir = mkdtempSync(join(tmpdir(), 'cc-git-routes-'));
-    claudeJson = join(mkdtempSync(join(tmpdir(), 'cc-git-home-')), '.claude.json');
+    claudeJson = join(extraTemp('cc-git-home-'), '.claude.json');
     app = Fastify();
     registerProjectGitRoutes(app, storeContext(claudeJson));
     await app.ready();
@@ -90,6 +101,7 @@ describe('project-git-routes', () => {
   afterEach(async () => {
     await app.close();
     dropTemp(dir);
+    dropExtraTemps();
   });
 
   it('без пути или с относительным путём — 400', async () => {
@@ -269,6 +281,9 @@ describe('project-git-routes: рабочие копии', () => {
   let busyRunning = true;
   /** Кого конвейер просили подтолкнуть после смены настроек разделения. */
   let kicked: string[] = [];
+  /** Простаивающий процесс CLI, чей cwd — копия: его держит пул живых сессий. */
+  let idle: ChildProcess | undefined;
+  let idleAsked: string[] = [];
 
   const gitIn = (cwd: string, ...args: string[]): void => {
     execFileSync('git', args, { cwd, stdio: 'ignore', windowsHide: true });
@@ -277,11 +292,13 @@ describe('project-git-routes: рабочие копии', () => {
   beforeEach(async () => {
     // Длинная форма пути: git отвечает ею, а сравнение путей и есть защита.
     dir = realpathSync.native(mkdtempSync(join(tmpdir(), 'cc-wt-routes-')));
-    claudeJson = join(mkdtempSync(join(tmpdir(), 'cc-wt-home-')), '.claude.json');
+    claudeJson = join(extraTemp('cc-wt-home-'), '.claude.json');
     siblings = join(dirname(dir), `${basename(dir)}-worktrees`);
     busyPath = undefined;
     busyRunning = true;
     kicked = [];
+    idle = undefined;
+    idleAsked = [];
     app = Fastify();
     // Двойник реестра повторяет его существенное свойство: `active()` держит
     // прогон ещё минуту ПОСЛЕ завершения (буфер догона), и «занято» решает не
@@ -292,6 +309,16 @@ describe('project-git-routes: рабочие копии', () => {
       {
         active: () => (busyPath ? [{ chatId: 'run-1', projectPath: busyPath }] : []),
         isRunning: () => busyRunning,
+        livePool: {
+          closeIdleIn: (path: string) => {
+            idleAsked.push(path);
+            const child = idle;
+            if (!child || child.exitCode !== null) return { busy: 0, closed: Promise.resolve() };
+            const closed = new Promise<void>((done) => child.once('exit', () => done()));
+            child.kill();
+            return { busy: 0, closed };
+          },
+        },
       },
       (path) => void kicked.push(path),
     );
@@ -299,9 +326,11 @@ describe('project-git-routes: рабочие копии', () => {
   });
 
   afterEach(async () => {
+    idle?.kill();
     await app.close();
     dropTemp(siblings);
     dropTemp(dir);
+    dropExtraTemps();
   });
 
   // Журнал 25: смена «сколько групп разом» толкает очередь групп проекта.
@@ -450,6 +479,41 @@ describe('project-git-routes: рабочие копии', () => {
     },
     60_000,
   );
+  // Ф22 (projects-copies-003): после переезда разговора в копию между ходами
+  // живёт простаивающий процесс CLI с cwd в копии. Он панели свой, а Windows не
+  // отдаёт папку, пока она чей-то cwd: «Убрать» отвечало «папку держит
+  // запущенный процесс — закройте его», а закрыть человеку было нечего.
+  it('удаление копии сперва гасит простаивающий процесс панели в ней', async () => {
+    gitIn(dir, 'init', '-b', 'main');
+    gitIn(dir, 'config', 'user.email', 'probe@example.com');
+    gitIn(dir, 'config', 'user.name', 'probe');
+    writeFileSync(join(dir, 'a.txt'), 'a');
+    gitIn(dir, 'add', '.');
+    gitIn(dir, 'commit', '-m', 'init');
+    const added = await app.inject({
+      method: 'POST',
+      url: '/api/project-git/worktrees/add',
+      payload: { path: dir, name: 'feature/idle' },
+    });
+    const copy = added.json<{ createdPath: string }>().createdPath;
+    idle = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], {
+      cwd: copy,
+      stdio: 'ignore',
+      windowsHide: true,
+    });
+    await new Promise((done) => setTimeout(done, 300));
+
+    const removed = await app.inject({
+      method: 'POST',
+      url: '/api/project-git/worktrees/remove',
+      payload: { path: dir, worktreePath: copy },
+    });
+    expect(removed.statusCode, removed.body).toBe(200);
+    expect(idleAsked.map((path) => resolve(path))).toEqual([resolve(copy)]);
+    expect(idle.exitCode !== null || idle.signalCode !== null).toBe(true);
+    expect(existsSync(join(copy, 'a.txt'))).toBe(false);
+  }, 60_000);
+
   it('битое тело записи — 400 с именем поля, до git дело не доходит', async () => {
     const checkout = await app.inject({
       method: 'POST',

@@ -1,0 +1,93 @@
+{
+  "topic": "kit",
+  "frames": {
+    "page/01-modes": {
+      "light-ru": {
+        "file": "01-modes.png",
+        "width": 1140,
+        "height": 336
+      },
+      "light-en": {
+        "file": "01-modes.en.png",
+        "width": 1140,
+        "height": 336
+      },
+      "dark-ru": {
+        "file": "01-modes.dark.png",
+        "width": 1140,
+        "height": 336
+      },
+      "dark-en": {
+        "file": "01-modes.dark.en.png",
+        "width": 1140,
+        "height": 336
+      }
+    },
+    "page/02-items": {
+      "light-ru": {
+        "file": "02-items.png",
+        "width": 1440,
+        "height": 720
+      },
+      "light-en": {
+        "file": "02-items.en.png",
+        "width": 1440,
+        "height": 720
+      },
+      "dark-ru": {
+        "file": "02-items.dark.png",
+        "width": 1440,
+        "height": 720
+      },
+      "dark-en": {
+        "file": "02-items.dark.en.png",
+        "width": 1440,
+        "height": 720
+      }
+    },
+    "page/03-diff": {
+      "light-ru": {
+        "file": "03-diff.png",
+        "width": 880,
+        "height": 720
+      },
+      "light-en": {
+        "file": "03-diff.en.png",
+        "width": 880,
+        "height": 720
+      },
+      "dark-ru": {
+        "file": "03-diff.dark.png",
+        "width": 880,
+        "height": 720
+      },
+      "dark-en": {
+        "file": "03-diff.dark.en.png",
+        "width": 880,
+        "height": 720
+      }
+    },
+    "page/04-global-only": {
+      "light-ru": {
+        "file": "04-global-only.png",
+        "width": 1140,
+        "height": 214
+      },
+      "light-en": {
+        "file": "04-global-only.en.png",
+        "width": 1140,
+        "height": 214
+      },
+      "dark-ru": {
+        "file": "04-global-only.dark.png",
+        "width": 1140,
+        "height": 214
+      },
+      "dark-en": {
+        "file": "04-global-only.dark.en.png",
+        "width": 1140,
+        "height": 214
+      }
+    }
+  }
+}

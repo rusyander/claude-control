@@ -89,8 +89,9 @@ export const panelAgentRu = {
       'Этот разговор продолжили в другой вкладке — откройте его заново из «Истории».',
     conversation_deleted:
       'Этот разговор удалили в другой вкладке — следующее сообщение начнёт новый.',
-    provider_unsupported: 'Агент панели пока работает только с Claude Code: активный CLI другой.',
-    cli_not_found: 'Claude Code не найден в PATH: агенту нечем работать.',
+    provider_unsupported:
+      'Агент панели не работает с активным CLI: он идёт через Claude Code, Qwen Code, Codex, Gemini CLI, OpenCode, Goose или Kimi Code.',
+    cli_not_found: 'CLI активного провайдера не найден в PATH: агенту нечем работать.',
     endpoint_unsupported:
       'Ассистенту выбран свой эндпоинт: его ключ пришлось бы отдать процессу агента.',
     data_mask_broken:
@@ -146,6 +147,8 @@ export const panelAgentRu = {
     draft_cases: 'Черновик кейсов',
     run_tests: 'Запустить тесты',
     list_contours: 'Список контуров',
+    local_models_status: 'Состояние локальных моделей',
+    kit_status: 'Состояние набора панели',
     contour_status: 'Состояние контура',
     probe_contour_url: 'Проверить адрес контура',
     save_contour_draft: 'Сохранить черновик контура',

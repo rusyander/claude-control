@@ -62,6 +62,8 @@ export function useForeignSplitHub(input: {
   providerId?: string;
   activeChatId?: string;
   workdir?: string;
+  /** «Разрешить правки» разговора — с ним уходят звенья разделения, как у Claude. */
+  allowEdits?: boolean;
 }): ForeignSplitHub {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -81,7 +83,7 @@ export function useForeignSplitHub(input: {
         projectPath,
         proposal,
         startRuns: options.startRuns,
-        allowEdits: true,
+        allowEdits: input.allowEdits === true,
         // Родитель обязателен: без него связей не будет, а с ними — ни дерева,
         // ни хаба, ни стадий. Ключ панель именует сама (`codex:c1a2…`).
         ...(activeChatId ? { parentChatId: activeChatId } : {}),

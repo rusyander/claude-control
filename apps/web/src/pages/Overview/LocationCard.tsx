@@ -7,14 +7,16 @@ import { Badge } from '@shared/ui/badge';
 import { Icon } from '@shared/ui/icon';
 import type { LocationCardProps } from './LocationCard.types';
 import { serverFieldText } from '@shared/config/i18n';
+import { locationView } from './model/locationView';
 
 /**
  * Карточка расположения конфигурации. Показывает не только путь, но и как он
  * был найден: пользователю важно понимать, читает приложение стандартный
  * каталог или тот, что задали руками.
  */
-export function LocationCard({ location }: LocationCardProps) {
+export function LocationCard({ location, claudeInUse }: LocationCardProps) {
   const { t } = useTranslation();
+  const view = locationView(location, claudeInUse);
 
   return (
     <Card padding="md" isRaised>
@@ -24,8 +26,8 @@ export function LocationCard({ location }: LocationCardProps) {
           <Typography variant="body-sm" color="muted" as="span">
             {t('overview.configPath')}
           </Typography>
-          <Badge tone={location.isValid ? 'success' : 'danger'} withDot>
-            {sourceLabel(location, t)}
+          <Badge tone={view.tone} withDot>
+            {view.claudeUnused ? t('overview.claudeUnused') : sourceLabel(location, t)}
           </Badge>
         </Stack>
 
@@ -33,13 +35,13 @@ export function LocationCard({ location }: LocationCardProps) {
           {location.paths.root}
         </Typography>
 
-        {location.missing.length > 0 && (
+        {view.showProblems && location.missing.length > 0 && (
           <Typography variant="caption" color="warning" as="span">
             {t('overview.missingFiles')}: {location.missing.join(', ')}
           </Typography>
         )}
 
-        {location.problem && (
+        {view.showProblems && location.problem && (
           <Typography variant="caption" color="danger" as="span">
             {serverFieldText(location, 'problem')}
           </Typography>

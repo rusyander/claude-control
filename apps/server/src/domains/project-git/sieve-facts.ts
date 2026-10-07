@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { resolve } from 'node:path';
-import type { SieveMechanics } from '@agentdeck/contracts/sieves';
+import { isTestPath, type SieveMechanics } from '@agentdeck/contracts/sieves';
 import {
   GIT_MAX_BUFFER,
   GIT_NETWORK_TIMEOUT_MS,
@@ -185,8 +185,6 @@ function escape(value: string): string {
 const TOKENS_MAX = 40;
 const FILES_PER_TOKEN = 5;
 const HUNKS_MAX = 80;
-const TEST_PATH =
-  /(^|\/)(__tests__|tests?|e2e|qa|spec|cypress|playwright)\/|\.(test|spec)\.[^/]+$/i;
 
 /**
  * Потребители удалённого: имя, которое больше нигде не ОБЪЯВЛЕНО, но ещё
@@ -219,8 +217,9 @@ async function consumersOf(
       if (declared.code === 0 && declared.stdout.trim()) continue;
       hits.push({ token, files: files.slice(0, FILES_PER_TOKEN) });
     } else {
-      const produced = files.some((file) => !TEST_PATH.test(file));
-      const consumers = files.filter((file) => TEST_PATH.test(file));
+      // Тест — по правилу каталога сит (Ф3), а не по своей копии регулярки.
+      const produced = files.some((file) => !isTestPath(file));
+      const consumers = files.filter((file) => isTestPath(file));
       if (!produced && consumers.length > 0) {
         hits.push({ token, files: consumers.slice(0, FILES_PER_TOKEN) });
       }

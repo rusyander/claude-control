@@ -861,7 +861,9 @@ describe('карта соответствий первоисточника', () 
     const project = importEnvironment({ provider: codex, scope: 'project', projectRoot });
     const home = importEnvironment({ provider: codex, scope: 'global' });
 
-    for (const word of ['approval_policy', 'agents', 'prompts']) {
+    // `[agents]`, а не `agents`: проектный уровень законно называет каталог
+    // `.agents/skills` — слово без скобок ловило бы путь, а не ключ конфига.
+    for (const word of ['approval_policy', '[agents]', 'prompts']) {
       expect(project.skipped.some((skip) => skip.detail.includes(word))).toBe(false);
       // Дом эти же факты называет — иначе проверка проходила бы и на пустом доме,
       // то есть не проверяла бы ничего.

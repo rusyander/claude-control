@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import type { Analytics, RunningAgent } from '@agentdeck/contracts';
+import type { Analytics, AnalyticsLive } from '@agentdeck/contracts';
 import type { LoweredRunRecord } from '@agentdeck/contracts/model-cascade';
 import { apiClient } from '@shared/api/client';
 import type { AnalyticsPeriod } from '../model/period';
@@ -10,10 +10,8 @@ async function getAnalytics(period: AnalyticsPeriod): Promise<Analytics> {
   return data;
 }
 
-async function getLive(): Promise<{ runningAgents: RunningAgent[]; at: string }> {
-  const { data } = await apiClient.get<{ runningAgents: RunningAgent[]; at: string }>(
-    '/analytics/live',
-  );
+async function getLive(): Promise<AnalyticsLive> {
+  const { data } = await apiClient.get<AnalyticsLive>('/analytics/live');
   return data;
 }
 

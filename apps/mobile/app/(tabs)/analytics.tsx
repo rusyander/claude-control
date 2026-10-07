@@ -9,10 +9,12 @@ import { compact } from '../../src/shared/lib/format';
 import { isConfigured, useConnection } from '../../src/shared/api/connection';
 import {
   DEFAULT_PERIOD,
+  analyticsRefusal,
   useAnalytics,
   type AnalyticsPeriod,
   type AnalyticsPreset,
 } from '../../src/entities/analytics/api';
+import { useProviders } from '../../src/entities/provider-chat/api';
 
 /**
  * Аналитика по транскриптам. Считает всё сервер — приложение только показывает:
@@ -25,6 +27,10 @@ import {
  * Фильтры — те же, что в панели: пять пресетов, произвольный диапазон и сброс.
  * Диапазон выбирается системным календарём, а не двумя полями для даты: набирать
  * `2026-08-09` пальцем на телефоне никто не станет.
+ *
+ * Под CLI, журналы которого панель не читает (goose, kimi, gemini…), сервер
+ * отвечает отказом — экран показывает его текст и НИ ОДНОЙ цифры: прежний отчёт
+ * Claude, оставшийся в кэше запроса, под чужим CLI был бы ложью.
  */
 
 const PRESETS: AnalyticsPreset[] = ['today', '7', '30', '90', '0'];
@@ -34,13 +40,15 @@ export default function AnalyticsScreen() {
   const connection = useConnection();
   const [period, setPeriod] = useState<AnalyticsPeriod>(DEFAULT_PERIOD);
   const [picking, setPicking] = useState<'from' | 'to' | undefined>();
-  const analytics = useAnalytics(period);
+  const providers = useProviders();
+  const analytics = useAnalytics(period, providers.data?.active);
+  const refusal = analyticsRefusal(analytics.error);
 
   if (!isConfigured(connection)) {
     return <Empty text={t.common.notConnected} />;
   }
 
-  const data = analytics.data;
+  const data = refusal ? undefined : analytics.data;
   const maxDay = Math.max(1, ...(data?.byDay ?? []).map((day) => day.totals.total));
   const isRange = period.kind === 'range';
   const isDefault =
@@ -143,7 +151,13 @@ export default function AnalyticsScreen() {
       ) : null}
 
       {analytics.isLoading ? <Loading /> : null}
-      {analytics.isError ? <Mono style={styles.failed}>{t.common.panelSilent}</Mono> : null}
+      {refusal ? (
+        <Card>
+          <Muted>{refusal}</Muted>
+        </Card>
+      ) : analytics.isError ? (
+        <Mono style={styles.failed}>{t.common.panelSilent}</Mono>
+      ) : null}
 
       {data ? (
         <>

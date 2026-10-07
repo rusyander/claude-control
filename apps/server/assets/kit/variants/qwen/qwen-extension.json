@@ -1,0 +1,5 @@
+{
+  "name": "agentdeck-kit",
+  "version": "1.2.0",
+  "description": "agentdeck built-in kit: rules, skills, pipeline commands and safety hooks for coding agents"
+}

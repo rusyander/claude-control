@@ -252,6 +252,8 @@ export const groupSourcesRu = {
   warning_renamed: '«{{member}}»: имя занято в общих, взято «{{to}}»',
   warning_skipped: '«{{member}}» не перенесён: {{detail}}',
   warning_failed: '«{{member}}» не записался: {{detail}}',
+  warning_approve:
+    '«{{member}}» перенесён, но заработает только после одобрения в самом {{detail}} (команда /hooks)',
   warningDetail_kind: 'участник вида «{{kind}}» в общие не переносится',
   warningDetail_projectRelative: 'путь внутри проекта — вне его он ни на что не укажет',
   warningDetail_missing: 'файла нет',

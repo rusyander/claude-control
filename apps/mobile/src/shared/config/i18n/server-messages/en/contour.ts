@@ -121,6 +121,8 @@ export const contourEn: Record<ContourMessageCode, string> = {
     "The contour «{{title}}» is required, and the panel's gateway is down — the run was not started, so that it would not slip into the vendor cloud. Press «Start the gateway» on the contour card (the «Contour» section) or switch the provider back to the default one.",
   'contour-required-no-token':
     'The contour «{{title}}» is required, and its key is not saved — the run was not started, so that it would not slip into the vendor cloud. Save the key («Configure» on the contour card → the «Key» step) or switch the provider back to the default one.',
+  'contour-required-cli-config':
+    'The contour «{{title}}» is required, and the CLI config has {{setting}} — with it the run or part of it would bypass the contour, and the CLI offers no environment variable to override it. The run was not started. Fix that setting in the CLI config or switch the provider back to the default one.',
   'contour-target-assistant': 'Panel assistant',
   'contour-bridge-script-missing':
     'The bridge script tools/mcp/platform.mjs was not found — the panel was started outside its own repository.',

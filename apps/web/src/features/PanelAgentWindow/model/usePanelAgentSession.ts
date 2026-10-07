@@ -275,7 +275,9 @@ export function usePanelAgentSession(
       }
 
       if (!outcome.ok) {
-        const refusal = outcome.code ? texts.refusal(outcome.code) : undefined;
+        // Текст с кодом сервера называет провайдера и причину — он точнее строки по коду отказа.
+        const refusal =
+          outcome.code && !outcome.localized ? texts.refusal(outcome.code) : undefined;
         const kind = outcome.aborted ? 'notice' : 'error';
         const note = outcome.aborted ? texts.stopped : texts.runFailed(refusal ?? outcome.message);
         setState((prev) => {

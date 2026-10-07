@@ -10,6 +10,7 @@ import { filesEn } from './en/files.ts';
 import { gatewayEn } from './en/gateway.ts';
 import { gitEn } from './en/git.ts';
 import { integrationsEn } from './en/integrations.ts';
+import { localEn } from './en/local.ts';
 import { mediaEn } from './en/media.ts';
 import { platformEn } from './en/platform.ts';
 import { sandboxEn } from './en/sandbox.ts';
@@ -30,6 +31,7 @@ export const serverMessagesEn: Record<ServerMessageCode, string> = {
   ...gatewayEn,
   ...gitEn,
   ...integrationsEn,
+  ...localEn,
   ...mediaEn,
   ...platformEn,
   ...sandboxEn,

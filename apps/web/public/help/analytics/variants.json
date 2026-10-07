@@ -220,6 +220,28 @@
         "width": 700,
         "height": 504
       }
+    },
+    "report/09-session-details": {
+      "light-ru": {
+        "file": "09-session-details.png",
+        "width": 1094,
+        "height": 294
+      },
+      "light-en": {
+        "file": "09-session-details.en.png",
+        "width": 1094,
+        "height": 294
+      },
+      "dark-ru": {
+        "file": "09-session-details.dark.png",
+        "width": 1094,
+        "height": 294
+      },
+      "dark-en": {
+        "file": "09-session-details.dark.en.png",
+        "width": 1094,
+        "height": 294
+      }
     }
   }
 }

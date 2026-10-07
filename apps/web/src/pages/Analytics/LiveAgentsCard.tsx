@@ -4,6 +4,7 @@ import { Typography } from '@shared/ui/typography';
 import { Card } from '@shared/ui/card';
 import { Badge } from '@shared/ui/badge';
 import { useLiveAgents } from '@entities/Analytics';
+import { messageFromPayload } from '@shared/api/client';
 import styles from './AnalyticsPage.module.scss';
 
 /**
@@ -15,6 +16,9 @@ export function LiveAgentsCard() {
   const { t } = useTranslation();
   const { data } = useLiveAgents();
   const agents = data?.runningAgents ?? [];
+  // Под Codex и Qwen Code процессы активного CLI не опознаются: пустой список
+  // несёт причину, и карточка показывает её вместо «ничего не запущено».
+  const unavailable = data?.unavailable ? messageFromPayload(data.unavailable) : undefined;
 
   // Суммарная память: в гигабайтах, когда счёт пошёл на тысячи мегабайт.
   const megabytes = agents.reduce((sum, agent) => sum + agent.memoryMb, 0);
@@ -41,7 +45,7 @@ export function LiveAgentsCard() {
 
         {agents.length === 0 ? (
           <Typography variant="body-sm" color="subtle">
-            {t('analytics.noAgents')}
+            {unavailable ?? t('analytics.noAgents')}
           </Typography>
         ) : (
           // Список PID развёрнутым занимал весь первый экран и отодвигал вниз

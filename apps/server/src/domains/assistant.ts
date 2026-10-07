@@ -1,9 +1,11 @@
+import type { spawn as nodeSpawn } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnCliProcess } from '../lib/cli-spawn.ts';
 import { killChildTree } from '../lib/process-tree.ts';
 import { defaultCliCommand } from '../providers/cli.ts';
+import type { ServerMessageCode, ServerMessageParams } from '@agentdeck/contracts/server-messages';
 import { coded } from '../lib/server-text.ts';
 import { SECRET_MASK } from '../lib/secret-mask.ts';
 import {
@@ -63,6 +65,9 @@ export interface AssistResponse {
   kept?: string[];
   /** Текст ошибки, если вызов не удался. */
   error?: string;
+  /** Код причины, если её назвала панель (отказ маршрута провайдера). */
+  messageCode?: ServerMessageCode;
+  params?: ServerMessageParams;
 }
 
 /** Сколько последних реплик истории уходит модели и сколько знаков в каждой. */
@@ -208,13 +213,17 @@ export function runClaudeOneShot(
   command: string,
   images: readonly AgentImage[] = [],
   timeoutMs: number = ASSIST_TIMEOUT_MS,
+  spawnImpl?: typeof nodeSpawn,
 ): Promise<string> {
   // С картинками — потоковый ввод (картинка едет блоком `image`), и итог
   // приходит событием `result` потокового вывода, а не одним JSON.
   const streaming = images.length > 0;
   const { dir, cleanup } = lightWindowDir();
 
-  const spawned = spawnCliProcess(command, oneShotArgs(streaming), { cwd: dir });
+  const spawned = spawnCliProcess(command, oneShotArgs(streaming), {
+    cwd: dir,
+    ...(spawnImpl ? { spawnImpl } : {}),
+  });
   if (spawned.error) {
     cleanup();
     return Promise.reject(spawned.error);
@@ -271,25 +280,69 @@ function envelopeOf(stdout: string): string {
   });
 }
 
+/**
+ * Ответ модели окну помощника: текст либо отказ/сбой — с кодом, если причину
+ * назвала панель (маршрут провайдера, `assistant-route.ts`).
+ */
+export type HelperOutcome =
+  | { ok: true; text: string }
+  | { ok: false; error: string; messageCode?: ServerMessageCode; params?: ServerMessageParams };
+
+/**
+ * Кто отвечает окну: промпт (уже под маской) и картинки → текст модели. Решает
+ * маршрут активного провайдера (`assistant-route.ts → helperAsk`); здесь только
+ * то, что окно делает с ответом. Функцией, а не маршрутом: модуль маршрута сам
+ * зовёт этот файл, и обратный импорт замкнул бы круг.
+ */
+export type HelperAsk = (
+  prompt: string,
+  images: readonly AgentImage[],
+  timeoutMs: number,
+) => Promise<HelperOutcome>;
+
+/** Прежний путь окна — процесс `claude` по подписке, ответ из конверта JSON. */
+export function claudeAsk(command: string, spawnImpl?: typeof nodeSpawn): HelperAsk {
+  return async (prompt, images, timeoutMs) => {
+    const stdout = await runClaudeOneShot(prompt, command, images, timeoutMs, spawnImpl);
+    const envelope = JSON.parse(stdout) as { result?: string };
+    return { ok: true, text: envelope.result ?? '' };
+  };
+}
+
+/** Строка — команда `claude` (прежняя подпись), функция — маршрут провайдера. */
+export function helperAskOf(ask: string | HelperAsk): HelperAsk {
+  return typeof ask === 'string' ? claudeAsk(ask) : ask;
+}
+
 export async function askAssistant(
   request: AssistRequest,
-  command: string = defaultCliCommand(),
+  ask: string | HelperAsk = defaultCliCommand(),
 ): Promise<AssistResponse> {
   try {
     const fields = request.fields ?? {};
     const masked = maskFormFields(fields);
-    const stdout = await runClaudeOneShot(
+    const answer = await helperAskOf(ask)(
       buildPrompt(request, masked),
-      command,
       request.images ?? [],
+      ASSIST_TIMEOUT_MS,
     );
-    const envelope = JSON.parse(stdout) as { result?: string };
-    const parsed = extractJson(envelope.result ?? '');
+    if (!answer.ok) {
+      // Отказ маршрута (контур, провайдер без запуска) — с кодом: клиент назовёт
+      // причину на своём языке, а не общим «помощник не ответил».
+      return {
+        reply: '',
+        fields: {},
+        error: answer.error,
+        ...(answer.messageCode ? { messageCode: answer.messageCode } : {}),
+        ...(answer.params ? { params: answer.params } : {}),
+      };
+    }
+    const parsed = extractJson(answer.text);
 
     if (!parsed) {
       // Модель ответила текстом вместо JSON — показываем ответ как есть,
       // поля не трогаем: лучше ничего не менять, чем испортить форму.
-      return { reply: envelope.result ?? '', fields: {} };
+      return { reply: answer.text, fields: {} };
     }
 
     const restored = restoreFormSecrets(fields, masked, parsed.fields);

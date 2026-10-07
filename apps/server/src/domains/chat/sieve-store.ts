@@ -5,6 +5,7 @@ import {
   areaOf,
   checkSimilarity,
   learnedAppliesTo,
+  LEARNED_SIEVES_MAX,
   SAME_SIEVE_SIMILARITY,
   type LearnedRejection,
   type LearnedSieve,
@@ -35,8 +36,8 @@ import { readJsonFile, writeJsonFile } from '../../lib/safe-io.ts';
  */
 
 const FILE = 'sieves.json';
-/** Больше — задание звена превращается в простыню; вытесняется давно не виденное. */
-const LEARNED_MAX = 40;
+/** Потолок — общий с карточкой настроек, она называет его в отказе. */
+const LEARNED_MAX = LEARNED_SIEVES_MAX;
 /** Сколько выученных сит уходит в одно задание. */
 export const LEARNED_IN_PROMPT = 8;
 /** Источников у одного сита — хватит доказать повторяемость. */
@@ -54,6 +55,22 @@ export interface LearnOutcome {
 
 function empty(): SieveFile {
   return { version: 1, learned: [], tally: {} };
+}
+
+/**
+ * Освободить место под новое сито: уходит давно не виденное непринятое.
+ * `false` — непринятых нет, все сита приняты человеком.
+ */
+function evictProposed(data: SieveFile): boolean {
+  let oldest = -1;
+  data.learned.forEach((sieve, index) => {
+    if (sieve.status === 'active') return;
+    const current = data.learned[oldest];
+    if (!current || sieve.lastSeenAt.localeCompare(current.lastSeenAt) < 0) oldest = index;
+  });
+  if (oldest < 0) return false;
+  data.learned.splice(oldest, 1);
+  return true;
 }
 
 export class SieveStore {
@@ -74,7 +91,12 @@ export class SieveStore {
         ...sieve,
         status: sieve.status ?? ('proposed' as const),
       }));
-      return { version: 1, learned, tally: data.tally ?? {} };
+      return {
+        version: 1,
+        learned,
+        tally: data.tally ?? {},
+        ...(data.refused ? { refused: data.refused } : {}),
+      };
     } catch {
       // Битый файл — сита начинаются заново, панель встаёт: это подсказка
       // заданию, а не данные человека.
@@ -173,15 +195,18 @@ export class SieveStore {
         createdAt: at,
         lastSeenAt: at,
       };
+      if (data.learned.length >= LEARNED_MAX && !evictProposed(data)) {
+        // Все сита приняты человеком — вытеснять нечего (Ф4): отказ виден в
+        // настройках, а не молча, как раньше, — за счёт принятого.
+        outcome.rejected.push({ row, reason: 'store-full' });
+        data.refused = { count: (data.refused?.count ?? 0) + 1, at };
+        continue;
+      }
       data.learned.push(sieve);
       outcome.accepted.push(sieve);
     }
 
-    if (data.learned.length > LEARNED_MAX) {
-      data.learned.sort((a, b) => b.lastSeenAt.localeCompare(a.lastSeenAt));
-      data.learned = data.learned.slice(0, LEARNED_MAX);
-    }
-    if (outcome.accepted.length > 0 || seenThreads.size > 0) this.write(data);
+    if (outcome.accepted.length > 0 || seenThreads.size > 0 || data.refused) this.write(data);
     return outcome;
   }
 
@@ -237,12 +262,13 @@ export class SieveStore {
     return true;
   }
 
-  /** Человек убрал сито. `false` — такого нет. */
+  /** Человек убрал сито. `false` — такого нет. Место освободилось — отказ снят. */
   remove(id: string): boolean {
     const data = this.read();
     const next = data.learned.filter((sieve) => sieve.id !== id);
     if (next.length === data.learned.length) return false;
-    this.write({ ...data, learned: next });
+    const { refused: _refused, ...rest } = data;
+    this.write({ ...rest, learned: next });
     return true;
   }
 }

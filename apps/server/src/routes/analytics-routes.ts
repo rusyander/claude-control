@@ -1,11 +1,15 @@
 import { join } from 'node:path';
-import type { FastifyInstance } from 'fastify';
-import type { Analytics, AnalyticsPricing } from '@agentdeck/contracts';
+import type { FastifyInstance, FastifyReply } from 'fastify';
+import type { Analytics, AnalyticsLive, AnalyticsPricing } from '@agentdeck/contracts';
 import type { ServerContext } from '../context.ts';
 import { scanAnalytics } from '../domains/analytics/scanner.ts';
 import { getRunningAgents, getSkillUsage } from '../domains/analytics/runtime.ts';
 import { PRICING_URL } from '../domains/analytics/pricing-source.ts';
 import { longCacheRate, withOwnLongCacheRate } from '../domains/analytics/pricing.ts';
+import type { ForeignSource } from '../domains/analytics/scanner/types.ts';
+import { getActiveProvider } from '../providers/registry.ts';
+import { codexHome, qwenHome } from '../providers/catalog/config-dirs.ts';
+import { serverText } from '../lib/server-texts.ts';
 
 /**
  * Аналитика. Полный обход транскриптов стоит секунд, поэтому результат
@@ -90,10 +94,47 @@ function parseLocalDay(value?: string): number | undefined {
   return Number.isNaN(date.getTime()) ? undefined : date.getTime();
 }
 
+/**
+ * Чьи сессии считать: аналитика идёт за активным CLI, как и вся панель. У Qwen
+ * два дома — свой человека и `QWEN_HOME` набора панели (режим «Наши»): чат
+ * панели в нём — тоже расход человека.
+ */
+function foreignSource(ctx: ServerContext): ForeignSource | undefined {
+  const id = getActiveProvider(ctx.store).id;
+  if (id === 'codex') return { kind: 'codex', homes: [codexHome()] };
+  if (id === 'qwen') {
+    return {
+      kind: 'qwen',
+      homes: [qwenHome(), join(ctx.location.paths.appData, 'kit', 'qwen-home')],
+    };
+  }
+  return undefined;
+}
+
+/**
+ * Отказ для CLI, журналы которого аналитика не читает (gemini, goose, kimi,
+ * cursor, opencode, aider, continue). Раньше маршрут молча падал на
+ * `~/.claude/projects` — и под чужим CLI показывал расход Claude, а телефон, у
+ * которого нет гейта возможностей, рисовал эти цифры как есть. Честный отказ с
+ * именем CLI лучше чужого отчёта под своей вывеской.
+ */
+function unsupportedRefusal(ctx: ServerContext) {
+  const provider = getActiveProvider(ctx.store);
+  if (provider.id === 'claude' || foreignSource(ctx)) return undefined;
+  return {
+    error: 'provider_unsupported',
+    message: serverText('analytics-provider-unsupported', { provider: provider.name }),
+    messageCode: 'analytics-provider-unsupported',
+    params: { provider: provider.name },
+  } as const;
+}
+
 export function registerAnalyticsRoutes(app: FastifyInstance, ctx: ServerContext): void {
   app.get<{ Querystring: { days?: string; from?: string; to?: string; refresh?: string } }>(
     '/api/analytics',
-    async (request): Promise<Analytics> => {
+    async (request, reply): Promise<Analytics | FastifyReply> => {
+      const refusal = unsupportedRefusal(ctx);
+      if (refusal) return reply.code(409).send(refusal);
       // Явный диапазон из пикера перебивает период по дням.
       const range = parseRange(request.query.from, request.query.to);
       // days=today — календарные сутки целиком: от местной полуночи текущего дня
@@ -124,6 +165,7 @@ export function registerAnalyticsRoutes(app: FastifyInstance, ctx: ServerContext
       const until = bounds?.until;
       const snapshot = ctx.pricing.current();
       const projectsDir = join(ctx.location.paths.root, 'projects');
+      const source = foreignSource(ctx);
       // Тарифы входят в ключ: иначе после правки цен (или после обновления
       // прайса) панель ещё минуту показывала бы стоимость по старым.
       //
@@ -136,7 +178,8 @@ export function registerAnalyticsRoutes(app: FastifyInstance, ctx: ServerContext
         // периоды при одном days, а ещё ответ за вчера не должен доживать в кэше
         // до сегодняшнего запроса «сегодня» — с полуночью меняются и границы.
         bounds ? `range:${bounds.since}-${bounds.until}` : `days:${days}`,
-        projectsDir,
+        // Переключили CLI — отчёт другого CLI, а не минутный кэш прежнего.
+        source ? `${source.kind}:${source.homes.join(';')}` : projectsDir,
         JSON.stringify(ctx.store.getSettings().modelPricing),
         snapshot.fetchedAt,
       ].join('|');
@@ -158,24 +201,46 @@ export function registerAnalyticsRoutes(app: FastifyInstance, ctx: ServerContext
             // Актуальный прайс Anthropic из кэша. В сеть здесь не ходим:
             // аналитика и так тяжёлая, обновление живёт на своей точке.
             pricingEntries: snapshot.entries,
+            ...(source ? { source, strictPricing: true } : {}),
           }),
         };
       }
 
-      const [runningAgents, topSkills] = [
-        await getRunningAgents(),
-        getSkillUsage(ctx.location.paths.mcpConfig),
-      ];
+      // Процессы `claude` и счётчик скиллов из ~/.claude.json — данные Claude Code;
+      // в отчёте чужого CLI они были бы чужими.
+      const [runningAgents, topSkills] = source
+        ? [[], []]
+        : [await getRunningAgents(), getSkillUsage(ctx.location.paths.mcpConfig)];
 
       return { ...cache!.data, runningAgents, topSkills };
     },
   );
 
   /** Отдельная точка для живых данных: обновляется чаще, чем тяжёлая аналитика. */
-  app.get('/api/analytics/live', async () => ({
-    runningAgents: await getRunningAgents(),
-    at: new Date().toISOString(),
-  }));
+  app.get('/api/analytics/live', async (_request, reply): Promise<AnalyticsLive | FastifyReply> => {
+    // Список здесь — процессы `claude`: под CLI без своей аналитики это те же
+    // данные Claude под чужой вывеской, что и в отчёте выше.
+    const refusal = unsupportedRefusal(ctx);
+    if (refusal) return reply.code(409).send(refusal);
+    const at = new Date().toISOString();
+    // Под Codex и Qwen Code отчёт уже их собственный, а свои процессы этих CLI
+    // обход не опознаёт (он ищет `claude` и `node …claude-code`). Процессы claude
+    // под их вывеской выглядели бы как их собственные — поэтому список пуст, и
+    // ответ говорит почему (решение владельца, Z-fix 07.10.2026).
+    if (foreignSource(ctx)) {
+      const provider = getActiveProvider(ctx.store).name;
+      return {
+        runningAgents: [],
+        at,
+        unavailable: {
+          message: serverText('analytics-live-foreign', { provider }),
+          messageCode: 'analytics-live-foreign',
+          params: { provider },
+        },
+      };
+    }
+    return { runningAgents: await getRunningAgents(), at };
+  });
 
   /**
    * Тарифы: актуальный прайс и свои цены. Нужны настройкам, чтобы показать,

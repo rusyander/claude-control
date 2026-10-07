@@ -1,10 +1,55 @@
+import { readdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { setTimeout as sleep } from 'node:timers/promises';
+import { describe, expect, it, vi } from 'vitest';
 import type { Deck } from '@agentdeck/contracts';
 import { isMediaError } from '../errors.ts';
 import { renderDeckHtml } from './html.ts';
-import { canPrintPdf, printDeckPdf } from './pdf.ts';
+import { canPrintPdf, dropPrintDir, printDeckPdf } from './pdf.ts';
+
+const printDirs = (): string[] =>
+  readdirSync(tmpdir()).filter((name) => name.startsWith('cc-deck-'));
+
+describe('dropPrintDir', () => {
+  it('занятый каталог сносится повтором в фоне, а не остаётся в temp', () => {
+    vi.useFakeTimers();
+    try {
+      let busy = 2;
+      const removed: string[] = [];
+      const remove = (target: string): void => {
+        if (busy-- > 0) throw Object.assign(new Error('EBUSY'), { code: 'EBUSY' });
+        removed.push(target);
+      };
+
+      dropPrintDir('X', [2_000, 10_000, 60_000], remove);
+      expect(removed).toEqual([]);
+      vi.advanceTimersByTime(2_000);
+      expect(removed).toEqual([]);
+      vi.advanceTimersByTime(10_000);
+      expect(removed).toEqual(['X']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('повторы конечны: занятый навсегда каталог не крутит таймеры вечно', () => {
+    vi.useFakeTimers();
+    try {
+      let calls = 0;
+      dropPrintDir('X', [1, 2], () => {
+        calls += 1;
+        throw new Error('EBUSY');
+      });
+      vi.advanceTimersByTime(1_000);
+      expect(calls).toBe(3);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
 
 /**
  * PDF: печать системным браузером — и обе ветки обещания.
@@ -71,12 +116,19 @@ describe('printDeckPdf', () => {
   it.skipIf(!canPrintPdf())(
     'живая печать: лист на слайд, и панель узнаёт PDF по подписи',
     async () => {
+      const before = new Set(printDirs());
       const bytes = await printDeckPdf(renderDeckHtml(deck));
 
       expect(bytes.subarray(0, 5).toString('latin1')).toBe('%PDF-');
       // Титул плюс два слайда: `page-break-after` в странице обязан дать три
       // листа. Разошлось — значит PDF разошёлся с предпросмотром.
       expect(pageCount(bytes)).toBe(3);
+
+      // Отделившийся браузер держит профиль после печати — каталог печати всё
+      // равно уходит из temp, пусть и не сразу (фоновые повторы уборки).
+      const left = (): string[] => printDirs().filter((name) => !before.has(name));
+      for (let waited = 0; left().length > 0 && waited < 20_000; waited += 500) await sleep(500);
+      expect(left()).toEqual([]);
     },
     120_000,
   );

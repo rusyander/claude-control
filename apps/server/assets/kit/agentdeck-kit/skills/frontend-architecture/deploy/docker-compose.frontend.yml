@@ -1,0 +1,9 @@
+# Reference compose for the frontend (dev stand). Full stack/backend is read-only infra: propose, never apply.
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile
+    ports:
+      - '8080:80'
+    restart: unless-stopped

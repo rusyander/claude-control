@@ -81,7 +81,7 @@ export function registerProviderRulesRoutes(app: FastifyInstance, ctx: ServerCon
     const target = requireTarget(reply);
     if (!target) return reply;
 
-    const draft = parseProviderRuleDraft(request.body);
+    const draft = parseProviderRuleDraft(request.body, target.format);
     if (!draft) return reply.code(400).send(INVALID_DRAFT);
 
     return guarded(reply, () => {

@@ -42,7 +42,15 @@ export default tseslint.config(
   {
     // Генераторы схем лежат рядом со своим `.drawio` в `docs/diagrams/`, а не
     // в `tools/`: источник и его сборщик не разносятся по разным деревьям.
-    files: ['tools/**/*.{mjs,js}', 'docs/**/*.{mjs,js}', '*.cjs', '*.mjs'],
+    // Хуки набора панели (`apps/server/assets/kit`) — такие же скрипты Node: их
+    // запускает CLI, а не сборка сервера.
+    files: [
+      'tools/**/*.{mjs,js}',
+      'docs/**/*.{mjs,js}',
+      'apps/server/assets/**/*.mjs',
+      '*.cjs',
+      '*.mjs',
+    ],
     languageOptions: { globals: { ...globals.node } },
   },
   // Код внутри page.evaluate() выполняется браузером, а не Node.

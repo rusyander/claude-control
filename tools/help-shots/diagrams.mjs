@@ -169,6 +169,16 @@ const SETS = [
     pages: ['what-the-proxy-sees-and-what-the-gate-sees'],
   },
   {
+    source: 'docs/diagrams/localModels-guide/localModels-guide.drawio',
+    topic: 'localModels',
+    pages: ['from-button-to-gpu'],
+  },
+  {
+    source: 'docs/diagrams/kit-guide/kit-guide.drawio',
+    topic: 'kit',
+    pages: ['kit-to-run'],
+  },
+  {
     source: 'docs/diagrams/panelAgent-guide/panelAgent-guide.drawio',
     topic: 'panelAgent',
     pages: ['action-path', 'keys-and-files'],

@@ -130,6 +130,26 @@ describe('живая сессия разговора', { timeout: 30_000 }, () =
     expect(pidIn(next)).toBe(pidIn(first));
   });
 
+  // Живой прогон 06.10: «Продолжить» групп, чей процесс умер с фоновой командой.
+  // CLI сперва закрывал свой ход уведомления пустым `result`, панель принимала его
+  // за конец хода человека и заводила доставку, а настоящий ход уходил «пробуждением»
+  // в тот же чат — две сессии в одной копии.
+  it('итог хода уведомления CLI не закрывает ход человека', async () => {
+    fresh();
+    const finished: { text: string; ok: boolean }[] = [];
+    registry.setHandoffPlanner((run) => {
+      finished.push({ text: run.text, ok: run.ok });
+      return undefined;
+    });
+    const text = await turn('new-ghost', 'GHOST');
+    expect(text).toMatch(/^turn 1 pid \d+$/);
+    expect(finished).toEqual([{ text, ok: true }]);
+    // Настоящий ход достался прогону человека — пробуждения под него не заводили.
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(registry.describe('new-ghost')?.options.wake).toBeUndefined();
+    expect(finished).toHaveLength(1);
+  });
+
   it('другие параметры запуска — новый процесс, прежний закрыт', async () => {
     fresh();
     const first = await turn('new-4', 'привет');

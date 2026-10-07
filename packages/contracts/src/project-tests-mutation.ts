@@ -29,6 +29,13 @@ export interface ProjectTestMutationCheck {
   mode: ProjectTestMutationMode;
   /** Что именно сломано: строка до и после или «модуль падает при загрузке». */
   mutation?: string;
+  /**
+   * То же кодом — интерфейс пишет его на своём языке (`mutation` — английская
+   * строка сервера, в русском окне она торчала). `line-flip` несёт строку и
+   * её текст до и после в `mutationParams`.
+   */
+  mutationCode?: 'module-throws' | 'module-raises' | 'file-emptied' | 'line-flip';
+  mutationParams?: { line: number; from: string; to: string };
   command?: string;
   startedAt: string;
   finishedAt?: string;
@@ -40,8 +47,20 @@ export interface ProjectTestMutationCheck {
   caught: number;
   /** Кейсов, оставшихся зелёными, — поломку не заметили. */
   missed: number;
+  /**
+   * Кейсов, о которых отчёт не сказал ничего (`no-result`): ни пойманы, ни
+   * пропущены. Все кейсы такие — итог «нет результата», а не «не защищён» (Ф10).
+   */
+  noResult: number;
   error?: string;
   errorCode?: string;
+  /** Подстановки текста `errorCode` (`names` у нехватки доступов стенда). */
+  params?: Record<string, string>;
+  /**
+   * Копию не удалось убрать и после повторов (её держит процесс, переживший
+   * команду): папка осталась в каталоге данных до уборки при старте (Ф9).
+   */
+  cleanupError?: string;
 }
 
 /** Файл, который есть что ломать: на него указывают `codePaths` автоматических кейсов. */

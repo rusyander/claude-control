@@ -483,6 +483,24 @@ export function measureLayout(opts = {}) {
   // Коробка содержимого ячейки: текст и элементы управления, которые видно.
   // Текст внутри коробки в 1–2px — подпись для скринридера, её глаз не видит.
   const SOLID = 'img, svg, input, select, textarea, button, [role="switch"], [role="checkbox"]';
+  // Плашка (значок статуса, тег) — коробка с заливкой или рамкой: глаз видит её
+  // края, а не края букв внутри. По буквам ячейка с рядом тегов под названием
+  // «теряла» поля плашек снизу и читалась на 2px выше соседних, хотя строка
+  // стояла ровно (библиотека тестов, 05.10).
+  const clear = (color) =>
+    !color ||
+    color === 'transparent' ||
+    /,\s*0(\.0+)?\s*\)$/.test(color) ||
+    /\/\s*0(\.0+)?\s*\)$/.test(color);
+  const painted = (el) => {
+    const style = getComputedStyle(el);
+    if (!clear(style.backgroundColor)) return true;
+    return (
+      px(style.borderTopWidth) > 0 &&
+      style.borderTopStyle !== 'none' &&
+      !clear(style.borderTopColor)
+    );
+  };
   const contentBox = (cell) => {
     let top = Infinity;
     let bottom = -Infinity;
@@ -495,12 +513,15 @@ export function measureLayout(opts = {}) {
     for (let node = walker.nextNode(); node; node = walker.nextNode()) {
       if (node.nodeType === Node.TEXT_NODE) {
         if (!node.textContent.trim()) continue;
+        // Текст закрытого <details> раскладывается, но не рисуется: у сит
+        // глобального слоя список случаев под именем «опускал» ячейку на 200px.
+        if (!rendered(node.parentElement)) continue;
         const host = node.parentElement.getBoundingClientRect();
         if (host.width <= 2 || host.height <= 2) continue;
         const range = document.createRange();
         range.selectNodeContents(node);
         for (const rect of range.getClientRects()) take(rect);
-      } else if (node.matches(SOLID) && isShown(node)) {
+      } else if ((node.matches(SOLID) || painted(node)) && isShown(node)) {
         take(node.getBoundingClientRect());
       }
     }

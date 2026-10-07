@@ -4,6 +4,7 @@ export {
   useDeleteProviderChat,
   usePatchProviderChat,
   useProviderChat,
+  useProviderChatProjects,
   useProviderChats,
   useRestartProviderChat,
 } from './api/ProviderChatApi';

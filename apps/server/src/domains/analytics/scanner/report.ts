@@ -4,6 +4,7 @@ import type {
   HourlyActivity,
   ModelUsage,
   ProjectUsage,
+  SessionUsage,
   ToolUsage,
 } from '@agentdeck/contracts';
 import { localDay, shortenProject } from './keys.ts';
@@ -46,6 +47,37 @@ function fillDays(
   return rows.length >= byDay.length ? rows : byDay;
 }
 
+/** Сколько инструментов сессии показывать: список для строки, а не для отчёта. */
+const SESSION_TOOLS_LIMIT = 5;
+
+/** Сколько последних сессий класть в каждый проект. */
+const PROJECT_SESSIONS_LIMIT = 10;
+
+/**
+ * Сессия для отчёта: к итогам, посчитанным по ходу обхода, добавляются
+ * заголовок и инструменты. Копия, а не правка: одна и та же сессия попадает и в
+ * общий список последних, и в список своего проекта.
+ */
+function describeSession(session: SessionUsage, acc: Accumulator): SessionUsage {
+  const tools = acc.sessionTools.get(session.sessionId);
+  const title = acc.sessionTitles.get(session.sessionId);
+  const own = [...(tools ?? [])]
+    .map(([name, count]) => ({ name, count }))
+    // При равенстве — по имени: порядок не должен зависеть от порядка строк в файле.
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+
+  return {
+    ...session,
+    ...(title ? { title } : {}),
+    ...(own.length > 0
+      ? {
+          toolCalls: own.reduce((sum, tool) => sum + tool.count, 0),
+          topTools: own.slice(0, SESSION_TOOLS_LIMIT),
+        }
+      : {}),
+  };
+}
+
 /** Накопленные разрезы → готовый отчёт: сортировка, отсечки и производные числа. */
 export function buildResult(
   acc: Accumulator,
@@ -68,6 +100,16 @@ export function buildResult(
     options.since !== undefined && Number.isFinite(options.since),
   );
 
+  const newestFirst = [...acc.sessions.values()].sort((a, b) =>
+    b.lastActivity.localeCompare(a.lastActivity),
+  );
+  const sessionsByProject = new Map<string, SessionUsage[]>();
+  for (const session of newestFirst) {
+    const own = sessionsByProject.get(session.project) ?? [];
+    if (own.length < PROJECT_SESSIONS_LIMIT) own.push(describeSession(session, acc));
+    sessionsByProject.set(session.project, own);
+  }
+
   const byProject: ProjectUsage[] = [...acc.byProject.entries()]
     .map(([project, bucket]) => ({
       project,
@@ -76,6 +118,7 @@ export function buildResult(
       estimatedCost: bucket.cost,
       sessions: bucket.sessions.size,
       lastActivity: bucket.lastActivity,
+      sessionList: sessionsByProject.get(project) ?? [],
     }))
     .sort((a, b) => b.totals.total - a.totals.total);
 
@@ -85,16 +128,21 @@ export function buildResult(
     tokens: acc.byHour.get(hour)?.tokens ?? 0,
   }));
 
-  const recentSessions = [...acc.sessions.values()]
-    .sort((a, b) => b.lastActivity.localeCompare(a.lastActivity))
-    .slice(0, options.recentSessionsLimit);
+  const recentSessions = newestFirst
+    .slice(0, options.recentSessionsLimit)
+    .map((session) => describeSession(session, acc));
 
   const topTools: ToolUsage[] = [...acc.tools.entries()]
     .map(([name, count]) => ({ name, count }))
     .sort((a, b) => b.count - a.count)
     .slice(0, 20);
 
-  const cacheableInput = acc.overall.cacheRead + acc.overall.cacheCreation;
+  // Claude пишет кэш явно, и доля — чтение против записи. Codex и Qwen запись не
+  // сообщают (кэш у OpenAI-формы неявный), и та же формула давала бы 100% при
+  // любом чтении — у них доля считается от всего входа.
+  const cacheableInput = options.source
+    ? acc.overall.input + acc.overall.cacheRead + acc.overall.cacheCreation
+    : acc.overall.cacheRead + acc.overall.cacheCreation;
 
   return {
     from: new Date(since).toISOString(),
@@ -114,5 +162,7 @@ export function buildResult(
     scannedFiles,
     scanDurationMs,
     cacheHitRatio: cacheableInput > 0 ? acc.overall.cacheRead / cacheableInput : 0,
+    ...(options.source ? { providerId: options.source.kind } : {}),
+    ...(acc.unpriced.size > 0 ? { unpricedModels: [...acc.unpriced].sort() } : {}),
   };
 }

@@ -14,6 +14,7 @@ import { filesMessageParams } from './files.ts';
 import { gatewayMessageParams } from './gateway.ts';
 import { gitMessageParams } from './git.ts';
 import { integrationsMessageParams } from './integrations.ts';
+import { localMessageParams } from './local.ts';
 import { mediaMessageParams } from './media.ts';
 import { platformMessageParams } from './platform.ts';
 import { sandboxMessageParams } from './sandbox.ts';
@@ -33,6 +34,7 @@ export const serverMessageAreas = {
   gateway: gatewayMessageParams,
   git: gitMessageParams,
   integrations: integrationsMessageParams,
+  local: localMessageParams,
   media: mediaMessageParams,
   platform: platformMessageParams,
   sandbox: sandboxMessageParams,
@@ -53,6 +55,7 @@ export const serverMessageParams = {
   ...gatewayMessageParams,
   ...gitMessageParams,
   ...integrationsMessageParams,
+  ...localMessageParams,
   ...mediaMessageParams,
   ...platformMessageParams,
   ...sandboxMessageParams,
@@ -72,6 +75,7 @@ export type FilesMessageCode = keyof typeof filesMessageParams;
 export type GatewayMessageCode = keyof typeof gatewayMessageParams;
 export type GitMessageCode = keyof typeof gitMessageParams;
 export type IntegrationsMessageCode = keyof typeof integrationsMessageParams;
+export type LocalMessageCode = keyof typeof localMessageParams;
 export type MediaMessageCode = keyof typeof mediaMessageParams;
 export type PlatformMessageCode = keyof typeof platformMessageParams;
 export type SandboxMessageCode = keyof typeof sandboxMessageParams;

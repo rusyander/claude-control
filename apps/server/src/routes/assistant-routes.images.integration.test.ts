@@ -2,6 +2,9 @@ import { describe, it, expect, afterEach } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { registerAssistantRoutes } from './assistant-routes.ts';
 
+/** Маршрут окна для проверок, которым он не важен: контура нет, шлюз не поднят. */
+const NO_ROUTE = { runRoute: () => ({ env: {} }), gatewayPort: () => 0 };
+
 /**
  * Ревью 28.09 (F-204): картинки без реплики человека молча выбрасывались, и
  * ответ был 200 — модель отвечала, не увидев того, что ей прислали.
@@ -21,7 +24,7 @@ describe('POST /api/assistant/run — картинки', () => {
   it('картинки без реплики человека → 400, а не молчаливая потеря', async () => {
     app = Fastify();
     // Отказ обязан прийти до провайдера и модели: контекст им не нужен.
-    registerAssistantRoutes(app, {} as never);
+    registerAssistantRoutes(app, {} as never, NO_ROUTE);
     const response = await app.inject({
       method: 'POST',
       url: '/api/assistant/run',

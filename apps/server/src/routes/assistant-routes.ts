@@ -3,9 +3,9 @@ import { z } from 'zod';
 import type { AssistantRunRequest, AssistantRunResult } from '@agentdeck/contracts';
 import type { ServerContext } from '../context.ts';
 import { askAssistant } from '../domains/assistant.ts';
+import { helperAskFor, type HelperRouteWiring } from '../domains/assistant-route.ts';
 import { runAssistant, type AssistantMessage } from '../domains/assistant-runner.ts';
 import { resolveAssistantEndpoint } from '../domains/endpoints.ts';
-import { activeCliCommand } from '../providers/cli.ts';
 import { getActiveProvider } from '../providers/registry.ts';
 import { readAgentImages } from '../lib/agent-images.ts';
 
@@ -52,17 +52,31 @@ export function invalidAssistBody(error: z.ZodError) {
  *
  * `/api/assist` — помощник по заполнению форм: лёгкое окно (D4, 28.09) —
  * тело проверяется схемой, история в нём же, секреты полей — маской до модели.
+ * Идёт маршрутом активного провайдера (`domains/assistant-route.ts`): профиль
+ * «Ассистент панели», иначе Claude по подписке или чужой CLI маршрутом его чата;
+ * отказ маршрута — `error` с кодом в ответе 200, как и прочие сбои окна.
  * `/api/assistant/run` — мультимодельный ассистент по активному провайдеру
  * (Ф6b): claude делегирует своему существующему CLI-пути, прочие идут через
  * новые раннеры (cli/api) по switch. Секреты/ключи не логируем.
  */
-export function registerAssistantRoutes(app: FastifyInstance, ctx: ServerContext): void {
+export function registerAssistantRoutes(
+  app: FastifyInstance,
+  ctx: ServerContext,
+  /** Маршрут провайдера для окна помощника — тот же `runRoute`, что у чатов. */
+  helperRoute: HelperRouteWiring,
+): void {
   app.post<{ Body: unknown }>('/api/assist', { bodyLimit: ASSIST_BODY_LIMIT }, (request, reply) => {
     const parsed = assistBodySchema.safeParse(request.body ?? {});
     if (!parsed.success) return reply.code(400).send(invalidAssistBody(parsed.error));
     const images = readAgentImages(parsed.data.images);
     if (!images.ok) return reply.code(400).send(images.refusal);
-    return askAssistant({ ...parsed.data, images: images.images }, activeCliCommand(ctx.store));
+    // Маршрут решается на КАЖДЫЙ запрос: активный CLI, профиль ассистента и
+    // галочки контура меняются на лету, и окно обязано идти тем, что выбрано сейчас.
+    const appDataDir = ctx.location.paths.appData;
+    return askAssistant(
+      { ...parsed.data, images: images.images },
+      helperAskFor(ctx.store, appDataDir, helperRoute),
+    );
   });
 
   app.post<{ Body: AssistantRunRequest & { images?: unknown } }>(

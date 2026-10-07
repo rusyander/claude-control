@@ -70,6 +70,8 @@ export const testsEn: Record<TestsMessageCode, string> = {
   'draft-not-found': 'Draft “{{runId}}” is not in the project.',
   'draft-chat-not-found':
     'Conversation “{{chatId}}” was not found — there is nothing to build the case from.',
+  'draft-chat-not-registered':
+    'Folder “{{path}}” is not among the panel’s projects — a case from chat is written only into a registered project.',
   'draft-chat-no-steps':
     'The conversation has no human messages, commands or edits — there is nothing to build the case from.',
   'mutation-busy': 'A mutation check is already running.',
@@ -82,6 +84,14 @@ export const testsEn: Record<TestsMessageCode, string> = {
   'mutation-no-report': 'The run in the copy left no report — see the command output.',
   'mutation-failed': 'The mutation check broke off — the reason is in the output.',
   'mutation-spawn': 'The run command could not be started.',
+  'mutation-no-stand':
+    'Not verified: no stand. Without a stand address (project environment) every e2e test in the copy would fail, and that would read as “caught”.',
+  'mutation-no-secrets':
+    'Not verified: this machine has no values for {{names}} — signing in to the stand would fail, and the failed cases would read as “caught”.',
+  'mutation-e2e-running':
+    'The project tests are running — the mutation check uses the same tests and stand. Wait for them to finish.',
+  'e2e-run-mutation-running':
+    'A mutation check is running — it uses the same tests and stand. Wait for it to finish or stop it.',
   'draft-case-human-written':
     'The case was written by a person — an edit to it is accepted by hand.',
   'draft-revert-case-gone': 'The case is no longer in the library.',

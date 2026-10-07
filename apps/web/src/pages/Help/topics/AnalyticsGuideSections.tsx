@@ -46,6 +46,9 @@ export function AnalyticsGuideSections({ tr }: SectionProps) {
           <GuideStep title={g('reportSessions')} text={g('reportSessionsText')}>
             <HelpShot topic="analytics" scenario="report" frame="05-sessions" side="panel" />
           </GuideStep>
+          <GuideStep title={g('reportSessionsDetail')} text={g('reportSessionsDetailText')}>
+            <HelpShot topic="analytics" scenario="report" frame="09-session-details" side="panel" />
+          </GuideStep>
           <GuideStep title={g('reportSessionsGo')} text={g('reportSessionsGoText')}>
             <HelpShot topic="analytics" scenario="report" frame="07-session-where" side="panel" />
           </GuideStep>

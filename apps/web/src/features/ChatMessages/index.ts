@@ -8,6 +8,12 @@ export { QueuedBubbles } from './ui/QueuedBubbles';
  */
 export { TaskSplitCard } from './ui/TaskSplitCard';
 export type { ChildBranch, TaskSplitCardProps } from './ui/TaskSplitCard.types';
+/**
+ * Карточка просьбы о разрешении — по той же причине: у чужого CLI просьбы идут
+ * из его серверного режима, а решает их человек той же карточкой, что у Claude.
+ */
+export { PermissionCard } from './ui/PermissionCard';
+export type { PendingPermission } from './ui/PermissionCard.types';
 /** Карточка продолжения в чистой сессии — по той же причине, что и соседняя. */
 export { HandoffCard } from './ui/HandoffCard';
 export type { HandoffCardProps } from './ui/HandoffCard.types';

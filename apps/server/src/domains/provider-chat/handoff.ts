@@ -63,6 +63,8 @@ export interface ForeignHandoffInput {
   cascade?: ProviderChatCascade;
   /** Связь разговора: продолжение наследует её целиком. */
   link?: ChatLink;
+  /** «Разрешить правки» разговора: продолжение работает с теми же правами. */
+  allowEdits?: boolean;
 }
 
 /** Чем панель заводит продолжение; всё, что пишет, подаётся снаружи. */
@@ -78,6 +80,7 @@ export interface ForeignHandoffDeps {
     model?: string;
     effort?: string;
     cascade?: ProviderChatCascade;
+    allowEdits?: boolean;
   }) => string | undefined;
   /** Отправить задание в заведённый разговор. */
   run: (chatId: string, prompt: string, cascade?: ProviderChatCascade) => void;
@@ -201,6 +204,7 @@ export function startForeignHandoff(
     ...(input.model ? { model: input.model } : {}),
     ...(input.effort ? { effort: input.effort } : {}),
     ...(input.cascade ? { cascade: input.cascade } : {}),
+    ...(input.allowEdits === undefined ? {} : { allowEdits: input.allowEdits }),
   });
   if (!created) return undefined;
 

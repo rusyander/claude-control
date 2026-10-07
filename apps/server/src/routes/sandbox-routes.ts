@@ -30,6 +30,7 @@ import { hasOAuthTokens, oauthProviderFor } from '../domains/mcp-oauth.ts';
 import { readArtifacts } from '../domains/chat/ChatArtifacts.ts';
 import { codeOf } from '../lib/server-text.ts';
 import { attachTextCodes } from '../lib/server-texts.ts';
+import { sectionGuard } from './provider-guard.ts';
 
 /**
  * Песочница: проверка отдельных настроек в изоляции.
@@ -62,6 +63,11 @@ function safeScriptPath(hooksDir: string, name: string): string | undefined {
 
 export function registerSandboxRoutes(app: FastifyInstance, ctx: ServerContext): void {
   const running = new Map<string, ChatRun>();
+  // Сборка, прогоны и опрос MCP читают конфигурацию Claude, а разговор — это
+  // процесс `claude`. При другом активном CLI песочница проверяла бы НЕ его
+  // настройки и запускала бы Claude молча — отказ до сборки и до запуска.
+  // Образцы, уборка, остановка и список файлов ничего не читают и не запускают.
+  const claudeOnly = { preHandler: sectionGuard(ctx.store, 'sandbox') };
 
   // Подпись и пояснение образца собраны сервером строкой: код к ним
   // восстанавливается разбором, и каталог читается на языке панели.
@@ -70,6 +76,7 @@ export function registerSandboxRoutes(app: FastifyInstance, ctx: ServerContext):
   /** Сборка песочницы: показываем состав до того, как что-либо запускать. */
   app.post<{ Body: { id?: string; selection?: SandboxSelection } }>(
     '/api/sandbox/create',
+    claudeOnly,
     (request, reply) => {
       // Идентификатор задаёт КАТАЛОГ песочницы — домыслить его нельзя, а без
       // проверки запрос без тела собирал путь из `undefined` и отвечал 500.
@@ -118,7 +125,7 @@ export function registerSandboxRoutes(app: FastifyInstance, ctx: ServerContext):
       /** Произвольное событие, введённое руками: сырой JSON вместо заготовок. */
       customEvent?: string;
     };
-  }>('/api/sandbox/probe-hook', async (request) => {
+  }>('/api/sandbox/probe-hook', claudeOnly, async (request) => {
     const { id, hookId, scriptName, fixtureIds, customEvent } = request.body;
     const { workDir, configDir } = sandboxPaths(id);
     const sandboxHooks = join(configDir, 'hooks');
@@ -238,7 +245,7 @@ export function registerSandboxRoutes(app: FastifyInstance, ctx: ServerContext):
     ),
   });
 
-  app.post<{ Body: { mcpId: string } }>('/api/sandbox/mcp-tools', async (request) => {
+  app.post<{ Body: { mcpId: string } }>('/api/sandbox/mcp-tools', claudeOnly, async (request) => {
     const server = readMcpServers(ctx.location.paths.mcpConfig, ctx.store).find(
       (item) => item.id === request.body.mcpId,
     );
@@ -260,6 +267,7 @@ export function registerSandboxRoutes(app: FastifyInstance, ctx: ServerContext):
 
   app.post<{ Body: { mcpId: string; tool: string; args?: Record<string, unknown> } }>(
     '/api/sandbox/mcp-call',
+    claudeOnly,
     async (request) => {
       const server = readMcpServers(ctx.location.paths.mcpConfig, ctx.store).find(
         (item) => item.id === request.body.mcpId,
@@ -292,6 +300,7 @@ export function registerSandboxRoutes(app: FastifyInstance, ctx: ServerContext):
    */
   app.post<{ Body: { id?: string; prompt?: string; sessionId?: string } }>(
     '/api/sandbox/run',
+    claudeOnly,
     async (request, reply) => {
       const { id, prompt, sessionId } = request.body;
 

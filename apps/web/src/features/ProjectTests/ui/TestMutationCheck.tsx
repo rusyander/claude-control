@@ -13,7 +13,10 @@ import { ConfirmDialog } from '@shared/ui/confirm-dialog';
 import { SelectField } from '@shared/ui/select-field';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
+import { mutationVerdict } from '../model/mutationVerdict';
 import type { TestMutationCheckProps } from './TestMutationCheck.types';
+
+const VERDICT_TONE = { caught: 'success', unprotected: 'danger', noResult: 'warning' } as const;
 
 const CASE_WORD = {
   failed: 'testsE2e.mutation.caseCaught',
@@ -49,8 +52,11 @@ export function TestMutationCheck({ path, isBusy }: TestMutationCheckProps) {
   const failure = start.error ?? stop.error;
   const checkError =
     check?.status === 'error'
-      ? (serverMessageText(check.errorCode, { file: check.file }) ?? check.error ?? '')
+      ? (serverMessageText(check.errorCode, { file: check.file, ...check.params }) ??
+        check.error ??
+        '')
       : '';
+  const verdict = check?.status === 'done' ? mutationVerdict(check) : undefined;
 
   return (
     <Stack gap="var(--spacing-xs)" data-testid="tests-mutation">
@@ -115,18 +121,35 @@ export function TestMutationCheck({ path, isBusy }: TestMutationCheckProps) {
       )}
       {check?.mutation && (
         <Typography variant="caption" color="subtle">
-          {check.file} — {t('testsE2e.mutation.mutation', { what: check.mutation })}
+          {check.file} —{' '}
+          {t('testsE2e.mutation.mutation', {
+            // Код — на языке окна; строка сервера — запасной путь старой записи.
+            what: check.mutationCode
+              ? t(`testsE2e.mutation.kind.${check.mutationCode}`, {
+                  ...check.mutationParams,
+                  interpolation: { escapeValue: false },
+                })
+              : check.mutation,
+            interpolation: { escapeValue: false },
+          })}
         </Typography>
       )}
-      {check?.status === 'done' && (
+      {check && verdict && (
         <Typography
           variant="caption"
-          color={check.caught > 0 ? 'success' : 'danger'}
+          color={VERDICT_TONE[verdict]}
           data-mutation-caught={check.caught}
+          data-mutation-verdict={verdict}
         >
-          {check.caught > 0
-            ? t('testsE2e.mutation.caught', { caught: check.caught, count: check.cases.length })
-            : t('testsE2e.mutation.unprotected', { count: check.cases.length })}
+          {t(`testsE2e.mutation.${verdict}`, {
+            caught: check.caught,
+            count: check.cases.length,
+          })}
+        </Typography>
+      )}
+      {check?.cleanupError && (
+        <Typography variant="caption" color="warning" role="status">
+          {t('testsE2e.mutation.cleanupFailed', { reason: check.cleanupError })}
         </Typography>
       )}
       {check?.status === 'stopped' && (

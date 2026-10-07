@@ -445,7 +445,22 @@ async function runF66(ctx) {
       const until = Date.now() + 50_000;
       while (!seen.at && Date.now() < until) await wait(300);
       check(`${label}: после тишины телефон перечитывает разговор`, Boolean(seen.at));
-      if (tapNew) await phone.tap(/^New conversation$/, 5000);
+      if (tapNew) {
+        // Нажатие, не дошедшее до кнопки (дамп экрана под нагрузкой медленный),
+        // выглядит в итоге так же, как дефект: старый разговор на экране. Поэтому
+        // сначала видим, что сброс случился, — и только потом ждём перечитку.
+        let cleared = false;
+        for (let attempt = 0; attempt < 3 && !cleared; attempt++) {
+          if ((await phone.find(/^New conversation$/)).length > 0)
+            await phone.tap(/^New conversation$/, 5000);
+          cleared = await phone.waitGone(/^first ask$/, 3000);
+        }
+        check(
+          'F-66: «Новый разговор» сбросил ленту',
+          cleared,
+          `${Date.now() - seen.at} мс после запроса перечитки`,
+        );
+      }
       await wait(12_000);
       const old = await phone.find(/^OLD-CONVERSATION-RELOADED$|^OLD-TURN-TEXT$/);
       shot(tapNew ? 'f66-new-conversation-kept-en' : 'f66-control-reload-shown-en');

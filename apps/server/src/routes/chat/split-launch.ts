@@ -63,6 +63,7 @@ import {
   isKnownProviderId,
 } from '../../providers/registry.ts';
 import { activeCliCommand } from '../../providers/cli.ts';
+import { serverText } from '../../lib/server-texts.ts';
 
 /**
  * Запуск групп разделения — всё, что стоит между «завести копию» и «прогон
@@ -142,6 +143,27 @@ export interface SplitLauncher {
 }
 
 const TRIAGE_TITLE = 'Разбор разделения';
+
+/**
+ * Отказ разделению, пока активный CLI не умеет чат панели (Cursor: у него нет
+ * неинтерактивного запуска). Без проверки дети заводились бы разговорами,
+ * которые ни один прогон не продолжит, — висели бы «запущенными» без агента.
+ */
+export function splitChatRefusal(
+  ctx: ServerContext,
+):
+  | { message: string; messageCode: 'provider-chat-unsupported'; params: { provider: string } }
+  | undefined {
+  const provider = getActiveProvider(ctx.store);
+  if (provider.id === DEFAULT_PROVIDER_ID || provider.capabilities.chat === 'ready')
+    return undefined;
+  const params = { provider: provider.name };
+  return {
+    message: serverText('provider-chat-unsupported', params),
+    messageCode: 'provider-chat-unsupported',
+    params,
+  };
+}
 
 export function createSplitLauncher(
   ctx: ServerContext,
@@ -559,6 +581,9 @@ export function createSplitLauncher(
       // Плану модель не назначается: он и есть «потолок» чужого CLI.
       ...(assignment && !isPlan ? { model: assignment.model, effort: assignment.effort } : {}),
       ...(cascade ? { cascade } : {}),
+      // «Разрешить правки» разделения — то же, что у Claude (`permissionMode`
+      // выше): выключено — каждая просьба CLI приходит карточкой в чат звена.
+      allowEdits: allowEdits === true,
     });
     if (!created) return false;
     // Связь — сразу после того, как хранилище провайдера выдало ключ, и ДО
@@ -626,6 +651,9 @@ export function createSplitLauncher(
       title: TRIAGE_TITLE,
       workdir: dir,
       cascade: { stage: 'triage' },
+      // Как у Claude (`AUTONOMOUS_PERMISSION_MODE` разбора): спрашивать права
+      // разбору некого — каждый `grep` ждал бы кнопки в чате, которого никто не видит.
+      allowEdits: true,
     });
     if (!created) return { chatId: '', started: false, deferred: false };
 
@@ -667,12 +695,16 @@ export function createSplitLauncher(
 
   const start: SplitStart = (input) => {
     // Набор, привязанный к проекту, включается и здесь: копия репозитория
-    // считается тем же проектом.
-    const activated = activateGroupsQuietly(
-      { paths: ctx.location.paths, store: ctx.store, backupDir: ctx.backupDir },
-      input.cwd,
-      (error) => deps.log.warn({ err: error }, 'group activation failed'),
-    );
+    // считается тем же проектом. Только у Claude: чужой CLI его файлов не
+    // читает, а `~/.claude` человека менялся бы зря — привязанные группы чужой
+    // ребёнок получает слоем на прогон при отправке (`group-activation-wiring`).
+    const activated = isForeign
+      ? []
+      : activateGroupsQuietly(
+          { paths: ctx.location.paths, store: ctx.store, backupDir: ctx.backupDir },
+          input.cwd,
+          (error) => deps.log.warn({ err: error }, 'group activation failed'),
+        );
     // У Claude ключ ребёнка и связь уже есть (`link` зовётся до `start`); у
     // чужого CLI ключ выдаёт его хранилище — выбор ложится внутри `startForeign`.
     if (!isForeign) applyPick(input.chatId, input.group);
@@ -866,11 +898,8 @@ function startForeignReviewStage(
   }
   const provider = getProvider(providerId);
   const appData = ctx.location.paths.appData;
-  activateGroupsQuietly(
-    { paths: ctx.location.paths, store: ctx.store, backupDir: ctx.backupDir },
-    input.cwd,
-    (error) => deps.log.warn({ err: error }, 'group activation failed'),
-  );
+  // Группы проекта тумблером Claude здесь НЕ включаются: чужой CLI файлов Claude
+  // не читает. Привязанные к проекту едут слоем на прогон при отправке ниже.
 
   // Продолжение того же разговора (Д8, Д4): чат уже есть в хранилище.
   const resumed = input.resume ? parseForeignChatKey(input.resume.sessionId) : undefined;
@@ -903,6 +932,8 @@ function startForeignReviewStage(
     // неизвестное в понятное, и менять ступень под правки не за что.
     ...(input.model ? { model: input.model } : {}),
     ...(input.effort ? { effort: input.effort } : {}),
+    // Как у Claude: стадия ревью по ссылке идёт с автономными правами.
+    allowEdits: true,
   });
   if (!created) return { started: false };
 

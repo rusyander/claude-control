@@ -1,8 +1,21 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { KIMI_BLOCKING_EVENTS, KIMI_HOOK_EVENTS } from '../../lib/kimi-hook.ts';
+import { kimiTranscriptParser } from '../../lib/kimi-transcript.ts';
 import { buildCapabilities, type ConfigProvider } from '../types.ts';
 import { kimiCodeHome, unimplementedPaths } from './config-dirs.ts';
+import { contourModelName, readConfigRoot } from './run-endpoint.ts';
+
+/**
+ * Профиль главного агента «только чтение» для `kimi -p` при выключенных правках.
+ * Лежит рядом с каталогом и в конфиг человека не пишется: `--agent-file`
+ * действует на один запуск. Тело — `${base_prompt}`, так что системный промпт
+ * Kimi (с AGENTS.md, скиллами и плагинами) остаётся прежним.
+ */
+export const KIMI_READ_ONLY_AGENT = fileURLToPath(
+  new URL('./kimi-read-only-agent.md', import.meta.url),
+);
 
 /** Один `config.toml` держит и права (`[permission]`), и хуки (`[[hooks]]`). */
 const kimiConfigToml = (): string => join(kimiCodeHome(), 'config.toml');
@@ -96,14 +109,66 @@ export const kimiProvider: ConfigProvider = {
     skills: { format: 'skill-md-dir', relativeDir: '.kimi-code/skills' },
   },
   configLocations: () => [kimiCodeHome()],
-  // Ассистент: модельное API Kimi — OpenAI-совместимое (`base_url` вида
-  // `https://api.kimi.com/coding/v1`), ключ в `KIMI_API_KEY`/`MOONSHOT_API_KEY`.
-  // One-shot: `kimi -p <промпт>`.
+  // Ассистент: модельное API Kimi — OpenAI-совместимое API Moonshot, ключ в
+  // `KIMI_API_KEY`/`MOONSHOT_API_KEY`. One-shot: `kimi -p <промпт>`. Живой ход
+  // (сообщение посреди ответа) — через `kimi web`: занятая сессия ставит
+  // сообщение в очередь, `prompts:steer` вливает его в идущий ход
+  // (`domains/provider-chat/live/kimi-server.ts`).
   assistant: {
     apiKind: 'openai-compat',
     apiKeyEnvVars: ['KIMI_API_KEY', 'MOONSHOT_API_KEY'],
+    // Адрес — из документации самого вендора (D1): Moonshot API reference
+    // (https://platform.moonshot.ai/docs/api/chat) зовёт
+    // `https://api.moonshot.ai/v1/chat/completions` ключом `MOONSHOT_API_KEY`, а
+    // Kimi Code для ключа `KIMI_API_KEY` называет тот же `https://api.moonshot.ai/v1`
+    // (Environment variables: `KIMI_BASE_URL`). `api.kimi.com/coding/v1` — адрес
+    // подписки после `/login` (OAuth), не ключа: туда ключ не идёт.
+    apiBaseUrl: 'https://api.moonshot.ai/v1',
     cliRunnable: true,
-    oneShotArgs: (prompt) => ['-p', prompt],
+    // «Разрешить правки» в одиночном запуске (D2). `-p` не сочетается ни с
+    // `--plan`, ни с `-y`, ни с `--auto` (CLI отказывает при старте) и всегда
+    // идёт под политикой `auto`: просьба записать файл исполняется без вопроса,
+    // даже при `default_permission_mode = "manual"` (живая проба 2.1.1 и
+    // документация `kimi` Command). Поэтому выключено — профиль агента
+    // `--agent-file` с одними читающими инструментами: Write/Edit/Bash модель не
+    // видит, а вызов мимо списка CLI отклоняет сам («Tool "Write" not found»).
+    // Включено или переключателя нет — argv прежний: это и есть «правки можно».
+    oneShotArgs: (prompt, run) => [
+      ...(run?.allowEdits === false ? ['--agent-file', KIMI_READ_ONLY_AGENT] : []),
+      '-p',
+      prompt,
+    ],
+    // Оформление стенограммы `kimi -p` (`• ` и отступ) из ответа убирается.
+    parseStdout: kimiTranscriptParser,
+    liveServer: 'kimi-server',
+    // Переключатель доходит профилем `--agent-file` (см. `oneShotArgs`) и
+    // ответом живого сервера на просьбу о разрешении.
+    editsControl: 'flag',
+  },
+  // Контур (X7): модель целиком из окружения — `KIMI_MODEL_*` (документация
+  // «Environment variables» Kimi Code). CLI заводит из них модель
+  // `__kimi_env_model__`, и она перебивает `default_model` конфига; запрос идёт
+  // на `<адрес>/chat/completions` с ключом из окружения (живая проба 2.1.1).
+  // `KIMI_BASE_URL`/`KIMI_API_KEY` — поля конфига, не переменные: не годятся.
+  runEndpoint: {
+    apiKind: 'openai-compat',
+    env: ({ baseUrl, model, key }) => ({
+      KIMI_MODEL_PROVIDER_TYPE: 'openai',
+      KIMI_MODEL_BASE_URL: baseUrl,
+      KIMI_MODEL_API_KEY: key,
+      KIMI_MODEL_NAME: contourModelName(model),
+    }),
+    // Вторая модель (`[secondary_model]`) ходит своим провайдером, а переменной,
+    // перебивающей её, документация не называет (`KIMI_SECONDARY_MODEL` в бинаре
+    // есть, в документации — нет): прогон отказывает, а не уходит в облако.
+    bypass: () => {
+      const secondary = readConfigRoot(kimiConfigToml(), 'toml').secondary_model;
+      const model =
+        secondary && typeof secondary === 'object'
+          ? (secondary as Record<string, unknown>).model
+          : undefined;
+      return typeof model === 'string' && model.trim() ? '[secondary_model] model' : undefined;
+    },
   },
   capabilities: buildCapabilities({
     globalInstructions: 'ready',

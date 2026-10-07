@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { scopeOf } from '@agentdeck/contracts';
+import { scopeOf, scopeProvider } from '@agentdeck/contracts';
 import { Modal } from '@shared/ui/modal';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
@@ -10,6 +10,7 @@ import { SandboxButton } from '@features/SandboxRunner';
 import { DeleteButton } from '@features/EntityDelete';
 import { GroupPath } from '@features/GroupPath';
 import { useDeleteGroup } from '@entities/Group';
+import { activeProvider, useIsCapabilityReady, useProviders } from '@entities/Provider';
 import { selectionOfGroup } from './GroupsPage.lib';
 import { usePairSide } from './model/usePairSide';
 import { changedMemberLabel } from './model/changedMembers';
@@ -17,6 +18,7 @@ import { GroupViewTabs, groupViewPanelId, groupViewTabId } from './GroupViewTabs
 import type { GroupView } from './GroupViewTabs.types';
 import { GroupDetails } from './GroupDetails';
 import { GroupPairSwitch } from './GroupPairSwitch';
+import { GroupDelivery } from './GroupDelivery';
 import type { GroupDialogProps } from './GroupDialog.types';
 import styles from './GroupDialog.module.scss';
 
@@ -51,6 +53,16 @@ export function GroupDialog({
   const when = shown.when ?? shown.scenario?.when ?? '';
   const changed = group.originChanged ?? [];
   const idBase = `group-${group.id}`;
+  // Песочница — Claude Code в изоляции: у другого CLI сервер отказал бы 409, и
+  // кнопка обещала бы то, чего нет (как на странице скриптов).
+  const hasSandbox = useIsCapabilityReady('sandbox');
+  // Группа Claude при чужом CLI едет к нему слоем (или не едет вовсе) — окно
+  // говорит, что именно доедет; копия для другой CLI — её собственные файлы.
+  const provider = activeProvider(useProviders().data);
+  const foreign =
+    provider && provider.id !== 'claude' && scopeProvider(group.scope) === 'claude'
+      ? provider
+      : undefined;
 
   return (
     <Modal
@@ -75,11 +87,13 @@ export function GroupDialog({
               {t('groupSources.copyToGlobal')}
             </Button>
           )}
-          <SandboxButton
-            kind="group"
-            title={group.name}
-            selection={selectionOfGroup(group.members)}
-          />
+          {hasSandbox && (
+            <SandboxButton
+              kind="group"
+              title={group.name}
+              selection={selectionOfGroup(group.members)}
+            />
+          )}
           <DeleteButton
             entityName={group.name}
             description={t('common.deleteGroup')}
@@ -122,6 +136,8 @@ export function GroupDialog({
             </Button>
           </Stack>
         )}
+
+        {foreign && <GroupDelivery groupId={group.id} provider={foreign} />}
 
         {pair && side.pairPath && (
           <GroupPairSwitch

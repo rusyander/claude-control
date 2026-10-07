@@ -220,3 +220,60 @@ describe('выученные сита по областям', () => {
     expect(sieves.list().learned[0]?.areas).toBeUndefined();
   });
 });
+
+describe('потолок выученных сит (Ф4)', () => {
+  /** 41 разное сито: у каждого свой тред и непохожая проверка, время идёт вперёд. */
+  function fill(count: number, acceptEvery: (index: number) => boolean) {
+    const dir = mkdtempSync(join(tmpdir(), 'sieve-store-'));
+    dirs.push(dir);
+    let tick = Date.parse('2026-09-28T12:00:00Z');
+    const sieves = new SieveStore(dir, () => new Date((tick += 60_000)));
+    const learnOne = (index: number) =>
+      sieves.learn({
+        rows: [
+          row({
+            thread: `${MR}#note_${index}`,
+            check: `verify zq${index}alpha zq${index}beta zq${index}gamma on the stand`,
+          }),
+        ],
+        relayed: [`${MR}#note_${index}`],
+        projectPath: '/p',
+      });
+    for (let index = 0; index < count; index += 1) {
+      const outcome = learnOne(index);
+      const id = outcome.accepted[0]?.id;
+      if (id && acceptEvery(index)) sieves.accept(id, 'project');
+    }
+    return { sieves, learnOne };
+  }
+
+  it('41-е сито вытесняет самое старое непринятое, принятое остаётся', () => {
+    // Принято самое старое (0) и ещё половина: вытеснить надо непринятое 1, а не 0.
+    const { sieves, learnOne } = fill(40, (index) => index % 2 === 0);
+    const before = sieves.list().learned;
+    expect(before).toHaveLength(40);
+    const outcome = learnOne(40);
+    expect(outcome.rejected).toEqual([]);
+    const after = sieves.list().learned;
+    expect(after).toHaveLength(40);
+    const threads = after.map((sieve) => sieve.sources[0]?.thread);
+    expect(threads).toContain(`${MR}#note_0`);
+    expect(threads).not.toContain(`${MR}#note_1`);
+    expect(threads).toContain(`${MR}#note_40`);
+    expect(after.filter((sieve) => sieve.status === 'active')).toHaveLength(20);
+    expect(sieves.list().refused).toBeUndefined();
+  });
+
+  it('все 40 приняты — 41-е не записано, отказ виден; убрали сито — отказ снят', () => {
+    const { sieves, learnOne } = fill(40, () => true);
+    const outcome = learnOne(40);
+    expect(outcome.accepted).toEqual([]);
+    expect(outcome.rejected.map((item) => item.reason)).toEqual(['store-full']);
+    const view = sieves.list();
+    expect(view.learned).toHaveLength(40);
+    expect(view.learned.every((sieve) => sieve.status === 'active')).toBe(true);
+    expect(view.refused).toMatchObject({ count: 1 });
+    sieves.remove(view.learned[0]!.id);
+    expect(sieves.list().refused).toBeUndefined();
+  });
+});

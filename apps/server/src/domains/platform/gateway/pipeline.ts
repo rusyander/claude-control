@@ -31,6 +31,13 @@ import {
   statusOfErrorCode,
   type Dialect,
 } from './dialect.ts';
+import { bridgedRequest, bridgedResponse, responsesRequestToChat } from './responses-bridge.ts';
+import {
+  estimateGoogleTokens,
+  googleRequestToChat,
+  googleResponse,
+  parseGooglePath,
+} from './google-bridge.ts';
 import { maskStopMessage, StreamTranslator, TRUNCATED_MESSAGE } from './frames.ts';
 import {
   AnthropicStreamMeter,
@@ -93,18 +100,26 @@ const MAX_BODY_BYTES = 32 * 1024 * 1024;
 const MAX_ANSWER_BYTES = 8 * 1024 * 1024;
 
 /**
- * Четыре маршрута, и это всё. Остальное — честный 404, а не притворство.
+ * Шесть маршрутов, и это всё. Остальное — честный 404, а не притворство.
  * Четвёртый, ручка картинок, — с 17.09.2026: до того панель рисовала ею мимо
- * шлюза, без следа, расхода и перевода отказов (`images.ts`).
+ * шлюза, без следа, расхода и перевода отказов (`images.ts`). Пятый, ручка
+ * Responses (MAP D), — диалект Codex: переводится на краю в chat/completions и
+ * идёт тем же конвейером (`responses-bridge.ts`). Шестой, ручки Gemini API
+ * (07.10.2026), — диалект Gemini CLI, переводится так же (`google-bridge.ts`);
+ * `{model}` в пути — имя модели, и оно может содержать `/`.
  */
 export const GATEWAY_ROUTES = [
   '/v1/chat/completions',
   '/v1/messages',
   '/v1/models',
   '/v1/images/generations',
+  '/v1/responses',
+  '/v1beta/models/{model}:streamGenerateContent',
+  '/v1beta/models/{model}:generateContent',
+  '/v1beta/models/{model}:countTokens',
 ] as const;
 
-export type GatewayRoute = 'chat' | 'messages' | 'models' | 'images';
+export type GatewayRoute = 'chat' | 'messages' | 'models' | 'images' | 'responses' | 'google';
 
 export interface PipelineDeps {
   store: AppStore;
@@ -154,10 +169,13 @@ export interface ToolCallGate {
 /** Какой из маршрутов просят. Хвост `/v1` может отсутствовать у клиента. */
 export function resolveRoute(path: string): GatewayRoute | undefined {
   const clean = (path.split('?')[0] ?? path).replace(/\/+$/, '');
+  // Первым: имя модели в пути Gemini произвольно и могло бы кончаться чем угодно.
+  if (parseGooglePath(clean)) return 'google';
   if (clean.endsWith('/chat/completions')) return 'chat';
   if (clean.endsWith('/messages')) return 'messages';
   if (clean.endsWith('/models')) return 'models';
   if (clean.endsWith('/images/generations')) return 'images';
+  if (clean.endsWith('/responses')) return 'responses';
   return undefined;
 }
 
@@ -253,12 +271,15 @@ function sectionClosedText(section: string, title: string): string {
 
 export async function handleGatewayRequest(
   request: IncomingMessage,
-  response: ServerResponse,
+  realResponse: ServerResponse,
   deps: PipelineDeps,
 ): Promise<void> {
   const url = request.url ?? '/';
   const { platformId, rest, runTag, section, badSection } = splitPath(url);
   const route = platformId ? resolveRoute(rest) : undefined;
+  // Клиент Gemini читает отказ только в форме Google API — переводится КАЖДЫЙ
+  // ответ ручки, и отказы проверок до конвейера (раздел, ключ, контур) тоже.
+  const response = route === 'google' ? googleResponse(realResponse) : realResponse;
   // В след запроса путь идёт БЕЗ строки запроса: часть CLI носит в ней свой
   // ключ (`?key=…`), а журнал шлюза уезжает на экран панели целиком. Метка
   // прогона и отметка раздела из пути тоже убраны — у следа для них свои поля.
@@ -340,7 +361,9 @@ export async function handleGatewayRequest(
     });
   }
 
-  if (route === 'models') return models(response, deps, platform, token, path, dialect);
+  if (route === 'models') {
+    return models(response, deps, platform, token, path, dialect, { runTag, section });
+  }
   if (route === 'images') {
     return imagesRequest(
       request,
@@ -368,7 +391,152 @@ export async function handleGatewayRequest(
       },
     );
   }
+  if (route === 'responses') {
+    return responses(request, response, deps, platform, token, path, runTag, section);
+  }
+  if (route === 'google') {
+    return google(
+      request,
+      response,
+      realResponse,
+      deps,
+      platform,
+      token,
+      path,
+      rest,
+      runTag,
+      section,
+    );
+  }
   return chat(request, response, deps, platform, token, path, dialect, runTag, section);
+}
+
+/**
+ * Ручка Responses: тело переводится в chat/completions, ответ конвейера — обратно
+ * в события Responses. Своих решений тут нет: размер, правила, маска, прослойка,
+ * расход и след — те же, что у любого клиента OpenAI. Что перевести нельзя,
+ * уходит в след потерями, а не молча.
+ */
+async function responses(
+  request: IncomingMessage,
+  response: ServerResponse,
+  deps: PipelineDeps,
+  platform: Platform,
+  token: string,
+  path: string,
+  runTag?: string,
+  section?: string,
+): Promise<void> {
+  const dialect: Dialect = 'openai-compat';
+  const declared = Number(request.headers['content-length'] ?? 0);
+  const raw = declared > MAX_BODY_BYTES ? undefined : await readBody(request);
+  if (raw === undefined) {
+    refuse(response, deps, {
+      platformId: platform.id,
+      path,
+      dialect,
+      status: 413,
+      code: 'request_too_large',
+      message: serverText('gateway-body-too-large'),
+    });
+    request.destroy();
+    return;
+  }
+  const body = safeJson(raw.toString('utf8'));
+  const bridged = isRecord(body) ? responsesRequestToChat(body) : undefined;
+  if (!bridged || 'refusal' in bridged) {
+    return refuse(response, deps, {
+      platformId: platform.id,
+      path,
+      dialect,
+      status: 400,
+      code: 'invalid_request_error',
+      message: bridged
+        ? bridged.refusal
+        : serverText(isRecord(body) ? 'gateway-responses-not-request' : 'gateway-body-not-json'),
+    });
+  }
+  return chat(
+    bridgedRequest(request, Buffer.from(JSON.stringify(bridged.chat))),
+    bridgedResponse(response, bridged),
+    deps,
+    platform,
+    token,
+    path,
+    dialect,
+    runTag,
+    section,
+    bridged.dropped,
+  );
+}
+
+/**
+ * Ручки Gemini API: тело переводится в chat/completions и идёт обычным `chat`,
+ * ответ переводит обёртка, уже надетая на `response` (`googleResponse`).
+ * `:countTokens` контура не касается: оценка на месте, без следа и расхода.
+ */
+async function google(
+  request: IncomingMessage,
+  response: ServerResponse,
+  /** Без перевода: ответ `:countTokens` уже в форме Google, переводить нечего. */
+  raw: ServerResponse,
+  deps: PipelineDeps,
+  platform: Platform,
+  token: string,
+  path: string,
+  rest: string,
+  runTag?: string,
+  section?: string,
+): Promise<void> {
+  const dialect: Dialect = 'openai-compat';
+  const target = parseGooglePath(rest);
+  const declared = Number(request.headers['content-length'] ?? 0);
+  const read = declared > MAX_BODY_BYTES ? undefined : await readBody(request);
+  if (read === undefined || !target) {
+    refuse(response, deps, {
+      platformId: platform.id,
+      path,
+      dialect,
+      status: 413,
+      code: 'request_too_large',
+      message: serverText('gateway-body-too-large'),
+    });
+    request.destroy();
+    return;
+  }
+  const body = safeJson(read.toString('utf8'));
+  if (target.method === 'countTokens') {
+    raw.writeHead(200, { 'content-type': 'application/json' });
+    raw.end(JSON.stringify({ totalTokens: estimateGoogleTokens(body) }));
+    return;
+  }
+  const bridged = isRecord(body)
+    ? googleRequestToChat(body, target.model, target.method === 'streamGenerateContent')
+    : undefined;
+  if (!bridged || 'refusal' in bridged) {
+    return refuse(response, deps, {
+      platformId: platform.id,
+      path,
+      dialect,
+      status: 400,
+      code: 'invalid_request_error',
+      message: bridged
+        ? bridged.refusal
+        : serverText(isRecord(body) ? 'gateway-google-not-request' : 'gateway-body-not-json'),
+    });
+  }
+  return chat(
+    bridgedRequest(request, Buffer.from(JSON.stringify(bridged.chat))),
+    response,
+    deps,
+    platform,
+    token,
+    path,
+    dialect,
+    runTag,
+    section,
+    bridged.dropped,
+  );
 }
 
 /**
@@ -428,7 +596,14 @@ async function models(
   token: string,
   path: string,
   dialect: Dialect,
+  origin: { runTag?: string | undefined; section?: string | undefined } = {},
 ): Promise<void> {
+  // След списка моделей несёт раздел и прогон, как и след ответа: иначе по журналу
+  // не понять, какой CLI спрашивал список через контур.
+  const traced = {
+    ...(origin.runTag ? { runTag: origin.runTag } : {}),
+    ...(origin.section ? { section: origin.section } : {}),
+  };
   try {
     const upstream = await callUpstream({
       platform,
@@ -454,6 +629,7 @@ async function models(
         message: bridged.message,
         violations: bridged.violations,
         blocked: upstream.status === 451,
+        ...traced,
       });
     }
     response.writeHead(200, { 'content-type': 'application/json' });
@@ -462,7 +638,7 @@ async function models(
     response.end(
       dialect === 'anthropic' ? JSON.stringify(openAiModelsToAnthropic(safeJson(text))) : text,
     );
-    record(deps, { platformId: platform.id, path, dialect, status: 200 });
+    record(deps, { platformId: platform.id, path, dialect, status: 200, ...traced });
   } catch (error) {
     const message = error instanceof UpstreamError ? error.message : String(error);
     refuse(response, deps, {
@@ -472,6 +648,7 @@ async function models(
       status: 502,
       code: 'api_error',
       message,
+      ...traced,
     });
   }
 }
@@ -486,6 +663,8 @@ async function chat(
   dialect: Dialect,
   runTag?: string,
   section?: string,
+  /** Что выпало ещё на краю, переводом Responses (`responses-bridge.ts`). */
+  bridgeLost: readonly string[] = [],
 ): Promise<void> {
   // Объявленный размер проверяется ДО чтения: 40-мегабайтное тело незачем
   // тянуть в память ради того, чтобы отказать в конце.
@@ -570,7 +749,7 @@ async function chat(
   // инструментами она дублировала `tools` из перевода, без них называла потерю,
   // которой не было. Уступка видна и так — `shimmed` пуст, а `platform_tools` в
   // теле есть (ревью Т7, m4).
-  const lost = translated.lost.map((item) => item.field);
+  const lost = [...bridgeLost, ...translated.lost.map((item) => item.field)];
   const allowed = new Set(translated.tools.map((tool) => tool.name));
 
   // Правила контура (Т7) подмешиваются ПОСЛЕ перевода диалекта и ДО защиты
@@ -1609,6 +1788,8 @@ interface Refusal {
   blocked?: boolean;
   /** Раздел из адреса — след закрытого раздела называет, чей запрос не пустили. */
   section?: string;
+  /** Метка прогона из адреса, если отказ случился внутри уже опознанного прогона. */
+  runTag?: string;
 }
 
 /** Отказ: форма диалекта клиента, русская причина, след в панель. */
@@ -1633,6 +1814,7 @@ function refuse(response: ServerResponse, deps: PipelineDeps, refusal: Refusal):
     lost: refusal.lost,
     error: refusal.message,
     ...(refusal.section ? { section: refusal.section } : {}),
+    ...(refusal.runTag ? { runTag: refusal.runTag } : {}),
   });
 }
 

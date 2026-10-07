@@ -195,6 +195,12 @@ How it works and why:
 - **The run belongs to the server, not to the tab.** A closed tab, a move to another page and F5 do
   not kill the answer: on return the panel asks for the state and shows what has been printed.
 - **An attachment is a file path**, not its content: agent CLIs read files themselves.
+- **The panel kit reaches Codex for one launch.** Modes are "Yours only" and "Yours and the panel
+  kit". Rules go in through the launch key `-c developer_instructions=…`, placed after your own
+  `developer_instructions` from `config.toml`; skills come as an extra skills folder (a one-shot
+  `codex exec` gets a list of them in the same instructions). Codex's own folder and `config.toml`
+  are never written. Commands, subagents and hooks do not reach Codex: it has no per-launch layer
+  for them and runs a hook only after you approve it inside Codex.
 - **No CLI means a direct model API call** with the stored key; neither one available means an
   honest refusal with an explanation, not an empty answer.
 
@@ -362,3 +368,13 @@ one list.
 For **Codex**, **Continue**, **Goose**, **Kimi Code**, **Cursor** and **Aider** the format of user
 commands is not covered by their documentation, so the section is hidden there. The panel does not
 invent a format the docs do not describe.
+
+## 12. Analytics
+
+The "Analytics" section follows the active CLI. For **Claude** it reads its own transcripts. For
+**Codex** it reads the session files `~/.codex/sessions/**/rollout-*.jsonl` plus
+`~/.codex/archived_sessions`; for **Qwen Code**, `~/.qwen/projects/<project>/chats/*.jsonl`. Both
+count input tokens together with those read from the cache, so the panel subtracts the cached part
+to avoid counting it twice. A model with no known price is shown as unpriced: its tokens are
+counted, but no cost is invented for them. The other CLIs keep no usage files the panel could read,
+so the section is hidden there.

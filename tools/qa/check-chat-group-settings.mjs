@@ -531,12 +531,18 @@ if (!shotsTag) {
   state.settingsFail = true;
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.waitForSelector('nav');
-  await page.waitForTimeout(1200);
+  // Ждём состояния, а не фиксированных пауз: в прогоне группы под нагрузкой
+  // список после перезагрузки поднимался дольше 1,2 с, и меню открывалось у
+  // другого чата — три строки краснели при исправном продукте.
+  await row('Группа API').waitFor({ timeout: 30_000 });
   await row('Группа API').click();
   await page.waitForTimeout(1200);
   await openMenu();
   // Секция запрашивает вид при открытии меню, и запрос повторяется один раз.
-  await page.waitForTimeout(3000);
+  await page
+    .getByText('Настройки чата не загрузились', { exact: false })
+    .waitFor({ timeout: 20_000 })
+    .catch(() => undefined);
   check(
     await page.getByText('Настройки чата не загрузились', { exact: false }).isVisible(),
     'GET настроек 500 — в меню сказано, что настройки не загрузились',

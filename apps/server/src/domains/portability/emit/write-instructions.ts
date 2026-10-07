@@ -8,6 +8,7 @@ import {
 } from '../../provider-instructions.ts';
 import { readProviderRulesInfo } from '../../provider-rules/read.ts';
 import { saveProviderRule } from '../../provider-rules/write.ts';
+import { ruleExtension } from '../../provider-rules/paths.ts';
 import { bodyAfterFrontmatter } from '../markdown.ts';
 import {
   EmitMechanismMissingError,
@@ -41,14 +42,17 @@ export function emitInstructionsLayer(context: EmitContext): StageResult {
   if (carried.length === 0) return { entries: [], writes: [] };
 
   const { target } = context.deps;
-  if (context.targets.instructionsRules) return asRules(context, carried);
+  // Один файл — первым: у Qwen есть и QWEN.md, и каталог правил, и постоянные
+  // инструкции — это QWEN.md, а не новое правило рядом с ним.
   if (context.targets.instructionsFile) return asSingleFile(context, carried);
+  if (context.targets.instructionsRules) return asRules(context, carried);
   if (context.targets.instructionsList) return asListedFile(context, carried);
   throw new EmitMechanismMissingError(target.id, 'instructions');
 }
 
 /**
- * Каталог правил (Cursor, Continue): каждая запись — свой файл `.mdc`. Тело
+ * Каталог правил (Cursor, Continue): каждая запись — свой файл с расширением
+ * формата (`.mdc` у Cursor, `.md` у Continue). Тело
  * пишет адаптер раздела, он же хранит чужие ключи шапки и отказывается
  * переписывать файл, который не разобрал.
  */
@@ -58,6 +62,7 @@ function asRules(context: EmitContext, items: readonly EnvItem[]): StageResult {
   if (!target) throw new EmitMechanismMissingError(context.deps.target.id, 'instructions');
 
   const info = readProviderRulesInfo(target);
+  const extension = ruleExtension(target.format);
   const used = new Set<string>();
 
   for (const item of items) {
@@ -78,13 +83,18 @@ function asRules(context: EmitContext, items: readonly EnvItem[]): StageResult {
       // Молча записать оба значило бы отчитаться, что доехали оба, оставив у
       // цели только последнее.
       result.entries.push(
-        emitEntry(item, verdict, 'collision_needs_choice', join(target.rulesDir, `${name}.mdc`)),
+        emitEntry(
+          item,
+          verdict,
+          'collision_needs_choice',
+          join(target.rulesDir, `${name}${extension}`),
+        ),
       );
       continue;
     }
     used.add(name);
 
-    const relativePath = `${name}.mdc`;
+    const relativePath = `${name}${extension}`;
     const fullPath = join(target.rulesDir, relativePath);
     const body = textOf(item);
     const already = info.rules.find((rule) => rule.path === relativePath);

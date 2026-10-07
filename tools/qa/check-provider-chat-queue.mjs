@@ -9,6 +9,10 @@
  * себя как сервер (`ProviderChatService`): 202 с элементом очереди, очередь в
  * статусе, досылка по концу ответа.
  *
+ * Ф13: очередь без хода (ответ остановили, панель перезапускалась) сама не
+ * уйдёт — статус несёт `queueHeld`, пузырь подписан «Ждёт отправки» и несёт
+ * кнопку «Отправить», которая шлёт `POST …/queue/:id/send`.
+ *
  * Запуск: `node tools/qa/check-provider-chat-queue.mjs` при поднятом `pnpm dev`.
  */
 import { chromium } from 'playwright';
@@ -64,6 +68,7 @@ await page.route('**/api/provider-chat/chats/qq1/status', (route) =>
     isRunning,
     partial,
     ...(queue.length > 0 ? { queued: queue } : {}),
+    ...(queue.length > 0 && !isRunning ? { queueHeld: true } : {}),
   }),
 );
 
@@ -101,6 +106,22 @@ await page.route('**/api/provider-chat/chats/qq1/send', async (route) => {
     );
   }
   return json(route, { message: startTurn(body.text) });
+});
+
+const sentQueued = [];
+await page.route('**/api/provider-chat/chats/qq1/queue/*/send', async (route) => {
+  const id = route.request().url().split('/').at(-2);
+  const item = queue.find((entry) => entry.id === id);
+  if (!item) {
+    return json(
+      route,
+      { message: 'Сообщения в очереди уже нет', messageCode: 'foreign-queued-gone' },
+      404,
+    );
+  }
+  queue = queue.filter((entry) => entry !== item);
+  sentQueued.push(id);
+  return json(route, { message: startTurn(item.text) });
 });
 
 await page.route('**/api/provider-chat/chats/qq1/queue/*', async (route) => {
@@ -207,6 +228,27 @@ check(sent.includes('Второй вопрос'), 'по концу ответа 
 check(after.includes('Ответ на «Второй вопрос»'), 'ответ на дописанное пришёл без перезагрузки');
 check(!sent.includes('Третий вопрос'), 'отменённое так и не ушло');
 check((await queuedBubbles.count()) === 0, 'очередь пуста — пузырей нет');
+// Ф13: «перезапуск панели» — в очереди сообщение, хода нет. Сама очередь не
+// уйдёт: подпись «Ждёт отправки» и кнопка «Отправить» у пузыря.
+queue = [{ id: 'qh', text: 'Ждущий вопрос', at: new Date().toISOString() }];
+isRunning = false;
+await page.reload({ waitUntil: 'domcontentloaded' });
+await page.waitForSelector('[data-queued-message]', { timeout: 10000 }).catch(() => {});
+const heldText = (await page.textContent('body')) ?? '';
+check(heldText.includes('Ждёт отправки'), 'стоящая очередь подписана «Ждёт отправки»');
+check(!heldText.includes('Уйдёт следующим'), 'и не обещает уйти сама');
+const heldSend = page.locator('[data-queued-send]');
+check((await heldSend.count()) === 1, 'у ждущего сообщения — кнопка «Отправить»');
+await page
+  .screenshot({ path: process.env.SHOT_HELD ?? '.agent/tmp/next/f13-held.png' })
+  .catch(() => {});
+await heldSend.click().catch(() => {});
+await page.waitForTimeout(1500);
+check(sentQueued.includes('qh'), 'кнопка шлёт сообщение очереди на сервер');
+const heldAfter = (await page.textContent('body')) ?? '';
+check(heldAfter.includes('Ответ на «Ждущий вопрос»'), 'ответ на него пришёл без перезагрузки');
+check((await page.locator('[data-queued-message]').count()) === 0, 'пузырь ожидания снят');
+
 check(errors.length === 0, `ошибок в консоли нет${errors.length ? `: ${errors[0]}` : ''}`);
 
 await browser.close();

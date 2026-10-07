@@ -30,7 +30,11 @@ import { GAPS_TEXT_PARAMS } from './panel-agent-texts-gaps.ts';
 export const PANEL_ACTION_RISKS = ['read', 'change', 'danger'] as const;
 export type PanelActionRisk = (typeof PANEL_ACTION_RISKS)[number];
 
-/** Сколько действие ждёт клика человека. Дольше — отказ по таймауту. */
+/**
+ * Сколько действие ждёт клика человека. Дольше — отказ по таймауту. Это потолок:
+ * у хода агента срок карточки свой для каждого CLI —
+ * `panelAgentConfirmTimeoutMs`.
+ */
 export const PANEL_ACTION_CONFIRM_TIMEOUT_MS = 10 * 60_000;
 
 /**
@@ -403,6 +407,8 @@ export const panelTextParams = {
   'journal-search-panel': [],
   'journal-analytics-summary': [],
   'journal-compare-providers': [],
+  'journal-local-models-status': [],
+  'journal-kit-status': [],
   'journal-env-passport': [],
   'journal-list-plugins': [],
   'journal-list-available-plugins': [],
@@ -624,11 +630,42 @@ export type PanelAgentEvent =
 // --- Прогон агента (А2) ------------------------------------------------------
 
 /**
- * Сколько CLI ждёт ответа инструмента MCP (`MCP_TOOL_TIMEOUT` в окружении
- * прогона). Больше ожидания карточки с запасом: иначе CLI бросил бы вызов
- * раньше, чем человек успел нажать, и карточка исполнилась бы в пустоту.
+ * Запас между сроком карточки и ожиданием инструмента у CLI: карточка истекает
+ * раньше, и модель слышит от панели «время ожидания вышло», а не обрыв вызова.
  */
-export const PANEL_AGENT_MCP_TOOL_TIMEOUT_MS = PANEL_ACTION_CONFIRM_TIMEOUT_MS + 60_000;
+export const PANEL_AGENT_TOOL_MARGIN_MS = 60_000;
+
+/**
+ * Сколько CLI ждёт ответа инструмента MCP (`MCP_TOOL_TIMEOUT` в окружении
+ * прогона, `timeout` в конфиге MCP, `tool_timeout_sec` у Codex). Больше
+ * ожидания карточки с запасом: иначе CLI бросил бы вызов раньше, чем человек
+ * успел нажать, и карточка исполнилась бы в пустоту.
+ */
+export const PANEL_AGENT_MCP_TOOL_TIMEOUT_MS =
+  PANEL_ACTION_CONFIRM_TIMEOUT_MS + PANEL_AGENT_TOOL_MARGIN_MS;
+
+/**
+ * CLI, у которых ожидание инструмента панель задать не может. Goose 1.53:
+ * переходник приходит флагом `--with-extension`, а у расширения из флага
+ * ожидание вызова — 300 с, по умолчанию Goose; флаг своего срока не принимает.
+ */
+export const PANEL_AGENT_FIXED_TOOL_TIMEOUT_MS: Readonly<Record<string, number>> = {
+  goose: 300_000,
+};
+
+/**
+ * Срок карточки подтверждения в ходе агента у этого CLI — единственное место,
+ * откуда его берут сервер (таймер и `expiresAt` карточки) и справка. Где CLI
+ * ждёт сколько ему сказали — потолок `PANEL_ACTION_CONFIRM_TIMEOUT_MS`; где
+ * ожидание у CLI своё — на запас короче него: карточка, живущая дольше вызова,
+ * показывала бы срок, до которого её никто не дождётся (её снимает обрыв).
+ */
+export function panelAgentConfirmTimeoutMs(dialect: string | undefined): number {
+  const fixed = dialect === undefined ? undefined : PANEL_AGENT_FIXED_TOOL_TIMEOUT_MS[dialect];
+  return fixed === undefined
+    ? PANEL_ACTION_CONFIRM_TIMEOUT_MS
+    : Math.min(PANEL_ACTION_CONFIRM_TIMEOUT_MS, fixed - PANEL_AGENT_TOOL_MARGIN_MS);
+}
 
 /** Потолок одного хода агента: ожидание карточки плюс время на работу. */
 export const PANEL_AGENT_RUN_TIMEOUT_MS = PANEL_ACTION_CONFIRM_TIMEOUT_MS + 5 * 60_000;

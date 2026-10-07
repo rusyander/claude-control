@@ -3,12 +3,16 @@ import {
   STEP_ORDER,
   STEP_STORAGE_KEY,
   clearStoredStep,
+  fitStep,
+  hasOtherCli,
   initialStep,
+  onboardingGate,
   isStep,
   nextStep,
   prevStep,
   readStoredStep,
   stepNumber,
+  stepOrder,
   storeStep,
 } from './steps';
 
@@ -98,5 +102,55 @@ describe('память шага между перезагрузками', () => 
     expect(readStoredStep(broken)).toBeUndefined();
     expect(() => storeStep(broken, 'intro')).not.toThrow();
     expect(() => clearStoredStep(broken)).not.toThrow();
+  });
+});
+
+describe('onboardingGate — каталог Claude обязателен только Claude', () => {
+  it('нет .claude, выбран Qwen: панель готова, «Готово» доступно', () => {
+    expect(
+      onboardingGate({ isValid: false, activeProviderId: 'qwen', otherCliFound: true }),
+    ).toEqual({ panelReady: true, canLeaveLocation: true });
+  });
+
+  it('нет .claude, выбран ещё Claude, но найден qwen: можно уйти на выбор CLI, но не закончить', () => {
+    expect(
+      onboardingGate({ isValid: false, activeProviderId: 'claude', otherCliFound: true }),
+    ).toEqual({ panelReady: false, canLeaveLocation: true });
+  });
+
+  it('нет ни .claude, ни другого CLI: мастер держит на шаге каталога (identity)', () => {
+    expect(
+      onboardingGate({ isValid: false, activeProviderId: 'claude', otherCliFound: false }),
+    ).toEqual({ panelReady: false, canLeaveLocation: false });
+  });
+
+  it('hasOtherCli: claude в PATH не считается «другим», qwen — считается', () => {
+    const detect = (id: string) => ({ providers: [{ id, cliInstalled: true }] });
+    expect(hasOtherCli(detect('claude'))).toBe(false);
+    expect(hasOtherCli(detect('qwen'))).toBe(true);
+    expect(hasOtherCli(undefined)).toBe(false);
+  });
+});
+
+// Развилка A3 (07.10): шаг «Доступ Claude Code» нужен только Claude — у другого
+// провайдера он спрашивал про доступ, которым тот не пользуется.
+describe('шаги при другом провайдере', () => {
+  it('у Claude и у неизвестного провайдера — все четыре шага', () => {
+    expect(stepOrder('claude')).toEqual(STEP_ORDER);
+    expect(stepOrder(undefined)).toEqual(STEP_ORDER);
+  });
+
+  it('у другого CLI шага доступа нет: выбор CLI — последний, счётчик из трёх', () => {
+    const order = stepOrder('qwen');
+    expect(order).toEqual(['intro', 'location', 'providers']);
+    expect(nextStep('providers', order)).toBeUndefined();
+    expect(prevStep('providers', order)).toBe('location');
+    expect(stepNumber('providers', order)).toBe(3);
+  });
+
+  it('сохранённый шаг доступа после смены провайдера становится последним из оставшихся', () => {
+    expect(fitStep('access', stepOrder('codex'))).toBe('providers');
+    expect(fitStep('access', stepOrder('claude'))).toBe('access');
+    expect(fitStep('location', stepOrder('codex'))).toBe('location');
   });
 });

@@ -20,10 +20,10 @@ function providerOf(id: string): ConfigProvider {
 }
 
 const RUN = {
-  providerId: 'codex',
+  providerId: 'continue',
   sessionId: 'chat-1',
   cwd: process.cwd(),
-  transcriptPath: 'C:/appdata/provider-chats/codex/chat-1.jsonl',
+  transcriptPath: 'C:/appdata/provider-chats/continue/chat-1.jsonl',
 };
 
 const CALL = { id: 'call-1', name: 'Write', input: { file_path: 'a.ts' } };
@@ -41,10 +41,10 @@ describe('владелец события инструмента', () => {
   });
 
   it('у цели без механизма — провод, но ТОЛЬКО через контур', () => {
-    const codex = providerOf('codex');
-    expect(toolEventOwner(codex, 'PreToolUse', { throughContour: true })).toBe('wire');
-    expect(toolEventOwner(codex, 'PreToolUse', { throughContour: false })).toBe('none');
-    expect(toolEventOwner(codex, 'PostToolUse', { throughContour: false })).toBe('none');
+    const target = providerOf('continue');
+    expect(toolEventOwner(target, 'PreToolUse', { throughContour: true })).toBe('wire');
+    expect(toolEventOwner(target, 'PreToolUse', { throughContour: false })).toBe('none');
+    expect(toolEventOwner(target, 'PostToolUse', { throughContour: false })).toBe('none');
   });
 });
 
@@ -53,7 +53,7 @@ describe('событие без владельца', () => {
     // Отсутствие события — это отсутствие события. Выдать его за запрет значило
     // бы остановить работу агента там, где человек ни о чём не просил.
     const decision = await runToolEvent({
-      provider: providerOf('codex'),
+      provider: providerOf('continue'),
       run: RUN,
       call: CALL,
       event: 'PreToolUse',
@@ -81,7 +81,7 @@ describe('событие без владельца', () => {
 describe('событие на проводе', () => {
   it('код 2 запрещает вызов, а причиной едет STDERR скрипта', async () => {
     const decision = await runToolEvent({
-      provider: providerOf('codex'),
+      provider: providerOf('continue'),
       run: RUN,
       call: CALL,
       event: 'PreToolUse',
@@ -107,7 +107,7 @@ describe('событие на проводе', () => {
     // означал бы, что вызов до него доехал пустым: так и было, пока имена полей
     // на шве шлюза не совпали (`arguments` против `input`).
     const decision = await runToolEvent({
-      provider: providerOf('codex'),
+      provider: providerOf('continue'),
       run: RUN,
       call: { id: 'call-1', name: 'Write', input: { file_path: 'secrets/key.txt' } },
       event: 'PreToolUse',
@@ -131,7 +131,7 @@ describe('событие на проводе', () => {
     // Половина «красным» без половины «зелёным» доказывала бы лишь то, что скрипт
     // отказывает всегда.
     const decision = await runToolEvent({
-      provider: providerOf('codex'),
+      provider: providerOf('continue'),
       run: RUN,
       call: CALL,
       event: 'PreToolUse',
@@ -156,7 +156,7 @@ describe('событие на проводе', () => {
     // Наблюдательное событие с правом запрета врало бы модели о том, чего не
     // было: инструмент к этому времени уже отработал.
     const decision = await runToolEvent({
-      provider: providerOf('codex'),
+      provider: providerOf('continue'),
       run: RUN,
       call: CALL,
       event: 'PostToolUse',
@@ -176,7 +176,7 @@ describe('событие на проводе', () => {
 
   it('хуки другого события не зовутся', async () => {
     const decision = await runToolEvent({
-      provider: providerOf('codex'),
+      provider: providerOf('continue'),
       run: RUN,
       call: CALL,
       event: 'PreToolUse',

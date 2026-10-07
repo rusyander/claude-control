@@ -138,11 +138,12 @@ export function resetCliInfoCache(): void {
  */
 export function updateCli(
   path: string,
-  options: { exec?: CliExec } = {},
+  /** `args` — подкоманда обновления этого CLI (у Claude, Qwen и Codex — `update`). */
+  options: { exec?: CliExec; args?: string[] } = {},
 ): { ok: boolean; output: string } {
   const exec = options.exec ?? defaultExec;
   const shell = /\.(cmd|bat)$/i.test(path);
-  const result = exec(path, ['update'], { timeoutMs: 5 * 60_000, shell });
+  const result = exec(path, options.args ?? ['update'], { timeoutMs: 5 * 60_000, shell });
   resetCliInfoCache();
   const output = `${result.stdout}\n${result.stderr ?? ''}`.trim();
   return { ok: result.status === 0, output: output.slice(-2000) };

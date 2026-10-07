@@ -68,7 +68,7 @@ export const settingsEn: typeof settingsRu = {
 
     tabsTitle: 'Sections of the page',
     tabsCaption:
-      'Settings are split across nine tabs — exactly one section is open at a time. The ' +
+      'Settings are split across tabs — exactly one section is open at a time. The ' +
       'chosen one goes into the address (/settings?tab=…): the link can be shared and ' +
       'survives a reload. Tabs work from the keyboard too: Tab enters the strip, arrows ' +
       'switch sections, Home and End jump to the edges.',
@@ -88,6 +88,14 @@ export const settingsEn: typeof settingsRu = {
     tabPromptsText:
       'The texts the panel speaks to the model with, not on your behalf: the tool protocol, ' +
       'the agent behind a contour, the image and presentation modes.',
+    tabGroups: 'Groups',
+    tabGroupsText:
+      'What a split group decides by itself, how many groups run at once, which project is ' +
+      'heavy, and the sieves a group passes before an MR.',
+    tabGlobalLayer: 'Global layer',
+    tabGlobalLayerText:
+      'Mechanics living both in the panel and in the config directory hooks: which copy is ' +
+      'better on one case corpus, and how to carry the better one over.',
     tabIntegrations: 'Integrations',
     tabIntegrationsText:
       'Jira and Confluence, a forge by token, Telegram, a webhook, test management and CI ' +
@@ -143,6 +151,7 @@ export const settingsEn: typeof settingsRu = {
       'by default the panel works with Claude Code. If none is found, the panel still opens.',
     firstRunStep4: '“Claude Code access”',
     firstRunStep4Text:
+      'Claude Code only: with another CLI the wizard ends on step 3 of 3. ' +
       'Where the sandbox access comes from. “Set manually” opens the same form as the card in ' +
       'this section; “Remove manual” returns to automatic lookup. “Done” closes the wizard.',
     firstRunReturnTitle: 'The wizard comes back if the folder becomes unavailable',
@@ -470,7 +479,9 @@ export const settingsEn: typeof settingsRu = {
       'folder and the home ~/.agentdeck (access set by hand, and the phone token) arrived with ' +
       'the product rename: the first start copies the former folders there, and those stay ' +
       'where they are as a backup with a marker inside. Nothing is merged — a non-empty new ' +
-      'folder wins, and a copy that failed means the panel keeps working with the former folder.',
+      'folder wins, and a copy that failed means the panel keeps working with the former folder. ' +
+      'With no Claude Code folder on the machine at all the panel still starts and keeps its own ' +
+      'data in ~/.agentdeck/data; when ~/.claude appears later, that data stays where it already is.',
 
     platformLinkTitle: 'The Contour tab is a separate article',
     platformLinkCaption:
@@ -513,7 +524,7 @@ export const settingsEn: typeof settingsRu = {
       'old environment — a new session has to be started.',
 
     guide: {
-      firstRunTitle: 'Path 1. First run: from the wizard to the nine tabs',
+      firstRunTitle: 'Path 1. First run: from the wizard to the section tabs',
       firstRunCaption:
         'Walked once. Everything the wizard asks about can be changed later on the Access ' +
         'tab — it only keeps you from starting blind.',
@@ -538,10 +549,11 @@ export const settingsEn: typeof settingsRu = {
         'A step about the sandbox, and only about it. A green badge means everything was ' +
         'found. “Not found” with a file path means the ordinary chat and the sections are ' +
         'fine; sign in with the claude command in a terminal, or set access manually.',
-      firstRunTabs: 'Nine tabs',
+      firstRunTabs: 'Eleven tabs',
       firstRunTabsText:
         'After the wizard the page looks like this: general, access, providers, models, ' +
-        'prompts, integrations, spend, safety, transfer. The Contour tab opens as its own sidebar ' +
+        'prompts, groups, global layer, integrations, spend, safety, transfer. ' +
+        'The Contour tab opens as its own sidebar ' +
         'entry and has its own article.',
       firstRunDir: 'The directory card',
       firstRunDirText:
@@ -648,7 +660,12 @@ export const settingsEn: typeof settingsRu = {
       readOnlyText:
         'A cheap Claude model analyses with the Read, Grep and Glob tools, working directory ' +
         "= the panel's sources. The process environment is a narrow list of variables: " +
-        'service keys never reach it. It is always Claude, whichever provider is selected.',
+        'service keys never reach it. Only Claude Code analyses: a read-only launch is ' +
+        'described for it alone. With another CLI active the analysis does not start and the ' +
+        'card names the reason — Claude is never substituted for the chosen CLI. A “Panel ' +
+        'assistant” on a contour sends the analysis through the contour gateway, and the ' +
+        'profile then sets the model instead of the vendor’s cheap tier; an own assistant ' +
+        'endpoint is refused — its token would have to be handed to a CLI process.',
       spend: 'Spend',
       spendText:
         'Tokens of every analysis add up from the moment it was switched on. Money — when ' +
@@ -662,12 +679,64 @@ export const settingsEn: typeof settingsRu = {
         'report cannot be written — the watcher keeps going and names the reason. An ' +
         'analysis failed — problems wait for the next one; the analysis does not retry in a ' +
         'loop. The hourly cap is reached — problems are written as “checking” and the ' +
-        'analysis resumes on its own. In every case the reason is spelled out in the card ' +
+        'analysis resumes on its own. The route does not let the analysis run (another CLI, ' +
+        'an own assistant endpoint, the contour gateway down or no key) — problems wait, no ' +
+        'process starts and the cap is not spent. In every case the reason is spelled out in the card ' +
         "and in the indicator's window.",
+    },
+    globalLayer: {
+      title: 'Global layer: which copy of a mechanism is better — the panel or your hooks',
+      caption:
+        'Some mechanics live twice: in the panel code and in the hooks and skills of the ' +
+        'config directory (today, the pre-MR sieves). The copies drift apart silently. The ' +
+        '“Global layer” tab runs both through one case corpus and says which is better.',
+      open: 'Open the tab — the comparison starts by itself',
+      openText:
+        'The first load starts a comparison for a pair never compared; after that, use ' +
+        '“Compare”. It runs on this machine, with no model and no network: each case is a ' +
+        'real git repository, and both copies read it the way they would before a real MR. ' +
+        'About half a minute per corpus.',
+      read: 'Read the verdict and the differences',
+      readText:
+        'The verdict in words sits above the table. A copy is right on a case when it flags ' +
+        'exactly what the corpus demands: a miss and a false alarm are equally wrong. The ' +
+        'better copy is right on more cases of the sieve. “Cases that differ” under a row ' +
+        'shows what each one missed or flagged extra.',
+      changed: 'A file edit — a mark with no reload',
+      changedText:
+        'When a file of the pair changes, a mark appears on the open page and the comparison ' +
+        're-runs by itself. The mark stays until you compare: a person should see the edit, ' +
+        'not only the panel.',
+      transfer: 'Transfer — a task for the agent, not a panel write',
+      transferText:
+        '“Carry into the panel” or “Carry into global” in a sieve row puts a task into the ' +
+        'input of a new chat in the panel repository and opens the chat. You send it. The ' +
+        'agent does not write to the global layer: it puts the change into the proposal ' +
+        'directory.',
+      proposal: 'Proposal — diff, confirmation, backup',
+      proposalText:
+        'While the proposal sits in its directory, the comparison already measures it over ' +
+        'the layer — you see whether it got better. “Write to the global layer” appears only ' +
+        'with the diff open and asks for confirmation. Every file is backed up first (the ' +
+        'History page), and if a file changed after the diff was shown, the write is refused.',
+      neverTitle: 'The panel never edits your layer on its own',
+      neverText:
+        'It reads, to compare. It writes only a confirmed proposal, with a backup. A transfer ' +
+        'into the panel edits the working copy of the repository and does not commit.',
     },
   },
 
   shots: {
+    'global-layer': {
+      '01-verdict':
+        'Comparing the real copies: the global layer is better on secrets and debug leftovers, the other sieves are equal',
+      '02-cases':
+        'Cases that differ, opened under a sieve row: what was missed and what was flagged extra',
+      '03-changed':
+        'The mark for an edited layer file on the open page and the new verdict after the automatic comparison',
+      '04-proposal':
+        'The agent’s proposal: the diff of the layer file and the “Write to the global layer” button',
+    },
     watcher: {
       '01-card-off':
         'The “Background watcher” card turned off: the toggle, what it collects and what goes into the report',
@@ -685,7 +754,7 @@ export const settingsEn: typeof settingsRu = {
         'Step 3 of 4: the CLIs found — Claude Code carries the “installed” and “recommended” badges',
       '04-wizard-access':
         'Step 4 of 4: access not found, the path to .credentials.json named, and a “Set manually” button',
-      '05-tabs': 'The settings page after the wizard: nine tabs, General open',
+      '05-tabs': 'The settings page after the wizard: the tab strip, General open',
       '06-access-dir': 'The “.claude directory” card: the path and a badge for where it came from',
       '07-access-credentials':
         'The “Claude Code access” card: a “not found” badge, the note about the sandbox, and the manual button',

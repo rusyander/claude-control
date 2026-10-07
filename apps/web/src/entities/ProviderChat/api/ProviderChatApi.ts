@@ -3,6 +3,7 @@ import type {
   ProviderChatDetail,
   ProviderChatEvent,
   ProviderChatMessage,
+  ProviderChatProject,
   ProviderChatQueued,
   ProviderChatStatus,
   ProviderChatSummary,
@@ -18,7 +19,25 @@ import { apiClient } from '@shared/api/client';
 export const providerChatKeys = {
   list: ['provider-chats'] as const,
   detail: (id: string) => ['provider-chats', id] as const,
+  // Свой корень, а не `['provider-chats', 'projects']`: тот совпал бы с
+  // карточкой разговора по id «projects».
+  projects: ['provider-chat-projects'] as const,
 };
+
+/**
+ * Проекты всех провайдеров одним списком (Claude по его транскриптам, чужие CLI
+ * по разговорам панели) — склеивает сервер, здесь только запрос.
+ */
+export function useProviderChatProjects(enabled = true) {
+  return useQuery({
+    queryKey: providerChatKeys.projects,
+    queryFn: async () => {
+      const { data } = await apiClient.get<ProviderChatProject[]>('/provider-chat/projects');
+      return data;
+    },
+    enabled,
+  });
+}
 
 export function useProviderChats(enabled = true) {
   return useQuery({
@@ -53,6 +72,8 @@ export function useCreateProviderChat() {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: providerChatKeys.list });
+      // Разговор в каталоге проекта добавляет проекту бейдж провайдера.
+      void queryClient.invalidateQueries({ queryKey: providerChatKeys.projects });
     },
   });
 }
@@ -61,7 +82,12 @@ export function usePatchProviderChat() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: { chatId: string; title?: string; workdir?: string }) => {
+    mutationFn: async (input: {
+      chatId: string;
+      title?: string;
+      workdir?: string;
+      allowEdits?: boolean;
+    }) => {
       const { chatId, ...patch } = input;
       const { data } = await apiClient.patch<ProviderChatSummary>(
         `/provider-chat/chats/${chatId}`,
@@ -122,14 +148,16 @@ export function useRestartProviderChat() {
 /**
  * Задать вопрос. Ответ придёт потоком — здесь возвращается записанная реплика.
  * Разговор занят, а `queueIfBusy` — сервер ставит сообщение в очередь (202) и
- * возвращает её элемент: сообщение уйдёт само по концу идущего ответа.
+ * возвращает её элемент: сообщение уйдёт само по концу идущего ответа. Если у
+ * CLI есть вход посреди ответа (В1), реплику подхватывает идущий ход —
+ * `{ message, steered: true }`.
  */
 export async function sendProviderChatMessage(
   chatId: string,
   input: { text: string; attachments?: string[]; queueIfBusy?: boolean },
-): Promise<{ message: ProviderChatMessage } | { queued: ProviderChatQueued }> {
+): Promise<{ message: ProviderChatMessage; steered?: true } | { queued: ProviderChatQueued }> {
   const { data } = await apiClient.post<
-    { message: ProviderChatMessage } | { queued: ProviderChatQueued }
+    { message: ProviderChatMessage; steered?: true } | { queued: ProviderChatQueued }
   >(`/provider-chat/chats/${chatId}/send`, input);
   return data;
 }
@@ -140,6 +168,29 @@ export async function cancelProviderChatQueued(chatId: string, queuedId: string)
     `/provider-chat/chats/${chatId}/queue/${queuedId}`,
   );
   return data.cancelled;
+}
+
+/**
+ * «Отправить» у ждущей очереди (Ф13): ход остановили или панель
+ * перезапускалась — сообщение уходит обычной отправкой.
+ */
+export async function sendProviderChatQueued(
+  chatId: string,
+  queuedId: string,
+): Promise<{ message: ProviderChatMessage }> {
+  const { data } = await apiClient.post<{ message: ProviderChatMessage }>(
+    `/provider-chat/chats/${chatId}/queue/${queuedId}/send`,
+  );
+  return data;
+}
+
+/** Ответ человека на просьбу CLI о разрешении (карточка в ленте). */
+export async function answerProviderChatPermission(
+  chatId: string,
+  askId: string,
+  decision: 'allow' | 'deny',
+): Promise<void> {
+  await apiClient.post(`/provider-chat/chats/${chatId}/permissions/${askId}`, { decision });
 }
 
 export async function stopProviderChat(chatId: string): Promise<void> {

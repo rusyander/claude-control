@@ -1,0 +1,15 @@
+{
+  "topic": "localModels",
+  "source": "docs/diagrams/localModels-guide/localModels-guide.drawio",
+  "pages": [
+    {
+      "name": "from-button-to-gpu",
+      "file": "from-button-to-gpu.png",
+      "page": 1,
+      "source": "445e78a546137e7d",
+      "width": 1667,
+      "height": 968,
+      "exportedAt": "2026-10-05T13:41:40.816Z"
+    }
+  ]
+}

@@ -48,6 +48,12 @@ const SKIP_DIRS = new Set(['node_modules', '__fixtures__', 'coverage', 'dist']);
 const TEST_FILE = /\.(test|spec)\.[cm]?[jt]s$/;
 const DEBOUNCE_MS = 300;
 const DEFER_POLL_MS = Number(process.env.AGENTDECK_DEV_DEFER_POLL_MS) || 5_000;
+/**
+ * Журналы процессов проверок проекта в каталоге данных: имена — те же, что у
+ * `project-tests/runs.ts` и `mutation.ts` (сторож исполняется голым Node и
+ * `.ts` не подключает; совпадение держит тест).
+ */
+export const CHECK_LEDGERS = ['e2e-runs.json', 'project-test-runs.json', 'mutation-runs.json'];
 
 /** Правка этого файла может изменить поведение сервера. */
 export function isWatched(path) {
@@ -261,6 +267,9 @@ function main() {
   const configRoot = process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude');
   const appData = appDataDirOf(configRoot);
   const ledgerFile = join(appData, 'runs.json');
+  // Автотесты, агентский прогон тестов и проверка поломкой — свои журналы
+  // процессов (Ф11): перезапуск посреди них рвал прогон и оставлял копию.
+  const checkLedgers = CHECK_LEDGERS.map((name) => join(appData, name));
   const stateFile = join(appData, 'state.json');
   const repoRoot = resolve(serverDir, '..', '..');
   // Прошлый сторож мог оставить и состояние, и запрос: новый начинает с чистого.
@@ -346,12 +355,15 @@ function main() {
         ? deferReason(
             busyRun(readEntries(ledgerFile), pidAlive),
             splitSetupRunning(readJson(stateFile), now),
+            checkLedgers.some((file) => busyRun(readEntries(file), pidAlive)),
           )
         : undefined;
     if (waitingFor) {
       if (deferredSince === undefined) {
         deferredSince = now;
-        log('правки ждут конца идущих ходов и подготовки копий — перезапуск без предела отложен');
+        log(
+          'правки ждут конца идущих ходов, подготовки копий и проверок — перезапуск без предела отложен',
+        );
       }
       writeRestartState(appData, {
         pid: process.pid,

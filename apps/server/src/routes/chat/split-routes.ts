@@ -16,16 +16,23 @@ import {
   type SplitReviewRefusal,
 } from '@agentdeck/contracts/chat-handoff';
 import { checkProjectDir } from '../../domains/projects.ts';
-import { createSplitLauncher, type SplitLaunchDeps } from './split-launch.ts';
+import { createSplitLauncher, splitChatRefusal, type SplitLaunchDeps } from './split-launch.ts';
 import { registerSplitControlRoutes, stopChatKey } from './split-control-routes.ts';
 import { codeOf, coded } from '../../lib/server-text.ts';
 import { removeGroupCopy } from '../../domains/chat/split-cleanup.ts';
 import { splitRootOf } from '../../domains/project-git.ts';
 import { conversationKeys } from '../../lib/app-store/chat-links.ts';
 import {
+  atlassianTaskTracker,
   atlassianTicketTracker,
   type SplitTicketTracker,
 } from '../../domains/chat/split-ticket-tracker.ts';
+import {
+  moveSplitTasks,
+  splitTaskKeys,
+  splitTaskOptions,
+  type SplitTaskTracker,
+} from '../../domains/chat/split-tasks.ts';
 import { IntegrationError } from '../../domains/integrations/errors.ts';
 import { fail } from '../integrations/shared.ts';
 import type { PendingAsks } from '../../domains/chat/pending-asks.ts';
@@ -64,6 +71,8 @@ export function registerChatSplitRoutes(
     recheckMr?: (parentChatId: string, index: number) => Promise<SplitGroupRechecked>;
     /** Трекер для тикетов групп (L277); по умолчанию — Jira из интеграций. */
     tracker?: SplitTicketTracker;
+    /** Задачи групп в трекере (G4); по умолчанию — Jira из интеграций. */
+    tasks?: SplitTaskTracker;
     /** Записанные вопросы деревьев: отмена плана снимает вопросы его групп. */
     asks?: Pick<PendingAsks, 'forget'>;
   },
@@ -71,6 +80,12 @@ export function registerChatSplitRoutes(
   const tracker =
     deps.tracker ??
     atlassianTicketTracker(
+      () => ctx.store,
+      () => ctx.location.paths.appData,
+    );
+  const tasks =
+    deps.tasks ??
+    atlassianTaskTracker(
       () => ctx.store,
       () => ctx.location.paths.appData,
     );
@@ -111,6 +126,8 @@ export function registerChatSplitRoutes(
 
     const problem = checkProjectDir(String(projectPath ?? ''));
     if (problem) return reply.code(400).send({ message: problem });
+    const unsupported = splitChatRefusal(ctx);
+    if (unsupported) return reply.code(409).send(unsupported);
 
     // Разбор тот же самый, которым панель узнаёт блок в ответе: два понимания
     // формата — два разных набора заведённых веток при одном и том же тексте.
@@ -538,6 +555,90 @@ export function registerChatSplitRoutes(
       }
     },
   );
+
+  /**
+   * «Перевести задачи» (G4): задачи групп, статусы, общие для всех, и «из статуса».
+   * `index` — одна группа; без него — весь план с вложенными разделениями.
+   */
+  app.get<{ Params: { parent: string }; Querystring: { index?: string } }>(
+    '/api/chat/split/:parent/tasks',
+    async (request, reply) => {
+      const scope = taskScope(request.params.parent, request.query.index);
+      if ('error' in scope) return reply.code(scope.code).send(scope.error);
+      try {
+        return await splitTaskOptions(tasks, scope.keys);
+      } catch (error) {
+        if (error instanceof IntegrationError) return fail(reply, error);
+        throw error;
+      }
+    },
+  );
+
+  /**
+   * Перевести задачи в статус. Зовёт только кнопка человека: нажатие — его
+   * согласие на запись в Jira, второго вопроса нет (решение владельца G4).
+   * Ключи берутся из записи плана, не из тела: чужую задачу сюда не подсунуть.
+   */
+  app.post<{
+    Params: { parent: string };
+    Body: { index?: unknown; status?: unknown; from?: unknown };
+  }>('/api/chat/split/:parent/tasks/move', async (request, reply) => {
+    const status = typeof request.body?.status === 'string' ? request.body.status.trim() : '';
+    if (!status)
+      return reply
+        .code(400)
+        .send({ message: 'Не выбран статус', messageCode: 'split-tasks-status-missing' });
+    const index = request.body?.index;
+    const scope = taskScope(
+      request.params.parent,
+      index === undefined || index === null ? undefined : String(index),
+    );
+    if ('error' in scope) return reply.code(scope.code).send(scope.error);
+    const from = typeof request.body?.from === 'string' ? request.body.from.trim() : '';
+    return moveSplitTasks(
+      tasks,
+      scope.keys.map((item) => item.key),
+      status,
+      from || undefined,
+    );
+  });
+
+  /** Задачи кнопки или отказ: Jira не подключена, плана нет, задач нет. */
+  function taskScope(
+    parent: string,
+    rawIndex: string | undefined,
+  ):
+    | { keys: { key: string; group: string }[] }
+    | { code: number; error: { message: string; messageCode: string } } {
+    if (!tasks.connected())
+      return {
+        code: 404,
+        error: {
+          message: 'Jira не подключена — переводить задачи некуда',
+          messageCode: 'split-tasks-jira-off',
+        },
+      };
+    const record = ctx.store.getSplitPlan(parent);
+    if (!record)
+      return {
+        code: 404,
+        error: { message: 'Разделения с уровнями тут нет', messageCode: 'split-levels-missing' },
+      };
+    const index = rawIndex !== undefined && rawIndex !== '' ? Number(rawIndex) : undefined;
+    // Кривой номер — отказ, а не весь план: кнопка группы не должна задеть чужие задачи.
+    if (index !== undefined && !Number.isInteger(index))
+      return {
+        code: 400,
+        error: { message: 'Номер группы — целое число', messageCode: 'split-tasks-index-bad' },
+      };
+    const keys = splitTaskKeys(record, index, (chatId) => ctx.store.getSplitPlan(chatId));
+    if (keys.length === 0)
+      return {
+        code: 409,
+        error: { message: 'У групп с MR нет задач трекера', messageCode: 'split-tasks-none' },
+      };
+    return { keys };
+  }
 
   app.get<{ Params: { parent: string } }>(
     '/api/chat/split/:parent/overlap',

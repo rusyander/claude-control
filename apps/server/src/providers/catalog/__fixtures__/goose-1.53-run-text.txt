@@ -1,0 +1,10 @@
+
+    __( O)>  ● new session · openai stub-model
+   \____)    20261006_1 · C:\work\demo\work
+     L L     goose is ready
+Сначала проверю. 
+  ────────────────────────────────────────
+  ▸ shell
+    command: echo fixture-probe
+
+fixture-probeГотово: файл на месте.

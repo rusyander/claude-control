@@ -333,7 +333,16 @@ export const skillsEn: typeof skillsRu = {
       'Qwen, ~/.kimi-code/skills/ and <project>/.kimi-code/skills/ for Kimi — which, like ' +
       'OpenCode, also picks up the shared ~/.agents/skills, and the panel does not write ' +
       "there either. One difference: Kimi's documentation caps description at 240 " +
-      'characters, and the panel checks exactly that limit.',
+      'characters, and the panel checks exactly that limit. For Codex, personal skills ' +
+      'live in ~/.agents/skills/ (<project>/.agents/skills/ in a project), and the panel ' +
+      'writes there; Codex also reads the older ~/.codex/skills, which the panel names ' +
+      'but leaves alone. A Codex name is at most 64 characters: it will not load a ' +
+      'longer one, and the panel refuses first. For Goose the panel keeps the skills ' +
+      'directory next to its config.yaml (on Windows %APPDATA%\\Block\\goose\\config\\skills, ' +
+      'in a project <project>/.agents/skills/), so a skill reaches Goose alone. Goose also ' +
+      'reads the shared ~/.agents/skills and ~/.claude/skills — the panel names them and ' +
+      'writes nothing there. Goose plugins are not in the panel: the CLI installs them ' +
+      'itself (goose plugin install).',
 
     undoTitle: 'How to undo',
     undoCaption: 'One action at a time: what exactly comes back, and where to go for it.',

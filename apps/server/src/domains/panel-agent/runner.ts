@@ -14,11 +14,46 @@ import {
   PANEL_AGENT_MCP_TOOL_TIMEOUT_MS,
   PANEL_AGENT_RUN_TIMEOUT_MS,
 } from '@agentdeck/contracts/panel-agent';
-import { streamJsonUserLine, type AgentImage } from '../../lib/agent-images.ts';
+import { streamJsonUserLine, writeAgentImages, type AgentImage } from '../../lib/agent-images.ts';
 import { spawnCliProcess } from '../../lib/cli-spawn.ts';
 import { lightWindowLayers } from '../platform/layers.ts';
 import { killChildTree } from '../../lib/process-tree.ts';
 import { isForeignInterimNote } from './interim-note.ts';
+import {
+  PANEL_AGENT_TOOL_PREFIX,
+  codexPanelAgentArgs,
+  createCodexTranslator,
+  dialectEnvAllowlist,
+  foreignInitTools,
+  qwenBridgeConfig,
+  qwenPanelAgentArgs,
+  type BridgeLaunch,
+  type PanelAgentDialect,
+  type PanelStreamBlock,
+  type PanelStreamEvent,
+} from './foreign-cli.ts';
+import {
+  createGeminiTranslator,
+  geminiPanelAgentArgs,
+  prepareGeminiAgentHome,
+} from './gemini-agent.ts';
+import {
+  createGooseTranslator,
+  goosePanelAgentArgs,
+  prepareGooseAgentRoot,
+} from './goose-agent.ts';
+import {
+  KIMI_REQUEST_MAX_CHARS,
+  createKimiTranslator,
+  kimiConversation,
+  kimiPanelAgentArgs,
+  prepareKimiAgentHome,
+} from './kimi-agent.ts';
+import {
+  createOpencodeTranslator,
+  opencodePanelAgentArgs,
+  prepareOpencodeAgentLayers,
+} from './opencode-agent.ts';
 import {
   DEFAULT_HELP_WEB_SRC,
   panelAgentKnowledge,
@@ -50,7 +85,7 @@ import {
  * (`.claude/gotchas.md` §Sessions).
  */
 
-export const PANEL_AGENT_TOOL_PREFIX = `mcp__${PANEL_AGENT_BRIDGE_ID}__`;
+export { PANEL_AGENT_TOOL_PREFIX };
 
 /** Путь к переходнику: лежит в репозитории панели, как и переходник контура. */
 export function panelBridgeScript(): string {
@@ -241,15 +276,16 @@ export const PANEL_AGENT_ENV_ALLOWLIST: readonly string[] = [
 export function panelAgentEnv(
   parent: NodeJS.ProcessEnv,
   extra: Record<string, string>,
+  /** Сверх общего списка — то, что нужно чужому CLI (`dialectEnvAllowlist`). */
+  more: readonly string[] = [],
 ): Record<string, string> {
-  const allowed = new Set(PANEL_AGENT_ENV_ALLOWLIST.map((name) => name.toLowerCase()));
+  const list = [...PANEL_AGENT_ENV_ALLOWLIST, ...more];
+  const allowed = new Set(list.map((name) => name.toLowerCase()));
   const caseless = process.platform === 'win32';
   const env: Record<string, string> = {};
   for (const [name, value] of Object.entries(parent)) {
     if (value === undefined) continue;
-    const pass = caseless
-      ? allowed.has(name.toLowerCase())
-      : PANEL_AGENT_ENV_ALLOWLIST.includes(name);
+    const pass = caseless ? allowed.has(name.toLowerCase()) : list.includes(name);
     if (pass) env[name] = value;
   }
   return { ...env, ...extra };
@@ -257,6 +293,11 @@ export function panelAgentEnv(
 
 export interface PanelAgentRunOptions {
   command: string;
+  /**
+   * Чей это CLI (`foreign-cli.ts`): от него argv, конфиг переходника и разбор
+   * вывода. Не задан — Claude, прежний запуск байт в байт.
+   */
+  dialect?: PanelAgentDialect;
   /** Добавка маршрута (контур) к окружению процесса. */
   env: Record<string, string>;
   /** Адрес панели для переходника — единственное, что уходит в его окружение. */
@@ -364,34 +405,15 @@ function launchPanelAgentProcess(
   systemPromptText: string,
 ): PanelAgentRunHandle {
   const dir = mkdtempSync(join(tmpdir(), 'cc-panel-agent-'));
-  const mcpConfig = join(dir, 'mcp.json');
-  const systemPrompt = join(dir, 'system-prompt.txt');
-  writeFileSync(
-    mcpConfig,
-    JSON.stringify({
-      mcpServers: {
-        [PANEL_AGENT_BRIDGE_ID]: {
-          command: process.execPath,
-          // Разговор — аргументом, а не переменной: окружение переходника держит
-          // ровно адрес панели, и это проверяется. Шаблон id не пускает в argv
-          // ничего, кроме букв, цифр, `_` и `-`.
-          args: [
-            options.bridgeScript ?? panelBridgeScript(),
-            '--conversation',
-            options.conversationId,
-          ],
-          env: { AGENTDECK_URL: options.selfBaseUrl },
-        },
-      },
-    }),
-    'utf8',
-  );
-  writeFileSync(systemPrompt, systemPromptText, 'utf8');
-  // Файлом, как у чата: текст многострочный, argv на Windows его разваливает.
-  const contourText = options.contourPrompt?.trim();
-  const contourPrompt = contourText ? join(dir, 'contour-system-prompt.txt') : undefined;
-  if (contourPrompt && contourText) writeFileSync(contourPrompt, contourText, 'utf8');
-
+  const dialect = options.dialect ?? 'claude';
+  // Разговор — аргументом, а не переменной: окружение переходника держит ровно
+  // адрес панели, и это проверяется. Шаблон id не пускает в argv ничего, кроме
+  // букв, цифр, `_` и `-`.
+  const bridge: BridgeLaunch = {
+    command: process.execPath,
+    args: [options.bridgeScript ?? panelBridgeScript(), '--conversation', options.conversationId],
+    env: { AGENTDECK_URL: options.selfBaseUrl },
+  };
   const hasImages = (options.images?.length ?? 0) > 0;
   const cleanup = (): void => {
     try {
@@ -401,23 +423,92 @@ function launchPanelAgentProcess(
     }
   };
 
-  const spawned = spawnCliProcess(
-    options.command,
-    panelAgentArgs({ mcpConfig, systemPrompt, contourPrompt, streamInput: hasImages }),
-    {
-      spawnImpl: options.spawnImpl,
-      cwd: dir,
-      // Окружение — список, а не окружение панели целиком: ключ API и переменные
-      // контура/интеграций в процессе агента не нужны и не должны быть видны.
-      inheritEnv: false,
-      env: panelAgentEnv(process.env, {
+  // Честный отказ до запуска, а не ответ модели, не видевшей картинки.
+  const kimi =
+    dialect === 'kimi' ? kimiConversation(options.messages, options.priorActions) : undefined;
+  const refusal =
+    (hasImages ? IMAGE_REFUSAL[dialect] : undefined) ??
+    (kimi && kimi.request.length > KIMI_REQUEST_MAX_CHARS ? KIMI_LONG_REQUEST : undefined);
+  if (refusal) {
+    cleanup();
+    options.onEvent({ kind: 'error', message: refusal.error });
+    return {
+      done: Promise.resolve({
+        ok: false,
+        reply: '',
+        error: refusal.error,
+        seal: { reason: 'failed', detail: refusal.detail },
+        actions: [],
+      }),
+      stop: () => {},
+    };
+  }
+
+  let args: string[];
+  let dialectEnv: Record<string, string> = {};
+  if (dialect === 'gemini') {
+    dialectEnv = prepareGeminiAgentHome({ dir, bridge, systemPromptText });
+    args = geminiPanelAgentArgs();
+  } else if (dialect === 'goose') {
+    dialectEnv = prepareGooseAgentRoot({ dir, systemPromptText });
+    args = goosePanelAgentArgs(bridge);
+  } else if (kimi) {
+    const home = prepareKimiAgentHome({
+      dir,
+      bridge,
+      systemPromptText,
+      context: kimi.context,
+      toolTimeoutMs: PANEL_AGENT_MCP_TOOL_TIMEOUT_MS,
+    });
+    dialectEnv = home.env;
+    args = kimiPanelAgentArgs({ request: kimi.request, agentFile: home.agentFile });
+  } else if (dialect === 'opencode') {
+    // Картинки OpenCode берёт вложениями `-f`: их читает сам CLI, не агент.
+    const imagePaths = writeAgentImages(join(dir, 'images'), options.images ?? []);
+    dialectEnv = prepareOpencodeAgentLayers({ dir, bridge, systemPromptText });
+    args = opencodePanelAgentArgs(imagePaths);
+  } else if (dialect === 'qwen') {
+    const mcpConfig = join(dir, 'mcp.json');
+    writeFileSync(mcpConfig, JSON.stringify(qwenBridgeConfig(bridge)), 'utf8');
+    args = qwenPanelAgentArgs({ mcpConfig, systemPromptText, streamInput: hasImages });
+  } else if (dialect === 'codex') {
+    // Картинки Codex берёт файлами (`-i`), а не блоком потокового ввода.
+    const imagePaths = writeAgentImages(join(dir, 'images'), options.images ?? []);
+    args = codexPanelAgentArgs({ bridge, systemPromptText, imagePaths });
+  } else {
+    const mcpConfig = join(dir, 'mcp.json');
+    const systemPrompt = join(dir, 'system-prompt.txt');
+    writeFileSync(
+      mcpConfig,
+      JSON.stringify({ mcpServers: { [PANEL_AGENT_BRIDGE_ID]: bridge } }),
+      'utf8',
+    );
+    writeFileSync(systemPrompt, systemPromptText, 'utf8');
+    // Файлом, как у чата: текст многострочный, argv на Windows его разваливает.
+    const contourText = options.contourPrompt?.trim();
+    const contourPrompt = contourText ? join(dir, 'contour-system-prompt.txt') : undefined;
+    if (contourPrompt && contourText) writeFileSync(contourPrompt, contourText, 'utf8');
+    args = panelAgentArgs({ mcpConfig, systemPrompt, contourPrompt, streamInput: hasImages });
+  }
+
+  const spawned = spawnCliProcess(options.command, args, {
+    spawnImpl: options.spawnImpl,
+    cwd: dir,
+    // Окружение — список, а не окружение панели целиком: ключ API и переменные
+    // контура/интеграций в процессе агента не нужны и не должны быть видны.
+    inheritEnv: false,
+    env: panelAgentEnv(
+      process.env,
+      {
         ...options.env,
         AGENTDECK_URL: options.selfBaseUrl,
         // Ожидание карточки дольше стандартного ожидания инструмента у CLI.
         MCP_TOOL_TIMEOUT: String(PANEL_AGENT_MCP_TOOL_TIMEOUT_MS),
-      }),
-    },
-  );
+        ...dialectEnv,
+      },
+      dialectEnvAllowlist(dialect),
+    ),
+  });
 
   if (spawned.error) {
     cleanup();
@@ -451,12 +542,35 @@ function launchPanelAgentProcess(
       heldNote = undefined;
     };
 
+    // Codex и Gemini пишут свой JSONL — он переводится в события Claude, разбор ниже один.
+    const translate = dialectTranslator(dialect);
     const handleLine = (line: string): void => {
       if (!line.trim()) return;
-      let event: StreamEvent;
+      let parsed: unknown;
       try {
-        event = JSON.parse(line) as StreamEvent;
+        parsed = JSON.parse(line);
       } catch {
+        return;
+      }
+      if (typeof parsed !== 'object' || parsed === null) return;
+      if (!translate) return handleEvent(parsed as StreamEvent);
+      for (const event of translate(parsed)) handleEvent(event);
+    };
+    const handleEvent = (event: StreamEvent): void => {
+      if (dialect === 'qwen' && event.type === 'system' && event.subtype === 'init') {
+        // Новая версия Qwen с новым встроенным инструментом: ход не идёт с руками,
+        // которых агенту не положено, — обрыв до первого запроса модели.
+        const extra = foreignInitTools(event.tools);
+        if (extra.length > 0) {
+          const detail = `Qwen Code offered the agent tools beyond the panel bridge: ${extra.join(', ')}`;
+          finish({
+            ok: false,
+            reply: '',
+            error: `Qwen Code предложил агенту инструменты сверх переходника панели (${extra.join(', ')}) — ход остановлен, чтобы у агента не было лишних рук.`,
+            seal: { reason: 'failed', detail },
+          });
+          killChildTree(child);
+        }
         return;
       }
       if (event.type === 'assistant') {
@@ -467,6 +581,21 @@ function launchPanelAgentProcess(
             if (isForeignInterimNote(block.text, userText)) heldNote = block.text;
             else options.onEvent({ kind: 'text', text: block.text });
           } else if (block.type === 'tool_use' && block.name) {
+            // Gemini и OpenCode не называют инструменты кадром `init` — они только в
+            // запросе к модели: страховка — первый же вызов не переходника обрывает ход.
+            if (TOOL_GUARDED.has(dialect) && !block.name.startsWith(PANEL_AGENT_TOOL_PREFIX)) {
+              finish({
+                ok: false,
+                reply: '',
+                error: `CLI дал агенту инструмент сверх переходника панели (${block.name}) — ход остановлен, чтобы у агента не было лишних рук.`,
+                seal: {
+                  reason: 'failed',
+                  detail: `The CLI let the agent call a tool beyond the panel bridge: ${block.name}`,
+                },
+              });
+              killChildTree(child);
+              return;
+            }
             // Отброшенная заметка уходит и из запаса ответа: без итога CLI ответ
             // собирается из текстов хода, и она вернулась бы в сохранённый ответ.
             if (heldNote !== undefined) {
@@ -578,8 +707,12 @@ function launchPanelAgentProcess(
 
     // Ошибка записи в stdin — CLI закрылся раньше; необработанная роняла бы сервер.
     child.stdin.on('error', () => {});
+    // Kimi stdin не читает: разговор уже в argv и в файле агента.
+    if (kimi) return void child.stdin.end();
     const prompt = panelAgentPrompt(options.messages, options.priorActions);
-    child.stdin.end(hasImages ? streamJsonUserLine(prompt, options.images ?? []) : prompt);
+    // Codex и OpenCode берут картинки файлами (`-i`, `-f`), их stdin — всегда текст.
+    const streamLine = hasImages && STREAM_INPUT.has(dialect);
+    child.stdin.end(streamLine ? streamJsonUserLine(prompt, options.images ?? []) : prompt);
   });
 
   return {
@@ -592,6 +725,58 @@ function launchPanelAgentProcess(
   };
 }
 
+/** Диалекты, чей ввод — потоковый JSON с блоками `image` (`--input-format stream-json`). */
+const STREAM_INPUT: ReadonlySet<PanelAgentDialect> = new Set(['claude', 'qwen']);
+
+/** Диалекты, где ход сам сверяет каждый вызов с переходником (`init` без списка инструментов). */
+const TOOL_GUARDED: ReadonlySet<PanelAgentDialect> = new Set([
+  'gemini',
+  'opencode',
+  'goose',
+  'kimi',
+]);
+
+/**
+ * Диалекты без пути картинки к модели. Gemini CLI берёт её только через `@файл` —
+ * это его инструмент чтения файлов, а у агента файловой системы нет; `goose run`
+ * путь к картинке вложением не делает (снято живьём: путь доходит текстом).
+ */
+const IMAGE_REFUSAL: Partial<Record<PanelAgentDialect, { error: string; detail: string }>> = {
+  gemini: {
+    error:
+      'Агент панели на Gemini CLI не принимает картинки: CLI читает их только своим инструментом файлов, которого у агента нет. Отправьте вопрос без картинки.',
+    detail: 'Gemini CLI panel agent takes no images.',
+  },
+  goose: {
+    error:
+      'Агент панели на Goose не принимает картинки: в одиночном запуске Goose не передаёт их модели. Отправьте вопрос без картинки.',
+    detail: 'Goose panel agent takes no images.',
+  },
+  kimi: {
+    error:
+      'Агент панели на Kimi Code не принимает картинки: одиночный запуск Kimi берёт только текст. Отправьте вопрос без картинки.',
+    detail: 'Kimi Code panel agent takes no images.',
+  },
+};
+
+/** Реплика длиннее потолка argv: Kimi берёт промпт только флагом `-p`. */
+const KIMI_LONG_REQUEST = {
+  error: `Сообщение длиннее ${KIMI_REQUEST_MAX_CHARS} знаков: Kimi Code принимает его только строкой запуска. Сократите сообщение или разбейте его на части.`,
+  detail: 'Kimi Code panel agent request is over the argv limit.',
+};
+
+/** Перевод JSONL чужого CLI в события Claude; undefined — CLI уже пишет их сам. */
+function dialectTranslator(
+  dialect: PanelAgentDialect,
+): ((line: object) => PanelStreamEvent[]) | undefined {
+  if (dialect === 'codex') return createCodexTranslator();
+  if (dialect === 'gemini') return createGeminiTranslator();
+  if (dialect === 'opencode') return createOpencodeTranslator();
+  if (dialect === 'goose') return createGooseTranslator();
+  if (dialect === 'kimi') return createKimiTranslator();
+  return undefined;
+}
+
 /** `mcp__agentdeck-panel__list_sections` → `list_sections`; чужое имя — как есть. */
 function actionName(tool: string): string {
   return tool.startsWith(PANEL_AGENT_TOOL_PREFIX)
@@ -599,19 +784,5 @@ function actionName(tool: string): string {
     : tool;
 }
 
-interface StreamBlock {
-  type?: string;
-  text?: string;
-  name?: string;
-  id?: string;
-  tool_use_id?: string;
-  is_error?: boolean;
-  content?: string | Array<{ type?: string; text?: string }>;
-}
-
-interface StreamEvent {
-  type?: string;
-  message?: { content?: StreamBlock[] };
-  result?: unknown;
-  is_error?: boolean;
-}
+type StreamBlock = PanelStreamBlock;
+type StreamEvent = PanelStreamEvent;

@@ -2,7 +2,7 @@ import type { ClaudeLocation } from '@agentdeck/contracts';
 import { listResourceFiles, readResourceFile, isWritable } from './ResourceFiles.ts';
 import type { ResourceKind } from './registry.ts';
 import { defaultCliCommand } from '../../providers/cli.ts';
-import { historyLines, runClaudeOneShot, type AssistTurn } from '../assistant.ts';
+import { helperAskOf, historyLines, type AssistTurn, type HelperAsk } from '../assistant.ts';
 import { maskAssistText } from '../assistant-secrets.ts';
 import { SECRET_MASK, maskSecretsInText, restoreMaskedSecrets } from '../../lib/secret-mask.ts';
 import type { AgentImage } from '../../lib/agent-images.ts';
@@ -17,8 +17,10 @@ import type { ServerMessageCode, ServerMessageParams } from '@agentdeck/contract
  * слиянием — существующее обновляется, новое добавляется, ничего не
  * удаляется само.
  *
- * Запуск — то же лёгкое окно, что у помощника формы (`runClaudeOneShot`): без
- * инструментов, сессии и наших слоёв. Разговор продолжается историей в запросе
+ * Запуск — то же лёгкое окно, что у помощника формы, и тем же маршрутом
+ * активного провайдера (`assistant-route.ts`): у Claude — `runClaudeOneShot` без
+ * инструментов, сессии и наших слоёв, у чужого CLI — его неинтерактивный флаг с
+ * окружением маршрута, у выбранного профиля ассистента — прямой вызов по нему. Разговор продолжается историей в запросе
  * (её держит окно помощника), а текущее дерево файлов приходит заново каждый ход.
  *
  * Секреты в файлах (U6, 28.09): модель видит содержимое через маску, а ответ
@@ -51,7 +53,8 @@ export async function assistStructure(
   id: string,
   prompt: string,
   location: ClaudeLocation,
-  command: string = defaultCliCommand(),
+  /** Кто отвечает: маршрут провайдера (`helperAsk`) или команда `claude` — прежняя подпись. */
+  ask: string | HelperAsk = defaultCliCommand(),
   history: readonly AssistTurn[] = [],
   images: readonly AgentImage[] = [],
 ): Promise<StructureAssistResult> {
@@ -66,19 +69,28 @@ export async function assistStructure(
 
   try {
     const current = readCurrent(kind, id, location);
-    const stdout = await runClaudeOneShot(
+    const answer = await helperAskOf(ask)(
       buildPrompt(kind, prompt, current, history),
-      command,
       images,
       STRUCTURE_TIMEOUT_MS,
     );
-    const envelope = JSON.parse(stdout) as { result?: string };
-    const parsed = extractJson(envelope.result ?? '');
+    if (!answer.ok) {
+      // Отказ маршрута провайдера — с кодом: маршрут отдаёт его клиенту, и тот
+      // называет причину на своём языке.
+      return {
+        reply: '',
+        files: [],
+        error: answer.error,
+        ...(answer.messageCode ? { messageCode: answer.messageCode } : {}),
+        ...(answer.params ? { params: answer.params } : {}),
+      };
+    }
+    const parsed = extractJson(answer.text);
 
     if (!parsed) {
       // Модель ответила текстом без разметки — показываем его как реплику,
       // файлов в этот раз нет.
-      return { reply: envelope.result ?? '', files: [] };
+      return { reply: answer.text, files: [] };
     }
 
     const restored = restoreFileSecrets(

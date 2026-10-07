@@ -67,12 +67,26 @@ export const qwenProvider: ConfigProvider = {
   // шапки те же два (`name`, `description`), прочие (`priority`, `paths`,
   // `user-invocable`, `disable-model-invocation`) панель сохраняет как чужие.
   skillsConfig: { format: 'skill-md-dir', dir: () => join(qwenHome(), 'skills') },
+  // Правила (MAP 24): каталог `~/.qwen/rules/*.md`, рекурсивно; `paths:` во
+  // frontmatter — условное правило, без него — постоянное. Формат по документу
+  // CLI `docs/users/features/rules.md`, сверен с qwen-code 0.25.0.
+  rulesConfig: { format: 'qwen-md', dir: () => join(qwenHome(), 'rules') },
   // Слэш-команды — тот же формат, что у Gemini (форк документацию сохранил):
   // `~/.qwen/commands` с файлами `.toml`, подкаталог даёт `/namespace:command`.
   commandsConfig: {
     format: 'toml-prompt',
     dir: () => join(qwenHome(), 'commands'),
     namespaceSeparator: ':',
+  },
+  // Расширения (MAP 25): `<QWEN_HOME>/extensions/<имя>/qwen-extension.json`.
+  // Манифесты панель читает сама; ставит, включает, выключает и удаляет — только
+  // `qwen extensions install --consent|enable|disable --scope user|uninstall`.
+  // Хранилище `extension-store/` и `extension-enablement.json` — внутреннее
+  // устройство CLI, панель их не пишет. Сверено с qwen-code 0.25.0.
+  pluginsConfig: {
+    format: 'qwen-extensions',
+    dir: () => join(qwenHome(), 'extensions'),
+    installedByCli: true,
   },
   // Проектный уровень: проектный QWEN.md в корне, `<проект>/.qwen/settings.json`
   // (MCP и права; проектные настройки перекрывают пользовательские) и
@@ -87,9 +101,16 @@ export const qwenProvider: ConfigProvider = {
     // проектные хуки требуют доверенной папки) и каталог `.qwen/skills/`.
     hooks: { format: 'qwen-json', relativePath: '.qwen/settings.json' },
     skills: { format: 'skill-md-dir', relativeDir: '.qwen/skills' },
+    // Каталог правил проекта: CLI 0.25 читает `<проект>/.qwen/rules` вслед за
+    // глобальным `~/.qwen/rules`, только если папка доверенная (`loadRulesFromDir`
+    // в его бандле под `folderTrust`). Формат тот же, что у глобального.
+    instructionsRules: { format: 'qwen-md', relativeDir: '.qwen/rules' },
   },
   // Детект «конфиг найден» (Ф7): каталог конфигурации. Только проверка существования.
   configLocations: () => [qwenHome()],
+  // Группа Claude едет на прогон файлом системных настроек
+  // (`QWEN_CODE_SYSTEM_SETTINGS_PATH`, живьём на 0.25 — provider-formats).
+  groupLayer: 'qwen-system-settings',
   // Ассистент Qwen: модельное API — OpenAI-совместимое (OPENAI_API_KEY +
   // OPENAI_BASE_URL/OPENAI_MODEL), у ModelStudio/DashScope — DASHSCOPE_API_KEY.
   // One-shot: `qwen -p <промпт>` — задокументированный headless-режим.
@@ -97,7 +118,21 @@ export const qwenProvider: ConfigProvider = {
     apiKind: 'openai-compat',
     apiKeyEnvVars: ['OPENAI_API_KEY', 'DASHSCOPE_API_KEY'],
     cliRunnable: true,
-    oneShotArgs: (prompt) => ['-p', prompt],
+    // «Разрешить правки» (`qwen --help` 0.25.0: `--approval-mode
+    // plan|default|auto-edit|auto|yolo`). Включено — `yolo`, как живой ход, где
+    // каждая просьба получает «да»; выключено — `default`: в `-p` спросить
+    // некого, и просьба отклоняется, даже если в настройках стоит `yolo`.
+    oneShotArgs: (prompt, run) => [
+      ...(run?.allowEdits === undefined
+        ? []
+        : ['--approval-mode', run.allowEdits ? 'yolo' : 'default']),
+      '-p',
+      prompt,
+    ],
+    // В1: `qwen serve` (≥ 0.19) — сообщение посреди хода уходит в тот же ход.
+    liveServer: 'qwen-serve',
+    // Переключатель правок доходит флагом `--approval-mode` и ответом `qwen serve`.
+    editsControl: 'flag',
   },
   // Свой эндпоинт: Qwen Code документирует ДВА протокола сразу — совместимый с
   // OpenAI (`OPENAI_API_KEY`, `OPENAI_BASE_URL`, `OPENAI_MODEL`) и Anthropic
@@ -134,9 +169,14 @@ export const qwenProvider: ConfigProvider = {
     hooks: 'ready',
     // Команды: каталог `commands/*.toml`, формат унаследован от Gemini.
     commands: 'ready',
-    // Плагинов у Qwen Code документация не описывает → раздел скрыт.
-    plugins: 'unsupported',
-    analytics: 'unsupported',
+    // Расширения (MAP 25): `extensions/<имя>/qwen-extension.json` — раздел
+    // «Плагины», меняется только командами `qwen extensions …`.
+    plugins: 'ready',
+    // Правила: глобальный каталог `~/.qwen/rules/` (`rulesConfig`). Проектный
+    // `<проект>/.qwen/rules/` CLI читает только в доверенной папке — вкладки
+    // проекта у раздела пока нет.
+    rules: 'ready',
+    analytics: 'ready',
     sandbox: 'unsupported',
   }),
   // Модели: каталог Alibaba (models.dev) — семейство Qwen.

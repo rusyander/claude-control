@@ -1,0 +1,14 @@
+
+Update git name with: git config user.name "Your Name"
+Update git email with: git config user.email "you@example.com"
+Aider v0.86.2
+Model: openai/stub-model with whole edit format
+Git repo: ..\work\.git with 1 files
+Repo-map: using 1024 tokens, auto refresh
+
+
+note.txt
+Add file to the chat? (Y)es/(N)o/(D)on't ask again [Yes]: Привет! Ответ заглушки: «ёлка» — 42.
+
+Вторая строка ответа.
+Tokens: 737 sent, 30 received.

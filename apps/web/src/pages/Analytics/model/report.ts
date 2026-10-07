@@ -73,6 +73,9 @@ export const SESSION_CSV_HEADER = [
   'estimatedCost',
   'models',
   'isActive',
+  'title',
+  'toolCalls',
+  'topTools',
 ] as const;
 
 /**
@@ -158,7 +161,10 @@ export function buildProjectsCsv(byProject: ProjectUsage[]): string {
   );
 }
 
-/** CSV по недавним сессиям. Модели склеиваются через `; ` в одну ячейку. */
+/**
+ * CSV по недавним сессиям. Модели и инструменты склеиваются через `; ` в одну
+ * ячейку; длительность в файл не пишется — её даёт разность startedAt и lastActivity.
+ */
 export function buildSessionsCsv(recentSessions: SessionUsage[]): string {
   return toCsv(
     SESSION_CSV_HEADER,
@@ -172,6 +178,9 @@ export function buildSessionsCsv(recentSessions: SessionUsage[]): string {
       session.estimatedCost,
       session.models.join('; '),
       session.isActive,
+      session.title ?? '',
+      session.toolCalls ?? '',
+      (session.topTools ?? []).map((tool) => `${tool.name}:${tool.count}`).join('; '),
     ]),
   );
 }

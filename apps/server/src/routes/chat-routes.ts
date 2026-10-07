@@ -50,6 +50,6 @@ export function registerChatRoutes(
   registerChatBrowseRoutes(app, ctx);
   registerChatRunRoutes(app, ctx, registry, session);
   registerChatArtifactRoutes(app, ctx);
-  registerChatCliRoutes(app);
+  registerChatCliRoutes(app, undefined, () => ctx.store);
   registerChatInboxRoutes(app, ctx, registry, session);
 }

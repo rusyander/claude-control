@@ -175,7 +175,10 @@ export function WorktreeSection({ path, busy }: WorktreeSectionProps) {
                   {worktree.branch ?? t('git.detached')}
                 </span>
                 {worktree.isMain && <Badge tone="neutral">{t('git.worktrees.main')}</Badge>}
-                {status && (
+                {/* Простаивающий агент — «ничего не происходит» (`agent-runs/status.ts`):
+                    метки нет, как у проекта в списке. Раньше рисовался сырой ключ
+                    `workspace.status.idle` — такого текста в словаре нет. */}
+                {status && status !== 'idle' && (
                   <Badge tone={STATUS_TONE[status]}>{t(`workspace.status.${status}`)}</Badge>
                 )}
                 {worktree.locked && <Badge tone="warning">{t('git.worktrees.locked')}</Badge>}

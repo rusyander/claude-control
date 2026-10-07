@@ -1,13 +1,23 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { Skeleton } from '@shared/ui/skeleton';
-import type { ProviderChatSidebarProps } from './ProviderChatSidebar.types';
+import { TabButton } from '@shared/ui/tab-button';
+import { ProviderChatProjects } from './ProviderChatProjects';
+import type {
+  ProviderChatSidebarProps,
+  ProviderChatSidebarSection,
+} from './ProviderChatSidebar.types';
 import styles from './ProviderChatPage.module.scss';
 
-/** Левая колонка: разговоры активного провайдера, свежие сверху. */
+/**
+ * Левая колонка: разговоры активного провайдера, свежие сверху, — и вкладка
+ * «Проекты» со всеми каталогами, где работал любой CLI. Без неё при смене
+ * провайдера проекты, начатые с Claude, из чата пропадали.
+ */
 export function ProviderChatSidebar({
   chats,
   isLoading,
@@ -15,8 +25,21 @@ export function ProviderChatSidebar({
   onSelect,
   onCreate,
   isCreating,
+  projects,
+  isProjectsLoading,
+  providerId,
+  providerName,
+  onStartInProject,
 }: ProviderChatSidebarProps) {
   const { t } = useTranslation();
+  const [section, setSection] = useState<ProviderChatSidebarSection>('chats');
+
+  // Новый разговор в проекте открывается в ленте — и список рядом с ним должен
+  // быть списком разговоров, где он теперь первый.
+  const startInProject = (path: string): void => {
+    onStartInProject(path);
+    setSection('chats');
+  };
 
   return (
     <div className={styles.sidebar}>
@@ -28,13 +51,21 @@ export function ProviderChatSidebar({
         padding="var(--spacing-2xs) var(--spacing-xs)"
         className={styles.sidebarHead}
       >
-        <Typography variant="body-sm" weight="medium">
-          {t('providerChat.conversations')}
-        </Typography>
+        <Stack direction="row" gap="var(--spacing-3xs)">
+          <TabButton isActive={section === 'chats'} onClick={() => setSection('chats')}>
+            {t('providerChat.conversations')}
+          </TabButton>
+          <TabButton isActive={section === 'projects'} onClick={() => setSection('projects')}>
+            {t('providerChat.projectsTab')}
+          </TabButton>
+        </Stack>
         <Button
           size="sm"
           variant="ghost"
-          onClick={onCreate}
+          onClick={() => {
+            onCreate();
+            setSection('chats');
+          }}
           isLoading={isCreating}
           leftIcon={<Icon name="plus" size={16} />}
         >
@@ -43,7 +74,18 @@ export function ProviderChatSidebar({
       </Stack>
 
       <div className={styles.sidebarList}>
-        {isLoading && (
+        {section === 'projects' && (
+          <ProviderChatProjects
+            projects={projects}
+            isLoading={isProjectsLoading}
+            providerId={providerId}
+            providerName={providerName}
+            onStart={startInProject}
+            isStarting={isCreating}
+          />
+        )}
+
+        {section === 'chats' && isLoading && (
           <Stack gap="var(--spacing-3xs)">
             <Skeleton height={38} />
             <Skeleton height={38} />
@@ -51,7 +93,7 @@ export function ProviderChatSidebar({
           </Stack>
         )}
 
-        {!isLoading && chats.length === 0 && (
+        {section === 'chats' && !isLoading && chats.length === 0 && (
           <Stack padding="var(--spacing-xs)">
             <Typography variant="caption" color="subtle">
               {t('providerChat.noConversations')}
@@ -59,7 +101,7 @@ export function ProviderChatSidebar({
           </Stack>
         )}
 
-        {!isLoading && chats.length > 0 && (
+        {section === 'chats' && !isLoading && chats.length > 0 && (
           <Stack gap="2px">
             {chats.map((chat) => (
               <button

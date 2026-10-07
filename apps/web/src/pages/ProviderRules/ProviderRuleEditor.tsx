@@ -12,6 +12,7 @@ import { Toggle } from '@shared/ui/toggle';
 import { SkeletonList } from '@shared/ui/skeleton';
 import { useProviderRule, useSaveProviderRule } from '@entities/ProviderRules';
 import type { ProviderRuleEditorProps } from './ProviderRuleEditor.types';
+import { ruleFormat } from './ruleLabels';
 import styles from './ProviderRulesPage.module.scss';
 
 /**
@@ -23,8 +24,9 @@ import styles from './ProviderRulesPage.module.scss';
  * Правило, чей frontmatter панель не разобрала, открывается ТОЛЬКО НА ЧТЕНИЕ:
  * показываем файл целиком и честно говорим, почему кнопки сохранения нет.
  */
-export function ProviderRuleEditor({ path, projectId, onClose }: ProviderRuleEditorProps) {
+export function ProviderRuleEditor({ path, format, projectId, onClose }: ProviderRuleEditorProps) {
   const { t } = useTranslation();
+  const traits = ruleFormat(format);
   const scope = projectId ? { projectId } : {};
   const { data, isLoading } = useProviderRule(path, scope);
   const save = useSaveProviderRule(scope);
@@ -42,11 +44,11 @@ export function ProviderRuleEditor({ path, projectId, onClose }: ProviderRuleEdi
         path: data.path,
         description: data.description ?? '',
         globs: data.globs ?? '',
-        alwaysApply: data.alwaysApply ?? false,
+        ...(traits.alwaysApply ? { alwaysApply: data.alwaysApply ?? false } : {}),
         body: data.body,
       });
     }
-  }, [data, draft]);
+  }, [data, draft, traits.alwaysApply]);
 
   if (isLoading || !data) return <SkeletonList rows={4} withActions={false} />;
 
@@ -115,32 +117,34 @@ export function ProviderRuleEditor({ path, projectId, onClose }: ProviderRuleEdi
           label={t('providerRules.fieldDescription')}
           value={draft.description ?? ''}
           onChange={(value) => patch({ description: value })}
-          hint={t('providerRules.hintDescription')}
+          hint={t(traits.text('hintDescription'))}
           placeholder={t('providerRules.placeholderDescription')}
         />
 
         <TextField
-          label={t('providerRules.fieldGlobs')}
+          label={t(traits.text('fieldGlobs'))}
           value={draft.globs ?? ''}
           onChange={(value) => patch({ globs: value })}
-          hint={t('providerRules.hintGlobs')}
+          hint={t(traits.text('hintGlobs'))}
           placeholder="src/**/*.tsx, src/**/*.ts"
           isMono
         />
 
-        <Stack direction="row" align="center" justify="between" gap="var(--spacing-sm)" wrap>
-          <Stack gap="var(--spacing-3xs)" flex={1} minWidth={0}>
-            <Typography variant="body-sm">{t('providerRules.fieldAlwaysApply')}</Typography>
-            <Typography variant="caption" color="subtle">
-              {t('providerRules.hintAlwaysApply')}
-            </Typography>
+        {traits.alwaysApply && (
+          <Stack direction="row" align="center" justify="between" gap="var(--spacing-sm)" wrap>
+            <Stack gap="var(--spacing-3xs)" flex={1} minWidth={0}>
+              <Typography variant="body-sm">{t('providerRules.fieldAlwaysApply')}</Typography>
+              <Typography variant="caption" color="subtle">
+                {t('providerRules.hintAlwaysApply')}
+              </Typography>
+            </Stack>
+            <Toggle
+              checked={draft.alwaysApply ?? false}
+              onCheckedChange={(checked) => patch({ alwaysApply: checked })}
+              aria-label={t('providerRules.fieldAlwaysApply')}
+            />
           </Stack>
-          <Toggle
-            checked={draft.alwaysApply ?? false}
-            onCheckedChange={(checked) => patch({ alwaysApply: checked })}
-            aria-label={t('providerRules.fieldAlwaysApply')}
-          />
-        </Stack>
+        )}
 
         <Stack gap="var(--spacing-3xs)">
           <Typography variant="body-sm">{t('providerRules.fieldBody')}</Typography>

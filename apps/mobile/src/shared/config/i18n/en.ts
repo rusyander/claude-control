@@ -4,6 +4,7 @@ import { serverMessagesEn } from './server-messages/en.ts';
 import { panelTextsEn } from './panel-texts/texts.en.ts';
 import { homeEn } from './home/en.ts';
 import { watcherEn } from './watcher/en.ts';
+import { foreignChatEn } from './foreign-chat/en.ts';
 
 /**
  * English mirrors `ru.ts` and is typed against it: a missing or renamed key
@@ -14,6 +15,7 @@ export const en: Dictionary = {
   panelTexts: panelTextsEn,
   home: homeEn,
   watcher: watcherEn,
+  foreignChat: foreignChatEn,
   tabs: {
     home: 'Home',
     chat: 'Chat',
@@ -632,9 +634,9 @@ export const en: Dictionary = {
       conversation_deleted:
         'This conversation was deleted in another window. Your message was not sent — the next one starts a new conversation.',
       provider_unsupported:
-        'The panel agent works only with Claude Code for now: the active CLI is different.',
+        'The panel agent does not work with the active CLI: it runs through Claude Code, Qwen Code, Codex, Gemini CLI, OpenCode, Goose or Kimi Code.',
       cli_not_found:
-        'Claude Code was not found in the computer PATH: the agent has nothing to run on.',
+        'The active provider’s CLI was not found in the computer PATH: the agent has nothing to run on.',
       endpoint_unsupported:
         'The assistant uses its own endpoint: its key would have to be handed to the agent process.',
       contour_unreachable:

@@ -18,6 +18,7 @@ import {
   type KnownSection,
 } from './analyzer.ts';
 import { WatchEventStore } from './events.ts';
+import { watcherRefusalDetail, type WatcherRoute } from './route.ts';
 import {
   reportCounts,
   reportRefs,
@@ -82,6 +83,11 @@ export interface BackgroundWatcherDeps {
   resolveCommand: () => string | undefined;
   /** Дешёвая ступень модели (`haiku` у Claude). */
   model: () => string | undefined;
+  /**
+   * Маршрут разбора на ЭТОТ разбор (`route.ts`): облако вендора, контур профиля
+   * «Ассистент панели» или отказ. Не задан — прежний путь, облако вендора.
+   */
+  resolveRoute?: () => WatcherRoute;
   pricing: () => PricingLookup;
   /** Язык интерфейса панели — язык отчёта; нет — русский. */
   language?: () => ReportLanguage;
@@ -366,6 +372,18 @@ export class BackgroundWatcher {
       this.checkCli();
       return;
     }
+    // Маршрут — до потолка и до записи времени разбора: отказ не тратит разбор
+    // из часового потолка и не запускает процесс мимо выбранного маршрута.
+    const route = this.deps.resolveRoute?.() ?? { ok: true, env: {}, viaContour: false };
+    if (!route.ok) {
+      this.setProblem({
+        problemCode: 'route_refused',
+        message: route.message,
+        detail: watcherRefusalDetail(route, this.language()),
+      });
+      return;
+    }
+    this.clearProblem('route_refused');
     if (this.capReached()) return;
     // Разбор пошёл — отложенный на «освободится место» больше не нужен.
     if (this.timer) clearTimeout(this.timer);
@@ -385,7 +403,9 @@ export class BackgroundWatcher {
       handle = startAnalysis({
         command,
         cwd: this.deps.cwd,
-        model: this.deps.model(),
+        // Через контур модель задаёт профиль: дешёвую ступень вендора контур отклонил бы.
+        ...(route.viaContour ? {} : { model: this.deps.model() }),
+        env: route.env,
         events: batch,
         known: this.knownSections(batch),
         language: this.language(),

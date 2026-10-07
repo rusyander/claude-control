@@ -56,7 +56,14 @@ import { codeOf } from '../lib/server-text.ts';
 export interface ActiveRuns {
   active(): { chatId: string; projectPath?: string }[];
   isRunning(chatId: string): boolean;
+  /** Пул живых сессий CLI: простаивающие между ходами процессы держат свой cwd. */
+  livePool?: {
+    closeIdleIn(dir: string, options?: { tree?: boolean }): { busy: number; closed: Promise<void> };
+  };
 }
+
+/** Сколько ждать выхода погашенных процессов, прежде чем пробовать папку. */
+const IDLE_CLOSE_WAIT_MS = 5000;
 
 /**
  * Маршруты git выбранного проекта: состояние, переключение ветки, создание
@@ -486,6 +493,24 @@ export function registerProjectGitRoutes(
         message: 'В этой копии работает агент — остановите его и повторите',
         messageCode: 'worktree-agent-running',
       });
+    }
+    // Разговор, переехавший в копию, держит между ходами простаивающий процесс
+    // CLI с cwd в ней. Процесс панели свой, а Windows не отдаёт папку, пока она
+    // чей-то cwd: «Убрать» отвечало «закройте процесс», а закрыть человеку было
+    // нечего. Гасим деревом (MCP-серверы того же cwd держат папку дольше самого
+    // CLI); занятый ходом или фоном процесс не трогаем — это 409, как выше.
+    const idle = runs?.livePool?.closeIdleIn(target, { tree: true });
+    if (idle && idle.busy > 0) {
+      return reply.code(409).send({
+        message: 'В этой копии работает агент — остановите его и повторите',
+        messageCode: 'worktree-agent-running',
+      });
+    }
+    if (idle) {
+      await Promise.race([
+        idle.closed,
+        new Promise((done) => setTimeout(done, IDLE_CLOSE_WAIT_MS)),
+      ]);
     }
     const force = body.force === true;
     return worktreeWrite(path, reply, () =>

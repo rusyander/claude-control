@@ -190,6 +190,27 @@ describe('panel-agent-routes', () => {
     expect(frames.filter((frame) => frame.type === 'agent-open-page')).toHaveLength(1);
   });
 
+  // Ф22 (panel-agent-002): «открой тестирование проекта X» — раздел помнит
+  // выбранный проект в браузере, и без `?project=` человек смотрел бы на чужие тесты.
+  it('open_page /tests с projectPath открывает раздел на этом проекте; у других разделов — invalid', async () => {
+    const body = (
+      await call('open_page', { route: '/tests', focus: 'runs', projectPath: projectDir })
+    ).json<PanelActionResult>();
+    expect(body).toMatchObject({
+      outcome: 'done',
+      page: { route: `/tests?project=${encodeURIComponent(projectDir)}`, focus: 'runs' },
+    });
+
+    const elsewhere = (
+      await call('open_page', { route: '/rules', projectPath: projectDir })
+    ).json<PanelActionResult>();
+    expect(elsewhere.outcome).toBe('invalid');
+    const relative = (
+      await call('open_page', { route: '/tests', projectPath: 'some/dir' })
+    ).json<PanelActionResult>();
+    expect(relative.outcome).toBe('invalid');
+  });
+
   it('изменение без решения — таймаут, ничего не создано', async () => {
     await app.close();
     await build(150);

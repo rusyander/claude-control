@@ -1,8 +1,24 @@
 import { apiClient } from '@shared/api/client';
 import { enqueue } from './agent-runs.commands';
 import { drainQueue } from './agent-runs.lifecycle';
-import { findKey, runs } from './agent-runs.state';
+import { emit, findKey, nextQueueSeq, runs, setRun } from './agent-runs.state';
 import type { AgentRun, QueuedMessage } from './agent-runs.types';
+
+/** Слово «на ходу» — в ленту сразу, до ответа сервера (Ф12). */
+function markSending(key: string, text: string): string {
+  const id = `steering-${Date.now()}-${nextQueueSeq()}`;
+  setRun(key, { steering: [...(runs.get(key)?.steering ?? []), { id, text }] });
+  emit();
+  return id;
+}
+
+function unmarkSending(key: string, id: string): void {
+  const run = runs.get(key);
+  if (!run?.steering) return;
+  const rest = run.steering.filter((item) => item.id !== id);
+  setRun(key, { steering: rest.length > 0 ? rest : undefined });
+  emit();
+}
 
 /**
  * Сказать агенту посреди хода — как в самом Claude Code: сообщение уходит в
@@ -23,6 +39,7 @@ export async function steer(
     enqueue(id, message);
     return 'queued';
   }
+  const sendingId = markSending(key, message.prompt);
   try {
     const { data } = await apiClient.post<{ steered?: boolean }>('/chat/send', {
       chatId: run.serverRunId ?? (run.id || key),
@@ -35,10 +52,15 @@ export async function steer(
       ...(message.model ? { model: message.model } : {}),
       ...(message.effort ? { effort: message.effort } : {}),
     });
-    if (data?.steered) return 'steered';
+    if (data?.steered) {
+      unmarkSending(key, sendingId);
+      return 'steered';
+    }
   } catch {
     // Занят без живой сессии (409), ход кончился или сеть — дальше очередь.
   }
+  // Снять пузырь «Передаётся…» и поставить в очередь — одним показом, без мигания.
+  unmarkSending(key, sendingId);
   enqueue(id, message);
   // Ход кончился, пока шёл запрос: конец хода очередь уже не снимет — дослать сейчас.
   if (runs.get(key)?.status !== 'running') drainQueue(key);
@@ -47,15 +69,29 @@ export async function steer(
 
 /**
  * Что показать пузырями ожидания: переданное агенту на ходу — первым (оно уже у
- * агента), за ним очередь, которая уйдёт только по концу хода.
+ * агента), за ним ещё передающееся (запрос в пути, Ф12), за ними очередь,
+ * которая уйдёт только по концу хода. Событие `steer` может прийти раньше
+ * ответа на запрос — тогда слово уже среди переданных, и второго пузыря нет.
  */
-export function pendingBubbles(run: Pick<AgentRun, 'steered' | 'queued'>): QueuedMessage[] {
+export function pendingBubbles(
+  run: Pick<AgentRun, 'steered' | 'queued' | 'steering'>,
+): QueuedMessage[] {
+  const steered = run.steered ?? [];
+  const delivered = new Map<string, number>();
+  for (const item of steered) delivered.set(item.text, (delivered.get(item.text) ?? 0) + 1);
+  const sending = (run.steering ?? []).filter((item) => {
+    const left = delivered.get(item.text) ?? 0;
+    if (left === 0) return true;
+    delivered.set(item.text, left - 1);
+    return false;
+  });
   return [
-    ...(run.steered ?? []).map((item) => ({
+    ...steered.map((item) => ({
       id: `steered-${item.at}`,
       prompt: item.text,
       steered: true,
     })),
+    ...sending.map((item) => ({ id: item.id, prompt: item.text, sending: true })),
     ...run.queued,
   ];
 }

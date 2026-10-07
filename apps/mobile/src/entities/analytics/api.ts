@@ -1,6 +1,6 @@
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import type { Analytics } from '@agentdeck/contracts';
-import { api } from '../../shared/api/client';
+import { api, ApiError } from '../../shared/api/client';
 
 /**
  * Аналитика по транскриптам: расход, модели, проекты, инструменты.
@@ -37,11 +37,36 @@ export function periodKey(period: AnalyticsPeriod): string {
   return period.preset;
 }
 
-export function useAnalytics(period: AnalyticsPeriod): UseQueryResult<Analytics> {
-  return useQuery({
-    queryKey: ['analytics', periodKey(period)],
+/**
+ * Отказ панели «журналы этого CLI аналитика не читает» (409
+ * `analytics-provider-unsupported`): текст уже переведён по коду клиентом
+ * запросов. У телефона нет гейта возможностей, как у веба, поэтому отказ —
+ * единственное, что не даёт показать под goose или kimi расход Claude.
+ */
+export function analyticsRefusal(error: unknown): string | undefined {
+  return error instanceof ApiError && error.status === 409 && error.code === 'provider_unsupported'
+    ? error.message
+    : undefined;
+}
+
+/**
+ * Активный CLI входит в ключ: отчёт одного CLI не должен минуту доживать в
+ * кэше под другим. Отказ не повторяется — он не временный, повтор только
+ * оттянул бы честный ответ.
+ */
+export function analyticsQueryOptions(period: AnalyticsPeriod, providerId: string | undefined) {
+  return {
+    queryKey: ['analytics', providerId ?? '', periodKey(period)],
     queryFn: () => api.get<Analytics>('/analytics', periodParams(period)),
     // Скан транскриптов не бесплатен, а цифры за сутки не меняются посекундно.
     staleTime: 60_000,
-  });
+    retry: (failures: number, error: Error) => !analyticsRefusal(error) && failures < 1,
+  };
+}
+
+export function useAnalytics(
+  period: AnalyticsPeriod,
+  providerId: string | undefined,
+): UseQueryResult<Analytics> {
+  return useQuery(analyticsQueryOptions(period, providerId));
 }

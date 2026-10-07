@@ -101,6 +101,9 @@ export function AnalyticsTopic() {
           <Callout tone="info" title={tr('noteProjectTitle')}>
             {tr('noteProjectText')}
           </Callout>
+          <Callout tone="warning" title={tr('noteSubagentsTitle')}>
+            {tr('noteSubagentsText')}
+          </Callout>
           <Callout tone="info" title={tr('noteScopeTitle')}>
             {tr('noteScopeText')}
           </Callout>

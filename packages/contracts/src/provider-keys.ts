@@ -81,6 +81,14 @@ export const providerRunnerInfoSchema = object({
   cliRunnable: boolean(),
   /** Имя команды CLI провайдера под текущую ОС. */
   cliCommand: string(),
+  /**
+   * «Разрешить правки» чата этого CLI действует: флагом одиночного запуска или
+   * ответом панели живому серверу. Нет — права целиком из настроек самого CLI,
+   * и переключатель не показывается.
+   */
+  editsToggle: boolean().optional(),
+  /** Выключенный переключатель: `ask` — карточка на просьбу CLI, `deny` — запись закрыта. */
+  editsWhenOff: zodEnum(['ask', 'deny']).optional(),
 });
 export type ProviderRunnerInfo = Infer<typeof providerRunnerInfoSchema>;
 

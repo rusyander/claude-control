@@ -16,6 +16,7 @@ import { registerGroupSourcesRoutes } from '../routes/group-sources-routes.ts';
 import { registerGroupPathRoutes } from '../routes/group-path-routes.ts';
 import { registerGroupKnobsRoutes } from '../routes/group-knobs-routes.ts';
 import { registerGroupDuplicateRoutes } from '../routes/group-duplicate-routes.ts';
+import { registerGroupDeliveryRoutes } from '../routes/group-delivery-routes.ts';
 import { registerAnalyticsRoutes } from '../routes/analytics-routes.ts';
 import { registerAnalyticsSessionRoutes } from '../routes/analytics-session-routes.ts';
 import { registerModelRoutes } from '../routes/model-routes.ts';
@@ -24,6 +25,8 @@ import { registerProviderCheckRoutes } from '../routes/provider-check-routes.ts'
 import { registerProviderPreviewRoutes } from '../routes/provider-preview-routes.ts';
 import { registerConfigPreviewRoutes } from '../routes/config-preview-routes.ts';
 import { registerProviderCompareRoutes } from '../routes/provider-compare-routes.ts';
+import { registerGlobalLayerRoutes } from '../routes/global-layer-routes.ts';
+import { registerKitRoutes } from '../routes/kit-routes.ts';
 import { registerPortabilityRoutes } from '../routes/portability-routes.ts';
 import { registerPortabilityCarryRoutes } from '../routes/portability-carry-routes.ts';
 import { registerFormatCheckRoutes } from '../routes/format-check-routes.ts';
@@ -56,6 +59,7 @@ import { registerProviderChatRoutes } from '../routes/provider-chat-routes.ts';
 import { registerDlpRoutes } from '../routes/dlp-routes.ts';
 import { registerCompromiseRoutes } from '../routes/compromise-routes.ts';
 import { registerPlatformRoutes } from '../routes/platform-routes.ts';
+import { registerLocalModelsRoutes } from '../routes/local-models-routes.ts';
 import { registerMediaRoutes } from '../routes/media-routes.ts';
 import { registerPromptGateRoutes } from '../routes/prompt-gate-routes.ts';
 import { registerPromptRoutes } from '../routes/prompt-routes.ts';
@@ -86,6 +90,7 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
     splitOverlap,
     splitReview,
     recheckMr,
+    splitView,
     projectRunner,
     projectTestRuns,
     projectTestManual,
@@ -98,7 +103,13 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
     events,
     panelPending,
     selfBaseUrl,
+    localModels,
+    globalLayer,
+    kit,
   } = runtime;
+  // Маршрут и порт спрашиваются на каждом запросе окна, а не здесь: галочка
+  // контура, снятая минуту назад, уже действует.
+  const helperRoute = { runRoute: runtime.runRoute, gatewayPort: runtime.gatewayPort };
 
   return [
     registerConfigRoutes,
@@ -121,6 +132,8 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
     registerGroupKnobsRoutes,
     // «Копировать группу»: независимая выключенная копия рядом с оригиналом.
     registerGroupDuplicateRoutes,
+    // «Что из группы дойдёт до CLI»: чистый план слоя, без записи.
+    registerGroupDeliveryRoutes,
     registerAnalyticsRoutes,
     // «Перейти» / «Остановить» у сессий аналитики: прогоны панели знает реестр.
     (instance, context) => registerAnalyticsSessionRoutes(instance, context, chatRuns),
@@ -143,10 +156,12 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
       }),
     registerFormatCheckRoutes,
     registerPluginRoutes,
-    registerAssistantRoutes,
+    // Помощники формы и структуры идут маршрутом активного провайдера — тем же,
+    // что его чат: контур, набор панели и отказ доезжают и до лёгкого окна.
+    (instance, context) => registerAssistantRoutes(instance, context, helperRoute),
     registerScriptRoutes,
     registerSandboxRoutes,
-    registerResourceRoutes,
+    (instance, context) => registerResourceRoutes(instance, context, helperRoute),
     registerBackupRoutes,
     registerHistoryRoutes,
     registerSearchRoutes,
@@ -166,6 +181,11 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
       registerSplitDefaultsRoutes(instance, context, (path) => splitConveyor.kickProject(path)),
     // Сита перед MR: выученные по тредам MR и счёт блокеров — та же вкладка «Группы».
     registerSieveRoutes,
+    // Сверка сит панели с их копией в глобальном слое — вкладка «Глобальный слой».
+    (instance, context) => registerGlobalLayerRoutes(instance, context, globalLayer),
+    // Встроенный набор панели (В2): своя страница, режимы по CLI, копии «моё».
+    (instance, context) =>
+      registerKitRoutes(instance, context, kit, () => events.broadcast(['kit'], '')),
     registerProjectFilesRoutes,
     (instance, context) =>
       registerChatRoutes(instance, context, chatRuns, chatSession, (chatId) =>
@@ -193,8 +213,7 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
       }),
     // Пауза дерева: «Остановить всё» / «Продолжить всё» у родителя и само
     // дерево для пульта. Объект переживает запрос — он же глушит автостарты.
-    (instance, context) =>
-      registerChatTreeRoutes(instance, context, treePause, (ids) => splitConveyor.view(ids)),
+    (instance, context) => registerChatTreeRoutes(instance, context, treePause, splitView),
     // Продолжение в чистой сессии: маршруты заводят новый разговор по кнопке, а
     // цепочки (тумблер автомата и номер шага) переживают запрос — как и реестр.
     (instance, context) =>
@@ -231,6 +250,8 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
     // панели нужен по той же причине, что и интеграциям: переходник MCP ходит
     // не в контур, а сюда, и в его записи лежит только этот адрес.
     (instance, context) => registerPlatformRoutes(instance, context, platformGateway, selfBaseUrl),
+    // Локальные модели: работы с прогрессом переживают запрос, объект — из runtime.
+    (instance, context) => registerLocalModelsRoutes(instance, context, localModels, kit),
     // Картинки из чата (Т9). Порт спрашивается у ЖИВОГО слушателя, а не у
     // настроек: запрос в контур идёт через шлюз, а задуманный порт мог быть
     // занят — тогда настройка указывает на чужой процесс.

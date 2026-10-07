@@ -104,6 +104,40 @@ export const ROUTE_LEDGER: RouteLedger = {
   'POST /api/chat/split/:parent/review-push': 'human:outward',
   'POST /api/chat/split/:parent/review-retry': 'human:outward',
   'POST /api/chat/split/:parent/tickets/file': 'human:outward',
+  'GET /api/chat/split/:parent/tasks': 'human:outward',
+  'POST /api/chat/split/:parent/tasks/move': 'human:outward',
+  // global-layer-routes.ts (В5): чтение и сверка — пробел агента; запись в слой ~/.claude — человек.
+  'GET /api/global-layer': 'gap:P3',
+  'POST /api/global-layer/:id/compare': 'gap:P3',
+  'POST /api/global-layer/:id/transfer': 'gap:P3',
+  'GET /api/global-layer/:id/proposal': 'gap:P3',
+  'POST /api/global-layer/:id/apply': 'human:code-write',
+  // local-models-routes.ts: загрузки, нагрузка на видеокарту, удаление и подключение — человек.
+  'GET /api/local-models': 'action:local_models_status',
+  'POST /api/local-models/hardware/refresh': 'gap:P3',
+  'PUT /api/local-models/kit': 'gap:P3',
+  'POST /api/local-models/jobs/:id/cancel': 'gap:P3',
+  'POST /api/local-models/runtime/install': 'human:download',
+  'POST /api/local-models/pull': 'human:download',
+  'POST /api/local-models/qwen-code/install': 'human:download',
+  'POST /api/local-models/import': 'human:upload',
+  'POST /api/local-models/server/start': 'human:consent',
+  'POST /api/local-models/server/stop': 'human:consent',
+  'DELETE /api/local-models/models/:tag': 'human:consent',
+  'POST /api/local-models/bench': 'human:consent',
+  'POST /api/local-models/connect': 'human:consent',
+  'POST /api/local-models/disconnect': 'human:consent',
+  // kit-routes.ts (В2): набор панели живёт в сторе панели, не в ~/.claude — чтение и правка копии «моё» пока пробел агента.
+  'GET /api/kit': 'action:kit_status',
+  'GET /api/kit/item': 'gap:P3',
+  'PUT /api/kit/item': 'gap:P3',
+  'DELETE /api/kit/item': 'gap:P3',
+  'PUT /api/kit/item/enabled': 'gap:P3',
+  'PUT /api/kit/conflict': 'gap:P3',
+  'PUT /api/kit/mode': 'gap:P3',
+  'POST /api/kit/global/import': 'gap:P3',
+  // Единственная запись набора в ~/.claude — настоящая конфигурация человека.
+  'POST /api/kit/global/export': 'human:code-write',
   'POST /api/chat/split/decline': 'action:split_decline',
   // chat/transcript-routes.ts
   // Выгрузка разговора файлом — кнопка человека «Экспортировать» (D2, U5c).
@@ -114,6 +148,8 @@ export const ROUTE_LEDGER: RouteLedger = {
   'GET /api/chats/:chatId/messages': 'action:read_chat',
   'GET /api/chats/:chatId/version': 'internal:ui-state',
   'GET /api/chats/projects': 'action:list_chat_projects',
+  // Закрепление в списке — раскладка окна человека, как ширина дерева файлов.
+  'PUT /api/chats/:chatId/pin': 'internal:ui-state',
   // chat/tree-routes.ts
   'GET /api/chat/:id/tree': 'action:read_chat,split_control',
   'GET /api/chat/awaiting': 'action:list_waiting',
@@ -207,6 +243,8 @@ export const ROUTE_LEDGER: RouteLedger = {
   // format-check-routes.ts
   'GET /api/format-check': 'action:format_check',
   'POST /api/format-check/refresh': 'action:format_check',
+  // group-delivery-routes.ts — что из группы дойдёт до прогона чужого CLI (D6)
+  'GET /api/groups/:id/delivery': 'foreign-cli',
   // group-duplicate-routes.ts
   'POST /api/groups/:id/duplicate': 'action:copy_group',
   // group-knobs-routes.ts
@@ -524,9 +562,14 @@ export const ROUTE_LEDGER: RouteLedger = {
   'GET /api/provider-chat/chats/:id/stream': 'foreign-cli',
   'PATCH /api/provider-chat/chats/:id': 'foreign-cli',
   'POST /api/provider-chat/chats': 'foreign-cli',
+  // Ответ на запрос прав чужого CLI — как у Claude (`permission-decision`): только человек.
+  'POST /api/provider-chat/chats/:id/permissions/:askId': 'human:rights',
   'POST /api/provider-chat/chats/:id/restart': 'foreign-cli',
+  'POST /api/provider-chat/chats/:id/queue/:queuedId/send': 'foreign-cli',
   'POST /api/provider-chat/chats/:id/send': 'foreign-cli',
   'POST /api/provider-chat/chats/:id/stop': 'foreign-cli',
+  // provider-chat-projects-route.ts
+  'GET /api/provider-chat/projects': 'foreign-cli',
   // provider-check-routes.ts
   'GET /api/providers/checks': 'action:read_provider_checks',
   'POST /api/providers/:id/check': 'action:run_provider_check',
@@ -563,6 +606,12 @@ export const ROUTE_LEDGER: RouteLedger = {
   'GET /api/provider-plugins/file': 'foreign-cli',
   'PUT /api/provider-plugins/file': 'foreign-cli',
   'PUT /api/provider-plugins/packages': 'foreign-cli',
+  'POST /api/provider-plugins/installed': 'foreign-cli',
+  'POST /api/provider-plugins/installed/:name/:action': 'foreign-cli',
+  'DELETE /api/provider-plugins/installed/:name': 'foreign-cli',
+  'POST /api/provider-plugins/marketplaces': 'foreign-cli',
+  'POST /api/provider-plugins/marketplaces/:name/upgrade': 'foreign-cli',
+  'DELETE /api/provider-plugins/marketplaces/:name': 'foreign-cli',
   // provider-preview-routes.ts
   'POST /api/provider-preview': 'foreign-cli',
   // provider-project/env-routes.ts

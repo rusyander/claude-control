@@ -30,7 +30,8 @@ describe('маршрут прогона песочницы', () => {
 
     const ctx = {
       location: { paths: { root, appData: join(root, 'agentdeck') } },
-      store: {},
+      // Песочница работает только при активном Claude — провайдер называем явно.
+      store: { getSettings: () => ({ provider: 'claude' }) },
     } as unknown as ServerContext;
 
     app = Fastify();

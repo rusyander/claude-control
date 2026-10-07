@@ -29,6 +29,8 @@ export const watcherEn: WatcherTexts = {
     analysis_failed:
       'The last analysis failed. Its problems go to the model together with the next one.',
     hourly_cap: 'The hourly analysis cap is reached. Analysis resumes by itself next hour.',
+    route_refused:
+      'The analysis did not start: the chosen route does not allow it. The reason is in the watcher summary in the panel.',
   },
   turnOff: 'Turn off',
   turnOffFailed: (reason: string) => `Did not turn off: ${reason}`,

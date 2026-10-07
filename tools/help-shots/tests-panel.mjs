@@ -28,7 +28,7 @@
  * Переменные: GUIDE_PANEL_PORT, GUIDE_WEB_PORT, GUIDE_TESTS_PROJECT.
  */
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, readdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, join, resolve } from 'node:path';
 import { chromium } from 'playwright';
@@ -700,6 +700,51 @@ async function health(page) {
   scenario.finish();
 }
 
+/** Кейсы корзины, заведённые сверкой папки e2e, — из файла группы на диске. */
+function syncedCartCases() {
+  const dir = join(PROJECT, '.agent', 'tests');
+  for (const name of readdirSync(dir)) {
+    if (!name.endsWith('.tests.json')) continue;
+    const group = JSON.parse(readFileSync(join(dir, name), 'utf8'));
+    const cases = (group.cases ?? []).filter((item) => /^cart-00[12]$/.test(item.id));
+    if (cases.length > 0) return { groupId: name.replace(/\.tests\.json$/, ''), cases };
+  }
+  throw new Error('Кейсов корзины после сверки папки e2e нет');
+}
+
+async function mutation(page, scenario) {
+  const { groupId, cases } = syncedCartCases();
+  for (const testCase of cases) {
+    await post('/case', { groupId, testCase: { ...testCase, codePaths: ['src/cart/index.js'] } });
+  }
+  await post('/environment', {
+    environment: {
+      id: 'local',
+      title: shotLanguage() === 'en' ? 'Local' : 'Локальное',
+      isDefault: true,
+      baseUrl: 'http://localhost:3000',
+    },
+  });
+  await openTests(page);
+  const card = '[data-testid="tests-mutation"]';
+  await page.locator(card).scrollIntoViewIfNeeded();
+  await page
+    .locator(card)
+    .getByRole('button', { name: /^(Сломать и прогнать|Break and run)$/ })
+    .click();
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: /^(Запустить|Start)$/ })
+    .click();
+  await page.locator(`${card} [data-mutation-verdict]`).waitFor({ timeout: 60_000 });
+  await page.locator(`${card} li`).first().waitFor({ timeout: 15_000 });
+  // Итог дописывается под карточкой, а та стоит у нижнего края окна: кадр
+  // обрезал бы его по окну — карточка встаёт в середину.
+  await page.locator(card).evaluate((node) => node.scrollIntoView({ block: 'center' }));
+  await page.waitForTimeout(800);
+  await scenario.shot(page, '11-mutation-result', { clip: card, padding: 8 });
+}
+
 /**
  * Папка e2e: завести, сверить с кейсами, убрать. Всё настоящее — папку и строку
  * в `.git/info/exclude` пишет панель, спеку кладёт сценарий (как её положил бы
@@ -780,6 +825,7 @@ async function e2e(page) {
     { timeout: 30_000 },
   );
   await page.waitForTimeout(800);
+
   await openTests(page, 'report');
   const quarantine = '[data-testid="tests-quarantine-card"]';
   await page.locator(quarantine).scrollIntoViewIfNeeded();
@@ -835,6 +881,18 @@ async function e2e(page) {
   await within.getByRole('button', { name: /^(Убрать папку|Remove folder)$/ }).click();
   await page.waitForTimeout(1500);
   await scenario.shot(page, '04-remove-confirm', { clip: card, padding: 8 });
+
+  // Проверка набора поломкой с итогом (Ф21) — после кадра подтверждения: итог
+  // удлиняет карточку, и кадр 04 обрезал бы его на краю окна. Автокейсы корзины
+  // привязываются к её модулю тем же путём, что правка кейса человеком,
+  // окружение получает адрес стенда — без него проверка не стартует. Дальше всё
+  // настоящее: копия, поломка, прогон подменного раннера, разбор отчёта и
+  // уборка копии делает панель.
+  await within.getByRole('button', { name: /^(Отмена|Cancel)$/ }).click();
+  await mutation(page, scenario);
+  await openTests(page);
+  await within.getByRole('button', { name: /^(Убрать папку|Remove folder)$/ }).click();
+  await page.waitForTimeout(1500);
 
   await within.getByRole('button', { name: /^(Убрать вместе с ними|Remove them too)$/ }).click();
   await page.waitForTimeout(1500);

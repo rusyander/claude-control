@@ -92,6 +92,25 @@ export async function shootReport(browser, web, scenario) {
     await page.waitForTimeout(400);
     await frame(scenario, page, '05-sessions');
 
+    // ── 09. Сессия раскрыта: разбивка токенов, время и инструменты ───────────
+    // Снимается вся строка, а не одна сетка цифр: без проекта и заголовка
+    // над ней читатель не поймёт, чья это разбивка.
+    const more = page
+      .locator('summary', { hasText: /^(Токены, время и инструменты|Tokens, time and tools)$/ })
+      .first();
+    await more.click();
+    await page
+      .locator('[class*="sessionRow"]:has(details[open])')
+      .first()
+      .evaluate((node) => node.scrollIntoView({ block: 'center' }));
+    await page.waitForTimeout(500);
+    await frame(scenario, page, '09-session-details', {
+      clip: '[class*="sessionRow"]:has(details[open])',
+      padding: 6,
+    });
+    await more.click();
+    await page.waitForTimeout(300);
+
     // ── 07–08. «Перейти» и «Остановить» у идущей сессии ─────────────────────
     // Процесс CLI на стенде съёмки не запущен, поэтому ответ «где идёт»
     // подменён: всё, кроме места (номер, команда), — настоящее от сервера.

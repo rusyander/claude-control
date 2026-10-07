@@ -21,6 +21,7 @@ export function ProviderChatComposer({
   onClearAttachments,
   onSend,
   isRunning,
+  isSteerable,
   isBlocked,
   modes,
 }: ProviderChatComposerProps) {
@@ -95,12 +96,15 @@ export function ProviderChatComposer({
     // предложение собрать новую колоду вместо этой.
     if (isDeck && modes?.reviseTitle) return t('chat.mode.revisePlaceholder');
     if (isDeck) return t('chat.mode.deckPlaceholder');
+    // Ход принимает сообщения посреди ответа (В1) — обещать «по концу» неправда.
+    if (isRunning && isSteerable) return t('providerChat.steerPlaceholder');
     if (isRunning) return t('providerChat.queuePlaceholder');
     return t('providerChat.placeholder');
   })();
   const sendLabel = ((): string => {
     if (isImage) return t('chat.mode.draw');
     if (isDeck) return t('chat.mode.build');
+    if (isRunning && isSteerable) return t('providerChat.steerSend');
     if (isRunning) return t('providerChat.queueSend');
     return t('providerChat.send');
   })();

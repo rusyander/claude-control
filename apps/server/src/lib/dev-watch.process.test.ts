@@ -300,4 +300,72 @@ describe('dev-сторож как процесс', () => {
     expect(existsSync(stateFile)).toBe(false);
     expect(existsSync(join(appData, 'dev-restart.request'))).toBe(false);
   }, 120_000);
+
+  // Ф11: перезапуск посреди автотестов или проверки поломкой рвал прогон и
+  // оставлял копию. Сторож ждёт их журналы процессов и перезапускает сам, когда
+  // запись ушла.
+  it('правка ждёт идущую проверку поломкой и перезапускает сама, когда та кончилась', async () => {
+    root = mkdtempSync(join(tmpdir(), 'dev-watch-checks-'));
+    const serverDir = join(root, 'apps', 'server');
+    const lib = join(serverDir, 'src', 'lib');
+    mkdirSync(lib, { recursive: true });
+    mkdirSync(join(root, 'packages', 'contracts', 'src'), { recursive: true });
+    copyFileSync(DEV_WATCH, join(lib, 'dev-watch.mjs'));
+    copyFileSync(PROBE, join(lib, 'dev-boot-probe.mjs'));
+    copyFileSync(BRAND, join(lib, 'brand.mjs'));
+    copyFileSync(RESTART, join(lib, 'dev-restart.mjs'));
+    writeFileSync(join(lib, 'part.ts'), "export const part: string = 'v1';\n");
+    writeFileSync(
+      join(serverDir, 'src', 'index.ts'),
+      `import { appendFileSync } from 'node:fs';\nimport { part } from './lib/part.ts';\nappendFileSync(process.env.PIDS_FILE as string, \`\${process.pid} \${part}\\n\`);\nsetInterval(() => {}, 1000);\n`,
+    );
+    const config = join(root, 'config');
+    const { appDataDirOf } = (await import(BRAND.href)) as {
+      appDataDirOf: (configRoot: string) => string;
+    };
+    const appData = appDataDirOf(config);
+    mkdirSync(appData, { recursive: true });
+    // Идущая проверка поломкой: её процесс — сам тест, он жив.
+    const ledger = join(appData, 'mutation-runs.json');
+    writeFileSync(ledger, JSON.stringify([{ key: 'mutation:k', pid: process.pid }]));
+    const pidsFile = join(root, 'pids.txt');
+    let log = '';
+    watch = spawn(process.execPath, [join(lib, 'dev-watch.mjs')], {
+      cwd: serverDir,
+      env: {
+        ...process.env,
+        CLAUDE_CONFIG_DIR: config,
+        AGENTDECK_DEV_DEFER_POLL_MS: '200',
+        PIDS_FILE: pidsFile,
+      },
+      stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
+      windowsHide: true,
+    });
+    watch.stdout?.on('data', (chunk: Buffer) => (log += chunk.toString()));
+    watch.stderr?.on('data', (chunk: Buffer) => (log += chunk.toString()));
+    const launches = (): string[] => {
+      if (!existsSync(pidsFile)) return [];
+      const rows = readFileSync(pidsFile, 'utf8').split(/\r?\n/).filter(Boolean);
+      for (const row of rows) recorded.add(Number(row.split(' ')[0]));
+      return rows;
+    };
+    await until(() => launches()[0], 30_000, `первый запуск\n${log}`);
+
+    writeFileSync(join(lib, 'part.ts'), "export const part: string = 'v2';\n");
+    const stateFile = join(appData, 'dev-restart.json');
+    const state = await until(
+      () => (existsSync(stateFile) ? JSON.parse(readFileSync(stateFile, 'utf8')) : undefined),
+      30_000,
+      `состояние ожидания\n${log}`,
+    );
+    expect(state).toMatchObject({ waitingFor: 'checks' });
+    await pause(2_000);
+    expect(launches()).toHaveLength(1);
+
+    // Проверка кончилась — запись ушла из журнала, перезапуск без всякой кнопки.
+    writeFileSync(ledger, '[]');
+    const second = await until(() => launches()[1], 60_000, `перезапуск после проверки\n${log}`);
+    expect(second.split(' ')[1]).toBe('v2');
+    expect(existsSync(stateFile)).toBe(false);
+  }, 120_000);
 });

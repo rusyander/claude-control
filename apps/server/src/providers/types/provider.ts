@@ -1,14 +1,17 @@
 import type { ClaudePaths } from '@agentdeck/contracts';
+import type { GroupLayerKind } from '@agentdeck/contracts/group-delivery';
 import type { CapabilityMap, ProviderStatus } from './capabilities.ts';
 import type {
   ProviderAssistant,
   ProviderCli,
   ProviderEndpointConfig,
   ProviderEndpointFile,
+  ProviderRunEndpoint,
 } from './assistant.ts';
 import type {
   ProviderInstructionsListLocation,
   ProviderInstructionsRulesLocation,
+  ProviderRulesConfigLocation,
 } from './instructions.ts';
 import type {
   ProviderCommandsConfigLocation,
@@ -67,10 +70,11 @@ export interface ProviderProjectConfigLocation {
    * Проектный КАТАЛОГ ПРАВИЛ (CURSOR-1) — третья альтернатива `instructions`:
    * у Cursor правила проекта лежат в `<проект>/.cursor/rules/` файлами `.mdc`
    * (подкаталоги поддерживаются). Задокументировано ровно так же, как глобальный
-   * каталог, поэтому домен и адаптер формата переиспользуются целиком.
+   * каталог, поэтому домен и адаптер формата переиспользуются целиком. У Qwen
+   * Code каталог `<проект>/.qwen/rules` идёт РЯДОМ с QWEN.md, а не вместо него.
    */
   instructionsRules?: {
-    format: ProviderInstructionsRulesLocation['format'];
+    format: ProviderInstructionsRulesLocation['format'] | ProviderRulesConfigLocation['format'];
     /** Относительный путь КАТАЛОГА от корня проекта, разделитель — `/`. */
     relativeDir: string;
   };
@@ -229,6 +233,12 @@ export interface ConfigProvider {
    */
   instructionsRules?: ProviderInstructionsRulesLocation;
   /**
+   * Каталог правил РЯДОМ с файлом инструкций — раздел «Правила» (MAP 24, Qwen).
+   * С `instructionsRules` не сочетается: у того каталог правил и есть раздел
+   * инструкций. Отсутствует → раздел правил у провайдера не поддержан.
+   */
+  rulesConfig?: ProviderRulesConfigLocation;
+  /**
    * Расположение и формат файла MCP-серверов — задан только у провайдеров с
    * реализованным адаптером (Codex/Gemini), у них же `mcp` = `ready`. Отсутствует
    * → универсальный раздел MCP провайдер не поддерживает (fail-closed). Claude
@@ -331,6 +341,8 @@ export interface ConfigProvider {
    * место сама — угадывать структуру чужого конфига панель не станет.
    */
   endpointFile?: ProviderEndpointFile;
+  /** Адрес контура только окружением прогона — см. `ProviderRunEndpoint`. */
+  runEndpoint?: ProviderRunEndpoint;
   /**
    * Вендоры каталога моделей (models.dev), чьи модели относятся к этому CLI:
    * claude → `anthropic`, codex → `openai`, gemini → `google`, qwen →
@@ -366,4 +378,13 @@ export interface ConfigProvider {
    * поэтому едет вообще без флага модели.
    */
   modelLadder?: string[];
+  /**
+   * Чем группа из файлов Claude едет на ОДИН прогон этого CLI
+   * (`domains/groups/run-layer.ts`). Тумблер каталогов Claude чужому CLI ничего
+   * не даёт, поэтому без слоя группа на его прогоны не действует вовсе — и
+   * панель так и говорит (`group-layer-none`), а не включает её в `~/.claude`.
+   * Задан только там, где механизм «на один запуск» проверен: Qwen — файл
+   * системных настроек, Codex — накладка поверх его конфига.
+   */
+  groupLayer?: GroupLayerKind;
 }

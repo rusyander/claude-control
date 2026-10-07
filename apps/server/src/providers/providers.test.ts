@@ -104,7 +104,20 @@ describe('реестр провайдеров', () => {
     // Codex: env (shell_environment_policy.set) и права (approval_policy/sandbox_mode) реализованы → ready.
     expect(
       CAPABILITIES.filter((cap) => getProvider('codex').capabilities[cap] === 'ready').sort(),
-    ).toEqual(['chat', 'env', 'globalInstructions', 'mcp', 'permissions', 'projects', 'scripts']);
+    ).toEqual([
+      // Lane G: расход из ~/.codex/sessions.
+      'analytics',
+      'chat',
+      'env',
+      'globalInstructions',
+      'hooks',
+      'mcp',
+      'permissions',
+      'plugins',
+      'projects',
+      'scripts',
+      'skills',
+    ]);
     // Gemini: GEMINI-3 закрыл env (файл .env), GEMINI-2 — права
     // (general.defaultApprovalMode + coreTools/excludeTools в settings.json),
     // команды — каталог commands/**/*.toml (только чтение).
@@ -154,6 +167,8 @@ describe('реестр провайдеров', () => {
     expect(getProvider('codex').projectConfig).toEqual({
       instructions: 'AGENTS.md',
       mcp: { format: 'toml', relativePath: '.codex/config.toml' },
+      hooks: { format: 'codex-json', relativePath: '.codex/hooks.json' },
+      skills: { format: 'skill-md-dir', relativeDir: '.agents/skills' },
     });
     expect(getProvider('gemini').projectConfig).toEqual({
       instructions: 'GEMINI.md',
@@ -277,8 +292,13 @@ describe('реестр провайдеров', () => {
     // Скиллы (QWEN-2) — каталог папок со SKILL.md.
     expect(provider.skillsConfig).toMatchObject({ format: 'skill-md-dir' });
     expect(provider.skillsConfig?.dir()).toBe(join(home, 'skills'));
-    // Плагинов у Qwen документация не описывает → раздела нет.
-    expect(provider.pluginsConfig).toBeUndefined();
+    // Расширения (MAP 25) — раздел «Плагины», меняет их только сам CLI.
+    expect(provider.pluginsConfig).toMatchObject({
+      format: 'qwen-extensions',
+      installedByCli: true,
+    });
+    expect(provider.pluginsConfig?.dir()).toBe(join(home, 'extensions'));
+    expect(provider.capabilities.plugins).toBe('ready');
 
     expect(provider.projectConfig).toEqual({
       instructions: 'QWEN.md',
@@ -287,10 +307,13 @@ describe('реестр провайдеров', () => {
       permissions: { format: 'qwen-json', relativePath: '.qwen/settings.json' },
       hooks: { format: 'qwen-json', relativePath: '.qwen/settings.json' },
       skills: { format: 'skill-md-dir', relativeDir: '.qwen/skills' },
+      instructionsRules: { format: 'qwen-md', relativeDir: '.qwen/rules' },
     });
     expect(provider.configLocations?.()).toEqual([home]);
 
     expect(CAPABILITIES.filter((cap) => provider.capabilities[cap] === 'ready').sort()).toEqual([
+      // Lane G: расход из ~/.qwen/projects/<проект>/chats.
+      'analytics',
       'chat',
       // Команды — тот же формат, что у gemini: ~/.qwen/commands/**/*.toml.
       'commands',
@@ -299,7 +322,11 @@ describe('реестр провайдеров', () => {
       'hooks',
       'mcp',
       'permissions',
+      // Расширения (MAP 25) — раздел «Плагины».
+      'plugins',
       'projects',
+      // Правила (MAP 24) — каталог ~/.qwen/rules.
+      'rules',
       'scripts',
       'skills',
     ]);
@@ -393,8 +420,11 @@ describe('реестр провайдеров', () => {
     expect(provider.envConfig).toBeUndefined();
     expect(provider.capabilities.env).toBe('unsupported');
 
-    // В проекте — только подсказки: своего проектного config.yaml Goose не читает.
-    expect(provider.projectConfig).toEqual({ instructions: '.goosehints' });
+    // В проекте — подсказки и `.agents/skills`: своего проектного config.yaml Goose не читает.
+    expect(provider.projectConfig).toEqual({
+      instructions: '.goosehints',
+      skills: { format: 'skill-md-dir', relativeDir: '.agents/skills' },
+    });
     expect(provider.configLocations?.()).toEqual([home]);
 
     expect(CAPABILITIES.filter((cap) => provider.capabilities[cap] === 'ready').sort()).toEqual([
@@ -404,6 +434,7 @@ describe('реестр провайдеров', () => {
       'permissions',
       'projects',
       'scripts',
+      'skills',
     ]);
   });
 
@@ -519,7 +550,12 @@ describe('реестр провайдеров', () => {
     // One-shot-флаг задан у codex/gemini и (OPENCODE-7) у opencode — все
     // задокументированы. Промпт всегда ОТДЕЛЬНЫМ элементом argv.
     expect(getProvider('codex').assistant?.oneShotArgs?.('P')).toEqual(['exec', 'P']);
-    expect(getProvider('gemini').assistant?.oneShotArgs?.('P')).toEqual(['-p', 'P']);
+    expect(getProvider('gemini').assistant?.oneShotArgs?.('P')).toEqual([
+      '-o',
+      'stream-json',
+      '-p',
+      'P',
+    ]);
     // Т12: подобранная модель уходит задокументированными ключами, каждый на
     // своём месте командной строки. Кавычек из примеров документации в argv
     // быть не должно — их снимает оболочка, а здесь оболочки нет.
@@ -543,7 +579,7 @@ describe('реестр провайдеров', () => {
         model: 'gemini-3.8-flash',
         effort: 'high',
       }),
-    ).toEqual(['-m', 'gemini-3.8-flash', '-p', 'P']);
+    ).toEqual(['-m', 'gemini-3.8-flash', '-o', 'stream-json', '-p', 'P']);
     // CLI без задокументированного способа передать модель второй аргумент
     // игнорирует: argv остаётся тем же самым.
     expect(getProvider('qwen').assistant?.oneShotArgs?.('P', { model: 'qwen3.8-flash' })).toEqual([
@@ -572,17 +608,17 @@ describe('реестр провайдеров', () => {
     });
     // OPENCODE-7: `opencode run "<промпт>"` — подкоманда `run`, промпт позиционный.
     expect(getProvider('opencode').assistant?.oneShotArgs?.('P')).toEqual(['run', 'P']);
+    // D1 (L-aider): ключ — только OpenAI и только в OpenAI; ANTHROPIC_API_KEY не читается.
     expect(getProvider('aider').assistant).toMatchObject({
-      apiKind: 'openai-compat',
-      apiKeyEnvVars: ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY'],
+      apiKind: 'openai',
+      apiKeyEnvVars: ['OPENAI_API_KEY'],
       cliRunnable: true,
     });
     // AIDER-2: задокументированный one-shot `--message <text>` — промпт ОТДЕЛЬНЫМ
-    // элементом argv, без интерполяции в shell.
-    expect(getProvider('aider').assistant?.oneShotArgs?.('привет "мир" && rm -rf /')).toEqual([
-      '--message',
-      'привет "мир" && rm -rf /',
-    ]);
+    // элементом argv, без интерполяции в shell (остальные флаги — `catalog/aider-run.test.ts`).
+    expect(
+      getProvider('aider').assistant?.oneShotArgs?.('привет "мир" && rm -rf /').slice(0, 2),
+    ).toEqual(['--message', 'привет "мир" && rm -rf /']);
     // Cursor: нет модельного API и запуск через CLI не поддержан → ассистент unsupported.
     expect(getProvider('cursor').assistant).toEqual({
       apiKind: 'none',
@@ -700,8 +736,14 @@ describe('реестр провайдеров', () => {
       'scripts',
       // COMMON-2: проектный AGENTS.md + <проект>/.codex/config.toml.
       'projects',
+      // MAP 25/26: плагины командами CLI, скиллы в ~/.agents/skills, хуки в hooks.json.
+      'plugins',
+      'skills',
+      'hooks',
+      // Lane G: расход читается из ~/.codex/sessions/**/rollout-*.jsonl.
+      'analytics',
     ] as const;
-    const unsupported = ['skills', 'hooks', 'plugins', 'analytics', 'sandbox', 'rules'] as const;
+    const unsupported = ['sandbox', 'rules'] as const;
     for (const cap of ready) expect(capabilities[cap]).toBe('ready');
     for (const cap of unsupported) expect(capabilities[cap]).toBe('unsupported');
   });
@@ -909,14 +951,14 @@ describe('реестр провайдеров', () => {
     }
   });
 
-  it('hooks/plugins/skillsConfig есть ТОЛЬКО у opencode: Claude на своих роутах', () => {
+  it('hooks/plugins/skillsConfig нет у Claude и у CLI без адаптера: Claude на своих роутах', () => {
     // У Claude все три модели свои и богатые (события settings.json / расширения
     // самой панели / каталог скиллов с группами) — универсальные разделы не
     // должны их даже видеть.
     expect(claudeProvider.hooksConfig).toBeUndefined();
     expect(claudeProvider.pluginsConfig).toBeUndefined();
     expect(claudeProvider.skillsConfig).toBeUndefined();
-    for (const id of ['codex', 'gemini', 'cursor', 'aider']) {
+    for (const id of ['gemini', 'cursor', 'aider']) {
       expect(getProvider(id).hooksConfig, id).toBeUndefined();
       expect(getProvider(id).pluginsConfig, id).toBeUndefined();
       expect(getProvider(id).skillsConfig, id).toBeUndefined();

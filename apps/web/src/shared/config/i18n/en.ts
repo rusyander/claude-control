@@ -12,10 +12,15 @@ import { devRestartEn } from './dev-restart/en.ts';
 import { projectsPageEn } from './projects/en.ts';
 import { contourConfigEn } from './contour-config/en.ts';
 import { presetsEn } from './presets/en.ts';
+import { localModelsEn } from './local-models/en.ts';
+import { kitEn } from './kit/en.ts';
 
 /** Типизирован по русской версии: забыть ключ при переводе не получится. */
 export const en: TranslationSchema = {
   serverMessages: serverMessagesEn,
+  localModels: localModelsEn,
+  /** Страница «Набор панели» (В2) — `kit/en.ts`. */
+  kit: kitEn,
   panelAgent: panelAgentEn,
   attach: attachEn,
   groupPath: groupPathEn,
@@ -120,6 +125,8 @@ export const en: TranslationSchema = {
     settings: 'Settings',
     dlp: 'Data protection',
     platform: 'Contour',
+    localModels: 'Local models',
+    kit: 'Panel kit',
     help: 'Help',
     sectionMain: 'Main',
     sectionBehavior: 'Agent behaviour',
@@ -376,6 +383,10 @@ export const en: TranslationSchema = {
         no_stub_endpoint: 'there is nothing to point this target at instead of a model',
         needs_panel_runtime: 'emulation promised — the runtime supervisor measures it',
         needs_wire: 'wire promised — the contour must sit in the request path',
+        needs_cli_approval:
+          'native once approved inside the CLI — approval is the person’s act, the probe does not fake it',
+        target_reads_real_home:
+          'the target finds this folder from the OS profile, not from the probe’s temporary home',
         target_defers_tools:
           'the target took the record but does not name it to the model up front',
         emit_failed: 'the probe environment for this target did not build',
@@ -417,7 +428,7 @@ export const en: TranslationSchema = {
         in_process_only: 'the entity lives inside another process',
         account_only: 'the body is synced with the account and absent on disk',
         unit_not_installable:
-          'the plugin is installed by the source store — its contents travel, not the unit',
+          'the plugin is installed by a store or the CLI’s own command — its contents travel, not the unit',
         panel_only_construct: 'a panel construct — no CLI has it',
         no_panel_run: 'the panel cannot start this CLI',
         no_wire: 'the CLI documents no endpoint of its own',
@@ -425,6 +436,7 @@ export const en: TranslationSchema = {
       condition: {
         run_through_panel: 'when started through the panel',
         enable_contour: 'with the contour enabled',
+        approve_in_cli: 'once approved inside the CLI (/hooks)',
       },
     },
   },
@@ -541,13 +553,14 @@ export const en: TranslationSchema = {
   },
   overview: {
     title: 'Configuration overview',
-    subtitle: 'What is currently wired into your Claude Code',
+    subtitle: 'What is currently wired into your {{provider}}',
     configPath: 'Configuration directory',
     detectedAuto: 'detected automatically',
     detectedEnv: 'from environment variable',
     detectedManual: 'set manually',
     notFound: 'not found',
     missingFiles: 'Missing files',
+    claudeUnused: 'Claude Code not in use',
     brokenHooks: 'hooks with a broken path',
     mcpFailed: 'servers not responding',
     unusedScripts: 'not bound to any event',
@@ -820,6 +833,9 @@ export const en: TranslationSchema = {
       next: 'Goes out next',
       later: 'Goes out after that',
       steered: 'Passed to the agent — it takes it into account at the next step',
+      sending: 'Sending…',
+      held: 'Waiting to be sent',
+      sendHeld: 'Send',
     },
     mode: {
       title: 'What sending does',
@@ -1118,6 +1134,10 @@ export const en: TranslationSchema = {
         mr: 'MR !{{id}}',
         mrOpenHint: 'Open the group’s MR in a new tab',
         mrClosed: { merged: 'MR merged', closed: 'MR closed' },
+        mergeOrder: 'merge {{ordinal}} of {{total}}',
+        mergeOrderAfter: 'Merge the MRs of these groups first: {{names}}',
+        mergeOrderFree: 'Depends on no other MR: its place follows the plan order',
+        mergeOrderName: '“{{name}}”',
         openHint: 'Open the group’s chat',
         waiting: 'waiting for: {{names}}',
         held: 'waiting for your answer',
@@ -1246,6 +1266,53 @@ export const en: TranslationSchema = {
           checkedHint: 'The last recheck ended in a delivery. Click to recheck again',
           sent: 'The group is rechecking its MR',
           queued: 'The recheck goes out once a slot frees up',
+          merged: 'The MR is already merged — the group is finished',
+          closed: 'The MR is closed — nothing to recheck',
+          failed: 'Failed: {{message}}',
+        },
+        moveTasks: {
+          action_one: 'Move the task',
+          action_few: 'Move {{count}} tasks',
+          action_many: 'Move {{count}} tasks',
+          action_other: 'Move {{count}} tasks',
+          actionAll: 'Move group tasks',
+          hint: 'Move the tracker tasks of this group to another Jira status. The panel moves them itself — pressing «Move» in the dialog is the consent',
+          hintAll:
+            'Move the tracker tasks of every group — and of splits the groups made themselves — to another Jira status',
+          title: 'Move tasks in Jira',
+          loading: 'Reading the tasks in Jira…',
+          loadFailed: 'Could not read the tasks: {{message}}',
+          tableKey: 'Task',
+          tableGroup: 'Group',
+          tableStatus: 'Now',
+          unread: 'Not read: {{reason}}',
+          status: 'New status',
+          statusHint: 'Only statuses every task that was read can move to',
+          statusHintFrom: 'Only statuses every task in the chosen status can move to',
+          from: 'From status',
+          fromHint: 'Move only the tasks that are in this status right now',
+          fromAll: 'All tasks',
+          fromOption_one: '{{status}} — {{count}} task',
+          fromOption_few: '{{status}} — {{count}} tasks',
+          fromOption_many: '{{status}} — {{count}} tasks',
+          fromOption_other: '{{status}} — {{count}} tasks',
+          offline:
+            'Jira is not connected in the panel, so there is nothing to move the tasks with. Connect it in Settings, «Integrations»: address, email and token; after that the button moves the tasks itself.',
+          connect: 'Open «Integrations»',
+          noStatusFrom: 'Nowhere to move from this status: the transitions of its tasks differ',
+          noStatus:
+            'There is nowhere to move all the tasks at once: they already share a status or their available transitions differ',
+          submit: 'Move',
+          cancel: 'Cancel',
+          done: 'Done',
+          outcomes: {
+            moved: 'moved',
+            already: 'already in this status',
+            unavailable: 'no transition to this status',
+            failed: 'error: {{reason}}',
+            skipped: 'left alone — it is in «{{reason}}»',
+          },
+          toast: 'Moved {{moved}} of {{total}}',
           failed: 'Failed: {{message}}',
         },
         tickets: {
@@ -1429,7 +1496,7 @@ export const en: TranslationSchema = {
     /** The CLI the panel runs chats with: path, version, a newer copy. */
     cli: {
       loading: 'Checking the CLI…',
-      current: 'Running Claude Code {{version}}: {{path}}',
+      current: 'Running {{provider}} {{version}}: {{path}}',
       missing: 'CLI “{{command}}” was not found on PATH',
       newer: 'A newer copy exists — {{version}}: {{path}}. The panel takes the first copy on PATH.',
       update: 'Update CLI',
@@ -1569,10 +1636,13 @@ export const en: TranslationSchema = {
     platformRefusedReason: {
       gateway_down: 'the panel gateway is down',
       no_token: 'the contour key is not saved',
+      cli_config_bypass:
+        'the CLI config has {{setting}}, which the run environment cannot override',
     },
     platformRefusedFix: {
       gateway_down: 'Press “Start the gateway” on the contour card (the “Contour” section).',
       no_token: 'Save the key: “Configure” on the contour card → the “Key” step.',
+      cli_config_bypass: 'Fix that setting in the CLI config.',
     },
     platformLayers: 'Through the "{{title}}" contour the run goes without ours: {{list}}.',
     platformLayersAll:
@@ -1707,7 +1777,17 @@ export const en: TranslationSchema = {
     thisWeek: 'This week',
     earlier: 'Earlier',
     runningNow: 'Running now',
+    pinnedGroup: 'Pinned',
+    pinChat: 'Pin to top',
+    unpinChat: 'Unpin',
+    lostParent: 'Parent chat deleted',
+    lostParentNote: 'Claude Code removed its transcript after the retention period',
+    lostParentHint:
+      'Claude Code deletes transcripts not written to for longer than cleanupPeriodDays (a setting in ~/.claude/settings.json). The child chats are intact and gathered here.',
     inactiveBranch: 'Inactive',
+    branchMore: '{{count}} more',
+    branchUnfoldHint: 'Show the groups that are not working right now',
+    branchFoldHint: 'Fold the groups that are not working right now',
     justNow: 'just now',
     minutesAgo: '{{count}} min ago',
     limitResets: 'limit until {{time}}',
@@ -2086,11 +2166,27 @@ export const en: TranslationSchema = {
     ignoredTitle: 'Cursor does not read these files',
     ignoredExplain:
       'Only .mdc files with frontmatter count as rules. Everything else in the directory is ignored by Cursor - the panel lists them but never edits or deletes them.',
+    qwenMd: {
+      subtitle: '{{provider}} rules directory: .md files, paths patterns',
+      explain:
+        'Besides QWEN.md, {{provider}} has a rules DIRECTORY {{rulesDir}}: every .md file is a separate rule, nested folders are read too. A rule without patterns is permanent - the CLI puts it into context from the first request, like QWEN.md. A rule with paths patterns is attached once per session when a matching file comes into play - but only in the terminal qwen: the panel chat runs through qwen serve, which skips such rules (a limit of CLI 0.25). The frontmatter header is optional: the panel writes it only when a description or patterns are set, and edits just those two fields - comments and other keys stay, and a backup is made before writing. Changes are picked up after the CLI restarts.',
+      empty: 'No rules yet: create the first one - an .md file will appear in the directory.',
+      hintPath:
+        'Relative to {{rulesDir}}. A subfolder is fine - frontend/react.md; it appears on disk when you save. The .md extension is added for you.',
+      hintDescription: 'What the rule is about, briefly: the CLI shows it next to the rule text.',
+      fieldGlobs: 'File patterns (paths)',
+      hintGlobs:
+        'The rule is attached when a matching file is in play; patterns are relative to the project root. Several - comma-separated, a comma inside {ts,tsx} does not split. Empty - the rule is permanent.',
+      badgeAlwaysApply: 'permanent',
+      ignoredTitle: 'Qwen does not read these files',
+      ignoredExplain:
+        'Only .md files count as rules. The CLI skips everything else in the directory - the panel lists them but never edits or deletes them.',
+    },
   },
   providerHooks: {
     title: 'Hooks · {{provider}}',
     subtitle: '{{provider}} hooks: the experimental.hook key in opencode.json',
-    subtitleRules: '{{provider}} hooks: the hooks key in settings.json - event, matcher, command',
+    subtitleRules: '{{provider}} hooks: rules in {{file}} - event, matcher, command',
     explainTitle: 'How it works',
     explain:
       '{{provider}} organises hooks differently from Claude: they live in the experimental.hook key of {{filePath}}. There are exactly two events. "File edited" (file_edited) maps a file pattern to a list of actions: edit a file matching the pattern and the actions run. "Session completed" (session_completed) is simply a list of actions to run when work finishes. A command is given as a LIST OF ARGUMENTS, not a shell string: the program first, then its arguments one per field - so spaces inside an argument are safe. The panel edits only this key: the rest of the file, other experimental keys and unknown events stay put, and a backup is made before writing. Changes take effect after the CLI restarts.',
@@ -2152,6 +2248,12 @@ export const en: TranslationSchema = {
       empty: 'No rules yet: add the first one and the command will run on the chosen event.',
       disabledAll:
         'The file has disableAllHooks: true - the CLI will run no hook at all while that key is on. The panel does not change it: it is the master switch for the whole section and turning it off should be a deliberate act.',
+      disabledAllCodex:
+        'The config.toml next to it has [features] hooks = false - Codex will run no hook at all while that key is off. The panel does not change it: it is the master switch for the whole section and turning it on should be a deliberate act.',
+      trustRequired:
+        'Codex runs a hook only once it is approved: open /hooks inside Codex and approve the rule. Approval is tied to the rule fingerprint, so every edit made here needs a fresh approval.',
+      alsoDefinedIn:
+        'Codex also reads hooks from the [[hooks.…]] tables in {{path}}, together with this file. The panel does not edit them and does not show them here; keep rules in one place so they do not run twice.',
       preservedText:
         'Events whose shape the panel could not parse (several actions in a group, an action that is not of type command, foreign fields). They stay in the file as is and are shown read-only.',
     },
@@ -2159,6 +2261,9 @@ export const en: TranslationSchema = {
   providerPlugins: {
     title: 'Plugins · {{provider}}',
     subtitle: '{{provider}} plugins: files in the plugins directory and npm packages in the config',
+    subtitleInstalled: 'Installed {{provider}} plugins - view only',
+    subtitleExtensions: '{{provider}} extensions: install, enable and remove through CLI commands',
+    subtitleCodex: '{{provider}} plugins: marketplaces, install and enable through CLI commands',
     explainTitle: 'How it works',
     explain:
       'These are plugins of {{provider}} itself, not extensions of the panel. There are two documented ways to add one. First, drop a JS or TS file into {{pluginsDir}}: everything there is loaded by the CLI at startup. Second, list npm package names in {{configPath}} under the plugin key; both plain and scoped packages such as @org/name are supported. The panel manages both: files can be created, edited and deleted (a backup is made before writing and before deleting), and the package list can be edited as a whole. A file path must stay inside the plugins directory: "..", absolute paths and foreign extensions are rejected. Changes take effect after the CLI restarts.',
@@ -2179,6 +2284,55 @@ export const en: TranslationSchema = {
       hooks: 'hook rules: {{count}}',
       commands: 'adds commands',
       registry: 'Installed-plugins registry: {{path}} - the panel never writes it.',
+    },
+    extensions: {
+      explain:
+        'For {{provider}} an extension is a package with a qwen-extension.json manifest: it brings slash commands, skills, subagents, MCP servers and context files. What is installed lives in {{pluginsDir}}. The panel never writes into that directory itself: installing, enabling, disabling and removing go through the CLI’s own qwen extensions commands, and the enabled state is shown as qwen extensions list reports it. Enabling and disabling apply at user level. Updating (qwen extensions update) and linking a folder (qwen extensions link) always ask for confirmation in the terminal, so run those yourself. Changes take effect in a new CLI session.',
+      installTitle: 'Install an extension',
+      sourceLabel: 'Source',
+      sourceHint:
+        'A git repository URL, owner/repo on GitHub or a path to a folder with qwen-extension.json - whatever qwen extensions install accepts.',
+      sourceInvalid: 'The source is one line and does not start with “-”.',
+      trust:
+        'An extension runs its own code and MCP servers with your permissions. The panel confirms the install for you (--consent) - install only from a source you trust.',
+      install: 'Install',
+      installing: 'Installing…',
+      enabled: 'enabled',
+      disabled: 'disabled',
+      enable: 'Enable',
+      disable: 'Disable',
+      uninstallConfirm:
+        'Remove this extension? qwen extensions uninstall deletes its whole directory; the panel makes no backup.',
+      source: 'source: {{source}} ({{type}})',
+      agents: 'brings subagents',
+      context: 'context: {{list}}',
+      empty: 'No extensions installed - install the first one with the form above.',
+      stateUnknown: 'Could not tell which extensions are enabled: {{reason}}',
+    },
+    codex: {
+      explain:
+        'For {{provider}} a plugin comes from a marketplace - a folder or a git repository with a marketplace.json catalog (Codex reads both its own .agents/plugins/marketplace.json and Claude’s .claude-plugin/marketplace.json). A plugin brings skills, MCP servers, hooks and commands. The panel never puts anything into the plugin cache {{pluginsDir}} itself: the CLI’s own codex plugin command adds and removes marketplaces and installs and removes plugins. Enabling and disabling is the enabled key of the [plugins."name@marketplace"] table in config.toml: the panel edits exactly that line and makes a backup. A plugin’s hooks run only after you approve them in /hooks inside Codex. Changes take effect in a new CLI session.',
+      marketplacesTitle: 'Plugin marketplaces',
+      marketplacesEmpty: 'No marketplaces yet - add the first one with the form below.',
+      marketplaceSourceLabel: 'Marketplace source',
+      marketplaceSourceHint:
+        'A folder path, owner/repo[@ref] on GitHub, or a git URL over HTTPS or SSH - whatever codex plugin marketplace add accepts.',
+      marketplaceSourceInvalid: 'The source is one line and does not start with “-”.',
+      addMarketplace: 'Add marketplace',
+      adding: 'Adding…',
+      upgrade: 'Refresh snapshot',
+      removeMarketplaceConfirm:
+        'Remove this marketplace? Codex forgets it; plugins installed from it stay in the cache.',
+      availableTitle: 'Available to install',
+      availableEmpty: 'Every plugin of the added marketplaces is already installed.',
+      trust:
+        'A plugin runs its own code, MCP servers and hooks with your permissions - install only from a marketplace you trust.',
+      install: 'Install',
+      marketplace: 'marketplace: {{name}}',
+      uninstallConfirm:
+        'Remove this plugin? codex plugin remove deletes it from the cache and from config.toml; the panel makes no backup.',
+      empty: 'No plugins installed - pick one under “Available to install”.',
+      stateUnknown: 'Codex did not return the plugin list: {{reason}}',
     },
     ignoredTitle: 'The panel does not manage these files',
     ignoredExplain:
@@ -3047,6 +3201,8 @@ export const en: TranslationSchema = {
       no_env_section: 'this CLI has no environment file at all',
       no_documented_base_url: 'no documented address variable',
       gateway_dialect: 'speaks a dialect the gateway does not understand',
+      cli_config_bypass:
+        'the CLI config would keep it from reading the contour address (Gemini: sign-in other than an API key)',
       gateway_down: 'the gateway is down or the contour is not active',
     },
     targetApplied: 'applied',
@@ -3069,6 +3225,8 @@ export const en: TranslationSchema = {
       no_env_section: 'this CLI has no environment file at all',
       no_documented_base_url: 'no documented address variable',
       gateway_dialect: 'speaks a dialect the gateway does not understand',
+      cli_config_bypass:
+        'the CLI config would keep it from reading the contour address (Gemini: sign-in other than an API key)',
       gateway_down: 'the gateway is down or the contour is not active',
     },
     gatewayUp: 'gateway is up: {{address}}',
@@ -3854,6 +4012,8 @@ export const en: TranslationSchema = {
     unsupported:
       '{{provider}} has no model API of its own, and running the assistant via CLI is not supported.',
     unsupportedHint: 'Choose another provider in Settings — the assistant will work with it.',
+    cliOnly:
+      '{{provider}} has no model API of its own — the assistant runs only through its "{{command}}" CLI, which is not in PATH. An API key will not help here: install the CLI.',
     subscriptionTitle: 'Option 1 (recommended): sign in to the CLI (subscription)',
     subscriptionHint:
       'Install the "{{command}}" CLI and sign in — the assistant will use your subscription, with no separate paid key.',
@@ -3899,6 +4059,34 @@ export const en: TranslationSchema = {
     conversations: 'Conversations',
     new: 'New',
     noConversations: 'No conversations yet.',
+    projectsTab: 'Projects',
+    projects: {
+      search: 'Search projects',
+      searchPlaceholder: 'Name or path',
+      count_one: '{{count}} project',
+      count_few: '{{count}} projects',
+      count_many: '{{count}} projects',
+      count_other: '{{count}} projects',
+      emptyTitle: 'No projects yet',
+      emptyText:
+        'Folders where Claude or another CLI has worked show up here. A conversation folder is set in its header.',
+      notFound: 'Nothing found.',
+      providersLabel: 'Who worked in this project',
+      badgeTitle_one: '{{provider}}: {{count}} conversation',
+      badgeTitle_few: '{{provider}}: {{count}} conversations',
+      badgeTitle_many: '{{provider}}: {{count}} conversations',
+      badgeTitle_other: '{{provider}}: {{count}} conversations',
+      startHere: 'New conversation here',
+      startHereLabel: 'New {{provider}} conversation in project {{name}}',
+      startFailed: 'Could not start a conversation in the project: {{message}}',
+      problem: {
+        empty: 'The folder path is empty',
+        relative: 'The path is not absolute — there is nowhere to run the CLI',
+        missing: 'The folder no longer exists on disk',
+        'not-dir': 'The path points to a file, not a folder',
+        unreadable: 'The folder cannot be read',
+      },
+    },
     messageCount_one: '{{count}} message',
     messageCount_few: '{{count}} messages',
     messageCount_many: '{{count}} messages',
@@ -3908,13 +4096,25 @@ export const en: TranslationSchema = {
     empty: 'Type a message — the reply appears as the provider prints it.',
     placeholder: 'Message the provider…',
     queuePlaceholder: 'Add more — it goes out as soon as the answer ends…',
+    steerPlaceholder: 'Add more — the CLI gets it mid-answer…',
     send: 'Send',
     queueSend: 'Queue',
+    steerSend: 'Pass on',
     stop: 'Stop',
     thinking: 'The provider is thinking…',
     failed: 'error',
+    // A message picked up by the running CLI turn (В1), not sent after it.
+    steered: 'mid-answer',
     restart: 'Restart',
     restartTitle: 'Restart the conversation from a clean slate',
+    allowEdits: 'Allow edits without asking',
+    editsAllowed: 'Edits without asking',
+    editsAsk: 'Ask before edits',
+    editsDenied: 'Edits blocked',
+    groupHint:
+      "The group reaches the CLI as a layer on every reply — Claude's files do not change. «Auto» means the groups bound to the project and switched on for this CLI.",
+    editsByCli: '{{name}} decides on edits itself, by its own settings',
+    permissionFailed: 'The answer did not reach the CLI: {{message}}',
     restartDone:
       'Work continues in a new conversation — a foreign CLI has no session, so this is a new conversation with the checkpoint.',
     restartRequested:
@@ -3940,6 +4140,7 @@ export const en: TranslationSchema = {
       stream: 'CLI stream',
       session: 'CLI session',
       api: 'via API',
+      live: 'CLI server',
     },
     timing: {
       step: 'Answer took {{step}}',
@@ -4258,6 +4459,9 @@ export const en: TranslationSchema = {
     tab_groups: 'Groups',
     tabHint_groups:
       'Split groups: what they decide on their own, how many run at once and which project counts as heavy. Shared rules and what a project overrides.',
+    tab_globalLayer: 'Global layer',
+    tabHint_globalLayer:
+      'Mechanics that live both in the panel and in the hooks and skills of the config directory: which copy is better on one case corpus, and how to carry the better one over.',
     tab_integrations: 'Integrations',
     tabHint_integrations:
       'Jira and Confluence, a forge by token, Telegram, test management and CI reports: where the panel takes outside context from and where it hands results back.',
@@ -4312,6 +4516,8 @@ export const en: TranslationSchema = {
       learnedTitle: 'Learned from MR threads',
       learnedHint:
         'A reviewer found a blocker in an MR — the group turns its thread into a sieve. The sieve arrives proposed: it reaches group tasks only once you accept it — for its project or for all. A similar sieve is not duplicated; the same blocker in another project suggests making the sieve shared. The sieve text is a task for the model, hence English.',
+      refused:
+        'New sieves were not recorded ({{count}}, last at {{at}}): all {{max}} places hold accepted sieves, and the panel never evicts an accepted one. Remove a sieve you no longer need to free a place.',
       learnedEmpty:
         'None yet: a sieve appears once a group works through a reviewer thread in its MR.',
       scopeGlobal: 'all projects',
@@ -4337,6 +4543,54 @@ export const en: TranslationSchema = {
       classColumn: 'Blocker class',
       escaped: 'Escaped to MR',
       caught: 'Caught',
+    },
+    globalLayer: {
+      loading: 'Loading comparison pairs…',
+      empty: 'No pairs to compare.',
+      intro:
+        'One mechanism lives in two copies — in the panel code and in the hooks and skills of your config directory. Both run through one case corpus: the better copy is the one right on more cases — it catches the real thing and stays quiet where there is nothing to catch.',
+      compare: 'Compare',
+      comparing: 'Comparing the copies on the corpus…',
+      comparedAt: 'Compared {{at}} · cases in the corpus: {{count}}',
+      never: 'Not compared yet.',
+      side: { panel: 'Panel', global: 'Global layer' },
+      sideFailing: '{{side}}: wrong on cases — {{count}}',
+      sideGreen: '{{side}}: the whole corpus passed',
+      sideError: '{{side}}: the run did not happen — {{error}}',
+      files: '{{side}}: {{files}}',
+      changed:
+        '{{sides}}: a file changed {{at}}. The comparison re-ran by itself; the mark clears after you compare.',
+      summaryGlobal: 'Global layer is better: {{sieves}}',
+      summaryPanel: 'Panel is better: {{sieves}}',
+      summaryEqual: 'The copies are equal on every sieve.',
+      sieve: 'Sieve',
+      both: 'Both right',
+      panelOnly: 'Panel only',
+      globalOnly: 'Global only',
+      neither: 'Both wrong',
+      verdict: 'Verdict',
+      verdictOf: { panel: 'Panel better', global: 'Global better', equal: 'Equal' },
+      action: 'Transfer',
+      cases: 'Cases that differ: {{count}}',
+      missed: 'missed: {{items}}',
+      extra: 'extra: {{items}}',
+      toPanel: 'Carry into the panel',
+      toGlobal: 'Carry into global',
+      transferHint:
+        'A transfer puts a task for the agent into the chat input of this repository — you send it. The agent does not write to the global layer: the change lands in the proposal directory and waits for your confirmation here.',
+      transferReady: 'The transfer task is in the chat input. Review it and send.',
+      proposalTitle: 'Proposal for the global layer',
+      proposalHint:
+        'The agent put the change into the proposal directory; the layer is untouched. The comparison already measures the proposal over the layer. Writing happens only on your confirmation, with a backup of every file.',
+      proposalFiles: 'Files in the proposal: {{count}}',
+      proposalShow: 'Show diff',
+      proposalHide: 'Hide diff',
+      proposalNew: 'new file',
+      apply: 'Write to the global layer',
+      applyTitle: 'Write the proposal to the global layer?',
+      applyText:
+        'These files will be overwritten: {{files}}. Each is backed up first; if a file changed after the diff was shown, the write is refused.',
+      applied: 'Files written: {{count}}. Backups are on the History page.',
     },
     groups: {
       loading: 'Loading group rules…',
@@ -4595,8 +4849,10 @@ export const en: TranslationSchema = {
         'The microphone is not responding: the browser did not start recording. Check that a microphone is connected and allowed for this page, then try again.',
     },
     thinking: 'Thinking…',
+    loadingLists: 'Loading the form lists — the assistant can pick from them once they arrive.',
     noReply: 'Done.',
-    failed: 'Could not get an answer. Check that Claude Code is installed and you are signed in.',
+    failed:
+      'Could not get an answer. Check that the selected provider’s CLI is installed and you are signed in.',
     missedValues: 'Not found in the panel, skipped: {{items}}',
     missedTypes: 'Wrong kind of value, not filled: {{fields}}',
     missedFields: 'The form has no such field, or it is locked: {{fields}}',
@@ -4935,12 +5191,25 @@ export const en: TranslationSchema = {
     limitsText:
       'Claude Code limit balances live on Anthropic servers and never reach local files — they cannot be shown here. Exact figures are available via the /usage command inside Claude Code. There is also no per-model limit setting in Claude Code: the feature does not exist.',
     noData: 'No data for the selected period',
+    foreignSource:
+      '{{cli}} sessions: usage is read from its own session files. Skills and live processes are counted for Claude Code only.',
+    unpricedModels:
+      'Not in the price list: {{models}} — their cost is counted as zero. Set your own price in Settings → Spend.',
     ofTotal: 'of the total',
     inputTokens: 'Input tokens',
     cacheRead: 'Cache reads',
     cacheCreation: 'Cache writes',
     estimatedCostShort: 'estimate at API rates',
     sessionsCount: 'Sessions',
+    sessionsScopeNote:
+      'A session’s tokens are its main conversation. Claude Code writes sub-agent runs to separate files the panel does not read yet, so they are not in the total.',
+    sessionRequests: 'requests: {{requests}}',
+    sessionDetails: 'Tokens, time and tools',
+    sessionDuration: 'Duration',
+    sessionToolCalls: 'Tool calls',
+    sessionTools: 'Called most',
+    projectSessions: 'Project sessions',
+    projectSessionsHint: 'Showing the latest {{shown}} of {{total}}',
     cacheComposition: 'What the spend is made of',
     cacheCompositionHint:
       'Shares of input, output and cache traffic across all tokens in the period',
@@ -5118,7 +5387,7 @@ export const en: TranslationSchema = {
     log: 'Run log',
     logEmpty: 'The agent has printed nothing yet.',
     fullAccessNote:
-      'The run agent is always Claude Code, even when another CLI is selected in the panel. ' +
+      'The run agent is the selected CLI: Claude Code, Qwen Code or Codex; others do not start. ' +
       'Its permissions come from the panel itself: it may read the project and run commands, ' +
       'and change only test files (.agent/tests; «Automate» also the autotest files). It cannot ' +
       'ask a human — doubts go into the case note.',
@@ -5147,17 +5416,19 @@ export const en: TranslationSchema = {
     },
     counts: '{{passed}} passed · {{failed}} failed · {{skipped}} skipped · {{rest}} not run',
     lastRun: 'Checked {{time}}',
-    conventionOff: 'Chat does not keep the cases',
+    conventionOff: 'Cases are not kept outside the panel',
     conventionOffText:
-      'A run started here writes the cases itself. An ordinary conversation knows nothing ' +
-      'about them: say “run the tests” in chat and it will check but write nothing.',
+      'The panel’s chats keep the cases anyway: the panel adds a line to each of their ' +
+      'agents saying where the cases live and how to keep them. Claude Code started in the ' +
+      'project outside the panel knows nothing about them until the convention is written ' +
+      'into the project’s CLAUDE.md.',
     conventionInstall: 'Write it into the project’s CLAUDE.md',
     conventionInstallText:
       'A block with the file format and the rules for keeping cases is appended to the ' +
       'project’s CLAUDE.md. It is read in EVERY conversation, so from then on the cases ' +
       'are kept no matter where the request came from. Your own text is left alone and ' +
       'pressing again adds nothing.',
-    conventionOn: 'Chat keeps the cases too (written into CLAUDE.md)',
+    conventionOn: 'Cases are kept outside the panel too (written into CLAUDE.md)',
     selectAll: 'Select all',
     clearSelection: 'Clear selection',
   },
@@ -5549,6 +5820,7 @@ export const en: TranslationSchema = {
       duration: 'duration: {{text}}',
       tokens: 'tokens: {{count}}',
       cost: 'cost: ${{value}}',
+      agentCli: 'agent: {{name}}',
       openChat: 'Open the conversation',
       exportMd: 'Report .md',
       exportCsv: 'Report .csv',
@@ -6398,6 +6670,7 @@ export const en: TranslationSchema = {
     tab_instructions: 'Project instructions',
     tab_instructionsList: 'Attached files',
     tab_instructionsRules: 'Rules (.mdc)',
+    tab_instructionsRulesMd: 'Rules (.md)',
     tab_env: 'Environment variables',
     tab_permissions: 'Permissions & approvals',
     tab_hooks: 'Hooks',
@@ -6415,10 +6688,10 @@ export const en: TranslationSchema = {
   },
   onboarding: {
     introTitle: 'Welcome to AgentDeck',
-    introSubtitle: 'A panel for your Claude Code configuration, all in one place.',
+    introSubtitle:
+      'A panel for your CLI agents’ configuration (Claude Code, Qwen Code, Codex and others), all in one place.',
     point1: 'View and edit rules, hooks, skills, MCP servers and permissions.',
-    point2:
-      'Everything reads and writes your local Claude Code files — nothing leaves your machine.',
+    point2: 'Everything reads and writes your CLI’s local files — nothing leaves your machine.',
     point3: 'Backups are made before edits, so any change is easy to roll back.',
     locationTitle: 'Configuration folder',
     locationSubtitle: 'Point the panel at your .claude directory.',
@@ -6440,7 +6713,9 @@ export const en: TranslationSchema = {
     skip: 'Skip',
     stepOf: 'Step {{current}} of {{total}}',
     cannotSkip:
-      'Point the panel at a working .claude folder first — without it there is nothing to show.',
+      'Point the panel at a working .claude folder or choose another detected CLI first — without them there is nothing to show.',
+    locationOptional:
+      'Claude Code was not found on this machine — its folder is optional. Choose a detected CLI (for example Qwen Code) on the next step. Panel data is kept in {{dir}}.',
     pathLabel: 'Path to the .claude folder',
     pathPlaceholder: 'For example ~/.claude or C:\\Users\\name\\.claude',
     apply: 'Apply',

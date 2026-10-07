@@ -335,22 +335,22 @@
       "light-ru": {
         "file": "03-hub.png",
         "width": 832,
-        "height": 310
+        "height": 388
       },
       "light-en": {
         "file": "03-hub.en.png",
         "width": 832,
-        "height": 310
+        "height": 388
       },
       "dark-ru": {
         "file": "03-hub.dark.png",
         "width": 832,
-        "height": 310
+        "height": 388
       },
       "dark-en": {
         "file": "03-hub.dark.en.png",
         "width": 832,
-        "height": 310
+        "height": 388
       }
     },
     "split/04-child-ask": {
@@ -401,22 +401,22 @@
       "light-ru": {
         "file": "06-paused.png",
         "width": 832,
-        "height": 372
+        "height": 450
       },
       "light-en": {
         "file": "06-paused.en.png",
         "width": 832,
-        "height": 372
+        "height": 450
       },
       "dark-ru": {
         "file": "06-paused.dark.png",
         "width": 832,
-        "height": 372
+        "height": 450
       },
       "dark-en": {
         "file": "06-paused.dark.en.png",
         "width": 832,
-        "height": 372
+        "height": 450
       }
     },
     "split/07-worktrees": {
@@ -439,6 +439,28 @@
         "file": "07-worktrees.dark.en.png",
         "width": 800,
         "height": 1200
+      }
+    },
+    "split/08-move-tasks": {
+      "light-ru": {
+        "file": "08-move-tasks.png",
+        "width": 940,
+        "height": 880
+      },
+      "light-en": {
+        "file": "08-move-tasks.en.png",
+        "width": 940,
+        "height": 880
+      },
+      "dark-ru": {
+        "file": "08-move-tasks.dark.png",
+        "width": 940,
+        "height": 880
+      },
+      "dark-en": {
+        "file": "08-move-tasks.dark.en.png",
+        "width": 940,
+        "height": 880
       }
     }
   }

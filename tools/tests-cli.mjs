@@ -37,6 +37,7 @@ import {
   mkdtempSync,
   readdirSync,
   readFileSync,
+  realpathSync,
   rmSync,
   statSync,
   writeFileSync,
@@ -161,6 +162,9 @@ async function domain(name) {
 }
 
 function parseArgs(argv) {
+  // Опции-флаги: у них нет значения. Остальные ждут его следующим словом.
+  // Внутри функции: `main()` зовётся раньше, чем дошла бы константа модуля.
+  const FLAG_OPTIONS = new Set(['help', 'dry', 'save']);
   const options = {};
   const positional = [];
   let command;
@@ -168,18 +172,41 @@ function parseArgs(argv) {
     const item = argv[index];
     if (item.startsWith('--')) {
       const name = item.slice(2);
-      const next = argv[index + 1];
-      if (next === undefined || next.startsWith('--')) options[name] = true;
-      else {
-        options[name] = next;
-        index += 1;
+      if (FLAG_OPTIONS.has(name)) {
+        options[name] = true;
+        continue;
       }
+      const next = argv[index + 1];
+      // Следующий флаг на месте значения — не значение (Ф17): `--note --x`
+      // раньше тихо терял заметку, и запись уходила без неё.
+      if (next === undefined || next.startsWith('--')) {
+        throw new Error(
+          `--${name} ждёт значение${next === undefined ? '' : `, а следом «${next}»`}. Значение, начинающееся с «--», не принимается.`,
+        );
+      }
+      options[name] = next;
+      index += 1;
       continue;
     }
     if (!command) command = item;
     else positional.push(item);
   }
   return { command, options, positional };
+}
+
+/**
+ * Файл кейса — только из проекта (Ф18): кейс потом гоняется без присмотра, и
+ * его не должно быть можно подсунуть из любого места диска. Сравниваются
+ * настоящие пути — ссылка изнутри проекта наружу тоже отказ.
+ */
+function projectFile(project, file) {
+  const target = resolve(project, file);
+  const real = (path) => (existsSync(path) ? realpathSync.native(path) : path);
+  const inside = relative(real(project), real(target));
+  if (inside === '' || inside.startsWith('..') || isAbsolute(inside)) {
+    throw new Error(`Файл кейса вне проекта: ${file}. Нужен путь внутри ${project}.`);
+  }
+  return target;
 }
 
 /** Группы проекта, при желании суженные до одной. */
@@ -239,7 +266,7 @@ async function saveCase(project, options) {
     typeof options.json === 'string'
       ? options.json
       : typeof options.file === 'string'
-        ? readFileSync(resolve(project, options.file), 'utf8')
+        ? readFileSync(projectFile(project, options.file), 'utf8')
         : '';
   if (!raw) throw new Error("Нужен кейс: --json '<кейс>' или --file <файл.json>");
   let input;

@@ -207,6 +207,11 @@ export interface JiraIssue {
 export interface JiraTransition {
   id: string;
   name: string;
+  /**
+   * Статус, в который переход ведёт. Имя перехода у команды своё («Отдать в
+   * тест»), а человек выбирает статус («Ready for Test») — сверять надо с ним.
+   */
+  to?: string;
 }
 
 export interface ConfluenceSpace {

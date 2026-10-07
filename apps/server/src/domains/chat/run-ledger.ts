@@ -217,8 +217,16 @@ export function isPidAlive(pid: number): boolean {
 /**
  * Имена процессов, под которыми живёт запущенный панелью CLI: на Windows `spawn`
  * с оболочкой отдаёт pid `cmd.exe`, на POSIX — `sh`/`node`/сам `claude`.
+ * Агент тестов и агент панели ходят ещё и чужими CLI: Qwen Code — пакетом node,
+ * Codex — и пакетом, и родным `codex.exe`, если он стоит в PATH сам.
  */
-const CLI_IMAGE = /^(cmd|cmd\.exe|sh|bash|zsh|node|node\.exe|claude|claude\.exe|claude\.cmd)$/i;
+const CLI_IMAGE =
+  /^(cmd|cmd\.exe|sh|bash|zsh|node|node\.exe|claude|claude\.exe|claude\.cmd|qwen|qwen\.exe|codex|codex\.exe)$/i;
+
+/** Имя образа (без каталога) — того вида, под которым живёт запущенный панелью CLI. */
+export function isCliImage(name: string): boolean {
+  return CLI_IMAGE.test(name);
+}
 
 /**
  * Похож ли процесс с этим pid на запущенный панелью CLI. Страховка от переданного
@@ -233,7 +241,7 @@ export function pidLooksLikeCli(pid: number): boolean {
         : spawnSync('ps', ['-o', 'comm=', '-p', String(pid)], { encoding: 'utf8' }).stdout;
     const short = (name ?? '').trim().split(/[\\/]/).pop() ?? '';
     if (!short) return true;
-    return CLI_IMAGE.test(short);
+    return isCliImage(short);
   } catch {
     return true;
   }
@@ -280,7 +288,7 @@ export interface ChildProcessInfo {
  * Имя процесса самого CLI под обёрткой: `claude.exe` (родной бинарник) или
  * `node` (пакетный запуск). `conhost.exe` и вложенные `cmd.exe` — не он.
  */
-const CLI_CHILD = /^(claude|claude\.exe|node|node\.exe)$/i;
+const CLI_CHILD = /^(claude|claude\.exe|node|node\.exe|qwen|qwen\.exe|codex|codex\.exe)$/i;
 
 /**
  * Дети процесса на Windows. `wmic` на свежих сборках нет, у `tasklist` нет

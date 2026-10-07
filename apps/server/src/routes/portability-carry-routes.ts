@@ -23,7 +23,6 @@ import {
 } from '../domains/portability/carry-context.ts';
 import { continuationStarter } from './chat/handoff-routes.ts';
 import { projectsDir } from './chat/paths.ts';
-import { activateGroupsQuietly } from '../domains/group-activation.ts';
 
 /**
  * Незакрытая работа переезжает вместе со средой (П6.1).
@@ -159,13 +158,10 @@ export function registerPortabilityCarryRoutes(
               : { ok: false, failure: 'run_not_started' };
           }
 
-          // Набор проекта — до запуска и здесь тоже: без него у нового CLI
-          // молча не действуют правила и скиллы, привязанные к каталогу.
-          activateGroupsQuietly(
-            { paths: ctx.location.paths, store: ctx.store, backupDir: ctx.backupDir },
-            input.cwd,
-            (error) => app.log.warn({ err: error }, 'group activation failed'),
-          );
+          // Набор проекта тумблером Claude здесь НЕ включается: новый CLI файлов
+          // Claude не читает. Привязанные к каталогу группы он получает слоем на
+          // прогон при отправке ниже (`group-activation-wiring`), а у CLI без
+          // слоя в ленте остаётся заметка «не действует».
           const created = createChat(appData(), target.id, {
             title: input.title,
             workdir: input.cwd,

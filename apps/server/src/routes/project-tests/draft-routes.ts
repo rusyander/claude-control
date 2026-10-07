@@ -1,6 +1,7 @@
 import type { ProjectTestDraft } from '@agentdeck/contracts';
 import type { FastifyInstance } from 'fastify';
 import {
+  ProjectTestsError,
   ProjectTestsNotFoundError,
   applyDraft,
   readDraft,
@@ -12,7 +13,12 @@ import {
   similarTo,
   writeDraft,
 } from '../../domains/project-tests.ts';
-import { findTranscript, readTranscriptRecords } from '../../domains/chat/ChatHistory.ts';
+import {
+  findSessionCwd,
+  findTranscript,
+  readWholeTranscriptRecords,
+} from '../../domains/chat/ChatHistory.ts';
+import { matchesProject } from '../../domains/group-activation.ts';
 import { chatCaseDraft } from '../../domains/chat/chat-case-draft.ts';
 import { projectsDir } from '../chat/paths.ts';
 import { assertUnlocked, buildView, guard, idList, requireRoot, type TestsDeps } from './shared.ts';
@@ -74,10 +80,26 @@ export function registerTestDraftRoutes(app: FastifyInstance, deps: TestsDeps): 
       if (!root) return reply;
       const chatId = request.body?.chatId?.trim() ?? '';
       return guard(reply, () => {
-        const transcript = /^[\w-]{1,128}$/.test(chatId)
-          ? findTranscript(projectsDir(deps.ctx), chatId)
-          : undefined;
-        if (!transcript) {
+        // Ф19: черновик пишется в каталог проекта — значит, только в проект
+        // реестра (или его копию ветки), а чат — только его собственный: иначе
+        // любой каталог на диске получал `.agent/tests/drafts`, а кейс собирался
+        // из разговора другого проекта.
+        const project = deps.ctx.store
+          .getProjects()
+          .find((item) => matchesProject(item.path, root));
+        if (!project) {
+          throw coded(
+            new ProjectTestsError(`Каталог «${root}» не проект реестра.`),
+            'draft-chat-not-registered',
+            { path: root },
+          );
+        }
+        const known = /^[\w-]{1,128}$/.test(chatId);
+        const transcript = known ? findTranscript(projectsDir(deps.ctx), chatId) : undefined;
+        const cwd = transcript ? findSessionCwd(projectsDir(deps.ctx), chatId) : undefined;
+        // Чужой чат отвечает тем же «не нашлось»: о разговорах других проектов
+        // этот маршрут не рассказывает.
+        if (!transcript || !cwd || !matchesProject(project.path, cwd)) {
           throw coded(
             new ProjectTestsNotFoundError(`Разговора «${chatId}» не нашлось.`),
             'draft-chat-not-found',
@@ -85,7 +107,8 @@ export function registerTestDraftRoutes(app: FastifyInstance, deps: TestsDeps): 
           );
         }
         const groupId = request.body?.groupId?.trim();
-        const draft = chatCaseDraft(readTranscriptRecords(transcript), {
+        // Целиком: у большого транскрипта середина — это и есть сценарий (Ф15).
+        const draft = chatCaseDraft(readWholeTranscriptRecords(transcript), {
           chatId,
           projectPath: root,
           now: new Date().toISOString(),

@@ -88,11 +88,17 @@ export type PlatformRouteSkipReason =
    * `gateway_down` и `no_token`.
    */
   | 'unknown_provider'
+  /**
+   * CLI идёт в контур окружением прогона (`runEndpoint`), но в конфиге человека
+   * стоит настройка, которая увела бы часть прогона мимо контура, а перебить её
+   * окружением CLI не даёт. Имя настройки — в `setting` решения.
+   */
+  | 'cli_config_bypass'
   | PlatformConsumerReason;
 
 export type PlatformRouteDecision =
   | ({ routed: true; platformId: string } & PlatformRunRoute)
-  | { routed: false; reason: PlatformRouteSkipReason; refusal?: string };
+  | { routed: false; reason: PlatformRouteSkipReason; refusal?: string; setting?: string };
 
 /** Что прогон получает от контура: окружение и — если включён — свой промпт. */
 export interface PlatformRunRoute {
@@ -145,6 +151,13 @@ export interface PlatformRunRoute {
    * трогает — на карточке это сказано словами.
    */
   layers?: RunLayers;
+  /**
+   * Встроенный набор панели (В2): флаг плагина и окружение по режиму,
+   * выбранному на странице «Набор панели». Отдельным полем, а не в `layers` и
+   * не в `env`: набор едет и МИМО контура (облачный Claude), а непустое `env`
+   * у чужого чата значит «прогон через контур».
+   */
+  kit?: { args: string[]; env: Record<string, string> };
 }
 
 /** Активный контур либо undefined. Читается на каждый запуск: он же и меняется. */
@@ -252,6 +265,27 @@ function unreachable(
 }
 
 /**
+ * Конфиг CLI увёл бы часть прогона мимо контура (`ProviderRunEndpoint.bypass`).
+ * Решение то же, что у `unreachable`: «по возможности» идёт мимо контура и
+ * говорит об этом в шапке, обязательный — отказывает, назвав настройку.
+ */
+function configBypass(
+  platform: Platform,
+  setting: string,
+  language: TextLanguage,
+): PlatformRouteDecision {
+  const skip = { routed: false as const, reason: 'cli_config_bypass' as const, setting };
+  if (platform.mode === 'best-effort') return skip;
+  return {
+    ...skip,
+    refusal: localizeText(
+      serverText('contour-required-cli-config', { title: platform.title, setting }),
+      language,
+    ),
+  };
+}
+
+/**
  * Решение по одному запуску. Зовётся из мест спавна — реестра прогонов, агента
  * тестов, чата чужого CLI, — и ни одно из них не знает про контуры ничего,
  * кроме этой функции.
@@ -291,9 +325,18 @@ export function resolveRunRoute(
     return unreachable(platform, 'no_token', deps.store.getSettings().language);
   }
 
-  const apiKind = pickApiKind(provider);
-  const vars = apiKind ? provider.endpointConfig?.[apiKind] : undefined;
-  if (!apiKind || !vars) return { routed: false, reason: 'no_env_section' };
+  const envKind = pickApiKind(provider);
+  const vars = envKind ? provider.endpointConfig?.[envKind] : undefined;
+  // Переменных адреса в реестре нет — остаётся окружение одного прогона
+  // (`runEndpoint`: Kimi Code, Goose, OpenCode). Настройка конфига, уводящая
+  // часть прогона мимо контура, проверяется до сборки адреса.
+  const runEndpoint = vars ? undefined : provider.runEndpoint;
+  const apiKind = vars ? envKind : runEndpoint?.apiKind;
+  if (!apiKind || (!vars && !runEndpoint)) return { routed: false, reason: 'no_env_section' };
+  // Переменные адреса есть, но конфиг не даст CLI их прочесть (Gemini: вход не
+  // ключом API) — тот же отказ, что у настройки мимо контура.
+  const setting = (vars?.bypass ?? runEndpoint?.bypass)?.();
+  if (setting) return configBypass(platform, setting, deps.store.getSettings().language);
 
   // Те же два вызова, которыми контур применяется к файлам: управляемый профиль
   // и его пересборка под диалект этого CLI. Один сборщик на оба пути — значит
@@ -317,14 +360,22 @@ export function resolveRunRoute(
   });
 
   const env: Record<string, string> = {};
-  for (const item of buildEndpointPlan(profile, vars, PLACEHOLDER_KEY, false)) {
-    env[item.key] = item.value;
+  if (vars) {
+    for (const item of buildEndpointPlan(profile, vars, PLACEHOLDER_KEY, false)) {
+      env[item.key] = item.value;
+    }
+  } else if (runEndpoint) {
+    Object.assign(
+      env,
+      runEndpoint.env({ baseUrl: profile.baseUrl, model: model.model, key: PLACEHOLDER_KEY }),
+    );
   }
   // Промпт берётся из каталога (Т4), а не строкой здесь: человек правит его в
   // панели, и вторая копия в коде означала бы, что половина прогонов слушает
   // правку, а половина — нет. Преамбула контура едет следом: до аудита MD-06 её
   // можно было править, а не читал её никто.
   const systemPrompt = contourRunPrompt(deps.appDataDir, platform, model.model);
+  const layers = provider.id === 'claude' ? runLayers(platform) : undefined;
   return {
     routed: true,
     platformId: platform.id,
@@ -338,7 +389,7 @@ export function resolveRunRoute(
     // КАЖДОМ старте по той же причине, что и остальной маршрут: снятая галочка
     // должна действовать со следующего прогона, а не с перезапуска панели.
     // compromise: rules-partial — личные правила, хуки и права снимаются одним флагом, порознь CLI их не различает
-    ...(provider.id === 'claude' ? { layers: runLayers(platform) } : {}),
+    ...(layers ? { layers } : {}),
   };
 }
 
@@ -388,6 +439,7 @@ export function describeRunPlan(deps: PlatformRoutingDeps, consumer: string): Pl
       title: platform?.title ?? '',
       ...(decision.routed ? {} : { reason: decision.reason }),
       ...(!decision.routed && decision.refusal ? { refused: true as const } : {}),
+      ...(!decision.routed && decision.setting ? { setting: decision.setting } : {}),
       ...(bypassed(decision) ? { bypassed: true as const } : {}),
       rules: { model: '', source: 'none', map: {}, catalog: [] },
       effort: true,
@@ -416,7 +468,11 @@ export function describeRunPlan(deps: PlatformRoutingDeps, consumer: string): Pl
  */
 function bypassed(decision: PlatformRouteDecision): boolean {
   if (decision.routed || decision.refusal) return false;
-  return decision.reason === 'gateway_down' || decision.reason === 'no_token';
+  return (
+    decision.reason === 'gateway_down' ||
+    decision.reason === 'no_token' ||
+    decision.reason === 'cli_config_bypass'
+  );
 }
 
 /**
@@ -428,7 +484,9 @@ function bypassed(decision: PlatformRouteDecision): boolean {
  * получается. Панель говорит «только глобально» и оставляет человеку терминал.
  */
 function routeReason(provider: ConfigProvider): PlatformConsumerReason | undefined {
-  if (pickApiKind(provider)) return undefined;
+  // `runEndpoint` — только прогон панели: файловая цель у такого CLI остаётся
+  // недоступной (`apply/targets.ts`), а галочка чата — рабочая.
+  if (pickApiKind(provider) || provider.runEndpoint) return undefined;
   if (provider.endpointFile) return 'file_only';
   if (provider.endpointConfig) return 'gateway_dialect';
   return provider.capabilities.env === 'ready' ? 'no_documented_base_url' : 'no_env_section';

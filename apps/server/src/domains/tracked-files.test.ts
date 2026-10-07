@@ -66,9 +66,13 @@ describe('Файлы активного провайдера', () => {
     expect(providerTrackedFiles(fakeStore('claude'))).toEqual([]);
   });
 
-  it('codex: AGENTS.md + config.toml, причём config.toml ОДИН раз (mcp/env/права в нём же)', () => {
+  it('codex: AGENTS.md + config.toml + hooks.json, причём config.toml ОДИН раз (mcp/env/права в нём же)', () => {
     const files = providerTrackedFiles(fakeStore('codex'));
-    expect(files.map((item) => item.file).sort()).toEqual(['AGENTS.md', 'config.toml']);
+    expect(files.map((item) => item.file).sort()).toEqual([
+      'AGENTS.md',
+      'config.toml',
+      'hooks.json',
+    ]);
     expect(files.filter((item) => item.file === 'config.toml')).toHaveLength(1);
   });
 

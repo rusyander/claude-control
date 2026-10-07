@@ -242,8 +242,17 @@ export interface RunPermissionGate {
   baseUrl: string;
   /** Ключ прогона: чужой запрос на этот порт не пройдёт. */
   runId: string;
+  /**
+   * Чем приёмник ответил на вызов с этим id (`toolCallId` хука Qwen) — или
+   * ничего, если вызов к нему не приходил. По этому сторож прогона чужого CLI
+   * узнаёт инструмент, исполненный мимо проверки.
+   */
+  decided(toolCallId: string): PermissionDecision['behavior'] | undefined;
   close(): void;
 }
+
+/** Как приёмник решает: по умолчанию — правила Claude; у чужого CLI — свои (`agent/foreign-gate.ts`). */
+export type GateDecider = (scope: RunScope, toolName: string, input: unknown) => PermissionDecision;
 
 /** Что делать с отказом — прогон пишет его в свой лог, чтобы он не пропал. */
 export type DenyReporter = (toolName: string, message: string) => void;
@@ -253,7 +262,12 @@ interface BrokerRequest {
   runId?: string;
   toolName?: string;
   input?: unknown;
+  /** Id вызова у CLI (хук Qwen) — ключ, по которому сторож сверяет исполненное. */
+  toolCallId?: string;
 }
+
+/** Сколько решений помнит приёмник: прогон — тысячи вызовов, память не резиновая. */
+const DECIDED_LIMIT = 20_000;
 
 /**
  * Поднять приёмник на локальной петле. Порт выбирает система, адрес уходит
@@ -263,8 +277,10 @@ interface BrokerRequest {
 export function startPermissionGate(
   scope: RunScope,
   onDeny?: DenyReporter,
+  decide: GateDecider = decidePermission,
 ): Promise<RunPermissionGate> {
   const runId = randomUUID();
+  const decided = new Map<string, PermissionDecision['behavior']>();
   const server: Server = createServer((request, response) => {
     const chunks: Buffer[] = [];
     request.on('data', (chunk: Buffer) => chunks.push(chunk));
@@ -275,10 +291,14 @@ export function startPermissionGate(
       } catch {
         body = {};
       }
-      const decision =
-        body.runId === runId
-          ? decidePermission(scope, String(body.toolName ?? ''), body.input)
-          : { behavior: 'deny' as const, message: 'The request is not from this run.' };
+      const own = body.runId === runId;
+      const decision = own
+        ? decide(scope, String(body.toolName ?? ''), body.input)
+        : { behavior: 'deny' as const, message: 'The request is not from this run.' };
+      if (own && typeof body.toolCallId === 'string' && body.toolCallId) {
+        if (decided.size >= DECIDED_LIMIT) decided.delete(decided.keys().next().value as string);
+        decided.set(body.toolCallId, decision.behavior);
+      }
       if (decision.behavior === 'deny')
         onDeny?.(String(body.toolName ?? ''), decision.message ?? '');
       response.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -302,6 +322,7 @@ export function startPermissionGate(
       done({
         baseUrl: `http://127.0.0.1:${address.port}`,
         runId,
+        decided: (toolCallId) => decided.get(toolCallId),
         close: () => server.close(),
       });
     });

@@ -85,6 +85,7 @@ describe('тексты сводки', () => {
       'report_unwritable',
       'analysis_failed',
       'hourly_cap',
+      'route_refused',
     ] as const) {
       expect(watcherRu.problem[code]).toBeTruthy();
       expect(watcherEn.problem[code]).toBeTruthy();

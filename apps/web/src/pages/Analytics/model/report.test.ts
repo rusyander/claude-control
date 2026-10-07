@@ -178,7 +178,25 @@ describe('buildSessionsCsv', () => {
     // Модели через "; " внутри одной ячейки — запятой в них нет, столбцы целы.
     expect(rows[1]).toContain('claude-opus-4-8; claude-sonnet-4-5');
     expect(rows[1]!.startsWith('s1,C:/work/proj,Проект,')).toBe(true);
-    expect(rows[1]!.endsWith(',1.5,claude-opus-4-8; claude-sonnet-4-5,true')).toBe(true);
+    // У сессии без заголовка и инструментов три последние ячейки пусты, но на месте.
+    expect(rows[1]!.endsWith(',1.5,claude-opus-4-8; claude-sonnet-4-5,true,,,')).toBe(true);
+  });
+
+  it('заголовок, число вызовов и топ инструментов выгружаются в свои ячейки', () => {
+    const csv = buildSessionsCsv([
+      {
+        ...session('s1'),
+        title: 'Починить аналитику, срочно',
+        toolCalls: 12,
+        topTools: [
+          { name: 'Bash', count: 7 },
+          { name: 'Read', count: 5 },
+        ],
+      },
+    ]);
+    const row = csv.split('\r\n')[1]!;
+    // Запятая в заголовке экранируется кавычками; инструменты — name:count через "; ".
+    expect(row.endsWith(',true,"Починить аналитику, срочно",12,Bash:7; Read:5')).toBe(true);
   });
 });
 

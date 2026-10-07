@@ -110,6 +110,29 @@ export const configRu: Record<ConfigMessageCode, string> = {
     'Набор переменных не прошёл проверку: у каждой нужны непустой ключ и значение.',
   'kimi-plugins-readonly':
     'Плагины Kimi Code панель только показывает: устанавливать, включать и выключать их нужно командой /plugins внутри CLI — форма реестра установленного не задокументирована.',
+  'qwen-extensions-files-readonly':
+    'Расширения Qwen Code меняются только командами qwen extensions — файлы каталога расширений панель не пишет.',
+  'installed-actions-unsupported':
+    'У активного провайдера панель не меняет установленные расширения.',
+  'installed-action-invalid': 'Действие над расширением — только enable или disable.',
+  'qwen-extension-source-invalid':
+    'Источник расширения не прошёл проверку: одна строка до 1000 символов, не начинается с «-».',
+  'qwen-extension-not-found': 'Расширение «{{name}}» не установлено.',
+  'qwen-cli-unavailable': 'Qwen Code CLI не запустился — проверьте, что qwen есть в PATH сервера.',
+  'qwen-extension-cli-failed': 'Qwen Code отказал: {{reason}}',
+  'codex-plugins-files-readonly':
+    'Плагины Codex меняются только командами codex plugin — файлы кэша плагинов панель не пишет.',
+  'plugin-marketplaces-unsupported': 'У активного провайдера нет рынков плагинов.',
+  'codex-plugin-toggle-unrecognized':
+    'Не нашлась таблица [plugins."имя@рынок"] в config.toml Codex — включение не записано, файл не тронут.',
+  'codex-plugin-selector-invalid':
+    'Плагин Codex называется как имя@рынок: одна строка без пробелов, не начинается с «-».',
+  'codex-marketplace-source-invalid':
+    'Источник рынка не прошёл проверку: одна строка до 1000 символов, не начинается с «-».',
+  'codex-plugin-not-found': 'Плагин «{{name}}» не установлен.',
+  'codex-marketplace-not-found': 'Рынок «{{name}}» не подключён.',
+  'codex-cli-unavailable': 'Codex CLI не запустился — проверьте, что codex есть в PATH сервера.',
+  'codex-plugin-cli-failed': 'Codex отказал: {{reason}}',
   'rule-draft-invalid':
     'Правило не прошло проверку: нужен путь внутри каталога правил и текстовое тело; description и globs — однострочные, alwaysApply — булево.',
   'gemini-yolo-cli-only':
@@ -146,7 +169,7 @@ export const configRu: Record<ConfigMessageCode, string> = {
   'config-format-unrecognized-list-readonly':
     'Формат файла конфигурации не распознан — запись запрещена (список только для чтения).',
   'hooks-draft-invalid-foreign':
-    'Хуки не прошли проверку. OpenCode: команда — непустой список непустых аргументов, шаблон файлов непустой и не повторяется, имена переменных окружения непустые и уникальные. Qwen и Kimi: событие — из задокументированного списка, команда непустая и в одну строку, матчер только у событий, которые его поддерживают, таймаут — целое в допустимых границах.',
+    'Хуки не прошли проверку. OpenCode: команда — непустой список непустых аргументов, шаблон файлов непустой и не повторяется, имена переменных окружения непустые и уникальные. Qwen, Kimi и Codex: событие — из задокументированного списка, команда непустая и в одну строку, матчер только у событий, которые его поддерживают, таймаут — целое в допустимых границах.',
   'hooks-draft-invalid':
     'Хуки не прошли проверку: команда — непустой список непустых аргументов, шаблон файлов непустой и не повторяется, имена переменных окружения непустые и уникальные.',
   'mcp-draft-invalid':
@@ -321,4 +344,36 @@ export const configRu: Record<ConfigMessageCode, string> = {
   'endpoint-probe-not-json': 'Ответ не является JSON — по адресу отвечает не модельный API.',
   'endpoint-probe-status': 'Адрес ответил {{status}}{{detail}}',
   'instructions-section-unsupported': 'Активный CLI не поддерживает глобальные инструкции.',
+  'group-layer-permission':
+    'Разрешения группы в {{cli}} не переносятся: у {{cli}} своя схема прав, и перевод вслепую выдал бы права, которых не просили. Задайте их в разделе «Разрешения» {{cli}}.',
+  'group-layer-mcp-sse': 'MCP «{{id}}» работает через SSE — Codex такой транспорт не поддерживает.',
+  'group-layer-mcp-name':
+    'Имя MCP «{{id}}» содержит точку — Codex читает её как вложенный ключ настроек.',
+  'group-layer-mcp-secret-header':
+    'Заголовки MCP «{{id}}» несут секрет, а передать его Codex можно только в командной строке — панель этого не делает.',
+  'group-layer-mcp-shape':
+    'Запись MCP «{{id}}» в файлах Claude незнакомой формы — переносить нечего.',
+  'group-layer-skill-name': 'Имя скилла «{{id}}» длиннее 64 знаков — Codex его не загрузит.',
+  'group-layer-hook-event':
+    'Хук на событие {{event}} в {{cli}} не срабатывает: панель проигрывает только начало сессии, отправку сообщения и конец ответа.',
+  'group-layer-hook-event-native':
+    'Хук на событие {{event}} в {{cli}} не срабатывает: у {{cli}} такого события нет.',
+  'group-layer-missing': 'Участник «{{id}}» не найден в файлах Claude — перенести нечего.',
+  'group-layer-duplicate': '«{{id}}» уже едет с группой «{{group}}» — вторая копия не подаётся.',
+  'group-layer-none':
+    '{{cli}} файлы Claude не читает, а слоя группы для него у панели нет — группа на этот прогон не действует.',
+  'group-layer-too-large':
+    'Правила группы и набора вместе длиннее предела Codex ({{limit}} знаков) — прогон не запущен, ничего не обрезано.',
+  'group-layer-notice': 'Группы на этом прогоне {{cli}}: {{groups}}.',
+  'group-layer-notice-delivered': 'Едет слоем на прогон — {{members}}.',
+  'group-layer-notice-nothing': 'Ни один участник до прогона не доехал.',
+  'group-layer-notice-refused': 'Не едет:',
+  'group-layer-kind-rule': 'правила: {{names}}',
+  'group-layer-kind-skill': 'скиллы: {{names}}',
+  'group-layer-kind-mcp': 'MCP: {{names}}',
+  'group-layer-kind-hook': 'хуки: {{names}}',
+  'group-layer-kind-env': 'переменные: {{names}}',
+  'group-layer-enabled-for':
+    'Группа включена для прогонов {{cli}} — едет слоем на каждый, файлы Claude не менялись.',
+  'group-layer-disabled-for': 'Группа выключена для прогонов {{cli}}; файлы Claude не менялись.',
 };

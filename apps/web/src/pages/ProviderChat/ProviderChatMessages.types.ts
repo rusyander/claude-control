@@ -14,6 +14,9 @@ export interface ProviderChatMessagesProps {
   queued?: ProviderChatQueued[];
   /** Убрать сообщение из очереди, пока оно не ушло. */
   onCancelQueued?: (queuedId: string) => void;
+  /** Очередь стоит без хода (Ф13) — первое сообщение несёт «Отправить». */
+  queueHeld?: boolean;
+  onSendQueued?: (queuedId: string) => void;
   /** Нет разговоров вовсе — подсказка отличается от «разговор пустой». */
   isEmptyState: boolean;
   /** Начать разговор прямо из пустого экрана. */

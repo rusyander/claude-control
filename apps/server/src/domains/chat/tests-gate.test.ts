@@ -185,4 +185,57 @@ describe('вердикт группы из блока «Тесты»', () => {
     expect(verdict.missing).toEqual([expect.stringContaining(COMMAND)]);
     expect(verdict.verdict).toMatchObject({ cases: 1, passed: 0 });
   });
+
+  // Ф23, проект `.agent/item17-tests-block-design.agent.md`: прогон считается,
+  // только если записан ПОСЛЕ последней правки группы, а не просто после старта.
+  it('Ф23: прогон после старта, но до последней правки — пробел «прогон старше правки»', () => {
+    const verdict = judgeTests({
+      groups: groups([login]),
+      runs: [run('r1', '2026-09-30T10:30:00.000Z', [['auth-001', 'passed']])],
+      paths: ['src/auth/login.ts'],
+      startedAt: STARTED,
+      changedAt: '2026-09-30T11:00:00.000Z',
+      command: COMMAND,
+    });
+    expect(verdict.missing).toHaveLength(1);
+    expect(verdict.missing[0]).toContain('r1');
+    expect(verdict.missing[0]).toContain('src/auth/login.ts');
+    expect(verdict.missing[0]).toContain(COMMAND);
+    expect(verdict.verdict).toMatchObject({ cases: 1, passed: 0, runId: 'r1' });
+  });
+
+  it('Ф23: прогон после последней правки — засчитан', () => {
+    const verdict = judgeTests({
+      groups: groups([login]),
+      runs: [
+        run('r2', '2026-09-30T11:10:00.000Z', [['auth-001', 'passed']]),
+        run('r1', '2026-09-30T10:30:00.000Z', [['auth-001', 'failed']]),
+      ],
+      paths: ['src/auth/login.ts'],
+      startedAt: STARTED,
+      changedAt: '2026-09-30T11:00:00.000Z',
+      command: COMMAND,
+    });
+    expect(verdict.missing).toEqual([]);
+    expect(verdict.verdict).toMatchObject({ cases: 1, passed: 1, runId: 'r2' });
+  });
+
+  it('Ф23: свежий прогон не прогнал задетый кейс, старый прогнал — «не прогнаны»', () => {
+    const verdict = judgeTests({
+      groups: groups([login, logout]),
+      runs: [
+        run('r2', '2026-09-30T11:10:00.000Z', [['auth-001', 'passed']]),
+        run('r1', '2026-09-30T10:30:00.000Z', [
+          ['auth-001', 'passed'],
+          ['auth-002', 'passed'],
+        ]),
+      ],
+      paths: ['src/auth/logout.ts'],
+      startedAt: STARTED,
+      changedAt: '2026-09-30T11:00:00.000Z',
+      command: COMMAND,
+    });
+    expect(verdict.missing).toEqual([expect.stringContaining('auth-002')]);
+    expect(verdict.verdict).toMatchObject({ cases: 2, passed: 1 });
+  });
 });

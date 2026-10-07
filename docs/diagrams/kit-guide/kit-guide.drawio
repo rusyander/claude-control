@@ -1,0 +1,167 @@
+<mxfile host="app.diagrams.net" version="24.7.7">
+  <diagram id="p1" name="Как набор доезжает до прогона">
+    <mxGraphModel dx="0" dy="0" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1730" pageHeight="970" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="p1:title" value="Как набор доезжает до прогона" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=20;fontColor=#1A237E;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="30" width="1400" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:sub" value="Встроенный текст и ваши копии собираются в папку одного запуска; CLI получает её флагом, и ваша папка ~/.claude остаётся байт в байт той же." style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=11;fontColor=#546E7A;" vertex="1" parent="1">
+          <mxGeometry x="60" y="60" width="1400" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="k:page" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#1B5E20;text-align:left&quot;&gt;Страница «Набор панели»&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Режим на каждый CLI: «Только ваши» (по умолчанию), «Ваши и набор панели», «Только набор панели».&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Включить и выключить элемент, править его, сравнить с глобальным, перенести в одну или другую сторону.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#E8F5E9;strokeColor=#43A047;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;spacingLeft=50;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="150" width="400" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="k:page:icon" value="вы" style="shape=card;fillColor=#FFFFFF;strokeColor=#43A047;html=1;whiteSpace=wrap;align=center;verticalAlign=bottom;fontSize=7;fontColor=#1B5E20;informational=1;" vertex="1" parent="k:page">
+          <mxGeometry x="10" y="10" width="40" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="k:builtin" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#EF6C00;text-align:left&quot;&gt;Встроенный набор — в приложении&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Навыки, пайплайны, субагенты, правила и хуки. Версия набора меняется вместе с панелью.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFF3E0;strokeColor=#FB8C00;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="300" width="400" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="k:mine" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#EF6C00;text-align:left&quot;&gt;Ваши копии — agentdeck/kit/mine&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Правка ложится сюда поверх встроенного текста; обновление панели её не затирает. «Вернуть встроенный» уносит копию в архив.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFF3E0;strokeColor=#FB8C00;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="430" width="400" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="k:compose" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#00695C;text-align:left&quot;&gt;Сборка перед каждым запуском&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Встроенный набор, поверх ваши копии, без выключенных элементов → agentdeck/kit/effective/&lt;режим&gt;.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Не собралось — прогон не запускается и говорит почему, а не уходит молча на ваш глобальный слой.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#E0F2F1;strokeColor=#26A69A;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;spacingLeft=50;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="620" y="300" width="460" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="k:compose:icon" value="сборка" style="shape=hexagon;fillColor=#FFFFFF;strokeColor=#26A69A;html=1;whiteSpace=wrap;align=center;verticalAlign=bottom;fontSize=7;fontColor=#00695C;informational=1;" vertex="1" parent="k:compose">
+          <mxGeometry x="10" y="10" width="40" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="k:run" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#AD1457;text-align:left&quot;&gt;Чат, группа, тест&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Claude Code: флаг --plugin-dir на один запуск; в режиме «Только набор панели» ещё и без вашего личного слоя настроек.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Qwen Code на локальной модели: собранный домашний каталог на этот запуск.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FCE4EC;strokeColor=#EC407A;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;spacingLeft=50;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="620" y="150" width="460" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="k:run:icon" value="CLI" style="shape=process;fillColor=#FFFFFF;strokeColor=#EC407A;html=1;whiteSpace=wrap;align=center;verticalAlign=bottom;fontSize=7;fontColor=#AD1457;informational=1;" vertex="1" parent="k:run">
+          <mxGeometry x="10" y="10" width="40" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="k:global" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#1B5E20;text-align:left&quot;&gt;Ваш глобальный слой ~/.claude&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Прогон его не меняет. Запись сюда — только кнопкой «В глобальный» и после подтверждения; прежняя версия уходит в резервную копию.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#E8F5E9;strokeColor=#43A047;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="620" y="430" width="460" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="k:history" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#4527A0;text-align:left&quot;&gt;«История изменений»&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Резервные копии того, что лежало в глобальном слое до переноса: вернуть одной кнопкой.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#EDE7F6;strokeColor=#7E57C2;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="1240" y="430" width="430" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="k:limits" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#B71C1C;text-align:left&quot;&gt;Границы&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Остальные CLI набор не получают: у них нет способа подключить его на один запуск, а писать в их папки панель не будет. Исключения — Codex и Qwen Code, ниже.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Правила и хуки переносятся только внутри набора. Ключей в наборе нет — доступ к трекеру берётся из «Интеграций».&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFEBEE;strokeColor=#E53935;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="1240" y="150" width="430" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="k:codex" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#B71C1C;text-align:left&quot;&gt;Исключение: Codex&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Набор — наложение на один запуск, ~/.codex и config.toml не меняются. Режимы: «Только ваши» и «Ваши и набор панели»; «Только набор панели» недоступен.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Правила идут ключом запуска -c developer_instructions после ваших собственных; навыки — через app-server (skills/extraRoots/set, каталог набора).&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Пайплайны, субагенты и хуки в Codex не едут (хукам нужно одобрение в /hooks самого Codex); панель говорит об этом на странице.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Qwen Code получает набор как расширение: хуки срабатывают.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFEBEE;strokeColor=#E53935;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="1240" y="270" width="430" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge:k:page:k:builtin" value="режим и выключенные" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#2E7D32;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="k:page" target="k:builtin">
+          <mxGeometry relative="1" x="0" y="0" as="geometry">
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge:k:builtin:k:compose" value="основа" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#6D4C41;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.3888888888888889;entryDx=0;entryDy=0;" edge="1" parent="1" source="k:builtin" target="k:compose">
+          <mxGeometry relative="1" x="0" y="0" as="geometry">
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge:k:mine:k:compose" value="поверх" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#6D4C41;exitX=1;exitY=0.3;exitDx=0;exitDy=0;entryX=0;entryY=0.85;entryDx=0;entryDy=0;" edge="1" parent="1" source="k:mine" target="k:compose">
+          <mxGeometry relative="1" x="0" y="0" as="geometry">
+            <Array as="points">
+            <mxPoint x="540" y="451"/>
+            <mxPoint x="540" y="377"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge:k:compose:k:run" value="папка запуска" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#1565C0;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="k:compose" target="k:run">
+          <mxGeometry relative="1" x="0" y="0" as="geometry">
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge:k:mine:k:global" value="перенос кнопкой" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#2E7D32;exitX=1;exitY=0.7;exitDx=0;exitDy=0;entryX=0;entryY=0.7;entryDx=0;entryDy=0;" edge="1" parent="1" source="k:mine" target="k:global">
+          <mxGeometry relative="1" x="0" y="0" as="geometry">
+            <Array as="points">
+            <mxPoint x="560" y="479"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge:k:global:k:history" value="прежняя версия" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#78909C;dashed=1;dashPattern=6 4;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="k:global" target="k:history">
+          <mxGeometry relative="1" x="0" y="0" as="geometry">
+            <Array as="points">
+            <mxPoint x="1240" y="465"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p1:legend:title" value="Обозначения" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=11;fontColor=#37474F;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="560" width="210" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw0" value="" style="rounded=1;arcSize=12;fillColor=#E8F5E9;strokeColor=#43A047;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="590" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:cap0" value="человек и его файлы" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="590" width="150" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw1" value="" style="rounded=1;arcSize=12;fillColor=#E0F2F1;strokeColor=#26A69A;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="620" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:cap1" value="работа панели" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="620" width="150" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw2" value="" style="rounded=1;arcSize=12;fillColor=#EDE7F6;strokeColor=#7E57C2;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="650" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:cap2" value="что видно на экране" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="650" width="150" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw3" value="" style="rounded=1;arcSize=12;fillColor=#FCE4EC;strokeColor=#EC407A;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="680" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:cap3" value="агент-CLI" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="680" width="150" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw4" value="" style="rounded=1;arcSize=12;fillColor=#FFF3E0;strokeColor=#FB8C00;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="710" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:cap4" value="файлы набора" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="710" width="150" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw5" value="" style="rounded=1;arcSize=12;fillColor=#FFEBEE;strokeColor=#E53935;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="740" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:cap5" value="границы" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="740" width="150" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw6" value="" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#7E57C2;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="770" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:cap6" value="значок — чья это коробка" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="770" width="150" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw7" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#1565C0;sample=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="60" y="810" as="sourcePoint"/>
+            <mxPoint x="110" y="810" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p1:legend:cap7" value="порядок" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="800" width="150" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw8" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#2E7D32;sample=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="60" y="840" as="sourcePoint"/>
+            <mxPoint x="110" y="840" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p1:legend:cap8" value="действие человека" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="830" width="150" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw9" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#6D4C41;sample=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="60" y="870" as="sourcePoint"/>
+            <mxPoint x="110" y="870" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p1:legend:cap9" value="данные" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="860" width="150" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1:legend:sw10" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#78909C;dashed=1;dashPattern=6 4;sample=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="60" y="900" as="sourcePoint"/>
+            <mxPoint x="110" y="900" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="p1:legend:cap10" value="резервная копия" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="890" width="150" height="20" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

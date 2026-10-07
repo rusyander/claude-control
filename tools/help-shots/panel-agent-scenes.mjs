@@ -271,9 +271,11 @@ export async function shootGuards(browser, web, scenario, { panel, configDir }) 
     await page.keyboard.press('Escape');
     await page.waitForTimeout(800);
 
-    // ── 07. Активен другой CLI — ход не запускается ─────────────────────────
+    // ── 07. Активен CLI без агента — ход не запускается ─────────────────────
+    // Continue: у него нет запуска, где у агента только переходник. Codex здесь
+    // уже не годится — агент на нём работает, и кадр снял бы настоящий ход.
     await newConversation(page);
-    await patchSettings(panel, { provider: 'codex' });
+    await patchSettings(panel, { provider: 'continue' });
     await openSection(page, web, '/settings');
     await openAgent(page);
     await send(page, t('Что ты умеешь?', 'What can you do?'));

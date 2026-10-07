@@ -2,8 +2,8 @@ import { existsSync } from 'node:fs';
 import { isAbsolute, join } from 'node:path';
 import { z } from 'zod';
 import type {
+  AnalyticsLive,
   PluginScaffoldResult,
-  RunningAgent,
   SessionLocation,
   SessionStopResult,
 } from '@agentdeck/contracts';
@@ -32,13 +32,15 @@ const liveAgents = definePanelAction({
   name: 'analytics_live',
   section: 'analytics',
   risk: 'read',
-  description: 'Claude processes running on this machine right now: pid, name, memory, start time.',
+  description:
+    'Claude Code processes running on this machine right now: pid, name, memory, start time. Under Codex or Qwen Code the list is empty and `unavailable` says why.',
   input: z.object({}),
   route: () => ({ method: 'GET', url: '/api/analytics/live' }),
   shape: (_input, body) => {
-    const live = body as { runningAgents: RunningAgent[]; at: string };
+    const live = body as AnalyticsLive;
     return {
       at: live.at,
+      ...(live.unavailable ? { unavailable: live.unavailable.message } : {}),
       count: live.runningAgents.length,
       agents: live.runningAgents.slice(0, 50),
     };

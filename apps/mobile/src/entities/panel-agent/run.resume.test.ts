@@ -10,6 +10,11 @@ import type { PanelAgentRunEvent } from '@agentdeck/contracts/panel-agent';
 
 const fetchMock = vi.fn();
 vi.mock('expo/fetch', () => ({ fetch: (...args: unknown[]) => fetchMock(...args) }));
+// Текст отказа по коду — настоящий словарь телефона; подменён только выбор языка.
+vi.mock('../../shared/config/i18n', async () => {
+  const { en } = await import('../../shared/config/i18n/en');
+  return { dict: () => en };
+});
 vi.mock('../../shared/api/client', () => ({
   apiUrl: (path: string) => `http://panel/api${path}`,
   authHeaders: () => ({ Authorization: 'Bearer phone-token' }),

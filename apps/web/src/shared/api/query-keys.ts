@@ -82,6 +82,11 @@ export const queryKeys = {
   endpoints: (profileId: string) => ['endpoints', profileId] as const,
   /** Защита данных: настройки, правила и состояние локального прокси. */
   dlp: ['dlp'] as const,
+  localModels: ['local-models'] as const,
+  /** Сверка панели с глобальным слоем (В5); дифф предложения — под ним же. */
+  globalLayer: ['global-layer'] as const,
+  /** Встроенный набор панели (В2); текст элемента — под ним же. */
+  kit: ['kit'] as const,
   /**
    * Подписанные компромиссы: реестр ведёт сервер. Свой корень, а не ветка
    * контура — сброс кеша после пробы контура не должен ронять статический
@@ -170,6 +175,8 @@ export const queryKeys = {
   groupKnobs: (id: string) => ['groups', 'knobs', id] as const,
   /** Участники группы одной строкой «что делает» — из их же файлов, без модели. */
   groupMembers: (id: string) => ['groups', 'members', id] as const,
+  /** Что группа дала бы прогону чужого CLI — по группе и CLI. */
+  groupDelivery: (id: string, provider: string) => ['groups', 'delivery', id, provider] as const,
   /** Каталог «Выбрать готовый»: общие ресурсы и — с путём — ресурсы проекта. */
   groupResourceCatalog: (path: string) => ['groups', 'resource-catalog', path] as const,
   /** Сводка ресурса кэшируется сервером по хэшу содержимого — у клиента ключ по типу и id. */
@@ -264,6 +271,9 @@ export function isProviderScopedKey(key: readonly unknown[]): boolean {
   // Глобальный поиск идёт по разделам активного провайдера: после переключения
   // выдача вела бы на страницы прошлого CLI, скрытые гейтингом.
   if (head === 'search') return true;
+  // Отчёт аналитики идёт за активным CLI (сессии Codex / Qwen вместо
+  // транскриптов Claude). Прайс и живые процессы от провайдера не зависят.
+  if (head === 'analytics') return key[1] !== 'pricing' && key[1] !== 'live';
   // Проектные разделы того же слоя: ['projects', id, 'provider', …].
   return head === 'projects' && third === 'provider';
 }
@@ -300,6 +310,11 @@ export const DOMAIN_KEYS: Record<string, readonly (readonly string[])[]> = {
   // пары (всё под `groups`) и группа чата — меню «Группа» открытого чата.
   // Раздел `settings` разбирает FileWatchProvider: там мало инвалидации.
   groups: [queryKeys.groups, ['chat-group-settings']],
+  // Сверка с глобальным слоем закончилась или файл пары изменился — сервер шлёт
+  // раздел сам (В5); дифф предложения перечитывается вместе с карточкой.
+  globalLayer: [queryKeys.globalLayer],
+  // Набор панели изменён в другой вкладке или агентом панели (В2).
+  kit: [queryKeys.kit],
   // Транскриптов здесь намеренно нет: разговоров сотни, и правка одного не
   // повод перечитывать открытый — обновление идёт адресно, по пути из события
   // (см. FileWatchProvider).

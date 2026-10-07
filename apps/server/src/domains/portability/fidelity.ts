@@ -124,6 +124,13 @@ export interface TargetProfile {
    * ничего не меняет, — ровно та ложь, ради которой отчёт и заведён.
    */
   readonly wireOpened: boolean;
+  /**
+   * Записанный хук цель запускает только после одобрения человеком в самом CLI
+   * (Codex: `/hooks`, доверие по отпечатку). Без него запись лежит в файле и не
+   * исполняется — «нативно» без условия было бы обещанием, а для запрета ещё и
+   * молча снятым запретом (инвариант 6).
+   */
+  readonly hooksNeedApproval: boolean;
 }
 
 /**
@@ -169,7 +176,9 @@ export function describeTarget(provider: ConfigProvider, level?: SectionTargets)
     pluginForms: pluginFormsOf(provider),
     // Раздел плагинов есть, а принимаемых форм нет и «только для чтения» это не
     // объясняет — значит единицы приходят установкой (магазин Claude).
-    pluginsFromStore: pluginFormsOf(provider).length === 0 && Boolean(own?.plugins),
+    pluginsFromStore:
+      pluginFormsOf(provider).length === 0 &&
+      (Boolean(own?.plugins) || Boolean(provider.pluginsConfig?.installedByCli)),
     readOnly: {
       hooks: hooksReadOnly,
       plugins: Boolean(provider.pluginsConfig?.writeDisabledReason) && !own?.plugins,
@@ -177,6 +186,7 @@ export function describeTarget(provider: ConfigProvider, level?: SectionTargets)
     panelRun: provider.assistant?.cliRunnable === true,
     wire: Boolean(provider.endpointConfig ?? provider.endpointFile),
     wireOpened: REQUEST_PATH_GATE_OPENED,
+    hooksNeedApproval: provider.hooksConfig?.approvalRequired === true,
   };
 
   return level ? atLevel(catalog, level) : catalog;
@@ -197,7 +207,7 @@ export function describeTarget(provider: ConfigProvider, level?: SectionTargets)
  */
 function pluginFormsOf(provider: ConfigProvider): PluginForm[] {
   const config = provider.pluginsConfig;
-  if (!config || config.writeDisabledReason) return [];
+  if (!config || config.writeDisabledReason || config.installedByCli) return [];
   // Каталог файлов у раздела есть всегда (`dir` обязателен), список пакетов —
   // только там, где он задокументирован.
   return config.configPath ? ['module', 'package'] : ['module'];
@@ -270,6 +280,7 @@ function nothingAtLevel(provider: string): TargetProfile {
     panelRun: false,
     wire: false,
     wireOpened: REQUEST_PATH_GATE_OPENED,
+    hooksNeedApproval: false,
   };
 }
 
@@ -432,6 +443,15 @@ function hookVerdict(item: HookItem, profile: TargetProfile): FidelityVerdict {
   if (event) {
     if (blocks && !event.blocking) return degraded(profile, 'blocking_lost', inRequestPath);
     if (!undetermined || item.source.provider === profile.provider) {
+      // Перенос в сам себя одобрения не теряет: хук уже стоит и уже одобрен там.
+      if (profile.hooksNeedApproval && item.source.provider !== profile.provider) {
+        return {
+          level: 'native',
+          reason: 'target_mechanism',
+          condition: 'approve_in_cli',
+          fallback: 'impossible',
+        };
+      }
       return verdict('native', 'target_mechanism');
     }
     // Событие у чужой цели есть, но ЧТО скрипт читает из нагрузки — неизвестно,

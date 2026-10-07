@@ -15,13 +15,16 @@ import { useLocation, useSetLocation, useSettings, useUpdateSettings } from '@en
 import { useProviderDetect } from '@entities/Provider';
 import type { Step } from './OnboardingWizard.types';
 import {
-  STEP_ORDER,
   clearStoredStep,
+  hasOtherCli,
   initialStep,
+  onboardingGate,
   nextStep,
   prevStep,
   readStoredStep,
   stepNumber,
+  stepOrder,
+  fitStep,
   storeStep,
 } from './model/steps';
 import { IntroStep } from './steps/IntroStep';
@@ -104,11 +107,23 @@ export function OnboardingWizard() {
 
   const isValid = location.data.isValid;
   const onboardingDone = settings.data.onboardingDone;
-  if (onboardingDone && isValid) return null;
+  // Каталог Claude обязателен только Claude: выбран другой CLI — панели есть что показывать.
+  const otherCliFound = hasOtherCli(detect.data);
+  const { panelReady, canLeaveLocation } = onboardingGate({
+    isValid,
+    activeProviderId: settings.data.provider,
+    otherCliFound,
+  });
+  if (onboardingDone && panelReady) return null;
 
-  const step = stepState ?? initialStep({ onboardingDone, stored: readStoredStep(stepStorage()) });
-  const back = prevStep(step);
-  const next = nextStep(step);
+  // Выбор CLI на шаге «Найденные CLI» меняет и сам список шагов (без доступа Claude).
+  const order = stepOrder(settings.data.provider);
+  const step = fitStep(
+    stepState ?? initialStep({ onboardingDone, stored: readStoredStep(stepStorage()) }),
+    order,
+  );
+  const back = prevStep(step, order);
+  const next = nextStep(step, order);
 
   const goTo = (target: Step | undefined): void => {
     if (!target) return;
@@ -134,7 +149,7 @@ export function OnboardingWizard() {
   // закрыть нельзя (панели нечего показывать), и молчащая кнопка тут хуже отказа.
   const handleOpenChange = (open: boolean): void => {
     if (open) return;
-    if (isValid) finish();
+    if (panelReady) finish();
     else toast.error(t('onboarding.cannotSkip'));
   };
 
@@ -180,7 +195,7 @@ export function OnboardingWizard() {
     providers: t('onboarding.providersSubtitle'),
     access: t('onboarding.accessSubtitle'),
   };
-  const counter = t('onboarding.stepOf', { current: stepNumber(step), total: STEP_ORDER.length });
+  const counter = t('onboarding.stepOf', { current: stepNumber(step, order), total: order.length });
 
   const bodies: Record<Step, ReactNode> = {
     intro: <IntroStep />,
@@ -193,6 +208,7 @@ export function OnboardingWizard() {
         onPickFolder={() => setPickerOpen(true)}
         onReset={resetLocation}
         isResetting={resetSettings.isPending}
+        claudeOptional={!isValid && canLeaveLocation}
       />
     ),
     providers: (
@@ -211,10 +227,11 @@ export function OnboardingWizard() {
 
   // Мастер вернулся из-за пропавшего каталога — пропускать нечего и назад
   // к знакомству идти незачем: как только каталог в порядке, окно уйдёт само.
-  const canSkip = isValid && !onboardingDone && next !== undefined;
+  const canSkip = panelReady && !onboardingDone && next !== undefined;
   const showBack = back !== undefined && !onboardingDone;
-  // Дальше — только с рабочим каталогом: без него панели нечего показывать.
-  const nextDisabled = !isValid && step !== 'intro';
+  // Дальше — с рабочим каталогом или когда есть другой CLI, на который можно
+  // переключиться на шаге «Найденные CLI»; иначе панели нечего показывать.
+  const nextDisabled = !canLeaveLocation && step !== 'intro';
 
   const footer = (
     <Stack direction="row" justify="between" align="center" gap="var(--spacing-xs)" width="100%">
@@ -239,7 +256,7 @@ export function OnboardingWizard() {
           <Button
             variant="primary"
             onClick={finish}
-            disabled={!isValid}
+            disabled={!panelReady}
             isLoading={finishSettings.isPending}
           >
             {t('onboarding.done')}

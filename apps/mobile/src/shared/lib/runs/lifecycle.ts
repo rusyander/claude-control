@@ -173,6 +173,7 @@ function finish(id: string): void {
     void notifyLocally(
       status === 'error' ? t.failed : t.finished,
       status === 'error' ? (run.error ?? name) : name,
+      { chatId: run.sessionId ?? id, projectPath: run.projectPath ?? '' },
     ).catch(() => undefined);
   }
 

@@ -92,9 +92,9 @@ describe('готовность', () => {
 
   it('свою причину прочерка «шлюз погашен» не перебивает', () => {
     const plan = buildPlatformApplyPlan(deps(false), PLATFORM);
-    // У gemini беда не в шлюзе, и подменять причину значило бы отправить
+    // У goose беда не в шлюзе, и подменять причину значило бы отправить
     // человека поднимать шлюз ради цели, которая всё равно не заработает.
-    expect(targetOf(plan, 'gemini').reason).toBe('gateway_dialect');
+    expect(targetOf(plan, 'goose').reason).toBe('no_env_section');
   });
 
   it('оба адреса шлюза и имя профиля названы', () => {

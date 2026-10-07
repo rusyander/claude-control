@@ -35,6 +35,7 @@ import { asksDelivery } from '../chat/ChatCascadeStages.ts';
 import type { ChainOutcome } from '../chat/split-conveyor.ts';
 import type { HandoffChains, HashFile, StatFile } from '../chat/ChatHandoff.ts';
 import { planForeignHandoff, type ForeignHandoffDeps } from './handoff.ts';
+import { foreignPathTurn, type ForeignPathTurnDeps } from './path-turn.ts';
 import { appendMessage, createChat, readChat, readChatCascade, setChatCascade } from './store.ts';
 import type { ProviderChatCascade } from './store.ts';
 import type { ProviderChatRunDeps, ProviderChatService } from './ProviderChatService.ts';
@@ -431,6 +432,11 @@ export interface ForeignStagePlannerDeps {
   /** Изменила ли работа что-нибудь в копии: пустой дифф проверять незачем. */
   hasWork: (cwd: string, since?: string) => boolean;
   /**
+   * Свои шаги «Пути» группы звена после стадии (`runPathSteps`) — те же, что у
+   * Claude. Не задан — шагов у чужого CLI нет.
+   */
+  pathSteps?: ForeignPathTurnDeps['pathSteps'];
+  /**
    * Связи чатов. Звено наследует связь своего разговора — ту же группу, ту же
    * ветку, того же родителя, — меняя только стадию: без этого дерево видит одну
    * работу, а хаб родителя молчит о ревью и правках. Пусто — связей нет вовсе
@@ -513,6 +519,7 @@ function foreignHandoffDeps(
         ...(input.model ? { model: input.model } : {}),
         ...(input.effort ? { effort: input.effort } : {}),
         ...(input.cascade ? { cascade: input.cascade } : {}),
+        ...(input.allowEdits === undefined ? {} : { allowEdits: input.allowEdits }),
       })?.id,
     run: (chatId, prompt, header) => {
       const provider = deps.provider(providerId);
@@ -542,6 +549,34 @@ function foreignHandoffDeps(
     ...(deps.stat ? { stat: deps.stat } : {}),
     ...(deps.hash ? { hash: deps.hash } : {}),
   };
+}
+
+/**
+ * Следующий ход ТОГО ЖЕ разговора (шаг «Пути») с дополнением звена — тем же,
+ * что на старте звена (`foreignChatPrefix`). `false` — не запустился.
+ */
+function sendInChat(
+  deps: ForeignStagePlannerDeps,
+  appDataDir: string,
+  providerId: string,
+  chatId: string,
+  prompt: string,
+): boolean {
+  const provider = deps.provider(providerId);
+  if (!provider) return false;
+  const key = foreignChatKey(providerId, chatId);
+  const prefix = foreignChatPrefix(
+    readChatCascade(appDataDir, providerId, chatId),
+    deps.settings(),
+    deps.childExtra?.(key),
+  );
+  return deps.chats.send(
+    appDataDir,
+    providerId,
+    chatId,
+    { text: prompt },
+    { provider, models: deps.models(provider), ...(prefix ? { systemPrefix: prefix } : {}) },
+  ).ok;
 }
 
 /**
@@ -628,7 +663,39 @@ export function createForeignStagePlanner(
       // Задание разговора — ПЕРВАЯ реплика человека. Разделение кладёт туда
       // задание группы, и именно с ним ревьюер сверяет сделанное; последняя
       // реплика была бы уточнением по ходу работы, а не заданием.
-      const task = chat.messages.find((message) => message.role === 'user')?.content ?? '';
+      const firstTask = chat.messages.find((message) => message.role === 'user')?.content ?? '';
+
+      // Свои шаги «Пути» группы идут ДО всего остального, как у Claude:
+      // продолжение и звено решаются по ответу стадии, который шаги отложили.
+      const pathed =
+        link && chat.workdir && deps.pathSteps
+          ? foreignPathTurn(
+              {
+                chatKey,
+                link,
+                cwd: chat.workdir,
+                ok: finished.ok,
+                paused,
+                text: finished.text,
+                task: firstTask,
+                ...(finished.error ? { error: finished.error } : {}),
+                ...(finished.retry ? { retry: finished.retry } : {}),
+              },
+              {
+                pathSteps: deps.pathSteps,
+                ...(deps.saveLink ? { saveLink: deps.saveLink } : {}),
+                ...(deps.onChainEnded ? { onChainEnded: deps.onChainEnded } : {}),
+                sendStep: (prompt) => sendInChat(deps, appDataDir, providerId, chatId, prompt),
+              },
+            )
+          : { stop: false as const, text: finished.text, task: firstTask };
+      if (pathed.stop) {
+        if (pathed.notice) {
+          appendMessage(appDataDir, providerId, chatId, { role: 'notice', content: pathed.notice });
+        }
+        return;
+      }
+      const { text, task } = pathed;
 
       // Продолжение в чистой сессии (Т7) — ДО звена конвейера и по той же
       // причине, что у Claude: предложение агента означает, что работа ещё идёт,
@@ -641,12 +708,13 @@ export function createForeignStagePlanner(
               providerId,
               chatId,
               ok: finished.ok,
-              text: finished.text,
+              text,
               startedAt: finished.startedAt,
               title: chat.title,
               task,
               ...(chat.workdir ? { cwd: chat.workdir } : {}),
               ...(chat.model ? { model: chat.model } : {}),
+              ...(chat.allowEdits === undefined ? {} : { allowEdits: chat.allowEdits }),
               ...(chat.effort ? { effort: chat.effort } : {}),
               ...(cascade ? { cascade } : {}),
               ...(link ? { link } : {}),
@@ -679,7 +747,7 @@ export function createForeignStagePlanner(
       const plan = planForeignStage({
         cascade,
         ok: finished.ok,
-        text: finished.text,
+        text,
         task,
         hasWork: () => deps.hasWork(cwd, chat.createdAt),
         ...(link ? { link } : {}),
@@ -706,7 +774,7 @@ export function createForeignStagePlanner(
             chainOutcomeOf({
               link,
               ok: finished.ok,
-              text: finished.text,
+              text,
               hasWork: () => deps.hasWork(cwd, chat.createdAt),
               ...(finished.error ? { error: finished.error } : {}),
               ...(finished.retry ? { retry: finished.retry } : {}),
@@ -746,6 +814,9 @@ export function createForeignStagePlanner(
         cascade: plan.cascade,
         ...(plan.model ? { model: plan.model } : {}),
         ...(plan.effort ? { effort: plan.effort } : {}),
+        // Звено идёт с правами разговора, который его завёл: ревью и правки
+        // работы — та же работа, и переключатель человека действует на всю цепочку.
+        ...(chat.allowEdits === undefined ? {} : { allowEdits: chat.allowEdits }),
       });
       if (!created) return;
 

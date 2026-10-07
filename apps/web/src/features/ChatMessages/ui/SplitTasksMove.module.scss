@@ -1,0 +1,41 @@
+// Окно «Перевести задачи»: список задач (ключ · группа · статус) и выбор
+// статуса под ним. Строки — сеткой, чтобы колонки ключей и статусов стояли
+// ровно и при длинном названии группы.
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.rows {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) max-content;
+  gap: var(--spacing-3xs) var(--spacing-sm);
+  align-items: baseline;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+// Строка списка не создаёт своей коробки: её ячейки встают в сетку родителя.
+.row {
+  display: contents;
+}
+
+.group {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+// Итог по задаче — на обе оставшиеся колонки: группы в ответе перевода нет.
+.wide {
+  grid-column: span 2;
+}
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-2xs);
+  justify-content: flex-end;
+}

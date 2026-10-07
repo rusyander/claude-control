@@ -46,7 +46,7 @@ const TRANSIENT_RENAME_CODES = new Set(['EPERM', 'EBUSY', 'EACCES']);
  * цель либо прежняя, либо новая, — но однократная попытка на Windows
  * проигрывала сканеру файлов и роняла запрос 500 на здоровом конфиге.
  */
-function renameWithRetry(from: string, to: string): void {
+export function renameWithRetry(from: string, to: string): void {
   for (let attempt = 0; ; attempt += 1) {
     try {
       renameSync(from, to);

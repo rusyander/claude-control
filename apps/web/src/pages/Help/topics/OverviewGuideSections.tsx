@@ -41,6 +41,15 @@ export function OverviewGuideSections({ tr }: SectionProps) {
         <Callout tone="info" title={tr('sourceNote')} />
       </HelpSection>
 
+      <HelpSection title={tr('providerTitle')} caption={tr('providerCaption')}>
+        <Callout tone="info" title={tr('providerTitle')}>
+          {tr('providerText')}
+        </Callout>
+        <Callout tone="info" title={tr('noClaudeTitle')}>
+          {tr('noClaudeText')}
+        </Callout>
+      </HelpSection>
+
       <HelpSection title={g('tourTitle')} caption={g('tourCaption')}>
         <GuideSteps>
           <GuideStep title={g('tourTiles')} text={g('tourTilesText')}>

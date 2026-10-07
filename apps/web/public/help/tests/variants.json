@@ -221,6 +221,28 @@
         "height": 277
       }
     },
+    "e2e/11-mutation-result": {
+      "light-ru": {
+        "file": "11-mutation-result.png",
+        "width": 1108,
+        "height": 322
+      },
+      "light-en": {
+        "file": "11-mutation-result.en.png",
+        "width": 1108,
+        "height": 322
+      },
+      "dark-ru": {
+        "file": "11-mutation-result.dark.png",
+        "width": 1108,
+        "height": 322
+      },
+      "dark-en": {
+        "file": "11-mutation-result.dark.en.png",
+        "width": 1108,
+        "height": 322
+      }
+    },
     "health/01-changed-only": {
       "light-ru": {
         "file": "01-changed-only.png",

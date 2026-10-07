@@ -109,8 +109,16 @@ export async function settings(page, patch = {}) {
 /**
  * Каркас вкладки проекта: список проектов, git, каталог моделей и всё, что
  * страница спрашивает про каждый разговор. Дальше сценарий доопределяет своё.
+ *
+ * Подсказка о локальной модели закрыта, как её закрыл бы человек: иначе её текст
+ * берёт видеокарту машины, на которой снимали, и кадр несёт чужое железо.
+ * Сцена, которая снимает саму подсказку, передаёт `localHint: true`.
  */
-export async function projectShell(page, { git = GIT, worktrees } = {}) {
+export async function projectShell(page, { git = GIT, worktrees, localHint = false } = {}) {
+  if (!localHint)
+    await page.addInitScript(() =>
+      window.localStorage.setItem('agentdeck.localModelHint.dismissed', '1'),
+    );
   await page.route('**/api/models*', (route) => route.fulfill({ json: MODELS }));
   await page.route('**/api/project-git/worktrees*', (route) =>
     route.fulfill({

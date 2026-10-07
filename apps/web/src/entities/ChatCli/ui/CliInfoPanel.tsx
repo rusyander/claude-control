@@ -12,10 +12,10 @@ import type { CliInfoPanelProps } from './CliInfoPanel.types';
  * копия первой в PATH работала молча, пока модель не отказалась от неё сырой
  * ошибкой API (живой прогон 25.09.2026).
  */
-export function CliInfoPanel({ refresh, withUpdate }: CliInfoPanelProps) {
+export function CliInfoPanel({ refresh, withUpdate, providerId }: CliInfoPanelProps) {
   const { t } = useTranslation();
-  const cli = useChatCli({ refresh: refresh === true });
-  const update = useUpdateChatCli();
+  const cli = useChatCli({ refresh: refresh === true, provider: providerId });
+  const update = useUpdateChatCli(providerId);
   const info = cli.data;
 
   if (cli.isLoading) {
@@ -44,7 +44,11 @@ export function CliInfoPanel({ refresh, withUpdate }: CliInfoPanelProps) {
     <Stack gap="var(--spacing-3xs)" data-cli-info>
       <Typography variant="caption" color="subtle">
         {info.path
-          ? t('chat.cli.current', { version: info.version ?? '?', path: info.path })
+          ? t('chat.cli.current', {
+              provider: info.providerName ?? 'Claude Code',
+              version: info.version ?? '?',
+              path: info.path,
+            })
           : t('chat.cli.missing', { command: info.command })}
       </Typography>
       {info.newer && (
@@ -52,7 +56,8 @@ export function CliInfoPanel({ refresh, withUpdate }: CliInfoPanelProps) {
           {t('chat.cli.newer', { version: info.newer.version ?? '?', path: info.newer.path })}
         </Typography>
       )}
-      {withUpdate && info.path && (
+      {/* Сервер без поля `canUpdate` — прежний, где обновлялся только Claude. */}
+      {withUpdate && info.path && info.canUpdate !== false && (
         <div>
           <Button
             size="sm"

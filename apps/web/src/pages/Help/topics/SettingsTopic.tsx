@@ -5,6 +5,7 @@ import { HelpSection, FieldTable, Callout, OptionCards } from '../ui';
 import { SettingsGuideSections } from './SettingsGuideSections';
 import { SettingsLimitsSections } from './SettingsLimitsSections';
 import { SettingsWatcherSection } from './SettingsWatcherSection';
+import { SettingsGlobalLayerSection } from './SettingsGlobalLayerSection';
 
 /**
  * Документ раздела «Настройки».
@@ -43,6 +44,8 @@ export function SettingsTopic() {
 
       <SettingsWatcherSection tr={tr} />
 
+      <SettingsGlobalLayerSection tr={tr} />
+
       <SettingsLimitsSections
         tr={tr}
         common={common}
@@ -60,6 +63,8 @@ export function SettingsTopic() {
             { title: tr('tabProviders'), text: tr('tabProvidersText') },
             { title: tr('tabModels'), text: tr('tabModelsText') },
             { title: tr('tabPrompts'), text: tr('tabPromptsText') },
+            { title: tr('tabGroups'), text: tr('tabGroupsText') },
+            { title: tr('tabGlobalLayer'), text: tr('tabGlobalLayerText') },
             { title: tr('tabIntegrations'), text: tr('tabIntegrationsText') },
             { title: tr('tabSpend'), text: tr('tabSpendText') },
             { title: tr('tabSafety'), text: tr('tabSafetyText') },

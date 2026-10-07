@@ -28,7 +28,10 @@ const GOLDEN: ReadonlyArray<{ lang: 'ru' | 'en'; query: string; topic: string }>
   { lang: 'ru', query: 'зачем нужны скиллы', topic: 'skills' },
   { lang: 'ru', query: 'как подключить Jira', topic: 'integrations' },
   { lang: 'ru', query: 'приложение на телефоне', topic: 'phone' },
-  { lang: 'ru', query: 'как подключить локальную модель вместо облака', topic: 'endpoints' },
+  // С темой «Локальные модели» (05.10) этот вопрос — её: раздел сам ставит и
+  // подключает модель. «Адреса» остаются ответом на свой адрес API.
+  { lang: 'ru', query: 'как подключить локальную модель вместо облака', topic: 'localModels' },
+  { lang: 'ru', query: 'как направить Claude на свой адрес API', topic: 'endpoints' },
   { lang: 'ru', query: 'какие команды можно вызвать через слэш', topic: 'commands' },
   { lang: 'ru', query: 'как установить плагин', topic: 'plugins' },
   // «права» (разрешения) и «правила» — разные разделы; совпадение по началу

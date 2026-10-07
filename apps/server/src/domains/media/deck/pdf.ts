@@ -92,14 +92,32 @@ export async function printDeckPdf(html: string, env?: NodeJS.ProcessEnv): Promi
       target,
     );
   } finally {
-    // Настойчиво, но не в ущерб готовому файлу: отделившийся браузер держит свой
-    // профиль ещё какое-то время, и падение на занятом файле отменило бы удачную
-    // печать. Не вышло — каталог останется системе, PDF уже прочитан.
-    try {
-      rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
-    } catch {
-      // Временный каталог — не повод терять колоду.
-    }
+    dropPrintDir(dir);
+  }
+}
+
+/** Паузы фоновых повторов уборки: отделившийся Edge держит профиль секундами. */
+const LATE_DROP_MS = [2_000, 10_000, 60_000];
+
+/**
+ * Снос каталога печати. Настойчиво, но не в ущерб готовому файлу: отделившийся
+ * браузер держит свой профиль ещё какое-то время, и падение на занятом файле
+ * отменило бы удачную печать. Сразу не вышло — повторы в фоне: без них каждая
+ * печать оставляла в temp профиль браузера в ~7 МБ (за три дня — сотня каталогов).
+ */
+export function dropPrintDir(
+  dir: string,
+  delays: readonly number[] = LATE_DROP_MS,
+  remove: (target: string) => void = (target) =>
+    rmSync(target, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }),
+): void {
+  try {
+    remove(dir);
+  } catch {
+    const [next, ...rest] = delays;
+    // Не вышло и в последний раз — каталог останется системе, PDF уже прочитан.
+    if (next === undefined) return;
+    setTimeout(() => dropPrintDir(dir, rest, remove), next).unref();
   }
 }
 

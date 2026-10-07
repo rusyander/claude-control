@@ -14,8 +14,8 @@ import { SieveStore } from '../domains/chat/sieve-store.ts';
 export function registerSieveRoutes(app: FastifyInstance, ctx: ServerContext): void {
   const store = (): SieveStore => new SieveStore(ctx.location.paths.appData);
   const view = (): SievesView => {
-    const { learned, tally } = store().list();
-    return { learned, tally };
+    const { learned, tally, refused } = store().list();
+    return { learned, tally, ...(refused ? { refused } : {}) };
   };
   const notFound = (reply: FastifyReply) =>
     reply

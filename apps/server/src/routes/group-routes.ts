@@ -26,6 +26,10 @@ import {
   InvalidGroupDraftError,
 } from '../domains/group-draft.ts';
 import { codeOf } from '../lib/server-text.ts';
+import { serverText } from '../lib/server-texts.ts';
+import { groupLayerWriter } from '../domains/groups/run-layer.ts';
+import { getActiveProviderId, getProvider, isKnownProviderId } from '../providers/registry.ts';
+import { scopeProvider } from '@agentdeck/contracts/group-sources';
 import type { ServerMessageCode } from '@agentdeck/contracts/server-messages';
 
 /**
@@ -68,6 +72,8 @@ function keptFields(existing: Group, body: GroupDraft): Partial<Group> {
     ...(body.when === undefined && existing.when !== undefined ? { when: existing.when } : {}),
     // Старая форма группы про ход пути не знает: без этого её сохранение делало сценарий конвейером.
     ...(body.flow === undefined && existing.flow !== undefined ? { flow: existing.flow } : {}),
+    // Включение для чужих CLI правится своим маршрутом (`/:id/enabled`), форма о нём не знает.
+    ...(existing.enabledFor ? { enabledFor: existing.enabledFor } : {}),
   };
 }
 
@@ -233,7 +239,48 @@ export function registerGroupRoutes(app: FastifyInstance, ctx: ServerContext): v
     }
   });
 
-  app.post<{ Params: { id: string }; Body: { isEnabled: boolean } }>(
+  /**
+   * Тумблер группы для чужого CLI: у CLI со слоем на прогон — отметка
+   * `enabledFor[cli]`, которую читает каждый его запуск, без единой записи в
+   * файлы; у CLI без слоя — честный отказ: включать нечего и некуда.
+   */
+  const toggleForForeign = (
+    group: Group,
+    providerId: string,
+    isEnabled: boolean,
+    reply: FastifyReply,
+  ): FastifyReply | Record<string, unknown> => {
+    const provider = getProvider(providerId);
+    if (!groupLayerWriter(provider.groupLayer)) {
+      const params = { provider: provider.name };
+      return reply.code(409).send({
+        error: 'Группа до этого CLI не доходит',
+        message: serverText('groups-foreign-not-delivered', params),
+        messageCode: 'groups-foreign-not-delivered',
+        params,
+      });
+    }
+    const { enabledFor: _previous, ...rest } = group;
+    const enabledFor = { ...group.enabledFor, [providerId]: isEnabled };
+    // Выключенный CLI из карты убирается: пустая карта — то же, что её нет.
+    if (!isEnabled) delete enabledFor[providerId];
+    ctx.store.saveGroup(Object.keys(enabledFor).length ? { ...rest, enabledFor } : rest);
+    const code = isEnabled ? 'group-layer-enabled-for' : 'group-layer-disabled-for';
+    const params = { cli: provider.name };
+    return {
+      ok: true,
+      provider: providerId,
+      enabledFor: isEnabled,
+      affected: 0,
+      skippedLocalHooks: 0,
+      needsRestart: false,
+      message: serverText(code, params),
+      messageCode: code,
+      params,
+    };
+  };
+
+  app.post<{ Params: { id: string }; Body: { isEnabled: boolean; provider?: string } }>(
     '/api/groups/:id/enabled',
     (request, reply) => {
       const group = ctx.store.getGroups().find((item) => item.id === request.params.id);
@@ -247,6 +294,22 @@ export function registerGroupRoutes(app: FastifyInstance, ctx: ServerContext): v
         return reply
           .code(400)
           .send({ error: 'Не указано состояние группы', messageCode: 'group-state-unspecified' });
+      }
+
+      // Чей тумблер — решает CLI: явный `provider` или активный. Чужой CLI
+      // файлов Claude не читает, и переключать ради него `~/.claude` значило бы
+      // менять настройки человека, ничего не дав прогону (F1 владельца 06.10).
+      const providerId = request.body?.provider ?? getActiveProviderId(ctx.store);
+      if (!isKnownProviderId(providerId)) {
+        return reply.code(400).send({
+          error: 'Незнакомый CLI',
+          message: serverText('provider-unknown', { id: providerId }),
+          messageCode: 'provider-unknown',
+          params: { id: providerId },
+        });
+      }
+      if (providerId !== 'claude' && scopeProvider(group.scope) === 'claude') {
+        return toggleForForeign(group, providerId, isEnabled, reply);
       }
 
       const result = setGroupEnabled(toggleDeps(ctx), group, isEnabled);

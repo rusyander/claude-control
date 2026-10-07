@@ -1,15 +1,25 @@
 import { describe, it, expect, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
-import { OpencodeServe, freePort } from './opencode-serve.ts';
+import {
+  OPENCODE_DECLINE_MESSAGE,
+  OPENCODE_STOPPED_REPLY,
+  OpencodeServe,
+  freePort,
+  pickAgent,
+  sessionPermissionRules,
+  type OpencodePermissionRule,
+} from './opencode-serve.ts';
 import { runAssistant } from './assistant-runner.ts';
 import { getProvider } from '../providers/registry.ts';
 
 /**
  * Сессионный режим OpenCode (IDEA-8). Настоящий `opencode serve` здесь не
- * запускается НИ РАЗУ: `spawn` и `fetch` подменены. Проверяем то, ради чего он
- * и делался, — что диалог держит CLI (наружу уходит только новое сообщение),
- * что сервер поднимается ОДИН на все запросы, и что любая заминка молча
- * возвращает панель к one-shot, а не ломает ответ пользователю.
+ * запускается НИ РАЗУ: `spawn` и `fetch` подменены (живой прогон —
+ * `tools/qa/check-cli-opencode.mjs`). Проверяем то, ради чего он и делался, —
+ * что диалог держит CLI (наружу уходит только новое сообщение), что сервер
+ * поднимается ОДИН на все запросы, что любая заминка до начала работы молча
+ * возвращает панель к one-shot, и что «Разрешить правки» доходит до CLI:
+ * правила сессии и ответы на его просьбы.
  */
 
 /** Поддельный дочерний процесс: ничего не запускает, умеет «умереть». */
@@ -25,6 +35,100 @@ const jsonResponse = (body: unknown): Response =>
 
 const okHealth = (): Response => ({ ok: true, json: async () => ({}) }) as unknown as Response;
 
+/** Умолчание агента `build` у OpenCode 1.18.34 (`opencode debug agent build`), сокращённо. */
+const BUILD_DEFAULT: OpencodePermissionRule[] = [
+  { permission: '*', pattern: '*', action: 'allow' },
+  { permission: 'doom_loop', pattern: '*', action: 'ask' },
+  { permission: 'external_directory', pattern: '*', action: 'ask' },
+  { permission: 'read', pattern: '*.env', action: 'ask' },
+];
+
+interface FakeServerOptions {
+  agents?: unknown;
+  config?: unknown;
+  /** Ответ на сообщение; по умолчанию — один текстовый кусок. */
+  message?: (body: unknown) => unknown;
+  /** Ждущие просьбы, которые сервер покажет при опросе (пока на них не ответили). */
+  pending?: { id: string; sessionID: string; permission: string; patterns: string[] }[];
+  /** Сообщение держится, пока на все просьбы не ответили. */
+  holdUntilAnswered?: boolean;
+}
+
+/** Подделка сервера OpenCode по путям его спецификации; пишет каждый запрос. */
+function fakeServer(options: FakeServerOptions = {}) {
+  const calls: { method: string; url: string; body?: unknown }[] = [];
+  const replies: { id: string; body: unknown }[] = [];
+  let sessions = 0;
+  const pending = [...(options.pending ?? [])];
+  const fetchImpl = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+    const href = String(url);
+    const path = href.replace(/^https?:\/\/[^/]+/, '').replace(/\?.*$/, '');
+    const body = init?.body ? JSON.parse(String(init.body)) : undefined;
+    calls.push({ method: init?.method ?? 'GET', url: href, body });
+    if (path === '/global/health') return okHealth();
+    if (path === '/config') return jsonResponse(options.config ?? {});
+    if (path === '/agent') {
+      return jsonResponse(
+        options.agents ?? [
+          { name: 'build', mode: 'primary', permission: BUILD_DEFAULT, options: {} },
+        ],
+      );
+    }
+    if (path === '/session') {
+      sessions += 1;
+      return jsonResponse({ id: `ses_${sessions}` });
+    }
+    if (path === '/permission') return jsonResponse(pending);
+    const reply = path.match(/^\/permission\/([^/]+)\/reply$/);
+    if (reply) {
+      replies.push({ id: decodeURIComponent(reply[1]!), body });
+      const index = pending.findIndex((ask) => ask.id === decodeURIComponent(reply[1]!));
+      if (index >= 0) pending.splice(index, 1);
+      return jsonResponse(true);
+    }
+    if (/^\/session\/[^/]+\/message$/.test(path)) {
+      if (options.holdUntilAnswered) {
+        for (let i = 0; i < 200 && pending.length > 0; i += 1) {
+          await new Promise((resolve) => setTimeout(resolve, 5));
+        }
+      }
+      return jsonResponse(
+        options.message?.(body) ?? { info: {}, parts: [{ type: 'text', text: 'Привет!' }] },
+      );
+    }
+    return { ok: false, json: async () => ({}) } as unknown as Response;
+  });
+  return { fetchImpl, calls, replies };
+}
+
+const depsOf = (fetchImpl: unknown, extra: Record<string, unknown> = {}) => ({
+  command: 'opencode',
+  spawnImpl: (() => fakeChild()) as never,
+  fetchImpl: fetchImpl as never,
+  port: 4096,
+  permissionPollMs: 1,
+  ...extra,
+});
+
+/**
+ * Решение OpenCode по набору правил: последнее подходящее правило побеждает
+ * (`*` — что угодно), правила сессии идут после правил агента. Так OpenCode
+ * 1.18.34 решал в живом прогоне: вопрос сессии перекрыл явный запрет конфига.
+ */
+function decide(rules: OpencodePermissionRule[], permission: string, target: string): string {
+  const match = (value: string, pattern: string) =>
+    new RegExp(
+      `^${pattern
+        .split('*')
+        .map((part) => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&'))
+        .join('.*')}$`,
+    ).test(value);
+  const hit = [...rules]
+    .reverse()
+    .find((rule) => match(permission, rule.permission) && match(target, rule.pattern));
+  return hit?.action ?? 'ask';
+}
+
 describe('OpencodeServe: локальный сервер и сессии', () => {
   it('свободный порт выдаётся ОС и не равен нулю', async () => {
     const port = await freePort();
@@ -33,22 +137,10 @@ describe('OpencodeServe: локальный сервер и сессии', () =>
 
   it('поднимает сервер один раз, создаёт сессию и шлёт только новое сообщение', async () => {
     const spawnImpl = vi.fn(() => fakeChild());
-    const calls: { url: string; body?: unknown }[] = [];
-    const fetchImpl = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
-      const href = String(url);
-      calls.push({ url: href, body: init?.body ? JSON.parse(String(init.body)) : undefined });
-      if (href.endsWith('/global/health')) return okHealth();
-      if (href.endsWith('/session')) return jsonResponse({ id: 'ses_1' });
-      return jsonResponse({ info: {}, parts: [{ type: 'text', text: 'Привет!' }] });
-    });
+    const { fetchImpl, calls } = fakeServer();
 
     const serve = new OpencodeServe();
-    const deps = {
-      command: 'opencode',
-      spawnImpl: spawnImpl as never,
-      fetchImpl: fetchImpl as never,
-      port: 4096,
-    };
+    const deps = depsOf(fetchImpl, { spawnImpl });
 
     expect(await serve.ask('conv-1', 'первый вопрос', deps)).toEqual({
       reply: 'Привет!',
@@ -62,14 +154,48 @@ describe('OpencodeServe: локальный сервер и сессии', () =>
 
     const messages = calls.filter((call) => call.url.includes('/message'));
     expect(messages).toHaveLength(2);
-    // Наружу уходит ТОЛЬКО новое сообщение: истории в теле нет.
-    expect(messages[0]?.body).toEqual({ parts: [{ type: 'text', text: 'первый вопрос' }] });
-    expect(messages[1]?.body).toEqual({ parts: [{ type: 'text', text: 'второй вопрос' }] });
+    // Наружу уходит ТОЛЬКО новое сообщение: истории в теле нет. Агент — тот, чьи
+    // правила взяты в набор сессии.
+    expect(messages[0]?.body).toEqual({
+      agent: 'build',
+      parts: [{ type: 'text', text: 'первый вопрос' }],
+    });
+    expect(messages[1]?.body).toEqual({
+      agent: 'build',
+      parts: [{ type: 'text', text: 'второй вопрос' }],
+    });
 
     // Сервер слушает только петлю — наружу его не выставляем.
     expect(JSON.stringify(spawnImpl.mock.calls[0] ?? [])).toContain('127.0.0.1');
 
     serve.dispose();
+    expect(serve.currentBaseUrl()).toBeUndefined();
+  });
+
+  it('снятие посреди старта снимает и поднимающийся процесс, а не оставляет его сиротой', async () => {
+    const child = fakeChild();
+    const kill = vi.spyOn(child, 'kill');
+    const serve = new OpencodeServe();
+    let healthy!: () => void;
+    const health = new Promise<void>((resolve) => (healthy = resolve));
+    const asked = serve.ask('conv-1', 'вопрос', {
+      command: 'opencode',
+      spawnImpl: vi.fn(() => child) as never,
+      // Health отвечает только после снятия — так сервер поднимается у панели,
+      // которая уже закрывается.
+      fetchImpl: (async () => {
+        await health;
+        return okHealth();
+      }) as never,
+      port: 4096,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    serve.dispose();
+    expect(kill).toHaveBeenCalled();
+    healthy();
+
+    expect(await asked).toBeUndefined();
     expect(serve.currentBaseUrl()).toBeUndefined();
   });
 
@@ -101,49 +227,205 @@ describe('OpencodeServe: локальный сервер и сессии', () =>
   });
 
   it('ответ не той формы (нет текстовых частей) → undefined, сессия забыта', async () => {
-    const fetchImpl = vi.fn(async (url: string | URL | Request) => {
-      const href = String(url);
-      if (href.endsWith('/global/health')) return okHealth();
-      if (href.endsWith('/session')) return jsonResponse({ id: 'ses_1' });
-      // Части есть, но текстовых среди них нет — выдумывать ответ панель не станет.
-      return jsonResponse({ info: {}, parts: [{ type: 'tool', name: 'bash' }] });
+    // Части есть, но текстовых среди них нет — выдумывать ответ панель не станет.
+    const { fetchImpl } = fakeServer({
+      message: () => ({ info: {}, parts: [{ type: 'tool', name: 'bash' }] }),
     });
-
     const serve = new OpencodeServe();
-    expect(
-      await serve.ask('conv-1', 'вопрос', {
-        command: 'opencode',
-        spawnImpl: (() => fakeChild()) as never,
-        fetchImpl: fetchImpl as never,
-        port: 4096,
-      }),
-    ).toBeUndefined();
+    expect(await serve.ask('conv-1', 'вопрос', depsOf(fetchImpl))).toBeUndefined();
   });
 
   it('смерть процесса сервера забывает адрес и сессии: следующий запрос поднимает заново', async () => {
     const children = [fakeChild(), fakeChild()];
     let index = 0;
     const spawnImpl = vi.fn(() => children[index++]!);
-    const fetchImpl = vi.fn(async (url: string | URL | Request) => {
-      const href = String(url);
-      if (href.endsWith('/global/health')) return okHealth();
-      if (href.endsWith('/session')) return jsonResponse({ id: `ses_${index}` });
-      return jsonResponse({ info: {}, parts: [{ type: 'text', text: 'ответ' }] });
-    });
+    const { fetchImpl } = fakeServer();
 
     const serve = new OpencodeServe();
-    const deps = {
-      command: 'opencode',
-      spawnImpl: spawnImpl as never,
-      fetchImpl: fetchImpl as never,
-      port: 4096,
-    };
+    const deps = depsOf(fetchImpl, { spawnImpl });
 
     await serve.ask('conv-1', 'первый', deps);
     children[0]!.emit('exit', 1);
     await serve.ask('conv-1', 'второй', deps);
 
     expect(spawnImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it('каталог разговора уходит каждым запросом (?directory=), смена каталога — новая сессия', async () => {
+    const { fetchImpl, calls } = fakeServer();
+    const serve = new OpencodeServe();
+    const dir = 'C:/work/проект a';
+
+    await serve.ask('conv-1', 'вопрос', depsOf(fetchImpl, { workdir: dir }));
+    const scoped = calls.filter((call) => !call.url.endsWith('/global/health'));
+    expect(scoped.length).toBeGreaterThan(0);
+    for (const call of scoped) expect(call.url).toContain(`?directory=${encodeURIComponent(dir)}`);
+
+    const second = await serve.ask('conv-1', 'ещё', depsOf(fetchImpl, { workdir: 'C:/work/b' }));
+    expect(second?.sessionId).toBe('ses_2');
+  });
+
+  it('правила агента не прочитаны → сессии нет, undefined (one-shot как раньше)', async () => {
+    const { fetchImpl, calls } = fakeServer({ agents: { not: 'an array' } });
+    const serve = new OpencodeServe();
+    expect(await serve.ask('conv-1', 'вопрос', depsOf(fetchImpl))).toBeUndefined();
+    expect(calls.some((call) => call.url.includes('/session'))).toBe(false);
+  });
+});
+
+describe('sessionPermissionRules: «можно по умолчанию» становится вопросом, решения человека — нет', () => {
+  const evaluate = (agent: OpencodePermissionRule[], permission: string, target: string) =>
+    decide([...agent, ...sessionPermissionRules(agent)], permission, target);
+
+  it('умолчание OpenCode («*»: allow) → правка и команда спрашивают', () => {
+    expect(decide(BUILD_DEFAULT, 'edit', 'src/a.ts')).toBe('allow');
+    expect(evaluate(BUILD_DEFAULT, 'edit', 'src/a.ts')).toBe('ask');
+    expect(evaluate(BUILD_DEFAULT, 'bash', 'echo hi > f')).toBe('ask');
+  });
+
+  it('прочие разрешения набор сессии не трогает', () => {
+    const rules = sessionPermissionRules(BUILD_DEFAULT);
+    expect(new Set(rules.map((rule) => rule.permission))).toEqual(new Set(['edit', 'bash']));
+    expect(evaluate(BUILD_DEFAULT, 'read', 'src/a.ts')).toBe('allow');
+  });
+
+  it('явный запрет человека остаётся запретом — и целиком, и шаблоном', () => {
+    const agent: OpencodePermissionRule[] = [
+      ...BUILD_DEFAULT,
+      { permission: 'bash', pattern: '*', action: 'deny' },
+      { permission: 'edit', pattern: '*.lock', action: 'deny' },
+    ];
+    expect(evaluate(agent, 'bash', 'rm -rf x')).toBe('deny');
+    expect(evaluate(agent, 'edit', 'pnpm.lock')).toBe('deny');
+    expect(evaluate(agent, 'edit', 'src/a.ts')).toBe('ask');
+  });
+
+  it('явное «allow» человека для edit/bash — его решение, остаётся', () => {
+    const agent: OpencodePermissionRule[] = [
+      ...BUILD_DEFAULT,
+      { permission: 'bash', pattern: '*', action: 'ask' },
+      { permission: 'bash', pattern: 'git status*', action: 'allow' },
+      { permission: 'edit', pattern: '*', action: 'allow' },
+    ];
+    expect(evaluate(agent, 'bash', 'git status --short')).toBe('allow');
+    expect(evaluate(agent, 'bash', 'git push')).toBe('ask');
+    expect(evaluate(agent, 'edit', 'src/a.ts')).toBe('allow');
+  });
+
+  it('шаблонный запрет («*»: deny) не ослабляется до вопроса', () => {
+    const agent: OpencodePermissionRule[] = [
+      ...BUILD_DEFAULT,
+      { permission: '*', pattern: '*', action: 'deny' },
+    ];
+    expect(evaluate(agent, 'bash', 'ls')).toBe('deny');
+    expect(evaluate(agent, 'edit', 'a.ts')).toBe('deny');
+  });
+});
+
+describe('pickAgent: чьи правила брать', () => {
+  const build = { name: 'build', mode: 'primary', permission: BUILD_DEFAULT };
+  const mine = { name: 'mine', mode: 'primary', permission: [] };
+  const sub = { name: 'helper', mode: 'subagent', permission: [] };
+
+  it('default_agent из настроек, если это основной агент', () => {
+    expect(pickAgent([build, mine], { default_agent: 'mine' })?.name).toBe('mine');
+  });
+
+  it('подагент или неизвестное имя → build', () => {
+    expect(pickAgent([build, sub], { default_agent: 'helper' })?.name).toBe('build');
+    expect(pickAgent([build], { default_agent: 'nope' })?.name).toBe('build');
+  });
+
+  it('правило не той формы или агента нет → undefined (fail-closed)', () => {
+    expect(pickAgent([{ ...build, permission: [{ permission: 'bash' }] }], {})).toBeUndefined();
+    expect(pickAgent([mine], {})).toBeUndefined();
+    expect(pickAgent(undefined, {})).toBeUndefined();
+  });
+});
+
+describe('OpencodeServe: просьбы о разрешении решает decidePermission', () => {
+  const ask = { id: 'per_1', sessionID: 'ses_1', permission: 'bash', patterns: ['echo hi > f'] };
+
+  it('сессия создаётся с набором правил из правил агента', async () => {
+    const { fetchImpl, calls } = fakeServer();
+    await new OpencodeServe().ask('conv-1', 'вопрос', depsOf(fetchImpl));
+    const created = calls.find((call) => call.url.endsWith('/session'));
+    expect(created?.body).toEqual({ permission: sessionPermissionRules(BUILD_DEFAULT) });
+  });
+
+  it('правки выключены, человек отказал → reject с причиной для модели, ровно один ответ', async () => {
+    const { fetchImpl, replies } = fakeServer({ pending: [ask], holdUntilAnswered: true });
+    const human = vi.fn(async () => 'deny' as const);
+    const result = await new OpencodeServe().ask(
+      'conv-1',
+      'вопрос',
+      depsOf(fetchImpl, { permission: { allowEdits: false, ask: human } }),
+    );
+    expect(human).toHaveBeenCalledTimes(1);
+    expect(human).toHaveBeenCalledWith({
+      cli: 'opencode',
+      requestId: 'per_1',
+      tool: 'bash',
+      title: 'echo hi > f',
+    });
+    expect(replies).toEqual([
+      { id: 'per_1', body: { reply: 'reject', message: OPENCODE_DECLINE_MESSAGE } },
+    ]);
+    expect(result?.reply).toBe('Привет!');
+  });
+
+  it('правки выключены, человек разрешил → once', async () => {
+    const { fetchImpl, replies } = fakeServer({ pending: [ask], holdUntilAnswered: true });
+    await new OpencodeServe().ask(
+      'conv-1',
+      'вопрос',
+      depsOf(fetchImpl, { permission: { allowEdits: false, ask: async () => 'allow' } }),
+    );
+    expect(replies).toEqual([{ id: 'per_1', body: { reply: 'once' } }]);
+  });
+
+  it('правки включены → once без вопроса человеку', async () => {
+    const { fetchImpl, replies } = fakeServer({ pending: [ask], holdUntilAnswered: true });
+    const human = vi.fn(async () => 'deny' as const);
+    await new OpencodeServe().ask(
+      'conv-1',
+      'вопрос',
+      depsOf(fetchImpl, { permission: { allowEdits: true, ask: human } }),
+    );
+    expect(human).not.toHaveBeenCalled();
+    expect(replies).toEqual([{ id: 'per_1', body: { reply: 'once' } }]);
+  });
+
+  it('прав не передали (ассистент формы) → отказ, молча «да» не бывает', async () => {
+    const { fetchImpl, replies } = fakeServer({ pending: [ask], holdUntilAnswered: true });
+    await new OpencodeServe().ask('conv-1', 'вопрос', depsOf(fetchImpl));
+    expect(replies.map((item) => (item.body as { reply: string }).reply)).toEqual(['reject']);
+  });
+
+  it('чужая сессия — не наша просьба: не отвечаем', async () => {
+    const foreign = { ...ask, id: 'per_x', sessionID: 'ses_other' };
+    // Держим сообщение ~1 с: опрос успевает увидеть чужую просьбу много раз.
+    const { fetchImpl, replies } = fakeServer({ pending: [foreign], holdUntilAnswered: true });
+    await new OpencodeServe().ask(
+      'conv-1',
+      'вопрос',
+      depsOf(fetchImpl, { permission: { allowEdits: true } }),
+    );
+    expect(replies).toEqual([]);
+  });
+
+  it('спрашивал, а текста нет → заметка, а не undefined (one-shot повторил бы работу мимо отказа)', async () => {
+    const { fetchImpl } = fakeServer({
+      pending: [ask],
+      holdUntilAnswered: true,
+      message: () => ({ info: {}, parts: [{ type: 'tool', state: { status: 'error' } }] }),
+    });
+    const result = await new OpencodeServe().ask(
+      'conv-1',
+      'вопрос',
+      depsOf(fetchImpl, { permission: { allowEdits: false } }),
+    );
+    expect(result?.reply).toBe(OPENCODE_STOPPED_REPLY);
   });
 });
 

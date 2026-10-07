@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { sieveDeliveryGaps } from './sieve-gate.ts';
+import { caughtClass, sieveDeliveryGaps } from './sieve-gate.ts';
 
 /**
  * Проверка доставки на НАСТОЯЩЕМ git без удалённого (ревью сит, 28.09): механика
@@ -68,5 +68,16 @@ describe('сита на доставке без удалённого', () => {
     });
 
     expect(result.missing.some((line) => line.includes('browser-focus'))).toBe(false);
+  });
+});
+
+describe('устаревшее снятие механики — пойманный блокер (Ф5)', () => {
+  it('stale у механического сита идёт в счёт его класса, у обычного — нет', () => {
+    expect(caughtClass({ code: 'sieve-gap-stale', params: { sieve: 'secrets', files: 'a' } })).toBe(
+      'security',
+    );
+    expect(
+      caughtClass({ code: 'sieve-gap-stale', params: { sieve: 'browser-focus', files: 'a' } }),
+    ).toBeUndefined();
   });
 });

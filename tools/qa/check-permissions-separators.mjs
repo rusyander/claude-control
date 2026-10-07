@@ -29,6 +29,26 @@ const check = (pass, label, seen = '') => {
   else failures.push(label);
 };
 
+/**
+ * Строки для сверки — свои: проверка рисованная, а не про содержимое. Без
+ * подмены список брался из настоящих настроек стенда, и на одноразовом стенде
+ * (ни одного права) вторая строка не появлялась никогда.
+ */
+const RULES = [
+  ['Bash(git status:*)', 'allow'],
+  ['Bash(git push:*)', 'ask'],
+  ['Read(./.env)', 'deny'],
+  ['mcp__qa-tracker__get_issue', 'allow'],
+].map(([pattern, decision], index) => ({
+  id: `qa-${index}`,
+  pattern,
+  decision,
+  ...(pattern.startsWith('mcp__') ? { mcpServer: 'qa-tracker', mcpTool: 'get_issue' } : {}),
+  groupIds: [],
+  source: 'settings',
+  isEnabled: true,
+}));
+
 const browser = await chromium.launch();
 for (const theme of ['light', 'dark']) {
   const context = await browser.newContext({
@@ -43,6 +63,10 @@ for (const theme of ['light', 'dark']) {
     blocked.push(`${request.method()} ${new URL(request.url()).pathname}`);
     return route.fulfill({ status: 501, json: { error: 'qa: запись закрыта' } });
   });
+  // Поставлена после общей подмены — отвечает первой.
+  await page.route(/\/api\/permissions(\?|$)/, (route) =>
+    route.request().method() === 'GET' ? route.fulfill({ json: RULES }) : route.fallback(),
+  );
   await bypassOnboarding(page);
   await page.goto(`${BASE}/permissions`, { waitUntil: 'domcontentloaded' });
   // Список прав — на вкладке «Все правила»; первой открыта «Системные».

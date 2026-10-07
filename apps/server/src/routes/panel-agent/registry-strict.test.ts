@@ -21,6 +21,8 @@ const ROUTE_SECTIONS: Record<string, readonly string[]> = {
   '/history': ['history'],
   '/settings': ['settings', 'provider', 'endpoints', 'integrations'],
   '/dlp': ['dlp'],
+  '/local-models': ['local-models'],
+  '/kit': ['kit'],
   '/platform': ['contour'],
   '/compare': ['compare'],
   '/portability': ['portability'],

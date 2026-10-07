@@ -1,5 +1,6 @@
 import { object, string, array, boolean, enum as zodEnum, type infer as Infer } from 'zod';
 import { providerHooksFormats } from './provider-hooks';
+import { providerRulesFormats } from './provider-rules';
 
 /**
  * Проектный уровень конфигурации у НЕ-Claude провайдеров (COMMON-2).
@@ -79,9 +80,10 @@ export const providerProjectInfoSchema = object({
   instructionsListPath: string().optional(),
   /**
    * Формат проектного каталога правил, если раздел есть: `cursor-mdc` (Cursor,
-   * файлы `.mdc`) или `continue-md` (Continue, файлы `.md` в `.continue/rules`).
+   * файлы `.mdc`), `continue-md` (Continue, файлы `.md` в `.continue/rules`) или
+   * `qwen-md` (Qwen Code, файлы `.md` в `.qwen/rules`; см. `ProviderRulesFormat`).
    */
-  instructionsRulesFormat: zodEnum(['cursor-mdc', 'continue-md']).optional(),
+  instructionsRulesFormat: zodEnum(providerRulesFormats).optional(),
   /** Абсолютный путь проектного каталога правил (`<проект>/.cursor/rules`). */
   instructionsRulesDir: string().optional(),
   /** Формат проектного файла MCP, если раздел есть. */

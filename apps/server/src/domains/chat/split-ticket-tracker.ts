@@ -1,7 +1,13 @@
 import type { AppStore } from '../../lib/app-store.ts';
 import { atlassianAccessFrom } from '../integrations/atlassian/access.ts';
-import { createIssue } from '../integrations/atlassian/jira.ts';
+import {
+  applyTransition,
+  createIssue,
+  listTransitions,
+  readIssue,
+} from '../integrations/atlassian/jira.ts';
 import { linkForCwd } from '../integrations/links.ts';
+import type { SplitTaskTracker } from './split-tasks.ts';
 
 /**
  * Трекер для тикетов, предложенных группами разделения (L277): куда их можно
@@ -37,5 +43,29 @@ export function atlassianTicketTracker(
     },
     create: async (projectKey, summary, description) =>
       (await createIssue(access(), { projectKey, summary, description })).key,
+  };
+}
+
+/**
+ * Задачи групп в Jira (G4): статус, переходы, перевод. Подключённость —
+ * `connected`: доступ собирается без запроса наружу, отказ — интеграции нет.
+ */
+export function atlassianTaskTracker(
+  store: () => AppStore,
+  appDataDir: () => string,
+): SplitTaskTracker {
+  const access = () => atlassianAccessFrom(store(), appDataDir());
+  return {
+    connected: () => {
+      try {
+        access();
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    status: async (key) => (await readIssue(access(), key)).status,
+    transitions: (key) => listTransitions(access(), key),
+    apply: (key, id) => applyTransition(access(), key, id),
   };
 }

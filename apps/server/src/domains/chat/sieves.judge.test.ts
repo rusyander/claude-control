@@ -341,3 +341,78 @@ describe('выученные сита по областям', () => {
     expect(learnedAppliesTo({ scope: 'project' }, ['x/y.ts'])).toBe(true);
   });
 });
+
+describe('задание показывает ровно то, что потребует судья (Ф1, Ф2)', () => {
+  it('строка, которую судья отклонит, в задании открыта; принятая — нет', () => {
+    const applicable = [sieve('boundary-negative'), sieve('project-checks')];
+    const mechanics: SieveMechanics = {
+      checks: [{ command: 'pnpm lint' }, { command: 'pnpm test' }],
+    };
+    const done = [
+      // Длинное доказательство без run:<id> в проекте с блоком «Тесты» — судья: no-run.
+      row('boundary-negative', 'POST max+1 → 400 as documented, checked by hand'),
+      // Названа одна команда из двух — судья: sieve-gap-checks.
+      row('project-checks', 'pnpm lint → 0 problems, all green'),
+    ];
+    const proof = { testsBlock: true };
+    const gaps = judgeSieves({ applicable, rows: done, mechanics, proof });
+    expect(codes(gaps).sort()).toEqual(['sieve-gap-checks', 'sieve-gap-no-run']);
+    const block = sievePromptBlock({ stage: 'deliver', applicable, done, mechanics, proof });
+    expect(block).toContain('[boundary-negative]');
+    expect(block).toContain('[project-checks]');
+
+    const fixed = [
+      row('boundary-negative', 'POST max+1 → 400, recorded run:run-000001'),
+      row('project-checks', 'pnpm lint → 0 problems; pnpm test → 12 passed'),
+    ];
+    const runs = { 'run-000001': { found: true, red: [], passed: 3, changedAfter: [] } };
+    const good = { testsBlock: true, runs };
+    expect(judgeSieves({ applicable, rows: fixed, mechanics, proof: good })).toEqual([]);
+    const after = sievePromptBlock({
+      stage: 'deliver',
+      applicable,
+      done: fixed,
+      mechanics,
+      proof: good,
+    });
+    expect(after).not.toContain('[boundary-negative]');
+    expect(after).not.toContain('[project-checks]');
+  });
+
+  it('25 отмеченных файлов: задание называет все, судья принимает ровно показанное', () => {
+    const files = Array.from({ length: 25 }, (_, index) => `src/mod${index}/config.ts`);
+    const mechanics: SieveMechanics = { secrets: files };
+    const applicable = applicableSieves(files);
+    const block = sievePromptBlock({ stage: 'deliver', applicable, mechanics });
+    for (const file of files) expect(block).toContain(file);
+    const shown = /\[secrets\][^:]*: ([^\n]*)\./.exec(block)?.[1] ?? '';
+    const all = row('secrets', `test fixtures, not keys: ${shown}`, { status: 'n/a' });
+    const gapsOf = (evidence: SieveReportRow) =>
+      codes(judgeSieves({ applicable, rows: [evidence], mechanics })).filter(
+        (code) => code === 'sieve-gap-secrets',
+      );
+    expect(gapsOf(all)).toEqual([]);
+    const ten = row('secrets', `test fixtures: ${files.slice(0, 10).join(', ')}`, {
+      status: 'n/a',
+    });
+    expect(gapsOf(ten)).toEqual(['sieve-gap-secrets']);
+  });
+});
+
+describe('снятие механики устаревает правкой отмеченного (Ф5)', () => {
+  const mechanics: SieveMechanics = { envVars: ['PAYMENTS_URL'], lockfiles: ['web/package.json'] };
+  const rows = [
+    row('env-config', 'PAYMENTS_URL is set by the deploy chart', { at: '2026-10-01T10:00:00Z' }),
+    row('lockfile-sync', 'web/package.json only reorders scripts', { at: '2026-10-01T10:00:00Z' }),
+  ];
+  const judge = (changed: Record<string, string[]>) =>
+    judgeSieves({ applicable: [], rows, mechanics, proof: { changedAfterRow: changed } });
+
+  it('после снятия правили чужое или доки — снято; правили отмеченное — снова открыто', () => {
+    expect(judge({ 'env-config': ['README.md'], 'lockfile-sync': ['web/src/a.ts'] })).toEqual([]);
+    expect(judge({ 'env-config': ['src/pay.ts'], 'lockfile-sync': ['web/package.json'] })).toEqual([
+      { code: 'sieve-gap-stale', params: { sieve: 'lockfile-sync', files: 'web/package.json' } },
+      { code: 'sieve-gap-stale', params: { sieve: 'env-config', files: 'src/pay.ts' } },
+    ]);
+  });
+});

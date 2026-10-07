@@ -53,7 +53,7 @@ export function registerProviderProjectRulesRoutes(app: FastifyInstance, ctx: Se
       const rules = target.instructionsRules;
       if (!rules) return reply.code(400).send(INSTRUCTIONS_RULES_UNSUPPORTED);
 
-      const draft = parseProviderRuleDraft(request.body);
+      const draft = parseProviderRuleDraft(request.body, rules.format);
       if (!draft) return reply.code(400).send(INVALID_RULE_DRAFT);
 
       return guardedRule(reply, () => {

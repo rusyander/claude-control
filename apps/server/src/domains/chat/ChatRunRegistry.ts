@@ -1043,7 +1043,8 @@ export class ChatRunRegistry {
       !claudeModelHasAutoMode(route.model.model)
         ? { permissionMode: 'acceptEdits' }
         : {}),
-      platformEnv: route.env,
+      // Набор панели (В2) едет своим полем: и мимо контура, и поверх него.
+      platformEnv: { ...route.env, ...route.kit?.env },
       // Промпт контура ставится и СНИМАЕТСЯ здесь же: прогон, продолженный
       // после выключенной галочки, обязан вернуться к промпту CLI.
       platformSystemPrompt: route.systemPrompt ?? '',
@@ -1052,7 +1053,7 @@ export class ChatRunRegistry {
       // и кладутся безусловно — прошлая жизнь прогона не переживает ни снятую
       // галочку, ни возвращённую. Сам текст дописки при этом не трогается:
       // затёртый, он не вернулся бы после паузы дерева (ревью Т8, MAJOR-4).
-      platformArgs: route.layers?.args ?? [],
+      platformArgs: [...(route.layers?.args ?? []), ...(route.kit?.args ?? [])],
       platformDropAppend: route.layers ? !route.layers.systemPrompt : false,
       // Пересчитывается на каждом старте: папка e2e могла появиться между ходами.
       workspaceNote: this.workspaceNoteSafe(options.cwd),

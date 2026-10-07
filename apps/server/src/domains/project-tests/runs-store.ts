@@ -118,6 +118,8 @@ function parseRun(data: unknown, fileId: string): ProjectTestRunRecord | undefin
     finishedAt: optional(record.finishedAt),
     error: optional(record.error),
     messageCode: optional(record.messageCode),
+    params: parseParams(record.params),
+    provider: optional(record.provider),
     exitCode: typeof record.exitCode === 'number' ? record.exitCode : undefined,
     tokens: typeof record.tokens === 'number' ? record.tokens : undefined,
     costUsd: typeof record.costUsd === 'number' ? record.costUsd : undefined,
@@ -138,6 +140,16 @@ function parseRun(data: unknown, fileId: string): ProjectTestRunRecord | undefin
  * остальное: по этому полю повторная отправка решает, что ран уже есть, и
  * мусор в нём означал бы либо отказ чужой системы, либо попадание в чужой ран.
  */
+/** Подстановки текста записи: только строки и числа — прочее чужой файл мог принести мусором. */
+function parseParams(raw: unknown): ProjectTestRunRecord['params'] {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const entries = Object.entries(raw as Record<string, unknown>).filter(
+    (entry): entry is [string, string | number] =>
+      typeof entry[1] === 'string' || typeof entry[1] === 'number',
+  );
+  return entries.length > 0 ? Object.fromEntries(entries) : undefined;
+}
+
 function parseTms(raw: unknown): ProjectTestRunRecord['tms'] {
   if (!raw || typeof raw !== 'object') return undefined;
   const value = raw as Record<string, unknown>;

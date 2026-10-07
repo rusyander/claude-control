@@ -52,7 +52,9 @@ export function FeedErrorCard({
             {explained}
           </Typography>
         )}
-        {stream.errorCode === 'cli-outdated' && <CliInfoPanel refresh withUpdate />}
+        {stream.errorCode === 'cli-outdated' && (
+          <CliInfoPanel refresh withUpdate providerId="claude" />
+        )}
         {/* Текст самой панели (потерянный процесс чата) по-русски совпадает с
             объяснением — второй раз ту же фразу не показываем. */}
         {stream.error !== explained && <div className={styles.errorText}>{stream.error}</div>}

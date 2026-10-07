@@ -1,4 +1,8 @@
-import type { ProviderChatDetail, ProviderRunnerInfo } from '@agentdeck/contracts';
+import type {
+  ProviderChatDetail,
+  ProviderEditsWhenOff,
+  ProviderRunnerInfo,
+} from '@agentdeck/contracts';
 
 export interface ProviderChatHeaderProps {
   chat?: ProviderChatDetail;
@@ -21,4 +25,13 @@ export interface ProviderChatHeaderProps {
    */
   onRestart?: () => void;
   isRestarting?: boolean;
+  /**
+   * «Разрешить правки» разговора. Нет обработчика — до этого CLI переключатель
+   * не доходит ни флагом, ни живым сервером, и вместо него подсказка: решают
+   * настройки самого CLI.
+   */
+  allowEdits?: boolean;
+  onAllowEditsChange?: (next: boolean) => void;
+  /** Смысл выключенного переключателя: вопрос карточкой или закрытая запись. */
+  editsWhenOff?: ProviderEditsWhenOff;
 }

@@ -38,8 +38,9 @@ export function GroupFormModal({ isOpen, onOpenChange, group }: GroupFormModalPr
   const [failure, setFailure] = useState('');
   const { data: permissions = [] } = permissionApi.useList();
   // Помощник выбирает участников и проекты из того же, что видит человек.
-  const { items: catalog } = useMemberCatalog(group?.id);
-  const { data: projects = [] } = useProjectRegistry();
+  const { items: catalog, loading: catalogLoading } = useMemberCatalog(group?.id);
+  const projectRegistry = useProjectRegistry();
+  const projects = projectRegistry.data ?? [];
 
   // Конфликт внутри группы: два участника-права с одним шаблоном, но разными
   // решениями (allow и deny разом). Claude Code возьмёт какое-то одно, а группа
@@ -134,6 +135,7 @@ export function GroupFormModal({ isOpen, onOpenChange, group }: GroupFormModalPr
           projectPaths,
         }}
         spec={groupAssistantSpec({ catalog, members, projects, projectPaths })}
+        loading={catalogLoading || projectRegistry.isPending}
         onApply={(applied) => {
           if (applied.name !== undefined) setName(applied.name);
           if (applied.description !== undefined) setDescription(applied.description);

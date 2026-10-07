@@ -4,6 +4,8 @@ import type { ComposerModeState } from '@features/ChatComposer';
 import type { ChatSendFile } from './ChatPage.types';
 
 export interface ChatDockProps {
+  /** Ключ черновика: новый ключ — курсор в поле ввода. */
+  focusKey?: string;
   /** План агента и дерево субагентов — read-only, из транскрипта. */
   progress?: ChatProgress;
   isRunning: boolean;

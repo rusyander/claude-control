@@ -76,13 +76,17 @@ export function GroupsTopic() {
 
       {/* В самом разделе автоматического включения не видно: человек в этот
           момент смотрит в чат. Единственный его след на экране — строка в ленте
-          прогона, и у чужого CLI нет даже её. Поэтому — словами. */}
+          прогона (у чужого CLI — своя заметка о группах). Поэтому — словами. */}
       <HelpSection title={tr('bindTitle')} caption={tr('bindCaption')}>
         <OptionCards
           items={[
             { title: tr('bindProject'), text: tr('bindProjectText') },
             { title: tr('bindWhen'), text: tr('bindWhenText') },
             { title: tr('bindNotice'), text: tr('bindNoticeText') },
+            { title: tr('bindQwen'), text: tr('bindQwenText') },
+            { title: tr('bindCodex'), text: tr('bindCodexText') },
+            { title: tr('bindPage'), text: tr('bindPageText') },
+            { title: tr('bindForeign'), text: tr('bindForeignText') },
             { title: tr('bindWorktree'), text: tr('bindWorktreeText') },
             { title: tr('bindNoOff'), text: tr('bindNoOffText') },
           ]}

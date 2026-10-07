@@ -77,4 +77,33 @@ export const platformEn: Record<PlatformMessageCode, string> = {
     'Request rejected: «{{subject}}» — the key travels under this name, and the key is stored encrypted and travels in its own field ({{field}}).',
   'transport-header-reserved':
     'Request rejected: «{{subject}}» — the panel sets this header itself ({{field}}).',
+  'assistant-route-refused': 'The helper did not start: {{reason}}',
+  'assistant-provider-unsupported':
+    '{{provider}} has neither a non-interactive mode nor an API — the helper has nothing to answer with. Switch the active CLI or pick a «Panel assistant» profile',
+  'assistant-provider-unavailable':
+    '{{provider}} is not on the panel process PATH and there is no API key — the helper has nothing to answer with. Install the CLI or save a key',
+  'assistant-contour-cli-missing':
+    '{{provider}} goes through the contour, but the CLI is not on the panel process PATH — the helper did not start, so as not to reach the vendor cloud past the contour',
+  'assistant-contour-gateway-down':
+    'The panel assistant goes through the contour «{{title}}», but the panel gateway is not running — the request was not sent, so as not to reach the vendor cloud. Press «Start gateway» on the contour card',
+  'assistant-contour-no-token':
+    'The panel assistant goes through the contour «{{title}}», but the contour key is not saved — the gateway has nothing to insert. Save the key on the contour card',
+  'watcher-provider-unsupported':
+    'The watcher analyses failures only through Claude Code: a read-only launch is described for it alone, and the active CLI is {{provider}}. Analysis did not start',
+  'watcher-endpoint-unsupported':
+    'The panel assistant uses its own endpoint «{{name}}» — the watcher would have to hand its token to a CLI process, which the panel does not do. Analysis did not start',
+  'provider-chat-unsupported':
+    '{{provider}} has no non-interactive mode — the panel chat cannot work with it. The conversation was not created: switch the active CLI',
+  'analytics-provider-unsupported':
+    'Analytics reads the logs of Claude Code, Codex and Qwen Code only, and the active CLI is {{provider}}. Claude data is not shown under it',
+  'analytics-live-foreign':
+    'The panel recognises running processes of Claude Code only, and the active CLI is {{provider}}. The list stays empty rather than pass claude processes off as its own',
+  'groups-foreign-not-delivered':
+    'Panel groups live in the Claude Code settings, and {{provider}} does not read them — the group does not reach its runs',
+  'plugins-provider-unsupported':
+    'The Claude Code plugins section works through claude only, and the active CLI is {{provider}}. The command did not run',
+  'sandbox-provider-unsupported':
+    'The sandbox runs Claude Code only, and the active CLI is {{provider}}. The run did not start',
+  'assistant-api-base-unknown':
+    'The panel does not know the model API address of {{provider}} — the key was sent nowhere, so as not to reach another vendor. Install the CLI or pick your own endpoint',
 };

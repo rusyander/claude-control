@@ -24,5 +24,7 @@ export {
   useReviewRetry,
   useStartGroupNow,
 } from './api/ChatTreeApi';
+export { splitTasksKeys, useMoveSplitTasks, useSplitTaskOptions } from './api/SplitTasksApi';
+export type { SplitTasksScope } from './api/SplitTasksApi';
 export { splitLocked } from './lib/splitLocked';
 export { focusPlanCancel, isPlanRunningRefusal, offerPlanCancel } from './lib/planCancelOffer';

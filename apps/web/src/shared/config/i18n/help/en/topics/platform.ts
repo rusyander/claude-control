@@ -201,10 +201,17 @@ export const platformEn: typeof platformRu = {
       'CLI works as a chat — the mark beside it says which. Circle: can be applied. Dash: ' +
       'unavailable, and ' +
       'the reason is spelled out — no environment file, no documented address variable, a ' +
-      'foreign dialect, a gateway that is down. A foreign dialect today means Gemini CLI ' +
-      'and Codex: codex speaks the “/responses” handle the gateway does not serve, and it ' +
-      'refuses to load a config with any other handle at all — a dash is more honest than ' +
-      'a write after which the CLI itself no longer starts.',
+      'foreign dialect, a gateway that is down, a setting of the CLI itself that takes it ' +
+      'past the contour. Codex speaks the “/responses” handle and Gemini CLI the Gemini API ' +
+      'handles: the gateway translates them at the edge into chat/completions and back, so ' +
+      'rules, the mask, the tool shim and spend work for them as for the rest; what cannot ' +
+      'be translated (web search, reasoning, a reference to an earlier answer) shows in the ' +
+      'request trace as losses. Gemini CLI reads the gateway address only with API-key ' +
+      'sign-in: Google-account or Vertex AI sign-in goes to its own servers, so its row is ' +
+      'then a dash with a reason, and a chat through a required contour refuses, naming the ' +
+      'security.auth.selectedType setting. The same goes for Kimi Code with ' +
+      '[secondary_model] and Goose with GOOSE_LEAD_PROVIDER: part of their run would go ' +
+      'past the contour.',
     screenJournal: 'Apply journal',
     screenJournalText:
       'One entry is one target, with its date and its own rollback button. A rollback removes ' +
@@ -1329,8 +1336,9 @@ export const platformEn: typeof platformRu = {
         'that one process’s environment and nowhere else — “through the panel profile”, or ' +
         '“written into the CLI config”. An unavailable consumer is a dash with a reason, not ' +
         'a checkbox: Codex and Continue keep the address in their own file, one per machine, ' +
-        'so “for chat only” is physically impossible there; Gemini CLI speaks a dialect the ' +
-        'gateway does not understand. Below the list come the mode for a contour refusal ' +
+        'so “for chat only” is physically impossible there. Gemini CLI is on the list, but ' +
+        'goes through the contour only with API-key sign-in — otherwise the run is refused ' +
+        'with the setting named. Below the list come the mode for a contour refusal ' +
         '(“required” = do not work), the key budget (the figure you set in the admin; 100 on ' +
         'the screenshot) and the day the contour restarts its period from, as 2026-09-01.',
       pTerminal: 'CLI files live under the “Terminal” tick',

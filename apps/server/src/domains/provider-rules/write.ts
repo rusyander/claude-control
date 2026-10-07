@@ -1,7 +1,8 @@
 import { existsSync, statSync } from 'node:fs';
-import type { ProviderRuleDraft } from '@agentdeck/contracts';
+import type { ProviderRuleDraft, ProviderRulesFormat } from '@agentdeck/contracts';
 import { backupEntry, removeEntry, readTextFile, writeTextFile } from '../../lib/safe-io.ts';
-import { MdcFormatError, readMdcRule, writeMdcRule, type MdcFields } from '../../lib/cursor-mdc.ts';
+import { MdcFormatError, type MdcFields } from '../../lib/cursor-mdc.ts';
+import { ruleCodec } from './codec.ts';
 import { RuleNotEditableError, RuleNotFoundError, UnsafeRulePathError } from './errors.ts';
 import { resolveRulePath, ruleBackupName, toRelative } from './paths.ts';
 import type { ProviderRulesTarget } from './types.ts';
@@ -9,9 +10,14 @@ import type { ProviderRulesTarget } from './types.ts';
 /**
  * Разобрать черновик правила из тела запроса. Схему zod в рантайме сервера
  * использовать нельзя (значение из contracts роняет node ESM) — проверяем руками.
- * Некорректное тело → `undefined` (маршрут ответит 400).
+ * Некорректное тело → `undefined` (маршрут ответит 400). С `format` черновик
+ * сверяется и с формой CLI: `alwaysApply` формату без такого поля (Qwen) —
+ * отказ, а не молча выброшенное значение.
  */
-export function parseProviderRuleDraft(body: unknown): ProviderRuleDraft | undefined {
+export function parseProviderRuleDraft(
+  body: unknown,
+  format?: ProviderRulesFormat,
+): ProviderRuleDraft | undefined {
   if (!body || typeof body !== 'object') return undefined;
   const raw = body as Record<string, unknown>;
 
@@ -22,6 +28,7 @@ export function parseProviderRuleDraft(body: unknown): ProviderRuleDraft | undef
   if (raw.description !== undefined && typeof raw.description !== 'string') return undefined;
   if (raw.globs !== undefined && typeof raw.globs !== 'string') return undefined;
   if (raw.alwaysApply !== undefined && typeof raw.alwaysApply !== 'boolean') return undefined;
+  if (raw.alwaysApply !== undefined && format && !ruleCodec(format).alwaysApply) return undefined;
   // Перевод строки внутри однострочных полей frontmatter сломал бы форму записи.
   if (typeof raw.description === 'string' && /[\r\n]/.test(raw.description)) return undefined;
   if (typeof raw.globs === 'string' && /[\r\n]/.test(raw.globs)) return undefined;
@@ -55,11 +62,12 @@ export function saveProviderRule(
     throw new UnsafeRulePathError(draft.path, 'по этому пути находится каталог, а не файл.');
   }
 
+  const codec = ruleCodec(target.format);
   const original = exists ? readTextFile(fullPath) : '';
   if (exists) {
     // Fail-closed: файл, который панель не понимает, она не переписывает.
     try {
-      readMdcRule(original);
+      codec.read(original);
     } catch (error) {
       if (error instanceof MdcFormatError) {
         throw new RuleNotEditableError(
@@ -78,7 +86,7 @@ export function saveProviderRule(
     ...(draft.alwaysApply === undefined ? {} : { alwaysApply: draft.alwaysApply }),
   };
 
-  const next = writeMdcRule(original, fields, draft.body);
+  const next = codec.write(original, fields, draft.body);
   const backupPath = writeTextFile(fullPath, next, {
     backupDir,
     backupName: ruleBackupName(target, fullPath),

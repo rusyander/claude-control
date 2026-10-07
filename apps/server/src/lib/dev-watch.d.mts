@@ -2,6 +2,9 @@
 
 export declare function isWatched(path: string): boolean;
 
+/** Журналы процессов проверок проекта, которых ждёт перезапуск (Ф11). */
+export declare const CHECK_LEDGERS: readonly string[];
+
 export declare function busyRun(
   entries: readonly unknown[],
   isAlive: (pid: number) => boolean,

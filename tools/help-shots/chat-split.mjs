@@ -18,7 +18,23 @@ import {
   openChat,
 } from './chat-stubs.mjs';
 
+/**
+ * Время сценария сдвинуто к моменту съёмки. Сводка групп считает «с начала …»
+ * от самого раннего старта до настоящих часов браузера, пока группа идёт, и с
+ * неподвижными датами кадр старел на час с каждым часом («с начала 606ч»).
+ * Часы браузера не подменяются: `page.clock.install` останавливал таймеры
+ * панели, и кадры выходили пустыми. Поэтому сдвигаются сами даты: «сейчас»
+ * в кадре — всегда 11:37 сценарного дня, через минуту после паузы дерева.
+ */
+const SHIFT = Date.now() - Date.parse('2026-09-10T11:37:00.000Z');
+const at = (iso) => new Date(Date.parse(iso) + SHIFT).toISOString();
+
 const PARENT = 'help-split-parent';
+/** Родитель — в том же сдвинутом времени, иначе он «старше» своих детей на месяц. */
+const PARENT_CHAT = chat(PARENT, 'Разбор задач', {
+  createdAt: at('2026-09-10T11:00:00.000Z'),
+  updatedAt: at('2026-09-10T11:02:00.000Z'),
+});
 const A_PLAN = 'help-split-a-plan';
 const A_WORK = 'help-split-a-work';
 const A_REVIEW = 'help-split-a-review';
@@ -66,7 +82,7 @@ const PARENT_MESSAGES = {
           text: 'Три дела по странице заказов: выгрузка в CSV, фильтры списка и отчёт по возвратам.',
         },
       ],
-      timestamp: '2026-09-10T11:00:00.000Z',
+      timestamp: at('2026-09-10T11:00:00.000Z'),
     },
     {
       id: 's2',
@@ -77,7 +93,7 @@ const PARENT_MESSAGES = {
           text: `Задачи независимы: общий у них только каталог.\n\n${block(PROPOSAL)}\n\nЖду решения.`,
         },
       ],
-      timestamp: '2026-09-10T11:02:00.000Z',
+      timestamp: at('2026-09-10T11:02:00.000Z'),
     },
   ],
   total: 2,
@@ -97,31 +113,31 @@ const link = (id, group, stage, extra = {}) =>
 
 const CHILDREN = [
   link(A_PLAN, A, 'plan', {
-    createdAt: '2026-09-10T11:03:00.000Z',
-    updatedAt: '2026-09-10T11:05:00.000Z',
+    createdAt: at('2026-09-10T11:03:00.000Z'),
+    updatedAt: at('2026-09-10T11:05:00.000Z'),
     model: 'claude-opus-5',
   }),
   link(A_WORK, A, 'work', {
-    createdAt: '2026-09-10T11:05:00.000Z',
-    updatedAt: '2026-09-10T11:24:00.000Z',
+    createdAt: at('2026-09-10T11:05:00.000Z'),
+    updatedAt: at('2026-09-10T11:24:00.000Z'),
     model: 'claude-sonnet-4-5',
-    firstEditAt: '2026-09-10T11:05:12.000Z',
+    firstEditAt: at('2026-09-10T11:05:12.000Z'),
   }),
   link(A_REVIEW, A, 'review', {
-    createdAt: '2026-09-10T11:24:00.000Z',
-    updatedAt: '2026-09-10T11:31:00.000Z',
+    createdAt: at('2026-09-10T11:24:00.000Z'),
+    updatedAt: at('2026-09-10T11:31:00.000Z'),
     model: 'claude-opus-5',
   }),
   link(B_PLAN, B, 'plan', {
-    createdAt: '2026-09-10T11:03:00.000Z',
-    updatedAt: '2026-09-10T11:06:00.000Z',
+    createdAt: at('2026-09-10T11:03:00.000Z'),
+    updatedAt: at('2026-09-10T11:06:00.000Z'),
     model: 'claude-opus-5',
   }),
   link(B_WORK, B, 'work', {
-    createdAt: '2026-09-10T11:06:00.000Z',
-    updatedAt: '2026-09-10T11:29:00.000Z',
+    createdAt: at('2026-09-10T11:06:00.000Z'),
+    updatedAt: at('2026-09-10T11:29:00.000Z'),
     model: 'claude-sonnet-4-5',
-    firstEditAt: '2026-09-10T11:06:09.000Z',
+    firstEditAt: at('2026-09-10T11:06:09.000Z'),
   }),
 ];
 
@@ -157,7 +173,7 @@ const QUESTION = frame(
 
 /** Пересечения веток: одно нарушение границ и один законный общий файл. */
 const OVERLAP = {
-  at: '2026-09-10T11:35:00.000Z',
+  at: at('2026-09-10T11:35:00.000Z'),
   files: [
     { path: 'src/shared/api/client.ts', groups: [0, 1], outside: [1] },
     { path: 'src/pages/Orders/OrdersPage.tsx', groups: [0, 1], outside: [] },
@@ -184,8 +200,8 @@ const WORKTREES = {
       bootstrap: {
         command: 'pnpm install --frozen-lockfile --prefer-offline',
         status: 'ok',
-        startedAt: '2026-09-10T11:03:00.000Z',
-        finishedAt: '2026-09-10T11:03:48.000Z',
+        startedAt: at('2026-09-10T11:03:00.000Z'),
+        finishedAt: at('2026-09-10T11:03:48.000Z'),
         exitCode: 0,
         logTail: 'Packages: +812\nDone in 47.6s',
         reverted: ['pnpm-lock.yaml'],
@@ -200,13 +216,40 @@ const WORKTREES = {
       bootstrap: {
         command: 'pnpm install --frozen-lockfile --prefer-offline',
         status: 'ok',
-        startedAt: '2026-09-10T11:03:00.000Z',
-        finishedAt: '2026-09-10T11:03:52.000Z',
+        startedAt: at('2026-09-10T11:03:00.000Z'),
+        finishedAt: at('2026-09-10T11:03:52.000Z'),
         exitCode: 0,
         logTail: 'Packages: +812\nDone in 51.2s',
       },
     },
   ],
+};
+
+/** Кадр 08: доставка обеих групп — MR и задачи трекера из их заданий. */
+const DELIVERED = [
+  {
+    deliver: true,
+    mr: 'https://git.example.com/shop/-/merge_requests/41',
+    result: { kind: 'pushed', commits: 3 },
+    taskKeys: ['PROJ-41', 'PROJ-42'],
+  },
+  {
+    deliver: true,
+    mr: 'https://git.example.com/shop/-/merge_requests/42',
+    result: { kind: 'pushed', commits: 2 },
+    taskKeys: ['PROJ-43'],
+  },
+];
+
+/** Ответ «какие задачи и куда»: статусы сейчас и общие для всех переходы. */
+const TASK_OPTIONS = {
+  keys: [
+    { key: 'PROJ-41', group: A.title, status: 'In Progress' },
+    { key: 'PROJ-42', group: A.title, status: 'In Progress' },
+    { key: 'PROJ-43', group: B.title, status: 'Code Review' },
+  ],
+  statuses: ['Code Review', 'Ready for QA'],
+  unread: [],
 };
 
 export async function shootSplit(browser, web, scenario) {
@@ -216,6 +259,8 @@ export async function shootSplit(browser, web, scenario) {
   let withChildren = false;
   let paused = false;
   let overlap;
+  /** Кадр 08: группы доставлены с MR, Jira подключена — «Перевести задачи». */
+  let delivered = false;
 
   try {
     await settings(page);
@@ -224,10 +269,8 @@ export async function shootSplit(browser, web, scenario) {
     await page.route('**/api/chats', (route) =>
       route.fulfill({
         json: withChildren
-          ? [chat(PARENT, 'Разбор задач'), ...CHILDREN].map((item) =>
-              paused ? { ...item, paused: true } : item,
-            )
-          : [chat(PARENT, 'Разбор задач')],
+          ? [PARENT_CHAT, ...CHILDREN].map((item) => (paused ? { ...item, paused: true } : item))
+          : [PARENT_CHAT],
       }),
     );
     // Порядок обязателен: Playwright отдаёт запрос ПОСЛЕДНЕМУ подходящему
@@ -243,7 +286,7 @@ export async function shootSplit(browser, web, scenario) {
     await page.route('**/api/chat/active', (route) =>
       route.fulfill({
         json:
-          withChildren && !paused
+          withChildren && !paused && !delivered
             ? [
                 { chatId: A_WORK, seq: 0 },
                 { chatId: B_WORK, seq: 0 },
@@ -268,34 +311,39 @@ export async function shootSplit(browser, web, scenario) {
       route.fulfill({
         json: {
           root: PARENT,
-          running: paused ? 0 : 2,
-          ...(paused ? { paused: { at: '2026-09-10T11:36:00.000Z', chats: 5, pending: 0 } } : {}),
+          running: paused || delivered ? 0 : 2,
+          ...(paused
+            ? { paused: { at: at('2026-09-10T11:36:00.000Z'), chats: 5, pending: 0 } }
+            : {}),
           split: {
             parentChatId: PARENT,
             order: [0, 1],
             triage: {
-              at: '2026-09-10T11:02:40.000Z',
+              at: at('2026-09-10T11:02:40.000Z'),
               received: true,
               repairs: [],
               conflicts: [],
             },
             ...(overlap ? { overlap } : {}),
+            ...(delivered ? { jiraTasks: true } : {}),
             groups: [
               {
                 index: 0,
                 title: A.title,
                 branch: A.branch,
                 after: [],
-                status: 'started',
+                status: delivered ? 'done' : 'started',
                 chatId: A_WORK,
+                ...(delivered ? DELIVERED[0] : {}),
               },
               {
                 index: 1,
                 title: B.title,
                 branch: B.branch,
                 after: [],
-                status: 'started',
+                status: delivered ? 'done' : 'started',
                 chatId: B_WORK,
+                ...(delivered ? DELIVERED[1] : {}),
               },
             ],
           },
@@ -304,7 +352,7 @@ export async function shootSplit(browser, web, scenario) {
             aliases: [],
             parentChatId: PARENT,
             title: item.title,
-            running: !paused && (item.id === A_WORK || item.id === B_WORK),
+            running: !paused && !delivered && (item.id === A_WORK || item.id === B_WORK),
           })),
         },
       }),
@@ -326,6 +374,9 @@ export async function shootSplit(browser, web, scenario) {
       route.fulfill({ json: { ok: true } }),
     );
     await page.route('**/api/chat/split/decline', (route) => route.fulfill({ json: { ok: true } }));
+    await page.route('**/api/chat/split/*/tasks*', (route) =>
+      route.fulfill({ json: TASK_OPTIONS }),
+    );
 
     // ── 01. Предложение разделить задачи ─────────────────────────────────────
     // Карточка трёх групп выше рабочего окна, а лента уезжает вниз: на 900 px
@@ -405,6 +456,19 @@ export async function shootSplit(browser, web, scenario) {
     // Пульт узкий (350 px), и запас вокруг него обязателен: кадр раздаётся на
     // ширину колонки документа, а узкая картинка в ней разбухает до плаката.
     await scenario.shot(page, '07-worktrees', { clip: '[role="dialog"]', padding: 240 });
+    await page.keyboard.press('Escape');
+
+    // ── 08. Перевести задачи групп с MR в статус Jira ───────────────────────
+    delivered = true;
+    paused = false;
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('[data-child-hub]', { timeout: 15000 });
+    await page.waitForTimeout(1500);
+    await page.locator('[data-move-tasks="all"]').click();
+    await page.locator('[data-move-tasks-keys]').waitFor({ timeout: 10000 });
+    await page.waitForTimeout(600);
+    await scenario.shot(page, '08-move-tasks', { clip: '[role="dialog"]', padding: 160 });
   } finally {
     await page.close();
   }

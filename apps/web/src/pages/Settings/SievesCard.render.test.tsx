@@ -116,3 +116,18 @@ describe('карточка сит перед MR', () => {
     expect(loading).not.toContain('<table');
   });
 });
+
+describe('полное хранилище выученных сит (Ф4)', () => {
+  it('отказ виден словами, с числом и потолком; без отказа — строки нет', () => {
+    const refused = render({
+      learned: [learned],
+      tally: {},
+      refused: { count: 2, at: '2026-10-05T10:00:00Z' },
+    });
+    expect(refused).toContain('data-sieves-refused');
+    expect(refused).toContain('role="alert"');
+    expect(textOf(refused)).toMatch(/Новые сита не записаны \(2,/);
+    expect(textOf(refused)).toContain('все 40 мест');
+    expect(render({ learned: [learned], tally: {} })).not.toContain('data-sieves-refused');
+  });
+});

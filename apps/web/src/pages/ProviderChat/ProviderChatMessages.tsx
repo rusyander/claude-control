@@ -38,6 +38,8 @@ export function ProviderChatMessages({
   isRunning,
   queued,
   onCancelQueued,
+  queueHeld,
+  onSendQueued,
   isEmptyState,
   onCreate,
   isCreating,
@@ -304,6 +306,7 @@ export function ProviderChatMessages({
                 <Typography variant="caption" color="subtle" as="span">
                   {message.role === 'user' ? t('providerChat.you') : providerName}
                   {message.failed ? ` · ${t('providerChat.failed')}` : ''}
+                  {message.steered ? ` · ${t('providerChat.steered')}` : ''}
                 </Typography>
                 {renderTurn(message)}
                 {message.role === 'assistant' && message.contextSummarized && (
@@ -363,6 +366,8 @@ export function ProviderChatMessages({
           <QueuedBubbles
             items={(queued ?? []).map((item) => ({ id: item.id, prompt: item.text }))}
             {...(onCancelQueued ? { onCancel: onCancelQueued } : {})}
+            {...(queueHeld ? { held: true } : {})}
+            {...(onSendQueued ? { onSend: onSendQueued } : {})}
           />
         </Stack>
       )}

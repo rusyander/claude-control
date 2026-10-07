@@ -4,8 +4,11 @@ import { Typography } from '@shared/ui/typography';
 import { Modal } from '@shared/ui/modal';
 import { Badge } from '@shared/ui/badge';
 import { Card } from '@shared/ui/card';
+import { cn } from '@shared/lib/cn';
 import { formatCompact, formatMoney, formatNumber, formatPercent } from '@shared/lib/format-number';
 import { DetailRow } from './DetailRow';
+import { SessionDetails } from './SessionDetails';
+import { sessionBrief } from './model/sessionFacts';
 import type { DetailModalProps } from './DetailModal.types';
 import styles from './AnalyticsPage.module.scss';
 
@@ -26,11 +29,14 @@ export function DetailModal({ isOpen, onOpenChange, kind, id, analytics }: Detai
   const cost = model?.estimatedCost ?? project?.estimatedCost ?? 0;
   const title = model?.model ?? project?.displayName ?? id;
 
-  // Сессии, относящиеся к выбранному проекту: для модели такой связи нет,
-  // одна сессия может обращаться к нескольким моделям.
+  // Сессии проекта сервер кладёт в сам проект. Общий список последних обрезан до
+  // 25 на все проекты, и по нему у малого проекта сессий не нашлось бы вовсе;
+  // он остаётся запасным — на случай старого сервера без `sessionList`.
+  // Для модели такой связи нет: одна сессия может обращаться к нескольким моделям.
   const sessions =
     kind === 'project'
-      ? analytics.recentSessions.filter((session) => session.project === id)
+      ? (project?.sessionList ??
+        analytics.recentSessions.filter((session) => session.project === id))
       : analytics.recentSessions.filter((session) => session.models.includes(id));
 
   const share = totals && analytics.overall.total > 0 ? totals.total / analytics.overall.total : 0;
@@ -90,39 +96,61 @@ export function DetailModal({ isOpen, onOpenChange, kind, id, analytics }: Detai
           {sessions.length > 0 && (
             <Stack gap="var(--spacing-xs)">
               <Typography variant="body-sm" weight="medium">
-                {t('analytics.recentSessions')}
+                {kind === 'project'
+                  ? t('analytics.projectSessions')
+                  : t('analytics.recentSessions')}
               </Typography>
+              {project && project.sessions > sessions.length && (
+                <Typography variant="caption" color="subtle">
+                  {t('analytics.projectSessionsHint', {
+                    shown: sessions.length,
+                    total: project.sessions,
+                  })}
+                </Typography>
+              )}
 
               <Card padding="none">
                 <Stack>
                   {sessions.slice(0, 10).map((session) => (
                     <Stack
                       key={session.sessionId}
-                      direction="row"
-                      align="center"
-                      justify="between"
-                      gap="var(--spacing-sm)"
-                      className={styles.sessionRow}
+                      gap="var(--spacing-2xs)"
+                      className={cn(styles.sessionRow, styles.sessionRowInset)}
                     >
-                      <Stack gap="var(--spacing-3xs)">
-                        <Stack direction="row" align="center" gap="var(--spacing-xs)" wrap>
-                          <Typography variant="body-sm" as="span">
-                            {kind === 'project' ? session.models.join(', ') : session.displayName}
+                      <Stack
+                        direction="row"
+                        align="center"
+                        justify="between"
+                        gap="var(--spacing-sm)"
+                      >
+                        <Stack gap="var(--spacing-3xs)">
+                          <Stack direction="row" align="center" gap="var(--spacing-xs)" wrap>
+                            <Typography variant="body-sm" as="span">
+                              {session.title ??
+                                (kind === 'project'
+                                  ? session.models.join(', ')
+                                  : session.displayName)}
+                            </Typography>
+                            {session.isActive && (
+                              <Badge tone="success" withDot>
+                                {t('analytics.sessionActive')}
+                              </Badge>
+                            )}
+                          </Stack>
+                          <Typography variant="caption" color="subtle" as="span">
+                            {new Date(session.lastActivity).toLocaleString(locale)} ·{' '}
+                            <span className={styles.nowrap}>
+                              {sessionBrief(session, t, locale)}
+                            </span>
                           </Typography>
-                          {session.isActive && (
-                            <Badge tone="success" withDot>
-                              {t('analytics.sessionActive')}
-                            </Badge>
-                          )}
                         </Stack>
-                        <Typography variant="caption" color="subtle" as="span">
-                          {new Date(session.lastActivity).toLocaleString(locale)}
+
+                        <Typography variant="body-sm" color="muted" as="span">
+                          {formatCompact(session.totals.total, locale)}
                         </Typography>
                       </Stack>
 
-                      <Typography variant="body-sm" color="muted" as="span">
-                        {formatCompact(session.totals.total, locale)}
-                      </Typography>
+                      <SessionDetails session={session} locale={locale} />
                     </Stack>
                   ))}
                 </Stack>

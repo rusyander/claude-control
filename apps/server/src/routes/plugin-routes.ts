@@ -15,6 +15,7 @@ import {
 } from '../domains/plugins.ts';
 import { activeCliCommand } from '../providers/cli.ts';
 import { attachTextCodes } from '../lib/server-texts.ts';
+import { sectionGuard } from './provider-guard.ts';
 
 /**
  * Маршруты плагинов. Каждая операция — вызов CLI, а он ходит в сеть и клонирует
@@ -22,17 +23,24 @@ import { attachTextCodes } from '../lib/server-texts.ts';
  * ход выполнения, а не подвисать молча.
  */
 export function registerPluginRoutes(app: FastifyInstance, ctx: ServerContext): void {
+  // Всё, кроме скаффолдера, — команды `claude plugin …` и каталог плагинов Claude.
+  // При другом активном CLI маршрут запустил бы ЕГО с аргументами Claude и
+  // показал бы плагины Claude под чужим именем — отказываем до запуска.
+  const claudePlugins = { preHandler: sectionGuard(ctx.store, 'panel-plugins') };
+
   // Заметка «список не получен» собрана строкой: код к ней восстанавливается
   // разбором, и английская страница читает её своим словарём.
-  app.get('/api/plugins', async () =>
+  app.get('/api/plugins', claudePlugins, async () =>
     attachTextCodes(await readPlugins(ctx.location.paths.root, activeCliCommand(ctx.store)), [
       'notes',
     ]),
   );
 
-  app.get('/api/plugins/available', () => readAvailablePlugins(activeCliCommand(ctx.store)));
+  app.get('/api/plugins/available', claudePlugins, () =>
+    readAvailablePlugins(activeCliCommand(ctx.store)),
+  );
 
-  app.post<{ Body: { id?: string } }>('/api/plugins/install', (request, reply) => {
+  app.post<{ Body: { id?: string } }>('/api/plugins/install', claudePlugins, (request, reply) => {
     // Без идентификатора установка ушла бы в CLI пустой строкой: он клонирует
     // репозитории и ходит в сеть, поэтому отказываем до запуска.
     if (!request.body.id)
@@ -43,12 +51,13 @@ export function registerPluginRoutes(app: FastifyInstance, ctx: ServerContext): 
     return installPlugin(request.body.id, activeCliCommand(ctx.store));
   });
 
-  app.post<{ Params: { id: string } }>('/api/plugins/:id/uninstall', (request) =>
+  app.post<{ Params: { id: string } }>('/api/plugins/:id/uninstall', claudePlugins, (request) =>
     uninstallPlugin(request.params.id, activeCliCommand(ctx.store)),
   );
 
   app.post<{ Params: { id: string }; Body: { isEnabled?: boolean } }>(
     '/api/plugins/:id/enabled',
+    claudePlugins,
     (request, reply) => {
       // Состояние домысливать нельзя: пустое тело раньше означало «выключить».
       if (typeof request.body.isEnabled !== 'boolean') {
@@ -64,24 +73,30 @@ export function registerPluginRoutes(app: FastifyInstance, ctx: ServerContext): 
     },
   );
 
-  app.post<{ Params: { id: string } }>('/api/plugins/:id/update', (request) =>
+  app.post<{ Params: { id: string } }>('/api/plugins/:id/update', claudePlugins, (request) =>
     updatePlugin(request.params.id, activeCliCommand(ctx.store)),
   );
 
   // Маркетплейсы: раньше источник добавляли только командой claude в терминале.
-  app.post<{ Body: { source?: string } }>('/api/plugins/marketplaces', (request, reply) => {
-    if (!request.body.source)
-      return reply
-        .code(400)
-        .send({ message: 'Не указан источник', messageCode: 'plugin-source-unspecified' });
+  app.post<{ Body: { source?: string } }>(
+    '/api/plugins/marketplaces',
+    claudePlugins,
+    (request, reply) => {
+      if (!request.body.source)
+        return reply
+          .code(400)
+          .send({ message: 'Не указан источник', messageCode: 'plugin-source-unspecified' });
 
-    return addMarketplace(request.body.source, activeCliCommand(ctx.store));
-  });
+      return addMarketplace(request.body.source, activeCliCommand(ctx.store));
+    },
+  );
 
   // Параметр уже раскодирован Fastify: второе раскодирование падало на «%» пятисоткой
   // и превращало присланное имя в другое.
-  app.delete<{ Params: { name: string } }>('/api/plugins/marketplaces/:name', (request) =>
-    removeMarketplace(request.params.name, activeCliCommand(ctx.store)),
+  app.delete<{ Params: { name: string } }>(
+    '/api/plugins/marketplaces/:name',
+    claudePlugins,
+    (request) => removeMarketplace(request.params.name, activeCliCommand(ctx.store)),
   );
 
   // Скаффолдер: пишет файлы в выбранный пользователем каталог (не в ~/.claude),

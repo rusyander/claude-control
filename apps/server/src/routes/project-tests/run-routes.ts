@@ -26,6 +26,13 @@ import {
   type TestsDeps,
 } from './shared.ts';
 import { coded } from '../../lib/server-text.ts';
+import { getActiveProvider } from '../../providers/registry.ts';
+import { providerCliCandidates } from '../../providers/cli.ts';
+import { detectCliOnPath, findCliOnPath } from '../../providers/detect.ts';
+import {
+  testsAgentDialectOf,
+  type TestsAgentProvider,
+} from '../../domains/project-tests/agent/agent-runs.ts';
 import { attachTextCodes } from '../../lib/server-texts.ts';
 
 /** Режимы прогона: чужое слово в теле не должно запускать неизвестно что. */
@@ -72,6 +79,45 @@ export function registerTestRunRoutes(app: FastifyInstance, deps: TestsDeps): vo
   }>('/api/project-tests/run', async (request, reply) => {
     const root = requireRoot(request.body?.path, reply);
     if (!root) return reply;
+    // Агент тестов идёт CLI выбранного провайдера, и каждый вызов инструмента
+    // сверяется с границами режима: у Claude — брокером прав, у Qwen Code —
+    // хуком к тому же приёмнику, у Codex — ответами на его просьбы
+    // (`domains/project-tests/agent/`). У прочих CLI такой проверки нет — отказ с
+    // именем CLI, а не прогон через Claude молчком (выбор провайдера один на всю
+    // панель).
+    const active = getActiveProvider(deps.ctx.store);
+    const dialect = testsAgentDialectOf(active.id);
+    if (!dialect) {
+      return reply.code(409).send({
+        error: 'provider_unsupported',
+        message: `Агент блока «Тесты» работает с Claude Code, Qwen Code и Codex, а активный CLI — ${active.name}. Прогон не запущен.`,
+        messageCode: 'tests-agent-provider-unsupported',
+        params: { provider: active.name },
+      });
+    }
+    let provider: TestsAgentProvider = { id: 'claude' };
+    if (dialect !== 'claude') {
+      const command = findCliOnPath(providerCliCandidates(active), detectCliOnPath);
+      if (command === undefined) {
+        return reply.code(409).send({
+          error: 'cli_not_found',
+          message: `${active.name} не найден в PATH процесса панели — прогону нечем работать.`,
+          messageCode: 'tests-agent-cli-not-found',
+          params: { provider: active.name },
+        });
+      }
+      // Маршрут контура у агента тестов собран под Claude: чужой CLI через него
+      // не ходит, и прогон молча ушёл бы в облако вендора мимо выбранного контура.
+      if (deps.runs.routesThroughContour()) {
+        return reply.code(409).send({
+          error: 'contour_foreign',
+          message: `Через контур агент блока «Тесты» ходит только с Claude Code, а активный CLI — ${active.name}. Прогон не запущен.`,
+          messageCode: 'tests-agent-contour-foreign',
+          params: { provider: active.name },
+        });
+      }
+      provider = { id: dialect, name: active.name, command };
+    }
     const asked = request.body?.mode;
     const mode = asked && MODES.includes(asked) ? asked : 'run';
     const source = request.body?.source;
@@ -151,6 +197,7 @@ export function registerTestRunRoutes(app: FastifyInstance, deps: TestsDeps): vo
         (environment) => runSecrets(deps.ctx.location.paths.appData, root, environment),
         {
           appData: deps.ctx.location.paths.appData,
+          provider,
           ensureE2e: () =>
             createE2eFolder(deps.ctx.location.paths.appData, root, new Date().toISOString()),
         },

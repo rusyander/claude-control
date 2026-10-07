@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -11,6 +11,13 @@ import { buildEnvironmentArchive } from './env-transfer/archive.ts';
 import { buildDiff, buildHistory } from './history.ts';
 import { collectSearchInputs, searchConfig } from './search.ts';
 import { trackedFiles, isSecretFile } from './tracked-files.ts';
+
+// Поиск спрашивает каталог плагинов у CLI. Настоящий `claude plugin list`
+// отвечал бы плагинами человека из его настоящего конфига, а не этого стенда.
+vi.mock('./plugins/read.ts', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./plugins/read.ts')>()),
+  readInstalledPluginsCached: async () => [],
+}));
 
 /**
  * КРИТИЧЕСКИЙ ИНВАРИАНТ: секреты не попадают ни в историю, ни в поиск, ни в

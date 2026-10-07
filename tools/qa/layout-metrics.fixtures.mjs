@@ -166,6 +166,35 @@ export const FIXTURES = [
     html: shell(`${header}${table('vertical-align:top')}`),
   },
   {
+    // Библиотека тестов: название в две строки, под ним ряд тегов-плашек с полями.
+    // Строка стоит на средней линии; по буквам тегов ячейка казалась выше соседей.
+    name: 'R не срабатывает: под названием ряд плашек с полями, ячейки на средней линии',
+    expect: [],
+    html: shell(
+      `${header}<table><tbody>${rows(
+        3,
+        (i) =>
+          `<tr><td><button style="display:block;border:0;background:none;padding:0;font:inherit;text-align:left">Название кейса ${i}<br>во вторую строку</button>` +
+          `<div style="display:flex;gap:4px;align-items:center"><span style="display:inline-flex;padding:3px 8px;border-radius:999px;background:#eee">тег</span><span style="display:inline-flex;padding:3px 8px;border-radius:999px;background:#eee">ещё</span></div></td>` +
+          `<td><span style="display:inline-flex;padding:3px 8px;border-radius:999px;background:#dfd">пройден</span></td>` +
+          `<td><span style="font-size:12px">zone ${i}</span></td></tr>`,
+      )}</tbody></table>`,
+    ),
+  },
+  {
+    // Глобальный слой: под именем сита — закрытый <details> со списком случаев.
+    name: 'R не срабатывает: закрытый <details> под именем в ячейке строки',
+    expect: [],
+    html: shell(
+      `${header}<table><tbody>${rows(
+        3,
+        (i) =>
+          `<tr><th>Сито ${i}<details><summary>случаи: 4</summary><ul>${rows(8, (k) => `<li>случай ${k} — пропущено то и это</li>`)}</ul></details></th>` +
+          `<td>3</td><td>0</td><td><button>Перенести</button></td></tr>`,
+      )}</tbody></table>`,
+    ),
+  },
+  {
     name: 'B: последний элемент у самого низа окна (обёртка сжата до колонки)',
     expect: ['B'],
     html: shell(

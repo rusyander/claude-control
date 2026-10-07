@@ -248,6 +248,21 @@ function rng(seed) {
 }
 
 const MODELS = ['claude-opus-4-8', 'claude-sonnet-5', 'claude-haiku-4-5'];
+// Заголовок — слова самой модели, поэтому на английских кадрах он английский.
+const TITLES =
+  process.env.GUIDE_LANG === 'en'
+    ? [
+        [
+          'Fix the cart discount calculation',
+          'Add roles to the admin area',
+          'Investigate the build failure',
+        ],
+        ['Rewrite the order form', 'Wire up the CSV export', 'Remove redundant re-renders'],
+      ]
+    : [
+        ['Починить расчёт скидки в корзине', 'Добавить роли в админку', 'Разобрать падение сборки'],
+        ['Переписать форму заказа', 'Подключить выгрузку в CSV', 'Убрать лишние перерисовки'],
+      ];
 const TOOLS = ['Read', 'Edit', 'Bash', 'Grep', 'Glob', 'Write', 'Task', 'WebFetch'];
 
 /**
@@ -309,6 +324,13 @@ function writeTranscripts(root) {
           }),
         );
       }
+
+      // Заголовок разговора: Claude Code пишет его отдельной записью без метки
+      // времени. Берётся по номеру дня, а не из rng: числа отчёта не должны сдвинуться.
+      const titles = TITLES[index % TITLES.length];
+      lines.push(
+        JSON.stringify({ type: 'ai-title', aiTitle: titles[day % titles.length], sessionId }),
+      );
 
       const file = join(dir, `${sessionId}.jsonl`);
       writeFileSync(file, `${lines.join('\n')}\n`, 'utf8');

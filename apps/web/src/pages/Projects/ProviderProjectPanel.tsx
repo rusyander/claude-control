@@ -85,7 +85,11 @@ export function ProviderProjectPanel({ project, onRemove, isRemoving }: ProjectC
     const labels: Record<ProviderProjectSection, string> = {
       instructions: data.instructionsFileName ?? t('providerProject.tab_instructions'),
       instructionsList: t('providerProject.tab_instructionsList'),
-      instructionsRules: t('providerProject.tab_instructionsRules'),
+      instructionsRules: t(
+        data.instructionsRulesFormat === 'cursor-mdc'
+          ? 'providerProject.tab_instructionsRules'
+          : 'providerProject.tab_instructionsRulesMd',
+      ),
       mcp: t('projectsPage.tab.mcp'),
       env: t('providerProject.tab_env'),
       permissions: t('providerProject.tab_permissions'),

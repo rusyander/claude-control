@@ -25,12 +25,16 @@ export type {
   ProviderEndpointApiKind,
   ProviderEndpointConfig,
   ProviderEndpointFile,
+  ProviderRunEndpoint,
+  RunEndpointInput,
   ProviderEndpointVars,
+  ProviderStdoutParser,
 } from './types/assistant.ts';
 
 export type {
   ProviderInstructionsListLocation,
   ProviderInstructionsRulesLocation,
+  ProviderRulesConfigLocation,
 } from './types/instructions.ts';
 
 export type {

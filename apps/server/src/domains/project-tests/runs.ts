@@ -13,7 +13,8 @@ import type {
   ProjectTestStepResult,
 } from '@agentdeck/contracts';
 import { pointId, summarize as summarizeResults } from '@agentdeck/contracts/test-format';
-import { ChatRun, type ChatEvent } from '../chat/ChatRunner.ts';
+import type { ServerMessageCode, ServerMessageParams } from '@agentdeck/contracts/server-messages';
+import { ChatRun } from '../chat/ChatRunner.ts';
 import type { RunNotice } from '../chat/ChatRunRegistry.ts';
 import type { PlatformRunRoute } from '../platform/routing.ts';
 import { forgetOtherSpellings, ProjectTestsLockedError, projectEntry } from './files.ts';
@@ -44,6 +45,9 @@ import { e2eCommand, shellLine } from './e2e-command.ts';
 import { E2E_JUNIT_REPORT } from './e2e-scaffold.ts';
 import { syncE2eFolder } from './e2e-sync.ts';
 import { importResultsIntoRun } from './import-results.ts';
+import type { TestsAgentEvent, TestsAgentRun } from './agent/agent-run.types.ts';
+import { makeAgentRun, type TestsAgentProvider } from './agent/agent-runs.ts';
+import { decideQwenCall } from './agent/foreign-gate.ts';
 import {
   PanelAgentProcesses,
   reapPanelAgentOrphans,
@@ -66,6 +70,11 @@ export const PROJECT_TEST_PROCESS_LEDGER = 'project-test-runs.json';
  * записи раннера не смешиваются с CLI агентских прогонов.
  */
 export const E2E_RUN_PROCESS_LEDGER = 'e2e-runs.json';
+/**
+ * Журнал процессов проверки поломкой (Ф11): по нему dev-сторож ждёт её конца, а
+ * старт панели снимает сирот, переживших её падение.
+ */
+export const MUTATION_PROCESS_LEDGER = 'mutation-runs.json';
 
 /**
  * Старт панели: снять дерево каждого живого процесса прогонов тестов из обоих
@@ -74,7 +83,8 @@ export const E2E_RUN_PROCESS_LEDGER = 'e2e-runs.json';
 export function reapProjectTestOrphans(appData: string, deps: ReapDeps = {}): number {
   return (
     reapPanelAgentOrphans(appData, deps, PROJECT_TEST_PROCESS_LEDGER) +
-    reapPanelAgentOrphans(appData, deps, E2E_RUN_PROCESS_LEDGER)
+    reapPanelAgentOrphans(appData, deps, E2E_RUN_PROCESS_LEDGER) +
+    reapPanelAgentOrphans(appData, deps, MUTATION_PROCESS_LEDGER)
   );
 }
 
@@ -115,7 +125,7 @@ export class ProjectTestRunRegistry {
     string,
     {
       view: ProjectTestRun;
-      run: ChatRun;
+      run: ChatRun | TestsAgentRun;
       gate?: RunPermissionGate;
       /** Принимать черновик генерации без просмотра — решение человека на старте. */
       autoAccept?: boolean;
@@ -150,6 +160,17 @@ export class ProjectTestRunRegistry {
 
   setPlatformRouting(resolve: () => PlatformRunRoute): void {
     this.platformRouting = resolve;
+  }
+
+  /**
+   * Идёт ли агент тестов через контур (или контур обязателен и отказывает).
+   * Маршрут контура собран под Claude (`runRoute('tests')`): чужой CLI через
+   * него не ходит, и прогон на нём через контур — отказ до старта, а не уход в
+   * облако вендора мимо выбранного контура.
+   */
+  routesThroughContour(): boolean {
+    const route = this.platformRouting?.();
+    return Boolean(route?.refusal) || Object.keys(route?.env ?? {}).length > 0;
   }
 
   /** Язык панели: на нём имя сессии прогона в списке разговоров. */
@@ -205,8 +226,9 @@ export class ProjectTestRunRegistry {
      * знает). Зовётся ПОСЛЕ всех отказов старта: отказанный прогон («уже идёт»,
      * «кейсов нет») папку на диске не оставляет.
      */
-    options: { appData?: string; ensureE2e?: () => void } = {},
+    options: { appData?: string; ensureE2e?: () => void; provider?: TestsAgentProvider } = {},
   ): ProjectTestRun {
+    const provider: TestsAgentProvider = options.provider ?? { id: 'claude' };
     const root = request.projectPath;
     if (!existsSync(root))
       throw coded(new ProjectTestsError('Каталог проекта не найден.'), 'project-dir-not-found');
@@ -332,6 +354,8 @@ export class ProjectTestRunRegistry {
       log: '',
       tokens: 0,
       costUsd: 0,
+      // Кем шёл прогон: у чужого CLI нет сессии, и открыть его в чате нечем.
+      provider: provider.id,
       // След источника едет в запись прогона: черновик применяют позже, иногда
       // через день, и к тому времени материал взять уже неоткуда.
       generate: stampOf(material),
@@ -365,7 +389,7 @@ export class ProjectTestRunRegistry {
       context,
     );
 
-    const run = new ChatRun();
+    const run = makeAgentRun(provider);
     forgetOtherSpellings(this.runs, root);
     this.runs.set(root, {
       view,
@@ -408,7 +432,11 @@ export class ProjectTestRunRegistry {
       e2e?.dir,
     );
     const name = runName(request, scoped, this.language());
-    void this.launch(root, run, prompt, name, scope, secrets.values);
+    if (provider.id === 'claude' && run instanceof ChatRun) {
+      void this.launch(root, run, prompt, name, scope, secrets.values);
+    } else if (provider.id !== 'claude' && !(run instanceof ChatRun)) {
+      void this.launchForeign(root, run, provider, prompt, scope, secrets.values);
+    }
 
     return view;
   }
@@ -434,11 +462,10 @@ export class ProjectTestRunRegistry {
     let gate: RunPermissionGate | undefined;
     try {
       gate = await startPermissionGate(scope, (tool, message) => this.note(root, tool, message));
-      const entry = this.runs.get(root);
-      if (entry) entry.gate = gate;
     } catch (error) {
       this.note(root, 'права', `приёмник прав не поднялся (${(error as Error).message})`);
     }
+    if (!this.adoptGate(root, run, gate)) return;
 
     // Маршрут контура — на КАЖДОМ запуске: снятая галочка обязана действовать
     // со следующего прогона.
@@ -456,7 +483,7 @@ export class ProjectTestRunRegistry {
           ...(Object.keys(env).length > 0 ? { env } : {}),
           // Маршрут контура — отдельным полем и на КАЖДОМ запуске: снятая
           // галочка обязана действовать со следующего прогона.
-          platformEnv: route.env,
+          platformEnv: { ...route.env, ...route.kit?.env },
           // Модель и глубина маршрута — тем же правилом, что в реестре чата (Т6).
           // Сегодня модель доезжает и переменной окружения, но флаг `--model`
           // сильнее её: первый же выбор модели в этом запуске обошёл бы перевод
@@ -470,7 +497,7 @@ export class ProjectTestRunRegistry {
           // И наши слои (Т8): агент тестов ходит тем же маршрутом, и снятые
           // правила обязаны сниматься и у него — иначе «прогон без наших слоёв»
           // означал бы «без них в чате, со всеми в тестах».
-          platformArgs: route.layers?.args ?? [],
+          platformArgs: [...(route.layers?.args ?? []), ...(route.kit?.args ?? [])],
           // С приёмником — обычный режим: каждый вызов инструмента проходит через
           // границы прогона. Без него — прежний полный доступ, но об этом сказано
           // в логе прогона, а не молчком.
@@ -490,6 +517,98 @@ export class ProjectTestRunRegistry {
     } catch (error) {
       this.finish(root, 'error', (error as Error).message);
     }
+  }
+
+  /**
+   * Запуск агента на чужом CLI (Qwen Code, Codex). Отличие от Claude одно и
+   * принципиальное: без приёмника прав прогона НЕТ. Запасного полного доступа,
+   * как у Claude, здесь не бывает — Qwen идёт в `yolo`, и без проверки агент
+   * писал бы куда угодно.
+   */
+  private async launchForeign(
+    root: string,
+    run: TestsAgentRun,
+    provider: Exclude<TestsAgentProvider, { id: 'claude' }>,
+    prompt: string,
+    scope: RunScope,
+    env: Record<string, string>,
+  ): Promise<void> {
+    let gate: RunPermissionGate;
+    try {
+      gate = await startPermissionGate(
+        scope,
+        (tool, message) => this.note(root, tool, message),
+        // У Qwen хук приносит имена Qwen; у Codex приёмник не спрашивают вовсе —
+        // он решает на месте (`codex-run.ts`), но правила те же.
+        provider.id === 'qwen' ? decideQwenCall : undefined,
+      );
+    } catch (error) {
+      this.note(root, 'права', `приёмник прав не поднялся (${(error as Error).message})`);
+      this.finish(
+        root,
+        'error',
+        `Прогон на ${provider.name} не запущен: панель не смогла поднять проверку прав, а без неё агент писал бы куда угодно. Повторите запуск; не помогло — перезапустите панель.`,
+        { messageCode: 'tests-agent-gate-unavailable', params: { provider: provider.name } },
+      );
+      return;
+    }
+    if (!this.adoptGate(root, run, gate)) return;
+
+    // Контур — на КАЖДОМ запуске, как у Claude: маршрут собран под Claude, и
+    // чужой CLI через него не ходит. Маршрут проверил и старт; здесь — на случай,
+    // если галочку поставили между стартом и запуском.
+    if (this.routesThroughContour()) {
+      this.finish(
+        root,
+        'error',
+        `Через контур агент блока «Тесты» ходит только с Claude Code, а активный CLI — ${provider.name}. Прогон не запущен, чтобы не уйти в облако вендора.`,
+        { messageCode: 'tests-agent-contour-foreign', params: { provider: provider.name } },
+      );
+      return;
+    }
+    try {
+      const started = run.start(
+        {
+          command: provider.command,
+          providerName: provider.name,
+          prompt,
+          cwd: root,
+          env,
+          gate,
+          scope,
+          onDeny: (tool, message) => this.note(root, tool, message),
+        },
+        (event) => this.consume(root, event),
+      );
+      const current = this.runs.get(root);
+      const running = current?.run === run && current.view.status === 'running';
+      if (running && current.processes && run.pid !== undefined) {
+        current.processes.started(current.view.id, run.pid, root);
+      }
+      await started;
+    } catch (error) {
+      this.finish(root, 'error', (error as Error).message);
+    }
+  }
+
+  /**
+   * Отдать поднятый приёмник прав прогону — если прогон ещё ждёт запуска.
+   * «Стоп», нажатый, пока приёмник поднимался, прогон уже закрыл: запуск
+   * после него стартовал бы CLI, которого больше никто не остановит, а
+   * приёмник остался бы открытым портом. Такой запуск только гасит приёмник.
+   */
+  private adoptGate(
+    root: string,
+    run: ChatRun | TestsAgentRun,
+    gate: RunPermissionGate | undefined,
+  ): boolean {
+    const entry = this.runs.get(root);
+    if (entry?.run !== run || entry.view.status !== 'running') {
+      gate?.close();
+      return false;
+    }
+    if (gate) entry.gate = gate;
+    return true;
   }
 
   /** Строка от панели в лог прогона — отказ прав или причина, почему их нет. */
@@ -579,7 +698,7 @@ export class ProjectTestRunRegistry {
   }
 
   /** События агента → лог и расход. Статусы кейсов пишет он сам, мимо панели. */
-  private consume(projectPath: string, event: ChatEvent): void {
+  private consume(projectPath: string, event: TestsAgentEvent): void {
     const entry = this.runs.get(projectPath);
     if (!entry) return;
     const view = entry.view;
@@ -602,10 +721,23 @@ export class ProjectTestRunRegistry {
       view.sessionId = event.sessionId || view.sessionId;
       this.finish(projectPath, 'done');
     }
-    if (event.kind === 'error') this.finish(projectPath, 'error', event.message);
+    if (event.kind === 'error') {
+      this.finish(
+        projectPath,
+        'error',
+        event.message,
+        event.messageCode ? { messageCode: event.messageCode, params: event.params } : undefined,
+      );
+    }
   }
 
-  private finish(projectPath: string, status: ProjectTestRun['status'], error?: string): void {
+  private finish(
+    projectPath: string,
+    status: ProjectTestRun['status'],
+    error?: string,
+    /** Код текста ошибки — отказ проверки прав человек читает на своём языке. */
+    code?: { messageCode: ServerMessageCode; params?: ServerMessageParams },
+  ): void {
     const entry = this.runs.get(projectPath);
     if (!entry || entry.view.status !== 'running') return;
     // Приёмник прав живёт ровно столько, сколько прогон: открытый порт после
@@ -617,6 +749,10 @@ export class ProjectTestRunRegistry {
     entry.view.status = status;
     entry.view.finishedAt = new Date().toISOString();
     if (error) entry.view.error = entry.redact ? entry.redact(error) : error;
+    if (error && code) {
+      entry.view.messageCode = code.messageCode;
+      if (code.params) entry.view.params = code.params;
+    }
     // Заметки к кейсам пишет агент, а они уезжают в историю прогонов — файл в
     // git проверяемого проекта. Секрет, попавший в «не пустил с паролем …»,
     // остался бы там навсегда.
@@ -768,6 +904,9 @@ export class ProjectTestRunRegistry {
       startedAt: view.startedAt,
       finishedAt: view.finishedAt,
       error: view.error,
+      messageCode: view.messageCode,
+      params: view.params,
+      provider: view.provider,
       tokens: view.tokens,
       costUsd: view.costUsd,
       sessionId: view.sessionId,

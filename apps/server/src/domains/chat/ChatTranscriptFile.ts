@@ -56,6 +56,44 @@ export function readRecords(path: string, sizeHint: number): Record[] {
   return [...parseLines(readHead(path)), ...parseLines(readTail(path, size))];
 }
 
+/** Кусок, которым файл читается целиком (`readAllRecords`). */
+const WHOLE_CHUNK_BYTES = 1024 * 1024;
+
+/**
+ * Файл ЦЕЛИКОМ, кусками: нужен разбору, которому важна середина, — «Сделать
+ * кейс» по транскрипту больше `FULL_READ_LIMIT` собирал шаги из начала и хвоста
+ * и молча терял всё между ними (Ф15). Кусок за куском, строка на границе куска
+ * доклеивается к следующему, так что большой файл не держится в памяти строкой.
+ */
+export function readAllRecords(path: string): Record[] {
+  const records: Record[] = [];
+  const handle = openSync(path, 'r');
+  try {
+    const buffer = Buffer.alloc(WHOLE_CHUNK_BYTES);
+    let carry = Buffer.alloc(0);
+    let position = 0;
+    for (;;) {
+      const read = readSync(handle, buffer, 0, WHOLE_CHUNK_BYTES, position);
+      if (read === 0) break;
+      position += read;
+      const chunk = Buffer.concat([carry, buffer.subarray(0, read)]);
+      // Режем по последнему переводу строки в байтах: так многобайтный символ
+      // на границе куска не ломается.
+      const cut = chunk.lastIndexOf(0x0a);
+      if (cut < 0) {
+        carry = chunk;
+        continue;
+      }
+      records.push(...parseLines(chunk.subarray(0, cut).toString('utf8')));
+      carry = Buffer.from(chunk.subarray(cut + 1));
+    }
+    if (carry.length > 0) records.push(...parseLines(carry.toString('utf8')));
+  } finally {
+    closeSync(handle);
+  }
+  return records;
+}
+
 /**
  * Только первые строки файла — когда нужна первая реплика человека (исходное
  * задание разговора). Хвост в этом вопросе не участвует: дописываются строки в

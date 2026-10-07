@@ -257,15 +257,20 @@ export const projectsEn: typeof projectsRu = {
       'globally, with the same path safety. For Continue the project level is the only ' +
       'one it has: the rules directory <project>/.continue/rules/*.md, the MCP file ' +
       '.continue/mcpServers/mcp.json and the .continue/.env variables. Goose’s project level ' +
-      'is a single <project>/.goosehints file next to the global one. Kimi Code gets ' +
+      'is a <project>/.goosehints file next to the global one plus skills in ' +
+      '<project>/.agents/skills/. Kimi Code gets ' +
       'AGENTS.md and the MCP file <project>/.kimi-code/mcp.json in the project; it has no ' +
       'project permissions, since the CLI reads exactly one user-level config.toml. Project ' +
       'hooks are not Claude’s alone: Qwen Code keeps them in that same ' +
       '<project>/.qwen/settings.json and they are edited from here, OpenCode keeps them in ' +
       '<project>/opencode.json but read-only — the key is gone from its schema, and the ' +
       'panel will not write what the schema does not have. Project skills exist for Qwen ' +
-      'Code, Kimi Code and OpenCode, project plugins for OpenCode; each of those levels has ' +
-      'a tab of its own.',
+      'Code, Kimi Code, OpenCode and Codex (Codex keeps them in <project>/.agents/skills/ ' +
+      'and its hooks in <project>/.codex/hooks.json, which it runs only in a trusted project ' +
+      'and after approval in /hooks), project plugins for OpenCode; each of those levels ' +
+      'has a tab of its own. Qwen Code also has project rules — the «Rules (.md)» tab over ' +
+      '<project>/.qwen/rules/*.md, in the same format as the global ~/.qwen/rules; the CLI ' +
+      'reads them only when the project folder is trusted.',
 
     undoTitle: 'How to put it back',
     undoCaption: 'One case per line — undo is looked up after the fact, not before.',

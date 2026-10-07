@@ -208,6 +208,9 @@ function runNode(file) {
       process.stdout.write(tail(output, 30));
       const seconds = (Date.now() - started) / 1000;
       const passed = code === 0 && !timedOut;
+      // Код 2 — «не проверено» (`NotChecked` в throwaway-stand.mjs): нет CLI или
+      // стенд не поднялся. Это не дефект продукта — пропуск с причиной.
+      const notChecked = code === 2 && !timedOut;
       console.log(
         `  код ${code ?? 'нет'}${timedOut ? ' (таймаут)' : ''} за ${Math.round(seconds)} с`,
       );
@@ -215,11 +218,11 @@ function runNode(file) {
         passed,
         downSamples,
         outcome: {
-          status: passed ? 'passed' : 'failed',
+          status: passed ? 'passed' : notChecked ? 'skipped' : 'failed',
           seconds,
           message: passed
             ? undefined
-            : `${timedOut ? 'Таймаут. ' : ''}Код выхода ${code ?? 'нет'}. ${verdictLines(output)}`,
+            : `${timedOut ? 'Таймаут. ' : ''}${notChecked ? 'Не проверено. ' : ''}Код выхода ${code ?? 'нет'}. ${verdictLines(output)}`,
           output: tail(output, 80),
         },
       });

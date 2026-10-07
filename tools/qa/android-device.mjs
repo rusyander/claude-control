@@ -104,6 +104,12 @@ export function device(serial, adb = adbPath()) {
     return (result.stdout ?? '') + (result.stderr ?? '');
   };
 
+  // Рукописный ввод стилусом, не выключенный явно (значение null), Gboard
+  // однажды встречает обучалкой «Try out your stylus» поверх приложения — и
+  // она глотает весь ввод: поле адреса не стирается и не печатается, а
+  // проверка падает на сопряжении. Свойство эмулятора, не продукта.
+  shell('settings put secure stylus_handwriting_enabled 0');
+
   const noIdle = noIdleDumper(run);
   // Экран, на котором `uiautomator dump` не дождался покоя, тикает и дальше:
   // следующие 30 с снимаем его сразу без ожидания, не тратя по 10 с на отказ.
@@ -237,6 +243,15 @@ export function device(serial, adb = adbPath()) {
     hideKeyboard: () => shell('input keyevent KEYCODE_ESCAPE'),
     install: (apk) => run(['install', '-r', apk], { encoding: 'utf8' }),
     isInstalled: (pkg = PACKAGE) => shell(`pm list packages ${pkg}`).includes(`package:${pkg}`),
+    /** Когда на устройство встал установленный APK (мс эпохи, часы устройства); нет — undefined. */
+    installedAt: (pkg = PACKAGE) => {
+      const path = shell(`pm path ${pkg}`)
+        .split(/\r?\n/)
+        .find((line) => line.trim().endsWith('base.apk'));
+      if (!path) return undefined;
+      const seconds = Number(shell(`stat -c %Y ${path.replace(/^package:/, '').trim()}`).trim());
+      return Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : undefined;
+    },
     clearData: (pkg = PACKAGE) => shell(`pm clear ${pkg}`),
     stopApp: (pkg = PACKAGE) => shell(`am force-stop ${pkg}`),
     /** Запуск через лаунчер-интент — как палец по иконке. */

@@ -187,6 +187,20 @@
   background: var(--color-surface-sunken);
 }
 
+// MR влит (владелец 06.10.2026): работа кончена совсем — зелёный оттенок и
+// приглушённый текст, карточка стоит в самом низу (`hubOrder.ts`). Закрытый MR —
+// только приглушён: он кончен, но не успехом.
+.groupMerged {
+  border-color: color-mix(in srgb, var(--color-success) 35%, var(--color-border));
+  background: var(--color-success-subtle);
+  color: var(--color-fg-muted);
+}
+
+.groupClosed {
+  color: var(--color-fg-muted);
+  opacity: 0.8;
+}
+
 // Карточка с чатом кликабельна целиком, поэтому наведение видно в ОБЕИХ темах.
 .groupOpenable {
   cursor: pointer;
@@ -279,6 +293,26 @@
   &.groupActions > * {
     margin-top: 0;
   }
+}
+
+// Кнопка MR и её номер в очереди слияния (G3) — один кусок ряда кнопок:
+// перенос не отрывает номер от кнопки, к которой он относится.
+.mrPair {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--spacing-2xs);
+}
+
+// Номер в очереди — обводкой, а не заливкой: карточка сама на утопленной
+// поверхности, и заливка той же поверхности пропадала бы в обеих темах.
+.mergeOrder {
+  flex: none;
+  padding: 1px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  white-space: nowrap;
+  cursor: help;
 }
 
 .groupFoot {

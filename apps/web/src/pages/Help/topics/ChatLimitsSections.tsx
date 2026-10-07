@@ -34,6 +34,7 @@ export function ChatLimitsSections() {
             tr('canModel'),
             tr('canApprove'),
             tr('canSearchMessages'),
+            tr('canPin'),
             tr('canLoadMore'),
             tr('canExport'),
             tr('canRun'),
@@ -97,6 +98,9 @@ export function ChatLimitsSections() {
           </Callout>
           <Callout tone="info" title={tr('noteHistoryTitle')}>
             {tr('noteHistoryText')}
+          </Callout>
+          <Callout tone="info" title={tr('noteCleanupTitle')}>
+            {tr('noteCleanupText')}
           </Callout>
           <Callout tone="info" title={tr('noteLiveTitle')}>
             {tr('noteLiveText')}

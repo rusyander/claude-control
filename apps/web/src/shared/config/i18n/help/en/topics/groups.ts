@@ -135,14 +135,16 @@ export const groupsEn: typeof groupsRu = {
         'group for the same CLI — a merge with the original updates the copy. The group’s ' +
         'pinned skill numbers travel with the copy, under the new name for a renamed ' +
         'skill; “Auto” stays “Auto”. In another CLI’s directories numbers arrive only for ' +
-        'the skills it accepted: codex has no skills, so a copy for it goes without ' +
+        'the skills it accepted: the panel does not write codex skills, so a copy for it goes without ' +
         'numbers. A scenario stays a scenario in the copy. A copy for another CLI is a ' +
         'card of its own, “global · qwen”: no Claude toggle, not paired with the project ' +
         'group, and no override. The agent gives advice only for a copy into Claude — the ' +
         'window of a copy for another CLI says so, and the copy is ready as it is. If the ' +
         'agent did not answer, the window says “The agent did not answer — no advice”: the ' +
         'copy is already made and can be checked by hand. The copy’s warnings (a taken ' +
-        'name, a member that does not carry over) are written in words, not codes.',
+        'name, a member that does not carry over) are written in words, not codes. A hook ' +
+        'in a copy for Codex will not work by itself: Codex runs a new hook only after it is ' +
+        'approved in its own /hooks command, and the copy warns about exactly that.',
       sDuplicate: '“Copy”: your own copy next to it',
       sDuplicateText:
         'The Copy button sits on the group’s card (the icon next to the toggle) and in its ' +
@@ -190,7 +192,9 @@ export const groupsEn: typeof groupsRu = {
         'foreign skill (not in our catalog), a prompt, a hook, a rule or a utility. A step’s ' +
         'numbers (review rounds, agents per round) sit right in the row as lists. A “+” between ' +
         'rows is where a new step goes: inside an open skill block the step runs in the same ' +
-        'turn as the skill, and a step after a stage runs as its own checked turn after it. At ' +
+        'turn as the skill, and a step after a stage runs as its own checked turn after it; in ' +
+        'a link run by another CLI (Qwen Code, Codex) it is the same, a turn of that same ' +
+        'conversation, and the review starts only after it. At ' +
         'the top are a search by title and description and Collapse all, and that bar stays ' +
         'above the list while it scrolls — no step shows through under it; while the search is not ' +
         'empty the list is flat, with no “+” and no dragging. Your own steps move by their ' +
@@ -438,8 +442,48 @@ export const groupsEn: typeof groupsRu = {
       'Having switched a bundle on, the panel puts the line “Bundle “X” switched on by ' +
       'itself — it is bound to this project” into the run feed; several switched on — ' +
       'they are named in one line. One line per fact: a bundle already on is left alone ' +
-      'and not mentioned twice. A foreign CLI has no feed for panel notes, and there the ' +
-      'fact shows only on the Groups page.',
+      'and not mentioned twice. A chat of another CLI gets its own line, “Groups on this … ' +
+      'run”: which groups ride on the run, what of them got through and what did not, with ' +
+      'the reason; it repeats only when that changes.',
+    bindQwen: 'A group in a Qwen Code chat',
+    bindQwenText:
+      'Qwen Code does not read the Claude directories, so the panel does not switch groups ' +
+      'on in Claude and hands them over with every Qwen run instead: the one chosen in the ' +
+      '“Group” field of the chat header, those bound to the project and those switched on for Qwen on this page (the ' +
+      'toggle while Qwen is active switches the group on for Qwen). MCP servers and hooks ' +
+      'go in a separate Qwen system settings file (the hook timeout is kept), skills in its ' +
+      'own skills directory, rules as instruction text. A member present in two groups is ' +
+      'taken from the first. The group in Claude stays as it was, the Qwen settings in your ' +
+      'home folder are not changed, and the Qwen system settings made on this machine are ' +
+      'kept. Group permissions are not passed to Qwen. A group copied for Qwen («global · ' +
+      'qwen») already lives in its files and works on its own.',
+    bindCodex: 'A group in a Codex chat',
+    bindCodexText:
+      'Codex gets groups the same way — as a layer on every run, without writing to its ' +
+      'home folder or to the Claude files. Rules go as instruction text after your own and ' +
+      'the panel kit, skills as a copy in the layer directory, MCP servers as a setting for ' +
+      'this run (secrets only in the process environment, names alone on the command ' +
+      'line). Hooks are played by the panel itself: session start, sending a message and ' +
+      'the end of an answer; hooks on Codex tools do not ride on the run and are named in ' +
+      'the feed note. Group permissions are not passed to Codex.',
+    bindPage: 'What you see under another CLI',
+    bindPageText:
+      'The toggle on a card shows and changes the group’s state for the active CLI, not for ' +
+      'Claude: a group switched on in Claude may be off under Qwen Code, and a click switches ' +
+      'it on for Qwen only. The group window has a “How the group gets to …” block: whether ' +
+      'it is on for this CLI, what of it gets through and what does not — with the reason ' +
+      '(say, a skill has no file). There is no sandbox button there: the sandbox runs the ' +
+      'group in Claude Code. The Qwen Code and Codex chat header has a “Group” field: “Auto” ' +
+      'takes those bound to the project and switched on for this CLI, a chosen group is ' +
+      'remembered for this conversation.',
+    bindForeign: 'A group under another CLI',
+    bindForeignText:
+      'When the active CLI is not Claude Code, Qwen Code or Codex, Claude groups do not apply ' +
+      'to its runs: it does not read the Claude files and the panel has no group layer for ' +
+      'it. A line above the cards says so, there is no toggle on the card and no “Group” ' +
+      'field in the chat, and ' +
+      'splitting, continuing in a clean session and carrying a conversation no longer ' +
+      'switch groups on in Claude — the Claude settings do not change under another CLI at all.',
     bindWorktree: 'Branch copies count too',
     bindWorktreeText:
       'A branch copy lives next to the repository, in the sibling directory ' +

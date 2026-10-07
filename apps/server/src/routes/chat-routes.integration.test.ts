@@ -28,7 +28,9 @@ describe('маршруты чата: проекты и ФС', () => {
     mkdirSync(join(root, 'agentdeck'), { recursive: true });
 
     // Транскрипт настоящего проекта — cwd указывает на существующий каталог.
-    const realProject = mkdtempSync(join(tmpdir(), 'cc-realproj-'));
+    // Внутри root: снаружи он оставался в temp после каждого теста.
+    const realProject = join(root, 'real-project');
+    mkdirSync(realProject);
     writeFileSync(
       join(root, 'projects', 'enc-a', 'sess.jsonl'),
       JSON.stringify({

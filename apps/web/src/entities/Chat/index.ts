@@ -14,6 +14,7 @@ export {
   CHAT_PAGE_SIZE,
   MIN_CHAT_SEARCH_LENGTH,
 } from './api/ChatApi';
+export { usePinChat } from './api/pinChat';
 export { useAwaitingChats, useAwaitingAlarm } from './model/useAwaitingChats';
 export {
   selectAwaitingChats,

@@ -172,8 +172,42 @@ export function registerChatTranscriptRoutes(
               ...(link.firstEditAt ? { firstEditAt: link.firstEditAt } : {}),
             };
           });
-    return sendConditional(request, reply, withLinks);
+    // Закреплённые человеком — меткой на выдаче, как и связи: транскрипт о
+    // закреплении не знает ничего.
+    const pins = ctx.store.getChatPins();
+    const withPins =
+      Object.keys(pins).length === 0
+        ? withLinks
+        : withLinks.map((chat) => (pins[chat.id] ? { ...chat, pinnedAt: pins[chat.id] } : chat));
+    return sendConditional(request, reply, withPins);
   });
+
+  /**
+   * Закрепить разговор в списке или открепить (владелец, 07.10.2026). Ветвь
+   * разделения закрепляется своим корнем: ребёнка закрепить нельзя — он едет
+   * вверх за родителем, а отдельно от него ветвь распалась бы.
+   */
+  app.put<{ Params: { chatId: string }; Body: unknown }>(
+    '/api/chats/:chatId/pin',
+    (request, reply) => {
+      const body = request.body as { pinned?: unknown } | undefined;
+      if (typeof body?.pinned !== 'boolean') {
+        return reply
+          .code(400)
+          .send({ message: 'Нужно поле pinned: true или false', messageCode: 'chat-pin-invalid' });
+      }
+      const id = request.params.chatId;
+      if (body.pinned && (ctx.store.getChatLink(id) || ctx.store.getRetiredChatLinks()[id])) {
+        return reply.code(409).send({
+          message: 'Чат группы закрепляется вместе со своим родителем',
+          messageCode: 'chat-pin-child',
+          code: 'chat_pin_child',
+        });
+      }
+      ctx.store.setChatPin(id, body.pinned);
+      return { id, pinned: body.pinned };
+    },
+  );
 
   /**
    * Полнотекстовый поиск по телу переписки: в дополнение к фильтру списка по

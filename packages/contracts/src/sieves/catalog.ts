@@ -287,14 +287,20 @@ export const BUILTIN_SIEVES: readonly SieveDef[] = [
 
 const UI_EXT = /\.(tsx|jsx|vue|svelte|astro|css|scss|sass|less|html)$/i;
 const BACKEND_EXT = /\.(go|py|java|kt|kts|rb|php|rs|cs|ex|exs|scala|sql)$/i;
-const BACKEND_DIR = /(^|\/)(server|backend|api|services?)\//i;
 const CODE_EXT = /\.(m?[jt]sx?|c[jt]s)$/i;
 const DOC_EXT = /\.(md|mdx|rst|adoc)$/i;
 const CONTRACT_NAME = /(^|\/)[^/]*(openapi|swagger)[^/]*\.(ya?ml|json)$/i;
 const CONTRACT_EXT = /\.(proto|graphql|gql)$/i;
 const CONTRACT_DIR = /(^|\/)(contracts?|docs?|api-docs)\//i;
+/**
+ * Тест — по ИМЕНИ файла (Ф3): `*.test.*`, `*.spec.*`, `*.stories.*`, `*.cy.*`,
+ * `*_test.go`, `test_*.py`, `*_spec.rb`, `FooTest.java`. Папка сама файл тестом
+ * не делает: `tests/` и `qa/` — частые имена кода (`apps/mobile/src/entities/tests`,
+ * скрипты `tools/qa`), и их правка без теста иначе сходила бы за «тест рядом».
+ * Исключение — `__tests__/`: так код не называют, это корень тестов Jest.
+ */
 const TEST_PATH =
-  /(^|\/)(__tests__|tests?|e2e|qa|spec|cypress|playwright)\/|\.(test|spec|stories)\.[^/]+$/i;
+  /(^|\/)__tests__\/|\.(test|spec|stories|cy|e2e)\.[^/]+$|_(test|spec)\.(go|py|rb|exs?|rs|php|[cm]?[jt]sx?)$|(^|\/)test_[^/]+\.py$|(^|\/)[^/]+Tests?\.(java|kt|kts|cs|scala|php)$/;
 /** Служебные каталоги агентов и инструментов — не доки продукта. */
 const DOT_DIR = /(^|\/)\.[^/]+\//;
 /** Миграции и схемы БД — у любого стека: каталоги, SQL и файлы схем ORM. */
@@ -319,9 +325,8 @@ export function touchKinds(paths: readonly string[]): Set<TouchKind> {
     if (test) continue;
     if (DATA_PATH.test(path)) kinds.add('data');
     if (UI_EXT.test(path)) kinds.add('ui');
-    if (BACKEND_EXT.test(path) || (BACKEND_DIR.test(path) && CODE_EXT.test(path))) {
-      kinds.add('backend');
-    }
+    // Вид решает расширение (Ф3): TS в `apps/web/**/api/` — клиент, а не бэкенд.
+    if (BACKEND_EXT.test(path)) kinds.add('backend');
     if (UI_EXT.test(path) || BACKEND_EXT.test(path) || CODE_EXT.test(path)) kinds.add('code');
   }
   return kinds;

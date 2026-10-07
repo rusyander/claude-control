@@ -457,6 +457,7 @@ export function ChatPage() {
           )}
 
           <ChatDock
+            {...(session.draftId ? { focusKey: session.draftId } : {})}
             progress={progress.data}
             isRunning={isRunning}
             awaiting={run.status === 'waiting' || Boolean(activeChat?.awaitingReply)}

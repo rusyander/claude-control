@@ -3,11 +3,14 @@ import { Stack } from '@shared/ui/stack';
 import { PageHeader } from '@shared/ui/page-header';
 import { SkeletonList } from '@shared/ui/skeleton';
 import { useProviders, activeProvider } from '@entities/Provider';
+import { useProviderRules } from '@entities/ProviderRules';
+import { ruleFormat } from './ruleLabels';
 import { ProviderRulesPanel } from './ProviderRulesPanel';
 import styles from './ProviderRulesPage.module.scss';
 
 /**
- * Раздел инструкций у провайдера, где они устроены КАТАЛОГОМ ПРАВИЛ (Cursor).
+ * Каталог правил CLI: раздел инструкций у Cursor/Continue и раздел правил у Qwen
+ * (MAP 24, рядом с QWEN.md).
  * Заголовок называет вещи своими именами: это не редактор одного файла, а
  * менеджер каталога `.mdc`-правил CLI.
  */
@@ -15,6 +18,10 @@ export function ProviderRulesPage() {
   const { t } = useTranslation();
   const { data } = useProviders();
   const provider = activeProvider(data);
+  // Тот же запрос, что у панели ниже, — из кэша: формат решает подзаголовок.
+  const rules = useProviderRules({});
+  const format = rules.data?.format;
+  const traits = ruleFormat(format);
 
   if (!provider) return <SkeletonList rows={5} />;
 
@@ -22,7 +29,7 @@ export function ProviderRulesPage() {
     <Stack gap="var(--spacing-lg)" className={styles.page}>
       <PageHeader
         title={t('providerRules.title', { provider: provider.name })}
-        subtitle={t('providerRules.subtitle', { provider: provider.name })}
+        subtitle={t(traits.text('subtitle'), { provider: provider.name })}
         helpTopic="claudeMd"
       />
       <ProviderRulesPanel />

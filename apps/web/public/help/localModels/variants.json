@@ -1,0 +1,115 @@
+{
+  "topic": "localModels",
+  "frames": {
+    "first/01-machine": {
+      "light-ru": {
+        "file": "01-machine.png",
+        "width": 1440,
+        "height": 1500
+      },
+      "light-en": {
+        "file": "01-machine.en.png",
+        "width": 1440,
+        "height": 1500
+      },
+      "dark-ru": {
+        "file": "01-machine.dark.png",
+        "width": 1440,
+        "height": 1500
+      },
+      "dark-en": {
+        "file": "01-machine.dark.en.png",
+        "width": 1440,
+        "height": 1500
+      }
+    },
+    "first/02-catalog": {
+      "light-ru": {
+        "file": "02-catalog.png",
+        "width": 1140,
+        "height": 1126
+      },
+      "light-en": {
+        "file": "02-catalog.en.png",
+        "width": 1140,
+        "height": 1126
+      },
+      "dark-ru": {
+        "file": "02-catalog.dark.png",
+        "width": 1140,
+        "height": 1126
+      },
+      "dark-en": {
+        "file": "02-catalog.dark.en.png",
+        "width": 1140,
+        "height": 1126
+      }
+    },
+    "first/03-pulling": {
+      "light-ru": {
+        "file": "03-pulling.png",
+        "width": 1140,
+        "height": 1176
+      },
+      "light-en": {
+        "file": "03-pulling.en.png",
+        "width": 1140,
+        "height": 1176
+      },
+      "dark-ru": {
+        "file": "03-pulling.dark.png",
+        "width": 1140,
+        "height": 1176
+      },
+      "dark-en": {
+        "file": "03-pulling.dark.en.png",
+        "width": 1140,
+        "height": 1176
+      }
+    },
+    "first/04-ready": {
+      "light-ru": {
+        "file": "04-ready.png",
+        "width": 1440,
+        "height": 1500
+      },
+      "light-en": {
+        "file": "04-ready.en.png",
+        "width": 1440,
+        "height": 1500
+      },
+      "dark-ru": {
+        "file": "04-ready.dark.png",
+        "width": 1440,
+        "height": 1500
+      },
+      "dark-en": {
+        "file": "04-ready.dark.en.png",
+        "width": 1440,
+        "height": 1500
+      }
+    },
+    "first/05-agents": {
+      "light-ru": {
+        "file": "05-agents.png",
+        "width": 1140,
+        "height": 477
+      },
+      "light-en": {
+        "file": "05-agents.en.png",
+        "width": 1140,
+        "height": 477
+      },
+      "dark-ru": {
+        "file": "05-agents.dark.png",
+        "width": 1140,
+        "height": 477
+      },
+      "dark-en": {
+        "file": "05-agents.dark.en.png",
+        "width": 1140,
+        "height": 477
+      }
+    }
+  }
+}

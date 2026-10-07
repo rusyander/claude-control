@@ -76,7 +76,8 @@ describe('provider-project-routes: проектный уровень прова�
       codex: {
         instructions: 'AGENTS.md',
         mcp: ['.codex', 'config.toml'],
-        sections: ['instructions', 'mcp'],
+        // MAP 26: проектные хуки `.codex/hooks.json` и скиллы `.agents/skills`.
+        sections: ['instructions', 'mcp', 'hooks', 'skills'],
       },
       // GEMINI-2/3: у Gemini к инструкциям и MCP добавились проектные .env и права.
       gemini: {
@@ -770,7 +771,7 @@ describe('provider-project-routes: проектный уровень прова�
   });
 
   it('хуки, плагины и скиллы проекта закрыты у провайдеров без них (включая claude)', async () => {
-    for (const provider of ['claude', 'codex', 'gemini', 'cursor', 'aider']) {
+    for (const provider of ['claude', 'gemini', 'cursor', 'aider']) {
       const id = await boot(provider);
       for (const url of [
         `/api/projects/${id}/provider/hooks`,
@@ -784,6 +785,26 @@ describe('provider-project-routes: проектный уровень прова�
       await app.close();
       rmSync(join(appDataRoot, 'state.json'), { force: true });
     }
+  });
+
+  it('codex: проектные хуки и скиллы открыты, плагины проекта закрыты (они только глобальные)', async () => {
+    const id = await boot('codex');
+    const hooks = await app.inject({ method: 'GET', url: `/api/projects/${id}/provider/hooks` });
+    expect(hooks.statusCode, hooks.body).toBe(200);
+    expect(hooks.json<{ filePath: string }>().filePath).toBe(
+      join(projectDir, '.codex', 'hooks.json'),
+    );
+    const skills = await app.inject({ method: 'GET', url: `/api/projects/${id}/provider/skills` });
+    expect(skills.statusCode, skills.body).toBe(200);
+    expect(skills.json<{ skillsDir: string }>().skillsDir).toBe(
+      join(projectDir, '.agents', 'skills'),
+    );
+    const plugins = await app.inject({
+      method: 'GET',
+      url: `/api/projects/${id}/provider/plugins`,
+    });
+    expect(plugins.statusCode).toBe(400);
+    expect(plugins.json<{ error: string }>().error).toBe('section_unsupported');
   });
 
   it('регресс-ноль Claude: его проектные роуты работают при claude и закрыты при codex', async () => {

@@ -177,7 +177,13 @@ await page.route(/\/api\/rules(\?.*)?$/, (route) =>
     : route.fallback(),
 );
 
-const emit = (frame) => page.evaluate((f) => window.__qaEmit(f), frame);
+// Кадр слушает окно агента панели: пока его кнопки нет на странице, подписки
+// ещё нет, и кадр, отправленный сразу после перехода, терялся (на стенде
+// послабее `integration-focus` падал каждый раз).
+const emit = async (frame) => {
+  await page.locator('[data-panel-agent-trigger]').first().waitFor({ timeout: 15_000 });
+  await page.evaluate((f) => window.__qaEmit(f), frame);
+};
 const remember = (key, value) =>
   page.evaluate(([k, v]) => window.localStorage.setItem(k, v), [key, value]);
 const search = () => Object.fromEntries(new URL(page.url()).searchParams);

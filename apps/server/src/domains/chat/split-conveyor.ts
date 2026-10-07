@@ -45,6 +45,8 @@ import {
   errorCodeOf,
 } from './split-group-texts.ts';
 import { groupIdentityLine } from './panel-preamble.ts';
+import { trackerKeys } from './tracker-keys.ts';
+import { groupTaskKeys } from './split-tasks.ts';
 import { continuable, continuePrompt } from './split-continue.ts';
 
 /**
@@ -85,6 +87,8 @@ export interface SplitConveyorDeps {
    * подключена. Нет зависимости или ответа — завести тикет из хаба нельзя.
    */
   ticketTracker?: (projectPath: string) => string | undefined;
+  /** Jira подключена — хаб предлагает «Перевести задачи» групп с MR (G4). */
+  tasksConnected?: () => boolean;
   /**
    * Завести копии и запустить ПЛАН для групп записи (индексы). Одна порция —
    * один контекст: от какой ветки отводить и что группы знают о предшественниках.
@@ -228,18 +232,7 @@ export const DELIVERY_BLOCKED_PROBE_MS = 15 * 60_000;
 /** …столько раз (4 часа), дальше — `failed` с причиной. */
 export const DELIVERY_BLOCKED_PROBES = 16;
 
-/** Префиксы вида «XXX-9», которые ключом задачи трекера не бывают. */
-const NOT_TRACKER = new Set(['UTF', 'ISO', 'SHA', 'RFC', 'CVE', 'TLS', 'HTTP', 'MD', 'ES', 'IEC']);
-
-/** Ключи задач трекера (`PROJ-1064`) в тексте — по порядку, без повторов. */
-export function trackerKeys(text: string): string[] {
-  const keys: string[] = [];
-  for (const match of text.matchAll(/\b([A-Z][A-Z0-9]{1,9})-([1-9]\d{0,6})\b/g)) {
-    if (NOT_TRACKER.has(match[1] ?? '')) continue;
-    if (!keys.includes(match[0])) keys.push(match[0]);
-  }
-  return keys;
-}
+export { trackerKeys } from './tracker-keys.ts';
 
 /** Сколько снятых групп разговор помнит: запись не должна расти без края. */
 const RETIRED_GROUPS_MAX = 50;
@@ -1686,6 +1679,7 @@ export class SplitConveyor {
           }
         : {}),
       ...(this.ticketTrackerOf(record) ? { ticketTracker: this.ticketTrackerOf(record) } : {}),
+      ...(this.deps.tasksConnected?.() ? { jiraTasks: true as const } : {}),
       order: record.order,
       groups: record.groups.map((group) => ({
         index: group.index,
@@ -1727,6 +1721,7 @@ export class SplitConveyor {
         ...(record.proposal.groups[group.index]?.review ? { review: true as const } : {}),
         ...(group.droppedAt ? { droppedAt: group.droppedAt } : {}),
         ...(group.tickets?.length ? { tickets: group.tickets } : {}),
+        ...(groupTaskKeys(record, group).length ? { taskKeys: groupTaskKeys(record, group) } : {}),
         ...(group.humanSteps?.length ? { humanSteps: group.humanSteps } : {}),
         ...(group.autoNotices?.length ? { autoNotices: group.autoNotices } : {}),
       })),

@@ -10,9 +10,12 @@ import { GroupCopyCleanup } from './GroupCopyCleanup';
 import { GroupControl } from './GroupControl';
 import { GroupAcceptance } from './GroupAcceptance';
 import { GroupRecheck } from './GroupRecheck';
+import { SplitTasksMove } from './SplitTasksMove';
 import { GroupAutoNotices } from './GroupAutoNotices';
 import { GroupStepLine } from './GroupMeta';
 import { GroupText } from './GroupText';
+import { MergeOrderChip } from './MergeOrderChip';
+import { isMrSettled } from '../lib/hubOrder';
 import type { GroupCardProps } from './GroupCard.types';
 import styles from './ChildStages.module.scss';
 
@@ -41,11 +44,18 @@ export function GroupCard({
   const cleanup = group.copy && parentChatId ? group.copy : undefined;
   const release =
     !chatId && group.pending === 'waiting' && group.groupIndex !== undefined && onRelease;
+  const settled = isMrSettled(group) ? group.mrClosed : undefined;
 
   return (
     <div
-      className={cn(styles.group, openable && styles.groupOpenable)}
+      className={cn(
+        styles.group,
+        openable && styles.groupOpenable,
+        settled === 'merged' && styles.groupMerged,
+        settled === 'closed' && styles.groupClosed,
+      )}
       data-hub-row={chatId ? 'chat' : group.pending}
+      {...(settled ? { 'data-hub-settled': settled } : {})}
     >
       <div className={styles.groupBody}>
         <div className={styles.groupMain}>
@@ -82,19 +92,32 @@ export function GroupCard({
           {cleanup && !cleanup.cleaned && parentChatId && (
             <GroupCopyCleanup parentChatId={parentChatId} index={cleanup.index} />
           )}
+          {/* Номер в очереди слияния — вплотную к кнопке MR и переносится с ней
+              одним куском (G3): оторванный, он читался бы про соседнюю кнопку. */}
           {group.mr && (
-            <Button
-              size="sm"
-              variant="secondary"
-              leftIcon={<Icon name="link" size={14} />}
-              title={t('chat.cascade.hub.mrOpenHint')}
-              data-hub-mr
-              onClick={() => window.open(group.mr, '_blank', 'noopener,noreferrer')}
-            >
-              {t('chat.cascade.hub.mr', { id: mrId })}
-            </Button>
+            <span className={styles.mrPair}>
+              {group.mergeOrder && <MergeOrderChip order={group.mergeOrder} />}
+              <Button
+                size="sm"
+                variant="secondary"
+                leftIcon={<Icon name="link" size={14} />}
+                title={t('chat.cascade.hub.mrOpenHint')}
+                data-hub-mr
+                onClick={() => window.open(group.mr, '_blank', 'noopener,noreferrer')}
+              >
+                {t('chat.cascade.hub.mr', { id: mrId })}
+              </Button>
+            </span>
           )}
           {group.recheck && <GroupRecheck recheck={group.recheck} />}
+          {group.taskMove && parentChatId && (
+            <SplitTasksMove
+              parentChatId={parentChatId}
+              index={group.taskMove.index}
+              keys={group.taskMove.keys}
+              connected={group.taskMove.connected}
+            />
+          )}
           {group.acceptance && <GroupAcceptance acceptance={group.acceptance} />}
           {group.interrupted && onResumeInterrupted && (
             <div className={styles.holdActions} data-resume-interrupted="group">
@@ -157,6 +180,7 @@ export function GroupCard({
 }
 
 function statusTone(group: GroupCardProps['group']): 'success' | 'danger' | 'neutral' {
+  if (isMrSettled(group)) return group.mrClosed === 'merged' ? 'success' : 'neutral';
   if (group.chatId) return group.isRunning ? 'success' : 'neutral';
   return group.pending === 'failed' ? 'danger' : 'neutral';
 }

@@ -1,13 +1,16 @@
 import type { ClaudePaths } from '@agentdeck/contracts';
 import { foreignChatKey } from '@agentdeck/contracts/foreign-chat-key';
 import type { ChatRunRegistry } from '../domains/chat/ChatRunRegistry.ts';
-import { activateEffectiveGroup } from '../domains/chat/group-auto-pick.ts';
+import { activateEffectiveGroup, effectiveGroupsForRun } from '../domains/chat/group-auto-pick.ts';
 import { groupsActivatedNotice } from '../domains/group-activation.ts';
+import { GroupLayerBlocked, decideRunLayer, runLayerNotice } from '../domains/groups/run-layer.ts';
 import type { ProviderChatService } from '../domains/provider-chat.ts';
+import type { GroupRunActivation } from '../domains/provider-chat/ProviderChatService.ts';
 import type { AppStore } from '../lib/app-store/store.ts';
+import { getProvider } from '../providers/registry.ts';
 
 /**
- * Выбранная группа чата включается на КАЖДОМ старте — у обоих провайдеров.
+ * Выбранная группа чата действует на КАЖДОМ старте — у обоих провайдеров.
  *
  * Раньше включение жило в маршруте отправки, и всё, что панель запускает сама
  * (дети разделения, звенья конвейера, ревью по ссылке, слово родителя), шло
@@ -15,6 +18,11 @@ import type { AppStore } from '../lib/app-store/store.ts';
  * Теперь один вопрос у реестра Claude и у службы чужих CLI; маршрут отправки
  * больше не включает выбранную группу сам — только группы, привязанные к
  * проекту.
+ *
+ * У Claude это тумблер его каталогов. У чужого CLI — НИКОГДА: он файлов Claude
+ * не читает, тумблер ему ничего не давал, а `~/.claude` человека менялся зря.
+ * Группы едут слоем на прогон (`domains/groups/run-layer.ts`), CLI без слоя
+ * получает заметку «не действует», и ни в одной ветке нет записи в Claude.
  */
 export interface GroupActivationWiringDeps {
   store: AppStore;
@@ -46,8 +54,49 @@ export function wireGroupActivation(deps: GroupActivationWiringDeps): void {
     const name = activate(keys, cwd);
     return name ? groupsActivatedNotice([name]) : undefined;
   });
-  // Ленты у чужого CLI панель не пишет: факт виден на странице «Наборы».
-  deps.providerChats?.setGroupActivation((providerId, chatId, workdir) => {
-    activate([foreignChatKey(providerId, chatId)], workdir);
-  });
+  deps.providerChats?.setGroupActivation((providerId, chatId, workdir) =>
+    runLayer(providerId, [foreignChatKey(providerId, chatId)], workdir),
+  );
+
+  /**
+   * Выбранная, привязанные к проекту и включённые для этого CLI группы — одним
+   * слоем на прогон. Слоя у CLI нет — заметка «не действует»; слой не помещается
+   * (Codex) — отказ прогону с причиной, ничего не обрезано.
+   */
+  const runLayer = (
+    providerId: string,
+    keys: readonly string[],
+    workdir: string | undefined,
+  ): GroupRunActivation | undefined => {
+    const provider = getProvider(providerId);
+    // Незнакомый id реестр откатывает на Claude — тумблер каталогов здесь не
+    // имеет права сработать ни при каком ответе.
+    if (provider.id !== providerId || providerId === 'claude') return undefined;
+    try {
+      const groups = effectiveGroupsForRun(toggle, keys, workdir, providerId);
+      if (groups.length === 0) return undefined;
+      const decision = decideRunLayer({ paths: deps.paths, store: deps.store }, provider, groups);
+      const notice = { digest: decision.digest, text: runLayerNotice(decision) };
+      if (decision.model === 'none') return { notice };
+      if (decision.plan.refused.length > 0) {
+        deps.log?.(
+          `groups on ${providerId}: not delivered`,
+          decision.plan.refused.map((one) => `${one.member} (${one.code})`).join(', '),
+        );
+      }
+      const written = decision.writer.write(
+        { paths: deps.paths, store: deps.store },
+        decision.plan,
+      );
+      return {
+        notice,
+        ...(written ? { env: written.env } : {}),
+        ...(written?.hooks?.length ? { hooks: written.hooks } : {}),
+      };
+    } catch (error) {
+      if (error instanceof GroupLayerBlocked) return { refusal: error.message };
+      deps.log?.(`group layer for ${providerId} failed`, error);
+      return undefined;
+    }
+  };
 }

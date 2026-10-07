@@ -17,4 +17,6 @@ export interface FormWithAssistantProps<S extends AssistantSpec> {
   /** Применить уже проверенные значения — только принятые поля. */
   onApply: (values: AssistantValues<S>) => void;
   placeholder?: string;
+  /** Допустимые значения ещё грузятся — помощник ждёт их, а не шлёт пустые списки. */
+  loading?: boolean;
 }

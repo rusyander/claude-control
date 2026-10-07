@@ -198,10 +198,21 @@ describe('авторежим прав чата', () => {
     expect(await decide(PLAIN, 'npm test')).toBe('allow');
   });
 
-  it('чужой CLI: без флага авторежима — acceptEdits и автоподтверждение панели', async () => {
+  // Раньше здесь проверялось, что прогон чужого CLI идёт в `acceptEdits`, — но
+  // этот прогон и был ошибкой: `ChatRunner` собирает argv Claude, и `codex`
+  // получал флаги Claude. Теперь отправка при чужом CLI отказывает
+  // (`run-routes.foreign-provider.integration.test.ts`), а «у чужого CLI нет
+  // авторежима» проверяет сам `supportsCliAutoMode` (`auto-mode.test.ts`).
+  it('чужой CLI: прогон Claude-путём не заводится — отказ с кодом', async () => {
     store.updateSettings({ provider: 'codex' });
-    expect((await send(PLAIN)).permissionMode).toBe('acceptEdits');
-    expect(await decide(PLAIN, 'npm test')).toBe('allow');
+    const reply = await app.inject({
+      method: 'POST',
+      url: '/api/chat/send',
+      payload: { chatId: PLAIN, prompt: 'работай', projectPath: work, allowEdits: true },
+    });
+    expect(reply.statusCode).toBe(409);
+    expect(reply.json()).toMatchObject({ messageCode: 'chat-send-foreign-provider' });
+    expect(runs.some((item) => item.options.permissionPrompt?.runId === PLAIN)).toBe(false);
   });
 
   it('безвозвратное в авторежиме уходит человеку, и чат из родителя показывает запрос в его хабе', async () => {

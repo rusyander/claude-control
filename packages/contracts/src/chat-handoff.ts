@@ -739,6 +739,11 @@ export interface SplitPlanView {
    * подключена, и у тикета остаётся только «Копировать».
    */
   ticketTracker?: string;
+  /**
+   * Интеграция Jira подключена: хаб может перевести задачи групп с MR в
+   * выбранный статус (G4). Нет — кнопки «Перевести задачи» нет.
+   */
+  jiraTasks?: true;
   /** Порядок старта и слияния — индексы групп. */
   order: number[];
   /**
@@ -855,6 +860,12 @@ export interface SplitPlanView {
       /** Дефекты вне задач группы, которые она предложила завести тикетом (95b). */
       tickets?: SplitTicketView[];
       /**
+       * Задачи трекера, над которыми работала группа (ключи из её заданий,
+       * ветки и названия), — только у группы, у которой есть MR (G4). Дефекты
+       * из `tickets` сюда не входят: их не чинили, переводить их нечего.
+       */
+      taskKeys?: string[];
+      /**
        * Что должен сделать человек: группа не может сама (находка 112 — зависимость
        * между MR выставляется только руками). Хаб — списком «Сделать человеку».
        */
@@ -931,6 +942,32 @@ export interface SplitGroupRechecked {
   index: number;
   outcome: 'sent' | 'queued';
   requestedAt: string;
+}
+
+/**
+ * Что можно сделать с задачами групп в Jira (G4): задачи (ключ + группа) и
+ * статусы, в которые можно перевести КАЖДУЮ из них (или она уже в нём).
+ * `unread` — задачи, которые Jira не отдала, с причиной. `from` — «из статуса»:
+ * по каждому текущему статусу — сколько задач в нём и куда можно перевести
+ * каждую из них.
+ */
+export interface SplitTaskOptions {
+  from: { status: string; count: number; targets: string[] }[];
+  keys: { key: string; group: string; status?: string }[];
+  statuses: string[];
+  unread: { key: string; reason: string }[];
+}
+
+/**
+ * Итог перевода по задаче: переведена, уже была в статусе, перехода нет, ошибка
+ * Jira, пропущена — стоит не в выбранном «из статуса» (`reason` — где стоит).
+ */
+export type SplitTaskOutcome = 'moved' | 'already' | 'unavailable' | 'failed' | 'skipped';
+
+export interface SplitTasksMoved {
+  status: string;
+  from?: string;
+  items: { key: string; outcome: SplitTaskOutcome; reason?: string }[];
 }
 
 /** Итог «Принять» / «Снять отметку»: `acceptedAt` нет — отметка снята. */

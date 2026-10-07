@@ -65,6 +65,25 @@ export const overviewEn: typeof overviewRu = {
       'If everything on the overview is zero, start here: most likely the wrong ' +
       'directory was found. The path is changed in the panel settings and applies at ' +
       'once.',
+    providerTitle: 'Whose numbers these are: the active provider',
+    providerCaption:
+      'The tiles count the configuration of the CLI chosen in “Settings → Providers”, ' +
+      'and the page subtitle names it.',
+    providerText:
+      'Under Claude Code the numbers come from ~/.claude, as before. Under another CLI (Qwen ' +
+      'Code, Codex and so on) they come from its own files, read the same way as its sections. ' +
+      'A section the provider does not have gets no tile: a zero there would mean “empty”, not ' +
+      '“does not exist”. The panel does not know the health of other CLIs’ MCP servers, so ' +
+      '“failed” is not shown for them; Codex and Goose permissions are one mode without lists, ' +
+      'so they get no permissions tile.',
+    noClaudeTitle: 'A machine without Claude Code',
+    noClaudeText:
+      'If there is no ~/.claude folder, the panel still starts and does not create one: it ' +
+      'keeps its own data in ~/.agentdeck/data. The first-run wizard lets you past the folder ' +
+      'step when another CLI is found on the system — choose it on the next step; another CLI ' +
+      'has no “Claude Code access” step. The folder card on the overview is then grey, “Claude ' +
+      'Code not in use”; a red “not found” appears only when Claude itself is selected. ' +
+      'If Claude Code is installed later, the panel data stays where it is, in ~/.agentdeck/data.',
 
     guide: {
       tourTitle: 'Path 1. First look: what the panel sees at all',

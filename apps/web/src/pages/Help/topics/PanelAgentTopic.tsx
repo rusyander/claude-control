@@ -115,6 +115,8 @@ export function PanelAgentTopic() {
             riskyRow('secProjectRunner'),
             riskyRow('secChatSession'),
             dangerRow('secSandbox'),
+            readRow('secLocalModels'),
+            readRow('secKit'),
             riskyRow('secContourAgents'),
             riskyRow('secChats'),
             riskyRow('secAnalyticsPortability'),

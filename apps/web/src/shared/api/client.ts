@@ -135,6 +135,15 @@ export function toErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+/** Код текста отказа сервера (`messageCode`) — чтобы отличить ответ от сбоя. */
+export function messageCodeOf(error: unknown): string | undefined {
+  if (!axios.isAxiosError(error)) return undefined;
+  const data: unknown = error.response?.data;
+  if (typeof data !== 'object' || data === null) return undefined;
+  const code = (data as { messageCode?: unknown }).messageCode;
+  return typeof code === 'string' ? code : undefined;
+}
+
 /**
  * Отказ 409 — «занято»: сервер отверг запрос не из-за его формы, а потому что
  * состояние ушло вперёд (прогон уже идёт, группу держит чужой прогон). Экран,

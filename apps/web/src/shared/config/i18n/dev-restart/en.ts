@@ -5,8 +5,10 @@ export const devRestartEn: typeof devRestartRu = {
   title: 'Server edits are waiting for a restart',
   waitingRuns: 'The server restarts on its own once the running chat turns finish.',
   waitingSetup: 'The server restarts on its own once split groups finish preparing their copies.',
+  waitingChecks:
+    'The server restarts on its own once the running project autotests and mutation checks finish.',
   waitingBoth:
-    'The server restarts on its own once the running turns and group copy preparation finish.',
+    'The server restarts on its own once everything running finishes: chat turns, group copy preparation, autotests and checks.',
   since: 'Waiting since {{time}}',
   files_one: '{{count}} file edited: {{names}}',
   files_few: '{{count}} files edited: {{names}}',

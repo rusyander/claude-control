@@ -5,6 +5,8 @@ import {
   inClaudeGlobals,
   inactivePairSides,
   parseGroupKey,
+  scopeOf,
+  scopeProvider,
   type GroupKey,
   type StoredProjectChoice,
 } from '@agentdeck/contracts/group-sources';
@@ -13,6 +15,7 @@ import type { AppStore } from '../../lib/app-store/store.ts';
 import { pairsIn, readChoice } from '../groups/choice.ts';
 import { layoutForCwd } from '../project-git/copy-readiness.ts';
 import type { EntityToggleDeps } from '../entity-toggle.ts';
+import { groupsForCwd, matchesProject } from '../group-activation.ts';
 import { isSandboxPath } from './ChatArtifacts.ts';
 import {
   activateChosenGroup,
@@ -174,6 +177,74 @@ export function pinnedChoiceAt<Choice extends string>(
     { groups, projectPath, pairChoice: readChoice(appData, projectPath) },
     choice as GroupKey,
   );
+}
+
+/**
+ * Действующая группа разговора (своя или от родителя, из пары — действующая
+ * сторона) без включения: чужому CLI она подаётся слоем на прогон, а не
+ * тумблером каталогов Claude. `auto` и песочница — `undefined`.
+ */
+export function effectiveChosenGroup(
+  deps: Pick<EntityToggleDeps, 'store' | 'paths'>,
+  keys: readonly string[],
+  cwd: string | undefined,
+): Group | undefined {
+  if (!cwd || isSandboxPath(cwd)) return undefined;
+  const choice = chatGroupSettingsView(storeTreeReader(deps.store), keys).groupChoice;
+  const key = pinnedChoiceAt(deps.store.getGroups(), deps.paths.appData, choice, cwd);
+  if (key === 'auto' || !parseGroupKey(key)) return undefined;
+  return deps.store.getGroups().find((group) => groupKeyOf(group) === key);
+}
+
+/**
+ * Группы ОДНОГО прогона чужого CLI — то, что едет слоем вместо тумблера
+ * каталогов Claude. По порядку приоритета:
+ *
+ * 1. выбранная разговором (своя или родителя, из пары — действующая сторона);
+ * 2. привязанные к проекту прогона (F2 владельца 06.10): у Claude их включает
+ *    старт прогона, у чужого CLI без этого они молча отсутствовали;
+ * 3. включённые для этого CLI на странице «Группы» (`enabledFor`, F1) —
+ *    общие везде, проектные только в своём проекте.
+ *
+ * Повтор группы отбрасывается, из пары проекта остаётся действующая сторона
+ * (то же правило, что у меню чата и каталога разбора). Только группы в файлах
+ * Claude: копия для другого CLI держит ЕГО файлы, а копия для этого действует
+ * сама. Песочница — мимо: у неё свой каталог конфигурации.
+ */
+export function effectiveGroupsForRun(
+  deps: Pick<EntityToggleDeps, 'store' | 'paths'>,
+  keys: readonly string[],
+  cwd: string | undefined,
+  providerId: string,
+): Group[] {
+  if (cwd && isSandboxPath(cwd)) return [];
+  const groups = deps.store.getGroups();
+  const chosen = effectiveChosenGroup(deps, keys, cwd);
+  const enabled = groups.filter((group) => {
+    if (group.enabledFor?.[providerId] !== true) return false;
+    if (inClaudeGlobals(group.scope)) return true;
+    const scope = scopeOf(group);
+    return Boolean(cwd && scope.kind === 'project' && matchesProject(scope.path, cwd));
+  });
+  const picked = [
+    ...(chosen ? [chosen] : []),
+    ...(cwd ? groupsForCwd(groups, cwd) : []),
+    ...enabled,
+  ];
+
+  const projectPath = cwd ? (layoutForCwd(cwd).mainDir ?? cwd) : undefined;
+  const hidden = projectPath
+    ? inactivePairSides(pairsIn(groups, projectPath), readChoice(deps.paths.appData, projectPath))
+    : new Set<GroupKey>();
+  const seen = new Set<string>();
+  return picked.filter((group) => {
+    // Ключ пары одинаков у проектных групп разных проектов — к нему добавлен путь.
+    const scope = scopeOf(group);
+    const identity = `${groupKeyOf(group)}\u0000${scope.kind === 'project' ? scope.path : ''}`;
+    if (seen.has(identity)) return false;
+    seen.add(identity);
+    return !hidden.has(groupKeyOf(group)) && scopeProvider(group.scope) === 'claude';
+  });
 }
 
 /**

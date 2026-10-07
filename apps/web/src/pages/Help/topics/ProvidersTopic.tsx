@@ -158,6 +158,7 @@ export function ProvidersTopic() {
               { label: tr('fileInstructions'), value: '~/.qwen/QWEN.md', isMono: true },
               { label: tr('fileMcp'), value: '~/.qwen/settings.json', isMono: true },
               { label: tr('fileEnv'), value: '~/.qwen/.env', isMono: true },
+              { label: tr('fileRules'), value: '~/.qwen/rules/*.md', isMono: true },
               { label: tr('fileOverride'), value: 'QWEN_HOME', isMono: true },
             ]}
           />
@@ -265,6 +266,9 @@ export function ProvidersTopic() {
           </Callout>
           <Callout tone="danger" title={tr('noteFirstRunTitle')}>
             {tr('noteFirstRunText')}
+          </Callout>
+          <Callout tone="info" title={tr('noteCliTitle')}>
+            {tr('noteCliText')}
           </Callout>
         </Stack>
       </HelpSection>

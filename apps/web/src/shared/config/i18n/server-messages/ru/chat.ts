@@ -5,6 +5,8 @@ export const chatRu: Record<ChatMessageCode, string> = {
     'Предыдущий ответ в этом разговоре ещё генерируется. Дождитесь его окончания или нажмите «Остановить» — сообщение не отправлено.',
   'run-steer-ended':
     'Ход уже закончился — сообщение посреди хода не отправлено; панель отправит его обычным порядком.',
+  'chat-send-foreign-provider':
+    'Активен {{provider}}: этот маршрут запускает только чат Claude. Сообщение не отправлено — пишите в чат {{provider}} на компьютере или переключите активный CLI на Claude.',
   'run-empty-prompt': 'Сообщение пустое — отправлять нечего.',
   'run-unsupported-upload':
     'Не поддерживаются вложения: {{names}}. Сообщение не отправлено. Допустимые расширения: {{supported}}.',
@@ -25,6 +27,8 @@ export const chatRu: Record<ChatMessageCode, string> = {
   'cli-not-found': 'CLI Claude не найден в PATH',
   'cli-outdated':
     'Панель запускает Claude Code {{current}}, а модели нужна версия {{required}} или новее. Обновите CLI.',
+  'cli-provider-not-found': 'CLI {{provider}} не найден в PATH',
+  'cli-update-unsupported': 'Обновление CLI {{provider}} из панели не поддерживается',
   'prompt-too-long':
     'Контекст разговора переполнен: следующее сообщение он не примет. Сожмите контекст или продолжите в новой сессии.',
   'chat-process-lost':
@@ -60,6 +64,8 @@ export const chatRu: Record<ChatMessageCode, string> = {
   'conversation-create-failed': 'Не удалось создать разговор',
   'request-empty': 'Пустой запрос',
   'foreign-answer-running': 'Ответ на предыдущий вопрос ещё идёт',
+  'foreign-queued-gone': 'Сообщения в очереди уже нет',
+  'foreign-permission-gone': 'Этот вопрос о разрешении уже закрыт',
   'foreign-restart-running':
     'Ответ ещё идёт: дождитесь конца хода или остановите его, потом перезапускайте',
   'foreign-restart-no-cwd': 'У разговора нет рабочего каталога — новый разговор заводить негде',
@@ -69,6 +75,24 @@ export const chatRu: Record<ChatMessageCode, string> = {
   'panel-agent-not-running': 'В этом разговоре ход не идёт.',
   'panel-agent-bad-from-seq': 'Номер кадра (fromSeq) должен быть числом.',
   'panel-agent-turn-gone': 'Начало хода уже не хранится — откройте разговор.',
+  'panel-agent-provider-unsupported':
+    'Агент панели не работает с {{provider}}: у этого CLI нет запуска, в котором агент действует только инструментами панели. Агент работает с Claude Code, Qwen Code, Codex, Gemini CLI, OpenCode, Goose и Kimi Code — переключите активный CLI в «Провайдерах».',
+  'panel-agent-cli-not-found':
+    '{{provider}} не найден в PATH процесса панели — агенту нечем работать. Без CLI у агента нет инструментов панели, ключ API здесь не поможет.',
+  'panel-agent-contour-foreign':
+    'Через контур агент панели ходит только с Claude Code, а активный CLI — {{provider}}. Ход не запущен, чтобы не уйти в облако вендора: снимите у контура галочку «Ассистент панели» или переключите CLI на Claude Code.',
+  'tests-agent-provider-unsupported':
+    'Агент блока «Тесты» работает с Claude Code, Qwen Code и Codex, а активный CLI — {{provider}}: у него нет запуска, где панель проверяет каждую запись агента. Прогон не запущен — переключите CLI в «Провайдерах» или отметьте кейсы вручную.',
+  'tests-agent-cli-not-found':
+    '{{provider}} не найден в PATH процесса панели — прогону нечем работать. Установите CLI или переключите активный CLI в «Провайдерах».',
+  'tests-agent-contour-foreign':
+    'Через контур агент блока «Тесты» ходит только с Claude Code, а активный CLI — {{provider}}. Прогон не запущен, чтобы не уйти в облако вендора: снимите у контура галочку «Агент тестов» или переключите CLI на Claude Code.',
+  'tests-agent-gate-unavailable':
+    'Прогон на {{provider}} не запущен: панель не смогла поднять проверку прав, а без неё агент писал бы куда угодно. Повторите запуск; не помогло — перезапустите панель.',
+  'tests-agent-codex-app-server-unavailable':
+    'Codex не поднял app-server (нужен Codex 0.160 или новее): {{why}}. Прогон не запущен.',
+  'tests-agent-gate-bypassed':
+    'Прогон остановлен: {{provider}} выполнил «{{tool}}» мимо проверки прав панели. Проверьте рабочую копию — изменение могло лечь вне разрешённых папок.',
   'split-hold-not-waiting': 'Группа не ждёт ответа: вопроса нет или на него уже ответили',
   'split-release-not-waiting': 'Группа не ждёт предшественников: отпускать нечего',
   'split-relaunch-nothing': 'Разделения нет: перезапускать нечего',
@@ -100,6 +124,10 @@ export const chatRu: Record<ChatMessageCode, string> = {
     'Перепроверять нечего: у группы нет доставленного MR или её копия убрана',
   'split-recheck-merged': 'MR уже влит — перепроверять нечего',
   'split-recheck-closed': 'MR закрыт — перепроверять нечего',
+  'split-tasks-jira-off': 'Jira не подключена — переводить задачи некуда',
+  'split-tasks-none': 'У групп с MR нет задач трекера',
+  'split-tasks-status-missing': 'Не выбран статус',
+  'split-tasks-index-bad': 'Номер группы — целое число',
   'split-limit-active': 'Лимит подписки исчерпан до {{until}}',
   'split-plan-cancel-nothing': 'Отменять нечего: разделение этого разговора уже закончилось',
   'split-plan-cancel-unknown': 'Разделения с этим разговором нет',
@@ -111,4 +139,6 @@ export const chatRu: Record<ChatMessageCode, string> = {
     'Процесс агента не остановлен: панель не смогла проверить, что номер всё ещё его, и не тронула его. Прогон идёт дальше — попробуйте «Остановить» ещё раз.',
   'branch-stop-unconfirmed':
     'Копия {{path}} заведена, но процесс агента не остановлен: панель не смогла проверить, что номер всё ещё его, и не тронула его. Разговор остался в основной копии, агент ждёт у той же карточки.',
+  'chat-pin-invalid': 'Нужно поле pinned: true или false',
+  'chat-pin-child': 'Чат группы закрепляется вместе со своим родителем',
 };

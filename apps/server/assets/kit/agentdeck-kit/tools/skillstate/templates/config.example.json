@@ -1,0 +1,15 @@
+{
+  "repo": "<ABS PATH to the repo the workers edit — long path, never an 8.3 short one>",
+  "model": "claude-sonnet-5",
+  "allowedTools": ["Read", "Edit", "Write", "Grep", "Glob"],
+  "permissionMode": "acceptEdits",
+  "gate": null,
+  "maxTurnsPerUnit": 30,
+  "maxRetriesPerUnit": 2,
+  "unitTimeoutMs": 600000,
+  "maxConsecutiveFailures": 3,
+  "stateBudgetChars": 4000,
+  "effort": null,
+  "maxContinuations": 2,
+  "cli": null
+}

@@ -6,6 +6,7 @@ import {
   parsePosixProcessTable,
   parseKillOutcomes,
   parseProcessTable,
+  planLeftoverKill,
   planTreeKill,
   readPosixProcessTable,
   readProcessTable,
@@ -439,4 +440,47 @@ describe.runIf(process.platform === 'win32')('killProcessTree — по деск�
       child.kill();
     }
   }, 30_000);
+});
+
+/**
+ * Добивание пережившего команду (Ф9): дерево записано за прогон, команда вышла.
+ * Наш 901 (записан) жив; его сын 905 создан после последнего снимка; 903
+ * (записан) мёртв, а его сирота 906 создана после него — наша. Номер мёртвого
+ * 904 занял чужой 904' позже, и его сын 907 — не наш. Сторож 500 и его дети в
+ * записи не значатся и не тронуты.
+ */
+describe('planLeftoverKill — что пережило команду', () => {
+  const known = new Map<number, bigint>([
+    [900, at(100)],
+    [901, at(101)],
+    [903, at(103)],
+    [904, at(104)],
+  ]);
+  const AFTER: ProcessRow[] = [
+    row(4, 0, at(-1000)),
+    row(500, 900, at(0)),
+    row(501, 500, at(1)),
+    row(901, 900, at(101)),
+    row(905, 901, at(150)),
+    row(906, 903, at(120)),
+    row(904, 7, at(200)),
+    row(907, 904, at(201)),
+  ];
+
+  it('живые записанные, их дети и сироты мёртвых записанных — листьями вперёд', () => {
+    const pids = planLeftoverKill(AFTER, known, { selfPid: -1 });
+    expect([...pids].sort()).toEqual([901, 905, 906]);
+    expect(pids.indexOf(905)).toBeLessThan(pids.indexOf(901));
+  });
+
+  it('номер записанного занят новым процессом — ни он, ни его дети не тронуты', () => {
+    const pids = planLeftoverKill(AFTER, known, { selfPid: -1 });
+    expect(pids).not.toContain(904);
+    expect(pids).not.toContain(907);
+    expect(pids).not.toContain(500);
+  });
+
+  it('себя не снимает', () => {
+    expect(planLeftoverKill(AFTER, known, { selfPid: 901 })).not.toContain(901);
+  });
 });

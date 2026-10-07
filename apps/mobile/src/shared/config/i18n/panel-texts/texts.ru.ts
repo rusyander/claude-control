@@ -306,6 +306,8 @@ export const panelTextsRu: PanelTextDictionary = {
   'journal-search-panel': 'Поиск по конфигурации',
   'journal-analytics-summary': 'Сводка аналитики',
   'journal-compare-providers': 'Сравнение CLI',
+  'journal-local-models-status': 'Локальные модели: состояние',
+  'journal-kit-status': 'Набор панели: состояние',
   'journal-env-passport': 'Паспорт среды',
   'journal-list-plugins': 'Список плагинов',
   'journal-list-available-plugins': 'Каталог плагинов',

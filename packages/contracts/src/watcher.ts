@@ -137,6 +137,11 @@ export const WATCHER_PROBLEM_CODES = [
   'analysis_failed',
   /** Потолок разборов в час достигнут: сбои пишутся, разбор — со следующим часом. */
   'hourly_cap',
+  /**
+   * Маршрут разбора отказал: активен чужой CLI, свой эндпоинт ассистента или
+   * контур недоступен. Причина на языке панели — в `detail`.
+   */
+  'route_refused',
 ] as const;
 export type WatcherProblemCode = (typeof WATCHER_PROBLEM_CODES)[number];
 

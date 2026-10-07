@@ -5,6 +5,8 @@ export const chatEn: Record<ChatMessageCode, string> = {
     'The previous answer in this conversation is still being generated. Wait for it to finish or press “Stop” — the message was not sent.',
   'run-steer-ended':
     'The turn has already ended — the mid-turn message was not sent; the panel will send it the usual way.',
+  'chat-send-foreign-provider':
+    '{{provider}} is the active CLI: this route runs only the Claude chat. The message was not sent — write in the {{provider}} chat on the computer or switch the active CLI to Claude.',
   'run-empty-prompt': 'The message is empty — nothing to send.',
   'run-unsupported-upload':
     'Unsupported attachments: {{names}}. The message was not sent. Allowed extensions: {{supported}}.',
@@ -25,6 +27,8 @@ export const chatEn: Record<ChatMessageCode, string> = {
   'cli-not-found': 'Claude CLI was not found on PATH',
   'cli-outdated':
     'The panel runs Claude Code {{current}}, but the model needs version {{required}} or newer. Update the CLI.',
+  'cli-provider-not-found': '{{provider}} CLI was not found on PATH',
+  'cli-update-unsupported': 'Updating the {{provider}} CLI from the panel is not supported',
   'prompt-too-long':
     'The conversation context is full: it will not accept another message. Compact the context or continue in a new session.',
   'chat-process-lost':
@@ -62,6 +66,8 @@ export const chatEn: Record<ChatMessageCode, string> = {
   'conversation-create-failed': 'Could not create the conversation',
   'request-empty': 'Empty request',
   'foreign-answer-running': 'The answer to the previous question is still coming',
+  'foreign-queued-gone': 'The queued message is no longer there',
+  'foreign-permission-gone': 'This permission request is already closed',
   'foreign-restart-running':
     'The answer is still coming: wait for the turn to end or stop it, then restart',
   'foreign-restart-no-cwd':
@@ -73,6 +79,24 @@ export const chatEn: Record<ChatMessageCode, string> = {
   'panel-agent-not-running': 'No turn is running in this conversation.',
   'panel-agent-bad-from-seq': 'The frame number (fromSeq) must be a number.',
   'panel-agent-turn-gone': 'The start of the turn is no longer kept — open the conversation again.',
+  'panel-agent-provider-unsupported':
+    'The panel agent does not work with {{provider}}: this CLI has no run in which the agent acts through the panel tools alone. The agent works with Claude Code, Qwen Code, Codex, Gemini CLI, OpenCode, Goose and Kimi Code — switch the active CLI in «Providers».',
+  'panel-agent-cli-not-found':
+    '{{provider}} was not found in the PATH of the panel process — the agent has nothing to work with. Without the CLI the agent has no panel tools; an API key does not help here.',
+  'panel-agent-contour-foreign':
+    'The panel agent goes through a contour only with Claude Code, and the active CLI is {{provider}}. The turn was not started so as not to go to the vendor cloud: untick «Panel assistant» on the contour or switch the CLI to Claude Code.',
+  'tests-agent-provider-unsupported':
+    'The Tests block agent works with Claude Code, Qwen Code and Codex, and the active CLI is {{provider}}: it has no run in which the panel checks every write the agent makes. The run was not started — switch the CLI in «Providers» or mark the cases by hand.',
+  'tests-agent-cli-not-found':
+    '{{provider}} was not found in the PATH of the panel process — the run has nothing to work with. Install the CLI or switch the active CLI in «Providers».',
+  'tests-agent-contour-foreign':
+    'The Tests block agent goes through a contour only with Claude Code, and the active CLI is {{provider}}. The run was not started so as not to go to the vendor cloud: untick «Test agent» on the contour or switch the CLI to Claude Code.',
+  'tests-agent-gate-unavailable':
+    'The run on {{provider}} was not started: the panel could not start its permission check, and without it the agent could write anywhere. Start it again; if that does not help, restart the panel.',
+  'tests-agent-codex-app-server-unavailable':
+    'Codex did not start its app-server (Codex 0.160 or newer is needed): {{why}}. The run was not started.',
+  'tests-agent-gate-bypassed':
+    "The run was stopped: {{provider}} ran «{{tool}}» without passing the panel's permission check. Review the working copy — the change may have landed outside the allowed folders.",
   'split-hold-not-waiting':
     'The group is not waiting for an answer: there is no question or it was already answered',
   'split-release-not-waiting':
@@ -107,6 +131,10 @@ export const chatEn: Record<ChatMessageCode, string> = {
     'Nothing to recheck: the group has no delivered MR or its copy was removed',
   'split-recheck-merged': 'The MR is already merged — nothing to recheck',
   'split-recheck-closed': 'The MR is closed — nothing to recheck',
+  'split-tasks-jira-off': 'Jira is not connected — there is nowhere to move the tasks',
+  'split-tasks-none': 'Groups with an MR have no tracker tasks',
+  'split-tasks-status-missing': 'No status selected',
+  'split-tasks-index-bad': 'The group number must be an integer',
   'split-limit-active': 'The subscription limit is exhausted until {{until}}',
   'split-plan-cancel-nothing':
     'Nothing to cancel: the split of this conversation has already finished',
@@ -119,4 +147,6 @@ export const chatEn: Record<ChatMessageCode, string> = {
     "The agent process was not stopped: the panel could not verify that the number is still the agent's, so it left it alone. The run goes on — try Stop again.",
   'branch-stop-unconfirmed':
     'The copy {{path}} was created, but the agent process was not stopped: the panel could not verify the number still belongs to it and left it alone. The conversation stays in the main copy; the agent waits at the same card.',
+  'chat-pin-invalid': 'The pinned field must be true or false',
+  'chat-pin-child': 'A group chat is pinned together with its parent',
 };

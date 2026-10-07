@@ -7,6 +7,7 @@ import { useT } from '../src/shared/config/i18n';
 import { newChatId, openChat, useWorkspace } from '../src/shared/lib/workspace';
 import { runNamed, useRuns, visibleStatus } from '../src/shared/lib/runs';
 import { useChats } from '../src/entities/chat/api';
+import { ForeignChatsSection } from '../src/features/chat/foreign/ForeignChatsSection';
 
 /**
  * Разговоры машины: те же транскрипты, что видит панель и терминал. Своей базы
@@ -58,6 +59,7 @@ export default function ChatsScreen() {
           tone="accent"
           onPress={() => open(newChatId(), workspace.projectPath)}
         />
+        <ForeignChatsSection projectPath={workspace.projectPath} />
         <Field value={filter} onChangeText={setFilter} placeholder={t.chats.search} />
 
         {chats.isLoading ? <Loading /> : null}

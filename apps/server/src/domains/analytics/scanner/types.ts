@@ -22,6 +22,8 @@ export interface RawUsage {
 /** Одна строка транскрипта. Незнакомые поля не читаем — их там много. */
 export interface RawEntry {
   type?: string;
+  /** Заголовок разговора: Claude Code пишет его отдельной записью `ai-title`, без метки времени. */
+  aiTitle?: string;
   timestamp?: string;
   sessionId?: string;
   requestId?: string;
@@ -48,6 +50,12 @@ export interface Accumulator {
   byHour: Map<number, { requests: number; tokens: number }>;
   sessions: Map<string, SessionUsage>;
   tools: Map<string, number>;
+  /** Вызовы инструментов по сессиям: имя → число. Из них собирается `topTools` сессии. */
+  sessionTools: Map<string, Map<string, number>>;
+  /** Заголовок сессии (`ai-title`): побеждает последний. */
+  sessionTitles: Map<string, string>;
+  /** Модели без цены в прайсе (только при `strictPricing`): их расход посчитан нулём. */
+  unpriced: Set<string>;
 }
 
 export interface ScanOptions {
@@ -69,4 +77,17 @@ export interface ScanOptions {
   pricing?: Record<string, ModelPricing>;
   /** Прайс, по которому считать. Пусто — встроенная запасная таблица. */
   pricingEntries?: PricingEntry[];
+  /**
+   * Модель без цены — ноль, а не запасная ставка. Включается для чужих CLI: у
+   * Claude неизвестная модель — почти всегда новая Claude, у Codex и Qwen — нет.
+   */
+  strictPricing?: boolean;
+  /** Чьи сессии читать. Нет — транскрипты Claude Code из `projectsDir`. */
+  source?: ForeignSource;
+}
+
+/** Сессии чужого CLI: формат и каталоги-дома, где он их пишет. */
+export interface ForeignSource {
+  kind: 'codex' | 'qwen';
+  homes: string[];
 }

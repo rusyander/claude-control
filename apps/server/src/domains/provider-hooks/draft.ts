@@ -168,7 +168,11 @@ export function parseProviderHookRulesDraft(
     if (entry.timeout !== undefined) {
       const timeout = entry.timeout;
       if (typeof timeout !== 'number' || !Number.isInteger(timeout)) return undefined;
-      if (timeout < meta.timeoutMin || timeout > meta.timeoutMax) return undefined;
+      // Свой потолок события (Codex: `SessionEnd`/`Interrupt` ≤ 3 с) строже
+      // общего: больший CLI урежет с предупреждением, а человек будет уверен в своём.
+      if (timeout < meta.timeoutMin || timeout > (event.timeoutMax ?? meta.timeoutMax)) {
+        return undefined;
+      }
       rule.timeout = timeout;
     }
 

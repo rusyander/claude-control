@@ -757,8 +757,9 @@ describe('POST /api/agent/run', () => {
     expect(existsSync(dumpFile)).toBe(false);
   });
 
-  it('чужой активный CLI — отказ provider_unsupported', async () => {
-    store.updateSettings({ provider: 'codex' });
+  it('CLI без запуска агента — отказ provider_unsupported', async () => {
+    // Codex, Qwen Code, Goose и др. агент панели поддерживает (run-routes.foreign-provider…).
+    store.updateSettings({ provider: 'aider' });
     const response = await run(body);
     expect(response.statusCode).toBe(409);
     expect(response.json()).toMatchObject({ error: 'provider_unsupported' });

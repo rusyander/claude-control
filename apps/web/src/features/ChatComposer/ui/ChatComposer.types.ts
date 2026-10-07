@@ -24,6 +24,11 @@ import type { ComposerModeState } from '@entities/Media';
 export type { ComposerMode, ComposerModeState } from '@entities/Media';
 
 export interface ChatComposerProps {
+  /**
+   * Ключ чистого листа: новый ключ — курсор в поле. «Новый чат» оставлял фокус
+   * на своей кнопке, и первое слово уходило в никуда (кейс chat-001).
+   */
+  focusKey?: string;
   value: string;
   onChange: (value: string) => void;
   /**

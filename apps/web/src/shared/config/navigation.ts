@@ -138,6 +138,11 @@ export const NAV_SECTIONS: NavSection[] = [
       // Контур тоже панель-level: корпоративная платформа стоит между ЛЮБЫМ
       // потребителем и моделью — и ассистентом самой панели в том числе.
       { path: '/platform', label: 'nav.platform', icon: 'flag', key: 'platform' },
+      // Тоже панель-level: локальная модель обслуживает любого потребителя контура.
+      { path: '/local-models', label: 'nav.localModels', icon: 'server', key: 'localModels' },
+      // Набор панели — тоже панель-level: его получает любой прогон Claude, не только
+      // локальный, а режим выбирается на CLI, а не на провайдера раздела.
+      { path: '/kit', label: 'nav.kit', icon: 'skills', key: 'kit' },
       { path: '/help', label: 'nav.help', icon: 'help', key: 'help' },
     ],
   },

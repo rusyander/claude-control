@@ -10,6 +10,7 @@ import { filesRu } from './ru/files.ts';
 import { gatewayRu } from './ru/gateway.ts';
 import { gitRu } from './ru/git.ts';
 import { integrationsRu } from './ru/integrations.ts';
+import { localRu } from './ru/local.ts';
 import { mediaRu } from './ru/media.ts';
 import { platformRu } from './ru/platform.ts';
 import { sandboxRu } from './ru/sandbox.ts';
@@ -39,6 +40,7 @@ export const serverMessagesRu: Record<ServerMessageCode, string> = {
   ...gatewayRu,
   ...gitRu,
   ...integrationsRu,
+  ...localRu,
   ...mediaRu,
   ...platformRu,
   ...sandboxRu,

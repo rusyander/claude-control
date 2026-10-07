@@ -151,6 +151,13 @@ export const groupSchema = object({
   when: string().optional(),
   /** Выключение группы выключает все её сущности разом. */
   isEnabled: boolean().default(true),
+  /**
+   * Включена ли группа для прогонов ЧУЖОГО CLI (`qwen`, `codex`): файлов Claude
+   * они не читают, и тумблер `isEnabled` им ничего не давал. Здесь — флаг на
+   * провайдера: группа едет слоем на каждый его прогон, а в каталогах Claude
+   * при этом не меняется ничего. Нет записи — для этого CLI выключена.
+   */
+  enabledFor: record(string(), boolean()).optional(),
   order: number().default(0),
 });
 

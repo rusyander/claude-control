@@ -56,8 +56,9 @@ import {
 } from '../../domains/project-git/copy-readiness.ts';
 import { cascadeCeilingFor, expandAssignedModel } from '../../domains/model-cascade.ts';
 import { loweredWorkPrompt } from '@agentdeck/contracts/model-cascade';
-import { activeCliCommand } from '../../providers/cli.ts';
-import { getActiveProvider, getActiveProviderId } from '../../providers/registry.ts';
+import { providerCliCommand } from '../../providers/cli.ts';
+import { getActiveProvider } from '../../providers/registry.ts';
+import type { ConfigProvider } from '../../providers/types.ts';
 import { supportsCliAutoMode } from '../../providers/auto-mode.ts';
 import type { ChatAutoModeView } from '@agentdeck/contracts';
 import { estimateCost } from '../../domains/analytics/pricing.ts';
@@ -117,6 +118,27 @@ const refuse = (
  * сроку или истёк срок брокера (`ChatPermissions.ts`). 410 — запрос был, но его
  * больше нет; телефон и вкладка показывают текст по `messageCode`.
  */
+/**
+ * Отправка, когда активен чужой CLI. Этот маршрут — чат Claude: аргументы
+ * собирает `ChatRunner` под `claude` (`--output-format stream-json
+ * --include-partial-messages --permission-prompt-tool …`), и раньше он брал
+ * команду активного провайдера — телефон при активном Qwen запускал `qwen` с
+ * флагами Claude. Тихо уйти в Claude тоже нельзя: человек выбрал другой CLI.
+ * Поэтому честный отказ с кодом — телефон и вкладка показывают его своим языком.
+ */
+const refuseForeignProvider = (reply: FastifyReply, provider: ConfigProvider): FastifyReply =>
+  refuse(
+    reply,
+    409,
+    'provider_not_claude',
+    `Активен ${provider.name}: этот маршрут запускает только чат Claude. Сообщение не отправлено — пишите в чат ${provider.name} на компьютере или переключите активный CLI на Claude.`,
+    {
+      provider: provider.id,
+      messageCode: 'chat-send-foreign-provider',
+      params: { provider: provider.name },
+    },
+  );
+
 const refuseExpired = (reply: FastifyReply): FastifyReply =>
   refuse(
     reply,
@@ -247,6 +269,10 @@ export function registerChatRunRoutes(
         effort,
         lowered,
       } = body;
+      // Провайдер — один снимок на весь запрос: и отказ, и команда запуска ниже
+      // читают его, а не настройку заново (переключение посреди запроса не
+      // должно дать бинарь одного CLI с аргументами другого).
+      const provider = getActiveProvider(ctx.store);
 
       // Прошлый ответ ещё генерируется — второй промпт принять некуда. Раньше
       // маршрут в этом случае молча подключался к идущему прогону с seq 0:
@@ -267,6 +293,9 @@ export function registerChatRunRoutes(
         if (body.steer && (files ?? []).length === 0 && registry.steer(chatId, sessionId, prompt)) {
           return reply.code(202).send({ steered: true, runId });
         }
+        // Слово идущему ходу выше — не новый запуск, его чужой CLI не касается.
+        // Очередь же потом запустит прогон — её при чужом CLI не принимаем.
+        if (provider.id !== 'claude') return refuseForeignProvider(reply, provider);
         // Просили не отказывать (ответ из хаба ребёнку, чей прогон вкладка не
         // знает): сообщение ждёт конца хода на сервере и уходит тем же маршрутом
         // — со всеми его проверками, — а не теряется в 409.
@@ -286,6 +315,8 @@ export function registerChatRunRoutes(
           messageCode: 'run-busy',
         });
       }
+
+      if (provider.id !== 'claude') return refuseForeignProvider(reply, provider);
 
       // Слово «на ходу», а ход уже кончился (между проверкой вкладки и этой):
       // новый прогон здесь же, а вкладка поставила бы то же слово в очередь —
@@ -541,10 +572,7 @@ export function registerChatRunRoutes(
       // Sonnet» (живой прогон 29.09: выбран Sonnet, шёл Sonnet 5 при вышедшем
       // 5.5). Конкретное имя модели — его точный выбор, оно едет как есть.
       const runModel = model
-        ? expandAssignedModel(
-            ctx.models.current(getActiveProvider(ctx.store).modelVendors ?? []).models,
-            model,
-          )
+        ? expandAssignedModel(ctx.models.current(provider.modelVendors ?? []).models, model)
         : model;
 
       // Связь с родителем — СТРОГО до запуска. Прогон называет свой настоящий
@@ -578,9 +606,7 @@ export function registerChatRunRoutes(
       // Авторежим CLI — только там, где он есть: haiku CLI молча опускает до
       // `default`, и прогон спрашивал бы даже правку файла. Таким — `acceptEdits`
       // плюс автоподтверждение панели, взведённое выше.
-      const cliAutoMode =
-        autoMode &&
-        supportsCliAutoMode(getActiveProviderId(ctx.store), runModel || assigned?.model);
+      const cliAutoMode = autoMode && supportsCliAutoMode(provider.id, runModel || assigned?.model);
 
       // Запускаем прогон в реестре и подключаемся к нему потоком. Обрыв этого
       // соединения агента не тронет.
@@ -592,8 +618,9 @@ export function registerChatRunRoutes(
           name,
           fork,
           cwd,
-          // Команда запуска — из активного провайдера (Ф1: всегда Claude).
-          command: activeCliCommand(ctx.store),
+          // Команда запуска — Claude: чужой CLI отсечён выше, а снимок провайдера
+          // тот же, что прошёл проверку.
+          command: providerCliCommand(provider),
           // Модель и глубина продумывания — выбор пользователя в шапке чата.
           // Пусто — берём назначение этого чата, если оно у него есть: чат,
           // заведённый разделением, работает моделью, подобранной под род его

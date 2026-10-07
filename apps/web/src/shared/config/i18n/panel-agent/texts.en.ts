@@ -272,6 +272,8 @@ export const panelTextsEn: PanelTextDictionary = {
   'journal-search-panel': 'Configuration search',
   'journal-analytics-summary': 'Analytics summary',
   'journal-compare-providers': 'CLI comparison',
+  'journal-local-models-status': 'Local models: status',
+  'journal-kit-status': 'Panel kit: status',
   'journal-env-passport': 'Environment passport',
   'journal-list-plugins': 'List of plugins',
   'journal-list-available-plugins': 'Plugin catalog',

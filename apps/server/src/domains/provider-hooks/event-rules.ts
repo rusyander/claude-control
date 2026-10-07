@@ -11,6 +11,14 @@ import {
   readQwenHooks,
 } from '../../lib/qwen-hook.ts';
 import {
+  CODEX_HOOK_EVENTS,
+  CODEX_TIMEOUT_DEFAULT,
+  CODEX_TIMEOUT_MAX,
+  CODEX_TIMEOUT_MIN,
+  applyCodexHooks,
+  readCodexHooks,
+} from '../../lib/codex-hook.ts';
+import {
   KIMI_HOOK_EVENTS,
   KIMI_TIMEOUT_DEFAULT,
   KIMI_TIMEOUT_MAX,
@@ -26,14 +34,23 @@ import type {
 } from './types.ts';
 
 /**
- * Модель «правила на событие» (Qwen, Kimi): плоский список «событие + матчер +
- * команда + таймаут». У Qwen это ключ корня `hooks` в `settings.json` (таймаут в
- * миллисекундах), у Kimi — массив таблиц `[[hooks]]` в `config.toml` (таймаут в
- * секундах).
+ * Модель «правила на событие» (Qwen, Kimi, Codex): плоский список «событие +
+ * матчер + команда + таймаут». У Qwen это ключ корня `hooks` в `settings.json`
+ * (таймаут в миллисекундах), у Codex — тот же ключ в отдельном `hooks.json`
+ * (секунды), у Kimi — массив таблиц `[[hooks]]` в `config.toml` (секунды).
  */
 
 /** Границы и словарь событий формата — из адаптеров, а не из головы. */
 export function rulesMeta(format: ProviderHooksFormat): RulesMeta {
+  if (format === 'codex-json') {
+    return {
+      events: CODEX_HOOK_EVENTS.map((event) => ({ ...event })),
+      timeoutUnit: 's',
+      timeoutMin: CODEX_TIMEOUT_MIN,
+      timeoutMax: CODEX_TIMEOUT_MAX,
+      timeoutDefault: CODEX_TIMEOUT_DEFAULT,
+    };
+  }
   if (format === 'kimi-toml') {
     return {
       // У Kimi матчер поддерживают все события: «регулярное выражение для
@@ -92,7 +109,11 @@ export function saveProviderHookRules(
   // Второй разбор — рабочее дерево (первый остаётся эталоном «как было»).
   const config: RawQwenSettings = text.trim() ? parseProviderJsonObject<RawQwenSettings>(text) : {};
 
-  const hooks = applyQwenHooks(config.hooks, draft.rules);
+  // Codex читает ту же форму, что Qwen (`hooks.json`), со своим словарём событий.
+  const codex = target.format === 'codex-json';
+  const apply = codex ? applyCodexHooks : applyQwenHooks;
+  const read = codex ? readCodexHooks : readQwenHooks;
+  const hooks = apply(config.hooks, draft.rules);
   if (hooks) config.hooks = hooks;
   else delete config.hooks;
 
@@ -101,9 +122,9 @@ export function saveProviderHookRules(
   // Контроль ДО записи: итог разбирается, правила совпали с намерением, чужие
   // события внутри `hooks` целы, все прочие ключи файла целы.
   const parsed = parseProviderJsonObject<RawQwenSettings>(next);
-  const check = readQwenHooks(parsed.hooks);
+  const check = read(parsed.hooks);
   if (stableJson(check.rules) !== stableJson(draft.rules)) throw new UnrecognizedFormatError();
-  const before = readQwenHooks(original.hooks);
+  const before = read(original.hooks);
   if (stableJson(check.preservedEvents) !== stableJson(before.preservedEvents)) {
     throw new UnrecognizedFormatError();
   }

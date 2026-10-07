@@ -6,6 +6,9 @@ import { tmpdir } from 'node:os';
 import type { ServerContext } from '../context.ts';
 import { registerResourceRoutes } from './resource-routes.ts';
 
+/** Маршрут окна для проверок, которым он не важен: контура нет, шлюз не поднят. */
+const NO_ROUTE = { runRoute: () => ({ env: {} }), gatewayPort: () => 0 };
+
 /**
  * Помощник структуры и секреты в файлах ресурса (U6, 28.09).
  *
@@ -32,6 +35,7 @@ const MASKED = BODY('API_TOKEN=••••••', '••••••', '•�
 
 const FAKE = `
 import { readFileSync, writeFileSync } from 'node:fs';
+
 const chunks = [];
 for await (const chunk of process.stdin) chunks.push(chunk);
 const near = (name) => new URL('./' + name, import.meta.url);
@@ -90,7 +94,7 @@ beforeEach(async () => {
     store: { getSettings: () => ({ provider: 'claude' }) },
   } as unknown as ServerContext;
   app = Fastify();
-  registerResourceRoutes(app, ctx);
+  registerResourceRoutes(app, ctx, NO_ROUTE);
   await app.ready();
 });
 

@@ -26,21 +26,48 @@ export interface ChatRowData {
    */
   depth?: number;
   /** Ветвь поднята наверх: в ней сейчас идёт прогон (см. `withActiveFirst`). */
-  pinned?: boolean;
+  raised?: boolean;
+  /** Ветвь закреплена человеком: стоит в «Закреплённых» над всем (см. `withPinnedFirst`). */
+  pinnedRow?: boolean;
+  /**
+   * Заглушка корня, которого нет на диске: Claude Code стёр транскрипт
+   * (`cleanupPeriodDays`), а дети живы. `chat` у неё собран из id родителя, и
+   * открыть её нечего — строка не кнопка (см. `withTree`).
+   */
+  lostParent?: boolean;
   /** Первый из снятых перезапуском детей: над ним разделитель «Неактивно». */
   inactiveStart?: boolean;
 }
 
 export type TimeGroup = 'today' | 'yesterday' | 'thisWeek' | 'earlier';
 
-/** Заголовок в списке: дата или «Сейчас работают» над поднятыми ветвями. */
-export type ListGroup = TimeGroup | 'running';
+/**
+ * Заголовок в списке: дата, «Сейчас работают» над поднятыми ветвями или
+ * «Закреплённые» над закреплёнными человеком.
+ */
+export type ListGroup = TimeGroup | 'running' | 'pinned';
 
 export type Row =
   | { kind: 'header'; group: ListGroup }
   | { kind: 'chat'; group: ListGroup; data: ChatRowData }
   /** Разделитель внутри ветви: ниже — дети, снятые перезапуском разделения. */
-  | { kind: 'inactive'; group: ListGroup; parentId: string };
+  | { kind: 'inactive'; group: ListGroup; parentId: string }
+  /**
+   * Гармошка ветви (G1): все не идущие дети родителя одной строкой «Ещё N».
+   * `expanded` — раскрыта, и свёрнутые строки идут сразу под ней.
+   */
+  | { kind: 'more'; group: ListGroup; parentId: string; count: number; expanded: boolean };
+
+/** Как строить дерево: какие ветви раскрыты и идёт ли поиск (тогда гармошек нет). */
+export interface ChatListRowsOptions {
+  expanded?: ReadonlySet<string>;
+  searching?: boolean;
+  /**
+   * Id всех разговоров на диске, не только видимых: по ним сирота отличает
+   * «родитель удалён» от «родитель отфильтрован». Нет — заглушек не строим.
+   */
+  known?: ReadonlySet<string>;
+}
 
 export interface ChatRowProps {
   chat: ChatSummary;
@@ -59,4 +86,9 @@ export interface ChatRowProps {
   depth?: number;
   /** Непрочитанные критичные заметки детей разделения — только у главного чата. */
   unreadEscalations?: number;
+  /**
+   * Закрепить/открепить — только у корня: ребёнок едет за родителем. Нет
+   * обработчика — нет и кнопки.
+   */
+  onTogglePin?: () => void;
 }

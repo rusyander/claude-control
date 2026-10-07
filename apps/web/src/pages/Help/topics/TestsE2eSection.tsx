@@ -43,6 +43,9 @@ export function TestsE2eSection() {
           <GuideStep title={e('pyramid')} text={e('pyramidText')}>
             <HelpShot topic="tests" scenario="e2e" frame="10-pyramid" side="panel" />
           </GuideStep>
+          <GuideStep title={e('mutation')} text={e('mutationText')}>
+            <HelpShot topic="tests" scenario="e2e" frame="11-mutation-result" side="panel" />
+          </GuideStep>
           <GuideStep title={e('chatTest')} text={e('chatTestText')}>
             <HelpShot topic="tests" scenario="e2e" frame="07-chat-test" side="panel" />
           </GuideStep>

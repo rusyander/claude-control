@@ -1,0 +1,93 @@
+// Reference ESLint flat config of the frontend doctrine (ESLint 9+).
+// Insert into a project on consent; adapt to its versions/plugins.
+// Plugin install:
+//   npm i -D eslint typescript-eslint eslint-plugin-boundaries eslint-plugin-import \
+//            eslint-plugin-check-file eslint-plugin-react eslint-plugin-react-hooks
+// FSD boundaries / naming / barrels — machine enforcement of structure.md. Cross-file shape (folder per
+// component, one importer per stylesheet) is beyond a per-file linter → <kit>/tools/fe-arch-check.mjs.
+
+import js from '@eslint/js';
+import tseslint from 'typescript-eslint';
+import boundaries from 'eslint-plugin-boundaries';
+import importPlugin from 'eslint-plugin-import';
+import checkFile from 'eslint-plugin-check-file';
+import reactHooks from 'eslint-plugin-react-hooks';
+
+export default tseslint.config(
+  js.configs.recommended,
+  ...tseslint.configs.recommended,
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    plugins: {
+      boundaries,
+      import: importPlugin,
+      'check-file': checkFile,
+      'react-hooks': reactHooks,
+    },
+    settings: {
+      // FSD layers → boundaries element types
+      'boundaries/elements': [
+        { type: 'app', pattern: 'src/app/*' },
+        { type: 'pages', pattern: 'src/pages/*' },
+        { type: 'features', pattern: 'src/features/*', capture: ['feature'] },
+        { type: 'entities', pattern: 'src/entities/*', capture: ['entity'] },
+        { type: 'shared', pattern: 'src/shared/*' },
+      ],
+      'import/resolver': { typescript: true },
+    },
+    rules: {
+      ...reactHooks.configs.recommended.rules,
+
+      // --- Layer boundaries (downward only; cross-feature forbidden) ---
+      'boundaries/element-types': ['error', {
+        default: 'disallow',
+        rules: [
+          { from: 'app', allow: ['pages', 'features', 'entities', 'shared'] },
+          { from: 'pages', allow: ['features', 'entities', 'shared'] },
+          { from: 'features', allow: ['entities', 'shared', ['features', { feature: '${feature}' }]] },
+          { from: 'entities', allow: ['shared', ['entities', { entity: '${entity}' }]] },
+          { from: 'shared', allow: ['shared'] },
+        ],
+      }],
+      'boundaries/no-private': ['error', { allowUninitialized: true }],
+
+      // --- Imports only through the barrel, no cycles ---
+      'import/no-internal-modules': ['error', {
+        allow: ['**/index.ts', '@/shared/**', '**/*.module.scss', '**/*.{png,svg,json}'],
+      }],
+      'import/no-cycle': ['error', { maxDepth: 1 }],
+      'import/no-namespace': 'warn', // clean named imports (ADR-007): no `import * as ns`
+      'no-restricted-syntax': ['error', {
+        selector: "ExportDefaultDeclaration",
+        message: 'Named exports (ADR-003): default is forbidden (except where the framework requires it).',
+      }],
+
+      // --- Naming: component files PascalCase in every layer; folders PascalCase, kebab-case in shared ---
+      // .ts stays unconstrained: index.ts, queryKeys.ts, useUser.ts, user.api.ts are camelCase by role.
+      'check-file/filename-naming-convention': ['error', {
+        'src/{app,pages,widgets,features,entities,shared}/**/*.tsx': 'PASCAL_CASE', // src/main.tsx stays out
+      }, { ignoreMiddleExtensions: true }],
+      // check-file names the folder at the key's FIRST wildcard, so each layer gets a literal key: the
+      // former 'src/{entities,features,pages}/**/' flagged the layer folder "features" itself on every
+      // file (eslint-plugin-check-file 3.3.2, measured 23.09.2026). Deeper component folders are beyond
+      // it → fe-arch-check.
+      'check-file/folder-naming-convention': ['error', {
+        'src/entities/*/': 'PASCAL_CASE',
+        'src/features/*/': 'PASCAL_CASE',
+        'src/widgets/*/': 'PASCAL_CASE',
+        'src/pages/*/': 'PASCAL_CASE',
+        'src/shared/*/*/': 'KEBAB_CASE',
+      }],
+
+      // --- Quality (thresholds as signals) ---
+      'max-lines': ['warn', { max: 400, skipBlankLines: true, skipComments: true }],
+      'no-nested-ternary': 'error',
+      'no-lonely-if': 'warn',
+    },
+  },
+  // Exemptions from max-lines
+  {
+    files: ['**/*.test.{ts,tsx}', '**/*.constants.ts', '**/*.mock.{ts,tsx}', '**/*.stories.tsx'],
+    rules: { 'max-lines': 'off', 'no-restricted-syntax': 'off' },
+  },
+);

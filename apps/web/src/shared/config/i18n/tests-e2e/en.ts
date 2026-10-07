@@ -125,8 +125,18 @@ export const testsE2eEn: typeof testsE2eRu = {
       cleanup: 'Removing the copy…',
     },
     mutation: 'Broken: {{what}}',
+    kind: {
+      'module-throws': 'the module throws on load',
+      'module-raises': 'the module raises on import',
+      'file-emptied': 'the file is emptied',
+      'line-flip': 'line {{line}}: {{from}} → {{to}}',
+    },
     caught: 'The breakage was caught by {{caught}} of {{count}} cases.',
     unprotected: 'The file is not protected by cases: none of the {{count}} went red.',
+    noResult:
+      'No result: the run report said nothing about any of the {{count}} cases — whether the file is protected is unknown. See the command output.',
+    cleanupFailed:
+      'The repository copy could not be removed ({{reason}}) — a process that outlived the run holds it. It will be removed on the next panel start.',
     stopped: 'The check was stopped.',
     caseCaught: 'caught it',
     caseMissed: 'missed it',

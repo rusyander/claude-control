@@ -97,6 +97,16 @@ export interface QwenHookState {
   preservedEvents: QwenHookPreservedEvent[];
 }
 
+/**
+ * Диалект формы «событие → группы → действия». Ту же форму (она пришла из Claude)
+ * читает и Codex в `hooks.json` — с другим списком событий и таймаутом в секундах,
+ * поэтому разбор один, а словарь и границы таймаута — у диалекта.
+ */
+export interface HookGroupsDialect {
+  events: readonly { name: string }[];
+  isValidTimeout: (value: unknown) => value is number;
+}
+
 /** Объект (не массив, не null) — форма и `hooks`, и группы, и действия. */
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -122,11 +132,21 @@ export function isValidQwenTimeout(value: unknown): value is number {
   );
 }
 
+/** Диалект самого Qwen: восемнадцать событий, таймаут в миллисекундах. */
+const QWEN_DIALECT: HookGroupsDialect = {
+  events: QWEN_HOOK_EVENTS,
+  isValidTimeout: isValidQwenTimeout,
+};
+
 /**
  * Разобрать ОДНУ группу события. Не наша форма → `undefined`: тогда всё событие
  * уходит в несопровождаемые.
  */
-function readGroup(event: string, value: unknown): QwenHookRule | undefined {
+function readGroup(
+  event: string,
+  value: unknown,
+  dialect: HookGroupsDialect,
+): QwenHookRule | undefined {
   if (!isPlainObject(value)) return undefined;
   if (Object.keys(value).some((key) => !GROUP_KEYS.has(key))) return undefined;
 
@@ -138,7 +158,7 @@ function readGroup(event: string, value: unknown): QwenHookRule | undefined {
   if (Object.keys(action).some((key) => !ACTION_KEYS.has(key))) return undefined;
   if (action.type !== 'command') return undefined;
   if (!isCleanString(action.command) || !action.command.trim()) return undefined;
-  if (action.timeout !== undefined && !isValidQwenTimeout(action.timeout)) return undefined;
+  if (action.timeout !== undefined && !dialect.isValidTimeout(action.timeout)) return undefined;
 
   const rule: QwenHookRule = { event, command: action.command };
 
@@ -157,7 +177,10 @@ function readGroup(event: string, value: unknown): QwenHookRule | undefined {
  * Прочитать ключ `hooks`. Ключа нет → пусто. Значение не объект (или значение
  * события не массив) → fail-closed: чужую форму не толкуем.
  */
-export function readQwenHooks(value: unknown): QwenHookState {
+export function readQwenHooks(
+  value: unknown,
+  dialect: HookGroupsDialect = QWEN_DIALECT,
+): QwenHookState {
   if (value === undefined || value === null) {
     return { present: false, rules: [], preservedEvents: [] };
   }
@@ -166,7 +189,7 @@ export function readQwenHooks(value: unknown): QwenHookState {
   const rules: QwenHookRule[] = [];
   const preservedEvents: QwenHookPreservedEvent[] = [];
 
-  const known = new Set(QWEN_HOOK_EVENTS.map((event) => event.name));
+  const known = new Set(dialect.events.map((event) => event.name));
 
   for (const [event, raw] of Object.entries(value)) {
     // Событие вне задокументированного списка панель не ведёт даже при знакомой
@@ -179,7 +202,7 @@ export function readQwenHooks(value: unknown): QwenHookState {
     const parsed: QwenHookRule[] = [];
     let understood = true;
     for (const group of raw) {
-      const rule = readGroup(event, group);
+      const rule = readGroup(event, group, dialect);
       if (!rule) {
         understood = false;
         break;
@@ -217,8 +240,9 @@ function toGroup(rule: QwenHookRule): Record<string, unknown> {
 export function applyQwenHooks(
   value: unknown,
   rules: readonly QwenHookRule[],
+  dialect: HookGroupsDialect = QWEN_DIALECT,
 ): Record<string, unknown> | undefined {
-  const state = readQwenHooks(value);
+  const state = readQwenHooks(value, dialect);
   const preserved = new Map(state.preservedEvents.map((entry) => [entry.key, entry]));
 
   const managed = new Map<string, Record<string, unknown>[]>();

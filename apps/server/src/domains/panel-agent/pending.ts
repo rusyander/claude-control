@@ -58,15 +58,35 @@ const SETTLED_MEMORY = 500;
 export class PanelPendingActions {
   private readonly open = new Map<string, Entry>();
   private readonly settled = new Map<string, PendingSettlement>();
+  /** Срок карточек идущего хода по разговору — у каждого CLI свой. */
+  private readonly deadlines = new Map<string, number>();
   private readonly timeoutMs: number;
 
   constructor(timeoutMs: number) {
     this.timeoutMs = timeoutMs;
   }
 
+  /**
+   * Срок карточек разговора на время хода. Ход знает, каким CLI идёт, а карточку
+   * заводит вызов переходника, у которого есть только id разговора: срок
+   * передаётся здесь, на сервере, а не словами переходника. Не больше общего
+   * потолка — сократить срок можно, продлить нельзя.
+   */
+  setDeadline(conversationId: string, timeoutMs: number): void {
+    this.deadlines.set(conversationId, Math.min(timeoutMs, this.timeoutMs));
+  }
+
+  /** Ход закончился — карточки разговора снова на общем сроке. */
+  clearDeadline(conversationId: string): void {
+    this.deadlines.delete(conversationId);
+  }
+
   /** Завести карточку. Ожидание начинается сразу: таймер взведён до ответа. */
   create(request: PendingRequest): PendingHandle {
     const now = Date.now();
+    const timeoutMs =
+      (request.conversationId ? this.deadlines.get(request.conversationId) : undefined) ??
+      this.timeoutMs;
     const pending: PanelPendingAction = {
       id: randomUUID(),
       name: request.name,
@@ -74,14 +94,14 @@ export class PanelPendingActions {
       ...(request.conversationId ? { conversationId: request.conversationId } : {}),
       preview: request.preview,
       createdAt: new Date(now).toISOString(),
-      expiresAt: new Date(now + this.timeoutMs).toISOString(),
+      expiresAt: new Date(now + timeoutMs).toISOString(),
     };
 
     let resolve!: (settlement: PendingSettlement) => void;
     const settled = new Promise<PendingSettlement>((done) => {
       resolve = done;
     });
-    const timer = setTimeout(() => this.settle(pending.id, 'timeout'), this.timeoutMs);
+    const timer = setTimeout(() => this.settle(pending.id, 'timeout'), timeoutMs);
     // Ждущая карточка не должна держать процесс живым на выходе.
     timer.unref?.();
     this.open.set(pending.id, { pending, resolve, timer });

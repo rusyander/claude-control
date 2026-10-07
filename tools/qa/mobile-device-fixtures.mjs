@@ -321,6 +321,13 @@ export function startProxy(upstream) {
       (upstreamRes) => {
         entry.status = upstreamRes.statusCode;
         res.writeHead(upstreamRes.statusCode ?? 502, upstreamRes.headers);
+        // Начало тела — в журнал: по нему проверка говорит, ЧТО телефон увидел,
+        // а не только что спросил (потоки длинные — берём первые 2 КБ).
+        entry.body = '';
+        upstreamRes.on('data', (chunk) => {
+          if (entry.body.length < 2048)
+            entry.body += String(chunk).slice(0, 2048 - entry.body.length);
+        });
         upstreamRes.pipe(res);
       },
     );

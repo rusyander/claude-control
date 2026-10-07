@@ -34,6 +34,7 @@ export const PANEL_SECTIONS: readonly PanelSection[] = [
     description:
       'Panel settings by tab; open_page focus = tab key: general (theme, language), access (remote, token), ' +
       'providers (active CLI), models (endpoint profiles, chat model), prompts, groups (split groups), ' +
+      'globalLayer (panel vs ~/.claude copies of one mechanism), ' +
       'integrations (tracker, messenger, webhook), spend, safety (backups, file watch), transfer',
     tabs: [
       'general',
@@ -42,6 +43,7 @@ export const PANEL_SECTIONS: readonly PanelSection[] = [
       'models',
       'prompts',
       'groups',
+      'globalLayer',
       'integrations',
       'spend',
       'safety',
@@ -49,6 +51,16 @@ export const PANEL_SECTIONS: readonly PanelSection[] = [
     ],
   },
   { route: '/dlp', title: 'Data protection', description: 'Local DLP proxy and its rules' },
+  {
+    route: '/local-models',
+    title: 'Local models',
+    description: 'Models on this machine: runtime, downloads, benchmark, connection to CLIs',
+  },
+  {
+    route: '/kit',
+    title: 'Panel kit',
+    description: 'Built-in skills, pipeline commands, rules and hooks; per-CLI kit mode',
+  },
   { route: '/platform', title: 'Contour', description: 'Corporate model contours and gateway' },
   { route: '/compare', title: 'Compare CLIs', description: 'Side-by-side CLI provider comparison' },
   {

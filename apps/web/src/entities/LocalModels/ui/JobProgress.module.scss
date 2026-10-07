@@ -1,0 +1,54 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2xs);
+  width: 100%;
+}
+
+.track {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--color-surface-sunken);
+  overflow: hidden;
+}
+
+.fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--color-accent);
+  transition: width 300ms ease;
+}
+
+// Размер неизвестен (установка пакетов, распаковка): полоса бежит, а не стоит
+// на нуле — иначе работа выглядит зависшей.
+.indeterminate {
+  width: 30%;
+  animation: run 1.2s ease-in-out infinite;
+}
+
+@keyframes run {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(340%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .indeterminate {
+    width: 100%;
+    animation: none;
+    opacity: 0.4;
+  }
+}
+
+.line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-xs);
+}

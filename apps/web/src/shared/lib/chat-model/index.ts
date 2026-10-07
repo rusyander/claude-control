@@ -130,6 +130,22 @@ export function platformModelCaption(
   }
 }
 
+/** Причина отказа или ухода мимо контура — ключ словаря и имя настройки CLI. */
+export interface PlatformRefusalParams {
+  title: string;
+  reason: 'gateway_down' | 'no_token' | 'cli_config_bypass';
+  /** Настройка конфига CLI (`cli_config_bypass`); у остальных причин пусто. */
+  setting: string;
+}
+
+function refusalParams(plan: PlatformRunPlan): PlatformRefusalParams {
+  const reason =
+    plan.reason === 'no_token' || plan.reason === 'cli_config_bypass'
+      ? plan.reason
+      : 'gateway_down';
+  return { title: plan.title, reason, setting: plan.setting ?? '' };
+}
+
 /**
  * Подпись «прогон будет отклонён» — обязательный контур без шлюза или ключа.
  * Сервер отказывает при отправке; без этой строки человек узнал бы об отказе
@@ -138,10 +154,9 @@ export function platformModelCaption(
  */
 export function platformRefusalCaption(
   plan: PlatformRunPlan | undefined,
-): { key: 'chat.platformRefused'; params: { title: string; reason: string } } | undefined {
+): { key: 'chat.platformRefused'; params: PlatformRefusalParams } | undefined {
   if (!plan?.refused) return undefined;
-  const reason = plan.reason === 'no_token' ? 'no_token' : 'gateway_down';
-  return { key: 'chat.platformRefused', params: { title: plan.title, reason } };
+  return { key: 'chat.platformRefused', params: refusalParams(plan) };
 }
 
 /**
@@ -154,10 +169,9 @@ export function platformRefusalCaption(
  */
 export function platformBypassCaption(
   plan: PlatformRunPlan | undefined,
-): { key: 'chat.platformBypassed'; params: { title: string; reason: string } } | undefined {
+): { key: 'chat.platformBypassed'; params: PlatformRefusalParams } | undefined {
   if (!plan?.bypassed) return undefined;
-  const reason = plan.reason === 'no_token' ? 'no_token' : 'gateway_down';
-  return { key: 'chat.platformBypassed', params: { title: plan.title, reason } };
+  return { key: 'chat.platformBypassed', params: refusalParams(plan) };
 }
 
 /** Что сказать о наших слоях, снятых с прогона через контур (Т8). */

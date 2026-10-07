@@ -3,4 +3,6 @@ export interface CliInfoPanelProps {
   refresh?: boolean;
   /** Показывать кнопку «Обновить CLI». */
   withUpdate?: boolean;
+  /** Чей CLI: id провайдера; не задан — активного провайдера панели. */
+  providerId?: string;
 }

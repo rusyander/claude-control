@@ -1,5 +1,5 @@
 import { Buffer } from 'node:buffer';
-import { spawnSync } from 'node:child_process';
+import { execFile, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -519,6 +519,139 @@ export function killChildProcessTree(child, options = {}, impl = {}) {
     child.kill();
   } catch {
     // Процесс уже завершился — повторный сигнал не ошибка.
+  }
+  return killed;
+}
+
+/**
+ * Запас сверки времени создания для наблюдения за деревом (Ф9): POSIX считает
+ * время по `etime` с точностью до секунды, и два снимка одного процесса могут
+ * разойтись на секунду в каждую сторону.
+ */
+export const WATCH_SLACK_MS = 2_000;
+
+/**
+ * Чистый план добивания того, что пережило вышедшую команду (Ф9). `known` —
+ * процессы (`pid → created`), замеченные потомками команды во время прогона.
+ * Снимаются: живые из них (тот же процесс — время создания совпадает с
+ * запасом), их потомки, и дети уже мёртвых из них, созданные после родителя,
+ * — если номер родителя не занял тем временем другой процесс, чьи это дети.
+ * Номера листьями вперёд; себя — никогда.
+ */
+export function planLeftoverKill(table, known, options = {}) {
+  const slack = BigInt(options.slackMs ?? WATCH_SLACK_MS) * 10_000n;
+  const near = (a, b) => (a > b ? a - b : b - a) <= slack;
+  const byPid = new Map();
+  const children = new Map();
+  for (const row of table) {
+    byPid.set(row.pid, row);
+    if (row.ppid === row.pid) continue;
+    const list = children.get(row.ppid);
+    if (list) list.push(row);
+    else children.set(row.ppid, [row]);
+  }
+  const alive = (pid, created) => {
+    const row = byPid.get(pid);
+    return row !== undefined && row.created > 0n && near(row.created, created);
+  };
+  const roots = [];
+  for (const [pid, created] of known) if (alive(pid, created)) roots.push(byPid.get(pid));
+  for (const row of table) {
+    const parentCreated = known.get(row.ppid);
+    if (parentCreated === undefined || row.ppid === row.pid || !(row.created > 0n)) continue;
+    if (row.created + slack < parentCreated || alive(row.ppid, parentCreated)) continue;
+    // Номер мёртвого родителя занял новый процесс — его дети созданы после него и не наши.
+    const owner = byPid.get(row.ppid);
+    if (owner && row.created >= owner.created) continue;
+    roots.push(row);
+  }
+  const self = options.selfPid ?? process.pid;
+  const order = [];
+  const seen = new Set();
+  const visit = (parent) => {
+    if (seen.has(parent.pid)) return;
+    seen.add(parent.pid);
+    for (const kid of children.get(parent.pid) ?? []) {
+      if (!(kid.created > 0n) || kid.created < parent.created) continue;
+      visit(kid);
+    }
+    order.push(parent.pid);
+  };
+  for (const root of roots) visit(root);
+  return order.filter((pid) => pid !== self);
+}
+
+/**
+ * Снимок процессов без блокировки цикла событий — для наблюдения за деревом во
+ * время долгого прогона (Ф9). Синхронный `readProcessTable` стоит ~0.3 с и на
+ * каждом опросе держал бы весь сервер. Та же команда и тот же разбор.
+ */
+export function readProcessTableAsync(platform = process.platform) {
+  return new Promise((done) => {
+    const finish = (error, stdout) => {
+      if (error) done(undefined);
+      else if (platform === 'win32') done(parseProcessTable(stdout));
+      else done(parsePosixProcessTable(stdout, now));
+    };
+    const now = Date.now();
+    try {
+      if (platform === 'win32') {
+        encodedScript ??= Buffer.from(SNAPSHOT_SCRIPT, 'utf16le').toString('base64');
+        execFile(
+          powershellPath(),
+          ['-NoProfile', '-NonInteractive', '-EncodedCommand', encodedScript],
+          {
+            encoding: 'utf8',
+            windowsHide: true,
+            timeout: SNAPSHOT_TIMEOUT_MS,
+            maxBuffer: 64 * 1024 * 1024,
+            env: { ...process.env, AGENTDECK_PROCESS_TABLE_DLL: helperDll() },
+          },
+          finish,
+        );
+      } else {
+        execFile(
+          'ps',
+          ['-A', '-o', 'pid=', '-o', 'ppid=', '-o', 'etime='],
+          { encoding: 'utf8', timeout: SNAPSHOT_TIMEOUT_MS, maxBuffer: 64 * 1024 * 1024 },
+          finish,
+        );
+      }
+    } catch {
+      done(undefined);
+    }
+  });
+}
+
+/**
+ * Добить пережившее команду по плану `planLeftoverKill`. Windows — по
+ * дескриптору со сверкой времени создания (номер не снимется чужим), POSIX —
+ * `SIGKILL` по номеру. Возвращает номера, по которым ушёл сигнал.
+ */
+export function killLeftovers(known, options = {}, impl = {}) {
+  if (known.size === 0) return [];
+  const platform = impl.platform ?? process.platform;
+  const readTable =
+    impl.readTable ?? (platform === 'win32' ? readProcessTable : readPosixProcessTable);
+  const table = readTable();
+  if (!table) return [];
+  const pids = planLeftoverKill(table, known, options);
+  if (pids.length === 0) return [];
+  const send = impl.kill ?? ((target, signal) => process.kill(target, signal));
+  if (platform === 'win32') {
+    const terminate = impl.terminate ?? (impl.kill ? undefined : terminateByHandle);
+    const created = new Map(table.map((row) => [row.pid, row.created]));
+    const outcomes = terminate?.(pids.map((pid) => ({ pid, created: created.get(pid) })));
+    if (outcomes) return pids.filter((pid) => outcomes.get(pid) === 'killed');
+  }
+  const killed = [];
+  for (const pid of pids) {
+    try {
+      send(pid, 'SIGKILL');
+      killed.push(pid);
+    } catch {
+      // Уже вышел.
+    }
   }
   return killed;
 }

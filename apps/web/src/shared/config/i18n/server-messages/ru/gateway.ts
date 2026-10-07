@@ -47,6 +47,12 @@ export const gatewayRu: Record<GatewayMessageCode, string> = {
     'Адрес шлюза несёт незнакомую отметку раздела — запрос не отправлен. Примените контур заново, чтобы адрес переписался',
   'gateway-body-too-large': 'Тело запроса больше 32 МБ — шлюз его не принимает',
   'gateway-body-not-json': 'Тело запроса не разбирается как JSON',
+  'gateway-responses-previous-id':
+    'previous_response_id шлюз не поддерживает: пришлите весь разговор в input (store: false)',
+  'gateway-responses-not-request':
+    'Тело запроса /v1/responses без model или input — это не запрос Responses',
+  'gateway-google-not-request': 'Тело запроса Gemini без contents — это не запрос generateContent',
+  'gateway-google-empty': 'В запросе Gemini нет ни одного сообщения, на которое можно ответить',
   'gateway-answer-not-model':
     'Контур ответил не потоком, и его тело не разбирается как ответ модели',
   'gateway-client-gone': 'Клиент отключился до конца ответа',

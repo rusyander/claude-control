@@ -25,6 +25,7 @@ export function LocationStep({
   onPickFolder,
   onReset,
   isResetting,
+  claudeOptional = false,
 }: LocationStepProps) {
   const { t } = useTranslation();
   const [draft, setDraft] = useState('');
@@ -34,6 +35,9 @@ export function LocationStep({
 
   const isValid = location.isValid;
   const isManual = location.source === 'manual';
+  let badgeTone: 'success' | 'neutral' | 'danger' = 'danger';
+  if (isValid) badgeTone = 'success';
+  else if (claudeOptional) badgeTone = 'neutral';
 
   const submit = (event: FormEvent): void => {
     event.preventDefault();
@@ -47,7 +51,7 @@ export function LocationStep({
       </Typography>
 
       <Stack direction="row" align="center" gap="var(--spacing-xs)" wrap>
-        <Badge tone={isValid ? 'success' : 'danger'} withDot>
+        <Badge tone={badgeTone} withDot>
           {sourceLabel(location, t)}
         </Badge>
         <Typography variant="mono" color="subtle" as="span" truncate>
@@ -55,7 +59,13 @@ export function LocationStep({
         </Typography>
       </Stack>
 
-      {!isValid && (
+      {!isValid && claudeOptional && (
+        <Typography variant="body-sm" color="subtle" data-claude-optional>
+          {t('onboarding.locationOptional', { dir: location.paths.appData })}
+        </Typography>
+      )}
+
+      {!isValid && !claudeOptional && (
         <Typography variant="body-sm" color="danger">
           {location.problem ? serverFieldText(location, 'problem') : t('errors.locationHint')}
         </Typography>

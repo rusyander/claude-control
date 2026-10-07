@@ -70,6 +70,7 @@ import {
   getTreePauses as readTreePauses,
   setTreePause as writeTreePause,
 } from './tree-pause.ts';
+import { getChatPins as readChatPins, setChatPin as writeChatPin } from './chat-pins.ts';
 import {
   findSplitPlanByTriage as readSplitPlanByTriage,
   getSplitPlan as readSplitPlan,
@@ -740,6 +741,19 @@ export class AppStore {
 
   clearTreePause(root: string): void {
     if (dropTreePause(this.state, root)) this.persist();
+  }
+
+  // --- Закреплённые в списке разговоры: id корня → момент закрепления ---
+
+  getChatPins(): Record<string, string> {
+    return readChatPins(this.state);
+  }
+
+  /** `false` — состояние уже такое, сохранять нечего. */
+  setChatPin(chatId: string, pinned: boolean): boolean {
+    const changed = writeChatPin(this.state, chatId, pinned, new Date().toISOString());
+    if (changed) this.persist();
+    return changed;
   }
 
   // --- Конвейер уровней разделения (Т1): родитель → разбор, ожидания, группы.

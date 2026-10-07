@@ -1,6 +1,7 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { buildCapabilities, type ConfigProvider } from '../types.ts';
+import { aiderOneShotArgs, aiderOneShotEnv, createAiderStdoutParser } from './aider-run.ts';
 import { AIDER_CONFIG_BASENAME, aiderConfigFile, unimplementedPaths } from './config-dirs.ts';
 
 /**
@@ -25,9 +26,9 @@ import { AIDER_CONFIG_BASENAME, aiderConfigFile, unimplementedPaths } from './co
  *  - **чат** (`chat = ready`, AIDER-2): задокументированный one-shot-флаг
  *    `--message <text>` — «Specify a single message to send the LLM, process
  *    reply then exit (disables chat mode)». Промпт передаётся ОТДЕЛЬНЫМ
- *    элементом argv, без shell-интерполяции. NB: `aider` на машине разработки не
- *    установлен — раннер собран по документации и НЕ проверен живым прогоном
- *    (verify-on-first-real-run), поэтому провайдер остаётся `experimental`.
+ *    элементом argv, без shell-интерполяции. Проверен живым прогоном 06.10.2026
+ *    (aider-chat 0.86.2 через панель, модель — заглушка; `tools/qa/check-cli-aider.mjs`);
+ *    с настоящей моделью не гонялся, поэтому провайдер остаётся `experimental`.
  *
  * ЧТО ОСТАЁТСЯ ВЫКЛЮЧЕННЫМ: **MCP** — `unsupported`: в справочнике опций Aider
  * настройки MCP-серверов нет вовсе. Форматы не угадываем.
@@ -59,18 +60,28 @@ export const aiderProvider: ConfigProvider = {
   // Детект «конфиг найден» (Ф7): у Aider каталога конфигурации нет — есть
   // задокументированные файлы в домашнем каталоге. Проверяем только их наличие.
   configLocations: () => [aiderConfigFile(), join(homedir(), '.aider.model.settings.yml')],
-  // Ассистент Aider: OpenAI-совместимый (работает с разными моделями), ключ —
-  // OPENAI_API_KEY или ANTHROPIC_API_KEY; есть рабочий CLI (`aider`).
-  // One-shot: `aider --message <prompt>` — отправляет одно сообщение, печатает
-  // ответ и выходит (интерактивный чат при этом отключается).
+  // Ассистент Aider. Прямой вызов модели (CLI не установлен, ключ есть) — ТОЛЬКО
+  // ключом OpenAI и только в OpenAI (`openai` → api.openai.com, адрес задан
+  // кодом, а не окружением): своего модельного API у Aider нет, и «совместимый»
+  // вид отдал бы ключ неизвестно чьему серверу. `ANTHROPIC_API_KEY` здесь больше
+  // не читается: с ним Aider ходит в Claude, а Claude у панели — свой провайдер.
+  // One-shot: `aider --message <prompt>` и флаги, снятые живыми пробами 0.86.2
+  // (`aider-run.ts`: без человека каждый вопрос Aider отвечается «да»).
   assistant: {
-    apiKind: 'openai-compat',
-    apiKeyEnvVars: ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY'],
+    apiKind: 'openai',
+    apiKeyEnvVars: ['OPENAI_API_KEY'],
     cliRunnable: true,
     // Подбора модели (Т12) у Aider НЕТ, хотя `--model` задокументирован: своего
     // вендора у него нет вовсе (`modelVendors` не задан — оболочка поверх любой
     // модели), значит нет и каталога, из которого брать ступени лестницы.
-    oneShotArgs: (prompt) => ['--message', prompt],
+    oneShotArgs: (prompt, run) => aiderOneShotArgs(prompt, run),
+    // UTF-8 в трубе и строки rich без переноса — иначе русский ответ «������».
+    oneShotEnv: aiderOneShotEnv,
+    // «Разрешить правки» → `--yes-always`, иначе `--dry-run` (правки показаны, не
+    // записаны). Коммитов нет ни в каком режиме (`--no-auto-commits`).
+    editsControl: 'flag',
+    // Заставка, вопросы о файлах и расход токенов вокруг ответа — служебные.
+    parseStdout: createAiderStdoutParser,
   },
   // Свой эндпоинт: у Aider свои имена под собственным префиксом —
   // `AIDER_OPENAI_API_BASE` («Specify the api base url»), `AIDER_MODEL`
@@ -89,8 +100,8 @@ export const aiderProvider: ConfigProvider = {
     // AIDER-1: инструкции есть, но модель другая — список ссылок `read`.
     globalInstructions: 'ready',
     env: 'ready',
-    // AIDER-2: one-shot `--message` задокументирован. Живым прогоном не проверен
-    // (CLI не установлен) → бейдж «экспериментально» в интерфейсе остаётся.
+    // AIDER-2: one-shot `--message` задокументирован и прогнан живьём на заглушке
+    // модели; с настоящей моделью — нет → бейдж «экспериментально» остаётся.
     chat: 'ready',
     // AIDER-4: `<проект>/.aider.conf.yml` — задокументированный путь.
     projects: 'ready',

@@ -1573,6 +1573,99 @@ describe('список моделей', () => {
     };
     expect(body.data[0]).toMatchObject({ type: 'model', id: 'gpt-x', display_name: 'gpt-x' });
   });
+
+  it('след списка моделей называет раздел и прогон, как след ответа', async () => {
+    writePlatform(store, { ...PLATFORM, consumers: ['foreign:opencode'] });
+    await start(wholeBody(LIST));
+    const answer = await fetch(
+      `http://127.0.0.1:${port}/enterprise-platform/_s/foreign/opencode/_run/run-7/v1/models`,
+    );
+    expect(answer.status).toBe(200);
+    expect(gateway.status().events[0]).toMatchObject({
+      path: '/enterprise-platform/v1/models',
+      section: 'foreign:opencode',
+      runTag: 'run-7',
+    });
+  });
+});
+
+describe('ручки Gemini API (диалект google)', () => {
+  const GEMINI_BODY = {
+    contents: [{ role: 'user', parts: [{ text: 'скажи да' }] }],
+    systemInstruction: { parts: [{ text: 'система' }] },
+    generationConfig: { temperature: 1 },
+  };
+
+  const FINISH =
+    '{"id":"c1","model":"gpt-x","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}';
+
+  it('поток Gemini идёт конвейером chat/completions и возвращается кадрами Gemini', async () => {
+    await start(upstream([DELTA, FINISH, USAGE]));
+    const answer = await ask(
+      '/enterprise-platform/v1beta/models/Qwen%2Fx:streamGenerateContent?alt=sse',
+      GEMINI_BODY,
+      { headers: { 'x-goog-api-key': 'placeholder' } },
+    );
+    expect(answer.status).toBe(200);
+    // Наверх — chat/completions с ключом контура, моделью из пути и системным текстом.
+    expect(calls[0]?.url).toContain('/chat/completions');
+    expect(JSON.stringify(calls[0]?.headers)).toContain(SECRET);
+    const sent = JSON.parse(calls[0]?.body ?? '{}') as {
+      model: string;
+      messages: { role: string }[];
+    };
+    expect(sent.model).toBe('Qwen/x');
+    expect(sent.messages.map((message) => message.role)).toEqual(['system', 'user']);
+
+    const frames = answer.text
+      .split('\r\n\r\n')
+      .filter((line) => line.startsWith('data:'))
+      .map((line) => JSON.parse(line.slice(5)) as Record<string, unknown>);
+    expect(frames[0]).toEqual({
+      candidates: [{ content: { role: 'model', parts: [{ text: 'да' }] }, index: 0 }],
+    });
+    expect(frames.at(-1)).toMatchObject({
+      candidates: [{ finishReason: 'STOP' }],
+      usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 2, totalTokenCount: 12 },
+    });
+    // Расход и след — как у любого клиента OpenAI.
+    expect(gateway.status().events[0]).toMatchObject({
+      path: '/enterprise-platform/v1beta/models/Qwen%2Fx:streamGenerateContent',
+      status: 200,
+    });
+  });
+
+  it('закрытый раздел отказывает ошибкой Google API, а не формой OpenAI', async () => {
+    await start(upstream([DELTA, USAGE]));
+    const answer = await ask(
+      '/enterprise-platform/_s/foreign/gemini/v1beta/models/m:streamGenerateContent?alt=sse',
+      GEMINI_BODY,
+    );
+    expect(answer.status).toBe(403);
+    expect(JSON.parse(answer.text)).toMatchObject({
+      error: { code: 403, status: 'PERMISSION_DENIED' },
+    });
+    expect(calls).toHaveLength(0);
+  });
+
+  it(':countTokens отвечает оценкой на месте и в контур не ходит', async () => {
+    await start(upstream([DELTA, USAGE]));
+    const answer = await ask('/enterprise-platform/v1beta/models/m:countTokens', GEMINI_BODY);
+    expect(answer.status).toBe(200);
+    expect((JSON.parse(answer.text) as { totalTokens: number }).totalTokens).toBeGreaterThan(0);
+    expect(calls).toHaveLength(0);
+  });
+
+  it('тело не запрос Gemini — 400 в форме Google', async () => {
+    await start(upstream([DELTA, USAGE]));
+    const answer = await ask('/enterprise-platform/v1beta/models/m:generateContent', {
+      prompt: 'x',
+    });
+    expect(answer.status).toBe(400);
+    expect(JSON.parse(answer.text)).toMatchObject({
+      error: { code: 400, status: 'INVALID_ARGUMENT' },
+    });
+  });
 });
 
 describe('постоянный учёт расхода (Т8)', () => {

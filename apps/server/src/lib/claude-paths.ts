@@ -1,7 +1,7 @@
 import { existsSync, accessSync, constants, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, dirname, resolve, basename } from 'node:path';
-import { resolveAppDataDir } from './brand.mjs';
+import { appDataDirOf, legacyAppDataDirOf, panelHomeDirPath, resolveAppDataDir } from './brand.mjs';
 import { userInstructionTarget } from './instruction-files.ts';
 import type { ClaudeLocation, ClaudePaths, DetectionSource } from '@agentdeck/contracts';
 import type { ServerMessageCode } from '@agentdeck/contracts/server-messages';
@@ -48,11 +48,14 @@ export function detectClaudeLocation(override?: string): ClaudeLocation {
       continue;
     }
 
-    const paths = buildPaths(dir);
+    const paths = buildPaths(dir, source === 'home' ? stickyStandaloneAppData(dir) : undefined);
     return { paths, source, isValid: true, missing: findMissing(paths) };
   }
 
-  const fallback = buildPaths(join(homedir(), '.claude'));
+  // Каталога Claude нет вовсе: панель всё равно должна стартовать (выбран может
+  // быть другой CLI), поэтому её данные — в домашнем каталоге панели, а не в
+  // `~/.claude`, который иначе создался бы молча первым же `mkdir`.
+  const fallback = buildPaths(join(homedir(), '.claude'), standaloneAppDataDir());
   return {
     paths: fallback,
     source: 'not-found',
@@ -125,7 +128,29 @@ function resolveClaudeMd(root: string): string {
   return userInstructionTarget(root).filePath;
 }
 
-function buildPaths(root: string): ClaudePaths {
+/**
+ * Каталог данных панели, когда каталога Claude Code на машине нет:
+ * `~/.agentdeck/data`. Отдельная папка, а не сам `~/.agentdeck`, — там уже лежат
+ * токен API, чаты и песочницы, и имена файлов состояния не должны с ними пересечься.
+ */
+export function standaloneAppDataDir(home: string = homedir()): string {
+  return join(panelHomeDirPath(home), 'data');
+}
+
+/**
+ * Панель уже жила без Claude (есть `~/.agentdeck/data/state.json`), а потом
+ * появился `~/.claude` без своего каталога данных панели — остаёмся там, где
+ * лежат настройки, иначе установка Claude выглядела бы как потеря всего.
+ * Каталог данных внутри `~/.claude` (новый или прежнего бренда) всегда главнее:
+ * существующие установки не переезжают никуда.
+ */
+function stickyStandaloneAppData(root: string): string | undefined {
+  if (existsSync(appDataDirOf(root)) || existsSync(legacyAppDataDirOf(root))) return undefined;
+  const standalone = standaloneAppDataDir();
+  return existsSync(join(standalone, 'state.json')) ? standalone : undefined;
+}
+
+function buildPaths(root: string, appDataOverride?: string): ClaudePaths {
   return {
     root,
     settings: join(root, 'settings.json'),
@@ -137,7 +162,7 @@ function buildPaths(root: string): ClaudePaths {
     mcpConfig: resolveMcpConfig(root),
     // Каталог данных панели. Прежнее имя (`agentdeck/`) переезжает сюда
     // копией при первом обращении — `brand.mjs`.
-    appData: resolveAppDataDir(root),
+    appData: appDataOverride ?? resolveAppDataDir(root),
   };
 }
 

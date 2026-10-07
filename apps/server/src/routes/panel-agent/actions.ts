@@ -1,4 +1,4 @@
-import { resolve } from 'node:path';
+import { isAbsolute, resolve } from 'node:path';
 import { z } from 'zod';
 import { projectDirProblem, projectName, type ProjectDirProblem } from '../../domains/projects.ts';
 import { normalizeProjectPath } from '../../lib/app-store/projects.ts';
@@ -6,6 +6,7 @@ import { spelledOnDisk } from '../../lib/disk-spelling.ts';
 import { definePanelAction, fingerprintOf, type AnyPanelAction } from './registry.ts';
 import { readRoute } from './action-kit.ts';
 import { PANEL_SECTIONS, sectionRoutes } from './sections.ts';
+import { testsPage } from './tests-page.ts';
 import { PROJECT_CHAT_ACTIONS } from './actions-projects.ts';
 import { TEST_ACTIONS } from './actions-tests.ts';
 import { CONTOUR_ACTIONS } from './actions-contour.ts';
@@ -36,6 +37,8 @@ import { GAPS_CHAT_ACTIONS } from './actions-gaps-chat.ts';
 import { GAPS_SETTINGS_ACTIONS } from './actions-gaps-settings.ts';
 import { GAPS_PROJECT_ACTIONS } from './actions-gaps-projects.ts';
 import { GAPS_TESTS_ACTIONS } from './actions-gaps-tests.ts';
+import { LOCAL_MODELS_ACTIONS } from './actions-local-models.ts';
+import { KIT_ACTIONS } from './actions-kit.ts';
 import { dataField, summaryText, textField } from './texts.ts';
 import { PANEL_E2E_DIR } from '../../domains/project-tests/e2e-scaffold.ts';
 import type { ProjectTestE2eFolder } from '@agentdeck/contracts';
@@ -84,22 +87,46 @@ const openPage = definePanelAction({
   description:
     'Open a panel section on the human’s screen. Does not change any data. ' +
     'Result `windows` = how many panel windows received it (0 = nobody sees it).',
-  input: z.object({
-    route: z.enum(sectionRoutes()).describe('Section route from list_sections'),
-    focus: z
-      .string()
-      .max(200)
-      .optional()
-      .describe(
-        'Optional, by route: /settings and /tests — a tab key from list_sections `tabs`; /chat — a chat id; ' +
-          '/projects — a project id; any other section — an element id',
-      ),
-  }),
+  input: z
+    .object({
+      route: z.enum(sectionRoutes()).describe('Section route from list_sections'),
+      focus: z
+        .string()
+        .max(200)
+        .optional()
+        .describe(
+          'Optional, by route: /settings and /tests — a tab key from list_sections `tabs`; /chat — a chat id; ' +
+            '/projects — a project id; any other section — an element id',
+        ),
+      projectPath: z
+        .string()
+        .trim()
+        .min(1)
+        .optional()
+        .describe(
+          'Only with /tests: absolute project path from list_projects — opens the section on THAT ' +
+            'project (the section otherwise shows whichever project the browser last picked)',
+        ),
+    })
+    // Раздел тестов помнит выбранный проект в браузере: «открой тестирование
+    // проекта X» без проекта в адресе показывало бы тесты другого проекта.
+    // У прочих разделов проекта в адресе нет — там поле было бы молча проглочено.
+    .refine((input) => input.projectPath === undefined || input.route === '/tests', {
+      message: 'projectPath is accepted only with route /tests',
+      path: ['projectPath'],
+    })
+    .refine((input) => input.projectPath === undefined || isAbsolute(input.projectPath), {
+      message: 'projectPath must be an absolute directory (take it from list_projects)',
+      path: ['projectPath'],
+    }),
   // Окно получает кадр из `page` — один путь для навигации и для «показать
   // результат»; здесь только честный ответ, увидел ли его кто-нибудь.
   local: (input, env) => ({ opened: input.route, windows: env.windows() }),
   summary: 'journal-open-page',
-  page: (input) => ({ route: input.route, ...(input.focus ? { focus: input.focus } : {}) }),
+  page: (input) =>
+    input.projectPath
+      ? { ...testsPage(input.projectPath), ...(input.focus ? { focus: input.focus } : {}) }
+      : { route: input.route, ...(input.focus ? { focus: input.focus } : {}) },
 });
 
 const listProjects = definePanelAction({
@@ -223,6 +250,8 @@ export const PANEL_ACTIONS: readonly AnyPanelAction[] = [
   ...GROUP_ACTIONS,
   ...WORK_ACTIONS,
   ...PANEL_READ_ACTIONS,
+  ...LOCAL_MODELS_ACTIONS,
+  ...KIT_ACTIONS,
   ...TESTS_BLOCK_ACTIONS,
   ...GROUP_SOURCES_ACTIONS,
   ...ENTITY_EXTRA_ACTIONS,

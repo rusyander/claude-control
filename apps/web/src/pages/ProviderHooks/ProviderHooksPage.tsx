@@ -22,12 +22,15 @@ export function ProviderHooksPage() {
 
   const subtitleKey =
     hooks?.shape === 'event-rules' ? 'providerHooks.subtitleRules' : 'providerHooks.subtitle';
+  // Файл правил у каждого CLI свой (settings.json у Qwen, config.toml у Kimi,
+  // hooks.json у Codex) — подзаголовок называет тот, что прислал сервер.
+  const file = hooks?.filePath.split(/[\\/]/).pop() ?? '';
 
   return (
     <Stack gap="var(--spacing-lg)">
       <PageHeader
         title={t('providerHooks.title', { provider: provider.name })}
-        subtitle={t(subtitleKey, { provider: provider.name })}
+        subtitle={t(subtitleKey, { provider: provider.name, file })}
         helpTopic="hooks"
       />
       <ProviderHooksPanel />

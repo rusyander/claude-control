@@ -75,6 +75,7 @@ export function PanelAgentLimitsSections({ tr }: SectionProps) {
               { ...row('refusalContour'), badge: 'contour_unreachable', badgeTone: 'warning' },
               { ...row('refusalMask'), badge: 'data_mask_broken', badgeTone: 'danger' },
               { ...row('refusalBusy'), badge: 'busy', badgeTone: 'neutral' },
+              row('refusalLong'),
               { ...row('refusalTimeout'), badge: 'timeout', badgeTone: 'neutral' },
             ]}
           />

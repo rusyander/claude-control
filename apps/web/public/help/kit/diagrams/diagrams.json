@@ -1,0 +1,15 @@
+{
+  "topic": "kit",
+  "source": "docs/diagrams/kit-guide/kit-guide.drawio",
+  "pages": [
+    {
+      "name": "kit-to-run",
+      "file": "kit-to-run.png",
+      "page": 1,
+      "source": "cdf0d762dd6a62f2",
+      "width": 1667,
+      "height": 928,
+      "exportedAt": "2026-10-07T09:00:12.983Z"
+    }
+  ]
+}

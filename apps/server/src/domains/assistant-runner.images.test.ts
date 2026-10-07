@@ -24,6 +24,11 @@ const messages: AssistantMessage[] = [
   { role: 'user', content: 'что на снимке?', images: [image] },
 ];
 
+/** Строка вывода gemini `-o stream-json` (0.62.0): так он печатает кусок ответа. */
+const geminiOut = (text: string): string =>
+  `${JSON.stringify({ type: 'message', role: 'assistant', content: text, delta: true })}
+`;
+
 function fakeSpawn(stdout: string, onSpawn?: (args: string[], options?: { cwd?: string }) => void) {
   const calls: string[][] = [];
   const stdin: string[] = [];
@@ -172,7 +177,7 @@ describe('runAssistant: картинка доходит до модели', () =
     let seenPath = '';
     let bytesDuringRun: Buffer | undefined;
     let cwd = '';
-    const spawn = fakeSpawn('ок', (args, options) => {
+    const spawn = fakeSpawn(geminiOut('ок'), (args, options) => {
       cwd = options?.cwd ?? '';
       const match = /disk: (\S+image-1\.png)/.exec(args.join(' '));
       seenPath = (match?.[1] ?? '').replace(/["']/g, '');

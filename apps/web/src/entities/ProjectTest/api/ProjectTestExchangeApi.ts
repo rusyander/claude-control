@@ -1,11 +1,6 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import type {
-  IntegrationPublishResult,
-  ProjectTestImportFormat,
-  ProjectTestImportResult,
-} from '@agentdeck/contracts';
+import type { ProjectTestImportFormat, ProjectTestImportResult } from '@agentdeck/contracts';
 import { apiClient } from '@shared/api/client';
-import { testKeys } from './keys';
+import { useImportMutation } from './useImportMutation';
 
 /**
  * Обмен с внешним миром: результаты из CI, кейсы из таблиц, выгрузка группы.
@@ -21,34 +16,12 @@ import { testKeys } from './keys';
 
 /** Отчёты прогонов и таблицы кейсов — разные половины одного списка форматов. */
 export type ResultsFormat = Extract<ProjectTestImportFormat, 'junit' | 'playwright' | 'allure'>;
-export type CasesFormat = Extract<
-  ProjectTestImportFormat,
-  'csv' | 'xlsx' | 'testrail-csv' | 'markdown'
->;
 
 export interface ImportResultsPayload {
   format: ResultsFormat;
   content?: string;
   file?: string;
   environmentId?: string;
-}
-
-export interface ImportCasesPayload {
-  groupId: string;
-  format: CasesFormat;
-  content?: string;
-  /** Файл внутри проекта; у `markdown` — КАТАЛОГ с ручными кейсами. */
-  file?: string;
-}
-
-function useImportMutation<TPayload>(
-  send: (payload: TPayload) => Promise<ProjectTestImportResult>,
-) {
-  const client = useQueryClient();
-  return useMutation({
-    mutationFn: send,
-    onSuccess: () => void client.invalidateQueries({ queryKey: testKeys.root }),
-  });
 }
 
 export function useImportTestResults(path: string | undefined) {
@@ -58,83 +31,5 @@ export function useImportTestResults(path: string | undefined) {
       { path, ...payload },
     );
     return data;
-  });
-}
-
-export function useImportTestCases(path: string | undefined) {
-  return useImportMutation(async (payload: ImportCasesPayload) => {
-    const { data } = await apiClient.post<ProjectTestImportResult>('/project-tests/import/cases', {
-      path,
-      ...payload,
-    });
-    return data;
-  });
-}
-
-/**
- * Адрес выгрузки — обычная ссылка, а не запрос из кода: браузер сам покажет
- * диалог сохранения с именем файла из `Content-Disposition`, а собранный в
- * памяти blob пришлось бы ещё и освобождать.
- */
-export function exportUrl(
-  path: string | undefined,
-  groupId: string,
-  format: 'csv' | 'md' | 'xlsx',
-): string {
-  const query = new URLSearchParams({ path: path ?? '', groupId, format });
-  return `/api/project-tests/export?${query.toString()}`;
-}
-
-/**
- * Адрес отчёта по одному прогону. Отдельно от выгрузки кейсов: там срез набора
- * «как он выглядит сейчас», здесь событие «вот что было в этот раз».
- *
- * PDF живёт СВОИМ маршрутом, а не форматом выгрузки: печать асинхронная и
- * отвечает отказом, когда печатать нечем. Общий маршрут выгрузки такого формата
- * не знает и на `format=pdf` отвечает 400 — ссылка приводила бы к отказу
- * «формат: md, csv или html» вместо файла.
- */
-export function runExportUrl(
-  path: string | undefined,
-  id: string,
-  format: RunExportFormat,
-): string {
-  if (format === 'pdf') {
-    const print = new URLSearchParams({ path: path ?? '', id });
-    return `/api/project-tests/run/pdf?${print.toString()}`;
-  }
-  const query = new URLSearchParams({ path: path ?? '', id, format });
-  return `/api/project-tests/run/export?${query.toString()}`;
-}
-
-/**
- * PDF рядом с md и csv: отчёт уходит приёмке и заказчику, а туда посылают не
- * markdown. Рисует его браузер, найденный на машине, — нет браузера, сервер
- * честно отвечает отказом, и ссылка приводит к его тексту, а не к битому файлу.
- */
-export type RunExportFormat = 'md' | 'csv' | 'pdf';
-
-/** Куда публикуется отчёт прогона: страницей Confluence или комментарием в Jira. */
-export type PublishTarget = 'confluence' | 'jira';
-
-/**
- * Публикация отчёта наружу.
- *
- * Отдельно от выгрузки файлом: файл человек уносит сам, а публикация пишет в
- * ЧУЖУЮ систему — и делается только по явному нажатию, с адресом созданного в
- * ответе. Куда именно писать, решает привязка проекта, а не эта кнопка.
- */
-export function usePublishTestRun(path: string | undefined) {
-  return useMutation({
-    mutationFn: async (payload: {
-      id: string;
-      target: PublishTarget;
-    }): Promise<IntegrationPublishResult> => {
-      const { data } = await apiClient.post<IntegrationPublishResult>(
-        '/project-tests/run/publish',
-        { path, ...payload },
-      );
-      return data;
-    },
   });
 }

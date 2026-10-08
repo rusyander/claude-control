@@ -285,18 +285,19 @@ async function main() {
   const cliDirs = present.map((id) => dirname(found[id]));
   process.env.PATH = [...cliDirs, process.env.PATH ?? process.env.Path ?? ''].join(delimiter);
 
-  const { AppStore } = await import('../../apps/server/src/lib/app-store.ts');
+  const { AppStore } = await import('../../apps/server/src/lib/app-store/app-store.ts');
   const { PlatformGateway } =
-    await import('../../apps/server/src/domains/platform/gateway/listener.ts');
+    await import('../../apps/server/src/domains/platform/gateway/listener/listener.ts');
   const { writePlatform, writeToken } =
-    await import('../../apps/server/src/domains/platform/store.ts');
+    await import('../../apps/server/src/domains/platform/store/store.ts');
   const { resolveRunRoute, runRouteOf } =
-    await import('../../apps/server/src/domains/platform/routing.ts');
+    await import('../../apps/server/src/domains/platform/routing/routing.ts');
   const { ProviderChatService } =
-    await import('../../apps/server/src/domains/provider-chat/ProviderChatService.ts');
+    await import('../../apps/server/src/domains/provider-chat/ProviderChatService/ProviderChatService.ts');
   const { createChat, readChat } =
-    await import('../../apps/server/src/domains/provider-chat/store.ts');
-  const { opencodeServe } = await import('../../apps/server/src/domains/opencode-serve.ts');
+    await import('../../apps/server/src/domains/provider-chat/store/store.ts');
+  const { opencodeServe } =
+    await import('../../apps/server/src/domains/opencode-serve/opencode-serve.ts');
   const { getProvider } = await import('../../apps/server/src/providers/registry.ts');
   const { gooseConfigDir, kimiCodeHome, opencodeConfigDir } =
     await import('../../apps/server/src/providers/catalog/config-dirs.ts');
@@ -365,7 +366,7 @@ async function main() {
       appDataDir: appData,
       gatewayPort: () => (gateway.status().running ? gateway.status().port : 0),
     };
-    // Проекция — та же, что у сборки сервера (`bootstrap/runtime.ts`).
+    // Проекция — та же, что у сборки сервера (`bootstrap/runtime/runtime.ts`).
     chats.setPlatformRouting((origin, asked = '', runTag = '') =>
       runRouteOf(resolveRunRoute(deps, origin, asked, runTag)),
     );

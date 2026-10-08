@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { clockTicks, shellView, summarizeProgress } from './progressView';
+import { shellView } from './shellView';
+import { summarizeProgress } from './summarizeProgress';
+import { clockTicks } from './clockTicks';
 
 /**
  * Свёрнутая полоса прогресса отвечает на единственный вопрос: «сколько сделано и

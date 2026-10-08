@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import type { EnvItem, EnvNeeds } from '@agentdeck/contracts/portable-env';
 import { sharedNeeds } from './passport-view';
-import { TRANSFER_TARGET_KEY, readRememberedTarget, rememberTarget } from './target-memory';
+import { readRememberedTarget } from './target-memory';
+import { TRANSFER_TARGET_KEY } from './target-memory.constants';
+import { rememberTarget } from './rememberTarget';
 
 // Тест смотрит только на `needs`: остальные поля записи функции не нужны.
 const item = (needs: EnvNeeds): EnvItem => ({ needs }) as unknown as EnvItem;

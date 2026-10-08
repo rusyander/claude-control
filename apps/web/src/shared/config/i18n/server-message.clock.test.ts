@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { i18n } from './instance';
-import { serverFieldText, serverMessageFromPayload } from './server-message';
+import { serverMessageFromPayload } from './serverMessageFromPayload';
+import { serverFieldText } from './serverFieldText';
 
 type Notice = { notice: string; noticeCode?: string; noticeParams?: unknown };
 

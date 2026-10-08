@@ -6,9 +6,9 @@ import type {
   EndpointVarPlan,
 } from '@agentdeck/contracts';
 import { listProviders } from '../../providers/registry.ts';
-import type { ConfigProvider, ProviderEndpointVars } from '../../providers/types.ts';
-import { maskKey } from '../../lib/provider-keys.ts';
-import { resolveProviderEnvTargetFor } from '../provider-env.ts';
+import type { ConfigProvider, ProviderEndpointVars } from '../../providers/types/types.ts';
+import { maskKey } from '../../lib/provider-keys/provider-keys.ts';
+import { resolveProviderEnvTargetFor } from '../provider-env/provider-env.ts';
 
 /**
  * Что именно панель напишет в конфигурацию CLI, чтобы он ходил в свой эндпоинт,
@@ -26,8 +26,8 @@ export interface EndpointWriteTarget {
   filePath: string;
   /**
    * Claude пишет переменные в блок `env` файла settings.json собственными
-   * средствами (`domains/env.ts`), у остальных это универсальный env-раздел
-   * (`domains/provider-env.ts`). Ветка выбирается ЗДЕСЬ один раз, чтобы
+   * средствами (`domains/env/env.ts`), у остальных это универсальный env-раздел
+   * (`domains/provider-env/provider-env.ts`). Ветка выбирается ЗДЕСЬ один раз, чтобы
    * применение не разбиралось в этом повторно.
    */
   kind: 'claude-settings' | 'provider-env';

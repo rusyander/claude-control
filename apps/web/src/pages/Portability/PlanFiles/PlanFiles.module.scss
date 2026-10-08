@@ -1,0 +1,99 @@
+.summary {
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+}
+
+// Намерение записи — целая фраза, и длинная: описание скилла бывает в две
+// строки. Без переноса по словам она уезжает под соседнюю колонку и там
+// обрезается — то есть человек читает половину смысла записи.
+.intent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3xs);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+// Путь к файлу-источнику: моноширинный и приглушённый — он подпись, а не смысл.
+.source {
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  color: var(--color-fg-subtle);
+}
+
+// Строка файла плана: путь с метками слева, кнопка диффа справа.
+.fileRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--spacing-sm);
+  align-items: center;
+  padding: var(--spacing-2xs) var(--spacing-xs);
+  border-radius: 8px;
+
+  &:nth-child(odd) {
+    background: var(--color-surface-sunken);
+  }
+}
+
+// Дифф — те же цвета и моноширина, что в ленте изменений и в предпросмотре
+// одной записи: одна сущность читается в панели одинаково везде.
+.diff {
+  max-height: 50vh;
+  overflow: auto;
+  border-radius: 8px;
+  background: var(--color-surface-sunken);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-body-sm);
+  line-height: 1.5;
+  scrollbar-width: thin;
+}
+
+.diffLine {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2xs);
+  padding: 0 var(--spacing-sm);
+
+  &[data-kind='add'] {
+    background: var(--color-success-subtle);
+    color: var(--color-success);
+  }
+
+  &[data-kind='del'] {
+    background: var(--color-danger-subtle);
+    color: var(--color-danger);
+  }
+
+  &[data-kind='ctx'] {
+    color: var(--color-fg-muted);
+  }
+}
+
+.diffSign {
+  flex: none;
+  width: 1.5ch;
+  user-select: none;
+  opacity: 0.7;
+}
+
+// Длинные строки конфига не переносим: перенос в диффе сбивает чтение колонок.
+.diffText {
+  white-space: pre;
+}
+
+// На узком экране две колонки не помещаются: требования уходят под намерение,
+// а не жмут его до одного слова в строке.
+@media (width <= 720px) {
+  // Кнопка диффа уходит под путь: рядом с ним на 420 px она сжимала бы путь до
+  // нечитаемого огрызка.
+  .fileRow {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: start;
+  }
+}

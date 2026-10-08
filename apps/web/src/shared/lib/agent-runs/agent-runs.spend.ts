@@ -1,5 +1,5 @@
 import { apiClient } from '@shared/api/client';
-import { emit } from './agent-runs.state';
+import { emit } from './emit';
 
 /**
  * Накопленный за сеанс расход. Считает его сервер (реестр прогонов) — так

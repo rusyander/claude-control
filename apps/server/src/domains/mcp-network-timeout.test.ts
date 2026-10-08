@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createServer, type IncomingMessage, type Server } from 'node:http';
 import type { McpServer } from '@agentdeck/contracts';
-import { checkMcpHealth } from './mcp.ts';
+import { checkMcpHealth } from './mcp/mcp-health.ts';
 
 /**
  * Настраиваемый потолок подключения к сетевым MCP-серверам.

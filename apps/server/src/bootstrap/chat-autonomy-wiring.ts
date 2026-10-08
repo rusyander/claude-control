@@ -1,11 +1,11 @@
 import type { ChatEvent } from '../domains/chat/chat-events.ts';
-import type { ChatRunRegistry } from '../domains/chat/ChatRunRegistry.ts';
+import type { ChatRunRegistry } from '../domains/chat/ChatRunRegistry/ChatRunRegistry.ts';
 import {
   chatGroupSettingsView,
   rootChatOf,
   storeTreeReader,
-} from '../domains/chat/chat-autonomy.ts';
-import { createEscalations } from '../domains/chat/escalations.ts';
+} from '../domains/chat/chat-autonomy/chat-autonomy.ts';
+import { createEscalations } from '../domains/chat/escalations/escalations.ts';
 import type { AppStore } from '../lib/app-store/store.ts';
 
 /**

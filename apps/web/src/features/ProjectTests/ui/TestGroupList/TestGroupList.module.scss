@@ -1,0 +1,41 @@
+// Ниже этой высоты колонки библиотеки не сжимаются, прокручивается страница.
+$library-floor: 320px;
+
+// Строка дерева секций: подпись слева, счётчик справа, отступ задаёт глубину.
+.section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-2xs);
+  width: 100%;
+  padding: var(--spacing-3xs) var(--spacing-xs);
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+
+  &:hover {
+    background: var(--color-surface-sunken);
+  }
+}
+
+.sectionActive {
+  background: var(--color-surface-sunken);
+  font-weight: 600;
+}
+
+.sectionTitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-body-sm);
+}
+
+.sectionCount {
+  flex: none;
+  font-size: var(--font-size-caption);
+  color: var(--color-text-subtle);
+}

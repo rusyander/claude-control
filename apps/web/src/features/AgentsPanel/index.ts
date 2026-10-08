@@ -1,2 +1,2 @@
-export { AgentsPanel } from './ui/AgentsPanel';
-export type { AgentsPanelProps } from './ui/AgentsPanel.types';
+export { AgentsPanel } from './ui/AgentsPanel/AgentsPanel';
+export type { AgentsPanelProps } from './ui/AgentsPanel/AgentsPanel.types';

@@ -7,8 +7,8 @@ import {
   findHook,
   type EntityToggleDeps,
 } from '../../domains/entity-toggle.ts';
-import { assertSkillId } from '../../domains/skills.ts';
-import { assertMcpServerExists } from '../../domains/mcp.ts';
+import { assertSkillId } from '../../domains/skills/skills.ts';
+import { assertMcpServerExists } from '../../domains/mcp/mcp.ts';
 import { done, live } from '../write-result.ts';
 
 /** Включение и выключение любой сущности — один маршрут на все виды. */

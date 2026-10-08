@@ -1,0 +1,22 @@
+.runLink {
+  color: var(--color-accent);
+  font-size: var(--font-size-caption);
+}
+
+// Кейс плашкой на вкладке покрытия: длинное название обрезается многоточием, иначе
+// одна плашка растягивалась шире карточки и уходила за её край.
+// «Покрыть кейсами» — действие строки требования, и стоит оно в одной колонке у
+// правого края карточки: за названием задачи кнопка ехала за его длиной, и в
+// соседних карточках её приходилось искать заново.
+.coverAction {
+  margin-left: auto;
+}
+
+.coverageCaseTitle {
+  display: inline-block;
+  max-width: 360px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}

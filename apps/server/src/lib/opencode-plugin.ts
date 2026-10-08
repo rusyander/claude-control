@@ -1,4 +1,4 @@
-import { UnrecognizedFormatError } from './codex-toml.ts';
+import { UnrecognizedFormatError } from './codex-toml/codex-toml.ts';
 
 /**
  * Плагины OpenCode из npm — ключ `plugin` в `opencode.json` (OPENCODE-4, часть 2).

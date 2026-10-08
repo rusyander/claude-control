@@ -1,8 +1,8 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ClaudeLocation } from '@agentdeck/contracts';
-import type { AppStore } from '../../lib/app-store.ts';
-import { readClaudeCredentials, writeSecretFile } from '../../lib/credentials.ts';
+import type { AppStore } from '../../lib/app-store/app-store.ts';
+import { readClaudeCredentials, writeSecretFile } from '../../lib/credentials/credentials.ts';
 import { removeTree, sandboxKey, sandboxPaths } from './SandboxPaths.ts';
 import { forgetExpired, forgetSandbox } from './SandboxRegistry.ts';
 import { armSandboxSweeper } from './SandboxSweep.ts';
@@ -10,7 +10,7 @@ import { copyScripts, copySkills, writeRules } from './SandboxContents.ts';
 import { buildSettings } from './SandboxSettings.ts';
 import type { Sandbox, SandboxDescription, SandboxSelection } from './SandboxConfig.types.ts';
 import { brandEnvName, legacyEnvName } from '../../lib/brand.mjs';
-import { coded } from '../../lib/server-text.ts';
+import { coded } from '../../lib/server-text/server-text.ts';
 
 /**
  * Собирает песочницу под выбранные элементы.

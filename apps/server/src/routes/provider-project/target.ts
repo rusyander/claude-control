@@ -5,10 +5,10 @@ import {
   resolveProviderProjectTarget,
   UnsafeProjectPathError,
   type ProviderProjectTarget,
-} from '../../domains/provider-projects.ts';
-import { checkProjectDir } from '../../domains/projects.ts';
+} from '../../domains/provider-projects/provider-projects.ts';
+import { checkProjectDir } from '../../domains/projects/projects.ts';
 import { SECTION_UNSUPPORTED } from './messages.ts';
-import { codeOf } from '../../lib/server-text.ts';
+import { codeOf } from '../../lib/server-text/server-text.ts';
 
 /**
  * Проектная цель активного провайдера по id записи реестра. Undefined означает,

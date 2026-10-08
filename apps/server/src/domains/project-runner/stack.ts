@@ -6,7 +6,7 @@ import {
   type PackageJsonShape,
   type PackageManager,
 } from './project-runner.types.ts';
-import { coded } from '../../lib/server-text.ts';
+import { coded } from '../../lib/server-text/server-text.ts';
 
 /**
  * Чем и как запускается проект: пакетный менеджер, скрипт, итоговая команда.

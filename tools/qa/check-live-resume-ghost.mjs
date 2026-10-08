@@ -162,7 +162,8 @@ Object.assign(process.env, {
   CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1',
 });
 
-const { ChatRunRegistry } = await import('../../apps/server/src/domains/chat/ChatRunRegistry.ts');
+const { ChatRunRegistry } =
+  await import('../../apps/server/src/domains/chat/ChatRunRegistry/ChatRunRegistry.ts');
 const registry = new ChatRunRegistry();
 const finished = [];
 registry.setHandoffPlanner((run) => {

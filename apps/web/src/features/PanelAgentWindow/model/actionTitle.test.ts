@@ -15,8 +15,9 @@ function registeredActionNames(): string[] {
   const here = dirname(fileURLToPath(import.meta.url));
   const dir = join(here, '..', '..', '..', '..', '..', 'server', 'src', 'routes', 'panel-agent');
   const names = new Set<string>();
-  for (const file of readdirSync(dir)) {
-    if (!/^actions.*\.ts$/.test(file) || file.includes('.test.')) continue;
+  // Модуль с тестами лежит в своей папке (actions-x/actions-x.ts) — обход рекурсивный.
+  for (const file of readdirSync(dir, { recursive: true, encoding: 'utf8' })) {
+    if (!/(^|[\\/])actions[^\\/]*\.ts$/.test(file) || file.includes('.test.')) continue;
     const source = readFileSync(join(dir, file), 'utf8');
     // Цифры в имени бывают (`create_e2e_folder`): без них скан молча терял действие.
     for (const match of source.matchAll(/definePanelAction\(\{\s*name:\s*'([a-z0-9_]+)'/g)) {

@@ -15,8 +15,8 @@ import {
   SPLIT_HEAVY_RULE_DEFAULT,
   type SplitHeavyRule,
 } from '@agentdeck/contracts/split-groups';
-import { killChildTree } from '../../lib/process-tree.ts';
-import { gitSync } from './exec.ts';
+import { killChildTree } from '../../lib/process-tree/process-tree.ts';
+import { gitSync } from './exec/exec.ts';
 
 /**
  * Бутстрап копии: команда, которая идёт в новой копии ДО того, как в ней

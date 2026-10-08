@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import type { AppSettings } from '@agentdeck/contracts';
 import { api } from '../../shared/api/client';
-import type { CostUnit } from '../../shared/lib/format';
+import type { CostUnit } from '../../shared/lib/formatSpend';
 
 /**
  * Настройки самой панели. Приложение их не правит — только читает то, что

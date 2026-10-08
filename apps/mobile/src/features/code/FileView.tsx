@@ -1,11 +1,15 @@
 import { useMemo, useState } from 'react';
-import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, ScrollView, Text, View } from 'react-native';
 import { Empty, Loading, Mono, Muted, Row, Title } from '../../shared/ui';
-import { colors, font, space } from '../../shared/config/theme';
+import { space } from '../../shared/config/theme';
 import { useT } from '../../shared/config/i18n';
-import { apiUrl, authHeaders } from '../../shared/api/client';
-import { useFileContent } from '../../entities/files/api';
-import { canDiff, collapse, diffLines } from './diff';
+import { apiUrl } from '../../shared/api/client';
+import { canDiff } from './diff';
+import { useFileContent } from '../../entities/files/useFileContent';
+import { diffLines } from './diffLines';
+import { collapse } from './collapse';
+import { authHeaders } from '../../shared/api/authHeaders';
+import { styles } from './FileView.styles';
 
 /**
  * Файл целиком — только на чтение. Правки в приложении нет и не будет: править
@@ -118,19 +122,3 @@ export function FileView({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  root: { gap: space.sm },
-  grow: { flex: 1 },
-  wrap: { flexWrap: 'wrap' },
-  added: { color: colors.success },
-  removed: { color: colors.danger },
-  warn: { color: colors.warning },
-  toggle: { color: colors.accent, fontSize: font.small },
-  image: { width: '100%', height: 240, backgroundColor: colors.surface },
-  code: { backgroundColor: colors.surface, borderRadius: 6 },
-  codeContent: { padding: space.sm },
-  line: { color: colors.text, fontFamily: font.mono, fontSize: font.small, lineHeight: 17 },
-  lineAdded: { color: colors.success },
-  lineRemoved: { color: colors.danger },
-});

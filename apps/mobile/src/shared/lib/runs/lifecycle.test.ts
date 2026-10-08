@@ -23,7 +23,9 @@ vi.mock('@react-native-async-storage/async-storage', () => ({
     removeItem: async (key: string) => void storage.delete(key),
   },
 }));
-vi.mock('../notifications', () => ({ notifyLocally: vi.fn(async () => undefined) }));
+vi.mock('../notifyLocally', () => ({
+  notifyLocally: vi.fn(async () => undefined),
+}));
 vi.mock('../../api/connection', () => ({ isConfigured: () => true }));
 vi.mock('../../api/client', () => ({
   api: {
@@ -32,6 +34,8 @@ vi.mock('../../api/client', () => ({
   },
   apiUrl: (path: string, query?: Record<string, string | number>) =>
     `http://panel${path}${query ? `?${new URLSearchParams(query as Record<string, string>)}` : ''}`,
+}));
+vi.mock('../../api/authHeaders', () => ({
   authHeaders: () => ({}),
 }));
 vi.mock('../../config/i18n', () => ({
@@ -57,8 +61,8 @@ vi.mock('../../config/i18n', () => ({
 }));
 
 import { restoreQueue, resumeActive, send, stop } from './lifecycle';
-import { controllers, getRun, lastSeqs, runs, setRun, subscribe } from './store';
 import type { ActiveRunInfo } from './types';
+import { subscribe, runs, getRun, setRun, lastSeqs, controllers } from './store';
 
 /** Поток SSE, которым управляет тест: кадры уходят по вызову, конец — по `close`. */
 function sseStream() {

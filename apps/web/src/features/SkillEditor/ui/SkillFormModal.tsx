@@ -10,13 +10,13 @@ import { FormWithAssistant } from '@shared/ui/form-with-assistant';
 import { slugify } from '@shared/lib/slug';
 import { ResourceFileTree } from '@features/ResourceFiles';
 import { useResourceTemplates, useApplyTemplate } from '@entities/Resource';
-import { toErrorMessage } from '@shared/api/client';
 import { skillApi, useRenameSkill } from '@entities/Skill';
 import { SKILL_BODY_TEMPLATE_IDS, type SkillBodyTemplateId } from '../lib/skill-templates';
 import { skillAssistantSpec } from '../model/skillAssistant';
 import { primaryLabelKey } from './SkillFormModal.lib';
 import type { SkillFormModalProps } from './SkillFormModal.types';
 import styles from './SkillFormModal.module.scss';
+import { toErrorMessage } from '../../../shared/api/toErrorMessage';
 
 /**
  * Конструктор скилла.

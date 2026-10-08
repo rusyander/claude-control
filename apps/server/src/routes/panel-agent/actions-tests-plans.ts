@@ -10,8 +10,8 @@ import {
   type AnyPanelAction,
   type InjectRoute,
 } from './registry.ts';
-import { card, encode, stateCard, textOf } from './action-kit.ts';
-import { dataField, textField } from './texts.ts';
+import { card, encode, stateCard, textOf } from './action-kit/action-kit.ts';
+import { dataField, textField } from './texts/texts.ts';
 import { testsPage, testsQuery as query } from './tests-page.ts';
 import { caseFilter, idOf, named, projectPath, viewOf } from './tests-block-kit.ts';
 

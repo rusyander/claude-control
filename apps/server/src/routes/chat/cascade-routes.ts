@@ -1,14 +1,17 @@
 import { resolve } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import type { ServerContext } from '../../context.ts';
-import { cascadeProjectKey, isCascadeEnabled } from '../../domains/model-cascade.ts';
-import { readLoweredRuns, summarizeLoweredRuns } from '../../domains/chat/lowered-journal.ts';
+import { cascadeProjectKey, isCascadeEnabled } from '../../domains/model-cascade/model-cascade.ts';
+import {
+  readLoweredRuns,
+  summarizeLoweredRuns,
+} from '../../domains/chat/lowered-journal/lowered-journal.ts';
 
 /**
  * Правило «Подбирать модель под задачу» — чтение и запись положения тумблера.
  *
  * Тумблер стоит в меню чата рядом с правами, а помнится на проект: см.
- * `domains/model-cascade.ts`. Отдельный маршрут, а не поле настроек, именно
+ * `domains/model-cascade/model-cascade.ts`. Отдельный маршрут, а не поле настроек, именно
  * поэтому — у настроек панели нет проектной области, а заводить её ради одного
  * тумблера значило бы переписать схему, которую читают ещё телефон и импорт
  * снимка.

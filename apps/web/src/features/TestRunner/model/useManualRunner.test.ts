@@ -1,13 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type { ProjectTestManualSession, ProjectTestSharedStep } from '@agentdeck/contracts';
-import {
-  formatElapsed,
-  nextOpenPoint,
-  patchStepResult,
-  resolveSteps,
-  savedFor,
-  toBase64,
-} from './useManualRunner';
+import { resolveSteps } from '../lib/resolveSteps';
+import { formatElapsed } from '../lib/formatElapsed';
+import { nextOpenPoint } from '../lib/nextOpenPoint';
+import { patchStepResult } from '../lib/patchStepResult';
+import { toBase64 } from '../lib/toBase64';
+import { savedFor } from '../lib/savedFor';
 
 /**
  * Тестировщик и агент обязаны видеть один и тот же текст шага: общие шаги

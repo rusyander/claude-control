@@ -1,9 +1,9 @@
 import { mkdirSync, copyFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { hookEntryOf, readHooks } from '../hooks.ts';
-import { readMcpServers } from '../mcp.ts';
+import { hookEntryOf, readHooks } from '../hooks/hooks.ts';
+import { readMcpServers } from '../mcp/mcp.ts';
 import type { ClaudeLocation } from '@agentdeck/contracts';
-import type { AppStore } from '../../lib/app-store.ts';
+import type { AppStore } from '../../lib/app-store/app-store.ts';
 import type { SandboxDescription, SandboxSelection } from './SandboxConfig.types.ts';
 
 /**

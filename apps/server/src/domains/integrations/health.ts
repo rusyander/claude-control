@@ -1,5 +1,5 @@
 import type { AtlassianDeployment, IntegrationId, IntegrationState } from '@agentdeck/contracts';
-import type { AppStore } from '../../lib/app-store.ts';
+import type { AppStore } from '../../lib/app-store/app-store.ts';
 import type { IntegrationHealthRecord } from '../../lib/app-store/app-store.types.ts';
 
 /**

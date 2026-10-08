@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Platform } from '@agentdeck/contracts';
-import { parseToolNames, platformRules } from '../lib/rulesView';
+import { platformRules } from '../lib/rulesView';
+import { parseToolNames } from '../lib/parseToolNames';
 
 export interface RuleDrafts {
   /** Недописанный список инструментов контура — строкой, как в поле. */

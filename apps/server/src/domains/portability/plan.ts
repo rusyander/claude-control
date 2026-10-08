@@ -1,11 +1,11 @@
 import { createHash } from 'node:crypto';
 import type { AgentEnvironment } from '@agentdeck/contracts/portable-env';
 import type { TransferFilePlan, TransferPlan } from '@agentdeck/contracts/portable-transfer';
-import type { ConfigProvider } from '../../providers/types.ts';
-import { runPreview } from '../provider-preview.ts';
+import type { ConfigProvider } from '../../providers/types/types.ts';
+import { runPreview } from '../provider-preview/provider-preview.ts';
 import { emitEnvironment } from './emit/index.ts';
 import type { EmitDeps, EmitWrite } from './emit/types.ts';
-import { buildFidelityReport } from './fidelity-report.ts';
+import { buildFidelityReport } from './fidelity-report/fidelity-report.ts';
 
 /**
  * План переноса: всё, что человек обязан увидеть ДО первой записи (П2.3).

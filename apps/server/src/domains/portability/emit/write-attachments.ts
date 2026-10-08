@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { SkillItem } from '@agentdeck/contracts/portable-env';
-import { providerBackupName, writeBinaryFile } from '../../../lib/safe-io.ts';
-import { coded } from '../../../lib/server-text.ts';
+import { providerBackupName, writeBinaryFile } from '../../../lib/safe-io/safe-io.ts';
+import { coded } from '../../../lib/server-text/server-text.ts';
 import { isSafeSegment } from './context.ts';
 import type { EmitWrite } from './types.ts';
 

@@ -1,8 +1,8 @@
 import { existsSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { providerBackupName, providerProjectBackupName } from '../../lib/safe-io.ts';
+import { providerBackupName, providerProjectBackupName } from '../../lib/safe-io/safe-io.ts';
 import { getActiveProvider } from '../../providers/registry.ts';
-import type { ConfigProvider } from '../../providers/types.ts';
+import type { ConfigProvider } from '../../providers/types/types.ts';
 import type { ProviderMcpSettingsSource, ProviderMcpTarget } from './types.ts';
 
 /**

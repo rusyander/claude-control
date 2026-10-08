@@ -1,6 +1,6 @@
 import { isMap, isScalar, type Document } from 'yaml';
 import { GOOSE_MODES, type GooseMode } from '@agentdeck/contracts/vocabulary';
-import { UnrecognizedFormatError } from './codex-toml.ts';
+import { UnrecognizedFormatError } from './codex-toml/codex-toml.ts';
 import { deleteYamlKey, otherYamlKeysProjection, parseYamlMapDocument } from './yaml-doc.ts';
 
 /**

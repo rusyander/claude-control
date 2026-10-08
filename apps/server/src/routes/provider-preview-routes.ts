@@ -5,10 +5,10 @@ import {
   previewProviderWrite,
   SectionUnsupportedError,
   InvalidDraftError,
-} from '../domains/provider-preview.ts';
-import { McpServerExistsError } from '../domains/provider-mcp.ts';
+} from '../domains/provider-preview/provider-preview.ts';
+import { McpServerExistsError } from '../domains/provider-mcp/provider-mcp.ts';
 import { UnrecognizedFormatError } from '../lib/format-errors.ts';
-import { codeOf } from '../lib/server-text.ts';
+import { codeOf } from '../lib/server-text/server-text.ts';
 
 /**
  * Предпросмотр записи в конфигурацию активного провайдера.

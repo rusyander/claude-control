@@ -1,0 +1,211 @@
+// Вопрос с вариантами. Пока на него не ответят, работа стоит, — поэтому он
+// выделен сильнее всего остального в ленте.
+//
+// Заливку берём от поверхности, а не от акцента: в тёмной теме
+// --color-accent-subtle почти совпадает и с фоном страницы, и с фоном реплик
+// человека, из-за чего карточка переставала читаться как отдельный блок.
+// Отделяет её теперь полоса слева и приподнятая поверхность.
+.question {
+  margin-bottom: var(--spacing-xs);
+  padding: var(--spacing-sm) var(--spacing-md) var(--spacing-md);
+  border: 1px solid var(--color-accent);
+  border-left: 3px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.questionHead {
+  margin-bottom: var(--spacing-xs);
+  color: var(--color-accent);
+  font-size: var(--font-size-body-sm);
+  font-weight: 600;
+}
+
+.questionItem + .questionItem {
+  margin-top: var(--spacing-md);
+  padding-top: var(--spacing-md);
+  border-top: 1px solid var(--color-border);
+}
+
+// Карточка ведёт по одному вопросу: активен ровно один, следующие видны, но
+// погашены — так понятно, что спросят дальше, и невозможно ответить не по
+// порядку, потеряв по дороге остальные вопросы.
+.questionLocked {
+  opacity: 0.45;
+  filter: grayscale(1);
+  pointer-events: none;
+}
+
+// Отвеченный вопрос сворачивается в строку «что спросили — что выбрано»: он
+// больше не требует внимания, но и прятать его нельзя — по нему сверяются.
+.questionDone {
+  padding-top: var(--spacing-xs);
+}
+
+.questionDoneIcon {
+  flex: none;
+  color: var(--color-success);
+}
+
+.questionStep {
+  margin-left: auto;
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-caption);
+  font-weight: 400;
+}
+
+.questionNext {
+  margin-top: var(--spacing-xs);
+}
+
+// Свой вариант: строка «Другое» ниже предложенных и поле под неё. Отступ сверху
+// отделяет её от списка — иначе кнопка читается как ещё один вариант ответа.
+.questionOtherOpen {
+  margin-top: var(--spacing-2xs);
+}
+
+.questionOther {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2xs);
+  margin-top: var(--spacing-2xs);
+}
+
+.questionOtherInput {
+  width: 100%;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 8px;
+  background: var(--color-surface-sunken);
+  color: inherit;
+  font: inherit;
+  resize: vertical;
+}
+
+.questionOtherInput:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.questionSubmit {
+  margin-top: var(--spacing-md);
+  width: 100%;
+}
+
+// Отправлено: ответ ушёл, агент думает. Состояние ставится по клику, не по
+// ответу сервера, — иначе секунды ожидания читаются как «клик не прошёл».
+.questionSent {
+  border-color: var(--color-border-strong);
+  border-left-color: var(--color-border-strong);
+}
+
+.questionSentNote {
+  margin-top: var(--spacing-sm);
+}
+
+.questionDelivered {
+  flex: none;
+  color: var(--color-success);
+}
+
+.questionSpinner {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--color-accent);
+  border-right-color: transparent;
+  border-radius: var(--radius-full);
+  animation: spin 700ms linear infinite;
+}
+
+.questionBadge {
+  display: inline-block;
+  margin-bottom: var(--spacing-2xs);
+  padding: 2px var(--spacing-2xs);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-sunken);
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-caption);
+}
+
+.questionText {
+  margin: 0 0 var(--spacing-xs);
+}
+
+.questionHint {
+  display: block;
+  margin-bottom: var(--spacing-2xs);
+}
+
+.options {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+// Вариант должен читаться как отдельная кнопка выбора, поэтому он темнее
+// (в светлой теме — светлее) самой карточки: одинаковая заливка сливала
+// варианты и с карточкой, и друг с другом.
+.option {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-sunken);
+}
+
+// Кликабельный вариант: тот же вид, но реагирует на курсор — по нему можно
+// ответить прямо в чате, не уходя в терминал. Цвет и шрифт наследуем явно:
+// у <button> свои системные значения, из-за которых текст варианта тускнел
+// (раньше это был <div>, наследовавший цвет карточки).
+.optionClickable {
+  display: block;
+  width: 100%;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition:
+    border-color 0.12s ease,
+    background 0.12s ease;
+}
+
+.optionClickable:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  background: var(--color-surface);
+}
+
+.optionClickable:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.optionClickable:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+// Выбранный вариант виден и в множественном выборе, и в свёрнутом ответе:
+// иначе после клика ничто не подтверждает, что попал именно туда.
+.optionChosen {
+  border-color: var(--color-accent);
+  background: var(--color-accent-subtle);
+}
+
+.optionLabel {
+  display: block;
+}
+
+.optionText {
+  display: block;
+  margin-top: 2px;
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-caption);
+  line-height: 1.4;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

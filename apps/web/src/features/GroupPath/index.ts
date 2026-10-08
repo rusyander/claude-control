@@ -1,4 +1,4 @@
-export { GroupPath } from './ui/GroupPath';
-export type { GroupPathProps } from './ui/GroupPath.types';
-export { ownStepCount } from './model/pathRows';
-export { pickLang } from './model/useEntryTitle';
+export { GroupPath } from './ui/GroupPath/GroupPath';
+export type { GroupPathProps } from './ui/GroupPath/GroupPath.types';
+export { ownStepCount } from './model/ownStepCount';
+export { pickLang } from './lib/pickLang';

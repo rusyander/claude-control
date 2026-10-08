@@ -1,0 +1,76 @@
+// Хост редактора. Цвета подсветки заданы переменными: тема панели переключается
+// атрибутом на <html>, и так редактор перекрашивается вместе со страницей, а не
+// пересоздаётся на JS с потерей курсора и истории отмен (см. model/editorSetup).
+.editor {
+  height: 100%;
+
+  // Светлая палитра держит 4,5:1 (WCAG AA) не только на белом, но и на
+  // приглушённом фоне (строка с курсором, поле правки документа) и на фоне
+  // выделения любого акцента: прежние фиолетовый (#8250df) и серый (#6e7781)
+  // выходили на них ровно на 4,5 и ниже — axe в светлой теме. Серые — с
+  // запасом под зелёную заливку правки на строке с курсором (там фон темнее).
+  --code-keyword: #6639ba;
+  --code-string: #116329;
+  --code-comment: #525c67;
+  --code-number: #0550ae;
+  --code-function: #6639ba;
+  --code-type: #953800;
+  --code-property: #0550ae;
+  --code-punctuation: #4f5963;
+
+  :global(.cm-editor) {
+    height: 100%;
+  }
+
+  // Палитра @codemirror/merge задана правилами вида
+  // `.cm-editor.cm-light .cm-deletedLineGutter` — три класса. Селекторы ниже
+  // намеренно удваивают `.cm-editor`: иначе выигрывает библиотечный красный на
+  // удалении, а договорённость здесь другая — старое серым, новое зелёным.
+
+  // Новый код — тот, что реально лежит в файле, — зелёный. Заливка лёгкая
+  // намеренно: подсветка синтаксиса поверх неё обязана держать 4,5:1, а при
+  // 12 % строки и 22 % слова вышло 3,0–4,2 в обеих темах (axe). Строку всё
+  // равно отмечает сплошная зелёная метка в поле номеров.
+  :global(.cm-editor.cm-editor .cm-changedLine) {
+    background: color-mix(in srgb, var(--color-success) 6%, transparent);
+  }
+
+  :global(.cm-editor.cm-editor .cm-changedText) {
+    background: color-mix(in srgb, var(--color-success) 10%, transparent);
+  }
+
+  :global(.cm-editor.cm-editor .cm-changedLineGutter) {
+    background: var(--color-success);
+  }
+
+  // Удалённый код в файле уже отсутствует: он показан серой вставкой, которую
+  // нельзя править и которая никуда не сохраняется, — только память о том, что
+  // здесь было. grayscale гасит подсветку синтаксиса внутри куска: иначе старая
+  // строка выглядит такой же живой, как новая, и глазу не за что зацепиться.
+  :global(.cm-editor.cm-editor .cm-deletedChunk) {
+    background: var(--color-surface-sunken);
+    color: var(--color-fg-subtle);
+    border-left: 3px solid var(--color-border-strong);
+    filter: grayscale(1) opacity(0.85);
+  }
+
+  :global(.cm-editor.cm-editor .cm-deletedChunk .cm-deletedText) {
+    background: color-mix(in srgb, var(--color-fg-subtle) 22%, transparent);
+  }
+
+  :global(.cm-editor.cm-editor .cm-deletedLineGutter) {
+    background: var(--color-border-strong);
+  }
+}
+
+:global(:root[data-theme='dark']) .editor {
+  --code-keyword: #d2a8ff;
+  --code-string: #7ee787;
+  // Чуть светлее прежнего #8b949e: на янтарном выделении тот давал 4,49.
+  --code-comment: #939ca6;
+  --code-number: #79c0ff;
+  --code-function: #d2a8ff;
+  --code-type: #ffa657;
+  --code-property: #79c0ff;
+  --code-punctuation: #9aa2b1;
+}

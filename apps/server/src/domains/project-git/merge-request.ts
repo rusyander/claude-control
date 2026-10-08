@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import type { WorktreeMirrorReport, WorktreeMirrorSettings } from '@agentdeck/contracts';
-import { git } from './exec.ts';
+import { git } from './exec/exec.ts';
 import { requireRepo } from './read.ts';
 import { addWorktree, worktreeDirFor } from './worktrees.ts';
 

@@ -6,15 +6,15 @@ import {
 } from '@agentdeck/contracts/platform-presets';
 import type { PlatformDriver } from '../driver.ts';
 import { allDrivers } from '../index.ts';
-import { contourHeaders, contourUrl } from '../../transport.ts';
+import { contourHeaders, contourUrl } from '../../transport/transport.ts';
 import {
   anthropicRequestToOpenAi,
   chooseToolRoute,
   openAiRequestLoss,
   type Dialect,
-} from '../../gateway/dialect.ts';
-import { StreamTranslator } from '../../gateway/frames.ts';
-import { bridgeUpstreamStatus } from '../../gateway/status.ts';
+} from '../../gateway/dialect/dialect.ts';
+import { StreamTranslator } from '../../gateway/frames/frames.ts';
+import { bridgeUpstreamStatus } from '../../gateway/status/status.ts';
 import {
   ANTHROPIC_REQUEST_WITH_TOOLS,
   DELTA_FRAME,

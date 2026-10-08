@@ -9,16 +9,22 @@
  * runs it against the pre-relay code).
  */
 import { pathToFileURL } from 'node:url';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 const [appData, cwd, command, prompt] = process.argv.slice(2);
 const dir = process.env.REGISTRY_DIR ?? join(import.meta.dirname, '..');
+// A module with tests sits in its own folder; an older chat domain copy has it flat.
+const moduleIn = (name: string): string => {
+  const folded = join(dir, name, `${name}.ts`);
+  return pathToFileURL(existsSync(folded) ? folded : join(dir, `${name}.ts`)).href;
+};
 const registryModule = (await import(
-  pathToFileURL(join(dir, 'ChatRunRegistry.ts')).href
-)) as typeof import('../ChatRunRegistry.ts');
+  moduleIn('ChatRunRegistry')
+)) as typeof import('../ChatRunRegistry/ChatRunRegistry.ts');
 const ledgerModule = (await import(
-  pathToFileURL(join(dir, 'run-ledger.ts')).href
-)) as typeof import('../run-ledger.ts');
+  moduleIn('run-ledger')
+)) as typeof import('../run-ledger/run-ledger.ts');
 
 const registry = new registryModule.ChatRunRegistry();
 const ledger = new ledgerModule.RunLedger(appData as string);

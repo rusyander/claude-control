@@ -1,0 +1,24 @@
+// Сводка «длительность · запросы» не разрывается посреди числа и подписи.
+.nowrap {
+  white-space: nowrap;
+}
+
+.sessionRow {
+  padding: var(--spacing-xs) 0;
+
+  &:not(:last-child) {
+    border-bottom: 1px solid var(--color-border);
+  }
+}
+
+/* Действия строки сессии: объём и кнопки — одной группой справа. */
+.sessionTail {
+  flex-shrink: 0;
+}
+
+// Блок про лимиты — пояснение, а не ошибка: нейтральный информационный тон.
+.limitsNote {
+  border-left: 3px solid var(--color-info);
+  padding-left: var(--spacing-sm);
+  max-width: 78ch;
+}

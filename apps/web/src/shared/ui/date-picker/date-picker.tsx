@@ -5,10 +5,12 @@ import { DayPicker } from 'react-day-picker';
 import type { DateRange, Matcher } from 'react-day-picker';
 import { enUS, ru } from 'react-day-picker/locale';
 import { Icon } from '@shared/ui/icon';
-import { formatLocalDay, formatValueLabel, parseLocalDay } from './date-picker.lib';
+import { parseLocalDay } from './date-picker.lib';
 import type { DatePickerProps } from './date-picker.types';
 import 'react-day-picker/style.css';
 import styles from './date-picker.module.scss';
+import { formatLocalDay } from './formatLocalDay';
+import { formatValueLabel } from './formatValueLabel';
 
 /**
  * Выбор даты или диапазона календарём во всплывающем окне.

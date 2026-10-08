@@ -3,15 +3,7 @@ import { Card } from '../card';
 import { Stack } from '../stack';
 import { Typography } from '../typography';
 import { Button } from '../button';
-
-export interface LoadErrorCardProps {
-  /** Повторить запрос — без перезагрузки вкладки. */
-  onRetry: () => void;
-  /** Свой заголовок; по умолчанию общий «не удалось загрузить данные раздела». */
-  title?: string;
-  /** Своё пояснение; по умолчанию общее «сервер не ответил». */
-  text?: string;
-}
+import type { LoadErrorCardProps } from './LoadErrorCard.types';
 
 /**
  * Раздел не смог загрузить данные. Раньше страницы в этом случае крутили

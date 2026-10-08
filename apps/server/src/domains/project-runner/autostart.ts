@@ -1,4 +1,4 @@
-import { coded } from '../../lib/server-text.ts';
+import { coded } from '../../lib/server-text/server-text.ts';
 import { RunnerError, type AutostartMemory, type AutostartReport } from './project-runner.types.ts';
 import type { ProjectRunnerRegistry } from './registry.ts';
 

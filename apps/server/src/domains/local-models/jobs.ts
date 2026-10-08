@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { LocalJob, LocalJobKind } from '@agentdeck/contracts/local-models';
-import { codeOf } from '../../lib/server-text.ts';
+import { codeOf } from '../../lib/server-text/server-text.ts';
 
 /**
  * Долгие работы раздела — загрузка сервера, модели, Qwen Code — с прогрессом.

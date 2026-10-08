@@ -13,18 +13,18 @@ import {
   PANEL_AGENT_BRIDGE_ID,
   PANEL_AGENT_HEADER,
 } from '@agentdeck/contracts/panel-agent';
-import { AppStore } from '../../lib/app-store.ts';
+import { AppStore } from '../../lib/app-store/app-store.ts';
 import type { ServerContext } from '../../context.ts';
-import { registerAccessGate } from '../../lib/access-gate.ts';
+import { registerAccessGate } from '../../lib/access-gate/access-gate.ts';
 import { registerEmptyBodyGuard } from '../../lib/empty-body.ts';
-import { createEventHub } from '../../lib/event-hub.ts';
-import { allowedOrigins } from '../../lib/origin-guard.ts';
-import { PanelPendingActions } from '../../domains/panel-agent/pending.ts';
-import { agentJournalPath } from '../../domains/panel-agent/journal.ts';
-import { panelBridgeScript } from '../../domains/panel-agent/runner.ts';
-import { registerProjectRoutes } from '../project-routes.ts';
-import { registerPanelAgentRoutes } from './panel-agent-routes.ts';
-import { textWindow } from './action-kit.ts';
+import { createEventHub } from '../../lib/event-hub/event-hub.ts';
+import { allowedOrigins } from '../../lib/origin-guard/origin-guard.ts';
+import { PanelPendingActions } from '../../domains/panel-agent/pending/pending.ts';
+import { agentJournalPath } from '../../domains/panel-agent/journal/journal.ts';
+import { panelBridgeScript } from '../../domains/panel-agent/runner/runner.ts';
+import { registerProjectRoutes } from '../project-routes/project-routes.ts';
+import { registerPanelAgentRoutes } from './panel-agent-routes/panel-agent-routes.ts';
+import { textWindow } from './action-kit/action-kit.ts';
 
 /**
  * Переходник `tools/mcp/panel.mjs` (А2) — настоящим процессом по stdio против

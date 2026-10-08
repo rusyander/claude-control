@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { CompareSectionResult } from '@agentdeck/contracts';
-import { selectableKeys, stateTone } from './compare';
+import { stateTone } from './compare';
+import { selectableKeys } from './selectableKeys';
 
 /**
  * Правило отбора записей к переносу. Проверяем именно его, а не разметку:

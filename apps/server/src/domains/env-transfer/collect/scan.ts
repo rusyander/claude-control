@@ -1,6 +1,6 @@
 import { existsSync, readdirSync } from 'node:fs';
 import { basename, join, relative } from 'node:path';
-import type { ConfigProvider } from '../../../providers/types.ts';
+import type { ConfigProvider } from '../../../providers/types/types.ts';
 import { providerLocations } from '../locations.ts';
 import { byPriority, EXCLUDED_DIRS, VENV_MARKER } from './rules.ts';
 import { takeFile } from './take-file.ts';

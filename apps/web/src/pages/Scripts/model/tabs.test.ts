@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { scriptTab, scriptsInTab } from './tabs';
+import { scriptTab } from './tabs';
+import { scriptsInTab } from './scriptsInTab';
 
 const USED = { name: 'guard.mjs', isUsed: true };
 const USED_TEST = { name: 'tests/guard.test.mjs', isUsed: true, isTest: true };

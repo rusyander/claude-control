@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { fuzzyScore, rankByFuzzy } from './fuzzy';
+import { fuzzyScore } from './fuzzy';
+import { rankByFuzzy } from './rankByFuzzy';
 
 /**
  * Нечёткий поиск по названиям разделов. Проверяем ровно то, за что он отвечает:

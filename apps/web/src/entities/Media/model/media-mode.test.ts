@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { mediaImageBlockers } from '@agentdeck/contracts';
 import { mediaDeckBlockers } from '@agentdeck/contracts/media-deck';
 import { ru } from '@shared/config/i18n/ru';
-import { deckModeView, imageModeView } from './media-mode';
+import { imageModeView } from './media-mode';
+import { deckModeView } from './deckModeView';
 
 /**
  * Слова доступности режимов «Картинка» и «Презентация».

@@ -1,5 +1,5 @@
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
-import type { ProjectFileChanges, ProjectFileContent, ProjectFileTree } from '@agentdeck/contracts';
+import type { ProjectFileTree } from '@agentdeck/contracts';
 import { api } from '../../shared/api/client';
 
 /**
@@ -20,40 +20,5 @@ export function useFileTree(
     queryFn: () => api.get<ProjectFileTree>('/project-files/tree', { path: projectPath, dir }),
     enabled: Boolean(projectPath),
     staleTime: 30_000,
-  });
-}
-
-/**
- * Что агент изменил в этом разговоре. База сравнения восстанавливается сервером
- * ОБРАТНЫМ проигрыванием транскрипта, а не из git, — поэтому список честен и в
- * репозитории с грязным рабочим деревом.
- */
-export function useFileChanges(
-  projectPath: string | undefined,
-  chatId: string | undefined,
-): UseQueryResult<ProjectFileChanges> {
-  return useQuery({
-    queryKey: ['project-files', 'changes', projectPath, chatId],
-    queryFn: () =>
-      api.get<ProjectFileChanges>('/project-files/changes', { path: projectPath, chatId }),
-    enabled: Boolean(projectPath),
-    staleTime: 10_000,
-  });
-}
-
-export function useFileContent(
-  projectPath: string | undefined,
-  file: string | undefined,
-  chatId: string | undefined,
-): UseQueryResult<ProjectFileContent> {
-  return useQuery({
-    queryKey: ['project-files', 'content', projectPath, file, chatId],
-    queryFn: () =>
-      api.get<ProjectFileContent>('/project-files/content', {
-        path: projectPath,
-        file,
-        chatId,
-      }),
-    enabled: Boolean(projectPath && file),
   });
 }

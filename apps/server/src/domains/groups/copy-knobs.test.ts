@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { Group } from '@agentdeck/contracts';
 import type { Knob } from '@agentdeck/contracts/group-knobs';
-import { AppStore } from '../../lib/app-store.ts';
+import { AppStore } from '../../lib/app-store/app-store.ts';
 import {
   projectKey,
   readGroupSources,
@@ -12,16 +12,16 @@ import {
   writePanelJson,
 } from '../../lib/app-store/group-sources.ts';
 import { getProvider as provider } from '../../providers/registry.ts';
-import { adviseCopy, applyAdvice } from './advice.ts';
+import { adviseCopy, applyAdvice } from './advice/advice.ts';
 import { copyGroupToGlobal } from './copy.ts';
-import { copyGroupToProvider } from './copy-foreign.ts';
-import { groupKnobsLine, KNOBS_EXTRACTION_VERSION } from './knobs.ts';
-import { promotePathStep } from './promote.ts';
-import { readRules, saveRule } from '../rules.ts';
-import { readHooks, readHooksFromFiles } from '../hooks.ts';
-import { maskSecretsInText, SECRET_MASK } from '../../lib/secret-mask.ts';
-import * as safeIo from '../../lib/safe-io.ts';
-import { memberContent } from './members.ts';
+import { copyGroupToProvider } from './copy-foreign/copy-foreign.ts';
+import { groupKnobsLine, KNOBS_EXTRACTION_VERSION } from './knobs/knobs.ts';
+import { promotePathStep } from './promote/promote.ts';
+import { readRules, saveRule } from '../rules/rules.ts';
+import { readHooks, readHooksFromFiles } from '../hooks/hooks.ts';
+import { maskSecretsInText, SECRET_MASK } from '../../lib/secret-mask/secret-mask.ts';
+import * as safeIo from '../../lib/safe-io/safe-io.ts';
+import { memberContent } from './members/members.ts';
 
 /**
  * Числа группы едут вместе с копией: в общие каталоги Claude и к чужому CLI.

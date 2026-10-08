@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { manualSteps, restoreStepStatuses } from './manualSteps';
+import { manualSteps } from './manualSteps';
+import { restoreStepStatuses } from './restoreStepStatuses';
 
 describe('manualSteps', () => {
   const shared = [

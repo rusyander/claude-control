@@ -4,12 +4,19 @@ import { skillApi } from '@entities/Skill';
 import { hookApi } from '@entities/Hook';
 import { useLocation } from '@entities/AppConfig';
 import { useGroupMembers } from '@entities/Group';
-import { pickLang } from './useEntryTitle';
 import type { KnownSkill } from './describe';
 import { skillTextSteps } from './skillText';
-import { rowBilingual, rowType, rowWords, skillBlockType, type WordsSource } from './rowWords';
-import { entrySource, skillSource, sourceFile, type StepSource } from './stepSource';
-import type { PathRow } from './pathRows';
+import { rowWords } from './rowWords';
+import { skillSource } from './stepSource';
+import type { PathRow } from './pathRows.types';
+import { rowType } from './rowType';
+import { skillBlockType } from './skillBlockType';
+import type { WordsSource } from './rowWords.types';
+import { rowBilingual } from './rowBilingual';
+import type { StepSource } from './stepSource.types';
+import { entrySource } from './entrySource';
+import { sourceFile } from './sourceFile';
+import { pickLang } from '../lib/pickLang';
 
 /**
  * Всё, что строке порядка работы нужно знать о мире вокруг группы: какие

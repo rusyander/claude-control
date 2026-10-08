@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { AxiosError, AxiosHeaders } from 'axios';
-import { LONG_TIMEOUTS, messageFromPayload, toErrorMessage } from './client';
+import { LONG_TIMEOUTS, messageFromPayload } from './client';
+import { toErrorMessage } from './toErrorMessage';
 
 /** Ответ сервера, каким его видит axios. */
 function axiosError(status: number, data: unknown): AxiosError {

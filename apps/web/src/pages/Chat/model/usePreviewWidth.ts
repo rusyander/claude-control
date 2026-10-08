@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { PREVIEW_WIDTH_KEY } from '../ChatPage.constants';
+import { PREVIEW_WIDTH_KEY } from '../ChatPage/ChatPage.constants';
 
 /**
  * Ширина панели предпросмотра артефакта. Значение переживает перезагрузку:

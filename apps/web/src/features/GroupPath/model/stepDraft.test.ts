@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { langAfterKey } from './stepDraft';
+import { langAfterKey } from './langAfterKey';
 
 describe('клавиши на вкладках языка шага (F-275)', () => {
   it('Home и End ведут к краям списка, а не переключают сторону', () => {

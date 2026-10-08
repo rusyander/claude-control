@@ -261,7 +261,7 @@ beforeAll(async () => {
 
   // Каталоги всех CLI и панели — под временным домом, иначе одобрение пишет в настоящие.
   const dirs = await import('../../providers/catalog/config-dirs.ts');
-  const { detectClaudeLocation } = await import('../../lib/claude-paths.ts');
+  const { detectClaudeLocation } = await import('../../lib/claude-paths/claude-paths.ts');
   const { panelHomeDirPath } = await import('../../lib/brand.mjs');
   const location = detectClaudeLocation().paths;
   const outside = [
@@ -298,12 +298,12 @@ beforeAll(async () => {
 
   const { default: Fastify } = await import('fastify');
   const { ServerContext } = await import('../../context.ts');
-  const { createRuntime } = await import('../../bootstrap/runtime.ts');
+  const { createRuntime } = await import('../../bootstrap/runtime/runtime.ts');
   const { buildRouteTable } = await import('../../bootstrap/route-table.ts');
-  const { registerAccessGate } = await import('../../lib/access-gate.ts');
+  const { registerAccessGate } = await import('../../lib/access-gate/access-gate.ts');
   const { registerEmptyBodyGuard } = await import('../../lib/empty-body.ts');
-  const { registerCodedErrors } = await import('../../lib/server-text.ts');
-  const { allowedOrigins } = await import('../../lib/origin-guard.ts');
+  const { registerCodedErrors } = await import('../../lib/server-text/server-text.ts');
+  const { allowedOrigins } = await import('../../lib/origin-guard/origin-guard.ts');
   ({ PANEL_ACTIONS: actions } = await import('./actions.ts'));
 
   const ctx = new ServerContext();

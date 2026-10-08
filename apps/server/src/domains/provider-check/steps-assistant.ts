@@ -1,9 +1,9 @@
 import type { ProviderCheckStep } from '@agentdeck/contracts';
-import type { ConfigProvider } from '../../providers/types.ts';
-import { runAssistant, type AssistantRunResult } from '../assistant-runner.ts';
+import type { ConfigProvider } from '../../providers/types/types.ts';
+import { runAssistant, type AssistantRunResult } from '../assistant-runner/assistant-runner.ts';
 import { reason, step } from './step.ts';
 import type { ProviderCheckDeps } from './types.ts';
-import { serverText } from '../../lib/server-texts.ts';
+import { serverText } from '../../lib/server-texts/server-texts.ts';
 
 /** Промпт проверки: ответ короткий, стоит копейки, по нему видно, что канал жив. */
 const PROBE_PROMPT = 'Reply with exactly one word: ready. Write nothing else and do nothing.';

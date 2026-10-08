@@ -1,6 +1,6 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { buildCapabilities, type ConfigProvider } from '../types.ts';
+import { buildCapabilities, type ConfigProvider } from '../types/types.ts';
 import { gooseConfigDir, unimplementedPaths } from './config-dirs.ts';
 import { createGooseStreamParser } from './goose-stream.ts';
 import { contourModelName, readConfigRoot } from './run-endpoint.ts';

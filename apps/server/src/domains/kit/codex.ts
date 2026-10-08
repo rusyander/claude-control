@@ -1,8 +1,8 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { parseCodexToml } from '../../lib/codex-toml.ts';
-import { readJsonFile, writeJsonFile } from '../../lib/safe-io.ts';
-import { serverText } from '../../lib/server-texts.ts';
+import { parseCodexToml } from '../../lib/codex-toml/codex-toml.ts';
+import { readJsonFile, writeJsonFile } from '../../lib/safe-io/safe-io.ts';
+import { serverText } from '../../lib/server-texts/server-texts.ts';
 import { codexHome } from '../../providers/catalog/config-dirs.ts';
 import { composedRules } from './compose.ts';
 import { describe } from './items.ts';
@@ -29,7 +29,7 @@ import { describe } from './items.ts';
  */
 
 export const CODEX_KIT_ENV = 'AGENTDECK_CODEX_KIT';
-/** Путь к накладке групп прогона (`domains/groups/codex-layer.ts`). */
+/** Путь к накладке групп прогона (`domains/groups/codex-layer/codex-layer.ts`). */
 export const CODEX_GROUP_ENV = 'AGENTDECK_CODEX_GROUP';
 
 /**

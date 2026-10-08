@@ -1,9 +1,8 @@
-import type { Group } from '@agentdeck/contracts';
-import type { GroupView } from '@agentdeck/contracts';
+import type { Group, GroupView } from '@agentdeck/contracts';
 import { groupKeyOf, scopeOf, type StoredProjectChoice } from '@agentdeck/contracts/group-sources';
 import { projectKey, readGroupSources } from '../../lib/app-store/group-sources.ts';
 import type { EntityToggleDeps } from '../entity-toggle.ts';
-import { memberContent, memberHashes, parseMemberKey } from './members.ts';
+import { memberContent, memberHashes, parseMemberKey } from './members/members.ts';
 
 /**
  * Группа глазами страницы: запись плюс то, что досчитывается при чтении и не

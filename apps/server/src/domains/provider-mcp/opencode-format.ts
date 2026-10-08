@@ -1,6 +1,6 @@
 import type { UniversalMcpServer, UniversalMcpServerDraft } from '@agentdeck/contracts';
 import { parseProviderJsonObject } from '../../lib/provider-json.ts';
-import { readTextFile, writeTextFile } from '../../lib/safe-io.ts';
+import { readTextFile, writeTextFile } from '../../lib/safe-io/safe-io.ts';
 import { OPENCODE_MODELLED_KEYS } from './constants.ts';
 import { backupNameOf } from './target.ts';
 import type { ProviderMcpTarget } from './types.ts';

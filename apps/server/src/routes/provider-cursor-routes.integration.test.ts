@@ -11,13 +11,13 @@ import {
 } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { AppStore } from '../lib/app-store.ts';
+import { AppStore } from '../lib/app-store/app-store.ts';
 import type { ServerContext } from '../context.ts';
 import { registerProviderRulesRoutes } from './provider-rules-routes.ts';
 import { registerProviderInstructionsRoutes } from './provider-instructions-routes.ts';
-import { registerProviderProjectRoutes } from './provider-project-routes.ts';
-import { registerProjectRoutes } from './project-routes.ts';
-import { registerEntityRoutes } from './entity-routes.ts';
+import { registerProviderProjectRoutes } from './provider-project-routes/provider-project-routes.ts';
+import { registerProjectRoutes } from './project-routes/project-routes.ts';
+import { registerEntityRoutes } from './entity-routes/entity-routes.ts';
 
 /**
  * CURSOR-1 на маршрутах: правила Cursor КАТАЛОГОМ `.mdc` — глобальные и проектные.

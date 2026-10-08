@@ -13,9 +13,9 @@ import type {
 import type { PathStepProposal } from '@agentdeck/contracts/group-path';
 import type { GroupScope } from '@agentdeck/contracts/group-sources';
 import { projectLayout, readInventory } from '../group-discovery/inventory.ts';
-import { readHooks } from '../hooks.ts';
-import { readRules } from '../rules.ts';
-import { readScripts } from '../scripts.ts';
+import { readHooks } from '../hooks/hooks.ts';
+import { readRules } from '../rules/rules.ts';
+import { readScripts } from '../scripts/scripts.ts';
 import { readSkills } from '../skills/read.ts';
 import {
   describeOrQueue,
@@ -24,10 +24,10 @@ import {
   type DescribeEntry,
   type Describer,
   type DescribeSource,
-} from './describe.ts';
+} from './describe/describe.ts';
 import { resourceSource } from './describe-sources.ts';
-import { memberBriefs } from './member-briefs.ts';
-import { memberScope, type MemberDeps } from './members.ts';
+import { memberBriefs } from './member-briefs/member-briefs.ts';
+import { memberScope, type MemberDeps } from './members/members.ts';
 
 /**
  * Описания в ответах маршрутов: участники группы с шагами скиллов, каталог

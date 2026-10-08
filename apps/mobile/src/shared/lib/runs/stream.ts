@@ -1,11 +1,12 @@
 import { fetch as streamingFetch } from 'expo/fetch';
 import type { ServerMessageParams } from '@agentdeck/contracts/server-messages';
-import { apiUrl, authHeaders } from '../../api/client';
+import { apiUrl } from '../../api/client';
 import { serverMessage } from '../../api/server-message';
-import { dict } from '../../config/i18n';
 import { STREAM_CONNECT_MS, STREAM_STALL_MS } from './constants';
-import { applyEvent, lastSeqs, markLive, markStalled, runs, setRun } from './store';
 import type { ChatEvent, SendOutcome, StartInput } from './types';
+import { authHeaders } from '../../api/authHeaders';
+import { dict } from '../../config/i18n';
+import { runs, setRun, markStalled, markLive, applyEvent, lastSeqs } from './store';
 
 /**
  * Транспорт прогона. Штатный `fetch` React Native тело потоком читать не умеет

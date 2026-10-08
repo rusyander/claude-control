@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { stringify as stringifyToml } from 'smol-toml';
-import { spliceCodexTableRegion, upsertCodexRootScalar } from '../../lib/codex-toml.ts';
+import { spliceCodexTableRegion, upsertCodexRootScalar } from '../../lib/codex-toml/codex-toml.ts';
 import type { ProviderEndpointApiKind } from '../../providers/types/assistant.ts';
 import type { EnvScope } from '@agentdeck/contracts/portable-env';
 import type { ProbeLayer } from '@agentdeck/contracts/portable-probe';

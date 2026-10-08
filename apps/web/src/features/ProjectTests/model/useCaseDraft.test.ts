@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import type { ProjectTestCase } from '@agentdeck/contracts';
-import { fromCase, toInput, type CaseDraft } from './useCaseDraft';
+import type { CaseDraft } from './useCaseDraft.types';
+import { fromCase } from '../lib/fromCase';
+import { toInput } from '../lib/toInput';
 
 /**
  * Форма кейса — единственное место, где человек пишет тест руками, и её вход и

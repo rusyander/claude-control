@@ -12,10 +12,10 @@ import {
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { Platform } from '@agentdeck/contracts';
-import { AppStore } from '../../../lib/app-store.ts';
-import { buildHistory } from '../../history.ts';
-import { claudeTrackedFiles } from '../../tracked-files.ts';
-import { writePlatform, writeToken } from '../store.ts';
+import { AppStore } from '../../../lib/app-store/app-store.ts';
+import { buildHistory } from '../../history/history.ts';
+import { claudeTrackedFiles } from '../../tracked-files/tracked-files.ts';
+import { writePlatform, writeToken } from '../store/store.ts';
 import { PlatformError } from '../errors.ts';
 import { applyContour } from './apply.ts';
 import { applyCodexEndpoint } from './config-files.ts';

@@ -3,8 +3,8 @@ import { z } from 'zod';
 import type { Project, ProjectWorktreesInfo } from '@agentdeck/contracts';
 import type { PanelPageTarget } from '@agentdeck/contracts/panel-agent';
 import type { InjectRoute } from './registry.ts';
-import { encode, readRoute } from './action-kit.ts';
-import { findProject } from './actions-projects.ts';
+import { encode, readRoute } from './action-kit/action-kit.ts';
+import { findProject } from './actions-projects/actions-projects.ts';
 
 /**
  * Цель действий над проектом: запись реестра и, по желанию, одна из его

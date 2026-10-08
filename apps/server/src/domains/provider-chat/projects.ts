@@ -1,10 +1,15 @@
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ProviderChatProject, ProviderChatProjectProvider } from '@agentdeck/contracts';
-import { isNonProject, listProjects, normalizePath, shortName } from '../chat/ChatProjects.ts';
-import { isSandboxPath } from '../chat/ChatArtifacts.ts';
-import { projectDirProblem } from '../projects.ts';
-import { listChats } from './store.ts';
+import {
+  isNonProject,
+  listProjects,
+  normalizePath,
+  shortName,
+} from '../chat/ChatProjects/ChatProjects.ts';
+import { isSandboxPath } from '../chat/ChatArtifacts/ChatArtifacts.ts';
+import { projectDirProblem } from '../projects/projects.ts';
+import { listChats } from './store/store.ts';
 
 /**
  * Все проекты для чата чужого провайдера: каталоги, где работали Claude (его

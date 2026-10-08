@@ -1,5 +1,5 @@
 import type { Artifact, ChatMessage, ChatSummary } from '@agentdeck/contracts';
-import type { StreamState } from '@shared/lib/chat-stream';
+import type { StreamState } from '../chat-stream/isStreamShown';
 
 /**
  * Данные для витрины.

@@ -1,6 +1,6 @@
 import { existsSync, statSync } from 'node:fs';
 import { resolve, sep } from 'node:path';
-import type { ConfigProvider } from '../../providers/types.ts';
+import type { ConfigProvider } from '../../providers/types/types.ts';
 
 /**
  * Где лежит конфигурация провайдера — единый список мест, которым пользуются и
@@ -13,7 +13,7 @@ import type { ConfigProvider } from '../../providers/types.ts';
  * Число мест не совпало — записи честно помечаются нерешёнными, а не пишутся
  * наугад.
  *
- * Источник истины по путям — `providers/catalog.ts`; здесь только сборка его
+ * Источник истины по путям — `providers/catalog/catalog.ts`; здесь только сборка его
  * объявлений в один упорядоченный список. Разделы со статусом не `ready` не
  * берутся: панель их не ведёт, значит и переносить их формат мы не умеем.
  */

@@ -3,15 +3,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { scrollDecision } from './virtual-list.lib';
 import styles from './virtual-list.module.scss';
 import type { VirtualListProps } from './virtual-list.types';
-
-/** Ближайший предок, который прокручивается по вертикали (у раздела — `main`). */
-function scrollParentOf(node: HTMLElement): HTMLElement | null {
-  for (let parent = node.parentElement; parent; parent = parent.parentElement) {
-    const { overflowY } = getComputedStyle(parent);
-    if (overflowY === 'auto' || overflowY === 'scroll') return parent;
-  }
-  return null;
-}
+import { scrollParentOf } from './lib/scrollParentOf';
 
 /**
  * Список с виртуализацией: в DOM живут только видимые строки. Включается

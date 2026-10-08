@@ -1,0 +1,84 @@
+// Заголовок раздела пересечений как переключатель: занимает строку так же, как
+// простая подпись до него, чтобы «Сверить ветки» не сдвигалась при сворачивании.
+.toggle {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--spacing-3xs);
+  min-width: 0;
+  padding: 2px var(--spacing-3xs);
+  margin-left: calc(-1 * var(--spacing-3xs));
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--color-fg-subtle);
+  text-align: left;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--color-bg);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 1px;
+  }
+}
+
+.outsideCount {
+  padding: 0 var(--spacing-3xs) var(--spacing-3xs);
+}
+
+// Подпись тянется до кнопок: мера строки прозы (78ch) обрывала её посреди
+// широкой карточки, и кнопки шапки висели в середине (владелец 05.10).
+.headText {
+  flex: 1;
+  min-width: 0;
+  max-width: none;
+}
+
+// Пересечения веток (Т6). Раздел карточки, а не отдельная карточка: вопрос
+// «кто ещё трогал этот файл» — про те же группы, что строками выше, и разрывать
+// их пустым полем значило бы заставить человека сводить два списка глазами.
+.overlap {
+  margin-top: var(--spacing-2xs);
+  padding-top: var(--spacing-2xs);
+  border-top: 1px solid var(--color-border);
+}
+
+.overlapHead {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2xs);
+  margin-bottom: var(--spacing-3xs);
+}
+
+// Строка файла: путь слева, группы справа. Путь бывает длиннее строки —
+// обрезается многоточием, а целиком читается по наведению (`title`).
+.overlapRow {
+  display: flex;
+  align-items: baseline;
+  gap: var(--spacing-2xs);
+  padding: 2px var(--spacing-3xs);
+  border-radius: 8px;
+}
+
+.overlapPath {
+  flex: 1;
+  min-width: 0;
+}
+
+.overlapGroups {
+  flex: none;
+  max-width: 55%;
+}
+
+// Файл вне объявленного владения — единственное красное в карточке: это не
+// «надо будет свести», а «границы разбора нарушены».
+.overlapBad {
+  background: var(--color-danger-subtle);
+
+  .overlapGroups {
+    color: var(--color-danger);
+  }
+}

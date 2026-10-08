@@ -1,4 +1,4 @@
-import type { ConfigProvider } from '../../../providers/types.ts';
+import type { ConfigProvider } from '../../../providers/types/types.ts';
 import { providerHookEvents } from '../hook-events.ts';
 import {
   runSupervisorEvent,

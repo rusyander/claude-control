@@ -9,10 +9,10 @@ import {
   writeListedInstructionsFile,
   ListedFileNotEditableError,
   type ProviderInstructionsTarget,
-} from '../domains/provider-instructions.ts';
+} from '../domains/provider-instructions/provider-instructions.ts';
 import { UnrecognizedFormatError } from '../lib/format-errors.ts';
 import { done } from './write-result.ts';
-import { codeOf } from '../lib/server-text.ts';
+import { codeOf } from '../lib/server-text/server-text.ts';
 
 /**
  * Раздел инструкций в модели СПИСКА ССЫЛОК (AIDER-1) — глобальный уровень.

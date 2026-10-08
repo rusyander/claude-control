@@ -1,17 +1,5 @@
-import MarkdownIt from 'markdown-it';
-
-/**
- * Разметка ответов и markdown-артефактов.
- *
- * Текст приходит от модели, а не от нас, поэтому html в исходнике отключён:
- * иначе ответ мог бы протащить в страницу произвольную разметку. Ссылки
- * открываются в новой вкладке — уводить пользователя из чата незачем.
- */
-const markdown = new MarkdownIt({
-  html: false,
-  linkify: true,
-  breaks: true,
-});
+import { markdown } from './renderMarkdown.constants';
+import type { RenderEnv } from './renderDocumentMarkdown';
 
 // Ссылками считаем только явные — с протоколом. Иначе linkify принимает за
 // адрес имя файла: `README.md` уезжало в ссылку на домен .md, а `package.json`
@@ -188,11 +176,6 @@ markdown.renderer.rules.link_open = (tokens, index, options, env, self) => {
   return defaultLinkOpen(tokens, index, options, env, self);
 };
 
-/** Окружение разбора: `noImages` — картинки ссылками, а не `<img>`. */
-interface RenderEnv {
-  noImages?: boolean;
-}
-
 const defaultImage =
   markdown.renderer.rules.image ??
   ((tokens, index, options, _env, self) => self.renderToken(tokens, index, options));
@@ -208,20 +191,4 @@ markdown.renderer.rules.image = (tokens, index, options, env: RenderEnv, self) =
 
 export function renderMarkdown(text: string): string {
   return markdown.render(text);
-}
-
-/**
- * Документ из репозитория (файл инструкций, markdown в окне кода): картинка —
- * ссылка с подписью, а не `<img>`. Файл пишет кто угодно — клонированный чужой
- * CLAUDE.md с `![](https://…/pixel.png)` заставлял панель при открытии вкладки
- * сходить по чужому адресу (IP, время), а относительная картинка всё равно
- * рисовалась битой: страница панели — не каталог репозитория.
- */
-export function renderDocumentMarkdown(text: string): string {
-  return markdown.render(text, { noImages: true } satisfies RenderEnv);
-}
-
-/** Короткий фрагмент без блочных обёрток — для строки в списке. */
-export function renderMarkdownInline(text: string): string {
-  return markdown.renderInline(text);
 }

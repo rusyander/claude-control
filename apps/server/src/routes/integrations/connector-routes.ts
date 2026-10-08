@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import type { ZodType } from 'zod';
 import type { IntegrationId, IntegrationsSettings } from '@agentdeck/contracts';
 import { parseBody } from '../../lib/request-body.ts';
-import { integrationSettingsSchemas } from '../../providers/settings-validation.ts';
+import { integrationSettingsSchemas } from '../../providers/settings-validation/settings-validation.ts';
 import { checkIntegration } from '../../domains/integrations/check.ts';
 import {
   describeIntegration,
@@ -12,9 +12,9 @@ import {
   writeConfluenceToken,
   writeSettings,
   writeToken,
-} from '../../domains/integrations/store.ts';
+} from '../../domains/integrations/store/store.ts';
 import { appDataOf, fail, type IntegrationsDeps } from './shared.ts';
-import { attachTextCodes } from '../../lib/server-texts.ts';
+import { attachTextCodes } from '../../lib/server-texts/server-texts.ts';
 
 /**
  * Пять карточек интеграций: показать, сохранить, проверить связь, забыть.

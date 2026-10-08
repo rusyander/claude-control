@@ -318,7 +318,9 @@ try {
   server.kill();
   await wait(1500);
   const seed = join(root, 'seed.ts');
-  const storeUrl = pathToFileURL(join(process.cwd(), 'apps/server/src/lib/app-store.ts')).href;
+  const storeUrl = pathToFileURL(
+    join(process.cwd(), 'apps/server/src/lib/app-store/app-store.ts'),
+  ).href;
   writeFileSync(
     seed,
     `import { AppStore } from ${JSON.stringify(storeUrl)};

@@ -6,8 +6,8 @@ import {
   parseCodexToml,
   spliceCodexTableRegion,
   stableToml,
-} from '../../lib/codex-toml.ts';
-import { readTextFile, writeTextFile } from '../../lib/safe-io.ts';
+} from '../../lib/codex-toml/codex-toml.ts';
+import { readTextFile, writeTextFile } from '../../lib/safe-io/safe-io.ts';
 import { CODEX_MODELLED_KEYS } from './constants.ts';
 import { backupNameOf } from './target.ts';
 import type { ProviderMcpTarget } from './types.ts';

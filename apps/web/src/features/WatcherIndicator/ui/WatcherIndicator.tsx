@@ -13,24 +13,17 @@ import {
   watcherSpendText,
 } from '@entities/Watcher';
 import { SETTINGS_ROUTE } from '@shared/config/routes';
-import { toErrorMessage } from '@shared/api/client';
 import { formatDuration } from '@shared/lib/format-duration';
 import { toast } from '@shared/lib/toast';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
-import { placePopover } from '../model/placeBeside';
 import type { WatcherIndicatorProps } from './WatcherIndicator.types';
 import styles from './WatcherIndicator.module.scss';
-
-/** Зазор между краем боковой панели и окном, px. */
-const POPOVER_GAP = 8;
-/** Окно не прижимается к краям экрана вплотную, px. */
-const VIEWPORT_MARGIN = 16;
-/** Что внутри окна берёт фокус с клавиатуры. */
-const FOCUSABLE =
-  'button:not([disabled]), a[href], input:not([disabled]), [tabindex]:not([tabindex="-1"])';
+import { placeBeside } from '../lib/placeBeside';
+import { FOCUSABLE } from './WatcherIndicator.constants';
+import { toErrorMessage } from '../../../shared/api/toErrorMessage';
 
 /**
  * Индикатор фонового наблюдателя: строка в боковой панели на каждой странице,
@@ -229,25 +222,4 @@ export function WatcherIndicator({ isCollapsed = false }: WatcherIndicatorProps)
       )}
     </div>
   );
-}
-
-/** Высота окна, пока его ещё не нарисовали: первый кадр до замера. */
-const POPOVER_HEIGHT_GUESS = 260;
-/** Ширина окна до замера — как в стилях (`.popover`). */
-const POPOVER_WIDTH_GUESS = 320;
-
-/** Окно у видимого правого края строки; целиком в экране (`placePopover`). */
-function placeBeside(trigger: HTMLElement | null, popover: HTMLElement | null): CSSProperties {
-  const rect = trigger?.getBoundingClientRect();
-  if (!rect) return {};
-  const clip = trigger?.closest('nav')?.getBoundingClientRect();
-  return placePopover({
-    anchor: rect,
-    clip,
-    width: popover?.offsetWidth || POPOVER_WIDTH_GUESS,
-    height: popover?.offsetHeight || POPOVER_HEIGHT_GUESS,
-    viewport: { width: window.innerWidth, height: window.innerHeight },
-    gap: POPOVER_GAP,
-    margin: VIEWPORT_MARGIN,
-  });
 }

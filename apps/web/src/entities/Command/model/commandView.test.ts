@@ -1,13 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import type { SlashCommand } from '@agentdeck/contracts';
-import {
-  buildCommandRows,
-  builtinRows,
-  filterCommands,
-  countBySource,
-  type CommandRow,
-} from './commandView';
+import { builtinRows } from './commandView';
 import { BUILTIN_COMMANDS } from './builtinCommands';
+import type { CommandRow } from './commandView.types';
+import { filterCommands } from './filterCommands';
+import { countBySource } from './countBySource';
+import { buildCommandRows } from './buildCommandRows';
 
 /**
  * Список команд склеивается из двух половин, и обе имеют право соврать

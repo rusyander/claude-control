@@ -1,12 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import type { ProviderDetection, ProviderDetectResponse } from '@agentdeck/contracts';
-import {
-  detectionBadge,
-  findDetection,
-  installedProviders,
-  recommendedProviderId,
-  activeCliHint,
-} from './detection';
+import { findDetection } from './detection';
+import { installedProviders } from './installedProviders';
+import { recommendedProviderId } from './recommendedProviderId';
+import { activeCliHint } from './activeCliHint';
+import { detectionBadge } from './detectionBadge';
 
 /**
  * Вид детекта провайдеров (Ф7). Сценарий из задачи: claude установлен и с

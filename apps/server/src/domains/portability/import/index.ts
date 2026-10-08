@@ -1,6 +1,6 @@
 import type { AgentEnvironment } from '@agentdeck/contracts/portable-env';
 import { agentEnvironment } from '../canon.ts';
-import { sectionTargets } from '../project.ts';
+import { sectionTargets } from '../project/project.ts';
 import { UnknownImportProviderError, type ImportDeps, type Importer } from '../types.ts';
 import { importAiderEnvironment } from './aider.ts';
 import { importClaudeEnvironment } from './claude.ts';

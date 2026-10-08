@@ -1,5 +1,5 @@
 import type { LocalMessageCode, ServerMessageParams } from '@agentdeck/contracts/server-messages';
-import { coded } from '../../lib/server-text.ts';
+import { coded } from '../../lib/server-text/server-text.ts';
 
 /**
  * Ошибка раздела с кодом текста: русская строка остаётся запасной, а

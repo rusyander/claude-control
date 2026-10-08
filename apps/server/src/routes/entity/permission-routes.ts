@@ -10,7 +10,7 @@ import {
   hasPermission,
   PermissionExistsError,
   PermissionNotFoundError,
-} from '../../domains/permissions.ts';
+} from '../../domains/permissions/permissions.ts';
 import { LOCAL_ID_PREFIX, isLocalId, stripLocalPrefix } from '../../lib/settings-source.ts';
 import { done } from '../write-result.ts';
 import { targetOf, type ClaudePaths } from './shared.ts';

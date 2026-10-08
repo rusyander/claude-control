@@ -50,7 +50,7 @@ function describe(candidate) {
 
 async function main() {
   const { runProbe } = await import(
-    new URL('../../apps/server/src/domains/portability/probe.ts', import.meta.url).href
+    new URL('../../apps/server/src/domains/portability/probe/probe.ts', import.meta.url).href
   );
   const { claudeProvider } = await import(
     new URL('../../apps/server/src/providers/claude.ts', import.meta.url).href

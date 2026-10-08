@@ -1,2 +1,2 @@
-export { RuleFormModal } from './ui/RuleFormModal';
-export type { RuleFormModalProps } from './ui/RuleFormModal.types';
+export { RuleFormModal } from './ui/RuleFormModal/RuleFormModal';
+export type { RuleFormModalProps } from './ui/RuleFormModal/RuleFormModal.types';

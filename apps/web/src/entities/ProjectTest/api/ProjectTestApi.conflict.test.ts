@@ -11,8 +11,8 @@ vi.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({ invalidateQueries, setQueryData: vi.fn() }),
 }));
 
-const library = await import('./ProjectTestApi');
-const manual = await import('./ProjectTestManualApi');
+const library = await import('./useStartTestRun');
+const manual = await import('./useStartManualRun');
 
 type WithError = { onError?: (error: unknown) => void };
 const failWith = (status: number): AxiosError =>

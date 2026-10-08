@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import type { PromptId, PromptOverride } from '@agentdeck/contracts/prompts';
 import { PROMPT_MAX_BYTES } from '@agentdeck/contracts/prompts';
-import { backupEntry, writeJsonFile, writeTextFile } from '../../lib/safe-io.ts';
+import { backupEntry, writeJsonFile, writeTextFile } from '../../lib/safe-io/safe-io.ts';
 import { builtinPromptSha, builtinPromptText, promptIds } from './catalog.ts';
 import { PromptTooLongError } from './errors.ts';
 

@@ -10,7 +10,8 @@ import { ru } from '../config/i18n/ru';
 let language: 'ru' | 'en' = 'en';
 vi.mock('../config/i18n', () => ({ dict: () => (language === 'en' ? en : ru) }));
 
-const { serverField, serverMessage } = await import('./server-message');
+const { serverField } = await import('./serverField');
+const { serverMessage } = await import('./server-message');
 
 /**
  * Каждый код сервера переведён на оба языка телефона, и перевод использует ровно

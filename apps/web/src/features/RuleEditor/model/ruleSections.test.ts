@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { defaultSections, sectionsToMarkdown, hasContent, type RuleSection } from './ruleSections';
+import { defaultSections } from './ruleSections';
+import type { RuleSection } from './ruleSections.types';
+import { hasContent } from './hasContent';
+import { sectionsToMarkdown } from './sectionsToMarkdown';
 
 /**
  * Конструктор правила собирает текст, который уходит в живой `CLAUDE.md`.

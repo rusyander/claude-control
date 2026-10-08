@@ -2,7 +2,7 @@
  * Группа из файлов Claude в чате Codex — настоящим codex через настоящую панель.
  *
  * Codex каталогов Claude не читает, поэтому группа едет накладкой на прогон
- * (`domains/groups/codex-layer.ts`): правила — в `developer_instructions` после
+ * (`domains/groups/codex-layer/codex-layer.ts`): правила — в `developer_instructions` после
  * собственного текста человека, скилл — корнем `skills/extraRoots/set`, MCP —
  * `-c mcp_servers.…` с секретом ТОЛЬКО в окружении (по имени через `env_vars`),
  * хук `UserPromptSubmit` — надзирателем панели. Сценарии:

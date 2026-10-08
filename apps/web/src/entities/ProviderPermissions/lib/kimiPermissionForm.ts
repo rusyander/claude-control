@@ -1,11 +1,5 @@
-import type { KimiDecision, KimiPermissionRule } from '@agentdeck/contracts';
-
-/** Строка формы: `id` нужен, чтобы строки не «прыгали» при вводе. */
-export interface KimiRuleRow {
-  id: number;
-  decision: KimiDecision;
-  pattern: string;
-}
+import type { KimiPermissionRule } from '@agentdeck/contracts';
+import type { KimiRuleRow } from './kimiPermissionForm.types';
 
 /**
  * Идентификатор — позиция, а не монотонный счётчик, и это осознанно: форма
@@ -17,13 +11,3 @@ export interface KimiRuleRow {
  */
 export const toKimiRuleRows = (rules: readonly KimiPermissionRule[]): KimiRuleRow[] =>
   rules.map((rule, index) => ({ id: index, decision: rule.decision, pattern: rule.pattern }));
-
-/** Черновик для сервера: пустые шаблоны выбрасываются, порядок сохраняется. */
-export const toKimiRules = (rows: readonly KimiRuleRow[]): KimiPermissionRule[] =>
-  rows
-    .map((row) => ({ decision: row.decision, pattern: row.pattern.trim() }))
-    .filter((rule) => rule.pattern.length > 0);
-
-/** Нормализованный слепок правил — по нему считается «есть правки». Порядок значим. */
-export const stableKimiRules = (rules: readonly KimiPermissionRule[]): string =>
-  JSON.stringify(rules.map((rule) => [rule.decision, rule.pattern]));

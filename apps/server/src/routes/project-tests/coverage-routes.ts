@@ -1,10 +1,10 @@
 import type { FastifyInstance } from 'fastify';
-import { readGroups } from '../../domains/project-tests.ts';
-import { buildCoverage } from '../../domains/project-tests/coverage.ts';
-import { refreshDefectStates } from '../../domains/project-tests/defect-status.ts';
+import { readGroups } from '../../domains/project-tests/project-tests.ts';
+import { buildCoverage } from '../../domains/project-tests/coverage-matrix/coverage-matrix.ts';
+import { refreshDefectStates } from '../../domains/project-tests/defect-status/defect-status.ts';
 import { IntegrationError } from '../../domains/integrations/errors.ts';
-import { guardAsync, requireRoot, type TestsDeps } from './shared.ts';
-import { codeOf } from '../../lib/server-text.ts';
+import { guardAsync, requireRoot, type TestsDeps } from './shared/shared.ts';
+import { codeOf } from '../../lib/server-text/server-text.ts';
 
 /**
  * Покрытие требований и судьба дефектов — два вопроса, на которые раздел тестов

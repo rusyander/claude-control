@@ -1,4 +1,4 @@
-import type { PickedAnswers, Question } from '../ui/QuestionCard.types';
+import type { PickedAnswers, Question } from '../ui/QuestionCard/QuestionCard.types';
 
 /**
  * Собрать ответ на карточку вопросов в одно сообщение.
@@ -22,36 +22,4 @@ export function composeAnswer(questions: Question[], picked: PickedAnswers): str
     })
     .filter(Boolean)
     .join('\n');
-}
-
-/**
- * Тот же ответ, но для канала подтверждения прав: через него агент и ждёт
- * выбора. Канал умеет ровно две вещи — разрешить или отказать с текстом.
- * Разрешить нельзя: CLI тогда выполнит вызов сам и упрётся в то, что в режиме
- * `-p` спрашивать не у кого («Answer questions?»). Значит, ответ едет текстом
- * отказа — и этот текст обязан читаться как решение человека, а не как запрет,
- * иначе агент поймёт его как «нельзя» и пойдёт извиняться вместо работы.
- */
-export function answerMessage(answer: string): string {
-  return `Пользователь выбрал: ${answer}`;
-}
-
-/**
- * Какой вопрос спрашиваем сейчас. `undefined` — отвечены все, карточка готова
- * к отправке.
- *
- * Множественный выбор закрывается не первым щелчком, а подтверждением: иначе
- * вопрос «отметьте всё, что подходит» схлопывался бы после первой же галочки,
- * не дав поставить вторую.
- */
-export function nextQuestion(
-  questions: Question[],
-  picked: PickedAnswers,
-  confirmed: Record<number, boolean>,
-): number | undefined {
-  const index = questions.findIndex((question, at) => {
-    if ((picked[at] ?? []).length === 0) return true;
-    return Boolean(question.multiSelect) && !confirmed[at];
-  });
-  return index === -1 ? undefined : index;
 }

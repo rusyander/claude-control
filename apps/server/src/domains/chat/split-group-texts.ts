@@ -1,5 +1,5 @@
 import type { SplitPlanView } from '@agentdeck/contracts/chat-handoff';
-import { matchText, serverText } from '../../lib/server-texts.ts';
+import { matchText, serverText } from '../../lib/server-texts/server-texts.ts';
 
 type GroupView = SplitPlanView['groups'][number];
 

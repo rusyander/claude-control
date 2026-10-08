@@ -1,12 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { PlatformToolShimReport } from '@agentdeck/contracts';
-import {
-  shimDropped,
-  shimEmptyKind,
-  showsToolShim,
-  showsToolsFact,
-  smokeToolsLineKind,
-} from './toolShimView';
+import { shimDropped } from './toolShimView';
+import { showsToolsFact } from './showsToolsFact';
+import { shimEmptyKind } from './shimEmptyKind';
+import { showsToolShim } from './showsToolShim';
+import { smokeToolsLineKind } from './smokeToolsLineKind';
 
 describe('showsToolsFact', () => {
   it('раздел, где все контуры получают инструменты полем, факта о тексте не показывает', () => {

@@ -1,18 +1,18 @@
 import type { Group, ProviderEnvVar } from '@agentdeck/contracts';
 import type { EnvItem, EnvItemKind, EnvSectionState } from '@agentdeck/contracts/portable-env';
-import { getStoredKey, maskKey } from '../../../lib/provider-keys.ts';
-import { isSecretName } from '../../../lib/secret-mask.ts';
-import type { ConfigProvider } from '../../../providers/types.ts';
+import { getStoredKey, maskKey } from '../../../lib/provider-keys/provider-keys.ts';
+import { isSecretName } from '../../../lib/secret-mask/secret-mask.ts';
+import type { ConfigProvider } from '../../../providers/types/types.ts';
 
 /**
  * ПЕРЕМЕННЫЕ И КЛЮЧИ ЦЕЛИ — ЧЕРЕЗ ОКРУЖЕНИЕ ПРОЦЕССА (П3.5).
  *
  * Панель сама запускает чужой CLI, значит она и собирает ему окружение: имена и
  * значения переменных берутся из канона среды, значение ключа — из шифрованного
- * хранилища панели (`lib/provider-keys.ts`). На диск отсюда не ложится НИЧЕГО:
+ * хранилища панели (`lib/provider-keys/provider-keys.ts`). На диск отсюда не ложится НИЧЕГО:
  * модуль не открывает ни одного файла на запись, и единственное место, где
  * значение ключа существует, — объект, который уходит в `spawn` (врезка в
- * `lib/cli-spawn.ts`).
+ * `lib/cli-spawn/cli-spawn.ts`).
  *
  * Отсюда и форма врезки: `cli-spawn` получает не строку, а функцию. Параметры
  * прогона панель СОХРАНЯЕТ (продолжение остановленного прогона переживает

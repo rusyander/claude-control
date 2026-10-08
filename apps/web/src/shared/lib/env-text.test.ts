@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest';
 // Без расширения: во фронте модули резолвит Vite, и `allowImportingTsExtensions`
 // здесь не включён — в отличие от сервера, где TypeScript исполняется напрямую.
-import { envToText, textToEnv, parseArgs, formatArgs } from './env-text';
+import { envToText } from './env-text';
+import { textToEnv } from './textToEnv';
+import { parseArgs } from './parseArgs';
+import { formatArgs } from './formatArgs';
 
 /**
  * Тесты текстового представления переменных окружения (KEY=VALUE по строке)

@@ -1,9 +1,9 @@
 import { readdirSync, statSync, existsSync, mkdirSync, renameSync, readFileSync } from 'node:fs';
 import { join, resolve, dirname, basename, sep } from 'node:path';
 import type { ClaudeLocation } from '@agentdeck/contracts';
-import { writeTextFile, backupEntry, removeEntry } from '../../lib/safe-io.ts';
+import { writeTextFile, backupEntry, removeEntry } from '../../lib/safe-io/safe-io.ts';
 import { layoutOf, safeSegment, type ResourceKind } from './registry.ts';
-import { coded } from '../../lib/server-text.ts';
+import { coded } from '../../lib/server-text/server-text.ts';
 import type { ServerMessageCode } from '@agentdeck/contracts/server-messages';
 
 /**

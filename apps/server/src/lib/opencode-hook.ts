@@ -1,4 +1,4 @@
-import { UnrecognizedFormatError } from './codex-toml.ts';
+import { UnrecognizedFormatError } from './codex-toml/codex-toml.ts';
 
 /**
  * Хуки OpenCode — ключ `experimental.hook` в `opencode.json` (OPENCODE-3).

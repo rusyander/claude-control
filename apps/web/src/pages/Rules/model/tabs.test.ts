@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { rulesInTab, rulesShownInTab } from './tabs';
+import { rulesInTab } from './tabs';
+import { rulesShownInTab } from './rulesShownInTab';
 
 const ON = { id: 'a', isEnabled: true };
 const OFF = { id: 'b', isEnabled: false };

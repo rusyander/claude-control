@@ -5,7 +5,11 @@ import { AliasVault } from './mask.ts';
 import { maskRequestBody } from './request-filter.ts';
 import { ResponseStreamFilter, restoreJsonResponse } from './response-filter.ts';
 import { appendJournal } from './journal.ts';
-import { localizeText, serverText, type TextLanguage } from '../../lib/server-texts.ts';
+import {
+  localizeText,
+  serverText,
+  type TextLanguage,
+} from '../../lib/server-texts/server-texts.ts';
 
 /**
  * Локальный прокси между CLI и моделью.

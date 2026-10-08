@@ -22,25 +22,25 @@ import {
   triageStagePrompt,
   workAfterPlanPrompt,
 } from '@agentdeck/contracts/split-plan';
-import { initiativePrompt, childAppend } from '../domains/chat/initiative.ts';
-import { childrenBrief } from '../domains/chat/children-brief.ts';
-import { tellPrompt } from '../domains/chat/child-tell.ts';
-import { mrWatchPrompt } from '../domains/chat/mr-watch.ts';
-import { retryPrompt } from '../domains/chat/run-retry.ts';
+import { initiativePrompt, childAppend } from '../domains/chat/initiative/initiative.ts';
+import { childrenBrief } from '../domains/chat/children-brief/children-brief.ts';
+import { tellPrompt } from '../domains/chat/child-tell/child-tell.ts';
+import { mrWatchPrompt } from '../domains/chat/mr-watch/mr-watch.ts';
+import { retryPrompt } from '../domains/chat/run-retry/run-retry.ts';
 import { groupIdentityLine } from '../domains/chat/panel-preamble.ts';
 import {
   deliveryNudgePrompt,
   interruptResumePrompt,
   limitResumePrompt,
   pauseResumePrompt,
-} from '../domains/chat/split-conveyor.ts';
-import { buildPrompt } from '../domains/project-tests/prompt.ts';
+} from '../domains/chat/split-conveyor/split-conveyor.ts';
+import { buildPrompt } from '../domains/project-tests/prompt/prompt.ts';
 import {
   decidePermission,
   describeScope,
   runScope,
-} from '../domains/project-tests/run-permissions.ts';
-import { serverText } from '../lib/server-texts.ts';
+} from '../domains/project-tests/run-permissions/run-permissions.ts';
+import { serverText } from '../lib/server-texts/server-texts.ts';
 import { sealFooter } from '@agentdeck/contracts/panel-agent-feed';
 
 /**
@@ -86,38 +86,38 @@ const MODEL_FILES: ModelFile[] = [
   },
   // Починки разбора — лента человека (`repairs`), не задание.
   { path: join(CONTRACTS, 'split-plan.ts'), human: ['applySplitPlan'] },
-  { path: join(SRC, 'domains/chat/initiative.ts') },
-  { path: join(SRC, 'domains/chat/children-brief.ts') },
-  { path: join(SRC, 'domains/chat/child-tell.ts') },
-  { path: join(SRC, 'domains/chat/mr-watch.ts') },
-  { path: join(SRC, 'domains/chat/run-retry.ts') },
-  { path: join(SRC, 'domains/chat/ChatBranchGate.ts') },
-  { path: join(SRC, 'domains/chat/ChatPermissions.ts') },
+  { path: join(SRC, 'domains/chat/initiative/initiative.ts') },
+  { path: join(SRC, 'domains/chat/children-brief/children-brief.ts') },
+  { path: join(SRC, 'domains/chat/child-tell/child-tell.ts') },
+  { path: join(SRC, 'domains/chat/mr-watch/mr-watch.ts') },
+  { path: join(SRC, 'domains/chat/run-retry/run-retry.ts') },
+  { path: join(SRC, 'domains/chat/ChatBranchGate/ChatBranchGate.ts') },
+  { path: join(SRC, 'domains/chat/ChatPermissions/ChatPermissions.ts') },
   // Мост прав: отказы уходят агенту результатом вызова (F-51).
   { path: join(SRC, 'domains/chat/permission-prompt-server.mjs') },
   // Хвост запечатанного ответа агента панели уходит модели следующим ходом (F-50).
   { path: join(CONTRACTS, 'panel-agent-feed.ts') },
   {
-    path: join(SRC, 'domains/panel-agent/conversations.ts'),
+    path: join(SRC, 'domains/panel-agent/conversations/conversations.ts'),
     human: ['writePanelAgentConversation'],
   },
   { path: join(SRC, 'domains/chat/panel-preamble.ts') },
   { path: join(SRC, 'domains/integrations/links.ts'), human: ['requirePath'] },
   { path: join(SRC, 'domains/provider-check/steps-assistant.ts') },
   { path: join(SRC, 'domains/resources/ResourceAssistant.ts'), human: ['assistStructure'] },
-  { path: join(SRC, 'domains/provider-chat/prompt.ts') },
-  { path: join(SRC, 'domains/project-tests/convention.ts') },
+  { path: join(SRC, 'domains/provider-chat/prompt/prompt.ts') },
+  { path: join(SRC, 'domains/project-tests/convention/convention.ts') },
   // Имя прогона — название в списке чатов. Метка регресса — данные библиотеки на
   // её языке (F-63): по ней человек отбирает кейсы, и «regression» в русской
   // библиотеке выпадал из фильтра «регресс».
   {
-    path: join(SRC, 'domains/project-tests/prompt.ts'),
+    path: join(SRC, 'domains/project-tests/prompt/prompt.ts'),
     human: ['runName', 'RUN_NAME_WORDS', 'regressionTag', 'REGRESSION_TAGS'],
   },
   { path: join(SRC, 'domains/portability/supervisor/skills-router.ts') },
   { path: join(SRC, 'domains/portability/supervisor/subagents.ts') },
-  { path: join(SRC, 'routes/panel-agent/actions-projects.ts') },
-  { path: join(SRC, 'routes/panel-agent/actions-contour.ts') },
+  { path: join(SRC, 'routes/panel-agent/actions-projects/actions-projects.ts') },
+  { path: join(SRC, 'routes/panel-agent/actions-contour/actions-contour.ts') },
   { path: join(SRC, 'routes/panel-agent/actions-tests-library.ts') },
 ];
 

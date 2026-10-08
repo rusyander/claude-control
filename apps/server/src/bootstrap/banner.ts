@@ -1,6 +1,6 @@
 import type { ServerContext } from '../context.ts';
 import type { startSandboxHousekeeping } from '../domains/sandbox/SandboxConfig.ts';
-import type { autostartProjects } from '../domains/project-runner.ts';
+import type { autostartProjects } from '../domains/project-runner/project-runner.ts';
 
 export interface BannerInput {
   host: string;

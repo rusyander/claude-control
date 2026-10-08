@@ -1,0 +1,43 @@
+import { StyleSheet } from 'react-native';
+import { space, colors, font } from '../../../shared/config/theme';
+
+export const styles = StyleSheet.create({
+  body: { gap: space.sm },
+  grow: { flex: 1 },
+  kind: {
+    color: colors.warning,
+    fontSize: font.small,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  hint: { color: colors.textDim, fontSize: font.small, lineHeight: 17 },
+  tool: { color: colors.warning },
+  summary: { color: colors.text },
+  link: { color: colors.accent, fontSize: font.small },
+  question: { color: colors.text, fontSize: font.title, fontWeight: '600', lineHeight: 22 },
+  options: { gap: space.xs },
+  option: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: space.sm,
+    paddingHorizontal: space.md,
+    paddingVertical: space.sm + 2,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    backgroundColor: colors.surfaceRaised,
+    minHeight: 44,
+  },
+  optionOn: { borderColor: colors.accent, backgroundColor: colors.accentDim },
+  optionPressed: { opacity: 0.75 },
+  optionLabel: { color: colors.text, fontSize: font.body, fontWeight: '600' },
+  optionHint: { color: colors.textDim, fontSize: font.small, lineHeight: 17, marginTop: 2 },
+  otherLabel: { color: colors.textDim, fontWeight: '400' },
+  mark: { width: 16, height: 16, marginTop: 2, borderWidth: 2, borderColor: colors.textFaint },
+  markRound: { borderRadius: 999 },
+  markBox: { borderRadius: 4 },
+  markDashed: { borderRadius: 4, borderStyle: 'dashed' },
+  markOn: { borderColor: colors.accent, backgroundColor: colors.accent },
+  other: { gap: space.sm },
+});

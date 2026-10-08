@@ -2,11 +2,11 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { object, string, boolean, array, number, enum as zodEnum } from 'zod';
 import type { DlpRule } from '@agentdeck/contracts';
-import { writeJsonFile } from '../../lib/safe-io.ts';
+import { writeJsonFile } from '../../lib/safe-io/safe-io.ts';
 import { DLP_BUILTIN_IDS } from './builtins.mjs';
 import { compileRulePattern } from './rules.ts';
-import { coded } from '../../lib/server-text.ts';
-import { serverText } from '../../lib/server-texts.ts';
+import { coded } from '../../lib/server-text/server-text.ts';
+import { serverText } from '../../lib/server-texts/server-texts.ts';
 
 /**
  * Правила на диске — файл панели, не чужой формат.
@@ -17,7 +17,7 @@ import { serverText } from '../../lib/server-texts.ts';
  * персональных данных ездить вместе с ними не должен.
  *
  * Схема повторяет `dlpRuleSchema` из contracts — по той же причине, что и
- * `providers/settings-validation.ts`: contracts входит в сервер только типами.
+ * `providers/settings-validation/settings-validation.ts`: contracts входит в сервер только типами.
  */
 
 const FILE = 'dlp-rules.json';

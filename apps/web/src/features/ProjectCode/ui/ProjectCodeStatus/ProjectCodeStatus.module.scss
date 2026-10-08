@@ -1,0 +1,12 @@
+.added {
+  color: var(--color-success);
+}
+
+.removed {
+  color: var(--color-danger);
+}
+
+.status {
+  flex: none;
+  min-height: var(--spacing-lg);
+}

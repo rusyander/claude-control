@@ -1,1 +1,2 @@
-export { useChatAutoMode, useSetChatAutoMode } from './api/ChatAutoModeApi';
+export { useChatAutoMode } from './api/ChatAutoModeApi';
+export { useSetChatAutoMode } from './api/useSetChatAutoMode';

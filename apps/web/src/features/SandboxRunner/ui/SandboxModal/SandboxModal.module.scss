@@ -1,0 +1,35 @@
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
+  gap: var(--spacing-md);
+}
+
+// Состав песочницы: что именно подключено к прогону.
+.aside {
+  padding: var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-sunken);
+  align-self: start;
+}
+
+.tabs {
+  display: flex;
+  gap: var(--spacing-3xs);
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: var(--spacing-2xs);
+}
+
+.isolation {
+  margin-top: var(--spacing-sm);
+  padding-top: var(--spacing-sm);
+  border-top: 1px solid var(--color-border);
+}
+
+/* Доступ к аккаунту: отделён от состава чертой — это не «что подключено»,
+   а условие, без которого разговор в песочнице не пойдёт вовсе. */
+.access {
+  margin-top: var(--spacing-xs);
+  padding-top: var(--spacing-xs);
+  border-top: 1px solid var(--color-border);
+}

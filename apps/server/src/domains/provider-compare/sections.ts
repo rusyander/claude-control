@@ -1,17 +1,17 @@
 import { existsSync } from 'node:fs';
 import type { McpServer, UniversalMcpServer } from '@agentdeck/contracts';
 import { providerSettingsSource } from '../../providers/registry.ts';
-import { readTextFile } from '../../lib/safe-io.ts';
+import { readTextFile } from '../../lib/safe-io/safe-io.ts';
 import { sortedJson } from '../../lib/sorted-json.ts';
-import { resolveProviderMcpTarget, readProviderMcpServers } from '../provider-mcp.ts';
+import { resolveProviderMcpTarget, readProviderMcpServers } from '../provider-mcp/provider-mcp.ts';
 import {
   resolveProviderPermissionsTarget,
   readProviderPermissions,
-} from '../provider-permissions.ts';
-import { resolveProviderEnvTarget, readProviderEnvVars } from '../provider-env.ts';
-import { resolveInstructionsTarget } from '../instructions.ts';
+} from '../provider-permissions/provider-permissions.ts';
+import { resolveProviderEnvTarget, readProviderEnvVars } from '../provider-env/provider-env.ts';
+import { resolveInstructionsTarget } from '../instructions/instructions.ts';
 // Маска секрета — та же, что в разделе env: своя открывала начало токена (`glp…`).
-import { maskValue } from '../env.ts';
+import { maskValue } from '../env/env.ts';
 // Секрет по имени — правило раздела env (целое слово): своя подстрока прятала
 // MAX_THINKING_TOKENS и *_PATH у чужой CLI, пока колонка Claude их показывала.
 import { isSecretEnvKey } from '@agentdeck/contracts/env-secret';

@@ -1,0 +1,19 @@
+/* Строка «Применён к»: значок, имя и подпись держатся вместе и переносятся
+   целиком — разорванная по строкам цель читается как две разные. */
+.target {
+  padding: var(--spacing-3xs) var(--spacing-2xs);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+}
+
+/* Слово для скринридера там, где глазами человек читает значок и легенду. */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

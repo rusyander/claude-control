@@ -1,0 +1,26 @@
+/* ── Блоки ───────────────────────────────────────────────────────────── */
+
+.plain,
+.accent,
+.muted,
+.danger,
+.row {
+  stroke-width: 1.5;
+}
+
+.muted {
+  fill: var(--color-surface-raised);
+  stroke: var(--color-border-strong);
+}
+
+/* ── Подписи ─────────────────────────────────────────────────────────── */
+
+.label {
+  fill: var(--color-fg);
+  font-size: 15px;
+}
+
+.note {
+  fill: var(--color-fg-muted);
+  font-size: 14px;
+}

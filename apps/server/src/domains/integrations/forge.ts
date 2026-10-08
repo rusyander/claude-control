@@ -1,7 +1,7 @@
 import type { ForgeSettings } from '@agentdeck/contracts';
-import { gitSync } from '../project-git/exec.ts';
+import { gitSync } from '../project-git/exec/exec.ts';
 import { invalidField, unreachable } from './errors.ts';
-import { failedResponse, parseJson, sendRequest } from './http.ts';
+import { failedResponse, parseJson, sendRequest } from './http/http.ts';
 
 /**
  * Фордж по ТОКЕНУ: дефекты и комментарии без установленных `gh`/`glab`.

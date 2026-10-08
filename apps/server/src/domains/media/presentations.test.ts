@@ -7,9 +7,9 @@ import { deflateSync } from 'node:zlib';
 import type { EndpointProfile, MediaDeck, Platform, PlatformModelInfo } from '@agentdeck/contracts';
 import { defaultOurRules, defaultPlatformRules } from '@agentdeck/contracts/platform';
 import { DECK_MAX_RASTER } from '@agentdeck/contracts/media-deck';
-import { AppStore } from '../../lib/app-store.ts';
-import type { PlatformFetch } from '../platform/ca-fetch.ts';
-import { promptText } from '../prompts.ts';
+import { AppStore } from '../../lib/app-store/app-store.ts';
+import type { PlatformFetch } from '../platform/ca-fetch/ca-fetch.ts';
+import { promptText } from '../prompts/prompts.ts';
 import {
   deckFromBlock,
   deckFile,

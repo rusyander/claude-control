@@ -1,12 +1,12 @@
 import type { FastifyInstance } from 'fastify';
 import type { RuleDraft } from '@agentdeck/contracts';
 import type { ServerContext } from '../../context.ts';
-import { assertRuleTitleFree, readRules, saveRule, deleteRule } from '../../domains/rules.ts';
+import { assertRuleTitleFree, readRules, saveRule, deleteRule } from '../../domains/rules/rules.ts';
 import {
   resolveInstructionsTarget,
   readInstructionsInfo,
   writeInstructions,
-} from '../../domains/instructions.ts';
+} from '../../domains/instructions/instructions.ts';
 import { done } from '../write-result.ts';
 import type { ClaudePaths } from './shared.ts';
 

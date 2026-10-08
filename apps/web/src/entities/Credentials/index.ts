@@ -1,8 +1,6 @@
-export {
-  useCredentialsStatus,
-  useSaveCredentials,
-  useClearCredentials,
-} from './api/CredentialsApi';
+export { useCredentialsStatus } from './api/CredentialsApi';
+export { useClearCredentials } from './api/useClearCredentials';
+export { useSaveCredentials } from './api/useSaveCredentials';
 export {
   CREDENTIALS_TONE,
   CREDENTIALS_TEMPLATES,

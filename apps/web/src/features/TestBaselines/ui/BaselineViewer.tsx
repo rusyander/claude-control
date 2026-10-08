@@ -12,10 +12,13 @@ import { SkeletonList } from '@shared/ui/skeleton';
 import { TabButton } from '@shared/ui/tab-button';
 import { projectFileRawUrl } from '@entities/ProjectFile';
 import { useAcceptBaseline, useTestBaselines } from '@entities/ProjectTest';
-import { baselineTone, isOverThreshold, pickPoint, ratioPercent } from '../model/baselineView';
+import { baselineTone } from '../model/baselineView';
 import type { BaselineViewerProps } from './BaselineViewer.types';
 import styles from './TestBaselines.module.scss';
 import { serverFieldText } from '@shared/config/i18n';
+import { pickPoint } from '../model/pickPoint';
+import { ratioPercent } from '../model/ratioPercent';
+import { isOverThreshold } from '../model/isOverThreshold';
 
 /**
  * Сверка скриншота с эталоном: было / стало / разница.

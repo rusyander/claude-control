@@ -1,10 +1,8 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import type { McpServer, McpServerDraft, McpToolsResult } from '@agentdeck/contracts';
-import { createEntityApi } from '@shared/api/create-entity-api';
-import { apiClient, LONG_TIMEOUTS } from '@shared/api/client';
+import { useMutation } from '@tanstack/react-query';
+import type { McpServer, McpServerDraft } from '@agentdeck/contracts';
+import { apiClient } from '@shared/api/client';
 import { queryKeys } from '@shared/api/query-keys';
-import { i18n } from '@shared/config/i18n';
-import { toast } from '@shared/lib/toast';
+import { createEntityApi } from '../../../shared/api/createEntityApi';
 
 export const mcpServerApi = createEntityApi<McpServer, McpServerDraft>({
   resource: 'mcp',
@@ -37,43 +35,5 @@ export function useStartOAuth() {
     },
     // Отказ карточка показывает сама, словами у кнопки — общий тост был бы вторым.
     meta: { silentError: true },
-  });
-}
-
-/**
- * Список инструментов сервера для помощника отбора прав. Сервер поднимается и
- * опрашивается по протоколу — как проверка связи, но возвращаются сами имена.
- * Ждём дольше обычного: у stdio в рукопожатие входит запуск процесса.
- *
- * Бюджет тот же, что у проверки связи: серверный `listMcpServerTools` считает
- * потолок по той же формуле, что и `checkMcpHealth` (до ~180 c при большом
- * mcpNetworkTimeoutMs). Своих 120 c здесь не хватало — медленный сервер рвался
- * на клиенте ложным таймаутом, пока серверная сторона спокойно ждала ответа.
- */
-export function useMcpServerTools() {
-  return useMutation({
-    mutationFn: async (id: string): Promise<McpToolsResult> => {
-      const { data } = await apiClient.post<McpToolsResult>(
-        `/mcp/${encodeURIComponent(id)}/tools`,
-        undefined,
-        { timeout: LONG_TIMEOUTS.mcpHealth },
-      );
-      return data;
-    },
-  });
-}
-
-/** Забыть авторизацию сервера — удалить сохранённый токен. */
-export function useClearOAuth() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (id: string): Promise<void> => {
-      await apiClient.delete(`/mcp/${encodeURIComponent(id)}/oauth`);
-    },
-    onSuccess: () => {
-      toast.success(i18n.t('mcp.oauthCleared'));
-      void queryClient.invalidateQueries({ queryKey: queryKeys.mcp });
-    },
   });
 }

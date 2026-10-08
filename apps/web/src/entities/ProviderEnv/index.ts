@@ -1,1 +1,2 @@
-export { useProviderEnv, useSaveProviderEnv } from './api/ProviderEnvApi';
+export { useProviderEnv } from './api/ProviderEnvApi';
+export { useSaveProviderEnv } from './api/useSaveProviderEnv';

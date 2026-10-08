@@ -1,0 +1,37 @@
+.guideStep {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--spacing-3xs) var(--spacing-sm);
+  counter-increment: help-guide;
+
+  &::before {
+    content: counter(help-guide);
+    display: flex;
+    align-items: center;
+    grid-row: 1 / span 3;
+    justify-content: center;
+    align-self: start;
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    background-color: var(--color-accent-subtle);
+    color: var(--color-accent);
+    font-size: var(--font-size-caption);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.guideStepTitle,
+.guideStepText {
+  grid-column: 2;
+  margin: 0;
+}
+
+.guideStepBody {
+  display: flex;
+  flex-direction: column;
+  grid-column: 2;
+  gap: var(--spacing-sm);
+  padding-top: var(--spacing-2xs);
+}

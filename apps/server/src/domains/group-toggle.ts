@@ -1,15 +1,15 @@
 import type { EntityRef, Group, GroupMember } from '@agentdeck/contracts';
 import { inClaudeGlobals } from '@agentdeck/contracts/group-sources';
-import { readHooks } from './hooks.ts';
+import { readHooks } from './hooks/hooks.ts';
 import {
   applyEntityStates,
   rewriteHooks,
   type EntityState,
   type EntityToggleDeps,
 } from './entity-toggle.ts';
-import { applyGroupEnv, existingEnvKeys } from './env.ts';
-import { collectLeafMembers } from './group-graph.ts';
-import { retireScenarioHooks } from './group-scenario.ts';
+import { applyGroupEnv, existingEnvKeys } from './env/env.ts';
+import { collectLeafMembers } from './group-graph/group-graph.ts';
+import { retireScenarioHooks } from './group-scenario/group-scenario.ts';
 
 /**
  * Включение и выключение группы целиком.

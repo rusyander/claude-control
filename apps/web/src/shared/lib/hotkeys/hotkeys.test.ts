@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { parseChord, parseStep } from './parseChord';
-import { matchSequence, stepsEqual } from './matchSequence';
+import { parseChord } from './parseChord';
+import { matchSequence } from './matchSequence';
 import { isEditableTarget } from './isEditableTarget';
 import type { KeyStep } from './hotkeys.types';
+import { stepsEqual } from './stepsEqual';
+import { parseStep } from './parseStep';
 
 /**
  * Разбор и сопоставление аккордов клавиш. Проверяем грамматику (модификаторы,

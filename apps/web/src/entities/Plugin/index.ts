@@ -1,12 +1,10 @@
-export {
-  usePlugins,
-  useAvailablePlugins,
-  useInstallPlugin,
-  useUninstallPlugin,
-  useSetPluginEnabled,
-  useUpdatePlugin,
-  useAddMarketplace,
-  useRemoveMarketplace,
-  useScaffoldPlugin,
-  pluginsKey,
-} from './api/PluginApi';
+export { usePlugins } from './api/PluginApi';
+export { useRemoveMarketplace } from './api/useRemoveMarketplace';
+export { useAddMarketplace } from './api/useAddMarketplace';
+export { useUpdatePlugin } from './api/useUpdatePlugin';
+export { useSetPluginEnabled } from './api/useSetPluginEnabled';
+export { useUninstallPlugin } from './api/useUninstallPlugin';
+export { useInstallPlugin } from './api/useInstallPlugin';
+export { pluginsKey } from './api/PluginApi.constants';
+export { useScaffoldPlugin } from './api/useScaffoldPlugin';
+export { useAvailablePlugins } from './api/useAvailablePlugins';

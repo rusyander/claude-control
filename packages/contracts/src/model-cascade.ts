@@ -120,7 +120,7 @@ const BIG_GROUP_CHARS = 4_000;
 /**
  * Группа, которую панель считает большой по одним только фактам — числу задач и
  * длине задания. Экспортируется, потому что тот же вопрос решает подбор у ЧУЖИХ
- * провайдеров (`domains/provider-cascade.ts`): у них другая лестница моделей, но
+ * провайдеров (`domains/provider-cascade/provider-cascade.ts`): у них другая лестница моделей, но
  * ровно та же поправка на размер, и второй её копии быть не должно.
  */
 export function isBigGroup(group: Pick<CascadeGroup, 'tasks' | 'length'>): boolean {

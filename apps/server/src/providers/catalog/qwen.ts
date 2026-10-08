@@ -1,6 +1,6 @@
 import { join } from 'node:path';
-import { QWEN_HOOK_EVENTS } from '../../lib/qwen-hook.ts';
-import { buildCapabilities, type ConfigProvider } from '../types.ts';
+import { QWEN_HOOK_EVENTS } from '../../lib/qwen-hook/qwen-hook.ts';
+import { buildCapabilities, type ConfigProvider } from '../types/types.ts';
 import { qwenHome, unimplementedPaths } from './config-dirs.ts';
 
 /** MCP, права и хуки Qwen лежат в одном `settings.json`, каждый — своим ключом. */

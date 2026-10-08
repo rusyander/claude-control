@@ -10,12 +10,12 @@ import {
   type EnvItem,
 } from '@agentdeck/contracts/portable-env';
 import { claudeProvider } from '../../providers/claude.ts';
-import { CATALOG_PROVIDERS } from '../../providers/catalog.ts';
+import { CATALOG_PROVIDERS } from '../../providers/catalog/catalog.ts';
 import { importEnvironment } from './import/index.ts';
 import { emitEnvironment, emitterProviderIds, hasEmitter } from './emit/index.ts';
 import { UnknownEmitProviderError, type EmitPlan } from './emit/types.ts';
 import { KINDS_NOT_YET_EMITTED } from './emit/context.ts';
-import { level } from './fidelity.ts';
+import { level } from './fidelity/fidelity.ts';
 import { panelSupervisorHooks } from './supervisor/panel-hooks.ts';
 
 /**

@@ -11,12 +11,12 @@ import type {
   ConfigProvider,
   ProviderEndpointFile,
   ProviderEndpointVars,
-} from '../../../providers/types.ts';
+} from '../../../providers/types/types.ts';
 import { buildEndpointPlan, resolveEndpointVars } from '../../endpoints/endpoint-plan.ts';
-import { resolveProviderEnvTargetFor } from '../../provider-env.ts';
+import { resolveProviderEnvTargetFor } from '../../provider-env/provider-env.ts';
 import { gatewayUrlFor, PLACEHOLDER_KEY, type GatewayUrlRoute } from './profile.ts';
-import { GATEWAY_ROUTES } from '../gateway/pipeline.ts';
-import { serverText } from '../../../lib/server-texts.ts';
+import { GATEWAY_ROUTES } from '../gateway/pipeline/pipeline.ts';
+import { serverText } from '../../../lib/server-texts/server-texts.ts';
 
 /**
  * Обслуживает ли шлюз ту ручку, которой пойдёт CLI.

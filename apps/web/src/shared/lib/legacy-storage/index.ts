@@ -1,3 +1,4 @@
 import './run';
 
-export { migrateBrowserStorage, migrateLegacyStorageKeys } from './migrate';
+export { migrateLegacyStorageKeys } from './migrate';
+export { migrateBrowserStorage } from './migrateBrowserStorage';

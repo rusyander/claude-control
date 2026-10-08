@@ -2,7 +2,7 @@ import { readFileSync, statSync } from 'node:fs';
 import type { ProjectFilePreview } from '@agentdeck/contracts';
 import { MAX_MEDIA_BYTES } from './constants.ts';
 import { ProjectFileError, resolveProjectPath } from './paths.ts';
-import { coded } from '../../lib/server-text.ts';
+import { coded } from '../../lib/server-text/server-text.ts';
 
 /**
  * Файлы, которые показываются не текстом: картинки, PDF, SVG, разметка.

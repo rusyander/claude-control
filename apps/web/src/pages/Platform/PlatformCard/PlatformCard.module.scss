@@ -1,0 +1,24 @@
+.problem {
+  padding: var(--spacing-xs);
+  border-left: 3px solid var(--color-warning);
+  background-color: var(--color-surface-sunken);
+}
+
+.bar {
+  width: 100%;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background-color: var(--color-surface-sunken);
+}
+
+.barFill,
+.barFillWarn {
+  display: block;
+  height: 100%;
+  background-color: var(--color-accent);
+}
+
+.barFillWarn {
+  background-color: var(--color-warning);
+}

@@ -1,10 +1,10 @@
 import { mkdirSync, writeFileSync, copyFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { copyRecursive } from '../../lib/safe-io.ts';
-import { readRules } from '../rules.ts';
-import { readSkills } from '../skills.ts';
+import { copyRecursive } from '../../lib/safe-io/safe-io.ts';
+import { readRules } from '../rules/rules.ts';
+import { readSkills } from '../skills/skills.ts';
 import type { ClaudeLocation } from '@agentdeck/contracts';
-import type { AppStore } from '../../lib/app-store.ts';
+import type { AppStore } from '../../lib/app-store/app-store.ts';
 import type { SandboxDescription, SandboxSelection } from './SandboxConfig.types.ts';
 
 /**

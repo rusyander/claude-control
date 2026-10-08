@@ -1,0 +1,32 @@
+.agent {
+  padding: var(--spacing-3xs) 0;
+}
+
+.agentText {
+  min-width: 0;
+  max-width: 48ch;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.result {
+  margin-left: calc(var(--spacing-sm) + 2px);
+  font-size: var(--font-size-caption);
+
+  summary {
+    color: var(--color-fg-subtle);
+    cursor: pointer;
+  }
+}
+
+.resultBody {
+  max-height: 180px;
+  margin-top: var(--spacing-3xs);
+  overflow: auto;
+  font-family: var(--font-mono);
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--color-fg-muted);
+  scrollbar-width: thin;
+}

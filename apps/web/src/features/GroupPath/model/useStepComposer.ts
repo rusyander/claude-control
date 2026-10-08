@@ -9,8 +9,17 @@ import type {
 } from '@agentdeck/contracts';
 import type { AgentImage } from '@agentdeck/contracts/agent-images';
 import { useDraftPathStep, usePromotePathStep, useSaveGroupPathSteps } from '@entities/Group';
-import { customSteps, insertAfter, replaceStep, slotAfter, type PathSlot } from './pathEdit';
-import { isBilingual, otherLang, stepFromProposal, withoutMatch } from './stepDraft';
+import { customSteps } from './pathEdit';
+import { stepFromProposal } from './stepDraft';
+import type { PathSlot } from './pathEdit.types';
+import { slotAfter } from './slotAfter';
+import { insertAfter } from './insertAfter';
+import { replaceStep } from './replaceStep';
+import { withoutMatch } from './withoutMatch';
+import { isBilingual } from './isBilingual';
+import { otherLang } from './otherLang';
+import { mergeTranslation } from '../lib/mergeTranslation';
+import { isTranslated } from '../lib/isTranslated';
 
 /** Что делает окно: вставляет новый шаг после строки `index` или правит готовый. */
 export type ComposerTarget = { kind: 'insert'; index: number } | { kind: 'edit'; step: PathStep };
@@ -286,33 +295,6 @@ export function useStepComposer({
       !save.isPending &&
       !draft.isPending,
   };
-}
-
-/**
- * Ответ переводчика поверх шага из окна: берётся только вторая сторона.
- * Пустое название в ответе оставляет прежнее (название — подпись, не
- * инструкция); промпт и условие готовности берутся ТОЛЬКО из ответа — старый
- * текст второй стороны и есть то, от чего перевод спасает.
- */
-export function mergeTranslation(
-  current: PathStepProposal,
-  answer: PathStepProposal,
-  to: PathLang,
-): PathStepProposal {
-  return {
-    ...current,
-    title: { ...current.title, [to]: answer.title[to] || current.title[to] },
-    prompt: { ...current.prompt, [to]: answer.prompt[to] ?? '' },
-    ...(current.gate ? { gate: { ...current.gate, [to]: answer.gate?.[to] ?? '' } } : {}),
-  };
-}
-
-/** Перевод полон: у второй стороны есть промпт и условие, если оно есть у правленой. */
-export function isTranslated(proposal: PathStepProposal, from: PathLang): boolean {
-  const to = otherLang(from);
-  if (!proposal.prompt[to].trim()) return false;
-  const gateFrom = proposal.gate?.[from].trim();
-  return !gateFrom || Boolean(proposal.gate?.[to].trim());
 }
 
 function targetIndex(target: ComposerTarget): number {

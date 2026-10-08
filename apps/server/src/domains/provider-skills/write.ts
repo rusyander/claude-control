@@ -1,7 +1,12 @@
 import { existsSync, statSync } from 'node:fs';
 import { basename, dirname } from 'node:path';
 import type { ProviderSkillDraft } from '@agentdeck/contracts';
-import { backupEntry, removeEntry, readTextFile, writeTextFile } from '../../lib/safe-io.ts';
+import {
+  backupEntry,
+  removeEntry,
+  readTextFile,
+  writeTextFile,
+} from '../../lib/safe-io/safe-io.ts';
 import {
   SKILL_DESCRIPTION_MAX,
   SKILL_NAME_MAX,
@@ -19,7 +24,7 @@ import {
 } from './errors.ts';
 import { resolveSkillPath, skillBackupName, toRelative } from './paths.ts';
 import type { ProviderSkillsTarget } from './types.ts';
-import { coded } from '../../lib/server-text.ts';
+import { coded } from '../../lib/server-text/server-text.ts';
 import type { ServerMessageCode } from '@agentdeck/contracts/server-messages';
 
 /**

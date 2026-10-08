@@ -1,6 +1,6 @@
 import type { SplitGroupAccepted } from '@agentdeck/contracts/chat-handoff';
-import { coded } from '../../lib/server-text.ts';
-import type { SplitConveyorStore } from './split-conveyor.ts';
+import { coded } from '../../lib/server-text/server-text.ts';
+import type { SplitConveyorStore } from './split-conveyor/split-conveyor.ts';
 
 /**
  * «Принять» доставленную группу разделения и «Снять отметку» (TK-accepted).

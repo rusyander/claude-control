@@ -1,0 +1,75 @@
+.wrap {
+  position: relative;
+}
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+}
+
+.panel {
+  position: absolute;
+  top: calc(100% + var(--spacing-2xs));
+  right: 0;
+  z-index: 61;
+  width: min(360px, calc(100vw - var(--spacing-xl)));
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  // Высоту под окно ставит useAnchoredPanel: шапка пульта остаётся, ужимается
+  // только список.
+  display: flex;
+  flex-direction: column;
+  max-height: var(--panel-max-block, none);
+}
+
+.head {
+  padding: var(--spacing-sm);
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* Ползунок громкости узкий: он делит строку со счётчиком агентов и тумблером,
+   а панель шириной 360px. */
+.volume {
+  width: 72px;
+  accent-color: var(--color-accent);
+  cursor: pointer;
+}
+
+.volumeValue {
+  min-width: 40px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-fg-subtle);
+  font: inherit;
+  font-size: var(--font-size-caption);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--color-fg);
+  }
+}
+
+.list {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 50vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.empty {
+  display: block;
+  padding: var(--spacing-md);
+  text-align: center;
+}
+
+.foot {
+  border-top: 1px solid var(--color-border);
+}

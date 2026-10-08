@@ -2,17 +2,15 @@ import { describe, expect, it } from 'vitest';
 import type { InboxChat } from '@agentdeck/contracts/chat-inbox';
 import { homeEn } from '../../shared/config/i18n/home/en';
 import { homeRu } from '../../shared/config/i18n/home/ru';
-import {
-  askKinds,
-  pendingCount,
-  projectGroups,
-  questionCards,
-  sentKeys,
-  stableChatKey,
-  staleSent,
-  toolSummary,
-  visibleAsks,
-} from './model';
+import { projectGroups } from './model';
+import { toolSummary } from './toolSummary';
+import { sentKeys } from './sentKeys';
+import { visibleAsks } from './visibleAsks';
+import { stableChatKey } from './stableChatKey';
+import { pendingCount } from './pendingCount';
+import { staleSent } from './staleSent';
+import { questionCards } from './questionCards';
+import { askKinds } from './askKinds';
 
 /**
  * Главный экран телефона: чаты по проектам и вопросы по чатам. Проверяем то,

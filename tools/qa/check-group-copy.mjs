@@ -7,7 +7,7 @@
  *
  * Сервер подменён (`group-stubs.mjs`, маршрут `/duplicate` как у настоящего);
  * независимость копии, новые id шагов и «ничего не гасит» доказывает
- * `apps/server/src/routes/group-duplicate-routes.integration.test.ts` на
+ * `apps/server/src/routes/group-duplicate-routes/group-duplicate-routes.integration.test.ts` на
  * настоящих маршрутах и временном каталоге.
  *
  * Запуск: `node tools/qa/check-group-copy.mjs` при поднятом `pnpm dev`

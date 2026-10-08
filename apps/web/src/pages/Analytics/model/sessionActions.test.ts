@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import type { SessionWhere } from '@agentdeck/contracts';
-import { goPlan, samePath, stopOutcome, stopPlan } from './sessionActions';
+import { goPlan, samePath } from './sessionActions';
+import { stopPlan } from './stopPlan';
+import { stopOutcome } from './stopOutcome';
 
 const ID = 'f104fdda-599b-4973-a272-fe5a515c08b7';
 const PROCESS: SessionWhere = {

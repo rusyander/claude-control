@@ -17,19 +17,16 @@ import {
   useSavePlatform,
 } from '@entities/Platform';
 import { useUpdateSettings } from '@entities/AppConfig';
-import {
-  confirmedCapabilities,
-  draftWithPatch,
-  finishCloses,
-  finishPlan,
-  initialTargets,
-  needsGatewayEnable,
-  savePayload,
-  stepAfter,
-  stepBefore,
-  toggled,
-  type WizardStep,
-} from './wizard-logic';
+import { finishPlan, stepAfter } from './wizard-logic';
+import { draftWithPatch } from './draftWithPatch';
+import { confirmedCapabilities } from './confirmedCapabilities';
+import { initialTargets } from './initialTargets';
+import { needsGatewayEnable } from './needsGatewayEnable';
+import { toggled } from './toggled';
+import { savePayload } from './savePayload';
+import { finishCloses } from './finishCloses';
+import type { WizardStep } from './wizard-logic.types';
+import { stepBefore } from './stepBefore';
 
 /**
  * Мастер подключения контура: четыре шага и вся их последовательность.

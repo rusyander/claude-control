@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { buildTree, countFiles, type TreeNode } from './buildTree';
+import { buildTree } from './buildTree';
+import type { TreeNode } from './buildTree.types';
+import { countFiles } from './countFiles';
 
 /**
  * Дерево файлов скилла. Сервер отдаёт плоские пути, а по узлу дерева потом

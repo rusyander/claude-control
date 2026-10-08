@@ -1,7 +1,6 @@
 import type {
   AppSettings,
   IntegrationId,
-  IntegrationLink,
   IntegrationsSettings,
   TelegramEvent,
 } from '@agentdeck/contracts';
@@ -124,27 +123,4 @@ export function readIntegrations(settings: AppSettings | undefined): Integration
       events: readTelegramEvents(webhook.events),
     },
   };
-}
-
-/** Настройки одного коннектора — тип выводится из его id, без ручных развилок. */
-export function readIntegration<T extends IntegrationId>(
-  settings: AppSettings | undefined,
-  id: T,
-): IntegrationsSettings[T] {
-  return readIntegrations(settings)[id];
-}
-
-/**
- * Пустая ли привязка. Отсутствующая и «привязка, из которой всё стёрли» — одно
- * и то же состояние для человека, и показывать её строкой не за что.
- */
-export function isLinkEmpty(link: IntegrationLink | undefined): boolean {
-  if (!link) return true;
-  return !(
-    link.jiraProjectKey ||
-    link.jiraIssueKey ||
-    link.confluencePageId ||
-    link.forgeRepo ||
-    link.note
-  );
 }

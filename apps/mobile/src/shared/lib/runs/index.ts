@@ -9,17 +9,15 @@ export {
   setAutoApprove,
   stop,
 } from './lifecycle';
-export {
-  findRunKey,
-  getRun,
-  quietRun,
-  runKeyFor,
-  runNamed,
-  useRun,
-  useRunKey,
-  useRuns,
-  visibleStatus,
-} from './store';
+export { useRunKey } from './store';
+export { useRuns } from './store';
+export { useRun } from './store';
+export { quietRun } from './store';
+export { runKeyFor } from './store';
+export { findRunKey } from './store';
+export { getRun } from './store';
+export { visibleStatus } from './store';
+export { runNamed } from './store';
 export type {
   ActiveRunInfo,
   AgentRun,

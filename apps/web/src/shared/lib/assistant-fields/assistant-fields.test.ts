@@ -1,11 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import {
-  assistantSchema,
-  groupMisses,
-  MAX_LISTED_OPTIONS,
-  readAssistantFields,
-} from './assistant-fields';
+import { assistantSchema, MAX_LISTED_OPTIONS } from './assistant-fields';
 import type { AssistantSpec } from './assistant-fields.types';
+import { groupMisses } from './groupMisses';
+import { readAssistantFields } from './readAssistantFields';
 
 const SPEC = {
   name: { type: 'text', hint: 'Name' },

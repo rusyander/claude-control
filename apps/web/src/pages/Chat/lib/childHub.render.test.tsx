@@ -6,7 +6,8 @@ import type { SplitPlanView } from '@agentdeck/contracts/chat-handoff';
 import type { ActiveRunView } from '@shared/lib/agent-runs';
 import { i18n } from '@shared/config/i18n';
 import { ChildStages } from '@features/ChatMessages';
-import { collectChildStages, treeForChat } from './childStages';
+import { collectChildStages } from './childStages';
+import { treeForChat } from './treeForChat';
 
 /**
  * Хаб родителя целиком: настоящая сводка (`collectChildStages` со склейкой

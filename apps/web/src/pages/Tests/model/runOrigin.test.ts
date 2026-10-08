@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { filterRunsByOrigin, hasBothOrigins, runLabelKeys, visibleRuns } from './runOrigin';
+import { filterRunsByOrigin } from './runOrigin';
+import { hasBothOrigins } from './hasBothOrigins';
+import { runLabelKeys } from './runLabelKeys';
+import { visibleRuns } from './visibleRuns';
 
 /**
  * История различает прогон автотестов панелью и импорт отчёта CI: обе записи —

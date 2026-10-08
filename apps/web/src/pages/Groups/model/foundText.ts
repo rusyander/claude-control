@@ -1,14 +1,10 @@
 import type { DiscoveredGroup } from '@agentdeck/contracts';
+import { uiLang } from './uiLang';
 
 export interface FoundText {
   name: string;
   when: string;
   why: string;
-}
-
-/** Язык интерфейса в том виде, в каком его знает сервер. */
-export function uiLang(language: string): 'ru' | 'en' {
-  return language.startsWith('en') ? 'en' : 'ru';
 }
 
 /**

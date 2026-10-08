@@ -1,7 +1,7 @@
 import type { HandoffRefusal } from '@agentdeck/contracts/chat-handoff';
 import type { CascadeStage } from '@agentdeck/contracts/model-cascade';
 import type { ServerMessageCode, ServerMessageParams } from '@agentdeck/contracts/server-messages';
-import type { BranchGateChild } from './ChatBranchGate.ts';
+import type { BranchGateChild } from './ChatBranchGate/ChatBranchGate.ts';
 import type { EscalationNotice, RecommendedPick } from '@agentdeck/contracts/chat-group-settings';
 
 /**

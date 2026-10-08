@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { panelHomeDir } from '../../lib/brand.mjs';
-import { removeEntry } from '../../lib/safe-io.ts';
+import { removeEntry } from '../../lib/safe-io/safe-io.ts';
 
 /** Корень всех песочниц — намеренно вне каталога Claude Code: туда писать нельзя. */
 export function sandboxRoot(): string {

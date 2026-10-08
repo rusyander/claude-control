@@ -1,6 +1,6 @@
 import type { UniversalMcpServerDraft } from '@agentdeck/contracts';
 import { isStringRecord, stringList } from './values.ts';
-import { coded } from '../../lib/server-text.ts';
+import { coded } from '../../lib/server-text/server-text.ts';
 
 // --- Общий разбор черновика (валидация на стороне сервера) -------------------
 

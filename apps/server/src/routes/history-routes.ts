@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { ServerContext } from '../context.ts';
-import { buildDiff, buildHistory, revertHunk } from '../domains/history.ts';
-import { trackedFiles } from '../domains/tracked-files.ts';
+import { buildDiff, buildHistory, revertHunk } from '../domains/history/history.ts';
+import { trackedFiles } from '../domains/tracked-files/tracked-files.ts';
 
 /**
  * История изменений конфигурации: лента правок и полный дифф отдельной копии.
@@ -9,7 +9,7 @@ import { trackedFiles } from '../domains/tracked-files.ts';
  * Читающие маршруты без побочных эффектов — как поиск. Разбираются только копии
  * известных файлов конфигурации; имя копии из запроса за пределы каталога не
  * уводит (проверка в домене). Набор файлов — файлы Claude плюс файлы активного
- * провайдера (см. `domains/tracked-files.ts`); секреты (`.mcp-secrets.env`,
+ * провайдера (см. `domains/tracked-files/tracked-files.ts`); секреты (`.mcp-secrets.env`,
  * `provider-keys.enc`, `provider-keys.key`) в разрешённые цели НЕ входят: их
  * построчный дифф раскрыл бы значения токенов в интерфейсе.
  */

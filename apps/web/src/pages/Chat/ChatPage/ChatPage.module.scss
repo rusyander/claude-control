@@ -1,0 +1,98 @@
+// Оболочка страницы чата: сверху лента табов рабочего пространства, под ней —
+// сама сетка чата. Высоту берём из колонки раздела (`flex: 1`), а не из
+// `100vh - var(--layout-header-height)`: верхней шапки у приложения нет, и та
+// формула отнимала её 56 пикселей впустую — снизу оставался пробел в 48px
+// против 8px сверху. Отрицательный отступ гасит `padding` области раздела
+// (`--spacing-xl`) не до нуля, а до ровной рамки в 8px со всех сторон.
+.shell {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  // Гасим padding области раздела не до нуля, а до ровной рамки в 8px. Значение
+  // margin следует за padding, который на узких экранах уменьшается
+  // (см. MainLayout `.content`): иначе на узком отрицательный отступ съедал
+  // больше, чем есть padding, и оболочка вылезала за край.
+  margin: calc(-1 * var(--spacing-lg)); // 32 padding − 8 рамка
+  overflow: hidden;
+
+  @media (max-width: 900px) {
+    margin: calc(-1 * var(--spacing-xs)); // 16 padding − 8 рамка
+  }
+
+  @media (max-width: 480px) {
+    margin: calc(-1 * var(--spacing-2xs)); // 12 padding − 8 рамка
+  }
+}
+
+// Чат занимает всю оставшуюся высоту: лента прокручивается внутри, а поле ввода
+// и список остаются на месте.
+.page {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  overflow: hidden;
+}
+
+// Список | разговор | ручка | превью. Ширину превью человек тянет ручкой
+// (`--preview-width`), но она не вправе съесть разговор: превью уступает, пока
+// разговору не останется $thread-min. Раньше ширина стояла в inline-стиле
+// готовой сеткой, перебивала все правила ниже, и на 1280 разговор сжимался до
+// столбика в одну букву.
+$thread-min: 420px;
+
+.pageWithPreview {
+  grid-template-columns:
+    300px minmax(0, 1fr) auto
+    max(280px, min(var(--preview-width, 520px), calc(100% - 300px - #{$thread-min})));
+}
+
+// Планшет: колонка списка ужимается, чтобы разговору осталось больше места.
+@media (max-width: 900px) {
+  .page {
+    grid-template-columns: 240px minmax(0, 1fr);
+  }
+
+  // Списку и превью рядом с разговором места нет — список уходит, пока
+  // превью открыто; закрыл превью — список вернулся.
+  .pageWithPreview {
+    grid-template-columns:
+      minmax(0, 1fr) auto
+      max(240px, min(var(--preview-width, 520px), calc(100% - 320px)));
+
+    > .sidebarCell {
+      display: none;
+    }
+  }
+}
+
+// Узкий экран: две колонки в 300px+ уже не помещаются и выезжали за край.
+// Складываем в одну колонку — список сверху отдельной прокручиваемой полосой,
+// разговор под ним. Так чат остаётся рабочим и на телефоне.
+@media (max-width: 640px) {
+  .page,
+  .pageWithPreview {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+@media (max-width: 1200px) and (min-width: 901px) {
+  .pageWithPreview {
+    grid-template-columns:
+      260px minmax(0, 1fr) auto
+      max(260px, min(var(--preview-width, 520px), calc(100% - 260px - #{$thread-min})));
+  }
+}
+
+// Ссылка на справку переехала в меню «Настройки чата» (ChatHeaderMenu):
+// своей шапки PageHeader у чата нет, а в ряду она занимала место наравне с
+// работой. Стили пункта живут там же, рядом с остальными пунктами меню.

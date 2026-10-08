@@ -1,0 +1,76 @@
+.scroll {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
+  text-align: left;
+  font-size: var(--font-size-body-sm);
+}
+
+// Выравнивание по высоте не задаётся: общее правило таблиц (global.scss) держит
+// ячейки на средней линии строки. `top` здесь ставил числа и кнопку к верху
+// строки, а имя сита с раскрытыми случаями — на сотню пикселей ниже них.
+.table th,
+.table td {
+  padding: var(--spacing-xs) var(--spacing-sm);
+}
+
+.table thead th {
+  border-bottom: 1px solid var(--color-border);
+  background-color: var(--color-surface-sunken);
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-caption);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.table tbody tr + tr th,
+.table tbody tr + tr td {
+  border-top: 1px solid var(--color-border);
+}
+
+// Имя сита — фраза, а не код: переносится, но не уже читаемой колонки.
+.table tbody th {
+  min-width: 16rem;
+  font-weight: 500;
+}
+
+.table td {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+// Случаи с расхождением под именем сита: обычный шрифт, по строке на случай.
+.cases {
+  margin-top: var(--spacing-3xs);
+  font-weight: 400;
+
+  summary {
+    cursor: pointer;
+    color: var(--color-fg-muted);
+    font-size: var(--font-size-caption);
+  }
+
+  ul {
+    margin: var(--spacing-3xs) 0 0;
+    padding-left: var(--spacing-md);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-3xs);
+  }
+
+  li {
+    display: flex;
+    flex-direction: column;
+  }
+}
+
+.miss {
+  overflow-wrap: anywhere;
+}

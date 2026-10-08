@@ -1,4 +1,5 @@
-import { countFiles, type TreeNode } from './buildTree';
+import type { TreeNode } from './buildTree.types';
+import { countFiles } from './countFiles';
 
 /**
  * Что именно удаляем — основа текста подтверждения.
@@ -23,14 +24,4 @@ export function planDelete(node: TreeNode): DeletePlan {
     isDirectory: node.isDirectory,
     fileCount: countFiles(node),
   };
-}
-
-/**
- * Попадает ли открытый файл под удаление. Проверяем не только сам путь, но и
- * вложенность: удалили папку — открытый внутри неё файл тоже исчез, и держать
- * его в редакторе нельзя, иначе правка уйдёт в несуществующий путь.
- */
-export function isRemovedByDelete(selected: string | undefined, deletedPath: string): boolean {
-  if (!selected) return false;
-  return selected === deletedPath || selected.startsWith(`${deletedPath}/`);
 }

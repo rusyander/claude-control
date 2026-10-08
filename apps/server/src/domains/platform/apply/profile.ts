@@ -10,7 +10,7 @@ import {
   sectionPath,
   type PlatformConsumerId,
 } from '@agentdeck/contracts/platform-consumers';
-import type { AppStore } from '../../../lib/app-store.ts';
+import type { AppStore } from '../../../lib/app-store/app-store.ts';
 
 /**
  * Управляемый профиль эндпоинта — то, ЧЕМ контур применяется.
@@ -201,7 +201,7 @@ export function reconcileManagedProfiles(store: AppStore): string[] {
  * пересборке плана значило бы уводить работающий контур на другую модель.
  *
  * Пусто — человек не выбирал ничего; чем дополнить пустоту, решает
- * `defaultModelOf` (`domains/platform/models.ts`), у которого есть каталог
+ * `defaultModelOf` (`domains/platform/models/models.ts`), у которого есть каталог
  * пробы. Здесь каталога нет намеренно: этот модуль импортирует `store.ts`, и
  * обратный импорт замкнул бы круг.
  */

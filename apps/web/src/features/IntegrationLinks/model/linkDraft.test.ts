@@ -1,14 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import type { ConfluencePage, IntegrationLinks, JiraIssue } from '@agentdeck/contracts';
-import {
-  cleanLink,
-  hasLink,
-  pickLink,
-  withConfluencePage,
-  withJiraIssue,
-  withoutConfluencePage,
-  withoutJiraIssue,
-} from './linkDraft';
+import { pickLink } from './linkDraft';
+import { withJiraIssue } from './withJiraIssue';
+import { withConfluencePage } from './withConfluencePage';
+import { withoutJiraIssue } from './withoutJiraIssue';
+import { withoutConfluencePage } from './withoutConfluencePage';
+import { cleanLink } from './cleanLink';
+import { hasLink } from './hasLink';
 
 const links: IntegrationLinks = {
   project: { jiraProjectKey: 'QA' },

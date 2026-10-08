@@ -6,13 +6,13 @@ import {
   platformManifestOf,
   shimByClientTools,
 } from '@agentdeck/contracts/platform-presets';
-import { anthropicRequestToOpenAi, chooseToolRoute } from '../gateway/dialect.ts';
+import { anthropicRequestToOpenAi, chooseToolRoute } from '../gateway/dialect/dialect.ts';
 import { defaultOurRules, defaultPlatformRules, type Platform } from '@agentdeck/contracts';
 import { allDrivers, driverFor, driverOf } from './index.ts';
 import { enterprisePlatformDriver } from './enterprise-platform.ts';
 import { openAiCompatDriver } from './openai-compat.ts';
-import { contourHeaders } from '../transport.ts';
-import { applyManagedRules } from '../rules-matrix.ts';
+import { contourHeaders } from '../transport/transport.ts';
+import { applyManagedRules } from '../rules-matrix/rules-matrix.ts';
 import { nativeMessagesPath } from '../gateway/anthropic-native.ts';
 
 /**

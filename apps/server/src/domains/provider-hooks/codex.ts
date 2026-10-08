@@ -1,7 +1,7 @@
 import { dirname, join } from 'node:path';
 import type { ProviderHooksInfo } from '@agentdeck/contracts';
-import { readTextFile } from '../../lib/safe-io.ts';
-import { parseCodexToml } from '../../lib/codex-toml.ts';
+import { readTextFile } from '../../lib/safe-io/safe-io.ts';
+import { parseCodexToml } from '../../lib/codex-toml/codex-toml.ts';
 
 /**
  * Что рядом с `hooks.json` Codex меняет судьбу его правил, хотя панель туда не пишет.

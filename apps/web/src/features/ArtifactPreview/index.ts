@@ -1,2 +1,2 @@
-export { ArtifactPreview } from './ui/ArtifactPreview';
-export { MediaImageCard } from './ui/MediaImageCard';
+export { ArtifactPreview } from './ui/ArtifactPreview/ArtifactPreview';
+export { MediaImageCard } from './ui/MediaImageCard/MediaImageCard';

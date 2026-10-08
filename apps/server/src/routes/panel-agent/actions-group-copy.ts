@@ -2,9 +2,9 @@ import { z } from 'zod';
 import type { AppSettings, Group } from '@agentdeck/contracts';
 import { groupCopyName, type GroupDuplicateResult } from '@agentdeck/contracts/groups';
 import { definePanelAction, type InjectRoute } from './registry.ts';
-import { card, encode, readRoute, routeFingerprint, stateCard } from './action-kit.ts';
-import { findGroup } from './actions-app.ts';
-import { dataField, textField } from './texts.ts';
+import { card, encode, readRoute, routeFingerprint, stateCard } from './action-kit/action-kit.ts';
+import { findGroup } from './actions-app/actions-app.ts';
+import { dataField, textField } from './texts/texts.ts';
 
 /**
  * «Копировать группу» для агента панели — тем же маршрутом, что кнопка окна

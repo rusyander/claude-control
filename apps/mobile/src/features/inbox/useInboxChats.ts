@@ -2,8 +2,8 @@ import { useMemo } from 'react';
 import type { UseQueryResult } from '@tanstack/react-query';
 import type { InboxChat } from '@agentdeck/contracts/chat-inbox';
 import { useInbox } from '../../entities/inbox/api';
-import { withLiveAsks } from '../../entities/inbox/liveAsks';
 import { useRuns } from '../../shared/lib/runs';
+import { withLiveAsks } from '../../entities/inbox/withLiveAsks';
 
 /**
  * Сводка «что идёт и кто ждёт» глазами телефона: ответ сервера плюс вопросы

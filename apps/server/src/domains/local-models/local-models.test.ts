@@ -16,7 +16,7 @@ import { countFetches, npmCliPath } from './qwen-code.ts';
 import { assetsFor, compareVersions, parseSha256Sums, pickRuntime } from './runtime.ts';
 import { parseNvidiaSmi } from './hardware.ts';
 import { connectLocal, localPlatformSettings, LOCAL_PLATFORM_ID } from './connect.ts';
-import { platformSchema } from '../../providers/settings-validation.ts';
+import { platformSchema } from '../../providers/settings-validation/settings-validation.ts';
 
 const dirs: string[] = [];
 const temp = (): string => {

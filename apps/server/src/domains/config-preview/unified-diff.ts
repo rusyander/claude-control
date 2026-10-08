@@ -1,5 +1,5 @@
-import { maskSecretsInText } from '../../lib/secret-mask.ts';
-import { diffLines } from '../history.ts';
+import { maskSecretsInText } from '../../lib/secret-mask/secret-mask.ts';
+import { diffLines } from '../history/history.ts';
 
 /**
  * Унифицированный дифф «было → станет» для карточки подтверждения.
@@ -57,11 +57,11 @@ function middleOps(a: string[], b: string[]): Op[] {
  * Значение секрета в строке диффа прячется. Карточку видит человек, но она
  * лежит и в `GET /api/agent/pending`, и в соседней строке контекста может
  * оказаться чужой токен, которого эта правка вообще не касается. Детектор —
- * общий для всего, что видит агент (`lib/secret-mask.ts`): заголовок в аргументе,
+ * общий для всего, что видит агент (`lib/secret-mask/secret-mask.ts`): заголовок в аргументе,
  * пароль в адресе и непрозрачный ключ прячутся так же, как пара «имя — значение».
  * Ссылка `${VAR}` — не секрет, она остаётся видна.
  */
-export { isSecretName, SECRET_MASK } from '../../lib/secret-mask.ts';
+export { isSecretName, SECRET_MASK } from '../../lib/secret-mask/secret-mask.ts';
 
 export function maskSecretsInLine(line: string): string {
   return maskSecretsInText(line);

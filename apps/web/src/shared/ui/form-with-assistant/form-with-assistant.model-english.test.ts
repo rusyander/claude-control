@@ -11,7 +11,7 @@ import ts from 'typescript';
  *
  * Сторож читает КАЖДУЮ форму фич с `FormWithAssistant`: новая форма с русской
  * схемой краснеет здесь, а не на живом прогоне. Описание полей (`spec`) часто
- * собирается в `model/*Assistant.ts` фичи — там сторож читает каждое `hint`.
+ * собирается в `model/*Assistant*.ts` фичи — там сторож читает каждое `hint`.
  * Подписи вариантов (`label`) — данные человека (имена правил, проектов), их
  * язык не проверяется.
  */
@@ -23,7 +23,7 @@ function formFiles(): string[] {
   for (const feature of readdirSync(FEATURES)) {
     const ui = join(FEATURES, feature, 'ui');
     // У фичи без папки ui форм нет — пропускаем её.
-    const names = existsSync(ui) ? readdirSync(ui) : [];
+    const names = existsSync(ui) ? readdirSync(ui, { recursive: true, encoding: 'utf8' }) : [];
     for (const name of names) {
       if (!name.endsWith('.tsx') || name.includes('.test.')) continue;
       const path = join(ui, name);
@@ -33,14 +33,19 @@ function formFiles(): string[] {
   return found;
 }
 
-/** Описания полей помощника в фичах: `model/<что-то>Assistant.ts`. */
+/**
+ * Описания полей помощника в фичах: `model/<что-то>Assistant<что-то>.ts`, тесты
+ * мимо. Хвост после `Assistant` нужен: описания групп вынесены в
+ * `groupAssistantSpec.ts`, и строгая маска `*Assistant.ts` молча их теряла.
+ */
 function specFiles(): string[] {
   const found: string[] = [];
   for (const feature of readdirSync(FEATURES)) {
     const model = join(FEATURES, feature, 'model');
     const names = existsSync(model) ? readdirSync(model) : [];
     for (const name of names) {
-      if (/Assistant\.ts$/.test(name)) found.push(join(model, name));
+      if (/Assistant\w*\.ts$/.test(name) && !/\.test\.ts$/.test(name))
+        found.push(join(model, name));
     }
   }
   return found;
@@ -103,9 +108,11 @@ describe('помощник формы — задание модели по-ан�
     expect(drift).toEqual([]);
   });
 
-  it('описания полей в model/*Assistant.ts — по-английски', () => {
+  it('описания полей в model/*Assistant*.ts — по-английски', () => {
     const files = specFiles();
     expect(files.length).toBeGreaterThanOrEqual(8);
+    // Каждый файл фичи с полем `hint` в описании помощника попал в обход.
+    expect(files.some((path) => path.endsWith('groupAssistantSpec.ts'))).toBe(true);
     const drift = files.flatMap((path) =>
       hintDrift(path, readFileSync(path, 'utf8')).map(
         (hit) => `${path.slice(FEATURES.length + 1).replaceAll('\\', '/')}:${hit}`,

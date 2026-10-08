@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { appendDictation, isDictating, isVoiceProblem, voiceView } from './voiceInput';
+import { voiceView } from './voiceInput';
+import { appendDictation } from './appendDictation';
+import { isDictating } from './isDictating';
+import { isVoiceProblem } from './isVoiceProblem';
 
 const base = { state: 'idle', supported: true, error: null, attempted: false } as const;
 

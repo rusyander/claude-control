@@ -10,7 +10,7 @@ import {
   secretsIn,
   untestedCodeIn,
   type Addition,
-} from './sieve-scan.ts';
+} from './sieve-scan/sieve-scan.ts';
 
 /**
  * Вход механики сит из git копии: добавленные файлы, их размер и то, что их

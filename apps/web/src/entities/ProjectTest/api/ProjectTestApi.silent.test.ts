@@ -8,7 +8,12 @@ vi.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({ invalidateQueries: vi.fn(), setQueryData: vi.fn() }),
 }));
 
-const api = await import('./ProjectTestApi');
+const api = {
+  ...(await import('./useSaveTestCase')),
+  ...(await import('./useCreateTestGroup')),
+  ...(await import('./useUpdateTestGroup')),
+  ...(await import('./useRemoveTestGroup')),
+};
 
 type Options = { meta?: { silentError?: boolean } };
 const metaOf = (hook: (path: string) => unknown): Options['meta'] => (hook('C:/p') as Options).meta;

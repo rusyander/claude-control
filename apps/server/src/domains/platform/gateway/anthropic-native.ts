@@ -1,8 +1,8 @@
 import type { IncomingMessage } from 'node:http';
 import type { Platform } from '@agentdeck/contracts';
 import type { PlatformDriver } from '../drivers/driver.ts';
-import { errorBody } from './dialect.ts';
-import type { TextLanguage } from '../../../lib/server-texts.ts';
+import { errorBody } from './dialect/dialect.ts';
+import type { TextLanguage } from '../../../lib/server-texts/server-texts.ts';
 
 /**
  * Платформа, говорящая на диалекте Anthropic сама (DRV-07): манифест объявил

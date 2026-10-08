@@ -9,7 +9,10 @@ vi.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({ invalidateQueries, setQueryData: vi.fn() }),
 }));
 
-const manual = await import('./ProjectTestManualApi');
+const manual = {
+  ...(await import('./useFinishManualRun')),
+  ...(await import('./useSaveManualResult')),
+};
 
 type WithSuccess = { onSuccess?: (session: unknown) => void };
 const keysInvalidated = (): unknown[] =>

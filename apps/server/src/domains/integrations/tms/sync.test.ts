@@ -3,8 +3,8 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { ProjectTestRunRecord, TmsPushResult } from '@agentdeck/contracts';
-import { createGroup, readGroup, upsertCase } from '../../project-tests/store.ts';
-import { readRun, writeRun } from '../../project-tests/runs-store.ts';
+import { createGroup, readGroup, upsertCase } from '../../project-tests/store/store.ts';
+import { readRun, writeRun } from '../../project-tests/runs-store/runs-store.ts';
 import { pullIntoGroup, pushRunToTms } from './sync.ts';
 import type { TmsClient, TmsRunPush } from './types.ts';
 

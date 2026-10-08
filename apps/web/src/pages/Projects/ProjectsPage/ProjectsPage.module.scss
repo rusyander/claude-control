@@ -1,0 +1,94 @@
+// Страница занимает всю колонку раздела — и по ширине, и по высоте: документ
+// инструкций дотягивается до низа окна, а не стоит коробкой фиксированной
+// высоты посреди пустого места. Прокрутка одна — у колонки раздела.
+.page {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  gap: var(--layout-section-gap);
+  min-width: 0;
+}
+
+// Мастер-деталь: слева реестр проектов, справа конфиг выбранного.
+.layout {
+  display: grid;
+  flex: 1 0 auto;
+  grid-template-columns: var(--layout-master-width) minmax(0, 1fr);
+  gap: var(--spacing-lg);
+  align-items: stretch;
+
+  // Узкий экран: реестр уезжает наверх, конфиг — под него.
+  @media (max-width: 900px) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+// Реестр липнет к верху прокрутки: длинный список прав не уводит выбор проекта
+// за экран.
+.registry {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2xs);
+  align-self: start;
+  min-width: 0;
+
+  @media (max-width: 900px) {
+    position: static;
+  }
+}
+
+.registryList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.projectButton {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  min-width: 0;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background var(--duration-fast),
+    border-color var(--duration-fast);
+
+  &:hover {
+    background: var(--color-surface-sunken);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 1px;
+  }
+}
+
+// Выбранный проект — заливкой и полосой слева: одной заливкой на светлой теме
+// он почти не отличался от наведённого.
+.projectButtonActive {
+  border-color: var(--color-accent-subtle);
+  background: var(--color-accent-subtle);
+  box-shadow: inset 3px 0 0 var(--color-accent);
+
+  &:hover {
+    background: var(--color-accent-subtle);
+  }
+}
+
+.projectPath {
+  display: block;
+  font-size: 11px;
+}

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MutationObserver, QueryClient } from '@tanstack/react-query';
 import { apiClient } from '@shared/api/client';
-import { cleanupGroupMutation } from './ChatTreeApi';
+import { cleanupGroupMutation } from './useCleanupGroup';
 
 /**
  * Уборка копии (Д19). Группа прошлого

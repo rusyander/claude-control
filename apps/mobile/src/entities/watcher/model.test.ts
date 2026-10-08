@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import type { WatcherStatus } from '@agentdeck/contracts';
 import { watcherEn } from '../../shared/config/i18n/watcher/en';
 import { watcherRu } from '../../shared/config/i18n/watcher/ru';
-import { formatUptime, watcherElapsedMs, watcherSpendText, watcherVisible } from './model';
+import { watcherVisible } from './model';
+import { watcherElapsedMs } from './watcherElapsedMs';
+import { formatUptime } from './formatUptime';
+import { watcherSpendText } from './watcherSpendText';
 
 /**
  * Значок наблюдателя на главной телефона: виден ли, сколько работает и сколько

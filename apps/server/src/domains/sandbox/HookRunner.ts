@@ -1,10 +1,10 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { killChildTree } from '../../lib/process-tree.ts';
+import { killChildTree } from '../../lib/process-tree/process-tree.ts';
 import { readDecision, tryParse } from './HookDecision.ts';
 import { CUSTOM_FIXTURE_ID, TIMEOUT_MS, isWindows } from './HookProbe.constants.ts';
 import type { EventFixture, ProbeResult } from './HookProbe.types.ts';
-import { serverText } from '../../lib/server-texts.ts';
+import { serverText } from '../../lib/server-texts/server-texts.ts';
 
 /**
  * Итог закрывшегося процесса хука. Кода выхода нет и таймаута не было — хук

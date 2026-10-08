@@ -5,6 +5,7 @@ import { hookApi } from '@entities/Hook';
 import { mcpServerApi } from '@entities/McpServer';
 import { permissionApi } from '@entities/Permission';
 import { useGroups } from '@entities/Group';
+import { firstLine } from '../lib/firstLine';
 
 export interface MemberLine {
   label: string;
@@ -61,13 +62,4 @@ export function useMemberLines(): (member: GroupMember) => MemberLine {
     if (known && member.scope?.kind !== 'project') return known;
     return { label: member.id };
   };
-}
-
-/** Первая непустая строка без markdown-заголовка — то, что влезает в строку карточки. */
-export function firstLine(text: string): string | undefined {
-  const line = text
-    .split('\n')
-    .map((item) => item.replace(/^#+\s*/, '').trim())
-    .find(Boolean);
-  return line || undefined;
 }

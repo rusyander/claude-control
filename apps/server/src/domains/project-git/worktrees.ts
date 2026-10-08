@@ -8,11 +8,11 @@ import type {
   WorktreeMirrorReport,
   WorktreeMirrorSettings,
 } from '@agentdeck/contracts';
-import { serverText } from '../../lib/server-texts.ts';
+import { serverText } from '../../lib/server-texts/server-texts.ts';
 import { GIT_NETWORK_TIMEOUT_MS } from './constants.ts';
 import { copyProjectAccess, dropProjectAccess } from './copy-access.ts';
 import { checkCopyReady, describeGaps } from './copy-readiness.ts';
-import { GitError, git, gitOutput, type GitOutput } from './exec.ts';
+import { GitError, git, gitOutput, type GitOutput } from './exec/exec.ts';
 import {
   LINK_DIRS,
   describeMirror,
@@ -24,7 +24,7 @@ import {
 import { parseChurn } from './lockfiles.ts';
 import { isGitRepo, requireRepo } from './read.ts';
 import { assertBranchName } from './write.ts';
-import { coded } from '../../lib/server-text.ts';
+import { coded } from '../../lib/server-text/server-text.ts';
 
 /**
  * Параллельные рабочие копии (`git worktree`) — то, чем несколько агентов

@@ -4,7 +4,11 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { ProjectTestCase } from '@agentdeck/contracts';
-import { runScope, startPermissionGate, type RunPermissionGate } from '../run-permissions.ts';
+import {
+  runScope,
+  startPermissionGate,
+  type RunPermissionGate,
+} from '../run-permissions/run-permissions.ts';
 import {
   QWEN_TESTS_EXCLUDED_TOOLS,
   QWEN_TOOL_NAMES,

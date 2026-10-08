@@ -2,15 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { envItemKinds, type EnvItemKind } from '@agentdeck/contracts/portable-env';
 import type { EnvSubscription, SubscriptionRow } from '@agentdeck/contracts/portable-subscribe';
 import { KIND_ORDER } from './passport';
-import {
-  ROW_STATE_ORDER,
-  ROW_STATE_TONE,
-  findSubscription,
-  hasLayers,
-  isLayerOn,
-  summarizeRows,
-  toggleLayer,
-} from './subscribe';
+import { ROW_STATE_ORDER, ROW_STATE_TONE } from './subscribe';
+import { findSubscription } from './findSubscription';
+import { hasLayers } from './hasLayers';
+import { isLayerOn } from './isLayerOn';
+import { toggleLayer } from './toggleLayer';
+import { summarizeRows } from './summarizeRows';
 
 const row = (
   itemId: string,

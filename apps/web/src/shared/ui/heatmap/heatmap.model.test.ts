@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { cellIntensity, gridPosition, labelStep } from './heatmap.model';
+import { gridPosition } from './heatmap.model';
+import { cellIntensity } from './cellIntensity';
+import { labelStep } from './labelStep';
 
 /**
  * Тепловая шкала читается по цвету, поэтому проверяем именно шкалу: пустая

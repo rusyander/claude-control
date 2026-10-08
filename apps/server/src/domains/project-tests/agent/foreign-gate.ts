@@ -1,5 +1,9 @@
-import { baseSystemSettings } from '../../groups/qwen-layer.ts';
-import { decidePermission, type PermissionDecision, type RunScope } from '../run-permissions.ts';
+import { baseSystemSettings } from '../../groups/qwen-layer/qwen-layer.ts';
+import {
+  decidePermission,
+  type PermissionDecision,
+  type RunScope,
+} from '../run-permissions/run-permissions.ts';
 
 /**
  * Проверка прав прогона тестов у чужого CLI (Qwen Code, Codex).

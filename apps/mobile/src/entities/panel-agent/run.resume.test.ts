@@ -17,11 +17,15 @@ vi.mock('../../shared/config/i18n', async () => {
 });
 vi.mock('../../shared/api/client', () => ({
   apiUrl: (path: string) => `http://panel/api${path}`,
+}));
+vi.mock('../../shared/api/authHeaders', () => ({
   authHeaders: () => ({ Authorization: 'Bearer phone-token' }),
 }));
 
-const { STREAM_LOST, runResumablePanelAgent, splitSeqFrames, stopPanelAgent } =
-  await import('./run');
+const { STREAM_LOST } = await import('./run.constants');
+const { runResumablePanelAgent } = await import('./runResumablePanelAgent');
+const { splitSeqFrames } = await import('./run');
+const { stopPanelAgent } = await import('./stopPanelAgent');
 
 function streamOf(text: string): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();

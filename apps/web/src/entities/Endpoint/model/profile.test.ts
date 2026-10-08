@@ -1,13 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import type { EndpointProfile } from '@agentdeck/contracts';
-import {
-  ENDPOINT_API_KINDS,
-  ENDPOINT_BASE_URL_SAMPLE,
-  isProfileComplete,
-  newEndpointProfile,
-  removeProfile,
-  replaceProfile,
-} from './profile';
+import { ENDPOINT_API_KINDS, ENDPOINT_BASE_URL_SAMPLE, newEndpointProfile } from './profile';
+import { replaceProfile } from './replaceProfile';
+import { removeProfile } from './removeProfile';
+import { isProfileComplete } from './isProfileComplete';
 
 /**
  * Список профилей своего эндпоинта на стороне клиента.

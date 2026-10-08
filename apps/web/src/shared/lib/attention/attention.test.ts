@@ -1,13 +1,11 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import type { ActiveRunView } from '@shared/lib/agent-runs';
-import {
-  attentionReasons,
-  attentionTitle,
-  isLookingAt,
-  quietRunIds,
-  runKeyPrefix,
-  selectAttention,
-} from './attention';
+import { runKeyPrefix } from './runKeyPrefix';
+import { quietRunIds } from './quietRunIds';
+import { isLookingAt } from './isLookingAt';
+import { attentionTitle } from './attentionTitle';
+import { attentionReasons } from './attentionReasons';
+import { selectAttention } from './selectAttention';
 
 /**
  * Метка в браузере зовёт человека за НОВЫЙ повод и гаснет, как только он его

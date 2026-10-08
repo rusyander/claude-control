@@ -1,8 +1,8 @@
 import { existsSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type { ClaudePaths, SlashCommand } from '@agentdeck/contracts';
-import type { AppStore } from '../../lib/app-store.ts';
-import { readSkills, SKILLS_DISABLED_DIR } from '../skills.ts';
+import type { AppStore } from '../../lib/app-store/app-store.ts';
+import { readSkills, SKILLS_DISABLED_DIR } from '../skills/skills.ts';
 import { FILE_LIMIT, isDirectory, readJson } from './io.ts';
 import { commandFiles, sortCommands } from './list.ts';
 import { readMdCommand, trim } from './parse.ts';

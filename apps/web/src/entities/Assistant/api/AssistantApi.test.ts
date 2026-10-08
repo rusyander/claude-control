@@ -8,7 +8,7 @@ vi.mock('@shared/api/client', async () => {
   return { ...actual, apiClient: { post } };
 });
 
-const { runAssistant } = await import('./AssistantApi');
+const { runAssistant } = await import('../lib/runAssistant');
 const { LONG_TIMEOUTS } = await import('@shared/api/client');
 
 const body: AssistantRunRequest = { messages: [{ role: 'user', content: 'привет' }] };

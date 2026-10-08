@@ -4,7 +4,9 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { ChildStageGroup } from '../ui/ChildStages.types';
-import { isFinishedGroup, isMrSettled, orderHubGroups } from './hubOrder';
+import { isFinishedGroup } from './hubOrder';
+import { isMrSettled } from './isMrSettled';
+import { orderHubGroups } from './orderHubGroups';
 
 function row(title: string, extra: Partial<ChildStageGroup> = {}): ChildStageGroup {
   return { chatId: `c-${title}`, title, stages: ['work'], isRunning: false, ...extra };

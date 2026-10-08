@@ -10,8 +10,8 @@ import { Toaster } from '@shared/ui/toast';
 import { CrashCard, ErrorBoundary } from '@shared/ui/error-boundary';
 import '@shared/api/mutation-meta';
 import { queryClient } from './queryClient';
-import { ThemeProvider } from './providers/ThemeProvider';
-import { FileWatchProvider } from './providers/FileWatchProvider';
+import { ThemeProvider } from './providers/ThemeProvider/ThemeProvider';
+import { FileWatchProvider } from './providers/FileWatchProvider/FileWatchProvider';
 import { router } from './router/router';
 import '@shared/styles/global.scss';
 

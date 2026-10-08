@@ -2,9 +2,13 @@ import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Group } from '@agentdeck/contracts';
 import { migrateScenarioSteps } from '@agentdeck/contracts/group-path';
-import { readTextFile } from '../../lib/safe-io.ts';
+import { readTextFile } from '../../lib/safe-io/safe-io.ts';
 import type { EntityToggleDeps } from '../entity-toggle.ts';
-import { buildScenarioBody, hasScenario, retireScenarioHooks } from '../group-scenario.ts';
+import {
+  buildScenarioBody,
+  hasScenario,
+  retireScenarioHooks,
+} from '../group-scenario/group-scenario.ts';
 import { splitFrontmatter } from '../skills/frontmatter.ts';
 import { deleteSkill } from '../skills/lifecycle.ts';
 import { disabledSkillsDir } from '../skills/paths.ts';

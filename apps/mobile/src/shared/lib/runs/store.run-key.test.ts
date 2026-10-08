@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { forgetRun, runKeyFor, runNamed, setRun } from './store';
 import { EMPTY_RUN, type AgentRun } from './types';
+import { runNamed, setRun, runKeyFor, forgetRun } from './store';
 
 /**
  * Ход со стола идёт под временным `new-…`, а телефон открывает разговор по

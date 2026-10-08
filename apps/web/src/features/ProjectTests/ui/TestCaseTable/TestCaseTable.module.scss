@@ -1,0 +1,86 @@
+// Ниже этой высоты колонки библиотеки не сжимаются, прокручивается страница.
+$library-floor: 320px;
+
+// Колонка названия не уже этого: на узком экране значки статуса и важности не
+// переносятся, и без нижней границы название складывалось в столбик по слову.
+.cellTitle {
+  min-width: 240px;
+}
+
+.tableWrap {
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-body-sm);
+
+  th,
+  td {
+    padding: var(--spacing-3xs) var(--spacing-2xs);
+    text-align: left;
+    // Средняя линия строки — от глобальной основы таблиц (global.scss): значки
+    // статуса, текст и кнопки строки стоят на одной оси с заголовком.
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--color-surface);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+}
+
+.tableCaption {
+  caption-side: top;
+  text-align: left;
+  padding-bottom: var(--spacing-3xs);
+  font-size: var(--font-size-caption);
+  color: var(--color-text-subtle);
+}
+
+.tableRow:hover {
+  background: var(--color-surface-sunken);
+}
+
+// Провал видно по списку, не раскрывая кейс: полоса слева читается быстрее
+// подписи и не занимает колонку.
+.tableRowFailed {
+  box-shadow: inset 3px 0 0 0 var(--color-danger);
+}
+
+.tableRowArchived {
+  opacity: 0.55;
+}
+
+.cellCheck {
+  width: 28px;
+}
+
+.caseLink {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+// Скрыто визуально, но читается диктором: заголовок колонки с кнопками.
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

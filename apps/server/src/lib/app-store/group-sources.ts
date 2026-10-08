@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { MemberAdvice, StoredProjectChoice } from '@agentdeck/contracts/group-sources';
-import { readJsonFile, writeJsonFile } from '../safe-io.ts';
+import { readJsonFile, writeJsonFile } from '../safe-io/safe-io.ts';
 import { normalizeProjectPath } from './projects.ts';
 
 /**

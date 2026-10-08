@@ -1,0 +1,15 @@
+// Ниже этой высоты колонки библиотеки не сжимаются, прокручивается страница.
+$library-floor: 320px;
+
+.narrowField {
+  width: 120px;
+}
+
+.halfField {
+  flex: 1;
+  min-width: 220px;
+
+  > * {
+    width: 100%;
+  }
+}

@@ -1,15 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { defaultOurRules } from '@agentdeck/contracts';
+import { defaultOurRules, defaultPlatformTransport } from '@agentdeck/contracts';
 import type { Platform, PlatformAgentAnswer } from '@agentdeck/contracts';
-import {
-  askBlocker,
-  outcomeTone,
-  sessionLine,
-  showsAgents,
-  warnsCut,
-  warnsSessionGap,
-} from './agentsView';
-import { defaultPlatformTransport } from '@agentdeck/contracts';
+import { askBlocker } from './agentsView';
+import { outcomeTone } from './outcomeTone';
+import { warnsSessionGap } from './warnsSessionGap';
+import { warnsCut } from './warnsCut';
+import { showsAgents } from './showsAgents';
+import { sessionLine } from './sessionLine';
 
 const PLATFORM: Platform = {
   id: 'company-dev',

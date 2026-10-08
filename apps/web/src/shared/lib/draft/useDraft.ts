@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { loadDraft, saveDraft } from './draft-storage';
+import { loadDraft } from './draft-storage';
+import { saveDraft } from './saveDraft';
 
 /**
  * Черновик поля, привязанный к ключу контекста и сохраняемый в localStorage.

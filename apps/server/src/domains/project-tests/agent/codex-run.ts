@@ -1,13 +1,13 @@
 import type { ChildProcessWithoutNullStreams } from 'node:child_process';
-import { spawnCliProcess } from '../../../lib/cli-spawn.ts';
-import { killChildTree } from '../../../lib/process-tree.ts';
+import { spawnCliProcess } from '../../../lib/cli-spawn/cli-spawn.ts';
+import { killChildTree } from '../../../lib/process-tree/process-tree.ts';
 import {
   openCodexThread,
   startCodexTurn,
   steerCodexTurn,
 } from '../../provider-chat/live/codex-session.ts';
 import { StdioRpc, type RpcIncoming } from '../../provider-chat/live/stdio-rpc.ts';
-import type { PermissionDecision } from '../run-permissions.ts';
+import type { PermissionDecision } from '../run-permissions/run-permissions.ts';
 import type { TestsAgentEvent, TestsAgentRun, TestsAgentStartOptions } from './agent-run.types.ts';
 import {
   codexChangesOf,

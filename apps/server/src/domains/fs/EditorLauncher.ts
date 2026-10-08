@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from 'node:child_process';
-import { shellArgs } from '../../lib/cli-args.ts';
+import { shellArgs } from '../../lib/cli-args/cli-args.ts';
 
 /**
  * Открытие проекта во внешнем редакторе кода. Панель умеет и сама вести агента в

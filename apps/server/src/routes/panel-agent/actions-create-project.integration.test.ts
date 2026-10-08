@@ -15,17 +15,20 @@ import { tmpdir } from 'node:os';
 import type { ProjectAdded } from '@agentdeck/contracts';
 import type { PanelActionResult, PanelPendingAction } from '@agentdeck/contracts/panel-agent';
 import { PANEL_AGENT_HEADER } from '@agentdeck/contracts/panel-agent';
-import { AppStore } from '../../lib/app-store.ts';
+import { AppStore } from '../../lib/app-store/app-store.ts';
 import type { ServerContext } from '../../context.ts';
-import { registerAccessGate } from '../../lib/access-gate.ts';
+import { registerAccessGate } from '../../lib/access-gate/access-gate.ts';
 import { registerEmptyBodyGuard } from '../../lib/empty-body.ts';
-import { createEventHub } from '../../lib/event-hub.ts';
-import { allowedOrigins } from '../../lib/origin-guard.ts';
-import { PanelPendingActions } from '../../domains/panel-agent/pending.ts';
-import { ProjectTestManualRegistry, ProjectTestRunRegistry } from '../../domains/project-tests.ts';
-import { registerProjectRoutes } from '../project-routes.ts';
-import { registerProjectTestsRoutes } from '../project-tests-routes.ts';
-import { registerPanelAgentRoutes } from './panel-agent-routes.ts';
+import { createEventHub } from '../../lib/event-hub/event-hub.ts';
+import { allowedOrigins } from '../../lib/origin-guard/origin-guard.ts';
+import { PanelPendingActions } from '../../domains/panel-agent/pending/pending.ts';
+import {
+  ProjectTestManualRegistry,
+  ProjectTestRunRegistry,
+} from '../../domains/project-tests/project-tests.ts';
+import { registerProjectRoutes } from '../project-routes/project-routes.ts';
+import { registerProjectTestsRoutes } from '../project-tests-routes/project-tests-routes.ts';
+import { registerPanelAgentRoutes } from './panel-agent-routes/panel-agent-routes.ts';
 
 /**
  * `create_project` — не только запись в реестре: маршрут добавления сводит

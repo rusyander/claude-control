@@ -1,0 +1,10 @@
+.sectionText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3xs);
+  min-width: 0;
+}
+
+.sectionHint {
+  max-width: var(--text-measure);
+}

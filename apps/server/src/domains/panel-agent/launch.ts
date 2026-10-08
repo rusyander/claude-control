@@ -1,17 +1,17 @@
 import type { PanelAgentRunRefusalCode } from '@agentdeck/contracts/panel-agent';
 import type { ServerMessageCode } from '@agentdeck/contracts/server-messages';
 import { PLATFORM_ASSISTANT_CONSUMER } from '@agentdeck/contracts/platform-consumers';
-import type { AppStore } from '../../lib/app-store.ts';
+import type { AppStore } from '../../lib/app-store/app-store.ts';
 import { claudeProvider } from '../../providers/claude.ts';
-import { detectCliOnPath, findCliOnPath } from '../../providers/detect.ts';
-import { providerCliCandidates } from '../../providers/cli.ts';
+import { detectCliOnPath, findCliOnPath } from '../../providers/detect/detect.ts';
+import { providerCliCandidates } from '../../providers/cli/cli.ts';
 import { getActiveProvider } from '../../providers/registry.ts';
 import { buildEndpointPlan } from '../endpoints/endpoint-plan.ts';
 import { PLACEHOLDER_KEY } from '../platform/apply/profile.ts';
 import { targetProfile } from '../platform/apply/targets.ts';
-import { contourRunPrompt } from '../platform/routing.ts';
-import { readPlatforms, readToken } from '../platform/store.ts';
-import { panelAgentDialectOf, type PanelAgentDialect } from './foreign-cli.ts';
+import { contourRunPrompt } from '../platform/routing/routing.ts';
+import { readPlatforms, readToken } from '../platform/store/store.ts';
+import { panelAgentDialectOf, type PanelAgentDialect } from './foreign-cli/foreign-cli.ts';
 
 /**
  * Чем пойдёт ход агента панели — решение ДО запуска, без сети и без записи.

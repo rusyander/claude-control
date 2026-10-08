@@ -1,0 +1,116 @@
+.rows {
+  display: flex;
+  flex-direction: column;
+}
+
+// Заголовок вида — кнопка «развернуть»: вся строка, а не значок, чтобы попасть
+// по ней и пальцем, и с клавиатуры (Enter/Space, `aria-expanded`).
+.kindHeading {
+  margin: 0;
+}
+
+.kindHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-xs);
+  width: 100%;
+  padding: var(--spacing-3xs) 0;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+}
+
+// Требование, общее для всего вида: одна строка над списком вместо повтора в каждой.
+.sharedNeeds {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-3xs) var(--spacing-xs);
+  padding: var(--spacing-2xs) var(--spacing-xs);
+  border-radius: 8px;
+  background: var(--color-surface-sunken);
+
+  > * {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: var(--spacing-sm);
+  align-items: start;
+  padding: var(--spacing-2xs) var(--spacing-xs);
+  border-radius: 8px;
+
+  &:nth-child(odd) {
+    background: var(--color-surface-sunken);
+  }
+
+  // Пропуск — не запись: полоса слева отличает «этого мы не прочитали» от
+  // «это у вас есть», не крася строку целиком (бейджи справа сами несут цвет).
+  &[data-skip='true'] {
+    box-shadow: inset 2px 0 0 var(--color-warning);
+  }
+
+  // Пустой раздел — тоже не запись, но и не беда: полоса приглушённая, иначе
+  // страница обычного дома целиком в предупреждениях, и настоящее из них не
+  // видно.
+  &[data-skip='empty'] {
+    box-shadow: inset 2px 0 0 var(--color-border);
+  }
+}
+
+// Намерение записи — целая фраза, и длинная: описание скилла бывает в две
+// строки. Без переноса по словам она уезжает под соседнюю колонку и там
+// обрезается — то есть человек читает половину смысла записи.
+.intent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3xs);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+// Путь к файлу-источнику: моноширинный и приглушённый — он подпись, а не смысл.
+.source {
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  color: var(--color-fg-subtle);
+}
+
+.needs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-3xs);
+  min-width: 0;
+  justify-content: flex-end;
+
+  > * {
+    min-width: 0;
+  }
+}
+
+// На узком экране две колонки не помещаются: требования уходят под намерение,
+// а не жмут его до одного слова в строке.
+@media (width <= 720px) {
+  .row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .needs {
+    justify-content: flex-start;
+  }
+}

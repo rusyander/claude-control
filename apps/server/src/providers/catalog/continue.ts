@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { buildCapabilities, type ConfigProvider } from '../types.ts';
+import { buildCapabilities, type ConfigProvider } from '../types/types.ts';
 import { continueHome, unimplementedPaths } from './config-dirs.ts';
 import { continueOneShotArgs } from './continue-args.ts';
 

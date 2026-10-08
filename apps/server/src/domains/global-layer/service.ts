@@ -10,7 +10,7 @@ import type {
   GlobalLayerTransferRequest,
   GlobalLayerTransferResponse,
 } from '@agentdeck/contracts';
-import { readJsonFile, writeJsonFile, writeTextFile } from '../../lib/safe-io.ts';
+import { readJsonFile, writeJsonFile, writeTextFile } from '../../lib/safe-io/safe-io.ts';
 import { diffLines } from '../history/diff.ts';
 import {
   PANEL_REPO_ROOT,

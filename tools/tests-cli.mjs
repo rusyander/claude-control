@@ -156,9 +156,14 @@ function relaunchIfNeeded() {
   process.exit(result.status ?? 1);
 }
 
-/** Модуль домена по имени файла. Отдельной функцией — путь один на все команды. */
+/**
+ * Модуль домена по имени. Отдельной функцией — путь один на все команды. Модуль
+ * с тестами лежит в своей папке (`store/store.ts`), одиночный — файлом рядом.
+ */
 async function domain(name) {
-  return await import(pathToFileURL(join(DOMAIN, `${name}.ts`)).href);
+  const folded = join(DOMAIN, name, `${name}.ts`);
+  const file = existsSync(folded) ? folded : join(DOMAIN, `${name}.ts`);
+  return await import(pathToFileURL(file).href);
 }
 
 function parseArgs(argv) {

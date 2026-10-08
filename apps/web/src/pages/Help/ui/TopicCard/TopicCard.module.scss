@@ -1,0 +1,53 @@
+/* ── Карточка раздела в индексе ─────────────────────────────────────── */
+
+// Ячейку сетки растягивает сама сетка, но растянуться должна карточка, а не
+// только ссылка-обёртка вокруг неё: иначе в ряду соседствуют коробки разной
+// высоты, хотя занимают одинаковые ячейки.
+.topicLink {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-lg);
+  color: inherit;
+  text-decoration: none;
+
+  > * {
+    height: 100%;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+}
+
+.topicIcon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  background-color: var(--color-accent-subtle);
+  color: var(--color-accent);
+}
+
+.topicSummary {
+  overflow-wrap: anywhere;
+}
+
+.topicChevron {
+  color: var(--color-fg-subtle);
+  flex-shrink: 0;
+  transition: transform var(--duration-fast) ease;
+}
+
+.topicLink:hover .topicChevron {
+  transform: translateX(2px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .topicChevron {
+    transition: none;
+  }
+}

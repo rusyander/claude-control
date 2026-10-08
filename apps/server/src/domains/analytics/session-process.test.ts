@@ -4,7 +4,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync, utimesSync } from 'no
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { filetimeFromMs } from '../../lib/kill-tree.mjs';
-import { killPidTree, wasStoppedOnPurpose } from '../../lib/process-tree.ts';
+import { killPidTree, wasStoppedOnPurpose } from '../../lib/process-tree/process-tree.ts';
 import {
   ancestorsOf,
   hostOf,

@@ -6,10 +6,10 @@ import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { SelectField } from '@shared/ui/select-field';
 import { toast } from '@shared/lib/toast';
-import { toErrorMessage } from '@shared/api/client';
 import { useSetKitProviderMode } from '@entities/Kit';
 import type { KitModesCardProps } from './KitModesCard.types';
 import styles from './KitModesCard.module.scss';
+import { toErrorMessage } from '../../../shared/api/toErrorMessage';
 
 /**
  * Кто получает набор: режим на каждый CLI. Тот, кому набор не подключить на один

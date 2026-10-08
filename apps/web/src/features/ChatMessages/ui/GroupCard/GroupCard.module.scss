@@ -1,0 +1,137 @@
+.group {
+  position: relative;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface-sunken);
+}
+
+// MR влит (владелец 06.10.2026): работа кончена совсем — зелёный оттенок и
+// приглушённый текст, карточка стоит в самом низу (`hubOrder.ts`). Закрытый MR —
+// только приглушён: он кончен, но не успехом.
+.groupMerged {
+  border-color: color-mix(in srgb, var(--color-success) 35%, var(--color-border));
+  background: var(--color-success-subtle);
+  color: var(--color-fg-muted);
+}
+
+.groupClosed {
+  color: var(--color-fg-muted);
+  opacity: 0.8;
+}
+
+// Карточка с чатом кликабельна целиком, поэтому наведение видно в ОБЕИХ темах.
+.groupOpenable {
+  cursor: pointer;
+
+  &:hover {
+    border-color: var(--color-border-strong);
+  }
+}
+
+// Текст слева, кнопки справа сверху. Тесно — кнопки переносятся в своём же
+// блоке, оставаясь справа; под текст уходят только на узком экране.
+.groupBody {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-2xs) var(--spacing-sm);
+
+  @media (max-width: 640px) {
+    flex-wrap: wrap;
+  }
+}
+
+.groupMain {
+  display: flex;
+  flex: 1 1 240px;
+  align-items: flex-start;
+  gap: var(--spacing-2xs);
+  min-width: 0;
+}
+
+// Точка — по строке названия, а не по середине карточки.
+.groupDot {
+  display: inline-flex;
+  flex: none;
+  margin-top: 6px;
+}
+
+// Растянутая кнопка: её ::after накрывает карточку, так что открывает клик в
+// любом месте; кнопки и формы стоят над ним (z-index), и их клик — свой.
+.groupOpen {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  &::after {
+    position: absolute;
+    inset: 0;
+    border-radius: 8px;
+    content: '';
+  }
+
+  &:focus-visible {
+    outline: none;
+  }
+
+  &:focus-visible::after {
+    outline: 2px solid var(--color-accent);
+    outline-offset: -2px;
+  }
+}
+
+.groupActions {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--spacing-2xs);
+  max-width: 65%;
+  margin-left: auto;
+
+  @media (max-width: 640px) {
+    max-width: none;
+  }
+
+  &:empty {
+    display: none;
+  }
+
+  // Обёртки кнопок несут свой верхний отступ для жизни под строкой — в ряду
+  // кнопок он сбивал их по высоте.
+  &.groupActions > * {
+    margin-top: 0;
+  }
+}
+
+// Кнопка MR и её номер в очереди слияния (G3) — один кусок ряда кнопок:
+// перенос не отрывает номер от кнопки, к которой он относится.
+.mrPair {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--spacing-2xs);
+}
+
+.groupFoot {
+  position: relative;
+  z-index: 1;
+  margin-top: var(--spacing-2xs);
+  padding-left: calc(8px + var(--spacing-2xs));
+}
+
+.holdActions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--spacing-2xs);
+}

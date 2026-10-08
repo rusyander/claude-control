@@ -1,7 +1,7 @@
 import { homedir } from 'node:os';
 import type { spawn as nodeSpawn } from 'node:child_process';
-import { spawnCliProcess } from '../../lib/cli-spawn.ts';
-import { killChildTree } from '../../lib/process-tree.ts';
+import { spawnCliProcess } from '../../lib/cli-spawn/cli-spawn.ts';
+import { killChildTree } from '../../lib/process-tree/process-tree.ts';
 
 /**
  * Запуск команд плагинов чужого CLI: `qwen extensions …` (MAP 25), `codex

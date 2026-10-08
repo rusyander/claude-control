@@ -18,8 +18,8 @@ import {
   readRoute,
   SECRET_REFUSAL,
   stateCard,
-} from './action-kit.ts';
-import { dataField, textField } from './texts.ts';
+} from './action-kit/action-kit.ts';
+import { dataField, textField } from './texts/texts.ts';
 import { testsPage, testsQuery as query } from './tests-page.ts';
 import { caseFilter, idOf, named, projectPath, schemaShown, viewOf } from './tests-block-kit.ts';
 

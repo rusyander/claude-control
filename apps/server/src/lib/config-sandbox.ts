@@ -1,7 +1,7 @@
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { removeEntry } from './safe-io.ts';
+import { removeEntry } from './safe-io/safe-io.ts';
 
 /**
  * Временная копия файла конфигурации — «песочница» для записи.

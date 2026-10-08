@@ -1,16 +1,6 @@
 import type { MessageUsage } from '@agentdeck/contracts';
-import { EMPTY_RUN } from './agent-runs.constants';
 import type { AgentRun, HandoffEvent } from './agent-runs.types';
-
-/**
- * Живое состояние стора: сами прогоны, их потоки и подписчики. Лежит в модуле, а
- * не в React-состоянии, потому что прогон переживает и смену таба, и размонтаж
- * страницы; компоненты подключаются к нему через `useSyncExternalStore`.
- */
-
-export const runs = new Map<string, AgentRun>();
 export const controllers = new Map<string, AbortController>();
-const listeners = new Set<() => void>();
 
 /** Последний полученный seq по прогону — точка догоняния при переподключении. */
 export const lastSeqs = new Map<string, number>();
@@ -72,36 +62,3 @@ export const callbacks: {
    */
   rebalance?: () => void;
 } = {};
-
-export function emit(): void {
-  for (const listener of listeners) listener();
-}
-
-export function setRun(id: string, patch: Partial<AgentRun>): void {
-  const current = runs.get(id) ?? { ...EMPTY_RUN, id };
-  runs.set(id, { ...current, ...patch });
-}
-
-/**
- * Ключ прогона по id чата. Новый чат стартует под временным id (`new-…`), а
- * потом получает настоящий sessionId; чтобы отображение не потеряло прогон при
- * смене id, ищем и по sessionId.
- */
-export function findKey(id: string | undefined): string | undefined {
-  if (!id) return undefined;
-  if (runs.has(id)) return id;
-  for (const [key, run] of runs) if (run.sessionId === id) return key;
-  return undefined;
-}
-
-export function getRun(id: string | undefined): AgentRun {
-  const key = findKey(id);
-  return (key && runs.get(key)) || EMPTY_RUN;
-}
-
-export function subscribeRuns(listener: () => void): () => void {
-  listeners.add(listener);
-  return () => {
-    listeners.delete(listener);
-  };
-}

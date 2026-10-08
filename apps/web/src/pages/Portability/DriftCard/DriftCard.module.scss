@@ -1,0 +1,21 @@
+.summary {
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+// Путь к файлу-источнику: моноширинный и приглушённый — он подпись, а не смысл.
+.source {
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  color: var(--color-fg-subtle);
+}
+
+// Карточка расхождения: своя рамка и отступ — это отдельный разговор про один
+// файл, а не ещё одна строка плана.
+.driftCard {
+  padding: var(--spacing-xs);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface-sunken);
+}

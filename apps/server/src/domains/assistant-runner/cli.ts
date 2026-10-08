@@ -1,6 +1,6 @@
-import { killChildTree } from '../../lib/process-tree.ts';
-import { spawnCliProcess } from '../../lib/cli-spawn.ts';
-import { serverText } from '../../lib/server-texts.ts';
+import { killChildTree } from '../../lib/process-tree/process-tree.ts';
+import { spawnCliProcess } from '../../lib/cli-spawn/cli-spawn.ts';
+import { serverText } from '../../lib/server-texts/server-texts.ts';
 import { withCodexKit } from '../kit/codex.ts';
 import {
   readStreamJsonResult,
@@ -8,12 +8,12 @@ import {
   streamJsonUserLine,
   writeAgentImages,
   type AgentImage,
-} from '../../lib/agent-images.ts';
-import type { ConfigProvider } from '../../providers/types.ts';
-import { providerCliCommand } from '../../providers/cli.ts';
-import { opencodeServe } from '../opencode-serve.ts';
+} from '../../lib/agent-images/agent-images.ts';
+import type { ConfigProvider } from '../../providers/types/types.ts';
+import { providerCliCommand } from '../../providers/cli/cli.ts';
+import { opencodeServe } from '../opencode-serve/opencode-serve.ts';
 import { DEFAULT_TIMEOUT } from './constants.ts';
-import { lightWindowArgs, lightWindowDir } from '../assistant.ts';
+import { lightWindowArgs, lightWindowDir } from '../assistant/assistant.ts';
 import type {
   AssistantMessage,
   AssistantRunResult,
@@ -43,7 +43,7 @@ export function flattenPrompt(messages: AssistantMessage[]): string {
 /**
  * One-shot: дождаться конца работы CLI и отдать вывод целиком. Как именно
  * процесс запускается (и почему на Windows это отдельная история) — в
- * `lib/cli-spawn.ts`; здесь только ожидание, таймаут и сбор вывода.
+ * `lib/cli-spawn/cli-spawn.ts`; здесь только ожидание, таймаут и сбор вывода.
  */
 function spawnCli(
   command: string,

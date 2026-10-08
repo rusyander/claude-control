@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import type { ModelInfo } from '@agentdeck/contracts';
-import { readJsonFile, writeJsonFile } from '../../lib/safe-io.ts';
+import { readJsonFile, writeJsonFile } from '../../lib/safe-io/safe-io.ts';
 import { fetchModels, MODELS_URL, sortModels } from './model-source.ts';
 
 /** Сутки: модели выходят не чаще, а список нужен при каждом открытии настроек. */

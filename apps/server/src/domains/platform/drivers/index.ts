@@ -12,7 +12,7 @@ import {
 import type { DriverControl, PlatformDriver } from './driver.ts';
 import { buildEnterprisePlatformDriver, enterprisePlatformDriver } from './enterprise-platform.ts';
 import { openAiCompatDriver } from './openai-compat.ts';
-import { serverText } from '../../../lib/server-texts.ts';
+import { serverText } from '../../../lib/server-texts/server-texts.ts';
 
 /**
  * Реестр драйверов. Ветвление по платформе кончается здесь: дальше все

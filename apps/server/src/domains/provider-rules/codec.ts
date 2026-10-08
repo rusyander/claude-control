@@ -1,6 +1,11 @@
 import type { ProviderRulesFormat } from '@agentdeck/contracts';
-import { readMdcRule, writeMdcRule, type MdcFields, type MdcRule } from '../../lib/cursor-mdc.ts';
-import { readQwenRule, writeQwenRule } from '../../lib/qwen-rule-md.ts';
+import {
+  readMdcRule,
+  writeMdcRule,
+  type MdcFields,
+  type MdcRule,
+} from '../../lib/cursor-mdc/cursor-mdc.ts';
+import { readQwenRule, writeQwenRule } from '../../lib/qwen-rule-md/qwen-rule-md.ts';
 
 /** Чтение и запись файла правила в форме своего CLI. */
 export interface RuleCodec {

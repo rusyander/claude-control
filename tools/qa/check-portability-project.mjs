@@ -184,7 +184,7 @@ async function main() {
     new URL('../../apps/server/src/domains/portability/emit/index.ts', import.meta.url).href
   );
   const { ProjectLevelUnsupportedError } = await import(
-    new URL('../../apps/server/src/domains/portability/project.ts', import.meta.url).href
+    new URL('../../apps/server/src/domains/portability/project/project.ts', import.meta.url).href
   );
   const { linkSharedDirs } = await import(
     new URL('../../apps/server/src/domains/project-git/mirror-local.ts', import.meta.url).href
@@ -193,7 +193,7 @@ async function main() {
     new URL('../../apps/server/src/providers/claude.ts', import.meta.url).href
   );
   const { CATALOG_PROVIDERS } = await import(
-    new URL('../../apps/server/src/providers/catalog.ts', import.meta.url).href
+    new URL('../../apps/server/src/providers/catalog/catalog.ts', import.meta.url).href
   );
 
   const env = importEnvironment({ provider: claudeProvider, scope: 'global', override: home });

@@ -11,20 +11,29 @@ import type {
 } from '@agentdeck/contracts/portable-env';
 import { permissionDecisions } from '@agentdeck/contracts/portable-env';
 import type { Hook, McpServerDraft, PermissionDraft } from '@agentdeck/contracts';
-import { detectClaudeLocation } from '../../../lib/claude-paths.ts';
-import { claudeProjectPaths, ProjectRootRequiredError, type ClaudeLevelPaths } from '../project.ts';
-import { readTextFile, writeTextFile } from '../../../lib/safe-io.ts';
+import { detectClaudeLocation } from '../../../lib/claude-paths/claude-paths.ts';
+import {
+  claudeProjectPaths,
+  ProjectRootRequiredError,
+  type ClaudeLevelPaths,
+} from '../project/project.ts';
+import { readTextFile, writeTextFile } from '../../../lib/safe-io/safe-io.ts';
 import { slugify } from '../../../lib/slug.ts';
-import { readHooksFromFiles, writeHooks } from '../../hooks.ts';
-import { assertMcpDraft, DISABLED_MCP_KEY, saveMcpServer, setMcpServerEnabled } from '../../mcp.ts';
-import { saveEnvVar } from '../../env.ts';
-import { savePermission } from '../../permissions.ts';
+import { readHooksFromFiles, writeHooks } from '../../hooks/hooks.ts';
+import {
+  assertMcpDraft,
+  DISABLED_MCP_KEY,
+  saveMcpServer,
+  setMcpServerEnabled,
+} from '../../mcp/mcp.ts';
+import { saveEnvVar } from '../../env/env.ts';
+import { savePermission } from '../../permissions/permissions.ts';
 import { disabledSkillsDir } from '../../skills/paths.ts';
 import { saveSkill } from '../../skills/write.ts';
 import { splitFrontmatter } from '../../skills/frontmatter.ts';
 import { bodyAfterFrontmatter } from '../markdown.ts';
-import { targetEventName } from '../fidelity.ts';
-import { translatePermission } from '../permissions-map.ts';
+import { targetEventName } from '../fidelity/fidelity.ts';
+import { translatePermission } from '../permissions-map/permissions-map.ts';
 import { readSubagentsDir } from '../subagents.ts';
 import {
   buildPlan,
@@ -124,7 +133,7 @@ function emitClaudeInstructions(context: EmitContext): StageResult {
 
   const block = blockOf(carried.map((item) => textOf(item)));
   // Имя резервной копии у Claude ПРЕЖНЕЕ (`CLAUDE.md.<метка>.bak`), без префикса
-  // провайдера: то же решение, что в `domains/instructions.ts` — история и откат
+  // провайдера: то же решение, что в `domains/instructions/instructions.ts` — история и откат
   // ленты правил опираются на это имя, и второе имя порвало бы им ротацию.
   const write = (path: string, backupDir: string | undefined): void => {
     const original = existsSync(path) ? readTextFile(path) : '';
@@ -226,7 +235,7 @@ function emitClaudeSkills(context: EmitContext): StageResult {
 /**
  * Слэш-команды: `commands/<пространство>/<имя>.md` с шапкой `description`.
  * Адаптера записи у раздела нет (панель эти файлы только читает), поэтому запись
- * идёт через `lib/safe-io.ts` — прямого `writeFileSync` здесь не будет (§5.3).
+ * идёт через `lib/safe-io/safe-io.ts` — прямого `writeFileSync` здесь не будет (§5.3).
  */
 function emitClaudeCommands(context: EmitContext): StageResult {
   const result: StageResult = { entries: [], writes: [] };

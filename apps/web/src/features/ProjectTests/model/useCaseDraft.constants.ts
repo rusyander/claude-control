@@ -1,0 +1,28 @@
+import type { CaseDraft } from './useCaseDraft.types';
+
+export const BLANK: CaseDraft = {
+  type: 'case',
+  title: '',
+  purpose: '',
+  area: '',
+  section: '',
+  precondition: '',
+  steps: [{ action: '' }],
+  expected: '',
+  postcondition: '',
+  oracle: '',
+  priority: 'medium',
+  readiness: 'draft',
+  duration: '',
+  tags: '',
+  links: [],
+  attributes: {},
+  parameters: [],
+  attachments: [],
+  automationStatus: 'manual',
+  automationFile: '',
+  automationTestName: '',
+  automationExternalId: '',
+  codePaths: '',
+  archived: false,
+};

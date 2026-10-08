@@ -356,7 +356,7 @@ export interface ConfigProvider {
   /**
    * Лестница СЕМЕЙСТВ каталога (`ModelInfo.family`) от слабого к сильному — по
    * ней подбирается модель под класс работы у ЧУЖОГО провайдера (Т12,
-   * `domains/provider-cascade.ts`). Конкретное имя берётся `newestInFamily`,
+   * `domains/provider-cascade/provider-cascade.ts`). Конкретное имя берётся `newestInFamily`,
    * поэтому поколение всегда последнее.
    *
    * Задавать разрешено при ТРЁХ условиях сразу, иначе провайдер живёт без
@@ -380,7 +380,7 @@ export interface ConfigProvider {
   modelLadder?: string[];
   /**
    * Чем группа из файлов Claude едет на ОДИН прогон этого CLI
-   * (`domains/groups/run-layer.ts`). Тумблер каталогов Claude чужому CLI ничего
+   * (`domains/groups/run-layer/run-layer.ts`). Тумблер каталогов Claude чужому CLI ничего
    * не даёт, поэтому без слоя группа на его прогоны не действует вовсе — и
    * панель так и говорит (`group-layer-none`), а не включает её в `~/.claude`.
    * Задан только там, где механизм «на один запуск» проверен: Qwen — файл

@@ -6,13 +6,13 @@ import type {
   ProviderSkillsIgnoredDir,
   ProviderSkillsInfo,
 } from '@agentdeck/contracts';
-import { readTextFile } from '../../lib/safe-io.ts';
+import { readTextFile } from '../../lib/safe-io/safe-io.ts';
 import { SECTION_MAX_ENTRIES, SECTION_MAX_FILE_BYTES, fileSizeOf } from '../../lib/section-fs.ts';
 import { SKILL_FILE_NAME, SkillFormatError, readOpencodeSkill } from '../../lib/opencode-skill.ts';
 import { SkillNotEditableError, SkillNotFoundError } from './errors.ts';
 import { resolveSkillPath, toRelative } from './paths.ts';
 import type { ProviderSkillsTarget } from './types.ts';
-import { coded } from '../../lib/server-text.ts';
+import { coded } from '../../lib/server-text/server-text.ts';
 
 /** Папки каталога: со `SKILL.md` — скиллы, без него — прочие (показываем, не трогаем). */
 function walkSkillsDir(target: ProviderSkillsTarget): { skills: string[]; ignored: string[] } {

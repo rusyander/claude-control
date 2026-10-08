@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { Group } from '@agentdeck/contracts';
 import { groupCopyName, type GroupDuplicateRequest } from '@agentdeck/contracts/groups';
 import { assertGroupNameFree } from '../group-draft.ts';
-import type { AppStore } from '../../lib/app-store.ts';
+import type { AppStore } from '../../lib/app-store/app-store.ts';
 
 /**
  * «Копировать группу»: независимая запись рядом с оригиналом. Участники — те же

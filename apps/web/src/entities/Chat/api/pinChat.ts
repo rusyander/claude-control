@@ -1,22 +1,9 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { ChatSummary } from '@agentdeck/contracts';
 import { apiClient } from '@shared/api/client';
-import { chatKeys } from './ChatApi';
-
-export interface PinChatInput {
-  chatId: string;
-  pinned: boolean;
-}
-
-/** Метка закрепления в кэше списка — сразу, не дожидаясь перечитывания. */
-export function withPin(chats: ChatSummary[] | undefined, input: PinChatInput, at: string) {
-  return chats?.map((chat) => {
-    if (chat.id !== input.chatId) return chat;
-    if (input.pinned) return { ...chat, pinnedAt: at };
-    const { pinnedAt: _dropped, ...rest } = chat;
-    return rest;
-  });
-}
+import { chatKeys } from './ChatApi.constants';
+import type { PinChatInput } from './pinChat.types';
+import { withPin } from '../lib/withPin';
 
 /**
  * Закрепить разговор в списке или открепить (владелец, 07.10.2026).

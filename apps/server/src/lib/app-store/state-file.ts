@@ -1,7 +1,7 @@
 import { renameSync } from 'node:fs';
 import { join } from 'node:path';
 import { migrateLegacyPlatforms } from '@agentdeck/contracts/platform-legacy';
-import { readJsonFile } from '../safe-io.ts';
+import { readJsonFile } from '../safe-io/safe-io.ts';
 import { DEFAULT_STATE } from './app-store.constants.ts';
 import type { AppState } from './app-store.types.ts';
 

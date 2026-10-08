@@ -1,7 +1,7 @@
 import type { ConfluencePage, ConfluenceSpace } from '@agentdeck/contracts';
 import { invalidField, unreachable } from '../errors.ts';
 import { call, confluenceRoot, CONFLUENCE_SYSTEM, type AtlassianAccess } from './client.ts';
-import { coded } from '../../../lib/server-text.ts';
+import { coded } from '../../../lib/server-text/server-text.ts';
 
 /**
  * Confluence: пространства, поиск, чтение и запись страницы.

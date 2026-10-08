@@ -1,5 +1,5 @@
 import type { SkillFormatError } from '../../lib/opencode-skill.ts';
-import { coded, codeOf } from '../../lib/server-text.ts';
+import { coded, codeOf } from '../../lib/server-text/server-text.ts';
 
 /** Путь скилла выходит за пределы каталога скиллов — операция запрещена. */
 export class UnsafeSkillPathError extends Error {

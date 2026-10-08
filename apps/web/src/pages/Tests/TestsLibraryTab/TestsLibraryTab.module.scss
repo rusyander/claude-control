@@ -1,0 +1,17 @@
+.libraryTab {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  flex: 1;
+  min-height: 0;
+}
+
+// Плашка непринятого черновика. Выделена рамкой, а не цветом фона: это не
+// ошибка и не успех, а ожидающее решение — и оно не должно кричать поверх
+// списка кейсов, ради которого сюда и пришли.
+.draftBanner {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-border-accent, var(--color-border));
+  border-radius: 8px;
+  background: var(--color-surface-sunken);
+}

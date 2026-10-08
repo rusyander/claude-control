@@ -5,7 +5,7 @@ import {
   type DriverReading,
   type PlatformDriver,
 } from './driver.ts';
-import { serverText } from '../../../lib/server-texts.ts';
+import { serverText } from '../../../lib/server-texts/server-texts.ts';
 
 /**
  * Драйвер любого совместимого с OpenAI шлюза.

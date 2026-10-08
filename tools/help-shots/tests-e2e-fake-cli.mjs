@@ -10,7 +10,7 @@
  * Не нашёл строки о папке — пишет об этом и ничего не кладёт: кадр «тест лёг в
  * папку» тогда не снимется, и пропажа строки видна, а не спрятана.
  *
- * Ход печатается строками stream-json (`domains/chat/ChatRunner.ts`); живой
+ * Ход печатается строками stream-json (`domains/chat/ChatRunner/ChatRunner.ts`); живой
  * режим (`--input-format stream-json`) держит процесс и ждёт следующей реплики.
  */
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';

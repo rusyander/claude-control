@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import type { ClaudeLocation } from '@agentdeck/contracts';
 import { createConfigSandbox } from '../../lib/config-sandbox.ts';
-import { readJsonFile, removeEntry, writeJsonFile } from '../../lib/safe-io.ts';
+import { readJsonFile, removeEntry, writeJsonFile } from '../../lib/safe-io/safe-io.ts';
 import { unifiedDiff } from './unified-diff.ts';
 
 /**

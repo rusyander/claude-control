@@ -5,16 +5,11 @@ import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
 import { TextField } from '@shared/ui/text-field';
-import { toErrorMessage } from '@shared/api/client';
-import {
-  CREDENTIALS_TEMPLATES,
-  useSaveCredentials,
-  type CredentialsTemplateKind,
-} from '@entities/Credentials';
+import { CREDENTIALS_TEMPLATES, useSaveCredentials } from '@entities/Credentials';
 import type { CredentialsFormModalProps } from './CredentialsFormModal.types';
 import styles from './CredentialsFormModal.module.scss';
-
-const TEMPLATE_KINDS: CredentialsTemplateKind[] = ['oauth', 'apiKey', 'readFrom'];
+import { TEMPLATE_KINDS } from './CredentialsFormModal.constants';
+import { toErrorMessage } from '../../../shared/api/toErrorMessage';
 
 /**
  * Форма ручного доступа Claude Code: три образца (токен подписки, ключ API,

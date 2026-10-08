@@ -133,7 +133,7 @@ it boots its own throwaway panel plus `tools/qa/stub-platform.mjs` as the upstre
 socket path client → gateway → contour, so it needs no stand and no installed CLI — **and `node
 tools/qa/check-platform-run-env.mjs`**, which is the only check that sees what reaches a real process:
 its own throwaway panel, a gateway on port 0 and fake CLIs on PATH that dump their own env and argv.
-Touched our layers (`domains/platform/layers.ts`, the run registry's flags) → **`node
+Touched our layers (`domains/platform/layers/layers.ts`, the run registry's flags) → **`node
 tools/qa/check-run-layers.mjs`**, the only check that answers what a launch flag actually REMOVES:
 the real `claude` with a throwaway config dir carrying a unique marker in every layer, a stub for the
 model, and the body of the request that went up as the sole evidence. It needs an installed CLI

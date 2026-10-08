@@ -1,15 +1,18 @@
 import { dirname } from 'node:path';
 import type { EnvVarItem, HookItem, McpServerItem } from '@agentdeck/contracts/portable-env';
-import type { ProviderHookRule } from '@agentdeck/contracts';
-import { readProviderEnvVars, saveProviderEnvVars } from '../../provider-env.ts';
-import type { ProviderEnvVar, UniversalMcpServerDraft } from '@agentdeck/contracts';
+import type {
+  ProviderHookRule,
+  ProviderEnvVar,
+  UniversalMcpServerDraft,
+} from '@agentdeck/contracts';
+import { readProviderEnvVars, saveProviderEnvVars } from '../../provider-env/provider-env.ts';
 import { readProviderHooksInfo } from '../../provider-hooks/info.ts';
 import { saveProviderHookRules } from '../../provider-hooks/event-rules.ts';
 import { readProviderMcpServers, upsertProviderMcpServer } from '../../provider-mcp/section.ts';
 import type { ProviderMcpTarget } from '../../provider-mcp/types.ts';
-import { targetEventName } from '../fidelity.ts';
+import { targetEventName } from '../fidelity/fidelity.ts';
 import { hookCommandForTarget } from './hook-command.ts';
-import { hookShimCommand, hookShimPath, installHookShim } from './hook-shim.ts';
+import { hookShimCommand, hookShimPath, installHookShim } from './hook-shim/hook-shim.ts';
 import {
   EmitMechanismMissingError,
   emitEntry,

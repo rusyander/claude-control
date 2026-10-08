@@ -4,7 +4,7 @@ import {
   writeContinueServers,
   type ContinueRawServer,
 } from '../../lib/continue-yaml.ts';
-import { readTextFile, writeTextFile } from '../../lib/safe-io.ts';
+import { readTextFile, writeTextFile } from '../../lib/safe-io/safe-io.ts';
 import { CONTINUE_MODELLED_KEYS, CONTINUE_REMOTE_TYPES } from './constants.ts';
 import { backupNameOf, blockBackupNameOf } from './target.ts';
 import type { ProviderMcpTarget } from './types.ts';

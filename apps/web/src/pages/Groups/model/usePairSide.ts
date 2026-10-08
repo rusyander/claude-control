@@ -1,6 +1,6 @@
 import { groupKeyOf } from '@agentdeck/contracts';
 import { useProjectGroupChoice, type GroupListItem } from '@entities/Group';
-import { projectPathOf } from './sections';
+import { projectPathOf } from './projectPathOf';
 
 /**
  * Какая сторона связанной пары действует в проекте: её порядок работы и

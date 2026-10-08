@@ -2,11 +2,11 @@ import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { stringify as stringifyYaml } from 'yaml';
 import type { SkillDraft } from '@agentdeck/contracts';
-import { readTextFile, writeTextFile } from '../../lib/safe-io.ts';
+import { readTextFile, writeTextFile } from '../../lib/safe-io/safe-io.ts';
 import { slugify } from '../../lib/slug.ts';
 import { splitFrontmatter } from './frontmatter.ts';
 import { assertSkillId, disabledSkillsDir } from './paths.ts';
-import { coded } from '../../lib/server-text.ts';
+import { coded } from '../../lib/server-text/server-text.ts';
 
 /** Имя нового скилла уже занято — маршрут отвечает 409, а не пишет поверх. */
 export class SkillExistsError extends Error {

@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import type { ModelCatalogResponse } from '@agentdeck/contracts';
 import { apiClient } from '@shared/api/client';
 import { queryKeys } from '@shared/api/query-keys';
@@ -7,11 +7,6 @@ import { queryKeys } from '@shared/api/query-keys';
 
 async function getModels(): Promise<ModelCatalogResponse> {
   const { data } = await apiClient.get<ModelCatalogResponse>('/models');
-  return data;
-}
-
-async function refreshModels(): Promise<ModelCatalogResponse> {
-  const { data } = await apiClient.get<ModelCatalogResponse>('/models?refresh=true');
   return data;
 }
 
@@ -27,19 +22,5 @@ export function useModelCatalog() {
     queryKey: queryKeys.models,
     queryFn: getModels,
     staleTime: 10 * 60 * 1000,
-  });
-}
-
-/** Ручное обновление по кнопке: всегда идёт в сеть. */
-export function useRefreshModels() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: refreshModels,
-    onSuccess: (catalog) => {
-      queryClient.setQueryData(queryKeys.models, catalog);
-      // Автозамена дефолта меняет настройки на сервере — перечитываем их.
-      if (catalog.promoted) void queryClient.invalidateQueries({ queryKey: queryKeys.settings });
-    },
   });
 }

@@ -1,25 +1,30 @@
 import type { spawn as nodeSpawn } from 'node:child_process';
 import { foreignConsumerId } from '@agentdeck/contracts/platform-consumers';
-import type { AppStore } from '../lib/app-store.ts';
-import type { AgentImage } from '../lib/agent-images.ts';
+import type { AppStore } from '../lib/app-store/app-store.ts';
+import type { AgentImage } from '../lib/agent-images/agent-images.ts';
 import {
   localizeText,
   serverText,
   type ServerTextCode,
   type TextLanguage,
   type TextParams,
-} from '../lib/server-texts.ts';
-import { providerCliCommand } from '../providers/cli.ts';
+} from '../lib/server-texts/server-texts.ts';
+import { providerCliCommand } from '../providers/cli/cli.ts';
 import { getActiveProvider } from '../providers/registry.ts';
-import type { ConfigProvider } from '../providers/types.ts';
-import { claudeAsk, lightWindowDir, type HelperAsk, type HelperOutcome } from './assistant.ts';
+import type { ConfigProvider } from '../providers/types/types.ts';
+import {
+  claudeAsk,
+  lightWindowDir,
+  type HelperAsk,
+  type HelperOutcome,
+} from './assistant/assistant.ts';
 import { runProviderApi } from './assistant-runner/api.ts';
 import { runProviderCli, withImagePaths } from './assistant-runner/cli.ts';
 import type { AssistantEndpoint, AssistantRunResult } from './assistant-runner/types.ts';
-import { resolveAssistantEndpoint } from './endpoints.ts';
+import { resolveAssistantEndpoint } from './endpoints/endpoints.ts';
 import { contourUnreachable } from './panel-agent/launch.ts';
-import type { PlatformRunRoute } from './platform/routing.ts';
-import { getRawKey, resolveRunner } from './provider-keys.ts';
+import type { PlatformRunRoute } from './platform/routing/routing.ts';
+import { getRawKey, resolveRunner } from './provider-keys/provider-keys.ts';
 
 /**
  * Чем пойдёт ЛЁГКОЕ ОКНО панели — помощник формы и помощник структуры ресурса.

@@ -4,9 +4,9 @@ import {
   CONTROL_CHARS,
   GIT_NETWORK_TIMEOUT_MS,
 } from './constants.ts';
-import { GitError, git, gitOutput, type GitOutput } from './exec.ts';
+import { GitError, git, gitOutput, type GitOutput } from './exec/exec.ts';
 import { requireRepo } from './read.ts';
-import { coded } from '../../lib/server-text.ts';
+import { coded } from '../../lib/server-text/server-text.ts';
 
 /**
  * Операции записи: переключение ветки, создание ветки, коммит, pull и push.

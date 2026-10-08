@@ -5,9 +5,11 @@ vi.mock('@shared/api/client', () => ({
 }));
 
 import { HIDDEN_STREAMS, MAX_STREAMS } from './agent-runs.constants';
-import { budget, priority, setWatched } from './agent-runs.slots';
-import { callbacks, runs, sending, setRun } from './agent-runs.state';
+import { setWatched, budget, priority } from './agent-runs.slots';
+import { callbacks, sending } from './agent-runs.state';
 import type { AgentRun } from './agent-runs.types';
+import { runs } from './agent-runs.state.constants';
+import { setRun } from './setRun';
 
 /**
  * Очередь за потоком: кто важнее, тот и держит соединение.

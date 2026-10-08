@@ -6,13 +6,13 @@ import type {
   PlatformVarPlan,
 } from '@agentdeck/contracts';
 import { PLATFORM_ASSISTANT_TARGET } from '@agentdeck/contracts/platform';
-import type { AppStore } from '../../../lib/app-store.ts';
-import { maskKey } from '../../../lib/provider-keys.ts';
+import type { AppStore } from '../../../lib/app-store/app-store.ts';
+import { maskKey } from '../../../lib/provider-keys/provider-keys.ts';
 import { driftedSinceApply, readCurrentEnv, readCurrentFileValues } from './current.ts';
 import { activeGatewaySettings, buildManagedProfile, gatewayUrlFor } from './profile.ts';
-import { defaultModelOf, toolRouteOf } from '../models.ts';
+import { defaultModelOf, toolRouteOf } from '../models/models.ts';
 import { describeContourTargets, type ContourTarget, type ContourTargetPaths } from './targets.ts';
-import { listConsumerOptions } from '../routing.ts';
+import { listConsumerOptions } from '../routing/routing.ts';
 
 /**
  * Предпросмотр применения: что и куда ляжет, что уже занято, что панель уже

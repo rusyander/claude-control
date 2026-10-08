@@ -1,1 +1,1 @@
-export { ProviderChatPage } from './ProviderChatPage';
+export { ProviderChatPage } from './ProviderChatPage/ProviderChatPage';

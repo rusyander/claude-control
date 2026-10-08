@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { WatcherStatus } from '@agentdeck/contracts';
 import { apiClient } from '@shared/api/client';
 import { queryKeys } from '@shared/api/query-keys';
@@ -47,19 +47,4 @@ export function useWatcherStatus() {
     return watchQueryCache(queryClient.getQueryCache());
   }, [enabled, queryClient]);
   return query;
-}
-
-export function useSetWatcher() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (enabled: boolean) => {
-      const { data } = await apiClient.post<WatcherStatus>('/watcher', { enabled });
-      return data;
-    },
-    // Отказ называет каждый вызов своим тостом (карточка, окно индикатора) —
-    // общий тост клиента дал бы второй на тот же отказ.
-    meta: { silentError: true },
-    // Ответ — уже новое состояние: кладём его в кэш, индикатор меняется сразу.
-    onSuccess: (status) => queryClient.setQueryData(queryKeys.watcher, status),
-  });
 }

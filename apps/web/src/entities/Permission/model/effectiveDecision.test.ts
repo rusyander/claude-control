@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import type { PermissionRule } from '@agentdeck/contracts';
-import { coversPattern, shadowedBy, effectiveRuleFor, findDuplicate } from './effectiveDecision';
+import { coversPattern } from './effectiveDecision';
+import { findDuplicate } from './findDuplicate';
+import { shadowedBy } from './shadowedBy';
+import { effectiveRuleFor } from './effectiveRuleFor';
 
 const rule = (
   decision: PermissionRule['decision'],

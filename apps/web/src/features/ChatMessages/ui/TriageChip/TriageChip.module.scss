@@ -1,0 +1,9 @@
+// Фишка «на паузе» — та же форма, что у звена конвейера в списке чатов: одно
+// слово в капсуле на утопленной поверхности, читается в обеих темах.
+.chip {
+  flex: none;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--color-surface-sunken);
+  white-space: nowrap;
+}

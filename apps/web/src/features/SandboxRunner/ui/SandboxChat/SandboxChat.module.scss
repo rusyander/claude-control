@@ -1,0 +1,55 @@
+// Готовые запросы. Каждый — плашка из двух частей: подставить и скопировать.
+.chip {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-sunken);
+  overflow: hidden;
+
+  &:hover {
+    border-color: var(--color-accent);
+  }
+}
+
+.chipText {
+  padding: var(--spacing-2xs) var(--spacing-sm);
+  border: none;
+  background: transparent;
+  color: var(--color-fg);
+  font: inherit;
+  font-size: var(--font-size-body-sm);
+  text-align: left;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--color-accent);
+  }
+}
+
+.chipCopy {
+  display: flex;
+  align-items: center;
+  padding: 0 var(--spacing-xs);
+  border: none;
+  border-left: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-fg-subtle);
+  cursor: pointer;
+
+  &:hover {
+    background: var(--color-surface);
+    color: var(--color-accent);
+  }
+}
+
+.answer {
+  padding: var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-sunken);
+  min-height: 180px;
+  max-height: 380px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+}

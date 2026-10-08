@@ -4,21 +4,8 @@
  * шага — по порядковому номеру отсюда строка пути находит своё описание, а число
  * скилла — строку, к которой оно относится. Здесь только границы разделов.
  */
-import { headingLevels, knobStepOf, skillStepHeadings } from '@agentdeck/contracts/skill-steps';
-
-export interface SkillTextStep {
-  title: string;
-  /** Номер строки заголовка (с нуля). */
-  line: number;
-  /** Номер шага, как написан в заголовке. */
-  number: number;
-  /** Смещение строки заголовка в тексте. */
-  start: number;
-  /** Где кончается раздел шага: следующий шаг или заголовок не глубже. */
-  end: number;
-  /** Текст раздела без заголовка. */
-  body: string;
-}
+import { headingLevels, skillStepHeadings } from '@agentdeck/contracts/skill-steps';
+import type { SkillTextStep } from './skillText.types';
 
 /**
  * Разобранные тексты скиллов — по тексту: строк пути у одного скилла десятки,
@@ -71,29 +58,4 @@ function parseSteps(text: string): SkillTextStep[] {
       body: text.slice(starts[head.line + 1] ?? text.length, end).trim(),
     };
   });
-}
-
-/**
- * К какому шагу относится цитата числа — тот же разбор, что у сервера
- * (`knobStep`): раздел, в котором стоит цитата (любое её вхождение, не первое),
- * иначе шаг, названный во вступлении («§3», «step 3», «шаг 3»). Не нашлось —
- * шага нет, число относится к скиллу целиком.
- */
-export function stepOfQuote(
-  steps: SkillTextStep[],
-  text: string,
-  quote: string,
-): number | undefined {
-  return knobStepOf(text, quote, steps);
-}
-
-/** Первый абзац раздела — то, что влезает в подсказку строки. */
-export function firstParagraph(text: string, limit = 280): string {
-  const paragraph =
-    text
-      .split(/\n\s*\n/)
-      .map((part) => part.replace(/^#+\s*/gm, '').trim())
-      .find(Boolean) ?? '';
-  const flat = paragraph.replace(/\s+/g, ' ');
-  return flat.length > limit ? `${flat.slice(0, limit - 1).trimEnd()}…` : flat;
 }

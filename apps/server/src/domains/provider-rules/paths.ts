@@ -2,9 +2,9 @@ import { resolve } from 'node:path';
 import type { ProviderRulesFormat } from '@agentdeck/contracts';
 import { getActiveProvider } from '../../providers/registry.ts';
 import { resolveInsideSectionDir, toClientRelative } from '../../lib/section-fs.ts';
-import { MDC_EXTENSION } from '../../lib/cursor-mdc.ts';
+import { MDC_EXTENSION } from '../../lib/cursor-mdc/cursor-mdc.ts';
 import { UnsafeRulePathError } from './errors.ts';
-import type { ConfigProvider } from '../../providers/types.ts';
+import type { ConfigProvider } from '../../providers/types/types.ts';
 import type { ProviderRulesSettingsSource, ProviderRulesTarget } from './types.ts';
 
 /**

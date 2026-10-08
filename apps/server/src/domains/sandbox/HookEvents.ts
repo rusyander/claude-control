@@ -1,6 +1,6 @@
 import { isWindows } from './HookProbe.constants.ts';
 import type { EventFixture } from './HookProbe.types.ts';
-import { serverText } from '../../lib/server-texts.ts';
+import { serverText } from '../../lib/server-texts/server-texts.ts';
 
 /**
  * Путь в примере события — в стиле той системы, где панель запущена.

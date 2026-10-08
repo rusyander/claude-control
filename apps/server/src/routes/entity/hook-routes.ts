@@ -7,7 +7,7 @@ import {
   deleteHook,
   moveHook,
   normalizeHookDraft as hookDraft,
-} from '../../domains/hooks.ts';
+} from '../../domains/hooks/hooks.ts';
 import { findHook, type EntityToggleDeps } from '../../domains/entity-toggle.ts';
 import { stripLocalPrefix } from '../../lib/settings-source.ts';
 import { done } from '../write-result.ts';

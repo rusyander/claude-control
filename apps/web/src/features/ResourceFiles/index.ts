@@ -1,1 +1,1 @@
-export { ResourceFileTree } from './ui/ResourceFileTree';
+export { ResourceFileTree } from './ui/ResourceFileTree/ResourceFileTree';

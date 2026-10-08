@@ -7,8 +7,9 @@ import { i18n } from '@shared/config/i18n';
 import { ChildBlocks } from '@features/ChatMessages';
 import { collectChildQuestions } from './childQuestions';
 import { collectChildPermissions } from './childPermissions';
-import { collectTreeAsks, withTreeAsks } from './treeAsks';
+import { collectTreeAsks } from './treeAsks';
 import { answerChild } from './answerChild';
+import { withTreeAsks } from './withTreeAsks';
 
 /**
  * Вопросы и права ОТЦЕПЛЕННЫХ групп в хабе родителя (WP9c; журнал 30, 36, 62,

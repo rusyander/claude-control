@@ -19,7 +19,8 @@ import {
   useSaveGroupPathSteps,
 } from '@entities/Group';
 import { queryKeys } from '@shared/api/query-keys';
-import { customSteps, insertAfter } from './pathEdit';
+import { customSteps } from './pathEdit';
+import { insertAfter } from './insertAfter';
 
 /** Готовый ресурс, который человек выбрал в каталоге. */
 export interface PickedResource {

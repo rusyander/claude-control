@@ -1,5 +1,9 @@
 import { spawn, spawnSync } from 'node:child_process';
-import { killChildTree, killPidTree, type KillableChild } from '../../lib/process-tree.ts';
+import {
+  killChildTree,
+  killPidTree,
+  type KillableChild,
+} from '../../lib/process-tree/process-tree.ts';
 import { isWindows } from './project-runner.constants.ts';
 
 /**
@@ -16,7 +20,7 @@ export function runLines(file: string, args: string[]): string[] {
 
 /**
  * Убить дерево процессов по номеру: Windows — обход по времени создания
- * (`lib/process-tree.ts`, без `taskkill /T`, который снимал чужих сирот),
+ * (`lib/process-tree/process-tree.ts`, без `taskkill /T`, который снимал чужих сирот),
  * POSIX — по группе: серверы проекта запускаются `detached`.
  */
 export function killTree(pid: number): void {

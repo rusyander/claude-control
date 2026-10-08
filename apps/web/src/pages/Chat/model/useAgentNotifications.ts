@@ -6,7 +6,8 @@ import { toast } from '@shared/lib/toast';
 import { notifyAgent, type NotifyKind } from '@shared/lib/notify-sound';
 import { dismissAttention } from '@shared/lib/attention';
 import { askNotifyPermissionOnGesture, showSystemNotice } from '@shared/lib/system-notify';
-import { backgroundRunNotice, openRunNotice } from '../lib/runNotice';
+import { backgroundRunNotice } from '../lib/runNotice';
+import { openRunNotice } from '../lib/openRunNotice';
 
 /** Каким звуком зовёт завершившийся фоновый прогон: упал, спросил или просто закончил. */
 const BACKGROUND_SOUND: Record<RunStatus, NotifyKind> = {

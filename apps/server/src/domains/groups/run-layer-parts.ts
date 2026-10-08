@@ -3,11 +3,11 @@ import { join } from 'node:path';
 import type { Group, GroupMember } from '@agentdeck/contracts';
 import type { GroupLayerDelivered, GroupLayerRefusal } from '@agentdeck/contracts/group-delivery';
 import { inClaudeGlobals, type GroupScope } from '@agentdeck/contracts/group-sources';
-import { readJsonFile } from '../../lib/safe-io.ts';
-import { serverText } from '../../lib/server-texts.ts';
-import { readHooks, readHooksFromFiles } from '../hooks.ts';
-import { DISABLED_MCP_KEY } from '../mcp.ts';
-import { memberScope, projectClaudeDir, type MemberDeps } from './members.ts';
+import { readJsonFile } from '../../lib/safe-io/safe-io.ts';
+import { serverText } from '../../lib/server-texts/server-texts.ts';
+import { readHooks, readHooksFromFiles } from '../hooks/hooks.ts';
+import { DISABLED_MCP_KEY } from '../mcp/mcp.ts';
+import { memberScope, projectClaudeDir, type MemberDeps } from './members/members.ts';
 
 /**
  * Общие части слоёв группы на прогон. Отдельно от реестра (`run-layer.ts`):

@@ -9,7 +9,7 @@ import {
   type ShimCall,
   type ShimFlaw,
 } from './parse.ts';
-import { serverText } from '../../../../lib/server-texts.ts';
+import { serverText } from '../../../../lib/server-texts/server-texts.ts';
 
 /**
  * Потоковый разбор ответа: текст модели → куски текста и готовые вызовы, в том

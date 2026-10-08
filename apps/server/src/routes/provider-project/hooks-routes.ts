@@ -5,7 +5,7 @@ import {
   parseProviderHooksDraft,
   saveProviderHooks,
   WriteDisabledError,
-} from '../../domains/provider-hooks.ts';
+} from '../../domains/provider-hooks/provider-hooks.ts';
 import { UnrecognizedFormatError } from '../../lib/format-errors.ts';
 import { done } from '../write-result.ts';
 import { requireTarget } from './target.ts';

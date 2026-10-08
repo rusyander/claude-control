@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { editDraft, isChangedElsewhere, savedDraft, settleDraft } from './diskDraft';
+import { editDraft } from './diskDraft';
+import { settleDraft } from './settleDraft';
+import { savedDraft } from './savedDraft';
+import { isChangedElsewhere } from './isChangedElsewhere';
 
 describe('черновик файла инструкций поверх диска (ревью 28.09 F-90, F-91)', () => {
   it('правка запоминает текст диска, от которого начата, и не сдвигает его дальше', () => {

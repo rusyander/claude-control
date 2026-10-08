@@ -1,16 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import type { ModelPricing, PricingEntry } from '@agentdeck/contracts';
-import {
-  PRICING_FIELDS,
-  draftFromPrice,
-  manualPrices,
-  manualPriceFromDraft,
-  nextCustom,
-  overrideFor,
-  priceFromDraft,
-  withManualPrice,
-  withoutCustom,
-} from './PricingRow';
+import { draftFromPrice } from './PricingRow';
+import { overrideFor } from './overrideFor';
+import { withManualPrice } from './withManualPrice';
+import { withoutCustom } from './withoutCustom';
+import { manualPrices } from './manualPrices';
+import { PRICING_FIELDS } from './PricingRow.constants';
+import { priceFromDraft } from './priceFromDraft';
+import { manualPriceFromDraft } from './manualPriceFromDraft';
+import { nextCustom } from './nextCustom';
 
 /**
  * Регрессия про ДЕНЬГИ. Карточка «Тарифы» правила четыре поля, и часовая ставка

@@ -4,13 +4,13 @@ import { isAbsolute, join, relative, resolve } from 'node:path';
 import type { Group, GroupMember, Hook } from '@agentdeck/contracts';
 import type { GroupScope } from '@agentdeck/contracts/group-sources';
 import { projectKey } from '../../lib/app-store/group-sources.ts';
-import { readTextFile } from '../../lib/safe-io.ts';
-import { maskSecretsInText } from '../../lib/secret-mask.ts';
-import { readHooks, readHooksFromFiles } from '../hooks.ts';
-import { readScriptContent } from '../scripts.ts';
-import type { DescribeSource } from './describe.ts';
-import { hashText, memberContent, projectClaudeDir, type MemberDeps } from './members.ts';
-import { skillSteps, stepHeadings } from './path.ts';
+import { readTextFile } from '../../lib/safe-io/safe-io.ts';
+import { maskSecretsInText } from '../../lib/secret-mask/secret-mask.ts';
+import { readHooks, readHooksFromFiles } from '../hooks/hooks.ts';
+import { readScriptContent } from '../scripts/scripts.ts';
+import type { DescribeSource } from './describe/describe.ts';
+import { hashText, memberContent, projectClaudeDir, type MemberDeps } from './members/members.ts';
+import { skillSteps, stepHeadings } from './path/path.ts';
 
 /**
  * Текст, по которому модель описывает ресурс, — по одному на вид. Всё, что

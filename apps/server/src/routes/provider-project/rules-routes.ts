@@ -7,7 +7,7 @@ import {
   saveProviderRule,
   deleteProviderRule,
   describeRuleError,
-} from '../../domains/provider-rules.ts';
+} from '../../domains/provider-rules/provider-rules.ts';
 import { done } from '../write-result.ts';
 import { guardedBy, requireTarget } from './target.ts';
 import { INSTRUCTIONS_RULES_UNSUPPORTED, INVALID_RULE_DRAFT } from './messages.ts';

@@ -1,0 +1,231 @@
+// ── Документ инструкций ────────────────────────────────────────────────────
+// Контейнер нужен запросу по ширине: раскладка файлов уходит вбок, когда
+// ширины хватает, а не по ширине окна — колонку ужимают и реестр, и окно агента.
+.docContainer {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  container-type: inline-size;
+}
+
+.doc {
+  display: grid;
+  flex: 1 1 auto;
+  grid-template-areas:
+    'toolbar'
+    'files'
+    'body'
+    'footer';
+  grid-template-rows: auto auto minmax(min(320px, 55vh), 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--spacing-sm);
+  min-width: 0;
+}
+
+@container (min-width: 1000px) {
+  .doc {
+    grid-template-areas:
+      'toolbar toolbar'
+      'body files'
+      'footer files';
+    grid-template-rows: auto minmax(320px, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) 300px;
+  }
+}
+
+// Полоса над документом липнет к верху колонки: с длинным файлом «Сохранить»
+// и «Просмотр» остаются под рукой, а не уезжают вместе с первым экраном.
+.docToolbar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  grid-area: toolbar;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-xs) var(--spacing-sm);
+  min-width: 0;
+  padding-block: var(--spacing-2xs);
+  background: var(--color-bg);
+}
+
+// Кнопки держатся правого края и тогда, когда узкая колонка переносит их на
+// вторую строку: сохранение ищут справа.
+.docActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--spacing-xs);
+  margin-left: auto;
+}
+
+.docFiles {
+  grid-area: files;
+  align-self: start;
+  min-width: 0;
+}
+
+// Тело документа: короткий файл тянется до низа окна (строка сетки `1fr`),
+// длинный растёт вместе со страницей. Своей прокрутки нет — она была бы второй
+// на странице; `clip` только обрезает углы и не делает блок прокручиваемым.
+// Колонки-флексы до самого редактора растягивают его на всю площадь, чтобы
+// щелчок под последней строкой попадал в текст, а не мимо.
+.docBody {
+  display: flex;
+  flex-direction: column;
+  grid-area: body;
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+  overflow: clip;
+}
+
+.docBodyEditing {
+  border-color: var(--color-border-strong);
+  background: var(--color-surface-sunken);
+}
+
+.docScroll {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+// Хост редактора держит `height: 100%` под окно кода со своей прокруткой —
+// здесь он растёт с текстом. Удвоенный класс перебивает правило фичи.
+.docBody .docEditor > * {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  height: auto;
+  min-width: 0;
+}
+
+.docBody .docEditor :global(.cm-editor),
+.docBody .docEditor :global(.cm-scroller) {
+  flex: 1 0 auto;
+  height: auto;
+}
+
+.docFooter {
+  display: flex;
+  flex-wrap: wrap;
+  grid-area: footer;
+  gap: var(--spacing-3xs) var(--spacing-md);
+}
+
+.docEmpty {
+  display: flex;
+  flex: 1 0 auto;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-lg);
+}
+
+// Просмотр: разметка как документ, а не сырой текст. Мера строки — у абзацев и
+// пунктов, а не у документа: заголовки с чертой, код и таблицы идут на всю
+// ширину поля, а текст остаётся читаемым на широком экране.
+.preview {
+  padding: var(--spacing-md) var(--spacing-lg);
+  color: var(--color-fg);
+  font-size: var(--font-size-body);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+
+  & > :first-child {
+    margin-top: 0;
+  }
+
+  :global(h1),
+  :global(h2),
+  :global(h3),
+  :global(h4) {
+    margin: 1.4em 0 0.5em;
+    line-height: 1.3;
+  }
+
+  :global(h1) {
+    font-size: var(--font-size-heading);
+  }
+
+  :global(h2) {
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--color-border);
+    font-size: var(--font-size-heading-sm);
+  }
+
+  :global(h3),
+  :global(h4) {
+    font-size: var(--font-size-body-lg);
+  }
+
+  :global(p),
+  :global(ul),
+  :global(ol),
+  :global(pre),
+  :global(blockquote),
+  :global(table) {
+    margin: 0 0 0.8em;
+  }
+
+  :global(ul),
+  :global(ol) {
+    padding-left: 1.4em;
+  }
+
+  :global(p),
+  :global(li),
+  :global(blockquote) {
+    max-width: var(--text-measure);
+  }
+
+  :global(code) {
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: var(--color-surface-sunken);
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+  }
+
+  :global(pre) {
+    padding: var(--spacing-sm);
+    border-radius: 8px;
+    background: var(--color-surface-sunken);
+    overflow-x: auto;
+
+    :global(code) {
+      padding: 0;
+      background: none;
+    }
+  }
+
+  :global(blockquote) {
+    padding-left: var(--spacing-sm);
+    border-left: 3px solid var(--color-border-strong);
+    color: var(--color-fg-muted);
+  }
+
+  :global(a) {
+    color: var(--color-accent);
+  }
+
+  :global(hr) {
+    border: 0;
+    border-top: 1px solid var(--color-border);
+  }
+
+  :global(table) {
+    border-collapse: collapse;
+
+    :global(td),
+    :global(th) {
+      padding: var(--spacing-3xs) var(--spacing-xs);
+      border: 1px solid var(--color-border);
+    }
+  }
+}

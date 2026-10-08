@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { useReleaseGroup } from '@entities/ChatTree';
-import { toErrorMessage } from '@shared/api/client';
 import { toast } from '@shared/lib/toast';
+import { toErrorMessage } from '../../../shared/api/toErrorMessage';
 
 /**
  * «Отпустить» группу, которая ждёт предшественников (Т3), у чужого провайдера.

@@ -4,10 +4,10 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { parseSpec } from './e2e-parse.ts';
 import { parsePytest } from './e2e-parse-pytest.ts';
-import { groupIdOfFile, syncE2eFolder, syncE2eIfChanged } from './e2e-sync.ts';
-import { e2eFolderView, SPEC_FILE } from './e2e-folder.ts';
-import { importResults } from './import-results.ts';
-import { readGroups } from './store.ts';
+import { groupIdOfFile, syncE2eFolder, syncE2eIfChanged } from './e2e-sync/e2e-sync.ts';
+import { e2eFolderView, SPEC_FILE } from './e2e-folder/e2e-folder.ts';
+import { importResults } from './import-results/import-results.ts';
+import { readGroups } from './store/store.ts';
 
 /**
  * Cypress и pytest: разбор без запуска, сверка с кейсами и сопоставление их

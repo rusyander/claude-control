@@ -11,8 +11,8 @@ import {
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import type { WatchEntryClass, WatchSeverity, WatchVerdict } from '@agentdeck/contracts';
-import { readTextFile, writeTextFile } from '../../lib/safe-io.ts';
-import { maskSecretsInText } from '../../lib/secret-mask.ts';
+import { readTextFile, writeTextFile } from '../../lib/safe-io/safe-io.ts';
+import { maskSecretsInText } from '../../lib/secret-mask/secret-mask.ts';
 import { refNumber, type ReportRefs } from './events.ts';
 import {
   LOCATION_LINE,

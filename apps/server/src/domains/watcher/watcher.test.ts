@@ -4,8 +4,8 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { isPidAlive, RunLedger } from '../chat/run-ledger.ts';
-import { killPidTree } from '../../lib/process-tree.ts';
+import { isPidAlive, RunLedger } from '../chat/run-ledger/run-ledger.ts';
+import { killPidTree } from '../../lib/process-tree/process-tree.ts';
 import { sectionsOf } from './report.ts';
 import {
   BackgroundWatcher,

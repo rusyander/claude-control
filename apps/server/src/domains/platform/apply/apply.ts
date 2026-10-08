@@ -11,10 +11,10 @@ import {
   PLATFORM_ASSISTANT_CONSUMER,
   PLATFORM_TERMINAL_CONSUMER,
 } from '@agentdeck/contracts/platform-consumers';
-import type { AppStore } from '../../../lib/app-store.ts';
+import type { AppStore } from '../../../lib/app-store/app-store.ts';
 import { applyEndpointProfile } from '../../endpoints/endpoint-apply.ts';
 import { invalidField } from '../errors.ts';
-import { consumersOf } from '../store.ts';
+import { consumersOf } from '../store/store.ts';
 import { applyCodexEndpoint, applyContinueEndpoint, type FileWriteResult } from './config-files.ts';
 import { fingerprintOf, ownedFingerprintOf, readCurrentEnv } from './current.ts';
 import {

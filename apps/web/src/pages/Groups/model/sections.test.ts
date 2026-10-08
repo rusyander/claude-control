@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { DiscoveredGroup } from '@agentdeck/contracts';
 import type { GroupListItem } from '@entities/Group';
-import { buildSections, cardOf, foundInOf, projectPathOf, sourceLabel } from './sections';
+import { buildSections } from './sections';
+import { projectPathOf } from './projectPathOf';
+import { foundInOf } from './foundInOf';
+import { sourceLabel } from './sourceLabel';
+import { cardOf } from './cardOf';
 
 function group(id: string, patch: Partial<GroupListItem> = {}): GroupListItem {
   return {

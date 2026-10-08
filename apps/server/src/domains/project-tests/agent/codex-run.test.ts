@@ -4,7 +4,7 @@ import { PassThrough } from 'node:stream';
 import { tmpdir } from 'node:os';
 import type { spawn as nodeSpawn } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
-import { runScope, type RunPermissionGate } from '../run-permissions.ts';
+import { runScope, type RunPermissionGate } from '../run-permissions/run-permissions.ts';
 import type { TestsAgentEvent } from './agent-run.types.ts';
 import { CodexTestsRun } from './codex-run.ts';
 

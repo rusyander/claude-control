@@ -1,0 +1,13 @@
+/* ── Путеводитель: шаг со снимком ───────────────────────────────────── */
+
+.guideSteps {
+  display: flex;
+  flex-direction: column;
+  // Шаг здесь с картинкой, и на расстоянии рецепта (spacing-sm) снимок
+  // предыдущего шага склеивается с заголовком следующего.
+  gap: var(--spacing-lg);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: help-guide;
+}

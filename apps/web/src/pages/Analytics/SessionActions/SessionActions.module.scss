@@ -1,0 +1,8 @@
+.sessionActions {
+  flex-shrink: 0;
+}
+
+/* Невидимая копия «Остановить»: держит ширину, не фокусируется и не читается. */
+.stopSlot {
+  visibility: hidden;
+}

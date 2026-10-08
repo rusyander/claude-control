@@ -1,6 +1,6 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { buildCapabilities, type ConfigProvider } from '../types.ts';
+import { buildCapabilities, type ConfigProvider } from '../types/types.ts';
 import { aiderOneShotArgs, aiderOneShotEnv, createAiderStdoutParser } from './aider-run.ts';
 import { AIDER_CONFIG_BASENAME, aiderConfigFile, unimplementedPaths } from './config-dirs.ts';
 
@@ -35,7 +35,7 @@ import { AIDER_CONFIG_BASENAME, aiderConfigFile, unimplementedPaths } from './co
  *
  * Все правки конфига идут Document API пакета `yaml` (зависимость УЖЕ есть в
  * apps/server): комментарии, порядок ключей и незатронутые ключи целы, бэкап +
- * атомарная запись, round-trip-проверка до записи (см. `lib/aider-yaml.ts`).
+ * атомарная запись, round-trip-проверка до записи (см. `lib/aider-yaml/aider-yaml.ts`).
  */
 export const aiderProvider: ConfigProvider = {
   id: 'aider',

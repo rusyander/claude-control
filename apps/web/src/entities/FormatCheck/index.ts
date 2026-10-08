@@ -1,1 +1,2 @@
-export { useFormatCheck, useRefreshFormatCheck } from './api/FormatCheckApi';
+export { useFormatCheck } from './api/FormatCheckApi';
+export { useRefreshFormatCheck } from './api/useRefreshFormatCheck';

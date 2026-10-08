@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { NAV_SECTIONS } from '@shared/config/navigation';
 import { helpRu } from '@shared/config/i18n/help/ru';
-import { HELP_GROUPS, findHelpTopic, findTopicNeighbours } from './topics';
+import { findHelpTopic } from './topics';
+import { HELP_GROUPS } from './topics.constants';
+import { findTopicNeighbours } from './findTopicNeighbours';
 
 /**
  * Индекс справки — единственное место, где документ становится видимым: адрес

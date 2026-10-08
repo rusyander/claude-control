@@ -1,9 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import {
-  EXPANDED_BRANCHES_KEY,
-  readExpandedBranches,
-  writeExpandedBranches,
-} from './expandedBranches';
+import { EXPANDED_BRANCHES_KEY } from './expandedBranches.constants';
+import { readExpandedBranches } from '../lib/readExpandedBranches';
+import { writeExpandedBranches } from '../lib/writeExpandedBranches';
 
 /**
  * Память раскрытых ветвей (G1): переживает перезагрузку, а испорченное или

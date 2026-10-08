@@ -20,7 +20,7 @@ import { record, string, boolean } from 'zod';
  * Что правила НЕ отменяют: `deny` и `ask` из settings.json (человек сам сказал
  * «спрашивай» — это сильнее), выключенный тумблер правок в шапке чата («только
  * чтение») и вопрос человеку (`AskUserQuestion`). Разбор конкретных команд и
- * инструментов — на сервере (`domains/chat/auto-approve.ts`).
+ * инструментов — на сервере (`domains/chat/auto-approve/auto-approve.ts`).
  */
 
 /**

@@ -1,6 +1,6 @@
 import type { JiraIssue, JiraProject, JiraTransition } from '@agentdeck/contracts';
 import { invalidField } from '../errors.ts';
-import { failedResponse, parseJson, type OutboundResponse } from '../http.ts';
+import { failedResponse, parseJson, type OutboundResponse } from '../http/http.ts';
 import { call, jiraApi, raw, type AtlassianAccess } from './client.ts';
 import { fromAdf, toAdf } from './adf.ts';
 

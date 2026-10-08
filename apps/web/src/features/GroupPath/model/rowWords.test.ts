@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { GroupMembersView } from '@agentdeck/contracts';
-import type { PathRow } from './pathRows';
-import { rowWords, type WordsSource } from './rowWords';
+import { rowWords } from './rowWords';
+import type { PathRow } from './pathRows.types';
+import type { WordsSource } from './rowWords.types';
 
 const row = (title: string): PathRow => ({
   kind: 'entry',

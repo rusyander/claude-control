@@ -1,18 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { defaultOurRules, defaultPlatformRules } from '@agentdeck/contracts';
 import type { Platform, PlatformConsumerOption, PlatformRuleConflict } from '@agentdeck/contracts';
-import {
-  overlapSummary,
-  overlapsByOurRule,
-  overlapsByPlatformRule,
-  ourOverlapName,
-  rulesAppliesOf,
-  sectionRows,
-  sideOff,
-  toolExclusionLocks,
-  winnerKey,
-  withApplies,
-} from './contourConfigView';
+import { sectionRows } from './contourConfigView';
+import { rulesAppliesOf } from './rulesAppliesOf';
+import { withApplies } from './withApplies';
+import { sideOff } from './sideOff';
+import { toolExclusionLocks } from './toolExclusionLocks';
+import { overlapsByPlatformRule } from './overlapsByPlatformRule';
+import { overlapsByOurRule } from './overlapsByOurRule';
+import { overlapSummary } from './overlapSummary';
+import { winnerKey } from './winnerKey';
+import { ourOverlapName } from './ourOverlapName';
 
 const PLATFORM = {
   id: 'company-dev',

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { CATALOG_PROVIDERS } from '../../../providers/catalog.ts';
-import type { ConfigProvider } from '../../../providers/types.ts';
+import { CATALOG_PROVIDERS } from '../../../providers/catalog/catalog.ts';
+import type { ConfigProvider } from '../../../providers/types/types.ts';
 import { runToolEvent, toolEventOwner } from './tool-events.ts';
 
 /**

@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { writeJsonFile } from '../../lib/safe-io.ts';
-import type { ChatRunRegistry } from './ChatRunRegistry.ts';
+import { writeJsonFile } from '../../lib/safe-io/safe-io.ts';
+import type { ChatRunRegistry } from './ChatRunRegistry/ChatRunRegistry.ts';
 
 /**
  * Заголовок повторной отправки из очереди сервера. Такой запрос потока не

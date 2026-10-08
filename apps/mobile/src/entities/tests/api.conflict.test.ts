@@ -22,7 +22,8 @@ vi.mock('../../shared/api/client', () => ({
 }));
 
 const { ApiError } = await import('../../shared/api/client');
-const { useStartTestRun, useStartManualRun } = await import('./api');
+const { useStartTestRun } = await import('./useStartTestRun');
+const { useStartManualRun } = await import('./useStartManualRun');
 
 type WithError = { onError?: (error: unknown) => void };
 const keysInvalidated = (): unknown[] =>

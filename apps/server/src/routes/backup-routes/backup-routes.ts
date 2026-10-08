@@ -1,0 +1,160 @@
+import type { FastifyInstance } from 'fastify';
+import type { ServerContext } from '../../context.ts';
+import {
+  listBackups,
+  restoreBackup,
+  deleteBackup,
+  restorePreview,
+} from '../../domains/backups/backups.ts';
+import { unifiedDiff } from '../../domains/config-preview/unified-diff.ts';
+import { setSecretPassphrase, hasSecretPassphrase } from '../../lib/safe-io/safe-io.ts';
+import { makeVerifier, verifyPassphrase } from '../../lib/secret-crypto/secret-crypto.ts';
+import { codeOf } from '../../lib/server-text/server-text.ts';
+
+/**
+ * Резервные копии: посмотреть и откатиться.
+ *
+ * Каталог копий существовал с самого начала, но был доступен только из
+ * проводника. Откат — как раз то действие, ради которого копии и делаются,
+ * поэтому ему место в панели.
+ */
+export function registerBackupRoutes(app: FastifyInstance, ctx: ServerContext): void {
+  /** Пути, куда вообще разрешено восстанавливать: имя копии из запроса сюда не попадает. */
+  const restorableTargets = (): Record<string, string> => {
+    const { settings, settingsLocal, claudeMd, secretsEnv, mcpConfig } = ctx.location.paths;
+    return { settings, settingsLocal, claudeMd, secretsEnv, mcpConfig };
+  };
+
+  app.get('/api/backups', () => ({
+    // store.backupDir, а не ctx.backupDir: копии надо показывать и тогда,
+    // когда пользователь выключил их создание, — старые никуда не делись.
+    items: listBackups(ctx.store.backupDir, restorableTargets(), ctx.location.paths.skills),
+    isEnabled: ctx.store.getSettings().backupBeforeWrite,
+    // Шифрование копий секретов: включено ли, введена ли фраза в этой сессии и
+    // настраивалось ли шифрование вообще (есть verifier). По этим флагам
+    // интерфейс решает, спросить ли фразу перед восстановлением/включением.
+    encryptSecrets: ctx.store.getSettings().encryptSecretBackups,
+    passphraseLoaded: hasSecretPassphrase(),
+    hasPassphrase: Boolean(ctx.store.getSecretBackupVerifier()),
+  }));
+
+  /**
+   * Задать парольную фразу шифрования копий секретов на эту сессию.
+   *
+   * Фраза НЕ хранится: в state.json ложится только verifier (проверочная
+   * производная). Первый ввод создаёт verifier; последующие сверяются с ним,
+   * чтобы случайной опечаткой не завести вторую фразу — тогда старые и новые
+   * копии шифровались бы разными ключами. `enable` заодно включает режим.
+   */
+  app.post<{ Body: { passphrase?: string; enable?: boolean } }>(
+    '/api/backups/secret-passphrase',
+    (request, reply) => {
+      const passphrase = request.body.passphrase ?? '';
+      if (passphrase.length < 8) {
+        return reply.code(400).send({
+          error: 'Парольная фраза должна быть не короче 8 символов',
+          messageCode: 'backup-passphrase-short',
+        });
+      }
+
+      const verifier = ctx.store.getSecretBackupVerifier();
+      if (verifier) {
+        if (!verifyPassphrase(passphrase, verifier)) {
+          return reply
+            .code(400)
+            .send({ error: 'Неверная парольная фраза', messageCode: 'backup-passphrase-wrong' });
+        }
+      } else {
+        ctx.store.setSecretBackupVerifier(makeVerifier(passphrase));
+      }
+
+      setSecretPassphrase(passphrase);
+      if (request.body.enable) {
+        ctx.store.updateSettings({ encryptSecretBackups: true });
+        // Настройку мало записать в state.json: шифрование живёт глобальным
+        // флагом в safe-io, и без этого вызова он оставался бы выключенным до
+        // перезапуска — панель показывала бы «шифрование включено», а копии
+        // `.mcp-secrets.env` продолжали ложиться открытым текстом.
+        ctx.applyIoSettings();
+      }
+
+      return { ok: true, encryptSecrets: ctx.store.getSettings().encryptSecretBackups };
+    },
+  );
+
+  // Имя копии берём как есть: клиент кодирует его один раз, и Fastify уже
+  // раскодировал параметр пути. Лишний decodeURIComponent здесь раскодировал
+  // имя ВТОРОЙ раз — `skills-50%off.…` падал на битой escape-последовательности
+  // (URIError → 500 вместо отката), а `a%2520b` схлопывался в другое имя и
+  // приводил к «Копия не найдена».
+  app.post<{ Params: { name: string }; Body: { passphrase?: string } }>(
+    '/api/backups/:name/restore',
+    (request, reply) => {
+      const result = restoreBackup(
+        ctx.store.backupDir,
+        request.params.name,
+        restorableTargets(),
+        ctx.location.paths.skills,
+        request.body?.passphrase,
+      );
+
+      // Неизвестная копия — 404, как у DELETE ниже; 400 остаётся за плохим
+      // запросом (нет фразы, копию некуда возвращать).
+      // Код текста рядом со строкой: без него английское окно показывало русскую.
+      if (!result.ok)
+        return reply
+          .code(result.notFound ? 404 : 400)
+          .send({ error: result.error, ...codeOf(result) });
+
+      return { ...result, needsRestart: true };
+    },
+  );
+
+  /**
+   * Что изменит откат к копии: дифф «сейчас → станет» по каждому файлу, секреты
+   * в строках замаскированы. Нужен карточке подтверждения агента панели: откат
+   * переписывает файл целиком и уносит правки, сделанные после копии.
+   */
+  app.get<{ Params: { name: string } }>('/api/backups/:name/preview', (request, reply) => {
+    const preview = restorePreview(
+      ctx.store.backupDir,
+      request.params.name,
+      restorableTargets(),
+      ctx.location.paths.skills,
+    );
+    if (!preview.ok) {
+      return reply.code(preview.notFound ? 404 : 400).send({
+        error: preview.error,
+        messageCode: preview.messageCode,
+        ...(preview.params ? { params: preview.params } : {}),
+      });
+    }
+    return {
+      // Двоичное и сверхбольшое строками не показать: у такого файла только
+      // факт замены (`binary`) или отметка «не помещается» (`truncated`).
+      files: preview.files.map((file) =>
+        file.skipped
+          ? {
+              path: file.path,
+              diff: '',
+              added: 0,
+              removed: 0,
+              truncated: file.skipped === 'too-large' && file.differs === true,
+              ...(file.skipped === 'binary' && file.differs ? { binary: true } : {}),
+            }
+          : { path: file.path, ...unifiedDiff(file.path, file.before, file.after) },
+      ),
+    };
+  });
+
+  app.delete<{ Params: { name: string } }>('/api/backups/:name', (request, reply) => {
+    // То же самое, что и в откате: имя уже раскодировано маршрутизатором.
+    const removed = deleteBackup(ctx.store.backupDir, request.params.name);
+    if (!removed)
+      return reply
+        .code(404)
+        .send({ error: 'Копия не найдена', messageCode: 'backup-copy-not-found' });
+
+    return { ok: true };
+  });
+}

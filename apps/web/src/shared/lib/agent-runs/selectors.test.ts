@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { selectActiveRuns, countRunning, type RunLike } from './selectors';
+import { selectActiveRuns } from './selectors';
 import { STALL_MS } from './status';
+import type { RunLike } from './selectors.types';
+import { countRunning } from './countRunning';
 
 /**
  * Тесты выборок для пульта агентов. Тест-кейсы см. .agent/TEST-CASES.md →

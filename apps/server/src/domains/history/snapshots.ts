@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import type { TrackedFile } from '../tracked-files.ts';
+import type { TrackedFile } from '../tracked-files/tracked-files.ts';
 import { BACKUP_NAME, STAMP } from './constants.ts';
 import type { DiffBase, Snapshot } from './types.ts';
 

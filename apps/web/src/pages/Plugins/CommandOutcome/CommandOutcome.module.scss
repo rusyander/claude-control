@@ -1,0 +1,9 @@
+// Вывод команды может быть длинным и с переносами — сохраняем как есть.
+.output {
+  white-space: pre-wrap;
+  max-height: 200px;
+  overflow-y: auto;
+  padding: var(--spacing-xs);
+  background-color: var(--color-surface-sunken);
+  border-radius: var(--radius-md);
+}

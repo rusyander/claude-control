@@ -10,7 +10,7 @@ import {
   buildPoints,
   planCases,
   selectCases,
-} from '../../domains/project-tests.ts';
+} from '../../domains/project-tests/project-tests.ts';
 import {
   definePanelAction,
   fingerprintOf,
@@ -24,8 +24,8 @@ import {
   readRoute,
   SECRET_REFUSAL,
   stateCard,
-} from './action-kit.ts';
-import { dataField, summaryText, textField } from './texts.ts';
+} from './action-kit/action-kit.ts';
+import { dataField, summaryText, textField } from './texts/texts.ts';
 import { testsPage, testsQuery as query } from './tests-page.ts';
 import { idOf, named, projectPath, STATUS_WORDS, viewOf } from './tests-block-kit.ts';
 

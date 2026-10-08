@@ -1,4 +1,4 @@
-import { UnrecognizedFormatError } from '../../lib/codex-toml.ts';
+import { UnrecognizedFormatError } from '../../lib/codex-toml/codex-toml.ts';
 
 /**
  * Общая нормализация для всех форматов раздела: разбор списков черновика,

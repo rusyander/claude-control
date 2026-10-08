@@ -1,18 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { ProviderChatPermission, ProviderChatQueued } from '@agentdeck/contracts';
-import { toErrorMessage } from '@shared/api/client';
-import {
-  answerProviderChatPermission,
-  cancelProviderChatQueued,
-  openProviderChatStream,
-  providerChatKeys,
-  readProviderChatStatus,
-  sendProviderChatMessage,
-  sendProviderChatQueued,
-  stopProviderChat,
-} from '../api/ProviderChatApi';
 import { isAnswerRunningRefusal } from './sendRefusal';
+import { sendProviderChatMessage } from '../lib/sendProviderChatMessage';
+import { cancelProviderChatQueued } from '../lib/cancelProviderChatQueued';
+import { sendProviderChatQueued } from '../lib/sendProviderChatQueued';
+import { answerProviderChatPermission } from '../lib/answerProviderChatPermission';
+import { stopProviderChat } from '../lib/stopProviderChat';
+import { readProviderChatStatus } from '../lib/readProviderChatStatus';
+import { openProviderChatStream } from '../lib/openProviderChatStream';
+import { providerChatKeys } from '../api/ProviderChatApi.constants';
+import { toErrorMessage } from '../../../shared/api/toErrorMessage';
 
 /**
  * Идущий ответ открытого разговора: текст, который уже напечатан, и признак

@@ -1,0 +1,153 @@
+// Окно пристёгнуто к правому краю и не затемняет страницу: агент открывает её,
+// чтобы человек увидел результат, и разговор идёт рядом. Слой ниже модальных
+// окон страницы (100). На широком экране модальное окно, открытое при открытом
+// окне агента, встаёт слева от него (`@shared/lib/side-dock`, метка
+// `data-side-dock`): черновики и мастер видны, а разговор идёт дальше. Уже 900 px
+// места нет — модальное окно встаёт поверх, как везде.
+// Ширина окна — одна переменная для самого окна и для отступа страницы, иначе
+// они разойдутся при первой правке. На широком экране (от 900 px) открытое окно
+// сдвигает содержимое страницы (`MainLayout` читает `--panel-agent-dock-inset`):
+// якорь, открытый агентом, и правый край таблиц не прячутся под окном. Уже
+// 900 px сдвигать некуда — окно встаёт поверх страницы. 440 px — ширина по
+// умолчанию; на широком экране человек тянет её ручкой, и окно ставит свою
+// ширину той же переменной на корне (`model/useDockWidth.ts`).
+:global(:root) {
+  --panel-agent-dock-width: 440px;
+}
+
+@media (min-width: 900px) {
+  :global(:root[data-panel-agent-docked]) {
+    --panel-agent-dock-inset: var(--panel-agent-dock-width);
+  }
+}
+
+.context {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+}
+
+.scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  padding-right: var(--spacing-2xs);
+  // Видимая граница под плашкой «Страница: …»: реплика, уехавшая прокруткой
+  // под верхний край ленты, иначе читалась как обрезанная плашкой.
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--spacing-xs);
+}
+
+.message {
+  max-width: 92%;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: 10px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.user {
+  align-self: flex-end;
+  background-color: var(--color-accent);
+}
+
+.assistant {
+  align-self: flex-start;
+  border: 1px solid var(--color-border);
+  background-color: var(--color-surface);
+}
+
+.step {
+  align-self: flex-start;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2xs);
+}
+
+.markdown {
+  // Пузырь сообщения держит `pre-wrap` для реплик человека; разметка его не
+  // наследует — переводы строк между <li> и <p> рисовались пустыми строками.
+  white-space: normal;
+  font-size: var(--font-size-body-sm);
+  line-height: 1.5;
+  color: var(--color-fg);
+  overflow-wrap: anywhere;
+
+  p,
+  ul,
+  ol {
+    margin: 0 0 var(--spacing-xs);
+  }
+
+  > :last-child {
+    margin-bottom: 0;
+  }
+
+  ul,
+  ol {
+    padding-left: var(--spacing-md);
+  }
+
+  code {
+    padding: 0 4px;
+    border-radius: 4px;
+    background-color: var(--color-surface-sunken);
+    font-size: 0.95em;
+  }
+
+  pre {
+    overflow-x: auto;
+    padding: var(--spacing-xs);
+    border-radius: 6px;
+    background-color: var(--color-surface-sunken);
+  }
+
+  pre code {
+    padding: 0;
+  }
+}
+
+.foreignGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  padding-top: var(--spacing-sm);
+  border-top: 1px dashed var(--color-border);
+}
+
+.composer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+  align-items: flex-end;
+}
+
+.input {
+  flex: 1;
+  min-height: 64px;
+  max-height: 200px;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background-color: var(--color-surface);
+  color: var(--color-fg);
+  font: inherit;
+  resize: vertical;
+
+  &:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 1px;
+  }
+}
+
+// Якорь, в который агент не перенёс фокус (человек печатал): его показывают
+// подсветкой, а фокус остаётся там, где человек пишет.
+:global([data-agent-highlight]) {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+  transition: outline-color var(--duration-fast) ease;
+}

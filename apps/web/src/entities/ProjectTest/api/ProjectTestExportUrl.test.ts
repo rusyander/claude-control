@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { runExportUrl } from './ProjectTestExchangeApi';
-import { releaseExportUrl } from './ProjectTestReleaseApi';
+import { runExportUrl } from '../lib/runExportUrl';
+import { releaseExportUrl } from '../lib/releaseExportUrl';
 
 /**
  * Адреса отчётов файлом.

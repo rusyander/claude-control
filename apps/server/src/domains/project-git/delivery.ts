@@ -14,7 +14,7 @@ import {
 import { chatDeliveryPrompt } from '@agentdeck/contracts/task-split';
 import { bootstrapPlanFor, isHeavyPlan } from './bootstrap.ts';
 import { layoutForCwd } from './copy-readiness.ts';
-import { gitSync } from './exec.ts';
+import { gitSync } from './exec/exec.ts';
 import { pickRemote } from './parse.ts';
 
 /**

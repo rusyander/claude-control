@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import type { ProviderCheckResult } from '@agentdeck/contracts';
-import { trustBadge, checkScore, stepTone } from './trust';
+import { checkScore } from './checkScore';
+import { stepTone } from './stepTone';
+import { trustBadge } from './trustBadge';
 
 function result(level: ProviderCheckResult['level']): ProviderCheckResult {
   return {

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryObserver } from '@tanstack/react-query';
 import { apiClient } from '@shared/api/client';
-import { caseHistoryQuery } from './ProjectTestCaseHistoryApi';
+import { caseHistoryQuery } from '../lib/caseHistoryQuery';
 
 /**
  * Ревью z3 C01: открытая «История» кейса не перечитывалась, когда прогон агента

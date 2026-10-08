@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { DEFAULT_INTEGRATIONS, TELEGRAM_EVENTS } from '@entities/Integration';
-import { buildSettings, draftFrom, isDraftDirty, missingFields, toggleEvent } from './draft';
+import { draftFrom } from './draft';
+import { toggleEvent } from './toggleEvent';
+import { buildSettings } from './buildSettings';
+import { isDraftDirty } from './isDraftDirty';
+import { missingFields } from './missingFields';
 
 describe('draftFrom', () => {
   it('раскладывает настройки коннектора по полям карточки', () => {

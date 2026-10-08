@@ -1,43 +1,19 @@
 import { useTranslation } from 'react-i18next';
-import type {
-  Platform,
-  PlatformDataMask,
-  PlatformRunLayers,
-  PlatformRuleConflict,
-  PlatformRuleRow,
-} from '@agentdeck/contracts';
+import type { Platform } from '@agentdeck/contracts';
 import { Card } from '@shared/ui/card';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { useSavePlatform } from '@entities/Platform';
-import styles from '../PlatformPage.module.scss';
-import { rulesAppliesOf, sideOff, toolExclusionLocks } from '../lib/contourConfigView';
-import { RulesChoice } from '../RulesChoice';
-import { OursRulesColumn } from './OursRulesColumn';
-import { PlatformRulesColumn } from './PlatformRulesColumn';
-import { RuleConflicts } from './RuleConflicts';
+import styles from './RulesCard.module.scss';
+import { RulesChoice } from '../RulesChoice/RulesChoice';
+import { OursRulesColumn } from './OursRulesColumn/OursRulesColumn';
+import { PlatformRulesColumn } from './PlatformRulesColumn/PlatformRulesColumn';
+import { RuleConflicts } from './RuleConflicts/RuleConflicts';
 import { useRuleDrafts } from './useRuleDrafts';
-
-export interface RulesCardProps {
-  platform: Platform;
-  /**
-   * Правила из манифеста драйвера: чем распоряжаемся и что только видно.
-   * Необязательны намеренно — ответ без них приносит рассинхрон версий, и
-   * падение здесь унесло бы с экрана весь раздел, а не одну карточку.
-   */
-  rules?: PlatformRuleRow[];
-  /** Ячейки матрицы: где правило контура спорит с нашим. */
-  conflicts?: PlatformRuleConflict[];
-  /**
-   * Что из нашего унесёт прогон через этот контур (Т8) — СЧИТАЕТ СЕРВЕР. Экран
-   * показывает готовые флаги, а не собирает их заново: разошедшись, вторая
-   * сборка обещала бы снятый слой при полном запуске. Необязательны по той же
-   * причине, что и правила выше: ответ старого сервера их не приносит.
-   */
-  layers?: PlatformRunLayers;
-  /** Маска данных на этом контуре (Р11) — решение сервера, как и слои. */
-  dataMask?: PlatformDataMask;
-}
+import type { RulesCardProps } from './RulesCard.types';
+import { rulesAppliesOf } from '../lib/rulesAppliesOf';
+import { sideOff } from '../lib/sideOff';
+import { toolExclusionLocks } from '../lib/toolExclusionLocks';
 
 /**
  * Правила контура и матрица конфликтов (Т7).

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildTree } from './buildTree';
-import { planDelete, isRemovedByDelete } from './deletePlan';
+import { planDelete } from './deletePlan';
+import { isRemovedByDelete } from './isRemovedByDelete';
 
 /**
  * Регрессия: корзина в дереве файлов удаляла сразу по клику, без вопроса, а у

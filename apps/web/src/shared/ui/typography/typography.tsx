@@ -1,6 +1,7 @@
 import styles from './typography.module.scss';
-import { clampStyle, defaultTag } from './typography.lib';
+import { defaultTag } from './typography.lib';
 import type { TypographyProps } from './typography.types';
+import { clampStyle } from './clampStyle';
 
 /**
  * Единственный способ выводить текст в приложении: сырые теги абзацев,

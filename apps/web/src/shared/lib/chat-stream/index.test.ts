@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isStreamShown } from './index';
+import { isStreamShown } from './isStreamShown';
 
 /**
  * Одно условие на двоих: по нему лента рисует потоковый пузырь и по нему же

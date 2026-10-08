@@ -1,11 +1,20 @@
 import type { ClaudeLocation } from '@agentdeck/contracts';
 import { listResourceFiles, readResourceFile, isWritable } from './ResourceFiles.ts';
 import type { ResourceKind } from './registry.ts';
-import { defaultCliCommand } from '../../providers/cli.ts';
-import { helperAskOf, historyLines, type AssistTurn, type HelperAsk } from '../assistant.ts';
+import { defaultCliCommand } from '../../providers/cli/cli.ts';
+import {
+  helperAskOf,
+  historyLines,
+  type AssistTurn,
+  type HelperAsk,
+} from '../assistant/assistant.ts';
 import { maskAssistText } from '../assistant-secrets.ts';
-import { SECRET_MASK, maskSecretsInText, restoreMaskedSecrets } from '../../lib/secret-mask.ts';
-import type { AgentImage } from '../../lib/agent-images.ts';
+import {
+  SECRET_MASK,
+  maskSecretsInText,
+  restoreMaskedSecrets,
+} from '../../lib/secret-mask/secret-mask.ts';
+import type { AgentImage } from '../../lib/agent-images/agent-images.ts';
 import type { ServerMessageCode, ServerMessageParams } from '@agentdeck/contracts/server-messages';
 
 /**

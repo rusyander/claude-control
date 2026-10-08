@@ -3,8 +3,8 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { createGroup, readGroups, upsertCase } from './store.ts';
-import { readRuns } from './runs-store.ts';
+import { createGroup, readGroups, upsertCase } from './store/store.ts';
+import { readRuns } from './runs-store/runs-store.ts';
 
 /**
  * `case` и `record` — команды, которыми агент чата пишет в блок «Тесты» (Ф17,

@@ -1,8 +1,8 @@
 import type { Group } from '@agentdeck/contracts';
 import { readAnswerBlock } from './answer-block.ts';
-import { memberKey } from './members.ts';
+import { memberKey } from './members/members.ts';
 import { singleTurn, type GroupAsk } from './model.ts';
-import { fallbackOverrideText } from './override.ts';
+import { fallbackOverrideText } from './override/override.ts';
 
 /**
  * Текст файла переопределения и список запретов для тумблера «В этом проекте —

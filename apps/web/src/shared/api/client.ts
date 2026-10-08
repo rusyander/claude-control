@@ -68,7 +68,7 @@ export const LONG_TIMEOUTS = {
    */
   mcpHealth: 200_000,
   /**
-   * Вопрос агенту контура: у сервера бюджет 125 c (`domains/platform/agents.ts`,
+   * Вопрос агенту контура: у сервера бюджет 125 c (`domains/platform/agents/agents.ts`,
    * AGENT_TIMEOUT_MS), потому что сам контур ведёт прогон агента до ~115 c и
    * потоком его не отдаёт — заголовки приезжают в конце. На общих 60 c браузер
    * рвал бы каждый ответ длиннее минуты ложным таймаутом, пока контур спокойно
@@ -121,34 +121,4 @@ export function messageFromPayload(payload: unknown): string | undefined {
     if (typeof candidate === 'string' && candidate.trim()) return candidate;
   }
   return undefined;
-}
-
-/**
- * Сообщение об ошибке, пригодное для показа пользователю. Сервер присылает
- * человеческий текст в теле ответа — берём его, а не сырой статус axios
- * («Request failed with status code 400» пользователю ничего не объясняет).
- */
-export function toErrorMessage(error: unknown): string {
-  if (axios.isAxiosError(error)) {
-    return messageFromPayload(error.response?.data) ?? error.message;
-  }
-  return error instanceof Error ? error.message : String(error);
-}
-
-/** Код текста отказа сервера (`messageCode`) — чтобы отличить ответ от сбоя. */
-export function messageCodeOf(error: unknown): string | undefined {
-  if (!axios.isAxiosError(error)) return undefined;
-  const data: unknown = error.response?.data;
-  if (typeof data !== 'object' || data === null) return undefined;
-  const code = (data as { messageCode?: unknown }).messageCode;
-  return typeof code === 'string' ? code : undefined;
-}
-
-/**
- * Отказ 409 — «занято»: сервер отверг запрос не из-за его формы, а потому что
- * состояние ушло вперёд (прогон уже идёт, группу держит чужой прогон). Экран,
- * получивший такой отказ, устарел и должен перечитать состояние.
- */
-export function isConflict(error: unknown): boolean {
-  return axios.isAxiosError(error) && error.response?.status === 409;
 }

@@ -73,7 +73,7 @@ import {
 
 const ROOT = resolve(import.meta.dirname, '../..');
 const TOPICS_DIR = join(ROOT, 'apps/web/src/pages/Help/topics');
-const TOPICS_REGISTRY = join(ROOT, 'apps/web/src/pages/Help/model/topics.ts');
+const TOPICS_REGISTRY = join(ROOT, 'apps/web/src/pages/Help/model/topics.constants.ts');
 const RU_DICT_DIR = join(ROOT, 'apps/web/src/shared/config/i18n/help/ru/topics');
 const SECRETS_DIR = join(homedir(), '.agentdeck');
 
@@ -267,7 +267,7 @@ function sourceProblems(states) {
   for (const state of states) {
     if (state.unknownTopic) {
       problems.push(
-        `${SOURCES_MANIFEST}: раздела «${state.topic}» нет в pages/Help/model/topics.ts — ` +
+        `${SOURCES_MANIFEST}: раздела «${state.topic}» нет в pages/Help/model/topics.constants.ts — ` +
           'опись пережила документ',
       );
     } else if (state.missingDocument) {
@@ -308,7 +308,7 @@ function readUsages(dir = TOPICS_DIR) {
   const shots = [];
   const diagrams = [];
   if (!existsSync(dir)) return { shots, diagrams };
-  for (const name of readdirSync(dir)) {
+  for (const name of readdirSync(dir, { recursive: true, encoding: 'utf8' })) {
     if (!name.endsWith('.tsx')) continue;
     const source = readFileSync(join(dir, name), 'utf8');
     const read = (props, prop) => props.match(new RegExp(`${prop}="([^"]+)"`))?.[1];

@@ -13,8 +13,8 @@ import type { ChatMessage } from '@agentdeck/contracts';
 import { Empty, Loading, Mono, Row, StatusDot } from '../src/shared/ui';
 import { colors, font, space } from '../src/shared/config/theme';
 import { useT } from '../src/shared/config/i18n';
-import { isConfigured, useConnection } from '../src/shared/api/connection';
-import { newChatId, openChat, useWorkspace } from '../src/shared/lib/workspace';
+import { useConnection, isConfigured } from '../src/shared/api/connection';
+import { useWorkspace, newChatId, openChat } from '../src/shared/lib/workspace';
 import {
   cancelQueued,
   restoreQueue,
@@ -25,27 +25,32 @@ import {
   useRunKey,
   visibleStatus,
 } from '../src/shared/lib/runs';
-import { chatMessagesQuery, useChatMessages, useChatProgress } from '../src/entities/chat/api';
-import { ChatGroupNotes } from '../src/features/chat/ChatGroupNotes';
+import { ChatGroupNotes } from '../src/features/chat/ChatGroupNotes/ChatGroupNotes';
 import { useCostUnit } from '../src/entities/settings/api';
-import { formatSpend, shortModel } from '../src/shared/lib/format';
-import { Composer, type ComposerValue } from '../src/features/chat/Composer';
-import { MediaImageCard } from '../src/features/chat/MediaImageCard';
+import { Composer } from '../src/features/chat/Composer/Composer';
+import { MediaImageCard } from '../src/features/chat/MediaImageCard/MediaImageCard';
 import { useImageMode } from '../src/features/chat/useImageMode';
-import { Markdown } from '../src/features/chat/Markdown';
-import { AgentText } from '../src/features/chat/AgentText';
-import { PermissionCard } from '../src/features/chat/PermissionCard';
-import { Progress } from '../src/features/chat/Progress';
-import { TokenBadge } from '../src/features/chat/TokenBadge';
-import { ToolCall } from '../src/features/chat/ToolCall';
-import { RunTimer } from '../src/features/chat/RunTimer';
+import { Markdown } from '../src/features/chat/Markdown/Markdown';
+import { AgentText } from '../src/features/chat/AgentText/AgentText';
+import { PermissionCard } from '../src/features/chat/PermissionCard/PermissionCard';
+import { Progress } from '../src/features/chat/Progress/Progress';
+import { TokenBadge } from '../src/features/chat/TokenBadge/TokenBadge';
+import { ToolCall } from '../src/features/chat/ToolCall/ToolCall';
+import { RunTimer } from '../src/features/chat/RunTimer/RunTimer';
 import { liveToolsOutsideHistory } from '../src/features/chat/liveTurn';
-import { Transcript, UserBubble } from '../src/features/chat/Transcript';
-import { AskCard } from '../src/features/inbox/AskCard';
+import { Transcript } from '../src/features/chat/Transcript/Transcript';
+import { AskCard } from '../src/features/inbox/AskCard/AskCard';
 import { useSent } from '../src/features/inbox/sent';
 import { useInboxChats } from '../src/features/inbox/useInboxChats';
-import { inboxChatNamed } from '../src/entities/inbox/liveAsks';
-import { visibleAsks } from '../src/entities/inbox/model';
+import { chatMessagesQuery } from '../src/entities/chat/chatMessagesQuery';
+import { useChatMessages } from '../src/entities/chat/useChatMessages';
+import { useChatProgress } from '../src/entities/chat/useChatProgress';
+import { inboxChatNamed } from '../src/entities/inbox/inboxChatNamed';
+import { visibleAsks } from '../src/entities/inbox/visibleAsks';
+import { shortModel } from '../src/shared/lib/shortModel';
+import { formatSpend } from '../src/shared/lib/formatSpend';
+import type { ComposerValue } from '../src/features/chat/Composer/Composer.types';
+import { UserBubble } from '../src/features/chat/UserBubble/UserBubble';
 
 /**
  * Разговор — то, ради чего приложение существует: видеть, что делает агент,

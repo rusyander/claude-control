@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { emitOutcomes, type EmitEntry, type EmitOutcome } from '@agentdeck/contracts/portable-emit';
 import type { TransferFilePlan, TransferPlan } from '@agentdeck/contracts/portable-transfer';
-import { OUTCOME_TONE, summarizeOutcomes, summarizePlan } from './transfer.ts';
+import { OUTCOME_TONE } from './transfer.ts';
+import { summarizeOutcomes } from './summarizeOutcomes';
+import { summarizePlan } from './summarizePlan';
 
 /**
  * Сводка переноса на экране (П2.3).

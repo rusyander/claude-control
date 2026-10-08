@@ -2,8 +2,8 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import type { ClaudeLocation } from '@agentdeck/contracts';
-import type { AppStore } from '../../lib/app-store.ts';
-import { readJsonFile } from '../../lib/safe-io.ts';
+import type { AppStore } from '../../lib/app-store/app-store.ts';
+import { readJsonFile } from '../../lib/safe-io/safe-io.ts';
 import { isLocalId } from '../../lib/settings-source.ts';
 
 type ClaudePaths = ClaudeLocation['paths'];

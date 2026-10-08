@@ -7,12 +7,12 @@ import {
   deleteSkill,
   renameSkill,
   SkillExistsError,
-} from '../../domains/skills.ts';
-import { readCommands } from '../../domains/commands.ts';
+} from '../../domains/skills/skills.ts';
+import { readCommands } from '../../domains/commands/commands.ts';
 import { live } from '../write-result.ts';
 import type { ClaudePaths } from './shared.ts';
-import { codeOf } from '../../lib/server-text.ts';
-import { attachTextCodes } from '../../lib/server-texts.ts';
+import { codeOf } from '../../lib/server-text/server-text.ts';
+import { attachTextCodes } from '../../lib/server-texts/server-texts.ts';
 
 /**
  * Скиллы (папки в skills/) и сводный список слэш-команд.

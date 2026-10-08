@@ -12,7 +12,6 @@ import { Icon } from '@shared/ui/icon';
 import { PageHeader } from '@shared/ui/page-header';
 import { ExplainBox } from '@shared/ui/explain-box';
 import { SearchField } from '@shared/ui/search-field';
-import { formatSize, formatDateTime } from '@shared/lib/format';
 import { ScriptFormModal } from '@features/ScriptEditor';
 import { DeleteButton } from '@features/EntityDelete';
 import { SandboxButton } from '@features/SandboxRunner';
@@ -21,8 +20,12 @@ import { useScripts, useDeleteScript, type ScriptFile } from '@entities/Script';
 import { useIsCapabilityReady } from '@entities/Provider';
 import { PageTabs, PageTabPanel } from '@shared/ui/page-tabs';
 import { usePageTab } from '@shared/hooks/use-page-tab';
-import { SCRIPTS_TABS, SCRIPTS_TAB_ICONS, scriptsInTab } from './model/tabs';
+import { SCRIPTS_TAB_ICONS } from './model/tabs';
 import styles from './ScriptsPage.module.scss';
+import { SCRIPTS_TABS } from './model/tabs.types';
+import { scriptsInTab } from './model/scriptsInTab';
+import { formatSize } from '../../shared/lib/formatSize';
+import { formatDateTime } from '../../shared/lib/formatDateTime';
 
 /**
  * Скрипты из каталога hooks/. Хуки на странице «Хуки» задают, когда скрипт

@@ -2,10 +2,10 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { readHooks, writeHooks } from './hooks.ts';
-import { readPermissions } from './permissions.ts';
-import { readEnvVars, saveEnvVar, deleteEnvVar } from './env.ts';
-import { AppStore } from '../lib/app-store.ts';
+import { readHooks, writeHooks } from './hooks/hooks.ts';
+import { readPermissions } from './permissions/permissions.ts';
+import { readEnvVars, saveEnvVar, deleteEnvVar } from './env/env.ts';
+import { AppStore } from '../lib/app-store/app-store.ts';
 
 /**
  * settings.local.json Claude Code читает наравне с основным файлом, поэтому

@@ -1,0 +1,138 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--color-surface);
+}
+
+.header {
+  padding: var(--spacing-sm);
+  border-bottom: 1px solid var(--color-border);
+}
+
+// Боковые отступы у полосы списка: без них карточки упирались в границу
+// панели и в край сетки. Как в списке проектов — при переключении сегмента
+// «Чаты | Проекты» полоса не должна дёргаться.
+.items {
+  flex: 1;
+  min-height: 0;
+  padding: 0 var(--spacing-xs);
+  overflow-y: auto;
+}
+
+.title {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.preview {
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+// Переключатель режима поиска: «по названию» | «по сообщениям». Сегмент во всю
+// ширину, активная половина подсвечена — как сегмент «Чаты | Проекты» в шапке.
+.modes {
+  padding: var(--spacing-3xs);
+  background: var(--color-surface-sunken);
+  border-radius: var(--radius-md);
+}
+
+.modeButton {
+  flex: 1;
+  padding: var(--spacing-3xs) var(--spacing-2xs);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-fg-subtle);
+  font: inherit;
+  font-size: var(--font-size-caption);
+  cursor: pointer;
+  transition:
+    background var(--duration-fast),
+    color var(--duration-fast);
+
+  &:hover {
+    color: var(--color-fg);
+  }
+}
+
+.modeActive {
+  background: var(--color-surface);
+  color: var(--color-fg);
+  box-shadow: var(--shadow-sm);
+
+  &:hover {
+    color: var(--color-fg);
+  }
+}
+
+// Заголовок группы по дате: разделяет «Сегодня», «Вчера» и остальное, чтобы
+// порядок списка читался с первого взгляда.
+.group {
+  display: flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 var(--spacing-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/*
+  Гармошка ветви «Ещё N» (G1) — с отступом и линией ребёнка: читается частью
+  ветви, а не заголовком даты. Высота — MORE_HEIGHT (32px) минус зазор, как у
+  строк: виртуальный список кладёт строку ровно в эту высоту.
+*/
+.more {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3xs);
+  width: calc(100% - 16px);
+  height: 28px;
+  margin: 2px 0 2px 16px;
+  padding: 0 var(--spacing-2xs);
+  border: none;
+  border-left: 2px solid var(--color-border);
+  border-radius: 0 8px 8px 0;
+  background: transparent;
+  color: var(--color-fg-subtle);
+  font: inherit;
+  font-size: var(--font-size-caption);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background var(--duration-fast),
+    color var(--duration-fast);
+
+  &:hover {
+    background: var(--color-surface-sunken);
+    color: var(--color-fg);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: -2px;
+  }
+}
+
+/* Разделитель внутри ветви — с отступом ребёнка, чтобы не читался датой. */
+.inactive {
+  display: flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 var(--spacing-2xs) 0 calc(18px + var(--spacing-2xs));
+}
+
+/* Заглушка удалённого родителя: не кнопка, открыть нечего. */
+.lostParent {
+  height: calc(100% - 4px);
+  padding: var(--spacing-sm);
+  border: 1px dashed var(--color-border);
+  border-radius: 8px;
+  overflow: hidden;
+}

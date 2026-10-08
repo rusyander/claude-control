@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { applyEvent, getRun, setRun, visibleStatus } from './store';
 import type { ChatEvent } from './types';
+import { visibleStatus, getRun, setRun, applyEvent } from './store';
 
 /**
  * Вопрос, закрытый автономией чата: телефон не должен держать «ждёт вас» над

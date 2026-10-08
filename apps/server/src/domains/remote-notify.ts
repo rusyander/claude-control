@@ -1,6 +1,6 @@
 import type { PushDevice } from '@agentdeck/contracts';
 import { basename } from 'node:path';
-import type { RunNotice } from './chat/ChatRunRegistry.ts';
+import type { RunNotice } from './chat/ChatRunRegistry/ChatRunRegistry.ts';
 
 /**
  * Уведомления на телефон через сервис Expo.

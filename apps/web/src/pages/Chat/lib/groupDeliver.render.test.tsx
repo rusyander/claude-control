@@ -6,7 +6,7 @@ import type { ChatTreeView, SplitPlanView } from '@agentdeck/contracts/chat-hand
 import { apiClient } from '@shared/api/client';
 import { i18n } from '@shared/config/i18n';
 import { DeliveryControl } from '@features/ProjectGit';
-import { groupDeliverOf } from './childStages';
+import { groupDeliverOf } from './groupDeliverOf';
 
 /**
  * Живой прогон 25.09 (O2): план шёл с «До MR» выключенным, а шапка чата группы

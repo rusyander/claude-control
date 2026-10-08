@@ -1,0 +1,104 @@
+// Строка дерева: слева кнопка перехода, справа действия по наведению.
+.node {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2xs);
+  width: 100%;
+  padding: var(--spacing-3xs) var(--spacing-2xs);
+  border-radius: var(--radius-sm);
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-body-sm);
+
+  &:hover {
+    background: var(--color-surface-sunken);
+    color: var(--color-fg);
+  }
+}
+
+.nodeMain {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2xs);
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.nodeActive {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+
+  &:hover {
+    background: var(--color-accent-subtle);
+    color: var(--color-accent);
+  }
+}
+
+.chevron {
+  transition: transform var(--duration-fast);
+  flex-shrink: 0;
+}
+
+.chevronOpen {
+  transform: rotate(90deg);
+}
+
+.name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+// Счётчик файлов идёт сразу за именем папки, а не у края строки: у края он
+// читался как отдельное число, не связанное с папкой.
+.count {
+  padding: 0 var(--spacing-2xs);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-sunken);
+  color: var(--color-fg-subtle);
+  font-size: var(--font-size-caption);
+  flex-shrink: 0;
+}
+
+// Вложенность обозначаем отступом и линией: так видно, что к чему относится.
+.children {
+  margin-left: var(--spacing-sm);
+  padding-left: var(--spacing-xs);
+  border-left: 1px solid var(--color-border);
+}
+
+// Кнопки создания появляются у строки под курсором: постоянный ряд иконок
+// в дереве из сотни файлов превращается в кашу.
+.nodeActions {
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+  opacity: 0;
+}
+
+.node:hover .nodeActions,
+.node:focus-within .nodeActions {
+  opacity: 1;
+}
+
+.nodeAction {
+  display: flex;
+  align-items: center;
+  padding: 2px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-fg-subtle);
+  cursor: pointer;
+
+  &:hover {
+    background: var(--color-surface);
+    color: var(--color-accent);
+  }
+}

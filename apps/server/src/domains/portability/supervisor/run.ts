@@ -1,8 +1,8 @@
 import { spawn as nodeSpawn } from 'node:child_process';
-import { killChildTree } from '../../../lib/process-tree.ts';
+import { killChildTree } from '../../../lib/process-tree/process-tree.ts';
 import { readDecision, tryParse } from '../../sandbox/HookDecision.ts';
 import type { HookDecision } from '../../sandbox/HookProbe.types.ts';
-import type { ConfigProvider } from '../../../providers/types.ts';
+import type { ConfigProvider } from '../../../providers/types/types.ts';
 import { blockingOfEvent } from '../hook-events.ts';
 import {
   encodeSupervisorPayload,
@@ -59,7 +59,7 @@ export interface SupervisorHook {
    * калитка молча ничего не делала бы у `qwen` и `kimi` — единственных, у кого
    * `UserPromptSubmit` свой.
    *
-   * `layer` — хук группы прогона (`domains/groups/codex-layer.ts`): слой в файлы
+   * `layer` — хук группы прогона (`domains/groups/codex-layer/codex-layer.ts`): слой в файлы
    * цели не пишет, поэтому, как и `panel`, отыгрывается и на родном событии.
    */
   readonly owner?: 'target' | 'panel' | 'layer';

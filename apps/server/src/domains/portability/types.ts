@@ -5,8 +5,8 @@ import type {
   EnvSectionState,
   EnvSkip,
 } from '@agentdeck/contracts/portable-env';
-import type { ConfigProvider } from '../../providers/types.ts';
-import type { DisabledRuleSnapshot } from '../../lib/app-store.ts';
+import type { ConfigProvider } from '../../providers/types/types.ts';
+import type { DisabledRuleSnapshot } from '../../lib/app-store/app-store.ts';
 
 /**
  * Договор импорта: что импортёру дают и что он возвращает.

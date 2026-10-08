@@ -6,7 +6,7 @@ import {
   readHelpIndex,
   searchHelp,
   type HelpLanguage,
-} from '../../domains/panel-agent/help-topics.ts';
+} from '../../domains/panel-agent/help-topics/help-topics.ts';
 
 /**
  * Справка для агента панели: поиск и чтение темы. Маршруты, а не вызов домена

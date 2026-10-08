@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { AppStore } from '../lib/app-store.ts';
+import { AppStore } from '../lib/app-store/app-store.ts';
 import { resolveHelperRoute } from './assistant-route.ts';
 import { resolvePanelAgentLaunch } from './panel-agent/launch.ts';
 

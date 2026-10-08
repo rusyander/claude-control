@@ -1,0 +1,377 @@
+import type { FastifyInstance, FastifyReply } from 'fastify';
+import type {
+  McpServerDraft,
+  PermissionDraft,
+  ProjectAdded,
+  ProjectE2eOnboarding,
+  Project,
+  ProjectDraft,
+  SettingsSource,
+} from '@agentdeck/contracts';
+import type { ServerContext } from '../../context.ts';
+import { projectBackupName, readTextFile, writeTextFile } from '../../lib/safe-io/safe-io.ts';
+import {
+  projectInstructionTarget,
+  type InstructionTarget,
+} from '../../lib/instruction-files/instruction-files.ts';
+import { isLocalId, stripLocalPrefix } from '../../lib/settings-source.ts';
+import {
+  readMcpServers,
+  saveMcpServer,
+  deleteMcpServer,
+  setMcpServerEnabled,
+  McpServerExistsError,
+} from '../../domains/mcp/mcp.ts';
+import {
+  readPermissions,
+  savePermission,
+  deletePermission,
+  hasPermission,
+  assertPermissionDraft,
+  PermissionExistsError,
+  PermissionNotFoundError,
+} from '../../domains/permissions/permissions.ts';
+import {
+  checkProjectDraft,
+  makeProject,
+  findProjectOnDisk,
+  resolveProjectPaths,
+  type ProjectPaths,
+} from '../../domains/projects/projects.ts';
+import { onboardE2e } from '../../domains/project-tests/project-tests.ts';
+import { requireProject as requireProjectAccess, type ErrorReply } from '../project-access.ts';
+import { done } from '../write-result.ts';
+import { codeOf } from '../../lib/server-text/server-text.ts';
+
+/**
+ * Маршруты проектного уровня конфигурации.
+ *
+ * Реестр проектов (CRUD `/api/projects`) — это список запомненных путей в
+ * состоянии панели. На выбранный проект работают вложенные маршруты, которые
+ * читают и пишут ЕГО файлы (`CLAUDE.md`, `.claude/settings.json`, `.mcp.json`)
+ * теми же доменными функциями, что и пользовательский уровень, только с
+ * проектными путями и с резервной копией перед записью.
+ *
+ * Проектная область — «сырое» чтение/правка файлов проекта: групповые и
+ * disabled-оверлеи пользовательского уровня к ней не применяются. Доменные
+ * функции требуют `store` — передаём его, но `groupIds` там неактуальны
+ * (проектные сущности в пользовательские группы не входят по смыслу).
+ */
+export function registerProjectRoutes(app: FastifyInstance, ctx: ServerContext): void {
+  /**
+   * Запись реестра по id или ответ 404/400 — общий с `project-local-routes.ts`
+   * помощник (`project-access.ts`): гейт провайдера и поиск в реестре одни на
+   * все проектные маршруты Claude.
+   */
+  const requireProject = (id: string, reply: ErrorReply): Project | undefined =>
+    requireProjectAccess(ctx, id, reply);
+
+  /**
+   * Пути к конфигам проекта по id из реестра. Пользовательский `settings.json`
+   * передаётся всегда: ключ `instructionFiles`, заданный глобально, действует и
+   * в проекте, пока проект его не перекрыл, — и от него зависит ИМЯ файла правил.
+   */
+  const pathsOf = (project: Project): ProjectPaths =>
+    resolveProjectPaths(project.path, ctx.location.paths.settings);
+
+  /**
+   * Имя резервной копии проектного файла — `project-<id>-<basename>`. Без него
+   * копия `<проект>/CLAUDE.md` ложилась под именем пользовательской и попадала в
+   * её ленту истории, ротацию и кнопку «Восстановить» (см. `projectBackupName`).
+   */
+  const backupNameOf = (project: Project, filePath: string): string =>
+    projectBackupName(project.id, filePath);
+
+  /**
+   * В какой файл настроек проекта писать запись с этим id: локальные записи
+   * (`local:`) уходят обратно в `settings.local.json`, остальные — в основной
+   * `settings.json`. Так же, как на пользовательском уровне (см. entity-routes).
+   */
+  const targetSettings = (
+    paths: ProjectPaths,
+    id: string,
+  ): { path: string; source: SettingsSource } =>
+    isLocalId(id)
+      ? { path: paths.settingsLocal, source: 'settings-local' }
+      : { path: paths.settings, source: 'settings' };
+
+  // --- Реестр проектов ---
+
+  app.get('/api/projects', () => ctx.store.getProjects());
+
+  app.post<{ Body: ProjectDraft }>('/api/projects', (request, reply) => {
+    const problem = checkProjectDraft(request.body);
+    if (problem) {
+      return reply.code(400).send({ error: 'invalid_project', message: problem });
+    }
+    const draft = request.body;
+    // Повтор того же каталога — не «создано»: раньше ответ 200 возвращал старую
+    // запись и молча переименовывал её, а панель показывала тост о создании.
+    // Сверка и по написанию на диске: реестр хранит его, а ввести тот же каталог
+    // могли коротким именем 8.3.
+    const candidate = makeProject(draft);
+    const existing =
+      ctx.store.getProjectByPath(draft.path) ??
+      ctx.store.getProjectByPath(candidate.path) ??
+      findProjectOnDisk(ctx.store.getProjects(), candidate.path);
+    if (existing) {
+      return reply.code(409).send({
+        error: 'project_exists',
+        message: `Этот каталог уже добавлен как «${existing.name}».`,
+        messageCode: 'project-dir-already-added',
+        params: { name: existing.name },
+        project: existing,
+      });
+    }
+
+    const project = ctx.store.addProject(candidate);
+    // Правило владельца: у каждого проекта есть папка e2e. Своя — её тесты сразу
+    // становятся кейсами раздела «Тесты»; нет своей — панель заводит, спрятав от
+    // git. Сбой здесь не отменяет добавление: проект уже в реестре, а папку
+    // человек заведёт кнопкой в разделе. Итог уходит в ответ: человек видит, что
+    // сделалось с его проектом, а не находит папку в каталоге сам.
+    let e2e: ProjectE2eOnboarding | undefined;
+    try {
+      e2e = onboardE2e(ctx.location.paths.appData, project.path, new Date().toISOString());
+    } catch (error) {
+      console.warn('e2e folder onboarding failed', error);
+      e2e = { state: 'failed' };
+    }
+    const added: ProjectAdded = { ...project, ...(e2e ? { e2e } : {}) };
+    return added;
+  });
+
+  app.delete<{ Params: { id: string } }>('/api/projects/:id', (request, reply) => {
+    if (!ctx.store.getProject(request.params.id)) {
+      return reply.code(404).send({
+        error: 'not_found',
+        message: 'Проекта с таким id нет в реестре.',
+        messageCode: 'project-id-not-in-registry',
+      });
+    }
+    ctx.store.removeProject(request.params.id);
+    return { ok: true };
+  });
+
+  // --- Правила проекта: файл инструкций целиком (сырой markdown) ---
+
+  /**
+   * ИМЯ файла — не константа (П2.7): проект без своего `CLAUDE.md` живёт на
+   * `AGENTS.md`, и тот же резолвер, что строит `pathsOf`, отвечает, какой файл
+   * читает CLI, какой лежит рядом непрочитанным и предложено ли имя, потому что
+   * на диске ещё ничего нет.
+   */
+  const instructionTargetOf = (project: Project, requested?: string): InstructionTarget =>
+    projectInstructionTarget(project.path, ctx.location.paths.settings, requested);
+
+  app.get<{ Params: { id: string } }>('/api/projects/:id/rules', (request, reply) => {
+    const project = requireProject(request.params.id, reply);
+    if (!project) return reply;
+    const target = instructionTargetOf(project);
+    return {
+      content: readTextFile(target.filePath),
+      fileName: target.fileName,
+      filePath: target.filePath,
+      instructionFiles: target.view,
+    };
+  });
+
+  app.put<{ Params: { id: string }; Body: { content?: unknown; fileName?: unknown } }>(
+    '/api/projects/:id/rules',
+    (request, reply) => {
+      const project = requireProject(request.params.id, reply);
+      if (!project) return reply;
+
+      const body = request.body ?? {};
+      const content = body.content;
+      // Как и глобальный файл инструкций: пустая строка — осознанная очистка, всё
+      // нестроковое — отказ, чтобы запрос без поля не затирал файл пустотой.
+      if (typeof content !== 'string') {
+        return reply.code(400).send({
+          error: 'invalid_content',
+          message: 'Поле content обязано быть строкой (пустая строка допустима).',
+          messageCode: 'content-must-be-string',
+        });
+      }
+      if (body.fileName !== undefined && typeof body.fileName !== 'string') {
+        return reply.code(400).send({
+          error: 'invalid_file_name',
+          message: 'Имя файла инструкций обязано быть строкой.',
+          messageCode: 'instructions-file-name-must-be-string',
+        });
+      }
+
+      // Имя действует ТОЛЬКО пока файла нет; существующий резолвер не отдаст
+      // переименовать (`file_exists` → 409), и второй файл панель не заводит.
+      const claudeMd = instructionTargetOf(project, body.fileName).filePath;
+      return done(
+        writeTextFile(claudeMd, content, {
+          backupDir: ctx.backupDir,
+          backupName: backupNameOf(project, claudeMd),
+        }),
+      );
+    },
+  );
+
+  // --- MCP-серверы проекта: .mcp.json в корне ---
+
+  app.get<{ Params: { id: string } }>('/api/projects/:id/mcp', (request, reply) => {
+    const project = requireProject(request.params.id, reply);
+    if (!project) return reply;
+    return readMcpServers(pathsOf(project).mcpConfig, ctx.store);
+  });
+
+  // Занятое имя — 409 вместо записи поверх (та же защита, что и на
+  // пользовательском уровне): .mcp.json проекта лежит в его репозитории, и
+  // молчаливая замена чужой записи уехала бы в общий коммит.
+  const mcpExists = (reply: FastifyReply, error: unknown): FastifyReply => {
+    if (error instanceof McpServerExistsError) {
+      return reply
+        .code(409)
+        .send({ error: 'server_exists', message: error.message, ...codeOf(error) });
+    }
+    throw error;
+  };
+
+  app.post<{ Params: { id: string }; Body: McpServerDraft }>(
+    '/api/projects/:id/mcp',
+    (request, reply) => {
+      const project = requireProject(request.params.id, reply);
+      if (!project) return reply;
+      const mcpConfig = pathsOf(project).mcpConfig;
+      try {
+        return done(
+          saveMcpServer(mcpConfig, null, request.body, ctx.backupDir, {
+            backupName: backupNameOf(project, mcpConfig),
+          }),
+        );
+      } catch (error) {
+        return mcpExists(reply, error);
+      }
+    },
+  );
+
+  app.put<{ Params: { id: string; serverId: string }; Body: McpServerDraft }>(
+    '/api/projects/:id/mcp/:serverId',
+    (request, reply) => {
+      const project = requireProject(request.params.id, reply);
+      if (!project) return reply;
+      const mcpConfig = pathsOf(project).mcpConfig;
+      try {
+        return done(
+          saveMcpServer(mcpConfig, request.params.serverId, request.body, ctx.backupDir, {
+            backupName: backupNameOf(project, mcpConfig),
+          }),
+        );
+      } catch (error) {
+        return mcpExists(reply, error);
+      }
+    },
+  );
+
+  app.delete<{ Params: { id: string; serverId: string } }>(
+    '/api/projects/:id/mcp/:serverId',
+    (request, reply) => {
+      const project = requireProject(request.params.id, reply);
+      if (!project) return reply;
+      const mcpConfig = pathsOf(project).mcpConfig;
+      return done(
+        deleteMcpServer(
+          mcpConfig,
+          request.params.serverId,
+          ctx.backupDir,
+          backupNameOf(project, mcpConfig),
+        ),
+      );
+    },
+  );
+
+  /** Включение/выключение сервера проекта — перенос записи между секциями файла. */
+  app.post<{ Params: { id: string; serverId: string }; Body: { isEnabled: boolean } }>(
+    '/api/projects/:id/mcp/:serverId/enabled',
+    (request, reply) => {
+      const project = requireProject(request.params.id, reply);
+      if (!project) return reply;
+      const mcpConfig = pathsOf(project).mcpConfig;
+      return done(
+        setMcpServerEnabled(
+          mcpConfig,
+          request.params.serverId,
+          Boolean(request.body?.isEnabled),
+          ctx.backupDir,
+          backupNameOf(project, mcpConfig),
+        ),
+      );
+    },
+  );
+
+  // --- Права проекта: .claude/settings.json (+ settings.local.json) ---
+
+  app.get<{ Params: { id: string } }>('/api/projects/:id/permissions', (request, reply) => {
+    const project = requireProject(request.params.id, reply);
+    if (!project) return reply;
+    const paths = pathsOf(project);
+    return readPermissions(paths.settings, ctx.store, paths.settingsLocal);
+  });
+
+  app.post<{ Params: { id: string }; Body: PermissionDraft }>(
+    '/api/projects/:id/permissions',
+    (request, reply) => {
+      const project = requireProject(request.params.id, reply);
+      if (!project) return reply;
+      // Та же проверка, что у пользовательских прав: решение из трёх известных,
+      // шаблон не пустой — иначе в settings.json проекта заводился список
+      // `undefined` из null-ов.
+      const draft = assertPermissionDraft(request.body);
+      // Дубль и незнакомый id — как на пользовательском уровне: 409 / 404 без
+      // записи. Раньше маршрут писал файл в любом случае: settings.json проекта
+      // лежит в его гите и переформатировался ради ничего, а тост говорил «Создано».
+      const settings = pathsOf(project).settings;
+      if (hasPermission(settings, `${draft.decision}:${draft.pattern}`)) {
+        throw new PermissionExistsError(draft.pattern);
+      }
+      return done(
+        savePermission(settings, null, draft, ctx.backupDir, backupNameOf(project, settings)),
+      );
+    },
+  );
+
+  app.put<{ Params: { id: string; permId: string }; Body: PermissionDraft }>(
+    '/api/projects/:id/permissions/:permId',
+    (request, reply) => {
+      const project = requireProject(request.params.id, reply);
+      if (!project) return reply;
+      const target = targetSettings(pathsOf(project), request.params.permId);
+      const draft = assertPermissionDraft(request.body);
+      const bareId = stripLocalPrefix(request.params.permId);
+      if (!hasPermission(target.path, bareId)) {
+        throw new PermissionNotFoundError(request.params.permId);
+      }
+      return done(
+        savePermission(
+          target.path,
+          bareId,
+          draft,
+          ctx.backupDir,
+          backupNameOf(project, target.path),
+        ),
+      );
+    },
+  );
+
+  app.delete<{ Params: { id: string; permId: string } }>(
+    '/api/projects/:id/permissions/:permId',
+    (request, reply) => {
+      const project = requireProject(request.params.id, reply);
+      if (!project) return reply;
+      const target = targetSettings(pathsOf(project), request.params.permId);
+      const bareId = stripLocalPrefix(request.params.permId);
+      if (!hasPermission(target.path, bareId)) {
+        throw new PermissionNotFoundError(request.params.permId);
+      }
+      return done(
+        deletePermission(target.path, bareId, ctx.backupDir, backupNameOf(project, target.path)),
+      );
+    },
+  );
+}

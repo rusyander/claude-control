@@ -1,12 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import type { ChatSummary } from '@agentdeck/contracts';
 import type { RunStatus } from '@shared/lib/agent-runs';
-import {
-  selectAwaitingChats,
-  mergeAwaitingStatuses,
-  mergeAwaitingProjectStatuses,
-  foldCopyStatuses,
-} from './awaiting';
+import { selectAwaitingChats } from './awaiting';
+import { mergeAwaitingStatuses } from './mergeAwaitingStatuses';
+import { mergeAwaitingProjectStatuses } from './mergeAwaitingProjectStatuses';
+import { foldCopyStatuses } from './foldCopyStatuses';
 
 /**
  * Сигнал «тебя ждут» собирается из двух источников: живого прогона в памяти

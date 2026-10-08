@@ -1,0 +1,24 @@
+// Ниже этой высоты колонки библиотеки не сжимаются, прокручивается страница.
+$library-floor: 320px;
+
+// Лог прогона: моноширинный хвост вывода агента, отдельной прокруткой.
+.log {
+  margin: 0;
+  max-height: 220px;
+  overflow: auto;
+  scrollbar-width: thin;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  color: var(--color-text-subtle);
+  background: var(--color-surface-sunken);
+  border-radius: 8px;
+  padding: var(--spacing-xs);
+}
+
+.resultsRun {
+  color: var(--color-accent);
+  font-size: var(--font-size-caption);
+  white-space: nowrap;
+}

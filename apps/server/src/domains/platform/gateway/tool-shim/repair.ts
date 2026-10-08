@@ -1,4 +1,4 @@
-import { serverText } from '../../../../lib/server-texts.ts';
+import { serverText } from '../../../../lib/server-texts/server-texts.ts';
 /**
  * Ремонт JSON вызова — не больше двух раундов, и оба местные.
  *

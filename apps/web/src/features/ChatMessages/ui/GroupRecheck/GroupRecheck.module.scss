@@ -1,0 +1,19 @@
+.holdActions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--spacing-2xs);
+}
+
+// «Перепроверить MR»: время последней проверки — рядом с кнопкой, а не под ней.
+.recheckTime {
+  align-self: center;
+  margin-right: var(--spacing-2xs);
+}
+
+// Перепроверка кончилась доставкой — кнопка зелёная, пока новая работа группы
+// отметку не снимет (владелец 05.10).
+.recheckChecked {
+  color: var(--color-success);
+  background: var(--color-success-subtle);
+  border-color: var(--color-success);
+}

@@ -1,4 +1,4 @@
-import type { Question } from '../ui/QuestionCard.types';
+import type { Question } from '../ui/QuestionCard/QuestionCard.types';
 
 /**
  * Разбор input вызова: формат нам не подконтролен, и приходит он в двух видах.

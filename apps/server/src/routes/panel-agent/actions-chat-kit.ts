@@ -6,11 +6,11 @@ import type {
   ProvidersResponse,
 } from '@agentdeck/contracts';
 import type { ChatTreeView } from '@agentdeck/contracts/chat-handoff';
-import { maskSecretsInText } from '../../lib/secret-mask.ts';
+import { maskSecretsInText } from '../../lib/secret-mask/secret-mask.ts';
 import type { PanelActionPreviewField } from '@agentdeck/contracts/panel-agent';
-import { encode, readRoute, routeError } from './action-kit.ts';
+import { encode, readRoute, routeError } from './action-kit/action-kit.ts';
 import type { InjectRoute, StreamHead } from './registry.ts';
-import { dataField, textField } from './texts.ts';
+import { dataField, textField } from './texts/texts.ts';
 
 /**
  * Общее у действий над чатами: найти разговор так, как его видит список чатов,

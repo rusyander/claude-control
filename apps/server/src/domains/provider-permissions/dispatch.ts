@@ -10,8 +10,8 @@ import type {
   ProviderPermissionInfo,
   QwenPermissionDraft,
 } from '@agentdeck/contracts';
-import { readTextFile } from '../../lib/safe-io.ts';
-import { UnrecognizedFormatError } from '../../lib/codex-toml.ts';
+import { readTextFile } from '../../lib/safe-io/safe-io.ts';
+import { UnrecognizedFormatError } from '../../lib/codex-toml/codex-toml.ts';
 import { GOOSE_DEFAULT_MODE, GOOSE_MODES } from '../../lib/goose-yaml.ts';
 import { KIMI_DECISIONS, KIMI_DEFAULT_MODE, KIMI_MODES } from '../../lib/kimi-toml.ts';
 import {

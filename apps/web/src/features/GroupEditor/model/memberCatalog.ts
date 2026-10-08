@@ -1,8 +1,5 @@
 import type { MemberSources, PickerItem } from './memberCatalog.types';
-
-/** Подпись хука: событие и фильтр — его id нечитаем. */
-export const hookLabel = (item: { event: string; matcher?: string }): string =>
-  `${item.event}${item.matcher ? ` · ${item.matcher}` : ''}`;
+import { hookLabel } from './hookLabel';
 
 /**
  * Всё, что можно взять в группу, одним списком. Один источник и для выбора

@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, statSync } from 'node
 import { join } from 'node:path';
 import type { Deck, MediaDeck, MediaDeckFormat } from '@agentdeck/contracts';
 import { DECK_KEEP_FILES } from '@agentdeck/contracts/media-deck';
-import { writeBinaryFile, writeJsonFile, removeEntry } from '../../../lib/safe-io.ts';
+import { writeBinaryFile, writeJsonFile, removeEntry } from '../../../lib/safe-io/safe-io.ts';
 import { MediaError } from '../errors.ts';
 import { assertId } from '../store.ts';
 

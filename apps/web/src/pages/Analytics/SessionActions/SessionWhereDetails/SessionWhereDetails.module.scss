@@ -1,0 +1,16 @@
+/* Поля «где идёт»: подпись над значением, длинная команда переносится. */
+.sessionFields {
+  display: grid;
+  gap: var(--spacing-sm);
+  margin: 0;
+}
+
+.sessionField {
+  display: grid;
+  gap: var(--spacing-3xs);
+
+  dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+}

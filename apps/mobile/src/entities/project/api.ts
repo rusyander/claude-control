@@ -1,85 +1,11 @@
-import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
-import type { ProjectGitInfo, ProjectGitResult, ProjectWorktreesInfo } from '@agentdeck/contracts';
+import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { api } from '../../shared/api/client';
-
-/**
- * Каталоги на машине с панелью: обзор файловой системы для выбора проекта и
- * пульт git выбранного.
- *
- * Проект здесь — это просто путь. Реестра приложение не спрашивает намеренно:
- * работать можно в любой папке, и требовать «сначала заведи проект» на телефоне
- * значило бы упереться в экран, которого тут нет.
- */
-
-export interface DirEntry {
-  name: string;
-  path: string;
-  /** Задано только у файлов; обзор по умолчанию отдаёт одни каталоги. */
-  isFile?: boolean;
-}
-
-export interface DirListing {
-  path: string;
-  parent?: string;
-  entries: DirEntry[];
-}
+import type { DirEntry } from './api.types';
 
 export function useFsRoots(): UseQueryResult<DirEntry[]> {
   return useQuery({
     queryKey: ['fs', 'roots'],
     queryFn: () => api.get<DirEntry[]>('/fs/roots'),
     staleTime: 60_000,
-  });
-}
-
-export function useFsList(path: string): UseQueryResult<DirListing> {
-  return useQuery({
-    queryKey: ['fs', 'list', path],
-    queryFn: () => api.get<DirListing>('/fs/list', { path }),
-    enabled: Boolean(path),
-  });
-}
-
-export function useProjectGit(path: string | undefined): UseQueryResult<ProjectGitInfo> {
-  return useQuery({
-    queryKey: ['project-git', path],
-    queryFn: () => api.get<ProjectGitInfo>('/project-git', { path }),
-    enabled: Boolean(path),
-    staleTime: 10_000,
-  });
-}
-
-/**
- * Параллельные копии проекта. Отдельный запрос, а не поле пульта: список копий
- * требует похода в git по каждой из них, и пульт, который перечитывается после
- * каждой операции, платил бы за это на ровном месте. Держится дольше пульта —
- * копии заводят с компьютера, и на телефоне они меняются редко.
- */
-export function useProjectWorktrees(
-  path: string | undefined,
-): UseQueryResult<ProjectWorktreesInfo> {
-  return useQuery({
-    queryKey: ['project-worktrees', path],
-    queryFn: () => api.get<ProjectWorktreesInfo>('/project-git/worktrees', { path }),
-    enabled: Boolean(path),
-    staleTime: 30_000,
-  });
-}
-
-/**
- * Операции git. Все они меняют состояние репозитория, поэтому после каждой
- * перечитываем не только сам пульт, но и дерево файлов: коммит и переключение
- * ветки меняют то, что показывает окно кода.
- */
-export function useGitAction(
-  action: 'checkout' | 'branch' | 'commit' | 'pull' | 'push',
-): ReturnType<typeof useMutation<ProjectGitResult, Error, Record<string, unknown>>> {
-  const queryClient = useQueryClient();
-  return useMutation<ProjectGitResult, Error, Record<string, unknown>>({
-    mutationFn: (body) => api.post<ProjectGitResult>(`/project-git/${action}`, body),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['project-git'] });
-      void queryClient.invalidateQueries({ queryKey: ['project-files'] });
-    },
   });
 }

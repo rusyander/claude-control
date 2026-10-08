@@ -9,8 +9,8 @@ import {
   withoutSplitTickets,
 } from '@agentdeck/contracts/split-tickets';
 import { splitTicketPreamble } from '@agentdeck/contracts/task-split';
-import { PendingAsks } from './pending-asks.ts';
-import type { RunFinished } from './ChatRunRegistry.ts';
+import { PendingAsks } from './pending-asks/pending-asks.ts';
+import type { RunFinished } from './ChatRunRegistry/ChatRunRegistry.ts';
 
 /**
  * Разбор блока тикета (95b) — то, что агент может написать криво: поле на

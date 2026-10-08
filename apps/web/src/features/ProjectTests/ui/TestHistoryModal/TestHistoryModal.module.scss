@@ -1,0 +1,9 @@
+// Ниже этой высоты колонки библиотеки не сжимаются, прокручивается страница.
+$library-floor: 320px;
+
+// Строка истории файла кейсов: тема коммита сверху, подпись и объём — под ней.
+.historyRow {
+  padding: var(--spacing-xs);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 8px;
+}

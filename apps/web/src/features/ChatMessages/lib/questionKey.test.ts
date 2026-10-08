@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { liveQuestionKey, questionKey } from './questionKey';
+import { questionKey } from './questionKey';
+import { liveQuestionKey } from './liveQuestionKey';
 
 /**
  * Имя вопроса в памяти отвеченных. Требование к нему одно, зато жёсткое: два

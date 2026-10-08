@@ -1,14 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { PlatformStatus } from '@agentdeck/contracts';
-import {
-  DEFAULT_PLATFORM_TAB,
-  PER_CONTOUR_TABS,
-  PLATFORM_TABS,
-  findPlatformTab,
-  pickContour,
-  platformPanelDomId,
-  platformTabDomId,
-} from './tabs';
+import { DEFAULT_PLATFORM_TAB, PER_CONTOUR_TABS, findPlatformTab } from './tabs';
+import { pickContour } from './pickContour';
+import { PLATFORM_TABS } from './tabs.constants';
+import { platformTabDomId } from './platformTabDomId';
+import { platformPanelDomId } from './platformPanelDomId';
 
 const status = (id: string): PlatformStatus => ({ platform: { id } }) as unknown as PlatformStatus;
 

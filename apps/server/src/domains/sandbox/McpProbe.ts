@@ -1,6 +1,6 @@
 import type { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js';
 import type { McpServer } from '@agentdeck/contracts';
-import { openMcpSession, type EnvLookup, type McpTool } from '../mcp-client.ts';
+import { openMcpSession, type EnvLookup, type McpTool } from '../mcp-client/mcp-client.ts';
 
 /**
  * Стенд для MCP-сервера: подключиться, посмотреть, что он умеет, и вызвать

@@ -1,6 +1,6 @@
 import type { UniversalMcpServer, UniversalMcpServerDraft } from '@agentdeck/contracts';
-import { UnrecognizedFormatError } from '../../lib/codex-toml.ts';
-import { readTextFile } from '../../lib/safe-io.ts';
+import { UnrecognizedFormatError } from '../../lib/codex-toml/codex-toml.ts';
+import { readTextFile } from '../../lib/safe-io/safe-io.ts';
 import { findBlockOf, scanMcpBlocks, type McpBlockScan } from './blocks.ts';
 import { readCodexServers, upsertCodexServer, deleteCodexServer } from './codex-format.ts';
 import {

@@ -1,17 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import type { PathEntry, PathStep } from '@agentdeck/contracts';
-import {
-  anchorAfter,
-  canMoveInPath,
-  customSteps,
-  insertAfter,
-  moveInPath,
-  moveToSlot,
-  removeStep,
-  renumber,
-  replaceStep,
-} from './pathEdit';
-import { isBilingual, stepFromProposal } from './stepDraft';
+import { customSteps } from './pathEdit';
+import { stepFromProposal } from './stepDraft';
+import { renumber } from './renumber';
+import { canMoveInPath } from './canMoveInPath';
+import { removeStep } from './removeStep';
+import { anchorAfter } from './anchorAfter';
+import { insertAfter } from './insertAfter';
+import { moveToSlot } from './moveToSlot';
+import { moveInPath } from './moveInPath';
+import { replaceStep } from './replaceStep';
+import { isBilingual } from './isBilingual';
 
 function step(id: string, anchor: PathStep['anchor'], order: number): PathStep {
   return {

@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { readJsonFile, writeJsonFile } from '../../lib/safe-io.ts';
+import { readJsonFile, writeJsonFile } from '../../lib/safe-io/safe-io.ts';
 import { BUILT_IN_SNAPSHOT, type PricingEntry, type PricingSnapshot } from './pricing.ts';
 
 /**

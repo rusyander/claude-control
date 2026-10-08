@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { useNavigate, useSearch } from '@tanstack/react-router';
+import { useSearch } from '@tanstack/react-router';
 
 /**
  * Связка «открытый элемент ↔ адрес страницы».
@@ -40,17 +40,4 @@ export function useEntityUrl<T>({ items, getId, onOpen }: Options<T>): void {
     // один раз на каждый id — за этим следит ref, а не список зависимостей.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, items]);
-}
-
-/**
- * Записать id открытого элемента в адрес или убрать его при закрытии.
- * Замена записи в истории, а не новая: возврат назад должен уводить со
- * страницы, а не отматывать по одному открытому элементу.
- */
-export function useEntityUrlWriter(): (id: string | undefined) => void {
-  const navigate = useNavigate();
-
-  return (id) => {
-    void navigate({ to: '.', search: id ? { id } : {}, replace: true });
-  };
 }

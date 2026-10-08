@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { git } from './exec.ts';
+import { git } from './exec/exec.ts';
 
 /** Больше — вместо хеша текста размер и время правки: читать гигабайт ради карточки незачем. */
 const HASHED_MAX_BYTES = 32 * 1024 * 1024;

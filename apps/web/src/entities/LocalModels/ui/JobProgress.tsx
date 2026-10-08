@@ -1,18 +1,14 @@
 import { useTranslation } from 'react-i18next';
-import type { LocalJob } from '@agentdeck/contracts/local-models';
 import { Button } from '@shared/ui/button';
 import { Typography } from '@shared/ui/typography';
 import { serverFieldText } from '@shared/config/i18n';
-import { jobEtaSec, jobShare, toGb } from '../model/view';
+import { toGb } from '../model/view';
 import styles from './JobProgress.module.scss';
-
-interface JobProgressProps {
-  job: LocalJob;
-  onCancel?: () => void;
-}
-
-/** Байтов нет у установки пакетов: там счётчик — число полученных пакетов. */
-const COUNTED_PHASES = new Set(['install']);
+import { jobShare } from '../model/jobShare';
+import { jobEtaSec } from '../model/jobEtaSec';
+import type { JobProgressProps } from './JobProgress.types';
+import { COUNTED_PHASES } from './JobProgress.constants';
+import { formatEta } from '../lib/formatEta';
 
 /**
  * Полоса долгой работы: этап словами, сколько из скольких, скорость, сколько
@@ -93,10 +89,4 @@ export function JobProgress({ job, onCancel }: JobProgressProps) {
       </div>
     </div>
   );
-}
-
-function formatEta(t: (key: string, options: { count: number }) => string, sec: number): string {
-  return sec >= 90
-    ? t('localModels.job.minutes', { count: Math.round(sec / 60) })
-    : t('localModels.job.seconds', { count: sec });
 }

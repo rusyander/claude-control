@@ -1,14 +1,23 @@
 import type { Overview, ProviderHooksInfo, ProviderPermissionInfo } from '@agentdeck/contracts';
-import type { ConfigProvider } from '../providers/types.ts';
-import type { AppStore } from '../lib/app-store.ts';
-import { readProviderMcpSection, resolveProviderMcpTarget } from './provider-mcp.ts';
-import { readProviderHooksInfo, resolveProviderHooksTarget } from './provider-hooks.ts';
-import { readProviderSkillsInfo, resolveProviderSkillsTarget } from './provider-skills.ts';
-import { readProviderRulesInfo, resolveProviderRulesTarget } from './provider-rules.ts';
+import type { ConfigProvider } from '../providers/types/types.ts';
+import type { AppStore } from '../lib/app-store/app-store.ts';
+import { readProviderMcpSection, resolveProviderMcpTarget } from './provider-mcp/provider-mcp.ts';
+import {
+  readProviderHooksInfo,
+  resolveProviderHooksTarget,
+} from './provider-hooks/provider-hooks.ts';
+import {
+  readProviderSkillsInfo,
+  resolveProviderSkillsTarget,
+} from './provider-skills/provider-skills.ts';
+import {
+  readProviderRulesInfo,
+  resolveProviderRulesTarget,
+} from './provider-rules/provider-rules.ts';
 import {
   buildProviderPermissionInfo,
   resolveProviderPermissionsTarget,
-} from './provider-permissions.ts';
+} from './provider-permissions/provider-permissions.ts';
 
 type SectionCounts = Pick<Overview, 'rules' | 'hooks' | 'skills' | 'mcp' | 'permissions'>;
 

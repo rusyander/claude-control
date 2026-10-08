@@ -1,5 +1,5 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { ProviderMcpInfo, UniversalMcpServerDraft, WriteResult } from '@agentdeck/contracts';
+import { useQuery } from '@tanstack/react-query';
+import type { ProviderMcpInfo } from '@agentdeck/contracts';
 import { apiClient } from '@shared/api/client';
 import { queryKeys } from '@shared/api/query-keys';
 
@@ -18,57 +18,4 @@ async function getProviderMcp(): Promise<ProviderMcpInfo> {
 
 export function useProviderMcp() {
   return useQuery({ queryKey: queryKeys.providerMcp, queryFn: getProviderMcp });
-}
-
-/** Инвалидация после записи: список раздела + сводка на главной. */
-function useInvalidateProviderMcp() {
-  const queryClient = useQueryClient();
-  return () => {
-    void queryClient.invalidateQueries({ queryKey: queryKeys.providerMcp });
-    void queryClient.invalidateQueries({ queryKey: queryKeys.overview });
-  };
-}
-
-export function useCreateProviderMcp() {
-  const invalidate = useInvalidateProviderMcp();
-  return useMutation({
-    mutationFn: async (draft: UniversalMcpServerDraft): Promise<WriteResult> => {
-      const { data } = await apiClient.post<WriteResult>('/provider-mcp', draft);
-      return data;
-    },
-    onSuccess: invalidate,
-    meta: { successMessage: 'toasts.created' },
-  });
-}
-
-export function useUpdateProviderMcp() {
-  const invalidate = useInvalidateProviderMcp();
-  return useMutation({
-    mutationFn: async (input: {
-      id: string;
-      draft: UniversalMcpServerDraft;
-    }): Promise<WriteResult> => {
-      const { data } = await apiClient.put<WriteResult>(
-        `/provider-mcp/${encodeURIComponent(input.id)}`,
-        input.draft,
-      );
-      return data;
-    },
-    onSuccess: invalidate,
-    meta: { successMessage: 'toasts.saved' },
-  });
-}
-
-export function useDeleteProviderMcp() {
-  const invalidate = useInvalidateProviderMcp();
-  return useMutation({
-    mutationFn: async (id: string): Promise<WriteResult> => {
-      const { data } = await apiClient.delete<WriteResult>(
-        `/provider-mcp/${encodeURIComponent(id)}`,
-      );
-      return data;
-    },
-    onSuccess: invalidate,
-    meta: { successMessage: 'toasts.deleted' },
-  });
 }

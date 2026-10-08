@@ -1,12 +1,10 @@
-export {
-  pickPageTab,
-  unknownTabParam,
-  nextPageTab,
-  pageTabStorageKey,
-  readRememberedPageTab,
-  rememberPageTab,
-  pageTabDomId,
-  pageTabPanelDomId,
-  stripScrollDelta,
-  revealScrollLeft,
-} from './page-tab';
+export { pickPageTab } from './page-tab';
+export { revealScrollLeft } from './revealScrollLeft';
+export { stripScrollDelta } from './stripScrollDelta';
+export { nextPageTab } from './nextPageTab';
+export { pageTabPanelDomId } from './pageTabPanelDomId';
+export { pageTabDomId } from './pageTabDomId';
+export { rememberPageTab } from './rememberPageTab';
+export { readRememberedPageTab } from './readRememberedPageTab';
+export { pageTabStorageKey } from './pageTabStorageKey';
+export { unknownTabParam } from './unknownTabParam';

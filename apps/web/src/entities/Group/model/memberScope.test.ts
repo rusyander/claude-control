@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { memberLivesIn, pickedMember } from './memberScope';
+import { pickedMember } from './memberScope';
+import { memberLivesIn } from './memberLivesIn';
 
 const PROJECT = { kind: 'project', path: 'C:/work/shop', provider: 'claude' } as const;
 

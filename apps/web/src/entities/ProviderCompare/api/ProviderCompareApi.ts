@@ -1,9 +1,5 @@
-import { useMutation, useQuery } from '@tanstack/react-query';
-import type {
-  ProviderCompareResponse,
-  ProviderMigrateRequest,
-  ProviderMigrateResponse,
-} from '@agentdeck/contracts';
+import { useQuery } from '@tanstack/react-query';
+import type { ProviderCompareResponse } from '@agentdeck/contracts';
 import { apiClient } from '@shared/api/client';
 import { queryKeys } from '@shared/api/query-keys';
 
@@ -13,11 +9,6 @@ async function getCompare(left: string, right: string): Promise<ProviderCompareR
   const { data } = await apiClient.get<ProviderCompareResponse>('/provider-compare', {
     params: { left, right },
   });
-  return data;
-}
-
-async function postMigrate(request: ProviderMigrateRequest): Promise<ProviderMigrateResponse> {
-  const { data } = await apiClient.post<ProviderMigrateResponse>('/provider-migrate', request);
   return data;
 }
 
@@ -31,12 +22,4 @@ export function useProviderCompare(left: string, right: string) {
     queryFn: () => getCompare(left, right),
     enabled: Boolean(left) && Boolean(right) && left !== right,
   });
-}
-
-/**
- * Перенос записей. Одна и та же мутация служит и предпросмотру, и записи —
- * разница только в `mode`, и это сознательно: разойтись они не смогут.
- */
-export function useMigrateProvider() {
-  return useMutation({ mutationFn: postMigrate });
 }

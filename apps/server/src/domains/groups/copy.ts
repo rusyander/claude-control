@@ -7,16 +7,16 @@ import type { CopyWarning, GroupScope } from '@agentdeck/contracts/group-sources
 import { groupKeyOf, scopeOf } from '@agentdeck/contracts/group-sources';
 import { updateGroupSources, projectKey } from '../../lib/app-store/group-sources.ts';
 import { hookContentId } from '../../lib/hook-id.ts';
-import { copyRecursive } from '../../lib/safe-io.ts';
-import { maskSecretsInText } from '../../lib/secret-mask.ts';
+import { copyRecursive } from '../../lib/safe-io/safe-io.ts';
+import { maskSecretsInText } from '../../lib/secret-mask/secret-mask.ts';
 import type { EntityToggleDeps } from '../entity-toggle.ts';
-import { readHooks, writeHooks } from '../hooks.ts';
-import { saveMcpServer } from '../mcp.ts';
-import { freeRuleTitle, readRules, ruleByTitle, saveRule } from '../rules.ts';
+import { readHooks, writeHooks } from '../hooks/hooks.ts';
+import { saveMcpServer } from '../mcp/mcp.ts';
+import { freeRuleTitle, readRules, ruleByTitle, saveRule } from '../rules/rules.ts';
 import { disabledSkillsDir } from '../skills/paths.ts';
-import { assertNotCopied, pairsIn, withPairChoice } from './choice.ts';
+import { assertNotCopied, pairsIn, withPairChoice } from './choice/choice.ts';
 import { GroupRequestError } from './errors.ts';
-import { carriedKnobs, seedCopiedKnobs } from './knobs.ts';
+import { carriedKnobs, seedCopiedKnobs } from './knobs/knobs.ts';
 import {
   hashDir,
   memberContent,
@@ -25,7 +25,7 @@ import {
   memberScope,
   skillDirFor,
   type MemberContent,
-} from './members.ts';
+} from './members/members.ts';
 
 /**
  * Копия проектной группы в глобальные каталоги — через те же писатели, что у

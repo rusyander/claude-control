@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { readdirSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { writeAgentImages, type AgentImage } from '../../lib/agent-images.ts';
+import { writeAgentImages, type AgentImage } from '../../lib/agent-images/agent-images.ts';
 
 /**
  * Картинки для агента, который читает файлы САМ (чат чужого CLI): у него нет

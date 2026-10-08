@@ -6,27 +6,23 @@ import { useQueryClient } from '@tanstack/react-query';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Button, Field, Loading, Mono, Muted, Row } from '../src/shared/ui';
 import { colors, font, space } from '../src/shared/config/theme';
-import { dict, useT } from '../src/shared/config/i18n';
-import { notifyLocally } from '../src/shared/lib/notifications';
+import { useT, dict } from '../src/shared/config/i18n';
 import { foreignChatKey } from '@agentdeck/contracts/foreign-chat-key';
-import {
-  fetchForeignStatus,
-  foreignKeys,
-  useForeignChat,
-  useForeignStatus,
-  useProviders,
-  useSendForeign,
-  useStopForeign,
-  waitForeignStatus,
-} from '../src/entities/provider-chat/api';
-import {
-  canWrite,
-  editsState,
-  sendMode,
-  watchInBackground,
-} from '../src/entities/provider-chat/model';
-import { ForeignFeed } from '../src/features/chat/foreign/ForeignFeed';
-import { ForeignAsks } from '../src/features/chat/foreign/ForeignAsks';
+import { useProviders } from '../src/entities/provider-chat/api';
+import { ForeignFeed } from '../src/features/chat/foreign/ForeignFeed/ForeignFeed';
+import { ForeignAsks } from '../src/features/chat/foreign/ForeignAsks/ForeignAsks';
+import { fetchForeignStatus } from '../src/entities/provider-chat/fetchForeignStatus';
+import { foreignKeys } from '../src/entities/provider-chat/api.constants';
+import { useForeignChat } from '../src/entities/provider-chat/useForeignChat';
+import { useSendForeign } from '../src/entities/provider-chat/useSendForeign';
+import { useStopForeign } from '../src/entities/provider-chat/useStopForeign';
+import { useForeignStatus } from '../src/entities/provider-chat/useForeignStatus';
+import { waitForeignStatus } from '../src/entities/provider-chat/waitForeignStatus';
+import { canWrite } from '../src/entities/provider-chat/canWrite';
+import { sendMode } from '../src/entities/provider-chat/sendMode';
+import { watchInBackground } from '../src/entities/provider-chat/watchInBackground';
+import { editsState } from '../src/entities/provider-chat/editsState';
+import { notifyLocally } from '../src/shared/lib/notifyLocally';
 
 /**
  * Разговор с чужим CLI (Codex, Qwen Code…). Открывается из списка разговоров и

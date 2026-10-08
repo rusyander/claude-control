@@ -1,10 +1,10 @@
 import { CLAUDE_HOOK_EVENTS } from '@agentdeck/contracts/vocabulary';
-import { detectClaudeLocation } from '../lib/claude-paths.ts';
-import { uniformCapabilities, type ConfigProvider } from './types.ts';
+import { detectClaudeLocation } from '../lib/claude-paths/claude-paths.ts';
+import { uniformCapabilities, type ConfigProvider } from './types/types.ts';
 
 /**
  * Адаптер Claude Code — провайдер #1. Поведение панели не меняется: пути
- * делегируются существующему `lib/claude-paths.ts`, а не дублируются, CLI —
+ * делегируются существующему `lib/claude-paths/claude-paths.ts`, а не дублируются, CLI —
  * `claude` (на Windows `claude.cmd`). Статус `verified`, а все возможности —
  * `ready`: у Claude каждый раздел панели реально работает.
  */

@@ -17,7 +17,7 @@ vi.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({ invalidateQueries: vi.fn() }),
 }));
 
-const { useMcpServerTools } = await import('./McpServerApi');
+const { useMcpServerTools } = await import('./useMcpServerTools');
 const { LONG_TIMEOUTS } = await import('@shared/api/client');
 
 /**

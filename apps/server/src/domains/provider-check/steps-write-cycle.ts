@@ -1,8 +1,8 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import type { ProviderCheckStep, ProviderPermissionDraft } from '@agentdeck/contracts';
-import type { ConfigProvider } from '../../providers/types.ts';
+import type { ConfigProvider } from '../../providers/types/types.ts';
 import { providerSettingsSource } from '../../providers/registry.ts';
-import { readTextFile } from '../../lib/safe-io.ts';
+import { readTextFile } from '../../lib/safe-io/safe-io.ts';
 import { createConfigSandbox } from '../../lib/config-sandbox.ts';
 import { sameShape } from '../../lib/sorted-json.ts';
 import {
@@ -10,26 +10,26 @@ import {
   readProviderMcpServers,
   upsertProviderMcpServer,
   deleteProviderMcpServer,
-} from '../provider-mcp.ts';
+} from '../provider-mcp/provider-mcp.ts';
 import {
   resolveProviderPermissionsTarget,
   readProviderPermissions,
   saveProviderPermissions,
   type ProviderPermissionsValues,
-} from '../provider-permissions.ts';
+} from '../provider-permissions/provider-permissions.ts';
 import {
   resolveProviderEnvTarget,
   readProviderEnvVars,
   saveProviderEnvVars,
-} from '../provider-env.ts';
+} from '../provider-env/provider-env.ts';
 import {
   resolveProviderInstructionsTarget,
   readProviderInstructionsEntries,
   saveProviderInstructionsEntries,
-} from '../provider-instructions.ts';
+} from '../provider-instructions/provider-instructions.ts';
 import { reason, skipReason, step } from './step.ts';
 import type { ProviderCheckDeps } from './types.ts';
-import { serverText } from '../../lib/server-texts.ts';
+import { serverText } from '../../lib/server-texts/server-texts.ts';
 
 /**
  * Круги записи «прочитали → записали → прочитали». Настоящие файлы пользователя

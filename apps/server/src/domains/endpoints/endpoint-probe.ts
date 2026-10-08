@@ -1,5 +1,5 @@
 import type { EndpointApiKind, EndpointProbeResult, EndpointProfile } from '@agentdeck/contracts';
-import { serverText } from '../../lib/server-texts.ts';
+import { serverText } from '../../lib/server-texts/server-texts.ts';
 
 /**
  * Проверка связи со своим эндпоинтом: панель спрашивает у адреса СПИСОК МОДЕЛЕЙ.

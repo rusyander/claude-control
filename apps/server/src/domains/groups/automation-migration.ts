@@ -3,7 +3,7 @@ import type { PathStep } from '@agentdeck/contracts/group-path';
 import { hookContentId } from '../../lib/hook-id.ts';
 import { hasAutomationMarker } from '../compiled-markers.ts';
 import { applyEntityStates, rewriteHooks, type EntityToggleDeps } from '../entity-toggle.ts';
-import { readHooks, writeHooks } from '../hooks.ts';
+import { readHooks, writeHooks } from '../hooks/hooks.ts';
 import { migrateGroupRecord } from './path-migration.ts';
 
 /**

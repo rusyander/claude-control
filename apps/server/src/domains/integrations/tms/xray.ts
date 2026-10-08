@@ -1,8 +1,8 @@
 import type { TmsPushResult } from '@agentdeck/contracts';
 import { invalidField } from '../errors.ts';
-import { requestJson } from '../http.ts';
+import { requestJson } from '../http/http.ts';
 import type { TmsCaseBatch, TmsClient, TmsRunPush } from './types.ts';
-import { serverText } from '../../../lib/server-texts.ts';
+import { serverText } from '../../../lib/server-texts/server-texts.ts';
 
 /**
  * Xray (облако): импорт результатов документом и чтение кейсов через GraphQL.

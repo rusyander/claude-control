@@ -1,0 +1,15 @@
+.row {
+  padding: var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+}
+
+.name {
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
+
+.conflict {
+  max-width: 40rem;
+}

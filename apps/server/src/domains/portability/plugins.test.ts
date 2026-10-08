@@ -12,7 +12,7 @@ import type {
   SubagentItem,
 } from '@agentdeck/contracts/portable-env';
 import { claudeProvider } from '../../providers/claude.ts';
-import { CATALOG_PROVIDERS } from '../../providers/catalog.ts';
+import { CATALOG_PROVIDERS } from '../../providers/catalog/catalog.ts';
 import { importEnvironment } from './import/index.ts';
 import { emitEnvironment } from './emit/index.ts';
 

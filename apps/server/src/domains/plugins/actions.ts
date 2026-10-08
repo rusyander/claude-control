@@ -1,6 +1,6 @@
 import type { CommandResult } from '@agentdeck/contracts';
-import { safePluginId } from '../../lib/cli-args.ts';
-import { defaultCliCommand } from '../../providers/cli.ts';
+import { safePluginId } from '../../lib/cli-args/cli-args.ts';
+import { defaultCliCommand } from '../../providers/cli/cli.ts';
 import { runClaude } from './cli.ts';
 import { forgetInstalledPlugins } from './read.ts';
 

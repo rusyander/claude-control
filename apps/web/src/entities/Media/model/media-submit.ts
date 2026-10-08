@@ -1,6 +1,6 @@
-import type { MediaDeck, MediaDeckPlan, MediaImagePlan } from '@agentdeck/contracts';
-import type { ComposerMode, ComposerModeState } from './composer-mode';
-import type { MediaModeView } from './media-mode';
+import type { MediaDeck } from '@agentdeck/contracts';
+import type { ComposerMode } from './composer-mode';
+import type { MediaPlans } from './media-submit.types';
 
 /**
  * Что сделает отправка в неттекстовом режиме.
@@ -18,11 +18,6 @@ export type MediaAction =
   | { road: 'image'; prompt: string }
   /** Панель собирает колоду сама; правка несёт прежнюю полем запроса. */
   | { road: 'deck'; prompt: string; reviseOf?: string };
-
-export interface MediaPlans {
-  image?: MediaImagePlan;
-  deck?: MediaDeckPlan;
-}
 
 /**
  * Дорога отправки. Пусто — делать нечего: обычный текст или пустое поле.
@@ -59,31 +54,4 @@ export function planMediaSubmit(
     };
   }
   return { road: 'deck', prompt: asked, ...(reviseOf ? { reviseOf } : {}) };
-}
-
-/**
- * Поля состояния композера, которые считаются, а не хранятся: доступность обоих
- * режимов их словами, признак «рисует агент», занятость и заголовок правки.
- */
-export function composerFlags(input: {
-  image: MediaModeView;
-  deck: MediaModeView;
-  plans: MediaPlans;
-  isBusy: boolean;
-  revising?: MediaDeck;
-}): Omit<ComposerModeState, 'mode' | 'onModeChange' | 'onReviseCancel'> {
-  const { image, deck, plans, isBusy, revising } = input;
-  return {
-    imageAvailable: image.available,
-    ...(image.reasonText ? { imageReason: image.reasonText } : {}),
-    ...(image.sourceText ? { imageSource: image.sourceText } : {}),
-    // Признак нужен подсказке в пустом поле: «панель нарисует сама» на дороге
-    // агента — прямая неправда, а человек читает именно её.
-    ...(plans.image?.source === 'agent' ? { imageByAgent: true } : {}),
-    deckAvailable: deck.available,
-    ...(deck.reasonText ? { deckReason: deck.reasonText } : {}),
-    ...(deck.sourceText ? { deckSource: deck.sourceText } : {}),
-    isDrawing: isBusy,
-    ...(revising ? { reviseTitle: revising.title } : {}),
-  };
 }

@@ -15,8 +15,9 @@ function registrySections(): { writes: Set<string>; all: Set<string> } {
   const dir = join(here, '..', '..', '..', '..', '..', 'server', 'src', 'routes', 'panel-agent');
   const writes = new Set<string>();
   const all = new Set<string>();
-  for (const file of readdirSync(dir)) {
-    if (!/^actions.*\.ts$/.test(file) || file.includes('.test.')) continue;
+  // Модуль с тестами лежит в своей папке (actions-x/actions-x.ts) — обход рекурсивный.
+  for (const file of readdirSync(dir, { recursive: true, encoding: 'utf8' })) {
+    if (!/(^|[\\/])actions[^\\/]*\.ts$/.test(file) || file.includes('.test.')) continue;
     const source = readFileSync(join(dir, file), 'utf8');
     // Блок одного действия — от его `definePanelAction({` до следующего.
     const blocks = source.split('definePanelAction({').slice(1);

@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef } from 'react';
 import { useRouter, useRouterState } from '@tanstack/react-router';
-import { scrollIntent, type HistoryActionType } from './topicScroll';
+import type { HistoryActionType } from './topicScroll.types';
+import { scrollIntent } from './scrollIntent';
 
 /**
  * Позиции прокрутки по записям истории. Живут на уровне модуля, а не в

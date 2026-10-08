@@ -96,7 +96,7 @@ await runOnStand(
       location?.paths?.appData === join(stand.home, '.agentdeck', 'data'),
       location?.paths?.appData,
     );
-    const detect = (await stand.api('/providers/detect')).body;
+    const detect = (await stand.api('/providers/detect/detect')).body;
     check(
       'qwen найден в PATH панели',
       detect?.providers?.some((item) => item.id === 'qwen' && item.cliInstalled),

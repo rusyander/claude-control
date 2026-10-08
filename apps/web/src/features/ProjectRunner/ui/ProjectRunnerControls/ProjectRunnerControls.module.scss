@@ -1,0 +1,47 @@
+// Поповер настроек запуска позиционируется от этого контейнера — так же, как
+// у git-веток по соседству.
+.wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.row {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+// Слой — числом, как у соседних поповеров шапки (60/61). Здесь стоял
+// `var(--z-dropdown)`, а такой переменной в проекте нет: z-index становился
+// недействительным, то есть `auto`, и любой позже нарисованный элемент —
+// перенесённые кнопки шапки, полоса git, поле ввода — ложился поверх поповера
+// и срезал его первую строку (владелец, 28.09).
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+}
+
+// Сдвиг по горизонтали и высоту под окно ставит useAnchoredPanel; здесь только
+// начальное положение и потолок.
+.panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 61;
+  width: 420px;
+  max-width: calc(100vw - 16px);
+  max-height: min(80vh, var(--panel-max-block, 80vh));
+  overflow-y: auto;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+}
+
+// Целей в монорепе бывает много: прокручивается сам поповер (его высоту
+// держит в окне useAnchoredPanel) — одна прокрутка, а не вторая внутри первой.
+.targets {
+  display: flex;
+  flex-direction: column;
+}

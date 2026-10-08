@@ -1,5 +1,5 @@
-import type { ConfigProvider } from '../../providers/types.ts';
-import { createZip, readZip, type ZipEntry } from '../../lib/zip.ts';
+import type { ConfigProvider } from '../../providers/types/types.ts';
+import { createZip, readZip, type ZipEntry } from '../../lib/zip/zip.ts';
 import { collectProviderFiles, sha256, type ChecklistItem } from './collect.ts';
 import {
   panelPlatformsChecklist,
@@ -49,7 +49,7 @@ export type {
   BuiltArchive,
 } from './archive.types.ts';
 import { BRAND_SLUG, LEGACY_BRAND_SLUG } from '../../lib/brand.mjs';
-import { coded } from '../../lib/server-text.ts';
+import { coded } from '../../lib/server-text/server-text.ts';
 
 /**
  * Собирает архив окружения провайдера. `exportedAt` приходит извне (запрос или

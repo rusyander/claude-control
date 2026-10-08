@@ -1,5 +1,5 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { IntegrationLink, IntegrationLinks } from '@agentdeck/contracts';
+import { useQuery } from '@tanstack/react-query';
+import type { IntegrationLinks } from '@agentdeck/contracts';
 import { apiClient } from '@shared/api/client';
 import { integrationKeys } from './keys';
 
@@ -25,46 +25,5 @@ export function useIntegrationLinks(path: string | undefined, isEnabled = true) 
       return data;
     },
     enabled: Boolean(path) && isEnabled,
-  });
-}
-
-export interface SaveIntegrationLinkPayload {
-  /** Пусто — привязка самого проекта, иначе привязка группы тестов. */
-  groupId?: string;
-  link: IntegrationLink;
-}
-
-export function useSaveIntegrationLink(path: string | undefined) {
-  const client = useQueryClient();
-  return useMutation({
-    mutationFn: async ({
-      groupId,
-      link,
-    }: SaveIntegrationLinkPayload): Promise<IntegrationLinks> => {
-      const { data } = await apiClient.put<IntegrationLinks>('/integrations/links', {
-        path,
-        groupId,
-        link,
-      });
-      return data;
-    },
-    onSuccess: (data) => client.setQueryData(integrationKeys.links(path), data),
-    meta: { successMessage: 'toasts.saved' },
-  });
-}
-
-export function useRemoveIntegrationLink(path: string | undefined) {
-  const client = useQueryClient();
-  return useMutation({
-    mutationFn: async (groupId: string | undefined): Promise<IntegrationLinks> => {
-      // DELETE с телом: адресуемся не идентификатором в пути, а парой
-      // «проект + группа», и запихивать абсолютный путь в адрес незачем.
-      const { data } = await apiClient.delete<IntegrationLinks>('/integrations/links', {
-        data: { path, groupId },
-      });
-      return data;
-    },
-    onSuccess: (data) => client.setQueryData(integrationKeys.links(path), data),
-    meta: { successMessage: 'toasts.deleted' },
   });
 }

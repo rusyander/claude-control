@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { ChatTreeView } from '@agentdeck/contracts/chat-handoff';
-import { collectReviews, reviewTreeOf } from './reviewItems';
+import { collectReviews } from './reviewItems';
+import { reviewTreeOf } from './reviewTreeOf';
 
 /**
  * Карточки решения по ревью чужих MR (Т7): кому какие показывать.

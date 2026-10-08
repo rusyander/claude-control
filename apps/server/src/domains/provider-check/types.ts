@@ -1,5 +1,5 @@
 import type { ModelInfo } from '@agentdeck/contracts';
-import type { runAssistant } from '../assistant-runner.ts';
+import type { runAssistant } from '../assistant-runner/assistant-runner.ts';
 
 /** Что нужно проверке от окружения (всё подменяемо в тестах). */
 export interface ProviderCheckDeps {

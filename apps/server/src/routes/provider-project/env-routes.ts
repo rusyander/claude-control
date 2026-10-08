@@ -6,12 +6,12 @@ import {
   parseProviderEnvDraft,
   EnvKeyNotEncodableError,
   EnvKeyPreservedError,
-} from '../../domains/provider-env.ts';
+} from '../../domains/provider-env/provider-env.ts';
 import { UnrecognizedFormatError } from '../../lib/format-errors.ts';
 import { done } from '../write-result.ts';
 import { requireTarget } from './target.ts';
 import { ENV_UNSUPPORTED, FORMAT_UNRECOGNIZED, INVALID_ENV_DRAFT } from './messages.ts';
-import { codeOf } from '../../lib/server-text.ts';
+import { codeOf } from '../../lib/server-text/server-text.ts';
 
 /** Переменные окружения проекта: тот же адаптер, что и глобально, файл в проекте. */
 export function registerProviderProjectEnvRoutes(app: FastifyInstance, ctx: ServerContext): void {

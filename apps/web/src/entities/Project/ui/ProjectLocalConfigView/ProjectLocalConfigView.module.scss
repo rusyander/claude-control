@@ -1,0 +1,14 @@
+// Описания пишет автор скилла, и длина их ничем не ограничена: мера строки
+// держит текст читаемым на широком экране.
+.text {
+  max-width: 72ch;
+}
+
+.chevron {
+  transition: transform var(--duration-fast);
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+  transition: transform var(--duration-fast);
+}

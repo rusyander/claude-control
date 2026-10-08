@@ -11,8 +11,8 @@ import {
   removeEntry,
   transferBackupName,
   writeBinaryFile,
-} from '../../lib/safe-io.ts';
-import { coded } from '../../lib/server-text.ts';
+} from '../../lib/safe-io/safe-io.ts';
+import { coded } from '../../lib/server-text/server-text.ts';
 import type { EmitWrite } from './emit/types.ts';
 
 /**

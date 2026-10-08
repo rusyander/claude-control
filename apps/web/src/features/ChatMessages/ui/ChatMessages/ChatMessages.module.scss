@@ -1,0 +1,252 @@
+.list {
+  // Ширина колонки расхода справа от блоков ответа. Считана по самому широкому
+  // виду бейджа («999.9k +99.9k»): переносить цифры на вторую строку нельзя,
+  // они читаются одним взглядом или не читаются вовсе.
+  // Ширина под «41.5k +3.3k» в одну строку и «2м 37с Σ 2м 40с» во вторую:
+  // время переносится под токены, а не растягивает колонку на всю ленту.
+  --spend-column: 132px;
+
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--spacing-lg) var(--spacing-xl);
+}
+
+.row {
+  display: flex;
+  // Промежутка хватает и на воздух между репликами, и на ряд кнопок под
+  // сообщением — иначе они ложатся поверх последней строки ответа.
+  margin-bottom: var(--spacing-xl);
+}
+
+.bubble {
+  position: relative;
+  max-width: min(var(--text-measure), 100%);
+  border-radius: var(--radius-lg);
+  color: var(--color-fg);
+
+  // Кнопки появляются при наведении: постоянно висящий ряд иконок в ленте
+  // мешает читать. Клавиатурный доступ отдельно — иначе до них не добраться
+  // без мыши.
+  &:hover .actions,
+  &:focus-within .actions {
+    opacity: 1;
+  }
+}
+
+.bubbleAssistant {
+  width: 100%;
+  // Колонка расхода вынесена ЗА ширину чтения, а не отрезана от неё: цифры
+  // рядом с действиями не должны сужать сам ответ.
+  max-width: calc(var(--text-measure) + var(--spend-column));
+  min-width: 0;
+}
+
+/*
+ * Строка блока ответа: сам блок и справа — расход шага, который его породил.
+ *
+ * Колонка держится постоянной ширины даже там, где расхода нет (первый шаг
+ * разговора, реплика человека): плавающая граница текста дёргала бы ленту на
+ * каждом сообщении.
+ */
+.block {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--spend-column);
+  align-items: start;
+  gap: var(--spacing-2xs);
+}
+
+.spend {
+  // По верхней строке блока: у длинной плашки инструмента середина уезжает
+  // вниз, и цифра переставала читаться как относящаяся к этой строке.
+  margin-top: 1px;
+  justify-self: end;
+}
+
+// Таймер живого прогона — там же, где потом встанет время шага: у правого
+// края, в колонке расхода, чтобы глаз не искал его в двух местах.
+.liveTimer {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: var(--spacing-2xs);
+}
+
+/* На узкой ленте колонки для цифр нет — там дороже сам текст. */
+@media (max-width: 720px) {
+  .block {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .spend {
+    display: none;
+  }
+}
+
+.thinking {
+  margin-bottom: var(--spacing-xs);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-sunken);
+
+  summary {
+    padding: var(--spacing-2xs) var(--spacing-sm);
+    color: var(--color-fg-muted);
+    font-size: var(--font-size-body-sm);
+    cursor: pointer;
+  }
+}
+
+.thinkingBody {
+  padding: 0 var(--spacing-sm) var(--spacing-sm);
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-body-sm);
+  white-space: pre-wrap;
+}
+
+// Вызовы инструментов идут подряд десятками, поэтому каждый — одна узкая
+// строка: подробности разворачиваются по клику.
+.tool {
+  margin-bottom: var(--spacing-3xs);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-sunken);
+
+  summary {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-2xs);
+    padding: var(--spacing-3xs) var(--spacing-xs);
+    color: var(--color-fg-muted);
+    font-family: var(--font-mono);
+    font-size: var(--font-size-caption);
+    cursor: pointer;
+  }
+}
+
+.toolInput {
+  padding: 0 var(--spacing-xs) var(--spacing-xs);
+  color: var(--color-fg-subtle);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.caret {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 2px;
+  background: var(--color-accent);
+  vertical-align: text-bottom;
+  animation: blink 1s step-end infinite;
+}
+
+// Состояние «идёт работа» до первого слова ответа. Ожидание тут исчисляется
+// секундами, поэтому нужен не просто индикатор, а понятная подпись: видно,
+// что разговор жив и чем именно занят.
+.pending {
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-body-sm);
+}
+
+.dots {
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 4px;
+
+  i {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--color-accent);
+    animation: wave 1.4s ease-in-out infinite;
+
+    &:nth-child(2) {
+      animation-delay: 0.18s;
+    }
+
+    &:nth-child(3) {
+      animation-delay: 0.36s;
+    }
+  }
+}
+
+.pendingLabel {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+// Полосы на месте будущего ответа: видно, что текст ещё пишется, и лента не
+// подпрыгивает, когда он приходит. Ширина — как у пузыря, не во всю ленту.
+.pendingSkeleton {
+  min-width: 220px;
+  margin-top: var(--spacing-2xs);
+}
+
+// Переключатель «Меньше движения» должен выключать движение по-настоящему:
+// точки остаются видимыми, но не прыгают — состояние читается по подписи.
+@media (prefers-reduced-motion: reduce) {
+  .caret,
+  .pendingLabel,
+  .dots i {
+    animation: none;
+  }
+
+  .dots i {
+    opacity: 0.7;
+  }
+}
+
+/*
+  Отметка смены ветки. Линия во всю ширину, а не пузырь: это не чья-то реплика,
+  а граница, после которой правки уходят в другую ветку, — ровно так её и надо
+  прочитать, скользя по ленте взглядом.
+*/
+.branchMark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-2xs);
+  margin: var(--spacing-md) 0;
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-caption);
+}
+
+.branchMark::before,
+.branchMark::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--color-border);
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+@keyframes wave {
+  0%,
+  65%,
+  100% {
+    opacity: 0.35;
+    transform: translateY(0);
+  }
+
+  30% {
+    opacity: 1;
+    transform: translateY(-5px);
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 0.65;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}

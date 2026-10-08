@@ -4,7 +4,8 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { en } from '../../shared/config/i18n/en';
 import { ru } from '../../shared/config/i18n/ru';
-import { agentTextView, svgRatio } from './agentTextView';
+import { agentTextView } from './agentTextView';
+import { svgRatio } from './svgRatio';
 
 const svg =
   '<svg viewBox="0 0 800 400" xmlns="http://www.w3.org/2000/svg"><rect width="10" height="10"/></svg>';
@@ -154,8 +155,8 @@ describe('agentTextView — текст человека', () => {
   // лента по-прежнему режет текст человека.
   it('лента передаёт автора текста в разбор', () => {
     const here = dirname(fileURLToPath(import.meta.url));
-    const transcript = readFileSync(resolve(here, 'Transcript.tsx'), 'utf8');
-    const agentText = readFileSync(resolve(here, 'AgentText.tsx'), 'utf8');
+    const transcript = readFileSync(resolve(here, 'Transcript/Transcript.tsx'), 'utf8');
+    const agentText = readFileSync(resolve(here, 'AgentText/AgentText.tsx'), 'utf8');
     expect(transcript).toMatch(/<AgentText[^>]*\bfromUser=\{message\.role === 'user'\}/);
     expect(agentText).toMatch(/agentTextView\(text, t\.chat, \{[^}]*\bfromUser\b[^}]*\}\)/);
   });

@@ -1,17 +1,17 @@
 import { useEffect, useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, Mono, Muted } from '../../shared/ui';
-import { colors, font, space } from '../../shared/config/theme';
 import { useT } from '../../shared/config/i18n';
 import { useCostUnit } from '../../entities/settings/api';
-import { useTurnOffWatcher, useWatcherStatus } from '../../entities/watcher/api';
-import {
-  formatUptime,
-  watcherElapsedMs,
-  watcherSpendText,
-  watcherVisible,
-} from '../../entities/watcher/model';
+import { useWatcherStatus } from '../../entities/watcher/api';
+import { watcherVisible } from '../../entities/watcher/model';
+import { useTurnOffWatcher } from '../../entities/watcher/useTurnOffWatcher';
+import { watcherElapsedMs } from '../../entities/watcher/watcherElapsedMs';
+import { formatUptime } from '../../entities/watcher/formatUptime';
+import { watcherSpendText } from '../../entities/watcher/watcherSpendText';
+import { useTicking } from './useTicking';
+import { styles } from './WatcherChip.styles';
 
 /**
  * Значок фонового наблюдателя на главной: виден, только пока он включён, —
@@ -129,61 +129,3 @@ export function WatcherChip({ enabled }: { enabled: boolean }) {
     </>
   );
 }
-
-/** Секундный такт, пока значок на экране: время работы идёт на глазах. */
-function useTicking(active: boolean): number {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    if (!active) return undefined;
-    setNow(Date.now());
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, [active]);
-  return now;
-}
-
-const styles = StyleSheet.create({
-  chip: {
-    alignSelf: 'flex-start',
-    // Отступ несёт сам значок: выключенный наблюдатель не оставляет пустой полосы.
-    marginHorizontal: space.lg,
-    marginTop: space.sm,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.sm,
-    paddingHorizontal: space.md,
-    paddingVertical: space.xs,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceRaised,
-  },
-  pressed: { opacity: 0.7 },
-  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.success },
-  dotBusy: { backgroundColor: colors.running },
-  dotProblem: { backgroundColor: colors.warning },
-  chipText: { color: colors.text, fontSize: font.small },
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
-  sheet: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: 14,
-    borderTopRightRadius: 14,
-    padding: space.lg,
-    gap: space.sm,
-  },
-  title: { color: colors.text, fontSize: font.title, fontWeight: '600' },
-  line: { color: colors.text, fontSize: font.body },
-  dim: { color: colors.textDim },
-  problem: {
-    borderLeftWidth: 3,
-    borderLeftColor: colors.warning,
-    paddingLeft: space.md,
-    gap: space.xs,
-  },
-  problemTitle: { color: colors.warning, fontSize: font.body, fontWeight: '600' },
-  path: { color: colors.textDim },
-  hint: { marginTop: space.xs },
-  error: { color: colors.danger, fontSize: font.small },
-  actions: { flexDirection: 'row', gap: space.sm, marginTop: space.sm },
-  grow: { flex: 1 },
-});

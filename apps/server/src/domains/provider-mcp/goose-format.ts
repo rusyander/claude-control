@@ -1,12 +1,12 @@
 import type { UniversalMcpServer, UniversalMcpServerDraft } from '@agentdeck/contracts';
-import { UnrecognizedFormatError } from '../../lib/codex-toml.ts';
+import { UnrecognizedFormatError } from '../../lib/codex-toml/codex-toml.ts';
 import {
   isGooseMcpExtension,
   readGooseExtensions,
   writeGooseExtensions,
   type GooseRawExtension,
 } from '../../lib/goose-yaml.ts';
-import { readTextFile, writeTextFile } from '../../lib/safe-io.ts';
+import { readTextFile, writeTextFile } from '../../lib/safe-io/safe-io.ts';
 import { GOOSE_MODELLED_KEYS, GOOSE_REMOTE_TYPES } from './constants.ts';
 import { backupNameOf } from './target.ts';
 import type { ProviderMcpTarget } from './types.ts';

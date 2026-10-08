@@ -10,9 +10,7 @@ import { HOME_TAB_ID, type ProjectTab } from '@shared/lib/workspace';
 import { statusTone, type RunStatus } from '@shared/lib/agent-runs';
 import type { WorkspaceTabsProps } from './WorkspaceTabs.types';
 import styles from './WorkspaceTabs.module.scss';
-
-/** Alt+←/→ на табе — шаг влево/вправо, клавиатурная замена перетаскиванию. */
-const MOVE_KEYS: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1 };
+import { MOVE_KEYS } from './WorkspaceTabs.constants';
 
 /**
  * Лента табов рабочего пространства в шапке чата. Постоянный домашний таб

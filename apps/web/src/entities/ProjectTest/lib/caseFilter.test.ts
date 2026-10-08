@@ -1,12 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import type { ProjectTestCase, ProjectTestGroup } from '@agentdeck/contracts';
-import {
-  allCases,
-  buildSectionTree,
-  collectFacets,
-  flattenSections,
-  matchesFilter,
-} from './caseFilter';
+import { matchesFilter } from './caseFilter';
+import { collectFacets } from './collectFacets';
+import { buildSectionTree } from './buildSectionTree';
+import { flattenSections } from './flattenSections';
+import { allCases } from './allCases';
 
 /**
  * Отбор кейсов должен работать так же, как он работает на сервере: по нему

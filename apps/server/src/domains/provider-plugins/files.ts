@@ -5,7 +5,12 @@ import type {
   ProviderPluginFileDraft,
   ProviderPluginsInfo,
 } from '@agentdeck/contracts';
-import { backupEntry, removeEntry, readTextFile, writeTextFile } from '../../lib/safe-io.ts';
+import {
+  backupEntry,
+  removeEntry,
+  readTextFile,
+  writeTextFile,
+} from '../../lib/safe-io/safe-io.ts';
 import { SECTION_MAX_FILE_BYTES, fileSizeOf, walkSectionFiles } from '../../lib/section-fs.ts';
 import {
   PluginFileNotEditableError,
@@ -14,7 +19,7 @@ import {
 } from './errors.ts';
 import { hasPluginExtension, pluginBackupName, resolvePluginPath, toRelative } from './paths.ts';
 import type { ProviderPluginsTarget } from './types.ts';
-import { coded } from '../../lib/server-text.ts';
+import { coded } from '../../lib/server-text/server-text.ts';
 
 /** Половина сводки, отвечающая за файлы каталога. */
 type PluginFilesSection = Pick<ProviderPluginsInfo, 'files' | 'ignored' | 'filesReadOnly'> &

@@ -1,6 +1,6 @@
 import type { ForgeAccess, MergeRequestRef } from './forge.ts';
 import { forgeGraphql } from './forge.ts';
-import type { MrReview, MrReviewPipeline, MrReviewThread } from './mr-review.types.ts';
+import type { MrReview, MrReviewPipeline, MrReviewThread } from './mr-review/mr-review.types.ts';
 
 /**
  * PR GitHub глазами наблюдателя MR. Всё — одним запросом GraphQL: REST не

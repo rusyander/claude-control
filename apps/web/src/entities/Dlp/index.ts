@@ -1,23 +1,19 @@
-export {
-  useDlp,
-  useDlpJournal,
-  useSaveDlpRules,
-  useDlpPreview,
-  useSetDlpRunning,
-  useClearDlpJournal,
-} from './api/DlpApi';
-export {
-  DLP_BUILTINS,
-  newRuleId,
-  newTermsRule,
-  newBuiltinRule,
-  newRegexRule,
-  starterRules,
-  replaceRule,
-  removeRule,
-  isRuleComplete,
-  missingBuiltins,
-  builtinAsRegex,
-  type BuiltinNames,
-} from './model/rules';
+export { useDlp } from './api/DlpApi';
+export { useClearDlpJournal } from './api/useClearDlpJournal';
+export { useSetDlpRunning } from './api/useSetDlpRunning';
+export { useDlpPreview } from './api/useDlpPreview';
+export { useSaveDlpRules } from './api/useSaveDlpRules';
+export { useDlpJournal } from './api/useDlpJournal';
+export { newRuleId } from './model/rules';
+export { missingBuiltins } from './model/missingBuiltins';
+export { starterRules } from './model/starterRules';
+export { DLP_BUILTINS } from './model/rules.constants';
+export type { BuiltinNames } from './model/starterRules';
+export { newBuiltinRule } from './model/newBuiltinRule';
+export { isRuleComplete } from './model/isRuleComplete';
+export { removeRule } from './model/removeRule';
+export { replaceRule } from './model/replaceRule';
+export { builtinAsRegex } from './model/builtinAsRegex';
+export { newRegexRule } from './model/newRegexRule';
+export { newTermsRule } from './model/newTermsRule';
 export { dlpErrorMessage } from './model/errors';

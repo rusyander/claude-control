@@ -3,11 +3,11 @@
     "n": 10,
     "why": "log line / internal error not shown as text"
   },
-  "bootstrap/runtime.ts": {
+  "bootstrap/runtime/runtime.ts": {
     "n": 5,
     "why": "log line / internal error not shown as text"
   },
-  "bootstrap/watcher-capture.ts": {
+  "bootstrap/watcher-capture/watcher-capture.ts": {
     "n": 9,
     "why": "watcher signal text for WATCH-REPORT.md (human report, Russian by design): 5xx/4xx/409-loop/slow/log/CLI-exit wording"
   },
@@ -23,27 +23,27 @@
     "n": 3,
     "why": "CLI timeout / exit / missing-flag errors shown to the human"
   },
-  "domains/assistant.ts": {
+  "domains/assistant/assistant.ts": {
     "n": 1,
     "why": "CLI exit error shown in the form-assistant reply bubble (the prompt itself is English, D-E)"
   },
-  "domains/chat/chat-case-draft.ts": {
+  "domains/chat/chat-case-draft/chat-case-draft.ts": {
     "n": 10,
     "why": "text of the draft test case built from a chat (step labels, title and purpose) — data written into the project's test library, reviewed by the human at acceptance, not UI text"
   },
-  "domains/chat/ChatExport.ts": {
+  "domains/chat/ChatExport/ChatExport.ts": {
     "n": 3,
     "why": "exported document / markdown written for another tool"
   },
-  "domains/chat/ChatRecords.ts": {
+  "domains/chat/ChatRecords/ChatRecords.ts": {
     "n": 2,
     "why": "exported document / markdown written for another tool; +3 mode word of a media chat title (Презентация/Правка презентации/Рисунок) — KNOWN GAP: English UI shows it Russian, title is a plain string with no code slot"
   },
-  "domains/chat/ChatRunner.ts": {
+  "domains/chat/ChatRunner/ChatRunner.ts": {
     "n": 5,
     "why": "run errors shown in the chat feed (model name rejected, spawn failed, exit code, request failed); +1 the `modelDropped` feed notice — the code travels for translation"
   },
-  "domains/chat/detached-run.ts": {
+  "domains/chat/detached-run/detached-run.ts": {
     "n": 2,
     "why": "feed notices of a run picked up after a panel restart (the human reads them)"
   },
@@ -51,15 +51,15 @@
     "n": 17,
     "why": "matching data: Russian openers of panel preambles in transcripts written before the D-E translation, never shown, never sent"
   },
-  "domains/chat/split-conveyor.ts": {
+  "domains/chat/split-conveyor/split-conveyor.ts": {
     "n": 9,
     "why": "feed notices of the triage outcome (applied / not received) the human reads in the parent chat; every prompt to a group is English (D-E)"
   },
-  "domains/chat/split-overlap.ts": {
+  "domains/chat/split-overlap/split-overlap.ts": {
     "n": 9,
     "why": "composed list explanation / git output assembly"
   },
-  "domains/chat/split-review.ts": {
+  "domains/chat/split-review/split-review.ts": {
     "n": 14,
     "why": "review outcome the human reads: the MR comment written INTO the forge, the feed notice and reviewNoticeText in a foreign CLI feed"
   },
@@ -95,15 +95,15 @@
     "n": 17,
     "why": "exported document / markdown written for another tool"
   },
-  "domains/env.ts": {
+  "domains/env/env.ts": {
     "n": 4,
     "why": "internal invariant: a path the caller must pass (never reaches a response)"
   },
-  "domains/format-check.ts": {
+  "domains/format-check/format-check.ts": {
     "n": 2,
     "why": "log line / internal error not shown as text"
   },
-  "domains/group-activation.ts": {
+  "domains/group-activation/group-activation.ts": {
     "n": 2,
     "why": "feed notice: the code travels in the event ('groupsActivated'), the text is the fallback for a client without a dictionary"
   },
@@ -111,15 +111,15 @@
     "n": 9,
     "why": "validation of a draft written by the agent: the text answers the agent, not a screen"
   },
-  "domains/group-scenario.ts": {
+  "domains/group-scenario/group-scenario.ts": {
     "n": 4,
     "why": "file content: the scenario body written into the group skill the human edits; byte-compared with the legacy compiled output"
   },
-  "domains/groups/knob-candidates.ts": {
+  "domains/groups/knob-candidates/knob-candidates.ts": {
     "n": 17,
     "why": "parser vocabulary: Russian stems (agent, reviewer, pass, retry…) matched inside the human's rule text to find numeric knobs; never shown"
   },
-  "domains/hook-scripts.ts": {
+  "domains/hook-scripts/hook-scripts.ts": {
     "n": 7,
     "why": "file content: Russian comments of the generated hook script the human edits"
   },
@@ -147,11 +147,11 @@
     "n": 2,
     "why": "composed forge reason + fallback display value of a foreign account"
   },
-  "domains/integrations/http.ts": {
+  "domains/integrations/http/http.ts": {
     "n": 5,
     "why": "RU twin of the already coded failureCode (the code travels beside it)"
   },
-  "domains/integrations/publish.ts": {
+  "domains/integrations/publish/publish.ts": {
     "n": 4,
     "why": "exported document / markdown written for another tool"
   },
@@ -227,19 +227,19 @@
     "n": 1,
     "why": "outbound notification to an external channel (phone push / Telegram)"
   },
-  "domains/opencode-serve.ts": {
+  "domains/opencode-serve/opencode-serve.ts": {
     "n": 1,
     "why": "log line / internal error not shown as text"
   },
-  "domains/panel-agent/conversations.ts": {
+  "domains/panel-agent/conversations/conversations.ts": {
     "n": 1,
     "why": "internal id invariant; the sealed-turn footer is English (sealFooter in contracts panel-agent-feed) and the window renders the human note from the seal code"
   },
-  "domains/panel-agent/data-mask.ts": {
+  "domains/panel-agent/data-mask/data-mask.ts": {
     "n": 3,
     "why": "DLP refusal the human reads + the mask label КЛЮЧ, the same label as the built-in DLP rule (user-editable data, kept identical on purpose)"
   },
-  "domains/panel-agent/help-topics.ts": {
+  "domains/panel-agent/help-topics/help-topics.ts": {
     "n": 4,
     "why": "internal invariant errors of the help index parser (never shown, never sent) + the Russian word endings the help search stems with (matching data, never shown)"
   },
@@ -247,11 +247,11 @@
     "n": 4,
     "why": "launch refusals shown on the panel agent card"
   },
-  "domains/panel-agent/runner.ts": {
+  "domains/panel-agent/runner/runner.ts": {
     "n": 10,
     "why": "turn errors shown on the panel agent card (Qwen init-tools stop, foreign-tool stop, Kimi image/argv refusals) — the error event has no code channel yet"
   },
-  "domains/permissions.ts": {
+  "domains/permissions/permissions.ts": {
     "n": 1,
     "why": "map key composed from a path and a decision word"
   },
@@ -271,7 +271,7 @@
     "n": 14,
     "why": "driver manifest: per-field fate notes read by the dialect conversion and its tests, never rendered"
   },
-  "domains/platform/embeddings.ts": {
+  "domains/platform/embeddings/embeddings.ts": {
     "n": 3,
     "why": "refusals of the embeddings API: no panel screen calls it, the body goes to the calling program"
   },
@@ -279,11 +279,11 @@
     "n": 1,
     "why": "composition around a zod issue name: the parts are data, the wrapper already carries the code"
   },
-  "domains/platform/gateway/dialect.ts": {
+  "domains/platform/gateway/dialect/dialect.ts": {
     "n": 33,
     "why": "dialect table notes + dropped-key names: read by the conversion and its tests, never rendered"
   },
-  "domains/platform/gateway/frames.ts": {
+  "domains/platform/gateway/frames/frames.ts": {
     "n": 8,
     "why": "frame notes for unknown upstream frames: trace payload, not rendered"
   },
@@ -291,7 +291,7 @@
     "n": 2,
     "why": "KNOWN GAP (model text, contour lane): vendor-tool manifest note + the tool-result body handed to the model"
   },
-  "domains/platform/gateway/spend-flush.ts": {
+  "domains/platform/gateway/spend-flush/spend-flush.ts": {
     "n": 7,
     "why": "stderr log lines of the spend flush"
   },
@@ -299,7 +299,7 @@
     "n": 4,
     "why": "Russian word forms of the claim regex: matching data, never shown"
   },
-  "domains/platform/redact.ts": {
+  "domains/platform/redact/redact.ts": {
     "n": 1,
     "why": "mask placeholder inside the request trace"
   },
@@ -327,7 +327,7 @@
     "n": 1,
     "why": "invariant violation thrown at the caller (empty needs list); unreachable by construction, never an answer to the person"
   },
-  "domains/portability/carry-context.ts": {
+  "domains/portability/carry-context/carry-context.ts": {
     "n": 4,
     "why": "the two feed notices of a carried conversation (what travelled, and that the source is neither closed nor changed); in a foreign chat the stored string is their ONLY carrier, while the Claude branch sends the same text with code `contextCarried` — same shape as ChatRunner's modelDropped"
   },
@@ -335,7 +335,7 @@
     "n": 7,
     "why": "emit-plan invariants thrown at the developer (catalog promises a mechanism no adapter writes, verdict missing, an item answered twice or not at all, two writes of one layer into one file) plus ticket labels for kinds not yet emitted; never an answer to the person"
   },
-  "domains/portability/emit/hook-shim.ts": {
+  "domains/portability/emit/hook-shim/hook-shim.ts": {
     "n": 1,
     "why": "the GENERATED hook shim as one template: its Russian comments land in a file beside the target config and its single stderr note reaches the CLI output a person reads; never an API answer (same case as domains/prompt-gate/script.ts)"
   },
@@ -347,7 +347,7 @@
     "n": 1,
     "why": "emitter-missing error text; the route answers with the coded reply instead"
   },
-  "domains/portability/fidelity-report.ts": {
+  "domains/portability/fidelity-report/fidelity-report.ts": {
     "n": 1,
     "why": "scope-unsupported error thrown at the caller; the route answers with the coded reply instead"
   },
@@ -387,7 +387,7 @@
     "n": 23,
     "why": "passport prose for the human: item intent / named skip detail, not an API error"
   },
-  "domains/portability/permissions-map.ts": {
+  "domains/portability/permissions-map/permissions-map.ts": {
     "n": 1,
     "why": "the refusal thrown at the developer when a permission translation weakened a decision (deny or ask turned into allow) — an invariant-6 breach that must stop the transfer, never an answer to the person"
   },
@@ -403,11 +403,11 @@
     "n": 18,
     "why": "text of the six probe records themselves: item intents for the passport plus the skill body, command prompt and descriptions that LAND IN THE TARGET CLI's files and reach only the probe's own loopback stub — never an answer to the person"
   },
-  "domains/portability/probe.ts": {
+  "domains/portability/probe/probe.ts": {
     "n": 1,
     "why": "the stub's closing reply to the target CLI (one line ending the scripted turn); it reaches the CLI's transcript inside the temporary home, never an answer to the person"
   },
-  "domains/portability/project.ts": {
+  "domains/portability/project/project.ts": {
     "n": 2,
     "why": "level errors thrown at the caller (project root not named; the CLI documents no project level) plus the phrase the route repeats in its coded refusal — portability-project-required / portability-project-unsupported answer with the code, the string stays the fallback"
   },
@@ -447,11 +447,11 @@
     "n": 1,
     "why": "tests-agent run error when Qwen exits without a result: carries the exit code of a foreign CLI, no code channel for its own text"
   },
-  "domains/project-tests/defect-status.ts": {
+  "domains/project-tests/defect-status/defect-status.ts": {
     "n": 9,
     "why": "exported document / markdown written for another tool"
   },
-  "domains/project-tests/defects.ts": {
+  "domains/project-tests/defects/defects.ts": {
     "n": 22,
     "why": "exported document / markdown written for another tool"
   },
@@ -463,7 +463,7 @@
     "n": 4,
     "why": "parsing a foreign format / matching foreign text"
   },
-  "domains/project-tests/e2e-run.ts": {
+  "domains/project-tests/e2e-run/e2e-run.ts": {
     "n": 6,
     "why": "run history scope labels (stored record text, same as other run scopes) + the timeout line appended to the command's own log"
   },
@@ -471,7 +471,7 @@
     "n": 1,
     "why": "file content written into the user's project"
   },
-  "domains/project-tests/export-cases.ts": {
+  "domains/project-tests/export-cases/export-cases.ts": {
     "n": 61,
     "why": "exported document / markdown written for another tool"
   },
@@ -483,95 +483,95 @@
     "n": 55,
     "why": "exported run report dictionary: the ru half of a ru/en pair picked by the exporter's interface language (L8 28.09); en sibling in the same object"
   },
-  "domains/project-tests/export-run.ts": {
+  "domains/project-tests/export-run/export-run.ts": {
     "n": 1,
     "why": "unknown-format guard: the route answers its own coded 400 before reaching it; report words live in export-run-texts.ts"
   },
-  "domains/project-tests/generate-sources.ts": {
+  "domains/project-tests/generate-sources/generate-sources.ts": {
     "n": 1,
     "why": "range name of the working copy used as a key, not a sentence"
   },
-  "domains/project-tests/group-files.ts": {
+  "domains/project-tests/group-files/group-files.ts": {
     "n": 1,
     "why": "assertId label naming a field inside an internal invariant"
   },
-  "domains/project-tests/impact.ts": {
+  "domains/project-tests/impact/impact.ts": {
     "n": 2,
     "why": "composed explanation list / stored user-owned default"
   },
-  "domains/project-tests/import-cases.ts": {
+  "domains/project-tests/import-cases/import-cases.ts": {
     "n": 62,
     "why": "matching data: foreign header aliases / stopwords, never shown"
   },
-  "domains/project-tests/import-manual-cases.ts": {
+  "domains/project-tests/import-manual-cases/import-manual-cases.ts": {
     "n": 6,
     "why": "heuristics of a foreign manual format: matching data, never shown"
   },
-  "domains/project-tests/import-results.ts": {
+  "domains/project-tests/import-results/import-results.ts": {
     "n": 1,
     "why": "import scope name stored with the run record (the retry-pass phrase became the flakyAttempts field, F-355)"
   },
-  "domains/project-tests/library.ts": {
+  "domains/project-tests/library/library.ts": {
     "n": 8,
     "why": "assertId/section labels naming a field inside an internal invariant"
   },
-  "domains/project-tests/migrate.ts": {
+  "domains/project-tests/migrate/migrate.ts": {
     "n": 1,
     "why": "description written INTO the created group record"
   },
-  "domains/project-tests/plan-recipes.ts": {
+  "domains/project-tests/plan-recipes/plan-recipes.ts": {
     "n": 17,
     "why": "composed explanation list / stored user-owned default"
   },
-  "domains/project-tests/plans.ts": {
+  "domains/project-tests/plans/plans.ts": {
     "n": 5,
     "why": "assertId labels naming a field inside an internal invariant"
   },
-  "domains/project-tests/png.ts": {
+  "domains/project-tests/png/png.ts": {
     "n": 12,
     "why": "media: plan reasons translated client-side by key / nested decode reasons"
   },
-  "domains/project-tests/prompt.ts": {
+  "domains/project-tests/prompt/prompt.ts": {
     "n": 10,
     "why": "runName: the run title shown in the chat list (the task itself is English, D-E); REGRESSION_TAGS/regressionTag: the regression tag value in the library language (F-63) — data the human filters by, not a message"
   },
-  "domains/project-tests/release.ts": {
+  "domains/project-tests/release/release.ts": {
     "n": 8,
     "why": "exported document / markdown written for another tool"
   },
-  "domains/project-tests/repair.ts": {
+  "domains/project-tests/repair/repair.ts": {
     "n": 2,
     "why": "ORPHAN_RUN_ERROR stored in the run record `error` field — KNOWN GAP: run records carry no errorCode, English UI shows it Russian"
   },
-  "domains/project-tests/risk.ts": {
+  "domains/project-tests/risk/risk.ts": {
     "n": 16,
     "why": "composed explanation list / stored user-owned default"
   },
-  "domains/project-tests/run-permissions.ts": {
+  "domains/project-tests/run-permissions/run-permissions.ts": {
     "n": 1,
     "why": "internal error thrown at the caller when the permission receiver got no port"
   },
-  "domains/project-tests/runs.ts": {
+  "domains/project-tests/runs/runs.ts": {
     "n": 26,
     "why": "run-log notes: a free-text log of the run, kept as the agent wrote it"
   },
-  "domains/project-tests/similar.ts": {
+  "domains/project-tests/similar/similar.ts": {
     "n": 58,
     "why": "matching data: foreign header aliases / stopwords, never shown"
   },
-  "domains/project-tests/store.ts": {
+  "domains/project-tests/store/store.ts": {
     "n": 12,
     "why": "stored defaults of a new library (group descriptions, copy suffix) + strictValue field labels (Тип, Тип ссылки, Приоритет, Готовность, Статус автоматизации)"
   },
-  "domains/project-tests/taxonomy.ts": {
+  "domains/project-tests/taxonomy/taxonomy.ts": {
     "n": 4,
     "why": "composed explanation list / stored user-owned default"
   },
-  "domains/projects.ts": {
+  "domains/projects/projects.ts": {
     "n": 8,
     "why": "composed explanation list / stored user-owned default"
   },
-  "domains/prompt-gate.ts": {
+  "domains/prompt-gate/prompt-gate.ts": {
     "n": 2,
     "why": "hook-missing error shown on the prompt gate card"
   },
@@ -587,11 +587,11 @@
     "n": 1,
     "why": "size refusal of an edited prompt, shown to the human"
   },
-  "domains/provider-chat/cascade.ts": {
+  "domains/provider-chat/cascade/cascade.ts": {
     "n": 8,
     "why": "stage words of a stored chat title and the plan-missing feed notice the human reads"
   },
-  "domains/provider-chat/handoff.ts": {
+  "domains/provider-chat/handoff/handoff.ts": {
     "n": 10,
     "why": "continuation titles and the refusal / feed texts of a foreign-CLI continuation the human reads"
   },
@@ -615,11 +615,11 @@
     "n": 8,
     "why": "live-transport turn texts of a foreign CLI (В1, 05.10): `unavailable.why` never reaches a person (the run silently falls back to a one-shot launch, log only); `error` texts become the chat's run error — the same class as ProviderChatRun.ts, whose error event has no code channel"
   },
-  "domains/provider-chat/ProviderChatRun.ts": {
+  "domains/provider-chat/ProviderChatRun/ProviderChatRun.ts": {
     "n": 9,
     "why": "run errors and the supervisor refusal reason a person reads in the chat when a hook denies the run (П3.2); +1 «CLI закончил ход без ответа», a live turn that ended empty (В1, 05.10)"
   },
-  "domains/provider-chat/store.ts": {
+  "domains/provider-chat/store/store.ts": {
     "n": 3,
     "why": "stored default title of a foreign-CLI chat record (the user renames it)"
   },
@@ -659,7 +659,7 @@
     "n": 3,
     "why": "record field of an extension whose manifest is missing; CLI failure reason forwarded as a messageCode param"
   },
-  "domains/provider-projects.ts": {
+  "domains/provider-projects/provider-projects.ts": {
     "n": 1,
     "why": "composed explanation list / stored user-owned default"
   },
@@ -695,7 +695,7 @@
     "n": 20,
     "why": "file content / template / parsed foreign format"
   },
-  "domains/rules.ts": {
+  "domains/rules/rules.ts": {
     "n": 1,
     "why": "file content assembled for CLAUDE.md: the «## ПРАВИЛО:» heading written to disk (disabled rules no longer carry a Russian service note — F1)"
   },
@@ -715,7 +715,7 @@
     "n": 3,
     "why": "log line / internal error not shown as text"
   },
-  "domains/scripts.ts": {
+  "domains/scripts/scripts.ts": {
     "n": 6,
     "why": "path-rejection reason composed inside the error class"
   },
@@ -739,11 +739,11 @@
     "n": 5,
     "why": "boot banner lines printed to the terminal"
   },
-  "lib/access-gate.ts": {
+  "lib/access-gate/access-gate.ts": {
     "n": 2,
     "why": "log line / internal error not shown as text"
   },
-  "lib/aider-yaml.ts": {
+  "lib/aider-yaml/aider-yaml.ts": {
     "n": 1,
     "why": "reason of a foreign-format key check, folded into a coded refusal above"
   },
@@ -751,19 +751,19 @@
     "n": 1,
     "why": "stderr log line"
   },
-  "lib/cli-args.ts": {
+  "lib/cli-args/cli-args.ts": {
     "n": 1,
     "why": "internal invariant of an argv value (never reaches a response)"
   },
-  "lib/cli-spawn.ts": {
+  "lib/cli-spawn/cli-spawn.ts": {
     "n": 3,
     "why": "log line / internal error not shown as text"
   },
-  "lib/cursor-mdc.ts": {
+  "lib/cursor-mdc/cursor-mdc.ts": {
     "n": 2,
     "why": "file content / template / parsed foreign format"
   },
-  "lib/dotenv-file.ts": {
+  "lib/dotenv-file/dotenv-file.ts": {
     "n": 2,
     "why": "file content / template / parsed foreign format"
   },
@@ -775,11 +775,11 @@
     "n": 1,
     "why": "path-rejection detail composed inside an error class"
   },
-  "lib/instruction-files.ts": {
+  "lib/instruction-files/instruction-files.ts": {
     "n": 7,
     "why": "5 = passport prose for the human (named skip detail: which instructionFiles mode hid which file), moved here from domains/portability/instruction-files.ts; 2 = RU fallback message of InstructionNameRefusedError, which carries coded() beside it (instructions-file-name-unknown / instructions-file-exists)"
   },
-  "lib/qwen-rule-md.ts": {
+  "lib/qwen-rule-md/qwen-rule-md.ts": {
     "n": 1,
     "why": "field-type rejection detail composed inside the error class (same as lib/cursor-mdc.ts)"
   },
@@ -795,15 +795,15 @@
     "n": 2,
     "why": "log line / internal error not shown as text"
   },
-  "lib/script-description.ts": {
+  "lib/script-description/script-description.ts": {
     "n": 1,
     "why": "file content / template / parsed foreign format"
   },
-  "lib/secret-crypto.ts": {
+  "lib/secret-crypto/secret-crypto.ts": {
     "n": 1,
     "why": "log line / internal error not shown as text"
   },
-  "lib/secret-mask.ts": {
+  "lib/secret-mask/secret-mask.ts": {
     "n": 3,
     "why": "log line / internal error not shown as text"
   },
@@ -823,7 +823,7 @@
     "n": 1,
     "why": "file content / template / parsed foreign format"
   },
-  "providers/settings-validation.ts": {
+  "providers/settings-validation/settings-validation.ts": {
     "n": 3,
     "why": "zod issue detail list (issues[]) not rendered by clients"
   },
@@ -831,19 +831,19 @@
     "n": 1,
     "why": "stored default title of a foreign-CLI continuation chat when the caller names none (the user renames it)"
   },
-  "routes/chat/run-routes.ts": {
+  "routes/chat/run-routes/run-routes.ts": {
     "n": 1,
     "why": "RUN_BUSY_MESSAGE fallback text of a coded refusal the human reads"
   },
   "routes/chat/split-launch.ts": {
-    "n": 4,
-    "why": "stored chat title parts: the triage chat title and the stage suffix (правки/ревью/отправка)"
+    "n": 1,
+    "why": "stored title of the triage chat"
   },
   "routes/entity/mcp-routes.ts": {
     "n": 1,
     "why": "server-rendered OAuth callback HTML page"
   },
-  "routes/env-transfer-routes.ts": {
+  "routes/env-transfer-routes/env-transfer-routes.ts": {
     "n": 1,
     "why": "shape check of an archive entry, folded into a coded refusal above"
   },
@@ -851,55 +851,55 @@
     "n": 4,
     "why": "outbound notification to an external channel (phone push / Telegram)"
   },
-  "routes/panel-agent/action-kit.ts": {
+  "routes/panel-agent/action-kit/action-kit.ts": {
     "n": 2,
     "why": "diff body placeholder of the preview card the human confirms"
   },
-  "routes/panel-agent/actions-app.ts": {
+  "routes/panel-agent/actions-app/actions-app.ts": {
     "n": 1,
     "why": "default DLP rule label ДАННЫЕ (user data, written into the rule record)"
   },
-  "routes/panel-agent/actions-chat-control.ts": {
+  "routes/panel-agent/actions-chat-control/actions-chat-control.ts": {
     "n": 7,
     "why": "model-facing action descriptions quote the Russian UI label the human names (split buttons «Разделить задачи по чатам» / «Разделить на N чата», the Chat page «Проекты» tab) so the model maps the human's words to the action; never shown to the human"
   },
-  "routes/panel-agent/actions-chat.ts": {
+  "routes/panel-agent/actions-chat/actions-chat.ts": {
     "n": 3,
     "why": "model-facing action descriptions quote the Russian UI label the human names (split buttons «Разделить задачи по чатам» / «Разделить на N чата», the Chat page «Проекты» tab) so the model maps the human's words to the action; never shown to the human"
   },
-  "routes/panel-agent/actions-config.ts": {
+  "routes/panel-agent/actions-config/actions-config.ts": {
     "n": 1,
     "why": "diff body placeholder of the preview card the human confirms"
   },
-  "routes/panel-agent/actions-entities-extra.ts": {
+  "routes/panel-agent/actions-entities-extra/actions-entities-extra.ts": {
     "n": 1,
     "why": "diff body placeholder of the preview card the human confirms"
   },
-  "routes/panel-agent/actions-gaps-chat.ts": {
+  "routes/panel-agent/actions-gaps-chat/actions-gaps-chat.ts": {
     "n": 7,
     "why": "model-facing action descriptions quote the Russian UI label the human names («Закрыть этап», «Подбирать модель под задачу», «Пересечения», «Принять», «Снять отметку») so the model maps the human's words to the action; never shown to the human"
   },
-  "routes/panel-agent/actions-gaps-settings.ts": {
+  "routes/panel-agent/actions-gaps-settings/actions-gaps-settings.ts": {
     "n": 2,
     "why": "model-facing action descriptions quote the Russian UI label the human names (settings buttons) so the model maps the human's words to the action; never shown to the human"
   },
-  "routes/panel-agent/actions-gaps-tests.ts": {
+  "routes/panel-agent/actions-gaps-tests/actions-gaps-tests.ts": {
     "n": 3,
     "why": "model-facing action descriptions quote the Russian UI label the human names (Tests block buttons) so the model maps the human's words to the action; never shown to the human"
   },
-  "routes/panel-agent/actions-groups-sources.ts": {
+  "routes/panel-agent/actions-groups-sources/actions-groups-sources.ts": {
     "n": 1,
     "why": "diff body placeholder of the preview card the human confirms"
   },
-  "routes/panel-agent/actions-integrations-read.ts": {
+  "routes/panel-agent/actions-integrations-read/actions-integrations-read.ts": {
     "n": 1,
     "why": "integration-link card: the too-large-diff placeholder inside the diff body, same as stateCard in action-kit.ts (the card flags truncated: true, the window shows its own text)"
   },
-  "routes/panel-agent/actions-panel.ts": {
+  "routes/panel-agent/actions-panel/actions-panel.ts": {
     "n": 1,
     "why": "diff body placeholder for a truncated file inside the preview diff text (content, not a label)"
   },
-  "routes/panel-agent/actions-project-config.ts": {
+  "routes/panel-agent/actions-project-config/actions-project-config.ts": {
     "n": 1,
     "why": "too-large-diff placeholder inside the diff body of the preview card, same as stateCard in action-kit.ts"
   },
@@ -915,7 +915,7 @@
     "n": 2,
     "why": "internal invariant errors of the action registry, thrown at the developer"
   },
-  "routes/panel-agent/run-routes.ts": {
+  "routes/panel-agent/run-routes/run-routes.ts": {
     "n": 3,
     "why": "internal invariant + conversation_stale / conversation_deleted fallbacks (coded by refuse(); underscore code invisible to the detector)"
   },
@@ -923,7 +923,7 @@
     "n": 1,
     "why": "test fixture: a rule heading seeded into a throwaway config dir for the secret sweep, never shipped"
   },
-  "routes/panel-agent/sections.ts": {
+  "routes/panel-agent/sections/sections.ts": {
     "n": 1,
     "why": "internal invariant error: an empty section list"
   },
@@ -959,12 +959,16 @@
     "n": 86,
     "why": "fallback RU table of panel-agent codes: each line is addressed by PanelTextCode and translated by the window (Tests block actions)"
   },
-  "routes/panel-agent/texts.ts": {
+  "routes/panel-agent/texts/texts.ts": {
     "n": 314,
     "why": "fallback RU table of panel-agent codes: each line is addressed by PanelTextCode and translated by the window; +11 note codes of the preview card; +12 group read/draft/step/knob codes; +3 scenario draft codes; +4 group copy codes; +9 e2e-folder preview codes of create_project (F-53); +1 journal-local-models-status summary code (05.10); +1 journal-kit-status (06.10)"
   },
-  "routes/portability-routes.ts": {
+  "routes/portability-routes/portability-routes.ts": {
     "n": 4,
     "why": "server log lines only — unreadable source, rolled-back transfer, rolled-back subscription rebuild, rolled-back drift resolution; every reply carries messageCode (the parser text is deliberately kept out of the body)"
+  },
+  "routes/chat/review-starter.ts": {
+    "n": 3,
+    "why": "stored chat title stage suffix (правки/ревью/отправка), moved out of split-launch"
   }
 }

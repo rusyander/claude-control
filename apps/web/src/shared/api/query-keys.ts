@@ -306,7 +306,7 @@ export const DOMAIN_KEYS: Record<string, readonly (readonly string[])[]> = {
   // стал кейсом — раздел «Тесты» перечитывает вид, историю и отчёт.
   'project-tests': [['project-tests']],
   // Собственное состояние панели, изменённое в другой вкладке или с телефона
-  // (сервер шлёт раздел сам, `lib/app-state-events.ts`): группы, выбор стороны
+  // (сервер шлёт раздел сам, `lib/app-state-events/app-state-events.ts`): группы, выбор стороны
   // пары (всё под `groups`) и группа чата — меню «Группа» открытого чата.
   // Раздел `settings` разбирает FileWatchProvider: там мало инвалидации.
   groups: [queryKeys.groups, ['chat-group-settings']],

@@ -427,7 +427,7 @@ legend(p1, 60, bottomOf(p1) + 60, [
 
 // ─── Страница: фоновый наблюдатель ─────────────────────────────────────────
 //
-// Источник фактов — `apps/server/src/bootstrap/watcher-capture.ts` (что
+// Источник фактов — `apps/server/src/bootstrap/watcher-capture/watcher-capture.ts` (что
 // сервер считает проблемой), `apps/web/src/shared/lib/watch-capture` (что
 // страница), `domains/watcher/{fingerprint,events,report,analyzer,watcher}.ts`
 // (склейка, отчёт, разбор, потолок). Числа — значения по умолчанию оттуда же.

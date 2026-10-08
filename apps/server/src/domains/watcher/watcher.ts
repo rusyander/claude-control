@@ -7,10 +7,15 @@ import type {
   WatcherStatus,
   WatcherThresholds,
 } from '@agentdeck/contracts';
-import { readJsonFile, readTextFile, writeJsonFile } from '../../lib/safe-io.ts';
-import { killPidTree } from '../../lib/process-tree.ts';
+import { readJsonFile, readTextFile, writeJsonFile } from '../../lib/safe-io/safe-io.ts';
+import { killPidTree } from '../../lib/process-tree/process-tree.ts';
 import { findPricing, costOf, type PricingLookup } from '../analytics/pricing.ts';
-import { adoptableEntries, isPidAlive, pidLooksLikeCli, RunLedger } from '../chat/run-ledger.ts';
+import {
+  adoptableEntries,
+  isPidAlive,
+  pidLooksLikeCli,
+  RunLedger,
+} from '../chat/run-ledger/run-ledger.ts';
 import {
   startAnalysis,
   WATCH_KNOWN_MAX,
@@ -134,7 +139,7 @@ export class BackgroundWatcher {
   }
 
   private get runsPerHour(): number {
-    // Не меньше одного, как у настройки на старте (`bootstrap/watcher.ts`): при
+    // Не меньше одного, как у настройки на старте (`bootstrap/watcher/watcher.ts`): при
     // нуле пустой список разборов давал `Math.min()` = ∞ и RangeError даты.
     return Math.max(1, this.deps.runsPerHour ?? WATCH_RUNS_PER_HOUR);
   }

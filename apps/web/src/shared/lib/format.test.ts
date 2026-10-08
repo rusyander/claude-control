@@ -1,8 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { formatBytes, formatBytesIn, formatTokens, formatSpend } from './format';
-import { formatMoney, formatPercent, formatCompact } from './format-number';
+import { formatBytesIn } from './format';
+import { formatCompact } from './format-number';
 import { sourceLabel } from './location-label';
 import type { ClaudeLocation } from '@agentdeck/contracts';
+import { formatMoney } from './formatMoney';
+import { formatPercent } from './formatPercent';
+import { formatBytes } from './formatBytes';
+import { formatTokens } from './formatTokens';
+import { formatSpend } from './formatSpend';
 
 /**
  * Форматирование чисел и подписей. Логики тут немного, но она на виду:

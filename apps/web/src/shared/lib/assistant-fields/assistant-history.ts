@@ -1,4 +1,4 @@
-import type { AssistantMiss, AssistTurn } from './assistant-fields.types';
+import type { AssistTurn } from './assistant-fields.types';
 
 /**
  * Прежние реплики окна помощника — в тело запроса.
@@ -15,12 +15,4 @@ export function assistHistory(
   return messages
     .filter((message) => !message.failed && message.text.trim())
     .map((message) => ({ role: message.role, text: message.text }));
-}
-
-/**
- * Поля, где модель переписала маску секрета так, что сервер не смог вернуть
- * секрет на место: форма их не трогает, лента называет.
- */
-export function keptSecretMisses(kept: readonly string[] | undefined): AssistantMiss[] {
-  return (kept ?? []).map((field) => ({ field, reason: 'secret' }));
 }

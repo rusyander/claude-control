@@ -1,10 +1,13 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { ServerContext } from '../context.ts';
-import { previewConfigWrite, type ConfigPreviewRequest } from '../domains/config-preview.ts';
-import { SkillExistsError } from '../domains/skills.ts';
-import { normalizeHookDraft } from '../domains/hooks.ts';
-import { codeOf } from '../lib/server-text.ts';
+import {
+  previewConfigWrite,
+  type ConfigPreviewRequest,
+} from '../domains/config-preview/config-preview.ts';
+import { SkillExistsError } from '../domains/skills/skills.ts';
+import { normalizeHookDraft } from '../domains/hooks/hooks.ts';
+import { codeOf } from '../lib/server-text/server-text.ts';
 
 /**
  * Предпросмотр записи в конфигурацию Claude Code (правила, скиллы, права, MCP).

@@ -9,7 +9,7 @@ import type {
 import { getProvider } from '../../providers/registry.ts';
 import { envSide, instructionsSide, mcpSide, permissionsSide } from './sections.ts';
 import { CompareRequestError, type CompareDeps, type Row, type SideRead } from './types.ts';
-import { coded } from '../../lib/server-text.ts';
+import { coded } from '../../lib/server-text/server-text.ts';
 import type { ServerMessageCode } from '@agentdeck/contracts/server-messages';
 
 export function compareProviders(

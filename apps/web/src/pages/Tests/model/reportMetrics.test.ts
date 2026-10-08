@@ -1,16 +1,14 @@
 import type { TFunction } from 'i18next';
 import { describe, it, expect } from 'vitest';
 import type { ProjectTestReport, ProjectTestRunRecord } from '@agentdeck/contracts';
-import {
-  automationTotal,
-  formatRunDuration,
-  isUnproven,
-  shownCost,
-  redCases,
-  runTally,
-  statusTotals,
-  trendBars,
-} from './reportMetrics';
+import { statusTotals } from './reportMetrics';
+import { automationTotal } from './automationTotal';
+import { redCases } from './redCases';
+import { isUnproven } from './isUnproven';
+import { shownCost } from './shownCost';
+import { formatRunDuration } from './formatRunDuration';
+import { trendBars } from './trendBars';
+import { runTally } from './runTally';
 
 const report = (part: Partial<ProjectTestReport>): ProjectTestReport => ({
   areas: [],

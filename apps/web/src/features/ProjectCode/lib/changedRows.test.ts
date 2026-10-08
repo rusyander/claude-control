@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { changedRows, firstOpenable } from './changedRows';
+import { changedRows } from './changedRows';
+import { firstOpenable } from './firstOpenable';
 
 /**
  * Список изменённых собирается из двух источников, и цена ошибки здесь — не

@@ -1,8 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import type { PushDevice, RemoteAccessSettings, RemoteAccessStatus } from '@agentdeck/contracts';
 import type { ServerContext } from '../context.ts';
-import type { RunNotice } from '../domains/chat/ChatRunRegistry.ts';
-import { readApiToken, rotateApiToken } from '../lib/api-token.ts';
+import type { RunNotice } from '../domains/chat/ChatRunRegistry/ChatRunRegistry.ts';
+import { readApiToken, rotateApiToken } from '../lib/api-token/api-token.ts';
 import { detectTailscale } from '../lib/tailscale.ts';
 
 /**

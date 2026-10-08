@@ -1,14 +1,14 @@
 import type { EndpointApplyResult, EndpointProfile } from '@agentdeck/contracts';
 import { getProvider, isKnownProviderId } from '../../providers/registry.ts';
-import { readJsonFile, writeJsonFile } from '../../lib/safe-io.ts';
+import { readJsonFile, writeJsonFile } from '../../lib/safe-io/safe-io.ts';
 import {
   readProviderEnvVars,
   resolveProviderEnvTargetFor,
   saveProviderEnvVars,
-} from '../provider-env.ts';
+} from '../provider-env/provider-env.ts';
 import { buildEndpointPlan, resolveEndpointVars } from './endpoint-plan.ts';
 import { isLocalHost, parseEndpointUrl } from './endpoint-probe.ts';
-import { coded } from '../../lib/server-text.ts';
+import { coded } from '../../lib/server-text/server-text.ts';
 
 /**
  * Применение профиля своего эндпоинта к конфигурации выбранного CLI.
@@ -71,7 +71,7 @@ interface ClaudeSettingsEnv {
 /**
  * Записать переменные в блок `env` файла settings.json Claude.
  *
- * Почему не через `domains/env.ts`: там запись поштучная (каждый ключ — своя
+ * Почему не через `domains/env/env.ts`: там запись поштучная (каждый ключ — своя
  * копия файла и своя запись), а здесь набор применяется одним заходом. Богатый
  * раздел env самого Claude при этом не трогается ни на строку — незыблемое
  * правило «не ломать Claude» дороже переиспользования пяти строк.

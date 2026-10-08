@@ -10,10 +10,10 @@ import {
   normalizePlatformDriverId,
 } from '@agentdeck/contracts/platform-legacy';
 import { defaultOurRules, defaultPlatformRules } from '@agentdeck/contracts';
-import { platformSchema } from '../../providers/settings-validation.ts';
-import { AppStore } from '../../lib/app-store.ts';
+import { platformSchema } from '../../providers/settings-validation/settings-validation.ts';
+import { AppStore } from '../../lib/app-store/app-store.ts';
 import { driverFor, driverOf } from './drivers/index.ts';
-import { readPlatforms } from './store.ts';
+import { readPlatforms } from './store/store.ts';
 
 /**
  * Переезд драйвера платформы компании на нейтральное имя: запись, сделанная до

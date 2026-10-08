@@ -5,8 +5,8 @@ import {
   compareBaseline,
   readBaselines,
   saveAttachment,
-} from '../../domains/project-tests.ts';
-import { assertUnlocked, guard, idList, requireRoot, type TestsDeps } from './shared.ts';
+} from '../../domains/project-tests/project-tests.ts';
+import { assertUnlocked, guard, idList, requireRoot, type TestsDeps } from './shared/shared.ts';
 
 /** Статусы прохода. Список повторён здесь нарочно: приводить чужой ввод к
  * «unknown» молча нельзя — человек должен увидеть отказ, а не потерянный

@@ -4,8 +4,9 @@ import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { toast } from '@shared/lib/toast';
-import { useChatCli, useUpdateChatCli } from '../api/ChatCliApi';
+import { useChatCli } from '../api/ChatCliApi';
 import type { CliInfoPanelProps } from './CliInfoPanel.types';
+import { useUpdateChatCli } from '../api/useUpdateChatCli';
 
 /**
  * Какой CLI запускает панель и нет ли рядом новее. Без этой строки старая

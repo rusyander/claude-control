@@ -1,4 +1,4 @@
-import type { ConfigProvider } from '../../../providers/types.ts';
+import type { ConfigProvider } from '../../../providers/types/types.ts';
 import type { SupervisorHook } from '../supervisor/run.ts';
 import type { SupervisorRun } from '../supervisor/payload.ts';
 import { runToolEvent, type WireToolDecision } from './tool-events.ts';

@@ -1,20 +1,12 @@
 import { useTranslation } from 'react-i18next';
-import type { MediaDeck } from '@agentdeck/contracts';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { Badge } from '@shared/ui/badge';
-import { mediaDeckUrl } from '../api/MediaApi';
 import styles from './MediaDeckCard.module.scss';
-
-export interface MediaDeckCardProps {
-  deck: MediaDeck;
-  /** Кнопка закрытия — только в правом столбце: в ленте карточку не закрывают. */
-  onClose?: () => void;
-  /** Начать правку этой колоды: композер перейдёт в режим правки. */
-  onRevise?: (deck: MediaDeck) => void;
-}
+import { mediaDeckUrl } from '../lib/mediaDeckUrl';
+import type { MediaDeckCardProps } from './MediaDeckCard.types';
 
 /**
  * Карточка готовой презентации.

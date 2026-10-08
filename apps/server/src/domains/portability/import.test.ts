@@ -16,7 +16,7 @@ import type {
 } from '@agentdeck/contracts/portable-env';
 import { agentEnvironmentSchema } from '@agentdeck/contracts/portable-env-schema';
 import { claudeProvider } from '../../providers/claude.ts';
-import { CATALOG_PROVIDERS } from '../../providers/catalog.ts';
+import { CATALOG_PROVIDERS } from '../../providers/catalog/catalog.ts';
 import { importClaudeEnvironment } from './import/claude.ts';
 import { hasImporter, importEnvironment, importerProviderIds } from './import/index.ts';
 import { hookCommandForTarget } from './emit/hook-command.ts';
@@ -24,7 +24,7 @@ import {
   DEFAULT_INSTRUCTION_FILES_MODE,
   readInstructionFilesChoice,
   resolveInstructionSources,
-} from '../../lib/instruction-files.ts';
+} from '../../lib/instruction-files/instruction-files.ts';
 import { UnknownImportProviderError } from './types.ts';
 
 /**

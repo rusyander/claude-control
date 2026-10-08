@@ -1,0 +1,24 @@
+.row {
+  &:hover {
+    background: var(--color-bg);
+  }
+}
+
+.rowMain {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  flex: 1;
+  min-width: 0;
+  padding: var(--spacing-2xs) 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rowText {
+  min-width: 0;
+}

@@ -253,31 +253,33 @@ const platform = {
 async function main() {
   // Импорт ВНУТРИ функции: наверху он случился бы до перезапуска с флагом
   // снятия типов, и на Node 22.6 сорвался бы на первом же `.ts`.
-  const { AppStore } = await import('../../apps/server/src/lib/app-store.ts');
+  const { AppStore } = await import('../../apps/server/src/lib/app-store/app-store.ts');
   const { PlatformGateway } =
-    await import('../../apps/server/src/domains/platform/gateway/listener.ts');
+    await import('../../apps/server/src/domains/platform/gateway/listener/listener.ts');
   const { writePlatform, writeToken } =
-    await import('../../apps/server/src/domains/platform/store.ts');
+    await import('../../apps/server/src/domains/platform/store/store.ts');
   const { buildManagedProfile, PLACEHOLDER_KEY } =
     await import('../../apps/server/src/domains/platform/apply/profile.ts');
   const { resolveRunRoute, runRouteOf } =
-    await import('../../apps/server/src/domains/platform/routing.ts');
-  const { promptText } = await import('../../apps/server/src/domains/prompts.ts');
-  const { ChatRunRegistry } = await import('../../apps/server/src/domains/chat/ChatRunRegistry.ts');
+    await import('../../apps/server/src/domains/platform/routing/routing.ts');
+  const { promptText } = await import('../../apps/server/src/domains/prompts/prompts.ts');
+  const { ChatRunRegistry } =
+    await import('../../apps/server/src/domains/chat/ChatRunRegistry/ChatRunRegistry.ts');
   const { ProjectTestRunRegistry } =
-    await import('../../apps/server/src/domains/project-tests/runs.ts');
+    await import('../../apps/server/src/domains/project-tests/runs/runs.ts');
   const { createGroup, upsertCase } =
-    await import('../../apps/server/src/domains/project-tests/store.ts');
+    await import('../../apps/server/src/domains/project-tests/store/store.ts');
   const { ProviderChatService } =
-    await import('../../apps/server/src/domains/provider-chat/ProviderChatService.ts');
+    await import('../../apps/server/src/domains/provider-chat/ProviderChatService/ProviderChatService.ts');
   const { createChat, readChat } =
-    await import('../../apps/server/src/domains/provider-chat/store.ts');
+    await import('../../apps/server/src/domains/provider-chat/store/store.ts');
   const { getProvider } = await import('../../apps/server/src/providers/registry.ts');
-  const { resetCliLookupCache } = await import('../../apps/server/src/providers/detect.ts');
-  const { askAssistant } = await import('../../apps/server/src/domains/assistant.ts');
+  const { resetCliLookupCache } = await import('../../apps/server/src/providers/detect/detect.ts');
+  const { askAssistant } = await import('../../apps/server/src/domains/assistant/assistant.ts');
   const { helperAskFor } = await import('../../apps/server/src/domains/assistant-route.ts');
   const { BackgroundWatcher } = await import('../../apps/server/src/domains/watcher/watcher.ts');
-  const { backgroundWatcherDeps } = await import('../../apps/server/src/bootstrap/watcher.ts');
+  const { backgroundWatcherDeps } =
+    await import('../../apps/server/src/bootstrap/watcher/watcher.ts');
 
   /**
    * Один разбор наблюдателя: зависимости — сборкой сервера, свои только рабочая
@@ -375,7 +377,7 @@ async function main() {
       appDataDir: appData,
       gatewayPort: () => (gateway.status().running ? gateway.status().port : 0),
     };
-    // Ровно тем же ответом, что и `bootstrap/runtime.ts`: маршрут отдаёт не
+    // Ровно тем же ответом, что и `bootstrap/runtime/runtime.ts`: маршрут отдаёт не
     // только окружение, но и модель прогона с приёмом усилия (Т6), промпт
     // контура и наши слои (Т8). Урезанный здесь ответ зеленел бы на панели,
     // которая эти поля потеряла, — и ровно так эта проверка полдня показывала

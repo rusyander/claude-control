@@ -7,14 +7,13 @@ import { Button, Card, Empty, Field, Loading, Muted, Row, Screen, Title } from '
 import { colors, font, radius, space } from '../src/shared/config/theme';
 import { useT } from '../src/shared/config/i18n';
 import { useWorkspace } from '../src/shared/lib/workspace';
-import {
-  useCloseManualRun,
-  useManualSession,
-  useProjectTests,
-  useSaveManualResult,
-} from '../src/entities/tests/api';
+import { useProjectTests } from '../src/entities/tests/api';
 import { STATUS_MARK, statusColor } from '../src/entities/tests/status';
-import { manualSteps, restoreStepStatuses } from '../src/entities/tests/manualSteps';
+import { manualSteps } from '../src/entities/tests/manualSteps';
+import { useManualSession } from '../src/entities/tests/useManualSession';
+import { useSaveManualResult } from '../src/entities/tests/useSaveManualResult';
+import { useCloseManualRun } from '../src/entities/tests/useCloseManualRun';
+import { restoreStepStatuses } from '../src/entities/tests/restoreStepStatuses';
 
 /**
  * Ручной прогон: проверяет человек, панель записывает.

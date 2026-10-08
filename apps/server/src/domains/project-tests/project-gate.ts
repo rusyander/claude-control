@@ -1,8 +1,8 @@
 import { basename, dirname, join, relative, resolve } from 'node:path';
-import { matchesProject } from '../group-activation.ts';
-import { gitSync } from '../project-git/exec.ts';
-import { spelledOnDisk } from '../../lib/disk-spelling.ts';
-import { coded } from '../../lib/server-text.ts';
+import { matchesProject } from '../group-activation/group-activation.ts';
+import { gitSync } from '../project-git/exec/exec.ts';
+import { spelledOnDisk } from '../../lib/disk-spelling/disk-spelling.ts';
+import { coded } from '../../lib/server-text/server-text.ts';
 import { ProjectTestsError } from './files.ts';
 
 /**

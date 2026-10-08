@@ -1,0 +1,42 @@
+.item {
+  display: block;
+  width: 100%;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  margin-bottom: var(--spacing-3xs);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  // Без этого браузер держит на кнопке свой `buttontext` — иконки внутри
+  // рисуются через `currentColor` и уходят в чёрный на тёмном фоне. Текст
+  // не страдал: Typography задаёт цвет сам, а `font: inherit` цвет не несёт.
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background var(--duration-fast),
+    border-color var(--duration-fast);
+
+  &:hover {
+    background: var(--color-bg);
+    border-color: var(--color-border);
+  }
+}
+
+.itemActive {
+  background: var(--color-accent-subtle);
+  border-color: var(--color-accent-subtle);
+}
+
+.name {
+  min-width: 0;
+}
+
+.path {
+  display: block;
+  font-size: 11px;
+}
+
+.dot {
+  color: var(--color-fg-subtle);
+}

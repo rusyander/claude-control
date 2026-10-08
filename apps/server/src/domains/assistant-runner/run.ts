@@ -1,5 +1,5 @@
-import type { ConfigProvider } from '../../providers/types.ts';
-import { resolveRunner, getRawKey } from '../provider-keys.ts';
+import type { ConfigProvider } from '../../providers/types/types.ts';
+import { resolveRunner, getRawKey } from '../provider-keys/provider-keys.ts';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -12,7 +12,11 @@ import {
   withImagePaths,
 } from './cli.ts';
 import { runProviderApi } from './api.ts';
-import { SECRET_MASK, maskSecretsInText, restoreMaskedSecrets } from '../../lib/secret-mask.ts';
+import {
+  SECRET_MASK,
+  maskSecretsInText,
+  restoreMaskedSecrets,
+} from '../../lib/secret-mask/secret-mask.ts';
 import type { AssistantMessage, AssistantRunResult, RunAssistantDeps } from './types.ts';
 
 // --- Публичный switch --------------------------------------------------------

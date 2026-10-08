@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { askedProjectMissing, askedProjectPending, testsProjectState } from './projectState';
+import { testsProjectState } from './projectState';
+import { askedProjectMissing } from './askedProjectMissing';
+import { askedProjectPending } from './askedProjectPending';
 
 /**
  * Что показывает раздел тестов, пока нет выбранного проекта.

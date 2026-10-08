@@ -8,17 +8,17 @@ import {
   readEnvironments,
   readGroup,
   readRun,
-} from '../../domains/project-tests.ts';
+} from '../../domains/project-tests/project-tests.ts';
 // Напрямую, а не через фасад раздела: заведение по токену — часть интеграций, и
 // фасад тестов (файл соседней зоны ответственности) ради него не трогается.
 import {
   buildDraft,
   createTokenDefect,
   type DefectDeps,
-} from '../../domains/project-tests/defects.ts';
+} from '../../domains/project-tests/defects/defects.ts';
 import { IntegrationError } from '../../domains/integrations/errors.ts';
-import { guard, requireRoot, type TestsDeps } from './shared.ts';
-import { codeOf, coded } from '../../lib/server-text.ts';
+import { guard, requireRoot, type TestsDeps } from './shared/shared.ts';
+import { codeOf, coded } from '../../lib/server-text/server-text.ts';
 
 /**
  * Дефект по проваленному кейсу.

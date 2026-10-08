@@ -7,7 +7,7 @@ import { saveProviderPluginFile } from '../../provider-plugins/files.ts';
 import { saveProviderPluginPackages } from '../../provider-plugins/packages.ts';
 import { hasPluginExtension, resolvePluginPath } from '../../provider-plugins/paths.ts';
 import type { ProviderPluginsTarget } from '../../provider-plugins/types.ts';
-import { readTextFile } from '../../../lib/safe-io.ts';
+import { readTextFile } from '../../../lib/safe-io/safe-io.ts';
 import {
   claimTargetFile,
   EmitMechanismMissingError,

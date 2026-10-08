@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { renderDocumentMarkdown, renderMarkdown, renderMarkdownInline } from './renderMarkdown';
+import { renderMarkdown } from './renderMarkdown';
+import { renderMarkdownInline } from './renderMarkdownInline';
+import { renderDocumentMarkdown } from './renderDocumentMarkdown';
 
 /**
  * Разметка ответов модели.

@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import type { SplitPlanView } from '@agentdeck/contracts/chat-handoff';
 import type { ChildStageGroup } from '../ui/ChildStages.types';
-import { hubCardKey, mergeSplitGroups, splitGroupKey } from './mergeSplitGroups';
+import { mergeSplitGroups } from './mergeSplitGroups';
+import { splitGroupKey } from './splitGroupKey';
+import { hubCardKey } from './hubCardKey';
 
 type Group = SplitPlanView['groups'][number];
 

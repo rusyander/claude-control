@@ -1,0 +1,63 @@
+// Список | разговор | ручка | превью. Ширину превью человек тянет ручкой
+// (`--preview-width`), но она не вправе съесть разговор: превью уступает, пока
+// разговору не останется $thread-min. Раньше ширина стояла в inline-стиле
+// готовой сеткой, перебивала все правила ниже, и на 1280 разговор сжимался до
+// столбика в одну букву.
+$thread-min: 420px;
+
+// Левая колонка: сегмент «Чаты | Проекты» (на домашнем табе) над списком.
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid var(--color-border);
+  background: var(--color-surface);
+
+  // В одноколоночной раскладке список едет наверх: разделитель снизу, а не
+  // справа, и высота ограничена, чтобы поле разговора не ушло за экран.
+  @media (max-width: 640px) {
+    max-height: 38vh;
+    border-right: none;
+    border-bottom: 1px solid var(--color-border);
+  }
+}
+
+.sidebarList {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.segment {
+  border-bottom: 1px solid var(--color-border);
+}
+
+.segmentButton {
+  flex: 1;
+  padding: var(--spacing-2xs);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-fg-muted);
+  font: inherit;
+  font-size: var(--font-size-body-sm);
+  cursor: pointer;
+  transition:
+    background var(--duration-fast),
+    color var(--duration-fast);
+
+  &:hover {
+    color: var(--color-fg);
+  }
+}
+
+.segmentActive {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+  font-weight: 500;
+}
+
+// Ссылка на справку переехала в меню «Настройки чата» (ChatHeaderMenu):
+// своей шапки PageHeader у чата нет, а в ряду она занимала место наравне с
+// работой. Стили пункта живут там же, рядом с остальными пунктами меню.

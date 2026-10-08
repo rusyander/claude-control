@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 import type { PathEntry, PathStep } from '@agentdeck/contracts';
 import { buildPathRows } from './pathRows';
 import { buildLayout } from './layout';
-import { insertAfter } from './pathEdit';
-import { entrySource, type SourceContext } from './stepSource';
-import { rowType, skillBlockType } from './rowWords';
+import { insertAfter } from './insertAfter';
+import { rowType } from './rowType';
+import { skillBlockType } from './skillBlockType';
+import type { SourceContext } from './stepSource.types';
+import { entrySource } from './entrySource';
 
 const context: SourceContext = {
   group: { scope: undefined, members: [] } as unknown as SourceContext['group'],

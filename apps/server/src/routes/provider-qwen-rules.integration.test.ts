@@ -11,12 +11,12 @@ import {
 } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { AppStore } from '../lib/app-store.ts';
+import { AppStore } from '../lib/app-store/app-store.ts';
 import type { ServerContext } from '../context.ts';
 import { registerProviderRulesRoutes } from './provider-rules-routes.ts';
 import { describeProviders } from '../providers/registry.ts';
-import { registerProjectRoutes } from './project-routes.ts';
-import { registerProviderProjectRoutes } from './provider-project-routes.ts';
+import { registerProjectRoutes } from './project-routes/project-routes.ts';
+import { registerProviderProjectRoutes } from './provider-project-routes/provider-project-routes.ts';
 
 /**
  * MAP 24 на маршрутах: правила Qwen Code каталогом `<QWEN_HOME>/rules/*.md`.

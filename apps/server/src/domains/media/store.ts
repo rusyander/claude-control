@@ -1,11 +1,10 @@
-import { existsSync, mkdirSync, readdirSync, statSync } from 'node:fs';
-import { readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, statSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { MediaImage } from '@agentdeck/contracts';
 import { MEDIA_KEEP_FILES } from '@agentdeck/contracts/media';
-import { writeBinaryFile, writeJsonFile, removeEntry } from '../../lib/safe-io.ts';
+import { writeBinaryFile, writeJsonFile, removeEntry } from '../../lib/safe-io/safe-io.ts';
 import { MediaError } from './errors.ts';
-import { coded } from '../../lib/server-text.ts';
+import { coded } from '../../lib/server-text/server-text.ts';
 
 /**
  * Файлы картинок в каталоге данных панели.

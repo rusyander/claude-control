@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { pickRetryPrompt } from './agent-runs.retry';
+import { pickRetryPrompt } from './pickRetryPrompt';
 
 /**
  * Авто-повтор после обрыва: задача заново или «продолжай» — по транскрипту.

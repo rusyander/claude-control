@@ -35,3 +35,14 @@ export interface AssistantChatProps {
    */
   loading?: boolean;
 }
+
+export interface AssistResponse {
+  reply: string;
+  fields: Record<string, unknown>;
+  /** Поля, где маску секрета вернуть не удалось: форма их не трогает. */
+  kept?: string[];
+  error?: string;
+  /** Код отказа маршрута провайдера: причина называется словарём клиента. */
+  messageCode?: string;
+  params?: Record<string, string | number>;
+}

@@ -1,6 +1,6 @@
 import { basename } from 'node:path';
 import type { ProviderPluginsInfo } from '@agentdeck/contracts';
-import { readTextFile, writeTextFile } from '../../lib/safe-io.ts';
+import { readTextFile, writeTextFile } from '../../lib/safe-io/safe-io.ts';
 import { UnrecognizedFormatError } from '../../lib/format-errors.ts';
 import { parseProviderJsonObject, stableJson } from '../../lib/provider-json.ts';
 import {

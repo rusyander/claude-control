@@ -1,7 +1,7 @@
 import { MutationCache, QueryClient } from '@tanstack/react-query';
 import { i18n } from '@shared/config/i18n';
 import { toast } from '@shared/lib/toast';
-import { toErrorMessage } from '@shared/api/client';
+import { toErrorMessage } from '../shared/api/toErrorMessage';
 
 export const queryClient = new QueryClient({
   defaultOptions: {

@@ -75,8 +75,8 @@ store.setChatLink('qwen:${id}', { parentChatId: 'qwen:parent', title: 'Пере�
   const script = join(root, 'seed-state.ts');
   writeFileSync(
     script,
-    `import { AppStore } from ${url('apps/server/src/lib/app-store.ts')};
-import { createChat } from ${url('apps/server/src/domains/provider-chat/store.ts')};
+    `import { AppStore } from ${url('apps/server/src/lib/app-store/app-store.ts')};
+import { createChat } from ${url('apps/server/src/domains/provider-chat/store/store.ts')};
 const store = new AppStore(${JSON.stringify(appData)});
 store.saveGroup({ id: 'g', name: 'Путь с шагом', description: '', color: 'accent', icon: 'folder', members: [], env: {},
   projectPaths: [], isEnabled: false, order: 0, path: { steps: [{ id: 's1', anchor: 'work', order: 0, kind: 'prompt',

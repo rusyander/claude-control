@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import type { DevRestartStatus } from '@agentdeck/contracts';
 import { apiClient } from '@shared/api/client';
 import { queryKeys } from '@shared/api/query-keys';
@@ -25,18 +25,5 @@ export function useDevRestart() {
     refetchInterval: POLL_MS,
     // Старый сервер без маршрута или сервер в перезапуске — плашки просто нет.
     retry: false,
-  });
-}
-
-export function useRequestDevRestart() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async () => {
-      const { data } = await apiClient.post<DevRestartStatus>('/dev-restart');
-      return data;
-    },
-    // Отказ называет сама плашка своим тостом — общий дал бы второй.
-    meta: { silentError: true },
-    onSuccess: (status) => queryClient.setQueryData(queryKeys.devRestart, status),
   });
 }

@@ -6,14 +6,14 @@
       "runner": "sieves",
       "corpus": "corpus/sieves.json",
       "panel": {
-        "module": "apps/server/src/domains/project-git/sieve-facts.ts",
+        "module": "apps/server/src/domains/project-git/sieve-facts/sieve-facts.ts",
         "files": [
-          "apps/server/src/domains/project-git/sieve-scan.ts",
-          "apps/server/src/domains/project-git/sieve-facts.ts",
+          "apps/server/src/domains/project-git/sieve-scan/sieve-scan.ts",
+          "apps/server/src/domains/project-git/sieve-facts/sieve-facts.ts",
           "apps/server/src/domains/project-git/sieve-facts-scan.ts",
           "packages/contracts/src/sieves/catalog.ts"
         ],
-        "tests": ["apps/server/src/domains/project-git/sieve-scan.test.ts"]
+        "tests": ["apps/server/src/domains/project-git/sieve-scan/sieve-scan.test.ts"]
       },
       "global": {
         "module": "hooks/lib/push-sieves-scan.mjs",

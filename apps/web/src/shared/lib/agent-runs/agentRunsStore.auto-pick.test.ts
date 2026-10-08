@@ -9,9 +9,9 @@ vi.mock('@shared/api/client', () => ({
 }));
 
 import { applyEvent } from './agent-runs.events';
-import { runs } from './agent-runs.state';
 import type { AgentRun } from './agent-runs.types';
 import { isOpenAsk } from '../chat-stream';
+import { runs } from './agent-runs.state.constants';
 
 /**
  * Вопрос агента, закрытый автономией чата. Сервер считает его закрытым по

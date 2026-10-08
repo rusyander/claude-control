@@ -1,0 +1,25 @@
+// Шапка вкладки со списком: источник и пояснение слева, «Добавить» справа.
+.sectionHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+}
+
+.sectionText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3xs);
+  min-width: 0;
+
+  // Основа ширины — только в строке шапки: в колонке та же основа стала бы
+  // высотой и отодвинула бы список на треть экрана.
+  .sectionHead > & {
+    flex: 1 1 320px;
+  }
+}
+
+.sectionHint {
+  max-width: var(--text-measure);
+}

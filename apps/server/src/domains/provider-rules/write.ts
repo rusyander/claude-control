@@ -1,7 +1,12 @@
 import { existsSync, statSync } from 'node:fs';
 import type { ProviderRuleDraft, ProviderRulesFormat } from '@agentdeck/contracts';
-import { backupEntry, removeEntry, readTextFile, writeTextFile } from '../../lib/safe-io.ts';
-import { MdcFormatError, type MdcFields } from '../../lib/cursor-mdc.ts';
+import {
+  backupEntry,
+  removeEntry,
+  readTextFile,
+  writeTextFile,
+} from '../../lib/safe-io/safe-io.ts';
+import { MdcFormatError, type MdcFields } from '../../lib/cursor-mdc/cursor-mdc.ts';
 import { ruleCodec } from './codec.ts';
 import { RuleNotEditableError, RuleNotFoundError, UnsafeRulePathError } from './errors.ts';
 import { resolveRulePath, ruleBackupName, toRelative } from './paths.ts';

@@ -3,12 +3,12 @@ import { Stack } from 'expo-router';
 import type { ProjectTestRunRecord } from '@agentdeck/contracts';
 import { Card, Empty, Loading, Muted, Row, Screen, Title } from '../src/shared/ui';
 import { colors, font, radius, space } from '../src/shared/config/theme';
-import { useLanguage, useT } from '../src/shared/config/i18n';
+import { useT, useLanguage } from '../src/shared/config/i18n';
 import { useWorkspace } from '../src/shared/lib/workspace';
-import { useTestRuns } from '../src/entities/tests/api';
-import { formatWhen } from '../src/entities/tests/status';
 import { runLabel } from '../src/entities/tests/runLabel';
-import { serverField } from '../src/shared/api/server-message';
+import { useTestRuns } from '../src/entities/tests/useTestRuns';
+import { formatWhen } from '../src/entities/tests/formatWhen';
+import { serverField } from '../src/shared/api/serverField';
 
 /**
  * История прогонов: файлы `runs/*.run.json` того же проекта, от новых к старым.

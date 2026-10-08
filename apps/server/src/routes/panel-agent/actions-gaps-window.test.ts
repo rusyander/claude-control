@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { maskSecretsInText } from '../../lib/secret-mask.ts';
-import { textWindow } from './action-kit.ts';
+import { maskSecretsInText } from '../../lib/secret-mask/secret-mask.ts';
+import { textWindow } from './action-kit/action-kit.ts';
 import type { AnyPanelAction } from './registry.ts';
-import { GAPS_PROJECT_ACTIONS } from './actions-gaps-projects.ts';
-import { GAPS_TESTS_ACTIONS } from './actions-gaps-tests.ts';
+import { GAPS_PROJECT_ACTIONS } from './actions-gaps-projects/actions-gaps-projects.ts';
+import { GAPS_TESTS_ACTIONS } from './actions-gaps-tests/actions-gaps-tests.ts';
 
 /**
  * Маска до окна (ревью сит, 28.09): `draft_defect` резал тело окном и только

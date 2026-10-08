@@ -6,13 +6,13 @@ import type {
   UniversalMcpServer,
 } from '@agentdeck/contracts';
 import { getProvider, providerSettingsSource } from '../../providers/registry.ts';
-import { readTextFile } from '../../lib/safe-io.ts';
-import { runPreview } from '../provider-preview.ts';
-import { resolveProviderMcpTarget, upsertProviderMcpServer } from '../provider-mcp.ts';
-import { resolveInstructionsTarget, writeInstructions } from '../instructions.ts';
+import { readTextFile } from '../../lib/safe-io/safe-io.ts';
+import { runPreview } from '../provider-preview/provider-preview.ts';
+import { resolveProviderMcpTarget, upsertProviderMcpServer } from '../provider-mcp/provider-mcp.ts';
+import { resolveInstructionsTarget, writeInstructions } from '../instructions/instructions.ts';
 import { mcpSide } from './sections.ts';
 import { CompareRequestError, type CompareDeps } from './types.ts';
-import { coded } from '../../lib/server-text.ts';
+import { coded } from '../../lib/server-text/server-text.ts';
 
 /**
  * Перенос записей из одного провайдера в другой.

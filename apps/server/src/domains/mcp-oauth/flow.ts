@@ -1,12 +1,12 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { UnauthorizedError } from '@modelcontextprotocol/sdk/client/auth.js';
 import type { McpServer } from '@agentdeck/contracts';
-import { createNetworkTransport, type NetworkTransport } from '../mcp-client.ts';
+import { createNetworkTransport, type NetworkTransport } from '../mcp-client/mcp-client.ts';
 import { oauthCallbackUrl } from './callback.ts';
 import { PanelOAuthProvider } from './provider.ts';
 import { oauthStorePath } from './store.ts';
-import { coded } from '../../lib/server-text.ts';
-import { serverText } from '../../lib/server-texts.ts';
+import { coded } from '../../lib/server-text/server-text.ts';
+import { serverText } from '../../lib/server-texts/server-texts.ts';
 
 /**
  * Интерактивный вход: старт (получить адрес авторизации) и завершение (обменять

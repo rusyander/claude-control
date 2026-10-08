@@ -8,14 +8,8 @@ import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
 import { TextField } from '@shared/ui/text-field';
 import { useProviderRunner, useSaveProviderKey } from '@entities/ProviderKeys';
-import { gateKind, type GateKind } from './model/gateKind';
-
-/** Подпись модалки по виду гейта; `hidden` модалку не показывает вовсе. */
-const DESCRIPTION_KEY: Record<Exclude<GateKind, 'hidden'>, string> = {
-  key: 'assistantKey.description',
-  cliOnly: 'assistantKey.cliOnly',
-  unsupported: 'assistantKey.unsupported',
-};
+import { gateKind } from './model/gateKind';
+import { DESCRIPTION_KEY } from './AssistantKeyGate.constants';
 
 /**
  * Гейт ключа ассистента на входе в чат (Ф6a).

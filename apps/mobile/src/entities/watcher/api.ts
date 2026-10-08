@@ -1,6 +1,7 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import type { WatcherStatus } from '@agentdeck/contracts';
 import { api } from '../../shared/api/client';
+import { KEY } from './api.constants';
 
 /**
  * Состояние наблюдателя: пока включён — раз в 15 с (сводка и расход меняются
@@ -8,8 +9,6 @@ import { api } from '../../shared/api/client';
  * что его включили в панели.
  */
 export const WATCHER_POLL_MS = { on: 15_000, off: 60_000 } as const;
-
-const KEY = ['watcher'];
 
 export function useWatcherStatus(enabled = true) {
   return useQuery({
@@ -19,15 +18,5 @@ export function useWatcherStatus(enabled = true) {
     staleTime: 10_000,
     refetchInterval: (query) =>
       query.state.data?.enabled ? WATCHER_POLL_MS.on : WATCHER_POLL_MS.off,
-  });
-}
-
-/** Выключить. Включения на телефоне нет: это решение принимают в панели. */
-export function useTurnOffWatcher() {
-  const client = useQueryClient();
-  return useMutation({
-    mutationFn: () => api.post<WatcherStatus>('/watcher', { enabled: false }),
-    onSuccess: (status) => client.setQueryData(KEY, status),
-    onSettled: () => client.invalidateQueries({ queryKey: KEY }),
   });
 }

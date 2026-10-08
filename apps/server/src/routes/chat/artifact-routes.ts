@@ -5,8 +5,8 @@ import {
   readArtifactText,
   readArtifactBinary,
   deleteArtifact,
-} from '../../domains/chat/ChatArtifacts.ts';
-import { resolveWorkspace } from '../../domains/chat/ChatWorkspace.ts';
+} from '../../domains/chat/ChatArtifacts/ChatArtifacts.ts';
+import { resolveWorkspace } from '../../domains/chat/ChatWorkspace/ChatWorkspace.ts';
 import { projectsDir } from './paths.ts';
 
 /** Файл не найден — один и тот же ответ на всё, что нельзя отдать наружу. */

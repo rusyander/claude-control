@@ -2,8 +2,8 @@ import { useCallback } from 'react';
 import { keepPreviousData, useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { localizeMediaTitle } from '@agentdeck/contracts/chat-title';
 import type { ChatInbox, InboxChat } from '@agentdeck/contracts/chat-inbox';
-import { api } from '../../shared/api/client';
 import { useT } from '../../shared/config/i18n';
+import { inboxQuery } from './inboxQuery';
 
 /**
  * Сводка «что идёт и кто ждёт» по всем разговорам — один запрос на экран.
@@ -13,15 +13,6 @@ import { useT } from '../../shared/config/i18n';
  * памяти реестра и кэша транскриптов, а не перечитыванием диска.
  */
 export const INBOX_POLL_MS = 5_000;
-
-export function inboxQuery(): { queryKey: unknown[]; queryFn: () => Promise<ChatInbox> } {
-  return {
-    // Под `chat`: конец хода на экране чата перечитывает всё `['chat']` — и
-    // сводку тоже, без отдельного вызова.
-    queryKey: ['chat', 'inbox'],
-    queryFn: () => api.get<ChatInbox>('/chat/inbox'),
-  };
-}
 
 /**
  * Чаты сводки. `select` отдаёт только чаты: время сборки ответа меняется на

@@ -4,22 +4,21 @@ import { useRouter } from 'expo-router';
 import Constants from 'expo-constants';
 import { Button, Card, Mono, Muted, Row, Screen, Title } from '../../src/shared/ui';
 import { colors, font, radius, space } from '../../src/shared/config/theme';
-import { setLanguage, useLanguage, useT, type Language } from '../../src/shared/config/i18n';
-import { clearConnection, isConfigured, useConnection } from '../../src/shared/api/connection';
-import { registerForPush } from '../../src/shared/lib/notifications';
+import { useT, setLanguage, useLanguage } from '../../src/shared/config/i18n';
+import { useConnection, isConfigured, clearConnection } from '../../src/shared/api/connection';
 import { usePullRefresh } from '../../src/shared/lib/pull-refresh';
-import {
-  useForgetDevice,
-  useRemote,
-  useRemoteUpdate,
-  useTestNotification,
-} from '../../src/entities/remote/api';
+import { useRemote } from '../../src/entities/remote/api';
 import {
   budgetPercent,
   platformProblem,
   platformTone,
   usePlatforms,
 } from '../../src/entities/platform/api';
+import { useRemoteUpdate } from '../../src/entities/remote/useRemoteUpdate';
+import { useForgetDevice } from '../../src/entities/remote/useForgetDevice';
+import { useTestNotification } from '../../src/entities/remote/useTestNotification';
+import type { Language } from '../../src/shared/config/i18n';
+import { registerForPush } from '../../src/shared/lib/registerForPush';
 
 /** Вердикт → стиль строки. Три состояния: успех, беда и «ещё не смотрели». */
 const STATE_STYLE = { ok: 'stateOk', bad: 'stateBad', quiet: 'stateQuiet' } as const;

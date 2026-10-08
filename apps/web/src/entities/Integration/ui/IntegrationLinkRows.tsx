@@ -3,9 +3,9 @@ import { Stack } from '@shared/ui/stack';
 import { Badge } from '@shared/ui/badge';
 import { Typography } from '@shared/ui/typography';
 import { useSettings } from '@entities/AppConfig';
-import { readIntegration } from '../model/settings';
-import { linkRows } from '../model/links';
 import type { IntegrationLinkRowsProps } from './IntegrationLinkRows.types';
+import { linkRows } from '../model/linkRows';
+import { readIntegration } from '../model/readIntegration';
 
 /**
  * Привязка внешнего мира, показанная строками, — только чтение.

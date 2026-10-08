@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { PlatformRunPlan } from '@agentdeck/contracts';
 import { ru } from '../../shared/config/i18n/ru';
-import { runPlanConsumer, runPlanView } from './run-plan';
+import { runPlanConsumer } from './run-plan';
+import { runPlanView } from './runPlanView';
 
 /**
  * Подписи контура под полем ввода телефона (Т8 MINOR-5). Модель считает

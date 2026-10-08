@@ -22,12 +22,12 @@ import {
   groupIdOfFile,
   onboardE2e,
   syncE2eFolder,
-} from './e2e-sync.ts';
-import { createE2eFolder, e2eFolderView, removeE2eFolder } from './e2e-folder.ts';
+} from './e2e-sync/e2e-sync.ts';
+import { createE2eFolder, e2eFolderView, removeE2eFolder } from './e2e-folder/e2e-folder.ts';
 import { e2eChatLine } from './e2e-chat.ts';
-import { readGroups } from './store.ts';
-import { isWritable, runScope, describeScope } from './run-permissions.ts';
-import { buildPrompt } from './prompt.ts';
+import { readGroups } from './store/store.ts';
+import { isWritable, runScope, describeScope } from './run-permissions/run-permissions.ts';
+import { buildPrompt } from './prompt/prompt.ts';
 
 /**
  * Папка e2e: разбор спек без запуска, сверка с кейсами, заведение и уборка

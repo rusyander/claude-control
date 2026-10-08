@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { InboxChat } from '@agentdeck/contracts/chat-inbox';
 import { EMPTY_RUN, type AgentRun, type StreamedTool } from '../../shared/lib/runs/types';
-import { inboxChatNamed, liveQuestionAsks, parseQuestions, withLiveAsks } from './liveAsks';
+import { parseQuestions } from './liveAsks';
+import { inboxChatNamed } from './inboxChatNamed';
+import { liveQuestionAsks } from './liveQuestionAsks';
+import { withLiveAsks } from './withLiveAsks';
 
 /**
  * Сводка сервера теряет вопрос, как только CLI пишет итог фонового субагента

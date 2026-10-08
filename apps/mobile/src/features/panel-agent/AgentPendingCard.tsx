@@ -1,27 +1,25 @@
 import { useEffect, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
 import type { PanelPendingAction } from '@agentdeck/contracts/panel-agent';
 import { Button, Mono, Muted, Row, Title } from '../../shared/ui';
-import { colors, radius, space } from '../../shared/config/theme';
-import { useLanguage, useT } from '../../shared/config/i18n';
-import { formatClock } from '../../shared/lib/format';
+import { space } from '../../shared/config/theme';
+import { useT, useLanguage } from '../../shared/config/i18n';
 import { ApiError } from '../../shared/api/client';
-import { PANEL_AGENT_KEYS, useDecidePanelAction } from '../../entities/panel-agent/api';
-import {
-  canApprove,
-  cardFields,
-  cardPreview,
-  cardSummary,
-  type CardText,
-  decisionProblem,
-  isDanger,
-  isFinalRefusal,
-} from '../../entities/panel-agent/model';
 import { panelText } from '../../entities/panel-agent/panelText';
-
-/** Кнопки глухи первые полсекунды: карточка всплывает под пальцем, и тап по ленте решал бы её. */
-const DECISION_ARM_MS = 500;
+import { useDecidePanelAction } from '../../entities/panel-agent/useDecidePanelAction';
+import { PANEL_AGENT_KEYS } from '../../entities/panel-agent/api.constants';
+import { isFinalRefusal } from '../../entities/panel-agent/isFinalRefusal';
+import { cardPreview } from '../../entities/panel-agent/cardPreview';
+import { isDanger } from '../../entities/panel-agent/isDanger';
+import { canApprove } from '../../entities/panel-agent/canApprove';
+import { decisionProblem } from '../../entities/panel-agent/decisionProblem';
+import type { CardText } from '../../entities/panel-agent/model.types';
+import { cardSummary } from '../../entities/panel-agent/cardSummary';
+import { cardFields } from '../../entities/panel-agent/cardFields';
+import { formatClock } from '../../shared/lib/formatClock';
+import { DECISION_ARM_MS } from './AgentPendingCard.constants';
+import { styles } from './AgentPendingCard.styles';
 
 /**
  * Карточка подтверждения агента на телефоне — то же решение, что в окне панели:
@@ -145,21 +143,3 @@ export function AgentPendingCard({ pending }: { pending: PanelPendingAction }) {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: colors.surfaceRaised,
-    borderWidth: 1,
-    borderColor: colors.warning,
-    borderRadius: radius.md,
-    padding: space.md,
-    gap: space.sm,
-  },
-  danger: { borderColor: colors.danger },
-  name: { color: colors.warning },
-  dangerText: { color: colors.danger },
-  field: { gap: space.xs },
-  label: { color: colors.textDim },
-  long: { maxHeight: 200 },
-  grow: { flex: 1 },
-});

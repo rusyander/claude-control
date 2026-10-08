@@ -1,11 +1,11 @@
 import { accessSync, constants, readFileSync, statSync } from 'node:fs';
 import type { ProjectFileContent } from '@agentdeck/contracts';
-import { diffLines } from '../history.ts';
+import { diffLines } from '../history/history.ts';
 import { MAX_DIFF_CHARS, MAX_FILE_BYTES, MAX_MEDIA_BYTES } from './constants.ts';
 import { rebuildBaseline, type AgentEdit } from './edits.ts';
 import { previewKindOf } from './media.ts';
 import { resolveProjectPath } from './paths.ts';
-import { coded } from '../../lib/server-text.ts';
+import { coded } from '../../lib/server-text/server-text.ts';
 
 /**
  * Чтение одного файла проекта вместе со всем, что нужно редактору: текущий

@@ -9,7 +9,7 @@ import {
   deleteProviderRule,
   describeRuleError,
   type ProviderRulesTarget,
-} from '../domains/provider-rules.ts';
+} from '../domains/provider-rules/provider-rules.ts';
 
 /**
  * Раздел инструкций в модели КАТАЛОГА ПРАВИЛ (CURSOR-1) — глобальный уровень.

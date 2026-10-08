@@ -1,11 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { ProjectTestGroup, ProjectTestPlan } from '@agentdeck/contracts';
-import {
-  attributeProblem,
-  plansUsingEnvironment,
-  sharedStepUsage,
-  sortEnvironments,
-} from './testSettings';
+import { sharedStepUsage } from './testSettings';
+import { plansUsingEnvironment } from './plansUsingEnvironment';
+import { attributeProblem } from './attributeProblem';
+import { sortEnvironments } from './sortEnvironments';
 
 /**
  * Счёт окна настроек: он решает, что человек увидит перед удалением.

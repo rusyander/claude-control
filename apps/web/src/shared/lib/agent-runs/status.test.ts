@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { runStatus, aggregateStatus, statusTone, isLive, STALL_MS, type RunStatus } from './status';
+import { runStatus, STALL_MS } from './status';
+import type { RunStatus } from './status.types';
+import { isLive } from './isLive';
+import { statusTone } from './statusTone';
+import { aggregateStatus } from './aggregateStatus';
 
 /**
  * Тесты логики статуса агента — что показывает цветная точка. Чистые функции,

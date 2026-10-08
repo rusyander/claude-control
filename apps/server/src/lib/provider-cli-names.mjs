@@ -1,7 +1,7 @@
 /**
  * Имена CLI провайдеров для процессов, которые не могут импортировать каталог
  * провайдеров (`tools/doctor.mjs` идёт обычным `node`, без разбора TypeScript).
- * Источник правды — `providers/catalog.ts`; совпадение закреплено тестом
+ * Источник правды — `providers/catalog/catalog.ts`; совпадение закреплено тестом
  * `provider-cli-names.test.ts`, поэтому новый провайдер без строки здесь краснит.
  */
 export const PROVIDER_CLI_NAMES = [

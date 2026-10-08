@@ -205,8 +205,8 @@ function checkBranches(ctx, damage) {
     'domains/portability/import/',
     'domains/portability/emit/',
   ]);
-  files.push(new URL('routes/portability-routes.ts', serverSrc));
-  files.push(new URL('routes/portability-carry-routes.ts', serverSrc));
+  files.push(new URL('routes/portability-routes/portability-routes.ts', serverSrc));
+  files.push(new URL('routes/portability-carry-routes/portability-carry-routes.ts', serverSrc));
 
   const scanned = files.map((at) => [
     at.href.slice(serverSrc.href.length),
@@ -357,9 +357,11 @@ const SECTIONS = [
 ];
 
 async function context() {
-  const { level } = await import(new URL('domains/portability/fidelity.ts', serverSrc).href);
+  const { level } = await import(
+    new URL('domains/portability/fidelity/fidelity.ts', serverSrc).href
+  );
   const { buildFidelityReport } = await import(
-    new URL('domains/portability/fidelity-report.ts', serverSrc).href
+    new URL('domains/portability/fidelity-report/fidelity-report.ts', serverSrc).href
   );
   const { hasEmitter, emitEnvironment } = await import(
     new URL('domains/portability/emit/index.ts', serverSrc).href
@@ -367,7 +369,9 @@ async function context() {
   const { UnknownEmitProviderError } = await import(
     new URL('domains/portability/emit/types.ts', serverSrc).href
   );
-  const { CATALOG_PROVIDERS } = await import(new URL('providers/catalog.ts', serverSrc).href);
+  const { CATALOG_PROVIDERS } = await import(
+    new URL('providers/catalog/catalog.ts', serverSrc).href
+  );
   const { fidelityReasons } = await import(
     new URL('packages/contracts/src/portable-fidelity.ts', root).href
   );

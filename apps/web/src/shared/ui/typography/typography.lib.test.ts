@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { clampStyle, defaultTag } from './typography.lib';
+import { defaultTag } from './typography.lib';
+import { clampStyle } from './clampStyle';
 
 describe('clampStyle', () => {
   it('обрезка ложится поверх стиля вызывающего, а не стирается им', () => {

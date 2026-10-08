@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import type { SievesView } from '@agentdeck/contracts/sieves';
 import type { ServerContext } from '../context.ts';
-import { SieveStore } from '../domains/chat/sieve-store.ts';
+import { SieveStore } from '../domains/chat/sieve-store/sieve-store.ts';
 
 /**
  * Сита перед MR — вкладка «Группы» в настройках (решение владельца 28.09).

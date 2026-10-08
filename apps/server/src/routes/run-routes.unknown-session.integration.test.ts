@@ -3,11 +3,11 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { AppStore } from '../lib/app-store.ts';
+import { AppStore } from '../lib/app-store/app-store.ts';
 import type { ServerContext } from '../context.ts';
-import { registerChatRoutes } from './chat-routes.ts';
-import { ChatRunRegistry, type RunLike } from '../domains/chat/ChatRunRegistry.ts';
-import { ChatSession } from '../domains/chat/ChatSession.ts';
+import { registerChatRoutes } from './chat-routes/chat-routes.ts';
+import { ChatRunRegistry, type RunLike } from '../domains/chat/ChatRunRegistry/ChatRunRegistry.ts';
+import { ChatSession } from '../domains/chat/ChatSession/ChatSession.ts';
 
 /**
  * Отправка с `sessionId`, которого нет. Живой прогон 24.09.2026: сообщение с

@@ -1,14 +1,14 @@
 import type { IncomingMessage } from 'node:http';
 import type { Platform, PlatformGatewayEvent } from '@agentdeck/contracts';
-import type { AppStore } from '../../../lib/app-store.ts';
-import type { PlatformFetch } from '../ca-fetch.ts';
+import type { AppStore } from '../../../lib/app-store/app-store.ts';
+import type { PlatformFetch } from '../ca-fetch/ca-fetch.ts';
 import { AliasVault, maskText } from '../../dlp/mask.ts';
 import { maskRulesFor } from '../../dlp/default-rules.ts';
-import { dataMaskOn } from '../data-mask.ts';
+import { dataMaskOn } from '../data-mask/data-mask.ts';
 import type { PlatformDriver } from '../drivers/driver.ts';
 import { driverOf } from '../drivers/index.ts';
-import { callUpstream, UpstreamError } from './upstream.ts';
-import { serverText } from '../../../lib/server-texts.ts';
+import { callUpstream, UpstreamError } from './upstream/upstream.ts';
+import { serverText } from '../../../lib/server-texts/server-texts.ts';
 
 /**
  * Ручка картинок контура (`driver.images = { api }`) — ЧЕРЕЗ шлюз.

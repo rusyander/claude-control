@@ -1,3 +1,3 @@
-export { ProjectGitControls } from './ui/ProjectGitControls';
-export { DeliveryControl } from './ui/DeliveryControl';
-export { SplitSettings } from './ui/SplitSettings';
+export { ProjectGitControls } from './ui/ProjectGitControls/ProjectGitControls';
+export { DeliveryControl } from './ui/DeliveryControl/DeliveryControl';
+export { SplitSettings } from './ui/SplitSettings/SplitSettings';

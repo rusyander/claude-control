@@ -3,13 +3,17 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { mkdtempSync, rmSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { AppStore } from '../lib/app-store.ts';
+import { AppStore } from '../lib/app-store/app-store.ts';
 import type { ServerContext } from '../context.ts';
-import { registerChatRoutes } from './chat-routes.ts';
+import { registerChatRoutes } from './chat-routes/chat-routes.ts';
 import { spawn, type ChildProcess } from 'node:child_process';
-import { ChatRunRegistry, type RunLike } from '../domains/chat/ChatRunRegistry.ts';
-import { ChatSession } from '../domains/chat/ChatSession.ts';
-import { MAX_AGE_MS, RunLedger, RUN_UNKNOWN_DENIED } from '../domains/chat/run-ledger.ts';
+import { ChatRunRegistry, type RunLike } from '../domains/chat/ChatRunRegistry/ChatRunRegistry.ts';
+import { ChatSession } from '../domains/chat/ChatSession/ChatSession.ts';
+import {
+  MAX_AGE_MS,
+  RunLedger,
+  RUN_UNKNOWN_DENIED,
+} from '../domains/chat/run-ledger/run-ledger.ts';
 
 /**
  * Запрос прав от прогона, которого реестр не знает.

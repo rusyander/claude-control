@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { GroupMember } from '@agentdeck/contracts';
 import { assistantSchema, readAssistantFields } from '@shared/lib/assistant-fields';
-import { groupAssistantSpec, memberRef, membersFromRefs } from './groupAssistant';
+import { memberRef } from './groupAssistant';
 import { memberCatalog } from './memberCatalog';
+import { membersFromRefs } from './membersFromRefs';
+import { groupAssistantSpec } from './groupAssistantSpec';
 
 /**
  * Помощник «Нового набора» (владелец 28.09): состав и проекты — такие же поля,

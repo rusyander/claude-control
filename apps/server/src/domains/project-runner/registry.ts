@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { basename, resolve } from 'node:path';
 import type { ProjectRunnerView } from '@agentdeck/contracts';
-import { shellArgs, quoteForShell } from '../../lib/cli-args.ts';
+import { shellArgs, quoteForShell } from '../../lib/cli-args/cli-args.ts';
 import {
   OUTPUT_TAIL,
   READY_POLL_MS,

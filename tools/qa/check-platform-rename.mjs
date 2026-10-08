@@ -166,7 +166,7 @@ const seed = spawnSync(
     '--no-warnings',
     '--input-type=module',
     '-e',
-    `const m = await import(${JSON.stringify(pathToFileURL(join(ROOT, 'apps/server/src/lib/provider-keys.ts')).href)});
+    `const m = await import(${JSON.stringify(pathToFileURL(join(ROOT, 'apps/server/src/lib/provider-keys/provider-keys.ts')).href)});
      m.setStoredKey(process.argv[1], process.argv[2], process.argv[3]);`,
     appData,
     `platform:${CONTOUR}`,

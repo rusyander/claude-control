@@ -1,10 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import {
-  holdPageInert,
-  isBesideDock,
-  isEscapeYieldedToSideDock,
-  yieldEscapeToSideDock,
-} from './side-dock';
+import { holdPageInert, isBesideDock } from './side-dock';
+import { yieldEscapeToSideDock } from './yieldEscapeToSideDock';
+import { isEscapeYieldedToSideDock } from './isEscapeYieldedToSideDock';
 
 describe('модальное окно рядом с пристёгнутым', () => {
   it('[C1] рядом — только когда окно сдвигает страницу; поверх страницы (узкий экран) — нет', () => {

@@ -1,0 +1,72 @@
+.placeholder {
+  display: block;
+  padding: var(--spacing-lg);
+}
+
+// Показ файла вместо кода. Прокрутка здесь своя: у окна её нет вовсе, а
+// картинка в полный рост и длинная разметка одинаково не обязаны помещаться.
+.previewBox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: var(--spacing-md);
+  overflow: auto;
+
+  // Шахматка под картинкой: без неё прозрачный PNG на светлой теме выглядит
+  // белым прямоугольником, а на тёмной — исчезает вовсе.
+  background-image:
+    linear-gradient(45deg, var(--color-surface-raised) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--color-surface-raised) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--color-surface-raised) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--color-surface-raised) 75%);
+  background-position:
+    0 0,
+    0 8px,
+    8px -8px,
+    -8px 0;
+  background-size: 16px 16px;
+}
+
+.previewImage {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.previewFrame {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: var(--color-surface);
+}
+
+.previewDocument {
+  height: 100%;
+  padding: var(--spacing-lg);
+  overflow: auto;
+  font-size: var(--font-size-body);
+  line-height: 1.6;
+  background: var(--color-surface);
+
+  :global(pre) {
+    padding: var(--spacing-sm);
+    overflow-x: auto;
+    background: var(--color-surface-sunken);
+    border-radius: var(--radius-sm);
+  }
+
+  :global(img) {
+    max-width: 100%;
+  }
+
+  :global(table) {
+    border-collapse: collapse;
+
+    :global(td),
+    :global(th) {
+      padding: var(--spacing-3xs) var(--spacing-xs);
+      border: 1px solid var(--color-border);
+    }
+  }
+}

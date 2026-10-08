@@ -1,0 +1,68 @@
+.dots {
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 4px;
+
+  i {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--color-accent);
+    animation: wave 1.4s ease-in-out infinite;
+
+    &:nth-child(2) {
+      animation-delay: 0.18s;
+    }
+
+    &:nth-child(3) {
+      animation-delay: 0.36s;
+    }
+  }
+}
+
+/*
+  Потерянная связь. Негромко и без красного: агент продолжает работать на
+  сервере, терять человеку нечего — тревожная карточка здесь обещала бы беду,
+  которой нет. Ширину держим по мерке текста, чтобы строка читалась как реплика
+  ленты, а не как полосу во всю её ширину.
+*/
+.reconnecting {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  max-width: min(var(--text-measure), 100%);
+  margin-bottom: var(--spacing-xl);
+  padding: var(--spacing-2xs) var(--spacing-xs);
+  border: 1px dashed var(--color-border);
+  border-radius: 8px;
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-caption);
+}
+
+// Переключатель «Меньше движения» должен выключать движение по-настоящему:
+// точки остаются видимыми, но не прыгают — состояние читается по подписи.
+@media (prefers-reduced-motion: reduce) {
+  .caret,
+  .pendingLabel,
+  .dots i {
+    animation: none;
+  }
+
+  .dots i {
+    opacity: 0.7;
+  }
+}
+
+@keyframes wave {
+  0%,
+  65%,
+  100% {
+    opacity: 0.35;
+    transform: translateY(0);
+  }
+
+  30% {
+    opacity: 1;
+    transform: translateY(-5px);
+  }
+}

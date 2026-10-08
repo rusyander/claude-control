@@ -9,8 +9,8 @@ import type {
 import { GLOB_DEPTH, MAX_TARGETS, isWindows } from './project-runner.constants.ts';
 import { RunnerError, type RunnerTargetSpec, type TargetMemory } from './project-runner.types.ts';
 import { readPackageJson, resolveRunCommand } from './stack.ts';
-import { coded } from '../../lib/server-text.ts';
-import { serverText } from '../../lib/server-texts.ts';
+import { coded } from '../../lib/server-text/server-text.ts';
+import { serverText } from '../../lib/server-texts/server-texts.ts';
 
 /* ── Цели запуска: корень и пакеты монорепозитория ───────────────────── */
 

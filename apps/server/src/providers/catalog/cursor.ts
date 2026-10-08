@@ -1,6 +1,6 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { buildCapabilities, type ConfigProvider } from '../types.ts';
+import { buildCapabilities, type ConfigProvider } from '../types/types.ts';
 import { unimplementedPaths } from './config-dirs.ts';
 
 /**

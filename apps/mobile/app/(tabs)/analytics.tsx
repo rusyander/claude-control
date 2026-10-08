@@ -6,15 +6,11 @@ import { Card, Empty, Loading, Mono, Muted, Row, Screen, Title } from '../../src
 import { colors, font, radius, space } from '../../src/shared/config/theme';
 import { useT, type Dictionary } from '../../src/shared/config/i18n';
 import { compact } from '../../src/shared/lib/format';
-import { isConfigured, useConnection } from '../../src/shared/api/connection';
-import {
-  DEFAULT_PERIOD,
-  analyticsRefusal,
-  useAnalytics,
-  type AnalyticsPeriod,
-  type AnalyticsPreset,
-} from '../../src/entities/analytics/api';
+import { useConnection, isConfigured } from '../../src/shared/api/connection';
+import { DEFAULT_PERIOD, useAnalytics } from '../../src/entities/analytics/api';
 import { useProviders } from '../../src/entities/provider-chat/api';
+import { analyticsRefusal } from '../../src/entities/analytics/analyticsRefusal';
+import type { AnalyticsPreset, AnalyticsPeriod } from '../../src/entities/analytics/api.types';
 
 /**
  * Аналитика по транскриптам. Считает всё сервер — приложение только показывает:

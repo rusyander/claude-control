@@ -1,0 +1,19 @@
+.itemHeader {
+  display: block;
+  width: 100%;
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  border-radius: var(--radius-lg);
+
+  &:hover {
+    background: var(--color-surface-sunken);
+  }
+}
+
+.itemBody {
+  padding: 0 var(--spacing-md) var(--spacing-md);
+}

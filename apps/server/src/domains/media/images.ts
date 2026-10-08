@@ -2,10 +2,10 @@ import { randomBytes } from 'node:crypto';
 import type { MediaImage, MediaImagePlan, MediaImageBlocker, Platform } from '@agentdeck/contracts';
 import { MEDIA_SVG_MIME } from '@agentdeck/contracts/media';
 import { checkPicture } from '@agentdeck/contracts/media-block';
-import { createCaFetch, type PlatformFetch } from '../platform/ca-fetch.ts';
+import { createCaFetch, type PlatformFetch } from '../platform/ca-fetch/ca-fetch.ts';
 import { driverOf } from '../platform/drivers/index.ts';
-import { readEndpointToken } from '../endpoints.ts';
-import { promptText } from '../prompts.ts';
+import { readEndpointToken } from '../endpoints/endpoints.ts';
+import { promptText } from '../prompts/prompts.ts';
 import { decodeBase64Image, decodeDataUrl } from './decode.ts';
 import { MediaError } from './errors.ts';
 import { extensionFor, saveImage } from './store.ts';
@@ -20,7 +20,7 @@ import {
   refusalOf,
   type MediaDeps,
 } from './upstream.ts';
-import { coded } from '../../lib/server-text.ts';
+import { coded } from '../../lib/server-text/server-text.ts';
 
 /**
  * Картинка по просьбе человека из чата.

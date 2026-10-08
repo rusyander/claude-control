@@ -1,13 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import type { AppSettings } from '@agentdeck/contracts';
 import { NOTIFY_EVENTS } from '@agentdeck/contracts/integrations';
-import {
-  DEFAULT_INTEGRATIONS,
-  TELEGRAM_EVENTS,
-  isLinkEmpty,
-  readIntegration,
-  readIntegrations,
-} from './settings';
+import { DEFAULT_INTEGRATIONS, TELEGRAM_EVENTS, readIntegrations } from './settings';
+import { readIntegration } from './readIntegration';
+import { isLinkEmpty } from './isLinkEmpty';
 
 /** Настройки панели без секции интеграций — конфиг, заведённый прошлой версией. */
 const bare = {} as AppSettings;

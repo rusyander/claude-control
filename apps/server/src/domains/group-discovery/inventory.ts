@@ -1,11 +1,11 @@
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { basename, extname, join } from 'node:path';
 import type { DiscoveredMemberKind } from '@agentdeck/contracts/group-sources';
-import { readJsonFile, readTextFile } from '../../lib/safe-io.ts';
-import { maskSecretsInText } from '../../lib/secret-mask.ts';
-import { readHooksFromFiles } from '../hooks.ts';
-import { hashDir, hashText, projectClaudeDir } from '../groups/members.ts';
-import { skillSteps } from '../groups/path.ts';
+import { readJsonFile, readTextFile } from '../../lib/safe-io/safe-io.ts';
+import { maskSecretsInText } from '../../lib/secret-mask/secret-mask.ts';
+import { readHooksFromFiles } from '../hooks/hooks.ts';
+import { hashDir, hashText, projectClaudeDir } from '../groups/members/members.ts';
+import { skillSteps } from '../groups/path/path.ts';
 import { splitFrontmatter } from '../skills/frontmatter.ts';
 
 /**

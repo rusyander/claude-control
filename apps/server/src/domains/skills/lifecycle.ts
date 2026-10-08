@@ -1,9 +1,9 @@
 import { existsSync, mkdirSync, renameSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
-import { backupEntry, copyRecursive, removeEntry } from '../../lib/safe-io.ts';
-import type { AppStore } from '../../lib/app-store.ts';
+import { backupEntry, copyRecursive, removeEntry } from '../../lib/safe-io/safe-io.ts';
+import type { AppStore } from '../../lib/app-store/app-store.ts';
 import { assertSkillId, disabledSkillsDir, SKILLS_DISABLED_DIR } from './paths.ts';
-import { coded } from '../../lib/server-text.ts';
+import { coded } from '../../lib/server-text/server-text.ts';
 
 /**
  * Судьба папки скилла: включение, переименование, удаление. Содержимое

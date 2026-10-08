@@ -1,7 +1,10 @@
 import { normalizeProjectPath } from '@shared/lib/workspace';
-import { emit, runs } from './agent-runs.state';
 import { selectActiveRuns, type ActiveRunView } from './selectors';
-import { aggregateStatus, runStatus, type RunStatus } from './status';
+import { runStatus } from './status';
+import { emit } from './emit';
+import { runs } from './agent-runs.state.constants';
+import type { RunStatus } from './status.types';
+import { aggregateStatus } from './aggregateStatus';
 
 /**
  * Своды по прогонам: статус проекта (точка на табе), статус разговора (точка в

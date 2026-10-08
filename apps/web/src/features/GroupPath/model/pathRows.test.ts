@@ -1,10 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import type { KnobView, PathEntry } from '@agentdeck/contracts';
-import { buildPathRows, canInsertAfter, ownStepCount } from './pathRows';
-import { firstParagraph, skillTextSteps, stepOfQuote } from './skillText';
-import { rowHint, rowText } from './describe';
-import { isAutoKnob, knobEditValue, knobNumbers, knobSelectValue, KNOB_AUTO } from './knobs';
-import { entrySource, joinPath, skillSource, sourceFile } from './stepSource';
+import { buildPathRows } from './pathRows';
+import { skillTextSteps } from './skillText';
+import { rowText } from './describe';
+import { isAutoKnob } from './knobs';
+import { skillSource } from './stepSource';
+import { rowHint } from './rowHint';
+import { knobNumbers } from './knobNumbers';
+import { KNOB_AUTO } from './knobs.constants';
+import { knobSelectValue } from './knobSelectValue';
+import { knobEditValue } from './knobEditValue';
+import { ownStepCount } from './ownStepCount';
+import { canInsertAfter } from './canInsertAfter';
+import { firstParagraph } from './firstParagraph';
+import { stepOfQuote } from './stepOfQuote';
+import { joinPath } from './joinPath';
+import { entrySource } from './entrySource';
+import { sourceFile } from './sourceFile';
 
 const SKILL = [
   '---',

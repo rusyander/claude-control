@@ -3,9 +3,9 @@ import { join } from 'node:path';
 import type { ClaudePaths } from '@agentdeck/contracts';
 import { providerSource } from '@agentdeck/contracts/group-sources';
 import { projectKey } from '../../lib/app-store/group-sources.ts';
-import type { ConfigProvider } from '../../providers/types.ts';
-import { projectClaudeDir } from '../groups/members.ts';
-import { gitSync } from '../project-git/exec.ts';
+import type { ConfigProvider } from '../../providers/types/types.ts';
+import { projectClaudeDir } from '../groups/members/members.ts';
+import { gitSync } from '../project-git/exec/exec.ts';
 import { WORKTREES_DIR_SUFFIX } from '../project-git/worktrees.ts';
 import { projectLayout, type InventoryLayout } from './inventory.ts';
 

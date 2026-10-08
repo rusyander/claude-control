@@ -101,13 +101,15 @@ export function gatewayDriverSource({
   routes = '',
 } = {}) {
   const gatewayTs = new URL(
-    '../../apps/server/src/domains/platform/gateway/pipeline.ts',
+    '../../apps/server/src/domains/platform/gateway/pipeline/pipeline.ts',
     import.meta.url,
   ).href;
-  const storeTs = new URL('../../apps/server/src/domains/platform/store.ts', import.meta.url).href;
-  const appStoreTs = new URL('../../apps/server/src/lib/app-store.ts', import.meta.url).href;
+  const storeTs = new URL('../../apps/server/src/domains/platform/store/store.ts', import.meta.url)
+    .href;
+  const appStoreTs = new URL('../../apps/server/src/lib/app-store/app-store.ts', import.meta.url)
+    .href;
   const usageTs = new URL(
-    '../../apps/server/src/domains/platform/gateway/usage.ts',
+    '../../apps/server/src/domains/platform/gateway/usage/usage.ts',
     import.meta.url,
   ).href;
   return `

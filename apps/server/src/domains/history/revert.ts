@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { basename } from 'node:path';
-import { writeTextFile } from '../../lib/safe-io.ts';
-import type { TrackedFile } from '../tracked-files.ts';
+import { writeTextFile } from '../../lib/safe-io/safe-io.ts';
+import type { TrackedFile } from '../tracked-files/tracked-files.ts';
 import { BACKUP_NAME } from './constants.ts';
 import { buildRevertedText, diffLines, isBinary, tooBig } from './diff.ts';
 import { collectSnapshots, readText } from './snapshots.ts';

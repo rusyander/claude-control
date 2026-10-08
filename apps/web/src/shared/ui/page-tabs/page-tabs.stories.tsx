@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Typography } from '@shared/ui/typography';
-import { PageTabs, PageTabPanel } from './page-tabs';
+import { PageTabs } from './PageTabs/PageTabs';
+import { PageTabPanel } from './PageTabPanel/PageTabPanel';
 
 /**
  * Вкладки страницы раздела: длинная страница, разложенная по заботам. Адрес и

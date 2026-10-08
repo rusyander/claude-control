@@ -1,5 +1,5 @@
 import type { ServerMessageCode, ServerMessageParams } from '@agentdeck/contracts/server-messages';
-import { serverText } from '../../lib/server-texts.ts';
+import { serverText } from '../../lib/server-texts/server-texts.ts';
 
 /**
  * Отказы контура — состояние, а не падение панели.

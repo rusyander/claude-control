@@ -17,15 +17,15 @@ import {
   stripReasoning,
 } from '@agentdeck/contracts/media-block';
 import { DECK_MAX_RASTER } from '@agentdeck/contracts/media-deck';
-import { createCaFetch, type PlatformFetch } from '../platform/ca-fetch.ts';
-import { defaultModelOf } from '../platform/models.ts';
+import { createCaFetch, type PlatformFetch } from '../platform/ca-fetch/ca-fetch.ts';
+import { defaultModelOf } from '../platform/models/models.ts';
 import {
   defaultPlatformTransport,
   platformRequestUrl,
 } from '@agentdeck/contracts/platform-transport';
-import { readEndpointToken } from '../endpoints.ts';
-import { promptText } from '../prompts.ts';
-import { MediaError } from './errors.ts';
+import { readEndpointToken } from '../endpoints/endpoints.ts';
+import { promptText } from '../prompts/prompts.ts';
+import { MediaError, isMediaError } from './errors.ts';
 import {
   activeContour,
   askUpstream,
@@ -43,7 +43,6 @@ import { canPrintPdf, printDeckPdf } from './deck/pdf.ts';
 import { deckAssets } from './deck/assets.ts';
 import { generateImage, planImage } from './images.ts';
 import { readImageRecord } from './store.ts';
-import { isMediaError } from './errors.ts';
 import {
   cacheDeckPdf,
   hasDeckFile,

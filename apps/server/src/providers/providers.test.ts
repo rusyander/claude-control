@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { claudeProvider } from './claude.ts';
-import { CAPABILITIES, type CapabilityMap } from './types.ts';
+import { CAPABILITIES, type CapabilityMap } from './types/types.ts';
 import {
   DEFAULT_PROVIDER_ID,
   describeProviders,
@@ -14,7 +14,7 @@ import {
   listProviders,
   type SettingsSource,
 } from './registry.ts';
-import { activeCliCommand, defaultCliCommand, providerCliCommand } from './cli.ts';
+import { activeCliCommand, defaultCliCommand, providerCliCommand } from './cli/cli.ts';
 
 /** Фейковое хранилище настроек: отдаёт заданный id провайдера. */
 function fakeStore(provider: string): SettingsSource {

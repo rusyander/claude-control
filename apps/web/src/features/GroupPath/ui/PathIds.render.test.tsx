@@ -1,8 +1,8 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { i18n } from '@shared/config/i18n';
-import { SkillBlock } from './SkillBlock';
-import { PathEntryRow } from './PathEntryRow';
+import { SkillBlock } from './SkillBlock/SkillBlock';
+import { PathEntryRow } from './PathEntryRow/PathEntryRow';
 
 beforeAll(async () => {
   await i18n.changeLanguage('ru');

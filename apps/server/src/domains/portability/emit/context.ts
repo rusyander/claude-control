@@ -1,8 +1,8 @@
 import type { EmitEntry, EmitOutcome } from '@agentdeck/contracts/portable-emit';
 import type { AgentEnvironment, EnvItem, EnvItemKind } from '@agentdeck/contracts/portable-env';
 import type { FidelityVerdict } from '@agentdeck/contracts/portable-fidelity';
-import { describeTarget, level, type TargetProfile } from '../fidelity.ts';
-import { sectionTargets, type SectionTargets } from '../project.ts';
+import { describeTarget, level, type TargetProfile } from '../fidelity/fidelity.ts';
+import { sectionTargets, type SectionTargets } from '../project/project.ts';
 import type { EmitDeps, EmitPlan, EmitWrite } from './types.ts';
 
 /**

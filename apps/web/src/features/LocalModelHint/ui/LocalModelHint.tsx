@@ -15,32 +15,9 @@ import {
   usePullModel,
 } from '@entities/LocalModels';
 import styles from './LocalModelHint.module.scss';
-
-interface LocalModelHintProps {
-  /**
-   * Продолжить разговор, когда модель скачана и подключена. Нет разговора —
-   * нечего продолжать: модель просто подключается, и следующее сообщение уйдёт в неё.
-   */
-  onReady?: () => void;
-}
-
-const DISMISS_KEY = 'agentdeck.localModelHint.dismissed';
-
-function readDismissed(): boolean {
-  try {
-    return window.localStorage.getItem(DISMISS_KEY) === '1';
-  } catch {
-    return false;
-  }
-}
-
-function writeDismissed(): void {
-  try {
-    window.localStorage.setItem(DISMISS_KEY, '1');
-  } catch {
-    // Хранилище недоступно (приватное окно) — скрыто до перезагрузки, и только.
-  }
-}
+import type { LocalModelHintProps } from './LocalModelHint.types';
+import { readDismissed } from '../lib/readDismissed';
+import { writeDismissed } from '../lib/writeDismissed';
 
 /**
  * Строка вверху раздела «Локальные модели»: какую модель поставить на ЭТУ

@@ -6,13 +6,10 @@ import {
 } from '@agentdeck/contracts/portable-fidelity';
 import { en } from '@shared/config/i18n/en';
 import { ru } from '@shared/config/i18n/ru';
-import {
-  conditionLabelKey,
-  levelLabelKey,
-  reasonLabelKey,
-  usableTarget,
-  LEVEL_TONE,
-} from './fidelity';
+import { levelLabelKey, LEVEL_TONE } from './fidelity';
+import { reasonLabelKey } from './reasonLabelKey';
+import { conditionLabelKey } from './conditionLabelKey';
+import { usableTarget } from './usableTarget';
 
 /**
  * СЛОВАРЬ КАНОНА И ЭКРАН НЕ РАСХОДЯТСЯ.

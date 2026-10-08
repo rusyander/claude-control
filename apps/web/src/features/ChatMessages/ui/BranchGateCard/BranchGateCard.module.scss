@@ -1,0 +1,53 @@
+// Вопрос с вариантами. Пока на него не ответят, работа стоит, — поэтому он
+// выделен сильнее всего остального в ленте.
+//
+// Заливку берём от поверхности, а не от акцента: в тёмной теме
+// --color-accent-subtle почти совпадает и с фоном страницы, и с фоном реплик
+// человека, из-за чего карточка переставала читаться как отдельный блок.
+// Отделяет её теперь полоса слева и приподнятая поверхность.
+.question {
+  margin-bottom: var(--spacing-xs);
+  padding: var(--spacing-sm) var(--spacing-md) var(--spacing-md);
+  border: 1px solid var(--color-accent);
+  border-left: 3px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.questionHead {
+  margin-bottom: var(--spacing-xs);
+  color: var(--color-accent);
+  font-size: var(--font-size-body-sm);
+  font-weight: 600;
+}
+
+.questionItem + .questionItem {
+  margin-top: var(--spacing-md);
+  padding-top: var(--spacing-md);
+  border-top: 1px solid var(--color-border);
+}
+
+// Ворота ветки: тон не «опасно», а «выбор» — правка не отклоняется, у неё
+// спрашивают место. Отсюда акцентная рамка вместо предупреждающей.
+.branchGate {
+  border-color: var(--color-accent);
+  border-left-color: var(--color-accent);
+}
+
+.branchGateHead {
+  color: var(--color-accent);
+}
+
+.permissionInput {
+  margin: var(--spacing-2xs) 0;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-sunken);
+  color: var(--color-fg-muted);
+  font-family: var(--font-mono, monospace);
+  font-size: var(--font-size-caption);
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-x: auto;
+}

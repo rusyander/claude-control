@@ -1,4 +1,4 @@
-import { emit } from './agent-runs.state';
+import { emit } from './emit';
 
 const KEY = 'agentdeck:answered-questions';
 

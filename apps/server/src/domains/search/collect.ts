@@ -1,22 +1,22 @@
 import type { SearchResponse } from '@agentdeck/contracts';
 import { getActiveProvider } from '../../providers/registry.ts';
-import { readEnvVars } from '../env.ts';
-import { readHooks } from '../hooks.ts';
-import { readInstructionsInfo, resolveInstructionsTarget } from '../instructions.ts';
-import { readMcpServers } from '../mcp.ts';
-import { readPermissions } from '../permissions.ts';
-import { readInstalledPluginsCached } from '../plugins.ts';
-import { readProviderEnvVars, resolveProviderEnvTarget } from '../provider-env.ts';
-import { readProviderMcpServers, resolveProviderMcpTarget } from '../provider-mcp.ts';
+import { readEnvVars } from '../env/env.ts';
+import { readHooks } from '../hooks/hooks.ts';
+import { readInstructionsInfo, resolveInstructionsTarget } from '../instructions/instructions.ts';
+import { readMcpServers } from '../mcp/mcp.ts';
+import { readPermissions } from '../permissions/permissions.ts';
+import { readInstalledPluginsCached } from '../plugins/plugins.ts';
+import { readProviderEnvVars, resolveProviderEnvTarget } from '../provider-env/provider-env.ts';
+import { readProviderMcpServers, resolveProviderMcpTarget } from '../provider-mcp/provider-mcp.ts';
 import {
   readProviderPermissions,
   resolveProviderPermissionsTarget,
   type ProviderPermissionsValues,
-} from '../provider-permissions.ts';
-import { readGroups } from '../project-tests.ts';
-import { readRules } from '../rules.ts';
-import { readScripts } from '../scripts.ts';
-import { readSkills } from '../skills.ts';
+} from '../provider-permissions/provider-permissions.ts';
+import { readGroups } from '../project-tests/project-tests.ts';
+import { readRules } from '../rules/rules.ts';
+import { readScripts } from '../scripts/scripts.ts';
+import { readSkills } from '../skills/skills.ts';
 import { MIN_QUERY_LENGTH } from './constants.ts';
 import { searchEntities } from './filter.ts';
 import type { ProviderSearchInputs, SearchInputs, SearchSources, SearchTestCase } from './types.ts';

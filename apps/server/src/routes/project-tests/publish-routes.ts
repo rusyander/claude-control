@@ -1,7 +1,7 @@
 import { resolve } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import type { ServerContext } from '../../context.ts';
-import { publishRun, type PublishTarget } from '../../domains/integrations/publish.ts';
+import { publishRun, type PublishTarget } from '../../domains/integrations/publish/publish.ts';
 import { fail } from '../integrations/shared.ts';
 
 /**

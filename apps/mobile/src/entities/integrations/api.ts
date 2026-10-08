@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import type { AppSettings, AtlassianSettings, IntegrationLinks } from '@agentdeck/contracts';
+import type { AppSettings, AtlassianSettings } from '@agentdeck/contracts';
 import { api } from '../../shared/api/client';
 
 /**
@@ -28,25 +28,6 @@ const EMPTY_ATLASSIAN: AtlassianSettings = {
   confluenceUrl: '',
 };
 
-const trimSlash = (value: string): string => value.replace(/\/+$/, '');
-
-export function jiraIssueUrl(atlassian: AtlassianSettings, key: string | undefined): string {
-  if (!atlassian.baseUrl || !key) return '';
-  return `${trimSlash(atlassian.baseUrl)}/browse/${encodeURIComponent(key)}`;
-}
-
-export function confluencePageUrl(
-  atlassian: AtlassianSettings,
-  pageId: string | undefined,
-): string {
-  if (!pageId) return '';
-  const own = trimSlash(atlassian.confluenceUrl);
-  const base = trimSlash(atlassian.baseUrl);
-  if (!own && !base) return '';
-  const root = own || (atlassian.deployment === 'server' ? base : `${base}/wiki`);
-  return `${root}/pages/viewpage.action?pageId=${encodeURIComponent(pageId)}`;
-}
-
 /**
  * Настройки Atlassian из общих настроек панели. Читаем защищённо: секция
  * появилась позже остального, и её отсутствие — обычный старый конфиг, а не
@@ -60,16 +41,4 @@ export function useAtlassianSettings(): AtlassianSettings {
   });
   const raw = settings.data?.integrations?.atlassian;
   return raw ? { ...EMPTY_ATLASSIAN, ...raw } : EMPTY_ATLASSIAN;
-}
-
-/** Привязки проекта и его групп. Нет проекта — не спрашиваем. */
-export function useIntegrationLinks(projectPath: string | undefined) {
-  return useQuery({
-    queryKey: ['integration-links', projectPath],
-    queryFn: () => api.get<IntegrationLinks>('/integrations/links', { path: projectPath }),
-    enabled: Boolean(projectPath),
-    staleTime: 60_000,
-    // Интеграции могут быть не настроены вовсе — это не повод повторять запрос.
-    retry: false,
-  });
 }

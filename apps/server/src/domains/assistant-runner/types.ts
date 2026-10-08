@@ -1,7 +1,7 @@
 import type { spawn as nodeSpawn } from 'node:child_process';
 import type { AssistantRunReason, AssistantRunResult, ModelInfo } from '@agentdeck/contracts';
-import type { OpencodeServe } from '../opencode-serve.ts';
-import type { AgentImage } from '../../lib/agent-images.ts';
+import type { OpencodeServe } from '../opencode-serve/opencode-serve.ts';
+import type { AgentImage } from '../../lib/agent-images/agent-images.ts';
 
 /** Роль реплики в мультимодельном чате. */
 export interface AssistantMessage {
@@ -9,7 +9,7 @@ export interface AssistantMessage {
   content: string;
   /**
    * Картинки реплики человека — в самом запросе, в форме каждого получателя
-   * (`lib/agent-images.ts`). Чужой CLI без входа для картинки получает их
+   * (`lib/agent-images/agent-images.ts`). Чужой CLI без входа для картинки получает их
    * файлами и путями в тексте.
    */
   images?: readonly AgentImage[];

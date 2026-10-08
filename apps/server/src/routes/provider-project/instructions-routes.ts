@@ -4,7 +4,7 @@ import type { ServerContext } from '../../context.ts';
 import {
   readProviderProjectInstructions,
   writeProviderProjectInstructions,
-} from '../../domains/provider-projects.ts';
+} from '../../domains/provider-projects/provider-projects.ts';
 import { UnrecognizedFormatError } from '../../lib/format-errors.ts';
 import {
   readProviderInstructionsInfo,
@@ -13,7 +13,7 @@ import {
   readListedInstructionsFile,
   writeListedInstructionsFile,
   ListedFileNotEditableError,
-} from '../../domains/provider-instructions.ts';
+} from '../../domains/provider-instructions/provider-instructions.ts';
 import { done } from '../write-result.ts';
 import { requireTarget } from './target.ts';
 import {
@@ -23,7 +23,7 @@ import {
   INVALID_CONTENT,
   INVALID_LIST_DRAFT,
 } from './messages.ts';
-import { codeOf } from '../../lib/server-text.ts';
+import { codeOf } from '../../lib/server-text/server-text.ts';
 
 /** Отказ по одной записи списка: «нет в списке» → 404, прочее (нет файла, бинарь) → 400. */
 const sendEntryError = (reply: FastifyReply, error: ListedFileNotEditableError): FastifyReply =>

@@ -1,12 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Stack } from '@shared/ui/stack';
-import {
-  ImageAttachButton,
-  ImageAttachTray,
-  ImageAttachZone,
-  SentImageNames,
-} from './image-attach';
 import { useImageAttach } from './useImageAttach';
+import { ImageAttachButton } from './ImageAttachButton/ImageAttachButton';
+import { ImageAttachTray } from './ImageAttachTray/ImageAttachTray';
+import { ImageAttachZone } from './ImageAttachZone/ImageAttachZone';
+import { SentImageNames } from './SentImageNames/SentImageNames';
 
 /**
  * Картинки в поле агента: кнопка, перетаскивание и вставка Ctrl+V. Одно

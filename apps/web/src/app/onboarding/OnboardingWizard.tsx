@@ -2,36 +2,33 @@ import { useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
-import type { ClaudeLocation } from '@agentdeck/contracts';
 import { Modal } from '@shared/ui/modal';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
 import { toast } from '@shared/lib/toast';
-import { toErrorMessage } from '@shared/api/client';
 import { FolderPicker } from '@features/FolderPicker';
 import { CredentialsFormModal } from '@features/CredentialsEditor';
 import { useLocation, useSetLocation, useSettings, useUpdateSettings } from '@entities/AppConfig';
 import { useProviderDetect } from '@entities/Provider';
 import type { Step } from './OnboardingWizard.types';
-import {
-  clearStoredStep,
-  hasOtherCli,
-  initialStep,
-  onboardingGate,
-  nextStep,
-  prevStep,
-  readStoredStep,
-  stepNumber,
-  stepOrder,
-  fitStep,
-  storeStep,
-} from './model/steps';
-import { IntroStep } from './steps/IntroStep';
-import { LocationStep } from './steps/LocationStep';
-import { ProvidersStep } from './steps/ProvidersStep';
-import { AccessStep } from './steps/AccessStep';
-import { serverFieldText } from '@shared/config/i18n';
+import { IntroStep } from './steps/IntroStep/IntroStep';
+import { LocationStep } from './steps/LocationStep/LocationStep';
+import { ProvidersStep } from './steps/ProvidersStep/ProvidersStep';
+import { AccessStep } from './steps/AccessStep/AccessStep';
+import { describeApplyProblem } from './lib/describeApplyProblem';
+import { stepStorage } from './lib/stepStorage';
+import { fitStep } from './model/fitStep';
+import { initialStep } from './model/initialStep';
+import { onboardingGate } from './model/onboardingGate';
+import { hasOtherCli } from './model/hasOtherCli';
+import { stepOrder } from './model/stepOrder';
+import { stepNumber } from './model/stepNumber';
+import { nextStep } from './model/nextStep';
+import { prevStep } from './model/prevStep';
+import { readStoredStep } from './model/readStoredStep';
+import { storeStep } from './model/storeStep';
+import { clearStoredStep } from './model/clearStoredStep';
 
 /**
  * Приветственный мастер первого запуска. Появляется, пока пользователь не прошёл
@@ -293,25 +290,4 @@ export function OnboardingWizard() {
       <CredentialsFormModal isOpen={credentialsOpen} onOpenChange={setCredentialsOpen} />
     </>
   );
-}
-
-/** Причина отказа — у поля: текст сервера для непринятого пути, иначе ошибка запроса. */
-function describeApplyProblem(
-  result: ClaudeLocation | undefined,
-  error: unknown,
-  fallback: string,
-): string | undefined {
-  if (result && !result.isValid)
-    return result.problem ? serverFieldText(result, 'problem') : fallback;
-  if (error) return toErrorMessage(error);
-  return undefined;
-}
-
-/** sessionStorage может быть недоступен (приватный режим, запрет данных сайта) — тогда шаг не запоминается. */
-function stepStorage(): Storage | undefined {
-  try {
-    return window.sessionStorage;
-  } catch {
-    return undefined;
-  }
 }

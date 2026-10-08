@@ -20,8 +20,9 @@ describe('опись справки агента панели', () => {
     const entry = manifest.topics.find((topic) => topic.topic === 'panelAgent');
     expect(entry).toBeDefined();
     const watched = new Set(entry!.sources.map((source) => source.path));
-    const actionFiles = readdirSync(`${REPO}${ACTIONS_DIR}`)
-      .filter((name) => /^actions(-[\w-]+)?\.ts$/.test(name) && !/\.test\.ts$/.test(name))
+    const actionFiles = readdirSync(`${REPO}${ACTIONS_DIR}`, { recursive: true, encoding: 'utf8' })
+      .map((name) => name.replaceAll('\\', '/'))
+      .filter((name) => /(^|\/)actions(-[\w-]+)?\.ts$/.test(name) && !/\.test\.ts$/.test(name))
       .map((name) => `${ACTIONS_DIR}${name}`);
     expect(actionFiles.length).toBeGreaterThan(10);
     expect(actionFiles.filter((path) => !watched.has(path))).toEqual([]);

@@ -1,6 +1,6 @@
 import type { TFunction } from 'i18next';
-import { formatDate } from '@shared/lib/format';
-import { timeGroup } from './rows';
+import { timeGroup } from './timeGroup';
+import { formatDate } from '../../../shared/lib/formatDate';
 
 /**
  * Когда в чате последний раз говорили. Внутри часа — минуты, сегодня и вчера —

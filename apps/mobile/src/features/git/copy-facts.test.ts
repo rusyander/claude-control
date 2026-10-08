@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { ProjectWorktree, ProjectWorktreesInfo } from '@agentdeck/contracts';
 import { ru } from '../../shared/config/i18n/ru';
-import { copyFacts, visibleCopies } from './copy-facts';
+import { visibleCopies } from './copy-facts';
+import { copyFacts } from './copyFacts';
 
 /**
  * Копии в кармане. Проверяется то, ради чего они там вообще появились: человек

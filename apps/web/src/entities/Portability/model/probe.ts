@@ -42,16 +42,3 @@ export const PROBE_LAYER_ORDER: readonly ProbeLayer[] = probeLayers;
 export function probeLayerLabelKey(layer: ProbeLayer): string {
   return `portability.probe.layer.${layer}`;
 }
-
-export function probeObservationLabelKey(observation: ProbeObservation): string {
-  return `portability.probe.observation.${observation}`;
-}
-
-export function probeVerdictLabelKey(verdict: ProbeVerdict): string {
-  return `portability.probe.verdict.${verdict}`;
-}
-
-/** Причина пропуска. Без перевода показывает свой код, а не пустоту. */
-export function probeSkipLabelKey(skip: string): string {
-  return `portability.probe.skip.${skip}`;
-}

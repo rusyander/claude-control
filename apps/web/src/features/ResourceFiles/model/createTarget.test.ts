@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { cancelCreate, isCreatingIn, CREATE_IN_ROOT } from './createTarget';
+import { isCreatingIn, CREATE_IN_ROOT } from './createTarget';
+import { cancelCreate } from './cancelCreate';
 
 /**
  * Регрессия: отмена поля «новый файл» внутри папки отдавала пустую строку, а

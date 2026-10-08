@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import type { ProjectFileChanges } from '@agentdeck/contracts';
-import { diffLines } from '../history.ts';
+import { diffLines } from '../history/history.ts';
 import { MAX_CHANGED_FILES, MAX_DIFF_CHARS, MAX_FILE_BYTES } from './constants.ts';
 import { looksBinary } from './content.ts';
 import { rebuildBaseline, type CollectedEdits } from './edits.ts';

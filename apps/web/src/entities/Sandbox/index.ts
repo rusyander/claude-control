@@ -1,20 +1,16 @@
-export {
-  useEventFixtures,
-  useCreateSandbox,
-  useProbeHook,
-  useMcpTools,
-  useCallMcpTool,
-  useDeleteSandbox,
-} from './api/SandboxApi';
-export type {
-  SandboxKind,
-  SandboxSelection,
-  SandboxDescription,
-  SandboxCredentials,
-  SandboxCredentialsSource,
-  HookDecision,
-  ProbeResult,
-} from './api/SandboxApi';
+export { useEventFixtures } from './api/SandboxApi';
+export { useProbeHook } from './api/useProbeHook';
+export { useCreateSandbox } from './api/useCreateSandbox';
+export { useMcpTools } from './api/useMcpTools';
+export { useDeleteSandbox } from './api/useDeleteSandbox';
+export { useCallMcpTool } from './api/useCallMcpTool';
+export type { SandboxKind } from './api/SandboxApi';
+export type { ProbeResult } from './api/useProbeHook';
+export type { HookDecision } from './api/useProbeHook';
+export type { SandboxCredentials } from './api/useCreateSandbox';
+export type { SandboxCredentialsSource } from './api/useCreateSandbox';
+export type { SandboxDescription } from './api/useCreateSandbox';
+export type { SandboxSelection } from './api/useCreateSandbox';
 export { useSandboxRun } from './model/useSandboxRun';
 export { sandboxAccessNotice } from './model/sandboxCredentials';
 export type { SandboxAccessNotice } from './model/sandboxCredentials';

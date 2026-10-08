@@ -4,8 +4,8 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { claudeProvider } from '../../providers/claude.ts';
 import { getProvider, listProviders } from '../../providers/registry.ts';
-import type { ConfigProvider, ProviderAssistant } from '../../providers/types.ts';
-import { serverText } from '../../lib/server-texts.ts';
+import type { ConfigProvider, ProviderAssistant } from '../../providers/types/types.ts';
+import { serverText } from '../../lib/server-texts/server-texts.ts';
 import { runProviderApi } from './api.ts';
 
 /**

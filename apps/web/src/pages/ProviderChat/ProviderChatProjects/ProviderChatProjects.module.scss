@@ -1,0 +1,16 @@
+// Строка проекта во вкладке «Проекты»: не кнопка целиком, как у разговора, —
+// действие одно и явное («Новый разговор здесь»), а у погашенного рядом причина.
+.projectItem {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3xs);
+  min-width: 0;
+  padding: var(--spacing-2xs) var(--spacing-xs);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.projectPath {
+  display: block;
+  font-size: 11px;
+}

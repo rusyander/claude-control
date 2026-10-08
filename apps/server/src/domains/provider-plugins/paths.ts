@@ -2,7 +2,7 @@ import { getActiveProvider } from '../../providers/registry.ts';
 import { resolveInsideSectionDir, toClientRelative } from '../../lib/section-fs.ts';
 import { UnrecognizedFormatError } from '../../lib/format-errors.ts';
 import { UnsafePluginPathError } from './errors.ts';
-import type { ConfigProvider } from '../../providers/types.ts';
+import type { ConfigProvider } from '../../providers/types/types.ts';
 import type { ProviderPluginsSettingsSource, ProviderPluginsTarget } from './types.ts';
 
 /**

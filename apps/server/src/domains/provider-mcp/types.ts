@@ -1,5 +1,5 @@
 import type { AppSettings, UniversalMcpServer } from '@agentdeck/contracts';
-import type { ConfigProvider } from '../../providers/types.ts';
+import type { ConfigProvider } from '../../providers/types/types.ts';
 import type { SkippedMcpBlock } from './blocks.ts';
 
 /** Источник настроек: провайдер и переопределение каталога конфигурации. */

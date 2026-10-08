@@ -1,7 +1,12 @@
 import { existsSync, mkdirSync, readdirSync, renameSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type { KitGlobalItem, KitTwinKind } from '@agentdeck/contracts/kit';
-import { backupEntry, copyRecursive, removeEntry, writeTextFile } from '../../lib/safe-io.ts';
+import {
+  backupEntry,
+  copyRecursive,
+  removeEntry,
+  writeTextFile,
+} from '../../lib/safe-io/safe-io.ts';
 import { describe, listFiles, readText } from './items.ts';
 
 /**

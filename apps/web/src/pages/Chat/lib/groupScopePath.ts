@@ -1,5 +1,5 @@
 import type { ChatSummary } from '@agentdeck/contracts';
-import { samePath } from '@shared/lib/file-path';
+import { samePath } from '../../../shared/lib/samePath';
 
 // Одно сравнение путей на весь фронт: здешняя копия опускала регистр у любого
 // пути и сливала на Linux/macOS разные каталоги в один (F-180).

@@ -1,5 +1,5 @@
 import type { WatcherSpend } from '@agentdeck/contracts';
-import { formatSpend } from '@shared/lib/format';
+import { formatSpend } from '../../../shared/lib/formatSpend';
 
 /**
  * Расход наблюдателя в единицах, выбранных в настройках. Деньги — только

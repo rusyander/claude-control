@@ -1,12 +1,16 @@
 import { resolve } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { fetchCiReport } from '../../domains/integrations/ci.ts';
-import { readIntegrations, readToken, requireConnected } from '../../domains/integrations/store.ts';
+import {
+  readIntegrations,
+  readToken,
+  requireConnected,
+} from '../../domains/integrations/store/store.ts';
 import { tmsClient } from '../../domains/integrations/tms/index.ts';
 import { pullIntoGroup, pushRunToTms } from '../../domains/integrations/tms/sync.ts';
 import { sendTelegramMessage } from '../../domains/notify/telegram.ts';
 import { sendWebhook } from '../../domains/notify/webhook.ts';
-import { importResults } from '../../domains/project-tests/import-results.ts';
+import { importResults } from '../../domains/project-tests/import-results/import-results.ts';
 import {
   appDataOf,
   guard,

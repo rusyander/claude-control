@@ -1,0 +1,17 @@
+// Строка провайдера: имя слева, кнопки прижаты вправо.
+.row {
+  padding: var(--spacing-2xs) 0;
+  border-bottom: 1px solid var(--color-border-subtle);
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.name {
+  min-width: 0;
+}
+
+.actions {
+  margin-left: auto;
+}

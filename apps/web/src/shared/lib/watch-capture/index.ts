@@ -1,15 +1,12 @@
-export {
-  setWatchCaptureEnabled,
-  setWatchThresholds,
-  isWatchCaptureEnabled,
-  reportClientSignal,
-  reportRenderCrash,
-  logRenderCrash,
-  reportApiFailure,
-  reportContractMismatch,
-  looksLikeWrongShape,
-  formatConsoleArgs,
-  installWatchCapture,
-  watchQueryCache,
-} from './watch-capture';
+export { setWatchCaptureEnabled, installWatchCapture } from './watch-capture';
+export { watchQueryCache } from './watch-capture';
+export { setWatchThresholds } from './watch-capture';
+export { reportContractMismatch } from './watch-capture';
+export { reportApiFailure } from './watch-capture';
+export { logRenderCrash } from './watch-capture';
+export { reportRenderCrash } from './watch-capture';
+export { reportClientSignal } from './watch-capture';
+export { isWatchCaptureEnabled } from './watch-capture';
+export { formatConsoleArgs } from './watch-capture';
+export { looksLikeWrongShape } from './watch-capture';
 export type { WatchableQueryCache } from './watch-capture';

@@ -1,0 +1,120 @@
+.bar {
+  flex: none;
+}
+
+// Узкое место (1100px с боковой панелью, окно тестов в чате): у второстепенных
+// кнопок пульта и группы остаётся только значок, подпись уходит в доступное имя
+// и во всплывающую подсказку. Иначе пульт ложился в 4–6 строк и уводил таблицу
+// за низ экрана. Меряется ширина самого блока, а не окна: в окне чата он узкий
+// при любом экране.
+.narrowable {
+  container-type: inline-size;
+}
+
+@container (max-width: 1000px) {
+  .narrowLabel {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+// Оговорка об агенте прогона: заголовок строкой, текст по раскрытию.
+.note {
+  max-width: var(--text-measure, 72ch);
+
+  summary {
+    cursor: pointer;
+  }
+}
+
+// Полоса состояния группы в пульте: доли статусов без подписей внутри —
+// числа стоят рядом строкой, а полоса читается с одного взгляда.
+.miniStack {
+  display: inline-flex;
+  width: 120px;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--color-surface-sunken);
+}
+
+.miniStackPart {
+  display: block;
+  height: 100%;
+  flex-basis: 0;
+}
+
+.miniStackPassed {
+  background: var(--color-success);
+}
+
+.miniStackFailed {
+  background: var(--color-danger);
+}
+
+.miniStackSkipped {
+  background: var(--color-warning);
+}
+
+.miniStackRest {
+  background: var(--color-border);
+}
+
+// Поле пожелания растягивается, кнопки прогона держат свою ширину справа.
+.scope {
+  flex: 1;
+  min-width: 220px;
+}
+
+// Веха — короткая строка («v1.4», «спринт 12»), и растягивать её незачем:
+// место в пульте нужно кнопкам прогона.
+.release {
+  flex: none;
+  width: 160px;
+}
+
+// Поля пульта — обычный ввод той же высоты, что кнопки рядом, без лупы:
+// это задание агенту и имя вехи, а не поиск по списку.
+.runInput {
+  box-sizing: border-box;
+  height: 36px;
+  padding: 0 var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background-color: var(--color-surface);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-body);
+  text-overflow: ellipsis;
+
+  &::placeholder {
+    color: var(--color-fg-subtle);
+  }
+
+  &:hover {
+    border-color: var(--color-border-strong);
+  }
+}
+
+// Ниже этой высоты колонки библиотеки не сжимаются, прокручивается страница.
+$library-floor: 320px;
+
+// Лог прогона: моноширинный хвост вывода агента, отдельной прокруткой.
+.log {
+  margin: 0;
+  max-height: 220px;
+  overflow: auto;
+  scrollbar-width: thin;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  color: var(--color-text-subtle);
+  background: var(--color-surface-sunken);
+  border-radius: 8px;
+  padding: var(--spacing-xs);
+}

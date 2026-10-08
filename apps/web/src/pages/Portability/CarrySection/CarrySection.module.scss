@@ -1,0 +1,41 @@
+.summary {
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+}
+
+// Путь к файлу-источнику: моноширинный и приглушённый — он подпись, а не смысл.
+.source {
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  color: var(--color-fg-subtle);
+}
+
+.layer {
+  display: flex;
+  gap: var(--spacing-2xs);
+  align-items: center;
+  cursor: pointer;
+  font-size: var(--font-size-body-sm);
+}
+
+// Строка незакрытого разговора: слева название с каталогом и причиной отказа,
+// справа метки провайдера и времени. Та же сетка, что у строки плана, — обе
+// отвечают на вопрос «что это и откуда», и расходиться им незачем.
+.carryRow {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 1fr);
+  gap: var(--spacing-sm);
+  align-items: start;
+  padding: var(--spacing-2xs) var(--spacing-xs);
+  border-radius: 8px;
+
+  &:nth-child(odd) {
+    background: var(--color-surface-sunken);
+  }
+}

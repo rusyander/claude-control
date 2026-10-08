@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { loadDraft, saveDraft, clearDraft, migrateDraft } from './draft-storage';
+import { loadDraft } from './draft-storage';
+import { saveDraft } from './saveDraft';
+import { clearDraft } from './clearDraft';
+import { migrateDraft } from './migrateDraft';
 
 /**
  * Черновики форм. Ключевое: непустой текст переживает «перезагрузку» (чтение из

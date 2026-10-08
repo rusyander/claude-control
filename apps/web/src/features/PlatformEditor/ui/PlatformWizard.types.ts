@@ -1,6 +1,6 @@
 import type { PlatformStatus } from '@agentdeck/contracts';
 import type { PlatformWizardModel } from '../model/usePlatformWizard';
-import type { WizardStep } from '../model/wizard-logic';
+import type { WizardStep } from '../model/wizard-logic.types';
 
 export interface PlatformWizardProps {
   isOpen: boolean;

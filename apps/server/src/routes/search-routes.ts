@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { ServerContext } from '../context.ts';
-import { searchConfig } from '../domains/search.ts';
+import { searchConfig } from '../domains/search/search.ts';
 
 /**
  * Маршрут глобального поиска. Читающий и без побочных эффектов: агрегирует

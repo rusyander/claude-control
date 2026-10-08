@@ -1,0 +1,17 @@
+// Сводка «длительность · запросы» не разрывается посреди числа и подписи.
+.nowrap {
+  white-space: nowrap;
+}
+
+.sessionRow {
+  padding: var(--spacing-xs) 0;
+
+  &:not(:last-child) {
+    border-bottom: 1px solid var(--color-border);
+  }
+}
+
+// Строка внутри карточки без полей (окно проекта): без отступа текст липнет к рамке.
+.sessionRowInset {
+  padding-inline: var(--spacing-sm);
+}

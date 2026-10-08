@@ -9,10 +9,13 @@ import {
   probeEndpoint,
   readEndpointToken,
   saveEndpointToken,
-} from '../domains/endpoints.ts';
+} from '../domains/endpoints/endpoints.ts';
 import { UnrecognizedFormatError } from '../lib/format-errors.ts';
-import { EnvKeyNotEncodableError, EnvKeyPreservedError } from '../domains/provider-env.ts';
-import { codeOf } from '../lib/server-text.ts';
+import {
+  EnvKeyNotEncodableError,
+  EnvKeyPreservedError,
+} from '../domains/provider-env/provider-env.ts';
+import { codeOf } from '../lib/server-text/server-text.ts';
 
 /**
  * Свой эндпоинт: профили адреса модели, проверка связи и применение профиля к

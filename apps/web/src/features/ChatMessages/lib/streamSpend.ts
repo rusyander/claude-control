@@ -1,5 +1,5 @@
 import type { MessageUsage } from '@agentdeck/contracts';
-import type { StreamedTool } from '@shared/lib/chat-stream';
+import type { StreamedTool } from '../../../shared/lib/chat-stream';
 
 /** Расход шага у вызова живого пузыря и сколько вызовов его делят. */
 export interface StreamStepSpend {

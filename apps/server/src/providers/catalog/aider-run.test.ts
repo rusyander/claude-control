@@ -4,8 +4,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { runProviderCli } from '../../domains/assistant-runner/cli.ts';
-import type { RunAssistantDeps } from '../../domains/assistant-runner.ts';
-import { ProviderChatRun } from '../../domains/provider-chat/ProviderChatRun.ts';
+import type { RunAssistantDeps } from '../../domains/assistant-runner/assistant-runner.ts';
+import { ProviderChatRun } from '../../domains/provider-chat/ProviderChatRun/ProviderChatRun.ts';
 import { getProvider } from '../registry.ts';
 import {
   aiderOneShotArgs,

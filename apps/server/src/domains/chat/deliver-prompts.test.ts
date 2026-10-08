@@ -2,9 +2,13 @@ import { describe, it, expect } from 'vitest';
 import { deliverStagePrompt, fixStagePrompt } from '@agentdeck/contracts/model-cascade';
 import { deliveryPreamble } from '@agentdeck/contracts/task-split';
 import type { SplitPlanRecord } from '../../lib/app-store/app-store.types.ts';
-import { asksDelivery, planCascadeStage } from './ChatCascadeStages.ts';
-import { CHILD_PROMPT } from './initiative.ts';
-import { SplitConveyor, deliveryNudgePrompt, type SplitConveyorDeps } from './split-conveyor.ts';
+import { asksDelivery, planCascadeStage } from './ChatCascadeStages/ChatCascadeStages.ts';
+import { CHILD_PROMPT } from './initiative/initiative.ts';
+import {
+  SplitConveyor,
+  deliveryNudgePrompt,
+  type SplitConveyorDeps,
+} from './split-conveyor/split-conveyor.ts';
 
 /**
  * Тексты доставки группы разделения (журнал 59d, 61b, 78): что звенья читают

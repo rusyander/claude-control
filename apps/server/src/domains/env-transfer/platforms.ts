@@ -1,10 +1,10 @@
 import type { Platform, PlatformGatewaySettings } from '@agentdeck/contracts';
 import { platformGatewaySettingsSchema, platformsSchema } from '@agentdeck/contracts/platform';
-import { withLegacyConsumers } from '../platform/store.ts';
+import { withLegacyConsumers } from '../platform/store/store.ts';
 import { driverOf } from '../platform/drivers/index.ts';
-import { brokenExclusion } from '../platform/rules-matrix.ts';
+import { brokenExclusion } from '../platform/rules-matrix/rules-matrix.ts';
 import type { ChecklistItem } from './collect/types.ts';
-import { serverText } from '../../lib/server-texts.ts';
+import { serverText } from '../../lib/server-texts/server-texts.ts';
 import type { CodedFields } from '@agentdeck/contracts/server-messages';
 
 /**
@@ -283,7 +283,7 @@ function parsePanelPlatforms(
 
 /*
  * Подстановка прежнего поведения для архива, собранного ДО Т3, живёт в
- * `domains/platform/store.ts` рядом с самим правилом (`consumersOf`): дверей,
+ * `domains/platform/store/store.ts` рядом с самим правилом (`consumersOf`): дверей,
  * через которые контур приезжает извне, три — архив, снимок настроек и PATCH, —
  * и три копии одного правила разъехались бы на первой же правке.
  */

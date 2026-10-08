@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { getProvider } from '../../providers/registry.ts';
-import { runAssistant, type RunAssistantDeps } from '../assistant-runner.ts';
+import { runAssistant, type RunAssistantDeps } from './assistant-runner.ts';
 
 /**
  * Ассистент форм и структуры идёт тем же `oneShotArgs`, что и чат, — значит, и

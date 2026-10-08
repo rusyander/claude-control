@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { pickShot, shotFallbackChain, shotLangOf } from './shotVariant';
+import { shotFallbackChain } from './shotVariant';
 import type { ShotVariantIndex } from './shotVariant.types';
+import { shotLangOf } from './shotLangOf';
+import { pickShot } from './pickShot';
 
 /**
  * Выбор кадра под тему и язык панели. Ошибка здесь не падает: справка просто

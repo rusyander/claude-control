@@ -3,10 +3,10 @@ import { SymbolView } from 'expo-symbols';
 import { colors } from '../../src/shared/config/theme';
 import { useT } from '../../src/shared/config/i18n';
 import { PENDING_POLL_MS, usePanelAgentPending } from '../../src/entities/panel-agent/api';
-import { isConfigured, useConnection } from '../../src/shared/api/connection';
-import { pendingCount } from '../../src/entities/inbox/model';
+import { useConnection, isConfigured } from '../../src/shared/api/connection';
 import { useSent } from '../../src/features/inbox/sent';
 import { useInboxChats } from '../../src/features/inbox/useInboxChats';
+import { pendingCount } from '../../src/entities/inbox/pendingCount';
 
 /**
  * Пять вкладок — ровно то, ради чего приложение существует: главная (что идёт и кто ждёт),

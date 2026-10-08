@@ -7,7 +7,7 @@ import {
   saveProviderSkill,
   deleteProviderSkill,
   describeSkillError,
-} from '../../domains/provider-skills.ts';
+} from '../../domains/provider-skills/provider-skills.ts';
 import { done } from '../write-result.ts';
 import { guardedBy, requireTarget } from './target.ts';
 import { INVALID_SKILL_DRAFT, SKILLS_UNSUPPORTED } from './messages.ts';

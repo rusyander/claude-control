@@ -1,0 +1,48 @@
+.row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+  cursor: pointer;
+}
+
+/* Место флажка у «оставить»: причины всех советов начинаются с одной колонки. */
+.spacer {
+  width: 13px;
+}
+
+.reason {
+  max-width: 72ch;
+  padding-left: calc(13px + var(--spacing-xs));
+}
+
+/* Текст замены от модели: читается до применения, команда хука — сразу открыта. */
+.replacement {
+  padding-left: calc(13px + var(--spacing-xs));
+
+  summary {
+    cursor: pointer;
+  }
+}
+
+.code {
+  max-height: 240px;
+  margin: var(--spacing-3xs) 0 0;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  overflow: auto;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--color-surface-sunken);
+  border-radius: 8px;
+}

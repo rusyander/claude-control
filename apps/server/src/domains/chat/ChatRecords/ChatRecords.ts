@@ -1,0 +1,418 @@
+import type { ChatSummary, ChatBlock, MessageUsage } from '@agentdeck/contracts';
+import { splitAttachments } from '@agentdeck/contracts/uploads';
+import { mediaRequestOf } from '@agentdeck/contracts/media-block';
+import { mediaTitle } from '@agentdeck/contracts/chat-title';
+import { stripChildrenBrief } from '../children-brief/children-brief.ts';
+import { withoutPanelPreamble } from '../panel-preamble.ts';
+
+/**
+ * Разбор одной записи транскрипта: что это за строка и что из неё показывать.
+ *
+ * Здесь только толкование уже прочитанных записей — файлов этот слой не
+ * открывает и о размерах ничего не знает (чтение живёт в `ChatTranscriptFile`).
+ */
+
+/**
+ * Сколько вопрос агента считается ожиданием ответа.
+ *
+ * Процесс, задавший вопрос, живёт минутами: через сутки отвечать уже некуда —
+ * это не «тебя ждут», а брошенный разговор. Без окна одна забытая переписка
+ * месячной давности держала бы метку в браузере зажжённой навсегда, и человек
+ * переставал бы на неё смотреть — ровно то, ради чего метка и заводилась.
+ */
+const AWAITING_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+export interface Record {
+  type?: string;
+  uuid?: string;
+  parentUuid?: string | null;
+  timestamp?: string;
+  cwd?: string;
+  /** Ветка git на момент записи — Claude Code кладёт её в каждую строку. */
+  gitBranch?: string;
+  aiTitle?: string;
+  isMeta?: boolean;
+  isCompactSummary?: boolean;
+  isApiErrorMessage?: boolean;
+  toolUseResult?: unknown;
+  isSidechain?: boolean;
+  /** Служебная вставка CLI; `queued_command` — сообщение человека посреди хода. */
+  attachment?: {
+    type?: string;
+    prompt?: unknown;
+    /** `prompt` — слова человека; `task-notification` — уведомление CLI. */
+    commandMode?: string;
+    /** `peer` — отчёт субагента, а не человек. */
+    origin?: { kind?: string };
+    isMeta?: boolean;
+  };
+  message?: {
+    /** Ход модели: его блоки лежат отдельными строками с одним `id`. */
+    id?: string;
+    role?: string;
+    model?: string;
+    content?: string | ContentBlock[];
+    /** Расход на шаг — модель кладёт его рядом с ответом. */
+    usage?: {
+      input_tokens?: number;
+      output_tokens?: number;
+      cache_read_input_tokens?: number;
+      cache_creation_input_tokens?: number;
+      /** Разбивка записи в кэш по сроку жизни: часовая стоит вдвое дороже. */
+      cache_creation?: { ephemeral_1h_input_tokens?: number };
+    };
+  };
+}
+
+export interface ContentBlock {
+  type: string;
+  text?: string;
+  thinking?: string;
+  name?: string;
+  input?: unknown;
+  /** Идентификатор вызова инструмента — по нему результат сходится с вызовом. */
+  id?: string;
+  tool_use_id?: string;
+  content?: string | ContentBlock[];
+  is_error?: boolean;
+  source?: { type?: string; media_type?: string; data?: string };
+  title?: string;
+}
+
+/**
+ * Запись транскрипта в том виде, в каком её читает панель. Сообщение человека,
+ * написанное посреди хода и отданное модели внутри него (замер CLI 2.1.285),
+ * CLI пишет не репликой, а вставкой `attachment` вида `queued_command`: без
+ * перевода оно пропадало бы из ленты после перезагрузки — человек не видел бы
+ * собственных слов. Здесь оно становится обычной репликой человека на своём месте.
+ */
+export function normalizeRecord(record: Record): Record {
+  const attachment = record.attachment;
+  if (record.type !== 'attachment' || attachment?.type !== 'queued_command') return record;
+  // Та же вставка несёт уведомления CLI и отчёты субагентов — не слова человека (ревью PR #1).
+  if ((attachment.commandMode ?? 'prompt') !== 'prompt') return record;
+  if (attachment.isMeta || attachment.origin?.kind === 'peer') return record;
+  const prompt = attachment.prompt;
+  if (typeof prompt === 'string') {
+    if (!prompt.trim()) return record;
+    return { ...record, type: 'user', message: { role: 'user', content: prompt } };
+  }
+  // Расширение VS Code пишет слова блоками.
+  if (!Array.isArray(prompt)) return record;
+  const blocks = (prompt as ContentBlock[]).filter(
+    (block) => block?.type !== 'text' || Boolean(block.text?.trim()),
+  );
+  if (blocks.length === 0) return record;
+  return { ...record, type: 'user', message: { role: 'user', content: blocks } };
+}
+
+/** Вопрос старше суток — брошенный разговор, а не ожидание ответа. */
+export function withAwaitingWindow(summary: ChatSummary, mtimeMs: number): ChatSummary {
+  if (!summary.awaitingReply) return summary;
+  if (Date.now() - mtimeMs <= AWAITING_WINDOW_MS) return summary;
+  return { ...summary, awaitingReply: undefined };
+}
+
+/** Настоящая реплика диалога, а не служебная запись. */
+/**
+ * Расход на шаг из записи транскрипта.
+ *
+ * Только у ответов модели: реплика человека токенов не тратит, и бейдж «0» на
+ * ней читался бы как сбой подсчёта, а не как «здесь нечего показывать».
+ * Пустой usage (все четыре нуля) отбрасываем по той же причине.
+ *
+ * Стоимость здесь НЕ считается: тарифы живут в кэше прайса, до которого
+ * добирается роут, — история о ценах ничего не знает.
+ */
+export function toUsage(record: Record): MessageUsage | undefined {
+  const usage = record.message?.usage;
+  if (!usage) return undefined;
+
+  const input = usage.input_tokens ?? 0;
+  const output = usage.output_tokens ?? 0;
+  const cacheRead = usage.cache_read_input_tokens ?? 0;
+  const cacheCreation = usage.cache_creation_input_tokens ?? 0;
+  if (!input && !output && !cacheRead && !cacheCreation) return undefined;
+
+  const long = usage.cache_creation?.ephemeral_1h_input_tokens;
+  return {
+    input,
+    output,
+    cacheRead,
+    cacheCreation,
+    cacheCreation1h: long || undefined,
+    model: record.message?.model,
+  };
+}
+
+/**
+ * Разговор стоит на вопросе к человеку.
+ *
+ * Смотрим последнюю запись СО СМЫСЛОМ (служебные — заголовок, отметка о
+ * промпте — пропускаем, ветки субагентов тоже): если это вызов
+ * `AskUserQuestion`, ответа за ним ещё нет — CLI пишет его следующей строкой,
+ * сразу как человек выбрал вариант. Через `isDialogMessage` это не считается
+ * намеренно: тот прячет результаты инструментов, и ответ на вопрос перестал бы
+ * гасить признак.
+ */
+export function isAwaitingReply(records: Record[]): boolean {
+  for (let index = records.length - 1; index >= 0; index -= 1) {
+    const record = records[index];
+    if (!record?.message || record.isSidechain) continue;
+    if (record.type !== 'assistant') return false;
+
+    const content = record.message.content;
+    if (!Array.isArray(content)) return false;
+    return content.some((block) => block.type === 'tool_use' && block.name === 'AskUserQuestion');
+  }
+
+  return false;
+}
+
+/**
+ * Сколько реплик в записях. Ход модели лежит в транскрипте НЕСКОЛЬКИМИ строками
+ * — по одной на блок содержимого (размышление, вызов, текст), с одним
+ * `message.id`, — и считать строки значило бы завышать число реплик в разы.
+ * Лента (`readChatMessages`) сводит их так же.
+ */
+export function countDialogMessages(records: Record[]): number {
+  let count = 0;
+  let lastId: string | undefined;
+
+  for (const record of records) {
+    if (!isDialogMessage(record)) continue;
+    const id = record.type === 'assistant' ? record.message?.id : undefined;
+    if (id && id === lastId) continue;
+    lastId = id;
+    count += 1;
+  }
+
+  return count;
+}
+
+export function isDialogMessage(record: Record): boolean {
+  if (record.type !== 'user' && record.type !== 'assistant') return false;
+  if (record.isMeta || record.isCompactSummary || record.isApiErrorMessage) return false;
+  // У результата инструмента есть разобранный результат — это не реплика.
+  if (record.type === 'user' && record.toolUseResult !== undefined) return false;
+
+  const content = record.message?.content;
+  if (Array.isArray(content) && content.every((block) => block.type === 'tool_result'))
+    return false;
+
+  // Отметка самого CLI: в пакетном режиме он дописывает её в конец хода, когда
+  // отвечать не на что. Репликой разговора она не является и в ленте только
+  // разбивает переписку пустыми вставками.
+  if (isSyntheticReply(record)) return false;
+
+  return true;
+}
+
+/**
+ * Запись «ответа», которого модель не давала: CLI пишет её сам (`model:
+ * <synthetic>`), например «No response requested.» при `--resume` до первого
+ * слова модели. Ни репликой, ни концом хода она не является (журнал 96: после
+ * продолжения группы последним ответом считалась эта заглушка).
+ */
+export function isSyntheticReply(record: Record): boolean {
+  if (record.type !== 'assistant') return false;
+  return (
+    record.message?.model === '<synthetic>' || textOf(record).trim() === 'No response requested.'
+  );
+}
+
+/**
+ * Первые осмысленные слова человека — из них делается название чата, когда
+ * Claude Code не успел придумать своё. Реплика нередко начинается со служебной
+ * вставки среды (открытый файл, напоминание), после очистки от неё остаётся
+ * пусто или одиночный знак — поэтому идём по репликам, пока не найдётся текст
+ * длиннее символа. Не нашёлся — годится и одиночный: «?» или «а» в названии
+ * лучше, чем кодированное имя папки, которое ставится вместо пустого.
+ */
+export function firstMeaningfulText(
+  records: Record[],
+  shape: (text: string) => string = (text) => text,
+  /** Правка сырого текста ДО очистки: абзацы в нём ещё различимы. */
+  raw: (text: string) => string = (text) => text,
+): string {
+  let single = '';
+
+  for (const record of records) {
+    if (!isDialogMessage(record) || record.type !== 'user') continue;
+
+    const text = shape(cleanText(raw(splitAttachments(textOf(record)).text)));
+    if (text.length > 1) return text;
+    if (text && !single) single = text;
+  }
+
+  return single;
+}
+
+/**
+ * Название чата по первой реплике — без ссылок. Задание, начатое адресом из
+ * трекера, называлось самим адресом, и список показывал
+ * «https://tracker.example.com/browse/…» вместо задачи (живой прогон 24.09.2026).
+ * Сам текст задания (`readChatTask`) ссылки сохраняет: агенту они нужны.
+ * Преамбулы панели (подготовка копии, доставка, задание звена) — тоже мимо:
+ * группы назывались «Панель подготовила эту копию: …» (`panel-preamble.ts`).
+ */
+export function chatTitleText(records: Record[]): string {
+  return firstMeaningfulText(records, withoutLinks, (text) =>
+    withoutPanelPreamble(mediaRequestTitle(text)),
+  );
+}
+
+/**
+ * Просьба режима «Презентация»/«Картинка» — это правила из каталога плюс слова
+ * человека, и разговор звался первой строкой правил, одинаковой у всех колод
+ * (живой прогон 26.09.2026). Название берётся из слов человека.
+ */
+export function mediaRequestTitle(text: string): string {
+  const request = mediaRequestOf(text);
+  // Слово режима — по нему в списке видно, что это колода или картинка.
+  return request ? mediaTitle(request.kind, request.topic) : text;
+}
+
+/**
+ * Первая реплика со словами написана панелью целиком. Название тогда берётся из
+ * следующей реплики человека, а у звена группы это обычно ответ на её вопрос
+ * («Локальный репозиторий»), а не задача — и чат группы звали ответом (живой
+ * прогон 26.09, D8). По этому признаку список предпочитает имя группы.
+ */
+export function opensWithPanel(records: Record[]): boolean {
+  const first = records.find(
+    (record) =>
+      isDialogMessage(record) &&
+      record.type === 'user' &&
+      cleanText(splitAttachments(textOf(record)).text).length > 1,
+  );
+  return Boolean(first) && !cleanText(withoutPanelPreamble(splitAttachments(textOf(first)).text));
+}
+
+/**
+ * Текст без ссылок: от адреса остаётся только ключ задачи трекера (`PROJ-1064`),
+ * если он в адресе есть, — по нему человек и узнаёт задачу. Ищется в пути, а не
+ * в имени хоста: хост вида `a-1.example` ключом не является.
+ */
+export function withoutLinks(text: string): string {
+  return text
+    .replace(/\bhttps?:\/\/[^\s<>"'`]+/gi, (url) => {
+      const path = url.replace(/^https?:\/\/[^/]*/i, '');
+      return ` ${/\b[A-Z][A-Z0-9_]*-\d+\b/.exec(path)?.[0] ?? ''} `;
+    })
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Текст реплики человека без служебного хвоста панели. Блок вложений
+ * («Приложенные файлы: - C:\…») пишет сервер, а не человек, и в заголовке или
+ * превью разговора ему не место: название обрывалось на «…Приложен», а превью
+ * показывало абсолютный путь вместо вопроса.
+ */
+export function humanText(record: Record): string {
+  return cleanText(splitAttachments(textOf(record)).text);
+}
+
+/**
+ * Ветка из записи транскрипта. Claude Code пишет `gitBranch` в каждую строку
+ * и вне репозитория ставит туда `HEAD` — у чатов панели и у папок без git. Это
+ * не ветка (так git не назовёт ни одну), и в списке она читалась как «⎇ HEAD»
+ * вместо «Чат в панели» или имени проекта. Отсечённая HEAD в настоящем
+ * репозитории тоже не ветка — показывать нечего.
+ */
+export function branchOf(record: Record): string | undefined {
+  const branch = record.gitBranch;
+  return branch && branch !== 'HEAD' ? branch : undefined;
+}
+
+export function toBlocks(record: Record): ChatBlock[] {
+  const content = record.message?.content;
+  // Сводку детей (Д6) панель кладёт в начало хода родителя для агента, не для
+  // человека: в пузыре его реплики её быть не должно.
+  const said = (text: string): string => (record.type === 'user' ? stripChildrenBrief(text) : text);
+  if (typeof content === 'string') {
+    const text = said(content);
+    return text.trim() ? [{ type: 'text', text }] : [];
+  }
+  if (!Array.isArray(content)) return [];
+
+  const blocks: ChatBlock[] = [];
+
+  for (const block of content) {
+    if (block.type === 'text' && block.text && said(block.text).trim()) {
+      blocks.push({ type: 'text', text: said(block.text) });
+    } else if (block.type === 'thinking' && block.thinking?.trim()) {
+      blocks.push({ type: 'thinking', text: block.thinking });
+    } else if (block.type === 'tool_use') {
+      blocks.push({
+        type: 'tool',
+        name: block.name ?? '',
+        input: JSON.stringify(block.input ?? {}),
+      });
+    } else if (block.type === 'image' && block.source?.data) {
+      // Картинки лежат в транскрипте прямо в base64.
+      blocks.push({
+        type: 'image',
+        source: `data:${block.source.media_type ?? 'image/png'};base64,${block.source.data}`,
+      });
+    } else if (block.type === 'document') {
+      blocks.push({ type: 'text', text: `📎 ${block.title ?? 'документ'}` });
+    }
+  }
+
+  return blocks;
+}
+
+export function textOf(record: Record | undefined): string {
+  if (!record) return '';
+
+  const content = record.message?.content;
+  if (typeof content === 'string') return content;
+  if (!Array.isArray(content)) return '';
+
+  // Служебная вставка среды часто идёт отдельным блоком перед настоящим
+  // текстом, поэтому склеиваем все текстовые блоки, а не берём первый.
+  return content
+    .filter((block) => block.type === 'text' && block.text)
+    .map((block) => block.text)
+    .join(' ');
+}
+
+/**
+ * Служебные обёртки среды попадают в текст первой реплики и в названии чата
+ * выглядят мусором, поэтому их вырезаем.
+ */
+export function cleanText(text: string): string {
+  return stripChildrenBrief(text)
+    .replace(/<(ide_[a-z_]+|command-[a-z]+|task-notification|system-reminder)>[\s\S]*?<\/\1>/g, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function lastValue<T>(
+  records: Record[],
+  pick: (record: Record) => T | undefined,
+): T | undefined {
+  for (let index = records.length - 1; index >= 0; index -= 1) {
+    const record = records[index];
+    const value = record && pick(record);
+    if (value !== undefined && value !== false) return value as T;
+  }
+
+  return undefined;
+}
+
+/** Первое непустое значение — зеркало `lastValue` для полей, где верно начало. */
+export function firstValue<T>(
+  records: Record[],
+  pick: (record: Record) => T | undefined,
+): T | undefined {
+  for (const record of records) {
+    const value = pick(record);
+    if (value !== undefined && value !== false) return value as T;
+  }
+
+  return undefined;
+}

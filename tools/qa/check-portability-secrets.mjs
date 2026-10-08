@@ -182,12 +182,12 @@ async function probe(damage) {
   // «панель ничего не подставила» стало бы неотличимо от «подставила».
   delete process.env[KEY_VAR];
 
-  const { AppStore } = await import('../../apps/server/src/lib/app-store.ts');
-  const { setStoredKey } = await import('../../apps/server/src/lib/provider-keys.ts');
-  const { spawnCliProcess } = await import('../../apps/server/src/lib/cli-spawn.ts');
+  const { AppStore } = await import('../../apps/server/src/lib/app-store/app-store.ts');
+  const { setStoredKey } = await import('../../apps/server/src/lib/provider-keys/provider-keys.ts');
+  const { spawnCliProcess } = await import('../../apps/server/src/lib/cli-spawn/cli-spawn.ts');
   const { resolveProviderEnvTargetFor, saveProviderEnvVars } =
-    await import('../../apps/server/src/domains/provider-env.ts');
-  const { CATALOG_PROVIDERS } = await import('../../apps/server/src/providers/catalog.ts');
+    await import('../../apps/server/src/domains/provider-env/provider-env.ts');
+  const { CATALOG_PROVIDERS } = await import('../../apps/server/src/providers/catalog/catalog.ts');
   const { buildPortableEnv, describePortableEnv, planSecretFileWrite } =
     await import('../../apps/server/src/domains/portability/supervisor/env-inject.ts');
 

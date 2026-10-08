@@ -1,8 +1,12 @@
 import type { FastifyInstance } from 'fastify';
 import type { PromptGateInfo, PromptGateSettings } from '@agentdeck/contracts';
 import type { ServerContext } from '../context.ts';
-import { applyPromptGate, describePromptGate, type GateLocation } from '../domains/prompt-gate.ts';
-import { codeOf } from '../lib/server-text.ts';
+import {
+  applyPromptGate,
+  describePromptGate,
+  type GateLocation,
+} from '../domains/prompt-gate/prompt-gate.ts';
+import { codeOf } from '../lib/server-text/server-text.ts';
 
 /**
  * Гейт на промпте: состояние и одно действие «привести в соответствие».

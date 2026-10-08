@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { ProjectTestCase, ProjectTestGroup, ProjectTestRiskItem } from '@agentdeck/contracts';
-import { dropEmpty, selectView } from './useTestFilters';
+import { dropEmpty } from '../lib/dropEmpty';
+import { selectView } from '../lib/selectView';
 
 /**
  * Отбор библиотеки: то, что видно на экране, и есть то, что уйдёт в прогон и в

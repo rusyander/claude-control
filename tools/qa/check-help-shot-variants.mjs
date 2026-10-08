@@ -34,7 +34,7 @@ import { chromium } from 'playwright';
 import { REPO, runOnStand, wait } from './throwaway-stand.mjs';
 
 const HELP_ROOT = join(REPO, 'apps/web/public/help');
-const TOPICS_REGISTRY = join(REPO, 'apps/web/src/pages/Help/model/topics.ts');
+const TOPICS_REGISTRY = join(REPO, 'apps/web/src/pages/Help/model/topics.constants.ts');
 const sampleArg = process.argv.indexOf('--topic');
 const SAMPLE = sampleArg > 0 ? process.argv[sampleArg + 1] : 'overview';
 

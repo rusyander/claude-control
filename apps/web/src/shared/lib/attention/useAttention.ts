@@ -1,17 +1,15 @@
 import { useEffect, useMemo, useSyncExternalStore } from 'react';
 import { useActiveRuns } from '@shared/lib/agent-runs';
-import { forgetSeen, getSeen, markSeen, subscribeSeen } from './attentionStore';
-import {
-  attentionReasons,
-  attentionTitle,
-  isLookingAt,
-  quietRunIds,
-  runKeyPrefix,
-  selectAttention,
-  type AttentionView,
-  type AwaitingMark,
-} from './attention';
+import { getSeen, subscribeSeen, markSeen, forgetSeen } from './attentionStore';
 import { applyFaviconBadge } from './favicon';
+import { runKeyPrefix } from './runKeyPrefix';
+import { quietRunIds } from './quietRunIds';
+import { isLookingAt } from './isLookingAt';
+import { attentionTitle } from './attentionTitle';
+import type { AwaitingMark } from './attentionReasons';
+import { attentionReasons } from './attentionReasons';
+import type { AttentionView } from './selectAttention';
+import { selectAttention } from './selectAttention';
 
 /**
  * Метка в самом браузере: точка на значке вкладки и счёт в её заголовке — только

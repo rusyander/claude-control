@@ -19,11 +19,11 @@ import {
   readGroups,
   upsertCase,
   writeGroup,
-} from './store.ts';
-import { readRuns, writeRun } from './runs-store.ts';
-import { syncE2eFolder } from './e2e-sync.ts';
+} from './store/store.ts';
+import { readRuns, writeRun } from './runs-store/runs-store.ts';
+import { syncE2eFolder } from './e2e-sync/e2e-sync.ts';
 import { installFakeRunners, markRunnerInstalled } from './__fixtures__/fake-runners.ts';
-import { playwrightFileArg } from './e2e-command.ts';
+import { playwrightFileArg } from './e2e-command/e2e-command.ts';
 
 /**
  * `pnpm tests` глазами того, кто его зовёт: настоящий процесс `node

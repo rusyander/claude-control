@@ -11,7 +11,7 @@
  *    у истории, поиска и проектов документы были, а кнопки не было, и заметить
  *    это можно было только открыв страницу. Теперь замечает прогон.
  *
- * Список тем берётся из самого реестра `pages/Help/model/topics.ts`: новый
+ * Список тем берётся из самого реестра `pages/Help/model/topics.constants.ts`: новый
  * документ попадает в обе проверки сам, без правки этого файла.
  *
  * Язык только ru: `en.ts` типизирован по `ru.ts`, недостающий ключ там ловит
@@ -25,10 +25,10 @@ import { bypassOnboarding } from './bypass-onboarding.mjs';
 
 const BASE = process.env.APP_URL ?? 'http://localhost:8888';
 
-const registry = await readFile('apps/web/src/pages/Help/model/topics.ts', 'utf8');
+const registry = await readFile('apps/web/src/pages/Help/model/topics.constants.ts', 'utf8');
 const TOPICS = [...new Set([...registry.matchAll(/\bid:\s*'([^']+)'/g)].map((m) => m[1]))];
 if (TOPICS.length === 0) {
-  console.log('Не удалось прочитать список тем из pages/Help/model/topics.ts');
+  console.log('Не удалось прочитать список тем из pages/Help/model/topics.constants.ts');
   process.exit(1);
 }
 

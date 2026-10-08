@@ -1,6 +1,6 @@
 import axios from 'axios';
-import { toErrorMessage } from '@shared/api/client';
-import type { HealthResult } from '../McpServerCard.types';
+import type { HealthResult } from '../McpServerCard/McpServerCard.types';
+import { toErrorMessage } from '../../../shared/api/toErrorMessage';
 
 /**
  * Отказ проверки связи, показанный как результат проверки.

@@ -3,8 +3,8 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { DatePicker } from './date-picker';
-import { todayIso } from './date-picker.lib';
 import type { DateRangeValue } from './date-picker.types';
+import { todayIso } from './todayIso';
 
 /** Выбор даты или диапазона календарём. */
 const meta = {

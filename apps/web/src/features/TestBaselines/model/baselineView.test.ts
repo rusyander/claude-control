@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import type { ProjectTestBaseline } from '@agentdeck/contracts';
-import { baselineTone, isOverThreshold, pickPoint, ratioPercent } from './baselineView';
+import { baselineTone } from './baselineView';
+import { pickPoint } from './pickPoint';
+import { ratioPercent } from './ratioPercent';
+import { isOverThreshold } from './isOverThreshold';
 
 const point = (over: Partial<ProjectTestBaseline>): ProjectTestBaseline => ({
   pointId: 'gui-001',

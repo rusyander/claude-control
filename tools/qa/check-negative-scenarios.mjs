@@ -57,10 +57,13 @@ const SCENARIOS = [
     title: 'Адрес админки вместо api.',
     expects: 'называет ошибку адреса',
     closedBy: [
-      [`${SERVER}/domains/platform/probe.test.ts`, 'адрес админки назван отдельным сообщением'],
-      [`${SERVER}/domains/platform/probe.test.ts`, 'но про админку не выдумываем'],
       [
-        `${SERVER}/domains/platform/gateway/pipeline.integration.test.ts`,
+        `${SERVER}/domains/platform/probe/probe.test.ts`,
+        'адрес админки назван отдельным сообщением',
+      ],
+      [`${SERVER}/domains/platform/probe/probe.test.ts`, 'но про админку не выдумываем'],
+      [
+        `${SERVER}/domains/platform/gateway/pipeline/pipeline.integration.test.ts`,
         '404 на чате называет ОБА чтения',
       ],
     ],
@@ -70,9 +73,12 @@ const SCENARIOS = [
     title: 'Опечатка в адресе, DNS не резолвится',
     expects: 'адрес не отвечает',
     closedBy: [
-      [`${SERVER}/domains/platform/probe.test.ts`, 'вышло время — «не ответил за 15 с»'],
-      [`${SERVER}/domains/platform/ca-fetch.test.ts`, 'мёртвый адрес — отказ обещания'],
-      [`${SERVER}/domains/platform/store.test.ts`, 'неудачная проба НЕ стирает подтверждённое'],
+      [`${SERVER}/domains/platform/probe/probe.test.ts`, 'вышло время — «не ответил за 15 с»'],
+      [`${SERVER}/domains/platform/ca-fetch/ca-fetch.test.ts`, 'мёртвый адрес — отказ обещания'],
+      [
+        `${SERVER}/domains/platform/store/store.test.ts`,
+        'неудачная проба НЕ стирает подтверждённое',
+      ],
     ],
   },
   {
@@ -80,8 +86,14 @@ const SCENARIOS = [
     title: 'Корпоративный или самоподписанный сертификат',
     expects: 'свой корневой сертификат',
     closedBy: [
-      [`${SERVER}/domains/platform/probe.test.ts`, 'подсказка про корневой сертификат компании'],
-      [`${SERVER}/domains/platform/ca-fetch.test.ts`, 'нет присваивания rejectUnauthorized'],
+      [
+        `${SERVER}/domains/platform/probe/probe.test.ts`,
+        'подсказка про корневой сертификат компании',
+      ],
+      [
+        `${SERVER}/domains/platform/ca-fetch/ca-fetch.test.ts`,
+        'нет присваивания rejectUnauthorized',
+      ],
     ],
   },
   {
@@ -90,7 +102,7 @@ const SCENARIOS = [
     expects: 'русской причиной',
     closedBy: [
       [
-        `${SERVER}/domains/platform/gateway/pipeline.integration.test.ts`,
+        `${SERVER}/domains/platform/gateway/pipeline/pipeline.integration.test.ts`,
         'контур не отвечает ⇒ 502 с русской причиной',
       ],
     ],
@@ -100,8 +112,11 @@ const SCENARIOS = [
     title: 'Ключ неверный или отозван',
     expects: 'подсказка про кэш',
     closedBy: [
-      [`${SERVER}/domains/platform/probe.test.ts`, '401 — ключ отклонён, и это сказано словами'],
-      [`${SERVER}/domains/platform/probe.test.ts`, 'подпись про кэш ключа'],
+      [
+        `${SERVER}/domains/platform/probe/probe.test.ts`,
+        '401 — ключ отклонён, и это сказано словами',
+      ],
+      [`${SERVER}/domains/platform/probe/probe.test.ts`, 'подпись про кэш ключа'],
     ],
   },
   {
@@ -115,7 +130,7 @@ const SCENARIOS = [
       'клиенту приходит плоское «invalid API key». Панель называет все пять.',
     closedBy: [
       [
-        `${SERVER}/domains/platform/gateway/pipeline.integration.test.ts`,
+        `${SERVER}/domains/platform/gateway/pipeline/pipeline.integration.test.ts`,
         '401 называет ВСЕ ПЯТЬ причин',
       ],
       // Текст отказа переехал в драйвер (Т1), а оттуда — в таблицу текстов по кодам
@@ -131,7 +146,7 @@ const SCENARIOS = [
     expects: 'все ПЯТЬ причин',
     closedBy: [
       [
-        `${SERVER}/domains/platform/gateway/pipeline.integration.test.ts`,
+        `${SERVER}/domains/platform/gateway/pipeline/pipeline.integration.test.ts`,
         '401 называет ВСЕ ПЯТЬ причин',
       ],
       // Якорь в САМОМ ТЕКСТЕ отказа, а не в комментарии рядом с ним: комментарий
@@ -151,14 +166,14 @@ const SCENARIOS = [
       '(budgetRefusals), а молчащий контур оставляет поля пустыми.',
     closedBy: [
       [
-        `${SERVER}/domains/platform/gateway/pipeline.integration.test.ts`,
+        `${SERVER}/domains/platform/gateway/pipeline/pipeline.integration.test.ts`,
         '402 платформы компании назван бюджетом КЛЮЧА',
       ],
       [
-        `${SERVER}/domains/platform/gateway/pipeline.integration.test.ts`,
+        `${SERVER}/domains/platform/gateway/pipeline/pipeline.integration.test.ts`,
         'новый отказ заменяет прежний целиком',
       ],
-      [`${SERVER}/domains/platform/spend.test.ts`, 'чей это лимит доезжает до экрана'],
+      [`${SERVER}/domains/platform/spend/spend.test.ts`, 'чей это лимит доезжает до экрана'],
     ],
   },
   {
@@ -167,10 +182,10 @@ const SCENARIOS = [
     expects: '403 с именем модели',
     closedBy: [
       [
-        `${SERVER}/domains/platform/gateway/pipeline.integration.test.ts`,
+        `${SERVER}/domains/platform/gateway/pipeline/pipeline.integration.test.ts`,
         '403 называет МОДЕЛЬ и место',
       ],
-      [`${SERVER}/domains/platform/probe.test.ts`, '403 — ключу не разрешено'],
+      [`${SERVER}/domains/platform/probe/probe.test.ts`, '403 — ключу не разрешено'],
     ],
   },
   {
@@ -179,12 +194,12 @@ const SCENARIOS = [
     expects: 'когда повторить',
     closedBy: [
       [
-        `${SERVER}/domains/platform/gateway/upstream.test.ts`,
+        `${SERVER}/domains/platform/gateway/upstream/upstream.test.ts`,
         'повторяем только временное и только на стороне контура',
       ],
-      [`${SERVER}/domains/platform/gateway/upstream.test.ts`, 'третьей попытки нет'],
+      [`${SERVER}/domains/platform/gateway/upstream/upstream.test.ts`, 'третьей попытки нет'],
       [
-        `${SERVER}/domains/platform/gateway/pipeline.integration.test.ts`,
+        `${SERVER}/domains/platform/gateway/pipeline/pipeline.integration.test.ts`,
         '429 говорит, ЧЕРЕЗ СКОЛЬКО повторить',
       ],
     ],
@@ -195,10 +210,10 @@ const SCENARIOS = [
     expects: 'перечень нарушений без текста',
     closedBy: [
       [
-        `${SERVER}/domains/platform/gateway/pipeline.integration.test.ts`,
+        `${SERVER}/domains/platform/gateway/pipeline/pipeline.integration.test.ts`,
         '451 в потоке приходит клиенту терминальной ошибкой',
       ],
-      [`${SERVER}/domains/platform/gateway/status.test.ts`, 'похожая на секрет'],
+      [`${SERVER}/domains/platform/gateway/status/status.test.ts`, 'похожая на секрет'],
     ],
   },
   {
@@ -207,15 +222,18 @@ const SCENARIOS = [
     expects: 'stream_interrupted',
     closedBy: [
       [
-        `${SERVER}/domains/platform/gateway/frames.test.ts`,
+        `${SERVER}/domains/platform/gateway/frames/frames.test.ts`,
         'после обрыва в поток клиента больше ничего не пишется',
       ],
       // Вторая половина обещания: клиенту уходит ТЕРМИНАЛЬНАЯ ошибка, а не тишина.
       [
-        `${SERVER}/domains/platform/gateway/frames.test.ts`,
+        `${SERVER}/domains/platform/gateway/frames/frames.test.ts`,
         'openai получает терминальную ошибку и [DONE]',
       ],
-      [`${SERVER}/domains/platform/violations.test.ts`, 'обрыв в потоке — не «не приняли»'],
+      [
+        `${SERVER}/domains/platform/violations/violations.test.ts`,
+        'обрыв в потоке — не «не приняли»',
+      ],
     ],
   },
   {
@@ -223,9 +241,9 @@ const SCENARIOS = [
     title: 'Реестр моделей не готов — 503',
     expects: 'контур ещё поднимается',
     closedBy: [
-      [`${SERVER}/domains/platform/probe.test.ts`, '503 — контур ещё поднимается'],
+      [`${SERVER}/domains/platform/probe/probe.test.ts`, '503 — контур ещё поднимается'],
       [
-        `${SERVER}/domains/platform/gateway/upstream.test.ts`,
+        `${SERVER}/domains/platform/gateway/upstream/upstream.test.ts`,
         '503 переживается одной повторной попыткой',
       ],
     ],
@@ -236,11 +254,11 @@ const SCENARIOS = [
     expects: 'пометка в списке',
     closedBy: [
       [
-        `${SERVER}/domains/platform/gateway/pipeline.integration.test.ts`,
+        `${SERVER}/domains/platform/gateway/pipeline/pipeline.integration.test.ts`,
         '404 на чате называет ОБА чтения',
       ],
       [
-        `${SERVER}/lib/app-store/platform-health.test.ts`,
+        `${SERVER}/lib/app-store/platform-health/platform-health.test.ts`,
         'исчезнувшая из ответа модель помечается и помнит',
       ],
       [
@@ -254,9 +272,9 @@ const SCENARIOS = [
     title: 'Контур ответил не-JSON: HTML прокси или страница входа',
     expects: 'тело не показывается сырым',
     closedBy: [
-      [`${SERVER}/domains/platform/probe.test.ts`, 'не JSON при 200'],
+      [`${SERVER}/domains/platform/probe/probe.test.ts`, 'не JSON при 200'],
       [
-        `${SERVER}/domains/platform/gateway/pipeline.integration.test.ts`,
+        `${SERVER}/domains/platform/gateway/pipeline/pipeline.integration.test.ts`,
         'и не поток, и не ответ модели',
       ],
     ],
@@ -267,11 +285,11 @@ const SCENARIOS = [
     expects: 'шлюз ходит потоком',
     closedBy: [
       [
-        `${SERVER}/domains/platform/gateway/pipeline.integration.test.ts`,
+        `${SERVER}/domains/platform/gateway/pipeline/pipeline.integration.test.ts`,
         'наверх всё равно уходит поток',
       ],
       [
-        `${SERVER}/domains/platform/gateway/pipeline.integration.test.ts`,
+        `${SERVER}/domains/platform/gateway/pipeline/pipeline.integration.test.ts`,
         'anthropic без потока получает цельное сообщение',
       ],
     ],
@@ -282,11 +300,11 @@ const SCENARIOS = [
     expects: 'учёт не удваивается',
     closedBy: [
       [
-        `${SERVER}/domains/platform/gateway/pipeline.integration.test.ts`,
+        `${SERVER}/domains/platform/gateway/pipeline/pipeline.integration.test.ts`,
         'обрыв не удваивает учёт',
       ],
       [
-        `${SERVER}/domains/platform/gateway/pipeline.integration.test.ts`,
+        `${SERVER}/domains/platform/gateway/pipeline/pipeline.integration.test.ts`,
         'клиент видит ошибку, панель — событие и расход',
       ],
     ],
@@ -300,11 +318,11 @@ const SCENARIOS = [
       'запрос мог дойти и исполниться, и второй такой же — второй списанный расход у контура.',
     closedBy: [
       [
-        `${SERVER}/domains/platform/gateway/upstream.test.ts`,
+        `${SERVER}/domains/platform/gateway/upstream/upstream.test.ts`,
         '503 переживается одной повторной попыткой',
       ],
       [
-        `${SERVER}/domains/platform/gateway/upstream.test.ts`,
+        `${SERVER}/domains/platform/gateway/upstream/upstream.test.ts`,
         'обрыв связи не повторяется: запрос мог дойти',
       ],
     ],
@@ -317,7 +335,10 @@ const SCENARIOS = [
       [`${WEB}/shared/config/i18n/ru.ts`, 'он получит отказ соединения, а не тихо уйдёт в облако'],
       // Поведение, а не подпись: остановленный шлюз ОТПУСКАЕТ порт, и именно
       // поэтому направленный на него CLI получает отказ соединения.
-      [`${SERVER}/domains/platform/gateway/listener.test.ts`, 'остановленный шлюз не держит порт'],
+      [
+        `${SERVER}/domains/platform/gateway/listener/listener.test.ts`,
+        'остановленный шлюз не держит порт',
+      ],
     ],
   },
   {
@@ -325,8 +346,14 @@ const SCENARIOS = [
     title: 'Порт шлюза занят другим процессом',
     expects: 'соседний порт',
     closedBy: [
-      [`${SERVER}/domains/platform/gateway/listener.test.ts`, 'занятый порт уступается соседнему'],
-      [`${SERVER}/domains/platform/gateway/listener.test.ts`, 'доставшийся порт публикуется'],
+      [
+        `${SERVER}/domains/platform/gateway/listener/listener.test.ts`,
+        'занятый порт уступается соседнему',
+      ],
+      [
+        `${SERVER}/domains/platform/gateway/listener/listener.test.ts`,
+        'доставшийся порт публикуется',
+      ],
     ],
   },
   {
@@ -349,13 +376,13 @@ const SCENARIOS = [
       'Сильнее таблицы: раздел показывает СПИСОК контуров, а не один с оговоркой. ' +
       'Строка таблицы писалась, когда страницы ещё не было.',
     closedBy: [
-      [`${SERVER}/domains/platform/store.test.ts`, 'два контура живут рядом'],
+      [`${SERVER}/domains/platform/store/store.test.ts`, 'два контура живут рядом'],
       // Именно перебор списка контуров: короткий «map(» совпал бы с любым
       // другим перебором на странице и пережил бы возврат к одному контуру.
       // После вкладок список идёт из `platforms` и рисует КАРТОЧКУ на каждый
       // контур; перебор того же массива в выборе контура карточек не рисует.
       [
-        `${WEB}/pages/Platform/PlatformPage.tsx`,
+        `${WEB}/pages/Platform/PlatformPage/PlatformPage.tsx`,
         '<PlatformCard\n                    key={status.platform.id}',
       ],
     ],
@@ -365,8 +392,8 @@ const SCENARIOS = [
     title: 'Ключ поменяли в админке — старый работает до истечения кэша',
     expects: 'до истечения кэша',
     closedBy: [
-      [`${SERVER}/domains/platform/probe.test.ts`, 'подпись про кэш ключа'],
-      [`${SERVER}/domains/platform/probe.test.ts`, 'кэшировать нечего'],
+      [`${SERVER}/domains/platform/probe/probe.test.ts`, 'подпись про кэш ключа'],
+      [`${SERVER}/domains/platform/probe/probe.test.ts`, 'кэшировать нечего'],
     ],
   },
   {
@@ -375,10 +402,13 @@ const SCENARIOS = [
     expects: 'журнал диагностики',
     closedBy: [
       [
-        `${SERVER}/domains/platform/gateway/frames.test.ts`,
+        `${SERVER}/domains/platform/gateway/frames/frames.test.ts`,
         'незнакомый кадр попадает в след ИМЕНАМИ ПОЛЕЙ',
       ],
-      [`${SERVER}/domains/platform/gateway/frames.test.ts`, 'нечитаемый кадр наружу не идёт'],
+      [
+        `${SERVER}/domains/platform/gateway/frames/frames.test.ts`,
+        'нечитаемый кадр наружу не идёт',
+      ],
     ],
   },
   {
@@ -387,13 +417,13 @@ const SCENARIOS = [
     expects: 'поток без потолка',
     closedBy: [
       [
-        `${SERVER}/domains/platform/gateway/pipeline.integration.test.ts`,
+        `${SERVER}/domains/platform/gateway/pipeline/pipeline.integration.test.ts`,
         'тело больше 32 МБ отклоняется, не читаясь',
       ],
       // Вторая половина строки, и до ревью Т10 её не было вовсе: потолок
       // ЗАПРОСА закрывал строку про ответ.
       [
-        `${SERVER}/domains/platform/gateway/pipeline.integration.test.ts`,
+        `${SERVER}/domains/platform/gateway/pipeline/pipeline.integration.test.ts`,
         'собранный ответ больше потолка',
       ],
     ],
@@ -403,8 +433,11 @@ const SCENARIOS = [
     title: 'Часы машины ушли',
     expects: 'JWT не используется',
     closedBy: [
-      [`${SERVER}/domains/platform/ca-fetch.test.ts`, 'ключ контура не подписывается временем'],
-      [`${SERVER}/domains/platform/spend.test.ts`, 'день местный, а не UTC'],
+      [
+        `${SERVER}/domains/platform/ca-fetch/ca-fetch.test.ts`,
+        'ключ контура не подписывается временем',
+      ],
+      [`${SERVER}/domains/platform/spend/spend.test.ts`, 'день местный, а не UTC'],
     ],
   },
   {
@@ -415,11 +448,11 @@ const SCENARIOS = [
     // «Failed to authenticate.». Все три места отказа — мост, родная ручка, прокси.
     closedBy: [
       [
-        `${SERVER}/domains/platform/gateway/pipeline.integration.test.ts`,
+        `${SERVER}/domains/platform/gateway/pipeline/pipeline.integration.test.ts`,
         'правило «отклонить» останавливает запрос, и наружу он не уходит',
       ],
       [
-        `${SERVER}/domains/platform/gateway/pipeline.native.integration.test.ts`,
+        `${SERVER}/domains/platform/gateway/pipeline/pipeline.native.integration.test.ts`,
         'правило «отклонить» на родной ручке — 400 invalid_request_error',
       ],
       [`${SERVER}/domains/dlp/DlpProxy.test.ts`, 'отклоняет запрос правилом block'],

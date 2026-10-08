@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { AxiosError, AxiosHeaders } from 'axios';
-import { focusPlanCancel, isPlanRunningRefusal } from './planCancelOffer';
+import { isPlanRunningRefusal } from './planCancelOffer';
+import { focusPlanCancel } from './focusPlanCancel';
 
 /**
  * Отказ 409 «разделение уже идёт» узнаётся по коду сервера, а не по тексту, и

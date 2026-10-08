@@ -49,7 +49,7 @@ const hasConfigDir = existsSync(configDir);
 const chosenId = readChosenProvider();
 const chosen = PROVIDER_CLI_NAMES.find((item) => item.id === chosenId) ?? PROVIDER_CLI_NAMES[0];
 // Чужие CLI только ищем в PATH, `--version` не спрашиваем — как и панель
-// (`providers/detect.ts`): незнакомый CLI может зависнуть на первом запуске.
+// (`providers/detect/detect.ts`): незнакомый CLI может зависнуть на первом запуске.
 const foundOthers = PROVIDER_CLI_NAMES.filter(
   (item) => item.id !== 'claude' && whichCli(item) !== undefined,
 );
@@ -241,7 +241,7 @@ function checkClaudeFiles() {
   // === Файлы конфигурации ===
   // `.claude.json` лежит ВНУТРИ каталога, когда тот задан переменной, и рядом с
   // ним, когда каталог домашний: правило CLI, проверенное живьём (см. комментарий
-  // в `apps/server/src/lib/claude-paths.ts`). Проверять не тот файл — значит
+  // в `apps/server/src/lib/claude-paths/claude-paths.ts`). Проверять не тот файл — значит
   // говорить «отсутствует» про существующий и наоборот.
   const claudeJson = process.env.CLAUDE_CONFIG_DIR
     ? join(configDir, '.claude.json')

@@ -1,5 +1,5 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { GroupKnobsEdit, GroupKnobsView } from '@agentdeck/contracts';
+import { useQuery } from '@tanstack/react-query';
+import type { GroupKnobsView } from '@agentdeck/contracts';
 import { apiClient } from '@shared/api/client';
 import { queryKeys } from '@shared/api/query-keys';
 
@@ -20,18 +20,5 @@ export function useGroupKnobs(id: string, enabled = true) {
     enabled,
     refetchInterval: (query) =>
       (query.state.data?.pending ?? []).length > 0 ? PENDING_POLL_MS : false,
-  });
-}
-
-/** Новые значения одним запросом; `null` у числа — вернуть умолчание скилла. */
-export function useSetGroupKnobs(id: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (values: GroupKnobsEdit['values']) => {
-      const { data } = await apiClient.put<GroupKnobsView>(`/groups/${id}/knobs`, { values });
-      return data;
-    },
-    onSuccess: (view) => queryClient.setQueryData(queryKeys.groupKnobs(id), view),
-    meta: { successMessage: 'toasts.saved' },
   });
 }

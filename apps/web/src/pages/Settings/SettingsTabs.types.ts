@@ -1,5 +1,5 @@
 import type { AppSettings } from '@agentdeck/contracts';
-import type { SettingsTabId } from './model/tabs';
+import type { SettingsTabId } from './model/tabs.types';
 
 export interface SettingsTabsProps {
   active: SettingsTabId;

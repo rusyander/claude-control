@@ -1,16 +1,16 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
-  ANCHOR_TIMEOUT_MS,
-  TYPING_GRACE_MS,
-  WINDOW_SELECTOR,
-  canTakeFocus,
   decisionPress,
+  WINDOW_SELECTOR,
   isEditable,
-  noteKeystroke,
-  noteReturnedFocus,
-  resetTyping,
-  typedRecently,
+  ANCHOR_TIMEOUT_MS,
   watchForAnchor,
+  TYPING_GRACE_MS,
+  typedRecently,
+  noteReturnedFocus,
+  noteKeystroke,
+  resetTyping,
+  canTakeFocus,
 } from './focusAnchor';
 
 /** Разметка-подделка: якорь появляется, когда тест «дорисовал» страницу. */

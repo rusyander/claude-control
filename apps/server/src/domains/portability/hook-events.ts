@@ -1,5 +1,5 @@
 import type { EnvBlocking } from '@agentdeck/contracts/portable-env';
-import type { ConfigProvider } from '../../providers/types.ts';
+import type { ConfigProvider } from '../../providers/types/types.ts';
 import { canonBlockingOfEvent } from './needs.ts';
 
 /**

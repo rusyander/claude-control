@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { PlatformStatus } from '@agentdeck/contracts';
-import { budgetPercent, platformProblem, platformTone } from './state';
+import { platformProblem } from './state';
+import { budgetPercent } from './budgetPercent';
+import { platformTone } from './platformTone';
 
 /**
  * Состояние контура в кармане. Проверяется ПОРЯДОК ответов: у выключенного

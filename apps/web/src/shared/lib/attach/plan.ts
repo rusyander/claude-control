@@ -1,3 +1,5 @@
+import type { AttachRejection } from './plan.types';
+
 /**
  * Что делать с файлами, которые человек приложил к полю агента — кнопкой,
  * перетаскиванием или вставкой из буфера. Решение одно на все поля панели
@@ -9,14 +11,6 @@
 
 /** Предел одного вложения — тот же, что у чата: «до 20 МБ». */
 export const ATTACH_MAX_BYTES = 20 * 1024 * 1024;
-
-/** Отсеянные при вложении — их называют человеку, каждый со своей причиной. */
-export interface AttachRejection {
-  /** Тип, который поле не принимает: только имена. */
-  unsupported: string[];
-  /** Крупнее предела: имя и настоящий размер — «больше 20 МБ» без него не сверить. */
-  tooLarge: { name: string; size: number }[];
-}
 
 export interface AttachPlan<T> extends AttachRejection {
   /** Файлы, которые лягут чипами. */
@@ -47,9 +41,4 @@ export function planAttach<T extends { name: string; size: number }>(
   }
 
   return { accepted, unsupported, tooLarge };
-}
-
-/** Есть ли что сказать человеку. */
-export function hasRejections(rejection: AttachRejection): boolean {
-  return rejection.unsupported.length > 0 || rejection.tooLarge.length > 0;
 }

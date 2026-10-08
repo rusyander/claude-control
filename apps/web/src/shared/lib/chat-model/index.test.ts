@@ -1,17 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import type { ModelInfo } from '@agentdeck/contracts';
 import type { PlatformModelChoice } from '@agentdeck/contracts/platform-models';
-import {
-  modelLabel,
-  MODEL_OPTIONS,
-  EFFORT_LEVELS,
-  modelSelectOptions,
-  platformBypassCaption,
-  platformLayersCaption,
-  platformModelCaption,
-  platformRunChoice,
-  withCurrentValue,
-} from './index';
+import { modelLabel, MODEL_OPTIONS, EFFORT_LEVELS } from './index';
+import { modelSelectOptions } from './modelSelectOptions';
+import { platformRunChoice } from './platformRunChoice';
+import { withCurrentValue } from './withCurrentValue';
+import { platformModelCaption } from './platformModelCaption';
+import { platformBypassCaption } from './platformBypassCaption';
+import { platformLayersCaption } from './platformLayersCaption';
 
 /**
  * Константы и подпись выбора модели/глубины продумывания. Мелочь, но подпись

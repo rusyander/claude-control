@@ -7,14 +7,14 @@ import type {
   EnvSkip,
   McpTransport,
 } from '@agentdeck/contracts/portable-env';
-import { detectClaudeLocation } from '../../../lib/claude-paths.ts';
-import { readJsonFile, readTextFile } from '../../../lib/safe-io.ts';
+import { detectClaudeLocation } from '../../../lib/claude-paths/claude-paths.ts';
+import { readJsonFile, readTextFile } from '../../../lib/safe-io/safe-io.ts';
 import { readClaudeCommands } from '../../commands/claude.ts';
-import { readEnvVars } from '../../env.ts';
-import { readHooksFromFiles } from '../../hooks.ts';
-import { readMcpServers } from '../../mcp.ts';
-import { readPermissions } from '../../permissions.ts';
-import { parseRules } from '../../rules.ts';
+import { readEnvVars } from '../../env/env.ts';
+import { readHooksFromFiles } from '../../hooks/hooks.ts';
+import { readMcpServers } from '../../mcp/mcp.ts';
+import { readPermissions } from '../../permissions/permissions.ts';
+import { parseRules } from '../../rules/rules.ts';
 import { splitFrontmatter } from '../../skills/frontmatter.ts';
 import { disabledSkillsDir } from '../../skills/paths.ts';
 import { readSkills } from '../../skills/read.ts';
@@ -23,7 +23,7 @@ import {
   DEFAULT_INSTRUCTION_FILES_MODE,
   readInstructionFilesChoice,
   resolveInstructionSources,
-} from '../../../lib/instruction-files.ts';
+} from '../../../lib/instruction-files/instruction-files.ts';
 import { expandInstructionText } from '../instruction-imports.ts';
 import {
   commandItem,
@@ -37,7 +37,11 @@ import { normalizeMcpServers, type McpServerInput } from '../normalize-mcp.ts';
 import { normalizeClaudePermissions } from '../normalize-permissions.ts';
 import { sourceFactory } from '../normalize-types.ts';
 import { readClaudePlugins } from '../plugins-claude.ts';
-import { claudeProjectPaths, ProjectRootRequiredError, type ClaudeLevelPaths } from '../project.ts';
+import {
+  claudeProjectPaths,
+  ProjectRootRequiredError,
+  type ClaudeLevelPaths,
+} from '../project/project.ts';
 import { readSubagentsDir } from '../subagents.ts';
 import type { ImportDeps, ImportResult } from '../types.ts';
 import { importStore } from './store-view.ts';

@@ -37,32 +37,3 @@ export function newEndpointProfile(id: string, name: string): EndpointProfile {
     ownerPlatformId: '',
   };
 }
-
-/** Заменить профиль в списке по id (не мутируя исходный массив). */
-export function replaceProfile(
-  profiles: EndpointProfile[],
-  profile: EndpointProfile,
-): EndpointProfile[] {
-  return profiles.map((item) => (item.id === profile.id ? profile : item));
-}
-
-/** Убрать профиль из списка по id. */
-export function removeProfile(profiles: EndpointProfile[], id: string): EndpointProfile[] {
-  return profiles.filter((item) => item.id !== id);
-}
-
-/**
- * Готов ли профиль к применению: адрес обязателен и обязан быть http(s).
- * Проверка та же, что на сервере, — здесь она нужна лишь затем, чтобы кнопка
- * не отправляла заведомо отвергаемое.
- */
-export function isProfileComplete(profile: EndpointProfile): boolean {
-  const url = profile.baseUrl.trim();
-  if (!url) return false;
-  try {
-    const parsed = new URL(url);
-    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
-  } catch {
-    return false;
-  }
-}

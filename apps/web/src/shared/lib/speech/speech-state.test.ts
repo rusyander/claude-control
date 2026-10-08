@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { ru } from '@shared/config/i18n/ru';
 import { en } from '@shared/config/i18n/en';
-import { isReportableSpeechError, nextStateAfterEnd, speechErrorMessageKey } from './speech-state';
+import { speechErrorMessageKey } from './speech-state';
 import type { SpeechErrorKind } from './speech-provider';
+import { isReportableSpeechError } from './isReportableSpeechError';
+import { nextStateAfterEnd } from './nextStateAfterEnd';
 
 /**
  * Регрессия: отказ микрофона не доходил до человека. onError ставил 'error', но

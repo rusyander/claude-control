@@ -1,4 +1,4 @@
-import type { ConfigProvider } from '../../../providers/types.ts';
+import type { ConfigProvider } from '../../../providers/types/types.ts';
 import { CodexAppServerTurn } from './codex-app-server.ts';
 import { GooseAcpTurn } from './goose-acp.ts';
 import { KimiServerTurn } from './kimi-server.ts';

@@ -1,7 +1,7 @@
 import type { ChildProcessWithoutNullStreams } from 'node:child_process';
-import { spawnCliProcess } from '../../../lib/cli-spawn.ts';
-import { killChildTree } from '../../../lib/process-tree.ts';
-import { serverText } from '../../../lib/server-texts.ts';
+import { spawnCliProcess } from '../../../lib/cli-spawn/cli-spawn.ts';
+import { killChildTree } from '../../../lib/process-tree/process-tree.ts';
+import { serverText } from '../../../lib/server-texts/server-texts.ts';
 import { withCodexKit } from '../../kit/codex.ts';
 import { openCodexThread, startCodexTurn, steerCodexTurn } from './codex-session.ts';
 import { decidePermission } from './permission.ts';

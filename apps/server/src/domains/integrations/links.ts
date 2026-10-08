@@ -1,5 +1,5 @@
 import type { IntegrationLink, IntegrationLinks } from '@agentdeck/contracts';
-import type { AppStore } from '../../lib/app-store.ts';
+import type { AppStore } from '../../lib/app-store/app-store.ts';
 import { normalizeProjectPath } from '../../lib/app-store/projects.ts';
 import { WORKTREES_DIR_SUFFIX } from '../project-git/worktrees.ts';
 import { invalidField } from './errors.ts';

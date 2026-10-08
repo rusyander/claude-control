@@ -1,6 +1,6 @@
 import type { ProviderCheckStep } from '@agentdeck/contracts';
 import { getProvider } from '../../providers/registry.ts';
-import { serverText } from '../../lib/server-texts.ts';
+import { serverText } from '../../lib/server-texts/server-texts.ts';
 
 /** Один шаг проверки: путь к файлу добавляем, только если он есть. */
 export function step(

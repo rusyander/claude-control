@@ -1,5 +1,4 @@
-/** Ключ словаря с человеческим названием действия реестра сервера. */
-export const actionTitleKey = (name: string): string => `panelAgent.actions.${name}`;
+import { actionTitleKey } from './actionTitleKey';
 
 /**
  * Название действия для человека: «Создать проект», а не `create_project`.

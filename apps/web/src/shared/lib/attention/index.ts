@@ -1,12 +1,17 @@
-export {
-  selectAttention,
-  attentionTitle,
-  attentionReasons,
-  callsForAttention,
-  isLookingAt,
-  quietRunIds,
-} from './attention';
-export type { AttentionView, AttentionTone, AttentionReason, AwaitingMark } from './attention';
-export { dismissAttention, getSeen, subscribeSeen, markSeen, resetSeen } from './attentionStore';
+export { callsForAttention } from './attention';
+export { selectAttention } from './selectAttention';
+export { attentionReasons } from './attentionReasons';
+export { attentionTitle } from './attentionTitle';
+export { isLookingAt } from './isLookingAt';
+export { quietRunIds } from './quietRunIds';
+export type { AttentionView } from './selectAttention';
+export type { AttentionReason } from './attention.types';
+export type { AttentionTone } from './attention.types';
+export type { AwaitingMark } from './attentionReasons';
+export { getSeen } from './attentionStore';
+export { dismissAttention } from './attentionStore';
+export { markSeen } from './attentionStore';
+export { resetSeen } from './attentionStore';
+export { subscribeSeen } from './attentionStore';
 export { useAttentionBadge } from './useAttention';
 export { applyFaviconBadge } from './favicon';

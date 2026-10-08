@@ -1,5 +1,5 @@
 import type { SplitPlanGroupRecord, SplitPlanRecord } from '../../lib/app-store/app-store.types.ts';
-import { localizeText } from '../../lib/server-texts.ts';
+import { localizeText } from '../../lib/server-texts/server-texts.ts';
 
 /**
  * «Продолжить» человека в строке группы (владелец, 05.10.2026) — группе, которая

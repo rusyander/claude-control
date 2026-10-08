@@ -1,0 +1,38 @@
+// Ниже этой высоты колонки библиотеки не сжимаются, прокручивается страница.
+$library-floor: 320px;
+
+.onboarding {
+  max-width: 720px;
+  padding: var(--spacing-md);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 8px;
+}
+
+.onboardingSteps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.onboardingStep {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--spacing-xs);
+  align-items: start;
+}
+
+// Номер шага, а после выполнения — галочка на его месте: строка не прыгает.
+.onboardingNumber {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  color: var(--color-fg-subtle);
+  font-variant-numeric: tabular-nums;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+}

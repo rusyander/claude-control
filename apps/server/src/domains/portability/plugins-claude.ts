@@ -1,8 +1,8 @@
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import type { EnvItem, EnvItemKind, EnvSkip } from '@agentdeck/contracts/portable-env';
-import type { ConfigProvider } from '../../providers/types.ts';
-import { readJsonFile, readTextFile } from '../../lib/safe-io.ts';
+import type { ConfigProvider } from '../../providers/types/types.ts';
+import { readJsonFile, readTextFile } from '../../lib/safe-io/safe-io.ts';
 import { splitFrontmatter } from '../skills/frontmatter.ts';
 import { envItemId, envSkip } from './canon.ts';
 import { commandItem, pluginItem, skillItem, subagentItem } from './normalize-files.ts';

@@ -1,12 +1,10 @@
 export { useCommands } from './api/CommandApi';
 export { BUILTIN_COMMANDS, type BuiltinCommand } from './model/builtinCommands';
-export {
-  buildCommandRows,
-  builtinRows,
-  filterCommands,
-  filterBySource,
-  countBySource,
-  type CommandRow,
-  type CommandFilter,
-  type CommandLocale,
-} from './model/commandView';
+export { builtinRows } from './model/commandView';
+export { buildCommandRows } from './model/buildCommandRows';
+export { countBySource } from './model/countBySource';
+export { filterBySource } from './model/filterBySource';
+export type { CommandFilter } from './model/commandView.types';
+export { filterCommands } from './model/filterCommands';
+export type { CommandRow } from './model/commandView.types';
+export type { CommandLocale } from './model/commandView.types';

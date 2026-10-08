@@ -1,0 +1,24 @@
+import { Stack } from '@shared/ui/stack';
+import { ProviderSelectorCard } from '../ProviderSelectorCard/ProviderSelectorCard';
+import { ProviderCheckCard } from '../ProviderCheckCard/ProviderCheckCard';
+import { ProviderKeysCard } from '../ProviderKeysCard/ProviderKeysCard';
+import { FormatCheckCard } from '../FormatCheckCard/FormatCheckCard';
+import { KitModesSection } from '../KitModesSection/KitModesSection';
+
+/**
+ * Раздел «Провайдеры»: каким CLI управляет панель, стоит ли он в системе, чем
+ * он авторизуется и совпадают ли форматы его конфигов с опубликованными
+ * схемами. Проверка и сверка форматов отвечают на один вопрос — можно ли
+ * доверять записи в чужой конфиг, — поэтому живут рядом с выбором провайдера.
+ */
+export function ProvidersTab() {
+  return (
+    <Stack gap="var(--spacing-lg)">
+      <ProviderSelectorCard />
+      <ProviderCheckCard />
+      <ProviderKeysCard />
+      <KitModesSection />
+      <FormatCheckCard />
+    </Stack>
+  );
+}

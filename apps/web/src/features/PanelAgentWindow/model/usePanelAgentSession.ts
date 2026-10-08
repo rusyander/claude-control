@@ -22,13 +22,11 @@ import {
   type ConversationState,
   type SealNote,
 } from './conversation';
-import {
-  closeSkippedTurn,
-  readWindowMemory,
-  restoredConversation,
-  sessionStore,
-  writeWindowMemory,
-} from './windowMemory';
+import { sessionStore } from './windowMemory';
+import { restoredConversation } from './restoredConversation';
+import { readWindowMemory } from './readWindowMemory';
+import { writeWindowMemory } from './writeWindowMemory';
+import { closeSkippedTurn } from './closeSkippedTurn';
 
 /** Отказ хода: вкладка отстала от разговора — его продолжили в другой вкладке. */
 const CONVERSATION_STALE: PanelAgentRunRefusalCode = 'conversation_stale';

@@ -1,7 +1,7 @@
 import type { ChildProcessWithoutNullStreams } from 'node:child_process';
-import { spawnCliProcess } from '../../../lib/cli-spawn.ts';
-import { killChildTree } from '../../../lib/process-tree.ts';
-import { freePort } from '../../opencode-serve.ts';
+import { spawnCliProcess } from '../../../lib/cli-spawn/cli-spawn.ts';
+import { killChildTree } from '../../../lib/process-tree/process-tree.ts';
+import { freePort } from '../../opencode-serve/opencode-serve.ts';
 import { decidePermission, pickOption, type PermissionOption } from './permission.ts';
 import type { LivePermissionPolicy, LiveTurn, LiveTurnOptions, LiveTurnResult } from './types.ts';
 

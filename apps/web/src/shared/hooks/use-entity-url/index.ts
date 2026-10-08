@@ -1,1 +1,2 @@
-export { useEntityUrl, useEntityUrlWriter } from './useEntityUrl';
+export { useEntityUrl } from './useEntityUrl';
+export { useEntityUrlWriter } from './useEntityUrlWriter';

@@ -1,5 +1,5 @@
 import type { ChatSummary } from '@agentdeck/contracts';
-import type { ChatTreeView, SplitPlanView } from '@agentdeck/contracts/chat-handoff';
+import type { SplitPlanView } from '@agentdeck/contracts/chat-handoff';
 import { CASCADE_STAGES, type CascadeStage } from '@agentdeck/contracts/model-cascade';
 import type { ActiveRunView } from '@shared/lib/agent-runs';
 import { mergeSplitGroups, splitGroupKey, type ChildStageGroup } from '@features/ChatMessages';
@@ -65,37 +65,6 @@ export function collectChildStages(
   // Порядок старта и группы без чата — общее с лентой чужого CLI: тот же счёт
   // по той же записи конвейера, разный только источник готовых строк.
   return [...mergeSplitGroups(byKey, split), ...retired];
-}
-
-/**
- * Дерево, каким его видит хаб ЭТОГО разговора. Сервер отдаёт дерево по корню,
- * и в чате группы приезжал план всего разделения: хаб звена рисовал все группы
- * «ждёт итога разбора» и кнопки «Остановить всё / Отменить план» чужого плана
- * (живой прогон 26.09, F2). План принадлежит разговору, который его завёл.
- */
-export function treeForChat(
-  tree: ChatTreeView | undefined,
-  chatId: string | undefined,
-): ChatTreeView | undefined {
-  if (!tree?.split || tree.split.parentChatId === chatId) return tree;
-  const own = { ...tree };
-  delete own.split;
-  return own;
-}
-
-/**
- * Решение «До MR» группы, принятое при разделении, — для шапки её чата. Путь
- * копии даёт настройку проекта, а она расходится с планом, запущенным с другим
- * выбором (живой прогон 25.09, O2). Не группа или план не её родителя — нет.
- */
-export function groupDeliverOf(
-  tree: ChatTreeView | undefined,
-  chat: Pick<ChatSummary, 'parentId' | 'groupIndex'> | undefined,
-): boolean | undefined {
-  const split = tree?.split;
-  if (!split || !chat?.parentId || chat.groupIndex === undefined) return undefined;
-  if (split.parentChatId !== chat.parentId) return undefined;
-  return split.groups.find((group) => group.index === chat.groupIndex)?.deliver;
 }
 
 /**

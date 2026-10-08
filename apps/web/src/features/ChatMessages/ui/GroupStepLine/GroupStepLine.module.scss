@@ -1,0 +1,20 @@
+// Строки состояния переносятся, а не режутся многоточием. Это данные, не проза:
+// мера строки (78ch) резала их посреди широкой карточки (владелец 05.10).
+.wrap {
+  max-width: none;
+  overflow-wrap: anywhere;
+}
+
+// Шаг по плану агента: номер жирнее — это первое, что ищут глазами.
+.step {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--spacing-2xs);
+  min-width: 0;
+}
+
+.stepNo {
+  flex: none;
+  font-weight: 600;
+}

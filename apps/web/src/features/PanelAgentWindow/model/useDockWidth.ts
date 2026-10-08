@@ -1,13 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import {
-  DOCK_WIDE_FROM,
-  DOCK_WIDTH_MIN,
-  clampDockWidth,
-  dockWidthMax,
-  localStore,
-  readDockWidth,
-  writeDockWidth,
-} from './dockWidth';
+import { DOCK_WIDE_FROM, dockWidthMax } from './dockWidth';
+import { localStore } from './localStore';
+import { DOCK_WIDTH_MIN } from './dockWidth.constants';
+import { clampDockWidth } from './clampDockWidth';
+import { readDockWidth } from './readDockWidth';
+import { writeDockWidth } from './writeDockWidth';
 
 /** Переменная ширины окна — её же читает отступ страницы (`PanelAgent.module.scss`). */
 const WIDTH_VAR = '--panel-agent-dock-width';

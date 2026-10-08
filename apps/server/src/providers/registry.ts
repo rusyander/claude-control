@@ -1,9 +1,9 @@
 import { basename } from 'node:path';
 import type { AppSettings, ProviderInfo, ProvidersResponse } from '@agentdeck/contracts';
 import { claudeProvider } from './claude.ts';
-import { CATALOG_PROVIDERS } from './catalog.ts';
-import { providerEditsWhenOff } from './edits-control.ts';
-import type { ConfigProvider } from './types.ts';
+import { CATALOG_PROVIDERS } from './catalog/catalog.ts';
+import { providerEditsWhenOff } from './edits-control/edits-control.ts';
+import type { ConfigProvider } from './types/types.ts';
 
 /**
  * Реестр провайдеров конфигурации. Claude — проверенный дефолт и идёт первым;

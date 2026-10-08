@@ -9,17 +9,17 @@ import {
   PANEL_AGENT_FIXED_TOOL_TIMEOUT_MS,
   panelAgentConfirmTimeoutMs,
 } from '@agentdeck/contracts/panel-agent';
-import { AppStore } from '../../lib/app-store.ts';
+import { AppStore } from '../../lib/app-store/app-store.ts';
 import type { ServerContext } from '../../context.ts';
-import { registerAccessGate } from '../../lib/access-gate.ts';
+import { registerAccessGate } from '../../lib/access-gate/access-gate.ts';
 import { registerEmptyBodyGuard } from '../../lib/empty-body.ts';
-import { createEventHub } from '../../lib/event-hub.ts';
-import { allowedOrigins } from '../../lib/origin-guard.ts';
-import { resetCliLookupCache } from '../../providers/detect.ts';
-import { PanelPendingActions } from '../../domains/panel-agent/pending.ts';
-import { registerProjectRoutes } from '../project-routes.ts';
-import { registerPanelAgentRoutes } from './panel-agent-routes.ts';
-import { registerPanelAgentRunRoutes } from './run-routes.ts';
+import { createEventHub } from '../../lib/event-hub/event-hub.ts';
+import { allowedOrigins } from '../../lib/origin-guard/origin-guard.ts';
+import { resetCliLookupCache } from '../../providers/detect/detect.ts';
+import { PanelPendingActions } from '../../domains/panel-agent/pending/pending.ts';
+import { registerProjectRoutes } from '../project-routes/project-routes.ts';
+import { registerPanelAgentRoutes } from './panel-agent-routes/panel-agent-routes.ts';
+import { registerPanelAgentRunRoutes } from './run-routes/run-routes.ts';
 
 /**
  * Срок карточки в ходе агента — по CLI (Z-fix 4, 07.10.2026). Карточка Goose

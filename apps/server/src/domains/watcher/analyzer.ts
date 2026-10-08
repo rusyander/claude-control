@@ -4,10 +4,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { WATCH_SEVERITIES, WATCH_VERDICTS } from '@agentdeck/contracts/watcher';
 import type { WatchSeverity } from '@agentdeck/contracts';
-import { spawnCliProcess } from '../../lib/cli-spawn.ts';
-import { killChildTree } from '../../lib/process-tree.ts';
-import { lightWindowLayers } from '../platform/layers.ts';
-import { panelAgentEnv } from '../panel-agent/runner.ts';
+import { spawnCliProcess } from '../../lib/cli-spawn/cli-spawn.ts';
+import { killChildTree } from '../../lib/process-tree/process-tree.ts';
+import { lightWindowLayers } from '../platform/layers/layers.ts';
+import { panelAgentEnv } from '../panel-agent/runner/runner.ts';
 import type { AnalysisOutcome, WatchEvent, WatchFinding, WatchRemark } from './types.ts';
 import type { ReportLanguage } from './report-texts.ts';
 

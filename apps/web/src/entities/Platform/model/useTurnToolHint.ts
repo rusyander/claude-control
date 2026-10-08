@@ -1,5 +1,5 @@
-import { usePlatformRunPlan } from '../api/PlatformApi';
 import { turnToolHint, type TurnToolHint } from './turnToolHint';
+import { usePlatformRunPlan } from '../api/usePlatformRunPlan';
 
 /**
  * Подсказка хода по плану прогона ЭТОГО потребителя: контур мог вести чат и

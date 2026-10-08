@@ -1,0 +1,77 @@
+// Заголовок группы: «Права», «Разговор».
+.groupTitle {
+  display: block;
+  padding: var(--spacing-2xs) var(--spacing-2xs) var(--spacing-3xs);
+}
+
+// Строка с тумблером кликабельна целиком — попадать в сам тумблер не нужно.
+.row {
+  padding: var(--spacing-2xs);
+  border-radius: 8px;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--color-bg);
+  }
+}
+
+// Строка правила: тумблер и название в ряд, под ними — что именно правило
+// покрывает. Пояснение обязано быть на виду, а не в подсказке мыши: по одному
+// названию «Инфраструктура» человек не решит, что он разрешает.
+.ruleRow {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-2xs);
+  padding: var(--spacing-2xs);
+  border-radius: 8px;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--color-bg);
+  }
+}
+
+.ruleText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.divider {
+  height: 1px;
+  margin: var(--spacing-2xs) 0;
+  background: var(--color-border);
+}
+
+// Пункт-действие: кнопка во всю ширину, слева иконка, текст прижат к ней.
+.item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2xs);
+  width: 100%;
+  padding: var(--spacing-2xs);
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: var(--font-size-body-sm);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--color-bg);
+  }
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: -2px;
+  }
+}

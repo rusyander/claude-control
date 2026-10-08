@@ -1,5 +1,5 @@
 import type { LocalClaudeInfo } from '@agentdeck/contracts/local-models';
-import { readJsonFile, writeJsonFile } from '../../lib/safe-io.ts';
+import { readJsonFile, writeJsonFile } from '../../lib/safe-io/safe-io.ts';
 import { localError } from './errors.ts';
 import type { ClaudeModelPicker, ClaudeSwitchRecord } from './paths.ts';
 

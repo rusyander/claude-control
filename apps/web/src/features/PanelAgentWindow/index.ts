@@ -1,1 +1,1 @@
-export { PanelAgentLauncher } from './ui/PanelAgentLauncher';
+export { PanelAgentLauncher } from './ui/PanelAgentLauncher/PanelAgentLauncher';

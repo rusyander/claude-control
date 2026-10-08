@@ -1,6 +1,6 @@
 import type { WorktreeMirrorSettings } from '@agentdeck/contracts';
 import type { SplitGroupCleaned } from '@agentdeck/contracts/chat-handoff';
-import { git } from '../project-git/exec.ts';
+import { git } from '../project-git/exec/exec.ts';
 import { removeWorktree } from '../project-git/worktrees.ts';
 
 /**

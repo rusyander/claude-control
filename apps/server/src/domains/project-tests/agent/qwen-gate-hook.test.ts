@@ -5,7 +5,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { runScope, startPermissionGate, type RunPermissionGate } from '../run-permissions.ts';
+import {
+  runScope,
+  startPermissionGate,
+  type RunPermissionGate,
+} from '../run-permissions/run-permissions.ts';
 import { decideQwenCall } from './foreign-gate.ts';
 
 /**

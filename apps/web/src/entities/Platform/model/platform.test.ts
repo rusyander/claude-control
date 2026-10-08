@@ -6,17 +6,15 @@ import type {
   PlatformProbeOutcome,
   PlatformStatus,
 } from '@agentdeck/contracts';
-import {
-  isPlatformValid,
-  newPlatform,
-  platformBudgetAlarming,
-  platformCardState,
-  platformIdFromTitle,
-  sortApplyTargets,
-  toolRouteMark,
-  toolRouteOf,
-  validatePlatform,
-} from './platform';
+import { newPlatform } from './newPlatform';
+import { platformIdFromTitle } from './platformIdFromTitle';
+import { toolRouteOf } from './toolRouteOf';
+import { toolRouteMark } from './toolRouteMark';
+import { sortApplyTargets } from './sortApplyTargets';
+import { platformBudgetAlarming } from './platformBudgetAlarming';
+import { validatePlatform } from './validatePlatform';
+import { isPlatformValid } from './isPlatformValid';
+import { platformCardState } from './platformCardState';
 
 describe('маршрут инструментов', () => {
   it('подпись у CLI идёт за маршрутом, а не стоит у каждого типа', () => {

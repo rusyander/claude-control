@@ -1,6 +1,6 @@
 import { CALL_CLOSE, CALL_OPEN } from './protocol.ts';
 import { repairJson, repaired, strictObject, type RepairRound } from './repair.ts';
-import { serverText } from '../../../../lib/server-texts.ts';
+import { serverText } from '../../../../lib/server-texts/server-texts.ts';
 
 /**
  * Разбор ОДНОГО вызова и границы блоков. Состояние потока живёт в `stream.ts`,

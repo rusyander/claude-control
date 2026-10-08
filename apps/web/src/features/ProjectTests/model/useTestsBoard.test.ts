@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import type { ProjectTestGroup } from '@agentdeck/contracts';
-import { messageOf, pickActive, toggleChecked } from './useTestsBoard';
+import { pickActive } from '../lib/pickActive';
+import { toggleChecked } from '../lib/toggleChecked';
+import { messageOf } from '../lib/messageOf';
 
 describe('pickActive', () => {
   const groups: ProjectTestGroup[] = [

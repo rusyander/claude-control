@@ -5,15 +5,13 @@ import {
   saveMcpServer,
   deleteMcpServer,
   migrateMcpServerIdentity,
-  checkMcpHealth,
-  listMcpServerTools,
   assertMcpDraft,
   InvalidMcpDraftError,
   McpServerExistsError,
   McpServerNotFoundError,
-} from '../../domains/mcp.ts';
-import { readEnvLookup } from '../../domains/env.ts';
-import type { EnvLookup } from '../../domains/mcp-client.ts';
+} from '../../domains/mcp/mcp.ts';
+import { readEnvLookup } from '../../domains/env/env.ts';
+import type { EnvLookup } from '../../domains/mcp-client/mcp-client.ts';
 import {
   startOAuth,
   finishOAuth,
@@ -21,10 +19,11 @@ import {
   hasOAuthTokens,
   oauthProviderFor,
   oauthCallbackPage,
-} from '../../domains/mcp-oauth.ts';
+} from '../../domains/mcp-oauth/mcp-oauth.ts';
 import { done } from '../write-result.ts';
 import type { ClaudePaths } from './shared.ts';
-import { codeOf } from '../../lib/server-text.ts';
+import { codeOf } from '../../lib/server-text/server-text.ts';
+import { checkMcpHealth, listMcpServerTools } from '../../domains/mcp/mcp-health.ts';
 
 type McpServer = ReturnType<typeof readMcpServers>[number];
 

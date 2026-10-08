@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { AxiosError, AxiosHeaders } from 'axios';
-import { sandboxDeleteFailedText, sandboxErrorText } from './sandboxError';
+import { sandboxErrorText } from './sandboxError';
+import { sandboxDeleteFailedText } from './sandboxDeleteFailedText';
 
 describe('sandboxErrorText', () => {
   it('достаёт объяснение из конверта ошибки Fastify', () => {

@@ -1,6 +1,6 @@
 import { getActiveProvider } from '../../providers/registry.ts';
-import { providerBackupName } from '../../lib/safe-io.ts';
-import type { ConfigProvider } from '../../providers/types.ts';
+import { providerBackupName } from '../../lib/safe-io/safe-io.ts';
+import type { ConfigProvider } from '../../providers/types/types.ts';
 import type {
   ProviderHooksFormat,
   ProviderHooksSettingsSource,

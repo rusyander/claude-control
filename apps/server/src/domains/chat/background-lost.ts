@@ -1,5 +1,5 @@
 import type { ChatLink } from '../../lib/app-store/app-store.types.ts';
-import type { SplitConveyor } from './split-conveyor.ts';
+import type { SplitConveyor } from './split-conveyor/split-conveyor.ts';
 
 /**
  * Процесс группы разделения ушёл сам, держа фоновые задачи агента (решение

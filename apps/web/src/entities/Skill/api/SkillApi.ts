@@ -1,8 +1,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { Skill, SkillDraft, WriteResult } from '@agentdeck/contracts';
 import { apiClient } from '@shared/api/client';
-import { createEntityApi } from '@shared/api/create-entity-api';
 import { queryKeys } from '@shared/api/query-keys';
+import { createEntityApi } from '../../../shared/api/createEntityApi';
 
 export const skillApi = createEntityApi<Skill, SkillDraft>({
   resource: 'skills',

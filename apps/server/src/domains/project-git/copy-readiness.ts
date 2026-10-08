@@ -1,8 +1,8 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import type { WorktreeMirrorSettings } from '@agentdeck/contracts';
-import { readJsonFile } from '../../lib/safe-io.ts';
-import { serverText } from '../../lib/server-texts.ts';
+import { readJsonFile } from '../../lib/safe-io/safe-io.ts';
+import { serverText } from '../../lib/server-texts/server-texts.ts';
 import { copyProjectAccess, projectKey } from './copy-access.ts';
 import { LINK_DIRS, mirrorLocalLayer } from './mirror-local.ts';
 

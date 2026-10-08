@@ -10,7 +10,7 @@ vi.mock('@shared/api/client', () => ({
 }));
 
 import { agentRuns, getRun } from './agentRunsStore';
-import { pendingBubbles } from './agent-runs.steer';
+import { pendingBubbles } from './pendingBubbles';
 
 /**
  * Слово агенту посреди хода (решение владельца 30.09): как в самом Claude Code —

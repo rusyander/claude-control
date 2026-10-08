@@ -4,7 +4,7 @@ import {
   type OpencodePermissionLevel,
   type OpencodePermissionTool,
 } from '@agentdeck/contracts/vocabulary';
-import { UnrecognizedFormatError } from './codex-toml.ts';
+import { UnrecognizedFormatError } from './codex-toml/codex-toml.ts';
 
 /**
  * Права OpenCode — ключ `permission` в `opencode.json` (OPENCODE-1).

@@ -314,7 +314,7 @@ async function main() {
   const version = spawnSync(exe, ['--version'], { encoding: 'utf8' }).stdout?.trim() ?? '?';
 
   const { enableOverride, disableOverride } =
-    await import('../../apps/server/src/domains/groups/override.ts');
+    await import('../../apps/server/src/domains/groups/override/override.ts');
 
   const stub = await startStub();
   const work = buildProject();

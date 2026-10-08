@@ -4,8 +4,8 @@ import type { TaskSplitReviewDecision } from '@agentdeck/contracts/task-split';
 import type { ChatTreeView } from '@agentdeck/contracts/chat-handoff';
 import { useReviewDecision, useReviewPush, useReviewRetry } from '@entities/ChatTree';
 import { collectReviews, reviewTreeOf, type ReviewDecisionItem } from '@features/ChatMessages';
-import { toErrorMessage } from '@shared/api/client';
 import { toast } from '@shared/lib/toast';
+import { toErrorMessage } from '../../../shared/api/toErrorMessage';
 
 /**
  * Карточки решения по ревью MR у чужого провайдера (Т6).

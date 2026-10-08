@@ -1,6 +1,6 @@
 import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
-import { git } from './exec.ts';
+import { git } from './exec/exec.ts';
 
 /**
  * Lock-файлы, которые установка зависимостей переписывает у себя под ногами.

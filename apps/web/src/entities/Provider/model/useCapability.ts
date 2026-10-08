@@ -1,7 +1,7 @@
 import type { Capability } from '@agentdeck/contracts';
 import { useSettings } from '@entities/AppConfig';
 import { useProviders } from '../api/ProviderApi';
-import { isCapabilityReady } from './gating';
+import { isCapabilityReady } from './isCapabilityReady';
 
 /**
  * Готова ли возможность у активного провайдера — точечный гейт ВНУТРИ страницы.

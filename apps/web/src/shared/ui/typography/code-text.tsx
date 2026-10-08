@@ -1,10 +1,6 @@
 import { Fragment } from 'react';
 import styles from './typography.module.scss';
-
-interface CodeTextProps {
-  /** Текст словаря: фрагменты в обратных кавычках — пути, флаги, имена. */
-  text: string;
-}
+import type { CodeTextProps } from './code-text.types';
 
 /**
  * Строка словаря с фрагментами кода в обратных кавычках.

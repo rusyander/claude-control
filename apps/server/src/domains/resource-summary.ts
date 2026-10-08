@@ -4,7 +4,7 @@ import { projectKey, readPanelJson, writePanelJson } from '../lib/app-store/grou
 import type { EntityToggleDeps } from './entity-toggle.ts';
 import { readJsonBlock } from './groups/answer-block.ts';
 import { GroupRequestError } from './groups/errors.ts';
-import { memberContent } from './groups/members.ts';
+import { memberContent } from './groups/members/members.ts';
 import { singleTurn, type GroupAsk } from './groups/model.ts';
 
 /**

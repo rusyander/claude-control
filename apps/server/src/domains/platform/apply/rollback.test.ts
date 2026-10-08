@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { parse as parseYaml } from 'yaml';
 import type { Platform } from '@agentdeck/contracts';
-import { AppStore } from '../../../lib/app-store.ts';
+import { AppStore } from '../../../lib/app-store/app-store.ts';
 import { applyContour } from './apply.ts';
 import { buildPlatformApplyPlan, type ContourApplyDeps } from './plan.ts';
 import { rollbackContour } from './rollback.ts';

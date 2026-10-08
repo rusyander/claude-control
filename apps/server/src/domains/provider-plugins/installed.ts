@@ -1,7 +1,7 @@
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ProviderInstalledPlugin, ProviderPluginsInfo } from '@agentdeck/contracts';
-import { readTextFile } from '../../lib/safe-io.ts';
+import { readTextFile } from '../../lib/safe-io/safe-io.ts';
 import { parseProviderJsonObject } from '../../lib/provider-json.ts';
 import type { ProviderPluginsTarget } from './types.ts';
 

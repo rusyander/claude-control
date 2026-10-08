@@ -11,11 +11,11 @@ import {
 } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { AppStore } from '../lib/app-store.ts';
+import { AppStore } from '../lib/app-store/app-store.ts';
 import type { ServerContext } from '../context.ts';
 import { registerProviderInstructionsRoutes } from './provider-instructions-routes.ts';
-import { registerProviderProjectRoutes } from './provider-project-routes.ts';
-import { registerProjectRoutes } from './project-routes.ts';
+import { registerProviderProjectRoutes } from './provider-project-routes/provider-project-routes.ts';
+import { registerProjectRoutes } from './project-routes/project-routes.ts';
 
 /**
  * AIDER-1 / AIDER-4 на маршрутах: инструкции-СПИСКОМ и проектный уровень Aider.

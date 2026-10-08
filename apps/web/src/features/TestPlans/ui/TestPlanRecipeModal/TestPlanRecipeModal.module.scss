@@ -1,0 +1,6 @@
+// Строка предпросмотра отбора: разделитель нужен, потому что строк бывает
+// полсотни и читают их сравнением — «этот взяли, а этот нет».
+.previewRow {
+  padding-bottom: var(--spacing-3xs);
+  border-bottom: 1px solid var(--color-border-subtle);
+}

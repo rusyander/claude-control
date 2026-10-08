@@ -4,10 +4,10 @@ import { mkdtempSync, rmSync, readFileSync, writeFileSync, mkdirSync, existsSync
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { ProviderHooksInfo, ProviderSkillsInfo } from '@agentdeck/contracts';
-import { AppStore } from '../lib/app-store.ts';
+import { AppStore } from '../lib/app-store/app-store.ts';
 import type { ServerContext } from '../context.ts';
-import { registerProviderHooksRoutes } from './provider-hooks-routes.ts';
-import { registerProviderSkillsRoutes } from './provider-skills-routes.ts';
+import { registerProviderHooksRoutes } from './provider-hooks-routes/provider-hooks-routes.ts';
+import { registerProviderSkillsRoutes } from './provider-skills-routes/provider-skills-routes.ts';
 
 /**
  * MAP 26, маршруты при активном Codex: `/api/provider-hooks` и `/api/provider-skills`.

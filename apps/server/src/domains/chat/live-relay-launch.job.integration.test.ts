@@ -5,8 +5,8 @@ import { connect } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
-import { RELAY_SCRIPT } from './live-transport.ts';
-import { killPidTree } from '../../lib/process-tree.ts';
+import { RELAY_SCRIPT } from './live-transport/live-transport.ts';
+import { killPidTree } from '../../lib/process-tree/process-tree.ts';
 
 const LAUNCHER = join(import.meta.dirname, 'live-relay-launch.mjs');
 const FAKE_CLI = join(import.meta.dirname, '__fixtures__', 'fake-live-cli.mjs');

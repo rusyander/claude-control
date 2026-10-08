@@ -6,12 +6,12 @@ import {
   deleteProviderMcpServer,
   parseUniversalDraft,
   McpServerExistsError,
-} from '../../domains/provider-mcp.ts';
+} from '../../domains/provider-mcp/provider-mcp.ts';
 import { UnrecognizedFormatError } from '../../lib/format-errors.ts';
 import { done } from '../write-result.ts';
 import { requireTarget } from './target.ts';
 import { FORMAT_UNRECOGNIZED, INVALID_DRAFT, MCP_UNSUPPORTED } from './messages.ts';
-import { codeOf } from '../../lib/server-text.ts';
+import { codeOf } from '../../lib/server-text/server-text.ts';
 
 /** MCP-серверы проекта: тот же универсальный субсет, что и глобально, файл в проекте. */
 export function registerProviderProjectMcpRoutes(app: FastifyInstance, ctx: ServerContext): void {

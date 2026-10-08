@@ -4,7 +4,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import type { ChatSummary } from '@agentdeck/contracts';
 import type { ChatTreeView } from '@agentdeck/contracts/chat-handoff';
 import type { TaskSplitReviewDecision } from '@agentdeck/contracts/task-split';
-import { toErrorMessage } from '@shared/api/client';
 import { agentRuns, type ActiveRunView } from '@shared/lib/agent-runs';
 import { toast } from '@shared/lib/toast';
 import { chatKeys } from '@entities/Chat';
@@ -32,8 +31,11 @@ import {
 } from '@features/ChatMessages';
 import { collectChildQuestions } from '../lib/childQuestions';
 import { collectChildPermissions } from '../lib/childPermissions';
-import { collectChildStages, groupDeliverOf, treeForChat } from '../lib/childStages';
-import { withTreeAsks } from '../lib/treeAsks';
+import { collectChildStages } from '../lib/childStages';
+import { treeForChat } from '../lib/treeForChat';
+import { groupDeliverOf } from '../lib/groupDeliverOf';
+import { withTreeAsks } from '../lib/withTreeAsks';
+import { toErrorMessage } from '../../../shared/api/toErrorMessage';
 
 /** Всё, что родительский разговор знает о своих детях, одним объектом. */
 export interface ChildHub {

@@ -1,7 +1,7 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { CODEX_BLOCKING_EVENTS, CODEX_HOOK_EVENTS } from '../../lib/codex-hook.ts';
-import { buildCapabilities, type ConfigProvider } from '../types.ts';
+import { CODEX_BLOCKING_EVENTS, CODEX_HOOK_EVENTS } from '../../lib/codex-hook/codex-hook.ts';
+import { buildCapabilities, type ConfigProvider } from '../types/types.ts';
 import { codexHome, unimplementedPaths } from './config-dirs.ts';
 
 /**
@@ -103,7 +103,7 @@ export const codexProvider: ConfigProvider = {
   configLocations: () => [codexHome()],
   // Группа Claude едет на прогон накладкой поверх конфига Codex (`-c`, корни
   // скиллов app-server, хуки надзирателем). Пока писатель накладки не
-  // зарегистрирован в `domains/groups/run-layer.ts`, прогон получает честное
+  // зарегистрирован в `domains/groups/run-layer/run-layer.ts`, прогон получает честное
   // «слоя нет», а не тумблер каталогов Claude.
   groupLayer: 'codex-overlay',
   // Ассистент Codex: API — OpenAI (ключ OPENAI_API_KEY), есть рабочий CLI (`codex`).

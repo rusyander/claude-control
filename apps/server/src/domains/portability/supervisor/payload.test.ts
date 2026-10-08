@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CATALOG_PROVIDERS } from '../../../providers/catalog.ts';
+import { CATALOG_PROVIDERS } from '../../../providers/catalog/catalog.ts';
 import {
   SUPERVISOR_COMMON_FIELDS,
   SUPERVISOR_EVENTS,

@@ -5,7 +5,7 @@
  * Скопированный `PageHeader` с чужим `helpTopic` проходит первую проверку и
  * отправляет человека читать не о том разделе, где он стоит.
  *
- * Для каждого раздела из реестра `pages/Help/model/topics.ts` (пара
+ * Для каждого раздела из реестра `pages/Help/model/topics.constants.ts` (пара
  * `id` + `pagePath`): открыть раздел, найти ссылку `/help?topic=…` (в шапке или
  * в собственном меню раздела), убедиться, что её тема — одна из тем ЭТОГО пути,
  * нажать и увидеть адрес справки с той же темой. Ничего не пишет.
@@ -18,7 +18,7 @@ import { bypassOnboarding } from './bypass-onboarding.mjs';
 
 const BASE = process.env.APP_URL ?? 'http://localhost:8888';
 
-const registry = await readFile('apps/web/src/pages/Help/model/topics.ts', 'utf8');
+const registry = await readFile('apps/web/src/pages/Help/model/topics.constants.ts', 'utf8');
 // `[^{}]` не даёт шаблону перешагнуть в соседнюю запись.
 const byPath = new Map();
 for (const match of registry.matchAll(/\{\s*id:\s*'([^']+)'[^{}]*?pagePath:\s*'([^']+)'/g)) {
@@ -27,7 +27,7 @@ for (const match of registry.matchAll(/\{\s*id:\s*'([^']+)'[^{}]*?pagePath:\s*'(
   byPath.set(match[2], set);
 }
 if (byPath.size === 0) {
-  console.log('Не удалось прочитать пары тема → раздел из pages/Help/model/topics.ts');
+  console.log('Не удалось прочитать пары тема → раздел из pages/Help/model/topics.constants.ts');
   process.exit(1);
 }
 

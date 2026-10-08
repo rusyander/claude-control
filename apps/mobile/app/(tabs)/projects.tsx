@@ -4,12 +4,13 @@ import { useRouter } from 'expo-router';
 import { Button, Card, Empty, Loading, Mono, Muted, Row, Screen, Title } from '../../src/shared/ui';
 import { colors, font, radius, space } from '../../src/shared/config/theme';
 import { useT } from '../../src/shared/config/i18n';
-import { isConfigured, useConnection } from '../../src/shared/api/connection';
-import { openProject, useWorkspace } from '../../src/shared/lib/workspace';
-import { useFsList, useFsRoots } from '../../src/entities/project/api';
-import { useChatProjects } from '../../src/entities/chat/api';
-import { GitPanel } from '../../src/features/git/GitPanel';
-import { Worktrees } from '../../src/features/git/Worktrees';
+import { useConnection, isConfigured } from '../../src/shared/api/connection';
+import { useWorkspace, openProject } from '../../src/shared/lib/workspace';
+import { useFsRoots } from '../../src/entities/project/api';
+import { GitPanel } from '../../src/features/git/GitPanel/GitPanel';
+import { Worktrees } from '../../src/features/git/Worktrees/Worktrees';
+import { useChatProjects } from '../../src/entities/chat/useChatProjects';
+import { useFsList } from '../../src/entities/project/useFsList';
 
 /**
  * Выбор проекта: недавние — и обзор файловой системы машины, где стоит панель.

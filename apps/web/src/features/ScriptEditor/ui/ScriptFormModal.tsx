@@ -8,14 +8,15 @@ import { Typography } from '@shared/ui/typography';
 import { FormWithAssistant } from '@shared/ui/form-with-assistant';
 import { Card } from '@shared/ui/card';
 import { BulkPresets } from '@shared/ui/bulk-presets';
-import { toErrorMessage } from '@shared/api/client';
 import { toLanguage } from '@shared/config/i18n';
 import { useSaveScript, useScriptContent } from '@entities/Script';
 import { useIsCapabilityReady } from '@entities/Provider';
-import { scriptTemplatesFor, newScriptTemplateFor } from '../model/ScriptTemplate';
+import { scriptTemplatesFor } from '../model/ScriptTemplate';
 import { scriptAssistantSpec } from '../model/scriptAssistant';
 import type { ScriptFormModalProps } from './ScriptFormModal.types';
 import styles from './ScriptFormModal.module.scss';
+import { newScriptTemplateFor } from '../model/newScriptTemplateFor';
+import { toErrorMessage } from '../../../shared/api/toErrorMessage';
 
 /**
  * Редактор файла скрипта. В отличие от остальных форм здесь одно большое поле

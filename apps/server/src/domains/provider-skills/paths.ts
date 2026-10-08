@@ -4,7 +4,7 @@ import { getActiveProvider } from '../../providers/registry.ts';
 import { resolveInsideSectionDir, toClientRelative } from '../../lib/section-fs.ts';
 import { SKILL_FILE_NAME } from '../../lib/opencode-skill.ts';
 import { UnsafeSkillPathError } from './errors.ts';
-import type { ConfigProvider } from '../../providers/types.ts';
+import type { ConfigProvider } from '../../providers/types/types.ts';
 import type { ProviderSkillsSettingsSource, ProviderSkillsTarget } from './types.ts';
 
 /**

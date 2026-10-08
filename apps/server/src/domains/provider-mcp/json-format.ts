@@ -1,7 +1,7 @@
 import type { UniversalMcpServer, UniversalMcpServerDraft } from '@agentdeck/contracts';
 import { parseProviderJsonObject } from '../../lib/provider-json.ts';
-import { UnrecognizedFormatError } from '../../lib/codex-toml.ts';
-import { readTextFile, writeTextFile } from '../../lib/safe-io.ts';
+import { UnrecognizedFormatError } from '../../lib/codex-toml/codex-toml.ts';
+import { readTextFile, writeTextFile } from '../../lib/safe-io/safe-io.ts';
 import { JSON_MODELLED_KEYS } from './constants.ts';
 import { backupNameOf } from './target.ts';
 import type { ProviderMcpTarget } from './types.ts';

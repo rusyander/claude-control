@@ -1,0 +1,50 @@
+// Чат чужого провайдера. Раскладка повторяет чат Claude — список разговоров
+// слева, переписка справа, — потому что это одно и то же занятие, и переучивать
+// человека при смене провайдера не за что.
+.shell {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  // Гасим padding области раздела не до нуля, а до ровной рамки в 8px — как в
+  // чате Claude, иначе разделы выглядели бы по-разному.
+  margin: calc(-1 * var(--spacing-lg));
+  overflow: hidden;
+
+  @media (max-width: 900px) {
+    margin: calc(-1 * var(--spacing-xs));
+  }
+
+  @media (max-width: 480px) {
+    margin: calc(-1 * var(--spacing-2xs));
+  }
+}
+
+.page {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  overflow: hidden;
+}
+
+@media (max-width: 900px) {
+  .page {
+    grid-template-columns: 240px minmax(0, 1fr);
+  }
+}
+
+// Узкий экран: две колонки не помещаются — список уезжает наверх отдельной
+// полосой, разговор под ним.
+@media (max-width: 640px) {
+  .page {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+}
+
+.conversation {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}

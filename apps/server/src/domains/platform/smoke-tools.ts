@@ -1,9 +1,9 @@
 import type { Platform, PlatformSmokeTools } from '@agentdeck/contracts';
 import { looksLikeToolCall } from '@agentdeck/contracts/platform-tool-hint';
-import type { PlatformFetch } from './ca-fetch.ts';
-import { toolRouteOf } from './models.ts';
-import { effectivePlatformRules } from './rules-apply.ts';
-import { serverText } from '../../lib/server-texts.ts';
+import type { PlatformFetch } from './ca-fetch/ca-fetch.ts';
+import { toolRouteOf } from './models/models.ts';
+import { effectivePlatformRules } from './rules-apply/rules-apply.ts';
+import { serverText } from '../../lib/server-texts/server-texts.ts';
 
 /**
  * Проба инструментов при активации (развилка 3 CONTOUR-DECISIONS): ОДИН вопрос,

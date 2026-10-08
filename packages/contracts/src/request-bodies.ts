@@ -18,7 +18,7 @@ import {
  * до домена и падало внутри с 500; теперь маршрут отвечает 400 с именем поля.
  *
  * Сервер берёт этот файл по подпути `@agentdeck/contracts/request-bodies`:
- * zod-ЗНАЧЕНИЯ из барреля в Node не резолвятся (см. `providers/settings-validation.ts`).
+ * zod-ЗНАЧЕНИЯ из барреля в Node не резолвятся (см. `providers/settings-validation/settings-validation.ts`).
  * Неизвестные поля zod отбрасывает — клиент новее сервера от этого не ломается.
  */
 

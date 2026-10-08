@@ -1,6 +1,6 @@
 import type { KimiPermissionDraft } from '@agentdeck/contracts';
-import { readTextFile, writeTextFile } from '../../lib/safe-io.ts';
-import { UnrecognizedFormatError } from '../../lib/codex-toml.ts';
+import { readTextFile, writeTextFile } from '../../lib/safe-io/safe-io.ts';
+import { UnrecognizedFormatError } from '../../lib/codex-toml/codex-toml.ts';
 import {
   KIMI_DECISIONS,
   KIMI_DEFAULT_MODE,

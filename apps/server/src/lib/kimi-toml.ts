@@ -11,7 +11,7 @@ import {
   spliceCodexTableRegion,
   stableToml,
   upsertCodexRootScalar,
-} from './codex-toml.ts';
+} from './codex-toml/codex-toml.ts';
 
 /**
  * Права Kimi Code в `config.toml` — седьмая модель прав панели и вторая на TOML.

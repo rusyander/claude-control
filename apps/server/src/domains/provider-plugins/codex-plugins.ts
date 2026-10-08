@@ -5,9 +5,9 @@ import type {
   ProviderPluginMarketplace,
   ProviderPluginsInfo,
 } from '@agentdeck/contracts';
-import { readTextFile, writeTextFile, providerBackupName } from '../../lib/safe-io.ts';
+import { readTextFile, writeTextFile, providerBackupName } from '../../lib/safe-io/safe-io.ts';
 import { parseProviderJsonObject } from '../../lib/provider-json.ts';
-import { setCodexTableBoolean, UnrecognizedFormatError } from '../../lib/codex-toml.ts';
+import { setCodexTableBoolean, UnrecognizedFormatError } from '../../lib/codex-toml/codex-toml.ts';
 import {
   PLUGIN_ACTION_TIMEOUT_MS,
   PLUGIN_LIST_TIMEOUT_MS,

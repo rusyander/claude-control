@@ -33,7 +33,7 @@ import type {
   ProviderCheckResult,
   PushDevice,
 } from '@agentdeck/contracts';
-import { writeJsonFile } from '../safe-io.ts';
+import { writeJsonFile } from '../safe-io/safe-io.ts';
 import {
   addPushDevice as writePushDevice,
   getPushDevices as readPushDevices,
@@ -99,7 +99,7 @@ import {
   forgetPlatformHealth as dropPlatformHealth,
   getPlatformHealth as readPlatformHealth,
   savePlatformHealth as writePlatformHealth,
-} from './platform-health.ts';
+} from './platform-health/platform-health.ts';
 import {
   forgetPlatformApplied as dropPlatformApplied,
   getPlatformApplied as readPlatformApplied,
@@ -154,7 +154,7 @@ import {
   setSplitSettings as writeSplitSettings,
   getSplitDefaults as readSplitDefaults,
   setSplitDefaults as writeSplitDefaults,
-} from './split-settings.ts';
+} from './split-settings/split-settings.ts';
 import {
   addChatEscalation,
   aliasChatSession,
@@ -163,7 +163,7 @@ import {
   listChatEscalations,
   markChatEscalationsRead,
   setChatGroupSettings as writeChatGroupSettings,
-} from './chat-group-settings.ts';
+} from './chat-group-settings/chat-group-settings.ts';
 import {
   forgetMcpHealth as dropMcpHealth,
   getMcpHealth as readMcpHealth,
@@ -612,7 +612,7 @@ export class AppStore {
   /**
    * Где выключен подбор модели под задачу. Отдаём весь список, а не ответ по
    * одному пути: рабочая папка прогона бывает подпапкой проекта и копией ветки,
-   * и сопоставление живёт в домене (`domains/model-cascade.ts`).
+   * и сопоставление живёт в домене (`domains/model-cascade/model-cascade.ts`).
    */
   getProjectCascadeEntries(): Array<[string, boolean]> {
     return readCascadeEntries(this.state);

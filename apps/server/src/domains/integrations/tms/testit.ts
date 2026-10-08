@@ -1,8 +1,8 @@
 import type { TmsPushResult } from '@agentdeck/contracts';
 import { invalidField } from '../errors.ts';
-import { requestJson } from '../http.ts';
+import { requestJson } from '../http/http.ts';
 import type { TmsCase, TmsCaseBatch, TmsClient, TmsRunPush } from './types.ts';
-import { serverText } from '../../../lib/server-texts.ts';
+import { serverText } from '../../../lib/server-texts/server-texts.ts';
 
 /**
  * Test IT: своя установка, `PrivateToken` и ран из выбранных кейсов.

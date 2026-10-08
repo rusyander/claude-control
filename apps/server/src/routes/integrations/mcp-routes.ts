@@ -4,7 +4,7 @@ import {
   isAtlassianMcpRegistered,
   registerAtlassianMcp,
   unregisterAtlassianMcp,
-} from '../../domains/integrations/mcp-server.ts';
+} from '../../domains/integrations/mcp-server/mcp-server.ts';
 import { fail, type IntegrationsDeps } from './shared.ts';
 
 /**
@@ -15,7 +15,7 @@ import { fail, type IntegrationsDeps } from './shared.ts';
  * удобства.
  *
  * Куда именно — решает активный провайдер: у Claude это `~/.claude.json`, у
- * остальных — их собственный файл MCP (`domains/provider-mcp.ts`), с их
+ * остальных — их собственный файл MCP (`domains/provider-mcp/provider-mcp.ts`), с их
  * форматом и их же бэкапом. Провайдер без поддержки MCP записи не получает.
  *
  * В записи НЕТ токена Atlassian. Переходник ходит в саму панель, а к Atlassian

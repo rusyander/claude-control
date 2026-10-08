@@ -1,9 +1,9 @@
 import type { EndpointProfile, Platform } from '@agentdeck/contracts';
-import type { AppStore } from '../../lib/app-store.ts';
-import type { PlatformFetch } from '../platform/ca-fetch.ts';
-import { readPlatforms } from '../platform/store.ts';
+import type { AppStore } from '../../lib/app-store/app-store.ts';
+import type { PlatformFetch } from '../platform/ca-fetch/ca-fetch.ts';
+import { readPlatforms } from '../platform/store/store.ts';
 import { MediaError } from './errors.ts';
-import { coded } from '../../lib/server-text.ts';
+import { coded } from '../../lib/server-text/server-text.ts';
 
 /**
  * Общее для картинок и презентаций: куда панель ходит и как читает чужой ответ.

@@ -4,7 +4,7 @@ import type {
   ServerMessageCode,
   ServerMessageNestedParams,
 } from '@agentdeck/contracts/server-messages';
-import type { RunStatus } from './status';
+import type { RunStatus } from './status.types';
 
 export interface StreamedTool {
   name: string;

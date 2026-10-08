@@ -3,7 +3,7 @@ import {
   GATE_HOOK_TIMEOUT_SEC,
   gateCommandOf,
   installedGateScriptPath,
-} from '../../prompt-gate.ts';
+} from '../../prompt-gate/prompt-gate.ts';
 import type { SupervisorHook } from './run.ts';
 
 /**

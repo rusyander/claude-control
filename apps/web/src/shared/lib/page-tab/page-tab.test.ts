@@ -1,14 +1,12 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import {
-  unknownTabParam,
-  nextPageTab,
-  pageTabStorageKey,
-  pickPageTab,
-  readRememberedPageTab,
-  rememberPageTab,
-  revealScrollLeft,
-  stripScrollDelta,
-} from './page-tab';
+import { pickPageTab } from './page-tab';
+import { unknownTabParam } from './unknownTabParam';
+import { pageTabStorageKey } from './pageTabStorageKey';
+import { readRememberedPageTab } from './readRememberedPageTab';
+import { rememberPageTab } from './rememberPageTab';
+import { nextPageTab } from './nextPageTab';
+import { stripScrollDelta } from './stripScrollDelta';
+import { revealScrollLeft } from './revealScrollLeft';
 
 const IDS = ['proxy', 'rules', 'check'] as const;
 

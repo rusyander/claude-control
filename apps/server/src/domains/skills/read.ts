@@ -1,8 +1,8 @@
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Skill } from '@agentdeck/contracts';
-import { readTextFile } from '../../lib/safe-io.ts';
-import type { AppStore } from '../../lib/app-store.ts';
+import { readTextFile } from '../../lib/safe-io/safe-io.ts';
+import type { AppStore } from '../../lib/app-store/app-store.ts';
 import { splitFrontmatter } from './frontmatter.ts';
 import { disabledSkillsDir } from './paths.ts';
 

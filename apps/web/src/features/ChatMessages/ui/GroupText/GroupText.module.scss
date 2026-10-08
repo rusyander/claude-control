@@ -1,0 +1,56 @@
+// Фишка «на паузе» — та же форма, что у звена конвейера в списке чатов: одно
+// слово в капсуле на утопленной поверхности, читается в обеих темах.
+.chip {
+  flex: none;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--color-surface-sunken);
+  white-space: nowrap;
+}
+
+// Ждут человека — вопрос или решение по ревью: это единственные фишки, после
+// которых работа не пойдёт сама, и они не должны сливаться с «ждёт фон».
+.chipAsk {
+  background: var(--color-warning-subtle);
+  color: var(--color-fg);
+}
+
+// Хвост ответа — цитата, а не состояние: курсивом, чтобы не сливался со строкой
+// ветки и звеньев над ним. Две строки, а не одна (живой прогон 29.09): одной
+// строкой вопрос группы обрывался раньше, чем становилось понятно, о чём он.
+.tail {
+  display: -webkit-box;
+  overflow: hidden;
+  font-style: italic;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow-wrap: anywhere;
+  line-clamp: 2;
+}
+
+// Строки состояния переносятся, а не режутся многоточием. Это данные, не проза:
+// мера строки (78ch) резала их посреди широкой карточки (владелец 05.10).
+.wrap {
+  max-width: none;
+  overflow-wrap: anywhere;
+}
+
+// Ветка — одной строкой, целиком по наведению.
+.branch {
+  display: block;
+  max-width: 100%;
+}
+
+.titleLine {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2xs);
+  min-width: 0;
+}
+
+// Длинное имя ветки не должно распирать карточку: текст ужимается, а не
+// растягивает ленту вбок.
+.text {
+  min-width: 0;
+  flex: 1;
+}

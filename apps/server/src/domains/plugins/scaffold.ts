@@ -1,7 +1,7 @@
 import { existsSync, statSync } from 'node:fs';
 import { isAbsolute, join, resolve, sep } from 'node:path';
 import type { PluginScaffoldRequest, PluginScaffoldResult } from '@agentdeck/contracts';
-import { writeTextFile } from '../../lib/safe-io.ts';
+import { writeTextFile } from '../../lib/safe-io/safe-io.ts';
 import {
   agentTemplate,
   commandTemplate,

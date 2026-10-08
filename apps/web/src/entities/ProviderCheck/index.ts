@@ -1,9 +1,8 @@
-export { useProviderChecks, useRunProviderCheck } from './api/ProviderCheckApi';
-export {
-  findCheck,
-  trustBadge,
-  stepTone,
-  checkScore,
-  type TrustBadge,
-  type TrustTone,
-} from './model/trust';
+export { useProviderChecks } from './api/ProviderCheckApi';
+export { useRunProviderCheck } from './api/useRunProviderCheck';
+export { findCheck } from './model/trust';
+export { trustBadge } from './model/trustBadge';
+export type { TrustBadge } from './model/trustBadge';
+export { stepTone } from './model/stepTone';
+export type { TrustTone } from './model/trust.types';
+export { checkScore } from './model/checkScore';

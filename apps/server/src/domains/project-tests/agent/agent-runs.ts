@@ -1,4 +1,4 @@
-import { ChatRun } from '../../chat/ChatRunner.ts';
+import { ChatRun } from '../../chat/ChatRunner/ChatRunner.ts';
 import type { TestsAgentRun } from './agent-run.types.ts';
 import { CodexTestsRun } from './codex-run.ts';
 import { QwenTestsRun } from './qwen-run.ts';

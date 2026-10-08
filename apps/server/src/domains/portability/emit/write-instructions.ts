@@ -1,11 +1,11 @@
 import { existsSync } from 'node:fs';
 import { basename, join, relative } from 'node:path';
 import type { EnvItem } from '@agentdeck/contracts/portable-env';
-import { providerBackupName, readTextFile, writeTextFile } from '../../../lib/safe-io.ts';
+import { providerBackupName, readTextFile, writeTextFile } from '../../../lib/safe-io/safe-io.ts';
 import {
   readProviderInstructionsEntries,
   saveProviderInstructionsEntries,
-} from '../../provider-instructions.ts';
+} from '../../provider-instructions/provider-instructions.ts';
 import { readProviderRulesInfo } from '../../provider-rules/read.ts';
 import { saveProviderRule } from '../../provider-rules/write.ts';
 import { ruleExtension } from '../../provider-rules/paths.ts';

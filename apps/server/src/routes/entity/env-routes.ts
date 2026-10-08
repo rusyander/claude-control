@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import type { ServerContext } from '../../context.ts';
-import { SecretBackupUnavailableError } from '../../lib/safe-io.ts';
+import { SecretBackupUnavailableError } from '../../lib/safe-io/safe-io.ts';
 import {
   EnvVarExistsError,
   EnvVarNotFoundError,
@@ -11,10 +11,10 @@ import {
   saveEnvVar,
   deleteEnvVar,
   moveEnvVar,
-} from '../../domains/env.ts';
+} from '../../domains/env/env.ts';
 import { done } from '../write-result.ts';
 import type { ClaudePaths } from './shared.ts';
-import { codeOf } from '../../lib/server-text.ts';
+import { codeOf } from '../../lib/server-text/server-text.ts';
 
 /** Ключ и источник из строки запроса — проверяет домен, здесь они «как пришли». */
 interface EnvRefQuery {

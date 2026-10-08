@@ -3,9 +3,16 @@ import { z } from 'zod';
 import type { Group, GroupMember } from '@agentdeck/contracts';
 import type { GroupPathView, PathStep } from '@agentdeck/contracts/group-path';
 import { definePanelAction, type InjectRoute } from './registry.ts';
-import { card, encode, readRoute, routeError, routeFingerprint, stateCard } from './action-kit.ts';
-import { groupDraft, groupInput } from './actions-app.ts';
-import { bilingualField, bothSides, type BilingualText } from './texts.ts';
+import {
+  card,
+  encode,
+  readRoute,
+  routeError,
+  routeFingerprint,
+  stateCard,
+} from './action-kit/action-kit.ts';
+import { groupDraft, groupInput } from './actions-app/actions-app.ts';
+import { bilingualField, bothSides, type BilingualText } from './texts/texts.ts';
 
 /**
  * Черновик сценария одной карточкой: группа с `flow: 'scenario'`, чьи шаги по

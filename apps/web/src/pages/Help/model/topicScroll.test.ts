@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { anchorOf, isHistoryMove, scrollIntent } from './topicScroll';
+import { isHistoryMove } from './topicScroll';
+import { anchorOf } from './anchorOf';
+import { scrollIntent } from './scrollIntent';
 
 /**
  * Кейс help-003: «Следующий раздел» открывал новый документ на высоте прошлого

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { edgeScrollDelta } from '../lib/edgeScrollDelta';
 
 /** Взятый шаг: откуда (индекс в `entries`) и куда его положат (`afterIndex`). */
 export interface DragState {
@@ -33,11 +34,6 @@ interface Options {
   /** Путь сохраняется: ручки остаются на месте (и в фокусе), но жесты не принимаются. */
   isBusy?: boolean;
 }
-
-/** Полоса у края прокрутки, где взятый шаг тянет список за собой (px). */
-const EDGE = 56;
-/** Скорость у самого края, px за кадр; к границе полосы спадает. */
-const MAX_SPEED = 18;
 /** Сколько ждать перерисовки пути, прежде чем перестать возвращать фокус (мс). */
 const FOCUS_WINDOW = 3000;
 
@@ -50,13 +46,6 @@ function scrollParent(node: HTMLElement | null): HTMLElement | null {
     }
   }
   return (document.scrollingElement as HTMLElement | null) ?? null;
-}
-
-/** Сдвиг за кадр: у верхнего края — вверх, у нижнего — вниз, в середине — ноль. */
-export function edgeScrollDelta(y: number, top: number, bottom: number): number {
-  if (y < top + EDGE) return -Math.ceil(MAX_SPEED * Math.min(1, (top + EDGE - y) / EDGE));
-  if (y > bottom - EDGE) return Math.ceil(MAX_SPEED * Math.min(1, (y - (bottom - EDGE)) / EDGE));
-  return 0;
 }
 
 /**

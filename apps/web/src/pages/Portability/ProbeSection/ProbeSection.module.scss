@@ -1,0 +1,96 @@
+.summary {
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+// Корень паспорта — абсолютный путь: пусть жмётся, а не растягивает карточку.
+.root {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: var(--spacing-sm);
+  align-items: start;
+  padding: var(--spacing-2xs) var(--spacing-xs);
+  border-radius: 8px;
+
+  &:nth-child(odd) {
+    background: var(--color-surface-sunken);
+  }
+
+  // Пропуск — не запись: полоса слева отличает «этого мы не прочитали» от
+  // «это у вас есть», не крася строку целиком (бейджи справа сами несут цвет).
+  &[data-skip='true'] {
+    box-shadow: inset 2px 0 0 var(--color-warning);
+  }
+
+  // Пустой раздел — тоже не запись, но и не беда: полоса приглушённая, иначе
+  // страница обычного дома целиком в предупреждениях, и настоящее из них не
+  // видно.
+  &[data-skip='empty'] {
+    box-shadow: inset 2px 0 0 var(--color-border);
+  }
+}
+
+// Намерение записи — целая фраза, и длинная: описание скилла бывает в две
+// строки. Без переноса по словам она уезжает под соседнюю колонку и там
+// обрезается — то есть человек читает половину смысла записи.
+.intent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3xs);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+// Путь к файлу-источнику: моноширинный и приглушённый — он подпись, а не смысл.
+.source {
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  color: var(--color-fg-subtle);
+}
+
+.needs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-3xs);
+  min-width: 0;
+  justify-content: flex-end;
+
+  > * {
+    min-width: 0;
+  }
+}
+
+// Причина «рантайм не нужен» — фраза, а не ярлык: она переносится по словам и
+// выравнивается по правому краю вместе с бейджами фактов.
+.why {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+// На узком экране две колонки не помещаются: требования уходят под намерение,
+// а не жмут его до одного слова в строке.
+@media (width <= 720px) {
+  .row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .needs {
+    justify-content: flex-start;
+  }
+
+  .why {
+    text-align: left;
+  }
+}

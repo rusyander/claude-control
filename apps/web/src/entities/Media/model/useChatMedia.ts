@@ -2,19 +2,20 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { MediaDeck, MediaImage } from '@agentdeck/contracts';
 import { toast } from '@shared/lib/toast';
-import { toErrorMessage } from '@shared/api/client';
-import {
-  useCreateDeck,
-  useCreateImage,
-  useDeckPlan,
-  useImagePlan,
-  useMediaPrompt,
-} from '../api/MediaApi';
+import { useImagePlan } from '../api/MediaApi';
 import type { ComposerMode, ComposerModeState } from './composer-mode';
-import { onComposerModeRequest, takeComposerMode, type ComposerHost } from './composer-request';
-import { deckModeView, imageModeView } from './media-mode';
-import { composerFlags, planMediaSubmit } from './media-submit';
+import { takeComposerMode, type ComposerHost } from './composer-request';
+import { imageModeView } from './media-mode';
+import { planMediaSubmit } from './media-submit';
 import type { MediaRevision } from './revision';
+import { useCreateImage } from '../api/useCreateImage';
+import { useCreateDeck } from '../api/useCreateDeck';
+import { useMediaPrompt } from '../api/useMediaPrompt';
+import { useDeckPlan } from '../api/useDeckPlan';
+import { onComposerModeRequest } from './onComposerModeRequest';
+import { deckModeView } from './deckModeView';
+import { composerFlags } from './composerFlags';
+import { toErrorMessage } from '../../../shared/api/toErrorMessage';
 
 export interface ChatMediaInput {
   /** Разговор, к которому привязать результат. Пусто — черновик без разговора. */

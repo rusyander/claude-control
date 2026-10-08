@@ -32,7 +32,7 @@ import { join, resolve } from 'node:path';
 const home = process.env.USERPROFILE || process.env.HOME || '';
 // Каталог настроек — по правилу настоящего CLI: заданный `CLAUDE_CONFIG_DIR`
 // перебивает дом, и `.claude.json` при нём лежит ВНУТРИ каталога, а не рядом
-// (`apps/server/src/lib/claude-paths.mcp-config.test.ts`, живая проверка
+// (`apps/server/src/lib/claude-paths/claude-paths.mcp-config.test.ts`, живая проверка
 // 18.09.2026). Подделка, читающая по-своему, краснела бы про себя.
 const claudeDir = process.env.CLAUDE_CONFIG_DIR || join(home, '.claude');
 const settingsPath = join(claudeDir, 'settings.json');

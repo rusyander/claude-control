@@ -368,13 +368,14 @@ async function main() {
 
   // Импорт ВНУТРИ функции: наверху он случился бы до перезапуска со снятием
   // типов, и на Node 22.6 сорвался бы на первом же `.ts`.
-  const { ChatRunRegistry } = await import('../../apps/server/src/domains/chat/ChatRunRegistry.ts');
-  const { runLayers } = await import('../../apps/server/src/domains/platform/layers.ts');
+  const { ChatRunRegistry } =
+    await import('../../apps/server/src/domains/chat/ChatRunRegistry/ChatRunRegistry.ts');
+  const { runLayers } = await import('../../apps/server/src/domains/platform/layers/layers.ts');
   const { startPanelAgentRun } =
-    await import('../../apps/server/src/domains/panel-agent/runner.ts');
+    await import('../../apps/server/src/domains/panel-agent/runner/runner.ts');
   const { resolvePanelAgentLaunch } =
     await import('../../apps/server/src/domains/panel-agent/launch.ts');
-  const { AppStore } = await import('../../apps/server/src/lib/app-store.ts');
+  const { AppStore } = await import('../../apps/server/src/lib/app-store/app-store.ts');
   const { defaultOurRules, defaultPlatformRules } =
     await import('../../packages/contracts/src/platform.ts');
   const { KitService } = await import('../../apps/server/src/domains/kit/service.ts');

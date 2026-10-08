@@ -1,0 +1,14 @@
+// Форма ответа на вопрос разбора — под строкой группы, в её же отступе: вопрос
+// про эту группу, и ответ уедет в её план.
+.hold {
+  margin-top: var(--spacing-3xs);
+  padding: var(--spacing-2xs) var(--spacing-xs);
+  border: 1px dashed var(--color-border);
+  border-radius: 8px;
+}
+
+.holdActions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--spacing-2xs);
+}

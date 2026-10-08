@@ -1,0 +1,30 @@
+.rulesColumn {
+  padding: var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  min-width: 0;
+}
+
+.rulesColumnOurs {
+  border-left: 3px solid var(--color-accent);
+}
+
+/* Тумблер и его подпись — одна строка и в узкой колонке: с переносом тумблер
+   уезжал НАД подписью, и было не понять, к какой строке он относится. Двойной
+   класс — сильнее класса переноса у Stack, порядок модулей здесь не гарантирован. */
+.toggleRow.toggleRow {
+  flex-wrap: nowrap;
+
+  > :last-child {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+// Снятые выбором наши слои — пунктиром вокруг блока слоёв, а не всей колонки:
+// маска и прослойка рядом действуют (F-243).
+.layersOff {
+  padding: var(--spacing-xs);
+  border: 1px dashed var(--color-border);
+  border-radius: 8px;
+}

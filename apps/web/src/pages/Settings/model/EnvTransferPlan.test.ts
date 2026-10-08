@@ -4,14 +4,12 @@ import type {
   EnvTransferEntryStatus,
   EnvTransferPromptEntry,
 } from '../EnvTransfer.types';
-import {
-  defaultPlatformSelection,
-  defaultPromptSelection,
-  defaultSelection,
-  isAllSelected,
-  selectableEntries,
-  formatArchiveSize,
-} from './EnvTransferPlan';
+import { selectableEntries } from './EnvTransferPlan';
+import { defaultSelection } from './defaultSelection';
+import { defaultPlatformSelection } from './defaultPlatformSelection';
+import { defaultPromptSelection } from './defaultPromptSelection';
+import { isAllSelected } from './isAllSelected';
+import { formatArchiveSize } from './formatArchiveSize';
 
 const entry = (name: string, status: EnvTransferEntryStatus): EnvTransferPlanEntry => ({
   archivePath: `files/loc-0/${name}`,

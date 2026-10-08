@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { ServerContext } from '../context.ts';
-import type { EventHub } from '../lib/event-hub.ts';
+import type { EventHub } from '../lib/event-hub/event-hub.ts';
 
 /**
  * Как часто в поток уходит пустой комментарий.

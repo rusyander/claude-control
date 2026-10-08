@@ -1,4 +1,3 @@
-import type { SendOutcome } from '@shared/lib/agent-runs';
 import { unsupportedUploadNames } from './uploads';
 
 /**
@@ -26,9 +25,4 @@ export function planSend(text: string, files: { name: string }[]): SendPlan {
   if (names.length > 0) return { action: 'reject', names };
 
   return { action: 'dispatch', prompt };
-}
-
-/** Очищать ли поле ввода: только когда сервер сообщение ПРИНЯЛ. */
-export function clearsComposer(outcome: SendOutcome): boolean {
-  return outcome.ok;
 }

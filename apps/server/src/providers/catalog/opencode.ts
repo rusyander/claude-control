@@ -1,6 +1,6 @@
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { buildCapabilities, type ConfigProvider } from '../types.ts';
+import { buildCapabilities, type ConfigProvider } from '../types/types.ts';
 import { opencodeConfigDir, opencodeConfigFile, unimplementedPaths } from './config-dirs.ts';
 import { contourModelName } from './run-endpoint.ts';
 
@@ -187,7 +187,7 @@ export const opencodeProvider: ConfigProvider = {
     // Без него `run` отклоняет каждую просьбу сам («auto-rejecting»). Просьбы
     // при этом возникают лишь там, где конфигурация OpenCode говорит `ask`:
     // его умолчание — «можно всё», и одиночный запуск слоя правил не получает.
-    // Полный переключатель — у сессии `opencode serve` (`domains/opencode-serve.ts`).
+    // Полный переключатель — у сессии `opencode serve` (`domains/opencode-serve/opencode-serve.ts`).
     oneShotArgs: (prompt, run) => ['run', ...(run?.allowEdits ? ['--auto'] : []), prompt],
     sessionServer: 'opencode',
     editsControl: 'flag',

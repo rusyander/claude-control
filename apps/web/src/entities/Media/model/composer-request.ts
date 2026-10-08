@@ -1,4 +1,5 @@
 import type { ComposerMode } from './composer-mode';
+import { listeners } from './composer-request.constants';
 
 /**
  * Режим, который композер чата должен принять при следующем показе.
@@ -18,7 +19,6 @@ import type { ComposerMode } from './composer-mode';
 export const COMPOSER_REQUEST_TTL_MS = 10_000;
 
 let requested: { mode: ComposerMode; at: number } | undefined;
-const listeners = new Set<() => void>();
 
 export function requestComposerMode(mode: ComposerMode, now = Date.now()): void {
   requested = { mode, at: now };
@@ -39,9 +39,4 @@ export function takeComposerMode(host: ComposerHost, now = Date.now()): Composer
   requested = undefined;
   if (!taken || now - taken.at > COMPOSER_REQUEST_TTL_MS) return undefined;
   return taken.mode;
-}
-
-export function onComposerModeRequest(listener: () => void): () => void {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
 }

@@ -1,68 +1,9 @@
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import type { Analytics } from '@agentdeck/contracts';
-import { api, ApiError } from '../../shared/api/client';
-
-/**
- * Аналитика по транскриптам: расход, модели, проекты, инструменты.
- *
- * Считает всё сервер — он же сканирует файлы. Приложение только показывает: в
- * противном случае телефон и браузер расходились бы в цифрах, и доверия не
- * заслуживал бы ни один.
- *
- * Период устроен как в панели: либо пресет-кнопка, либо произвольный диапазон
- * дат. Одно значение вместо пары «дни + даты» — два независимых состояния
- * разъезжались бы, и было бы неясно, что именно показано.
- */
-
-/** `today` — календарные сутки целиком, `0` — за всё время. */
-export type AnalyticsPreset = 'today' | '7' | '30' | '90' | '0';
-
-export type AnalyticsPeriod =
-  | { kind: 'preset'; preset: AnalyticsPreset }
-  /** Границы — местные календарные дни `YYYY-MM-DD`, обе включительно. */
-  | { kind: 'range'; from: string; to: string };
+import type { AnalyticsPeriod } from './api.types';
+import { analyticsQueryOptions } from './analyticsQueryOptions';
 
 export const DEFAULT_PERIOD: AnalyticsPeriod = { kind: 'preset', preset: '7' };
-
-/** Параметры запроса: сервер понимает либо `days`, либо пару `from`/`to`. */
-export function periodParams(period: AnalyticsPeriod): Record<string, string> {
-  return period.kind === 'range' ? { from: period.from, to: period.to } : { days: period.preset };
-}
-
-/** Ключ кэша: тот же принцип, что в панели. */
-export function periodKey(period: AnalyticsPeriod): string {
-  if (period.kind === 'range') {
-    return period.from === period.to ? period.from : `${period.from}_${period.to}`;
-  }
-  return period.preset;
-}
-
-/**
- * Отказ панели «журналы этого CLI аналитика не читает» (409
- * `analytics-provider-unsupported`): текст уже переведён по коду клиентом
- * запросов. У телефона нет гейта возможностей, как у веба, поэтому отказ —
- * единственное, что не даёт показать под goose или kimi расход Claude.
- */
-export function analyticsRefusal(error: unknown): string | undefined {
-  return error instanceof ApiError && error.status === 409 && error.code === 'provider_unsupported'
-    ? error.message
-    : undefined;
-}
-
-/**
- * Активный CLI входит в ключ: отчёт одного CLI не должен минуту доживать в
- * кэше под другим. Отказ не повторяется — он не временный, повтор только
- * оттянул бы честный ответ.
- */
-export function analyticsQueryOptions(period: AnalyticsPeriod, providerId: string | undefined) {
-  return {
-    queryKey: ['analytics', providerId ?? '', periodKey(period)],
-    queryFn: () => api.get<Analytics>('/analytics', periodParams(period)),
-    // Скан транскриптов не бесплатен, а цифры за сутки не меняются посекундно.
-    staleTime: 60_000,
-    retry: (failures: number, error: Error) => !analyticsRefusal(error) && failures < 1,
-  };
-}
 
 export function useAnalytics(
   period: AnalyticsPeriod,

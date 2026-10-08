@@ -4,12 +4,12 @@ import type {
   CodexPermissionDraft,
   CodexSandboxMode,
 } from '@agentdeck/contracts';
-import { writeTextFile } from '../../lib/safe-io.ts';
+import { writeTextFile } from '../../lib/safe-io/safe-io.ts';
 import {
   UnrecognizedFormatError,
   parseCodexToml,
   upsertCodexRootScalar,
-} from '../../lib/codex-toml.ts';
+} from '../../lib/codex-toml/codex-toml.ts';
 import {
   APPROVAL_POLICIES,
   DEFAULT_APPROVAL,

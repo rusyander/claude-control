@@ -4,8 +4,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join, relative } from 'node:path';
 import type { EnvVarDraft, HookDraft } from '@agentdeck/contracts';
 import type { PanelPreviewNote } from '@agentdeck/contracts/panel-agent';
-import type { AppStore } from '../../lib/app-store.ts';
-import { readJsonFile, removeEntry } from '../../lib/safe-io.ts';
+import type { AppStore } from '../../lib/app-store/app-store.ts';
+import { readJsonFile, removeEntry } from '../../lib/safe-io/safe-io.ts';
 import { isLocalId, stripLocalPrefix } from '../../lib/settings-source.ts';
 import { applyEntityState, findHook, rewriteHooks } from '../entity-toggle.ts';
 import {
@@ -14,10 +14,10 @@ import {
   EnvVarNotFoundError,
   InvalidEnvDraftError,
   saveEnvVar,
-} from '../env.ts';
-import { deleteHook, upsertHook } from '../hooks.ts';
-import { resolveInstructionsTarget, writeInstructions } from '../instructions.ts';
-import { assertMcpServerExists } from '../mcp.ts';
+} from '../env/env.ts';
+import { deleteHook, upsertHook } from '../hooks/hooks.ts';
+import { resolveInstructionsTarget, writeInstructions } from '../instructions/instructions.ts';
+import { assertMcpServerExists } from '../mcp/mcp.ts';
 import {
   createScript,
   deleteScript,
@@ -25,8 +25,8 @@ import {
   saveScript,
   ScriptExistsError,
   UnsafeScriptPathError,
-} from '../scripts.ts';
-import { assertSkillId } from '../skills.ts';
+} from '../scripts/scripts.ts';
+import { assertSkillId } from '../skills/skills.ts';
 import { disabledSkillsDir } from '../skills/paths.ts';
 import {
   failure,
@@ -36,7 +36,7 @@ import {
   type ClaudePaths,
   type ConfigPreviewFile,
 } from './sandbox-diff.ts';
-import { codeOf, coded } from '../../lib/server-text.ts';
+import { codeOf, coded } from '../../lib/server-text/server-text.ts';
 
 /**
  * Предпросмотр второго набора видов (волна A, 17.09.2026): хуки, переменные

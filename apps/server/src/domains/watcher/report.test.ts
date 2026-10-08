@@ -168,7 +168,7 @@ describe('отчёт наблюдателя', () => {
           happened: 'Маршрут бросил исключение.',
           context: 'Открыт чат.',
           verdict: 'confirmed',
-          location: 'apps/server/src/routes/chat-routes.ts:42',
+          location: 'apps/server/src/routes/chat-routes/chat-routes.ts:42',
           fix: 'Проверить поле.',
         },
       }),
@@ -178,7 +178,7 @@ describe('отчёт наблюдателя', () => {
     expect(sections.size).toBe(2);
     expect(sections.get('aaaaaa111111')).toMatchObject({ verdict: 'confirmed', count: 3 });
     expect(text.match(/<!-- watch:aaaaaa111111 /g)).toHaveLength(1);
-    expect(text).toContain('`apps/server/src/routes/chat-routes.ts:42`');
+    expect(text).toContain('`apps/server/src/routes/chat-routes/chat-routes.ts:42`');
     expect(text).toContain('Заметка человека: проверил, воспроизводится.');
     expect(text).toContain('подтверждено 1');
     // Второй раздел остался прежним.

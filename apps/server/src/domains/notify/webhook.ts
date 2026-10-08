@@ -1,6 +1,6 @@
 import { createHmac } from 'node:crypto';
 import type { NotifyEvent, WebhookPayload, WebhookSettings } from '@agentdeck/contracts';
-import { failedResponse, sendRequest } from '../integrations/http.ts';
+import { failedResponse, sendRequest } from '../integrations/http/http.ts';
 import { invalidField } from '../integrations/errors.ts';
 import { compose, noticeEvent, type TelegramNotice } from './telegram.ts';
 import { LEGACY_BRAND_NAME } from '../../lib/brand.mjs';

@@ -1,0 +1,19 @@
+// Пояснение под заголовком раздела: на широком экране карточка тянется во всю
+// колонку, а строка длиннее примерно девяноста символов уже плохо читается —
+// глаз промахивается мимо начала следующей.
+.hint {
+  max-width: 90ch;
+}
+
+// Предупреждение о выбранном экспериментальном провайдере: заметное, но не
+// алармирующее.
+.providerNotice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2xs);
+  align-items: flex-start;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-left: 2px solid var(--color-warning);
+  background: var(--color-warning-subtle);
+  border-radius: var(--radius-sm);
+}

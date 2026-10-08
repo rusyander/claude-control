@@ -1,5 +1,5 @@
 import type { AtlassianDeployment, IntegrationId, IntegrationStatus } from '@agentdeck/contracts';
-import type { AppStore } from '../../lib/app-store.ts';
+import type { AppStore } from '../../lib/app-store/app-store.ts';
 import { telegramMe } from '../notify/telegram.ts';
 import { sendWebhook } from '../notify/webhook.ts';
 import {
@@ -19,10 +19,10 @@ import {
   readIntegrations,
   readToken,
   writeSettings,
-} from './store.ts';
+} from './store/store.ts';
 import { tmsClient } from './tms/index.ts';
-import { coded } from '../../lib/server-text.ts';
-import { serverText } from '../../lib/server-texts.ts';
+import { coded } from '../../lib/server-text/server-text.ts';
+import { serverText } from '../../lib/server-texts/server-texts.ts';
 
 /**
  * «Проверить связь» — одна кнопка на карточку и один вход на все пять систем.

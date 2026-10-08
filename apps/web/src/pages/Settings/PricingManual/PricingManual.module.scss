@@ -1,0 +1,54 @@
+/**
+ * Таблица тарифов. Строк полтора десятка и шесть колонок — на узком экране
+ * она не помещается, поэтому прокрутка живёт на своей обёртке: страница
+ * целиком горизонтально ездить не должна.
+ */
+.scroll {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
+  text-align: left;
+  font-size: var(--font-size-body-sm);
+}
+
+.table th,
+.table td {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  vertical-align: middle;
+}
+
+.table thead th {
+  border-bottom: 1px solid var(--color-border);
+  background-color: var(--color-surface-sunken);
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-caption);
+  font-weight: 500;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.table tbody tr + tr th,
+.table tbody tr + tr td {
+  border-top: 1px solid var(--color-border);
+}
+
+.table tbody th {
+  font-weight: 500;
+  // Имя модели не переносится, но и не растягивает таблицу.
+  width: 1%;
+  white-space: nowrap;
+}
+
+.table tbody td {
+  // Цены выравниваются по цифрам: так столбик читается сверху вниз.
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}

@@ -1,0 +1,32 @@
+.summary {
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+// Путь к файлу-источнику: моноширинный и приглушённый — он подпись, а не смысл.
+.source {
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  color: var(--color-fg-subtle);
+}
+
+// След применённого переноса: отбит полосой, потому что говорит не о том, что
+// БУДЕТ, а о том, что уже случилось с файлами на диске.
+.applied {
+  padding: var(--spacing-xs);
+  border-radius: 8px;
+  background: var(--color-surface-sunken);
+  box-shadow: inset 2px 0 0 var(--color-accent);
+}
+
+// Выбор «вернуть и этот файл тоже» — по файлу, и путь рядом с флажком: человек
+// решает про конкретный файл, а не про список вообще.
+.alsoRevert {
+  display: flex;
+  gap: var(--spacing-2xs);
+  align-items: baseline;
+  min-width: 0;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}

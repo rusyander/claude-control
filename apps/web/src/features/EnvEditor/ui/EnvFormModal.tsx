@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { EnvSource, EnvVar } from '@agentdeck/contracts';
 import { ENV_KEY_PATTERN } from '@agentdeck/contracts/env-secret';
-import { apiClient, toErrorMessage } from '@shared/api/client';
+import { apiClient } from '@shared/api/client';
 import { queryKeys } from '@shared/api/query-keys';
 import { Stack } from '@shared/ui/stack';
 import { Modal } from '@shared/ui/modal';
@@ -16,15 +16,12 @@ import { Badge } from '@shared/ui/badge';
 import { BulkCreate } from '@shared/ui/bulk-create';
 import { envSecretAnchor } from '@entities/PanelAgent';
 import type { EnvFormModalProps } from './EnvFormModal.types';
-import {
-  SecretRevealError,
-  buildEnvDraft,
-  envFileName,
-  looksSecret,
-  secretValueHints,
-} from './EnvFormModal.lib';
+import { SecretRevealError, envFileName } from './EnvFormModal.lib';
 import { envAssistantSpec } from '../model/envAssistant';
 import styles from './EnvFormModal.module.scss';
+import { secretValueHints } from './secretValueHints';
+import { looksSecret, buildEnvDraft } from './buildEnvDraft';
+import { toErrorMessage } from '../../../shared/api/toErrorMessage';
 
 /**
  * Создание и правка переменной окружения. При создании файл выбирается явно:

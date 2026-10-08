@@ -5,7 +5,7 @@ import {
   parseProviderPermissionsDraft,
   isCliOnlyGeminiApprovalMode,
   buildProviderPermissionInfo,
-} from '../../domains/provider-permissions.ts';
+} from '../../domains/provider-permissions/provider-permissions.ts';
 import { UnrecognizedFormatError } from '../../lib/format-errors.ts';
 import { done } from '../write-result.ts';
 import { requireTarget } from './target.ts';

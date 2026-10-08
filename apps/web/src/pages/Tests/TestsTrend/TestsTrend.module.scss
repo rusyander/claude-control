@@ -1,0 +1,12 @@
+.trend {
+  width: 100%;
+  height: 120px;
+}
+
+.trendPassed {
+  fill: var(--color-success);
+}
+
+.trendFailed {
+  fill: var(--color-danger);
+}

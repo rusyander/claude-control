@@ -4,10 +4,10 @@ import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, readdirSyn
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { blockLang } from '@agentdeck/contracts/brand';
-import { AppStore } from '../lib/app-store.ts';
+import { AppStore } from '../lib/app-store/app-store.ts';
 import type { ServerContext } from '../context.ts';
 import type { GroupAsk, GroupModelMessage } from '../domains/groups/model.ts';
-import { registerGroupPathRoutes } from './group-path-routes.ts';
+import { registerGroupPathRoutes } from './group-path-routes/group-path-routes.ts';
 
 /**
  * Картинка ассистенту шага группы (12b): маршрут `…/path/draft` принимает её

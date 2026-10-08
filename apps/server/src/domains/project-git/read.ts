@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import type { ProjectGitInfo } from '@agentdeck/contracts';
-import { git, gitSync, GitError } from './exec.ts';
+import { git, gitSync, GitError } from './exec/exec.ts';
 import {
   parseBranches,
   parseNumstat,
@@ -9,7 +9,7 @@ import {
   parseStatus,
   pickRemote,
 } from './parse.ts';
-import { coded } from '../../lib/server-text.ts';
+import { coded } from '../../lib/server-text/server-text.ts';
 
 /**
  * Чтение состояния репозитория проекта.

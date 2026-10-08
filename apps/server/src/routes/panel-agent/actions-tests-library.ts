@@ -6,8 +6,8 @@ import {
   type AnyPanelAction,
   type InjectRoute,
 } from './registry.ts';
-import { card, encode, readRoute, stateCard } from './action-kit.ts';
-import { dataField } from './texts.ts';
+import { card, encode, readRoute, stateCard } from './action-kit/action-kit.ts';
+import { dataField } from './texts/texts.ts';
 import { testsPage, testsQuery } from './tests-page.ts';
 import { registeredOnly } from './tests-block-kit.ts';
 

@@ -1,13 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { ProviderChatStatus } from '@agentdeck/contracts';
-import {
-  backgroundSignal,
-  canWrite,
-  editsState,
-  notificationTarget,
-  sendMode,
-  watchInBackground,
-} from './model';
+import { notificationTarget } from './model';
+import { canWrite } from './canWrite';
+import { sendMode } from './sendMode';
+import { backgroundSignal } from './backgroundSignal';
+import { watchInBackground } from './watchInBackground';
+import { editsState } from './editsState';
 
 const status = (patch: Partial<ProviderChatStatus>): ProviderChatStatus => ({
   chatId: 'c1',

@@ -1,7 +1,7 @@
 import type { spawn as nodeSpawn } from 'node:child_process';
 import type { ServerMessageCode, ServerMessageParams } from '@agentdeck/contracts/server-messages';
 import type { ChatEvent } from '../../chat/chat-events.ts';
-import type { RunPermissionGate, RunScope } from '../run-permissions.ts';
+import type { RunPermissionGate, RunScope } from '../run-permissions/run-permissions.ts';
 
 /**
  * Прогон агента тестов у чужого CLI (Qwen Code, Codex). Реестр прогонов

@@ -1,24 +1,24 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { ServerContext } from './context.ts';
-import { allowedOrigins } from './lib/origin-guard.ts';
-import { readApiToken } from './lib/api-token.ts';
-import { registerAccessGate } from './lib/access-gate.ts';
-import { createConfigWatcher } from './lib/config-watcher.ts';
-import { appStateDomains } from './lib/app-state-events.ts';
+import { allowedOrigins } from './lib/origin-guard/origin-guard.ts';
+import { readApiToken } from './lib/api-token/api-token.ts';
+import { registerAccessGate } from './lib/access-gate/access-gate.ts';
+import { createConfigWatcher } from './lib/config-watcher/config-watcher.ts';
+import { appStateDomains } from './lib/app-state-events/app-state-events.ts';
 import { registerEmptyBodyGuard } from './lib/empty-body.ts';
-import { registerCodedErrors } from './lib/server-text.ts';
-import { detectProviders } from './providers/detect.ts';
-import { autostartProjects } from './domains/project-runner.ts';
-import { isProjectOrCopy } from './domains/project-tests.ts';
-import { buildDlpRuntime } from './domains/dlp.ts';
-import { gatewayPricing } from './domains/platform/spend.ts';
-import { reconcileActivePlatform } from './domains/platform/activation.ts';
+import { registerCodedErrors } from './lib/server-text/server-text.ts';
+import { detectProviders } from './providers/detect/detect.ts';
+import { autostartProjects } from './domains/project-runner/project-runner.ts';
+import { isProjectOrCopy } from './domains/project-tests/project-tests.ts';
+import { buildDlpRuntime } from './domains/dlp/dlp.ts';
+import { gatewayPricing } from './domains/platform/spend/spend.ts';
+import { reconcileActivePlatform } from './domains/platform/activation/activation.ts';
 import { startSandboxHousekeeping } from './domains/sandbox/SandboxConfig.ts';
-import { createRuntime, installShutdownHandlers } from './bootstrap/runtime.ts';
+import { createRuntime, installShutdownHandlers } from './bootstrap/runtime/runtime.ts';
 import { buildRouteTable } from './bootstrap/route-table.ts';
 import { startupBanner } from './bootstrap/banner.ts';
-import { createWatchCapture } from './bootstrap/watcher-capture.ts';
+import { createWatchCapture } from './bootstrap/watcher-capture/watcher-capture.ts';
 
 /**
  * Сборка сервера: гейт доступа, долгоживущие объекты, таблица маршрутов,

@@ -1,2 +1,2 @@
 export { LoadErrorCard } from './LoadErrorCard';
-export type { LoadErrorCardProps } from './LoadErrorCard';
+export type { LoadErrorCardProps } from './LoadErrorCard.types';

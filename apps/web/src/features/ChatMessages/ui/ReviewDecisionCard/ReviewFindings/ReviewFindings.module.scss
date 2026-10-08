@@ -1,0 +1,28 @@
+// Копия отведена НЕ от ветки MR: ревью читало не тот дифф, и молчать об этом
+// нельзя — замечания могут быть уверенными и не про тот код.
+.warning {
+  margin-bottom: var(--spacing-2xs);
+  padding: var(--spacing-2xs) var(--spacing-xs);
+  border-radius: 8px;
+  border-left: 2px solid var(--color-warning);
+  background: var(--color-warning-subtle);
+  color: var(--color-fg);
+}
+
+.list {
+  margin: 0 0 var(--spacing-sm);
+  padding-left: var(--spacing-md);
+}
+
+.item {
+  margin-bottom: var(--spacing-3xs);
+  white-space: pre-wrap;
+}
+
+.clean {
+  margin-bottom: var(--spacing-2xs);
+}
+
+.actions {
+  margin-top: var(--spacing-2xs);
+}

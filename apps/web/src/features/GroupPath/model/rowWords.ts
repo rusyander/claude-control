@@ -1,53 +1,9 @@
-import type {
-  DescribedKind,
-  GroupMembersView,
-  LocalizedLine,
-  MemberDescription,
-  PathAnchor,
-} from '@agentdeck/contracts';
-import type { PathRow } from './pathRows';
-import { firstParagraph } from './skillText';
-import { pickLang } from './useEntryTitle';
-import {
-  skillSource,
-  type SourceContext,
-  type StepSource,
-  type StepSourceKind,
-} from './stepSource';
-
-/**
- * Вид строки для метки в конструкторе — ровно шесть слов, которые человек
- * различает: наш скилл, чужой скилл, промпт, хук, правило, утилита (и стадия у
- * конвейера). Скилл проекта — наш: он в файлах того же проекта; скилл плагина —
- * чужой: панель его не пишет и не правит.
- */
-export type RowType =
-  'stage' | 'our-skill' | 'foreign-skill' | 'prompt' | 'hook' | 'rule' | 'script';
-
-const TYPE_OF_SOURCE: Record<StepSourceKind, RowType> = {
-  builtin: 'stage',
-  'our-skill': 'our-skill',
-  'project-skill': 'our-skill',
-  skill: 'our-skill',
-  'plugin-skill': 'foreign-skill',
-  'foreign-skill': 'foreign-skill',
-  prompt: 'prompt',
-  hook: 'hook',
-  rule: 'rule',
-  script: 'script',
-};
-
-export function rowType(source: StepSource): RowType {
-  return TYPE_OF_SOURCE[source.kind];
-}
-
-/**
- * Вид блока скилла — по самому скиллу. Первой строкой блока бывает свой шаг
- * (вставленный сразу после стадии работы), и вид по ней давал «промпт».
- */
-export function skillBlockType(skillId: string, context: SourceContext): RowType {
-  return rowType(skillSource(skillId, context));
-}
+import type { GroupMembersView, LocalizedLine } from '@agentdeck/contracts';
+import type { PathRow } from './pathRows.types';
+import type { WordsSource } from './rowWords.types';
+import { memberOf } from './memberOf';
+import { firstParagraph } from './firstParagraph';
+import { pickLang } from '../lib/pickLang';
 
 /** Строка словами на языке интерфейса: название, одна строка «что делает», подсказка. */
 export interface RowWords {
@@ -58,35 +14,6 @@ export interface RowWords {
   hint: string;
   /** Описание ещё готовит сервер (моделью в фоне) — строка говорит об этом. */
   isDescribing: boolean;
-}
-
-/** Обе стороны описания и оригинал, уходящий в прогон, — для окна шага. */
-export interface RowBilingual {
-  summary?: LocalizedLine;
-  /** Текст, который прогон читает как есть (раздел скилла — по-английски). */
-  original?: string;
-}
-
-export interface WordsSource {
-  language: string;
-  view: GroupMembersView | undefined;
-  stageTitle: (stage: PathAnchor) => string;
-  stageHint: (stage: PathAnchor) => string;
-  wholeTitle: (skillId: string) => string;
-  /** Название шага скилла, пока его описание готовится: «Шаг 13 скилла». */
-  pendingStepTitle: (number: number) => string;
-  /** Строка шага скилла, который описать не вышло: «не описан — оригинал в окне шага». */
-  notDescribedLine: string;
-  /** Раздел шага в тексте скилла, если текст у панели есть. */
-  sectionText: (skillId: string, index: number) => string | undefined;
-}
-
-function memberOf(
-  view: GroupMembersView | undefined,
-  kind: DescribedKind,
-  id: string,
-): MemberDescription | undefined {
-  return view?.members.find((member) => member.kind === kind && member.id === id);
 }
 
 function isPending(view: GroupMembersView | undefined, key: string): boolean {
@@ -156,24 +83,4 @@ export function rowWords(row: PathRow, source: WordsSource): RowWords {
   const describing = !member?.summary && isPending(view, `${resource.type}:${resource.id}`);
   const text = pick(member?.summary) || (describing ? '' : (member?.description ?? ''));
   return words(title || pick(member?.title) || resource.id, text, describing);
-}
-
-/** Обе стороны описания строки и то, что прогон прочтёт как есть. */
-export function rowBilingual(row: PathRow, source: WordsSource): RowBilingual {
-  const { view } = source;
-  if (row.kind === 'skill') return { summary: memberOf(view, 'skill', row.skillId)?.summary };
-  const { entry } = row;
-  if (entry.kind === 'builtin') return {};
-  if (entry.kind === 'skill-step') {
-    const described = view?.steps.find(
-      (item) => item.skillId === entry.skillId && item.index === entry.index,
-    );
-    return {
-      summary: described?.summary,
-      original: source.sectionText(entry.skillId, entry.index),
-    };
-  }
-  const resource = entry.step.resource;
-  if (!resource || resource.type === 'script') return {};
-  return { summary: memberOf(view, resource.type, resource.id)?.summary };
 }

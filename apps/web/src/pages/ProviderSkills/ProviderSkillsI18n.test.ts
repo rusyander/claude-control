@@ -26,7 +26,7 @@ const lookup = (dictionary: unknown, key: string): unknown =>
 const usedKeys = (): string[] => {
   const keys = new Set<string>();
 
-  for (const file of readdirSync(pageDir)) {
+  for (const file of readdirSync(pageDir, { recursive: true, encoding: 'utf8' })) {
     if (!file.endsWith('.tsx') && !file.endsWith('.ts')) continue;
     if (file.endsWith('.test.ts') || file.endsWith('.test.tsx')) continue;
 

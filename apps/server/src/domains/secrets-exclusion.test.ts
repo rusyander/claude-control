@@ -3,14 +3,14 @@ import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { ClaudePaths } from '@agentdeck/contracts';
-import { AppStore } from '../lib/app-store.ts';
-import { setStoredKey } from '../lib/provider-keys.ts';
+import { AppStore } from '../lib/app-store/app-store.ts';
+import { setStoredKey } from '../lib/provider-keys/provider-keys.ts';
 import { claudeProvider } from '../providers/claude.ts';
-import { readZip } from '../lib/zip.ts';
+import { readZip } from '../lib/zip/zip.ts';
 import { buildEnvironmentArchive } from './env-transfer/archive.ts';
-import { buildDiff, buildHistory } from './history.ts';
-import { collectSearchInputs, searchConfig } from './search.ts';
-import { trackedFiles, isSecretFile } from './tracked-files.ts';
+import { buildDiff, buildHistory } from './history/history.ts';
+import { collectSearchInputs, searchConfig } from './search/search.ts';
+import { trackedFiles, isSecretFile } from './tracked-files/tracked-files.ts';
 
 // Поиск спрашивает каталог плагинов у CLI. Настоящий `claude plugin list`
 // отвечал бы плагинами человека из его настоящего конфига, а не этого стенда.

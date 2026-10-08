@@ -1,13 +1,13 @@
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { coded } from '../../lib/server-text.ts';
+import { coded } from '../../lib/server-text/server-text.ts';
 
 /**
  * ПЕРЕОПРЕДЕЛЕНИЯ КАТАЛОГОВ КОНФИГУРАЦИИ ЧЕРЕЗ ОКРУЖЕНИЕ.
  *
  * Уважаем ТОЛЬКО задокументированные переменные — угадывать переменные чужих CLI
  * нельзя, иначе панель начнёт читать/писать не туда:
- *  - Claude — `CLAUDE_CONFIG_DIR` (уже уважается в `lib/claude-paths.ts`);
+ *  - Claude — `CLAUDE_CONFIG_DIR` (уже уважается в `lib/claude-paths/claude-paths.ts`);
  *  - Codex — `CODEX_HOME`: полный перенос каталога `~/.codex` (config.toml,
  *    AGENTS.md, всё остальное);
  *  - OpenCode — XDG: глобальный конфиг лежит в

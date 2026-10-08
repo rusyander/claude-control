@@ -1,10 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import {
-  COMPOSER_REQUEST_TTL_MS,
-  onComposerModeRequest,
-  requestComposerMode,
-  takeComposerMode,
-} from './composer-request';
+import { COMPOSER_REQUEST_TTL_MS, requestComposerMode, takeComposerMode } from './composer-request';
+import { onComposerModeRequest } from './onComposerModeRequest';
 
 describe('composer-request', () => {
   it('просьба забирается один раз: второй показ чата режим не навязывает', () => {

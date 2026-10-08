@@ -8,18 +8,18 @@ import type {
   EnvSectionState,
   EnvSkip,
 } from '@agentdeck/contracts/portable-env';
-import { readTextFile } from '../../lib/safe-io.ts';
+import { readTextFile } from '../../lib/safe-io/safe-io.ts';
 import { readProviderCommands } from '../commands/providers.ts';
-import { readProviderEnvVars } from '../provider-env.ts';
+import { readProviderEnvVars } from '../provider-env/provider-env.ts';
 import { readProviderHooksInfo } from '../provider-hooks/info.ts';
-import { readProviderInstructionsEntries } from '../provider-instructions.ts';
+import { readProviderInstructionsEntries } from '../provider-instructions/provider-instructions.ts';
 import { readProviderMcpSection } from '../provider-mcp/section.ts';
 import { readProviderPermissions } from '../provider-permissions/dispatch.ts';
 import { readProviderPluginsInfo } from '../provider-plugins/info.ts';
 import { readProviderRulesInfo } from '../provider-rules/read.ts';
 import { readProviderSkillsInfo } from '../provider-skills/read.ts';
 import { envSkip } from './canon.ts';
-import { sectionTargets, type SectionTargets } from './project.ts';
+import { sectionTargets, type SectionTargets } from './project/project.ts';
 import { bodyAfterFrontmatter } from './markdown.ts';
 import {
   normalizeHooks,
@@ -29,7 +29,7 @@ import {
   type HookInput,
 } from './normalize-hooks.ts';
 import { normalizeMcpServers } from './normalize-mcp.ts';
-import { readHookShimCommand } from './emit/hook-shim.ts';
+import { readHookShimCommand } from './emit/hook-shim/hook-shim.ts';
 import { normalizePermissions } from './normalize-permissions.ts';
 import {
   commandItem,

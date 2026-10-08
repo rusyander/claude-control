@@ -21,7 +21,7 @@ import {
   E2E_RUN_PROCESS_LEDGER,
   MUTATION_PROCESS_LEDGER,
   PROJECT_TEST_PROCESS_LEDGER,
-} from '../domains/project-tests/runs.ts';
+} from '../domains/project-tests/runs/runs.ts';
 import {
   deferReason,
   readRestartState,
@@ -94,7 +94,7 @@ describe('dev-сторож сервера', () => {
   });
 
   it('что считается кодом сервера', () => {
-    expect(isWatched('/s/src/domains/chat/ChatRunner.ts')).toBe(true);
+    expect(isWatched('/s/src/domains/chat/ChatRunner/ChatRunner.ts')).toBe(true);
     expect(isWatched('/s/src/lib/brand.mjs')).toBe(true);
     expect(isWatched('/s/src/domains/chat/ChatRunner.test.ts')).toBe(false);
     expect(isWatched('/s/src/domains/chat/__fixtures__/fake.mjs')).toBe(false);

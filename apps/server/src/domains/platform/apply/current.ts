@@ -1,12 +1,15 @@
 import { createHash } from 'node:crypto';
 import type { PlatformAppliedTarget } from '@agentdeck/contracts';
 import { existsSync, readFileSync } from 'node:fs';
-import { readJsonFile } from '../../../lib/safe-io.ts';
+import { readJsonFile } from '../../../lib/safe-io/safe-io.ts';
 import { readContinueModels } from '../../../lib/continue-yaml.ts';
-import { parseCodexToml } from '../../../lib/codex-toml.ts';
+import { parseCodexToml } from '../../../lib/codex-toml/codex-toml.ts';
 import { getProvider, isKnownProviderId } from '../../../providers/registry.ts';
 import type { ProviderEndpointFile } from '../../../providers/types/assistant.ts';
-import { readProviderEnvVars, resolveProviderEnvTargetFor } from '../../provider-env.ts';
+import {
+  readProviderEnvVars,
+  resolveProviderEnvTargetFor,
+} from '../../provider-env/provider-env.ts';
 import type { ContourTarget, ContourTargetPaths } from './targets.ts';
 import { contourEntryName } from './targets.ts';
 

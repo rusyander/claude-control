@@ -139,7 +139,8 @@ const RUN_TS = new URL(
   '../../apps/server/src/domains/portability/supervisor/run.ts',
   import.meta.url,
 ).href;
-const CATALOG_TS = new URL('../../apps/server/src/providers/catalog.ts', import.meta.url).href;
+const CATALOG_TS = new URL('../../apps/server/src/providers/catalog/catalog.ts', import.meta.url)
+  .href;
 
 /**
  * Водитель: зовёт НАСТОЯЩИЙ `runSupervisorEvent` из дерева, а не его пересказ.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatWhen } from './status';
+import { formatWhen } from './formatWhen';
 
 describe('formatWhen', () => {
   // Дата прогона — на языке интерфейса приложения, а не системы телефона: русский

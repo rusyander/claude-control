@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MutationObserver, QueryClient } from '@tanstack/react-query';
 import { apiClient } from '@shared/api/client';
-import { fileSplitTicketMutation } from './ChatTreeApi';
+import { fileSplitTicketMutation } from './useFileSplitTicket';
 
 /**
  * «Завести» тикет (L277): запрос уходит по адресу родителя с ключом и

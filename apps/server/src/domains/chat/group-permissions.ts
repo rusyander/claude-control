@@ -7,7 +7,7 @@ import {
 } from '@agentdeck/contracts/split-groups';
 import type { StoredSplitSettings } from '@agentdeck/contracts/task-split';
 import type { SplitPlanRecord } from '../../lib/app-store/app-store.types.ts';
-import { isReadOnlyTool, ruleFor, shouldAutoApprove } from './auto-approve.ts';
+import { isReadOnlyTool, ruleFor, shouldAutoApprove } from './auto-approve/auto-approve.ts';
 
 /**
  * Разрешения группы разделения — строки вкладки «Группы».

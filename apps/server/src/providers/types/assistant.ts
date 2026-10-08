@@ -76,7 +76,7 @@ export type ProviderEndpointConfig = Partial<Record<ProviderEndpointApiKind, Pro
  * должны: способ задокументирован, просто он другой.
  *
  * Правка — всегда хирургическая, регионом: остальной файл обязан остаться
- * байт-в-байт (`lib/codex-toml.ts`, `lib/continue-yaml.ts`).
+ * байт-в-байт (`lib/codex-toml/codex-toml.ts`, `lib/continue-yaml.ts`).
  */
 export interface ProviderEndpointFile {
   /** Какой из двух форматов правится — по нему выбирается писатель. */
@@ -160,7 +160,7 @@ export interface ProviderRunEndpoint {
  */
 /**
  * Чем вести ЭТОТ прогон, если панель подобрала модель под класс работы
- * (`domains/provider-cascade.ts`). Пусто — панель ничего не подбирала, и CLI
+ * (`domains/provider-cascade/provider-cascade.ts`). Пусто — панель ничего не подбирала, и CLI
  * работает своей настроенной моделью: подставлять её вместо человека нельзя,
  * панель не знает ни его подписки, ни доступных ему моделей.
  */
@@ -211,7 +211,7 @@ export interface ProviderAssistant {
    * вместо one-shot: диалог держит сам CLI, панель шлёт только новое сообщение.
    *
    * Значение называет протокол, а не просто «умеет сервер»: реализация под него
-   * лежит в отдельном домене (`domains/opencode-serve.ts`). Не задан → сессионного
+   * лежит в отдельном домене (`domains/opencode-serve/opencode-serve.ts`). Не задан → сессионного
    * режима у провайдера нет, и панель его не выдумывает (fail-closed). Сейчас
    * задокументирован ровно один — `opencode serve`.
    */

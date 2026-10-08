@@ -4,10 +4,10 @@ import { Stack, useRouter } from 'expo-router';
 import { Button, Card, Empty, Field, Loading, Mono, Muted, Row, Screen } from '../src/shared/ui';
 import { colors, font, space } from '../src/shared/config/theme';
 import { useT } from '../src/shared/config/i18n';
-import { newChatId, openChat, useWorkspace } from '../src/shared/lib/workspace';
+import { useWorkspace, newChatId, openChat } from '../src/shared/lib/workspace';
 import { runNamed, useRuns, visibleStatus } from '../src/shared/lib/runs';
 import { useChats } from '../src/entities/chat/api';
-import { ForeignChatsSection } from '../src/features/chat/foreign/ForeignChatsSection';
+import { ForeignChatsSection } from '../src/features/chat/foreign/ForeignChatsSection/ForeignChatsSection';
 
 /**
  * Разговоры машины: те же транскрипты, что видит панель и терминал. Своей базы

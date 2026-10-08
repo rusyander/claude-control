@@ -6,14 +6,12 @@ import {
   type ProvidersResponse,
 } from '@agentdeck/contracts';
 import { NAV_SECTIONS, NAV_ITEMS } from '@shared/config/navigation';
-import {
-  gateNavSections,
-  navItemAccess,
-  activeCapabilities,
-  isCapabilityReady,
-  summarizeNavCapabilities,
-  visibleNavItems,
-} from './gating';
+import { isCapabilityReady } from './isCapabilityReady';
+import { activeCapabilities } from './activeCapabilities';
+import { navItemAccess } from './navItemAccess';
+import { visibleNavItems } from './visibleNavItems';
+import { gateNavSections } from './gateNavSections';
+import { summarizeNavCapabilities } from './summarizeNavCapabilities';
 
 /** Собрать карту возможностей: все `unsupported`, перечисленные — заданным статусом. */
 function caps(

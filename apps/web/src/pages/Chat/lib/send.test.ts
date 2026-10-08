@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { planSend, clearsComposer } from './send';
+import { planSend } from './send';
 import { isSupportedUpload, unsupportedUploadNames } from './uploads';
+import { clearsComposer } from './clearsComposer';
 
 /**
  * Отправка сообщения из поля ввода.

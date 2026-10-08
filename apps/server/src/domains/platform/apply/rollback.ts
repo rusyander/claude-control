@@ -5,13 +5,13 @@ import type {
   PlatformRollbackResult,
 } from '@agentdeck/contracts';
 import { PLATFORM_ASSISTANT_TARGET } from '@agentdeck/contracts/platform';
-import { readJsonFile, writeJsonFile } from '../../../lib/safe-io.ts';
+import { readJsonFile, writeJsonFile } from '../../../lib/safe-io/safe-io.ts';
 import { getProvider, isKnownProviderId } from '../../../providers/registry.ts';
 import {
   readProviderEnvVars,
   resolveProviderEnvTargetFor,
   saveProviderEnvVars,
-} from '../../provider-env.ts';
+} from '../../provider-env/provider-env.ts';
 import { rollbackCodexEndpoint, rollbackContinueEndpoint } from './config-files.ts';
 import { driftedSinceApply } from './current.ts';
 import { managedProfileId } from './profile.ts';

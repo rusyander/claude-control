@@ -1,4 +1,6 @@
 export { createSpeechProvider } from './create-speech-provider';
 export type { SpeechErrorKind, SpeechProvider } from './speech-provider';
-export { isReportableSpeechError, nextStateAfterEnd, speechErrorMessageKey } from './speech-state';
-export type { SpeechState } from './speech-state';
+export { speechErrorMessageKey } from './speech-state';
+export { nextStateAfterEnd } from './nextStateAfterEnd';
+export { isReportableSpeechError } from './isReportableSpeechError';
+export type { SpeechState } from './nextStateAfterEnd';

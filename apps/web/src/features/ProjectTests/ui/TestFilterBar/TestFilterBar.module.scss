@@ -1,0 +1,76 @@
+// Ниже этой высоты колонки библиотеки не сжимаются, прокручивается страница.
+$library-floor: 320px;
+
+.filters {
+  flex: none;
+}
+
+.spacer {
+  flex: 1;
+}
+
+// Условия отбора плашками в свёрнутой строке: подпись и крестик одной кнопкой.
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-3xs);
+  padding: 2px var(--spacing-2xs);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface-sunken);
+  color: var(--color-fg);
+  font: inherit;
+  font-size: var(--font-size-caption);
+  cursor: pointer;
+
+  &:hover {
+    border-color: var(--color-border-strong);
+  }
+}
+
+// Раскрытая панель фильтров — в рамке: иначе её поля читаются как продолжение
+// строки поиска, и непонятно, где кончается отбор и начинается список.
+.filterPanel {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.query {
+  min-width: 260px;
+  flex: 1;
+
+  > * {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+.archived {
+  padding-bottom: var(--spacing-3xs);
+}
+
+/* Поле минут: узкое намеренно — в него пишут «30», а не текст. */
+.budget {
+  width: 96px;
+
+  > * {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+.viewChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.viewApply {
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}

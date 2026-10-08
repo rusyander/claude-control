@@ -89,11 +89,11 @@ ${out.slice(-1500)}`);
 }
 
 async function main() {
-  const { AppStore } = await import('../../apps/server/src/lib/app-store.ts');
+  const { AppStore } = await import('../../apps/server/src/lib/app-store/app-store.ts');
   const { PlatformGateway } =
-    await import('../../apps/server/src/domains/platform/gateway/listener.ts');
+    await import('../../apps/server/src/domains/platform/gateway/listener/listener.ts');
   const { writePlatform, writeToken } =
-    await import('../../apps/server/src/domains/platform/store.ts');
+    await import('../../apps/server/src/domains/platform/store/store.ts');
   const { defaultOurRules, defaultPlatformRules } =
     await import('../../packages/contracts/src/platform.ts');
   const { defaultPlatformTransport } =

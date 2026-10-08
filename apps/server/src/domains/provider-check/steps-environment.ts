@@ -1,10 +1,10 @@
 import type { ProviderCheckStep } from '@agentdeck/contracts';
-import type { ConfigProvider } from '../../providers/types.ts';
-import { providerCliCandidates } from '../../providers/cli.ts';
-import { findCliOnPath, pathExists } from '../../providers/detect.ts';
+import type { ConfigProvider } from '../../providers/types/types.ts';
+import { providerCliCandidates } from '../../providers/cli/cli.ts';
+import { findCliOnPath, pathExists } from '../../providers/detect/detect.ts';
 import { step } from './step.ts';
 import type { ProviderCheckDeps } from './types.ts';
-import { serverText } from '../../lib/server-texts.ts';
+import { serverText } from '../../lib/server-texts/server-texts.ts';
 
 /** Шаги про окружение: есть ли бинарь CLI и лежат ли где-то его файлы. */
 

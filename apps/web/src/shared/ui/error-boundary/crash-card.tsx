@@ -6,16 +6,7 @@ import { Typography } from '../typography';
 import { Button } from '../button';
 import type { CrashCardProps } from './error-boundary.types';
 import styles from './crash-card.module.scss';
-
-/** Короткая строка для экрана и полный текст со стеком для буфера обмена. */
-function describe(error: unknown): { line: string; full: string } {
-  if (error instanceof Error) {
-    const line = error.message || error.name;
-    return { line, full: `${error.name}: ${error.message}\n${error.stack ?? ''}`.trim() };
-  }
-  const line = String(error);
-  return { line, full: line };
-}
+import { describe } from './lib/describe';
 
 /**
  * Что показать на месте упавшего компонента. Ошибка отрисовки — это ошибка в

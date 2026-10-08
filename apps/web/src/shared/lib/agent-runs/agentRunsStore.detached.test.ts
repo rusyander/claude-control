@@ -10,7 +10,7 @@ vi.mock('@shared/api/client', () => ({
 
 import { apiClient } from '@shared/api/client';
 import { agentRuns, getRun } from './agentRunsStore';
-import { isStreamShown } from '@shared/lib/chat-stream';
+import { isStreamShown } from '../chat-stream/isStreamShown';
 
 /**
  * Прогон, усыновлённый сервером после его перезапуска: процесс агента жив,

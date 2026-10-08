@@ -2,7 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MutationObserver, QueryClient, QueryObserver } from '@tanstack/react-query';
 import { chatTreeKeys } from '@entities/ChatTree';
 import { apiClient } from '@shared/api/client';
-import { splitTasksOptions, type SplitTasksBody } from './ChatSplitApi';
+import type { SplitTasksBody } from '../lib/splitTasksOptions';
+import { splitTasksOptions } from '../lib/splitTasksOptions';
 
 /**
  * Живой прогон 26.09 (D1): после 200 кнопка «Разделить» оживала, пока дерево

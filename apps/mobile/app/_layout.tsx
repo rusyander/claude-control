@@ -8,14 +8,15 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import 'react-native-reanimated';
 import { AppSplash } from '../src/features/splash/AppSplash';
-import { loadConnection, useConnection } from '../src/shared/api/connection';
+import { useConnection, loadConnection } from '../src/shared/api/connection';
 import { forgetPanelData } from '../src/shared/api/panel-cache';
-import { loadWorkspace, openChat } from '../src/shared/lib/workspace';
 import { resumeActive } from '../src/shared/lib/runs';
-import { ensureChannel, useNotificationOpen } from '../src/shared/lib/notifications';
+import { useNotificationOpen } from '../src/shared/lib/notifications';
 import { notificationTarget } from '../src/entities/provider-chat/model';
 import { colors } from '../src/shared/config/theme';
-import { loadLanguage, useT } from '../src/shared/config/i18n';
+import { useT, loadLanguage } from '../src/shared/config/i18n';
+import { ensureChannel } from '../src/shared/lib/ensureChannel';
+import { loadWorkspace, openChat } from '../src/shared/lib/workspace';
 
 export {
   // Ошибку в дереве навигации должен показывать экран, а не белый лист.

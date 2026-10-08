@@ -9,7 +9,7 @@ import { BRAND_NAME, LEGACY_BRAND_NAME } from './brand.ts';
  * и странице нужно уметь это объяснить: сколько таких разделов в файле и какой
  * заголовок ждёт панель. Считать разделы клиент должен той же линейкой, какой
  * сервер отбирает правила, поэтому регулярные выражения живут здесь, а не в
- * двух копиях (см. `domains/rules.ts` и `pages/Rules/model`).
+ * двух копиях (см. `domains/rules/rules.ts` и `pages/Rules/model`).
  *
  * Модуль самодостаточен и без zod: сервер под `--experimental-strip-types`
  * импортирует его напрямую через точку экспорта `@agentdeck/contracts/rule-format`.

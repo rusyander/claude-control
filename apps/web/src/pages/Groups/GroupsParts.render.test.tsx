@@ -3,10 +3,10 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import type { DiscoveredGroup, DiscoveryView } from '@agentdeck/contracts';
 import { i18n } from '@shared/config/i18n';
 import { Typography } from '@shared/ui/typography';
-import { GroupsTabs } from './GroupsTabs';
-import { GroupViewTabs } from './GroupViewTabs';
-import { DiscoveryProgress } from './DiscoveryProgress';
-import { FoundTile } from './FoundTile';
+import { GroupsTabs } from './GroupsTabs/GroupsTabs';
+import { GroupViewTabs } from './GroupViewTabs/GroupViewTabs';
+import { DiscoveryProgress } from './DiscoveryProgress/DiscoveryProgress';
+import { FoundTile } from './FoundTile/FoundTile';
 
 beforeAll(async () => {
   await i18n.changeLanguage('ru');

@@ -1,10 +1,10 @@
 import type { ProviderHooksInfo } from '@agentdeck/contracts';
-import { readTextFile } from '../../lib/safe-io.ts';
+import { readTextFile } from '../../lib/safe-io/safe-io.ts';
 import { parseProviderJsonObject } from '../../lib/provider-json.ts';
 import { readOpencodeHook } from '../../lib/opencode-hook.ts';
-import { readQwenHooks } from '../../lib/qwen-hook.ts';
-import { readKimiHooks } from '../../lib/kimi-hook.ts';
-import { readCodexHooks } from '../../lib/codex-hook.ts';
+import { readQwenHooks } from '../../lib/qwen-hook/qwen-hook.ts';
+import { readKimiHooks } from '../../lib/kimi-hook/kimi-hook.ts';
+import { readCodexHooks } from '../../lib/codex-hook/codex-hook.ts';
 import { codexHooksSwitches } from './codex.ts';
 import { rulesMeta } from './event-rules.ts';
 import { hooksShapeOf } from './target.ts';

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { ChatSummary } from '@agentdeck/contracts';
-import { childOfRun, runForUrl, runViewChat } from './runViewChat';
+import { runViewChat } from './runViewChat';
+import { childOfRun } from './childOfRun';
+import { runForUrl } from './runForUrl';
 
 const chat = (id: string, parentId?: string): ChatSummary =>
   ({ id, title: id, ...(parentId ? { parentId } : {}) }) as ChatSummary;

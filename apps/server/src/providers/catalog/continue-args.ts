@@ -28,7 +28,7 @@
  */
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import type { OneShotRun } from '../types.ts';
+import type { OneShotRun } from '../types/types.ts';
 import { continueHome } from './config-dirs.ts';
 
 /** Инструменты `cn`, которыми модель меняет файлы (оболочка — тоже правка). */

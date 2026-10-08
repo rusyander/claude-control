@@ -23,7 +23,7 @@ import { assistantRunReasons } from './assistant-run.ts';
  * план могут не дать блока или не завершиться вовсе, и об этом надо сказать в
  * той же ленте, где человек читает ответ. Выдавать такие строки за реплику
  * провайдера нельзя — их писала не модель; в контекст следующего запуска они
- * тоже не идут (`domains/provider-chat/prompt.ts`).
+ * тоже не идут (`domains/provider-chat/prompt/prompt.ts`).
  */
 export const providerChatRoles = ['user', 'assistant', 'notice'] as const;
 

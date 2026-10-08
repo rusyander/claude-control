@@ -1,7 +1,7 @@
 import type { Group } from '@agentdeck/contracts';
 import type { PathStep } from '@agentdeck/contracts/group-path';
 import { pathStepsEditSchema, pathStepTooLong } from '@agentdeck/contracts/group-path';
-import { coded } from '../../lib/server-text.ts';
+import { coded } from '../../lib/server-text/server-text.ts';
 
 /**
  * Правка своих шагов «Пути» одним запросом: клиент присылает весь список —

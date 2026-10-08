@@ -10,13 +10,9 @@ vi.mock('@shared/api/client', () => ({
 
 import { apiClient } from '@shared/api/client';
 import type { EnvVar } from '@agentdeck/contracts';
-import {
-  SecretRevealError,
-  buildEnvDraft,
-  envFileName,
-  looksSecret,
-  secretValueHints,
-} from './EnvFormModal.lib';
+import { SecretRevealError, envFileName } from './EnvFormModal.lib';
+import { secretValueHints } from './secretValueHints';
+import { looksSecret, buildEnvDraft } from './buildEnvDraft';
 
 /**
  * Правка секрета не должна стирать его значение.

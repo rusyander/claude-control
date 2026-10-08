@@ -7,9 +7,9 @@ import {
   readEnvironments,
   undeclareSecret,
   writeSecretValue,
-} from '../../domains/project-tests.ts';
-import { buildView, guard, requireRoot, type TestsDeps } from './shared.ts';
-import { coded } from '../../lib/server-text.ts';
+} from '../../domains/project-tests/project-tests.ts';
+import { buildView, guard, requireRoot, type TestsDeps } from './shared/shared.ts';
+import { coded } from '../../lib/server-text/server-text.ts';
 
 /**
  * Доступы стенда: логин, пароль, токен для прогона против настоящего окружения.

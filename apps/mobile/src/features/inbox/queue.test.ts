@@ -1,16 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { InboxAsk } from '@agentdeck/contracts/chat-inbox';
-import {
-  answerAsk,
-  cardView,
-  composeAnswer,
-  editAsk,
-  EMPTY_CARD,
-  planSubmissions,
-  reconcile,
-  submitAll,
-  type CardState,
-} from './queue';
+import { cardView, EMPTY_CARD } from './queue';
+import type { CardState } from './queue.types';
+import { answerAsk } from './answerAsk';
+import { editAsk } from './editAsk';
+import { reconcile } from './reconcile';
+import { composeAnswer } from './composeAnswer';
+import { planSubmissions } from './planSubmissions';
+import { submitAll } from './submitAll';
 
 /**
  * Карточка вопросов одного чата на телефоне: по одному вопросу, ответ

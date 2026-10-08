@@ -1,0 +1,60 @@
+/* ── Что умеет и чего не умеет ──────────────────────────────────────── */
+
+.capabilities {
+  display: grid;
+  // `min(…, 100%)`: на 375 px колонка уже минимума, и без него сетка вылезала за <main>.
+  grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
+  gap: var(--spacing-sm);
+}
+
+.capabilityColumn {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-md);
+  border: 1px solid var(--column-border);
+  border-radius: var(--radius-md);
+  background-color: var(--column-bg);
+}
+
+.capabilityCan {
+  --column-bg: var(--color-success-subtle);
+  --column-border: var(--color-success);
+}
+
+// Столбец ограничений подчёркнуто нейтрален: «нельзя» здесь — не ошибка
+// пользователя и не предупреждение, а граница раздела.
+.capabilityCant {
+  --column-bg: var(--color-surface-sunken);
+  --column-border: var(--color-border);
+}
+
+.capabilityTitle {
+  color: var(--color-fg);
+}
+
+.capabilityList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.capabilityItem {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-xs);
+  min-width: 0;
+}
+
+.capabilityIconCan {
+  color: var(--color-success);
+  flex-shrink: 0;
+}
+
+.capabilityIconCant {
+  color: var(--color-fg-subtle);
+  flex-shrink: 0;
+}

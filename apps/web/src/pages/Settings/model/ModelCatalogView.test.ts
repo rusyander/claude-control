@@ -1,18 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import type { ModelCatalogResponse, ModelInfo, PlatformStatus } from '@agentdeck/contracts';
-import {
-  canPinModel,
-  canUsePlatformSource,
-  declaredFlags,
-  emptyKey,
-  formatContext,
-  platformSourceOptions,
-  showsPlatformSource,
-  sourceLine,
-  sourceValue,
-  visibleModels,
-  VISIBLE_MODELS,
-} from './ModelCatalogView';
+import { visibleModels, VISIBLE_MODELS } from './ModelCatalogView';
+import { platformSourceOptions } from './platformSourceOptions';
+import { canUsePlatformSource } from './canUsePlatformSource';
+import { showsPlatformSource } from './showsPlatformSource';
+import { emptyKey } from './emptyKey';
+import { canPinModel } from './canPinModel';
+import { declaredFlags } from './declaredFlags';
+import { sourceValue } from './sourceValue';
+import { formatContext } from './formatContext';
+import { sourceLine } from './sourceLine';
 
 const models = (count: number): ModelInfo[] =>
   Array.from({ length: count }, (_, index) => ({

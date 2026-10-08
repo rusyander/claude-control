@@ -3,10 +3,10 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { AppStore } from '../lib/app-store.ts';
+import { AppStore } from '../lib/app-store/app-store.ts';
 import type { ServerContext } from '../context.ts';
-import { registerProviderEnvRoutes } from './provider-env-routes.ts';
-import { registerProviderPermissionsRoutes } from './provider-permissions-routes.ts';
+import { registerProviderEnvRoutes } from './provider-env-routes/provider-env-routes.ts';
+import { registerProviderPermissionsRoutes } from './provider-permissions-routes/provider-permissions-routes.ts';
 
 /**
  * Универсальные роуты env и прав под активным провайдером Gemini (GEMINI-2/3).

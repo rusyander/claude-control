@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { formatClock, formatDateTime } from './format';
+import { formatClock } from './formatClock';
+import { formatDateTime } from './formatDateTime';
 
 /**
  * Время на телефоне — на языке ИНТЕРФЕЙСА приложения, а не системы (F-323,

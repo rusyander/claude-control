@@ -8,7 +8,9 @@ import {
 import { serverMessagesEn } from './server-messages/en';
 import { serverMessagesRu } from './server-messages/ru';
 import { i18n } from './instance';
-import { serverFieldText, serverMessageFromPayload, serverMessageText } from './server-message';
+import { serverMessageText } from './server-message';
+import { serverMessageFromPayload } from './serverMessageFromPayload';
+import { serverFieldText } from './serverFieldText';
 
 /**
  * Каждый код сервера переведён на оба языка, и перевод использует ровно те

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { typeNumberSetting, commitNumberSetting } from './NumberSetting';
+import { typeNumberSetting } from './NumberSetting';
+import { commitNumberSetting } from './commitNumberSetting';
 
 /**
  * Регрессия: «Ожидание сети» (2000…120000) нельзя было изменить с клавиатуры.

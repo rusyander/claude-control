@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { MediaDeck, MediaDeckPlan, MediaImagePlan } from '@agentdeck/contracts';
-import { composerFlags, planMediaSubmit } from './media-submit';
+import { planMediaSubmit } from './media-submit';
+import { composerFlags } from './composerFlags';
 
 const imagePlan = (patch: Partial<MediaImagePlan> = {}): MediaImagePlan => ({
   available: true,

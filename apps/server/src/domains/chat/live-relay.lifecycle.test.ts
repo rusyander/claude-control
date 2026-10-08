@@ -4,18 +4,18 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { killChildTree, killPidTree } from '../../lib/process-tree.ts';
+import { killChildTree, killPidTree } from '../../lib/process-tree/process-tree.ts';
 import type { ChatLink, SplitPlanRecord } from '../../lib/app-store/app-store.types.ts';
-import { ChatRunRegistry, type BufferedEvent } from './ChatRunRegistry.ts';
+import { ChatRunRegistry, type BufferedEvent } from './ChatRunRegistry/ChatRunRegistry.ts';
 import { interruptOnBackgroundLost } from './background-lost.ts';
-import { SplitConveyor } from './split-conveyor.ts';
+import { SplitConveyor } from './split-conveyor/split-conveyor.ts';
 import {
   adoptableEntries,
   isPidAlive,
   pidLooksLikeCli,
   RunLedger,
   type RunLedgerEntry,
-} from './run-ledger.ts';
+} from './run-ledger/run-ledger.ts';
 
 /**
  * Жизнь посредника вокруг выхода сервера (решения W3-4a, b, c) — на настоящих

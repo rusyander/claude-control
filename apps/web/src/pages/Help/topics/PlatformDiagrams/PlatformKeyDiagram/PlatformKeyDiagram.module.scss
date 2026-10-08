@@ -1,0 +1,33 @@
+// Область машины и область файлов CLI: пунктир, потому что это не коробка, а
+// граница ответственности.
+.zone {
+  fill: none;
+  stroke: var(--color-border-strong);
+  stroke-width: 1.5;
+  stroke-dasharray: 6 5;
+}
+
+.zoneLabel {
+  fill: var(--color-fg-muted);
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.note {
+  fill: var(--color-fg-muted);
+  font-size: 14px;
+}
+
+/* ── Связи ───────────────────────────────────────────────────────────── */
+
+.arrow {
+  stroke: var(--color-fg-muted);
+  stroke-width: 2;
+}
+
+// Перечёркнутая связь: ключ в файлы CLI не попадает.
+.cross {
+  stroke: var(--color-danger);
+  stroke-width: 3;
+}

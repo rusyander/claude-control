@@ -1,11 +1,11 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { formatTokens } from '@shared/lib/format';
 import { formatDuration } from '@shared/lib/format-duration';
 import { formatClock } from '@shared/lib/format-clock';
 import type { TokenBadgeProps } from './token-badge.types';
 import { generationSpeed } from './generation-speed';
 import styles from './token-badge.module.scss';
+import { formatTokens } from '../../lib/formatTokens';
 
 /**
  * Расход токенов на одно действие агента.

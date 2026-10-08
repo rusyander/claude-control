@@ -2,11 +2,11 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { canHoldKey, getRawKey, resolveRunner } from '../../domains/provider-keys.ts';
+import { canHoldKey, getRawKey, resolveRunner } from '../../domains/provider-keys/provider-keys.ts';
 import {
   ProviderChatRun,
   type ProviderChatRunEvent,
-} from '../../domains/provider-chat/ProviderChatRun.ts';
+} from '../../domains/provider-chat/ProviderChatRun/ProviderChatRun.ts';
 import { getProvider } from '../registry.ts';
 
 /**

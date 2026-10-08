@@ -1,13 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import {
-  DOCK_WIDTH_DEFAULT,
-  DOCK_WIDTH_KEY,
-  DOCK_WIDTH_MIN,
-  clampDockWidth,
-  dockWidthMax,
-  readDockWidth,
-  writeDockWidth,
-} from './dockWidth';
+import { dockWidthMax } from './dockWidth';
+import { DOCK_WIDTH_MIN, DOCK_WIDTH_KEY } from './dockWidth.constants';
+import { clampDockWidth } from './clampDockWidth';
+import { DOCK_WIDTH_DEFAULT, readDockWidth } from './readDockWidth';
+import { writeDockWidth } from './writeDockWidth';
 
 const memory = (initial: Record<string, string> = {}) => {
   const data = new Map(Object.entries(initial));

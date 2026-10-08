@@ -1,0 +1,26 @@
+// Заголовок карточки: название и пояснение слева, «Сверить» справа; на узком
+// экране кнопка уходит под текст.
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+// Отметка правки файла пары: заметная, но не ошибка — правка законна, её надо увидеть.
+.changed {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs) var(--spacing-sm);
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-warning);
+  border-radius: 8px;
+  background-color: var(--color-warning-subtle);
+}
+
+.files {
+  overflow-wrap: anywhere;
+}

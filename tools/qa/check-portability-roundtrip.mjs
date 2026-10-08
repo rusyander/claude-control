@@ -625,7 +625,7 @@ async function main() {
     new URL('../../apps/server/src/providers/claude.ts', import.meta.url).href
   );
   const { CATALOG_PROVIDERS } = await import(
-    new URL('../../apps/server/src/providers/catalog.ts', import.meta.url).href
+    new URL('../../apps/server/src/providers/catalog/catalog.ts', import.meta.url).href
   );
 
   const providers = [claudeProvider, ...CATALOG_PROVIDERS];

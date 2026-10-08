@@ -3,7 +3,7 @@ import type { ChatEscalationsView } from '@agentdeck/contracts/chat-group-settin
 
 vi.mock('../../shared/api/client', () => ({ api: { get: vi.fn(), post: vi.fn() } }));
 
-const { unreadEscalations } = await import('./group-settings');
+const { unreadEscalations } = await import('./unreadEscalations');
 
 const entry = (id: string, read = false) => ({
   id,

@@ -3,14 +3,12 @@ import type { MediaImage, MediaImagePlan } from '@agentdeck/contracts';
 import { mediaImageBlockers } from '@agentdeck/contracts/media';
 import { en } from '../../shared/config/i18n/en';
 import { ru } from '../../shared/config/i18n/ru';
-import {
-  formatBytes,
-  imageCardLines,
-  imageModeView,
-  mediaChatId,
-  mediaImagePath,
-  planImageSubmit,
-} from './mode';
+import { imageModeView } from './mode';
+import { mediaChatId } from './mediaChatId';
+import { mediaImagePath } from './mediaImagePath';
+import { formatBytes } from './formatBytes';
+import { planImageSubmit } from './planImageSubmit';
+import { imageCardLines } from './imageCardLines';
 
 /**
  * Режим «Картинка» на телефоне (Т9 MINOR-11): доступность и дорога берутся из

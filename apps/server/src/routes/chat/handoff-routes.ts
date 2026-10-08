@@ -14,13 +14,19 @@ import {
   scanHandoffProse,
 } from '@agentdeck/contracts/chat-handoff';
 import type { ServerContext } from '../../context.ts';
-import type { ChatEvent } from '../../domains/chat/ChatRunner.ts';
-import type { ChatRunRegistry, RunFinished } from '../../domains/chat/ChatRunRegistry.ts';
-import type { ChatSession } from '../../domains/chat/ChatSession.ts';
-import { initiativePrompt } from '../../domains/chat/initiative.ts';
-import { planContextRotation } from '../../domains/chat/context-rotation.ts';
-import { AUTONOMOUS_PERMISSION_MODE } from '../../domains/chat/ChatWorkspace.ts';
-import { activateGroupsQuietly, groupsActivatedNotice } from '../../domains/group-activation.ts';
+import type { ChatEvent } from '../../domains/chat/ChatRunner/ChatRunner.ts';
+import type {
+  ChatRunRegistry,
+  RunFinished,
+} from '../../domains/chat/ChatRunRegistry/ChatRunRegistry.ts';
+import type { ChatSession } from '../../domains/chat/ChatSession/ChatSession.ts';
+import { initiativePrompt } from '../../domains/chat/initiative/initiative.ts';
+import { planContextRotation } from '../../domains/chat/context-rotation/context-rotation.ts';
+import { AUTONOMOUS_PERMISSION_MODE } from '../../domains/chat/ChatWorkspace/ChatWorkspace.ts';
+import {
+  activateGroupsQuietly,
+  groupsActivatedNotice,
+} from '../../domains/group-activation/group-activation.ts';
 import {
   checkpointInside,
   evaluateHandoff,
@@ -32,33 +38,40 @@ import {
   type HandoffStart,
   type HashFile,
   type StatFile,
-} from '../../domains/chat/ChatHandoff.ts';
-import { readChatMessages } from '../../domains/chat/ChatHistory.ts';
+} from '../../domains/chat/ChatHandoff/ChatHandoff.ts';
+import { readChatMessages } from '../../domains/chat/ChatHistory/ChatHistory.ts';
 import { projectsDir } from './paths.ts';
 import {
   asksDelivery,
   planCascadeStage,
   stageAppendPrompt,
   stageOf,
-} from '../../domains/chat/ChatCascadeStages.ts';
-import { childStageExtra } from '../../domains/chat/group-run-lines.ts';
-import { planPathTurn } from '../../domains/chat/path-steps.ts';
+} from '../../domains/chat/ChatCascadeStages/ChatCascadeStages.ts';
+import { childStageExtra } from '../../domains/chat/group-run-lines/group-run-lines.ts';
+import { planPathTurn } from '../../domains/chat/path-steps/path-steps.ts';
 import type { CascadeStage } from '@agentdeck/contracts/model-cascade';
 import type { PathStep } from '@agentdeck/contracts/group-path';
 import type { SieveReportRow, SieveStage } from '@agentdeck/contracts/sieves';
-import { serverText } from '../../lib/server-texts.ts';
+import { serverText } from '../../lib/server-texts/server-texts.ts';
 import type { ChatLink } from '../../lib/app-store/app-store.types.ts';
 import { carriedLink } from '../../lib/app-store/chat-links.ts';
-import { chainOutcomeOf, endsWithQuestion } from '../../domains/chat/chain-outcome.ts';
-import type { ChainOutcome } from '../../domains/chat/split-conveyor.ts';
-import type { TreeStartGate } from '../../domains/chat/tree-pause.ts';
-import { fillSieveSlot, SIEVE_SLOT, type SieveAsk } from '../../domains/chat/sieve-gate.ts';
-import { createChat, type ProviderChatService } from '../../domains/provider-chat.ts';
-import { checkProjectDir } from '../../domains/projects.ts';
+import {
+  chainOutcomeOf,
+  endsWithQuestion,
+} from '../../domains/chat/chain-outcome/chain-outcome.ts';
+import type { ChainOutcome } from '../../domains/chat/split-conveyor/split-conveyor.ts';
+import type { TreeStartGate } from '../../domains/chat/tree-pause/tree-pause.ts';
+import {
+  fillSieveSlot,
+  SIEVE_SLOT,
+  type SieveAsk,
+} from '../../domains/chat/sieve-gate/sieve-gate.ts';
+import { createChat, type ProviderChatService } from '../../domains/provider-chat/provider-chat.ts';
+import { checkProjectDir } from '../../domains/projects/projects.ts';
 import { getActiveProvider, getActiveProviderId } from '../../providers/registry.ts';
-import { supportsCliAutoMode } from '../../providers/auto-mode.ts';
-import { providerCliCommand } from '../../providers/cli.ts';
-import { apiTokenPath } from '../../lib/api-token.ts';
+import { supportsCliAutoMode } from '../../providers/auto-mode/auto-mode.ts';
+import { providerCliCommand } from '../../providers/cli/cli.ts';
+import { apiTokenPath } from '../../lib/api-token/api-token.ts';
 
 /**
  * Продолжение работы в чистой сессии — маршруты и планировщик.

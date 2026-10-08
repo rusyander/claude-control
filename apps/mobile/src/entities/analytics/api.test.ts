@@ -16,7 +16,9 @@ vi.mock('../../shared/config/i18n', async () => {
   return { dict: () => en };
 });
 
-const { analyticsQueryOptions, analyticsRefusal, DEFAULT_PERIOD } = await import('./api');
+const { analyticsQueryOptions } = await import('./analyticsQueryOptions');
+const { analyticsRefusal } = await import('./analyticsRefusal');
+const { DEFAULT_PERIOD } = await import('./api');
 
 const answer = (status: number, body: unknown): void => {
   vi.stubGlobal(

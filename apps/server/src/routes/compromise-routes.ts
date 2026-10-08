@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { CompromisesResponse } from '@agentdeck/contracts';
 import type { ServerContext } from '../context.ts';
-import { compromiseViews } from '../domains/platform/compromises.ts';
+import { compromiseViews } from '../domains/platform/compromises/compromises.ts';
 
 /**
  * Реестр подписанных компромиссов.

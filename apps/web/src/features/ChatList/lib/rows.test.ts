@@ -1,7 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import type { ChatSummary } from '@agentdeck/contracts';
-import { chatListRows, rowKey, withActiveFirst, withTree, withGroupHeaders } from './rows';
-import type { ChatRowData } from '../ui/ChatList.types';
+import type { ChatRowData } from '../ui/ChatList/ChatList.types';
+import { withActiveFirst } from './withActiveFirst';
+import { rowKey } from './rowKey';
+import { withTree } from './withTree';
+import { withGroupHeaders } from './withGroupHeaders';
+import { chatListRows } from './chatListRows';
 
 /**
  * Дерево в списке чатов. Нужно ровно для одного: увидеть, что несколько чатов

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { ProjectTestsView } from '@agentdeck/contracts';
 import { definePanelAction, type ActionRouteRequest, type AnyPanelAction } from './registry.ts';
-import { encode } from './action-kit.ts';
+import { encode } from './action-kit/action-kit.ts';
 import { testsQuery as query } from './tests-page.ts';
 import { assertRegistered, fitForModel, projectPath, schemaShown } from './tests-block-kit.ts';
 

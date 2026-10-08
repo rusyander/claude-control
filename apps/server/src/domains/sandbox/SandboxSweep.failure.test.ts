@@ -15,8 +15,8 @@ import { join } from 'node:path';
  * Отказ удаления подделываем на уровне safe-io: воспроизвести настоящий EBUSY
  * одинаково на всех системах нельзя, а проверяем мы поведение подметания.
  */
-vi.mock('../../lib/safe-io.ts', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../lib/safe-io.ts')>()),
+vi.mock('../../lib/safe-io/safe-io.ts', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../lib/safe-io/safe-io.ts')>()),
   removeEntry: vi.fn(() => {
     throw new Error('EBUSY: resource busy or locked');
   }),

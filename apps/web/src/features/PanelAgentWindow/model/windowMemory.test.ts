@@ -1,12 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { PanelAgentConversation } from '@agentdeck/contracts/panel-agent';
-import {
-  WINDOW_MEMORY_KEY,
-  closeSkippedTurn,
-  readWindowMemory,
-  restoredConversation,
-  writeWindowMemory,
-} from './windowMemory';
+import { restoredConversation } from './restoredConversation';
+import { WINDOW_MEMORY_KEY } from './windowMemory.constants';
+import { readWindowMemory } from './readWindowMemory';
+import { writeWindowMemory } from './writeWindowMemory';
+import { closeSkippedTurn } from './closeSkippedTurn';
 
 const memoryStorage = () => {
   const map = new Map<string, string>();

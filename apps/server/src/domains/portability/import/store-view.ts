@@ -1,4 +1,4 @@
-import type { AppStore } from '../../../lib/app-store.ts';
+import type { AppStore } from '../../../lib/app-store/app-store.ts';
 import type { ImportState } from '../types.ts';
 
 /**
@@ -10,7 +10,7 @@ import type { ImportState } from '../types.ts';
  * набор файлов во временном каталоге, где состояния панели нет вовсе, и падать
  * там значило бы, что паспорт среды снимается только с этой машины.
  *
- * Поэтому здесь ровно тот же приём, что и у `NEUTRAL_OVERLAY` в `domains/hooks.ts`
+ * Поэтому здесь ровно тот же приём, что и у `NEUTRAL_OVERLAY` в `domains/hooks/hooks.ts`
  * (`readHooksFromFiles` читает чужой `.claude` без отметок владельца машины):
  * нейтральный вид, в котором ничего не выключено и групп нет. Отметки настоящей
  * панели подмешиваются только когда вызывающий их дал — и только для СВОЕГО дома.

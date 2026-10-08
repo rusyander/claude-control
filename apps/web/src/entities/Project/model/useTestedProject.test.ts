@@ -1,13 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type { Project } from '@agentdeck/contracts';
-import {
-  mergeProjects,
-  projectByPath,
-  readStored,
-  resolveSelected,
-  subscribeStored,
-  writeStored,
-} from './useTestedProject';
+import { resolveSelected } from '../lib/resolveSelected';
+import { mergeProjects } from '../lib/mergeProjects';
+import { projectByPath } from '../lib/projectByPath';
+import { readStored } from '../lib/readStored';
+import { subscribeStored } from '../lib/subscribeStored';
+import { writeStored } from '../lib/writeStored';
 
 describe('projectByPath', () => {
   const projects = [

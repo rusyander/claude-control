@@ -800,7 +800,7 @@ export function startStubPlatform({
 
     // Опубликованные агенты платформы компании (`agent/completions`,
     // `agent/sessions/<id>`) и эмбеддинги: форма провода та, что разбирают
-    // `domains/platform/agents.ts` и `embeddings.ts`. Агент отвечает эхом
+    // `domains/platform/agents/agents.ts` и `embeddings.ts`. Агент отвечает эхом
     // последней реплики, сессия живёт в памяти стаба, вектор — длина текста и
     // его номер, чтобы проверка видела, какой вектор к какому тексту.
     const agentSession = /\/agent\/sessions\/([^/]+)$/.exec(url.pathname);

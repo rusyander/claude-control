@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { EndpointProfile, Platform } from '@agentdeck/contracts';
-import { AppStore } from '../../../lib/app-store.ts';
+import { AppStore } from '../../../lib/app-store/app-store.ts';
 import {
   buildManagedProfile,
   gatewayUrlFor,

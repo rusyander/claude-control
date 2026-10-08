@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import type { TFunction } from 'i18next';
 import type { SessionUsage } from '@agentdeck/contracts';
-import { sessionBrief, sessionSpanMs } from './sessionFacts';
+import { sessionSpanMs } from './sessionFacts';
+import { sessionBrief } from './sessionBrief';
 
 const session = (startedAt: string, lastActivity: string, requests = 351): SessionUsage => ({
   sessionId: 's1',

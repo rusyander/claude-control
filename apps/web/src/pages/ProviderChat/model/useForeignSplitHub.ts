@@ -2,7 +2,6 @@ import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import type { TaskSplitProposal } from '@agentdeck/contracts/task-split';
 import { foreignChatKey } from '@agentdeck/contracts/foreign-chat-key';
-import { toErrorMessage } from '@shared/api/client';
 import { toast } from '@shared/lib/toast';
 import { providerChatKeys } from '@entities/ProviderChat';
 import { useSplitTasks } from '@entities/ChatSplit';
@@ -17,10 +16,11 @@ import {
   useResumeTree,
 } from '@entities/ChatTree';
 import { useResumeInterruptedGroups } from '@features/ChatMessages';
-import type { ProviderChatMessagesProps } from '../ProviderChatMessages.types';
+import type { ProviderChatMessagesProps } from '../ProviderChatMessages/ProviderChatMessages.types';
 import { collectForeignStages } from '../lib/foreignStages';
 import { useForeignRelease } from './useForeignRelease';
 import { useForeignReviews } from './useForeignReviews';
+import { toErrorMessage } from '../../../shared/api/toErrorMessage';
 
 /** Что хаб разделения отдаёт ленте чужого чата — ровно её пропсы. */
 export type ForeignSplitHubProps = Pick<

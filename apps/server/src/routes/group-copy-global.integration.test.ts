@@ -6,14 +6,14 @@ import { tmpdir } from 'node:os';
 import type { Group, GroupMember } from '@agentdeck/contracts';
 import type { GroupMembersView } from '@agentdeck/contracts/group-describe';
 import type { GroupPathView } from '@agentdeck/contracts/group-path';
-import { AppStore } from '../lib/app-store.ts';
+import { AppStore } from '../lib/app-store/app-store.ts';
 import type { ServerContext } from '../context.ts';
-import { describeIdle } from '../domains/groups/describe.ts';
-import { readHooksFromFiles } from '../domains/hooks.ts';
+import { describeIdle } from '../domains/groups/describe/describe.ts';
+import { readHooksFromFiles } from '../domains/hooks/hooks.ts';
 import type { GroupAsk } from '../domains/groups/model.ts';
 import { blockLang } from '@agentdeck/contracts/brand';
-import { registerGroupPathRoutes } from './group-path-routes.ts';
-import { registerGroupSourcesRoutes } from './group-sources-routes.ts';
+import { registerGroupPathRoutes } from './group-path-routes/group-path-routes.ts';
+import { registerGroupSourcesRoutes } from './group-sources-routes/group-sources-routes.ts';
 
 /**
  * «Скопировать в общие» на группе формы доставки тикета (28.09, баг 9а): проектный скилл

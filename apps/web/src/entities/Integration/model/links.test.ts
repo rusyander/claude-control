@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import type { AtlassianSettings } from '@agentdeck/contracts';
-import { confluencePageUrl, jiraIssueUrl, linkRows } from './links';
+import { jiraIssueUrl } from './links';
+import { confluencePageUrl } from './confluencePageUrl';
+import { linkRows } from './linkRows';
 
 const cloud: AtlassianSettings = {
   enabled: true,

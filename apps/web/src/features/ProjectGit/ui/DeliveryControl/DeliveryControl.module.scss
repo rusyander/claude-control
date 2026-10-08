@@ -1,0 +1,31 @@
+// Кнопка «До MR» и её панель. Раскладка повторяет меню шапки чата: в одном ряду
+// стоят кнопки, открывающие панель, и вести они себя должны одинаково.
+.wrap {
+  position: relative;
+}
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+}
+
+.panel {
+  position: absolute;
+  top: calc(100% + var(--spacing-2xs));
+  right: 0;
+  z-index: 61;
+  width: min(380px, calc(100vw - var(--spacing-xl)));
+  max-height: min(75vh, 640px, var(--panel-max-block, 640px));
+  padding: var(--spacing-xs);
+  overflow-y: auto;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+}
+
+.title {
+  display: block;
+  padding: var(--spacing-3xs) 0 var(--spacing-2xs);
+}

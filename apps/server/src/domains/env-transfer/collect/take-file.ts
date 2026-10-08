@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readFileSync, statSync } from 'node:fs';
 import { basename, extname } from 'node:path';
-import type { ConfigProvider } from '../../../providers/types.ts';
+import type { ConfigProvider } from '../../../providers/types/types.ts';
 import type { ProviderLocation } from '../locations.ts';
 import { redactSecrets } from '../redact.ts';
 import {

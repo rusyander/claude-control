@@ -1,10 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import {
-  LEGACY_TRANSFER_TARGET_KEY,
-  TRANSFER_TARGET_KEY,
-  readRememberedTarget,
-  rememberTarget,
-} from './target-memory';
+import { readRememberedTarget } from './target-memory';
+import { TRANSFER_TARGET_KEY, LEGACY_TRANSFER_TARGET_KEY } from './target-memory.constants';
+import { rememberTarget } from './rememberTarget';
 
 /** Storage поверх Map: тесты идут в node, где браузерного хранилища нет. */
 function memoryStorage(initial: Record<string, string>): Storage {

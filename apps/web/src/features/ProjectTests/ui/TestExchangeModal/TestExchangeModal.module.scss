@@ -1,0 +1,30 @@
+// Ниже этой высоты колонки библиотеки не сжимаются, прокручивается страница.
+$library-floor: 320px;
+
+.halfField {
+  flex: 1;
+  min-width: 220px;
+
+  > * {
+    width: 100%;
+  }
+}
+
+// Выбор файла: нативный input скрыт, нажимают по кнопке рядом.
+.file {
+  display: none;
+}
+
+// Ссылка выгрузки стоит в одном ряду с полями — поэтому выглядит кнопкой.
+.exportLink {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  color: var(--color-fg);
+  font-size: var(--font-size-body-sm);
+  text-decoration: none;
+
+  &:hover {
+    border-color: var(--color-border-strong);
+  }
+}

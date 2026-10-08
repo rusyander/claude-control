@@ -10,21 +10,18 @@ import {
 } from 'react-native';
 import { Card, Chips, Empty, Field, Loading, Mono, Muted, Row, Title } from '../../src/shared/ui';
 import { colors, font, radius, space } from '../../src/shared/config/theme';
-import { useLanguage, useT } from '../../src/shared/config/i18n';
-import { formatDateTime } from '../../src/shared/lib/format';
-import { isConfigured, useConnection } from '../../src/shared/api/connection';
+import { useT, useLanguage } from '../../src/shared/config/i18n';
+import { useConnection, isConfigured } from '../../src/shared/api/connection';
 import { useWorkspace } from '../../src/shared/lib/workspace';
 import { useVoice } from '../../src/shared/lib/voice';
-import { appendDictation } from '../../src/entities/panel-agent/model';
-import {
-  PENDING_POLL_MS,
-  usePanelAgentConversations,
-  usePanelAgentJournal,
-  usePanelAgentPending,
-} from '../../src/entities/panel-agent/api';
+import { PENDING_POLL_MS, usePanelAgentPending } from '../../src/entities/panel-agent/api';
 import { AgentPendingCard } from '../../src/features/panel-agent/AgentPendingCard';
 import { useAgentSession } from '../../src/features/panel-agent/useAgentSession';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { usePanelAgentJournal } from '../../src/entities/panel-agent/usePanelAgentJournal';
+import { usePanelAgentConversations } from '../../src/entities/panel-agent/usePanelAgentConversations';
+import { appendDictation } from '../../src/entities/panel-agent/appendDictation';
+import { formatDateTime } from '../../src/shared/lib/formatDateTime';
 
 type AgentView = 'conversation' | 'history' | 'journal';
 

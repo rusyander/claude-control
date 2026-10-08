@@ -3,11 +3,11 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
-import { AppStore } from '../lib/app-store.ts';
+import { AppStore } from '../lib/app-store/app-store.ts';
 import type { ServerContext } from '../context.ts';
-import { describeIdle } from '../domains/groups/describe.ts';
-import { registerAssistantRoutes } from './assistant-routes.ts';
-import { registerGroupPathRoutes } from './group-path-routes.ts';
+import { describeIdle } from '../domains/groups/describe/describe.ts';
+import { registerAssistantRoutes } from './assistant-routes/assistant-routes.ts';
+import { registerGroupPathRoutes } from './group-path-routes/group-path-routes.ts';
 
 /** Маршрут окна для проверок, которым он не важен: контура нет, шлюз не поднят. */
 const NO_ROUTE = { runRoute: () => ({ env: {} }), gatewayPort: () => 0 };

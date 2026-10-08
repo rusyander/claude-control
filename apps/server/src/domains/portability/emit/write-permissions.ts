@@ -15,7 +15,10 @@ import type {
   ProviderPermissionsTarget,
   ProviderPermissionsValues,
 } from '../../provider-permissions/types.ts';
-import { translatePermission, type PermissionTranslation } from '../permissions-map.ts';
+import {
+  translatePermission,
+  type PermissionTranslation,
+} from '../permissions-map/permissions-map.ts';
 import {
   EmitMechanismMissingError,
   emitEntry,

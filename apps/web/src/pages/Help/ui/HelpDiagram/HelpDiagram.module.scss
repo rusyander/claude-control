@@ -1,0 +1,42 @@
+/* ── Снимок экрана ──────────────────────────────────────────────────── */
+
+.shot {
+  overflow: hidden;
+  margin: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  // Подложка видна, пока картинка грузится (место под неё зарезервировано
+  // размером из описи), и у кадра, для которого нужной темы ещё не сняли.
+  background-color: var(--color-surface-sunken);
+}
+
+.shotImage {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+// У схемы белый фон нарисован внутри картинки, поэтому подложка под ней должна
+// быть такой же — иначе на тёмной теме вокруг схемы остаётся тёмная кайма.
+.diagram {
+  background-color: #ffffff;
+}
+
+.shotCaption {
+  padding: var(--spacing-2xs) var(--spacing-sm);
+  border-top: 1px solid var(--color-border);
+  background-color: var(--color-surface);
+}
+
+// Схема кликается целиком: ссылка не должна ни подчёркивать картинку, ни
+// добавлять под ней лишнюю строку — но фокус на ней обязан быть виден.
+.diagramLink {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+
+  &:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: -2px;
+  }
+}

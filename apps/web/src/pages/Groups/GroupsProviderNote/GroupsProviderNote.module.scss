@@ -1,0 +1,14 @@
+/* Строка о чужом активном CLI над вкладками: слой на прогон — сведения,
+   «не действует» — предупреждение. */
+.providerNote,
+.providerNoteNone {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: 8px;
+  border-left: 3px solid var(--color-info);
+  background: var(--color-info-subtle);
+}
+
+.providerNoteNone {
+  border-left-color: var(--color-warning);
+  background: var(--color-warning-subtle);
+}

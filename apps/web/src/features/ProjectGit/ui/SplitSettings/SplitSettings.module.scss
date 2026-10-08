@@ -1,0 +1,42 @@
+// Строка с тумблером кликабельна целиком, пояснение — под названием.
+.toggleRow {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-2xs);
+  padding: var(--spacing-2xs);
+  border-radius: 8px;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--color-bg);
+  }
+}
+
+.toggleText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3xs);
+  min-width: 0;
+}
+
+.note {
+  margin: 0;
+  padding: 0 var(--spacing-2xs);
+}
+
+.divider {
+  height: 1px;
+  background: var(--color-border);
+}
+
+// Команда подготовки копии бывает длинной (по цепочке на каталог) — переносим
+// по словам, а не растягиваем панель.
+.command {
+  display: block;
+  padding: var(--spacing-2xs);
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  background: var(--color-bg);
+  border-radius: 8px;
+}

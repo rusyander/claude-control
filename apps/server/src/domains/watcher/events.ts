@@ -1,7 +1,7 @@
 import { join } from 'node:path';
 import type { WatchSeverity } from '@agentdeck/contracts';
-import { readJsonFile, writeJsonFile } from '../../lib/safe-io.ts';
-import { maskSecretsInText } from '../../lib/secret-mask.ts';
+import { readJsonFile, writeJsonFile } from '../../lib/safe-io/safe-io.ts';
+import { maskSecretsInText } from '../../lib/secret-mask/secret-mask.ts';
 import { fingerprintOf, remarkFingerprint } from './fingerprint.ts';
 import type { WatchEvent, WatchFinding, WatchRemark, WatchSignal } from './types.ts';
 

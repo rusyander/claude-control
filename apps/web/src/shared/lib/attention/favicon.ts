@@ -1,4 +1,4 @@
-import type { AttentionTone } from './attention';
+import type { AttentionTone } from './attention.types';
 
 /**
  * Точка на значке вкладки. Значок рисуем сами в data-URL, а не подменяем файл:

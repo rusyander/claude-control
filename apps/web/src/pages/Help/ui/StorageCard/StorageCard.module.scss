@@ -1,0 +1,43 @@
+/* ── Где это лежит ──────────────────────────────────────────────────── */
+
+.storageIcon {
+  color: var(--color-fg-subtle);
+  flex-shrink: 0;
+}
+
+.storageList {
+  display: grid;
+  // Колонка подписей ровно по самой длинной из них, остальное — значению.
+  grid-template-columns: max-content 1fr;
+  gap: var(--spacing-xs) var(--spacing-md);
+  margin: 0;
+}
+
+.storageRow {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  align-items: baseline;
+}
+
+.storageLabel {
+  margin: 0;
+}
+
+.storageValue {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+// Узкий экран: подпись встаёт над значением, иначе путь к файлу сжимается
+// в нечитаемый столбик из двух символов.
+@media (width <= 560px) {
+  .storageList {
+    grid-template-columns: 1fr;
+  }
+
+  .storageRow {
+    grid-template-columns: 1fr;
+    gap: var(--spacing-3xs);
+  }
+}

@@ -1,13 +1,13 @@
 import type { FastifyReply } from 'fastify';
 import type { ServerContext } from '../context.ts';
-import { runAssistant } from '../domains/assistant-runner.ts';
+import { runAssistant } from '../domains/assistant-runner/assistant-runner.ts';
 import type { EntityToggleDeps } from '../domains/entity-toggle.ts';
-import { resolveAssistantEndpoint } from '../domains/endpoints.ts';
+import { resolveAssistantEndpoint } from '../domains/endpoints/endpoints.ts';
 import type { ZodType } from 'zod';
 import { badGroupRequest, GroupRequestError, refusalBody } from '../domains/groups/errors.ts';
 import { issuesOf } from '../lib/request-body.ts';
 import { cheapModelFor, GroupModelError, type GroupAsk } from '../domains/groups/model.ts';
-import { codeOf } from '../lib/server-text.ts';
+import { codeOf } from '../lib/server-text/server-text.ts';
 import { getActiveProvider } from '../providers/registry.ts';
 
 /**

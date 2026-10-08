@@ -44,7 +44,7 @@ const CODE_EXT = ['.ts', '.tsx', '.mjs', '.js'];
 /** Файлы, где идентификаторы встречаются по долгу службы, а не как подпись. */
 const NOT_ANCHORS = [
   join('packages', 'contracts', 'src', 'compromises.ts'),
-  join('apps', 'server', 'src', 'domains', 'platform', 'compromises.ts'),
+  join('apps', 'server', 'src', 'domains', 'platform', 'compromises', 'compromises.ts'),
   join('tools', 'qa', 'check-compromises.mjs'),
 ];
 

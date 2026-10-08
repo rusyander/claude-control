@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import type { PanelPendingAction, PanelTextParams } from '@agentdeck/contracts/panel-agent';
 import { panelTextsEn } from '../../shared/config/i18n/panel-texts/texts.en';
 import { panelTextsRu } from '../../shared/config/i18n/panel-texts/texts.ru';
-import { cardFields, cardPreview, cardSummary } from './model';
 import { panelText } from './panelText';
+import { cardPreview } from './cardPreview';
+import { cardSummary } from './cardSummary';
+import { cardFields } from './cardFields';
 
 /**
  * Карточка агента на телефоне — словарём по коду, как окно панели. Раньше телефон

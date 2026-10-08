@@ -1,6 +1,6 @@
 import { basename } from 'node:path';
 import type { DiffLine, HistoryDiff, HistoryEntry } from '@agentdeck/contracts';
-import type { TrackedFile } from '../tracked-files.ts';
+import type { TrackedFile } from '../tracked-files/tracked-files.ts';
 import { BACKUP_NAME } from './constants.ts';
 import { assignHunks, diffLines, isBinary, tooBig } from './diff.ts';
 import { collectSnapshots, orderVersions, readText, resolveBase } from './snapshots.ts';

@@ -1,0 +1,7 @@
+.results {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2xs);
+  max-height: 420px;
+  overflow-y: auto;
+}

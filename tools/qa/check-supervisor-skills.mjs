@@ -28,16 +28,19 @@ import { tmpdir } from 'node:os';
 const SELFTEST = process.argv.includes('--selftest');
 
 const RUN_TS = new URL(
-  '../../apps/server/src/domains/provider-chat/ProviderChatRun.ts',
+  '../../apps/server/src/domains/provider-chat/ProviderChatRun/ProviderChatRun.ts',
   import.meta.url,
 ).href;
 const SERVICE_TS = new URL(
-  '../../apps/server/src/domains/provider-chat/ProviderChatService.ts',
+  '../../apps/server/src/domains/provider-chat/ProviderChatService/ProviderChatService.ts',
   import.meta.url,
 ).href;
-const STORE_TS = new URL('../../apps/server/src/domains/provider-chat/store.ts', import.meta.url)
+const STORE_TS = new URL(
+  '../../apps/server/src/domains/provider-chat/store/store.ts',
+  import.meta.url,
+).href;
+const CATALOG_TS = new URL('../../apps/server/src/providers/catalog/catalog.ts', import.meta.url)
   .href;
-const CATALOG_TS = new URL('../../apps/server/src/providers/catalog.ts', import.meta.url).href;
 
 /**
  * Маркер внутри тела скилла. Ищется потом ВЕЗДЕ, где тела быть не должно, — и

@@ -3,8 +3,8 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { spawnCliProcess } from '../../../lib/cli-spawn.ts';
-import { killChildTree } from '../../../lib/process-tree.ts';
+import { spawnCliProcess } from '../../../lib/cli-spawn/cli-spawn.ts';
+import { killChildTree } from '../../../lib/process-tree/process-tree.ts';
 import type { TestsAgentEvent, TestsAgentRun, TestsAgentStartOptions } from './agent-run.types.ts';
 import {
   QWEN_TESTS_EXCLUDED_TOOLS,

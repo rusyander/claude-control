@@ -1,0 +1,29 @@
+// «Порт занят»: предупреждение с именем держателя и кнопкой освобождения.
+// Тон предупреждающий, но не ошибочный — это состояние, из которого есть выход
+// в один клик.
+.busy {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-3xs);
+  padding: 0 0 0 var(--spacing-2xs);
+  border-left: 2px solid var(--color-warning);
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-body-sm);
+}
+
+.busyText {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--spacing-3xs);
+  min-width: 0;
+}
+
+// Имя чужого процесса — деталь: усечено, целиком видно в title.
+.busyWho {
+  max-width: 22ch;
+  overflow: hidden;
+  color: var(--color-fg-subtle);
+  font-size: var(--font-size-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

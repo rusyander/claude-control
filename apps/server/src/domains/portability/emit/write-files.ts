@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { stringify as stringifyToml } from 'smol-toml';
 import type { CommandItem, SkillItem } from '@agentdeck/contracts/portable-env';
-import { providerBackupName, readTextFile, writeTextFile } from '../../../lib/safe-io.ts';
+import { providerBackupName, readTextFile, writeTextFile } from '../../../lib/safe-io/safe-io.ts';
 import { bodyAfterFrontmatter } from '../markdown.ts';
 import { readProviderSkillsInfo } from '../../provider-skills/read.ts';
 import { saveProviderSkill } from '../../provider-skills/write.ts';
@@ -130,7 +130,7 @@ function emitSkills(context: EmitContext): StageResult {
  * Слэш-команды: файл на команду, подкаталог даёт пространство имён.
  *
  * Адаптера записи у раздела нет — панель эти файлы сегодня только читает
- * (`domains/commands/`), — поэтому запись идёт через `lib/safe-io.ts`: бэкап,
+ * (`domains/commands/`), — поэтому запись идёт через `lib/safe-io/safe-io.ts`: бэкап,
  * атомарная запись, создание каталога при явном сохранении. Прямого
  * `writeFileSync` здесь нет и быть не может (§5.3).
  */

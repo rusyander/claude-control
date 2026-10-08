@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { assistHistory, keptSecretMisses } from './assistant-history';
-import { groupMisses } from './assistant-fields';
+import { assistHistory } from './assistant-history';
+import { groupMisses } from './groupMisses';
+import { keptSecretMisses } from './keptSecretMisses';
 
 /**
  * Окно помощника без сессии (лёгкое окно, D4 28.09): разговор продолжается

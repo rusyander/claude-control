@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
-import { detectTextForm, stripBom, type TextForm } from '../text-form.ts';
+import { detectTextForm, stripBom, type TextForm } from '../text-form/text-form.ts';
 
 /** Выше этого размера форму файла не определяем — запись идёт как есть. */
 const MAX_FORM_PROBE_BYTES = 4 * 1024 * 1024;

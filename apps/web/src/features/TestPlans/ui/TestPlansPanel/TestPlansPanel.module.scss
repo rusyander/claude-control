@@ -1,0 +1,7 @@
+// Планы карточками: их единицы, а не сотни, и у каждого есть что показать —
+// сроки, состав, число проходов. Список строками прятал бы ровно это.
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--spacing-sm);
+}

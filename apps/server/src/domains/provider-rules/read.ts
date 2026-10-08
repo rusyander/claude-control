@@ -5,14 +5,14 @@ import type {
   ProviderRulesIgnoredFile,
   ProviderRulesInfo,
 } from '@agentdeck/contracts';
-import { readTextFile } from '../../lib/safe-io.ts';
+import { readTextFile } from '../../lib/safe-io/safe-io.ts';
 import { SECTION_MAX_FILE_BYTES, fileSizeOf, walkSectionFiles } from '../../lib/section-fs.ts';
-import { MdcFormatError } from '../../lib/cursor-mdc.ts';
+import { MdcFormatError } from '../../lib/cursor-mdc/cursor-mdc.ts';
 import { ruleCodec } from './codec.ts';
 import { RuleNotEditableError, RuleNotFoundError } from './errors.ts';
 import { resolveRulePath, ruleExtension, toRelative } from './paths.ts';
 import type { ProviderRulesTarget } from './types.ts';
-import { coded } from '../../lib/server-text.ts';
+import { coded } from '../../lib/server-text/server-text.ts';
 
 /** Все файлы каталога правил: `.mdc` — правила, остальное — игнорируемое Cursor. */
 function walkRulesDir(target: ProviderRulesTarget): { rules: string[]; ignored: string[] } {

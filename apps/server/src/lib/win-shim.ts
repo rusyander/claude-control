@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { basename, delimiter, dirname, extname, isAbsolute, join, resolve } from 'node:path';
-import { resolveWindowsExecutable } from './win-exec.ts';
+import { resolveWindowsExecutable } from './win-exec/win-exec.ts';
 
 /**
  * Разбор `.cmd`-обёртки менеджера пакетов на Windows — чтобы запускать её цель

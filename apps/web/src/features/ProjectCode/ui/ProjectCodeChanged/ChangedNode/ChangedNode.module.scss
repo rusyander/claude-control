@@ -1,0 +1,83 @@
+// Размер строки — это читаемость списка, по которому ходят весь сеанс: мельче
+// имена сливаются, а попасть в строку становится работой. Держим кегль обычного
+// текста и высоту строки, в которую попадаешь не целясь.
+.node {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2xs);
+  width: 100%;
+  min-height: 28px;
+  padding: var(--spacing-2xs) var(--spacing-xs);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-body);
+  line-height: 1.35;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: var(--color-surface-sunken);
+    color: var(--color-fg);
+  }
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.6;
+  }
+}
+
+.nodeActive {
+  background: var(--color-accent-subtle);
+  color: var(--color-fg);
+}
+
+.nodeCounts {
+  display: flex;
+  flex: none;
+  gap: var(--spacing-3xs);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-body-sm);
+}
+
+.added {
+  color: var(--color-success);
+}
+
+.removed {
+  color: var(--color-danger);
+}
+
+/* Буква состояния git там, где строк не посчитать: у нового файла нет прежней
+   версии, и «+0 −0» читалось бы как «ничего не изменилось». */
+.gitStatus {
+  color: var(--color-fg-subtle);
+  font-weight: var(--font-weight-semibold);
+}
+
+/*
+  Путь в списке изменённых: каталог сжимается, имя файла остаётся целым. То же
+  правило, что в пульте git, и по той же причине — обрезка с конца прячет ровно
+  то, что ищут глазами.
+*/
+.nodePath {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: baseline;
+}
+
+.nodeDir {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-fg-subtle);
+}
+
+.nodeFile {
+  flex: none;
+  white-space: nowrap;
+}

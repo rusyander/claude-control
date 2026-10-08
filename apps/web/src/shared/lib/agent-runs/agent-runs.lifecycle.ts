@@ -1,33 +1,27 @@
-import { apiClient } from '@shared/api/client';
-import { i18n } from '@shared/config/i18n';
 import { isOpenAsk } from '@shared/lib/chat-stream';
 import { MAX_AUTO_RETRIES, MAX_RECONNECT } from './agent-runs.constants';
-import {
-  autoRetries,
-  autoRetryTimers,
-  pickRetryPrompt,
-  shouldAutoRetry,
-  stoppedByUser,
-} from './agent-runs.retry';
-import { persistQueue } from './agent-runs.queue-store';
+import { autoRetries, autoRetryTimers, stoppedByUser } from './agent-runs.retry';
 import { loadSpend } from './agent-runs.spend';
 import { sleep } from './agent-runs.sse';
 import {
   callbacks,
   caughtUp,
   controllers,
-  emit,
-  getRun,
   lastSeqs,
   pendingUsage,
-  runs,
   sending,
-  setRun,
 } from './agent-runs.state';
 import { ensureWatchdog, rebuildStatuses } from './agent-runs.statuses';
-import { openStream } from './agent-runs.stream';
 import type { AgentRun, SendOutcome, StartInput } from './agent-runs.types';
-import type { RunStatus } from './status';
+import { retryPromptFor } from './retryRun';
+import { persistQueue } from './persistQueue';
+import { shouldAutoRetry } from './shouldAutoRetry';
+import { emit } from './emit';
+import { runs } from './agent-runs.state.constants';
+import { setRun } from './setRun';
+import { getRun } from './getRun';
+import { openStream } from './openStream';
+import type { RunStatus } from './status.types';
 
 /**
  * Жизненный цикл прогона: запуск, ведение потока с переподключением, авто-рестарт
@@ -480,28 +474,4 @@ export async function retryRun(
     effort: run.effort,
     fullAccess: options?.fullAccess,
   });
-}
-
-/** Хвост транскрипта: своя реплика — последняя из реплик человека, дальше смотреть незачем. */
-const RETRY_TAIL = 5;
-
-/** Задача заново или «продолжай» — по тому, дожила ли реплика до транскрипта. */
-async function retryPromptFor(run: AgentRun): Promise<string> {
-  const lastPrompt = run.lastPrompt ?? '';
-  if (!run.sessionId || run.startedAt === undefined) return lastPrompt;
-  try {
-    const { data } = await apiClient.get<{ messages: { role: string; timestamp: string }[] }>(
-      `/chats/${run.sessionId}/messages`,
-      { params: { limit: RETRY_TAIL } },
-    );
-    return pickRetryPrompt({
-      lastPrompt,
-      startedAt: run.startedAt,
-      history: data.messages,
-      continuation: i18n.t('chat.continueAfterDrop'),
-    });
-  } catch {
-    // Транскрипт не прочитался — ведём себя как раньше: задача заново.
-    return lastPrompt;
-  }
 }

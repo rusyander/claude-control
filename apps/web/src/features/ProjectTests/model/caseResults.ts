@@ -1,8 +1,4 @@
-import type {
-  ProjectTestCaseResultEntry,
-  ProjectTestFlakyMark,
-  ProjectTestFlakyMarks,
-} from '@agentdeck/contracts';
+import type { ProjectTestCaseResultEntry } from '@agentdeck/contracts';
 import { resultReason } from '@agentdeck/contracts/test-format';
 
 /** Причина неуспеха одной строкой: номер шага (если разобран) и что вышло. */
@@ -32,24 +28,4 @@ export function reasonOf(entry: ProjectTestCaseResultEntry): ResultReason | unde
     .map((part) => part.trim())
     .find((part) => part.length > 0);
   return line ? { step: reason?.step, text: line } : undefined;
-}
-
-/** Отметки нестабильности по ключу строки таблицы — «группа:кейс». */
-export function flakyIndex(
-  marks: ProjectTestFlakyMarks | undefined,
-): Map<string, ProjectTestFlakyMark> {
-  return new Map((marks?.cases ?? []).map((mark) => [`${mark.groupId}:${mark.caseId}`, mark]));
-}
-
-/**
- * Адрес записи прогона из истории кейса: вкладка прогонов, раскрытый прогон и
- * ПРОЕКТ. Карточка кейса живёт и в окне тестов чата, где проект — каталог
- * чата, а раздел «Тестирование» помнит свой выбор; без проекта ссылка вела в
- * историю чужого проекта, где такого прогона нет, и раздел молчал.
- */
-export function caseRunSearch(
-  projectPath: string | undefined,
-  runId: string,
-): { tab: 'runs'; run: string; project?: string } {
-  return { tab: 'runs', run: runId, ...(projectPath ? { project: projectPath } : {}) };
 }

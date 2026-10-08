@@ -5,7 +5,10 @@ import {
   type SplitDefaults,
 } from '@agentdeck/contracts/split-groups';
 import type { SplitSettingsView } from '@agentdeck/contracts/task-split';
-import { defaultRows, projectRows, toggleDefaultRow, toggleProjectRow } from './groupRows';
+import { projectRows } from './groupRows';
+import { toggleProjectRow } from './toggleProjectRow';
+import { toggleDefaultRow } from './toggleDefaultRow';
+import { defaultRows } from './defaultRows';
 
 /**
  * Строки вкладки «Группы»: проект наследует общие, пока строку не тронули, и

@@ -1,0 +1,101 @@
+.target {
+  border-top: 1px solid var(--color-border-subtle);
+  padding-top: var(--spacing-2xs);
+
+  &:first-child {
+    border-top: none;
+    padding-top: 0;
+  }
+}
+
+.targetHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-2xs);
+}
+
+.disclosure {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-3xs);
+  min-width: 0;
+  padding: var(--spacing-3xs);
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--color-fg);
+  cursor: pointer;
+
+  &:hover {
+    background: var(--color-surface-sunken);
+  }
+}
+
+.targetName {
+  overflow: hidden;
+  font-size: var(--font-size-body-sm);
+  font-weight: var(--font-weight-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chevron {
+  color: var(--color-fg-subtle);
+  transition: transform var(--duration-fast);
+}
+
+.chevronOpen {
+  transform: rotate(90deg);
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2xs);
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  padding: 0 var(--spacing-2xs);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface-sunken);
+  color: var(--color-fg);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+
+  &:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 1px;
+  }
+}
+
+.inputNarrow {
+  flex: 0 0 96px;
+}
+
+// Хвост вывода процесса: нужен ровно тогда, когда что-то пошло не так, поэтому
+// свёрнут и моноширинный.
+.output {
+  font-size: var(--font-size-caption);
+
+  summary {
+    color: var(--color-fg-subtle);
+    cursor: pointer;
+  }
+
+  pre {
+    max-height: 180px;
+    margin: var(--spacing-3xs) 0 0;
+    overflow: auto;
+    padding: var(--spacing-2xs);
+    border-radius: 6px;
+    background: var(--color-surface-sunken);
+    font-family: var(--font-mono);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+}

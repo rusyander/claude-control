@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { GroupMembersView, PathEntry } from '@agentdeck/contracts';
-import { describedStepTitle, previewSteps, projectOnlyLines, tileToggle } from './tile';
+import { projectOnlyLines } from './projectOnlyLines';
+import { describedStepTitle } from './describedStepTitle';
+import { previewSteps } from './previewSteps';
+import { tileToggle } from './tileToggle';
 
 const step = (index: number, title: string): PathEntry => ({
   kind: 'skill-step',

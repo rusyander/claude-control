@@ -1,0 +1,230 @@
+import { useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useQueryClient } from '@tanstack/react-query';
+import type { CompareSectionResult, ProviderMigrateRequest } from '@agentdeck/contracts';
+import { Stack } from '@shared/ui/stack';
+import { Button } from '@shared/ui/button';
+import { Icon } from '@shared/ui/icon';
+import { Card } from '@shared/ui/card';
+import { PageHeader } from '@shared/ui/page-header';
+import { SelectField } from '@shared/ui/select-field';
+import { SkeletonList } from '@shared/ui/skeleton';
+import { LoadErrorCard } from '@shared/ui/load-error';
+import { PageTabs, PageTabPanel } from '@shared/ui/page-tabs';
+import { usePageTab } from '@shared/hooks/use-page-tab';
+import { EmptyState } from '@shared/ui/empty-state';
+import { toast } from '@shared/lib/toast';
+import { useSettings } from '@entities/AppConfig';
+import { useProviders } from '@entities/Provider';
+import { useProviderCompare, useMigrateProvider } from '@entities/ProviderCompare';
+import { WritePreviewDialog } from '@features/WritePreview';
+import { CompareSection } from '../CompareSection/CompareSection';
+import { COMPARE_TABS, COMPARE_TAB_ICONS, type CompareTabId } from '../model/tabs';
+import styles from './ProviderComparePage.module.scss';
+import { serverFieldText } from '@shared/config/i18n';
+
+/**
+ * Сравнение конфигураций двух провайдеров и перенос записей между ними
+ * (IDEA-5 + IDEA-4).
+ *
+ * Раздел панель-level: он про ДВУХ провайдеров сразу, поэтому не гейтится
+ * возможностями активного и не зависит от того, кто сейчас выбран. Слева по
+ * умолчанию активный провайдер — с ним чаще всего и сравнивают.
+ *
+ * Перенос всегда идёт в два шага: сначала сервер считает дифф целевого файла на
+ * временной копии, и только после подтверждения — настоящая запись. Один шаг
+ * здесь был бы неуместной храбростью: пишем в файл чужого CLI, который человек
+ * вёл руками.
+ */
+export function ProviderComparePage() {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const { data: settings, isError: settingsFailed, refetch: refetchSettings } = useSettings();
+  const { data: providers, isError: providersFailed, refetch: refetchProviders } = useProviders();
+
+  const [left, setLeft] = useState('');
+  const [right, setRight] = useState('');
+  const { active: activeTab, select: selectTab } = usePageTab('compare', COMPARE_TABS);
+
+  const options = useMemo(
+    () => (providers?.providers ?? []).map((item) => ({ value: item.id, label: item.name })),
+    [providers],
+  );
+
+  // Стороны по умолчанию: активный провайдер и первый отличный от него. Сделано
+  // через производное значение, а не эффектом: эффект успел бы отрисовать
+  // страницу с пустыми сторонами и запросить сравнение «ничего с ничем».
+  const leftId = left || settings?.provider || 'claude';
+  const rightId = right || options.find((item) => item.value !== leftId)?.value || '';
+
+  const compare = useProviderCompare(leftId, rightId);
+  const migrate = useMigrateProvider();
+
+  /** Что подтверждаем прямо сейчас: запрос переноса ждёт «Записать». */
+  const [pending, setPending] = useState<ProviderMigrateRequest | undefined>(undefined);
+
+  const swap = (): void => {
+    setLeft(rightId);
+    setRight(leftId);
+  };
+
+  const askMigrate = (request: ProviderMigrateRequest): void => {
+    setPending(request);
+    migrate.mutate({ ...request, mode: 'preview' });
+  };
+
+  const closeDialog = (): void => {
+    setPending(undefined);
+    migrate.reset();
+  };
+
+  const confirmMigrate = (): void => {
+    if (!pending) return;
+    const request = pending;
+    setPending(undefined);
+
+    migrate.mutate(
+      { ...request, mode: 'apply' },
+      {
+        onSuccess: (result) => {
+          migrate.reset();
+          void queryClient.invalidateQueries({ queryKey: ['providers', 'compare'] });
+          if (result.applied.length === 0) toast.info(t('providerCompare.migrateNothing'));
+          else toast.success(t('providerCompare.migrateDone', { count: result.applied.length }));
+          for (const skip of result.skipped)
+            toast.info(`${skip.key}: ${serverFieldText(skip, 'reason')}`);
+        },
+        // Тост об ошибке даёт глобальный MutationCache (`app/queryClient.ts`) —
+        // с причиной от сервера («формат приёмника не распознан»); свой второй,
+        // общий «не удалось», только дублировал его. Здесь — лишь сброс состояния.
+        onError: () => {
+          migrate.reset();
+        },
+      },
+    );
+  };
+
+  // Отказ сервера — не вечный скелет: заголовок с «?» и кнопка повторить.
+  if ((settingsFailed || providersFailed) && (!settings || !providers)) {
+    return (
+      <Stack gap="var(--spacing-md)">
+        <PageHeader
+          title={t('providerCompare.title')}
+          subtitle={t('providerCompare.subtitle')}
+          helpTopic="compare"
+        />
+        <LoadErrorCard
+          onRetry={() => {
+            void refetchSettings();
+            void refetchProviders();
+          }}
+        />
+      </Stack>
+    );
+  }
+
+  if (!settings || !providers) return <SkeletonList rows={4} />;
+
+  const sections = compare.data?.sections ?? [];
+  const sectionOf = (id: CompareTabId): CompareSectionResult | undefined =>
+    sections.find((section) => section.section === id);
+
+  // Панель открытой вкладки: одинаковые стороны сравнивать нечего, дальше по
+  // порядку — загрузка, отказ сервера и сам раздел.
+  const renderResult = (): ReactNode => {
+    if (leftId === rightId) return <EmptyState icon="swap" title={t('providerCompare.samePair')} />;
+    if (compare.isLoading) return <SkeletonList rows={4} />;
+    // Отказ самого сравнения — та же карточка с повтором, что и у настроек выше:
+    // пояснение без кнопки оставляло страницу без выхода, кроме F5.
+    if (compare.isError) {
+      return (
+        <LoadErrorCard
+          title={t('providerCompare.loadError')}
+          text={t('providerCompare.loadErrorText')}
+          onRetry={() => {
+            void compare.refetch();
+          }}
+        />
+      );
+    }
+    const section = sectionOf(activeTab);
+    if (!section) return <EmptyState icon="swap" title={t('providerCompare.empty')} />;
+    return (
+      <CompareSection
+        key={section.section}
+        section={section}
+        busy={migrate.isPending}
+        onMigrate={askMigrate}
+      />
+    );
+  };
+
+  // Число на вкладке — сколько записей НЕ совпало: ради этого сравнение и
+  // открывают, и по нему видно, куда идти, не перебирая вкладки.
+  const tabs = COMPARE_TABS.map((id) => {
+    const section = leftId === rightId ? undefined : sectionOf(id);
+    return {
+      id,
+      label: t(`providerCompare.section.${id}`),
+      icon: COMPARE_TAB_ICONS[id],
+      ...(section
+        ? {
+            count: section.entries.filter((entry) => entry.state !== 'same').length,
+            countHint: t('pageTabs.compare.countHint'),
+          }
+        : {}),
+    };
+  });
+
+  return (
+    <Stack gap="var(--spacing-md)">
+      <PageHeader
+        title={t('providerCompare.title')}
+        subtitle={t('providerCompare.subtitle')}
+        helpTopic="compare"
+      />
+
+      <Card padding="md">
+        <Stack direction="row" gap="var(--spacing-sm)" align="end" className={styles.picker}>
+          <SelectField
+            label={t('providerCompare.left')}
+            value={leftId}
+            onChange={setLeft}
+            options={options}
+          />
+          <Button variant="ghost" onClick={swap} aria-label={t('providerCompare.swap')}>
+            <Icon name="swap" />
+          </Button>
+          <SelectField
+            label={t('providerCompare.right')}
+            value={rightId}
+            onChange={setRight}
+            options={options}
+          />
+        </Stack>
+      </Card>
+
+      <PageTabs
+        page="compare"
+        label={t('pageTabs.compare.tabsLabel')}
+        tabs={tabs}
+        active={activeTab}
+        onSelect={selectTab}
+      />
+
+      <PageTabPanel page="compare" tab={activeTab} hint={t(`pageTabs.compare.hint.${activeTab}`)}>
+        {renderResult()}
+      </PageTabPanel>
+
+      <WritePreviewDialog
+        isOpen={pending !== undefined}
+        isLoading={migrate.isPending}
+        preview={migrate.data?.diff}
+        error={migrate.isError}
+        onCancel={closeDialog}
+        onConfirm={confirmMigrate}
+      />
+    </Stack>
+  );
+}

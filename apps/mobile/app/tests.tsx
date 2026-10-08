@@ -15,32 +15,28 @@ import {
   Title,
 } from '../src/shared/ui';
 import { colors, font, radius, space } from '../src/shared/config/theme';
-import { useLanguage, useT } from '../src/shared/config/i18n';
+import { useT, useLanguage } from '../src/shared/config/i18n';
 import { useWorkspace } from '../src/shared/lib/workspace';
-import {
-  useInstallTestConvention,
-  useProjectTests,
-  useRemoveTestCase,
-  useSaveTestCase,
-  useStartManualRun,
-  useStartTestRun,
-  useStopTestRun,
-  useTestPyramid,
-} from '../src/entities/tests/api';
-import { formatWhen } from '../src/entities/tests/status';
-import { TestCaseEditor } from '../src/features/tests/TestCaseEditor';
-import { TestCaseRow } from '../src/features/tests/TestCaseRow';
-import { TestE2eCard } from '../src/features/tests/TestE2eCard';
-import { TestPyramidCard } from '../src/features/tests/TestPyramidCard';
-import { TestLinks } from '../src/features/tests/TestLinks';
+import { useProjectTests } from '../src/entities/tests/api';
+import { TestCaseEditor } from '../src/features/tests/TestCaseEditor/TestCaseEditor';
+import { TestCaseRow } from '../src/features/tests/TestCaseRow/TestCaseRow';
+import { TestE2eCard } from '../src/features/tests/TestE2eCard/TestE2eCard';
+import { TestPyramidCard } from '../src/features/tests/TestPyramidCard/TestPyramidCard';
+import { TestLinks } from '../src/features/tests/TestLinks/TestLinks';
 import { usePullRefresh } from '../src/shared/lib/pull-refresh';
-import {
-  EMPTY_FILTER,
-  TestFilters,
-  filterCases,
-  isFilterEmpty,
-  type TestFilterState,
-} from '../src/features/tests/TestFilters';
+import { TestFilters } from '../src/features/tests/TestFilters/TestFilters';
+import { useTestPyramid } from '../src/entities/tests/useTestPyramid';
+import { useStartTestRun } from '../src/entities/tests/useStartTestRun';
+import { useStopTestRun } from '../src/entities/tests/useStopTestRun';
+import { useInstallTestConvention } from '../src/entities/tests/useInstallTestConvention';
+import { useSaveTestCase } from '../src/entities/tests/useSaveTestCase';
+import { useRemoveTestCase } from '../src/entities/tests/useRemoveTestCase';
+import { useStartManualRun } from '../src/entities/tests/useStartManualRun';
+import { formatWhen } from '../src/entities/tests/formatWhen';
+import type { TestFilterState } from '../src/features/tests/TestFilters/TestFilters.types';
+import { EMPTY_FILTER } from '../src/features/tests/TestFilters/TestFilters.constants';
+import { isFilterEmpty } from '../src/features/tests/isFilterEmpty';
+import { filterCases } from '../src/features/tests/filterCases';
 
 /**
  * Тест-кейсы проекта на телефоне: те же файлы `.agent/tests/`, что в панели.

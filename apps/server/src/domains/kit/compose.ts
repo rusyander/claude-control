@@ -8,7 +8,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { copyRecursive, removeEntry, renameWithRetry } from '../../lib/safe-io.ts';
+import { copyRecursive, removeEntry, renameWithRetry } from '../../lib/safe-io/safe-io.ts';
 import { kitFiles, listFiles, type KitFile } from './items.ts';
 
 /**

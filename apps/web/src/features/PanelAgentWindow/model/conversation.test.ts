@@ -5,7 +5,6 @@ import {
   applyRunEvent,
   fromConversation,
   isOwnConversationEvent,
-  pendingOpensWindow,
   reloadSettledConversation,
   splitPending,
   withNotice,
@@ -15,6 +14,7 @@ import {
   withUserMessage,
 } from './conversation';
 import { sealFooter, sealNoteFrom } from '@agentdeck/contracts/panel-agent-feed';
+import { pendingOpensWindow } from './pendingOpensWindow';
 
 describe('conversation', () => {
   it('ход с блоками текста: ответ в ленте один раз, в истории из done', () => {

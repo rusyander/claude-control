@@ -1,4 +1,4 @@
-import type { CredentialsSource } from '../../lib/credentials.ts';
+import type { CredentialsSource } from '../../lib/credentials/credentials.ts';
 
 /** Что именно проверяем. */
 export interface SandboxSelection {

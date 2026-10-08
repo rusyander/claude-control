@@ -2,20 +2,18 @@ import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { usePlatformRunPlan } from '@entities/Platform';
-import {
-  MODEL_OPTIONS,
-  EFFORT_LEVELS,
-  modelLabel,
-  modelSelectOptions,
-  platformLayersCaption,
-  platformModelCaption,
-  platformRunChoice,
-  platformBypassCaption,
-  platformRefusalCaption,
-  withCurrentValue,
-} from '@shared/lib/chat-model';
+import { MODEL_OPTIONS, EFFORT_LEVELS, modelLabel } from '@shared/lib/chat-model';
 import type { ChatModelPickerProps } from './ChatModelPicker.types';
 import styles from './ChatModelPicker.module.scss';
+import {
+  modelSelectOptions,
+  platformRunChoice,
+  withCurrentValue,
+  platformModelCaption,
+  platformRefusalCaption,
+  platformBypassCaption,
+  platformLayersCaption,
+} from '../../../shared/lib/chat-model';
 
 /**
  * Выбор модели и глубины продумывания для ТЕКУЩЕГО чата. Пустое значение —

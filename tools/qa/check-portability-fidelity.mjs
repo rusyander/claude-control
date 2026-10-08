@@ -2,7 +2,7 @@
  * Матрица верности против опубликованной таблицы (П1.1).
  *
  * Матрица «слой × провайдер» в `docs/TASKS-PORTABILITY.ru.md` §3 — это ОБЕЩАНИЕ человеку.
- * Считает её код (`domains/portability/fidelity.ts`) по данным каталога. Эта
+ * Считает её код (`domains/portability/fidelity/fidelity.ts`) по данным каталога. Эта
  * проверка сводит одно с другим: каждая клетка таблицы обязана совпасть с тем,
  * что модуль выдаёт для представителя этого слоя у этого провайдера. Разошлись —
  * красный: либо код посчитал не то, либо документ рассказывает о панели то, чего
@@ -70,13 +70,13 @@ async function main() {
   checked = { layers: LAYERS.length, columns: columns.length };
 
   const { level } = await import(
-    new URL('../../apps/server/src/domains/portability/fidelity.ts', import.meta.url).href
+    new URL('../../apps/server/src/domains/portability/fidelity/fidelity.ts', import.meta.url).href
   );
   const { claudeProvider } = await import(
     new URL('../../apps/server/src/providers/claude.ts', import.meta.url).href
   );
   const { CATALOG_PROVIDERS } = await import(
-    new URL('../../apps/server/src/providers/catalog.ts', import.meta.url).href
+    new URL('../../apps/server/src/providers/catalog/catalog.ts', import.meta.url).href
   );
   const { fidelityReasons, fidelityConditions } = await import(
     new URL('../../packages/contracts/src/portable-fidelity.ts', import.meta.url).href

@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
+import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import type { RemoteAccessStatus } from '@agentdeck/contracts';
 import { api } from '../../shared/api/client';
 import { isConfigured } from '../../shared/api/connection';
@@ -21,34 +21,5 @@ export function useRemote(): UseQueryResult<RemoteAccessStatus> {
     staleTime: 10_000,
     refetchInterval: REMOTE_POLL_MS,
     enabled: isConfigured(),
-  });
-}
-
-export function useRemoteUpdate(): ReturnType<
-  typeof useMutation<RemoteAccessStatus, Error, { notify?: boolean; publicUrl?: string }>
-> {
-  const queryClient = useQueryClient();
-  return useMutation<RemoteAccessStatus, Error, { notify?: boolean; publicUrl?: string }>({
-    mutationFn: (body) => api.patch<RemoteAccessStatus>('/remote', body),
-    onSuccess: (status) => queryClient.setQueryData(['remote'], status),
-  });
-}
-
-export function useForgetDevice(): ReturnType<
-  typeof useMutation<RemoteAccessStatus, Error, string>
-> {
-  const queryClient = useQueryClient();
-  return useMutation<RemoteAccessStatus, Error, string>({
-    mutationFn: (token) => api.delete<RemoteAccessStatus>('/remote/devices', { token }),
-    onSuccess: (status) => queryClient.setQueryData(['remote'], status),
-  });
-}
-
-/** Проверочное уведомление: путь до телефона длинный, и «не пришло» надо ловить сразу. */
-export function useTestNotification(): ReturnType<
-  typeof useMutation<{ ok: boolean; devices: number }, Error, void>
-> {
-  return useMutation<{ ok: boolean; devices: number }, Error, void>({
-    mutationFn: () => api.post<{ ok: boolean; devices: number }>('/remote/test'),
   });
 }

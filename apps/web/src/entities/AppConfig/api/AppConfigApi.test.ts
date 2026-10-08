@@ -3,7 +3,9 @@ import { QueryClient } from '@tanstack/react-query';
 import { appSettingsSchema, type AppSettings } from '@agentdeck/contracts';
 import { queryKeys } from '@shared/api/query-keys';
 import { apiClient } from '@shared/api/client';
-import { applySettingsUpdate, changedSettings, refreshSettingsFromServer } from './AppConfigApi';
+import { applySettingsUpdate } from '../lib/applySettingsUpdate';
+import { changedSettings } from '../lib/changedSettings';
+import { refreshSettingsFromServer } from '../lib/refreshSettingsFromServer';
 
 const settings = (patch: Partial<AppSettings>): AppSettings => appSettingsSchema.parse(patch);
 

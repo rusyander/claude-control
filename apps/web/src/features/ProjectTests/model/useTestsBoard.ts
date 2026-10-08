@@ -40,7 +40,9 @@ import {
   type StartTestRunPayload,
 } from '@entities/ProjectTest';
 import { useTestFilters, type TestFilters } from './useTestFilters';
-import { messageFromPayload } from '@shared/api/client';
+import { pickActive } from '../lib/pickActive';
+import { toggleChecked } from '../lib/toggleChecked';
+import { messageOf } from '../lib/messageOf';
 
 /**
  * Состояние библиотеки тестов: что открыто, что отобрано, что отмечено.
@@ -132,31 +134,6 @@ export interface TestsBudget {
 }
 
 const EMPTY_SCHEMA: ProjectTestSchema = { attributes: [], statuses: [] };
-
-/**
- * Открытая группа: выбранная человеком, а если её не стало — первая.
- *
- * Группы может не стать: агент удалил файл, или окно открыли впервые. Пустой
- * экран без вкладок читается как «тестов нет», хотя они есть.
- */
-export function pickActive(
-  groups: ProjectTestGroup[],
-  activeId: string,
-): ProjectTestGroup | undefined {
-  return groups.find((group) => group.id === activeId) ?? groups[0];
-}
-
-/** Отметить или снять кейс: отметки — набор, а не список, повторов в нём нет. */
-export function toggleChecked(checked: string[], id: string): string[] {
-  return checked.includes(id) ? checked.filter((item) => item !== id) : [...checked, id];
-}
-
-/** Текст ошибки любой из мутаций — одной строкой, как её показывает окно. */
-export function messageOf(error: unknown): string | undefined {
-  if (!error) return undefined;
-  const response = (error as { response?: { data?: unknown } }).response;
-  return messageFromPayload(response?.data) ?? (error as Error).message;
-}
 
 export function useTestsBoard(projectPath: string | undefined, isOpen: boolean): TestsBoard {
   const tests = useProjectTests(projectPath, isOpen);

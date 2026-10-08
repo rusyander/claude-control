@@ -5,7 +5,8 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { SplitPlanView } from '@agentdeck/contracts/chat-handoff';
-import { englishOrdinal, mergeOrderOf } from './mergeOrder';
+import { mergeOrderOf } from './mergeOrder';
+import { englishOrdinal } from './englishOrdinal';
 
 type Group = SplitPlanView['groups'][number];
 

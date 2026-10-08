@@ -5,8 +5,9 @@ import { Card, Empty, Loading, Mono, Muted, Row, Screen, Title } from '../src/sh
 import { colors, font, space } from '../src/shared/config/theme';
 import { useT } from '../src/shared/config/i18n';
 import { useWorkspace } from '../src/shared/lib/workspace';
-import { useFileChanges, useFileTree } from '../src/entities/files/api';
+import { useFileTree } from '../src/entities/files/api';
 import { FileView } from '../src/features/code/FileView';
+import { useFileChanges } from '../src/entities/files/useFileChanges';
 
 /**
  * Среда разработки глазами телефона: дерево проекта, список тронутого агентом и

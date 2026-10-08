@@ -4,10 +4,10 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync, readdirSyn
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { ProviderPluginsInfo } from '@agentdeck/contracts';
-import { AppStore } from '../lib/app-store.ts';
+import { AppStore } from '../lib/app-store/app-store.ts';
 import type { ServerContext } from '../context.ts';
-import type { QwenCliResult } from '../domains/provider-plugins.ts';
-import { registerProviderPluginsRoutes } from './provider-plugins-routes.ts';
+import type { QwenCliResult } from '../domains/provider-plugins/provider-plugins.ts';
+import { registerProviderPluginsRoutes } from './provider-plugins-routes/provider-plugins-routes.ts';
 
 /**
  * MAP 25, маршруты плагинов Codex: `/api/provider-plugins`, `/installed`,

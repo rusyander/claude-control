@@ -1,6 +1,4 @@
-export {
-  useProviderMcp,
-  useCreateProviderMcp,
-  useUpdateProviderMcp,
-  useDeleteProviderMcp,
-} from './api/ProviderMcpApi';
+export { useProviderMcp } from './api/ProviderMcpApi';
+export { useDeleteProviderMcp } from './api/useDeleteProviderMcp';
+export { useUpdateProviderMcp } from './api/useUpdateProviderMcp';
+export { useCreateProviderMcp } from './api/useCreateProviderMcp';

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { DiscoveredGroup } from '@agentdeck/contracts';
-import { foundText, uiLang } from './foundText';
+import { foundText } from './foundText';
+import { uiLang } from './uiLang';
 
 const base: DiscoveredGroup = {
   key: 'c:/work/shop#release',

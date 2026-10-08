@@ -1,6 +1,6 @@
 import type { ChildProcessWithoutNullStreams } from 'node:child_process';
-import { spawnCliProcess } from '../../../lib/cli-spawn.ts';
-import { killChildTree } from '../../../lib/process-tree.ts';
+import { spawnCliProcess } from '../../../lib/cli-spawn/cli-spawn.ts';
+import { killChildTree } from '../../../lib/process-tree/process-tree.ts';
 import { StdioRpc, type RpcIncoming } from './stdio-rpc.ts';
 import { decidePermission, pickOption, type PermissionOption } from './permission.ts';
 import type { LiveTurn, LiveTurnOptions, LiveTurnResult } from './types.ts';

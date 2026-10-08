@@ -1,6 +1,6 @@
-import type { AppStore } from '../../../lib/app-store.ts';
+import type { AppStore } from '../../../lib/app-store/app-store.ts';
 import { toAccess, type AtlassianAccess } from './client.ts';
-import { readConfluenceToken, readIntegrations, requireConnected } from '../store.ts';
+import { readConfluenceToken, readIntegrations, requireConnected } from '../store/store.ts';
 
 /**
  * Доступ к Atlassian из настроек и сохранённых токенов — их ДВА.

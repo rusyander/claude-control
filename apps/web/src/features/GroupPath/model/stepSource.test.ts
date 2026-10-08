@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { PathEntry, PathStep } from '@agentdeck/contracts';
-import { inProject } from './describe';
-import { entrySource, sourceFile, type SourcePaths } from './stepSource';
+import { inProject } from './inProject';
+import type { SourcePaths } from './sourceFile';
+import { entrySource } from './entrySource';
+import { sourceFile } from './sourceFile';
 
 const PATHS: SourcePaths = {
   skills: 'C:/Users/me/.claude/skills',

@@ -1,5 +1,5 @@
 import type { ServerMessageCode, ServerMessageParams } from '@agentdeck/contracts/server-messages';
-import { coded } from '../../lib/server-text.ts';
+import { coded } from '../../lib/server-text/server-text.ts';
 
 /**
  * Отказы внешних интеграций — состояние, а не падение.
@@ -9,7 +9,7 @@ import { coded } from '../../lib/server-text.ts';
  * которому клиент отличает «не настроено» от «не отвечает», и русская строка,
  * которую человеку показывают как есть.
  *
- * `statusCode` + `code` — та же форма, что у ошибок MCP (`domains/mcp.ts`):
+ * `statusCode` + `code` — та же форма, что у ошибок MCP (`domains/mcp/mcp.ts`):
  * Fastify отдаёт её сам, даже если маршрут её не поймал.
  */
 

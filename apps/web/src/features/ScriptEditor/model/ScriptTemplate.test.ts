@@ -1,12 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  SCRIPT_TEMPLATES,
-  NEW_SCRIPT_TEMPLATE,
-  GENERIC_SCRIPT_TEMPLATE,
-  GENERIC_SCRIPT_TEMPLATES,
-  scriptTemplatesFor,
-  newScriptTemplateFor,
-} from './ScriptTemplate';
+import { SCRIPT_TEMPLATES, GENERIC_SCRIPT_TEMPLATES, scriptTemplatesFor } from './ScriptTemplate';
 import {
   GENERIC_SCRIPT_TEMPLATE_EN,
   GENERIC_SCRIPT_TEMPLATES_EN,
@@ -14,6 +7,8 @@ import {
   SCRIPT_TEMPLATES_EN,
 } from './ScriptTemplate.en';
 import type { ScriptTemplate } from './ScriptTemplate.types';
+import { NEW_SCRIPT_TEMPLATE, GENERIC_SCRIPT_TEMPLATE } from './ScriptTemplate.constants';
+import { newScriptTemplateFor } from './newScriptTemplateFor';
 
 /**
  * Два набора — русский и английский (`ScriptTemplate.en.ts`). Всё, что ниже

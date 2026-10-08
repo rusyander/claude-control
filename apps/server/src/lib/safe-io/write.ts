@@ -1,6 +1,6 @@
 import { mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { applyTextForm } from '../text-form.ts';
+import { applyTextForm } from '../text-form/text-form.ts';
 import { backupEntry } from './backups.ts';
 import { applyFileMode, fileMode, resolveWriteTarget } from './path-guards.ts';
 import { readTextForm } from './read.ts';

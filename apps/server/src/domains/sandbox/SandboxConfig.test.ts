@@ -3,8 +3,8 @@ import { mkdtempSync, rmSync, mkdirSync, writeFileSync, existsSync, readFileSync
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { ClaudeLocation } from '@agentdeck/contracts';
-import { AppStore } from '../../lib/app-store.ts';
-import { readHooks } from '../hooks.ts';
+import { AppStore } from '../../lib/app-store/app-store.ts';
+import { readHooks } from '../hooks/hooks.ts';
 import { createSandbox, removeSandbox, sandboxPaths, stopSandboxSweeper } from './SandboxConfig.ts';
 
 /**

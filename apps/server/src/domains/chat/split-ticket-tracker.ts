@@ -1,4 +1,4 @@
-import type { AppStore } from '../../lib/app-store.ts';
+import type { AppStore } from '../../lib/app-store/app-store.ts';
 import { atlassianAccessFrom } from '../integrations/atlassian/access.ts';
 import {
   applyTransition,
@@ -7,7 +7,7 @@ import {
   readIssue,
 } from '../integrations/atlassian/jira.ts';
 import { linkForCwd } from '../integrations/links.ts';
-import type { SplitTaskTracker } from './split-tasks.ts';
+import type { SplitTaskTracker } from './split-tasks/split-tasks.ts';
 
 /**
  * Трекер для тикетов, предложенных группами разделения (L277): куда их можно

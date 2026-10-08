@@ -1,6 +1,6 @@
 import type { AtlassianDeployment, AtlassianSettings } from '@agentdeck/contracts';
 import { invalidField } from '../errors.ts';
-import { failedResponse, parseJson, sendRequest, type OutboundResponse } from '../http.ts';
+import { failedResponse, parseJson, sendRequest, type OutboundResponse } from '../http/http.ts';
 
 /**
  * Один клиент Atlassian на два диалекта: облако и своя установка (Server/DC).

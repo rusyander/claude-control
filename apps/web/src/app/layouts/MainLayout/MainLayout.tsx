@@ -10,11 +10,10 @@ import { useAwaitingAlarm } from '@entities/Chat';
 import { OnboardingWizard } from '@app/onboarding/OnboardingWizard';
 import { ProviderTrustBadge } from '@features/ProviderTrust';
 import { DevRestartBanner } from '@features/DevRestartBanner';
-import { Sidebar } from './Sidebar';
-import { AppShortcuts } from './AppShortcuts';
+import { Sidebar } from './Sidebar/Sidebar';
+import { AppShortcuts } from './AppShortcuts/AppShortcuts';
 import styles from './MainLayout.module.scss';
-
-const STORAGE_KEY = 'agentdeck:sidebar-collapsed';
+import { STORAGE_KEY } from './MainLayout.constants';
 
 /** Каркас приложения: постоянная боковая навигация и область раздела. */
 export function MainLayout() {

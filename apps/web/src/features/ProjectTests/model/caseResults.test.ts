@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import type { ProjectTestCaseResultEntry } from '@agentdeck/contracts';
-import { caseRunSearch, flakyIndex, reasonOf } from './caseResults';
+import { reasonOf } from './caseResults';
+import { flakyIndex } from './flakyIndex';
+import { caseRunSearch } from './caseRunSearch';
 
 const entry = (patch: Partial<ProjectTestCaseResultEntry>): ProjectTestCaseResultEntry => ({
   runId: 'r1',

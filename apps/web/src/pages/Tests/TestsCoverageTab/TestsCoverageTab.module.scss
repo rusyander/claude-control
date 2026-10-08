@@ -1,0 +1,20 @@
+.runLink {
+  color: var(--color-accent);
+  font-size: var(--font-size-caption);
+}
+
+// Поле запроса JQL тянется на всю свободную ширину строки: запрос длинный, и
+// в поле обычной ширины от него виден только хвост.
+.jqlField {
+  flex: 1;
+  min-width: 260px;
+}
+
+.coverageCaseTitle {
+  display: inline-block;
+  max-width: 360px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}

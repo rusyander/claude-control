@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { ServerContext } from '../../context.ts';
-import { providerProjectInfo } from '../../domains/provider-projects.ts';
+import { providerProjectInfo } from '../../domains/provider-projects/provider-projects.ts';
 import { requireTarget } from './target.ts';
 
 /** Что активный провайдер умеет на уровне этого проекта — из чего интерфейс строит вкладки. */

@@ -1,9 +1,9 @@
 import type { SlashCommand } from '@agentdeck/contracts';
-import type { ConfigProvider } from '../../providers/types.ts';
+import type { ConfigProvider } from '../../providers/types/types.ts';
 import { isDirectory, readJson } from './io.ts';
 import { commandFiles, sortCommands } from './list.ts';
 import { trim } from './parse.ts';
-import { serverText } from '../../lib/server-texts.ts';
+import { serverText } from '../../lib/server-texts/server-texts.ts';
 
 /**
  * Команды остальных CLI. Берём ровно то, что описано в их документации

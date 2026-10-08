@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { isAbsolute, resolve } from 'node:path';
 import type { EnvSkip, EnvTrigger, HookItem } from '@agentdeck/contracts/portable-env';
-import type { ConfigProvider } from '../../providers/types.ts';
+import type { ConfigProvider } from '../../providers/types/types.ts';
 import { envItemId, envSkip, needsUndetermined } from './canon.ts';
 import { blockingOfEvent } from './hook-events.ts';
 import { resolveHookNeeds, triggerOfEvent } from './needs.ts';

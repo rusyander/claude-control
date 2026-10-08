@@ -1,0 +1,11 @@
+// Ниже этой высоты колонки библиотеки не сжимаются, прокручивается страница.
+$library-floor: 320px;
+
+// Сломанный файл обвязки в окне настроек: причина стоит НАД списками, поэтому
+// нужна рамка — иначе она читается как подпись к первому окружению.
+.issueBox {
+  padding: var(--spacing-xs);
+  border: 1px solid var(--color-border-warning, var(--color-border));
+  border-radius: 8px;
+  background: var(--color-surface-sunken);
+}

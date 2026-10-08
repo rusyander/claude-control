@@ -1,28 +1,8 @@
-import { isLive, runStatus, type RunStatus } from './status';
+import { runStatus } from './status';
 import { isOpenAsk } from '@shared/lib/chat-stream';
 import type { PendingPermission, StreamedTool } from './agent-runs.types';
-
-/**
- * Чистые выборки поверх прогонов — для пульта агентов и суммарной стоимости.
- * Работают со структурной формой прогона (не завязаны на класс стора), поэтому
- * легко тестируются отдельно.
- */
-
-export interface RunLike {
-  id: string;
-  sessionId?: string;
-  projectPath?: string;
-  status: RunStatus;
-  lastEventAt: number;
-  costUsd?: number;
-  tokens?: number;
-  /** Чем ведётся прогон: имя называет сам CLI первым событием сессии. */
-  model?: string;
-  /** Запросы прав, ждущие ответа — влияют на статус (жёлтая точка). */
-  permissions?: PendingPermission[];
-  /** Вызовы этого хода: среди них и вопрос человеку. */
-  tools?: StreamedTool[];
-}
+import type { RunLike } from './selectors.types';
+import type { RunStatus } from './status.types';
 
 export interface ActiveRunView {
   id: string;
@@ -90,21 +70,4 @@ export function selectActiveRuns(runs: RunLike[], now: number): ActiveRunView[] 
     running: 3,
   };
   return active.sort((a, b) => order[a.status] - order[b.status]);
-}
-
-/**
- * Сколько активных прогонов сейчас работает (для бейджа-счётчика). Молчащий —
- * тоже работает: процесс жив, просто событий давно не было.
- */
-export function countRunning(runs: RunLike[], now: number): number {
-  return runs.filter((run) =>
-    isLive(
-      runStatus({
-        status: run.status,
-        lastEventAt: run.lastEventAt,
-        now,
-        pendingPermission: (run.permissions?.length ?? 0) > 0,
-      }),
-    ),
-  ).length;
 }

@@ -1,6 +1,6 @@
 import { parseDocument, isMap, type Document } from 'yaml';
-import { UnrecognizedFormatError } from './codex-toml.ts';
-import { stripBom } from './text-form.ts';
+import { UnrecognizedFormatError } from './codex-toml/codex-toml.ts';
+import { stripBom } from './text-form/text-form.ts';
 
 /**
  * Общая основа round-trip-правки YAML-конфигураций чужих CLI (Continue, Goose).

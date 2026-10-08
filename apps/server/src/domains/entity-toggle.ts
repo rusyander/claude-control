@@ -1,10 +1,10 @@
 import type { ClaudePaths, EntityKind, Hook } from '@agentdeck/contracts';
-import type { AppStore } from '../lib/app-store.ts';
-import { readRules, saveRule, setRulesEnabled } from './rules.ts';
-import { readHooks, writeHooks } from './hooks.ts';
-import { setSkillEnabled } from './skills.ts';
-import { setMcpServerEnabled, McpServerNotFoundError } from './mcp.ts';
-import { setPermissionsEnabled } from './permissions.ts';
+import type { AppStore } from '../lib/app-store/app-store.ts';
+import { readRules, saveRule, setRulesEnabled } from './rules/rules.ts';
+import { readHooks, writeHooks } from './hooks/hooks.ts';
+import { setSkillEnabled } from './skills/skills.ts';
+import { setMcpServerEnabled, McpServerNotFoundError } from './mcp/mcp.ts';
+import { setPermissionsEnabled } from './permissions/permissions.ts';
 import { isLocalId, stripLocalPrefix } from '../lib/settings-source.ts';
 
 /**

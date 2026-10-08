@@ -1,7 +1,8 @@
 import { useEffect, useReducer, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toLanguage } from './instance';
-import { hasHelp, loadHelp } from './help-loader';
+import { hasHelp } from './help-loader';
+import { loadHelp } from './loadHelp';
 
 /**
  * Справка текущего языка загружена и её можно рисовать. Первый заход

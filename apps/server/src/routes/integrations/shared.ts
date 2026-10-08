@@ -3,7 +3,7 @@ import type { ServerContext } from '../../context.ts';
 import type { AtlassianAccess } from '../../domains/integrations/atlassian/client.ts';
 import { atlassianAccessFrom } from '../../domains/integrations/atlassian/access.ts';
 import { IntegrationError, invalidField } from '../../domains/integrations/errors.ts';
-import { codeOf } from '../../lib/server-text.ts';
+import { codeOf } from '../../lib/server-text/server-text.ts';
 import type { ServerMessageCode, ServerMessageParams } from '@agentdeck/contracts/server-messages';
 
 /**

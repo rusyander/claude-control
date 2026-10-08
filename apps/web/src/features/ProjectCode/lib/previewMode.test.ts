@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import type { ProjectFileContent } from '@agentdeck/contracts';
-import { bodyKind, canPreview, defaultTab, hasBothSides } from './previewMode';
+import { canPreview } from './previewMode';
+import { hasBothSides } from './hasBothSides';
+import { defaultTab } from './defaultTab';
+import { bodyKind } from './bodyKind';
 
 /**
  * Выбор стороны файла. Правило одно: показывать только то, что у файла есть.

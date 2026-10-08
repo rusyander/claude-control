@@ -2,10 +2,10 @@ import { useNavigate } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
 import type { GlobalLayerTransferRequest } from '@agentdeck/contracts';
 import { useGlobalTransfer } from '@entities/GlobalLayer';
-import { toErrorMessage } from '@shared/api/client';
 import { saveDraft } from '@shared/lib/draft';
 import { toast } from '@shared/lib/toast';
 import { projectShortName, workspace } from '@shared/lib/workspace';
+import { toErrorMessage } from '../../../shared/api/toErrorMessage';
 
 /**
  * Перенос между копиями — задание агенту, а не запись панели: сервер собирает

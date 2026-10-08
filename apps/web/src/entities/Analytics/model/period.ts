@@ -1,15 +1,4 @@
-/**
- * Период аналитики. Пресет — быстрая кнопка («сегодня», 7/30/90 дней, всё
- * время), диапазон — произвольные даты из пикера. Одно значение вместо пары
- * «дни + даты»: два независимых состояния разъезжались бы, и было бы неясно,
- * что именно показано.
- */
-export type AnalyticsPreset = 'today' | 7 | 30 | 90 | 0;
-
-export type AnalyticsPeriod =
-  | { kind: 'preset'; preset: AnalyticsPreset }
-  /** Границы — местные календарные дни `YYYY-MM-DD`, обе включительно. */
-  | { kind: 'range'; from: string; to: string };
+import type { AnalyticsPeriod } from './period.types';
 
 /** По умолчанию открываем текущие сутки: расход «прямо сейчас» — частый вопрос. */
 export const DEFAULT_PERIOD: AnalyticsPeriod = { kind: 'preset', preset: 'today' };
@@ -19,16 +8,4 @@ export function periodParams(period: AnalyticsPeriod): Record<string, string> {
   return period.kind === 'range'
     ? { from: period.from, to: period.to }
     : { days: String(period.preset) };
-}
-
-/** Ключ кэша запроса и суффикс имени выгружаемого файла. */
-export function periodKey(period: AnalyticsPeriod): string {
-  // Одни сутки — одна дата в имени: `2026-08-30_2026-08-30` читается как ошибка
-  // выгрузки, хотя период выбран именно такой.
-  if (period.kind === 'range') {
-    return period.from === period.to ? period.from : `${period.from}_${period.to}`;
-  }
-  if (period.preset === 0) return 'all';
-  if (period.preset === 'today') return 'today';
-  return `${period.preset}d`;
 }

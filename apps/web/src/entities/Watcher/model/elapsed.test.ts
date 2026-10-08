@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { elapsedMs } from './elapsed';
+import { elapsedMs } from '../lib/elapsedMs';
 
 describe('время работы наблюдателя', () => {
   it('считается по часам сервера, а не браузера', () => {

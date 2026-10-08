@@ -1,20 +1,17 @@
 import { describe, it, expect } from 'vitest';
-import {
-  STEP_ORDER,
-  STEP_STORAGE_KEY,
-  clearStoredStep,
-  fitStep,
-  hasOtherCli,
-  initialStep,
-  onboardingGate,
-  isStep,
-  nextStep,
-  prevStep,
-  readStoredStep,
-  stepNumber,
-  stepOrder,
-  storeStep,
-} from './steps';
+import { isStep } from './steps';
+import { fitStep } from './fitStep';
+import { initialStep } from './initialStep';
+import { onboardingGate } from './onboardingGate';
+import { hasOtherCli } from './hasOtherCli';
+import { STEP_ORDER, STEP_STORAGE_KEY } from './steps.constants';
+import { stepOrder } from './stepOrder';
+import { stepNumber } from './stepNumber';
+import { nextStep } from './nextStep';
+import { prevStep } from './prevStep';
+import { readStoredStep } from './readStoredStep';
+import { storeStep } from './storeStep';
+import { clearStoredStep } from './clearStoredStep';
 
 /** Память вместо sessionStorage: тесты фронта идут в node, без DOM. */
 function memoryStorage(initial: Record<string, string> = {}) {

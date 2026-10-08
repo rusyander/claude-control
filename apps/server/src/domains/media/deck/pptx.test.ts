@@ -1,6 +1,6 @@
 import type { Deck } from '@agentdeck/contracts';
 import { describe, expect, it } from 'vitest';
-import { readZip } from '../../../lib/zip.ts';
+import { readZip } from '../../../lib/zip/zip.ts';
 import type { DeckAssets } from './assets.ts';
 import { renderDeckPptx } from './pptx.ts';
 

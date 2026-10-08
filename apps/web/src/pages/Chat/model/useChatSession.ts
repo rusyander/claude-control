@@ -20,7 +20,9 @@ import { useClearRunnerAutostart } from '@entities/ProjectRunner';
 import { useForgetProjectCodeView } from '@entities/ProjectFile';
 import { draftKeyFor } from '../lib/draftKey';
 import { visibleChats } from '../lib/visibleChats';
-import { childOfRun, runForUrl, runViewChat } from '../lib/runViewChat';
+import { runViewChat } from '../lib/runViewChat';
+import { childOfRun } from '../lib/childOfRun';
+import { runForUrl } from '../lib/runForUrl';
 
 export interface ChatSessionInput {
   /** Все разговоры из истории Claude Code — по ним находится «повзрослевший» чат. */

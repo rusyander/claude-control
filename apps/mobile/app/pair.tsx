@@ -7,7 +7,7 @@ import { Button, Card, Field, Mono, Muted, Screen, Title } from '../src/shared/u
 import { colors, radius, space } from '../src/shared/config/theme';
 import { useT } from '../src/shared/config/i18n';
 import { bundledUrl, normalizeUrl, saveConnection } from '../src/shared/api/connection';
-import { registerForPush } from '../src/shared/lib/notifications';
+import { registerForPush } from '../src/shared/lib/registerForPush';
 
 /**
  * Спаривание с панелью. QR-код панель рисует у себя в настройках; в нём адрес и

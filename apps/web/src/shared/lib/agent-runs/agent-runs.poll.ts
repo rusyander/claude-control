@@ -1,4 +1,4 @@
-import { resumeActive } from './agent-runs.commands';
+import { resumeActive } from './resumeActive';
 
 /** Как часто спрашивать сервер о чужих прогонах. Ответ — из памяти, не с диска. */
 export const ADOPT_INTERVAL_MS = 5000;

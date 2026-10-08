@@ -1,12 +1,6 @@
 import { useTranslation } from 'react-i18next';
-import type { LocalizedText, PathEntry } from '@agentdeck/contracts';
-
-/** Сторона текста на языке интерфейса; пустая — вторая, чтобы строка не была безымянной. */
-export function pickLang(text: LocalizedText, language: string): string {
-  const own = language.startsWith('en') ? text.en : text.ru;
-  const other = language.startsWith('en') ? text.ru : text.en;
-  return own.trim() || other.trim();
-}
+import type { PathEntry } from '@agentdeck/contracts';
+import { pickLang } from '../lib/pickLang';
 
 /** Подпись строки пути на языке интерфейса — и для списка, и для доступных имён кнопок. */
 export function useEntryTitle(): (entry: PathEntry) => string {

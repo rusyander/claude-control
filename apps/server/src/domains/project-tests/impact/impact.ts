@@ -1,0 +1,165 @@
+import type { ProjectTestGroup, ProjectTestImpact } from '@agentdeck/contracts';
+import { join, resolve } from 'node:path';
+import { StatMemo } from '../../../lib/stat-memo/stat-memo.ts';
+import { gitSync } from '../../project-git/exec/exec.ts';
+import { GIT_READ_TIMEOUT_MS } from '../../project-git/constants.ts';
+
+/**
+ * Отбор по диффу: какие кейсы задеты тем, что сейчас лежит в рабочей копии.
+ *
+ * Это то, чего в TMS не бывает: панель видит и кейсы, и изменения кода рядом.
+ * Полный регресс сотни GUI-кейсов агентом стоит часы и заметный расход окна, а
+ * после правки одной страницы проверять нужно десяток кейсов. Связь строится по
+ * `codePaths` кейса (что он трогает), а если их не проставили — по совпадению
+ * зоны (`area`) с путём файла, чтобы отбор работал и на старых кейсах.
+ *
+ * Гадать здесь нельзя: если изменений нет или каталог не репозиторий, честнее
+ * вернуть пустой список, чем «на всякий случай» весь набор — иначе «прогнать
+ * задетое» молча превратится в «прогнать всё».
+ */
+
+/** Ветка и коммит рабочей копии — контекст любого прогона. */
+export function gitContext(root: string): { branch?: string; commit?: string } {
+  const branch = gitSync(root, ['rev-parse', '--abbrev-ref', 'HEAD'])?.trim();
+  const commit = gitSync(root, ['rev-parse', '--short', 'HEAD'])?.trim();
+  return { branch: branch || undefined, commit: commit || undefined };
+}
+
+const viewContexts = new StatMemo<{ branch?: string; commit?: string }>({ ttlMs: 30_000 });
+
+/**
+ * То же для вида раздела, который опрашивается раз в пару секунд: два запуска
+ * git на каждый ответ — 45–60 мс синхронно в цикле событий. Ответ помнится,
+ * пока не сдвинулись файлы, из которых git его и читает: `HEAD` (переключение
+ * ветки, отвязанная голова), ссылка ветки и `packed-refs` (коммит, сброс).
+ * Прогоны штампуют контекст без памяти (`gitContext`): запись в историю дороже
+ * одного запуска git.
+ */
+export function viewGitContext(root: string): { branch?: string; commit?: string } {
+  return viewContexts.get(resolve(root), (touch) => {
+    // Репозиторий заведут потом — сдвинется время корня.
+    touch(resolve(root));
+    const dirs = gitSync(root, ['rev-parse', '--git-dir', '--git-common-dir'])
+      ?.split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+    const context = gitContext(root);
+    if (dirs?.length === 2) {
+      const [gitDir = '', commonDir = ''] = dirs.map((dir) => resolve(root, dir));
+      touch(join(gitDir, 'HEAD'));
+      touch(join(commonDir, 'packed-refs'));
+      if (context.branch && context.branch !== 'HEAD') {
+        touch(join(commonDir, 'refs', 'heads', ...context.branch.split('/')));
+      }
+    }
+    return context;
+  });
+}
+
+/**
+ * Веха рабочей копии: ближайшая метка версии на текущем коммите или до него.
+ *
+ * Только МЕТКА, без счётчика коммитов и хеша (`--abbrev=0`): вехой называется
+ * `v1.4`, а не `v1.4-12-gabc1234` — иначе каждый коммит после релиза заводил бы
+ * в отчёте новую «веху» из одного прогона. Меток нет — пусто, и это честнее
+ * придуманного имени: релиз, о котором не знает git, панель знать не может.
+ */
+export function releaseTag(root: string): string | undefined {
+  const tag = gitSync(root, ['describe', '--tags', '--abbrev=0'])?.trim();
+  return tag || undefined;
+}
+
+/**
+ * Изменённые файлы рабочей копии в posix-форме.
+ *
+ * `--porcelain` даёт и индекс, и рабочее дерево одной командой; переименование
+ * приходит как `R  было -> стало`, и интересен здесь второй путь.
+ *
+ * `-uall` обязателен: без него git сворачивает новую папку в одну строку `src/`,
+ * и целиком новая страница не пересеклась бы ни с одним `codePaths` — отбор
+ * молча возвращал бы пусто там, где изменений как раз больше всего.
+ */
+export function changedFiles(root: string): string[] {
+  // Потолок чтения, а не пятисекундный по умолчанию: `-uall` разворачивает
+  // каждую новую папку пофайлово, и на большом дереве это не мгновенная команда.
+  // Вышедший срок здесь читался бы как «ничего не трогали» — то есть «прогнать
+  // задетое» молча не нашло бы ничего сразу после большой правки.
+  const output = gitSync(root, ['status', '--porcelain', '-uall'], GIT_READ_TIMEOUT_MS);
+  if (!output) return [];
+  const files: string[] = [];
+  for (const line of output.split('\n')) {
+    const path = line.slice(3).trim();
+    if (!path) continue;
+    const arrow = path.lastIndexOf(' -> ');
+    const clean = (arrow >= 0 ? path.slice(arrow + 4) : path).replace(/^"|"$/g, '');
+    if (clean) files.push(clean.replace(/\\/g, '/'));
+  }
+  return [...new Set(files)];
+}
+
+/** Слова файла: имя без расширения и папки пути — по ним ищут зону. */
+function wordsOf(file: string): string[] {
+  return file
+    .toLowerCase()
+    .split(/[/\\.]/)
+    .map((part) => part.trim())
+    .filter((part) => part.length > 2);
+}
+
+/** Кейсы, задетые изменениями рабочей копии. */
+export function impactOf(root: string, groups: ProjectTestGroup[]): ProjectTestImpact {
+  return casesTouching(changedFiles(root), groups);
+}
+
+/**
+ * Кейсы, задетые данными файлами: по `codePaths`, а без них — по зоне в пути.
+ * Отдельно от git: группа разделения считает задетое по своему диффу от
+ * основной, а не по незакоммиченному (у доставленной группы его нет).
+ */
+export function casesTouching(
+  changed: readonly string[],
+  groups: ProjectTestGroup[],
+): ProjectTestImpact {
+  const files = changed
+    .map((file) => file.replace(/\\/g, '/'))
+    .filter((file) => !file.startsWith('.agent/tests/'));
+  const cases: ProjectTestImpact['cases'] = [];
+  if (files.length === 0) return { files, cases };
+
+  const words = new Set(files.flatMap((file) => wordsOf(file)));
+
+  for (const group of groups) {
+    if (group.error) continue;
+    for (const testCase of group.cases) {
+      if (testCase.archived) continue;
+
+      const byPath = (testCase.codePaths ?? []).find((path) => {
+        const needle = path.replace(/\\/g, '/').replace(/^\.\//, '');
+        return files.some((file) => file === needle || file.startsWith(`${needle}/`));
+      });
+      if (byPath) {
+        cases.push({
+          groupId: group.id,
+          caseId: testCase.id,
+          title: testCase.title,
+          reason: `изменён ${byPath}`,
+        });
+        continue;
+      }
+
+      // Запасной путь для кейсов без `codePaths`: зона кейса встретилась в
+      // пути файла. Слабее прямой привязки, поэтому и причина пишется иначе —
+      // человек должен видеть, на чём основан отбор.
+      const area = testCase.area?.toLowerCase().trim();
+      if (area && words.has(area)) {
+        cases.push({
+          groupId: group.id,
+          caseId: testCase.id,
+          title: testCase.title,
+          reason: `зона «${testCase.area}» в изменённых файлах`,
+        });
+      }
+    }
+  }
+  return { files, cases };
+}

@@ -1,11 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import {
-  DEFAULT_SETTINGS_TAB,
-  SETTINGS_TABS,
-  findSettingsTab,
-  settingsPanelDomId,
-  settingsTabDomId,
-} from './tabs';
+import { DEFAULT_SETTINGS_TAB, findSettingsTab } from './tabs';
+import { SETTINGS_TABS } from './tabs.constants';
+import { settingsTabDomId } from './settingsTabDomId';
+import { settingsPanelDomId } from './settingsPanelDomId';
 
 /**
  * Вкладка из адреса `/settings?tab=…`: ссылкой на раздел делятся, и она обязана

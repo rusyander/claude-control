@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { DEFAULT_PERIOD, periodKey, periodParams } from './period';
+import { DEFAULT_PERIOD, periodParams } from './period';
+import { periodKey } from './periodKey';
 
 describe('periodParams', () => {
   it('пресет уходит на сервер числом дней', () => {

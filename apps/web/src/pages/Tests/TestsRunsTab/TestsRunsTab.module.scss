@@ -1,0 +1,29 @@
+// Заголовок записи прогона — кнопка раскрытия. Кнопка по умолчанию центрирует
+// содержимое и обрезает его, поэтому её оформление снимается целиком.
+.runHead {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.runLink {
+  color: var(--color-accent);
+  font-size: var(--font-size-caption);
+}
+
+.runBody {
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--spacing-2xs);
+}
+
+.result {
+  padding: var(--spacing-2xs);
+  border-radius: 8px;
+  background: var(--color-surface-sunken);
+}

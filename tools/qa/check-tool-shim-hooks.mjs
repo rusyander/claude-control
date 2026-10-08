@@ -102,7 +102,8 @@ const GATE_TS = new URL(
   '../../apps/server/src/domains/portability/wire/tool-gate.ts',
   import.meta.url,
 ).href;
-const CATALOG_TS = new URL('../../apps/server/src/providers/catalog.ts', import.meta.url).href;
+const CATALOG_TS = new URL('../../apps/server/src/providers/catalog/catalog.ts', import.meta.url)
+  .href;
 
 /**
  * Водитель: НАСТОЯЩИЙ шлюз на настоящем сокете и НАСТОЯЩИЕ ворота вызовов.
@@ -113,7 +114,7 @@ const CATALOG_TS = new URL('../../apps/server/src/providers/catalog.ts', import.
  * по которой нет и своего разборщика: проверялась бы она сама.
  *
  * Ворота открываются `setToolGate`-путём реестра — тем же, которым их открывает
- * `bootstrap/runtime.ts`. Метка `BARE_TAG` не открыта намеренно: она и есть
+ * `bootstrap/runtime/runtime.ts`. Метка `BARE_TAG` не открыта намеренно: она и есть
  * красное-до, встроенное в прогон.
  */
 const DRIVER = gatewayDriverSource({
@@ -363,7 +364,7 @@ const DAMAGES = {
   'no-hold': {
     title: 'вызов не придерживается — уезжает клиенту, не спросив хука',
     trace: 'запрещённый вызов до клиента НЕ доехал',
-    file: 'apps/server/src/domains/platform/gateway/frames.ts',
+    file: 'apps/server/src/domains/platform/gateway/frames/frames.ts',
     // Порча снимает саму придержку: ветка ворот не берётся, и вызов идёт по
     // прежнему пути — рисуется клиенту, ни о чём не спросив. Подмена одной
     // строки внутри ветки этого НЕ воспроизводила: вызов не рисовался вовсе, и

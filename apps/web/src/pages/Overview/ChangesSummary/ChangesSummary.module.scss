@@ -1,0 +1,17 @@
+// Сводка «изменилось за N дней»: отдельная карточка-ссылка над плитками. Ведёт
+// в историю изменений и переиспользует её ленту (см. ChangesSummary).
+.changesLink {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  border-radius: var(--radius-lg);
+  transition: transform var(--duration-fast);
+
+  &:hover {
+    transform: translateY(-2px);
+  }
+
+  &:hover > * {
+    border-color: var(--color-accent);
+  }
+}

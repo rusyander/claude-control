@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
-import { cellIntensity, gridPosition, labelStep } from './heatmap.model';
+import { gridPosition } from './heatmap.model';
 import { GAP, RADIUS, ROW_HEIGHT } from './heatmap.constants';
 import type { HeatmapProps } from './heatmap.types';
 import styles from './heatmap.module.scss';
+import { cellIntensity } from './cellIntensity';
+import { labelStep } from './labelStep';
 
 /**
  * Тепловая шкала: величина кодируется насыщенностью одного тона. Форма выбрана

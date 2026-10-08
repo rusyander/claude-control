@@ -1,9 +1,9 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { KIMI_BLOCKING_EVENTS, KIMI_HOOK_EVENTS } from '../../lib/kimi-hook.ts';
-import { kimiTranscriptParser } from '../../lib/kimi-transcript.ts';
-import { buildCapabilities, type ConfigProvider } from '../types.ts';
+import { KIMI_BLOCKING_EVENTS, KIMI_HOOK_EVENTS } from '../../lib/kimi-hook/kimi-hook.ts';
+import { kimiTranscriptParser } from '../../lib/kimi-transcript/kimi-transcript.ts';
+import { buildCapabilities, type ConfigProvider } from '../types/types.ts';
 import { kimiCodeHome, unimplementedPaths } from './config-dirs.ts';
 import { contourModelName, readConfigRoot } from './run-endpoint.ts';
 
@@ -73,7 +73,7 @@ export const kimiProvider: ConfigProvider = {
     // бы с ним молча.
     events: [...KIMI_HOOK_EVENTS],
     // Блокировать умеют ровно три события из четырнадцати — это сказано в
-    // документации прямо (`lib/kimi-hook.ts`, KIMI_BLOCKING_EVENTS).
+    // документации прямо (`lib/kimi-hook/kimi-hook.ts`, KIMI_BLOCKING_EVENTS).
     blockingEvents: [...KIMI_BLOCKING_EVENTS],
   },
   // Скиллы Kimi (KIMI-2) — папка на скилл со `SKILL.md`: `~/.kimi-code/skills/`.

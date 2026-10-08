@@ -5,7 +5,7 @@ import { promisify } from 'node:util';
 import type { SessionStopResult, SessionWhere } from '@agentdeck/contracts';
 import type { SessionStopBody } from '@agentdeck/contracts/request-bodies';
 import { filetimeFromMs, type ProcessRow } from '../../lib/kill-tree.mjs';
-import { killPidTree } from '../../lib/process-tree.ts';
+import { killPidTree } from '../../lib/process-tree/process-tree.ts';
 import { isClaudeAgentCommand } from './runtime.ts';
 
 const execFileAsync = promisify(execFile);

@@ -1,0 +1,165 @@
+/*
+ * Строка блока ответа: сам блок и справа — расход шага, который его породил.
+ *
+ * Колонка держится постоянной ширины даже там, где расхода нет (первый шаг
+ * разговора, реплика человека): плавающая граница текста дёргала бы ленту на
+ * каждом сообщении.
+ */
+.block {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--spend-column);
+  align-items: start;
+  gap: var(--spacing-2xs);
+}
+
+// Текст ответа и всё, что из него выросло (карточка предложения разделить
+// задачи), — ОДНОЙ колонкой сетки. Поставленные соседями, они попадали во
+// вторую колонку — ту, что отведена под расход, — и сжимались до сотни
+// пикселей: карточка вставала узким столбиком у правого края ленты.
+.blockBody {
+  min-width: 0;
+}
+
+.spend {
+  // По верхней строке блока: у длинной плашки инструмента середина уезжает
+  // вниз, и цифра переставала читаться как относящаяся к этой строке.
+  margin-top: 1px;
+  justify-self: end;
+}
+
+/* На узкой ленте колонки для цифр нет — там дороже сам текст. */
+@media (max-width: 720px) {
+  .block {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .spend {
+    display: none;
+  }
+}
+
+.text {
+  // Длинные пути, ссылки и куски JSON приходят одной строкой без пробелов:
+  // без принудительного переноса они распирают колонку и внизу появляется
+  // горизонтальная прокрутка.
+  min-width: 0;
+  overflow-wrap: anywhere;
+
+  // В одном сообщении текстовых блоков бывает несколько, и идут они подряд.
+  // Раньше их разделял браузерный отступ абзаца; теперь, когда он снят ради
+  // первой строки, разделение задаём здесь — иначе блоки слипаются в стену.
+  & + & {
+    margin-top: var(--spacing-sm);
+  }
+
+  :global {
+    h1,
+    h2,
+    h3 {
+      margin: var(--spacing-sm) 0 var(--spacing-2xs);
+      font-size: var(--font-size-body);
+      line-height: 1.35;
+
+      // Отбивка сверху нужна между разделами, но не первой строке сообщения.
+      &:first-child {
+        margin-top: 0;
+      }
+    }
+
+    p {
+      // Браузерный margin-top у абзаца остаётся, если его не снять, и первая
+      // строка отходит от верхнего края пузыря на лишний сантиметр — заметнее
+      // всего у реплик человека, где виден фон. Раздел между абзацами при
+      // этом задаём снизу явно: убрав только верхний отступ, абзацы слипаются.
+      margin-top: 0;
+      margin-bottom: var(--spacing-sm);
+
+      &:last-child {
+        margin-bottom: 0;
+      }
+    }
+
+    ul,
+    ol {
+      margin-bottom: var(--spacing-xs);
+      padding-left: var(--spacing-lg);
+    }
+
+    li {
+      margin-bottom: var(--spacing-3xs);
+    }
+
+    code {
+      padding: 0.1em 0.35em;
+      border-radius: var(--radius-sm);
+      background: var(--color-surface-sunken);
+      font-family: var(--font-mono);
+      font-size: 0.92em;
+    }
+
+    // Путь к файлу — самое частое, что выхватывают глазами из ответа: куда
+    // смотреть и что править. Отделяем его от обычного кода цветом и рамкой.
+    code.chat-path {
+      border: 1px solid var(--color-border);
+      background: var(--color-accent-subtle);
+      color: var(--color-accent);
+      white-space: nowrap;
+    }
+
+    // Строка «Вариант 1 — …»: место, где от читателя ждут решения. Полоса
+    // слева и своя заливка выхватывают её из сплошного текста.
+    .chat-choice {
+      margin-top: var(--spacing-xs);
+      padding: var(--spacing-2xs) var(--spacing-sm);
+      border-left: 3px solid var(--color-accent);
+      border-radius: var(--radius-sm);
+      background: var(--color-surface-sunken);
+      font-weight: 600;
+    }
+
+    pre {
+      margin-bottom: var(--spacing-xs);
+      padding: var(--spacing-sm);
+      border-radius: var(--radius-sm);
+      background: var(--color-surface-sunken);
+      // Код переносим по словам: прокрутка под каждым блоком мешает читать.
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+
+      code {
+        padding: 0;
+        background: none;
+      }
+    }
+
+    a {
+      color: var(--color-accent);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: var(--spacing-xs);
+    }
+
+    th,
+    td {
+      padding: var(--spacing-3xs) var(--spacing-xs);
+      border: 1px solid var(--color-border);
+      text-align: left;
+    }
+  }
+}
+
+/*
+  Пояснение под непонятым блоком предложения. Намеренно негромкое: сам блок
+  остаётся выше текстом, и это подпись к нему, а не ошибка разговора — красная
+  карточка здесь пугала бы там, где ничего не потеряно.
+*/
+.splitRejected {
+  padding: var(--spacing-2xs) var(--spacing-xs);
+  border: 1px dashed var(--color-border);
+  border-radius: 8px;
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-caption);
+}

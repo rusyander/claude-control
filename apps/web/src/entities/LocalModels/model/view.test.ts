@@ -6,7 +6,10 @@ import type {
   LocalModelsInfo,
   ModelBench,
 } from '@agentdeck/contracts/local-models';
-import { benchElsewhere, catalogRows, claudeModelOf, placementOf } from './view';
+import { benchElsewhere } from './benchElsewhere';
+import { placementOf } from './placementOf';
+import { catalogRows } from './catalogRows';
+import { claudeModelOf } from './claudeModelOf';
 
 /**
  * Где модель легла на деле и какую модель берёт «Claude Code на локальной

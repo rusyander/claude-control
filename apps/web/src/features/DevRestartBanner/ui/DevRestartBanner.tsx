@@ -1,23 +1,14 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDevRestart, useRequestDevRestart } from '@entities/DevRestart';
-import { toErrorMessage } from '@shared/api/client';
 import { formatClock } from '@shared/lib/format-clock';
 import { toast } from '@shared/lib/toast';
 import { Button } from '@shared/ui/button';
 import { ConfirmDialog } from '@shared/ui/confirm-dialog';
 import { Typography } from '@shared/ui/typography';
 import styles from './DevRestartBanner.module.scss';
-
-/** Сколько правленых файлов назвать по имени: дальше — только число. */
-const NAMED_FILES = 3;
-
-const WAITING_KEY = {
-  runs: 'devRestart.waitingRuns',
-  setup: 'devRestart.waitingSetup',
-  checks: 'devRestart.waitingChecks',
-  both: 'devRestart.waitingBoth',
-} as const;
+import { NAMED_FILES, WAITING_KEY } from './DevRestartBanner.constants';
+import { toErrorMessage } from '../../../shared/api/toErrorMessage';
 
 /**
  * «Правки сервера ждут перезапуска» (решение 30.09). Dev-сторож не рвёт живые

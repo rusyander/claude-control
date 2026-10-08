@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { composeAnswer, nextQuestion } from './composeAnswer';
-import type { Question } from '../ui/QuestionCard.types';
+import { composeAnswer } from './composeAnswer';
+import type { Question } from '../ui/QuestionCard/QuestionCard.types';
+import { nextQuestion } from './nextQuestion';
 
 const three: Question[] = [
   { header: 'Редактор', question: 'Чем строить?', options: [{ label: 'CodeMirror' }] },

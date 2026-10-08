@@ -1,18 +1,19 @@
-export {
-  mediaDeckUrl,
-  mediaImageUrl,
-  useCreateDeck,
-  useCreateImage,
-  useDeckPlan,
-  useImagePlan,
-  useMediaPrompt,
-  useSaveDeck,
-  useSavePicture,
-  storeAgentImageFiles,
-} from './api/MediaApi';
-export { deckModeView, imageModeView, type MediaModeView } from './model/media-mode';
+export { useImagePlan } from './api/MediaApi';
+export { useDeckPlan } from './api/useDeckPlan';
+export { useMediaPrompt } from './api/useMediaPrompt';
+export { useSaveDeck } from './api/useSaveDeck';
+export { useSavePicture } from './api/useSavePicture';
+export { useCreateDeck } from './api/useCreateDeck';
+export { useCreateImage } from './api/useCreateImage';
+export { mediaDeckUrl } from './lib/mediaDeckUrl';
+export { mediaImageUrl } from './lib/mediaImageUrl';
+export { storeAgentImageFiles } from './lib/storeAgentImageFiles';
+export { imageModeView } from './model/media-mode';
+export { deckModeView } from './model/deckModeView';
+export type { MediaModeView } from './model/media-mode.types';
 export type { ComposerMode, ComposerModeState } from './model/composer-mode';
 export { requestComposerMode } from './model/composer-request';
 export type { MediaRevision } from './model/revision';
 export { useChatMedia, type ChatMediaApi, type ChatMediaInput } from './model/useChatMedia';
-export { MediaDeckCard, type MediaDeckCardProps } from './ui/MediaDeckCard';
+export { MediaDeckCard } from './ui/MediaDeckCard';
+export type { MediaDeckCardProps } from './ui/MediaDeckCard.types';

@@ -1,0 +1,18 @@
+// Ниже этой высоты колонки библиотеки не сжимаются, прокручивается страница.
+$library-floor: 320px;
+
+.linkRow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 2fr) minmax(0, 1fr) auto;
+  gap: var(--spacing-xs);
+  align-items: end;
+}
+
+.linkUrl,
+.linkTitle {
+  min-width: 0;
+
+  > * {
+    width: 100%;
+  }
+}

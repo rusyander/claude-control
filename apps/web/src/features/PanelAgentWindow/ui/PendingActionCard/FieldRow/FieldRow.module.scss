@@ -1,0 +1,48 @@
+// Окно пристёгнуто к правому краю и не затемняет страницу: агент открывает её,
+// чтобы человек увидел результат, и разговор идёт рядом. Слой ниже модальных
+// окон страницы (100). На широком экране модальное окно, открытое при открытом
+// окне агента, встаёт слева от него (`@shared/lib/side-dock`, метка
+// `data-side-dock`): черновики и мастер видны, а разговор идёт дальше. Уже 900 px
+// места нет — модальное окно встаёт поверх, как везде.
+// Ширина окна — одна переменная для самого окна и для отступа страницы, иначе
+// они разойдутся при первой правке. На широком экране (от 900 px) открытое окно
+// сдвигает содержимое страницы (`MainLayout` читает `--panel-agent-dock-inset`):
+// якорь, открытый агентом, и правый край таблиц не прячутся под окном. Уже
+// 900 px сдвигать некуда — окно встаёт поверх страницы. 440 px — ширина по
+// умолчанию; на широком экране человек тянет её ручкой, и окно ставит свою
+// ширину той же переменной на корне (`model/useDockWidth.ts`).
+:global(:root) {
+  --panel-agent-dock-width: 440px;
+}
+
+@media (min-width: 900px) {
+  :global(:root[data-panel-agent-docked]) {
+    --panel-agent-dock-inset: var(--panel-agent-dock-width);
+  }
+}
+
+// Длинное поле карточки (задача агента, тело кейса) — целиком, но в прокрутке:
+// обрезать нельзя, это и есть то, что выполнится.
+.fieldLong {
+  max-height: 200px;
+  overflow: auto;
+  padding: var(--spacing-2xs) var(--spacing-xs);
+  border-radius: 6px;
+  background-color: var(--color-surface-sunken);
+  white-space: pre-wrap;
+  word-break: break-word;
+
+  &:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 1px;
+  }
+}
+
+// Якорь, в который агент не перенёс фокус (человек печатал): его показывают
+// подсветкой, а фокус остаётся там, где человек пишет.
+:global([data-agent-highlight]) {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+  transition: outline-color var(--duration-fast) ease;
+}

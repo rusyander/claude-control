@@ -2,20 +2,20 @@ import { existsSync, readFileSync, statSync } from 'node:fs';
 import { basename, resolve, sep } from 'node:path';
 import type { Platform } from '@agentdeck/contracts';
 import type { PromptOverride } from '@agentdeck/contracts/prompts';
-import type { ConfigProvider } from '../../providers/types.ts';
+import type { ConfigProvider } from '../../providers/types/types.ts';
 import {
   readJsonFile,
   writeJsonFile,
   writeTextFile,
   writeBinaryFile,
   providerBackupName,
-} from '../../lib/safe-io.ts';
+} from '../../lib/safe-io/safe-io.ts';
 import { archiveError, type ArchiveManifest, type ParsedArchive } from './archive.ts';
 import { sha256 } from './collect.ts';
 import { providerLocations } from './locations.ts';
 import { planPanelPlatforms, type PanelPlatformsPlan } from './platforms.ts';
 import { planPanelPrompts, type PanelPromptsPlan } from './prompts.ts';
-import { coded } from '../../lib/server-text.ts';
+import { coded } from '../../lib/server-text/server-text.ts';
 import type { CodedFields } from '@agentdeck/contracts/server-messages';
 
 /**

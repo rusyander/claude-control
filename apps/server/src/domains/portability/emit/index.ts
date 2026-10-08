@@ -1,5 +1,5 @@
 import type { AgentEnvironment } from '@agentdeck/contracts/portable-env';
-import { ProjectLevelUnsupportedError, projectSupport } from '../project.ts';
+import { ProjectLevelUnsupportedError, projectSupport } from '../project/project.ts';
 import { emitToAider } from './aider.ts';
 import { emitToClaude } from './claude.ts';
 import { emitToCodex } from './codex.ts';

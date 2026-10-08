@@ -1,7 +1,7 @@
 import type { Group, GroupDraft, GroupMemberKind } from '@agentdeck/contracts';
 import { ENV_KEY_PATTERN } from '@agentdeck/contracts/env-secret';
-import { coded } from '../lib/server-text.ts';
-import { serverText } from '../lib/server-texts.ts';
+import { coded } from '../lib/server-text/server-text.ts';
+import { serverText } from '../lib/server-texts/server-texts.ts';
 
 /**
  * Проверка черновика группы ДО записи и ошибки домена для маршрутов.

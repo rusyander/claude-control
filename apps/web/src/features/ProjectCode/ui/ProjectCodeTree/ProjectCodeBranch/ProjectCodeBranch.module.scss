@@ -1,0 +1,112 @@
+.treeNote {
+  display: block;
+  padding: var(--spacing-2xs);
+}
+
+// Размер строки — это читаемость списка, по которому ходят весь сеанс: мельче
+// имена сливаются, а попасть в строку становится работой. Держим кегль обычного
+// текста и высоту строки, в которую попадаешь не целясь.
+.node {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2xs);
+  width: 100%;
+  min-height: 28px;
+  padding: var(--spacing-2xs) var(--spacing-xs);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-body);
+  line-height: 1.35;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: var(--color-surface-sunken);
+    color: var(--color-fg);
+  }
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.6;
+  }
+}
+
+.nodeActive {
+  background: var(--color-accent-subtle);
+  color: var(--color-fg);
+}
+
+// Тронутое агентом видно прямо в дереве, без перехода на вкладку «Изменённые»:
+// у файла зелёное имя, у папки — зелёная точка на иконке. Точка, а не цвет
+// имени: у папки менялось не имя, а что-то внутри, и красить её так же, как
+// сам изменённый файл, значило бы врать о том, что поменялось.
+.nodeChanged .nodeName {
+  color: var(--color-success);
+  font-weight: var(--font-weight-medium);
+}
+
+// Обёртка нужна самой метке: точку рисует псевдоэлемент, а на <svg> он не
+// отображается — значок иконки живёт внутри этого span.
+.nodeIcon {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}
+
+.nodeInside .nodeIcon::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  right: -3px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-success);
+}
+
+.nodeName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nodeCounts {
+  display: flex;
+  flex: none;
+  gap: var(--spacing-3xs);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-body-sm);
+}
+
+.added {
+  color: var(--color-success);
+}
+
+.removed {
+  color: var(--color-danger);
+}
+
+.chevron {
+  flex: none;
+  transition: transform var(--duration-fast) ease;
+}
+
+.chevronOpen {
+  transform: rotate(90deg);
+}
+
+.chevronSpacer {
+  flex: none;
+  width: 16px;
+}
+
+/* Буква состояния git там, где строк не посчитать: у нового файла нет прежней
+   версии, и «+0 −0» читалось бы как «ничего не изменилось». */
+.gitStatus {
+  color: var(--color-fg-subtle);
+  font-weight: var(--font-weight-semibold);
+}

@@ -1,34 +1,30 @@
-export {
-  useLocalModels,
-  hasRunningJob,
-  useRefreshHardware,
-  useInstallRuntime,
-  useStartLocalServer,
-  useStopLocalServer,
-  usePullModel,
-  useImportModel,
-  useRemoveModel,
-  useBenchModel,
-  useConnectLocal,
-  useDisconnectLocal,
-  useInstallQwenCode,
-  useCancelLocalJob,
-  useSetLocalDevice,
-  useSetLocalClaude,
-} from './api/LocalModelsApi';
-export {
-  toGb,
-  jobFor,
-  runningJob,
-  catalogRows,
-  foreignInstalled,
-  chatHint,
-  jobShare,
-  jobEtaSec,
-  placementOf,
-  claudeModelOf,
-  benchElsewhere,
-  type CatalogRow,
-  type ChatHint,
-} from './model/view';
+export { useLocalModels } from './api/LocalModelsApi';
+export { useSetLocalClaude } from './api/useSetLocalClaude';
+export { useSetLocalDevice } from './api/useSetLocalDevice';
+export { useInstallQwenCode } from './api/useInstallQwenCode';
+export { useDisconnectLocal } from './api/useDisconnectLocal';
+export { useConnectLocal } from './api/useConnectLocal';
+export { useBenchModel } from './api/useBenchModel';
+export { useImportModel } from './api/useImportModel';
+export { usePullModel } from './api/usePullModel';
+export { useStopLocalServer } from './api/useStopLocalServer';
+export { useStartLocalServer } from './api/useStartLocalServer';
+export { useInstallRuntime } from './api/useInstallRuntime';
+export { useRefreshHardware } from './api/useRefreshHardware';
+export { useCancelLocalJob } from './api/useCancelLocalJob';
+export { useRemoveModel } from './api/useRemoveModel';
+export { hasRunningJob } from './lib/hasRunningJob';
+export { toGb } from './model/view';
+export { chatHint } from './model/chatHint';
+export type { ChatHint } from './model/chatHint';
+export { claudeModelOf } from './model/claudeModelOf';
+export { catalogRows } from './model/catalogRows';
+export type { CatalogRow } from './model/catalogRows';
+export { placementOf } from './model/placementOf';
+export { jobEtaSec } from './model/jobEtaSec';
+export { jobShare } from './model/jobShare';
+export { benchElsewhere } from './model/benchElsewhere';
+export { foreignInstalled } from './model/foreignInstalled';
+export { runningJob } from './model/runningJob';
+export { jobFor } from './model/jobFor';
 export { JobProgress } from './ui/JobProgress';

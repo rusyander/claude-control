@@ -1,30 +1,6 @@
-import type { MediaDeckPlan, MediaImagePlan } from '@agentdeck/contracts';
-
-/**
- * Чистая часть режимов «Картинка» и «Презентация»: что меню обязано показать по
- * плану сервера.
- *
- * Отдельно от хука намеренно. Решение здесь ровно одно — какими словами
- * называется доступность, — и именно оно врёт заметнее всего: пункт, запертый
- * без причины, читается как поломка панели, подпись без оговорки про промпт
- * читается как «моя правка промпта не сработала», а «рисовать некому» там, где
- * рисует агент разговора, — прямая неправда (её и снял владелец 13.09.2026). Хук
- * вокруг этого держит только состояние.
- *
- * Жить это здесь, в сущности, а не на странице: тот же расчёт нужен и чату
- * Claude, и чату чужого CLI, а страница страницу импортировать не вправе.
- */
-
-export interface MediaModeView {
-  available: boolean;
-  /** Причина словами. Пусто — план ещё не приехал: чужой диагноз не выдумываем. */
-  reasonText?: string;
-  /** Чем сделает: кто, какой моделью и уедет ли промпт режима. */
-  sourceText?: string;
-}
-
-/** Перевод ключа словаря — та же подпись, что у `t` из i18next. */
-type Translate = (key: string, values?: Record<string, string>) => string;
+import type { MediaImagePlan } from '@agentdeck/contracts';
+import type { Translate, MediaModeView } from './media-mode.types';
+import { whoAndWhat } from './whoAndWhat';
 
 /**
  * Кто и чем нарисует. `available` берётся у сервера как есть: единственное, что
@@ -66,33 +42,4 @@ export function imageModeView(plan: MediaImagePlan | undefined, t: Translate): M
  */
 function withDetail(text: string, plan: { reasonDetail?: string }): string {
   return plan.reasonDetail ? `${text} — ${plan.reasonDetail}` : text;
-}
-
-/**
- * Кто соберёт презентацию. Вторая строка — про PDF: он получается не на всякой
- * машине (нужен системный браузер), и сказать об этом надо ДО нажатия, а не
- * отказом на кнопке «PDF».
- */
-export function deckModeView(plan: MediaDeckPlan | undefined, t: Translate): MediaModeView {
-  if (!plan) return { available: false };
-  if (!plan.available) {
-    // Ключ причины отдельным словарём (`noDeck`), а не веткой внутри
-    // `deckBlocked`: `deckBlocked` — это общее «собирать нечем» для случая, когда
-    // код причины не приехал, и строка с вложенными ключами под одним именем в
-    // i18next не живёт.
-    return plan.reason
-      ? { available: false, reasonText: t(`chat.mode.noDeck.${plan.reason}`) }
-      : { available: false };
-  }
-
-  const { title, model, source } = plan;
-  const parts = [source === 'agent' ? t('chat.mode.deckSourceAgent') : whoAndWhat(title, model, t)];
-  if (!plan.pdf.available) parts.push(t(`chat.mode.noPdf.${plan.pdf.reason ?? 'no-browser'}`));
-
-  return { available: true, sourceText: parts.join(' · ') };
-}
-
-/** Кто и какой моделью. Модели может не быть — выдумывать её имя нельзя. */
-function whoAndWhat(title: string, model: string, t: Translate): string {
-  return model ? t('chat.mode.source', { title, model }) : t('chat.mode.sourceNoModel', { title });
 }

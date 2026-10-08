@@ -1,0 +1,18 @@
+.source {
+  padding: var(--spacing-md);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-body-sm);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+
+  :global(pre) {
+    margin: 0;
+    padding: 0;
+    background: none !important;
+    // Подсвеченный код Shiki приходит одной длинной строкой на строку файла —
+    // переносим, чтобы не появлялась горизонтальная прокрутка.
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+}

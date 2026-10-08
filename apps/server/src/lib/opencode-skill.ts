@@ -1,6 +1,6 @@
 import { parseDocument, isMap, isScalar, type Document } from 'yaml';
-import { stripBom } from './text-form.ts';
-import { coded } from './server-text.ts';
+import { stripBom } from './text-form/text-form.ts';
+import { coded } from './server-text/server-text.ts';
 
 /**
  * Скилл OpenCode — файл `SKILL.md` внутри папки скилла (OPENCODE-5).
@@ -21,7 +21,7 @@ import { coded } from './server-text.ts';
  * поля OpenCode игнорирует, но терять их панель не имеет права.
  *
  * ПОЧЕМУ Document API пакета `yaml`, а не `parse` + `stringify` (та же причина,
- * что у `lib/cursor-mdc.ts`): шапку пишут руками, в ней бывают комментарии и
+ * что у `lib/cursor-mdc/cursor-mdc.ts`): шапку пишут руками, в ней бывают комментарии и
  * ключи, о которых панель не знает. Полная пересборка стёрла бы и то, и другое.
  * Document правит ДЕРЕВО: меняются ровно два управляемых ключа.
  *

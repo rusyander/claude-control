@@ -5,13 +5,11 @@ import { findCompromise } from '@agentdeck/contracts';
 import { CodeText, Typography } from '@shared/ui/typography';
 import { Icon } from '@shared/ui/icon';
 import { HELP_ROUTE } from '@shared/config/routes';
-import { formatDate } from '@shared/lib/format';
 import { cn } from '@shared/lib/cn';
 import styles from './compromise-mark.module.scss';
 import type { CompromiseMarkProps } from './compromise-mark.types';
-
-/** Отступ от края окна, при котором подсказку разворачиваем в другую сторону. */
-const EDGE_GAP = 12;
+import { formatDate } from '../../lib/formatDate';
+import { EDGE_GAP } from './compromise-mark.constants';
 
 /**
  * Знак компромисса: флажок вплотную к тому, что он объясняет.

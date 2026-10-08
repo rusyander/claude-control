@@ -4,7 +4,8 @@ const get = vi.fn();
 vi.mock('../../shared/api/client', () => ({ api: { get: (...args: unknown[]) => get(...args) } }));
 vi.mock('../../shared/config/i18n', () => ({ useT: () => ({}) }));
 
-import { chatAutoModeQuery, shownAutoMode } from './api';
+import { chatAutoModeQuery } from './chatAutoModeQuery';
+import { shownAutoMode } from './shownAutoMode';
 
 /**
  * Переключатель авторежима на телефоне показывает то, что решит сервер: выбор

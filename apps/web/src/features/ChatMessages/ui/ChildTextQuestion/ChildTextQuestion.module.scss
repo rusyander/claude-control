@@ -1,0 +1,69 @@
+// Вопрос ребёнка, заданный текстом: та же рамка, что у карточки вопроса
+// (`.question` в ChatMessages.module.scss), своё здесь — только тело и поле.
+
+// Текст агента как есть: абзацы и переносы — часть вопроса. Длинный хвост
+// прокручивается внутри, чтобы карточка не растягивала ленту на экран.
+.body {
+  max-height: 240px;
+  margin: 0 0 var(--spacing-sm);
+  overflow-y: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.reply {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2xs);
+}
+
+.input {
+  width: 100%;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 8px;
+  background: var(--color-surface-sunken);
+  color: inherit;
+  font: inherit;
+  resize: vertical;
+}
+
+.input:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.send {
+  align-self: flex-start;
+}
+
+// Вопрос с вариантами. Пока на него не ответят, работа стоит, — поэтому он
+// выделен сильнее всего остального в ленте.
+//
+// Заливку берём от поверхности, а не от акцента: в тёмной теме
+// --color-accent-subtle почти совпадает и с фоном страницы, и с фоном реплик
+// человека, из-за чего карточка переставала читаться как отдельный блок.
+// Отделяет её теперь полоса слева и приподнятая поверхность.
+.question {
+  margin-bottom: var(--spacing-xs);
+  padding: var(--spacing-sm) var(--spacing-md) var(--spacing-md);
+  border: 1px solid var(--color-accent);
+  border-left: 3px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.questionHead {
+  margin-bottom: var(--spacing-xs);
+  color: var(--color-accent);
+  font-size: var(--font-size-body-sm);
+  font-weight: 600;
+}
+
+// Отправлено: ответ ушёл, агент думает. Состояние ставится по клику, не по
+// ответу сервера, — иначе секунды ожидания читаются как «клик не прошёл».
+.questionSent {
+  border-color: var(--color-border-strong);
+  border-left-color: var(--color-border-strong);
+}

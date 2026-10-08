@@ -9,7 +9,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { removeEntry } from '../../lib/safe-io.ts';
+import { removeEntry } from '../../lib/safe-io/safe-io.ts';
 import {
   exportToGlobal,
   globalItems,

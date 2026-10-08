@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import type { ServerMessageCode } from '@agentdeck/contracts/server-messages';
-import { readJsonFile, writeJsonFile } from '../../lib/safe-io.ts';
+import { readJsonFile, writeJsonFile } from '../../lib/safe-io/safe-io.ts';
 
 /**
  * Доступ копии = запись КАТАЛОГА в `.claude.json`, а не файлы в репозитории.

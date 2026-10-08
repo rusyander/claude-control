@@ -11,8 +11,8 @@ import type {
   Skill,
   UniversalMcpServer,
 } from '@agentdeck/contracts';
-import type { AppStore } from '../../lib/app-store.ts';
-import type { ScriptFile } from '../scripts.ts';
+import type { AppStore } from '../../lib/app-store/app-store.ts';
+import type { ScriptFile } from '../scripts/scripts.ts';
 
 /**
  * Разделы АКТИВНОГО провайдера (не Claude), которые панель реально редактирует.

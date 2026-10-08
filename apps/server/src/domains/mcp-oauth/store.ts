@@ -3,8 +3,8 @@ import type {
   OAuthClientInformationMixed,
   OAuthTokens,
 } from '@modelcontextprotocol/sdk/shared/auth.js';
-import { writeSecretFile } from '../../lib/credentials.ts';
-import { readJsonFile } from '../../lib/safe-io.ts';
+import { writeSecretFile } from '../../lib/credentials/credentials.ts';
+import { readJsonFile } from '../../lib/safe-io/safe-io.ts';
 
 /**
  * Хранилище выданных токенов и регистраций клиента.

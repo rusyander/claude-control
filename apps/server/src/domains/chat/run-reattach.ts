@@ -1,8 +1,8 @@
-import type { RunOptions } from './ChatRunner.ts';
-import type { RunMeta } from './ChatRunRegistry.types.ts';
-import { LiveSession, type LiveSessionPool } from './live-session.ts';
-import { connectRelay } from './live-transport.ts';
-import type { RunLedgerEntry } from './run-ledger.ts';
+import type { RunOptions } from './ChatRunner/ChatRunner.ts';
+import type { RunMeta } from './ChatRunRegistry/ChatRunRegistry.types.ts';
+import { LiveSession, type LiveSessionPool } from './live-session/live-session.ts';
+import { connectRelay } from './live-transport/live-transport.ts';
+import type { RunLedgerEntry } from './run-ledger/run-ledger.ts';
 
 /**
  * Подхват живой сессии после перезапуска панели — через посредника.

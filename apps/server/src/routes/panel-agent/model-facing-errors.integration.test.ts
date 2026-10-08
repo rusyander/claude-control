@@ -7,10 +7,10 @@ import { z } from 'zod';
 import type { PanelActionResult } from '@agentdeck/contracts/panel-agent';
 import { PANEL_AGENT_HEADER } from '@agentdeck/contracts/panel-agent';
 import type { ServerContext } from '../../context.ts';
-import { createEventHub } from '../../lib/event-hub.ts';
-import { allowedOrigins } from '../../lib/origin-guard.ts';
-import { PanelPendingActions } from '../../domains/panel-agent/pending.ts';
-import { registerPanelAgentRoutes } from './panel-agent-routes.ts';
+import { createEventHub } from '../../lib/event-hub/event-hub.ts';
+import { allowedOrigins } from '../../lib/origin-guard/origin-guard.ts';
+import { PanelPendingActions } from '../../domains/panel-agent/pending/pending.ts';
+import { registerPanelAgentRoutes } from './panel-agent-routes/panel-agent-routes.ts';
 import { PANEL_ACTIONS } from './actions.ts';
 import { definePanelAction } from './registry.ts';
 

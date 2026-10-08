@@ -1,17 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import type { Platform, PlatformRuleConflict, PlatformRuleRow } from '@agentdeck/contracts';
-import {
-  blockingConflict,
-  conflictTone,
-  layerOn,
-  managedRules,
-  observedRules,
-  ourRules,
-  parseToolNames,
-  platformRules,
-  withOurRule,
-  withRule,
-} from './rulesView';
+import { platformRules } from './rulesView';
+import { ourRules } from './ourRules';
+import { layerOn } from './layerOn';
+import { withOurRule } from './withOurRule';
+import { managedRules } from './managedRules';
+import { observedRules } from './observedRules';
+import { conflictTone } from './conflictTone';
+import { blockingConflict } from './blockingConflict';
+import { parseToolNames } from './parseToolNames';
+import { withRule } from './withRule';
 
 /**
  * Карточка правил контура (Т7): что она раскладывает и что отправляет назад.

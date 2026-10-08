@@ -1,23 +1,8 @@
 import type { KnobView, PathEntry } from '@agentdeck/contracts';
-import { skillTextSteps, stepOfQuote } from './skillText';
-
-/**
- * Строка вкладки «Порядок работы». Почти всегда — строка пути с сервера; но у
- * скилла-участника с настраиваемыми числами и без пронумерованных шагов в пути
- * нет ни одной строки, и его числам негде было бы стоять. Такой скилл получает
- * свою строку «скилл целиком» — там же, где сервер ставит шаги скиллов: после
- * стадии работы.
- */
-export type PathRow =
-  | {
-      kind: 'entry';
-      key: string;
-      entry: PathEntry;
-      /** Индекс в `entries` — «+» после строки вставляет шаг после него. */
-      entryIndex: number;
-      knobs: KnobView[];
-    }
-  | { kind: 'skill'; key: string; skillId: string; entryIndex: number; knobs: KnobView[] };
+import { skillTextSteps } from './skillText';
+import { entryKey } from './entryKey';
+import type { PathRow } from './pathRows.types';
+import { stepOfQuote } from './stepOfQuote';
 
 /** Сервер ставит шаги скиллов после этой стадии (`SKILL_STEPS_AFTER`). */
 const SKILLS_AFTER = 'work';
@@ -95,25 +80,4 @@ function skillsEnd(entries: PathEntry[]): number {
   if (at < 0) return entries.length - 1;
   while (entries[at + 1]?.kind === 'skill-step') at += 1;
   return at;
-}
-
-export function entryKey(entry: PathEntry, index: number): string {
-  if (entry.kind === 'builtin') return `builtin:${entry.stage}`;
-  if (entry.kind === 'custom') return `custom:${entry.step.id}`;
-  return `skill:${entry.skillId}:${entry.index}:${index}`;
-}
-
-/** Сколько шагов у группы сверх встроенных стадий — число на карточке. */
-export function ownStepCount(entries: PathEntry[]): number {
-  return entries.filter((entry) => entry.kind !== 'builtin').length;
-}
-
-/**
- * Есть ли «+» после строки `index`. Между любыми двумя строками — да: рядом с
- * шагами скилла вставка идёт внутрь его порядка (`slotAfter`). Нет только
- * перед строкой «скилл целиком»: у такого скилла нет шагов, между которыми
- * встать, и шаг ушёл бы ниже неё — «+» соврал бы о месте.
- */
-export function canInsertAfter(rows: PathRow[], index: number): boolean {
-  return rows[index + 1]?.kind !== 'skill';
 }

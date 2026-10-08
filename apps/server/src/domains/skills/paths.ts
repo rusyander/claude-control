@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import { safeSegment } from '../resources/registry.ts';
-import { coded } from '../../lib/server-text.ts';
+import { coded } from '../../lib/server-text/server-text.ts';
 
 /**
  * Id скилла — имя его папки, и до этой проверки он шёл в `join()` как есть:

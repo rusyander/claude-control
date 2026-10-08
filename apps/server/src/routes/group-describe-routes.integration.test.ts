@@ -11,13 +11,17 @@ import type {
   ResourceCatalogView,
 } from '@agentdeck/contracts/group-describe';
 import { PATH_STEP_BLOCK_KIND, type GroupPathView } from '@agentdeck/contracts/group-path';
-import { AppStore } from '../lib/app-store.ts';
+import { AppStore } from '../lib/app-store/app-store.ts';
 import type { ServerContext } from '../context.ts';
-import { DESCRIBE_BLOCK_KIND, DESCRIBE_VERSION, describeIdle } from '../domains/groups/describe.ts';
+import {
+  DESCRIBE_BLOCK_KIND,
+  DESCRIBE_VERSION,
+  describeIdle,
+} from '../domains/groups/describe/describe.ts';
 import { resourceSource } from '../domains/groups/describe-sources.ts';
-import { readHooks } from '../domains/hooks.ts';
+import { readHooks } from '../domains/hooks/hooks.ts';
 import type { GroupAsk, GroupModelMessage, GroupModelTier } from '../domains/groups/model.ts';
-import { registerGroupPathRoutes } from './group-path-routes.ts';
+import { registerGroupPathRoutes } from './group-path-routes/group-path-routes.ts';
 
 /**
  * Описания на двух языках со стороны маршрутов: временный каталог конфигурации

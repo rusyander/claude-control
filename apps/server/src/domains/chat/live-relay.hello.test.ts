@@ -5,7 +5,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { connect } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { connectRelay, RELAY_SCRIPT, type LiveTransport } from './live-transport.ts';
+import { connectRelay, RELAY_SCRIPT, type LiveTransport } from './live-transport/live-transport.ts';
 
 /**
  * Ключ канала посредника. Имя канала видно любому процессу машины, а

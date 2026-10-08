@@ -4,8 +4,8 @@ import { join } from 'node:path';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { Group } from '@agentdeck/contracts';
 import type { EnvItem, EnvSource, SecretItem, EnvVarItem } from '@agentdeck/contracts/portable-env';
-import { setStoredKey } from '../../../lib/provider-keys.ts';
-import { spawnCliProcess } from '../../../lib/cli-spawn.ts';
+import { setStoredKey } from '../../../lib/provider-keys/provider-keys.ts';
+import { spawnCliProcess } from '../../../lib/cli-spawn/cli-spawn.ts';
 import { qwenProvider } from '../../../providers/catalog/qwen.ts';
 import {
   buildPortableEnv,

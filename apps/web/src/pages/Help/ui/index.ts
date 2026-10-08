@@ -1,16 +1,17 @@
-export { HelpSection } from './HelpSection';
-export { StorageCard } from './StorageCard';
-export { FieldTable } from './FieldTable';
-export { StepList } from './StepList';
-export { Callout } from './Callout';
-export { CapabilityGrid } from './CapabilityGrid';
-export { OptionCards } from './OptionCards';
-export { TopicNav } from './TopicNav';
-export { TopicCard } from './TopicCard';
-export { HelpShot } from './HelpShot';
-export { HelpDiagram } from './HelpDiagram';
-export { GuideSteps, GuideStep } from './GuideStep';
-export { PageTabsSection } from './PageTabsSection';
+export { HelpSection } from './HelpSection/HelpSection';
+export { StorageCard } from './StorageCard/StorageCard';
+export { FieldTable } from './FieldTable/FieldTable';
+export { StepList } from './StepList/StepList';
+export { Callout } from './Callout/Callout';
+export { CapabilityGrid } from './CapabilityGrid/CapabilityGrid';
+export { OptionCards } from './OptionCards/OptionCards';
+export { TopicNav } from './TopicNav/TopicNav';
+export { TopicCard } from './TopicCard/TopicCard';
+export { HelpShot } from './HelpShot/HelpShot';
+export { HelpDiagram } from './HelpDiagram/HelpDiagram';
+export { GuideStep } from './GuideStep/GuideStep';
+export { GuideSteps } from './GuideSteps/GuideSteps';
+export { PageTabsSection } from './PageTabsSection/PageTabsSection';
 export type {
   OptionCard,
   OptionCardsProps,

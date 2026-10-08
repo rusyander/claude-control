@@ -1,5 +1,5 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { FormatCheckReport, FormatCheckResponse } from '@agentdeck/contracts';
+import { useQuery } from '@tanstack/react-query';
+import type { FormatCheckResponse } from '@agentdeck/contracts';
 import { apiClient } from '@shared/api/client';
 import { queryKeys } from '@shared/api/query-keys';
 
@@ -7,11 +7,6 @@ import { queryKeys } from '@shared/api/query-keys';
 
 async function getFormatCheck(): Promise<FormatCheckResponse> {
   const { data } = await apiClient.get<FormatCheckResponse>('/format-check');
-  return data;
-}
-
-async function refreshFormatCheck(): Promise<FormatCheckReport> {
-  const { data } = await apiClient.post<FormatCheckReport>('/format-check/refresh');
   return data;
 }
 
@@ -25,21 +20,5 @@ export function useFormatCheck() {
     queryKey: queryKeys.formatCheck,
     queryFn: getFormatCheck,
     staleTime: 10 * 60 * 1000,
-  });
-}
-
-/** Кнопка «проверить сейчас»: единственный путь, который идёт в сеть синхронно. */
-export function useRefreshFormatCheck() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    meta: { silentError: true },
-    mutationFn: refreshFormatCheck,
-    onSuccess: (report) => {
-      queryClient.setQueryData<FormatCheckResponse>(queryKeys.formatCheck, {
-        report,
-        stale: false,
-      });
-    },
   });
 }

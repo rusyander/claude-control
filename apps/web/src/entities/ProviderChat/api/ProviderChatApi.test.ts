@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import type { ProviderChatEvent } from '@agentdeck/contracts';
-import { openProviderChatStream } from './ProviderChatApi';
+import { openProviderChatStream } from '../lib/openProviderChatStream';
 
 /**
  * Чтение потока ответа. Проверяется то, что ломается на настоящем соединении:

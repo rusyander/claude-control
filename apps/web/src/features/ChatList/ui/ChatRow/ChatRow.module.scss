@@ -1,0 +1,147 @@
+// Строка занимает ровно ту высоту, под которую рассчитана виртуализация,
+// минус зазор между соседями: иначе длинный заголовок вылезал на соседнюю
+// карточку и они наезжали друг на друга.
+.item {
+  display: block;
+  width: 100%;
+  height: calc(100% - 4px);
+  padding: var(--spacing-sm);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  transition:
+    background var(--duration-fast),
+    border-color var(--duration-fast);
+
+  &:hover {
+    background: var(--color-surface-sunken);
+    border-color: var(--color-border);
+  }
+}
+
+.itemActive {
+  background: var(--color-accent-subtle);
+  border-color: var(--color-accent);
+
+  &:hover {
+    background: var(--color-accent-subtle);
+    border-color: var(--color-accent);
+  }
+}
+
+/*
+  Ветвь дерева: чат, выделенный разделением задач.
+
+  Отступ и вертикальная линия, а не значок: значок пришлось бы объяснять, а
+  сдвиг с линией читается сразу и тем же способом, каким дерево показывают
+  файловые менеджеры. Линия рисуется рамкой самой строки — так она не съезжает
+  при виртуализации, где соседей у строки может не быть вовсе.
+*/
+.itemChild {
+  width: calc(100% - 16px);
+  margin-left: 16px;
+  border-left: 2px solid var(--color-border);
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.title {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.preview {
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+// Звено конвейера подбора модели: «ревью» или «правки» рядом с названием. Метка
+// маленькая и без цвета состояния намеренно — это не тревога и не статус, а
+// ответ на вопрос «почему у этой группы три разговора подряд».
+.stage {
+  flex: none;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--color-surface-sunken);
+  white-space: nowrap;
+}
+
+.mrChip {
+  cursor: pointer;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+// Совпадение в сниппете поиска по телу — подсветка теми же токенами акцента,
+// что и активная строка, чтобы найденное слово читалось с первого взгляда.
+.mark {
+  padding: 0 2px;
+  border-radius: var(--radius-sm);
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+}
+
+.dot {
+  color: var(--color-fg-subtle);
+}
+
+/* Строка и её кнопка закрепления: кнопка — сосед строки, вложенная недопустима. */
+.rowWrap {
+  position: relative;
+  height: 100%;
+}
+
+.pin {
+  position: absolute;
+  right: var(--spacing-xs);
+  bottom: var(--spacing-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-fg-subtle);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity var(--duration-fast),
+    background var(--duration-fast);
+
+  &:hover {
+    background: var(--color-surface-sunken);
+    border-color: var(--color-border);
+    color: var(--color-fg);
+  }
+
+  &:focus-visible {
+    opacity: 1;
+    outline: 2px solid var(--color-accent);
+    outline-offset: 1px;
+  }
+}
+
+/* Видна, пока строку наводят или в ней фокус; у закреплённой — всегда. */
+.rowWrap:hover .pin,
+.rowWrap:focus-within .pin,
+.rowPinned .pin {
+  opacity: 1;
+}
+
+.rowPinned .pin {
+  color: var(--color-accent);
+}

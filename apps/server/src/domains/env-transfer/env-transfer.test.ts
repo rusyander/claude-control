@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, existsSync
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { getProvider } from '../../providers/registry.ts';
-import { readZip } from '../../lib/zip.ts';
+import { readZip } from '../../lib/zip/zip.ts';
 import { buildEnvironmentArchive, parseEnvironmentArchive } from './archive.ts';
 import { collectProviderFiles } from './collect.ts';
 import { applyEnvironmentImport, planEnvironmentImport } from './import.ts';

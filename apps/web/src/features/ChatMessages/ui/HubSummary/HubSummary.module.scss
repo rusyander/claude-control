@@ -1,0 +1,26 @@
+// Сводка под шапкой (L37): счётчики-капсулы одной строкой, переносятся на
+// узком экране, а не распирают карточку.
+.summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-3xs) var(--spacing-2xs);
+  margin-bottom: var(--spacing-3xs);
+}
+
+// Фишка «на паузе» — та же форма, что у звена конвейера в списке чатов: одно
+// слово в капсуле на утопленной поверхности, читается в обеих темах.
+.chip {
+  flex: none;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--color-surface-sunken);
+  white-space: nowrap;
+}
+
+// Ждут человека — вопрос или решение по ревью: это единственные фишки, после
+// которых работа не пойдёт сама, и они не должны сливаться с «ждёт фон».
+.chipAsk {
+  background: var(--color-warning-subtle);
+  color: var(--color-fg);
+}

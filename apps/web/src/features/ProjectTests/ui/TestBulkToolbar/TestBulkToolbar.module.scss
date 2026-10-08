@@ -1,0 +1,53 @@
+// Ниже этой высоты колонки библиотеки не сжимаются, прокручивается страница.
+$library-floor: 320px;
+
+// Панель массовых действий: видна только когда что-то отмечено, поэтому она
+// подсвечена — это не постоянная часть экрана, а режим.
+.bulk {
+  flex: none;
+  padding: var(--spacing-xs);
+  border: 1px solid var(--color-accent);
+  border-radius: 8px;
+  background: var(--color-surface-sunken);
+}
+
+.bulkCount {
+  white-space: nowrap;
+}
+
+// Поля панели выделения — одной высоты с кнопками и без подписей сверху (см.
+// `TestBulkToolbar`): так панель остаётся одной строкой и не двигает таблицу.
+.bulkControl {
+  box-sizing: border-box;
+  height: 32px;
+  max-width: 100%;
+  padding: 0 var(--spacing-xs);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background-color: var(--color-surface);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-body-sm);
+  text-overflow: ellipsis;
+
+  &::placeholder {
+    color: var(--color-fg-subtle);
+  }
+
+  &:hover {
+    border-color: var(--color-border-strong);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 1px;
+  }
+}
+
+// Поле значения тянется и сжимается: на узком экране оно уступает место
+// кнопкам, а не выталкивает их на вторую строку.
+.bulkInput {
+  flex: 1 1 200px;
+  min-width: 140px;
+  max-width: 360px;
+}

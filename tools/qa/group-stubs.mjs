@@ -94,7 +94,7 @@ function step(id, anchor, order, title, prompt, extra = {}) {
 const BUILTIN = ['triage', 'plan', 'work', 'review', 'fix', 'deliver'];
 
 /**
- * Путь, как его собрал бы сервер (`domains/groups/path.ts buildPath`): у
+ * Путь, как его собрал бы сервер (`domains/groups/path/path.ts buildPath`): у
  * конвейера — стадия, затем шаги скилла и свои шаги этой стадии; у сценария
  * (`flow: 'scenario'`) — только свои шаги по порядку, без стадий и скиллов.
  */

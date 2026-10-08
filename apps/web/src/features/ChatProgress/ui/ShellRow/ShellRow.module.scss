@@ -1,0 +1,18 @@
+.agent {
+  padding: var(--spacing-3xs) 0;
+}
+
+/* Команда — моноширинно и в одну строку: целиком она в подсказке. */
+.shellCommand {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+}
+
+.shellStatus {
+  flex-shrink: 0;
+}

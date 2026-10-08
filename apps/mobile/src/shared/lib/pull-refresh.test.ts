@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { pullOnce } from './pull-refresh';
+import { pullOnce } from './pullOnce';
 
 describe('pullOnce', () => {
   it('крутилка горит, пока идут все перезапросы, и гаснет после последнего', async () => {

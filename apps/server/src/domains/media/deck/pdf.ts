@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { findSystemBrowser } from '../../../lib/system-browser.ts';
 import { MediaError } from '../errors.ts';
-import { coded } from '../../../lib/server-text.ts';
+import { coded } from '../../../lib/server-text/server-text.ts';
 
 /**
  * HTML колоды → PDF печатью системного браузера (решение В3).

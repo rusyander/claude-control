@@ -1,0 +1,21 @@
+// Строка источника: пометка «правится здесь» / «только чтение» и путь к файлу.
+// Она стоит первой на каждой вкладке — различие не угадывается по кнопкам.
+.source {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-3xs) var(--spacing-xs);
+  min-width: 0;
+}
+
+.sourceMark {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sourcePath {
+  min-width: 0;
+  font-size: var(--font-size-caption);
+  overflow-wrap: anywhere;
+}

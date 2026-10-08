@@ -3,8 +3,12 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ChatRunRegistry, type BufferedEvent } from './ChatRunRegistry.ts';
-import { BACKGROUND_PROMPT, SPLIT_FOREGROUND_PROMPT, initiativePrompt } from './initiative.ts';
+import { ChatRunRegistry, type BufferedEvent } from './ChatRunRegistry/ChatRunRegistry.ts';
+import {
+  BACKGROUND_PROMPT,
+  SPLIT_FOREGROUND_PROMPT,
+  initiativePrompt,
+} from './initiative/initiative.ts';
 
 /**
  * Группа разделения не уводит проверки в фон (журнал 60b) — на настоящем

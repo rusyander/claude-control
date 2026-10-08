@@ -8,7 +8,7 @@ import type {
 import type { McpServer } from '@agentdeck/contracts';
 import { oauthCallbackUrl } from './callback.ts';
 import { oauthStorePath, readRecord, updateRecord } from './store.ts';
-import { coded } from '../../lib/server-text.ts';
+import { coded } from '../../lib/server-text/server-text.ts';
 
 /**
  * Провайдер для одного сервера. SDK зовёт его методы по ходу `auth()`: читает

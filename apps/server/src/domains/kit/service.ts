@@ -11,7 +11,7 @@ import {
   type KitResponse,
 } from '@agentdeck/contracts/kit';
 import type { KitMode } from '@agentdeck/contracts/local-models';
-import { readJsonFile, writeJsonFile, writeTextFile } from '../../lib/safe-io.ts';
+import { readJsonFile, writeJsonFile, writeTextFile } from '../../lib/safe-io/safe-io.ts';
 import { diffLines, tooBig } from '../history/diff.ts';
 import { buildCodexOverlay, CODEX_KIT_ENV, writeCodexOverlay } from './codex.ts';
 import { composeKit, composeQwenHome } from './compose.ts';

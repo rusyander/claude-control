@@ -1,5 +1,5 @@
-import { UnrecognizedFormatError } from './codex-toml.ts';
-import { stripBom } from './text-form.ts';
+import { UnrecognizedFormatError } from './codex-toml/codex-toml.ts';
+import { stripBom } from './text-form/text-form.ts';
 
 /**
  * Разбор JSON-конфига ЧУЖОГО инструмента (Gemini `settings.json`, Cursor

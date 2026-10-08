@@ -1,9 +1,9 @@
 import { basename } from 'node:path';
 import type { TelegramEvent, TelegramSettings } from '@agentdeck/contracts';
-import type { RunNotice } from '../chat/ChatRunRegistry.ts';
-import { describeFailure, failureCode, parseJson, sendRequest } from '../integrations/http.ts';
+import type { RunNotice } from '../chat/ChatRunRegistry/ChatRunRegistry.ts';
+import { describeFailure, failureCode, parseJson, sendRequest } from '../integrations/http/http.ts';
 import { unreachable } from '../integrations/errors.ts';
-import type { CodedText } from '../../lib/server-text.ts';
+import type { CodedText } from '../../lib/server-text/server-text.ts';
 
 /**
  * Уведомления в Telegram — второй адресат тех же событий, что уходят на телефон.

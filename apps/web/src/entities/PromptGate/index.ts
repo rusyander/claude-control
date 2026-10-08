@@ -1,1 +1,2 @@
-export { usePromptGate, useApplyPromptGate } from './api/PromptGateApi';
+export { usePromptGate } from './api/PromptGateApi';
+export { useApplyPromptGate } from './api/useApplyPromptGate';

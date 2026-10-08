@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { ProjectTestGroup } from '@agentdeck/contracts';
-import { groupFormSeed, takenGroup } from './groupForm';
+import { takenGroup } from './groupForm';
+import { groupFormSeed } from './groupFormSeed';
 
 describe('takenGroup', () => {
   const groups: ProjectTestGroup[] = [

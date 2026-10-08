@@ -1,10 +1,10 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { normalizeProjectPath } from '../../lib/app-store/projects.ts';
-import { spelledOnDisk } from '../../lib/disk-spelling.ts';
-import { writeJsonFile } from '../../lib/safe-io.ts';
+import { spelledOnDisk } from '../../lib/disk-spelling/disk-spelling.ts';
+import { writeJsonFile } from '../../lib/safe-io/safe-io.ts';
 import { ProjectFileError, resolveProjectPath } from '../project-files/paths.ts';
-import { coded } from '../../lib/server-text.ts';
+import { coded } from '../../lib/server-text/server-text.ts';
 import type { CodedMessage } from '@agentdeck/contracts';
 
 /**

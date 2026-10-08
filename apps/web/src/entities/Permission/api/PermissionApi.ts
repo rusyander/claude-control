@@ -1,8 +1,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { PermissionRule, PermissionDraft } from '@agentdeck/contracts';
 import { apiClient } from '@shared/api/client';
-import { createEntityApi } from '@shared/api/create-entity-api';
 import { queryKeys } from '@shared/api/query-keys';
+import { createEntityApi } from '../../../shared/api/createEntityApi';
 
 export const permissionApi = createEntityApi<PermissionRule, PermissionDraft>({
   resource: 'permissions',
@@ -30,23 +30,5 @@ export function useCreatePermissions() {
       void queryClient.invalidateQueries({ queryKey: queryKeys.overview });
     },
     meta: { successMessage: 'toasts.created' },
-  });
-}
-
-/**
- * Перенести право в противоположный файл настроек: из settings.json в
- * settings.local.json и обратно. Файл-источник сервер определяет по префиксу id.
- */
-export function useMovePermission() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (id: string) => {
-      await apiClient.post(`/permissions/${encodeURIComponent(id)}/move`);
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.permissions });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.overview });
-    },
-    meta: { successMessage: 'toasts.moved' },
   });
 }

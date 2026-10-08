@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { hasConflict, isDirty, syncWithDisk } from './editorSync';
+import { isDirty } from './editorSync';
+import { hasConflict } from './hasConflict';
+import { syncWithDisk } from './syncWithDisk';
 
 describe('editorSync: сверка редактора CLAUDE.md с диском', () => {
   it('первая загрузка берёт файл целиком', () => {

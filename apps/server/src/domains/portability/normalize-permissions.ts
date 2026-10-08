@@ -1,6 +1,6 @@
 import type { EnvSkip, PermissionItem } from '@agentdeck/contracts/portable-env';
 import { envItemId, envSkip, needsFacts, needsNone } from './canon.ts';
-import { isModeRule, modeRule } from './permissions-map.ts';
+import { isModeRule, modeRule } from './permissions-map/permissions-map.ts';
 import type { ProviderPermissionsValues } from '../provider-permissions/types.ts';
 import type { EnvSourceFactory } from './normalize-types.ts';
 

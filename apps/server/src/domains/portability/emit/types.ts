@@ -1,7 +1,7 @@
 import type { EmitEntry } from '@agentdeck/contracts/portable-emit';
 import type { AgentEnvironment, EnvItemKind, EnvScope } from '@agentdeck/contracts/portable-env';
-import type { ConfigProvider } from '../../../providers/types.ts';
-import type { SectionTargets } from '../project.ts';
+import type { ConfigProvider } from '../../../providers/types/types.ts';
+import type { SectionTargets } from '../project/project.ts';
 
 /**
  * Договор эмиссии: что эмиттеру дают и что он возвращает.

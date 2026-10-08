@@ -1,4 +1,4 @@
-import type { ConfigProvider } from '../../providers/types.ts';
+import type { ConfigProvider } from '../../providers/types/types.ts';
 import { resolveAssistantModel } from '../models/model-defaults.ts';
 import { ANTHROPIC_URL, GOOGLE_BASE, MODELS, OPENAI_BASE } from './constants.ts';
 import type {
@@ -7,14 +7,14 @@ import type {
   AssistantRunResult,
   RunAssistantDeps,
 } from './types.ts';
-import { coded } from '../../lib/server-text.ts';
-import { serverText } from '../../lib/server-texts.ts';
-import { vendorApiRefusal } from '../provider-keys.ts';
+import { coded } from '../../lib/server-text/server-text.ts';
+import { serverText } from '../../lib/server-texts/server-texts.ts';
+import { vendorApiRefusal } from '../provider-keys/provider-keys.ts';
 import {
   anthropicImageBlocks,
   googleImageParts,
   openAiImageParts,
-} from '../../lib/agent-images.ts';
+} from '../../lib/agent-images/agent-images.ts';
 
 /**
  * Содержимое реплики в форме API: без картинок — прежняя строка байт в байт,

@@ -6,23 +6,21 @@ import type { InboxChat } from '@agentdeck/contracts/chat-inbox';
 import { Button, Empty, Loading, Muted } from '../../src/shared/ui';
 import { colors, font, space } from '../../src/shared/config/theme';
 import { useT } from '../../src/shared/config/i18n';
-import { isConfigured, useConnection } from '../../src/shared/api/connection';
-import { newChatId, openChat, useWorkspace } from '../../src/shared/lib/workspace';
+import { useConnection, isConfigured } from '../../src/shared/api/connection';
+import { useWorkspace, newChatId, openChat } from '../../src/shared/lib/workspace';
 import { usePullRefresh } from '../../src/shared/lib/pull-refresh';
-import {
-  pendingCount,
-  projectGroups,
-  stableChatKey,
-  questionCards,
-  staleSent,
-  type QuestionCardData,
-} from '../../src/entities/inbox/model';
-import { ActiveChats } from '../../src/features/inbox/ActiveChats';
-import { AskCard } from '../../src/features/inbox/AskCard';
+import { projectGroups } from '../../src/entities/inbox/model';
+import { ActiveChats } from '../../src/features/inbox/ActiveChats/ActiveChats';
+import { AskCard } from '../../src/features/inbox/AskCard/AskCard';
 import { localChatKey } from '../../src/features/inbox/chatKey';
-import { forgetSent, useSent } from '../../src/features/inbox/sent';
+import { useSent, forgetSent } from '../../src/features/inbox/sent';
 import { useInboxChats } from '../../src/features/inbox/useInboxChats';
 import { WatcherChip } from '../../src/features/watcher/WatcherChip';
+import { stableChatKey } from '../../src/entities/inbox/stableChatKey';
+import { pendingCount } from '../../src/entities/inbox/pendingCount';
+import { staleSent } from '../../src/entities/inbox/staleSent';
+import type { QuestionCardData } from '../../src/entities/inbox/questionCards';
+import { questionCards } from '../../src/entities/inbox/questionCards';
 
 type HomeTab = 'chats' | 'questions';
 

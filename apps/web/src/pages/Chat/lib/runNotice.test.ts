@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { backgroundRunNotice, openRunNotice } from './runNotice';
+import { backgroundRunNotice } from './runNotice';
+import { openRunNotice } from './openRunNotice';
 
 /**
  * Каким текстом звать человека (находка 77): у каждого повода свой, и вопрос

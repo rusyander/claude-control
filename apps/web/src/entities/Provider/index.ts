@@ -1,26 +1,23 @@
-export { useProviders, useProviderDetect } from './api/ProviderApi';
-export {
-  detectionBadge,
-  findDetection,
-  installedProviders,
-  recommendedProviderId,
-  activeCliHint,
-  type DetectionBadge,
-  type DetectionBadgeKind,
-  type TextKey,
-} from './model/detection';
-export {
-  activeProvider,
-  activeCapabilities,
-  isCapabilityReady,
-  navItemAccess,
-  gateNavSections,
-  visibleNavItems,
-  summarizeNavCapabilities,
-  type SectionAccess,
-  type ProviderCapabilities,
-  type GatedNavItem,
-  type GatedNavSection,
-  type CapabilitySummary,
-} from './model/gating';
+export { useProviders } from './api/ProviderApi';
+export { useProviderDetect } from './api/useProviderDetect';
+export { findDetection } from './model/detection';
+export { detectionBadge } from './model/detectionBadge';
+export type { DetectionBadge } from './model/detectionBadge';
+export type { DetectionBadgeKind } from './model/detectionBadge';
+export { activeCliHint } from './model/activeCliHint';
+export type { TextKey } from './model/activeCliHint';
+export { recommendedProviderId } from './model/recommendedProviderId';
+export { installedProviders } from './model/installedProviders';
+export { activeProvider } from './model/gating';
+export { summarizeNavCapabilities } from './model/summarizeNavCapabilities';
+export type { CapabilitySummary } from './model/summarizeNavCapabilities';
+export { gateNavSections } from './model/gateNavSections';
+export type { GatedNavSection } from './model/gateNavSections';
+export type { GatedNavItem } from './model/gating.types';
+export { visibleNavItems } from './model/visibleNavItems';
+export { navItemAccess } from './model/navItemAccess';
+export type { SectionAccess } from './model/gating.types';
+export { activeCapabilities } from './model/activeCapabilities';
+export type { ProviderCapabilities } from './model/gating.types';
+export { isCapabilityReady } from './model/isCapabilityReady';
 export { useIsCapabilityReady } from './model/useCapability';

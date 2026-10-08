@@ -1,18 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import type { PanelPendingAction } from '@agentdeck/contracts/panel-agent';
 import { splitRunFrames } from '../api/runStream';
-import { buildPageContext, contextProject, sectionLabelKey } from './pageContext';
-import {
-  contourKeyAnchor,
-  dlpRuleAnchor,
-  endpointTokenAnchor,
-  envSecretAnchor,
-  integrationSecretAnchor,
-  isSecretAnchor,
-  mcpSecretAnchor,
-  pageNavigation,
-} from './pageTarget';
-import { initialDecision, withPending, withoutPending } from './pending';
+import { sectionLabelKey } from './pageContext';
+import { contourKeyAnchor } from './pageTarget';
+import { withPending } from './pending';
+import { contextProject } from './contextProject';
+import { buildPageContext } from './buildPageContext';
+import { mcpSecretAnchor } from './mcpSecretAnchor';
+import { envSecretAnchor } from './envSecretAnchor';
+import { endpointTokenAnchor } from './endpointTokenAnchor';
+import { integrationSecretAnchor } from './integrationSecretAnchor';
+import { dlpRuleAnchor } from './dlpRuleAnchor';
+import { isSecretAnchor } from './isSecretAnchor';
+import { pageNavigation } from './pageNavigation';
+import { withoutPending } from './withoutPending';
+import { initialDecision } from './initialDecision';
 
 const pending = (id: string, summary = 's'): PanelPendingAction => ({
   id,

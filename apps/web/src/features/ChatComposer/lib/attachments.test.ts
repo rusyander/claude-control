@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { hasRejections, pastedNames, planAttach, MAX_FILE_BYTES } from './attachments';
+import { hasRejections, planAttach, MAX_FILE_BYTES } from './attachments';
+import { pastedNames } from './pastedNames';
 
 /**
  * Регрессия: файл крупнее предела отсеивался молча — ни чипа, ни сообщения.

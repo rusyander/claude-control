@@ -1,0 +1,21 @@
+// Вопрос дочернего разговора. Карточка та же, но отвечает человек ЗА ДРУГОЙ чат,
+// и это должно быть видно раньше, чем он ткнёт в вариант: отсюда подпись сверху
+// и приглушённая полоса слева — чужой вопрос не смешивается со своим.
+.childAsk {
+  margin-bottom: var(--spacing-xs);
+  padding-left: var(--spacing-sm);
+  border-left: 3px solid var(--color-border);
+}
+
+.childAskFrom {
+  display: block;
+  margin-bottom: var(--spacing-3xs);
+}
+
+// Полоса запросов детей над хабом: отделена от строк хаба снизу, чтобы
+// карточки не читались как часть строки группы.
+.childAsks {
+  margin-bottom: var(--spacing-sm);
+  padding-bottom: var(--spacing-xs);
+  border-bottom: 1px solid var(--color-border);
+}

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { appliesAlways, ruleFormat } from './ruleLabels';
+import { appliesAlways } from './appliesAlways';
+import { ruleFormat } from './ruleFormat';
 
 describe('ruleFormat', () => {
   it('расширение по формату: .mdc у Cursor, .md у Continue и Qwen', () => {

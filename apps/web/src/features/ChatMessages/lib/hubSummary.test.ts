@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ChildStageGroup } from '../ui/ChildStages.types';
-import { hubBucket, summarizeHub } from './hubSummary';
+import { hubBucket } from './hubBucket';
+import { summarizeHub } from './summarizeHub';
 
 function row(extra: Partial<ChildStageGroup>): ChildStageGroup {
   return { chatId: '', title: 'группа', stages: [], isRunning: false, ...extra };

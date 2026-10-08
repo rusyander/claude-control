@@ -1,0 +1,25 @@
+// Составная полоса: доли статусов подряд, без подписей внутри — подписи рядом
+// значками. Полоса без текста читается с двух метров, полоса с текстом внутри
+// не читается вовсе.
+.stack {
+  display: flex;
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--color-surface-sunken);
+}
+
+.stackPart {
+  display: block;
+  height: 100%;
+}
+
+.stackPassed {
+  background: var(--color-success);
+}
+
+// Сведённый провал: причина сверху, задетые кейсы — под ней.
+.failureRow {
+  padding: var(--spacing-2xs) 0;
+  border-top: 1px solid var(--color-border-subtle);
+}

@@ -114,3 +114,8 @@ export interface AssistTurn {
   role: 'user' | 'assistant';
   text: string;
 }
+
+export type Miss = Omit<AssistantMiss, 'field'>;
+
+/** Итог проверки одного поля; принятое может нести и частичный отказ (часть id). */
+export type Checked = { ok: true; value: unknown; miss?: Miss } | { ok: false; miss: Miss };

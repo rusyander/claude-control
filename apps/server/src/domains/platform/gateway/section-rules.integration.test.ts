@@ -5,11 +5,11 @@ import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { Platform, PlatformRulesApplies } from '@agentdeck/contracts';
-import { AppStore } from '../../../lib/app-store.ts';
-import { writePlatform, writeToken } from '../store.ts';
-import type { PlatformFetch } from '../ca-fetch.ts';
-import { PlatformGateway } from './listener.ts';
-import { splitPath } from './pipeline.ts';
+import { AppStore } from '../../../lib/app-store/app-store.ts';
+import { writePlatform, writeToken } from '../store/store.ts';
+import type { PlatformFetch } from '../ca-fetch/ca-fetch.ts';
+import { PlatformGateway } from './listener/listener.ts';
+import { splitPath } from './pipeline/pipeline.ts';
 
 /**
  * Баг 11 на настоящем слушателе: закрытый раздел отказывает В ШЛЮЗЕ, на каждом

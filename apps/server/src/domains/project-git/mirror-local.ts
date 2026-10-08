@@ -17,9 +17,9 @@ import type {
   WorktreeMirrorSettings,
   WorktreeMirrorSkipped,
 } from '@agentdeck/contracts';
-import { localizeText, serverText } from '../../lib/server-texts.ts';
-import { git } from './exec.ts';
-import { isPanelScaffold } from '../project-tests/e2e-folder.ts';
+import { localizeText, serverText } from '../../lib/server-texts/server-texts.ts';
+import { git } from './exec/exec.ts';
+import { isPanelScaffold } from '../project-tests/e2e-folder/e2e-folder.ts';
 import { PANEL_E2E_DIR } from '../project-tests/e2e-scaffold.ts';
 
 /**

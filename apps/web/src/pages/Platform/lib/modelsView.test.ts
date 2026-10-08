@@ -1,17 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { defaultOurRules } from '@agentdeck/contracts';
+import { defaultOurRules, defaultPlatformTransport } from '@agentdeck/contracts';
 import type { Platform, PlatformHealthRecord } from '@agentdeck/contracts';
-import {
-  cardModel,
-  catalogIds,
-  consumerModelRows,
-  mapRows,
-  missingFromCatalog,
-  withConsumerModel,
-  withMapRow,
-  withoutMapRow,
-} from './modelsView';
-import { defaultPlatformTransport } from '@agentdeck/contracts';
+import { consumerModelRows } from './modelsView';
+import { catalogIds } from './catalogIds';
+import { cardModel } from './cardModel';
+import { missingFromCatalog } from './missingFromCatalog';
+import { withMapRow } from './withMapRow';
+import { withoutMapRow } from './withoutMapRow';
+import { withConsumerModel } from './withConsumerModel';
+import { mapRows } from './mapRows';
 
 /**
  * Карточка модели контура (Т6): что человек видит и что вправе выбрать.

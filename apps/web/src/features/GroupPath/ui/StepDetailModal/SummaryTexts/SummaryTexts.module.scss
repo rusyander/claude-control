@@ -1,0 +1,7 @@
+/* Текст шага — как написан: переносы строк значимы. */
+.text {
+  display: block;
+  max-width: 72ch;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

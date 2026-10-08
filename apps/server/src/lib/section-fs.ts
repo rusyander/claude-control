@@ -3,8 +3,8 @@ import { join, relative, sep } from 'node:path';
 
 /**
  * Работа с КАТАЛОГОМ раздела чужого CLI — одна на все такие разделы: правила
- * Cursor/Continue (`domains/provider-rules.ts`), плагины OpenCode
- * (`domains/provider-plugins.ts`), скиллы (`domains/provider-skills.ts`).
+ * Cursor/Continue (`domains/provider-rules/provider-rules.ts`), плагины OpenCode
+ * (`domains/provider-plugins/provider-plugins.ts`), скиллы (`domains/provider-skills/provider-skills.ts`).
  *
  * Разделы разные, а обход каталога и защита путей у них обязаны быть
  * ОДИНАКОВЫМИ: разъехавшаяся копия защиты — это дыра, о которой никто не узнает.

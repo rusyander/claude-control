@@ -91,7 +91,8 @@ describe.skipIf(!LIVE_URL)('телефон решает карточку аге�
   it('без токена телефон не видит карточек; с токеном — отклоняет и одобряет', async () => {
     const { saveConnection } = await import('../../shared/api/connection');
     const { ApiError } = await import('../../shared/api/client');
-    const { decidePanelAction, fetchPanelAgentPending } = await import('./api');
+    const { decidePanelAction } = await import('./decidePanelAction');
+    const { fetchPanelAgentPending } = await import('./fetchPanelAgentPending');
 
     const startedAt = new Date().toISOString();
     await saveConnection(LIVE_URL, '');

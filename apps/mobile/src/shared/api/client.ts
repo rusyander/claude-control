@@ -1,7 +1,8 @@
-import { currentConnection } from './connection';
 import type { ServerMessageParams } from '@agentdeck/contracts/server-messages';
-import { dict } from '../config/i18n';
 import { serverMessage } from './server-message';
+import { authHeaders } from './authHeaders';
+import { currentConnection } from './connection';
+import { dict } from '../config/i18n';
 
 /**
  * Запросы к панели. Тонкий слой поверх fetch, а не axios: единственное, что
@@ -33,11 +34,6 @@ export function apiUrl(path: string, query?: Record<string, string | number | un
   }
   const tail = search.toString();
   return `${url}/api${path}${tail ? `?${tail}` : ''}`;
-}
-
-export function authHeaders(): Record<string, string> {
-  const { token } = currentConnection();
-  return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 const TIMEOUT_MS = 20_000;

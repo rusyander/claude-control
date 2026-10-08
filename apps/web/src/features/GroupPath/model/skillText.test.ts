@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { skillTextSteps, stepOfQuote } from './skillText';
+import { skillTextSteps } from './skillText';
+import { stepOfQuote } from './stepOfQuote';
 
 const SKILL = [
   'Intro line.',

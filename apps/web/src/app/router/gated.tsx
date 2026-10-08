@@ -1,7 +1,7 @@
 import type { Capability } from '@agentdeck/contracts';
 import type { RouteComponent } from '@tanstack/react-router';
 import type { ReactElement } from 'react';
-import { RouteGate } from './RouteGate';
+import { RouteGate } from './RouteGate/RouteGate';
 
 /**
  * Обернуть страницу гейтом возможности провайдера: у активного провайдера раздел

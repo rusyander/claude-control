@@ -10,8 +10,8 @@ import {
   updateGroupSources,
   type GroupSourcesState,
 } from '../../lib/app-store/group-sources.ts';
-import type { AppStore } from '../../lib/app-store.ts';
-import { readTextFile } from '../../lib/safe-io.ts';
+import type { AppStore } from '../../lib/app-store/app-store.ts';
+import { readTextFile } from '../../lib/safe-io/safe-io.ts';
 import { GroupRequestError } from '../groups/errors.ts';
 import { usedInOf } from '../groups/views.ts';
 import { readDiscoveryCache } from './run.ts';

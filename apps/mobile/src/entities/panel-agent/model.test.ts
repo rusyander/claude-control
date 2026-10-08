@@ -1,14 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { PanelPendingAction } from '@agentdeck/contracts/panel-agent';
-import {
-  appendDictation,
-  canApprove,
-  cardFields,
-  decisionProblem,
-  isDanger,
-  isFinalRefusal,
-  phoneContext,
-} from './model';
+import { phoneContext } from './model';
+import { isFinalRefusal } from './isFinalRefusal';
+import { isDanger } from './isDanger';
+import { canApprove } from './canApprove';
+import { appendDictation } from './appendDictation';
+import { decisionProblem } from './decisionProblem';
+import { cardFields } from './cardFields';
 
 const texts = {
   truncated: 'truncated',

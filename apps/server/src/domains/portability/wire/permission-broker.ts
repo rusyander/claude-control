@@ -1,6 +1,6 @@
 import type { PermissionDecision, PermissionItem } from '@agentdeck/contracts/portable-env';
-import { serverText } from '../../../lib/server-texts.ts';
-import { isModeRule, parsePermissionRule } from '../permissions-map.ts';
+import { serverText } from '../../../lib/server-texts/server-texts.ts';
+import { isModeRule, parsePermissionRule } from '../permissions-map/permissions-map.ts';
 import type { GatewayToolCall, ToolGate } from './tool-gate.ts';
 
 /**

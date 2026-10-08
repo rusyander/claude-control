@@ -1,0 +1,100 @@
+// Узкое место (1100px с боковой панелью, окно тестов в чате): у второстепенных
+// кнопок пульта и группы остаётся только значок, подпись уходит в доступное имя
+// и во всплывающую подсказку. Иначе пульт ложился в 4–6 строк и уводил таблицу
+// за низ экрана. Меряется ширина самого блока, а не окна: в окне чата он узкий
+// при любом экране.
+.narrowable {
+  container-type: inline-size;
+}
+
+@container (max-width: 1000px) {
+  .narrowLabel {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+.tabs {
+  flex: none;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.library {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  flex: 1;
+  min-height: 0;
+}
+
+// Ниже этой высоты колонки библиотеки не сжимаются, прокручивается страница.
+$library-floor: 320px;
+
+// Дерево и таблица — две колонки одной высоты, каждая со своей прокруткой.
+// Общая прокрутка увела бы дерево вверх ровно тогда, когда по нему выбирают.
+.libraryBody {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: var(--spacing-sm);
+  flex: 1;
+  min-height: 0;
+}
+
+.tree {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  overflow: auto;
+
+  // Групп бывает два десятка: список групп берёт не больше половины колонки и
+  // прокручивается сам, иначе дерево секций уезжало под него за низ экрана.
+  > nav:first-child {
+    flex: none;
+    max-height: 50%;
+    overflow: auto;
+    scrollbar-width: thin;
+  }
+
+  scrollbar-width: thin;
+  // Тот же пол, что у таблицы: колонки стоят в одной строке сетки, и ниже него
+  // страница прокручивается целиком для обеих. Дерево и так не бывало ниже
+  // таблицы — пол назван, чтобы запасной режим низкого окна был объявлен у
+  // каждой прокрутки, а не только у одной.
+  min-height: $library-floor;
+  padding-right: var(--spacing-3xs);
+}
+
+.tableArea {
+  overflow: auto;
+  scrollbar-width: thin;
+  // Своя прокрутка — пока есть куда: на экране в 950px пульт, фильтры и панель
+  // выделения съедают всю высоту, и с `min-height: 0` таблица схлопывалась в
+  // ноль — выбрал кейс, и список исчез. Ниже этой высоты страница прокручивается
+  // целиком, а таблица остаётся видимой.
+  min-height: $library-floor;
+}
+
+@media (max-width: 900px) {
+  // На узком экране дерево уезжает наверх: две колонки по 220px не оставляют
+  // таблице ширины, а таблица здесь — главное.
+  .libraryBody {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .tree {
+    min-height: 0;
+    max-height: 180px;
+  }
+}
+
+// Имя открытой группы в её шапке: сжимается первым, чтобы кнопки действий над
+// группой оставались в одной строке с ним, а не уезжали на вторую.
+.groupHead {
+  flex: 1 1 200px;
+  min-width: 0;
+}

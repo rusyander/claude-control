@@ -1,4 +1,4 @@
-import { readJsonFile } from '../lib/safe-io.ts';
+import { readJsonFile } from '../lib/safe-io/safe-io.ts';
 
 /**
  * Кто владелец подписки. Данные лежат в ~/.claude.json — их кладёт туда сам

@@ -59,9 +59,9 @@ function pairWith(corpus: string): PairEntry {
     runner: 'sieves',
     corpus: pathToFileURL(corpus).href,
     panel: {
-      module: 'apps/server/src/domains/project-git/sieve-facts.ts',
-      files: ['apps/server/src/domains/project-git/sieve-scan.ts'],
-      tests: ['apps/server/src/domains/project-git/sieve-scan.test.ts'],
+      module: 'apps/server/src/domains/project-git/sieve-facts/sieve-facts.ts',
+      files: ['apps/server/src/domains/project-git/sieve-scan/sieve-scan.ts'],
+      tests: ['apps/server/src/domains/project-git/sieve-scan/sieve-scan.test.ts'],
     },
     global: { module: GLOBAL_MODULE, files: [GLOBAL_MODULE], tests: ['hooks/tests/fake.test.mjs'] },
   };

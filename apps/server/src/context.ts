@@ -1,18 +1,18 @@
 import { existsSync, mkdirSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
 import type { AppSettings, ClaudeLocation } from '@agentdeck/contracts';
-import { detectClaudeLocation } from './lib/claude-paths.ts';
+import { detectClaudeLocation } from './lib/claude-paths/claude-paths.ts';
 import {
   setBackupKeep,
   setEncryptSecretBackups,
   setSecretPassphrase,
   setSecretsBasename,
-} from './lib/safe-io.ts';
-import { AppStore } from './lib/app-store.ts';
+} from './lib/safe-io/safe-io.ts';
+import { AppStore } from './lib/app-store/app-store.ts';
 import { stateFilePath } from './lib/app-store/state-file.ts';
 import { PricingStore } from './domains/analytics/pricing-source.ts';
 import { ModelCatalogStore } from './domains/models/model-store.ts';
-import { FormatCheckStore } from './domains/format-check.ts';
+import { FormatCheckStore } from './domains/format-check/format-check.ts';
 import { WorktreeBootstraps } from './domains/project-git/bootstrap.ts';
 import { revertLockfileChurn } from './domains/project-git/lockfiles.ts';
 

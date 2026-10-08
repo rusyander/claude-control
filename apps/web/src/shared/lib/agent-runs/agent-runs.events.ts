@@ -1,10 +1,12 @@
 import type { MessageUsage } from '@agentdeck/contracts';
-import { persistQueue } from './agent-runs.queue-store';
-import { callbacks, emit, pendingUsage, runs } from './agent-runs.state';
+import { callbacks, pendingUsage } from './agent-runs.state';
 import { rebuildStatuses } from './agent-runs.statuses';
 import type { AgentRun, ChatEvent, HandoffEvent } from './agent-runs.types';
 import { addUsage } from './agent-runs.usage';
 import { isOpenAsk } from '@shared/lib/chat-stream';
+import { persistQueue } from './persistQueue';
+import { emit } from './emit';
+import { runs } from './agent-runs.state.constants';
 
 /**
  * Применить одно событие потока к прогону. Обновления иммутабельны (новый объект

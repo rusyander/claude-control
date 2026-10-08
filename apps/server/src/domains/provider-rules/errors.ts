@@ -1,4 +1,4 @@
-import type { MdcFormatError } from '../../lib/cursor-mdc.ts';
+import type { MdcFormatError } from '../../lib/cursor-mdc/cursor-mdc.ts';
 
 /** Путь правила выходит за пределы каталога правил — операция запрещена. */
 export class UnsafeRulePathError extends Error {

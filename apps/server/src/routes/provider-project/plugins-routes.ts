@@ -9,7 +9,7 @@ import {
   parseProviderPluginPackagesDraft,
   saveProviderPluginPackages,
   describePluginError,
-} from '../../domains/provider-plugins.ts';
+} from '../../domains/provider-plugins/provider-plugins.ts';
 import { UnrecognizedFormatError } from '../../lib/format-errors.ts';
 import { done } from '../write-result.ts';
 import { guardedBy, requireTarget } from './target.ts';

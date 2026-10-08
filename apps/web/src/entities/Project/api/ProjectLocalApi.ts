@@ -24,16 +24,3 @@ export function useProjectLocal(projectId: string) {
     enabled: Boolean(projectId),
   });
 }
-
-export function useProjectLocalByPath(path: string) {
-  return useQuery({
-    queryKey: queryKeys.projectLocalByPath(path),
-    queryFn: async () => {
-      const { data } = await apiClient.get<ProjectLocalConfig>('/projects/local', {
-        params: { path },
-      });
-      return data;
-    },
-    enabled: Boolean(path),
-  });
-}

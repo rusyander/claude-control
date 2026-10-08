@@ -1,6 +1,6 @@
 import type { ProviderHookRulesDraft } from '@agentdeck/contracts';
-import { readTextFile, writeTextFile } from '../../lib/safe-io.ts';
-import { UnrecognizedFormatError } from '../../lib/codex-toml.ts';
+import { readTextFile, writeTextFile } from '../../lib/safe-io/safe-io.ts';
+import { UnrecognizedFormatError } from '../../lib/codex-toml/codex-toml.ts';
 import { parseProviderJsonObject, stableJson } from '../../lib/provider-json.ts';
 import {
   QWEN_HOOK_EVENTS,
@@ -9,7 +9,7 @@ import {
   QWEN_TIMEOUT_MIN,
   applyQwenHooks,
   readQwenHooks,
-} from '../../lib/qwen-hook.ts';
+} from '../../lib/qwen-hook/qwen-hook.ts';
 import {
   CODEX_HOOK_EVENTS,
   CODEX_TIMEOUT_DEFAULT,
@@ -17,14 +17,14 @@ import {
   CODEX_TIMEOUT_MIN,
   applyCodexHooks,
   readCodexHooks,
-} from '../../lib/codex-hook.ts';
+} from '../../lib/codex-hook/codex-hook.ts';
 import {
   KIMI_HOOK_EVENTS,
   KIMI_TIMEOUT_DEFAULT,
   KIMI_TIMEOUT_MAX,
   KIMI_TIMEOUT_MIN,
   writeKimiHooks,
-} from '../../lib/kimi-hook.ts';
+} from '../../lib/kimi-hook/kimi-hook.ts';
 import { WriteDisabledError, backupNameOf } from './target.ts';
 import type {
   ProviderHooksFormat,

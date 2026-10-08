@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { PlatformSummarizedReport } from '@agentdeck/contracts';
-import { isSummarizedReport, showsSummarized, summarizedLinkOf } from './summarizedView';
+import { isSummarizedReport } from './summarizedView';
+import { showsSummarized } from './showsSummarized';
+import { summarizedLinkOf } from './summarizedLinkOf';
 
 const report: PlatformSummarizedReport = {
   total: 1,

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { ProjectTestSchema, ProjectTestsView } from '@agentdeck/contracts';
 import type { InjectRoute } from './registry.ts';
-import { maskDeep, readRoute } from './action-kit.ts';
+import { maskDeep, readRoute } from './action-kit/action-kit.ts';
 import { testsQuery } from './tests-page.ts';
 
 /**
@@ -19,7 +19,7 @@ export const idOf = (what: string) => z.string().trim().min(1).describe(what);
  * проверки модель писала бы планы и запускала команду `automation.json` в папке,
  * которой человек панели не давал. Сама проверка — `registered-folder.ts`.
  */
-export { assertRegistered, registeredOnly } from './registered-folder.ts';
+export { assertRegistered, registeredOnly } from './registered-folder/registered-folder.ts';
 
 /** Вид раздела тестов — источник карточек: план, окружение, шаг, фильтр, прогон. */
 export const viewOf = (inject: InjectRoute, path: string): Promise<ProjectTestsView> =>

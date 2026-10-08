@@ -1,9 +1,9 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Marketplace, Plugin, PluginsState } from '@agentdeck/contracts';
-import { defaultCliCommand } from '../../providers/cli.ts';
+import { defaultCliCommand } from '../../providers/cli/cli.ts';
 import { runClaude } from './cli.ts';
-import { serverText } from '../../lib/server-texts.ts';
+import { serverText } from '../../lib/server-texts/server-texts.ts';
 
 /**
  * Чтение каталога плагинов: что установлено, что доступно и какие маркетплейсы

@@ -5,14 +5,14 @@ import {
   lazyRouteComponent,
 } from '@tanstack/react-router';
 import { MainLayout } from '@app/layouts/MainLayout/MainLayout';
-import { OverviewPage } from '@pages/Overview/OverviewPage';
-import { ChatSection } from '@pages/Chat/ChatSection';
-import { SkeletonList } from '@shared/ui/skeleton';
+import { OverviewPage } from '@pages/Overview/OverviewPage/OverviewPage';
+import { ChatSection } from '@pages/Chat/ChatSection/ChatSection';
 import { i18n, loadHelp, toLanguage } from '@shared/config/i18n';
 import { gated } from './gated';
 import { validateSearch } from './validateSearch';
-import { NotFoundPage } from './NotFoundPage';
-import { RouteErrorPage } from './RouteErrorPage';
+import { NotFoundPage } from './NotFoundPage/NotFoundPage';
+import { RouteErrorPage } from './RouteErrorPage/RouteErrorPage';
+import { RoutePending } from './RoutePending/RoutePending';
 
 /*
  * Обзор и чат — в главном чанке: с них панель открывается. Остальные разделы
@@ -21,70 +21,83 @@ import { RouteErrorPage } from './RouteErrorPage';
  * целиком ради любого раздела — с телефона по Tailscale это секунды.
  */
 const SearchPage = lazyRouteComponent(() => import('@pages/Search/SearchPage'), 'SearchPage');
-const GroupsPage = lazyRouteComponent(() => import('@pages/Groups/GroupsPage'), 'GroupsPage');
-const HistoryPage = lazyRouteComponent(() => import('@pages/History/HistoryPage'), 'HistoryPage');
+const GroupsPage = lazyRouteComponent(
+  () => import('@pages/Groups/GroupsPage/GroupsPage'),
+  'GroupsPage',
+);
+const HistoryPage = lazyRouteComponent(
+  () => import('@pages/History/HistoryPage/HistoryPage'),
+  'HistoryPage',
+);
 const SettingsPage = lazyRouteComponent(
-  () => import('@pages/Settings/SettingsPage'),
+  () => import('@pages/Settings/SettingsPage/SettingsPage'),
   'SettingsPage',
 );
-const DlpPage = lazyRouteComponent(() => import('@pages/Dlp/DlpPage'), 'DlpPage');
+const DlpPage = lazyRouteComponent(() => import('@pages/Dlp/DlpPage/DlpPage'), 'DlpPage');
 const PlatformPage = lazyRouteComponent(
-  () => import('@pages/Platform/PlatformPage'),
+  () => import('@pages/Platform/PlatformPage/PlatformPage'),
   'PlatformPage',
 );
-const KitPage = lazyRouteComponent(() => import('@pages/Kit/KitPage'), 'KitPage');
+const KitPage = lazyRouteComponent(() => import('@pages/Kit/KitPage/KitPage'), 'KitPage');
 const LocalModelsPage = lazyRouteComponent(
-  () => import('@pages/LocalModels/LocalModelsPage'),
+  () => import('@pages/LocalModels/LocalModelsPage/LocalModelsPage'),
   'LocalModelsPage',
 );
 const ProviderComparePage = lazyRouteComponent(
-  () => import('@pages/ProviderCompare/ProviderComparePage'),
+  () => import('@pages/ProviderCompare/ProviderComparePage/ProviderComparePage'),
   'ProviderComparePage',
 );
 const PortabilityPage = lazyRouteComponent(
-  () => import('@pages/Portability/PortabilityPage'),
+  () => import('@pages/Portability/PortabilityPage/PortabilityPage'),
   'PortabilityPage',
 );
-const HelpPage = lazyRouteComponent(() => import('@pages/Help/HelpPage'), 'HelpPage');
+const HelpPage = lazyRouteComponent(() => import('@pages/Help/HelpPage/HelpPage'), 'HelpPage');
 const AnalyticsPage = lazyRouteComponent(
-  () => import('@pages/Analytics/AnalyticsPage'),
+  () => import('@pages/Analytics/AnalyticsPage/AnalyticsPage'),
   'AnalyticsPage',
 );
-const RulesSection = lazyRouteComponent(() => import('@pages/Rules/RulesSection'), 'RulesSection');
+const RulesSection = lazyRouteComponent(
+  () => import('@pages/Rules/RulesSection/RulesSection'),
+  'RulesSection',
+);
 const InstructionsSection = lazyRouteComponent(
-  () => import('@pages/ClaudeMd/InstructionsSection'),
+  () => import('@pages/ClaudeMd/InstructionsSection/InstructionsSection'),
   'InstructionsSection',
 );
-const HooksSection = lazyRouteComponent(() => import('@pages/Hooks/HooksSection'), 'HooksSection');
+const HooksSection = lazyRouteComponent(
+  () => import('@pages/Hooks/HooksSection/HooksSection'),
+  'HooksSection',
+);
 const SkillsSection = lazyRouteComponent(
-  () => import('@pages/Skills/SkillsSection'),
+  () => import('@pages/Skills/SkillsSection/SkillsSection'),
   'SkillsSection',
 );
 const CommandsPage = lazyRouteComponent(
-  () => import('@pages/Commands/CommandsPage'),
+  () => import('@pages/Commands/CommandsPage/CommandsPage'),
   'CommandsPage',
 );
 const ScriptsPage = lazyRouteComponent(() => import('@pages/Scripts/ScriptsPage'), 'ScriptsPage');
 const PluginsSection = lazyRouteComponent(
-  () => import('@pages/Plugins/PluginsSection'),
+  () => import('@pages/Plugins/PluginsSection/PluginsSection'),
   'PluginsSection',
 );
-const McpSection = lazyRouteComponent(() => import('@pages/Mcp/McpSection'), 'McpSection');
+const McpSection = lazyRouteComponent(
+  () => import('@pages/Mcp/McpSection/McpSection'),
+  'McpSection',
+);
 const PermissionsSection = lazyRouteComponent(
-  () => import('@pages/Permissions/PermissionsSection'),
+  () => import('@pages/Permissions/PermissionsSection/PermissionsSection'),
   'PermissionsSection',
 );
-const EnvSection = lazyRouteComponent(() => import('@pages/Env/EnvSection'), 'EnvSection');
+const EnvSection = lazyRouteComponent(
+  () => import('@pages/Env/EnvSection/EnvSection'),
+  'EnvSection',
+);
 const ProjectsPage = lazyRouteComponent(
-  () => import('@pages/Projects/ProjectsPage'),
+  () => import('@pages/Projects/ProjectsPage/ProjectsPage'),
   'ProjectsPage',
 );
-const TestsPage = lazyRouteComponent(() => import('@pages/Tests/TestsPage'), 'TestsPage');
-
-/** Чанк раздела едет дольше секунды — скелет вместо застывшей предыдущей страницы. */
-function RoutePending() {
-  return <SkeletonList rows={4} withActions={false} />;
-}
+const TestsPage = lazyRouteComponent(() => import('@pages/Tests/TestsPage/TestsPage'), 'TestsPage');
 
 // Свои «не найдено» и «упало» внутри макета: дефолты роутера — голые английские
 // «Not Found» и «Something went wrong!» на месте всей панели, без навигации.

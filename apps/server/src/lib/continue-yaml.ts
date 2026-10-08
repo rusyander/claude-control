@@ -1,5 +1,5 @@
 import { isMap, isSeq, isScalar, type Document } from 'yaml';
-import { UnrecognizedFormatError } from './codex-toml.ts';
+import { UnrecognizedFormatError } from './codex-toml/codex-toml.ts';
 import { deleteYamlKey, otherYamlKeysProjection, parseYamlMapDocument } from './yaml-doc.ts';
 
 /**

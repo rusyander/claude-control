@@ -93,7 +93,7 @@ const seed = spawnSync(
     '--experimental-strip-types',
     '--input-type=module',
     '-e',
-    `const m = await import(${JSON.stringify(pathToFileURL(join(ROOT, 'apps/server/src/lib/provider-keys.ts')).href)});
+    `const m = await import(${JSON.stringify(pathToFileURL(join(ROOT, 'apps/server/src/lib/provider-keys/provider-keys.ts')).href)});
      m.setStoredKey(process.argv[1], 'int:atlassian', process.argv[2]);`,
     OLD_APPDATA,
     storedValue,

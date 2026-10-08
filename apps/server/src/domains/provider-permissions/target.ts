@@ -1,8 +1,8 @@
 import { existsSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { getActiveProvider } from '../../providers/registry.ts';
-import { providerBackupName } from '../../lib/safe-io.ts';
-import type { ConfigProvider } from '../../providers/types.ts';
+import { providerBackupName } from '../../lib/safe-io/safe-io.ts';
+import type { ConfigProvider } from '../../providers/types/types.ts';
 import type { ProviderPermissionsSettingsSource, ProviderPermissionsTarget } from './types.ts';
 
 /** Имя копии для этой цели: своё, если задано, иначе стандартное `<id>-<basename>`. */

@@ -1,11 +1,11 @@
 import type { FastifyInstance } from 'fastify';
 import type { ServerContext } from '../context.ts';
-import { checkProjectDir } from '../domains/projects.ts';
-import { readProjectLocalConfig } from '../domains/project-local.ts';
+import { checkProjectDir } from '../domains/projects/projects.ts';
+import { readProjectLocalConfig } from '../domains/project-local/project-local.ts';
 import { requireClaudeProvider, requireProject } from './project-access.ts';
 
 /**
- * Собственный `.claude` проекта — только чтение (см. `domains/project-local.ts`).
+ * Собственный `.claude` проекта — только чтение (см. `domains/project-local/project-local.ts`).
  *
  * Два входа с одинаковым ответом: по id из реестра и по абсолютному пути.
  * Второй нужен группам, привязанным к каталогам проектов, — такой каталог в

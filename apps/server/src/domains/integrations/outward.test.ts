@@ -3,8 +3,8 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { ClaudePaths } from '@agentdeck/contracts';
-import { AppStore } from '../../lib/app-store.ts';
-import { createZip } from '../../lib/zip.ts';
+import { AppStore } from '../../lib/app-store/app-store.ts';
+import { createZip } from '../../lib/zip/zip.ts';
 import { compose, createTelegramNotifier, sendTelegramMessage } from '../notify/telegram.ts';
 import { fetchCiReport } from './ci.ts';
 import {
@@ -26,7 +26,7 @@ import {
   isAtlassianMcpRegistered,
   registerAtlassianMcp,
   unregisterAtlassianMcp,
-} from './mcp-server.ts';
+} from './mcp-server/mcp-server.ts';
 import { writeLink } from './links.ts';
 import { tmsClient } from './tms/index.ts';
 import { externalKeys, keyFromTags, keyLookup, sourceTag } from './tms/types.ts';

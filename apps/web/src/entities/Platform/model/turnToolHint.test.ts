@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { ChatMessage } from '@agentdeck/contracts';
-import { lastTurnFacts, turnToolHint } from './turnToolHint';
+import { turnToolHint } from './turnToolHint';
+import { lastTurnFacts } from './lastTurnFacts';
 
 const say = (role: ChatMessage['role'], blocks: ChatMessage['blocks']) => ({ role, blocks });
 const CALL = '{"name":"Write","arguments":{"file_path":"a.txt"}}';

@@ -1,2 +1,2 @@
-export { SandboxModal } from './ui/SandboxModal';
-export { SandboxButton } from './ui/SandboxButton';
+export { SandboxModal } from './ui/SandboxModal/SandboxModal';
+export { SandboxButton } from './ui/SandboxButton/SandboxButton';

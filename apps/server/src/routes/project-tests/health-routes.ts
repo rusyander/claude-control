@@ -7,10 +7,13 @@ import {
   readGroups,
   readRuns,
   suggestTaxonomy,
-} from '../../domains/project-tests.ts';
-import { linkedRequirements, requirementUpdates } from '../../domains/project-tests/coverage.ts';
-import { guard, guardAsync, requireRoot, type TestsDeps } from './shared.ts';
-import { attachTextCodes } from '../../lib/server-texts.ts';
+} from '../../domains/project-tests/project-tests.ts';
+import {
+  linkedRequirements,
+  requirementUpdates,
+} from '../../domains/project-tests/coverage-matrix/coverage-matrix.ts';
+import { guard, guardAsync, requireRoot, type TestsDeps } from './shared/shared.ts';
+import { attachTextCodes } from '../../lib/server-texts/server-texts.ts';
 
 /**
  * Здоровье набора: замечания линтера, дубликаты, таксономия и карантин.

@@ -2,8 +2,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ProjectFileContent } from '@agentdeck/contracts';
 import { useProjectChanges, useProjectFile, useSaveProjectFile } from '@entities/ProjectFile';
 import { useProjectGit } from '@entities/ProjectGit';
-import { changedRows, firstOpenable, type ChangedRow } from '../lib/changedRows';
+import { changedRows } from '../lib/changedRows';
 import { useCodeView } from './useCodeView';
+import type { ChangedRow } from '../lib/changedRows.types';
+import { firstOpenable } from '../lib/firstOpenable';
 
 /**
  * Состояние окна кода: какой файл открыт, что в нём набрано и показывать ли

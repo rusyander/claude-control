@@ -1,0 +1,12 @@
+.output {
+  margin-top: var(--spacing-2xs);
+  padding: var(--spacing-2xs);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-sunken);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 160px;
+  overflow-y: auto;
+}

@@ -1,10 +1,10 @@
-import type { AppStore } from '../../lib/app-store.ts';
+import type { AppStore } from '../../lib/app-store/app-store.ts';
 import {
   localizeText,
   serverText,
   type ServerTextCode,
   type TextParams,
-} from '../../lib/server-texts.ts';
+} from '../../lib/server-texts/server-texts.ts';
 import { claudeProvider } from '../../providers/claude.ts';
 import { getActiveProvider } from '../../providers/registry.ts';
 import { contourUnreachable, resolvePanelAgentLaunch } from '../panel-agent/launch.ts';

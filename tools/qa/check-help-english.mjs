@@ -3,7 +3,7 @@
  * текста — каждый документ целиком на английском, строк вида `help.xxx` нет.
  *
  * Кейс просит пять любых тем — здесь берутся ВСЕ темы реестра
- * `pages/Help/model/topics.ts`: новая тема попадает в проверку сама. Язык —
+ * `pages/Help/model/topics.constants.ts`: новая тема попадает в проверку сама. Язык —
  * настоящая настройка панели (`language: 'en'` в state.json стенда до старта).
  * Русский ищется по кириллице в видимом тексте документа: `tsc` сверяет
  * полноту `en` с `ru` по ключам, но не видит русскую строку, вписанную прямо в
@@ -16,7 +16,10 @@ import { join } from 'node:path';
 import { chromium } from 'playwright';
 import { REPO, runOnStand, wait } from './throwaway-stand.mjs';
 
-const registry = readFileSync(join(REPO, 'apps/web/src/pages/Help/model/topics.ts'), 'utf8');
+const registry = readFileSync(
+  join(REPO, 'apps/web/src/pages/Help/model/topics.constants.ts'),
+  'utf8',
+);
 const TOPICS = [...new Set([...registry.matchAll(/\bid:\s*'([^']+)'/g)].map((match) => match[1]))];
 const CYRILLIC = /[А-Яа-яЁё]+(?:[\s,.:;«»-]+[А-Яа-яЁё]+)*/g;
 /**

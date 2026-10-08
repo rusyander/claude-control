@@ -10,7 +10,11 @@ vi.mock('@tanstack/react-query', () => ({
   useQueryClient: () => client,
 }));
 
-const api = await import('./ProjectTestDraftApi');
+const api = {
+  ...(await import('./useRollbackTestDraft')),
+  ...(await import('./useRejectTestDraft')),
+  ...(await import('./useApplyTestDraft')),
+};
 
 type Options = { onSuccess: (data: unknown) => void };
 const draft = { runId: 'r1', status: 'rolledBack', items: [] };

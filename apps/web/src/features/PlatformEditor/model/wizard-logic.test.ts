@@ -4,26 +4,23 @@ import {
   PLATFORM_ASSISTANT_CONSUMER,
   PLATFORM_ASSISTANT_TARGET,
   PLATFORM_TERMINAL_CONSUMER,
+  defaultPlatformTransport,
 } from '@agentdeck/contracts';
 import type { Platform, PlatformProbeResult, PlatformStatus } from '@agentdeck/contracts';
-import {
-  WIZARD_STEPS,
-  appliedFileTargets,
-  budgetFromText,
-  consumerFileWins,
-  finishCloses,
-  confirmedCapabilities,
-  draftWithPatch,
-  finishPlan,
-  initialTargets,
-  manifestWithField,
-  needsGatewayEnable,
-  savePayload,
-  stepAfter,
-  stepBefore,
-  toggled,
-} from './wizard-logic';
-import { defaultPlatformTransport } from '@agentdeck/contracts';
+import { finishPlan, stepAfter } from './wizard-logic';
+import { draftWithPatch } from './draftWithPatch';
+import { manifestWithField } from './manifestWithField';
+import { confirmedCapabilities } from './confirmedCapabilities';
+import { initialTargets } from './initialTargets';
+import { needsGatewayEnable } from './needsGatewayEnable';
+import { toggled } from './toggled';
+import { savePayload } from './savePayload';
+import { budgetFromText } from './budgetFromText';
+import { finishCloses } from './finishCloses';
+import { consumerFileWins } from './consumerFileWins';
+import { appliedFileTargets } from './appliedFileTargets';
+import { WIZARD_STEPS } from './wizard-logic.constants';
+import { stepBefore } from './stepBefore';
 
 /**
  * Решения мастера подключения.

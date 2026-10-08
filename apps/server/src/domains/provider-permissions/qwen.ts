@@ -1,6 +1,6 @@
 import type { QwenApprovalMode, QwenPermissionDraft } from '@agentdeck/contracts';
-import { readTextFile, writeTextFile } from '../../lib/safe-io.ts';
-import { UnrecognizedFormatError } from '../../lib/codex-toml.ts';
+import { readTextFile, writeTextFile } from '../../lib/safe-io/safe-io.ts';
+import { UnrecognizedFormatError } from '../../lib/codex-toml/codex-toml.ts';
 import { parseProviderJsonObject, stableJson } from '../../lib/provider-json.ts';
 import { DEFAULT_QWEN_APPROVAL, QWEN_APPROVAL_MODES } from './constants.ts';
 import {

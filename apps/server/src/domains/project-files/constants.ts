@@ -56,7 +56,7 @@ export const MAX_MEDIA_BYTES = 25 * 1024 * 1024;
 /**
  * Порог построчного сравнения. Выше него дифф не строится вовсе: LCS квадратичен
  * по числу строк — ровно та же граница и по той же причине, что в предпросмотре
- * записи (`domains/provider-preview.ts`).
+ * записи (`domains/provider-preview/provider-preview.ts`).
  */
 export const MAX_DIFF_CHARS = 400_000;
 

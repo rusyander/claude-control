@@ -8,23 +8,23 @@ import {
   readProviderMcpServers,
   upsertProviderMcpServer,
   type ProviderMcpTarget,
-} from './provider-mcp.ts';
+} from './provider-mcp/provider-mcp.ts';
 import {
   readProviderEnvVars,
   saveProviderEnvVars,
   type ProviderEnvTarget,
-} from './provider-env.ts';
+} from './provider-env/provider-env.ts';
 import {
   readProviderPermissions,
   saveProviderPermissions,
   type ProviderPermissionsTarget,
-} from './provider-permissions.ts';
+} from './provider-permissions/provider-permissions.ts';
 import {
   readInstructionsInfo,
   writeInstructions,
   type InstructionsTarget,
-} from './instructions.ts';
-import { stripBom } from '../lib/text-form.ts';
+} from './instructions/instructions.ts';
+import { stripBom } from '../lib/text-form/text-form.ts';
 
 /**
  * Ф9/Ф10 — ФОРМА ЧУЖОГО ФАЙЛА: переводы строк и BOM.

@@ -1,0 +1,35 @@
+// Помощник структуры: собирает или дополняет всё дерево по описанию задачи.
+.assistant {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2xs);
+  margin-top: var(--spacing-sm);
+  padding: var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-accent-subtle);
+}
+
+.assistantInput {
+  width: 100%;
+  padding: var(--spacing-2xs) var(--spacing-xs);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-fg);
+  font: inherit;
+  font-size: var(--font-size-body-sm);
+  line-height: 1.5;
+  resize: vertical;
+
+  &:focus-within,
+  &:focus {
+    outline: none;
+    border-color: var(--color-accent);
+  }
+}
+
+.assistantReply {
+  padding-top: var(--spacing-2xs);
+  border-top: 1px solid var(--color-border);
+}

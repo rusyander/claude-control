@@ -1,0 +1,6 @@
+// Пути длинные, но переносить их нельзя — иначе не скопируешь целиком.
+.path {
+  overflow-wrap: anywhere;
+  font-size: var(--font-size-body-sm);
+  color: var(--color-fg-muted);
+}

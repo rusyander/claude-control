@@ -5,9 +5,9 @@ import type {
   ProviderChecksResponse,
 } from '@agentdeck/contracts';
 import type { ServerContext } from '../context.ts';
-import { checkProvider } from '../domains/provider-check.ts';
+import { checkProvider } from '../domains/provider-check/provider-check.ts';
 import { getProvider, isKnownProviderId } from '../providers/registry.ts';
-import { attachTextCodes } from '../lib/server-texts.ts';
+import { attachTextCodes } from '../lib/server-texts/server-texts.ts';
 
 /**
  * Проверка провайдера на реальной машине (IDEA-2) и её сохранённые итоги.
@@ -15,7 +15,7 @@ import { attachTextCodes } from '../lib/server-texts.ts';
  * `GET /api/providers/checks` — что проверено раньше (бейджи рисуются по нему,
  * без запуска чего-либо). `POST /api/providers/:id/check` — прогнать проверку
  * сейчас; настоящие файлы пользователя при этом не пишутся (круг записи идёт на
- * временной копии, см. `domains/provider-check.ts`).
+ * временной копии, см. `domains/provider-check/provider-check.ts`).
  *
  * Незнакомый id — 404, а НЕ молчаливый откат на claude: реестр таким откатом
  * защищает работу панели, но здесь он означал бы «проверили не то, что просили»

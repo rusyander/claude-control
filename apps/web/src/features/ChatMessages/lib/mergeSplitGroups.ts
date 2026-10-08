@@ -4,33 +4,7 @@ import type { GroupControlAction } from '../ui/GroupControl.types';
 import { acceptanceOf } from './groupAcceptance';
 import { recheckOf } from './groupRecheck';
 import { mergeOrderOf } from './mergeOrder';
-
-/**
- * Ключ строки хаба для звена группы. Номер группы из связи — первым (Д12):
- * ветку, прочитанную из разговора, агент волен сменить (или уйти в detached
- * HEAD), и одна группа распадалась на две строки. Номера нет (связь старше
- * поля) — ветка, затем имя группы, затем сам разговор.
- */
-export function splitGroupKey(link: {
-  groupIndex?: number | undefined;
-  branch?: string | undefined;
-  title?: string | undefined;
-  id: string;
-}): string {
-  if (typeof link.groupIndex === 'number') return `#${link.groupIndex}`;
-  return link.branch || link.title || link.id;
-}
-
-/**
- * React-ключ карточки хаба. У группы без чата `chatId` — пустая строка, не
- * `undefined`: `chatId ?? title` давал двум ждущим группам один ключ `""`
- * (наблюдатель WR-9, 54 повтора), и React волен был потерять или задвоить
- * карточку. Без чата ключом служит номер группы, без номера — её имя.
- */
-export function hubCardKey(group: ChildStageGroup): string {
-  if (group.chatId) return group.chatId;
-  return typeof group.groupIndex === 'number' ? `#${group.groupIndex}` : group.title;
-}
+import { splitGroupKey } from './splitGroupKey';
 
 /**
  * Склейка строк хаба с записью конвейера уровней: порядок старта плюс группы,

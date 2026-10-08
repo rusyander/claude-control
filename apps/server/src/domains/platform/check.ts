@@ -1,8 +1,8 @@
 import type { PlatformProbeResult } from '@agentdeck/contracts';
-import type { AppStore } from '../../lib/app-store.ts';
-import type { PlatformFetch } from './ca-fetch.ts';
-import { probePlatform } from './probe.ts';
-import { findPlatform, requirePlatform, readToken, writePlatform } from './store.ts';
+import type { AppStore } from '../../lib/app-store/app-store.ts';
+import type { PlatformFetch } from './ca-fetch/ca-fetch.ts';
+import { probePlatform } from './probe/probe.ts';
+import { findPlatform, requirePlatform, readToken, writePlatform } from './store/store.ts';
 
 /**
  * Живая проверка контура: сходить, запомнить итог, обновить список

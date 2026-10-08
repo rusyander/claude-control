@@ -2,7 +2,7 @@ import { existsSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { UnrecognizedFormatError, readContinueServers } from '../../lib/continue-yaml.ts';
 import type { ContinueRawServer } from '../../lib/continue-yaml.ts';
-import { readTextFile } from '../../lib/safe-io.ts';
+import { readTextFile } from '../../lib/safe-io/safe-io.ts';
 
 /**
  * Файлы-блоки MCP у Continue.

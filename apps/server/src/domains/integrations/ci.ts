@@ -1,9 +1,9 @@
 import type { CiSettings } from '@agentdeck/contracts';
-import { readZip } from '../../lib/zip.ts';
+import { readZip } from '../../lib/zip/zip.ts';
 import { invalidField, unreachable } from './errors.ts';
-import { failedResponse, parseJson, sendRequest } from './http.ts';
+import { failedResponse, parseJson, sendRequest } from './http/http.ts';
 import { repoFromOrigin } from './forge.ts';
-import { coded } from '../../lib/server-text.ts';
+import { coded } from '../../lib/server-text/server-text.ts';
 
 /**
  * Отчёт последнего прогона CI — сюда, в кейсы.
@@ -14,7 +14,7 @@ import { coded } from '../../lib/server-text.ts';
  * дальше — три запроса и распаковка.
  *
  * Своего разбора junit тут НЕТ: содержимое отдаётся существующему импорту
- * (`domains/project-tests/import-results.ts`), который уже знает и про
+ * (`domains/project-tests/import-results/import-results.ts`), который уже знает и про
  * playwright, и про allure, и про то, как ложатся статусы. Второй разбор того
  * же формата разошёлся бы с первым на первой же нестандартной выгрузке.
  */

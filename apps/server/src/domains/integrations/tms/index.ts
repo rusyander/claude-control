@@ -4,7 +4,7 @@ import { zephyrClient } from './zephyr.ts';
 import { xrayClient } from './xray.ts';
 import { testitClient } from './testit.ts';
 import type { TmsClient } from './types.ts';
-import { coded } from '../../../lib/server-text.ts';
+import { coded } from '../../../lib/server-text/server-text.ts';
 
 export type { TmsCase, TmsClient, TmsRunPush } from './types.ts';
 export { externalKeys, keyFromTags, keyLookup, sourceTag } from './types.ts';

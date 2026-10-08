@@ -1,6 +1,6 @@
 import type { GoosePermissionDraft } from '@agentdeck/contracts';
-import { readTextFile, writeTextFile } from '../../lib/safe-io.ts';
-import { UnrecognizedFormatError } from '../../lib/codex-toml.ts';
+import { readTextFile, writeTextFile } from '../../lib/safe-io/safe-io.ts';
+import { UnrecognizedFormatError } from '../../lib/codex-toml/codex-toml.ts';
 import {
   GOOSE_DEFAULT_MODE,
   GOOSE_MODES,
@@ -8,7 +8,7 @@ import {
   writeGooseMode,
   type GooseMode,
 } from '../../lib/goose-yaml.ts';
-import { readGooseToolPermissions } from '../../lib/goose-permission-file.ts';
+import { readGooseToolPermissions } from '../../lib/goose-permission-file/goose-permission-file.ts';
 import { backupNameOf } from './target.ts';
 import type { GoosePermissionsValues, ProviderPermissionsTarget } from './types.ts';
 

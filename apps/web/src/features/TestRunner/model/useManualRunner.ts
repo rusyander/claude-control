@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type {
   ProjectTestGroup,
-  ProjectTestManualSession,
   ProjectTestPoint,
   ProjectTestPointResult,
   ProjectTestSharedStep,
@@ -9,7 +8,6 @@ import type {
   ProjectTestStep,
   ProjectTestStepResult,
 } from '@agentdeck/contracts';
-import { applyParams, expandSteps } from '@agentdeck/contracts/test-format';
 import {
   useFinishManualRun,
   useManualSession,
@@ -18,6 +16,11 @@ import {
   useUploadTestAttachment,
   type StartManualPayload,
 } from '@entities/ProjectTest';
+import { resolveSteps } from '../lib/resolveSteps';
+import { nextOpenPoint } from '../lib/nextOpenPoint';
+import { patchStepResult } from '../lib/patchStepResult';
+import { toBase64 } from '../lib/toBase64';
+import { savedFor } from '../lib/savedFor';
 
 /**
  * Ход ручного прохода.
@@ -64,96 +67,6 @@ export interface ManualRunner {
   isBusy: boolean;
   /** Группа и кейс текущего поинта — по ним заводится дефект. */
   current?: { groupId: string; caseId: string; runId: string };
-}
-
-/**
- * Шаги поинта в том виде, в каком их читает человек: общие раскрыты, значения
- * параметров подставлены. Отдельной функцией — по ней и проверяется, что
- * тестировщик и агент видят один и тот же текст.
- */
-export function resolveSteps(
-  steps: ProjectTestStep[] | undefined,
-  sharedSteps: ProjectTestSharedStep[],
-  params: Record<string, string> = {},
-): ProjectTestStep[] {
-  if (!steps) return [];
-  return expandSteps(steps, sharedSteps).map((step) => ({
-    action: applyParams(step.action, params),
-    ...(step.expected ? { expected: applyParams(step.expected, params) } : {}),
-    ...(step.data ? { data: applyParams(step.data, params) } : {}),
-  }));
-}
-
-/**
- * Секундомер как `мм:сс` — без часов: один проход столько не идёт.
- *
- * Живёт рядом с самим секундомером, а не в разметке: время поинта уходит в
- * результат прогона, и показанное человеку обязано быть тем же числом.
- */
-export function formatElapsed(ms: number): string {
-  const total = Math.max(0, Math.floor(ms / 1000));
-  const minutes = String(Math.floor(total / 60)).padStart(2, '0');
-  const seconds = String(total % 60).padStart(2, '0');
-  return `${minutes}:${seconds}`;
-}
-
-/**
- * Куда вести после отметки: к следующему НЕОТМЕЧЕННОМУ проходу, потом к
- * первому открытому сначала; всё отмечено — остаться на месте.
- *
- * Соседний проход годится только при проходе подряд. Человек, вернувшийся
- * перепройти пятый из семи, после отметки попадал на уже закрытый шестой и
- * листал до места, где остановился, руками.
- */
-export function nextOpenPoint(
-  points: { id: string }[],
-  results: { pointId: string }[],
-  from: number,
-): number {
-  const done = new Set(results.map((item) => item.pointId));
-  const ahead = points.findIndex((item, index) => index > from && !done.has(item.id));
-  if (ahead >= 0) return ahead;
-  const first = points.findIndex((item) => !done.has(item.id));
-  return first >= 0 ? first : from;
-}
-
-/** То, что уже отмечено по поинту: с ним человек и возвращается к пройденному. */
-export interface SavedPoint {
-  steps: ProjectTestStepResult[];
-  note: string;
-  attachments: string[];
-}
-
-/**
- * Отмеченное по поинту из сессии.
- *
- * Переход на другой поинт обязан класть в форму ЕГО отметки, а не остатки
- * прошлого: чужая заметка, приехавшая на новый кейс, — худший вид испорченного
- * результата, потому что выглядит она как настоящая.
- */
-export function savedFor(
-  session: ProjectTestManualSession | undefined,
-  pointId: string | undefined,
-): SavedPoint {
-  const saved = session?.results.find((item) => item.pointId === pointId);
-  return {
-    steps: saved?.steps ?? [],
-    note: saved?.note ?? '',
-    attachments: saved?.attachments ?? [],
-  };
-}
-
-/** Отметка по шагу: строка либо дописывается, либо заводится со статусом «нет». */
-export function patchStepResult(
-  results: ProjectTestStepResult[],
-  index: number,
-  part: Partial<ProjectTestStepResult>,
-): ProjectTestStepResult[] {
-  const found = results.find((item) => item.index === index);
-  if (found) {
-    return results.map((item) => (item.index === index ? { ...item, ...part } : item));
-  }
-  return [...results, { index, status: 'unknown' as ProjectTestStatus, ...part }];
 }
 
 export function useManualRunner(
@@ -277,23 +190,4 @@ export function useManualRunner(
       ? { current: { groupId: point.groupId, caseId: point.caseId, runId: session.runId } }
       : {}),
   };
-}
-
-/**
- * Файл в base64 без префикса `data:`.
- *
- * Читается через FileReader, а не через `arrayBuffer` + ручную кодировку:
- * скриншот на пару мегабайт при ручной сборке строки из байтов кладёт вкладку,
- * а браузер делает то же самое нативно.
- */
-export async function toBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(reader.error ?? new Error('read failed'));
-    reader.onload = () => {
-      const result = typeof reader.result === 'string' ? reader.result : '';
-      resolve(result.slice(result.indexOf(',') + 1));
-    };
-    reader.readAsDataURL(file);
-  });
 }

@@ -1,0 +1,23 @@
+// Колонки группы: подпись над значением. Переносятся колонками целиком, так
+// что на узком экране встают друг под друга, а не режутся посередине.
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px var(--spacing-sm);
+  margin: 2px 0;
+}
+
+.metaCell {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+
+  dt,
+  dd {
+    margin: 0;
+  }
+}
+
+.metaValue {
+  overflow-wrap: anywhere;
+}

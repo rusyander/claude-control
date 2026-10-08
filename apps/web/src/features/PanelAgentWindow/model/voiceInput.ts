@@ -1,20 +1,5 @@
 import type { SpeechErrorKind, SpeechState } from '@shared/lib/speech';
-
-/**
- * Что показывает микрофон окна агента. Состояние распознавателя общее с чатом
- * (`useSpeechRecognition`), а слова свои: окно называет ОТКАЗ по существу —
- * «нет разрешения» человек чинит в браузере, «не поддерживается» не чинит
- * ничем, и одна строка «не вышло» для обоих оставила бы его жать кнопку снова.
- */
-export type VoiceView =
-  | 'idle'
-  | 'listening'
-  | 'finalizing'
-  | 'unsupported'
-  | 'denied'
-  | 'network'
-  | 'microphone'
-  | 'error';
+import type { VoiceView } from './voiceInput.types';
 
 export interface VoiceInputState {
   state: SpeechState;
@@ -36,31 +21,4 @@ export function voiceView({ state, supported, error, attempted }: VoiceInputStat
     return 'error';
   }
   return 'idle';
-}
-
-/** Идёт запись или её финализация — отправка ждёт текста, который ещё не в поле. */
-export function isDictating(view: VoiceView): boolean {
-  return view === 'listening' || view === 'finalizing';
-}
-
-/** Отказ, о котором строка под полем говорит как о проблеме (`role=alert`). */
-export function isVoiceProblem(view: VoiceView): boolean {
-  return (
-    view === 'unsupported' ||
-    view === 'denied' ||
-    view === 'network' ||
-    view === 'microphone' ||
-    view === 'error'
-  );
-}
-
-/**
- * Надиктованное ДОПИСЫВАЕТСЯ к набранному: часть фразы могла быть набрана
- * руками до микрофона. Отправки здесь нет и быть не должно — решает человек.
- */
-export function appendDictation(current: string, heard: string): string {
-  const text = heard.trim();
-  if (!text) return current;
-  const base = current.trimEnd();
-  return base ? `${base} ${text}` : text;
 }

@@ -81,7 +81,7 @@ function writeKidTranscript(cfg, cwd, kid) {
 /** Связь «ребёнок разделения на стадии fix» — тем же хранилищем, что пишет панель. */
 function seedLinks(root, appData) {
   const script = join(root, 'seed-links.ts');
-  const storeUrl = pathToFileURL(join(REPO, 'apps/server/src/lib/app-store.ts')).href;
+  const storeUrl = pathToFileURL(join(REPO, 'apps/server/src/lib/app-store/app-store.ts')).href;
   const links = KIDS.map(
     (kid, index) =>
       `store.setChatLink(${JSON.stringify(kid.sid)}, { parentChatId: 'walk-parent', createdAt: '${NOW}', title: ${JSON.stringify(kid.title)}, branch: 'split/kid-${index}', groupIndex: ${index}, model: 'sonnet', effort: 'medium', kind: 'mechanical', stage: 'fix', ceilingModel: 'claude-opus-5', workModel: 'sonnet', workEffort: 'medium' });`,

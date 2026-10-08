@@ -74,8 +74,8 @@ process.stdin.setEncoding('utf8');
 process.stdin.on('data', (chunk) => (prompt += chunk));
 process.stdin.on('end', () => {
   const ids = [...prompt.matchAll(/^id: ([0-9a-f]+)$/gm)].map((m) => m[1]);
-  const findings = ids.map((id) => ({ id, title: 'Settings page threw', happened: 'Timer callback threw.', rootCause: 'Items read before load.', steps: 'Open Settings.', verdict: 'confirmed', severity: 'high', location: 'apps/web/src/pages/Settings/GeneralTab.tsx:1', fix: 'Catch it.' }));
-  if (ids.length) findings.push({ kind: 'remark', title: 'Timer is never cleared', explanation: 'The timeout outlives the page.', severity: 'low', location: 'apps/web/src/pages/Settings/GeneralTab.tsx:1', fix: 'Clear it on unmount.', relatedTo: ids[0] });
+  const findings = ids.map((id) => ({ id, title: 'Settings page threw', happened: 'Timer callback threw.', rootCause: 'Items read before load.', steps: 'Open Settings.', verdict: 'confirmed', severity: 'high', location: 'apps/web/src/pages/Settings/GeneralTab/GeneralTab.tsx:1', fix: 'Catch it.' }));
+  if (ids.length) findings.push({ kind: 'remark', title: 'Timer is never cleared', explanation: 'The timeout outlives the page.', severity: 'low', location: 'apps/web/src/pages/Settings/GeneralTab/GeneralTab.tsx:1', fix: 'Clear it on unmount.', relatedTo: ids[0] });
   const fence = String.fromCharCode(96).repeat(3);
   process.stdout.write(JSON.stringify({ type: 'result', is_error: false, result: fence + 'agentdeck-watch\\n' + JSON.stringify(findings) + '\\n' + fence, modelUsage: { 'claude-haiku-4-5': { inputTokens: 1840, outputTokens: 410, cacheReadInputTokens: 12600, cacheCreationInputTokens: 900 } } }) + '\\n');
 });

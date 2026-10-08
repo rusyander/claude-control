@@ -8,13 +8,13 @@ import type {
   SplitPlanCancelled,
 } from '@agentdeck/contracts/chat-handoff';
 import type { ServerContext } from '../../context.ts';
-import type { StopOutcome } from '../../domains/chat/ChatRunRegistry.ts';
-import type { SplitConveyor } from '../../domains/chat/split-conveyor.ts';
-import type { PendingAsks } from '../../domains/chat/pending-asks.ts';
+import type { StopOutcome } from '../../domains/chat/ChatRunRegistry/ChatRunRegistry.ts';
+import type { SplitConveyor } from '../../domains/chat/split-conveyor/split-conveyor.ts';
+import type { PendingAsks } from '../../domains/chat/pending-asks/pending-asks.ts';
 import { acceptSplitGroup } from '../../domains/chat/split-acceptance.ts';
 import type { ChatLink } from '../../lib/app-store/app-store.types.ts';
 import { conversationKeys } from '../../lib/app-store/chat-links.ts';
-import { codeOf } from '../../lib/server-text.ts';
+import { codeOf } from '../../lib/server-text/server-text.ts';
 import type { SplitLaunchDeps } from './split-launch.ts';
 
 /**

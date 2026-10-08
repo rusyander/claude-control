@@ -1,11 +1,11 @@
 import type { ModelInfo } from '@agentdeck/contracts';
 import { ASSIGNABLE_MODELS } from '@agentdeck/contracts/model-cascade';
 import type { PromptId } from '@agentdeck/contracts/prompts';
-import type { ConfigProvider } from '../../providers/types.ts';
+import type { ConfigProvider } from '../../providers/types/types.ts';
 import { newestInFamily } from '../models/model-defaults.ts';
-import { promptText } from '../prompts.ts';
+import { promptText } from '../prompts/prompts.ts';
 import { withBlockLang } from './answer-block.ts';
-import type { AgentImage } from '../../lib/agent-images.ts';
+import type { AgentImage } from '../../lib/agent-images/agent-images.ts';
 
 /**
  * Служебный вызов модели для групп: опись, советы, слияние, шаг «Пути», сводки.
@@ -18,7 +18,7 @@ import type { AgentImage } from '../../lib/agent-images.ts';
 export interface GroupModelMessage {
   role: 'user' | 'assistant';
   content: string;
-  /** Картинки реплики человека — в самом запросе к модели (`lib/agent-images.ts`). */
+  /** Картинки реплики человека — в самом запросе к модели (`lib/agent-images/agent-images.ts`). */
   images?: readonly AgentImage[];
 }
 

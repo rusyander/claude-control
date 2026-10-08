@@ -4,15 +4,15 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { killPidTree } from '../../lib/process-tree.ts';
-import { ChatRunRegistry, type BufferedEvent } from './ChatRunRegistry.ts';
+import { killPidTree } from '../../lib/process-tree/process-tree.ts';
+import { ChatRunRegistry, type BufferedEvent } from './ChatRunRegistry/ChatRunRegistry.ts';
 import {
   adoptableEntries,
   isPidAlive,
   pidLooksLikeCli,
   RunLedger,
   type RunLedgerEntry,
-} from './run-ledger.ts';
+} from './run-ledger/run-ledger.ts';
 
 /**
  * Перезапуск панели посреди жизни агента (журнал 29, 60, 72a) — на настоящих

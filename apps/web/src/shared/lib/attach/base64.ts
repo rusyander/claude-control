@@ -7,8 +7,3 @@ export function bytesToBase64(bytes: Uint8Array): string {
   }
   return btoa(binary);
 }
-
-/** Содержимое файла в base64. */
-export async function fileToBase64(file: Blob): Promise<string> {
-  return bytesToBase64(new Uint8Array(await file.arrayBuffer()));
-}

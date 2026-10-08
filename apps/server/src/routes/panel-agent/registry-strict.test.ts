@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { PANEL_ACTIONS } from './actions.ts';
-import { PANEL_SECTIONS } from './sections.ts';
+import { PANEL_SECTIONS } from './sections/sections.ts';
 
 /**
  * Строгая сверка реестра действий агента в обе стороны:
@@ -87,7 +87,7 @@ describe('реестр действий агента: строгая сверк�
 
   it('каждое действие вызывается интеграционным тестом через маршрут', () => {
     const dir = import.meta.dirname;
-    const tests = readdirSync(dir)
+    const tests = readdirSync(dir, { recursive: true, encoding: 'utf8' })
       .filter((file) => file.endsWith('.integration.test.ts'))
       .map((file) => readFileSync(resolve(dir, file), 'utf8'))
       .join('\n');

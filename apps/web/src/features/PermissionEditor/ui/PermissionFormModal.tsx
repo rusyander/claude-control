@@ -14,7 +14,6 @@ import { Typography } from '@shared/ui/typography';
 import { Card } from '@shared/ui/card';
 import { Badge } from '@shared/ui/badge';
 import { FormWithAssistant } from '@shared/ui/form-with-assistant';
-import { toErrorMessage } from '@shared/api/client';
 import { presetText } from '@shared/config/i18n';
 import {
   permissionApi,
@@ -28,6 +27,7 @@ import type { PermissionFormModalProps } from './PermissionFormModal.types';
 import { looksLikePermission } from '../model/looksLikePermission';
 import { permissionAssistantSpec } from '../model/permissionAssistant';
 import styles from './PermissionFormModal.module.scss';
+import { toErrorMessage } from '../../../shared/api/toErrorMessage';
 
 /**
  * Создание и правка правила доступа. Правила пишутся в особом формате

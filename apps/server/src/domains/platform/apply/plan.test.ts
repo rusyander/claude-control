@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { Platform, PlatformApplyTarget } from '@agentdeck/contracts';
-import { AppStore } from '../../../lib/app-store.ts';
+import { AppStore } from '../../../lib/app-store/app-store.ts';
 import { buildPlatformApplyPlan, type ContourApplyDeps } from './plan.ts';
 import { fingerprintOf } from './current.ts';
 import { managedProfileId } from './profile.ts';

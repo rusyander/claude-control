@@ -34,7 +34,7 @@ export interface ProviderDetection {
   configPaths: string[];
 }
 
-/** Ответ `GET /api/providers/detect`: активный провайдер + детект по всем известным. */
+/** Ответ `GET /api/providers/detect/detect`: активный провайдер + детект по всем известным. */
 export interface ProviderDetectResponse {
   active: string;
   providers: ProviderDetection[];

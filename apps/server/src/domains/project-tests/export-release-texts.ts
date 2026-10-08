@@ -3,7 +3,7 @@ import type {
   ProjectTestReleaseRequirement,
 } from '@agentdeck/contracts';
 import { RUN_TEXTS, type ExportLanguage } from './export-run-texts.ts';
-import { releaseVerdict } from './release.ts';
+import { releaseVerdict } from './release/release.ts';
 
 /**
  * Слова документа готовности вехи на двух языках — той же парой, что отчёт по

@@ -1,17 +1,12 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import type { Analytics, AnalyticsLive } from '@agentdeck/contracts';
-import type { LoweredRunRecord } from '@agentdeck/contracts/model-cascade';
+import type { Analytics } from '@agentdeck/contracts';
 import { apiClient } from '@shared/api/client';
-import type { AnalyticsPeriod } from '../model/period';
-import { periodKey, periodParams } from '../model/period';
+import { periodParams } from '../model/period';
+import type { AnalyticsPeriod } from '../model/period.types';
+import { periodKey } from '../model/periodKey';
 
 async function getAnalytics(period: AnalyticsPeriod): Promise<Analytics> {
   const { data } = await apiClient.get<Analytics>('/analytics', { params: periodParams(period) });
-  return data;
-}
-
-async function getLive(): Promise<AnalyticsLive> {
-  const { data } = await apiClient.get<AnalyticsLive>('/analytics/live');
   return data;
 }
 
@@ -32,53 +27,5 @@ export function useAnalytics(period: AnalyticsPeriod) {
      * ряд фильтров перевёрстывался на каждое переключение.
      */
     placeholderData: keepPreviousData,
-  });
-}
-
-/**
- * Журнал понижённых прогонов веера: чем их вели и видела ли панель, что прогон
- * выполнил планку сдачи. Сводка приходит с сервера — правило «что считать
- * проверкой» одно и живёт рядом со списком образцов команд.
- */
-export interface LoweredRunsCount {
-  total: number;
-  withChecks: number;
-  withoutChecks: number;
-  failed: number;
-  /** Расход окна: сумма токенов прогонов разреза. */
-  tokens: number;
-}
-
-/**
- * Разрез по классу работы — во что обошёлся каждый класс. Числа показываются
- * ЧЕЛОВЕКУ и только ему: таблицу «класс → модель» правит он, а агенту-
- * классификатору цена классов не сообщается никогда (см. `lowered-journal.ts`).
- */
-export interface LoweredRunsKind extends LoweredRunsCount {
-  /** Пусто — прогоны, которым класса не называли: ручной веер. */
-  kind: string;
-}
-
-export interface LoweredRunsView {
-  runs: LoweredRunRecord[];
-  summary: LoweredRunsCount & { byKind: LoweredRunsKind[] };
-}
-
-async function getLoweredRuns(): Promise<LoweredRunsView> {
-  const { data } = await apiClient.get<LoweredRunsView>('/chat/lowered-runs');
-  return data;
-}
-
-export function useLoweredRuns() {
-  return useQuery({ queryKey: ['chat', 'lowered-runs'], queryFn: getLoweredRuns });
-}
-
-/** Живой срез: запущенные процессы. Обновляется часто — он дешёвый. */
-export function useLiveAgents() {
-  return useQuery({
-    queryKey: ['analytics', 'live'],
-    queryFn: getLive,
-    refetchInterval: 5_000,
-    staleTime: 0,
   });
 }

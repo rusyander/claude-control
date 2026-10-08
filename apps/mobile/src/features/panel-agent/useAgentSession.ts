@@ -14,16 +14,15 @@ import {
   type ConversationState,
   type SealNote,
 } from '@agentdeck/contracts/panel-agent-feed';
-import { PANEL_AGENT_KEYS, fetchPanelAgentConversation } from '../../entities/panel-agent/api';
 import { phoneContext } from '../../entities/panel-agent/model';
-import {
-  STREAM_LOST,
-  runResumablePanelAgent,
-  stopPanelAgent,
-  type RunEventSink,
-} from '../../entities/panel-agent/run';
 import { useT } from '../../shared/config/i18n';
 import { openConversation } from './openConversation';
+import { fetchPanelAgentConversation } from '../../entities/panel-agent/fetchPanelAgentConversation';
+import { PANEL_AGENT_KEYS } from '../../entities/panel-agent/api.constants';
+import { stopPanelAgent } from '../../entities/panel-agent/stopPanelAgent';
+import type { RunEventSink } from '../../entities/panel-agent/run.types';
+import { STREAM_LOST } from '../../entities/panel-agent/run.constants';
+import { runResumablePanelAgent } from '../../entities/panel-agent/runResumablePanelAgent';
 
 /** Приложение снова на экране: в фоне сеть закрыта, возвращаться к ходу оттуда бесполезно. */
 function foreground(): Promise<void> {

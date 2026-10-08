@@ -1,12 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { sameText } from '@shared/lib/same-text';
-import {
-  editDraft,
-  isChangedElsewhere,
-  savedDraft,
-  settleDraft,
-  type DiskDraft,
-} from './diskDraft';
+import { editDraft } from './diskDraft';
+import type { DiskDraft } from './diskDraft.types';
+import { settleDraft } from './settleDraft';
+import { savedDraft } from './savedDraft';
+import { isChangedElsewhere } from './isChangedElsewhere';
 
 /**
  * Черновик файла инструкций поверх текста с диска — общий для Claude и прочих

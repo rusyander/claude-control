@@ -3,7 +3,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Group, ProjectRunnerView } from '@agentdeck/contracts';
 import type { PanelPendingAction } from '@agentdeck/contracts/panel-agent';
-import { agentJournalPath } from '../../domains/panel-agent/journal.ts';
+import { agentJournalPath } from '../../domains/panel-agent/journal/journal.ts';
 import {
   GIT_AVAILABLE,
   initRepo,

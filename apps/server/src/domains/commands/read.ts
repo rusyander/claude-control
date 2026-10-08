@@ -1,5 +1,5 @@
 import type { ClaudePaths, CommandsResponse } from '@agentdeck/contracts';
-import type { AppStore } from '../../lib/app-store.ts';
+import type { AppStore } from '../../lib/app-store/app-store.ts';
 import { getActiveProvider } from '../../providers/registry.ts';
 import { readClaudeCommands } from './claude.ts';
 import { readProviderCommands } from './providers.ts';

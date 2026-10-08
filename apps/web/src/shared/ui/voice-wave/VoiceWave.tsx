@@ -3,9 +3,7 @@ import { cn } from '@shared/lib/cn';
 
 import styles from './VoiceWave.module.scss';
 import type { VoiceWaveProps } from './VoiceWave.types';
-
-/** Ниже этого уровня считаем, что тишина → показываем «дышащую» idle-волну. */
-const IDLE_LEVEL = 0.1;
+import { IDLE_LEVEL } from './VoiceWave.constants';
 
 /**
  * Бегущая звуковая дорожка: столбцы РАВНОМЕРНО заполняют всю ширину (flex:1), высота

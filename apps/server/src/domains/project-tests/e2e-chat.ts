@@ -1,5 +1,5 @@
 import type { ProjectTestAutomationCommand, ProjectTestE2eFolder } from '@agentdeck/contracts';
-import { AUTOMATION_FILE } from './automation.ts';
+import { AUTOMATION_FILE } from './automation/automation.ts';
 import { TESTS_DIR } from './files.ts';
 
 /**
@@ -33,7 +33,7 @@ import { TESTS_DIR } from './files.ts';
  * которую видят раздел и проверка доставки группы.
  *
  * По-английски: это текст для модели. Одна строка — таково правило склейки
- * дописки (`domains/chat/initiative.ts`): на Windows перевод строки рвёт аргумент.
+ * дописки (`domains/chat/initiative/initiative.ts`): на Windows перевод строки рвёт аргумент.
  */
 export function e2eChatLine(input: {
   root: string;

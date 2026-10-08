@@ -48,7 +48,7 @@ neither Anthropic nor OpenAI nor Google publishes a model list reachable without
 goes out no more than once a day and the answer is cached in `agentdeck/models-cache.json`;
 with no network the previous list is shown with its age rather than nothing.
 
-The vendor is declared in `providers/catalog.ts` via `modelVendors`: claude → `anthropic`, codex →
+The vendor is declared in `providers/catalog/catalog.ts` via `modelVendors`: claude → `anthropic`, codex →
 `openai`, gemini → `google`, qwen → `alibaba`, kimi → `moonshotai`, opencode → its own `opencode`
 gateway. Continue, Goose, Aider and Cursor deliberately have none: they are harnesses on top of any
 model, and the panel will not decide whose list to show (fail-closed).
@@ -195,7 +195,7 @@ than on a guess.
 The other nine CLIs say "no schema". That is an honest answer rather than "all good": an invented
 schema URL would either fail silently or compare the panel against someone else's file and produce
 a false "everything matches". Once a schema is published, it goes into the registry in
-`domains/format-check.ts` together with the list of keys.
+`domains/format-check/format-check.ts` together with the list of keys.
 
 The network is touched at most once a week and never on your path: the section opens from the cache
 (`agentdeck/format-check.json`), a stale result refreshes in the background, and even a total

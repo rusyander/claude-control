@@ -5,22 +5,22 @@ import {
   type TaskSplitResult,
 } from '@agentdeck/contracts/task-split';
 import { cascadeSystemPrompt, parseAssignments } from '@agentdeck/contracts/model-cascade';
-import { cascadeCeilingFor } from '../../domains/model-cascade.ts';
+import { cascadeCeilingFor } from '../../domains/model-cascade/model-cascade.ts';
 import type { ServerContext } from '../../context.ts';
-import type { SplitConveyor } from '../../domains/chat/split-conveyor.ts';
-import type { SplitOverlap } from '../../domains/chat/split-overlap.ts';
-import type { SplitReview } from '../../domains/chat/split-review.ts';
+import type { SplitConveyor } from '../../domains/chat/split-conveyor/split-conveyor.ts';
+import type { SplitOverlap } from '../../domains/chat/split-overlap/split-overlap.ts';
+import type { SplitReview } from '../../domains/chat/split-review/split-review.ts';
 import {
   splitPlanRunning,
   type SplitGroupRechecked,
   type SplitReviewRefusal,
 } from '@agentdeck/contracts/chat-handoff';
-import { checkProjectDir } from '../../domains/projects.ts';
+import { checkProjectDir } from '../../domains/projects/projects.ts';
 import { createSplitLauncher, splitChatRefusal, type SplitLaunchDeps } from './split-launch.ts';
 import { registerSplitControlRoutes, stopChatKey } from './split-control-routes.ts';
-import { codeOf, coded } from '../../lib/server-text.ts';
+import { codeOf, coded } from '../../lib/server-text/server-text.ts';
 import { removeGroupCopy } from '../../domains/chat/split-cleanup.ts';
-import { splitRootOf } from '../../domains/project-git.ts';
+import { splitRootOf } from '../../domains/project-git/project-git.ts';
 import { conversationKeys } from '../../lib/app-store/chat-links.ts';
 import {
   atlassianTaskTracker,
@@ -32,10 +32,10 @@ import {
   splitTaskKeys,
   splitTaskOptions,
   type SplitTaskTracker,
-} from '../../domains/chat/split-tasks.ts';
+} from '../../domains/chat/split-tasks/split-tasks.ts';
 import { IntegrationError } from '../../domains/integrations/errors.ts';
 import { fail } from '../integrations/shared.ts';
-import type { PendingAsks } from '../../domains/chat/pending-asks.ts';
+import type { PendingAsks } from '../../domains/chat/pending-asks/pending-asks.ts';
 
 /**
  * Разделение списка задач по нескольким чатам — одним запросом.

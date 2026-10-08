@@ -1,10 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
-import { Skeleton } from './Skeleton';
-import { SkeletonList } from './SkeletonList';
-import { SkeletonTiles } from './SkeletonTiles';
-import { SkeletonChart } from './SkeletonChart';
+import { Skeleton } from './Skeleton/Skeleton';
+import { SkeletonList } from './SkeletonList/SkeletonList';
+import { SkeletonTiles } from './SkeletonTiles/SkeletonTiles';
+import { SkeletonChart } from './SkeletonChart/SkeletonChart';
 
 /**
  * Заглушка на время загрузки. Держит место будущего содержимого, чтобы

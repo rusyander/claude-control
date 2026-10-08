@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { AliasVault, maskText } from '../../../dlp/mask.ts';
 import { ResponseStreamFilter, restoreJsonResponse } from '../../../dlp/response-filter.ts';
 import { enterprisePlatformDriver } from '../../drivers/enterprise-platform.ts';
-import { StreamTranslator } from '../frames.ts';
+import { StreamTranslator } from '../frames/frames.ts';
 import { expandContourAliases, strayAliases } from './aliases.ts';
 
 /**

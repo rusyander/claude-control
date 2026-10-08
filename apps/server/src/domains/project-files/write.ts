@@ -1,9 +1,9 @@
 import { statSync } from 'node:fs';
 import type { ProjectFileSaveResult } from '@agentdeck/contracts';
-import { writeTextFile } from '../../lib/safe-io.ts';
+import { writeTextFile } from '../../lib/safe-io/safe-io.ts';
 import { MAX_FILE_BYTES } from './constants.ts';
 import { ProjectFileError, resolveProjectPath } from './paths.ts';
-import { coded } from '../../lib/server-text.ts';
+import { coded } from '../../lib/server-text/server-text.ts';
 
 /**
  * Запись правки человека в файл проекта.

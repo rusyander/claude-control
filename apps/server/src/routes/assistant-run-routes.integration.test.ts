@@ -3,11 +3,11 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { mkdtempSync, rmSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { AppStore } from '../lib/app-store.ts';
+import { AppStore } from '../lib/app-store/app-store.ts';
 import { ModelCatalogStore } from '../domains/models/model-store.ts';
 import type { ServerContext } from '../context.ts';
 import type { AssistantRunResult } from '@agentdeck/contracts';
-import { registerAssistantRoutes } from './assistant-routes.ts';
+import { registerAssistantRoutes } from './assistant-routes/assistant-routes.ts';
 
 /** Маршрут окна для проверок, которым он не важен: контура нет, шлюз не поднят. */
 const NO_ROUTE = { runRoute: () => ({ env: {} }), gatewayPort: () => 0 };

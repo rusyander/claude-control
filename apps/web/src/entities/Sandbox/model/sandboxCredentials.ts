@@ -1,10 +1,10 @@
-import type { SandboxCredentials, SandboxCredentialsSource } from '../api/SandboxApi';
+import type { SandboxCredentialsSource, SandboxCredentials } from '../api/useCreateSandbox';
 
 /**
  * Что сказать про доступ к аккаунту внутри песочницы.
  *
  * Песочница запускает Claude Code со СВОИМ каталогом настроек, поэтому доступ
- * к аккаунту переносится туда отдельно (см. сервер: `lib/credentials.ts`).
+ * к аккаунту переносится туда отдельно (см. сервер: `lib/credentials/credentials.ts`).
  * Источников несколько, и на macOS штатного файла нет вовсе — связка ключей
  * может и отказать. Сервер разбирается в этом при сборке и возвращает,
  * ОТКУДА доступ взялся и почему не взялся; до экрана это не доходило, и

@@ -1,7 +1,7 @@
 import type { MediaImageMime } from '@agentdeck/contracts';
 import { MEDIA_IMAGE_MAX_BYTES, mediaImageMimes } from '@agentdeck/contracts/media';
 import { MediaError } from './errors.ts';
-import { coded } from '../../lib/server-text.ts';
+import { coded } from '../../lib/server-text/server-text.ts';
 
 /**
  * Байты картинки из ответа модели.

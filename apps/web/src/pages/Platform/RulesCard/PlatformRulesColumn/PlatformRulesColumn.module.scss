@@ -1,0 +1,19 @@
+.rulesColumn {
+  padding: var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  min-width: 0;
+}
+
+/* Колонка платформы отмечена полосой другого цвета: «чьё это правило» —
+   первое, что человек должен прочитать, ещё до заголовка. */
+.rulesColumnPlatform {
+  border-left: 3px solid var(--color-warning);
+}
+
+/* Сторона, снятая выбором «чьи правила действуют» (баг 11б): рамка пунктиром и
+   надпись словами, а не прозрачность — приглушённый текст проваливал контраст
+   (axe), а значения на ней живые и правятся, выбор снимает их только с прогона. */
+.rulesColumnOff.rulesColumnOff {
+  border-style: dashed;
+}

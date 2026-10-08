@@ -1,16 +1,11 @@
 import { HIDDEN_STREAMS, MAX_STREAMS } from './agent-runs.constants';
 import { runStream } from './agent-runs.lifecycle';
 import { isOpenAsk } from '@shared/lib/chat-stream';
-import {
-  callbacks,
-  controllers,
-  emit,
-  findKey,
-  lastSeqs,
-  runs,
-  sending,
-  setRun,
-} from './agent-runs.state';
+import { callbacks, controllers, lastSeqs, sending } from './agent-runs.state';
+import { runs } from './agent-runs.state.constants';
+import { emit } from './emit';
+import { findKey } from './findKey';
+import { setRun } from './setRun';
 import type { AgentRun } from './agent-runs.types';
 
 /**

@@ -15,12 +15,10 @@ import { Icon } from '@shared/ui/icon';
 import { useSearch, MIN_SEARCH_LENGTH } from '@entities/Search';
 import { useTestsProject } from '@entities/Project';
 import { useProviders, activeCapabilities, visibleNavItems } from '@entities/Provider';
-import { rankByFuzzy } from '../model/fuzzy';
 import type { CommandPaletteProps, PaletteOption } from './CommandPalette.types';
 import styles from './CommandPalette.module.scss';
-
-/** Сколько разделов показывать в быстром переходе, чтобы список не разрастался. */
-const NAV_LIMIT = 6;
+import { rankByFuzzy } from '../model/rankByFuzzy';
+import { NAV_LIMIT } from './CommandPalette.constants';
 
 /**
  * Командная палитра: одно поле, из которого можно и перепрыгнуть в раздел

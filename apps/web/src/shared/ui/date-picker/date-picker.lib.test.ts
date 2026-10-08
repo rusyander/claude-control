@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { formatLocalDay, formatValueLabel, parseLocalDay, todayIso } from './date-picker.lib';
+import { parseLocalDay } from './date-picker.lib';
+import { formatLocalDay } from './formatLocalDay';
+import { todayIso } from './todayIso';
+import { formatValueLabel } from './formatValueLabel';
 
 const PLACEHOLDER = 'Свои даты';
 

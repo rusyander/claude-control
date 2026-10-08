@@ -1,11 +1,10 @@
-export { PlatformWizard } from './ui/PlatformWizard';
-export { ConsumerRow, TargetRow } from './ui/ConsumerRows';
-export type { WizardStep } from './model/wizard-logic';
-export {
-  appliedFileTargets,
-  consumerFileWins,
-  finishPlan,
-  finishCloses,
-  initialTargets,
-  toggled,
-} from './model/wizard-logic';
+export { PlatformWizard } from './ui/PlatformWizard/PlatformWizard';
+export { TargetRow } from './ui/TargetRow/TargetRow';
+export { ConsumerRow } from './ui/ConsumerRow/ConsumerRow';
+export type { WizardStep } from './model/wizard-logic.types';
+export { finishPlan } from './model/wizard-logic';
+export { appliedFileTargets } from './model/appliedFileTargets';
+export { consumerFileWins } from './model/consumerFileWins';
+export { finishCloses } from './model/finishCloses';
+export { toggled } from './model/toggled';
+export { initialTargets } from './model/initialTargets';

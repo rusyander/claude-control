@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { askNotifyPermissionOnGesture, showSystemNotice } from './systemNotify';
+import { showSystemNotice } from './systemNotify';
+import { askNotifyPermissionOnGesture } from './askNotifyPermissionOnGesture';
 
 /**
  * Системное уведомление скрытой вкладки (находка 77 живого прогона 24.09).

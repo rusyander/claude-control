@@ -7,15 +7,15 @@ import {
   resolveProviderMcpTarget,
   upsertProviderMcpServer,
   McpServerNotFoundError as ProviderMcpServerNotFoundError,
-} from './provider-mcp.ts';
+} from './provider-mcp/provider-mcp.ts';
 import type { ProviderMcpSettingsSource, ProviderMcpTarget } from './provider-mcp/types.ts';
-import { serverText } from '../lib/server-texts.ts';
+import { serverText } from '../lib/server-texts/server-texts.ts';
 import {
   McpServerNotFoundError,
   assertMcpServerExists,
   deleteMcpServer,
   saveMcpServer,
-} from './mcp.ts';
+} from './mcp/mcp.ts';
 
 /**
  * Переходники панели: как записать СВОЙ MCP-сервер в конфигурацию CLI.

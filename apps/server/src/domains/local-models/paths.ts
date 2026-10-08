@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { KitMode, LocalDevice, ModelBench } from '@agentdeck/contracts/local-models';
-import { writeTextFile } from '../../lib/safe-io.ts';
+import { writeTextFile } from '../../lib/safe-io/safe-io.ts';
 
 /**
  * Всё локальное — в ОДНОМ каталоге внутри панели: `<корень приложения>/.local-models`.

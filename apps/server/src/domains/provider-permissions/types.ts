@@ -5,9 +5,9 @@ import type {
   GeminiApprovalMode,
   QwenApprovalMode,
 } from '@agentdeck/contracts';
-import type { ConfigProvider } from '../../providers/types.ts';
+import type { ConfigProvider } from '../../providers/types/types.ts';
 import type { GooseMode } from '../../lib/goose-yaml.ts';
-import type { GooseToolPermissions } from '../../lib/goose-permission-file.ts';
+import type { GooseToolPermissions } from '../../lib/goose-permission-file/goose-permission-file.ts';
 import type { KimiMode, KimiPermissionRule } from '../../lib/kimi-toml.ts';
 import type {
   OpencodePreservedEntry,

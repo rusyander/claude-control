@@ -1,5 +1,5 @@
 import { basename } from 'node:path';
-import { encryptSecret } from '../secret-crypto.ts';
+import { encryptSecret } from '../secret-crypto/secret-crypto.ts';
 
 /**
  * Опциональное шифрование копий файла секретов `.mcp-secrets.env`.

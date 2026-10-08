@@ -1,5 +1,5 @@
 import type { TFunction } from 'i18next';
-import { formatDateTime } from '@shared/lib/format';
+import { formatDateTime } from '../../../shared/lib/formatDateTime';
 
 /**
  * Когда это было — словами. «Проверен 2 мин назад» человек читает мгновенно, а

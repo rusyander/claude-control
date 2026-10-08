@@ -1,0 +1,69 @@
+.summary {
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+}
+
+// Намерение записи — целая фраза, и длинная: описание скилла бывает в две
+// строки. Без переноса по словам она уезжает под соседнюю колонку и там
+// обрезается — то есть человек читает половину смысла записи.
+.intent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3xs);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+// Путь к файлу-источнику: моноширинный и приглушённый — он подпись, а не смысл.
+.source {
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  color: var(--color-fg-subtle);
+}
+
+// Слои подписки: сетка переключателей, а не столбик. Видов записи двенадцать, и
+// столбиком они уводят кнопку «показать план» за нижний край экрана.
+.layers {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--spacing-2xs) var(--spacing-sm);
+}
+
+.layer {
+  display: flex;
+  gap: var(--spacing-2xs);
+  align-items: center;
+  cursor: pointer;
+  font-size: var(--font-size-body-sm);
+}
+
+// Строка файла плана: путь с метками слева, кнопка диффа справа.
+.fileRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--spacing-sm);
+  align-items: center;
+  padding: var(--spacing-2xs) var(--spacing-xs);
+  border-radius: 8px;
+
+  &:nth-child(odd) {
+    background: var(--color-surface-sunken);
+  }
+}
+
+// На узком экране две колонки не помещаются: требования уходят под намерение,
+// а не жмут его до одного слова в строке.
+@media (width <= 720px) {
+  // Кнопка диффа уходит под путь: рядом с ним на 420 px она сжимала бы путь до
+  // нечитаемого огрызка.
+  .fileRow {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: start;
+  }
+}

@@ -3,15 +3,15 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { mkdtempSync, rmSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { AppStore } from '../lib/app-store.ts';
+import { AppStore } from '../lib/app-store/app-store.ts';
 import { registerEmptyBodyGuard } from '../lib/empty-body.ts';
 import type { ServerContext } from '../context.ts';
-import { registerGroupRoutes } from './group-routes.ts';
-import { registerProjectGitRoutes } from './project-git-routes.ts';
+import { registerGroupRoutes } from './group-routes/group-routes.ts';
+import { registerProjectGitRoutes } from './project-git-routes/project-git-routes.ts';
 import { registerHookRoutes } from './entity/hook-routes.ts';
 import { registerMcpRoutes } from './entity/mcp-routes.ts';
-import { registerScriptRoutes } from './script-routes.ts';
-import { registerPluginRoutes } from './plugin-routes.ts';
+import { registerScriptRoutes } from './script-routes/script-routes.ts';
+import { registerPluginRoutes } from './plugin-routes/plugin-routes.ts';
 
 /**
  * Запрос без тела не должен ронять сервер.

@@ -7,9 +7,9 @@ import {
   spliceCodexTableRegion,
   stableToml,
   upsertCodexRootScalar,
-} from '../../../lib/codex-toml.ts';
+} from '../../../lib/codex-toml/codex-toml.ts';
 import { readContinueModels, writeContinueModels } from '../../../lib/continue-yaml.ts';
-import { writeTextFile } from '../../../lib/safe-io.ts';
+import { writeTextFile } from '../../../lib/safe-io/safe-io.ts';
 import { UnrecognizedFormatError } from '../../../lib/format-errors.ts';
 import { PLACEHOLDER_KEY } from './profile.ts';
 
@@ -20,7 +20,7 @@ import { PLACEHOLDER_KEY } from './profile.ts';
  *
  * Правило одно и то же: правится РОВНО своя запись, всё остальное в файле
  * остаётся как было — у codex это гарантируется хирургией региона
- * (`lib/codex-toml.ts`), у continue — записью через `Document` библиотеки yaml с
+ * (`lib/codex-toml/codex-toml.ts`), у continue — записью через `Document` библиотеки yaml с
  * перепроверкой проекции прочих ключей. И там, и там перед записью файл обязан
  * разбираться: непонятный формат — отказ, а не запись вслепую.
  *

@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { useResumeInterrupted } from '@entities/ChatTree';
-import { toErrorMessage } from '@shared/api/client';
 import { toast } from '@shared/lib/toast';
+import { toErrorMessage } from '../../../shared/api/toErrorMessage';
 
 /**
  * «Продолжить» оборванные группы разделения (WP1c) — у обеих лент: у Claude и

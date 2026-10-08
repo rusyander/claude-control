@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { usePlatformRunPlan } from '@entities/Platform';
-import { modelLabel, platformRunChoice } from '@shared/lib/chat-model';
+import { modelLabel } from '@shared/lib/chat-model';
+import { platformRunChoice } from '../../../shared/lib/chat-model';
 
 export interface RunModelNameInput {
   /** Потребитель маршрута — тот же, которым спрашивает шапка чата. */

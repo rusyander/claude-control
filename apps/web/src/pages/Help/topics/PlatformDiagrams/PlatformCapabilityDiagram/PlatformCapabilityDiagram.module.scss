@@ -1,0 +1,41 @@
+/* ── Блоки ───────────────────────────────────────────────────────────── */
+
+.plain,
+.accent,
+.muted,
+.danger,
+.row {
+  stroke-width: 1.5;
+}
+
+.row {
+  fill: var(--color-surface-sunken);
+  stroke: var(--color-border);
+}
+
+/* ── Подписи ─────────────────────────────────────────────────────────── */
+
+.label {
+  fill: var(--color-fg);
+  font-size: 15px;
+}
+
+/* ── Матрица возможностей ────────────────────────────────────────────── */
+
+.markYes {
+  fill: var(--color-success);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.markPartial {
+  fill: var(--color-warning);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.markNo {
+  fill: var(--color-danger);
+  font-size: 20px;
+  font-weight: 700;
+}

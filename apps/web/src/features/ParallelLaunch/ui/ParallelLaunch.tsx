@@ -18,14 +18,7 @@ import { TextField } from '@shared/ui/text-field';
 import { normalizeProjectPath } from '@shared/lib/workspace';
 import type { ParallelLaunchProps } from './ParallelLaunch.types';
 import styles from './ParallelLaunch.module.scss';
-
-/**
- * С какого числа агентов на потолке запуск считается дорогим и получает
- * предупреждение. Два прогона — обычная работа; на третьем веер начинает
- * заметно съедать окно лимитов, и человек имеет право узнать об этом ДО нажатия,
- * а не из упёршегося в лимит агента.
- */
-const CEILING_WARN_FROM = 3;
+import { CEILING_WARN_FROM } from './ParallelLaunch.constants';
 
 /**
  * Запуск одного запроса сразу в нескольких проектах. Отмечаешь проекты, пишешь

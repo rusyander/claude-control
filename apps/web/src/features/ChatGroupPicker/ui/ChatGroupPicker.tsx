@@ -9,9 +9,9 @@ import {
   scopeOf,
 } from '@agentdeck/contracts/group-sources';
 import { useGroups, useProjectGroupChoice } from '@entities/Group';
-import { samePath } from '@shared/lib/file-path';
 import { SelectField } from '@shared/ui/select-field';
 import type { ChatGroupPickerProps } from './ChatGroupPicker.types';
+import { samePath } from '../../../shared/lib/samePath';
 
 /**
  * Поле «Группа» чата — одно правило отбора для чата Claude и чата чужого CLI.

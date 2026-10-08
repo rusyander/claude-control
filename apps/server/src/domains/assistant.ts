@@ -214,6 +214,8 @@ export function runClaudeOneShot(
   images: readonly AgentImage[] = [],
   timeoutMs: number = ASSIST_TIMEOUT_MS,
   spawnImpl?: typeof nodeSpawn,
+  /** Добавка к окружению сервера — переключатель «Claude Code на локальной модели». */
+  env: Record<string, string> = {},
 ): Promise<string> {
   // С картинками — потоковый ввод (картинка едет блоком `image`), и итог
   // приходит событием `result` потокового вывода, а не одним JSON.
@@ -223,6 +225,7 @@ export function runClaudeOneShot(
   const spawned = spawnCliProcess(command, oneShotArgs(streaming), {
     cwd: dir,
     ...(spawnImpl ? { spawnImpl } : {}),
+    ...(Object.keys(env).length > 0 ? { env } : {}),
   });
   if (spawned.error) {
     cleanup();
@@ -257,7 +260,10 @@ export function runClaudeOneShot(
       clearTimeout(timer);
       cleanup();
       if (code === 0) resolve(streaming ? envelopeOf(stdout) : stdout);
-      else reject(new Error(stderr.slice(0, 500) || `CLI завершился с кодом ${code}`));
+      else
+        reject(
+          new Error(failureText(stderr, stdout, streaming) || `CLI завершился с кодом ${code}`),
+        );
     });
 
     // Обработчик ОБЯЗАТЕЛЕН: CLI закрывается сразу (сломан, не залогинен), а
@@ -269,6 +275,23 @@ export function runClaudeOneShot(
     child.stdin.write(streaming ? streamJsonUserLine(prompt, images) : prompt);
     child.stdin.end();
   });
+}
+
+/**
+ * Причина сбоя для человека. Claude Code кладёт её не в stderr, а в `result`
+ * своего ответа: без входа stderr пуст, а в stdout — «Not logged in · Please
+ * run /login». Голое «код 1» не говорит человеку, что делать.
+ */
+function failureText(stderr: string, stdout: string, streaming: boolean): string {
+  if (stderr.trim()) return stderr.trim().slice(0, 500);
+  if (streaming) return (readStreamJsonResult(stdout)?.text ?? '').trim().slice(0, 500);
+  const last = stdout.trim().split('\n').pop() ?? '';
+  try {
+    const envelope = JSON.parse(last) as { result?: unknown };
+    return typeof envelope.result === 'string' ? envelope.result.trim().slice(0, 500) : '';
+  } catch {
+    return last.trim().slice(0, 500);
+  }
 }
 
 /** Итог потокового вывода в форме конверта `--output-format json`. */
@@ -301,9 +324,13 @@ export type HelperAsk = (
 ) => Promise<HelperOutcome>;
 
 /** Прежний путь окна — процесс `claude` по подписке, ответ из конверта JSON. */
-export function claudeAsk(command: string, spawnImpl?: typeof nodeSpawn): HelperAsk {
+export function claudeAsk(
+  command: string,
+  spawnImpl?: typeof nodeSpawn,
+  env: Record<string, string> = {},
+): HelperAsk {
   return async (prompt, images, timeoutMs) => {
-    const stdout = await runClaudeOneShot(prompt, command, images, timeoutMs, spawnImpl);
+    const stdout = await runClaudeOneShot(prompt, command, images, timeoutMs, spawnImpl, env);
     const envelope = JSON.parse(stdout) as { result?: string };
     return { ok: true, text: envelope.result ?? '' };
   };

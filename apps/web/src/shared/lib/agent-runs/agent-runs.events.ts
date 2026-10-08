@@ -86,6 +86,7 @@ export function applyEvent(id: string, event: ChatEvent): void {
         cacheCreation1h: event.cacheCreation1h,
         model: event.model,
         costUsd: event.costUsd,
+        genMs: event.genMs,
       };
       const toolIds = event.toolIds ?? [];
       if (toolIds.length === 0) {

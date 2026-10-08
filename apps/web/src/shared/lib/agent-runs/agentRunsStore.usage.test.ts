@@ -126,6 +126,27 @@ describe('agentRuns — расход по действиям', () => {
     expect(state.textUsage?.costUsd).toBeCloseTo(0.024, 6);
   });
 
+  it('время генерации ходов доезжает и складывается — скорость сплошного ответа', async () => {
+    const timed = (seq: number, output: number, genMs: number): string =>
+      frame(
+        {
+          kind: 'usage',
+          input: 1,
+          output,
+          cacheRead: 0,
+          cacheCreation: 0,
+          model: 'qwen',
+          genMs,
+          toolIds: [],
+        },
+        seq,
+      );
+    const state = await run([timed(1, 100, 1000), timed(2, 12, 200)]);
+
+    expect(state.textUsage?.output).toBe(112);
+    expect(state.textUsage?.genMs).toBe(1200);
+  });
+
   it('общий счётчик токенов прогона считает все шаги, включая безвызовные', async () => {
     const state = await run([
       usageFrame(['t1'], 1),

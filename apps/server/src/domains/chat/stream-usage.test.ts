@@ -59,6 +59,46 @@ describe('TurnTracker — настоящий поток claude 2.1.177', () => {
     const output = spent.reduce((sum, event) => sum + event.output, 0);
     expect(output).toBe(219);
   });
+
+  it('время генерации хода: от первого содержимого до message_delta, без чтения промпта', () => {
+    // Часы: каждая строка потока — +100 мс. Ход открывается message_start, затем
+    // идут блоки; генерация считается с первой дельты, а не со старта хода.
+    let clock = 0;
+    const tracker = new TurnTracker(() => clock);
+    const events: ChatEvent[] = [];
+    let firstDelta: number[] = [];
+    let ends: number[] = [];
+    let turnStarted = -1;
+    for (const line of lines) {
+      clock += 100;
+      const kind = line.type === 'stream_event' ? line.event?.type : undefined;
+      if (kind === 'message_start') turnStarted = clock;
+      if (kind === 'message_delta') ends = [...ends, clock];
+      if (kind === 'content_block_delta' && turnStarted >= 0) {
+        firstDelta = [...firstDelta, clock];
+        turnStarted = -1;
+      }
+      events.push(...tracker.track(line));
+    }
+    const spent = usages(events).filter((event) => !event.remainder);
+    expect(spent).toHaveLength(2);
+    expect(firstDelta).toHaveLength(2);
+    expect(spent.map((event) => event.genMs)).toEqual(
+      ends.map((end, index) => end - firstDelta[index]!),
+    );
+  });
+
+  it('ход без единой дельты — без времени генерации, а не с нулём', () => {
+    const tracker = new TurnTracker(() => 5);
+    const events = [
+      raw({
+        type: 'stream_event',
+        event: { type: 'message_start', message: { id: 'm', model: 'qwen' } },
+      }),
+      raw({ type: 'stream_event', event: { type: 'message_delta', usage: { output_tokens: 3 } } }),
+    ].flatMap((line) => tracker.track(line));
+    expect(usages(events)[0]).not.toHaveProperty('genMs');
+  });
 });
 
 describe('TurnTracker — края', () => {

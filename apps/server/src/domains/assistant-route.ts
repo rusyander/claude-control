@@ -52,6 +52,11 @@ export interface HelperRouteDeps {
   runRoute: (consumer: string) => PlatformRunRoute;
   /** Поиск CLI на PATH (подменяется в тестах). */
   detect?: (command: string) => boolean;
+  /**
+   * Окружение переключателя «Claude Code на локальной модели» (пусто — выключен):
+   * окно идёт без слоя `user`, а переключатель живёт в settings.json.
+   */
+  claudeSwitchEnv?: () => Record<string, string>;
 }
 
 /** Отказ окна: русский текст на языке панели плюс код для клиента. */
@@ -62,8 +67,8 @@ export interface HelperRefusal {
 }
 
 export type HelperRoute =
-  /** Процесс `claude` по подписке — прежний путь окна. */
-  | { kind: 'claude'; command: string }
+  /** Процесс `claude` по подписке — прежний путь окна (или уведённый переключателем). */
+  | { kind: 'claude'; command: string; env: Record<string, string> }
   /** Прямой вызов API по профилю «Ассистент панели». */
   | { kind: 'endpoint'; provider: ConfigProvider; endpoint: AssistantEndpoint }
   /** Чужой CLI неинтерактивным флагом, с окружением маршрута. */
@@ -117,7 +122,13 @@ export function resolveHelperRoute(deps: HelperRouteDeps): HelperRoute {
     if (endpoint) return { kind: 'endpoint', provider, endpoint };
   }
 
-  if (provider.id === 'claude') return { kind: 'claude', command: providerCliCommand(provider) };
+  if (provider.id === 'claude') {
+    return {
+      kind: 'claude',
+      command: providerCliCommand(provider),
+      env: deps.claudeSwitchEnv?.() ?? {},
+    };
+  }
 
   // Тот же потребитель, что у чата этого CLI: галочка «Qwen Code» на контуре
   // значит «этот CLI через контур» — и в окне панели тоже.
@@ -224,7 +235,7 @@ export function helperAsk(
   route: HelperRoute,
   options: { appDataDir: string; spawnImpl?: typeof nodeSpawn },
 ): HelperAsk {
-  if (route.kind === 'claude') return claudeAsk(route.command, options.spawnImpl);
+  if (route.kind === 'claude') return claudeAsk(route.command, options.spawnImpl, route.env);
   return async (prompt, images, timeoutMs) => {
     const { dir, cleanup } = lightWindowDir();
     try {
@@ -249,6 +260,7 @@ export interface HelperRouteWiring {
   gatewayPort: () => number;
   detect?: (command: string) => boolean;
   spawnImpl?: typeof nodeSpawn;
+  claudeSwitchEnv?: () => Record<string, string>;
 }
 
 /** Решение на ЭТОТ запрос → функция ответа: галочка, снятая минуту назад, уже действует. */
@@ -263,6 +275,7 @@ export function helperAskFor(
     gatewayPort: wiring.gatewayPort,
     runRoute: wiring.runRoute,
     ...(wiring.detect ? { detect: wiring.detect } : {}),
+    ...(wiring.claudeSwitchEnv ? { claudeSwitchEnv: wiring.claudeSwitchEnv } : {}),
   });
   return helperAsk(route, {
     appDataDir,

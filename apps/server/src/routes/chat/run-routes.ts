@@ -11,6 +11,7 @@ import {
   runGroupChoice,
 } from '../../domains/chat/group-run-lines.ts';
 import { chatPathHint } from '../../domains/chat/path-steps.ts';
+import { genTimeSink } from '../../domains/chat/gen-time-ledger.ts';
 import type { ChatRunRegistry } from '../../domains/chat/ChatRunRegistry.ts';
 import { RUN_UNKNOWN_DENIED } from '../../domains/chat/run-ledger.ts';
 import { ChatSession } from '../../domains/chat/ChatSession.ts';
@@ -61,7 +62,7 @@ import { getActiveProvider } from '../../providers/registry.ts';
 import type { ConfigProvider } from '../../providers/types.ts';
 import { supportsCliAutoMode } from '../../providers/auto-mode.ts';
 import type { ChatAutoModeView } from '@agentdeck/contracts';
-import { estimateCost } from '../../domains/analytics/pricing.ts';
+import { estimateStepCost } from '../../domains/analytics/pricing.ts';
 import { projectsDir, validTargetCwd } from './paths.ts';
 import { streamRun, streamGone } from '../../domains/chat/ChatStream.ts';
 import {
@@ -169,11 +170,13 @@ export function registerChatRunRoutes(
   // доступны только здесь. Отдаём ему саму функцию, а не таблицу, — тогда правка
   // цен в настройках подхватывается со следующего же шага.
   registry.setCostEstimator((model, tokens) =>
-    estimateCost(model, tokens, {
+    estimateStepCost(model, tokens, {
       overrides: ctx.store.getSettings().modelPricing,
       entries: ctx.pricing.current().entries,
     }),
   );
+  // Скорость ответа переживает конец хода: лента из транскрипта берёт время отсюда.
+  registry.setGenTimeSink(genTimeSink(ctx.location.paths.appData));
 
   /**
    * Охраняемые паттерны: всё, что пользователь просил спрашивать или запрещать.

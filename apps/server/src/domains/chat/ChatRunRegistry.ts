@@ -411,10 +411,23 @@ export class ChatRunRegistry {
    * прайса и в настройках пользователя, а реестр про них ничего не знает и
    * знать не должен. Не задана — цена шага просто не показывается.
    */
-  private estimateStepCost?: (model: string, tokens: StepTokens) => number;
+  private estimateStepCost?: (model: string, tokens: StepTokens) => number | undefined;
 
-  setCostEstimator(estimate: (model: string, tokens: StepTokens) => number): void {
+  setCostEstimator(estimate: (model: string, tokens: StepTokens) => number | undefined): void {
     this.estimateStepCost = estimate;
+  }
+
+  /**
+   * Куда сдать время генерации хода (id сообщения, мс, модель). Ставится снаружи:
+   * журнал живёт в каталоге данных панели, а реестр путей не знает. Не задано —
+   * скорость видна только пока ответ идёт.
+   */
+  private noteGenTime?: (messageId: string, genMs: number, model: string | undefined) => void;
+
+  setGenTimeSink(
+    note: (messageId: string, genMs: number, model: string | undefined) => void,
+  ): void {
+    this.noteGenTime = note;
   }
 
   /**
@@ -1306,8 +1319,17 @@ export class ChatRunRegistry {
       // Цена шага — чтобы разбивка по действию была видна сразу, а не после
       // перечитывания ленты из транскрипта: по одним токенам дешёвый шаг от
       // дорогого не отличить.
-      if (event.model && this.estimateStepCost) {
-        outgoing = { ...event, costUsd: this.estimateStepCost(event.model, event) };
+      const costUsd =
+        event.model && this.estimateStepCost
+          ? this.estimateStepCost(event.model, event)
+          : undefined;
+      if (costUsd !== undefined) outgoing = { ...event, costUsd };
+      if (event.genMs && event.messageId) {
+        try {
+          this.noteGenTime?.(event.messageId, event.genMs, event.model);
+        } catch {
+          // Журнал скорости не главнее потока прогона.
+        }
       }
     }
     if (event.kind === 'done') {

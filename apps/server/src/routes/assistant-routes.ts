@@ -121,6 +121,8 @@ export function registerAssistantRoutes(
         // Свой эндпоинт панели, если он выбран в настройках: тогда ассистент идёт
         // по этому адресу, а не в облако вендора и не через подписочный CLI.
         endpoint: resolveAssistantEndpoint(ctx.store, ctx.location.paths.appData),
+        // Переключатель Claude на локальную модель — тот же, что у помощника формы.
+        ...(helperRoute.claudeSwitchEnv ? { claudeEnv: helperRoute.claudeSwitchEnv } : {}),
       });
       return result satisfies AssistantRunResult;
     },

@@ -72,4 +72,24 @@ describe('askAssistant: CLI закрылся раньше промпта', () =>
     expect(result.error).toContain('Not logged in');
     expect(result.fields).toEqual({});
   });
+
+  it('причина из конверта stdout, когда stderr пуст (так отвечает Claude без входа)', async () => {
+    const answer = askAssistant(request, 'claude');
+    // Форма снята вживую 08.10: `claude -p --output-format json` без входа, код 1.
+    child.stdout.emit(
+      'data',
+      Buffer.from(
+        JSON.stringify({
+          type: 'result',
+          is_error: true,
+          terminal_reason: 'api_error',
+          result: 'Not logged in · Please run /login',
+        }) + '\n',
+      ),
+    );
+    child.emit('close', 1);
+
+    const result = await answer;
+    expect(result.error).toBe('Not logged in · Please run /login');
+  });
 });

@@ -504,7 +504,9 @@ export const panelAgentEn: typeof panelAgentRu = {
     routeDefault: 'Default provider',
     routeDefaultText:
       'The request goes to the vendor cloud with the active CLI’s own login: ' +
-      'Claude Code, Qwen Code, Codex, Gemini CLI, OpenCode, Goose or Kimi Code.',
+      'Claude Code, Qwen Code, Codex, Gemini CLI, OpenCode, Goose or Kimi Code. With the ' +
+      '“Claude Code on this model” checkbox on in “Local models”, the agent’s Claude Code answers ' +
+      'with the local model, bypassing the cloud.',
     routeContour: 'Contour',
     routeContourText:
       'Claude Code only: with any other CLI a turn through the contour does not start (a ' +

@@ -991,7 +991,7 @@
     {
       "topic": "analytics",
       "document": "apps/web/src/pages/Help/topics/AnalyticsTopic.tsx",
-      "confirmedAt": "2026-10-07T09:16:06.463Z",
+      "confirmedAt": "2026-10-08T09:23:59.841Z",
       "sources": [
         {
           "path": "apps/server/src/domains/analytics/scanner/scan.ts",
@@ -1016,7 +1016,7 @@
         {
           "path": "apps/server/src/domains/analytics/pricing.ts",
           "why": "«В эквиваленте API»: откуда тарифы и что перебивает прайс",
-          "sha": "050b0f7dc65e579f"
+          "sha": "f13310ff31a3a1f1"
         },
         {
           "path": "apps/server/src/domains/analytics/runtime.ts",
@@ -1122,7 +1122,7 @@
     {
       "topic": "settings",
       "document": "apps/web/src/pages/Help/topics/SettingsTopic.tsx",
-      "confirmedAt": "2026-10-06T08:16:44.816Z",
+      "confirmedAt": "2026-10-08T09:23:59.921Z",
       "sources": [
         {
           "path": "apps/server/src/lib/safe-io.ts",
@@ -1152,7 +1152,7 @@
         {
           "path": "apps/server/src/domains/watcher/report.ts",
           "why": "«Как читать отчёт»: WATCH-REPORT.md в корне приложения, оглавление, WR-n, тип и важность, разделы на месте, улики, секреты вычищены",
-          "sha": "1f6fd1981b2c1fbe"
+          "sha": "ccc03048b38b1fca"
         },
         {
           "path": "apps/server/src/domains/watcher/report-texts.ts",
@@ -1448,12 +1448,12 @@
         {
           "path": "apps/server/src/routes/panel-agent/run-routes.ts",
           "why": "«Отказы»: busy и data_mask_broken до запуска",
-          "sha": "3ddf2e84923b5eaf"
+          "sha": "794a3aa589bd2639"
         },
         {
           "path": "apps/server/src/domains/panel-agent/launch.ts",
           "why": "«Куда уходит разговор» и отказы provider_unsupported, cli_not_found, endpoint_unsupported, contour_unreachable",
-          "sha": "db461a3b655ba14f"
+          "sha": "2a4bdd3b9823d8f4"
         },
         {
           "path": "apps/server/src/domains/panel-agent/runner.ts",
@@ -1681,7 +1681,7 @@
           "sha": "67f7d758e22c089b"
         }
       ],
-      "confirmedAt": "2026-10-07T09:28:30.566Z"
+      "confirmedAt": "2026-10-08T09:24:00.033Z"
     },
     {
       "topic": "portability",
@@ -1950,7 +1950,7 @@
     {
       "topic": "phone",
       "document": "apps/web/src/pages/Help/topics/PhoneTopic.tsx",
-      "confirmedAt": "2026-10-07T09:34:31.038Z",
+      "confirmedAt": "2026-10-08T09:24:00.122Z",
       "sources": [
         {
           "path": "apps/server/src/lib/access-gate.ts",
@@ -2005,7 +2005,7 @@
         {
           "path": "apps/server/src/routes/panel-agent/run-routes.ts",
           "why": "«Когда панель не отвечает», ход агента панели: фон и обрыв не останавливают ход, 10 минут без телефона, минута на конец",
-          "sha": "3ddf2e84923b5eaf"
+          "sha": "794a3aa589bd2639"
         },
         {
           "path": "apps/mobile/src/entities/remote/api.ts",
@@ -2032,7 +2032,7 @@
     {
       "topic": "localModels",
       "document": "apps/web/src/pages/Help/topics/LocalModelsTopic.tsx",
-      "confirmedAt": "2026-10-07T21:25:00.590Z",
+      "confirmedAt": "2026-10-08T09:24:00.190Z",
       "sources": [
         {
           "path": "packages/contracts/src/local-models.ts",
@@ -2052,7 +2052,7 @@
         {
           "path": "apps/server/src/domains/local-models/connect.ts",
           "why": "«Куда идёт запрос»: контур локальной модели, режим «обязательно», кому отдаётся маршрут",
-          "sha": "1d40980592c45723"
+          "sha": "367b0d33591c463f"
         },
         {
           "path": "apps/server/src/domains/local-models/paths.ts",
@@ -2067,7 +2067,7 @@
         {
           "path": "apps/server/src/domains/local-models/claude-switch.ts",
           "why": "«Claude Code на этой модели»: какие переменные пишутся в settings.json, что возвращает выключение, правка руками",
-          "sha": "3d40b6160df007b6"
+          "sha": "7880ffcaaf83da5a"
         },
         {
           "path": "apps/server/src/domains/local-models/hardware.ts",
@@ -2079,7 +2079,7 @@
     {
       "topic": "kit",
       "document": "apps/web/src/pages/Help/topics/KitTopic.tsx",
-      "confirmedAt": "2026-10-07T21:35:01.149Z",
+      "confirmedAt": "2026-10-08T09:24:00.278Z",
       "sources": [
         {
           "path": "apps/server/src/domains/kit/service.ts",
@@ -2099,7 +2099,7 @@
         {
           "path": "apps/server/src/bootstrap/runtime.ts",
           "why": "«Не собралось — прогон не запускается»: отказ при сбое сборки набора",
-          "sha": "9458e7601262d510"
+          "sha": "4c61eab846408407"
         },
         {
           "path": "apps/web/src/pages/Kit/KitGlobalActions.tsx",

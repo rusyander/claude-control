@@ -309,6 +309,33 @@ describe('мелочи разбора', () => {
     ).rejects.toThrow('сохранение контура: Запрос не принят: неверно задано enabled.');
   });
 
+  it('шлюз не поднялся — включение отдаёт свою красную проверку, а не 409 с кодом причины', async () => {
+    const activation = { active: true, probe: { ok: false, message: 'шлюз не запущен' } };
+    const inject = async (request: { method: string; url: string }) => {
+      if (request.method === 'POST' && request.url.endsWith('/activate'))
+        return { status: 200, body: activation };
+      if (request.method === 'POST' && request.url.endsWith('/apply'))
+        return {
+          status: 200,
+          body: { skipped: [{ targetId: 'assistant', reason: 'gateway_down' }] },
+        };
+      return { status: 200, body: {} };
+    };
+    await expect(
+      connectLocal(inject, { baseUrl: 'http://127.0.0.1:1', model: 'm', title: 't' }),
+    ).resolves.toEqual(activation);
+  });
+
+  it('цель ассистента пропущена по другой причине — отказ с этой причиной', async () => {
+    const inject = async (request: { method: string; url: string }) =>
+      request.method === 'POST' && request.url.endsWith('/apply')
+        ? { status: 200, body: { skipped: [{ targetId: 'assistant', reason: 'no_token' }] } }
+        : { status: 200, body: {} };
+    await expect(
+      connectLocal(inject, { baseUrl: 'http://127.0.0.1:1', model: 'm', title: 't' }),
+    ).rejects.toThrow('no_token');
+  });
+
   it('контур локальной модели — драйвер ollama, адрес с /v1, обязательный режим', () => {
     expect(
       localPlatformSettings({

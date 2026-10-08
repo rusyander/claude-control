@@ -25,7 +25,11 @@ export function groupDeps(ctx: ServerContext): EntityToggleDeps {
  * `haiku`); свой эндпоинт панели, если выбран, уважается так же, как у
  * ассистента: данные уходят туда, куда человек их направил.
  */
-export function groupAsk(ctx: ServerContext): GroupAsk {
+export function groupAsk(
+  ctx: ServerContext,
+  /** Переключатель Claude на локальную модель; без него `claude -p` ушёл бы в облако. */
+  claudeEnv?: () => Record<string, string>,
+): GroupAsk {
   return async (messages, tier) => {
     const provider = getActiveProvider(ctx.store);
     const models = ctx.models.current(provider.modelVendors ?? []).models;
@@ -35,6 +39,7 @@ export function groupAsk(ctx: ServerContext): GroupAsk {
       models,
       endpoint: resolveAssistantEndpoint(ctx.store, ctx.location.paths.appData),
       ...(model ? { model } : {}),
+      ...(claudeEnv ? { claudeEnv } : {}),
     });
     if (!result.ok) throw new GroupModelError(result.reason, result.error);
     return result.reply;

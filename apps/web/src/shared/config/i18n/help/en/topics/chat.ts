@@ -1886,7 +1886,12 @@ export const chatEn: typeof chatRu = {
       'the step time: how long the agent took to reach this action since the previous ' +
       'record of the run; the last block of an answer also carries the whole run (Σ), ' +
       'and while an answer is being written a live counter runs under it. Old records ' +
-      'without a timestamp get no column.',
+      'without a timestamp get no column. An answer from a local model (not cloud ' +
+      'Claude) also shows its speed on the badge — “N tok/s”: generated tokens over ' +
+      'generation time, prompt reading excluded. It stays after the turn ends and ' +
+      'after a reload; an answer written outside the panel (in a terminal) has none — ' +
+      'only the panel’s live stream knows the generation time. Such a model has no ' +
+      'price until you set one yourself in the pricing settings.',
 
     recipesTitle: 'How to start working with a project',
     recipe1: 'Open the project',

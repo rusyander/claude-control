@@ -1676,6 +1676,8 @@ export const en: TranslationSchema = {
       span: 'from {{from}} to {{to}}',
       run: 'Whole run',
       live: 'running {{time}}',
+      speed: '{{value}} tok/s',
+      speedRow: 'Generation speed',
     },
     copyArtifact: 'Copy contents',
     tabPreview: 'Preview',

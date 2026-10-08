@@ -40,6 +40,8 @@ interface Turn {
   /** Счётчики из `message_start` — подстраховка, если дельта пришла без них. */
   start: Tokens;
   toolIds: string[];
+  /** Первое содержимое хода (текст, размышление, аргументы вызова) — начало генерации. */
+  firstDeltaAt?: number;
 }
 
 const ZERO: Tokens = { input: 0, output: 0, cacheRead: 0, cacheCreation: 0, cacheCreation1h: 0 };
@@ -58,7 +60,13 @@ function tokensOf(usage: RawUsage | undefined, base: Tokens = ZERO): Tokens {
 
 function usageEvent(
   tokens: Tokens,
-  meta: { model?: string; toolIds?: string[]; remainder?: boolean },
+  meta: {
+    model?: string;
+    toolIds?: string[];
+    remainder?: boolean;
+    genMs?: number;
+    messageId?: string;
+  },
 ): ChatEvent {
   return {
     kind: 'usage',
@@ -70,6 +78,8 @@ function usageEvent(
     ...(meta.model ? { model: meta.model } : {}),
     ...(meta.toolIds ? { toolIds: meta.toolIds } : {}),
     ...(meta.remainder ? { remainder: true } : {}),
+    ...(meta.genMs ? { genMs: meta.genMs } : {}),
+    ...(meta.genMs && meta.messageId ? { messageId: meta.messageId } : {}),
   };
 }
 
@@ -83,6 +93,17 @@ export class TurnTracker {
   /** Начался следующий блок — абзац отдадим, как только в нём появится текст. */
   private textPending = false;
   private thinkingPending = false;
+
+  /**
+   * Часы — ради скорости генерации (ток/с у ответа локальной модели): от первого
+   * содержимого хода до его `message_delta`. Чтение промпта сюда не входит — его
+   * время до первого токена, и на локальной модели оно отдельная величина.
+   */
+  private readonly now: () => number;
+
+  constructor(now: () => number = Date.now) {
+    this.now = now;
+  }
 
   /** События интерфейса по одной строке потока: расход хода, разделители блоков, остаток. */
   track(raw: RawEvent): ChatEvent[] {
@@ -114,6 +135,7 @@ export class TurnTracker {
     }
 
     if (event.type === 'content_block_delta') {
+      if (this.turn && this.turn.firstDeltaAt === undefined) this.turn.firstDeltaAt = this.now();
       const delta = event.delta;
       if (delta?.type === 'text_delta' && delta.text) {
         this.textStarted = true;
@@ -136,7 +158,10 @@ export class TurnTracker {
       const turn = this.turn;
       if (!turn) return [];
       this.turn = undefined;
-      return [this.account(tokensOf(event.usage, turn.start), turn.id, turn.model, turn.toolIds)];
+      const genMs = turn.firstDeltaAt === undefined ? 0 : this.now() - turn.firstDeltaAt;
+      return [
+        this.account(tokensOf(event.usage, turn.start), turn.id, turn.model, turn.toolIds, genMs),
+      ];
     }
 
     return [];
@@ -172,6 +197,7 @@ export class TurnTracker {
     id: string | undefined,
     model?: string,
     toolIds?: string[],
+    genMs?: number,
   ): ChatEvent {
     if (id) this.seen.add(id);
     this.total.input += tokens.input;
@@ -179,7 +205,11 @@ export class TurnTracker {
     this.total.cacheRead += tokens.cacheRead;
     this.total.cacheCreation += tokens.cacheCreation;
     this.total.cacheCreation1h += tokens.cacheCreation1h;
-    return usageEvent(tokens, { model, toolIds });
+    return usageEvent(tokens, {
+      model,
+      toolIds,
+      ...(genMs && genMs > 0 ? { genMs, ...(id ? { messageId: id } : {}) } : {}),
+    });
   }
 
   /**

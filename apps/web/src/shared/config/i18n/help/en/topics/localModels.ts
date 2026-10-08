@@ -44,7 +44,10 @@ export const localModelsEn: typeof localModelsRu = {
       'gateway; through the local-model contour the gateway passes the request to the model ' +
       'server on 127.0.0.1:11435, which holds the model in video memory. The contour’s mode is ' +
       '“required”: if the server does not answer, the request does not silently go to the cloud — ' +
-      'it fails with a clear error.',
+      'it fails with a clear error. The panel’s own helpers — the panel agent, the form helper, ' +
+      'the assistant window, the watcher and group service calls — take the same contour: ' +
+      'connecting makes it the “Panel assistant”, and “Back to the cloud” restores the previous ' +
+      'choice. If the gateway did not start (port busy), the section shows a red check with the reason.',
 
     guide: {
       firstTitle: 'Frame by frame: the section itself',
@@ -143,7 +146,10 @@ export const localModelsEn: typeof localModelsRu = {
       'the model for every role (subagents included) and the server context window. Claude Code ' +
       'itself — terminal, editor chat, panel chats — goes to the local model. The model choice in ' +
       'Claude Code (/model in the terminal, the list in the editor) shows one row with its name ' +
-      'instead of Opus and Sonnet. New sessions pick it up at once; start an open session again.',
+      'instead of Opus and Sonnet. New sessions pick it up at once; start an open session again. ' +
+      'The panel’s helpers (the panel agent, the form helper, the assistant window, the watcher, ' +
+      'group service calls) start Claude without your settings — the panel passes them the same ' +
+      'variables itself, so they answer with the local model too.',
     claudeOff: 'Turn off',
     claudeOffText:
       'Restores these variables exactly as they were before switching on; nothing else in the ' +

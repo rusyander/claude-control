@@ -35,6 +35,12 @@ export interface PanelAgentLaunchDeps {
   /** Порт живого шлюза; 0 — не поднят. */
   gatewayPort: () => number;
   detect?: (command: string) => boolean;
+  /**
+   * Окружение переключателя «Claude Code на локальной модели» (пусто — выключен).
+   * Лёгкое окно снимает слой `user`, а переключатель живёт именно в settings.json:
+   * без этих переменных агент при уведённом Claude ушёл бы в облако.
+   */
+  claudeSwitchEnv?: () => Record<string, string>;
 }
 
 export type PanelAgentLaunch =
@@ -126,8 +132,12 @@ export function resolvePanelAgentLaunch(deps: PanelAgentLaunchDeps): PanelAgentL
   const profile = settings.assistantEndpointId
     ? settings.endpointProfiles.find((item) => item.id === settings.assistantEndpointId)
     : undefined;
-  // Выбранного профиля больше нет — как у ассистента: облако вендора по умолчанию.
-  if (!profile) return { ok: true, providerId: provider.id, dialect, command, env: {} };
+  // Выбранного профиля больше нет — как у ассистента: облако вендора по умолчанию,
+  // а если Claude уведён переключателем на локальную модель — туда же, куда и он.
+  if (!profile) {
+    const env = dialect === 'claude' ? (deps.claudeSwitchEnv?.() ?? {}) : {};
+    return { ok: true, providerId: provider.id, dialect, command, env };
+  }
 
   if (!profile.ownerPlatformId) {
     return refuse(

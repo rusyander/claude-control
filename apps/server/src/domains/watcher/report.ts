@@ -342,6 +342,7 @@ const LOCK_WAIT_MS = 3000;
  * ожидания держал бы каждый сигнал все 3 с на главном потоке и ронял его.
  */
 const LOCK_STALE_MS = 2000;
+const LOCK_BUSY_CODES = new Set(['EEXIST', 'EPERM', 'EACCES']);
 
 /** Жив ли процесс, названный в замке. `EPERM` — есть, но чужой: тоже жив. */
 function ownerAlive(lock: string): boolean {
@@ -374,7 +375,9 @@ function withLock<T>(path: string, work: () => T): T {
       }
       break;
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+      // Windows под спором отвечает EPERM/EACCES, пока сосед свой замок ещё
+      // удаляет (замер 08.10: ~1 на 400 попыток) — это тот же «занято».
+      if (!LOCK_BUSY_CODES.has((error as NodeJS.ErrnoException).code ?? '')) throw error;
       try {
         const stale = Date.now() - statSync(lock).mtimeMs > LOCK_STALE_MS;
         if (stale || !ownerAlive(lock)) rmSync(lock, { force: true });

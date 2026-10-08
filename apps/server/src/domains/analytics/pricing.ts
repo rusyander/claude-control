@@ -298,6 +298,39 @@ export function costOf(
   );
 }
 
+/**
+ * Цена ОДНОГО шага модели в ленте чата; undefined — цены нет.
+ *
+ * Отличие от {@link estimateCost}: запасная ставка Sonnet достаётся только модели
+ * Claude, которой ещё нет в прайсе. Чужая модель без известной цены — локальная
+ * Qwen через Ollama, модель контура — цены не получает: живой прогон 08.10 показал
+ * «$0.0814» у ответа локальной Qwen, которая не стоит ничего. Выдуманная цена у
+ * каждого шага хуже пустой (контракт: пусто — считать не по чему).
+ */
+export function estimateStepCost(
+  model: string,
+  tokens: Parameters<typeof estimateCost>[1],
+  lookup: PricingLookup = {},
+): number | undefined {
+  // Прайс и запасная ставка — только у имени Claude: прайс ищет семейство
+  // подстрокой, и дистиллят `…Qwen3-14B-Claude-Sonnet…` получил бы цену Sonnet.
+  // Свои цены человека из настроек действуют для любой модели.
+  const claude = isClaudeModelName(model);
+  const known = findPricing(model, claude ? lookup : { ...lookup, entries: [] });
+  if (known) return costOf(known, tokens);
+  return claude ? costOf(FALLBACK, tokens) : undefined;
+}
+
+/**
+ * Имя модели Claude: `claude-…`, псевдоним CLI (`opus`, `sonnet[1m]`, `opusplan`)
+ * или то же за приставкой облака (`us.anthropic.claude-…`, `anthropic/claude-…`).
+ * Слово семейства в середине чужого тега Claude не делает.
+ */
+function isClaudeModelName(model: string): boolean {
+  const name = model.toLowerCase().replace(/^([a-z]{2,6}\.)?anthropic[./]/, '');
+  return name.startsWith('claude') || FAMILIES.some((family) => name.startsWith(family));
+}
+
 export function estimateCost(
   model: string,
   tokens: {

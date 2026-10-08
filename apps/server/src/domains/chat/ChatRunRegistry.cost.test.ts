@@ -84,6 +84,17 @@ describe('ChatRunRegistry — цена шага', () => {
     expect(sent()?.costUsd).toBeUndefined();
   });
 
+  it('оценщик цены не знает (локальная модель) — у события нет цены, а не ноль и не выдумка', () => {
+    registry.setCostEstimator(() => undefined);
+    registry.start('c1', OPTIONS, {});
+    registry.attach('c1', 0, subscriber);
+
+    fake.emit(usage('qwen3.6:27b-coding'));
+
+    expect(sent()).not.toHaveProperty('costUsd');
+    expect(sent()?.output).toBe(200);
+  });
+
   it('оценщик не задан — событие проходит как есть, счётчик токенов работает', () => {
     registry.start('c1', OPTIONS, {});
     registry.attach('c1', 0, subscriber);

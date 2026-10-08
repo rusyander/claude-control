@@ -1,4 +1,5 @@
 import type { LocalConnectInfo } from '@agentdeck/contracts/local-models';
+import { PLATFORM_ASSISTANT_TARGET } from '@agentdeck/contracts/platform';
 import {
   PLATFORM_ASSISTANT_CONSUMER,
   foreignConsumerId,
@@ -130,6 +131,27 @@ export async function connectLocal(
     url: `/api/platforms/${LOCAL_PLATFORM_ID}/activate`,
   });
   if (activated.status >= 400) throw fail('local-contour-activate', 'включение контура', activated);
+  // Агент панели, помощники и наблюдатель ходят профилем «Ассистента панели», а не
+  // окружением прогона: его назначает применение цели `assistant`, как в мастере
+  // контура. Без этого шага при недоступном Claude они уходили в облако и падали
+  // «Not logged in» (живой прогон 08.10). Прежний выбор профиля перекрывается —
+  // «Подключить» обещает модель везде, — а `deactivate` возвращает его откатом.
+  const applied = await inject({
+    method: 'POST',
+    url: `/api/platforms/${LOCAL_PLATFORM_ID}/apply`,
+    payload: { targets: [PLATFORM_ASSISTANT_TARGET], overwrite: [PLATFORM_ASSISTANT_TARGET] },
+  });
+  if (applied.status >= 400) throw fail('local-contour-activate', 'ассистент панели', applied);
+  const skipped = (applied.body as { skipped?: { reason?: string }[] } | undefined)?.skipped ?? [];
+  // Шлюз не поднялся (порт занят): включение уже отдало красную проверку с
+  // причиной — она человеку и нужна, а не 409 с кодом цели поверх неё.
+  if (skipped.every((item) => item.reason === 'gateway_down')) return activated.body;
+  if (skipped.length > 0) {
+    throw fail('local-contour-activate', 'ассистент панели', {
+      status: 409,
+      body: { message: `цель пропущена: ${skipped[0]?.reason ?? 'причина не названа'}` },
+    });
+  }
   return activated.body;
 }
 

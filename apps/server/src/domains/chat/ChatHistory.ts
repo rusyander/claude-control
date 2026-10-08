@@ -163,6 +163,16 @@ function readSummary(path: string, projectName: string): ChatSummary | undefined
   return withAwaitingWindow(summary, stats.mtimeMs);
 }
 
+/** Расход ответа плюс время генерации из журнала — если ответ в нём есть. */
+function withGenMs(
+  usage: ChatMessage['usage'],
+  messageId: string | undefined,
+  genTimes: ReadonlyMap<string, number> | undefined,
+): ChatMessage['usage'] {
+  const genMs = messageId ? genTimes?.get(messageId) : undefined;
+  return usage && genMs ? { ...usage, genMs } : usage;
+}
+
 /** Параметры окна ленты: сколько сообщений отдать и сколько новых пропустить. */
 export interface MessagesWindow {
   /** Размер окна — сколько реплик вернуть. */
@@ -175,6 +185,11 @@ export interface MessagesWindow {
    * читает маршрут: лента о контурах не знает ничего, кроме этого набора.
    */
   summarizedIds?: ReadonlySet<string>;
+  /**
+   * Время генерации ответа по id сообщения модели (`gen-time-ledger.ts`): в
+   * транскрипте его нет, а без него лента теряет скорость ответа в конце хода.
+   */
+  genTimes?: ReadonlyMap<string, number>;
 }
 
 /**
@@ -236,7 +251,7 @@ export async function readChatMessages(
       ring[ring.length - 1] = {
         ...tail,
         blocks: [...tail.blocks, ...blocks],
-        usage: toUsage(record) ?? tail.usage,
+        usage: withGenMs(toUsage(record) ?? tail.usage, messageId, window.genTimes),
       };
       continue;
     }
@@ -250,7 +265,7 @@ export async function readChatMessages(
       blocks,
       timestamp: record.timestamp ?? '',
       parentId: record.parentUuid ?? undefined,
-      usage: toUsage(record),
+      usage: withGenMs(toUsage(record), messageId, window.genTimes),
       gitBranch: branchOf(record),
       ...(summarized ? { contextSummarized: true } : {}),
     });

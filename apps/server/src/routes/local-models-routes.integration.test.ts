@@ -174,6 +174,10 @@ beforeAll(async () => {
   app.get('/api/platforms/:id/apply', () => ({
     consumers: [{ id: 'foreign:qwen' }, { id: 'foreign:codex', reason: 'нет' }],
   }));
+  app.post<{ Body: unknown }>('/api/platforms/:id/apply', (request) => {
+    platformCalls.push({ method: 'POST', url: request.url, body: request.body });
+    return { applied: [{ targetId: 'assistant' }], skipped: [] };
+  });
   app.post('/api/platforms/:id/activate', (request) => {
     platformCalls.push({ method: 'POST', url: request.url, body: undefined });
     platforms.activePlatformId = LOCAL_PLATFORM_ID;
@@ -248,10 +252,16 @@ describe('раздел «Локальные модели» по настояще
     });
     expect(settings.consumers).toContain('foreign:qwen');
     expect(settings.consumers).not.toContain('foreign:codex');
-    expect(platformCalls.at(-1)).toMatchObject({
-      method: 'POST',
-      url: `/api/platforms/${LOCAL_PLATFORM_ID}/activate`,
-    });
+    // Включение, затем ассистент панели на контур: без него агент панели, помощники и
+    // наблюдатель шли в облако Claude мимо локальной модели (живой прогон 08.10).
+    expect(platformCalls.slice(-2)).toMatchObject([
+      { method: 'POST', url: `/api/platforms/${LOCAL_PLATFORM_ID}/activate` },
+      {
+        method: 'POST',
+        url: `/api/platforms/${LOCAL_PLATFORM_ID}/apply`,
+        body: { targets: ['assistant'], overwrite: ['assistant'] },
+      },
+    ]);
 
     const { body } = await api<LocalModelsInfo>('GET', '/api/local-models');
     expect(body.connect).toEqual({ configured: true, active: true, model: TAG });

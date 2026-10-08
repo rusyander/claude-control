@@ -34,6 +34,8 @@ export interface WatcherRouteDeps {
   /** Порт живого шлюза; 0 — не поднят. */
   gatewayPort: () => number;
   detect?: (command: string) => boolean;
+  /** Окружение переключателя «Claude Code на локальной модели» — см. `PanelAgentLaunchDeps`. */
+  claudeSwitchEnv?: () => Record<string, string>;
 }
 
 export type WatcherRoute =
@@ -66,7 +68,9 @@ export function resolveWatcherRoute(deps: WatcherRouteDeps): WatcherRoute {
     ? (settings.endpointProfiles ?? []).find((item) => item.id === settings.assistantEndpointId)
     : undefined;
   // Выбранного профиля больше нет — как у ассистента: облако вендора по умолчанию.
-  if (!profile) return { ok: true, env: {}, viaContour: false };
+  // Уведённый переключателем Claude — его окружением: `--model haiku` наблюдателя
+  // переводит в локальную модель `ANTHROPIC_DEFAULT_HAIKU_MODEL` того же набора.
+  if (!profile) return { ok: true, env: deps.claudeSwitchEnv?.() ?? {}, viaContour: false };
   if (!profile.ownerPlatformId)
     return refuse('watcher-endpoint-unsupported', { name: profile.name });
 

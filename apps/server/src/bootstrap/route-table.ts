@@ -12,6 +12,9 @@ import { registerProviderSkillsRoutes } from '../routes/provider-skills-routes.t
 import { registerProviderPermissionsRoutes } from '../routes/provider-permissions-routes.ts';
 import { registerProviderKeysRoutes } from '../routes/provider-keys-routes.ts';
 import { registerGroupRoutes } from '../routes/group-routes.ts';
+import { groupAsk } from '../routes/group-ask.ts';
+import type { GroupAsk } from '../domains/groups/model.ts';
+import type { ServerContext } from '../context.ts';
 import { registerGroupSourcesRoutes } from '../routes/group-sources-routes.ts';
 import { registerGroupPathRoutes } from '../routes/group-path-routes.ts';
 import { registerGroupKnobsRoutes } from '../routes/group-knobs-routes.ts';
@@ -109,7 +112,15 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
   } = runtime;
   // Маршрут и порт спрашиваются на каждом запросе окна, а не здесь: галочка
   // контура, снятая минуту назад, уже действует.
-  const helperRoute = { runRoute: runtime.runRoute, gatewayPort: runtime.gatewayPort };
+  const helperRoute = {
+    runRoute: runtime.runRoute,
+    gatewayPort: runtime.gatewayPort,
+    claudeSwitchEnv: runtime.claudeSwitchEnv,
+  };
+
+  // Служебные вызовы групп идут тем же переключателем Claude, что и окно помощника.
+  const groupAskFor = (context: ServerContext): GroupAsk =>
+    groupAsk(context, runtime.claudeSwitchEnv);
 
   return [
     registerConfigRoutes,
@@ -126,10 +137,10 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
     registerProviderKeysRoutes,
     registerGroupRoutes,
     // Группы по областям (обнаружение, копия в общие, выбор, переопределение) и «Путь».
-    registerGroupSourcesRoutes,
-    registerGroupPathRoutes,
+    (instance, context) => registerGroupSourcesRoutes(instance, context, groupAskFor),
+    (instance, context) => registerGroupPathRoutes(instance, context, groupAskFor),
     // «Числа» группы: сколько прогонов делают её скиллы.
-    registerGroupKnobsRoutes,
+    (instance, context) => registerGroupKnobsRoutes(instance, context, groupAskFor),
     // «Копировать группу»: независимая выключенная копия рядом с оригиналом.
     registerGroupDuplicateRoutes,
     // «Что из группы дойдёт до CLI»: чистый план слоя, без записи.
@@ -297,6 +308,7 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
         selfBaseUrl: `http://127.0.0.1:${process.env.PORT ?? 5178}`,
         gatewayPort: () =>
           runtime.platformGateway.status().running ? runtime.platformGateway.status().port : 0,
+        claudeSwitchEnv: runtime.claudeSwitchEnv,
         pending: panelPending,
       }),
   ];

@@ -32,14 +32,17 @@ export function createBackgroundWatcher(
   ctx: ServerContext,
   /** Порт живого шлюза контуров; 0 — не поднят. */
   gatewayPort: () => number = () => 0,
+  /** Окружение переключателя «Claude Code на локальной модели» (пусто — выключен). */
+  claudeSwitchEnv: () => Record<string, string> = () => ({}),
 ): BackgroundWatcher {
-  return new BackgroundWatcher(backgroundWatcherDeps(ctx, gatewayPort));
+  return new BackgroundWatcher(backgroundWatcherDeps(ctx, gatewayPort, claudeSwitchEnv));
 }
 
 /** Зависимости наблюдателя из контекста — отдельно, чтобы проверка видела маршрут без запуска. */
 export function backgroundWatcherDeps(
   ctx: ServerContext,
   gatewayPort: () => number,
+  claudeSwitchEnv: () => Record<string, string> = () => ({}),
 ): BackgroundWatcherDeps {
   const claude = getProvider('claude');
   const debounce = envNumber('AGENTDECK_WATCH_DEBOUNCE_MS', 0);
@@ -57,6 +60,7 @@ export function backgroundWatcherDeps(
         store: ctx.store,
         appDataDir: ctx.location.paths.appData,
         gatewayPort,
+        claudeSwitchEnv,
       }),
     pricing: gatewayPricing(ctx.store, ctx.pricing),
     language: () => reportLanguage(ctx.store.getSettings().language),

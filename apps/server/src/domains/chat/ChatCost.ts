@@ -1,5 +1,5 @@
 import type { ChatMessage } from '@agentdeck/contracts';
-import { estimateCost, type PricingLookup } from '../analytics/pricing.ts';
+import { estimateStepCost, type PricingLookup } from '../analytics/pricing.ts';
 
 /**
  * Тарифы на момент запроса. Функция, а не таблица: прайс подтягивается в фоне,
@@ -25,10 +25,11 @@ export function createStepCost(rates: StepRates): (message: ChatMessage) => Chat
     if (!usage?.model) return message;
 
     const at = Date.parse(message.timestamp);
-    const costUsd = estimateCost(usage.model, usage, {
+    const costUsd = estimateStepCost(usage.model, usage, {
       ...rates(),
       at: Number.isNaN(at) ? undefined : at,
     });
+    if (costUsd === undefined) return message;
 
     return { ...message, usage: { ...usage, costUsd } };
   };

@@ -60,7 +60,7 @@ describe('маршрут разбора наблюдателя', () => {
     rmSync(cwd, { recursive: true, force: true });
   });
 
-  const make = (): BackgroundWatcher => {
+  const make = (switchEnv?: Record<string, string>): BackgroundWatcher => {
     const watcher = new BackgroundWatcher({
       appDataDir: () => appData,
       reportPath: () => join(cwd, 'WATCH-REPORT.md'),
@@ -68,7 +68,12 @@ describe('маршрут разбора наблюдателя', () => {
       resolveCommand: () => process.execPath,
       model: () => 'haiku',
       resolveRoute: () =>
-        resolveWatcherRoute({ store, appDataDir: appData, gatewayPort: () => gatewayPort }),
+        resolveWatcherRoute({
+          store,
+          appDataDir: appData,
+          gatewayPort: () => gatewayPort,
+          ...(switchEnv ? { claudeSwitchEnv: () => switchEnv } : {}),
+        }),
       language: () => (store.getSettings().language === 'en' ? 'en' : 'ru'),
       pricing: () => ({ overrides: {} }),
       spawnImpl: ((command: string, args: string[], options: object) => {
@@ -186,5 +191,18 @@ describe('маршрут разбора наблюдателя', () => {
     const { argv, baseUrl } = dump();
     expect(argv[argv.indexOf('--model') + 1]).toBe('haiku');
     expect(baseUrl).toBe('');
+  });
+
+  it('Claude уведён переключателем на локальную модель — разбор идёт туда же, а не в облако', async () => {
+    // Наблюдатель запускается без слоя `user`, и settings.json с переключателем не
+    // читает: без явного окружения разбор ушёл бы в облако («Not logged in», 08.10).
+    const watcher = make({
+      ANTHROPIC_BASE_URL: 'http://127.0.0.1:11435',
+      ANTHROPIC_MODEL: 'qwen3.6:27b-coding',
+    });
+    await runOnce(watcher);
+    const { baseUrl, envNames } = dump();
+    expect(baseUrl).toBe('http://127.0.0.1:11435');
+    expect(envNames).toContain('ANTHROPIC_MODEL');
   });
 });

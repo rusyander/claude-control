@@ -329,6 +329,8 @@ export type ChatEvent =
       cacheCreation1h?: number;
       model?: string;
       costUsd?: number;
+      /** Генерация выхода этого хода, мс — для скорости ответа. */
+      genMs?: number;
       /** Вызовы, рождённые этим шагом; пусто — шаг закончился одним текстом. */
       toolIds?: string[];
       /**

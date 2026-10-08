@@ -4,6 +4,7 @@ import { formatTokens } from '@shared/lib/format';
 import { formatDuration } from '@shared/lib/format-duration';
 import { formatClock } from '@shared/lib/format-clock';
 import type { TokenBadgeProps } from './token-badge.types';
+import { generationSpeed } from './generation-speed';
 import styles from './token-badge.module.scss';
 
 /**
@@ -48,6 +49,7 @@ export function TokenBadge({
   const isOpen = hovered || pinned;
   const time = durationMs === undefined ? undefined : formatDuration(durationMs, t);
   const runTotal = runTotalMs === undefined ? undefined : formatDuration(runTotalMs, t);
+  const speed = generationSpeed(usage);
 
   // Закрепление снимается кликом мимо и Escape — иначе раскрытие,
   // оставленное открытым, перекрывало бы соседние строки ленты.
@@ -113,6 +115,9 @@ export function TokenBadge({
             {runTotal !== undefined && <span className={styles.runTotal}>Σ {runTotal}</span>}
           </span>
         )}
+        {speed !== undefined && (
+          <span className={styles.speed}>{t('chat.usage.speed', { value: speed })}</span>
+        )}
       </button>
 
       {isOpen && (
@@ -167,6 +172,12 @@ export function TokenBadge({
               <span className={styles.row}>
                 <span className={styles.rowName}>{t('chat.usage.effort')}</span>
                 <span className={styles.rowValue}>{effort}</span>
+              </span>
+            )}
+            {speed !== undefined && (
+              <span className={styles.row}>
+                <span className={styles.rowName}>{t('chat.usage.speedRow')}</span>
+                <span className={styles.rowValue}>{t('chat.usage.speed', { value: speed })}</span>
               </span>
             )}
           </span>

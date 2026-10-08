@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   getPricing,
   estimateCost,
+  estimateStepCost,
   findEntry,
   longCacheRate,
   BUILT_IN_ENTRIES,
@@ -457,5 +458,49 @@ describe('estimateCost', () => {
       // 5 + 6.25 + 5 = 16.25
       expect(projectTotal).toBe(16.25);
     });
+  });
+});
+
+describe('estimateStepCost — цена шага в ленте чата', () => {
+  const input = { ...NO_TOKENS, input: M };
+
+  it('локальная модель без цены — цены нет, а не ставка Sonnet (живой прогон 08.10: $0.0814 у Qwen)', () => {
+    expect(estimateStepCost('qwen3.6:27b-coding', input, { at: AT })).toBeUndefined();
+    expect(estimateStepCost('gpt-4o', input, { at: AT })).toBeUndefined();
+  });
+
+  it('модель Claude, которой ещё нет в прайсе, — по запасной ставке, как и раньше', () => {
+    expect(estimateStepCost('claude-opus-9-9', input, { entries: [], at: AT })).toBe(3);
+  });
+
+  it('известная модель — её собственная цена', () => {
+    expect(estimateStepCost('claude-opus-4-8', input, { at: AT })).toBe(5);
+  });
+
+  it('своя цена из настроек делает и локальную модель платной — человек так решил', () => {
+    const own = { input: 1, output: 2, cacheRead: 0, cacheWrite: 0 };
+    expect(
+      estimateStepCost('qwen3.6:27b-coding', input, { overrides: { qwen: own }, at: AT }),
+    ).toBe(1);
+  });
+
+  it('слово семейства в теге локальной модели не делает её Claude', () => {
+    // Дистиллят под чужой моделью: «sonnet» в имени — не тариф Anthropic.
+    const local = 'hf.co/someone/Qwen3-14B-Claude-Sonnet-Distill-GGUF:Q4_K_M';
+    expect(estimateStepCost(local, input, { at: AT })).toBeUndefined();
+    expect(estimateStepCost('llama3-opus-merge:8b', input, { at: AT })).toBeUndefined();
+  });
+
+  it('имена Claude у облаков и псевдонимы CLI цену сохраняют', () => {
+    for (const model of [
+      'opus',
+      'sonnet[1m]',
+      'claude-opus-4-8[1m]',
+      'us.anthropic.claude-opus-4-8-v1:0',
+      'anthropic/claude-opus-4-8',
+      'claude-opus-4-8@20260101',
+    ]) {
+      expect(estimateStepCost(model, input, { at: AT }), model).toBeGreaterThan(0);
+    }
   });
 });

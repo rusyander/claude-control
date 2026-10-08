@@ -205,6 +205,8 @@ export async function runClaudeDelegate(
   // Модель — только когда её попросили явно (дешёвая ступень для служебных вызовов групп).
   const head = deps.model ? ['-p', '--model', deps.model] : ['-p'];
   const images = userImages(messages);
+  // Переключатель на локальную модель: без его переменных лёгкое окно ушло бы в облако.
+  const switchEnv = deps.claudeEnv?.() ?? {};
   const { dir, cleanup } = lightWindowDir();
   try {
     if (images.length === 0) {
@@ -214,6 +216,7 @@ export async function runClaudeDelegate(
         deps,
         flattenPrompt(messages),
         dir,
+        switchEnv,
       );
       // Claude — verified-путь, не помечаем experimental.
       return outcomeToResult(provider.id, outcome, false);
@@ -226,6 +229,7 @@ export async function runClaudeDelegate(
       deps,
       streamJsonUserLine(flattenPrompt(messages), images),
       dir,
+      switchEnv,
     );
     return outcomeToResult(provider.id, fromStreamJson(outcome), false);
   } finally {

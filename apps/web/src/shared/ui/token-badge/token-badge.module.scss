@@ -60,6 +60,13 @@
   color: var(--color-fg-subtle);
 }
 
+/* Скорость ответа локальной модели — тем же тоном, что время шага: величина
+   справочная, но ради неё человек и выбирал карту и контекст. */
+.speed {
+  color: var(--color-fg-muted);
+  white-space: nowrap;
+}
+
 .panel {
   position: absolute;
   top: calc(100% + var(--spacing-2xs));

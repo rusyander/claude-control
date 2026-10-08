@@ -23,5 +23,11 @@ export function addUsage(base: MessageUsage | undefined, step: MessageUsage): Me
       base.costUsd === undefined && step.costUsd === undefined
         ? undefined
         : (base.costUsd ?? 0) + (step.costUsd ?? 0),
+    // Время генерации складывается вместе с выходом — скорость сплошного ответа
+    // из нескольких ходов остаётся честной: всё сгенерированное за всё время.
+    genMs:
+      base.genMs === undefined && step.genMs === undefined
+        ? undefined
+        : (base.genMs ?? 0) + (step.genMs ?? 0),
   };
 }

@@ -10,6 +10,7 @@ import {
   findSessionStart,
 } from '../../domains/chat/ChatHistory.ts';
 import { summarizedMessageIds } from '../../domains/platform/gateway/summarized-ledger.ts';
+import { genTimesById } from '../../domains/chat/gen-time-ledger.ts';
 import { readChatProgress } from '../../domains/chat/ChatProgress.ts';
 import { readStepsFile } from '../../domains/chat/steps-file.ts';
 import { searchChats } from '../../domains/chat/ChatSearch.ts';
@@ -239,6 +240,8 @@ export function registerChatTranscriptRoutes(
         offset,
         // Подпись «контур сжал историю» — по журналу сжатий шлюза (`context-managed`).
         summarizedIds: summarizedMessageIds(ctx.location.paths.appData),
+        // Скорость ответа локальной модели — по журналу времени генерации живого потока.
+        genTimes: genTimesById(ctx.location.paths.appData),
       });
       return { ...page, messages: page.messages.map(withStepCost) };
     },

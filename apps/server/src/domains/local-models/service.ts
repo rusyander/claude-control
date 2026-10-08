@@ -30,6 +30,7 @@ import {
   claudeSwitchEnv,
   claudeSwitchPicker,
   describeClaudeSwitch,
+  readSwitchEnv,
   switchClaudeOff,
   switchClaudeOn,
 } from './claude-switch.ts';
@@ -141,6 +142,9 @@ export function benchOf(
     ns > 0 ? Math.round((count / (ns / 1e9)) * 10) / 10 : 0;
   return {
     tokensPerSec: rate(result.evalCount, result.evalDurationNs),
+    // Не для показа как есть: промпт замера — ~50 токенов, его чтение (93–150 мс на
+    // 4090, замер 08.10) — накладные расходы, а не скорость чтения. Настоящая видна
+    // по первому ходу Claude Code: ~22 тыс. токенов за ~17 с.
     promptTokensPerSec: rate(result.promptCount, result.promptDurationNs),
     measuredAt: now.toISOString(),
     gpu,
@@ -597,6 +601,13 @@ export function createLocalModels(deps: LocalModelsDeps) {
 
     /** Claude уведён переключателем — для маршрутизации контура. */
     claudeRedirected: (): boolean => Boolean(readState(paths).claude),
+
+    /**
+     * Окружение переключателя для запусков без слоя `user` (лёгкое окно);
+     * выключен — пусто, и такой запуск идёт как раньше.
+     */
+    claudeEnv: (): Record<string, string> =>
+      deps.claude && readState(paths).claude ? readSwitchEnv(deps.claude.settingsPath()) : {},
 
     /** На какую модель уведён Claude и как её подписать; выключено — нет. */
     claudeModel: (): { model: string; title: string } | undefined => {

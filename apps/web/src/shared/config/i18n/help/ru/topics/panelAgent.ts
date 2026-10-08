@@ -491,7 +491,9 @@ export const panelAgentRu = {
     routeDefault: 'Провайдер по умолчанию',
     routeDefaultText:
       'Запрос уходит в облако вендора со входом самого активного CLI: ' +
-      'Claude Code, Qwen Code, Codex, Gemini CLI, OpenCode, Goose или Kimi Code.',
+      'Claude Code, Qwen Code, Codex, Gemini CLI, OpenCode, Goose или Kimi Code. Включена галочка ' +
+      '«Claude Code на этой модели» в разделе «Локальные модели» — Claude Code агента отвечает ' +
+      'локальной моделью, мимо облака.',
     routeContour: 'Контур',
     routeContourText:
       'Только с Claude Code: с любым другим CLI ход через контур не запускается (отказ ' +

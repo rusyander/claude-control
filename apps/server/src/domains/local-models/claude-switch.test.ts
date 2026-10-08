@@ -7,6 +7,7 @@ import {
   claudeSwitchEnv,
   claudeSwitchPicker,
   describeClaudeSwitch,
+  readSwitchEnv,
   switchClaudeOff,
   switchClaudeOn,
 } from './claude-switch.ts';
@@ -209,5 +210,19 @@ describe('Claude Code на локальной модели', () => {
       vars: [...CLAUDE_SWITCH_VARS],
       drift: [],
     });
+  });
+});
+
+describe('readSwitchEnv — переменные переключателя для окон без слоя user', () => {
+  it('берёт только переменные переключателя, прочее окружение человека — нет', () => {
+    const path = settingsFile({ env: { ...VARS, MY_SECRET: 'x', HTTP_PROXY: 'p' }, model: 'opus' });
+    expect(readSwitchEnv(path)).toEqual(VARS);
+  });
+
+  it('нет файла или он сломан — пусто, без исключения', () => {
+    expect(readSwitchEnv(settingsFile())).toEqual({});
+    const broken = settingsFile();
+    writeFileSync(broken, '{ не json');
+    expect(readSwitchEnv(broken)).toEqual({});
   });
 });

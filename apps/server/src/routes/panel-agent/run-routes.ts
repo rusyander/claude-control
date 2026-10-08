@@ -39,6 +39,8 @@ export interface PanelAgentRunRouteDeps {
   selfBaseUrl: string;
   /** Порт живого шлюза контура; 0 — не поднят. */
   gatewayPort: () => number;
+  /** Окружение переключателя «Claude Code на локальной модели» (пусто — выключен). */
+  claudeSwitchEnv?: () => Record<string, string>;
   /** Подмены для проверок. */
   spawnImpl?: typeof nodeSpawn;
   detect?: (command: string) => boolean;
@@ -210,6 +212,7 @@ export function registerPanelAgentRunRoutes(
         store: ctx.store,
         appDataDir: appData(),
         gatewayPort: deps.gatewayPort,
+        ...(deps.claudeSwitchEnv ? { claudeSwitchEnv: deps.claudeSwitchEnv } : {}),
         detect: deps.detect,
       });
       if (!launch.ok) {

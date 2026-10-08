@@ -229,6 +229,8 @@ export interface Runtime {
   gatewayPort: () => number;
   /** Куда уведён сам Claude настройкой settings.json — для шапки чата. */
   claudeSettingsRoute: PlatformRoutingDeps['claudeSettingsRoute'];
+  /** Окружение этого переключателя — лёгкому окну, которое settings.json не читает. */
+  claudeSwitchEnv: () => Record<string, string>;
   /** Погасить всё, что спавнит процессы. Идемпотентно. */
   shutdown: () => void;
 }
@@ -1252,7 +1254,9 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   // тумблер продолжает с того, что не успел разобрать.
   // Порт шлюза — живого слушателя: разбор через контур идёт тем же маршрутом,
   // что агент панели, и при погашенном шлюзе отказывает, а не уходит в облако.
-  const watcher = createBackgroundWatcher(ctx, platformRouting.gatewayPort);
+  const watcher = createBackgroundWatcher(ctx, platformRouting.gatewayPort, () =>
+    localModels.claudeEnv(),
+  );
   watcher.resume();
   for (const entry of adopt) {
     if (entry.autoApprove) chatSession.armAutoApprove(entry.key, entry.autoApprove);
@@ -1388,6 +1392,7 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     runRoute: (origin) => runRoute(origin),
     gatewayPort: platformRouting.gatewayPort,
     claudeSettingsRoute: platformRouting.claudeSettingsRoute,
+    claudeSwitchEnv: () => localModels.claudeEnv(),
     shutdown,
   };
 }

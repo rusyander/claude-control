@@ -1850,6 +1850,8 @@ export const ru = {
       span: 'с {{from}} до {{to}}',
       run: 'Весь прогон',
       live: 'идёт {{time}}',
+      speed: '{{value}} ток/с',
+      speedRow: 'Скорость генерации',
     },
     copyArtifact: 'Скопировать содержимое',
     tabPreview: 'Превью',

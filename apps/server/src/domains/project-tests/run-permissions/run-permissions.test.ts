@@ -120,6 +120,18 @@ describe('project-tests run-permissions', () => {
       expect(describeScope(scope)).toContain('tests/e2e/chat.spec.ts');
     });
 
+    // Живая проверка 08.10: кейсы ещё без `automation.file`, папка e2e заведена
+    // панелью и пуста — первый спек писать было некуда, автоматизация отложила всё.
+    it('режим `automate` пишет первый спек в папку e2e проекта', () => {
+      const scope = runScope(root, 'automate', [testCase('calc-002')], 'e2e');
+
+      expect(isWritable(scope, 'e2e/calc.spec.ts')).toBe(true);
+      expect(isWritable(scope, 'apps/web/src/App.tsx')).toBe(false);
+      expect(describeScope(scope)).toContain('e2e/');
+      // Корень проекта папкой e2e не становится.
+      expect(isWritable(runScope(root, 'automate', [], '.'), 'src/main.ts')).toBe(false);
+    });
+
     it('в остальных режимах имя автотеста прав не даёт', () => {
       const cases = [testCase('gui-001', 'tests/e2e/chat.spec.ts')];
 

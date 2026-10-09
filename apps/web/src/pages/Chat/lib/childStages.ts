@@ -83,6 +83,7 @@ function retiredRow(chat: ChatSummary, runs: ActiveRunView[]): ChildStageGroup {
     ),
     retired: true,
     ...(chat.copyLeft && chat.parentId ? { retiredCopy: { parentChatId: chat.parentId } } : {}),
+    ...(chat.accepted ? { retiredAccepted: true } : {}),
   };
 }
 

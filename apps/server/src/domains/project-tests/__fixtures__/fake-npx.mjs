@@ -5,7 +5,9 @@
 // and exits non-zero on a red test, exactly like the real runners.
 // FAKE_E2E_MODE: report (default) | none (exit 2, no report) | missing (npx refusal) |
 // hang (wait for kill) |
-// report-hang (write the report, then wait for kill — a run stopped after its results).
+// report-hang (write the report, then wait for kill — a run stopped after its results) |
+// no-browser (Playwright updated, its browser not downloaded: the report IS written, every test
+// failed with the launch error, the hint box printed).
 // FAKE_E2E_JUNIT: report body. FAKE_E2E_ARGV: file to dump argv + cwd + stand env into.
 // Like the real Playwright junit reporter, retry children (<flakyFailure>, <flakyError>,
 // <rerunFailure>, <rerunError>) reach the report only with PLAYWRIGHT_JUNIT_INCLUDE_RETRIES.
@@ -48,6 +50,25 @@ if (mode === 'hang') {
   // What `npx --no-install` prints when the package is absent (npm 10/11).
   process.stderr.write(
     'npm error npx canceled due to missing packages and no YES option: ["playwright@1.61.1"]\n',
+  );
+  process.exit(1);
+} else if (mode === 'no-browser') {
+  const launch =
+    "browserType.launch: Executable doesn't exist at /ms-playwright/chromium_headless_shell-1248/chrome-headless-shell";
+  process.stdout.write(
+    `    Error: ${launch}\n` +
+      '    ║ Looks like Playwright was just installed or updated.       ║\n' +
+      '    ║ Please run the following command to download new browsers: ║\n' +
+      '    ║     npx playwright install                                 ║\n',
+  );
+  const file = reportPath();
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(
+    file,
+    '<testsuites><testsuite name="auth.spec.ts">' +
+      `<testcase name="[auth-001] вход по паролю"><failure message="${launch.replace(/"/g, '')}"/></testcase>` +
+      `<testcase name="[auth-002] неверный пароль"><failure message="${launch.replace(/"/g, '')}"/></testcase>` +
+      '</testsuite></testsuites>',
   );
   process.exit(1);
 } else if (mode === 'none') {

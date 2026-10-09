@@ -1408,6 +1408,10 @@ export const serverTextTemplates = {
     ru: 'блок «Тесты» копии: после старта группы не записано ни одного прогона — прогоните кейсы по изменённым файлам ({{cases}}) и запишите прогон: {{command}}',
     en: 'Tests block of the copy: no run has been recorded since the group started — run the cases for the changed files ({{cases}}) and record the run: {{command}}',
   },
+  'tests-gap-word-only': {
+    ru: 'блок «Тесты» копии: после старта группы есть только запись словом (tests-cli record), а она автоматический кейс не закрывает — запустите кейсы по изменённым файлам ({{cases}}) командой: {{command}}',
+    en: 'Tests block of the copy: since the group started there is only a word-only record (tests-cli record), which does not close an automated case — run the cases for the changed files ({{cases}}) with: {{command}}',
+  },
   'tests-gap-stale': {
     ru: 'блок «Тесты» копии: прогон {{run}} записан раньше последней правки ({{files}}) — прогоните кейсы заново и запишите прогон: {{command}}',
     en: 'Tests block of the copy: run {{run}} was recorded before the latest change ({{files}}) — run the cases again and record the run: {{command}}',

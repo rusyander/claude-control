@@ -64,7 +64,7 @@ async function openPage({ scheme, provider, onboardingDone, storedStep }) {
   page.on('pageerror', (error) => errors.push(error.message));
   await patchJson(page, '**/api/settings', { provider, onboardingDone });
   await patchJson(page, '**/api/location', NO_CLAUDE);
-  await patchJson(page, '**/api/providers/detect/detect', DETECT_QWEN);
+  await patchJson(page, '**/api/providers/detect', DETECT_QWEN);
   await patchJson(page, '**/api/overview', (body) => ({
     ...body,
     provider:

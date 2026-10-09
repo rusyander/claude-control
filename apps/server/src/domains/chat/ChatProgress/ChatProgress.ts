@@ -53,6 +53,15 @@ export function buildProgress(records: TranscriptRecord[]): ChatProgress {
     // Сводка сжатия и реплики субагента — тоже не слово человека (ревью r2, R3).
     const service = record.isMeta || record.isCompactSummary || record.isSidechain;
     if (record.type === 'user' && !service && isHumanPrompt(content)) skill = undefined;
+    // Итог, пришедший посреди хода, CLI пишет не репликой, а вставкой
+    // `queued_command` (живой прогон 08.10): без неё фон, погашенный агентом,
+    // и субагент, закончивший работу, числились идущими до конца разговора.
+    const queued = taskNoticeOf(record);
+    if (queued) {
+      shells.notice(queued, record.timestamp);
+      applyAgentNotices(queued, agents);
+      continue;
+    }
     // Итог фоновой команды или субагента приходит отдельной репликой-уведомлением, строкой.
     if (typeof content === 'string') {
       shells.notice(content, record.timestamp);
@@ -87,6 +96,14 @@ export function buildProgress(records: TranscriptRecord[]): ChatProgress {
     ...(skill ? { skill } : {}),
     updatedAt,
   };
+}
+
+/** Текст уведомления CLI из вставки `queued_command`; слова человека — не оно. */
+function taskNoticeOf(record: TranscriptRecord): string | undefined {
+  const attachment = record.attachment;
+  if (record.type !== 'attachment' || attachment?.type !== 'queued_command') return undefined;
+  if (attachment.commandMode !== 'task-notification') return undefined;
+  return typeof attachment.prompt === 'string' ? attachment.prompt : undefined;
 }
 
 /**
@@ -435,8 +452,11 @@ function portsOf(text: string): Set<string> {
   // Адрес — обращение к серверу, а не сам сервер: `wait-on
   // http://localhost:9123` вместе с ним не гаснет (N5).
   const command = text.replace(/\b[a-z][\w+.-]*:\/\/\S+/gi, '');
+  // Кроме ключей и `host:port` — формы, которыми агенты поднимают сервер чаще
+  // всего (живой прогон 08.10): `.listen(9123)`, `http.server 8000`,
+  // `serve -l 3000`, `http-server -p 8080`.
   const forms =
-    /(?:--port[=\s]|PORT=|:|-LocalPort\s+|kill-port\s+)(\d{2,5})\b|\b(\d{2,5})\/tcp\b/gi;
+    /(?:--port[=\s]|PORT=|:|-LocalPort\s+|kill-port\s+|\.listen\(\s*|http\.server\s+|(?:^|\s)-[pl]\s+)(\d{2,5})\b|\b(\d{2,5})\/tcp\b/gi;
   for (const match of command.matchAll(forms)) {
     const port = match[1] ?? match[2];
     if (port) ports.add(port);

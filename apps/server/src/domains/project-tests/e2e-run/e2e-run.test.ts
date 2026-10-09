@@ -364,6 +364,25 @@ describe('project-tests/e2e-run: прогон автотестов панель�
     expect(readRuns(root)).toHaveLength(0);
   });
 
+  // Живая проверка 08.10: Playwright в папке обновился, его браузер не скачан —
+  // отчёт есть, и все кейсы ложились «упал», будто сломано приложение.
+  it('браузер раннера не скачан: отказ «не установлен», кейсы не краснеют, истории нет', async () => {
+    panelFolder();
+    writeFileSync(join(root, 'e2e', 'auth.spec.ts'), SPEC);
+    syncE2eFolder(root, now, { dir: 'e2e', appData });
+    setEnv('FAKE_E2E_MODE', 'no-browser');
+    const registry = new E2eRunRegistry();
+    registry.start({ root, appData });
+    await vi.waitFor(() => expect(registry.get(root)?.status).toBe('error'), { timeout: 20_000 });
+    expect(registry.get(root)).toMatchObject({
+      errorCode: 'e2e-run-not-installed',
+      errorParams: { dir: 'e2e', install: 'npm install && npx playwright install chromium' },
+    });
+    expect(readRuns(root)).toHaveLength(0);
+    const statuses = readGroups(root).flatMap((group) => group.cases.map((c) => c.status));
+    expect(statuses).not.toContain('failed');
+  });
+
   it('каркас не распознан или папки нет — отказ кодом, ничего не запущено', () => {
     const registry = new E2eRunRegistry();
     expect(() => registry.start({ root, appData })).toThrow(

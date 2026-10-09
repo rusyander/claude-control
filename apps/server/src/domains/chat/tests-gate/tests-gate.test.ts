@@ -184,6 +184,10 @@ describe('вердикт группы из блока «Тесты»', () => {
     });
     expect(verdict.missing).toEqual([expect.stringContaining(COMMAND)]);
     expect(verdict.verdict).toMatchObject({ cases: 1, passed: 0 });
+    // Живой прогон 08.10: группа записала проверку словом, а пробел говорил «не
+    // записано ни одного прогона» — она спорила с панелью, а не исправляла раннер.
+    expect(verdict.missing[0]).not.toContain('ни одного прогона');
+    expect(verdict.missing[0]).toContain('tests-cli record');
   });
 
   // Ф23, проект `.agent/item17-tests-block-design.agent.md`: прогон считается,

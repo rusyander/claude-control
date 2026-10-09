@@ -214,6 +214,8 @@ export const composedEn: Record<ComposedMessageCode, string> = {
     'sieve {{sieve}}: run {{run}} is older than the change to the code this sieve covers ({{files}}) — run it again on the final commit',
   'tests-gap-no-run':
     'Tests block of the copy: no run has been recorded since the group started — run the cases for the changed files ({{cases}}) and record the run: {{command}}',
+  'tests-gap-word-only':
+    'Tests block of the copy: since the group started there is only a word-only record (tests-cli record), which does not close an automated case — run the cases for the changed files ({{cases}}) with: {{command}}',
   'tests-gap-stale':
     'Tests block of the copy: run {{run}} was recorded before the latest change ({{files}}) — run the cases again and record the run: {{command}}',
   'tests-gap-unrun':

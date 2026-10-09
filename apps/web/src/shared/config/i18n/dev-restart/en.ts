@@ -18,7 +18,7 @@ export const devRestartEn: typeof devRestartRu = {
   requested: 'Restart requested — the watcher will do it within seconds',
   confirmTitle: 'Restart the server now?',
   confirmText:
-    'Running chat turns and copy preparation will be cut off midway. Conversations are kept, but their current turn will have to be continued again.',
+    'Chat turns carry on: the agent process survives the restart and the feed picks it up again. Group copy preparation and running autotests and project checks will be cut off midway.',
   confirm: 'Restart',
   failed: 'Could not pass the restart request on: {{message}}',
 };

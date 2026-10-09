@@ -143,6 +143,12 @@ export interface SplitConveyorDeps {
    */
   delivery?: SplitDeliveryDeps;
   /**
+   * Есть ли в копии правки с момента `since` — незакоммиченные или коммиты.
+   * Итог хода меряет правки от начала ПОСЛЕДНЕГО звена, а у группы их бывает
+   * несколько (продолжение, ревью); «без правок» сверяется со стартом группы.
+   */
+  hasWork?: (cwd: string, since?: string) => boolean;
+  /**
    * Продолжить разговор группы словом панели — тем же каналом, что слово
    * родителя (Д7). Нужен оборванной группе (WP1c); не задан — она ждёт кнопки.
    */
@@ -788,6 +794,16 @@ export class SplitConveyor {
     );
     if (sieveRows.length > 0) group.sieveRows = sieveRows;
     if (outcome.learnedSieves?.length) this.learnSieves(record, group, outcome.learnedSieves);
+    // «Без правок» сказано о последнем звене, а итог — о группе: ревью-звено,
+    // заведённое после её коммитов, писало «без правок» ветке с двумя коммитами.
+    if (
+      outcome.result?.kind === 'unchanged' &&
+      group.path &&
+      group.startedAt &&
+      this.deps.hasWork?.(group.path, group.startedAt)
+    ) {
+      outcome = { ...outcome, result: { kind: 'changed' } };
+    }
 
     // Группа с доставкой закрывается только по фактам git (живой прогон 24.09:
     // «готово» у групп без push, без MR и со ссылкой на чужой MR). До ответа

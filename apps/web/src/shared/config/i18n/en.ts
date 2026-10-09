@@ -1132,6 +1132,7 @@ export const en: TranslationSchema = {
         pausedNoChat: 'paused',
         interruptedNoChat: 'cut before its chat existed — nothing to resume',
         mr: 'MR !{{id}}',
+        pr: 'PR #{{id}}',
         mrOpenHint: 'Open the group’s MR in a new tab',
         mrClosed: { merged: 'MR merged', closed: 'MR closed' },
         mergeOrder: 'merge {{ordinal}} of {{total}}',

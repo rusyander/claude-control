@@ -71,6 +71,8 @@ function build(
     delivery?: SplitDeliveryDeps;
     /** Продолжение оборванной группы (WP1c). */
     resume?: SplitConveyorDeps['resume'];
+    /** Факты копии группы: были ли правки с её старта. */
+    hasWork?: SplitConveyorDeps['hasWork'];
     /** Что запуск делает ВНУТРИ себя, до возврата: настоящее имя ветки, конец цепочки. */
     during?: (
       groups: number[],
@@ -118,6 +120,7 @@ function build(
     ...(options.parallel ? { parallel: () => options.parallel as number } : {}),
     ...(options.delivery ? { delivery: options.delivery } : {}),
     ...(options.resume ? { resume: options.resume } : {}),
+    ...(options.hasWork ? { hasWork: options.hasWork } : {}),
     log: () => undefined,
     now: () => new Date(2026, 8, 9, 12, 0, (tick += 1)),
   });
@@ -378,6 +381,29 @@ describe('SplitConveyor: ожидания и ответ человека', () =>
     conveyor.onChainResumed(link(0));
     conveyor.onChainEnded(link(0), { status: 'awaiting', waitingFor: 'question' });
     expect(records.get('родитель')?.groups[0]?.status).toBe('awaiting');
+  });
+
+  // Живая приёмка 09.10: цепочка группы кончилась ревью-звеном, заведённым ПОСЛЕ
+  // двух её коммитов; правки мерились от начала последнего звена, и хаб писал
+  // «без правок» группе с двумя коммитами.
+  it('итог «без правок» последнего звена сверяется с копией от старта группы', async () => {
+    const calls: [string, string | undefined][] = [];
+    const { conveyor, link, records } = await triaged({
+      hasWork: (cwd, since) => {
+        calls.push([cwd, since]);
+        return cwd === 'C:/copies/0';
+      },
+    });
+    const startedAt = records.get('родитель')?.groups[0]?.startedAt;
+
+    conveyor.onChainEnded(link(0), { status: 'done', result: { kind: 'unchanged' } });
+    conveyor.onChainEnded(link(1), { status: 'done', result: { kind: 'unchanged' } });
+
+    expect(startedAt).toBeTruthy();
+    expect(calls[0]).toEqual(['C:/copies/0', startedAt]);
+    expect(records.get('родитель')?.groups[0]?.result).toEqual({ kind: 'changed' });
+    // В копии второй группы правок нет и с её старта — итог остаётся честным.
+    expect(records.get('родитель')?.groups[1]?.result).toEqual({ kind: 'unchanged' });
   });
 
   it('группа находится по номеру из связи, даже когда ветка копии другая (Д12)', async () => {

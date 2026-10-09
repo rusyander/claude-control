@@ -595,8 +595,8 @@ export const testsEn: typeof testsRu = {
       'the automated cases linked to it through codePaths are run, and the card names which ' +
       'went red. None — the file is not protected by cases. It is an autotest run in a copy, ' +
       'minutes or more, so only by the button; your working copy, library and history do ' +
-      'not change. A case that produced no result is shown apart — “no result”, not “not ' +
-      'protected”. Without a stand address (or its own webServer in the Playwright config) ' +
+      'not change. A case that produced no result (no line in the report, or skipped by the ' +
+      'stand) is shown apart — “no result”, not “not protected”. Without a stand address (or its own webServer in the Playwright config) ' +
       'and without the environment’s secret values the check does not start and names what ' +
       'is missing. Processes the command left behind are killed and the copy is removed in ' +
       'the same run; if it could not be removed, the card shows it. While the check runs, e2e ' +
@@ -1299,7 +1299,10 @@ export const testsEn: typeof testsRu = {
         'The button runs the folder tests with its framework command — npx --no-install playwright ' +
         'test, npx --no-install cypress run or python -m pytest (python3 -m pytest on Linux and macOS) — with no agent and no tokens. ' +
         'Only an installed runner is used: with none in node_modules the panel refuses before ' +
-        'starting and names the install command; it never downloads anything itself. The junit ' +
+        'starting and names the install command; it never downloads anything itself. The same ' +
+        'answer comes when the runner package is there but its browser is not: such a run is ' +
+        'red throughout, yet cases and history stay untouched — the environment is broken, not ' +
+        'the application. The junit ' +
         'report is written into the panel directory, not the project, and lands on cases by ' +
         'their tags; the exception is a report path in the project automation.json: then the ' +
         'report sits in the project and is erased before every run. Creating the folder and ' +

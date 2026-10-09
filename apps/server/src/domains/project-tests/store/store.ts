@@ -283,7 +283,11 @@ export function parseCase(raw: unknown, index: number): ProjectTestCase | undefi
     flaky,
     lastRunAt: optional(item.lastRunAt),
     lastRunId,
-    source: text(item.source) === 'human' ? 'human' : 'agent',
+    // Каждый писатель панели ставит `source` явно; без него кейс пришёл снаружи —
+    // написан руками в файле или пришёл чужой веткой, то есть он человека. Прежнее
+    // «нет поля — агента» отдавало такой кейс на перезапись агенту чата, а первая
+    // же запись группы сохраняла `agent` на диск, и защита пропадала насовсем.
+    source: text(item.source) === 'agent' ? 'agent' : 'human',
     updatedAt: optional(item.updatedAt),
     archived: item.archived === true ? true : undefined,
   };

@@ -510,7 +510,7 @@
         {
           "path": "apps/server/src/domains/chat/split-conveyor/split-conveyor.ts",
           "why": "«Что запускает „Разделить“»: разбор в корне, план в копии, порядок after и hold",
-          "sha": "aa00e1e8d98bb2ed"
+          "sha": "5a815667fd789613"
         },
         {
           "path": "apps/server/src/domains/chat/split-recheck/split-recheck.ts",
@@ -658,7 +658,7 @@
           "sha": "bb23d4b9ff80b8e5"
         }
       ],
-      "confirmedAt": "2026-10-08T12:34:13.303Z"
+      "confirmedAt": "2026-10-09T08:09:36.527Z"
     },
     {
       "topic": "tests",
@@ -667,7 +667,7 @@
         {
           "path": "apps/server/src/domains/project-tests/runs/runs.ts",
           "why": "«Запись прогона»: собирается из файлов кейсов, штамп lastRunId, пустая запись; «Сгенерировать кейсы пишет и код тестов»: черновик применяется сам, сверка папки и статусы из свежего отчёта junit",
-          "sha": "ba9d3edda11e5323"
+          "sha": "4520756d812a5655"
         },
         {
           "path": "apps/server/src/domains/project-tests/impact/impact.ts",
@@ -742,7 +742,7 @@
         {
           "path": "apps/server/src/domains/project-tests/e2e-run/e2e-run.ts",
           "why": "«Прогнать автотесты», «Прогон лёг в историю»: команда фреймворка, junit в каталоге панели, одна запись истории, отказ при прогоне агента",
-          "sha": "da5f9f94b9a7e8e9"
+          "sha": "325d3934c5422922"
         },
         {
           "path": "apps/server/src/domains/project-tests/e2e-parse-pytest.ts",
@@ -802,7 +802,7 @@
         {
           "path": "apps/server/src/domains/project-tests/mutation/mutation.ts",
           "why": "«Проверка набора поломкой»: копия, виды поломки, поймал / не заметил / нет результата, уборка копии",
-          "sha": "843d1ba8ba0daf96"
+          "sha": "d3c27824bc564978"
         },
         {
           "path": "apps/server/src/domains/project-tests/mutation-stand/mutation-stand.ts",
@@ -820,7 +820,7 @@
           "sha": "fa4b9ad2f98e961d"
         }
       ],
-      "confirmedAt": "2026-10-08T14:28:42.502Z"
+      "confirmedAt": "2026-10-09T08:09:36.611Z"
     },
     {
       "topic": "rules",
@@ -2784,7 +2784,7 @@
     {
       "topic": "kit",
       "document": "apps/web/src/pages/Help/topics/KitTopic/KitTopic.tsx",
-      "confirmedAt": "2026-10-08T12:34:14.305Z",
+      "confirmedAt": "2026-10-09T08:09:36.703Z",
       "sources": [
         {
           "path": "apps/server/src/domains/kit/service.ts",
@@ -2804,7 +2804,7 @@
         {
           "path": "apps/server/src/bootstrap/runtime/runtime.ts",
           "why": "«Не собралось — прогон не запускается»: отказ при сбое сборки набора",
-          "sha": "c5032ee33dd54cc5"
+          "sha": "109781bcd859e347"
         },
         {
           "path": "apps/web/src/pages/Kit/KitGlobalActions/KitGlobalActions.tsx",

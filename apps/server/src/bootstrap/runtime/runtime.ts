@@ -638,6 +638,7 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
         ...(record.request.effort ? { effort: record.request.effort } : {}),
       }).startTriage(prompt, claim),
     parallel: (record) => resolveProjectDelivery(ctx.store, record.projectPath).view.parallel,
+    hasWork: (cwd, since) => hasWorkSince(cwd, since),
     // Доставка группы по фактам git (WP1b): «готово» — только когда ветка на
     // удалённом и MR с той же головой; иначе напоминание группе её же сессией.
     delivery: {

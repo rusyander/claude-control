@@ -45,6 +45,19 @@ export function RetiredChats({ chats, onOpen }: RetiredChatsProps) {
               <Typography variant="body-sm" color="subtle" as="span" truncate>
                 {chat.title}
               </Typography>
+              {/* Приёмка человека переживает новое разделение (живая приёмка 09.10):
+                  без отметки принятая группа здесь не отличалась от брошенной. */}
+              {chat.retiredAccepted && (
+                <Typography
+                  variant="caption"
+                  color="subtle"
+                  as="span"
+                  className={styles.chip}
+                  data-hub-accepted
+                >
+                  {t('chat.cascade.hub.accept.marker')}
+                </Typography>
+              )}
               <Typography variant="caption" color="subtle" as="span" truncate>
                 {[chat.branch, ...chat.stages.map((stage) => t(`chat.cascade.stageFull.${stage}`))]
                   .filter(Boolean)

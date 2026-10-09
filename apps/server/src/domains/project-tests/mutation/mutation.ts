@@ -30,7 +30,7 @@ import { git } from '../../project-git/exec/exec.ts';
 import { automationCommand, readAutomation } from '../automation/automation.ts';
 import { e2eCommand } from '../e2e-command/e2e-command.ts';
 import { e2eFolderView } from '../e2e-folder/e2e-folder.ts';
-import { ProjectTestsError } from '../files.ts';
+import { ProjectTestsError, TESTS_DIR } from '../files.ts';
 import { prepareResultsForRun } from '../import-results/import-results.ts';
 import { readGroups } from '../store/store.ts';
 import { mutationStand } from '../mutation-stand/mutation-stand.ts';
@@ -210,6 +210,28 @@ export function breakFile(
     };
   }
   return { text: '', description: 'file emptied', code: 'file-emptied' };
+}
+
+/**
+ * Библиотека кейсов — в копию, если git её не привёз (панель прячет `.agent` от git).
+ * Раннер метит тесты номерами кейсов по библиотеке из своей папки
+ * (`tools/qa/junit-run.mjs`); без неё отчёт шёл без номеров, и проверка на настоящем
+ * проекте давала «нет результата» по каждому кейсу (живая проверка 08.10).
+ * Только файлы групп: история прогонов и черновики раннеру не нужны.
+ */
+function copyLibrary(root: string, copy: string): void {
+  const source = join(root, ...TESTS_DIR.split('/'));
+  const target = join(copy, ...TESTS_DIR.split('/'));
+  let names: string[];
+  try {
+    names = readdirSync(source).filter((name) => name.endsWith('.tests.json'));
+  } catch {
+    return;
+  }
+  mkdirSync(target, { recursive: true });
+  for (const name of names) {
+    if (!existsSync(join(target, name))) cpSync(join(source, name), join(target, name));
+  }
 }
 
 /** Каталоги зависимостей оригинала — по относительному пути. */
@@ -626,6 +648,7 @@ export class MutationChecks {
         mkdirSync(dirname(join(copy, path)), { recursive: true });
         cpSync(from, join(copy, path));
       }
+      copyLibrary(root, copy);
       for (const dir of dependencyDirs(root)) {
         const target = join(copy, dir);
         if (existsSync(target) || !existsSync(dirname(target))) continue;
@@ -682,7 +705,9 @@ export class MutationChecks {
         (item) => item.status === 'failed' || item.status === 'blocked',
       ).length;
       view.missed = view.cases.filter((item) => item.status === 'passed').length;
-      view.noResult = view.cases.filter((item) => item.status === 'no-result').length;
+      // Всё, что не «поймал» и не «не заметил» (нет строки, пропущен стендом), —
+      // «нет результата»: иначе пропущенный кейс выпадал из счёта.
+      view.noResult = view.cases.length - view.caught - view.missed;
       view.status = 'done';
       view.finishedAt = now();
       rmSync(command.report, { force: true });

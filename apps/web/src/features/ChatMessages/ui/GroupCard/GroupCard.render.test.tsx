@@ -35,7 +35,7 @@ const split: SplitPlanView = {
  * кнопкой, а не ссылкой внутри кликабельной строки; ветка — одной строкой с
  * подсказкой. Рисуется настоящей сводкой `ChildStages`, как её видит человек.
  */
-function render(): string {
+function render(mr: string = MR): string {
   const rows = new Map<string, ChildStageGroup>([
     [
       splitGroupKey({ groupIndex: 0, id: 'c0' }),
@@ -44,7 +44,13 @@ function render(): string {
   ]);
   return renderToStaticMarkup(
     <QueryClientProvider client={new QueryClient()}>
-      <ChildStages groups={mergeSplitGroups(rows, split)} onOpen={() => {}} />
+      <ChildStages
+        groups={mergeSplitGroups(rows, {
+          ...split,
+          groups: split.groups.map((g) => ({ ...g, mr })),
+        })}
+        onOpen={() => {}}
+      />
     </QueryClientProvider>,
   );
 }
@@ -71,6 +77,13 @@ describe('карточка группы в хабе', () => {
     const mr = element(html, 'data-hub-mr', 'button');
     expect(mr).toContain('MR !898');
     expect(html).not.toContain(`href="${MR}"`);
+  });
+
+  // Живой прогон 08.10: PR GitHub подписывался по-гитлабовски, «MR !1».
+  it('PR GitHub подписан своим словом и номером — «PR #12»', () => {
+    const mr = element(render('https://github.com/team/app/pull/12'), 'data-hub-mr', 'button');
+    expect(mr).toContain('PR #12');
+    expect(mr).not.toContain('MR !');
   });
 
   it('кнопки группы — внутри её карточки', () => {

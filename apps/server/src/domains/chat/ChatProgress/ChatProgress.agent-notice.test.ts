@@ -62,6 +62,24 @@ describe('buildProgress — итог фонового субагента из у
     expect(progress.agents.map((item) => item.status)).toEqual(['failed', 'failed', 'running']);
   });
 
+  // Живой прогон 08.10: итог посреди хода CLI пишет вставкой `queued_command`, не репликой.
+  it('итог, пришедший вставкой посреди хода, закрывает субагента', () => {
+    const progress = buildProgress([
+      assistant(1, [agent('toolu_a', 'A')]),
+      user(1, [launched('toolu_a')]),
+      {
+        type: 'attachment',
+        timestamp: at(3),
+        attachment: {
+          type: 'queued_command',
+          prompt: notice('toolu_a', 'completed'),
+          commandMode: 'task-notification',
+        },
+      } as TranscriptRecord,
+    ]);
+    expect(progress.agents.map((item) => item.status)).toEqual(['done']);
+  });
+
   it('несколько уведомлений одной репликой закрывают каждое своё', () => {
     const progress = buildProgress([
       assistant(1, [agent('toolu_a', 'A'), agent('toolu_b', 'B')]),

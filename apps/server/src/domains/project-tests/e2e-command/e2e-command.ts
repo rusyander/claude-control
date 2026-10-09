@@ -177,6 +177,14 @@ export function installedBin(cwd: string, bin: string): string | undefined {
 export const NOT_INSTALLED =
   /canceled due to missing packages|could not determine executable to run|No module named pytest|python3?: (?:command )?not found|'python3?' is not recognized/i;
 
+/**
+ * Пакет раннера есть, а браузера или бинаря к нему нет: Playwright после обновления,
+ * Cypress без скачанного бинаря. Отчёт при этом пишется, и каждый тест в нём «упал» —
+ * но сломано окружение, а не приложение.
+ */
+export const BROWSER_MISSING =
+  /Executable doesn't exist at|download new browsers|Cypress binary is missing|Cypress executable not found/i;
+
 /** Каталог запуска от корня проекта — для подсказки «где выполнить». */
 export function runDirOf(root: string, command: Pick<E2eCommand, 'cwd'> | undefined): string {
   return toPosix(relative(root, command?.cwd ?? root)) || '.';

@@ -252,6 +252,30 @@ describe('хаб разделения — отброшенные перезап�
     expect(button).toBeGreaterThan(withCopy);
     expect(button).toBeLessThan(inactive.indexOf('Старая без копии'));
   });
+
+  // Живая приёмка 09.10 (п. 5): после нового разделения принятая группа уходила
+  // в «Неактивно» без отметки — приёмку человека видно было только в списке чатов.
+  it('снятый принятый чат несёт в «Неактивно» отметку «принято», прочие снятые — нет', () => {
+    const chats = [
+      triageChat,
+      chat({
+        id: 'old-ok',
+        retired: true,
+        accepted: true,
+        copyLeft: true,
+        title: 'Старая принятая',
+      }),
+      chat({ id: 'old-open', retired: true, title: 'Старая непринятая' }),
+    ];
+    const html = render(chats, []);
+
+    const inactive = html.slice(html.indexOf('data-hub-inactive'));
+    expect(inactive.match(/data-hub-accepted/g)?.length).toBe(1);
+    const marker = inactive.indexOf('data-hub-accepted');
+    expect(marker).toBeGreaterThan(inactive.indexOf('Старая принятая'));
+    expect(marker).toBeLessThan(inactive.indexOf('Старая непринятая'));
+    expect(textOf(inactive)).toContain('принято');
+  });
 });
 
 /**

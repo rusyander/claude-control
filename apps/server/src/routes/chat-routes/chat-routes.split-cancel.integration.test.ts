@@ -356,6 +356,33 @@ describe('разделение: отмена плана', () => {
     expect(asks.of(['other-child'], () => false)).toHaveLength(1);
   }, 20_000);
 
+  // Живая приёмка 09.10 (п. 5): группа кончила ход вопросом, человек отменил
+  // план — запись вопроса снята, но законченный прогон ещё минуту лежал в
+  // `/chat/active`, вкладка после F5 подхватывала его хвост с вопросом и снова
+  // звала «агент ждёт ответа». Прогоны отменённых групп из буфера уходят; чужой
+  // законченный прогон остаётся — его хвост ещё догоняют.
+  it('отмена убирает законченные прогоны групп из буфера догона, чужой — нет', async () => {
+    const conveyor = withConveyor();
+    const instance = await withRoutes(conveyor);
+    const triageId = await triageStarted(instance);
+    finishTriage(conveyor, triageId);
+    await until(
+      () => store.getSplitPlan('parent-1')?.groups.every((group) => group.chatId) ?? false,
+    );
+    const groupIds = store.getSplitPlan('parent-1')!.groups.map((group) => group.chatId!);
+    registry.start('solo', { prompt: 'p', cwd: project }, { projectPath: project });
+    const listed = (): string[] => registry.active().map((run) => run.chatId);
+    await until(() => [...groupIds, 'solo'].every((id) => !registry.isRunning(id)));
+    expect(listed()).toEqual(expect.arrayContaining([...groupIds, 'solo']));
+
+    const response = await cancel(instance);
+    await instance.close();
+
+    expect(response.statusCode).toBe(200);
+    expect(listed().filter((id) => groupIds.includes(id))).toEqual([]);
+    expect(listed()).toContain('solo');
+  }, 20_000);
+
   it('отменять нечего — 409 с кодом, и на чужом ключе, и на отменённом плане', async () => {
     const instance = await withRoutes(withConveyor());
     // Плана не было вовсе — это не «уже закончилось» (D7).

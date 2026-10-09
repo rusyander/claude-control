@@ -124,8 +124,10 @@ export function judgeTests(input: {
   }
 
   if (automated.length > 0 && executed.length === 0) {
+    // Запись словом есть, а исполненного прогона нет: «ни одного прогона» тут
+    // неправда, и агент спорит с панелью вместо того, чтобы запустить команду.
     missing.push(
-      serverText('tests-gap-no-run', {
+      serverText(own.length > 0 ? 'tests-gap-word-only' : 'tests-gap-no-run', {
         cases: named(automated.map((key) => key.split(':')[1] ?? key)),
         command: input.command,
       }),

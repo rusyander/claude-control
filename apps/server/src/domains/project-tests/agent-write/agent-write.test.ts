@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { agentUpsertCase, recordAgentResults } from './agent-write.ts';
@@ -50,6 +50,37 @@ describe('запись в блок «Тесты» от агента чата', (
     const draft = readDraft(root, result.kind === 'draft' ? result.runId : '');
     expect(draft?.items[0]).toMatchObject({ op: 'update', caseId: 'auth-001', state: 'pending' });
     expect(draft?.items[0]?.testCase.title).toBe('Вход — агент');
+  });
+
+  it('кейс без поля source (написан руками в файле) — тоже человека: черновик, и запись прогона его не перекрашивает', () => {
+    root = mkdtempSync(join(tmpdir(), 'agent-write-'));
+    const dir = join(root, '.agent', 'tests');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      join(dir, 'core.tests.json'),
+      JSON.stringify({
+        version: 1,
+        title: 'Ядро',
+        cases: [
+          { id: 'core-001', type: 'case', title: 'Сумма', expected: '5', status: 'untested' },
+        ],
+      }),
+    );
+
+    const result = agentUpsertCase(
+      root,
+      'core',
+      { id: 'core-001', title: 'Сумма', expected: '5 без ошибок' },
+      NOW,
+    );
+    expect(result).toMatchObject({ kind: 'draft', caseId: 'core-001' });
+    expect(readGroup(root, 'core').cases[0]).toMatchObject({ expected: '5', source: 'human' });
+
+    recordAgentResults(root, [{ groupId: 'core', caseId: 'core-001', status: 'passed' }], NOW);
+    const onDisk = JSON.parse(readFileSync(join(dir, 'core.tests.json'), 'utf8')) as {
+      cases: Array<{ source?: string }>;
+    };
+    expect(onDisk.cases[0]?.source).not.toBe('agent');
   });
 
   it('проверенное пишется прогоном агента в историю и ложится на кейсы', () => {

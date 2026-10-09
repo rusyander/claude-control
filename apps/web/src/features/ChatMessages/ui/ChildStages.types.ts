@@ -63,6 +63,8 @@ export interface ChildStageGroup {
    * адресуется её уборка. Нет — убирать нечего.
    */
   retiredCopy?: { parentChatId: string };
+  /** Снятую группу человек принял (TK-accepted) — отметка переживает новое разделение. */
+  retiredAccepted?: boolean;
   /** Дерево стоит на паузе — группа остановлена и ждёт «Продолжить всё». */
   isPaused?: boolean;
   /**

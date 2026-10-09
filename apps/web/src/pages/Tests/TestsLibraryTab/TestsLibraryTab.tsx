@@ -54,7 +54,7 @@ export function TestsLibraryTab({
           <Icon name="plus" size={18} />
           <Typography variant="body" as="span">
             {pending
-              ? t('tests.drafts.waiting', { count: pending.pending })
+              ? t('tests.drafts.waiting', { count: board.pendingDraftItems })
               : t('tests.drafts.doneBanner', { count: lastApplied?.accepted ?? 0 })}
           </Typography>
           <Button

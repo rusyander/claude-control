@@ -290,6 +290,52 @@ describe('проверка набора поломкой', () => {
     });
   }, 90_000);
 
+  // Живая проверка 08.10: кейс, не засчитанный из-за стенда (`skipped`), выпадал из
+  // всех трёх счётчиков — 7 + 0 + 0 при восьми кейсах.
+  it('кейс, пропущенный раннером, считается «нет результата» — счёт сходится', async () => {
+    const { dir, appData } = project();
+    writeFileSync(
+      join(dir, 'check.mjs'),
+      CHECK.replace(
+        "row('[math-002] smoke', 'passed')",
+        '\'<testcase name="[math-002] smoke"><skipped/></testcase>\'',
+      ),
+    );
+    gitIn(dir, ['commit', '-qam', 'smoke skipped']);
+    const checks = new MutationChecks();
+    checks.start({ root: dir, appData, file: 'src/math.mjs' });
+    const check = await finished(checks, dir);
+    expect(check?.cases.map((item) => item.status)).toEqual(['failed', 'skipped']);
+    expect(check).toMatchObject({ caught: 1, missed: 0, noResult: 1 });
+  }, 90_000);
+
+  // Живая проверка 08.10 на самом репозитории панели: библиотека спрятана от git,
+  // в копию-worktree не приезжала, и раннер, метящий тесты номерами кейсов по ней
+  // (как `tools/qa/junit-run.mjs`), писал отчёт без номеров — все кейсы «нет результата».
+  it('раннер метит тесты по библиотеке из своей папки — библиотека едет в копию', async () => {
+    const { dir, appData } = project();
+    writeFileSync(
+      join(dir, 'check.mjs'),
+      CHECK.replace(
+        'const row = ',
+        "import { readFileSync as read } from 'node:fs';\n" +
+          'let ids = [];\n' +
+          "try { ids = JSON.parse(read('.agent/tests/math.tests.json', 'utf8')).cases.map((c) => c.id); } catch {}\n" +
+          'const row = ',
+      )
+        .replace(/\[(math-00\d)\] /g, "' + (ids.includes('$1') ? '[$1] ' : '') + '")
+        // Имена тестов не совпадают с заголовками кейсов: связь — только номер.
+        .replace('add and big', 'sums')
+        .replace("'smoke'", "'boots'"),
+    );
+    gitIn(dir, ['commit', '-qam', 'runner reads the library']);
+    const checks = new MutationChecks();
+    checks.start({ root: dir, appData, file: 'src/math.mjs' });
+    expect(await finished(checks, dir)).toMatchObject({ status: 'done', caught: 1, missed: 1 });
+    // Библиотека человека не тронута: в копию — копией, а не ссылкой.
+    expect(gitIn(dir, ['worktree', 'list']).split('\n')).toHaveLength(1);
+  }, 90_000);
+
   it('кандидаты — файлы codePaths автокейсов, каталог не ломается целиком', () => {
     const { dir } = project();
     expect(mutationCandidates(dir)).toEqual([{ file: 'src/math.mjs', cases: 1 }]);

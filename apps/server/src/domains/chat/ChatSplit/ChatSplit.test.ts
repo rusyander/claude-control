@@ -207,6 +207,26 @@ describe('терпимость разбора к именам полей', () =>
     expect(parsed?.shared).toBe('Проект на Node без сборки\nОтступ — два пробела');
   });
 
+  // Живая проверка сит 08.10: задача в 3,1 тыс. знаков дошла до группы обрубком
+  // «2) После ПЕРВОГО напомин» — без следа, и группа гадала, где остальное.
+  it('длинная задача обрезается с меткой, а не молча', () => {
+    const long = `${'а'.repeat(2_500)} КОНЕЦ`;
+    const parsed = parseSplitProposal({
+      shared: 'б'.repeat(5_000),
+      groups: [
+        { title: 'Раз', tasks: [long, 'коротко'] },
+        { title: 'Два', prompt: 'в'.repeat(5_000) },
+      ],
+    });
+
+    const [cut, short] = parsed?.groups[0]?.tasks ?? [];
+    expect(cut).not.toContain('КОНЕЦ');
+    expect(cut).toMatch(/cut by the panel/);
+    expect(short).toBe('коротко');
+    expect(parsed?.groups[1]?.tasks[0]).toMatch(/cut by the panel/);
+    expect(parsed?.shared).toMatch(/cut by the panel/);
+  });
+
   it('терпимость не превращает пустое в предложение', () => {
     expect(parseSplitProposal({ groups: [{ tasks: ['x'] }, { tasks: ['y'] }] })).toBeUndefined();
     expect(parseSplitProposal({ groups: [{ title: '   ' }, { title: 'Два' }] })).toBeUndefined();

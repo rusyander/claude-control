@@ -352,6 +352,17 @@ function text(value: unknown, limit: number): string | undefined {
 }
 
 /**
+ * Текст задания: длиннее потолка — обрезается С МЕТКОЙ. Молча обрубленная
+ * инструкция читается группой как целая (живая проверка 08.10: шаги 2–4 задания
+ * пропали посреди слова), а метку видят и группа, и человек в карточке.
+ */
+function longText(value: unknown, limit: number): string | undefined {
+  const whole = text(value, Number.POSITIVE_INFINITY);
+  if (!whole || whole.length <= limit) return whole;
+  return `${whole.slice(0, limit)}… [cut by the panel at ${limit} of ${whole.length} chars — ask the human for the rest]`;
+}
+
+/**
  * То же, но принимает и СПИСОК строк. Живой ответ модели присылал
  * `"shared": []` и `"shared": ["…", "…"]` там, где инструкция просит строку:
  * поле у неё «общий контекст», а контекст естественно перечислять пунктами.
@@ -360,11 +371,11 @@ function text(value: unknown, limit: number): string | undefined {
 function textOrList(value: unknown, limit: number): string | undefined {
   if (Array.isArray(value)) {
     const parts = value
-      .map((item) => text(item, limit))
+      .map((item) => text(item, Number.POSITIVE_INFINITY))
       .filter((item): item is string => Boolean(item));
-    return parts.length > 0 ? parts.join('\n').slice(0, limit) : undefined;
+    return parts.length > 0 ? longText(parts.join('\n'), limit) : undefined;
   }
-  return text(value, limit);
+  return longText(value, limit);
 }
 
 /**
@@ -440,13 +451,13 @@ function taskList(group: Record<string, unknown>): string[] {
   if (Array.isArray(direct)) {
     return direct
       .slice(0, SPLIT_MAX_TASKS_PER_GROUP)
-      .map((task) => text(task, MAX_TASK))
+      .map((task) => longText(task, MAX_TASK))
       .filter((task): task is string => Boolean(task));
   }
 
   // Одной строкой приходит готовое задание целиком — оно и есть содержание
   // группы. Режем по длине задания, а не по длине пункта: это не пункт.
-  const single = text(direct, MAX_BRIEF);
+  const single = longText(direct, MAX_BRIEF);
   return single ? [single] : [];
 }
 
@@ -455,7 +466,7 @@ function taskList(group: Record<string, unknown>): string[] {
  * ими границы группы, и в задании это ровно то, что агенту нужно знать первым.
  */
 function briefOf(group: Record<string, unknown>): string | undefined {
-  const own = text(group.brief ?? group.context ?? group.note, MAX_BRIEF);
+  const own = longText(group.brief ?? group.context ?? group.note, MAX_BRIEF);
 
   const raw = group.files;
   const files = Array.isArray(raw)

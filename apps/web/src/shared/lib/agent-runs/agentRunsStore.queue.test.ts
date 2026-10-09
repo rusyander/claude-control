@@ -9,6 +9,7 @@ vi.mock('@shared/api/client', () => ({
 }));
 
 import { agentRuns, getRun } from './agentRunsStore';
+import { getChatStatuses, getProjectStatuses } from './agent-runs.statuses';
 
 /**
  * Очередь дописанного. Смысл её в том, что задача может идти часами: пока агент
@@ -219,5 +220,27 @@ describe('agentRuns — очередь дописанного', () => {
     expect(bodies.some((body) => body.includes('работа группы'))).toBe(true);
     expect(bodies.some((body) => body.includes('дописанное'))).toBe(false);
     expect(getRun('q-5').queued).toHaveLength(0);
+  });
+
+  /**
+   * Живая приёмка 09.10 (п. 5): группа кончила ход вопросом, человек отменил
+   * план — сервер вопрос забыл, а вкладка держала законченный прогон «ждёт» и
+   * звала «агент ждёт ответа» на вкладке проекта, пока его не откроют.
+   */
+  it('«Отменить план» гасит «ждёт ответа» у группы, кончившей ход вопросом', async () => {
+    const ASK =
+      'data: {"kind":"tool","name":"AskUserQuestion","id":"ask-1","input":{"questions":[]},"seq":1}';
+    const END = 'data: {"kind":"done","costUsd":0,"durationMs":1,"sessionId":"s-6","seq":2}';
+    fetchMock.mockImplementationOnce(async () => sseResponse([ASK, END]));
+    void agentRuns.start({ chatId: 'q-6', prompt: 'работа группы', projectPath: '/proj/q6' });
+    await settle();
+    expect(getRun('q-6').status).toBe('waiting');
+    expect(getChatStatuses().get('q-6')).toBe('waiting');
+
+    agentRuns.haltQueued(['q-6']);
+
+    expect(getRun('q-6').status).toBe('idle');
+    expect(getChatStatuses().has('q-6')).toBe(false);
+    expect(getProjectStatuses().get('/proj/q6')).not.toBe('waiting');
   });
 });

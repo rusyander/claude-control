@@ -113,7 +113,9 @@ export function runScope(
     mode,
     writeDir: mode === 'generate' ? DRAFTS_WRITE_DIR : TESTS_DIR,
     testFiles: mode === 'automate' ? automationFiles(cases) : [],
-    ...(mode === 'generate' && e2eDir ? { e2eDir } : {}),
+    // Автоматизация пишет спеки туда же, куда генерация с кодом: кейс без
+    // `automation.file` иначе не получил бы первого файла никогда.
+    ...((mode === 'generate' || mode === 'automate') && e2eDir ? { e2eDir } : {}),
   };
 }
 
@@ -180,12 +182,16 @@ export function describeScope(scope: RunScope): string {
     return `${base}${e2e} — the panel changes the library by applying the draft`;
   }
   if (scope.mode !== 'automate') return base;
+  const folder = scope.e2eDir ? `, into the e2e folder ${scope.e2eDir}/ (test code)` : '';
   const named = scope.testFiles.length
     ? `, and also into the autotest files the cases name (${scope.testFiles.slice(0, 5).join(', ')}${
         scope.testFiles.length > 5 ? ', …' : ''
       })`
-    : ", and also into autotest files next to the project's existing tests";
-  return `${base}${named}`;
+    : scope.e2eDir
+      ? ''
+      : // Обещать «рядом с тестами проекта» нельзя: гейт такую запись отклонит.
+        ' — the project has no e2e folder, so no test code can be written: leave automation.status at toAutomate and say why in note';
+  return `${base}${folder}${named}`;
 }
 
 /** Решение по вызову инструмента. Разрешаем работать, запрещаем выходить за границы. */

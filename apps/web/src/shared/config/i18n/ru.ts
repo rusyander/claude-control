@@ -1241,6 +1241,7 @@ export const ru = {
         pausedNoChat: 'на паузе',
         interruptedNoChat: 'оборвалась до своего чата — продолжать нечего',
         mr: 'MR !{{id}}',
+        pr: 'PR #{{id}}',
         mrOpenHint: 'Открыть MR группы в новой вкладке',
         mrClosed: { merged: 'MR влит', closed: 'MR закрыт' },
         // Очередь слияния MR групп (G3): номер у кнопки MR и кого влить раньше.

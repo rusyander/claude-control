@@ -179,6 +179,18 @@ export function diffRealProviderDirs(before, after, { ignore = LIVE_SESSION_CHUR
 
 export class NotChecked extends Error {}
 
+/**
+ * Место необработанного исключения, если процесс Node упал на файле проекта:
+ * заголовок `file:///…:N` перед строкой кода. Внутренности Node (`node:…`, занятый
+ * порт) и зависимости (`node_modules`) — окружение, не код: undefined.
+ */
+export function codeCrash(log) {
+  const header = /^(file:\/\/\/\S+?):(\d+)\r?$/m.exec(log);
+  if (!header) return undefined;
+  const file = decodeURIComponent(header[1]);
+  return /[\\/]node_modules[\\/]/.test(file) ? undefined : `${file}:${header[2]}`;
+}
+
 export const wait = (ms) => new Promise((done) => setTimeout(done, ms));
 
 /** Свободный порт у системы: фиксированный номер свёл бы прогон с брошенной панелью прошлого. */
@@ -193,7 +205,7 @@ export function freePort() {
   });
 }
 
-async function waitFor(url, seconds) {
+async function waitFor(url, seconds, gone = () => false) {
   for (let i = 0; i < seconds * 4; i += 1) {
     try {
       const res = await fetch(url);
@@ -201,6 +213,8 @@ async function waitFor(url, seconds) {
     } catch {
       // ещё не поднялся
     }
+    // Процесс уже вышел — ждать минуту нечего (проверка поломкой ждала её на каждом скрипте).
+    if (gone()) return false;
     await wait(250);
   }
   return false;
@@ -421,8 +435,13 @@ export async function startStand({
 
   const apiUrl = `http://127.0.0.1:${apiPort}`;
   const webUrl = `http://127.0.0.1:${webPort}`;
-  if (!(await waitFor(`${apiUrl}/api/system`, 60))) {
+  if (!(await waitFor(`${apiUrl}/api/system`, 60, () => server.exitCode !== null))) {
     await stop();
+    // Панель упала исключением из своего же кода — это дефект продукта, а не стенд:
+    // иначе сломанный сервер читался бы «не проверено» и в прогоне, и в проверке
+    // набора поломкой (живая проверка 08.10: восемь кейсов «нет результата»).
+    const thrown = codeCrash(log);
+    if (thrown) throw new Error(`одноразовая панель упала на коде ${thrown}:\n${log.slice(-2000)}`);
     throw new NotChecked(`одноразовая панель не поднялась:\n${log.slice(-2000)}`);
   }
   if (web && !(await waitFor(webUrl, 90))) {

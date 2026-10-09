@@ -28,6 +28,7 @@ import { writeRun } from '../runs-store/runs-store.ts';
 import {
   e2eCommand,
   installedBin,
+  BROWSER_MISSING,
   NOT_INSTALLED,
   runDirOf,
   type E2eCommand,
@@ -364,8 +365,11 @@ export class E2eRunRegistry {
       startedAt: view.startedAt,
       finishedAt: at,
     };
-    if (!fresh) {
-      if (!stopped && NOT_INSTALLED.test(view.log)) {
+    // Браузер раннера не скачан: свежий отчёт красный целиком, но кейсы не трогаем и
+    // историю не пишем — иначе вся библиотека краснеет из-за окружения.
+    const browserMissing = !stopped && BROWSER_MISSING.test(view.log);
+    if (!fresh || browserMissing) {
+      if (browserMissing || (!stopped && NOT_INSTALLED.test(view.log))) {
         const refusal = notInstalled(root, this.commands.get(root));
         Object.assign(view, {
           status: 'error',

@@ -408,6 +408,105 @@ describe('buildProgress — фон и текущий вызов', () => {
     });
   });
 
+  // Живой прогон 08.10 (партия 30.09, п. 7): итог фона, умершего посреди хода, CLI
+  // пишет не репликой, а вставкой `queued_command` с `commandMode: task-notification`,
+  // а порт сервера стоит в `.listen(9123)`. Панель держала оба погашенных сервера
+  // «идущими». Вывод taskkill на русской Windows приходит битой кодировкой —
+  // доказательством по тексту он не станет никогда.
+  describe('фон, погашенный посреди хода (живой прогон 08.10)', () => {
+    const SERVER = (port: number) =>
+      `node -e "require('http').createServer((q,s)=>s.end('ok')).listen(${port})"`;
+    const GARBLED = '�ᯥ譮: �����, � �����䨪��஬ 70600, �ᯥ譮 �����襭.';
+    const started = (id: string, port: number, minute: number): TranscriptRecord[] => [
+      assistant(minute, [bash(id, SERVER(port), { run_in_background: true })]),
+      user(minute, [
+        result(id, `Command running in background with ID: b${id}. Output is being written to: x`),
+      ]),
+    ];
+    const queuedNotice = (task: string, status: string, minute: number): TranscriptRecord =>
+      ({
+        type: 'attachment',
+        timestamp: at(minute),
+        attachment: {
+          type: 'queued_command',
+          prompt: notification(task, status),
+          commandMode: 'task-notification',
+          origin: { kind: 'task-notification' },
+        },
+      }) as TranscriptRecord;
+
+    it('уведомление вставкой посреди хода закрывает фон', () => {
+      const progress = buildProgress([...started('s', 9200, 1), queuedNotice('bs', 'failed', 2)]);
+      expect(progress.shells?.[0]?.status).toBe('failed');
+    });
+
+    it('порт из переменной, PID из netstat, taskkill без || true — killed', () => {
+      const progress = buildProgress([
+        ...started('a', 9123, 1),
+        assistant(2, [
+          bash(
+            'k',
+            `P=9123; PID=$(netstat -ano | grep ":$P " | grep LISTENING | awk '{print $5}' | head -1); echo $PID; taskkill //F //PID $PID`,
+          ),
+        ]),
+        user(2, [result('k', `82804\n${GARBLED}`)]),
+        queuedNotice('ba', 'failed', 2),
+      ]);
+      expect(progress.shells?.[0]?.status).toBe('killed');
+    });
+
+    it('taskkill … || true с битым выводом, потом фон упал — killed', () => {
+      const progress = buildProgress([
+        ...started('b', 9124, 1),
+        assistant(2, [
+          bash(
+            'k',
+            `P=9124 && taskkill //F //PID $(netstat -ano | grep ":$P " | grep LISTENING | awk '{print $5}' | head -1) || true`,
+          ),
+        ]),
+        user(2, [result('k', GARBLED)]),
+        queuedNotice('bb', 'failed', 2),
+      ]);
+      expect(progress.shells?.[0]?.status).toBe('killed');
+    });
+
+    it('kill через lsof, которого нет, — сервер идёт', () => {
+      const progress = buildProgress([
+        ...started('c', 9125, 1),
+        assistant(2, [bash('k', 'P=9125 && kill $(lsof -ti:$P) 2>/dev/null || true')]),
+        user(2, [result('k', '/usr/bin/bash: line 1: lsof: command not found')]),
+      ]);
+      expect(progress.shells?.[0]?.status).toBe('running');
+    });
+
+    it.each([
+      ['python -m http.server 8000', '8000'],
+      ['npx serve -l 3000', '3000'],
+      ['npx http-server -p 8080', '8080'],
+      ['node -e "require(\'http\').createServer().listen( 4321 )"', '4321'],
+    ])('порт сервера в «%s» узнаётся', (command, port) => {
+      const progress = buildProgress([
+        assistant(1, [bash('v', command, { run_in_background: true })]),
+        user(1, [result('v', 'Command running in background with ID: bv.')]),
+        assistant(2, [bash('k', `lsof -ti:${port} | xargs kill`)]),
+        user(2, [result('k', '')]),
+      ]);
+      expect(progress.shells?.[0]?.status).toBe('killed');
+    });
+
+    it('ключ -p не порт, если за ним не число: mkdir -p и ssh без порта не гасятся', () => {
+      const progress = buildProgress([
+        assistant(1, [
+          bash('v', 'mkdir -p dist && npx vite build --watch', { run_in_background: true }),
+        ]),
+        user(1, [result('v', 'Command running in background with ID: bv.')]),
+        assistant(2, [bash('k', 'lsof -ti:5173 | xargs kill')]),
+        user(2, [result('k', '')]),
+      ]);
+      expect(progress.shells?.[0]?.status).toBe('running');
+    });
+  });
+
   it('все вызовы вернулись — текущего нет', () => {
     const progress = buildProgress([
       assistant(1, [bash('a', 'pnpm install')]),

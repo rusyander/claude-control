@@ -41,6 +41,7 @@ import {
 } from '@entities/ProjectTest';
 import { useTestFilters, type TestFilters } from './useTestFilters';
 import { pickActive } from '../lib/pickActive';
+import { pendingDraftItems } from '../lib/pendingDraftItems';
 import { toggleChecked } from '../lib/toggleChecked';
 import { messageOf } from '../lib/messageOf';
 
@@ -115,6 +116,8 @@ export interface TestsBoard {
   drafts: ProjectTestDraftSummary[];
   /** Непринятый черновик — тот, ради которого человек сюда и вернулся. */
   pendingDraft?: ProjectTestDraftSummary;
+  /** Ждущих правок во всех непринятых черновиках — счёт плашки (`pendingDraftItems`). */
+  pendingDraftItems: number;
   /** Галочка «принимать сразу»: одно положение на проект, помнит сервер. */
   autoAcceptDrafts: boolean;
   setAutoAcceptDrafts: (enabled: boolean) => void;
@@ -295,6 +298,7 @@ export function useTestsBoard(projectPath: string | undefined, isOpen: boolean):
     automation: tests.data?.automation,
     drafts,
     pendingDraft: drafts.find((item) => item.status === 'pending'),
+    pendingDraftItems: pendingDraftItems(drafts),
     autoAcceptDrafts: tests.data?.autoAcceptDrafts ?? false,
     setAutoAcceptDrafts: (enabled) => autoAccept.mutate(enabled),
     pickBudget,

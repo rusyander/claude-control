@@ -425,11 +425,15 @@ export class ProjectTestRunRegistry {
     }
     this.persist(root, view);
 
+    // Автоматизации — папка e2e проекта (своя или заведённая панелью): первый
+    // спек кейса без `automation.file` иначе писать было бы некуда (живая проверка 08.10).
+    const automateDir =
+      request.mode === 'automate' ? e2eFolderView(root, options.appData).dir : undefined;
     const scope = runScope(
       root,
       request.mode,
       scoped.flatMap((group) => group.cases),
-      e2e?.dir,
+      e2e?.dir ?? automateDir,
     );
     const name = runName(request, scoped, this.language());
     if (provider.id === 'claude' && run instanceof ChatRun) {

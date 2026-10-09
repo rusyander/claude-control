@@ -36,3 +36,12 @@
   min-width: 0;
   flex: 1;
 }
+
+// «принято» у снятой группы — та же капсула, что у строки живой группы.
+.chip {
+  align-self: flex-start;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--color-surface-sunken);
+  white-space: nowrap;
+}

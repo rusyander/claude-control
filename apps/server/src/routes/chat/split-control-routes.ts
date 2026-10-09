@@ -276,8 +276,12 @@ export function registerSplitControlRoutes(
       for (const path of paths) void deps.runs.livePool.closeIdleIn(path);
       // Вопросы закрытых групп больше никто не ждёт — иначе вкладка звала бы
       // «агент ждёт ответа» по разговору отменённого плана.
+      // И законченные прогоны их ходов уходят из буфера догона: хвост с вопросом
+      // вкладка после F5 подхватила бы и снова позвала (живая приёмка 09.10).
       for (const chatId of chatIds) {
-        deps.asks?.forget([chatId, ...conversationKeys(ctx.store.getChatLinks(), chatId)]);
+        const keys = [chatId, ...conversationKeys(ctx.store.getChatLinks(), chatId)];
+        deps.asks?.forget(keys);
+        for (const key of keys) deps.runs.discardFinished(key);
       }
       return body;
     } catch (error) {

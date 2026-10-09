@@ -41,6 +41,10 @@ export function GroupCard({
   const chatId = group.chatId;
   const openable = Boolean(chatId && onOpen);
   const mrId = group.mr?.match(/(\d+)$/)?.[1] ?? '';
+  // PR GitHub — «PR #12», MR GitLab — «MR !12»: слово и знак своего форджа.
+  const mrLabel = /\/pull\/\d+$/.test(group.mr ?? '')
+    ? 'chat.cascade.hub.pr'
+    : 'chat.cascade.hub.mr';
   const cleanup = group.copy && parentChatId ? group.copy : undefined;
   const release =
     !chatId && group.pending === 'waiting' && group.groupIndex !== undefined && onRelease;
@@ -105,7 +109,7 @@ export function GroupCard({
                 data-hub-mr
                 onClick={() => window.open(group.mr, '_blank', 'noopener,noreferrer')}
               >
-                {t('chat.cascade.hub.mr', { id: mrId })}
+                {t(mrLabel, { id: mrId })}
               </Button>
             </span>
           )}

@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '@shared/api/query-keys';
 
 export async function getProviderDetect(): Promise<ProviderDetectResponse> {
-  const { data } = await apiClient.get<ProviderDetectResponse>('/providers/detect/detect');
+  const { data } = await apiClient.get<ProviderDetectResponse>('/providers/detect');
   return data;
 }
 

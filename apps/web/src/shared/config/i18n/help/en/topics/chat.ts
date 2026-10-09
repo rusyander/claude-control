@@ -1168,9 +1168,11 @@ export const chatEn: typeof chatRu = {
       'second task. A group that gave ' +
       'up passes the slot limit like a new one. “Cancel plan” stops every group of the split and closes the plan after ' +
       'asking for confirmation: chats, copies and branches stay, and after cancelling ' +
-      'you can split again. A cancelled plan does not come back to life on a restart. ' +
-      'Chats of groups dropped by a split relaunch are collected separately — ' +
-      '“Inactive: N”.',
+      'you can split again. A cancelled plan does not come back to life on a restart, ' +
+      'and its groups’ questions are withdrawn: the project tab stops showing “agent ' +
+      'is waiting for an answer”. Chats of groups dropped by a split relaunch are ' +
+      'collected separately — “Inactive: N”; an accepted group keeps its “accepted” ' +
+      'mark and the “Remove copy” button there.',
     cascadeRules: 'What a group decides on its own — “Settings” → “Groups”',
     cascadeRulesText:
       'A group has no human by construction, so its permissions are decided by the ' +

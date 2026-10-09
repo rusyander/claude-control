@@ -45,7 +45,7 @@ function parseMatrix(text) {
     cell
       .replaceAll('\\*', '')
       .replaceAll('*', '')
-      .replace(/[†‡§¶⊘∅∎]/g, '')
+      .replace(/[†‡§¶⊘∅∎¤]/g, '')
       .trim();
   const columns = lines[start].split('|').slice(2, -1).map(clean);
   const rows = new Map();

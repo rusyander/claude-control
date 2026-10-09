@@ -424,6 +424,8 @@ export const en: TranslationSchema = {
         decision_downgraded: 'the rule decision was downgraded towards strictness',
         decision_unrepresentable:
           'the target has no stricter decision, and the rule may not be weakened',
+        rule_unexpressible:
+          "this CLI's rule vocabulary cannot express the rule, so it is not written",
         value_not_carried: 'the value does not travel: a secret lives in the environment only',
         in_process_only: 'the entity lives inside another process',
         account_only: 'the body is synced with the account and absent on disk',
@@ -2595,6 +2597,8 @@ export const en: TranslationSchema = {
       usingDefaults:
         'The permissions file does not exist yet — Continue defaults are shown. It is created only when you save.',
       rulesPlaceholder: 'one rule per line, e.g. Read(*)',
+      unenforced:
+        'Continue (cn 1.5.47) does not apply a pattern on Read, Write or List — these rules sit in the file but never fire: {{rules}}. Close the whole tool (Read) or put the pattern on Bash, Edit or Fetch.',
       allow: {
         label: 'Allow without confirmation (allow)',
         hint: 'One rule per line: Bash, Read(*), Write. Listed tools run straight away. An empty list removes the key from the file.',

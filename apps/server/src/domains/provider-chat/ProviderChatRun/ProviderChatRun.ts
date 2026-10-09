@@ -13,7 +13,11 @@ import type { ConfigProvider } from '../../../providers/types/types.ts';
 import { providerCliCommand } from '../../../providers/cli/cli.ts';
 import { resolveRunner, getRawKey } from '../../provider-keys/provider-keys.ts';
 import { runProviderApi } from '../../assistant-runner/api.ts';
-import { opencodeServe, type OpencodeServe } from '../../opencode-serve/opencode-serve.ts';
+import {
+  opencodeServe,
+  type OpencodeServe,
+  type OpencodeSessionOutcome,
+} from '../../opencode-serve/opencode-serve.ts';
 import type {
   SessionStartSource,
   SupervisorEventInput,
@@ -30,6 +34,16 @@ import { createLiveTurn } from '../live/index.ts';
 import type { LivePermissionPolicy, LiveTurn } from '../live/types.ts';
 
 /** У прогона есть своё окружение (контур, набор, слой группы). */
+/**
+ * Цвета терминала из вывода ошибок CLI. `opencode run` красит «Error:» кодами
+ * ANSI и под трубой — в переписке они легли бы мусором `\u001b[91m`.
+ */
+const ANSI = new RegExp(
+  `${String.fromCharCode(27)}(?:\\[[0-?]*[ -/]*[@-~]|\\][^\\u0007]*\\u0007)`,
+  'g',
+);
+const stripAnsi = (text: string): string => text.replace(ANSI, '');
+
 const hasEnv = (env: Record<string, string> | undefined): boolean =>
   env !== undefined && Object.keys(env).length > 0;
 
@@ -278,18 +292,33 @@ export class ProviderChatRun implements ProviderChatRunLike {
 
     if (resolution.mode === 'cli') {
       if (await this.runLive(options, resolution.cliCommandFound, onEvent)) return;
-      const session = await this.runSession(options, resolution.cliCommandFound, () =>
-        onEvent({ type: 'steerable' }),
+      // Куски ответа идут шиной сессии, пока он пишется; что успело прийти —
+      // ответ и после «Стоп», как у одиночного запуска.
+      let streamed = '';
+      const session = await this.runSession(
+        options,
+        resolution.cliCommandFound,
+        () => onEvent({ type: 'steerable' }),
+        (text) => {
+          streamed += text;
+          onEvent({ type: 'delta', text });
+        },
       );
       // Остановили, пока сессия отвечала: разговор закрыт тем, что успело
-      // прийти (обычно ничем), и ни к одиночному запуску, ни к API дальше не идём.
+      // прийти, и ни к одиночному запуску, ни к API дальше не идём.
       if (this.stopped) {
-        onEvent({ type: 'done', reply: session ?? '', transport: 'session' });
+        const reply = session && 'reply' in session ? session.reply : streamed.trim();
+        onEvent({ type: 'done', reply, transport: 'session' });
+        return;
+      }
+      // Ход начался и упал — причина CLI в поток; одиночный запуск повторил бы ход.
+      if (session && 'error' in session) {
+        onEvent({ type: 'error', error: session.error, reason: 'cli_error' });
         return;
       }
       if (session) {
-        onEvent({ type: 'delta', text: session });
-        onEvent({ type: 'done', reply: session, transport: 'session' });
+        if (!streamed) onEvent({ type: 'delta', text: session.reply });
+        onEvent({ type: 'done', reply: session.reply, transport: 'session' });
         return;
       }
 
@@ -449,7 +478,8 @@ export class ProviderChatRun implements ProviderChatRunLike {
     options: ProviderChatRunOptions,
     cliCommand?: string,
     onSteerable?: () => void,
-  ): Promise<string | undefined> {
+    onDelta?: (text: string) => void,
+  ): Promise<OpencodeSessionOutcome | undefined> {
     const { provider } = options;
     if (provider.assistant?.sessionServer !== 'opencode') return undefined;
     // Сервер сессий общий на все разговоры: окружение ЭТОГО прогона (адрес
@@ -475,10 +505,11 @@ export class ProviderChatRun implements ProviderChatRunLike {
       // разговора, а просьбы CLI о разрешении решает `decidePermission` (D2).
       ...(options.workdir ? { workdir: options.workdir } : {}),
       ...(options.permission ? { permission: options.permission } : {}),
+      ...(onDelta ? { onDelta } : {}),
     });
 
     this.steerTarget = undefined;
-    return result?.reply;
+    return result;
   }
 
   /**
@@ -724,7 +755,7 @@ export class ProviderChatRun implements ProviderChatRunLike {
         if ((code !== 0 && !parser?.settled?.()) || !text) {
           finish({
             type: 'error',
-            error: errorText.trim().slice(0, 500) || `CLI завершился с кодом ${code}`,
+            error: stripAnsi(errorText).trim().slice(0, 500) || `CLI завершился с кодом ${code}`,
             reason: 'cli_error',
           });
           return;

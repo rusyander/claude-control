@@ -53,7 +53,12 @@ export const continueProvider: ConfigProvider = {
     path: () => join(continueHome(), 'config.yaml'),
     blockDir: () => join(continueHome(), 'mcpServers'),
   },
-  envConfig: { format: 'dotenv', path: () => join(continueHome(), '.env') },
+  // Секреты конфига, не окружение инструментов: см. `configSecretsOnly`.
+  envConfig: {
+    format: 'dotenv',
+    path: () => join(continueHome(), '.env'),
+    configSecretsOnly: true,
+  },
   // Адрес у Continue — поле `apiBase` КОНКРЕТНОЙ модели в config.yaml (его
   // документация): общей переменной окружения для этого нет. Контур добавляет
   // свою запись в список моделей и не трогает чужие.
@@ -72,6 +77,21 @@ export const continueProvider: ConfigProvider = {
     // `exclude`: третий и есть запрет, поэтому решения все три.
     model: 'rules',
     decisions: ['allow', 'ask', 'deny'],
+    // Словарь снят ЖИВЬЁМ (cn 1.5.47, проба 09.10.2026) и по его исходнику
+    // `permissionsYamlLoader.ts`: уточнение в скобках сверяется с аргументом
+    // `file_path`/`path`, а у `Read`, `Write` и `List` аргументы зовутся
+    // `filepath`/`dirpath` — их правило с уточнением не срабатывает никогда
+    // (запрет `Read(файл)` лежал в файле, а `cn` файл читал). Сверяются
+    // уточнения только у `Bash` (`command`), `Edit` (`file_path`) и `Fetch`
+    // (`url`). Подстановка у `cn` — свой glob по всей строке, канонический
+    // `git push:*` ему не соответствует. Инструмент целиком (`Read`) работает.
+    ruleGrammar: {
+      tools: { WebFetch: 'Fetch' },
+      closed: false,
+      argumentTools: ['Bash', 'Edit', 'Fetch'],
+      argumentSyntax: 'own',
+      oneShapePerTool: false,
+    },
   },
   projectConfig: {
     instructionsRules: { format: 'continue-md', relativeDir: '.continue/rules' },
@@ -79,6 +99,9 @@ export const continueProvider: ConfigProvider = {
       format: 'json',
       relativePath: '.continue/mcpServers/mcp.json',
       relativeBlockDir: '.continue/mcpServers',
+      // Каталог блоков проекта читает расширение IDE; `cn` берёт только
+      // `~/.continue/config.yaml` (его `configLoader.ts`, проба 09.10.2026).
+      cliIgnores: true,
     },
     env: { format: 'dotenv', relativePath: '.continue/.env' },
   },

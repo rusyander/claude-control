@@ -111,6 +111,55 @@ mcpServers:
     expect(readProviderMcpServers(targetFor(filePath))).toEqual([]);
   });
 
+  it('файла нет → новый config.yaml с name и version: без них cn не стартует вовсе', () => {
+    // Живая проба 09.10.2026 (cn 1.5.47): файл из одного mcpServers/models CLI
+    // отверг целиком — «Failed to parse config: name: Required, version:
+    // Required», ни одного запроса к модели. Перенос MCP ломал запуск.
+    const filePath = join(root, 'fresh.yaml');
+    upsertProviderMcpServer(
+      targetFor(filePath),
+      null,
+      {
+        name: 'added',
+        transport: 'stdio',
+        command: 'npx',
+        args: [],
+        env: {},
+        url: undefined,
+        headers: {},
+      },
+      backupDir,
+    );
+
+    const config = parsed(filePath);
+    expect(typeof config.name).toBe('string');
+    expect(config.name.length).toBeGreaterThan(0);
+    expect(typeof config.version).toBe('string');
+    expect(Object.keys(config)).toEqual(['name', 'version', 'schema', 'mcpServers']);
+  });
+
+  it('свои name и version человека запись не трогает', () => {
+    const filePath = join(root, 'config.yaml');
+    writeConfig(filePath);
+    upsertProviderMcpServer(
+      targetFor(filePath),
+      null,
+      {
+        name: 'added',
+        transport: 'stdio',
+        command: 'npx',
+        args: [],
+        env: {},
+        url: undefined,
+        headers: {},
+      },
+      backupDir,
+    );
+    const config = parsed(filePath);
+    expect(config.name).toBe('my assistant');
+    expect(config.version).toBe('1.0.0');
+  });
+
   it('добавление stdio: запись в конец списка, прочие ключи и комментарии целы', () => {
     const filePath = join(root, 'config.yaml');
     writeConfig(filePath);
@@ -239,6 +288,9 @@ mcpServers:
       backupDir,
     );
     expect(parsed(filePath)).toEqual({
+      name: 'Local Assistant',
+      version: '1.0.0',
+      schema: 'v1',
       mcpServers: [
         {
           name: 'docs',

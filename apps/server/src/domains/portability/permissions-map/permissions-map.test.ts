@@ -180,6 +180,36 @@ describe('словарь инструментов цели', () => {
     expect(translated).toEqual({ kind: 'refused', why: 'argument_not_expressible' });
   });
 
+  /**
+   * Живая проба 09.10.2026 (cn 1.5.47): `Read(файл)` в `exclude` лежал в
+   * `permissions.yaml`, а `cn` файл читал. Его разбор сверяет уточнение `Read`,
+   * `Write` и `List` с аргументами `file_path`/`path`, которых у этих
+   * инструментов нет (`filepath`, `dirpath`), — такое правило не срабатывает
+   * никогда. Работают `Bash(…)`, `Edit(…)`, `Fetch(…)` и инструмент целиком.
+   */
+  it('у Continue уточнение, которое cn не сверяет, — отказ; инструмент целиком едет', () => {
+    const cn = targets.find((target) => target.id === 'continue') as ConfigProvider;
+    for (const rule of ['Read(secret.txt)', 'Write(out.txt)']) {
+      expect(translatePermission(permission(rule, 'deny'), 'deny', cn), rule).toEqual({
+        kind: 'refused',
+        why: 'argument_not_expressible',
+      });
+      expect(level(permission(rule, 'deny'), cn).level, rule).not.toBe('native');
+    }
+    expect(translatePermission(permission('Read', 'deny'), 'deny', cn)).toMatchObject({
+      kind: 'rule',
+      rule: 'Read',
+    });
+    expect(translatePermission(permission('Bash(git push)', 'deny'), 'deny', cn)).toMatchObject({
+      kind: 'rule',
+      rule: 'Bash(git push)',
+    });
+    expect(translatePermission(permission('Bash(git push:*)', 'deny'), 'deny', cn)).toEqual({
+      kind: 'refused',
+      why: 'argument_grammar_differs',
+    });
+  });
+
   it('там, где словаря нет, строка едет как есть', () => {
     for (const target of targets.filter((item) => !item.permissionsConfig?.ruleGrammar)) {
       const translated = translatePermission(

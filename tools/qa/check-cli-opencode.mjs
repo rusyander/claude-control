@@ -68,7 +68,13 @@ function findCli() {
 /** Сам исполняемый файл: обёртка зовёт его напрямую, без оболочки. */
 function realBinary(dir) {
   const candidates = IS_WIN
-    ? [join(dir, 'opencode.exe'), join(dir, '..', 'opencode-ai', 'bin', 'opencode.exe')]
+    ? [
+        join(dir, 'opencode.exe'),
+        // node_modules/.bin — обёртка рядом с пакетом.
+        join(dir, '..', 'opencode-ai', 'bin', 'opencode.exe'),
+        // Глобальная установка npm (`npm i -g opencode-ai`): обёртка в каталоге npm.
+        join(dir, 'node_modules', 'opencode-ai', 'bin', 'opencode.exe'),
+      ]
     : [join(dir, 'opencode')];
   return candidates.find((file) => existsSync(file));
 }

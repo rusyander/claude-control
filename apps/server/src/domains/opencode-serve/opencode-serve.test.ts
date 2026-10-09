@@ -371,7 +371,7 @@ describe('OpencodeServe: просьбы о разрешении решает dec
     expect(replies).toEqual([
       { id: 'per_1', body: { reply: 'reject', message: OPENCODE_DECLINE_MESSAGE } },
     ]);
-    expect(result?.reply).toBe('Привет!');
+    expect(result).toMatchObject({ reply: 'Привет!' });
   });
 
   it('правки выключены, человек разрешил → once', async () => {
@@ -425,7 +425,7 @@ describe('OpencodeServe: просьбы о разрешении решает dec
       'вопрос',
       depsOf(fetchImpl, { permission: { allowEdits: false } }),
     );
-    expect(result?.reply).toBe(OPENCODE_STOPPED_REPLY);
+    expect(result).toMatchObject({ reply: OPENCODE_STOPPED_REPLY });
   });
 });
 

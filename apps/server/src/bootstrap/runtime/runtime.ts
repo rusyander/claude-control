@@ -6,7 +6,7 @@ import { createGlobalLayer, type GlobalLayer } from '../../domains/global-layer/
 import type { ProjectTestRun } from '@agentdeck/contracts';
 import type { SieveReportRow, SieveStage } from '@agentdeck/contracts/sieves';
 import type { SplitGroupRechecked, SplitPlanView } from '@agentdeck/contracts/chat-handoff';
-import type { ChatLink } from '../../lib/app-store/app-store.types.ts';
+import type { ChatLink, SplitPlanGroupRecord } from '../../lib/app-store/app-store.types.ts';
 import type { ServerContext } from '../../context.ts';
 import { localizeText, serverText } from '../../lib/server-texts/server-texts.ts';
 import {
@@ -152,6 +152,7 @@ import { readChoice } from '../../domains/groups/choice/choice.ts';
 import { projectTestsBusy, wireTestsChatNote } from '../tests-chat-wiring/tests-chat-wiring.ts';
 import { ActivatingTestRunRegistry } from '../activating-test-runs/activating-test-runs.ts';
 import { createReviewStarter } from '../../routes/chat/review-starter.ts';
+import { lostConversationBrief } from '../../domains/chat/split-continue.ts';
 
 /**
  * Объекты, живущие дольше запроса. Создаются при сборке приложения — только
@@ -600,6 +601,26 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
       ...(projectPath ? { projectPath } : {}),
     });
   };
+  // Слово панели группе — продолжением её сессии. Вводная едет на случай, когда
+  // файла сессии нет и ход пойдёт новым разговором (вопрос ревью Q2).
+  const tellGroup = (
+    group: SplitPlanGroupRecord,
+    chatId: string,
+    cwd: string,
+    prompt: string,
+  ): 'sent' | 'queued' | 'refused' => {
+    const parent = ctx.store.getChatLink(chatId)?.parentChatId;
+    const tasks = parent
+      ? (ctx.store.getSplitPlan(parent)?.proposal.groups[group.index]?.tasks ?? [])
+      : [];
+    return childTells.send({
+      chatId,
+      cwd,
+      prompt,
+      title: group.title,
+      fresh: lostConversationBrief(group, tasks),
+    });
+  };
   const splitConveyor = new SplitConveyor({
     store: {
       get: (parent) => ctx.store.getSplitPlan(parent),
@@ -713,9 +734,7 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
       },
       // `childTells` объявлен ниже: к моменту первой проверки он уже есть.
       nudge: (group, prompt): 'sent' | 'queued' | 'refused' =>
-        group.chatId && group.path
-          ? childTells.send({ chatId: group.chatId, cwd: group.path, prompt, title: group.title })
-          : 'refused',
+        group.chatId && group.path ? tellGroup(group, group.chatId, group.path, prompt) : 'refused',
     },
     // Оборванная группа (WP1c) продолжается своей же сессией. Сессии нет —
     // процесс умер в первом ходе, продолжать нечего: ждёт человека, а не
@@ -724,7 +743,7 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
       if (!group.chatId || !group.path) return 'refused';
       const keys = conversationKeys(ctx.store.getChatLinks(), group.chatId);
       if (![group.chatId, ...keys].some((key) => !key.startsWith('new-'))) return 'refused';
-      return childTells.send({ chatId: group.chatId, cwd: group.path, prompt, title: group.title });
+      return tellGroup(group, group.chatId, group.path, prompt);
     },
     // Ожидание сброса лимита (журнал 89): срок в записи, таймер только будит.
     schedule: (run, ms) => setTimeout(run, ms).unref(),

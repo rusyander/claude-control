@@ -151,6 +151,7 @@ function writeNamedEntries(text: string, key: string, entries: ContinueRawServer
 
   if (entries.length === 0) deleteYamlKey(draft, key);
   else draft.set(key, entries);
+  const seeded = entries.length === 0 ? [] : seedRequiredHeader(draft);
 
   // lineWidth: 0 — длинные аргументы и адреса не переносятся на следующую строку.
   // flowCollectionPadding: false — чужие потоковые списки (`roles: [chat, edit]`)
@@ -161,11 +162,34 @@ function writeNamedEntries(text: string, key: string, entries: ContinueRawServer
   if (JSON.stringify(entries) !== JSON.stringify(readNamedEntries(next, key))) {
     throw new UnrecognizedFormatError();
   }
-  if (otherYamlKeysProjection(original, [key]) !== otherYamlKeysProjection(check, [key])) {
+  const own = [key, ...seeded];
+  if (otherYamlKeysProjection(original, own) !== otherYamlKeysProjection(check, own)) {
     throw new UnrecognizedFormatError();
   }
 
   return next;
+}
+
+/**
+ * Обязательная шапка `config.yaml`: без `name` и `version` CLI `cn` отвергает
+ * файл целиком — «Failed to parse config: name: Required, version: Required»
+ * (живая проба 09.10.2026, cn 1.5.47), и вместе с ним всё, что панель туда
+ * перенесла. Файл, который панель создаёт сама, без шапки был бы сломан с
+ * рождения. Дописываются ТОЛЬКО отсутствующие ключи и встают в начало, как в
+ * документации; свои значения человека не трогаются. Возвращает дописанные.
+ */
+const CONTINUE_REQUIRED_HEADER: readonly (readonly [string, string])[] = [
+  ['name', 'Local Assistant'],
+  ['version', '1.0.0'],
+  ['schema', 'v1'],
+];
+
+function seedRequiredHeader(doc: Document): string[] {
+  if (doc.get('name') !== undefined && doc.get('version') !== undefined) return [];
+  const missing = CONTINUE_REQUIRED_HEADER.filter(([name]) => !doc.has(name));
+  if (!isMap(doc.contents)) return [];
+  doc.contents.items.unshift(...missing.map(([name, value]) => doc.createPair(name, value)));
+  return missing.map(([name]) => name);
 }
 
 // --- Права (`allow` / `ask` / `exclude` в permissions.yaml) ------------------

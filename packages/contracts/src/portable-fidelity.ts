@@ -68,6 +68,8 @@ export function worstFidelity(left: FidelityLevel, right: FidelityLevel): Fideli
  *   сторону строгости (`ask` → `deny`); во что именно — сказано полем `decision`;
  * - `decision_unrepresentable` — решения строже у цели нет вовсе, а ослабить
  *   правило нельзя (инвариант 6): выразить его механизмом цели невозможно;
+ * - `rule_unexpressible` — словарь правил цели не выражает этот инструмент или
+ *   уточнение его аргумента: правило не пишется, а не лежит в файле без действия;
  * - `value_not_carried` — значение не переносится по построению (секрет живёт в
  *   окружении процесса и нигде не сохраняется, инвариант 5);
  * - `in_process_only` — сущность живёт внутри чужого процесса (`"type":"sdk"` у
@@ -97,6 +99,7 @@ export const fidelityReasons = [
   'needs_undetermined',
   'decision_downgraded',
   'decision_unrepresentable',
+  'rule_unexpressible',
   'value_not_carried',
   'in_process_only',
   'account_only',

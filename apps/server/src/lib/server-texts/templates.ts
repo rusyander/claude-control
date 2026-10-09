@@ -1242,6 +1242,10 @@ export const serverTextTemplates = {
     ru: 'Группа «{{group}}»: наблюдатель MR {{mr}} продолжал её уже {{resumes}} раз и больше сам не продолжает — новые ветки ревьюера и падения конвейера ждут вас.',
     en: 'Group «{{group}}»: the MR watcher for {{mr}} has resumed it {{resumes}} times and stops resuming it by itself — new reviewer threads and pipeline failures wait for you.',
   },
+  'chat-conversation-lost-notice': {
+    ru: 'Прежний разговор группы продолжить нельзя: его файла ({{lost}}) на диске нет. Ход пошёл новым разговором в той же копии — ветка, MR и задачи переданы ему вводной.',
+    en: "The group's previous conversation cannot be continued: its file ({{lost}}) is not on disk. The turn went on as a new conversation in the same copy — the branch, MR and tasks were handed to it in the brief.",
+  },
   'split-default-drift-notice': {
     ru: 'Группа «{{group}}»: {{target}} ушла вперёд и задела её файлы ({{count}}): {{files}}. Ветку посреди работы панель не трогает — перенесёт её rebase при доставке.',
     en: 'Group «{{group}}»: {{target}} moved ahead and touched its files ({{count}}): {{files}}. The panel leaves the branch alone mid-work — the delivery rebase moves it.',

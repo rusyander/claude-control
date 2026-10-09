@@ -7,6 +7,8 @@ import { CLAUDE_HOOK_EVENTS } from '@agentdeck/contracts/vocabulary';
 import type { EnvItem, EnvNeeds, EnvTrigger } from '@agentdeck/contracts/portable-env';
 import { fidelityConditions, fidelityReasons } from '@agentdeck/contracts/portable-fidelity';
 import { describeTarget, level } from './fidelity.ts';
+import { translatePermission } from '../permissions-map/permissions-map.ts';
+import { sectionTargets } from '../project/project.ts';
 import { blockingOfEvent, providerHookEvents } from '../hook-events.ts';
 import { triggerOfEvent } from '../needs.ts';
 import { importClaudeEnvironment } from '../import/claude.ts';
@@ -388,6 +390,68 @@ describe('понижение — только в сторону строгост
       provider('goose'),
     );
     expect(goose.level).toBe('text');
+  });
+
+  /**
+   * Живая проба 09.10.2026 (opencode 1.18.35): `Read` в закрытом словаре
+   * OpenCode перевод не писал, а отчёт обещал «нативно» — человек читал, что
+   * запрет действует, а OpenCode читал файл. Отчёт и перевод обязаны совпасть.
+   */
+  it('правило, которое словарь цели не выражает, не обещается нативным — как и не пишется', () => {
+    const opencode = provider('opencode');
+    const rule = (text: string) =>
+      item({ kind: 'permission', rule: text, decision: 'deny', order: 0 } as Partial<EnvItem> &
+        Pick<EnvItem, 'kind'>) as Extract<EnvItem, { kind: 'permission' }>;
+
+    for (const text of ['Read(agentdeck-probe-denied.txt)', 'WebSearch', 'Bash(git push:*)']) {
+      const verdict = level(rule(text), opencode);
+      expect(translatePermission(rule(text), 'deny', opencode).kind, text).toBe('refused');
+      expect(verdict.level, text).not.toBe('native');
+      expect(verdict.reason, text).toBe('rule_unexpressible');
+    }
+
+    const bash = rule('Bash(git push)');
+    expect(translatePermission(bash, 'deny', opencode).kind).toBe('rule');
+    expect(level(bash, opencode).level).toBe('native');
+  });
+
+  /**
+   * Живая проба 09.10.2026 (cn 1.5.47): `.continue/.env` питает только
+   * подстановки `${{ secrets.ИМЯ }}` в конфиге — команда инструмента переменную
+   * не видит ни на одном уровне. Отчёт обещал «нативно».
+   */
+  it('файл секретов конфига переменную окружения нативно не переносит', () => {
+    const env = item({ kind: 'envVar', name: 'E', value: 'v' } as Partial<EnvItem> &
+      Pick<EnvItem, 'kind'>);
+    expect(level(env, provider('continue')).level).not.toBe('native');
+    expect(level(env, provider('gemini')).level).toBe('native');
+  });
+
+  /**
+   * Та же проба: `<проект>/.continue/mcpServers/mcp.json` читает расширение IDE,
+   * а `cn` — только `~/.continue/config.yaml` (его `configLoader.ts`):
+   * пробный сервер в списке инструментов не появился. Дом при этом честен.
+   */
+  it('MCP проекта, которого CLI не читает, нативным на уровне проекта не обещается', () => {
+    const server = item({
+      kind: 'mcpServer',
+      name: 'm',
+      transport: 'stdio',
+      command: 'node',
+      args: [],
+      url: null,
+      envKeys: [],
+    } as Partial<EnvItem> & Pick<EnvItem, 'kind'>);
+    const root = { projectRoot: join(tmpdir(), 'agentdeck-fidelity-project') };
+    const cn = provider('continue');
+    expect(level(server, describeTarget(cn, sectionTargets(cn, 'project', root))).level).not.toBe(
+      'native',
+    );
+    expect(level(server, describeTarget(cn)).level).toBe('native');
+    const gemini = provider('gemini');
+    expect(
+      level(server, describeTarget(gemini, sectionTargets(gemini, 'project', root))).level,
+    ).toBe('native');
   });
 });
 

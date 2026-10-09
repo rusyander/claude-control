@@ -265,8 +265,12 @@ export const portabilityEn = {
       'The reason is named exactly: the target has no such event, the entity ' +
       'lives inside a foreign process, the body of the entry is synced with an ' +
       'account and is not on disk, a plugin at the target is installed only by its store ' +
-      'or the CLI’s own command (Qwen Code and Codex work that way). There is no "text is ' +
-      'probably enough" here.',
+      'or the CLI’s own command (Qwen Code and Codex work that way), a permission rule the ' +
+      'target’s vocabulary cannot express (the tool is not in it, its argument cannot be ' +
+      'set, or the wildcard is written differently — such a rule is not written at all ' +
+      'rather than written as something "close"), environment variables for a target ' +
+      'whose file holds only its own config secrets, not the tools’ environment ' +
+      '(Continue works that way). There is no "text is probably enough" here.',
 
     limitsTitle: 'Limits and refusals',
     limitsCaption:

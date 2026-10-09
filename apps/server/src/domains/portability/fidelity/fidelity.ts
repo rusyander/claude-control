@@ -22,7 +22,8 @@ import type { ConfigProvider } from '../../../providers/types/types.ts';
 import type { SectionTargets } from '../project/project.ts';
 import { providerHookEvents } from '../hook-events.ts';
 import { triggerOfEvent } from '../needs.ts';
-import { isModeRule } from '../permissions-map/permissions-map.ts';
+import { grammarRefusal, isModeRule } from '../permissions-map/permissions-map.ts';
+import type { ProviderPermissionRuleGrammar } from '../../../providers/types/sections.ts';
 import { REQUEST_PATH_GATE_OPENED } from '../wire/tool-gate.ts';
 
 /**
@@ -79,6 +80,8 @@ export interface TargetProfile {
   readonly permissions: {
     readonly model: 'rules' | 'mode' | 'none';
     readonly decisions: readonly ('allow' | 'ask' | 'deny')[];
+    /** Словарь правил цели (`ruleGrammar` каталога): им же отказывает перевод. */
+    readonly grammar?: ProviderPermissionRuleGrammar;
   };
   readonly mcp: boolean;
   readonly env: boolean;
@@ -169,10 +172,14 @@ export function describeTarget(provider: ConfigProvider, level?: SectionTargets)
       ? {
           model: provider.permissionsConfig.model,
           decisions: provider.permissionsConfig.decisions,
+          ...(provider.permissionsConfig.ruleGrammar
+            ? { grammar: provider.permissionsConfig.ruleGrammar }
+            : {}),
         }
       : (own?.permissions ?? { model: 'none', decisions: [] }),
     mcp: Boolean(provider.mcpConfig) || Boolean(own?.mcp),
-    env: Boolean(provider.envConfig) || Boolean(own?.env),
+    env:
+      (Boolean(provider.envConfig) && !provider.envConfig?.configSecretsOnly) || Boolean(own?.env),
     pluginForms: pluginFormsOf(provider),
     // Раздел плагинов есть, а принимаемых форм нет и «только для чтения» это не
     // объясняет — значит единицы приходят установкой (магазин Claude).
@@ -189,7 +196,7 @@ export function describeTarget(provider: ConfigProvider, level?: SectionTargets)
     hooksNeedApproval: provider.hooksConfig?.approvalRequired === true,
   };
 
-  return level ? atLevel(catalog, level) : catalog;
+  return level ? atLevel(catalog, level, provider) : catalog;
 }
 
 /**
@@ -228,7 +235,11 @@ function pluginFormsOf(provider: ConfigProvider): PluginForm[] {
  * разделы полны, а универсальных целей нет вовсе) возвращают профиль каталога
  * НЕТРОНУТЫМ — поведение до П2.5 не меняется ни на байт.
  */
-function atLevel(catalog: TargetProfile, level: SectionTargets): TargetProfile {
+function atLevel(
+  catalog: TargetProfile,
+  level: SectionTargets,
+  provider: ConfigProvider,
+): TargetProfile {
   if (level.scope === 'global' || level.ownLayout) return catalog;
   if (!level.supported) return nothingAtLevel(catalog.provider);
 
@@ -251,7 +262,7 @@ function atLevel(catalog: TargetProfile, level: SectionTargets): TargetProfile {
     subagents: false,
     hookEvents: level.hooks ? catalog.hookEvents : [],
     permissions: level.permissions ? catalog.permissions : { model: 'none', decisions: [] },
-    mcp: catalog.mcp && Boolean(level.mcp),
+    mcp: catalog.mcp && Boolean(level.mcp) && !provider.projectConfig?.mcp?.cliIgnores,
     env: catalog.env && Boolean(level.env),
     pluginForms: level.plugins ? catalog.pluginForms : [],
     pluginsFromStore: level.plugins ? catalog.pluginsFromStore : false,
@@ -534,6 +545,12 @@ function permissionVerdict(item: PermissionItem, profile: TargetProfile): Fideli
   if (isModeRule(item.rule)) return degraded(profile, 'no_mechanism', true);
 
   if (profile.permissions.model === 'rules') {
+    // Правило, которого словарь цели не выражает, перевод НЕ ПИШЕТ
+    // (`permissions-map.ts`) — обещать здесь «нативно» значило бы сказать
+    // человеку, что запрет действует, когда его нет в файле.
+    if (grammarRefusal(item.rule, profile.permissions.grammar)) {
+      return degraded(profile, 'rule_unexpressible', true);
+    }
     if (profile.permissions.decisions.includes(item.decision)) {
       return { ...verdict('native', 'target_mechanism'), decision: item.decision };
     }

@@ -355,7 +355,10 @@ export const permissionsEn: typeof permissionsRu = {
       'lives in a SEPARATE file, ~/.continue/permissions.yaml: no mode at all, just three ' +
       'lists — allow (run straight away), ask (confirm) and exclude (hide the tool from ' +
       'the agent). In headless mode (cn -p) tools under ask are unavailable: there is ' +
-      'nobody to confirm. Goose boils down to ONE key, GOOSE_MODE in config.yaml: auto (run ' +
+      'nobody to confirm. cn 1.5.47 applies a pattern in brackets only on Bash, Edit and ' +
+      'Fetch: a rule like Read(.env) sits in the file but never fires, and the section names ' +
+      'such rules in a warning under the form before you save. Reading can only be closed ' +
+      'whole — Read. Goose boils down to ONE key, GOOSE_MODE in config.yaml: auto (run ' +
       'without asking), approve (by the configured permissions), smart_approve (auto-approve ' +
       'the safe calls) and chat (never run tools at all). Goose has no rule lists, and per-tool ' +
       'permissions sit in a neighbouring permission.yaml: the panel shows them as three lists ' +

@@ -93,13 +93,32 @@ export async function startProbeStub(script: StubScript): Promise<ProbeStub> {
       // Anthropic это `messages`, у ручки `/responses` — `input`. Маршрут для
       // этого не годится: CLI зовёт заглушку по адресу, который сам же и
       // составляет, и хвост у него свой.
-      const dialect = Array.isArray(body.messages)
-        ? 'anthropic'
-        : Array.isArray(body.input)
+      //
+      // Одно исключение: `/chat/completions` (OpenCode, Continue, Aider, Goose)
+      // тоже шлёт `messages`, и по полю его не отличить от Anthropic. Зато хвост
+      // этой ручки у всех её клиентов один и тот же — по нему и узнаётся.
+      const dialect = !Array.isArray(body.messages)
+        ? Array.isArray(body.input)
           ? 'responses'
-          : null;
+          : null
+        : request.url?.includes('chat/completions')
+          ? 'chat'
+          : 'anthropic';
       if (!dialect) {
         return sendJson(response, { ok: true });
+      }
+
+      // Запрос БЕЗ инструментов — тоже не ход: так CLI заказывает подпись сессии
+      // у малой модели. Живая проба 09.10.2026 (opencode 1.18.35): такой запрос
+      // встал нулевым ходом, вызовы ушли в него и не исполнились, настоящий ход
+      // получил «завершено» — и право по негативу вышло ЗЕЛЁНЫМ без единого
+      // вызова. Ответ — короткий текст, в запись не идёт.
+      if (!Array.isArray(body.tools) || body.tools.length === 0) {
+        const aside: StubBlock[] = [{ type: 'text', text: 'agentdeck probe' }];
+        if (dialect === 'responses') return sendResponsesStream(response, aside);
+        if (dialect === 'chat') return sendChat(response, aside, body.stream === true);
+        if (body.stream === true) return sendStream(response, aside, 'end_turn');
+        return sendJson(response, message(aside, 'end_turn'));
       }
 
       const turn = requests.length;
@@ -112,6 +131,7 @@ export async function startProbeStub(script: StubScript): Promise<ProbeStub> {
       // Ручка `/responses` отвечает ТОЛЬКО потоком: цельного ответа её клиенты
       // не ждут, и `stream` в теле они не присылают вовсе.
       if (dialect === 'responses') sendResponsesStream(response, blocks);
+      else if (dialect === 'chat') sendChat(response, blocks, body.stream === true);
       else if (body.stream === true) sendStream(response, blocks, stopReason);
       else sendJson(response, message(blocks, stopReason));
     });
@@ -265,5 +285,76 @@ function sendResponsesStream(response: ServerResponse, blocks: readonly StubBloc
     type: 'response.completed',
     response: { id, usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 } },
   });
+  response.end();
+}
+
+/**
+ * Тот же сценарий на ручке `/chat/completions` — диалекте OpenCode
+ * (`@ai-sdk/openai-compatible`), Continue (`provider: openai`), Aider (LiteLLM)
+ * и Goose (`GOOSE_PROVIDER=openai`).
+ *
+ * Вызовы инструментов здесь — массив `tool_calls` в реплике, аргументы СТРОКОЙ, а
+ * конец хода с вызовами — `finish_reason: "tool_calls"`: клиент, получивший
+ * `stop`, вызовов не исполнит и пробу не продолжит. Поток — куски
+ * `chat.completion.chunk` и `[DONE]`; у каждого вызова в первом же куске есть
+ * `id`, `type` и имя, иначе клиент не соберёт вызов из дельт.
+ */
+function sendChat(response: ServerResponse, blocks: readonly StubBlock[], stream: boolean): void {
+  const text = blocks
+    .filter((block) => block.type === 'text')
+    .map((block) => block.text)
+    .join('');
+  const calls = blocks.flatMap((block, index) =>
+    block.type === 'tool_use'
+      ? [
+          {
+            index,
+            id: block.id,
+            type: 'function',
+            function: { name: block.name, arguments: JSON.stringify(block.input) },
+          },
+        ]
+      : [],
+  );
+  const finish = calls.length > 0 ? 'tool_calls' : 'stop';
+  const base = { id: 'chatcmpl_agentdeck_probe', created: 0, model: 'agentdeck-probe-stub' };
+  const usage = { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 };
+
+  if (!stream) {
+    const toolCalls = calls.map(({ index: _index, ...call }) => call);
+    return sendJson(response, {
+      ...base,
+      object: 'chat.completion',
+      choices: [
+        {
+          index: 0,
+          message: {
+            role: 'assistant',
+            content: text || null,
+            ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
+          },
+          finish_reason: finish,
+        },
+      ],
+      usage,
+    });
+  }
+
+  response.writeHead(200, {
+    'content-type': 'text/event-stream',
+    'cache-control': 'no-cache',
+    connection: 'keep-alive',
+  });
+  const chunk = (choice: Record<string, unknown>, extra: Record<string, unknown> = {}): void => {
+    response.write(
+      `data: ${JSON.stringify({ ...base, object: 'chat.completion.chunk', choices: [{ index: 0, ...choice }], ...extra })}\n\n`,
+    );
+  };
+  chunk({ delta: { role: 'assistant', content: text }, finish_reason: null });
+  calls.forEach((call, index) => {
+    chunk({ delta: { tool_calls: [{ ...call, index }] }, finish_reason: null });
+  });
+  chunk({ delta: {}, finish_reason: finish }, { usage });
+  response.write('data: [DONE]\n\n');
   response.end();
 }

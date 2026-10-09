@@ -107,6 +107,7 @@ export const composedMessageParams = {
   'split-limit-warning-notice': ['until'],
   'split-delivery-description-unchecked-notice': ['group', 'mr'],
   'split-mr-watch-limit-notice': ['group', 'resumes', 'mr'],
+  'chat-conversation-lost-notice': ['lost'],
   'split-default-drift-notice': ['group', 'target', 'files', 'count'],
   'chat-autonomy-deferred-notice': ['count'],
   'chat-stop-unconfirmed-notice': ['pid'],

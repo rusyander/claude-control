@@ -3,6 +3,7 @@ import { createServer } from 'node:net';
 import { killChildTree } from '../../lib/process-tree/process-tree.ts';
 import { decidePermission } from '../provider-chat/live/permission.ts';
 import type { LivePermissionPolicy } from '../provider-chat/live/types.ts';
+import { watchOpencodeEvents } from './opencode-events.ts';
 
 /**
  * Сессионный режим OpenCode (IDEA-8) — вторая, более богатая форма ассистента
@@ -24,6 +25,8 @@ import type { LivePermissionPolicy } from '../provider-chat/live/types.ts';
  *  - `POST /session/:id/message` с телом `{ agent, parts: [{ type: 'text', text }] }` —
  *    отправить сообщение; ответ — `{ info, parts }`, текст лежит в частях с
  *    `type: 'text'`;
+ *  - `GET /event` — шина событий: куски ответа и причина падения сессии
+ *    (`opencode-events.ts`);
  *  - `GET /permission` — ждущие ответа просьбы о разрешении,
  *    `POST /permission/:id/reply` `{ reply: 'once'|'reject', message? }` — ответ.
  *
@@ -53,6 +56,18 @@ export interface OpencodeSessionReply {
   sessionId: string;
 }
 
+/**
+ * Ход начался и упал: причина от самого CLI (`session.error`) или ответ
+ * оборвался, когда его куски уже ушли наружу. К one-shot отсюда не возвращаются:
+ * он повторил бы ход (и показал бы его второй раз поверх уже напечатанного).
+ */
+export interface OpencodeSessionFailure {
+  error: string;
+  sessionId: string;
+}
+
+export type OpencodeSessionOutcome = OpencodeSessionReply | OpencodeSessionFailure;
+
 export interface OpencodeServeDeps {
   spawnImpl?: typeof nodeSpawn;
   fetchImpl?: typeof fetch;
@@ -75,12 +90,18 @@ export interface OpencodeServeDeps {
   permission?: LivePermissionPolicy;
   /** Как часто спрашивать сервер о ждущих просьбах, мс. */
   permissionPollMs?: number;
+  /** Кусок ответа, пока он идёт (шина `/event`). Не задан — ответ только целиком. */
+  onDelta?: (text: string) => void;
 }
 
 const DEFAULT_READY_TIMEOUT = 20_000;
 const DEFAULT_REQUEST_TIMEOUT = 180_000;
 const HEALTH_POLL_INTERVAL = 250;
 const PERMISSION_POLL_INTERVAL = 250;
+/** Сколько ждать подписки на шину до отправки сообщения: раньше — потеряем первые куски. */
+const EVENT_READY_WAIT = 1000;
+/** Сколько ждать события `session.error` после упавшего запроса: оно идёт отдельно. */
+const EVENT_FAILURE_WAIT = 1000;
 
 /**
  * Что уходит модели вместе с отказом. Без `message` OpenCode обрывает ход на
@@ -97,6 +118,9 @@ export const OPENCODE_DECLINE_MESSAGE =
  */
 export const OPENCODE_STOPPED_REPLY =
   'OpenCode stopped after a permission request and gave no text answer.';
+
+/** Куски ответа уже показаны, а целиком он так и не пришёл. */
+export const OPENCODE_BROKEN_REPLY = 'OpenCode stopped mid-answer and did not finish the reply.';
 
 /** Свободный порт от ОС: сокет на `0`, читаем выданный номер, закрываем. */
 export function freePort(): Promise<number> {
@@ -351,7 +375,7 @@ export class OpencodeServe {
     conversationId: string,
     text: string,
     deps: OpencodeServeDeps,
-  ): Promise<OpencodeSessionReply | undefined> {
+  ): Promise<OpencodeSessionOutcome | undefined> {
     const baseUrl = await this.ensure(deps);
     if (!baseUrl) return undefined;
 
@@ -366,8 +390,11 @@ export class OpencodeServe {
 
     const outcome = await this.sendMessage(baseUrl, session, text, deps);
     if (outcome.reply === undefined) {
+      // Причину назвал сам CLI — сессия жива и помнит разговор, держим её.
+      if (outcome.error) return { error: outcome.error, sessionId: session.id };
       // Сессия могла протухнуть вместе с сервером — не держим мёртвый id.
       this.sessions.delete(conversationId);
+      if (outcome.streamed) return { error: OPENCODE_BROKEN_REPLY, sessionId: session.id };
       if (!outcome.asked) return undefined;
       return { reply: OPENCODE_STOPPED_REPLY, sessionId: session.id };
     }
@@ -406,42 +433,37 @@ export class OpencodeServe {
     session: OpencodeSession,
     text: string,
     deps: OpencodeServeDeps,
-  ): Promise<{ reply: string | undefined; asked: boolean }> {
+  ): Promise<{ reply: string | undefined; asked: boolean; streamed: boolean; error?: string }> {
     const query = directoryQuery(session.workdir);
-    const watcher = this.watchPermissions(baseUrl, session, deps);
-    let body: unknown;
+    const events = watchOpencodeEvents({
+      url: `${baseUrl}/event${query}`,
+      sessionId: session.id,
+      fetchImpl: deps.fetchImpl ?? globalThis.fetch,
+      ...(deps.signal ? { signal: deps.signal } : {}),
+      ...(deps.onDelta ? { onDelta: deps.onDelta } : {}),
+    });
     try {
-      body = await this.request(
-        baseUrl,
-        `/session/${encodeURIComponent(session.id)}/message${query}`,
-        { agent: session.agent, parts: [{ type: 'text', text }] },
-        deps,
-      );
+      await Promise.race([events.ready, sleep(EVENT_READY_WAIT)]);
+      const watcher = this.watchPermissions(baseUrl, session, deps);
+      let body: unknown;
+      try {
+        body = await this.request(
+          baseUrl,
+          `/session/${encodeURIComponent(session.id)}/message${query}`,
+          { agent: session.agent, parts: [{ type: 'text', text }] },
+          deps,
+        );
+      } finally {
+        watcher.stop();
+      }
+      const asked = watcher.asked();
+      const reply = replyText(body);
+      if (reply !== undefined) return { reply, asked, streamed: events.streamed() };
+      const error = deps.signal?.aborted ? undefined : await events.failure(EVENT_FAILURE_WAIT);
+      return { reply: undefined, asked, streamed: events.streamed(), ...(error ? { error } : {}) };
     } finally {
-      watcher.stop();
+      events.stop();
     }
-    const asked = watcher.asked();
-    if (!body || typeof body !== 'object') return { reply: undefined, asked };
-
-    const parts = (body as { parts?: unknown }).parts;
-    if (!Array.isArray(parts)) return { reply: undefined, asked };
-
-    // Берём только части `type: 'text'` — единственная форма, задокументированная
-    // и на отправку, и на приём. Всё прочее (инструменты, служебные части) молча
-    // пропускаем: показывать непонятую часть как ответ было бы выдумкой.
-    const reply = parts
-      .filter(
-        (part): part is { type: string; text: string } =>
-          !!part &&
-          typeof part === 'object' &&
-          (part as { type?: unknown }).type === 'text' &&
-          typeof (part as { text?: unknown }).text === 'string',
-      )
-      .map((part) => part.text)
-      .join('')
-      .trim();
-
-    return { reply: reply || undefined, asked };
   }
 
   /**
@@ -589,6 +611,30 @@ export class OpencodeServe {
  */
 function killTree(child: ChildProcess): void {
   killChildTree(child);
+}
+
+/** Текст ответа из тела `POST /session/:id/message`; не той формы — `undefined`. */
+function replyText(body: unknown): string | undefined {
+  if (!body || typeof body !== 'object') return undefined;
+  const parts = (body as { parts?: unknown }).parts;
+  if (!Array.isArray(parts)) return undefined;
+
+  // Берём только части `type: 'text'` — единственная форма, задокументированная
+  // и на отправку, и на приём. Всё прочее (инструменты, служебные части) молча
+  // пропускаем: показывать непонятую часть как ответ было бы выдумкой.
+  const reply = parts
+    .filter(
+      (part): part is { type: string; text: string } =>
+        !!part &&
+        typeof part === 'object' &&
+        (part as { type?: unknown }).type === 'text' &&
+        typeof (part as { text?: unknown }).text === 'string',
+    )
+    .map((part) => part.text)
+    .join('')
+    .trim();
+
+  return reply || undefined;
 }
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));

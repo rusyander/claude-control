@@ -148,8 +148,12 @@ function mcpScript(askedPath: string): string {
     '          }],',
     '        },',
     '      });',
+    // Незнакомый метод — ошибкой «Method not found», как у настоящего сервера.
+    // Пустой `result` на него ломал подъём: Goose 1.54 первым шлёт
+    // `server/discover`, принимал `{}` за ответ и бросал сервер, не дойдя до
+    // `initialize` (живая проба 09.10.2026) — MCP «не доехал» там, где доехал.
     '    } else {',
-    "      send({ jsonrpc: '2.0', id: request.id, result: {} });",
+    "      send({ jsonrpc: '2.0', id: request.id, error: { code: -32601, message: 'Method not found' } });",
     '    }',
     '  }',
     '});',

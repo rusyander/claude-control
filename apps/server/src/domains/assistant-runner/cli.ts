@@ -366,6 +366,20 @@ export async function runSessionServer(
     requestTimeoutMs: deps.timeoutMs,
   });
   if (!result) return undefined;
+  // Ход начался и упал — причина CLI; one-shot повторил бы ход заново.
+  if ('error' in result) {
+    return {
+      ok: false,
+      providerId: provider.id,
+      mode: 'cli',
+      reply: '',
+      experimental: true,
+      reason: 'cli_error',
+      transport: 'session',
+      sessionId: result.sessionId,
+      error: result.error,
+    };
+  }
 
   return {
     ok: true,

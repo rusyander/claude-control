@@ -51,6 +51,8 @@ export type TellStart = (input: {
   fromAliases: string[];
   title?: string;
   resume: { sessionId: string };
+  /** Вводная на случай, когда разговор продолжить нельзя и ход идёт новым. */
+  fresh?: string;
 }) => { started: boolean; busy?: boolean };
 
 export interface ChildTellDeps {
@@ -75,6 +77,7 @@ interface Pending {
   prompt: string;
   cwd: string;
   title: string;
+  fresh?: string;
 }
 
 type Delivery = 'sent' | 'queued' | 'refused';
@@ -171,6 +174,7 @@ export class ChildTells {
       stage: 'tell',
       fromAliases: aliases,
       resume: { sessionId: session },
+      ...(pending.fresh ? { fresh: pending.fresh } : {}),
     });
     if (outcome.started) return 'sent';
     if (outcome.busy) {

@@ -1,3 +1,4 @@
+import { statSync } from 'node:fs';
 import type { ServerContext } from '../../context.ts';
 import {
   DEFAULT_PROVIDER_ID,
@@ -18,6 +19,10 @@ import {
 import { activeCliCommand } from '../../providers/cli/cli.ts';
 import { AUTONOMOUS_PERMISSION_MODE } from '../../domains/chat/ChatWorkspace/ChatWorkspace.ts';
 import { apiTokenPath } from '../../lib/api-token/api-token.ts';
+import { findTranscript } from '../../domains/chat/ChatTranscriptFile/ChatTranscriptFile.ts';
+import type { ChatEvent } from '../../domains/chat/chat-events.ts';
+import { serverText } from '../../lib/server-texts/server-texts.ts';
+import { projectsDir } from './paths.ts';
 
 /** Что домен ревью просит запустить: правки по замечаниям или их отправку в MR. */
 export interface ReviewStageStart {
@@ -31,6 +36,47 @@ export interface ReviewStageStart {
   title?: string;
   /** Продолжить этот разговор, а не заводить новый (Д8 push, Д4 повтор итога, Д7 слово родителя). */
   resume?: { sessionId: string };
+  /** Вводная на случай, когда продолжить разговор нельзя: его файла на диске нет. */
+  fresh?: string;
+}
+
+/**
+ * Какую сессию продолжать: ту, чей файл ещё на диске, — из просимой и всех
+ * ключей того же разговора, свежайшую. Нет ни одной — продолжать нечего, и
+ * `--resume` дал бы «No conversation found» (вопрос ревью Q2: транскрипт группы
+ * удалён мимо панели, доставленная группа «падала» на каждом нажатии).
+ */
+export function resumableSession(
+  dir: string,
+  wanted: string,
+  aliases: readonly string[],
+): string | undefined {
+  let best: { id: string; at: number } | undefined;
+  for (const id of new Set([wanted, ...aliases])) {
+    if (id.startsWith('new-')) continue;
+    const file = findTranscript(dir, id);
+    if (!file) continue;
+    const at = statSync(file).mtimeMs;
+    if (!best || at > best.at) best = { id, at };
+  }
+  return best?.id;
+}
+
+/** Вводная без подробностей группы — у стадий, что их не передали. */
+const LOST_FALLBACK =
+  'The panel could not continue your previous conversation in this folder: its transcript is ' +
+  'gone (deleted outside the panel). This is a new conversation — restore the context from the ' +
+  'facts: git status and git log.';
+
+/** Заметка человеку в чат группы: прежний разговор потерян, ход пошёл новым. */
+function conversationLostNotice(lost: string): ChatEvent {
+  return {
+    kind: 'notice',
+    code: 'conversationLost',
+    text: serverText('chat-conversation-lost-notice', { lost }),
+    textCode: 'chat-conversation-lost-notice',
+    textParams: { lost },
+  };
 }
 
 /**
@@ -160,21 +206,31 @@ export function createReviewStarter(
       input.cwd,
       (error) => deps.log.warn({ err: error }, 'group activation failed'),
     );
-    const sessionId = input.resume?.sessionId;
+    const wanted = input.resume?.sessionId;
+    const sessionId = wanted
+      ? resumableSession(projectsDir(ctx), wanted, input.fromAliases)
+      : undefined;
+    // Файла сессии нет — новый разговор под тем же ключом: настоящий ключ он
+    // получит своим первым ходом, и связь с группой переедет на него сама.
+    const lost = wanted && !sessionId ? wanted : undefined;
     // Продолжение того же разговора (Д8, Д4): второй прогон поверх идущего —
     // это два агента в одной копии, поэтому отказ с причиной.
-    if (sessionId && deps.runs.isRunning(input.chatId, sessionId)) {
+    if (wanted && deps.runs.isRunning(input.chatId, sessionId ?? wanted)) {
       return { started: false, busy: true };
     }
     deps.runs.muteSplit(input.chatId);
     // Тумблеры наследует только НОВЫЙ разговор: у продолженного они свои.
-    if (!sessionId && input.fromAliases.length > 0) {
+    if (!wanted && input.fromAliases.length > 0) {
       deps.session.inherit(input.fromAliases, input.chatId);
     }
 
     const initiative = initiativePrompt(settings, { splitMuted: true });
     const options = {
-      prompt: input.prompt,
+      prompt: lost
+        ? `${input.fresh ?? LOST_FALLBACK}
+
+${input.prompt}`
+        : input.prompt,
       ...(sessionId ? { sessionId } : {}),
       cwd: input.cwd,
       command: activeCliCommand(ctx.store),
@@ -196,6 +252,7 @@ export function createReviewStarter(
     // Заметка — после старта: до него прогона в реестре нет (см. `start`).
     const notice = started ? groupsActivatedNotice(activated) : undefined;
     if (notice) deps.runs.emitExternal(input.chatId, notice);
-    return started ? { started } : { started, ...(sessionId ? { busy: true } : {}) };
+    if (started && lost) deps.runs.emitExternal(input.chatId, conversationLostNotice(lost));
+    return started ? { started } : { started, ...(wanted ? { busy: true } : {}) };
   };
 }

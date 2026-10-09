@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { quoteForShell, shellArgs } from '../../../lib/cli-args/cli-args.ts';
 import type { EnvScope } from '@agentdeck/contracts/portable-env';
 import type {
   ProbeLayer,
@@ -18,9 +19,14 @@ import {
 import { findCliOnPath } from '../../../providers/detect/detect.ts';
 import { providerCliCandidates } from '../../../providers/cli/cli.ts';
 import type { ConfigProvider } from '../../../providers/types/types.ts';
-import { applyCodexEndpoint, CODEX_ENDPOINT_KEY_ENV } from '../../platform/apply/config-files.ts';
+import {
+  applyCodexEndpoint,
+  applyContinueEndpoint,
+  CODEX_ENDPOINT_KEY_ENV,
+} from '../../platform/apply/config-files.ts';
 import { emitEnvironment } from '../emit/index.ts';
-import { level } from '../fidelity/fidelity.ts';
+import { describeTarget, level } from '../fidelity/fidelity.ts';
+import { sectionTargets } from '../project/project.ts';
 import { PROBE_MARKS, probeEnvironment, writeProbeScripts } from '../probe-canon.ts';
 import type { ProbeScripts } from '../probe-canon.ts';
 import { PROBE_RECIPES, type ProbeRecipe } from '../probe-recipes.ts';
@@ -149,7 +155,7 @@ export async function runProbe(deps: ProbeDeps): Promise<ProbeReport> {
       const [command, ...prefix] = argv;
       const run = await runTarget({
         command: command ?? '',
-        args: [...prefix, ...recipe.args(recipe.commandPrompt)],
+        args: [...prefix, ...probeArgs(recipe, promised)],
         /** Оболочка нужна только настоящему бинарю (.cmd-обёртка на Windows). */
         shell: deps.cliOverride === undefined,
         cwd: workdir,
@@ -212,8 +218,30 @@ function stubAddress(
   }
 
   const file = target.endpointFile;
-  // Второй формат (`continue-yaml`) сюда не попадает не по забывчивости: у
-  // continue нет рецепта пробы, и до этой развилки он не доходит вовсе.
+  if (file?.apiKind === recipe.apiKind && file.format === 'continue-yaml') {
+    // Тот же код, которым панель пишет контур в `config.yaml` человеку (см.
+    // codex ниже); `cn` панель зовёт с `--config` этого файла.
+    return (home, baseUrl) => {
+      applyContinueEndpoint(
+        withHomeEnv(home, () => file.path()),
+        PROBE_SOURCE,
+        baseUrl,
+        PROBE_SOURCE,
+        undefined,
+      );
+      return {};
+    };
+  }
+
+  // Третий путь — окружение одного прогона, которым контур ведёт OpenCode,
+  // Goose и Kimi Code (`runEndpoint`): своего адреса в конфиге у них панель не
+  // пишет, а прогон контура адрес получает ровно так. Живьём проверен контуром
+  // (X7: всё дошло до его заглушки).
+  const run = target.runEndpoint;
+  if (run && run.apiKind === recipe.apiKind && !file) {
+    return (_home, baseUrl) => run.env({ baseUrl, model: PROBE_SOURCE, key: PROBE_SOURCE });
+  }
+
   if (!file || file.apiKind !== recipe.apiKind || file.format !== 'codex-toml') return null;
 
   return (home, baseUrl) => {
@@ -232,6 +260,24 @@ function stubAddress(
     return { [CODEX_ENDPOINT_KEY_ENV]: PROBE_SOURCE };
   };
 }
+
+/**
+ * Запрос прогона: пробная команда — только там, где она обещана НАТИВНО. Где
+ * команды на уровне нет, её вызов — это отказ CLI до модели (живая проба
+ * 09.10.2026, opencode 1.18.35 на проекте: «Command not found», ноль запросов и
+ * шесть «не проверено»), а строка команды тогда не меряется вовсе. Заглушка
+ * отвечает по сценарию, текст запроса ей безразличен.
+ */
+function probeArgs(
+  recipe: ProbeRecipe,
+  promised: ReturnType<typeof promisedLevels>,
+): readonly string[] {
+  if (promised.get('command')?.level !== 'native') return recipe.args(PROBE_PLAIN_PROMPT);
+  return recipe.commandArgs?.(recipe.commandPrompt) ?? recipe.args(recipe.commandPrompt);
+}
+
+/** Запрос прогона, когда пробная команда на уровне не обещана. */
+const PROBE_PLAIN_PROMPT = 'agentdeck probe';
 
 /** Найденный бинарь как argv; не нашёлся — `null`, а не пустая строка. */
 function asArgv(command: string | undefined): readonly string[] | null {
@@ -311,10 +357,19 @@ function promisedLevels(
     scripts,
     capturedAt: new Date(0).toISOString(),
   });
+  // Профиль — по разделам ЭТОГО уровня, как у отчёта верности и эмиттера.
+  // Профиль каталога описывает дом: живая проба 09.10.2026 (opencode 1.18.35)
+  // обещала «нативно» проектной команде, у которой проектного каталога нет, и
+  // мерила отказ CLI вместо честного «не обещано». Корень проекта — условный и
+  // не создаётся: обещание зависит от того, ЕСТЬ ли раздел на уровне, а не от пути.
+  const profile = describeTarget(
+    target,
+    sectionTargets(target, scope, { projectRoot: join(tmpdir(), 'agentdeck-probe-promise') }),
+  );
   const map = new Map<ProbeLayer, LayerPromise>();
   for (const item of env.items) {
     if (!(probeLayers as readonly string[]).includes(item.kind)) continue;
-    const verdict = level(item, target);
+    const verdict = level(item, profile);
     map.set(item.kind as ProbeLayer, {
       level: verdict.level,
       condition: verdict.condition,
@@ -658,7 +713,8 @@ interface TargetRun {
  * её адрес модели и её каталог настроек в чужом процессе пробы делать нечего —
  * с ними проба мерила бы среду панели, а не перенесённую.
  */
-function runTarget(params: {
+/** Экспорт ради теста экранирования; снаружи домена не зовётся. */
+export function runTarget(params: {
   command: string;
   args: readonly string[];
   cwd: string;
@@ -667,15 +723,23 @@ function runTarget(params: {
   shell: boolean;
 }): Promise<TargetRun> {
   return new Promise((resolve) => {
-    const child = spawn(params.command, [...params.args], {
-      cwd: params.cwd,
-      env: { ...baseEnv(), ...params.env },
-      // На Windows CLI обычно стоит .cmd-обёрткой, и без оболочки её не найти —
-      // то же решение, что у раннера ассистента. Подделке оболочка не нужна и
-      // вредна: её путь поехал бы через разбор командной строки.
-      shell: params.shell && process.platform === 'win32',
-      windowsHide: true,
-    });
+    // На Windows CLI обычно стоит .cmd-обёрткой, и без оболочки её не найти —
+    // то же решение, что у раннера ассистента. Подделке оболочка не нужна и
+    // вредна: её путь поехал бы через разбор командной строки.
+    const shell = params.shell && process.platform === 'win32';
+    // Через оболочку Node склеивает argv без кавычек: запрос «agentdeck probe»
+    // доходил до `cn` двумя словами, и тот молча выходил с кодом 1 — ни одного
+    // запроса к модели (живая проба 09.10.2026, cn 1.5.47).
+    const child = spawn(
+      shell ? quoteForShell(params.command) : params.command,
+      shell ? shellArgs(params.args) : [...params.args],
+      {
+        cwd: params.cwd,
+        env: { ...baseEnv(), ...params.env },
+        shell,
+        windowsHide: true,
+      },
+    );
 
     let stdout = '';
     let stderr = '';

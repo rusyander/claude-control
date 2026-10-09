@@ -1,13 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { readdirSync } from 'node:fs';
+import { mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { basename, join } from 'node:path';
+import { spawn } from 'node:child_process';
 import { expectedObservation, probeLayers } from '@agentdeck/contracts/portable-probe';
 import type { ProbeLayer, ProbeRow } from '@agentdeck/contracts/portable-probe';
 import { claudeProvider } from '../../../providers/claude.ts';
 import { getProvider } from '../../../providers/registry.ts';
-import { PROBE_ENV_NAME, PROBE_MARKS, probeEnvironment } from '../probe-canon.ts';
+import {
+  PROBE_ENV_NAME,
+  PROBE_MARKS,
+  probeEnvironment,
+  writeProbeScripts,
+} from '../probe-canon.ts';
 import { startProbeStub } from '../probe-stub.ts';
-import { probeRowsFrom, runProbe } from './probe.ts';
+import { probeRowsFrom, runProbe, runTarget } from './probe.ts';
 
 /**
  * Приёмочная проба: таблица приговоров и ступени отказа (П2.4).
@@ -319,6 +326,49 @@ describe('MCP-сервер: «не назвали» против «не доех
     expect(row(rows, 'mcpServer').observed).toBe('present');
     expect(row(rows, 'mcpServer').verdict).toBe('match');
   });
+
+  /**
+   * Настоящий скрипт пробного сервера, настоящим node, тем порядком, каким его
+   * поднимает Goose 1.54: сперва `server/discover`. Пустой `result` на него
+   * Goose принимал за ответ и бросал сервер до `initialize` (живая проба
+   * 09.10.2026), и MCP «не доезжал» там, где доехал.
+   */
+  it('незнакомый метод — ошибка «Method not found», после неё сервер поднимается', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'probe-mcp-'));
+    try {
+      const { mcpPath, mcpAskedPath } = writeProbeScripts(dir);
+      const child = spawn(process.execPath, [mcpPath], { stdio: ['pipe', 'pipe', 'inherit'] });
+      const lines: Record<string, unknown>[] = [];
+      let buffer = '';
+      const got = new Promise<void>((done) => {
+        child.stdout.on('data', (chunk: Buffer) => {
+          buffer += chunk.toString('utf8');
+          let at;
+          while ((at = buffer.indexOf('\n')) >= 0) {
+            lines.push(JSON.parse(buffer.slice(0, at)) as Record<string, unknown>);
+            buffer = buffer.slice(at + 1);
+          }
+          if (lines.length >= 3) done();
+        });
+      });
+      const ask = (id: number, method: string): void => {
+        child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id, method, params: {} })}\n`);
+      };
+      ask(0, 'server/discover');
+      ask(1, 'initialize');
+      ask(2, 'tools/list');
+      await got;
+      child.kill();
+
+      expect(lines[0]).toMatchObject({ id: 0, error: { code: -32601 } });
+      expect(lines[0]).not.toHaveProperty('result');
+      expect(lines[1]).toMatchObject({ id: 1, result: { capabilities: { tools: {} } } });
+      expect(JSON.stringify(lines[2])).toContain(PROBE_MARKS.mcpTool);
+      expect(readdirSync(dir)).toContain(basename(mcpAskedPath));
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('заглушка вместо модели', () => {
@@ -342,13 +392,102 @@ describe('заглушка вместо модели', () => {
       });
       await fetch(`${stub.baseUrl}/v1/messages`, {
         method: 'POST',
-        body: JSON.stringify({ model: 'probe', messages: [{ role: 'user', content: 'привет' }] }),
+        body: JSON.stringify({
+          model: 'probe',
+          tools: [{ name: 'Bash' }],
+          messages: [{ role: 'user', content: 'привет' }],
+        }),
       });
 
       // Настоящая первая реплика обязана получить ход НОЛЬ, а не второй.
       expect(seen).toEqual([0]);
       expect(stub.requests).toHaveLength(1);
       expect(stub.requests[0]?.messages).toBeDefined();
+    } finally {
+      await stub.close();
+    }
+  });
+
+  it('запрос БЕЗ инструментов (подпись сессии) — тоже не ход', async () => {
+    // Живая проба 09.10.2026 (opencode 1.18.35): подпись сессии малой моделью
+    // встала нулевым ходом, вызовы ушли в неё и не исполнились — и право по
+    // негативу вышло зелёным без единого вызова.
+    const seen: number[] = [];
+    const stub = await startProbeStub((turn) => {
+      seen.push(turn);
+      return [{ type: 'text', text: `ход ${turn}` }];
+    });
+    const chat = (body: Record<string, unknown>) =>
+      fetch(`${stub.baseUrl}/chat/completions`, { method: 'POST', body: JSON.stringify(body) });
+
+    try {
+      const title = await chat({ messages: [{ role: 'user', content: 'назови сессию' }] });
+      expect(((await title.json()) as { choices: unknown[] }).choices).toHaveLength(1);
+      await chat({
+        messages: [{ role: 'user', content: 'привет' }],
+        tools: [{ type: 'function', function: { name: 'bash' } }],
+      });
+
+      expect(seen).toEqual([0]);
+      expect(stub.requests).toHaveLength(1);
+    } finally {
+      await stub.close();
+    }
+  });
+
+  it('/chat/completions: вызовы — `tool_calls` строкой аргументов и конец `tool_calls`', async () => {
+    const stub = await startProbeStub(() => [
+      { type: 'tool_use', id: 'probe_a', name: 'bash', input: { command: 'node a.js' } },
+      { type: 'tool_use', id: 'probe_b', name: 'read', input: { filePath: 'x' } },
+    ]);
+    const body = {
+      messages: [{ role: 'user', content: 'привет' }],
+      tools: [{ type: 'function', function: { name: 'bash' } }],
+    };
+    try {
+      const whole = (await (
+        await fetch(`${stub.baseUrl}/v1/chat/completions`, {
+          method: 'POST',
+          body: JSON.stringify(body),
+        })
+      ).json()) as {
+        choices: {
+          finish_reason: string;
+          message: { tool_calls: { id: string; function: { arguments: string } }[] };
+        }[];
+      };
+      expect(whole.choices[0]?.finish_reason).toBe('tool_calls');
+      expect(whole.choices[0]?.message.tool_calls.map((call) => call.id)).toEqual([
+        'probe_a',
+        'probe_b',
+      ]);
+      expect(JSON.parse(whole.choices[0]?.message.tool_calls[0]?.function.arguments ?? '')).toEqual(
+        { command: 'node a.js' },
+      );
+
+      const streamed = await (
+        await fetch(`${stub.baseUrl}/v1/chat/completions`, {
+          method: 'POST',
+          body: JSON.stringify({ ...body, stream: true }),
+        })
+      ).text();
+      const chunks = streamed
+        .split('\n\n')
+        .filter((frame) => frame.startsWith('data: {'))
+        .map((frame) => JSON.parse(frame.slice(6)) as { choices: Record<string, unknown>[] });
+      const calls = chunks.flatMap(
+        (chunk) =>
+          (chunk.choices[0]?.delta as { tool_calls?: { id: string; index: number }[] })
+            ?.tool_calls ?? [],
+      );
+      expect(calls.map((call) => [call.index, call.id])).toEqual([
+        [0, 'probe_a'],
+        [1, 'probe_b'],
+      ]);
+      expect(chunks.at(-1)?.choices[0]?.finish_reason).toBe('tool_calls');
+      expect(streamed.trimEnd().endsWith('data: [DONE]')).toBe(true);
+      // Тот же `messages`, что у Anthropic, — но ответ НЕ в диалекте Anthropic.
+      expect(streamed).not.toContain('message_start');
     } finally {
       await stub.close();
     }
@@ -384,21 +523,26 @@ describe('ступени отказа', () => {
     expect(report.summary.notChecked).toBe(6);
   });
 
-  it('адрес заглушки в ФАЙЛЕ цели — не повод отказаться', async () => {
-    // У codex адрес модели переменной окружения не задаётся вовсе: он живёт
-    // таблицей в его собственном `config.toml`. Пока проба умела только
-    // переменные, эта цель отказывалась ступенью `no_stub_endpoint` — то есть
-    // была непроверяема при полностью задокументированном способе.
-    const report = await runProbe({
-      target: getProvider('codex'),
-      scope: 'global',
-      cliOverride: [process.execPath, '-e', 'process.exit(0)'],
-      timeoutMs: 20_000,
-    });
+  // У codex адрес модели переменной окружения не задаётся вовсе: он живёт
+  // таблицей в его собственном `config.toml`. Пока проба умела только
+  // переменные, эта цель отказывалась ступенью `no_stub_endpoint` — то есть
+  // была непроверяема при полностью задокументированном способе. Continue —
+  // список моделей своего `config.yaml`, OpenCode — окружение одного прогона
+  // (`runEndpoint`): оба пути добавлены живой пробой 09.10.2026.
+  it.each(['codex', 'continue', 'opencode', 'goose'])(
+    'адрес заглушки не в переменной цели — не повод отказаться: %s',
+    async (id) => {
+      const report = await runProbe({
+        target: getProvider(id),
+        scope: 'global',
+        cliOverride: [process.execPath, '-e', 'process.exit(0)'],
+        timeoutMs: 20_000,
+      });
 
-    expect(report.rows.every((candidate) => candidate.skip !== 'no_stub_endpoint')).toBe(true);
-    expect(row(report.rows, 'envVar').skip).toBe('run_failed');
-  });
+      expect(report.rows.every((candidate) => candidate.skip !== 'no_stub_endpoint')).toBe(true);
+      expect(report.rows.some((candidate) => candidate.skip === 'run_failed')).toBe(true);
+    },
+  );
 
   it('цель не дошла до модели — «не проверено», и после прогона не остаётся каталогов', async () => {
     const before = probeDirs();
@@ -422,3 +566,34 @@ describe('ступени отказа', () => {
 function probeDirs(): string[] {
   return readdirSync(tmpdir()).filter((name) => name.startsWith('agentdeck-probe-'));
 }
+
+/**
+ * Живая проба 09.10.2026 (cn 1.5.47): через оболочку Node склеивал argv без
+ * кавычек, запрос «agentdeck probe» доходил двумя словами, и `cn` молча
+ * выходил с кодом 1 — ни одного запроса, шесть «не проверено». Настоящая
+ * .cmd-обёртка и настоящий cmd.exe: подделка без оболочки дефекта не видит.
+ */
+describe.skipIf(process.platform !== 'win32')('запуск .cmd-обёртки через оболочку', () => {
+  it('аргумент с пробелом и кавычкой доходит одним аргументом', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'agentdeck-probe-argv-'));
+    try {
+      const wrapper = join(dir, 'echo-argv.cmd');
+      writeFileSync(
+        wrapper,
+        `@"${process.execPath}" -e "console.log(JSON.stringify(process.argv.slice(1)))" -- %*
+`,
+      );
+      const run = await runTarget({
+        command: wrapper,
+        args: ['-p', 'agentdeck probe', 'a "b" & c'],
+        cwd: dir,
+        env: {},
+        timeoutMs: 20_000,
+        shell: true,
+      });
+      expect(JSON.parse(run.stdout.trim())).toEqual(['-p', 'agentdeck probe', 'a "b" & c']);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});

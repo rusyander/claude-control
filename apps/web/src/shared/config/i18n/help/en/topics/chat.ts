@@ -1101,7 +1101,11 @@ export const chatEn: typeof chatRu = {
       '“delivery” link on the work model: commit, fresh main branch, push of its own ' +
       'branch, MR. The panel does not take the agent’s word for it: when the link ends ' +
       'it checks the git facts — is there a commit, was the branch pushed, is there an ' +
-      'MR whose head is the group’s copy — and the “MR !N” button in the card’s ' +
+      'MR whose head is the group’s copy, and which branch that MR comes from: while ' +
+      'the group has no commits of its own and shares its predecessor’s head, the MR ' +
+      'is recognised by its source branch at the connected forge (a self-hosted GitLab ' +
+      'on http or a custom port included), and without a forge it is not counted — ' +
+      'and the “MR !N” button in the card’s ' +
       'corner opens the MR found that way in a new tab — only that button, a click ' +
       'on the rest of the card goes to the chat. Something missing — the row says ' +
       '“missing for the MR: …” and the ' +
@@ -1118,7 +1122,10 @@ export const chatEn: typeof chatRu = {
       'reviewer comment, a red pipeline — and hands that to the group’s own ' +
       'conversation together with a request to check every task is done; what is ' +
       'found the group fixes and delivers again, and finding nothing it touches ' +
-      'nothing. The MR could not be read — the agent reads it itself. A merged or ' +
+      'nothing. The MR could not be read — the agent reads it itself. The group’s ' +
+      'conversation file is gone from disk (deleted outside the panel) — the turn ' +
+      'runs as a new conversation in the same copy: it is given the branch, the MR ' +
+      'and the group’s tasks, and a note about it appears in the chat. A merged or ' +
       'closed MR has nothing to recheck: the button says so with a notice, not an ' +
       'error, and the card is marked “MR merged” or “MR closed” at once and moves ' +
       'down. A merged one loses the button; a closed one ' +
@@ -2026,10 +2033,13 @@ export const chatEn: typeof chatRu = {
       'What is missing: parsed steps and tools, cost, branching, voice and ' +
       'parallel agents — all of that is read out of the claude streaming protocol, and no ' +
       'other CLI publishes such a format. OpenCode holds a session (opencode serve) instead ' +
-      'of a run per question, so its answer arrives whole. The Aider, OpenCode, Continue, ' +
-      'Goose and Kimi Code chats are built from the docs and have not been exercised live — ' +
-      'those CLIs are not installed on the development machine. Cursor has neither a ' +
-      'non-interactive entry point nor a model API of its own.',
+      'of a run per question: the answer arrives in pieces as the model writes it, and a ' +
+      'failed turn shows the reason in OpenCode’s own words — for instance, that the named ' +
+      'model does not exist. OpenCode, Continue, Aider and Goose have been exercised live on a local ' +
+      'model: the answer is recorded and the second question remembers the first. Continue ' +
+      'hands over its answer whole once it finishes — it does not write it in pieces. The ' +
+      'Kimi Code chat is built from the docs and has not been exercised live. ' +
+      'Cursor has neither a non-interactive entry point nor a model API of its own.',
   },
   shots: {
     basics: {

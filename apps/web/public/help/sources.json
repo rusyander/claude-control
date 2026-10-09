@@ -2205,7 +2205,7 @@
         {
           "path": "apps/server/src/domains/portability/fidelity/fidelity.ts",
           "why": "«Пять уровней верности»: какой уровень получает запись и по какой причине",
-          "sha": "bfd24fd18d158582"
+          "sha": "8df13852d4e6c0b1"
         },
         {
           "path": "apps/server/src/domains/portability/plan.ts",
@@ -2243,7 +2243,7 @@
           "sha": "c8960379be2d0e95"
         }
       ],
-      "confirmedAt": "2026-10-08T12:34:15.112Z"
+      "confirmedAt": "2026-10-09T12:58:43.246Z"
     },
     {
       "topic": "groups",
@@ -2784,7 +2784,7 @@
     {
       "topic": "kit",
       "document": "apps/web/src/pages/Help/topics/KitTopic/KitTopic.tsx",
-      "confirmedAt": "2026-10-09T08:09:36.703Z",
+      "confirmedAt": "2026-10-09T12:58:43.316Z",
       "sources": [
         {
           "path": "apps/server/src/domains/kit/service.ts",
@@ -2804,7 +2804,7 @@
         {
           "path": "apps/server/src/bootstrap/runtime/runtime.ts",
           "why": "«Не собралось — прогон не запускается»: отказ при сбое сборки набора",
-          "sha": "109781bcd859e347"
+          "sha": "818967d8f941f75c"
         },
         {
           "path": "apps/web/src/pages/Kit/KitGlobalActions/KitGlobalActions.tsx",

@@ -146,6 +146,7 @@ export type ChatEvent =
        *   команды: перезапуск с новой меткой ждёт их конца (F-31).
        * 'stopUnconfirmed' — «Остановить» не сняло процесс: номер не проверить без
        *   снимка процессов, а чужое панель не трогает; прогон остаётся идущим (F-145).
+       * 'conversationLost' — файла сессии группы нет на диске, ход пошёл новым разговором (Q2).
        */
       code:
         | 'adopted'
@@ -166,7 +167,8 @@ export type ChatEvent =
         | 'pathStep'
         | 'pathGateFailed'
         | 'autonomyDeferred'
-        | 'stopUnconfirmed';
+        | 'stopUnconfirmed'
+        | 'conversationLost';
       text: string;
       /**
        * Код самого текста — отдельно от `code`, который называет ПОВОД. Повод

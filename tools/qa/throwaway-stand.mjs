@@ -21,7 +21,7 @@
  *   try { ... stand.api('/rules') ... stand.newPage(browser) ... }
  *   finally { await stand.stop(); }
  */
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import {
   existsSync,
   lstatSync,
@@ -130,6 +130,19 @@ export function realProviderDirs(home = REAL_HOME) {
 export const LIVE_SESSION_CHURN = [
   /\/\.claude\.json(\.[^/]*)?$/,
   /\/\.claude\/(history\.jsonl|backups|cache|sessions|projects|todos|shell-snapshots|statsig|session-env|file-history|debug|ide|plans|paste-cache|telemetry)(\/|$)/,
+  // Рабочая панель человека (:5178) пишет своё состояние, пока идёт проверка.
+  // Стенд в него не пишет: его каталог Claude и состояние — во временном доме.
+  /\/\.claude\/agentdeck(\/state\.json)?$/,
+  // Уборка и автообновление маркетплейсов, которые Claude Code делает при каждом
+  // запуске. Стенд `claude` не запускает (его нет в PATH стенда).
+  /\/\.claude\/\.last-cleanup$/,
+  /\/\.claude\/plugins(\/(cache|marketplaces|known_marketplaces\.json)(\/|$)|$)/,
+  // Политики и удалённые настройки, которые идущий сеанс Claude Code обновляет
+  // сам примерно раз в четверть часа (живой прогон Goose 09.10: 15 минут — и
+  // проверка покраснела на них). Запись идёт через переименование, поэтому
+  // меняется и mtime самого каталога; новый файл в нём всё равно виден строкой.
+  /\/\.claude\/(policy-limits\.json(\.stamp\.json)?|remote-settings\.json)$/,
+  /\/\.claude$/,
 ];
 
 /**
@@ -251,6 +264,17 @@ export const STAND_ALIVE = '.stand-alive';
 
 function killTree(child) {
   if (!child?.pid || child.exitCode !== null || child.signalCode !== null) return;
+  // На Windows `kill()` — TerminateProcess одной панели: её `exit`-обработчики
+  // (снятие `opencode serve` и прочих серверов CLI) не исполняются, а дети
+  // `cmd → opencode.exe` переживают стенд и держат его временный дом (EPERM при
+  // удалении). Снимаем дерево целиком, пока родители живы и связь видна.
+  if (IS_WIN) {
+    const result = spawnSync('taskkill', ['/PID', String(child.pid), '/T', '/F'], {
+      stdio: 'ignore',
+      windowsHide: true,
+    });
+    if (result.status === 0) return;
+  }
   child.kill(IS_WIN ? undefined : 'SIGTERM');
 }
 

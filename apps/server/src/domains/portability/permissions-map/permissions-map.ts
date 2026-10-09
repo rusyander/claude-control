@@ -1,6 +1,7 @@
 import type { PermissionDecision, PermissionItem } from '@agentdeck/contracts/portable-env';
 import { permissionDecisions } from '@agentdeck/contracts/portable-env';
 import type { ConfigProvider } from '../../../providers/types/types.ts';
+import type { ProviderPermissionRuleGrammar } from '../../../providers/types/sections.ts';
 
 /**
  * ГРАММАТИКА ПРАВ (П2.2): правило канона → правило конкретного CLI.
@@ -120,21 +121,8 @@ export function translatePermission(
 
   const grammar = target.permissionsConfig?.ruleGrammar;
   const tool = grammar?.tools?.[parsed.tool] ?? parsed.tool;
-  if (grammar?.closed && !grammar.tools?.[parsed.tool]) {
-    return { kind: 'refused', why: 'tool_not_in_vocabulary' };
-  }
-  if (parsed.argument !== null && grammar && !grammar.argumentTools.includes(tool)) {
-    return { kind: 'refused', why: 'argument_not_expressible' };
-  }
-  // Буквальный аргумент значит у обеих сторон одну и ту же команду и едет как
-  // есть; расходится только ПОДСТАНОВКА, и её переводить нечем.
-  if (
-    parsed.argument !== null &&
-    grammar?.argumentSyntax === 'own' &&
-    hasWildcard(parsed.argument)
-  ) {
-    return { kind: 'refused', why: 'argument_grammar_differs' };
-  }
+  const why = grammarRefusal(item.rule, grammar);
+  if (why) return { kind: 'refused', why };
 
   return {
     kind: 'rule',
@@ -143,6 +131,38 @@ export function translatePermission(
     rule: parsed.argument === null ? tool : `${tool}(${parsed.argument})`,
     decision,
   };
+}
+
+/**
+ * Почему правило о вызове не выражается грамматикой цели; выражается — `null`.
+ *
+ * Отдельной точкой, потому что ответ нужен ДВУМ: переводу (писать ли правило) и
+ * матрице верности (что обещать человеку). Живая проба 09.10.2026 (opencode
+ * 1.18.35) нашла, чем стоит их расхождение: перевод отказывал `Read` в закрытом
+ * словаре, а отчёт обещал «нативно» — запрет не писался, а человек читал, что
+ * он действует.
+ */
+export function grammarRefusal(
+  rule: string,
+  grammar: ProviderPermissionRuleGrammar | undefined,
+): Exclude<PermissionRefusal, 'mode_is_whole_cli'> | null {
+  const parsed = parsePermissionRule(rule);
+  if (parsed.kind === 'mode' || !grammar) return null;
+  const tool = grammar.tools?.[parsed.tool] ?? parsed.tool;
+  if (grammar.closed && !grammar.tools?.[parsed.tool]) return 'tool_not_in_vocabulary';
+  if (parsed.argument !== null && !grammar.argumentTools.includes(tool)) {
+    return 'argument_not_expressible';
+  }
+  // Буквальный аргумент значит у обеих сторон одну и ту же команду и едет как
+  // есть; расходится только ПОДСТАНОВКА, и её переводить нечем.
+  if (
+    parsed.argument !== null &&
+    grammar.argumentSyntax === 'own' &&
+    hasWildcard(parsed.argument)
+  ) {
+    return 'argument_grammar_differs';
+  }
+  return null;
 }
 
 /**

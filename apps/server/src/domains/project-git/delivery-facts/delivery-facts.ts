@@ -74,7 +74,8 @@ export function missingDelivery(facts: DeliveryFacts, branch: string): string[] 
 /**
  * Веб-адрес проекта по адресу удалённого: `git@host:group/app.git`,
  * `ssh://git@host:22/group/app.git`, `https://user@host/group/app.git` →
- * `https://host/group/app`. Не разобрать — `undefined`.
+ * `https://host/group/app`; у http(s)-адреса схема и порт свои
+ * (`http://host:8080/group/app`). Не разобрать — `undefined`.
  */
 export function webBaseOf(remoteUrl: string): string | undefined {
   const url = remoteUrl
@@ -83,7 +84,11 @@ export function webBaseOf(remoteUrl: string): string | undefined {
     .replace(/\.git$/, '');
   const scp = /^[^@/\s]+@([^:/\s]+):(?!\/)(.+)$/.exec(url);
   if (scp) return `https://${scp[1]}/${scp[2]}`;
-  const parsed = /^(?:ssh|https?|git):\/\/(?:[^@/]+@)?([^/:]+)(?::\d+)?\/(.+)$/.exec(url);
+  // http(s) — уже веб-адрес: свой GitLab на http или на порту 8080 иначе
+  // получал ссылку на MR, которой нет, и фордж не читался (живой прогон 09.10).
+  const web = /^(https?):\/\/(?:[^@/]+@)?([^/:]+(?::\d+)?)\/(.+)$/.exec(url);
+  if (web) return `${web[1]}://${web[2]}/${web[3]}`;
+  const parsed = /^(?:ssh|git):\/\/(?:[^@/]+@)?([^/:]+)(?::\d+)?\/(.+)$/.exec(url);
   if (parsed) return `https://${parsed[1]}/${parsed[2]}`;
   return undefined;
 }

@@ -6,6 +6,9 @@ export { listToText } from './lib/permissionLists';
 export { sameList } from './lib/sameList';
 export { textToList } from './lib/textToList';
 
+// Правила Continue, которые cn примет, но не применит (уточнение у Read/Write/List).
+export { continueUnenforced } from './lib/continueUnenforced';
+
 // Нормализация формы прав OpenCode: состояние формы ↔ записи файла.
 export { toOpencodeFormState } from './lib/opencodePermissionForm';
 export { toOpencodeEntries } from './lib/toOpencodeEntries';

@@ -220,7 +220,7 @@ describe('ProviderChatService', () => {
     ]);
   });
 
-  it('строка тестов проекта — хвостом последней реплики, одной строкой и не в переписке', () => {
+  it('строка тестов проекта — перед последней репликой, одной строкой и не в переписке', () => {
     createChat(dir, 'codex', { id: 'wd', workdir: dir });
     const asked: string[] = [];
     service.setWorkspaceNote((cwd) => {
@@ -231,8 +231,11 @@ describe('ProviderChatService', () => {
 
     const history = (run.options as { history: { content: string }[] }).history;
     // Перевод строки убран: многострочный запрос через `.cmd` Windows не проходит.
+    // Строка — ДО слов человека: модель отвечает на последнее, что прочла, и
+    // строка хвостом уводила ответ в тесты (живой Continue на qwen2.5-coder:7b
+    // на «Какое число я просил запомнить?» спросил «что спросить человека о тестах»).
     expect(history.at(-1)?.content).toBe(
-      'напиши тест <agentdeck-workspace>QA workspace: e2e folder "e2e"</agentdeck-workspace>',
+      '<agentdeck-workspace>QA workspace: e2e folder "e2e"</agentdeck-workspace> напиши тест',
     );
     expect(asked).toEqual([dir]);
     expect(readChat(dir, 'codex', 'wd')?.messages.map((message) => message.content)).toEqual([
@@ -241,7 +244,7 @@ describe('ProviderChatService', () => {
   });
 
   /** F-164. Со вложением последняя строка — путь файла, и строка липла к нему. */
-  it('со вложением строка тестов идёт своей строкой, а не хвостом пути', () => {
+  it('со вложением строка тестов идёт своей строкой, путь файла остаётся последним', () => {
     createChat(dir, 'codex', { id: 'wd', workdir: dir });
     service.setWorkspaceNote(() => 'QA workspace: e2e');
     service.send(
@@ -252,10 +255,9 @@ describe('ProviderChatService', () => {
       { provider: PROVIDER },
     );
     const content = (run.options as { history: { content: string }[] }).history.at(-1)?.content;
-    expect(content?.split('\n').slice(-2)).toEqual([
-      'C:/tmp/a.png',
-      '<agentdeck-workspace>QA workspace: e2e</agentdeck-workspace>',
-    ]);
+    const lines = content?.split('\n') ?? [];
+    expect(lines[0]).toBe('<agentdeck-workspace>QA workspace: e2e</agentdeck-workspace>');
+    expect(lines.at(-1)).toBe('C:/tmp/a.png');
   });
 
   it('команда со слэша уходит без строки; сбой решателя отправку не срывает', () => {

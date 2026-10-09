@@ -365,6 +365,8 @@ describe('реестр провайдеров', () => {
         format: 'json',
         relativePath: '.continue/mcpServers/mcp.json',
         relativeBlockDir: '.continue/mcpServers',
+        // Читает расширение IDE, а не `cn` (живая проба 09.10.2026).
+        cliIgnores: true,
       },
       env: { format: 'dotenv', relativePath: '.continue/.env' },
     });

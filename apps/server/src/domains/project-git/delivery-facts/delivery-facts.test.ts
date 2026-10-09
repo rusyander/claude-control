@@ -355,6 +355,17 @@ describe('webBaseOf', () => {
     );
     expect(webBaseOf('C:/repos/app.git')).toBeUndefined();
   });
+
+  // Свой GitLab на http или нестандартном порту: адрес удалённого по http(s) —
+  // это и есть веб-адрес, схема и порт его. У ssh порт свой, не веб-сервера.
+  it('у http(s)-удалённого схема и порт сохраняются', () => {
+    expect(webBaseOf('http://gitlab.local:8080/team/app.git')).toBe(
+      'http://gitlab.local:8080/team/app',
+    );
+    expect(webBaseOf('https://u:p@gitlab.example.com:8443/team/sub/app')).toBe(
+      'https://gitlab.example.com:8443/team/sub/app',
+    );
+  });
 });
 
 // Аудит 25.09, L110: пустое описание MR — пробел готовности; непрочитанное — не повод держать группу.

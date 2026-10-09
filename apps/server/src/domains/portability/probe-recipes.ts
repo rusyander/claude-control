@@ -34,6 +34,11 @@ export interface ProbeRecipe {
   readonly readTool: ProbeTool;
   /** Чем запрос вызывает пробную слэш-команду. */
   readonly commandPrompt: string;
+  /**
+   * Запуск, в котором команда — не текст запроса, а свой флаг (`opencode run
+   * --command <имя>`). Не задан — команда уходит запросом через `args`.
+   */
+  commandArgs?(name: string): readonly string[];
   /** Подготовить временный дом до запуска: снять мастера первого запуска и т.п. */
   prepare?(home: string, workdir: string): void;
   /**
@@ -65,6 +70,12 @@ export interface ProbeTool {
   call(argument: string, workdir: string): Record<string, unknown>;
 }
 
+// Aider рецепта не имеет и без перемены в нём иметь не может: модель у него
+// инструментов не зовёт (правки — текстом по формату), а команду оболочки из
+// ответа он под `--yes-always` отклоняет сам — `handle_shell_commands` просит
+// `explicit_yes_required`, и `confirm_ask` отвечает «n» (исходник 0.86.2,
+// проверено 09.10.2026). Слои пробы меряются вызовами, вызвать нечего — его
+// строки остаются честным «нет рецепта».
 export const PROBE_RECIPES: Readonly<Record<string, ProbeRecipe>> = {
   claude: {
     apiKind: 'anthropic',
@@ -151,6 +162,49 @@ export const PROBE_RECIPES: Readonly<Record<string, ProbeRecipe>> = {
     // отвергает ошибкой, а ошибка чтения по негативу выглядела бы как
     // сработавший запрет: зелёное право там, где его не проверяли.
     readTool: { name: 'read_file', call: (path, workdir) => ({ file_path: join(workdir, path) }) },
+    commandPrompt: '/agentdeck-probe-command',
+  },
+  opencode: {
+    // Адрес — окружением прогона контура (`runEndpoint`, `OPENCODE_CONFIG_CONTENT`),
+    // диалект `/chat/completions`. `--auto` одобряет всё, что НЕ запрещено явно:
+    // запрет `permission` он не снимает. Команда — флагом `--command <имя>`.
+    apiKind: 'openai-compat',
+    args: (prompt) => ['run', '--auto', prompt],
+    commandArgs: (name) => ['run', '--auto', '--command', name],
+    shellTool: {
+      name: 'bash',
+      call: (command) => ({ command, description: 'agentdeck probe' }),
+    },
+    readTool: { name: 'read', call: (path, workdir) => ({ filePath: join(workdir, path) }) },
+    commandPrompt: 'agentdeck-probe-command',
+  },
+  continue: {
+    // Адрес — своей записью в списке моделей `config.yaml` (тот же код, что у
+    // контура), диалект `/chat/completions`. Имена и аргументы инструментов сняты
+    // живой пробой 09.10.2026 (cn 1.5.47) из списка, который он шлёт модели:
+    // `Bash {command}`, `Read {filepath}` — без подчёркивания.
+    apiKind: 'openai-compat',
+    // `--allow Bash` — оболочка в headless без него спрашивала бы и отказывала.
+    // Не `--auto` («all tools allowed» по его справке): строка права мерила бы
+    // флаг пробы, а не перенос.
+    args: (prompt) => ['-p', '--allow', 'Bash', prompt],
+    shellTool: { name: 'Bash', call: (command) => ({ command }) },
+    readTool: { name: 'Read', call: (path) => ({ filepath: path }) },
+    commandPrompt: '/agentdeck-probe-command',
+  },
+  goose: {
+    // Адрес — окружением прогона контура (`runEndpoint`: `OPENAI_HOST` +
+    // `OPENAI_BASE_PATH`), диалект `/chat/completions`. Режим не задаётся: флаг
+    // режима у `run` нет, а `GOOSE_MODE` окружением перекрыл бы перенесённый
+    // режим — строка права мерила бы пробу, а не перенос.
+    apiKind: 'openai-compat',
+    args: (prompt) => ['run', '--no-session', '-q', '-t', prompt],
+    // Имена сняты живой пробой 09.10.2026 (goose 1.54.0) из списка, который он
+    // шлёт модели: `shell {command}`, `edit`, `write`, `tree` — без приставки
+    // расширения. Инструмента чтения нет: `developer__text_editor` он отвергает
+    // («was not advertised for this model turn»), файл читается оболочкой.
+    shellTool: { name: 'shell', call: (command) => ({ command }) },
+    readTool: { name: 'shell', call: (path) => ({ command: readFileCommand(path) }) },
     commandPrompt: '/agentdeck-probe-command',
   },
 };

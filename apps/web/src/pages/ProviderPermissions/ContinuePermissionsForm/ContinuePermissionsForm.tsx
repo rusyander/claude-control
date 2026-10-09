@@ -3,7 +3,13 @@ import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
 import { Card } from '@shared/ui/card';
 import { TextField } from '@shared/ui/text-field';
-import { listToText, textToList, sameList } from '@entities/ProviderPermissions';
+import { Typography } from '@shared/ui/typography';
+import {
+  continueUnenforced,
+  listToText,
+  textToList,
+  sameList,
+} from '@entities/ProviderPermissions';
 import type { ContinuePermissionsFormProps } from '../ProviderPermissionsForm.types';
 
 /**
@@ -34,6 +40,9 @@ export function ContinuePermissionsForm({ data, header, onSave }: ContinuePermis
   const allow = textToList(allowText);
   const ask = textToList(askText);
   const exclude = textToList(excludeText);
+  // Правило, которое cn примет и не применит: человек должен узнать до того,
+  // как на него положится (запрет `Read(.env)` у cn не запрещает ничего).
+  const unenforced = continueUnenforced([...allow, ...ask, ...exclude]);
   const dirty =
     !sameList(allow, data.allow) || !sameList(ask, data.ask) || !sameList(exclude, data.exclude);
 
@@ -82,6 +91,12 @@ export function ContinuePermissionsForm({ data, header, onSave }: ContinuePermis
             isMono
             disabled={readOnly}
           />
+
+          {unenforced.length > 0 && (
+            <Typography variant="body-sm" color="warning" as="p" role="status">
+              {t('providerPermissions.continue.unenforced', { rules: unenforced.join(', ') })}
+            </Typography>
+          )}
         </Stack>
       </Card>
     </Stack>

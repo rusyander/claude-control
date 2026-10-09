@@ -123,6 +123,7 @@ export const en: TranslationSchema = {
     compare: 'Comparison',
     portability: 'Environment passport',
     settings: 'Settings',
+    watcher: 'Watcher',
     dlp: 'Data protection',
     platform: 'Contour',
     localModels: 'Local models',
@@ -2714,9 +2715,9 @@ export const en: TranslationSchema = {
     // OpenCode permission model: the `permission` key — a level per tool, plus a
     // command pattern list for bash.
     opencode: {
-      subtitle: '{{provider}} tool permissions: file edits, shell commands, network',
+      subtitle: '{{provider}} tool permissions: file edits and reads, shell commands, network',
       explain:
-        '{{provider}} permissions live under the permission key of {{fileName}}. Every tool gets its own level: allow — run without asking, ask — confirm every call, deny — block completely. For the bash tool a list of command patterns can be used instead of a single level: allow "git *" while denying "git push *". The panel edits the permission key only — the model, MCP servers, agent settings and every other key of the file stay untouched, and a backup is made before each write. Changes apply after restarting the CLI.',
+        '{{provider}} permissions live under the permission key of {{fileName}}. Every tool gets its own level: allow — run without asking, ask — confirm every call, deny — block completely. For the bash tool a list of command patterns can be used instead of a single level: allow "git *" while denying "git push *"; for read, a list of file path patterns. The panel edits the permission key only — the model, MCP servers, agent settings and every other key of the file stay untouched, and a backup is made before each write. Changes apply after restarting the CLI.',
       usingDefaults:
         'The permission key is not set in the file — OpenCode restricts nothing. The panel writes nothing until you pick a level and save.',
       unset: {
@@ -2741,14 +2742,20 @@ export const en: TranslationSchema = {
         },
       },
       patterns: {
-        label: 'by command patterns (advanced form)',
+        label: 'by patterns (advanced form)',
         description:
-          'Instead of a single level, a list of command pattern → level. Safe commands can be allowed while dangerous ones stay blocked.',
-        pattern: 'Command pattern',
+          'Instead of a single level, a list of pattern → level. What is safe can be allowed while what is dangerous stays blocked.',
+        pattern: 'Pattern',
         level: 'Level',
-        placeholder: 'e.g. git push *',
         add: 'Add pattern',
-        hint: 'The "*" pattern is the rule for every other command. Documented example: "*" — ask, "git *" — allow, "git push *" — deny. Empty patterns are dropped on save; if none is left, the tool key is removed from the file.',
+        bash: {
+          placeholder: 'e.g. git push *',
+          hint: 'A command pattern. "*" is the rule for every other command. Documented example: "*" — ask, "git *" — allow, "git push *" — deny. Empty patterns are dropped on save; if none is left, the tool key is removed from the file.',
+        },
+        read: {
+          placeholder: 'e.g. **/.env',
+          hint: 'A file path pattern. OpenCode matches it against the full path, so a file name gets "**/" in front: "**/.env" is that file in any folder, a bare ".env" matches nothing. Empty patterns are dropped on save; if none is left, the tool key is removed from the file.',
+        },
       },
       tool: {
         edit: {
@@ -2762,6 +2769,10 @@ export const en: TranslationSchema = {
         webfetch: {
           label: 'Network fetches (webfetch)',
           hint: 'Downloading pages and files by URL.',
+        },
+        read: {
+          label: 'File reads (read)',
+          hint: 'Opening files on disk. Not named in the OpenCode docs, but enforced — checked by a live run.',
         },
       },
       preserved: {

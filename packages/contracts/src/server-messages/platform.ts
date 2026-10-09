@@ -67,6 +67,7 @@ export const platformMessageParams = {
   'assistant-contour-no-token': ['title'],
   'watcher-provider-unsupported': ['provider'],
   'watcher-endpoint-unsupported': ['name'],
+  'watcher-off': [],
   'provider-chat-unsupported': ['provider'],
   'analytics-provider-unsupported': ['provider'],
   'analytics-live-foreign': ['provider'],

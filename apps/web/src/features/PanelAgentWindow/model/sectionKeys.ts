@@ -44,6 +44,8 @@ export const SECTION_QUERY_KEYS: Readonly<Record<string, Keys>> = {
   plugins: [pluginsKey, queryKeys.skills, queryKeys.mcp, queryKeys.overview],
   history: [queryKeys.history, queryKeys.backups, queryKeys.claudeMd, ...CONFIG_FILE_KEYS],
   settings: [queryKeys.settings],
+  // Вкл/выкл наблюдателя: без ключа его страница ждала бы следующего опроса.
+  watcher: [queryKeys.watcher],
   // Смена провайдера меняет содержимое почти каждой страницы — перечитываем всё.
   provider: [[]],
   // Применение профиля пишет переменные в конфиг CLI (у Claude — env в

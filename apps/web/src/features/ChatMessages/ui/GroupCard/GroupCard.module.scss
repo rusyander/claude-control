@@ -15,6 +15,15 @@
   color: var(--color-fg-muted);
 }
 
+// Принята человеком (владелец 09.10.2026): акцентный оттенок и полоса слева —
+// отличается и от доставленной (фон по умолчанию), и от влитой (зелёный).
+// Карточка стоит ниже ждущих приёмки (`orderHubGroups.ts`).
+.groupAccepted {
+  border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-border));
+  background: var(--color-accent-subtle);
+  box-shadow: inset 3px 0 0 var(--color-accent);
+}
+
 .groupClosed {
   color: var(--color-fg-muted);
   opacity: 0.8;

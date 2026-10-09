@@ -121,7 +121,7 @@ describe('маршрут разбора наблюдателя', () => {
     await watcher.settled();
   };
 
-  it('активен чужой CLI — разбор отказан кодом, Claude не запускается, сбой ждёт разбора', async () => {
+  it('активен чужой CLI, маршрут в облако Claude — отказ кодом, Claude не запускается, сбой ждёт', async () => {
     store.updateSettings({ provider: 'qwen', language: 'en' });
     const watcher = make();
     await runOnce(watcher);
@@ -131,9 +131,7 @@ describe('маршрут разбора наблюдателя', () => {
     expect(status.problem?.problemCode).toBe('route_refused');
     // Причина — на языке панели и с именем выбранного CLI.
     expect(status.problem?.detail).toContain('Qwen Code');
-    expect(status.problem?.detail).toContain(
-      'The watcher analyses failures only through Claude Code',
-    );
+    expect(status.problem?.detail).toContain('leads to the Claude cloud');
     expect(status.pending).toBe(1);
     // Отказ не съел разбор из часового потолка.
     expect(status.hourlyCap.used).toBe(0);
@@ -151,6 +149,34 @@ describe('маршрут разбора наблюдателя', () => {
     expect(argv[argv.indexOf('--tools') + 1]).toBe('Read,Grep,Glob');
     expect(readFileSync(dumpFile(), 'utf8')).not.toContain(SECRET);
     expect(envNames).toContain('ANTHROPIC_BASE_URL');
+    expect(watcher.status().problem).toBeUndefined();
+  });
+
+  // Владелец 09.10.2026: «выбран Qwen на локальной модели — наблюдатель тоже идёт
+  // через Qwen». До правки активный Qwen Code отказывал разбору при любом
+  // маршруте, хотя контур и локальная модель уводят его туда же, куда агентов.
+  it('активен Qwen Code, ассистент на контуре — разбор идёт через шлюз контура', async () => {
+    store.updateSettings({ provider: 'qwen' });
+    contour();
+    const watcher = make();
+    await runOnce(watcher);
+
+    const { argv, baseUrl } = dump();
+    expect(baseUrl).toContain(`127.0.0.1:${GATEWAY_PORT}`);
+    expect(argv).not.toContain('--model');
+    expect(argv[argv.indexOf('--tools') + 1]).toBe('Read,Grep,Glob');
+    expect(readFileSync(dumpFile(), 'utf8')).not.toContain(SECRET);
+    expect(watcher.status().problem).toBeUndefined();
+  });
+
+  it('активен Qwen Code, Claude уведён на локальную модель — разбор идёт в неё', async () => {
+    store.updateSettings({ provider: 'qwen' });
+    const watcher = make({
+      ANTHROPIC_BASE_URL: 'http://127.0.0.1:11435',
+      ANTHROPIC_MODEL: 'qwen3.6:27b-coding',
+    });
+    await runOnce(watcher);
+    expect(dump().baseUrl).toBe('http://127.0.0.1:11435');
     expect(watcher.status().problem).toBeUndefined();
   });
 

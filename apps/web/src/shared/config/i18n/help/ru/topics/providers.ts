@@ -124,8 +124,8 @@ export const providersRu = {
       'coreTools и excludeTools), Qwen Code (режим tools.approvalMode плюс списки правил ' +
       'permissions.allow / ask / deny), Continue (отдельный файл permissions.yaml: три ' +
       'списка allow / ask / exclude, режима нет вовсе), OpenCode (ключ permission в opencode.json: уровень ' +
-      'allow / ask / deny у инструментов edit, bash и webfetch, а у bash вместо уровня — ' +
-      'список шаблонов команд), Goose (один ключ GOOSE_MODE: auto / approve / smart_approve / ' +
+      'allow / ask / deny у инструментов edit, bash, webfetch и read, а у bash и read вместо ' +
+      'уровня — список шаблонов команд и путей), Goose (один ключ GOOSE_MODE: auto / approve / smart_approve / ' +
       'chat, списков нет вовсе), Kimi Code (режим default_permission_mode: manual / auto / ' +
       'yolo плюс упорядоченные правила [[permission.rules]] — шаблон и решение ' +
       'allow / ask / deny), Cursor (ключ permissions в cli-config.json: два списка ' +

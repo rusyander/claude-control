@@ -8,19 +8,20 @@
  * `AGENTDECK_WATCH_REPORT`) и свой Vite; стенд человека не нужен и не
  * трогается. Что проверяется:
  *
- *   1. выключен — индикатора нет, сбой страницы никуда не уходит;
- *   2. тумблер в настройках включает, индикатор появляется с подсказкой,
- *      временем и расходом;
+ *   1. выключен — строка в боковой панели «выкл» и ведёт на страницу
+ *      наблюдателя, сбой страницы никуда не уходит;
+ *   2. «Запустить наблюдателя» на странице включает, строка показывает
+ *      подсказку, время и расход;
  *   3. ошибка страницы с секретом внутри → раздел в отчёте сразу, секрета в
  *      отчёте нет, после разбора — вердикт и место в коде;
  *   4. запуск модели: только Read/Grep/Glob, рабочий каталог — корень
  *      приложения, посаженная переменная окружения до процесса не дошла;
  *   5. 5xx запроса страницы (ответ подменён на границе сети) → раздел с путём;
  *   6. окно индикатора: фокус внутрь, Escape и клик мимо — фокус обратно, окно
- *      помещается на экране после смены размера; «Перейти в
- *      настройки» с другой страницы — вкладка «Общие», фокус на тумблере;
- *   7. упавший разбор → проблема словами в карточке;
- *   8. «Выключить» — индикатор исчез, новый сбой не уходит и отчёт не растёт;
+ *      помещается на экране после смены размера; «Открыть страницу» с другой
+ *      страницы — страница наблюдателя с кнопкой «Остановить»;
+ *   7. упавший разбор → проблема словами в сводке на странице;
+ *   8. «Выключить» — строка снова «выкл», новый сбой не уходит и отчёт не растёт;
  *   9. все проблемы, не только сбои: 400 из интерфейса дважды → ОДИН раздел
  *      с повторов 2; предупреждение консоли; медленный ответ (фальшивый
  *      `--version` тянет дольше порога); зависшая загрузка (ответ задержан на
@@ -128,8 +129,9 @@ const config = existsSync(${JSON.stringify(config)}) ? JSON.parse(readFileSync($
 if (argv.includes('--version')) {
   // Задержка версии — медленный ответ панели, который её ждёт.
   setTimeout(() => { process.stdout.write('9.9.9 (Claude Code)\\n'); process.exit(0); }, config.versionDelayMs ?? 0);
-} else if (config.providerError && !argv.includes('--tools')) {
-  // Ошибка провайдера у запуска панели (не у разбора наблюдателя — у того --tools).
+} else if (config.providerError && argv[argv.indexOf('--tools') + 1] !== 'Read,Grep,Glob') {
+  // Ошибка провайдера у запуска панели, не у разбора наблюдателя: у того
+  // --tools Read,Grep,Glob, а лёгкие окна панели передают --tools пустым.
   process.stderr.write('starting session 4f2a\\n' + config.providerError + '\\n');
   process.exit(1);
 } else if (!argv.includes('-p')) process.exit(0);
@@ -350,6 +352,12 @@ async function main() {
 
 async function newPage(browser, language = 'ru') {
   const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+  // Под автоматизацией страница молчит об отказах API, которых сервер не видел
+  // (`reportApiFailure`): подменённый проверкой ответ — не сбой панели. Здесь
+  // подмена и есть сбой, который проверяется, — страница ведёт себя как у человека.
+  await page.addInitScript(() => {
+    Object.defineProperty(Navigator.prototype, 'webdriver', { get: () => false });
+  });
   await bypassOnboarding(page, { language, theme: 'light' });
   return page;
 }
@@ -370,25 +378,34 @@ async function uiPart({ api, report, fake }) {
     page.on('request', (request) => {
       if (request.url().includes('/api/watcher/events')) sent.push(request.url());
     });
-    await page.goto(`${WEB}/settings?tab=general`, { waitUntil: 'domcontentloaded' });
-    const card = page.locator('[data-watcher-card]');
-    await card.waitFor({ timeout: 30_000 });
-    const indicator = page.locator('[data-watcher-indicator]');
+    await page.goto(`${WEB}/rules`, { waitUntil: 'domcontentloaded' });
+    // Строка видна всегда; «включённая» — та, у которой нет метки «выкл».
+    const offRow = page.locator('[data-watcher-indicator][data-watcher-off]');
+    const indicator = page.locator('[data-watcher-indicator]:not([data-watcher-off])');
+    await offRow.waitFor({ timeout: 30_000 });
 
-    // 1. Выключен.
+    // 1. Выключен: строка «выкл» ведёт на страницу наблюдателя.
     await wait(500);
-    check('выключен: индикатора нет', (await indicator.count()) === 0);
+    check('выключен: окна у строки нет', (await indicator.count()) === 0);
+    await offRow.click();
+    await page.waitForURL(/\/watcher$/, { timeout: 10_000 }).catch(() => undefined);
+    const start = page.locator('[data-watcher-start]');
+    await start.waitFor({ timeout: 15_000 }).catch(() => undefined);
+    check(
+      'выключен: строка «выкл» ведёт на страницу с «Запустить наблюдателя»',
+      (await start.count()) === 1 && new URL(page.url()).pathname === '/watcher',
+      page.url(),
+    );
     await throwOnPage(page, 'qa before enable');
     await wait(800);
     check('выключен: сбой страницы никуда не ушёл', sent.length === 0, `запросов: ${sent.length}`);
 
-    // 2. Тумблер включает.
-    const toggle = card.locator('[role="switch"]');
-    await toggle.click();
+    // 2. «Запустить наблюдателя» включает.
+    await start.click();
     await indicator.waitFor({ timeout: 10_000 }).catch(() => undefined);
     const status = (await api('/watcher')).body;
     check(
-      'тумблер: сервер включён, отчёт — во временном каталоге',
+      '«Запустить наблюдателя»: сервер включён, отчёт — во временном каталоге',
       status?.enabled === true && status.reportPath === report,
       JSON.stringify(status),
     );
@@ -398,7 +415,7 @@ async function uiPart({ api, report, fake }) {
       title.includes(TOOLTIP_RU) && /Работает \d/.test(title) && /Расход: /.test(title),
       title,
     );
-    await page.screenshot({ path: join(SHOTS, 'after-settings-general.png') });
+    await page.screenshot({ path: join(SHOTS, 'after-watcher-page.png') });
 
     // 3. Ошибка страницы с секретом.
     const before = sectionCount(readReport(report));
@@ -499,22 +516,16 @@ async function uiPart({ api, report, fake }) {
     }
     await page.keyboard.press('Escape');
     await indicator.click();
-    await page.locator('[data-watcher-go-settings]').click();
-    await page
-      .waitForURL(/\/settings\?tab=general#watcher/, { timeout: 10_000 })
-      .catch(() => undefined);
-    const onSwitch = await until(
-      () =>
-        page.evaluate(
-          () =>
-            document.activeElement?.closest('[data-watcher-card]') !== null &&
-            document.activeElement?.getAttribute('role') === 'switch',
-        ),
-      5,
-    );
+    await page.locator('[data-watcher-open-page]').click();
+    await page.waitForURL(/\/watcher$/, { timeout: 10_000 }).catch(() => undefined);
+    const stop = await page
+      .locator('[data-watcher-stop]')
+      .waitFor({ timeout: 10_000 })
+      .then(() => true)
+      .catch(() => false);
     check(
-      '«Перейти в настройки»: вкладка «Общие», фокус на тумблере',
-      onSwitch === true,
+      '«Открыть страницу»: страница наблюдателя, кнопка «Остановить»',
+      stop && (await page.locator('[data-watcher-popover]').count()) === 0,
       page.url(),
     );
 
@@ -532,7 +543,7 @@ async function uiPart({ api, report, fake }) {
     const problemShown =
       (await page.locator('[data-watcher-problem="analysis_failed"]').count()) > 0;
     check(
-      'упавший разбор: проблема в статусе и словами в карточке',
+      'упавший разбор: проблема в статусе и словами в сводке на странице',
       failed === true && problemShown,
     );
     writeFileSync(fake.config, '{}', 'utf8');
@@ -540,9 +551,12 @@ async function uiPart({ api, report, fake }) {
     // 8. Выключить из окна индикатора.
     await indicator.click();
     await page.locator('[data-watcher-turn-off]').click();
-    const gone = await until(async () => (await indicator.count()) === 0, 10);
+    const gone = await until(
+      async () => (await indicator.count()) === 0 && (await offRow.count()) === 1,
+      10,
+    );
     check(
-      '«Выключить»: индикатор исчез, сервер выключен',
+      '«Выключить»: строка снова «выкл», сервер выключен',
       gone === true && (await api('/watcher')).body?.enabled === false,
     );
     await wait(3500);
@@ -558,15 +572,21 @@ async function uiPart({ api, report, fake }) {
     // Снимки в английском интерфейсе — для справки обоих языков.
     await api('/watcher', { method: 'POST', body: JSON.stringify({ enabled: true }) });
     const en = await newPage(browser, 'en');
-    await en.goto(`${WEB}/settings?tab=general#watcher`, { waitUntil: 'domcontentloaded' });
-    await en.locator('[data-watcher-indicator]').waitFor({ timeout: 20_000 });
-    const enTitle = (await en.locator('[data-watcher-indicator]').getAttribute('title')) ?? '';
+    await en.goto(`${WEB}/watcher`, { waitUntil: 'domcontentloaded' });
+    const enRow = en.locator('[data-watcher-indicator]:not([data-watcher-off])');
+    await enRow.waitFor({ timeout: 20_000 });
+    // Язык приходит с настройками, а строка — со статусом: что раньше, не задано.
+    await until(
+      async () => ((await enRow.getAttribute('title')) ?? '').includes('running in the background'),
+      10,
+    );
+    const enTitle = (await enRow.getAttribute('title')) ?? '';
     check(
       'английский: подсказка индикатора переведена',
       enTitle.includes('running in the background'),
       enTitle,
     );
-    await en.screenshot({ path: join(SHOTS, 'after-settings-general-en.png') });
+    await en.screenshot({ path: join(SHOTS, 'after-watcher-page-en.png') });
     await en.close();
     await api('/watcher', { method: 'POST', body: JSON.stringify({ enabled: false }) });
     await page.close();

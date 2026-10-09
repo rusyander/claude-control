@@ -164,10 +164,10 @@ describe('OpenCode opencode.json: права в ключе permission', () => {
       { entries: 'nope' },
       { entries: [{ tool: 'bash', mode: 'level', level: 'maybe' }] },
       { entries: [{ tool: 'bash', mode: 'level', level: 'ALLOW' }] },
-      { entries: [{ tool: 'read', mode: 'level', level: 'allow' }] },
+      { entries: [{ tool: 'list', mode: 'level', level: 'allow' }] },
       { entries: [{ tool: 'bash', mode: 'level' }] },
       { entries: [{ tool: 'bash', mode: 'else', level: 'allow' }] },
-      // Карта шаблонов задокументирована только у bash.
+      // Карта шаблонов работает только у bash и read.
       { entries: [{ tool: 'edit', mode: 'patterns', patterns: [{ pattern: '*', level: 'ask' }] }] },
       // Пустая карта бессмысленна: «не задано» выражается отсутствием инструмента.
       { entries: [{ tool: 'bash', mode: 'patterns', patterns: [] }] },
@@ -344,8 +344,8 @@ describe('OpenCode opencode.json: права в ключе permission', () => {
     if (info.kind !== 'opencode') throw new Error('ожидалась opencode-модель');
     expect(info.format).toBe('opencode-json');
     expect(info.levels).toEqual(['allow', 'deny', 'ask']);
-    expect(info.tools).toEqual(['edit', 'bash', 'webfetch']);
-    expect(info.patternTools).toEqual(['bash']);
+    expect(info.tools).toEqual(['edit', 'bash', 'webfetch', 'read']);
+    expect(info.patternTools).toEqual(['bash', 'read']);
     expect(info.entries).toHaveLength(3);
     expect(info.readOnly).toBe(false);
 

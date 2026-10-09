@@ -15,6 +15,7 @@ import { MergeOrderChip } from '../MergeOrderChip/MergeOrderChip';
 import type { GroupCardProps } from './GroupCard.types';
 import styles from './GroupCard.module.scss';
 import { isMrSettled } from '../../lib/isMrSettled';
+import { hubBucket } from '../../lib/hubBucket';
 import { statusTone } from '../../lib/statusTone';
 import { HoldAnswer } from './HoldAnswer/HoldAnswer';
 import { GroupStepLine } from '../GroupStepLine/GroupStepLine';
@@ -49,6 +50,10 @@ export function GroupCard({
   const release =
     !chatId && group.pending === 'waiting' && group.groupIndex !== undefined && onRelease;
   const settled = isMrSettled(group) ? group.mrClosed : undefined;
+  // Принятая человеком — своим фоном (владелец 09.10.2026): «Принять» должно
+  // быть видно с первого взгляда, а не только по подписи кнопки. Влитый MR
+  // важнее: с ним группа кончена совсем, и красится она зелёным.
+  const accepted = !settled && hubBucket(group) === 'accepted';
 
   return (
     <div
@@ -57,9 +62,11 @@ export function GroupCard({
         openable && styles.groupOpenable,
         settled === 'merged' && styles.groupMerged,
         settled === 'closed' && styles.groupClosed,
+        accepted && styles.groupAccepted,
       )}
       data-hub-row={chatId ? 'chat' : group.pending}
       {...(settled ? { 'data-hub-settled': settled } : {})}
+      {...(accepted ? { 'data-hub-accepted': '' } : {})}
     >
       <div className={styles.groupBody}>
         <div className={styles.groupMain}>

@@ -12,5 +12,6 @@ export interface OpencodePatternRow {
 
 export interface OpencodeFormState {
   choices: Record<string, OpencodeToolChoice>;
-  patterns: OpencodePatternRow[];
+  /** Списки шаблонов по инструменту: у `bash` — команды, у `read` — пути. */
+  patterns: Record<string, OpencodePatternRow[]>;
 }

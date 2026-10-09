@@ -247,10 +247,6 @@
     "n": 4,
     "why": "launch refusals shown on the panel agent card"
   },
-  "domains/panel-agent/runner/runner.ts": {
-    "n": 10,
-    "why": "turn errors shown on the panel agent card (Qwen init-tools stop, foreign-tool stop, Kimi image/argv refusals) — the error event has no code channel yet"
-  },
   "domains/permissions/permissions.ts": {
     "n": 1,
     "why": "map key composed from a path and a decision word"
@@ -728,7 +724,7 @@
     "why": "watcher problem.detail raw reason (timeout/no reply); coded by problemCode analysis_failed"
   },
   "domains/watcher/report-texts.ts": {
-    "n": 75,
+    "n": 77,
     "why": "WATCH-REPORT.md dictionary: the ru half of a ru/en pair picked by the panel UI language (owner 27.09); moved out of report.ts, which now holds none"
   },
   "domains/watcher/watcher.ts": {
@@ -812,8 +808,8 @@
     "why": "path-rejection detail composed inside an error class"
   },
   "lib/server-texts/templates.ts": {
-    "n": 440,
-    "why": "RU side of the server text table: every line here IS a code, this is the one file where a Russian literal is the data. The generator and its manifest are gone from the tree (see the file header) — a new code is written by hand and `n` rises with it; +6 sieve-gap-* codes of the pre-MR sieves (28.09); +1 split drop/restart/no-slot-paused codes (29.09); +4 tests-gap-* codes of the group verdict from the Tests block (30.09); +13 sieve-gap-* codes of the panel mechanics, freshness and Tests-run proof (30.09); +1 sieve-gap-run-empty, a run that checked nothing (review PR #1, 05.10); +1 tests-gap-stale, a Tests run recorded before the group's last change (05.10); +1 kit-compose-failed (06.10); +8 assistant-*/watcher-* refusals of the provider route for the panel helpers and the watcher (06.10); +2 gateway-responses-* refusals of the /v1/responses route for Codex (06.10); +6 provider-chat/analytics/groups/plugins/sandbox refusals and assistant-api-base-unknown of the CLI pass B0 (06.10); +22 group-layer-* refusals, feed notice lines and per-CLI toggle answers of the group run layer, batch A (06.10); +1 provider-unknown, now composed by code for the group toggle and delivery routes (06.10); +1 tests-gap-word-only, a word-only Tests record does not close an automated case (09.10); +1 chat-conversation-lost-notice, the group transcript is gone and the turn went on as a new conversation (09.10)"
+    "n": 450,
+    "why": "RU side of the server text table: every line here IS a code, this is the one file where a Russian literal is the data. The generator and its manifest are gone from the tree (see the file header) — a new code is written by hand and `n` rises with it; +6 sieve-gap-* codes of the pre-MR sieves (28.09); +1 split drop/restart/no-slot-paused codes (29.09); +4 tests-gap-* codes of the group verdict from the Tests block (30.09); +13 sieve-gap-* codes of the panel mechanics, freshness and Tests-run proof (30.09); +1 sieve-gap-run-empty, a run that checked nothing (review PR #1, 05.10); +1 tests-gap-stale, a Tests run recorded before the group's last change (05.10); +1 kit-compose-failed (06.10); +8 assistant-*/watcher-* refusals of the provider route for the panel helpers and the watcher (06.10); +2 gateway-responses-* refusals of the /v1/responses route for Codex (06.10); +6 provider-chat/analytics/groups/plugins/sandbox refusals and assistant-api-base-unknown of the CLI pass B0 (06.10); +22 group-layer-* refusals, feed notice lines and per-CLI toggle answers of the group run layer, batch A (06.10); +1 provider-unknown, now composed by code for the group toggle and delivery routes (06.10); +1 tests-gap-word-only, a word-only Tests record does not close an automated case (09.10); +1 chat-conversation-lost-notice, the group transcript is gone and the turn went on as a new conversation (09.10); +10 panel-agent-* turn errors (stop, extra tools, timeout, no reply, CLI exit, image and Kimi argv refusals) — the agent error frame now carries a code (09.10)"
   },
   "providers/catalog/kimi.ts": {
     "n": 1,

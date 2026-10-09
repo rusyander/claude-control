@@ -20,6 +20,7 @@ const ROUTE_SECTIONS: Record<string, readonly string[]> = {
   '/groups': ['groups'],
   '/history': ['history'],
   '/settings': ['settings', 'provider', 'endpoints', 'integrations'],
+  '/watcher': ['watcher'],
   '/dlp': ['dlp'],
   '/local-models': ['local-models'],
   '/kit': ['kit'],

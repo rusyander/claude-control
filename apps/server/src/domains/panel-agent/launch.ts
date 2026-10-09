@@ -1,5 +1,6 @@
 import type { PanelAgentRunRefusalCode } from '@agentdeck/contracts/panel-agent';
 import type { ServerMessageCode } from '@agentdeck/contracts/server-messages';
+import type { EndpointProfile } from '@agentdeck/contracts';
 import { PLATFORM_ASSISTANT_CONSUMER } from '@agentdeck/contracts/platform-consumers';
 import type { AppStore } from '../../lib/app-store/app-store.ts';
 import { claudeProvider } from '../../providers/claude.ts';
@@ -102,6 +103,36 @@ export function contourUnreachable(
   return undefined;
 }
 
+/**
+ * Окружение одного процесса `claude`, ведущее его через шлюз контура профиля
+ * «Ассистента панели». Отдельной функцией потому, что его строят двое — агент
+ * панели и наблюдатель (`watcher/route.ts`), — и два построителя одного
+ * маршрута разошлись бы на первом же новом поле профиля. `undefined` — у
+ * Claude Code не описан адрес шлюза.
+ */
+export function claudeContourEnv(
+  profile: EndpointProfile,
+  platformId: string,
+  port: number,
+): Record<string, string> | undefined {
+  const vars = claudeProvider.endpointConfig?.anthropic;
+  if (!vars) return undefined;
+  const env: Record<string, string> = {};
+  for (const item of buildEndpointPlan(
+    // Раздел «Ассистент» в адресе: закрыли его на контуре — шлюз откажет и
+    // уже идущему разговору агента, а не только следующему запуску.
+    targetProfile(profile, platformId, port, 'anthropic', {
+      section: PLATFORM_ASSISTANT_CONSUMER,
+    }),
+    vars,
+    PLACEHOLDER_KEY,
+    false,
+  )) {
+    env[item.key] = item.value;
+  }
+  return env;
+}
+
 export function resolvePanelAgentLaunch(deps: PanelAgentLaunchDeps): PanelAgentLaunch {
   const provider = getActiveProvider(deps.store);
   // Агент идёт CLI выбранного провайдера (Claude, Qwen Code, Codex, Gemini CLI,
@@ -171,27 +202,12 @@ export function resolvePanelAgentLaunch(deps: PanelAgentLaunchDeps): PanelAgentL
       `Агент панели идёт через контур «${unreachable.title}», а ключ контура не сохранён — шлюзу нечего подставить. Сохраните ключ на карточке контура.`,
     );
   }
-  const port = deps.gatewayPort();
-
-  const vars = claudeProvider.endpointConfig?.anthropic;
-  if (!vars) {
+  const env = claudeContourEnv(profile, platformId, deps.gatewayPort());
+  if (!env) {
     return refuse(
       'provider_unsupported',
       'У Claude Code не описан адрес шлюза — контур не применить.',
     );
-  }
-  const env: Record<string, string> = {};
-  for (const item of buildEndpointPlan(
-    // Раздел «Ассистент» в адресе: закрыли его на контуре — шлюз откажет и
-    // уже идущему разговору агента, а не только следующему запуску.
-    targetProfile(profile, platformId, port, 'anthropic', {
-      section: PLATFORM_ASSISTANT_CONSUMER,
-    }),
-    vars,
-    PLACEHOLDER_KEY,
-    false,
-  )) {
-    env[item.key] = item.value;
   }
   // Слои у агента сняты всегда (лёгкое окно, `lightWindowLayers`) — строже любой
   // галочки контура, поэтому правила слоёв контура здесь ничего не добавляют.

@@ -2,6 +2,8 @@ import type { spawn as nodeSpawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type {
+  WatchUserCheck,
+  WatchUserReport,
   WatcherProblem,
   WatcherSpend,
   WatcherStatus,
@@ -73,6 +75,13 @@ export const WATCH_DEFAULT_THRESHOLDS: WatcherThresholds = {
   stuckLoadingMs: 30_000,
 };
 const HOUR_MS = 60 * 60_000;
+/**
+ * Пауза перед разбором бага, присланного человеком: пачки ждать незачем —
+ * человек смотрит на кнопку «Проверить» и ждёт ответа.
+ */
+export const WATCH_USER_REPORT_DELAY_MS = 300;
+/** Сколько последних проверок человека помнить в статусе. */
+export const WATCH_USER_CHECKS_MAX = 10;
 /** Сколько помнить номер своего процесса после выхода: событие выхода может прийти позже. */
 const OWN_PID_TTL_MS = 60_000;
 const LEDGER_KEY = 'watcher';
@@ -160,6 +169,7 @@ export class BackgroundWatcher {
       spend: { ...ZERO_SPEND, ...(state.spend ?? {}) },
       ...(state.problem ? { problem: state.problem } : {}),
       ...(Array.isArray(state.runTimes) ? { runTimes: state.runTimes } : {}),
+      ...(Array.isArray(state.checks) ? { checks: state.checks } : {}),
     };
   }
 
@@ -201,7 +211,13 @@ export class BackgroundWatcher {
       spend: state.spend,
       reportPath,
       ...(state.problem ? { problem: state.problem } : {}),
+      ...(state.enabled && state.checks?.length ? { checks: state.checks } : {}),
     };
+  }
+
+  /** Путь отчёта — его читает страница отчёта. */
+  reportPath(): string {
+    return this.deps.reportPath();
   }
 
   isEnabled(): boolean {
@@ -278,6 +294,50 @@ export class BackgroundWatcher {
     if (kept) this.writeReport([event]);
     this.schedule();
     return true;
+  }
+
+  /**
+   * Баг словами человека. В отчёт сразу НЕ пишется, в отличие от сигнала:
+   * жалоба — ещё не находка. Её сверяет с кодом та же модель, и раздел
+   * появляется, только если дефект подтвердился; иначе запись убирается, а
+   * человек видит в окне, почему нет. Выключен наблюдатель — `undefined`.
+   */
+  reportBug(report: WatchUserReport): WatchUserCheck | undefined {
+    if (!this.isEnabled()) return undefined;
+    const at = this.now();
+    const { event } = this.events.record(
+      {
+        source: 'user',
+        kind: 'user-report',
+        message: report.text,
+        ...(report.route ? { route: report.route } : {}),
+      },
+      at,
+    );
+    const check: WatchUserCheck = {
+      id: event.id,
+      text: event.message,
+      ...(event.route ? { route: event.route } : {}),
+      at,
+      state: 'checking',
+    };
+    this.updateChecks((checks) => [check, ...checks.filter((item) => item.id !== check.id)]);
+    this.schedule(WATCH_USER_REPORT_DELAY_MS);
+    return check;
+  }
+
+  private updateChecks(change: (checks: WatchUserCheck[]) => WatchUserCheck[]): void {
+    const state = this.readState();
+    this.writeState({
+      ...state,
+      checks: change(state.checks ?? []).slice(0, WATCH_USER_CHECKS_MAX),
+    });
+  }
+
+  private settleCheck(id: string, patch: Partial<WatchUserCheck>): void {
+    this.updateChecks((checks) =>
+      checks.map((check) => (check.id === id ? { ...check, ...patch } : check)),
+    );
   }
 
   private language(): ReportLanguage {
@@ -449,7 +509,16 @@ export class BackgroundWatcher {
     outcome: AnalysisOutcome,
   ): void {
     this.addSpend(outcome.usage);
+    const userReports = batch.filter((event) => event.kind === 'user-report');
     if (!outcome.ok) {
+      // Человек ждёт ответа на свою кнопку — говорим, что разбор не удался.
+      // Запись остаётся в кольце: следующий разбор возьмёт её снова.
+      for (const event of userReports) {
+        this.settleCheck(event.id, {
+          state: 'failed',
+          ...(outcome.error ? { reason: outcome.error } : {}),
+        });
+      }
       // Неудачный разбор не повторяется сам: проблемы остаются «проверяется» и
       // уйдут модели со следующим сигналом. Иначе упавший CLI крутился бы по кругу.
       this.setProblem({
@@ -471,13 +540,32 @@ export class BackgroundWatcher {
     }
     this.events.markAnalyzed(seen, findings);
 
+    const touched = new Set(batch.map((event) => event.id));
+    const merges = new Map(outcome.merges ?? []);
+    // Неподтверждённый баг человека в отчёт не идёт и ни с чем не сливается:
+    // слияние добавило бы чужому разделу повтор, которого не было.
+    for (const event of userReports) {
+      const finding = findings.get(event.id);
+      if (finding?.verdict === 'confirmed') continue;
+      this.events.drop(event.id);
+      touched.delete(event.id);
+      merges.delete(event.id);
+      const reason = finding?.rootCause || finding?.happened;
+      this.settleCheck(event.id, {
+        state: finding?.verdict === 'not-in-code' ? 'rejected' : 'unclear',
+        ...(finding?.title ? { title: finding.title } : {}),
+        ...(reason ? { reason } : {}),
+      });
+    }
+
     // Та же причина, доказанная моделью: раздел вливается в другой и из отчёта уходит.
     const removed: string[] = [];
-    const touched = new Set(batch.map((event) => event.id));
-    for (const [from, into] of outcome.merges ?? []) {
+    const mergedInto = new Map<string, string>();
+    for (const [from, into] of merges) {
       const merged = this.events.merge(from, into);
       if (!merged) continue;
       removed.push(merged.removed.id);
+      mergedInto.set(merged.removed.id, merged.into.id);
       touched.delete(merged.removed.id);
       touched.add(merged.into.id);
     }
@@ -487,6 +575,18 @@ export class BackgroundWatcher {
     const byId = new Map(this.events.list().map((event) => [event.id, event]));
     const updated = [...touched].map((id) => byId.get(id)).filter(Boolean) as WatchEvent[];
     this.writeReport(updated, removed);
+    // Подтверждённый — номер раздела, куда он лёг: свой или той же причины.
+    for (const event of userReports) {
+      const finding = findings.get(event.id);
+      if (finding?.verdict !== 'confirmed') continue;
+      const section = byId.get(mergedInto.get(event.id) ?? event.id);
+      this.settleCheck(event.id, {
+        state: 'confirmed',
+        ...(section?.ref ? { ref: section.ref } : {}),
+        title: finding.title,
+        ...(finding.rootCause ? { reason: finding.rootCause } : {}),
+      });
+    }
     this.clearProblem('analysis_failed');
   }
 

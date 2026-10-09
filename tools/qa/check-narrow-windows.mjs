@@ -128,7 +128,7 @@ try {
     check(applied === theme, `[${theme}] тема применена`, applied);
     const notify = page.locator('nav button[aria-label="Уведомления"]').first();
     const agentTrigger = page.locator('[data-panel-agent-trigger]').first();
-    const watcherTrigger = page.locator('[data-watcher-indicator]').first();
+    const watcherTrigger = page.locator('[data-watcher-indicator]:not([data-watcher-off])').first();
     for (const [name, button] of [
       ['уведомления', notify],
       ['агент панели', agentTrigger],

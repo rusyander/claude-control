@@ -311,11 +311,19 @@ describe('ход агента на Kimi Code', () => {
     expect(result.ok).toBe(false);
     expect(result.error).toContain('сверх переходника панели (Bash)');
     expect(events.some((event) => event.kind === 'tool')).toBe(false);
+    // Кадр ошибки несёт код: окно и телефон покажут причину на языке интерфейса.
+    expect(events.find((event) => event.kind === 'error')).toMatchObject({
+      messageCode: 'panel-agent-extra-tool',
+      params: { tool: 'Bash' },
+    });
   });
 
   it('конца хода нет — ответа нет: выход без session.resume_hint — сбой', async () => {
-    const { result } = await run([{ role: 'assistant', content: 'PART' }]);
+    const { result, events } = await run([{ role: 'assistant', content: 'PART' }]);
     expect(result.ok).toBe(false);
+    expect(events.find((event) => event.kind === 'error')).toMatchObject({
+      messageCode: 'panel-agent-cli-exit',
+    });
   });
 
   it('картинка и длинная реплика — честный отказ до запуска CLI', async () => {
@@ -325,6 +333,13 @@ describe('ход агента на Kimi Code', () => {
     const long = await run([done], { content: 'я'.repeat(KIMI_REQUEST_MAX_CHARS + 1) });
     expect(long.result.error).toContain(`длиннее ${KIMI_REQUEST_MAX_CHARS} знаков`);
     expect(long.seen.args).toBeUndefined();
+    expect(image.events.find((event) => event.kind === 'error')).toMatchObject({
+      messageCode: 'panel-agent-images-kimi',
+    });
+    expect(long.events.find((event) => event.kind === 'error')).toMatchObject({
+      messageCode: 'panel-agent-kimi-long',
+      params: { max: String(KIMI_REQUEST_MAX_CHARS) },
+    });
     const edge = await run([{ role: 'assistant', content: 'ok' }, done], {
       content: 'я'.repeat(KIMI_REQUEST_MAX_CHARS),
     });

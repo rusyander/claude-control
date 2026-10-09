@@ -56,6 +56,7 @@ const DEFAULT_SEVERITY: Record<WatchEvent['kind'], WatchSeverity> = {
   'log-warn': 'low',
   'console-warn': 'low',
   remark: 'low',
+  'user-report': 'medium',
 };
 
 interface EventsFile {
@@ -360,6 +361,19 @@ export class WatchEventStore {
     data.events = data.events.filter((event) => event.id !== from.id);
     this.save(data);
     return { into: snapshot(into), removed: from };
+  }
+
+  /**
+   * Убрать запись совсем: баг, присланный человеком, модель не подтвердила —
+   * в кольце ему не место, иначе следующий разбор взял бы его снова.
+   */
+  drop(key: string): void {
+    const data = this.read();
+    const id = data.aliases?.[key] ?? key;
+    const kept = data.events.filter((event) => event.id !== id);
+    if (kept.length === data.events.length) return;
+    data.events = kept;
+    this.save(data);
   }
 
   /** Новое включение: кольцо пустое, номера продолжаются. */

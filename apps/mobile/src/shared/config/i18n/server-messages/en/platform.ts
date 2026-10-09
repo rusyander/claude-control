@@ -89,9 +89,10 @@ export const platformEn: Record<PlatformMessageCode, string> = {
   'assistant-contour-no-token':
     'The panel assistant goes through the contour «{{title}}», but the contour key is not saved — the gateway has nothing to insert. Save the key on the contour card',
   'watcher-provider-unsupported':
-    'The watcher analyses failures only through Claude Code: a read-only launch is described for it alone, and the active CLI is {{provider}}. Analysis did not start',
+    'The active CLI is {{provider}}, and the panel assistant route leads to the Claude cloud: the watcher will not substitute Claude for the chosen CLI. Analysis runs when the assistant is on a contour or a local model. Analysis did not start',
   'watcher-endpoint-unsupported':
     'The panel assistant uses its own endpoint «{{name}}» — the watcher would have to hand its token to a CLI process, which the panel does not do. Analysis did not start',
+  'watcher-off': 'The watcher is off: turn it on to check a bug.',
   'provider-chat-unsupported':
     '{{provider}} has no non-interactive mode — the panel chat cannot work with it. The conversation was not created: switch the active CLI',
   'analytics-provider-unsupported':

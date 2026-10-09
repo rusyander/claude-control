@@ -15,7 +15,7 @@ export function toOpencodeEntries(
     if (choice === 'unset') continue;
 
     if (choice === 'patterns') {
-      const rules = state.patterns
+      const rules = (state.patterns[tool] ?? [])
         .map((row) => ({ pattern: row.pattern.trim(), level: row.level }))
         .filter((row) => row.pattern.length > 0);
       if (rules.length > 0) entries.push({ tool, mode: 'patterns', patterns: rules });

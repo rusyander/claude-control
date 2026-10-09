@@ -372,9 +372,11 @@ export const permissionsEn: typeof permissionsRu = {
       'section read-only — the panel does not edit blindly. ' +
       'OpenCode uses yet another model — the permission key ' +
       'of opencode.json (global and per-project): the edit (file edits), bash (shell ' +
-      'commands) and webfetch (network fetches) tools each get an allow, ask or deny ' +
-      'level, and bash may take a list of command patterns instead — e.g. “*” ask, ' +
-      '“git *” allow, “git push *” deny. Entries inside permission that the panel does ' +
+      'commands), webfetch (network fetches) and read (file reads) tools each get an ' +
+      'allow, ask or deny level, and bash may take a list of command patterns instead — ' +
+      'e.g. “*” ask, “git *” allow, “git push *” deny. For read the patterns are file ' +
+      'paths, matched by OpenCode against the full path: “**/.env” blocks that file in any ' +
+      'folder, a bare “.env” matches nothing. Entries inside permission that the panel does ' +
       'not manage are kept as they are and shown read-only; per-agent permissions ' +
       '(agent.*) are not touched at all. ' +
       'Cursor has the shortest list-based model: the permissions key in ' +

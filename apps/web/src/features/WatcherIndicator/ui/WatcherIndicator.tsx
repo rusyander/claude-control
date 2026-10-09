@@ -3,16 +3,13 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from '@tanstack/react-router';
 import { useSettings } from '@entities/AppConfig';
 import {
-  WATCHER_ANCHOR,
-  WATCHER_FOCUS_EVENT,
   WatcherSummary,
   useSetWatcher,
   useWatcherElapsed,
   useWatcherStatus,
-  watcherSettingsTab,
   watcherSpendText,
 } from '@entities/Watcher';
-import { SETTINGS_ROUTE } from '@shared/config/routes';
+import { WATCHER_ROUTE } from '@shared/config/routes';
 import { formatDuration } from '@shared/lib/format-duration';
 import { toast } from '@shared/lib/toast';
 import { Stack } from '@shared/ui/stack';
@@ -23,16 +20,22 @@ import type { WatcherIndicatorProps } from './WatcherIndicator.types';
 import styles from './WatcherIndicator.module.scss';
 import { placeBeside } from '../lib/placeBeside';
 import { FOCUSABLE } from './WatcherIndicator.constants';
+import { WatcherBugCheck } from './WatcherBugCheck/WatcherBugCheck';
 import { toErrorMessage } from '../../../shared/api/toErrorMessage';
 
+/** Сколько последних проверок видно в окне: остальные — на странице наблюдателя. */
+const SHOWN_CHECKS = 3;
+
 /**
- * Индикатор фонового наблюдателя: строка в боковой панели на каждой странице,
- * пока наблюдатель включён. Выключен — строки нет вовсе: индикатор нужен,
- * чтобы про работающий в фоне агент (и его расход) нельзя было забыть, а не
- * чтобы напоминать о выключенном.
+ * Индикатор фонового наблюдателя: строка в боковой панели на каждой странице.
+ * Видна всегда (владелец 09.10.2026): выключенный наблюдатель — строка «выкл»,
+ * клик ведёт на его страницу, где его запускают; раньше строки у выключенного
+ * не было, и до запуска приходилось знать дорогу в настройки.
  *
- * Клик открывает окно: сводка, «Выключить» и «Перейти в настройки». Escape и
- * клик мимо закрывают его и возвращают фокус на строку.
+ * Включённый — клик открывает окно: сводка, «Выключить», «Открыть страницу» и
+ * форма «Нашли баг сами?» — человек описывает баг словами, а наблюдатель
+ * сверяет его с кодом. Escape и клик мимо закрывают окно и возвращают фокус
+ * на строку.
  */
 export function WatcherIndicator({ isCollapsed = false }: WatcherIndicatorProps) {
   const { t } = useTranslation();
@@ -49,8 +52,8 @@ export function WatcherIndicator({ isCollapsed = false }: WatcherIndicatorProps)
 
   const enabled = status?.enabled === true;
 
-  // Выключили (здесь, в настройках или с телефона) — окно закрывается вместе
-  // со строкой: висеть над страницей без хозяина ему незачем.
+  // Выключили (здесь, на странице наблюдателя или с телефона) — окно
+  // закрывается: управлять в нём больше нечем, строка остаётся ссылкой.
   useEffect(() => {
     if (!enabled) setOpen(false);
   }, [enabled]);
@@ -78,7 +81,31 @@ export function WatcherIndicator({ isCollapsed = false }: WatcherIndicatorProps)
     if (isOpen) popoverRef.current?.querySelector<HTMLElement>('button')?.focus();
   }, [isOpen]);
 
-  if (!status || !enabled) return null;
+  // Состояние ещё не пришло или наблюдатель выключен — строка ведёт на его
+  // страницу: окно со сводкой и формой бага нужно только работающему.
+  if (!status || !enabled) {
+    return (
+      <button
+        type="button"
+        className={styles.trigger}
+        onClick={() => void navigate({ to: WATCHER_ROUTE } as never)}
+        title={t('watcher.offTooltip')}
+        aria-label={t('watcher.offAria')}
+        data-watcher-indicator
+        data-watcher-off
+      >
+        <span className={styles.iconWrap}>
+          <Icon name="eye" size={24} />
+        </span>
+        {!isCollapsed && (
+          <span className={styles.label}>
+            <span>{t('watcher.short')}</span>
+            <span className={styles.time}>{t('watcher.offShort')}</span>
+          </span>
+        )}
+      </button>
+    );
+  }
 
   const time = formatDuration(elapsed, t);
   const spend = watcherSpendText(status.spend, costUnit);
@@ -109,16 +136,9 @@ export function WatcherIndicator({ isCollapsed = false }: WatcherIndicatorProps)
     });
   };
 
-  const goToSettings = (): void => {
+  const openPage = (): void => {
     setOpen(false);
-    void navigate({
-      to: SETTINGS_ROUTE,
-      search: { tab: watcherSettingsTab },
-      hash: WATCHER_ANCHOR,
-    } as never);
-    // Уже стоим на этой вкладке — адрес не меняется, и карточке надо сказать
-    // отдельно, что фокус снова нужен ей.
-    window.dispatchEvent(new Event(WATCHER_FOCUS_EVENT));
+    void navigate({ to: WATCHER_ROUTE } as never);
   };
 
   return (
@@ -212,10 +232,11 @@ export function WatcherIndicator({ isCollapsed = false }: WatcherIndicatorProps)
                 >
                   {t('watcher.turnOff')}
                 </Button>
-                <Button variant="ghost" size="sm" onClick={goToSettings} data-watcher-go-settings>
-                  {t('watcher.openSettings')}
+                <Button variant="secondary" size="sm" onClick={openPage} data-watcher-open-page>
+                  {t('watcher.openPage')}
                 </Button>
               </Stack>
+              <WatcherBugCheck checks={status.checks ?? []} limit={SHOWN_CHECKS} />
             </Stack>
           </div>
         </>

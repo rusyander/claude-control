@@ -1058,11 +1058,13 @@ export const chatEn: typeof chatRu = {
       'walked (“work › review › fixes”) and the model of the current stage; a ' +
       'running stage carries a pulsing dot. A click on the card opens the group’s ' +
       'chat, and the group’s buttons sit in its top right corner. Groups still in ' +
-      'progress (running, waiting for you, paused, queued) sit on top, finished ' +
-      'ones (delivered, accepted, copy removed) below, and groups whose MR is merged ' +
-      'or closed at the very bottom: a delivered but unmerged group still waits for ' +
-      'its merge. A merged group’s card is green, a closed one is dimmed; each part ' +
-      'keeps plan order. The panel learns by itself whether an MR is merged while ' +
+      'progress (running, waiting for you, paused, queued) sit on top; below them, ' +
+      'delivered groups waiting for your acceptance; under those, groups you ' +
+      'accepted that are not merged yet; at the very bottom, closed ones: MR merged ' +
+      'or closed, plan cancelled, copy removed. “Accept” recolours the card violet ' +
+      'with a stripe on the left at once and moves it down to the accepted ones; ' +
+      '“Remove mark” moves it back. A merged group’s card is green, a closed one is ' +
+      'dimmed; each part keeps plan order. The panel learns by itself whether an MR is merged while ' +
       'the hub is open: at most once every 5 minutes it asks the forge for the state ' +
       'alone — one request per project, no discussions or pipeline; with the hub ' +
       'closed or every MR already merged it does not ask at all. It needs the ' +

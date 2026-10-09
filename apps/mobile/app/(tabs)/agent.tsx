@@ -12,6 +12,7 @@ import { Card, Chips, Empty, Field, Loading, Mono, Muted, Row, Title } from '../
 import { colors, font, radius, space } from '../../src/shared/config/theme';
 import { useT, useLanguage } from '../../src/shared/config/i18n';
 import { useConnection, isConfigured } from '../../src/shared/api/connection';
+import { serverMessage } from '../../src/shared/api/server-message';
 import { useWorkspace } from '../../src/shared/lib/workspace';
 import { useVoice } from '../../src/shared/lib/voice';
 import { PENDING_POLL_MS, usePanelAgentPending } from '../../src/entities/panel-agent/api';
@@ -133,7 +134,7 @@ export default function AgentScreen() {
               }
               return (
                 <Mono key={item.id} style={item.kind === 'error' ? styles.error : undefined}>
-                  {item.text}
+                  {serverMessage(item.messageCode, item.params) ?? item.text}
                 </Mono>
               );
             })}

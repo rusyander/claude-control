@@ -1,0 +1,101 @@
+.title {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+// Путь к файлу длиннее строки текста: мера абзаца переносила его посреди
+// имени, хотя карточка вдвое шире.
+.location {
+  max-width: none;
+}
+
+.code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--color-surface-sunken);
+  font-family: var(--font-mono);
+  font-size: 0.95em;
+  overflow-wrap: anywhere;
+}
+
+// Тело раздела — тот же Markdown, что в файле; вид как у предпросмотра
+// документов проекта, только мельче: это подробности, не главный текст.
+.body {
+  padding-top: var(--spacing-xs);
+  border-top: 1px solid var(--color-border);
+  color: var(--color-fg);
+  font-size: var(--font-size-body-sm);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+
+  & > :first-child {
+    margin-top: 0;
+  }
+
+  :global(h3),
+  :global(h4) {
+    margin: 1.2em 0 0.4em;
+    font-size: var(--font-size-body);
+    line-height: 1.3;
+  }
+
+  :global(p),
+  :global(ul),
+  :global(ol),
+  :global(pre),
+  :global(blockquote),
+  :global(table) {
+    margin: 0 0 0.8em;
+  }
+
+  :global(ul),
+  :global(ol) {
+    padding-left: 1.4em;
+  }
+
+  :global(p),
+  :global(li),
+  :global(blockquote) {
+    max-width: var(--text-measure);
+  }
+
+  :global(code) {
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: var(--color-surface-sunken);
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+  }
+
+  :global(pre) {
+    padding: var(--spacing-sm);
+    border-radius: 8px;
+    background: var(--color-surface-sunken);
+    overflow-x: auto;
+
+    :global(code) {
+      padding: 0;
+      background: none;
+    }
+  }
+
+  :global(blockquote) {
+    padding-left: var(--spacing-sm);
+    border-left: 3px solid var(--color-border-strong);
+    color: var(--color-fg-muted);
+  }
+
+  :global(a) {
+    color: var(--color-accent);
+  }
+
+  :global(table) {
+    border-collapse: collapse;
+
+    :global(td),
+    :global(th) {
+      padding: var(--spacing-3xs) var(--spacing-xs);
+      border: 1px solid var(--color-border);
+    }
+  }
+}

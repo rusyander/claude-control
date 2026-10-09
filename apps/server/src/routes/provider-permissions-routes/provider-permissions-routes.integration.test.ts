@@ -76,7 +76,7 @@ describe('provider-permissions роуты: гейтинг по провайде�
     const body = info.json<{ kind: string; levels: string[]; tools: string[] }>();
     expect(body.kind).toBe('opencode');
     expect(body.levels).toEqual(['allow', 'deny', 'ask']);
-    expect(body.tools).toEqual(['edit', 'bash', 'webfetch']);
+    expect(body.tools).toEqual(['edit', 'bash', 'webfetch', 'read']);
 
     for (const payload of [
       { approvalPolicy: 'never', sandboxMode: 'read-only' },
@@ -333,7 +333,7 @@ describe('provider-permissions роуты: opencode на tmp-HOME opencode.json'
     ]);
     // Чужой инструмент показан отдельно и только для чтения.
     expect(body.preserved).toEqual([{ key: 'deploy', value: '"ask"' }]);
-    expect(body.patternTools).toEqual(['bash']);
+    expect(body.patternTools).toEqual(['bash', 'read']);
     expect(body.usingDefaults).toBe(false);
 
     const put = await app.inject({

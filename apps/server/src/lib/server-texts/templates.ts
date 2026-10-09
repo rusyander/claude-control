@@ -1457,8 +1457,8 @@ export const serverTextTemplates = {
     en: 'The panel assistant goes through the contour «{{title}}», but the contour key is not saved — the gateway has nothing to insert. Save the key on the contour card',
   },
   'watcher-provider-unsupported': {
-    ru: 'Наблюдатель разбирает сбои только через Claude Code: запуск «только чтение» описан лишь у него, а активный CLI — {{provider}}. Разбор не запущен',
-    en: 'The watcher analyses failures only through Claude Code: a read-only launch is described for it alone, and the active CLI is {{provider}}. Analysis did not start',
+    ru: 'Активный CLI — {{provider}}, а маршрут ассистента панели ведёт в облако Claude: подставлять Claude вместо выбранного CLI наблюдатель не станет. Разбор идёт, когда ассистент на контуре или на локальной модели. Разбор не запущен',
+    en: 'The active CLI is {{provider}}, and the panel assistant route leads to the Claude cloud: the watcher will not substitute Claude for the chosen CLI. Analysis runs when the assistant is on a contour or a local model. Analysis did not start',
   },
   'watcher-endpoint-unsupported': {
     ru: 'Ассистенту панели выбран свой эндпоинт «{{name}}» — наблюдателю пришлось бы отдать его токен процессу CLI, этого панель не делает. Разбор не запущен',
@@ -1587,5 +1587,45 @@ export const serverTextTemplates = {
   'provider-unknown': {
     ru: 'Провайдер «{{id}}» неизвестен панели.',
     en: 'The panel does not know provider “{{id}}”.',
+  },
+  'panel-agent-stopped': {
+    ru: 'Ход остановлен.',
+    en: 'The turn was stopped.',
+  },
+  'panel-agent-extra-tools-qwen': {
+    ru: 'Qwen Code предложил агенту инструменты сверх переходника панели ({{tools}}) — ход остановлен, чтобы у агента не было лишних рук.',
+    en: 'Qwen Code offered the agent tools beyond the panel bridge ({{tools}}) — the turn was stopped so that the agent has no extra hands.',
+  },
+  'panel-agent-extra-tool': {
+    ru: 'CLI дал агенту инструмент сверх переходника панели ({{tool}}) — ход остановлен, чтобы у агента не было лишних рук.',
+    en: 'The CLI gave the agent a tool beyond the panel bridge ({{tool}}) — the turn was stopped so that the agent has no extra hands.',
+  },
+  'panel-agent-timeout': {
+    ru: 'Агент не закончил ход за отведённое время.',
+    en: 'The agent did not finish the turn in the allotted time.',
+  },
+  'panel-agent-no-reply': {
+    ru: 'Агент не ответил.',
+    en: 'The agent did not answer.',
+  },
+  'panel-agent-cli-exit': {
+    ru: 'CLI завершился с кодом {{code}} без ответа.',
+    en: 'The CLI exited with code {{code}} without an answer.',
+  },
+  'panel-agent-images-gemini': {
+    ru: 'Агент панели на Gemini CLI не принимает картинки: CLI читает их только своим инструментом файлов, которого у агента нет. Отправьте вопрос без картинки.',
+    en: 'The panel agent on Gemini CLI takes no images: the CLI reads them only with its own file tool, which the agent does not have. Send the question without the image.',
+  },
+  'panel-agent-images-goose': {
+    ru: 'Агент панели на Goose не принимает картинки: в одиночном запуске Goose не передаёт их модели. Отправьте вопрос без картинки.',
+    en: 'The panel agent on Goose takes no images: in a one-shot run Goose does not pass them to the model. Send the question without the image.',
+  },
+  'panel-agent-images-kimi': {
+    ru: 'Агент панели на Kimi Code не принимает картинки: одиночный запуск Kimi берёт только текст. Отправьте вопрос без картинки.',
+    en: 'The panel agent on Kimi Code takes no images: a one-shot Kimi run takes text only. Send the question without the image.',
+  },
+  'panel-agent-kimi-long': {
+    ru: 'Сообщение длиннее {{max}} знаков: Kimi Code принимает его только строкой запуска. Сократите сообщение или разбейте его на части.',
+    en: 'The message is longer than {{max}} characters: Kimi Code takes it only on the launch line. Shorten the message or split it into parts.',
   },
 } as const satisfies Record<string, { ru: string; en: string }>;

@@ -53,6 +53,7 @@ export function watchSystemPrompt(lang: ReportLanguage = 'ru'): string {
     '- confirmed: a real defect in the panel code; name the file:line where it originates;',
     '- not-in-code: the code is fine, the cause is the environment (missing CLI, network, permissions, user data) or it cannot be reproduced from the code;',
     '- unclear: you could not decide.',
+    'A problem of kind user-report is a bug a HUMAN described in their own words (message = their text, panel route = the page they were on). Verify the claim against the code: confirmed only when you found the code that behaves as they say and it is a defect; not-in-code when the code does not do that or it is intended behaviour (explain why in rootCause, so the human reads the reason); unclear when you could not tell.',
     'Never edit anything. Never guess a location you did not read. Be brief: a few targeted searches per problem.',
     `Reply with ONE fenced block \`\`\`${BLOCK} holding a JSON array. One object per problem id you were given:`,
     '{"id": "<id>", "title": "...", "happened": "...", "rootCause": "...", "steps": "...", "verdict": "confirmed|not-in-code|unclear", "severity": "critical|high|medium|low", "location": "path/to/file.ts:123", "fix": "...", "sameAs": ""}',

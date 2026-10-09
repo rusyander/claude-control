@@ -8,14 +8,11 @@ import type { WatcherSummaryProps } from './WatcherSummary.types';
 /**
  * Сводка включённого наблюдателя: сколько работает, сколько потратил, что в
  * отчёте и почему он не может работать, если не может. Одна на индикатор и
- * карточку настроек — иначе две формулировки одного и того же разъехались бы.
+ * пульт страницы наблюдателя — иначе две формулировки одного и того же
+ * разъехались бы. Путь отчёта здесь не пишется: на странице он стоит над самим
+ * отчётом.
  */
-export function WatcherSummary({
-  status,
-  elapsed,
-  costUnit,
-  showReportPath = false,
-}: WatcherSummaryProps) {
+export function WatcherSummary({ status, elapsed, costUnit }: WatcherSummaryProps) {
   const { t, i18n } = useTranslation();
   const spend = watcherSpendText(status.spend, costUnit);
   const problem = status.problem;
@@ -45,16 +42,6 @@ export function WatcherSummary({
         <Typography variant="caption" color="subtle" as="span">
           {t('watcher.pending', { count: status.pending })}
         </Typography>
-      )}
-      {showReportPath && (
-        <Stack gap="var(--spacing-3xs)">
-          <Typography variant="caption" color="subtle" as="span">
-            {t('watcher.report')}
-          </Typography>
-          <Typography variant="body-sm" as="code" data-watcher-report-path>
-            {status.reportPath}
-          </Typography>
-        </Stack>
       )}
       {problem && (
         <Stack gap="var(--spacing-3xs)" role="status" data-watcher-problem={problem.problemCode}>

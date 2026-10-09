@@ -1,7 +1,7 @@
 /**
- * Состояние наблюдателя не прочиталось (ревью 28.09, F-302): карточка в
- * «Настройки → Общие» говорит почему и даёт «Повторить», а не стоит с
- * выключенным тумблером без единого слова.
+ * Состояние наблюдателя не прочиталось (ревью 28.09, F-302): пульт на его
+ * странице `/watcher` говорит почему и даёт «Повторить», а не стоит с
+ * запертой кнопкой «Запустить наблюдателя» без единого слова.
  *
  * `GET /api/watcher` отвечает 500, пока прогон не «починит» его; после
  * «Повторить» — живым состоянием «выключен». Любая запись — 501: наблюдатель
@@ -65,8 +65,8 @@ for (const theme of ['light', 'dark']) {
       : route.fulfill({ status: 500, json: { error: REASON } });
   });
   await bypassOnboarding(page);
-  await page.goto(`${BASE}/settings?tab=general`, { waitUntil: 'domcontentloaded' });
-  const card = page.locator('[data-watcher-card]');
+  await page.goto(`${BASE}/watcher`, { waitUntil: 'domcontentloaded' });
+  const card = page.locator('[data-watcher-control]');
   await card.waitFor({ timeout: 60_000 });
 
   const alert = card.getByRole('alert').filter({ hasText: REASON });
@@ -83,11 +83,11 @@ for (const theme of ['light', 'dark']) {
   if (hasRetry) {
     healed = true;
     await retry.click();
-    const toggle = card.getByRole('switch');
+    const start = card.locator('[data-watcher-start]');
     const live = await page
       .waitForFunction(
         () => {
-          const element = document.querySelector('[data-watcher-card] [role="switch"]');
+          const element = document.querySelector('[data-watcher-control] [data-watcher-start]');
           return element && !element.hasAttribute('disabled');
         },
         undefined,
@@ -97,8 +97,8 @@ for (const theme of ['light', 'dark']) {
       .catch(() => false);
     check(
       live && (await alert.count()) === 0,
-      `${theme}: после «Повторить» тумблер живой, сбоя больше нет`,
-      `тумблер ${(await toggle.isDisabled().catch(() => true)) ? 'заперт' : 'живой'}`,
+      `${theme}: после «Повторить» кнопка запуска живая, сбоя больше нет`,
+      `кнопка ${(await start.isDisabled().catch(() => true)) ? 'заперта' : 'живая'}`,
     );
   }
   check(blocked.length === 0, `${theme}: записей не было`, blocked.join(', '));

@@ -16,10 +16,11 @@ import { object, string, number, boolean, enum as zodEnum, type infer as Infer }
  */
 
 /**
- * Откуда пришёл сигнал: сама панель (сервер), её страница в браузере или
- * модель (замечание, найденное при сверке с кодом).
+ * Откуда пришёл сигнал: сама панель (сервер), её страница в браузере,
+ * модель (замечание, найденное при сверке с кодом) или человек, описавший
+ * баг своими словами.
  */
-export const WATCH_SIGNAL_SOURCES = ['server', 'client', 'model'] as const;
+export const WATCH_SIGNAL_SOURCES = ['server', 'client', 'model', 'user'] as const;
 export type WatchSignalSource = (typeof WATCH_SIGNAL_SOURCES)[number];
 
 /**
@@ -61,6 +62,11 @@ export const WATCH_SIGNAL_KINDS = [
   'stuck-loading',
   /** Замечание модели: дефект логики рядом со сбоем, найденный при сверке. */
   'remark',
+  /**
+   * Баг, описанный человеком в окне наблюдателя. В отчёт ложится, только если
+   * модель подтвердила его по коду: неподтверждённая жалоба — не находка.
+   */
+  'user-report',
 ] as const;
 export type WatchSignalKind = (typeof WATCH_SIGNAL_KINDS)[number];
 
@@ -106,6 +112,44 @@ export const watchClientSignalSchema = object({
   durationMs: number().int().min(0).max(86_400_000).optional(),
 });
 export type WatchClientSignal = Infer<typeof watchClientSignalSchema>;
+
+/** Тело `POST /api/watcher/reports`: баг словами человека и где он его видел. */
+export const watchUserReportSchema = object({
+  text: string().trim().min(3).max(4000),
+  /** Маршрут страницы, с которой отправили, — подсказка модели, где искать. */
+  route: string().max(300).optional(),
+});
+export type WatchUserReport = Infer<typeof watchUserReportSchema>;
+
+/**
+ * Проверка бага, присланного человеком: `checking` — ждёт модели;
+ * `confirmed` — дефект есть, раздел `ref` лежит в отчёте; `rejected` — по коду
+ * дефекта нет; `unclear` — модель не решила; `failed` — разбор не удался.
+ * В отчёт попадает только `confirmed`.
+ */
+export const WATCH_USER_CHECK_STATES = [
+  'checking',
+  'confirmed',
+  'rejected',
+  'unclear',
+  'failed',
+] as const;
+export type WatchUserCheckState = (typeof WATCH_USER_CHECK_STATES)[number];
+
+export interface WatchUserCheck {
+  /** Отпечаток сигнала — тот же id, что у раздела отчёта, если его подтвердят. */
+  id: string;
+  text: string;
+  route?: string;
+  at: string;
+  state: WatchUserCheckState;
+  /** `WR-n` подтверждённого раздела. */
+  ref?: string;
+  /** Заголовок, который дала модель. */
+  title?: string;
+  /** Почему так решила модель или почему разбор не удался — на языке панели. */
+  reason?: string;
+}
 
 /** Тело `POST /api/watcher`: включить или выключить. */
 export const watcherToggleBodySchema = object({ enabled: boolean() });
@@ -185,4 +229,31 @@ export interface WatcherStatus {
   /** Абсолютный путь отчёта — его человек и пересылает. */
   reportPath: string;
   problem?: WatcherProblem;
+  /** Баги, присланные человеком, — свежие первыми, не больше десяти. */
+  checks?: WatchUserCheck[];
+}
+
+/** Раздел отчёта для страницы: метка раздела и его текст в Markdown. */
+export interface WatchReportSection {
+  id: string;
+  ref: string;
+  entryClass: WatchEntryClass;
+  severity: WatchSeverity;
+  verdict: WatchVerdict;
+  count: number;
+  first: string;
+  last: string;
+  title: string;
+  location?: string;
+  /** Тело раздела без заголовка и меток — Markdown как в файле. */
+  body: string;
+}
+
+/** Ответ `GET /api/watcher/report`. */
+export interface WatchReportView {
+  path: string;
+  exists: boolean;
+  /** Когда файл менялся последний раз (ISO). */
+  updatedAt?: string;
+  sections: WatchReportSection[];
 }

@@ -1,4 +1,5 @@
 import type { AgentImage } from './agent-images';
+import type { ServerMessageCode, ServerMessageNestedParams } from './server-messages.ts';
 import { PANEL_MANAGE_TEXT_PARAMS } from './panel-agent-texts-manage.ts';
 import { TESTS_BLOCK_TEXT_PARAMS } from './panel-agent-texts-tests.ts';
 import { GROUPS_ENTITIES_TEXT_PARAMS } from './panel-agent-texts-groups-entities.ts';
@@ -744,7 +745,17 @@ export type PanelAgentRunEvent =
   | { kind: 'tool'; name: string }
   | { kind: 'tool-result'; name: string; isError: boolean }
   | { kind: 'done'; reply: string }
-  | { kind: 'error'; message: string };
+  /**
+   * `message` — русский текст сервера; `messageCode` + `params` — тот же текст
+   * кодом, если сервер узнал свою строку. Слова самого CLI (stderr) кода не
+   * получают, и окно показывает их как есть.
+   */
+  | {
+      kind: 'error';
+      message: string;
+      messageCode?: ServerMessageCode;
+      params?: ServerMessageNestedParams;
+    };
 
 /** Файл разговора `<appData>/panel-agent/<id>.json`. */
 export interface PanelAgentConversation {

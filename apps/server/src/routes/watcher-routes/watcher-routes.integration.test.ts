@@ -82,4 +82,51 @@ describe('маршруты фонового наблюдателя', () => {
     expect(forged.statusCode).toBe(400);
     expect(existsSync(report())).toBe(false);
   });
+
+  it('баг словами человека: выключен — 409 с кодом, включён — проверка, отчёт не тронут', async () => {
+    const payload = { text: 'Кнопка «Принять» не меняет карточку', route: '/chat' };
+    const off = await app.inject({ method: 'POST', url: '/api/watcher/reports', payload });
+    expect(off.statusCode).toBe(409);
+    expect(off.json().messageCode).toBe('watcher-off');
+
+    await app.inject({ method: 'POST', url: '/api/watcher', payload: { enabled: true } });
+    const short = await app.inject({
+      method: 'POST',
+      url: '/api/watcher/reports',
+      payload: { text: ' a ' },
+    });
+    expect(short.statusCode).toBe(400);
+
+    const on = await app.inject({ method: 'POST', url: '/api/watcher/reports', payload });
+    expect(on.statusCode).toBe(200);
+    expect(on.json().check).toMatchObject({ state: 'checking', route: '/chat' });
+    // Жалоба — ещё не находка: раздела нет, пока модель её не подтвердит.
+    expect(existsSync(report())).toBe(false);
+    const status = (await app.inject({ url: '/api/watcher' })).json<WatcherStatus>();
+    expect(status.checks?.map((check) => check.state)).toEqual(['checking']);
+  });
+
+  it('отчёт для страницы: нет файла — пусто, есть — разделы с телом без заголовка', async () => {
+    const empty = (await app.inject({ url: '/api/watcher/report' })).json();
+    expect(empty).toEqual({ path: report(), exists: false, sections: [] });
+
+    await app.inject({ method: 'POST', url: '/api/watcher', payload: { enabled: true } });
+    await app.inject({
+      method: 'POST',
+      url: '/api/watcher/events',
+      payload: { kind: 'window-error', message: 'x is not a function', route: '/settings' },
+    });
+    const view = (await app.inject({ url: '/api/watcher/report' })).json();
+    expect(view.exists).toBe(true);
+    expect(view.sections).toHaveLength(1);
+    expect(view.sections[0]).toMatchObject({ ref: 'WR-1', verdict: 'pending', count: 1 });
+    expect(view.sections[0].body).not.toMatch(/^## /m);
+    expect(view.sections[0].body).not.toContain('<!--');
+    expect(view.sections[0].body).toContain('x is not a function');
+    // Строки шапки, что карточка рисует из меток, из тела убраны; тип с источником — нет.
+    expect(view.sections[0].body).not.toMatch(
+      /\*\*(?:Важность|Статус|Место в коде|Повторов|Отпечаток|Severity|Status|Location in code|Repeats|Fingerprint):\*\*/,
+    );
+    expect(view.sections[0].body).toMatch(/\*\*(?:Тип|Type):\*\*/);
+  });
 });

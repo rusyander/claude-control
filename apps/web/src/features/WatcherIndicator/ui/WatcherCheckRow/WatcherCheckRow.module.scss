@@ -1,0 +1,36 @@
+.row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--spacing-3xs) var(--spacing-xs);
+  border-radius: 8px;
+  background: var(--color-surface-sunken);
+}
+
+// Текст человека — одной строкой: целиком он в подсказке.
+.text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.state {
+  font-weight: 500;
+}
+
+.checking {
+  color: var(--color-fg-muted);
+}
+
+.confirmed {
+  color: var(--color-success);
+}
+
+.rejected,
+.unclear {
+  color: var(--color-fg-muted);
+}
+
+.failed {
+  color: var(--color-danger);
+}

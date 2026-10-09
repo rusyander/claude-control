@@ -65,7 +65,7 @@ describe('orderHubGroups', () => {
     expect(titles(orderHubGroups(groups))).toEqual(['Б', 'Г', 'Е', 'А', 'Д', 'В']);
   });
 
-  it('принятая, но не влитая группа стоит выше влитых и закрытых (владелец 06.10)', () => {
+  it('принятая, но не влитая — ниже доставленных и выше влитых и закрытых (владелец 06.10, 09.10)', () => {
     const groups = [
       row('влит-1', { status: 'done', mrClosed: 'merged' }),
       row('закрыт', { status: 'done', mrClosed: 'closed' }),
@@ -77,11 +77,37 @@ describe('orderHubGroups', () => {
       row('доставлена', { status: 'done' }),
     ];
     expect(titles(orderHubGroups(groups))).toEqual([
-      'принята',
       'доставлена',
+      'принята',
       'влит-1',
       'закрыт',
       'влит-2',
+    ]);
+  });
+
+  it('«Принять» опускает группу под доставленные, «Снять отметку» возвращает (владелец 09.10)', () => {
+    const accepted = { parentChatId: 'p', index: 0, acceptedAt: 'x' };
+    const plan = (first: Partial<ChildStageGroup>) => [
+      row('А', { status: 'done', ...first }),
+      row('Б', { status: 'done' }),
+      row('В', { isRunning: true }),
+    ];
+    expect(titles(orderHubGroups(plan({})))).toEqual(['В', 'А', 'Б']);
+    expect(titles(orderHubGroups(plan({ acceptance: accepted })))).toEqual(['В', 'Б', 'А']);
+  });
+
+  it('отменённая планом и с убранной копией — внизу, вместе с влитыми', () => {
+    const groups = [
+      row('отменена', { status: 'failed', errorCode: 'split-group-plan-cancelled' }),
+      row('копия убрана', { status: 'done', copy: { index: 1, cleaned: 'kept' } }),
+      row('доставлена', { status: 'done' }),
+      row('влита', { mrClosed: 'merged' }),
+    ];
+    expect(titles(orderHubGroups(groups))).toEqual([
+      'доставлена',
+      'отменена',
+      'копия убрана',
+      'влита',
     ]);
   });
 

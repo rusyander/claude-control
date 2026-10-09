@@ -548,7 +548,7 @@ function permissionVerdict(item: PermissionItem, profile: TargetProfile): Fideli
     // Правило, которого словарь цели не выражает, перевод НЕ ПИШЕТ
     // (`permissions-map.ts`) — обещать здесь «нативно» значило бы сказать
     // человеку, что запрет действует, когда его нет в файле.
-    if (grammarRefusal(item.rule, profile.permissions.grammar)) {
+    if (grammarRefusal(item.rule, profile.permissions.grammar, item.decision)) {
       return degraded(profile, 'rule_unexpressible', true);
     }
     if (profile.permissions.decisions.includes(item.decision)) {

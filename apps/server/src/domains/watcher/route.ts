@@ -7,7 +7,7 @@ import {
 } from '../../lib/server-texts/server-texts.ts';
 import { claudeProvider } from '../../providers/claude.ts';
 import { getActiveProvider } from '../../providers/registry.ts';
-import { contourUnreachable, resolvePanelAgentLaunch } from '../panel-agent/launch.ts';
+import { claudeContourEnv, contourUnreachable } from '../panel-agent/launch.ts';
 
 /**
  * Чем пойдёт разбор фонового наблюдателя — решение ДО запуска, без сети и без
@@ -17,15 +17,19 @@ import { contourUnreachable, resolvePanelAgentLaunch } from '../panel-agent/laun
  * бы CLI ни был активен и куда бы ни шёл «Ассистент панели»: человек, сведший
  * панель в контур, получал разбор кода панели мимо контура. Теперь:
  *
- * - активен чужой CLI — честный отказ: запуск «только чтение» (`--tools`,
- *   `--allowedTools`, снятие слоёв) описан и проверен лишь у Claude Code, а
- *   подставить Claude вместо выбранного CLI значит уйти туда, куда человек не
- *   звал;
+ * - разбор всегда запускает `claude`: запуск «только чтение» (`--tools`,
+ *   `--allowedTools`, снятие слоёв) описан и проверен лишь у Claude Code;
  * - Claude без профиля ассистента — прежний путь, облако вендора по подписке;
+ *   Claude, уведённый переключателем на локальную модель, — его окружением;
  * - профиль контура — окружение ОДНОГО процесса тем же построителем, что у
- *   агента панели (`resolvePanelAgentLaunch`), и без `--model`: дешёвую ступень
+ *   агента панели (`claudeContourEnv`), и без `--model`: дешёвую ступень
  *   вендора контур отклонил бы 403 «модель», модель задаёт профиль;
- * - свой эндпоинт — отказ: его токен пришлось бы отдать процессу CLI.
+ * - свой эндпоинт — отказ: его токен пришлось бы отдать процессу CLI;
+ * - активен чужой CLI — решает, КУДА уйдёт разбор (владелец 09.10.2026: «выбран
+ *   Qwen на локальной модели — наблюдатель тоже идёт через Qwen»). Контур или
+ *   локальная модель — разбор идёт: отвечает та же модель, что у агентов, и
+ *   код панели не покидает выбранного маршрута. Облако Claude — честный отказ:
+ *   подставить его вместо выбранного CLI значит уйти туда, куда человек не звал.
  */
 
 export interface WatcherRouteDeps {
@@ -60,9 +64,7 @@ function refuse(messageCode: ServerTextCode, params: TextParams): WatcherRoute {
 
 export function resolveWatcherRoute(deps: WatcherRouteDeps): WatcherRoute {
   const provider = getActiveProvider(deps.store);
-  if (provider.id !== claudeProvider.id) {
-    return refuse('watcher-provider-unsupported', { provider: provider.name });
-  }
+  const foreign = provider.id !== claudeProvider.id;
   const settings = deps.store.getSettings();
   const profile = settings.assistantEndpointId
     ? (settings.endpointProfiles ?? []).find((item) => item.id === settings.assistantEndpointId)
@@ -70,7 +72,15 @@ export function resolveWatcherRoute(deps: WatcherRouteDeps): WatcherRoute {
   // Выбранного профиля больше нет — как у ассистента: облако вендора по умолчанию.
   // Уведённый переключателем Claude — его окружением: `--model haiku` наблюдателя
   // переводит в локальную модель `ANTHROPIC_DEFAULT_HAIKU_MODEL` того же набора.
-  if (!profile) return { ok: true, env: deps.claudeSwitchEnv?.() ?? {}, viaContour: false };
+  if (!profile) {
+    const env = deps.claudeSwitchEnv?.() ?? {};
+    // Переключатель пишет адрес только локального сервера: есть адрес — разбор
+    // уходит в локальную модель, нет — в облако Claude, куда чужой CLI не звал.
+    if (foreign && !env.ANTHROPIC_BASE_URL) {
+      return refuse('watcher-provider-unsupported', { provider: provider.name });
+    }
+    return { ok: true, env, viaContour: false };
+  }
   if (!profile.ownerPlatformId)
     return refuse('watcher-endpoint-unsupported', { name: profile.name });
 
@@ -83,17 +93,15 @@ export function resolveWatcherRoute(deps: WatcherRouteDeps): WatcherRoute {
       { title: down.title },
     );
   }
-  // Окружение — тем же построителем, что у агента панели: два построителя одного
-  // маршрута разошлись бы на первом же новом поле профиля.
-  const launch = resolvePanelAgentLaunch({
-    ...deps,
-    // CLI наблюдатель ищет сам (`resolveCommand`); здесь важно только окружение.
-    detect: () => true,
-  });
-  if (!launch.ok) {
-    return refuse('assistant-route-refused', { reason: launch.message });
+  // Окружение — тем же построителем, что у агента панели, но без его проверки
+  // активного CLI: агент идёт CLI человека, а разбор — всегда `claude`.
+  const env = claudeContourEnv(profile, profile.ownerPlatformId, deps.gatewayPort());
+  if (!env) {
+    return refuse('assistant-route-refused', {
+      reason: 'У Claude Code не описан адрес шлюза — контур не применить.',
+    });
   }
-  return { ok: true, env: launch.env, viaContour: true };
+  return { ok: true, env, viaContour: true };
 }
 
 /** Текст отказа на языке панели — в `detail` проблемы наблюдателя. */

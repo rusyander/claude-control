@@ -36,6 +36,7 @@ import { portabilityEn } from './en/topics/portability';
 import { phoneEn } from './en/topics/phone';
 import { localModelsEn } from './en/topics/localModels';
 import { kitEn } from './en/topics/kit';
+import { watcherEn } from './en/topics/watcher';
 
 /** Типизирован по русской версии: забыть ключ при переводе не получится. */
 export const helpEn: HelpSchema = {
@@ -151,6 +152,7 @@ export const helpEn: HelpSchema = {
     phone: phoneEn.shots,
     localModels: localModelsEn.shots,
     kit: kitEn.shots,
+    watcher: watcherEn.shots,
   },
 
   diagrams: {
@@ -214,6 +216,7 @@ export const helpEn: HelpSchema = {
     phone: phoneEn.topic,
     localModels: localModelsEn.topic,
     kit: kitEn.topic,
+    watcher: watcherEn.topic,
     platform: platformEn.topic,
     endpoints: endpointsEn.topic,
     providers: providersEn.topic,

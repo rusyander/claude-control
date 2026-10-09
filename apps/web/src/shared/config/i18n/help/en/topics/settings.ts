@@ -607,83 +607,6 @@ export const settingsEn: typeof settingsRu = {
         'by hand. Secret values are replaced with the __REDACTED__ marker, and the variable ' +
         'name is spelled out so that it is clear what to fill in on the new machine.',
     },
-    watcher: {
-      title: 'Background watcher: every panel problem into a report for the developer',
-      caption:
-        'A toggle on the General tab. While it is on, the panel records all of its own ' +
-        'problems, checks each one against its source code and adds remarks — all that is ' +
-        'left is to send the report to a person or hand it to another agent.',
-      on: 'Turn it on',
-      onText:
-        'Settings → General → the “Background watcher” card. Turned off, it collects nothing ' +
-        'and spends no tokens. Turned on, it survives a panel restart, and running time and ' +
-        'spend start from zero every time it is switched on.',
-      indicator: 'An indicator on every page',
-      indicatorText:
-        'While the watcher is on, the sidebar shows a “Watcher” row with its running time; ' +
-        'the tooltip reads “The agent is running in the background and collecting ' +
-        'information”, plus time and spend. A click opens a window: summary, “Turn off” and ' +
-        '“Go to settings” — the link leads to this card and focuses the toggle. Escape or a ' +
-        'click outside the window closes it, and focus returns to the line.',
-      report: 'What goes into the report',
-      reportText:
-        'Server: 5xx responses; 4xx responses that mean a bug in its own interface (400 and ' +
-        '422 — the body failed the schema, 404 on a path with no route, a 409 repeated three ' +
-        'times within a minute); log errors and warnings; responses slower than the ' +
-        'threshold (except streams — a chat, panel-agent or sandbox turn is long by nature); failed CLI launches and CLI runs that exited with an error, with the tail ' +
-        'of their stderr (provider errors arrive this way too, and the line naming the ' +
-        'cause sits right in the message). Page: errors and rejected promises, render crashes, ' +
-        'console errors and warnings (React ones included), requests the server never saw ' +
-        '(a network drop, or a 5xx the proxy or Vite answered while the server restarted), wrongly shaped replies (HTML instead of JSON), loading slower than ' +
-        'the threshold. Other 4xx are refusals on the merits, not failures. On top of that ' +
-        'the model writes remarks — defects it notices in the code nearby. One cause — one ' +
-        'section: a refusal reported by both the server and the page counts in one section, ' +
-        'and the model may merge a section it proves has the same cause. The watcher’s own ' +
-        'CLI runs never land in the report: a failed analysis is a problem on the card, not ' +
-        'a new section. A page under automation (the panel’s Playwright checks) does not ' +
-        'send request failures the server never saw: those are responses the check stubbed ' +
-        'and tabs it closed; its page and console errors are still sent.',
-      read: 'How to read the report',
-      readText:
-        'WATCH-REPORT.md in the app root — the card shows the path. On top sits an index ' +
-        'table: number WR-n, kind (failure or remark), severity, status, repeats, place, ' +
-        'gist. A section appears at once as “checking”; after analysis it gets a status ' +
-        '(confirmed in code, no cause in code, unclear), file and line, root cause, steps to ' +
-        'reproduce, how to fix, the evidence as it was (for a CLI — the last stderr lines) and ' +
-        'the repeat count with the first ' +
-        'and last time. The WR-n number never changes — refer to it (“fixed WR-12”). The file ' +
-        'is updated in place: notes outside the markers are left alone. Secrets are removed ' +
-        'before writing — in the report and in the request to the model. The report is ' +
-        'written in the panel interface language — the header and the model texts alike; ' +
-        'sections written before a switch keep their language until a repeat updates them.',
-      readOnly: 'The model only reads',
-      readOnlyText:
-        'A cheap Claude model analyses with the Read, Grep and Glob tools, working directory ' +
-        "= the panel's sources. The process environment is a narrow list of variables: " +
-        'service keys never reach it. Only Claude Code analyses: a read-only launch is ' +
-        'described for it alone. With another CLI active the analysis does not start and the ' +
-        'card names the reason — Claude is never substituted for the chosen CLI. A “Panel ' +
-        'assistant” on a contour sends the analysis through the contour gateway, and the ' +
-        'profile then sets the model instead of the vendor’s cheap tier; an own assistant ' +
-        'endpoint is refused — its token would have to be handed to a CLI process.',
-      spend: 'Spend',
-      spendText:
-        'Tokens of every analysis add up from the moment it was switched on. Money — when ' +
-        'the settings show spend in money — is an estimate at API rates, not a bill: on a ' +
-        'subscription nothing is charged. No problems — no model calls; problems are ' +
-        'analysed in batches, at most twelve analyses an hour — beyond the cap they wait, ' +
-        'and the card says so in words.',
-      trouble: 'When the watcher cannot work',
-      troubleText:
-        'No Claude Code on PATH — problems are written to the report without analysis. The ' +
-        'report cannot be written — the watcher keeps going and names the reason. An ' +
-        'analysis failed — problems wait for the next one; the analysis does not retry in a ' +
-        'loop. The hourly cap is reached — problems are written as “checking” and the ' +
-        'analysis resumes on its own. The route does not let the analysis run (another CLI, ' +
-        'an own assistant endpoint, the contour gateway down or no key) — problems wait, no ' +
-        'process starts and the cap is not spent. In every case the reason is spelled out in the card ' +
-        "and in the indicator's window.",
-    },
     globalLayer: {
       title: 'Global layer: which copy of a mechanism is better — the panel or your hooks',
       caption:
@@ -736,14 +659,6 @@ export const settingsEn: typeof settingsRu = {
         'The mark for an edited layer file on the open page and the new verdict after the automatic comparison',
       '04-proposal':
         'The agent’s proposal: the diff of the layer file and the “Write to the global layer” button',
-    },
-    watcher: {
-      '01-card-off':
-        'The “Background watcher” card turned off: the toggle, what it collects and what goes into the report',
-      '02-card-on':
-        'The watcher on after its first failure: running time, spend, a finding in the report and the file path',
-      '03-indicator':
-        'The “Watcher” row in the sidebar and its window: summary, “Turn off” and “Go to settings”',
     },
     'first-run': {
       '01-wizard-intro':

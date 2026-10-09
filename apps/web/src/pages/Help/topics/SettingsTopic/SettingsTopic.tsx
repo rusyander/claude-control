@@ -4,7 +4,6 @@ import { PriorityLadder } from '@shared/ui/diagram';
 import { HelpSection, FieldTable, Callout, OptionCards } from '../../ui';
 import { SettingsGuideSections } from '../SettingsGuideSections/SettingsGuideSections';
 import { SettingsLimitsSections } from '../SettingsLimitsSections/SettingsLimitsSections';
-import { SettingsWatcherSection } from '../SettingsWatcherSection/SettingsWatcherSection';
 import { SettingsGlobalLayerSection } from '../SettingsGlobalLayerSection/SettingsGlobalLayerSection';
 
 /**
@@ -41,8 +40,6 @@ export function SettingsTopic() {
       </HelpSection>
 
       <SettingsGuideSections tr={tr} />
-
-      <SettingsWatcherSection tr={tr} />
 
       <SettingsGlobalLayerSection tr={tr} />
 

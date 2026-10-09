@@ -10,12 +10,12 @@ export function toOpencodeFormState(data: OpencodePermissionInfo): OpencodeFormS
   const choices: Record<string, OpencodeToolChoice> = {};
   for (const tool of data.tools) choices[tool] = 'unset';
 
-  let patterns: OpencodePatternRow[] = [];
+  const patterns: Record<string, OpencodePatternRow[]> = {};
   let nextId = 0;
   for (const entry of data.entries) {
     if (entry.mode === 'patterns') {
       choices[entry.tool] = 'patterns';
-      patterns = (entry.patterns ?? []).map((rule) => ({
+      patterns[entry.tool] = (entry.patterns ?? []).map((rule) => ({
         id: nextId++,
         pattern: rule.pattern,
         level: rule.level,

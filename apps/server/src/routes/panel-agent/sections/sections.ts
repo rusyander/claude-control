@@ -50,6 +50,12 @@ export const PANEL_SECTIONS: readonly PanelSection[] = [
       'transfer',
     ],
   },
+  {
+    route: '/watcher',
+    title: 'Watcher',
+    description:
+      'Background watcher: start/stop, spend, bug described in words checked against the code, WATCH-REPORT.md by section',
+  },
   { route: '/dlp', title: 'Data protection', description: 'Local DLP proxy and its rules' },
   {
     route: '/local-models',

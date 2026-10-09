@@ -43,6 +43,7 @@ import { portabilityRu } from './ru/topics/portability';
 import { phoneRu } from './ru/topics/phone';
 import { localModelsRu } from './ru/topics/localModels';
 import { kitRu } from './ru/topics/kit';
+import { watcherRu } from './ru/topics/watcher';
 export const helpRu = {
   index: {
     subtitle: 'Как работает каждый раздел панели',
@@ -165,6 +166,7 @@ export const helpRu = {
     phone: phoneRu.shots,
     localModels: localModelsRu.shots,
     kit: kitRu.shots,
+    watcher: watcherRu.shots,
   },
 
   /**
@@ -234,6 +236,7 @@ export const helpRu = {
     phone: phoneRu.topic,
     localModels: localModelsRu.topic,
     kit: kitRu.topic,
+    watcher: watcherRu.topic,
     platform: platformRu.topic,
     endpoints: endpointsRu.topic,
     providers: providersRu.topic,

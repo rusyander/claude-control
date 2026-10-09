@@ -716,4 +716,7 @@ export const ROUTE_LEDGER: RouteLedger = {
   'GET /api/watcher': 'action:watcher_status',
   'POST /api/watcher': 'action:set_watcher',
   'POST /api/watcher/events': 'internal:ui-state',
+  // Баг словами человека и отчёт страницей (09.10.2026): действий агента под них нет.
+  'POST /api/watcher/reports': 'gap:P3',
+  'GET /api/watcher/report': 'gap:P3',
 };

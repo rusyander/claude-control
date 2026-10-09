@@ -65,11 +65,14 @@ export const OPENCODE_PERMISSION_LEVELS = ['allow', 'deny', 'ask'] as const;
 export type OpencodePermissionLevel = (typeof OPENCODE_PERMISSION_LEVELS)[number];
 
 /**
- * Инструменты OpenCode, у которых уровень прав ЗАДОКУМЕНТИРОВАН: правка файлов,
- * запуск команд оболочки и загрузка страниц. Прочие ключи внутри `permission`
- * панель не ведёт — они сохраняются как есть и показываются только для чтения.
+ * Инструменты OpenCode, у которых панель ведёт уровень прав: правка файлов,
+ * запуск команд оболочки, загрузка страниц и чтение файлов. `read` в
+ * документации не назван, но OpenCode его применяет — живая проба 09.10.2026
+ * (OpenCode 1.18.35): карта шаблонов сверяется с АБСОЛЮТНЫМ путём файла.
+ * Прочие ключи внутри `permission` панель не ведёт — они сохраняются как есть и
+ * показываются только для чтения.
  */
-export const OPENCODE_PERMISSION_TOOLS = ['edit', 'bash', 'webfetch'] as const;
+export const OPENCODE_PERMISSION_TOOLS = ['edit', 'bash', 'webfetch', 'read'] as const;
 export type OpencodePermissionTool = (typeof OPENCODE_PERMISSION_TOOLS)[number];
 
 /** Режимы аппрувов Goose: значение корневого ключа `GOOSE_MODE`. */

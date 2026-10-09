@@ -5,7 +5,6 @@ import { Card } from '@shared/ui/card';
 import { Button } from '@shared/ui/button';
 import { ACCENT_OPTIONS, accentLabelKey } from '@shared/lib/accent';
 import { EditorCard } from '../EditorCard/EditorCard';
-import { WatcherCard } from '../WatcherCard/WatcherCard';
 import { SettingToggleRow } from '../SettingToggleRow/SettingToggleRow';
 import type { SettingsTabProps } from '../SettingsTabs.types';
 
@@ -104,8 +103,6 @@ export function GeneralTab({ settings, patch }: SettingsTabProps) {
       </Card>
 
       <EditorCard />
-
-      <WatcherCard costUnit={settings.costUnit} />
     </Stack>
   );
 }

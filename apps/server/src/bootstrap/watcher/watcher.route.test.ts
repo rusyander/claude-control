@@ -27,7 +27,7 @@ describe('сборка наблюдателя — маршрут разбора'
       () => 0,
     );
 
-  it('активен чужой CLI — маршрут отказывает кодом с именем CLI', () => {
+  it('активен чужой CLI, маршрут в облако Claude — отказ кодом с именем CLI', () => {
     store.updateSettings({ provider: 'qwen' });
     expect(deps().resolveRoute?.()).toMatchObject({
       ok: false,

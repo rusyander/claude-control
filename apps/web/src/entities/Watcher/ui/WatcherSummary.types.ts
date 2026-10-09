@@ -6,6 +6,4 @@ export interface WatcherSummaryProps {
   elapsed: number;
   /** Единицы расхода из настроек панели. */
   costUnit: 'tokens' | 'money';
-  /** Показать путь отчёта (карточка настроек — да, окно индикатора — нет). */
-  showReportPath?: boolean;
 }

@@ -249,7 +249,8 @@ export const panelAgentEn: typeof panelAgentRu = {
       'the whole panel, chat and the agent itself change. The shared group rules, the watcher, ' +
       'the model catalog page by page, the CLI format check, the account and the CLI version ' +
       'the agent reads. Changing the group rule numbers and switching the watcher on or off — ' +
-      'change: the watcher spends quota in the background. Group permissions and group ' +
+      'change: the watcher spends quota in the background; afterwards the Watcher page opens. ' +
+      'Group permissions and group ' +
       'questions are changed only by you. Updating the CLI — danger; the result names the ' +
       'version after the update. ' +
       'Model prices, code editors, where Claude Code’s account access comes from (the key ' +
@@ -735,6 +736,9 @@ export const panelAgentEn: typeof panelAgentRu = {
         'window writes that mark in the interface language — “The answer was not finished. ' +
         '<reason>” and “Actions performed: …”, a failed action marked “(failed)” — while the ' +
         'conversation file keeps the same tail in English for the model. ' +
+        'The reason a turn failed — a stop, an extra tool from the CLI, a refused picture, the CLI exit ' +
+        'code — is also written in the interface language in the window and on the phone; the CLI’s own ' +
+        'words are shown as they are. ' +
         'The bin next to a row deletes the conversation after a confirmation in the row itself; the ' +
         'action trail stays. The open conversation cannot be deleted while the agent answers. ' +
         'A tab keeps its conversation across F5: the window brings it back on its own. If the reload ' +

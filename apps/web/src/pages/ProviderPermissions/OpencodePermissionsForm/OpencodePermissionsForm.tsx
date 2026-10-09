@@ -23,11 +23,11 @@ import type { OpencodePermissionsFormProps } from '../ProviderPermissionsForm.ty
  * Одна и та же на глобальный раздел и на таб проекта: отличается только шапка,
  * поэтому она приходит снаружи (`header`), а состояние и правила живут здесь.
  *
- * У каждого задокументированного инструмента (`edit`, `bash`, `webfetch`) свой
- * выбор: «не задано» (ключа в файле нет — OpenCode ничего не ограничивает) либо
- * уровень `allow` / `ask` / `deny`. У `bash` дополнительно есть расширенная форма
- * — СПИСОК ШАБЛОНОВ команд («git push *» → deny), она задокументирована именно
- * для него.
+ * У каждого инструмента (`edit`, `bash`, `webfetch`, `read`) свой выбор: «не
+ * задано» (ключа в файле нет — OpenCode ничего не ограничивает) либо уровень
+ * `allow` / `ask` / `deny`. У `bash` и `read` дополнительно есть расширенная
+ * форма — СПИСОК ШАБЛОНОВ: команд («git push *» → deny) и путей файлов
+ * («**» и косая перед «.env» → deny); у каждого из двух свой список.
  *
  * Записи внутри `permission`, которых панель не ведёт (чужие имена инструментов,
  * непонятая форма значения), показываются отдельной карточкой ТОЛЬКО ДЛЯ ЧТЕНИЯ:
@@ -54,31 +54,39 @@ export function OpencodePermissionsForm({ data, header, onSave }: OpencodePermis
       // Переход на шаблоны с пустым списком — сразу даём одну строку с `*`,
       // чтобы правило по умолчанию было видно и не пришлось угадывать формат.
       patterns:
-        choice === 'patterns' && prev.patterns.length === 0
-          ? [{ id: 0, pattern: '*', level: 'ask' }]
+        choice === 'patterns' && (prev.patterns[tool] ?? []).length === 0
+          ? { ...prev.patterns, [tool]: [{ id: 0, pattern: '*', level: 'ask' }] }
           : prev.patterns,
     }));
   };
 
-  const patchRow = (id: number, patch: Partial<OpencodePatternRow>): void => {
+  const setRows = (
+    tool: OpencodePermissionTool,
+    change: (rows: OpencodePatternRow[]) => OpencodePatternRow[],
+  ): void => {
     setState((prev) => ({
       ...prev,
-      patterns: prev.patterns.map((row) => (row.id === id ? { ...row, ...patch } : row)),
+      patterns: { ...prev.patterns, [tool]: change(prev.patterns[tool] ?? []) },
     }));
   };
 
-  const addRow = (): void => {
-    setState((prev) => ({
-      ...prev,
-      patterns: [
-        ...prev.patterns,
-        { id: Math.max(0, ...prev.patterns.map((row) => row.id)) + 1, pattern: '', level: 'ask' },
-      ],
-    }));
+  const patchRow = (
+    tool: OpencodePermissionTool,
+    id: number,
+    patch: Partial<OpencodePatternRow>,
+  ): void => {
+    setRows(tool, (rows) => rows.map((row) => (row.id === id ? { ...row, ...patch } : row)));
   };
 
-  const removeRow = (id: number): void => {
-    setState((prev) => ({ ...prev, patterns: prev.patterns.filter((row) => row.id !== id) }));
+  const addRow = (tool: OpencodePermissionTool): void => {
+    setRows(tool, (rows) => [
+      ...rows,
+      { id: Math.max(0, ...rows.map((row) => row.id)) + 1, pattern: '', level: 'ask' },
+    ]);
+  };
+
+  const removeRow = (tool: OpencodePermissionTool, id: number): void => {
+    setRows(tool, (rows) => rows.filter((row) => row.id !== id));
   };
 
   const levelOptions = data.levels.map((level) => ({
@@ -128,7 +136,7 @@ export function OpencodePermissionsForm({ data, header, onSave }: OpencodePermis
             ];
 
             return (
-              <Stack key={tool} gap="var(--spacing-2xs)">
+              <Stack key={tool} gap="var(--spacing-2xs)" data-opencode-tool={tool}>
                 <SelectField
                   label={t(`providerPermissions.opencode.tool.${tool}.label`)}
                   value={choice}
@@ -146,14 +154,16 @@ export function OpencodePermissionsForm({ data, header, onSave }: OpencodePermis
 
                 {choice === 'patterns' && (
                   <Stack gap="var(--spacing-xs)" padding="var(--spacing-xs) 0 0 0">
-                    {state.patterns.map((row) => (
+                    {(state.patterns[tool] ?? []).map((row) => (
                       <Stack key={row.id} direction="row" align="end" gap="var(--spacing-xs)" wrap>
                         <Stack flex={1} minWidth={0}>
                           <TextField
                             label={t('providerPermissions.opencode.patterns.pattern')}
                             value={row.pattern}
-                            onChange={(value) => patchRow(row.id, { pattern: value })}
-                            placeholder={t('providerPermissions.opencode.patterns.placeholder')}
+                            onChange={(value) => patchRow(tool, row.id, { pattern: value })}
+                            placeholder={t(
+                              `providerPermissions.opencode.patterns.${tool}.placeholder`,
+                            )}
                             isMono
                             disabled={readOnly}
                           />
@@ -163,7 +173,7 @@ export function OpencodePermissionsForm({ data, header, onSave }: OpencodePermis
                             label={t('providerPermissions.opencode.patterns.level')}
                             value={row.level}
                             onChange={(value) =>
-                              patchRow(row.id, { level: value as OpencodePermissionLevel })
+                              patchRow(tool, row.id, { level: value as OpencodePermissionLevel })
                             }
                             options={levelOptions}
                           />
@@ -175,7 +185,7 @@ export function OpencodePermissionsForm({ data, header, onSave }: OpencodePermis
                             iconOnly
                             icon={<Icon name="trash" size={24} />}
                             aria-label={`${t('common.delete')}: ${row.pattern}`}
-                            onClick={() => removeRow(row.id)}
+                            onClick={() => removeRow(tool, row.id)}
                           />
                         )}
                       </Stack>
@@ -187,7 +197,7 @@ export function OpencodePermissionsForm({ data, header, onSave }: OpencodePermis
                           size="sm"
                           variant="secondary"
                           leftIcon={<Icon name="plus" size={20} />}
-                          onClick={addRow}
+                          onClick={() => addRow(tool)}
                         >
                           {t('providerPermissions.opencode.patterns.add')}
                         </Button>
@@ -195,7 +205,7 @@ export function OpencodePermissionsForm({ data, header, onSave }: OpencodePermis
                     )}
 
                     <Typography variant="caption" color="subtle">
-                      {t('providerPermissions.opencode.patterns.hint')}
+                      {t(`providerPermissions.opencode.patterns.${tool}.hint`)}
                     </Typography>
                   </Stack>
                 )}

@@ -1,0 +1,176 @@
+{
+  "topic": "watcher",
+  "scenario": "page",
+  "frames": [
+    {
+      "id": "01-page-off",
+      "side": "panel",
+      "file": "01-page-off.png",
+      "masked": 0,
+      "width": 1400,
+      "height": 1000,
+      "shotAt": "2026-10-09T15:35:32.587Z",
+      "text": "AgentDeck Свернуть панель Уведомления Агент панели Наблюдатель выкл Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 AGENTS.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Справка Наблюдатель Фоновый агент собирает проблемы панели и сверяет их с её кодом. Здесь его запускают, описывают найденный баг словами и читают отчёт. Фоновый наблюдатель Пока включён, панель собирает все свои проблемы: сервера — ответы 5xx и 4xx из-за ошибки своего же интерфейса, ошибки и предупреждения журнала, медленные ответы, упавшие и завершившиеся с ошибкой запуски CLI; страницы — ошибки, предупреждения консоли, неудавшиеся запросы, ответы не того вида, зависшие загрузки. Дешёвая модель сверяет каждую с исходным кодом панели и добавляет замечания о дефектах, замеченных рядом. Модель только читает код, ничего не правит. Запустить наблюдателя Каждая причина — один раздел отчёта с номером WR-n: тип (сбой или замечание), важность, статус сверки, место в коде, причина, шаги, как исправить, улики без секретов и число повторов; сверху — оглавление. Отчёт написан так, чтобы его мог подхватить другой агент. Разборов — не больше потолка в час; нет проблем — нет и трат. Выключенный наблюдатель не собирает ничего. Выключен Нашли баг сами? Описать баг словами можно, когда наблюдатель запущен: проверяет его модель наблюдателя. Отчёт Всё, что наблюдатель нашёл и сверил с кодом панели: сбои, замечания и баги, подтверждённые по вашим описаниям. Тот же файл, что пересылают агенту. Файл: …/agentdeck/WATCH-REPORT.md Отчёт пуст Файла ещё нет — он появится с первой находкой наблюдателя.",
+      "en": {
+        "file": "01-page-off.en.png",
+        "masked": 0,
+        "width": 1400,
+        "height": 1000,
+        "shotAt": "2026-10-09T15:35:59.100Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Watcher off Main Overview Search Analytics Chat Agent behaviour Rules 0 AGENTS.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Help Watcher A background agent collects the panel’s problems and checks them against its code. Here you start it, describe a bug you found in words and read the report. Background watcher While on, the panel collects all of its own problems: on the server — 5xx and 4xx responses caused by its own interface, log errors and warnings, slow responses, CLI runs that failed or exited with an error; on the page — errors, console warnings, failed requests, wrongly shaped replies, stuck loading. A cheap model checks each one against the panel's source code and adds remarks about defects it notices nearby. The model only reads code and changes nothing. Start the watcher Each cause is one report section numbered WR-n: kind (failure or remark), severity, check status, place in the code, root cause, steps, how to fix, evidence with secrets removed and the number of repeats; an index sits on top. The report is written so another agent can pick it up. Analyses stay under an hourly cap; no problems — no spend. Turned off, the watcher collects nothing. Off Found a bug yourself? You can describe a bug in words once the watcher is running: its model does the check. Report Everything the watcher found and checked against the panel code: failures, remarks and bugs confirmed from your descriptions. The same file you hand to an agent. File: …/agentdeck/WATCH-REPORT.md The report is empty There is no file yet — it appears with the watcher’s first finding."
+      },
+      "dark": {
+        "file": "01-page-off.dark.png",
+        "masked": 0,
+        "width": 1400,
+        "height": 1000,
+        "shotAt": "2026-10-09T15:36:36.095Z",
+        "text": "AgentDeck Свернуть панель Уведомления Агент панели Наблюдатель выкл Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 AGENTS.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Справка Наблюдатель Фоновый агент собирает проблемы панели и сверяет их с её кодом. Здесь его запускают, описывают найденный баг словами и читают отчёт. Фоновый наблюдатель Пока включён, панель собирает все свои проблемы: сервера — ответы 5xx и 4xx из-за ошибки своего же интерфейса, ошибки и предупреждения журнала, медленные ответы, упавшие и завершившиеся с ошибкой запуски CLI; страницы — ошибки, предупреждения консоли, неудавшиеся запросы, ответы не того вида, зависшие загрузки. Дешёвая модель сверяет каждую с исходным кодом панели и добавляет замечания о дефектах, замеченных рядом. Модель только читает код, ничего не правит. Запустить наблюдателя Каждая причина — один раздел отчёта с номером WR-n: тип (сбой или замечание), важность, статус сверки, место в коде, причина, шаги, как исправить, улики без секретов и число повторов; сверху — оглавление. Отчёт написан так, чтобы его мог подхватить другой агент. Разборов — не больше потолка в час; нет проблем — нет и трат. Выключенный наблюдатель не собирает ничего. Выключен Нашли баг сами? Описать баг словами можно, когда наблюдатель запущен: проверяет его модель наблюдателя. Отчёт Всё, что наблюдатель нашёл и сверил с кодом панели: сбои, замечания и баги, подтверждённые по вашим описаниям. Тот же файл, что пересылают агенту. Файл: …/agentdeck/WATCH-REPORT.md Отчёт пуст Файла ещё нет — он появится с первой находкой наблюдателя."
+      },
+      "darkEn": {
+        "file": "01-page-off.dark.en.png",
+        "masked": 0,
+        "width": 1400,
+        "height": 1000,
+        "shotAt": "2026-10-09T15:37:02.575Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Watcher off Main Overview Search Analytics Chat Agent behaviour Rules 0 AGENTS.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Help Watcher A background agent collects the panel’s problems and checks them against its code. Here you start it, describe a bug you found in words and read the report. Background watcher While on, the panel collects all of its own problems: on the server — 5xx and 4xx responses caused by its own interface, log errors and warnings, slow responses, CLI runs that failed or exited with an error; on the page — errors, console warnings, failed requests, wrongly shaped replies, stuck loading. A cheap model checks each one against the panel's source code and adds remarks about defects it notices nearby. The model only reads code and changes nothing. Start the watcher Each cause is one report section numbered WR-n: kind (failure or remark), severity, check status, place in the code, root cause, steps, how to fix, evidence with secrets removed and the number of repeats; an index sits on top. The report is written so another agent can pick it up. Analyses stay under an hourly cap; no problems — no spend. Turned off, the watcher collects nothing. Off Found a bug yourself? You can describe a bug in words once the watcher is running: its model does the check. Report Everything the watcher found and checked against the panel code: failures, remarks and bugs confirmed from your descriptions. The same file you hand to an agent. File: …/agentdeck/WATCH-REPORT.md The report is empty There is no file yet — it appears with the watcher’s first finding."
+      }
+    },
+    {
+      "id": "02-control-on",
+      "side": "panel",
+      "file": "02-control-on.png",
+      "masked": 0,
+      "width": 1116,
+      "height": 393,
+      "shotAt": "2026-10-09T15:35:41.078Z",
+      "text": "Фоновый наблюдатель Пока включён, панель собирает все свои проблемы: сервера — ответы 5xx и 4xx из-за ошибки своего же интерфейса, ошибки и предупреждения журнала, медленные ответы, упавшие и завершившиеся с ошибкой запуски CLI; страницы — ошибки, предупреждения консоли, неудавшиеся запросы, ответы не того вида, зависшие загрузки. Дешёвая модель сверяет каждую с исходным кодом панели и добавляет замечания о дефектах, замеченных рядом. Модель только читает код, ничего не правит. Остановить Каждая причина — один раздел отчёта с номером WR-n: тип (сбой или замечание), важность, статус сверки, место в коде, причина, шаги, как исправить, улики без секретов и число повторов; сверху — оглавление. Отчёт написан так, чтобы его мог подхватить другой агент. Разборов — не больше потолка в час; нет проблем — нет и трат. Выключенный наблюдатель не собирает ничего. Работает 8с Расход: 15.8k tok · 1 разбор В отчёте 2 раздела, из них 1 замечание",
+      "en": {
+        "file": "02-control-on.en.png",
+        "masked": 0,
+        "width": 1116,
+        "height": 375,
+        "shotAt": "2026-10-09T15:36:07.591Z",
+        "text": "Background watcher While on, the panel collects all of its own problems: on the server — 5xx and 4xx responses caused by its own interface, log errors and warnings, slow responses, CLI runs that failed or exited with an error; on the page — errors, console warnings, failed requests, wrongly shaped replies, stuck loading. A cheap model checks each one against the panel's source code and adds remarks about defects it notices nearby. The model only reads code and changes nothing. Stop Each cause is one report section numbered WR-n: kind (failure or remark), severity, check status, place in the code, root cause, steps, how to fix, evidence with secrets removed and the number of repeats; an index sits on top. The report is written so another agent can pick it up. Analyses stay under an hourly cap; no problems — no spend. Turned off, the watcher collects nothing. Running 8s Spend: 15.8k tok · 1 analysis 2 sections in the report, 1 of them a remark"
+      },
+      "dark": {
+        "file": "02-control-on.dark.png",
+        "masked": 0,
+        "width": 1116,
+        "height": 393,
+        "shotAt": "2026-10-09T15:36:44.591Z",
+        "text": "Фоновый наблюдатель Пока включён, панель собирает все свои проблемы: сервера — ответы 5xx и 4xx из-за ошибки своего же интерфейса, ошибки и предупреждения журнала, медленные ответы, упавшие и завершившиеся с ошибкой запуски CLI; страницы — ошибки, предупреждения консоли, неудавшиеся запросы, ответы не того вида, зависшие загрузки. Дешёвая модель сверяет каждую с исходным кодом панели и добавляет замечания о дефектах, замеченных рядом. Модель только читает код, ничего не правит. Остановить Каждая причина — один раздел отчёта с номером WR-n: тип (сбой или замечание), важность, статус сверки, место в коде, причина, шаги, как исправить, улики без секретов и число повторов; сверху — оглавление. Отчёт написан так, чтобы его мог подхватить другой агент. Разборов — не больше потолка в час; нет проблем — нет и трат. Выключенный наблюдатель не собирает ничего. Работает 8с Расход: 15.8k tok · 1 разбор В отчёте 2 раздела, из них 1 замечание"
+      },
+      "darkEn": {
+        "file": "02-control-on.dark.en.png",
+        "masked": 0,
+        "width": 1116,
+        "height": 375,
+        "shotAt": "2026-10-09T15:37:11.057Z",
+        "text": "Background watcher While on, the panel collects all of its own problems: on the server — 5xx and 4xx responses caused by its own interface, log errors and warnings, slow responses, CLI runs that failed or exited with an error; on the page — errors, console warnings, failed requests, wrongly shaped replies, stuck loading. A cheap model checks each one against the panel's source code and adds remarks about defects it notices nearby. The model only reads code and changes nothing. Stop Each cause is one report section numbered WR-n: kind (failure or remark), severity, check status, place in the code, root cause, steps, how to fix, evidence with secrets removed and the number of repeats; an index sits on top. The report is written so another agent can pick it up. Analyses stay under an hourly cap; no problems — no spend. Turned off, the watcher collects nothing. Running 8s Spend: 15.8k tok · 1 analysis 2 sections in the report, 1 of them a remark"
+      }
+    },
+    {
+      "id": "03-indicator",
+      "side": "panel",
+      "file": "03-indicator.png",
+      "masked": 0,
+      "width": 1400,
+      "height": 1000,
+      "shotAt": "2026-10-09T15:35:45.165Z",
+      "text": "AgentDeck Свернуть панель Уведомления Агент панели Наблюдатель 13с Фоновый наблюдатель Агент работает в фоне и собирает информацию Работает 13с Расход: 15.8k tok · 1 разбор В отчёте 2 раздела, из них 1 замечание Выключить Открыть страницу Нашли баг сами? Опишите, что и где сломалось. Наблюдатель сверит это с кодом панели: в отчёт попадёт только подтверждённый дефект, а ответ появится здесь. Что сломалось Проверить Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 AGENTS.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Справка Правила Личные правила из CLAUDE.md — действуют во всех проектах Добавить правило Что это Правил пока нет Панель считает правилом только раздел с заголовком «## ПРАВИЛО: …» в CLAUDE.md — остальной текст файла она не трогает и в список не берёт. Добавьте первое правило кнопкой выше — с ним появятся вкладки «Включены» и «Выключены».",
+      "en": {
+        "file": "03-indicator.en.png",
+        "masked": 0,
+        "width": 1400,
+        "height": 1000,
+        "shotAt": "2026-10-09T15:36:11.717Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Watcher 13s Background watcher The agent is running in the background and collecting information Running 13s Spend: 15.8k tok · 1 analysis 2 sections in the report, 1 of them a remark Turn off Open page Found a bug yourself? Describe what broke and where. The watcher checks it against the panel code: only a confirmed defect goes into the report, and the answer shows up here. What broke Check Main Overview Search Analytics Chat Agent behaviour Rules 0 AGENTS.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Help Rules Personal rules from CLAUDE.md — active in every project Add rule What this is No rules yet The panel counts a section as a rule only when its heading reads «## ПРАВИЛО: …» in CLAUDE.md — the rest of the file is left alone and never listed. Add the first rule with the button above — the «On» and «Off» tabs appear with it."
+      },
+      "dark": {
+        "file": "03-indicator.dark.png",
+        "masked": 0,
+        "width": 1400,
+        "height": 1000,
+        "shotAt": "2026-10-09T15:36:48.694Z",
+        "text": "AgentDeck Свернуть панель Уведомления Агент панели Наблюдатель 13с Фоновый наблюдатель Агент работает в фоне и собирает информацию Работает 13с Расход: 15.8k tok · 1 разбор В отчёте 2 раздела, из них 1 замечание Выключить Открыть страницу Нашли баг сами? Опишите, что и где сломалось. Наблюдатель сверит это с кодом панели: в отчёт попадёт только подтверждённый дефект, а ответ появится здесь. Что сломалось Проверить Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 AGENTS.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Справка Правила Личные правила из CLAUDE.md — действуют во всех проектах Добавить правило Что это Правил пока нет Панель считает правилом только раздел с заголовком «## ПРАВИЛО: …» в CLAUDE.md — остальной текст файла она не трогает и в список не берёт. Добавьте первое правило кнопкой выше — с ним появятся вкладки «Включены» и «Выключены»."
+      },
+      "darkEn": {
+        "file": "03-indicator.dark.en.png",
+        "masked": 0,
+        "width": 1400,
+        "height": 1000,
+        "shotAt": "2026-10-09T15:37:15.182Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Watcher 13s Background watcher The agent is running in the background and collecting information Running 13s Spend: 15.8k tok · 1 analysis 2 sections in the report, 1 of them a remark Turn off Open page Found a bug yourself? Describe what broke and where. The watcher checks it against the panel code: only a confirmed defect goes into the report, and the answer shows up here. What broke Check Main Overview Search Analytics Chat Agent behaviour Rules 0 AGENTS.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Help Rules Personal rules from CLAUDE.md — active in every project Add rule What this is No rules yet The panel counts a section as a rule only when its heading reads «## ПРАВИЛО: …» in CLAUDE.md — the rest of the file is left alone and never listed. Add the first rule with the button above — the «On» and «Off» tabs appear with it."
+      }
+    },
+    {
+      "id": "04-bug-check",
+      "side": "panel",
+      "file": "04-bug-check.png",
+      "masked": 0,
+      "width": 400,
+      "height": 655,
+      "shotAt": "2026-10-09T15:35:50.840Z",
+      "text": "Фоновый наблюдатель Агент работает в фоне и собирает информацию Работает 18с Расход: 47.3k tok · 3 разбора В отчёте 3 раздела, из них 1 замечание Выключить Открыть страницу Нашли баг сами? Опишите, что и где сломалось. Наблюдатель сверит это с кодом панели: в отчёт попадёт только подтверждённый дефект, а ответ появится здесь. Что сломалось Проверить Ваши проверки После «Принять» карточка группы в хабе не меняет цвет, пока не обновишь страницу подтверждён — WR-4 The accept mutation does not invalidate the tree query. Ctrl+Enter в поле бага ничего не отправляет по коду не подтвердился Ctrl+Enter is handled by the form and sends the description.",
+      "en": {
+        "file": "04-bug-check.en.png",
+        "masked": 0,
+        "width": 400,
+        "height": 673,
+        "shotAt": "2026-10-09T15:36:17.407Z",
+        "text": "Background watcher The agent is running in the background and collecting information Running 18s Spend: 47.3k tok · 3 analyses 3 sections in the report, 1 of them a remark Turn off Open page Found a bug yourself? Describe what broke and where. The watcher checks it against the panel code: only a confirmed defect goes into the report, and the answer shows up here. What broke Check Your checks After «Accept» the group card in the hub keeps its colour until the page is reloaded confirmed — WR-8 The accept mutation does not invalidate the tree query. Ctrl+Enter in the bug field sends nothing not confirmed by the code Ctrl+Enter is handled by the form and sends the description."
+      },
+      "dark": {
+        "file": "04-bug-check.dark.png",
+        "masked": 0,
+        "width": 400,
+        "height": 655,
+        "shotAt": "2026-10-09T15:36:54.356Z",
+        "text": "Фоновый наблюдатель Агент работает в фоне и собирает информацию Работает 18с Расход: 47.3k tok · 3 разбора В отчёте 3 раздела, из них 1 замечание Выключить Открыть страницу Нашли баг сами? Опишите, что и где сломалось. Наблюдатель сверит это с кодом панели: в отчёт попадёт только подтверждённый дефект, а ответ появится здесь. Что сломалось Проверить Ваши проверки После «Принять» карточка группы в хабе не меняет цвет, пока не обновишь страницу подтверждён — WR-4 The accept mutation does not invalidate the tree query. Ctrl+Enter в поле бага ничего не отправляет по коду не подтвердился Ctrl+Enter is handled by the form and sends the description."
+      },
+      "darkEn": {
+        "file": "04-bug-check.dark.en.png",
+        "masked": 0,
+        "width": 400,
+        "height": 673,
+        "shotAt": "2026-10-09T15:37:20.874Z",
+        "text": "Background watcher The agent is running in the background and collecting information Running 18s Spend: 47.3k tok · 3 analyses 3 sections in the report, 1 of them a remark Turn off Open page Found a bug yourself? Describe what broke and where. The watcher checks it against the panel code: only a confirmed defect goes into the report, and the answer shows up here. What broke Check Your checks After «Accept» the group card in the hub keeps its colour until the page is reloaded confirmed — WR-8 The accept mutation does not invalidate the tree query. Ctrl+Enter in the bug field sends nothing not confirmed by the code Ctrl+Enter is handled by the form and sends the description."
+      }
+    },
+    {
+      "id": "05-report",
+      "side": "panel",
+      "file": "05-report.png",
+      "masked": 0,
+      "width": 1116,
+      "height": 1000,
+      "shotAt": "2026-10-09T15:35:53.909Z",
+      "text": "Отчёт Всё, что наблюдатель нашёл и сверил с кодом панели: сбои, замечания и баги, подтверждённые по вашим описаниям. Тот же файл, что пересылают агенту. Файл: …/agentdeck/WATCH-REPORT.md Обновлён 9 окт. 2026 г., 20:35 Все · 3 Сбои · 2 Замечания · 1 Подтверждённые · 3 WR-1 Watcher page threw подтверждён высокая сбой Повторов: 1 Место в коде: apps/web/src/pages/Watcher/WatcherPage/WatcherPage.tsx:1 Впервые 9 окт. 2026 г., 20:35 · последний раз 9 окт. 2026 г., 20:35 Подробнее WR-4 Accepted group card keeps its colour подтверждён средняя сбой Повторов: 1 Место в коде: apps/web/src/features/ChatMessages/ui/GroupAcceptance/GroupAcceptance.tsx:1 Впервые 9 окт. 2026 г., 20:35 · последний раз 9 окт. 2026 г., 20:35 Свернуть Тип: сбой — описание бага (человек) Раздел панели: /rules Что произошло The card is repainted only after the next tree poll. Причина The accept mutation does not invalidate the tree query. Как воспроизвести Open a parent chat, press Accept on a delivered group. Как исправить Invalidate the tree on success. Улики После «Принять» карточка группы в хабе не меняет цвет, пока не обновишь страницу WR-2 Timer is never cleared подтверждён низкая замечание Повторов: 1 Место в коде: apps/web/src/pages/Watcher/WatcherPage/WatcherPage.tsx:1 Впервые 9 окт. 2026 г., 20:35 · последний раз 9 окт. 2026 г., 20:35 Подробнее",
+      "en": {
+        "file": "05-report.en.png",
+        "masked": 0,
+        "width": 1116,
+        "height": 1000,
+        "shotAt": "2026-10-09T15:36:20.525Z",
+        "text": "Report Everything the watcher found and checked against the panel code: failures, remarks and bugs confirmed from your descriptions. The same file you hand to an agent. File: …/agentdeck/WATCH-REPORT.md Updated Oct 9, 2026, 08:36 PM All · 3 Failures · 2 Remarks · 1 Confirmed · 3 WR-5 Watcher page threw confirmed high failure Repeats: 1 Code location: apps/web/src/pages/Watcher/WatcherPage/WatcherPage.tsx:1 First Oct 9, 2026, 08:36 PM · last Oct 9, 2026, 08:36 PM Details WR-8 Accepted group card keeps its colour confirmed medium failure Repeats: 1 Code location: apps/web/src/features/ChatMessages/ui/GroupAcceptance/GroupAcceptance.tsx:1 First Oct 9, 2026, 08:36 PM · last Oct 9, 2026, 08:36 PM Collapse Type: failure — bug description (human) Panel section: /rules What happened The card is repainted only after the next tree poll. Cause The accept mutation does not invalidate the tree query. How to reproduce Open a parent chat, press Accept on a delivered group. How to fix Invalidate the tree on success. Evidence After «Accept» the group card in the hub keeps its colour until the page is reloaded WR-6 Timer is never cleared confirmed low remark Repeats: 1 Code location: apps/web/src/pages/Watcher/WatcherPage/WatcherPage.tsx:1 First Oct 9, 2026, 08:36 PM · last Oct 9, 2026, 08:36 PM Details"
+      },
+      "dark": {
+        "file": "05-report.dark.png",
+        "masked": 0,
+        "width": 1116,
+        "height": 1000,
+        "shotAt": "2026-10-09T15:36:57.407Z",
+        "text": "Отчёт Всё, что наблюдатель нашёл и сверил с кодом панели: сбои, замечания и баги, подтверждённые по вашим описаниям. Тот же файл, что пересылают агенту. Файл: …/agentdeck/WATCH-REPORT.md Обновлён 9 окт. 2026 г., 20:36 Все · 3 Сбои · 2 Замечания · 1 Подтверждённые · 3 WR-1 Watcher page threw подтверждён высокая сбой Повторов: 1 Место в коде: apps/web/src/pages/Watcher/WatcherPage/WatcherPage.tsx:1 Впервые 9 окт. 2026 г., 20:36 · последний раз 9 окт. 2026 г., 20:36 Подробнее WR-4 Accepted group card keeps its colour подтверждён средняя сбой Повторов: 1 Место в коде: apps/web/src/features/ChatMessages/ui/GroupAcceptance/GroupAcceptance.tsx:1 Впервые 9 окт. 2026 г., 20:36 · последний раз 9 окт. 2026 г., 20:36 Свернуть Тип: сбой — описание бага (человек) Раздел панели: /rules Что произошло The card is repainted only after the next tree poll. Причина The accept mutation does not invalidate the tree query. Как воспроизвести Open a parent chat, press Accept on a delivered group. Как исправить Invalidate the tree on success. Улики После «Принять» карточка группы в хабе не меняет цвет, пока не обновишь страницу WR-2 Timer is never cleared подтверждён низкая замечание Повторов: 1 Место в коде: apps/web/src/pages/Watcher/WatcherPage/WatcherPage.tsx:1 Впервые 9 окт. 2026 г., 20:36 · последний раз 9 окт. 2026 г., 20:36 Подробнее"
+      },
+      "darkEn": {
+        "file": "05-report.dark.en.png",
+        "masked": 0,
+        "width": 1116,
+        "height": 1000,
+        "shotAt": "2026-10-09T15:37:23.935Z",
+        "text": "Report Everything the watcher found and checked against the panel code: failures, remarks and bugs confirmed from your descriptions. The same file you hand to an agent. File: …/agentdeck/WATCH-REPORT.md Updated Oct 9, 2026, 08:37 PM All · 3 Failures · 2 Remarks · 1 Confirmed · 3 WR-5 Watcher page threw confirmed high failure Repeats: 1 Code location: apps/web/src/pages/Watcher/WatcherPage/WatcherPage.tsx:1 First Oct 9, 2026, 08:37 PM · last Oct 9, 2026, 08:37 PM Details WR-8 Accepted group card keeps its colour confirmed medium failure Repeats: 1 Code location: apps/web/src/features/ChatMessages/ui/GroupAcceptance/GroupAcceptance.tsx:1 First Oct 9, 2026, 08:37 PM · last Oct 9, 2026, 08:37 PM Collapse Type: failure — bug description (human) Panel section: /rules What happened The card is repainted only after the next tree poll. Cause The accept mutation does not invalidate the tree query. How to reproduce Open a parent chat, press Accept on a delivered group. How to fix Invalidate the tree on success. Evidence After «Accept» the group card in the hub keeps its colour until the page is reloaded WR-6 Timer is never cleared confirmed low remark Repeats: 1 Code location: apps/web/src/pages/Watcher/WatcherPage/WatcherPage.tsx:1 First Oct 9, 2026, 08:37 PM · last Oct 9, 2026, 08:37 PM Details"
+      }
+    }
+  ]
+}

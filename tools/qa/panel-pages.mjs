@@ -373,6 +373,7 @@ export const PANEL_PAGES = [
   { path: '/portability?tab=subscription', name: 'Паспорт среды — подписка' },
   { path: '/portability?tab=probe', name: 'Паспорт среды — проба цели' },
   { path: '/portability?tab=carry', name: 'Паспорт среды — незакрытая работа' },
+  { path: '/watcher', name: 'Наблюдатель' },
   { path: '/dlp', name: 'Защита данных' },
   { path: '/dlp?tab=rules', name: 'Защита данных — правила' },
   { path: '/dlp?tab=check', name: 'Защита данных — проверка' },

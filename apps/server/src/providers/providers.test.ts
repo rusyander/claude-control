@@ -812,11 +812,13 @@ describe('реестр провайдеров', () => {
       // это правило, которое уедет к цели и не сработает, и молча такое
       // появиться не должно.
       ruleGrammar: {
-        tools: { Bash: 'bash', Edit: 'edit', WebFetch: 'webfetch' },
+        tools: { Bash: 'bash', Edit: 'edit', WebFetch: 'webfetch', Read: 'read' },
         closed: true,
-        argumentTools: ['bash'],
+        argumentTools: ['bash', 'read'],
         argumentSyntax: 'own',
         oneShapePerTool: true,
+        pathAnywhereTools: ['read'],
+        toolDecisions: { read: ['ask', 'deny'] },
       },
     });
     expect(getProvider('opencode').permissionsConfig?.path()).toBe(

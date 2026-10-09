@@ -1,4 +1,5 @@
 import type {
+  WatchUserCheck,
   WatchEntryClass,
   WatchSeverity,
   WatchSignalKind,
@@ -102,6 +103,8 @@ export interface WatcherState {
   problem?: WatcherProblem;
   /** Моменты запуска разборов за последний час — для потолка в час. */
   runTimes?: string[];
+  /** Баги, присланные человеком, и чем кончилась их проверка — свежие первыми. */
+  checks?: WatchUserCheck[];
 }
 
 /** Итог одного разбора: находки по id и расход. */

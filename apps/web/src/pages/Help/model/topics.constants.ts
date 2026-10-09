@@ -18,6 +18,7 @@ import { IntegrationsTopic } from '../topics/IntegrationsTopic/IntegrationsTopic
 import { ProjectsTopic } from '../topics/ProjectsTopic/ProjectsTopic';
 import { GroupsTopic } from '../topics/GroupsTopic/GroupsTopic';
 import { HistoryTopic } from '../topics/HistoryTopic/HistoryTopic';
+import { WatcherTopic } from '../topics/WatcherTopic/WatcherTopic';
 import { CompareTopic } from '../topics/CompareTopic/CompareTopic';
 import { PortabilityTopic } from '../topics/PortabilityTopic/PortabilityTopic';
 import { SettingsTopic } from '../topics/SettingsTopic/SettingsTopic';
@@ -111,6 +112,9 @@ export const HELP_GROUPS: HelpGroup[] = [
       // документа про «что у них разного».
       { id: 'portability', icon: 'file', pagePath: '/portability', Content: PortabilityTopic },
       { id: 'settings', icon: 'settings', pagePath: '/settings', Content: SettingsTopic },
+      // Наблюдатель жил карточкой настроек и переехал на свою страницу
+      // (09.10.2026) — документ стоит там же, где читатель искал его раньше.
+      { id: 'watcher', icon: 'eye', pagePath: '/watcher', Content: WatcherTopic },
       // Свой эндпоинт — блок на странице настроек, но объясняет он окружение
       // чужих CLI, а не саму панель. Отдельным документом, потому что вопрос
       // «куда уходят данные» задают до того, как открывают настройки.

@@ -22,6 +22,7 @@ import {
 import { spawnCliProcess } from '../../../lib/cli-spawn/cli-spawn.ts';
 import { lightWindowLayers } from '../../platform/layers/layers.ts';
 import { killChildTree } from '../../../lib/process-tree/process-tree.ts';
+import { attachTextCodes, serverText } from '../../../lib/server-texts/server-texts.ts';
 import { isForeignInterimNote } from '../interim-note/interim-note.ts';
 import {
   PANEL_AGENT_TOOL_PREFIX,
@@ -368,8 +369,17 @@ export interface PanelAgentRunHandle {
  * потом процесс. Справка не прочиталась — ход идёт без карты, а не падает:
  * инструменты справки у агента остаются.
  */
+/**
+ * Кадр ошибки хода. Своя строка сервера получает код (`messageCode` + `params`),
+ * и окно с телефоном показывают её на языке интерфейса; слова CLI (stderr)
+ * шаблоном не читаются и едут как есть.
+ */
+function errorEvent(message: string): PanelAgentRunEvent {
+  return attachTextCodes<PanelAgentRunEvent>({ kind: 'error', message });
+}
+
 /** Ход остановлен человеком — и до запуска процесса, и во время. */
-const STOPPED_TEXT = 'Ход остановлен.';
+const STOPPED_TEXT = serverText('panel-agent-stopped');
 
 export function startPanelAgentRun(options: PanelAgentRunOptions): PanelAgentRunHandle {
   let stopRequested = false;
@@ -379,7 +389,7 @@ export function startPanelAgentRun(options: PanelAgentRunOptions): PanelAgentRun
     .then((knowledge): Promise<PanelAgentRunResult> => {
       if (stopRequested) {
         const error = STOPPED_TEXT;
-        options.onEvent({ kind: 'error', message: error });
+        options.onEvent(errorEvent(error));
         return Promise.resolve({
           ok: false,
           reply: '',
@@ -435,7 +445,7 @@ function launchPanelAgentProcess(
     (kimi && kimi.request.length > KIMI_REQUEST_MAX_CHARS ? KIMI_LONG_REQUEST : undefined);
   if (refusal) {
     cleanup();
-    options.onEvent({ kind: 'error', message: refusal.error });
+    options.onEvent(errorEvent(refusal.error));
     return {
       done: Promise.resolve({
         ok: false,
@@ -517,7 +527,7 @@ function launchPanelAgentProcess(
   if (spawned.error) {
     cleanup();
     const message = spawned.error.message;
-    options.onEvent({ kind: 'error', message });
+    options.onEvent(errorEvent(message));
     return {
       done: Promise.resolve({ ok: false, reply: '', error: message, actions: [] }),
       stop: () => {},
@@ -570,7 +580,7 @@ function launchPanelAgentProcess(
           finish({
             ok: false,
             reply: '',
-            error: `Qwen Code предложил агенту инструменты сверх переходника панели (${extra.join(', ')}) — ход остановлен, чтобы у агента не было лишних рук.`,
+            error: serverText('panel-agent-extra-tools-qwen', { tools: extra.join(', ') }),
             seal: { reason: 'failed', detail },
           });
           killChildTree(child);
@@ -591,7 +601,7 @@ function launchPanelAgentProcess(
               finish({
                 ok: false,
                 reply: '',
-                error: `CLI дал агенту инструмент сверх переходника панели (${block.name}) — ход остановлен, чтобы у агента не было лишних рук.`,
+                error: serverText('panel-agent-extra-tool', { tool: block.name }),
                 seal: {
                   reason: 'failed',
                   detail: `The CLI let the agent call a tool beyond the panel bridge: ${block.name}`,
@@ -654,7 +664,7 @@ function launchPanelAgentProcess(
       finish({
         ok: false,
         reply: '',
-        error: 'Агент не закончил ход за отведённое время.',
+        error: serverText('panel-agent-timeout'),
         seal: { reason: 'timeout' },
       });
       killChildTree(child);
@@ -668,7 +678,7 @@ function launchPanelAgentProcess(
       releaseNote();
       cleanup();
       if (outcome.ok) options.onEvent({ kind: 'done', reply: outcome.reply });
-      else options.onEvent({ kind: 'error', message: outcome.error ?? 'Агент не ответил.' });
+      else options.onEvent(errorEvent(outcome.error ?? serverText('panel-agent-no-reply')));
       resolve({ ...outcome, actions });
     };
 
@@ -701,7 +711,7 @@ function launchPanelAgentProcess(
       finish({
         ok: false,
         reply: '',
-        error: said || `CLI завершился с кодом ${code ?? '?'} без ответа.`,
+        error: said || serverText('panel-agent-cli-exit', { code: code ?? '?' }),
         seal: {
           reason: 'failed',
           detail: said || `The CLI exited with code ${code ?? '?'} without an answer.`,
@@ -747,25 +757,22 @@ const TOOL_GUARDED: ReadonlySet<PanelAgentDialect> = new Set([
  */
 const IMAGE_REFUSAL: Partial<Record<PanelAgentDialect, { error: string; detail: string }>> = {
   gemini: {
-    error:
-      'Агент панели на Gemini CLI не принимает картинки: CLI читает их только своим инструментом файлов, которого у агента нет. Отправьте вопрос без картинки.',
+    error: serverText('panel-agent-images-gemini'),
     detail: 'Gemini CLI panel agent takes no images.',
   },
   goose: {
-    error:
-      'Агент панели на Goose не принимает картинки: в одиночном запуске Goose не передаёт их модели. Отправьте вопрос без картинки.',
+    error: serverText('panel-agent-images-goose'),
     detail: 'Goose panel agent takes no images.',
   },
   kimi: {
-    error:
-      'Агент панели на Kimi Code не принимает картинки: одиночный запуск Kimi берёт только текст. Отправьте вопрос без картинки.',
+    error: serverText('panel-agent-images-kimi'),
     detail: 'Kimi Code panel agent takes no images.',
   },
 };
 
 /** Реплика длиннее потолка argv: Kimi берёт промпт только флагом `-p`. */
 const KIMI_LONG_REQUEST = {
-  error: `Сообщение длиннее ${KIMI_REQUEST_MAX_CHARS} знаков: Kimi Code принимает его только строкой запуска. Сократите сообщение или разбейте его на части.`,
+  error: serverText('panel-agent-kimi-long', { max: KIMI_REQUEST_MAX_CHARS }),
   detail: 'Kimi Code panel agent request is over the argv limit.',
 };
 

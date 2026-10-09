@@ -27,7 +27,12 @@ export const watcherEn: typeof watcherRu = {
   pending_other: 'Waiting for analysis: {{count}} problems',
   analyzing: 'Analysing',
   turnOff: 'Turn off',
-  openSettings: 'Go to settings',
+  start: 'Start the watcher',
+  stop: 'Stop',
+  offShort: 'off',
+  offTooltip: 'The watcher is off. Open its page to start it.',
+  offAria: 'Background watcher is off — open its page',
+  openPage: 'Open page',
   toggleLabel: 'Background watcher',
   toggleHint:
     'While on, the panel collects all of its own problems: on the server — 5xx and 4xx ' +
@@ -42,12 +47,80 @@ export const watcherEn: typeof watcherRu = {
     'removed and the number of repeats; an index sits on top. The report is written so ' +
     'another agent can pick it up. Analyses stay under an hourly cap; no problems — no ' +
     'spend. Turned off, the watcher collects nothing.',
-  report: 'Report',
   reportEmpty: 'No file yet — it appears with the first finding.',
   offState: 'Off',
   toggleFailed: 'Could not switch the watcher: {{message}}',
   statusFailed: 'Could not read the watcher state: {{message}}',
   problemTitle: 'The watcher cannot do its job',
+  bug: {
+    title: 'Found a bug yourself?',
+    hint:
+      'Describe what broke and where. The watcher checks it against the panel code: only a ' +
+      'confirmed defect goes into the report, and the answer shows up here.',
+    label: 'What broke',
+    placeholder: 'For example: in chat the group card does not change after “Accept”',
+    check: 'Check',
+    sent: 'Sent for checking',
+    failed: 'Could not send for checking: {{message}}',
+    recent: 'Your checks',
+    off: 'You can describe a bug in words once the watcher is running: its model does the check.',
+    state: {
+      checking: 'checking',
+      confirmed: 'confirmed — {{ref}}',
+      confirmedNoRef: 'confirmed',
+      rejected: 'not confirmed by the code',
+      unclear: 'the model could not decide',
+      failed: 'check failed',
+    },
+    stateHint: {
+      checking: 'The model is reading the panel code. Usually a minute or two.',
+      confirmed: 'The defect is in the code — its section is in the report.',
+      rejected: 'Not written to the report: the model found no such defect in the code.',
+      unclear: 'Not written to the report: the model could not decide. Add detail and check again.',
+      failed: 'The analysis failed — the entry is retried with the next analysis.',
+    },
+  },
+  page: {
+    title: 'Watcher',
+    subtitle:
+      'A background agent collects the panel’s problems and checks them against its code. ' +
+      'Here you start it, describe a bug you found in words and read the report.',
+    reportTitle: 'Report',
+    reportHint:
+      'Everything the watcher found and checked against the panel code: failures, remarks ' +
+      'and bugs confirmed from your descriptions. The same file you hand to an agent.',
+    empty: 'The report is empty',
+    emptyText: 'There is no file yet — it appears with the watcher’s first finding.',
+    noMatch: 'No sections in this filter.',
+    loadFailed: 'Could not read the report',
+    file: 'File',
+    updated: 'Updated {{date}}',
+    filter: {
+      all: 'All · {{count}}',
+      failure: 'Failures · {{count}}',
+      remark: 'Remarks · {{count}}',
+      confirmed: 'Confirmed · {{count}}',
+    },
+    filterLabel: 'Section filter',
+    count: 'Repeats: {{count}}',
+    seen: 'First {{first}} · last {{last}}',
+    location: 'Code location',
+    expand: 'Details',
+    collapse: 'Collapse',
+    severity: {
+      critical: 'critical',
+      high: 'high',
+      medium: 'medium',
+      low: 'low',
+    },
+    verdict: {
+      confirmed: 'confirmed',
+      'not-in-code': 'not in code',
+      unclear: 'unclear',
+      pending: 'checking',
+    },
+    entryClass: { failure: 'failure', remark: 'remark' },
+  },
   problem: {
     cli_missing:
       'Claude Code was not found: problems are collected and written to the report, but ' +

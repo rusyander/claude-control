@@ -23,6 +23,12 @@ export interface NavItem {
    * зависит.
    */
   capability?: Capability;
+  /**
+   * `false` — боковая панель пункт не рисует: там его место уже занимает своя
+   * строка (наблюдатель — строка-индикатор). Палитра, подпись страницы в окне
+   * агента и справка пункт видят: без него `/watcher` подписывался бы сырым адресом.
+   */
+  inSidebar?: false;
 }
 
 export interface NavSection {
@@ -130,6 +136,7 @@ export const NAV_SECTIONS: NavSection[] = [
       // ДРУГОЙ установленный CLI, а не только на активного.
       { path: '/portability', label: 'nav.portability', icon: 'file', key: 'portability' },
       { path: '/settings', label: 'nav.settings', icon: 'settings', key: 'settings' },
+      { path: '/watcher', label: 'nav.watcher', icon: 'eye', key: 'watcher', inSidebar: false },
       // Панель-level, без `capability`: прокси стоит между ЛЮБЫМ CLI и моделью.
       // Именно поэтому он здесь, а не среди интеграций: там всё гейтится по
       // возможностям провайдера, и вечный пункт мешал бы секции исчезать

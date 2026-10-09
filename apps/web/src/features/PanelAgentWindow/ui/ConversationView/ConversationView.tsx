@@ -5,6 +5,7 @@ import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { renderMarkdown } from '@shared/lib/markdown/renderMarkdown';
 import { Typography } from '@shared/ui/typography';
+import { serverMessageText } from '@shared/config/i18n';
 import {
   ImageAttachButton,
   ImageAttachTray,
@@ -150,7 +151,7 @@ export function ConversationView({
               role={item.kind === 'error' ? 'alert' : undefined}
               data-agent-notice={item.kind}
             >
-              {item.text}
+              {serverMessageText(item.messageCode, item.params, t) ?? item.text}
             </Typography>
           );
         })}

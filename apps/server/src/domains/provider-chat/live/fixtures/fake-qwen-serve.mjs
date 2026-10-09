@@ -13,6 +13,9 @@ const mode = process.env.FAKE_MODE ?? 'inject';
 const holdMs = Number(process.env.HOLD_MS ?? 400);
 const answerMs = Number(process.env.ANSWER_MS ?? 50);
 const mcpMs = Number(process.env.MCP_MS ?? 300);
+// Ответ «принято» опаздывает на ACCEPT_DELAY_MS после того, как ход уже подхватил
+// сообщение: так под нагрузкой поток событий обгоняет ответ на POST.
+const acceptDelayMs = Number(process.env.ACCEPT_DELAY_MS ?? 0);
 let mcpReady = false;
 if (mode === 'no-server') process.exit(2);
 
@@ -66,6 +69,11 @@ createServer(async (req, res) => {
   if (url === '/session/ses-1/mid-turn-message') {
     const { message } = await body(req);
     if (!busy) return reply(res, 200, { accepted: false, reason: 'session_idle' });
+    if (acceptDelayMs > 0) {
+      release?.(message);
+      await wait(acceptDelayMs);
+      return reply(res, 200, { accepted: true });
+    }
     reply(res, 200, { accepted: true });
     release?.(message);
     return;

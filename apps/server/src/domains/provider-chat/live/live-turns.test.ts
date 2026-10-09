@@ -143,6 +143,26 @@ describe('qwen serve: сообщение посреди хода', () => {
     expect(run.result).toEqual({ kind: 'done', reply: 'ответ на рос человека\n\nучёл: и про Z' });
   });
 
+  it('поток событий обогнал ответ «принято» — сообщение всё равно принято и отвечено', async () => {
+    // Под нагрузкой turn_complete приходил раньше ответа на POST: ход закрывался,
+    // POST обрывался, и принятое CLI сообщение считалось непринятым.
+    for (const mode of ['inject', 'pending']) {
+      const turn = new QwenServeTurn({ graceMs: 2_000 });
+      const run = await runWithSteer(
+        turn,
+        options('fake-qwen-serve.mjs', {
+          FAKE_MODE: mode,
+          HOLD_MS: '10000',
+          ACCEPT_DELAY_MS: '300',
+        }),
+        'и про W',
+      );
+      expect(run.steered, mode).toEqual([true]);
+      expect(run.result.kind, mode).toBe('done');
+      expect(run.result.kind === 'done' && run.result.reply, mode).toContain('учёл: и про W');
+    }
+  });
+
   it('сессия простаивает — сообщение не принято', async () => {
     const turn = new QwenServeTurn();
     const result = await turn.run(

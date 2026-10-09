@@ -85,6 +85,22 @@ export const chatEn: Record<ChatMessageCode, string> = {
     '{{provider}} was not found in the PATH of the panel process — the agent has nothing to work with. Without the CLI the agent has no panel tools; an API key does not help here.',
   'panel-agent-contour-foreign':
     'The panel agent goes through a contour only with Claude Code, and the active CLI is {{provider}}. The turn was not started so as not to go to the vendor cloud: untick «Panel assistant» on the contour or switch the CLI to Claude Code.',
+  'panel-agent-stopped': 'The turn was stopped.',
+  'panel-agent-extra-tools-qwen':
+    'Qwen Code offered the agent tools beyond the panel bridge ({{tools}}) — the turn was stopped so that the agent has no extra hands.',
+  'panel-agent-extra-tool':
+    'The CLI gave the agent a tool beyond the panel bridge ({{tool}}) — the turn was stopped so that the agent has no extra hands.',
+  'panel-agent-timeout': 'The agent did not finish the turn in the allotted time.',
+  'panel-agent-no-reply': 'The agent did not answer.',
+  'panel-agent-cli-exit': 'The CLI exited with code {{code}} without an answer.',
+  'panel-agent-images-gemini':
+    'The panel agent on Gemini CLI takes no images: the CLI reads them only with its own file tool, which the agent does not have. Send the question without the image.',
+  'panel-agent-images-goose':
+    'The panel agent on Goose takes no images: in a one-shot run Goose does not pass them to the model. Send the question without the image.',
+  'panel-agent-images-kimi':
+    'The panel agent on Kimi Code takes no images: a one-shot Kimi run takes text only. Send the question without the image.',
+  'panel-agent-kimi-long':
+    'The message is longer than {{max}} characters: Kimi Code takes it only on the launch line. Shorten the message or split it into parts.',
   'tests-agent-provider-unsupported':
     'The Tests block agent works with Claude Code, Qwen Code and Codex, and the active CLI is {{provider}}: it has no run in which the panel checks every write the agent makes. The run was not started — switch the CLI in «Providers» or mark the cases by hand.',
   'tests-agent-cli-not-found':

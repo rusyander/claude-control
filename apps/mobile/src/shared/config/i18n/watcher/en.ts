@@ -34,7 +34,8 @@ export const watcherEn: WatcherTexts = {
   },
   turnOff: 'Turn off',
   turnOffFailed: (reason: string) => `Did not turn off: ${reason}`,
-  onlyPanel: 'The watcher is turned on in the panel: Settings → General.',
+  onlyPanel:
+    'The watcher is started in the panel: the “Watcher” row in the sidebar → “Start the watcher”.',
   close: 'Close',
   duration: { h: 'h', m: 'm', s: 's' },
 };

@@ -169,8 +169,50 @@ describe('словарь инструментов цели', () => {
   });
 
   it('закрытый словарь чужого имени не принимает — правило не пишется вовсе', () => {
-    const translated = translatePermission(permission('Read', 'deny'), 'deny', opencode);
+    const translated = translatePermission(permission('WebSearch', 'deny'), 'deny', opencode);
     expect(translated).toEqual({ kind: 'refused', why: 'tool_not_in_vocabulary' });
+  });
+
+  /**
+   * Живая проба 09.10.2026 (OpenCode 1.18.35): `read` OpenCode применяет, а
+   * шаблон сверяет с абсолютным путём — голое имя файла не совпадает ни с чем.
+   */
+  it('чтение у OpenCode: буквальный путь — «в любом каталоге», запрет и спрос едут', () => {
+    expect(
+      translatePermission(permission('Read(secret.txt)', 'deny'), 'deny', opencode),
+    ).toMatchObject({ kind: 'rule', tool: 'read', argument: '**/secret.txt', decision: 'deny' });
+    expect(
+      translatePermission(permission('Read(docs/plan.md)', 'ask'), 'ask', opencode),
+    ).toMatchObject({ kind: 'rule', tool: 'read', argument: '**/docs/plan.md' });
+    expect(translatePermission(permission('Read', 'deny'), 'deny', opencode)).toMatchObject({
+      kind: 'rule',
+      tool: 'read',
+      argument: null,
+    });
+    expect(level(permission('Read(secret.txt)', 'deny'), opencode).level).toBe('native');
+  });
+
+  it('чтение у OpenCode: разрешение и путь, который не переписать, — отказ', () => {
+    // `allow` карта чтения заменила бы встроенные правила OpenCode целиком.
+    expect(translatePermission(permission('Read(notes.md)', 'allow'), 'allow', opencode)).toEqual({
+      kind: 'refused',
+      why: 'decision_not_expressible',
+    });
+    expect(level(permission('Read(notes.md)', 'allow'), opencode).level).not.toBe('native');
+    for (const rule of [
+      'Read(src/*.ts)',
+      'Read(/etc/hosts)',
+      'Read(~/x)',
+      'Read(../x)',
+      'Read(./x)',
+      'Read(C:/x)',
+    ]) {
+      expect(translatePermission(permission(rule, 'deny'), 'deny', opencode), rule).toEqual({
+        kind: 'refused',
+        why: 'argument_grammar_differs',
+      });
+      expect(level(permission(rule, 'deny'), opencode).level, rule).not.toBe('native');
+    }
   });
 
   it('уточнение аргумента там, где формат его не держит, — отказ, а не запрет на всё', () => {

@@ -1,0 +1,115 @@
+{
+  "topic": "watcher",
+  "frames": {
+    "page/01-page-off": {
+      "light-ru": {
+        "file": "01-page-off.png",
+        "width": 1400,
+        "height": 1000
+      },
+      "light-en": {
+        "file": "01-page-off.en.png",
+        "width": 1400,
+        "height": 1000
+      },
+      "dark-ru": {
+        "file": "01-page-off.dark.png",
+        "width": 1400,
+        "height": 1000
+      },
+      "dark-en": {
+        "file": "01-page-off.dark.en.png",
+        "width": 1400,
+        "height": 1000
+      }
+    },
+    "page/02-control-on": {
+      "light-ru": {
+        "file": "02-control-on.png",
+        "width": 1116,
+        "height": 393
+      },
+      "light-en": {
+        "file": "02-control-on.en.png",
+        "width": 1116,
+        "height": 375
+      },
+      "dark-ru": {
+        "file": "02-control-on.dark.png",
+        "width": 1116,
+        "height": 393
+      },
+      "dark-en": {
+        "file": "02-control-on.dark.en.png",
+        "width": 1116,
+        "height": 375
+      }
+    },
+    "page/03-indicator": {
+      "light-ru": {
+        "file": "03-indicator.png",
+        "width": 1400,
+        "height": 1000
+      },
+      "light-en": {
+        "file": "03-indicator.en.png",
+        "width": 1400,
+        "height": 1000
+      },
+      "dark-ru": {
+        "file": "03-indicator.dark.png",
+        "width": 1400,
+        "height": 1000
+      },
+      "dark-en": {
+        "file": "03-indicator.dark.en.png",
+        "width": 1400,
+        "height": 1000
+      }
+    },
+    "page/04-bug-check": {
+      "light-ru": {
+        "file": "04-bug-check.png",
+        "width": 400,
+        "height": 655
+      },
+      "light-en": {
+        "file": "04-bug-check.en.png",
+        "width": 400,
+        "height": 673
+      },
+      "dark-ru": {
+        "file": "04-bug-check.dark.png",
+        "width": 400,
+        "height": 655
+      },
+      "dark-en": {
+        "file": "04-bug-check.dark.en.png",
+        "width": 400,
+        "height": 673
+      }
+    },
+    "page/05-report": {
+      "light-ru": {
+        "file": "05-report.png",
+        "width": 1116,
+        "height": 1000
+      },
+      "light-en": {
+        "file": "05-report.en.png",
+        "width": 1116,
+        "height": 1000
+      },
+      "dark-ru": {
+        "file": "05-report.dark.png",
+        "width": 1116,
+        "height": 1000
+      },
+      "dark-en": {
+        "file": "05-report.dark.en.png",
+        "width": 1116,
+        "height": 1000
+      }
+    }
+  }
+}

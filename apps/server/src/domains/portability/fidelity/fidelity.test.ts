@@ -396,6 +396,7 @@ describe('понижение — только в сторону строгост
    * Живая проба 09.10.2026 (opencode 1.18.35): `Read` в закрытом словаре
    * OpenCode перевод не писал, а отчёт обещал «нативно» — человек читал, что
    * запрет действует, а OpenCode читал файл. Отчёт и перевод обязаны совпасть.
+   * С тех пор `read` в словаре — и обещание, и запись «нативно» сходятся.
    */
   it('правило, которое словарь цели не выражает, не обещается нативным — как и не пишется', () => {
     const opencode = provider('opencode');
@@ -403,16 +404,17 @@ describe('понижение — только в сторону строгост
       item({ kind: 'permission', rule: text, decision: 'deny', order: 0 } as Partial<EnvItem> &
         Pick<EnvItem, 'kind'>) as Extract<EnvItem, { kind: 'permission' }>;
 
-    for (const text of ['Read(agentdeck-probe-denied.txt)', 'WebSearch', 'Bash(git push:*)']) {
+    for (const text of ['Read(src/*.ts)', 'WebSearch', 'Bash(git push:*)']) {
       const verdict = level(rule(text), opencode);
       expect(translatePermission(rule(text), 'deny', opencode).kind, text).toBe('refused');
       expect(verdict.level, text).not.toBe('native');
       expect(verdict.reason, text).toBe('rule_unexpressible');
     }
 
-    const bash = rule('Bash(git push)');
-    expect(translatePermission(bash, 'deny', opencode).kind).toBe('rule');
-    expect(level(bash, opencode).level).toBe('native');
+    for (const text of ['Bash(git push)', 'Read(agentdeck-probe-denied.txt)']) {
+      expect(translatePermission(rule(text), 'deny', opencode).kind, text).toBe('rule');
+      expect(level(rule(text), opencode).level, text).toBe('native');
+    }
   });
 
   /**

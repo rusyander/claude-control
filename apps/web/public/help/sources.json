@@ -1134,7 +1134,7 @@
         {
           "path": "apps/server/src/providers/catalog/opencode.ts",
           "why": "Проектный уровень OpenCode: права, хуки только на чтение, плагины",
-          "sha": "4227ae95b5598027"
+          "sha": "6c532aad8d4f430d"
         },
         {
           "path": "apps/server/src/providers/catalog/kimi.ts",
@@ -1147,7 +1147,7 @@
           "sha": "1798a3598e80040b"
         }
       ],
-      "confirmedAt": "2026-10-08T12:34:15.221Z"
+      "confirmedAt": "2026-10-09T15:45:40.587Z"
     },
     {
       "topic": "skills",
@@ -1572,7 +1572,7 @@
     {
       "topic": "settings",
       "document": "apps/web/src/pages/Help/topics/SettingsTopic/SettingsTopic.tsx",
-      "confirmedAt": "2026-10-08T12:34:15.814Z",
+      "confirmedAt": "2026-10-09T15:19:33.038Z",
       "sources": [
         {
           "path": "apps/server/src/lib/safe-io/safe-io.ts",
@@ -1593,51 +1593,6 @@
           "path": "apps/server/src/lib/credentials/credentials.ts",
           "why": "«Доступ Claude Code»: цепочка источников доступа, названная в документе",
           "sha": "895d0b739e77b296"
-        },
-        {
-          "path": "apps/server/src/domains/watcher/watcher.ts",
-          "why": "«Фоновый наблюдатель»: включение с нулевым счётом, продолжение после перезапуска, проблемы и отказ от повтора упавшего разбора, потолок разборов в час, слияние и замечания",
-          "sha": "0ca5a45ef82c4908"
-        },
-        {
-          "path": "apps/server/src/domains/watcher/report.ts",
-          "why": "«Как читать отчёт»: WATCH-REPORT.md в корне приложения, оглавление, WR-n, тип и важность, разделы на месте, улики, секреты вычищены",
-          "sha": "555336a45812262d"
-        },
-        {
-          "path": "apps/server/src/domains/watcher/report-texts.ts",
-          "why": "«Как читать отчёт»: подписи статусов и язык отчёта — язык интерфейса панели",
-          "sha": "71c1c476d062b563"
-        },
-        {
-          "path": "apps/server/src/domains/watcher/analyzer.ts",
-          "why": "«Модель только читает»: Read/Grep/Glob, рабочий каталог — исходники панели, узкое окружение",
-          "sha": "e97e54ef84b2be4d"
-        },
-        {
-          "path": "apps/server/src/bootstrap/watcher-capture/watcher-capture.ts",
-          "why": "«Что попадает в отчёт»: серверные сигналы — 5xx, правила 4xx, ошибки и предупреждения журнала, медленные ответы, запуски CLI с ошибкой",
-          "sha": "80389a1b5883180c"
-        },
-        {
-          "path": "apps/web/src/shared/lib/watch-capture/watch-capture.ts",
-          "why": "«Что попадает в отчёт»: сбои страницы, консоль, ответы не того вида, зависшие загрузки, записанное сервером не шлётся повторно",
-          "sha": "c8c1e39781739690"
-        },
-        {
-          "path": "apps/web/src/features/WatcherIndicator/ui/WatcherIndicator.tsx",
-          "why": "«Индикатор на каждой странице»: подсказка, время, расход, «Выключить» и «Перейти в настройки»",
-          "sha": "ed17fe3f84ea7c9f"
-        },
-        {
-          "path": "apps/web/src/features/WatcherIndicator/lib/placeBeside.ts",
-          "why": "«Индикатор на каждой странице»: подсказка, время, расход, «Выключить» и «Перейти в настройки»",
-          "sha": "1b12f4eecd5f0548"
-        },
-        {
-          "path": "apps/web/src/features/WatcherIndicator/ui/WatcherIndicator.constants.ts",
-          "why": "«Индикатор на каждой странице»: подсказка, время, расход, «Выключить» и «Перейти в настройки»",
-          "sha": "e007edd91eadb70b"
         },
         {
           "path": "apps/server/src/domains/global-layer/judge.ts",
@@ -1673,6 +1628,88 @@
           "path": "apps/web/src/pages/Settings/model/settingsPanelDomId.ts",
           "why": "«Разделы страницы»: список и порядок вкладок, описанных в документе",
           "sha": "882865413be055f2"
+        }
+      ]
+    },
+    {
+      "topic": "watcher",
+      "document": "apps/web/src/pages/Help/topics/WatcherTopic/WatcherTopic.tsx",
+      "confirmedAt": "2026-10-09T17:02:58.034Z",
+      "sources": [
+        {
+          "path": "apps/server/src/domains/watcher/watcher.ts",
+          "why": "«Запустить»: запуск с нулевым счётом, продолжение после перезапуска, проблемы и отказ от повтора упавшего разбора, потолок разборов в час, слияние и замечания",
+          "sha": "5c15411026d34bdb"
+        },
+        {
+          "path": "apps/server/src/domains/watcher/report.ts",
+          "why": "«Как читать отчёт»: WATCH-REPORT.md в корне приложения, оглавление, WR-n, тип и важность, разделы на месте, улики, секреты вычищены",
+          "sha": "555336a45812262d"
+        },
+        {
+          "path": "apps/server/src/domains/watcher/report-texts.ts",
+          "why": "«Как читать отчёт»: подписи статусов и язык отчёта — язык интерфейса панели",
+          "sha": "855b6cf3ac5fe627"
+        },
+        {
+          "path": "apps/server/src/domains/watcher/analyzer.ts",
+          "why": "«Модель только читает»: Read/Grep/Glob, рабочий каталог — исходники панели, узкое окружение",
+          "sha": "928b1800e6c30c97"
+        },
+        {
+          "path": "apps/server/src/bootstrap/watcher-capture/watcher-capture.ts",
+          "why": "«Что попадает в отчёт»: серверные сигналы — 5xx, правила 4xx, ошибки и предупреждения журнала, медленные ответы, запуски CLI с ошибкой",
+          "sha": "80389a1b5883180c"
+        },
+        {
+          "path": "apps/web/src/shared/lib/watch-capture/watch-capture.ts",
+          "why": "«Что попадает в отчёт»: сбои страницы, консоль, ответы не того вида, зависшие загрузки, записанное сервером не шлётся повторно",
+          "sha": "c8c1e39781739690"
+        },
+        {
+          "path": "apps/web/src/features/WatcherIndicator/ui/WatcherIndicator.tsx",
+          "why": "«Строка на каждой странице»: «выкл» ведёт на страницу; подсказка, время, расход, «Выключить», «Открыть страницу» и форма бага",
+          "sha": "dd0f0cdfe7255bca"
+        },
+        {
+          "path": "apps/web/src/features/WatcherIndicator/ui/WatcherBugCheck/WatcherBugCheck.tsx",
+          "why": "«Описать баг словами»: «Проверить» и Ctrl+Enter, адрес страницы с текстом (со страницы наблюдателя — без), «Ваши проверки»",
+          "sha": "48036a0e1b06cf05"
+        },
+        {
+          "path": "apps/web/src/pages/Watcher/WatcherReport/WatcherReport.tsx",
+          "why": "«Отчёт на странице»: путь и время правки, фильтры с числом разделов, пустой отчёт",
+          "sha": "29f7d906efd1eb31"
+        },
+        {
+          "path": "apps/server/src/domains/watcher/report-view.ts",
+          "why": "«Отчёт в панели»: тело раздела без строк шапки, порядок по важности",
+          "sha": "3476e55b8ed9ce01"
+        },
+        {
+          "path": "apps/web/src/features/WatcherIndicator/lib/placeBeside.ts",
+          "why": "«Строка на каждой странице»: окно идёт за строкой и помещается на экране",
+          "sha": "1b12f4eecd5f0548"
+        },
+        {
+          "path": "apps/web/src/features/WatcherIndicator/ui/WatcherIndicator.constants.ts",
+          "why": "«Строка на каждой странице»: Tab ходит по кругу внутри окна",
+          "sha": "e007edd91eadb70b"
+        },
+        {
+          "path": "apps/web/src/pages/Watcher/WatcherControlCard/WatcherControlCard.tsx",
+          "why": "«Запустить» и «Сводка на странице»: «Запустить наблюдателя» / «Остановить», сводка, сбой чтения с «Повторить»",
+          "sha": "34894d55c374dba7"
+        },
+        {
+          "path": "apps/web/src/pages/Watcher/WatcherPage/WatcherPage.tsx",
+          "why": "«Описать баг словами»: на странице форма только у запущенного, иначе подсказка",
+          "sha": "87721a1f42c354a8"
+        },
+        {
+          "path": "apps/server/src/domains/watcher/route.ts",
+          "why": "«Модель только читает»: маршрут разбора — облако, локальная модель, контур; чужой CLI идёт контуром или локальной моделью, в облако Claude — отказ",
+          "sha": "efccb328ef4a1dda"
         }
       ]
     },
@@ -1928,12 +1965,12 @@
         {
           "path": "apps/server/src/domains/panel-agent/launch.ts",
           "why": "«Куда уходит разговор» и отказы provider_unsupported, cli_not_found, endpoint_unsupported, contour_unreachable",
-          "sha": "5cd1e39fa5356c4b"
+          "sha": "673ccf19c547c944"
         },
         {
           "path": "apps/server/src/domains/panel-agent/runner/runner.ts",
           "why": "«Путь одного действия»: Claude Code без встроенных инструментов, только переходник, без сохранения сессии",
-          "sha": "f5403b4ed235e695"
+          "sha": "1bed82c3e2036bae"
         },
         {
           "path": "apps/server/src/domains/panel-agent/help-topics/help-topics.ts",
@@ -1968,7 +2005,7 @@
         {
           "path": "packages/contracts/src/panel-agent.ts",
           "why": "«Ждёт до…»: 10 минут на решение карточки",
-          "sha": "219bd8c508c641c0"
+          "sha": "c3cd622db741bff6"
         },
         {
           "path": "tools/mcp/panel.mjs",
@@ -2028,7 +2065,7 @@
         {
           "path": "apps/mobile/app/(tabs)/agent.tsx",
           "why": "«Телефон»: вкладка «Агент» — разговор, карточки, история, след, голос",
-          "sha": "4de0ccf1279ffd94"
+          "sha": "87e22fed2cdd8620"
         },
         {
           "path": "apps/mobile/src/features/panel-agent/AgentPendingCard.tsx",
@@ -2118,7 +2155,7 @@
         {
           "path": "apps/server/src/routes/panel-agent/actions-settings-extra/actions-settings-extra.ts",
           "why": "«Настройки и провайдер»: правила групп, наблюдатель, модели, сверка форматов, учётная запись, версия и обновление CLI",
-          "sha": "b8a656691d4da3fa"
+          "sha": "b2156e39be4930c2"
         },
         {
           "path": "apps/server/src/routes/panel-agent/actions-dlp-extra/actions-dlp-extra.ts",
@@ -2196,7 +2233,7 @@
           "sha": "1113e7ac61b649c5"
         }
       ],
-      "confirmedAt": "2026-10-08T12:48:16.049Z"
+      "confirmedAt": "2026-10-09T17:02:58.147Z"
     },
     {
       "topic": "portability",
@@ -2205,7 +2242,7 @@
         {
           "path": "apps/server/src/domains/portability/fidelity/fidelity.ts",
           "why": "«Пять уровней верности»: какой уровень получает запись и по какой причине",
-          "sha": "8df13852d4e6c0b1"
+          "sha": "b488525ea99cc801"
         },
         {
           "path": "apps/server/src/domains/portability/plan.ts",
@@ -2243,7 +2280,7 @@
           "sha": "c8960379be2d0e95"
         }
       ],
-      "confirmedAt": "2026-10-09T12:58:43.246Z"
+      "confirmedAt": "2026-10-09T15:45:40.656Z"
     },
     {
       "topic": "groups",

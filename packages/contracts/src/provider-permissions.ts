@@ -219,7 +219,7 @@ export const opencodePermissionInfoSchema = object({
   levels: array(zodEnum(opencodePermissionLevels)),
   /** Задокументированные инструменты — по ним строится форма. */
   tools: array(zodEnum(opencodePermissionTools)),
-  /** Инструменты, у которых панель умеет карту шаблонов (сейчас — `bash`). */
+  /** Инструменты, у которых панель умеет карту шаблонов (`bash` — команды, `read` — пути). */
   patternTools: array(zodEnum(opencodePermissionTools)),
   /** Что реально задано в файле (инструменты без записи ограничений не имеют). */
   entries: array(opencodePermissionEntrySchema),

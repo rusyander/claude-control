@@ -134,8 +134,8 @@ export const providersEn: typeof providersRu = {
       'permissions.allow / ask / deny rule lists), Continue (a separate permissions.yaml ' +
       'with three lists allow / ask / exclude and no mode at all), OpenCode (the permission key of ' +
       'opencode.json: an ' +
-      'allow / ask / deny level for the edit, bash and webfetch tools, and for bash a ' +
-      'list of command patterns instead of a single level), Goose (a single GOOSE_MODE key: ' +
+      'allow / ask / deny level for the edit, bash, webfetch and read tools, and for bash ' +
+      'and read a list of command or path patterns instead of a single level), Goose (a single GOOSE_MODE key: ' +
       'auto / approve / smart_approve / chat, no lists at all), Kimi Code (the ' +
       'default_permission_mode key: manual / auto / yolo, plus ordered ' +
       '[[permission.rules]] — a pattern and an allow / ask / deny decision), Cursor (the ' +

@@ -85,6 +85,11 @@ export const permissionRefusals = [
    * не совпадает ни с чем: запрет уехал бы «записанным» и не запрещал (инв. 6).
    */
   'argument_grammar_differs',
+  /**
+   * Инструмент у цели есть, но это решение у него не выражается
+   * (`ruleGrammar.toolDecisions`): у `read` OpenCode — только запрет и спрос.
+   */
+  'decision_not_expressible',
 ] as const;
 
 export type PermissionRefusal = (typeof permissionRefusals)[number];
@@ -121,14 +126,18 @@ export function translatePermission(
 
   const grammar = target.permissionsConfig?.ruleGrammar;
   const tool = grammar?.tools?.[parsed.tool] ?? parsed.tool;
-  const why = grammarRefusal(item.rule, grammar);
+  const why = grammarRefusal(item.rule, grammar, decision);
   if (why) return { kind: 'refused', why };
 
+  const argument =
+    parsed.argument !== null && grammar?.pathAnywhereTools?.includes(tool)
+      ? pathAnywhere(parsed.argument)
+      : parsed.argument;
   return {
     kind: 'rule',
     tool,
-    argument: parsed.argument,
-    rule: parsed.argument === null ? tool : `${tool}(${parsed.argument})`,
+    argument,
+    rule: argument === null ? tool : `${tool}(${argument})`,
     decision,
   };
 }
@@ -145,13 +154,21 @@ export function translatePermission(
 export function grammarRefusal(
   rule: string,
   grammar: ProviderPermissionRuleGrammar | undefined,
+  decision?: PermissionDecision,
 ): Exclude<PermissionRefusal, 'mode_is_whole_cli'> | null {
   const parsed = parsePermissionRule(rule);
   if (parsed.kind === 'mode' || !grammar) return null;
   const tool = grammar.tools?.[parsed.tool] ?? parsed.tool;
   if (grammar.closed && !grammar.tools?.[parsed.tool]) return 'tool_not_in_vocabulary';
+  const decisions = grammar.toolDecisions?.[tool];
+  if (decision !== undefined && decisions && !decisions.includes(decision)) {
+    return 'decision_not_expressible';
+  }
   if (parsed.argument !== null && !grammar.argumentTools.includes(tool)) {
     return 'argument_not_expressible';
+  }
+  if (parsed.argument !== null && grammar.pathAnywhereTools?.includes(tool)) {
+    return pathAnywhere(parsed.argument) === null ? 'argument_grammar_differs' : null;
   }
   // Буквальный аргумент значит у обеих сторон одну и ту же команду и едет как
   // есть; расходится только ПОДСТАНОВКА, и её переводить нечем.
@@ -172,6 +189,21 @@ export function grammarRefusal(
  */
 function hasWildcard(argument: string): boolean {
   return argument.includes('*');
+}
+
+/**
+ * Буквальный относительный путь канона → шаблон цели, сверяемый с абсолютным
+ * путём: перед `secret.txt` встаёт `**` и косая («этот файл в любом каталоге»). Всё
+ * прочее — `null`: подстановку переводить нечем, `/x` у Claude значит путь от
+ * файла настроек, `~` и буква диска — абсолютные, `.`/`..` — относительные к
+ * каталогу, которого шаблон цели не знает.
+ */
+export function pathAnywhere(argument: string): string | null {
+  const path = argument.trim().replace(/\\/g, '/');
+  if (!path || /[*?[\]{}]/.test(path)) return null;
+  if (path.startsWith('/') || path.startsWith('~') || /^[A-Za-z]:/.test(path)) return null;
+  if (path.split('/').some((part) => part === '.' || part === '..' || part === '')) return null;
+  return `**/${path}`;
 }
 
 /**

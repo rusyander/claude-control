@@ -11,12 +11,16 @@ import type {
   PanelAgentSeal,
   PanelAgentSealReason,
 } from './panel-agent';
+import type { ServerMessageCode, ServerMessageNestedParams } from './server-messages.ts';
 
 /** Строка ленты окна: реплика, шаг агента или заметка панели. */
 export interface FeedItem {
   id: string;
   kind: 'user' | 'assistant' | 'tool' | 'tool-error' | 'notice' | 'error';
   text: string;
+  /** Код ошибки сервера: окно переводит по нему, `text` — запасной русский. */
+  messageCode?: ServerMessageCode;
+  params?: ServerMessageNestedParams;
 }
 
 export interface ConversationState {
@@ -104,7 +108,15 @@ export function applyRunEvent(
       // ход, и модель выполнила бы её заново (сессия откат уже не делает — ход стоит).
       return withTurnAborted({
         ...state,
-        feed: [...state.feed, { id: nextId('e'), kind: 'error', text: event.message }],
+        feed: [
+          ...state.feed,
+          {
+            id: nextId('e'),
+            kind: 'error',
+            text: event.message,
+            ...(event.messageCode ? { messageCode: event.messageCode, params: event.params } : {}),
+          },
+        ],
       });
     default:
       return state;

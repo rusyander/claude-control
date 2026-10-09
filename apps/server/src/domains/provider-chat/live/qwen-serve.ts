@@ -50,10 +50,15 @@ export class QwenServeTurn implements LiveTurn {
   private graceOver = false;
   private graceTimer?: ReturnType<typeof setTimeout>;
   /**
-   * Принятые, но ещё не подхваченные сообщения. Ход, кончившийся между «принято»
-   * и подхватом, начнёт их следующим запросом — процесс нельзя гасить раньше.
+   * Отправленные, но ещё не подхваченные сообщения. Ход, кончившийся между
+   * «принято» и подхватом, начнёт их следующим запросом — процесс нельзя гасить
+   * раньше. Считается с ОТПРАВКИ, а не с ответа: поток событий бежит своим
+   * соединением и под нагрузкой обгонял ответ на POST — ход закрывался, POST
+   * обрывался, и принятое CLI сообщение уходило человеку как непринятое.
    */
   private awaitingSteers = 0;
+  /** Сколько сообщений ход уже подхватил — по нему оборванный POST узнаёт, что его взяли. */
+  private pickedTotal = 0;
   private readonly abort = new AbortController();
   private fetchImpl: typeof fetch = fetch;
   private readonly graceMs: number;
@@ -151,16 +156,22 @@ export class QwenServeTurn implements LiveTurn {
 
   async steer(text: string): Promise<boolean> {
     if (!this.active || !this.sessionId) return false;
+    this.awaitingSteers += 1;
+    const pickedBefore = this.pickedTotal;
+    let accepted: boolean;
     try {
       const reply = await this.json('POST', `/session/${this.sessionId}/mid-turn-message`, {
         message: text,
       });
-      const accepted = reply?.accepted === true;
-      if (accepted) this.awaitingSteers += 1;
-      return accepted;
+      accepted = reply?.accepted === true;
     } catch {
-      return false;
+      // Ход закрылся, пока ответ был в пути: подхвачено — значит, принято.
+      return this.pickedTotal > pickedBefore;
     }
+    // Отказ снимает ожидание, но окно подхвата не трогает: если ход уже кончился,
+    // его закроет окно, а не вечное ожидание потока.
+    if (!accepted) this.awaitingSteers = Math.max(0, this.awaitingSteers - 1);
+    return accepted;
   }
 
   stop(): void {
@@ -270,6 +281,7 @@ export class QwenServeTurn implements LiveTurn {
    * взведённый концом прошлого хода, оборвал бы начатый из сообщения ответ.
    */
   private picked(): void {
+    this.pickedTotal += 1;
     this.awaitingSteers = Math.max(0, this.awaitingSteers - 1);
     if (this.awaitingSteers === 0) clearTimeout(this.graceTimer);
   }

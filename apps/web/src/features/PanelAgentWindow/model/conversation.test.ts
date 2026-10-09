@@ -61,6 +61,20 @@ describe('conversation', () => {
     expect(state.feed.at(-1)).toMatchObject({ kind: 'error', text: 'упал' });
   });
 
+  it('код ошибки хода доезжает до строки ленты — окно переводит по нему', () => {
+    const state = applyRunEvent(withUserMessage(EMPTY_CONVERSATION, 'x'), {
+      kind: 'error',
+      message: 'CLI завершился с кодом 2 без ответа.',
+      messageCode: 'panel-agent-cli-exit',
+      params: { code: '2' },
+    });
+    expect(state.feed.at(-1)).toMatchObject({
+      kind: 'error',
+      messageCode: 'panel-agent-cli-exit',
+      params: { code: '2' },
+    });
+  });
+
   it('упавший ход не уезжает контекстом в следующий: одна реплика человека в конце истории', () => {
     let state = withUserMessage(EMPTY_CONVERSATION, 'удали правило');
     state = applyRunEvent(state, { kind: 'error', message: 'потолок хода' });

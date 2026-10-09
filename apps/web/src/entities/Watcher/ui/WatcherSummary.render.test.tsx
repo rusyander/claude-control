@@ -54,13 +54,13 @@ describe('сводка наблюдателя', () => {
     expect(html).not.toContain('server text');
   });
 
-  it('деньги — с подписью «оценка по тарифам API»; путь отчёта — по просьбе', () => {
+  it('деньги — с подписью «оценка по тарифам API»; путь отчёта сводка не пишет', () => {
     const html = renderToStaticMarkup(
-      <WatcherSummary status={base} elapsed={0} costUnit="money" showReportPath />,
+      <WatcherSummary status={base} elapsed={0} costUnit="money" />,
     );
     expect(html).toContain('$0.010');
     expect(html).toContain(i18n.t('watcher.spendEstimate'));
-    expect(html).toContain('C:/app/WATCH-REPORT.md');
+    expect(html).not.toContain('C:/app/WATCH-REPORT.md');
   });
 
   it('проблема: известный код — текст словаря, неизвестный — фраза сервера', () => {

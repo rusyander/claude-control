@@ -12,3 +12,5 @@ export const CHAT_ROUTE: string = '/chat';
 export const DLP_ROUTE: string = '/dlp';
 /** Локальные модели — на них ссылается подсказка под чатом. */
 export const LOCAL_MODELS_ROUTE: string = '/local-models';
+/** Страница наблюдателя — на неё ведёт строка «Наблюдатель» в боковой панели. */
+export const WATCHER_ROUTE: string = '/watcher';

@@ -36,21 +36,23 @@ export const opencodeProvider: ConfigProvider = {
     // команд: правило источника едет правилом.
     model: 'rules',
     decisions: ['allow', 'ask', 'deny'],
-    // Единственный CLI, чей словарь прав ЗАДОКУМЕНТИРОВАН и отличается от
-    // канонического: три строчных имени и ничего больше (`lib/opencode-permission.ts`,
-    // OPENCODE-4). Поэтому словарь закрыт: правило о `Read` или `WebSearch`
-    // здесь не пишется вовсе — ключ вне этих трёх OpenCode не читает, и запрет
-    // лежал бы в файле, ничего не запрещая. Уточнение аргумента задокументировано
-    // только у `bash` (карта шаблонов команд).
+    // Единственный CLI, чей словарь прав отличается от канонического: строчные
+    // имена и ничего больше (`lib/opencode-permission.ts`, OPENCODE-4). Поэтому
+    // словарь закрыт: правило о `WebSearch` здесь не пишется вовсе — ключ вне
+    // словаря OpenCode не читает, и запрет лежал бы в файле, ничего не запрещая.
+    // `read` снят живой пробой 09.10.2026: шаблон сверяется с абсолютным путём,
+    // поэтому путь пишется `**/<путь>`, и только запрет или спрос.
     ruleGrammar: {
-      tools: { Bash: 'bash', Edit: 'edit', WebFetch: 'webfetch' },
+      tools: { Bash: 'bash', Edit: 'edit', WebFetch: 'webfetch', Read: 'read' },
       closed: true,
-      argumentTools: ['bash'],
+      argumentTools: ['bash', 'read'],
       // Карта шаблонов команд — грамматика OpenCode, а не канона: правило
       // `Bash(git push:*)` записалось бы шаблоном `git push:*`, которому не
       // соответствует ни одна настоящая команда.
       argumentSyntax: 'own',
       oneShapePerTool: true,
+      pathAnywhereTools: ['read'],
+      toolDecisions: { read: ['ask', 'deny'] },
     },
   },
   // Хуки OpenCode (OPENCODE-3) — ключ `experimental.hook` того же opencode.json:

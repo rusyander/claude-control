@@ -17,7 +17,7 @@ import {
   activeCapabilities,
   gateNavSections,
 } from '@entities/Provider';
-import { NAV_SECTIONS, COLLAPSED_WIDTH, EXPANDED_WIDTH } from './Sidebar.constants';
+import { SIDEBAR_SECTIONS, COLLAPSED_WIDTH, EXPANDED_WIDTH } from './Sidebar.constants';
 import { navItemLabel } from './Sidebar.lib';
 import { AppMark } from '../AppMark/AppMark';
 import type { SidebarProps } from './Sidebar.types';
@@ -42,7 +42,7 @@ export function Sidebar({ isCollapsed, onToggle, isNarrow = false }: SidebarProp
   // Навигация гейтится возможностями активного провайдера: `unsupported`-разделы
   // убраны, `planned` помечены. Пока данные не загружены — показываем всё (для
   // дефолтного Claude всё `ready`, так что при Claude вид не меняется).
-  const sections = gateNavSections(NAV_SECTIONS, activeCapabilities(providers));
+  const sections = gateNavSections(SIDEBAR_SECTIONS, activeCapabilities(providers));
   const active = activeProvider(providers);
 
   const counts: Record<string, number | undefined> = {

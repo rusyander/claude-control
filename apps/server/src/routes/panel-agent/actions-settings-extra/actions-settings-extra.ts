@@ -149,10 +149,10 @@ const watcherView = (status: SettingsExtraWatcher) => ({
 
 const watcherStatus = definePanelAction({
   name: 'watcher_status',
-  section: 'settings',
+  section: 'watcher',
   risk: 'read',
   description:
-    'Background watcher (Settings → General): on/off, since when, whether an analysis runs now, ' +
+    'Background watcher (its own page, /watcher): on/off, since when, whether an analysis runs now, ' +
     'signals waiting, findings in its report.',
   input: z.object({}),
   route: () => ({ method: 'GET', url: WATCHER_URL }),
@@ -162,7 +162,7 @@ const watcherStatus = definePanelAction({
 
 const setWatcher = definePanelAction({
   name: 'set_watcher',
-  section: 'settings',
+  section: 'watcher',
   risk: 'change',
   title: 'journal-set-watcher',
   description:
@@ -187,7 +187,7 @@ const setWatcher = definePanelAction({
     };
   },
   shape: (_input, body) => watcherView(body as SettingsExtraWatcher),
-  page: () => ({ route: '/settings', focus: 'general' }),
+  page: () => ({ route: '/watcher' }),
 });
 
 const listModels = definePanelAction({

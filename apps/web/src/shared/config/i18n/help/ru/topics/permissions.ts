@@ -334,8 +334,8 @@ export const permissionsRu = {
       'При провайдере Codex это не списки allow/ask/deny, а два ключа config.toml: ' +
       'approval_policy (когда спрашивать) и sandbox_mode (что разрешено писать). ' +
       'У Gemini модель третья и лежит в settings.json: режим подтверждений ' +
-      'general.defaultApprovalMode плюс списки инструментов coreTools (что разрешено) и ' +
-      'excludeTools (что запрещено, он сильнее). Разрешать по белому списку ' +
+      'general.defaultApprovalMode плюс списки инструментов tools.core (что разрешено) и ' +
+      'tools.exclude (что запрещено, он сильнее). Разрешать по белому списку ' +
       'надёжнее, чем запрещать по чёрному. Режим yolo панель не пишет: у Gemini он ' +
       'допустим только как флаг командной строки, а в файле настроек ломает запуск CLI. ' +
       'У Qwen Code — своя, несмотря на родство с Gemini: режим tools.approvalMode ' +

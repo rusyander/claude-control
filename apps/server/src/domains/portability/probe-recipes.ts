@@ -1,5 +1,5 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { stringify as stringifyToml } from 'smol-toml';
 import { spliceCodexTableRegion, upsertCodexRootScalar } from '../../lib/codex-toml/codex-toml.ts';
 import type { ProviderEndpointApiKind } from '../../providers/types/assistant.ts';
@@ -39,6 +39,8 @@ export interface ProbeRecipe {
    * --command <имя>`). Не задан — команда уходит запросом через `args`.
    */
   commandArgs?(name: string): readonly string[];
+  /** Окружение запуска сверх адреса заглушки: то, что человек даёт CLI диалогом. */
+  readonly env?: Readonly<Record<string, string>>;
   /** Подготовить временный дом до запуска: снять мастера первого запуска и т.п. */
   prepare?(home: string, workdir: string): void;
   /**
@@ -124,7 +126,12 @@ export const PROBE_RECIPES: Readonly<Record<string, ProbeRecipe>> = {
     // `exec` — задокументированный неинтерактивный запуск. `--skip-git-repo-check`
     // обязателен: временный дом пробы репозиторием не является, а без флага этот
     // CLI вне git отказывается работать вовсе.
-    args: (prompt) => ['exec', '--skip-git-repo-check', prompt],
+    // `-m` — модель, которую codex знает: с умолчанием `codex-cli 0.160`
+    // (`gpt-6.1-sol`) он шлёт запрос БЕЗ поля `tools`, заглушка видит реплику в
+    // сторону, и проба кончалась `run_failed` (живая проба 10.10.2026; с
+    // `gpt-5.1-codex`, `gpt-5.4`, `o4-mini` инструменты на месте). Флагом, а не
+    // конфигом: конфиг — то, что проба меряет.
+    args: (prompt) => ['exec', '--skip-git-repo-check', '-m', 'gpt-5.1-codex', prompt],
     // Имена сняты ЖИВЫМ прогоном 22.09.2026 (`codex-cli 0.155.1`), а не взяты из
     // чужой документации: оболочка у него зовётся `exec_command` и ждёт команду
     // СТРОКОЙ в поле `cmd`. Вызов `shell` он отвергает — `unsupported call: shell`.
@@ -163,6 +170,23 @@ export const PROBE_RECIPES: Readonly<Record<string, ProbeRecipe>> = {
     // сработавший запрет: зелёное право там, где его не проверяли.
     readTool: { name: 'read_file', call: (path, workdir) => ({ file_path: join(workdir, path) }) },
     commandPrompt: '/agentdeck-probe-command',
+  },
+  gemini: {
+    // Адрес — теми же тремя переменными `endpointConfig`, что панель пишет в
+    // `.gemini/.env`. Имена и аргументы сняты живой пробой 10.10.2026 (gemini
+    // 0.63.0) из списка, который он шлёт модели: `run_shell_command {command}`,
+    // `read_file {file_path}`. Доверие каталогу — переменной
+    // `GEMINI_CLI_TRUST_WORKSPACE`, как у агента панели: без доверия `-p`
+    // отказывает сразу. Не флагом `--skip-trust`: с ним CLI работает, но
+    // проектный `.gemini/settings.json` не читает вовсе — проектный MCP выходил
+    // красным про пробу, а не про перенос (живая проба 10.10.2026).
+    apiKind: 'google',
+    args: (prompt) => ['-y', '-p', prompt],
+    env: { GEMINI_CLI_TRUST_WORKSPACE: 'true' },
+    shellTool: { name: 'run_shell_command', call: (command) => ({ command }) },
+    readTool: { name: 'read_file', call: (path, workdir) => ({ file_path: join(workdir, path) }) },
+    commandPrompt: '/agentdeck-probe-command',
+    prepare: prepareGeminiHome,
   },
   opencode: {
     // Адрес — окружением прогона контура (`runEndpoint`, `OPENCODE_CONFIG_CONTENT`),
@@ -234,6 +258,9 @@ function readFileCommand(path: string): string {
  */
 function prepareCodexHome(home: string, workdir: string): void {
   const path = join(home, '.codex', 'config.toml');
+  // На проектном уровне эмиттер пишет в `.codex` рабочего каталога, и дома
+  // `.codex` ещё нет: запись падала ENOENT, проба отвечала 500 (живая проба 10.10.2026).
+  mkdirSync(dirname(path), { recursive: true });
   let text = existsSync(path) ? readFileSync(path, 'utf8') : '';
   // Регионом, а не перезаписью: в этом же файле эмиттер уже разложил пробный
   // MCP-сервер и пробную переменную окружения, и целая запись стёрла бы их —
@@ -243,7 +270,32 @@ function prepareCodexHome(home: string, workdir: string): void {
     stringifyToml({ projects: { [workdir]: { trust_level: 'trusted' } } }),
     'projects',
   );
+  // `codex-cli 0.160` на старте клонирует каталог плагинов с GitHub
+  // (`openai/plugins.git`) в свой дом. Дом пробы каждый раз новый, и на
+  // медленной сети клон съедал весь срок прогона: проба кончалась `timed_out`, не
+  // дойдя до модели (живая проба 10.10.2026). Плагины проба не меряет.
+  text = spliceCodexTableRegion(text, stringifyToml({ features: { plugins: false } }), 'features');
   text = upsertCodexRootScalar(text, 'approval_policy', 'never');
   text = upsertCodexRootScalar(text, 'sandbox_mode', 'danger-full-access');
   writeFileSync(path, text, 'utf8');
+}
+
+/**
+ * Выбрать Gemini вход ключом API — единственный способ, при котором он идёт по
+ * `GOOGLE_GEMINI_BASE_URL` (`providers/catalog/gemini-contour.ts`). Без него CLI
+ * сам выбирает `gateway` и падает «Invalid auth method selected».
+ *
+ * Слиянием, а не перезаписью: на глобальном уровне эмиттер уже положил в этот
+ * файл пробный MCP-сервер и запрет — целая запись стёрла бы оба слоя.
+ */
+function prepareGeminiHome(home: string): void {
+  const path = join(home, '.gemini', 'settings.json');
+  mkdirSync(dirname(path), { recursive: true });
+  const settings = existsSync(path)
+    ? (JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>)
+    : {};
+  const security = (settings.security ?? {}) as Record<string, unknown>;
+  const auth = (security.auth ?? {}) as Record<string, unknown>;
+  settings.security = { ...security, auth: { ...auth, selectedType: 'gemini-api-key' } };
+  writeFileSync(path, `${JSON.stringify(settings, null, 2)}\n`, 'utf8');
 }

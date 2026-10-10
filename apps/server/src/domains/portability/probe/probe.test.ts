@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import { spawn } from 'node:child_process';
@@ -492,6 +492,53 @@ describe('заглушка вместо модели', () => {
       await stub.close();
     }
   });
+
+  it('Gemini (`contents`): вызов — часть `functionCall` объектом; счёт токенов и подпись — не ход', async () => {
+    // Живая проба 10.10.2026 (gemini 0.63.0): поток просится хвостом
+    // `?alt=sse`, а без диалекта заглушка отвечала `{ok:true}` — ноль ходов.
+    const seen: number[] = [];
+    const stub = await startProbeStub((turn) => {
+      seen.push(turn);
+      return [{ type: 'tool_use', id: 'probe_a', name: 'read_file', input: { file_path: 'x' } }];
+    });
+    const model = `${stub.baseUrl}/v1beta/models/probe`;
+    const body = {
+      contents: [{ role: 'user', parts: [{ text: 'привет' }] }],
+      tools: [{ functionDeclarations: [{ name: 'read_file' }] }],
+    };
+    try {
+      const counted = await fetch(`${model}:countTokens`, {
+        method: 'POST',
+        body: JSON.stringify({ contents: body.contents }),
+      });
+      expect(await counted.json()).toEqual({ totalTokens: 1 });
+      await fetch(`${model}:generateContent`, {
+        method: 'POST',
+        body: JSON.stringify({ contents: body.contents }),
+      });
+
+      const streamed = await (
+        await fetch(`${model}:streamGenerateContent?alt=sse`, {
+          method: 'POST',
+          body: JSON.stringify(body),
+        })
+      ).text();
+      expect(streamed.startsWith('data: {')).toBe(true);
+      const chunk = JSON.parse(streamed.slice(6)) as {
+        candidates: { content: { parts: { functionCall?: { name: string; args: unknown } }[] } }[];
+      };
+      expect(chunk.candidates[0]?.content.parts[0]?.functionCall).toEqual({
+        id: 'probe_a',
+        name: 'read_file',
+        args: { file_path: 'x' },
+      });
+
+      expect(seen).toEqual([0]);
+      expect(stub.requests).toHaveLength(1);
+    } finally {
+      await stub.close();
+    }
+  });
 });
 
 describe('ступени отказа', () => {
@@ -508,7 +555,7 @@ describe('ступени отказа', () => {
     // ответ про саму запись и останется верным, когда рецепт появится, а
     // «рецепта нет» через тикет П3 исчезнет. Показать второе вместо первого
     // значило бы обещать измерение, которого не будет.
-    const report = await runProbe({ target: getProvider('gemini'), scope: 'global' });
+    const report = await runProbe({ target: getProvider('aider'), scope: 'global' });
     const skips = new Map(report.rows.map((candidate) => [candidate.layer, candidate.skip]));
     const promised = new Map(report.rows.map((candidate) => [candidate.layer, candidate.promised]));
 
@@ -596,4 +643,45 @@ describe.skipIf(process.platform !== 'win32')('запуск .cmd-обёртки 
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  // Живая проба 10.10.2026: codex-cli 0.160 под `cmd.exe` не уложился в срок, а
+  // снятие убило только оболочку — CLI и его `git fetch` держали трубы, `close`
+  // не пришёл, и запрос пробы висел, пока его не оборвал клиент.
+  it('по сроку снимается всё дерево, и ответ приходит, хотя внук держал трубы', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'agentdeck-probe-tree-'));
+    const pidFile = join(dir, 'grandchild.pid');
+    try {
+      const grandchild = `require('fs').writeFileSync(${JSON.stringify(pidFile)}, String(process.pid)); setTimeout(() => {}, 120000)`;
+      const child = `require('child_process').spawn(process.execPath, ['-e', ${JSON.stringify(grandchild)}], { stdio: 'inherit' }); setTimeout(() => {}, 120000)`;
+      writeFileSync(join(dir, 'child.js'), child, 'utf8');
+      const wrapper = join(dir, 'hold-pipes.cmd');
+      writeFileSync(wrapper, `@"${process.execPath}" "${join(dir, 'child.js')}"\r\n`);
+
+      const started = Date.now();
+      const run = await runTarget({
+        command: wrapper,
+        args: [],
+        cwd: dir,
+        env: {},
+        timeoutMs: 3_000,
+        shell: true,
+      });
+
+      expect(run.timedOut).toBe(true);
+      expect(Date.now() - started).toBeLessThan(15_000);
+      const pid = Number(readFileSync(pidFile, 'utf8'));
+      const alive = (() => {
+        try {
+          process.kill(pid, 0);
+          return true;
+        } catch {
+          return false;
+        }
+      })();
+      if (alive) process.kill(pid);
+      expect(alive).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 });
+    }
+  }, 30_000);
 });

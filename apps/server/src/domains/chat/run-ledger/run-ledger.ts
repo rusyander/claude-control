@@ -221,7 +221,7 @@ export function isPidAlive(pid: number): boolean {
  * Codex — и пакетом, и родным `codex.exe`, если он стоит в PATH сам.
  */
 const CLI_IMAGE =
-  /^(cmd|cmd\.exe|sh|bash|zsh|node|node\.exe|claude|claude\.exe|claude\.cmd|qwen|qwen\.exe|codex|codex\.exe)$/i;
+  /^(cmd|cmd\.exe|sh|bash|zsh|node|node\.exe|claude|claude\.exe|claude\.cmd|qwen|qwen\.exe|codex|codex\.exe|opencode|opencode\.exe)$/i;
 
 /** Имя образа (без каталога) — того вида, под которым живёт запущенный панелью CLI. */
 export function isCliImage(name: string): boolean {
@@ -288,7 +288,8 @@ export interface ChildProcessInfo {
  * Имя процесса самого CLI под обёрткой: `claude.exe` (родной бинарник) или
  * `node` (пакетный запуск). `conhost.exe` и вложенные `cmd.exe` — не он.
  */
-const CLI_CHILD = /^(claude|claude\.exe|node|node\.exe|qwen|qwen\.exe|codex|codex\.exe)$/i;
+const CLI_CHILD =
+  /^(claude|claude\.exe|node|node\.exe|qwen|qwen\.exe|codex|codex\.exe|opencode|opencode\.exe)$/i;
 
 /**
  * Дети процесса на Windows. `wmic` на свежих сборках нет, у `tasklist` нет

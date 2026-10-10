@@ -121,7 +121,7 @@ export const providersRu = {
     mapPermissionsValue:
       'Работает: Claude (allow/ask/deny), Codex (approval_policy и sandbox_mode), ' +
       'Gemini (режим подтверждений general.defaultApprovalMode плюс списки инструментов ' +
-      'coreTools и excludeTools), Qwen Code (режим tools.approvalMode плюс списки правил ' +
+      'tools.core и tools.exclude), Qwen Code (режим tools.approvalMode плюс списки правил ' +
       'permissions.allow / ask / deny), Continue (отдельный файл permissions.yaml: три ' +
       'списка allow / ask / exclude, режима нет вовсе), OpenCode (ключ permission в opencode.json: уровень ' +
       'allow / ask / deny у инструментов edit, bash, webfetch и read, а у bash и read вместо ' +

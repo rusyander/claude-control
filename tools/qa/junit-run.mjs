@@ -72,10 +72,15 @@ for (const file of files) suites.push(await runFile(file, linked.get(file) ?? []
 writeFileSync(out, toJUnit(suites), 'utf8');
 const all = suites.flatMap((suite) => suite.cases);
 const failed = all.filter((item) => item.status === 'failed');
-const notRun = all.filter((item) => item.status === 'skipped').length;
+const skipped = all.filter((item) => item.status === 'skipped');
+const notRun = skipped.length;
+// Пропуск бывает двух родов: проверка сказала «не проверено» сама (кодом 2 —
+// нет CLI) или стенд лежал. Один счётчик «из-за стенда» на оба посылал
+// человека чинить стенд, когда не хватало goose и kimi (foreign-steer, 10.10).
+const notChecked = skipped.filter((item) => item.message?.startsWith('Не проверено.')).length;
 console.log(
-  `\njunit-run: файлов ${suites.length}, тестов ${all.length}, ` +
-    `провалов ${failed.length}, не засчитано из-за стенда ${notRun} → ${relative(project, out)}`,
+  `\njunit-run: файлов ${suites.length}, тестов ${all.length}, провалов ${failed.length}, ` +
+    `не проверено ${notChecked}, не засчитано из-за стенда ${notRun - notChecked} → ${relative(project, out)}`,
 );
 // exitCode, а не exit(): выход посреди закрытия сокетов fetch роняет Node на
 // Windows (libuv `UV_HANDLE_CLOSING`, код 127).

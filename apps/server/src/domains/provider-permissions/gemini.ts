@@ -20,11 +20,16 @@ import type { GeminiPermissionsValues, ProviderPermissionsTarget } from './types
  * GEMINI (`gemini-json`, GEMINI-2) — три ключа `settings.json` (глобального
  * `~/.gemini/settings.json` и проектного `<проект>/.gemini/settings.json`):
  *  - `general.defaultApprovalMode` — `default` | `auto_edit` | `plan`;
- *  - `coreTools` — белый список инструментов (что разрешено вызывать);
- *  - `excludeTools` — чёрный список; он ПРИОРИТЕТНЕЕ белого.
+ *  - `tools.core` — белый список инструментов (что разрешено вызывать);
+ *  - `tools.exclude` — чёрный список; он ПРИОРИТЕТНЕЕ белого.
+ *
+ * Прежние ключи верхнего уровня `coreTools`/`excludeTools` (формат настроек v1)
+ * gemini 0.63 НЕ ЧИТАЕТ вовсе и сам их не переносит: живая проба 10.10.2026 —
+ * `excludeTools: ["read_file"]` файл не закрыл, `tools.exclude` закрыл. Панель
+ * их читает (показать записанное раньше) и при сохранении убирает, перенося в v2.
  * Правятся ТОЛЬКО эти три ключа: соседи внутри `general`, объект `mcpServers` и
  * любые прочие ключи файла сохраняются (проверяется проекцией до записи).
- * Пустой список УДАЛЯЕТ ключ, а не пишет `[]`: пустой `coreTools` означал бы
+ * Пустой список УДАЛЯЕТ ключ, а не пишет `[]`: пустой `tools.core` означал бы
  * «не разрешено ничего» — молча запрещать инструменты панель не станет.
  *
  * `yolo` В ФАЙЛ НЕ ПИШЕТСЯ НИКОГДА. По документации Gemini это режим только для
@@ -35,10 +40,12 @@ import type { GeminiPermissionsValues, ProviderPermissionsTarget } from './types
 
 /**
  * Форма файла Gemini. Панель ведёт РОВНО `general.defaultApprovalMode` и два
- * списка инструментов; всё прочее (`mcpServers`, соседи внутри `general`) — чужое.
+ * списка инструментов в `tools`; всё прочее (`mcpServers`, соседи внутри
+ * `general` и `tools`) — чужое.
  */
 interface RawGeminiSettings {
   general?: Record<string, unknown>;
+  tools?: Record<string, unknown>;
   coreTools?: unknown;
   excludeTools?: unknown;
   [key: string]: unknown;
@@ -90,8 +97,9 @@ export function readGeminiPermissions(text: string): GeminiPermissionsValues {
 
   const config = parseProviderJsonObject<RawGeminiSettings>(text);
   const rawMode = objectSection(config, 'general')?.defaultApprovalMode;
-  const coreTools = readStringList(config.coreTools);
-  const excludeTools = readStringList(config.excludeTools);
+  const tools = objectSection(config, 'tools');
+  const coreTools = readStringList(tools?.core) ?? readStringList(config.coreTools);
+  const excludeTools = readStringList(tools?.exclude) ?? readStringList(config.excludeTools);
 
   const known =
     typeof rawMode === 'string' && GEMINI_APPROVAL_MODES.includes(rawMode as GeminiApprovalMode);
@@ -120,6 +128,7 @@ export function geminiOtherKeysProjection(config: RawGeminiSettings): string {
   delete rest.excludeTools;
 
   stripManagedSectionKeys(rest, 'general', ['defaultApprovalMode']);
+  stripManagedSectionKeys(rest, 'tools', ['core', 'exclude']);
 
   // Ключи сортируем РЕКУРСИВНО (`stableJson`, как у всех соседних проекций):
   // сравниваем содержимое, а не порядок обхода. Прежний
@@ -132,7 +141,7 @@ export function geminiOtherKeysProjection(config: RawGeminiSettings): string {
 
 /**
  * Записать права Gemini в settings.json, поменяв ТОЛЬКО три ключа. Пустой список
- * инструментов удаляет свой ключ (пустой `coreTools` означал бы «ничего нельзя»).
+ * инструментов удаляет свой ключ (пустой `tools.core` означал бы «ничего нельзя»).
  * Нет файла → создаётся с одним `general.defaultApprovalMode`.
  */
 export function saveGeminiPermissions(
@@ -158,10 +167,15 @@ export function saveGeminiPermissions(
   general.defaultApprovalMode = draft.approvalMode;
   config.general = general;
 
-  if (draft.coreTools.length > 0) config.coreTools = draft.coreTools;
-  else delete config.coreTools;
-  if (draft.excludeTools.length > 0) config.excludeTools = draft.excludeTools;
-  else delete config.excludeTools;
+  const tools = objectSection(config, 'tools') ?? {};
+  if (draft.coreTools.length > 0) tools.core = draft.coreTools;
+  else delete tools.core;
+  if (draft.excludeTools.length > 0) tools.exclude = draft.excludeTools;
+  else delete tools.exclude;
+  if (Object.keys(tools).length > 0) config.tools = tools;
+  else delete config.tools;
+  delete config.coreTools;
+  delete config.excludeTools;
 
   const next = `${JSON.stringify(config, null, 2)}\n`;
 

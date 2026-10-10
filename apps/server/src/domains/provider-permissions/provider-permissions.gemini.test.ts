@@ -50,7 +50,7 @@ describe('Gemini settings.json права: точечная правка трё�
     {
       theme: 'GitHub',
       general: { preferredEditor: 'vscode', defaultApprovalMode: 'auto_edit' },
-      coreTools: ['ReadFile'],
+      tools: { core: ['ReadFile'], sandbox: false },
       mcpServers: { probe: { command: 'node', args: ['x.js'] } },
     },
     null,
@@ -94,8 +94,12 @@ describe('Gemini settings.json права: точечная правка трё�
     expect(parsed.theme).toBe('GitHub');
     expect(parsed.mcpServers).toEqual({ probe: { command: 'node', args: ['x.js'] } });
     expect(parsed.general).toEqual({ preferredEditor: 'vscode', defaultApprovalMode: 'plan' });
-    expect(parsed.coreTools).toEqual(['ReadFile', 'Shell']);
-    expect(parsed.excludeTools).toEqual(['WriteFile']);
+    expect(parsed.tools).toEqual({
+      core: ['ReadFile', 'Shell'],
+      exclude: ['WriteFile'],
+      sandbox: false,
+    });
+    expect('coreTools' in parsed).toBe(false);
     expect(readdirSync(backupDir).some((n) => n.startsWith('gemini-settings.json.'))).toBe(true);
   });
 
@@ -108,8 +112,32 @@ describe('Gemini settings.json права: точечная правка трё�
       backupDir,
     );
     const parsed = JSON.parse(readFileSync(filePath, 'utf8')) as Record<string, unknown>;
+    expect(parsed.tools).toEqual({ sandbox: false });
+  });
+
+  // gemini 0.63 ключей верхнего уровня (v1) не читает: запрет там не действует
+  // (живая проба 10.10.2026). Записанное раньше панель показывает и при
+  // сохранении переносит в `tools`, не оставляя мёртвой копии.
+  it('ключи v1 coreTools/excludeTools читаются и при записи переезжают в tools', () => {
+    const filePath = join(root, 'settings.json');
+    writeFileSync(
+      filePath,
+      JSON.stringify({ theme: 'GitHub', coreTools: ['read_file'], excludeTools: ['write_file'] }),
+      'utf8',
+    );
+    const values = readGemini(filePath);
+    expect(values).toMatchObject({ coreTools: ['read_file'], excludeTools: ['write_file'] });
+
+    saveProviderPermissions(
+      targetFor(filePath),
+      { approvalMode: 'default', coreTools: [], excludeTools: ['write_file'] },
+      backupDir,
+    );
+    const parsed = JSON.parse(readFileSync(filePath, 'utf8')) as Record<string, unknown>;
+    expect(parsed.tools).toEqual({ exclude: ['write_file'] });
     expect('coreTools' in parsed).toBe(false);
     expect('excludeTools' in parsed).toBe(false);
+    expect(parsed.theme).toBe('GitHub');
   });
 
   it('форма файла сохраняется: BOM и CRLF остаются', () => {

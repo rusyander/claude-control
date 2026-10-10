@@ -236,15 +236,46 @@ async function waitFor(url, seconds, gone = () => false) {
 /**
  * PATH без каталогов, где лежит `claude`: одноразовая панель не должна запускать
  * настоящий CLI (он пошёл бы в сеть и в учётную запись человека). Git и node
- * остаются — без git не работают проекты.
+ * остаются — без git не работают проекты. Исключение — каталоги, поставленные
+ * самой проверкой (`checkAddedPathDirs`); если в таком лежит `claude`,
+ * `keptClaude` велит стенду заслонить его заглушкой (`BLOCKED_CLAUDE`).
  */
 function pathWithoutClaude() {
   const raw = process.env.PATH ?? process.env.Path ?? '';
   const names = IS_WIN ? ['claude.cmd', 'claude.exe', 'claude.ps1', 'claude'] : ['claude'];
-  return raw
-    .split(delimiter)
-    .filter((dir) => dir && !names.some((name) => existsSync(join(dir, name))))
-    .join(delimiter);
+  const added = new Set(checkAddedPathDirs(raw));
+  let keptClaude = false;
+  const dirs = raw.split(delimiter).filter((dir) => {
+    if (!dir) return false;
+    const hasClaude = names.some((name) => existsSync(join(dir, name)));
+    if (hasClaude && added.has(dir)) keptClaude = true;
+    return !hasClaude || added.has(dir);
+  });
+  return { path: dirs.join(delimiter), keptClaude };
+}
+
+/**
+ * Заглушка `claude` на случай, когда каталог проверки несёт и настоящий: такой
+ * каталог оставлен ради соседа (npm кладёт opencode рядом с claude.cmd), а сам
+ * Claude в одноразовом стенде запускаться не должен — отказ громкий, не тихий.
+ */
+const BLOCKED_CLAUDE = `process.stderr.write('throwaway-stand: настоящий claude в одноразовом стенде запрещён\\n');
+process.exit(1);
+`;
+
+/**
+ * Каталоги, которые проверка САМА поставила в PATH до `startStand` (каталог
+ * найденного CLI перед PATH оболочки). Их вырезать нельзя, даже если там лежит
+ * `claude`: npm кладёт opencode, codex и прочих рядом с claude.cmd, и стенд,
+ * вырезав каталог, прятал от панели тот самый CLI, ради которого шла проверка, —
+ * панель отвечала «нужен вход в CLI» (группа foreign-steer, 10.10).
+ */
+function checkAddedPathDirs(raw) {
+  const shell = SHELL_ENV.PATH ?? SHELL_ENV.Path ?? '';
+  if (!shell || raw === shell) return [];
+  if (raw.endsWith(shell)) return raw.slice(0, raw.length - shell.length).split(delimiter);
+  const known = new Set(shell.split(delimiter));
+  return raw.split(delimiter).filter((dir) => dir && !known.has(dir));
 }
 
 /**
@@ -276,6 +307,56 @@ function killTree(child) {
     if (result.status === 0) return;
   }
   child.kill(IS_WIN ? undefined : 'SIGTERM');
+}
+
+/**
+ * Снять посредников живых сессий (`live-relay.mjs`), которых запустила панель
+ * стенда. Посредник нарочно отвязан от панели — сессия переживает её
+ * перезапуск, а сам он гаснет после получаса простоя. Одноразовый стенд второй
+ * раз не стартует: ход настоящего CLI (не фальшивого, тот умирает по метке
+ * жизни) оставлял посредника с `claude.exe` под ним, и они держали временный
+ * дом (EPERM при удалении). Pid берётся из журнала прогонов панели и снимается,
+ * только если это всё ещё посредник: освободившийся pid мог достаться чужому.
+ */
+function reapStandRelays(stateDir) {
+  let entries;
+  try {
+    entries = JSON.parse(readFileSync(join(stateDir, 'runs.json'), 'utf8'));
+  } catch {
+    return;
+  }
+  const pids = [
+    ...new Set(
+      (Array.isArray(entries) ? entries : [])
+        .map((entry) => entry?.relay?.pid)
+        .filter((pid) => Number.isInteger(pid)),
+    ),
+  ];
+  for (const pid of pids) {
+    if (!IS_WIN) {
+      try {
+        const cmd = readFileSync(`/proc/${pid}/cmdline`, 'utf8');
+        if (cmd.includes('live-relay.mjs')) process.kill(pid, 'SIGTERM');
+      } catch {
+        // Процесса уже нет или /proc нет (macOS) — посредник догаснет сам.
+      }
+      continue;
+    }
+    const probe = spawnSync(
+      'powershell',
+      [
+        '-NoProfile',
+        '-Command',
+        `(Get-CimInstance Win32_Process -Filter 'ProcessId=${pid}').CommandLine`,
+      ],
+      { encoding: 'utf8', windowsHide: true },
+    );
+    if (!probe.stdout?.includes('live-relay.mjs')) continue;
+    spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], {
+      stdio: 'ignore',
+      windowsHide: true,
+    });
+  }
 }
 
 /**
@@ -340,7 +421,10 @@ export async function startStand({
   // панели: скрипт запускается этим же node через обёртку под именем CLI. Так
   // проверка видит, что ДОШЛО до процесса (argv, stdin), не трогая настоящий.
   const bin = join(root, 'bin');
-  const fakeNames = Object.keys(fakeCli);
+  const shellPath = pathWithoutClaude();
+  const fakes =
+    shellPath.keptClaude && !fakeCli.claude ? { ...fakeCli, claude: BLOCKED_CLAUDE } : fakeCli;
+  const fakeNames = Object.keys(fakes);
   if (fakeNames.length > 0) {
     mkdirSync(bin, { recursive: true });
     // Метка жизни стенда: фальшивый CLI сам выходит, когда её нет. Процесс CLI
@@ -349,7 +433,7 @@ export async function startStand({
     writeFileSync(join(bin, STAND_ALIVE), '', 'utf8');
     for (const name of fakeNames) {
       const script = join(bin, `${name}.mjs`);
-      writeFileSync(script, fakeCli[name], 'utf8');
+      writeFileSync(script, fakes[name], 'utf8');
       if (IS_WIN) {
         writeFileSync(
           join(bin, `${name}.cmd`),
@@ -387,9 +471,7 @@ export async function startStand({
     ...base,
     ...extraEnv,
     ...homeEnv,
-    PATH: [...(fakeNames.length > 0 ? [bin] : []), pathWithoutClaude(), ...extraPath].join(
-      delimiter,
-    ),
+    PATH: [...(fakeNames.length > 0 ? [bin] : []), shellPath.path, ...extraPath].join(delimiter),
   };
 
   const apiPort = await freePort();
@@ -401,6 +483,7 @@ export async function startStand({
       await wait(700);
     }
     for (const child of children) killTree(child);
+    reapStandRelays(stateDir);
     await wait(500);
     rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 });
   };
@@ -414,21 +497,28 @@ export async function startStand({
   });
 
   let log = '';
-  const server = spawn(
-    process.execPath,
-    ['--experimental-strip-types', '--no-warnings', 'src/index.ts'],
-    {
-      cwd: serverDir,
-      env: { ...env, PORT: String(apiPort), WEB_PORT: String(webPort || apiPort + 1) },
-      stdio: ['ignore', 'pipe', 'pipe'],
-      shell: false,
-      windowsHide: true,
-    },
-  );
-  server.stdout.on('data', (chunk) => (log += chunk));
-  server.stderr.on('data', (chunk) => (log += chunk));
-  server.on('exit', (code, signal) => (log += `\n[панель вышла: код ${code}, сигнал ${signal}]\n`));
-  children.push(server);
+  const spawnServer = () => {
+    const child = spawn(
+      process.execPath,
+      ['--experimental-strip-types', '--no-warnings', 'src/index.ts'],
+      {
+        cwd: serverDir,
+        env: { ...env, PORT: String(apiPort), WEB_PORT: String(webPort || apiPort + 1) },
+        stdio: ['ignore', 'pipe', 'pipe'],
+        shell: false,
+        windowsHide: true,
+      },
+    );
+    child.stdout.on('data', (chunk) => (log += chunk));
+    child.stderr.on('data', (chunk) => (log += chunk));
+    child.on(
+      'exit',
+      (code, signal) => (log += `\n[панель вышла: код ${code}, сигнал ${signal}]\n`),
+    );
+    children.push(child);
+    return child;
+  };
+  let server = spawnServer();
   if (web) {
     children.push(
       spawn(
@@ -504,7 +594,40 @@ export async function startStand({
 
   const read = (path) => (existsSync(path) ? readFileSync(path, 'utf8') : null);
 
-  return { root, home, cfg, bin, apiUrl, webUrl, api, newPage, read, stop, log: () => log };
+  /**
+   * Жёсткий перезапуск панели: снять ОДИН процесс сервера без обработчиков
+   * выхода (на Windows `kill()` — это `TerminateProcess`, ровно как `node
+   * --watch` при правке файла; его дети остаются жить) и поднять заново на том
+   * же доме и порту. Номер снятого процесса — в ответе.
+   */
+  async function restartHard() {
+    const killedPid = server.pid;
+    server.kill('SIGKILL');
+    await new Promise((resolve) =>
+      server.exitCode !== null ? resolve() : server.once('exit', resolve),
+    );
+    server = spawnServer();
+    if (!(await waitFor(`${apiUrl}/api/system`, 60, () => server.exitCode !== null))) {
+      throw new Error(`панель не поднялась после жёсткого перезапуска:\n${log.slice(-2000)}`);
+    }
+    return { killedPid, pid: server.pid };
+  }
+
+  return {
+    root,
+    home,
+    cfg,
+    bin,
+    apiUrl,
+    webUrl,
+    api,
+    newPage,
+    read,
+    stop,
+    restartHard,
+    serverPid: () => server.pid,
+    log: () => log,
+  };
 }
 
 /**
@@ -545,6 +668,9 @@ export async function runOnStand(options, scenario) {
       process.exit(2);
     }
     check('сценарий дошёл до конца', false, error?.stack ?? String(error));
+    // `fetch failed` посреди сценария — обычно упавшая панель; без её журнала
+    // причина терялась вместе со стендом.
+    if (stand) console.log(`\nЖурнал панели (хвост):\n${stand.log().slice(-4000)}`);
   } finally {
     if (stand) await stand.stop();
   }

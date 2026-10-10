@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { quoteForShell, shellArgs } from '../../../lib/cli-args/cli-args.ts';
+import { killChildTree } from '../../../lib/process-tree/process-tree.ts';
 import type { EnvScope } from '@agentdeck/contracts/portable-env';
 import type {
   ProbeLayer,
@@ -159,7 +160,7 @@ export async function runProbe(deps: ProbeDeps): Promise<ProbeReport> {
         /** Оболочка нужна только настоящему бинарю (.cmd-обёртка на Windows). */
         shell: deps.cliOverride === undefined,
         cwd: workdir,
-        env: { ...homeEnv(home), ...address(home, stub.baseUrl) },
+        env: { ...homeEnv(home), ...recipe.env, ...address(home, stub.baseUrl) },
         timeoutMs: deps.timeoutMs ?? RUN_TIMEOUT_MS,
       });
 
@@ -169,7 +170,7 @@ export async function runProbe(deps: ProbeDeps): Promise<ProbeReport> {
         // наблюдали» здесь означало бы провал переноса, которого не было.
         return report(
           probeLayers.map((layer) =>
-            skipped(layer, promised, 'run_failed', firstLine(run.stderr || run.stdout)),
+            skipped(layer, promised, 'run_failed', lastLine(run.stderr || run.stdout)),
           ),
         );
       }
@@ -608,13 +609,13 @@ function observe(
  * Реплики запроса — ПО ИМЕНИ ПОЛЯ, а не по одному заранее выбранному.
  *
  * У клиента Anthropic разговор лежит в `messages`, у ручки `/responses` — в
- * `input`; ровно по этому признаку узнаёт диалект и сама заглушка. Знай
+ * `input`, у Gemini — в `contents`; ровно по этому признаку узнаёт диалект и сама заглушка. Знай
  * наблюдение только одно имя — у второго диалекта ответы инструментов не нашлись
  * бы вовсе, и «вывод так и не появился» дало бы ЗЕЛЁНЫЙ там, где не было даже
  * вызова: наблюдение по негативу без реплик подтверждает что угодно.
  */
 function replies(request: Record<string, unknown>): string {
-  return JSON.stringify(request.messages ?? request.input ?? []);
+  return JSON.stringify(request.messages ?? request.input ?? request.contents ?? []);
 }
 
 /** Обещан ли этому слою уровень «текстом» — от него зависит, что вообще мерить. */
@@ -753,15 +754,24 @@ export function runTarget(params: {
       stderr += chunk;
     });
 
-    const timer = setTimeout(() => {
-      timedOut = true;
-      child.kill('SIGKILL');
-    }, params.timeoutMs);
-
+    let settled = false;
     const done = (): void => {
+      if (settled) return;
+      settled = true;
       clearTimeout(timer);
       resolve({ stdout, stderr, timedOut });
     };
+    // Снимается ДЕРЕВО: через оболочку `kill()` убивал только `cmd.exe`, а сам
+    // CLI под ним жил дальше и держал трубы вывода — `close` не приходил, и
+    // запрос пробы висел без конца, оставляя сирот (живая проба 10.10.2026,
+    // codex-cli 0.160 и его `git fetch`). После снятия ждём только выхода.
+    const timer = setTimeout(() => {
+      timedOut = true;
+      killChildTree(child);
+      if (child.exitCode !== null || child.signalCode !== null) done();
+      else child.once('exit', done);
+    }, params.timeoutMs);
+
     child.on('error', done);
     child.on('close', done);
     child.stdin?.on('error', () => undefined);
@@ -783,13 +793,19 @@ function baseEnv(): Record<string, string> {
   return env;
 }
 
-/** Первая непустая строка чужого вывода — ровно столько, сколько уместно показать. */
-function firstLine(text: string): string {
+/**
+ * Последняя непустая строка чужого вывода — ровно столько, сколько уместно
+ * показать. Последняя, а не первая: причину отказа CLI пишут в конце, а первой у
+ * codex идёт служебное «Reading additional input from stdin...» (живая проба
+ * 10.10.2026) — с ним отчёт не называл причину вовсе.
+ */
+function lastLine(text: string): string {
   return (
     text
       .split(/\r?\n/)
       .map((line) => line.trim())
-      .find((line) => line.length > 0)
+      .filter((line) => line.length > 0)
+      .at(-1)
       ?.slice(0, 200) ?? ''
   );
 }

@@ -263,6 +263,13 @@ async function checkCli(name, spec) {
         JSON.stringify(await status()),
       )
     ) {
+      // Ход кончился, не начавшись: причина — в последней реплике (ошибка CLI),
+      // а журнал панели о ней молчит.
+      const messages = (await stand.api(`/provider-chat/chats/${id}`)).body?.messages ?? [];
+      console.log(
+        `    последняя реплика: ${JSON.stringify(messages.at(-1) ?? null).slice(0, 800)}`,
+      );
+      console.log(`    модель получила запросов: ${stub.requests.length}`);
       console.log(stand.log().slice(-1500));
       return;
     }

@@ -182,8 +182,7 @@ GEMINI_MODEL=gemini-2.5-pro
     expect(parsed.theme).toBe('GitHub');
     expect(parsed.mcpServers).toEqual({ probe: { command: 'node', args: ['x.js'] } });
     expect(parsed.general).toEqual({ preferredEditor: 'vscode', defaultApprovalMode: 'auto_edit' });
-    expect(parsed.coreTools).toEqual(['ReadFile']);
-    expect(parsed.excludeTools).toEqual(['run_shell_command']);
+    expect(parsed.tools).toEqual({ core: ['ReadFile'], exclude: ['run_shell_command'] });
   });
 
   // Главное правило GEMINI-2: `yolo` — режим только для флага CLI, в

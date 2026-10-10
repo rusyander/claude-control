@@ -548,13 +548,17 @@ function permissionVerdict(item: PermissionItem, profile: TargetProfile): Fideli
     // Правило, которого словарь цели не выражает, перевод НЕ ПИШЕТ
     // (`permissions-map.ts`) — обещать здесь «нативно» значило бы сказать
     // человеку, что запрет действует, когда его нет в файле.
-    if (grammarRefusal(item.rule, profile.permissions.grammar, item.decision)) {
+    //
+    // Грамматика сверяется с решением, которое ПОЕДЕТ, — после понижения: перевод
+    // получает именно его. Сверка с исходным `ask` отвергала у Gemini (у
+    // инструментов только `deny`) правило, которое запретом записывается честно.
+    const own = profile.permissions.decisions.includes(item.decision);
+    const stricter = own ? null : strictestAvailable(item.decision, profile.permissions.decisions);
+    const carried = own ? item.decision : (stricter ?? item.decision);
+    if (grammarRefusal(item.rule, profile.permissions.grammar, carried)) {
       return degraded(profile, 'rule_unexpressible', true);
     }
-    if (profile.permissions.decisions.includes(item.decision)) {
-      return { ...verdict('native', 'target_mechanism'), decision: item.decision };
-    }
-    const stricter = strictestAvailable(item.decision, profile.permissions.decisions);
+    if (own) return { ...verdict('native', 'target_mechanism'), decision: item.decision };
     if (stricter) return { ...verdict('native', 'decision_downgraded'), decision: stricter };
     // Строже — нечем. Ослабить правило нельзя ни при каких условиях, значит
     // механизм цели ЭТО правило выразить не может: принудить остаётся брокеру

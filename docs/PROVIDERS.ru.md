@@ -115,8 +115,8 @@ Goose сервер не поднимет), чужой `enabled: false` пане�
 
 - **Codex** — два корневых ключа `config.toml`: `approval_policy` и `sandbox_mode`.
 - **Gemini** — `settings.json`: режим `general.defaultApprovalMode` (`default` — спрашивать всегда,
-  `auto_edit` — правки файлов без вопросов, `plan` — только чтение) плюс списки `coreTools`
-  (разрешено) и `excludeTools` (запрещено, сильнее). Режим `yolo` панель не записывает: по
+  `auto_edit` — правки файлов без вопросов, `plan` — только чтение) плюс списки `tools.core`
+  (разрешено) и `tools.exclude` (запрещено, сильнее). Режим `yolo` панель не записывает: по
   документации он допустим только как флаг командной строки, а в `settings.json` валит запуск CLI.
 - **Qwen Code** — `settings.json`, но ключи СВОИ, не гемини-совские, хотя это его форк: режим
   `tools.approvalMode` (`default`, `plan`, `auto-edit`, `auto`, `yolo`) плюс три списка правил

@@ -266,7 +266,7 @@ describe('provider-project-routes: проектный уровень прова�
     expect(raw.theme).toBe('dark');
     expect(raw.mcpServers).toEqual({ old: { command: 'node' } });
     expect(raw.general).toEqual({ defaultApprovalMode: 'plan' });
-    expect(raw.coreTools).toEqual(['ReadFile']);
+    expect(raw.tools).toEqual({ core: ['ReadFile'] });
   });
 
   // CURSOR-2: проектные права Cursor — ключ `permissions` в `<проект>/.cursor/cli.json`.

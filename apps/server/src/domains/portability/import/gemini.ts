@@ -5,7 +5,7 @@ import type { Importer } from '../types.ts';
  * Gemini CLI → канон.
  *
  * Разделы: `GEMINI.md`, `settings.json` (MCP, права `defaultApprovalMode` +
- * `coreTools`/`excludeTools`), файл `.env`, каталог `commands/*.toml`. Скиллов,
+ * `tools.core`/`tools.exclude`), файл `.env`, каталог `commands/*.toml`. Скиллов,
  * хуков и плагинов у Gemini нет.
  *
  * Как и у Codex, карта соответствий взята у одностороннего импортёра самого

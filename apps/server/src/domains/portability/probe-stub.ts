@@ -68,6 +68,9 @@ export async function startProbeStub(script: StubScript): Promise<ProbeStub> {
       if (request.url?.includes('count_tokens')) {
         return sendJson(response, { input_tokens: 1 });
       }
+      if (request.url?.includes(':countTokens')) {
+        return sendJson(response, { totalTokens: 1 });
+      }
 
       let body: Record<string, unknown> = {};
       try {
@@ -97,13 +100,19 @@ export async function startProbeStub(script: StubScript): Promise<ProbeStub> {
       // Одно исключение: `/chat/completions` (OpenCode, Continue, Aider, Goose)
       // тоже шлёт `messages`, и по полю его не отличить от Anthropic. Зато хвост
       // этой ручки у всех её клиентов один и тот же — по нему и узнаётся.
+      //
+      // Gemini (`generateContent` Google) кладёт реплики в `contents`, и поток он
+      // просит не полем тела, а хвостом адреса `?alt=sse`.
       const dialect = !Array.isArray(body.messages)
         ? Array.isArray(body.input)
           ? 'responses'
-          : null
+          : Array.isArray(body.contents)
+            ? 'google'
+            : null
         : request.url?.includes('chat/completions')
           ? 'chat'
           : 'anthropic';
+      const sse = request.url?.includes('alt=sse') === true;
       if (!dialect) {
         return sendJson(response, { ok: true });
       }
@@ -117,6 +126,7 @@ export async function startProbeStub(script: StubScript): Promise<ProbeStub> {
         const aside: StubBlock[] = [{ type: 'text', text: 'agentdeck probe' }];
         if (dialect === 'responses') return sendResponsesStream(response, aside);
         if (dialect === 'chat') return sendChat(response, aside, body.stream === true);
+        if (dialect === 'google') return sendGoogle(response, aside, sse);
         if (body.stream === true) return sendStream(response, aside, 'end_turn');
         return sendJson(response, message(aside, 'end_turn'));
       }
@@ -132,6 +142,7 @@ export async function startProbeStub(script: StubScript): Promise<ProbeStub> {
       // не ждут, и `stream` в теле они не присылают вовсе.
       if (dialect === 'responses') sendResponsesStream(response, blocks);
       else if (dialect === 'chat') sendChat(response, blocks, body.stream === true);
+      else if (dialect === 'google') sendGoogle(response, blocks, sse);
       else if (body.stream === true) sendStream(response, blocks, stopReason);
       else sendJson(response, message(blocks, stopReason));
     });
@@ -356,5 +367,33 @@ function sendChat(response: ServerResponse, blocks: readonly StubBlock[], stream
   });
   chunk({ delta: {}, finish_reason: finish }, { usage });
   response.write('data: [DONE]\n\n');
+  response.end();
+}
+
+/**
+ * Тот же сценарий на `generateContent` Google — диалекте Gemini CLI.
+ *
+ * Вызов инструмента — часть реплики `functionCall` с аргументами ОБЪЕКТОМ, не
+ * строкой; конец хода — `finishReason: "STOP"` и с вызовами тоже: исполнять их
+ * или нет, клиент решает по самим частям. Поток (`?alt=sse`) — тот же кусок
+ * строкой `data:`, без имён событий; снят живой пробой 10.10.2026 (gemini 0.63.0).
+ */
+function sendGoogle(response: ServerResponse, blocks: readonly StubBlock[], sse: boolean): void {
+  const parts = blocks.map((block) =>
+    block.type === 'text'
+      ? { text: block.text }
+      : { functionCall: { id: block.id, name: block.name, args: block.input } },
+  );
+  const chunk = {
+    candidates: [{ index: 0, content: { role: 'model', parts }, finishReason: 'STOP' }],
+    usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1, totalTokenCount: 2 },
+  };
+  if (!sse) return sendJson(response, chunk);
+  response.writeHead(200, {
+    'content-type': 'text/event-stream',
+    'cache-control': 'no-cache',
+    connection: 'keep-alive',
+  });
+  response.write(`data: ${JSON.stringify(chunk)}\r\n\r\n`);
   response.end();
 }

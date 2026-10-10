@@ -93,7 +93,7 @@ export interface ProviderEnvConfigLocation {
  *
  * Задаётся ТОЛЬКО у провайдеров с реализованным адаптером прав (Codex — скалярные
  * ключи корня `approval_policy` / `sandbox_mode` в config.toml; Gemini —
- * `general.defaultApprovalMode` + списки `coreTools`/`excludeTools` в
+ * `general.defaultApprovalMode` + списки `tools.core`/`tools.exclude` в
  * settings.json; OpenCode — ключ `permission` в opencode.json) — у них же
  * `permissions` = `ready`. У Claude права живут в settings.json (allow/deny/ask) и
  * обслуживаются собственными богатыми роутами, поэтому `permissionsConfig` у него
@@ -104,7 +104,7 @@ export interface ProviderPermissionsConfigLocation {
   /**
    * Формат файла:
    * - `toml` — скалярные ключи корня (Codex `config.toml`);
-   * - `gemini-json` — `general.defaultApprovalMode` + `coreTools`/`excludeTools`
+   * - `gemini-json` — `general.defaultApprovalMode` + `tools.core`/`tools.exclude`
    *   (Gemini `settings.json`), правятся точечно, прочие ключи сохраняются;
    * - `qwen-json` — `tools.approvalMode` + списки правил `permissions.allow` /
    *   `ask` / `deny` (Qwen Code `settings.json`). Форк Gemini, но ключи прав у

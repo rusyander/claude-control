@@ -103,8 +103,11 @@ describe('решение не ослабляется ни у одной цели
     );
     expect(noAsk.length).toBeGreaterThan(0);
 
+    // Правило без аргумента: у Gemini уточнение аргумента не держит вовсе
+    // (`ruleGrammar.argumentTools` пуст), и `Bash(rm -rf:*)` там — отказ
+    // грамматики, а не понижение решения.
     for (const target of noAsk) {
-      const verdict = level(permission('Bash(rm -rf:*)', 'ask'), target);
+      const verdict = level(permission('Bash', 'ask'), target);
       expect(verdict.level, target.id).toBe('native');
       expect(verdict.reason, target.id).toBe('decision_downgraded');
       expect(verdict.decision, target.id).toBe('deny');
@@ -280,6 +283,46 @@ describe('разбор правила канона', () => {
     expect(parsePermissionRule(modeRule('untrusted'))).toEqual({
       kind: 'mode',
       mode: 'untrusted',
+    });
+  });
+});
+
+/**
+ * Живая проба 10.10.2026 (gemini 0.63.0): `Read(файл)` дословно в списке Gemini
+ * не значил ничего, уточнение аргумента в `tools.exclude` не держало, а
+ * `tools.core` — «только эти инструменты», а не «не спрашивать».
+ */
+describe('перенос прав в Gemini', () => {
+  const gemini = targets.find((target) => target.id === 'gemini') as ConfigProvider;
+
+  it('запрет целого инструмента едет под именем Gemini', () => {
+    expect(translatePermission(permission('Read', 'deny'), 'deny', gemini)).toMatchObject({
+      kind: 'rule',
+      rule: 'read_file',
+      decision: 'deny',
+    });
+    expect(level(permission('Bash', 'deny'), gemini).level).toBe('native');
+  });
+
+  it('правило с аргументом — отказ, а не запрет всего инструмента', () => {
+    expect(translatePermission(permission('Read(secret.txt)', 'deny'), 'deny', gemini)).toEqual({
+      kind: 'refused',
+      why: 'argument_not_expressible',
+    });
+    expect(level(permission('Read(secret.txt)', 'deny'), gemini).level).not.toBe('native');
+  });
+
+  it('разрешение не пишется в белый список — он отнял бы остальные инструменты', () => {
+    expect(translatePermission(permission('Read', 'allow'), 'allow', gemini)).toEqual({
+      kind: 'refused',
+      why: 'decision_not_expressible',
+    });
+  });
+
+  it('инструмента, которого у Gemini нет, словарь не принимает', () => {
+    expect(translatePermission(permission('NotebookEdit', 'deny'), 'deny', gemini)).toEqual({
+      kind: 'refused',
+      why: 'tool_not_in_vocabulary',
     });
   });
 });

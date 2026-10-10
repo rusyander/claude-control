@@ -68,6 +68,27 @@ export interface OpencodeSessionFailure {
 
 export type OpencodeSessionOutcome = OpencodeSessionReply | OpencodeSessionFailure;
 
+/** Свой журнал процессов сервера OpenCode в каталоге данных панели. */
+export const OPENCODE_SERVE_PROCESS_LEDGER = 'opencode-serve-runs.json';
+
+/**
+ * Журнал процессов на диске (`panel-agent/processes`). Обработчик выхода ниже
+ * срабатывает только при обычном выходе; `node --watch` на Windows, падение или
+ * снятие панели проверкой убивают её без обработчиков, и сервер жил дальше
+ * сиротой, держа порт (живая приёмка 10.10: два `opencode serve` пережили свои
+ * панели на сутки). Записанный номер снимается на следующем старте панели.
+ */
+export interface ServeProcessLedger {
+  started(key: string, pid: number, cwd: string): void;
+  exited(key: string): void;
+}
+
+/**
+ * Как часто освежать запись живого сервера: уборка старше суток запись не
+ * снимает (`MAX_AGE_MS` журнала), а сервер живёт, сколько живёт панель.
+ */
+const LEDGER_REFRESH_MS = 60 * 60 * 1000;
+
 export interface OpencodeServeDeps {
   spawnImpl?: typeof nodeSpawn;
   fetchImpl?: typeof fetch;
@@ -283,10 +304,21 @@ export class OpencodeServe {
   /** Растёт на каждом `dispose()`: старт, начатый до снятия, сервер не усыновляет. */
   private generation = 0;
   private readonly sessions = new Map<string, OpencodeSession>();
+  private ledger: ServeProcessLedger | undefined;
+  /** Когда запись живого сервера в журнале последний раз освежалась. */
+  private recordedAt = 0;
+
+  /** Журнал ставит `runtime.ts`: каталог данных известен только там. */
+  setLedger(ledger: ServeProcessLedger | undefined): void {
+    this.ledger = ledger;
+  }
 
   /** Адрес поднятого сервера или `undefined`, если поднять не удалось. */
   async ensure(deps: OpencodeServeDeps): Promise<string | undefined> {
-    if (this.baseUrl) return this.baseUrl;
+    if (this.baseUrl) {
+      if (this.child && Date.now() - this.recordedAt > LEDGER_REFRESH_MS) this.record(this.child);
+      return this.baseUrl;
+    }
     // Параллельные запросы не должны поднимать ВТОРОЙ сервер: ждём один старт.
     this.starting ??= this.start(deps).finally(() => {
       this.starting = undefined;
@@ -329,8 +361,14 @@ export class OpencodeServe {
     // Процесс умер сам (CLI не найден, порт занят) — забываем адрес, следующий
     // запрос попробует поднять заново.
     child.on('error', () => this.forget());
-    child.on('exit', () => this.forget());
+    child.on('exit', () => {
+      this.unrecord(child);
+      this.forget();
+    });
     this.pending = child;
+    // В журнал — сразу, до готовности: панель, убитая посреди старта, тоже
+    // оставила бы сервер сиротой.
+    this.record(child);
 
     const baseUrl = `http://127.0.0.1:${port}`;
     const ready = await this.waitHealthy(baseUrl, deps);
@@ -358,6 +396,17 @@ export class OpencodeServe {
       if (Date.now() >= deadline) return false;
       await sleep(HEALTH_POLL_INTERVAL);
     }
+  }
+
+  /** Записать (или освежить) процесс сервера в журнале — следующий старт панели снимет сироту. */
+  private record(child: ChildProcess): void {
+    if (!child.pid) return;
+    this.recordedAt = Date.now();
+    this.ledger?.started(ledgerKey(child.pid), child.pid, process.cwd());
+  }
+
+  private unrecord(child: ChildProcess): void {
+    if (child.pid) this.ledger?.exited(ledgerKey(child.pid));
   }
 
   /** Забыть поднятый сервер (процесс умер) — сессии вместе с ним недействительны. */
@@ -591,8 +640,13 @@ export class OpencodeServe {
   /** Погасить сервер (выход панели, смена провайдера, тесты). */
   dispose(): void {
     this.generation += 1;
-    if (this.child) killTree(this.child);
-    if (this.pending) killTree(this.pending);
+    // Запись снимается здесь, а не в обработчике выхода процесса: на выходе
+    // панели он уже не успеет сработать.
+    for (const child of [this.child, this.pending]) {
+      if (!child) continue;
+      killTree(child);
+      this.unrecord(child);
+    }
     this.pending = undefined;
     this.forget();
   }
@@ -611,6 +665,11 @@ export class OpencodeServe {
  */
 function killTree(child: ChildProcess): void {
   killChildTree(child);
+}
+
+/** Ключ записи — по номеру оболочки: выход старого сервера не снимает запись нового. */
+function ledgerKey(pid: number): string {
+  return `opencode-serve-${pid}`;
 }
 
 /** Текст ответа из тела `POST /session/:id/message`; не той формы — `undefined`. */

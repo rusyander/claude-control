@@ -251,6 +251,44 @@ describe('OpencodeServe: локальный сервер и сессии', () =>
     expect(spawnImpl).toHaveBeenCalledTimes(2);
   });
 
+  it('журнал процессов: запись на старте, снятие на dispose и на смерти, освежение раз в час', async () => {
+    const children = [fakeChild(), fakeChild()];
+    children[1]!.pid = 4343;
+    let index = 0;
+    const spawnImpl = vi.fn(() => children[index++]!);
+    const { fetchImpl } = fakeServer();
+    const ledger = { started: vi.fn(), exited: vi.fn() };
+
+    const serve = new OpencodeServe();
+    serve.setLedger(ledger);
+    const deps = depsOf(fetchImpl, { spawnImpl });
+
+    await serve.ask('conv-1', 'первый', deps);
+    expect(ledger.started).toHaveBeenCalledWith('opencode-serve-4242', 4242, process.cwd());
+
+    // Смерть сервера снимает ЕГО запись; новый сервер пишется своим ключом.
+    children[0]!.emit('exit', 1);
+    expect(ledger.exited).toHaveBeenCalledWith('opencode-serve-4242');
+    await serve.ask('conv-1', 'второй', deps);
+    expect(ledger.started).toHaveBeenLastCalledWith('opencode-serve-4343', 4343, process.cwd());
+
+    // Живой сервер старше часа освежает запись: уборка суточной давности её не снимет.
+    const now = Date.now();
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(now + 61 * 60 * 1000);
+    ledger.started.mockClear();
+    await serve.ask('conv-1', 'третий', deps);
+    expect(ledger.started).toHaveBeenCalledWith('opencode-serve-4343', 4343, process.cwd());
+    ledger.started.mockClear();
+    await serve.ask('conv-1', 'четвёртый', deps);
+    expect(ledger.started).not.toHaveBeenCalled();
+    clock.mockRestore();
+
+    // На выходе панели обработчик выхода процесса не успеет — запись снимает dispose.
+    ledger.exited.mockClear();
+    serve.dispose();
+    expect(ledger.exited).toHaveBeenCalledWith('opencode-serve-4343');
+  });
+
   it('каталог разговора уходит каждым запросом (?directory=), смена каталога — новая сессия', async () => {
     const { fetchImpl, calls } = fakeServer();
     const serve = new OpencodeServe();

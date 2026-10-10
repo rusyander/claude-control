@@ -343,7 +343,7 @@ export const permissionsEn: typeof permissionsRu = {
       'With the Codex provider these are not allow/ask/deny lists but two config.toml keys: ' +
       'approval_policy (when to ask) and sandbox_mode (what may be written). Gemini uses ' +
       'a third model, kept in settings.json: the approval mode general.defaultApprovalMode ' +
-      'plus the tool lists coreTools (what is allowed) and excludeTools (what is blocked, ' +
+      'plus the tool lists tools.core (what is allowed) and tools.exclude (what is blocked, ' +
       'and it wins). Allowing by list is safer than blocking by list. The panel never ' +
       'writes the yolo mode: in Gemini it is a command-line flag only and breaks CLI ' +
       'startup from the settings file. Qwen Code has its own model despite being a Gemini ' +

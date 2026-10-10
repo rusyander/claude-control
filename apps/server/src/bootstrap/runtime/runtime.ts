@@ -141,7 +141,14 @@ import { createEventHub, type EventHub } from '../../lib/event-hub/event-hub.ts'
 import { PANEL_ACTION_CONFIRM_TIMEOUT_MS } from '@agentdeck/contracts/panel-agent';
 import { foreignChatKey, parseForeignChatKey } from '@agentdeck/contracts/foreign-chat-key';
 import { PanelPendingActions } from '../../domains/panel-agent/pending/pending.ts';
-import { reapPanelAgentOrphans } from '../../domains/panel-agent/processes/processes.ts';
+import {
+  PanelAgentProcesses,
+  reapPanelAgentOrphans,
+} from '../../domains/panel-agent/processes/processes.ts';
+import {
+  OPENCODE_SERVE_PROCESS_LEDGER,
+  opencodeServe,
+} from '../../domains/opencode-serve/opencode-serve.ts';
 import {
   chatKnobsLine,
   foreignChildExtra,
@@ -1290,6 +1297,15 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   // То же с CLI агентского прогона тестов: реестр в памяти, а сирота висел бы до
   // суток на мёртвом приёмнике прав, пока история пишет «остановился».
   reapProjectTestOrphans(ctx.location.paths.appData);
+  // И сервер OpenCode: обработчик выхода гасит его только при обычном выходе.
+  reapPanelAgentOrphans(ctx.location.paths.appData, {}, OPENCODE_SERVE_PROCESS_LEDGER);
+  opencodeServe.setLedger(
+    new PanelAgentProcesses(
+      () => ctx.location.paths.appData,
+      undefined,
+      OPENCODE_SERVE_PROCESS_LEDGER,
+    ),
+  );
   // Фоновый наблюдатель: сирота разбора прошлого запуска снимается, включённый
   // тумблер продолжает с того, что не успел разобрать.
   // Порт шлюза — живого слушателя: разбор через контур идёт тем же маршрутом,

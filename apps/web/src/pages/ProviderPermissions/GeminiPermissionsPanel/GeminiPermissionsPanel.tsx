@@ -16,7 +16,7 @@ import type { GeminiPermissionsPanelProps } from '../ProviderPermissionsPanel.ty
 /**
  * Права/аппрувы Gemini (GEMINI-2). Три ключа `settings.json`:
  * `general.defaultApprovalMode` (селект с пояснением риска у каждого значения) и
- * два списка инструментов — `coreTools` (белый) и `excludeTools` (чёрный,
+ * два списка инструментов — `tools.core` (белый) и `tools.exclude` (чёрный,
  * приоритетнее белого). Списки правятся текстом «одно имя в строке».
  *
  * Режим `yolo` в форме отсутствует СОЗНАТЕЛЬНО: у Gemini он допустим только как

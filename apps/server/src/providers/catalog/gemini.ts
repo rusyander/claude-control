@@ -12,6 +12,19 @@ const geminiHome = (): string => join(homedir(), '.gemini');
 const geminiSettings = (): string => join(geminiHome(), 'settings.json');
 
 /** Gemini CLI: GEMINI.md + ~/.gemini/settings.json. */
+/** Инструменты канона под именами Gemini 0.63 — из списка, который он шлёт модели. */
+const GEMINI_TOOL_NAMES: Readonly<Record<string, string>> = {
+  Bash: 'run_shell_command',
+  Read: 'read_file',
+  Write: 'write_file',
+  Edit: 'replace',
+  Glob: 'glob',
+  Grep: 'grep_search',
+  LS: 'list_directory',
+  WebFetch: 'web_fetch',
+  WebSearch: 'google_web_search',
+};
+
 export const geminiProvider: ConfigProvider = {
   id: 'gemini',
   name: 'Gemini CLI',
@@ -30,17 +43,36 @@ export const geminiProvider: ConfigProvider = {
   envConfig: { format: 'dotenv', path: () => join(geminiHome(), '.env') },
   // Права/аппрувы Gemini (GEMINI-2) — в том же settings.json: режим аппрувов
   // `general.defaultApprovalMode` (default | auto_edit | plan) и списки
-  // инструментов `coreTools` (белый) / `excludeTools` (чёрный, приоритетнее).
+  // инструментов `tools.core` (белый) / `tools.exclude` (чёрный, приоритетнее).
   // Значение `yolo` панель НЕ пишет никогда: по докам это режим только для флага
   // CLI, а в settings.json он валит старт ошибкой enum (сервер отвечает 400).
   permissionsConfig: {
     format: 'gemini-json',
     path: geminiSettings,
-    // Правила поимённо: белый список `coreTools` и чёрный `excludeTools`.
+    // Правила поимённо: белый список `tools.core` и чёрный `tools.exclude`.
     // Третьего списка (спросить) у Gemini нет — правило `ask` понижается до
     // `deny`, и матрица верности обязана назвать это понижением.
     model: 'rules',
     decisions: ['allow', 'deny'],
+    // Перенос правил канона — по живой пробе 10.10.2026 (gemini 0.63.0):
+    // - имена инструментов свои, и правило `Read(...)` дословно не значит для
+    //   Gemini ничего — запрет писался и не действовал;
+    // - уточнение аргумента в `tools.exclude` не держит: и `read_file(файл)`, и
+    //   `run_shell_command(node)` под `-y` исполнились, запрет целого
+    //   инструмента — закрыл. Правило с аргументом — отказ, а не запрет всего;
+    // - `allow` канона — «не спрашивать», а `tools.core` — «ТОЛЬКО эти
+    //   инструменты»: перенесённое разрешение одного чтения отняло бы у Gemini
+    //   все остальные. Поэтому переносится лишь запрет.
+    ruleGrammar: {
+      tools: GEMINI_TOOL_NAMES,
+      closed: true,
+      argumentTools: [],
+      argumentSyntax: 'own',
+      oneShapePerTool: false,
+      toolDecisions: Object.fromEntries(
+        Object.values(GEMINI_TOOL_NAMES).map((tool) => [tool, ['deny'] as const]),
+      ),
+    },
   },
   // Проектный уровень Gemini (COMMON-2 + GEMINI-2/3): задокументированы проектный
   // GEMINI.md, `<проект>/.gemini/settings.json` (MCP и права — проектные настройки
@@ -114,7 +146,7 @@ export const geminiProvider: ConfigProvider = {
   capabilities: buildCapabilities({
     globalInstructions: 'ready',
     mcp: 'ready',
-    // GEMINI-2: права — `general.defaultApprovalMode` + coreTools/excludeTools.
+    // GEMINI-2: права — `general.defaultApprovalMode` + tools.core/tools.exclude.
     permissions: 'ready',
     // GEMINI-3: переменные окружения — файл `.env` (глобальный и проектный).
     env: 'ready',

@@ -472,6 +472,8 @@ export class ProviderChatService {
 
     const note = this.workspaceNote(chat.workdir);
     const last = history.at(-1);
+    // Надзиратель судит слова человека, а не строку панели перед ними.
+    const ownWords = last?.role === 'user' ? last.content : undefined;
     if (note && last) {
       history[history.length - 1] = { ...last, content: withWorkspaceNote(last.content, note) };
     }
@@ -486,7 +488,12 @@ export class ProviderChatService {
           // Набор панели (В2) — у Qwen Code свой `QWEN_HOME` в режиме «Наши».
           // Слой группы — последним: его файл настроек решён для ЭТОГО разговора.
           platformEnv: { ...route.env, ...route.kit?.env, ...groupEnv },
-          ...(supervisor ? { supervisor } : {}),
+          ...(supervisor
+            ? {
+                supervisor:
+                  ownWords !== undefined ? { ...supervisor, prompt: ownWords } : supervisor,
+              }
+            : {}),
           ...(chat.workdir ? { workdir: chat.workdir } : {}),
           ...(model ? { model } : {}),
           ...(effort ? { effort } : {}),

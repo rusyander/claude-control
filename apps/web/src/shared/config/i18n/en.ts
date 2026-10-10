@@ -2507,7 +2507,7 @@ export const en: TranslationSchema = {
     gemini: {
       subtitle: 'Approval mode and allowed tools for {{provider}}',
       explain:
-        '{{provider}} permissions live in {{fileName}}: the approval mode general.defaultApprovalMode plus two tool lists — coreTools (what is allowed) and excludeTools (what is blocked). The blocklist wins over the allowlist: a tool present in both is blocked. The panel edits only these three keys; MCP servers and every other setting in the file stay untouched. Changes are picked up after the CLI restarts.',
+        '{{provider}} permissions live in {{fileName}}: the approval mode general.defaultApprovalMode plus two tool lists — tools.core (what is allowed) and tools.exclude (what is blocked). The blocklist wins over the allowlist: a tool present in both is blocked. Gemini no longer reads the old top-level coreTools and excludeTools keys — saving moves them into tools. The panel edits only these three keys; MCP servers and every other setting in the file stay untouched. Changes are picked up after the CLI restarts.',
       usingDefaults:
         'The keys are not set in the file yet — Gemini defaults are shown. They will be written only after you save.',
       yoloNote:
@@ -2532,11 +2532,11 @@ export const en: TranslationSchema = {
       },
       toolsPlaceholder: 'one tool name per line',
       coreTools: {
-        label: 'Tool allowlist (coreTools)',
-        hint: 'One name per line, e.g. run_shell_command or ReadFile. When the list is not empty, only the listed tools are allowed — this is the safest way to restrict the CLI. An empty list means no restriction (the key is removed from the file).',
+        label: 'Tool allowlist (tools.core)',
+        hint: 'One name per line, e.g. run_shell_command or read_file. When the list is not empty, only the listed tools are allowed — this is the safest way to restrict the CLI. An empty list means no restriction (the key is removed from the file).',
       },
       excludeTools: {
-        label: 'Tool blocklist (excludeTools)',
+        label: 'Tool blocklist (tools.exclude)',
         hint: 'One name per line. Listed tools are blocked; the blocklist wins over the allowlist. Blocking by list is less reliable than allowing: a tool added in a future CLI release becomes available automatically.',
       },
     },

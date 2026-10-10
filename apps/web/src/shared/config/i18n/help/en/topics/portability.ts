@@ -241,7 +241,10 @@ export const portabilityEn = {
       'The target has the same mechanism and the entry becomes its entry. This is ' +
       'the only level at which nothing is lost. It can carry a condition: Codex runs a ' +
       'carried hook only after it is approved in /hooks inside the CLI — the row says so, ' +
-      '“once approved inside the CLI”.',
+      '“once approved inside the CLI”. A rule decision the target lacks is carried ' +
+      'stricter and labelled “the rule decision was downgraded towards strictness”: ' +
+      'Gemini can only deny a tool, so “ask” for file reads becomes a read ban instead ' +
+      'of disappearing.',
     levelEmulated: 'Emulated',
     levelEmulatedText:
       'The target has no such mechanism, but the panel achieves the same ' +

@@ -789,14 +789,17 @@ describe('реестр провайдеров', () => {
     );
     // Claude обслуживается своими роутами (settings.json), permissionsConfig ему не нужен.
     expect(claudeProvider.permissionsConfig).toBeUndefined();
-    // Gemini (GEMINI-2): general.defaultApprovalMode + coreTools/excludeTools.
-    expect(getProvider('gemini').permissionsConfig).toEqual({
+    // Gemini (GEMINI-2): general.defaultApprovalMode + tools.core/tools.exclude.
+    expect(getProvider('gemini').permissionsConfig).toMatchObject({
       format: 'gemini-json',
       path: expect.any(Function),
       // Списка «спросить» у Gemini нет: правило `ask` поедет запретом.
       model: 'rules',
       decisions: ['allow', 'deny'],
+      // Перенос канона: свои имена, без аргументов, только запрет.
+      ruleGrammar: { closed: true, argumentTools: [] },
     });
+    expect(getProvider('gemini').permissionsConfig?.ruleGrammar?.tools.Read).toBe('read_file');
     expect(getProvider('gemini').permissionsConfig?.path()).toBe(
       join(homedir(), '.gemini', 'settings.json'),
     );

@@ -116,8 +116,8 @@ than marked "in development".
 
 - **Codex** — two root keys of `config.toml`: `approval_policy` and `sandbox_mode`.
 - **Gemini** — `settings.json`: the mode `general.defaultApprovalMode` (`default` — ask every time,
-  `auto_edit` — file edits without prompts, `plan` — read-only) plus the tool lists `coreTools`
-  (allowed) and `excludeTools` (blocked, and it wins). The `yolo` mode is never written: per the
+  `auto_edit` — file edits without prompts, `plan` — read-only) plus the tool lists `tools.core`
+  (allowed) and `tools.exclude` (blocked, and it wins). The `yolo` mode is never written: per the
   docs it is a command-line flag only, and in `settings.json` it makes the CLI fail on startup.
 - **Qwen Code** — `settings.json` too, but with keys of its OWN despite being a Gemini fork: the
   mode `tools.approvalMode` (`default`, `plan`, `auto-edit`, `auto`, `yolo`) plus three rule lists

@@ -129,8 +129,8 @@ export const providersEn: typeof providersRu = {
     mapPermissions: 'Permissions and approvals',
     mapPermissionsValue:
       'Works: Claude (allow/ask/deny), Codex (approval_policy and sandbox_mode), Gemini ' +
-      '(the approval mode general.defaultApprovalMode plus the coreTools and ' +
-      'excludeTools lists), Qwen Code (the tools.approvalMode mode plus the ' +
+      '(the approval mode general.defaultApprovalMode plus the tools.core and ' +
+      'tools.exclude lists), Qwen Code (the tools.approvalMode mode plus the ' +
       'permissions.allow / ask / deny rule lists), Continue (a separate permissions.yaml ' +
       'with three lists allow / ask / exclude and no mode at all), OpenCode (the permission key of ' +
       'opencode.json: an ' +

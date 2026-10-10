@@ -243,6 +243,23 @@ describe('ProviderChatService', () => {
     ]);
   });
 
+  it('надзирателю уходят слова человека без строки панели о каталоге', () => {
+    createChat(dir, 'codex', { id: 'wd', workdir: dir });
+    service.setWorkspaceNote(() => 'QA workspace: no e2e folder');
+    service.setSupervisor((context) => ({
+      run: { providerId: 'codex', sessionId: context.chatId, cwd: dir, transcriptPath: '' },
+      hooks: [],
+    }));
+    service.send(dir, 'codex', 'wd', { text: 'hello' }, { provider: PROVIDER });
+
+    const options = run.options as {
+      history: { content: string }[];
+      supervisor?: { prompt?: string };
+    };
+    expect(options.history.at(-1)?.content).toContain('<agentdeck-workspace>');
+    expect(options.supervisor?.prompt).toBe('hello');
+  });
+
   /** F-164. Со вложением последняя строка — путь файла, и строка липла к нему. */
   it('со вложением строка тестов идёт своей строкой, путь файла остаётся последним', () => {
     createChat(dir, 'codex', { id: 'wd', workdir: dir });

@@ -151,6 +151,36 @@ process.stdin.on('end', () => {
     }
   });
 
+  it('хук судит слова человека, а не строку панели о каталоге перед ними', async () => {
+    // Живьём 10.10 (qwen): калитка с правилом «e2e» отказала «hello» — слово было
+    // только в строке панели, которую служба ставит перед последней репликой.
+    const spawn = fakeSpawn({ chunks: ['ок'] });
+    const trace = join(dir, 'seen.json');
+    const command = hookAt(
+      'seen.cjs',
+      `const chunks = [];
+process.stdin.on('data', (c) => chunks.push(c));
+process.stdin.on('end', () => {
+  require('node:fs').writeFileSync(${JSON.stringify(trace)}, Buffer.concat(chunks).toString('utf8'), 'utf8');
+});`,
+    );
+
+    await collect('gemini', {
+      detect: yesCli,
+      spawnImpl: spawn.fn,
+      history: history(
+        '<agentdeck-workspace>QA workspace: no e2e folder</agentdeck-workspace> hello',
+      ),
+      supervisor: {
+        ...supervisorSetup([{ event: 'UserPromptSubmit', command }]),
+        prompt: 'hello',
+      },
+    });
+
+    const seen = JSON.parse(readFileSync(trace, 'utf8')) as Record<string, unknown>;
+    expect(seen.prompt).toBe('hello');
+  });
+
   it('промолчавший хук прогон не отказывает', async () => {
     // Второе утверждение этого случая — про КАНАЛ контекста — здесь не делается
     // намеренно. `additionalContext` встаёт отдельной репликой, то есть делает

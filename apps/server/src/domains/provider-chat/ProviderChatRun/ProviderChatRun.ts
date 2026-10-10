@@ -144,6 +144,14 @@ export interface ProviderChatRunOptions {
     /** Чем начат разговор — уходит в `SessionStart`. Не задан — события не будет. */
     readonly sessionStart?: SessionStartSource;
     readonly timeoutMs?: number;
+    /**
+     * Слова человека для `UserPromptSubmit` — как он их набрал. Последняя реплика
+     * истории у чужого CLI несёт ещё и строку панели о каталоге (у Claude она в
+     * системном промпте), и калитка судила её вместе со словами: правило на
+     * «e2e» отказывало «hello» в любом разговоре с папкой (живьём 10.10, qwen).
+     * Не задан — берётся последняя реплика человека из истории.
+     */
+    readonly prompt?: string;
   };
   /**
    * Переменные канона для окружения чужого CLI (П3.5).
@@ -391,6 +399,7 @@ export class ProviderChatRun implements ProviderChatRunLike {
     if (!supervisor) return { blocked: false, addedContext: [] };
 
     const lastUser = [...options.history].reverse().find((message) => message.role === 'user');
+    const prompt = supervisor.prompt ?? lastUser?.content;
 
     const events: SupervisorEventInput[] = [
       ...(supervisor.sessionStart
@@ -401,7 +410,7 @@ export class ProviderChatRun implements ProviderChatRunLike {
       // «данных нет» и «данные пустые» скрипт обязан различать.
       {
         event: 'UserPromptSubmit' as const,
-        ...(lastUser ? { prompt: lastUser.content } : {}),
+        ...(prompt !== undefined ? { prompt } : {}),
       },
     ];
 

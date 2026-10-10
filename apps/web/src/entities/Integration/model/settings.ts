@@ -1,9 +1,13 @@
 import type {
   AppSettings,
+  AtlassianSiteSettings,
+  ForgeSiteSettings,
   IntegrationId,
   IntegrationsSettings,
   TelegramEvent,
+  TmsSystemSettings,
 } from '@agentdeck/contracts';
+import { INTEGRATION_ORDER } from '@agentdeck/contracts/integrations';
 
 /**
  * Настройки внешних интеграций, прочитанные из общих настроек панели.
@@ -20,8 +24,11 @@ import type {
  * маской в `IntegrationStatus.maskedToken`.
  */
 
-/** Порядок карточек на вкладке: сверху то, без чего остальное бессмысленно. */
-export const INTEGRATION_IDS = ['atlassian', 'forge', 'telegram', 'webhook', 'tms', 'ci'] as const;
+/**
+ * Порядок карточек на вкладке — тот же, что у сервера: каждая система — своя
+ * интеграция (владелец 10.10.2026), сверху то, без чего остальное бессмысленно.
+ */
+export const INTEGRATION_IDS = INTEGRATION_ORDER;
 
 /**
  * События уведомлений в порядке от частого к редкому.
@@ -41,11 +48,19 @@ export const TELEGRAM_EVENTS: readonly TelegramEvent[] = [
   'budget',
 ];
 
+const NO_SITE: AtlassianSiteSettings = { enabled: false, baseUrl: '', email: '', deployment: '' };
+const NO_FORGE: ForgeSiteSettings = { enabled: false, baseUrl: '', repo: '' };
+const NO_TMS: TmsSystemSettings = { enabled: false, baseUrl: '', projectKey: '', groupId: '' };
+
 export const DEFAULT_INTEGRATIONS: IntegrationsSettings = {
-  atlassian: { enabled: false, baseUrl: '', email: '', deployment: '', confluenceUrl: '' },
-  forge: { enabled: false, kind: '', baseUrl: '', repo: '' },
+  jira: NO_SITE,
+  confluence: NO_SITE,
+  gitlab: NO_FORGE,
+  github: NO_FORGE,
   telegram: { enabled: false, chatId: '', events: [] },
-  tms: { enabled: false, kind: '', baseUrl: '', projectKey: '', groupId: '' },
+  zephyr: NO_TMS,
+  xray: NO_TMS,
+  testit: NO_TMS,
   ci: { enabled: false, kind: '', repo: '', workflow: '', artifact: '' },
   webhook: { enabled: false, url: '', events: [] },
 };
@@ -74,42 +89,48 @@ function readTelegramEvents(value: unknown): TelegramEvent[] {
   return TELEGRAM_EVENTS.filter((event) => value.includes(event));
 }
 
+function readSite(raw: Partial<AtlassianSiteSettings> = {}): AtlassianSiteSettings {
+  return {
+    enabled: asFlag(raw.enabled),
+    baseUrl: asText(raw.baseUrl),
+    email: asText(raw.email),
+    deployment: asOneOf(raw.deployment, ['cloud', 'server'] as const),
+  };
+}
+
+function readForge(raw: Partial<ForgeSiteSettings> = {}): ForgeSiteSettings {
+  return { enabled: asFlag(raw.enabled), baseUrl: asText(raw.baseUrl), repo: asText(raw.repo) };
+}
+
+function readTms(raw: Partial<TmsSystemSettings> = {}): TmsSystemSettings {
+  return {
+    enabled: asFlag(raw.enabled),
+    baseUrl: asText(raw.baseUrl),
+    projectKey: asText(raw.projectKey),
+    groupId: asText(raw.groupId),
+  };
+}
+
 /** Настройки всех коннекторов с умолчаниями вместо дыр. */
 export function readIntegrations(settings: AppSettings | undefined): IntegrationsSettings {
   const raw: PartialIntegrations = settings?.integrations ?? {};
-  const atlassian: PartialIntegrations['atlassian'] = raw.atlassian ?? {};
-  const forge: PartialIntegrations['forge'] = raw.forge ?? {};
   const telegram: PartialIntegrations['telegram'] = raw.telegram ?? {};
-  const tms: PartialIntegrations['tms'] = raw.tms ?? {};
   const ci: PartialIntegrations['ci'] = raw.ci ?? {};
   const webhook: PartialIntegrations['webhook'] = raw.webhook ?? {};
 
   return {
-    atlassian: {
-      enabled: asFlag(atlassian.enabled),
-      baseUrl: asText(atlassian.baseUrl),
-      email: asText(atlassian.email),
-      deployment: asOneOf(atlassian.deployment, ['cloud', 'server'] as const),
-      confluenceUrl: asText(atlassian.confluenceUrl),
-    },
-    forge: {
-      enabled: asFlag(forge.enabled),
-      kind: asOneOf(forge.kind, ['github', 'gitlab'] as const),
-      baseUrl: asText(forge.baseUrl),
-      repo: asText(forge.repo),
-    },
+    jira: readSite(raw.jira),
+    confluence: readSite(raw.confluence),
+    gitlab: readForge(raw.gitlab),
+    github: readForge(raw.github),
     telegram: {
       enabled: asFlag(telegram.enabled),
       chatId: asText(telegram.chatId),
       events: readTelegramEvents(telegram.events),
     },
-    tms: {
-      enabled: asFlag(tms.enabled),
-      kind: asOneOf(tms.kind, ['zephyr', 'xray', 'testit'] as const),
-      baseUrl: asText(tms.baseUrl),
-      projectKey: asText(tms.projectKey),
-      groupId: asText(tms.groupId),
-    },
+    zephyr: readTms(raw.zephyr),
+    xray: readTms(raw.xray),
+    testit: readTms(raw.testit),
     ci: {
       enabled: asFlag(ci.enabled),
       kind: asOneOf(ci.kind, ['github', 'gitlab'] as const),

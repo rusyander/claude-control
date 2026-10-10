@@ -3,6 +3,7 @@ import type { AppStore } from '../../../lib/app-store/app-store.ts';
 import { toAccess } from '../../integrations/atlassian/client.ts';
 import { readIssue } from '../../integrations/atlassian/jira.ts';
 import { readForgeIssue, toForgeAccess } from '../../integrations/forge.ts';
+import { pickForge } from '../../integrations/forge-pick.ts';
 import { readIntegrations, readToken } from '../../integrations/store/store.ts';
 import { applyDefectStates, type DefectStatePatch } from '../store/store.ts';
 
@@ -157,19 +158,19 @@ function lazyJira(
   return async (key) => {
     if (refused) return undefined;
     if (!access) {
-      const settings = readIntegrations(deps.store).atlassian;
-      const token = readToken(deps.appDataDir, 'atlassian');
+      const settings = readIntegrations(deps.store).jira;
+      const token = readToken(deps.appDataDir, 'jira');
       if (!settings.enabled || !token) {
         refused = true;
-        skipped.add('Atlassian не подключён — статусы задач Jira не спрашивали.');
+        skipped.add('Jira не подключена — статусы задач не спрашивали.');
         return undefined;
       }
       try {
         access = toAccess(settings, token);
       } catch (error) {
-        // Адрес Atlassian не заполнен: подключение есть, спрашивать некуда.
+        // Адрес Jira не заполнен: подключение есть, спрашивать некуда.
         refused = true;
-        skipped.add(`Адрес Atlassian не задан: ${reasonOf(error)}`);
+        skipped.add(`Адрес Jira не задан: ${reasonOf(error)}`);
         return undefined;
       }
     }
@@ -201,15 +202,16 @@ function lazyForge(
   return async (issueNumber, url) => {
     if (refused) return undefined;
     if (!access) {
-      const settings = readIntegrations(deps.store).forge;
-      const token = readToken(deps.appDataDir, 'forge');
-      if (!settings.enabled || !token) {
+      // Фордж — по ссылке первого дефекта: при двух подключённых GitHub-issue
+      // читается GitHub-ом, даже если origin проекта смотрит в GitLab.
+      const forge = pickForge(deps.store, deps.appDataDir, { root: deps.root, url });
+      if (!forge) {
         refused = true;
-        skipped.add('Фордж не подключён по токену — статусы issue не спрашивали.');
+        skipped.add('GitLab и GitHub не подключены по токену — статусы issue не спрашивали.');
         return undefined;
       }
       try {
-        access = toForgeAccess(settings, token, deps.root);
+        access = toForgeAccess(forge.settings, forge.token, deps.root);
       } catch (error) {
         refused = true;
         skipped.add(`Репозиторий форджа не определён: ${reasonOf(error)}`);

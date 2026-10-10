@@ -30,13 +30,12 @@ describe('integrations-routes: поверхность', () => {
     app.inject({ method: 'PUT', url, payload });
 
   const connect = async (): Promise<void> => {
-    await put('/api/integrations/atlassian', {
+    await put('/api/integrations/jira', {
       settings: {
         enabled: true,
         baseUrl: 'https://acme.atlassian.net',
         email: 'qa@acme.io',
         deployment: 'cloud',
-        confluenceUrl: '',
       },
       token: SECRET,
     });
@@ -52,7 +51,15 @@ describe('integrations-routes: поверхность', () => {
       {
         store: new AppStore(dir),
         backupDir: undefined,
-        location: { paths: { appData: dir, mcpConfig } },
+        location: {
+          paths: {
+            appData: dir,
+            mcpConfig,
+            settings: join(dir, 'settings.json'),
+            settingsLocal: join(dir, 'settings.local.json'),
+            secretsEnv: join(dir, '.mcp-secrets.env'),
+          },
+        },
       } as unknown as ServerContext,
       'http://127.0.0.1:5178',
     );
@@ -71,8 +78,10 @@ describe('integrations-routes: поверхность', () => {
     expect(response.statusCode).toBe(200);
     expect(response.body).not.toContain(SECRET);
     const cards = response.json() as { id: string; hasToken: boolean }[];
-    expect(cards).toHaveLength(6);
-    expect(cards.find((card) => card.id === 'atlassian')?.hasToken).toBe(true);
+    expect(cards).toHaveLength(10);
+    expect(cards.find((card) => card.id === 'jira')?.hasToken).toBe(true);
+    // Ключ Jira — только Jira: Confluence подключается своим.
+    expect(cards.find((card) => card.id === 'confluence')?.hasToken).toBe(false);
   });
 
   it('неизвестная интеграция — 404 с кодом, а не падение', async () => {
@@ -103,7 +112,6 @@ describe('integrations-routes: поверхность', () => {
     const tms = (extra: Record<string, unknown>) => ({
       settings: {
         enabled: true,
-        kind: 'testit',
         baseUrl: 'https://testit.acme.local',
         projectKey: 'PRJ-1',
         groupId: '',
@@ -112,34 +120,31 @@ describe('integrations-routes: поверхность', () => {
     });
 
     it('Test IT без адреса не сохраняется включённым', async () => {
-      const response = await put('/api/integrations/tms', tms({ baseUrl: '   ' }));
+      const response = await put('/api/integrations/testit', tms({ baseUrl: '   ' }));
       expect(response.statusCode).toBe(400);
       expect(response.json()).toMatchObject({ code: 'invalid_body' });
       expect(JSON.stringify(response.json())).toContain('baseUrl');
     });
 
-    it('без вида и без проекта — тоже отказ, и поле названо', async () => {
-      for (const [field, patch] of [
-        ['kind', { kind: '' }],
-        ['projectKey', { projectKey: '' }],
-      ] as const) {
-        const response = await put('/api/integrations/tms', tms(patch));
+    it('без проекта — тоже отказ, и поле названо', async () => {
+      for (const id of ['testit', 'zephyr', 'xray']) {
+        const response = await put(`/api/integrations/${id}`, tms({ projectKey: '' }));
         expect(response.statusCode).toBe(400);
-        expect(JSON.stringify(response.json())).toContain(field);
+        expect(JSON.stringify(response.json())).toContain('projectKey');
       }
     });
 
     it('Zephyr адреса не требует: у облака он общий на всех', async () => {
       const response = await put(
-        '/api/integrations/tms',
-        tms({ kind: 'zephyr', baseUrl: '', projectKey: 'PRJ' }),
+        '/api/integrations/zephyr',
+        tms({ baseUrl: '', projectKey: 'PRJ' }),
       );
       expect(response.statusCode).toBe(200);
     });
 
     it('выключенную карточку заполняют в несколько заходов — половина формы сохраняется', async () => {
-      const response = await put('/api/integrations/tms', {
-        settings: { enabled: false, kind: 'testit', baseUrl: '', projectKey: '', groupId: '' },
+      const response = await put('/api/integrations/testit', {
+        settings: { enabled: false, baseUrl: '', projectKey: '', groupId: '' },
       });
       expect(response.statusCode).toBe(200);
     });
@@ -148,7 +153,7 @@ describe('integrations-routes: поверхность', () => {
   it('проверка связи отвечает состоянием карточки, а не отказом', async () => {
     await connect();
     vi.stubGlobal('fetch', () => Promise.resolve(new Response('denied', { status: 401 })));
-    const response = await post('/api/integrations/atlassian/check');
+    const response = await post('/api/integrations/jira/check');
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({ state: 'error' });
     expect(response.body).toContain('токен отклонён');
@@ -194,30 +199,31 @@ describe('integrations-routes: поверхность', () => {
   /**
    * Дефект 18.09.2026, найден живьём на Server/DC: `GET .../confluence/spaces`
    * отвечал 502 «токен отклонён» при рабочей Jira — у Confluence там свой
-   * personal access token, а панель посылала ключ Jira.
-   *
-   * Проверка идёт НАСТОЯЩИМ маршрутом: тем же PUT ходят браузер, телефон и
-   * curl, и ровно на нём ключ должен разделиться.
+   * personal access token. Теперь Confluence — своя интеграция (владелец
+   * 10.10.2026): свой адрес и свой ключ, сохранённые тем же PUT, которым ходят
+   * браузер, телефон и curl.
    */
-  it('второй ключ Confluence сохраняется маршрутом и уезжает именно в вики', async () => {
+  it('Confluence подключается своей карточкой, и его ключ уезжает именно в вики', async () => {
     await connect();
-    const saved = await put('/api/integrations/atlassian', {
+    const saved = await put('/api/integrations/confluence', {
       settings: {
         enabled: true,
-        baseUrl: 'https://jira.acme.local',
+        baseUrl: 'https://wiki.acme.local',
         email: '',
         deployment: 'server',
-        confluenceUrl: 'https://wiki.acme.local',
       },
-      confluenceToken: WIKI_SECRET,
+      token: WIKI_SECRET,
     });
     expect(saved.statusCode).toBe(200);
     expect(saved.body).not.toContain(WIKI_SECRET);
-    expect(saved.json()).toMatchObject({ hasToken: true, hasConfluenceToken: true });
+    expect(saved.json()).toMatchObject({ id: 'confluence', hasToken: true });
 
-    const headers: string[] = [];
+    const calls: { url: string; auth: string }[] = [];
     vi.stubGlobal('fetch', (url: string, init: RequestInit = {}) => {
-      headers.push(String((init.headers as Record<string, string>)?.Authorization ?? ''));
+      calls.push({
+        url: String(url),
+        auth: String((init.headers as Record<string, string>)?.Authorization ?? ''),
+      });
       return Promise.resolve(
         new Response(JSON.stringify(String(url).includes('/space') ? { results: [] } : []), {
           status: 200,
@@ -227,8 +233,154 @@ describe('integrations-routes: поверхность', () => {
 
     await app.inject({ method: 'GET', url: '/api/integrations/confluence/spaces' });
     await app.inject({ method: 'GET', url: '/api/integrations/jira/projects' });
-    expect(headers[0]).toBe(`Bearer ${WIKI_SECRET}`);
-    expect(headers[1]).toBe(`Bearer ${SECRET}`);
+    expect(calls[0]?.auth).toBe(`Bearer ${WIKI_SECRET}`);
+    expect(calls[0]?.url.startsWith('https://wiki.acme.local/rest/api/space')).toBe(true);
+    expect(calls[1]?.auth).toContain('Basic ');
+  });
+
+  /**
+   * «Найти уже подключённые» (владелец 10.10.2026) — форма владельца: обёртка
+   * `with-secrets.mjs` перед `docker run` и `npx`, адреса в `env` сервера,
+   * ключи — в файле секретов по списку `MCP_SECRET_KEYS`.
+   */
+  describe('поиск среди MCP-серверов', () => {
+    // Ключи из кусков: литерал целиком похож на настоящий, и сторож его не пропустит.
+    const GITLAB_KEY = ['glpat', 'route', 'gitlab', '0001'].join('-');
+    const JIRA_KEY = ['JIRA', 'PAT', 'СЕКРЕТ', '0002'].join('-');
+    const WIKI_KEY = ['WIKI', 'PAT', 'СЕКРЕТ', '0003'].join('-');
+    const wrapper = 'C:/Users/qa/.claude/mcp-launchers/with-secrets.mjs';
+    const secretLine = (name: string, value: string): string => [name, value].join('=');
+
+    beforeEach(() => {
+      writeFileSync(
+        mcpConfig,
+        JSON.stringify({
+          mcpServers: {
+            'gitlab-acme': {
+              type: 'stdio',
+              command: 'node',
+              args: [wrapper, 'npx', '-y', '@zereight/mcp-gitlab'],
+              env: {
+                MCP_SECRET_KEYS: 'GITLAB_PERSONAL_ACCESS_TOKEN',
+                GITLAB_API_URL: 'https://gitlab.acme.local/api/v4',
+              },
+            },
+            'atlassian-acme': {
+              type: 'stdio',
+              command: 'node',
+              args: [
+                wrapper,
+                'docker',
+                'run',
+                '-i',
+                '--rm',
+                '-e',
+                'JIRA_URL',
+                '-e',
+                'JIRA_PERSONAL_TOKEN',
+                '-e',
+                'CONFLUENCE_URL',
+                '-e',
+                'CONFLUENCE_PERSONAL_TOKEN',
+                'ghcr.io/sooperset/mcp-atlassian:latest',
+              ],
+              env: {
+                MCP_SECRET_KEYS: 'JIRA_PERSONAL_TOKEN,CONFLUENCE_PERSONAL_TOKEN',
+                JIRA_URL: 'https://jira.acme.local',
+                CONFLUENCE_URL: 'https://wiki.acme.local',
+              },
+            },
+            // Свой переходник панели — не чужое подключение.
+            'agentdeck-atlassian': {
+              command: 'node',
+              args: ['tools/mcp/atlassian.mjs'],
+              env: { AGENTDECK_URL: 'http://127.0.0.1:5178' },
+            },
+          },
+        }),
+        'utf8',
+      );
+      writeFileSync(
+        join(dir, '.mcp-secrets.env'),
+        [
+          secretLine('GITLAB_PERSONAL_ACCESS_TOKEN', GITLAB_KEY),
+          secretLine('JIRA_PERSONAL_TOKEN', JIRA_KEY),
+          secretLine('CONFLUENCE_PERSONAL_TOKEN', WIKI_KEY),
+        ].join('\n'),
+        'utf8',
+      );
+    });
+
+    const discover = async () => app.inject({ method: 'GET', url: '/api/integrations/discover' });
+
+    it('находит GitLab, Jira и Confluence и не отдаёт ни одного ключа', async () => {
+      const response = await discover();
+      expect(response.statusCode).toBe(200);
+      for (const secret of [GITLAB_KEY, JIRA_KEY, WIKI_KEY]) {
+        expect(response.body).not.toContain(secret);
+      }
+      const { found, scanned } = response.json() as {
+        scanned: number;
+        found: { id: string; server: string; fields: Record<string, string>; hasToken: boolean }[];
+      };
+      expect(scanned).toBe(2);
+      expect(found.map((item) => [item.id, item.server, item.fields.baseUrl])).toEqual([
+        ['jira', 'atlassian-acme', 'https://jira.acme.local'],
+        ['confluence', 'atlassian-acme', 'https://wiki.acme.local'],
+        ['gitlab', 'gitlab-acme', 'https://gitlab.acme.local'],
+      ]);
+      expect(found.every((item) => item.hasToken)).toBe(true);
+    });
+
+    it('перенос включает интеграции с их ключами, и каждая ходит своим', async () => {
+      const { found } = (await discover()).json() as { found: { key: string }[] };
+      const applied = await post('/api/integrations/discover', {
+        keys: found.map((item) => item.key),
+      });
+      expect(applied.statusCode).toBe(200);
+      for (const secret of [GITLAB_KEY, JIRA_KEY, WIKI_KEY]) {
+        expect(applied.body).not.toContain(secret);
+      }
+      expect(applied.json()).toMatchObject([
+        { id: 'jira', enabled: true, hasToken: true },
+        { id: 'confluence', enabled: true, hasToken: true },
+        { id: 'gitlab', enabled: true, hasToken: true },
+      ]);
+
+      const calls: { url: string; auth: string }[] = [];
+      vi.stubGlobal('fetch', (url: string, init: RequestInit = {}) => {
+        calls.push({
+          url: String(url),
+          auth: String((init.headers as Record<string, string>)?.Authorization ?? ''),
+        });
+        return Promise.resolve(new Response(JSON.stringify({ name: 'qa' }), { status: 200 }));
+      });
+      const checked = await post('/api/integrations/confluence/check');
+      expect(checked.json()).toMatchObject({ state: 'ok' });
+      expect(calls.at(-1)).toEqual({
+        url: 'https://wiki.acme.local/rest/api/user/current',
+        auth: `Bearer ${WIKI_KEY}`,
+      });
+
+      // Повторный поиск видит перенесённое как уже подключённое: адреса и ключи
+      // легли туда, откуда их читают карточки.
+      const again = (await discover()).json() as { found: { alreadyConnected: boolean }[] };
+      expect(again.found.every((item) => item.alreadyConnected)).toBe(true);
+    });
+
+    it('пустой выбор и исчезнувший сервер — отказ до единой записи', async () => {
+      expect((await post('/api/integrations/discover', { keys: [] })).statusCode).toBe(400);
+      const gone = await post('/api/integrations/discover', {
+        keys: ['user||atlassian-acme|jira', 'user||nope|gitlab'],
+      });
+      expect(gone.statusCode).toBe(400);
+      expect(gone.json()).toMatchObject({ messageCode: 'integration-discover-gone' });
+      const cards = (await app.inject({ method: 'GET', url: '/api/integrations' })).json() as {
+        id: string;
+        hasToken: boolean;
+      }[];
+      expect(cards.find((card) => card.id === 'jira')?.hasToken).toBe(false);
+    });
   });
 
   it('внешняя система не отвечает — 502 с причиной словами', async () => {

@@ -51,11 +51,11 @@ export const testsRu: Record<TestsMessageCode, string> = {
   'run-not-in-history': 'Прогона «{{id}}» в истории нет.',
   'run-base-not-in-history': 'Прогона «{{baseId}}» в истории нет.',
   'compare-first-run': 'Сравнивать не с чем: это первый прогон с результатами.',
-  'coverage-atlassian-off': 'Atlassian не подключён: показаны только требования из ссылок кейсов.',
+  'coverage-atlassian-off': 'Jira не подключена: показаны только требования из ссылок кейсов.',
   'coverage-jira-project-unlinked':
     'К проекту не привязан проект Jira: показаны только требования из ссылок кейсов.',
   'coverage-jira-failed': 'Jira не ответила: {{reason}}',
-  'coverage-dates-atlassian-off': 'Atlassian не подключён: даты требований не сверялись.',
+  'coverage-dates-atlassian-off': 'Jira не подключена: даты требований не сверялись.',
   'coverage-dates-jira-failed': 'Jira не ответила, даты требований не сверялись: {{reason}}',
   'defect-jira-project-unlinked':
     'К проекту не привязан проект Jira — привяжите его на карточке проекта.',
@@ -163,6 +163,8 @@ export const testsRu: Record<TestsMessageCode, string> = {
   'case-id-not-in-group':
     'Кейса «{{caseId}}» в группе «{{groupId}}» нет: новый кейс сохраняют без id.',
   'case-not-in-named-group': 'Кейса «{{caseId}}» в группе «{{groupId}}» нет.',
+  'record-automated-case':
+    'Автокейсы не записываются словом: {{cases}}. Их проверяет тест — прогоните группу ({{groups}}) командой run.',
   'bulk-action-unknown': 'Неизвестное действие «{{action}}».',
   'bulk-none-selected': 'Не выбрано ни одного теста.',
   'bulk-mute-reason-required':
@@ -214,7 +216,7 @@ export const testsRu: Record<TestsMessageCode, string> = {
   'manual-files-no-title':
     'Файлы нашлись, но ни в одном нет заголовка «# Название» — читать нечего.',
   'generate-jira-off':
-    'Jira не подключена, а «покрыть требование» пишет кейсы по тексту задачи. Подключите Atlassian в разделе интеграций или выберите другой источник.',
+    'Jira не подключена, а «покрыть требование» пишет кейсы по тексту задачи. Подключите Jira в разделе интеграций или выберите другой источник.',
   'generate-diff-failed': 'Сравнение «{{range}}» не сделалось.',
   'generate-diff-timeout':
     'Сравнение «{{range}}» не сделалось: git не ответил за {{seconds}} с. Репозиторий тут ни при чём — так бывает на большом дереве, на медленном диске и под антивирусом.',

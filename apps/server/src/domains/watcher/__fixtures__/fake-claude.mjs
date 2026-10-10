@@ -1,5 +1,6 @@
 // Фальшивый `claude -p --output-format json` для проверок наблюдателя.
-// Читает промпт из stdin, пишет свой argv и промпт в `fake-argv.json` рабочего
+// Без `--output-format` — чужой CLI одиночным запуском (X9): задание в argv
+// после `-p`, ответ голым текстом. Читает промпт из stdin, пишет свой argv и промпт в `fake-argv.json` рабочего
 // каталога, по `fake-config.json` там же спит, падает или отвечает находкой на
 // каждый `id:` из промпта. Имена своего окружения — туда же: проверка того,
 // что сервер ему НЕ передал. Сеть не трогает, токенов не тратит.
@@ -14,6 +15,8 @@ let prompt = '';
 process.stdin.setEncoding('utf8');
 process.stdin.on('data', (chunk) => (prompt += chunk));
 process.stdin.on('end', () => {
+  const foreign = !process.argv.includes('--output-format');
+  if (foreign) prompt = process.argv[process.argv.indexOf('-p') + 1] ?? '';
   // Системный промпт — текстом: временную папку разбор снимает сразу после конца.
   const at = process.argv.indexOf('--append-system-prompt-file');
   const systemPromptFile = at > 0 ? process.argv[at + 1] : undefined;
@@ -56,6 +59,10 @@ process.stdin.on('end', () => {
     // Замечания — как есть из конфига: проверка решает, что модель «заметила».
     const items = [...findings, ...(config.remarks ?? []).map((r) => ({ kind: 'remark', ...r }))];
     const result = '```agentdeck-watch\n' + JSON.stringify(items) + '\n```';
+    if (foreign) {
+      process.stdout.write(result + '\n');
+      return;
+    }
     process.stdout.write(
       JSON.stringify({
         type: 'result',

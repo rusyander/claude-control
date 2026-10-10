@@ -60,24 +60,22 @@ const project = (): string => join(dir, 'repo');
 const deps = (): DefectDeps => ({ store, appDataDir: dir, root: project() });
 
 function connectJira(): void {
-  writeSettings(store, 'atlassian', {
+  writeSettings(store, 'jira', {
     enabled: true,
     baseUrl: 'https://acme.atlassian.net',
     email: 'qa@acme.io',
     deployment: 'cloud',
-    confluenceUrl: '',
   });
-  writeToken(dir, 'atlassian', 'ATL-SECRET');
+  writeToken(dir, 'jira', 'ATL-SECRET');
 }
 
 function connectForge(): void {
-  writeSettings(store, 'forge', {
+  writeSettings(store, 'github', {
     enabled: true,
-    kind: 'github',
     baseUrl: '',
     repo: 'acme/panel',
   });
-  writeToken(dir, 'forge', 'GH-SECRET');
+  writeToken(dir, 'github', 'GH-SECRET');
 }
 
 describe('project-tests/defects: черновик остаётся без интеграций', () => {
@@ -117,9 +115,8 @@ describe('project-tests/defects: назначения по токену', () => 
 
   it('выключенная карточка не даёт назначения, даже если ключ сохранён', () => {
     connectForge();
-    writeSettings(store, 'forge', {
+    writeSettings(store, 'github', {
       enabled: false,
-      kind: 'github',
       baseUrl: '',
       repo: 'acme/panel',
     });

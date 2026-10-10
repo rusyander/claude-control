@@ -189,11 +189,11 @@ async function requirementsFromJira(
   deps: CoverageDeps,
   jqlOverride?: string,
 ): Promise<JiraRequirements> {
-  const settings = readIntegrations(deps.store).atlassian;
-  const token = readToken(deps.appDataDir, 'atlassian');
+  const settings = readIntegrations(deps.store).jira;
+  const token = readToken(deps.appDataDir, 'jira');
   if (!settings.enabled || !token) {
     return {
-      warning: 'Atlassian не подключён: показаны только требования из ссылок кейсов.',
+      warning: 'Jira не подключена: показаны только требования из ссылок кейсов.',
       warningCode: 'coverage-atlassian-off',
     };
   }
@@ -268,12 +268,12 @@ export async function requirementUpdates(
   const known = keys.filter((key) => ISSUE_KEY.test(key));
   if (known.length === 0) return { updates: {} };
 
-  const settings = readIntegrations(deps.store).atlassian;
-  const token = readToken(deps.appDataDir, 'atlassian');
+  const settings = readIntegrations(deps.store).jira;
+  const token = readToken(deps.appDataDir, 'jira');
   if (!settings.enabled || !token) {
     return {
       updates: {},
-      warning: 'Atlassian не подключён: даты требований не сверялись.',
+      warning: 'Jira не подключена: даты требований не сверялись.',
       warningCode: 'coverage-dates-atlassian-off',
     };
   }

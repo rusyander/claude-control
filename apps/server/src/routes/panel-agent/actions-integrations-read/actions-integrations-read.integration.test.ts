@@ -126,22 +126,19 @@ describe('panel-agent actions: integrations read', () => {
       registerProjectRoutes(app, ctx);
     });
     // Подключение — дело человека: адрес и ключ он вводит в карточке интеграции.
-    const saved = await h.app.inject({
-      method: 'PUT',
-      url: '/api/integrations/atlassian',
-      headers: { origin: HARNESS_ORIGIN },
-      payload: {
-        settings: {
-          enabled: true,
-          baseUrl: stub.url,
-          email: '',
-          deployment: 'server',
-          confluenceUrl: '',
+    // Jira и Confluence — две карточки; заглушка отвечает за обе.
+    for (const id of ['jira', 'confluence']) {
+      const saved = await h.app.inject({
+        method: 'PUT',
+        url: `/api/integrations/${id}`,
+        headers: { origin: HARNESS_ORIGIN },
+        payload: {
+          settings: { enabled: true, baseUrl: stub.url, email: '', deployment: 'server' },
+          token: TOKEN,
         },
-        token: TOKEN,
-      },
-    });
-    expect(saved.statusCode).toBe(200);
+      });
+      expect(saved.statusCode).toBe(200);
+    }
   });
 
   afterEach(async () => {

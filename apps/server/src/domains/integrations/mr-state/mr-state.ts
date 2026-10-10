@@ -50,16 +50,22 @@ function githubState(state: string | undefined): MrState {
   return 'open';
 }
 
-function batchesOf(urls: readonly string[], token: string): Batch[] {
+/** Ключ на ссылку: строкой — один на все, функцией — свой у каждого форджа. */
+export type MrTokenSource = string | ((url: string) => string | undefined);
+
+function batchesOf(urls: readonly string[], token: MrTokenSource): Batch[] {
   const batches = new Map<string, Batch>();
   for (const url of urls) {
     const ref = parseMergeRequestUrl(url);
-    const access = forgeAccessForUrl(url, token);
+    const key = typeof token === 'string' ? token : token(url);
+    // Фордж этой ссылки не подключён — читать её нечем, остальные читаются.
+    if (!key) continue;
+    const access = forgeAccessForUrl(url, key);
     if (!ref || !access) continue;
-    const key = `${access.kind} ${access.api} ${access.repo}`;
-    const batch = batches.get(key) ?? { access, numbers: new Map<number, string[]>() };
+    const id = `${access.kind} ${access.api} ${access.repo}`;
+    const batch = batches.get(id) ?? { access, numbers: new Map<number, string[]>() };
     batch.numbers.set(ref.number, [...(batch.numbers.get(ref.number) ?? []), url]);
-    batches.set(key, batch);
+    batches.set(id, batch);
   }
   return [...batches.values()];
 }
@@ -108,7 +114,7 @@ async function readGithub(batch: Batch): Promise<Map<number, MrState>> {
 
 export async function readMergeRequestStates(
   urls: readonly string[],
-  token: string,
+  token: MrTokenSource,
 ): Promise<MrStates> {
   const states = new Map<string, MrState>();
   const failed: unknown[] = [];

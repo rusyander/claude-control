@@ -47,6 +47,15 @@ export function qwenVariantDir(): string {
   return fileURLToPath(new URL('../../../assets/kit/variants/qwen/', import.meta.url));
 }
 
+/**
+ * Claude на локальной модели с набором: вызовы инструментов — по одному. Claude
+ * Code сам гоняет параллельно до `CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY` вызовов
+ * (сверено с бинарём 2.1.286: без переменной — 10), а видеокарта отвечает на
+ * один запрос за раз: параллельные субагенты стоят в очереди и теряют нить.
+ * `rules/local.md` просит о том же словами — здесь это делает сам CLI.
+ */
+const LOCAL_CLAUDE_ENV = { CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY: '1' };
+
 /** Кто и как получает набор. Остальные CLI слоя на прогон не дают — честный «нет». */
 const SUPPORT: Record<string, { modes: KitMode[]; localOnly?: boolean; carries?: KitItemKind[] }> =
   {
@@ -394,7 +403,8 @@ export class KitService {
       // «Только набор панели»: личный источник `user` снимается тем же флагом,
       // что и у слоёв контура; вход в аккаунт живёт не в настройках и остаётся.
       if (mode === 'ours' && !input.hasSources) args.push('--setting-sources', 'project,local');
-      return { args, env: { [KIT_VARIANT_ENV]: input.local ? 'local' : 'standard' } };
+      if (!input.local) return { args, env: { [KIT_VARIANT_ENV]: 'standard' } };
+      return { args, env: { [KIT_VARIANT_ENV]: 'local', ...LOCAL_CLAUDE_ENV } };
     }
     if (input.provider === 'qwen' && mode === 'ours' && input.local) {
       const home = composeQwenHome(

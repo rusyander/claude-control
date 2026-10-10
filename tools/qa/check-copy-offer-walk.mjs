@@ -14,6 +14,9 @@
  *   разговор продолжается в ней: тот же ход приходит процессу с рабочей папкой
  *   копии, файл записан в копии, основная копия чиста (`git status`);
  * - разговор тот же: второго чата не появилось, ответ из копии в той же ленте;
+ * - копия открылась своей вкладкой (Ф-6) — разговор в её списке, полоса ветки
+ *   показывает ветку копии; следующее сообщение — ход в копии, ворот второй
+ *   раз нет (дом разговора — копия, `sessionHome`);
  * - «Убрать вместе с правками» — копии нет ни в `git worktree list`, ни на диске
  *   рабочим деревом; основная копия не тронута.
  *
@@ -105,6 +108,25 @@ await runOnStand(
         worktrees().some((path) => same(path, copy)),
         worktrees().join(' | '),
       );
+      // Ф-6: копия из карточки открывается своей вкладкой — как из окна
+      // «Параллельные ветки», — и разговор, переехавший в неё, виден уже там.
+      const copyId = copy.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+      const activeTab = () =>
+        page.evaluate(
+          () => JSON.parse(localStorage.getItem('agentdeck:workspace') ?? '{}').activeTabId ?? '',
+        );
+      let active = '';
+      for (let i = 0; i < 40 && copy && active !== copyId; i += 1) {
+        active = await activeTab();
+        if (active !== copyId) await wait(250);
+      }
+      check(
+        'копия открылась своей вкладкой и стала активной',
+        Boolean(copy) && active === copyId,
+        active,
+      );
+      if (process.env.SHOTS)
+        await page.screenshot({ path: join(process.env.SHOTS, 'copy-offer-tab.png') });
       // В копии запись — уже не основная копия: карточка прав (если она есть) — обычная.
       for (let i = 0; i < 60 && copy && !existsSync(join(copy, 'note.txt')); i += 1) {
         const allow = page.getByRole('button', { name: 'Разрешить', exact: true }).first();
@@ -138,6 +160,47 @@ await runOnStand(
         'в ленте того же чата — ответ из копии',
         feed.includes('ПРАВКА: допиши note.txt') && feed.includes('Правка записана.'),
         feed.replace(/\s+/g, ' ').slice(-400),
+      );
+      // Во вкладке копии разговор — свой: он в её списке, полоса ветки — ветка копии.
+      const counter = page.getByText(/Показано \d+ из \d+/).first();
+      let shownCount = '';
+      for (let i = 0; i < 60 && !/Показано 1 из 1/.test(shownCount); i += 1) {
+        shownCount = await counter.innerText().catch(() => '');
+        if (!/Показано 1 из 1/.test(shownCount)) await wait(250);
+      }
+      check('разговор в списке вкладки копии', /Показано 1 из 1/.test(shownCount), shownCount);
+      const branchBar = await page
+        .locator('main')
+        .getByText(branch, { exact: true })
+        .count()
+        .catch(() => 0);
+      check('полоса ветки во вкладке копии — ветка копии', branchBar > 0, branch);
+      if (process.env.SHOTS)
+        await page.screenshot({ path: join(process.env.SHOTS, 'copy-offer-tab-settled.png') });
+
+      // Переезд не на один ход: следующее сообщение человека идёт в копию, а не
+      // обратно в основную копию к тем же воротам.
+      const editsBefore = edits().length;
+      await input.fill('ПРАВКА: допиши второй абзац');
+      await input.press('Enter');
+      let next;
+      for (let i = 0; i < 240 && !next; i += 1) {
+        next = edits().slice(editsBefore)[0];
+        if (!next) await wait(250);
+      }
+      check(
+        'следующее сообщение — ход в копии',
+        Boolean(next) && same(next.cwd, copy),
+        JSON.stringify(next ?? null),
+      );
+      for (let i = 0; i < 40; i += 1) {
+        const allow = page.getByRole('button', { name: 'Разрешить', exact: true }).first();
+        if (await allow.isVisible().catch(() => false)) await allow.click();
+        await wait(250);
+      }
+      check(
+        'ворот ветки второй раз нет',
+        (await page.getByText('Первая правка — где работаем?').count()) === 0,
       );
 
       // Уборка — из окна параллельных веток основной копии.

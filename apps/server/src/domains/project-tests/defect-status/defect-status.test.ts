@@ -55,19 +55,22 @@ function testCase(over: Record<string, unknown> = {}): Record<string, unknown> {
 }
 
 function connectJira(): void {
-  writeSettings(store, 'atlassian', {
+  writeSettings(store, 'jira', {
     enabled: true,
     baseUrl: 'https://acme.atlassian.net',
     email: 'qa@acme.io',
     deployment: 'cloud',
-    confluenceUrl: '',
   });
-  writeToken(dir, 'atlassian', 'ATL-SECRET');
+  writeToken(dir, 'jira', 'ATL-SECRET');
 }
 
 function connectForge(): void {
-  writeSettings(store, 'forge', { enabled: true, kind: 'github', baseUrl: '', repo: 'acme/panel' });
-  writeToken(dir, 'forge', 'GH-SECRET');
+  writeSettings(store, 'github', {
+    enabled: true,
+    baseUrl: '',
+    repo: 'acme/panel',
+  });
+  writeToken(dir, 'github', 'GH-SECRET');
 }
 
 function stub(routes: [RegExp, { status?: number; body?: unknown }][]): { urls: string[] } {
@@ -223,7 +226,7 @@ describe('project-tests/defect-status: фордж и отсутствие инт
     const result = await refreshDefectStates(deps(), readGroups(root));
     expect(urls).toEqual([]);
     expect(result).toMatchObject({ checked: 0, closed: 0, recheck: [] });
-    expect(result.skipped).toEqual(['Atlassian не подключён — статусы задач Jira не спрашивали.']);
+    expect(result.skipped).toEqual(['Jira не подключена — статусы задач не спрашивали.']);
   });
 
   it('нераспознанный адрес не роняет обход остальных дефектов', async () => {

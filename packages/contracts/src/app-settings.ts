@@ -83,19 +83,17 @@ export interface AnalyticsPricing {
  * что сервер идёт под `--experimental-strip-types` и ЗНАЧЕНИЕ из бочки
  * контрактов взять не может.
  */
-export const atlassianSettingsSchema = object({
+export const atlassianSiteSettingsSchema = object({
   enabled: boolean().default(false),
   baseUrl: string().default(''),
   email: string().default(''),
   // Пусто — определить живой проверкой: облако отвечает на /rest/api/3, своя
   // установка — нет. Записывается тем, что ответил сервер, а не выбором в форме.
   deployment: zodEnum(['', 'cloud', 'server']).default(''),
-  confluenceUrl: string().default(''),
 });
 
-export const forgeSettingsSchema = object({
+export const forgeSiteSettingsSchema = object({
   enabled: boolean().default(false),
-  kind: zodEnum(['', 'github', 'gitlab']).default(''),
   baseUrl: string().default(''),
   repo: string().default(''),
 });
@@ -112,9 +110,8 @@ export const telegramSettingsSchema = object({
   ]),
 });
 
-export const tmsSettingsSchema = object({
+export const tmsSystemSettingsSchema = object({
   enabled: boolean().default(false),
-  kind: zodEnum(['', 'zephyr', 'xray', 'testit']).default(''),
   baseUrl: string().default(''),
   projectKey: string().default(''),
   groupId: string().default(''),
@@ -145,10 +142,14 @@ export const webhookSettingsSchema = object({
 });
 
 export const integrationsSettingsSchema = object({
-  atlassian: atlassianSettingsSchema.default(() => atlassianSettingsSchema.parse({})),
-  forge: forgeSettingsSchema.default(() => forgeSettingsSchema.parse({})),
+  jira: atlassianSiteSettingsSchema.default(() => atlassianSiteSettingsSchema.parse({})),
+  confluence: atlassianSiteSettingsSchema.default(() => atlassianSiteSettingsSchema.parse({})),
+  gitlab: forgeSiteSettingsSchema.default(() => forgeSiteSettingsSchema.parse({})),
+  github: forgeSiteSettingsSchema.default(() => forgeSiteSettingsSchema.parse({})),
   telegram: telegramSettingsSchema.default(() => telegramSettingsSchema.parse({})),
-  tms: tmsSettingsSchema.default(() => tmsSettingsSchema.parse({})),
+  zephyr: tmsSystemSettingsSchema.default(() => tmsSystemSettingsSchema.parse({})),
+  xray: tmsSystemSettingsSchema.default(() => tmsSystemSettingsSchema.parse({})),
+  testit: tmsSystemSettingsSchema.default(() => tmsSystemSettingsSchema.parse({})),
   ci: ciSettingsSchema.default(() => ciSettingsSchema.parse({})),
   webhook: webhookSettingsSchema.default(() => webhookSettingsSchema.parse({})),
 });

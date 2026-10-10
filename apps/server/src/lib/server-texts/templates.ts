@@ -942,22 +942,6 @@ export const serverTextTemplates = {
     ru: 'Вошли как {{account}} ({{deployment}}).',
     en: 'Logged in as {{account}} ({{deployment}}).',
   },
-  'integration-check-atlassian-confluence-ok': {
-    ru: 'Вошли как {{account}} ({{deployment}}). Confluence на связи.',
-    en: 'Logged in as {{account}} ({{deployment}}). Confluence is reachable.',
-  },
-  'integration-check-atlassian-confluence-rejected': {
-    ru: 'Вошли как {{account}} ({{deployment}}). Confluence отклонил токен — заполните отдельный ключ Confluence.',
-    en: 'Logged in as {{account}} ({{deployment}}). Confluence rejected the token — fill in the separate Confluence key.',
-  },
-  'integration-check-atlassian-confluence-failed': {
-    ru: 'Вошли как {{account}} ({{deployment}}). Confluence ответил {{status}} — проверьте адрес Confluence.',
-    en: 'Logged in as {{account}} ({{deployment}}). Confluence answered {{status}} — check the Confluence address.',
-  },
-  'integration-check-atlassian-confluence-unreachable': {
-    ru: 'Вошли как {{account}} ({{deployment}}). Confluence недоступен: {{reason}}.',
-    en: 'Logged in as {{account}} ({{deployment}}). Confluence is unreachable: {{reason}}.',
-  },
   'integration-deployment-cloud': { ru: 'облако', en: 'cloud' },
   'integration-deployment-own': { ru: 'своя установка', en: 'own installation' },
   'integration-tms-project': {
@@ -1327,6 +1311,10 @@ export const serverTextTemplates = {
     ru: 'у MR {{mr}} пустое описание',
     en: 'MR {{mr}} has an empty description',
   },
+  'delivery-gap-mr-na-reason': {
+    ru: 'в описании MR {{mr}} нет причины n/a живой проверки ({{sieves}}) — впишите в описание id сита и почему оно не применимо',
+    en: 'the description of MR {{mr}} does not give the n/a reason of the live check ({{sieves}}) — add the sieve id and why it does not apply',
+  },
   'delivery-gap-no-copy': { ru: 'нет копии группы', en: 'the group has no copy' },
   'sieve-gap-conflicts': {
     ru: 'сито «интеграция»: слияние со свежей основной веткой даёт конфликт в {{files}} — перенесите ветку на свежую основную (rebase) и разрешите конфликт',
@@ -1408,6 +1396,10 @@ export const serverTextTemplates = {
     ru: 'сито {{sieve}}: прогон {{run}} старше правки задетого ситом кода ({{files}}) — прогоните заново на последнем коммите',
     en: 'sieve {{sieve}}: run {{run}} is older than the change to the code this sieve covers ({{files}}) — run it again on the final commit',
   },
+  'sieve-gap-live-na': {
+    ru: 'сито {{sieve}}: живую проверку нельзя сдать n/a — дифф меняет поведение ({{files}}); проверьте вживую на последнем коммите и сдайте pass с доказательством, а не вышло — fail с причиной',
+    en: 'sieve {{sieve}}: a live check cannot be reported n/a — the diff changes behaviour ({{files}}); check it live on the final commit and report pass with evidence, or fail with the reason if it could not run',
+  },
   'tests-gap-no-run': {
     ru: 'блок «Тесты» копии: после старта группы не записано ни одного прогона — прогоните кейсы по изменённым файлам ({{cases}}) и запишите прогон: {{command}}',
     en: 'Tests block of the copy: no run has been recorded since the group started — run the cases for the changed files ({{cases}}) and record the run: {{command}}',
@@ -1456,9 +1448,13 @@ export const serverTextTemplates = {
     ru: 'Ассистент панели идёт через контур «{{title}}», а ключ контура не сохранён — шлюзу нечего подставить. Сохраните ключ на карточке контура',
     en: 'The panel assistant goes through the contour «{{title}}», but the contour key is not saved — the gateway has nothing to insert. Save the key on the contour card',
   },
+  'watcher-cli-missing': {
+    ru: '{{provider}} не найден в PATH процесса панели — разбор вести нечем. Установите CLI. Разбор не запущен',
+    en: '{{provider}} is not on the panel process PATH — there is nothing to run the analysis with. Install the CLI. Analysis did not start',
+  },
   'watcher-provider-unsupported': {
-    ru: 'Активный CLI — {{provider}}, а маршрут ассистента панели ведёт в облако Claude: подставлять Claude вместо выбранного CLI наблюдатель не станет. Разбор идёт, когда ассистент на контуре или на локальной модели. Разбор не запущен',
-    en: 'The active CLI is {{provider}}, and the panel assistant route leads to the Claude cloud: the watcher will not substitute Claude for the chosen CLI. Analysis runs when the assistant is on a contour or a local model. Analysis did not start',
+    ru: 'Активный CLI — {{provider}}: запуска без правок, которым наблюдатель разбирает проблемы, у него нет, а подставлять Claude вместо выбранного CLI наблюдатель не станет. Разбор идёт, когда ассистент на контуре или на локальной модели. Разбор не запущен',
+    en: 'The active CLI is {{provider}}: it has no run without edits, which the watcher analyses problems with, and the watcher will not substitute Claude for the chosen CLI. Analysis runs when the assistant is on a contour or a local model. Analysis did not start',
   },
   'watcher-endpoint-unsupported': {
     ru: 'Ассистенту панели выбран свой эндпоинт «{{name}}» — наблюдателю пришлось бы отдать его токен процессу CLI, этого панель не делает. Разбор не запущен',
@@ -1487,6 +1483,10 @@ export const serverTextTemplates = {
   'sandbox-provider-unsupported': {
     ru: 'Песочница запускает только Claude Code, а активный CLI — {{provider}}. Прогон не запущен',
     en: 'The sandbox runs Claude Code only, and the active CLI is {{provider}}. The run did not start',
+  },
+  'assistant-reply-truncated': {
+    ru: 'Ответ модели оборвался на пределе длины — ничего не применено. Разбейте задачу на части.',
+    en: "The model's answer was cut off at the length limit — nothing was applied. Split the task into parts.",
   },
   'assistant-api-base-unknown': {
     ru: 'Адрес модельного API {{provider}} панели не известен — ключ никуда не отправлен, чтобы не уйти к чужому вендору. Установите CLI или выберите свой эндпоинт',

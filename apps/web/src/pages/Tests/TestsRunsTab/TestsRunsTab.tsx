@@ -119,6 +119,11 @@ export function TestsRunsTab({ projectPath, groups, isRunning, openRunId }: Test
                     {t(label.mode)}
                   </Badge>
                   <Badge tone="info">{t(label.actor)}</Badge>
+                  {record.attested && (
+                    <span title={t('tests.runs.attestedHint')}>
+                      <Badge tone="neutral">{t('tests.runs.attested')}</Badge>
+                    </span>
+                  )}
                   {tally.state && (
                     <Badge tone={tally.state === 'running' ? 'info' : 'warning'}>
                       {t(`tests.runs.state.${tally.state}`)}

@@ -1,6 +1,11 @@
 /**
- * Внешние интеграции панели: Jira и Confluence, форджи по токену, Telegram,
- * тест-менеджмент в Jira (Zephyr/Xray) и подхват отчётов CI.
+ * Внешние интеграции панели: Jira, Confluence, GitLab, GitHub, Telegram,
+ * системы тест-кейсов (Zephyr, Xray, Test IT), подхват отчётов CI и вебхук.
+ *
+ * Каждая система — СВОЯ интеграция со своим тумблером, адресом и ключом
+ * (владелец 10.10.2026): захотел — подключил, отключение одной не трогает
+ * другие. Раньше Jira и Confluence жили одной связкой, а GitHub и GitLab —
+ * одной карточкой с выбором вида, и подключить оба форджа сразу было нельзя.
  *
  * Один принцип на весь файл: НАСТРОЙКА живёт в настройках панели и видна, ТОКЕН
  * живёт в зашифрованном хранилище (`lib/provider-keys/provider-keys.ts`) и наружу уходит
@@ -15,26 +20,37 @@ import type { CodedFields } from './server-messages.ts';
 /** Какой Atlassian на том конце: облако или своя установка. */
 export type AtlassianDeployment = 'cloud' | 'server';
 
-export interface AtlassianSettings {
+/** Jira или Confluence: у каждой свой адрес, своя почта и свой ключ. */
+export interface AtlassianSiteSettings {
   enabled: boolean;
-  /** `https://site.atlassian.net` для облака, свой адрес для Server/DC. */
+  /**
+   * Jira: `https://site.atlassian.net` или свой адрес. Confluence: адрес вики —
+   * у облака `https://site.atlassian.net/wiki`, у своей установки свой хост.
+   */
   baseUrl: string;
   /** Облако: почта для Basic-авторизации. Server/DC: пусто, там Bearer. */
   email: string;
   /** Пусто = определить живой проверкой и запомнить, что ответил сервер. */
   deployment: AtlassianDeployment | '';
-  /** Отдельный адрес Confluence, если он живёт не на хосте Jira. */
-  confluenceUrl: string;
 }
 
-/** Фордж по токену — дефекты и связь с MR без установленных `gh`/`glab`. */
-export interface ForgeSettings {
+export type JiraSettings = AtlassianSiteSettings;
+export type ConfluenceSettings = AtlassianSiteSettings;
+
+/** GitLab или GitHub по токену — дефекты и связь с MR без установленных `gh`/`glab`. */
+export interface ForgeSiteSettings {
   enabled: boolean;
-  kind: 'github' | 'gitlab' | '';
-  /** Свой GitLab: адрес инсталляции. Пусто = github.com / gitlab.com. */
+  /** Своя инсталляция: её адрес. Пусто = github.com / gitlab.com. */
   baseUrl: string;
   /** `owner/repo` или числовой id проекта GitLab; пусто = вывести из origin. */
   repo: string;
+}
+
+export type ForgeKind = 'github' | 'gitlab';
+
+/** Фордж с видом — то, с чем работает клиент форджа на сервере. */
+export interface ForgeSettings extends ForgeSiteSettings {
+  kind: ForgeKind | '';
 }
 
 /**
@@ -110,10 +126,13 @@ export interface WebhookPayload {
  */
 export type TmsKind = 'zephyr' | 'xray' | 'testit';
 
-/** Тест-менеджмент. Место истины по кейсам остаётся там, а не в панели. */
-export interface TmsSettings {
+/**
+ * Одна система тест-кейсов. Место истины по кейсам остаётся там, а не в
+ * панели. Каждая подключается сама по себе: Zephyr у одной команды и Test IT у
+ * другой живут рядом.
+ */
+export interface TmsSystemSettings {
   enabled: boolean;
-  kind: TmsKind | '';
   /**
    * Адрес своей установки. Нужен только Test IT: у Zephyr и Xray API общий на
    * всех, и поле у них не читается вовсе.
@@ -123,6 +142,11 @@ export interface TmsSettings {
   projectKey: string;
   /** Группа панели, с которой синхронизируется проект; пусто = спрашивать. */
   groupId: string;
+}
+
+/** Система тест-кейсов с видом — то, с чем работает её клиент на сервере. */
+export interface TmsSettings extends TmsSystemSettings {
+  kind: TmsKind | '';
 }
 
 /** Откуда панель сама забирает отчёт последнего прогона CI. */
@@ -138,15 +162,74 @@ export interface CiSettings {
 }
 
 export interface IntegrationsSettings {
-  atlassian: AtlassianSettings;
-  forge: ForgeSettings;
+  jira: JiraSettings;
+  confluence: ConfluenceSettings;
+  gitlab: ForgeSiteSettings;
+  github: ForgeSiteSettings;
   telegram: TelegramSettings;
-  tms: TmsSettings;
+  zephyr: TmsSystemSettings;
+  xray: TmsSystemSettings;
+  testit: TmsSystemSettings;
   ci: CiSettings;
   webhook: WebhookSettings;
 }
 
 export type IntegrationId = keyof IntegrationsSettings;
+
+/** Порядок карточек — он же порядок в ответе `GET /api/integrations`. */
+export const INTEGRATION_ORDER = [
+  'jira',
+  'confluence',
+  'gitlab',
+  'github',
+  'telegram',
+  'zephyr',
+  'xray',
+  'testit',
+  'ci',
+  'webhook',
+] as const satisfies readonly IntegrationId[];
+
+/** Как запущен найденный MCP-сервер. */
+export type DiscoveredLaunch = 'docker' | 'npx' | 'uvx' | 'url' | 'command';
+
+/**
+ * Интеграция, найденная среди MCP-серверов человека (`Найти уже подключённые`).
+ *
+ * Ключа здесь нет и быть не может — только маска: значение остаётся на
+ * сервере, и подтверждение переноса называет кандидата по `key`, а сервер
+ * заново читает ключ из того же источника.
+ */
+export interface DiscoveredIntegration {
+  /** Кандидат целиком: по нему человек подтверждает перенос. */
+  key: string;
+  id: IntegrationId;
+  /** Имя MCP-сервера, как оно записано в конфигурации. */
+  server: string;
+  /** Где описан сервер: `~/.claude.json` (общий или проектный блок) или `.mcp.json`. */
+  source: 'user' | 'project' | 'mcp-json';
+  /** Проект — для `project` и `mcp-json`. */
+  project?: string;
+  launch: DiscoveredLaunch;
+  /** Пакет, образ или адрес, по которому система узнана. */
+  package: string;
+  /** Видимые поля, которые лягут в настройку интеграции (адрес, почта, чат). */
+  fields: Record<string, string>;
+  hasToken: boolean;
+  maskedToken: string;
+  /** Чего в найденном не хватает для работы: `baseUrl`, `token`, `chatId`. */
+  missing: string[];
+  /** Интеграция уже подключена ровно с этим адресом и этим ключом. */
+  alreadyConnected: boolean;
+  /** Перенос заменит уже сохранённый другой ключ или адрес. */
+  replaces: boolean;
+}
+
+export interface IntegrationDiscovery {
+  found: DiscoveredIntegration[];
+  /** Сколько MCP-серверов просмотрено — «ничего не нашли» среди скольких. */
+  scanned: number;
+}
 
 /** Итог последней живой проверки связи — то же, что панель хранит по MCP. */
 export type IntegrationState = 'ok' | 'error' | 'unchecked';
@@ -166,16 +249,6 @@ export interface IntegrationStatus extends CodedFields<'detail'> {
   account?: string;
   /** Что ответил Atlassian на вопрос о себе: облако или своя установка. */
   deployment?: AtlassianDeployment;
-  /**
-   * Сохранён ли ОТДЕЛЬНЫЙ токен Confluence — только у Atlassian.
-   *
-   * На своей установке (Server/DC) Jira и Confluence выдают личные токены
-   * каждая своя: один ключ второй системой отклоняется с 401 на совершенно
-   * рабочем доступе. У облака токен один на весь сайт, и поле остаётся пустым.
-   */
-  hasConfluenceToken?: boolean;
-  /** `abc…4f21` второго ключа: узнать свой, не увидев его. */
-  maskedConfluenceToken?: string;
 }
 
 export interface JiraProject {

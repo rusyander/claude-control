@@ -70,7 +70,9 @@ export const kitEn: typeof kitRu = {
     cliHeader: 'CLI',
     cliWhat: 'Modes',
     cliClaude: 'Claude Code',
-    cliClaudeText: 'All three modes.',
+    cliClaudeText:
+      'All three modes. On a local model tool calls run one at a time, and the kit refuses ' +
+      'background commands and background subagents: the GPU answers one request at a time.',
     cliQwen: 'Qwen Code',
     cliQwenText:
       '«Panel kit only» while Qwen Code runs on a local model. Qwen Code has no per-launch layer, ' +
@@ -78,7 +80,8 @@ export const kitEn: typeof kitRu = {
       'subagents and hooks as a kit extension. «Both» cannot be assembled without touching ' +
       '`~/.qwen`. The kit hooks know the run is local: the guard lets a single subagent through ' +
       'without asking, since on your own card it spends no subscription limit; a fan-out of many ' +
-      'agents still asks.',
+      'agents still asks. Kit rules and skills name Claude tools, so QWEN.md also carries a map ' +
+      'of Qwen Code tool names; background work is refused here too.',
     cliCodex: 'Codex',
     cliCodexText:
       '«Yours only» and «Yours and the panel kit». Rules and skills get through: the rules via ' +

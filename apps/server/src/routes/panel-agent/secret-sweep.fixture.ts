@@ -54,11 +54,14 @@ export const STORES = {
   groupEnv: plain('ge'),
   contourKey: plain('ck'),
   endpointToken: plain('et'),
-  atlassianToken: plain('ia'),
+  jiraToken: plain('ia'),
   confluenceToken: plain('ic'),
-  forgeToken: plain('if'),
+  gitlabToken: plain('if'),
+  githubToken: plain('ig'),
   telegramToken: plain('it'),
-  tmsToken: plain('im'),
+  zephyrToken: plain('iz'),
+  xrayToken: plain('ix'),
+  testitToken: plain('im'),
   ciToken: plain('ii'),
   webhookToken: plain('iw'),
   testEnvSecret: plain('ts'),
@@ -327,8 +330,8 @@ export const ROWS: Readonly<Record<string, Row>> = {
   dlp_journal: [['done']],
   clear_dlp_journal: [['failed']],
   list_integrations: [['done']],
-  save_integration: [['card', { id: 'atlassian', settings: { email: 'other@example.com' } }]],
-  check_integration: [['card', { id: 'atlassian' }]],
+  save_integration: [['card', { id: 'jira', settings: { email: 'other@example.com' } }]],
+  check_integration: [['card', { id: 'jira' }]],
   forget_integration: [['card', { id: 'telegram' }]],
   jira_projects: [['failed']],
   jira_search: [['failed', { q: 'bug' }]],
@@ -775,19 +778,30 @@ export async function seedThroughPanel(
     payload: { token: STORES.endpointToken },
   });
   const integrations: Record<string, [Store, Record<string, unknown>]> = {
-    atlassian: [
-      'atlassianToken',
+    jira: [
+      'jiraToken',
       {
         enabled: true,
         baseUrl: 'http://127.0.0.1:1',
         email: 'qa@example.com',
         deployment: 'cloud',
-        confluenceUrl: '',
       },
     ],
-    forge: ['forgeToken', { enabled: false, kind: '', baseUrl: '', repo: '' }],
+    confluence: [
+      'confluenceToken',
+      {
+        enabled: true,
+        baseUrl: 'http://127.0.0.1:1',
+        email: 'qa@example.com',
+        deployment: 'cloud',
+      },
+    ],
+    gitlab: ['gitlabToken', { enabled: false, baseUrl: '', repo: '' }],
+    github: ['githubToken', { enabled: false, baseUrl: '', repo: '' }],
     telegram: ['telegramToken', { enabled: false, chatId: '', events: [] }],
-    tms: ['tmsToken', { enabled: false, kind: '', baseUrl: '', projectKey: '', groupId: '' }],
+    zephyr: ['zephyrToken', { enabled: false, baseUrl: '', projectKey: '', groupId: '' }],
+    xray: ['xrayToken', { enabled: false, baseUrl: '', projectKey: '', groupId: '' }],
+    testit: ['testitToken', { enabled: false, baseUrl: '', projectKey: '', groupId: '' }],
     ci: ['ciToken', { enabled: false, kind: '', repo: '', workflow: '', artifact: '' }],
     webhook: ['webhookToken', { enabled: false, url: '', events: [] }],
   };
@@ -795,11 +809,7 @@ export async function seedThroughPanel(
     await human({
       method: 'PUT',
       url: `/api/integrations/${id}`,
-      payload: {
-        settings,
-        token: STORES[store],
-        ...(id === 'atlassian' ? { confluenceToken: STORES.confluenceToken } : {}),
-      },
+      payload: { settings, token: STORES[store] },
     });
   }
   await human({

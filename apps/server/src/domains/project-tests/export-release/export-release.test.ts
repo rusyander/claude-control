@@ -246,9 +246,7 @@ describe('project-tests/export-release: язык документа', () => {
     );
     expect(text).toContain('- Вход [blocker] — failed — ошибка <b>500</b>');
     expect(text).toContain('- QA-8 (status not asked) — Оплата: https://jira/browse/QA-8');
-    expect(text).toContain(
-      '_Atlassian is not connected: only requirements from case links are shown._',
-    );
+    expect(text).toContain('_Jira is not connected: only requirements from case links are shown._');
     expect(text).toContain('| QA-2 |  | 0 | 0 | 0 | 0 | not covered |');
     expect(text).toContain('| manual pass | person | stage | 1 | 0 | 0 |');
   });

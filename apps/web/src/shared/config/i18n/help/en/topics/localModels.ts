@@ -165,7 +165,8 @@ export const localModelsEn: typeof localModelsRu = {
     kitTitle: 'Whose kit the agent gets',
     kitCaption:
       'The kit mode is chosen separately for Claude Code, Qwen Code and Codex. On a local model the kit ' +
-      'gets its own variant: shorter rules and a more explicit tool-call format. The kit itself, ' +
+      'gets its own variant: a short discipline block for a small model, tool calls one at a time, ' +
+      'background commands and subagents refused, and for Qwen Code a map of its own tool names. The kit itself, ' +
       'editing and the check against the global layer live in the «Panel kit» section.',
     kitHeader: 'Mode',
     kitWhat: 'What the agent gets',

@@ -1,7 +1,8 @@
 import { randomBytes, timingSafeEqual } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { panelHomeDir } from '../brand.mjs';
+import { writeSecretFile } from '../credentials/credentials.ts';
 
 /**
  * Токен доступа к API — единственный секрет, которым приложение на телефоне
@@ -27,9 +28,9 @@ export function apiTokenPath(): string {
 let cached: string | undefined;
 
 function write(token: string): string {
-  const path = apiTokenPath();
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, `${token}\n`, { encoding: 'utf8', mode: 0o600 });
+  // Права 0600 с момента создания и при ротации тоже: `mode` у `writeFileSync`
+  // действует только на новый файл, и перезапись оставила бы прежние, широкие.
+  writeSecretFile(apiTokenPath(), `${token}\n`);
   cached = token;
   return token;
 }

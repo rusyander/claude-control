@@ -36,6 +36,7 @@ import { basename } from 'node:path';
 import { issuesOf } from '../../lib/request-body.ts';
 import { codeOf } from '../../lib/server-text/server-text.ts';
 import { runLegacyGroupMigrations } from '../../domains/groups/legacy-migrations.ts';
+import { migrateLegacyIntegrations } from '@agentdeck/contracts/integrations-legacy';
 import type { CredentialsLookup } from '../../lib/credentials/credentials.ts';
 
 /** Источник доступа и причина с кодом — без самого токена. */
@@ -273,7 +274,7 @@ export function registerConfigRoutes(app: FastifyInstance, ctx: ServerContext): 
     // Снимок приходит с чужой машины — проверяем структуру до записи, иначе
     // испорченный или подсунутый файл осел бы в state.json как есть. Валидные
     // поля берём уже разобранными (без неизвестного мусора).
-    const parsed = importStateSchema.safeParse(request.body);
+    const parsed = importStateSchema.safeParse(withCurrentSnapshotIntegrations(request.body));
     if (!parsed.success) {
       return reply.code(400).send({
         error: 'invalid_state',
@@ -367,4 +368,24 @@ export function registerConfigRoutes(app: FastifyInstance, ctx: ServerContext): 
 
     return { ...credentialsReply(found), hasManual: false };
   });
+}
+
+/**
+ * Снимок, снятый до 10.10.2026, несёт интеграции прежней формы (`atlassian`,
+ * `forge`, `tms`): без переезда до проверки он отклонялся бы целиком — человек
+ * терял бы перенос всего остального из-за одного блока. Ключей снимок не
+ * несёт, переносятся только настройки и итоги проверок.
+ */
+function withCurrentSnapshotIntegrations(body: unknown): unknown {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return body;
+  const state = body as { settings?: unknown; integrationHealth?: unknown };
+  const settings = state.settings as { integrations?: unknown } | undefined;
+  if (!settings || typeof settings !== 'object') return body;
+  const migrated = migrateLegacyIntegrations(settings.integrations, state.integrationHealth);
+  if (!migrated.changed) return body;
+  return {
+    ...state,
+    ...(state.integrationHealth === undefined ? {} : { integrationHealth: migrated.health }),
+    settings: { ...settings, integrations: migrated.integrations },
+  };
 }

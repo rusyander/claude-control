@@ -4,6 +4,7 @@ import { toast } from '@shared/lib/toast';
 import { ChatMessages } from '@features/ChatMessages';
 import { ChatEmptyState } from '../ChatEmptyState/ChatEmptyState';
 import { answerChild } from '../lib/answerChild';
+import { followBranchCopy } from '../lib/followBranchCopy';
 import type { ChatThreadProps } from './ChatThread.types';
 
 /**
@@ -91,11 +92,12 @@ export function ChatThread({
       onPermissionDecide={(toolUseId, behavior, message) =>
         chatId && agentRuns.decidePermission(chatId, toolUseId, behavior, message)
       }
-      onBranchDecide={(toolUseId, choice, branch) =>
-        chatId
-          ? agentRuns.decideBranchGate(chatId, toolUseId, choice, branch)
-          : Promise.resolve({ ok: false })
-      }
+      onBranchDecide={async (toolUseId, choice, branch) => {
+        if (!chatId) return { ok: false };
+        const answer = await agentRuns.decideBranchGate(chatId, toolUseId, choice, branch);
+        if (answer.ok && answer.path) followBranchCopy(answer.path, conversationId ?? chatId);
+        return answer;
+      }}
       childStages={child.stages}
       onOpenChild={onOpenChild}
       childTree={child.tree}

@@ -119,10 +119,18 @@ export function sievePromptBlock(input: {
     }
   }
   const proved = own.filter((sieve) => sieve.proof === 'run').map((sieve) => sieve.id);
+  if (proved.length > 0) {
+    lines.push(
+      `${proved.join(', ')} are live checks: n/a is accepted only when the diff changes no ` +
+        'product code (UI or backend) — otherwise the panel refuses it; an n/a row also puts ' +
+        'its sieve id and reason into the MR description.',
+    );
+  }
   if (input.testsBlock && proved.length > 0) {
     lines.push(
       `This project has an AgentDeck Tests section: for ${proved.join(', ')} record the live ` +
-        'check there (tests-cli run, or tests-cli record … --note "<how you checked>") and cite ' +
+        'check there (tests-cli run; a manual case via tests-cli record … --note "<how you ' +
+        'checked>" — record refuses automated cases) and cite ' +
         'it in the evidence as run:<id> — the id tests-cli prints. The panel opens that run: it ' +
         'must exist, have no failed or blocked case, and be newer than the last change to the ' +
         'code the sieve covers.',

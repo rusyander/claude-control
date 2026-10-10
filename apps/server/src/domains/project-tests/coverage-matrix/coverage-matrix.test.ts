@@ -51,14 +51,13 @@ function testCase(over: Record<string, unknown> = {}): Record<string, unknown> {
 }
 
 function connectJira(): void {
-  writeSettings(store, 'atlassian', {
+  writeSettings(store, 'jira', {
     enabled: true,
     baseUrl: 'https://acme.atlassian.net',
     email: 'qa@acme.io',
     deployment: 'cloud',
-    confluenceUrl: '',
   });
-  writeToken(dir, 'atlassian', 'ATL-SECRET');
+  writeToken(dir, 'jira', 'ATL-SECRET');
 }
 
 function stubSearch(reply: { status?: number; body?: unknown }): { urls: string[] } {
@@ -216,7 +215,7 @@ describe('project-tests/coverage: требования из Jira', () => {
   it('без подключения и без привязки в сеть не ходят вовсе', async () => {
     const { urls } = stubSearch({ body: { issues: [] } });
     const noAtlassian = await buildCoverage(deps(), readGroups(root));
-    expect(noAtlassian.warning).toContain('Atlassian не подключён');
+    expect(noAtlassian.warning).toContain('Jira не подключена');
 
     connectJira();
     const noLink = await buildCoverage(deps(), readGroups(root));

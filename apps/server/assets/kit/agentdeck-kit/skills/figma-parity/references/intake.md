@@ -4,7 +4,7 @@ The contract with the user: **everything the run could need is asked HERE, in on
 that the run does not stop until the final decision set.** Anything discovered later that would
 have been a question becomes a file entry, never a prompt.
 
-## The question set (one AskUserQuestion, Russian, recommended option first)
+## The question set (one AskUserQuestion in the user's language, recommended option first)
 
 **Q1 — Mode**
 

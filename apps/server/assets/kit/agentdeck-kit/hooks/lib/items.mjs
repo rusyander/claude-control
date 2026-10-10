@@ -40,6 +40,7 @@ export const MANIFEST = {
     'language-guard',
     'agent-prompt-guard',
     'spawn-cost-guard',
+    'local-discipline',
     'doc-size-guard',
     'read-discipline',
     'todo-throttle',

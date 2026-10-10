@@ -18,14 +18,6 @@ export const composedRu: Record<ComposedMessageCode, string> = {
   'integration-check-telegram-ok': 'Бот {{account}} на связи.',
   'integration-check-tms-ok': '{{detail}} — связь есть.',
   'integration-check-atlassian-ok': 'Вошли как {{account}} ({{deployment}}).',
-  'integration-check-atlassian-confluence-ok':
-    'Вошли как {{account}} ({{deployment}}). Confluence на связи.',
-  'integration-check-atlassian-confluence-rejected':
-    'Вошли как {{account}} ({{deployment}}). Confluence отклонил токен — заполните отдельный ключ Confluence.',
-  'integration-check-atlassian-confluence-failed':
-    'Вошли как {{account}} ({{deployment}}). Confluence ответил {{status}} — проверьте адрес Confluence.',
-  'integration-check-atlassian-confluence-unreachable':
-    'Вошли как {{account}} ({{deployment}}). Confluence недоступен: {{reason}}.',
   'integration-deployment-cloud': 'облако',
   'integration-deployment-own': 'своя установка',
   'integration-tms-project': '{{system}}, проект {{project}}',
@@ -169,6 +161,8 @@ export const composedRu: Record<ComposedMessageCode, string> = {
   'delivery-gap-fix-missing':
     'замечания ревью ({{count}}) не исправлены: звено правок после ревью не проходило',
   'delivery-gap-mr-description': 'у MR {{mr}} пустое описание',
+  'delivery-gap-mr-na-reason':
+    'в описании MR {{mr}} нет причины n/a живой проверки ({{sieves}}) — впишите в описание id сита и почему оно не применимо',
   'delivery-gap-no-copy': 'нет копии группы',
   'sieve-gap-conflicts':
     'сито «интеграция»: слияние со свежей основной веткой даёт конфликт в {{files}} — перенесите ветку на свежую основную (rebase) и разрешите конфликт',
@@ -209,6 +203,8 @@ export const composedRu: Record<ComposedMessageCode, string> = {
     'сито {{sieve}}: в прогоне {{run}} красные кейсы: {{cases}} — почините и запишите новый прогон',
   'sieve-gap-run-stale':
     'сито {{sieve}}: прогон {{run}} старше правки задетого ситом кода ({{files}}) — прогоните заново на последнем коммите',
+  'sieve-gap-live-na':
+    'сито {{sieve}}: живую проверку нельзя сдать n/a — дифф меняет поведение ({{files}}); проверьте вживую на последнем коммите и сдайте pass с доказательством, а не вышло — fail с причиной',
   'tests-gap-no-run':
     'блок «Тесты» копии: после старта группы не записано ни одного прогона — прогоните кейсы по изменённым файлам ({{cases}}) и запишите прогон: {{command}}',
   'tests-gap-word-only':

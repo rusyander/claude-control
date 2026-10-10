@@ -265,9 +265,14 @@ describe('runExtras: что получает прогон', () => {
     expect(existsSync(join(effective('hybrid'), 'hooks', 'hooks.json'))).toBe(true);
   });
 
-  it('Claude на контуре локальной модели — локальный вариант правил', () => {
+  it('Claude на контуре локальной модели — локальный вариант правил и вызовы по одному', () => {
     service().setMode('claude', 'hybrid');
-    expect(extras('claude', true).env).toEqual({ [KIT_VARIANT_ENV]: 'local' });
+    expect(extras('claude', true).env).toEqual({
+      [KIT_VARIANT_ENV]: 'local',
+      CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY: '1',
+    });
+    // В облаке параллельность — забота самого Claude Code: переменной нет.
+    expect(extras('claude').env).not.toHaveProperty('CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY');
   });
 
   it('Claude «только наш» — плагин и без источника user', () => {
@@ -284,7 +289,7 @@ describe('runExtras: что получает прогон', () => {
     service().setMode('claude', 'ours');
     expect(extras('claude', true, true)).toEqual({
       args: ['--plugin-dir', effective('ours')],
-      env: { [KIT_VARIANT_ENV]: 'local' },
+      env: { [KIT_VARIANT_ENV]: 'local', CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY: '1' },
     });
   });
 

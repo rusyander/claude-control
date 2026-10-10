@@ -52,12 +52,11 @@ export const testsEn: Record<TestsMessageCode, string> = {
   'run-not-in-history': 'Run “{{id}}” is not in the history.',
   'run-base-not-in-history': 'Run “{{baseId}}” is not in the history.',
   'compare-first-run': 'Nothing to compare with: this is the first run with results.',
-  'coverage-atlassian-off':
-    'Atlassian is not connected: only requirements from case links are shown.',
+  'coverage-atlassian-off': 'Jira is not connected: only requirements from case links are shown.',
   'coverage-jira-project-unlinked':
     'No Jira project is linked to the project: only requirements from case links are shown.',
   'coverage-jira-failed': 'Jira did not answer: {{reason}}',
-  'coverage-dates-atlassian-off': 'Atlassian is not connected: requirement dates were not checked.',
+  'coverage-dates-atlassian-off': 'Jira is not connected: requirement dates were not checked.',
   'coverage-dates-jira-failed':
     'Jira did not answer, requirement dates were not checked: {{reason}}',
   'defect-jira-project-unlinked':
@@ -169,6 +168,8 @@ export const testsEn: Record<TestsMessageCode, string> = {
   'case-id-not-in-group':
     'Case “{{caseId}}” is not in group “{{groupId}}”: a new case is saved without an id.',
   'case-not-in-named-group': 'Case “{{caseId}}” is not in group “{{groupId}}”.',
+  'record-automated-case':
+    'Automated cases are not recorded by word: {{cases}}. Their test checks them — run the group ({{groups}}) with the run command.',
   'bulk-action-unknown': 'Unknown action “{{action}}”.',
   'bulk-none-selected': 'No test selected.',
   'bulk-mute-reason-required':
@@ -220,7 +221,7 @@ export const testsEn: Record<TestsMessageCode, string> = {
     'No ТК-*.md files were found in “{{relativeDir}}” (subfolders were searched too).',
   'manual-files-no-title': 'Files were found, but none has a “# Title” heading — nothing to read.',
   'generate-jira-off':
-    'Jira is not connected, and “cover a requirement” writes cases from the issue text. Connect Atlassian in the integrations section or choose another source.',
+    'Jira is not connected, and “cover a requirement” writes cases from the issue text. Connect Jira in the integrations section or choose another source.',
   'generate-diff-failed': 'The comparison “{{range}}” did not complete.',
   'generate-diff-timeout':
     'The comparison “{{range}}” did not complete: git did not answer within {{seconds}} s. The repository is not at fault — this happens on a large tree, a slow disk or under an antivirus.',

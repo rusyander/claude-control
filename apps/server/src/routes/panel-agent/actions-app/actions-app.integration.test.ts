@@ -385,11 +385,11 @@ describe('panel-agent actions: panel state', () => {
 
   it('интеграции: адрес без токена — поле токена человеку; секрет в поле — отказ; забыть', async () => {
     const list = (await call('list_integrations', {})).json<PanelActionResult>();
-    expect((list.result as unknown[]).length).toBe(6);
+    expect((list.result as unknown[]).length).toBe(10);
 
     const leak = (
       await call('save_integration', {
-        id: 'forge',
+        id: 'gitlab',
         settings: { baseUrl: 'https://gitlab.example.com', token: 'glpat-abcdefghijklmnopqrst' },
       })
     ).json<PanelActionResult>();
@@ -397,25 +397,23 @@ describe('panel-agent actions: panel state', () => {
     expect(await listPending()).toEqual([]);
 
     const { result } = await decided('save_integration', {
-      id: 'forge',
+      id: 'gitlab',
       settings: { baseUrl: 'https://gitlab.example.com', enabled: true },
     });
     expect(result).toMatchObject({
       outcome: 'needs-secret',
-      page: { route: '/settings', focus: 'integration-secret:forge' },
+      page: { route: '/settings', focus: 'integration-secret:gitlab' },
     });
-    expect(
-      (disk().getSettings().integrations.forge as unknown as { baseUrl: string }).baseUrl,
-    ).toBe('https://gitlab.example.com');
+    expect(disk().getSettings().integrations.gitlab.baseUrl).toBe('https://gitlab.example.com');
 
     // Проверка пишет итог на диск — только после карточки; без токена сеть не нужна.
-    const { result: check } = await decided('check_integration', { id: 'forge' });
+    const { result: check } = await decided('check_integration', { id: 'gitlab' });
     expect(check.outcome).toBe('done');
 
-    expect(disk().getSettings().integrations.forge.enabled).toBe(true);
-    const forgot = await decided('forget_integration', { id: 'forge' });
+    expect(disk().getSettings().integrations.gitlab.enabled).toBe(true);
+    const forgot = await decided('forget_integration', { id: 'gitlab' });
     expect(forgot.result.outcome).toBe('done');
-    expect(disk().getSettings().integrations.forge.enabled).toBe(false);
+    expect(disk().getSettings().integrations.gitlab.enabled).toBe(false);
   });
 
   /** Ключ из кусков: литерал целиком похож на настоящий, и сторож его не пропустит. */
@@ -520,28 +518,23 @@ describe('panel-agent actions: panel state', () => {
   // хоста, интеграция — нет: одна карточка «Адрес» отправляла сохранённый токен
   // туда, куда указала модель.
   it('save_integration: при сохранённом токене смена хоста — отказ до карточки', async () => {
-    const seeded = await human('PUT', '/api/integrations/forge', {
-      settings: { enabled: true, kind: 'gitlab', baseUrl: 'https://gitlab.example.com', repo: '' },
+    const seeded = await human('PUT', '/api/integrations/gitlab', {
+      settings: { enabled: true, baseUrl: 'https://gitlab.example.com', repo: '' },
       token: 'glpat-abcdefghijklmnopqrst',
     });
     expect(seeded.statusCode).toBe(200);
-    const forge = () =>
-      disk().getSettings().integrations.forge as unknown as { baseUrl: string; kind: string };
+    const forge = () => disk().getSettings().integrations.gitlab;
 
-    for (const settings of [
-      { baseUrl: 'https://evil.example.net' },
-      { baseUrl: '' },
-      { kind: 'github' },
-    ]) {
-      const moved = await callWithoutCard('save_integration', { id: 'forge', settings });
+    for (const settings of [{ baseUrl: 'https://evil.example.net' }, { baseUrl: '' }]) {
+      const moved = await callWithoutCard('save_integration', { id: 'gitlab', settings });
       expect(moved.cards).toEqual([]);
       expect(moved.result.outcome).toBe('failed');
     }
-    expect(forge()).toMatchObject({ baseUrl: 'https://gitlab.example.com', kind: 'gitlab' });
+    expect(forge()).toMatchObject({ baseUrl: 'https://gitlab.example.com' });
 
     // Тот же хост, другой путь и остальные поля — проходят.
     const { result } = await decided('save_integration', {
-      id: 'forge',
+      id: 'gitlab',
       settings: { baseUrl: 'https://gitlab.example.com/', repo: 'team/app' },
     });
     expect(result.outcome).not.toBe('failed');
@@ -689,20 +682,20 @@ describe('panel-agent actions: panel state', () => {
       focus: 'models',
     });
 
-    const seeded = await human('PUT', '/api/integrations/forge', {
+    const seeded = await human('PUT', '/api/integrations/gitlab', {
       settings: { enabled: false, kind: 'gitlab', baseUrl: 'https://gitlab.example.com', repo: '' },
       token: opaque(),
     });
     expect(seeded.statusCode).toBe(200);
     // Действие ведёт на СВОЮ карточку, а не в начало вкладки (живой прогон 26.09:
     // карточка вебхука — шестая, под экраном).
-    const integrations = { route: '/settings', focus: 'integration:forge' };
+    const integrations = { route: '/settings', focus: 'integration:gitlab' };
     const saved = await decided('save_integration', {
-      id: 'forge',
+      id: 'gitlab',
       settings: { repo: 'team/app' },
     });
     expect(saved.result).toMatchObject({ outcome: 'done', page: integrations });
-    expect((await decided('forget_integration', { id: 'forge' })).result.page).toEqual(
+    expect((await decided('forget_integration', { id: 'gitlab' })).result.page).toEqual(
       integrations,
     );
 
@@ -822,11 +815,11 @@ describe('panel-agent actions: panel state', () => {
 
     const integrations = store.getSettings().integrations;
     store.updateSettings({
-      integrations: { ...integrations, forge: { ...integrations.forge, enabled: true } },
+      integrations: { ...integrations, gitlab: { ...integrations.gitlab, enabled: true } },
     });
-    const off = await decided('save_integration', { id: 'forge', settings: { enabled: false } });
+    const off = await decided('save_integration', { id: 'gitlab', settings: { enabled: false } });
     expect(off.result.outcome).toBe('done');
-    expect(off.result.page).toEqual({ route: '/settings', focus: 'integration:forge' });
+    expect(off.result.page).toEqual({ route: '/settings', focus: 'integration:gitlab' });
   });
 
   it('toggle_dlp_proxy: без адреса пересылки или без правил — отказ до карточки; адрес — строкой карточки', async () => {

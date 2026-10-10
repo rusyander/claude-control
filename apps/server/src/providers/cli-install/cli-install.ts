@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import type { CliInfo, CliInstall } from '@agentdeck/contracts';
+import { posixPathMatches } from '../../lib/path-lookup.mjs';
 
 /**
  * Какой CLI Claude панель на самом деле запускает и нет ли рядом новее
@@ -20,6 +21,12 @@ export type CliExec = (
 ) => { status: number | null; stdout: string; stderr?: string };
 
 const defaultExec: CliExec = (file, args, options = {}) => {
+  // `which` есть не во всех дистрибутивах (базовый Arch, образы Fedora): его
+  // `-a` отвечает обход PATH здесь же, без процесса.
+  if (file === 'which') {
+    const found = posixPathMatches(args.at(-1) ?? '');
+    return { status: found.length > 0 ? 0 : 1, stdout: found.join('\n') };
+  }
   // `.cmd` на Windows запускается только через оболочку; путь с пробелами — в кавычках.
   const result = options.shell
     ? spawnSync(`"${file}" ${args.join(' ')}`, {

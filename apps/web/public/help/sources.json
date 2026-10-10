@@ -510,7 +510,7 @@
         {
           "path": "apps/server/src/domains/chat/split-conveyor/split-conveyor.ts",
           "why": "«Что запускает „Разделить“»: разбор в корне, план в копии, порядок after и hold",
-          "sha": "5a815667fd789613"
+          "sha": "30c3fc60293560a6"
         },
         {
           "path": "apps/server/src/domains/chat/split-recheck/split-recheck.ts",
@@ -550,12 +550,12 @@
         {
           "path": "apps/server/src/domains/project-git/copy-access.ts",
           "why": "«Доступ в копии»: запись `.claude.json` на каталог копии, что не подделывается и что умирает вместе с копией",
-          "sha": "7bed5d7c74e1f598"
+          "sha": "11aaf3b32dbcc4b0"
         },
         {
           "path": "apps/server/src/domains/project-git/copy-readiness.ts",
           "why": "«Полнота копии»: чем меряется полная/неполная и что показывает карточка",
-          "sha": "6e2256f043d25b41"
+          "sha": "e97860a0c3aaae95"
         },
         {
           "path": "apps/server/src/routes/project-git-routes/project-git-routes.ts",
@@ -565,17 +565,17 @@
         {
           "path": "packages/contracts/src/sieves/catalog.ts",
           "why": "«Сита перед MR»: встроенные сита, виды путей, уровень риска и план отката",
-          "sha": "cb696a693d6d0bd2"
+          "sha": "ab8fac9361171d13"
         },
         {
           "path": "packages/contracts/src/sieves/judge.ts",
           "why": "«Сита перед MR»: что держит «готово» — механика панели, названные файлы и команды, свежесть строки, прогон блока «Тесты»",
-          "sha": "094ea92e8d9fc9b7"
+          "sha": "09a384bb002bbfcf"
         },
         {
           "path": "apps/server/src/domains/chat/sieve-gate/sieve-gate.ts",
           "why": "«Сита перед MR»: абзац сит только группе с доставкой, пробелы становятся напоминанием доставки",
-          "sha": "1951fe5594599e38"
+          "sha": "2de528fc07771bb6"
         },
         {
           "path": "apps/server/src/domains/chat/sieve-store/sieve-store.ts",
@@ -658,7 +658,7 @@
           "sha": "bb23d4b9ff80b8e5"
         }
       ],
-      "confirmedAt": "2026-10-09T08:09:36.527Z"
+      "confirmedAt": "2026-10-10T11:13:53.197Z"
     },
     {
       "topic": "tests",
@@ -702,7 +702,7 @@
         {
           "path": "apps/server/src/domains/project-tests/coverage-matrix/coverage-matrix.ts",
           "why": "«Покрытие требований»: ссылки кейсов и JQL, архив не считается",
-          "sha": "7a706cd0c5814165"
+          "sha": "a4bbbd6ea5317c75"
         },
         {
           "path": "apps/server/src/domains/project-tests/release/release.ts",
@@ -727,7 +727,7 @@
         {
           "path": "apps/server/src/domains/project-tests/e2e-chat.ts",
           "why": "«Агент чата знает о папке»: что агент чата узнаёт и о чём спрашивает",
-          "sha": "fdba2ce89ac62708"
+          "sha": "3e987f9bd2925044"
         },
         {
           "path": "apps/web/src/features/ProjectTests/ui/TestE2eCard/TestE2eCard.tsx",
@@ -742,7 +742,7 @@
         {
           "path": "apps/server/src/domains/project-tests/e2e-run/e2e-run.ts",
           "why": "«Прогнать автотесты», «Прогон лёг в историю»: команда фреймворка, junit в каталоге панели, одна запись истории, отказ при прогоне агента",
-          "sha": "325d3934c5422922"
+          "sha": "26f570640d7de8e2"
         },
         {
           "path": "apps/server/src/domains/project-tests/e2e-parse-pytest.ts",
@@ -820,7 +820,7 @@
           "sha": "fa4b9ad2f98e961d"
         }
       ],
-      "confirmedAt": "2026-10-09T08:09:36.611Z"
+      "confirmedAt": "2026-10-10T14:00:46.530Z"
     },
     {
       "topic": "rules",
@@ -1401,12 +1401,12 @@
     {
       "topic": "analytics",
       "document": "apps/web/src/pages/Help/topics/AnalyticsTopic/AnalyticsTopic.tsx",
-      "confirmedAt": "2026-10-08T12:34:13.203Z",
+      "confirmedAt": "2026-10-10T14:00:46.606Z",
       "sources": [
         {
           "path": "apps/server/src/domains/analytics/scanner/scan.ts",
           "why": "«Откуда берутся числа»: обход projects/**.jsonl, границы периода, счётчик просканированных файлов",
-          "sha": "8ff9e4e58220826b"
+          "sha": "7712d2f5e34a2309"
         },
         {
           "path": "apps/server/src/domains/analytics/scanner/scan-file.ts",
@@ -1572,7 +1572,7 @@
     {
       "topic": "settings",
       "document": "apps/web/src/pages/Help/topics/SettingsTopic/SettingsTopic.tsx",
-      "confirmedAt": "2026-10-09T15:19:33.038Z",
+      "confirmedAt": "2026-10-10T11:13:53.078Z",
       "sources": [
         {
           "path": "apps/server/src/lib/safe-io/safe-io.ts",
@@ -1592,7 +1592,7 @@
         {
           "path": "apps/server/src/lib/credentials/credentials.ts",
           "why": "«Доступ Claude Code»: цепочка источников доступа, названная в документе",
-          "sha": "895d0b739e77b296"
+          "sha": "aefbd1171d12160e"
         },
         {
           "path": "apps/server/src/domains/global-layer/judge.ts",
@@ -1634,12 +1634,12 @@
     {
       "topic": "watcher",
       "document": "apps/web/src/pages/Help/topics/WatcherTopic/WatcherTopic.tsx",
-      "confirmedAt": "2026-10-09T17:02:58.034Z",
+      "confirmedAt": "2026-10-10T10:31:20.712Z",
       "sources": [
         {
           "path": "apps/server/src/domains/watcher/watcher.ts",
           "why": "«Запустить»: запуск с нулевым счётом, продолжение после перезапуска, проблемы и отказ от повтора упавшего разбора, потолок разборов в час, слияние и замечания",
-          "sha": "5c15411026d34bdb"
+          "sha": "a226353225aee7f2"
         },
         {
           "path": "apps/server/src/domains/watcher/report.ts",
@@ -1654,7 +1654,7 @@
         {
           "path": "apps/server/src/domains/watcher/analyzer.ts",
           "why": "«Модель только читает»: Read/Grep/Glob, рабочий каталог — исходники панели, узкое окружение",
-          "sha": "928b1800e6c30c97"
+          "sha": "9cb769e394f4832e"
         },
         {
           "path": "apps/server/src/bootstrap/watcher-capture/watcher-capture.ts",
@@ -1708,15 +1708,20 @@
         },
         {
           "path": "apps/server/src/domains/watcher/route.ts",
-          "why": "«Модель только читает»: маршрут разбора — облако, локальная модель, контур; чужой CLI идёт контуром или локальной моделью, в облако Claude — отказ",
-          "sha": "efccb328ef4a1dda"
+          "why": "«Модель только читает»: маршрут разбора — облако, локальная модель, контур; чужой CLI с маршрутом в облако Claude ведёт разбор сам в режиме без правок, Cursor — отказ",
+          "sha": "93d5d7c51766e6ab"
+        },
+        {
+          "path": "apps/server/src/domains/watcher/foreign-analysis.ts",
+          "why": "«Модель только читает»: разбор чужим CLI — запуск без правок, задание одним текстом, корень приложения",
+          "sha": "3b7cfb365f64d447"
         }
       ]
     },
     {
       "topic": "providers",
       "document": "apps/web/src/pages/Help/topics/ProvidersTopic/ProvidersTopic.tsx",
-      "confirmedAt": "2026-10-08T12:34:15.427Z",
+      "confirmedAt": "2026-10-10T11:13:53.571Z",
       "sources": [
         {
           "path": "apps/server/src/providers/registry.ts",
@@ -1726,7 +1731,7 @@
         {
           "path": "apps/server/src/providers/detect/detect.ts",
           "why": "«Установлен ли CLI»: поиск двоичного файла в PATH и отметка в списке",
-          "sha": "48a8ac0ac405eb14"
+          "sha": "79f04d146d3ab135"
         },
         {
           "path": "apps/server/src/domains/provider-check/provider-check.ts",
@@ -1770,22 +1775,32 @@
     {
       "topic": "integrations",
       "document": "apps/web/src/pages/Help/topics/IntegrationsTopic/IntegrationsTopic.tsx",
-      "confirmedAt": "2026-10-08T12:34:14.211Z",
+      "confirmedAt": "2026-10-10T15:12:05.385Z",
       "sources": [
         {
           "path": "apps/server/src/domains/integrations/store/store.ts",
           "why": "«Подключено и настроено»: два разных состояния, токен вне любого ответа",
-          "sha": "611e623caa9912c9"
+          "sha": "57156a84a1e1f175"
         },
         {
           "path": "apps/server/src/domains/integrations/check.ts",
           "why": "«Облако или Server/DC»: диалект определяется живой проверкой, а не вопросом",
-          "sha": "3e66df3c8ea8c204"
+          "sha": "879c434dbbd89170"
         },
         {
           "path": "apps/server/src/domains/integrations/mcp-server/mcp-server.ts",
           "why": "«Инструменты агента»: переходник, который не держит секрета",
           "sha": "05d3ebf5245c860e"
+        },
+        {
+          "path": "apps/server/src/domains/integrations/discover/discover.ts",
+          "why": "«Найти уже подключённые»: что узнаётся в MCP-серверах, маска вместо ключа, отказ до записи",
+          "sha": "bd99015cc57c6ccc"
+        },
+        {
+          "path": "apps/web/src/features/IntegrationsEditor/ui/IntegrationsList/IntegrationsList.tsx",
+          "why": "«Пустой список и два входа»: в списке только заведённые, добавление выбором",
+          "sha": "d63b516653b7dfbc"
         },
         {
           "path": "apps/server/src/domains/notify/webhook.ts",
@@ -1905,7 +1920,7 @@
         {
           "path": "apps/server/src/routes/panel-agent/actions-projects/actions-projects.ts",
           "why": "«Что агент умеет»: проекты, git, копии, снятие проекта и запуск чата — опасное, только Claude Code",
-          "sha": "e2e2a335c6f285c2"
+          "sha": "69309ec95076c2f7"
         },
         {
           "path": "apps/server/src/routes/panel-agent/actions-tests/actions-tests.ts",
@@ -2095,7 +2110,7 @@
         {
           "path": "apps/server/src/routes/panel-agent/actions-app/actions-app.ts",
           "why": "«Что агент умеет» и «Настройки только для вас»: настройки, провайдер, эндпоинты, интеграции, DLP",
-          "sha": "d51391d9573a978a"
+          "sha": "13f81ee1bfaa3c96"
         },
         {
           "path": "apps/server/src/routes/panel-agent/actions-panel/actions-panel.ts",
@@ -2150,7 +2165,7 @@
         {
           "path": "apps/server/src/routes/panel-agent/actions-chat-kit.ts",
           "why": "«Чаты»: как агент находит чат и с какой моделью уходит сообщение",
-          "sha": "6983eb32490d9010"
+          "sha": "65c6d31b149fb8da"
         },
         {
           "path": "apps/server/src/routes/panel-agent/actions-settings-extra/actions-settings-extra.ts",
@@ -2233,7 +2248,7 @@
           "sha": "1113e7ac61b649c5"
         }
       ],
-      "confirmedAt": "2026-10-09T17:02:58.147Z"
+      "confirmedAt": "2026-10-10T15:12:05.470Z"
     },
     {
       "topic": "portability",
@@ -2677,7 +2692,7 @@
     {
       "topic": "phone",
       "document": "apps/web/src/pages/Help/topics/PhoneTopic/PhoneTopic.tsx",
-      "confirmedAt": "2026-10-08T12:34:14.863Z",
+      "confirmedAt": "2026-10-10T11:13:53.494Z",
       "sources": [
         {
           "path": "apps/server/src/lib/access-gate/access-gate.ts",
@@ -2687,7 +2702,7 @@
         {
           "path": "apps/server/src/lib/api-token/api-token.ts",
           "why": "«Что где лежит»: ~/.agentdeck/api-token, один токен, смена токена",
-          "sha": "a5ebb5a23f20076c"
+          "sha": "7665744aed002fe7"
         },
         {
           "path": "apps/server/src/lib/tailscale.ts",
@@ -2774,7 +2789,7 @@
     {
       "topic": "localModels",
       "document": "apps/web/src/pages/Help/topics/LocalModelsTopic/LocalModelsTopic.tsx",
-      "confirmedAt": "2026-10-08T12:34:14.414Z",
+      "confirmedAt": "2026-10-10T11:13:52.985Z",
       "sources": [
         {
           "path": "packages/contracts/src/local-models.ts",
@@ -2789,7 +2804,7 @@
         {
           "path": "apps/server/src/domains/kit/service.ts",
           "why": "«Чей набор у агента»: что каждый режим добавляет или снимает у Claude Code и Qwen Code (runExtras)",
-          "sha": "65b4e3179e13d96b"
+          "sha": "cd6994f7ac75c74e"
         },
         {
           "path": "apps/server/src/domains/local-models/connect.ts",
@@ -2821,17 +2836,17 @@
     {
       "topic": "kit",
       "document": "apps/web/src/pages/Help/topics/KitTopic/KitTopic.tsx",
-      "confirmedAt": "2026-10-09T12:58:43.316Z",
+      "confirmedAt": "2026-10-10T15:12:05.536Z",
       "sources": [
         {
           "path": "apps/server/src/domains/kit/service.ts",
           "why": "«Как набор доезжает до прогона», «Режимы», «Какой CLI что умеет»: runExtras, отказы, сброс в архив",
-          "sha": "65b4e3179e13d96b"
+          "sha": "cd6994f7ac75c74e"
         },
         {
           "path": "apps/server/src/domains/kit/compose.ts",
           "why": "«Тот же путь словами»: что попадает в папку прогона и что выпадает",
-          "sha": "0ec5cf64c7c14f74"
+          "sha": "35d9c377d027029c"
         },
         {
           "path": "apps/server/src/domains/kit/global-twin.ts",
@@ -2841,7 +2856,7 @@
         {
           "path": "apps/server/src/bootstrap/runtime/runtime.ts",
           "why": "«Не собралось — прогон не запускается»: отказ при сбое сборки набора",
-          "sha": "818967d8f941f75c"
+          "sha": "10c856cdcf1962f3"
         },
         {
           "path": "apps/web/src/pages/Kit/KitGlobalActions/KitGlobalActions.tsx",

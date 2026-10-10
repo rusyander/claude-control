@@ -129,7 +129,8 @@ describe('POST /api/resources/:kind/:id/assist — маршрут активно
 
     expect(spawned).toHaveLength(1);
     expect(basename(spawned[0]!.command).toLowerCase()).toMatch(/^qwen(\.exe)?$/);
-    expect(spawned[0]!.args[0]).toBe('-p');
+    // Файл пишет панель из ответа, не CLI: сам CLI идёт в режиме без правок.
+    expect(spawned[0]!.args.slice(0, 3)).toEqual(['--approval-mode', 'default', '-p']);
     expect(spawned[0]!.args).not.toContain('--output-format');
     expect(spawned[0]!.env?.OPENAI_BASE_URL).toBe('http://127.0.0.1:9/c/_s/foreign/qwen/v1');
   });

@@ -78,6 +78,7 @@ function spawnCli(
   }
 
   const child = spawned.child;
+  if (child.pid !== undefined) deps.onSpawn?.(child.pid);
 
   return new Promise<SpawnOutcome>((resolve) => {
     // Куски копим БУФЕРАМИ и декодируем один раз в конце. Декодировать каждый
@@ -94,6 +95,7 @@ function spawnCli(
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      deps.signal?.removeEventListener('abort', abort);
       resolve({ ...outcome, stdout: decode(outChunks), stderr: decode(errChunks) });
     };
 
@@ -101,6 +103,10 @@ function spawnCli(
       timedOut = true;
       killSpawned(child);
     }, timeoutMs);
+    // Отмена (выключили наблюдателя) снимает процесс деревом; исход придёт `close`.
+    const abort = (): void => killSpawned(child);
+    if (deps.signal?.aborted) abort();
+    else deps.signal?.addEventListener('abort', abort, { once: true });
 
     child.stdout?.on('data', (chunk: Buffer) => {
       outChunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk)));
@@ -289,12 +295,18 @@ export async function runProviderCli(
   deps: RunAssistantDeps,
   cliCommand?: string,
   cwd?: string,
+  /** «Разрешить правки» этого запуска; `false` — режим CLI без правок (разбор наблюдателя). */
+  allowEdits?: boolean,
 ): Promise<AssistantRunResult> {
   const command = cliCommand ?? providerCliCommand(provider);
   // Каталог запуска — тоже часть прогона: Aider вне репозитория сам делает `git init`.
   const run =
-    deps.model || cwd
-      ? { ...(deps.model ? { model: deps.model } : {}), ...(cwd ? { workdir: cwd } : {}) }
+    deps.model || cwd || allowEdits !== undefined
+      ? {
+          ...(deps.model ? { model: deps.model } : {}),
+          ...(cwd ? { workdir: cwd } : {}),
+          ...(allowEdits !== undefined ? { allowEdits } : {}),
+        }
       : undefined;
   const args = provider.assistant?.oneShotArgs?.(prompt, run);
   if (!args) {

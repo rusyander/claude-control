@@ -1,5 +1,6 @@
 import { resolve } from 'node:path';
 import { z } from 'zod';
+import { normalizeProjectPath } from '../../../lib/app-store/projects.ts';
 import type {
   AppSettings,
   ChatSummary,
@@ -33,9 +34,9 @@ const CHATS_DEFAULT_LIMIT = 20;
 export async function findProject(inject: InjectRoute, ref: string): Promise<Project> {
   const projects = await readRoute<Project[]>(inject, '/api/projects');
   const wanted = ref.trim();
-  const byPath = resolve(wanted).toLowerCase();
+  const byPath = normalizeProjectPath(resolve(wanted));
   const project = projects.find(
-    (item) => item.id === wanted || resolve(item.path).toLowerCase() === byPath,
+    (item) => item.id === wanted || normalizeProjectPath(resolve(item.path)) === byPath,
   );
   if (!project) {
     // Не «зарегистрируй»: презентация и вопрос проекта не требуют, а подсказка
@@ -114,7 +115,7 @@ const listChats = definePanelAction({
   // Проекция, а не пересказ: те же строки, что в списке чата, без превью и
   // счётчиков — модели хватает, чтобы назвать разговор и открыть его.
   shape: (input, body) => {
-    const wanted = input.projectPath ? resolve(input.projectPath).toLowerCase() : undefined;
+    const wanted = input.projectPath ? normalizeProjectPath(resolve(input.projectPath)) : undefined;
     const chats = (Array.isArray(body) ? (body as ChatSummary[]) : [])
       // Разговор в git-копии числится и за основной копией — как во вкладке
       // проекта; иначе «чаты проекта» теряли всё, что «первая правка» увела в копию.
@@ -122,7 +123,8 @@ const listChats = definePanelAction({
         (chat) =>
           !wanted ||
           [chat.projectPath, chat.homeProjectPath].some(
-            (path) => path !== undefined && path !== '' && resolve(path).toLowerCase() === wanted,
+            (path) =>
+              path !== undefined && path !== '' && normalizeProjectPath(resolve(path)) === wanted,
           ),
       )
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));

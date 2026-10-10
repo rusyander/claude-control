@@ -309,6 +309,31 @@ describe('composeQwenHome: свой QWEN_HOME «только набор пане
     expect(read(join(home, 'QWEN.md'))).not.toContain('LOCAL-RULE');
   });
 
+  it('правила варианта — в QWEN.md после правил набора и до local.md', () => {
+    composeKit(input());
+    const dir = variant();
+    put(dir, 'rules/tools.md', 'QWEN-TOOLS-RULE\n');
+    const text = read(join(composeQwenHome(target, join(root, 'qwen-home'), true, dir), 'QWEN.md'));
+    expect(text.indexOf('QWEN-TOOLS-RULE')).toBeGreaterThan(text.indexOf('STANDARD-RULE'));
+    expect(text.indexOf('LOCAL-RULE')).toBeGreaterThan(text.indexOf('QWEN-TOOLS-RULE'));
+    // В расширение правила варианта не едут: Qwen считал бы их условными правилами.
+    expect(existsSync(ext(join(root, 'qwen-home'), 'rules'))).toBe(false);
+  });
+
+  it('variants/qwen/rules/tools.md называет только инструменты, что есть в Qwen Code 0.25', () => {
+    // Список инструментов, который qwen-code 0.25 отдал в init живого прогона 06.10
+    // (`.agent/provider-formats.agent.md`); выдуманное имя модель позвала бы впустую.
+    const QWEN_025 = new Set(
+      'read_mcp_resource read_file zoom_image grep_search list_agents task_stop send_message skill search_memory glob record_artifact loop_wakeup get_goal update_goal tool_call agent notebook_edit run_shell_command report_findings enter_worktree exit_worktree monitor web_fetch tool_search manage_memory write_file edit'.split(
+        ' ',
+      ),
+    );
+    const text = read(join(qwenVariantDir(), 'rules', 'tools.md'));
+    const named = [...text.matchAll(/→ `([a-z_]+)`/g)].map((match) => match[1] ?? '');
+    expect(named.length).toBeGreaterThanOrEqual(9);
+    expect(named.filter((name) => !QWEN_025.has(name))).toEqual([]);
+  });
+
   it('variants/qwen — та же замена над командами встроенного набора и его манифест', () => {
     const kit = builtinKitDir();
     const qwen = qwenVariantDir();

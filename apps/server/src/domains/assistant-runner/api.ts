@@ -34,6 +34,15 @@ function googleParts(m: AssistantMessage): unknown[] {
   return [...(m.images?.length ? googleImageParts(m.images) : []), { text: m.content }];
 }
 
+/**
+ * Потолок длины ответа для Anthropic (у него `max_tokens` обязателен). Замер
+ * 10.10: русский текст — около 2 символов на токен (медиана по транскриптам),
+ * а помощник структуры пишет файлы навыка целиком — 10–20 КБ у многофайлового
+ * навыка набора. Прежние 2048 обрезали ответ уже на ~4 КБ. 16384 вмещают ~32 КБ
+ * русского текста и укладываются в окно помощника структуры (240 с).
+ */
+export const API_MAX_OUTPUT_TOKENS = 16_384;
+
 /** Актуальное поколение зашитой модели — или она сама, если каталога нет. */
 function assistantModel(deps: RunAssistantDeps, fallback: string): string {
   return resolveAssistantModel(deps.models ?? [], fallback);
@@ -137,12 +146,16 @@ export async function runProviderApi(
         signal: deps.signal,
         body: JSON.stringify({
           model,
-          max_tokens: 2048,
+          max_tokens: API_MAX_OUTPUT_TOKENS,
           messages: messages.map((m) => ({ role: m.role, content: anthropicContent(m) })),
         }),
       });
       if (!res.ok) return apiError(provider.id, await describeHttpError(res));
-      const data = (await res.json()) as { content?: { type?: string; text?: string }[] };
+      const data = (await res.json()) as {
+        content?: { type?: string; text?: string }[];
+        stop_reason?: string;
+      };
+      if (data.stop_reason === 'max_tokens') return truncated(provider.id);
       const reply = (data.content ?? [])
         .map((block) => (block.type === 'text' ? (block.text ?? '') : ''))
         .join('')
@@ -170,8 +183,9 @@ export async function runProviderApi(
       });
       if (!res.ok) return apiError(provider.id, await describeHttpError(res));
       const data = (await res.json()) as {
-        candidates?: { content?: { parts?: { text?: string }[] } }[];
+        candidates?: { content?: { parts?: { text?: string }[] }; finishReason?: string }[];
       };
+      if (data.candidates?.[0]?.finishReason === 'MAX_TOKENS') return truncated(provider.id);
       const reply = (data.candidates?.[0]?.content?.parts ?? [])
         .map((p) => p.text ?? '')
         .join('')
@@ -200,7 +214,10 @@ export async function runProviderApi(
       }),
     });
     if (!res.ok) return apiError(provider.id, await describeHttpError(res));
-    const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    const data = (await res.json()) as {
+      choices?: { message?: { content?: string }; finish_reason?: string }[];
+    };
+    if (data.choices?.[0]?.finish_reason === 'length') return truncated(provider.id);
     const reply = (data.choices?.[0]?.message?.content ?? '').trim();
     return finalizeApi(provider.id, reply);
   } catch (error) {
@@ -212,6 +229,18 @@ function finalizeApi(providerId: string, reply: string): AssistantRunResult {
   if (!reply)
     return coded(apiError(providerId, 'Модель вернула пустой ответ.'), 'assistant-empty-reply');
   return { ok: true, providerId, mode: 'api', reply, experimental: false, reason: 'ok' };
+}
+
+/**
+ * Ответ оборвался на пределе длины. Отдавать обрезок нельзя: помощник формы и
+ * помощник структуры разбирают его как JSON, и половина файла записалась бы на
+ * диск как целый файл — честный отказ вместо этого.
+ */
+function truncated(providerId: string): AssistantRunResult {
+  return coded(
+    apiError(providerId, serverText('assistant-reply-truncated')),
+    'assistant-reply-truncated',
+  );
 }
 
 /** Краткое описание HTTP-ошибки API без раскрытия секретов. */

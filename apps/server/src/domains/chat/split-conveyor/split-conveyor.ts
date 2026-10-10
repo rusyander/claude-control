@@ -796,14 +796,11 @@ export class SplitConveyor {
     if (outcome.learnedSieves?.length) this.learnSieves(record, group, outcome.learnedSieves);
     // «Без правок» сказано о последнем звене, а итог — о группе: ревью-звено,
     // заведённое после её коммитов, писало «без правок» ветке с двумя коммитами.
-    if (
-      outcome.result?.kind === 'unchanged' &&
-      group.path &&
-      group.startedAt &&
-      this.deps.hasWork?.(group.path, group.startedAt)
-    ) {
-      outcome = { ...outcome, result: { kind: 'changed' } };
-    }
+    const ownWork =
+      outcome.result?.kind === 'unchanged' && group.path && group.startedAt && this.deps.hasWork
+        ? this.deps.hasWork(group.path, group.startedAt)
+        : undefined;
+    if (ownWork) outcome = { ...outcome, result: { kind: 'changed' } };
 
     // Группа с доставкой закрывается только по фактам git (живой прогон 24.09:
     // «готово» у групп без push, без MR и со ссылкой на чужой MR). До ответа
@@ -816,6 +813,13 @@ export class SplitConveyor {
       const unverified = withoutMr(outcome);
       if (outcome.status !== 'done') {
         this.settle(record, group, unverified);
+        return;
+      }
+      // Своих правок у группы с самого старта нет (живое разделение, 10.10):
+      // сдавать нечего, а MR без правок — не итог. Раньше такая группа вставала
+      // ждать доставки, которой не будет, и получала напоминания «нет MR».
+      if (ownWork === false) {
+        this.settle(record, group, { ...unverified, result: { kind: 'nothing' } });
         return;
       }
       this.apply(group, { ...unverified, status: 'awaiting', waitingFor: 'delivery' });

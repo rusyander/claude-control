@@ -17,7 +17,8 @@ import {
   accessSync,
   constants,
 } from 'node:fs';
-import { brandEnv, panelHomeDir } from '../brand.mjs';
+import { panelHomeDir } from '../brand.mjs';
+import { keychainServiceNames } from '../keychain-names.mjs';
 import { join, dirname } from 'node:path';
 
 /**
@@ -58,16 +59,7 @@ export interface CredentialsLookup {
   reasonParams?: ServerMessageParams;
 }
 
-/**
- * Имя записи в связке ключей macOS. Переопределяется переменной окружения:
- * Anthropic может её переименовать, и тогда достаточно подставить своё имя,
- * не трогая код.
- */
-const KEYCHAIN_SERVICES = [
-  brandEnv('KEYCHAIN_SERVICE'),
-  'Claude Code-credentials',
-  'Claude Code',
-].filter((name): name is string => Boolean(name));
+export { keychainServiceNames };
 
 /** Связка ключей может спросить разрешение — дольше этого не ждём. */
 const KEYCHAIN_TIMEOUT_MS = 10_000;
@@ -128,7 +120,7 @@ function readStandard(configRoot: string): CredentialsLookup {
     }
   }
 
-  if (process.platform === 'darwin') return readFromKeychain();
+  if (process.platform === 'darwin') return readFromKeychain(configRoot);
 
   return { source: 'none' };
 }
@@ -139,8 +131,8 @@ function readStandard(configRoot: string): CredentialsLookup {
  * Первый запрос система сопроводит окном «node хочет получить доступ к ключу» —
  * это нормально и происходит один раз, если нажать «Всегда разрешать».
  */
-function readFromKeychain(): CredentialsLookup {
-  for (const service of KEYCHAIN_SERVICES) {
+function readFromKeychain(configRoot: string): CredentialsLookup {
+  for (const service of keychainServiceNames(configRoot)) {
     try {
       const value = execFileSync('security', ['find-generic-password', '-s', service, '-w'], {
         encoding: 'utf8',

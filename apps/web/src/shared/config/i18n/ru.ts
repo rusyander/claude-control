@@ -1261,6 +1261,7 @@ export const ru = {
           changed: 'правки внесены',
           unchanged: 'правок в копии нет',
           pushed: 'правки отправлены',
+          nothing: 'нечего сдавать: своих правок нет, MR не нужен',
           commits: 'коммитов: {{count}}',
         },
         waitingFor: {
@@ -4738,7 +4739,7 @@ export const ru = {
       'Механика, которая живёт и в панели, и в хуках и навыках каталога конфигурации: какая копия лучше на одном корпусе случаев и как перенести лучшее.',
     tab_integrations: 'Интеграции',
     tabHint_integrations:
-      'Jira и Confluence, фордж по токену, Telegram, тест-менеджмент и отчёты CI: откуда панель берёт внешний контекст и куда отдаёт результат.',
+      'Jira, Confluence, GitLab, GitHub, Telegram, Zephyr, Xray, Test IT, отчёты CI и вебхук — каждая система своей карточкой: откуда панель берёт внешний контекст и куда отдаёт результат.',
     tab_spend: 'Расходы',
     tabHint_spend: 'В чём показывать расход и по каким ставкам его считать.',
     tab_safety: 'Безопасность',
@@ -5986,11 +5987,11 @@ export const ru = {
       defectBody: 'Описание',
       defectCopy: 'Скопировать черновик',
       defectTargetHint:
-        'gh и glab работают без единого ключа в панели. Фордж и Jira — по токену, сохранённому в «Интеграциях»: они есть там, где CLI не поставить.',
+        'gh и glab работают без единого ключа в панели. GitHub, GitLab и Jira — по токену, сохранённому в «Интеграциях»: они есть там, где CLI не поставить.',
       defectTargetName: {
         github: 'GitHub (gh)',
         gitlab: 'GitLab (glab)',
-        forge: 'Фордж по токену',
+        forge: 'GitHub / GitLab по токену',
         jira: 'Jira',
       },
       prev: 'Назад',
@@ -6083,6 +6084,8 @@ export const ru = {
         import: 'импорт',
       },
       actor: { agent: 'агент', human: 'человек', ci: 'CI' },
+      attested: 'вручную',
+      attestedHint: 'Проверено руками агента и записано через record — тест это не исполнял',
       origin: {
         e2e: 'автотесты',
         e2eActor: 'панель',
@@ -6526,7 +6529,7 @@ export const ru = {
       server: 'своя установка',
     },
     card: {
-      enabled: 'Включён',
+      enabled: 'Включена',
       enabledAria: 'Включить «{{name}}»',
       token: 'Токен',
       tokenPlaceholder: 'Вставьте ключ',
@@ -6534,33 +6537,59 @@ export const ru = {
         'Ключ сохранён: {{mask}}. Новое значение заменит его, пустое поле — оставит как есть.',
       tokenEmpty:
         'Ключа ещё нет. Он уйдёт в зашифрованное хранилище и на экран больше не вернётся.',
-      confluenceToken: 'Ключ Confluence (если отдельный)',
-      confluenceTokenEmpty: 'Отдельного ключа нет — Confluence спрашивается ключом Jira.',
       check: 'Проверить связь',
       forget: 'Забыть ключ',
       missing: 'Не заполнено: {{fields}}',
       account: 'вошли как {{name}}',
       checkedAt: 'проверено {{time}}',
-      fieldRequired: 'Без этого поля коннектор не включить',
-      atlassian: {
-        title: 'Jira и Confluence',
-        hint: 'Откуда берутся требования и куда уходят дефекты и отчёты. Один ключ на обе системы, если они на одном сайте.',
+      fieldRequired: 'Без этого поля интеграцию не включить',
+      jira: {
+        title: 'Jira',
+        hint: 'Задачи и требования: откуда агент берёт постановку и куда уходят дефекты по проваленным кейсам.',
         tokenHint:
-          'Облако: API-токен из id.atlassian.com вместе с почтой ниже. Server/DC: personal access token, почту оставьте пустой.',
-        confluenceTokenHint:
-          'Нужен только на своей установке: там Jira и Confluence выдают personal access token каждая свой, и ключом Jira вики отвечает 401. У облака ключ один — поле оставьте пустым.',
+          'Облако: API-токен из id.atlassian.com вместе с почтой выше. Своя установка: personal access token из профиля Jira, почту оставьте пустой.',
       },
-      forge: {
-        title: 'Фордж по токену',
-        hint: 'GitHub или GitLab напрямую, без установленных gh и glab: нужен там, где CLI не поставить.',
+      confluence: {
+        title: 'Confluence',
+        hint: 'Страницы требований и куда уходят отчёты прогонов.',
         tokenHint:
-          'GitHub: personal access token с правом на issues. GitLab: токен проекта или личный, scope api.',
+          'Облако: тот же API-токен, что у Jira, вместе с почтой. Своя установка: personal access token из профиля Confluence — ключом Jira вики отвечает 401.',
+      },
+      gitlab: {
+        title: 'GitLab',
+        hint: 'Задачи и merge request-ы напрямую по токену, без установленного glab.',
+        tokenHint: 'Токен проекта или личный, scope api.',
+      },
+      github: {
+        title: 'GitHub',
+        hint: 'Задачи и pull request-ы напрямую по токену, без установленного gh.',
+        tokenHint: 'Personal access token с правом на issues и pull requests.',
       },
       telegram: {
         title: 'Telegram',
         hint: 'Куда панель пишет о завершённых прогонах, вопросах агента и запросах прав.',
         tokenHint:
           'Токен бота от @BotFather. Бот должен быть добавлен в чат, иначе он туда не напишет.',
+      },
+      zephyr: {
+        title: 'Zephyr Scale',
+        hint: 'Забрать кейсы в группу панели и отправить туда результат прогона. Повторная отправка попадает в тот же цикл.',
+        tokenHint: 'API-ключ Zephyr Scale из профиля Jira.',
+      },
+      xray: {
+        title: 'Xray',
+        hint: 'Забрать кейсы в группу панели и отправить туда результат прогона. Повторная отправка попадает в то же исполнение.',
+        tokenHint: 'Client id и client secret одной строкой через двоеточие.',
+      },
+      testit: {
+        title: 'Test IT',
+        hint: 'Забрать кейсы в группу панели и отправить туда результат прогона. Повторная отправка попадает в тот же ран.',
+        tokenHint: 'Личный токен из профиля Test IT.',
+      },
+      ci: {
+        title: 'Отчёты CI',
+        hint: 'Откуда подтянуть отчёт последнего прогона сборки, чтобы не выкладывать файл руками.',
+        tokenHint: 'Токен форджа с правом читать артефакты сборок.',
       },
       webhook: {
         title: 'Вебхук',
@@ -6569,55 +6598,50 @@ export const ru = {
           'Секрет подписи, не токен доступа. Задан — тело подписывается заголовком ' +
           'X-AgentDeck-Signature (HMAC-SHA256, hex). Пусто — уйдёт без подписи.',
       },
-      tms: {
-        title: 'Тест-менеджмент',
-        hint: 'Zephyr, Xray или Test IT: забрать кейсы в группу панели и отправить туда результат прогона. Повторная отправка попадает в тот же ран.',
-        tokenHint:
-          'Zephyr Scale: свой API-ключ. Xray: ключ и секрет одной строкой через двоеточие. Test IT: личный токен из профиля. Пусто — возьмётся ключ Atlassian.',
-      },
-      ci: {
-        title: 'Отчёты CI',
-        hint: 'Откуда подтянуть отчёт последнего прогона сборки, чтобы не выкладывать файл руками.',
-        tokenHint: 'Тот же токен форджа, но с правом читать артефакты сборок.',
-      },
     },
     field: {
-      atlassian: {
-        baseUrl: 'Адрес сайта',
-        email: 'Почта',
-        deployment: 'Установка',
-        confluenceUrl: 'Адрес Confluence',
-      },
-      forge: { kind: 'Система', baseUrl: 'Адрес установки', repo: 'Репозиторий' },
+      jira: { baseUrl: 'Адрес сайта', email: 'Почта', deployment: 'Установка' },
+      confluence: { baseUrl: 'Адрес сайта', email: 'Почта', deployment: 'Установка' },
+      gitlab: { baseUrl: 'Адрес установки', repo: 'Репозиторий' },
+      github: { baseUrl: 'Адрес установки', repo: 'Репозиторий' },
       telegram: { chatId: 'Чат' },
-      webhook: { url: 'Адрес приёмника' },
-      tms: {
-        kind: 'Система',
-        baseUrl: 'Адрес установки',
-        projectKey: 'Проект',
-        groupId: 'Группа тестов',
-      },
+      zephyr: { projectKey: 'Проект', groupId: 'Группа тестов' },
+      xray: { projectKey: 'Проект', groupId: 'Группа тестов' },
+      testit: { baseUrl: 'Адрес установки', projectKey: 'Проект', groupId: 'Группа тестов' },
       ci: { kind: 'Система', repo: 'Репозиторий', workflow: 'Сборка', artifact: 'Артефакт' },
+      webhook: { url: 'Адрес приёмника' },
     },
     hint: {
-      atlassian: {
-        baseUrl: 'https://имя.atlassian.net для облака, свой адрес для Server/DC.',
-        email:
-          'Только для облака: там ключ работает в паре с почтой. Для Server/DC оставьте пустым.',
+      jira: {
+        baseUrl: 'https://имя.atlassian.net для облака, свой адрес для своей установки.',
+        email: 'Только для облака: там ключ работает в паре с почтой.',
         deployment: 'Не выбрано — определится живой проверкой и запомнится.',
-        confluenceUrl: 'Заполните, если Confluence живёт не на хосте Jira.',
       },
-      forge: {
-        kind: 'Что на том конце: GitHub или GitLab.',
-        baseUrl: 'Свой GitLab — адрес инсталляции. Пусто = github.com или gitlab.com.',
-        repo: 'owner/repo или числовой id проекта. Пусто — выведется из origin проверяемого проекта.',
+      confluence: {
+        baseUrl: 'Облако: https://имя.atlassian.net/wiki. Своя установка: адрес вики.',
+        email: 'Только для облака: там ключ работает в паре с почтой.',
+        deployment: 'Не выбрано — определится живой проверкой и запомнится.',
+      },
+      gitlab: {
+        baseUrl: 'Свой GitLab — адрес инсталляции. Пусто = gitlab.com.',
+        repo: 'group/project или числовой id. Пусто — выведется из origin проверяемого проекта.',
+      },
+      github: {
+        baseUrl: 'GitHub Enterprise — адрес инсталляции. Пусто = github.com.',
+        repo: 'owner/repo. Пусто — выведется из origin проверяемого проекта.',
       },
       telegram: { chatId: 'Числовой id чата или @имя канала.' },
-      webhook: { url: 'Куда слать POST с JSON. Только http(s).' },
-      tms: {
-        kind: 'Zephyr Scale, Xray или Test IT — от этого зависит формат кейсов.',
-        baseUrl: 'Только для Test IT: адрес своей установки. У Zephyr и Xray API общий на всех.',
-        projectKey: 'Ключ проекта Jira с кейсами и циклами; для Test IT — идентификатор проекта.',
+      zephyr: {
+        projectKey: 'Ключ проекта Jira с кейсами и циклами.',
+        groupId: 'С какой группой панели синхронизировать. Пусто — панель спросит при обмене.',
+      },
+      xray: {
+        projectKey: 'Ключ проекта Jira с кейсами и исполнениями.',
+        groupId: 'С какой группой панели синхронизировать. Пусто — панель спросит при обмене.',
+      },
+      testit: {
+        baseUrl: 'Адрес своей установки Test IT.',
+        projectKey: 'Идентификатор проекта Test IT.',
         groupId: 'С какой группой панели синхронизировать. Пусто — панель спросит при обмене.',
       },
       ci: {
@@ -6626,13 +6650,50 @@ export const ru = {
         workflow: 'Имя workflow или job. Пусто — последний завершившийся прогон.',
         artifact: 'Имя артефакта или путь к отчёту внутри него.',
       },
+      webhook: { url: 'Куда слать POST с JSON. Только http(s).' },
     },
     option: {
       unset: 'Не выбрано',
-      atlassian: { deployment: { cloud: 'Облако', server: 'Server / Data Center' } },
-      forge: { kind: { github: 'GitHub', gitlab: 'GitLab' } },
-      tms: { kind: { zephyr: 'Zephyr Scale', xray: 'Xray', testit: 'Test IT' } },
+      jira: { deployment: { cloud: 'Облако', server: 'Server / Data Center' } },
+      confluence: { deployment: { cloud: 'Облако', server: 'Server / Data Center' } },
       ci: { kind: { github: 'GitHub Actions', gitlab: 'GitLab CI' } },
+    },
+    empty: {
+      title: 'Пока ни одной интеграции',
+      text: 'Добавьте нужную систему вручную или найдите те, что уже подключены к агенту как MCP-серверы: адрес и ключ перенесутся оттуда.',
+    },
+    add: {
+      label: 'Добавить интеграцию',
+      placeholder: 'Выберите систему',
+    },
+    discover: {
+      open: 'Найти уже подключённые',
+      title: 'Найдено среди MCP-серверов',
+      explain:
+        'Панель прочитала ~/.claude.json, .mcp.json проектов и файл секретов MCP. Ключ остаётся на этой машине: здесь только маска, а перенос перечитает его из того же места.',
+      close: 'Закрыть',
+      nothing: 'Среди MCP-серверов ({{count}}) знакомых систем не нашлось.',
+      server: 'сервер «{{name}}»',
+      source: {
+        user: '~/.claude.json',
+        project: 'проект {{project}}',
+        mcpJson: '.mcp.json в {{project}}',
+      },
+      launch: {
+        docker: 'Docker',
+        npx: 'npx',
+        uvx: 'uvx',
+        url: 'по адресу',
+        command: 'своя команда',
+      },
+      key: 'ключ {{mask}}',
+      noKey: 'ключа нет',
+      missing: 'не хватает: {{fields}}',
+      already: 'уже подключено',
+      replaces: 'заменит сохранённое',
+      twice: 'Для «{{name}}» выбрано два сервера — оставьте один.',
+      apply: 'Перенести выбранные ({{count}})',
+      applied: 'Перенесено. Связь проверена — итог в карточках.',
     },
     telegram: {
       eventsTitle: 'О чём писать',
@@ -6656,7 +6717,7 @@ export const ru = {
     mcp: {
       connect: 'Подключить MCP Atlassian',
       disconnect: 'Отключить MCP Atlassian',
-      hint: 'Тот же сайт и тот же ключ, но доступные агенту прямо в разговоре. Сервер добавится в раздел MCP — оттуда его можно и убрать.',
+      hint: 'Jira и Confluence с адресами и ключами этих карточек, но доступные агенту прямо в разговоре. Один сервер на обе системы. Сервер добавится в раздел MCP — оттуда его можно и убрать.',
     },
     picker: {
       jira: {

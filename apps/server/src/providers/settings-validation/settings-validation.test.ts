@@ -177,15 +177,9 @@ describe('importStateSchema — ничего не теряется при пер
       const parsed = importStateSchema.safeParse({
         settings: {
           integrations: {
-            atlassian: {
-              enabled: false,
-              baseUrl: '',
-              email: '',
-              deployment: '',
-              confluenceUrl: '',
-            },
-            forge: { enabled: false, kind: '', baseUrl: '', repo: '' },
-            tms: { enabled: false, kind: '', baseUrl: '', projectKey: '', groupId: '' },
+            jira: { enabled: false, baseUrl: '', email: '', deployment: '' },
+            gitlab: { enabled: false, baseUrl: '', repo: '' },
+            testit: { enabled: false, baseUrl: '', projectKey: '', groupId: '' },
             ci: { enabled: false, kind: '', repo: '', workflow: '', artifact: '' },
             telegram: { enabled: false, chatId: '', events: [event] },
             webhook: { enabled: false, url: '', events: [event] },

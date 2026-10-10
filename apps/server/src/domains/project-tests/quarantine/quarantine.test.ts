@@ -325,13 +325,13 @@ describe('project-tests/quarantine: расхождение с требовани
       runs,
       {
         updates: {},
-        warning: 'Atlassian не подключён: даты требований не сверялись.',
+        warning: 'Jira не подключена: даты требований не сверялись.',
         warningCode: 'coverage-dates-atlassian-off',
       },
       { now: NOW },
     );
 
-    expect(report.warning).toContain('Atlassian');
+    expect(report.warning).toContain('Jira');
     // Код оговорки доезжает тоже — без него английский экран показывал русскую строку.
     expect(report.warningCode).toBe('coverage-dates-atlassian-off');
     expect(report.lift).toHaveLength(1);

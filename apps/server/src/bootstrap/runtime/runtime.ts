@@ -4,7 +4,7 @@ import { appRootDir } from '../../domains/watcher/report.ts';
 import { createLocalModels, type LocalModels } from '../../domains/local-models/service.ts';
 import { createGlobalLayer, type GlobalLayer } from '../../domains/global-layer/service.ts';
 import type { ProjectTestRun } from '@agentdeck/contracts';
-import type { SieveReportRow, SieveStage } from '@agentdeck/contracts/sieves';
+import { liveNaIds, type SieveReportRow, type SieveStage } from '@agentdeck/contracts/sieves';
 import type { SplitGroupRechecked, SplitPlanView } from '@agentdeck/contracts/chat-handoff';
 import type { ChatLink, SplitPlanGroupRecord } from '../../lib/app-store/app-store.types.ts';
 import type { ServerContext } from '../../context.ts';
@@ -135,6 +135,7 @@ import {
   readMergeRequestByUrl,
 } from '../../domains/integrations/forge.ts';
 import { readIntegrations, readToken } from '../../domains/integrations/store/store.ts';
+import { forgeTokenForUrl } from '../../domains/integrations/forge-pick.ts';
 import { carriedLink, conversationKeys } from '../../lib/app-store/chat-links.ts';
 import { createEventHub, type EventHub } from '../../lib/event-hub/event-hub.ts';
 import { PANEL_ACTION_CONFIRM_TIMEOUT_MS } from '@agentdeck/contracts/panel-agent';
@@ -538,7 +539,9 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
    * MR — интеграцией форджа, правки — обычным прогоном в копии группы. Ни то,
    * ни другое не случается само: и то и другое — клик человека.
    */
-  const forgeToken = () => readToken(ctx.location.paths.appData, 'forge');
+  // Ключ — того форджа, на который указывает ссылка: GitLab и GitHub
+  // подключаются по отдельности (`forge-pick.ts`).
+  const forgeToken = (url: string) => forgeTokenForUrl(ctx.store, ctx.location.paths.appData, url);
   const splitReview = new SplitReview({
     store: {
       all: () => ctx.store.getChatLinks(),
@@ -546,18 +549,20 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
       remove: (chatId) => ctx.store.clearChatLink(chatId),
     },
     post: async (url, body) => {
-      const token = forgeToken();
-      if (!token) throw new Error('токен форджа не сохранён в настройках панели');
+      const token = forgeToken(url);
+      if (!token) throw new Error('фордж этой ссылки не подключён в настройках панели');
       await commentMergeRequestByUrl(url, token, body);
     },
     // Причину спрашиваем на каждый показ карточки: интеграцию включают и
     // выключают, а кнопка, которая заведомо откажет, хуже отсутствующей.
     postBlocked: (url) => {
-      if (!parseMergeRequestUrl(url)) return 'ссылка не похожа на запрос на слияние';
-      if (!readIntegrations(ctx.store).forge.enabled) {
-        return 'интеграция с форджем выключена в настройках панели';
+      const ref = parseMergeRequestUrl(url);
+      if (!ref) return 'ссылка не похожа на запрос на слияние';
+      const title = ref.kind === 'gitlab' ? 'GitLab' : 'GitHub';
+      if (!readIntegrations(ctx.store)[ref.kind].enabled) {
+        return `интеграция ${title} выключена в настройках панели`;
       }
-      return forgeToken() ? undefined : 'токен форджа не сохранён в настройках панели';
+      return forgeToken(url) ? undefined : `токен ${title} не сохранён в настройках панели`;
     },
     start: createReviewStarter(ctx, launchDeps),
     // Заметка — в ленту родителя: карточку решения человек ищет в хабе. У
@@ -590,15 +595,17 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     stage: SieveStage,
     done: readonly SieveReportRow[],
   ): Promise<string> => {
-    const projectPath = link.parentChatId
-      ? ctx.store.getSplitPlan(link.parentChatId)?.projectPath
-      : undefined;
+    const plan = link.parentChatId ? ctx.store.getSplitPlan(link.parentChatId) : undefined;
+    const projectPath = plan?.projectPath;
+    // Группа, отведённая от ветки предшественника, — сита по её своим коммитам.
+    const forkedFrom = plan?.groups.find((group) => group.index === link.groupIndex)?.base;
     return sievePrompt({
       cwd,
       stage,
       done,
       store: sieveStore(),
       ...(projectPath ? { projectPath } : {}),
+      ...(forkedFrom ? { forkedFrom } : {}),
     });
   };
   // Слово панели группе — продолжением её сессии. Вводная едет на случай, когда
@@ -675,19 +682,23 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
           // MR выбирается по ветке группы, а не по одной голове (ревью 29.09):
           // ветку-источник знает только фордж, без него — «неизвестно».
           branchOfMr: async (url) => {
-            const token = forgeToken();
-            if (!token || !readIntegrations(ctx.store).forge.enabled) return undefined;
+            const token = forgeToken(url);
+            if (!token) return undefined;
             return (await readMergeRequestByUrl(url, token))?.branch;
           },
         });
         const missing = missingDelivery(facts, facts.branch ?? group.branch);
         // Описание MR читается форджем только у найденного по голове MR.
         const description = facts.mr
-          ? await mrDescriptionGap(facts.mr, async (url) => {
-              const token = forgeToken();
-              if (!token || !readIntegrations(ctx.store).forge.enabled) return undefined;
-              return readMergeRequestReview(url, token);
-            })
+          ? await mrDescriptionGap(
+              facts.mr,
+              async (url) => {
+                const token = forgeToken(url);
+                if (!token) return undefined;
+                return readMergeRequestReview(url, token);
+              },
+              liveNaIds(group.sieveRows ?? []),
+            )
           : {};
         // Сита перед MR (решение владельца 28.09): механика git панели и судья
         // отчёта группы. Сеть уже не ответила — сита ждут следующей проверки.
@@ -696,6 +707,7 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
           : await sieveDeliveryGaps({
               cwd: group.path,
               ...(group.startedAt ? { startedAt: group.startedAt } : {}),
+              ...(group.base ? { forkedFrom: group.base } : {}),
               rows: group.sieveRows ?? [],
             }).catch((error: unknown) => {
               console.warn('split delivery: sieves unreadable', error);
@@ -758,8 +770,8 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   // конвейера — по расписанию, только чтением; нашлось — группа продолжается.
   // Интеграция выключена или токена нет — читать нечем, наблюдатель молчит.
   const readMr = async (url: string) => {
-    const token = forgeToken();
-    if (!token || !readIntegrations(ctx.store).forge.enabled) return undefined;
+    const token = forgeToken(url);
+    if (!token) return undefined;
     return readMergeRequestReview(url, token);
   };
   // Влит ли MR — пока хаб открыт: только состояние, запрос на проект, не чаще
@@ -770,9 +782,8 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
       set: (record) => ctx.store.setSplitPlan(record),
     },
     read: async (urls) => {
-      const token = forgeToken();
-      if (!token || !readIntegrations(ctx.store).forge.enabled) return undefined;
-      return readMergeRequestStates(urls, token);
+      if (!urls.some((url) => forgeToken(url))) return undefined;
+      return readMergeRequestStates(urls, forgeToken);
     },
     log: (message, error) => console.warn(message, error),
   });
@@ -1283,8 +1294,12 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
   // тумблер продолжает с того, что не успел разобрать.
   // Порт шлюза — живого слушателя: разбор через контур идёт тем же маршрутом,
   // что агент панели, и при погашенном шлюзе отказывает, а не уходит в облако.
-  const watcher = createBackgroundWatcher(ctx, platformRouting.gatewayPort, () =>
-    localModels.claudeEnv(),
+  // Разбор самим чужим CLI идёт маршрутом его чата (`runRoute`).
+  const watcher = createBackgroundWatcher(
+    ctx,
+    platformRouting.gatewayPort,
+    () => localModels.claudeEnv(),
+    (origin) => runRoute(origin),
   );
   watcher.resume();
   for (const entry of adopt) {

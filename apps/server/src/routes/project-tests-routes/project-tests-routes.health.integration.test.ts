@@ -60,7 +60,9 @@ describe('project-tests-routes: здоровье набора и планы пр
           getProjectByPath: () => undefined,
           isTestsAutoAccept: () => false,
           // Ни одна интеграция не подключена: раздел обязан отвечать и так.
-          getSettings: () => ({ integrations: { atlassian: { enabled: false } } }),
+          getSettings: () => ({
+            integrations: { jira: { enabled: false }, confluence: { enabled: false } },
+          }),
         },
       } as unknown as ServerContext,
       new ProjectTestRunRegistry(),
@@ -202,7 +204,7 @@ describe('project-tests-routes: здоровье набора и планы пр
     expect(report.quarantine[0]?.stability).toBeLessThan(report.thresholds.stability);
   });
 
-  it('без Atlassian даты требований не сверяются — оговоркой, а не молчанием', async () => {
+  it('без Jira даты требований не сверяются — оговоркой, а не молчанием', async () => {
     await post('/api/project-tests/case', {
       path: project,
       groupId: 'gui',
@@ -216,7 +218,7 @@ describe('project-tests-routes: здоровье набора и планы пр
       `/api/project-tests/quarantine?path=${path()}`,
     )) as unknown as ProjectTestQuarantineReport;
 
-    expect(report.warning).toContain('Atlassian');
+    expect(report.warning).toContain('Jira');
     expect(report.stale).toHaveLength(0);
   });
 
@@ -293,8 +295,8 @@ describe('project-tests-routes: здоровье набора и планы пр
     expect(doc.untested.map((item) => item.caseId)).toEqual(['gui-002']);
     expect(doc.verdict.ready).toBe(false);
     expect(doc.verdict.blockers).toContain('Не проверено кейсов: 1 из 2.');
-    // Требования без Atlassian считаются по ссылкам кейсов — с оговоркой.
-    expect(doc.warning).toContain('Atlassian');
+    // Требования без Jira считаются по ссылкам кейсов — с оговоркой.
+    expect(doc.warning).toContain('Jira');
   });
 
   it('тот же документ файлом: markdown с вердиктом и именем файла', async () => {

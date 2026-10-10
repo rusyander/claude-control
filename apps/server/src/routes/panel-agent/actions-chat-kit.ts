@@ -6,6 +6,7 @@ import type {
   ProvidersResponse,
 } from '@agentdeck/contracts';
 import type { ChatTreeView } from '@agentdeck/contracts/chat-handoff';
+import { normalizeProjectPath } from '../../lib/app-store/projects.ts';
 import { maskSecretsInText } from '../../lib/secret-mask/secret-mask.ts';
 import type { PanelActionPreviewField } from '@agentdeck/contracts/panel-agent';
 import { encode, readRoute, routeError } from './action-kit/action-kit.ts';
@@ -210,4 +211,4 @@ export async function writeRoute<T>(
 
 /** Путь, сравнимый с путём проекта в записи группы. */
 export const samePath = (a: string, b: string): boolean =>
-  resolve(a).toLowerCase() === resolve(b).toLowerCase();
+  normalizeProjectPath(resolve(a)) === normalizeProjectPath(resolve(b));

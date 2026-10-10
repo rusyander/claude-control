@@ -45,11 +45,17 @@ export interface RunAssistantDeps {
   detect?: (command: string) => boolean;
   fetchImpl?: typeof fetch;
   /**
-   * Сигнал отмены HTTP-запроса к модели. Кнопка «Стоп» в чате обрывает запрос,
-   * а не ждёт ответа, который потом пришлось бы выбросить.
+   * Сигнал отмены HTTP-запроса к модели или CLI one-shot (процесс снимается
+   * деревом). Кнопка «Стоп» в чате обрывает запрос, а не ждёт ответа, который
+   * потом пришлось бы выбросить.
    */
   signal?: AbortSignal;
   spawnImpl?: typeof nodeSpawn;
+  /**
+   * pid запущенного CLI one-shot — тому, кто следит за чужими процессами:
+   * наблюдатель не должен принять выход своего же разбора за сбой.
+   */
+  onSpawn?: (pid: number) => void;
   /** Таймаут CLI one-shot, мс (по умолчанию 180000). */
   timeoutMs?: number;
   /**

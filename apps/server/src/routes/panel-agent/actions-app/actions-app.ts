@@ -11,6 +11,7 @@ import type {
   IntegrationStatus,
   ProvidersResponse,
 } from '@agentdeck/contracts';
+import { INTEGRATION_ORDER } from '@agentdeck/contracts/integrations';
 import {
   definePanelAction,
   fingerprintOf,
@@ -823,14 +824,14 @@ const toggleDlpProxy = definePanelAction({
 
 // --- Интеграции ---
 
-const INTEGRATIONS = ['atlassian', 'forge', 'telegram', 'tms', 'ci', 'webhook'] as const;
+const INTEGRATIONS = INTEGRATION_ORDER;
 
 const listIntegrations = definePanelAction({
   name: 'list_integrations',
   section: 'integrations',
   risk: 'read',
   description:
-    'List integrations (Jira/Confluence, forge, Telegram, TMS, CI, webhook): enabled, token saved, last check, visible settings.',
+    'List integrations (Jira, Confluence, GitLab, GitHub, Telegram, Zephyr, Xray, Test IT, CI, webhook) — each connects on its own: enabled, token saved, last check, visible settings.',
   input: z.object({}),
   route: () => ({ method: 'GET', url: '/api/integrations' }),
   afterRoute: async (_input, body, inject) => {
@@ -892,7 +893,7 @@ async function integrationPlan(
 }
 
 /** Поля, от которых зависит, куда уходит токен интеграции (у форджа пустой адрес = github.com/gitlab.com). */
-const INTEGRATION_TARGET_KEYS = ['url', 'baseUrl', 'confluenceUrl', 'kind'] as const;
+const INTEGRATION_TARGET_KEYS = ['url', 'baseUrl', 'kind'] as const;
 
 /**
  * Токен интеграции едет за адресом: смена хоста при сохранённом ключе отправила
@@ -914,7 +915,7 @@ async function assertIntegrationNotRetargeted(
   if (moved.length === 0) return;
   const statuses = await readRoute<IntegrationStatus[]>(inject, '/api/integrations');
   const status = statuses.find((item) => item.id === id);
-  if (!status?.hasToken && !status?.hasConfluenceToken) return;
+  if (!status?.hasToken) return;
   throw new Error(
     `Integration «${id}» has a saved token; changing its ${moved.join('/')} through the agent is ` +
       'refused, because the token would be sent to the new host. Nothing was written: the human ' +
@@ -931,7 +932,7 @@ function integrationAddress(settings: Record<string, unknown>): string | undefin
 }
 
 /**
- * Карточка интеграции на вкладке «Интеграции». Вкладки мало: карточек шесть, и
+ * Карточка интеграции на вкладке «Интеграции». Вкладки мало: карточек десять, и
  * последние под экраном — человек видел Jira, а агент говорил «карточка вебхука
  * открыта». Имя якоря повторяет `integrationAnchor` веба.
  */

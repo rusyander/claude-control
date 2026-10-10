@@ -1,6 +1,11 @@
 import { renameSync } from 'node:fs';
 import { join } from 'node:path';
 import { migrateLegacyPlatforms } from '@agentdeck/contracts/platform-legacy';
+import {
+  migrateLegacyIntegrations,
+  type LegacyTokenMove,
+} from '@agentdeck/contracts/integrations-legacy';
+import { clearStoredKey, getStoredKey, setStoredKey } from '../provider-keys/provider-keys.ts';
 import { readJsonFile } from '../safe-io/safe-io.ts';
 import { DEFAULT_STATE } from './app-store.constants.ts';
 import type { AppState } from './app-store.types.ts';
@@ -22,7 +27,7 @@ export function stateFilePath(appDataDir: string): string {
  * (песочницы, смена целевого каталога через claudeDirOverride).
  */
 export function mergeState(input: Partial<AppState>): AppState {
-  const loaded = withCurrentPlatformDrivers(input).state;
+  const loaded = withCurrentIntegrations(withCurrentPlatformDrivers(input).state).state;
   const base = structuredClone(DEFAULT_STATE);
   return {
     ...base,
@@ -82,6 +87,60 @@ export function withCurrentPlatformDrivers(loaded: Partial<AppState>): {
     state: { ...loaded, settings: { ...loaded.settings, platforms } as AppState['settings'] },
     changed: true,
   };
+}
+
+/**
+ * Интеграции в прежнем виде — в нынешнем (`integrations-legacy.ts`): связка
+ * Atlassian → Jira и Confluence, фордж и тест-менеджмент с выбором вида → своя
+ * интеграция на каждую систему. `tokens` — какие ключи переехать за ними
+ * (`moveLegacyIntegrationTokens`); снимок с другой машины ключей не несёт, и
+ * там переезжает только видимая половина.
+ */
+export function withCurrentIntegrations(loaded: Partial<AppState>): {
+  state: Partial<AppState>;
+  tokens: LegacyTokenMove[];
+  changed: boolean;
+} {
+  const migrated = migrateLegacyIntegrations(
+    loaded.settings?.integrations,
+    loaded.integrationHealth,
+  );
+  if (!migrated.changed || !loaded.settings) return { state: loaded, tokens: [], changed: false };
+  return {
+    state: {
+      ...loaded,
+      integrationHealth: migrated.health as AppState['integrationHealth'],
+      settings: {
+        ...loaded.settings,
+        integrations: migrated.integrations,
+      } as AppState['settings'],
+    },
+    tokens: migrated.tokens,
+    changed: true,
+  };
+}
+
+/**
+ * Ключи прежних интеграций — на места нынешних, в том же зашифрованном
+ * хранилище. Занятое место не перезаписывается (ключ, введённый уже в новой
+ * версии, правдивее старого); прежний ключ стирается после всех переносов —
+ * иначе секрет жил бы в файле без карточки, через которую его видно и можно
+ * забыть.
+ */
+export function moveLegacyIntegrationTokens(
+  appDataDir: string,
+  moves: readonly LegacyTokenMove[],
+): void {
+  for (const move of moves) {
+    const value = getStoredKey(appDataDir, move.from);
+    if (!value) continue;
+    for (const to of move.to) {
+      if (!getStoredKey(appDataDir, to)) setStoredKey(appDataDir, to, value);
+    }
+  }
+  for (const move of moves) {
+    if (getStoredKey(appDataDir, move.from)) clearStoredKey(appDataDir, move.from);
+  }
 }
 
 /**

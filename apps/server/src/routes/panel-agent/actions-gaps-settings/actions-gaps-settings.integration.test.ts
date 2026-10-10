@@ -272,16 +272,10 @@ describe('panel-agent actions: settings / provider / integrations / portability 
   it('jira_transitions: transitions of the issue, only GET reaches Jira; unknown issue is a failure', async () => {
     const connected = await h.app.inject({
       method: 'PUT',
-      url: '/api/integrations/atlassian',
+      url: '/api/integrations/jira',
       headers: { origin: HARNESS_ORIGIN },
       payload: {
-        settings: {
-          enabled: true,
-          baseUrl: jira.url,
-          email: '',
-          deployment: 'server',
-          confluenceUrl: '',
-        },
+        settings: { enabled: true, baseUrl: jira.url, email: '', deployment: 'server' },
         token: ATLASSIAN_TOKEN,
       },
     });

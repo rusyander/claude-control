@@ -43,6 +43,9 @@ export function IntegrationsGuideSections({ tr }: SectionProps) {
           <GuideStep title={g('contextForgotten')} text={g('contextForgottenText')}>
             <HelpShot topic="integrations" scenario="atlassian" frame="06-forgotten" side="panel" />
           </GuideStep>
+          <GuideStep title={g('contextDiscover')} text={g('contextDiscoverText')}>
+            <HelpShot topic="integrations" scenario="atlassian" frame="07-discover" side="panel" />
+          </GuideStep>
         </GuideSteps>
       </HelpSection>
 

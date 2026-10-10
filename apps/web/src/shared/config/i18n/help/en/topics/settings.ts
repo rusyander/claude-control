@@ -172,7 +172,9 @@ export const settingsEn: typeof settingsRu = {
     credsApiKey: 'an environment variable with an API key',
     credsNote:
       'On Windows and Linux access sits in a file. On macOS there is no file — Claude Code ' +
-      'keeps it in the keychain, and the system asks for permission on first use. So ' +
+      'keeps it in the keychain, and the system asks for permission on first use. With a ' +
+      'non-default config directory the keychain entry is named differently — with a hash of ' +
+      'the directory at the end; the panel looks for that one too. So ' +
       '“Not logged in” in the sandbox while the chat works is not an account problem.',
 
     fieldsTitle: 'What you can switch',

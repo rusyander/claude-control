@@ -448,7 +448,7 @@
     "why": "exported document / markdown written for another tool"
   },
   "domains/project-tests/defects/defects.ts": {
-    "n": 22,
+    "n": 20,
     "why": "exported document / markdown written for another tool"
   },
   "domains/project-tests/e2e-parse-pytest.ts": {
@@ -809,7 +809,7 @@
   },
   "lib/server-texts/templates.ts": {
     "n": 450,
-    "why": "RU side of the server text table: every line here IS a code, this is the one file where a Russian literal is the data. The generator and its manifest are gone from the tree (see the file header) — a new code is written by hand and `n` rises with it; +6 sieve-gap-* codes of the pre-MR sieves (28.09); +1 split drop/restart/no-slot-paused codes (29.09); +4 tests-gap-* codes of the group verdict from the Tests block (30.09); +13 sieve-gap-* codes of the panel mechanics, freshness and Tests-run proof (30.09); +1 sieve-gap-run-empty, a run that checked nothing (review PR #1, 05.10); +1 tests-gap-stale, a Tests run recorded before the group's last change (05.10); +1 kit-compose-failed (06.10); +8 assistant-*/watcher-* refusals of the provider route for the panel helpers and the watcher (06.10); +2 gateway-responses-* refusals of the /v1/responses route for Codex (06.10); +6 provider-chat/analytics/groups/plugins/sandbox refusals and assistant-api-base-unknown of the CLI pass B0 (06.10); +22 group-layer-* refusals, feed notice lines and per-CLI toggle answers of the group run layer, batch A (06.10); +1 provider-unknown, now composed by code for the group toggle and delivery routes (06.10); +1 tests-gap-word-only, a word-only Tests record does not close an automated case (09.10); +1 chat-conversation-lost-notice, the group transcript is gone and the turn went on as a new conversation (09.10); +10 panel-agent-* turn errors (stop, extra tools, timeout, no reply, CLI exit, image and Kimi argv refusals) — the agent error frame now carries a code (09.10)"
+    "why": "RU side of the server text table: every line here IS a code, this is the one file where a Russian literal is the data. The generator and its manifest are gone from the tree (see the file header) — a new code is written by hand and `n` rises with it; +6 sieve-gap-* codes of the pre-MR sieves (28.09); +1 split drop/restart/no-slot-paused codes (29.09); +4 tests-gap-* codes of the group verdict from the Tests block (30.09); +13 sieve-gap-* codes of the panel mechanics, freshness and Tests-run proof (30.09); +1 sieve-gap-run-empty, a run that checked nothing (review PR #1, 05.10); +1 tests-gap-stale, a Tests run recorded before the group's last change (05.10); +1 kit-compose-failed (06.10); +8 assistant-*/watcher-* refusals of the provider route for the panel helpers and the watcher (06.10); +2 gateway-responses-* refusals of the /v1/responses route for Codex (06.10); +6 provider-chat/analytics/groups/plugins/sandbox refusals and assistant-api-base-unknown of the CLI pass B0 (06.10); +22 group-layer-* refusals, feed notice lines and per-CLI toggle answers of the group run layer, batch A (06.10); +1 provider-unknown, now composed by code for the group toggle and delivery routes (06.10); +1 tests-gap-word-only, a word-only Tests record does not close an automated case (09.10); +1 chat-conversation-lost-notice, the group transcript is gone and the turn went on as a new conversation (09.10); +10 panel-agent-* turn errors (stop, extra tools, timeout, no reply, CLI exit, image and Kimi argv refusals) — the agent error frame now carries a code (09.10); +2 delivery-gap-mr-na-reason and sieve-gap-live-na, the n/a rules of the live-check sieve (10.10); +1 assistant-reply-truncated, an API reply cut at max_tokens is refused instead of parsed (10.10); +1 watcher-cli-missing, the active foreign CLI that runs the watcher analysis is not on PATH (X9, 10.10); -4 integration-check-atlassian-confluence-* codes, Confluence is its own integration with its own check (В6, 10.10)"
   },
   "providers/catalog/kimi.ts": {
     "n": 1,
@@ -848,7 +848,7 @@
     "why": "shape check of an archive entry, folded into a coded refusal above"
   },
   "routes/integrations/exchange-routes.ts": {
-    "n": 4,
+    "n": 2,
     "why": "outbound notification to an external channel (phone push / Telegram)"
   },
   "routes/panel-agent/action-kit/action-kit.ts": {

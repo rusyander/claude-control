@@ -78,7 +78,8 @@ const HELP = `Тест-кейсы проекта без панели.
   plan      собрать план правилом: plan smoke | diff | release | flaky
   case      завести или обновить кейс (агент чата): --group <g> --json '<кейс>' | --file <f.json>
             кейс человека не переписывается — правка уходит черновиком на приёмку
-  record    записать проверенное прогоном в историю: record <группа>:<кейс>=passed|failed|blocked|skipped …
+  record    записать проверенное вручную (только ручные кейсы, в разделе — «вручную»):
+            record <группа>:<кейс>=passed|failed|blocked|skipped …; автокейс — только run
 
 Опции:
   --project <dir>   каталог проекта (по умолчанию текущий)
@@ -321,7 +322,20 @@ async function recordResults(project, options, positional) {
     };
   });
   const { recordAgentResults } = await domain('agent-write');
-  const run = recordAgentResults(project, results, new Date().toISOString());
+  let run;
+  try {
+    run = recordAgentResults(project, results, new Date().toISOString());
+  } catch (error) {
+    if (error?.messageCode !== 'record-automated-case') throw error;
+    // Автокейс проверяет его тест: агенту — готовая команда, а не «нельзя».
+    const groups = String(error.params.groups).split(', ');
+    throw new Error(
+      `автокейсы не записываются словом — ${error.params.cases}. Их проверяет тест, прогоните: ${groups
+        .map((group) => `node tools/tests-cli.mjs run --project "${project}" --group ${group}`)
+        .join('; ')}`,
+      { cause: error },
+    );
+  }
   const { passed, failed, blocked, skipped } = run.summary;
   console.log(
     `Прогон ${run.id} записан: зелёных ${passed}, красных ${failed}, заблокировано ${blocked}, пропущено ${skipped}.`,

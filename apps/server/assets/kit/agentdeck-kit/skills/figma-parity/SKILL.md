@@ -41,7 +41,7 @@ Detail lives in `references/` — read the named file BEFORE the phase, not afte
 
 ## Phase 0 — the only question set
 
-ALWAYS one AskUserQuestion, Russian, exact wording in `references/intake.md`: mode
+ALWAYS one AskUserQuestion, in the user's language, wording in `references/intake.md`: mode
 (AUTO | AUTO+STRICT | AUDIT-ONLY) · scale policy (STRICT | PROPORTIONAL) · target width and whether other
 widths are in scope · the agent's own proposed screen↔frame mapping to confirm · rebuild
 needed (default no). Same turn, run the **preflight** from that file — every first-of-its-kind call

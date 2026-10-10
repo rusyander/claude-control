@@ -256,6 +256,51 @@ const remoteAccessSettingsSchema = object({
   notify: boolean(),
 });
 
+const atlassianSite = object({
+  enabled: boolean(),
+  baseUrl: string(),
+  email: string(),
+  deployment: zodEnum(['', 'cloud', 'server']),
+});
+
+const forgeSite = object({
+  enabled: boolean(),
+  baseUrl: string(),
+  repo: string(),
+});
+
+/**
+ * Система тест-кейсов. Включённая обязана быть рабочей. Проверку «чего не
+ * хватает» форма делала только у себя, и это давало щель: включённый Test IT
+ * сохранялся без адреса — карточка горела зелёным, а первая же кнопка
+ * отвечала «не указан адрес Test IT». Форма — не место для правила: телефон и
+ * curl ходят тем же маршрутом.
+ */
+function tmsSystem(needsUrl: boolean) {
+  return object({
+    enabled: boolean(),
+    // Адрес читает только Test IT: своя установка у каждого своя, у двух
+    // облачных API общий на всех и поле остаётся пустым.
+    baseUrl: string(),
+    projectKey: string(),
+    groupId: string(),
+  }).superRefine((value, ctx) => {
+    if (!value.enabled) return;
+    for (const [field, missing] of [
+      ['projectKey', !value.projectKey.trim()],
+      ['baseUrl', needsUrl && !value.baseUrl.trim()],
+    ] as const) {
+      if (missing) {
+        ctx.addIssue({
+          code: 'custom',
+          path: [field],
+          message: `Включённая система тест-кейсов без поля «${field}» работать не может`,
+        });
+      }
+    }
+  });
+}
+
 /**
  * Внешние интеграции: видимая половина настройки. ТОКЕНОВ здесь нет — они живут
  * в зашифрованном хранилище панели и правятся отдельным маршрутом
@@ -268,53 +313,18 @@ const remoteAccessSettingsSchema = object({
  * «остальные поля стереть» — ровно то, чего форма не имела в виду.
  */
 export const integrationSettingsSchemas = {
-  atlassian: object({
-    enabled: boolean(),
-    baseUrl: string(),
-    email: string(),
-    deployment: zodEnum(['', 'cloud', 'server']),
-    confluenceUrl: string(),
-  }),
-  forge: object({
-    enabled: boolean(),
-    kind: zodEnum(['', 'github', 'gitlab']),
-    baseUrl: string(),
-    repo: string(),
-  }),
+  jira: atlassianSite,
+  confluence: atlassianSite,
+  gitlab: forgeSite,
+  github: forgeSite,
   telegram: object({
     enabled: boolean(),
     chatId: string(),
     events: array(zodEnum(NOTIFY_EVENTS)),
   }),
-  tms: object({
-    enabled: boolean(),
-    kind: zodEnum(['', 'zephyr', 'xray', 'testit']),
-    // Адрес читает только Test IT: своя установка у каждого своя, у двух
-    // облачных API общий на всех и поле остаётся пустым.
-    baseUrl: string(),
-    projectKey: string(),
-    groupId: string(),
-  }).superRefine((value, ctx) => {
-    // Включённая карточка обязана быть рабочей. Проверку «чего не хватает»
-    // форма делала только у себя, и это давало щель: включённый Zephyr,
-    // переключённый на Test IT, сохранялся ВКЛЮЧЁННЫМ и без адреса — карточка
-    // горела зелёным, а первая же кнопка отвечала «не указан адрес Test IT».
-    // Форма — не место для правила: телефон и curl ходят тем же маршрутом.
-    if (!value.enabled) return;
-    for (const [field, missing] of [
-      ['kind', !value.kind],
-      ['projectKey', !value.projectKey.trim()],
-      ['baseUrl', value.kind === 'testit' && !value.baseUrl.trim()],
-    ] as const) {
-      if (missing) {
-        ctx.addIssue({
-          code: 'custom',
-          path: [field],
-          message: `Включённый тест-менеджмент без поля «${field}» работать не может`,
-        });
-      }
-    }
-  }),
+  zephyr: tmsSystem(false),
+  xray: tmsSystem(false),
+  testit: tmsSystem(true),
   ci: object({
     enabled: boolean(),
     kind: zodEnum(['', 'github', 'gitlab']),
@@ -416,6 +426,12 @@ const importSettingsSchema = settingsPatchSchema.extend({
    * сразу после записи.
    */
   activePlatformId: string().optional(),
+  /**
+   * Снимок может не нести части интеграций: прежняя форма после переезда даёт
+   * только те системы, что были настроены (`integrations-legacy.ts`), а
+   * недостающие дополняет слияние с дефолтами.
+   */
+  integrations: integrationsSettingsSchema.partial().optional(),
 });
 
 /**

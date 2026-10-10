@@ -215,7 +215,7 @@ export const testsEn: typeof testsRu = {
         'The Coverage tab turns the suite the other way round: not “what we check” but ' +
         '“what is left unchecked”. Here two requirements come from case links (SHOP-14 ' +
         'and SHOP-21, two cases each) and “Cases without a requirement: 2”. The honest ' +
-        'caveat sits below: without Atlassian only requirements from case links are ' +
+        'caveat sits below: without Jira only requirements from case links are ' +
         'shown — a JQL query would add the issues nobody linked.',
       hExchange: 'Step 7. Importing CI results',
       hExchangeText:
@@ -608,8 +608,10 @@ export const testsEn: typeof testsRu = {
       'chat knows about the section too: the panel appends a line to each of its agents saying ' +
       'where the cases live and how to keep them. Changing how the product behaves — not only ' +
       'when asked to "write tests" — the agent adds or updates the case for the change on its ' +
-      'own (tests-cli case) and records what it verified as a run (tests-cli record or run): ' +
-      '“tested” becomes a record in the history, not words in a reply. A case you wrote the ' +
+      'own (tests-cli case) and records what it verified as a run: “tested” becomes a record ' +
+      'in the history, not words in a reply. A manual case it records with tests-cli record — ' +
+      'the history marks that record “by hand”; record refuses an automated case, only run ' +
+      'checks it. A case you wrote the ' +
       'agent does not rewrite — its edit arrives as a draft for you to accept. The “Write it ' +
       'into the project’s CLAUDE.md” button appends a ' +
       'block with the format and the rules to the end of the file; it is read in EVERY ' +
@@ -840,7 +842,7 @@ export const testsEn: typeof testsRu = {
       'an email are one requirement, not two half-covered columns.',
     coverageJira: 'Requirements from Jira',
     coverageJiraText:
-      'With Atlassian connected the panel pulls issues by the JQL of the project ' +
+      'With Jira connected the panel pulls issues by the JQL of the project ' +
       'attachment. Those bring the important part: issues nobody linked to. Not connected ' +
       '— the matrix says plainly that it shows only what is already linked.',
     coverageOrder: 'Rows ordered by risk',
@@ -906,7 +908,7 @@ export const testsEn: typeof testsRu = {
     ageingStale: 'Drifted from the requirement',
     ageingStaleText:
       'The tracker issue was edited after the case, so the case checks yesterday’s ' +
-      'requirement. Dates come from Jira by the links of the cases; without Atlassian the ' +
+      'requirement. Dates come from Jira by the links of the cases; without Jira the ' +
       'panel says plainly that it did not check, and still counts the quarantine suggestions.',
     ageingNotRun: 'Not run for a long time',
     ageingNotRunText:
@@ -1156,7 +1158,7 @@ export const testsEn: typeof testsRu = {
       'the acceptance can be undone as a whole.',
     limitCoverage: 'A requirement nobody covered is not shown',
     limitCoverageText:
-      'Without Atlassian there is one source of requirements — the cases’ own links — ' +
+      'Without Jira there is one source of requirements — the cases’ own links — ' +
       'and by construction it cannot show a requirement nobody linked. A connected ' +
       'integration adds issues by a JQL query; until then the panel says so right under ' +
       'the table. Archived cases are excluded: a requirement covered only by an ' +
@@ -1391,7 +1393,8 @@ export const testsEn: typeof testsRu = {
         'silently either: with none and a task that needs tests, it asks in that same single ' +
         'question whether to keep them in the Tests section. Changing how the product behaves, ' +
         'it adds or updates the case for the change on its own (tests-cli case) and records ' +
-        'what it verified (tests-cli record or run); a case you wrote arrives as a draft edit to ' +
+        'what it verified: a manual case with tests-cli record (marked “by hand”), an ' +
+        'automated one only with a run; a case you wrote arrives as a draft edit to ' +
         'accept. When it cannot run commands or write files (for another CLI that is decided by ' +
         'its rights in the “Permissions” section), it says so and hands you the exact command ' +
         'instead of reporting a run that never happened.',

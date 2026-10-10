@@ -1,13 +1,16 @@
 import type { FastifyReply } from 'fastify';
 import type { ServerContext } from '../../context.ts';
 import type { AtlassianAccess } from '../../domains/integrations/atlassian/client.ts';
-import { atlassianAccessFrom } from '../../domains/integrations/atlassian/access.ts';
+import {
+  confluenceAccessFrom,
+  jiraAccessFrom,
+} from '../../domains/integrations/atlassian/access.ts';
 import { IntegrationError, invalidField } from '../../domains/integrations/errors.ts';
 import { codeOf } from '../../lib/server-text/server-text.ts';
 import type { ServerMessageCode, ServerMessageParams } from '@agentdeck/contracts/server-messages';
 
 /**
- * Общее для всех маршрутов интеграций: доступ к Atlassian, перевод отказов в
+ * Общее для всех маршрутов интеграций: доступ к Jira и Confluence, перевод отказов в
  * ответы и разбор полей тела.
  *
  * Тело здесь проверяется РУКАМИ, а не схемой: общий файл схем принадлежит
@@ -25,14 +28,14 @@ export function appDataOf(deps: IntegrationsDeps): string {
   return deps.ctx.location.paths.appData;
 }
 
-/** Доступ к Atlassian (`atlassianAccessFrom`) для маршрутов интеграций. */
-export function atlassianAccess(deps: IntegrationsDeps): AtlassianAccess {
-  return atlassianAccessOf(deps.ctx);
+/** Доступ к Jira (`jiraAccessFrom`) для маршрутов интеграций. */
+export function jiraAccess(deps: IntegrationsDeps): AtlassianAccess {
+  return jiraAccessFrom(deps.ctx.store, appDataOf(deps));
 }
 
-/** То же по контексту сервера — для маршрутов вне интеграций (тикеты разделения). */
-export function atlassianAccessOf(ctx: ServerContext): AtlassianAccess {
-  return atlassianAccessFrom(ctx.store, ctx.location.paths.appData);
+/** Доступ к Confluence (`confluenceAccessFrom`) для маршрутов интеграций. */
+export function confluenceAccess(deps: IntegrationsDeps): AtlassianAccess {
+  return confluenceAccessFrom(deps.ctx.store, appDataOf(deps));
 }
 
 /**

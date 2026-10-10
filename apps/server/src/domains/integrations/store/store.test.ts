@@ -11,12 +11,10 @@ import {
   describeIntegrations,
   forgetIntegration,
   isIntegrationId,
-  readConfluenceToken,
   readIntegrations,
   readToken,
   requireConnected,
   tokenId,
-  writeConfluenceToken,
   writeSettings,
   writeToken,
 } from './store.ts';
@@ -62,10 +60,14 @@ describe('domains/integrations/store: настройки и токены', () =>
   it('карточки показываются всегда, даже пустыми', () => {
     const cards = describeIntegrations(store, dir);
     expect(cards.map((card) => card.id)).toEqual([
-      'atlassian',
-      'forge',
+      'jira',
+      'confluence',
+      'gitlab',
+      'github',
       'telegram',
-      'tms',
+      'zephyr',
+      'xray',
+      'testit',
       'ci',
       'webhook',
     ]);
@@ -73,8 +75,8 @@ describe('domains/integrations/store: настройки и токены', () =>
   });
 
   it('идентификаторы токенов лежат в своём пространстве', () => {
-    expect(tokenId('atlassian')).toBe('int:atlassian');
-    expect(isIntegrationId('atlassian')).toBe(true);
+    expect(tokenId('jira')).toBe('int:jira');
+    expect(isIntegrationId('jira')).toBe(true);
     expect(isIntegrationId('anthropic')).toBe(false);
   });
 
@@ -86,95 +88,64 @@ describe('domains/integrations/store: настройки и токены', () =>
     });
     const all = readIntegrations(store);
     expect(all.telegram.chatId).toBe('@qa');
-    expect(all.atlassian.enabled).toBe(false);
+    expect(all.jira.enabled).toBe(false);
     expect(all.ci.workflow).toBe('');
   });
 
   it('пустая строка стирает токен — это «выкинуть ключ», а не пустое сохранение', () => {
-    writeToken(dir, 'atlassian', SECRET);
-    expect(readToken(dir, 'atlassian')).toBe(SECRET);
-    writeToken(dir, 'atlassian', '');
-    expect(readToken(dir, 'atlassian')).toBeUndefined();
+    writeToken(dir, 'jira', SECRET);
+    expect(readToken(dir, 'jira')).toBe(SECRET);
+    writeToken(dir, 'jira', '');
+    expect(readToken(dir, 'jira')).toBeUndefined();
   });
 
   it('слишком длинный токен не принимается — 400 с именем поля', () => {
-    expect(() => writeToken(dir, 'atlassian', 'x'.repeat(100_000))).toThrow(
+    expect(() => writeToken(dir, 'jira', 'x'.repeat(100_000))).toThrow(
       expect.objectContaining({ code: 'invalid_body', detail: 'token' }),
     );
   });
 
   it('выключенная интеграция или отсутствующий токен — честное 404, а не «сломалось»', () => {
-    expect(() => requireConnected(store, dir, 'atlassian', 'Atlassian')).toThrow(
+    expect(() => requireConnected(store, dir, 'jira', 'Jira')).toThrow(
       expect.objectContaining({ statusCode: 404 }),
     );
-    writeToken(dir, 'atlassian', SECRET);
-    expect(() => requireConnected(store, dir, 'atlassian', 'Atlassian')).toThrow(/не подключена/);
+    writeToken(dir, 'jira', SECRET);
+    expect(() => requireConnected(store, dir, 'jira', 'Jira')).toThrow(/не подключена/);
 
-    writeSettings(store, 'atlassian', {
-      ...readIntegrations(store).atlassian,
+    writeSettings(store, 'jira', {
+      ...readIntegrations(store).jira,
       enabled: true,
     });
-    expect(requireConnected(store, dir, 'atlassian', 'Atlassian')).toBe(SECRET);
-  });
-
-  /**
-   * Второй ключ Atlassian. На своей установке Jira и Confluence выдают личные
-   * токены по отдельности — панель обязана хранить их порознь и НЕ показывать
-   * ни одного целиком.
-   */
-  it('второй ключ Confluence живёт отдельно и наружу уходит только маской', () => {
-    const wiki = 'WIKI-PAT-7b2c-СЕКРЕТ';
-    writeToken(dir, 'atlassian', SECRET);
-    writeConfluenceToken(dir, wiki);
-
-    expect(readConfluenceToken(dir)).toBe(wiki);
-    // Он именно ОТДЕЛЬНЫЙ: основной ключ карточки от него не поменялся.
-    expect(readToken(dir, 'atlassian')).toBe(SECRET);
-
-    const card = describeIntegration(store, dir, 'atlassian');
-    expect(card.hasConfluenceToken).toBe(true);
-    expect(card.maskedConfluenceToken).not.toContain('СЕКРЕТ');
-    expect(JSON.stringify(card)).not.toContain(wiki);
-
-    // У чужой карточки поля нет вовсе: иначе «ключа нет» читалось бы как «не ввели».
-    expect(describeIntegration(store, dir, 'telegram').hasConfluenceToken).toBeUndefined();
-  });
-
-  it('«забыть» уносит и второй ключ: секрет без следа в панели недопустим', () => {
-    writeToken(dir, 'atlassian', SECRET);
-    writeConfluenceToken(dir, 'WIKI-PAT');
-    forgetIntegration(store, dir, 'atlassian');
-    expect(readConfluenceToken(dir)).toBeUndefined();
+    expect(requireConnected(store, dir, 'jira', 'Jira')).toBe(SECRET);
   });
 
   it('«забыть» снимает токен и гасит карточку, но адрес оставляет', () => {
-    writeSettings(store, 'atlassian', {
+    writeSettings(store, 'jira', {
       enabled: true,
-      baseUrl: 'https://acme.atlassian.net',
+      baseUrl: 'https://acme.jira.net',
       email: 'qa@acme.io',
       deployment: 'cloud',
-      confluenceUrl: '',
     });
-    writeToken(dir, 'atlassian', SECRET);
-    saveHealth(store, 'atlassian', { state: 'ok', detail: 'Вошли как Ольга' });
+    writeToken(dir, 'jira', SECRET);
+    saveHealth(store, 'jira', { state: 'ok', detail: 'Вошли как Ольга' });
 
-    const card = forgetIntegration(store, dir, 'atlassian');
+    const card = forgetIntegration(store, dir, 'jira');
     expect(card).toMatchObject({ enabled: false, hasToken: false, state: 'unchecked' });
     // Человек снял ключ, а не переехал на другой сайт — адрес вводить заново незачем.
-    expect(readIntegrations(store).atlassian.baseUrl).toBe('https://acme.atlassian.net');
-    expect(readHealth(store, 'atlassian')).toBeUndefined();
+    expect(readIntegrations(store).jira.baseUrl).toBe('https://acme.jira.net');
+    expect(readHealth(store, 'jira')).toBeUndefined();
   });
 });
 
 describe('domains/integrations/health: итог проверки переживает F5', () => {
   it('запись ложится на диск и читается обратно', () => {
-    saveHealth(store, 'forge', { state: 'error', detail: 'токен отклонён' });
+    saveHealth(store, 'gitlab', { state: 'error', detail: 'токен отклонён' });
     const reread = new AppStore(dir);
-    expect(readHealth(reread, 'forge')).toMatchObject({
+    expect(readHealth(reread, 'gitlab')).toMatchObject({
       state: 'error',
       detail: 'токен отклонён',
     });
-    expect(readHealth(reread, 'forge')?.checkedAt).toBeTruthy();
+    expect(readHealth(reread, 'gitlab')?.checkedAt).toBeTruthy();
   });
 });
 
@@ -222,25 +193,24 @@ describe('domains/integrations/links: привязка проекта', () => {
 
 describe('СЕКРЕТ НЕ ПОКИДАЕТ ХРАНИЛИЩА', () => {
   beforeEach(() => {
-    writeSettings(store, 'atlassian', {
+    writeSettings(store, 'jira', {
       enabled: true,
-      baseUrl: 'https://acme.atlassian.net',
+      baseUrl: 'https://acme.jira.net',
       email: 'qa@acme.io',
       deployment: 'cloud',
-      confluenceUrl: '',
     });
-    writeToken(dir, 'atlassian', SECRET);
+    writeToken(dir, 'jira', SECRET);
   });
 
   it('карточка отдаёт маску, а не ключ', () => {
-    const card = describeIntegration(store, dir, 'atlassian');
+    const card = describeIntegration(store, dir, 'jira');
     expect(card.hasToken).toBe(true);
     expect(card.maskedToken).not.toContain(SECRET);
     expect(card.maskedToken).toContain('…');
     expect(JSON.stringify(card)).not.toContain(SECRET);
   });
 
-  it('ни один из пяти ответов списка не содержит ключа', () => {
+  it('ни один из ответов списка не содержит ключа', () => {
     expect(JSON.stringify(describeIntegrations(store, dir))).not.toContain(SECRET);
   });
 
@@ -248,7 +218,7 @@ describe('СЕКРЕТ НЕ ПОКИДАЕТ ХРАНИЛИЩА', () => {
     vi.stubGlobal('fetch', () =>
       Promise.resolve(new Response(JSON.stringify({ displayName: 'Ольга' }), { status: 200 })),
     );
-    const card = await checkIntegration(store, dir, 'atlassian');
+    const card = await checkIntegration(store, dir, 'jira');
     expect(card.state).toBe('ok');
     expect(card.account).toBe('Ольга');
     expect(card.deployment).toBe('cloud');
@@ -258,7 +228,7 @@ describe('СЕКРЕТ НЕ ПОКИДАЕТ ХРАНИЛИЩА', () => {
 
   it('отказ 401 читается как «токен отклонён» и тоже не выносит ключ наружу', async () => {
     vi.stubGlobal('fetch', () => Promise.resolve(new Response('denied', { status: 401 })));
-    const card = await checkIntegration(store, dir, 'atlassian');
+    const card = await checkIntegration(store, dir, 'jira');
     expect(card.state).toBe('error');
     expect(card.detail).toContain('токен отклонён');
     expect(JSON.stringify(card)).not.toContain(SECRET);
@@ -271,63 +241,76 @@ describe('СЕКРЕТ НЕ ПОКИДАЕТ ХРАНИЛИЩА', () => {
       calls.push(String(url));
       return Promise.resolve(new Response('{}', { status: 200 }));
     });
-    const card = await checkIntegration(store, dir, 'forge');
+    const card = await checkIntegration(store, dir, 'gitlab');
     expect(card.state).toBe('error');
     expect(card.detail).toBe('Токен не сохранён.');
     expect(calls).toHaveLength(0);
   });
 
   /**
-   * «Проверить связь» отвечает за ОБЕ системы карточки. Дефект 18.09.2026: Jira
-   * отвечала «Вошли как …», а Confluence на том же доступе — 401, и узнать об
-   * этом можно было только нажав кнопку публикации.
+   * Каждая система проверяется у себя (владелец 10.10.2026). Дефект 18.09.2026:
+   * Jira отвечала «Вошли как …», а Confluence на том же доступе — 401, и узнать
+   * об этом можно было только нажав кнопку публикации.
    */
-  it('Confluence отклонил ключ — это сказано в подписи, но Jira не гасится', async () => {
-    vi.stubGlobal('fetch', (url: string) =>
-      Promise.resolve(
-        String(url).includes('/rest/api/space')
-          ? new Response('denied', { status: 401 })
-          : new Response(JSON.stringify({ displayName: 'Ольга' }), { status: 200 }),
-      ),
-    );
-    const card = await checkIntegration(store, dir, 'atlassian');
-    // Jira работает — карточка обязана остаться зелёной.
-    expect(card.state).toBe('ok');
-    expect(card.detail).toContain('Вошли как Ольга');
-    expect(card.detail).toContain('отдельный ключ Confluence');
-    expect(everythingOnDisk(dir)).not.toContain(SECRET);
-  });
-
-  it('Confluence на связи — подпись говорит и это', async () => {
-    vi.stubGlobal('fetch', (url: string) =>
-      Promise.resolve(
-        String(url).includes('/rest/api/space')
-          ? new Response(JSON.stringify({ results: [] }), { status: 200 })
-          : new Response(JSON.stringify({ displayName: 'Ольга' }), { status: 200 }),
-      ),
-    );
-    const card = await checkIntegration(store, dir, 'atlassian');
-    expect(card.detail).toContain('Confluence на связи');
-  });
-
-  it('своя установка без адреса вики и без второго ключа — вики не трогаем вовсе', async () => {
-    writeSettings(store, 'atlassian', {
-      enabled: true,
-      baseUrl: 'https://jira.acme.local',
-      email: '',
-      deployment: 'server',
-      confluenceUrl: '',
-    });
+  it('проверка Jira не ходит в вики: о Confluence говорит её собственная карточка', async () => {
     const calls: string[] = [];
     vi.stubGlobal('fetch', (url: string) => {
       calls.push(String(url));
-      return Promise.resolve(new Response(JSON.stringify({ name: 'qa' }), { status: 200 }));
+      return Promise.resolve(
+        new Response(JSON.stringify({ displayName: 'Ольга' }), { status: 200 }),
+      );
     });
-    const card = await checkIntegration(store, dir, 'atlassian');
-    // Корень Confluence там равен хосту Jira: 404 оттуда — ложная тревога про
-    // вики, которой у человека может не быть вовсе.
-    expect(calls.some((url) => url.includes('/rest/api/space'))).toBe(false);
-    expect(card.detail).toBe('Вошли как qa (своя установка).');
+    const card = await checkIntegration(store, dir, 'jira');
+    expect(card.detail).toContain('Вошли как Ольга');
+    expect(calls.every((url) => url.includes('/rest/api/3/myself'))).toBe(true);
+  });
+
+  it('Confluence спрашивается своим ключом и своим адресом — облако под /wiki', async () => {
+    const wiki = 'WIKI-PAT-7b2c-СЕКРЕТ';
+    writeSettings(store, 'confluence', {
+      enabled: true,
+      baseUrl: 'https://acme.jira.net',
+      email: 'qa@acme.io',
+      deployment: '',
+    });
+    writeToken(dir, 'confluence', wiki);
+    const calls: { url: string; auth: string }[] = [];
+    vi.stubGlobal('fetch', (url: string, init?: RequestInit) => {
+      const headers = (init?.headers ?? {}) as Record<string, string>;
+      calls.push({ url: String(url), auth: headers.Authorization ?? '' });
+      return Promise.resolve(
+        new Response(JSON.stringify({ displayName: 'Ольга' }), { status: 200 }),
+      );
+    });
+    const card = await checkIntegration(store, dir, 'confluence');
+    expect(card.state).toBe('ok');
+    expect(calls[0]?.url).toBe('https://acme.jira.net/wiki/rest/api/user/current');
+    // Ключ — свой, Confluence: ключом Jira вики отвечает 401 на рабочем доступе.
+    expect(Buffer.from(calls[0]!.auth.replace('Basic ', ''), 'base64').toString()).toBe(
+      `qa@acme.io:${wiki}`,
+    );
+    expect(readIntegrations(store).confluence.deployment).toBe('cloud');
+    expect(JSON.stringify(card)).not.toContain(wiki);
+    expect(everythingOnDisk(dir)).not.toContain(wiki);
+  });
+
+  it('Confluence отклонил ключ — красная его карточка, Jira остаётся зелёной', async () => {
+    writeSettings(store, 'confluence', {
+      enabled: true,
+      baseUrl: 'https://wiki.acme.local',
+      email: '',
+      deployment: 'server',
+    });
+    writeToken(dir, 'confluence', 'WIKI-PAT');
+    vi.stubGlobal('fetch', (url: string) =>
+      Promise.resolve(
+        String(url).includes('/rest/api/user/current')
+          ? new Response('denied', { status: 401 })
+          : new Response(JSON.stringify({ name: 'qa' }), { status: 200 }),
+      ),
+    );
+    expect((await checkIntegration(store, dir, 'confluence')).state).toBe('error');
+    expect((await checkIntegration(store, dir, 'jira')).state).toBe('ok');
   });
 
   it('определённый диалект запоминается — иначе Confluence ищется не по тем путям', async () => {
@@ -338,7 +321,7 @@ describe('СЕКРЕТ НЕ ПОКИДАЕТ ХРАНИЛИЩА', () => {
           : new Response(JSON.stringify({ name: 'qa' }), { status: 200 }),
       ),
     );
-    await checkIntegration(store, dir, 'atlassian');
-    expect(readIntegrations(store).atlassian.deployment).toBe('server');
+    await checkIntegration(store, dir, 'jira');
+    expect(readIntegrations(store).jira.deployment).toBe('server');
   });
 });

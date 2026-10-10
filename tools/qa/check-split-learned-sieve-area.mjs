@@ -215,10 +215,10 @@ await runOnStand(
     const learned = async () =>
       ((await stand.api('/sieves')).body?.learned ?? []).find((sieve) => sieve.check === MARKER);
 
-    const saved = await stand.api('/integrations/forge', {
+    const saved = await stand.api('/integrations/gitlab', {
       method: 'PUT',
       body: {
-        settings: { enabled: true, kind: 'gitlab', baseUrl: SITE, repo: 'team/app' },
+        settings: { enabled: true, baseUrl: SITE, repo: 'team/app' },
         token: 'qa-token',
       },
     });

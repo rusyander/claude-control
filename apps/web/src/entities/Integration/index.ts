@@ -7,6 +7,8 @@ export { useForgetIntegration } from './api/useForgetIntegration';
 export { useConnectAtlassianMcp } from './api/useConnectAtlassianMcp';
 export { useTestWebhook } from './api/useTestWebhook';
 export { useTestTelegram } from './api/useTestTelegram';
+export { useIntegrationDiscovery } from './api/useIntegrationDiscovery';
+export { useApplyDiscovered } from './api/useApplyDiscovered';
 export type { SaveIntegrationPayload } from './api/useSaveIntegration';
 
 export { useIntegrationLinks } from './api/IntegrationLinksApi';
@@ -30,6 +32,6 @@ export { readIntegration } from './model/readIntegration';
 export { jiraIssueUrl } from './model/links';
 export { linkRows } from './model/linkRows';
 export { confluencePageUrl } from './model/confluencePageUrl';
-export type { LinkRow } from './model/linkRows';
+export type { LinkRow, LinkSites } from './model/linkRows';
 
 export { IntegrationLinkRows } from './ui/IntegrationLinkRows';

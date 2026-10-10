@@ -57,6 +57,8 @@ export const platformEn: Record<PlatformMessageCode, string> = {
   'assistant-timeout': 'The assistant did not answer in the allotted time',
   'assistant-request-invalid': 'The assistant request was not accepted: {{detail}}',
   'assistant-empty-reply': 'The model returned an empty answer.',
+  'assistant-reply-truncated':
+    "The model's answer was cut off at the length limit — nothing was applied. Split the task into parts.",
   'manifest-invalid-object': 'Request rejected: overrides must be an object of fields ({{field}}).',
   'manifest-invalid-client-tools':
     'Request rejected: tools must be «native» or «shim» ({{field}}).',
@@ -88,8 +90,10 @@ export const platformEn: Record<PlatformMessageCode, string> = {
     'The panel assistant goes through the contour «{{title}}», but the panel gateway is not running — the request was not sent, so as not to reach the vendor cloud. Press «Start gateway» on the contour card',
   'assistant-contour-no-token':
     'The panel assistant goes through the contour «{{title}}», but the contour key is not saved — the gateway has nothing to insert. Save the key on the contour card',
+  'watcher-cli-missing':
+    '{{provider}} is not on the panel process PATH — there is nothing to run the analysis with. Install the CLI. Analysis did not start',
   'watcher-provider-unsupported':
-    'The active CLI is {{provider}}, and the panel assistant route leads to the Claude cloud: the watcher will not substitute Claude for the chosen CLI. Analysis runs when the assistant is on a contour or a local model. Analysis did not start',
+    'The active CLI is {{provider}}: it has no run without edits, which the watcher analyses problems with, and the watcher will not substitute Claude for the chosen CLI. Analysis runs when the assistant is on a contour or a local model. Analysis did not start',
   'watcher-endpoint-unsupported':
     'The panel assistant uses its own endpoint «{{name}}» — the watcher would have to hand its token to a CLI process, which the panel does not do. Analysis did not start',
   'watcher-off': 'The watcher is off: turn it on to check a bug.',

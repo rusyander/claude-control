@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import type { AppSettings, ProviderDetectResponse, ProviderDetection } from '@agentdeck/contracts';
+import { posixPathMatches } from '../../lib/path-lookup.mjs';
 import { getActiveProviderId, listProviders } from '../registry.ts';
 import { providerCliCandidates, providerCliCommand } from '../cli/cli.ts';
 import type { ConfigProvider } from '../types/types.ts';
@@ -62,15 +63,16 @@ export function resetCliLookupCache(): void {
 }
 
 function lookupCliOnPath(command: string): boolean {
+  // macOS и Linux — обходом PATH: внешнего `which` в части дистрибутивов нет.
+  if (process.platform !== 'win32') return posixPathMatches(command).length > 0;
   try {
-    const finder = process.platform === 'win32' ? 'where' : 'which';
     // Вывод НЕ разбираем (`stdio: 'ignore'`) — смотрим только код возврата.
     // Это важно именно на Windows: `where claude.cmd` вполне может напечатать
     // НЕСКОЛЬКО строк (одна и та же команда в нескольких каталогах PATH — глобальный
     // npm, nvm, Scripts). Разбор «первой строки» дал бы ложные ветвления; нам же
     // нужен один факт «нашлось или нет», а запуск всё равно идёт по имени, а не по
     // добытому пути, — то есть ту же строку разрешит сама ОС.
-    const result = spawnSync(finder, [command], {
+    const result = spawnSync('where', [command], {
       stdio: 'ignore',
       windowsHide: true,
       timeout: LOOKUP_TIMEOUT_MS,

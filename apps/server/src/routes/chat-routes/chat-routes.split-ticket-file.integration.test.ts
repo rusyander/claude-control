@@ -93,14 +93,13 @@ describe('POST /api/chat/split/:parent/tickets/file', () => {
       proposal: { groups: [] },
       groups: [group(0), group(1)],
     });
-    writeSettings(store, 'atlassian', {
+    writeSettings(store, 'jira', {
       enabled: true,
       baseUrl: 'https://jira.example.com',
       email: 'qa@example.com',
       deployment: 'server',
-      confluenceUrl: '',
     });
-    writeToken(appData, 'atlassian', 'SECRET');
+    writeToken(appData, 'jira', 'SECRET');
     const ctx = {
       location: { paths: { root, appData, mcpConfig: join(root, '.claude.json') } },
       store,

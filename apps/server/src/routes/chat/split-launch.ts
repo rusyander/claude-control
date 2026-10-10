@@ -56,7 +56,7 @@ import {
 import { planForeignAssignment } from '../../domains/provider-cascade/provider-cascade.ts';
 import { bootstrapPlanFor, resolveProjectDelivery } from '../../domains/project-git/project-git.ts';
 import { readMergeRequestByUrl } from '../../domains/integrations/forge.ts';
-import { readIntegrations, readToken } from '../../domains/integrations/store/store.ts';
+import { forgeTokenForUrl } from '../../domains/integrations/forge-pick.ts';
 import {
   createChat,
   type ProviderChatCascade,
@@ -250,9 +250,8 @@ export function createSplitLauncher(
    * (или заводит копию от базы с пометкой): ревью по ссылке возможно и так.
    */
   const resolveReview = async (review: { url: string }) => {
-    const settings = readIntegrations(ctx.store).forge;
-    const token = readToken(ctx.location.paths.appData, 'forge');
-    if (!settings.enabled || !token) return undefined;
+    const token = forgeTokenForUrl(ctx.store, ctx.location.paths.appData, review.url);
+    if (!token) return undefined;
     try {
       const mr = await readMergeRequestByUrl(review.url, token);
       return mr ? { branch: mr.branch } : undefined;

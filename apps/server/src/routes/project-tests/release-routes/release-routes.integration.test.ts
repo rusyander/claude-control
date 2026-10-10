@@ -62,7 +62,7 @@ describe('project-tests release routes: заметка на языке пане�
     registerTestReleaseRoutes(app, {
       ctx: {
         store: {
-          getSettings: () => ({ language, integrations: { atlassian: { enabled: false } } }),
+          getSettings: () => ({ language, integrations: { jira: { enabled: false } } }),
         },
         location: { paths: { appData } },
       },
@@ -94,8 +94,8 @@ describe('project-tests release routes: заметка на языке пане�
   // Файл и печать вехи — на языке панели того, кто выгружает, как отчёт по
   // прогону. Раньше документ был русским при английском интерфейсе.
   it.each([
-    ['en', '# Milestone readiness “1.4”', 'Atlassian is not connected'],
-    ['ru', '# Готовность вехи «1.4»', 'Atlassian не подключён'],
+    ['en', '# Milestone readiness “1.4”', 'Jira is not connected'],
+    ['ru', '# Готовность вехи «1.4»', 'Jira не подключена'],
   ])('выгрузка вехи, панель %s — «%s»', async (lang, heading, warning) => {
     language = lang;
     const response = await app.inject({

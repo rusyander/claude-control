@@ -1,16 +1,21 @@
-import type { AtlassianSettings } from '@agentdeck/contracts';
+import type { AtlassianSiteSettings } from '@agentdeck/contracts';
 import { trimSlash } from './trimSlash';
 
-/** Ссылка на страницу Confluence по её id. */
+/**
+ * Ссылка на страницу Confluence по её id. Адрес вики — у своей интеграции;
+ * облако держит её под `/wiki` сайта, и адрес сайта без него достраивается так
+ * же, как на сервере (`toConfluenceAccess`).
+ */
 export function confluencePageUrl(
-  atlassian: AtlassianSettings,
+  confluence: AtlassianSiteSettings,
   pageId: string | undefined,
 ): string {
   if (!pageId) return '';
-  const own = trimSlash(atlassian.confluenceUrl);
-  const base = trimSlash(atlassian.baseUrl);
-  if (!own && !base) return '';
-  // Свой адрес Confluence задан — он уже указывает на корень, `/wiki` не нужен.
-  const root = own || (atlassian.deployment === 'server' ? base : `${base}/wiki`);
+  const base = trimSlash(confluence.baseUrl);
+  if (!base) return '';
+  const cloud = confluence.deployment
+    ? confluence.deployment === 'cloud'
+    : Boolean(confluence.email.trim());
+  const root = cloud && !/\/wiki$/.test(base) ? `${base}/wiki` : base;
   return `${root}/pages/viewpage.action?pageId=${encodeURIComponent(pageId)}`;
 }

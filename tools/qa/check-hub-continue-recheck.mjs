@@ -9,8 +9,9 @@
  *    уходит родителю, строка говорит «перепроверяется»; когда проверка
  *    кончилась доставкой — кнопка зелёная и с временем последней проверки.
  * 3. MR уже влит (отказ сервера с кодом `split-recheck-merged`) — не сбой, а
- *    ответ: тост успеха, кнопки нет, карточка перекрашена и стоит в самом низу,
- *    ниже доставленных, но не влитых (владелец 06.10.2026).
+ *    ответ: тост успеха, кнопки нет, карточка перекрашена и уходит в закрытый
+ *    хвост — ниже доставленных, но не влитых (владелец 06.10.2026); в хвосте с
+ *    ней группа с убранной копией, обе по плану (09.10).
  *
  * Данные подменяются целиком: ни копий, ни прогонов прогон не создаёт.
  *
@@ -351,10 +352,19 @@ const order = await hub
   .evaluateAll((els) =>
     els.map((el) => `${el.getAttribute('data-hub-settled') ?? '-'}:${el.textContent ?? ''}`),
   );
-const last = order.at(-1) ?? '';
+// Закрытое — одна часть в самом низу, внутри по плану (09.10): влитая
+// «Экспорт» и «Импорт» с убранной копией стоят там вместе, «Импорт» — после,
+// он дальше в плане. Порядок частей на своём составе держит
+// `check-hub-order-merge.mjs`; здесь — что отказ «влит» уводит карточку в хвост.
+const mergedAt = order.findIndex((row) => /^merged:.*Экспорт/.test(row));
+const titlesAfter = order.slice(mergedAt + 1).map((row) => row.replace(/^[^:]*:/, ''));
 check(
-  /^merged:.*Экспорт/.test(last) && order.filter((row) => row.startsWith('merged:')).length === 1,
-  `влитая группа — последней карточкой: ${JSON.stringify(order.map((row) => row.slice(0, 24)))}`,
+  mergedAt >= 0 &&
+    order.filter((row) => row.startsWith('merged:')).length === 1 &&
+    order.slice(0, mergedAt).every((row) => /Авторизация|Отчёты/.test(row)) &&
+    titlesAfter.length === 1 &&
+    titlesAfter[0].startsWith('Импорт'),
+  `влитая группа — в закрытом хвосте, после незакрытых: ${JSON.stringify(order.map((row) => row.slice(0, 24)))}`,
 );
 const tint = await hub.locator('[data-hub-row]').evaluateAll((els) => {
   const merged = els.find((el) => el.getAttribute('data-hub-settled') === 'merged');

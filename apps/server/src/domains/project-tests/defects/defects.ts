@@ -9,11 +9,13 @@ import type {
 import { resultReason, stepText } from '@agentdeck/contracts/test-format';
 import type { AppStore } from '../../../lib/app-store/app-store.ts';
 import { findCliOnPath } from '../../../providers/detect/detect.ts';
-import { toAccess } from '../../integrations/atlassian/client.ts';
+import { jiraAccessFrom } from '../../integrations/atlassian/access.ts';
 import { createIssue } from '../../integrations/atlassian/jira.ts';
+import { IntegrationError } from '../../integrations/errors.ts';
 import { createForgeIssue, toForgeAccess } from '../../integrations/forge.ts';
+import { pickForge, type PickedForge } from '../../integrations/forge-pick.ts';
 import { linkForCwd } from '../../integrations/links.ts';
-import { readIntegrations, readToken, requireConnected } from '../../integrations/store/store.ts';
+import { isConnected } from '../../integrations/store/store.ts';
 import { ProjectTestsError } from '../files.ts';
 import { coded } from '../../../lib/server-text/server-text.ts';
 
@@ -166,8 +168,7 @@ function hintOf(deps?: DefectDeps): string | undefined {
 function jiraProjectOf(deps?: DefectDeps): string | undefined {
   if (!deps?.root) return undefined;
   try {
-    const settings = readIntegrations(deps.store).atlassian;
-    if (!settings.enabled || !readToken(deps.appDataDir, 'atlassian')) return undefined;
+    if (!isConnected(deps.store, deps.appDataDir, 'jira')) return undefined;
     return linkForCwd(deps.store, deps.root)?.link.jiraProjectKey || undefined;
   } catch {
     // Состояние панели недоступно (нерасшифрованное хранилище, битый файл) —
@@ -176,25 +177,26 @@ function jiraProjectOf(deps?: DefectDeps): string | undefined {
   }
 }
 
-function forgeReady(deps?: DefectDeps): boolean {
-  if (!deps) return false;
+/**
+ * Фордж по токену для этого проекта: GitLab и GitHub подключаются по
+ * отдельности, и при двух подключённых дефект уходит туда, куда смотрит origin
+ * проекта (`forge-pick.ts`).
+ */
+function projectForge(deps?: DefectDeps): PickedForge | undefined {
+  if (!deps) return undefined;
   try {
-    const settings = readIntegrations(deps.store).forge;
-    if (!settings.enabled || !settings.kind) return false;
-    return Boolean(readToken(deps.appDataDir, 'forge'));
+    return pickForge(deps.store, deps.appDataDir, { root: deps.root });
   } catch {
-    return false;
+    return undefined;
   }
 }
 
+function forgeReady(deps?: DefectDeps): boolean {
+  return Boolean(projectForge(deps));
+}
+
 function forgeTitle(deps?: DefectDeps): string {
-  try {
-    return deps && readIntegrations(deps.store).forge.kind === 'gitlab'
-      ? 'GitLab по токену'
-      : 'GitHub по токену';
-  } catch {
-    return 'фордж по токену';
-  }
+  return projectForge(deps)?.kind === 'gitlab' ? 'GitLab по токену' : 'GitHub по токену';
 }
 
 /**
@@ -221,14 +223,26 @@ export async function createTokenDefect(
         'defect-jira-project-unlinked',
       );
     }
-    const token = requireConnected(deps.store, deps.appDataDir, 'atlassian', 'Atlassian');
-    const access = toAccess(readIntegrations(deps.store).atlassian, token);
-    const issue = await createIssue(access, { projectKey, summary: title, description: body });
+    const issue = await createIssue(jiraAccessFrom(deps.store, deps.appDataDir), {
+      projectKey,
+      summary: title,
+      description: body,
+    });
     return issue.url;
   }
 
-  const token = requireConnected(deps.store, deps.appDataDir, 'forge', 'Фордж');
-  const access = toForgeAccess(readIntegrations(deps.store).forge, token, deps.root);
+  const forge = projectForge(deps);
+  if (!forge) {
+    throw coded(
+      new IntegrationError(
+        'integration_not_found',
+        'GitLab и GitHub не подключены: включите нужный и сохраните токен в настройках панели.',
+      ),
+      'integration-not-connected',
+      { title: 'GitLab / GitHub' },
+    );
+  }
+  const access = toForgeAccess(forge.settings, forge.token, deps.root);
   const issue = await createForgeIssue(access, title, body);
   return issue.url;
 }

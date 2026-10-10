@@ -1,4 +1,13 @@
-import type { IntegrationId, IntegrationStatus, IntegrationsSettings } from '@agentdeck/contracts';
+import type {
+  ForgeKind,
+  ForgeSettings,
+  IntegrationId,
+  IntegrationStatus,
+  IntegrationsSettings,
+  TmsKind,
+  TmsSettings,
+} from '@agentdeck/contracts';
+import { INTEGRATION_ORDER } from '@agentdeck/contracts/integrations';
 import type { AppStore } from '../../../lib/app-store/app-store.ts';
 import {
   clearStoredKey,
@@ -26,15 +35,30 @@ import { coded } from '../../../lib/server-text/server-text.ts';
  * этого модуля не возвращает значение целиком.
  */
 
-/** Все — всегда, даже неподключённые: страница настроек рисует карточку на каждую. */
-export const INTEGRATION_IDS: readonly IntegrationId[] = [
-  'atlassian',
-  'forge',
-  'telegram',
-  'tms',
-  'ci',
-  'webhook',
-];
+/**
+ * Каждая система — своя интеграция (владелец 10.10.2026): Jira и Confluence,
+ * GitLab и GitHub, три системы тест-кейсов подключаются и отключаются по
+ * отдельности. Все — всегда, даже неподключённые: список интеграций рисует
+ * каждую, а какие из них показать, решает экран.
+ */
+export const INTEGRATION_IDS: readonly IntegrationId[] = INTEGRATION_ORDER;
+
+/** Как система называется в отказе «не подключена». */
+export const INTEGRATION_TITLES: Record<IntegrationId, string> = {
+  jira: 'Jira',
+  confluence: 'Confluence',
+  gitlab: 'GitLab',
+  github: 'GitHub',
+  telegram: 'Telegram',
+  zephyr: 'Zephyr',
+  xray: 'Xray',
+  testit: 'Test IT',
+  ci: 'CI',
+  webhook: 'Webhook',
+};
+
+export const FORGE_KINDS: readonly ForgeKind[] = ['gitlab', 'github'];
+export const TMS_KINDS: readonly TmsKind[] = ['zephyr', 'xray', 'testit'];
 
 /**
  * Интеграции, живущие БЕЗ токена. У вебхука секрет подписи необязателен: адрес
@@ -50,33 +74,6 @@ export function needsToken(id: IntegrationId): boolean {
 /** Ключ токена в общем хранилище секретов панели. */
 export function tokenId(id: IntegrationId): string {
   return `int:${id}`;
-}
-
-/**
- * ВТОРОЙ ключ Atlassian — личный токен Confluence.
- *
- * На своей установке (Server/DC) Jira и Confluence выдают personal access token
- * каждая отдельно: ключ Jira второй системой отклоняется с 401 на полностью
- * рабочем доступе, и снаружи это выглядит как «Confluence не подключён», хотя
- * подключено всё. У облака токен один на сайт, поэтому ключ НЕОБЯЗАТЕЛЕН: при
- * пустом значении работает основной, и настройки, собранные до появления этого
- * поля, ведут себя ровно как прежде.
- */
-export const CONFLUENCE_TOKEN_ID = 'int:atlassian-confluence';
-
-/** Отдельный токен Confluence; пусто = его нет и в ход идёт основной. */
-export function readConfluenceToken(appDataDir: string): string | undefined {
-  return getStoredKey(appDataDir, CONFLUENCE_TOKEN_ID);
-}
-
-/** Сохранить второй ключ; пустая строка стирает его — как и у основного. */
-export function writeConfluenceToken(appDataDir: string, token: string): void {
-  if (token.length > MAX_KEY_LENGTH) {
-    throw invalidField('confluenceToken', 'токен длиннее допустимого', 'request-token-too-long', {
-      field: 'confluenceToken',
-    });
-  }
-  setStoredKey(appDataDir, CONFLUENCE_TOKEN_ID, token);
 }
 
 export function isIntegrationId(value: string): value is IntegrationId {
@@ -142,9 +139,6 @@ export function describeIntegration(
   const settings = readIntegrations(store)[id];
   const token = readToken(appDataDir, id) ?? '';
   const health = readHealth(store, id);
-  // Второй ключ есть только у Atlassian: у остальных карточек поля нет вовсе, и
-  // признак «ключа нет» на них читался бы как «ключ забыли ввести».
-  const confluence = id === 'atlassian' ? (readConfluenceToken(appDataDir) ?? '') : '';
 
   return {
     id,
@@ -156,12 +150,6 @@ export function describeIntegration(
     checkedAt: health?.checkedAt,
     account: health?.account,
     deployment: health?.deployment,
-    ...(id === 'atlassian'
-      ? {
-          hasConfluenceToken: Boolean(confluence),
-          maskedConfluenceToken: confluence ? maskKey(confluence) : '',
-        }
-      : {}),
   };
 }
 
@@ -181,9 +169,6 @@ export function forgetIntegration(
   id: IntegrationId,
 ): IntegrationStatus {
   forgetToken(appDataDir, id);
-  // «Забыть» относится ко всему доступу карточки: оставленный второй ключ
-  // Confluence был бы секретом без единого следа в панели.
-  if (id === 'atlassian') clearStoredKey(appDataDir, CONFLUENCE_TOKEN_ID);
   store.forgetIntegrationHealth(tokenId(id));
   const settings = readIntegrations(store)[id];
   writeSettings(store, id, { ...settings, enabled: false });
@@ -195,7 +180,7 @@ export function requireConnected(
   store: AppStore,
   appDataDir: string,
   id: IntegrationId,
-  title: string,
+  title = INTEGRATION_TITLES[id],
 ): string {
   const settings = readIntegrations(store)[id];
   const token = readToken(appDataDir, id);
@@ -210,4 +195,29 @@ export function requireConnected(
     );
   }
   return token ?? '';
+}
+
+/** Включена ли интеграция и есть ли у неё ключ — без отказа, для «можно ли». */
+export function isConnected(store: AppStore, appDataDir: string, id: IntegrationId): boolean {
+  if (!readIntegrations(store)[id].enabled) return false;
+  return !needsToken(id) || Boolean(readToken(appDataDir, id));
+}
+
+/** Настройка форджа с видом — в той форме, с которой работает его клиент. */
+export function forgeSettingsOf(store: AppStore, kind: ForgeKind): ForgeSettings {
+  return { ...readIntegrations(store)[kind], kind };
+}
+
+/** Настройка системы тест-кейсов с видом — для её клиента. */
+export function tmsSettingsOf(store: AppStore, kind: TmsKind): TmsSettings {
+  return { ...readIntegrations(store)[kind], kind };
+}
+
+/** Ключ форджа этого вида, если фордж подключён; иначе `undefined`. */
+export function forgeToken(
+  store: AppStore,
+  appDataDir: string,
+  kind: ForgeKind,
+): string | undefined {
+  return isConnected(store, appDataDir, kind) ? readToken(appDataDir, kind) : undefined;
 }

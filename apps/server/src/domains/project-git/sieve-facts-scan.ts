@@ -2,6 +2,7 @@ import type { SieveMechanics } from '@agentdeck/contracts/sieves';
 import { projectChecks } from './project-checks.ts';
 import {
   artifactsIn,
+  behaviourIn,
   debugLeftoversIn,
   declaresEnv,
   destructiveIn,
@@ -107,6 +108,7 @@ export async function scanMechanics(input: {
     artifacts: artifactsIn({ added, ...facts }),
     envVars: await undeclaredEnv(run, cwd, diff.additions),
     untestedCode: untestedCodeIn(paths),
+    behaviour: behaviourIn(paths),
     destructive: destructiveIn(diff.additions),
     checks: projectChecks(cwd),
   };

@@ -46,11 +46,15 @@ export function IntegrationsTopic() {
           nameHeader={tr('cardsHeader')}
           descriptionHeader={tr('cardsWhat')}
           rows={[
-            { name: tr('cardAtlassian'), description: tr('cardAtlassianText'), isMono: false },
-            { name: tr('cardForge'), description: tr('cardForgeText'), isMono: false },
+            { name: tr('cardJira'), description: tr('cardJiraText'), isMono: false },
+            { name: tr('cardConfluence'), description: tr('cardConfluenceText'), isMono: false },
+            { name: tr('cardGitlab'), description: tr('cardGitlabText'), isMono: false },
+            { name: tr('cardGithub'), description: tr('cardGithubText'), isMono: false },
             { name: tr('cardTelegram'), description: tr('cardTelegramText'), isMono: false },
             { name: tr('cardWebhook'), description: tr('cardWebhookText'), isMono: false },
-            { name: tr('cardTms'), description: tr('cardTmsText'), isMono: false },
+            { name: tr('cardZephyr'), description: tr('cardZephyrText'), isMono: false },
+            { name: tr('cardXray'), description: tr('cardXrayText'), isMono: false },
+            { name: tr('cardTestit'), description: tr('cardTestitText'), isMono: false },
             { name: tr('cardCi'), description: tr('cardCiText'), isMono: false },
           ]}
         />

@@ -128,7 +128,9 @@ lives in the Keychain and there is no file. The sandbox runs Claude with a subst
 
 **What the panel does.** It reads the token from the Keychain itself
 (`security find-generic-password`). The first access raises a permission prompt — click **Always
-Allow**.
+Allow**. When Claude Code runs with a non-default config directory (`CLAUDE_CONFIG_DIR`), the
+Keychain entry has a different name — `Claude Code-credentials-<8 characters of the directory
+hash>`; the panel looks for it too, and `pnpm doctor` checks the same names.
 
 **If that did not help** (the Keychain entry was renamed, say) — find the name and pass it in:
 

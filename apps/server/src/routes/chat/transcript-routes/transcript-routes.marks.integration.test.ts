@@ -81,7 +81,7 @@ describe('GET /api/chats — метки «ждёт вас» и «принято�
       parentChatId: 'parent',
       projectPath: join(root, 'work'),
       createdAt: '2026-09-25T10:00:00.000Z',
-      order: [0, 1, 2],
+      order: [0, 1, 2, 3],
       request: {},
       proposal: { groups: [] },
       groups: [
@@ -260,6 +260,7 @@ describe('GET /api/chats — метки «ждёт вас» и «принято�
     child('g-mr', 0);
     child('g-wait', 1);
     child('g-plain', 2);
+    child('g-none', 3);
     store.setSplitPlan({
       parentChatId: 'parent',
       projectPath: join(root, 'work'),
@@ -277,6 +278,8 @@ describe('GET /api/chats — метки «ждёт вас» и «принято�
         },
         { index: 1, status: 'running', chatId: 'g-wait', deliver: true },
         { index: 2, status: 'done', chatId: 'g-plain' },
+        // Своих правок не было — сдавать нечего, MR не нужен (10.10).
+        { index: 3, status: 'done', chatId: 'g-none', deliver: true, result: { kind: 'nothing' } },
       ],
     } as unknown as SplitPlanRecord);
 
@@ -290,5 +293,6 @@ describe('GET /api/chats — метки «ждёт вас» и «принято�
     expect(chats.get('g-wait')?.mergeRequest).toBeUndefined();
     expect(chats.get('g-plain')?.mergeRequest).toBeUndefined();
     expect(chats.get('g-plain')?.mergeRequestPending).toBeUndefined();
+    expect(chats.get('g-none')?.mergeRequestPending).toBeUndefined();
   });
 });

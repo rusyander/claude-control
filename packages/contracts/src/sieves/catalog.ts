@@ -299,8 +299,28 @@ const CONTRACT_DIR = /(^|\/)(contracts?|docs?|api-docs)\//i;
  * скрипты `tools/qa`), и их правка без теста иначе сходила бы за «тест рядом».
  * Исключение — `__tests__/`: так код не называют, это корень тестов Jest.
  */
-const TEST_PATH =
+const TEST_NAME =
   /(^|\/)__tests__\/|\.(test|spec|stories|cy|e2e)\.[^/]+$|_(test|spec)\.(go|py|rb|exs?|rs|php|[cm]?[jt]sx?)$|(^|\/)test_[^/]+\.py$|(^|\/)[^/]+Tests?\.(java|kt|kts|cs|scala|php)$/;
+/**
+ * Корень тестов ВНЕ исходников (живое разделение, 10.10): `test/`, `tests/`, `spec/`,
+ * `e2e/`, `cypress/`, `playwright/` и файл `test.*` — тесты, пока выше по пути
+ * нет `src/`. Внутри исходников то же имя — код (`src/entities/tests` блока
+ * «Тесты»), поэтому граница — `src/`, а не само имя папки. `qa/` сюда не входит:
+ * там скрипты (`tools/qa`), и решение Ф3 о них в силе.
+ */
+const TEST_ROOT_DIR = /^(tests?|spec|e2e|cypress|playwright)$/i;
+const TEST_ROOT_FILE = /^tests?\.[^.]+$/i;
+
+function isTestByPath(path: string): boolean {
+  if (TEST_NAME.test(path)) return true;
+  const parts = path.split('/');
+  const name = parts.pop() ?? '';
+  for (const part of parts) {
+    if (part === 'src') return false;
+    if (TEST_ROOT_DIR.test(part)) return true;
+  }
+  return TEST_ROOT_FILE.test(name);
+}
 /** Служебные каталоги агентов и инструментов — не доки продукта. */
 const DOT_DIR = /(^|\/)\.[^/]+\//;
 /** Миграции и схемы БД — у любого стека: каталоги, SQL и файлы схем ORM. */
@@ -313,7 +333,7 @@ export function touchKinds(paths: readonly string[]): Set<TouchKind> {
   for (const raw of paths) {
     const path = raw.replace(/\\/g, '/');
     if (DOT_DIR.test(path)) continue;
-    const test = TEST_PATH.test(path);
+    const test = isTestByPath(path);
     if (
       CONTRACT_NAME.test(path) ||
       CONTRACT_EXT.test(path) ||
@@ -359,7 +379,7 @@ export function riskTier(paths: readonly string[]): RiskAssessment {
   if (kinds.has('data')) reasons.push('data');
   const product = paths
     .map((path) => path.replace(/\\/g, '/'))
-    .filter((path) => !DOT_DIR.test(path) && !TEST_PATH.test(path));
+    .filter((path) => !DOT_DIR.test(path) && !isTestByPath(path));
   const sensitive = product.find((path) => SENSITIVE_PATH.test(path));
   if (sensitive) reasons.push(`sensitive: ${sensitive}`);
   const code = product.filter((path) => touchKinds([path]).has('code')).length;
@@ -370,13 +390,13 @@ export function riskTier(paths: readonly string[]): RiskAssessment {
 
 /** Путь — тест (по нему судится «тесты рядом с кодом»). */
 export function isTestPath(path: string): boolean {
-  return TEST_PATH.test(path.replace(/\\/g, '/'));
+  return isTestByPath(path.replace(/\\/g, '/'));
 }
 
 /** Путь — код продукта (не тест и не служебный каталог). */
 export function isProductCode(path: string): boolean {
   const clean = path.replace(/\\/g, '/');
-  return !DOT_DIR.test(clean) && !TEST_PATH.test(clean) && touchKinds([clean]).has('code');
+  return !DOT_DIR.test(clean) && !isTestByPath(clean) && touchKinds([clean]).has('code');
 }
 
 /**

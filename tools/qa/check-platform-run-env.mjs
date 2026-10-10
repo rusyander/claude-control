@@ -28,23 +28,27 @@
  *      `--strict-mcp-config` и потому переживает его. Что каждый флаг делает с
  *      настоящим CLI — отдельная проверка, `check-run-layers.mjs`;
  *   8. помощник формы при активном чужом CLI идёт ТЕМ ЖЕ маршрутом, что его
- *      чат: адрес шлюза в окружении, свой неинтерактивный флаг, ни одного флага
- *      Claude; со снятой галочкой — без адреса;
+ *      чат: адрес шлюза в окружении, свой неинтерактивный флаг в режиме без
+ *      правок, ни одного флага Claude; со снятой галочкой — без адреса;
  *   9. фоновый наблюдатель с «Ассистентом панели» на контуре разбирает через
- *      шлюз и без модели вендора, а при активном чужом CLI процесса не запускает
- *      и называет причину кодом `route_refused`;
+ *      шлюз и без модели вендора; при активном чужом CLI и облачном «Ассистенте»
+ *      разбор ведёт сам этот CLI (X9) в режиме без правок, маршрутом своего
+ *      чата: с галочкой `foreign:<cli>` — адрес шлюза, со снятой — без него;
  *  10. Kimi Code, Goose и OpenCode — CLI без переменных адреса в реестре (X7) —
  *      получают адрес окружением прогона (`runEndpoint`) в ТЕХ переменных,
  *      которые задокументированы у каждого, без ключа контура; настройка конфига
  *      Kimi, уводящая часть прогона мимо контура, даёт отказ без процесса. Что
- *      настоящий CLI с этим окружением идёт в шлюз — `check-run-endpoint-cli.mjs`.
+ *      настоящий CLI с этим окружением идёт в шлюз — `check-run-endpoint-cli.mjs`;
+ *  11. запасной путь «Codex» (владелец 06.10): контур драйвером `openai-compat`
+ *      с облачным адресом OpenAI ведёт тот же `claude` — чат, группа разделения,
+ *      агент тестов и наблюдатель получают адрес шлюза панели, модель OpenAI и
+ *      заглушку ключа; ни ключа, ни облачного адреса в процессе нет.
  *
  * Запуск: node tools/qa/check-platform-run-env.mjs
  */
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import {
-  copyFileSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
@@ -62,6 +66,10 @@ const isWindows = process.platform === 'win32';
 const SECRET = ['contour', 'live', 'key', '9f3c'].join('-');
 const CONTOUR = 'live-company';
 const MODEL = 'qwen2.5:7b';
+/** Запасной путь «Codex»: модель OpenAI за совместимым шлюзом в облаке. */
+const OPENAI_MODEL = 'gpt-5.1-codex';
+/** Облачный адрес шлюза — поддельный: прогон до сети не доходит, шлюз не зовётся. */
+const OPENAI_BASE = 'https://api.openai.example/v1';
 const DUMP = 'cc-env-dump.txt';
 /** Ключ строки с argv в том же файле: разбор у него общий с переменными. */
 const ARGV_KEY = 'CC_ARGV';
@@ -119,16 +127,17 @@ if (process.env.CC_HELPER_DUMP) {
 `;
 
 /**
- * Фальшивый чужой CLI помощника формы. Задание у окна многострочное, а
- * `.cmd`-обёртка такой argv законно не принимает (`cli-spawn`), поэтому на
- * Windows здесь настоящий исполняемый файл — копия node под именем CLI, а
- * выгрузку делает `--require` из NODE_OPTIONS раньше, чем node возьмётся за
- * `-p`. На остальных системах — скрипт, который запускает тот же код.
+ * Фальшивый чужой CLI помощника формы и разбора наблюдателя. Задание у них
+ * многострочное, а `.cmd`-обёртку с таким argv через cmd.exe не пустить
+ * (`cli-spawn`), поэтому на Windows — форма обёртки npm, как у настоящей
+ * установки (`qwen.cmd` → `node <скрипт> %*`): панель запускает её скрипт node
+ * напрямую. Копия node под именем CLI не годится — флаг режима правок перед
+ * `-p` node счёл бы своим. На остальных системах — скрипт с тем же кодом.
  */
 function fakeHelperCli(dir, name) {
   const script = join(dir, 'helper-dump.cjs');
   writeFileSync(script, HELPER_DUMP_SCRIPT);
-  if (isWindows) copyFileSync(process.execPath, join(dir, `${name}.exe`));
+  if (isWindows) writeFileSync(join(dir, `${name}.cmd`), '@node "%~dp0\\helper-dump.cjs" %*\r\n');
   else {
     writeFileSync(join(dir, name), `#!/bin/sh\nexec "${process.execPath}" "${script}" "$@"\n`, {
       mode: 0o755,
@@ -138,25 +147,21 @@ function fakeHelperCli(dir, name) {
 }
 
 /**
- * Один ответ помощника с выгрузкой процесса. Папка фальшивого CLI помощника,
- * NODE_OPTIONS и путь выгрузки живут только на время вызова: чат чужого CLI
- * выше проверяется своей `.cmd`-обёрткой, а не этой копией node.
+ * Один запуск чужого CLI с выгрузкой процесса. Папка фальшивого CLI и путь
+ * выгрузки живут только на время вызова: чат чужого CLI выше проверяется своей
+ * `.cmd`-обёрткой, а не этой.
  */
 async function helperRun(dir, marker, run, resetLookup) {
   const dump = join(dir, 'dumps');
   rmSync(dump, { recursive: true, force: true });
   mkdirSync(dump);
   const saved = {
-    NODE_OPTIONS: process.env.NODE_OPTIONS,
     CC_HELPER_DUMP: process.env.CC_HELPER_DUMP,
     PATH: process.env.PATH,
   };
   process.env.CC_HELPER_DUMP = dump;
   process.env.PATH = `${dir}${isWindows ? ';' : ':'}${process.env.PATH ?? ''}`;
   resetLookup();
-  // Прямые косые: NODE_OPTIONS разбирает обратную косую как экранирование.
-  const preload = join(dir, 'helper-dump.cjs').replaceAll('\\', '/');
-  if (isWindows) process.env.NODE_OPTIONS = `--require "${preload}"`;
   try {
     const reply = await run();
     // Своя выгрузка — та, где в задании есть просьба помощника. Разбор без
@@ -285,14 +290,14 @@ async function main() {
    * Один разбор наблюдателя: зависимости — сборкой сервера, свои только рабочая
    * папка и отчёт (фальшивый `claude` пишет выгрузку в рабочую папку).
    */
-  const watchRun = async (store, appData, dir, gatewayPort) => {
+  const watchRun = async (store, appData, dir, gatewayPort, runRoute) => {
     const ctx = {
       store,
       location: { paths: { appData } },
       pricing: { current: () => ({ entries: [] }) },
     };
     const watcher = new BackgroundWatcher({
-      ...backgroundWatcherDeps(ctx, gatewayPort),
+      ...backgroundWatcherDeps(ctx, gatewayPort, undefined, runRoute),
       cwd: dir,
       reportPath: () => join(dir, 'WATCH-REPORT.md'),
       debounceMs: 10,
@@ -334,6 +339,13 @@ async function main() {
     ['kimi', 'goose', 'opencode', 'kimi-bypass'].map((id) => [
       id,
       mkdtempSync(join(tmpdir(), `cc-t3-${id}-`)),
+    ]),
+  );
+  // Запасной путь «Codex»: у каждого места запуска — своя папка выгрузки.
+  const codexDirs = Object.fromEntries(
+    ['chat', 'group', 'project', 'watch'].map((id) => [
+      id,
+      mkdtempSync(join(tmpdir(), `cc-t3-codex-${id}-`)),
     ]),
   );
   const gateway = new PlatformGateway();
@@ -753,6 +765,11 @@ async function main() {
         `адрес шлюза в окружении помощника формы: ${url ?? '—'}`,
       );
       check(askOn.dump.args.includes('-p'), `свой неинтерактивный флаг: ${askOn.dump.args[0]}`);
+      // Помощнику нужен только текст: режим без правок, а не настройка CLI по умолчанию.
+      check(
+        askOn.dump.args.join(' ').includes('--approval-mode default'),
+        `помощник идёт в режиме без правок: ${askOn.dump.args.slice(0, 3).join(' ')}`,
+      );
       check(
         !askOn.dump.args.some((arg) => ['--output-format', '--tools'].includes(arg)),
         'флагов Claude у чужого CLI помощника нет',
@@ -790,14 +807,145 @@ async function main() {
       );
       check(!watchOn.dump.raw.includes(SECRET), 'ключа контура нет в окружении разбора');
     }
-    // Активен чужой CLI — отказ кодом, процесса нет.
-    store.updateSettings({ provider: FOREIGN });
-    const watchOff = await watchRun(store, appData, watchOffDir, gatewayPort);
-    check(!watchOff.dump, 'при чужом CLI разбор не запускает процесс');
+    // Активен чужой CLI, «Ассистент панели» — облако Claude, куда этот CLI не звал
+    // (X9): разбор ведёт сам CLI запуском без правок, маршрутом своего чата.
+    store.updateSettings({ provider: FOREIGN, assistantEndpointId: '' });
+    const watchForeign = async (consumers) => {
+      writePlatform(store, { ...platform, consumers });
+      // Задание разбора несёт сам сбой — по нему выгрузка опознаётся как своя.
+      return helperRun(
+        helperBin,
+        'qa failure',
+        () => watchRun(store, appData, watchOffDir, gatewayPort, runRoute),
+        resetCliLookupCache,
+      );
+    };
+    const viaGateway = await watchForeign([`foreign:${FOREIGN}`]);
+    check(Boolean(viaGateway.dump), 'при чужом CLI разбор ведёт сам этот CLI');
+    if (viaGateway.dump) {
+      const url = viaGateway.dump.env.OPENAI_BASE_URL;
+      check(
+        url === `http://127.0.0.1:${port}/${CONTOUR}/_s/foreign/${FOREIGN}/v1`,
+        `с галочкой его чата разбор идёт в шлюз: ${url ?? '—'}`,
+      );
+      check(
+        viaGateway.dump.args.join(' ').includes('--approval-mode default'),
+        `разбор чужим CLI — в режиме без правок: ${viaGateway.dump.args.slice(0, 3).join(' ')}`,
+      );
+      check(!viaGateway.raw.includes(SECRET), 'ключа контура нет в окружении разбора чужим CLI');
+    }
+    const ownRoute = await watchForeign(['chat']);
     check(
-      watchOff.problem?.problemCode === 'route_refused',
-      `причина в статусе наблюдателя: ${watchOff.problem?.problemCode ?? '—'}`,
+      Boolean(ownRoute.dump) && !ownRoute.dump.env.OPENAI_BASE_URL,
+      `со снятой галочкой разбор чужим CLI идёт без адреса шлюза: ${ownRoute.dump?.env.OPENAI_BASE_URL ?? '—'}`,
     );
+
+    // ── 6а. Запасной путь «Codex»: совместимый шлюз в облаке OpenAI ──────────
+    // Решение владельца 06.10: без отдельного движка — контур с облачным
+    // OpenAI-совместимым адресом гонит тот же `claude` на модель OpenAI. Драйвер
+    // и адрес шлюза в окружение прогона не входят: процесс видит только шлюз
+    // панели, модель — флагом. Провод к такому шлюзу — `check-platform-wire`, §13.
+    const openai = {
+      ...platform,
+      driver: 'openai-compat',
+      baseUrl: OPENAI_BASE,
+      consumers: ['chat', 'groups', 'tests', 'assistant'],
+    };
+    writePlatform(store, openai);
+    const openaiProfile = buildManagedProfile(
+      openai,
+      { enabled: true, port, forceStream: true },
+      OPENAI_MODEL,
+    );
+    store.updateSettings({
+      provider: 'claude',
+      endpointProfiles: [openaiProfile],
+      assistantEndpointId: openaiProfile.id,
+    });
+    createGroup(codexDirs.project, 'gui', 'GUI');
+    upsertCase(
+      codexDirs.project,
+      'gui',
+      { title: 'Вход', steps: ['открыть'] },
+      new Date().toISOString(),
+    );
+    const codexTests = new ProjectTestRunRegistry();
+    codexTests.setPlatformRouting(() => runRoute('tests'));
+    const surfaces = [
+      {
+        name: 'чат',
+        consumer: 'chat',
+        dir: codexDirs.chat,
+        start: () =>
+          chatRuns.start(
+            'codex-chat',
+            { prompt: 'привет', cwd: codexDirs.chat, configDir },
+            { origin: 'chat' },
+          ),
+      },
+      {
+        name: 'группа разделения',
+        consumer: 'groups',
+        dir: codexDirs.group,
+        start: () =>
+          chatRuns.start(
+            'codex-group',
+            { prompt: 'привет', cwd: codexDirs.group, configDir },
+            { origin: 'groups' },
+          ),
+      },
+      {
+        name: 'агент тестов',
+        consumer: 'tests',
+        dir: codexDirs.project,
+        start: () =>
+          codexTests.start(
+            { projectPath: codexDirs.project, mode: 'run' },
+            new Date().toISOString(),
+          ),
+      },
+    ];
+    for (const surface of surfaces) {
+      surface.start();
+      const dump = await waitForDump(surface.dir);
+      check(Boolean(dump), `codex: ${surface.name} — фальшивый claude запустился`);
+      if (!dump) continue;
+      const base = dump.env.get('ANTHROPIC_BASE_URL');
+      check(
+        base === `http://127.0.0.1:${port}/${CONTOUR}/_s/${surface.consumer}`,
+        `codex: ${surface.name} — адрес шлюза панели: ${base ?? '—'}`,
+      );
+      const argv = dump.env.get(ARGV_KEY) ?? '';
+      check(
+        argv.includes(`--model ${OPENAI_MODEL}`),
+        `codex: ${surface.name} — модель OpenAI флагом: ${argv.slice(0, 160)}`,
+      );
+      check(
+        dump.env.get('ANTHROPIC_AUTH_TOKEN') === PLACEHOLDER_KEY,
+        `codex: ${surface.name} — вместо ключа заглушка`,
+      );
+      check(!dump.raw.includes(SECRET), `codex: ${surface.name} — ключа контура в окружении нет`);
+      check(
+        !dump.raw.includes('api.openai.example'),
+        `codex: ${surface.name} — облачного адреса в процессе нет, только шлюз`,
+      );
+    }
+    codexTests.stopAll();
+    // Наблюдатель с «Ассистентом панели» на том же контуре: модель задаёт профиль.
+    const codexWatch = await watchRun(store, appData, codexDirs.watch, gatewayPort);
+    check(Boolean(codexWatch.dump), 'codex: наблюдатель — фальшивый claude разбора запустился');
+    if (codexWatch.dump) {
+      const base = codexWatch.dump.env.get('ANTHROPIC_BASE_URL');
+      check(
+        base === `http://127.0.0.1:${port}/${CONTOUR}/_s/assistant`,
+        `codex: наблюдатель — адрес шлюза панели: ${base ?? '—'}`,
+      );
+      check(
+        codexWatch.dump.env.get('ANTHROPIC_MODEL') === OPENAI_MODEL,
+        `codex: наблюдатель — модель профиля: ${codexWatch.dump.env.get('ANTHROPIC_MODEL') ?? '—'}`,
+      );
+      check(!codexWatch.dump.raw.includes(SECRET), 'codex: наблюдатель — ключа контура нет');
+    }
 
     // ── 7. Контур окружением прогона: Kimi Code, Goose, OpenCode (X7) ────────
     const savedEnv = { KIMI_CODE_HOME: process.env.KIMI_CODE_HOME, APPDATA: process.env.APPDATA };
@@ -916,6 +1064,7 @@ async function main() {
       watchOffDir,
       cliHomes,
       ...Object.values(endpointDirs),
+      ...Object.values(codexDirs),
     ]) {
       rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
     }

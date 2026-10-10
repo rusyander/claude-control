@@ -1,12 +1,14 @@
 /**
  * Прогон раздела «Интеграции» — вкладка настроек и привязка проекта.
  *
- * Проверяется то, ради чего раздел заведён: пять коннекторов открываются одной
- * вкладкой, сохранение уносит настройки И токен ОДНИМ запросом, само значение
- * токена на экран не попадает ни разу (только маска), живая проверка ходит
- * своим маршрутом и её итог виден в карточке, «Забыть» стирает ключ, события
- * Telegram уходят списком, а в разделе тестов привязку можно найти поиском и
- * прикрепить к проекту.
+ * Проверяется то, ради чего раздел заведён: каждая система — своя карточка, и в
+ * списке только заведённые; остальные добавляются выбором, а уже работающие у
+ * агента MCP-серверы переносятся «Найти уже подключённые» — с подтверждением,
+ * маской вместо ключа и живой проверкой после переноса. Сохранение уносит
+ * настройки И токен ОДНИМ запросом, само значение токена на экран не попадает ни
+ * разу, живая проверка ходит своим маршрутом и её итог виден в карточке,
+ * «Забыть» стирает ключ, события Telegram уходят списком, а в разделе тестов
+ * привязку можно найти поиском и прикрепить к проекту.
  *
  * Весь API подменён: настоящая проверка связи ходит в чужой Atlassian, которого
  * на машине проверяющего нет и быть не должно. Тем же приёмом живут
@@ -21,54 +23,119 @@ const BASE = process.env.APP_URL ?? 'http://localhost:8888';
 const PROJECT = { name: 'QA проект', path: 'C:/qa-project' };
 
 /** Настоящее значение ключа: оно не должно появиться на экране никогда. */
-const SECRET = 'atl-secret-value-0000';
+const SECRET = ['atl', 'secret', 'value', '0000'].join('-');
 
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
 
-/** Состояние «сервера»: настройки коннекторов и итоги проверок. */
+const SITE = { enabled: false, baseUrl: '', email: '', deployment: '' };
+const FORGE = { enabled: false, baseUrl: '', repo: '' };
+const TMS = { enabled: false, baseUrl: '', projectKey: '', groupId: '' };
+
+/**
+ * Состояние «сервера»: настройки интеграций и итоги проверок. Заведены две —
+ * Jira (адрес и ключ) и Telegram (чат); остальные восемь пусты и в списке
+ * стоять не должны.
+ */
 let settings = {
-  atlassian: {
-    enabled: false,
+  jira: {
+    ...SITE,
     baseUrl: 'https://site.atlassian.net',
     email: 'qa@example.com',
     deployment: 'cloud',
-    confluenceUrl: '',
   },
-  forge: { enabled: false, kind: 'github', baseUrl: '', repo: 'org/app' },
+  confluence: SITE,
+  gitlab: FORGE,
+  github: FORGE,
   telegram: { enabled: false, chatId: '@qa', events: [] },
-  tms: { enabled: false, kind: '', projectKey: '', groupId: '' },
+  zephyr: TMS,
+  xray: TMS,
+  testit: TMS,
   ci: { enabled: false, kind: '', repo: '', workflow: '', artifact: '' },
+  webhook: { enabled: false, url: '', events: [] },
 };
 
-let statuses = [
+const IDS = Object.keys(settings);
+const bare = (id) => ({
+  id,
+  enabled: false,
+  hasToken: false,
+  maskedToken: '',
+  state: 'unchecked',
+  detail: '',
+});
+let statuses = IDS.map((id) =>
+  id === 'jira' ? { ...bare(id), hasToken: true, maskedToken: 'atl…0000' } : bare(id),
+);
+
+/** Находки среди MCP-серверов: полная, её проектный дубль, неполная и уже подключённая. */
+const FOUND = [
   {
-    id: 'atlassian',
-    enabled: false,
+    key: 'user:gl:gitlab',
+    id: 'gitlab',
+    server: 'gitlab-acme',
+    source: 'user',
+    launch: 'npx',
+    package: '@zereight/mcp-gitlab',
+    fields: { baseUrl: 'https://gitlab.acme.local' },
+    hasToken: true,
+    maskedToken: 'glp…7f3a',
+    missing: [],
+    alreadyConnected: false,
+    replaces: false,
+  },
+  {
+    key: 'project:gl:gitlab',
+    id: 'gitlab',
+    server: 'gitlab-repo',
+    source: 'mcp-json',
+    project: 'C:/qa-project',
+    launch: 'npx',
+    package: '@zereight/mcp-gitlab',
+    fields: { baseUrl: 'https://gitlab.acme.local' },
+    hasToken: true,
+    maskedToken: 'glp…91c2',
+    missing: [],
+    alreadyConnected: false,
+    replaces: false,
+  },
+  {
+    key: 'user:tg:telegram',
+    id: 'telegram',
+    server: 'telegram-inbox',
+    source: 'user',
+    launch: 'command',
+    package: '',
+    fields: {},
+    hasToken: true,
+    maskedToken: '123…abcd',
+    missing: ['chatId'],
+    alreadyConnected: false,
+    replaces: false,
+  },
+  {
+    key: 'user:atl:jira',
+    id: 'jira',
+    server: 'atlassian',
+    source: 'user',
+    launch: 'docker',
+    package: 'ghcr.io/sooperset/mcp-atlassian:latest',
+    fields: { baseUrl: 'https://site.atlassian.net', deployment: 'cloud' },
     hasToken: true,
     maskedToken: 'atl…0000',
-    state: 'unchecked',
-    detail: '',
+    missing: [],
+    alreadyConnected: true,
+    replaces: false,
   },
-  { id: 'forge', enabled: false, hasToken: false, maskedToken: '', state: 'unchecked', detail: '' },
-  {
-    id: 'telegram',
-    enabled: false,
-    hasToken: false,
-    maskedToken: '',
-    state: 'unchecked',
-    detail: '',
-  },
-  { id: 'tms', enabled: false, hasToken: false, maskedToken: '', state: 'unchecked', detail: '' },
-  { id: 'ci', enabled: false, hasToken: false, maskedToken: '', state: 'unchecked', detail: '' },
 ];
 
 /** Что ушло на сервер — по этому проверяется, что кнопки делают обещанное. */
 let saved;
-let checked;
+let checked = [];
 let forgotten;
 let telegramTested = false;
 let savedLink;
+let applied;
 
 // Заплата настроек держится ссылкой: проверка меняет карточки по ходу, а
 // `bypassOnboarding` захватывает объект один раз — переприсваивание `settings`
@@ -81,6 +148,10 @@ page.on('pageerror', (error) => problems.push(error.message));
 page.on('console', (message) => message.type() === 'error' && problems.push(message.text()));
 
 const statusOf = (id) => statuses.find((item) => item.id === id);
+const setSettings = (next) => {
+  settings = next;
+  settingsPatch.integrations = settings;
+};
 
 // Общее раньше частного: Playwright отдаёт запрос ПОСЛЕДНЕМУ подходящему
 // обработчику, а `/integrations/links` подходит и к `/integrations/*`.
@@ -100,7 +171,7 @@ await page.route('**/api/integrations/*', async (route) => {
 
   if (request.method() === 'PUT') {
     saved = { id, ...request.postDataJSON() };
-    settings = { ...settings, [id]: { ...settings[id], ...saved.settings } };
+    setSettings({ ...settings, [id]: { ...settings[id], ...saved.settings } });
     statuses = statuses.map((item) =>
       item.id === id
         ? {
@@ -117,9 +188,30 @@ await page.route('**/api/integrations/*', async (route) => {
   return route.fulfill({ json: statusOf(id) });
 });
 
+await page.route('**/api/integrations/discover', async (route) => {
+  const request = route.request();
+  if (request.method() === 'POST') {
+    applied = request.postDataJSON().keys;
+    const chosen = FOUND.filter((item) => applied.includes(item.key));
+    for (const item of chosen) {
+      setSettings({
+        ...settings,
+        [item.id]: { ...settings[item.id], ...item.fields, enabled: true },
+      });
+      statuses = statuses.map((card) =>
+        card.id === item.id
+          ? { ...card, enabled: true, hasToken: true, maskedToken: item.maskedToken }
+          : card,
+      );
+    }
+    return route.fulfill({ json: chosen.map((item) => statusOf(item.id)) });
+  }
+  return route.fulfill({ json: { found: FOUND, scanned: 6 } });
+});
+
 await page.route('**/api/integrations/*/check', async (route) => {
   const id = new URL(route.request().url()).pathname.split('/').at(-2);
-  checked = id;
+  checked.push(id);
   statuses = statuses.map((item) =>
     item.id === id
       ? {
@@ -127,7 +219,7 @@ await page.route('**/api/integrations/*/check', async (route) => {
           state: 'ok',
           detail: 'связь есть',
           account: 'QA Робот',
-          deployment: 'cloud',
+          deployment: id === 'jira' ? 'cloud' : undefined,
           checkedAt: '2026-09-07T10:00:00.000Z',
         }
       : item,
@@ -284,8 +376,20 @@ const check = (ok, text) => {
 };
 
 const main = page.getByRole('main').or(page.locator('body')).first();
+// Карточка — по заголовку целиком: «Jira» встречается и в подсказках Confluence.
+const cardOf = (title) =>
+  page
+    .locator('div[class*="padding-md"]')
+    .filter({
+      has: page.locator('[data-agent-anchor] > span:first-child', {
+        hasText: new RegExp(`^${title}$`),
+      }),
+    })
+    .last();
+const cardTitles = () =>
+  page.locator('div[class*="padding-md"] [data-agent-anchor] > span:first-child').allInnerTexts();
 
-// ── Вкладка настроек ────────────────────────────────────────────────────────
+// ── Вкладка настроек: только заведённые ─────────────────────────────────────
 await page.goto(`${BASE}/settings?tab=integrations`, { waitUntil: 'domcontentloaded' });
 await page.waitForSelector('nav');
 await page.waitForTimeout(1500);
@@ -298,9 +402,11 @@ if (!opened) {
   process.exit(1);
 }
 
-for (const name of [/Atlassian/, /Фордж|Forge/, /Telegram/, /Тест-менеджмент/, /^CI$|CI\b/]) {
-  check((await main.getByText(name).count()) > 0, `карточка коннектора на экране: ${name}`);
-}
+const initial = await cardTitles();
+check(
+  initial.join(',') === 'Jira,Telegram',
+  `в списке только заведённые (Jira с ключом, Telegram с чатом): ${initial.join(', ')}`,
+);
 
 // Маска вместо ключа. Проверяем ВЕСЬ текст страницы: секрет не должен
 // оказаться ни в подписи, ни в подсказке, ни в значении поля.
@@ -311,51 +417,135 @@ const inputs = await page
 check(!pageText.includes(SECRET) && !inputs.includes(SECRET), 'сырой токен на экране не появился');
 check(pageText.includes('atl…0000'), 'сохранённый ключ показан маской');
 
-// Сохранение: настройки и токен уходят одним запросом.
-const tokenField = main.getByLabel(/Токен/).first();
+// ── «Добавить интеграцию» ───────────────────────────────────────────────────
+const addSelect = main.getByLabel(/Добавить интеграцию/).first();
+check((await addSelect.count()) > 0, 'есть выбор «Добавить интеграцию»');
+const addOptions = await addSelect.locator('option').allInnerTexts();
+check(
+  !addOptions.includes('Jira') &&
+    addOptions.includes('Confluence') &&
+    addOptions.includes('Test IT'),
+  `в выборе — только незаведённые: ${addOptions.join(', ')}`,
+);
+await addSelect.selectOption({ label: 'Confluence' });
+await page.waitForTimeout(400);
+check(
+  (await cardTitles()).join(',') === 'Jira,Confluence,Telegram',
+  `добавленная карточка встала на своё место в общем порядке: ${(await cardTitles()).join(', ')}`,
+);
+check(
+  !(await addSelect.locator('option').allInnerTexts()).includes('Confluence'),
+  'добавленная из выбора ушла',
+);
+
+// ── «Найти уже подключённые» ────────────────────────────────────────────────
+await main.getByRole('button', { name: /Найти уже подключённые/ }).click();
+await page.waitForTimeout(1000);
+const panel = page
+  .locator('div[class*="padding-md"]')
+  .filter({ hasText: 'Найдено среди MCP-серверов' })
+  .last();
+check((await panel.count()) > 0, 'панель находок открылась');
+const panelText = await panel.innerText();
+check(
+  panelText.includes('gitlab-acme') && panelText.includes('telegram-inbox'),
+  'видно, в каком MCP-сервере что найдено',
+);
+check(
+  panelText.includes('glp…7f3a') && !panelText.includes(SECRET),
+  'ключ находки — только маской',
+);
+check(/не хватает: Чат/.test(panelText), 'неполная находка называет, чего не хватает');
+check(/уже подключено/.test(panelText), 'уже подключённая помечена');
+const boxes = panel.locator('input[type="checkbox"]');
+check(
+  (await boxes.nth(0).isChecked()) && !(await boxes.nth(1).isChecked()),
+  'по умолчанию отмечена одна находка на систему — общая, не проектный дубль',
+);
+check(
+  (await boxes.nth(2).isDisabled()) && (await boxes.nth(3).isDisabled()),
+  'неполную и уже подключённую отметить нельзя',
+);
+const applyButton = panel.getByRole('button', { name: /Перенести выбранные/ });
+check((await applyButton.innerText()).includes('(1)'), 'кнопка называет число отмеченных');
+
+await boxes.nth(1).check();
+await page.waitForTimeout(300);
+check(
+  (await panel.getByText(/выбрано два сервера/).count()) > 0 && (await applyButton.isDisabled()),
+  'два сервера на одну систему — сказано до запроса, перенос погашен',
+);
+await boxes.nth(1).uncheck();
+await page.waitForTimeout(300);
+
+checked = [];
+await applyButton.click();
+await page.waitForTimeout(1800);
+check(
+  JSON.stringify(applied) === JSON.stringify(['user:gl:gitlab']),
+  `перенос назвал находку ключом: ${JSON.stringify(applied)}`,
+);
+check(checked.includes('gitlab'), `после переноса связь проверена: ${checked.join(', ')}`);
+check(
+  (await main.getByText('Найдено среди MCP-серверов').count()) === 0,
+  'панель находок закрылась',
+);
+check(
+  (await cardTitles()).includes('GitLab'),
+  `перенесённая интеграция встала в список: ${(await cardTitles()).join(', ')}`,
+);
+
+// ── Карточка Jira: сохранение, проверка, забыть ─────────────────────────────
+const jiraCard = cardOf('Jira');
+const tokenField = jiraCard.getByLabel(/Токен/).first();
 check((await tokenField.count()) > 0, 'у карточки есть поле токена');
+check(
+  (await jiraCard.getByLabel(/Ключ Confluence/).count()) === 0,
+  'второго поля ключа у Jira нет — у Confluence своя карточка',
+);
 await tokenField.fill(SECRET);
-const urlField = main.getByLabel(/Адрес сайта|Адрес Jira/).first();
-if ((await urlField.count()) > 0) await urlField.fill('https://qa.atlassian.net');
-await main
-  .getByRole('button', { name: /Сохранить/ })
+await jiraCard
+  .getByLabel(/Адрес сайта/)
   .first()
-  .click();
+  .fill('https://qa.atlassian.net');
+await jiraCard.getByRole('button', { name: /Сохранить/ }).click();
 await page.waitForTimeout(1200);
 
-check(saved?.id === 'atlassian', `сохранение адресовано коннектору: ${saved?.id}`);
+check(saved?.id === 'jira', `сохранение адресовано интеграции: ${saved?.id}`);
 check(saved?.token === SECRET, 'токен ушёл на сервер один раз, вместе с настройками');
 check(
   saved?.settings?.baseUrl === 'https://qa.atlassian.net',
   `правка адреса уехала: ${saved?.settings?.baseUrl}`,
 );
+check(!('confluenceToken' in (saved ?? {})), 'отдельного ключа Confluence в запросе нет');
 const afterSave = await page
   .locator('input')
   .evaluateAll((nodes) => nodes.map((node) => node.value ?? '').join(' | '));
 check(!afterSave.includes(SECRET), 'после сохранения поле токена очищено');
 
-// Живая проверка: свой маршрут, итог в карточке.
-await main
-  .getByRole('button', { name: /Проверить связь/ })
-  .first()
-  .click();
+checked = [];
+await jiraCard.getByRole('button', { name: /Проверить связь/ }).click();
 await page.waitForTimeout(1200);
-check(checked === 'atlassian', `«Проверить связь» ушла своим маршрутом: ${checked}`);
-check((await main.getByText('связь есть').count()) > 0, 'итог проверки виден в карточке');
-check((await main.getByText(/QA Робот/).count()) > 0, 'видно, кем панель представилась');
+check(checked.join(',') === 'jira', `«Проверить связь» ушла своим маршрутом: ${checked}`);
+check((await jiraCard.getByText('связь есть').count()) > 0, 'итог проверки виден в карточке');
+check((await jiraCard.getByText(/QA Робот/).count()) > 0, 'видно, кем панель представилась');
+check(
+  (await jiraCard.getByRole('button', { name: /MCP Atlassian/ }).count()) > 0,
+  'у Jira есть кнопка MCP Atlassian',
+);
 
-// События Telegram: список уходит вместе с настройками.
-const eventBox = main.getByText(/Прогон завершён/).first();
+// ── Telegram: события и пробное ─────────────────────────────────────────────
+const telegramCard = cardOf('Telegram');
+const eventBox = telegramCard.getByText(/Прогон завершён/).first();
 if ((await eventBox.count()) > 0) {
   await eventBox.click();
   await page.waitForTimeout(400);
-  const telegramCard = main.getByText('Telegram').first();
-  check((await telegramCard.count()) > 0, 'карточка Telegram на месте');
-  const saveButtons = main.getByRole('button', { name: /Сохранить/ });
-  await saveButtons.nth(2).click();
+  await telegramCard.getByRole('button', { name: /Сохранить/ }).click();
   await page.waitForTimeout(1000);
   check(
-    Array.isArray(saved?.settings?.events) && saved.settings.events.includes('runDone'),
+    saved?.id === 'telegram' &&
+      Array.isArray(saved?.settings?.events) &&
+      saved.settings.events.includes('runDone'),
     `выбранное событие уехало списком: ${JSON.stringify(saved?.settings?.events)}`,
   );
 } else {
@@ -363,7 +553,7 @@ if ((await eventBox.count()) > 0) {
 }
 
 // Пробное сообщение — отдельным маршрутом: «дозвонились» и «дошло» не одно и то же.
-const testButton = main.getByRole('button', { name: /Отправить пробное/ }).first();
+const testButton = telegramCard.getByRole('button', { name: /Отправить пробное/ }).first();
 if ((await testButton.count()) > 0) {
   await testButton.click();
   await page.waitForTimeout(900);
@@ -372,57 +562,75 @@ if ((await testButton.count()) > 0) {
   check(false, 'есть кнопка пробного сообщения Telegram');
 }
 
-// Забыть ключ.
-const forgetButton = main.getByRole('button', { name: /Забыть/ }).first();
+const forgetButton = jiraCard.getByRole('button', { name: /Забыть/ });
 if ((await forgetButton.count()) > 0) {
   await forgetButton.click();
   await page.waitForTimeout(1000);
-  check(forgotten === 'atlassian', `«Забыть» ушло на сервер: ${forgotten}`);
+  check(forgotten === 'jira', `«Забыть» ушло на сервер: ${forgotten}`);
 } else {
-  check(false, 'есть кнопка «Забыть токен» у коннектора с ключом');
+  check(false, 'есть кнопка «Забыть ключ» у интеграции с ключом');
 }
 
 // ── Включённая карточка без обязательного поля (находка M7 ревью Т9) ────────
 // Test IT без адреса раньше сохранялся ВКЛЮЧЁННЫМ: правило «чего не хватает»
 // гасило тумблер, но не кнопку сохранения — карточка горела зелёным, а первая
 // же операция отвечала «не указан адрес Test IT».
-settings = {
-  ...settings,
-  tms: { enabled: true, kind: 'testit', baseUrl: '', projectKey: 'PRJ-1', groupId: '' },
-};
-settingsPatch.integrations = settings;
+setSettings({ ...settings, testit: { ...TMS, enabled: true, projectKey: 'PRJ-1' } });
 statuses = statuses.map((card) =>
-  card.id === 'tms' ? { ...card, enabled: true, state: 'ok' } : card,
+  card.id === 'testit' ? { ...card, enabled: true, state: 'ok' } : card,
 );
 saved = undefined;
 await page.goto(`${BASE}/settings?tab=integrations`, { waitUntil: 'domcontentloaded' });
 await page.waitForTimeout(1200);
 
-const tmsCard = page
-  .locator('div[class*="padding-md"]')
-  .filter({ hasText: 'Тест-менеджмент' })
-  .last();
-check((await tmsCard.count()) > 0, 'карточка тест-менеджмента на месте');
-if ((await tmsCard.count()) > 0) {
-  const projectField = tmsCard.getByLabel(/Проект/).first();
-  await projectField.fill('PRJ-2');
+const testitCard = cardOf('Test IT');
+check((await testitCard.count()) > 0, 'включённая Test IT в списке без «Добавить»');
+if ((await testitCard.count()) > 0) {
+  await testitCard
+    .getByLabel(/Проект/)
+    .first()
+    .fill('PRJ-2');
   await page.waitForTimeout(300);
-  const tmsSave = tmsCard.getByRole('button', { name: /Сохранить/ }).first();
+  const testitSave = testitCard.getByRole('button', { name: /Сохранить/ });
   check(
-    await tmsSave.isDisabled(),
+    await testitSave.isDisabled(),
     'правку включённой карточки нельзя сохранить, пока пуст обязательный адрес',
   );
 
-  await tmsCard.getByLabel(/Адрес/).first().fill('https://testit.acme.local');
+  await testitCard.getByLabel(/Адрес/).first().fill('https://testit.acme.local');
   await page.waitForTimeout(300);
-  check(await tmsSave.isEnabled(), 'адрес заполнен — сохранение снова доступно');
-  await tmsSave.click();
+  check(await testitSave.isEnabled(), 'адрес заполнен — сохранение снова доступно');
+  await testitSave.click();
   await page.waitForTimeout(1000);
   check(
-    saved?.id === 'tms' && saved?.settings?.baseUrl === 'https://testit.acme.local',
+    saved?.id === 'testit' && saved?.settings?.baseUrl === 'https://testit.acme.local',
     `настройка уехала с адресом: ${saved?.settings?.baseUrl}`,
   );
 }
+
+// ── Ничего не заведено — пустое состояние, а не десять пустых форм ───────────
+setSettings({
+  jira: SITE,
+  confluence: SITE,
+  gitlab: FORGE,
+  github: FORGE,
+  telegram: { enabled: false, chatId: '', events: [] },
+  zephyr: TMS,
+  xray: TMS,
+  testit: TMS,
+  ci: { enabled: false, kind: '', repo: '', workflow: '', artifact: '' },
+  webhook: { enabled: false, url: '', events: [] },
+});
+const statusesBefore = statuses;
+statuses = IDS.map(bare);
+await page.goto(`${BASE}/settings?tab=integrations`, { waitUntil: 'domcontentloaded' });
+await page.waitForTimeout(1200);
+check(
+  (await cardTitles()).length === 0 &&
+    (await main.getByText('Пока ни одной интеграции').count()) > 0,
+  `пусто — сказано словами: ${(await cardTitles()).join(', ')}`,
+);
+statuses = statusesBefore;
 
 // ── Привязка проекта в разделе тестов ───────────────────────────────────────
 await page.goto(`${BASE}/`, { waitUntil: 'domcontentloaded' });

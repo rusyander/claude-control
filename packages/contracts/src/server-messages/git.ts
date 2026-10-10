@@ -47,6 +47,8 @@ export const gitMessageParams = {
   'git-committed': [],
   'worktree-pruned': [],
   'worktree-removed': ['path'],
+  'worktree-removed-runs': ['path', 'runs'],
+  'worktree-runs-carry-failed': ['count'],
   'run-copy-not-ready': ['cwd', 'gaps'],
   'worktree-mirror-skip-build-env': [],
   'worktree-mirror-skip-absent': [],

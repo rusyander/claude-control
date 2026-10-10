@@ -1,4 +1,4 @@
-import type { AtlassianDeployment, AtlassianSettings } from '@agentdeck/contracts';
+import type { AtlassianDeployment, AtlassianSiteSettings } from '@agentdeck/contracts';
 import { invalidField } from '../errors.ts';
 import { failedResponse, parseJson, sendRequest, type OutboundResponse } from '../http/http.ts';
 
@@ -16,12 +16,11 @@ import { failedResponse, parseJson, sendRequest, type OutboundResponse } from '.
  *
  * Всё остальное — те же ручки и те же поля, поэтому клиент один, а не два.
  *
- * ТОКЕНОВ при этом бывает ДВА. На своей установке Jira и Confluence — разные
- * приложения, и personal access token каждое выдаёт своё: ключ Jira Confluence
- * отклоняет с 401 на полностью рабочем доступе. Выбор ключа сделан здесь, в
- * одном месте на все запросы (`authHeaders` по имени системы), а не на каждой
- * ручке Confluence: пропущенная ручка вернула бы ровно тот же 401, ради
- * которого всё и затевалось.
+ * Jira и Confluence — РАЗНЫЕ интеграции со своим адресом и своим ключом
+ * (владелец 10.10.2026): на своей установке это разные приложения, и personal
+ * access token каждое выдаёт своё — ключ Jira Confluence отклоняет с 401 на
+ * полностью рабочем доступе. Поэтому доступ собирается на одну систему, и
+ * `baseUrl` у доступа Confluence — уже корень вики (`toConfluenceAccess`).
  */
 
 export interface AtlassianAccess {
@@ -29,13 +28,9 @@ export interface AtlassianAccess {
   email: string;
   token: string;
   deployment: AtlassianDeployment;
-  /** Адрес Confluence, если он живёт не на хосте Jira. */
-  confluenceUrl: string;
-  /** Личный токен Confluence; пусто = у сайта один ключ, работает `token`. */
-  confluenceToken: string;
 }
 
-/** Как `system` называет Confluence во всех его запросах — и в выборе ключа. */
+/** Как `system` называет Confluence во всех его запросах. */
 export const CONFLUENCE_SYSTEM = 'Confluence';
 
 /** Адрес без хвостового слэша: иначе пути склеиваются с двойным. */
@@ -48,9 +43,8 @@ export function trimUrl(url: string): string {
  * установка почты не знает вовсе и ждёт Bearer. Ошибиться диалектом = получить
  * 401 на верном токене, поэтому решает только `deployment`.
  */
-export function authHeaders(access: AtlassianAccess, system?: string): Record<string, string> {
-  const token =
-    system === CONFLUENCE_SYSTEM && access.confluenceToken ? access.confluenceToken : access.token;
+export function authHeaders(access: AtlassianAccess): Record<string, string> {
+  const token = access.token;
   if (access.deployment === 'cloud') {
     const basic = Buffer.from(`${access.email}:${token}`, 'utf8').toString('base64');
     return { Authorization: `Basic ${basic}` };
@@ -64,12 +58,11 @@ export function jiraApi(access: AtlassianAccess): string {
 }
 
 /**
- * Корень Confluence. У облака он живёт под `/wiki` того же сайта, у своей
- * установки — в корне (и часто вообще на другом хосте, отсюда `confluenceUrl`).
+ * Корень Confluence. Доступ Confluence собран так, что `baseUrl` — уже корень
+ * вики (у облака с `/wiki`, см. `toConfluenceAccess`).
  */
 export function confluenceRoot(access: AtlassianAccess): string {
-  const host = access.confluenceUrl ? trimUrl(access.confluenceUrl) : access.baseUrl;
-  return access.deployment === 'cloud' && !access.confluenceUrl ? `${host}/wiki` : host;
+  return access.baseUrl;
 }
 
 export interface AtlassianCall {
@@ -97,7 +90,7 @@ export async function raw(
     method: request.method ?? 'GET',
     system: request.system,
     headers: {
-      ...authHeaders(access, request.system),
+      ...authHeaders(access),
       Accept: 'application/json',
       ...(request.body === undefined ? {} : { 'Content-Type': 'application/json' }),
     },
@@ -161,6 +154,48 @@ export async function detectDeployment(
   throw failedResponse('Atlassian', decisive, 500);
 }
 
+/**
+ * То же определение для Confluence, подключённой без Jira: «кто я» спрашивается
+ * у самой вики. Облако — Basic с почтой под `/wiki` сайта, своя установка —
+ * Bearer в корне её адреса; порядок и выбор причины отказа — как у Jira.
+ */
+export async function detectConfluenceDeployment(
+  access: Omit<AtlassianAccess, 'deployment'>,
+): Promise<DeploymentProbe> {
+  if (!access.baseUrl)
+    throw invalidField('baseUrl', 'не указан адрес Confluence', 'request-atlassian-url-missing', {
+      field: 'baseUrl',
+    });
+  if (!access.token)
+    throw invalidField('token', 'не сохранён токен Confluence', 'request-atlassian-token-missing', {
+      field: 'token',
+    });
+
+  const settings = { baseUrl: access.baseUrl, email: access.email, enabled: true };
+  const cloud = toConfluenceAccess({ ...settings, deployment: 'cloud' }, access.token);
+  const cloudResponse = access.email
+    ? await raw(cloud, {
+        url: `${confluenceRoot(cloud)}/rest/api/user/current`,
+        system: CONFLUENCE_SYSTEM,
+      })
+    : undefined;
+  if (cloudResponse?.ok) {
+    const me = parseJson<MyselfResponse>(CONFLUENCE_SYSTEM, cloudResponse);
+    return { deployment: 'cloud', account: accountName(me) };
+  }
+
+  const server = toConfluenceAccess({ ...settings, deployment: 'server' }, access.token);
+  const serverResponse = await raw(server, {
+    url: `${confluenceRoot(server)}/rest/api/user/current`,
+    system: CONFLUENCE_SYSTEM,
+  });
+  if (serverResponse.ok) {
+    const me = parseJson<MyselfResponse>(CONFLUENCE_SYSTEM, serverResponse);
+    return { deployment: 'server', account: accountName(me) };
+  }
+  throw failedResponse(CONFLUENCE_SYSTEM, cloudResponse ?? serverResponse, 500);
+}
+
 function accountName(me: MyselfResponse): string {
   return me.displayName || me.name || me.emailAddress || 'учётная запись без имени';
 }
@@ -170,11 +205,7 @@ function accountName(me: MyselfResponse): string {
  * он там не записан — считаем облаком при заданной почте и своей установкой без
  * неё: это ровно та подсказка, которую человек уже дал, заполняя форму.
  */
-export function toAccess(
-  settings: AtlassianSettings,
-  token: string,
-  confluenceToken = '',
-): AtlassianAccess {
+export function toAccess(settings: AtlassianSiteSettings, token: string): AtlassianAccess {
   const baseUrl = trimUrl(settings.baseUrl);
   if (!baseUrl)
     throw invalidField('baseUrl', 'не указан адрес Atlassian', 'request-atlassian-url-missing', {
@@ -185,7 +216,19 @@ export function toAccess(
     email: settings.email.trim(),
     token,
     deployment: settings.deployment || (settings.email.trim() ? 'cloud' : 'server'),
-    confluenceUrl: settings.confluenceUrl.trim(),
-    confluenceToken: confluenceToken.trim(),
   };
+}
+
+/**
+ * Доступ Confluence: тот же, но корень — вики. Облако держит её под `/wiki`
+ * сайта; человек, вписавший адрес сайта без него, получил бы 404 на верном
+ * ключе, поэтому путь достраивается здесь, в одном месте.
+ */
+export function toConfluenceAccess(
+  settings: AtlassianSiteSettings,
+  token: string,
+): AtlassianAccess {
+  const access = toAccess(settings, token);
+  if (access.deployment !== 'cloud' || /\/wiki$/.test(access.baseUrl)) return access;
+  return { ...access, baseUrl: `${access.baseUrl}/wiki` };
 }

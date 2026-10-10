@@ -8,19 +8,17 @@ import { missingFields } from './missingFields';
 
 describe('draftFrom', () => {
   it('раскладывает настройки коннектора по полям карточки', () => {
-    const draft = draftFrom('atlassian', {
+    const draft = draftFrom('jira', {
       enabled: true,
       baseUrl: 'https://site.atlassian.net',
       email: 'qa@example.com',
       deployment: 'cloud',
-      confluenceUrl: '',
     });
 
     expect(draft).toEqual({
       baseUrl: 'https://site.atlassian.net',
       email: 'qa@example.com',
       deployment: 'cloud',
-      confluenceUrl: '',
     });
   });
 
@@ -31,30 +29,25 @@ describe('draftFrom', () => {
 
 describe('missingFields', () => {
   it('называет незаполненные обязательные поля', () => {
-    expect(missingFields('tms', { kind: '', projectKey: '', groupId: '' })).toEqual([
-      'kind',
-      'projectKey',
-    ]);
+    expect(missingFields('zephyr', { projectKey: '', groupId: '' })).toEqual(['projectKey']);
   });
 
   it('пробелы не считаются заполнением', () => {
-    expect(missingFields('atlassian', { baseUrl: '   ' })).toEqual(['baseUrl']);
+    expect(missingFields('confluence', { baseUrl: '   ' })).toEqual(['baseUrl']);
   });
 
   it('заполненное обязательное поле снимает запрет', () => {
-    expect(missingFields('forge', { kind: 'github' })).toEqual([]);
+    expect(missingFields('github', { repo: '' })).toEqual([]);
   });
 
   it('адрес тест-менеджмента обязателен только своей установке', () => {
     // Zephyr и Xray живут по общему адресу, и требовать его у них значило бы
     // не дать включить коннектор без выдуманного значения.
-    expect(missingFields('tms', { kind: 'zephyr', baseUrl: '', projectKey: 'PRJ' })).toEqual([]);
-    expect(missingFields('tms', { kind: 'testit', baseUrl: '', projectKey: 'PRJ' })).toEqual([
-      'baseUrl',
-    ]);
-    expect(
-      missingFields('tms', { kind: 'testit', baseUrl: 'https://testit.local', projectKey: 'PRJ' }),
-    ).toEqual([]);
+    expect(missingFields('xray', { projectKey: 'PRJ' })).toEqual([]);
+    expect(missingFields('testit', { baseUrl: '', projectKey: 'PRJ' })).toEqual(['baseUrl']);
+    expect(missingFields('testit', { baseUrl: 'https://testit.local', projectKey: 'PRJ' })).toEqual(
+      [],
+    );
   });
 });
 
@@ -86,9 +79,9 @@ describe('buildSettings', () => {
     ).toEqual({ enabled: false, chatId: '@qa', events: ['runDone'] });
     expect(
       buildSettings({
-        id: 'forge',
+        id: 'github',
         enabled: false,
-        draft: { kind: 'github' },
+        draft: { repo: 'org/app' },
         events: ['runDone'],
       }),
     ).not.toHaveProperty('events');
@@ -110,18 +103,14 @@ describe('buildSettings: подписка вебхука', () => {
 
 describe('isDraftDirty', () => {
   it('форма, равная сохранённому, правкой не считается', () => {
-    const saved = { ...DEFAULT_INTEGRATIONS.forge, kind: 'github' as const, repo: 'org/app' };
-    expect(isDraftDirty('forge', draftFrom('forge', saved), saved)).toBe(false);
+    const saved = { ...DEFAULT_INTEGRATIONS.github, repo: 'org/app' };
+    expect(isDraftDirty('github', draftFrom('github', saved), saved)).toBe(false);
   });
 
   it('изменённое значение видно, а разница в пробелах — нет', () => {
-    const saved = { ...DEFAULT_INTEGRATIONS.forge, kind: 'github' as const, repo: 'org/app' };
-    expect(isDraftDirty('forge', { kind: 'github', baseUrl: '', repo: ' org/app ' }, saved)).toBe(
-      false,
-    );
-    expect(isDraftDirty('forge', { kind: 'gitlab', baseUrl: '', repo: 'org/app' }, saved)).toBe(
-      true,
-    );
+    const saved = { ...DEFAULT_INTEGRATIONS.github, repo: 'org/app' };
+    expect(isDraftDirty('github', { baseUrl: '', repo: ' org/app ' }, saved)).toBe(false);
+    expect(isDraftDirty('github', { baseUrl: '', repo: 'org/other' }, saved)).toBe(true);
   });
 });
 

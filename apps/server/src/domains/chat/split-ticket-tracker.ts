@@ -1,5 +1,5 @@
 import type { AppStore } from '../../lib/app-store/app-store.ts';
-import { atlassianAccessFrom } from '../integrations/atlassian/access.ts';
+import { jiraAccessFrom } from '../integrations/atlassian/access.ts';
 import {
   applyTransition,
   createIssue,
@@ -29,7 +29,7 @@ export function atlassianTicketTracker(
   store: () => AppStore,
   appDataDir: () => string,
 ): SplitTicketTracker {
-  const access = () => atlassianAccessFrom(store(), appDataDir());
+  const access = () => jiraAccessFrom(store(), appDataDir());
   return {
     projectOf: (projectPath) => {
       const key = linkForCwd(store(), projectPath)?.link.jiraProjectKey?.trim();
@@ -54,7 +54,7 @@ export function atlassianTaskTracker(
   store: () => AppStore,
   appDataDir: () => string,
 ): SplitTaskTracker {
-  const access = () => atlassianAccessFrom(store(), appDataDir());
+  const access = () => jiraAccessFrom(store(), appDataDir());
   return {
     connected: () => {
       try {

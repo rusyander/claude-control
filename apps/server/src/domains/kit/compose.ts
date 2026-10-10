@@ -122,15 +122,26 @@ export function composeKit(input: ComposeInput): string {
 }
 
 /**
- * Правила набора одним текстом: всё из `rules/`, `local.md` — только варианту
- * локальной модели и последним, как у хука `session-rules.mjs`: он сужает общие
- * правила, а не заменяет их.
+ * Правила набора одним текстом: всё из `rules/`, затем `extra` — правила варианта
+ * CLI, `local.md` — только варианту локальной модели и последним, как у хука
+ * `session-rules.mjs`: он сужает общие правила, а не заменяет их.
  */
-export function composedRules(kitDir: string, local: boolean): string {
-  return listFiles(join(kitDir, 'rules'))
-    .filter((name) => name.endsWith('.md') && (local || name !== 'local.md'))
-    .sort((a, b) => Number(a === 'local.md') - Number(b === 'local.md') || a.localeCompare(b))
-    .map((name) => readFileSync(join(kitDir, 'rules', name), 'utf8').trim())
+export function composedRules(
+  kitDir: string,
+  local: boolean,
+  extra: readonly string[] = [],
+): string {
+  const names = listFiles(join(kitDir, 'rules'))
+    .filter((name) => name.endsWith('.md') && name !== 'local.md')
+    .sort((a, b) => a.localeCompare(b));
+  const localRules = join(kitDir, 'rules', 'local.md');
+  const files = [
+    ...names.map((name) => join(kitDir, 'rules', name)),
+    ...extra,
+    ...(local && existsSync(localRules) ? [localRules] : []),
+  ];
+  return files
+    .map((file) => readFileSync(file, 'utf8').trim())
     .filter(Boolean)
     .join('\n\n');
 }
@@ -173,7 +184,14 @@ export function composeQwenHome(
   variantDir: string,
 ): string {
   mkdirSync(home, { recursive: true });
-  writeFileSync(join(home, 'QWEN.md'), `${composedRules(kitDir, local)}\n`);
+  // Правила варианта (`variants/qwen/rules/`) — имена инструментов Qwen: правила и
+  // навыки набора называют инструменты Claude, а маленькая модель по ним не
+  // догадывается, что `Read` здесь — `read_file`.
+  const variantRules = listFiles(join(variantDir, 'rules'))
+    .filter((name) => name.endsWith('.md'))
+    .sort((a, b) => a.localeCompare(b))
+    .map((name) => join(variantDir, 'rules', name));
+  writeFileSync(join(home, 'QWEN.md'), `${composedRules(kitDir, local, variantRules)}\n`);
   // Прежняя раскладка клала навыки в `skills/` дома — рядом с расширением они
   // загрузились бы дважды.
   removeEntry(join(home, 'skills'));

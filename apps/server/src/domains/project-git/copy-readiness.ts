@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import type { WorktreeMirrorSettings } from '@agentdeck/contracts';
+import { normalizeProjectPath } from '../../lib/app-store/projects.ts';
 import { readJsonFile } from '../../lib/safe-io/safe-io.ts';
 import { serverText } from '../../lib/server-texts/server-texts.ts';
 import { copyProjectAccess, projectKey } from './copy-access.ts';
@@ -85,10 +86,8 @@ export function hasProjectAccess(claudeJsonPath: string, dir: string): boolean {
   } catch {
     return false;
   }
-  const wanted = projectKey(dir).toLowerCase();
-  return Object.keys(data.projects ?? {}).some(
-    (key) => key.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase() === wanted,
-  );
+  const wanted = normalizeProjectPath(dir);
+  return Object.keys(data.projects ?? {}).some((key) => normalizeProjectPath(key) === wanted);
 }
 
 /**
@@ -191,7 +190,7 @@ function fromGitFile(copyDir: string, marker: string): CwdLayout {
   }
 
   const mainDir = resolve(dirname(commonDir));
-  if (mainDir.toLowerCase() === copyDir.toLowerCase()) return {};
+  if (normalizeProjectPath(mainDir) === normalizeProjectPath(copyDir)) return {};
   return { mainDir, copyDir };
 }
 

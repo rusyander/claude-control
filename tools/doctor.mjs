@@ -8,12 +8,9 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { homedir, platform, release } from 'node:os';
 import { join, dirname } from 'node:path';
-import {
-  BRAND_SLUG,
-  brandEnv,
-  panelHomeDirPath,
-  panelHomeFile,
-} from '../apps/server/src/lib/brand.mjs';
+import { BRAND_SLUG, panelHomeDirPath, panelHomeFile } from '../apps/server/src/lib/brand.mjs';
+import { keychainServiceNames } from '../apps/server/src/lib/keychain-names.mjs';
+import { posixPathMatches } from '../apps/server/src/lib/path-lookup.mjs';
 import { PROVIDER_CLI_NAMES } from '../apps/server/src/lib/provider-cli-names.mjs';
 
 const OS_NAME = { win32: 'Windows', darwin: 'macOS', linux: 'Linux' }[platform()] ?? platform();
@@ -266,13 +263,9 @@ function checkClaudeFiles() {
   } else if (existsSync(credentialsFile)) {
     ok('Доступ: файл .credentials.json');
   } else if (platform() === 'darwin') {
-    const services = [
-      brandEnv('KEYCHAIN_SERVICE'),
-      'Claude Code-credentials',
-      'Claude Code',
-    ].filter(Boolean);
-
-    const found = services.find((service) => {
+    // Те же имена и в том же порядке, что ищет сервер: с нестандартным
+    // каталогом запись названа с хешем каталога.
+    const found = keychainServiceNames(configDir).find((service) => {
       try {
         const value = execFileSync('security', ['find-generic-password', '-s', service, '-w'], {
           encoding: 'utf8',
@@ -324,11 +317,13 @@ function cliName(item) {
   return platform() === 'win32' ? item.windowsCommand : item.command;
 }
 
-/** Первая копия CLI в PATH (`where` / `which`) или undefined. */
+/** Первая копия CLI в PATH (`where` / обход PATH) или undefined. */
 function whichCli(item) {
-  const windows = platform() === 'win32';
+  // macOS и Linux — обходом PATH, как в самой панели: внешнего `which` в части
+  // дистрибутивов нет, и доктор ругался бы на установленный CLI.
+  if (platform() !== 'win32') return posixPathMatches(cliName(item))[0];
   try {
-    const out = execFileSync(windows ? 'where' : 'which', [cliName(item)], {
+    const out = execFileSync('where', [cliName(item)], {
       encoding: 'utf8',
       timeout: 5_000,
       stdio: ['ignore', 'pipe', 'ignore'],

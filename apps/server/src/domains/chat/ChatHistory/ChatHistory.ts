@@ -17,8 +17,10 @@ import {
   readAllRecords,
   readHeadRecords,
   readRecords,
+  readTailRecords,
   streamLines,
 } from '../ChatTranscriptFile/ChatTranscriptFile.ts';
+import { sessionHome } from './sessionHome.ts';
 import {
   branchOf,
   chatTitleText,
@@ -133,8 +135,13 @@ function readSummary(path: string, projectName: string): ChatSummary | undefined
   const lastMessage = [...records].reverse().find(isDialogMessage);
   // Проект — ПЕРВЫЙ `cwd` транскрипта: там сессия начата и там её файл. Поздние
   // строки несут каталог оболочки агента: после `cd sub/dir` чат «уезжал» в
-  // подпапку, а продолжение из неё заводило новую папку проекта у CLI.
-  const projectPath = firstValue(records, (record) => record.cwd) ?? '';
+  // подпапку, а продолжение из неё заводило новую папку проекта у CLI. Переезд
+  // в git-копию из ворот ветки — исключение (`sessionHome`).
+  const projectPath =
+    sessionHome(
+      firstValue(records, (record) => record.cwd),
+      lastValue(records, (record) => record.cwd),
+    ) ?? '';
   const ownTitle = title?.trim() || cutTitle(chatTitleText(records));
 
   const summary: ChatSummary = {
@@ -316,20 +323,26 @@ export function readChatTask(projectsDir: string, chatId: string): string {
  * разговор можно лишь оттуда, где он начинался, — этот путь и берём из самого
  * транскрипта. Берём ПЕРВЫЙ `cwd`: он записан в каждой строке, но поздние строки
  * несут каталог оболочки агента, и после `cd sub/dir` последний `cwd` уводил
- * продолжение в подпапку — CLI не находил там сессию и заводил новую.
+ * продолжение в подпапку — CLI не находил там сессию и заводил новую. Переезд
+ * в git-копию из ворот ветки — исключение, его решает `sessionHome`.
  */
 export function findSessionCwd(projectsDir: string, sessionId: string): string | undefined {
   const path = findTranscript(projectsDir, sessionId);
   if (!path) return undefined;
 
-  // Начала хватает: первая строка с `cwd` лежит в первых строках файла, а читать
-  // ради неё весь транскрипт (до четырёх мегабайт на каждую отправку) незачем.
-  // В начале пусто — тогда уже тем же способом, что и список.
+  // Начала и хвоста хватает: первая строка с `cwd` лежит в первых строках
+  // файла, последняя — в последних, а читать ради них весь транскрипт (до
+  // четырёх мегабайт на каждую отправку) незачем. В начале пусто — тогда уже
+  // тем же способом, что и список.
+  const last = lastValue(readTailRecords(path), (record) => record.cwd);
   const fromHead = firstValue(readHeadRecords(path), (record) => record.cwd);
-  if (fromHead) return fromHead;
+  if (fromHead) return sessionHome(fromHead, last);
 
   const records = readRecords(path, statSync(path).size);
-  return firstValue(records, (record) => record.cwd);
+  return sessionHome(
+    firstValue(records, (record) => record.cwd),
+    lastValue(records, (record) => record.cwd),
+  );
 }
 
 /**

@@ -228,6 +228,11 @@ export function untestedCodeIn(changed: readonly string[]): string[] {
   return unique(code);
 }
 
+/** Файлы поведения в диффе — код продукта: с ними живая проверка не сдаётся `n/a`. */
+export function behaviourIn(changed: readonly string[]): string[] {
+  return unique(changed.filter(isProductCode));
+}
+
 const LOCAL_ENV = /(^|\/)\.env(\.[\w-]+)?$/i;
 /** Файлы, которым не место в git по одному имени: окружение и ключи. */
 const LOCAL_FILE =

@@ -92,6 +92,16 @@ export function IntegrationsLimitsSections({ tr, common }: SectionProps) {
               description: tr('refusalTelegramChatText'),
               isMono: false,
             },
+            {
+              name: tr('refusalDiscoverTwice'),
+              description: tr('refusalDiscoverTwiceText'),
+              isMono: false,
+            },
+            {
+              name: tr('refusalDiscoverIncomplete'),
+              description: tr('refusalDiscoverIncompleteText'),
+              isMono: false,
+            },
           ]}
         />
       </HelpSection>

@@ -33,7 +33,9 @@ describe('POST /api/project-tests/case: автор кейса', () => {
         store: {
           getProjectByPath: () => undefined,
           isTestsAutoAccept: () => false,
-          getSettings: () => ({ integrations: { atlassian: { enabled: false } } }),
+          getSettings: () => ({
+            integrations: { jira: { enabled: false }, confluence: { enabled: false } },
+          }),
         },
         location: { paths: { appData: backupDir } },
       } as unknown as ServerContext,

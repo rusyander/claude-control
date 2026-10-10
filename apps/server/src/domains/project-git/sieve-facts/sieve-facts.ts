@@ -285,10 +285,44 @@ async function foreignRemovalsOf(
   return [...foreign];
 }
 
+/**
+ * Развилка группы, отведённой от ветки предшественника (живое разделение,
+ * 10.10). Сита судят только СВОИ коммиты группы: от развилки с основной в дифф
+ * попадали коммиты предшественника, и его правка без теста приходила группе
+ * пробелом. Ветка предшественника — локальная (копии делят ссылки
+ * репозитория), иначе с удалённого. Берётся, только если её развилка ПОЗЖЕ
+ * развилки с основной и не сама голова: предшественник уже влит, ветки нет или
+ * это та же ветка — считать от основной, как раньше.
+ */
+async function forkedBase(
+  cwd: string,
+  forkedFrom: string,
+  mainBase: string,
+  remote: string | undefined,
+): Promise<string | undefined> {
+  const head = (await run(cwd, ['rev-parse', 'HEAD'])).stdout.trim();
+  const refs = [
+    `refs/heads/${forkedFrom}`,
+    ...(remote ? [`refs/remotes/${remote}/${forkedFrom}`] : []),
+  ];
+  for (const ref of refs) {
+    const found = await run(cwd, ['merge-base', ref, 'HEAD']);
+    const fork = found.stdout.trim();
+    if (found.code !== 0 || !fork) continue;
+    if (fork === head || fork === mainBase) return undefined;
+    if (!mainBase) return fork;
+    const later = await run(cwd, ['merge-base', '--is-ancestor', mainBase, fork]);
+    return later.code === 0 ? fork : undefined;
+  }
+  return undefined;
+}
+
 export async function readSieveFacts(input: {
   cwd: string;
   /** Когда группа стартовала (ISO) — граница «чужих» строк основной. */
   startedAt?: string;
+  /** Ветка предшественника, от которой отведена копия группы (`after`). */
+  forkedFrom?: string;
 }): Promise<SieveFacts> {
   const { cwd } = input;
   const unchecked: string[] = [];
@@ -306,10 +340,12 @@ export async function readSieveFacts(input: {
   if (fetched.code !== 0) unchecked.push(`fetch: ${fetched.stderr.trim().slice(0, 200)}`);
 
   const baseRun = await run(cwd, ['merge-base', mainRef, 'HEAD']);
-  const base = baseRun.stdout.trim();
-  if (baseRun.code !== 0 || !base) {
+  const mainBase = baseRun.stdout.trim();
+  if (baseRun.code !== 0 || !mainBase) {
     return { mainRef, paths: [], mechanics: {}, unchecked: [...unchecked, 'no-merge-base'] };
   }
+  const base =
+    (input.forkedFrom && (await forkedBase(cwd, input.forkedFrom, mainBase, remote))) || mainBase;
 
   const names = await run(cwd, ['diff', '--name-only', '-z', base, 'HEAD']);
   const paths = names.stdout.split('\0').filter(Boolean);
@@ -335,28 +371,32 @@ export async function readSieveFacts(input: {
     unchecked.push('merge-tree');
   }
 
-  const diff = parseZeroContextDiff(
-    // Имена не в восьмеричных кавычках: «src/страница.ts», а не "b/src/\\321…" (ревью PR #1).
-    (
-      await run(cwd, [
-        '-c',
-        'core.quotePath=false',
-        'diff',
-        '-U0',
-        '--no-color',
-        '--no-ext-diff',
-        '--no-renames',
-        base,
-        'HEAD',
-      ])
-    ).stdout,
-  );
+  const zeroDiff = async (from: string) =>
+    parseZeroContextDiff(
+      // Имена не в восьмеричных кавычках: «src/страница.ts», а не "b/src/\\321…" (ревью PR #1).
+      (
+        await run(cwd, [
+          '-c',
+          'core.quotePath=false',
+          'diff',
+          '-U0',
+          '--no-color',
+          '--no-ext-diff',
+          '--no-renames',
+          from,
+          'HEAD',
+        ])
+      ).stdout,
+    );
+  const diff = await zeroDiff(base);
   if (input.startedAt) {
+    // Чужие удаления — про основную, а не про предшественника: правка его строк
+    // группой — её работа, а не стёртая чужая. Поэтому дифф от основной.
     const foreign = await foreignRemovalsOf(cwd, {
       mainRef,
-      base,
+      base: mainBase,
       startedAt: input.startedAt,
-      removed: diff.removed,
+      removed: (base === mainBase ? diff : await zeroDiff(mainBase)).removed,
     });
     if (foreign === undefined) unchecked.push('foreign-removals');
     else if (foreign.length > 0) mechanics.foreignRemovals = foreign;
@@ -388,7 +428,11 @@ export async function touchedPaths(cwd: string): Promise<string[]> {
 }
 
 /** То же с развилкой: от неё задание считает коммиты ветки (свежесть отчёта). */
-export async function touchedFacts(cwd: string): Promise<{ paths: string[]; base?: string }> {
+export async function touchedFacts(
+  cwd: string,
+  /** Ветка предшественника, от которой отведена копия группы (`after`). */
+  forkedFrom?: string,
+): Promise<{ paths: string[]; base?: string }> {
   const read = async (args: string[]): Promise<string> => {
     const out = await run(cwd, args, GIT_READ_TIMEOUT_MS);
     return out.code === 0 ? out.stdout : '';
@@ -408,7 +452,8 @@ export async function touchedFacts(cwd: string): Promise<{ paths: string[]; base
       break;
     }
   }
-  const base = mainRef ? (await read(['merge-base', mainRef, 'HEAD'])).trim() : '';
+  const mainBase = mainRef ? (await read(['merge-base', mainRef, 'HEAD'])).trim() : '';
+  const base = (forkedFrom && (await forkedBase(cwd, forkedFrom, mainBase, remote))) || mainBase;
   const [branch, uncommitted, untracked] = await Promise.all([
     read(['diff', '--name-only', '-z', base || 'HEAD~1', 'HEAD']),
     read(['diff', '--name-only', '-z', 'HEAD']),

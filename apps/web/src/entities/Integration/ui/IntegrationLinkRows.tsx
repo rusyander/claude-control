@@ -5,7 +5,7 @@ import { Typography } from '@shared/ui/typography';
 import { useSettings } from '@entities/AppConfig';
 import type { IntegrationLinkRowsProps } from './IntegrationLinkRows.types';
 import { linkRows } from '../model/linkRows';
-import { readIntegration } from '../model/readIntegration';
+import { readIntegrations } from '../model/settings';
 
 /**
  * Привязка внешнего мира, показанная строками, — только чтение.
@@ -21,7 +21,8 @@ import { readIntegration } from '../model/readIntegration';
 export function IntegrationLinkRows({ link, withEmpty = false }: IntegrationLinkRowsProps) {
   const { t } = useTranslation();
   const { data: settings } = useSettings();
-  const rows = linkRows(link, readIntegration(settings, 'atlassian'));
+  const { jira, confluence } = readIntegrations(settings);
+  const rows = linkRows(link, { jira, confluence });
 
   if (rows.length === 0) {
     if (!withEmpty) return null;

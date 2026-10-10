@@ -216,6 +216,53 @@ describe('session-rules: правила набора контекстом сес
   });
 });
 
+describe('local-discipline: на локальной модели без фоновой работы', () => {
+  const ITEM = join(HOOKS, 'local-discipline.mjs');
+  const DISPATCH = join(HOOKS, 'lib', 'run.mjs');
+  const LOCAL = { AGENTDECK_KIT_VARIANT: 'local' };
+  const call = (tool_name: string, tool_input: Record<string, unknown>) =>
+    JSON.stringify({ hook_event_name: 'PreToolUse', tool_name, tool_input, session_id: 's1' });
+  const decision = (stdout: string): string | undefined =>
+    stdout.trim()
+      ? (JSON.parse(stdout) as { hookSpecificOutput?: { permissionDecision?: string } })
+          .hookSpecificOutput?.permissionDecision
+      : undefined;
+
+  it('фоновая команда и фоновый субагент — отказ с причиной', () => {
+    const shell = runNode(
+      ITEM,
+      call('Bash', { command: 'npm test', run_in_background: true }),
+      LOCAL,
+    );
+    expect(decision(shell.stdout)).toBe('deny');
+    expect(shell.stdout).toContain('without run_in_background');
+    const agent = call('Agent', { prompt: 'x', description: 'y', run_in_background: true });
+    expect(decision(runNode(ITEM, agent, LOCAL).stdout)).toBe('deny');
+  });
+
+  it('форма Qwen Code (`run_shell_command`) — тот же отказ', () => {
+    const input = call('run_shell_command', { command: 'npm test', run_in_background: true });
+    expect(decision(runNode(ITEM, input, LOCAL).stdout)).toBe('deny');
+  });
+
+  it('обычный вызов на локальной модели и фоновый в облаке — тишина', () => {
+    expect(runNode(ITEM, call('Bash', { command: 'npm test' }), LOCAL).stdout.trim()).toBe('');
+    const background = call('Bash', { command: 'npm test', run_in_background: true });
+    expect(runNode(ITEM, background).stdout.trim()).toBe('');
+  });
+
+  it('через диспетчер событий, как его зовёт hooks.json', () => {
+    const background = call('Bash', { command: 'npm run dev', run_in_background: true });
+    const out = spawnSync(process.execPath, [DISPATCH, 'pre'], {
+      input: background,
+      encoding: 'utf8',
+      env: { ...process.env, ...LOCAL },
+      timeout: 15_000,
+    });
+    expect(decision(out.stdout)).toBe('deny');
+  });
+});
+
 describe('spawn-cost-guard: субагент на локальной модели', () => {
   const SPAWN = join(HOOKS, 'spawn-cost-guard.mjs');
   // Форма вызова — как её отдал хуку qwen-code 0.25.0 в живом прогоне 08.10.

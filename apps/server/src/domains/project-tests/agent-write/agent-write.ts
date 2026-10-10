@@ -7,7 +7,7 @@ import type {
 } from '@agentdeck/contracts';
 import { coded } from '../../../lib/server-text/server-text.ts';
 import { writeDraft } from '../drafts/drafts.ts';
-import { ProjectTestsNotFoundError } from '../files.ts';
+import { ProjectTestsError, ProjectTestsNotFoundError } from '../files.ts';
 import { gitContext } from '../impact/impact.ts';
 import { writeRun } from '../runs-store/runs-store.ts';
 import { applyResults, createGroup, readGroup, upsertCase } from '../store/store.ts';
@@ -100,6 +100,20 @@ export function recordAgentResults(
       );
     }
   }
+  // Решение владельца 10.10: `record` — только для ручных кейсов. Автокейс
+  // проверяет его тест, а не слово агента: отказ целиком, до записи, с командой
+  // прогона — иначе в истории лежала бы «проверка», которой тест не делал.
+  if (automated.size > 0) {
+    const cases = [...automated];
+    const groups = [...new Set(cases.map((item) => item.split(':')[0]))];
+    throw coded(
+      new ProjectTestsError(
+        `Automated cases are not recorded by word: ${cases.join(', ')}. Run them instead: ${groups.map((group) => `tests-cli run --group ${group}`).join('; ')}.`,
+      ),
+      'record-automated-case',
+      { cases: cases.join(', '), groups: groups.join(', ') },
+    );
+  }
   const id = randomUUID();
   const count = (status: AgentResult['status']): number =>
     results.filter((result) => result.status === status).length;
@@ -107,7 +121,7 @@ export function recordAgentResults(
     id,
     mode: 'run',
     actor: 'agent',
-    // Проверено руками агента, не командой: автокейсу это прогон не заменяет.
+    // Проверено руками агента, не командой: в разделе запись помечена «вручную».
     attested: true,
     ...gitContext(root),
     status: 'done',
@@ -130,20 +144,16 @@ export function recordAgentResults(
     },
   };
   writeRun(root, record);
-  // Автокейсу слово прогон не заменяет — и статус в библиотеке ему не переписывает:
-  // в истории запись есть (помечена `attested`), статус ставит только исполненный прогон.
   applyResults(
     root,
-    results
-      .filter((result) => !automated.has(`${result.groupId}:${result.caseId}`))
-      .map((result) => ({
-        groupId: result.groupId,
-        caseId: result.caseId,
-        status: result.status,
-        ...(result.note ? { note: result.note } : {}),
-        runId: id,
-        at: now,
-      })),
+    results.map((result) => ({
+      groupId: result.groupId,
+      caseId: result.caseId,
+      status: result.status,
+      ...(result.note ? { note: result.note } : {}),
+      runId: id,
+      at: now,
+    })),
     now,
   );
   return record;

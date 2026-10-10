@@ -21,14 +21,6 @@ export const composedEn: Record<ComposedMessageCode, string> = {
   'integration-check-telegram-ok': 'The bot {{account}} is reachable.',
   'integration-check-tms-ok': '{{detail}} — the connection works.',
   'integration-check-atlassian-ok': 'Logged in as {{account}} ({{deployment}}).',
-  'integration-check-atlassian-confluence-ok':
-    'Logged in as {{account}} ({{deployment}}). Confluence is reachable.',
-  'integration-check-atlassian-confluence-rejected':
-    'Logged in as {{account}} ({{deployment}}). Confluence rejected the token — fill in the separate Confluence key.',
-  'integration-check-atlassian-confluence-failed':
-    'Logged in as {{account}} ({{deployment}}). Confluence answered {{status}} — check the Confluence address.',
-  'integration-check-atlassian-confluence-unreachable':
-    'Logged in as {{account}} ({{deployment}}). Confluence is unreachable: {{reason}}.',
   'integration-deployment-cloud': 'cloud',
   'integration-deployment-own': 'own installation',
   'integration-tms-project': '{{system}}, project {{project}}',
@@ -174,6 +166,8 @@ export const composedEn: Record<ComposedMessageCode, string> = {
   'delivery-gap-fix-missing':
     'review findings ({{count}}) are not fixed: the fix stage did not run after the review',
   'delivery-gap-mr-description': 'MR {{mr}} has an empty description',
+  'delivery-gap-mr-na-reason':
+    'the description of MR {{mr}} does not give the n/a reason of the live check ({{sieves}}) — add the sieve id and why it does not apply',
   'delivery-gap-no-copy': 'the group has no copy',
   'sieve-gap-conflicts':
     'integration sieve: merging with fresh main conflicts in {{files}} — rebase the branch onto fresh main and resolve the conflict',
@@ -214,6 +208,8 @@ export const composedEn: Record<ComposedMessageCode, string> = {
     'sieve {{sieve}}: run {{run}} has red cases: {{cases}} — fix them and record a new run',
   'sieve-gap-run-stale':
     'sieve {{sieve}}: run {{run}} is older than the change to the code this sieve covers ({{files}}) — run it again on the final commit',
+  'sieve-gap-live-na':
+    'sieve {{sieve}}: a live check cannot be reported n/a — the diff changes behaviour ({{files}}); check it live on the final commit and report pass with evidence, or fail with the reason if it could not run',
   'tests-gap-no-run':
     'Tests block of the copy: no run has been recorded since the group started — run the cases for the changed files ({{cases}}) and record the run: {{command}}',
   'tests-gap-word-only':

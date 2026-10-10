@@ -141,6 +141,30 @@ describe('scanAnalytics: сессии', () => {
     );
   });
 
+  // Решение 10.10: субагенты пишут свой транскрипт в `<сессия>/subagents/` — их
+  // расход входит в сессию родителя (записи несут его sessionId) и в общий итог.
+  it('транскрипты субагентов считаются в сессию родителя; другие вложенные папки — нет', async () => {
+    writeTranscript('p', 's1', response({ session: 's1', cwd: '/work/a', minute: 0, n: 1 }));
+    writeTranscript(
+      join('p', 's1', 'subagents'),
+      'agent-a1',
+      response({ session: 's1', cwd: '/work/a', minute: 5, n: 2, output: 30 }).map((line) => ({
+        ...(line as Record<string, unknown>),
+        isSidechain: true,
+        agentId: 'a1',
+      })),
+    );
+    // Не транскрипт субагента — в счёт не идёт.
+    writeTranscript(join('p', 's1', 'tool-results'), 'stray', [
+      ...response({ session: 's1', cwd: '/work/a', minute: 6, n: 3, output: 999 }),
+    ]);
+
+    const result = await scanAnalytics(projectsDir, options);
+    expect(result.recentSessions).toHaveLength(1);
+    expect(result.recentSessions[0]!.totals).toMatchObject({ output: 40, requests: 2 });
+    expect(result.overall.output).toBe(40);
+  });
+
   it('инструменты считаются по сессиям отдельно, по убыванию, список обрезан', async () => {
     writeTranscript('p', 's1', [
       ...response({

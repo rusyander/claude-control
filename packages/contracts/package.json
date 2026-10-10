@@ -27,6 +27,7 @@
     "./groups": "./src/groups.ts",
     "./instructions": "./src/instructions.ts",
     "./integrations": "./src/integrations.ts",
+    "./integrations-legacy": "./src/integrations-legacy.ts",
     "./kit": "./src/kit.ts",
     "./local-models": "./src/local-models.ts",
     "./media": "./src/media.ts",

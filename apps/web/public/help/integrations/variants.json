@@ -32,7 +32,7 @@
       "light-en": {
         "file": "02-filled.en.png",
         "width": 1116,
-        "height": 500
+        "height": 482
       },
       "dark-ru": {
         "file": "02-filled.dark.png",
@@ -42,29 +42,29 @@
       "dark-en": {
         "file": "02-filled.dark.en.png",
         "width": 1116,
-        "height": 500
+        "height": 482
       }
     },
     "atlassian/03-checked": {
       "light-ru": {
         "file": "03-checked.png",
         "width": 1116,
-        "height": 626
+        "height": 590
       },
       "light-en": {
         "file": "03-checked.en.png",
         "width": 1116,
-        "height": 626
+        "height": 572
       },
       "dark-ru": {
         "file": "03-checked.dark.png",
         "width": 1116,
-        "height": 626
+        "height": 590
       },
       "dark-en": {
         "file": "03-checked.dark.en.png",
         "width": 1116,
-        "height": 626
+        "height": 572
       }
     },
     "atlassian/04-mcp": {
@@ -93,44 +93,66 @@
       "light-ru": {
         "file": "05-forge.png",
         "width": 1116,
-        "height": 486
+        "height": 431
       },
       "light-en": {
         "file": "05-forge.en.png",
         "width": 1116,
-        "height": 468
+        "height": 431
       },
       "dark-ru": {
         "file": "05-forge.dark.png",
         "width": 1116,
-        "height": 486
+        "height": 431
       },
       "dark-en": {
         "file": "05-forge.dark.en.png",
         "width": 1116,
-        "height": 468
+        "height": 431
       }
     },
     "atlassian/06-forgotten": {
       "light-ru": {
         "file": "06-forgotten.png",
         "width": 1116,
-        "height": 396
+        "height": 341
       },
       "light-en": {
         "file": "06-forgotten.en.png",
         "width": 1116,
-        "height": 378
+        "height": 341
       },
       "dark-ru": {
         "file": "06-forgotten.dark.png",
         "width": 1116,
-        "height": 396
+        "height": 341
       },
       "dark-en": {
         "file": "06-forgotten.dark.en.png",
         "width": 1116,
-        "height": 378
+        "height": 341
+      }
+    },
+    "atlassian/07-discover": {
+      "light-ru": {
+        "file": "07-discover.png",
+        "width": 1116,
+        "height": 423
+      },
+      "light-en": {
+        "file": "07-discover.en.png",
+        "width": 1116,
+        "height": 423
+      },
+      "dark-ru": {
+        "file": "07-discover.dark.png",
+        "width": 1116,
+        "height": 423
+      },
+      "dark-en": {
+        "file": "07-discover.dark.en.png",
+        "width": 1116,
+        "height": 423
       }
     },
     "notify/01-webhook": {

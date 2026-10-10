@@ -103,9 +103,10 @@ function ownWorkLine(root: string, cli: string): string {
     'step on your own — add or update the case that covers the change',
     `(${cli} case --project "${root}" --group <group> --json`,
     '\'{"title":"…","steps":["…"],"expected":"…","codePaths":["<changed path>"]}\';',
-    'pass "id" to update; a case a human wrote becomes a draft they accept) and record what you',
-    `actually verified (${cli} record --project "${root}" <group>:<case>=passed|failed|blocked`,
-    '--note "<how you checked>") or run the automated ones as above. Never call the work tested',
+    'pass "id" to update; a case a human wrote becomes a draft they accept). A manual case: record',
+    `what you actually verified (${cli} record --project "${root}" <group>:<case>=passed|failed|blocked`,
+    '--note "<how you checked>"; it shows as checked by hand). An automated case is never recorded —',
+    'record refuses it — run it as above. Never call the work tested',
     'without a recorded run. If your tools here cannot run commands or write files, say so and',
     'hand the user the exact command instead of reporting a run that did not happen.',
   ].join(' ');

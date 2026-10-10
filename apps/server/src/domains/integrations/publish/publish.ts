@@ -6,8 +6,7 @@ import { exportLanguage, runToMarkdown } from '../../project-tests/export-run/ex
 import { RUN_TEXTS, type ExportLanguage } from '../../project-tests/export-run-texts.ts';
 import { IntegrationError, invalidField } from '../errors.ts';
 import { linkForCwd } from '../links.ts';
-import { readConfluenceToken, readIntegrations, requireConnected } from '../store/store.ts';
-import { toAccess } from '../atlassian/client.ts';
+import { confluenceAccessFrom, jiraAccessFrom } from '../atlassian/access.ts';
 import { commentIssue } from '../atlassian/jira.ts';
 import { createPage, readPage } from '../atlassian/confluence.ts';
 import { coded } from '../../../lib/server-text/server-text.ts';
@@ -80,14 +79,6 @@ export async function publishRun(
     );
   }
 
-  const token = requireConnected(deps.store, deps.appDataDir, 'atlassian', 'Atlassian');
-  // Второй ключ — для публикации в Confluence: на своей установке он свой (см.
-  // `atlassian/client.ts`), и без него отчёт уезжал бы в 401 на рабочей Jira.
-  const access = toAccess(
-    readIntegrations(deps.store).atlassian,
-    token,
-    readConfluenceToken(deps.appDataDir) ?? '',
-  );
   // Ошибки в файлах групп молчаливо пропускаем: заголовки кейсов — украшение
   // отчёта, а сорванный из-за битой группы отчёт по успешному прогону — нет.
   const markdown = runToMarkdown(
@@ -104,6 +95,9 @@ export async function publishRun(
         'К проекту не привязана задача Jira — привяжите её и повторите.',
       );
     }
+    // Jira и Confluence — разные интеграции: публикация в одну не требует
+    // подключённой второй.
+    const access = jiraAccessFrom(deps.store, deps.appDataDir);
     await commentIssue(access, key, commentText(markdown));
     // `created: false` — комментарий дописан в существующую задачу, ничего
     // нового не появилось; кнопка в панели говорит именно это.
@@ -126,6 +120,7 @@ export async function publishRun(
    * бы только тот, кто знает про историю версий Confluence. Дочерняя страница
    * сохраняет и требования, и связь между ними.
    */
+  const access = confluenceAccessFrom(deps.store, deps.appDataDir);
   const parent = await readPage(access, parentId);
   if (!parent.spaceKey) {
     throw new IntegrationError(

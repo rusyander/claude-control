@@ -99,10 +99,12 @@ export function useChatSession({ chats }: ChatSessionInput): ChatSession {
   // вкладке, где человек согласился делить, — и прогон, пульт git и окно кода
   // обязаны смотреть в каталог ОТКРЫТОГО ЧАТА, иначе ответ ребёнку ушёл бы
   // работать в родительскую копию. Черновик проекта чата не имеет — тогда
-  // каталог даёт вкладка.
+  // каталог даёт вкладка. Каталог берётся из СВЕЖЕЙ строки списка: открытый
+  // разговор — снимок момента открытия, а дом у разговора меняется на ходу —
+  // переезд в копию из ворот ветки (Ф-6) оставлял пульт git на основной копии.
+  const current = (activeChat && chats?.find((chat) => chat.id === activeChat.id)) ?? activeChat;
   const projectPath =
-    (activeChat && !activeChat.isSandbox ? activeChat.projectPath : undefined) ??
-    ws.activeProject?.path;
+    (current && !current.isSandbox ? current.projectPath : undefined) ?? ws.activeProject?.path;
   const isProjectContext = Boolean(projectPath);
 
   // Черновик поля ввода: у каждого разговора/проекта/домашнего чата — свой

@@ -69,9 +69,17 @@ export function expandInstructionText(text: string, filePath: string): ExpandedI
   const resolved = resolve(filePath);
   const includes: string[] = [resolved];
   const problems: string[] = [];
-  const seen = new Set<string>([resolved.toLowerCase()]);
+  const seen = new Set<string>([seenKey(resolved)]);
 
   return { text: expandBody(text, resolved, 1, seen, includes, problems), includes, problems };
+}
+
+/**
+ * Ключ «уже включён». Регистр сворачивается только на Windows, где ФС к нему
+ * слепа: на Linux `A.md` и `a.md` — разные файлы, а не цикл.
+ */
+function seenKey(filePath: string): string {
+  return process.platform === 'win32' ? filePath.toLowerCase() : filePath;
 }
 
 function expand(
@@ -81,7 +89,7 @@ function expand(
   includes: string[],
   problems: string[],
 ): string {
-  const key = filePath.toLowerCase();
+  const key = seenKey(filePath);
   if (seen.has(key)) {
     problems.push(`цикл импортов: ${filePath} уже включён выше`);
     return `<!-- импорт не раскрыт (цикл): ${filePath} -->`;

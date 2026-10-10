@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import type { AppSettings, AtlassianSettings } from '@agentdeck/contracts';
+import type { AppSettings, AtlassianSiteSettings } from '@agentdeck/contracts';
 import { api } from '../../shared/api/client';
 
 /**
@@ -12,33 +12,39 @@ import { api } from '../../shared/api/client';
  *
  * Адрес собирается из настроек панели, а не приходит с сервера: в привязке
  * лежат ключ задачи и id страницы — они переживают переезд сайта, а ссылка нет.
- * Та же формула живёт в панели (`entities/Integration/model/links.ts`); общего
+ * Та же формула живёт в панели (`entities/Integration/model/{links,confluencePageUrl}.ts`); общего
  * модуля у них нет, потому что Metro не тянет веб-код.
  */
 
 type SettingsWithIntegrations = AppSettings & {
-  integrations?: { atlassian?: Partial<AtlassianSettings> };
+  integrations?: {
+    jira?: Partial<AtlassianSiteSettings>;
+    confluence?: Partial<AtlassianSiteSettings>;
+  };
 };
 
-const EMPTY_ATLASSIAN: AtlassianSettings = {
-  enabled: false,
-  baseUrl: '',
-  email: '',
-  deployment: '',
-  confluenceUrl: '',
-};
+/** Jira и Confluence — две интеграции, у каждой свой адрес (владелец 10.10.2026). */
+export interface AtlassianSites {
+  jira: AtlassianSiteSettings;
+  confluence: AtlassianSiteSettings;
+}
+
+const NO_SITE: AtlassianSiteSettings = { enabled: false, baseUrl: '', email: '', deployment: '' };
 
 /**
- * Настройки Atlassian из общих настроек панели. Читаем защищённо: секция
+ * Адреса Jira и Confluence из общих настроек панели. Читаем защищённо: секция
  * появилась позже остального, и её отсутствие — обычный старый конфиг, а не
  * повод оставить экран тестов без списка кейсов.
  */
-export function useAtlassianSettings(): AtlassianSettings {
+export function useAtlassianSites(): AtlassianSites {
   const settings = useQuery({
     queryKey: ['panel-settings', 'integrations'],
     queryFn: () => api.get<SettingsWithIntegrations>('/settings'),
     staleTime: 10 * 60_000,
   });
-  const raw = settings.data?.integrations?.atlassian;
-  return raw ? { ...EMPTY_ATLASSIAN, ...raw } : EMPTY_ATLASSIAN;
+  const raw = settings.data?.integrations;
+  return {
+    jira: { ...NO_SITE, ...raw?.jira },
+    confluence: { ...NO_SITE, ...raw?.confluence },
+  };
 }

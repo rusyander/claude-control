@@ -42,6 +42,11 @@ export interface SieveMechanics {
   destructive?: string[];
   /** Команды проверок проекта (lint, типы, тесты), найденные в его манифестах. */
   checks?: ProjectCheck[];
+  /**
+   * Файлы поведения в диффе — код продукта (UI и бэкенд), не тесты и не доки.
+   * Есть хоть один — живая проверка не сдаётся `n/a` (решение владельца 10.10).
+   */
+  behaviour?: string[];
 }
 
 /** Что панель узнала о прогоне блока «Тесты», на который сослалось доказательство. */
@@ -92,7 +97,8 @@ export interface SieveGap {
     | 'sieve-gap-run-missing'
     | 'sieve-gap-run-empty'
     | 'sieve-gap-run-red'
-    | 'sieve-gap-run-stale';
+    | 'sieve-gap-run-stale'
+    | 'sieve-gap-live-na';
   params: Record<string, string>;
 }
 
@@ -272,6 +278,15 @@ function contentGap(
   row: SieveReportRow,
   mechanics: SieveMechanics,
 ): SieveGap | undefined {
+  // Живая проверка (`proof: 'run'`) сдаётся `n/a` только на диффе без файлов
+  // поведения (решение владельца 10.10): правка кода «не применимой» не бывает,
+  // а причина на доках/контракте уходит в описание MR (`mrDescriptionGap`).
+  if (sieve.proof === 'run' && row.status === 'n/a' && mechanics.behaviour?.length) {
+    return {
+      code: 'sieve-gap-live-na',
+      params: { sieve: sieve.id, files: named(mechanics.behaviour) },
+    };
+  }
   if (sieve.id === 'project-checks' && mechanics.checks?.length) {
     // Проверку, которую не удалось запустить, сдают `fail` с причиной, а не `n/a`.
     const missing =
@@ -407,6 +422,17 @@ export function judgeSieves(input: {
     if (gap) gaps.push(gap);
   }
   return gaps;
+}
+
+/**
+ * Живые проверки, сданные `n/a`: их причина идёт в описание MR, и проверка
+ * доставки требует, чтобы описание назвало каждое такое сито (решение 10.10).
+ */
+export function liveNaIds(rows: readonly SieveReportRow[]): string[] {
+  const live = new Set<string>(BUILTIN_SIEVES.filter((s) => s.proof === 'run').map((s) => s.id));
+  return [
+    ...new Set(rows.filter((row) => row.status === 'n/a' && live.has(row.id)).map((row) => row.id)),
+  ];
 }
 
 /** Сита, чьи сданные строки устарели: в задании их снова надо сделать. */

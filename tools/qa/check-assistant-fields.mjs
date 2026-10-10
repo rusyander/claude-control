@@ -272,6 +272,17 @@ await runOnStand(
     try {
       const page = await stand.newPage(browser, { width: 1500, height: 1000 });
 
+      /**
+       * Окно с помощником — по его полю ввода, а не «последнее окно страницы»:
+       * локатор ленивый, и любое окно, всплывшее позже (выбор, подтверждение),
+       * уводило `.last()` от формы — прогон группой падал на поиске поля.
+       */
+      const assistantDialog = () =>
+        page
+          .locator('[role="dialog"]')
+          .filter({ has: page.locator('textarea[data-assistant-input]') })
+          .last();
+
       /** Открыть форму создания; вернуть её окно. */
       const openForm = async (path, button, pick) => {
         await page.goto(`${stand.webUrl}${path}`, { waitUntil: 'domcontentloaded' });
@@ -286,7 +297,7 @@ await runOnStand(
             .waitFor({ state: 'detached', timeout: 5000 })
             .catch(() => undefined);
         }
-        const dialog = page.locator('[role="dialog"]').last();
+        const dialog = assistantDialog();
         await dialog.locator('textarea[data-assistant-input]').waitFor({ timeout: 10000 });
         return dialog;
       };
@@ -573,7 +584,7 @@ await runOnStand(
         await page.goto(`${stand.webUrl}/mcp`, { waitUntil: 'domcontentloaded' });
         await page.waitForSelector('nav');
         await page.getByRole('button', { name: 'Редактировать: qa-mcp-secret' }).click();
-        const dialog = page.locator('[role="dialog"]').last();
+        const dialog = assistantDialog();
         await dialog.locator('textarea[data-assistant-input]').waitFor({ timeout: 10000 });
         const envBefore = `QA_API_TOKEN=${SECRET_ENV}\nQA_DB_PASSWORD=${SECRET_SPACED}\nQA_HASH_KEY=${SECRET_HASHED}`;
         const argsBefore = `--token ${SECRET_ARG} --api-key "${SECRET_ARG_SPACED}"`;

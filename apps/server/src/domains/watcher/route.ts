@@ -1,3 +1,4 @@
+import { foreignConsumerId } from '@agentdeck/contracts/platform-consumers';
 import type { AppStore } from '../../lib/app-store/app-store.ts';
 import {
   localizeText,
@@ -7,7 +8,10 @@ import {
 } from '../../lib/server-texts/server-texts.ts';
 import { claudeProvider } from '../../providers/claude.ts';
 import { getActiveProvider } from '../../providers/registry.ts';
+import type { ConfigProvider } from '../../providers/types/types.ts';
 import { claudeContourEnv, contourUnreachable } from '../panel-agent/launch.ts';
+import type { PlatformRunRoute } from '../platform/routing/routing.ts';
+import { resolveRunner } from '../provider-keys/provider-keys.ts';
 
 /**
  * Чем пойдёт разбор фонового наблюдателя — решение ДО запуска, без сети и без
@@ -27,9 +31,12 @@ import { claudeContourEnv, contourUnreachable } from '../panel-agent/launch.ts';
  * - свой эндпоинт — отказ: его токен пришлось бы отдать процессу CLI;
  * - активен чужой CLI — решает, КУДА уйдёт разбор (владелец 09.10.2026: «выбран
  *   Qwen на локальной модели — наблюдатель тоже идёт через Qwen»). Контур или
- *   локальная модель — разбор идёт: отвечает та же модель, что у агентов, и
- *   код панели не покидает выбранного маршрута. Облако Claude — честный отказ:
- *   подставить его вместо выбранного CLI значит уйти туда, куда человек не звал.
+ *   локальная модель — разбор идёт `claude` той же моделью, что у агентов, и
+ *   код панели не покидает выбранного маршрута. Иначе маршрут ассистента вёл бы
+ *   в облако Claude, куда человек не звал, — и разбор ведёт САМ чужой CLI (X9,
+ *   10.10): одиночным запуском без правок (`allowEdits: false` — тот же режим,
+ *   что у переключателя «Разрешить правки» в чате) по маршруту его чата.
+ *   CLI без такого режима (Cursor) — честный отказ.
  */
 
 export interface WatcherRouteDeps {
@@ -40,6 +47,16 @@ export interface WatcherRouteDeps {
   detect?: (command: string) => boolean;
   /** Окружение переключателя «Claude Code на локальной модели» — см. `PanelAgentLaunchDeps`. */
   claudeSwitchEnv?: () => Record<string, string>;
+  /** Маршрут прогона по потребителю — `runRoute` сборки; без него разбор чужим CLI не идёт. */
+  runRoute?: (consumer: string) => PlatformRunRoute;
+}
+
+/** Разбор ведёт сам активный чужой CLI — одиночным запуском без правок. */
+export interface WatcherForeignRun {
+  provider: ConfigProvider;
+  command: string;
+  /** Модель маршрута его чата (контур); пусто — CLI своей настроенной моделью. */
+  model?: string;
 }
 
 export type WatcherRoute =
@@ -49,6 +66,8 @@ export type WatcherRoute =
       env: Record<string, string>;
       /** Через контур: модель задаёт профиль, `--model` вендора не передаётся. */
       viaContour: boolean;
+      /** Задан — разбор ведёт этот CLI, а не `claude`. */
+      foreign?: WatcherForeignRun;
     }
   | {
       ok: false;
@@ -76,9 +95,7 @@ export function resolveWatcherRoute(deps: WatcherRouteDeps): WatcherRoute {
     const env = deps.claudeSwitchEnv?.() ?? {};
     // Переключатель пишет адрес только локального сервера: есть адрес — разбор
     // уходит в локальную модель, нет — в облако Claude, куда чужой CLI не звал.
-    if (foreign && !env.ANTHROPIC_BASE_URL) {
-      return refuse('watcher-provider-unsupported', { provider: provider.name });
-    }
+    if (foreign && !env.ANTHROPIC_BASE_URL) return foreignRoute(deps, provider);
     return { ok: true, env, viaContour: false };
   }
   if (!profile.ownerPlatformId)
@@ -102,6 +119,37 @@ export function resolveWatcherRoute(deps: WatcherRouteDeps): WatcherRoute {
     });
   }
   return { ok: true, env, viaContour: true };
+}
+
+/**
+ * Разбор самим чужим CLI. Режим без правок у каждого CLI свой и объявлен в
+ * каталоге (`editsControl: 'flag'` — `oneShotArgs`/`oneShotEnv` читают
+ * `allowEdits`): Qwen и Gemini `--approval-mode default` (в `-p` спросить некого
+ * — правка и команда отклоняются), Codex `--sandbox read-only`, Goose
+ * `GOOSE_MODE chat`, Kimi агент только чтения, OpenCode без `--auto`, Aider
+ * `--dry-run`, Continue `--exclude`. Окружение — как у окна помощника этого CLI
+ * (`resolveHelperRoute`): маршрут его чата плюс набор панели.
+ */
+function foreignRoute(deps: WatcherRouteDeps, provider: ConfigProvider): WatcherRoute {
+  const names = { provider: provider.name };
+  const assistant = provider.assistant;
+  if (!assistant?.oneShotArgs || assistant.editsControl !== 'flag' || !deps.runRoute) {
+    return refuse('watcher-provider-unsupported', names);
+  }
+  const route = deps.runRoute(foreignConsumerId(provider.id));
+  if (route.refusal) return refuse('assistant-route-refused', { reason: route.refusal });
+  const runner = resolveRunner(provider, deps.appDataDir, deps.detect);
+  if (runner.mode !== 'cli' || !runner.cliCommandFound) return refuse('watcher-cli-missing', names);
+  return {
+    ok: true,
+    env: { ...route.env, ...route.kit?.env },
+    viaContour: false,
+    foreign: {
+      provider,
+      command: runner.cliCommandFound,
+      ...(route.model?.model ? { model: route.model.model } : {}),
+    },
+  };
 }
 
 /** Текст отказа на языке панели — в `detail` проблемы наблюдателя. */

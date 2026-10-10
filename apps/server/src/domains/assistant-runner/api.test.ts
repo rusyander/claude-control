@@ -6,7 +6,7 @@ import { claudeProvider } from '../../providers/claude.ts';
 import { getProvider, listProviders } from '../../providers/registry.ts';
 import type { ConfigProvider, ProviderAssistant } from '../../providers/types/types.ts';
 import { serverText } from '../../lib/server-texts/server-texts.ts';
-import { runProviderApi } from './api.ts';
+import { API_MAX_OUTPUT_TOKENS, runProviderApi } from './api.ts';
 
 /**
  * Прямой вызов модельного API: куда уходит ключ (06.10, SF-1/D1). Сеть — внешняя
@@ -132,5 +132,75 @@ describe('runProviderApi: ключ уходит только своему вен
     });
     expect(res).toMatchObject({ ok: true, reply: 'с эндпоинта' });
     expect(fetchMock.mock.calls[0]![0]).toBe('http://127.0.0.1:8080/v1/messages');
+  });
+});
+
+/**
+ * Предел длины ответа (10.10): обрезок не выдаётся за ответ. Помощник структуры
+ * разбирает ответ как JSON и пишет файлы — оборванный ответ записал бы половину
+ * файла, поэтому каждый вид API распознаёт свой признак обрыва и отказывает кодом.
+ */
+describe('runProviderApi: ответ, оборванный на пределе длины', () => {
+  let dir: string;
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'cc-api-limit-'));
+  });
+  afterEach(() => rmSync(dir, { recursive: true, force: true }));
+
+  const half = '{"reply": "Собрал навык", "files": [{"path": "SKILL.md", "content": "---\nna';
+  const truncatedRefusal = {
+    ok: false,
+    mode: 'api',
+    messageCode: 'assistant-reply-truncated',
+    error: serverText('assistant-reply-truncated'),
+  };
+
+  it('anthropic: потолок вмещает многофайловый навык, stop_reason max_tokens — отказ', async () => {
+    const fetchMock = okFetch({
+      content: [{ type: 'text', text: half }],
+      stop_reason: 'max_tokens',
+    });
+    const res = await runProviderApi(claudeProvider, ask, KEY, {
+      appDataDir: dir,
+      fetchImpl: fetchMock,
+    });
+    expect(res).toMatchObject(truncatedRefusal);
+    expect(res.reply).toBe('');
+    const body = JSON.parse(String(fetchMock.mock.calls[0]![1].body)) as { max_tokens: number };
+    // 20 КБ русского текста при ~2 символах на токен — 10 000 токенов.
+    expect(body.max_tokens).toBe(API_MAX_OUTPUT_TOKENS);
+    expect(body.max_tokens).toBeGreaterThanOrEqual(10_000);
+  });
+
+  it('anthropic: end_turn — ответ как есть', async () => {
+    const fetchMock = okFetch({ content: [{ type: 'text', text: '{}' }], stop_reason: 'end_turn' });
+    const res = await runProviderApi(claudeProvider, ask, KEY, {
+      appDataDir: dir,
+      fetchImpl: fetchMock,
+    });
+    expect(res).toMatchObject({ ok: true, reply: '{}' });
+  });
+
+  it('openai: finish_reason length — отказ', async () => {
+    const fetchMock = okFetch({
+      choices: [{ message: { content: half }, finish_reason: 'length' }],
+    });
+    const res = await runProviderApi(getProvider('codex'), ask, KEY, {
+      appDataDir: dir,
+      fetchImpl: fetchMock,
+    });
+    expect(res).toMatchObject(truncatedRefusal);
+  });
+
+  it('google: finishReason MAX_TOKENS — отказ', async () => {
+    const fetchMock = okFetch({
+      candidates: [{ content: { parts: [{ text: half }] }, finishReason: 'MAX_TOKENS' }],
+    });
+    const res = await runProviderApi(getProvider('continue'), ask, '', {
+      appDataDir: dir,
+      fetchImpl: fetchMock,
+      endpoint: { baseUrl: 'http://127.0.0.1:8080', apiKind: 'google', model: 'local' },
+    });
+    expect(res).toMatchObject(truncatedRefusal);
   });
 });

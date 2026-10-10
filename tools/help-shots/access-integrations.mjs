@@ -1,6 +1,11 @@
 /**
  * Сценарии раздела «Интеграции»: `integrations/atlassian` и `integrations/notify`.
  *
+ * Каждая система — своя карточка, и в списке только заведённые: сценарий
+ * начинается с пустого списка и добавляет карточки так же, как человек, —
+ * выбором «Добавить интеграцию». «Найти уже подключённые» снимается на MCP-
+ * серверах, записанных в `~/.claude.json` одноразового стенда.
+ *
  * Делятся по входу. В первый приходят за внешним КОНТЕКСТОМ — требования в
  * Confluence, задачи в Jira, дефекты в фордже, — и главный вопрос там «чем
  * панель представится и как я узнаю, что связь есть». Во второй приходят за
@@ -17,6 +22,7 @@
  * а потому, что проверка каталога снимков краснеет на любом чужом домене:
  * так она ловит кадр, переснятый не на стенде, а на живой системе заказчика.
  */
+import { readFileSync, writeFileSync } from 'node:fs';
 import { openSection, openSettingsTab, card, shotCard } from './access-providers-fixture.mjs';
 
 /** Выдуманные секреты: собираются из кусков, чтобы в файле не лежала строка вида ключа. */
@@ -24,9 +30,14 @@ const JIRA_TOKEN = ['atl', 'demo', '5c1f7b9e42a0'].join('_');
 const FORGE_TOKEN = ['glpat', 'demo', '7d3c81ba60f4'].join('-');
 const HOOK_SECRET = ['whsec', 'demo', 'a92e5f0c7b13'].join('_');
 
-const JIRA = card('Jira и Confluence');
-const FORGE = card('Фордж по токену');
+const JIRA = card('Jira');
+const FORGE = card('GitLab');
+const DISCOVERED = card('Найдено среди MCP-серверов');
 const WEBHOOK = card('Вебхук');
+
+const SITE = { enabled: false, baseUrl: '', email: '', deployment: '' };
+const FORGE_SITE = { enabled: false, baseUrl: '', repo: '' };
+const TMS = { enabled: false, baseUrl: '', projectKey: '', groupId: '' };
 const TELEGRAM = card('Telegram');
 
 export async function shootAtlassian(browser, web, scenario, { panel, upstream }) {
@@ -35,11 +46,12 @@ export async function shootAtlassian(browser, web, scenario, { panel, upstream }
   try {
     await resetIntegrations(panel);
 
-    // ── 01. Шесть карточек ───────────────────────────────────────────────────
-    // Ни одна не включена: панель остаётся местным приложением, пока её не
-    // попросили ходить наружу.
+    // ── 01. Пустой список ────────────────────────────────────────────────────
+    // Ничего не заведено: панель остаётся местным приложением, пока её не
+    // попросили ходить наружу. Карточки добавляются выбором.
     await openSettingsTab(page, web, 'integrations', 3000);
     await scenario.shot(page, '01-cards');
+    await addIntegration(page, 'Jira');
 
     // ── 02. Заполненная карточка ─────────────────────────────────────────────
     // «Установка» остаётся «не выбрано»: её определит живая проверка и запомнит.
@@ -89,14 +101,9 @@ export async function shootAtlassian(browser, web, scenario, { panel, upstream }
     await scenario.shot(page, '04-mcp');
     await openSettingsTab(page, web, 'integrations', 3000);
 
-    // ── 05. Фордж по токену ──────────────────────────────────────────────────
+    // ── 05. GitLab по токену ─────────────────────────────────────────────────
     // Своя инсталляция GitLab: адрес задан, и «кто я» уходит именно туда.
-    await page
-      .locator(FORGE)
-      .getByLabel(/^(Система|System)$/)
-      .first()
-      .selectOption({ label: 'GitLab' });
-    await page.waitForTimeout(600);
+    await addIntegration(page, 'GitLab');
     await page
       .locator(FORGE)
       .getByLabel(/^(Адрес установки|Installation URL)$/)
@@ -115,6 +122,9 @@ export async function shootAtlassian(browser, web, scenario, { panel, upstream }
       .first()
       .click();
     await page.waitForTimeout(2000);
+    // Карточка GitLab теперь вторая сверху, и тост «Сохранено» ложится на её
+    // кнопки: щелчок ждёт, пока он уйдёт.
+    await toastsGone(page);
     await page
       .locator(FORGE)
       .getByRole('button', { name: /^(Проверить связь|Check connection)$/ })
@@ -132,6 +142,17 @@ export async function shootAtlassian(browser, web, scenario, { panel, upstream }
       .click();
     await page.waitForTimeout(2500);
     await shotCard(scenario, page, '06-forgotten', FORGE);
+
+    // ── 07. Найти уже подключённые ───────────────────────────────────────────
+    // У агента уже есть MCP-серверы: GitLab с адресом и ключом, Telegram без
+    // чата. Находки показаны маской; неполная видна, но не отмечается.
+    await writeMcpServers(panel, upstream);
+    await openSettingsTab(page, web, 'integrations', 3000);
+    await page
+      .getByRole('button', { name: /^(Найти уже подключённые|Find already connected)$/ })
+      .click();
+    await page.waitForTimeout(2500);
+    await shotCard(scenario, page, '07-discover', DISCOVERED);
   } finally {
     await page.close();
   }
@@ -143,6 +164,8 @@ export async function shootNotify(browser, web, scenario, { panel, upstream }) {
   try {
     await resetIntegrations(panel);
     await openSettingsTab(page, web, 'integrations', 3000);
+    await addIntegration(page, 'Вебхук');
+    await addIntegration(page, 'Telegram');
 
     // ── 01. Приёмник и подпись ───────────────────────────────────────────────
     // Секрет подписи — не токен доступа: с ним тело подписывается заголовком,
@@ -205,17 +228,78 @@ export async function shootNotify(browser, web, scenario, { panel, upstream }) {
   }
 }
 
-/** Вернуть все коннекторы в состояние «ничего не подключено». */
+/**
+ * Дождаться, пока уйдут тосты: они перекрывают кнопки карточки под собой.
+ * Курсор уводится в угол — над тостом его таймер стоит на паузе.
+ */
+async function toastsGone(page) {
+  await page.mouse.move(2, 2);
+  await page
+    .locator('li[role="status"]')
+    .first()
+    .waitFor({ state: 'detached', timeout: 15_000 })
+    .catch(() => undefined);
+}
+
+/** Добавить карточку так же, как человек: выбором «Добавить интеграцию». */
+async function addIntegration(page, title) {
+  const titles = { Вебхук: 'Webhook' };
+  await page
+    .getByLabel(/^(Добавить интеграцию|Add integration)$/)
+    .first()
+    .selectOption({ label: process.env.GUIDE_LANG === 'en' ? (titles[title] ?? title) : title });
+  await page.waitForTimeout(600);
+}
+
+/**
+ * MCP-серверы человека в `~/.claude.json` стенда: GitLab с адресом верха и
+ * выдуманным ключом и Telegram без чата. Файл одноразового стенда, не владельца.
+ */
+async function writeMcpServers(panel, upstream) {
+  const location = await (await fetch(`${panel}/api/location`)).json();
+  const file = location.paths.mcpConfig;
+  let config = {};
+  try {
+    config = JSON.parse(readFileSync(file, 'utf8'));
+  } catch {
+    /* файла ещё нет */
+  }
+  config.mcpServers = {
+    ...config.mcpServers,
+    'gitlab-qa': {
+      command: 'npx',
+      args: ['-y', '@zereight/mcp-gitlab'],
+      env: { GITLAB_API_URL: `${upstream}/api/v4`, GITLAB_PERSONAL_ACCESS_TOKEN: FORGE_TOKEN },
+    },
+    'telegram-inbox': {
+      command: 'npx',
+      args: ['-y', 'mcp-telegram'],
+      env: { TELEGRAM_BOT_TOKEN: ['8123', 'demo', 'bot'].join(':') },
+    },
+  };
+  writeFileSync(
+    file,
+    `${JSON.stringify(config, null, 2)}
+`,
+    'utf8',
+  );
+}
+
+/** Вернуть все интеграции в состояние «ничего не подключено». */
 async function resetIntegrations(panel) {
   const response = await fetch(`${panel}/api/settings`, {
     method: 'PATCH',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
       integrations: {
-        atlassian: { enabled: false, baseUrl: '', email: '', deployment: '', confluenceUrl: '' },
-        forge: { enabled: false, kind: '', baseUrl: '', repo: '' },
+        jira: SITE,
+        confluence: SITE,
+        gitlab: FORGE_SITE,
+        github: FORGE_SITE,
         telegram: { enabled: false, chatId: '', events: ['runError', 'testFailed'] },
-        tms: { enabled: false, kind: '', baseUrl: '', projectKey: '', groupId: '' },
+        zephyr: TMS,
+        xray: TMS,
+        testit: TMS,
         ci: { enabled: false, kind: '', repo: '', workflow: '', artifact: '' },
         webhook: { enabled: false, url: '', events: ['runError', 'testFailed'] },
       },

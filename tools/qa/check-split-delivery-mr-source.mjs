@@ -179,10 +179,10 @@ try {
     async (stand, check) => {
       const groupB = async () => (await stand.api(`/chat/${PARENT}/tree`)).body?.split?.groups?.[1];
 
-      const saved = await stand.api('/integrations/forge', {
+      const saved = await stand.api('/integrations/gitlab', {
         method: 'PUT',
         body: {
-          settings: { enabled: true, kind: 'gitlab', baseUrl: SITE, repo: 'team/app' },
+          settings: { enabled: true, baseUrl: SITE, repo: 'team/app' },
           token: 'qa-token',
         },
       });

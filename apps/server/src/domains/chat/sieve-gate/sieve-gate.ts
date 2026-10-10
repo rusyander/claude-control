@@ -14,7 +14,7 @@ import {
 import { serverText } from '../../../lib/server-texts/server-texts.ts';
 import { projectChecks } from '../../project-git/project-checks.ts';
 import { readSieveFacts, touchedFacts } from '../../project-git/sieve-facts/sieve-facts.ts';
-import { untestedCodeIn } from '../../project-git/sieve-scan/sieve-scan.ts';
+import { behaviourIn, untestedCodeIn } from '../../project-git/sieve-scan/sieve-scan.ts';
 import { sieveProofFacts } from '../sieve-proof/sieve-proof.ts';
 import type { SieveStore } from '../sieve-store/sieve-store.ts';
 
@@ -32,9 +32,11 @@ import type { SieveStore } from '../sieve-store/sieve-store.ts';
 function localMechanics(cwd: string, paths: readonly string[]): SieveMechanics {
   const checks = projectChecks(cwd);
   const untestedCode = untestedCodeIn(paths);
+  const behaviour = behaviourIn(paths);
   return {
     ...(checks.length > 0 ? { checks } : {}),
     ...(untestedCode.length > 0 ? { untestedCode } : {}),
+    ...(behaviour.length > 0 ? { behaviour } : {}),
   };
 }
 
@@ -50,8 +52,10 @@ export async function sievePrompt(input: {
   done: readonly SieveReportRow[];
   store?: SieveStore;
   projectPath?: string;
+  /** Ветка предшественника, от которой отведена копия группы (`after`). */
+  forkedFrom?: string;
 }): Promise<string> {
-  const { paths, base } = await touchedFacts(input.cwd);
+  const { paths, base } = await touchedFacts(input.cwd, input.forkedFrom);
   const applicable = applicableSieves(paths);
   const learned = input.store?.forProject(input.projectPath ?? input.cwd, undefined, paths) ?? [];
   const proof = await sieveProofFacts({
@@ -142,16 +146,19 @@ export async function sieveDeliveryGaps(input: {
   cwd: string;
   startedAt?: string;
   rows: readonly SieveReportRow[];
+  /** Ветка предшественника: сита судят только свои коммиты группы. */
+  forkedFrom?: string;
 }): Promise<SieveDeliveryGaps> {
   const facts = await readSieveFacts({
     cwd: input.cwd,
     ...(input.startedAt ? { startedAt: input.startedAt } : {}),
+    ...(input.forkedFrom ? { forkedFrom: input.forkedFrom } : {}),
   });
   // Без remote, основной или общей базы git-механика молчит, но сита отчёта — фокус
   // в браузере, граничный ввод — судятся по тем же путям, что попали в задание:
   // иначе такая копия сдавала бы «готово» без единой строки (ревью сит, 28.09).
   const local = facts.paths.length === 0 && facts.unchecked?.length;
-  const fallback = local ? await touchedFacts(input.cwd) : undefined;
+  const fallback = local ? await touchedFacts(input.cwd, input.forkedFrom) : undefined;
   const paths = fallback?.paths ?? facts.paths;
   // Без удалённого git-механика молчит, но команды проекта и код без тестов
   // сети не требуют — их проверка остаётся и такой копии.

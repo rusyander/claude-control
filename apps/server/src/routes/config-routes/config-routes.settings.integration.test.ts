@@ -159,6 +159,47 @@ describe('config-routes: валидация настроек и импорта',
       expect(res.json<{ ok: boolean }>().ok).toBe(true);
     });
 
+    // Владелец 10.10.2026: каждая система — своя интеграция. Снимок, снятый до
+    // разделения, обязан пройти проверку и разложиться по системам, иначе одна
+    // старая карточка отклоняла бы перенос всех остальных настроек.
+    it('снимок с интеграциями прежней формы раскладывается по системам', async () => {
+      const res = await importState({
+        settings: {
+          integrations: {
+            atlassian: {
+              enabled: true,
+              baseUrl: 'https://acme.atlassian.net',
+              email: 'qa@acme.io',
+              deployment: 'cloud',
+              confluenceUrl: '',
+            },
+            forge: { enabled: true, kind: 'github', baseUrl: '', repo: 'acme/panel' },
+            tms: {
+              enabled: false,
+              kind: 'testit',
+              baseUrl: 'https://tms',
+              projectKey: 'P',
+              groupId: '',
+            },
+          },
+        },
+        integrationHealth: { 'int:atlassian': { state: 'ok', detail: 'Вошли', checkedAt: 'x' } },
+      });
+      expect(res.statusCode).toBe(200);
+      const { integrations } = await getSettings();
+      expect(integrations.jira).toMatchObject({
+        enabled: true,
+        baseUrl: 'https://acme.atlassian.net',
+      });
+      expect(integrations.confluence.baseUrl).toBe('https://acme.atlassian.net/wiki');
+      expect(integrations.github).toMatchObject({ enabled: true, repo: 'acme/panel' });
+      expect(integrations.testit).toMatchObject({ baseUrl: 'https://tms', projectKey: 'P' });
+      // Не названные снимком системы — дефолты, а не пропавшие ключи.
+      expect(integrations.gitlab.enabled).toBe(false);
+      expect(integrations).not.toHaveProperty('atlassian');
+      expect(store.exportState().integrationHealth).toHaveProperty('int:jira');
+    });
+
     // Ревью 28.09 (F-35, F-364) и решение владельца 27.09: разговоры, отпечаток
     // парольной фразы и тексты выключенных правил — этой машины; снимок с другой
     // их не стирает (правила только дополняет недостающими).

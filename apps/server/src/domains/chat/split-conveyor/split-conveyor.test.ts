@@ -708,6 +708,46 @@ describe('SplitConveyor: доставка по фактам git', () => {
     expect(conveyor.view(['родитель'])?.groups[0]?.deliver).toBe(true);
   });
 
+  // Живое разделение 10.10: группа без своих правок вставала ждать MR, которого
+  // не будет, и получала напоминания «нет MR» по кругу.
+  it('своих правок с самого старта нет — «нечего сдавать», done без MR и без сверки', async () => {
+    const h = deliveryHarness([{ missing: ['нет MR'] }]);
+    const built = build({ delivery: h.delivery, parallel: 1, hasWork: () => false });
+    await built.begin();
+    built.conveyor.onTriageFinished(finished('Ничего не нашёл.'), ['new-1-triage']);
+    await built.wait();
+
+    built.conveyor.onChainEnded(built.link(0), { status: 'done', result: { kind: 'unchanged' } });
+    await new Promise((done) => setTimeout(done, 5));
+
+    expect(built.records.get('родитель')?.groups[0]).toMatchObject({
+      status: 'done',
+      result: { kind: 'nothing' },
+    });
+    expect(h.asked).toEqual([]);
+    expect(h.nudges).toEqual([]);
+    // Место освобождено — следующая группа стартовала.
+    expect(built.launches.map((item) => item.groups)).toEqual([[0], [1]]);
+  });
+
+  it('правки в копии есть, хоть последнее звено «без правок», — обычная сверка доставки', async () => {
+    const h = deliveryHarness([{ missing: [], mr: MR }]);
+    const built = build({ delivery: h.delivery, parallel: 1, hasWork: () => true });
+    await built.begin();
+    built.conveyor.onTriageFinished(finished('Ничего не нашёл.'), ['new-1-triage']);
+    await built.wait();
+
+    built.conveyor.onChainEnded(built.link(0), { status: 'done', result: { kind: 'unchanged' } });
+    await new Promise((done) => setTimeout(done, 5));
+
+    expect(h.asked).toHaveLength(1);
+    expect(built.records.get('родитель')?.groups[0]).toMatchObject({
+      status: 'done',
+      mr: MR,
+      result: { kind: 'changed' },
+    });
+  });
+
   it('не хватает — одна повторная сверка, затем напоминание группе со списком; ответ — снова «работает»', async () => {
     const missing = ['ветка feature/login не отправлена на удалённый'];
     const h = deliveryHarness([{ missing }, { missing }]);

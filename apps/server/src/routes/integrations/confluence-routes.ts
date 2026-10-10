@@ -8,7 +8,7 @@ import {
   updatePage,
 } from '../../domains/integrations/atlassian/confluence.ts';
 import {
-  atlassianAccess,
+  confluenceAccess,
   guard,
   limitOf,
   optionalString,
@@ -31,7 +31,7 @@ export function registerIntegrationConfluenceRoutes(
   deps: IntegrationsDeps,
 ): void {
   app.get('/api/integrations/confluence/spaces', (_request, reply) =>
-    guard(reply, () => listSpaces(atlassianAccess(deps))),
+    guard(reply, () => listSpaces(confluenceAccess(deps))),
   );
 
   app.get<{ Querystring: { q?: string; limit?: string } }>(
@@ -39,7 +39,7 @@ export function registerIntegrationConfluenceRoutes(
     (request, reply) =>
       guard(reply, () =>
         searchPages(
-          atlassianAccess(deps),
+          confluenceAccess(deps),
           requireString(
             request.query.q,
             'q',
@@ -53,7 +53,7 @@ export function registerIntegrationConfluenceRoutes(
   );
 
   app.get<{ Params: { id: string } }>('/api/integrations/confluence/page/:id', (request, reply) =>
-    guard(reply, () => readPage(atlassianAccess(deps), request.params.id)),
+    guard(reply, () => readPage(confluenceAccess(deps), request.params.id)),
   );
 
   app.post<{ Body: unknown }>('/api/integrations/confluence/page', (request, reply) =>
@@ -64,7 +64,7 @@ export function registerIntegrationConfluenceRoutes(
         body?: unknown;
         parentId?: unknown;
       } | null;
-      return createPage(atlassianAccess(deps), {
+      return createPage(confluenceAccess(deps), {
         spaceKey: requireString(
           body?.spaceKey,
           'spaceKey',
@@ -95,7 +95,7 @@ export function registerIntegrationConfluenceRoutes(
     (request, reply) =>
       guard(reply, () => {
         const body = request.body as { title?: unknown; body?: unknown } | null;
-        return updatePage(atlassianAccess(deps), request.params.id, {
+        return updatePage(confluenceAccess(deps), request.params.id, {
           title: optionalString(body?.title),
           body: textToStorage(
             requireString(

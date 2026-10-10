@@ -95,13 +95,13 @@ async function requirement(
       'generate-requirement-missing',
     );
 
-  const settings = readIntegrations(deps.store).atlassian;
-  const token = readToken(deps.appDataDir, 'atlassian');
+  const settings = readIntegrations(deps.store).jira;
+  const token = readToken(deps.appDataDir, 'jira');
   if (!settings.enabled || !token) {
     throw coded(
       new ProjectTestsError(
         'Jira не подключена, а «покрыть требование» пишет кейсы по тексту задачи. ' +
-          'Подключите Atlassian в разделе интеграций или выберите другой источник.',
+          'Подключите Jira в разделе интеграций или выберите другой источник.',
       ),
       'generate-jira-off',
     );

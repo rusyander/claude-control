@@ -605,7 +605,10 @@ export const chatEn: typeof chatRu = {
       'project: <project>-worktrees/<branch>. A finished copy opens as a tab at once. The chat ' +
       'offers a copy by itself too: when the agent is about to edit files in the main copy for ' +
       'the first time, the feed shows a “First edit — where do we work?” card, and “Create the ' +
-      'copy and continue there” moves the conversation over. If the previous agent process ' +
+      'copy and continue there” moves the conversation over: the copy opens as its own tab ' +
+      'with the conversation in its list, and every later message runs there too, not back ' +
+      'in the main copy. Once the copy is removed, the conversation returns to the main ' +
+      'copy. If the previous agent process ' +
       'could not be stopped (its number cannot be verified), the copy stays created and the ' +
       'conversation stays in the main copy: the panel does not start a second process on the ' +
       'same session, refuses with the reason, and the agent waits at the same card.',
@@ -801,7 +804,9 @@ export const chatEn: typeof chatRu = {
       'code-change task to an MR — branch, checks, commit, push, MR, review, ' +
       'description — while questions and reviews without edits open no MR; in a split ' +
       'each group is one branch and one MR, and the group summary shows its link as ' +
-      '“MR !N”. “Split groups at once” depends on whether copy preparation is heavy (by ' +
+      '“MR !N”. A group with no changes of its own since its start closes as “nothing to ' +
+      'deliver”: an MR without changes is not an outcome, and the panel does not wait for one. ' +
+      '“Split groups at once” depends on whether copy preparation is heavy (by ' +
       'default — more than one install, or an install plus a build). The number comes ' +
       'from the shared rules (“Settings” → “Groups”: 8 on a light project, 4 on a heavy ' +
       'one), and the project’s “To MR” window shows which the project was judged to be; ' +
@@ -815,7 +820,8 @@ export const chatEn: typeof chatRu = {
     splitSievesText:
       'The review and delivery stages get a list of sieves in their task — checks chosen ' +
       'by the paths the branch touched (the file extension decides the path kind; a file is ' +
-      'a test by its name, a tests/ folder alone does not make it one): docs verified against the stand, removed names and ' +
+      'a test by its name or by a test root outside src/ — test/, tests/, spec/, e2e/ folders and a ' +
+      'test.* file; a tests/ folder inside src/ is code): docs verified against the stand, removed names and ' +
       'test ids found nowhere in the repository, no conflict with a fresh main, a UI edit ' +
       'checked in a browser, a wrong value refused with a clear message. The group passes ' +
       'each sieve with evidence — a command and its output. The task shows exactly the rows ' +
@@ -843,7 +849,11 @@ export const chatEn: typeof chatRu = {
       'are proved by a recorded run: the group cites run:<id>, and the panel opens that run ' +
       'in the history itself — it must be finished, have at least one green case and no red ' +
       'one, and be no older than ' +
-      'the last change to the covered code. A sieve not passed holds the group: “done” does not ' +
+      'the last change to the covered code. A live check cannot be reported “not applicable” ' +
+      '(n/a) when the diff changes product code — UI or backend: that is allowed only on a ' +
+      'docs-or-contract-only change, and then the reason with the sieve id goes into the MR ' +
+      'description — without it “done” does not come either. ' +
+      'A sieve not passed holds the group: “done” does not ' +
       'come and the group gets a reminder, as with an unpushed branch. When a reviewer ' +
       'finds a blocker in an MR thread, the group turns it into a new sieve — a proposed ' +
       'one, with the code area where the blocker was found (from the thread’s file). It ' +
@@ -964,7 +974,8 @@ export const chatEn: typeof chatRu = {
       'bring the branches back together — that is your step, as with copies made ' +
       'by hand. The copy of a closed group can be removed with “Remove the copy” in its ' +
       'summary row: the directory goes, the branch is deleted only if all its work ' +
-      'is already in the main branch, and an MR branch is never touched. A copy ' +
+      'is already in the main branch, and an MR branch is never touched. Tests runs ' +
+      'the group made in the copy move into the project history first. A copy ' +
       'still shared by an open group is not removed.',
 
     cascadeTitle: 'Model routing: what each chat of a split runs on',

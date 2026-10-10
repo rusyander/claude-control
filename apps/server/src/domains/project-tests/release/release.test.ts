@@ -310,10 +310,10 @@ describe('project-tests/release: требования', () => {
   it('оговорка матрицы переезжает в документ', () => {
     const doc = buildRelease('1.4', [], [run('r1', '1.4', [])], {
       now: NOW,
-      coverage: { items: [], orphans: [], source: 'links', warning: 'Atlassian не подключён.' },
+      coverage: { items: [], orphans: [], source: 'links', warning: 'Jira не подключена.' },
     });
 
-    expect(doc.warning).toBe('Atlassian не подключён.');
+    expect(doc.warning).toBe('Jira не подключена.');
     expect(doc.requirements).toEqual([]);
   });
 });

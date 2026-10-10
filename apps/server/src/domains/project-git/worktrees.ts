@@ -25,6 +25,7 @@ import { parseChurn } from './lockfiles.ts';
 import { isGitRepo, requireRepo } from './read.ts';
 import { assertBranchName } from './write.ts';
 import { coded } from '../../lib/server-text/server-text.ts';
+import { carryCopyRuns } from '../project-tests/runs-store/carry-runs.ts';
 
 /**
  * Параллельные рабочие копии (`git worktree`) — то, чем несколько агентов
@@ -613,6 +614,19 @@ export async function removeWorktree(
   // человек прочитал бы «копия убрана» и не смог завести ту же ветку снова.
   unlinkSharedDirs(entry.path, projectDir);
 
+  // Прогоны блока «Тесты», сделанные в копии, переживают копию (F-5): в
+  // историю основного — до удаления. Не перенеслось — копия остаётся, иначе
+  // удаление молча стёрло бы чужие результаты.
+  const carried = carryCopyRuns(entry.path, projectDir);
+  if (carried.failed > 0)
+    throw coded(
+      new GitError(
+        `Прогоны блока «Тесты» из копии не перенеслись (${carried.failed}) — копия оставлена`,
+      ),
+      'worktree-runs-carry-failed',
+      { count: String(carried.failed) },
+    );
+
   // Своя же грязь вопросом человеку быть не должна.
   const forced = force || (await dirtIsOnlyLocalLayer(entry.path, mirror));
 
@@ -633,5 +647,11 @@ export async function removeWorktree(
     }
     throw error;
   }
+  if (carried.runs > 0)
+    return {
+      output: `Копия ${entry.path} убрана, её прогоны блока «Тесты» (${carried.runs}) перенесены в историю проекта`,
+      outputCode: 'worktree-removed-runs',
+      outputParams: { path: entry.path, runs: String(carried.runs) },
+    };
   return gitOutput(out, `Копия ${entry.path} убрана`, 'worktree-removed', { path: entry.path });
 }

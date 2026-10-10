@@ -205,6 +205,8 @@ export async function runHelperRoute(
     // картинки в запросе у них нет, а читать вне рабочей области Qwen и Gemini не
     // станут.
     const [withPaths] = images.length > 0 ? withImagePaths([message], options.cwd) : [message];
+    // Помощнику нужен только текст ответа — режим CLI без правок, а не его настройка
+    // по умолчанию (у Kimi `-p` без профиля одобряет всё сам).
     return outcomeOf(
       await runProviderCli(
         route.provider,
@@ -212,6 +214,7 @@ export async function runHelperRoute(
         { ...base, env: route.env, ...(route.model ? { model: route.model } : {}) },
         route.command,
         options.cwd,
+        false,
       ),
     );
   }

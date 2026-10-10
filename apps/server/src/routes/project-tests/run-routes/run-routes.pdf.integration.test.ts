@@ -28,7 +28,10 @@ describe('GET /api/project-tests/run/pdf без id', () => {
         store: {
           getProjectByPath: () => undefined,
           isTestsAutoAccept: () => false,
-          getSettings: () => ({ language: 'ru', integrations: { atlassian: { enabled: false } } }),
+          getSettings: () => ({
+            language: 'ru',
+            integrations: { jira: { enabled: false }, confluence: { enabled: false } },
+          }),
         },
         location: { paths: { appData: project } },
       } as unknown as ServerContext,

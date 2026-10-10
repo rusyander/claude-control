@@ -149,8 +149,9 @@ describe('POST /api/assist — маршрут активного провайд�
     expect(spawned).toHaveLength(1);
     const run = spawned[0]!;
     expect(basename(run.command).toLowerCase()).toMatch(/^qwen(\.exe)?$/);
-    expect(run.args[0]).toBe('-p');
-    expect(run.args[1]).toContain("The user's current request: назови правило lint");
+    // Помощнику нужен только текст: режим без правок, а не настройка CLI по умолчанию.
+    expect(run.args.slice(0, 3)).toEqual(['--approval-mode', 'default', '-p']);
+    expect(run.args[3]).toContain("The user's current request: назови правило lint");
     for (const claudeFlag of ['--output-format', '--tools', '--no-session-persistence']) {
       expect(run.args).not.toContain(claudeFlag);
     }

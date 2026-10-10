@@ -4,13 +4,18 @@ import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
  * Ф10 — детект CLI на трёх ОС без живых macOS/Linux.
  *
  * `spawnSync` подменён: проверяется ровно то, что от детекта требуется —
- * какой искатель зовётся на какой ОС (`where`/`which`), что МНОГОСТРОЧНЫЙ вывод
+ * какой искатель зовётся на какой ОС (`where` или обход PATH), что МНОГОСТРОЧНЫЙ вывод
  * `where` (одна команда в нескольких каталогах PATH) ничего не ломает, что вывод
  * вообще не разбирается, и что ошибка/таймаут никогда не выходят наружу.
  */
 const spawnSyncMock = vi.fn();
 vi.mock('node:child_process', () => ({
   spawnSync: (...args: unknown[]) => spawnSyncMock(...args),
+}));
+/** Обход PATH на macOS/Linux — свой модуль со своими тестами; здесь важно, что зовётся он. */
+const posixMatches = vi.fn((_command: string): string[] => []);
+vi.mock('../../lib/path-lookup.mjs', () => ({
+  posixPathMatches: (command: string) => posixMatches(command),
 }));
 
 const { detectCliOnPath, findCliOnPath, detectProvider, resetCliLookupCache } =
@@ -34,7 +39,7 @@ afterEach(() => {
 });
 
 describe('detectCliOnPath: искатель по платформе', () => {
-  it('win32 зовёт where, darwin/linux — which; аргумент — само имя команды', () => {
+  it('win32 зовёт where с самим именем команды; darwin/linux обходят PATH без процесса', () => {
     spawnSyncMock.mockReturnValue({ status: 0 });
 
     withPlatform('win32');
@@ -47,9 +52,14 @@ describe('detectCliOnPath: искатель по платформе', () => {
       // Одна команда на двух платформах подряд — только в тесте; кеш ответа сбрасываем.
       resetCliLookupCache();
       withPlatform(platform);
+      posixMatches.mockReturnValueOnce(['/usr/local/bin/codex']);
       expect(detectCliOnPath('codex')).toBe(true);
-      expect(spawnSyncMock.mock.calls[0]![0]).toBe('which');
-      expect(spawnSyncMock.mock.calls[0]![1]).toEqual(['codex']);
+      expect(posixMatches).toHaveBeenLastCalledWith('codex');
+      // Внешнего `which` нет в части дистрибутивов — процесс не запускается вовсе.
+      expect(spawnSyncMock).not.toHaveBeenCalled();
+      resetCliLookupCache();
+      posixMatches.mockReturnValueOnce([]);
+      expect(detectCliOnPath('codex')).toBe(false);
     }
   });
 
@@ -66,7 +76,7 @@ describe('detectCliOnPath: искатель по платформе', () => {
   });
 
   it('ненулевой код, брошенное исключение и таймаут → «не найдено», без падения', () => {
-    withPlatform('linux');
+    withPlatform('win32');
     spawnSyncMock.mockReturnValue({ status: 1 });
     expect(detectCliOnPath('нет-такого')).toBe(false);
 

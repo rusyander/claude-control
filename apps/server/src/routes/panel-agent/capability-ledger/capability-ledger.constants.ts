@@ -291,6 +291,8 @@ export const ROUTE_LEDGER: RouteLedger = {
   'POST /api/integrations/confluence/page': 'human:outward',
   'PUT /api/integrations/confluence/page/:id': 'human:outward',
   // integrations/connector-routes.ts
+  'GET /api/integrations/discover': 'human:secret',
+  'POST /api/integrations/discover': 'human:secret',
   'DELETE /api/integrations/:id': 'action:forget_integration',
   'GET /api/integrations': 'action:list_integrations',
   'POST /api/integrations/:id/check': 'action:check_integration',

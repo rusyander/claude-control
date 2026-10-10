@@ -25,6 +25,7 @@ import {
   type KnownSection,
 } from './analyzer.ts';
 import { WatchEventStore } from './events.ts';
+import { fitForeignBatch, startForeignAnalysis } from './foreign-analysis.ts';
 import { watcherRefusalDetail, type WatcherRoute } from './route.ts';
 import {
   reportCounts,
@@ -258,9 +259,16 @@ export class BackgroundWatcher {
     if (this.events.pending().length > 0) this.schedule();
   }
 
-  /** CLI нет в PATH — сказать словами сразу, а не молча копить неразобранное. */
+  /**
+   * CLI нет в PATH — сказать словами сразу, а не молча копить неразобранное.
+   * Claude Code нужен, только когда разбор поведёт он: чужой CLI маршрут нашёл
+   * сам, а отказ маршрута называет свою причину при разборе («Claude не найден»
+   * при активном Cursor была бы неправдой).
+   */
   private checkCli(): boolean {
-    if (this.deps.resolveCommand()) {
+    const route = this.deps.resolveRoute?.();
+    const runsClaude = !route || (route.ok && !route.foreign);
+    if (!runsClaude || this.deps.resolveCommand()) {
       this.clearProblem('cli_missing');
       return true;
     }
@@ -430,13 +438,8 @@ export class BackgroundWatcher {
   /** Разобрать пачку сейчас (паузу уже выждали). */
   async runOnce(): Promise<void> {
     if (this.current || !this.isEnabled()) return;
-    const batch = this.events.pending().slice(0, WATCH_BATCH_MAX);
-    if (batch.length === 0) return;
-    const command = this.deps.resolveCommand();
-    if (!command) {
-      this.checkCli();
-      return;
-    }
+    const pending = this.events.pending().slice(0, WATCH_BATCH_MAX);
+    if (pending.length === 0) return;
     // Маршрут — до потолка и до записи времени разбора: отказ не тратит разбор
     // из часового потолка и не запускает процесс мимо выбранного маршрута.
     const route = this.deps.resolveRoute?.() ?? { ok: true, env: {}, viaContour: false };
@@ -449,7 +452,16 @@ export class BackgroundWatcher {
       return;
     }
     this.clearProblem('route_refused');
+    const command = route.foreign ? route.foreign.command : this.deps.resolveCommand();
+    if (!command) {
+      this.checkCli();
+      return;
+    }
     if (this.capReached()) return;
+    // Задание чужому CLI уходит элементом argv — пачка ужимается под его предел.
+    const batch = route.foreign
+      ? fitForeignBatch(pending, (part) => this.knownSections(part), this.language())
+      : pending;
     // Разбор пошёл — отложенный на «освободится место» больше не нужен.
     if (this.timer) clearTimeout(this.timer);
     this.timer = undefined;
@@ -465,23 +477,28 @@ export class BackgroundWatcher {
     this.selfSpawning = true;
     let handle: AnalysisHandle;
     try {
-      handle = startAnalysis({
-        command,
+      const common = {
         cwd: this.deps.cwd,
-        // Через контур модель задаёт профиль: дешёвую ступень вендора контур отклонил бы.
-        ...(route.viaContour ? {} : { model: this.deps.model() }),
         env: route.env,
         events: batch,
         known: this.knownSections(batch),
         language: this.language(),
         spawnImpl: this.deps.spawnImpl,
         timeoutMs: this.deps.timeoutMs,
-        onSpawn: (pid) => {
+        onSpawn: (pid: number) => {
           this.ownPids.add(pid);
           ledger.upsert({ key: LEDGER_KEY, pid, cwd: this.deps.cwd, startedAt: Date.now() });
         },
         onExit: () => ledger.remove(LEDGER_KEY),
-      });
+      };
+      handle = route.foreign
+        ? startForeignAnalysis({ ...common, foreign: route.foreign })
+        : startAnalysis({
+            ...common,
+            command,
+            // Через контур модель задаёт профиль: дешёвую ступень вендора контур отклонил бы.
+            ...(route.viaContour ? {} : { model: this.deps.model() }),
+          });
     } finally {
       this.selfSpawning = false;
     }

@@ -81,7 +81,9 @@ export function standEnv(environment: ProjectTestEnvironment | undefined): Recor
 
 /** Отчёт прогона — в каталоге панели, по проекту: соседние проекты не путаются. */
 export function e2eReportPath(appData: string, root: string): string {
-  const key = createHash('sha256').update(root.toLowerCase()).digest('hex').slice(0, 16);
+  // На Linux проекты `App` и `app` — разные: общий отчёт путал бы их прогоны.
+  const spelled = process.platform === 'win32' ? root.toLowerCase() : root;
+  const key = createHash('sha256').update(spelled).digest('hex').slice(0, 16);
   return join(appData, 'e2e-runs', key, 'junit.xml');
 }
 

@@ -60,14 +60,13 @@ beforeEach(() => {
   createGroup(project, 'gui', 'GUI');
   upsertCase(project, 'gui', { title: 'Вход', steps: [] }, '2026-09-01T10:00:00.000Z');
   writeRun(project, RUN);
-  writeSettings(store, 'atlassian', {
+  writeSettings(store, 'jira', {
     enabled: true,
     baseUrl: 'https://acme.atlassian.net',
     email: 'qa@acme.io',
     deployment: 'cloud',
-    confluenceUrl: '',
   });
-  writeToken(appData, 'atlassian', 'SECRET');
+  writeToken(appData, 'jira', 'SECRET');
 });
 
 afterEach(() => {
@@ -131,6 +130,13 @@ describe('domains/integrations/publish', () => {
 
   it('Confluence: отчёт ложится ДОЧЕРНЕЙ страницей, требования не переписываются', async () => {
     writeLink(store, project, undefined, { confluencePageId: '12' });
+    writeSettings(store, 'confluence', {
+      enabled: true,
+      baseUrl: 'https://acme.atlassian.net/wiki',
+      email: 'qa@acme.io',
+      deployment: 'cloud',
+    });
+    writeToken(appData, 'confluence', 'WIKI-SECRET');
     const { calls } = stubApi([
       [/api\/v2\/pages\/12\?/, { body: { id: 12, title: 'Требования', spaceId: '5' } }],
       [/api\/v2\/spaces\/5/, { body: { key: 'QA' } }],
@@ -169,14 +175,13 @@ describe('domains/integrations/publish', () => {
     ).resolves.toMatchObject({ url: 'https://acme.atlassian.net/browse/PRJ-99' });
   });
 
-  it('Atlassian не подключён — 404, а не попытка сходить в сеть', async () => {
+  it('Jira не подключена — 404, а не попытка сходить в сеть', async () => {
     writeLink(store, project, undefined, { jiraIssueKey: 'PRJ-1' });
-    writeSettings(store, 'atlassian', {
+    writeSettings(store, 'jira', {
       enabled: false,
       baseUrl: 'https://acme.atlassian.net',
       email: 'qa@acme.io',
       deployment: 'cloud',
-      confluenceUrl: '',
     });
     const { calls } = stubApi([]);
     await expect(

@@ -62,7 +62,7 @@ export interface ReleaseTexts {
 /** Оговорки матрицы покрытия (`coverage.ts`) по коду — те же слова, что у клиента. */
 const ENGLISH_WARNINGS: Record<string, (reason: string) => string> = {
   'coverage-atlassian-off': () =>
-    'Atlassian is not connected: only requirements from case links are shown.',
+    'Jira is not connected: only requirements from case links are shown.',
   'coverage-jira-project-unlinked': () =>
     'No Jira project is linked to the project: only requirements from case links are shown.',
   'coverage-jira-failed': (reason) => `Jira did not answer: ${reason}`,

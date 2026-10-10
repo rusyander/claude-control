@@ -9,7 +9,7 @@ import {
   searchIssues,
 } from '../../domains/integrations/atlassian/jira.ts';
 import {
-  atlassianAccess,
+  jiraAccess,
   guard,
   limitOf,
   optionalString,
@@ -27,14 +27,14 @@ import {
  */
 export function registerIntegrationJiraRoutes(app: FastifyInstance, deps: IntegrationsDeps): void {
   app.get('/api/integrations/jira/projects', (_request, reply) =>
-    guard(reply, () => listProjects(atlassianAccess(deps))),
+    guard(reply, () => listProjects(jiraAccess(deps))),
   );
 
   app.get<{ Querystring: { q?: string; jql?: string; limit?: string } }>(
     '/api/integrations/jira/search',
     (request, reply) =>
       guard(reply, () =>
-        searchIssues(atlassianAccess(deps), {
+        searchIssues(jiraAccess(deps), {
           q: optionalString(request.query.q),
           jql: optionalString(request.query.jql),
           limit: limitOf(request.query.limit),
@@ -43,7 +43,7 @@ export function registerIntegrationJiraRoutes(app: FastifyInstance, deps: Integr
   );
 
   app.get<{ Params: { key: string } }>('/api/integrations/jira/issue/:key', (request, reply) =>
-    guard(reply, () => readIssue(atlassianAccess(deps), request.params.key)),
+    guard(reply, () => readIssue(jiraAccess(deps), request.params.key)),
   );
 
   /** Завести задачу. Тип по умолчанию «Bug» — панель заводит именно дефекты. */
@@ -56,7 +56,7 @@ export function registerIntegrationJiraRoutes(app: FastifyInstance, deps: Integr
         issueType?: unknown;
         labels?: unknown;
       } | null;
-      return createIssue(atlassianAccess(deps), {
+      return createIssue(jiraAccess(deps), {
         projectKey: requireString(
           body?.projectKey,
           'projectKey',
@@ -84,7 +84,7 @@ export function registerIntegrationJiraRoutes(app: FastifyInstance, deps: Integr
       guard(reply, async () => {
         const body = (request.body as { body?: unknown } | null)?.body;
         await commentIssue(
-          atlassianAccess(deps),
+          jiraAccess(deps),
           request.params.key,
           requireString(body, 'body', 'пустой комментарий', 'request-comment-empty', {
             field: 'body',
@@ -96,8 +96,7 @@ export function registerIntegrationJiraRoutes(app: FastifyInstance, deps: Integr
 
   app.get<{ Params: { key: string } }>(
     '/api/integrations/jira/issue/:key/transitions',
-    (request, reply) =>
-      guard(reply, () => listTransitions(atlassianAccess(deps), request.params.key)),
+    (request, reply) => guard(reply, () => listTransitions(jiraAccess(deps), request.params.key)),
   );
 
   /**
@@ -110,7 +109,7 @@ export function registerIntegrationJiraRoutes(app: FastifyInstance, deps: Integr
       guard(reply, async () => {
         const id = (request.body as { id?: unknown } | null)?.id;
         await applyTransition(
-          atlassianAccess(deps),
+          jiraAccess(deps),
           request.params.key,
           requireString(id, 'id', 'не указан переход', 'request-transition-missing', {
             field: 'id',

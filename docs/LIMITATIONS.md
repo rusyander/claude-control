@@ -223,7 +223,19 @@ Separately and honestly: **the panel has been exercised live on Windows.** The c
 construction (`os.homedir()`, `path.join`, `\n` and `\r\n` treated alike), and the
 platform-dependent places — CLI executable names, `where` versus `which`, the process-spawn
 wrapper — are covered by tests that swap `process.platform` for `win32`, `darwin` and `linux`. But
-a swapped platform is not a real system. Still unverified on macOS/Linux: the real `which` and real
-`PATH` lookups, `0600`/`0700` permissions on key files, launching a CLI without the `cmd.exe`
-wrapper, the macOS keychain, and file-system case sensitivity. The two tests that need a real POSIX
-(the keychain and `chmod 000`) are marked skipped rather than faked.
+a swapped platform is not a real system. So some of these places have been checked on a real Linux
+(a container running Node 22) and pinned by tests that CI runs on Ubuntu on every commit:
+
+- **finding a CLI in `PATH`** — the panel no longer calls an external `which` (minimal images do not
+  have it); it walks `PATH` itself and accepts a regular file you are allowed to execute;
+- **permissions of the remote-access key file** — `0600`, directory `0700`, including after the key
+  is rotated (overwriting used to keep the previous, wider permissions);
+- **case in paths** — on Windows `C:\work\App` and `c:\work\app` are one directory, on Linux they
+  are two. Project path comparisons fold case on Windows only; before, removing a copy on Linux also
+  erased the `.claude.json` access entry of a project that differed only in case.
+
+Not verified live: **the macOS keychain**, and launching a CLI without the `cmd.exe` wrapper on
+macOS. The keychain entry name was checked against Claude Code itself (with a non-default config
+directory the entry is named `Claude Code-credentials-<8 characters of the directory hash>`), and
+the read path is tested with a stubbed `security` command — no macOS machine was available. The
+keychain test on a real macOS is marked skipped rather than faked.

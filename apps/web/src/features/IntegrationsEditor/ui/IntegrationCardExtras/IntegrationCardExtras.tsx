@@ -7,7 +7,7 @@ import { mcpServerApi } from '@entities/McpServer';
 import { useConnectAtlassianMcp, useTestTelegram, useTestWebhook } from '@entities/Integration';
 import type { TelegramEvent } from '@agentdeck/contracts';
 import type { IntegrationCardExtrasProps } from './IntegrationCardExtras.types';
-import styles from '../IntegrationsEditor.module.scss';
+import styles from './IntegrationCardExtras.module.scss';
 import { toggleEvent } from '../../model/toggleEvent';
 import { MCP_NAME } from './IntegrationCardExtras.constants';
 
@@ -16,7 +16,7 @@ import { MCP_NAME } from './IntegrationCardExtras.constants';
  * вебхук), отправка пробного сообщения и регистрация собственного MCP-сервера.
  *
  * Вынесено из карточки, чтобы её общая часть оставалась общей: как только
- * особенности расползаются по пяти веткам в одном компоненте, карточки
+ * особенности расползаются по веткам в одном компоненте, карточки
  * начинают тихо расходиться друг с другом.
  *
  * Список событий у Telegram и вебхука ОДИН и рисуется одним куском: это одни и
@@ -100,7 +100,9 @@ export function IntegrationCardExtras({
     );
   }
 
-  if (id !== 'atlassian') return null;
+  // Сервер один на обе системы: агенту в разговоре нужны и задачи, и страницы,
+  // а кнопка стоит на той карточке, с которой человек пришёл.
+  if (id !== 'jira' && id !== 'confluence') return null;
 
   // Сервер уже зарегистрирован — кнопка отключает. Список MCP панель и так
   // держит в кэше, отдельного «а подключено ли» с сервера не нужно.

@@ -322,7 +322,7 @@ export interface AnalysisHandle {
   stop: () => void;
 }
 
-const EMPTY_USAGE = { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 };
+export const EMPTY_USAGE = { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 };
 
 /**
  * Своя причина неудачного разбора — на языке панели, как тексты отчёта: она
@@ -330,7 +330,7 @@ const EMPTY_USAGE = { input: 0, output: 0, cacheRead: 0, cacheCreation: 0 };
  * перевода (он же несёт сырой вывод CLI). Русская строка в английском окне —
  * тот самый дефект, что в отчёте уже исправлен.
  */
-function failureText(
+export function failureText(
   language: ReportLanguage | undefined,
   kind: 'timeout' | 'no-reply',
   code?: number | null,

@@ -1,7 +1,7 @@
 import { Linking, Pressable, Text, View } from 'react-native';
 import { Muted } from '../../../shared/ui';
 import { useT } from '../../../shared/config/i18n';
-import { useAtlassianSettings } from '../../../entities/integrations/api';
+import { useAtlassianSites } from '../../../entities/integrations/api';
 import { useIntegrationLinks } from '../../../entities/integrations/useIntegrationLinks';
 import { jiraIssueUrl } from '../../../entities/integrations/jiraIssueUrl';
 import { confluencePageUrl } from '../../../entities/integrations/confluencePageUrl';
@@ -19,7 +19,7 @@ import { styles } from './TestLinks.styles';
  */
 export function TestLinks({ projectPath, groupId }: { projectPath: string; groupId?: string }) {
   const t = useT();
-  const atlassian = useAtlassianSettings();
+  const sites = useAtlassianSites();
   const links = useIntegrationLinks(projectPath);
 
   const link = (groupId ? links.data?.groups?.[groupId] : undefined) ?? links.data?.project;
@@ -32,13 +32,13 @@ export function TestLinks({ projectPath, groupId }: { projectPath: string; group
       text: link.jiraIssueKey
         ? `${link.jiraIssueKey}${link.jiraIssueTitle ? ` · ${link.jiraIssueTitle}` : ''}`
         : '',
-      url: jiraIssueUrl(atlassian, link.jiraIssueKey),
+      url: jiraIssueUrl(sites.jira, link.jiraIssueKey),
     },
     {
       key: 'page',
       label: t.tests.links.page,
       text: link.confluencePageTitle ?? link.confluencePageId ?? '',
-      url: confluencePageUrl(atlassian, link.confluencePageId),
+      url: confluencePageUrl(sites.confluence, link.confluencePageId),
     },
   ].filter((row) => row.text);
 

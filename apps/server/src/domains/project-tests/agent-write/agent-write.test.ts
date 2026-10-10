@@ -107,16 +107,17 @@ describe('запись в блок «Тесты» от агента чата', (
     expect(cases[0]?.note).toBe('в браузере');
   });
 
-  // Ревью PR #1: слово агента не заменяет прогон автокейса — и статус в библиотеке
-  // ему не переписывает; в истории запись остаётся, помеченная как слово.
-  it('автокейс: записанное словом не трогает его статус в библиотеке', () => {
+  // Решение владельца 10.10: `record` — только для ручных кейсов. Автокейс в записи —
+  // отказ ЦЕЛИКОМ, до записи: ни прогона в истории, ни статуса, ни ручного соседа.
+  it('автокейс в записи: отказ целиком, с кодом, кейсами и группой для прогона', () => {
     root = mkdtempSync(join(tmpdir(), 'agent-write-'));
+    agentUpsertCase(root, 'auth', { title: 'Ручной' }, NOW);
     agentUpsertCase(root, 'auth', { title: 'заготовка' }, NOW);
     upsertCase(
       root,
       'auth',
       {
-        id: 'auth-001',
+        id: 'auth-002',
         title: 'Авто',
         automation: { status: 'automated', file: 'e2e/auth.spec.ts' },
       },
@@ -125,17 +126,44 @@ describe('запись в блок «Тесты» от агента чата', (
     );
     applyResults(
       root,
-      [{ groupId: 'auth', caseId: 'auth-001', status: 'failed', runId: 'real-run', at: NOW }],
+      [{ groupId: 'auth', caseId: 'auth-002', status: 'failed', runId: 'real-run', at: NOW }],
       NOW,
     );
+    let thrown: unknown;
+    try {
+      recordAgentResults(
+        root,
+        [
+          { groupId: 'auth', caseId: 'auth-001', status: 'passed' },
+          { groupId: 'auth', caseId: 'auth-002', status: 'passed' },
+        ],
+        NOW,
+      );
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toMatchObject({
+      statusCode: 400,
+      messageCode: 'record-automated-case',
+      params: { cases: 'auth:auth-002', groups: 'auth' },
+    });
+    expect(readRuns(root)).toEqual([]);
+    expect(readGroup(root, 'auth').cases.map((item) => [item.id, item.status])).toEqual([
+      ['auth-001', 'unknown'],
+      ['auth-002', 'failed'],
+    ]);
+  });
+
+  it('ручной кейс записан с пометкой «вручную» (attested)', () => {
+    root = mkdtempSync(join(tmpdir(), 'agent-write-'));
+    agentUpsertCase(root, 'auth', { title: 'Ручной' }, NOW);
     const run = recordAgentResults(
       root,
       [{ groupId: 'auth', caseId: 'auth-001', status: 'passed' }],
       NOW,
     );
     expect(run.attested).toBe(true);
-    expect(readGroup(root, 'auth').cases[0]).toMatchObject({ status: 'failed' });
-    expect(readGroup(root, 'auth').cases[0]?.lastRunId).not.toBe(run.id);
+    expect(readRuns(root)[0]).toMatchObject({ id: run.id, attested: true });
   });
 
   it('результат для несуществующего кейса — отказ до записи', () => {

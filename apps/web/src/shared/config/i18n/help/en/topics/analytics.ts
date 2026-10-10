@@ -405,13 +405,12 @@ export const analyticsEn: typeof analyticsRu = {
       'always empty although agents were working. Now the command line is parsed and such ' +
       'runs are found. The panel excludes itself from the list, and the start time is ' +
       'shown on Windows only: on other systems there is nowhere to take it from.',
-    noteSubagentsTitle: 'Sub-agent runs are not in a session’s total',
+    noteSubagentsTitle: 'Sub-agent runs count towards the session’s total',
     noteSubagentsText:
       'When the agent launches a sub-agent (the Agent or Task tool), Claude Code writes its ' +
-      'work to a separate file next to the session, and the panel does not read those ' +
-      'files. So a session’s tokens, requests and cost are its main conversation; for ' +
-      'sessions where sub-agents did a lot, the real spend is larger than shown. How much ' +
-      'larger can be seen in those files, but the report’s numbers do not include it yet.',
+      'work to a separate file in the subagents folder next to the session. The panel reads ' +
+      'those files too and adds their tokens, requests and cost to the session that ' +
+      'launched the sub-agent: a sub-agent never shows up as a session row of its own.',
     noteScopeTitle: 'Only this machine is counted',
     noteScopeText:
       'Work from another computer or from another configuration directory will not reach ' +

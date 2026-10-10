@@ -3,8 +3,8 @@ import type { IntegrationId, IntegrationStatus } from '@agentdeck/contracts';
 import { apiClient } from '@shared/api/client';
 
 /**
- * Пять внешних коннекторов панели: Atlassian, фордж по токену, Telegram,
- * тест-менеджмент и CI.
+ * Внешние интеграции панели: каждая система — своя карточка (Jira, Confluence,
+ * GitLab, GitHub, Telegram, Zephyr, Xray, Test IT, CI, вебхук).
  *
  * Секрет сюда не приходит и отсюда не уходит обратно: при сохранении токен
  * передаётся один раз, а в ответе живёт только маска. Пустая строка в поле

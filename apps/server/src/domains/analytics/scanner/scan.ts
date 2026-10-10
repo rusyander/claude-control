@@ -50,26 +50,38 @@ export async function scanAnalytics(
   return buildResult(accumulator, options, files.length, Date.now() - startedAt, since, until);
 }
 
-/** Собирает пути транскриптов, отсекая старые по времени изменения файла. */
+/**
+ * Собирает пути транскриптов, отсекая старые по времени изменения файла.
+ * Субагенты пишут свой транскрипт отдельно — `<проект>/<сессия>/subagents/
+ * agent-*.jsonl` — и тратят те же токены подписки: без них аналитика
+ * занижала расход сессии ровно на работу её агентов (решение 10.10). Записи
+ * субагента несут `sessionId` родителя и ложатся в его сессию.
+ */
 function collectTranscripts(
   projectsDir: string,
   since: number,
 ): Array<{ path: string; mtimeMs: number }> {
   if (!existsSync(projectsDir)) return [];
   const result: Array<{ path: string; mtimeMs: number }> = [];
-
-  for (const projectEntry of readdirSync(projectsDir, { withFileTypes: true })) {
-    if (!projectEntry.isDirectory()) continue;
-    const projectPath = join(projectsDir, projectEntry.name);
-
-    for (const fileEntry of readdirSync(projectPath, { withFileTypes: true })) {
+  const take = (dir: string): void => {
+    for (const fileEntry of readdirSync(dir, { withFileTypes: true })) {
       if (!fileEntry.isFile() || !fileEntry.name.endsWith('.jsonl')) continue;
-
-      const filePath = join(projectPath, fileEntry.name);
+      const filePath = join(dir, fileEntry.name);
       const stats = statSync(filePath);
       // Файл, не менявшийся с начала периода, точно не содержит свежих записей.
       if (stats.mtimeMs < since) continue;
       result.push({ path: filePath, mtimeMs: stats.mtimeMs });
+    }
+  };
+
+  for (const projectEntry of readdirSync(projectsDir, { withFileTypes: true })) {
+    if (!projectEntry.isDirectory()) continue;
+    const projectPath = join(projectsDir, projectEntry.name);
+    take(projectPath);
+    for (const sessionEntry of readdirSync(projectPath, { withFileTypes: true })) {
+      if (!sessionEntry.isDirectory()) continue;
+      const subagents = join(projectPath, sessionEntry.name, 'subagents');
+      if (existsSync(subagents)) take(subagents);
     }
   }
 

@@ -781,7 +781,10 @@ export interface SplitPlanView {
        * только проверка, правок не было; `changed` — правки есть; `pushed` —
        * согласие на push отдано. С `commits` — сколько коммитов у ветки поверх базы.
        */
-      result?: { kind: 'reviewed' | 'changed' | 'unchanged' | 'pushed'; commits?: number };
+      result?: {
+        kind: 'reviewed' | 'changed' | 'unchanged' | 'pushed' | 'nothing';
+        commits?: number;
+      };
       /** Хвост последнего ответа ребёнка — видно, о чём он спросил текстом (Д16). */
       tail?: string;
       /**

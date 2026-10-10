@@ -16,6 +16,8 @@ export const integrationsRu: Record<IntegrationsMessageCode, string> = {
     'Запрос не принят: не выбрана система CI (github или gitlab) ({{field}}).',
   'request-repo-missing':
     'Запрос не принят: не указан репозиторий и его не удалось вывести из origin ({{field}}).',
+  'request-tms-system-ambiguous':
+    'Запрос не принят: подключено несколько систем тест-кейсов ({{systems}}) — укажите, какую ({{field}}).',
   'request-forge-kind-missing':
     'Запрос не принят: не выбран вид форджа (github или gitlab) ({{field}}).',
   'request-title-missing': 'Запрос не принят: не указан заголовок ({{field}}).',
@@ -67,6 +69,13 @@ export const integrationsRu: Record<IntegrationsMessageCode, string> = {
   'ci-no-finished-runs': 'В репозитории нет ни одного завершённого прогона Actions.',
   'ci-pipeline-job-missing': 'В конвейере {{pipeline}} нет задания «{{workflow}}» с артефактами.',
   'ci-pipeline-no-artifacts': 'В конвейере {{pipeline}} ни одно задание не оставило артефактов.',
+  'integration-discover-empty': 'Запрос не принят: не выбрано ни одной находки ({{field}}).',
+  'integration-discover-gone':
+    'Запрос не принят: сервер «{{key}}» больше не найден — обновите поиск ({{field}}).',
+  'integration-discover-incomplete':
+    'Запрос не принят: у «{{server}}» не хватает: {{missing}} ({{field}}).',
+  'integration-discover-twice':
+    'Запрос не принят: для «{{id}}» выбрано два сервера — оставьте один ({{field}}).',
   'integration-not-connected':
     '{{title}} не подключена: включите её и сохраните токен в настройках панели.',
   'tms-not-connected':

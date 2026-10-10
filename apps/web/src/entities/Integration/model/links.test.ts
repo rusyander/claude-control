@@ -1,24 +1,25 @@
 import { describe, it, expect } from 'vitest';
-import type { AtlassianSettings } from '@agentdeck/contracts';
+import type { AtlassianSiteSettings } from '@agentdeck/contracts';
 import { jiraIssueUrl } from './links';
 import { confluencePageUrl } from './confluencePageUrl';
 import { linkRows } from './linkRows';
 
-const cloud: AtlassianSettings = {
+const cloud: AtlassianSiteSettings = {
   enabled: true,
   baseUrl: 'https://site.atlassian.net/',
   email: 'qa@example.com',
   deployment: 'cloud',
-  confluenceUrl: '',
 };
 
-const server: AtlassianSettings = {
+const server: AtlassianSiteSettings = {
   enabled: true,
-  baseUrl: 'https://jira.company.ru',
+  baseUrl: 'https://wiki.company.ru',
   email: '',
   deployment: 'server',
-  confluenceUrl: '',
 };
+
+/** Jira и Confluence — свои адреса: у своей установки это разные хосты. */
+const sites = { jira: cloud, confluence: cloud };
 
 describe('jiraIssueUrl', () => {
   it('собирает адрес задачи и срезает хвостовой слэш адреса', () => {
@@ -38,15 +39,19 @@ describe('confluencePageUrl', () => {
     );
   });
 
-  it('своя установка — в корне хоста', () => {
+  it('своя установка — в корне своего адреса', () => {
     expect(confluencePageUrl(server, '42')).toBe(
-      'https://jira.company.ru/pages/viewpage.action?pageId=42',
+      'https://wiki.company.ru/pages/viewpage.action?pageId=42',
     );
   });
 
-  it('отдельный адрес Confluence отменяет догадки о корне', () => {
-    const own = { ...cloud, confluenceUrl: 'https://wiki.company.ru/' };
-    expect(confluencePageUrl(own, '42')).toBe(
+  it('адрес вики облака с /wiki не удваивается; вид не записан — решает почта', () => {
+    const wiki = { ...cloud, baseUrl: 'https://site.atlassian.net/wiki/' };
+    expect(confluencePageUrl(wiki, '42')).toBe(
+      'https://site.atlassian.net/wiki/pages/viewpage.action?pageId=42',
+    );
+    expect(confluencePageUrl({ ...cloud, deployment: '' }, '42')).toContain('/wiki/pages/');
+    expect(confluencePageUrl({ ...server, deployment: '' }, '42')).toBe(
       'https://wiki.company.ru/pages/viewpage.action?pageId=42',
     );
   });
@@ -59,14 +64,14 @@ describe('confluencePageUrl', () => {
 
 describe('linkRows', () => {
   it('пустая привязка не даёт строк', () => {
-    expect(linkRows(undefined, cloud)).toEqual([]);
-    expect(linkRows({}, cloud)).toEqual([]);
+    expect(linkRows(undefined, sites)).toEqual([]);
+    expect(linkRows({}, sites)).toEqual([]);
   });
 
   it('задача идёт первой и несёт заголовок вместе с ключом', () => {
     const rows = linkRows(
       { jiraIssueKey: 'QA-1', jiraIssueTitle: 'Оплата', jiraProjectKey: 'QA' },
-      cloud,
+      sites,
     );
     expect(rows[0]).toEqual({
       kind: 'jiraIssue',
@@ -77,13 +82,14 @@ describe('linkRows', () => {
   });
 
   it('страница без заголовка подписывается своим id', () => {
-    const rows = linkRows({ confluencePageId: '77' }, cloud);
+    const rows = linkRows({ confluencePageId: '77' }, { jira: cloud, confluence: server });
     expect(rows[0]?.text).toBe('77');
-    expect(rows[0]?.url).toContain('pageId=77');
+    // Ссылка страницы — на адрес Confluence, не Jira.
+    expect(rows[0]?.url).toBe('https://wiki.company.ru/pages/viewpage.action?pageId=77');
   });
 
   it('репозиторий и заметка показываются без ссылок', () => {
-    const rows = linkRows({ forgeRepo: 'org/app', note: 'требования тут' }, cloud);
+    const rows = linkRows({ forgeRepo: 'org/app', note: 'требования тут' }, sites);
     expect(rows.map((row) => row.kind)).toEqual(['forgeRepo', 'note']);
     expect(rows.every((row) => row.url === '')).toBe(true);
   });

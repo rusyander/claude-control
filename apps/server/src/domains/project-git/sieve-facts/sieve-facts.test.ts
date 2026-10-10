@@ -7,6 +7,7 @@ import {
   parseZeroContextDiff,
   readSieveFacts,
   removedTokens,
+  touchedFacts,
   touchedPaths,
 } from './sieve-facts.ts';
 
@@ -107,8 +108,8 @@ describe('механика сит на настоящем git', () => {
     const { work } = repo({ 'old.ts': 'const keep = 1;\nconst drop = 2;\n' });
     commit(work, { 'old.ts': 'const keep = 1;\n' }, STARTED);
     const facts = await readSieveFacts({ cwd: work, startedAt: STARTED });
-    // Git-механика молчит; остаётся только «код без тестов» — тестов ветка не трогала.
-    expect(facts.mechanics).toEqual({ untestedCode: ['old.ts'] });
+    // Git-механика молчит; остаются «код без тестов» (тестов ветка не трогала) и файлы поведения.
+    expect(facts.mechanics).toEqual({ untestedCode: ['old.ts'], behaviour: ['old.ts'] });
     expect(facts.unchecked).toBeUndefined();
     expect(facts.commits?.[0]?.paths).toEqual(['old.ts']);
   });
@@ -175,6 +176,41 @@ describe('механика сит на настоящем git', () => {
     commit(work, { 'b.tsx': 'y\n' }, STARTED);
     write(work, { 'a.ts': 'changed\n', 'new/c.go': 'package c\n' });
     expect((await touchedPaths(work)).sort()).toEqual(['a.ts', 'b.tsx', 'new/c.go']);
+  });
+
+  /** Предшественник `pred` от основной, группа `grp` — от его ветки (`after`). */
+  function chained(): string {
+    const { work } = repo({ 'a.ts': 'x\n' });
+    git(work, ['checkout', '-q', '-b', 'pred', 'origin/main']);
+    commit(work, { 'pred.ts': 'one\ntwo\n' }, BEFORE, 'predecessor');
+    git(work, ['checkout', '-q', '-B', 'grp']);
+    return work;
+  }
+
+  it('группа от ветки предшественника: сита видят только её коммиты', async () => {
+    const work = chained();
+    commit(work, { 'own.ts': 'mine\n' }, STARTED, 'group');
+
+    const own = await readSieveFacts({ cwd: work, forkedFrom: 'pred' });
+    expect(own.paths).toEqual(['own.ts']);
+    expect(own.commits?.map((item) => item.paths)).toEqual([['own.ts']]);
+    expect((await readSieveFacts({ cwd: work })).paths.sort()).toEqual(['own.ts', 'pred.ts']);
+    expect((await touchedFacts(work, 'pred')).paths).toEqual(['own.ts']);
+    // Ветки предшественника нет — считать от основной, как раньше.
+    expect((await readSieveFacts({ cwd: work, forkedFrom: 'gone' })).paths.sort()).toEqual([
+      'own.ts',
+      'pred.ts',
+    ]);
+  });
+
+  it('правка строк предшественника — не «чужие −»: они сверяются с основной', async () => {
+    const work = chained();
+    commit(work, { 'pred.ts': 'one\n' }, AFTER, 'group edits predecessor');
+
+    const facts = await readSieveFacts({ cwd: work, startedAt: STARTED, forkedFrom: 'pred' });
+    expect(facts.paths).toEqual(['pred.ts']);
+    expect(facts.mechanics.foreignRemovals).toBeUndefined();
+    expect(facts.unchecked).toBeUndefined();
   });
 });
 

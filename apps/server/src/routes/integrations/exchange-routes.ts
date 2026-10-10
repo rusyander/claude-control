@@ -1,11 +1,17 @@
 import { resolve } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { fetchCiReport } from '../../domains/integrations/ci.ts';
+import type { TmsKind } from '@agentdeck/contracts';
+import { IntegrationError, invalidField } from '../../domains/integrations/errors.ts';
 import {
+  isConnected,
   readIntegrations,
   readToken,
   requireConnected,
+  TMS_KINDS,
+  tmsSettingsOf,
 } from '../../domains/integrations/store/store.ts';
+import { coded } from '../../lib/server-text/server-text.ts';
 import { tmsClient } from '../../domains/integrations/tms/index.ts';
 import { pullIntoGroup, pushRunToTms } from '../../domains/integrations/tms/sync.ts';
 import { sendTelegramMessage } from '../../domains/notify/telegram.ts';
@@ -27,6 +33,34 @@ import {
  * файл, принесённый руками (`project-tests/import-results.ts`): второй разбор
  * того же формата разошёлся бы с первым на первой же нестандартной выгрузке.
  */
+/**
+ * Какая система тест-кейсов: названная в теле, иначе единственная подключённая.
+ * Подключены несколько и ни одна не названа — отказ с перечнем: угадать, куда
+ * человек хотел отправить прогон, нельзя, а отправка не туда — чужой цикл.
+ */
+function tmsSystemFor(deps: IntegrationsDeps, requested: unknown): TmsKind {
+  const named = TMS_KINDS.find((kind) => kind === requested);
+  if (named) return named;
+  const connected = TMS_KINDS.filter((kind) => isConnected(deps.ctx.store, appDataOf(deps), kind));
+  if (connected.length === 1) return connected[0]!;
+  if (connected.length === 0) {
+    throw coded(
+      new IntegrationError(
+        'integration_not_found',
+        'Ни одна система тест-кейсов не подключена: включите её и сохраните токен в настройках панели.',
+      ),
+      'integration-not-connected',
+      { title: 'Zephyr / Xray / Test IT' },
+    );
+  }
+  throw invalidField(
+    'system',
+    `подключено несколько систем тест-кейсов (${connected.join(', ')}) — укажите, какую`,
+    'request-tms-system-ambiguous',
+    { field: 'system', systems: connected.join(', ') },
+  );
+}
+
 export function registerIntegrationExchangeRoutes(
   app: FastifyInstance,
   deps: IntegrationsDeps,
@@ -52,7 +86,7 @@ export function registerIntegrationExchangeRoutes(
       );
       const token = requireConnected(deps.ctx.store, appDataOf(deps), 'ci', 'CI');
       const settings = readIntegrations(deps.ctx.store);
-      const baseUrl = settings.forge.kind === settings.ci.kind ? settings.forge.baseUrl : '';
+      const baseUrl = settings.ci.kind ? settings[settings.ci.kind].baseUrl : '';
 
       const report = await fetchCiReport(settings.ci, token, { projectRoot: root, baseUrl });
       const result = importResults(root, {
@@ -67,7 +101,7 @@ export function registerIntegrationExchangeRoutes(
   /** Кейсы из тест-менеджмента в группу панели. */
   app.post<{ Body: unknown }>('/api/integrations/tms/pull', (request, reply) =>
     guard(reply, async () => {
-      const body = request.body as { path?: unknown; groupId?: unknown } | null;
+      const body = request.body as { path?: unknown; groupId?: unknown; system?: unknown } | null;
       const root = resolve(
         requireString(
           body?.path,
@@ -77,21 +111,22 @@ export function registerIntegrationExchangeRoutes(
           { field: 'path' },
         ),
       );
-      const settings = readIntegrations(deps.ctx.store);
-      const token = requireConnected(deps.ctx.store, appDataOf(deps), 'tms', 'Тест-менеджмент');
+      const system = tmsSystemFor(deps, body?.system);
+      const settings = tmsSettingsOf(deps.ctx.store, system);
+      const token = requireConnected(deps.ctx.store, appDataOf(deps), system);
       // Группа из тела сильнее настройки: человек тянет кейсы в ту группу, что
       // открыта у него на экране, а настройка — это лишь значение по умолчанию.
       const groupId =
         optionalString(body?.groupId) ??
         requireString(
-          settings.tms.groupId,
+          settings.groupId,
           'groupId',
           'не указана группа тестов',
           'request-groupid-missing',
           { field: 'groupId' },
         );
 
-      const batch = await tmsClient(settings.tms, token).pullCases();
+      const batch = await tmsClient(settings, token).pullCases();
       const result = pullIntoGroup(root, groupId, batch.cases, new Date().toISOString());
       // Обрезанную выборку называем вслух: «привезено 2000» человек читает как
       // «это все кейсы проекта» и об остальных не узнает.
@@ -102,7 +137,7 @@ export function registerIntegrationExchangeRoutes(
   /** Прогон панели — в тест-менеджмент отдельным циклом/выполнением. */
   app.post<{ Body: unknown }>('/api/integrations/tms/push', (request, reply) =>
     guard(reply, async () => {
-      const body = request.body as { path?: unknown; runId?: unknown } | null;
+      const body = request.body as { path?: unknown; runId?: unknown; system?: unknown } | null;
       const root = resolve(
         requireString(
           body?.path,
@@ -115,9 +150,9 @@ export function registerIntegrationExchangeRoutes(
       const runId = requireString(body?.runId, 'runId', 'не указан прогон', 'request-run-missing', {
         field: 'runId',
       });
-      const settings = readIntegrations(deps.ctx.store);
-      const token = requireConnected(deps.ctx.store, appDataOf(deps), 'tms', 'Тест-менеджмент');
-      return pushRunToTms(tmsClient(settings.tms, token), root, runId);
+      const system = tmsSystemFor(deps, body?.system);
+      const token = requireConnected(deps.ctx.store, appDataOf(deps), system);
+      return pushRunToTms(tmsClient(tmsSettingsOf(deps.ctx.store, system), token), root, runId);
     }),
   );
 

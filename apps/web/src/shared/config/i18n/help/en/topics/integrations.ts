@@ -4,7 +4,8 @@ import type { integrationsRu } from '../../ru/topics/integrations';
 export const integrationsEn: typeof integrationsRu = {
   topic: {
     title: 'Integrations',
-    summary: 'Jira, Confluence, a token forge, Telegram, test management and CI reports',
+    summary:
+      'Jira, Confluence, GitLab, GitHub, Telegram, Zephyr, Xray, Test IT, CI reports and a webhook — each on its own card',
     lead:
       'The panel can already run tests, but everything it produced stayed on this ' +
       'machine: defects needed gh or glab on PATH, reports were files, and requirements ' +
@@ -14,19 +15,10 @@ export const integrationsEn: typeof integrationsRu = {
 
     whyOne: 'One credential per system',
     whyOneText:
-      'The token is entered once, in the connector card. From then on the panel buttons ' +
-      'and the agent both use it — except the agent never gets the token itself, only ' +
-      'the panel’s own MCP server, which goes outside on its behalf.',
+      "The token is entered once, on the integration card. From then on both the panel buttons and the agent use it — but the agent gets not the token but the panel's own MCP server, which goes outside on its behalf. What is already connected to the agent as an MCP server is carried over with “Find already connected” — no URL or key typed twice.",
     whyBoth: 'Cloud and self-hosted alike',
     whyBothText:
-      'Which Atlassian is on the other end is detected by a live check and remembered: ' +
-      'the cloud takes Basic auth with an email, Server/DC takes a Bearer token, and ' +
-      'their API paths differ. None of that has to be chosen by hand. What does have to ' +
-      'be chosen by hand: on an own installation Jira and Confluence are separate apps ' +
-      'and each issues its own token, so the card has a second field, "Confluence key". ' +
-      'Leaving it empty means "the same one as Jira" — which is how the cloud works, ' +
-      'where a site has a single key. "Check connection" asks both systems and says in ' +
-      'the caption what the wiki answered.',
+      'Which Atlassian is on the other end the panel finds out with a live check and remembers: cloud uses Basic with email and token, Server/DC uses Bearer, and their API paths differ. There is nothing to choose by hand. Jira and Confluence are two integrations, each with its own URL and key: on an own installation they are separate applications and each issues its own token. Cloud has one key per site — it goes into both cards.',
     whySecret: 'The secret is never shown and never forwarded',
     whySecretText:
       'The token is stored encrypted on this machine. What leaves it — in a response, a ' +
@@ -34,12 +26,11 @@ export const integrationsEn: typeof integrationsRu = {
       'recognise their key without seeing it.',
 
     stepsTitle: 'How to connect',
-    stepsCaption: 'The Integrations tab in settings, six cards in one column.',
+    stepsCaption:
+      'The Integrations tab in settings: only set-up integrations are listed, the rest are under “Add integration”.',
     step1: 'Fill in the address and account details',
     step1Text:
-      'For Atlassian that is the site address and an email (cloud only), for the forge — ' +
-      'its kind and repository, for Telegram — the chat id. A missing required field is ' +
-      'named under the card, and the connector cannot be switched on until it is filled.',
+      'Choose a system in “Add integration” or carry it over with “Find already connected”. For Jira and Confluence it is the site URL and email (for cloud), for GitLab and GitHub the installation URL and repository, for Telegram the chat id. A required field left empty is named under the card, and the integration cannot be enabled before it is filled.',
     step2: 'Paste the token and save',
     step2Text:
       'The token field is always empty: the server never hands the value back. Empty is ' +
@@ -56,18 +47,23 @@ export const integrationsEn: typeof integrationsRu = {
       'the Confluence page with the requirements, the project new defects go into. This ' +
       'is exactly what reaches the agent as a line in its task — it cannot know it itself.',
 
-    cardsTitle: 'The six connectors',
-    cardsCaption: 'Each is enabled separately; a disabled one gets in nobody’s way.',
-    cardsHeader: 'Connector',
+    cardsTitle: 'Ten integrations',
+    cardsCaption:
+      'Each system is its own card with its own key; a disabled one gets in the way of nothing.',
+    cardsHeader: 'Integration',
     cardsWhat: 'What it gives',
-    cardAtlassian: 'Atlassian',
-    cardAtlassianText:
-      'Searching Jira issues and Confluence pages, reading requirements, filing defects, ' +
-      'publishing a run report as a page or a comment.',
-    cardForge: 'Token forge',
-    cardForgeText:
-      'GitHub or GitLab without gh and glab installed: a defect, a comment, an MR linked ' +
-      'to a run. Installed CLIs stay as the fallback.',
+    cardJira: 'Jira',
+    cardJiraText:
+      'Issue search, defects for failed cases, comments, issues without cases in the coverage matrix.',
+    cardConfluence: 'Confluence',
+    cardConfluenceText:
+      "Searching and reading requirement pages, publishing a run report as a page. Its own URL and key, not Jira's.",
+    cardGitlab: 'GitLab',
+    cardGitlabText:
+      'Without glab installed: a defect, a comment, linking an MR to a run. An own installation — by its URL.',
+    cardGithub: 'GitHub',
+    cardGithubText:
+      'Without gh installed: a defect, a comment, linking a pull request to a run. With both forges connected the right one is picked by the link or by the project origin.',
     cardTelegram: 'Telegram',
     cardTelegramText:
       'A message when a run ends, fails, asks for permission, asks a question, or a test ' +
@@ -77,14 +73,15 @@ export const integrationsEn: typeof integrationsRu = {
       'The same events at an address of your own: one POST with JSON. It covers Slack, ' +
       'Mattermost, an on-call bot and an internal bus at once — the panel needs to know ' +
       'none of them. With a secret set, the body is signed.',
-    cardTms: 'Test management',
-    cardTmsText:
-      'Zephyr Scale, Xray or Test IT: pull cases into a panel group and push a run. Test IT ' +
-      'has its own URL — it is a company installation, not a cloud. The source of truth for ' +
-      'cases stays there, not in the panel, and pushing the same run again lands in the same ' +
-      'run instead of creating a second one — even if the previous push broke off midway. ' +
-      'The Test IT URL is required: without it the card can neither be enabled nor saved ' +
-      'while enabled.',
+    cardZephyr: 'Zephyr Scale',
+    cardZephyrText:
+      'Pull cases into a panel group and push a run as a cycle. Pushing the same run again lands in the same cycle instead of opening a second one — even if the previous push broke off halfway.',
+    cardXray: 'Xray',
+    cardXrayText:
+      'The same for Xray: the key is the client id and client secret in one line separated by a colon.',
+    cardTestit: 'Test IT',
+    cardTestitText:
+      'The same for Test IT. Its URL is its own — a company installation, not a cloud — and it is required: without it the card can be neither enabled nor saved enabled. The source of truth for cases stays there, not in the panel.',
     cardCi: 'CI',
     cardCiText:
       'The last build’s report is fetched by token and goes into the same results import ' +
@@ -104,9 +101,7 @@ export const integrationsEn: typeof integrationsRu = {
     testsCaption: 'An attached project changes six places in the Testing section.',
     testsDefect: 'Choosing a defect target',
     testsDefectText:
-      'In the defect window the list of targets comes from the server: Jira, the token ' +
-      'forge, gh, glab. With no target at all the draft is still assembled, and a button ' +
-      'copies it.',
+      'In the defect window the list of targets comes from the server: Jira, GitLab and GitHub by token, gh, glab. With no target at all the draft is still built and can be copied with a button.',
     testsDefectState: 'What became of a filed defect',
     testsDefectStateText:
       'The “Check defects” button asks the tracker whether the issues attached to red ' +
@@ -138,7 +133,7 @@ export const integrationsEn: typeof integrationsRu = {
       'Settings are visible, the secret is not; everything about cases lives in the ' +
       'tested project itself.',
     filePanelTitle: 'The panel',
-    fileSettings: 'Connector settings and attachments',
+    fileSettings: 'Integration settings and attachments',
     fileToken: 'Tokens (encrypted)',
     fileProjectTitle: 'The tested project',
     fileBaselines: 'Baseline screenshots',
@@ -165,12 +160,7 @@ export const integrationsEn: typeof integrationsRu = {
       'conversation, nor the panel’s startup suffers for it.',
     noteMcpTitle: 'The MCP server is registered by hand',
     noteMcpText:
-      'The button in the Atlassian card adds the server as an ordinary one, with a health ' +
-      'probe — into the ACTIVE CLI’s MCP configuration, not always into Claude Code’s. A ' +
-      'CLI with no MCP section at all gets a refusal that names it: writing into someone ' +
-      'else’s file would read as success while the agent gained no tool. After that the ' +
-      'panel enables the server itself when a run starts in an attached project, but it ' +
-      'never disables anything — switching off stays yours.',
+      "The button on the Jira or Confluence card adds the server like any other, with a connection check — into the MCP configuration of the ACTIVE CLI, not always Claude Code. One server serves both systems. For a CLI with no MCP section at all the button refuses and names it: writing into someone else's file would look like success while the agent got no tool. After that the panel enables the server itself when a run starts in a project with attachments, but never disables anything — disabling stays with you.",
     noteSignatureTitle: 'The webhook signature',
     noteSignatureText:
       'With a secret set, X-AgentDeck-Signature carries an HMAC-SHA256 of the body in ' +
@@ -182,9 +172,7 @@ export const integrationsEn: typeof integrationsRu = {
 
     guideTitle: 'What this document holds',
     guideText:
-      'A diagram of who calls whom; two paths split by entry — after external context ' +
-      '(Jira, Confluence, a forge) and after a notification (a webhook, Telegram); what ' +
-      'the tab is NOT; what it writes on disk; tables of cards, links and refusals.',
+      'A map of who calls whom; two paths by entry point — for outside context (Jira, Confluence, GitLab, carrying over what is already connected) and for notifications (webhook, Telegram); what the tab is NOT; what it writes to disk; tables of integrations, attachments and refusals.',
 
     wireMapTitle: 'Who calls whom',
     wireMapCaption:
@@ -201,15 +189,12 @@ export const integrationsEn: typeof integrationsRu = {
       'address or messages Telegram, and only the event header goes out.',
 
     guide: {
-      contextTitle: 'Path: connect Jira, Confluence and a forge',
+      contextTitle: 'Path: connect Jira, Confluence and GitLab',
       contextCaption:
-        'Settings → the “Integrations” tab. Six frames: the empty cards, filling one in, ' +
-        'the live check, access for the agent, a self-hosted forge and “forget the key”.',
-      contextCards: '1. Six cards, none of them on',
+        'Settings → the Integrations tab. Seven frames: an empty list, filling in, a live check, access for the agent, GitLab on an own installation, “forget key” and carrying over what is already connected.',
+      contextCards: '1. An empty list and two ways in',
       contextCardsText:
-        'Until asked, the panel stays a local application: no integration is enabled and ' +
-        'nothing goes outside. The cards differ by purpose — where requirements come ' +
-        'from, where defects are filed, where run news is written.',
+        'Until asked, the panel stays a local application: nothing is set up and nothing goes outside. Only set-up integrations are listed; a new one is added with “Add integration”, and what already works for the agent — with “Find already connected”. A card added but not saved is gone after a reload.',
       contextFilled: '2. Filling in: one field is required, the rest depend',
       contextFilledText:
         'Without the site address the connector cannot be enabled, and the card says so. ' +
@@ -227,18 +212,15 @@ export const integrationsEn: typeof integrationsRu = {
         'The “Connect Atlassian MCP” button adds the server to the MCP section like any ' +
         'other, with a health probe. The agent still holds no key: the proxy calls the ' +
         'panel, and the panel calls Atlassian. Removing it happens where any server is.',
-      contextForge: '5. A forge by token — without gh or glab installed',
+      contextForge: '5. GitLab by token — without glab installed',
       contextForgeText:
-        'The card exists for places where the forge CLI cannot be installed. The ' +
-        'installation address is set for a self-hosted GitLab; the repository may be left ' +
-        'out — it is then derived from the checked project’s origin. After the check the ' +
-        'card keeps the bot name and the time.',
+        'The card is needed where the forge CLI cannot be installed. The installation URL is set for an own GitLab; the repository may be left out — it is then derived from the origin of the checked project. GitHub is the same kind of card next to it, with its own key. After the check the card keeps the bot name and the time.',
       contextForgotten: '6. “Forget the key” erases the key and switches the card off',
       contextForgottenText:
-        'The button erases the key and the check result and also switches the integration ' +
-        'off: without a key there is no point in it being on. The address, the system and ' +
-        'the repository stay, and the card returns to “not checked” and “no key yet”. To ' +
-        'bring it back, type a key and turn the toggle on again.',
+        'The button erases the key and the check result and disables the integration too: without a key it has no reason to be on. The URL and repository stay, the card stays in the list and shows “not checked” and “no key yet” again. To bring it back — paste a key and switch the toggle on again.',
+      contextDiscover: '7. “Find already connected” — carrying over from MCP servers',
+      contextDiscoverText:
+        "The panel reads ~/.claude.json, the projects' .mcp.json and the MCP secrets file and recognises known systems by the server's package, image or URL. The key never reaches the screen — only its mask, and the transfer re-reads it from the same place. One finding per system is ticked; an incomplete one (here Telegram without a chat) is shown with what is missing but cannot be ticked, an already connected one is marked. After the transfer every integration is checked live right away.",
 
       notifyTitle: 'Path: get notifications without giving away too much',
       notifyCaption:
@@ -330,10 +312,9 @@ export const integrationsEn: typeof integrationsRu = {
     refusalNoTokenText:
       'The check refuses BEFORE any outbound request — the panel does not go online ' +
       'without a key. The webhook is the exception: its signing secret is optional.',
-    refusalNoBaseUrl: '“Without this field the connector cannot be enabled”',
+    refusalNoBaseUrl: '“The integration cannot be enabled without this field”',
     refusalNoBaseUrlText:
-      'The site address is the only mandatory field on the Atlassian card. Without it ' +
-      'there is nothing to build a request from.',
+      'The site URL is required on the Jira and Confluence cards, the installation URL on Test IT. Without it there is nothing to build a single request from.',
     refusalWrongDialect: 'A 404 with a perfectly good token',
     refusalWrongDialectText:
       'Usually the deployment kind is wrong: cloud and Server/DC have different paths to ' +
@@ -346,21 +327,30 @@ export const integrationsEn: typeof integrationsRu = {
     refusalTelegramChatText:
       'Most often the bot was never added to the chat, or the id has a typo. The panel ' +
       'shows Telegram’s answer as it came instead of hiding it behind a generic failure.',
+    refusalDiscoverTwice: '“Two servers are selected for … — keep one”',
+    refusalDiscoverTwiceText:
+      'One system was found in two MCP servers (say, a shared and a project one). The transfer refuses as a whole without writing anything: tick one.',
+    refusalDiscoverIncomplete: '“…is missing: …”',
+    refusalDiscoverIncompleteText:
+      'The server found has no URL, key or chat. Such a finding cannot be carried over — add the integration by hand or complete the server.',
   },
 
   shots: {
     atlassian: {
-      '01-cards': 'The whole “Integrations” tab: six cards, none enabled, nothing going outside',
+      '01-cards':
+        'The Integrations tab with no integration yet: “Add integration”, the “Find already connected” button and the empty state',
       '02-filled':
-        'The filled Atlassian card: the address is required, email is cloud-only, deployment not chosen yet',
+        'A filled Jira card: the URL is required, the email is for cloud only, “deployment” not chosen yet',
       '03-checked':
         'After the check: “connected”, the detected “cloud”, the account name and the key stub atl…42a0',
       '04-mcp':
         'The MCP section after the button: agentdeck-atlassian added like any other server, with a probe',
       '05-forge':
-        'A forge by token: a self-hosted GitLab, “Signed in as qa-release-bot” and the check time',
+        'GitLab by token: an own installation, “Signed in as qa-release-bot” and the check time',
       '06-forgotten':
         'After “Forget the key”: address and repository kept, no key, toggle off, state back to “not checked”',
+      '07-discover':
+        '“Find already connected”: GitLab from an MCP server with its URL and key mask is ticked, Telegram without a chat is shown but cannot be ticked',
     },
     notify: {
       '01-webhook':

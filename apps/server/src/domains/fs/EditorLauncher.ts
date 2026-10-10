@@ -1,5 +1,6 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { shellArgs } from '../../lib/cli-args/cli-args.ts';
+import { posixPathMatches } from '../../lib/path-lookup.mjs';
 
 /**
  * Открытие проекта во внешнем редакторе кода. Панель умеет и сама вести агента в
@@ -43,12 +44,11 @@ const SAFE_COMMAND = /^[a-zA-Z0-9._-]+$/;
 /** Есть ли команда в PATH. Пустую и небезопасную сразу отвергаем. */
 export function commandExists(command: string): boolean {
   if (!SAFE_COMMAND.test(command)) return false;
-  // Без shell: имя команды уже проверено регуляркой, а where.exe/which
-  // находятся по PATH сами. Так нет и предупреждения DEP0190.
-  const probe = isWindows
-    ? spawnSync('where', [command], { windowsHide: true })
-    : spawnSync('which', [command]);
-  return probe.status === 0;
+  // macOS и Linux — обходом PATH: внешнего `which` в части дистрибутивов нет.
+  if (!isWindows) return posixPathMatches(command).length > 0;
+  // Без shell: имя команды уже проверено регуляркой, а where.exe находится по
+  // PATH сам. Так нет и предупреждения DEP0190.
+  return spawnSync('where', [command], { windowsHide: true }).status === 0;
 }
 
 /**

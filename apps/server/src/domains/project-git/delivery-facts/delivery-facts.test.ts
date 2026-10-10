@@ -388,4 +388,21 @@ describe('mrDescriptionGap', () => {
       }),
     ).toEqual({ unchecked: true });
   });
+
+  // Решение владельца 10.10: причина n/a живой проверки идёт в описание MR по id сита.
+  it('живая проверка n/a: описание должно назвать сито по id', async () => {
+    const read = async () => ({ description: 'Что и зачем. browser-focus: n/a — только README.' });
+    expect(await mrDescriptionGap(MR, read, ['browser-focus'])).toEqual({});
+    const gap = await mrDescriptionGap(MR, read, ['browser-focus', 'contract-by-request']);
+    expect(gap.missing).toContain('contract-by-request');
+    expect(gap.missing).not.toContain('browser-focus,');
+    // Имя внутри другого слова не в счёт.
+    expect(
+      (
+        await mrDescriptionGap(MR, async () => ({ description: 'xbrowser-focus2' }), [
+          'browser-focus',
+        ])
+      ).missing,
+    ).toContain('browser-focus');
+  });
 });

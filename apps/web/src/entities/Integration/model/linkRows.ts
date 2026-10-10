@@ -1,4 +1,4 @@
-import type { IntegrationLink, AtlassianSettings } from '@agentdeck/contracts';
+import type { IntegrationLink, AtlassianSiteSettings } from '@agentdeck/contracts';
 import { confluencePageUrl } from './confluencePageUrl';
 import { jiraIssueUrl } from './links';
 
@@ -13,10 +13,13 @@ export interface LinkRow {
  * Привязка, разложенная в строки для показа. Порядок — от того, что человек
  * ищет чаще: задача, требования, куда заводить дефекты, свой репозиторий.
  */
-export function linkRows(
-  link: IntegrationLink | undefined,
-  atlassian: AtlassianSettings,
-): LinkRow[] {
+/** Адреса, по которым строки собирают ссылки: у Jira и Confluence свои. */
+export interface LinkSites {
+  jira: AtlassianSiteSettings;
+  confluence: AtlassianSiteSettings;
+}
+
+export function linkRows(link: IntegrationLink | undefined, sites: LinkSites): LinkRow[] {
   if (!link) return [];
   const rows: LinkRow[] = [];
 
@@ -25,14 +28,14 @@ export function linkRows(
     rows.push({
       kind: 'jiraIssue',
       text: `${link.jiraIssueKey}${title}`,
-      url: jiraIssueUrl(atlassian.baseUrl, link.jiraIssueKey),
+      url: jiraIssueUrl(sites.jira.baseUrl, link.jiraIssueKey),
     });
   }
   if (link.confluencePageId) {
     rows.push({
       kind: 'confluencePage',
       text: link.confluencePageTitle || link.confluencePageId,
-      url: confluencePageUrl(atlassian, link.confluencePageId),
+      url: confluencePageUrl(sites.confluence, link.confluencePageId),
     });
   }
   if (link.jiraProjectKey) {

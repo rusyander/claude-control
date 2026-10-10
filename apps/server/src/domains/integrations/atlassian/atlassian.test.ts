@@ -1,6 +1,14 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import type { AtlassianSettings } from '@agentdeck/contracts';
-import { authHeaders, confluenceRoot, detectDeployment, jiraApi, toAccess } from './client.ts';
+import type { AtlassianSiteSettings } from '@agentdeck/contracts';
+import {
+  authHeaders,
+  confluenceRoot,
+  detectConfluenceDeployment,
+  detectDeployment,
+  jiraApi,
+  toAccess,
+  toConfluenceAccess,
+} from './client.ts';
 import { fromAdf, toAdf } from './adf.ts';
 import {
   applyTransition,
@@ -56,8 +64,6 @@ const CLOUD = {
   email: 'qa@acme.io',
   token: 'CLOUD-SECRET',
   deployment: 'cloud' as const,
-  confluenceUrl: '',
-  confluenceToken: '',
 };
 
 const SERVER = {
@@ -65,9 +71,11 @@ const SERVER = {
   email: '',
   token: 'PAT-SECRET',
   deployment: 'server' as const,
-  confluenceUrl: 'https://wiki.acme.local',
-  confluenceToken: '',
 };
+
+/** Доступ Confluence: `baseUrl` — уже корень вики (`toConfluenceAccess`). */
+const CLOUD_WIKI = { ...CLOUD, baseUrl: 'https://acme.atlassian.net/wiki' };
+const SERVER_WIKI = { ...SERVER, baseUrl: 'https://wiki.acme.local', token: 'WIKI-SECRET' };
 
 /** Заголовок авторизации записанного запроса — по нему видно, какой ключ уехал. */
 function headerOf(call: { init: RequestInit } | undefined): string {
@@ -91,58 +99,59 @@ describe('atlassian/client: два диалекта', () => {
 
   /**
    * Живой дефект 18.09.2026: на своей установке Confluence отвечал 401 на
-   * полностью рабочем доступе. Причина — у Jira и Confluence там РАЗНЫЕ personal
-   * access token, а панель посылала обеим ключ Jira.
-   *
-   * Красное до правки: обе строки ниже возвращали `Bearer PAT-SECRET`, и
-   * `listSpaces` уходил с ключом Jira.
+   * полностью рабочем доступе — у Jira и Confluence там РАЗНЫЕ personal access
+   * token. Теперь это две интеграции, и доступ каждой несёт только свой ключ.
    */
-  it('у Confluence свой ключ: Jira ходит основным, вики — вторым', async () => {
-    const twoKeys = { ...SERVER, confluenceToken: 'WIKI-SECRET' };
-    expect(authHeaders(twoKeys, 'Jira').Authorization).toBe('Bearer PAT-SECRET');
-    expect(authHeaders(twoKeys, 'Confluence').Authorization).toBe('Bearer WIKI-SECRET');
-
-    // Не только заголовок в отрыве: настоящая ручка Confluence обязана уехать
-    // со вторым ключом, а соседняя ручка Jira — с основным.
+  it('Confluence ходит своим ключом и на свой адрес, Jira — своим', async () => {
     const { calls } = stubApi([
       [/rest\/api\/space/, { body: { results: [{ id: 1, key: 'QA', name: 'QA' }] } }],
       [/rest\/api\/2\/project/, { body: [] }],
     ]);
-    await listSpaces(twoKeys);
-    await listProjects(twoKeys);
+    await listSpaces(SERVER_WIKI);
+    await listProjects(SERVER);
+    expect(calls[0]?.url).toContain('https://wiki.acme.local/rest/api/space');
     expect(headerOf(calls[0])).toBe('Bearer WIKI-SECRET');
     expect(headerOf(calls[1])).toBe('Bearer PAT-SECRET');
   });
 
-  it('второго ключа нет — Confluence по-прежнему ходит основным', async () => {
-    const { calls } = stubApi([[/rest\/api\/space/, { body: { results: [] } }]]);
-    await listSpaces(SERVER);
-    expect(headerOf(calls[0])).toBe('Bearer PAT-SECRET');
+  it('облако держит вики под /wiki: адрес сайта достраивается, адрес вики — нет', () => {
+    const site: AtlassianSiteSettings = {
+      enabled: true,
+      baseUrl: 'https://acme.atlassian.net/',
+      email: 'qa@acme.io',
+      deployment: 'cloud',
+    };
+    expect(confluenceRoot(toConfluenceAccess(site, 't'))).toBe('https://acme.atlassian.net/wiki');
+    expect(
+      toConfluenceAccess({ ...site, baseUrl: 'https://acme.atlassian.net/wiki' }, 't').baseUrl,
+    ).toBe('https://acme.atlassian.net/wiki');
+    // Своя установка: вики живёт в корне своего адреса, /wiki не приписывается.
+    expect(
+      toConfluenceAccess({ ...site, baseUrl: 'https://wiki.acme.local', deployment: 'server' }, 't')
+        .baseUrl,
+    ).toBe('https://wiki.acme.local');
   });
 
-  it('облако: второй ключ уходит тем же Basic, но с почтой и своим значением', () => {
-    const twoKeys = { ...CLOUD, confluenceToken: 'WIKI-CLOUD' };
-    expect(authHeaders(twoKeys, 'Confluence').Authorization).toBe(
-      `Basic ${Buffer.from('qa@acme.io:WIKI-CLOUD').toString('base64')}`,
-    );
-  });
-
-  it('Confluence облака живёт под /wiki, своя установка — в корне своего адреса', () => {
-    expect(confluenceRoot(CLOUD)).toBe('https://acme.atlassian.net/wiki');
-    expect(confluenceRoot(SERVER)).toBe('https://wiki.acme.local');
-    // Задан отдельный адрес — /wiki не приписывается: это уже чужой хост.
-    expect(confluenceRoot({ ...CLOUD, confluenceUrl: 'https://wiki.acme.io/' })).toBe(
-      'https://wiki.acme.io',
-    );
+  it('проверка Confluence спрашивает «кто я» у вики, а не у Jira', async () => {
+    const { calls } = stubApi([
+      [/wiki\/rest\/api\/user\/current/, { status: 401 }],
+      [/wiki\.acme\.local\/rest\/api\/user\/current/, { body: { displayName: 'Ольга' } }],
+    ]);
+    await expect(
+      detectConfluenceDeployment({ baseUrl: 'https://wiki.acme.local', email: '', token: 't' }),
+    ).resolves.toEqual({ deployment: 'server', account: 'Ольга' });
+    // Без почты облако не пробуется: Basic без почты — заведомый 401.
+    expect(calls.map((call) => call.url)).toEqual([
+      'https://wiki.acme.local/rest/api/user/current',
+    ]);
   });
 
   it('пустой адрес — это незаполненное поле (400), а не сетевая ошибка', () => {
-    const settings: AtlassianSettings = {
+    const settings: AtlassianSiteSettings = {
       enabled: true,
       baseUrl: '  ',
       email: '',
       deployment: '',
-      confluenceUrl: '',
     };
     expect(() => toAccess(settings, 'token')).toThrow(
       expect.objectContaining({ statusCode: 400, code: 'invalid_body' }),
@@ -150,12 +159,11 @@ describe('atlassian/client: два диалекта', () => {
   });
 
   it('вид установки не записан — почта решает, куда метил человек', () => {
-    const base: AtlassianSettings = {
+    const base: AtlassianSiteSettings = {
       enabled: true,
       baseUrl: 'https://acme.atlassian.net/',
       email: 'qa@acme.io',
       deployment: '',
-      confluenceUrl: '',
     };
     expect(toAccess(base, 't').deployment).toBe('cloud');
     expect(toAccess({ ...base, email: '' }, 't').deployment).toBe('server');
@@ -170,8 +178,6 @@ describe('atlassian/client: два диалекта', () => {
         baseUrl: 'https://acme.atlassian.net',
         email: 'qa@acme.io',
         token: 't',
-        confluenceUrl: '',
-        confluenceToken: '',
       }),
     ).resolves.toEqual({ deployment: 'cloud', account: 'Ольга' });
     expect(calls).toHaveLength(1);
@@ -187,8 +193,6 @@ describe('atlassian/client: два диалекта', () => {
         baseUrl: 'https://jira.acme.local',
         email: 'qa@acme.io',
         token: 't',
-        confluenceUrl: '',
-        confluenceToken: '',
       }),
     ).resolves.toEqual({ deployment: 'server', account: 'qa' });
   });
@@ -199,8 +203,6 @@ describe('atlassian/client: два диалекта', () => {
       baseUrl: 'https://jira.acme.local',
       email: '',
       token: 't',
-      confluenceUrl: '',
-      confluenceToken: '',
     });
     expect(calls).toHaveLength(1);
     expect(calls[0]?.url).toContain('/rest/api/2/myself');
@@ -216,8 +218,6 @@ describe('atlassian/client: два диалекта', () => {
         baseUrl: 'https://acme.atlassian.net',
         email: 'qa@acme.io',
         token: 'bad',
-        confluenceUrl: '',
-        confluenceToken: '',
       }),
     ).rejects.toMatchObject({
       statusCode: 502,
@@ -232,8 +232,6 @@ describe('atlassian/client: два диалекта', () => {
         baseUrl: '',
         email: '',
         token: 't',
-        confluenceUrl: '',
-        confluenceToken: '',
       }),
     ).rejects.toMatchObject({ detail: 'baseUrl' });
     await expect(
@@ -241,8 +239,6 @@ describe('atlassian/client: два диалекта', () => {
         baseUrl: 'https://x',
         email: '',
         token: '',
-        confluenceUrl: '',
-        confluenceToken: '',
       }),
     ).rejects.toMatchObject({ detail: 'token' });
     expect(calls).toHaveLength(0);
@@ -391,27 +387,27 @@ describe('atlassian/jira', () => {
 describe('atlassian/confluence', () => {
   it('пространства читаются из своего API у каждого диалекта', async () => {
     stubApi([[/api\/v2\/spaces/, { body: { results: [{ id: 5, key: 'QA', name: 'Тесты' }] } }]]);
-    await expect(listSpaces(CLOUD)).resolves.toEqual([{ id: '5', key: 'QA', name: 'Тесты' }]);
+    await expect(listSpaces(CLOUD_WIKI)).resolves.toEqual([{ id: '5', key: 'QA', name: 'Тесты' }]);
 
     stubApi([[/rest\/api\/space/, { body: { results: [{ id: 7, key: 'DOC', name: 'Доки' }] } }]]);
-    await expect(listSpaces(SERVER)).resolves.toEqual([{ id: '7', key: 'DOC', name: 'Доки' }]);
+    await expect(listSpaces(SERVER_WIKI)).resolves.toEqual([{ id: '7', key: 'DOC', name: 'Доки' }]);
   });
 
   it('поиск идёт по CQL старого content-API у ОБОИХ — у облака под /wiki', async () => {
     const { calls } = stubApi([
       [/content\/search/, { body: { results: [{ id: 12, title: 'Требования' }] } }],
     ]);
-    await searchPages(CLOUD, 'требования');
+    await searchPages(CLOUD_WIKI, 'требования');
     expect(calls[0]!.url).toContain('/wiki/rest/api/content/search');
 
     const server = stubApi([[/content\/search/, { body: { results: [] } }]]);
-    await searchPages(SERVER, 'требования');
+    await searchPages(SERVER_WIKI, 'требования');
     expect(server.calls[0]!.url).toContain('https://wiki.acme.local/rest/api/content/search');
   });
 
   it('пустой запрос поиска — 400, наружу не ходим', async () => {
     const { calls } = stubApi([]);
-    await expect(searchPages(CLOUD, '   ')).rejects.toMatchObject({ detail: 'q' });
+    await expect(searchPages(CLOUD_WIKI, '   ')).rejects.toMatchObject({ detail: 'q' });
     expect(calls).toHaveLength(0);
   });
 
@@ -432,7 +428,7 @@ describe('atlassian/confluence', () => {
       ],
       [/api\/v2\/spaces\/5/, { body: { key: 'QA' } }],
     ]);
-    await expect(readPage(CLOUD, '12')).resolves.toEqual({
+    await expect(readPage(CLOUD_WIKI, '12')).resolves.toEqual({
       id: '12',
       title: 'Требования',
       spaceKey: 'QA',
@@ -447,7 +443,7 @@ describe('atlassian/confluence', () => {
       [/api\/v2\/pages\/12/, { body: { id: 12, title: 'Т', spaceId: '5' } }],
       [/api\/v2\/spaces\/5/, { status: 403 }],
     ]);
-    await expect(readPage(CLOUD, '12')).resolves.toMatchObject({ spaceKey: '', title: 'Т' });
+    await expect(readPage(CLOUD_WIKI, '12')).resolves.toMatchObject({ spaceKey: '', title: 'Т' });
   });
 
   it('создание страницы: облаку нужен числовой spaceId, своей установке — ключ', async () => {
@@ -455,7 +451,12 @@ describe('atlassian/confluence', () => {
       [/api\/v2\/spaces\?keys=QA/, { body: { results: [{ id: '5', key: 'QA' }] } }],
       [/api\/v2\/pages$/, { body: { id: 99, title: 'Отчёт', version: { number: 1 } } }],
     ]);
-    await createPage(CLOUD, { spaceKey: 'QA', title: 'Отчёт', body: '<p>x</p>', parentId: '12' });
+    await createPage(CLOUD_WIKI, {
+      spaceKey: 'QA',
+      title: 'Отчёт',
+      body: '<p>x</p>',
+      parentId: '12',
+    });
     const cloudBody = JSON.parse(String(cloud.calls[1]!.init.body)) as {
       spaceId: string;
       parentId: string;
@@ -463,7 +464,7 @@ describe('atlassian/confluence', () => {
     expect(cloudBody).toMatchObject({ spaceId: '5', parentId: '12' });
 
     const server = stubApi([[/rest\/api\/content$/, { body: { id: 77, title: 'Отчёт' } }]]);
-    await createPage(SERVER, { spaceKey: 'DOC', title: 'Отчёт', body: '<p>x</p>' });
+    await createPage(SERVER_WIKI, { spaceKey: 'DOC', title: 'Отчёт', body: '<p>x</p>' });
     const serverBody = JSON.parse(String(server.calls[0]!.init.body)) as {
       space: { key: string };
       type: string;
@@ -474,7 +475,7 @@ describe('atlassian/confluence', () => {
   it('несуществующее пространство названо словами, а не 404 от чужого API', async () => {
     stubApi([[/api\/v2\/spaces\?keys=NOPE/, { body: { results: [] } }]]);
     await expect(
-      createPage(CLOUD, { spaceKey: 'NOPE', title: 'x', body: '' }),
+      createPage(CLOUD_WIKI, { spaceKey: 'NOPE', title: 'x', body: '' }),
     ).rejects.toMatchObject({ message: expect.stringContaining('пространства «NOPE»') });
   });
 
@@ -487,7 +488,7 @@ describe('atlassian/confluence', () => {
       [/api\/v2\/spaces\/5/, { body: { key: 'QA' } }],
       [/api\/v2\/pages\/12$/, { body: { id: 12, title: 'Требования', version: { number: 5 } } }],
     ]);
-    await updatePage(CLOUD, '12', { body: '<p>новое</p>' });
+    await updatePage(CLOUD_WIKI, '12', { body: '<p>новое</p>' });
     const body = JSON.parse(String(calls.at(-1)!.init.body)) as { version: { number: number } };
     expect(body.version.number).toBe(5);
   });

@@ -117,10 +117,14 @@ export const DEFAULT_STATE: AppState = {
     // прогон, провал теста и порог бюджета контура. «Работа закончена» на каждый
     // чат — это спам.
     integrations: {
-      atlassian: { enabled: false, baseUrl: '', email: '', deployment: '', confluenceUrl: '' },
-      forge: { enabled: false, kind: '', baseUrl: '', repo: '' },
+      jira: { enabled: false, baseUrl: '', email: '', deployment: '' },
+      confluence: { enabled: false, baseUrl: '', email: '', deployment: '' },
+      gitlab: { enabled: false, baseUrl: '', repo: '' },
+      github: { enabled: false, baseUrl: '', repo: '' },
       telegram: { enabled: false, chatId: '', events: ['runError', 'testFailed', 'budget'] },
-      tms: { enabled: false, kind: '', baseUrl: '', projectKey: '', groupId: '' },
+      zephyr: { enabled: false, baseUrl: '', projectKey: '', groupId: '' },
+      xray: { enabled: false, baseUrl: '', projectKey: '', groupId: '' },
+      testit: { enabled: false, baseUrl: '', projectKey: '', groupId: '' },
       ci: { enabled: false, kind: '', repo: '', workflow: '', artifact: '' },
       webhook: { enabled: false, url: '', events: ['runError', 'testFailed', 'budget'] },
     },

@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs';
 import type { ServerMessageCode } from '@agentdeck/contracts/server-messages';
+import { normalizeProjectPath } from '../../lib/app-store/projects.ts';
 import { readJsonFile, writeJsonFile } from '../../lib/safe-io/safe-io.ts';
 
 /**
@@ -62,11 +63,11 @@ function findEntry(
   projects: Record<string, Record<string, unknown>>,
   dir: string,
 ): Record<string, unknown> | undefined {
-  const wanted = projectKey(dir).toLowerCase();
+  const wanted = normalizeProjectPath(dir);
   const exact = projects[projectKey(dir)];
   if (exact) return exact;
   for (const [key, value] of Object.entries(projects)) {
-    if (key.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase() === wanted) return value;
+    if (normalizeProjectPath(key) === wanted) return value;
   }
   return undefined;
 }
@@ -144,10 +145,10 @@ export function dropProjectAccess(claudeJsonPath: string, copyDir: string): bool
   }
   const projects = data.projects;
   if (!projects) return false;
-  const wanted = projectKey(copyDir).toLowerCase();
-  const keys = Object.keys(projects).filter(
-    (key) => key.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase() === wanted,
-  );
+  // Регистр сворачивается только на Windows: на Linux `/work/App` и `/work/app` —
+  // разные проекты, и удаление копии стирало бы доступ соседа.
+  const wanted = normalizeProjectPath(copyDir);
+  const keys = Object.keys(projects).filter((key) => normalizeProjectPath(key) === wanted);
   if (keys.length === 0) return false;
   for (const key of keys) delete projects[key];
   try {

@@ -311,7 +311,7 @@ export interface SplitPlanGroupRecord {
   /** Чего ждёт группа в `awaiting`/`background` (Д3). */
   waitingFor?: SplitGroupWait;
   /** Что сделано — по фактам копии (Д5). */
-  result?: { kind: 'reviewed' | 'changed' | 'unchanged' | 'pushed'; commits?: number };
+  result?: { kind: 'reviewed' | 'changed' | 'unchanged' | 'pushed' | 'nothing'; commits?: number };
   /** Хвост последнего ответа ребёнка (Д16). */
   tail?: string;
   /**

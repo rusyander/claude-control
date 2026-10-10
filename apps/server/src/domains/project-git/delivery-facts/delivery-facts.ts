@@ -287,14 +287,21 @@ async function sharesBaseHead(
  * «готовым» не считается. Читает фордж-клиент; MR не прочитать (интеграция
  * выключена, нет токена, фордж ответил ошибкой) — проверка пропускается, и
  * человеку говорится, что эту часть панель не проверила, а группа не держится.
+ *
+ * `liveNa` — живые проверки, сданные `n/a` (решение владельца 10.10): причина
+ * идёт в описание MR, и описание должно назвать каждое такое сито по id.
  */
 export async function mrDescriptionGap(
   mr: string,
   read: (url: string) => Promise<{ description?: string } | undefined>,
+  liveNa: readonly string[] = [],
 ): Promise<{ missing?: string; unchecked?: true }> {
   const review = await read(mr).catch(() => undefined);
   if (!review || review.description === undefined) return { unchecked: true };
-  return review.description.trim()
-    ? {}
-    : { missing: serverText('delivery-gap-mr-description', { mr }) };
+  const text = review.description.trim();
+  if (!text) return { missing: serverText('delivery-gap-mr-description', { mr }) };
+  const unnamed = liveNa.filter((id) => !new RegExp(`(^|[^\\w-])${id}([^\\w-]|$)`).test(text));
+  return unnamed.length > 0
+    ? { missing: serverText('delivery-gap-mr-na-reason', { mr, sieves: unnamed.join(', ') }) }
+    : {};
 }

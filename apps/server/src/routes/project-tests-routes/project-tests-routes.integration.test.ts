@@ -83,7 +83,7 @@ describe('project-tests-routes', () => {
           // Настройки спрашивают источники генерации: без них не ответить, что
           // Jira не подключена, — а это отказ прогона, а не поломка панели.
           getSettings: () => ({
-            integrations: { atlassian: { enabled: false } },
+            integrations: { jira: { enabled: false }, confluence: { enabled: false } },
             provider: activeProvider,
           }),
         },

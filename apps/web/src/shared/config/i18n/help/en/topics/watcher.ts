@@ -98,16 +98,17 @@ export const watcherEn: typeof watcherRu = {
     readOnly: 'The model only reads',
     readOnlyText:
       'The analysis is launched with Claude Code and the Read, Grep and Glob tools, working ' +
-      "directory = the panel's sources: a read-only launch is described and verified for it " +
-      'alone. The process environment is a narrow list of variables: service keys never ' +
+      "directory = the panel's sources. The process environment is a narrow list of variables: service keys never " +
       'reach it. The model follows the “Panel assistant” route: no profile — the cheap tier ' +
       'of the Claude cloud; Claude switched to a local model — that same local model; a ' +
       'contour profile (including a local model handed to agents with “Connect”) — the ' +
       'analysis goes through the contour gateway and the profile sets the model. With ' +
       'another CLI active, such as Qwen Code, the analysis runs when the route leads to a ' +
       'contour or a local model: the same model answers as for the agents. If it would lead ' +
-      'to the Claude cloud, the analysis does not start and the summary names the reason — ' +
-      'Claude is never substituted there for the chosen CLI. An own assistant endpoint is ' +
+      'to the Claude cloud, that CLI runs the analysis itself, in its no-edits mode (the same ' +
+      'as “Allow edits” switched off in chat), along the route of its own chat — Claude is ' +
+      'never substituted there for the chosen CLI. Only Cursor has no no-edits mode — then ' +
+      'the analysis does not start and the summary names the reason. An own assistant endpoint is ' +
       'refused — its token would have to be handed to a CLI process.',
     spend: 'Spend',
     spendText:
@@ -118,12 +119,12 @@ export const watcherEn: typeof watcherRu = {
       'they wait, and the summary says so in words.',
     trouble: 'When the watcher cannot work',
     troubleText:
-      'No Claude Code on PATH — problems are written to the report without analysis. The ' +
+      'The CLI the analysis runs with is not on PATH — problems are written to the report without analysis. The ' +
       'report cannot be written — the watcher keeps going and names the reason. An ' +
       'analysis failed — problems wait for the next one; the analysis does not retry in a ' +
       'loop. The hourly cap is reached — problems are written as “checking” and the ' +
-      'analysis resumes on its own. The route does not let the analysis run (another CLI ' +
-      'with a route to the Claude cloud, an own assistant endpoint, the contour gateway down ' +
+      'analysis resumes on its own. The route does not let the analysis run (Cursor ' +
+      'without a route to a contour or a local model, an own assistant endpoint, the contour gateway down ' +
       'or no key) — problems wait, no process starts and the cap is not spent. In every case ' +
       "the reason is spelled out in the summary on the page and in the row's window.",
   },

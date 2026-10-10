@@ -49,6 +49,7 @@ const RESULT: Record<NonNullable<SplitPlanView['groups'][number]['result']>['kin
   changed: 'edits made',
   unchanged: 'no edits in the copy',
   pushed: 'edits pushed',
+  nothing: 'nothing to deliver — the task needed no edits',
 };
 
 export function childrenBrief(split: SplitPlanView | undefined): string | undefined {

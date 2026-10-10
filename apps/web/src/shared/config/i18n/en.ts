@@ -1152,6 +1152,7 @@ export const en: TranslationSchema = {
           changed: 'changes made',
           unchanged: 'no changes in the copy',
           pushed: 'changes pushed',
+          nothing: 'nothing to deliver: no own changes, no MR needed',
           commits: 'commits: {{count}}',
         },
         waitingFor: {
@@ -4485,7 +4486,7 @@ export const en: TranslationSchema = {
       'Mechanics that live both in the panel and in the hooks and skills of the config directory: which copy is better on one case corpus, and how to carry the better one over.',
     tab_integrations: 'Integrations',
     tabHint_integrations:
-      'Jira and Confluence, a forge by token, Telegram, test management and CI reports: where the panel takes outside context from and where it hands results back.',
+      'Jira, Confluence, GitLab, GitHub, Telegram, Zephyr, Xray, Test IT, CI reports and a webhook — each system on its own card: where the panel takes outside context from and where it hands results back.',
     tab_spend: 'Spend',
     tabHint_spend: 'Which units to show spend in and which rates to count it by.',
     tab_safety: 'Safety',
@@ -5728,11 +5729,11 @@ export const en: TranslationSchema = {
       defectBody: 'Description',
       defectCopy: 'Copy draft',
       defectTargetHint:
-        'gh and glab need no key in the panel. Forge and Jira go by the token saved in Integrations — they work where the CLI cannot be installed.',
+        'gh and glab need no key in the panel. GitHub, GitLab and Jira go by the token saved in Integrations — they work where the CLI cannot be installed.',
       defectTargetName: {
         github: 'GitHub (gh)',
         gitlab: 'GitLab (glab)',
-        forge: 'Forge by token',
+        forge: 'GitHub / GitLab by token',
         jira: 'Jira',
       },
       prev: 'Back',
@@ -5824,6 +5825,8 @@ export const en: TranslationSchema = {
         import: 'import',
       },
       actor: { agent: 'agent', human: 'human', ci: 'CI' },
+      attested: 'by hand',
+      attestedHint: 'Checked by the agent by hand and recorded via record — no test executed it',
       origin: {
         e2e: 'autotests',
         e2eActor: 'panel',
@@ -6271,33 +6274,59 @@ export const en: TranslationSchema = {
       tokenPlaceholder: 'Paste the key',
       tokenSaved: 'Key saved: {{mask}}. A new value replaces it, an empty field leaves it alone.',
       tokenEmpty: 'No key yet. It goes into the encrypted store and never returns to this screen.',
-      confluenceToken: 'Confluence key (if separate)',
-      confluenceTokenEmpty: 'No separate key — Confluence is asked with the Jira one.',
       check: 'Check connection',
       forget: 'Forget key',
       missing: 'Not filled in: {{fields}}',
       account: 'signed in as {{name}}',
       checkedAt: 'checked {{time}}',
-      fieldRequired: 'The connector cannot be enabled without this field',
-      atlassian: {
-        title: 'Jira and Confluence',
-        hint: 'Where requirements come from and where defects and reports go. One key for both systems when they share a site.',
+      fieldRequired: 'The integration cannot be enabled without this field',
+      jira: {
+        title: 'Jira',
+        hint: 'Issues and requirements: where the agent takes its task from and where defects for failed cases go.',
         tokenHint:
-          'Cloud: an API token from id.atlassian.com together with the email below. Server/DC: a personal access token, leave the email empty.',
-        confluenceTokenHint:
-          'Needed on an own installation only: there Jira and Confluence issue a personal access token each, and the wiki answers 401 to the Jira one. Cloud has a single key — leave this empty.',
+          'Cloud: an API token from id.atlassian.com together with the email above. Own installation: a personal access token from the Jira profile, leave the email empty.',
       },
-      forge: {
-        title: 'Forge by token',
-        hint: 'GitHub or GitLab directly, without gh and glab installed: needed where the CLI cannot be installed.',
+      confluence: {
+        title: 'Confluence',
+        hint: 'Requirement pages and where run reports go.',
         tokenHint:
-          'GitHub: a personal access token with issue rights. GitLab: a project or personal token with the api scope.',
+          'Cloud: the same API token as Jira, together with the email. Own installation: a personal access token from the Confluence profile — the wiki answers 401 to the Jira one.',
+      },
+      gitlab: {
+        title: 'GitLab',
+        hint: 'Issues and merge requests directly by token, without glab installed.',
+        tokenHint: 'A project or personal token with the api scope.',
+      },
+      github: {
+        title: 'GitHub',
+        hint: 'Issues and pull requests directly by token, without gh installed.',
+        tokenHint: 'A personal access token with issue and pull request rights.',
       },
       telegram: {
         title: 'Telegram',
         hint: 'Where the panel writes about finished runs, agent questions and permission requests.',
         tokenHint:
           'A bot token from @BotFather. The bot must be added to the chat, otherwise it cannot post there.',
+      },
+      zephyr: {
+        title: 'Zephyr Scale',
+        hint: 'Pull cases into a panel group and push run results back. A repeated push lands in the same cycle.',
+        tokenHint: 'The Zephyr Scale API key from the Jira profile.',
+      },
+      xray: {
+        title: 'Xray',
+        hint: 'Pull cases into a panel group and push run results back. A repeated push lands in the same execution.',
+        tokenHint: 'Client id and client secret in one line separated by a colon.',
+      },
+      testit: {
+        title: 'Test IT',
+        hint: 'Pull cases into a panel group and push run results back. A repeated push lands in the same run.',
+        tokenHint: 'The personal token from the Test IT profile.',
+      },
+      ci: {
+        title: 'CI reports',
+        hint: 'Where to pull the latest build report from, so no file has to be uploaded by hand.',
+        tokenHint: 'A forge token allowed to read build artifacts.',
       },
       webhook: {
         title: 'Webhook',
@@ -6306,56 +6335,50 @@ export const en: TranslationSchema = {
           'A signing secret, not an access token. Set — the body is signed with the ' +
           'X-AgentDeck-Signature header (HMAC-SHA256, hex). Empty — sent unsigned.',
       },
-      tms: {
-        title: 'Test management',
-        hint: 'Zephyr, Xray or Test IT: pull cases into a panel group and push run results back. A repeated push lands in the same run.',
-        tokenHint:
-          'Zephyr Scale: its own API key. Xray: key and secret in one line separated by a colon. Test IT: the personal token from the profile. Empty — the Atlassian key is used.',
-      },
-      ci: {
-        title: 'CI reports',
-        hint: 'Where to pull the latest build report from, so no file has to be uploaded by hand.',
-        tokenHint: 'The same forge token, but allowed to read build artifacts.',
-      },
     },
     field: {
-      atlassian: {
-        baseUrl: 'Site URL',
-        email: 'Email',
-        deployment: 'Deployment',
-        confluenceUrl: 'Confluence URL',
-      },
-      forge: { kind: 'System', baseUrl: 'Installation URL', repo: 'Repository' },
+      jira: { baseUrl: 'Site URL', email: 'Email', deployment: 'Deployment' },
+      confluence: { baseUrl: 'Site URL', email: 'Email', deployment: 'Deployment' },
+      gitlab: { baseUrl: 'Installation URL', repo: 'Repository' },
+      github: { baseUrl: 'Installation URL', repo: 'Repository' },
       telegram: { chatId: 'Chat' },
-      webhook: { url: 'Receiver URL' },
-      tms: {
-        kind: 'System',
-        baseUrl: 'Installation URL',
-        projectKey: 'Project',
-        groupId: 'Test group',
-      },
+      zephyr: { projectKey: 'Project', groupId: 'Test group' },
+      xray: { projectKey: 'Project', groupId: 'Test group' },
+      testit: { baseUrl: 'Installation URL', projectKey: 'Project', groupId: 'Test group' },
       ci: { kind: 'System', repo: 'Repository', workflow: 'Workflow', artifact: 'Artifact' },
+      webhook: { url: 'Receiver URL' },
     },
     hint: {
-      atlassian: {
-        baseUrl: 'https://name.atlassian.net for cloud, your own URL for Server/DC.',
-        email:
-          'Cloud only: the key works there in a pair with the email. Leave empty for Server/DC.',
+      jira: {
+        baseUrl: 'https://name.atlassian.net for cloud, your own URL for an own installation.',
+        email: 'Cloud only: the key works there in a pair with the email.',
         deployment: 'Unset — detected by a live check and remembered.',
-        confluenceUrl: 'Fill in when Confluence does not live on the Jira host.',
       },
-      forge: {
-        kind: 'What is on the other end: GitHub or GitLab.',
-        baseUrl: 'Own GitLab — the installation URL. Empty = github.com or gitlab.com.',
-        repo: 'owner/repo or a numeric project id. Empty — derived from the checked project origin.',
+      confluence: {
+        baseUrl: 'Cloud: https://name.atlassian.net/wiki. Own installation: the wiki URL.',
+        email: 'Cloud only: the key works there in a pair with the email.',
+        deployment: 'Unset — detected by a live check and remembered.',
+      },
+      gitlab: {
+        baseUrl: 'Own GitLab — the installation URL. Empty = gitlab.com.',
+        repo: 'group/project or a numeric id. Empty — derived from the checked project origin.',
+      },
+      github: {
+        baseUrl: 'GitHub Enterprise — the installation URL. Empty = github.com.',
+        repo: 'owner/repo. Empty — derived from the checked project origin.',
       },
       telegram: { chatId: 'A numeric chat id or a @channel name.' },
-      webhook: { url: 'Where to POST the JSON. http(s) only.' },
-      tms: {
-        kind: 'Zephyr Scale, Xray or Test IT — the case format follows from it.',
-        baseUrl: 'Test IT only: the URL of your own installation. Zephyr and Xray share one API.',
-        projectKey:
-          'Key of the Jira project holding cases and cycles; for Test IT — the project id.',
+      zephyr: {
+        projectKey: 'Key of the Jira project holding cases and cycles.',
+        groupId: 'Which panel group to sync with. Empty — the panel asks at exchange time.',
+      },
+      xray: {
+        projectKey: 'Key of the Jira project holding cases and executions.',
+        groupId: 'Which panel group to sync with. Empty — the panel asks at exchange time.',
+      },
+      testit: {
+        baseUrl: 'The URL of your own Test IT installation.',
+        projectKey: 'The Test IT project id.',
         groupId: 'Which panel group to sync with. Empty — the panel asks at exchange time.',
       },
       ci: {
@@ -6364,13 +6387,50 @@ export const en: TranslationSchema = {
         workflow: 'Workflow or job name. Empty — the last finished run.',
         artifact: 'Artifact name or the path to the report inside it.',
       },
+      webhook: { url: 'Where to POST the JSON. http(s) only.' },
     },
     option: {
       unset: 'Not set',
-      atlassian: { deployment: { cloud: 'Cloud', server: 'Server / Data Center' } },
-      forge: { kind: { github: 'GitHub', gitlab: 'GitLab' } },
-      tms: { kind: { zephyr: 'Zephyr Scale', xray: 'Xray', testit: 'Test IT' } },
+      jira: { deployment: { cloud: 'Cloud', server: 'Server / Data Center' } },
+      confluence: { deployment: { cloud: 'Cloud', server: 'Server / Data Center' } },
       ci: { kind: { github: 'GitHub Actions', gitlab: 'GitLab CI' } },
+    },
+    empty: {
+      title: 'No integrations yet',
+      text: 'Add the system you need by hand, or find those already connected to the agent as MCP servers: the URL and key are carried over from there.',
+    },
+    add: {
+      label: 'Add integration',
+      placeholder: 'Choose a system',
+    },
+    discover: {
+      open: 'Find already connected',
+      title: 'Found among MCP servers',
+      explain:
+        'The panel read ~/.claude.json, the projects’ .mcp.json and the MCP secrets file. The key stays on this machine: only its mask is shown here, and the transfer re-reads it from the same place.',
+      close: 'Close',
+      nothing: 'No known systems among the MCP servers ({{count}}).',
+      server: 'server "{{name}}"',
+      source: {
+        user: '~/.claude.json',
+        project: 'project {{project}}',
+        mcpJson: '.mcp.json in {{project}}',
+      },
+      launch: {
+        docker: 'Docker',
+        npx: 'npx',
+        uvx: 'uvx',
+        url: 'by URL',
+        command: 'own command',
+      },
+      key: 'key {{mask}}',
+      noKey: 'no key',
+      missing: 'missing: {{fields}}',
+      already: 'already connected',
+      replaces: 'replaces the saved one',
+      twice: 'Two servers are selected for "{{name}}" — keep one.',
+      apply: 'Transfer selected ({{count}})',
+      applied: 'Transferred. Connection checked — the result is on the cards.',
     },
     telegram: {
       eventsTitle: 'What to write about',
@@ -6394,7 +6454,7 @@ export const en: TranslationSchema = {
     mcp: {
       connect: 'Connect Atlassian MCP',
       disconnect: 'Disconnect Atlassian MCP',
-      hint: 'The same site and the same key, but available to the agent inside a conversation. The server is added to the MCP section — it can be removed from there too.',
+      hint: 'Jira and Confluence with the URLs and keys of these cards, but available to the agent inside a conversation. One server for both systems. The server is added to the MCP section — it can be removed from there too.',
     },
     picker: {
       jira: {

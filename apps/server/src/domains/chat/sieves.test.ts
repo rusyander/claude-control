@@ -8,6 +8,7 @@ import {
   isTestPath,
   judgeSieves,
   LEARN_SIEVES_LINE,
+  liveNaIds,
   mergeSieveRows,
   scanSieveBlocks,
   SIEVE_LANG,
@@ -46,7 +47,15 @@ describe('применимость сит по путям', () => {
     ['apps/web/src/entities/Chat/services/stream.ts', ['code'], false],
     ['services/billing/charge.go', ['backend', 'code'], false],
     ['server/api.py', ['backend', 'code'], false],
-    ['tests/fixtures/data.json', [], false],
+    // Корень тестов вне `src/` — тест (живое разделение 10.10); внутри `src/` — код.
+    ['tests/fixtures/data.json', [], true],
+    ['test.mjs', [], true],
+    ['test/run.js', [], true],
+    ['packages/lib/tests/parse.ts', [], true],
+    ['e2e/helpers.ts', [], true],
+    ['spec/support/helpers.rb', [], true],
+    ['src/test.ts', ['code'], false],
+    ['apps/web/src/shared/test/render.ts', ['code'], false],
     ['docs/api_spec.yaml', ['contract'], false],
     ['src/a.test.ts', [], true],
     ['e2e/login.spec.ts', [], true],
@@ -267,6 +276,53 @@ describe('судья сит перед «доставлено»', () => {
         mechanics,
       }),
     ).toEqual([]);
+  });
+
+  // Решение владельца 10.10: живая проверка сдаётся n/a только на диффе без файлов
+  // поведения — правка кода «не применимой» не бывает.
+  it('живая проверка n/a при файлах поведения — пробел с файлами; без них — принята', () => {
+    const naRow = {
+      id: 'boundary-negative',
+      status: 'n/a' as const,
+      evidence: 'refactor only, nothing to check',
+    };
+    const flagged = judgeSieves({
+      applicable: byId('boundary-negative'),
+      rows: [naRow],
+      mechanics: { behaviour: ['apps/web/src/a.tsx'] },
+    });
+    expect(flagged).toEqual([
+      {
+        code: 'sieve-gap-live-na',
+        params: { sieve: 'boundary-negative', files: 'apps/web/src/a.tsx' },
+      },
+    ]);
+    // Дифф из одних доков: контракт применим, n/a с причиной — принят.
+    expect(
+      judgeSieves({
+        applicable: byId('contract-by-request'),
+        rows: [{ id: 'contract-by-request', status: 'n/a', evidence: 'README wording only' }],
+        mechanics: {},
+      }),
+    ).toEqual([]);
+    // Не живое сито — n/a при коде по-прежнему принимается своими правилами.
+    expect(
+      judgeSieves({
+        applicable: byId('branch-backend-stand'),
+        rows: [{ id: 'branch-backend-stand', status: 'n/a', evidence: 'no stand needed here' }],
+        mechanics: { behaviour: ['svc/main.go'] },
+      }),
+    ).toEqual([]);
+  });
+
+  it('liveNaIds: только живые сита, сданные n/a', () => {
+    expect(
+      liveNaIds([
+        { id: 'contract-by-request', status: 'n/a', evidence: 'README wording only' },
+        { id: 'browser-focus', status: 'pass', evidence },
+        { id: 'branch-backend-stand', status: 'n/a', evidence: 'no backend change' },
+      ]),
+    ).toEqual(['contract-by-request']);
   });
 });
 

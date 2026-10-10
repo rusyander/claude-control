@@ -7,6 +7,14 @@ import { AppStore } from '../../lib/app-store/app-store.ts';
 import type { ServerContext } from '../../context.ts';
 import type { RunLike } from '../../domains/chat/ChatRunRegistry/ChatRunRegistry.ts';
 import { registerChatRunRoutes } from '../../routes/chat/run-routes/run-routes.ts';
+import {
+  LOCAL_CONSUMERS,
+  LOCAL_PLATFORM_ID,
+  LOCAL_PLATFORM_TOKEN,
+  localPlatformSettings,
+} from '../../domains/local-models/connect.ts';
+import { writePlatform, writeToken } from '../../domains/platform/store/store.ts';
+import { platformSchema } from '../../providers/settings-validation/settings-validation.ts';
 import { createRuntime, type Runtime } from './runtime.ts';
 
 /**
@@ -29,6 +37,7 @@ describe('набор панели доезжает до прогона обла�
   let runtime: Runtime;
   let app: FastifyInstance;
   let started: Started[];
+  let store: AppStore;
 
   beforeEach(async () => {
     root = realpathSync.native(mkdtempSync(join(tmpdir(), 'cc-rt-kit-')));
@@ -37,8 +46,9 @@ describe('набор панели доезжает до прогона обла�
     project = join(root, 'project');
     mkdirSync(project);
     writeFileSync(join(root, 'settings.json'), '{}', 'utf8');
+    store = new AppStore(appData);
     const ctx = {
-      store: new AppStore(appData),
+      store,
       location: {
         paths: {
           root,
@@ -122,5 +132,33 @@ describe('набор панели доезжает до прогона обла�
     ]);
     runtime.kit.setMode('claude', 'global');
     expect((await send('наш-2'))?.args).toEqual([]);
+  });
+
+  it('контур локальной модели — локальный вариант правил и вызовы инструментов по одному', async () => {
+    // Контур заведён так же, как его заводит «Скачать и подключить» (`connect.ts`):
+    // та же форма настроек через схему, ключ-заглушка, активен; шлюз — живой.
+    const appData = join(root, 'agentdeck');
+    const settings = platformSchema.parse(
+      localPlatformSettings({
+        baseUrl: 'http://127.0.0.1:11435',
+        model: 'qwen3-coder:30b',
+        title: 'Локальная модель',
+        consumers: LOCAL_CONSUMERS,
+      }),
+    );
+    writePlatform(store, settings);
+    writeToken(appData, LOCAL_PLATFORM_ID, LOCAL_PLATFORM_TOKEN);
+    store.updateSettings({ activePlatformId: LOCAL_PLATFORM_ID });
+    await runtime.platformGateway.start({ store, appDataDir: appData, port: 0 });
+    try {
+      runtime.kit.setMode('claude', 'hybrid');
+      const run = await send('локальный');
+      expect(run?.args).toContain('--plugin-dir');
+      expect(run?.env.ANTHROPIC_BASE_URL).toContain(`/${LOCAL_PLATFORM_ID}/`);
+      expect(run?.env.AGENTDECK_KIT_VARIANT).toBe('local');
+      expect(run?.env.CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY).toBe('1');
+    } finally {
+      await runtime.platformGateway.stop();
+    }
   });
 });

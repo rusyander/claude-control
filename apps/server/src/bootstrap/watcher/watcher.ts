@@ -8,13 +8,14 @@ import { gatewayPricing } from '../../domains/platform/spend/spend.ts';
 import { findCliOnPath } from '../../providers/detect/detect.ts';
 import { providerCliCandidates } from '../../providers/cli/cli.ts';
 import { getProvider } from '../../providers/registry.ts';
+import type { PlatformRunRoute } from '../../domains/platform/routing/routing.ts';
 
 /**
- * Сборка фонового наблюдателя из контекста. Разбирает только Claude: флаги
- * «только чтение» (`--tools`, `--allowedTools`) и снятие наших слоёв проверены
- * именно на нём. Активен чужой CLI — разбор отказывает кодом (`route.ts`), а не
- * уходит в облако Claude мимо выбранного; профиль «Ассистент панели» на контуре
- * ведёт разбор через контур, как агента панели.
+ * Сборка фонового наблюдателя из контекста. Разбирает Claude: флаги «только
+ * чтение» (`--tools`, `--allowedTools`) и снятие наших слоёв проверены именно на
+ * нём; профиль «Ассистент панели» на контуре ведёт разбор через контур, как
+ * агента панели. Активен чужой CLI, а маршрут вёл бы в облако Claude, — разбор
+ * ведёт сам этот CLI запуском без правок, маршрутом его чата (`route.ts`).
  *
  * Переменные окружения — для проверок с одноразовой панелью, которым незачем
  * ждать реальных порогов: `AGENTDECK_WATCH_DEBOUNCE_MS` (пауза перед разбором),
@@ -34,8 +35,10 @@ export function createBackgroundWatcher(
   gatewayPort: () => number = () => 0,
   /** Окружение переключателя «Claude Code на локальной модели» (пусто — выключен). */
   claudeSwitchEnv: () => Record<string, string> = () => ({}),
+  /** Маршрут прогона по потребителю; без него разбор чужим CLI отказывает. */
+  runRoute?: (consumer: string) => PlatformRunRoute,
 ): BackgroundWatcher {
-  return new BackgroundWatcher(backgroundWatcherDeps(ctx, gatewayPort, claudeSwitchEnv));
+  return new BackgroundWatcher(backgroundWatcherDeps(ctx, gatewayPort, claudeSwitchEnv, runRoute));
 }
 
 /** Зависимости наблюдателя из контекста — отдельно, чтобы проверка видела маршрут без запуска. */
@@ -43,6 +46,7 @@ export function backgroundWatcherDeps(
   ctx: ServerContext,
   gatewayPort: () => number,
   claudeSwitchEnv: () => Record<string, string> = () => ({}),
+  runRoute?: (consumer: string) => PlatformRunRoute,
 ): BackgroundWatcherDeps {
   const claude = getProvider('claude');
   const debounce = envNumber('AGENTDECK_WATCH_DEBOUNCE_MS', 0);
@@ -61,6 +65,7 @@ export function backgroundWatcherDeps(
         appDataDir: ctx.location.paths.appData,
         gatewayPort,
         claudeSwitchEnv,
+        ...(runRoute ? { runRoute } : {}),
       }),
     pricing: gatewayPricing(ctx.store, ctx.pricing),
     language: () => reportLanguage(ctx.store.getSettings().language),

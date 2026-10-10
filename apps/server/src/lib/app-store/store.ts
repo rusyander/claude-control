@@ -141,8 +141,10 @@ import {
 } from './integration-links.ts';
 import {
   mergeState,
+  moveLegacyIntegrationTokens,
   readStateFile,
   stateFilePath,
+  withCurrentIntegrations,
   withCurrentPlatformDrivers,
 } from './state-file.ts';
 import {
@@ -244,8 +246,11 @@ export class AppStore {
     this.appDataDir = appDataDir;
     const loaded = readStateFile(appDataDir);
     this.state = mergeState(loaded);
-    // Контур под прежним именем драйвера переписывается на диске сразу, один раз.
-    if (withCurrentPlatformDrivers(loaded).changed) this.persist();
+    // Контур под прежним именем драйвера и интеграции в прежнем виде
+    // переписываются на диске сразу, один раз; ключи интеграций — следом.
+    const integrations = withCurrentIntegrations(loaded);
+    if (integrations.changed) moveLegacyIntegrationTokens(appDataDir, integrations.tokens);
+    if (withCurrentPlatformDrivers(loaded).changed || integrations.changed) this.persist();
   }
 
   private get stateFile(): string {

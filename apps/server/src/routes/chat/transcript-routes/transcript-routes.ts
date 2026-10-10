@@ -133,9 +133,10 @@ export function registerChatTranscriptRoutes(
                 ? { inWork: true }
                 : {}),
               // MR — у любого звена группы: он один на группу (владелец, 25.09).
+              // Группе «нечего сдавать» MR не нужен — и «MR нет» не про неё.
               ...(group?.mr
                 ? { mergeRequest: group.mr }
-                : group?.deliver
+                : group?.deliver && group.result?.kind !== 'nothing'
                   ? { mergeRequestPending: true }
                   : {}),
               ...named(chat, link.title),

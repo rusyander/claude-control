@@ -9,7 +9,8 @@ import { AppStore } from '../../lib/app-store/app-store.ts';
 import { isPidAlive } from '../chat/run-ledger/run-ledger.ts';
 import { buildManagedProfile } from '../platform/apply/profile.ts';
 import { writePlatform, writeToken } from '../platform/store/store.ts';
-import { resolveWatcherRoute } from './route.ts';
+import type { PlatformRunRoute } from '../platform/routing/routing.ts';
+import { resolveWatcherRoute, type WatcherRoute } from './route.ts';
 import { BackgroundWatcher } from './watcher.ts';
 import type { WatchSignal } from './types.ts';
 
@@ -56,24 +57,41 @@ describe('маршрут разбора наблюдателя', () => {
   afterEach(() => {
     for (const watcher of watchers.splice(0)) watcher.shutdown();
     for (const child of spawned.splice(0)) if (child.pid && isPidAlive(child.pid)) child.kill();
+    chatRoute = { env: {} };
+    lastRoute = undefined;
     rmSync(appData, { recursive: true, force: true });
     rmSync(cwd, { recursive: true, force: true });
   });
 
-  const make = (switchEnv?: Record<string, string>): BackgroundWatcher => {
+  /** Маршрут чата чужого CLI — `runRoute` сборки; по умолчанию «мимо контура». */
+  let chatRoute: PlatformRunRoute = { env: {} };
+  /** Что маршрут решил на последнем разборе — до подмены команды на node. */
+  let lastRoute: WatcherRoute | undefined;
+
+  const make = (
+    switchEnv?: Record<string, string>,
+    foreign: { runRoute?: boolean; cliOnPath?: boolean } = {},
+  ): BackgroundWatcher => {
     const watcher = new BackgroundWatcher({
       appDataDir: () => appData,
       reportPath: () => join(cwd, 'WATCH-REPORT.md'),
       cwd,
       resolveCommand: () => process.execPath,
       model: () => 'haiku',
-      resolveRoute: () =>
-        resolveWatcherRoute({
+      resolveRoute: () => {
+        lastRoute = resolveWatcherRoute({
           store,
           appDataDir: appData,
           gatewayPort: () => gatewayPort,
           ...(switchEnv ? { claudeSwitchEnv: () => switchEnv } : {}),
-        }),
+          ...(foreign.runRoute === false ? {} : { runRoute: () => chatRoute }),
+          detect: () => foreign.cliOnPath !== false,
+        });
+        // Найденный CLI — имя с PATH; запускается вместо него node с фальшивкой.
+        return lastRoute.ok && lastRoute.foreign
+          ? { ...lastRoute, foreign: { ...lastRoute.foreign, command: process.execPath } }
+          : lastRoute;
+      },
       language: () => (store.getSettings().language === 'en' ? 'en' : 'ru'),
       pricing: () => ({ overrides: {} }),
       spawnImpl: ((command: string, args: string[], options: object) => {
@@ -121,8 +139,32 @@ describe('маршрут разбора наблюдателя', () => {
     await watcher.settled();
   };
 
-  it('активен чужой CLI, маршрут в облако Claude — отказ кодом, Claude не запускается, сбой ждёт', async () => {
-    store.updateSettings({ provider: 'qwen', language: 'en' });
+  // X9 (10.10): до правки активный чужой CLI при маршруте в облако Claude получал
+  // отказ, и сбои копились неразобранными. Теперь разбор ведёт сам этот CLI.
+  it('активен Qwen Code, маршрут в облако Claude — разбор ведёт сам Qwen без правок, в корне приложения', async () => {
+    store.updateSettings({ provider: 'qwen' });
+    chatRoute = { env: { QWEN_ROUTE_MARK: 'chat-route' } };
+    const watcher = make();
+    await runOnce(watcher);
+
+    expect(lastRoute).toMatchObject({ ok: true, foreign: { provider: { id: 'qwen' } } });
+    const { argv, prompt, envNames } = dump() as ReturnType<typeof dump> & { prompt: string };
+    // Режим без правок: в `-p` спросить некого — правка и команда отклоняются.
+    expect(argv.slice(0, 3)).toEqual(['--approval-mode', 'default', '-p']);
+    expect(argv).not.toContain('--tools');
+    // Правила разбора — в самом задании: системного промпта файлом у Qwen нет.
+    expect(prompt).toContain('You are the background watcher of the AgentDeck panel');
+    expect(prompt).toContain('/api/chats');
+    // Окружение — маршрут чата этого CLI.
+    expect(envNames).toContain('QWEN_ROUTE_MARK');
+    const status = watcher.status();
+    expect(status.problem).toBeUndefined();
+    expect(status.pending).toBe(0);
+    expect(readFileSync(join(cwd, 'WATCH-REPORT.md'), 'utf8')).toContain('Находка');
+  });
+
+  it('чужой CLI без запуска без правок (Cursor) — отказ кодом, процесса нет, сбой ждёт', async () => {
+    store.updateSettings({ provider: 'cursor', language: 'en' });
     const watcher = make();
     await runOnce(watcher);
 
@@ -130,11 +172,30 @@ describe('маршрут разбора наблюдателя', () => {
     const status = watcher.status();
     expect(status.problem?.problemCode).toBe('route_refused');
     // Причина — на языке панели и с именем выбранного CLI.
-    expect(status.problem?.detail).toContain('Qwen Code');
-    expect(status.problem?.detail).toContain('leads to the Claude cloud');
+    expect(status.problem?.detail).toContain('Cursor');
+    expect(status.problem?.detail).toContain('no run without edits');
     expect(status.pending).toBe(1);
     // Отказ не съел разбор из часового потолка.
     expect(status.hourlyCap.used).toBe(0);
+  });
+
+  it('Qwen Code не на PATH — отказ кодом «CLI не найден», процесса нет', async () => {
+    store.updateSettings({ provider: 'qwen' });
+    const watcher = make(undefined, { cliOnPath: false });
+    await runOnce(watcher);
+    expect(existsSync(dumpFile())).toBe(false);
+    expect(watcher.status().problem?.detail).toContain('не найден в PATH');
+    expect(lastRoute).toMatchObject({ ok: false, messageCode: 'watcher-cli-missing' });
+  });
+
+  it('маршрут чата Qwen отказывает (контур без шлюза) — отказ его текстом, процесса нет', async () => {
+    store.updateSettings({ provider: 'qwen' });
+    chatRoute = { env: {}, refusal: 'шлюз контура не поднят' };
+    const watcher = make();
+    await runOnce(watcher);
+    expect(existsSync(dumpFile())).toBe(false);
+    expect(lastRoute).toMatchObject({ ok: false, messageCode: 'assistant-route-refused' });
+    expect(watcher.status().problem?.detail).toContain('шлюз контура не поднят');
   });
 
   it('профиль ассистента на контуре — разбор через шлюз контура, без --model вендора и без ключа', async () => {

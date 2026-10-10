@@ -22,6 +22,8 @@ Manifest shape (unknown/absent keys are simply skipped):
 
 ```jsonc
 {
+  "lang": "ru", // the user's language (BCP-47): page chrome follows it (en, ru built in,
+  // others fall back to English chrome); every text you write here is in it
   "title": "...",
   "mode": "AUTO",
   "scale": "PROPORTIONAL k=1.5",
@@ -177,12 +179,12 @@ stable, favicon `🎯`.
 
 ## Chat answer, and the ONLY question set after Phase 0
 
-Short, Russian: screens by status · autofix counts by category · what stayed unverified and why ·
+Short, in the user's language: screens by status · autofix counts by category · what stayed unverified and why ·
 the single gate result · path to `report.html`. No per-item retelling — that is what the page is
 for. STRICT mode adds exactly one line, the sweep coverage:
 `compared N/N · confirmed X · fixed Y · escalated Z · false positives W`.
 
-Then, and only then, the decisions. Batch by theme, never per row (≤4 questions, Russian):
+Then, and only then, the decisions. Batch by theme, never per row (≤4 questions, in the user's language):
 
 - structural diffs — fix all / selected / none;
 - colors and values without tokens — turn into variables / keep as values;

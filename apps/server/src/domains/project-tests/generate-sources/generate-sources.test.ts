@@ -44,14 +44,13 @@ afterEach(() => {
 const deps = (): GenerateSourceDeps => ({ store, appDataDir: dir, root });
 
 function connectJira(): void {
-  writeSettings(store, 'atlassian', {
+  writeSettings(store, 'jira', {
     enabled: true,
     baseUrl: 'https://acme.atlassian.net',
     email: 'qa@acme.io',
     deployment: 'cloud',
-    confluenceUrl: '',
   });
-  writeToken(dir, 'atlassian', 'ATL-SECRET');
+  writeToken(dir, 'jira', 'ATL-SECRET');
 }
 
 function stubIssue(reply: { status?: number; body?: unknown }): void {

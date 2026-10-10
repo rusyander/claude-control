@@ -18,6 +18,8 @@ export const integrationsEn: Record<IntegrationsMessageCode, string> = {
     'Request rejected: no CI system selected (github or gitlab) ({{field}}).',
   'request-repo-missing':
     'Request rejected: no repository specified and it could not be derived from origin ({{field}}).',
+  'request-tms-system-ambiguous':
+    'Request rejected: several test-case systems are connected ({{systems}}) — name one ({{field}}).',
   'request-forge-kind-missing':
     'Request rejected: no forge kind selected (github or gitlab) ({{field}}).',
   'request-title-missing': 'Request rejected: no title specified ({{field}}).',
@@ -70,6 +72,13 @@ export const integrationsEn: Record<IntegrationsMessageCode, string> = {
   'ci-no-finished-runs': 'The repository holds no finished Actions run.',
   'ci-pipeline-job-missing': 'The pipeline {{pipeline}} has no job «{{workflow}}» with artifacts.',
   'ci-pipeline-no-artifacts': 'In the pipeline {{pipeline}} no job left artifacts.',
+  'integration-discover-empty': 'Request rejected: no finding was chosen ({{field}}).',
+  'integration-discover-gone':
+    'Request rejected: server “{{key}}” is no longer found — search again ({{field}}).',
+  'integration-discover-incomplete':
+    'Request rejected: “{{server}}” is missing: {{missing}} ({{field}}).',
+  'integration-discover-twice':
+    'Request rejected: two servers were chosen for “{{id}}” — keep one ({{field}}).',
   'integration-not-connected':
     "{{title}} is not connected: switch it on and save the token in the panel's settings.",
   'tms-not-connected':

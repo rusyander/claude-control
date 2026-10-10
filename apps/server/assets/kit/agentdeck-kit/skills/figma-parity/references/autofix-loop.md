@@ -39,7 +39,7 @@ Behaviour, data flow and logic stay unchanged throughout — this skill changes 
 
 ## Decision file
 
-Per screen `.agent/figma-parity/<screen>.agent.md`, Russian (the user reads it):
+Per screen `.agent/figma-parity/<screen>.agent.md`, in the user's language (the user reads it):
 
 ```
 # <screen> — what is left for decision

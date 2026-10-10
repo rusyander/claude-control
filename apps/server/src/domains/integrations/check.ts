@@ -3,21 +3,20 @@ import type { AppStore } from '../../lib/app-store/app-store.ts';
 import { telegramMe } from '../notify/telegram.ts';
 import { sendWebhook } from '../notify/webhook.ts';
 import {
-  confluenceRoot,
-  CONFLUENCE_SYSTEM,
+  detectConfluenceDeployment,
   detectDeployment,
-  raw,
   trimUrl,
-  type AtlassianAccess,
+  type DeploymentProbe,
 } from './atlassian/client.ts';
 import { IntegrationError } from './errors.ts';
 import { toForgeIdentity, whoAmI } from './forge.ts';
 import { saveHealth } from './health.ts';
 import {
   describeIntegration,
-  readConfluenceToken,
+  forgeSettingsOf,
   readIntegrations,
   readToken,
+  tmsSettingsOf,
   writeSettings,
 } from './store/store.ts';
 import { tmsClient } from './tms/index.ts';
@@ -25,7 +24,7 @@ import { coded } from '../../lib/server-text/server-text.ts';
 import { serverText } from '../../lib/server-texts/server-texts.ts';
 
 /**
- * «Проверить связь» — одна кнопка на карточку и один вход на все пять систем.
+ * «Проверить связь» — одна кнопка на карточку и один вход на все системы.
  *
  * Проверка обязана быть ДЕШЁВОЙ и БЕЗВРЕДНОЙ: она спрашивает «кто я», а не
  * трогает данные. Иначе человек, нажавший кнопку трижды, завёл бы три пустых
@@ -97,115 +96,60 @@ async function probeIntegration(
     );
   }
 
-  if (id === 'atlassian') return probeAtlassian(store, appDataDir, token);
-  if (id === 'forge') {
-    const account = await whoAmI(toForgeIdentity(settings.forge, token));
+  if (id === 'jira' || id === 'confluence') return probeAtlassian(store, id, token);
+  if (id === 'gitlab' || id === 'github') {
+    const account = await whoAmI(toForgeIdentity(forgeSettingsOf(store, id), token));
     return { detail: serverText('integration-check-logged-in', { account }), account };
   }
   if (id === 'telegram') {
     const account = await telegramMe(token);
     return { detail: serverText('integration-check-telegram-ok', { account }), account };
   }
-  if (id === 'tms') {
-    const detail = await tmsClient(settings.tms, token).ping();
+  if (id === 'zephyr' || id === 'xray' || id === 'testit') {
+    const detail = await tmsClient(tmsSettingsOf(store, id), token).ping();
     return { detail: serverText('integration-check-tms-ok', { detail }) };
   }
   // CI ходит в тот же фордж и тем же токеном; своего адреса у карточки нет
-  // намеренно (см. `ci.ts`), поэтому инсталляцию берём у форджа, когда вид
-  // совпадает, — иначе человек вводил бы один и тот же адрес дважды.
-  const baseUrl = settings.forge.kind === settings.ci.kind ? settings.forge.baseUrl : '';
-  const account = await whoAmI(
-    toForgeIdentity({ enabled: true, kind: settings.ci.kind, baseUrl, repo: '' }, token),
-  );
+  // намеренно (см. `ci.ts`), поэтому инсталляцию берём у форджа того же вида —
+  // иначе человек вводил бы один и тот же адрес дважды.
+  const kind = settings.ci.kind;
+  const baseUrl = kind ? settings[kind].baseUrl : '';
+  const account = await whoAmI(toForgeIdentity({ enabled: true, kind, baseUrl, repo: '' }, token));
   return { detail: serverText('integration-check-logged-in', { account }), account };
 }
 
 /**
- * Atlassian проверяется определением диалекта — и ЗАПОМИНАЕТ его.
+ * Jira и Confluence проверяются определением диалекта — и ЗАПОМИНАЮТ его.
  *
  * Иначе облако с пустым полем «вид установки» каждый раз угадывалось бы по
  * наличию почты, а Confluence у облака и у своей установки живёт по разным
- * путям: ошибка диалекта даёт 404 на верном токене.
+ * путям: ошибка диалекта даёт 404 на верном токене. Каждая система
+ * спрашивается у себя самой: подключённая без Jira вики не обязана знать о ней.
  */
-async function probeAtlassian(store: AppStore, appDataDir: string, token: string): Promise<Probe> {
-  const settings = readIntegrations(store).atlassian;
-  const identity = {
-    baseUrl: trimUrl(settings.baseUrl),
-    email: settings.email.trim(),
-    token,
-    confluenceUrl: settings.confluenceUrl.trim(),
-    confluenceToken: readConfluenceToken(appDataDir) ?? '',
-  };
-  const probe = await detectDeployment(identity);
+async function probeAtlassian(
+  store: AppStore,
+  id: 'jira' | 'confluence',
+  token: string,
+): Promise<Probe> {
+  const settings = readIntegrations(store)[id];
+  const identity = { baseUrl: trimUrl(settings.baseUrl), email: settings.email.trim(), token };
+  const probe: DeploymentProbe =
+    id === 'jira' ? await detectDeployment(identity) : await detectConfluenceDeployment(identity);
   if (settings.deployment !== probe.deployment) {
-    writeSettings(store, 'atlassian', { ...settings, deployment: probe.deployment });
+    writeSettings(store, id, { ...settings, deployment: probe.deployment });
   }
-  const params = {
-    account: probe.account,
-    deployment: serverText(
-      probe.deployment === 'cloud' ? 'integration-deployment-cloud' : 'integration-deployment-own',
-    ),
-  };
-  const confluence = await probeConfluence({ ...identity, deployment: probe.deployment });
   return {
-    detail: confluence
-      ? serverText(confluence.code, { ...params, ...confluence.params })
-      : serverText('integration-check-atlassian-ok', params),
+    detail: serverText('integration-check-atlassian-ok', {
+      account: probe.account,
+      deployment: serverText(
+        probe.deployment === 'cloud'
+          ? 'integration-deployment-cloud'
+          : 'integration-deployment-own',
+      ),
+    }),
     account: probe.account,
     deployment: probe.deployment,
   };
-}
-
-type ConfluenceVerdict = {
-  code:
-    | 'integration-check-atlassian-confluence-ok'
-    | 'integration-check-atlassian-confluence-rejected'
-    | 'integration-check-atlassian-confluence-failed'
-    | 'integration-check-atlassian-confluence-unreachable';
-  params?: Record<string, string | number>;
-};
-
-/**
- * Живёт ли Confluence на этом доступе — вторая половина той же кнопки.
- *
- * Спрашивается отдельно, потому что связь у них РАЗНАЯ: на своей установке Jira
- * и Confluence — разные приложения с разными личными токенами, и «Вошли как …»
- * по Jira ничего не обещает про вики. Живой случай: панель отвечала
- * «Confluence не подключён» на 401, хотя ключ Confluence существовал — просто
- * панель его не спрашивала.
- *
- * Итог НЕ красит карточку: Jira работает, и гасить её из-за вики нельзя. Итог
- * дописывается в ту же подпись, чтобы причина была видна до первой кнопки.
- *
- * Не спрашиваем вовсе, когда спрашивать не у кого: у своей установки без адреса
- * Confluence и без отдельного ключа корень равен хосту Jira, и 404 оттуда —
- * ложная тревога про вики, которой у человека может не быть.
- */
-async function probeConfluence(access: AtlassianAccess): Promise<ConfluenceVerdict | undefined> {
-  const asked =
-    access.deployment === 'cloud' || Boolean(access.confluenceUrl || access.confluenceToken);
-  if (!asked) return undefined;
-  try {
-    // Старый content-API отвечает у ОБОИХ диалектов (у облака — под `/wiki`),
-    // а `limit=1` делает пробу такой же дешёвой и безвредной, как «кто я».
-    const response = await raw(access, {
-      url: `${confluenceRoot(access)}/rest/api/space?limit=1`,
-      system: CONFLUENCE_SYSTEM,
-    });
-    if (response.ok) return { code: 'integration-check-atlassian-confluence-ok' };
-    if (response.status === 401 || response.status === 403) {
-      return { code: 'integration-check-atlassian-confluence-rejected' };
-    }
-    return {
-      code: 'integration-check-atlassian-confluence-failed',
-      params: { status: response.status },
-    };
-  } catch (error) {
-    return {
-      code: 'integration-check-atlassian-confluence-unreachable',
-      params: { reason: reasonOf(error) },
-    };
-  }
 }
 
 /** Причина отказа человеческой строкой — она же ляжет на карточку. */

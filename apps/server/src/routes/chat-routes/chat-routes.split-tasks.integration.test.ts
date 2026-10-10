@@ -128,14 +128,13 @@ describe('/api/chat/split/:parent/tasks', () => {
       'PROJ-3': 'In Progress',
       'SUB-1': 'In Progress',
     };
-    writeSettings(store, 'atlassian', {
+    writeSettings(store, 'jira', {
       enabled: true,
       baseUrl: 'https://jira.example.com',
       email: 'qa@example.com',
       deployment: 'server',
-      confluenceUrl: '',
     });
-    writeToken(appData, 'atlassian', 'SECRET');
+    writeToken(appData, 'jira', 'SECRET');
     const ctx = {
       location: { paths: { root, appData, mcpConfig: join(root, '.claude.json') } },
       store,
@@ -186,12 +185,11 @@ describe('/api/chat/split/:parent/tasks', () => {
       ['PROJ-3'],
       undefined,
     ]);
-    writeSettings(store, 'atlassian', {
+    writeSettings(store, 'jira', {
       enabled: false,
       baseUrl: 'https://jira.example.com',
       email: 'qa@example.com',
       deployment: 'server',
-      confluenceUrl: '',
     });
     expect(conveyor.view(['parent-1'])?.jiraTasks).toBeUndefined();
   });
@@ -312,12 +310,11 @@ describe('/api/chat/split/:parent/tasks', () => {
     expect(noPlan.statusCode).toBe(404);
     expect(noPlan.json().messageCode).toBe('split-levels-missing');
 
-    writeSettings(store, 'atlassian', {
+    writeSettings(store, 'jira', {
       enabled: false,
       baseUrl: 'https://jira.example.com',
       email: 'qa@example.com',
       deployment: 'server',
-      confluenceUrl: '',
     });
     const off = await move({ status: 'Done' });
     expect(off.statusCode).toBe(404);

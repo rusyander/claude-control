@@ -50,6 +50,10 @@ export const gitEn: Record<GitMessageCode, string> = {
   'git-committed': 'Commit created',
   'worktree-pruned': 'The copy directory no longer exists — the record was removed',
   'worktree-removed': 'Copy {{path}} removed',
+  'worktree-removed-runs':
+    'Copy {{path}} removed; its Tests runs ({{runs}}) moved into the project history',
+  'worktree-runs-carry-failed':
+    'Tests runs in the copy could not be moved ({{count}}) — the copy is kept so they are not lost',
   'run-copy-not-ready':
     'Copy {{cwd}} is incomplete: {{gaps}}. The panel tried to fill in what was missing and could not — an agent in such a copy would work with the wrong environment.',
   'worktree-mirror-skip-build-env':

@@ -1,0 +1,38 @@
+/* Строка находки: галочка и описание — одна цель нажатия. */
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  cursor: pointer;
+
+  &:hover {
+    background-color: var(--color-surface-sunken);
+  }
+
+  input {
+    margin-top: 3px;
+    cursor: pointer;
+    accent-color: var(--color-accent);
+  }
+}
+
+/* Нечего переносить — строка видна, но не нажимается. */
+.disabled {
+  cursor: default;
+  opacity: 0.75;
+
+  &:hover {
+    background-color: transparent;
+  }
+
+  input {
+    cursor: default;
+  }
+}
+
+.body {
+  min-width: 0;
+}

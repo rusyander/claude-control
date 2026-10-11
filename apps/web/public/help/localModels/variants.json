@@ -98,17 +98,17 @@
       "light-en": {
         "file": "05-agents.en.png",
         "width": 1140,
-        "height": 477
+        "height": 610
       },
       "dark-ru": {
         "file": "05-agents.dark.png",
         "width": 1140,
-        "height": 477
+        "height": 610
       },
       "dark-en": {
         "file": "05-agents.dark.en.png",
         "width": 1140,
-        "height": 477
+        "height": 610
       }
     }
   }

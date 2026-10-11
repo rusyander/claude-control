@@ -105,6 +105,40 @@ describe('ChatRunRegistry — цена шага', () => {
     expect(registry.spend().tokens).toBe(4350);
   });
 
+  const done = (): Extract<ChatEvent, { kind: 'done' }> | undefined =>
+    events.map((buffered) => buffered.event).find((event) => event.kind === 'done') as
+      Extract<ChatEvent, { kind: 'done' }> | undefined;
+
+  /**
+   * Живой прогон 11.10: Claude под переключателем на локальную Qwen закончил ход
+   * с `total_cost_usd` 0.19 — CLI посчитал чужую модель по тарифу Claude, и
+   * шапка чата в деньгах показала бы цену ответа, который не стоит ничего.
+   */
+  it('ход целиком на модели без цены — итог 0, а не цена CLI по тарифу Claude', () => {
+    registry.setCostEstimator((model) => (model === 'opus' ? 0.1 : undefined));
+    registry.start('c1', OPTIONS, {});
+    registry.attach('c1', 0, subscriber);
+
+    fake.emit(usage('qwen3.6:27b-coding'));
+    fake.emit({ kind: 'done', costUsd: 0.19, durationMs: 1, sessionId: 's' });
+
+    expect(done()?.costUsd).toBe(0);
+    expect(registry.spend().costUsd).toBe(0);
+  });
+
+  it('хоть один шаг с ценой — итог хода от CLI остаётся', () => {
+    registry.setCostEstimator((model) => (model === 'opus' ? 0.1 : undefined));
+    registry.start('c1', OPTIONS, {});
+    registry.attach('c1', 0, subscriber);
+
+    fake.emit(usage('qwen3.6:27b-coding'));
+    fake.emit(usage('opus'));
+    fake.emit({ kind: 'done', costUsd: 0.19, durationMs: 1, sessionId: 's' });
+
+    expect(done()?.costUsd).toBe(0.19);
+    expect(registry.spend().costUsd).toBe(0.19);
+  });
+
   it('вызовы шага доезжают до слушателя — по ним цифра садится на своё действие', () => {
     registry.start('c1', OPTIONS, {});
     registry.attach('c1', 0, subscriber);

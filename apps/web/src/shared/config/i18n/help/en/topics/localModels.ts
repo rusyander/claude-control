@@ -15,7 +15,8 @@ export const localModelsEn: typeof localModelsRu = {
 
     guideTitle: 'What this document covers',
     guideText:
-      'First a diagram of where an agent’s request goes. Then the section frame by frame, from ' +
+      'The section is split into three tabs in the order of the path: “Hardware & server”, ' +
+      '“Models”, “For agents”. First a diagram of where an agent’s request goes. Then the section frame by frame, from ' +
       'the first visit to agents on your own card. After that: what the catalog marks mean, ' +
       'whose kit the agent gets, where the files live and what a local model cannot do.',
 
@@ -54,15 +55,15 @@ export const localModelsEn: typeof localModelsRu = {
       firstCaption:
         'From the first visit to agents on your card. There are three buttons: “Download” for the ' +
         'server, “Download” for the model and “Hand to agents”; “Download and connect” in the line ' +
-        'at the top of the section does all three in a row — on a clean machine it installs the server too.',
+        'above the tabs does all three in a row — on a clean machine it installs the server too.',
       firstMachine: 'First visit: card detected, no server yet',
       firstMachineText:
-        'On the left is your machine: the card, its video memory and how much is free, bandwidth, ' +
+        'The “Hardware & server” tab. On the left is your machine: the card, its video memory and how much is free, bandwidth, ' +
         'RAM and disk space. On the right is the model server: if Ollama is already installed, ' +
         'the section uses it; if not, “Download” puts its own copy into the panel folder.',
       firstCatalog: 'The catalog for this card',
       firstCatalogText:
-        'Each model shows how it was trained (for code, tuned for code or general), whether it ' +
+        'The “Models” tab. Each model shows how it was trained (for code, tuned for code or general), whether it ' +
         'fits, its context, how much memory it needs and the speed estimate. “Recommended” is the ' +
         'best one for an agent on this machine. A red line under a model says why it will not do ' +
         'for an agent.',
@@ -72,13 +73,14 @@ export const localModelsEn: typeof localModelsRu = {
         'fetched: the next click resumes where it stopped.',
       firstReady: 'The model is ready',
       firstReadyText:
-        'The server is running and holds the model in memory — you can see how much video memory ' +
-        'it takes. “Measure” measures the real speed and shows it next to the estimate. “Used by ' +
-        'agents” means this model is answering chats right now. “Where to compute” is the video ' +
-        'card or the processor, and the “In memory” line tells where the model actually went.',
+        'On the “Hardware & server” tab the server is running and holds the model in memory — you ' +
+        'can see how much video memory it takes. “Where to compute” is the video card or the ' +
+        'processor, and the “In memory” line tells where the model actually went. On the “Models” ' +
+        'tab the model has “Measure” — it measures the real speed and shows it next to the ' +
+        'estimate — and the “Used by agents” mark: this model is answering chats right now.',
       firstAgents: 'Agents and the kit',
       firstAgentsText:
-        'Which model the agents use now, and the “Back to the cloud” button. The “Claude Code on ' +
+        'The “For agents” tab: which model the agents use now, and the “Back to the cloud” button. The “Claude Code on ' +
         'this model” checkbox (off) sends Claude Code itself there too. Below are Qwen Code ' +
         'and the kit choice: whose skills, hooks and rules the agent gets while it runs on the ' +
         'local model.',
@@ -114,7 +116,8 @@ export const localModelsEn: typeof localModelsRu = {
       'gives 4 to 9 tokens per second against 107 on an RTX 4090. Fine for questions; an agent needs 8 or more.',
 
     deviceTitle: 'Where to compute: video card or processor',
-    deviceCaption: 'The switch is in the model server card. The video card by default.',
+    deviceCaption:
+      'The switch is in the model server card, “Hardware & server” tab. The video card by default.',
     deviceGpu: 'Video card',
     deviceGpuText:
       'Tens of times faster than the processor. The catalog is marked by the card video memory, ' +
@@ -139,7 +142,7 @@ export const localModelsEn: typeof localModelsRu = {
       'Max, Ultra), marked as an estimate.',
 
     claudeTitle: 'Claude Code on this model',
-    claudeCaption: 'A checkbox in the agents card. Off by default.',
+    claudeCaption: 'A checkbox in the agents card, “For agents” tab. Off by default.',
     claudeOn: 'Turn on',
     claudeOnText:
       'The panel writes into the env section of Claude settings.json the model server address, ' +
@@ -238,7 +241,7 @@ export const localModelsEn: typeof localModelsRu = {
         'The catalog: “Recommended” on Qwen3.6 27B Coding, “partly in system memory” on the big ones, “not an agent” on models without tools',
       '03-pulling': 'Downloading a model: the bar, 7.1 of 16.5 GB, speed and time left',
       '04-ready':
-        'Ready: the server on port 11435, “Where to compute” set to the video card, the model fully on it, measured 61.4 tok/s, “Used by agents”',
+        'Ready: the server on port 11435, “Where to compute” set to the video card, the model fully on it',
       '05-agents':
         'Agents on the local model, “Back to the cloud”, the “Claude Code on this model” checkbox off, Qwen Code and the kit',
     },

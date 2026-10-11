@@ -606,7 +606,7 @@ export const testsEn: typeof testsRu = {
     agentConventionText:
       'The buttons of this section explain the format to the agent themselves. A project ' +
       'chat knows about the section too: the panel appends a line to each of its agents saying ' +
-      'where the cases live and how to keep them. Changing how the product behaves — not only ' +
+      'where the cases live and how to keep them (Qwen Code gets it in the system prompt, not in your message). Changing how the product behaves — not only ' +
       'when asked to "write tests" — the agent adds or updates the case for the change on its ' +
       'own (tests-cli case) and records what it verified as a run: “tested” becomes a record ' +
       'in the history, not words in a reply. A manual case it records with tests-cli record — ' +

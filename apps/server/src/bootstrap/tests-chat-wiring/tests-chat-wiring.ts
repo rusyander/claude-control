@@ -9,7 +9,9 @@ import { e2eChatLine } from '../../domains/project-tests/e2e-chat.ts';
 import { syncE2eIfChanged } from '../../domains/project-tests/e2e-sync/e2e-sync.ts';
 import { readEnvironments } from '../../domains/project-tests/library/library.ts';
 import { readAutomation } from '../../domains/project-tests/automation/automation.ts';
+import { writeQwenSystemNote } from '../../domains/provider-chat/system-note/system-note.ts';
 import { panelHomeDir } from '../../lib/brand.mjs';
+import { getProvider } from '../../providers/registry.ts';
 
 /**
  * Агент чата узнаёт о тестах проекта на КАЖДОМ старте: отправка человека, дети
@@ -30,7 +32,7 @@ import { panelHomeDir } from '../../lib/brand.mjs';
 export interface TestsChatWiringDeps {
   appData: string;
   chatRuns: Pick<ChatRunRegistry, 'setWorkspaceNote'>;
-  providerChats?: Pick<ProviderChatService, 'setWorkspaceNote'>;
+  providerChats?: Pick<ProviderChatService, 'setWorkspaceNote' | 'setSystemNote'>;
   /** Прогон раздела «Тесты» пишет в файлы групп — сверка поверх него потеряла бы правку. */
   isBusy?: (path: string) => boolean;
   now?: () => string;
@@ -122,5 +124,13 @@ export function wireTestsChatNote(deps: TestsChatWiringDeps): {
 } {
   deps.chatRuns.setWorkspaceNote((cwd) => testsChatNote(deps, cwd));
   deps.providerChats?.setWorkspaceNote((cwd) => testsChatNote(deps, cwd));
+  // Тот же файл системных настроек, что везёт группы Qwen, везёт и строку — в
+  // системный промпт, а не в слова человека. Незнакомый id реестр откатывает на
+  // Claude, у которого слоя нет, — строка остаётся в реплике.
+  deps.providerChats?.setSystemNote((providerId, note, env) =>
+    getProvider(providerId).groupLayer === 'qwen-system-settings'
+      ? writeQwenSystemNote({ appData: deps.appData, note, env })
+      : undefined,
+  );
   return { finished: (cwd, startedAt) => testsChatFinished(deps, cwd, startedAt) };
 }

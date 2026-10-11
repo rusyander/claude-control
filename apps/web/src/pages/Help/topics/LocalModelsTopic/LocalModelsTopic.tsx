@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
+import { LOCAL_MODELS_TABS } from '@pages/LocalModels/model/tabs';
 import {
   HelpSection,
   StorageCard,
@@ -10,6 +11,7 @@ import {
   GuideStep,
   HelpShot,
   HelpDiagram,
+  PageTabsSection,
 } from '../../ui';
 
 /**
@@ -31,6 +33,8 @@ export function LocalModelsTopic() {
       <Callout tone="info" title={tr('guideTitle')}>
         {tr('guideText')}
       </Callout>
+
+      <PageTabsSection page="localModels" tabs={LOCAL_MODELS_TABS} />
 
       <HelpSection title={common('whyTitle')}>
         <OptionCards

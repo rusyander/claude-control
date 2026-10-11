@@ -752,7 +752,7 @@
         {
           "path": "apps/server/src/bootstrap/tests-chat-wiring/tests-chat-wiring.ts",
           "why": "«Кейс появился сам»: сверка папки по концу хода, пропуск при прогоне агента, копия сверяется в исходном проекте",
-          "sha": "c1c378cb09f73c49"
+          "sha": "bcc0a301602d8c07"
         },
         {
           "path": "apps/web/src/features/ProjectTests/ui/TestE2eRun/TestE2eRun.tsx",
@@ -820,7 +820,7 @@
           "sha": "fa4b9ad2f98e961d"
         }
       ],
-      "confirmedAt": "2026-10-10T14:00:46.530Z"
+      "confirmedAt": "2026-10-11T08:55:21.576Z"
     },
     {
       "topic": "rules",
@@ -2649,7 +2649,7 @@
         {
           "path": "apps/server/src/domains/groups/qwen-run-layer/qwen-run-layer.ts",
           "why": "«Группа в чате Qwen Code»: слой из нескольких групп — MCP и хуки (таймаут) системными настройками, скиллы нативным каталогом, правила текстом, повтор участника — из первой группы, разрешения не передаются",
-          "sha": "c95552037864c541"
+          "sha": "3294d8d7f92ffdfd"
         },
         {
           "path": "apps/server/src/domains/chat/group-auto-pick/group-auto-pick.ts",
@@ -2687,7 +2687,7 @@
           "sha": "b280d6dc187cf339"
         }
       ],
-      "confirmedAt": "2026-10-08T12:34:13.948Z"
+      "confirmedAt": "2026-10-11T08:55:21.682Z"
     },
     {
       "topic": "phone",

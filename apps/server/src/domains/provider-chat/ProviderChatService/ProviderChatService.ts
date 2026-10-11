@@ -347,8 +347,9 @@ export class ProviderChatService {
 
   /**
    * Строка о каталоге разговора (тесты проекта, папка e2e) — той же функцией,
-   * что у реестра Claude (`ChatRunRegistry.setWorkspaceNote`). У чужого CLI
-   * системной строки нет, и едет она хвостом ПОСЛЕДНЕЙ реплики этого хода, в
+   * что у реестра Claude (`ChatRunRegistry.setWorkspaceNote`). Где у CLI есть
+   * системный канал (`setSystemNote`), она едет им; у остальных системной
+   * строки нет, и едет она перед словами ПОСЛЕДНЕЙ реплики этого хода, в
    * ту же строку: отдельная реплика (`systemPrefix`) сделала бы запрос
    * многострочным, а многострочный запрос через `.cmd`-обёртку Windows не
    * пропускает (`cli-spawn.ts`) — первый же вопрос такого CLI упал бы. В
@@ -360,6 +361,41 @@ export class ProviderChatService {
   }
 
   private workspaceNoteOf?: (cwd: string) => string | undefined;
+
+  /**
+   * Системный канал строки о каталоге: у CLI, где он есть (Qwen — файл
+   * системных настроек, `system-note.ts`), решатель кладёт строку туда и отдаёт
+   * переменные прогона — тогда в реплику она не едет. `undefined` или осечка —
+   * прежний путь, строкой перед словами человека.
+   */
+  setSystemNote(
+    resolve: (
+      providerId: string,
+      note: string,
+      env: NodeJS.ProcessEnv,
+    ) => Record<string, string> | undefined,
+  ): void {
+    this.systemNoteOf = resolve;
+  }
+
+  private systemNoteOf?: (
+    providerId: string,
+    note: string,
+    env: NodeJS.ProcessEnv,
+  ) => Record<string, string> | undefined;
+
+  private systemNoteEnv(
+    providerId: string,
+    note: string,
+    env: Record<string, string>,
+  ): Record<string, string> | undefined {
+    if (!note) return undefined;
+    try {
+      return this.systemNoteOf?.(providerId, note, { ...process.env, ...env });
+    } catch {
+      return undefined;
+    }
+  }
 
   private workspaceNote(workdir: string | undefined): string {
     if (!workdir) return '';
@@ -470,11 +506,15 @@ export class ProviderChatService {
       ask: (request) => this.askHuman(chatId, live, request, chat.workdir),
     };
 
+    // Слой группы — последним: его файл настроек решён для ЭТОГО разговора.
+    const runEnv: Record<string, string> = { ...route.env, ...route.kit?.env, ...groupEnv };
     const note = this.workspaceNote(chat.workdir);
+    // Системная строка ложится ПОВЕРХ уже выбранного файла настроек (слоя группы).
+    const noteEnv = this.systemNoteEnv(providerId, note, runEnv);
     const last = history.at(-1);
     // Надзиратель судит слова человека, а не строку панели перед ними.
     const ownWords = last?.role === 'user' ? last.content : undefined;
-    if (note && last) {
+    if (note && last && !noteEnv) {
       history[history.length - 1] = { ...last, content: withWorkspaceNote(last.content, note) };
     }
 
@@ -486,8 +526,7 @@ export class ProviderChatService {
           chatId,
           appDataDir,
           // Набор панели (В2) — у Qwen Code свой `QWEN_HOME` в режиме «Наши».
-          // Слой группы — последним: его файл настроек решён для ЭТОГО разговора.
-          platformEnv: { ...route.env, ...route.kit?.env, ...groupEnv },
+          platformEnv: { ...runEnv, ...noteEnv },
           ...(supervisor
             ? {
                 supervisor:

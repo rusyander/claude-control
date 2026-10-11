@@ -301,7 +301,8 @@ function writeQwenLayer(
   };
 }
 
-function pruneStaleLayers(root: string, keep: string, now: number): void {
+/** Убрать слои старше недели, кроме текущего; занятый CLI каталог — в другой раз. */
+export function pruneStaleLayers(root: string, keep: string, now: number): void {
   let names: string[];
   try {
     names = readdirSync(root);

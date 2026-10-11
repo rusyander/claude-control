@@ -299,6 +299,59 @@ describe('ProviderChatService', () => {
   });
 
   /**
+   * Системный канал строки (Qwen, владелец 11.10): строка уходит в системный
+   * промпт через окружение прогона, в реплике её нет. Канал видит окружение
+   * ПОСЛЕ слоя группы — его файл настроек и есть основа.
+   */
+  it('строка с системным каналом едет окружением прогона, а не в реплике', () => {
+    createChat(dir, 'codex', { id: 'wd', workdir: dir });
+    const seen: { providerId: string; note: string; layer?: string }[] = [];
+    service.setWorkspaceNote(() => 'QA workspace: e2e');
+    service.setGroupActivation(() => ({ env: { QWEN_CODE_SYSTEM_SETTINGS_PATH: '/group.json' } }));
+    service.setSystemNote((providerId, note, env) => {
+      seen.push({ providerId, note, layer: env.QWEN_CODE_SYSTEM_SETTINGS_PATH });
+      return { QWEN_CODE_SYSTEM_SETTINGS_PATH: '/note.json' };
+    });
+    service.send(dir, 'codex', 'wd', { text: 'напиши тест' }, { provider: PROVIDER });
+
+    const options = run.options as {
+      history: { content: string }[];
+      platformEnv: Record<string, string>;
+    };
+    expect(options.history.at(-1)?.content).toBe('напиши тест');
+    expect(options.platformEnv.QWEN_CODE_SYSTEM_SETTINGS_PATH).toBe('/note.json');
+    expect(seen).toEqual([
+      { providerId: 'codex', note: 'QA workspace: e2e', layer: '/group.json' },
+    ]);
+  });
+
+  it('нет канала у CLI или осечка канала — строка остаётся перед словами человека', () => {
+    createChat(dir, 'codex', { id: 'wd', workdir: dir });
+    service.setWorkspaceNote(() => 'QA workspace: e2e');
+    service.setSystemNote(() => undefined);
+    service.send(dir, 'codex', 'wd', { text: 'вопрос' }, { provider: PROVIDER });
+    expect((run.options as { history: { content: string }[] }).history.at(-1)?.content).toBe(
+      '<agentdeck-workspace>QA workspace: e2e</agentdeck-workspace> вопрос',
+    );
+    run.emit?.({ type: 'done', reply: 'ok', transport: 'stream' });
+    run.finish();
+
+    run = new FakeRun();
+    const failing = new ProviderChatService(() => run);
+    failing.setWorkspaceNote(() => 'QA workspace: e2e');
+    failing.setSystemNote(() => {
+      throw new Error('disk full');
+    });
+    failing.send(dir, 'codex', 'wd', { text: 'вопрос' }, { provider: PROVIDER });
+    const options = run.options as {
+      history: { content: string }[];
+      platformEnv: Record<string, string>;
+    };
+    expect(options.history.at(-1)?.content).toContain('<agentdeck-workspace>');
+    expect(options.platformEnv.QWEN_CODE_SYSTEM_SETTINGS_PATH).toBeUndefined();
+  });
+
+  /**
    * Время ответа (Т1 партии чужих CLI). Меряет панель по своему прогону —
    * расход чужие CLI отдают не все и по-разному, а часы есть всегда. Меряется
    * настоящими часами, поэтому проверяется не число, а его наличие и знак.

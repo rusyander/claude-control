@@ -270,6 +270,13 @@ interface RegisteredRun {
   spentCostUsd: number;
   spentTokens: number;
   /**
+   * Шаги с моделью, у которой цены нет (локальная Qwen под переключателем
+   * Claude), и с ценой. Только безценовые — итог хода от CLI выдуман: он
+   * считает чужую модель по тарифу Claude (живой прогон 11.10: $0.19).
+   */
+  unpricedSteps?: number;
+  pricedSteps?: number;
+  /**
    * Размер окна на последнем шаге — вход целиком (свежий, из кэша и записанный
    * в кэш). Это НЕ накопленный расход `spentTokens`: тот растёт от каждого шага,
    * а здесь — сколько контекста перевыставит СЛЕДУЮЩИЙ запрос. Именно по этому
@@ -1343,6 +1350,10 @@ export class ChatRunRegistry {
           ? this.estimateStepCost(event.model, event)
           : undefined;
       if (costUsd !== undefined) outgoing = { ...event, costUsd };
+      if (event.model && this.estimateStepCost && !event.remainder) {
+        if (costUsd === undefined) run.unpricedSteps = (run.unpricedSteps ?? 0) + 1;
+        else run.pricedSteps = (run.pricedSteps ?? 0) + 1;
+      }
       if (event.genMs && event.messageId) {
         try {
           this.noteGenTime?.(event.messageId, event.genMs, event.model);
@@ -1352,8 +1363,12 @@ export class ChatRunRegistry {
       }
     }
     if (event.kind === 'done') {
-      run.spentCostUsd += event.costUsd;
-      this.totalCostUsd += event.costUsd;
+      // Ни одного шага с ценой — ход сделала модель, которая не стоит ничего.
+      const unpriced = (run.unpricedSteps ?? 0) > 0 && (run.pricedSteps ?? 0) === 0;
+      const costUsd = unpriced ? 0 : event.costUsd;
+      if (unpriced) outgoing = { ...outgoing, costUsd } as typeof outgoing;
+      run.spentCostUsd += costUsd;
+      this.totalCostUsd += costUsd;
     }
 
     // Два повода дёрнуть телефон посреди прогона: агент упёрся в разрешение или

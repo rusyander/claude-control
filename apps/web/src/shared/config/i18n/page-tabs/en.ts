@@ -24,6 +24,22 @@ export const pageTabsEn: typeof pageTabsRu = {
     },
     unsaved: 'unsaved',
   },
+  localModels: {
+    tabsLabel: 'Local model stages',
+    tab: {
+      hardware: 'Hardware & server',
+      models: 'Models',
+      agents: 'For agents',
+    },
+    hint: {
+      hardware:
+        'What this machine is — GPU, video memory, RAM and disk — and the model server: installed or not, running or not, and where it computes.',
+      models:
+        'The catalog for your GPU: what fits and how fast, one-click download, benchmark and picking the model for agents.',
+      agents:
+        'Which model the agents use now, “Back to the cloud”, Claude Code on this model, Qwen Code and whose kit the agent gets.',
+    },
+  },
   portability: {
     tabsLabel: 'Environment passport sections',
     tab: {

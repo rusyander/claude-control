@@ -421,6 +421,8 @@ export const PANEL_PAGES = [
     },
   },
   { path: '/local-models', name: 'Локальные модели' },
+  { path: '/local-models?tab=models', name: 'Локальные модели — модели' },
+  { path: '/local-models?tab=agents', name: 'Локальные модели — агентам' },
   // Набор панели: вкладка на тип элемента, режимы по CLI сверху. Окно правки
   // открывается чтением файла — записи нет, обходу можно.
   { path: '/kit', name: 'Набор панели' },

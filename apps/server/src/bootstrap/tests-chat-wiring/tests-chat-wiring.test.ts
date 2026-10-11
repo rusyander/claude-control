@@ -15,6 +15,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { panelHomeDir } from '../../lib/brand.mjs';
+import type { ProviderChatService } from '../../domains/provider-chat/ProviderChatService/ProviderChatService.ts';
 import { readGroups } from '../../domains/project-tests/store/store.ts';
 import { createE2eFolder } from '../../domains/project-tests/e2e-folder/e2e-folder.ts';
 import { E2eRunRegistry } from '../../domains/project-tests/e2e-run/e2e-run.ts';
@@ -146,15 +147,24 @@ describe('bootstrap/tests-chat-wiring', () => {
   it('чужие CLI получают тот же решатель; конец хода отдаётся наружу', () => {
     let claude: ((cwd: string) => string | undefined) | undefined;
     let foreign: ((cwd: string) => string | undefined) | undefined;
+    let system: Parameters<ProviderChatService['setSystemNote']>[0] | undefined;
     const wired = wireTestsChatNote({
       appData,
       chatRuns: { setWorkspaceNote: (fn) => (claude = fn) },
-      providerChats: { setWorkspaceNote: (fn) => (foreign = fn) },
+      providerChats: {
+        setWorkspaceNote: (fn) => (foreign = fn),
+        setSystemNote: (fn) => (system = fn),
+      },
     });
     expect(foreign?.(root)).toBe(claude?.(root));
     expect(foreign?.(root)).toContain('QA workspace of this project');
     // Папки нет — сверять нечего, и конец хода ничего не пишет.
     expect(wired.finished(root, Date.now() - 60_000)).toBeUndefined();
+    // Системный канал — только у CLI со слоем системных настроек (Qwen).
+    const qwen = system?.('qwen', 'QA note', {});
+    expect(qwen?.QWEN_CODE_SYSTEM_SETTINGS_PATH).toContain(join(appData, 'qwen-note-layers'));
+    expect(system?.('codex', 'QA note', {})).toBeUndefined();
+    expect(system?.('claude', 'QA note', {})).toBeUndefined();
   });
 
   it('конец хода: агент написал тест — кейс заведён; идёт прогон — сверка ждёт', () => {

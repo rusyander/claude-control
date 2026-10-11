@@ -2,8 +2,19 @@ import { useState } from 'react';
 import { Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import Constants from 'expo-constants';
-import { Button, Card, Mono, Muted, Row, Screen, Title } from '../../src/shared/ui';
-import { colors, font, radius, space } from '../../src/shared/config/theme';
+import {
+  Button,
+  Card,
+  ListRow,
+  Mono,
+  Muted,
+  Row,
+  Screen,
+  Segmented,
+  SwitchRow,
+  Title,
+} from '../../src/shared/ui';
+import { colors, font, space } from '../../src/shared/config/theme';
 import { useT, setLanguage, useLanguage } from '../../src/shared/config/i18n';
 import { useConnection, isConfigured, clearConnection } from '../../src/shared/api/connection';
 import { usePullRefresh } from '../../src/shared/lib/pull-refresh';
@@ -19,6 +30,7 @@ import { useForgetDevice } from '../../src/entities/remote/useForgetDevice';
 import { useTestNotification } from '../../src/entities/remote/useTestNotification';
 import type { Language } from '../../src/shared/config/i18n';
 import { registerForPush } from '../../src/shared/lib/registerForPush';
+import { OutsideRelayCard } from '../../src/features/inbox/OutsideRelayCard/OutsideRelayCard';
 
 /** Вердикт → стиль строки. Три состояния: успех, беда и «ещё не смотрели». */
 const STATE_STYLE = { ok: 'stateOk', bad: 'stateBad', quiet: 'stateQuiet' } as const;
@@ -72,7 +84,12 @@ export default function SettingsScreen() {
         {isConfigured(connection) ? (
           <>
             <Mono numberOfLines={2}>{connection.url}</Mono>
-            <Muted>{remote.isError ? t.settings.offline : t.settings.online}</Muted>
+            <Row gap={space.sm}>
+              <View style={[styles.dot, remote.isError ? styles.dotOff : styles.dotOn]} />
+              <Text style={remote.isError ? styles.offline : styles.online}>
+                {remote.isError ? t.settings.offline : t.settings.online}
+              </Text>
+            </Row>
           </>
         ) : (
           <Muted>{t.settings.notPaired}</Muted>
@@ -97,19 +114,14 @@ export default function SettingsScreen() {
 
       <Card>
         <Title>{t.settings.language}</Title>
-        <Row gap={space.sm}>
-          {LANGUAGES.map((item) => (
-            <Pressable
-              key={item.value}
-              onPress={() => setLanguage(item.value)}
-              style={[styles.lang, language === item.value && styles.langOn]}
-            >
-              <Text style={styles.langText}>
-                {item.value === 'ru' ? t.settings.languageRu : t.settings.languageEn}
-              </Text>
-            </Pressable>
-          ))}
-        </Row>
+        <Segmented<Language>
+          options={LANGUAGES.map((item) => ({
+            value: item.value,
+            label: item.value === 'ru' ? t.settings.languageRu : t.settings.languageEn,
+          }))}
+          value={language}
+          onChange={setLanguage}
+        />
       </Card>
 
       <Card>
@@ -125,15 +137,12 @@ export default function SettingsScreen() {
 
         {status ? (
           <>
-            <Pressable
-              onPress={() => update.mutate({ notify: !status.notify })}
-              style={styles.toggle}
-            >
-              <Text style={styles.toggleText}>
-                {status.notify ? '✓ ' : '  '}
-                {t.settings.panelNotifies}
-              </Text>
-            </Pressable>
+            <SwitchRow
+              label={t.settings.panelNotifies}
+              value={status.notify}
+              onChange={(notify) => update.mutate({ notify })}
+              disabled={update.isPending}
+            />
             <Button
               title={t.settings.testNotification}
               onPress={() => test.mutate()}
@@ -146,19 +155,27 @@ export default function SettingsScreen() {
         ) : null}
       </Card>
 
+      <OutsideRelayCard />
+
       {status && status.devices.length > 0 ? (
         <Card>
           <Title>{t.settings.devices}</Title>
-          {status.devices.map((device) => (
-            <Row key={device.token} gap={space.sm}>
-              <View style={styles.grow}>
-                <Text style={styles.name}>{device.label || device.platform}</Text>
-                <Muted>{device.registeredAt.slice(0, 16).replace('T', ' ')}</Muted>
-              </View>
-              <Pressable onPress={() => forget.mutate(device.token)}>
-                <Muted>{t.settings.forget}</Muted>
-              </Pressable>
-            </Row>
+          {status.devices.map((device, index) => (
+            <ListRow
+              key={device.token}
+              title={device.label || device.platform}
+              subtitle={device.registeredAt.slice(0, 16).replace('T', ' ')}
+              divided={index > 0}
+              trailing={
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => forget.mutate(device.token)}
+                  hitSlop={8}
+                >
+                  <Text style={styles.forget}>{t.settings.forget}</Text>
+                </Pressable>
+              }
+            />
           ))}
         </Card>
       ) : null}
@@ -255,16 +272,12 @@ const LANGUAGES: { value: Language }[] = [{ value: 'ru' }, { value: 'en' }];
 
 const styles = StyleSheet.create({
   grow: { flex: 1 },
-  lang: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: space.sm,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  langOn: { borderColor: colors.accent, backgroundColor: colors.accentDim },
-  langText: { color: colors.text, fontSize: font.body },
+  dot: { width: 8, height: 8, borderRadius: 999 },
+  dotOn: { backgroundColor: colors.success },
+  dotOff: { backgroundColor: colors.danger },
+  online: { color: colors.success, fontSize: font.small + 1, fontWeight: '600' },
+  offline: { color: colors.danger, fontSize: font.small + 1, fontWeight: '600' },
+  forget: { color: colors.danger, fontSize: font.small + 1, fontWeight: '600' },
   name: { color: colors.text, fontSize: font.body },
   platform: { paddingVertical: space.xs, gap: space.xs },
   stateOk: { color: colors.text, fontSize: font.body },
@@ -272,6 +285,4 @@ const styles = StyleSheet.create({
   stateQuiet: { color: colors.textDim, fontSize: font.body },
   note: { color: colors.warning },
   failed: { color: colors.danger },
-  toggle: { paddingVertical: space.xs },
-  toggleText: { color: colors.text, fontSize: font.body },
 });

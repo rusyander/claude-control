@@ -99,6 +99,8 @@ export type KimiDecision = (typeof KIMI_DECISIONS)[number];
  */
 export const CLAUDE_HOOK_EVENTS = [
   { name: 'PreToolUse', blocking: true },
+  // Решение хука (`allow` / `deny`) закрывает окно разрешения — событие решающее.
+  { name: 'PermissionRequest', blocking: true },
   { name: 'PostToolUse', blocking: false },
   { name: 'UserPromptSubmit', blocking: true },
   { name: 'Notification', blocking: false },

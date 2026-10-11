@@ -5,9 +5,11 @@ import type { ChatSession } from '../../../domains/chat/ChatSession/ChatSession.
 import { readChats } from '../../../domains/chat/ChatHistory/ChatHistory.ts';
 import {
   buildInbox,
-  createLastAskedReader,
+  createTranscriptTailReader,
+  liveByTail,
   type InboxRun,
 } from '../../../domains/chat/chat-inbox/chat-inbox.ts';
+import type { OutsideRelay } from '../../../domains/chat/outside-relay/outside-relay.ts';
 import { projectsDir } from '../paths.ts';
 
 /**
@@ -20,8 +22,9 @@ export function registerChatInboxRoutes(
   ctx: ServerContext,
   registry: ChatRunRegistry,
   session: ChatSession,
+  relay?: OutsideRelay,
 ): void {
-  const lastAsked = createLastAskedReader(() => projectsDir(ctx));
+  const readTail = createTranscriptTailReader(() => projectsDir(ctx));
 
   app.get('/api/chat/inbox', () => {
     const runs: InboxRun[] = registry
@@ -38,14 +41,45 @@ export function registerChatInboxRoutes(
           startedAt: run.startedAt,
         };
       });
+    // Прогон панели, кончившийся только что, ещё пару секунд выглядит в
+    // транскрипте открытым (убитый процесс конца хода не пишет) — это не ход
+    // вне панели.
+    const ownSessions = new Set(
+      registry
+        .active()
+        .map((run) => run.sessionId)
+        .filter((id): id is string => Boolean(id)),
+    );
+    const now = Date.now();
     const links = ctx.store.getChatLinks();
-    return buildInbox({
+    const inbox = buildInbox({
       chats: readChats(projectsDir(ctx)),
       runs,
       permissions: session.pendingPermissions(),
-      lastAsked,
+      outsidePermissions: (relay?.pending() ?? [])
+        .filter((ask) => ask.toolName !== 'AskUserQuestion')
+        .map((ask) => ({
+          toolUseId: ask.toolUseId,
+          sessionId: ask.sessionId,
+          toolName: ask.toolName,
+          input: ask.input,
+          askedAt: new Date(ask.askedAt).toISOString(),
+        })),
+      lastAsked: (chatId) => readTail(chatId)?.asked,
+      liveOutside: (chatId) => !ownSessions.has(chatId) && liveByTail(readTail(chatId), now),
       groupTitle: (chatId) => links[chatId]?.title,
-      now: Date.now(),
+      now,
     });
+    if (!relay) return inbox;
+    // Вопрос, который держит хук панели, отвечается с телефона — карточке надо
+    // это знать, иначе она показала бы его только для чтения.
+    for (const chat of inbox.chats) {
+      for (const ask of chat.asks) {
+        if (ask.kind === 'question' && ask.toolUseId && relay.isPending(ask.toolUseId)) {
+          ask.relay = true;
+        }
+      }
+    }
+    return inbox;
   });
 }

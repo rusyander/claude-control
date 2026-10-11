@@ -4396,6 +4396,50 @@ export const en: TranslationSchema = {
     tab_access: 'Access',
     tabHint_access:
       'The Claude Code account, where the panel takes access from, which configuration directory it reads and who it lets in from outside.',
+    tab_phone: 'Phone',
+    tabHint_phone:
+      'The phone app: build the APK, install it over USB or download the file — and answer the agent’s questions from a terminal or VS Code on the phone.',
+    phone: {
+      apkTitle: 'Phone app',
+      apkExplain:
+        'Builds the same APK as «pnpm mobile:apk», into the repository root. A build takes about 10 minutes and survives a panel restart. The finished file is installed on the phone over adb or downloaded.',
+      state_idle: 'not built',
+      state_building: 'building',
+      state_succeeded: 'built',
+      state_failed: 'build failed',
+      build: 'Build APK',
+      rebuild: 'Update APK',
+      buildingSince: 'Running since {{time}}',
+      finishedAt: 'Finished {{time}}',
+      unavailable:
+        'Nothing to build: the panel is not running from a repository checkout, the app sources are not next to it.',
+      logLabel: 'Build output',
+      file: 'agentdeck.apk — {{size}}, built {{time}}',
+      installOn: 'Install on {{device}}',
+      installed: 'APK installed on {{device}}',
+      download: 'Download APK',
+      adbMissing:
+        'adb is not in PATH — installing by button is not possible. Download the file and open it on the phone.',
+      noDevices:
+        'adb sees no phone. Connect it over USB with debugging on — the «Install» button appears by itself.',
+      devicesHint: 'Installs over the previous version; pairing and app settings are kept.',
+      relayTitle: 'The agent on the computer — under control from the phone',
+      relayExplain:
+        'When the agent in a terminal or VS Code asks a question or for a permission, the request shows on the phone and in the window on the computer alike; the first decision wins. You can also write to the agent mid-work from the phone: it reads the message after its next step. The panel hooks in the Claude Code settings do this.',
+      relayToggle: 'Send requests to the phone',
+      relayToggleHint:
+        'On — the panel writes its hooks into the Claude Code settings itself; off — it removes them. A session started before the hooks were added does not see them: Claude Code reads hooks at startup.',
+      hookInstalled: 'hook installed',
+      hookMissing: 'no hook',
+      hookShort: 'short timeout',
+      hookShortTimeout:
+        'The PermissionRequest hook is installed but its timeout is under 10 minutes (no timeout means 60 seconds): the CLI drops it before you answer and the request stays in the window only. Set the timeout to 3600 under «Hooks».',
+      hookHowTo:
+        'The panel hooks are not in the Claude Code settings: the write failed or a hook is switched off under «Hooks». Switch it on there or add three hooks with one command — PermissionRequest, matcher *, timeout 3600 seconds; PostToolUse, matcher *, timeout 10; Stop, timeout 10. Command:',
+      copyCommand: 'Copy command',
+      commandCopied: 'Command copied',
+      openHooks: 'Open «Hooks»',
+    },
     tab_providers: 'Providers',
     tabHint_providers:
       'Which CLI the panel manages, whether it is installed, how it authenticates and whether its config formats match the published schemas.',

@@ -65,7 +65,16 @@ export const phoneEn: typeof phoneRu = {
       'Live conversations across all projects at once: what is running, what is waiting for ' +
       'you, what ran in the last day. Conversations of a project copy sit under their main ' +
       'project. Refreshes every 5 seconds; the number on the tab is how many answers are ' +
-      'waiting for you.',
+      'waiting for you. A conversation running in a terminal or VS Code is «working» too: its ' +
+      'steps appear in the chat by themselves. With «The agent on the computer» on in Settings ' +
+      'and the panel hooks in the Claude Code settings, you control it from here: a question or ' +
+      'a permission request stands both on the phone and in the window on the computer, and the ' +
+      'first decision wins; what you write in the chat the agent reads after its next step, ' +
+      'without waiting for the turn to end, and under the field you see whether a message still ' +
+      'waits for a step or has been passed on. A session started before the hooks were added ' +
+      'does not see them: once the agent finishes a step and the message is still waiting, the ' +
+      'phone says it will arrive only after the session restarts. Without the hooks the ' +
+      'request card is read-only.',
     screenQuestions: 'Home → «Questions»',
     screenQuestionsText:
       'Everything that waits for a human, one card per chat: agent questions with options, ' +
@@ -101,7 +110,10 @@ export const phoneEn: typeof phoneRu = {
     screenSettings: 'Settings',
     screenSettingsText:
       'The panel address and «online / not answering», the app language, notifications, ' +
-      'devices, the contour state (read-only) and outside access.',
+      'devices, «The agent on the computer» (the panel writes its hooks into the Claude Code ' +
+      'settings itself; if they are still missing, the card shows the ready command for the ' +
+      '«Hooks» section: PermissionRequest with timeout 3600, ' +
+      'PostToolUse and Stop with timeout 10), the contour state (read-only) and outside access.',
 
     offlineTitle: 'When the panel does not answer',
     offlineCaption:
@@ -202,7 +214,8 @@ export const phoneEn: typeof phoneRu = {
     limitsMeaningColumn: 'What it means',
     limitAndroid: 'Android only',
     limitAndroidText:
-      'The ready build is an Android APK (pnpm mobile:apk puts it in the repository root). No ' +
+      'The ready build is an Android APK: the button in Settings → «Phone» or pnpm mobile:apk ' +
+      'puts it in the repository root, from where it is installed over adb or downloaded. No ' +
       'iPhone build ships with it.',
     limitTailscale: 'Tailscale on both devices',
     limitTailscaleText:

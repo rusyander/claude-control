@@ -1,6 +1,6 @@
 import { Text, View } from 'react-native';
 import type { InboxChat } from '@agentdeck/contracts/chat-inbox';
-import { Mono, Row } from '../../../shared/ui';
+import { Row } from '../../../shared/ui';
 import { space } from '../../../shared/config/theme';
 import { useT } from '../../../shared/config/i18n';
 import { type ProjectGroup } from '../../../entities/inbox/model';
@@ -31,7 +31,7 @@ export function ActiveChats({
               <Text style={styles.groupName} numberOfLines={1}>
                 {group.isSandbox ? t.home.sandbox : group.name}
               </Text>
-              {counts ? <Mono style={styles.counts}>{counts}</Mono> : null}
+              {counts ? <Text style={styles.counts}>{counts}</Text> : null}
             </Row>
             <View style={styles.rows}>
               {group.chats.map((chat, index) => (

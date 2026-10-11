@@ -2,8 +2,20 @@ import { useState } from 'react';
 import { Platform, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import type { TokenTotals } from '@agentdeck/contracts';
-import { Card, Empty, Loading, Mono, Muted, Row, Screen, Title } from '../../src/shared/ui';
-import { colors, font, radius, space } from '../../src/shared/config/theme';
+import {
+  Card,
+  Chips,
+  Empty,
+  Icon,
+  Loading,
+  Mono,
+  Muted,
+  Row,
+  Screen,
+  Title,
+} from '../../src/shared/ui';
+import { colors, font, radius, space, tabular } from '../../src/shared/config/theme';
+import { usePullRefresh } from '../../src/shared/lib/pull-refresh';
 import { useT, type Dictionary } from '../../src/shared/config/i18n';
 import { compact } from '../../src/shared/lib/format';
 import { useConnection, isConfigured } from '../../src/shared/api/connection';
@@ -39,6 +51,9 @@ export default function AnalyticsScreen() {
   const providers = useProviders();
   const analytics = useAnalytics(period, providers.data?.active);
   const refusal = analyticsRefusal(analytics.error);
+  // Крутилка сверху — только на жест: смена периода грузится под приглушённым
+  // отчётом, а не крутилкой поверх ряда периодов.
+  const pull = usePullRefresh(analytics.refetch);
 
   if (!isConfigured(connection)) {
     return <Empty text={t.common.notConnected} />;
@@ -80,59 +95,42 @@ export default function AnalyticsScreen() {
       scroll
       refreshControl={
         <RefreshControl
-          refreshing={analytics.isFetching}
-          onRefresh={() => void analytics.refetch()}
+          refreshing={pull.refreshing}
+          onRefresh={pull.onRefresh}
           tintColor={colors.accent}
         />
       }
     >
-      <Row gap={space.xs} style={styles.wrap}>
-        {PRESETS.map((preset) => (
-          <Pressable
-            key={preset}
-            onPress={() => setPeriod({ kind: 'preset', preset })}
-            style={[
-              styles.chip,
-              !isRange && period.kind === 'preset' && period.preset === preset && styles.chipOn,
-            ]}
-          >
-            <Text
-              style={[
-                styles.chipText,
-                !isRange &&
-                  period.kind === 'preset' &&
-                  period.preset === preset &&
-                  styles.chipTextOn,
-              ]}
-            >
-              {presetLabel(preset, t)}
-            </Text>
-          </Pressable>
-        ))}
-      </Row>
+      <Chips<AnalyticsPreset>
+        scroll
+        options={PRESETS.map((preset) => ({ value: preset, label: presetLabel(preset, t) }))}
+        value={period.kind === 'preset' ? period.preset : undefined}
+        onChange={(preset) => setPeriod({ kind: 'preset', preset })}
+      />
 
-      <Row gap={space.xs} style={styles.wrap}>
-        <Pressable
+      <Row gap={space.sm}>
+        <DateButton
+          label={period.kind === 'range' ? period.from : t.analytics.from}
+          active={isRange}
           onPress={() => setPicking('from')}
-          style={[styles.chip, isRange && styles.chipOn]}
-        >
-          <Text style={[styles.chipText, isRange && styles.chipTextOn]}>
-            {period.kind === 'range' ? period.from : t.analytics.from}
-          </Text>
-        </Pressable>
+        />
         <Text style={styles.dash}>—</Text>
-        <Pressable onPress={() => setPicking('to')} style={[styles.chip, isRange && styles.chipOn]}>
-          <Text style={[styles.chipText, isRange && styles.chipTextOn]}>
-            {period.kind === 'range' ? period.to : t.analytics.to}
-          </Text>
-        </Pressable>
-        <Pressable
-          onPress={() => setPeriod(DEFAULT_PERIOD)}
-          disabled={isDefault}
-          style={[styles.chip, isDefault && styles.chipOff]}
-        >
-          <Text style={styles.chipText}>{t.analytics.reset}</Text>
-        </Pressable>
+        <DateButton
+          label={period.kind === 'range' ? period.to : t.analytics.to}
+          active={isRange}
+          onPress={() => setPicking('to')}
+        />
+        {/* Сброс виден, только когда есть что сбрасывать: серая неактивная
+            кнопка рядом с датами читалась как поломка. */}
+        {isDefault ? null : (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setPeriod(DEFAULT_PERIOD)}
+            style={({ pressed }) => [styles.reset, pressed && styles.pressed]}
+          >
+            <Text style={styles.resetText}>{t.analytics.reset}</Text>
+          </Pressable>
+        )}
       </Row>
 
       {picking ? (
@@ -146,7 +144,7 @@ export default function AnalyticsScreen() {
         />
       ) : null}
 
-      {analytics.isLoading ? <Loading /> : null}
+      {analytics.isLoading && !data ? <Loading /> : null}
       {refusal ? (
         <Card>
           <Muted>{refusal}</Muted>
@@ -156,9 +154,9 @@ export default function AnalyticsScreen() {
       ) : null}
 
       {data ? (
-        <>
+        <View style={[styles.report, analytics.isPlaceholderData && styles.stale]}>
           <Card>
-            <Title>${data.estimatedCost.toFixed(2)}</Title>
+            <Text style={styles.hero}>${data.estimatedCost.toFixed(2)}</Text>
             {/* Выбранный диапазон показываем ровно тем, чем его выбрали: сервер
                 возвращает границы мгновением в UTC, а сутки в отчёте — это
                 КАЛЕНДАРНЫЕ сутки машины с панелью. Телефон в другом поясе
@@ -169,12 +167,12 @@ export default function AnalyticsScreen() {
                 : `${isoDay(new Date(data.from))} — ${isoDay(new Date(data.to))}`}{' '}
               · {t.analytics.estimate}
             </Muted>
-            <Row gap={space.md} style={styles.wrap}>
+            <View style={styles.stats}>
               <Stat label={t.analytics.tokens} value={compact(data.overall.total)} />
               <Stat label={t.analytics.requests} value={compact(data.overall.requests)} />
               <Stat label={t.analytics.cached} value={`${Math.round(data.cacheHitRatio * 100)}%`} />
               <Stat label={t.analytics.activeSessions} value={String(data.activeSessions)} />
-            </Row>
+            </View>
           </Card>
 
           {data.overall.total === 0 ? <Muted>{t.analytics.nothingForFilter}</Muted> : null}
@@ -277,8 +275,10 @@ export default function AnalyticsScreen() {
             </Card>
           ) : null}
 
-          <Muted>{t.analytics.scanned(data.scannedFiles, Math.round(data.scanDurationMs))}</Muted>
-        </>
+          <Muted style={styles.footnote}>
+            {t.analytics.scanned(data.scannedFiles, Math.round(data.scanDurationMs))}
+          </Muted>
+        </View>
       ) : null}
     </Screen>
   );
@@ -303,9 +303,37 @@ function dateOf(period: AnalyticsPeriod, edge: 'from' | 'to'): Date {
   return Number.isNaN(value.getTime()) ? new Date() : value;
 }
 
+function DateButton({
+  label,
+  active,
+  onPress,
+}: {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [styles.date, active && styles.dateOn, pressed && styles.pressed]}
+    >
+      <Icon
+        ios="calendar"
+        android="calendar_today"
+        size={16}
+        color={active ? colors.accent : colors.textFaint}
+      />
+      <Text style={[styles.dateText, active && styles.dateTextOn]} numberOfLines={1}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <View>
+    <View style={styles.stat}>
       <Text style={styles.statValue}>{value}</Text>
       <Muted>{label}</Muted>
     </View>
@@ -318,8 +346,8 @@ function Line({ name, totals, cost }: { name: string; totals: TokenTotals; cost:
       <Text style={styles.name} numberOfLines={1}>
         {name}
       </Text>
-      <Mono>{compact(totals.total)}</Mono>
-      <Mono style={styles.cost}>${cost.toFixed(2)}</Mono>
+      <Text style={styles.figure}>{compact(totals.total)}</Text>
+      <Text style={[styles.figure, styles.cost]}>${cost.toFixed(2)}</Text>
     </Row>
   );
 }
@@ -335,33 +363,61 @@ function Tally({ name, count }: { name: string; count: number }) {
       <Text style={styles.name} numberOfLines={1}>
         {name}
       </Text>
-      <Mono>{compact(count)}</Mono>
+      <Text style={styles.figure}>{compact(count)}</Text>
     </Row>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { flexWrap: 'wrap' },
-  chip: {
+  report: { gap: space.md },
+  stale: { opacity: 0.5 },
+  pressed: { opacity: 0.7 },
+  date: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    minHeight: 40,
     paddingHorizontal: space.md,
-    paddingVertical: space.xs + 2,
-    borderRadius: radius.sm,
+    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.border,
+    backgroundColor: colors.surface,
   },
-  chipOn: { borderColor: colors.accent, backgroundColor: colors.accentDim },
-  chipOff: { opacity: 0.45 },
-  chipText: { color: colors.textDim, fontSize: font.small },
-  chipTextOn: { color: colors.text },
+  dateOn: { borderColor: colors.accent, backgroundColor: colors.accentDim },
+  dateText: { color: colors.textDim, fontSize: font.small + 1, flexShrink: 1, ...tabular },
+  dateTextOn: { color: colors.text },
+  reset: { minHeight: 40, justifyContent: 'center', paddingHorizontal: space.sm },
+  resetText: { color: colors.accent, fontSize: font.small + 1, fontWeight: '600' },
   dash: { color: colors.textFaint, fontSize: font.small },
-  statValue: { color: colors.text, fontSize: font.title, fontWeight: '700' },
-  bars: { flexDirection: 'row', alignItems: 'flex-end', gap: 3, height: 110 },
-  barSlot: { flex: 1, alignItems: 'center', gap: 2 },
-  bar: { width: '100%', backgroundColor: colors.accent, borderRadius: 2 },
-  barLabel: { color: colors.textFaint, fontSize: 9 },
-  line: { paddingVertical: 2 },
+  hero: { color: colors.text, fontSize: font.hero, fontWeight: '700', ...tabular },
+  stats: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    rowGap: space.md,
+    marginTop: space.sm,
+    paddingTop: space.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  stat: { width: '50%', gap: 2 },
+  statValue: { color: colors.text, fontSize: font.large, fontWeight: '700', ...tabular },
+  bars: { flexDirection: 'row', alignItems: 'flex-end', gap: 4, height: 120, marginTop: space.xs },
+  barSlot: { flex: 1, alignItems: 'center', gap: space.xs },
+  bar: {
+    width: '100%',
+    backgroundColor: colors.accent,
+    borderTopLeftRadius: 4,
+    borderTopRightRadius: 4,
+    borderBottomLeftRadius: 1,
+    borderBottomRightRadius: 1,
+  },
+  barLabel: { color: colors.textFaint, fontSize: 10, ...tabular },
+  line: { paddingVertical: space.xs },
   name: { color: colors.text, fontSize: font.body, flex: 1 },
-  cost: { color: colors.accent },
+  figure: { color: colors.textDim, fontSize: font.small + 1, ...tabular },
+  cost: { color: colors.accent, fontWeight: '600', minWidth: 64, textAlign: 'right' },
   session: { paddingVertical: space.xs, gap: 2 },
+  footnote: { textAlign: 'center' },
   failed: { color: colors.danger },
 });

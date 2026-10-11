@@ -35,6 +35,7 @@ import { dataField } from '../texts/texts.ts';
 
 const HOOK_EVENTS = [
   'PreToolUse',
+  'PermissionRequest',
   'PostToolUse',
   'UserPromptSubmit',
   'Notification',

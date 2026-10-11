@@ -119,8 +119,20 @@ const PINNED_HUMAN: Readonly<Record<string, RouteClass>> = {
   'POST /api/project-tests/import/results': 'human:upload',
   'POST /api/project-tests/run/publish': 'human:outward',
   'POST /api/provider-chat/chats/:id/permissions/:askId': 'human:rights',
+  // 11.10: решение по запросу сессии вне панели, его возврат окну, сообщение в её
+  // ход и сам переключатель — как `permission-decision`: решает человек, не агент
+  // панели.
+  'PATCH /api/outside/relay': 'human:rights',
+  'POST /api/outside/asks/:id/answer': 'human:rights',
+  'POST /api/outside/asks/:id/release': 'human:rights',
+  'POST /api/outside/messages': 'human:rights',
   'POST /api/remote/devices': 'human:remote',
   'POST /api/remote/test': 'human:remote',
+  // 11.10: APK телефона из настроек — сборка, установка по adb, файл.
+  'GET /api/mobile/apk': 'human:remote',
+  'GET /api/mobile/apk/file': 'human:download',
+  'POST /api/mobile/apk/build': 'human:remote',
+  'POST /api/mobile/apk/install': 'human:remote',
   'POST /api/remote/token': 'human:remote',
   'POST /api/sandbox/mcp-call': 'human:outward',
   'POST /api/sandbox/mcp-tools': 'human:outward',

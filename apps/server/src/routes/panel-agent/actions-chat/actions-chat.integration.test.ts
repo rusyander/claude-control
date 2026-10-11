@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { Group } from '@agentdeck/contracts';
@@ -151,6 +151,10 @@ describe('panel-agent actions: chats', () => {
       ]),
     ]);
     seed(ids.other, projectDir, [userLine(ids.other, projectDir, 'Почини сборку ракеты')]);
+    // Свежий файл с репликой человека в хвосте — открытый ход вне панели
+    // (терминал, VS Code). «Молчащий» чат старше окна живости.
+    const silentSince = new Date(Date.now() - 60 * 60 * 1000);
+    utimesSync(join(root, 'projects', 'demo', `${ids.other}.jsonl`), silentSince, silentSince);
     seed(ids.twinA, projectDir, [userLine(ids.twinA, projectDir, 'Дубль')]);
     seed(ids.twinB, projectDir, [userLine(ids.twinB, projectDir, 'Дубль')]);
     const sandboxCwd = join(sandboxRoot(), ids.sandbox);

@@ -11,6 +11,9 @@ import type { IconName } from '@shared/ui/icon';
 export const SETTINGS_TABS = [
   { id: 'general', icon: 'settings' },
   { id: 'access', icon: 'lock' },
+  // Телефон — сразу за доступом: спарить его можно там, а собрать и научить
+  // отвечать на вопросы с компьютера — здесь.
+  { id: 'phone', icon: 'phone' },
   { id: 'providers', icon: 'swap' },
   { id: 'models', icon: 'link' },
   // Промпты стоят сразу за моделями: это вторая половина одного вопроса — «чем

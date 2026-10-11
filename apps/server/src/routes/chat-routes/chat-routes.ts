@@ -8,6 +8,8 @@ import { registerChatRunRoutes } from '../chat/run-routes/run-routes.ts';
 import { registerChatArtifactRoutes } from '../chat/artifact-routes.ts';
 import { registerChatCliRoutes } from '../chat/cli-routes/cli-routes.ts';
 import { registerChatInboxRoutes } from '../chat/inbox-routes/inbox-routes.ts';
+import { registerOutsideRelayRoutes } from '../chat/outside-relay-routes/outside-relay-routes.ts';
+import { OutsideRelay } from '../../domains/chat/outside-relay/outside-relay.ts';
 
 /**
  * Классификация ошибок CLI живёт в домене; здесь она переэкспортирована, чтобы
@@ -51,5 +53,12 @@ export function registerChatRoutes(
   registerChatRunRoutes(app, ctx, registry, session);
   registerChatArtifactRoutes(app, ctx);
   registerChatCliRoutes(app, undefined, () => ctx.store);
-  registerChatInboxRoutes(app, ctx, registry, session);
+  // Вопросы сессий из терминала и VS Code: сводка помечает те, что ждут
+  // телефона, маршруты ретранслятора их закрывают — объект один на обоих.
+  const relay = new OutsideRelay({
+    enabled: () => ctx.store.getOutsideRelay(),
+    ownSession: (sessionId) => registry.active().some((run) => run.sessionId === sessionId),
+  });
+  registerChatInboxRoutes(app, ctx, registry, session, relay);
+  registerOutsideRelayRoutes(app, ctx, relay);
 }

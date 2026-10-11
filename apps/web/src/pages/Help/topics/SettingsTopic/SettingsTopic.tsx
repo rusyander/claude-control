@@ -57,6 +57,7 @@ export function SettingsTopic() {
           items={[
             { title: tr('tabGeneral'), text: tr('tabGeneralText') },
             { title: tr('tabAccess'), text: tr('tabAccessText') },
+            { title: tr('tabPhone'), text: tr('tabPhoneText') },
             { title: tr('tabProviders'), text: tr('tabProvidersText') },
             { title: tr('tabModels'), text: tr('tabModelsText') },
             { title: tr('tabPrompts'), text: tr('tabPromptsText') },

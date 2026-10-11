@@ -152,6 +152,10 @@ export const queryKeys = {
   prompt: (id: string) => ['prompts', id] as const,
   /** Удалённый доступ: токен, адрес в приватной сети и спаренные телефоны. */
   remote: ['remote'] as const,
+  /** Сборка APK телефона и телефоны, которые видит adb. */
+  mobileApk: ['mobile-apk'] as const,
+  /** Вопросы сессий вне панели — на телефон: переключатель и хук. */
+  outsideRelay: ['outside-relay'] as const,
   watcher: ['watcher'] as const,
   watcherReport: ['watcher', 'report'] as const,
   /** Отложенный перезапуск dev-сервера: ждут ли правки живых ходов. */

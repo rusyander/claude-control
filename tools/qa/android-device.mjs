@@ -36,15 +36,23 @@ export function adbPath() {
   return exe;
 }
 
-/** Первое подключённое устройство в состоянии `device`, иначе undefined. */
+/**
+ * Первый ЭМУЛЯТОР в состоянии `device`, иначе undefined. `ANDROID_SERIAL` —
+ * явный выбор. Настоящий телефон по USB не берётся никогда: прогоны ставят на
+ * устройство APK и переспаривают приложение с одноразовой панелью через
+ * `10.0.2.2` — на телефоне человека это стёрло бы его подключение, а адрес
+ * эмулятора там всё равно никуда не ведёт.
+ */
 export function firstDevice(adb = adbPath()) {
+  if (process.env.ANDROID_SERIAL) return process.env.ANDROID_SERIAL;
   const result = spawnSync(adb, ['devices'], { encoding: 'utf8' });
   if (result.status !== 0) return undefined;
   const line = result.stdout
     .split(/\r?\n/)
     .slice(1)
-    .find((row) => /\tdevice$/.test(row.trim()) || /\sdevice$/.test(row));
-  return line?.split(/\s+/)[0];
+    .map((row) => row.trim().split(/\s+/))
+    .find(([serial, state]) => state === 'device' && serial.startsWith('emulator-'));
+  return line?.[0];
 }
 
 /**

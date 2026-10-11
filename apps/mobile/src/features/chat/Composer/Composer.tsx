@@ -8,7 +8,7 @@ import { api } from '../../../shared/api/client';
 import type { Upload } from '../../../shared/lib/runs';
 import { useVoice } from '../../../shared/lib/voice';
 import { useT } from '../../../shared/config/i18n';
-import { Field, Mono, Row } from '../../../shared/ui';
+import { Field, Icon, Mono, Row } from '../../../shared/ui';
 import { colors, space } from '../../../shared/config/theme';
 import { runPlanConsumer, runPlanView } from '../../../entities/platform/api';
 import { useChats } from '../../../entities/chat/api';
@@ -300,7 +300,12 @@ export function Composer({
             pressed && styles.pressed,
           ]}
         >
-          <Text style={styles.micText}>🎙</Text>
+          <Icon
+            ios="mic.fill"
+            android="mic"
+            size={22}
+            color={voice.listening ? '#ffffff' : colors.text}
+          />
         </Pressable>
         <Pressable
           onPress={onSend}
@@ -317,7 +322,7 @@ export function Composer({
           {busy || image?.drawing ? (
             <ActivityIndicator color={colors.text} size="small" />
           ) : (
-            <Text style={styles.sendText}>↑</Text>
+            <Icon ios="arrow.up" android="arrow_upward" size={22} color="#ffffff" />
           )}
         </Pressable>
       </Row>

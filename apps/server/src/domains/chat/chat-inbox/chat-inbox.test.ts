@@ -8,7 +8,7 @@ import type { Record } from '../ChatRecords/ChatRecords.ts';
 import {
   ASKED_CACHE_MAX,
   buildInbox,
-  createLastAskedReader,
+  createTranscriptTailReader,
   INBOX_LIMIT,
   lastAskedIn,
   parseQuestions,
@@ -297,11 +297,11 @@ describe('buildInbox', () => {
 });
 
 /**
- * F-147. Память читателя вопросов вытесняла по порядку ВСТАВКИ: чат, который
+ * F-147. Память читателя хвостов вытесняла по порядку ВСТАВКИ: чат, который
  * телефон спрашивает каждые секунды, уходил первым, как только набиралось
  * больше предела других, — и его каталог сканировался заново на каждом опросе.
  */
-describe('createLastAskedReader: вытеснение по давности обращения', () => {
+describe('createTranscriptTailReader: вытеснение по давности обращения', () => {
   it('часто спрашиваемый чат остаётся в памяти, уходит давно не спрошенный', () => {
     const dir = mkdtempSync(join(tmpdir(), 'cc-inbox-lru-'));
     try {
@@ -310,7 +310,7 @@ describe('createLastAskedReader: вытеснение по давности об
       const ids = Array.from({ length: ASKED_CACHE_MAX + 1 }, (_, i) => `c${i}`);
       for (const id of ids) writeFileSync(join(project, `${id}.jsonl`), '');
       let scans = 0;
-      const read = createLastAskedReader(() => {
+      const read = createTranscriptTailReader(() => {
         scans += 1;
         return dir;
       });

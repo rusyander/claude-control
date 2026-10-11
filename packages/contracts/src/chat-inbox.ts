@@ -4,6 +4,7 @@ import {
   literal,
   number,
   object,
+  record,
   string,
   union,
   unknown,
@@ -44,6 +45,11 @@ export const inboxAskSchema = union([
     toolName: string(),
     input: unknown(),
     askedAt: string(),
+    /**
+     * Запрос прав сессии вне панели: его держит хук панели, решение уходит
+     * маршрутом `/api/outside/asks`, а не `permission-decision` прогона.
+     */
+    relay: boolean().optional(),
   }),
   object({
     /** Первая правка в основной копии: «писать здесь» или «не писать». */
@@ -65,6 +71,12 @@ export const inboxAskSchema = union([
     total: number().int().positive(),
     question: inboxQuestionSchema,
     askedAt: string(),
+    /**
+     * Вопрос сессии вне панели, который ждёт ответа с телефона: хук панели
+     * держит его и отдаст ответ CLI. Отвечают маршрутом `/api/outside/asks`,
+     * а не сообщением в разговор.
+     */
+    relay: boolean().optional(),
   }),
 ]);
 export type InboxAsk = Infer<typeof inboxAskSchema>;
@@ -93,6 +105,13 @@ export const inboxChatSchema = object({
   status: inboxChatStatusSchema,
   /** Идёт ли прогон — и у ждущего тоже: вопрос бывает задан посреди хода. */
   running: boolean(),
+  /**
+   * Ход идёт вне панели — в терминале или VS Code, его видно только по
+   * транскрипту. Сообщение панели начало бы второй ход рядом, поэтому пишут
+   * сюда через `/api/outside/messages`: хук панели отдаёт текст агенту после
+   * ближайшего шага. Вопросы и права такой сессии помечены `relay`.
+   */
+  outside: boolean().optional(),
   /** Последнее движение: время транскрипта, начала прогона или вопроса. */
   updatedAt: string(),
   preview: string().optional(),
@@ -105,3 +124,71 @@ export const chatInboxSchema = object({
   chats: array(inboxChatSchema),
 });
 export type ChatInbox = Infer<typeof chatInboxSchema>;
+
+/**
+ * Хук панели (`PermissionRequest`) сообщает о вопросе или запросе прав сессии
+ * вне панели. Окно на компьютере показывает тот же запрос одновременно: чей
+ * ответ первый, тот и принят.
+ */
+export const outsideAskRegisterSchema = object({
+  toolUseId: string().min(1),
+  sessionId: string().min(1),
+  cwd: string().optional(),
+  toolName: string().min(1),
+  input: unknown().optional(),
+});
+export type OutsideAskRegister = Infer<typeof outsideAskRegisterSchema>;
+
+/**
+ * Ответ с телефона: на вопрос — текст вопроса → выбранное (несколько — через
+ * запятую), на запрос прав — «разрешить» или «запретить».
+ */
+export const outsideAnswerSchema = union([
+  object({ answers: record(string(), string()) }),
+  object({ behavior: union([literal('allow'), literal('deny')]) }),
+]);
+export type OutsideAnswer = Infer<typeof outsideAnswerSchema>;
+
+/** Пересылка с компьютера на телефон: вопросы, права и сообщения посреди хода. */
+export const outsideRelayStateSchema = object({
+  enabled: boolean(),
+  /** Все три хука панели стоят и включены в настройках Claude Code. */
+  installed: boolean(),
+  /**
+   * Хук прав стоит, но его таймаут короче ожидания ответа: без явного таймаута
+   * CLI снимает хук через 60 с, и запрос с телефона пропадает раньше ответа.
+   */
+  shortTimeout: boolean(),
+  /**
+   * Команда хука панели — готовая строка для раздела «Хуки»: вписать хуки в
+   * настройки Claude Code человек решает сам.
+   */
+  command: string(),
+});
+export type OutsideRelayState = Infer<typeof outsideRelayStateSchema>;
+
+/** Сообщение с телефона в ход, идущий в терминале или VS Code. */
+export const outsideMessageSendSchema = object({
+  sessionId: string().min(1),
+  text: string().trim().min(1).max(20_000),
+});
+
+export const outsideMessageSchema = object({
+  id: string(),
+  text: string(),
+  queuedAt: string(),
+  /** Когда хук отдал его агенту: после шага или в конце хода. Нет — ещё ждёт. */
+  deliveredAt: string().optional(),
+});
+export type OutsideMessage = Infer<typeof outsideMessageSchema>;
+
+export const outsideMessagesSchema = object({
+  messages: array(outsideMessageSchema),
+  /**
+   * Хуки панели уже отзывались из этой сессии. Нет — сессия могла быть
+   * запущена до их установки: Claude Code читает хуки на старте, и сообщение
+   * дойдёт только после её перезапуска.
+   */
+  hooked: boolean(),
+});
+export type OutsideMessages = Infer<typeof outsideMessagesSchema>;

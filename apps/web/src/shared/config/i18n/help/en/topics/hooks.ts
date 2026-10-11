@@ -50,7 +50,7 @@ export const hooksEn: typeof hooksRu = {
     diffPermission: 'A permission is an allowance with no code',
     diffPermissionText:
       'A denial in permissions is a pattern and executes nothing. A hook can look ' +
-      'at the arguments, read the disk and decide — but only on two of the nine events.',
+      'at the arguments, read the disk and decide — but only on three of the ten events.',
 
     guide: {
       mapTitle: 'What happens at the moment of an event',
@@ -65,9 +65,9 @@ export const hooksEn: typeof hooksRu = {
         'and deleting it does not remove the file.',
       pathTextTitle: 'The same path in words',
       pathTextText:
-        'The event happens → Claude Code checks the tool filter (four of the nine ' +
+        'The event happens → Claude Code checks the tool filter (five of the ten ' +
         'events have one) → runs the command, handing it the event on stdin → looks ' +
-        'at the exit code. A 2 on PreToolUse and UserPromptSubmit stops the action, ' +
+        'at the exit code. A 2 on PreToolUse, PermissionRequest and UserPromptSubmit stops the action, ' +
         'and the text from stderr explains why; on the other seven events nothing ' +
         'is blocked. When the script file is missing there is no error either — ' +
         'nothing simply happens, and that is the one reason the panel paints such a ' +
@@ -85,7 +85,7 @@ export const hooksEn: typeof hooksRu = {
       fForm: 'The event is picked from a list',
       fFormText:
         'Next to every event it says when it happens and whether it can stop the ' +
-        'action — there is no need to memorise nine names. Below is the tool filter ' +
+        'action — there is no need to memorise ten names. Below is the tool filter ' +
         'as checkboxes: in the file it will be joined by a vertical bar.',
       fPreset: 'A preset fills everything in at once',
       fPresetText:
@@ -165,7 +165,7 @@ export const hooksEn: typeof hooksRu = {
     cantLocal:
       'Switch off a hook from settings.local.json with the toggle: editing and deleting it ' +
       'is possible, but switching off would mean deleting a line from a personal file',
-    cantBlockAll: 'Block an action on any event: only two of the nine can stop anything',
+    cantBlockAll: 'Block an action on any event: only three of the ten can stop anything',
     cantStable:
       'Rely on a stable link for two identical hooks: the identifier is derived from ' +
       'the content, and full duplicates differ only by a suffix',
@@ -204,6 +204,8 @@ export const hooksEn: typeof hooksRu = {
       'system window, a message in a chat app.',
     evtStop:
       'When Claude has finished answering. Wrap-up work: collect a report, signal ' + 'completion.',
+    evtPermissionRequest:
+      'When Claude Code shows a permission dialog or an agent question. Decide for the person or forward the request — this is how the panel sends them to the phone; the dialog stays, the first decision wins.',
     evtSubagentStop:
       'When a subordinate agent has finished. Handling the results of background tasks.',
     evtSessionStart:
@@ -248,7 +250,7 @@ export const hooksEn: typeof hooksRu = {
       '"Session completed" (session_completed) is simply a list of actions to run when ' +
       'work finishes. A command is given as a list of arguments, not a shell string: ' +
       'the program first, then its arguments one per field, so no pipes and no && ' +
-      'there. OpenCode has no blocking, no tool matchers and no nine events. Note: as of ' +
+      'there. OpenCode has no blocking, no tool matchers and no ten events. Note: as of ' +
       '25 July 2026 the section is READ-ONLY for OpenCode. The key lived under ' +
       'experimental, which OpenCode declares unstable, and it is gone from there: neither ' +
       'the configuration reference nor the published schema mentions it any more, and ' +
@@ -258,7 +260,8 @@ export const hooksEn: typeof hooksRu = {
 
     eventsTitle: 'Nine events: what fires when',
     eventsCaption:
-      'Only PreToolUse and UserPromptSubmit can block an action. Four events support ' +
+      'Only PreToolUse, PermissionRequest and UserPromptSubmit can block an action. Five ' +
+      'events support ' +
       'a tool filter; on the others a hook always fires.',
 
     templatesTitle: 'What a hook does: four templates',
@@ -312,7 +315,7 @@ export const hooksEn: typeof hooksRu = {
 
     fieldsTitle: 'Fields of a hook',
     fieldsCaption: 'Names match the hookDraftSchema schema.',
-    fieldEvent: 'The Claude Code event the hook runs on. One of the nine.',
+    fieldEvent: 'The Claude Code event the hook runs on. One of the ten.',
     fieldMatchers:
       'A filter by tool. Picked with checkboxes and written to the config joined by ' +
       'a vertical bar — syntax you do not need to remember.',
@@ -341,7 +344,8 @@ export const hooksEn: typeof hooksRu = {
       'visible in the frames above.',
     limitEvents: 'Events',
     limitEventsValue:
-      'nine. Two can stop an action — PreToolUse and UserPromptSubmit; four support a tool filter',
+      'ten. Three can stop an action — PreToolUse, PermissionRequest and UserPromptSubmit; ' +
+      'five support a tool filter',
     limitTimeout: 'Timeout',
     limitTimeoutValue: 'in seconds; empty means the Claude Code default, 60',
     limitId: 'Identifier',
@@ -436,7 +440,7 @@ export const hooksEn: typeof hooksRu = {
       '"unbound". That is deliberate: another hook may need it.',
     noteExitTitle: 'Exit code 2 means refusal',
     noteExitText:
-      'On PreToolUse and UserPromptSubmit it stops the action, and the text from ' +
+      'On PreToolUse, PermissionRequest and UserPromptSubmit it stops the action, and the text from ' +
       'stderr explains why. On the other events nothing is blocked.',
   },
 
@@ -460,7 +464,7 @@ export const hooksEn: typeof hooksRu = {
 
   diagrams: {
     'hook-flow':
-      'What happens at the moment of an event: the tool filter, the command launched with the event on stdin, and the exit code — a 2 stops the action on only two of the nine events.',
+      'What happens at the moment of an event: the tool filter, the command launched with the event on stdin, and the exit code — a 2 stops the action on only three of the ten events.',
     'hook-storage':
       "Where a hook lives: the entry in settings.json or settings.local.json, the script file in hooks/, the snapshot of a disabled one in the panel's state.json. That is why switching off looks like disappearance and deleting does not remove the file.",
   },

@@ -3,7 +3,7 @@ import { useT } from '../../../../shared/config/i18n';
 import { askKinds } from '../../../../entities/inbox/askKinds';
 import { Pressable, View, Text } from 'react-native';
 import { styles } from '../ActiveChats.styles';
-import { StatusDot, Row, Mono } from '../../../../shared/ui';
+import { StatusDot, Row } from '../../../../shared/ui';
 import { space } from '../../../../shared/config/theme';
 import { ageMinutes } from '../../../../entities/inbox/ageMinutes';
 
@@ -22,6 +22,9 @@ export function ChatRow({
   const asks = chat.asks.length;
   const kinds = askKinds(chat.asks);
   const status = t.home.status[chat.status];
+  // «молчит» на каждой второй строке — шум: серая точка уже это говорит, а
+  // место нужнее последней реплике. Слово остаётся там, где оно и есть новость.
+  const showStatus = chat.status !== 'idle' || !chat.preview;
   return (
     <Pressable
       accessibilityRole="button"
@@ -37,18 +40,20 @@ export function ChatRow({
           <Text style={styles.title} numberOfLines={1}>
             {chat.title}
           </Text>
-          <Mono style={styles.age}>{t.home.age(ageMinutes(chat.updatedAt, now))}</Mono>
+          <Text style={styles.age}>{t.home.age(ageMinutes(chat.updatedAt, now))}</Text>
         </Row>
         <Row gap={space.sm}>
-          <Text
-            style={[
-              styles.status,
-              chat.status === 'waiting' && styles.statusWaiting,
-              chat.status === 'running' && styles.statusRunning,
-            ]}
-          >
-            {status}
-          </Text>
+          {showStatus ? (
+            <Text
+              style={[
+                styles.status,
+                chat.status === 'waiting' && styles.statusWaiting,
+                chat.status === 'running' && styles.statusRunning,
+              ]}
+            >
+              {status}
+            </Text>
+          ) : null}
           {asks > 0 ? (
             <View style={styles.badge}>
               <Text style={styles.badgeText}>

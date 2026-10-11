@@ -16,3 +16,7 @@ export { Chips } from './Chips/Chips';
 export { Empty } from './Empty/Empty';
 export { Loading } from './Loading/Loading';
 export { Row } from './Row/Row';
+export { Icon } from './Icon/Icon';
+export { Segmented } from './Segmented/Segmented';
+export { SwitchRow } from './SwitchRow/SwitchRow';
+export { ListRow } from './ListRow/ListRow';

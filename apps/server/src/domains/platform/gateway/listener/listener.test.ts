@@ -115,11 +115,14 @@ describe('порт', () => {
 
     const status = gateway.status();
     expect(status.running).toBe(true);
-    expect(status.port).toBe(busy + 1);
+    // Соседний — обычно busy + 1, но в полном прогоне его может держать
+    // параллельный файл, и шлюз честно идёт дальше вверх.
+    expect(status.port).toBeGreaterThan(busy);
+    expect(status.port).toBeLessThan(busy + 10);
     // Человек копирует адрес отсюда, поэтому разница между «просили» и
     // «досталось» обязана быть на виду, а не в логах.
     expect(status.requestedPort).toBe(busy);
-    expect(status.address).toBe(`http://127.0.0.1:${busy + 1}`);
+    expect(status.address).toBe(`http://127.0.0.1:${status.port}`);
   });
 
   it('остановленный шлюз не держит порт и не показывает адрес', async () => {
@@ -150,7 +153,9 @@ describe('порт', () => {
     await gateway.start({ store, appDataDir: appData, port: busy });
     // Задуманный порт совпадает с портом прокси защиты данных: сторож, следящий
     // за ним, слушал бы ЧУЖОЙ слушатель и смерти шлюза не заметил.
-    expect(new AppStore(appData).getState().platformGatewayPort).toBe(busy + 1);
+    const got = gateway.status().port;
+    expect(got).not.toBe(busy);
+    expect(new AppStore(appData).getState().platformGatewayPort).toBe(got);
 
     await gateway.stop();
     expect(new AppStore(appData).getState().platformGatewayPort).toBe(0);
@@ -204,10 +209,12 @@ describe('порт', () => {
     // Профиль — ХРАНИМАЯ запись с адресом внутри, и ассистент панели читает её
     // как есть: оставшийся в ней задуманный порт означал бы промпты, ушедшие
     // тому процессу, который порт и занял.
+    const got = gateway.status().port;
+    expect(got).not.toBe(busy);
     expect(
       store.getSettings().endpointProfiles.find((item) => item.id === 'contour-company-dev')
         ?.baseUrl,
-    ).toBe(`http://127.0.0.1:${busy + 1}/company-dev/_s/assistant/v1`);
+    ).toBe(`http://127.0.0.1:${got}/company-dev/_s/assistant/v1`);
   });
 });
 

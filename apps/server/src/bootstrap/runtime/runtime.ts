@@ -102,6 +102,7 @@ import {
 import { readLastAssistantTurn } from '../../domains/chat/ChatHistory/ChatHistory.ts';
 import { createHandoffPlanner } from '../../routes/chat/handoff-routes.ts';
 import { projectsDir } from '../../routes/chat/paths.ts';
+import { syncRelayHooks } from '../../routes/chat/outside-relay-routes/outside-relay-routes.ts';
 import {
   atlassianTaskTracker,
   atlassianTicketTracker,
@@ -1120,6 +1121,9 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     appRoot: appRootDir(),
     claude: { settingsPath: () => ctx.location.paths.settings, backupDir: () => ctx.backupDir },
   });
+  // Сессии из терминала и VS Code видны телефону только через хуки панели:
+  // включённой пересылке они нужны с первого сеанса, без ручной установки.
+  syncRelayHooks(ctx);
   // Включённому «Claude на локальной модели» нужен живой сервер с первого сеанса.
   void localModels.resume().catch((error: unknown) => {
     console.warn('local models: server for the Claude switch did not start', error);

@@ -52,6 +52,15 @@ export interface InboxRun {
   prompt?: string;
 }
 
+/** Запрос прав сессии вне панели — ключом служит сессия, а не прогон. */
+export interface OutsidePermission {
+  toolUseId: string;
+  sessionId: string;
+  toolName: string;
+  input?: unknown;
+  askedAt: string;
+}
+
 /** Последний неотвеченный вызов `AskUserQuestion`. */
 export interface AskedCall {
   toolUseId?: string;
@@ -64,7 +73,14 @@ export interface InboxSources {
   /** Только идущие прогоны. */
   runs: readonly InboxRun[];
   permissions: readonly PendingPermissionInfo[];
+  /**
+   * Запросы прав сессий вне панели, которые держит хук панели: окно на
+   * компьютере показывает их же, решить можно и с телефона.
+   */
+  outsidePermissions?: readonly OutsidePermission[];
   lastAsked: (chatId: string) => AskedCall | undefined;
+  /** Идёт ли ход вне панели (терминал, VS Code) — по хвосту транскрипта. */
+  liveOutside?: (chatId: string) => boolean;
   /** Имя группы разделения для чата без своего названия. */
   groupTitle?: (chatId: string) => string | undefined;
   now: number;
@@ -130,6 +146,15 @@ export function buildInbox(sources: InboxSources): ChatInbox {
     byRun.set(run.key, draft);
   }
 
+  // Разговор из терминала или VS Code в реестре не числится: что он работает,
+  // видно только по транскрипту. Без этого телефон показывал «молчит» ровно
+  // тогда, когда агент на компьютере вовсю шёл по шагам.
+  for (const draft of drafts.values()) {
+    if (draft.running || !draft.sessionId || !sources.liveOutside?.(draft.sessionId)) continue;
+    draft.running = true;
+    draft.outside = true;
+  }
+
   for (const permission of sources.permissions) {
     const draft = byRun.get(permission.runId);
     if (!draft) continue;
@@ -141,6 +166,22 @@ export function buildInbox(sources: InboxSources): ChatInbox {
       toolName: permission.toolName,
       input: permission.input,
       askedAt: permission.askedAt,
+    });
+  }
+
+  for (const permission of sources.outsidePermissions ?? []) {
+    const summary = byId.get(permission.sessionId);
+    const draft = drafts.get(permission.sessionId) ?? (summary ? fromSummary(summary) : undefined);
+    if (!draft) continue;
+    drafts.set(permission.sessionId, draft);
+    draft.asks.push({
+      kind: 'permission',
+      key: `r:${permission.toolUseId}`,
+      toolUseId: permission.toolUseId,
+      toolName: permission.toolName,
+      input: permission.input,
+      askedAt: permission.askedAt,
+      relay: true,
     });
   }
 
@@ -280,19 +321,70 @@ export function isHumanPrompt(content: unknown): boolean {
 }
 
 /**
- * Читатель вопросов с памятью по файлу: телефон спрашивает сводку каждые
+ * Сколько транскрипт может молчать, а ход вне панели всё ещё считаться идущим.
+ * Долгая команда пишет в файл только по своему концу (Bash — до 10 минут);
+ * процесс, убитый посреди хода, конца не пишет вовсе — граница не даёт ему
+ * «работать» вечно.
+ */
+export const OUTSIDE_LIVE_MS = 10 * 60 * 1000;
+
+/** Чем кончается ход модели: всё прочее — ход ещё идёт. */
+const TURN_ENDS = new Set(['end_turn', 'stop_sequence', 'max_tokens', 'refusal']);
+/** Отмена человеком (Esc): CLI пишет её репликой от его имени. */
+const INTERRUPTED = /^\s*\[Request interrupted by user/;
+
+/**
+ * Открыт ли ход по записям транскрипта: последняя запись разговора — реплика
+ * человека или результат инструмента (модель думает), либо шаг модели, который
+ * ещё не кончил ход (`tool_use` — инструмент выполняется).
+ */
+export function turnOpenIn(records: readonly Record[]): boolean {
+  let open = false;
+  for (const record of records) {
+    if (record.isSidechain || record.isMeta || record.isApiErrorMessage) continue;
+    if (record.type === 'user') open = !interrupted(record.message?.content);
+    else if (record.type === 'assistant') open = !TURN_ENDS.has(record.message?.stop_reason ?? '');
+  }
+  return open;
+}
+
+function interrupted(content: unknown): boolean {
+  if (typeof content === 'string') return INTERRUPTED.test(content);
+  return (
+    Array.isArray(content) &&
+    content.some(
+      (block: { type?: string; text?: unknown }) =>
+        block?.type === 'text' && typeof block.text === 'string' && INTERRUPTED.test(block.text),
+    )
+  );
+}
+
+/** Что сводке нужно из хвоста транскрипта. */
+export interface TranscriptTail {
+  asked: AskedCall | undefined;
+  turnOpen: boolean;
+  mtimeMs: number;
+}
+
+/** Ход вне панели: открыт и файл двигался недавно. */
+export function liveByTail(tail: TranscriptTail | undefined, now: number): boolean {
+  return Boolean(tail?.turnOpen && now - tail.mtimeMs <= OUTSIDE_LIVE_MS);
+}
+
+/** Сколько транскриптов помнит читатель хвостов. */
+export const ASKED_CACHE_MAX = 500;
+
+/**
+ * Читатель хвостов с памятью по файлу: телефон спрашивает сводку каждые
  * несколько секунд, а меняются за это время один-два транскрипта. Хвост
  * перечитывается, только когда у файла сменились время или размер.
  */
-/** Сколько транскриптов помнит читатель вопросов. */
-export const ASKED_CACHE_MAX = 500;
-
-export function createLastAskedReader(
+export function createTranscriptTailReader(
   projectsDir: () => string,
-): (chatId: string) => AskedCall | undefined {
+): (chatId: string) => TranscriptTail | undefined {
   const cache = new Map<
     string,
-    { path: string; mtimeMs: number; size: number; value: AskedCall | undefined }
+    { path: string; mtimeMs: number; size: number; value: TranscriptTail }
   >();
   return (chatId) => {
     const known = cache.get(chatId);
@@ -313,7 +405,12 @@ export function createLastAskedReader(
         cache.set(chatId, known);
         return known.value;
       }
-      const value = lastAskedIn(readTailRecords(path, ASK_TAIL_BYTES));
+      const records = readTailRecords(path, ASK_TAIL_BYTES);
+      const value: TranscriptTail = {
+        asked: lastAskedIn(records),
+        turnOpen: turnOpenIn(records),
+        mtimeMs: stats.mtimeMs,
+      };
       cache.delete(chatId);
       cache.set(chatId, { path, mtimeMs: stats.mtimeMs, size: stats.size, value });
       if (cache.size > ASKED_CACHE_MAX) cache.delete(cache.keys().next().value as string);

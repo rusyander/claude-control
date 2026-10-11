@@ -18,6 +18,7 @@ import { settingsSourceSchema } from './settings-source';
  */
 export const hookEventSchema = zodEnum([
   'PreToolUse',
+  'PermissionRequest',
   'PostToolUse',
   'UserPromptSubmit',
   'Notification',
@@ -88,6 +89,15 @@ export const HOOK_EVENT_INFO: readonly HookEventInfo[] = [
     useFor: 'Итоговые действия: собрать отчёт, подать сигнал о завершении работы.',
     // Код возврата 2 НЕ даёт агенту остановиться и продолжает разговор — это
     // задокументированное поведение события, а не догадка.
+    canBlock: true,
+  },
+  {
+    event: 'PermissionRequest',
+    supportsMatcher: true,
+    matcherExamples: ['Bash', 'Edit', 'AskUserQuestion', '*'],
+    when: 'Когда Claude Code показывает окно разрешения или вопрос агента',
+    useFor:
+      'Решить за человека или переслать запрос: окно стоит одновременно с хуком, первое решение принимается.',
     canBlock: true,
   },
   {

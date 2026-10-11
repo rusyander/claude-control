@@ -111,14 +111,14 @@
       "masked": 0,
       "width": 540,
       "height": 1200,
-      "shotAt": "2026-09-28T18:57:55.907Z",
+      "shotAt": "2026-10-11T13:42:39.545Z",
       "text": "Настройки Панель Не подключено Спарить Спарить Язык Русский Русский English English Уведомления Приходят, когда работа закончена, упала, ждёт разрешения или агент задал вопрос. Уходит только вид события и имя папки проекта — ни текста, ни кода. Включить на этом телефоне Включить на этом телефоне AgentDeck 1.0.0 Главная  Главная , Проекты  Проекты , Аналитика  Аналитика Агент  Агент , Настройки Настройки ",
       "en": {
         "file": "04-phone-not-paired.en.png",
         "masked": 0,
         "width": 540,
         "height": 1200,
-        "shotAt": "2026-09-28T19:00:16.219Z",
+        "shotAt": "2026-10-11T13:45:05.114Z",
         "text": "Settings Panel Not connected Pair Pair Language Русский Русский English English Notifications They arrive when work is finished, has failed, waits for a permission or the agent asks a question. Only the kind of event and the project folder name leave the machine — no text, no code. Enable on this phone Enable on this phone AgentDeck 1.0.0 Home  Home , Projects  Projects , Analytics  Analytics Agent  Agent , Settings Settings "
       }
     },
@@ -129,33 +129,33 @@
       "masked": 0,
       "width": 540,
       "height": 1200,
-      "shotAt": "2026-09-28T18:58:09.073Z",
-      "text": "Navigate up Подключение Код из панели Настройки → Удалённый доступ. Наведите камеру на код. Разрешить камеру Разрешить камеру Или руками http://10.0.2.2:59710 ••••••••••••••••••••••••••••••••••••••••••• Подключиться Подключиться Токен открывает всё API панели: он лежит в защищённом хранилище телефона и никуда больше не уходит. Потеряли телефон — смените токен в панели, и это устройство перестанет ходить.",
+      "shotAt": "2026-10-11T13:42:54.571Z",
+      "text": "Navigate up Подключение Код из панели Настройки → Удалённый доступ. Наведите камеру на код. Разрешить камеру Разрешить камеру Или руками http://10.0.2.2:59550 ••••••••••••••••••••••••••••••••••••••••••• Подключиться Подключиться Токен открывает всё API панели: он лежит в защищённом хранилище телефона и никуда больше не уходит. Потеряли телефон — смените токен в панели, и это устройство перестанет ходить.",
       "en": {
         "file": "05-phone-pair-screen.en.png",
         "masked": 0,
         "width": 540,
         "height": 1200,
-        "shotAt": "2026-09-28T19:00:29.532Z",
-        "text": "Navigate up Connecting Code from the panel Settings → Remote access. Point the camera at the code. Allow the camera Allow the camera Or by hand http://10.0.2.2:59710 ••••••••••••••••••••••••••••••••••••••••••• Connect Connect The token opens the panel’s whole API: it lives in the phone’s secure storage and goes nowhere else. Lost the phone — rotate the token in the panel and this device stops working."
+        "shotAt": "2026-10-11T13:45:17.385Z",
+        "text": "Navigate up Connecting Code from the panel Settings → Remote access. Point the camera at the code. Allow the camera Allow the camera Or by hand http://10.0.2.2:59550 ••••••••••••••••••••••••••••••••••••••••••• Connect Connect The token opens the panel’s whole API: it lives in the phone’s secure storage and goes nowhere else. Lost the phone — rotate the token in the panel and this device stops working."
       }
     },
     {
       "id": "06-phone-online",
       "side": "phone",
       "file": "06-phone-online.png",
-      "masked": 1,
+      "masked": 0,
       "width": 540,
       "height": 1200,
-      "shotAt": "2026-09-28T18:58:17.393Z",
-      "text": "Настройки Панель http://10.0.2.2:59710 на связи Спарить заново Спарить заново Отключить Отключить Язык Русский Русский English English Уведомления Приходят, когда работа закончена, упала, ждёт разрешения или агент задал вопрос. Уходит только вид события и имя папки проекта — ни текста, ни кода. Включить на этом телефоне Включить на этом телефоне ✓ Панель шлёт уведомления ✓ Панель шлёт уведомления Проверочное уведомление Проверочное уведомление Доступ снаружи Включён: панель требует токен на каждом запросе. Tailscale: https://•••••••••••• (serve работает) Главная, ждут ответа: 1  1 Главная , Проекты  Проекты , Аналитика  Аналитика Агент  Агент , Настройки Настройки ",
+      "shotAt": "2026-10-11T13:43:03.663Z",
+      "text": "Настройки Панель http://10.0.2.2:59550 на связи Спарить заново Спарить заново Отключить Отключить Язык Русский Русский English English Уведомления Приходят, когда работа закончена, упала, ждёт разрешения или агент задал вопрос. Уходит только вид события и имя папки проекта — ни текста, ни кода. Включить на этом телефоне Включить на этом телефоне Панель шлёт уведомления Панель шлёт уведомления Проверочное уведомление Проверочное уведомление Вопросы с компьютера Когда агент в терминале или VS Code задаёт вопрос, ответить можно отсюда — ответ уйдёт агенту так же, как выбор в окне на компьютере. Пока включено, вопрос ждёт здесь, а не в окне; вернуть его окну — «Отвечу на компьютере». Главная, ждут ответа: 1  1 Главная , Проекты  Проекты , Аналитика  Аналитика Агент  Агент , Настройки Настройки ",
       "en": {
         "file": "06-phone-online.en.png",
-        "masked": 1,
+        "masked": 0,
         "width": 540,
         "height": 1200,
-        "shotAt": "2026-09-28T19:00:37.815Z",
-        "text": "Settings Panel http://10.0.2.2:59710 online Pair again Pair again Disconnect Disconnect Language Русский Русский English English Notifications They arrive when work is finished, has failed, waits for a permission or the agent asks a question. Only the kind of event and the project folder name leave the machine — no text, no code. Enable on this phone Enable on this phone ✓ The panel sends notifications ✓ The panel sends notifications Test notification Test notification Access from outside On: the panel requires a token on every request. Tailscale: https://•••••••••••• (serve is running) Home, 1 waiting for an answer  1 Home , Projects  Projects , Analytics  Analytics Agent  Agent , Settings Settings "
+        "shotAt": "2026-10-11T13:45:25.560Z",
+        "text": "Settings Panel http://10.0.2.2:59550 online Pair again Pair again Disconnect Disconnect Language Русский Русский English English Notifications They arrive when work is finished, has failed, waits for a permission or the agent asks a question. Only the kind of event and the project folder name leave the machine — no text, no code. Enable on this phone Enable on this phone The panel sends notifications The panel sends notifications Test notification Test notification Questions from the computer When the agent in a terminal or VS Code asks a question, you can answer it here — the answer reaches the agent just like a choice made in the window on the computer. While on, the question waits here, not in the window; «I will answer on the computer» hands it back. Home, 1 waiting for an answer  1 Home , Projects  Projects , Analytics  Analytics Agent  Agent , Settings Settings "
       }
     }
   ]

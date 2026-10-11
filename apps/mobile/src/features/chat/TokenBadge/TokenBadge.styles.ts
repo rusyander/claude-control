@@ -1,24 +1,23 @@
 import { StyleSheet } from 'react-native';
-import { space, radius, colors, font } from '../../../shared/config/theme';
+import { space, radius, colors, font, tabular } from '../../../shared/config/theme';
 
 export const styles = StyleSheet.create({
   root: { alignSelf: 'flex-end', gap: space.xs },
+  // Подпись шага, а не кнопка: рамка и подложка на каждой строке весили почти
+  // как сами реплики. Нажимается так же — разбивка открывается по тапу.
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: space.xs,
-    paddingHorizontal: space.sm,
-    paddingVertical: space.xs,
+    gap: space.sm,
+    paddingHorizontal: space.xs,
+    paddingVertical: 2,
     borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceRaised,
   },
-  pressed: { opacity: 0.7 },
-  total: { color: colors.textFaint, fontSize: font.small, fontFamily: font.mono },
-  fresh: { color: colors.accent, fontSize: font.small, fontFamily: font.mono, fontWeight: '700' },
-  time: { color: colors.textDim, fontSize: font.small, fontFamily: font.mono },
-  runTotal: { color: colors.textFaint, fontSize: font.small, fontFamily: font.mono },
+  pressed: { opacity: 0.6, backgroundColor: colors.surfaceRaised },
+  total: { color: colors.textFaint, fontSize: font.small - 1, ...tabular },
+  fresh: { color: colors.accent, fontSize: font.small - 1, fontWeight: '600', ...tabular },
+  time: { color: colors.textFaint, fontSize: font.small - 1, ...tabular },
+  runTotal: { color: colors.textFaint, fontSize: font.small - 1, ...tabular },
   panel: {
     minWidth: 240,
     gap: space.xs,

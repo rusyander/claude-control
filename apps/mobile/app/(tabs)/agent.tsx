@@ -8,7 +8,18 @@ import {
   Text,
   View,
 } from 'react-native';
-import { Card, Chips, Empty, Field, Loading, Mono, Muted, Row, Title } from '../../src/shared/ui';
+import {
+  Card,
+  Empty,
+  Field,
+  Icon,
+  Loading,
+  Mono,
+  Muted,
+  Row,
+  Segmented,
+  Title,
+} from '../../src/shared/ui';
 import { colors, font, radius, space } from '../../src/shared/config/theme';
 import { useT, useLanguage } from '../../src/shared/config/i18n';
 import { useConnection, isConfigured } from '../../src/shared/api/connection';
@@ -74,9 +85,9 @@ export default function AgentScreen() {
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
       <View style={styles.header}>
-        <Title>{t.agent.title}</Title>
-        <Muted>{t.agent.subtitle}</Muted>
-        <Chips
+        <Title style={styles.heading}>{t.agent.title}</Title>
+        <Muted style={styles.subtitle}>{t.agent.subtitle}</Muted>
+        <Segmented<AgentView>
           options={[
             { value: 'conversation', label: t.agent.views.conversation },
             { value: 'history', label: t.agent.views.history },
@@ -102,7 +113,14 @@ export default function AgentScreen() {
             onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}
           >
             <Row gap={space.sm} style={styles.wrap}>
-              {workspace.projectPath ? <Mono>{t.agent.context(workspace.projectPath)}</Mono> : null}
+              {workspace.projectPath ? (
+                <View style={styles.context}>
+                  <Icon ios="folder" android="folder" size={14} color={colors.textDim} />
+                  <Text style={styles.contextText} numberOfLines={1}>
+                    {t.agent.context(workspace.projectPath)}
+                  </Text>
+                </View>
+              ) : null}
               {state.feed.length > 0 ? (
                 <Pressable accessibilityRole="button" onPress={session.reset}>
                   <Text style={styles.link}>{t.agent.newConversation}</Text>
@@ -110,7 +128,15 @@ export default function AgentScreen() {
               ) : null}
             </Row>
 
-            {state.feed.length === 0 && cards.length === 0 ? <Muted>{t.agent.empty}</Muted> : null}
+            {state.feed.length === 0 && cards.length === 0 ? (
+              <Empty
+                title={t.agent.emptyTitle}
+                text={t.agent.empty}
+                icon={
+                  <Icon ios="sparkles" android="auto_awesome" size={28} color={colors.accent} />
+                }
+              />
+            ) : null}
 
             {state.feed.map((item) => {
               if (item.kind === 'user' || item.kind === 'assistant') {
@@ -175,7 +201,12 @@ export default function AgentScreen() {
                 pressed && styles.pressed,
               ]}
             >
-              <Text style={styles.roundText}>🎙</Text>
+              <Icon
+                ios="mic.fill"
+                android="mic"
+                size={22}
+                color={voice.listening ? '#ffffff' : colors.text}
+              />
             </Pressable>
             {state.running ? (
               <Pressable
@@ -200,7 +231,7 @@ export default function AgentScreen() {
                   pressed && styles.pressed,
                 ]}
               >
-                <Text style={styles.roundText}>↑</Text>
+                <Icon ios="arrow.up" android="arrow_upward" size={22} color="#ffffff" />
               </Pressable>
             )}
           </Row>
@@ -284,11 +315,27 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   header: {
     padding: space.lg,
-    paddingBottom: space.sm,
+    paddingBottom: space.md,
     gap: space.sm,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+    backgroundColor: colors.surface,
   },
+  heading: { fontSize: font.large, fontWeight: '700' },
+  subtitle: { fontSize: font.body - 1, lineHeight: 18, marginBottom: space.xs },
+  context: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.xs,
+    maxWidth: '100%',
+    paddingHorizontal: space.sm,
+    paddingVertical: space.xs,
+    borderRadius: 999,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  contextText: { color: colors.textDim, fontSize: font.small, flexShrink: 1 },
   badge: { color: colors.warning },
   feed: { padding: space.lg, gap: space.sm },
   wrap: { flexWrap: 'wrap' },
@@ -323,5 +370,4 @@ const styles = StyleSheet.create({
   stopMark: { width: 14, height: 14, borderRadius: 2, backgroundColor: colors.text },
   off: { opacity: 0.4 },
   pressed: { opacity: 0.7 },
-  roundText: { color: colors.text, fontSize: 20 },
 });

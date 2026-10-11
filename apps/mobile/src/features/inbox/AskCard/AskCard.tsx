@@ -4,7 +4,7 @@ import type { InboxAsk, InboxChat } from '@agentdeck/contracts/chat-inbox';
 import { Button, Mono, Row } from '../../../shared/ui';
 import { space } from '../../../shared/config/theme';
 import { useT } from '../../../shared/config/i18n';
-import { api } from '../../../shared/api/client';
+import { ApiError, api } from '../../../shared/api/client';
 import { getRun, send } from '../../../shared/lib/runs';
 import { EMPTY_CARD, cardView } from '../queue';
 import { AskBody } from '../AskBody/AskBody';
@@ -19,6 +19,8 @@ import { planSubmissions } from '../planSubmissions';
 import { submitAll } from '../submitAll';
 import { markSent } from '../sent';
 import { answerSummary } from '../answerSummary';
+import { isRelayCard, relayDecisions } from '../relayAnswers';
+import { OutsideAsks } from './OutsideAsks/OutsideAsks';
 import { styles } from './AskCard.styles';
 
 /**
@@ -52,13 +54,40 @@ export function AskCard({
 
   const view = cardView(asks, state);
   const hasQuestions = asks.some((ask) => ask.kind === 'question');
+  // Вопрос из терминала или VS Code ждёт ответа в своём окне: сообщение панели
+  // туда не дойдёт, а начало бы второй ход рядом. Видно — да, ответить — нет.
+  // Хук панели держит вопрос или запрос прав — решают отсюда, решение уходит
+  // CLI; окно на компьютере показывает тот же запрос, принимается первое.
+  const relayed = isRelayCard(asks);
+  const readOnly = chat.outside === true && !relayed;
 
   const answer = (ask: InboxAsk, value: AskAnswer): void => {
     setFailed(undefined);
     setStored(answerAsk(state, ask.key, value));
   };
 
+  const submitRelay = (): void => {
+    const decisions = relayDecisions(asks, state);
+    if (!decisions) return;
+    setBusy(true);
+    setFailed(undefined);
+    void Promise.all(
+      decisions.map((decision) =>
+        api
+          .post(`/outside/asks/${encodeURIComponent(decision.toolUseId)}/answer`, decision.body)
+          // 409 — запрос уже решён в окне на компьютере: карточке ждать нечего.
+          .catch((error: unknown) => {
+            if (!(error instanceof ApiError && error.status === 409)) throw error;
+          })
+          .then(() => markSent(decision.keys.flatMap((key) => sentKeys(chat, { key })))),
+      ),
+    )
+      .catch((error: unknown) => setFailed(error instanceof Error ? error.message : String(error)))
+      .finally(() => setBusy(false));
+  };
+
   const submit = (): void => {
+    if (relayed) return submitRelay();
     const plan = planSubmissions(chat, asks, state);
     setBusy(true);
     setFailed(undefined);
@@ -105,24 +134,27 @@ export function AskCard({
         ) : null}
       </Row>
 
-      {view.done.map(({ ask, answer: given }) => (
-        <View key={ask.key} style={styles.done}>
-          <Text style={styles.doneMark}>✓</Text>
-          <Text style={styles.doneText} numberOfLines={1}>
-            {answerSummary(t, ask, given)}
-          </Text>
-          <Pressable
-            accessibilityRole="button"
-            disabled={busy}
-            onPress={() => setStored(editAsk(state, ask.key))}
-            hitSlop={8}
-          >
-            <Text style={styles.link}>{t.home.change}</Text>
-          </Pressable>
-        </View>
-      ))}
+      {readOnly ? <OutsideAsks asks={asks} note={t.home.outside} /> : null}
 
-      {view.current ? (
+      {!readOnly &&
+        view.done.map(({ ask, answer: given }) => (
+          <View key={ask.key} style={styles.done}>
+            <Text style={styles.doneMark}>✓</Text>
+            <Text style={styles.doneText} numberOfLines={1}>
+              {answerSummary(t, ask, given)}
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              disabled={busy}
+              onPress={() => setStored(editAsk(state, ask.key))}
+              hitSlop={8}
+            >
+              <Text style={styles.link}>{t.home.change}</Text>
+            </Pressable>
+          </View>
+        ))}
+
+      {!readOnly && view.current ? (
         <View style={styles.current}>
           {view.total > 1 ? (
             <Mono style={styles.step}>{t.home.step(view.step, view.total)}</Mono>
@@ -139,10 +171,12 @@ export function AskCard({
         </View>
       ) : null}
 
-      {view.ready ? (
+      {!readOnly && view.ready ? (
         <View style={styles.footer}>
           <Text style={styles.hint}>{t.home.sendHint(view.total)}</Text>
-          {hasQuestions && chat.running ? <Text style={styles.hint}>{t.home.running}</Text> : null}
+          {hasQuestions && chat.running && !relayed ? (
+            <Text style={styles.hint}>{t.home.running}</Text>
+          ) : null}
           <Button title={t.home.send} tone="accent" busy={busy} onPress={submit} />
         </View>
       ) : null}

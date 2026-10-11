@@ -1,0 +1,12 @@
+/** Команда хука целиком: путь длинный, переносится, а не уезжает за край. */
+.command {
+  margin: 0;
+  padding: var(--spacing-xs);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background-color: var(--color-surface-sunken);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  white-space: pre-wrap;
+  word-break: break-all;
+}

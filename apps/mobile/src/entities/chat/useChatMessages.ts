@@ -4,10 +4,16 @@ import { useQuery } from '@tanstack/react-query';
 import { chatMessagesQuery } from './chatMessagesQuery';
 import { STALE_MS } from './api.constants';
 
-export function useChatMessages(chatId: string, limit = 60): UseQueryResult<ChatMessagesPage> {
+/** `pollMs` — перечитывать ленту, пока ход идёт там, откуда потока нет. */
+export function useChatMessages(
+  chatId: string,
+  limit = 60,
+  pollMs?: number,
+): UseQueryResult<ChatMessagesPage> {
   return useQuery({
     ...chatMessagesQuery(chatId, limit),
     enabled: Boolean(chatId) && !chatId.startsWith('new-'),
     staleTime: STALE_MS,
+    refetchInterval: pollMs ?? false,
   });
 }

@@ -30,10 +30,8 @@ export const styles = StyleSheet.create({
   pressed: { opacity: 0.75 },
   send: { backgroundColor: colors.accent },
   sendOff: { opacity: 0.4 },
-  sendText: { color: colors.text, fontSize: 26, fontWeight: '700', lineHeight: 30 },
   mic: { borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceRaised },
   micOn: { borderColor: colors.accent, backgroundColor: colors.accentDim },
-  micText: { fontSize: 22, lineHeight: 26 },
   stop: { backgroundColor: colors.danger },
   stopMark: { width: 16, height: 16, borderRadius: 3, backgroundColor: colors.text },
   toggle: {

@@ -253,7 +253,7 @@ function checkBranches(ctx, damage) {
 // --- 4. Роспись живой приёмки: пункт на каждый CLI ----------------------------
 function checkRoster(ctx, damage) {
   const failures = [];
-  const plan = readFileSync(new URL('docs/TASKS-PORTABILITY.ru.md', root), 'utf8');
+  const plan = readFileSync(new URL('docs/PORTABILITY-DESIGN.ru.md', root), 'utf8');
 
   // Шесть проб берутся ИЗ ПЛАНА: список назван в §9 (доктрина) и в разделе
   // закрытой приёмки, и обе копии обязаны совпасть — иначе приёмка закрывается

@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import type { InboxChat } from '@agentdeck/contracts/chat-inbox';
-import { Button, Empty, Loading, Muted } from '../../src/shared/ui';
+import { Button, Empty, Icon, Loading, Segmented } from '../../src/shared/ui';
 import { colors, font, space } from '../../src/shared/config/theme';
 import { useT } from '../../src/shared/config/i18n';
 import { useConnection, isConfigured } from '../../src/shared/api/connection';
@@ -81,18 +81,19 @@ export default function HomeScreen() {
     <SafeAreaView style={styles.screen} edges={['top']}>
       {/* Фоновый наблюдатель панели: виден, только пока включён. */}
       <WatcherChip enabled={configured} />
-      <View style={styles.tabs} accessibilityRole="tablist">
-        <Segment
-          label={t.home.tabChats}
-          selected={tab === 'chats'}
-          onPress={() => setTab('chats')}
-        />
-        <Segment
-          label={t.home.tabQuestions}
-          a11y={t.home.tabQuestionsA11y(pending)}
-          badge={pending}
-          selected={tab === 'questions'}
-          onPress={() => setTab('questions')}
+      <View style={styles.tabs}>
+        <Segmented<HomeTab>
+          options={[
+            { value: 'chats', label: t.home.tabChats },
+            {
+              value: 'questions',
+              label: t.home.tabQuestions,
+              a11y: t.home.tabQuestionsA11y(pending),
+              badge: pending,
+            },
+          ]}
+          value={tab}
+          onChange={setTab}
         />
       </View>
 
@@ -110,10 +111,12 @@ export default function HomeScreen() {
       >
         {failed && loaded ? <Text style={styles.failed}>{t.home.failed}</Text> : null}
         {failed && !loaded ? (
-          <View style={styles.center}>
-            <Muted style={styles.centerText}>{t.home.failedEmpty}</Muted>
+          <Empty
+            text={t.home.failedEmpty}
+            icon={<Icon ios="wifi.slash" android="cloud_off" size={28} color={colors.danger} />}
+          >
             <Button title={t.home.retry} onPress={() => void inbox.refetch()} />
-          </View>
+          </Empty>
         ) : null}
         {!loaded && !failed ? <Loading /> : null}
 
@@ -136,7 +139,11 @@ export default function HomeScreen() {
               />
             </View>
             {groups.length === 0 ? (
-              <EmptyState title={t.home.activeEmpty} hint={t.home.activeEmptyHint} />
+              <Empty
+                title={t.home.activeEmpty}
+                text={t.home.activeEmptyHint}
+                icon={<Icon ios="bubble.left.and.bubble.right" android="forum" size={28} />}
+              />
             ) : (
               <ActiveChats groups={groups} now={now} onOpen={open} />
             )}
@@ -163,7 +170,15 @@ function QuestionsTab({
 }) {
   const t = useT();
   if (cards.length === 0) {
-    return <EmptyState title={t.home.noQuestions} hint={t.home.noQuestionsHint} />;
+    return (
+      <Empty
+        title={t.home.noQuestions}
+        text={t.home.noQuestionsHint}
+        icon={
+          <Icon ios="checkmark.bubble" android="mark_chat_read" size={28} color={colors.success} />
+        }
+      />
+    );
   }
   return (
     <>
@@ -180,48 +195,6 @@ function QuestionsTab({
   );
 }
 
-function Segment({
-  label,
-  a11y,
-  badge = 0,
-  selected,
-  onPress,
-}: {
-  label: string;
-  a11y?: string;
-  badge?: number;
-  selected: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="tab"
-      accessibilityLabel={a11y ?? label}
-      accessibilityState={{ selected }}
-      onPress={onPress}
-      style={[styles.segment, selected && styles.segmentOn]}
-    >
-      <Text style={[styles.segmentText, selected && styles.segmentTextOn]} numberOfLines={1}>
-        {label}
-      </Text>
-      {badge > 0 ? (
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>{badge > 99 ? '99+' : badge}</Text>
-        </View>
-      ) : null}
-    </Pressable>
-  );
-}
-
-function EmptyState({ title, hint }: { title: string; hint: string }) {
-  return (
-    <View style={styles.center}>
-      <Text style={styles.emptyTitle}>{title}</Text>
-      <Muted style={styles.centerText}>{hint}</Muted>
-    </View>
-  );
-}
-
 function useClock(): number {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -235,45 +208,8 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   flex: { flex: 1 },
   grow: { flex: 1 },
-  tabs: {
-    flexDirection: 'row',
-    gap: space.xs,
-    marginHorizontal: space.lg,
-    marginTop: space.sm,
-    marginBottom: space.xs,
-    padding: 3,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 10,
-  },
-  segment: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: space.xs,
-    minHeight: 38,
-    paddingHorizontal: space.sm,
-    borderRadius: 8,
-  },
-  segmentOn: { backgroundColor: colors.accentDim },
-  segmentText: { color: colors.textDim, fontSize: font.body, fontWeight: '600', flexShrink: 1 },
-  segmentTextOn: { color: colors.text },
-  badge: {
-    minWidth: 20,
-    height: 20,
-    paddingHorizontal: 5,
-    borderRadius: 999,
-    backgroundColor: colors.waiting,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  badgeText: { color: colors.bg, fontSize: 11, fontWeight: '700' },
+  tabs: { marginHorizontal: space.lg, marginTop: space.sm, marginBottom: space.xs },
   content: { padding: space.lg, paddingTop: space.sm, gap: space.md },
   actions: { flexDirection: 'row', gap: space.sm },
   failed: { color: colors.danger, fontSize: font.small },
-  center: { paddingVertical: space.xl, alignItems: 'center', gap: space.md },
-  centerText: { textAlign: 'center', lineHeight: 18 },
-  emptyTitle: { color: colors.text, fontSize: font.title, fontWeight: '600' },
 });

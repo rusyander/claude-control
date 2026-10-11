@@ -47,6 +47,14 @@ export const en: Dictionary = {
     tests: 'Tests',
     homeChat: 'Home chat',
     blank: 'Empty. Write a task — it goes to the agent on your computer.',
+    outside:
+      'The agent is working on your computer — in a terminal or VS Code. Steps appear here by themselves; the agent reads what you write here after its next step.',
+    outsidePlaceholder: 'Write to the agent mid-work',
+    outsideWaiting: 'waiting for the agent step',
+    outsideDelivered: 'passed to the agent',
+    outsideUnhooked:
+      'The agent has finished a step, but the panel hooks did not answer from this session — it was probably started before they were added. The message arrives only after the session restarts.',
+    outsideOff: '«The agent on the computer» is off in Settings — the message will not arrive.',
     queued: (prompt: string) => `Queued: ${prompt} ✕`,
     steered: (prompt: string) => `Passed to the agent: ${prompt}`,
     image: '[image]',
@@ -535,6 +543,23 @@ export const en: Dictionary = {
     outsideOff: 'Off: only the panel’s own machine can reach it.',
     serveOn: ' (serve is running)',
     serveOff: ' (serve is not running)',
+    relay: 'The agent on the computer',
+    relayAbout:
+      'When the agent in a terminal or VS Code asks a question or for a permission, you can ' +
+      'decide here — the request stands both here and in the window on the computer; the first ' +
+      'decision wins. You can also write to the agent mid-work: it reads the message after its ' +
+      'next step.',
+    relayOn: 'Send requests to the phone',
+    relayInstalled: 'The panel hooks are in the Claude Code settings.',
+    relayShortTimeout:
+      'The PermissionRequest hook timeout is under 10 minutes (no timeout means 60 seconds): ' +
+      'the request stays in the window only before you answer. Set 3600 under «Hooks».',
+    relayMissing:
+      'The panel hooks are not in the Claude Code settings — without them, requests from the ' +
+      'computer are only visible here. The panel writes them itself; since they are missing, the ' +
+      'write failed or a hook is switched off under «Hooks» on the computer. Switch it on there ' +
+      'or add three hooks with one command: PermissionRequest (matcher *, timeout 3600), PostToolUse (matcher *, timeout ' +
+      '10), Stop (timeout 10). Command:',
     noTailscale: 'Tailscale was not found on the machine — there is no address from outside.',
     pushOn: 'Notifications are on',
     thisPhone: 'Phone',
@@ -603,6 +628,7 @@ export const en: Dictionary = {
     subtitle:
       'Type or dictate — the agent does it in the panel. Every change waits for your decision.',
     views: { conversation: 'Conversation', history: 'History', journal: 'Trail' },
+    emptyTitle: 'What should be done in the panel?',
     empty:
       'For example: “Create project C:/work/demo”. The agent opens panel pages on the computer.',
     placeholder: 'What should be done in the panel?',

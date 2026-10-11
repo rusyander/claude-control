@@ -28,6 +28,7 @@ import {
 import { ChatGroupNotes } from '../src/features/chat/ChatGroupNotes/ChatGroupNotes';
 import { useCostUnit } from '../src/entities/settings/api';
 import { Composer } from '../src/features/chat/Composer/Composer';
+import { OutsideComposer } from '../src/features/chat/OutsideComposer/OutsideComposer';
 import { MediaImageCard } from '../src/features/chat/MediaImageCard/MediaImageCard';
 import { useImageMode } from '../src/features/chat/useImageMode';
 import { Markdown } from '../src/features/chat/Markdown/Markdown';
@@ -44,6 +45,7 @@ import { useSent } from '../src/features/inbox/sent';
 import { useInboxChats } from '../src/features/inbox/useInboxChats';
 import { chatMessagesQuery } from '../src/entities/chat/chatMessagesQuery';
 import { useChatMessages } from '../src/entities/chat/useChatMessages';
+import { OUTSIDE_POLL_MS, useOutsideTurn } from '../src/features/chat/useOutsideTurn';
 import { useChatProgress } from '../src/entities/chat/useChatProgress';
 import { inboxChatNamed } from '../src/entities/inbox/inboxChatNamed';
 import { visibleAsks } from '../src/entities/inbox/visibleAsks';
@@ -91,22 +93,27 @@ export default function ChatScreen() {
   useEffect(() => {
     if (chatId) void restoreQueue(chatId);
   }, [chatId]);
-  const status = visibleStatus(run);
   const isRunning = run.status === 'running';
 
   // Транскрипт живёт под сессией. Разговор, открытый по ключу прогона `new-…`
   // (строка главной во время хода со стола), читает историю по сессии, которую
   // прогон уже знает, — иначе экран пуст, пока ход не кончится.
   const transcriptId = isDraft(chatId) && run.sessionId ? run.sessionId : chatId;
-  const messages = useChatMessages(transcriptId);
   const progress = useChatProgress(run.sessionId ?? transcriptId, isRunning);
   // Вопрос агента — той же карточкой, что во «Вопросах», и из той же сводки:
   // ответ уходит одним путём, отправленное скрыто в обоих местах.
   const inbox = useInboxChats(isConfigured(connection));
   const sentAnswers = useSent();
   const inboxRow = inboxChatNamed(inbox.data ?? [], runKey, run.sessionId, chatId);
-  const questionAsks = inboxRow
-    ? visibleAsks(inboxRow, sentAnswers).filter((ask) => ask.kind === 'question')
+  const outside = useOutsideTurn(inboxRow, isRunning, transcriptId);
+  const messages = useChatMessages(transcriptId, undefined, outside ? OUTSIDE_POLL_MS : undefined);
+  const status = outside ? 'running' : visibleStatus(run);
+  // Права своего прогона карточка ленты решает сама (`PermissionCard`); права
+  // сессии вне панели держит хук панели — они идут в карточку вместе с вопросами.
+  const cardAsks = inboxRow
+    ? visibleAsks(inboxRow, sentAnswers).filter(
+        (ask) => ask.kind === 'question' || (ask.kind === 'permission' && ask.relay === true),
+      )
     : [];
   // Единицы расхода выбираются один раз в самой панели — телефон им следует.
   const costUnit = useCostUnit();
@@ -256,7 +263,10 @@ export default function ChatScreen() {
   const history = messages.data?.messages ?? [];
   // Чат, открытый посреди хода, уже видит его шаги в транскрипте: поток их не повторяет.
   const liveTools = liveToolsOutsideHistory(history, run.tools, run.startedAt);
-  const isBlank = history.length === 0 && !run.text && !run.thinking && !isRunning;
+  // Пока лента грузится, «Пусто» — неправда: крутилка и приглашение писать
+  // стояли на экране одновременно.
+  const isBlank =
+    !messages.isLoading && history.length === 0 && !run.text && !run.thinking && !isRunning;
   // Транскрипт перечитывается только по окончании хода, поэтому своя задача
   // показывается из состояния прогона — и убирается, как только доехала лента.
   const sent =
@@ -366,8 +376,8 @@ export default function ChatScreen() {
             <PermissionCard key={permission.toolUseId} chatId={runKey} permission={permission} />
           ))}
 
-          {inboxRow && questionAsks.length > 0 ? (
-            <AskCard chat={inboxRow} asks={questionAsks} now={Date.now()} />
+          {inboxRow && cardAsks.length > 0 ? (
+            <AskCard chat={inboxRow} asks={cardAsks} now={Date.now()} />
           ) : null}
 
           {run.error ? <Text style={styles.error}>{run.error}</Text> : null}
@@ -397,17 +407,27 @@ export default function ChatScreen() {
 
         {image.shown ? <MediaImageCard image={image.shown} onClose={image.close} /> : null}
 
-        <Composer
-          chatId={chatId}
-          sessionId={run.sessionId ?? (isDraft(chatId) ? undefined : chatId)}
-          image={image}
-          value={value}
-          onChange={setValue}
-          onSend={onSend}
-          onStop={() => void stop(runKey)}
-          isRunning={isRunning}
-          busy={busy}
-        />
+        {/* Ход вне панели: сообщение панели начало бы второй ход рядом, поэтому
+            написанное уходит в очередь сессии, и хук панели отдаёт его агенту
+            после ближайшего шага. */}
+        {outside ? (
+          <OutsideComposer
+            sessionId={inboxRow?.sessionId ?? transcriptId}
+            transcript={messages.data?.messages ?? []}
+          />
+        ) : (
+          <Composer
+            chatId={chatId}
+            sessionId={run.sessionId ?? (isDraft(chatId) ? undefined : chatId)}
+            image={image}
+            value={value}
+            onChange={setValue}
+            onSend={onSend}
+            onStop={() => void stop(runKey)}
+            isRunning={isRunning}
+            busy={busy}
+          />
+        )}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

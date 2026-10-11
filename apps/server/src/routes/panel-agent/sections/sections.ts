@@ -33,12 +33,14 @@ export const PANEL_SECTIONS: readonly PanelSection[] = [
     title: 'Settings',
     description:
       'Panel settings by tab; open_page focus = tab key: general (theme, language), access (remote, token), ' +
+      'phone (build/install the phone APK, questions from the computer to the phone), ' +
       'providers (active CLI), models (endpoint profiles, chat model), prompts, groups (split groups), ' +
       'globalLayer (panel vs ~/.claude copies of one mechanism), ' +
       'integrations (tracker, messenger, webhook), spend, safety (backups, file watch), transfer',
     tabs: [
       'general',
       'access',
+      'phone',
       'providers',
       'models',
       'prompts',

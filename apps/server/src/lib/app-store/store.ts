@@ -367,6 +367,20 @@ export class AppStore {
     return removed;
   }
 
+  /**
+   * Сессии из терминала и VS Code — под контролем с телефона. Включено, пока
+   * человек не выключил (владелец 11.10: «из коробки»): окно на компьютере
+   * остаётся рабочим, телефон только добавляет второе место для решения.
+   */
+  getOutsideRelay(): boolean {
+    return this.state.outsideRelay !== false;
+  }
+
+  setOutsideRelay(enabled: boolean): void {
+    this.state.outsideRelay = enabled;
+    this.persist();
+  }
+
   /** Verifier парольной фразы шифрования копий секретов (или undefined, если не задан). */
   getSecretBackupVerifier(): string | undefined {
     return this.state.secretBackupVerifier;

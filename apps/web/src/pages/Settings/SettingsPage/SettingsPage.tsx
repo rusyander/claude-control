@@ -10,6 +10,7 @@ import { SettingsTabs } from '../SettingsTabs/SettingsTabs';
 import { SettingsLoadError } from '../SettingsLoadError/SettingsLoadError';
 import { GeneralTab } from '../GeneralTab/GeneralTab';
 import { AccessTab } from '../AccessTab/AccessTab';
+import { PhoneTab } from '../PhoneTab/PhoneTab';
 import { ProvidersTab } from '../ProvidersTab/ProvidersTab';
 import { ModelsTab } from '../ModelsTab/ModelsTab';
 import { PromptsTab } from '../PromptsTab/PromptsTab';
@@ -92,6 +93,7 @@ export function SettingsPage() {
         >
           {activeTab === 'general' && <GeneralTab settings={settings} patch={patch} />}
           {activeTab === 'access' && <AccessTab />}
+          {activeTab === 'phone' && <PhoneTab />}
           {activeTab === 'providers' && <ProvidersTab />}
           {activeTab === 'models' && <ModelsTab settings={settings} patch={patch} />}
           {activeTab === 'prompts' && <PromptsTab />}

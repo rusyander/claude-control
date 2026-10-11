@@ -128,6 +128,27 @@ async function fakeGone(pidFile: string): Promise<void> {
   await sleep(200);
 }
 
+/**
+ * Снять каталог, который ещё держит уходящий CLI. Папка чата лежит в настоящем
+ * `~/.agentdeck/chats` и служит CLI рабочим каталогом; обёртка `cmd.exe` живёт
+ * дольше node, чей pid ждёт `fakeGone`, и под нагрузкой полного прогона Windows
+ * отдаёт каталог через секунды — `maxRetries` у `rmSync` в это окно не
+ * укладывался (EPERM). Ждём освобождения до 15 с; не освободился — падаем
+ * настоящей ошибкой, а не оставляем папку в домашнем каталоге молча.
+ */
+async function removeWhenFree(dir: string): Promise<void> {
+  for (let waited = 0; ; waited += 200) {
+    try {
+      rmSync(dir, { recursive: true, force: true });
+      return;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if ((code !== 'EPERM' && code !== 'EBUSY') || waited >= 15_000) throw error;
+      await sleep(200);
+    }
+  }
+}
+
 describe('panel-agent actions: projects & chat', () => {
   let root: string;
   let appData: string;
@@ -242,9 +263,7 @@ describe('panel-agent actions: projects & chat', () => {
       rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
     }
     // Папку вложений маршрут отправки заводит на каждый ключ — убираем свои.
-    for (const key of chatKeys.splice(0)) {
-      rmSync(join(sandboxRoot(), key), { recursive: true, force: true });
-    }
+    for (const key of chatKeys.splice(0)) await removeWhenFree(join(sandboxRoot(), key));
   });
 
   const call = (name: string, input: unknown) =>

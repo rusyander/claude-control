@@ -52,6 +52,8 @@ export interface Record {
     role?: string;
     model?: string;
     content?: string | ContentBlock[];
+    /** `end_turn` — ход окончен; `tool_use` — модель ждёт результат инструмента. */
+    stop_reason?: string | null;
     /** Расход на шаг — модель кладёт его рядом с ответом. */
     usage?: {
       input_tokens?: number;

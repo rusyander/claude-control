@@ -82,4 +82,14 @@ describe('аналитика под CLI без своих журналов', () 
     const goose = analyticsQueryOptions(DEFAULT_PERIOD, 'goose').queryKey;
     expect(claude).not.toEqual(goose);
   });
+
+  it('смена периода держит прошлый отчёт на экране, смена CLI — нет', () => {
+    const shown = { estimatedCost: 1 } as never;
+    const week = analyticsQueryOptions({ kind: 'preset', preset: '30' }, 'claude');
+    const sameCli = { queryKey: analyticsQueryOptions(DEFAULT_PERIOD, 'claude').queryKey };
+    const otherCli = { queryKey: analyticsQueryOptions(DEFAULT_PERIOD, 'goose').queryKey };
+    expect(week.placeholderData(shown, sameCli)).toBe(shown);
+    expect(week.placeholderData(shown, otherCli)).toBeUndefined();
+    expect(week.placeholderData(undefined, undefined)).toBeUndefined();
+  });
 });

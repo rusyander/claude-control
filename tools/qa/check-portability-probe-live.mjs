@@ -16,7 +16,7 @@
  * `target_reads_real_home` и т.п.) — не красное: это названная граница пробы.
  *
  * Живая проба 09.10.2026 нашла этим прогоном шесть дефектов у OpenCode и
- * Continue (docs/TASKS-PORTABILITY.ru.md §9.1).
+ * Continue (docs/PORTABILITY-DESIGN.ru.md §9.1).
  *
  * Запуск: `node tools/qa/check-portability-probe-live.mjs <cli> [<cli> …]`
  * (например `opencode continue`). Нужны установленные CLI; модель не нужна —

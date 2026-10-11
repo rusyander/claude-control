@@ -25,9 +25,18 @@ export function Button({
         : tone === 'ghost'
           ? styles.buttonGhost
           : styles.buttonDefault;
+  const textTone =
+    tone === 'accent'
+      ? styles.buttonTextAccent
+      : tone === 'danger'
+        ? styles.buttonTextDanger
+        : tone === 'ghost'
+          ? styles.buttonTextGhost
+          : undefined;
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityState={{ disabled: Boolean(disabled || busy), busy: Boolean(busy) }}
       onPress={onPress}
       disabled={disabled || busy}
       style={({ pressed }) => [
@@ -39,9 +48,9 @@ export function Button({
       ]}
     >
       {busy ? (
-        <ActivityIndicator color={colors.text} size="small" />
+        <ActivityIndicator color={tone === 'danger' ? colors.danger : colors.text} size="small" />
       ) : (
-        <Text style={styles.buttonText}>{title}</Text>
+        <Text style={[styles.buttonText, textTone]}>{title}</Text>
       )}
     </Pressable>
   );

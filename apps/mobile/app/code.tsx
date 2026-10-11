@@ -1,8 +1,19 @@
 import { useState } from 'react';
 import { Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { Stack } from 'expo-router';
-import { Card, Empty, Loading, Mono, Muted, Row, Screen, Title } from '../src/shared/ui';
-import { colors, font, space } from '../src/shared/config/theme';
+import {
+  Card,
+  Empty,
+  Icon,
+  ListRow,
+  Loading,
+  Mono,
+  Muted,
+  Row,
+  Screen,
+  Title,
+} from '../src/shared/ui';
+import { colors, font, space, tabular } from '../src/shared/config/theme';
 import { useT } from '../src/shared/config/i18n';
 import { useWorkspace } from '../src/shared/lib/workspace';
 import { useFileTree } from '../src/entities/files/api';
@@ -100,24 +111,29 @@ export default function CodeScreen() {
           {tree.isLoading ? <Loading /> : null}
           {tree.isError ? <Mono style={styles.warn}>{t.code.dirFailed}</Mono> : null}
 
-          <View style={styles.list}>
-            {(tree.data?.entries ?? []).map((entry) => (
-              <Pressable
+          <View>
+            {(tree.data?.entries ?? []).map((entry, index) => (
+              <ListRow
                 key={entry.path}
-                onPress={() => (entry.isDir ? setDir(entry.path) : setFile(entry.path))}
-              >
-                <Row gap={space.sm}>
-                  <Text style={styles.name} numberOfLines={1}>
-                    {entry.isDir ? '📁 ' : '📄 '}
-                    {entry.name}
-                  </Text>
-                  {entry.sizeBytes !== undefined ? (
-                    <Mono>
+                title={entry.name}
+                divided={index > 0}
+                leading={
+                  <Icon
+                    ios={entry.isDir ? 'folder' : 'doc'}
+                    android={entry.isDir ? 'folder' : 'description'}
+                    size={20}
+                    color={entry.isDir ? colors.accent : colors.textFaint}
+                  />
+                }
+                trailing={
+                  entry.sizeBytes !== undefined ? (
+                    <Text style={styles.size}>
                       {Math.max(1, Math.round(entry.sizeBytes / 1024))} {t.common.kb}
-                    </Mono>
-                  ) : null}
-                </Row>
-              </Pressable>
+                    </Text>
+                  ) : undefined
+                }
+                onPress={() => (entry.isDir ? setDir(entry.path) : setFile(entry.path))}
+              />
             ))}
           </View>
           {tree.data?.truncated ? <Muted>{t.code.partial}</Muted> : null}
@@ -135,8 +151,8 @@ function parentOf(path: string): string {
 
 const styles = StyleSheet.create({
   grow: { flex: 1 },
-  list: { gap: space.xs, paddingTop: space.xs },
   name: { color: colors.text, fontSize: font.body, flex: 1 },
+  size: { color: colors.textFaint, fontSize: font.small, ...tabular },
   added: { color: colors.success },
   removed: { color: colors.danger },
   warn: { color: colors.warning },

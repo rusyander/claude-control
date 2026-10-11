@@ -11,8 +11,17 @@ import { analyticsRefusal } from './analyticsRefusal';
  * оттянул бы честный ответ.
  */
 export function analyticsQueryOptions(period: AnalyticsPeriod, providerId: string | undefined) {
+  const provider = providerId ?? '';
   return {
-    queryKey: ['analytics', providerId ?? '', periodKey(period)],
+    queryKey: ['analytics', provider, periodKey(period)],
+    // Новый период грузится поверх прошлого отчёта, а не пустым экраном: цифры
+    // того же CLI за другой срок — честная подложка, экран её приглушает. Отчёт
+    // ДРУГОГО CLI подложкой не бывает — это была бы ложь, ради которой CLI и
+    // стоит в ключе.
+    placeholderData: (
+      previous: Analytics | undefined,
+      previousQuery: { queryKey: readonly unknown[] } | undefined,
+    ): Analytics | undefined => (previousQuery?.queryKey[1] === provider ? previous : undefined),
     queryFn: () => api.get<Analytics>('/analytics', periodParams(period)),
     // Скан транскриптов не бесплатен, а цифры за сутки не меняются посекундно.
     staleTime: 60_000,

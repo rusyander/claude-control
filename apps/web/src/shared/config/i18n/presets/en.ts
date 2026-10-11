@@ -131,6 +131,11 @@ export const presetsEn: PresetsDictionary = {
       when: 'When Claude has finished answering',
       useFor: 'Final actions: build a report, signal that the work is done.',
     },
+    PermissionRequest: {
+      when: 'When Claude Code shows a permission dialog or an agent question',
+      useFor:
+        'Decide for the person or forward the request: the dialog stays up beside the hook, the first decision wins.',
+    },
     SubagentStop: {
       when: 'When a subagent has finished',
       useFor: 'Processing the results of background tasks.',

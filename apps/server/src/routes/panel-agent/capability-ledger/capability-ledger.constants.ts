@@ -562,6 +562,18 @@ export const ROUTE_LEDGER: RouteLedger = {
   'DELETE /api/provider-chat/chats/:id/queue/:queuedId': 'foreign-cli',
   'GET /api/provider-chat/chats': 'foreign-cli',
   'GET /api/provider-chat/chats/:id': 'foreign-cli',
+  // chat/outside-relay-routes.ts — сессии вне панели под контролем с телефона.
+  // Регистрация, ожидание и забор сообщений — обратный вызов хука; решение,
+  // отпускание запроса, сообщение в чужой ход и переключатель — человек.
+  'GET /api/outside/relay': 'internal:ui-state',
+  'PATCH /api/outside/relay': 'human:rights',
+  'POST /api/outside/asks': 'internal:callback',
+  'GET /api/outside/asks/:id/wait': 'internal:callback',
+  'POST /api/outside/asks/:id/answer': 'human:rights',
+  'POST /api/outside/asks/:id/release': 'human:rights',
+  'GET /api/outside/messages': 'internal:ui-state',
+  'POST /api/outside/messages': 'human:rights',
+  'POST /api/outside/messages/take': 'internal:callback',
   'GET /api/provider-chat/chats/:id/status': 'foreign-cli',
   'GET /api/provider-chat/chats/:id/stream': 'foreign-cli',
   'PATCH /api/provider-chat/chats/:id': 'foreign-cli',
@@ -667,6 +679,12 @@ export const ROUTE_LEDGER: RouteLedger = {
   'GET /api/provider-skills': 'foreign-cli',
   'GET /api/provider-skills/skill': 'foreign-cli',
   'PUT /api/provider-skills/skill': 'foreign-cli',
+  // mobile-apk-routes/mobile-apk-routes.ts — сборка и установка APK телефона: решает
+  // человек (десять минут сборки, запись на подключённый телефон).
+  'GET /api/mobile/apk': 'human:remote',
+  'GET /api/mobile/apk/file': 'human:download',
+  'POST /api/mobile/apk/build': 'human:remote',
+  'POST /api/mobile/apk/install': 'human:remote',
   // remote-routes.ts
   'DELETE /api/remote/devices': 'human:remote',
   'GET /api/remote': 'human:remote',

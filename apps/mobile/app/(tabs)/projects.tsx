@@ -1,8 +1,20 @@
 import { useState } from 'react';
 import { Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Button, Card, Empty, Loading, Mono, Muted, Row, Screen, Title } from '../../src/shared/ui';
-import { colors, font, radius, space } from '../../src/shared/config/theme';
+import {
+  Button,
+  Card,
+  Empty,
+  Icon,
+  ListRow,
+  Loading,
+  Mono,
+  Muted,
+  Row,
+  Screen,
+  Title,
+} from '../../src/shared/ui';
+import { colors, font, space } from '../../src/shared/config/theme';
 import { useT } from '../../src/shared/config/i18n';
 import { useConnection, isConfigured } from '../../src/shared/api/connection';
 import { useWorkspace, openProject } from '../../src/shared/lib/workspace';
@@ -68,6 +80,7 @@ export default function ProjectsScreen() {
           <Row gap={space.sm}>
             <Button
               title={t.projects.toChat}
+              tone="accent"
               onPress={() => router.push('/chat')}
               style={styles.grow}
             />
@@ -87,16 +100,16 @@ export default function ProjectsScreen() {
       {recent.data && recent.data.length > 0 ? (
         <Card>
           <Title>{t.projects.recent}</Title>
-          {recent.data.slice(0, 8).map((project) => (
-            <Pressable key={project.path} onPress={() => open(project.path)} style={styles.recent}>
-              <Text style={styles.name} numberOfLines={1}>
-                {project.name}
-              </Text>
-              <Muted>
-                {t.projects.chats(project.chats.length)} ·{' '}
-                {project.exists ? project.path : t.projects.gone}
-              </Muted>
-            </Pressable>
+          {recent.data.slice(0, 8).map((project, index) => (
+            <ListRow
+              key={project.path}
+              title={project.name}
+              subtitle={`${t.projects.chats(project.chats.length)} · ${
+                project.exists ? project.path : t.projects.gone
+              }`}
+              divided={index > 0}
+              onPress={() => open(project.path)}
+            />
           ))}
         </Card>
       ) : null}
@@ -105,8 +118,8 @@ export default function ProjectsScreen() {
         <Row gap={space.sm}>
           <Title style={styles.grow}>{t.projects.browse}</Title>
           {dir ? (
-            <Pressable onPress={() => setDir('')}>
-              <Muted>{t.projects.toDisks}</Muted>
+            <Pressable accessibilityRole="button" onPress={() => setDir('')} hitSlop={8}>
+              <Text style={styles.link}>{t.projects.toDisks}</Text>
             </Pressable>
           ) : null}
         </Row>
@@ -131,24 +144,34 @@ export default function ProjectsScreen() {
         {listing.isLoading || roots.isLoading ? <Loading /> : null}
         {offline ? <Mono style={styles.failed}>{offline.message}</Mono> : null}
 
-        <View style={styles.list}>
-          {entries.map((entry) => (
-            <Row key={entry.path} gap={space.sm}>
-              <Pressable
-                onPress={() => (entry.isFile ? undefined : setDir(entry.path))}
-                style={styles.grow}
-              >
-                <Text style={styles.name} numberOfLines={1}>
-                  {entry.isFile ? '' : '📁 '}
-                  {entry.name}
-                </Text>
-              </Pressable>
-              {entry.isFile ? null : (
-                <Pressable onPress={() => open(entry.path)} style={styles.pick}>
-                  <Text style={styles.pickText}>{t.common.open}</Text>
-                </Pressable>
-              )}
-            </Row>
+        <View>
+          {entries.map((entry, index) => (
+            <ListRow
+              key={entry.path}
+              title={entry.name}
+              divided={index > 0}
+              leading={
+                <Icon
+                  ios={entry.isFile ? 'doc' : 'folder'}
+                  android={entry.isFile ? 'description' : 'folder'}
+                  size={20}
+                  color={entry.isFile ? colors.textFaint : colors.accent}
+                />
+              }
+              onPress={entry.isFile ? undefined : () => setDir(entry.path)}
+              trailing={
+                entry.isFile ? null : (
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => open(entry.path)}
+                    style={({ pressed }) => [styles.pick, pressed && styles.pressed]}
+                    hitSlop={6}
+                  >
+                    <Text style={styles.pickText}>{t.common.open}</Text>
+                  </Pressable>
+                )
+              }
+            />
           ))}
         </View>
 
@@ -166,16 +189,17 @@ function basename(path: string): string {
 
 const styles = StyleSheet.create({
   grow: { flex: 1 },
-  list: { gap: space.sm, paddingTop: space.xs },
-  name: { color: colors.text, fontSize: font.body },
-  recent: { paddingVertical: space.xs, gap: 2 },
+  link: { color: colors.accent, fontSize: font.small + 1, fontWeight: '600' },
+  pressed: { opacity: 0.7 },
   pick: {
-    paddingHorizontal: space.sm,
-    paddingVertical: space.xs,
-    borderRadius: radius.sm,
+    minHeight: 32,
+    justifyContent: 'center',
+    paddingHorizontal: space.md,
+    borderRadius: 999,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.accent,
+    backgroundColor: colors.accentDim,
   },
-  pickText: { color: colors.accent, fontSize: font.small },
+  pickText: { color: colors.text, fontSize: font.small, fontWeight: '600' },
   failed: { color: colors.danger },
 });

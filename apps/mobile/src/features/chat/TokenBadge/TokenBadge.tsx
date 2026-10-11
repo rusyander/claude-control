@@ -81,6 +81,7 @@ export function TokenBadge({
         onPress={() => setOpen((value) => !value)}
         accessibilityRole="button"
         accessibilityLabel={t.chat.usage.title}
+        hitSlop={8}
         style={({ pressed }) => [styles.badge, pressed && styles.pressed]}
       >
         {unit === 'money' && usage.costUsd !== undefined ? (

@@ -70,4 +70,6 @@ export const homeEn: HomeTexts = {
     stop: 'Do not write',
   },
   running: 'the agent is working — the answer goes when it finishes the turn',
+  outside:
+    'You cannot answer from here: the request waits in a terminal or VS Code window. To decide from the phone, turn on «The agent on the computer» in Settings and add the panel hooks.',
 };

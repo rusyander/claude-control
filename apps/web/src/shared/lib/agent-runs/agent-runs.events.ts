@@ -129,7 +129,12 @@ export function applyEvent(id: string, event: ChatEvent): void {
         ? run.permissions
         : [
             ...run.permissions,
-            { toolName: event.toolName, input: event.input, toolUseId: event.toolUseId },
+            {
+              toolName: event.toolName,
+              input: event.input,
+              toolUseId: event.toolUseId,
+              ...(event.guard ? { guard: event.guard } : {}),
+            },
           ];
       firePermission = !already;
       break;

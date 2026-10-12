@@ -1,0 +1,142 @@
+{
+  "topic": "tests",
+  "scenario": "backend",
+  "frames": [
+    {
+      "id": "01-recipes",
+      "side": "panel",
+      "file": "01-recipes.png",
+      "masked": 0,
+      "width": 1132,
+      "height": 344,
+      "shotAt": "2026-10-12T14:19:27.841Z",
+      "text": "Папка автотестов Папки e2e в проекте нет — агентам некуда класть настоящие тесты. Кнопка заведёт e2e/ с конфигом Playwright и спрячет её от git — проект не изменится. Настоящие тесты туда пишут агенты, раздел сводит их с кейсами. Создать папку Команда прогона Тесты вне папки e2e — go test, pytest, Gradle, Maven, cargo test — панель гонит одной командой проекта. Результаты ложатся на кейсы так же, как у автотестов папки. Нашлись тесты — возьмите готовую команду: Go · корень проекта go test -json {packages} > {report} узнан по go.mod · 2 файла тестов Взять Задать свою команду",
+      "en": {
+        "file": "01-recipes.en.png",
+        "masked": 0,
+        "width": 1132,
+        "height": 344,
+        "shotAt": "2026-10-12T14:19:56.911Z",
+        "text": "Autotest folder The project has no e2e folder — agents have nowhere to put real tests. The button creates e2e/ with a Playwright config and hides it from git — the project stays unchanged. Agents write the real tests there; the section matches them to cases. Create folder Run command Tests outside the e2e folder — go test, pytest, Gradle, Maven, cargo test — run through one project command. Results land on cases just like the folder’s autotests. Tests found — take a ready command: Go · project root go test -json {packages} > {report} found by go.mod · 2 test files Take Set your own command"
+      },
+      "darkEn": {
+        "file": "01-recipes.dark.en.png",
+        "masked": 0,
+        "width": 1132,
+        "height": 344,
+        "shotAt": "2026-10-12T14:20:55.117Z",
+        "text": "Autotest folder The project has no e2e folder — agents have nowhere to put real tests. The button creates e2e/ with a Playwright config and hides it from git — the project stays unchanged. Agents write the real tests there; the section matches them to cases. Create folder Run command Tests outside the e2e folder — go test, pytest, Gradle, Maven, cargo test — run through one project command. Results land on cases just like the folder’s autotests. Tests found — take a ready command: Go · project root go test -json {packages} > {report} found by go.mod · 2 test files Take Set your own command"
+      },
+      "dark": {
+        "file": "01-recipes.dark.png",
+        "masked": 0,
+        "width": 1132,
+        "height": 344,
+        "shotAt": "2026-10-12T14:20:25.904Z",
+        "text": "Папка автотестов Папки e2e в проекте нет — агентам некуда класть настоящие тесты. Кнопка заведёт e2e/ с конфигом Playwright и спрячет её от git — проект не изменится. Настоящие тесты туда пишут агенты, раздел сводит их с кейсами. Создать папку Команда прогона Тесты вне папки e2e — go test, pytest, Gradle, Maven, cargo test — панель гонит одной командой проекта. Результаты ложатся на кейсы так же, как у автотестов папки. Нашлись тесты — возьмите готовую команду: Go · корень проекта go test -json {packages} > {report} узнан по go.mod · 2 файла тестов Взять Задать свою команду"
+      }
+    },
+    {
+      "id": "02-run-adopt",
+      "side": "panel",
+      "file": "02-run-adopt.png",
+      "masked": 0,
+      "width": 1132,
+      "height": 602,
+      "shotAt": "2026-10-12T14:19:31.428Z",
+      "text": "Папка автотестов Папки e2e в проекте нет — агентам некуда класть настоящие тесты. Кнопка заведёт e2e/ с конфигом Playwright и спрячет её от git — проект не изменится. Настоящие тесты туда пишут агенты, раздел сводит их с кейсами. Создать папку Команда прогона go test -json {packages} > {report} вывод go test -json — панель переводит его в JUnit · потолок 30 минут Изменить Убрать команду Команда записана в .agent/tests/automation.json. Прогнать автотесты Своя команда проекта (.agent/tests/automation.json): go test -json {packages} > {report} Тестов в отчёте: 6 — кейсов у них пока нет. Не собрался 1 пакет — ошибка компилятора в выводе команды. Без кейса (6): TestTotal, TestTotalBroken, TestSkipped, TestTable/one, TestTable/two, и ещё 1. Открыть прогон в истории Завести кейсы (6) Вывод команды Проверка набора поломкой Поймают ли кейсы регрессию: в отдельной копии репозитория файл ломается, привязанные к нему автоматические кейсы прогоняются, и видно, какие покраснели. Ваша рабочая копия, библиотека и история не меняются. Ломать нечего: ни у одного автоматического кейса нет codePaths на файл проекта.",
+      "en": {
+        "file": "02-run-adopt.en.png",
+        "masked": 0,
+        "width": 1132,
+        "height": 620,
+        "shotAt": "2026-10-12T14:20:00.473Z",
+        "text": "Autotest folder The project has no e2e folder — agents have nowhere to put real tests. The button creates e2e/ with a Playwright config and hides it from git — the project stays unchanged. Agents write the real tests there; the section matches them to cases. Create folder Run command go test -json {packages} > {report} go test -json output — the panel converts it to JUnit · limit 30 minutes Edit Remove command The command is written to .agent/tests/automation.json. Run autotests The project’s own command (.agent/tests/automation.json): go test -json {packages} > {report} Tests in the report: 6 — none has a case yet. 1 package did not build — the compiler error is in the command output. Without a case (6): TestTotal, TestTotalBroken, TestSkipped, TestTable/one, TestTable/two, and 1 more. Open the run in history Create cases (6) Command output Mutation check of the case set Will the cases catch a regression: in a separate copy of the repository the file is broken, the automated cases linked to it are run, and you see which went red. Your working copy, library and history do not change. Nothing to break: no automated case has codePaths pointing at a project file."
+      },
+      "darkEn": {
+        "file": "02-run-adopt.dark.en.png",
+        "masked": 0,
+        "width": 1132,
+        "height": 620,
+        "shotAt": "2026-10-12T14:20:58.640Z",
+        "text": "Autotest folder The project has no e2e folder — agents have nowhere to put real tests. The button creates e2e/ with a Playwright config and hides it from git — the project stays unchanged. Agents write the real tests there; the section matches them to cases. Create folder Run command go test -json {packages} > {report} go test -json output — the panel converts it to JUnit · limit 30 minutes Edit Remove command The command is written to .agent/tests/automation.json. Run autotests The project’s own command (.agent/tests/automation.json): go test -json {packages} > {report} Tests in the report: 6 — none has a case yet. 1 package did not build — the compiler error is in the command output. Without a case (6): TestTotal, TestTotalBroken, TestSkipped, TestTable/one, TestTable/two, and 1 more. Open the run in history Create cases (6) Command output Mutation check of the case set Will the cases catch a regression: in a separate copy of the repository the file is broken, the automated cases linked to it are run, and you see which went red. Your working copy, library and history do not change. Nothing to break: no automated case has codePaths pointing at a project file."
+      },
+      "dark": {
+        "file": "02-run-adopt.dark.png",
+        "masked": 0,
+        "width": 1132,
+        "height": 602,
+        "shotAt": "2026-10-12T14:20:29.441Z",
+        "text": "Папка автотестов Папки e2e в проекте нет — агентам некуда класть настоящие тесты. Кнопка заведёт e2e/ с конфигом Playwright и спрячет её от git — проект не изменится. Настоящие тесты туда пишут агенты, раздел сводит их с кейсами. Создать папку Команда прогона go test -json {packages} > {report} вывод go test -json — панель переводит его в JUnit · потолок 30 минут Изменить Убрать команду Команда записана в .agent/tests/automation.json. Прогнать автотесты Своя команда проекта (.agent/tests/automation.json): go test -json {packages} > {report} Тестов в отчёте: 6 — кейсов у них пока нет. Не собрался 1 пакет — ошибка компилятора в выводе команды. Без кейса (6): TestTotal, TestTotalBroken, TestSkipped, TestTable/one, TestTable/two, и ещё 1. Открыть прогон в истории Завести кейсы (6) Вывод команды Проверка набора поломкой Поймают ли кейсы регрессию: в отдельной копии репозитория файл ломается, привязанные к нему автоматические кейсы прогоняются, и видно, какие покраснели. Ваша рабочая копия, библиотека и история не меняются. Ломать нечего: ни у одного автоматического кейса нет codePaths на файл проекта."
+      }
+    },
+    {
+      "id": "03-adopted",
+      "side": "panel",
+      "file": "03-adopted.png",
+      "masked": 0,
+      "width": 1132,
+      "height": 568,
+      "shotAt": "2026-10-12T14:19:32.448Z",
+      "text": "Папка автотестов Папки e2e в проекте нет — агентам некуда класть настоящие тесты. Кнопка заведёт e2e/ с конфигом Playwright и спрячет её от git — проект не изменится. Настоящие тесты туда пишут агенты, раздел сводит их с кейсами. Создать папку Команда прогона go test -json {packages} > {report} вывод go test -json — панель переводит его в JUnit · потолок 30 минут Изменить Убрать команду Команда записана в .agent/tests/automation.json. Прогнать автотесты Только «orders/orders_test.go» Своя команда проекта (.agent/tests/automation.json): go test -json {packages} > {report} Тестов в отчёте: 6 — кейсы заведены после прогона, его результаты на них не легли. Не собрался 1 пакет — ошибка компилятора в выводе команды. Открыть прогон в истории Вывод команды Заведено 6 кейсов, группы: orders, table. Следующий прогон ляжет на них. Проверка набора поломкой Поймают ли кейсы регрессию: в отдельной копии репозитория файл ломается, привязанные к нему автоматические кейсы прогоняются, и видно, какие покраснели. Ваша рабочая копия, библиотека и история не меняются. Ломать нечего: ни у одного автоматического кейса нет codePaths на файл проекта.",
+      "en": {
+        "file": "03-adopted.en.png",
+        "masked": 0,
+        "width": 1132,
+        "height": 568,
+        "shotAt": "2026-10-12T14:20:01.475Z",
+        "text": "Autotest folder The project has no e2e folder — agents have nowhere to put real tests. The button creates e2e/ with a Playwright config and hides it from git — the project stays unchanged. Agents write the real tests there; the section matches them to cases. Create folder Run command go test -json {packages} > {report} go test -json output — the panel converts it to JUnit · limit 30 minutes Edit Remove command The command is written to .agent/tests/automation.json. Run autotests Only “orders/orders_test.go” The project’s own command (.agent/tests/automation.json): go test -json {packages} > {report} Tests in the report: 6 — their cases were created after this run, its results did not land on them. 1 package did not build — the compiler error is in the command output. Open the run in history Command output 6 cases created, groups: orders, table. The next run lands on them. Mutation check of the case set Will the cases catch a regression: in a separate copy of the repository the file is broken, the automated cases linked to it are run, and you see which went red. Your working copy, library and history do not change. Nothing to break: no automated case has codePaths pointing at a project file."
+      },
+      "darkEn": {
+        "file": "03-adopted.dark.en.png",
+        "masked": 0,
+        "width": 1132,
+        "height": 568,
+        "shotAt": "2026-10-12T14:20:59.623Z",
+        "text": "Autotest folder The project has no e2e folder — agents have nowhere to put real tests. The button creates e2e/ with a Playwright config and hides it from git — the project stays unchanged. Agents write the real tests there; the section matches them to cases. Create folder Run command go test -json {packages} > {report} go test -json output — the panel converts it to JUnit · limit 30 minutes Edit Remove command The command is written to .agent/tests/automation.json. Run autotests Only “orders/orders_test.go” The project’s own command (.agent/tests/automation.json): go test -json {packages} > {report} Tests in the report: 6 — their cases were created after this run, its results did not land on them. 1 package did not build — the compiler error is in the command output. Open the run in history Command output 6 cases created, groups: orders, table. The next run lands on them. Mutation check of the case set Will the cases catch a regression: in a separate copy of the repository the file is broken, the automated cases linked to it are run, and you see which went red. Your working copy, library and history do not change. Nothing to break: no automated case has codePaths pointing at a project file."
+      },
+      "dark": {
+        "file": "03-adopted.dark.png",
+        "masked": 0,
+        "width": 1132,
+        "height": 568,
+        "shotAt": "2026-10-12T14:20:30.408Z",
+        "text": "Папка автотестов Папки e2e в проекте нет — агентам некуда класть настоящие тесты. Кнопка заведёт e2e/ с конфигом Playwright и спрячет её от git — проект не изменится. Настоящие тесты туда пишут агенты, раздел сводит их с кейсами. Создать папку Команда прогона go test -json {packages} > {report} вывод go test -json — панель переводит его в JUnit · потолок 30 минут Изменить Убрать команду Команда записана в .agent/tests/automation.json. Прогнать автотесты Только «orders/orders_test.go» Своя команда проекта (.agent/tests/automation.json): go test -json {packages} > {report} Тестов в отчёте: 6 — кейсы заведены после прогона, его результаты на них не легли. Не собрался 1 пакет — ошибка компилятора в выводе команды. Открыть прогон в истории Вывод команды Заведено 6 кейсов, группы: orders, table. Следующий прогон ляжет на них. Проверка набора поломкой Поймают ли кейсы регрессию: в отдельной копии репозитория файл ломается, привязанные к нему автоматические кейсы прогоняются, и видно, какие покраснели. Ваша рабочая копия, библиотека и история не меняются. Ломать нечего: ни у одного автоматического кейса нет codePaths на файл проекта."
+      }
+    },
+    {
+      "id": "04-library",
+      "side": "panel",
+      "file": "04-library.png",
+      "masked": 0,
+      "width": 1440,
+      "height": 900,
+      "shotAt": "2026-10-12T14:19:38.961Z",
+      "text": "AgentDeck Свернуть панель Уведомления Агент панели Наблюдатель выкл Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Справка Тестирование Рабочее место тестировщика над проектом из реестра: библиотека кейсов, планы, ручные и агентские прогоны, отчёт. Кейсы лежат в файлах самого проекта. Ручной проход Проект Магазин Заказы (Go) C:\\work\\cc-help-tests\\goshop Кейсы: .agent/tests Настройки набора Внешние привязки Ничего не привязано Привязать Библиотека Планы Прогоны Отчёт Покрытие Прогнать Полный перетест Только изменённое Сгенерировать кейсы По диффу Принимать сразу Исследовать Автоматизировать (0) 1 пройдено · 1 провалено · 1 пропущено · 0 не проверялось Как работает агент прогона: читает проект, меняет только файлы тестов Вне панели кейсы не ведутся Вписать в CLAUDE.md проекта Папка автотестов Папки e2e в проекте нет — агентам некуда класть настоящие тесты. Кнопка заведёт e2e/ с конфигом Playwright и спрячет её от git — проект не изменится. Настоящие тесты туда пишут агенты, раздел сводит их с кейсами. Создать папку Команда прогона go test -json {packages} > {report} вывод go test -json — панель переводит его в JUnit · потолок 30 минут Изменить Убрать команду Прогнать автотесты Только «orders/orders_test.go» Своя команда проекта (.agent/tests/automation.json): go test -json {packages} > {report} Упало 3 из 6, прошло 2. Пропущено: 1. Не собрался 1 пакет — ошибка компилятора в выводе команды. Открыть прогон в истории Вывод команды Проверка набора поломкой Поймают ли кейсы регрессию: в отдельной копии репозитория файл ломается, привязанные к нему автоматические кейсы прогоняются, и видно, какие покраснели. Ваша рабочая копия, библиотека и история не меняются. Ломать нечего: ни у одного автоматического кейса нет codePaths на файл проекта. orders/orders_test.go Файл: .agent/tests/orders.tests.json Добавить тест История файла Обмен Изменить группу Удалить группу Пройти руками Фильтры Сохранить набор Группы orders/orders_test.go 3 orders/table_test.go 3 Новая группа Секции Все секции 3 Секции у кейсов не заданы. Показано 3 из 3 Кейс Статус Важность Готовность Авто Зона Варианты Действия TestTotal пройден средняя готов автотест — 1 TestTotalBroken провален средняя готов автотест — 1 TestSkipped пропущен средняя готов автотест — 1",
+      "en": {
+        "file": "04-library.en.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 900,
+        "shotAt": "2026-10-12T14:20:07.623Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Watcher off Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Help Testing A tester’s workspace over a project from the registry: case library, plans, manual and agent runs, report. The cases live in the project’s own files. Manual run Project Магазин Заказы (Go) C:\\work\\cc-help-tests\\goshop Cases: .agent/tests Library settings External links Nothing linked Link Library Plans Runs Report Coverage Run Full retest Changed only Generate cases From the diff Accept immediately Explore Automate (0) 1 passed · 1 failed · 1 skipped · 0 not run How the run agent works: reads the project, changes only test files Cases are not kept outside the panel Write it into the project’s CLAUDE.md Autotest folder The project has no e2e folder — agents have nowhere to put real tests. The button creates e2e/ with a Playwright config and hides it from git — the project stays unchanged. Agents write the real tests there; the section matches them to cases. Create folder Run command go test -json {packages} > {report} go test -json output — the panel converts it to JUnit · limit 30 minutes Edit Remove command Run autotests Only “orders/orders_test.go” The project’s own command (.agent/tests/automation.json): go test -json {packages} > {report} 3 of 6 failed, 2 passed. Skipped: 1. 1 package did not build — the compiler error is in the command output. Open the run in history Command output Mutation check of the case set Will the cases catch a regression: in a separate copy of the repository the file is broken, the automated cases linked to it are run, and you see which went red. Your working copy, library and history do not change. Nothing to break: no automated case has codePaths pointing at a project file. orders/orders_test.go File: .agent/tests/orders.tests.json Add a test File history Exchange Edit group Delete group Run it manually Filters Save the view Groups orders/orders_test.go 3 orders/table_test.go 3 New group Sections All sections 3 The cases carry no sections. Showing 3 of 3 Case Status Priority Readiness Auto Area Variants Actions TestTotal passed medium ready automated — 1 TestTotalBroken failed medium ready automated — 1 TestSkipped skipped medium ready automated — 1"
+      },
+      "darkEn": {
+        "file": "04-library.dark.en.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 900,
+        "shotAt": "2026-10-12T14:21:05.769Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Watcher off Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Help Testing A tester’s workspace over a project from the registry: case library, plans, manual and agent runs, report. The cases live in the project’s own files. Manual run Project Магазин Заказы (Go) C:\\work\\cc-help-tests\\goshop Cases: .agent/tests Library settings External links Nothing linked Link Library Plans Runs Report Coverage Run Full retest Changed only Generate cases From the diff Accept immediately Explore Automate (0) 1 passed · 1 failed · 1 skipped · 0 not run How the run agent works: reads the project, changes only test files Cases are not kept outside the panel Write it into the project’s CLAUDE.md Autotest folder The project has no e2e folder — agents have nowhere to put real tests. The button creates e2e/ with a Playwright config and hides it from git — the project stays unchanged. Agents write the real tests there; the section matches them to cases. Create folder Run command go test -json {packages} > {report} go test -json output — the panel converts it to JUnit · limit 30 minutes Edit Remove command Run autotests Only “orders/orders_test.go” The project’s own command (.agent/tests/automation.json): go test -json {packages} > {report} 3 of 6 failed, 2 passed. Skipped: 1. 1 package did not build — the compiler error is in the command output. Open the run in history Command output Mutation check of the case set Will the cases catch a regression: in a separate copy of the repository the file is broken, the automated cases linked to it are run, and you see which went red. Your working copy, library and history do not change. Nothing to break: no automated case has codePaths pointing at a project file. orders/orders_test.go File: .agent/tests/orders.tests.json Add a test File history Exchange Edit group Delete group Run it manually Filters Save the view Groups orders/orders_test.go 3 orders/table_test.go 3 New group Sections All sections 3 The cases carry no sections. Showing 3 of 3 Case Status Priority Readiness Auto Area Variants Actions TestTotal passed medium ready automated — 1 TestTotalBroken failed medium ready automated — 1 TestSkipped skipped medium ready automated — 1"
+      },
+      "dark": {
+        "file": "04-library.dark.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 900,
+        "shotAt": "2026-10-12T14:20:36.556Z",
+        "text": "AgentDeck Свернуть панель Уведомления Агент панели Наблюдатель выкл Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Справка Тестирование Рабочее место тестировщика над проектом из реестра: библиотека кейсов, планы, ручные и агентские прогоны, отчёт. Кейсы лежат в файлах самого проекта. Ручной проход Проект Магазин Заказы (Go) C:\\work\\cc-help-tests\\goshop Кейсы: .agent/tests Настройки набора Внешние привязки Ничего не привязано Привязать Библиотека Планы Прогоны Отчёт Покрытие Прогнать Полный перетест Только изменённое Сгенерировать кейсы По диффу Принимать сразу Исследовать Автоматизировать (0) 1 пройдено · 1 провалено · 1 пропущено · 0 не проверялось Как работает агент прогона: читает проект, меняет только файлы тестов Вне панели кейсы не ведутся Вписать в CLAUDE.md проекта Папка автотестов Папки e2e в проекте нет — агентам некуда класть настоящие тесты. Кнопка заведёт e2e/ с конфигом Playwright и спрячет её от git — проект не изменится. Настоящие тесты туда пишут агенты, раздел сводит их с кейсами. Создать папку Команда прогона go test -json {packages} > {report} вывод go test -json — панель переводит его в JUnit · потолок 30 минут Изменить Убрать команду Прогнать автотесты Только «orders/orders_test.go» Своя команда проекта (.agent/tests/automation.json): go test -json {packages} > {report} Упало 3 из 6, прошло 2. Пропущено: 1. Не собрался 1 пакет — ошибка компилятора в выводе команды. Открыть прогон в истории Вывод команды Проверка набора поломкой Поймают ли кейсы регрессию: в отдельной копии репозитория файл ломается, привязанные к нему автоматические кейсы прогоняются, и видно, какие покраснели. Ваша рабочая копия, библиотека и история не меняются. Ломать нечего: ни у одного автоматического кейса нет codePaths на файл проекта. orders/orders_test.go Файл: .agent/tests/orders.tests.json Добавить тест История файла Обмен Изменить группу Удалить группу Пройти руками Фильтры Сохранить набор Группы orders/orders_test.go 3 orders/table_test.go 3 Новая группа Секции Все секции 3 Секции у кейсов не заданы. Показано 3 из 3 Кейс Статус Важность Готовность Авто Зона Варианты Действия TestTotal пройден средняя готов автотест — 1 TestTotalBroken провален средняя готов автотест — 1 TestSkipped пропущен средняя готов автотест — 1"
+      }
+    }
+  ]
+}

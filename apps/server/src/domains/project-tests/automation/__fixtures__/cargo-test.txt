@@ -1,0 +1,44 @@
+   Compiling rshop v0.1.0 (C:\work\rshop)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.09s
+     Running unittests src\lib.rs (target\debug\deps\rshop-314e9fa9d0850b02.exe)
+
+running 4 tests
+test tests::slow ... ignored, needs db
+test orders::tests::total_ok ... ok
+test tests::adds ... ok
+test orders::tests::total_broken ... FAILED
+
+failures:
+
+---- orders::tests::total_broken stdout ----
+computing <total> & more
+
+thread 'orders::tests::total_broken' (83496) panicked at src\orders.rs:11:9:
+assertion `left == right` failed: want five
+  left: 4
+ right: 5
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    orders::tests::total_broken
+
+test result: FAILED. 2 passed; 1 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `--lib`
+     Running tests\api.rs (target\debug\deps\api-7bda9b4a8e0904c2.exe)
+
+running 1 test
+test api_works ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests rshop
+
+running 1 test
+test src\lib.rs - add (line 5) ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s
+
+error: 1 target failed:
+    `--lib`

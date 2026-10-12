@@ -35,6 +35,7 @@ import { ChatEscalationNotices } from '../ChatEscalationNotices/ChatEscalationNo
 import { ChatArtifactsBar } from '../ChatArtifactsBar/ChatArtifactsBar';
 import { ChatThread } from '../ChatThread/ChatThread';
 import { ChatOverlays } from '../ChatOverlays/ChatOverlays';
+import type { ProjectWindow } from '../ChatOverlays/ChatOverlays.types';
 import { ChatDock } from '../ChatDock/ChatDock';
 import { ChatPreviewPane } from '../ChatPreviewPane/ChatPreviewPane';
 import { useChatSession } from '../model/useChatSession';
@@ -46,6 +47,7 @@ import { useChatHandoff } from '../model/useChatHandoff';
 import { useRunLifecycle } from '../model/useRunLifecycle';
 import { useQueuedAsPending } from '../model/useQueuedAsPending';
 import { useAgentNotifications } from '../model/useAgentNotifications';
+import { useAskFromWindow } from '../model/useAskFromWindow';
 import { usePreviewWidth } from '../model/usePreviewWidth';
 import { visibleChats } from '../lib/visibleChats';
 import { useChildHub } from '../model/useChildHub';
@@ -72,12 +74,10 @@ export function ChatPage() {
   const { t } = useTranslation();
 
   const [previewWidth, resizePreview] = usePreviewWidth();
-  // Тумблер прав хранится в chatPrefs (localStorage): по умолчанию правки
-  // разрешены и не слетают после перезагрузки.
+  // Тумблер прав — в chatPrefs (localStorage): правки разрешены по умолчанию и не слетают.
   const { allowEdits, setAllowEdits } = useChatPrefs();
   const [isFolderPickerOpen, setFolderPickerOpen] = useState(false);
-  const [isCodeOpen, setCodeOpen] = useState(false);
-  const [isTestsOpen, setTestsOpen] = useState(false);
+  const [projectWindow, setProjectWindow] = useState<ProjectWindow>();
   const openEditor = useOpenInEditor();
   const { data: settings } = useSettings();
   const { data: modelCatalog } = useModelCatalog();
@@ -111,6 +111,7 @@ export function ChatPage() {
   const stream = useStreamState(run, isRunning);
 
   const draft = useDraftBox(draftKey);
+  const fromWindow = useAskFromWindow(draft, () => setProjectWindow(undefined));
 
   // Модель и глубина продумывания: общий дефолт из настроек, глубина, назначенная
   // разговору панелью, и выбор этого разговора (подробности — в хуке).
@@ -356,8 +357,9 @@ export function ChatPage() {
             onEffortChange={models.setEffortOverride}
             isEditorPending={openEditor.isPending}
             onOpenEditor={(path) => openEditor.mutate(path)}
-            onOpenCode={() => setCodeOpen(true)}
-            onOpenTests={() => setTestsOpen(true)}
+            onOpenCode={() => setProjectWindow('code')}
+            onOpenTests={() => setProjectWindow('tests')}
+            onOpenEnvironment={() => setProjectWindow('environment')}
             allowEdits={allowEdits}
             onAllowEditsChange={setAllowEdits}
             autoApprove={autoApprove}
@@ -509,10 +511,10 @@ export function ChatPage() {
         isProjectContext={isProjectContext}
         projectPath={projectPath}
         activeChatId={activeChat?.id}
-        isCodeOpen={isCodeOpen}
-        onCodeOpenChange={setCodeOpen}
-        isTestsOpen={isTestsOpen}
-        onTestsOpenChange={setTestsOpen}
+        projectWindow={projectWindow}
+        onProjectWindowChange={setProjectWindow}
+        onAskAgent={fromWindow.askAgent}
+        environmentFocusOnClose={fromWindow.focusOnClose}
         isParallelOpen={isParallelOpen}
         onParallelOpenChange={setParallelOpen}
         projects={projects.data ?? []}

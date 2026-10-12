@@ -4,6 +4,7 @@ import { ChatGuideSections } from '../ChatGuideSections/ChatGuideSections';
 import { ChatParallelSections } from '../ChatParallelSections/ChatParallelSections';
 import { ChatFieldSections } from '../ChatFieldSections/ChatFieldSections';
 import { ChatLimitsSections } from '../ChatLimitsSections/ChatLimitsSections';
+import { ChatEnvironmentSections } from '../ChatEnvironmentSections/ChatEnvironmentSections';
 
 /**
  * Документ раздела «Чат» — самый длинный в справке, и порядок в нём один:
@@ -19,8 +20,9 @@ import { ChatLimitsSections } from '../ChatLimitsSections/ChatLimitsSections';
  *
  * Соседние файлы — не «вынесенные куски», а разделы с собственной работой:
  * `ChatGuideSections` держит схемы и весь путь в снимках, `ChatParallelSections`
- * — копии, разделение, подбор модели и продолжение этапа, `ChatFieldSections` —
- * таблицы, `ChatLimitsSections` — границы, отказы и отмену.
+ * — копии, разделение, подбор модели и продолжение этапа, `ChatEnvironmentSections`
+ * — окно «Окружение», `ChatFieldSections` — таблицы, `ChatLimitsSections` —
+ * границы, отказы и отмену.
  */
 export function ChatTopic() {
   const { t } = useTranslation();
@@ -118,6 +120,8 @@ export function ChatTopic() {
           minWidth={320}
           items={[
             { title: tr('toolsRun'), text: tr('toolsRunText') },
+            { title: tr('toolsStacks'), text: tr('toolsStacksText') },
+            { title: tr('toolsGroup'), text: tr('toolsGroupText') },
             { title: tr('toolsPort'), text: tr('toolsPortText') },
             { title: tr('toolsAutostart'), text: tr('toolsAutostartText') },
             { title: tr('toolsGit'), text: tr('toolsGitText') },
@@ -128,6 +132,8 @@ export function ChatTopic() {
         />
         <Callout tone="info" title={tr('toolsNote')} />
       </HelpSection>
+
+      <ChatEnvironmentSections />
 
       {/* Копии репозитория и разделение задач — соседним файлом: два раздела об
           одном и том же, а документ и без них самый длинный в справке. */}

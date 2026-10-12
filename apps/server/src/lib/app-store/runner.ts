@@ -50,6 +50,19 @@ export function setRunnerAutostart(
   });
 }
 
+/** Включить/выключить цель в «Запустить всё» её проекта. */
+export function setRunnerGroup(
+  state: AppState,
+  path: string,
+  inGroup: boolean,
+  meta: RunnerTargetMeta,
+): void {
+  updateRunnerPrefs(state, path, meta, (prefs) => {
+    if (inGroup) prefs.inGroup = true;
+    else delete prefs.inGroup;
+  });
+}
+
 /**
  * Снять автозапуск со ВСЕХ целей проекта — закрытая вкладка не должна
  * оставлять после себя обещание что-то поднять при следующем старте.
@@ -117,7 +130,11 @@ function updateRunnerPrefs(
   mutate(next);
 
   const isEmpty =
-    !next.autostart && next.port === undefined && next.pinnedPort === undefined && !next.command;
+    !next.autostart &&
+    !next.inGroup &&
+    next.port === undefined &&
+    next.pinnedPort === undefined &&
+    !next.command;
   if (isEmpty) delete state.runnerPrefs[key];
   else state.runnerPrefs[key] = next;
 }

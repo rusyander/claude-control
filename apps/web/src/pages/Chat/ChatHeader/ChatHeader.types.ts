@@ -43,6 +43,8 @@ export interface ChatHeaderProps {
   /** Открыть окно кода проекта: дерево файлов и дифф правок этого разговора. */
   onOpenCode: () => void;
   onOpenTests: () => void;
+  /** Окно «Окружение»: сервисы Docker Compose проекта. */
+  onOpenEnvironment: () => void;
 
   allowEdits: boolean;
   onAllowEditsChange: (value: boolean) => void;

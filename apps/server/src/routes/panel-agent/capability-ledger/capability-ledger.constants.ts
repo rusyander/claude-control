@@ -459,6 +459,44 @@ export const ROUTE_LEDGER: RouteLedger = {
   'POST /api/project-runner/settings': 'action:save_project_runner_settings',
   'POST /api/project-runner/start': 'action:start_project_runner',
   'POST /api/project-runner/stop': 'action:stop_project_runner',
+  // Набор «Запустить всё» и Compose проекта: у агента панели этих действий пока нет.
+  'POST /api/project-runner/group': 'gap:P3',
+  'POST /api/project-runner/start-all': 'gap:P3',
+  'POST /api/project-runner/stop-all': 'gap:P3',
+  // compose-routes.ts
+  'GET /api/compose': 'gap:P3',
+  'POST /api/compose/action': 'gap:P3',
+  // database-routes.ts — агент ходит в базу своим переходником MCP, не через ассистента панели.
+  'GET /api/database/connections': 'gap:P3',
+  'POST /api/database/connections': 'gap:P3',
+  'POST /api/database/connections/remove': 'gap:P3',
+  'GET /api/database/schema': 'gap:P3',
+  'POST /api/database/query': 'gap:P3',
+  'GET /api/database/migrations': 'gap:P3',
+  'GET /api/database/mcp': 'internal:preview',
+  // Запись переходника в конфигурацию CLI — только кнопкой человека, как у Atlassian.
+  'POST /api/database/mcp': 'human:consent',
+  // backend-guard-routes.ts — защиту ставит и снимает только человек: агент,
+  // снявший себе вопрос перед DROP, обесценил бы её целиком.
+  'GET /api/backend-guard': 'internal:preview',
+  'POST /api/backend-guard/check': 'internal:preview',
+  'POST /api/backend-guard/install': 'human:rights',
+  'PUT /api/backend-guard/settings': 'human:rights',
+  'POST /api/backend-guard/remove': 'human:rights',
+  // api-explorer-routes.ts — запрос к API разработчика шлёт только человек: агенту
+  // для своего сервиса хватает curl в терминале, где его видит защита бэкенда.
+  'GET /api/api-explorer': 'internal:preview',
+  'GET /api/api-explorer/spec': 'internal:preview',
+  'GET /api/api-explorer/history': 'internal:preview',
+  'POST /api/api-explorer/sources': 'human:rights',
+  'POST /api/api-explorer/sources/remove': 'human:rights',
+  'POST /api/api-explorer/postman': 'human:rights',
+  'POST /api/api-explorer/send': 'human:rights',
+  'PUT /api/api-explorer/settings': 'human:rights',
+  'POST /api/api-explorer/history/clear': 'human:rights',
+  // logs-routes.ts — только чтение вывода своих целей и сервисов.
+  'GET /api/logs/sources': 'internal:preview',
+  'GET /api/logs': 'internal:preview',
   // project-tests/case-history-routes.ts
   'GET /api/project-tests/case-history': 'action:read_tests_report',
   'GET /api/project-tests/flaky': 'action:read_tests_report',
@@ -487,6 +525,12 @@ export const ROUTE_LEDGER: RouteLedger = {
   'POST /api/project-tests/e2e/run': 'action:run_e2e_tests',
   'POST /api/project-tests/e2e/run/stop': 'action:stop_e2e_tests',
   'POST /api/project-tests/e2e/sync': 'action:sync_e2e_tests',
+  // project-tests/automation-routes.ts — команду прогона панель потом исполняет
+  // сама: записать её может только человек.
+  'GET /api/project-tests/automation': 'internal:preview',
+  'PUT /api/project-tests/automation': 'human:code-write',
+  'DELETE /api/project-tests/automation': 'human:code-write',
+  'POST /api/project-tests/e2e/adopt': 'gap:P3',
   // project-tests/health-routes.ts
   'GET /api/project-tests/lint': 'action:lint_tests',
   'GET /api/project-tests/quarantine': 'action:read_tests_report',

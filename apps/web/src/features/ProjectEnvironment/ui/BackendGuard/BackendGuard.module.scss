@@ -1,0 +1,243 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2xs);
+  min-width: 0;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: var(--font-size-body-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.sub {
+  margin: 0;
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-caption);
+}
+
+.text {
+  margin: 0;
+  font-size: var(--font-size-body-sm);
+}
+
+.error {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--font-size-body-sm);
+}
+
+// Итог действия: получает фокус, поэтому видимое кольцо — от темы, без своего outline: none.
+.done {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2xs);
+  margin: 0;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: 8px;
+  background: var(--color-success-subtle);
+  font-size: var(--font-size-body-sm);
+}
+
+// Состояние
+.status {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.statusHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-2xs) var(--spacing-sm);
+}
+
+.statusTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2xs);
+  margin: 0;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-medium);
+}
+
+.partial {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-2xs) var(--spacing-sm);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: 8px;
+  background: var(--color-warning-subtle);
+  font-size: var(--font-size-body-sm);
+
+  p {
+    display: flex;
+    flex: 1 1 280px;
+    align-items: flex-start;
+    gap: var(--spacing-2xs);
+    margin: 0;
+  }
+}
+
+.filesTitle {
+  margin: 0;
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-medium);
+}
+
+.files {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--spacing-3xs) var(--spacing-xs);
+  }
+
+  li[data-state='missing'],
+  li[data-state='changed'] {
+    .partState {
+      color: var(--color-warning);
+      font-weight: var(--font-weight-medium);
+    }
+  }
+}
+
+.fileName {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  word-break: break-all;
+}
+
+.partState {
+  color: var(--color-success);
+  font-size: var(--font-size-caption);
+}
+
+.note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-2xs);
+  margin: 0;
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-caption);
+}
+
+// Правила слева, прод и проверка справа; на узком экране — друг под другом.
+.columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--spacing-lg);
+  align-items: start;
+
+  @media (max-width: 900px) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  min-width: 0;
+}
+
+.rules {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rule {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-xs) 0;
+  border-bottom: 1px solid var(--color-border);
+
+  &:last-child {
+    border-bottom: 0;
+  }
+
+  &[data-on='false'] .ruleTitle {
+    color: var(--color-fg-muted);
+  }
+}
+
+.ruleText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ruleTitle {
+  font-size: var(--font-size-body-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.check {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--spacing-2xs) var(--spacing-sm);
+}
+
+.checkField {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.verdict {
+  margin: 0;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: 8px;
+  font-size: var(--font-size-body-sm);
+  word-break: break-word;
+
+  &[data-verdict='asks'] {
+    background: var(--color-warning-subtle);
+  }
+
+  &[data-verdict='passes'] {
+    background: var(--color-success-subtle);
+  }
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-2xs) var(--spacing-sm);
+}
+
+.zone {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2xs);
+  padding: var(--spacing-sm);
+  border: 1px solid var(--color-danger-subtle);
+  border-radius: 8px;
+}

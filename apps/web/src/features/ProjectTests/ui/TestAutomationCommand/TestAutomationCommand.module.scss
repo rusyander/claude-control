@@ -1,0 +1,38 @@
+// Своя команда прогона: строка команды моноширинно, рецепты — списком строк.
+.command {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  color: var(--color-fg);
+  background: var(--color-surface-sunken);
+  border-radius: 8px;
+  padding: var(--spacing-3xs) var(--spacing-xs);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.recipes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+// Текст рецепта и кнопка в ряд; на узком экране кнопка уходит под текст.
+.recipe {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--spacing-xs);
+}
+
+.recipeText {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.fields {
+  max-width: 720px;
+}

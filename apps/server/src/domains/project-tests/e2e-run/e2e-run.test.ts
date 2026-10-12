@@ -485,6 +485,18 @@ writeFileSync(process.env.AGENTDECK_JUNIT_REPORT, '<testsuites><testsuite name="
       expect(readFileSync(ownArgv, 'utf8')).toBe('untouched');
     });
 
+    it('{paths}: без выбора пуст — раннер собирает весь набор сам, с группой — её файлы', async () => {
+      ownProject({ command: 'node tools/run.mjs {paths}' });
+      const registry = new E2eRunRegistry();
+      registry.start({ root, appData });
+      await vi.waitFor(() => expect(registry.get(root)?.status).toBe('done'), { timeout: 20_000 });
+      expect(argvOf().files).toEqual([]);
+
+      registry.start({ root, appData, groupId: 'qa' });
+      await vi.waitFor(() => expect(registry.get(root)?.status).toBe('done'), { timeout: 20_000 });
+      expect(argvOf().files).toEqual(['tools/qa/open.mjs', 'tools/qa/search.mjs']);
+    });
+
     it('потолок timeoutMinutes: зависшая команда остановлена, в журнале — почему', async () => {
       ownProject({ command: 'node tools/run.mjs', timeoutMinutes: 0.01 });
       setEnv('OWN_SLEEP', '60000');

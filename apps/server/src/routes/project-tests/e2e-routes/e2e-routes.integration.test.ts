@@ -545,13 +545,17 @@ describe('project-tests e2e routes', () => {
         '<testsuites><testsuite name="cart.spec.ts">' +
         '<testcase name="Корзина › [cart-001] добавить товар @smoke" classname="cart.spec.ts"/>' +
         '<testcase name="Корзина › пустая корзина" classname="cart.spec.ts"/>' +
+        '<testcase name="Корзина › новый тест" classname="cart.spec.ts"/>' +
         '</testsuite></testsuites>';
       expect((await run()).statusCode).toBe(200);
       await vi.waitFor(async () => expect((await view()).e2eRun?.status).toBe('done'), {
         timeout: 20_000,
       });
       const done = await view();
-      expect(done.e2eRun?.imported).toEqual({ read: 2, matched: 2, unmatched: 0 });
+      expect(done.e2eRun?.imported).toEqual({ read: 3, matched: 2, unmatched: 1 });
+      // Тест папки без кейса заводит «Обновить из папки» (со шагами из спека), а не
+      // «Завести кейсы» — та только у своей команды проекта.
+      expect(done.e2eRun?.adoptable).toBeUndefined();
       const cart = done.groups.find((group) => group.id === 'cart');
       expect(cart?.cases.map((item) => item.status)).toEqual(['passed', 'passed']);
 

@@ -8,6 +8,7 @@ import { Typography } from '@shared/ui/typography';
 import { useCreateE2eFolder, useRemoveE2eFolder, useSyncE2eFolder } from '@entities/ProjectTest';
 import { TestE2eRun } from '../TestE2eRun/TestE2eRun';
 import { TestMutationCheck } from '../TestMutationCheck/TestMutationCheck';
+import { TestAutomationCommand } from '../TestAutomationCommand/TestAutomationCommand';
 import type { TestE2eCardProps } from './TestE2eCard.types';
 import styles from './TestE2eCard.module.scss';
 import { automatedFiles } from '../../lib/automatedFiles';
@@ -230,6 +231,13 @@ export function TestE2eCard({ board, environmentId }: TestE2eCardProps) {
           {toErrorMessage(failure)}
         </Typography>
       )}
+
+      <TestAutomationCommand
+        path={board.path}
+        automation={board.automation}
+        isLocked={Boolean(board.e2eRun && !board.e2eRun.finishedAt)}
+        hasFolder={folder.state !== 'missing'}
+      />
 
       {(folder.state !== 'missing' || board.automation) && (
         <TestE2eRun

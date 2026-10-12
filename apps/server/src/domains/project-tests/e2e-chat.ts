@@ -134,7 +134,8 @@ function ownCommandLine(
   return [
     'QA workspace of this project (AgentDeck Tests section): the project runs its checks with',
     `its own command from ${TESTS_DIR}/${AUTOMATION_FILE}: "${automation.command}"`,
-    '({files} = the files of the selected cases, or of every automated case; {report} and AGENTDECK_JUNIT_REPORT = the junit',
+    '({files} = the files of the selected cases, or of every automated case; {paths} = the selected files, empty on a',
+    'full run; {packages} = their Go packages, ./... on a full run; {report} and AGENTDECK_JUNIT_REPORT = the junit',
     `report path); test cases live in ${TESTS_DIR}/<group>.tests.json.`,
     'When the task involves testing, write checks the way this project already writes them —',
     'do NOT add a Playwright/Cypress folder of your own. Link every new or existing check to a',

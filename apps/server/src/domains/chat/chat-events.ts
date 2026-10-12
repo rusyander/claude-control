@@ -1,3 +1,4 @@
+import type { PermissionGuardReason } from '@agentdeck/contracts/backend-guard';
 import type { HandoffRefusal } from '@agentdeck/contracts/chat-handoff';
 import type { CascadeStage, ReviewDepthGap } from '@agentdeck/contracts/model-cascade';
 import type { ServerMessageCode, ServerMessageParams } from '@agentdeck/contracts/server-messages';
@@ -69,7 +70,14 @@ export type ChatEvent =
   | { kind: 'done'; costUsd: number; durationMs: number; sessionId: string }
   | { kind: 'error'; message: string }
   // Интерактивные права: агент хочет применить инструмент — ждём решения человека.
-  | { kind: 'permission'; toolName: string; input: unknown; toolUseId: string }
+  | {
+      kind: 'permission';
+      toolName: string;
+      input: unknown;
+      toolUseId: string;
+      /** Защита бэкенда проекта узнала команду — карточка называет причину. */
+      guard?: PermissionGuardReason;
+    }
   /**
    * Запрос прав решён. `expired` — решал не человек: CLI перестал ждать ответа
    * (или истёк срок брокера), и карточка обязана сказать «истекло», а не

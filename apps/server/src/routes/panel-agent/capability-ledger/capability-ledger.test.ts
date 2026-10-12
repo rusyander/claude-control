@@ -151,6 +151,20 @@ const PINNED_HUMAN: Readonly<Record<string, RouteClass>> = {
   'POST /api/chat/split/:parent/continue-group': 'human:split-apply',
   'POST /api/chat/split/:parent/recheck': 'human:outward',
   'POST /api/project-tests/baseline': 'human:upload',
+  // Бэкенд-разработка (владелец 12.10): доступ агента к базе, защита бэкенда,
+  // запросы к API проекта и своя команда прогона — решение человека.
+  'POST /api/database/mcp': 'human:consent',
+  'POST /api/backend-guard/install': 'human:rights',
+  'PUT /api/backend-guard/settings': 'human:rights',
+  'POST /api/backend-guard/remove': 'human:rights',
+  'POST /api/api-explorer/sources': 'human:rights',
+  'POST /api/api-explorer/sources/remove': 'human:rights',
+  'POST /api/api-explorer/postman': 'human:rights',
+  'POST /api/api-explorer/send': 'human:rights',
+  'PUT /api/api-explorer/settings': 'human:rights',
+  'POST /api/api-explorer/history/clear': 'human:rights',
+  'PUT /api/project-tests/automation': 'human:code-write',
+  'DELETE /api/project-tests/automation': 'human:code-write',
 };
 
 /**

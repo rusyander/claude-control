@@ -17,3 +17,5 @@ apps/mobile/expo-env.d.ts
 apps/server/src/domains/prompts/catalog/
 # Личные черновики в корне (`.vsc-tmp.mjs` и т. п.) — не код проекта.
 /.*-tmp.mjs
+# Отчёты раннеров тестов — вывод инструмента байт в байт (go test -json — это NDJSON, а не JSON).
+apps/server/src/domains/project-tests/automation/__fixtures__/

@@ -1,5 +1,5 @@
 import { existsSync, statSync, readFileSync, readdirSync } from 'node:fs';
-import { basename, join, resolve } from 'node:path';
+import { basename, join, relative, resolve } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import type {
   ProjectRunnerInfo,
@@ -8,7 +8,14 @@ import type {
 } from '@agentdeck/contracts';
 import { GLOB_DEPTH, MAX_TARGETS, isWindows } from './project-runner.constants.ts';
 import { RunnerError, type RunnerTargetSpec, type TargetMemory } from './project-runner.types.ts';
-import { readPackageJson, resolveRunCommand } from './stack.ts';
+import { readPackageJson } from './stack.ts';
+import {
+  candidateView,
+  detectCandidates,
+  goProgramDirs,
+  pickCandidate,
+  type ToolCheck,
+} from './stacks/stacks.ts';
 import { coded } from '../../lib/server-text/server-text.ts';
 import { serverText } from '../../lib/server-texts/server-texts.ts';
 
@@ -132,34 +139,92 @@ export function listRunnerTargets(projectDir: string): {
   const targets: RunnerTargetSpec[] = [{ dir: '', path: root, name: rootName }];
 
   const workspaces = workspacePatterns(root);
-  if (!workspaces) return { targets, skipped: 0 };
+  const seen = new Set<string>();
+  let skipped = 0;
+  const add = (dir: string, name: string): void => {
+    if (seen.has(dir)) return;
+    seen.add(dir);
+    if (targets.length >= MAX_TARGETS) {
+      skipped += 1;
+      return;
+    }
+    targets.push({ dir, path: join(root, dir), name });
+  };
+
+  if (workspaces) collectWorkspaceTargets(root, workspaces.patterns, add);
+  const negated = (workspaces?.patterns ?? [])
+    .filter((pattern) => pattern.startsWith('!'))
+    .map((pattern) => pattern.slice(1).replace(/\/+$/, ''));
+  for (const dir of backendTargetDirs(root).filter((item) => !negated.includes(item))) {
+    add(dir, readPackageJson(join(root, dir))?.name ?? basename(dir));
+  }
+
+  // Воркспейсов нет, а цели нашлись сканом бэкенд-каталогов — это и есть
+  // «скан»: «один пакет, запускается корень» было бы неправдой.
+  const source = workspaces?.source ?? (targets.length > 1 ? 'scan' : undefined);
+  return { targets, source, skipped };
+}
+
+/** Пакеты монорепозитория со скриптом dev/start — по шаблонам воркспейсов. */
+function collectWorkspaceTargets(
+  root: string,
+  patterns: string[],
+  add: (dir: string, name: string) => void,
+): void {
+  const workspaces = { patterns };
 
   const negated = workspaces.patterns
     .filter((pattern) => pattern.startsWith('!'))
     .map((pattern) => pattern.slice(1).replace(/\/+$/, ''));
-  const seen = new Set<string>();
-  let skipped = 0;
 
-  for (const pattern of workspaces.patterns) {
+  for (const pattern of patterns) {
     if (pattern.startsWith('!')) continue;
     for (const dir of expandWorkspacePattern(root, pattern)) {
-      if (seen.has(dir) || negated.includes(dir)) continue;
-      seen.add(dir);
-
-      const abs = join(root, dir);
-      const pkg = readPackageJson(abs);
+      if (negated.includes(dir)) continue;
+      const pkg = readPackageJson(join(root, dir));
       // Пакет без скрипта запуска — библиотека: в списке «что запустить» её нет.
       if (!pkg?.scripts?.dev && !pkg?.scripts?.start) continue;
-
-      if (targets.length >= MAX_TARGETS) {
-        skipped += 1;
-        continue;
-      }
-      targets.push({ dir, path: abs, name: pkg.name ?? basename(abs) });
+      add(dir, pkg.name ?? basename(dir));
     }
   }
+}
 
-  return { targets, source: workspaces.source, skipped };
+/**
+ * Где искать бэкенд-сервисы: монорепы кладут их в `apps/*` и `services/*`,
+ * одиночные — в `backend`, `server`, `api`. Глубже не смотрим: список целей
+ * должен открываться мгновенно и в большом репозитории.
+ */
+const BACKEND_SCAN = ['apps/*', 'services/*', 'backend', 'backend/*', 'server', 'api', 'worker'];
+
+/** Для обхода наличие программ не важно — цель видна, даже если go не стоит. */
+const anyTool: ToolCheck = () => true;
+
+/**
+ * Цели бэкенда: программы Go-модулей (`cmd/*`) и каталоги, где детекторы
+ * стеков нашли, чем запускать. Каталог, уже найденный воркспейсами Node, второй
+ * раз не добавляется.
+ */
+export function backendTargetDirs(root: string): string[] {
+  const dirs = new Set<string>();
+  const addGoPrograms = (moduleDir: string) => {
+    if (!existsSync(join(root, moduleDir, 'go.mod'))) return;
+    for (const program of goProgramDirs(join(root, moduleDir))) {
+      dirs.add(relative(root, program).split('\\').join('/'));
+    }
+  };
+
+  addGoPrograms('');
+  for (const pattern of BACKEND_SCAN) {
+    const found = pattern.includes('*') ? expandWorkspacePattern(root, pattern) : [pattern];
+    for (const dir of found.filter((item) => isDirectory(join(root, item)))) {
+      addGoPrograms(dir);
+      // Пакеты Node здесь не ищем: их состав решают воркспейсы проекта, и
+      // исключённый шаблоном `!apps/legacy` пакет не должен возвращаться обходом.
+      const found = detectCandidates({ dir: join(root, dir), root }, anyTool);
+      if (found.some((candidate) => candidate.stack !== 'node')) dirs.add(dir);
+    }
+  }
+  return [...dirs];
 }
 
 /**
@@ -170,12 +235,14 @@ export function listRunnerTargets(projectDir: string): {
 export function describeRunner(
   projectDir: string,
   memoryOf: (targetPath: string) => TargetMemory | undefined = () => undefined,
+  hasTool?: ToolCheck,
 ): ProjectRunnerInfo {
   const root = resolve(projectDir);
   const found = listRunnerTargets(root);
 
   const targets: ProjectRunnerTarget[] = found.targets.map((target) => {
     const memory = memoryOf(target.path) ?? {};
+    const detected = detectCandidates({ dir: target.path, root }, hasTool);
     const base = {
       dir: target.dir,
       path: target.path,
@@ -184,17 +251,49 @@ export function describeRunner(
       pinnedPort: memory.pinnedPort,
       lastPort: memory.port,
       autostart: Boolean(memory.autostart),
+      inGroup: Boolean(memory.inGroup),
+      candidates: detected.map((candidate) => candidateView(root, candidate)),
     };
-    try {
-      const spec = resolveRunCommand(target.path, memory.command, root);
-      return { ...base, runnable: true, command: spec.display };
-    } catch (error) {
+
+    const override = memory.command?.trim();
+    // Команда, выбранная из найденных, остаётся находкой со своим стеком и
+    // файлами-доказательствами; «своя» — только вписанная руками.
+    const picked = override
+      ? detected.find((candidate) => candidate.display === override)
+      : undefined;
+    if (override && !picked) {
+      return { ...base, runnable: true, command: override, stack: 'custom' as const };
+    }
+
+    const chosen = picked ?? pickCandidate(detected);
+    if (!chosen) {
       return {
         ...base,
         runnable: false,
-        reason: error instanceof Error ? error.message : String(error),
+        reason:
+          'Не нашли, чем запускать: ни скрипта dev/start в package.json, ни известного стека. Задайте команду запуска вручную.',
       };
     }
+    const view = candidateView(root, chosen);
+    const facts = {
+      command: view.command,
+      stack: view.stack,
+      evidence: view.evidence,
+      ...(view.framework ? { framework: view.framework } : {}),
+    };
+    // Программы нет — запуск упал бы с «не является внутренней или внешней
+    // командой»; честнее назвать её до кнопки.
+    if (!chosen.available) {
+      const tool = chosen.tool ?? chosen.display.split(' ')[0] ?? '';
+      return {
+        ...base,
+        ...facts,
+        runnable: false,
+        missingTool: tool,
+        reason: `Не найдена программа «${tool}» — установите её или задайте команду запуска вручную.`,
+      };
+    }
+    return { ...base, ...facts, runnable: true };
   });
 
   return { projectPath: root, targets, workspaceSource: found.source, skipped: found.skipped };

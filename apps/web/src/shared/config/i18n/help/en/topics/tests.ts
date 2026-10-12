@@ -1315,8 +1315,9 @@ export const testsEn: typeof testsRu = {
         'the card says so and the history is untouched. While an agent run is going the button ' +
         'is closed: it writes into the same group files. Are the project checks not a ' +
         'Playwright, Cypress or pytest folder but its own scripts or vitest suites? The project ' +
-        'names the command itself in .agent/tests/automation.json ({"version":1,"command":"…"}): ' +
-        '{files} becomes the files of the selected cases (of every automated case when none is selected), {report} and the AGENTDECK_JUNIT_REPORT ' +
+        'names the command itself in .agent/tests/automation.json ({"version":1,"command":"…"}) — ' +
+        'by hand or with the “Run command” block (see “Backend tests” below): ' +
+        '{files} becomes the files of the selected cases (of every automated case when none is selected), {paths} the same files but empty when none is selected (the runner collects the suite itself), {report} and the AGENTDECK_JUNIT_REPORT ' +
         'variable become the junit report path. The command is named under the button and ' +
         'pnpm tests run without --cmd takes it too; a folder with tests wins over it. “Only ' +
         '“group”” runs just the files of the open group. Cases selected but none has an ' +
@@ -1420,6 +1421,58 @@ export const testsEn: typeof testsRu = {
         'panel-created folder, not a snapshot: a test written in the copy lives in the original ' +
         'project folder, and cases are synced there too.',
     },
+    backend: {
+      title: 'Backend tests',
+      caption:
+        'go test, pytest, Gradle, Maven and cargo test — no e2e folder needed: the panel finds the ' +
+        'command from the project’s files, runs it itself and lands the results on cases.',
+      recipes: 'The panel found tests',
+      recipesText:
+        'The “Run command” block in the card above the library looks for modules in the root and ' +
+        'two folders deep: go.mod — Go, pytest.ini or [tool.pytest] in pyproject.toml, conftest.py ' +
+        '— pytest, build.gradle(.kts) — Gradle, pom.xml — Maven, Cargo.toml — Cargo. Each recipe ' +
+        'shows which file it was found by, how many test files there are and a ready command. ' +
+        'Gradle and Maven use the project’s wrapper (gradlew, mvnw), pytest uses uv, poetry or the ' +
+        'project’s .venv. When the program is not on the machine, the recipe says so before the ' +
+        'run and names how to install it. A module in a subfolder runs via “cd folder && …” and ' +
+        'always as a whole.',
+      run: 'Command saved, run done',
+      runText:
+        '“Take” puts the recipe into the fields, “Save” writes .agent/tests/automation.json — the ' +
+        'same file people used to create by hand. “Edit” changes the command, the report path, the ' +
+        'report kind and the minute limit; “Remove command” sets the file aside as ' +
+        'automation.removed.json instead of deleting it. While a run is going, the command is not ' +
+        'changed. “Run autotests” runs it without an agent. The report is whatever the tool writes ' +
+        'itself: go test -json and cargo test output is converted to JUnit by the panel (a failed ' +
+        'package build is a red “1 package did not build” line, the compiler error is in the command output), Gradle and Maven write ' +
+        'JUnit as a folder — only this run’s *.xml are taken from it, nothing else there is ' +
+        'deleted. “Only group” narrows Go to the packages of the group’s files ({packages}) and ' +
+        'pytest in the root to its files ({paths}); Gradle, Maven, Cargo and subfolder modules run ' +
+        'the whole suite. A full run covers the whole suite even once cases exist (./... for Go, ' +
+        'no files for pytest), so a new test shows up for adoption by itself.',
+      adopt: 'Create cases',
+      adoptText:
+        'Tests without a case are named in the outcome, with “Create cases (N)” under it: each ' +
+        'test gets a case linked by name (with its package or class), grouped by the test’s file. ' +
+        'The file is looked up in the project — by func for Go, by module for Cargo, by class for ' +
+        'Java and Kotlin, by module for pytest; not found — the case has no file rather than an ' +
+        'invented path. A parametrised pytest test is one case for all its sets, a package that did not ' +
+        'build never becomes a case, the “Without a case” line goes away once they are created, and a second click from another screen duplicates nothing. The button ' +
+        'lives until the next run. An e2e folder run has no such button: there “Update from ' +
+        'folder” creates cases, steps from the spec included.',
+      library: 'The next run lands on the cases',
+      libraryText:
+        'The second run of the same command lands on the new cases in full: passed, failed, ' +
+        'skipped — and as one record in the run history. Steps and descriptions of such cases are ' +
+        'empty: fill them in by hand or ask an agent. Without the panel, pnpm tests run --project ' +
+        '<path> does the same: the command from automation.json, the report converted the same way.',
+      limitsTitle: 'What is not here',
+      limitsText:
+        'The panel installs nothing — not go, a JDK, cargo or pytest; it only names them. Modules ' +
+        'deeper than two folders get no recipe. .NET, PHPUnit, RSpec and the rest have no recipe: ' +
+        'a command that writes JUnit is set with “Set your own command”. Several modules give ' +
+        'several recipes while a project has one command: you decide which one runs.',
+    },
   },
   shots: {
     workspace: {
@@ -1481,6 +1534,15 @@ export const testsEn: typeof testsRu = {
         'The mutation check finished: the cart module was broken in a copy, one of the two linked cases went red',
       '10-pyramid':
         'Test pyramid: e2e from the folder, integration and unit from the project files, vitest named in package.json',
+    },
+    backend: {
+      '01-recipes':
+        'A Go project without an e2e folder: “Run command” found the module by go.mod and offers go test -json',
+      '02-run-adopt':
+        'The command is saved and run: the test outcome, “Without a case” by name and the “Create cases” button',
+      '03-adopted': 'Cases created: six cases in groups by test file',
+      '04-library':
+        'The library after the second run: backend cases passed, failed and skipped from the go test report',
     },
   },
   diagrams: {

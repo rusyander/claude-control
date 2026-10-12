@@ -8,6 +8,7 @@ import { testsE2eRu } from './tests-e2e/ru.ts';
 import { pageTabsRu } from './page-tabs/ru.ts';
 import { watcherRu } from './watcher/ru.ts';
 import { devRestartRu } from './dev-restart/ru.ts';
+import { environmentRu } from './environment/ru.ts';
 import { projectsPageRu } from './projects/ru.ts';
 import { contourConfigRu } from './contour-config/ru.ts';
 import { presetsRu } from './presets/ru.ts';
@@ -39,6 +40,8 @@ export const ru = {
   watcher: watcherRu,
   /** Плашка «правки сервера ждут перезапуска» — `dev-restart/ru.ts`. */
   devRestart: devRestartRu,
+  /** Окно «Окружение» из чата проекта — `environment/ru.ts`. */
+  environment: environmentRu,
   /** Раздел «Проекты — конфигурация»: шапка проекта, вкладки, документ инструкций — `projects/ru.ts`. */
   projectsPage: projectsPageRu,
   /** Контур: разделы на карточке, чьи правила действуют, кто берёт верх — `contour-config/ru.ts`. */
@@ -1772,6 +1775,17 @@ export const ru = {
     answerRefusedForChild: 'Ответ для «{{title}}» не принят: {{message}}',
     pickOption: 'Ответить этим вариантом',
     permissionTitle: 'Агент просит разрешение',
+    permissionGuard: 'Защита бэкенда: {{reason}}',
+    permissionGuardMatch: 'Узнала: {{match}}',
+    permissionGuardRules: {
+      'prod-target': 'команда обращается к проду',
+      'sql-drop': 'снос таблицы, базы или схемы',
+      'sql-truncate': 'очистка таблицы',
+      'sql-unbounded': 'DELETE или UPDATE без WHERE — все строки',
+      'migration-down': 'откат или сброс миграций',
+      'infra-change': 'изменение инфраструктуры',
+      'volume-delete': 'удаление томов Docker с данными',
+    },
     branchGate: {
       title: 'Первая правка — где работаем?',
       reason:
@@ -6866,13 +6880,14 @@ export const ru = {
     sourceSingle: 'Один пакет: запускается сам корень проекта',
     sourcePnpm: 'Пакеты взяты из pnpm-workspace.yaml',
     sourceNpm: 'Пакеты взяты из workspaces в package.json',
-    sourceScan: 'Файла воркспейсов нет — панель посмотрела в apps/, packages/ и services/',
+    sourceScan:
+      'Файла воркспейсов нет — панель посмотрела в apps/, packages/, services/, cmd/ и каталоги backend, server, api, worker',
     skipped: 'В список поместились не все: ещё {{count}} не показаны',
     command: 'Команда',
     port: 'Порт',
     portAuto: 'из вывода',
     portHint:
-      'Пусто — панель берёт порт из вывода сервера, то есть тот, что прописан в проекте. Заполните, если сервер адреса не печатает',
+      'Пусто — панель берёт порт из вывода сервера, то есть тот, что прописан в проекте. Заполните, если сервер адреса не печатает: панель передаст порт так, как его ждёт стек (PORT, --port у uvicorn, адрес у Django, SERVER_PORT у Spring)',
     portHintLast: 'Прошлый запуск: порт {{port}}. Пусто — панель снова возьмёт порт из вывода',
     output: 'Вывод процесса',
     saved: 'Настройки запуска сохранены',
@@ -6884,6 +6899,27 @@ export const ru = {
     freePort: 'Освободить и запустить',
     portStillBusy: 'Порт {{port}} всё ещё занят — процесс не погас. Попробуйте закрыть его вручную',
     note: 'Порт панель не назначает: приложение поднимается на своём порту, а панель читает адрес из вывода. Автозапуск — про следующий старт панели, окно браузера при нём не открывается',
+    stackCustom: 'своя команда',
+    evidence: 'Найдено по: {{files}}',
+    missingTool:
+      'Не найдена программа «{{tool}}». Установите её и откройте настройки заново — или выберите другой способ запуска, или впишите команду',
+    nothingFound:
+      'Не нашли, чем запускать: ни скрипта dev/start в package.json, ни Go, Python, Rust, Java, .NET, ни задач make/task/just. Впишите команду запуска',
+    candidates: 'Найденные способы запуска',
+    toolMissingShort: 'нет программы «{{tool}}»',
+    autoPick: 'Вернуть автовыбор',
+    autoPickHint:
+      'Забыть выбранную команду: панель снова возьмёт первый способ, для которого есть программа',
+    inGroup: 'В «Запустить всё»',
+    inGroupHint: 'Отметьте цели, которые нужны вместе, — «Запустить всё» поднимет их одной кнопкой',
+    startAll: 'Запустить отмеченные ({{count}})',
+    stopAll: 'Остановить всё',
+    groupEmpty:
+      'Отметьте галочками цели, которые нужны вместе (API, воркер, фронт), — набор запомнится',
+    groupHint:
+      'Набор запомнится. Кнопка запуска в ряду тоже поднимает его. «Остановить всё» гасит всё, что панель запустила в проекте',
+    groupFailed: '{{name}}: {{message}}',
+    startGroupHint: 'Запустить набор: {{names}}',
   },
   git: {
     title: 'Git проекта',

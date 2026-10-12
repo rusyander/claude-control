@@ -251,6 +251,29 @@ export const queryKeys = {
    * проекте — одна строка в разных проектах находит разное.
    */
   search: (query: string, projectPath = '') => ['search', query, projectPath] as const,
+  /** Docker Compose проекта (окно «Окружение»): живое состояние стека, опрашивается. */
+  compose: (projectPath: string) => ['compose', projectPath] as const,
+  /** База проекта (окно «Окружение», вкладка «База данных»). */
+  database: {
+    connections: (projectPath: string) => ['database', 'connections', projectPath] as const,
+    schema: (projectPath: string, connectionId: string) =>
+      ['database', 'schema', projectPath, connectionId] as const,
+    migrations: (projectPath: string, connectionId: string) =>
+      ['database', 'migrations', projectPath, connectionId] as const,
+  },
+  /** Защита бэкенда проекта (окно «Окружение», вкладка «Защита»). */
+  backendGuard: (projectPath: string) => ['backend-guard', projectPath] as const,
+  /** Вкладка «API» окна «Окружение»: источники, разобранный контракт, история запросов. */
+  apiExplorer: {
+    info: (projectPath: string) => ['api-explorer', 'info', projectPath] as const,
+    spec: (projectPath: string, sourceId: string) =>
+      ['api-explorer', 'spec', projectPath, sourceId] as const,
+    history: (projectPath: string) => ['api-explorer', 'history', projectPath] as const,
+  },
+  /** Вкладка «Логи» окна «Окружение»: цели «Dev-сервера» и сервисы Compose. */
+  logs: {
+    sources: (projectPath: string) => ['logs', 'sources', projectPath] as const,
+  },
 };
 
 /**

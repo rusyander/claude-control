@@ -757,7 +757,32 @@
         {
           "path": "apps/web/src/features/ProjectTests/ui/TestE2eRun/TestE2eRun.tsx",
           "why": "«Прогнать автотесты»: когда кнопка закрыта и почему, итог и вывод команды",
-          "sha": "4d922e574d23c4a5"
+          "sha": "130531aa918e8faf"
+        },
+        {
+          "path": "apps/server/src/domains/project-tests/automation/recipes.ts",
+          "why": "«Тесты бэкенда»: какие модули узнаются и по каким файлам, обёртки и окружения, нехватка программы, cd в подкаталог",
+          "sha": "0cc8644a0a9bd5ca"
+        },
+        {
+          "path": "apps/server/src/domains/project-tests/automation/automation.ts",
+          "why": "«Тесты бэкенда»: запись и снятие команды, {files}/{packages}/{report}, виды отчёта",
+          "sha": "f1ef62466bc7892d"
+        },
+        {
+          "path": "apps/server/src/domains/project-tests/automation/report.ts",
+          "why": "«Тесты бэкенда»: каталог отчётов — только свежие *.xml, ничего не стирается",
+          "sha": "b9af2244d1333622"
+        },
+        {
+          "path": "apps/server/src/domains/project-tests/automation/adopt.ts",
+          "why": "«Завести кейсы»: имя с пакетом или классом, группа по файлу, поиск файла, параметры pytest, «(build)» не кейс",
+          "sha": "f3e3646f5d13e98e"
+        },
+        {
+          "path": "apps/web/src/features/ProjectTests/ui/TestAutomationCommand/TestAutomationCommand.tsx",
+          "why": "«Тесты бэкенда»: блок «Команда прогона» — рецепты, правка, снятие, запрет во время прогона",
+          "sha": "a70e19ce2317e191"
         },
         {
           "path": "apps/web/src/features/ProjectTests/ui/TestE2eRun/TestE2eRun.constants.ts",

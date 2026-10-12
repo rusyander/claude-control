@@ -9,6 +9,7 @@ import { TestsExchangeSections } from '../TestsExchangeSections/TestsExchangeSec
 import { TestsLimitsSections } from '../TestsLimitsSections/TestsLimitsSections';
 import { TestsNotesSection } from '../TestsNotesSection/TestsNotesSection';
 import { TestsE2eSection } from '../TestsE2eSection/TestsE2eSection';
+import { TestsBackendSection } from '../TestsBackendSection/TestsBackendSection';
 
 /**
  * Документ раздела «Тесты» — рабочее место тестировщика целиком.
@@ -69,6 +70,9 @@ export function TestsTopic() {
 
       {/* Код тестов рядом с кейсами: папка e2e, генерация спек и агент чата. */}
       <TestsE2eSection />
+
+      {/* go test, pytest, Gradle, Maven, cargo — своей командой проекта, без папки e2e. */}
+      <TestsBackendSection />
 
       <HelpSection title={t('help.common.storageTitle')} caption={tr('storageCaption')}>
         <StorageCard

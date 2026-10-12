@@ -33,6 +33,21 @@ export function PermissionCard({ permissions, onDecide }: PermissionCardProps) {
       {permissions.map((permission) => (
         <div key={permission.toolUseId} className={styles.questionItem}>
           <span className={styles.questionBadge}>{permission.toolName}</span>
+          {permission.guard && (
+            <div className={styles.permissionGuard}>
+              <Icon name="lock" size={16} />
+              <span>
+                <strong>
+                  {t('chat.permissionGuard', {
+                    reason: t(`chat.permissionGuardRules.${permission.guard.rule}`),
+                  })}
+                </strong>{' '}
+                <span className={styles.permissionGuardMatch}>
+                  {t('chat.permissionGuardMatch', { match: permission.guard.match })}
+                </span>
+              </span>
+            </div>
+          )}
           <pre className={styles.permissionInput}>{summarize(permission.input)}</pre>
           <Stack
             direction="row"

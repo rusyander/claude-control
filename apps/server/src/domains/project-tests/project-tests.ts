@@ -119,8 +119,16 @@ export {
   specFiles,
 } from './e2e-folder/e2e-folder.ts';
 export { parseSpec } from './e2e-parse.ts';
-export { AUTOMATION_FILE, automationCommand, readAutomation } from './automation/automation.ts';
-export { assertProjectOrCopy, isProjectOrCopy } from './project-gate.ts';
+export {
+  AUTOMATION_FILE,
+  automationCommand,
+  readAutomation,
+  removeAutomation,
+  writeAutomation,
+} from './automation/automation.ts';
+export { automationRecipes } from './automation/recipes.ts';
+export { adoptUnmatched } from './automation/adopt.ts';
+export { assertProjectOrCopy, isProjectOrCopy, mainCheckoutOf } from './project-gate.ts';
 export { parsePytest } from './e2e-parse-pytest.ts';
 export {
   fullTestName,

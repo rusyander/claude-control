@@ -1,0 +1,46 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3xs);
+  padding: var(--spacing-xs);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2xs);
+  margin: 0;
+  font-size: var(--font-size-body-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.hint {
+  margin: 0;
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-caption);
+}
+
+// Хвост вывода docker: моноширинный, со своей прокруткой — длинная сборка
+// образа не должна раздувать окно.
+.output {
+  font-size: var(--font-size-caption);
+
+  summary {
+    color: var(--color-fg-subtle);
+    cursor: pointer;
+  }
+
+  pre {
+    max-height: 220px;
+    margin: var(--spacing-3xs) 0 0;
+    overflow: auto;
+    padding: var(--spacing-2xs);
+    border-radius: 6px;
+    background: var(--color-surface-sunken);
+    font-family: var(--font-mono);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+}

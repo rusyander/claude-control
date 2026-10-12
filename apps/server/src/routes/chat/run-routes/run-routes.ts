@@ -81,6 +81,8 @@ import {
 } from '../../../domains/chat/busy-send-queue.ts';
 import { parseBody } from '../../../lib/request-body.ts';
 import { allowedPermissionRules } from '@agentdeck/contracts/permission-rules';
+import { cachedMainOf, guardHitFor } from '../../../domains/backend-guard/backend-guard.ts';
+import { mainCheckoutOf } from '../../../domains/project-tests/project-tests.ts';
 import {
   groupAutoApproveFor,
   groupDecision,
@@ -174,6 +176,7 @@ export function registerChatRunRoutes(
   // эти маршруты, получают собственный.
   session: ChatSession,
 ): void {
+  const guardMainOf = cachedMainOf(mainCheckoutOf);
   // Реестр считает расход, но тарифов не знает: прайс и свои цены пользователя
   // доступны только здесь. Отдаём ему саму функцию, а не таблицу, — тогда правка
   // цен в настройках подхватывается со следующего же шага.
@@ -916,6 +919,12 @@ export function registerChatRunRoutes(
     // Чтение проходит и при выключенном тумблере: посмотреть файл нечего
     // отменять, а карточка на каждый открытый файл останавливала прогон чаще
     // всего остального вместе взятого.
+    // Защита бэкенда проекта узнала команду (снос таблицы, откат миграций,
+    // прод) — решает только человек, мимо автоподтверждения и строк группы.
+    // Хук проекта сказал CLI «спросить», но причина до брокера не доезжает:
+    // CLI передаёт инструменту прав только сам вызов. Без этой проверки
+    // включённый авторежим молча разрешал то, о чём хук просил спросить.
+    const guard = guardHitFor(held.options.cwd, toolName, input, guardMainOf);
     const auto = session.autoApproveFor(runId);
     // Группа разделения решает по строкам вкладки «Группы» (`group-permissions.ts`):
     // её ведёт конвейер, а не браузер. Уступают строки только тумблеру, который
@@ -926,12 +935,13 @@ export function registerChatRunRoutes(
     const groupLevel = group
       ? groupDecision(group, { toolName, input, guardedPatterns: guardedPatterns() })
       : 'human';
-    if (group && groupLevel !== 'human') {
+    if (!guard && group && groupLevel !== 'human') {
       // «С отметкой»: прошло без человека, но хаб родителя это покажет.
       if (groupLevel === 'notify') recordGroupAutoNotice(ctx.store, group, { toolName, input });
       return reply.send({ behavior: 'allow', updatedInput: input });
     }
     if (
+      !guard &&
       !group &&
       (auto?.enabled || isReadOnlyTool(toolName)) &&
       shouldAutoApprove({
@@ -949,7 +959,13 @@ export function registerChatRunRoutes(
     }
 
     // Прогон мог уйти из реестра, пока шли проверки выше, — тот же отказ.
-    const shown = registry.emitExternal(runId, { kind: 'permission', toolName, input, toolUseId });
+    const shown = registry.emitExternal(runId, {
+      kind: 'permission',
+      toolName,
+      input,
+      toolUseId,
+      ...(guard ? { guard } : {}),
+    });
     if (!shown) return reply.send({ behavior: 'deny', message: RUN_UNKNOWN_DENIED });
 
     const decision = await session.requestPermission({ runId, toolName, input, toolUseId });

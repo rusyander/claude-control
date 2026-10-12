@@ -11,6 +11,12 @@ import {
 } from '../../domains/project-runner/project-runner.ts';
 import { isProjectOrCopy } from '../../domains/project-tests/project-tests.ts';
 import { codeOf } from '../../lib/server-text/server-text.ts';
+import { parseBody } from '../../lib/request-body.ts';
+import {
+  runnerGroupBodySchema,
+  runnerProjectBodySchema,
+} from '@agentdeck/contracts/request-bodies';
+import type { ProjectRunnerStartAllResult } from '@agentdeck/contracts';
 
 /**
  * Маршруты запуска/остановки dev-серверов проекта.
@@ -240,4 +246,75 @@ export function registerProjectRunnerRoutes(
       }
     },
   );
+
+  /**
+   * Отметить цель для «Запустить всё». Ничего не запускает: это состав набора,
+   * который потом поднимается одной кнопкой.
+   */
+  app.post<{ Body: unknown }>('/api/project-runner/group', (request, reply) => {
+    const body = parseBody(runnerGroupBodySchema, request.body, reply);
+    if (!body) return reply;
+    const path = requirePath(body.path, reply);
+    if (!path) return reply;
+    try {
+      const target = resolveTargetDir(path, body.dir);
+      ctx.store.setRunnerGroup(target.path, body.inGroup, { projectPath: path, dir: target.dir });
+      return describeRunner(path, memoryOf);
+    } catch (error) {
+      if (error instanceof RunnerError)
+        return reply.code(400).send({ message: error.message, ...codeOf(error) });
+      throw error;
+    }
+  });
+
+  /**
+   * «Запустить всё»: поднять отмеченные цели проекта. Каждая стартует сама по
+   * себе — отказ одной (нет программы, занят порт) не мешает остальным, и ответ
+   * называет и поднятые, и отказавшие.
+   */
+  app.post<{ Body: unknown }>('/api/project-runner/start-all', async (request, reply) => {
+    const body = parseBody(runnerProjectBodySchema, request.body, reply);
+    if (!body) return reply;
+    const path = requirePath(body.path, reply);
+    if (!path) return reply;
+    if (!requireOwnProject(path, reply)) return reply;
+
+    const info = describeRunner(path, memoryOf);
+    const chosen = info.targets.filter((target) => target.inGroup);
+    const started = [];
+    const failed: ProjectRunnerStartAllResult['failed'] = [];
+    for (const target of chosen) {
+      if (!target.runnable) {
+        failed.push({ dir: target.dir, name: target.name, message: target.reason ?? '' });
+        continue;
+      }
+      try {
+        started.push(
+          await registry.start(
+            { projectPath: path, dir: target.dir },
+            {
+              command: ctx.store.getRunnerCommand(target.path),
+              port: ctx.store.getRunnerPrefs(target.path)?.pinnedPort,
+            },
+          ),
+        );
+      } catch (error) {
+        failed.push({
+          dir: target.dir,
+          name: target.name,
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+    return { started, failed };
+  });
+
+  /** «Остановить всё»: погасить все цели проекта, запущенные панелью. */
+  app.post<{ Body: unknown }>('/api/project-runner/stop-all', (request, reply) => {
+    const body = parseBody(runnerProjectBodySchema, request.body, reply);
+    if (!body) return reply;
+    const path = requirePath(body.path, reply);
+    if (!path) return reply;
+    return { stopped: registry.stopProject(path) };
+  });
 }

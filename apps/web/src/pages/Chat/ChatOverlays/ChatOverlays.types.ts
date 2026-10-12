@@ -4,6 +4,8 @@ import type { ProjectInfo } from '@entities/Project';
 import type { ParallelChoice } from '@features/ParallelLaunch';
 
 /** Окна поверх чата: выбор папки, подтверждение удаления, код, тесты, запуск. */
+export type ProjectWindow = 'code' | 'tests' | 'environment';
+
 export interface ChatOverlaysProps {
   /** Выбор папки проекта. */
   isFolderPickerOpen: boolean;
@@ -24,10 +26,19 @@ export interface ChatOverlaysProps {
   projectPath?: string;
   /** Разговор нужен коду проекта: дифф показывает правки ИМЕННО этого чата. */
   activeChatId?: string;
-  isCodeOpen: boolean;
-  onCodeOpenChange: (open: boolean) => void;
-  isTestsOpen: boolean;
-  onTestsOpenChange: (open: boolean) => void;
+  /**
+   * Открытое окно проекта: код, тест-кейсы или «Окружение» (Compose проекта).
+   * Одно поле, а не флаг на окно: модальных окон поверх чата открыто не больше одного.
+   */
+  projectWindow?: ProjectWindow;
+  onProjectWindowChange: (window: ProjectWindow | undefined) => void;
+  /**
+   * Просьба агенту из окна проекта («Сверить контракт с кодом»): текст уходит
+   * в поле чата, окно закрывается — отправляет человек сам.
+   */
+  onAskAgent: (text: string) => void;
+  /** Куда уходит фокус, когда окно «Окружение» закрылось (после просьбы агенту — в поле чата). */
+  environmentFocusOnClose: () => HTMLElement | null | undefined;
 
   /** Параллельный запуск агентов по нескольким проектам. */
   isParallelOpen: boolean;

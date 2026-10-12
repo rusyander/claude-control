@@ -3,8 +3,9 @@ import { useTranslation } from 'react-i18next';
 import { FolderPicker } from '@features/FolderPicker';
 import { ParallelLaunch } from '@features/ParallelLaunch';
 import { ProjectTestsModal } from '@features/ProjectTests';
+import { ProjectEnvironmentModal } from '@features/ProjectEnvironment';
 import { ConfirmDialog } from '@shared/ui/confirm-dialog';
-import type { ChatOverlaysProps } from './ChatOverlays.types';
+import type { ChatOverlaysProps, ProjectWindow } from './ChatOverlays.types';
 
 // Редактор кода — это CodeMirror, ~400 КБ поверх чата. Нужен только тем, кто
 // открыл окно «Код проекта», поэтому чанк едет при первом открытии, а не с
@@ -30,10 +31,10 @@ export function ChatOverlays({
   isProjectContext,
   projectPath,
   activeChatId,
-  isCodeOpen,
-  onCodeOpenChange,
-  isTestsOpen,
-  onTestsOpenChange,
+  projectWindow,
+  onProjectWindowChange,
+  onAskAgent,
+  environmentFocusOnClose,
   isParallelOpen,
   onParallelOpenChange,
   parallelCeiling,
@@ -41,6 +42,11 @@ export function ChatOverlays({
   onLaunch,
 }: ChatOverlaysProps) {
   const { t } = useTranslation();
+  const isCodeOpen = projectWindow === 'code';
+  const isEnvironmentOpen = projectWindow === 'environment';
+  /** Закрытие окна сбрасывает выбор; открытие идёт кнопками шапки. */
+  const toggle = (window: ProjectWindow) => (open: boolean) =>
+    onProjectWindowChange(open ? window : undefined);
   // Окно монтируется при первом открытии и дальше живёт как раньше: закрытие
   // не сбрасывает его состояние, а до первого клика чанк не качается.
   const [codeMounted, setCodeMounted] = useState(isCodeOpen);
@@ -70,7 +76,7 @@ export function ChatOverlays({
         <Suspense fallback={null}>
           <ProjectCodeModal
             isOpen={isCodeOpen}
-            onOpenChange={onCodeOpenChange}
+            onOpenChange={toggle('code')}
             projectPath={projectPath}
             chatId={activeChatId}
           />
@@ -81,9 +87,21 @@ export function ChatOverlays({
           к конкретному разговору они не привязаны. */}
       {isProjectContext && projectPath && (
         <ProjectTestsModal
-          isOpen={isTestsOpen}
-          onOpenChange={onTestsOpenChange}
+          isOpen={projectWindow === 'tests'}
+          onOpenChange={toggle('tests')}
           projectPath={projectPath}
+        />
+      )}
+
+      {/* Окружение — тоже свойство проекта, а не разговора. Монтируется только
+          открытым: закрытое окно не должно опрашивать docker. */}
+      {isProjectContext && projectPath && isEnvironmentOpen && (
+        <ProjectEnvironmentModal
+          isOpen={isEnvironmentOpen}
+          onOpenChange={toggle('environment')}
+          projectPath={projectPath}
+          onAskAgent={onAskAgent}
+          focusOnClose={environmentFocusOnClose}
         />
       )}
 

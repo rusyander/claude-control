@@ -7,6 +7,8 @@ import {
   record,
   unknown,
   union,
+  tuple,
+  literal,
   enum as zodEnum,
   type infer as Infer,
 } from 'zod';
@@ -200,3 +202,164 @@ export const sessionStopBodySchema = object({
 });
 
 export type SessionStopBody = Infer<typeof sessionStopBodySchema>;
+
+/** Цель в «Запустить всё» проекта: корень вкладки, подпапка цели и отметка. */
+export const runnerGroupBodySchema = object({
+  path: string().min(1),
+  dir: string().optional(),
+  inGroup: boolean(),
+});
+/** «Запустить всё» / «Остановить всё»: корень вкладки проекта. */
+export const runnerProjectBodySchema = object({ path: string().min(1) });
+
+export type RunnerGroupBody = Infer<typeof runnerGroupBodySchema>;
+export type RunnerProjectBody = Infer<typeof runnerProjectBodySchema>;
+
+/**
+ * Действие над Compose проекта. `service` пустое — над всем стеком.
+ * `confirm` обязателен для `down-volumes`: тома — это данные, и удалить их
+ * случайным запросом (старый клиент, `curl` руками) нельзя.
+ */
+export const composeActionBodySchema = object({
+  path: string().min(1),
+  action: zodEnum(['up', 'stop', 'restart', 'down', 'down-volumes']),
+  service: string().min(1).optional(),
+  confirm: boolean().optional(),
+});
+
+export type ComposeActionBody = Infer<typeof composeActionBodySchema>;
+
+/**
+ * Запрос к базе проекта. Только чтение: сервер сам открывает транзакцию READ
+ * ONLY и пропускает один оператор. 100 000 символов — с запасом на длинный
+ * отчётный запрос, но не мегабайт текста в одном теле.
+ */
+export const dbQueryBodySchema = object({
+  path: string().min(1),
+  connectionId: string().min(1),
+  sql: string().min(1).max(100_000),
+  mode: zodEnum(['run', 'explain', 'explain-analyze']).optional(),
+});
+
+/** Своё подключение к базе. `id` — правка существующего; пароль пустой — оставить прежний. */
+export const dbConnectionBodySchema = object({
+  path: string().min(1),
+  id: string().min(1).optional(),
+  label: string().trim().min(1).max(80),
+  host: string().trim().min(1).max(255),
+  port: number().int().min(1).max(65_535),
+  database: string().trim().min(1).max(128),
+  user: string().trim().min(1).max(128),
+  password: string().max(1024).optional(),
+});
+
+/** Убрать своё подключение (найденные в файлах проекта не убираются — их правят в файле). */
+export const dbConnectionRemoveBodySchema = object({
+  path: string().min(1),
+  id: string().min(1),
+});
+
+/** Переходник MCP базы для агента: записать в конфигурацию CLI или убрать. */
+export const dbMcpBodySchema = object({ enabled: boolean() });
+
+const backendGuardRuleSchema = zodEnum([
+  'prod-target',
+  'sql-drop',
+  'sql-truncate',
+  'sql-unbounded',
+  'migration-down',
+  'infra-change',
+  'volume-delete',
+]);
+
+/** Настройки защиты бэкенда: метки прода и выключенные правила. */
+export const backendGuardSettingsSchema = object({
+  prodMarkers: array(string().trim().min(3).max(255)).max(100),
+  disabled: array(backendGuardRuleSchema).max(7),
+});
+
+/** Поставить (или восстановить) защиту бэкенда в проекте. */
+export const backendGuardInstallBodySchema = object({
+  path: string().min(1),
+  settings: backendGuardSettingsSchema,
+  lang: zodEnum(['ru', 'en']).optional(),
+});
+
+/** Только настройки — файлы хука и правила не трогаются. */
+export const backendGuardSettingsBodySchema = object({
+  path: string().min(1),
+  settings: backendGuardSettingsSchema,
+});
+
+export const backendGuardRemoveBodySchema = object({ path: string().min(1) });
+
+/** «Проверить команду»: спросит ли защита. Настройки — из формы, ещё не сохранённые. */
+export const backendGuardCheckBodySchema = object({
+  command: string().min(1).max(20_000),
+  settings: backendGuardSettingsSchema,
+});
+
+export type BackendGuardInstallBody = Infer<typeof backendGuardInstallBodySchema>;
+export type BackendGuardSettingsBody = Infer<typeof backendGuardSettingsBodySchema>;
+export type BackendGuardCheckBody = Infer<typeof backendGuardCheckBodySchema>;
+
+const HTTP_URL = /^https?:\/\/\S+$/i;
+
+const apiHeaderSchema = tuple([string().max(256), string().max(16_384)]);
+
+/** Добавить источник контракта по адресу (`…/openapi.json` работающего сервиса или стенда). */
+export const apiSourceBodySchema = object({
+  path: string().min(1),
+  url: string().trim().max(2048).regex(HTTP_URL),
+});
+
+export const apiSourceRemoveBodySchema = object({
+  path: string().min(1),
+  sourceId: string().min(1).max(2100),
+});
+
+/** Коллекция Postman: текст файла, прочитанный в браузере. */
+export const apiPostmanBodySchema = object({
+  path: string().min(1),
+  name: string().trim().max(200).optional(),
+  content: string().min(2).max(5_000_000),
+});
+
+/** Отправить запрос. `useAuth` — подставить сохранённый заголовок авторизации на сервере. */
+export const apiSendBodySchema = object({
+  path: string().min(1),
+  method: zodEnum(['get', 'post', 'put', 'patch', 'delete', 'head', 'options']),
+  url: string().trim().min(1).max(8192),
+  headers: array(apiHeaderSchema).max(100),
+  body: string().max(5_000_000).optional(),
+  sourceId: string().max(2100).optional(),
+  endpointId: string().max(2100).optional(),
+  useAuth: boolean().optional(),
+});
+
+/** Базовый адрес и заголовок авторизации проекта; `null` — убрать. */
+export const apiSettingsBodySchema = object({
+  path: string().min(1),
+  baseUrl: union([string().trim().max(2048).regex(HTTP_URL), literal(null)]).optional(),
+  auth: union([
+    object({
+      header: string()
+        .trim()
+        .min(1)
+        .max(128)
+        .regex(/^[A-Za-z0-9!#$%&'*+.^_`|~-]+$/),
+      value: string().trim().min(1).max(8192),
+    }),
+    literal(null),
+  ]).optional(),
+});
+
+export const apiPathBodySchema = object({ path: string().min(1) });
+
+export type ApiSendBody = Infer<typeof apiSendBodySchema>;
+export type ApiSettingsBody = Infer<typeof apiSettingsBodySchema>;
+
+export type DbQueryBody = Infer<typeof dbQueryBodySchema>;
+export type DbConnectionBody = Infer<typeof dbConnectionBodySchema>;
+export type DbConnectionRemoveBody = Infer<typeof dbConnectionRemoveBodySchema>;
+export type DbMcpBody = Infer<typeof dbMcpBodySchema>;

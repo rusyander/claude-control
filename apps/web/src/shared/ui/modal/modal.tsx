@@ -27,6 +27,7 @@ export function Modal({
   size = 'md',
   bodyFill = false,
   dismissible = true,
+  focusOnClose,
 }: ModalProps) {
   const { t } = useTranslation();
   const isReduced = useReducedMotion();
@@ -46,10 +47,10 @@ export function Modal({
     openerRef.current = active instanceof HTMLElement ? active : null;
   }, [isOpen]);
   const restoreOpenerFocus = (event: Event): void => {
-    const opener = openerRef.current;
-    if (!opener?.isConnected) return;
+    const target = focusOnClose?.() ?? openerRef.current;
+    if (!target?.isConnected) return;
     event.preventDefault();
-    opener.focus();
+    target.focus();
   };
 
   // Недискриминируемое окно не закрывается ни Escape, ни кликом мимо: Radix

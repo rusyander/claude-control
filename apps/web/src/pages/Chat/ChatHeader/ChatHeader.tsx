@@ -57,6 +57,7 @@ export function ChatHeader({
   onOpenEditor,
   onOpenCode,
   onOpenTests,
+  onOpenEnvironment,
   allowEdits,
   onAllowEditsChange,
   autoApprove,
@@ -197,9 +198,10 @@ export function ChatHeader({
             />
           </div>
 
-          {/* Код, тесты, редактор — три ответа на один вопрос «в каком
+          {/* Код, тесты, окружение, редактор — ответы на один вопрос «в каком
               состоянии проект»: код и дифф правок агента прямо в панели,
-              тест-кейсы с пультом прогона и уже потом — уйти в редактор. */}
+              тест-кейсы с пультом прогона, сервисы Docker Compose и уже потом
+              — уйти в редактор. */}
           <div className={styles.group}>
             <Button
               variant="ghost"
@@ -218,6 +220,15 @@ export function ChatHeader({
               title={t('projectTests.open')}
             >
               <span data-bar-label="">{t('projectTests.open')}</span>
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              leftIcon={<Icon name="layers" size={20} />}
+              onClick={onOpenEnvironment}
+              title={t('environment.openHint')}
+            >
+              <span data-bar-label="">{t('environment.open')}</span>
             </Button>
             <Button
               variant="ghost"

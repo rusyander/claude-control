@@ -7,6 +7,9 @@ export { usePortHolders } from './api/usePortHolders';
 export { useProjectRunnerInfo } from './api/useProjectRunnerInfo';
 export { useStopRunner } from './api/useStopRunner';
 export { useStartRunner } from './api/useStartRunner';
+export { useSetRunnerGroup } from './api/useSetRunnerGroup';
+export { useStartAllRunners } from './api/useStartAllRunners';
+export { useStopAllRunners } from './api/useStopAllRunners';
 export { projectRunnerKey } from './api/ProjectRunnerApi.constants';
 export { useProjectRunner } from './api/useProjectRunner';
 export { useProjectRuns } from './api/useProjectRuns';
@@ -16,6 +19,8 @@ export type {
   ProjectRunnerStatus,
   ProjectRunnerInfo,
   ProjectRunnerTarget,
+  RunnerCandidate,
+  RunnerStack,
   PortHolder,
   PortHoldersInfo,
 } from '@agentdeck/contracts';

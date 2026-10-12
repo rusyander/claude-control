@@ -1,9 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { ProjectTestE2eFolder } from '@agentdeck/contracts';
-import { automationCommand, readAutomation } from './automation.ts';
+import {
+  automationCommand,
+  readAutomation,
+  removeAutomation,
+  writeAutomation,
+} from './automation.ts';
 import { e2eCommand } from '../e2e-command/e2e-command.ts';
 
 /**
@@ -94,5 +99,63 @@ describe('project-tests/automation: своя команда прогона пр�
   it('свой путь отчёта команды важнее каталога панели; без {files} — весь набор', () => {
     const own = automationCommand(root, { command: 'npm test', report: 'out/j.xml' }, ['a'], 'x');
     expect(own).toMatchObject({ line: 'npm test', report: join(root, 'out/j.xml') });
+  });
+
+  it('вид отчёта: родной вывод читается, чужой вид и каталог у родного — отказ', () => {
+    put('{"command":"go test -json ./... > {report}","format":"go-test-json"}');
+    expect(readAutomation(root).automation?.format).toBe('go-test-json');
+    put('{"command":"x","format":"junit"}');
+    expect(readAutomation(root).automation).toEqual({ command: 'x' });
+    put('{"command":"x","format":"tap"}');
+    expect(readAutomation(root).error).toContain('«tap»');
+    put('{"command":"x","format":"cargo-test","report":"out/"}');
+    expect(readAutomation(root).error).toContain('Каталог отчётов');
+  });
+
+  it('каталог отчётов: хвостовой / сохранён для сбора, в {report} и переменную — без него', () => {
+    put('{"command":"mvn test","report":"api\\\\target\\\\surefire-reports\\\\"}');
+    const automation = readAutomation(root).automation!;
+    expect(automation.report).toBe('api/target/surefire-reports/');
+    const own = automationCommand(root, { ...automation, command: 'x {report}' }, [], 'p');
+    expect(own.report).toMatch(/surefire-reports[\\/]$/);
+    expect(own.line).toBe(`x ${join(root, 'api/target/surefire-reports')}`);
+    expect(own.env.AGENTDECK_JUNIT_REPORT).toBe(join(root, 'api/target/surefire-reports'));
+  });
+
+  it('{packages}: каталоги файлов без повторов, подстановка оболочки — отказ', () => {
+    const line = (files: string[]) =>
+      automationCommand(root, { command: 'go test {packages}' }, files, 'x').line;
+    expect(line(['a/b/x_test.go', 'a/b/y_test.go', 'main_test.go'])).toBe('go test ./a/b .');
+    expect(line([])).toBe('go test ./...');
+    expect(() => line(['x$(id)/a_test.go'])).toThrow(
+      expect.objectContaining({ messageCode: 'e2e-run-file-unsafe' }),
+    );
+  });
+
+  it('полный прогон: {files} несёт файлы кейсов, {paths} пуст, {packages} — ./...', () => {
+    const command = { command: 'run {files} | pytest {paths} | go test {packages}' };
+    const files = ['orders/a_test.go', 'tests/test_b.py'];
+    expect(automationCommand(root, command, files, 'x', true).line).toBe(
+      'run orders/a_test.go tests/test_b.py | pytest  | go test ./...',
+    );
+    expect(automationCommand(root, command, files, 'x').line).toBe(
+      'run orders/a_test.go tests/test_b.py | pytest orders/a_test.go tests/test_b.py | go test ./orders ./tests',
+    );
+  });
+
+  it('запись — те же правила, что чтение; снятие откладывает файл, а не стирает', () => {
+    expect(() => writeAutomation(root, { command: 'a\nb' })).toThrow(
+      expect.objectContaining({ messageCode: 'automation-command-multiline', statusCode: 400 }),
+    );
+    writeAutomation(root, { command: ' go test ./... ', format: 'junit', timeoutMinutes: 30 });
+    expect(readAutomation(root).automation).toEqual({
+      command: 'go test ./...',
+      timeoutMinutes: 30,
+    });
+    removeAutomation(root);
+    expect(readAutomation(root)).toEqual({});
+    expect(existsSync(join(root, '.agent', 'tests', 'automation.removed.json'))).toBe(true);
+    // Снять то, чего нет, — не ошибка.
+    expect(() => removeAutomation(root)).not.toThrow();
   });
 });

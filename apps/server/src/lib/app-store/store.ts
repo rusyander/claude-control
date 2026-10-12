@@ -215,6 +215,7 @@ import {
   rememberRunnerPort as writeRunnerPortHint,
   setRunnerAutostart as writeRunnerAutostart,
   setRunnerCommand as writeRunnerCommand,
+  setRunnerGroup as writeRunnerGroup,
   setRunnerPort as writeRunnerPort,
 } from './runner.ts';
 
@@ -585,6 +586,11 @@ export class AppStore {
 
   setRunnerAutostart(path: string, autostart: boolean, meta: RunnerTargetMeta = {}): void {
     writeRunnerAutostart(this.state, path, autostart, meta);
+    this.persist();
+  }
+
+  setRunnerGroup(path: string, inGroup: boolean, meta: RunnerTargetMeta = {}): void {
+    writeRunnerGroup(this.state, path, inGroup, meta);
     this.persist();
   }
 

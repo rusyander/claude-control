@@ -76,6 +76,43 @@ export interface PortHoldersInfo {
   killed?: number[];
 }
 
+/**
+ * Чем запускается цель. `make`/`task`/`just` — цель запускается задачей
+ * сборщика проекта (`make run`), язык за ней не угадывается. `custom` —
+ * команду вписал человек.
+ */
+export type RunnerStack =
+  | 'node'
+  | 'go'
+  | 'python'
+  | 'rust'
+  | 'java'
+  | 'dotnet'
+  | 'deno'
+  | 'make'
+  | 'task'
+  | 'just'
+  | 'custom';
+
+/**
+ * Один найденный способ запустить цель. Панель показывает их все: угадать
+ * единственно верный нельзя (у Go-сервиса бывает и `make run`, и `go run .`,
+ * и `air`), а выбрать из готовых проще, чем вспоминать команду.
+ */
+export interface RunnerCandidate {
+  /** Команда, как её увидит человек: `go run ./cmd/api`. */
+  command: string;
+  stack: RunnerStack;
+  /** Фреймворк, если узнан: `Django`, `FastAPI`, `Spring Boot`. */
+  framework?: string;
+  /** Файлы проекта, по которым команда угадана, — относительно корня проекта. */
+  evidence: string[];
+  /** Программа, без которой команда не запустится (`go`, `uv`, `make`). */
+  tool?: string;
+  /** Нашлась ли эта программа (в PATH или файлом-обёрткой в проекте). */
+  available: boolean;
+}
+
 /** Одна цель запуска внутри проекта: корень или пакет монорепозитория. */
 export interface ProjectRunnerTarget {
   /** Подпапка относительно корня проекта; пустая строка — сам корень. */
@@ -102,6 +139,22 @@ export interface ProjectRunnerTarget {
    * переживает перезапуск.
    */
   autostart: boolean;
+  /** Стек выбранной команды; `custom` — команду задал человек. */
+  stack?: RunnerStack;
+  /** Фреймворк выбранной команды, если узнан. */
+  framework?: string;
+  /** Файлы, по которым угадана выбранная команда. */
+  evidence?: string[];
+  /** Все найденные способы запуска — по порядку предпочтения. */
+  candidates: RunnerCandidate[];
+  /**
+   * Программа, которой нет на машине, хотя выбранная команда без неё не
+   * запустится. Цель при этом не запускаемая: панель называет причину ДО
+   * запуска, а не показывает «процесс завершился с кодом 1».
+   */
+  missingTool?: string;
+  /** Цель входит в «Запустить всё» этого проекта. */
+  inGroup: boolean;
 }
 
 /** Ответ на запрос «что здесь вообще можно запустить». */
@@ -114,4 +167,10 @@ export interface ProjectRunnerInfo {
   workspaceSource?: ProjectWorkspaceSource;
   /** Сколько целей отброшено ограничением на размер списка (0 — ни одной). */
   skipped: number;
+}
+
+/** Ответ «Запустить всё»: что поднимается и что отказало — с причиной на цель. */
+export interface ProjectRunnerStartAllResult {
+  started: ProjectRunnerView[];
+  failed: { dir: string; name: string; message: string }[];
 }

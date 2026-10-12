@@ -1,5 +1,7 @@
 import type { ChildProcess } from 'node:child_process';
 import type { ProjectRunnerStatus } from '@agentdeck/contracts';
+import type { LogBuffer } from './log-buffer.ts';
+import type { PinPort } from './stacks/stacks.types.ts';
 
 /** Пакетный менеджер проекта — по lock-файлу. */
 export type PackageManager = 'pnpm' | 'yarn' | 'npm';
@@ -10,6 +12,12 @@ export interface LaunchSpec {
   args: string[];
   /** Команда для показа пользователю (`pnpm run dev`). */
   display: string;
+  /** Каталог запуска, если он не каталог цели (Go: корень модуля). */
+  cwd?: string;
+  /** Как стек принимает закреплённый порт (аргумент, переменная). */
+  pinPort?: PinPort;
+  /** `false` — по адресу не открывать браузер: это API, а не страница. */
+  browser?: boolean;
 }
 
 /** Поля package.json, которые нужны запуску. */
@@ -34,6 +42,8 @@ export interface TargetMemory {
   pinnedPort?: number;
   port?: number;
   autostart?: boolean;
+  /** Цель входит в «Запустить всё» проекта. */
+  inGroup?: boolean;
 }
 
 /** Запись реестра: одна работающая (или упавшая) цель. */
@@ -59,6 +69,8 @@ export interface RunEntry {
   pinned: boolean;
   /** Хвост вывода: и для разбора адреса, и для показа в панели. */
   output: string;
+  /** Вывод построчно — для вкладки «Логи» окна «Окружение». */
+  log: LogBuffer;
 }
 
 /** Цель запуска в запросе: корень вкладки плюс подпапка. */

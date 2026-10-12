@@ -35,6 +35,11 @@ const RULES: ReadonlyArray<{ test: (path: string) => boolean; domains: string[] 
     domains: [APP_STATE_DOMAINS.groups],
   },
   { test: (path) => path === '/api/projects/group-choice', domains: [APP_STATE_DOMAINS.groups] },
+  // Защита бэкенда заводит и убирает свою проектную группу.
+  {
+    test: (path) => path === '/api/backend-guard/install' || path === '/api/backend-guard/remove',
+    domains: [APP_STATE_DOMAINS.groups],
+  },
   {
     test: (path) => /^\/api\/chat\/[^/]+\/group-settings$/.test(path),
     domains: [APP_STATE_DOMAINS.groups],

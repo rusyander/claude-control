@@ -59,6 +59,8 @@ export const testKeys = {
   quarantine: (path: string | undefined) => [ROOT, 'quarantine', path ?? ''],
   /** Пирамида: обход всего проекта, поэтому свой ключ, а не поле вида. */
   pyramid: (path: string | undefined) => [ROOT, 'pyramid', path ?? ''],
+  /** Своя команда прогона и рецепты бэкенда — обход проекта, не опрашивается. */
+  automation: (path: string | undefined) => [ROOT, 'automation', path ?? ''],
   /** Риск кейсов: считается по всей библиотеке разом, бюджет применяется на экране. */
   risk: (path: string | undefined) => [ROOT, 'risk', path ?? ''],
   /**

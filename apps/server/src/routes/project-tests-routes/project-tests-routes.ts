@@ -20,6 +20,7 @@ import { registerTestReleaseRoutes } from '../project-tests/release-routes/relea
 import { registerTestSecretRoutes } from '../project-tests/secret-routes.ts';
 import { registerTestCaseHistoryRoutes } from '../project-tests/case-history-routes/case-history-routes.ts';
 import { registerTestE2eRoutes } from '../project-tests/e2e-routes/e2e-routes.ts';
+import { registerTestAutomationRoutes } from '../project-tests/automation-routes/automation-routes.ts';
 import { registerTestMutationRoutes } from '../project-tests/mutation-routes/mutation-routes.ts';
 import type { TestsDeps } from '../project-tests/shared/shared.ts';
 
@@ -71,6 +72,8 @@ export function registerProjectTestsRoutes(
   registerTestCaseHistoryRoutes(app, deps);
   // Папка настоящих автотестов и её сверка с кейсами.
   registerTestE2eRoutes(app, deps);
+  // Своя команда прогона: рецепты бэкенда, запись, «Завести кейсы».
+  registerTestAutomationRoutes(app, deps);
   // Проверка набора поломкой — в копии, по кнопке человека.
   registerTestMutationRoutes(app, deps);
   // Импорт и выгрузка ходят только по пути проекта, реестры им не нужны.

@@ -51,6 +51,11 @@ import { registerProjectRoutes } from '../routes/project-routes/project-routes.t
 import { registerProjectLocalRoutes } from '../routes/project-local-routes.ts';
 import { registerProviderProjectRoutes } from '../routes/provider-project-routes/provider-project-routes.ts';
 import { registerProjectRunnerRoutes } from '../routes/project-runner-routes/project-runner-routes.ts';
+import { registerComposeRoutes } from '../routes/compose-routes/compose-routes.ts';
+import { registerBackendGuardRoutes } from '../routes/backend-guard-routes/backend-guard-routes.ts';
+import { registerDatabaseRoutes } from '../routes/database-routes/database-routes.ts';
+import { registerApiExplorerRoutes } from '../routes/api-explorer-routes/api-explorer-routes.ts';
+import { registerLogsRoutes } from '../routes/logs-routes/logs-routes.ts';
 import { registerProjectGitRoutes } from '../routes/project-git-routes/project-git-routes.ts';
 import { registerSplitDefaultsRoutes } from '../routes/split-defaults-routes/split-defaults-routes.ts';
 import { registerSieveRoutes } from '../routes/sieve-routes.ts';
@@ -238,6 +243,19 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
     (instance, context) =>
       registerProviderChatRoutes(instance, context, providerChats, handoffChains),
     (instance, context) => registerProjectRunnerRoutes(instance, context, projectRunner),
+    // Compose проекта: реестр действий живёт внутри маршрутов — идущий docker
+    // compose панели при выходе не гасим, контейнеры и так остаются как есть.
+    (instance, context) => registerComposeRoutes(instance, context),
+    // База проекта: только чтение; переходник MCP агента ходит сюда же.
+    (instance, context) => registerDatabaseRoutes(instance, context, { selfBaseUrl }),
+    // Защита бэкенда: хук и правило в .claude проекта, тот же вопрос в брокере прав.
+    (instance, context) => registerBackendGuardRoutes(instance, context),
+    // API проекта: контракт, запрос через сервер панели (без CORS), сверка ответа.
+    (instance, context) =>
+      registerApiExplorerRoutes(instance, context, { runs: () => projectRunner.list() }),
+    // Логи: вывод целей «Dev-сервера» из реестра запусков и сервисов Compose от docker.
+    (instance, context) =>
+      registerLogsRoutes(instance, context, { runs: (path) => projectRunner.logsOf(path) }),
     // Тестам нужны оба реестра: прогоны агента и ручная сессия человека. Оба
     // переживают запрос — вкладку закрывают, а прогон идёт дальше.
     (instance, context) =>

@@ -9,6 +9,9 @@
   "exports": {
     ".": "./src/index.ts",
     "./agent-images": "./src/agent-images.ts",
+    "./api-explorer": "./src/api-explorer.ts",
+    "./logs": "./src/logs.ts",
+    "./backend-guard": "./src/backend-guard.ts",
     "./brand": "./src/brand.ts",
     "./chat-group-settings": "./src/chat-group-settings.ts",
     "./run-input": "./src/run-input.ts",

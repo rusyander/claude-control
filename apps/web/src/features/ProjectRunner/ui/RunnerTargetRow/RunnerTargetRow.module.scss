@@ -11,8 +11,19 @@
 .targetHead {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: var(--spacing-2xs);
+
+  // Кнопки справа прижаты к краю при любой длине имени.
+  > :last-child {
+    margin-left: auto;
+  }
+}
+
+.groupMark {
+  flex-shrink: 0;
+  margin: 0 0 0 var(--spacing-3xs);
+  accent-color: var(--color-accent);
+  cursor: pointer;
 }
 
 .disclosure {

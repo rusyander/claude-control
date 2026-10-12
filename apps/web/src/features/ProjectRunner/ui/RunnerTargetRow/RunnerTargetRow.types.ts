@@ -9,4 +9,6 @@ export interface RunnerTargetRowProps {
   run?: ProjectRunnerView;
   /** Разворачивать ли поля команды и порта сразу (у единственной цели — да). */
   defaultOpen: boolean;
+  /** Показывать галочку «в «Запустить всё»» — только когда целей больше одной. */
+  showGroup: boolean;
 }

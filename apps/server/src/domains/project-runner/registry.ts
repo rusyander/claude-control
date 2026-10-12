@@ -15,6 +15,7 @@ import {
   type RunnerDeps,
   type RunnerTargetRef,
 } from './project-runner.types.ts';
+import { FinishedLogs, LogBuffer, type RunLog } from './log-buffer.ts';
 import { extractBusyPort, extractServerPort, lastLines } from './output.ts';
 import { isPortBusy } from './ports.ts';
 import { killChildProcessTree, openBrowser } from './os-process.ts';
@@ -28,6 +29,7 @@ import { checkDir, normalizePath, resolveTargetDir } from './targets.ts';
  */
 export class ProjectRunnerRegistry {
   private runs = new Map<string, RunEntry>();
+  private finished = new FinishedLogs();
   private readonly openBrowser: (url: string) => void;
   private readonly resolveLaunch: (
     targetDir: string,
@@ -92,6 +94,7 @@ export class ProjectRunnerRegistry {
       silent: false,
       pinned: false,
       output: '',
+      log: new LogBuffer(),
     };
   }
 
@@ -161,14 +164,27 @@ export class ProjectRunnerRegistry {
     // навязывала бы адрес тем, кто его и так знает из своего конфига, — включая
     // собственный PORT сервера панели, который иначе утёк бы в каждый dev-сервер
     // по наследству от process.env.
-    const env = { ...process.env, BROWSER: 'none', FORCE_COLOR: '0' } as NodeJS.ProcessEnv;
+    // PYTHONUNBUFFERED: вывод Python в трубу буферизуется блоками, и строка
+    // «Starting development server at …» приходила бы через минуты — адрес не
+    // находился, и запуск висел в «запускается».
+    const env = {
+      ...process.env,
+      BROWSER: 'none',
+      FORCE_COLOR: '0',
+      PYTHONUNBUFFERED: '1',
+    } as NodeJS.ProcessEnv;
     if (pinned === undefined) delete env.PORT;
     else env.PORT = String(pinned);
+    // Закреплённый порт — ещё и так, как его понимает стек: uvicorn ждёт
+    // `--port`, Django — адрес аргументом, Spring — `SERVER_PORT`.
+    const pin = pinned === undefined ? undefined : launch.pinPort?.(pinned);
+    Object.assign(env, pin?.env);
+    const args = [...launch.args, ...(pin?.args ?? [])];
 
     let child: ChildProcess;
     try {
-      child = spawn(file, shellArgs(launch.args), {
-        cwd: path,
+      child = spawn(file, shellArgs(args), {
+        cwd: launch.cwd ?? path,
         shell: isWindows,
         windowsHide: true,
         // POSIX: своя группа процессов, чтобы убить всё дерево через kill(-pid).
@@ -190,21 +206,25 @@ export class ProjectRunnerRegistry {
       name: held.name,
       port: pinned,
       status: 'starting',
-      command: launch.display,
+      command: pin?.args?.length ? `${launch.display} ${pin.args.join(' ')}` : launch.display,
       // Время старта берём у брони: параллельный запрос уже получил её вид, и
       // разное время у одного и того же запуска сбивало бы клиента с толку.
       startedAt: held.startedAt,
       child,
       stopping: false,
-      silent: options.openBrowser === false,
+      // Бэкенд браузер не открывает: по корню API там 404 или JSON, а не
+      // страница, — пустая вкладка на каждый запуск сервиса только мешает.
+      silent: options.openBrowser === false || launch.browser === false,
       pinned: pinned !== undefined,
       output: '',
+      log: new LogBuffer(),
     };
     this.runs.set(key, entry);
 
     // Адрес печатают и в stdout (Vite, Next), и в stderr (некоторые сборки), —
     // читаем оба потока одинаково.
-    const absorb = (chunk: Buffer): void => {
+    const absorb = (stream: 'stdout' | 'stderr', chunk: Buffer): void => {
+      entry.log.push(stream, chunk.toString());
       entry.output = (entry.output + chunk.toString()).slice(-OUTPUT_TAIL);
       if (entry.port === undefined) {
         const port = extractServerPort(entry.output);
@@ -214,8 +234,8 @@ export class ProjectRunnerRegistry {
       // освободить его и запустить заново.
       entry.busyPort ??= extractBusyPort(entry.output);
     };
-    child.stdout?.on('data', absorb);
-    child.stderr?.on('data', absorb);
+    child.stdout?.on('data', (chunk: Buffer) => absorb('stdout', chunk));
+    child.stderr?.on('data', (chunk: Buffer) => absorb('stderr', chunk));
 
     child.on('error', (err) => {
       if (entry.stopping) return;
@@ -283,8 +303,21 @@ export class ProjectRunnerRegistry {
     const entry = this.runs.get(key);
     if (!entry) return false;
     this.killEntry(entry);
-    this.runs.delete(key);
+    this.retire(key, entry);
     return true;
+  }
+
+  /** Остановить все цели проекта («Остановить всё»): сколько процессов погашено. */
+  stopProject(projectPath: string): number {
+    const root = normalizePath(projectPath);
+    let stopped = 0;
+    for (const [key, entry] of [...this.runs.entries()]) {
+      if (normalizePath(entry.projectPath) !== root) continue;
+      this.killEntry(entry);
+      this.retire(key, entry);
+      stopped += 1;
+    }
+    return stopped;
   }
 
   /** Остановить все серверы — вызывается при выходе сервера панели. */
@@ -294,6 +327,37 @@ export class ProjectRunnerRegistry {
       if (entry) this.killEntry(entry);
       this.runs.delete(key);
     }
+  }
+
+  /** Убрать из реестра, оставив вывод «Логам». */
+  private retire(key: string, entry: RunEntry): void {
+    this.runs.delete(key);
+    this.finished.keep(key, this.runLog(entry));
+  }
+
+  private runLog(entry: RunEntry): RunLog {
+    return {
+      projectPath: entry.projectPath,
+      dir: entry.dir,
+      name: entry.name,
+      command: entry.command,
+      startedAt: entry.startedAt,
+      state: entry.status,
+      log: entry.log,
+    };
+  }
+
+  /** Цели проекта с выводом: идущие и остановленные; идущая заслоняет свой прошлый запуск. */
+  logsOf(projectPath: string): RunLog[] {
+    const root = normalizePath(projectPath);
+    const live = new Map<string, RunLog>();
+    for (const [key, entry] of this.runs) {
+      if (normalizePath(entry.projectPath) === root) live.set(key, this.runLog(entry));
+    }
+    const past = this.finished
+      .entries()
+      .filter(([key, run]) => !live.has(key) && normalizePath(run.projectPath) === root);
+    return [...live.values(), ...past.map(([, run]) => run)];
   }
 
   private killEntry(entry: RunEntry): void {

@@ -10,11 +10,14 @@ import { toast } from '@shared/lib/toast';
 import {
   useSaveRunnerSettings,
   useSetRunnerAutostart,
+  useSetRunnerGroup,
   useStartRunner,
   useStopRunner,
 } from '@entities/ProjectRunner';
 import { busyPortOf } from '../../lib/runnerHints';
+import { stackLabel, targetProblem } from '../../lib/targetFacts';
 import { BusyPortNotice } from '../BusyPortNotice/BusyPortNotice';
+import { RunnerCandidates } from '../RunnerCandidates/RunnerCandidates';
 import type { RunnerTargetRowProps } from './RunnerTargetRow.types';
 import styles from './RunnerTargetRow.module.scss';
 import { toErrorMessage } from '../../../../shared/api/toErrorMessage';
@@ -25,8 +28,18 @@ import { toErrorMessage } from '../../../../shared/api/toErrorMessage';
  * Поля скрыты по умолчанию не ради красоты: в монорепе целей может быть с
  * десяток, и список из одних заголовков читается, а список из форм — нет.
  * У единственной цели раскрывать нечего, поэтому она открыта сразу.
+ *
+ * Стек виден в заголовке (`Go`, `FastAPI`): в монорепе с бэкендом цели одного
+ * имени различаются именно им. Галочка в начале строки — цель входит в
+ * «Запустить всё»; у единственной цели набора не бывает, и галочки нет.
  */
-export function RunnerTargetRow({ path, target, run, defaultOpen }: RunnerTargetRowProps) {
+export function RunnerTargetRow({
+  path,
+  target,
+  run,
+  defaultOpen,
+  showGroup,
+}: RunnerTargetRowProps) {
   const { t } = useTranslation();
   const [isOpen, setOpen] = useState(defaultOpen);
   const [command, setCommand] = useState(target.commandOverride ?? '');
@@ -36,6 +49,7 @@ export function RunnerTargetRow({ path, target, run, defaultOpen }: RunnerTarget
   const stop = useStopRunner();
   const autostart = useSetRunnerAutostart();
   const save = useSaveRunnerSettings();
+  const group = useSetRunnerGroup();
 
   // Закреплённый порт занят — панель отказывает ещё до запуска, поэтому номер
   // приходит не поллингом, а прямо в ответе на старт.
@@ -62,9 +76,48 @@ export function RunnerTargetRow({ path, target, run, defaultOpen }: RunnerTarget
     );
   };
 
+  /** Выбор из найденных сохраняется сразу: это и есть решение, а не черновик. */
+  const onChoose = async (chosen: string): Promise<boolean> => {
+    setCommand(chosen);
+    try {
+      await save.mutateAsync({
+        path,
+        dir: target.dir,
+        command: chosen,
+        port: target.pinnedPort ?? null,
+      });
+      toast.success(t('runner.saved'));
+      return true;
+    } catch (error) {
+      setCommand(target.commandOverride ?? '');
+      failed(error);
+      return false;
+    }
+  };
+
+  const stack = stackLabel(target.stack, target.framework, t);
+  const problem = targetProblem(target, t);
+  const evidence = target.evidence ?? [];
+
   return (
     <div className={styles.target}>
       <div className={styles.targetHead}>
+        {showGroup && (
+          <input
+            type="checkbox"
+            className={styles.groupMark}
+            checked={target.inGroup}
+            disabled={group.isPending}
+            onChange={(event) =>
+              group.mutate(
+                { path, dir: target.dir, inGroup: event.target.checked },
+                { onError: failed },
+              )
+            }
+            aria-label={`${t('runner.inGroup')}: ${target.name}`}
+            title={t('runner.inGroupHint')}
+          />
+        )}
         <button
           type="button"
           className={styles.disclosure}
@@ -78,6 +131,7 @@ export function RunnerTargetRow({ path, target, run, defaultOpen }: RunnerTarget
           />
           <span className={styles.targetName}>{target.name}</span>
           <Badge tone={target.dir ? 'info' : 'neutral'}>{target.dir || t('runner.root')}</Badge>
+          {stack && <Badge tone="neutral">{stack}</Badge>}
         </button>
 
         <Stack direction="row" align="center" gap="var(--spacing-3xs)">
@@ -111,7 +165,7 @@ export function RunnerTargetRow({ path, target, run, defaultOpen }: RunnerTarget
               iconOnly
               icon={<Icon name="play" size={16} />}
               aria-label={`${t('runner.start')}: ${target.name}`}
-              title={target.runnable ? target.command : target.reason}
+              title={target.runnable ? target.command : problem}
               disabled={!target.runnable}
               isLoading={start.isPending}
               onClick={() => start.mutate({ path, dir: target.dir }, { onError: failed })}
@@ -123,8 +177,15 @@ export function RunnerTargetRow({ path, target, run, defaultOpen }: RunnerTarget
       {isOpen && (
         <Stack gap="var(--spacing-2xs)" padding="0 0 var(--spacing-2xs)">
           <Typography variant="caption" color={target.runnable ? 'subtle' : 'warning'}>
-            {target.runnable ? target.command : target.reason}
+            {target.runnable ? target.command : problem}
           </Typography>
+          {evidence.length > 0 && (
+            <Typography variant="caption" color="subtle">
+              {t('runner.evidence', { files: evidence.join(', ') })}
+            </Typography>
+          )}
+
+          <RunnerCandidates target={target} isBusy={save.isPending} onChoose={onChoose} />
 
           <label className={styles.field}>
             <Typography variant="caption" color="subtle" as="span">

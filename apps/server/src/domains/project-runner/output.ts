@@ -27,8 +27,22 @@ const LOCAL_URL = /https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1?\]):(\d
  * порта печатает «Port 5173 is in use, trying another one...» и спокойно
  * поднимается на следующем — это не отказ и предлагать убийство там нечего.
  */
-const PORT_TAKEN = /port\s+(\d{2,5})\s+is\s+already\s+in\s+use/i;
+const PORT_TAKEN = /port\s+(\d{2,5})\s+(?:is|was)\s+already\s+in\s+use/i;
 const ADDR_IN_USE = /EADDRINUSE[^\n]{0,80}?:(\d{2,5})\b/i;
+/** Go: `listen tcp 127.0.0.1:8080: bind: address already in use` (и вариант Windows). */
+const GO_BIND = /listen tcp \S*:(\d{2,5}): bind: (?:address already in use|only one usage)/i;
+
+/**
+ * Адрес без схемы — так его печатают бэкенды: Go (`listening on :8080`,
+ * `[GIN-debug] Listening and serving HTTP on :8080`), Echo (`http server
+ * started on [::]:1323`), Spring (`Tomcat started on port 8080 (http)`,
+ * `port(s): 8080`), Rust (`listening on 127.0.0.1:3000`).
+ *
+ * Глагол обязателен, и число не должно продолжаться датой или временем:
+ * `Started at 10:45` или `started on 2026-10-12` портом не являются.
+ */
+const BARE_PORT =
+  /\b(?:listening|serving|started|running)\b[^\n]{0,60}?\b(?:on|at)\s+(?:port\s*(?:\(s\))?:?\s*)?(?:(?:https?:\/\/)?(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1?\]|::)?:)?(\d{2,5})(?![\d.:\-/])/i;
 
 /** Номер порта из совпадения регулярки; мусор и выход за диапазон — undefined. */
 function toPort(raw: string | undefined): number | undefined {
@@ -38,14 +52,15 @@ function toPort(raw: string | undefined): number | undefined {
 
 /** Порт из вывода процесса или undefined, если адреса там ещё нет. */
 export function extractServerPort(output: string): number | undefined {
-  const match = LOCAL_URL.exec(output.replace(ANSI, ''));
+  const clean = output.replace(ANSI, '');
+  const match = LOCAL_URL.exec(clean) ?? BARE_PORT.exec(clean);
   return match ? toPort(match[1]) : undefined;
 }
 
 /** Порт, на который сервер пожаловался «уже занят», если он вообще жаловался. */
 export function extractBusyPort(output: string): number | undefined {
   const clean = output.replace(ANSI, '');
-  const match = PORT_TAKEN.exec(clean) ?? ADDR_IN_USE.exec(clean);
+  const match = PORT_TAKEN.exec(clean) ?? ADDR_IN_USE.exec(clean) ?? GO_BIND.exec(clean);
   return match ? toPort(match[1]) : undefined;
 }
 

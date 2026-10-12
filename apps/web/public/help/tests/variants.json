@@ -1,48 +1,136 @@
 {
   "topic": "tests",
   "frames": {
+    "backend/01-recipes": {
+      "light-ru": {
+        "file": "01-recipes.png",
+        "width": 1132,
+        "height": 344
+      },
+      "light-en": {
+        "file": "01-recipes.en.png",
+        "width": 1132,
+        "height": 344
+      },
+      "dark-ru": {
+        "file": "01-recipes.dark.png",
+        "width": 1132,
+        "height": 344
+      },
+      "dark-en": {
+        "file": "01-recipes.dark.en.png",
+        "width": 1132,
+        "height": 344
+      }
+    },
+    "backend/02-run-adopt": {
+      "light-ru": {
+        "file": "02-run-adopt.png",
+        "width": 1132,
+        "height": 602
+      },
+      "light-en": {
+        "file": "02-run-adopt.en.png",
+        "width": 1132,
+        "height": 620
+      },
+      "dark-ru": {
+        "file": "02-run-adopt.dark.png",
+        "width": 1132,
+        "height": 602
+      },
+      "dark-en": {
+        "file": "02-run-adopt.dark.en.png",
+        "width": 1132,
+        "height": 620
+      }
+    },
+    "backend/03-adopted": {
+      "light-ru": {
+        "file": "03-adopted.png",
+        "width": 1132,
+        "height": 568
+      },
+      "light-en": {
+        "file": "03-adopted.en.png",
+        "width": 1132,
+        "height": 568
+      },
+      "dark-ru": {
+        "file": "03-adopted.dark.png",
+        "width": 1132,
+        "height": 568
+      },
+      "dark-en": {
+        "file": "03-adopted.dark.en.png",
+        "width": 1132,
+        "height": 568
+      }
+    },
+    "backend/04-library": {
+      "light-ru": {
+        "file": "04-library.png",
+        "width": 1440,
+        "height": 900
+      },
+      "light-en": {
+        "file": "04-library.en.png",
+        "width": 1440,
+        "height": 900
+      },
+      "dark-ru": {
+        "file": "04-library.dark.png",
+        "width": 1440,
+        "height": 900
+      },
+      "dark-en": {
+        "file": "04-library.dark.en.png",
+        "width": 1440,
+        "height": 900
+      }
+    },
     "e2e/01-missing": {
       "light-ru": {
         "file": "01-missing.png",
         "width": 1132,
-        "height": 156
+        "height": 296
       },
       "light-en": {
         "file": "01-missing.en.png",
         "width": 1132,
-        "height": 156
+        "height": 296
       },
       "dark-ru": {
         "file": "01-missing.dark.png",
         "width": 1132,
-        "height": 156
+        "height": 296
       },
       "dark-en": {
         "file": "01-missing.dark.en.png",
         "width": 1132,
-        "height": 156
+        "height": 296
       }
     },
     "e2e/02-created": {
       "light-ru": {
         "file": "02-created.png",
         "width": 1132,
-        "height": 289
+        "height": 327
       },
       "light-en": {
         "file": "02-created.en.png",
         "width": 1132,
-        "height": 289
+        "height": 327
       },
       "dark-ru": {
         "file": "02-created.dark.png",
         "width": 1132,
-        "height": 289
+        "height": 327
       },
       "dark-en": {
         "file": "02-created.dark.en.png",
         "width": 1132,
-        "height": 289
+        "height": 327
       }
     },
     "e2e/03-synced": {
@@ -71,44 +159,44 @@
       "light-ru": {
         "file": "04-remove-confirm.png",
         "width": 1132,
-        "height": 394
+        "height": 432
       },
       "light-en": {
         "file": "04-remove-confirm.en.png",
         "width": 1132,
-        "height": 394
+        "height": 432
       },
       "dark-ru": {
         "file": "04-remove-confirm.dark.png",
         "width": 1132,
-        "height": 394
+        "height": 432
       },
       "dark-en": {
         "file": "04-remove-confirm.dark.en.png",
         "width": 1132,
-        "height": 394
+        "height": 432
       }
     },
     "e2e/05-run-done": {
       "light-ru": {
         "file": "05-run-done.png",
         "width": 1132,
-        "height": 378
+        "height": 416
       },
       "light-en": {
         "file": "05-run-done.en.png",
         "width": 1132,
-        "height": 378
+        "height": 416
       },
       "dark-ru": {
         "file": "05-run-done.dark.png",
         "width": 1132,
-        "height": 378
+        "height": 416
       },
       "dark-en": {
         "file": "05-run-done.dark.en.png",
         "width": 1132,
-        "height": 378
+        "height": 416
       }
     },
     "e2e/06-run-history": {

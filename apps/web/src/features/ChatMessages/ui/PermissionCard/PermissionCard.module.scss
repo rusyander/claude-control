@@ -49,6 +49,32 @@
   color: var(--color-warning, #d9822b);
 }
 
+// Причина от защиты бэкенда: команда узнана как разрушительная — сказано
+// словами до самой команды, чтобы «Разрешить» не нажимали по привычке.
+.permissionGuard {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-2xs);
+  margin: var(--spacing-2xs) 0;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: 8px;
+  background: var(--color-danger-subtle);
+  color: var(--color-fg);
+  font-size: var(--font-size-body-sm);
+
+  svg {
+    flex-shrink: 0;
+    margin-top: 2px;
+    color: var(--color-danger);
+  }
+}
+
+.permissionGuardMatch {
+  color: var(--color-fg-muted);
+  font-family: var(--font-mono, monospace);
+  font-size: var(--font-size-caption);
+}
+
 .permissionInput {
   margin: var(--spacing-2xs) 0;
   padding: var(--spacing-xs) var(--spacing-sm);

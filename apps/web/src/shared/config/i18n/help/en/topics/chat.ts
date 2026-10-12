@@ -80,8 +80,9 @@ export const chatEn: typeof chatRu = {
       'not cut off at the last window',
     canExport: 'Export a conversation to a file — Markdown or JSON',
     canRun:
-      'Start the project’s dev server right from its chat tab and jump to the address the ' +
-      'server printed itself; in a monorepo — one target per package, several at once',
+      'Start the project’s dev server or back end right from its chat tab and jump to the ' +
+      'address the server printed itself; in a monorepo — one target per package, several ' +
+      'at once, and the ones you need together with a single “Start all”',
     canFreePort:
       'See who is holding the port you need (process name and PID) and free it with one ' +
       'button, together with a retry',
@@ -511,7 +512,7 @@ export const chatEn: typeof chatRu = {
     toolsCaption:
       'The project tab header has two rows. The top one is the conversation: model and ' +
       'effort, “Agents”, “Chat settings”. The bottom one is the project: “To MR”, ' +
-      '“Project code”, “Tests”, “Editor” and “Dev server”. All of it works against the ' +
+      '“Project code”, “Tests”, “Environment”, “Editor” and “Dev server”. All of it works against the ' +
       'real directory on disk — the panel keeps no copy of the state. In a narrow ' +
       'column the buttons whose icon speaks for itself drop their label and keep the ' +
       'icon and a hover hint.',
@@ -525,7 +526,9 @@ export const chatEn: typeof chatRu = {
       'the address from its output and opens the browser once the port answers. A ' +
       'monorepo has several targets — “Dev server” lists them, and they can run at the ' +
       'same time. A running server shows in the same row as an “Open :port” link and a ' +
-      'stop button. The panel starts it only for projects in the Projects section, ' +
+      'stop button. The browser opens only for a front end: Go, Python, Java, Rust and ' +
+      '.NET serve an API at that address, not a page, and an empty tab on every start ' +
+      'would only get in the way. The panel starts it only for projects in the Projects section, ' +
       'folders inside them and copies of their branches: in any other folder ▶ answers ' +
       'with a refusal, “Add this folder as a project”, and the command does not run. A path ' +
       'with “..” gets the same refusal even when it starts with the project path: the panel ' +
@@ -536,7 +539,33 @@ export const chatEn: typeof chatRu = {
       'who holds the port — process name and PID — and a “Free it and start” button. It ' +
       'kills nothing on its own: a database or a neighbouring project may live there, so ' +
       'the call stays yours. A port can also be pinned in the target’s settings — then the ' +
-      'panel passes PORT and waits for exactly that one.',
+      'panel passes PORT and waits for exactly that one, and passes it to a back end the ' +
+      'way its stack expects too: uvicorn’s --port, Django’s address, Spring’s SERVER_PORT, ' +
+      '.NET’s --urls. Go and Python complain about a taken port in their own words ' +
+      '(“bind: address already in use”) — the panel recognises that as well.',
+    toolsStacks: 'Back end: how to run it',
+    toolsStacksText:
+      'Besides package.json the panel recognises Go (go.mod; programs under cmd/ are ' +
+      'separate targets, run from the module root), Python (FastAPI and Flask through ' +
+      'uvicorn/flask, Django through manage.py; uv, poetry or .venv when present), Java ' +
+      '(Gradle and Maven, with the project’s gradlew/mvnw wrapper), Rust (cargo run), .NET ' +
+      '(dotnet run), Deno and make, task and just tasks named dev, run, serve, start. ' +
+      'Services are found outside workspaces too — in services/, apps/, backend, server, ' +
+      'api, worker. A target shows its stack (“Go”, “FastAPI”) and a “Found by: …” line — ' +
+      'the files the command was guessed from. When there are several ways (Django has both ' +
+      'make run and manage.py runserver) they are listed: a click saves the choice at once, ' +
+      '“Back to automatic choice” clears it. When the needed program is missing the target ' +
+      'does not run, and the panel names the program BEFORE the start instead of showing ' +
+      '“process exited with code 1”.',
+    toolsGroup: '“Start all”',
+    toolsGroupText:
+      'A back end is rarely one process: API, worker, front end. When there is more than ' +
+      'one target, each row starts with an “In ‘Start all’” tick — tick the ones you need ' +
+      'once and the set is remembered for the project. “Start ticked” brings them up in ' +
+      'one request; one target’s refusal does not stop the rest and arrives as its own ' +
+      'message with the reason. While the set is not fully up, ▶ in the bar starts it too, ' +
+      'without the popover — its hint names the targets. “Stop all” stops everything the ' +
+      'panel started in this project, not just the set.',
     toolsAutostart: 'The “Autostart” toggle',
     toolsAutostartText:
       'It is not about now but about the panel’s next start: a ticked target comes up ' +
@@ -586,6 +615,227 @@ export const chatEn: typeof chatRu = {
       'the only operation that may merge: on a conflict the working tree stays in ' +
       'conflict and you sort it out in a terminal. The panel deletes no branches and ' +
       'never rebases.',
+
+    envTitle: 'Project environment: Docker Compose services',
+    envCaption:
+      'The “Environment” button (layers icon) in the project row opens a window with ' +
+      'what the backend cannot run without. The “Services” tab lists the containers from ' +
+      'the project’s Docker Compose. The panel stores nothing: the stack comes from the ' +
+      'file (docker compose config), the state from docker (docker compose ps), and the ' +
+      'window refreshes itself while open.',
+    envFind: 'Where the panel looks for the file',
+    envFindText:
+      'compose.yaml, compose.yml, docker-compose.yaml or docker-compose.yml — in the ' +
+      'project root, then in the docker/, deploy/ and .docker/ folders. Docker applies ' +
+      'an override next to the file (compose.override.yaml) on its own — the window ' +
+      'names it beside the main one. Commands run from the file’s folder without -f, ' +
+      'exactly as from a terminal, so the window sees the same containers and the same ' +
+      'project name as docker compose ps in your console.',
+    envStates: 'What the table shows',
+    envStatesText:
+      'Services come in start order: the database above the application that depends ' +
+      'on it. Each has its image (or “built from source”), state and ports. The state ' +
+      'accounts for the health check: “Running, healthy”, “Starting”, “Running, health ' +
+      'check failing”. A container stopped by a button reads “Stopped” even when docker ' +
+      'recorded exit code 137; “Crashed, code N” is a real crash only. A running ' +
+      'service’s port is a link: 5433 → 5432 means the database waits on 5433 on this ' +
+      'machine.',
+    envActions: 'Start, stop, restart',
+    envActionsText:
+      '“Start all”, “Stop all” and “Restart all” act on the whole stack; the buttons in ' +
+      'a row act on one service (starting a service starts its dependencies too). One ' +
+      'action runs on a stack at a time: while it runs the buttons are off and the ' +
+      'docker compose output shows under the table. If it fails the output stays open: ' +
+      'the reason (“port is already allocated”, “pull access denied”) is in the last ' +
+      'lines. Starting and removing work only for projects from “Projects” and their ' +
+      'copies — the same boundary as the dev server; viewing works anywhere.',
+    envRemove: 'Removal and data',
+    envRemoveText:
+      '“Remove containers” is docker compose down: the stack’s containers and network ' +
+      'go, data in named volumes stays, and the next “Start all” creates the containers ' +
+      'again. “Remove with data” is down -v: the volumes go too. Before that the window ' +
+      'asks again and names the volumes one by one — the databases, uploads and caches ' +
+      'in them do not come back.',
+    envNotReady: 'When nothing can be started',
+    envNotReadyText:
+      'The window explains each such case itself. No docker program — “Docker is not ' +
+      'installed” and what to install. The program is there but its service does not ' +
+      'answer — “Docker is not running”: start Docker Desktop or the docker service, ' +
+      'the window refreshes without a reload, and docker’s answer is under “What docker ' +
+      'said”. No file in the project — the window lists where it looked. A file docker ' +
+      'rejected — its answer is shown verbatim, with the line and key it tripped on.',
+    envNote:
+      'A closed window does not poll docker. An action started in the window runs to ' +
+      'the end even after it closes — reopen the window to see its result and output.',
+
+    dbTitle: 'Project environment: the database',
+    dbCaption:
+      'The Database tab shows the project’s Postgres: schema, data, query plans and ' +
+      'migrations. Everything is read-only: the panel never changes a row or a table, and the ' +
+      'same limit applies to the agent.',
+    dbFind: 'Where the connections come from',
+    dbFindText:
+      'The panel reads the project’s files: a Postgres service in Docker Compose (the port ' +
+      'published on this machine plus POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB), .env files ' +
+      '(DATABASE_URL, PG*, DB_*) and Spring settings (application.properties and .yml). One ' +
+      'database named in several places is one line in the list; a db:5432 address from the ' +
+      '.env of an app running in a container is mapped to the published port. A database ' +
+      'elsewhere is added with «Own connection»: its password is stored encrypted in the panel ' +
+      'and never handed out.',
+    dbQuery: 'Schema and queries',
+    dbQueryText:
+      'On the left are the tables with columns, types and an approximate row count; search ' +
+      'finds both tables and columns, and «Insert a query» puts a SELECT into the editor. Run a ' +
+      'query with the button or Ctrl+Enter: one statement, up to 500 rows, 15 seconds. The ' +
+      'result shows the type under each column name and tells NULL from an empty string. On ' +
+      'an error the window names the line and puts the cursor where Postgres stumbled. «Plan» ' +
+      'is EXPLAIN without running, «Plan with execution» is EXPLAIN ANALYZE with timings.',
+    dbSafe: 'Why nothing can be written',
+    dbSafeText:
+      'Two layers. First the panel looks at the text: a query must start with SELECT, WITH, ' +
+      'EXPLAIN, SHOW, TABLE or VALUES, and modifying words and functions acting outside the ' +
+      'query are refused before sending — «Query not sent». Then every query runs in a READ ' +
+      'ONLY transaction that is rolled back: even a function writing from inside a SELECT is ' +
+      'refused by Postgres itself. For a shared or production database create a read-only ' +
+      'role — an address not on this machine is flagged separately.',
+    dbMigrations: 'Migrations',
+    dbMigrationsText:
+      'The panel recognises golang-migrate, goose, dbmate, sqlx, Prisma, Flyway, Alembic, ' +
+      'Django, Rails and Knex, compares the migration files with the tracking table in the ' +
+      'database and names the ones not applied. The block opens itself when something is off: ' +
+      'pending migrations, a previous one that failed halfway (dirty), or a version in the ' +
+      'database with no file. Applying migrations is the project tool’s job, not the panel’s.',
+    dbAgent: 'Agent access',
+    dbAgentText:
+      'The switch at the bottom of the tab writes the panel’s MCP bridge into the CLI ' +
+      'configuration. The agent gets the schema, read queries, plans and migrations of the ' +
+      'current project under the same limits; the database address and password are not ' +
+      'passed to it. Picked up on the next CLI start.',
+    dbNote:
+      'Only Postgres is read. MySQL, MongoDB, Redis and other databases found in the files are ' +
+      'listed under «Found but not readable». A stopped database service in Compose is noticed ' +
+      'and the window leads to the Services tab.',
+
+    apiTitle: 'Project environment: API',
+    apiCaption:
+      'The «API» tab sends requests to the project service and checks the response against its ' +
+      'OpenAPI contract — without leaving the chat and without Postman. A mismatch goes to the ' +
+      'agent with one button.',
+    apiFind: 'Where the contract comes from',
+    apiFindText:
+      'The panel looks for openapi and swagger files (JSON and YAML) in the project up to 4 ' +
+      'levels deep, skipping node_modules and builds, and asks services started from «Dev ' +
+      'server» at the known addresses: /openapi.json, /v3/api-docs, /swagger.json and similar. ' +
+      'Your own contract address is added with «Add address» — the panel checks that there is a ' +
+      'contract there. A Postman 2.x collection comes in with «Import Postman», with collection ' +
+      'variables substituted.',
+    apiSend: 'Request',
+    apiSendText:
+      'Pick an endpoint on the left — path and query parameters, headers and body are already ' +
+      'filled with examples from the contract. «Fill with sample» puts random values from the ' +
+      'schema into parameters and the JSON body — new ones on every click; rows you added ' +
+      'yourself stay untouched. «Own request» — address and method by hand. The ' +
+      '«Goes to» line shows the final address; Ctrl+Enter sends. The request leaves from the ' +
+      'panel server, not the browser, so CORS does not get in the way. The response is awaited ' +
+      'for up to 30 seconds, the body is shown up to 2 MB.',
+    apiCheck: 'Schema check',
+    apiCheckText:
+      'A response to an endpoint request is checked against the contract schema for the status ' +
+      'that came: «matches» or a list of differences — wrong type, missing required field, value ' +
+      'not in the list, extra field, wrong format. A status the contract does not describe is ' +
+      'named separately. «Ask the agent about the difference» puts a request with the endpoint ' +
+      'and the differences into the chat field — you send it yourself.',
+    apiAuth: 'Base address and authorization',
+    apiAuthText:
+      'The environment comes from the folder of the current conversation. Base address ' +
+      'suggestions are the running services of the project, stand addresses from its .env files ' +
+      '(keys with passwords and tokens are not read; a task copy without its own .env takes ' +
+      'them from the main copy, marked as such) and the contract servers. A click on a ' +
+      'suggestion saves the address for the project. When a service does not answer, the panel ' +
+      'names the cause: name not found in DNS, port closed, TLS error. The authorization header (a Bearer token, for example) is stored encrypted ' +
+      'in the panel data and added by the server: only a mask reaches the browser and history.',
+    apiHistory: 'History',
+    apiHistoryText:
+      'The last 50 requests of the project, with the response status and a mismatch mark. A ' +
+      'click opens the request again: an endpoint request — with path fields filled. Masked ' +
+      'headers are not repeated — the saved authorization is used instead.',
+    apiNote:
+      'Ports forbidden by the fetch standard (6000, 6665–6669, 10080 and others) are not called, ' +
+      'and the panel says so plainly. «Check contract against code» asks the agent to find ' +
+      'endpoints that exist in code but not in the contract and vice versa.',
+
+    logsTitle: 'Project environment: logs',
+    logsCaption:
+      'The «Logs» tab shows the output of targets started from «Dev server» and of the ' +
+      'project’s Docker Compose services in one place: no terminal per process, no manual docker logs.',
+    logsSources: 'Where lines come from',
+    logsSourcesText:
+      'On the left — «Dev server» targets and Compose services with their state. «All services» ' +
+      'merges container lines by time and labels each with its service. The panel keeps a ' +
+      'target’s output while it lives and its last run after it stops; service lines come from docker.',
+    logsLevels: 'Levels',
+    logsLevelsText:
+      'The panel recognises the level itself: JSON logs (level, severity, pino numbers), ' +
+      'level=warn, [ERROR], Spring, Python, nginx. A level button shows that level and everything ' +
+      'more severe; its number is how many lines remain. A stack trace stays with its error.',
+    logsSearch: 'Search',
+    logsSearchText:
+      'Case-insensitive, over text and JSON fields, with highlighting and an «N of M» counter. ' +
+      'Search and level stay when you switch sources — handy for chasing a request id across services.',
+    logsFollow: 'Follow',
+    logsFollowText:
+      'While «Follow» is on, the view stays at the last line. Scroll up and following turns ' +
+      'off, new lines pile up in the «To new lines (N)» button; scroll back down and it turns on again.',
+    logsAsk: 'A line to the agent',
+    logsAskText:
+      'A click expands a line: JSON record fields as a table, «Copy line» and «Analyse in chat». ' +
+      'The latter puts the line and up to 20 lines around it into the chat input — passwords, ' +
+      'tokens, Bearer values and passwords in database URLs are masked. You send it.',
+    logsNote:
+      'The tab keeps the last 5000 lines of a source. Logs are shown only for projects from the ' +
+      '«Projects» section: they can carry secrets.',
+
+    guardTitle: 'Project environment: backend guard',
+    guardCaption:
+      'The Guard tab installs a Claude Code hook in the project: before a command that cannot ' +
+      'be undone, the agent stops and asks you. Everything else runs as before — no questions ' +
+      'on every git status.',
+    guardWhat: 'What it asks about',
+    guardWhatText:
+      'Dropping a table, database or schema (DROP, dropdb, FLUSHALL); TRUNCATE; DELETE and ' +
+      'UPDATE without WHERE; rolling back or resetting migrations (migrate down, alembic ' +
+      'downgrade, rails db:rollback, prisma migrate reset, flyway clean and others); changing ' +
+      'infrastructure (terraform apply and destroy, kubectl delete, apply and exec, helm ' +
+      'upgrade); deleting Docker volumes with data. Each rule can be turned off on its own. ' +
+      'Reads — kubectl get, terraform plan, SELECT — do not ask.',
+    guardProd: 'Production markers',
+    guardProdText:
+      'A host, an IP or a kubectl context name, one per line. A command containing any marker ' +
+      'always asks, even a read — the panel’s auto-approval does not recognise a production ' +
+      'address on its own. A marker shorter than three characters is refused: it would match ' +
+      'almost every command.',
+    guardCheck: 'Check a command',
+    guardCheckText:
+      'The field at the bottom right tells you whether the guard would ask about a command — ' +
+      'using the settings on screen, even unsaved ones. Handy before turning a rule off or ' +
+      'adding a marker.',
+    guardWhere: 'Where it works',
+    guardWhereText:
+      'The files go into the project’s .claude/: the hook script, an entry in settings.json ' +
+      '(your own entries there are left alone), a rule for the agent and the guard settings. ' +
+      'The guard works in the terminal and in the panel chat; in the chat the permission card ' +
+      'names the reason, and auto-approval does not let such commands through. Commit the ' +
+      'files and everyone working with the repository gets the guard.',
+    guardRemove: 'Restore and remove',
+    guardRemoveText:
+      'If a file is missing or was edited by hand, the tab says “Partial” and names it; ' +
+      '“Restore” puts the files back. “Remove the guard”, after confirmation, moves the files ' +
+      'into the panel’s backups and returns settings.json to how it was before; the “Backend ' +
+      'guard” group in Groups goes with it. Only a person can remove the guard — the agent ' +
+      'cannot.',
+    guardNote:
+      'Only Claude Code reads the hook and the rule. Codex, Gemini and the other CLIs do not see ' +
+      'them — the guard will not ask in their chats.',
 
     parallelTitle: 'Parallel branches: several agents in one project',
     parallelCaption:

@@ -15,6 +15,14 @@
     "n": 3,
     "why": "log line / internal error not shown as text"
   },
+  "domains/api-explorer/load.ts": {
+    "n": 5,
+    "why": "fallback text of a domain error code (ApiSpecError/ApiSendError/LogsError/DbError/RunnerError kind) the web translates from its own feature dictionary; server dictionary is shared with the phone, no new server messageCodes (owner 12.10)"
+  },
+  "domains/api-explorer/send.ts": {
+    "n": 6,
+    "why": "fallback text of a domain error code (ApiSpecError/ApiSendError/LogsError/DbError/RunnerError kind) the web translates from its own feature dictionary; server dictionary is shared with the phone, no new server messageCodes (owner 12.10)"
+  },
   "domains/assistant-runner/api.ts": {
     "n": 1,
     "why": "API error line shown to the human in the assistant reply"
@@ -26,6 +34,10 @@
   "domains/assistant/assistant.ts": {
     "n": 1,
     "why": "CLI exit error shown in the form-assistant reply bubble (the prompt itself is English, D-E)"
+  },
+  "domains/backend-guard/backend-guard.ts": {
+    "n": 3,
+    "why": "guard group title/description written into the project's .claude in the chosen language, plus the model-facing rule text"
   },
   "domains/chat/chat-case-draft/chat-case-draft.ts": {
     "n": 10,
@@ -66,6 +78,14 @@
   "domains/commands/claude.ts": {
     "n": 4,
     "why": "passport notes of the command palette (plugin registry version, missing install dir) the human reads"
+  },
+  "domains/database/client.ts": {
+    "n": 1,
+    "why": "fallback text of a domain error code (ApiSpecError/ApiSendError/LogsError/DbError/RunnerError kind) the web translates from its own feature dictionary; server dictionary is shared with the phone, no new server messageCodes (owner 12.10)"
+  },
+  "domains/database/mcp-bridge.ts": {
+    "n": 1,
+    "why": "MCP tool error text for the agent (model-facing), not a panel response"
   },
   "domains/dlp/default-rules.ts": {
     "n": 32,
@@ -166,6 +186,10 @@
   "domains/integrations/tms/zephyr.ts": {
     "n": 2,
     "why": "run description written INTO the foreign TMS"
+  },
+  "domains/logs/logs.ts": {
+    "n": 5,
+    "why": "fallback text of a domain error code (ApiSpecError/ApiSendError/LogsError/DbError/RunnerError kind) the web translates from its own feature dictionary; server dictionary is shared with the phone, no new server messageCodes (owner 12.10)"
   },
   "domains/mcp-oauth/callback.ts": {
     "n": 5,
@@ -435,6 +459,10 @@
     "n": 3,
     "why": "log line / internal error not shown as text"
   },
+  "domains/project-runner/targets.ts": {
+    "n": 2,
+    "why": "runner reason / RunnerError fallback beside its kind code, translated by the web runner dictionary; no new server messageCodes (owner 12.10)"
+  },
   "domains/project-tests/agent/codex-run.ts": {
     "n": 3,
     "why": "tests-agent run errors that carry the CLI's own failure (turn failed, exit code, turn not started): the CLI text itself has no code; it lands in the run record as error, the same class as runs.ts log notes"
@@ -442,6 +470,10 @@
   "domains/project-tests/agent/qwen-run.ts": {
     "n": 1,
     "why": "tests-agent run error when Qwen exits without a result: carries the exit code of a foreign CLI, no code channel for its own text"
+  },
+  "domains/project-tests/automation/automation.ts": {
+    "n": 3,
+    "why": "refusals of a hand-written automation.json (unknown format, report dir for a native format) and the never-reached fallback; coded ones carry messageCode; no new server messageCodes (owner 12.10)"
   },
   "domains/project-tests/defect-status/defect-status.ts": {
     "n": 9,
@@ -823,6 +855,14 @@
     "n": 3,
     "why": "zod issue detail list (issues[]) not rendered by clients"
   },
+  "routes/api-explorer-routes/api-explorer-routes.ts": {
+    "n": 5,
+    "why": "fallback message beside a feature `code` the web translates from its own dictionary; server dictionary is shared with the phone, no new server messageCodes (owner 12.10)"
+  },
+  "routes/backend-guard-routes/backend-guard-routes.ts": {
+    "n": 3,
+    "why": "fallback message beside a feature `code` the web translates from its own dictionary; server dictionary is shared with the phone, no new server messageCodes (owner 12.10)"
+  },
   "routes/chat/handoff-routes.ts": {
     "n": 1,
     "why": "stored default title of a foreign-CLI continuation chat when the caller names none (the user renames it)"
@@ -839,6 +879,14 @@
     "n": 1,
     "why": "stored title of the triage chat"
   },
+  "routes/compose-routes/compose-routes.ts": {
+    "n": 6,
+    "why": "fallback message beside a feature `code` the web translates from its own dictionary; server dictionary is shared with the phone, no new server messageCodes (owner 12.10)"
+  },
+  "routes/database-routes/database-routes.ts": {
+    "n": 6,
+    "why": "fallback message beside a feature `code` the web translates from its own dictionary; server dictionary is shared with the phone, no new server messageCodes (owner 12.10)"
+  },
   "routes/entity/mcp-routes.ts": {
     "n": 1,
     "why": "server-rendered OAuth callback HTML page"
@@ -850,6 +898,10 @@
   "routes/integrations/exchange-routes.ts": {
     "n": 2,
     "why": "outbound notification to an external channel (phone push / Telegram)"
+  },
+  "routes/logs-routes/logs-routes.ts": {
+    "n": 3,
+    "why": "fallback message beside a feature `code` the web translates from its own dictionary; server dictionary is shared with the phone, no new server messageCodes (owner 12.10)"
   },
   "routes/panel-agent/action-kit/action-kit.ts": {
     "n": 2,

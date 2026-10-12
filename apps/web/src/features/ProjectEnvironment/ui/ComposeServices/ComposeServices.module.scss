@@ -1,0 +1,164 @@
+.block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  outline: none;
+}
+
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-2xs) var(--spacing-lg);
+  margin: 0;
+  font-size: var(--font-size-body-sm);
+
+  > div {
+    display: flex;
+    align-items: baseline;
+    gap: var(--spacing-2xs);
+  }
+
+  dt {
+    color: var(--color-fg-muted);
+  }
+
+  dd {
+    margin: 0;
+  }
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+}
+
+.sub {
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-caption);
+}
+
+.notice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: 8px;
+  font-size: var(--font-size-body-sm);
+
+  p {
+    margin: 0;
+  }
+
+  &[data-tone='warning'] {
+    background: var(--color-warning-subtle);
+  }
+
+  &[data-tone='danger'] {
+    background: var(--color-danger-subtle);
+  }
+}
+
+.noticeTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2xs);
+  font-weight: var(--font-weight-medium);
+}
+
+.detail summary {
+  cursor: pointer;
+}
+
+.detail pre,
+.errorText {
+  max-height: 200px;
+  margin: var(--spacing-3xs) 0 0;
+  overflow: auto;
+  padding: var(--spacing-2xs);
+  border-radius: 6px;
+  background: var(--color-surface);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.stackBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-2xs);
+}
+
+.error {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--font-size-body-sm);
+}
+
+// Таблица шире телефона — прокручивается сама, страница не едет вбок.
+.tableWrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-body-sm);
+
+  caption {
+    padding-bottom: var(--spacing-2xs);
+    color: var(--color-fg-muted);
+    font-size: var(--font-size-caption);
+    text-align: left;
+  }
+
+  th,
+  td {
+    padding: var(--spacing-2xs) var(--spacing-xs);
+    border-bottom: 1px solid var(--color-border);
+    text-align: left;
+    vertical-align: middle;
+  }
+
+  thead th {
+    color: var(--color-fg-muted);
+    font-size: var(--font-size-caption);
+    font-weight: var(--font-weight-medium);
+  }
+}
+
+.nameCell {
+  font-weight: normal;
+}
+
+.name {
+  display: block;
+  font-weight: var(--font-weight-medium);
+}
+
+.state {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-2xs);
+  white-space: nowrap;
+}
+
+.ports {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+
+  a {
+    color: var(--color-accent);
+  }
+}
+
+.rowActions {
+  display: flex;
+  gap: var(--spacing-3xs);
+}

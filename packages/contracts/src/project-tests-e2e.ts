@@ -47,10 +47,74 @@ export interface ProjectTestE2eFolder {
  */
 export interface ProjectTestAutomationCommand {
   command: string;
-  /** Путь отчёта от корня, если команда пишет его сама, а не туда, куда велит панель. */
+  /**
+   * Путь отчёта от корня, если команда пишет его сама, а не туда, куда велит панель.
+   * Кончается на `/` — это каталог: из него берутся свежие `*.xml` этого прогона
+   * (так пишут Gradle и Maven — файл на класс тестов).
+   */
   report?: string;
   /** Потолок прогона в минутах: дольше — прогон останавливается. */
   timeoutMinutes?: number;
+  /** Чем записан отчёт; нет — JUnit XML. Остальное панель сама переводит в JUnit. */
+  format?: ProjectTestAutomationFormat;
+}
+
+/**
+ * Вид отчёта своей команды. `go-test-json` — вывод `go test -json`,
+ * `cargo-test` — обычный вывод `cargo test` (вместе с потоком ошибок): оба
+ * есть у самого инструмента, и сторонний конвертер ставить не нужно.
+ */
+export type ProjectTestAutomationFormat = 'junit' | 'go-test-json' | 'cargo-test';
+
+/** Стек готового рецепта команды прогона. */
+export type ProjectTestRecipeStack = 'go' | 'pytest' | 'gradle' | 'maven' | 'cargo';
+
+/**
+ * Готовая команда прогона для бэкенд-проекта: найдена по файлам проекта,
+ * выбирается одной кнопкой и пишется в `automation.json`.
+ */
+export interface ProjectTestAutomationRecipe {
+  /** Ключ рецепта: стек и каталог (`go:` — корень, `maven:services/api`). */
+  id: string;
+  stack: ProjectTestRecipeStack;
+  /** Каталог модуля от корня проекта, `''` — корень. */
+  dir: string;
+  /** Файлы, по которым рецепт найден, — от корня проекта. */
+  evidence: string[];
+  /** Сколько файлов тестов нашлось (с потолком обхода). */
+  tests: number;
+  automation: ProjectTestAutomationCommand;
+  /** Программа, без которой команда не пойдёт. */
+  tool: string;
+  /** Программы нет на машине (по PATH или файлу-обёртке) — назвать до прогона. */
+  missing?: boolean;
+  /** Чем её поставить. */
+  install?: string;
+  /** Команда гонит весь набор: выбор группы её не сужает. */
+  wholeSuite: boolean;
+}
+
+/** Своя команда проекта и готовые рецепты — для окна настройки команды прогона. */
+export interface ProjectTestAutomationInfo {
+  automation?: ProjectTestAutomationCommand;
+  /** Файл есть, но не годится: код текста — из словаря сервера. */
+  error?: string;
+  messageCode?: string;
+  recipes: ProjectTestAutomationRecipe[];
+}
+
+/** Тело записи своей команды. */
+export interface ProjectTestAutomationSave extends ProjectTestAutomationCommand {
+  path: string;
+}
+
+/** Итог «Завести кейсы» для тестов прогона без кейса. */
+export interface ProjectTestAdoptResult {
+  /** Сколько кейсов заведено и в какие группы. */
+  added: number;
+  groups: string[];
+  /** Тестов без кейса в прогоне было столько, но кейс заводить не из чего (пустое имя). */
+  skipped: number;
 }
 
 /**
@@ -127,6 +191,20 @@ export interface ProjectTestE2eRun {
   summary?: ProjectTestRunSummary;
   /** Имена первых тестов без кейса (до пяти): «без кейса 1» без имени не проверить. */
   unmatchedNames?: string[];
+  /**
+   * Тестам без кейса можно завести кейсы одной кнопкой: сервер помнит их
+   * полностью до следующего прогона. Нет — кнопки нет (старый прогон, перезапуск).
+   */
+  adoptable?: number;
+  /** Кейсы, заведённые «Завести кейсы» из этого прогона: строка «без кейса» о них больше не говорит. */
+  adopted?: number;
+  /**
+   * Прогон шёл своей командой проекта (automation.json), а не папкой e2e:
+   * тестам без кейса кейсы заводит «Завести кейсы», а не «Обновить из папки».
+   */
+  own?: true;
+  /** Пакеты, которые не собрались (строки «(build)» отчёта), — не тесты без кейса. */
+  buildFailed?: number;
   /** Почему результатов нет: команда не запустилась, отчёт не появился. */
   error?: string;
   /** Код текста `error` для перевода. */

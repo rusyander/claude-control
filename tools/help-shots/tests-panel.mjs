@@ -47,6 +47,12 @@ const WEB = `http://127.0.0.1:${WEB_PORT}`;
  */
 const PROJECT = process.env.GUIDE_TESTS_PROJECT ?? join(ROOT, '..', 'cc-help-tests', 'shop');
 const PROJECT_NAME = 'Магазин';
+/**
+ * Второй проект — бэкенд на Go рядом с магазином: у него нет папки e2e, тесты —
+ * `*_test.go`, и раздел гонит их своей командой проекта из рецепта.
+ */
+const BACKEND = join(PROJECT, '..', 'goshop');
+const BACKEND_NAME = 'Заказы (Go)';
 const GROUP = 'smoke';
 const API = `${PANEL}/api/project-tests`;
 
@@ -207,6 +213,7 @@ function fakeBin(home) {
       '__fixtures__',
       'fake-npx.mjs',
     ),
+    go: join(ROOT, 'tools', 'help-shots', 'tests-backend-fake-go.mjs'),
   };
   for (const [name, script] of Object.entries(scripts)) {
     if (process.platform === 'win32') {
@@ -312,13 +319,23 @@ writeFileSync(join(home, 'CLAUDE.md'), '# путеводитель\n', 'utf8');
 // незарегистрированном проекте показали бы отказ, а не работу.
 writeFileSync(
   join(home, 'agentdeck', 'state.json'),
-  `${JSON.stringify({ projects: [{ id: 'shop', name: PROJECT_NAME, path: PROJECT }] }, null, 2)}\n`,
+  `${JSON.stringify(
+    {
+      projects: [
+        { id: 'shop', name: PROJECT_NAME, path: PROJECT },
+        { id: 'goshop', name: BACKEND_NAME, path: BACKEND },
+      ],
+    },
+    null,
+    2,
+  )}\n`,
   'utf8',
 );
 
 const started = [];
 try {
   buildProject();
+  buildBackend();
   console.log(`проект ${PROJECT}`);
 
   const env = {
@@ -373,7 +390,10 @@ try {
 } finally {
   for (const child of started) child.kill();
   rmSync(home, { recursive: true, force: true });
-  if (!process.env.GUIDE_KEEP_PROJECT) rmSync(PROJECT, { recursive: true, force: true });
+  if (!process.env.GUIDE_KEEP_PROJECT) {
+    rmSync(PROJECT, { recursive: true, force: true });
+    rmSync(BACKEND, { recursive: true, force: true });
+  }
 }
 
 async function shoot() {
@@ -406,9 +426,16 @@ async function shoot() {
       [PROJECT, PROJECT_NAME],
     );
 
-    await workspace(page);
-    await health(page);
-    await e2e(page);
+    // GUIDE_ONLY=backend,e2e — переснять часть сценариев, не гоняя все.
+    const only = process.env.GUIDE_ONLY?.split(',');
+    for (const [name, run] of Object.entries({ workspace, health, e2e, backend })) {
+      if (!only || only.includes(name)) await run(page);
+    }
+  } catch (error) {
+    const failed = join(ROOT, '.agent', 'tmp', 'tests-panel-failed.png');
+    await page.screenshot({ path: failed, fullPage: true }).catch(() => undefined);
+    console.log(`снимок экрана на сбое: ${failed}`);
+    throw error;
   } finally {
     await browser.close();
   }
@@ -896,6 +923,88 @@ async function e2e(page) {
 
   await within.getByRole('button', { name: /^(Убрать вместе с ними|Remove them too)$/ }).click();
   await page.waitForTimeout(1500);
+
+  scenario.finish();
+}
+
+/**
+ * Бэкенд на Go: модуль и `*_test.go`, папки e2e нет. Тесты для `go test` и
+ * пакеты — настоящие файлы; подменён только сам `go` (печатает записанный
+ * вывод настоящего `go test -json`).
+ */
+function buildBackend() {
+  rmSync(BACKEND, { recursive: true, force: true });
+  const put = (path, body) => {
+    mkdirSync(join(BACKEND, ...path.split('/').slice(0, -1)), { recursive: true });
+    writeFileSync(join(BACKEND, ...path.split('/')), body, 'utf8');
+  };
+  put('go.mod', 'module example.com/goshop\n\ngo 1.24\n');
+  put('orders/orders.go', 'package orders\n\nfunc Total(items []int) int { return 0 }\n');
+  put(
+    'orders/orders_test.go',
+    [
+      'package orders',
+      '',
+      'import "testing"',
+      '',
+      'func TestTotal(t *testing.T) {}',
+      'func TestTotalBroken(t *testing.T) {}',
+      'func TestSkipped(t *testing.T) {}',
+      '',
+    ].join('\n'),
+  );
+  put(
+    'orders/table_test.go',
+    'package orders\n\nimport "testing"\n\nfunc TestTable(t *testing.T) {}\n',
+  );
+}
+
+/**
+ * Тесты бэкенда: рецепт по файлам проекта → команда записана → прогон →
+ * «Завести кейсы» для тестов без кейса. Рецепт находит, команду пишет, вывод
+ * переводит в JUnit и кейсы заводит настоящая панель.
+ */
+async function backend(page) {
+  const scenario = openScenario('tests', 'backend');
+  const card = '[data-testid="tests-e2e-card"]';
+  const within = page.locator(card);
+
+  // У раздела тестов свой запомненный проект (реестровый id), вкладка его не
+  // переключает: до этого сценария выбран «Магазин».
+  await page.evaluate(() => localStorage.setItem('agentdeck:tests-project', 'goshop'));
+  await openTests(page);
+  await page.locator('[data-testid="tests-automation-recipes"]').waitFor({ timeout: 20_000 });
+  await scenario.shot(page, '01-recipes', { clip: card, padding: 8 });
+
+  await within
+    .getByRole('button', { name: /^(Взять|Take)$/ })
+    .first()
+    .click();
+  await within.getByRole('button', { name: /^(Сохранить|Save)$/ }).click();
+  await page.locator('[data-testid="tests-automation-current"]').waitFor({ timeout: 15_000 });
+
+  await within.getByRole('button', { name: /^(Прогнать автотесты|Run autotests)$/ }).click();
+  const adopt = within.getByRole('button', { name: /^(Завести кейс|Create (a )?cases?)/ });
+  await adopt.waitFor({ timeout: 30_000 });
+  await page.waitForTimeout(800);
+  await scenario.shot(page, '02-run-adopt', { clip: card, padding: 8 });
+
+  await adopt.click();
+  await within
+    .getByText(/(Заведено|Заведён|cases? created)/)
+    .first()
+    .waitFor({ timeout: 15_000 });
+  await page.waitForTimeout(800);
+  await scenario.shot(page, '03-adopted', { clip: card, padding: 8 });
+
+  // Второй прогон ложится на заведённые кейсы — кадр библиотеки с их статусами.
+  await within.getByRole('button', { name: /^(Прогнать автотесты|Run autotests)$/ }).click();
+  await within
+    .getByText(/(Упало \d+ из|of \d+ failed)/)
+    .first()
+    .waitFor({ timeout: 30_000 });
+  await openTests(page);
+  await scenario.shot(page, '04-library');
 
   scenario.finish();
 }

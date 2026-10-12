@@ -1,8 +1,8 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import type {
+  ProjectTestAutomationFormat,
   ProjectTestE2eRun,
   ProjectTestEnvironment,
   ProjectTestRunRecord,
@@ -14,7 +14,15 @@ import { coded } from '../../../lib/server-text/server-text.ts';
 import { forgetOtherSpellings, ProjectTestsError, projectEntry } from '../files.ts';
 import { redactor } from '../env-secrets/env-secrets.ts';
 import { e2eFolderView } from '../e2e-folder/e2e-folder.ts';
-import { automationCommand, readAutomation } from '../automation/automation.ts';
+import {
+  automationCommand,
+  clearReport,
+  collectReport,
+  readAutomation,
+  reportTail,
+} from '../automation/automation.ts';
+import { BUILD_FAILURE } from '../automation/native-reports.ts';
+import type { ImportedTestResult } from '../import-results/import-results.ts';
 import { readGroups } from '../store/store.ts';
 import { gitContext } from '../impact/impact.ts';
 import { prepareResultsForRun } from '../import-results/import-results.ts';
@@ -120,6 +128,8 @@ interface Live {
   timer?: NodeJS.Timeout;
   /** Остановлен потолком `timeoutMinutes`, а не человеком. */
   timedOut?: boolean;
+  /** Тесты прогона без кейса — целиком: из них «Завести кейсы» делает кейсы. */
+  unmatched?: ImportedTestResult[];
 }
 
 /** Чем гонять: командой папки e2e или своей командой проекта (automation.json). */
@@ -128,6 +138,8 @@ interface RunPlan {
   cwd: string;
   env: Record<string, string>;
   report: string;
+  /** Вид отчёта; у команды папки — всегда JUnit. */
+  format?: ProjectTestAutomationFormat;
   /** Подпись записи истории: чья команда шла. */
   scope: string;
   timeoutMinutes?: number;
@@ -216,10 +228,9 @@ export class E2eRunRegistry {
     const secrets = input.secrets?.(environment) ?? { values: {}, missing: [] };
     const hide = redactor(secrets.values) ?? ((text: string) => text);
 
-    // Прошлый отчёт — долой ДО запуска: иначе упавшая команда «вернула» бы
-    // вчерашние результаты.
-    rmSync(report, { force: true });
-    mkdirSync(join(report, '..'), { recursive: true });
+    // Прошлый файл отчёта — долой ДО запуска; каталог отчётов (Gradle, Maven)
+    // остаётся, вчерашнее в нём отсекается временем записи.
+    clearReport(report);
 
     if (plan.folder) this.commands.set(root, plan.folder);
     else this.commands.delete(root);
@@ -268,7 +279,14 @@ export class E2eRunRegistry {
       live.child = undefined;
       live.processes?.ledger.exited(live.processes.key);
       if (live.timer) clearTimeout(live.timer);
-      this.finish(root, view, code, report, environmentId, now(), live.timedOut === true);
+      this.finish(
+        live,
+        root,
+        code,
+        { path: report, format: plan.format ?? 'junit', own: !plan.folder },
+        environmentId,
+        now(),
+      );
     });
     // Потолок из automation.json: зависший прогон держал бы кнопку и замок вечно.
     if (plan.timeoutMinutes) {
@@ -309,8 +327,15 @@ export class E2eRunRegistry {
     }
     if (automation) {
       // Без выбора `{files}` — файлы ВСЕХ кейсов с автотестом: запускателю вроде
-      // junit-run «весь набор» без списка неоткуда взять.
-      const own = automationCommand(root, automation, files ?? automatedFiles(root), report);
+      // junit-run «весь набор» без списка неоткуда взять; `{paths}`/`{packages}`
+      // — весь набор раннера (см. automationCommand).
+      const own = automationCommand(
+        root,
+        automation,
+        files ?? automatedFiles(root),
+        report,
+        files === undefined,
+      );
       return {
         ...own,
         scope: `Автотесты проекта: ${own.line}`,
@@ -326,6 +351,33 @@ export class E2eRunRegistry {
     );
   }
 
+  /**
+   * Тесты последнего прогона без кейса — забрать один раз: после «Завести
+   * кейсы» кнопка гаснет, второе нажатие завело бы те же кейсы повторно.
+   */
+  takeUnmatched(root: string): ImportedTestResult[] {
+    const live = projectEntry(this.runs, root);
+    if (!live || live.view.status === 'running') return [];
+    const taken = live.unmatched ?? [];
+    live.unmatched = undefined;
+    delete live.view.adoptable;
+    return taken;
+  }
+
+  /** Сколько кейсов завела «Завести кейсы» из последнего прогона — итог перестаёт звать их «без кейса». */
+  markAdopted(root: string, count: number): void {
+    const live = projectEntry(this.runs, root);
+    if (live && count > 0) live.view.adopted = (live.view.adopted ?? 0) + count;
+  }
+
+  /** Вернуть забранное, если завести кейсы не вышло: кнопка не должна пропасть зря. */
+  restoreUnmatched(root: string, results: ImportedTestResult[]): void {
+    const live = projectEntry(this.runs, root);
+    if (!live || results.length === 0) return;
+    live.unmatched = results;
+    live.view.adoptable = results.length;
+  }
+
   stop(root: string): ProjectTestE2eRun | undefined {
     const live = projectEntry(this.runs, root);
     if (!live || live.view.status !== 'running') return live?.view;
@@ -336,22 +388,25 @@ export class E2eRunRegistry {
   }
 
   private finish(
+    live: Live,
     root: string,
-    view: ProjectTestE2eRun,
     code: number | null,
-    report: string,
+    report: { path: string; format: ProjectTestAutomationFormat; own: boolean },
     environmentId: string | undefined,
     at: string,
-    timedOut = false,
   ): void {
+    const { view } = live;
+    const timedOut = live.timedOut === true;
     const stopped = view.status === 'stopped';
     view.exitCode = code;
     view.finishedAt = at;
-    let fresh = false;
-    try {
-      fresh = statSync(report).mtimeMs >= Date.parse(view.startedAt) - 1000;
-    } catch {
-      // Отчёта нет.
+    const collected = collectReport(report.path, report.format, Date.parse(view.startedAt));
+    const fresh = collected !== undefined;
+    if (!fresh && report.format !== 'junit') {
+      // Родной вывод шёл в файл: без его хвоста причина («cargo не найден»)
+      // не видна нигде — вывод команды пуст.
+      const tail = reportTail(report.path);
+      if (tail) view.log = `${view.log}\n${tail}\n`.slice(-LOG_LIMIT);
     }
     const runId = randomUUID();
     const base: Omit<ProjectTestRunRecord, 'status' | 'results' | 'summary'> = {
@@ -402,9 +457,9 @@ export class E2eRunRegistry {
       return;
     }
     try {
-      const { result, points, apply } = prepareResultsForRun(
+      const { result, points, apply, unmatchedResults } = prepareResultsForRun(
         root,
-        { format: 'junit', content: readFileSync(report, 'utf8'), environmentId, now: at },
+        { format: 'junit', content: collected.content, environmentId, now: at },
         runId,
       );
       const summary = summarize(points);
@@ -424,7 +479,20 @@ export class E2eRunRegistry {
         unmatched: result.unmatched.length,
       };
       view.summary = summary;
-      if (result.unmatched.length > 0) view.unmatchedNames = result.unmatched.slice(0, 5);
+      // Имена — только тестов: «(build)» итог называет своей строкой (`buildFailed`).
+      const names = result.unmatched.filter((name) => name !== BUILD_FAILURE);
+      if (names.length > 0) view.unmatchedNames = names.slice(0, 5);
+      // «Завести кейсы» — только у своей команды: тесты папки e2e заводит
+      // «Обновить из папки», и она читает из спека ещё и шаги. «(build)» —
+      // сборка пакета, а не тест: кейсом не станет и в счёт кнопки не входит,
+      // иначе «Завести кейсы (7)» завела бы шесть.
+      live.unmatched = report.own
+        ? unmatchedResults.filter((item) => item.name !== BUILD_FAILURE)
+        : undefined;
+      if (live.unmatched?.length) view.adoptable = live.unmatched.length;
+      if (report.own) view.own = true;
+      const buildFailed = unmatchedResults.filter((item) => item.name === BUILD_FAILURE).length;
+      if (buildFailed > 0) view.buildFailed = buildFailed;
       if (!stopped) view.status = 'done';
     } catch (error) {
       view.status = 'error';

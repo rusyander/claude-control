@@ -4,7 +4,12 @@ import { Stack } from '@shared/ui/stack';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { Typography } from '@shared/ui/typography';
-import { useE2eRunSettled, useRunE2eTests, useStopE2eTests } from '@entities/ProjectTest';
+import {
+  useAdoptE2eTests,
+  useE2eRunSettled,
+  useRunE2eTests,
+  useStopE2eTests,
+} from '@entities/ProjectTest';
 import { e2eRunOutcome } from '../../model/e2eRunOutcome';
 import { e2eRunChoice, type E2eRunChoice } from '../../model/e2eRunChoice';
 import type { TestE2eRunProps } from './TestE2eRun.types';
@@ -37,6 +42,7 @@ export function TestE2eRun({
   const { t } = useTranslation();
   const start = useRunE2eTests(path);
   const stop = useStopE2eTests(path);
+  const adopt = useAdoptE2eTests(path);
   useE2eRunSettled(path, run?.finishedAt);
 
   const isRunning = run?.status === 'running';
@@ -60,9 +66,11 @@ export function TestE2eRun({
     (group && group.files === 0 ? t('testsE2e.run.groupEmpty', group) : '');
   const launch = (groupId?: string) => {
     stop.reset();
+    adopt.reset();
     start.mutate({ environmentId, groupId });
   };
-  const failure = start.error ?? stop.error;
+  const failure = start.error ?? stop.error ?? adopt.error;
+  const adopted = adopt.data?.adopt;
   const outcome = e2eRunOutcome(run, t);
 
   return (
@@ -131,6 +139,23 @@ export function TestE2eRun({
               {t('testsE2e.run.openRun')}
             </Link>
           )}
+          {/* Тесты своей команды без кейса — кейсы одной кнопкой: сервер помнит
+              их до следующего прогона, второе нажатие ничего не задвоит. */}
+          {run?.adoptable && !isRunning ? (
+            <div>
+              <Button
+                variant="secondary"
+                size="sm"
+                leftIcon={<Icon name="plus" size={16} />}
+                title={busy || t('testsE2e.run.adoptHint')}
+                disabled={Boolean(busy)}
+                isLoading={adopt.isPending}
+                onClick={() => adopt.mutate()}
+              >
+                {t('testsE2e.run.adopt', { count: run.adoptable })}
+              </Button>
+            </div>
+          ) : null}
         </Stack>
       )}
 
@@ -145,6 +170,14 @@ export function TestE2eRun({
             {`${t('testsE2e.run.command')}: ${run.command}\n\n${run.log || t('testsE2e.run.logEmpty')}`}
           </pre>
         </details>
+      )}
+
+      {adopted && (
+        <Typography variant="caption" color="success" role="status">
+          {adopted.added > 0
+            ? t('testsE2e.run.adopted', { count: adopted.added, groups: adopted.groups.join(', ') })
+            : t('testsE2e.run.adoptedNone')}
+        </Typography>
       )}
 
       {failure && (

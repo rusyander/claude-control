@@ -76,6 +76,13 @@ export {
   useTestPyramid,
 } from './api/ProjectTestE2eApi';
 
+export {
+  useAdoptE2eTests,
+  useRemoveTestAutomation,
+  useSaveTestAutomation,
+  useTestAutomation,
+} from './api/ProjectTestAutomationApi';
+
 export { useTestRelease } from './api/ProjectTestReleaseApi';
 export { releaseExportUrl } from './lib/releaseExportUrl';
 export type { ReleaseExportFormat } from './lib/releaseExportUrl';

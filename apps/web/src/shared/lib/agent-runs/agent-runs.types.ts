@@ -1,4 +1,4 @@
-import type { MessageUsage } from '@agentdeck/contracts';
+import type { MessageUsage, PermissionGuardReason } from '@agentdeck/contracts';
 import type { HandoffRefusal, SplitGroupStatusView } from '@agentdeck/contracts/chat-handoff';
 import type {
   ServerMessageCode,
@@ -22,6 +22,8 @@ export interface PendingPermission {
   toolName: string;
   input: unknown;
   toolUseId: string;
+  /** Защита бэкенда проекта узнала команду — карточка называет причину. */
+  guard?: PermissionGuardReason;
 }
 
 /** Группа разделения, которой отдана работа разговора (Д15). */
@@ -351,7 +353,13 @@ export type ChatEvent =
       /** Контекст переполнен — и тогда, когда главный код другой. */
       overflow?: boolean;
     }
-  | { kind: 'permission'; toolName: string; input: unknown; toolUseId: string }
+  | {
+      kind: 'permission';
+      toolName: string;
+      input: unknown;
+      toolUseId: string;
+      guard?: PermissionGuardReason;
+    }
   | { kind: 'permissionResolved'; toolUseId: string; behavior: 'allow' | 'deny' }
   /** Вопрос закрыт автономией чата — выбор ложится на свой вызов по id. */
   | {
@@ -394,6 +402,7 @@ export type ChatEvent =
        * 'groupsInterrupted' — процессы групп оборвались посреди хода (WP1c);
        * 'groupsLimited' — группы ждут сброса лимита подписки (журнал 89);
        * 'mrWatchLimit' — наблюдатель MR исчерпал самостоятельные продолжения;
+       * 'mrWatchInfra' — CI упал на инфраструктуре: панель повторила задания сама / второе падение (E3);
        * 'defaultDrift' — основная ветка ушла вперёд и задела файлы идущей группы (находка 61);
        * 'deliveryUnchecked' — часть готовности группы (описание MR) панель не проверила.
        * 'pathStep' / 'pathGateFailed' — шаг «Пути» группы пошёл в этом чате / не прошёл проверку.
@@ -417,6 +426,7 @@ export type ChatEvent =
         | 'groupsInterrupted'
         | 'groupsLimited'
         | 'mrWatchLimit'
+        | 'mrWatchInfra'
         | 'defaultDrift'
         | 'deliveryUnchecked'
         | 'pathStep'

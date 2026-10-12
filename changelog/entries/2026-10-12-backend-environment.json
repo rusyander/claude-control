@@ -1,0 +1,72 @@
+{
+  "title": {
+    "ru": "Окружение бэкенда в панели",
+    "en": "Backend environment in the panel"
+  },
+  "summary": {
+    "ru": "Бэкендер работает в панели так же удобно, как фронтендер: на полосе проекта в чате появилось окно «Окружение» с вкладками «Сервисы», «База данных», «API», «Логи» и «Защита».",
+    "en": "A backend developer works in the panel as comfortably as a frontend one: the project bar in the chat gets an “Environment” window with Services, Database, API, Logs and Protection tabs."
+  },
+  "items": [
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Запуск бэкенд-проектов: панель распознаёт Go, Python (Django, FastAPI, Flask), Rust, Java, .NET, Makefile, Taskfile и justfile, показывает стек и откуда взята команда, называет недостающий инструмент до запуска и умеет «Запустить всё» / «Остановить всё».",
+        "en": "Starting backend projects: the panel recognises Go, Python (Django, FastAPI, Flask), Rust, Java, .NET, Makefile, Taskfile and justfile, shows the stack and where the command came from, names a missing tool before the launch, and has “Start all” / “Stop all”."
+      },
+      "area": { "ru": "Окружение", "en": "Environment" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Docker Compose: вкладка «Сервисы» показывает сервисы в порядке подъёма с состоянием, здоровьем и портами-ссылками; сервис или всё сразу поднимается, останавливается и перезапускается. «Удалить вместе с данными» переспрашивает и называет тома.",
+        "en": "Docker Compose: the Services tab lists services in start order with state, health and port links; a service or everything can be started, stopped and restarted. “Remove with data” asks again and names the volumes."
+      },
+      "area": { "ru": "Окружение", "en": "Environment" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "База данных только для чтения: подключения берутся из Compose, .env и Spring или добавляются свои (пароль хранится зашифрованным); схема с поиском, запрос, план и план с выполнением в транзакции только на чтение, миграции десяти инструментов, доступ агенту через MCP панели. Читается только Postgres — остальные СУБД названы «найдены, но не читаются».",
+        "en": "A read-only database: connections come from Compose, .env and Spring or are added by hand (the password is stored encrypted); a searchable schema, queries, plans and plans with execution in a read-only transaction, migrations of ten tools, and agent access through the panel’s MCP. Only Postgres is read; other databases are listed as “found, but not readable”."
+      },
+      "area": { "ru": "Окружение", "en": "Environment" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Защита бэкенда: проектная группа «хук + правило» в .claude/ проекта спрашивает перед DROP и TRUNCATE, DELETE и UPDATE без WHERE, откатом миграций, terraform, kubectl и helm, удалением томов и любой командой с меткой прода. Правила выключаются по одному, «Проверить команду» разбирает черновик, снятие возвращает settings.json байт в байт; в чате карточка прав называет причину, автоподтверждение такие команды не пропускает. Работает только у Claude Code.",
+        "en": "Backend protection: a project “hook + rule” group in the project’s .claude/ asks before DROP and TRUNCATE, DELETE and UPDATE without WHERE, migration rollbacks, terraform, kubectl and helm, volume removal and any command marked as production. Rules switch off one by one, “Check a command” analyses a draft, removal restores settings.json byte for byte; in the chat the permission card names the reason and auto-approve never lets such commands through. Claude Code only."
+      },
+      "area": { "ru": "Окружение", "en": "Environment" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "API: контракт OpenAPI 3 или Swagger 2 из файлов проекта, у запущенного сервиса или по адресу, а также коллекция Postman. Запрос уходит с сервера панели без CORS, ответ сверяется со схемой, авторизация хранится зашифрованной, в истории — только маской; «Спросить агента о расхождении» и «Сверить контракт с кодом» кладут просьбу в поле чата.",
+        "en": "API: an OpenAPI 3 or Swagger 2 contract from project files, a running service or an address, plus a Postman collection. The request goes from the panel’s server without CORS, the response is checked against the schema, authorisation is stored encrypted and shown in history only masked; “Ask the agent about the mismatch” and “Check the contract against the code” put a request into the chat field."
+      },
+      "area": { "ru": "Окружение", "en": "Environment" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Логи: цели «Dev-сервера» и сервисы Compose, «Все сервисы» по времени с подписью сервиса, уровни с порогом «и важнее», поиск с подсветкой, слежение и «К новым строкам», JSON-строка раскрывается полями. «Разобрать в чате» кладёт строку и 20 строк вокруг с замаскированными секретами; вывод остановленной цели виден до следующего запуска.",
+        "en": "Logs: dev-server targets and Compose services, “All services” in time order with a service label, levels with an “and above” threshold, search with highlighting, follow mode and “To new lines”, a JSON line expands into fields. “Analyse in chat” puts the line and 20 lines around it with secrets masked; the output of a stopped target stays visible until the next start."
+      },
+      "area": { "ru": "Окружение", "en": "Environment" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Тесты бэкенда в блоке «Тесты»: блок «Команда прогона» с рецептами go test, pytest, Gradle, Maven и Cargo по файлам проекта; вывод go test -json и cargo test переводится в JUnit; «Завести кейсы» заводит кейс каждому тесту без кейса, «Только группа» сужает прогон до пакетов и файлов группы.",
+        "en": "Backend tests in the Tests block: a “Run command” block with go test, pytest, Gradle, Maven and Cargo recipes detected from project files; go test -json and cargo test output is turned into JUnit; “Create cases” adds a case for every test without one, “Group only” narrows a run to the group’s packages and files."
+      },
+      "how": {
+        "ru": "Недостающая программа называется со ссылкой до прогона. Gradle проверен только по коду: на машине проверки его нет.",
+        "en": "A missing program is named with a link before the run. Gradle is verified by code only: it is not installed on the checking machine."
+      },
+      "area": { "ru": "Тесты", "en": "Tests" }
+    }
+  ]
+}

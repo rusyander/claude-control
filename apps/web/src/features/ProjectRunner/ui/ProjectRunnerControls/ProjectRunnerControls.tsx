@@ -9,10 +9,12 @@ import { useAnchoredPanel } from '@shared/hooks/use-anchored-panel';
 import { useProjectRuns, useProjectRunnerInfo, useStartRunner } from '@entities/ProjectRunner';
 import { BusyPortNotice } from '../BusyPortNotice/BusyPortNotice';
 import { RunnerChip } from '../RunnerChip/RunnerChip';
+import { RunnerGroupActions } from '../RunnerGroupActions/RunnerGroupActions';
 import { RunnerTargetRow } from '../RunnerTargetRow/RunnerTargetRow';
 import type { ProjectRunnerControlsProps } from './ProjectRunnerControls.types';
 import styles from './ProjectRunnerControls.module.scss';
 import { sourceHint } from '../../lib/sourceHint';
+import { useStartGroup } from '../../lib/useStartGroup';
 import { toErrorMessage } from '../../../../shared/api/toErrorMessage';
 
 /**
@@ -32,6 +34,9 @@ import { toErrorMessage } from '../../../../shared/api/toErrorMessage';
  * она и называет группу, и открывает настройки. Раньше это была голая
  * шестерёнка вплотную к шестерёнке «Настроек чата» — две одинаковые кнопки
  * рядом, и какая из них чья, было не понять (владелец, 28.09).
+ *
+ * Отмечен набор «Запустить всё» — кнопка запуска в ряду поднимает его целиком,
+ * без поповера: набор и заводят ровно затем, чтобы не выбирать каждый раз.
  */
 export function ProjectRunnerControls({ path }: ProjectRunnerControlsProps) {
   const { t } = useTranslation();
@@ -42,6 +47,7 @@ export function ProjectRunnerControls({ path }: ProjectRunnerControlsProps) {
   const info = useProjectRunnerInfo(path);
   const runs = useProjectRuns(path);
   const start = useStartRunner();
+  const startGroup = useStartGroup(path);
 
   const targets = info.data?.targets ?? [];
   const live = runs.filter((run) => run.status === 'running' || run.status === 'starting');
@@ -71,8 +77,18 @@ export function ProjectRunnerControls({ path }: ProjectRunnerControlsProps) {
     (target) => target.runnable && !live.some((run) => run.dir === target.dir),
   );
 
-  /** Одна свободная цель — запускаем сразу; несколько — пусть человек выберет. */
+  // Набор ещё не поднят целиком — кнопка в ряду поднимает его.
+  const idleGroup = idle.filter((target) => target.inGroup);
+
+  /**
+   * Есть набор — поднимаем его; одна свободная цель — её сразу; несколько без
+   * набора — пусть человек выберет.
+   */
   const onStart = (): void => {
+    if (idleGroup.length > 0) {
+      startGroup.run();
+      return;
+    }
     const [only] = idle;
     if (idle.length !== 1 || !only) {
       setOpen(true);
@@ -90,10 +106,14 @@ export function ProjectRunnerControls({ path }: ProjectRunnerControlsProps) {
   };
 
   const [firstIdle] = idle;
-  const startHint =
-    idle.length === 1 && firstIdle?.command
-      ? t('runner.startHint', { command: firstIdle.command })
-      : t('runner.chooseTarget');
+  let startHint = t('runner.chooseTarget');
+  if (idleGroup.length > 0) {
+    startHint = t('runner.startGroupHint', {
+      names: idleGroup.map((target) => target.name).join(', '),
+    });
+  } else if (idle.length === 1 && firstIdle?.command) {
+    startHint = t('runner.startHint', { command: firstIdle.command });
+  }
 
   return (
     <div
@@ -139,7 +159,7 @@ export function ProjectRunnerControls({ path }: ProjectRunnerControlsProps) {
             iconOnly
             icon={<Icon name="play" size={20} />}
             aria-label={t('runner.startDevServer')}
-            isLoading={start.isPending}
+            isLoading={start.isPending || startGroup.isPending}
             onClick={onStart}
             title={startHint}
           />
@@ -171,6 +191,10 @@ export function ProjectRunnerControls({ path }: ProjectRunnerControlsProps) {
                 )}
               </Stack>
 
+              {targets.length > 1 && (
+                <RunnerGroupActions path={path} targets={targets} liveCount={live.length} />
+              )}
+
               <div className={styles.targets}>
                 {targets.map((target) => (
                   <RunnerTargetRow
@@ -179,6 +203,7 @@ export function ProjectRunnerControls({ path }: ProjectRunnerControlsProps) {
                     target={target}
                     run={runs.find((run) => run.dir === target.dir)}
                     defaultOpen={targets.length === 1}
+                    showGroup={targets.length > 1}
                   />
                 ))}
               </div>

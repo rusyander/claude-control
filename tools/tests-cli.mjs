@@ -429,7 +429,7 @@ async function runTests(project, options) {
   const plan = options.cmd
     ? commandPlan(options.cmd, files, project)
     : ((await e2ePlan(project, files)) ??
-      (await automationPlan(project, files)) ??
+      (await automationPlan(project, files, !options.group)) ??
       commandPlan(projectTestCommand(project), files, project));
 
   console.log(`Кейсов с автотестом: ${automated.length}, файлов: ${files.length}`);
@@ -455,6 +455,24 @@ async function runTests(project, options) {
   console.log(
     `\nКоманда завершилась с кодом ${exitCode ?? 'нет кода'} за ${Math.round((Date.now() - started) / 1000)} с`,
   );
+
+  // Своя команда проекта: отчёт может быть каталогом (Gradle, Maven) или родным
+  // выводом (go test -json, cargo test) — тот же сбор, что у кнопки панели,
+  // сводит его в один JUnit этого прогона.
+  if (plan.collect) {
+    const collected = plan.collect(started);
+    if (!collected) {
+      console.log(
+        `Отчёт ${plan.reportShown} этим прогоном не записан — статусы не тронуты, запись в историю не легла.`,
+      );
+      if (plan.tail) console.log(plan.tail());
+      printSkipped(skipped);
+      dropTemp(plan.temp);
+      process.exit(result.status || 1);
+    }
+    writeFileSync(join(plan.temp, 'collected.xml'), collected.content);
+    plan.results = ['junit', join(plan.temp, 'collected.xml')];
+  }
 
   const found =
     plan.results ??
@@ -543,22 +561,27 @@ async function e2ePlan(project, files) {
 
 /**
  * Своя команда проекта из `.agent/tests/automation.json` — та же, что у кнопки
- * панели: подстановки `{files}`/`{report}`, отчёт во временный файл через
- * `AGENTDECK_JUNIT_REPORT`. `files` — файлы кейсов с автотестом (группы, если задана). Сломанный файл —
+ * панели: подстановки `{files}`/`{paths}`/`{packages}`/`{report}`, отчёт во временный файл через
+ * `AGENTDECK_JUNIT_REPORT`. `files` — файлы кейсов с автотестом (группы, если задана), `whole` —
+ * без группы: `{paths}`/`{packages}` — весь набор раннера. Сломанный файл —
  * отказ словами, а не тихий откат на npm test.
  */
-async function automationPlan(project, files) {
-  const { readAutomation, automationCommand } = await domain('automation');
+async function automationPlan(project, files, whole) {
+  const { readAutomation, automationCommand, clearReport, collectReport, reportTail } =
+    await domain('automation');
   const { automation, error } = readAutomation(project);
   if (error) throw new Error(`.agent/tests/automation.json: ${error}`);
   if (!automation) return undefined;
   const temp = mkdtempSync(join(tmpdir(), 'cc-tests-run-'));
-  const own = automationCommand(project, automation, files, join(temp, 'junit.xml'));
+  const own = automationCommand(project, automation, files, join(temp, 'junit.xml'), whole);
+  clearReport(own.report);
   return {
     line: own.line,
     cwd: own.cwd,
     env: own.env,
-    results: ['junit', own.report],
+    collect: (started) => collectReport(own.report, own.format, started),
+    tail: () => reportTail(own.report),
+    reportShown: automation.report ?? own.report,
     temp,
     origin: 'e2e',
     ...(automation.timeoutMinutes ? { timeout: automation.timeoutMinutes * 60_000 } : {}),

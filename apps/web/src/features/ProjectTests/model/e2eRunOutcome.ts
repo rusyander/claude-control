@@ -48,22 +48,35 @@ export function e2eRunOutcome(
   }
   const lines: string[] = [];
   const summary = run.summary;
+  const unmatched = run.imported?.unmatched ?? 0;
+  // «(build)» — пакет не собрался, а не тест без кейса: у него своя строка.
+  const buildFailed = run.buildFailed ?? 0;
+  const orphans = unmatched - buildFailed;
   if (run.status === 'stopped') {
     lines.push(t(run.runId ? 'testsE2e.run.stopped' : 'testsE2e.run.stoppedNoReport'));
   }
   if (summary) {
-    lines.push(headline(summary, t));
+    // Тесты в отчёте есть, кейсов у них нет: «в отчёте нет ни одного теста» было бы неправдой.
+    lines.push(
+      summary.total === 0 && orphans > 0
+        ? t(run.adopted ? 'testsE2e.run.resultAdoptedAfter' : 'testsE2e.run.resultNoCases', {
+            count: orphans,
+          })
+        : headline(summary, t),
+    );
     if (summary.skipped > 0) {
       lines.push(t('testsE2e.run.resultSkipped', { count: summary.skipped }));
     }
   }
-  const unmatched = run.imported?.unmatched ?? 0;
-  if (unmatched > 0) {
+  if (buildFailed > 0) lines.push(t('testsE2e.run.buildFailed', { count: buildFailed }));
+  // Заведённые из этого прогона — уже с кейсами: строка «без кейса» о них не говорит.
+  if (orphans > 0 && !run.adopted) {
     const names = run.unmatchedNames ?? [];
-    const more = unmatched - names.length;
+    const more = orphans - names.length;
+    // Своей команде кейсы заводит кнопка под итогом, папке e2e — «Обновить из папки».
     lines.push(
-      t('testsE2e.run.unmatched', {
-        count: unmatched,
+      t(run.adoptable || run.own ? 'testsE2e.run.unmatchedAdopt' : 'testsE2e.run.unmatched', {
+        count: orphans,
         names: [
           ...names,
           ...(more > 0 ? [t('testsE2e.run.unmatchedMore', { count: more })] : []),
@@ -72,14 +85,21 @@ export function e2eRunOutcome(
     );
   }
   const failed = summary?.failed ?? 0;
+  // Код выхода странен, только если упасть было нечему: тесты без кейса и
+  // несобравшийся пакет — сами по себе причина ненулевого кода.
   const exitOdd =
-    typeof run.exitCode === 'number' && run.exitCode !== 0 && failed === 0 && run.status === 'done';
+    typeof run.exitCode === 'number' &&
+    run.exitCode !== 0 &&
+    failed === 0 &&
+    unmatched === 0 &&
+    run.status === 'done';
   if (exitOdd) lines.push(t('testsE2e.run.exitOdd', { code: run.exitCode }));
-  // Красное — только упавшие тесты; «проверьте» — всё, что не даёт считать
-  // прогон зелёным: остановка, пустой отчёт, тесты без кейса, странный код выхода.
+  // Красное — упавшие тесты и несобравшийся пакет; «проверьте» — всё, что не
+  // даёт считать прогон зелёным: остановка, пустой отчёт, тесты без кейса,
+  // странный код выхода.
   const doubtful =
-    run.status === 'stopped' || !summary || summary.total === 0 || unmatched > 0 || exitOdd;
+    run.status === 'stopped' || !summary || summary.total === 0 || orphans > 0 || exitOdd;
   let tone: E2eRunOutcome['tone'] = doubtful ? 'warning' : 'success';
-  if (failed > 0) tone = 'danger';
+  if (failed > 0 || buildFailed > 0) tone = 'danger';
   return { tone, lines, ...(run.runId ? { runId: run.runId } : {}) };
 }

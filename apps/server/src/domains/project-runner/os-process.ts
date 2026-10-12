@@ -32,8 +32,14 @@ export function killChildProcessTree(child: KillableChild): void {
   killChildTree(child, { group: !isWindows });
 }
 
-/** Открыть URL в браузере ОС. Инъектируется в реестр — тест подставит заглушку. */
+/**
+ * Открыть URL в браузере ОС. Инъектируется в реестр — тест подставит заглушку.
+ * `AGENTDECK_OPEN_BROWSER=0` — не открывать: одноразовый стенд QA запускает
+ * веб-цели по-настоящему, и браузер ОС открывался бы на рабочем столе человека
+ * с подменённым профилем стенда, держа его каталог до закрытия окна.
+ */
 export function openBrowser(url: string): void {
+  if (process.env.AGENTDECK_OPEN_BROWSER === '0') return;
   const child =
     process.platform === 'darwin'
       ? spawn('open', [url], { stdio: 'ignore', detached: true })

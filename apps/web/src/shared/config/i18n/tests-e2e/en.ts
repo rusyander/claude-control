@@ -76,9 +76,32 @@ export const testsE2eEn: typeof testsE2eRu = {
     resultRed: '{{failed}} of {{total}} failed, {{passed}} passed.',
     resultSkipped: 'Skipped: {{count}}.',
     resultEmpty: 'The report holds no tests.',
+    resultNoCases: 'Tests in the report: {{count}} — none has a case yet.',
+    resultAdoptedAfter:
+      'Tests in the report: {{count}} — their cases were created after this run, its results did not land on them.',
+    buildFailed_one:
+      '{{count}} package did not build — the compiler error is in the command output.',
+    buildFailed_few:
+      '{{count}} packages did not build — the compiler errors are in the command output.',
+    buildFailed_many:
+      '{{count}} packages did not build — the compiler errors are in the command output.',
+    buildFailed_other:
+      '{{count}} packages did not build — the compiler errors are in the command output.',
     unmatched:
       'Without a case ({{count}}): {{names}} — “Update from folder” creates cases for them.',
     unmatchedMore: 'and {{count}} more',
+    unmatchedAdopt: 'Without a case ({{count}}): {{names}}.',
+    adopt_one: 'Create a case ({{count}})',
+    adopt_few: 'Create cases ({{count}})',
+    adopt_many: 'Create cases ({{count}})',
+    adopt_other: 'Create cases ({{count}})',
+    adoptHint:
+      'Each test without a case gets a case linked to it: grouped by the test’s file, the file found in the project. Statuses arrive with the next run; add steps and a description later.',
+    adopted_one: '{{count}} case created, groups: {{groups}}. The next run lands on it.',
+    adopted_few: '{{count}} cases created, groups: {{groups}}. The next run lands on them.',
+    adopted_many: '{{count}} cases created, groups: {{groups}}. The next run lands on them.',
+    adopted_other: '{{count}} cases created, groups: {{groups}}. The next run lands on them.',
+    adoptedNone: 'No new cases — these tests already have them.',
     exitOdd:
       'The command exited with code {{code}} although no test failed — see the command output.',
     openRun: 'Open the run in history',
@@ -102,6 +125,67 @@ export const testsE2eEn: typeof testsE2eRu = {
       'e2e-run-not-installed':
         'The autotest runner is not installed, and the panel does not install it itself — it will not download hundreds of megabytes unasked. Run in {{dir}}: {{install}}',
     },
+  },
+  automation: {
+    title: 'Run command',
+    intro:
+      'Tests outside the e2e folder — go test, pytest, Gradle, Maven, cargo test — run through one project command. Results land on cases just like the folder’s autotests.',
+    searching: 'Looking for tests in the project…',
+    recipesTitle: 'Tests found — take a ready command:',
+    noRecipes:
+      'No ready command found from the project’s files (go.mod, pyproject.toml, build.gradle, pom.xml, Cargo.toml) — set your own.',
+    custom: 'Set your own command',
+    recipe: '{{stack}} · {{dir}}',
+    root: 'project root',
+    stack: {
+      go: 'Go',
+      pytest: 'pytest',
+      gradle: 'Gradle',
+      maven: 'Maven',
+      cargo: 'Cargo',
+    },
+    evidence: 'found by {{files}}',
+    tests_one: '{{count}} test file',
+    tests_few: '{{count}} test files',
+    tests_many: '{{count}} test files',
+    tests_other: '{{count}} test files',
+    wholeSuite: 'runs the whole suite — “Only group” does not narrow it',
+    missing: '“{{tool}}” is not on this machine — the command will not start.',
+    install: 'Install: {{install}}',
+    take: 'Take',
+    takeHint: 'Put the command into the fields — it is written on “Save”.',
+    format: {
+      junit: 'JUnit XML report',
+      'go-test-json': 'go test -json output — the panel converts it to JUnit',
+      'cargo-test': 'cargo test output — the panel converts it to JUnit',
+    },
+    reportFile: 'report — {{report}}',
+    reportDir: 'reports — the {{report}} folder, this run’s *.xml are taken',
+    timeout_one: 'limit {{count}} minute',
+    timeout_few: 'limit {{count}} minutes',
+    timeout_many: 'limit {{count}} minutes',
+    timeout_other: 'limit {{count}} minutes',
+    edit: 'Edit',
+    remove: 'Remove command',
+    removeHint:
+      '.agent/tests/automation.json is set aside as automation.removed.json — not deleted.',
+    fields: {
+      command: 'Command',
+      commandHint:
+        '{files} — files of the selected cases (of every automated case when none is selected), {paths} — the selected files, empty when none is selected, {packages} — their Go packages, ./... when none is selected, {report} — the report path the panel assigns. Without placeholders the command runs the whole suite.',
+      report: 'Report path',
+      reportHint:
+        'From the project root — if the command writes the report itself. Ending in / means a folder (Gradle, Maven). Empty — the panel’s path, given by {report}.',
+      format: 'Report kind',
+      timeout: 'Limit, minutes',
+      timeoutHint: 'Longer — the run stops. Empty — no limit.',
+    },
+    save: 'Save',
+    cancel: 'Cancel',
+    saved: 'The command is written to .agent/tests/automation.json.',
+    removed: 'The command is removed — the file is set aside as automation.removed.json.',
+    locked: 'An autotest run is in progress — change the command after it ends.',
+    broken: 'The command file cannot be read: {{reason}}',
   },
   mutation: {
     title: 'Mutation check of the case set',

@@ -9,6 +9,7 @@ import { testsE2eEn } from './tests-e2e/en.ts';
 import { pageTabsEn } from './page-tabs/en.ts';
 import { watcherEn } from './watcher/en.ts';
 import { devRestartEn } from './dev-restart/en.ts';
+import { environmentEn } from './environment/en.ts';
 import { projectsPageEn } from './projects/en.ts';
 import { contourConfigEn } from './contour-config/en.ts';
 import { presetsEn } from './presets/en.ts';
@@ -32,6 +33,7 @@ export const en: TranslationSchema = {
   pageTabs: pageTabsEn,
   watcher: watcherEn,
   devRestart: devRestartEn,
+  environment: environmentEn,
   projectsPage: projectsPageEn,
   contourConfig: contourConfigEn,
   presets: presetsEn,
@@ -1623,6 +1625,17 @@ export const en: TranslationSchema = {
     answerRefusedForChild: 'Answer for “{{title}}” was not accepted: {{message}}',
     pickOption: 'Answer with this option',
     permissionTitle: 'The agent needs permission',
+    permissionGuard: 'Backend guard: {{reason}}',
+    permissionGuardMatch: 'Matched: {{match}}',
+    permissionGuardRules: {
+      'prod-target': 'the command targets production',
+      'sql-drop': 'dropping a table, database or schema',
+      'sql-truncate': 'emptying a table',
+      'sql-unbounded': 'DELETE or UPDATE without WHERE — every row',
+      'migration-down': 'rolling back or resetting migrations',
+      'infra-change': 'changing infrastructure',
+      'volume-delete': 'deleting Docker volumes with data',
+    },
     branchGate: {
       title: 'First edit — where do we work?',
       reason:
@@ -6604,13 +6617,14 @@ export const en: TranslationSchema = {
     sourceSingle: 'A single package: the project root itself is what runs',
     sourcePnpm: 'Packages taken from pnpm-workspace.yaml',
     sourceNpm: 'Packages taken from workspaces in package.json',
-    sourceScan: 'No workspace file — the panel looked into apps/, packages/ and services/',
+    sourceScan:
+      'No workspace file — the panel looked into apps/, packages/, services/, cmd/ and the backend, server, api, worker folders',
     skipped: 'Not all of them fit the list: {{count}} more are hidden',
     command: 'Command',
     port: 'Port',
     portAuto: 'from output',
     portHint:
-      "Empty — the panel reads the port from the server's output, i.e. the one configured in the project. Fill it in if the server never prints an address",
+      "Empty — the panel reads the port from the server's output, i.e. the one configured in the project. Fill it in if the server never prints an address: the panel passes it the way the stack expects (PORT, uvicorn's --port, Django's address, Spring's SERVER_PORT)",
     portHintLast: 'Last run: port {{port}}. Empty — the panel reads the port from output again',
     output: 'Process output',
     saved: 'Run settings saved',
@@ -6622,6 +6636,27 @@ export const en: TranslationSchema = {
     freePort: 'Free it and start',
     portStillBusy: 'Port {{port}} is still busy — the process survived. Close it by hand',
     note: "The panel does not assign the port: the app comes up on its own port and the panel reads the address from the output. Autostart is about the panel's NEXT start, and it opens no browser window",
+    stackCustom: 'own command',
+    evidence: 'Found by: {{files}}',
+    missingTool:
+      'Program "{{tool}}" was not found. Install it and reopen the settings — or pick another way to run, or type a command',
+    nothingFound:
+      'Nothing to run found: no dev/start script in package.json, no Go, Python, Rust, Java, .NET, no make/task/just tasks. Type a run command',
+    candidates: 'Ways to run that were found',
+    toolMissingShort: 'program "{{tool}}" is missing',
+    autoPick: 'Back to automatic choice',
+    autoPickHint:
+      'Forget the chosen command: the panel again takes the first way whose program is installed',
+    inGroup: 'In "Start all"',
+    inGroupHint: 'Tick the targets you need together — "Start all" brings them up with one button',
+    startAll: 'Start ticked ({{count}})',
+    stopAll: 'Stop all',
+    groupEmpty:
+      'Tick the targets you need together (API, worker, front end) — the set is remembered',
+    groupHint:
+      'The set is remembered. The start button in the bar brings it up too. "Stop all" stops everything the panel started in this project',
+    groupFailed: '{{name}}: {{message}}',
+    startGroupHint: 'Start the set: {{names}}',
   },
   git: {
     title: 'Project git',

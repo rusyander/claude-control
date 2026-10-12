@@ -19,6 +19,7 @@
     "./chat-handoff": "./src/chat-handoff.ts",
     "./chat-inbox": "./src/chat-inbox.ts",
     "./mobile-apk": "./src/mobile-apk.ts",
+    "./changelog": "./src/changelog.ts",
     "./chat-timing": "./src/chat-timing.ts",
     "./chat-title": "./src/chat-title.ts",
     "./compromises": "./src/compromises.ts",

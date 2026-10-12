@@ -1,45 +1,44 @@
 import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
 import { PageHeader } from '@shared/ui/page-header';
-import { ExplainBox } from '@shared/ui/explain-box';
-import { EmptyState } from '@shared/ui/empty-state';
-import { SkeletonList } from '@shared/ui/skeleton';
-import { useHistory } from '@entities/History';
-import { HistoryItem } from '../HistoryItem/HistoryItem';
+import { PageTabs, PageTabPanel } from '@shared/ui/page-tabs';
+import { usePageTab } from '@shared/hooks/use-page-tab';
+import { ChangelogTab } from '../ChangelogTab/ChangelogTab';
+import { ConfigHistoryTab } from '../ConfigHistoryTab/ConfigHistoryTab';
+import { HISTORY_TABS, HISTORY_TAB_ICONS } from '../model/tabs';
 import styles from './HistoryPage.module.scss';
 
 /**
- * История изменений конфигурации — временная лента правок с диффом.
- *
- * Панель делает резервную копию файла перед каждой записью, поэтому копии — это
- * снимки во времени. Страница собирает из них ленту: что за файл, когда и что
- * изменилось. Клик по записи раскрывает построчный дифф.
+ * «История изменений» — две вкладки: «Что нового» (выпуски самой панели, по
+ * умолчанию) и «Настройки» (временная лента правок вашей конфигурации с диффом).
+ * Вкладка живёт в адресе (`?tab=`) и помнится между заходами.
  */
 export function HistoryPage() {
   const { t } = useTranslation();
-  const { data, isLoading } = useHistory();
+  const { active, select } = usePageTab('history', HISTORY_TABS);
 
-  const items = data?.items ?? [];
+  const tabs = HISTORY_TABS.map((id) => ({
+    id,
+    label: t(`pageTabs.history.tab.${id}`),
+    icon: HISTORY_TAB_ICONS[id],
+  }));
 
   return (
     <Stack gap="var(--spacing-lg)" className={styles.page}>
       <PageHeader title={t('history.title')} subtitle={t('history.subtitle')} helpTopic="history" />
 
-      <ExplainBox title={t('history.explainTitle')} text={t('history.explain')} />
+      <PageTabs
+        page="history"
+        label={t('pageTabs.history.tabsLabel')}
+        tabs={tabs}
+        active={active}
+        onSelect={select}
+      />
 
-      {isLoading && <SkeletonList rows={5} />}
-
-      {!isLoading && items.length === 0 && (
-        <EmptyState icon="history" title={t('history.empty')} text={t('history.emptyText')} />
-      )}
-
-      {items.length > 0 && (
-        <Stack gap="var(--spacing-xs)">
-          {items.map((entry) => (
-            <HistoryItem key={entry.name} entry={entry} />
-          ))}
-        </Stack>
-      )}
+      <PageTabPanel page="history" tab={active} hint={t(`pageTabs.history.hint.${active}`)}>
+        {active === 'changelog' && <ChangelogTab />}
+        {active === 'config' && <ConfigHistoryTab />}
+      </PageTabPanel>
     </Stack>
   );
 }

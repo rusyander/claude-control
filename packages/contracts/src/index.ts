@@ -75,6 +75,7 @@ export * from './project-tests-mutation';
 export * from './project-test-case-history';
 export * from './search';
 export * from './history';
+export * from './changelog';
 export * from './remote';
 export * from './compromises';
 export * from './api';

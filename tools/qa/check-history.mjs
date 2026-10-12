@@ -16,7 +16,7 @@ const problems = [];
 page.on('pageerror', (e) => problems.push(e.message));
 page.on('console', (m) => m.type() === 'error' && problems.push(m.text()));
 
-await page.goto(`${BASE}/history`, { waitUntil: 'domcontentloaded' });
+await page.goto(`${BASE}/history?tab=config`, { waitUntil: 'domcontentloaded' });
 await page.waitForSelector('nav');
 await page.waitForTimeout(1000);
 

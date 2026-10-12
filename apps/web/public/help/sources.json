@@ -1564,6 +1564,21 @@
           "path": "apps/server/src/domains/backups/backups.ts",
           "why": "«Что на диске»: каталог копий, имя с меткой времени, ротация",
           "sha": "378d9348788521bf"
+        },
+        {
+          "path": "apps/server/src/domains/changelog/build.ts",
+          "why": "«Как читать запись ленты»: пометки «Не опубликовано» / «Рабочая копия» / «Из git», числа, область по пути, вид по префиксу, пояснение и тело коммита целиком",
+          "sha": "c1daebdfbe87146f"
+        },
+        {
+          "path": "apps/web/src/pages/History/model/kinds.ts",
+          "why": "«Счётчики по видам»: порядок и набор видов изменений",
+          "sha": "c490dbfd672e4793"
+        },
+        {
+          "path": "apps/web/src/pages/History/model/tabs.ts",
+          "why": "Две вкладки раздела, «Что нового» по умолчанию и адрес ?tab=",
+          "sha": "be076c5c3ea97d72"
         }
       ]
     },

@@ -195,6 +195,8 @@ export const queryKeys = {
   backups: ['backups'] as const,
   /** Лента изменений конфигурации: обновляется после каждой записи в конфиг. */
   history: ['history'] as const,
+  /** Лента «Что нового»: описания из репозитория и git; меняется с коммитом, а не с записью в конфиг. */
+  changelog: ['changelog'] as const,
   /** Полный дифф одной копии: ключ зависит от её имени. */
   historyDiff: (name: string) => ['history', name, 'diff'] as const,
   /** Сырой глобальный CLAUDE.md — для страницы просмотра/правки целиком. */

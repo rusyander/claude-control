@@ -73,6 +73,7 @@ import { registerPromptGateRoutes } from '../routes/prompt-gate-routes.ts';
 import { registerPromptRoutes } from '../routes/prompt-routes/prompt-routes.ts';
 import { registerRemoteRoutes } from '../routes/remote-routes.ts';
 import { registerMobileApkRoutes } from '../routes/mobile-apk-routes/mobile-apk-routes.ts';
+import { registerChangelogRoutes } from '../routes/changelog-routes/changelog-routes.ts';
 import { registerEventsRoutes } from '../routes/events-routes.ts';
 import { registerWatcherRoutes } from '../routes/watcher-routes/watcher-routes.ts';
 import { registerDevRestartRoutes } from '../routes/dev-restart-routes/dev-restart-routes.ts';
@@ -305,6 +306,8 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
     (instance, context) => registerRemoteRoutes(instance, context, notifyRun),
     // Сборка APK телефона кнопкой из настроек — рядом с удалённым доступом.
     registerMobileApkRoutes,
+    // Лента «Что нового»: описания из репозитория и факты из git.
+    (instance) => registerChangelogRoutes(instance),
     registerPromptGateRoutes,
     // Каталог промптов приложения: тексты режимов лежат файлами, а не строками
     // в коде, и правка человека живёт отдельно от встроенного текста.

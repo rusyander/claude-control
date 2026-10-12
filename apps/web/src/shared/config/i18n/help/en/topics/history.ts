@@ -5,9 +5,11 @@ export const historyEn: typeof historyRu = {
   topic: {
     title: 'Change history',
     summary:
-      'A feed of configuration edits with a line diff over the backups; roll back an edit by returning its block',
+      'Two tabs: “What’s new” — the panel’s own releases, “Settings” — a feed of configuration edits with a line diff over the backups; roll back an edit by returning its block',
     lead:
-      'Before every write the panel puts aside a backup of the file. The feed is built ' +
+      'A section of two tabs. “What’s new” is a feed of the panel’s own releases: what was ' +
+      'added, fixed and improved, with line counts and commits from git. “Settings” is the ' +
+      'history of edits to your configuration. Before every write the panel puts aside a backup of the file. The feed is built ' +
       'from those copies: what changed and when, and how an edit differs from the one ' +
       'before it. The diff reads forward in time, so “+N/−M” means how many lines this ' +
       'edit added and removed. A single block can be brought back straight from here, ' +
@@ -15,7 +17,7 @@ export const historyEn: typeof historyRu = {
 
     guideTitle: 'How to read this page',
     guideText:
-      'The diagram first: where the copies come from, how the feed is assembled from ' +
+      'First the “What’s new” tab: how to read a feed entry. Everything after it is about the “Settings” tab. The diagram: where the copies come from, how the feed is assembled from ' +
       'them, and where the diff has its limits. Then one path in screenshots — the ' +
       'section has one entrance, the feed itself — but carried to the end: to bringing ' +
       'one block back, and to that return becoming a new entry of the feed. After the ' +
@@ -54,6 +56,73 @@ export const historyEn: typeof historyRu = {
       'CLI’s files are visible with the provider’s badge, but reverting from them is ' +
       'refused — their names overlap with Claude’s. Secrets never appear in the feed: ' +
       'the secrets file and the key store are filtered out explicitly.',
+
+    changelog: {
+      title: 'The “What’s new” tab',
+      caption:
+        'The first tab of the section is a feed of the panel’s own releases. The “Settings” tab ' +
+        'is the former history of edits to your configuration: the rest of this document is about it.',
+      feed: 'The feed: in progress on top, released below',
+      feedText:
+        'Newest first: entries in progress, then released ones; the top one is open. Above the ' +
+        'feed, a filter by source (described by hand or from git) and by kind of change, and ' +
+        '“Expand all” and “Collapse all” work on the whole feed.',
+      entry: 'A release opens from its header',
+      entryText:
+        'A release header is one button and works from the keyboard too. Inside: an intro, items ' +
+        'by kind, a “What was touched” bar by area (web, server, phone, contracts, tools, tests, ' +
+        'docs) with lines for each, links, and the release’s commits, collapsed separately. ' +
+        'Screenshots attached to items open in a window.',
+      filter: 'Source and kind narrow the feed together',
+      filterText:
+        'The number on a kind chip is how many entries it gives for the chosen source. If nothing ' +
+        'matches, the feed says so and offers “Reset filters”. The feed shows 20 releases at a ' +
+        'time; the address /history?id=… opens the release you need even beyond the first page.',
+      cardTitle: 'How to read a feed entry',
+      cardCaption: 'What each mark and number in a release header means.',
+      cardColumn: 'Element',
+      cardMeaningColumn: 'What it means',
+      cardDate: 'Date',
+      cardDateText:
+        'For a released entry, the time of its last commit. For an entry in progress, the time ' +
+        'the description was created, with the hours.',
+      cardPending: 'Unpublished',
+      cardPendingText:
+        'A description exists but its commit does not yet. Such an entry carries no numbers: ' +
+        'working-tree edits cannot be tied to one description, there may be several tasks in them.',
+      cardTree: 'Working tree',
+      cardTreeText:
+        'One “Uncommitted changes” card: every change against the last commit — files, lines ' +
+        'and areas. It has no kinds of change; it sits right after the entries in progress.',
+      cardGit: 'From git',
+      cardGitText:
+        'A commit without a description is shown by its message: a title, items from the “- ” ' +
+        'lines of the commit body, a kind by prefix (feat, fix, perf, docs, refactor and so on). ' +
+        'The feed is full from day one, but such an entry is poorer than a hand-written one.',
+      cardKinds: 'Counters by kind',
+      cardKindsText:
+        'Added, improved, fixed, changed, removed, documentation, internal — how many items of ' +
+        'each kind the release has.',
+      cardTotals: '+N −M · Files',
+      cardTotalsText:
+        'Lines and files across the release’s commits: a file edited in several commits counts once.',
+      cardAreas: 'What was touched',
+      cardAreasText: 'The share of lines by area; the bar’s colours repeat the legend below it.',
+      cardCommits: 'Commits',
+      cardCommitsText:
+        'A hash with a “Copy” button, the subject and the time of each commit of the release.',
+      writeTitle: 'How a description gets into the feed',
+      writeText:
+        'A description is a file changelog/entries/YYYY-MM-DD-name.json in the same commit as the ' +
+        'change. “pnpm changelog:new” creates a draft: it takes the commits and the diff, and the ' +
+        'text is left to a person. A description binds to the commit where the file appeared or ' +
+        'was edited; reformatting two descriptions at once binds nothing.',
+      brokenTitle: 'If a description cannot be read',
+      brokenText:
+        'A file that failed to parse is skipped: the feed names it and the reason in a card on ' +
+        'top, and the other entries are shown. If the project folder is not a git repository, the ' +
+        'feed shows only descriptions and says so in a line.',
+    },
 
     guide: {
       traceTitle: 'The path. Find an edit and bring one block back',
@@ -239,9 +308,17 @@ export const historyEn: typeof historyRu = {
   },
 
   shots: {
+    changelog: {
+      '01-feed':
+        'The “What’s new” tab: on top the entry “Search across window tabs” marked “Unpublished” with two kinds of change, below the “Uncommitted changes” card marked “Working tree” with numbers, then the released “The project list opens faster” and entries from git; source and kind chips above the feed',
+      '02-entry':
+        'The opened release “The project list opens faster”: items by kind, a “What was touched” bar across three areas with line numbers, and two expanded commits with a hash and a “Copy” button',
+      '03-filter':
+        'The source “From git” and the kind “Fixed” leave two entries in the feed; the kind chips show recounted numbers',
+    },
     trace: {
       '01-feed':
-        'A feed of five entries, newest first: CLAUDE.md “vs current file” +4 −1, CLAUDE.md “vs next copy” “no changes”, settings.json “vs current file” +2 −1, CLAUDE.md “vs next copy” +3, and .claude.json “vs current file” +13 −1',
+        'A feed of five entries, newest first: CLAUDE.md “vs current file” +4 −1, CLAUDE.md “vs next copy” “no changes”, settings.json “vs next copy” +2 −1, CLAUDE.md “vs next copy” +3, and .claude.json “vs current file” +4',
       '02-diff':
         'The diff of that entry opened: the removed line “Прогонять тесты.” (“Run the tests.”) in red, three added ones in green, each block with its own “Revert this change” button',
       '03-revert':

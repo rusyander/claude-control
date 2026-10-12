@@ -7,6 +7,7 @@ import { groupsPageEn } from './groups/page-en.ts';
 import { groupBuilderEn } from './groups/builder-en.ts';
 import { testsE2eEn } from './tests-e2e/en.ts';
 import { pageTabsEn } from './page-tabs/en.ts';
+import { changelogEn } from './changelog/en.ts';
 import { watcherEn } from './watcher/en.ts';
 import { devRestartEn } from './dev-restart/en.ts';
 import { environmentEn } from './environment/en.ts';
@@ -31,6 +32,7 @@ export const en: TranslationSchema = {
   groupBuilder: groupBuilderEn,
   testsE2e: testsE2eEn,
   pageTabs: pageTabsEn,
+  changelog: changelogEn,
   watcher: watcherEn,
   devRestart: devRestartEn,
   environment: environmentEn,
@@ -530,7 +532,7 @@ export const en: TranslationSchema = {
   },
   history: {
     title: 'Change history',
-    subtitle: 'What changed in the configuration: a timeline of edits with diffs',
+    subtitle: 'What is new in the panel itself and what changed in your configuration',
     explainTitle: 'What this is',
     explain:
       'Before every write the panel backs up the file, so the copies are snapshots over time. The timeline is built from them: which file, when, and what changed. A copy is taken before an edit and compared against the next copy of the same file, and the freshest one against the current file on disk: that shows what each edit did. The timeline covers Claude files and the active provider files (AGENTS.md/GEMINI.md, config.toml, mcp.json, opencode.json, .aider.conf.yml). Secrets never appear: neither .mcp-secrets.env nor the provider API key store.',

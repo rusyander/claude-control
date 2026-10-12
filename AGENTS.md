@@ -118,6 +118,20 @@ a new entry goes into the area file, never back here.
   path, narrow `path`+`why` list, empty `sha`) then that command. Narrow = the modules carrying what
   the human reads about, never a whole tree.
 - `en.ts` is typed against `ru.ts` — a missing key fails the build; edit both in one pass.
+- **Changelog travels with the change** (owner 12.10.2026). Tab «Что нового» (default tab of `/history`) = curated
+  `changelog/entries/<YYYY-MM-DD>-<slug>.json` (one per push/MR) + git facts; commits without an entry show
+  from their message. A commit/push with a user-visible change (feature, fix, behaviour, UI, help) adds or
+  updates its entry IN THE SAME commit, never a follow-up; later commits of the same push/MR update that
+  entry (every commit touching the file binds to it). Pure internal work (refactor, tests, agent docs, CI)
+  needs none — keep its commit message readable, the page shows it as is. Draft `pnpm changelog:new`, then
+  rewrite: title = outcome; items by kind added/improved/fixed/changed/removed/docs/internal; `how` only where
+  the approach matters to a reader; a visible fix carries its before/after pair in `changelog/assets/<id>/`
+  (≤400 KB, stubbed data only — public repo). Text = published text: Russian, impersonal, what + why, no
+  authorship, no process narration, no company/contour names, no local paths. Format change → contracts
+  schema + this rule + help topic `history` in one pass. Built 12.10: map entries in `code-map.agent.md` /
+  `code-map-web.agent.md`, spec `.agent/changelog-page-plan.agent.md`. The page shows git whole (every commit
+  body paragraph, numbers per commit); a description without a commit shows NO numbers — uncommitted numbers
+  live on the single «Незакоммиченные правки» card. `pnpm changelog:remind` runs in pre-commit (warns, never blocks).
 
 Gate before "done": `pnpm type-check && pnpm lint && pnpm test && pnpm depcruise && pnpm compromises
 && pnpm negatives && pnpm shots && pnpm brand && pnpm mobile:contracts && node tools/qa/audit-layout.mjs && node tools/qa/check-a11y.mjs && node tools/qa/check-keyboard.mjs && node

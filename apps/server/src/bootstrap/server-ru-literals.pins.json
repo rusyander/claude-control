@@ -39,6 +39,10 @@
     "n": 3,
     "why": "guard group title/description written into the project's .claude in the chosen language, plus the model-facing rule text"
   },
+  "domains/changelog/entries.ts": {
+    "n": 3,
+    "why": "diagnostic about a changelog/entries file, shown to the repo developer on the changelog tab as the invalid-file reason, not a user-facing message"
+  },
   "domains/chat/chat-case-draft/chat-case-draft.ts": {
     "n": 10,
     "why": "text of the draft test case built from a chat (step labels, title and purpose) — data written into the project's test library, reviewed by the human at acceptance, not UI text"

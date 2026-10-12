@@ -1,11 +1,13 @@
 import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
 import { HelpSection, FieldTable, Callout, OptionCards } from '../../ui';
+import { HistoryChangelogSections } from '../HistoryChangelogSections/HistoryChangelogSections';
 import { HistoryGuideSections } from '../HistoryGuideSections/HistoryGuideSections';
 import { HistoryLimitsSections } from '../HistoryLimitsSections/HistoryLimitsSections';
 
 /**
- * Документ раздела «История изменений» — лента правок конфигурации с диффом.
+ * Документ раздела «История изменений»: вкладка «Что нового» — лента выпусков панели,
+ * вкладка «Настройки» — лента правок конфигурации с диффом.
  *
  * Порядок тот же, что у соседей: зачем это вообще → схема происхождения ленты →
  * путь в снимках до возврата блока → чем раздел НЕ является → что читает и пишет
@@ -22,6 +24,8 @@ export function HistoryTopic() {
       <Callout tone="info" title={tr('guideTitle')}>
         {tr('guideText')}
       </Callout>
+
+      <HistoryChangelogSections tr={tr} />
 
       <HelpSection title={common('whyTitle')}>
         <OptionCards

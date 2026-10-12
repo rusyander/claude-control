@@ -15,6 +15,7 @@
  *   analytics/report   — сколько наработали за период;
  *   analytics/live     — что идёт прямо сейчас;
  *   history/trace      — кто поменял файл и как вернуть один кусок;
+ *   history/changelog  — что поменялось в самой панели: лента выпусков;
  *   compare/look       — что настроено у одного CLI и нет у другого;
  *   compare/move       — перенести запись и увидеть, что панель откажется.
  *
@@ -28,7 +29,7 @@
  * Запуск: node tools/help-shots/watching-panel.mjs
  * Переменные: GUIDE_PANEL_PORT (5198), GUIDE_WEB_PORT (8908),
  *             GUIDE_ONLY — снять сценарии через запятую (tour|trouble|find|report|live|
- *             trace|look|move).
+ *             trace|changelog|look|move).
  */
 import { spawn } from 'node:child_process';
 import { rmSync } from 'node:fs';
@@ -40,6 +41,7 @@ import { shootTour, shootTrouble } from './watching-overview.mjs';
 import { shootFind } from './watching-search.mjs';
 import { shootReport, shootLive } from './watching-analytics.mjs';
 import { shootTrace } from './watching-history.mjs';
+import { shootChangelog } from './watching-changelog.mjs';
 import { shootLook, shootMove } from './watching-compare.mjs';
 
 const ROOT = resolve(import.meta.dirname, '../..');
@@ -73,6 +75,7 @@ const SCENARIOS = [
   { only: 'report', topic: 'analytics', name: 'report', shoot: shootReport },
   { only: 'live', topic: 'analytics', name: 'live', shoot: shootLive },
   { only: 'trace', topic: 'history', name: 'trace', shoot: shootTrace },
+  { only: 'changelog', topic: 'history', name: 'changelog', shoot: shootChangelog },
   { only: 'look', topic: 'compare', name: 'look', shoot: shootLook },
   { only: 'move', topic: 'compare', name: 'move', shoot: shootMove },
 ];

@@ -38,6 +38,9 @@ export const ROUTE_LEDGER: RouteLedger = {
   'GET /api/backups/:name/preview': 'internal:preview',
   'POST /api/backups/:name/restore': 'action:restore_backup',
   'POST /api/backups/secret-passphrase': 'human:secret',
+  // changelog-routes.ts
+  'GET /api/changelog': 'gap:P3',
+  'GET /api/changelog/assets/:id/:file': 'internal:media',
   // chat/artifact-routes.ts
   'DELETE /api/chat/:chatId/artifact': 'action:delete_chat_artifact',
   'GET /api/chat/:chatId/artifact': 'action:read_chat_artifact',

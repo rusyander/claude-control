@@ -1,0 +1,354 @@
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  width: 100%;
+  min-height: 56px;
+  padding: var(--spacing-md) var(--spacing-lg);
+  background: none;
+  border: none;
+  border-radius: 14px;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--color-surface-sunken);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: -2px;
+  }
+
+  @media (max-width: 640px) {
+    flex-wrap: wrap;
+    padding: var(--spacing-sm) var(--spacing-md);
+  }
+}
+
+.headerOpen {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.chevron {
+  flex: none;
+  color: var(--color-fg-muted);
+  transition: transform var(--duration-fast);
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
+
+.open {
+  transform: rotate(90deg);
+}
+
+/* Заголовок не растягивается на всю строку: на широком экране строка длиной в тысячу пикселей не читается. */
+.headMain {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  max-width: calc(var(--text-measure) + 100px);
+}
+
+.title {
+  font-size: var(--font-size-body-lg);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-tight);
+  overflow-wrap: anywhere;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px var(--spacing-sm);
+}
+
+.kindCount {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--font-size-caption);
+  color: var(--color-fg-muted);
+}
+
+.kindName {
+  @media (max-width: 640px) {
+    display: none;
+  }
+}
+
+.dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+}
+
+.totals {
+  flex: none;
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-body-sm);
+  text-align: right;
+  white-space: nowrap;
+
+  @media (max-width: 640px) {
+    width: 100%;
+    text-align: left;
+  }
+}
+
+.files {
+  color: var(--color-fg-muted);
+}
+
+.added {
+  color: var(--color-success);
+}
+
+.removed {
+  color: var(--color-danger);
+}
+
+.body {
+  /* Колонка текста шире общей меры на 100px: выпуски читают подробно. */
+  --entry-measure: calc(var(--text-measure) + 100px);
+
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+  padding: var(--spacing-md) var(--spacing-lg) var(--spacing-lg);
+  border-top: 1px solid var(--color-border);
+
+  @media (max-width: 640px) {
+    padding: var(--spacing-md);
+  }
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.groupTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  margin: 0;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
+}
+
+.groupCount {
+  color: var(--color-fg-subtle);
+  font-weight: var(--font-weight-regular);
+  font-size: var(--font-size-caption);
+}
+
+.items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  margin: 0;
+  padding: 0 0 0 18px;
+  list-style: disc;
+}
+
+.item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-left: 2px;
+  line-height: var(--line-height-normal);
+  max-width: var(--entry-measure);
+}
+
+/* Вводная и пояснение из git держат абзацы как в сообщении коммита. */
+.summary {
+  max-width: var(--entry-measure);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.itemText {
+  overflow-wrap: anywhere;
+}
+
+.areaBadge {
+  margin-left: var(--spacing-xs);
+  vertical-align: baseline;
+}
+
+.how {
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-body-sm);
+  overflow-wrap: anywhere;
+}
+
+.thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+}
+
+.thumb,
+.thumbLarge {
+  padding: 0;
+  overflow: hidden;
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  cursor: zoom-in;
+
+  &:hover {
+    border-color: var(--color-border-strong);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+
+  img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+}
+
+.thumb {
+  width: 120px;
+  height: 76px;
+}
+
+.thumbLarge {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+}
+
+.gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--spacing-md);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.figure {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.figCaption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: var(--font-size-body-sm);
+  color: var(--color-fg-muted);
+}
+
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs) var(--spacing-md);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.commitsToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  align-self: flex-start;
+  padding: 6px 8px 6px 4px;
+  background: none;
+  border: none;
+  border-radius: 8px;
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-body-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+
+  &:hover {
+    background: var(--color-surface-sunken);
+    color: var(--color-fg);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-accent);
+  }
+}
+
+.commits {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+
+.commit {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: 4px var(--spacing-sm);
+  font-size: var(--font-size-body-sm);
+
+  & + & {
+    border-top: 1px solid var(--color-border);
+  }
+
+  /* Узкая колонка: хэш, тема и время — друг под другом, тема получает всю ширину. */
+  @media (max-width: 640px) {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: 2px;
+    padding: var(--spacing-xs) var(--spacing-sm);
+  }
+}
+
+.hash {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+}
+
+.subject {
+  overflow-wrap: anywhere;
+}
+
+/* Сообщение коммита целиком, как его прислал git (без трейлеров авторства). */
+.commitBody {
+  grid-column: 1 / -1;
+  padding: 2px 0 6px 2px;
+  color: var(--color-fg-muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.lightbox {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+  border-radius: 10px;
+}

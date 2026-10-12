@@ -1,0 +1,48 @@
+{
+  "title": {
+    "ru": "Вкладка «Что нового» в «Истории изменений»",
+    "en": "“What’s new” tab in the change history"
+  },
+  "summary": {
+    "ru": "Раздел «История изменений» получил две вкладки: «Что нового» — лента изменений самой панели, свежее сверху, — и «Настройки» с прежней историей правок конфигурации.",
+    "en": "The change history now has two tabs: “What’s new”, a feed of the panel’s own changes with the newest on top, and “Settings” with the former config edit history."
+  },
+  "items": [
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Лента выпусков: каждый выпуск — раскрывающаяся карточка, последний открыт. В шапке — дата, счётчики по видам изменений и итог по строкам.",
+        "en": "A feed of releases: each one is an expandable card, the latest is open. The header shows the date, counters per kind of change and the line totals."
+      },
+      "area": { "ru": "История", "en": "History" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Описания пишутся вручную файлом в changelog/entries в том же коммите, что и правка; коммиты, файлы и строки по областям добавляет git.",
+        "en": "Descriptions are written by hand as a file in changelog/entries in the same commit as the change; git adds commits, files and lines per area."
+      },
+      "how": {
+        "ru": "Описание привязывается к коммиту, в котором файл появился; коммиты без описания показываются по своему сообщению, поэтому лента полна с первого дня.",
+        "en": "A description binds to the commit where its file appeared; commits without one are shown from their message, so the feed is full from day one."
+      },
+      "area": { "ru": "История", "en": "History" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Полоса «Что затронуто» по областям — веб, сервер, телефон, тесты, документация — и список коммитов выпуска.",
+        "en": "A “What was touched” bar per area — web, server, phone, tests, docs — and the release’s commit list."
+      },
+      "area": { "ru": "История", "en": "History" }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "История правок конфигурации переехала на вкладку «Настройки» без изменений; адрес /history теперь открывает «Что нового», а прежняя история — /history?tab=config.",
+        "en": "The config edit history moved to the “Settings” tab unchanged; /history now opens “What’s new” and the former history is at /history?tab=config."
+      },
+      "area": { "ru": "История", "en": "History" }
+    }
+  ]
+}

@@ -6,6 +6,7 @@ import { groupsPageRu } from './groups/page-ru.ts';
 import { groupBuilderRu } from './groups/builder-ru.ts';
 import { testsE2eRu } from './tests-e2e/ru.ts';
 import { pageTabsRu } from './page-tabs/ru.ts';
+import { changelogRu } from './changelog/ru.ts';
 import { watcherRu } from './watcher/ru.ts';
 import { devRestartRu } from './dev-restart/ru.ts';
 import { environmentRu } from './environment/ru.ts';
@@ -36,6 +37,8 @@ export const ru = {
   testsE2e: testsE2eRu,
   /** Вкладки страниц разделов (защита данных, паспорт, сравнение, плагины, скрипты, аналитика) — `page-tabs/ru.ts`. */
   pageTabs: pageTabsRu,
+  /** Вкладка «Что нового» в «Истории изменений» — `changelog/ru.ts`. */
+  changelog: changelogRu,
   /** Фоновый наблюдатель: его страница и строка в боковой панели — `watcher/ru.ts`. */
   watcher: watcherRu,
   /** Плашка «правки сервера ждут перезапуска» — `dev-restart/ru.ts`. */
@@ -538,7 +541,7 @@ export const ru = {
   },
   history: {
     title: 'История изменений',
-    subtitle: 'Что менялось в конфигурации: временная лента правок с диффом',
+    subtitle: 'Что нового в самой панели и что менялось в вашей конфигурации',
     explainTitle: 'Что это',
     explain:
       'Перед каждой записью панель делает резервную копию файла. Значит копии — это снимки во времени, из которых собирается лента: какой файл, когда и что изменилось. Копия снята перед правкой и сравнивается со следующей копией того же файла, а самая свежая — с текущим файлом на диске: так видно, что сделала каждая правка. Лента покрывает файлы Claude и файлы активного провайдера (AGENTS.md/GEMINI.md, config.toml, mcp.json, opencode.json, .aider.conf.yml). Секреты в ленту не попадают: ни .mcp-secrets.env, ни хранилище API-ключей провайдеров.',

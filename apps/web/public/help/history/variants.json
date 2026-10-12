@@ -1,6 +1,72 @@
 {
   "topic": "history",
   "frames": {
+    "changelog/01-feed": {
+      "light-ru": {
+        "file": "01-feed.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "light-en": {
+        "file": "01-feed.en.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-ru": {
+        "file": "01-feed.dark.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-en": {
+        "file": "01-feed.dark.en.png",
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    "changelog/02-entry": {
+      "light-ru": {
+        "file": "02-entry.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "light-en": {
+        "file": "02-entry.en.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-ru": {
+        "file": "02-entry.dark.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-en": {
+        "file": "02-entry.dark.en.png",
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    "changelog/03-filter": {
+      "light-ru": {
+        "file": "03-filter.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "light-en": {
+        "file": "03-filter.en.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-ru": {
+        "file": "03-filter.dark.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-en": {
+        "file": "03-filter.dark.en.png",
+        "width": 1440,
+        "height": 1000
+      }
+    },
     "trace/01-feed": {
       "light-ru": {
         "file": "01-feed.png",

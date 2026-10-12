@@ -8,4 +8,4 @@ export const DAY_MS = 24 * 60 * 60 * 1000;
  * собираются циклом), и литерал `to` не прошёл бы проверку. Тот же приём, что у
  * HELP_ROUTE.
  */
-export const HISTORY_ROUTE: string = '/history';
+export const HISTORY_ROUTE: string = '/history?tab=config';

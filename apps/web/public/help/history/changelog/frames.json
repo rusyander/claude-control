@@ -1,0 +1,108 @@
+{
+  "topic": "history",
+  "scenario": "changelog",
+  "frames": [
+    {
+      "id": "01-feed",
+      "side": "panel",
+      "file": "01-feed.png",
+      "masked": 0,
+      "width": 1440,
+      "height": 1000,
+      "shotAt": "2026-10-12T17:14:29.220Z",
+      "text": "AgentDeck Свернуть панель Уведомления Агент панели Наблюдатель выкл Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 3 Команды Хуки 6 Скрипты 4 Плагины Интеграции и доступы MCP-серверы 4 Права 7 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Справка История изменений Что нового в самой панели и что менялось в вашей конфигурации Что нового Настройки Что менялось в самой панели: выпуски со свежим сверху, описания правок и коммиты из git. Нажмите на выпуск, чтобы раскрыть подробности. Все Описанные Из git Добавлено 1 Улучшено 1 Исправлено 4 Документация 1 Внутреннее 2 Развернуть все Свернуть все Поиск по вкладкам окна 14 окт. 2026 г., 09:30 Не опубликовано Добавлено 1 Исправлено 1 Строка поиска над вкладками окна находит нужную по названию. Добавлено 1 Строка поиска над вкладкамиОкно Как: Начните вводить название — лишние вкладки скроются. Исправлено 1 Фокус возвращается на вкладку после закрытия окна Незакоммиченные правки 14 окт. 2026 г., 09:45 Рабочая копия +274 −18 · Файлов: 7 Быстрее открывается список проектов 12 окт. 2026 г. Улучшено 1 Исправлено 1 Внутреннее 1 +275 −74 · Файлов: 9 Не терялся фокус в поле чата 11 окт. 2026 г. Из git Исправлено 1 +24 −6 · Файлов: 2 Уточнён раздел про токен доступа 10 окт. 2026 г. Из git Документация 1 +24 −6 · Файлов: 2 Тесты разбиты по областям 9 окт. 2026 г. Из git Внутреннее 1 +24 −6 · Файлов: 2 Корректная дата у записей без часового пояса 8 окт. 2026 г. Из git Исправлено 1 +24 −6 · Файлов: 2",
+      "en": {
+        "file": "01-feed.en.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 1000,
+        "shotAt": "2026-10-12T17:14:53.164Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Watcher off Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 3 Commands Hooks 6 Scripts 4 Plugins Integrations and access MCP servers 4 Permissions 7 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Help Change history What is new in the panel itself and what changed in your configuration What’s new Settings What changed in the panel itself: releases with the newest on top, change descriptions and git commits. Click a release to expand it. All Described From git Added 1 Improved 1 Fixed 4 Docs 1 Internal 2 Expand all Collapse all Search across window tabs Oct 14, 2026, 09:30 AM Unpublished Added 1 Fixed 1 A search line above the window tabs finds the one you need by name. Added 1 A search line above the tabsWindow How: Start typing a name — other tabs hide. Fixed 1 Focus returns to the tab after the window closes Uncommitted changes Oct 14, 2026, 09:45 AM Working tree +274 −18 · Files: 7 The project list opens faster Oct 12, 2026 Improved 1 Fixed 1 Internal 1 +275 −74 · Files: 9 Chat field no longer loses focus Oct 11, 2026 From git Fixed 1 +24 −6 · Files: 2 The access token section clarified Oct 10, 2026 From git Docs 1 +24 −6 · Files: 2 Tests split by area Oct 9, 2026 From git Internal 1 +24 −6 · Files: 2 Correct date for entries without a timezone Oct 8, 2026 From git Fixed 1 +24 −6 · Files: 2"
+      },
+      "dark": {
+        "file": "01-feed.dark.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 1000,
+        "shotAt": "2026-10-12T17:15:17.009Z",
+        "text": "AgentDeck Свернуть панель Уведомления Агент панели Наблюдатель выкл Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 3 Команды Хуки 6 Скрипты 4 Плагины Интеграции и доступы MCP-серверы 4 Права 7 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Справка История изменений Что нового в самой панели и что менялось в вашей конфигурации Что нового Настройки Что менялось в самой панели: выпуски со свежим сверху, описания правок и коммиты из git. Нажмите на выпуск, чтобы раскрыть подробности. Все Описанные Из git Добавлено 1 Улучшено 1 Исправлено 4 Документация 1 Внутреннее 2 Развернуть все Свернуть все Поиск по вкладкам окна 14 окт. 2026 г., 09:30 Не опубликовано Добавлено 1 Исправлено 1 Строка поиска над вкладками окна находит нужную по названию. Добавлено 1 Строка поиска над вкладкамиОкно Как: Начните вводить название — лишние вкладки скроются. Исправлено 1 Фокус возвращается на вкладку после закрытия окна Незакоммиченные правки 14 окт. 2026 г., 09:45 Рабочая копия +274 −18 · Файлов: 7 Быстрее открывается список проектов 12 окт. 2026 г. Улучшено 1 Исправлено 1 Внутреннее 1 +275 −74 · Файлов: 9 Не терялся фокус в поле чата 11 окт. 2026 г. Из git Исправлено 1 +24 −6 · Файлов: 2 Уточнён раздел про токен доступа 10 окт. 2026 г. Из git Документация 1 +24 −6 · Файлов: 2 Тесты разбиты по областям 9 окт. 2026 г. Из git Внутреннее 1 +24 −6 · Файлов: 2 Корректная дата у записей без часового пояса 8 окт. 2026 г. Из git Исправлено 1 +24 −6 · Файлов: 2"
+      },
+      "darkEn": {
+        "file": "01-feed.dark.en.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 1000,
+        "shotAt": "2026-10-12T17:15:41.161Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Watcher off Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 3 Commands Hooks 6 Scripts 4 Plugins Integrations and access MCP servers 4 Permissions 7 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Help Change history What is new in the panel itself and what changed in your configuration What’s new Settings What changed in the panel itself: releases with the newest on top, change descriptions and git commits. Click a release to expand it. All Described From git Added 1 Improved 1 Fixed 4 Docs 1 Internal 2 Expand all Collapse all Search across window tabs Oct 14, 2026, 09:30 AM Unpublished Added 1 Fixed 1 A search line above the window tabs finds the one you need by name. Added 1 A search line above the tabsWindow How: Start typing a name — other tabs hide. Fixed 1 Focus returns to the tab after the window closes Uncommitted changes Oct 14, 2026, 09:45 AM Working tree +274 −18 · Files: 7 The project list opens faster Oct 12, 2026 Improved 1 Fixed 1 Internal 1 +275 −74 · Files: 9 Chat field no longer loses focus Oct 11, 2026 From git Fixed 1 +24 −6 · Files: 2 The access token section clarified Oct 10, 2026 From git Docs 1 +24 −6 · Files: 2 Tests split by area Oct 9, 2026 From git Internal 1 +24 −6 · Files: 2 Correct date for entries without a timezone Oct 8, 2026 From git Fixed 1 +24 −6 · Files: 2"
+      }
+    },
+    {
+      "id": "02-entry",
+      "side": "panel",
+      "file": "02-entry.png",
+      "masked": 0,
+      "width": 1440,
+      "height": 1000,
+      "shotAt": "2026-10-12T17:14:30.036Z",
+      "text": "AgentDeck Свернуть панель Уведомления Агент панели Наблюдатель выкл Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 3 Команды Хуки 6 Скрипты 4 Плагины Интеграции и доступы MCP-серверы 4 Права 7 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Справка История изменений Что нового в самой панели и что менялось в вашей конфигурации Что нового Настройки Что менялось в самой панели: выпуски со свежим сверху, описания правок и коммиты из git. Нажмите на выпуск, чтобы раскрыть подробности. Все Описанные Из git Добавлено 1 Улучшено 1 Исправлено 4 Документация 1 Внутреннее 2 Развернуть все Свернуть все Поиск по вкладкам окна 14 окт. 2026 г., 09:30 Не опубликовано Добавлено 1 Исправлено 1 Строка поиска над вкладками окна находит нужную по названию. Добавлено 1 Строка поиска над вкладкамиОкно Как: Начните вводить название — лишние вкладки скроются. Исправлено 1 Фокус возвращается на вкладку после закрытия окна Незакоммиченные правки 14 окт. 2026 г., 09:45 Рабочая копия +274 −18 · Файлов: 7 Все правки рабочей копии против последнего коммита, без разбора по задачам. Что из них уже описано, видно в карточках «Не опубликовано» выше. Что затронуто Веб +210 −18 · Файлов: 5 Тесты +64 −0 · Файлов: 2 Быстрее открывается список проектов 12 окт. 2026 г. Улучшено 1 Исправлено 1 Внутреннее 1 +275 −74 · Файлов: 9 Список проектов больше не ждёт чтения всех транскриптов. Улучшено 1 Список проектов открывается без ожидания Исправлено 1 Исправлен счётчик сессий у переименованного проекта Внутреннее 1 Чтение транскриптов вынесено в отдельный модуль Что затронуто Веб +120 −40 · Файлов: 3 Сервер +95 −30 · Файлов: 4 Тесты +60 −4 · Файлов: 2 Коммиты (2) aaaaaa11 perf(projects): список без чтения транскриптов 12 окт. 2026 г., 18:20 - список строится по именам файлов, транскрипты не читаются - первое открытие: 3,2 с → 0,3 с aaaaaa12 fix(projects): счётчик сессий переименованного проекта 12 окт. 2026 г., 14:05 Не терялся фокус в поле чата 11 окт. 2026 г. Из git Исправлено 1 +24 −6 · Файлов: 2 Уточнён раздел про токен доступа 10 окт. 2026 г. Из git Документация 1 +24 −6 · Файлов: 2 Тесты разбиты по областям 9 окт. 2026 г. Из git Внутреннее 1 +24 −6 · Файлов: 2 Корректная дата у записей без часового пояса 8 окт. 2026 г. Из git Исправлено 1 +24 −6 · Файлов: 2",
+      "en": {
+        "file": "02-entry.en.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 1000,
+        "shotAt": "2026-10-12T17:14:53.951Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Watcher off Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 3 Commands Hooks 6 Scripts 4 Plugins Integrations and access MCP servers 4 Permissions 7 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Help Change history What is new in the panel itself and what changed in your configuration What’s new Settings What changed in the panel itself: releases with the newest on top, change descriptions and git commits. Click a release to expand it. All Described From git Added 1 Improved 1 Fixed 4 Docs 1 Internal 2 Expand all Collapse all Search across window tabs Oct 14, 2026, 09:30 AM Unpublished Added 1 Fixed 1 A search line above the window tabs finds the one you need by name. Added 1 A search line above the tabsWindow How: Start typing a name — other tabs hide. Fixed 1 Focus returns to the tab after the window closes Uncommitted changes Oct 14, 2026, 09:45 AM Working tree +274 −18 · Files: 7 Every change in the working tree against the last commit, not split by task. What of it is already described shows in the “Unpublished” cards above. What was touched Web +210 −18 · Files: 5 Tests +64 −0 · Files: 2 The project list opens faster Oct 12, 2026 Improved 1 Fixed 1 Internal 1 +275 −74 · Files: 9 The project list no longer waits for every transcript to be read. Improved 1 The project list opens without waiting Fixed 1 Fixed the session counter of a renamed project Internal 1 Transcript reading moved to its own module What was touched Web +120 −40 · Files: 3 Server +95 −30 · Files: 4 Tests +60 −4 · Files: 2 Commits (2) aaaaaa11 perf(projects): list without reading transcripts Oct 12, 2026, 06:20 PM - the list is built from file names, transcripts are not read - first open: 3.2 s → 0.3 s aaaaaa12 fix(projects): session counter of a renamed project Oct 12, 2026, 02:05 PM Chat field no longer loses focus Oct 11, 2026 From git Fixed 1 +24 −6 · Files: 2 The access token section clarified Oct 10, 2026 From git Docs 1 +24 −6 · Files: 2 Tests split by area Oct 9, 2026 From git Internal 1 +24 −6 · Files: 2 Correct date for entries without a timezone Oct 8, 2026 From git Fixed 1 +24 −6 · Files: 2"
+      },
+      "dark": {
+        "file": "02-entry.dark.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 1000,
+        "shotAt": "2026-10-12T17:15:17.818Z",
+        "text": "AgentDeck Свернуть панель Уведомления Агент панели Наблюдатель выкл Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 3 Команды Хуки 6 Скрипты 4 Плагины Интеграции и доступы MCP-серверы 4 Права 7 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Справка История изменений Что нового в самой панели и что менялось в вашей конфигурации Что нового Настройки Что менялось в самой панели: выпуски со свежим сверху, описания правок и коммиты из git. Нажмите на выпуск, чтобы раскрыть подробности. Все Описанные Из git Добавлено 1 Улучшено 1 Исправлено 4 Документация 1 Внутреннее 2 Развернуть все Свернуть все Поиск по вкладкам окна 14 окт. 2026 г., 09:30 Не опубликовано Добавлено 1 Исправлено 1 Строка поиска над вкладками окна находит нужную по названию. Добавлено 1 Строка поиска над вкладкамиОкно Как: Начните вводить название — лишние вкладки скроются. Исправлено 1 Фокус возвращается на вкладку после закрытия окна Незакоммиченные правки 14 окт. 2026 г., 09:45 Рабочая копия +274 −18 · Файлов: 7 Все правки рабочей копии против последнего коммита, без разбора по задачам. Что из них уже описано, видно в карточках «Не опубликовано» выше. Что затронуто Веб +210 −18 · Файлов: 5 Тесты +64 −0 · Файлов: 2 Быстрее открывается список проектов 12 окт. 2026 г. Улучшено 1 Исправлено 1 Внутреннее 1 +275 −74 · Файлов: 9 Список проектов больше не ждёт чтения всех транскриптов. Улучшено 1 Список проектов открывается без ожидания Исправлено 1 Исправлен счётчик сессий у переименованного проекта Внутреннее 1 Чтение транскриптов вынесено в отдельный модуль Что затронуто Веб +120 −40 · Файлов: 3 Сервер +95 −30 · Файлов: 4 Тесты +60 −4 · Файлов: 2 Коммиты (2) aaaaaa11 perf(projects): список без чтения транскриптов 12 окт. 2026 г., 18:20 - список строится по именам файлов, транскрипты не читаются - первое открытие: 3,2 с → 0,3 с aaaaaa12 fix(projects): счётчик сессий переименованного проекта 12 окт. 2026 г., 14:05 Не терялся фокус в поле чата 11 окт. 2026 г. Из git Исправлено 1 +24 −6 · Файлов: 2 Уточнён раздел про токен доступа 10 окт. 2026 г. Из git Документация 1 +24 −6 · Файлов: 2 Тесты разбиты по областям 9 окт. 2026 г. Из git Внутреннее 1 +24 −6 · Файлов: 2 Корректная дата у записей без часового пояса 8 окт. 2026 г. Из git Исправлено 1 +24 −6 · Файлов: 2"
+      },
+      "darkEn": {
+        "file": "02-entry.dark.en.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 1000,
+        "shotAt": "2026-10-12T17:15:41.951Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Watcher off Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 3 Commands Hooks 6 Scripts 4 Plugins Integrations and access MCP servers 4 Permissions 7 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Help Change history What is new in the panel itself and what changed in your configuration What’s new Settings What changed in the panel itself: releases with the newest on top, change descriptions and git commits. Click a release to expand it. All Described From git Added 1 Improved 1 Fixed 4 Docs 1 Internal 2 Expand all Collapse all Search across window tabs Oct 14, 2026, 09:30 AM Unpublished Added 1 Fixed 1 A search line above the window tabs finds the one you need by name. Added 1 A search line above the tabsWindow How: Start typing a name — other tabs hide. Fixed 1 Focus returns to the tab after the window closes Uncommitted changes Oct 14, 2026, 09:45 AM Working tree +274 −18 · Files: 7 Every change in the working tree against the last commit, not split by task. What of it is already described shows in the “Unpublished” cards above. What was touched Web +210 −18 · Files: 5 Tests +64 −0 · Files: 2 The project list opens faster Oct 12, 2026 Improved 1 Fixed 1 Internal 1 +275 −74 · Files: 9 The project list no longer waits for every transcript to be read. Improved 1 The project list opens without waiting Fixed 1 Fixed the session counter of a renamed project Internal 1 Transcript reading moved to its own module What was touched Web +120 −40 · Files: 3 Server +95 −30 · Files: 4 Tests +60 −4 · Files: 2 Commits (2) aaaaaa11 perf(projects): list without reading transcripts Oct 12, 2026, 06:20 PM - the list is built from file names, transcripts are not read - first open: 3.2 s → 0.3 s aaaaaa12 fix(projects): session counter of a renamed project Oct 12, 2026, 02:05 PM Chat field no longer loses focus Oct 11, 2026 From git Fixed 1 +24 −6 · Files: 2 The access token section clarified Oct 10, 2026 From git Docs 1 +24 −6 · Files: 2 Tests split by area Oct 9, 2026 From git Internal 1 +24 −6 · Files: 2 Correct date for entries without a timezone Oct 8, 2026 From git Fixed 1 +24 −6 · Files: 2"
+      }
+    },
+    {
+      "id": "03-filter",
+      "side": "panel",
+      "file": "03-filter.png",
+      "masked": 0,
+      "width": 1440,
+      "height": 1000,
+      "shotAt": "2026-10-12T17:14:30.766Z",
+      "text": "AgentDeck Свернуть панель Уведомления Агент панели Наблюдатель выкл Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 3 Команды Хуки 6 Скрипты 4 Плагины Интеграции и доступы MCP-серверы 4 Права 7 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Справка История изменений Что нового в самой панели и что менялось в вашей конфигурации Что нового Настройки Что менялось в самой панели: выпуски со свежим сверху, описания правок и коммиты из git. Нажмите на выпуск, чтобы раскрыть подробности. Все Описанные Из git Исправлено 2 Документация 1 Внутреннее 1 Развернуть все Свернуть все Не терялся фокус в поле чата 11 окт. 2026 г. Из git Исправлено 1 +24 −6 · Файлов: 2 Корректная дата у записей без часового пояса 8 окт. 2026 г. Из git Исправлено 1 +24 −6 · Файлов: 2",
+      "en": {
+        "file": "03-filter.en.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 1000,
+        "shotAt": "2026-10-12T17:14:54.689Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Watcher off Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 3 Commands Hooks 6 Scripts 4 Plugins Integrations and access MCP servers 4 Permissions 7 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Help Change history What is new in the panel itself and what changed in your configuration What’s new Settings What changed in the panel itself: releases with the newest on top, change descriptions and git commits. Click a release to expand it. All Described From git Fixed 2 Docs 1 Internal 1 Expand all Collapse all Chat field no longer loses focus Oct 11, 2026 From git Fixed 1 +24 −6 · Files: 2 Correct date for entries without a timezone Oct 8, 2026 From git Fixed 1 +24 −6 · Files: 2"
+      },
+      "dark": {
+        "file": "03-filter.dark.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 1000,
+        "shotAt": "2026-10-12T17:15:18.550Z",
+        "text": "AgentDeck Свернуть панель Уведомления Агент панели Наблюдатель выкл Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 3 Команды Хуки 6 Скрипты 4 Плагины Интеграции и доступы MCP-серверы 4 Права 7 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Справка История изменений Что нового в самой панели и что менялось в вашей конфигурации Что нового Настройки Что менялось в самой панели: выпуски со свежим сверху, описания правок и коммиты из git. Нажмите на выпуск, чтобы раскрыть подробности. Все Описанные Из git Исправлено 2 Документация 1 Внутреннее 1 Развернуть все Свернуть все Не терялся фокус в поле чата 11 окт. 2026 г. Из git Исправлено 1 +24 −6 · Файлов: 2 Корректная дата у записей без часового пояса 8 окт. 2026 г. Из git Исправлено 1 +24 −6 · Файлов: 2"
+      },
+      "darkEn": {
+        "file": "03-filter.dark.en.png",
+        "masked": 0,
+        "width": 1440,
+        "height": 1000,
+        "shotAt": "2026-10-12T17:15:42.698Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Watcher off Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 3 Commands Hooks 6 Scripts 4 Plugins Integrations and access MCP servers 4 Permissions 7 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Help Change history What is new in the panel itself and what changed in your configuration What’s new Settings What changed in the panel itself: releases with the newest on top, change descriptions and git commits. Click a release to expand it. All Described From git Fixed 2 Docs 1 Internal 1 Expand all Collapse all Chat field no longer loses focus Oct 11, 2026 From git Fixed 1 +24 −6 · Files: 2 Correct date for entries without a timezone Oct 8, 2026 From git Fixed 1 +24 −6 · Files: 2"
+      }
+    }
+  ]
+}

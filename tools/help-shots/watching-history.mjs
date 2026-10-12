@@ -20,7 +20,15 @@ export async function shootTrace(browser, web, scenario) {
     await location(page);
 
     // ── 01. Лента: файл, время, против чего дифф и ±строк ────────────────────
-    await open(page, web, '/history', 2000);
+    await open(page, web, '/history?tab=config', 2000);
+    // Запись «сегодня» — след самой съёмки (панель пишет настройки при подъёме): фикстура
+    // датирована сентябрём, и в кадре, описанном подписью, ей не место.
+    await page.evaluate(() => {
+      for (const row of document.querySelectorAll('button[aria-expanded]')) {
+        const text = row.textContent ?? '';
+        if (text.includes('settings.json') && !/сент|Sep/.test(text)) row.parentElement?.remove();
+      }
+    });
     await frame(scenario, page, '01-feed');
 
     // ── 02. Раскрытая запись: построчный дифф ────────────────────────────────

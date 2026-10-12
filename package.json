@@ -42,7 +42,9 @@
     "mobile:test": "npm --prefix apps/mobile run test",
     "mobile:apk": "node tools/build-mobile-apk.mjs",
     "mobile:clean": "node tools/clean-mobile-build.mjs",
-    "prepare": "husky"
+    "prepare": "husky",
+    "changelog:new": "node tools/changelog.mjs new",
+    "changelog:remind": "node tools/changelog.mjs remind"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.12.1",

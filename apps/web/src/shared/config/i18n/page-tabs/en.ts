@@ -2,6 +2,19 @@ import type { pageTabsRu } from './ru.ts';
 
 /** English texts of the section-page tabs; typed against the Russian module. */
 export const pageTabsEn: typeof pageTabsRu = {
+  history: {
+    tabsLabel: 'Change history sections',
+    tab: {
+      changelog: 'What’s new',
+      config: 'Settings',
+    },
+    hint: {
+      changelog:
+        'What changed in the panel itself: releases with the newest on top, change descriptions and git commits. Click a release to expand it.',
+      config:
+        'What changed in your configuration: a timeline of edits with a diff, built from backup copies.',
+    },
+  },
   dlp: {
     tabsLabel: 'Data protection sections',
     tab: {

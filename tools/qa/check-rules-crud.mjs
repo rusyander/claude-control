@@ -128,7 +128,7 @@ await runOnStand(
         entries.length > 0 && entries.every((item) => item.added + item.removed > 0),
         JSON.stringify(entries.map(({ added, removed }) => [added, removed])),
       );
-      await page.goto(`${stand.webUrl}/history`, { waitUntil: 'domcontentloaded' });
+      await page.goto(`${stand.webUrl}/history?tab=config`, { waitUntil: 'domcontentloaded' });
       await page.getByRole('heading', { name: 'История изменений' }).waitFor({ timeout: 30_000 });
       await wait(1500);
       const shown = await page.getByText('CLAUDE.md', { exact: true }).count();

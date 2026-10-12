@@ -95,6 +95,7 @@ export const composedRu: Record<ComposedMessageCode, string> = {
   'tests-lint-checklist-with-expected': 'Чек-лист с ожиданием',
   'worktree-copy-gap-files': 'нет файлов: {{files}}',
   'worktree-copy-gap-links': 'нет ссылок: {{links}}',
+  'worktree-copy-gap-mcp': 'в .mcp.json копии нет серверов оригинала: {{names}}',
   'worktree-copy-gap-access': 'нет записи доступа — агент спросит про доверие и MCP',
   'worktree-mirror-moved': 'Локальный слой: перенесено {{count}}',
   'worktree-mirror-linked': 'ссылкой: {{paths}}',
@@ -121,6 +122,8 @@ export const composedRu: Record<ComposedMessageCode, string> = {
     'Родитель написал группам. Передано: {{sent}} · в очереди до конца их хода: {{queued}} · не доставлено (у группы нет чата или копии): {{refused}}.',
   'split-triage-groups-picked-notice': 'Разбор выбрал группы панели: {{picks}}.',
   'path-step-started-notice': 'Шаг пути группы «{{step}}» идёт в этом чате.',
+  'path-gate-nudge-notice':
+    'Шаг пути «{{step}}» закончил ход без итога проверки — панель один раз попросила его отчитаться. Без итога и после этого цепочка будет ждать ответа в этом чате.',
   'path-gate-failed-notice':
     'Шаг пути «{{step}}» не прошёл проверку: {{note}}. Цепочка ждёт ответа в этом чате.',
   'split-limit-wait-notice':
@@ -131,6 +134,10 @@ export const composedRu: Record<ComposedMessageCode, string> = {
     'Группа «{{group}}»: описание MR {{mr}} панель не проверила — MR не читается (интеграция с форджем выключена или нет токена). Проверьте описание сами.',
   'split-mr-watch-limit-notice':
     'Группа «{{group}}»: наблюдатель MR {{mr}} продолжал её уже {{resumes}} раз и больше сам не продолжает — новые ветки ревьюера и падения конвейера ждут вас.',
+  'split-mr-watch-infra-retry-notice':
+    'Группа «{{group}}»: конвейер MR {{mr}} упал на инфраструктуре CI, а не на коде — {{jobs}}. Панель сама повторила эти задания один раз и группу не будила.',
+  'split-mr-watch-infra-again-notice':
+    'Группа «{{group}}»: после повтора конвейер MR {{mr}} снова упал на инфраструктуре CI — {{jobs}}. Больше панель не повторяет и группу не будит: посмотрите раннер.',
   'chat-conversation-lost-notice':
     'Прежний разговор группы продолжить нельзя: его файла ({{lost}}) на диске нет. Ход пошёл новым разговором в той же копии — ветка, MR и задачи переданы ему вводной.',
   'split-default-drift-notice':
@@ -140,6 +147,7 @@ export const composedRu: Record<ComposedMessageCode, string> = {
   'chat-stop-unconfirmed-notice':
     'Остановить процесс агента ({{pid}}) не удалось: без снимка процессов панель не может проверить, что этот номер всё ещё его, а чужой процесс не трогает. Прогон остаётся идущим — нажмите «Остановить» ещё раз; после перезапуска панели он будет подхвачен снова.',
   'split-group-run-not-started': 'прогон не запустился',
+  'split-group-copy-not-ready': 'копия неполная, группа не запущена: {{gaps}}',
   'split-group-dropped': 'группа убрана человеком',
   'split-group-chain-failed': 'цепочка кончилась ошибкой или остановкой',
   'split-group-plan-cancelled': 'план отменён человеком',
@@ -160,6 +168,11 @@ export const composedRu: Record<ComposedMessageCode, string> = {
   'delivery-gap-review-unfinished': 'ревью работы не закончено: вердикта ревьюера нет',
   'delivery-gap-fix-missing':
     'замечания ревью ({{count}}) не исправлены: звено правок после ревью не проходило',
+  'delivery-gap-owner-unreported':
+    'нет отчёта по пунктам задания владельца: нужны строки owner-1, owner-2, … в блоке {{lang}} — {"sieves":[{"id":"owner-1","status":"pass|fail|n/a","evidence":"пункт в двух словах — файл:строка, команда и строка её вывода или причина"}]}',
+  'delivery-gap-owner-failed': 'пункт задания владельца {{point}} не выполнен: {{evidence}}',
+  'delivery-gap-owner-no-evidence':
+    'пункт задания владельца {{point}} отмечен без доказательства: нужен файл:строка, команда и строка её вывода или причина',
   'delivery-gap-mr-description': 'у MR {{mr}} пустое описание',
   'delivery-gap-mr-na-reason':
     'в описании MR {{mr}} нет причины n/a живой проверки ({{sieves}}) — впишите в описание id сита и почему оно не применимо',

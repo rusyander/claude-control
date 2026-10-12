@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { AppState, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 // Своя KeyboardAvoidingView, как у чата Claude: системная с edge-to-edge молчит.
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
@@ -23,6 +23,9 @@ import { sendMode } from '../src/entities/provider-chat/sendMode';
 import { watchInBackground } from '../src/entities/provider-chat/watchInBackground';
 import { editsState } from '../src/entities/provider-chat/editsState';
 import { notifyLocally } from '../src/shared/lib/notifyLocally';
+import { useRestartForeign } from '../src/entities/provider-chat/useRestartForeign';
+import { RestartSession } from '../src/features/chat/RestartSession/RestartSession';
+import { applyRestart } from '../src/features/chat/RestartSession/applyRestart';
 
 /**
  * Разговор с чужим CLI (Codex, Qwen Code…). Открывается из списка разговоров и
@@ -31,10 +34,12 @@ import { notifyLocally } from '../src/shared/lib/notifyLocally';
  */
 export default function ForeignChatScreen() {
   const t = useT().foreignChat;
+  const restartFailed = useT().chat.restart.failed;
   const params = useLocalSearchParams<{ provider?: string; id?: string }>();
   const providerId = params.provider ?? '';
   const chatId = params.id ?? '';
   const client = useQueryClient();
+  const router = useRouter();
   const scrollRef = useRef<ScrollView>(null);
   const [draft, setDraft] = useState('');
 
@@ -60,6 +65,7 @@ export default function ForeignChatScreen() {
   const status = useForeignStatus(providerId, chatId, writable);
   const send = useSendForeign(providerId, chatId);
   const stop = useStopForeign(providerId, chatId);
+  const restart = useRestartForeign(providerId, chatId);
 
   const running = Boolean(status.data?.isRunning);
   // Ход кончился — реплика ответа уже в файле: перечитать разговор.
@@ -115,6 +121,27 @@ export default function ForeignChatScreen() {
     });
   };
 
+  /**
+   * «Чистая сессия»: у чужого CLI продолжение — новый разговор в том же каталоге,
+   * экран переходит в него. Опора устарела — просьба её обновить уходит обычным
+   * сообщением, а продолжение сервер заведёт сам, когда агент её допишет.
+   */
+  const onRestart = async (): Promise<void> => {
+    await applyRestart(
+      await restart.mutateAsync(),
+      {
+        send: async (prompt) => {
+          await send.mutateAsync(prompt);
+          void status.refetch();
+          return true;
+        },
+        open: ({ chatId: next }) =>
+          router.replace({ pathname: '/foreign-chat', params: { provider: providerId, id: next } }),
+      },
+      restartFailed,
+    );
+  };
+
   const title = chat.data?.title ?? nameOf(providerId);
   const edits = editsState(
     providers.data?.providers.find((provider) => provider.id === providerId),
@@ -156,6 +183,10 @@ export default function ForeignChatScreen() {
               queued={status.data?.queued ?? []}
               queueHeld={Boolean(status.data?.queueHeld)}
             />
+          ) : null}
+          {/* Новый разговор заводится в каталоге этого — без каталога негде. */}
+          {writable && !running && chat.data?.workdir && chat.data.messages.length > 0 ? (
+            <RestartSession onRestart={onRestart} />
           ) : null}
         </ScrollView>
 

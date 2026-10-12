@@ -5,10 +5,23 @@ import type { PlatformRunConsumer } from '@agentdeck/contracts/platform-consumer
 // ничего — решение принимает домен платформы, реестр лишь передаёт его прогону.
 import type { PlatformRunRoute } from '../../platform/routing/routing.ts';
 import { claudeModelHasAutoMode } from '../../../providers/claude-auto-mode.ts';
-import { ChatRun, type ChatEvent, type RunOptions } from '../ChatRunner/ChatRunner.ts';
+import type { RunInputRecord } from '@agentdeck/contracts/run-input';
+import {
+  ChatRun,
+  receivedInputOf,
+  type ChatEvent,
+  type RunOptions,
+} from '../ChatRunner/ChatRunner.ts';
 import { DetachedRun, type DetachedRunDeps } from '../detached-run/detached-run.ts';
 import { LiveSessionPool } from '../live-session/live-session.ts';
 import { withChildrenBrief } from '../children-brief/children-brief.ts';
+import {
+  isCliCommand,
+  SessionWorkspaceNotes,
+  withWorkspaceUpdate,
+  type NoteTurn,
+  type SessionNote,
+} from '../workspace-note/workspace-note.ts';
 import type { BranchGateContext } from '../ChatBranchGate/ChatBranchGate.ts';
 import type { ClosingTurn } from '../ChatHistory/ChatHistory.ts';
 import { looksLikeCheck } from '../lowered-journal/lowered-journal.ts';
@@ -306,6 +319,8 @@ interface RegisteredRun {
   pids?: number[];
   /** Фон, записанный в журнал до перезапуска: процесс умер — умер и он (журнал 64). */
   ledgerBackground?: number;
+  /** Строка о тестах этого хода (E6): запоминается за сессией, когда та названа. */
+  workspace?: SessionNote;
 }
 
 /** Куда реестр пишет идущие прогоны, чтобы пережить перезапуск (см. `run-ledger.ts`). */
@@ -482,6 +497,17 @@ export class ChatRunRegistry {
   }
 
   /**
+   * «Что получил агент» (U8): вход каждого стартовавшего прогона — после
+   * маршрута контура, сводки детей и всех дописок, то есть ровно то, что уедет
+   * CLI. Куда писать, знает bootstrap, как и для журнала понижений.
+   */
+  setInputJournal(write: (keys: readonly string[], record: RunInputRecord) => void): void {
+    this.inputJournal = write;
+  }
+
+  private inputJournal?: (keys: readonly string[], record: RunInputRecord) => void;
+
+  /**
    * Прогон назвал свой настоящий `sessionId`. Ставится снаружи по той же
    * причине, что и остальные крючки: реестр знает про прогоны, а что делать с
    * этим знанием — дело домена. Сейчас слушатель ровно один: разделение задач
@@ -629,13 +655,22 @@ export class ChatRunRegistry {
     this.workspaceNoteOf = resolve;
   }
 
-  /** Осечка чужого слушателя старт не срывает — прогон уходит без строки. */
-  private workspaceNoteSafe(cwd: string): string {
+  /** Строки о тестах по сессиям: системная — одна на сессию (E6). */
+  private readonly workspaceNotes = new SessionWorkspaceNotes();
+
+  /**
+   * Строки хода о тестах. Осечка чужого слушателя старт не срывает: новая
+   * сессия уходит без строки, а продолженная — со своей прежней и без
+   * перемены (сбой чтения — не повод сказать агенту, что тестов больше нет).
+   */
+  private workspaceTurn(cwd: string, sessionId: string | undefined, prompt: string): NoteTurn {
+    let current: string;
     try {
-      return this.workspaceNoteOf?.(cwd) ?? '';
+      current = this.workspaceNoteOf?.(cwd) ?? '';
     } catch {
-      return '';
+      return this.workspaceNotes.turn(sessionId, '', false);
     }
+    return this.workspaceNotes.turn(sessionId, current, !isCliCommand(prompt));
   }
 
   /** Автономен ли идущий разговор — брокеру прав, тем же ответом, что и старту. */
@@ -1058,6 +1093,10 @@ export class ChatRunRegistry {
       this.remove(existingKey);
     }
 
+    // Сводка детей снимается до всего остального: под ней мог остаться блок
+    // перемены прошлой попытки, и снять его можно, только пока он стоит первым.
+    const said = withChildrenBrief(options.prompt, undefined);
+    const workspace = this.workspaceTurn(options.cwd, options.sessionId ?? meta.sessionId, said);
     const run = this.createRun();
     // Маршрут решается ЗДЕСЬ, на каждом старте: продолжение остановленного
     // прогона приходит со СТАРЫМИ параметрами (пауза дерева, продолжение в
@@ -1094,8 +1133,8 @@ export class ChatRunRegistry {
       // затёртый, он не вернулся бы после паузы дерева (ревью Т8, MAJOR-4).
       platformArgs: [...(route.layers?.args ?? []), ...(route.kit?.args ?? [])],
       platformDropAppend: route.layers ? !route.layers.systemPrompt : false,
-      // Пересчитывается на каждом старте: папка e2e могла появиться между ходами.
-      workspaceNote: this.workspaceNoteSafe(options.cwd),
+      // Одна на сессию (E6): перемена между ходами уезжает в сообщении ниже.
+      workspaceNote: workspace.system,
       child: this.childOf?.(meta.sessionId ? [chatId, meta.sessionId] : [chatId]) ?? false,
       // Метка автономии решается на КАЖДОМ старте и кладётся или снимается
       // безусловно: продолжение приходит со старыми параметрами, и метка прошлой
@@ -1105,7 +1144,7 @@ export class ChatRunRegistry {
         this.autonomousOf?.(meta.sessionId ? [chatId, meta.sessionId] : [chatId]) ?? false,
       ),
       prompt: withChildrenBrief(
-        options.prompt,
+        withWorkspaceUpdate(said, workspace.update),
         this.briefOf?.(meta.sessionId ? [chatId, meta.sessionId] : [chatId]),
       ),
     };
@@ -1140,6 +1179,7 @@ export class ChatRunRegistry {
       spentTokens: 0,
       contextTokens: 0,
       checks: [],
+      workspace: workspace.state,
     };
     this.runs.set(chatId, registered);
     try {
@@ -1159,6 +1199,18 @@ export class ChatRunRegistry {
       if (notice) this.emit(registered, notice);
     } catch {
       // Группа не главнее разговора: осечка включения старт не срывает.
+    }
+
+    // Отказанный контуром прогон не получил ничего — и записывать нечего.
+    if (!route.refusal) {
+      try {
+        this.inputJournal?.(
+          meta.sessionId ? [chatId, meta.sessionId] : [chatId],
+          receivedInputOf(routed, registered.startedAt),
+        );
+      } catch {
+        // Сверка входа не главнее прогона: сбой записи старт не срывает.
+      }
     }
 
     // Отказ обязательного контура — ошибка прогона тем же путём, что и сбой
@@ -1260,6 +1312,12 @@ export class ChatRunRegistry {
     const knownSession = run.sessionId;
     if (event.kind === 'session') run.sessionId = event.sessionId;
     if (event.kind === 'done' && event.sessionId) run.sessionId = event.sessionId;
+    // Строка о тестах запоминается за сессией, как только та названа: следующий
+    // ход получит ту же системную строку (E6). Ответвлённая сессия наследует
+    // строку прежней — её переписка и кэш начинаются с того же промпта.
+    if ((event.kind === 'session' || event.kind === 'done') && run.sessionId && run.workspace) {
+      this.workspaceNotes.remember(run.sessionId, run.workspace);
+    }
     // Ключ разговора стал настоящим — сообщаем ровно один раз, на смене. Журнал
     // на диске тоже узнаёт второе написание: после перезапуска по нему находят
     // прогон вкладки, знающие разговор по sessionId.

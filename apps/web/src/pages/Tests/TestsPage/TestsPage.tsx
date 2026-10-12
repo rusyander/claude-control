@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearch } from '@tanstack/react-router';
+import { useDraftBox } from '@shared/lib/draft';
 import { Stack } from '@shared/ui/stack';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
@@ -109,7 +110,7 @@ export function TestsPage() {
   const manual = useManualSession(projectPath);
   const hasManualSession = Boolean(manual.data && !manual.data.finishedAt);
 
-  const [scope, setScope] = useState('');
+  const scope = useDraftBox(undefined);
   const [environmentId, setEnvironmentId] = useState('');
   const [isRunnerOpen, setRunnerOpen] = useState(false);
   const [isSettingsOpen, setSettingsOpen] = useState(false);
@@ -299,7 +300,6 @@ export function TestsPage() {
             <TestsLibraryTab
               board={board}
               scope={scope}
-              onScopeChange={setScope}
               environmentId={environmentId}
               onEnvironmentChange={setEnvironmentId}
               onStartManual={startFromLibrary}
@@ -314,7 +314,7 @@ export function TestsPage() {
               views={board.views}
               environments={board.environments}
               onStartAgent={(planId, environment) =>
-                board.start({ mode: 'run', planId, environmentId: environment, scope })
+                board.start({ mode: 'run', planId, environmentId: environment, scope: scope.get() })
               }
               onStartManual={(planId, environment) =>
                 void openManual({ planId, environmentId: environment })

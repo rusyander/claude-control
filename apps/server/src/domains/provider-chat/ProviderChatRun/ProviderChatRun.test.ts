@@ -396,9 +396,19 @@ process.stdin.on('end', () => {
           Promise.resolve({ candidates: [{ content: { parts: [{ text: 'ответ API' }] } }] }),
       })) as unknown as typeof fetch;
 
-    const events = await collect('gemini', { detect: noCli, fetchImpl });
+    const inputs: string[] = [];
+    const events = await collect('gemini', {
+      detect: noCli,
+      fetchImpl,
+      systemPrefix: 'УКАЗАНИЕ ПАНЕЛИ',
+      onInput: (text: string) => inputs.push(text),
+    });
 
     expect(events.at(-1)).toEqual({ type: 'done', reply: 'ответ API', transport: 'api' });
+    // «Что получил агент» (TQ-09): API получил указание и реплику — запись тоже.
+    expect(inputs).toHaveLength(1);
+    expect(inputs[0]).toContain('УКАЗАНИЕ ПАНЕЛИ');
+    expect(inputs[0]).toContain('Вопрос');
   });
 
   it('сессия провайдера идёт первой, а её отсутствие роняет в поток', async () => {

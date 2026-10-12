@@ -9,7 +9,7 @@ import {
   existsSync,
 } from 'node:fs';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { getProvider } from '../../providers/registry.ts';
 import {
   readProviderInstructionsEntries,
@@ -87,6 +87,10 @@ describe('Aider инструкции-список: чтение и запись 
     const abs = join(root, 'elsewhere.md');
     expect(resolveEntryPath(target(), abs)).toBe(abs);
     expect(resolveEntryPath(target(), 'a/b.md')).toBe(join(root, 'a', 'b.md'));
+  });
+
+  it('запись `~/…` — от дома, как её разворачивает сам Aider', () => {
+    expect(resolveEntryPath(target(), '~/notes.md')).toBe(join(homedir(), 'notes.md'));
   });
 
   it('добавление/удаление/перестановка сохраняют комментарии и прочие ключи', () => {

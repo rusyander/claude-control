@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { expectedObservation, probeLayers } from '@agentdeck/contracts/portable-probe';
 import type { ProbeLayer, ProbeRow } from '@agentdeck/contracts/portable-probe';
 import { claudeProvider } from '../../../providers/claude.ts';
@@ -77,6 +77,7 @@ describe('пробная среда', () => {
         forbiddenPath: '/tmp/probe/forbidden.mjs',
         envPath: '/tmp/probe/env.mjs',
         mcpAskedPath: '/tmp/probe/mcp-asked.txt',
+        selfRunPath: '/tmp/probe/self-run.mjs',
       },
       capturedAt: '2026-09-20T00:00:00.000Z',
     });
@@ -106,6 +107,89 @@ describe('чего ждать от уровня', () => {
   it('«эмуляцию» и «провод» проба не меряет вовсе', () => {
     expect(expectedObservation('hook', 'emulated')).toBeNull();
     expect(expectedObservation('mcpServer', 'wired')).toBeNull();
+  });
+});
+
+describe('цель без инструментов (aider): пробу исполняет она сама', () => {
+  const aider = getProvider('aider');
+  if (!aider) throw new Error('aider пропал из каталога');
+
+  /** Первый и единственный запрос: вывод `/test` уже в репликах, запрет — в инструкциях. */
+  function selfRunTranscript(
+    output: string,
+    instructions = `запрещено Read(${PROBE_MARKS.deniedFile})`,
+  ): Record<string, unknown>[] {
+    return [
+      {
+        messages: [
+          { role: 'system', content: instructions },
+          { role: 'user', content: `Output:\n${output}` },
+        ],
+      },
+    ];
+  }
+
+  it('вывод скриптов в первом запросе — проба сходится без второго хода', () => {
+    const output = `${PROBE_MARKS.envEcho}${PROBE_MARKS.env}\n${PROBE_MARKS.forbiddenRan}`;
+    const rows = probeRowsFrom(selfRunTranscript(output), aider, 'global');
+
+    expect(row(rows, 'envVar').verdict).toBe('match');
+    expect(row(rows, 'hook').verdict).toBe('match');
+    expect(row(rows, 'permission').verdict).toBe('match');
+    expect(rows.some((candidate) => candidate.verdict === 'mismatch')).toBe(false);
+  });
+
+  it('переменная не доехала до процесса — красная строка переменной', () => {
+    const output = `${PROBE_MARKS.envEcho}\n${PROBE_MARKS.forbiddenRan}`;
+    const rows = probeRowsFrom(selfRunTranscript(output), aider, 'global');
+
+    expect(row(rows, 'envVar').verdict).toBe('mismatch');
+    expect(row(rows, 'envVar').observed).toBe('absent');
+  });
+
+  it('запрет текстом не доехал до модели — красная строка права', () => {
+    const output = `${PROBE_MARKS.envEcho}${PROBE_MARKS.env}`;
+    const rows = probeRowsFrom(selfRunTranscript(output, 'без запретов'), aider, 'global');
+
+    expect(row(rows, 'permission').verdict).toBe('mismatch');
+  });
+
+  it('скрипты не отработали — «не проверено», а не зелёный хук по негативу', () => {
+    const rows = probeRowsFrom(selfRunTranscript('ничего'), aider, 'global');
+
+    expect(row(rows, 'hook').verdict).toBe('not_checked');
+    expect(row(rows, 'envVar').verdict).toBe('not_checked');
+  });
+
+  it('скрипт самозапуска печатает оба вывода с унаследованной переменной и выходит провалом', () => {
+    // Провал — условие доставки: `/test` отдаёт вывод модели только при ненулевом коде.
+    const dir = mkdtempSync(join(tmpdir(), 'probe-self-'));
+    try {
+      const { selfRunPath } = writeProbeScripts(dir);
+      const run = spawnSync(process.execPath, [selfRunPath], {
+        encoding: 'utf8',
+        env: { ...process.env, [PROBE_ENV_NAME]: PROBE_MARKS.env },
+      });
+
+      expect(run.status).toBe(1);
+      expect(run.stdout).toContain(`${PROBE_MARKS.envEcho}${PROBE_MARKS.env}`);
+      expect(run.stdout).toContain(PROBE_MARKS.forbiddenRan);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('заглушка записывает ход без инструментов, когда цель их не получает', async () => {
+    const stub = await startProbeStub(() => [{ type: 'text', text: 'ok' }], { toolless: true });
+    try {
+      await fetch(`${stub.baseUrl}/chat/completions`, {
+        method: 'POST',
+        body: JSON.stringify({ messages: [{ role: 'user', content: 'x' }] }),
+      });
+      expect(stub.requests).toHaveLength(1);
+    } finally {
+      await stub.close();
+    }
   });
 });
 
@@ -555,18 +639,18 @@ describe('ступени отказа', () => {
     // ответ про саму запись и останется верным, когда рецепт появится, а
     // «рецепта нет» через тикет П3 исчезнет. Показать второе вместо первого
     // значило бы обещать измерение, которого не будет.
-    const report = await runProbe({ target: getProvider('aider'), scope: 'global' });
+    const report = await runProbe({ target: getProvider('kimi'), scope: 'global' });
     const skips = new Map(report.rows.map((candidate) => [candidate.layer, candidate.skip]));
     const promised = new Map(report.rows.map((candidate) => [candidate.layer, candidate.promised]));
 
-    expect(skips.get('skill')).toBe('needs_panel_runtime');
-    expect(skips.get('mcpServer')).toBe('no_probe_recipe');
-    // Ступень `needs_wire` СЕГОДНЯ недостижима, и это не потеря проверки, а её
-    // следствие: пока панель не открывает ворота на пути запроса, уровень
-    // «проводом» не обещается никому (`wire/tool-gate.ts`), и хук уезжает
-    // «невозможно» — причина у строки становится своя, про рецепт.
-    expect(promised.get('hook')).toBe('impossible');
+    // Kimi Code — цель без рецепта: переменная у неё «эмуляцией», остальное
+    // обещано нативно и упирается в отсутствие рецепта.
+    expect(promised.get('envVar')).toBe('emulated');
+    expect(skips.get('envVar')).toBe('needs_panel_runtime');
+    expect(skips.get('command')).toBe('needs_panel_runtime');
+    expect(promised.get('hook')).toBe('native');
     expect(skips.get('hook')).toBe('no_probe_recipe');
+    expect(skips.get('mcpServer')).toBe('no_probe_recipe');
     expect(report.summary.notChecked).toBe(6);
   });
 

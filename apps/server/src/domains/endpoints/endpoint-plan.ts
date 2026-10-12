@@ -89,6 +89,12 @@ export function resolveEndpointWriteTarget(
   };
 }
 
+/** Имя модели так, как его примет CLI: с его приставкой, если она нужна и её нет. */
+export function endpointModelName(model: string, vars: ProviderEndpointVars): string {
+  const prefix = vars.modelPrefix;
+  return prefix && !model.startsWith(prefix) ? `${prefix}${model}` : model;
+}
+
 /**
  * План записи: адрес всегда, модель — если профиль её называет И у CLI есть для
  * неё переменная, токен — только по галочке `writeToken` и только когда токен
@@ -110,7 +116,9 @@ export function buildEndpointPlan(
   ];
 
   const model = profile.model.trim();
-  if (model && vars.modelEnv) plan.push({ key: vars.modelEnv, value: model, secret: false });
+  if (model && vars.modelEnv) {
+    plan.push({ key: vars.modelEnv, value: endpointModelName(model, vars), secret: false });
+  }
 
   if (profile.writeToken && vars.credentialEnv && token) {
     plan.push({

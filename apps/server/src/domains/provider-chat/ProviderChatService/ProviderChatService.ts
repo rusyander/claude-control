@@ -15,11 +15,23 @@ import {
 } from '../ProviderChatRun/ProviderChatRun.ts';
 import type { PlatformRunRoute } from '../../platform/routing/routing.ts';
 import { expandCommand, type SupervisorCommand } from '../../portability/supervisor/commands.ts';
-import { appendMessage, dropMessage, readChat } from '../store/store.ts';
+import {
+  appendMessage,
+  dropMessage,
+  readChat,
+  readChatLiveSession,
+  writeChatLiveSession,
+} from '../store/store.ts';
+import { digestMessages, planLiveSession } from '../live-session/live-session.ts';
 import { composeUserMessage } from '../prompt/prompt.ts';
 import { withChildrenBrief } from '../../chat/children-brief/children-brief.ts';
+import {
+  SessionWorkspaceNotes,
+  withWorkspaceUpdate,
+} from '../../chat/workspace-note/workspace-note.ts';
 import type { RunNotice } from '../../chat/ChatRunRegistry/ChatRunRegistry.ts';
 import { foreignChatKey } from '@agentdeck/contracts/foreign-chat-key';
+import type { RunInputRecord } from '@agentdeck/contracts/run-input';
 import { serverText } from '../../../lib/server-texts/server-texts.ts';
 import { ForeignSendQueue } from '../queue.ts';
 import type { GroupLayerHook } from '../../groups/run-layer/run-layer.types.ts';
@@ -267,6 +279,51 @@ export class ProviderChatService {
     appendMessage(appDataDir, providerId, chatId, { role: 'notice', content: notice.text });
   }
 
+  /**
+   * Запомнить сессию CLI, которую продолжит следующий ход (E2b): сколько реплик
+   * переписки она видела и их отпечаток. Считается по переписке ПОСЛЕ записи
+   * ответа — в неё вошли и вопрос, и подхваченные посреди хода сообщения, и ответ.
+   * Отметка не главнее разговора: осечка записи — следующий ход начнёт сессию заново.
+   */
+  private rememberLiveSession(
+    appDataDir: string,
+    providerId: string,
+    chatId: string,
+    session: { kind: string; id: string; preamble: string },
+    run: { model: string; workdir: string },
+  ): void {
+    try {
+      const messages = readChat(appDataDir, providerId, chatId)?.messages;
+      if (!messages) return;
+      writeChatLiveSession(appDataDir, providerId, chatId, {
+        ...session,
+        covered: messages.length,
+        digest: digestMessages(messages),
+        ...run,
+      });
+    } catch {
+      // см. выше
+    }
+  }
+
+  /**
+   * Ход кончился ошибкой: что осталось в сессии CLI, панели неизвестно, и
+   * продолжать её нельзя. id остаётся — следующий ход её удалит.
+   */
+  private dropLiveSession(appDataDir: string, providerId: string, chatId: string): void {
+    try {
+      const mark = readChatLiveSession(appDataDir, providerId, chatId);
+      if (!mark || mark.stale) return;
+      writeChatLiveSession(appDataDir, providerId, chatId, {
+        kind: mark.kind,
+        id: mark.id,
+        stale: true,
+      });
+    } catch {
+      // Отметка не главнее разговора.
+    }
+  }
+
   /** Кому сообщать, что ответ начался: группа снова «работает» (Д3). */
   setStartListener(listener: (providerId: string, chatId: string) => void): void {
     this.onStarted = listener;
@@ -362,6 +419,9 @@ export class ProviderChatService {
 
   private workspaceNoteOf?: (cwd: string) => string | undefined;
 
+  /** Строки о тестах по разговорам: системная — одна на разговор (E6). */
+  private readonly workspaceNotes = new SessionWorkspaceNotes();
+
   /**
    * Системный канал строки о каталоге: у CLI, где он есть (Qwen — файл
    * системных настроек, `system-note.ts`), решатель кладёт строку туда и отдаёт
@@ -383,6 +443,17 @@ export class ProviderChatService {
     note: string,
     env: NodeJS.ProcessEnv,
   ) => Record<string, string> | undefined;
+
+  /**
+   * «Что получил агент» (U8): реплика, уехавшая CLI (со сводкой детей и
+   * строкой о каталоге, если та поехала в реплику), и системная строка, если
+   * она ушла своим каналом. Ключ — как у связи конвейера: `<провайдер>:<id>`.
+   */
+  setInputJournal(write: (key: string, record: RunInputRecord) => void): void {
+    this.inputJournal = write;
+  }
+
+  private inputJournal?: (key: string, record: RunInputRecord) => void;
 
   private systemNoteEnv(
     providerId: string,
@@ -508,14 +579,60 @@ export class ProviderChatService {
 
     // Слой группы — последним: его файл настроек решён для ЭТОГО разговора.
     const runEnv: Record<string, string> = { ...route.env, ...route.kit?.env, ...groupEnv };
-    const note = this.workspaceNote(chat.workdir);
+    const current = this.workspaceNote(chat.workdir);
+    // Системная строка — одна на разговор, как у Claude (E6): перемена между
+    // ходами едет в реплике, а не в системном промпте.
+    const noteKey = foreignChatKey(providerId, chatId);
+    const noteTurn = this.workspaceNotes.turn(noteKey, current, true);
+    this.workspaceNotes.remember(noteKey, noteTurn.state);
+    const note = noteTurn.system;
     // Системная строка ложится ПОВЕРХ уже выбранного файла настроек (слоя группы).
     const noteEnv = this.systemNoteEnv(providerId, note, runEnv);
     const last = history.at(-1);
     // Надзиратель судит слова человека, а не строку панели перед ними.
     const ownWords = last?.role === 'user' ? last.content : undefined;
-    if (note && last && !noteEnv) {
-      history[history.length - 1] = { ...last, content: withWorkspaceNote(last.content, note) };
+    // Без системного канала строка едет в последней реплике — нынешняя, на
+    // каждом ходе: хвост переписки кэш не держит.
+    if (current && last && !noteEnv) {
+      history[history.length - 1] = { ...last, content: withWorkspaceNote(last.content, current) };
+    } else if (noteEnv && last && noteTurn.update !== undefined) {
+      history[history.length - 1] = {
+        ...last,
+        content: withWorkspaceUpdate(last.content, noteTurn.update),
+      };
+    }
+    // Вход пишется тем, что прогон отправил CLI (TQ-09): указание панели, блоки
+    // навыков и хуков, переписка — а не одной последней репликой. Отказанный
+    // прогон не получил ничего — и записывать нечего.
+    const journalInput =
+      !route.refusal && !groups?.refusal
+        ? (prompt: string) => {
+            try {
+              this.inputJournal?.(foreignChatKey(providerId, chatId), {
+                startedAt: live.startedAt,
+                ...(model ? { model } : {}),
+                ...(effort ? { effort } : {}),
+                prompt,
+                ...(note && noteEnv ? { appendSystemPrompt: note } : {}),
+              });
+            } catch {
+              // Сверка входа не главнее прогона.
+            }
+          }
+        : undefined;
+
+    // Сессия CLI прошлых ходов (E2b): продолжается, только пока переписка, модель
+    // и каталог — те же, что она видела. Сверка — по сохранённым репликам, а не по
+    // `history`: строка о каталоге и сводка детей в файл разговора не пишутся.
+    const liveRun = { model, workdir: chat.workdir ?? '' };
+    let previousSession: ReturnType<typeof planLiveSession>;
+    try {
+      previousSession = planLiveSession(readChatLiveSession(appDataDir, providerId, chatId), {
+        messages: chat.messages,
+        ...liveRun,
+      });
+    } catch {
+      previousSession = undefined;
     }
 
     void live.run
@@ -525,6 +642,7 @@ export class ProviderChatService {
           history,
           chatId,
           appDataDir,
+          liveSession: previousSession ? { previous: previousSession } : {},
           // Набор панели (В2) — у Qwen Code свой `QWEN_HOME` в режиме «Наши».
           platformEnv: { ...runEnv, ...noteEnv },
           ...(supervisor
@@ -537,6 +655,7 @@ export class ProviderChatService {
           ...(model ? { model } : {}),
           ...(effort ? { effort } : {}),
           permission,
+          ...(journalInput ? { onInput: journalInput } : {}),
         },
         (event) => {
           if (event.type === 'delta') {
@@ -571,6 +690,9 @@ export class ProviderChatService {
               ...(toolCalls === undefined ? {} : { contourToolCalls: toolCalls }),
               ...(summarized ? { contextSummarized: true } : {}),
             });
+            if (event.liveSession) {
+              this.rememberLiveSession(appDataDir, providerId, chatId, event.liveSession, liveRun);
+            }
             this.finish(chatId, live, {
               type: 'done',
               ...(stored ? { message: stored } : {}),
@@ -597,6 +719,7 @@ export class ProviderChatService {
             failed: true,
             durationMs: Date.now() - live.startedAt,
           });
+          this.dropLiveSession(appDataDir, providerId, chatId);
           this.finish(chatId, live, { type: 'error', error: event.error, reason: event.reason });
         },
       )
@@ -610,6 +733,7 @@ export class ProviderChatService {
           failed: true,
           durationMs: Date.now() - live.startedAt,
         });
+        this.dropLiveSession(appDataDir, providerId, chatId);
         this.finish(chatId, live, { type: 'error', error: text, reason: 'cli_error' });
       });
 

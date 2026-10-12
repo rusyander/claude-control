@@ -1140,6 +1140,10 @@ export const serverTextTemplates = {
   },
   'worktree-copy-gap-files': { ru: 'нет файлов: {{files}}', en: 'missing files: {{files}}' },
   'worktree-copy-gap-links': { ru: 'нет ссылок: {{links}}', en: 'missing links: {{links}}' },
+  'worktree-copy-gap-mcp': {
+    ru: 'в .mcp.json копии нет серверов оригинала: {{names}}',
+    en: 'the copy .mcp.json lacks the original servers: {{names}}',
+  },
   'worktree-copy-gap-access': {
     ru: 'нет записи доступа — агент спросит про доверие и MCP',
     en: 'no access entry — the agent will ask about trust and MCP',
@@ -1206,6 +1210,10 @@ export const serverTextTemplates = {
     ru: 'Шаг пути группы «{{step}}» идёт в этом чате.',
     en: 'Group path step “{{step}}” runs in this chat.',
   },
+  'path-gate-nudge-notice': {
+    ru: 'Шаг пути «{{step}}» закончил ход без итога проверки — панель один раз попросила его отчитаться. Без итога и после этого цепочка будет ждать ответа в этом чате.',
+    en: 'Path step “{{step}}” ended its turn without a check result — the panel asked it once to report. Without a result after that, the chain waits for an answer in this chat.',
+  },
   'path-gate-failed-notice': {
     ru: 'Шаг пути «{{step}}» не прошёл проверку: {{note}}. Цепочка ждёт ответа в этом чате.',
     en: 'Path step “{{step}}” did not pass its check: {{note}}. The chain waits for an answer in this chat.',
@@ -1226,6 +1234,14 @@ export const serverTextTemplates = {
     ru: 'Группа «{{group}}»: наблюдатель MR {{mr}} продолжал её уже {{resumes}} раз и больше сам не продолжает — новые ветки ревьюера и падения конвейера ждут вас.',
     en: 'Group «{{group}}»: the MR watcher for {{mr}} has resumed it {{resumes}} times and stops resuming it by itself — new reviewer threads and pipeline failures wait for you.',
   },
+  'split-mr-watch-infra-retry-notice': {
+    ru: 'Группа «{{group}}»: конвейер MR {{mr}} упал на инфраструктуре CI, а не на коде — {{jobs}}. Панель сама повторила эти задания один раз и группу не будила.',
+    en: 'Group «{{group}}»: the MR {{mr}} pipeline failed on CI infrastructure, not on the code — {{jobs}}. The panel retried those jobs once by itself and did not wake the group.',
+  },
+  'split-mr-watch-infra-again-notice': {
+    ru: 'Группа «{{group}}»: после повтора конвейер MR {{mr}} снова упал на инфраструктуре CI — {{jobs}}. Больше панель не повторяет и группу не будит: посмотрите раннер.',
+    en: 'Group «{{group}}»: after the retry the MR {{mr}} pipeline failed on CI infrastructure again — {{jobs}}. The panel retries no more and does not wake the group: check the runner.',
+  },
   'chat-conversation-lost-notice': {
     ru: 'Прежний разговор группы продолжить нельзя: его файла ({{lost}}) на диске нет. Ход пошёл новым разговором в той же копии — ветка, MR и задачи переданы ему вводной.',
     en: "The group's previous conversation cannot be continued: its file ({{lost}}) is not on disk. The turn went on as a new conversation in the same copy — the branch, MR and tasks were handed to it in the brief.",
@@ -1243,6 +1259,10 @@ export const serverTextTemplates = {
     en: "The agent process ({{pid}}) could not be stopped: without a process snapshot the panel cannot verify that this number is still the agent's, and it never touches a foreign process. The run stays running — press Stop again; after a panel restart it is picked up again.",
   },
   'split-group-run-not-started': { ru: 'прогон не запустился', en: 'the run did not start' },
+  'split-group-copy-not-ready': {
+    ru: 'копия неполная, группа не запущена: {{gaps}}',
+    en: 'the copy is incomplete, the group did not start: {{gaps}}',
+  },
   'split-group-dropped': {
     ru: 'группа убрана человеком',
     en: 'the group was removed by a human',
@@ -1306,6 +1326,18 @@ export const serverTextTemplates = {
   'delivery-gap-fix-missing': {
     ru: 'замечания ревью ({{count}}) не исправлены: звено правок после ревью не проходило',
     en: 'review findings ({{count}}) are not fixed: the fix stage did not run after the review',
+  },
+  'delivery-gap-owner-unreported': {
+    ru: 'нет отчёта по пунктам задания владельца: нужны строки owner-1, owner-2, … в блоке {{lang}} — {"sieves":[{"id":"owner-1","status":"pass|fail|n/a","evidence":"пункт в двух словах — файл:строка, команда и строка её вывода или причина"}]}',
+    en: 'the points of the owner’s request are not reported: rows owner-1, owner-2, … are needed in a {{lang}} block — {"sieves":[{"id":"owner-1","status":"pass|fail|n/a","evidence":"the point in a few words — file:line, the command and a line of its output, or the reason"}]}',
+  },
+  'delivery-gap-owner-failed': {
+    ru: 'пункт задания владельца {{point}} не выполнен: {{evidence}}',
+    en: 'owner’s point {{point}} is not done: {{evidence}}',
+  },
+  'delivery-gap-owner-no-evidence': {
+    ru: 'пункт задания владельца {{point}} отмечен без доказательства: нужен файл:строка, команда и строка её вывода или причина',
+    en: 'owner’s point {{point}} is marked without evidence: file:line, the command and a line of its output, or the reason, are needed',
   },
   'delivery-gap-mr-description': {
     ru: 'у MR {{mr}} пустое описание',

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { DlpRule, DlpSettings } from '@agentdeck/contracts';
 import { Stack } from '@shared/ui/stack';
@@ -74,13 +74,45 @@ export function DlpPage() {
   // замыкание того нажатия ещё помнит список до записи.
   const savedRef = useRef(savedJson);
   savedRef.current = savedJson;
+  const savedRulesRef = useRef(data?.rules);
+  savedRulesRef.current = data?.rules;
+  // Правка — функцией от текущего списка, а не замыканием над ним: колбэки
+  // строк от этого постоянны, и строка правила перерисовывается, только когда
+  // правят её саму.
+  const editRules = useCallback(
+    (change: (rules: DlpRule[]) => DlpRule[]): void =>
+      setDraftState((current) => {
+        const next = change(current?.rules ?? savedRulesRef.current ?? []);
+        // Черновик, совпавший с сохранённым, начинается заново от него.
+        const keepsBase = current && JSON.stringify(current.rules) !== savedRef.current;
+        return { rules: next, base: keepsBase ? current.base : savedRef.current };
+      }),
+    [],
+  );
   const setDraft = (next: DlpRule[] | undefined): void =>
-    setDraftState((current) => {
-      if (next === undefined) return undefined;
-      // Черновик, совпавший с сохранённым, начинается заново от него.
-      const keepsBase = current && JSON.stringify(current.rules) !== savedRef.current;
-      return { rules: next, base: keepsBase ? current.base : savedRef.current };
-    });
+    next === undefined ? setDraftState(undefined) : editRules(() => next);
+  const changeRule = useCallback(
+    (next: DlpRule) => editRules((list) => replaceRule(list, next)),
+    [editRules],
+  );
+  const dropRule = useCallback(
+    (id: string) => editRules((list) => removeRule(list, id)),
+    [editRules],
+  );
+  const builtinNames = useMemo(
+    () =>
+      Object.fromEntries(
+        DLP_BUILTINS.map((builtin) => [builtin, t(`dlp.builtinName.${builtin}`)]),
+      ) as BuiltinNames,
+    [t],
+  );
+  const builtinLabels = useMemo(
+    () =>
+      Object.fromEntries(
+        DLP_BUILTINS.map((builtin) => [builtin, t(`dlp.builtinLabel.${builtin}`)]),
+      ) as BuiltinNames,
+    [t],
+  );
 
   // Отказ сервера — не вечный скелет: заголовок с «?» и кнопка повторить.
   if ((isError && !data) || (isSettingsError && !settings)) {
@@ -106,12 +138,6 @@ export function DlpPage() {
   const changedElsewhere = dirty && draft !== undefined && draft.base !== savedJson;
   const active = rules.filter((rule) => rule.enabled).length;
   const defaultLabel = t('dlp.defaultLabel');
-  const builtinNames = Object.fromEntries(
-    DLP_BUILTINS.map((builtin) => [builtin, t(`dlp.builtinName.${builtin}`)]),
-  ) as BuiltinNames;
-  const builtinLabels = Object.fromEntries(
-    DLP_BUILTINS.map((builtin) => [builtin, t(`dlp.builtinLabel.${builtin}`)]),
-  ) as BuiltinNames;
 
   /**
    * Работающий прокси живёт со снимком настроек, снятым при запуске. Настройку
@@ -258,8 +284,8 @@ export function DlpPage() {
             builtins={data.builtins}
             builtinNames={builtinNames}
             builtinLabels={builtinLabels}
-            onChange={(next) => setDraft(replaceRule(rules, next))}
-            onRemove={(id) => setDraft(removeRule(rules, id))}
+            onChange={changeRule}
+            onRemove={dropRule}
           />
         ))}
 

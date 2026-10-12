@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { SplitPlanView } from '@agentdeck/contracts/chat-handoff';
 import { childrenBrief, stripChildrenBrief, withChildrenBrief } from './children-brief.ts';
 import { cleanText, toBlocks } from '../ChatRecords/ChatRecords.ts';
+import { withWorkspaceUpdate } from '../workspace-note/workspace-note.ts';
 
 const SPLIT: SplitPlanView = {
   parentChatId: 'parent',
@@ -105,6 +106,22 @@ describe('сводка не видна человеку', () => {
   it('заголовок чата и поиск — без сводки', () => {
     expect(cleanText(sent)).toBe('исправлено?');
     expect(stripChildrenBrief(sent)).toBe('исправлено?');
+  });
+
+  // E6: перемена строки о тестах едет в реплике хода — человек её не видит.
+  it('лента — без перемены строки о тестах, как она ушла из реестра', () => {
+    const turn = withChildrenBrief(
+      withWorkspaceUpdate('исправлено?', 'QA workspace: e2e folder "e2e"'),
+      '<agentdeck-children>\n1. «Шапка» — работает.\n</agentdeck-children>',
+    );
+    expect(turn).toContain('<agentdeck-workspace>');
+    expect(
+      toBlocks({
+        type: 'user',
+        message: { role: 'user', content: [{ type: 'text', text: turn }] },
+      }),
+    ).toEqual([{ type: 'text', text: 'исправлено?' }]);
+    expect(stripChildrenBrief(turn)).toBe('исправлено?');
   });
 });
 

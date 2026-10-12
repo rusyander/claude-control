@@ -1159,6 +1159,7 @@ export const en: TranslationSchema = {
           question: 'waiting for your answer',
           decision: 'waiting for a review decision',
           'review-missing': 'review without a result',
+          'review-follow-up': 'panel is finishing the review',
           background: 'waiting for background work',
           retry: 'waiting for a retry',
           delivery: 'panel is checking delivery',
@@ -1171,6 +1172,18 @@ export const en: TranslationSchema = {
         deliveryNudges: 'delivery reminders: {{count}}',
         testsVerdict: 'Tests block: {{passed}} of {{count}} green',
         testsNone: 'Tests block: the diff touched no automated cases',
+        tokens: {
+          usage:
+            'tokens: start {{cold}} · turns {{turns}} · average context {{avg}} · from cache {{cache}}% · compactions {{compactions}} · instructions {{instructions}}%',
+          median: 'project median start {{median}}',
+          duplicates: 'same instruction text under different paths: {{list}}',
+          flag: {
+            'cold-start': 'start heavier than usual for the project',
+            compactions: 'many compactions',
+            instructions: 'instructions take over a quarter of the context',
+            duplicate: 'instructions loaded twice',
+          },
+        },
         interruptedAt: 'process cut short at {{time}}',
         interruptResumes: 'resumed by the panel: {{count}}',
         autoNotices: 'Allowed automatically: {{list}}',
@@ -1275,6 +1288,28 @@ export const en: TranslationSchema = {
           closed: 'The MR is closed — nothing to recheck',
           failed: 'Failed: {{message}}',
         },
+        received: {
+          button: 'What the agent got',
+          hint: 'The exact input of every run of this chat: the message, the panel appendix to the system prompt and the contour prompt — to check nothing was cut',
+          title: 'What the agent got',
+          description:
+            'Verbatim, as the CLI received it — the message with the children summary, the appendix to the system prompt, the contour prompt. Newest first; the last {{count}} runs are kept.',
+          loading: 'Loading…',
+          loadFailed: 'Could not load: {{message}}',
+          empty:
+            'No recorded runs: the chat is older than the record, or the panel did not start it.',
+          run: 'Run {{when}}',
+          model: 'Model: {{model}}',
+          effort: 'Depth: {{effort}}',
+          cliDefault: 'CLI setting',
+          mode: 'Mode: {{mode}}',
+          prompt: 'Message',
+          append: 'Appendix to the system prompt',
+          contour: 'Contour system prompt (replaces the CLI prompt)',
+          flags: 'Layer flags',
+          chars: '{{count}} characters',
+          close: 'Close',
+        },
         moveTasks: {
           action_one: 'Move the task',
           action_few: 'Move {{count}} tasks',
@@ -1376,8 +1411,8 @@ export const en: TranslationSchema = {
           'Stop every running run of the tree; continuations, stages and new children queue up',
         resumeHint: 'Restart the stopped runs in their own sessions and release the queue',
         resumeHintForeign:
-          'Start the stopped runs over and release the queue: this CLI has no session, ' +
-          'so continuing means asking the same thing again',
+          'Start the stopped runs over and release the queue: a stopped turn does not keep ' +
+          'its session, so continuing means asking the same thing again',
         paused: 'paused',
         awaitsYou: 'waits for you',
         accepted: 'accepted',
@@ -1477,6 +1512,14 @@ export const en: TranslationSchema = {
         'The review reply ended without a result block — the findings are unknown. This is not "no findings".',
       retry: 'Ask for the review result again',
       retryToast: 'The review was asked for its result in the same session',
+      incomplete:
+        'The review stayed incomplete even after it was asked to finish — this is not "no findings":',
+      depthGap: {
+        unreported: 'the reviewer did not report what it read and how much',
+        partial: 'only part of the diff was read',
+        entries: 'high risk, yet the review had one entry point — two are needed (diff and frame)',
+      },
+      witness: 'Second independent pass over an empty review',
       pushBlocked: 'The fixes cannot be pushed to the MR: the MR branch is unknown',
       failed: 'Failed: {{message}}',
     },
@@ -6667,6 +6710,7 @@ export const en: TranslationSchema = {
       copyGapLink:
         'shared directory {{path}} is not linked (skills and hooks come as a link to the original)',
       copyGapAccess: 'no access entry {{path}} in .claude.json',
+      copyGapMcp: '{{path}} of the copy lacks the original servers: {{names}}',
       copyAccessOk: 'access: the copy has an entry in .claude.json',
       copyAccessMissing: 'access: the copy has no entry in .claude.json',
       copyAccessUnknown: 'access: not checked — the original has no entry either',

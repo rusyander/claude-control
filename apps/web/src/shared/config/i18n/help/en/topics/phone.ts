@@ -89,7 +89,11 @@ export const phoneEn: typeof phoneRu = {
       'others) the project’s conversation list gets a «<CLI> conversations» block: a new ' +
       'conversation, the messages, «Pass into the answer» in the middle of an answer where ' +
       'the CLI can take it, a queue, the «The CLI asks for permission» card and a line saying how the CLI ' +
-      'will treat edits. A conversation of a CLI that is not active in the panel is read-only.',
+      'will treat edits. A conversation of a CLI that is not active in the panel is read-only. ' +
+      'Once a turn has ended, «Restart in a clean session» sits under the messages — for Claude ' +
+      'and for another CLI when the conversation was started in a project: as in the panel, the ' +
+      'agent is first asked to update the checkpoint, and a fresh checkpoint starts the ' +
+      'continuation as a new conversation right away, with the phone moving into it.',
     screenAgent: 'Agent',
     screenAgentText:
       'The panel agent: a request in words becomes an action in the panel. Anything that ' +

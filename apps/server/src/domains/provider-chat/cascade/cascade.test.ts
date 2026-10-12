@@ -7,6 +7,7 @@ import { HANDOFF_BLOCK_LANG } from '@agentdeck/contracts/chat-handoff';
 import { SPLIT_SYSTEM_PROMPT } from '@agentdeck/contracts/task-split';
 import type { ChatLink } from '../../../lib/app-store/app-store.types.ts';
 import { HandoffChains } from '../../chat/ChatHandoff/ChatHandoff.ts';
+import { planCascadeStage } from '../../chat/ChatCascadeStages/ChatCascadeStages.ts';
 import { foreignChildExtra } from '../../chat/group-run-lines/group-run-lines.ts';
 import { AppStore } from '../../../lib/app-store/app-store.ts';
 import { writePanelJson } from '../../../lib/app-store/group-sources.ts';
@@ -80,7 +81,7 @@ describe('planForeignStage', () => {
     expect(plan?.cascade).toMatchObject({ stage: 'review', workModel: 'gpt-5.3-codex-spark' });
   });
 
-  it('работу на настройке CLI не проверяет: усиливать нечем', () => {
+  it('работу на настройке CLI тоже проверяет (U6): свежая сессия — вторая пара глаз', () => {
     const plan = planForeignStage({
       cascade: { ...WORK, lowered: false },
       ok: true,
@@ -89,7 +90,8 @@ describe('planForeignStage', () => {
       hasWork: () => true,
     });
 
-    expect(plan).toBeUndefined();
+    expect(plan?.stage).toBe('review');
+    expect(plan?.model).toBeUndefined();
   });
 
   it('не заводит второе ревью на ту же работу', () => {
@@ -104,9 +106,9 @@ describe('planForeignStage', () => {
     expect(plan).toBeUndefined();
   });
 
-  it('пустой дифф не проверяет', () => {
+  it('пустой дифф работы на настройке CLI не проверяет', () => {
     const plan = planForeignStage({
-      cascade: WORK,
+      cascade: { stage: 'work', group: 'Переименование', branch: 'split/rename' },
       ok: true,
       text: 'готово',
       task: 'задание',
@@ -114,6 +116,35 @@ describe('planForeignStage', () => {
     });
 
     expect(plan).toBeUndefined();
+  });
+
+  it('понижённая работа без единой правки уходит на настройку CLI — один раз (F4)', () => {
+    const plan = planForeignStage({
+      cascade: WORK,
+      ok: true,
+      text: 'Нужна миграция БД — это не механика, останавливаюсь.',
+      task: 'Переименуй foo в bar',
+      hasWork: () => false,
+    });
+
+    expect(plan?.stage).toBe('work');
+    expect(plan?.model).toBeUndefined();
+    expect(plan?.effort).toBeUndefined();
+    expect(plan?.prompt).toContain('Переименуй foo в bar');
+    expect(plan?.prompt).toContain('Нужна миграция БД');
+    expect(plan?.cascade).toMatchObject({ stage: 'work', group: 'Переименование' });
+    expect(plan?.cascade.lowered).toBeUndefined();
+    expect(plan?.cascade.workModel).toBeUndefined();
+
+    expect(
+      planForeignStage({
+        cascade: { ...WORK, plannedAt: '2026-10-12T00:00:00.000Z' },
+        ok: true,
+        text: 'стоп',
+        task: 'Переименуй foo в bar',
+        hasWork: () => false,
+      }),
+    ).toBeUndefined();
   });
 
   it('упавший или снятый прогон звена не получает', () => {
@@ -145,6 +176,22 @@ describe('planForeignStage', () => {
     expect(plan?.prompt).toContain('1. src/a.ts: не переименован bar');
     // Ревьюером был сам CLI своей настройкой — «сильнее» тут не обещается.
     expect(plan?.prompt).toContain('another model');
+  });
+
+  it('правки работы на потолке идут той же настройкой CLI, а не обрывают цепочку (F3)', () => {
+    const plan = planForeignStage({
+      cascade: { stage: 'review', group: 'Архитектура', branch: 'split/arch' },
+      ok: true,
+      text: reviewBlock(['src/a.ts: нет проверки входа']),
+      task: 'задание',
+      hasWork: () => true,
+    });
+
+    expect(plan?.stage).toBe('fix');
+    expect(plan?.model).toBeUndefined();
+    // Ниже настройки CLI правки не идут — планка «тебя ведёт модель ниже» была бы ложью.
+    expect(plan?.cascade.lowered).toBeUndefined();
+    expect(plan?.cascade.fixFindings).toEqual(['src/a.ts: нет проверки входа']);
   });
 
   it('пустой список замечаний закрывает цепочку', () => {
@@ -359,7 +406,7 @@ describe('foreignStagePrefix', () => {
     expect(prefix).not.toContain('НИЖЕ');
   });
 
-  it('правки получают планку сдачи и НЕ получают обещания второго ревью', () => {
+  it('правки получают планку сдачи и обещание прохода проверки, а не второго ревью', () => {
     const plan = planForeignStage({
       cascade: { ...WORK, stage: 'review' },
       ok: true,
@@ -370,7 +417,9 @@ describe('foreignStagePrefix', () => {
 
     const prefix = foreignStagePrefix(plan, settings);
     expect(prefix).toContain('run the project checks');
-    expect(prefix).toContain('The panel will not start a review of this work');
+    expect(prefix).not.toContain('When you finish, the panel itself starts a review');
+    expect(prefix).toContain('one verification pass over your fixes');
+    expect(plan.cascade.fixFindings).toEqual(['поправь']);
   });
 });
 
@@ -480,6 +529,67 @@ describe('createForeignStagePlanner', () => {
     });
     // Звено — другой разговор: с ключом работы дерево склеило бы их в узел (Д11).
     expect(links[`codex:${nextId}`]?.conversation).toBeUndefined();
+  });
+
+  it('поднятая работа не наследует модель и «ниже» остановившейся (F4)', () => {
+    workChat('work');
+    const saveLink = vi.fn();
+    const send = vi.fn().mockReturnValue({ ok: true });
+
+    planner(send, false, {
+      linkOf: (key) =>
+        key === 'codex:work'
+          ? {
+              parentChatId: 'codex:parent',
+              createdAt: '2026-10-12T00:00:00.000Z',
+              stage: 'work',
+              model: 'gpt-5.3-codex-spark',
+              effort: 'medium',
+              lowered: true,
+            }
+          : undefined,
+      saveLink,
+    })({
+      providerId: 'codex',
+      appDataDir: dir,
+      startedAt: 0,
+      chatId: 'work',
+      ok: true,
+      text: 'Нужна миграция — останавливаюсь.',
+    });
+
+    const [, , nextId] = send.mock.calls[0] as [string, string, string];
+    expect(readChat(dir, 'codex', nextId)?.model).toBeUndefined();
+    const [, saved] = saveLink.mock.calls[0] as [string, ChatLink];
+    expect(saved.stage).toBe('work');
+    expect(saved.lowered).toBeUndefined();
+    expect(saved.model).toBeUndefined();
+    expect(saved.effort).toBeUndefined();
+  });
+
+  it('связанный разговор без шапки всё равно закрывает цепочку группы (F3)', () => {
+    createChat(dir, 'codex', { id: 'child', title: 'Группа', workdir: dir });
+    appendMessage(dir, 'codex', 'child', { role: 'user', content: 'Сделай группу' });
+    const link: ChatLink = {
+      parentChatId: 'codex:parent',
+      createdAt: '2026-10-12T00:00:00.000Z',
+      stage: 'work',
+    };
+    const onChainEnded = vi.fn();
+    const send = vi.fn().mockReturnValue({ ok: true });
+
+    planner(send, false, { linkOf: () => link, onChainEnded })({
+      providerId: 'codex',
+      appDataDir: dir,
+      startedAt: 0,
+      chatId: 'child',
+      ok: true,
+      text: 'сделал',
+    });
+
+    expect(send).not.toHaveBeenCalled();
+    expect(onChainEnded).toHaveBeenCalledTimes(1);
+    expect(onChainEnded.mock.calls[0]?.[0]).toBe(link);
   });
 
   it('связи у разговора нет — звено остаётся вне дерева, как и он сам', () => {
@@ -858,6 +968,31 @@ describe('createForeignStagePlanner', () => {
     expect(readChat(dir, 'codex', 'plan')?.messages.at(-1)?.role).toBe('user');
   });
 
+  it('связь работы несёт выжимку плана: звенья после работы её видят (F2)', () => {
+    planChat('plan', PLAN_HEAD, 'Переименуй foo в bar');
+    const send = vi.fn().mockReturnValue({ ok: true });
+    const saveLink = vi.fn();
+
+    planner(send, true, {
+      linkOf: (key) =>
+        key === 'codex:plan'
+          ? { parentChatId: 'codex:parent', createdAt: '2026-10-12T00:00:00.000Z', task: 'задание' }
+          : undefined,
+      saveLink,
+    })({
+      providerId: 'codex',
+      appDataDir: dir,
+      startedAt: 0,
+      chatId: 'plan',
+      ok: true,
+      text: '```agentdeck:plan\n1. Прочитать src/foo.ts\n```',
+    });
+
+    const [, saved] = saveLink.mock.calls[0] as [string, ChatLink];
+    expect(saved.stage).toBe('work');
+    expect(saved.planSummary).toContain('Прочитать src/foo.ts');
+  });
+
   it('плана в ответе нет — работа идёт, а лента называет причину', () => {
     planChat('plan', PLAN_HEAD, 'Переименуй foo в bar');
     const send = vi.fn().mockReturnValue({ ok: true });
@@ -1094,5 +1229,106 @@ describe('createForeignStagePlanner', () => {
       const [, , nextId] = send.mock.calls[0] as [string, string, string, { text: string }];
       expect(readChatCascade(dir, 'codex', nextId)?.stage).toBe('review');
     });
+  });
+});
+
+/**
+ * Звенья после работы — НОВЫЕ разговоры (F2, 12.10.2026): их первая реплика и
+ * есть промпт звена. Claude передаёт в него задание группы, план и итог
+ * прошлого звена; чужие правки, проверка и доставка шли без всего этого и
+ * восстанавливали задачу по диффу.
+ */
+describe('planForeignStage — контекст звеньев (F2, паритет с Claude)', () => {
+  const TASK = 'Задание группы: переименуй foo в bar во всём пакете';
+  const PLAN = 'План группы: сначала src/foo.ts, потом тесты';
+  const LINK: ChatLink = {
+    parentChatId: 'codex:parent',
+    createdAt: '2026-10-12T00:00:00.000Z',
+    task: 'собранное задание работы с преамбулами',
+    groupTask: TASK,
+    planSummary: PLAN,
+    branch: 'split/rename',
+  };
+
+  const foreign = (cascade: ProviderChatCascade, text: string) =>
+    planForeignStage({
+      cascade,
+      ok: true,
+      text,
+      task: 'первая реплика самого звена',
+      hasWork: () => true,
+      link: LINK,
+      deliver: true,
+    });
+
+  const claude = (link: Partial<ChatLink>, text: string) =>
+    planCascadeStage({
+      link: { ...LINK, model: 'm-work', workModel: 'm-work', ceilingModel: 'm-top', ...link },
+      ok: true,
+      text,
+      task: 'первая реплика самого звена',
+      hasWork: () => true,
+      deliver: true,
+    });
+
+  const cases: {
+    name: string;
+    stage: ForeignStagePlan['stage'];
+    cascade: ProviderChatCascade;
+    link: Partial<ChatLink>;
+    text: string;
+    previous?: string;
+  }[] = [
+    {
+      name: 'ревью работы',
+      stage: 'review',
+      cascade: WORK,
+      link: { stage: 'work' },
+      text: 'сделал',
+    },
+    {
+      name: 'правки по ревью',
+      stage: 'fix',
+      cascade: { ...WORK, stage: 'review' },
+      link: { stage: 'review' },
+      text: reviewBlock(['src/a.ts: не переименован bar']),
+      previous: 'Посмотрел.',
+    },
+    {
+      name: 'проверка правок',
+      stage: 'review',
+      cascade: { ...WORK, stage: 'fix', fixFindings: ['src/a.ts: не переименован bar'] },
+      link: { stage: 'fix', fixFindings: ['src/a.ts: не переименован bar'] },
+      text: 'исправил src/a.ts',
+      previous: 'исправил src/a.ts',
+    },
+    {
+      name: 'доставка после чистого ревью',
+      stage: 'deliver',
+      cascade: { ...WORK, stage: 'review' },
+      link: { stage: 'review' },
+      text: reviewBlock([]),
+    },
+    {
+      name: 'доставка после проверки',
+      stage: 'deliver',
+      cascade: { ...WORK, stage: 'review', fixFindings: ['src/a.ts: не переименован bar'] },
+      link: { stage: 'review', fixFindings: ['src/a.ts: не переименован bar'] },
+      text: `Проверил.\n${reviewBlock([])}`,
+      previous: 'Проверил.',
+    },
+  ];
+
+  it.each(cases)('$name: задание группы и план — у чужого CLI, как у Claude', (c) => {
+    const plan = foreign(c.cascade, c.text);
+    const mirror = claude(c.link, c.text);
+
+    expect(plan?.stage).toBe(c.stage);
+    expect(mirror?.stage).toBe(c.stage);
+    for (const prompt of [plan?.prompt, mirror?.prompt]) {
+      expect(prompt).toContain(TASK);
+      expect(prompt).toContain(PLAN);
+      if (c.previous) expect(prompt).toContain(c.previous);
+    }
   });
 });

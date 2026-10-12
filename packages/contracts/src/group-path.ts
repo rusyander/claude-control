@@ -36,7 +36,8 @@ export type LocalizedText = Infer<typeof localizedTextSchema>;
 export const pathResourceTypeSchema = zodEnum(['skill', 'hook', 'rule', 'script']);
 export type PathResourceType = Infer<typeof pathResourceTypeSchema>;
 
-const MAX_STEP_TEXT = 8_000;
+/** Текст шага — задание владельца: при 8k подробный шаг с примерами не сохранялся. */
+const MAX_STEP_TEXT = 32_000;
 const MAX_STEP_TITLE = 200;
 
 /**

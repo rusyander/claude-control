@@ -25,6 +25,8 @@ import type {
 } from '@agentdeck/contracts';
 import type {
   SplitGroupCleaned,
+  SplitGroupTokenFlag,
+  SplitGroupTokenLedger,
   SplitGroupWait,
   SplitOverlapView,
 } from '@agentdeck/contracts/chat-handoff';
@@ -36,6 +38,7 @@ import type {
 import type { StoredSplitDefaults } from '@agentdeck/contracts/split-groups';
 import type { SplitHumanStepView, SplitTicketView } from '@agentdeck/contracts/split-tickets';
 import type { SieveReportRow } from '@agentdeck/contracts/sieves';
+import type { ReviewDepthGap, ReviewTier } from '@agentdeck/contracts/model-cascade';
 
 /**
  * Откуда взялся чат: см. `AppState.chatLinks`.
@@ -84,6 +87,11 @@ export interface PathRun {
    * (ревью, правки, доставка) решается по ним, а не по ответу последнего шага.
    */
   held?: { text: string; task: string };
+  /**
+   * Шаг `pending` уже получил своё одно напоминание отчитаться блоком проверки
+   * (F10): без блока и после него цепочка ждёт человека.
+   */
+  nudged?: boolean;
 }
 
 export interface ChatLink {
@@ -178,6 +186,12 @@ export interface ChatLink {
    */
   deliveredAt?: string;
   /**
+   * Замечания ревью, по которым шли правки (U6): у связи правок — что проверить
+   * после них, у связи проверки — что она проверяет. Стадия проверки — та же
+   * `review`, и по этому полю она отличается от ревью работы.
+   */
+  fixFindings?: string[];
+  /**
    * Свои шаги «Пути» группы (`domains/chat/path-steps/path-steps.ts`), идущие ходами в ЭТОМ
    * чате после его стадии. Без записи шаг заводился бы на каждом ходу человека,
    * а стадия за шагами читала бы ответ шага вместо ответа своей стадии.
@@ -190,6 +204,16 @@ export interface ChatLink {
    * промпт прогона плана — это уже промпт плана, не задание.
    */
   task?: string;
+  /**
+   * Задание группы БЕЗ преамбул работы (копия, доставка, тикет, строка
+   * старшинства) — то, что звенья после работы (ревью, правки, проверка,
+   * доставка) вкладывают как «задание, с которого началась работа» (TQ-01,
+   * 12.10.2026). Собранный промпт работы туда не годится: ревью «ничего не
+   * правь» читало в нём право коммитить и пушить, а доставка — вторую
+   * процедуру доставки. `task` остаётся целым — по нему идёт работа после
+   * плана и продолжение с чистого листа, которым эти права нужны.
+   */
+  groupTask?: string;
   /**
    * Выжимка плана группы от звена плана — едет по всем следующим звеньям, чтобы
    * ревью, правки и доставка знали план, не видя его разговора (аудит 25.09, L238).
@@ -245,7 +269,12 @@ export interface ChatReviewState {
   findings?: string[];
   decision?: 'fix' | 'post' | 'both' | 'none';
   decidedAt?: string;
-  /** Сводный комментарий записан в MR (ISO). */
+  /**
+   * Владелец в задании сам разрешил публикацию (`grantsReviewPublish`): сессия
+   * ревью публикует замечания сама, карточка второй раз согласия не просит.
+   */
+  publish?: boolean;
+  /** Замечания записаны в MR (ISO): сессией ревью или сводным комментарием. */
   postedAt?: string;
   /** Почему запись не удалась — человеку на карточку, а не в лог. */
   postError?: string;
@@ -255,6 +284,24 @@ export interface ChatReviewState {
   pushBlocked?: 'branch-unknown';
   /** Согласие на коммит и push отдано агенту (ISO). */
   pushedAt?: string;
+  /**
+   * Панель сама продолжила ревью (A0): повтор итога, дочитать по отчёту о
+   * глубине или второй свидетель. Пока стоит, группа ждёт этот ход, а не
+   * человека; снимается концом хода.
+   */
+  followUp?: boolean;
+  /** Когда панель сама попросила повторить итог без блока: второй раз — карточка. */
+  missingAsked?: string;
+  /** Когда панель попросила дочитать по отчёту о глубине (U4): один раз. */
+  depthAsked?: string;
+  /** Тир из отчёта ревьюера о глубине. */
+  tier?: ReviewTier;
+  /** Что осталось неполным после просьбы дочитать — на карточку. */
+  incomplete?: ReviewDepthGap[];
+  /** Этот разговор — второй свидетель (U5): своего свидетеля он не заводит. */
+  witness?: boolean;
+  /** Ключ второго свидетеля, заведённого по пустому ревью этого разговора. */
+  witnessChatId?: string;
 }
 
 /**
@@ -413,7 +460,14 @@ export interface SplitPlanGroupRecord {
    * автоматических кейсов задел дифф группы, сколько из них зелёные и каким прогоном.
    */
   testsVerdict?: { cases: number; passed: number; runId?: string; runAt?: string };
+  /** Счёт токенов группы на её закрытии (E4, `token-ledger.ts`). */
+  tokenLedger?: SplitTokenLedger;
 }
+
+/** Счёт токенов группы (E4) — форма записи та же, что у хаба. */
+export type SplitTokenLedger = SplitGroupTokenLedger;
+export type SplitTokenUsage = NonNullable<SplitGroupTokenLedger['usage']>;
+export type SplitTokenFlag = SplitGroupTokenFlag;
 
 /** След звена: какое звено шло; у ревью, кончившего цепочку, — сколько замечаний. */
 export interface SplitStageTrace {
@@ -463,6 +517,11 @@ export interface SplitMrWatch {
   pipeline?: { id: string; status: string };
   /** Сколько раз наблюдатель продолжил группу — потолок против петли. */
   resumes?: number;
+  /**
+   * Задания, которые панель уже повторила после падения CI на инфраструктуре
+   * (E3): `<конвейер>:<задание>`. Второе падение того же — заметка человеку.
+   */
+  infraRetried?: string[];
   /** Круг кончен: MR влит или закрыт, расписание исчерпано, потолок продолжений. */
   stopped?: 'merged' | 'closed' | 'exhausted' | 'limit';
 }
@@ -619,6 +678,8 @@ export interface RunnerPrefs {
   pinnedPort?: number;
   /** Оверрайд команды запуска. */
   command?: string;
+  /** Цель входит в «Запустить всё» проекта. */
+  inGroup?: boolean;
 }
 
 /** Чем цель отличается от голого пути: корень проекта и подпапка внутри него. */

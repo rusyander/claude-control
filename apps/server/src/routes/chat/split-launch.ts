@@ -8,6 +8,7 @@ import {
   clampAssignment,
   loweredWorkPrompt,
   manualAssignment,
+  namesProjectChecks,
   parseAssignments,
   planAssignment,
 } from '@agentdeck/contracts/model-cascade';
@@ -16,6 +17,7 @@ import {
   planStagePrompt,
   TASK_MAX_CHARS,
 } from '@agentdeck/contracts/split-plan';
+import { labelledCut } from '@agentdeck/contracts/quality-floor';
 import { foreignChatKey, parseForeignChatKey } from '@agentdeck/contracts/foreign-chat-key';
 import type { ServerContext } from '../../context.ts';
 import type {
@@ -322,6 +324,10 @@ export function createSplitLauncher(
    */
   const linkRecord = (chat: Parameters<SplitLink>[0], parent: string): ChatLink => {
     const { title, branch, path, assignment, stage, group, prompt, context, review, index } = chat;
+    // Слова группы без преамбул работы — звеньям после неё (TQ-01).
+    const groupTask = chat.groupTask
+      ? { groupTask: labelledCut(chat.groupTask, TASK_MAX_CHARS) }
+      : {};
     // Номер группы в разделении — ключ её строки в хабе (Д12): ветку агент
     // волен переключить, а звенья одной группы от этого не становятся чужими.
     const groupIndex = { groupIndex: index };
@@ -353,7 +359,8 @@ export function createSplitLauncher(
         lowered: assignment.lowered,
         ...(assignment.kind ? { kind: assignment.kind } : {}),
         ...ceilingFields,
-        task: prompt.slice(0, TASK_MAX_CHARS),
+        task: labelledCut(prompt, TASK_MAX_CHARS),
+        ...groupTask,
         ...(group.owns && group.owns.length > 0 ? { owns: group.owns } : {}),
         ...(notes ? { notes } : {}),
       };
@@ -378,12 +385,17 @@ export function createSplitLauncher(
             }
           : {}),
         ...ceilingFields,
+        // Задание целиком — для второго свидетеля (U5): та же просьба владельца
+        // слово в слово, только с другого входа.
+        task: labelledCut(prompt, TASK_MAX_CHARS),
+        ...groupTask,
         review: {
           url: review.url,
           ...(review.branch ? { branch: review.branch } : {}),
           ...(review.onMrBranch ? {} : { onMrBranch: false }),
           ...(review.remote ? { remote: review.remote } : {}),
           ...(review.detached ? { detached: true } : {}),
+          ...(review.publish ? { publish: true } : {}),
           path,
         },
       };
@@ -394,6 +406,10 @@ export function createSplitLauncher(
       branch,
       ...groupIndex,
       createdAt: new Date().toISOString(),
+      // Задание целиком — продолжению с чистого листа (F6: раньше его корнем
+      // становилась последняя реплика, «да, вариант A»), слова группы — звеньям.
+      task: labelledCut(prompt, TASK_MAX_CHARS),
+      ...groupTask,
       // Назначение живёт в связи, а не только в прогоне: второе сообщение
       // ребёнку приходит уже без него.
       ...(assignment
@@ -456,7 +472,12 @@ export function createSplitLauncher(
       initiativePrompt(settings, { splitMuted: true }),
       // План идёт на потолке без права правок — планки сдачи ему не надо; её
       // получит работа, когда план кончится (`stageAppendPrompt`).
-      !isPlan && assignment?.lowered ? loweredWorkPrompt(assignment.kind) : '',
+      // Задание с доставкой уже назвало проверки проекта — без повтора (TQ-10).
+      !isPlan && assignment?.lowered
+        ? loweredWorkPrompt(assignment.kind, {
+            ...(namesProjectChecks(prompt) ? { checksInTask: true } : {}),
+          })
+        : '',
       // Та же стадия, что ляжет в связь (`linkRecord`), и то же дополнение, что
       // соберёт следующий ход (`childAppendPrompt`): подпись процесса одна.
       childStageExtra(
@@ -552,7 +573,12 @@ export function createSplitLauncher(
         : prompt;
     // Шапка звена. У плана в ней лежит то, чем пойдёт РАБОТА, а не он сам:
     // `lowered` здесь читается как «работа пойдёт ниже настройки CLI», и
-    // планировщик перенесёт это на работу вместе с моделью.
+    // планировщик перенесёт это на работу вместе с моделью. Шапку получает и
+    // группа на потолке (F3, 12.10.2026): без неё конвейер обрывался до ревью и
+    // до конца цепочки, и соседи, ждущие группу через `after`, ждали вечно.
+    // Ревью по ссылке шапки не получает (его конвейер живёт в связи), как и
+    // группа в проекте с выключенным подбором: там конец цепочки ловит сеть
+    // планировщика (`createForeignStagePlanner`).
     const cascade: ProviderChatCascade | undefined =
       isPlan && assignment
         ? {
@@ -574,7 +600,14 @@ export function createSplitLauncher(
               workEffort: assignment.effort,
               ...(assignment.kind ? { kind: assignment.kind } : {}),
             }
-          : undefined;
+          : input.review || !canPlan
+            ? undefined
+            : {
+                stage: 'work',
+                group: title,
+                branch,
+                ...(assignment?.kind ? { kind: assignment.kind } : {}),
+              };
     const created = createChat(appData, provider.id, {
       title,
       workdir: cwd,
@@ -602,7 +635,12 @@ export function createSplitLauncher(
       initiativePrompt(ctx.store.getSettings(), { splitMuted: true, foreign: true }),
       // План идёт на потолке — планка сдачи ему не нужна; её получит работа,
       // когда план кончится (`foreignStagePrefix`).
-      !isPlan && assignment?.lowered ? loweredWorkPrompt(assignment.kind, { reviewer: 'cli' }) : '',
+      !isPlan && assignment?.lowered
+        ? loweredWorkPrompt(assignment.kind, {
+            reviewer: 'cli',
+            ...(namesProjectChecks(prompt) ? { checksInTask: true } : {}),
+          })
+        : '',
       // Строки группы звена — те же, что у ребёнка Claude, и собраны по связи,
       // записанной выше: переход стадии, продолжение и ответ человека строят их
       // тем же `foreignChildExtra`. Системной дописки у чужого CLI нет — всё
@@ -741,6 +779,7 @@ export function createSplitLauncher(
         deliver: resolveProjectDelivery(ctx.store, settingsDir).active,
         // Кто решает развилки групп — общая строка вкладки «Группы».
         groupQuestions: ctx.store.getSplitDefaults().groupQuestions,
+        ...(isForeign ? { foreign: true } : {}),
       }),
     startTriage: (prompt, claim) => {
       // У чужого CLI разбор — такой же разговор его хранилища, как и всё

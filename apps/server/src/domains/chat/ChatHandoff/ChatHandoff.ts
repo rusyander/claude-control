@@ -10,6 +10,7 @@ import {
   type HandoffStarted,
   type HandoffVerdict,
 } from '@agentdeck/contracts/chat-handoff';
+import { labelledCut } from '@agentdeck/contracts/quality-floor';
 
 /**
  * Продолжение работы в чистой сессии — сторона сервера.
@@ -227,7 +228,11 @@ export class HandoffChains {
   link(fromAliases: string[], toChatId: string, options: ChainLinkOptions = {}): number {
     const parent = this.stateOf(fromAliases);
     const depth = (parent?.depth ?? 0) + (options.stage ? 0 : 1);
-    const rootTask = parent?.rootTask ?? options.rootTask?.trim().slice(0, HANDOFF_ROOT_TASK_MAX);
+    const rootTask =
+      parent?.rootTask ??
+      (options.rootTask?.trim()
+        ? labelledCut(options.rootTask.trim(), HANDOFF_ROOT_TASK_MAX)
+        : undefined);
     const checkpointHash = options.stage
       ? parent?.checkpointHash
       : (options.checkpointHash ?? parent?.checkpointHash);
@@ -496,6 +501,21 @@ export interface StartHandoffInput {
 }
 
 /**
+ * Ключи, выданные в одну миллисекунду, различаются суффиксом (12.10.2026): звенья
+ * конвейера заводятся этим же путём, и два старта в одну миллисекунду — подъём
+ * работы на потолок сразу за ней, концы двух групп разом — получали один ключ,
+ * и второй затирал связь и цепочку первого.
+ */
+let lastStamp = -1;
+let sameStamp = 0;
+
+function uniqueNewChatId(stamp: number): string {
+  sameStamp = stamp === lastStamp ? sameStamp + 1 : 0;
+  lastStamp = stamp;
+  return sameStamp === 0 ? `new-${stamp}` : `new-${stamp}-${sameStamp}`;
+}
+
+/**
  * Завести продолжение: новый разговор в том же каталоге с заданием из
  * предложения. Копий репозитория здесь не заводится и ветка не меняется —
  * работа та же самая, меняется только окно контекста.
@@ -514,10 +534,12 @@ export function startHandoff({
 }: StartHandoffInput): HandoffStarted {
   // Ключ чата — тот же временный вид, что и у разговора, начатого из панели:
   // настоящим id он станет, когда CLI выдаст сессию.
-  const chatId = `new-${now()}`;
+  const chatId = uniqueNewChatId(now());
   // Задание в промпте и задание в памяти цепочки — одно и то же: иначе второе
   // продолжение получило бы не тот текст, что первое.
-  const task = chains.rootTaskOf(fromAliases) ?? rootTask?.trim().slice(0, HANDOFF_ROOT_TASK_MAX);
+  const task =
+    chains.rootTaskOf(fromAliases) ??
+    (rootTask?.trim() ? labelledCut(rootTask.trim(), HANDOFF_ROOT_TASK_MAX) : undefined);
   const prompt = buildHandoffPrompt(proposal, task, { group });
   const chainDepth = chains.link(fromAliases, chatId, {
     ...(task ? { rootTask: task } : {}),

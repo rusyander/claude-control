@@ -350,9 +350,9 @@ describe('ChatRunRegistry — происхождение прогона и ма�
   });
 
   /**
-   * Строка о тестах проекта (папка e2e, команда сверки) — на КАЖДОМ старте и
-   * по каталогу прогона: папка могла появиться между ходами. Осечка слушателя
-   * старт не срывает.
+   * Строка о тестах проекта (папка e2e, команда сверки) — у новой сессии по
+   * каталогу прогона, а не из сохранённых параметров прошлой жизни. Осечка
+   * слушателя старт не срывает.
    */
   it('строка каталога прогона ставится на каждом старте, осечка слушателя — пустая строка', () => {
     const asked: string[] = [];
@@ -369,6 +369,86 @@ describe('ChatRunRegistry — происхождение прогона и ма�
     });
     registry.start('c9', { ...OPTIONS }, {});
     expect(registry.describe('c9')?.options.workspaceNote).toBe('');
+  });
+
+  /**
+   * E6. Системный промпт сессии обязан совпадать байт в байт от хода к ходу —
+   * иначе CLI пишет кэш всего разговора заново (замер 12.10.2026: путь папки
+   * e2e сменился посреди сессии копии). Строка о тестах замораживается на
+   * первом ходе сессии, а перемена уходит блоком в сообщении — один раз.
+   */
+  it('строка о тестах — одна на сессию, перемена уходит в сообщении один раз', async () => {
+    let note = 'QA workspace: no e2e folder yet';
+    registry.setWorkspaceNote(() => note);
+    registry.start('s1', { ...OPTIONS }, {});
+    fake.emit(SESSION);
+    fake.finish();
+    await flush();
+
+    note = 'QA workspace: e2e folder "e2e" (playwright, 3 spec files)';
+    fake = new FakeRun();
+    registry.start('s1', { ...OPTIONS, prompt: 'дальше', sessionId: 'sess-1' }, {});
+    const second = registry.describe('s1')?.options;
+    expect(second?.workspaceNote).toBe('QA workspace: no e2e folder yet');
+    expect(second?.prompt).toMatch(
+      /^<agentdeck-workspace>[^<]*QA workspace: e2e folder "e2e" \(playwright, 3 spec files\)<\/agentdeck-workspace>\n\nдальше$/,
+    );
+    fake.emit(SESSION);
+    fake.finish();
+    await flush();
+
+    // Перемена сказана — следующий ход идёт без блока, а системная строка та же.
+    fake = new FakeRun();
+    registry.start('s1', { ...OPTIONS, prompt: 'третий', sessionId: 'sess-1' }, {});
+    expect(registry.describe('s1')?.options.workspaceNote).toBe('QA workspace: no e2e folder yet');
+    expect(registry.describe('s1')?.options.prompt).toBe('третий');
+  });
+
+  it('перемена не ломает команду CLI и ждёт следующего хода; осечка не стирает строку', async () => {
+    let note: string | Error = 'QA workspace: one';
+    registry.setWorkspaceNote(() => {
+      if (note instanceof Error) throw note;
+      return note;
+    });
+    registry.start('s2', { ...OPTIONS }, {});
+    fake.emit(SESSION);
+    fake.finish();
+    await flush();
+
+    note = 'QA workspace: two';
+    fake = new FakeRun();
+    registry.start('s2', { ...OPTIONS, prompt: '/compact', sessionId: 'sess-1' }, {});
+    expect(registry.describe('s2')?.options.prompt).toBe('/compact');
+    fake.emit(SESSION);
+    fake.finish();
+    await flush();
+
+    // Сбой чтения: строка прежняя, и агенту не говорят, что тестов не стало.
+    note = new Error('битый файл окружений');
+    fake = new FakeRun();
+    registry.start('s2', { ...OPTIONS, prompt: 'ход', sessionId: 'sess-1' }, {});
+    expect(registry.describe('s2')?.options.workspaceNote).toBe('QA workspace: one');
+    expect(registry.describe('s2')?.options.prompt).toBe('ход');
+    fake.emit(SESSION);
+    fake.finish();
+    await flush();
+
+    // Повтор хода родителя разделения: параметры прошлой попытки несут и сводку
+    // детей, и блок перемены под ней — ни то, ни другое не копится.
+    note = 'QA workspace: two';
+    registry.setChildrenBriefResolver(() => '<agentdeck-children>дети</agentdeck-children>');
+    fake = new FakeRun();
+    const retried =
+      '<agentdeck-children>дети</agentdeck-children>\n\n' +
+      '<agentdeck-workspace>old</agentdeck-workspace>\n\nещё';
+    registry.start('s2', { ...OPTIONS, prompt: retried, sessionId: 'sess-1' }, {});
+    const prompt = registry.describe('s2')?.options.prompt ?? '';
+    expect(prompt.match(/<agentdeck-workspace>/g)).toHaveLength(1);
+    expect(prompt.match(/<agentdeck-children>/g)).toHaveLength(1);
+    expect(prompt).toMatch(
+      /^<agentdeck-children>дети<\/agentdeck-children>\n\n<agentdeck-workspace>/,
+    );
+    expect(prompt).toContain('QA workspace: two</agentdeck-workspace>\n\nещё');
   });
 
   it('маршрута нет — флагов нет, и дописка панели остаётся как была', () => {

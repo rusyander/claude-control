@@ -1,4 +1,5 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import type {
   AppSettings,
@@ -145,8 +146,14 @@ export function resolveProviderInstructionsTargetFor(
   };
 }
 
-/** Абсолютный путь записи: абсолютную оставляем как есть, относительную — от базы. */
+/**
+ * Абсолютный путь записи: абсолютную оставляем как есть, `~/…` — от дома (Aider
+ * разворачивает его сам, `expanduser`), прочую относительную — от базы.
+ */
 export function resolveEntryPath(target: ProviderInstructionsTarget, raw: string): string {
+  if (raw === '~' || raw.startsWith('~/') || raw.startsWith('~\\')) {
+    return resolve(homedir(), raw.slice(2));
+  }
   return isAbsolute(raw) ? resolve(raw) : resolve(target.baseDir, raw);
 }
 

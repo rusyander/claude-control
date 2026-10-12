@@ -5,11 +5,14 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { ModelInfo } from '@agentdeck/contracts';
 import { ESCALATE_LINE } from '@agentdeck/contracts/model-cascade';
+import { SPLIT_DEFAULTS_BUILTIN } from '@agentdeck/contracts/split-groups';
+import { FOREIGN_CHILD_PROMPT } from '../../domains/chat/initiative/initiative.ts';
 import { writePanelJson } from '../../lib/app-store/group-sources.ts';
 import { foreignChildExtra } from '../../domains/chat/group-run-lines/group-run-lines.ts';
 import { AppStore } from '../../lib/app-store/app-store.ts';
 import type { ServerContext } from '../../context.ts';
 import { registerChatSplitRoutes } from '../chat/split-routes.ts';
+import { startForeignReviewStage } from '../chat/review-starter.ts';
 import {
   ChatRunRegistry,
   type RunLike,
@@ -44,6 +47,7 @@ describe('POST /api/chat/split — чужой провайдер', () => {
   let runs: ProviderChatRunOptions[];
   let deferred: string[];
   let paused = false;
+  let ctx: ServerContext;
 
   const catalog = [
     { id: 'gpt-5.3-codex-spark', name: 'spark', family: 'gpt-codex-spark', releaseDate: '2026-02' },
@@ -75,7 +79,7 @@ describe('POST /api/chat/split — чужой провайдер', () => {
     store = new AppStore(appData);
     store.updateSettings({ provider: 'codex' });
 
-    const ctx = {
+    ctx = {
       location: {
         paths: {
           root,
@@ -158,11 +162,12 @@ describe('POST /api/chat/split — чужой провайдер', () => {
   });
 
   /**
-   * Стадия — единственное, чем конвейер у чужого CLI вообще держится: связей
-   * панели у этих разговоров нет, и, не запиши её разделение, ревью не завелось
-   * бы никогда.
+   * Стадия — единственное, чем конвейер у чужого CLI вообще держится: не запиши
+   * её разделение, ревью не завелось бы никогда. Группа на потолке получает
+   * шапку тоже (F3, 12.10.2026): без неё конвейер обрывался до ревью и до конца
+   * цепочки, и группы, ждущие её через `after`, ждали вечно.
    */
-  it('понижённой группе пишется стадия работы в шапке, группе на потолке — нет', async () => {
+  it('шапка работы — у каждой группы: понижённой с назначением, на потолке без модели (F3)', async () => {
     await split();
 
     const lowered = listChats(appData, 'codex').find((item) => item.title === 'Переименования');
@@ -178,7 +183,12 @@ describe('POST /api/chat/split — чужой провайдер', () => {
     expect(readChatCascade(appData, 'codex', lowered?.id ?? '')?.branch).toBeTruthy();
 
     const ceiling = listChats(appData, 'codex').find((item) => item.title === 'Архитектура');
-    expect(readChatCascade(appData, 'codex', ceiling?.id ?? '')).toBe(undefined);
+    const head = readChatCascade(appData, 'codex', ceiling?.id ?? '');
+    expect(head).toMatchObject({ stage: 'work', group: 'Архитектура' });
+    expect(head?.branch).toBeTruthy();
+    // Потолок чужого CLI — его собственная настройка: ни модели, ни «ниже».
+    expect(head?.workModel).toBeUndefined();
+    expect(head?.lowered).toBeUndefined();
   });
 
   // Раунд 5: чужие дети получали без чисел группы и без строки эскалации то,
@@ -223,6 +233,47 @@ describe('POST /api/chat/split — чужой провайдер', () => {
       expect(run.systemPrefix).toContain('ladder — Review rounds: 4 (skill default 2)');
       // Та же строка, что соберут ответ человека, переход стадии и продолжение.
       expect(run.systemPrefix).toContain(foreignChildExtra(store, appData, `codex:${run.chatId}`));
+    }
+
+    // E6: продолжение разговора панелью (пауза, лимит, слово родителя) идёт с
+    // той же шапкой, что и старт, — до правки с голыми инициативами.
+    const first = runs[0]!;
+    const key = `codex:${first.chatId}`;
+    const resumed = startForeignReviewStage(
+      ctx,
+      { providerChats } as unknown as Parameters<typeof startForeignReviewStage>[1],
+      'codex',
+      {
+        chatId: key,
+        prompt: 'The human paused the group and is now resuming it.',
+        cwd: project,
+        stage: 'tell',
+        fromAliases: [key],
+        resume: { sessionId: key },
+      },
+    );
+    expect(resumed.started).toBe(true);
+    expect(runs).toHaveLength(3);
+    expect(runs[2]?.systemPrefix).toBe(first.systemPrefix);
+  });
+
+  /**
+   * Ребёнок Claude получает правила группы системной дописью (`CHILD_PROMPT`,
+   * фон только для служебного); ребёнок чужого CLI не получал их вовсе (TQ-06,
+   * 12.10.2026) — а в задании ему велели спрашивать инструментом, которого у
+   * него нет (F8).
+   */
+  it('ребёнок чужого CLI получает правила группы — без инструмента вопросов (TQ-06, F8)', async () => {
+    store.setSplitDefaults({ ...structuredClone(SPLIT_DEFAULTS_BUILTIN), groupQuestions: 'human' });
+
+    await split();
+
+    expect(runs).toHaveLength(2);
+    for (const run of runs) {
+      expect(run.systemPrefix).toContain(FOREIGN_CHILD_PROMPT);
+      const said = [run.systemPrefix ?? '', ...run.history.map((message) => message.content)];
+      expect(said.join('\n')).not.toContain('AskUserQuestion');
+      expect(said.join('\n')).toContain('last line of your answer');
     }
   });
 

@@ -1,5 +1,5 @@
 import type { HandoffRefusal } from '@agentdeck/contracts/chat-handoff';
-import type { CascadeStage } from '@agentdeck/contracts/model-cascade';
+import type { CascadeStage, ReviewDepthGap } from '@agentdeck/contracts/model-cascade';
 import type { ServerMessageCode, ServerMessageParams } from '@agentdeck/contracts/server-messages';
 import type { BranchGateChild } from './ChatBranchGate/ChatBranchGate.ts';
 import type { EscalationNotice, RecommendedPick } from '@agentdeck/contracts/chat-group-settings';
@@ -139,6 +139,7 @@ export type ChatEvent =
        * 'groupsInterrupted' — процессы групп оборвались посреди хода (WP1c);
        * 'groupsLimited' — группы ждут сброса лимита подписки (журнал 89);
        * 'mrWatchLimit' — наблюдатель MR исчерпал самостоятельные продолжения;
+       * 'mrWatchInfra' — CI упал на инфраструктуре: панель повторила задания сама / второе падение (E3);
        * 'defaultDrift' — основная ветка ушла вперёд и задела файлы идущей группы (находка 61);
        * 'deliveryUnchecked' — часть готовности группы (описание MR) панель не проверила.
        * 'pathStep' / 'pathGateFailed' — шаг «Пути» группы пошёл в этом чате / не прошёл проверку.
@@ -162,6 +163,7 @@ export type ChatEvent =
         | 'groupsInterrupted'
         | 'groupsLimited'
         | 'mrWatchLimit'
+        | 'mrWatchInfra'
         | 'defaultDrift'
         | 'deliveryUnchecked'
         | 'pathStep'
@@ -249,6 +251,8 @@ export type ChatEvent =
       noChanges?: boolean;
       /** Правки есть, но push не предложен: ветка MR неизвестна (Д9). */
       pushBlocked?: 'branch-unknown';
+      /** Ревью осталось неполным и после просьбы дочитать (U4) — не «чисто». */
+      incomplete?: ReviewDepthGap[];
     };
 
 /** Счётчики расхода в том виде, в каком их пишет CLI (и модель). */

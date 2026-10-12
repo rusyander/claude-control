@@ -213,8 +213,9 @@ export const groupsEn: typeof groupsRu = {
       pProposal: 'A ready step in two languages',
       pProposalText:
         'The result is a title, the text for the model and “Done when”, in Russian and ' +
-        'English. The English side goes into the run: models get their instructions in ' +
-        'English, and the Russian side is for you.',
+        'English. Your words go into the run as written — the side you edited last — ' +
+        'and the translation follows only as a hint: where the two differ, the model ' +
+        'follows the original.',
       pTranslate: 'Editing one side',
       pTranslateText:
         'Edited the English text — the window warns that the Russian side should be ' +
@@ -224,7 +225,7 @@ export const groupsEn: typeof groupsRu = {
       pPromote: 'Make the step a resource?',
       pPromoteText:
         'After “Confirm” the step is saved as a panel prompt — it lives in the group’s ' +
-        'data, and its English side goes into the run. If the step will be useful in ' +
+        'data, and its original side goes into the run with the translation as a hint. If the step will be useful in ' +
         'other groups too, the assistant offers to make it a skill, hook or rule and ' +
         'shows a draft of the file. “Make” creates the resource the panel’s usual way ' +
         '(with a backup) and adds it to the group; “Keep as a panel prompt” creates ' +
@@ -630,11 +631,11 @@ export const groupsEn: typeof groupsRu = {
       'skills, hooks and variables, and in every project at once: the configuration ' +
       'files are shared. That is the price of automation, so bind only bundles that do ' +
       'not get in the way of other work.',
-    noteEnglishTitle: 'The model gets the English side of a step',
+    noteEnglishTitle: 'The model gets your words of a step, the translation as a hint',
     noteEnglishText:
-      'The Russian text of a step is for you; the English one goes into the run. Edit one ' +
-      'side without translating the other and they drift apart — the step window warns ' +
-      'about it.',
+      'The side you edited last goes into the run as written; the other follows as a ' +
+      'hint, and where they differ the original wins. Edit one side without translating ' +
+      'the other and they drift apart — the step window warns about it.',
     noteRebuildTitle: 'Automations became Hook steps',
     noteRebuildText:
       'Automations made earlier are moved once, at start-up: each becomes an ordinary hook ' +

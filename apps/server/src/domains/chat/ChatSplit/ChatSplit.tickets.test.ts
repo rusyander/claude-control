@@ -57,6 +57,48 @@ describe('абзац о блоке тикета в задании группы',
     }
   });
 
+  /**
+   * TQ-10 (12.10.2026): ревью по ссылке ничего не правит и не доставляет, а
+   * получало «свои дефекты чини сам» и блок шага доставки — противоречие
+   * своему же «ничего не правь».
+   */
+  it('ревью по ссылке: только блок тикета, без «чини своё» и шага доставки', async () => {
+    const seen: string[] = [];
+    await splitTasks({
+      projectPath: '/repo',
+      proposal: {
+        groups: [
+          { title: 'Форма входа', branch: 'feature/login', tasks: ['починить валидацию'] },
+          {
+            title: '!773',
+            branch: 'feat/b',
+            tasks: ['посмотри'],
+            review: { url: 'https://git.example/p/-/merge_requests/773' },
+          },
+        ],
+      },
+      startRuns: true,
+      git,
+      deliver: true,
+      claimBranch: () => undefined,
+      resolveReview: async () => ({ branch: 'feat/b' }),
+      start: ({ prompt }) => {
+        seen.push(prompt);
+        return true;
+      },
+    });
+
+    const [work, review] = seen;
+    expect(work).toContain('Fix defects of your own tasks yourself');
+    expect(work).toContain(`<${SPLIT_HUMAN_TAG}>`);
+    expect(review).toContain('EDIT NOTHING');
+    expect(review).toContain(`<${SPLIT_TICKET_TAG}>`);
+    expect(review).toContain('a finding of your review');
+    expect(review).not.toContain('Fix defects of your own tasks yourself');
+    expect(review).not.toContain(SPLIT_HUMAN_TAG);
+    expect(review).not.toContain('"For you to do"');
+  });
+
   it('без записи разделения абзаца нет — блок было бы некуда положить', async () => {
     const seen = await prompts(false);
 

@@ -29,6 +29,13 @@ describe('правки группы с доставкой (журнал 59d)', (
 
     expect(prompt).not.toContain('MR');
   });
+
+  it('правки без прохода проверки (ревью по ссылке, Т7) проверку не обещают', () => {
+    expect(fixStagePrompt(['поправь a.ts:1'])).not.toContain('verification pass');
+    expect(fixStagePrompt(['поправь a.ts:1'], { verify: true })).toContain(
+      'the panel starts one verification pass',
+    );
+  });
 });
 
 describe('звено доставки (журнал 59a, 61b)', () => {

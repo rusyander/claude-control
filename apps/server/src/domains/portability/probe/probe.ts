@@ -32,6 +32,7 @@ import { PROBE_MARKS, probeEnvironment, writeProbeScripts } from '../probe-canon
 import type { ProbeScripts } from '../probe-canon.ts';
 import { PROBE_RECIPES, type ProbeRecipe } from '../probe-recipes.ts';
 import { startProbeStub, type StubBlock } from '../probe-stub.ts';
+import { endpointModelName } from '../../endpoints/endpoint-plan.ts';
 
 /**
  * ПРИЁМОЧНАЯ ПРОБА (П2.4): отчёт верности из прогноза становится измерением.
@@ -151,12 +152,14 @@ export async function runProbe(deps: ProbeDeps): Promise<ProbeReport> {
     }
     recipe.prepare?.(home, workdir);
 
-    const stub = await startProbeStub(scriptFor(recipe, scripts, workdir));
+    const stub = await startProbeStub(scriptFor(recipe, scripts, workdir), {
+      toolless: recipe.selfRun !== undefined,
+    });
     try {
       const [command, ...prefix] = argv;
       const run = await runTarget({
         command: command ?? '',
-        args: [...prefix, ...probeArgs(recipe, promised)],
+        args: [...prefix, ...probeArgs(recipe, promised, scripts)],
         /** Оболочка нужна только настоящему бинарю (.cmd-обёртка на Windows). */
         shell: deps.cliOverride === undefined,
         cwd: workdir,
@@ -214,7 +217,7 @@ function stubAddress(
       // Профиль эндпоинта панель пишет человеку тремя переменными, и проба
       // обязана писать те же три: иначе она мерила бы цель, собранную не так,
       // как собирает панель.
-      ...(vars.modelEnv ? { [vars.modelEnv]: PROBE_SOURCE } : {}),
+      ...(vars.modelEnv ? { [vars.modelEnv]: endpointModelName(PROBE_SOURCE, vars) } : {}),
     });
   }
 
@@ -272,7 +275,11 @@ function stubAddress(
 function probeArgs(
   recipe: ProbeRecipe,
   promised: ReturnType<typeof promisedLevels>,
+  scripts: ProbeScripts,
 ): readonly string[] {
+  // Цель без инструментов исполняет пробу сама, своим запросом; нативной
+  // команды у неё на этом пути нет — запрос у прогона один.
+  if (recipe.selfRun) return recipe.args(recipe.selfRun(`node "${scripts.selfRunPath}"`));
   if (promised.get('command')?.level !== 'native') return recipe.args(PROBE_PLAIN_PROMPT);
   return recipe.commandArgs?.(recipe.commandPrompt) ?? recipe.args(recipe.commandPrompt);
 }
@@ -321,8 +328,9 @@ function judge(
   promised: ReturnType<typeof promisedLevels>,
   mcpAsked: boolean,
 ): readonly ProbeRow[] {
-  const realHome = new Set(PROBE_RECIPES[target.id]?.realHomeLayers?.(scope) ?? []);
-  return observe(requests, promised, mcpAsked).map((row) =>
+  const recipe = PROBE_RECIPES[target.id];
+  const realHome = new Set(recipe?.realHomeLayers?.(scope) ?? []);
+  return observe(requests, promised, mcpAsked, recipe?.selfRun !== undefined).map((row) =>
     realHome.has(row.layer) ? skipped(row.layer, promised, 'target_reads_real_home', '') : row,
   );
 }
@@ -350,6 +358,7 @@ function promisedLevels(
     forbiddenPath: '',
     envPath: '',
     mcpAskedPath: '',
+    selfRunPath: '',
   };
   const env = probeEnvironment({
     source: PROBE_SOURCE,
@@ -488,26 +497,29 @@ function scriptFor(
    */
   workdir: string,
 ): (turn: number) => readonly StubBlock[] {
+  const shellTool = recipe.shellTool;
+  const readTool = recipe.readTool;
   return (turn) => {
-    if (turn > 0) return [{ type: 'text', text: 'Проба завершена.' }];
+    // Цель без инструментов пробу уже исполнила сама: модели остаётся ответить.
+    if (turn > 0 || !shellTool || !readTool) return [{ type: 'text', text: 'Проба завершена.' }];
     return [
       {
         type: 'tool_use',
         id: 'probe_forbidden',
-        name: recipe.shellTool.name,
-        input: recipe.shellTool.call(`node "${scripts.forbiddenPath}"`, workdir),
+        name: shellTool.name,
+        input: shellTool.call(`node "${scripts.forbiddenPath}"`, workdir),
       },
       {
         type: 'tool_use',
         id: 'probe_env',
-        name: recipe.shellTool.name,
-        input: recipe.shellTool.call(`node "${scripts.envPath}"`, workdir),
+        name: shellTool.name,
+        input: shellTool.call(`node "${scripts.envPath}"`, workdir),
       },
       {
         type: 'tool_use',
         id: 'probe_denied',
-        name: recipe.readTool.name,
-        input: recipe.readTool.call(PROBE_MARKS.deniedFile, workdir),
+        name: readTool.name,
+        input: readTool.call(PROBE_MARKS.deniedFile, workdir),
       },
     ];
   };
@@ -528,13 +540,19 @@ function observe(
    * свидетельством, потому что запрос к модели на этот вопрос не отвечает.
    */
   mcpAsked: boolean,
+  /**
+   * Пробу исполнила сама цель (рецепт `selfRun`): вывод скриптов лежит уже в
+   * ПЕРВОМ запросе, а второго может не быть вовсе. Признак того, что скрипты
+   * отработали, — приставка вывода переменной: её печатают при любом значении.
+   */
+  selfRun = false,
 ): ProbeRow[] {
   const first = JSON.stringify(requests[0] ?? {});
   const messages = replies(requests[0] ?? {});
   const tools = JSON.stringify((requests[0] ?? {}).tools ?? []);
-  const results = requests.slice(1).map(replies);
+  const results = (selfRun ? requests : requests.slice(1)).map(replies);
   const answered = results.join('\n');
-  const toolsRan = requests.length > 1;
+  const toolsRan = selfRun ? answered.includes(PROBE_MARKS.envEcho) : requests.length > 1;
 
   const row = (
     layer: ProbeLayer,
@@ -567,16 +585,20 @@ function observe(
           first.includes(PROBE_MARKS.deniedFile) ? 'present' : 'absent',
           PROBE_MARKS.deniedFile,
         )
-      : row(
-          'permission',
-          toolsRan
-            ? answered.includes(PROBE_MARKS.deniedContent)
-              ? 'absent'
-              : 'enforced'
-            : 'unknown',
-          '',
-          toolsRan ? null : 'run_failed',
-        ),
+      : selfRun
+        ? // Запрещённый файл цель без инструментов не читает вовсе: «нет вывода»
+          // здесь значило бы «никто не просил», а не «запрет остановил».
+          row('permission', 'unknown', '', 'no_probe_recipe')
+        : row(
+            'permission',
+            toolsRan
+              ? answered.includes(PROBE_MARKS.deniedContent)
+                ? 'absent'
+                : 'enforced'
+              : 'unknown',
+            '',
+            toolsRan ? null : 'run_failed',
+          ),
     // MCP: имя инструмента в списке у модели — лучшее свидетельство, но не
     // единственное возможное. Цель, которая сервер ПОДНЯЛА и список у него
     // ВЗЯЛА, а модели его заранее не назвала, перенос не провалила — она просто

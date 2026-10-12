@@ -21,7 +21,16 @@ import type { LivePermissionPolicy, LiveTurn, LiveTurnOptions, LiveTurnResult } 
  * Права — по переключателю чата (`permission`): правки разрешены — просьба
  * `permission_request` получает «да»; нет — вопрос человеку, его ответ уходит
  * в `POST /session/:id/permission/:rid`. Без политики — отказ, как у `qwen -p`.
+ *
+ * С `session` (E2b) сессия переживает процесс: следующий ход поднимает её
+ * `POST /session/:id/resume` в новом `qwen serve`; события её прежних ходов, если
+ * поток их отдаст, в ответ не идут — ход слушает только свои запросы. Ход,
+ * кончившийся не ответом, сессию удаляет (`POST /sessions/delete`), как и
+ * сменённую (`discard`, не поднявшийся `resume`).
  */
+
+/** Сколько ждать удаления сессии, прежде чем снять процесс. */
+const DELETE_MS = 3_000;
 
 const HEALTH_MS = 20_000;
 /** Сколько ждать подхвата принятого сообщения после конца хода (на деле — доли секунды). */
@@ -64,6 +73,9 @@ export class QwenServeTurn implements LiveTurn {
   private readonly graceMs: number;
   private readonly mcpWaitMs: number;
   private permission?: LivePermissionPolicy;
+  private resumed = false;
+  /** Сессию оставить по концу хода: её продолжит следующий ход разговора (E2b). */
+  private keep = false;
 
   /**
    * `graceMs`, `mcpWaitMs` — подмены ожидания подхвата и потолка ожидания MCP для
@@ -117,11 +129,22 @@ export class QwenServeTurn implements LiveTurn {
       if (!(await this.waitHealthy(() => exited))) {
         return this.close({ kind: 'unavailable', why: 'qwen serve не поднялся' });
       }
-      const created = await this.json('POST', '/session', { cwd: workspace });
-      const sessionId = typeof created?.sessionId === 'string' ? created.sessionId : undefined;
-      if (!sessionId)
-        return this.close({ kind: 'unavailable', why: 'POST /session без sessionId' });
+      const request = options.session;
+      let sessionId: string | undefined;
+      if (request?.resume && (await this.resume(request.resume.id, workspace))) {
+        sessionId = request.resume.id;
+        this.resumed = true;
+      } else {
+        const created = await this.json('POST', '/session', { cwd: workspace });
+        sessionId = typeof created?.sessionId === 'string' ? created.sessionId : undefined;
+        if (!sessionId)
+          return this.close({ kind: 'unavailable', why: 'POST /session без sessionId' });
+        // Сменённую сессию разговора больше никто не продолжит — удаляем, не дожидаясь.
+        const stale = request?.resume?.id ?? request?.discard;
+        if (stale && stale !== sessionId) void this.remove(stale);
+      }
       this.sessionId = sessionId;
+      this.keep = request !== undefined;
 
       const events = await this.fetchImpl(`${this.base}/session/${sessionId}/events`, {
         signal: this.abort.signal,
@@ -132,7 +155,12 @@ export class QwenServeTurn implements LiveTurn {
       await this.waitMcpDiscovery();
 
       const prompt = await this.json('POST', `/session/${sessionId}/prompt`, {
-        prompt: [{ type: 'text', text: options.prompt }],
+        prompt: [
+          {
+            type: 'text',
+            text: this.resumed && request?.resume ? request.resume.prompt : options.prompt,
+          },
+        ],
       });
       const promptId = typeof prompt?.promptId === 'string' ? prompt.promptId : undefined;
       if (!promptId) return this.close({ kind: 'unavailable', why: 'prompt без promptId' });
@@ -211,6 +239,15 @@ export class QwenServeTurn implements LiveTurn {
             continue;
           }
           const data = event.data ?? {};
+          // Продолженная сессия: события её прежних ходов — не ответ этого.
+          if (
+            this.resumed &&
+            event.promptId &&
+            !open.has(event.promptId) &&
+            event.type !== 'pending_prompt_started'
+          ) {
+            continue;
+          }
           switch (event.type) {
             case 'session_update': {
               const update = data.update as
@@ -366,10 +403,54 @@ export class QwenServeTurn implements LiveTurn {
     return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : undefined;
   }
 
-  private close(result: LiveTurnResult): LiveTurnResult {
+  /**
+   * Поднять сессию разговора в этом процессе. `false` — сессии нет (удалена,
+   * другой дом Qwen) или сервер отказал: ход откроет новую.
+   */
+  private async resume(id: string, workspace: string): Promise<boolean> {
+    try {
+      const res = await this.fetchImpl(`${this.base}/session/${id}/resume`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cwd: workspace }),
+        signal: this.abort.signal,
+      });
+      await res.body?.cancel().catch(() => undefined);
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Закрыть сессию в процессе и стереть её с диска Qwen; ошибки — не повод держать ход. */
+  private async remove(id: string): Promise<void> {
+    const signal = AbortSignal.timeout(DELETE_MS);
+    const send = (method: string, path: string, body?: unknown) =>
+      this.fetchImpl(`${this.base}${path}`, {
+        method,
+        ...(body === undefined
+          ? {}
+          : { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }),
+        signal,
+      })
+        .then((res) => res.body?.cancel())
+        .catch(() => undefined);
+    await send('DELETE', `/session/${id}`);
+    await send('POST', '/sessions/delete', { sessionIds: [id] });
+  }
+
+  /**
+   * Конец прогона. Сессию, которую продолжит следующий ход, оставляем; ту же
+   * сессию после хода без ответа — удаляем. Одноразовую (без `session`) сервер
+   * уносит с собой, как и раньше.
+   */
+  private async close(result: LiveTurnResult): Promise<LiveTurnResult> {
     this.active = false;
     this.abort.abort();
+    const sessionId = this.sessionId;
+    const kept = this.keep && sessionId !== undefined && result.kind === 'done';
+    if (this.keep && sessionId && !kept) await this.remove(sessionId);
     if (this.child) killChildTree(this.child);
-    return result;
+    return kept ? { ...result, session: sessionId, resumed: this.resumed } : result;
   }
 }

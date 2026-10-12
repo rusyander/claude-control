@@ -189,6 +189,25 @@ describe('applySplitPlan: панель не доверяет разбору', ()
     expect(applied.repairs).toEqual([]);
   });
 
+  it('сокращённая разбором задача заменяется словами владельца — с починкой в ленте (F7)', () => {
+    const owner =
+      'Исправить расчёт скидки для корзины с промокодом и при этом ОБЯЗАТЕЛЬНО добавить тест на округление и прогнать e2e';
+    const short = 'Исправить расчёт скидки для корзины с промокодом и при этом';
+    const applied = applySplitPlan(
+      [{ title: 'Скидка', tasks: [owner] }, GROUPS[1] as (typeof GROUPS)[number]],
+      {
+        groups: [
+          { index: 0, tasks: [short], owns: [], after: [] },
+          { index: 1, tasks: [], owns: [], after: [] },
+        ],
+        conflicts: [],
+        order: [],
+      },
+    );
+    expect(applied.groups[0]?.tasks).toEqual([owner]);
+    expect(applied.repairs.some((line) => line.includes('сокращ'))).toBe(true);
+  });
+
   it('ожидание по кругу снимается — стоять вечно нельзя', () => {
     const applied = applySplitPlan(GROUPS, {
       groups: [
@@ -274,6 +293,16 @@ describe('заметки и задания уровней', () => {
     expect(prompt).toContain('on the model sonnet');
     expect(prompt).toContain('edit only here): src/header.tsx');
     expect(prompt).toContain(PLAN_BLOCK_LANG);
+  });
+
+  it('план называет критерии по каждому пункту владельца и уровень проверки до первой правки (U13)', () => {
+    const prompt = planStagePrompt({ title: 'Шапка', task: 'Выровнять отступ' });
+
+    expect(prompt).toContain(
+      "one for every point of the task (when it carries the owner's request",
+    );
+    expect(prompt).toContain('6. Verification level, named before the first edit');
+    expect(prompt).toContain('what would make it go red');
   });
 
   it('работа после плана несёт план; без плана — сказано прямо', () => {

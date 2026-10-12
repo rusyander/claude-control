@@ -19,6 +19,8 @@ import { triageGroupCatalog } from '../../domains/chat/group-auto-pick/group-aut
 import { storeTreeReader } from '../../domains/chat/chat-autonomy/chat-autonomy.ts';
 import { readChoice, writeChoice } from '../../domains/groups/choice/choice.ts';
 import { createSplitLauncher, launchFromRecord } from '../chat/split-launch.ts';
+import { createReviewStarter } from '../chat/review-starter.ts';
+import { pauseResumePrompt } from '../../domains/chat/split-conveyor/split-conveyor.ts';
 import { wireGroupActivation } from '../../bootstrap/group-activation-wiring/group-activation-wiring.ts';
 import type { ChatLink } from '../../lib/app-store/app-store.types.ts';
 import {
@@ -28,6 +30,7 @@ import {
 } from '@agentdeck/contracts/task-split';
 import { SPLIT_DEFAULTS_BUILTIN } from '@agentdeck/contracts/split-groups';
 import { ESCALATE_LINE } from '@agentdeck/contracts/model-cascade';
+import { OWNER_PRECEDENCE_LINE } from '@agentdeck/contracts/quality-floor';
 import {
   childAppendPrompt,
   stageOf,
@@ -165,6 +168,49 @@ describe('POST /api/chat/split', () => {
     expect(started).toHaveLength(2);
     expect(started[0]?.prompt).toContain('первая задача');
     expect(started[0]?.prompt).toContain('Общее');
+  });
+
+  // U1 (12.10.2026): пересказ агента родителя терял условия владельца — слова
+  // владельца берёт панель из транскрипта родителя и ставит в КАЖДУЮ группу.
+  it('слова владельца из разговора-родителя доходят до каждой группы дословно и один раз', async () => {
+    const sentinel = 'СТРАЖ-U1: проверь доки во всех трёх локалях\nи тесты рядом с кодом';
+    mkdirSync(join(root, 'projects', 'proj'), { recursive: true });
+    writeFileSync(
+      join(root, 'projects', 'proj', 'parent.jsonl'),
+      [
+        { type: 'user', message: { role: 'user', content: sentinel } },
+        { type: 'assistant', message: { role: 'assistant', content: 'делю' } },
+        {
+          type: 'user',
+          message: {
+            role: 'user',
+            content:
+              'Split the tasks of this conversation into independent groups and propose the split.',
+          },
+        },
+      ]
+        .map((record) => JSON.stringify(record))
+        .join('\n'),
+    );
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/chat/split',
+      payload: {
+        projectPath: project,
+        // Агент процитировал владельца, как велит инструкция, — второй копии не будет.
+        proposal: { ...proposal, shared: `${sentinel}\n\nОбщее` },
+        startRuns: true,
+        parentChatId: 'parent',
+      },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(started).toHaveLength(2);
+    for (const run of started) {
+      expect(run.prompt.split(sentinel)).toHaveLength(2);
+      expect(run.prompt).toContain("Owner's request, verbatim");
+      expect(run.prompt).toContain('Общее');
+      expect(run.prompt).not.toContain('Split the tasks of this conversation');
+    }
   });
 
   // Аудит 25.09, L40: общая строка «развилки решает человек» доезжает до групп.
@@ -313,6 +359,23 @@ describe('POST /api/chat/split', () => {
 
     expect(started).toHaveLength(2);
     for (const run of started) expect(run.parentAtStart).toBe('parent');
+  });
+
+  it('связь работы несёт задание целиком и слова группы без преамбул работы (TQ-01, F6)', async () => {
+    await app.inject({
+      method: 'POST',
+      url: '/api/chat/split',
+      payload: { projectPath: project, proposal, startRuns: true, parentChatId: 'parent' },
+    });
+
+    expect(started).toHaveLength(2);
+    for (const run of started) {
+      const link = store.getChatLink(run.chatId);
+      expect(run.prompt).toContain(link?.task as string);
+      expect(link?.groupTask).toBeTruthy();
+      expect(run.prompt).toContain(link?.groupTask as string);
+      expect(link?.groupTask).not.toContain(OWNER_PRECEDENCE_LINE);
+    }
   });
 
   // Раунд 4: ребёнок родителя с явной группой стартовал без неё — включение жило
@@ -529,6 +592,52 @@ describe('POST /api/chat/split', () => {
       ),
     );
     expect(appended).toBe(next);
+
+    // E6: продолжение той же сессии панелью (пауза, лимит, слово родителя)
+    // идёт с той же дописки, что и старт, — до правки оно уходило с голыми
+    // инициативами, и системный промпт сессии менялся посреди разговора.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    mkdirSync(join(root, 'projects', 'C--copy'), { recursive: true });
+    writeFileSync(join(root, 'projects', 'C--copy', 'sess-real.jsonl'), '{}\n', 'utf8');
+    const resumed = createReviewStarter(ctx, {
+      runs: registry,
+      providerChats: new ProviderChatService(),
+      session,
+      log: { warn: () => undefined },
+    })({
+      chatId: first.chatId,
+      prompt: pauseResumePrompt('feature/one'),
+      cwd: first.cwd,
+      stage: 'tell',
+      fromAliases: [first.chatId, 'sess-real'],
+      resume: { sessionId: 'sess-real' },
+    });
+    expect(resumed.started).toBe(true);
+    const turn = started.at(-1);
+    expect(turn?.chatId).toBe(first.chatId);
+    expect(turn?.prompt).toContain('The human paused the group');
+    expect(turn?.appendSystemPrompt).toBe(appended);
+
+    // Связь переехала на настоящий ключ, а вкладка помнит временный: дописка
+    // находится по продолжаемой сессии.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    store.setChatLink('sess-real', link);
+    const byTab = createReviewStarter(ctx, {
+      runs: registry,
+      providerChats: new ProviderChatService(),
+      session,
+      log: { warn: () => undefined },
+    })({
+      chatId: 'new-tab',
+      prompt: pauseResumePrompt('feature/one'),
+      cwd: first.cwd,
+      stage: 'tell',
+      fromAliases: ['new-tab', 'sess-real'],
+      resume: { sessionId: 'sess-real' },
+    });
+    expect(byTab.started).toBe(true);
+    expect(started.at(-1)?.chatId).toBe('new-tab');
+    expect(started.at(-1)?.appendSystemPrompt).toBe(appended);
   });
 
   /**
@@ -584,6 +693,13 @@ describe('POST /api/chat/split', () => {
       // планка сдачи, работе на потолке — нет, усиливать нечем.
       expect(started[0]?.appendSystemPrompt).toContain('BELOW the ceiling');
       expect(started[1]?.appendSystemPrompt).not.toContain('BELOW the ceiling');
+      // Доставки нет — задание проверок не называет, и планка сдачи несёт
+      // определение целиком, а не ссылку в пустоту (TQ-10).
+      expect(started[0]?.prompt).not.toContain('any red check means no MR');
+      expect(started[0]?.appendSystemPrompt).toContain('run the project checks its rules name');
+      expect(started[0]?.appendSystemPrompt).not.toContain(
+        'run the project checks your task names',
+      );
 
       const body = response.json() as { chats: { model?: string; kind?: string }[] };
       expect(body.chats[0]).toMatchObject({ model: 'sonnet', kind: 'mechanical' });

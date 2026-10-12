@@ -4,6 +4,8 @@ export interface GroupCardProps {
   group: ChildStageGroup;
   /** Родитель плана: адрес уборки копии. Нет — кнопки уборки нет. */
   parentChatId?: string;
+  /** Провайдер чужого CLI — для ключа «Что получил агент» (U8); у Claude нет. */
+  providerId?: string;
   /** Открыть чат группы; карточке без чата не передаётся — открывать нечего. */
   onOpen?: (chatId: string) => void;
   onAnswerHold?: (index: number, answer: string) => void;

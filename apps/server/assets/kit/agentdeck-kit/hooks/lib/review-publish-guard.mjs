@@ -26,6 +26,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { stateDir } from './kit-paths.mjs';
+import { readTail } from './transcript.mjs';
 
 const CACHE = stateDir('review') ?? '';
 const FRESH_MS = 15 * 60 * 1000;
@@ -123,12 +124,99 @@ function save(path, patch) {
   }
 }
 
+// Shape gates. A «quick» review once skipped the skill, read the diff without the docs, reported clean
+// over two docs blockers and posted one-line items. So a review write needs deep-review loaded in this
+// session; a new thread must be a finding card; a summary note claiming "no blocking" must carry the
+// coverage line. Replies inside an existing thread are exempt from all three. "Loaded" is CLI-agnostic:
+// a Skill/skill call, a read of deep-review/SKILL.md (Read or a shell `cat`, which is how Codex loads
+// a skill), or `/deep-review` typed by the user (seen in the transcript).
+const DEEP_REVIEW = /(?:^|:)deep-review$/;
+const SKILL_FILE = /deep-review[\\/]+SKILL\.md\b/;
+const isReply = (tool, i) =>
+  /create_merge_request_discussion_note$/i.test(tool) ||
+  Boolean(i?.discussion_id ?? i?.in_reply_to_discussion_id ?? i?.in_reply_to_id);
+// A plain note is review content only when it reads like one — a pipeline or release note is not.
+const REVIEW_TEXT =
+  /[🔴🟡❓🟢]|(?<![\w-])F-\d+|\breview|\bblocking\b|\bfinding|ревью|замечани|блокер/iu;
+const CARD = [
+  [/^\s*(?:🔴|🟡|❓|🟢)/u, 'severity marker first (🔴/🟡/❓/🟢)'],
+  [/(?<![\w-])F-\d+/, 'id `F-NN`'],
+  [/^[^\n]*\*\*[^*\n]+\*\*/, 'bold one-line thesis on the first line'],
+  [/[^\s`(]+\.\w+:\d+(?:-\d+)?/, 'the location as `path:start-end`'],
+];
+const CLEAN_CLAIM =
+  /\bno\s+(?:blocking|blockers|findings|issues|remarks)\b|\bLGTM\b|(?:блокер[а-яё]*|замечани[а-яё]*|находок)\s+нет|нет\s+(?:ни\s+)?(?:блокер|замечани)|(?<![а-яё])чисто(?![а-яё])/iu;
+const COVERAGE = /\*\*(?:Ledger|Coverage|Журнал|Покрытие):\*\*/i;
+
+/** This call loads deep-review, in any CLI's shape. */
+function loadsDeepReview(input) {
+  const tool = String(input?.tool_name ?? '');
+  const i = input?.tool_input ?? {};
+  if (/^skill$/i.test(tool)) return DEEP_REVIEW.test(String(i.skill ?? i.name ?? '').trim());
+  if (tool === 'Read') return SKILL_FILE.test(String(i.file_path ?? i.path ?? ''));
+  if (/^(Bash|PowerShell)$/.test(tool)) return SKILL_FILE.test(String(i.command ?? ''));
+  return false;
+}
+
+/** deep-review loaded in this session: a recorded load, or `/deep-review` typed by the user. */
+function deepReviewLoaded(input) {
+  if (load(sessionPath(input?.session_id)).skill) return true;
+  const typed = /<command-name>\/(?:[\w-]+:)?deep-review<\/command-name>/;
+  return readTail(String(input?.transcript_path ?? '')).some(
+    (r) => r.type === 'user' && typed.test(JSON.stringify(r.message?.content ?? '')),
+  );
+}
+
+/** Shape gates; a deny object or null. */
+function shapeRefusal(tool, input, cli) {
+  const i = input?.tool_input ?? {};
+  if (!cli && isReply(tool, i)) return null;
+  const body = String(i.body ?? i.note ?? '');
+  const thread = !cli && POSITIONAL.test(tool);
+  const bulk = /bulk_publish_draft_notes$/i.test(tool);
+  if (!cli && !thread && !bulk && !REVIEW_TEXT.test(body)) return null;
+
+  if (!deepReviewLoaded(input)) {
+    return {
+      decision: 'deny',
+      reason:
+        'Review write blocked: skill `agentdeck-kit:deep-review` was not loaded in this session. A review ' +
+        'published into an MR/PR goes through the skill — its depth may be quick, its presence is not ' +
+        'optional. Load it, run it, then publish.',
+    };
+  }
+  if (thread) {
+    const missing = CARD.filter(([re]) => !re.test(body)).map(([, what]) => what);
+    if (missing.length) {
+      return {
+        decision: 'deny',
+        reason:
+          `Review thread blocked: the body is not a finding card. Needed: ${missing.join(', ')}. ` +
+          'Template: <kit>/skills/deep-review/references/finding-card.md.',
+      };
+    }
+  } else if (!cli && !bulk && CLEAN_CLAIM.test(body) && !COVERAGE.test(body)) {
+    return {
+      decision: 'deny',
+      reason:
+        'Summary note blocked: it claims "no blocking / no findings" without a coverage line. Add ' +
+        '`**Ledger:**` naming what was read and what stayed uncovered — a clean verdict is earned only ' +
+        'by a ledger with no unread zone.',
+    };
+  }
+  return null;
+}
+
 /**
  * PostToolUse module: remember that this MR's thread list (or its shas) was actually read.
  * Always silent — it records, it never speaks.
  */
 export function recordReviewRead(input) {
   if (!CACHE) return null;
+  if (loadsDeepReview(input)) {
+    save(sessionPath(input?.session_id), { skill: Date.now() });
+    return null;
+  }
   const cli = cliMatch(input, CLI_READ);
   if (cli) input = asCli(input, cli.iid);
   const tool = String(input?.tool_name ?? '');
@@ -157,6 +245,9 @@ export default function reviewPublishGuard(input) {
   if (cli) input = asCli(input, cli.iid);
   const tool = String(input?.tool_name ?? '');
   if (!cli && !REVIEW_WRITE.test(tool)) return null;
+
+  const shape = shapeRefusal(tool, input, Boolean(cli));
+  if (shape) return shape;
 
   const path = mrKey(input, input?.session_id);
   // bulk_publish_draft_notes and friends may not name the MR in a shape we recognise. A guard that

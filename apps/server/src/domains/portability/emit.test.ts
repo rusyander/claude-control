@@ -555,6 +555,20 @@ describe('перенос в чужие CLI', () => {
     }
   });
 
+  it('aider: глобальная ссылка `read` идёт от дома, прежняя относительная заменяется', () => {
+    // Относительную запись Aider ищет от рабочего каталога, и из глобального
+    // конфига она не находилась ни в одном проекте (живая проба 12.10.2026).
+    const config = join(home, '.aider.conf.yml');
+    writeFileSync(config, 'read:\n  - CONVENTIONS.md\n  - agentdeck-portability.md\n', 'utf8');
+    emitAndApply('aider');
+    const text = readFileSync(config, 'utf8');
+
+    expect(text).toContain('~/agentdeck-portability.md');
+    expect(text).toContain('CONVENTIONS.md');
+    expect(text).not.toMatch(/^\s*- agentdeck-portability\.md$/m);
+    expect(existsSync(join(home, 'agentdeck-portability.md'))).toBe(true);
+  });
+
   it('соседние записи и чужие ключи целевого файла остаются по значению', () => {
     emitAndApply('codex');
     const toml = readFileSync(join(home, '.codex', 'config.toml'), 'utf8');

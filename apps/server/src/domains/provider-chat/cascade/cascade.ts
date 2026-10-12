@@ -4,15 +4,20 @@ import {
   fixStagePrompt,
   loweredWorkPrompt,
   reviewStagePrompt,
+  verifyStagePrompt,
   scanReviewBlocks,
+  type CascadeStage,
+  type StageContext,
   type TaskKind,
 } from '@agentdeck/contracts/model-cascade';
 import {
+  raisedWorkPrompt,
   scanPlanBlocks,
   workAfterPlanPrompt,
   TASK_MAX_CHARS,
 } from '@agentdeck/contracts/split-plan';
 import { foreignChatKey } from '@agentdeck/contracts/foreign-chat-key';
+import { labelledCut } from '@agentdeck/contracts/quality-floor';
 import {
   mergeSieveRows,
   scanSieveBlocks,
@@ -74,9 +79,11 @@ import type {
  *
  * Цепочка конечна по построению, отдельного счётчика ей не нужно: `work` даёт
  * ровно одно `review` (и только раз — по отметке `reviewedAt`), `review` даёт
- * `fix` только по НЕПУСТОМУ списку замечаний, а после `fix` — только доставка
- * группы с доставкой до MR (W3-3, зеркало Claude), одна на круг (`deliveredAt`);
- * после доставки не бывает ничего.
+ * `fix` только по НЕПУСТОМУ списку замечаний, `fix` — один проход проверки
+ * (U6: стадия `review` с `fixFindings`, раз — по `reviewedAt` правок), а он —
+ * только доставку группы с доставкой до MR (W3-3, зеркало Claude), одну на круг
+ * (`deliveredAt`); после доставки не бывает ничего. Ревью — после КАЖДОЙ работы
+ * (U6), и шедшей настройкой CLI тоже: свежая сессия — вторая пара глаз.
  */
 
 /** Что панель запустит следующим звеном у чужого провайдера. */
@@ -105,6 +112,13 @@ export interface ForeignStagePlan {
   planMissing?: boolean;
   /** Отчёт о ситах всех звеньев группы — в связь следующего (как у Claude). */
   sieveRows?: SieveReportRow[];
+  /** Выжимка плана (у работы после плана) — в связь, звеньям после работы. */
+  planSummary?: string;
+  /**
+   * Работа поднята с понижённой ступени на настройку CLI (F4): связь звена
+   * не наследует ни модели, ни «ниже» остановившейся работы.
+   */
+  raised?: boolean;
 }
 
 export interface ForeignStageInput {
@@ -161,8 +175,11 @@ function stageTitle(cascade: ProviderChatCascade, stage: ForeignStagePlan['stage
 function foreignDeliverPlan(
   cascade: ProviderChatCascade,
   input: ForeignStageInput,
-  after: 'fix' | 'review' | 'work',
+  after: 'fix' | 'verify' | 'review' | 'work',
   sieveRows: SieveReportRow[],
+  context: StageContext,
+  /** Итог прохода проверки (U6): что осталось открытым или что он не отчитался. */
+  verification?: { open?: string[]; unverified?: boolean },
 ): ForeignStagePlan | undefined {
   if (!input.deliver) return undefined;
   if (cascade.deliveredAt && !input.redeliver) return undefined;
@@ -175,7 +192,10 @@ function foreignDeliverPlan(
       after,
       foreign: true,
       ...(cascade.branch ? { branch: cascade.branch } : {}),
+      context,
       ...(sieves ? { sieves } : {}),
+      ...(verification?.open?.length ? { open: verification.open } : {}),
+      ...(verification?.unverified ? { unverified: true } : {}),
     }),
     ...(sieveRows.length > 0 ? { sieveRows } : {}),
     ...(model ? { model } : {}),
@@ -215,7 +235,7 @@ function afterForeignPlan(
 
   const plan = ok ? scanPlanBlocks(text).plan : undefined;
   const kind = cascade.kind as TaskKind | undefined;
-  const task = (link?.task ?? '').slice(0, TASK_MAX_CHARS);
+  const task = labelledCut(link?.task ?? '', TASK_MAX_CHARS);
 
   return {
     stage: 'work',
@@ -228,7 +248,7 @@ function afterForeignPlan(
     }),
     model,
     ...(cascade.workEffort ? { effort: cascade.workEffort } : {}),
-    ...(plan ? {} : { planMissing: true }),
+    ...(plan ? { planSummary: labelledCut(plan, TASK_MAX_CHARS) } : { planMissing: true }),
     cascade: {
       stage: 'work',
       ...(cascade.group ? { group: cascade.group } : {}),
@@ -239,6 +259,37 @@ function afterForeignPlan(
       ...(cascade.lowered ? { lowered: true } : {}),
       workModel: model,
       ...(cascade.workEffort ? { workEffort: cascade.workEffort } : {}),
+    },
+  };
+}
+
+/**
+ * Понижённая работа кончилась без единой правки — заново на настройке CLI
+ * (F4, 12.10.2026), то есть без флага модели: выше у чужого CLI ничего нет.
+ * Зеркало `raisedPlan` у Claude, одноразово по `plannedAt`.
+ */
+function raisedForeignPlan(
+  cascade: ProviderChatCascade,
+  input: ForeignStageInput,
+): ForeignStagePlan | undefined {
+  if (!cascade.lowered || cascade.plannedAt) return undefined;
+  const link = input.link;
+  return {
+    stage: 'work',
+    title: stageTitle(cascade, 'work'),
+    prompt: raisedWorkPrompt({
+      task: link?.task ?? input.task,
+      ...(link?.owns && link.owns.length > 0 ? { owns: link.owns } : {}),
+      ...(link?.notes ? { notes: link.notes } : {}),
+      ...(link?.planSummary ? { plan: link.planSummary } : {}),
+      report: input.text,
+    }),
+    raised: true,
+    cascade: {
+      stage: 'work',
+      ...(cascade.group ? { group: cascade.group } : {}),
+      ...(cascade.branch ? { branch: cascade.branch } : {}),
+      ...(cascade.kind ? { kind: cascade.kind } : {}),
     },
   };
 }
@@ -262,8 +313,52 @@ export function planForeignStage(input: ForeignStageInput): ForeignStagePlan | u
     stampSieveRows(scanSieveBlocks(text).rows, new Date().toISOString()),
   );
   const carried = sieveRows.length > 0 ? { sieveRows } : {};
-  // После правок ревью второго круга панель не заводит — только доставку.
-  if (cascade.stage === 'fix') return foreignDeliverPlan(cascade, input, 'fix', sieveRows);
+  // Звено — новый разговор, и его первая реплика — промпт звена (F2, 12.10.2026):
+  // задание группы, план и итог прошлого звена едут в него так же, как у Claude
+  // (`stageContextOf`). Без них правки, проверка и доставка восстанавливали
+  // задачу по диффу. Задание — слова группы без преамбул работы (TQ-01).
+  const link = input.link;
+  const groupTask =
+    link?.groupTask ??
+    link?.task ??
+    (cascade.stage === 'work' && task.trim() ? labelledCut(task, TASK_MAX_CHARS) : undefined);
+  const contextAfter = (previous: string): StageContext => ({
+    ...(groupTask ? { task: groupTask } : {}),
+    ...(link?.planSummary ? { plan: link.planSummary } : {}),
+    ...(cascade.branch ? { branch: cascade.branch } : {}),
+    ...(previous.trim()
+      ? { previous: { stage: cascade.stage as CascadeStage, text: previous } }
+      : {}),
+  });
+  // После правок — один проход проверки (U6), а не ревью второго круга. Уже
+  // заведён — доставку заведёт он. Шапка правок до U6 замечаний не несёт — сразу
+  // в доставку.
+  if (cascade.stage === 'fix') {
+    if (!cascade.fixFindings?.length) {
+      return foreignDeliverPlan(cascade, input, 'fix', sieveRows, contextAfter(text));
+    }
+    if (cascade.reviewedAt) return undefined;
+    return {
+      stage: 'review',
+      title: stageTitle(cascade, 'review'),
+      prompt: verifyStagePrompt({
+        findings: cascade.fixFindings,
+        ...(cascade.branch ? { branch: cascade.branch } : {}),
+        context: contextAfter(text),
+      }),
+      ...carried,
+      // Ни модели, ни глубины: проверяет настройка CLI, как и ревью.
+      cascade: {
+        stage: 'review',
+        ...(cascade.group ? { group: cascade.group } : {}),
+        ...(cascade.branch ? { branch: cascade.branch } : {}),
+        ...(cascade.kind ? { kind: cascade.kind } : {}),
+        ...(cascade.workModel ? { workModel: cascade.workModel } : {}),
+        ...(cascade.workEffort ? { workEffort: cascade.workEffort } : {}),
+        fixFindings: cascade.fixFindings,
+      },
+    };
+  }
 
   const kind = cascade.kind as TaskKind | undefined;
   const base: ProviderChatCascade = {
@@ -274,28 +369,26 @@ export function planForeignStage(input: ForeignStageInput): ForeignStagePlan | u
   };
 
   if (cascade.stage === 'work') {
-    // Работа шла настройкой CLI — усиливать нечем: ревью пошло бы ровно тем же.
-    // Ревью ей не будет, и группа с доставкой идёт в доставку сразу (M8, зеркало
-    // Claude); пустую работу не доставляем.
-    if (!cascade.lowered) {
-      return input.deliver && hasWork()
-        ? foreignDeliverPlan(cascade, input, 'work', sieveRows)
-        : undefined;
-    }
+    // Ревью — после КАЖДОЙ работы (U6), и шедшей настройкой CLI тоже: та же
+    // модель в свежей сессии читает дифф без истории его написания.
     // Ревью на работу заводится один раз. Без отметки второе сообщение человека
     // в тот же разговор заводило бы ещё одну проверку — и так на каждый ход.
     if (cascade.reviewedAt) return undefined;
-    if (!hasWork()) return undefined;
+    if (!hasWork()) return raisedForeignPlan(cascade, input);
     const sieves = input.sieves?.('review', sieveRows);
 
     return {
       stage: 'review',
       title: stageTitle(cascade, 'review'),
       prompt: reviewStagePrompt({
-        task,
+        task: groupTask ?? task,
         ...(cascade.workModel ? { model: cascade.workModel } : {}),
         ...(kind ? { kind } : {}),
         ...(cascade.branch ? { branch: cascade.branch } : {}),
+        context: {
+          ...(link?.planSummary ? { plan: link.planSummary } : {}),
+          ...(text.trim() ? { previous: { stage: 'work', text } } : {}),
+        },
         ...(sieves ? { sieves } : {}),
       }),
       ...carried,
@@ -310,15 +403,34 @@ export function planForeignStage(input: ForeignStageInput): ForeignStagePlan | u
     };
   }
 
+  // Проход проверки правок кончился (U6): правок он не заводит. Открытое и «не
+  // отчитался» едут в доставку и в MR — молча доставить «всё исправлено» нельзя.
+  if (cascade.fixFindings) {
+    const verified = scanReviewBlocks(text);
+    const open = verified.findings;
+    return foreignDeliverPlan(
+      cascade,
+      input,
+      'verify',
+      sieveRows,
+      contextAfter(verified.text),
+      open ? { open } : { unverified: true },
+    );
+  }
+
   // Ревью закончилось. Блока нет вовсе — ревьюер не отчитался в понятном виде, и
   // заводить по такому ответу правки нельзя: человек прочтёт его текст сам.
-  const findings = scanReviewBlocks(text).findings;
+  const reviewed = scanReviewBlocks(text);
+  const findings = reviewed.findings;
   if (!findings) return undefined;
   // Замечаний нет — чинить нечего, а доставлять группе с доставкой есть что.
-  if (findings.length === 0) return foreignDeliverPlan(cascade, input, 'review', sieveRows);
+  if (findings.length === 0) {
+    return foreignDeliverPlan(cascade, input, 'review', sieveRows, contextAfter(reviewed.text));
+  }
 
+  // Работа шла на потолке, то есть настройкой самого CLI (F3): правки идут ею
+  // же — без модели и без «ниже настройки».
   const model = cascade.workModel;
-  if (!model) return undefined;
 
   return {
     stage: 'fix',
@@ -327,19 +439,22 @@ export function planForeignStage(input: ForeignStageInput): ForeignStagePlan | u
       ...(cascade.branch ? { branch: cascade.branch } : {}),
       reviewer: 'cli',
       ...(input.deliver ? { deliver: true } : {}),
+      verify: true,
+      context: contextAfter(reviewed.text),
     }),
-    model,
+    ...(model ? { model } : {}),
     ...(cascade.workEffort ? { effort: cascade.workEffort } : {}),
     findings,
     ...carried,
     cascade: {
       ...base,
       stage: 'fix',
-      workModel: model,
+      ...(model ? { workModel: model } : {}),
       ...(cascade.workEffort ? { workEffort: cascade.workEffort } : {}),
       // Правки идут ниже настройки CLI ровно так же, как работа: планка сдачи им
-      // нужна та же самая, а вот ещё одного ревью по ним не будет — стадия конечна.
-      lowered: true,
+      // нужна та же самая. Ревью по ним не будет — будет один проход проверки (U6).
+      ...(model ? { lowered: true } : {}),
+      fixFindings: findings,
     },
   };
 }
@@ -387,7 +502,9 @@ export function foreignChatPrefix(
     lowered
       ? loweredWorkPrompt(lowered.kind as TaskKind | undefined, {
           reviewer: 'cli',
-          ...(lowered.stage === 'fix' ? { review: false } : {}),
+          // Задание правок само называет проверки проекта (TQ-10).
+          ...(lowered.stage === 'fix' ? { review: false, checksInTask: true } : {}),
+          ...(lowered.stage === 'fix' && lowered.fixFindings?.length ? { verify: true } : {}),
         })
       : '',
     childExtra ?? '',
@@ -747,8 +864,27 @@ export function createForeignStagePlanner(
 
       // Дальше — только конвейер звеньев, а он бывает лишь у разговора со
       // стадией в шапке и с копией: ревью читает дифф, а без каталога его нет.
-      if (!cascade) return;
-      if (!chat.workdir) return;
+      if (!cascade || !chat.workdir) {
+        // Связанный разговор без шапки (F3): звена не будет, но цепочка группы
+        // кончилась, и ждущие соседи и сверка веток узнать об этом обязаны.
+        // Новые группы шапку получают всегда — это сеть для старых и для
+        // разговоров без копии.
+        if (link && !cascade) {
+          const workdir = chat.workdir;
+          deps.onChainEnded?.(
+            link,
+            chainOutcomeOf({
+              link,
+              ok: finished.ok,
+              text,
+              ...(workdir ? { hasWork: () => deps.hasWork(workdir, chat.createdAt) } : {}),
+              ...(finished.error ? { error: finished.error } : {}),
+              ...(finished.retry ? { retry: finished.retry } : {}),
+            }),
+          );
+        }
+        return;
+      }
       const cwd = chat.workdir;
 
       // Повтор доставки на тот же круг — только по ПОСЛЕДНЕЙ реплике человека:
@@ -838,14 +974,21 @@ export function createForeignStagePlanner(
       // разделения) — звено остаётся вне дерева, как и сам разговор.
       const stageKey = foreignChatKey(providerId, created.id);
       if (link) {
+        const carried = carriedLink(link);
+        if (plan.raised) {
+          delete carried.lowered;
+          delete carried.model;
+          delete carried.effort;
+        }
         deps.saveLink?.(stageKey, {
-          ...carriedLink(link),
+          ...carried,
           stage: plan.stage,
           createdAt: new Date().toISOString(),
           ...(plan.model ? { model: plan.model } : {}),
           ...(plan.effort ? { effort: plan.effort } : {}),
           ...(plan.cascade.lowered ? { lowered: true } : {}),
           ...(plan.sieveRows ? { sieveRows: plan.sieveRows } : {}),
+          ...(plan.planSummary ? { planSummary: plan.planSummary } : {}),
         });
       }
 

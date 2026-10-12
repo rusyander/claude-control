@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { getProvider } from '../../../providers/registry.ts';
 import type { OpencodeServe, OpencodeServeDeps } from '../../opencode-serve/opencode-serve.ts';
 import { ProviderChatRun } from './ProviderChatRun.ts';
+import { MAX_PROMPT_CHARS } from '../prompt/prompt.ts';
 
 /**
  * OpenCode в чате (L-opencode). Сессия `opencode serve` получает каталог
@@ -68,6 +69,95 @@ describe('OpenCode в чате панели', () => {
     expect(deps?.permission?.allowEdits).toBe(false);
     expect(deps?.permission?.ask).toBe(ask);
     expect(events.at(-1)).toMatchObject({ type: 'done', transport: 'session' });
+  });
+
+  it('указание панели доходит до сессии OpenCode: вступлением новой сессии (TQ-04, F9)', async () => {
+    const seen: { text: string; opening?: string }[] = [];
+    const serve = {
+      ask: async (_id: string, text: string, given: OpencodeServeDeps) => {
+        seen.push({ text, ...(given.opening ? { opening: given.opening } : {}) });
+        return { reply: 'ответ', sessionId: 'ses_1' };
+      },
+      steer: async () => false,
+    } as unknown as OpencodeServe;
+
+    await new ProviderChatRun().start(
+      {
+        provider: getProvider('opencode'),
+        history,
+        chatId: 'chat',
+        appDataDir: dir,
+        detect: () => true,
+        sessionServe: serve,
+        systemPrefix: 'УКАЗАНИЕ ПАНЕЛИ: планка сдачи и эскалация',
+      },
+      () => undefined,
+    );
+
+    expect(seen).toHaveLength(1);
+    expect(seen[0]?.text).toContain('Вопрос');
+    expect(seen[0]?.text).not.toContain('УКАЗАНИЕ ПАНЕЛИ');
+    expect(seen[0]?.opening).toContain('УКАЗАНИЕ ПАНЕЛИ: планка сдачи и эскалация');
+    expect(seen[0]?.opening).toContain('Вопрос');
+  });
+
+  it('вход хода сессии — то, что отправил сервер сессий, а не последняя реплика (TQ-09)', async () => {
+    const inputs: string[] = [];
+    const serve = {
+      ask: async (_id: string, _text: string, given: OpencodeServeDeps) => {
+        given.onSent?.(given.opening ?? '');
+        return { reply: 'ответ', sessionId: 'ses_1' };
+      },
+      steer: async () => false,
+    } as unknown as OpencodeServe;
+
+    await new ProviderChatRun().start(
+      {
+        provider: getProvider('opencode'),
+        history,
+        chatId: 'chat',
+        appDataDir: dir,
+        detect: () => true,
+        sessionServe: serve,
+        systemPrefix: 'УКАЗАНИЕ ПАНЕЛИ',
+        onInput: (text) => inputs.push(text),
+      },
+      () => undefined,
+    );
+
+    expect(inputs).toHaveLength(1);
+    expect(inputs[0]).toContain('УКАЗАНИЕ ПАНЕЛИ');
+    expect(inputs[0]).toContain('Вопрос');
+  });
+
+  it('задание длиннее предела одиночного запуска — отказ вслух, CLI не запускается обрубком (TQ-05)', async () => {
+    const spawnImpl = vi.fn();
+    const events: { type: string; error?: string }[] = [];
+
+    await new ProviderChatRun().start(
+      {
+        provider: getProvider('opencode'),
+        history: [
+          {
+            id: 'm1',
+            role: 'user',
+            content: 'я'.repeat(MAX_PROMPT_CHARS + 10),
+            at: '2026-01-01T00:00:00.000Z',
+          },
+        ],
+        chatId: 'chat',
+        appDataDir: dir,
+        detect: () => true,
+        sessionServe: noSession,
+        spawnImpl: spawnImpl as unknown as SpawnImpl,
+        systemPrefix: 'УКАЗАНИЕ',
+      },
+      (event) => events.push(event),
+    );
+
+    expect(spawnImpl).not.toHaveBeenCalled();
+    expect(events.at(-1)).toMatchObject({ type: 'error' });
+    expect(events.at(-1)?.error).toContain('Обрезанным оно не отправлено');
   });
 
   const oneShot = async (allowEdits?: boolean, workdir?: string) => {

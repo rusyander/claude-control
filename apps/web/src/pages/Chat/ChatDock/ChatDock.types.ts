@@ -1,5 +1,6 @@
 import type { ChatProgress } from '@agentdeck/contracts';
 import type { QueuedMessage } from '@shared/lib/agent-runs';
+import type { DraftBox } from '@shared/lib/draft';
 import type { ComposerModeState } from '@features/ChatComposer';
 import type { ChatSendFile } from '../ChatPage.types';
 
@@ -14,8 +15,8 @@ export interface ChatDockProps {
   /** Дописанное, что уйдёт агенту, когда он закончит текущий ход. */
   queued: QueuedMessage[];
   onCancelQueued: (id: string) => void;
-  value: string;
-  onChange: (value: string) => void;
+  /** Черновик поля: на него подписано одно поле ввода, а не весь док и не страница. */
+  draft: DraftBox;
   /** `false` — сообщение не приняли: вложения остаются в поле. */
   onSend: (files: ChatSendFile[]) => Promise<boolean>;
   onStop: () => void;

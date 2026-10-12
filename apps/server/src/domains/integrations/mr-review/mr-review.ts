@@ -1,7 +1,14 @@
-import { forgeAccessForUrl, forgeGet, forgeProjectRef, parseMergeRequestUrl } from '../forge.ts';
+import {
+  forgeAccessForUrl,
+  forgeGet,
+  forgeProjectRef,
+  parseMergeRequestUrl,
+  type ForgeAccess,
+} from '../forge.ts';
 import { readGithubReview } from '../mr-review-github.ts';
 import type {
   MrReview,
+  MrReviewFailedJob,
   MrReviewNote,
   MrReviewPipeline,
   MrReviewThread,
@@ -18,7 +25,7 @@ import type {
  * сводным `statusCheckRollup` головы PR.
  */
 
-export type { MrReview, MrReviewNote, MrReviewPipeline, MrReviewThread };
+export type { MrReview, MrReviewFailedJob, MrReviewNote, MrReviewPipeline, MrReviewThread };
 
 /** Сколько страниц обсуждений читаем: сотня на странице, тысяча веток — с запасом. */
 const MAX_DISCUSSION_PAGES = 10;
@@ -98,6 +105,42 @@ function toState(state: string | undefined): MrReview['state'] {
   return 'open';
 }
 
+interface GlJob {
+  id?: number;
+  name?: string;
+  failure_reason?: string;
+  web_url?: string;
+  allow_failure?: boolean;
+}
+
+/**
+ * Упавшие задания красного конвейера с причиной GitLab (E3): по ней
+ * наблюдатель отличает умерший раннер от ошибки кода. Задания с
+ * `allow_failure` конвейер не роняют и не считаются. Не прочлись —
+ * `undefined`: причина неизвестна, и красный судится как прежде.
+ */
+async function readFailedJobs(
+  access: ForgeAccess,
+  pipelineId: number,
+): Promise<MrReviewFailedJob[] | undefined> {
+  try {
+    const jobs = await forgeGet<GlJob[]>(
+      access,
+      `/projects/${forgeProjectRef(access)}/pipelines/${pipelineId}/jobs?scope[]=failed&per_page=100`,
+    );
+    return (jobs ?? [])
+      .filter((job) => job.id !== undefined && !job.allow_failure)
+      .map((job) => ({
+        id: String(job.id),
+        name: job.name ?? String(job.id),
+        ...(job.failure_reason ? { reason: job.failure_reason } : {}),
+        ...(job.web_url ? { url: job.web_url } : {}),
+      }));
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * Прочитать MR по ссылке: состояние, автор, ветки обсуждения, конвейер головы.
  * `undefined` — ссылка не про MR или фордж, который панель так читать не умеет.
@@ -128,6 +171,10 @@ export async function readMergeRequestReview(
   }
 
   const pipeline = mr.head_pipeline;
+  const failedJobs =
+    pipeline?.id !== undefined && pipeline.status === 'failed'
+      ? await readFailedJobs(access, pipeline.id)
+      : undefined;
   return {
     state: toState(mr.state),
     ...(mr.author?.username ? { author: mr.author.username } : {}),
@@ -140,6 +187,7 @@ export async function readMergeRequestReview(
             id: String(pipeline.id),
             status: pipeline.status,
             ...(pipeline.web_url ? { url: pipeline.web_url } : {}),
+            ...(failedJobs ? { failedJobs } : {}),
           },
         }
       : {}),

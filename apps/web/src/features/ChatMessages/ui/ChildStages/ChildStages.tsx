@@ -51,6 +51,7 @@ export function ChildStages({
   onResumeInterrupted,
   resumeInterruptedBusy,
   foreign,
+  providerId,
 }: ChildStagesProps) {
   const { t } = useTranslation();
   // Время разбора и всего разделения тикает, только пока что-то идёт.
@@ -150,6 +151,7 @@ export function ChildStages({
             key={hubCardKey(group)}
             group={group}
             {...(split?.parentChatId ? { parentChatId: split.parentChatId } : {})}
+            {...(providerId ? { providerId } : {})}
             onOpen={onOpen}
             {...(onAnswerHold ? { onAnswerHold } : {})}
             {...(holdBusy !== undefined ? { holdBusy } : {})}

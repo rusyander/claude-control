@@ -303,6 +303,7 @@ export function ProviderChatPage() {
           <ProviderChatMessages
             messages={chat?.messages ?? []}
             providerName={providerName}
+            {...(runner?.providerId ? { providerId: runner.providerId } : {})}
             partial={run.partial}
             isRunning={run.isRunning}
             queued={run.queued}

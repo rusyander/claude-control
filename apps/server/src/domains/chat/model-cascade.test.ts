@@ -10,8 +10,11 @@ import {
   loweredWorkPrompt,
   manualAssignment,
   modelAlias,
+  namesProjectChecks,
   parseAssignments,
+  parseReviewDepth,
   parseReviewFindings,
+  reviewDepthGaps,
   plannedRunCount,
   reviewStagePrompt,
   scanReviewBlocks,
@@ -22,6 +25,11 @@ import {
   planAssignment,
   TASK_KINDS,
 } from '@agentdeck/contracts/model-cascade';
+import {
+  buildGroupPrompt,
+  deliveryPreamble,
+  SPLIT_MAX_GROUPS,
+} from '@agentdeck/contracts/task-split';
 
 /**
  * Контракт каскада лежит в `packages/contracts`, а тесты — здесь: пакет
@@ -149,12 +157,14 @@ describe('planAssignment — подбор под класс задачи', () =>
       kind: 'mechanical',
       lowered: true,
     });
+    // Правка кода и тесты — пол opus high (владелец, 12.10.2026): при потолке
+    // opus high это и есть потолок, понижения нет.
     expect(planAssignment({ kind: 'implementation' }, ceiling)).toMatchObject({
-      model: 'sonnet',
+      model: 'claude-opus-5',
       effort: 'high',
-      lowered: true,
+      lowered: false,
     });
-    expect(planAssignment({ kind: 'tests' }, ceiling).model).toBe('sonnet');
+    expect(planAssignment({ kind: 'tests' }, ceiling).model).toBe('claude-opus-5');
 
     for (const kind of ['design', 'investigation', 'review'] as const) {
       expect(planAssignment({ kind }, ceiling)).toMatchObject({
@@ -197,7 +207,7 @@ describe('planAssignment — подбор под класс задачи', () =>
       'high',
     );
     expect(planAssignment({ kind: 'implementation', model: 'haiku' }, ceiling).model).toBe(
-      'sonnet',
+      'claude-opus-5',
     );
     expect(planAssignment({ kind: 'mechanical', effort: 'low' }, ceiling).effort).toBe('medium');
     expect(planAssignment({ kind: 'design', model: 'haiku' }, ceiling).model).toBe('claude-opus-5');
@@ -345,6 +355,18 @@ describe('разбор ручных замен', () => {
     expect(parseAssignments({ '-1': { model: 'opus' }, '99': { model: 'opus' } }).size).toBe(0);
     expect(parseAssignments({ 0: null, 1: 'opus', 2: {} }).size).toBe(0);
   });
+
+  // G4 (12.10.2026): групп в разделении до 30, а замены читались только у
+  // первых восьми — выбор человека для девятой и дальше пропадал молча.
+  it('замена доходит до каждой группы разделения, не только до первых восьми', () => {
+    const last = SPLIT_MAX_GROUPS - 1;
+    const parsed = parseAssignments({
+      8: { model: 'haiku' },
+      [last]: { model: 'haiku' },
+      [SPLIT_MAX_GROUPS]: { model: 'haiku' },
+    });
+    expect([...parsed.keys()]).toEqual([8, last]);
+  });
 });
 
 describe('scanReviewBlocks', () => {
@@ -393,11 +415,81 @@ describe('scanReviewBlocks', () => {
   });
 });
 
-describe('parseReviewFindings', () => {
-  it('оставляет только непустые строки и режет по потолку длины', () => {
-    const parsed = parseReviewFindings({ findings: ['  есть  ', '', 42, 'x'.repeat(900)] });
+describe('отчёт ревью о глубине (U4)', () => {
+  const block = (body: string): string => ['```agentdeck:review', body, '```'].join('\n');
 
-    expect(parsed?.slice(0, 2)).toEqual(['есть', 'x'.repeat(600)]);
+  it('отчёт едет рядом с замечаниями; тир и покрытие читаются без учёта регистра', () => {
+    const scan = scanReviewBlocks(
+      block(
+        '{"findings":[],"depth":{"tier":"t2","entries":["diff-first","frame-first"],' +
+          '"coverage":"FULL","uncovered":[]}}',
+      ),
+    );
+
+    expect(scan.depth).toEqual({
+      tier: 'T2',
+      entries: ['diff-first', 'frame-first'],
+      coverage: 'full',
+      uncovered: [],
+    });
+  });
+
+  it('нет поля или оно не объект — отчёта нет, а не пустой отчёт', () => {
+    expect(scanReviewBlocks(block('{"findings":[]}')).depth).toBeUndefined();
+    expect(parseReviewDepth('T1')).toBeUndefined();
+    expect(parseReviewDepth(['T1'])).toBeUndefined();
+  });
+
+  it('неизвестный тир и покрытие отбрасываются, мусор в списках — тоже', () => {
+    expect(
+      parseReviewDepth({ tier: 'T9', coverage: 'most', entries: ['a', 3, ' '], uncovered: 'x' }),
+    ).toEqual({ entries: ['a'], uncovered: [] });
+  });
+
+  it('судит панель: без тира или покрытия отчёта нет', () => {
+    expect(reviewDepthGaps(undefined)).toEqual(['unreported']);
+    expect(reviewDepthGaps({ tier: 'T1', entries: ['diff-first'], uncovered: [] })).toEqual([
+      'unreported',
+    ]);
+    expect(reviewDepthGaps({ coverage: 'full', entries: ['diff-first'], uncovered: [] })).toEqual([
+      'unreported',
+    ]);
+  });
+
+  it('названное непрочитанное делает отчёт частичным, даже при «full»', () => {
+    const full = { tier: 'T1' as const, entries: ['diff-first'], coverage: 'full' as const };
+    expect(reviewDepthGaps({ ...full, uncovered: [] })).toEqual([]);
+    expect(reviewDepthGaps({ ...full, uncovered: ['docs'] })).toEqual(['partial']);
+    expect(reviewDepthGaps({ ...full, coverage: 'partial', uncovered: [] })).toEqual(['partial']);
+  });
+
+  it('T2 требует двух РАЗНЫХ входов; T1 хватает одного', () => {
+    const t2 = { tier: 'T2' as const, coverage: 'full' as const, uncovered: [] };
+    expect(reviewDepthGaps({ ...t2, entries: ['diff-first'] })).toEqual(['entries']);
+    expect(reviewDepthGaps({ ...t2, entries: ['Diff-First', 'diff-first'] })).toEqual(['entries']);
+    expect(reviewDepthGaps({ ...t2, entries: ['diff-first', 'frame-first'] })).toEqual([]);
+    expect(
+      reviewDepthGaps({ tier: 'T1', coverage: 'full', uncovered: [], entries: ['diff-first'] }),
+    ).toEqual([]);
+  });
+
+  it('задание ревью просит отчёт о глубине в том же блоке', () => {
+    expect(reviewStagePrompt({ task: 'Сделай вход' })).toContain('"depth"');
+  });
+});
+
+describe('parseReviewFindings', () => {
+  it('оставляет только непустые строки; карточку замечания не режет', () => {
+    const card = 'x'.repeat(9_000);
+    const parsed = parseReviewFindings({ findings: ['  есть  ', '', 42, card] });
+
+    expect(parsed?.slice(0, 2)).toEqual(['есть', card]);
+  });
+
+  it('сверх потолка длины — обрезка с меткой, а не молча', () => {
+    const parsed = parseReviewFindings({ findings: ['x'.repeat(20_000)] });
+
+    expect(parsed?.[0]).toContain('cut by the panel');
   });
 
   it('не список замечаний — не вердикт', () => {
@@ -406,21 +498,31 @@ describe('parseReviewFindings', () => {
     expect(parseReviewFindings(undefined)).toBeUndefined();
   });
 
-  it('простыня обрезается: список уезжает заданием, а не отчётом', () => {
+  it('полсотни замечаний доходят все: мелкие не выбрасываются', () => {
     const many = Array.from({ length: 50 }, (_, index) => `замечание ${index}`);
 
-    expect(parseReviewFindings({ findings: many })).toHaveLength(20);
+    expect(parseReviewFindings({ findings: many })).toEqual(many);
+  });
+
+  it('сверх потолка списка панель говорит, сколько не взяла', () => {
+    const many = Array.from({ length: 230 }, (_, index) => `замечание ${index}`);
+    const parsed = parseReviewFindings({ findings: many }) ?? [];
+
+    expect(parsed.at(-1)).toContain('30 more findings');
+    expect(parsed.slice(0, 200)).toEqual(many.slice(0, 200));
   });
 });
 
 describe('plannedRunCount', () => {
   /**
-   * Цена согласия: у группы на потолке прогон один, у понижённой — до трёх
-   * (работа, ревью, правки). Число показывается ДО кнопки.
+   * Цена согласия: до четырёх прогонов на группу — работа, ревью, правки и
+   * проход проверки (U6: ревью после каждой работы, на потолке тоже). Число
+   * показывается ДО кнопки.
    */
-  it('понижённой группе считает три прогона, остальным — один', () => {
-    expect(plannedRunCount([{ lowered: false }, { lowered: false }])).toBe(2);
-    expect(plannedRunCount([{ lowered: true }, { lowered: false }])).toBe(4);
+  it('каждой группе считает до четырёх прогонов, понижена она или нет', () => {
+    expect(plannedRunCount([{ lowered: false }, { lowered: false }])).toBe(8);
+    expect(plannedRunCount([{ lowered: true }, { lowered: false }])).toBe(8);
+    expect(plannedRunCount([{ lowered: true }], { planned: true })).toBe(6);
     expect(plannedRunCount([])).toBe(0);
   });
 });
@@ -432,6 +534,18 @@ describe('тексты звеньев', () => {
     expect(prompt).toContain('EDIT NOTHING');
     expect(prompt).toContain(REVIEW_BLOCK_LANG);
     expect(prompt).toContain('Переименуй foo в bar');
+  });
+
+  it('ревью сверяет и с критериями плана, когда план есть; без плана строки нет (U13)', () => {
+    const withPlan = reviewStagePrompt({
+      task: 'Сделай вход',
+      context: { plan: '5. Критерии: вход по паролю' },
+    });
+    const without = reviewStagePrompt({ task: 'Сделай вход' });
+
+    expect(withPlan).toContain('an acceptance criterion not met, or a check of its verification');
+    expect(withPlan).toContain('5. Критерии: вход по паролю');
+    expect(without).not.toContain('acceptance criterion');
   });
 
   it('правки перечисляют замечания по номерам и не зовут на второй заход', () => {
@@ -448,6 +562,12 @@ describe('тексты звеньев', () => {
    * чем она сильнее подобранной ступени — панель не знает. Обещать «сильнее»
    * значит подписаться за то, чего не проверяли.
    */
+  it('правки у чужого CLI не зовут к инструменту вопросов, которого у него нет (F8)', () => {
+    expect(fixStagePrompt(['первое'], { reviewer: 'cli' })).not.toContain('AskUserQuestion');
+    expect(fixStagePrompt(['первое'], { reviewer: 'cli' })).toContain('last line of your answer');
+    expect(fixStagePrompt(['первое'])).toContain('AskUserQuestion');
+  });
+
   it('правки у чужого CLI не называют ревьюера сильнейшим', () => {
     const prompt = fixStagePrompt(['первое'], { reviewer: 'cli' });
 
@@ -459,6 +579,21 @@ describe('тексты звеньев', () => {
    * Этап 2 сдан — значит про ревью можно и НУЖНО говорить прямо: агент, знающий
    * о проверке, оставляет незаконченное незаконченным.
    */
+  it('понижённая работа обещает подъём ровно там, где панель его заводит (F4)', () => {
+    expect(loweredWorkPrompt('mechanical')).toContain('re-runs the task on the ceiling model');
+    expect(loweredWorkPrompt('mechanical', { reviewer: 'cli' })).toContain(
+      're-runs the task on the model the CLI itself is configured with',
+    );
+    // Правки и ручной веер подъёма не получают — и обещать его им нельзя.
+    for (const prompt of [
+      loweredWorkPrompt('mechanical', { review: false }),
+      loweredWorkPrompt('mechanical', { review: false, verify: true }),
+    ]) {
+      expect(prompt).not.toContain('stronger model');
+      expect(prompt).not.toContain('re-runs the task');
+    }
+  });
+
   it('планка сдачи обещает ревью, а не только проверки проекта', () => {
     expect(loweredWorkPrompt('mechanical')).toContain('review');
     expect(loweredWorkPrompt('mechanical')).toContain('on the ceiling model');
@@ -477,5 +612,28 @@ describe('тексты звеньев', () => {
     const prompt = loweredWorkPrompt('mechanical', { review: false });
 
     expect(prompt).toContain('The panel will not start a review of this work');
+  });
+
+  /**
+   * TQ-10 (12.10.2026): задание с доставкой уже определяет проверки проекта —
+   * понижённая планка того же прогона ссылается на него, а не повторяет.
+   */
+  it('задание с доставкой называет проверки — планка сдачи ссылается, а не повторяет', () => {
+    const group = { title: 'Форма входа', branch: 'fix/login', tasks: ['Поправь валидацию'] };
+    const delivered = `${deliveryPreamble({ branch: 'fix/login' })}\n\n${buildGroupPrompt(group)}`;
+
+    expect(namesProjectChecks(delivered)).toBe(true);
+    expect(namesProjectChecks(buildGroupPrompt(group))).toBe(false);
+    expect(namesProjectChecks(fixStagePrompt(['x']))).toBe(true);
+
+    const short = loweredWorkPrompt('mechanical', { checksInTask: true });
+    expect(short).toContain('run the project checks your task names');
+    expect(short).not.toContain('run the project checks its rules name');
+    expect(loweredWorkPrompt('mechanical')).toContain('run the project checks its rules name');
+  });
+
+  it('источники правил названы и для чужих CLI', () => {
+    expect(loweredWorkPrompt('mechanical')).toContain("the CLI's own instruction files");
+    expect(deliveryPreamble({ branch: 'fix/login' })).toContain("the CLI's own instruction files");
   });
 });

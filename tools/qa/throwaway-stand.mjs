@@ -469,6 +469,9 @@ export async function startStand({
   );
   const env = {
     ...base,
+    // Веб-цель «Dev-сервера» открыла бы браузер ОС на рабочем столе человека, с
+    // домом стенда в профиле: окно висит, каталог стенда не удаляется.
+    AGENTDECK_OPEN_BROWSER: '0',
     ...extraEnv,
     ...homeEnv,
     PATH: [...(fakeNames.length > 0 ? [bin] : []), shellPath.path, ...extraPath].join(delimiter),

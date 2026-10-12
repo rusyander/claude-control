@@ -97,6 +97,13 @@ describe('строка инициатив для прогона', () => {
     expect(muted).not.toContain('agentdeck:split');
     expect(muted).toContain('agentdeck:handoff');
     expect(muted.startsWith('This run was started from the AgentDeck panel')).toBe(true);
+    // Источник называет только предложенное (TQ-10): разделения здесь нет.
+    expect(muted).not.toContain('spread a list of tasks');
+    expect(muted).toContain('continue the work in a clean session');
+    expect(muted).toContain('it is triggered by a service block');
+    const full = initiativePrompt(both) ?? '';
+    expect(full).toContain('spread a list of tasks');
+    expect(full).toContain('both are triggered by a service block');
   });
 
   it('единственная инициатива погашена — у чужого CLI строки нет вовсе', () => {

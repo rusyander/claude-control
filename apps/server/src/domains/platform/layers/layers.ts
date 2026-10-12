@@ -97,8 +97,8 @@ export interface UserMemoryPlace {
 
 /**
  * Личный `CLAUDE.md`, который CLI читает КАК ПРОЕКТНЫЙ, — исключить его при
- * снятом слое личных настроек. Возвращает текст файла для `--settings` или
- * `undefined`, когда исключать нечего.
+ * снятом слое личных настроек. Возвращает шаблоны `claudeMdExcludes` для
+ * `--settings` или `undefined`, когда исключать нечего.
  *
  * ПОЧЕМУ `--setting-sources project,local` МАЛО. Замерено 17.09.2026 настоящим
  * `claude` 2.1.263 против стаба (`check-run-layers.mjs`, случай 8): CLI ищет
@@ -127,10 +127,10 @@ export interface UserMemoryPlace {
  * (`lightWindowLayers`), и функция честно отвечает «исключать нечего» — правило
  * одно на оба запуска, просто там его нечем применить.
  */
-export function userMemorySettings(
+export function userMemoryExcludes(
   args: readonly string[],
   place: UserMemoryPlace,
-): string | undefined {
+): string[] | undefined {
   const at = args.indexOf('--setting-sources');
   if (at < 0) return undefined;
   const sources = (args[at + 1] ?? '').split(',');
@@ -138,8 +138,8 @@ export function userMemorySettings(
 
   const win = place.platform === 'win32';
   const p = win ? win32 : posix;
-  const home = (win ? place.env.USERPROFILE : place.env.HOME) || place.fallbackHome;
-  const configDir = place.env.CLAUDE_CONFIG_DIR || p.join(home, '.claude');
+  const home = homeOf(place);
+  const configDir = configDirOf(place);
   const key = (dir: string): string => {
     const clean = p.normalize(dir).replace(/[\\/]+$/, '');
     return win ? clean.toLowerCase() : clean;
@@ -171,11 +171,23 @@ export function userMemorySettings(
   const caseless = win || place.platform === 'darwin';
   const claudeMdExcludes = new Set(literal);
   if (caseless) for (const file of literal) claudeMdExcludes.add(caselessGlob(file));
-  return JSON.stringify({ claudeMdExcludes: [...claudeMdExcludes] });
+  return [...claudeMdExcludes];
 }
 
-/** Шаблон пути без учёта регистра: `[cC]:/[uU]…`; см. `userMemorySettings`. */
-function caselessGlob(path: string): string {
+function homeOf(place: UserMemoryPlace): string {
+  return (
+    (place.platform === 'win32' ? place.env.USERPROFILE : place.env.HOME) || place.fallbackHome
+  );
+}
+
+/** Каталог личной конфигурации CLI — тот, откуда он сам читает `settings.json`. */
+export function configDirOf(place: UserMemoryPlace): string {
+  const p = place.platform === 'win32' ? win32 : posix;
+  return place.env.CLAUDE_CONFIG_DIR || p.join(homeOf(place), '.claude');
+}
+
+/** Шаблон пути без учёта регистра: `[cC]:/[uU]…`; см. `userMemoryExcludes`. */
+export function caselessGlob(path: string): string {
   if (/[[\]!]/.test(path)) return path;
   return [...path]
     .map((ch) => {

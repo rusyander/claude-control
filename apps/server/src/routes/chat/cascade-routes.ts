@@ -6,6 +6,8 @@ import {
   readLoweredRuns,
   summarizeLoweredRuns,
 } from '../../domains/chat/lowered-journal/lowered-journal.ts';
+import { readRunInputs } from '../../domains/chat/run-input/run-input.ts';
+import type { RunInputsResponse } from '@agentdeck/contracts/run-input';
 
 /**
  * Правило «Подбирать модель под задачу» — чтение и запись положения тумблера.
@@ -48,4 +50,17 @@ export function registerChatCascadeRoutes(app: FastifyInstance, ctx: ServerConte
     const records = readLoweredRuns(ctx.location.paths.appData);
     return { runs: [...records].reverse(), summary: summarizeLoweredRuns(records) };
   });
+
+  /**
+   * «Что получил агент» (U8): дословные входы последних прогонов разговора,
+   * свежие первыми. Ключ — как у связи конвейера: `sessionId` у Claude,
+   * `<провайдер>:<id>` у чужого CLI. Разговор без записей — пустой список:
+   * он старше записи или панель его не запускала.
+   */
+  app.get<{ Params: { chatId: string } }>(
+    '/api/chat/:chatId/received',
+    (request): RunInputsResponse => ({
+      runs: readRunInputs(ctx.location.paths.appData, request.params.chatId),
+    }),
+  );
 }

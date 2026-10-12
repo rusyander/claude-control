@@ -127,27 +127,86 @@ describe('чужой CLI: звено доставки группы', () => {
     expect(ended).toEqual([]);
   });
 
-  // M8: работа настройкой CLI ревью не получает — группа с доставкой идёт в доставку.
-  it('работа без понижения у группы с доставкой заводит доставку, без ревью', () => {
+  // U6: работа настройкой CLI тоже идёт в ревью — мимо него в доставку не едет.
+  /** Разговоры, заведённые со стадией ревью (ревью работы и проход проверки). */
+  const reviews = (): string[] =>
+    send.mock.calls
+      .map((call) => call[2] as string)
+      .filter((id) => readChatCascade(dir, 'codex', id)?.stage === 'review');
+
+  it('работа без понижения тоже идёт в ревью (U6), а не мимо него в доставку', () => {
     chat('work', { ...FIX, stage: 'work', lowered: false }, 'work');
 
     planner()(finish('work', 'Сделал.'));
 
-    const [id] = deliveries();
+    expect(deliveries()).toEqual([]);
+    const [id] = reviews();
     expect(id).toBeDefined();
-    const prompt = (send.mock.calls[0]?.[3] as { text: string }).text;
-    expect(prompt).toContain('it has no separate review');
-    expect(readChatCascade(dir, 'codex', 'work')?.deliveredAt).toBeTruthy();
+    // Ни модели, ни глубины: ревьюер чужого CLI — его собственная настройка.
+    expect(readChat(dir, 'codex', id ?? '')?.model).toBeUndefined();
+    expect(readChatCascade(dir, 'codex', 'work')?.reviewedAt).toBeTruthy();
     expect(ended).toEqual([]);
   });
 
-  it('работа без понижения у группы без доставки кончается, как раньше', () => {
+  it('работа без понижения у группы без доставки тоже получает ревью', () => {
     chat('work', { ...FIX, stage: 'work', lowered: false }, 'work');
 
     planner(false)(finish('work', 'Сделал.'));
 
+    expect(reviews()).toHaveLength(1);
+    expect(ended).toEqual([]);
+  });
+
+  it('правки с замечаниями заводят проход проверки (U6), его итог — доставку с открытым', () => {
+    chat('fix', { ...FIX, fixFindings: ['a.ts:1 — забыт await'] }, 'fix');
+
+    planner()(finish('fix', 'Поправил a.ts.'));
+
     expect(deliveries()).toEqual([]);
-    expect(ended).toEqual([{ stage: 'work', status: 'done' }]);
+    const [verify] = reviews();
+    expect(verify).toBeDefined();
+    expect(readChatCascade(dir, 'codex', verify ?? '')?.fixFindings).toEqual([
+      'a.ts:1 — забыт await',
+    ]);
+    expect(readChatCascade(dir, 'codex', 'fix')?.reviewedAt).toBeTruthy();
+    const verifyPrompt = (send.mock.calls[0]?.[3] as { text: string }).text;
+    expect(verifyPrompt).toContain('VERIFYING those fixes');
+    expect(verifyPrompt).toContain('1. a.ts:1 — забыт await');
+
+    links[`codex:${verify}`] = { ...LINK, stage: 'review' };
+    appendMessage(dir, 'codex', verify ?? '', { role: 'user', content: verifyPrompt });
+    planner()(finish(verify ?? '', reviewBlock(['a.ts:1 — await всё ещё забыт'])));
+
+    const [delivery] = deliveries();
+    expect(delivery).toBeDefined();
+    const deliverPrompt = (send.mock.calls[1]?.[3] as { text: string }).text;
+    expect(deliverPrompt).toContain('Open after verification');
+    expect(deliverPrompt).toContain('1. a.ts:1 — await всё ещё забыт');
+    expect(reviews()).toHaveLength(1);
+  });
+
+  it('проход проверки без блока итога — доставка говорит в MR, что правки не проверены', () => {
+    chat('verify', { ...REVIEW, fixFindings: ['a.ts:1 — забыт await'] }, 'review');
+
+    planner()(finish('verify', 'Посмотрел, вроде всё хорошо.'));
+
+    const [delivery] = deliveries();
+    expect(delivery).toBeDefined();
+    const deliverPrompt = (send.mock.calls[0]?.[3] as { text: string }).text;
+    expect(deliverPrompt).toContain('the review fixes were NOT verified');
+    expect(deliverPrompt).not.toContain('Open after verification');
+  });
+
+  it('проход проверки уже заведён — второго нет, и доставку правки не заводят', () => {
+    chat(
+      'fix',
+      { ...FIX, fixFindings: ['a.ts:1 — забыт await'], reviewedAt: '2026-09-25T10:05:00.000Z' },
+      'fix',
+    );
+
+    planner()(finish('fix', 'Поправил ещё раз.'));
+
+    expect(send).not.toHaveBeenCalled();
   });
 
   it('правки по ревью группы с доставкой знают, что доставка идёт следом', () => {

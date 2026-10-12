@@ -16,8 +16,12 @@ import { fallbackOverrideText } from './override/override.ts';
  */
 
 export const OVERRIDE_BLOCK_KIND = 'group-override';
-/** Потолок текста: правило уезжает в каждый запрос проекта. */
-const MAX_TEXT = 8_000;
+/**
+ * Потолок текста: правило уезжает в каждый запрос проекта. Длиннее — не режется
+ * (обрубленное правило читается целым, и хвост запретов молча пропадал), а
+ * уступает место запасному шаблону: тот полон.
+ */
+const MAX_TEXT = 32_000;
 
 function skillIds(group: Group | undefined): string[] {
   return (group?.members ?? []).filter((m) => m.kind === 'skill').map((m) => m.id);
@@ -54,7 +58,7 @@ export async function overrideTextFor(
   try {
     const reply = await ask(singleTurn(prompt, data), 'cheap');
     const text = readAnswerBlock(reply, OVERRIDE_BLOCK_KIND)?.trim();
-    if (text && text.startsWith('#')) return { text: text.slice(0, MAX_TEXT), denySkills };
+    if (text && text.startsWith('#') && text.length <= MAX_TEXT) return { text, denySkills };
   } catch {
     // Модель недоступна — ниже запасной текст.
   }

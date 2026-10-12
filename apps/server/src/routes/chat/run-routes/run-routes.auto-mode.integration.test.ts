@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
-import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { ChatAutoModeView } from '@agentdeck/contracts';
@@ -166,6 +166,27 @@ describe('авторежим прав чата', () => {
   it('по умолчанию: CLI в авторежиме, рутину панель подтверждает сама', async () => {
     expect((await send(PLAIN)).permissionMode).toBe('auto');
     expect(await decide(PLAIN, 'npm test')).toBe('allow');
+  });
+
+  it('защита бэкенда проекта: узнанное уходит человеку мимо авторежима, прочее — как было', async () => {
+    await send(PLAIN);
+    const commands = [
+      'kubectl apply -f deploy.yaml',
+      'psql -h db.prod.internal -c "select 1"',
+      'alembic downgrade -1',
+    ];
+    // Без защиты эти команды авторежим пропускает: ни одно правило панели их не держит.
+    for (const command of commands) expect(await decide(PLAIN, command)).toBe('allow');
+
+    mkdirSync(join(work, '.claude'), { recursive: true });
+    writeFileSync(
+      join(work, '.claude', 'backend-guard.json'),
+      JSON.stringify({ version: 1, prodMarkers: ['db.prod.internal'], disabled: [] }),
+    );
+    for (const command of commands) expect(await decide(PLAIN, command)).toBe('card');
+    // Обычная работа с защитой не спотыкается.
+    expect(await decide(PLAIN, 'npm test')).toBe('allow');
+    expect(await decide(PLAIN, 'kubectl get pods')).toBe('allow');
   });
 
   it('глобально выключен — acceptEdits, рутина спрашивает человека', async () => {

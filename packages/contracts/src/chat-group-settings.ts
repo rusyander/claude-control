@@ -74,7 +74,7 @@ export const ESCALATE_BLOCK_LANG = blockLang('escalate');
 
 export const escalationSchema = object({
   severity: zodEnum(['critical']),
-  text: string().min(1).max(2_000),
+  text: string().min(1).max(20_000),
 });
 export type Escalation = Infer<typeof escalationSchema>;
 

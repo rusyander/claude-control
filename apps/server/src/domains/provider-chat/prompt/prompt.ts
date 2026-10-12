@@ -11,8 +11,11 @@ import type { ProviderChatMessage } from '@agentdeck/contracts';
  * элементом argv, а командная строка Windows обрывается примерно на 32 тысячах
  * символов — длинный разговор ушёл бы обрубком, и CLI ответил бы на половину
  * вопроса, не сказав об этом. Поэтому старые реплики отбрасываются, пока промпт
- * не влезет, а последний вопрос пользователя не отбрасывается никогда: без него
- * запускать нечего.
+ * не влезет, — с меткой для модели, сколько их было. Указание панели (реплики
+ * `system-prefix`: планка сдачи, эскалация, навыки, хуки) не отбрасывается
+ * никогда, и последний вопрос тоже. Не влезают они — промпта нет, есть размер:
+ * запуск отказывает вслух, а не режет задание (TQ-05, F1, 12.10.2026: задание
+ * группы уходило обрезанным без метки, а указание панели терялось первым).
  */
 
 /** Сколько символов промпта считаем безопасными для argv на всех системах. */
@@ -22,10 +25,21 @@ function label(message: ProviderChatMessage): string {
   return message.role === 'assistant' ? `Assistant: ${message.content}` : message.content;
 }
 
+/** Синтетическая реплика панели — указание, блок навыка или хука. */
+const PINNED_ID = 'system-prefix';
+
+const droppedLine = (count: number): string =>
+  `[${count} earlier messages of this conversation left out by the panel — over the command-line limit]`;
+
 export interface BuiltPrompt {
   text: string;
-  /** Сколько ранних реплик не поместилось — панель показывает это честно. */
+  /** Сколько ранних реплик не поместилось — модель видит это меткой в промпте. */
   droppedMessages: number;
+  /**
+   * Указание панели с последним вопросом длиннее предела: `text` пуст, здесь —
+   * сколько знаков заняли бы они одни. Обрубком такой промпт не уходит.
+   */
+  overflow?: number;
 }
 
 export function buildPrompt(
@@ -38,17 +52,20 @@ export function buildPrompt(
   const usable = history.filter((message) => !message.failed && message.role !== 'notice');
   if (usable.length === 0) return { text: '', droppedMessages: 0 };
 
+  const pinned = usable.filter((message) => message.id === PINNED_ID).map(label);
+  const talk = usable.filter((message) => message.id !== PINNED_ID);
+  const compose = (start: number): string =>
+    [...pinned, ...(start > 0 ? [droppedLine(start)] : []), ...talk.slice(start).map(label)]
+      .join('\n\n')
+      .trim();
+
   let start = 0;
-  let text = usable.map(label).join('\n\n').trim();
-
-  while (text.length > maxChars && start < usable.length - 1) {
+  let text = compose(start);
+  while (text.length > maxChars && start < talk.length - 1) {
     start += 1;
-    text = usable.slice(start).map(label).join('\n\n').trim();
+    text = compose(start);
   }
-
-  // Один-единственный вопрос длиннее предела — режем его сам текст: отказать
-  // молча нельзя, а урезание видно в ответе модели.
-  if (text.length > maxChars) text = text.slice(0, maxChars);
+  if (text.length > maxChars) return { text: '', droppedMessages: start, overflow: text.length };
 
   return { text, droppedMessages: start };
 }

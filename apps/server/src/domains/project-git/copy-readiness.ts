@@ -1,11 +1,16 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { join } from 'node:path';
 import type { WorktreeMirrorSettings } from '@agentdeck/contracts';
 import { normalizeProjectPath } from '../../lib/app-store/projects.ts';
 import { readJsonFile } from '../../lib/safe-io/safe-io.ts';
 import { serverText } from '../../lib/server-texts/server-texts.ts';
 import { copyProjectAccess, projectKey } from './copy-access.ts';
 import { LINK_DIRS, mirrorLocalLayer } from './mirror-local.ts';
+import { layoutForCwd } from './cwd-layout.ts';
+
+// Раскладка читается файлами и живёт отдельно: её зовёт запуск каждого прогона,
+// и тянуть туда git-обвязку починки копии незачем.
+export { layoutForCwd, type CwdLayout } from './cwd-layout.ts';
 
 /**
  * Готова ли копия к работе агента.
@@ -27,20 +32,24 @@ import { LINK_DIRS, mirrorLocalLayer } from './mirror-local.ts';
  * Что решает автономность копии. Не весь локальный слой: файл, которого нет и
  * в оригинале, не отсутствует — его просто нет в проекте.
  */
+const MCP_CONFIG = '.mcp.json';
+
 const CRITICAL: readonly string[] = [
-  '.mcp.json',
+  MCP_CONFIG,
   '.claude/settings.json',
   '.claude/settings.local.json',
   'CLAUDE.local.md',
   '.env',
 ];
 
-export type CopyGapKind = 'file' | 'link' | 'access';
+export type CopyGapKind = 'file' | 'link' | 'access' | 'mcp';
 
 export interface CopyGap {
   kind: CopyGapKind;
   /** Путь относительно корня копии или ключ записи доступа. */
   path: string;
+  /** `mcp`: серверы оригинала, которых нет в `.mcp.json` копии. */
+  names?: string[];
 }
 
 export interface CopyReadiness {
@@ -77,6 +86,28 @@ interface ClaudeJson {
   projects?: Record<string, unknown>;
 }
 
+/**
+ * Имена MCP-серверов из `.mcp.json`; нечитаемый файл — пустой список.
+ *
+ * Наличия файла мало: отслеживаемый `.mcp.json`, у которого в оригинале
+ * локальная правка под `skip-worktree`, в копии после `git checkout --`,
+ * `stash`, перебазирования или любой операции с индексом снова становится
+ * ЗАКОММИЧЕННЫМ — файл на месте, а серверов, ради которых он правился, нет.
+ * Агент узнаёт об этом посреди работы, когда инструмента не оказалось.
+ */
+export function mcpServerNames(path: string): string[] {
+  if (!isFile(path)) return [];
+  try {
+    const data = JSON.parse(readFileSync(path, 'utf8')) as { mcpServers?: unknown };
+    const servers = data.mcpServers;
+    return servers && typeof servers === 'object' && !Array.isArray(servers)
+      ? Object.keys(servers)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
 /** Есть ли у каталога запись в `.claude.json` — регистр и слэши не различаем. */
 export function hasProjectAccess(claudeJsonPath: string, dir: string): boolean {
   if (!existsSync(claudeJsonPath)) return false;
@@ -108,6 +139,16 @@ export function checkCopyReady(input: {
     if (!isFile(join(input.copyDir, rel))) gaps.push({ kind: 'file', path: rel });
   }
 
+  // Файл есть, а серверов оригинала в нём нет — см. `mcpServerNames`. Лишние
+  // серверы копии не дыра: их мог добавить сам агент для своей задачи.
+  if (isFile(join(input.mainDir, MCP_CONFIG)) && isFile(join(input.copyDir, MCP_CONFIG))) {
+    const present = new Set(mcpServerNames(join(input.copyDir, MCP_CONFIG)));
+    const names = mcpServerNames(join(input.mainDir, MCP_CONFIG)).filter(
+      (name) => !present.has(name),
+    );
+    if (names.length > 0) gaps.push({ kind: 'mcp', path: MCP_CONFIG, names });
+  }
+
   for (const rel of LINK_DIRS) {
     if (!isDir(join(input.mainDir, rel))) continue;
     // Мёртвая ссылка ведёт себя хуже отсутствия: каталог как бы есть, а читать
@@ -131,67 +172,6 @@ export function checkCopyReady(input: {
   }
 
   return { ready: gaps.length === 0, gaps, access };
-}
-
-/**
- * Раскладка каталога: копия ли он и от какого оригинала.
- *
- * Пустой ответ значит «сверять не с чем» — не репозиторий, основная копия,
- * подмодуль, нечитаемая раскладка.
- */
-export interface CwdLayout {
-  mainDir?: string;
-  copyDir?: string;
-}
-
-/**
- * Читается ФАЙЛАМИ, без запуска git, и это главное свойство функции.
- *
- * Раскладку спрашивают на КАЖДОМ сообщении человека, а `git rev-parse` — это
- * порождение процесса: на этой машине измерено 44–62 мс на посылку, одинаково
- * внутри репозитория и вне его. Столько стоило узнать то, что git сам же
- * записал в два маленьких файла: рабочая копия помечена `.git`-ФАЙЛОМ со
- * строкой `gitdir:`, а общий каталог назван в `commondir` рядом. Читаем их —
- * получается тот же ответ за несколько обращений к файловой системе.
- *
- * Отличать копию от подмодуля умеет тот же `commondir`: у подмодуля (его
- * `.git` — тоже файл, но ведёт в `.git/modules/…`) этого файла нет, и каталог
- * честно читается как «не копия».
- */
-export function layoutForCwd(cwd: string): CwdLayout {
-  let dir = resolve(cwd);
-  for (;;) {
-    const marker = join(dir, '.git');
-    // Каталог `.git` — обычный репозиторий, он сам себе источник.
-    if (isDir(marker)) return {};
-    if (isFile(marker)) return fromGitFile(dir, marker);
-
-    const up = dirname(dir);
-    if (up === dir) return {};
-    dir = up;
-  }
-}
-
-function fromGitFile(copyDir: string, marker: string): CwdLayout {
-  let gitDir: string;
-  try {
-    const pointer = /^gitdir:\s*(.+)$/m.exec(readFileSync(marker, 'utf8'));
-    if (!pointer?.[1]) return {};
-    gitDir = resolve(copyDir, pointer[1].trim());
-  } catch {
-    return {};
-  }
-
-  let commonDir: string;
-  try {
-    commonDir = resolve(gitDir, readFileSync(join(gitDir, 'commondir'), 'utf8').trim());
-  } catch {
-    return {};
-  }
-
-  const mainDir = resolve(dirname(commonDir));
-  if (normalizeProjectPath(mainDir) === normalizeProjectPath(copyDir)) return {};
-  return { mainDir, copyDir };
 }
 
 /**
@@ -233,8 +213,16 @@ export async function repairCopy(input: {
   mirror?: WorktreeMirrorSettings;
   claudeJsonPath?: string;
 }): Promise<CopyReadiness> {
+  // Повторное зеркало переносит только то, что в оригинале свежее, а
+  // откаченный в копии `.mcp.json` по времени как раз свежее рабочего. Его
+  // дыру видно только по содержимому — и переписывается он поверх времени.
+  const before = checkCopyReady(input);
+  const force = before.gaps.filter((gap) => gap.kind === 'mcp').map((gap) => gap.path);
   try {
-    await mirrorLocalLayer(input.mainDir, input.copyDir, input.mirror, { newerOnly: true });
+    await mirrorLocalLayer(input.mainDir, input.copyDir, input.mirror, {
+      newerOnly: true,
+      ...(force.length > 0 ? { force } : {}),
+    });
   } catch {
     // Причину назовёт сверка ниже — дыры важнее текста ошибки переноса.
   }
@@ -253,11 +241,14 @@ export function describeGaps(gaps: readonly CopyGap[]): string {
   const files = gaps.filter((gap) => gap.kind === 'file').map((gap) => gap.path);
   const links = gaps.filter((gap) => gap.kind === 'link').map((gap) => gap.path);
   const access = gaps.some((gap) => gap.kind === 'access');
+  const servers = gaps.flatMap((gap) => (gap.kind === 'mcp' ? (gap.names ?? []) : []));
   const parts: string[] = [];
   if (files.length > 0)
     parts.push(serverText('worktree-copy-gap-files', { files: files.join(', ') }));
   if (links.length > 0)
     parts.push(serverText('worktree-copy-gap-links', { links: links.join(', ') }));
+  if (servers.length > 0)
+    parts.push(serverText('worktree-copy-gap-mcp', { names: servers.join(', ') }));
   if (access) parts.push(serverText('worktree-copy-gap-access'));
   return parts.join('; ');
 }

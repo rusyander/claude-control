@@ -42,25 +42,44 @@ describe('buildPrompt', () => {
     expect(text).toBe('Вопрос\n\nЕщё');
   });
 
-  it('отбрасывает старые реплики, пока промпт не влезет', () => {
+  it('отбрасывает старые реплики, пока промпт не влезет, — и говорит модели, сколько', () => {
     const { text, droppedMessages } = buildPrompt(
       [
-        message('user', 'а'.repeat(50)),
-        message('user', 'б'.repeat(50)),
+        message('user', 'а'.repeat(150)),
+        message('user', 'б'.repeat(150)),
         message('user', 'в'.repeat(10)),
       ],
-      60,
+      200,
     );
 
     expect(droppedMessages).toBe(2);
-    expect(text).toBe('в'.repeat(10));
+    expect(text.endsWith('в'.repeat(10))).toBe(true);
+    expect(text).toContain('2 earlier messages');
+    expect(text).not.toContain('а');
   });
 
-  it('никогда не выбрасывает последний вопрос — режет его сам', () => {
-    const { text, droppedMessages } = buildPrompt([message('user', 'я'.repeat(100))], 40);
+  it('указание панели не выбрасывается никогда — уходят только старые реплики (TQ-05, F1)', () => {
+    const prefix: ProviderChatMessage = {
+      id: 'system-prefix',
+      role: 'user',
+      content: 'УКАЗАНИЕ',
+      at: '2026-01-01T00:00:00.000Z',
+    };
+    const { text, droppedMessages } = buildPrompt(
+      [prefix, message('user', 'а'.repeat(300)), message('user', 'в'.repeat(30))],
+      200,
+    );
 
-    expect(droppedMessages).toBe(0);
-    expect(text).toHaveLength(40);
+    expect(droppedMessages).toBe(1);
+    expect(text.startsWith('УКАЗАНИЕ')).toBe(true);
+    expect(text.endsWith('в'.repeat(30))).toBe(true);
+  });
+
+  it('последний вопрос не влезает — промпта нет, есть размер: обрубком не уходит (TQ-05, F1)', () => {
+    const built = buildPrompt([message('user', 'старое'), message('user', 'я'.repeat(100))], 40);
+
+    expect(built.text).toBe('');
+    expect(built.overflow).toBeGreaterThan(40);
   });
 
   it('пустая переписка даёт пустой промпт', () => {
@@ -68,7 +87,10 @@ describe('buildPrompt', () => {
   });
 
   it('по умолчанию держится в пределах, безопасных для argv', () => {
-    const { text } = buildPrompt([message('user', 'я'.repeat(MAX_PROMPT_CHARS * 2))]);
+    const { text } = buildPrompt([
+      message('user', 'я'.repeat(MAX_PROMPT_CHARS)),
+      message('user', 'ю'.repeat(100)),
+    ]);
 
     expect(text.length).toBeLessThanOrEqual(MAX_PROMPT_CHARS);
   });

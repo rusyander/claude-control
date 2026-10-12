@@ -113,6 +113,18 @@ export interface OpencodeServeDeps {
   permissionPollMs?: number;
   /** Кусок ответа, пока он идёт (шина `/event`). Не задан — ответ только целиком. */
   onDelta?: (text: string) => void;
+  /**
+   * Первое сообщение НОВОЙ сессии вместо `text`: указание панели, блоки навыков
+   * и хуков и вся прежняя переписка (TQ-04, 12.10.2026). Живая сессия всё это
+   * уже видела и получает только `text`; новая без вступления не знала бы ни
+   * планки сдачи, ни эскалации, ни того, о чём говорили до неё.
+   */
+  opening?: string;
+  /**
+   * Что ушло в сессию на самом деле — `opening` или `text` (TQ-09): «Что получил
+   * агент» пишется этим, а не догадкой вызывающего о том, свежая ли сессия.
+   */
+  onSent?: (text: string) => void;
 }
 
 const DEFAULT_READY_TIMEOUT = 20_000;
@@ -431,13 +443,16 @@ export class OpencodeServe {
     let session = this.sessions.get(conversationId);
     // Каталог разговора сменили — старая сессия работает в прежнем проекте.
     if (session && session.workdir !== deps.workdir) session = undefined;
+    const fresh = !session;
     if (!session) {
       session = await this.createSession(baseUrl, deps);
       if (!session) return undefined;
       this.sessions.set(conversationId, session);
     }
 
-    const outcome = await this.sendMessage(baseUrl, session, text, deps);
+    const sent = fresh && deps.opening ? deps.opening : text;
+    deps.onSent?.(sent);
+    const outcome = await this.sendMessage(baseUrl, session, sent, deps);
     if (outcome.reply === undefined) {
       // Причину назвал сам CLI — сессия жива и помнит разговор, держим её.
       if (outcome.error) return { error: outcome.error, sessionId: session.id };

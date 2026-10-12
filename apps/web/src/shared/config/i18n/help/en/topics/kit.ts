@@ -56,10 +56,14 @@ export const kitEn: typeof kitRu = {
     modeWhat: 'What the agent gets',
     modeGlobal: 'Yours only',
     modeGlobalText:
-      'The default. Only what is in `~/.claude` and its counterparts for other CLIs — as without the panel.',
+      'The default when you have a layer of your own. Only what is in `~/.claude` and its counterparts ' +
+      'for other CLIs — as without the panel.',
     modeHybrid: 'Yours and the panel kit',
     modeHybridText:
-      'Your layer plus the kit. For a same-named item yours is taken; such a row lets you choose «from the kit».',
+      'Your layer plus the kit. For a same-named item yours is taken; such a row lets you choose «from the kit». ' +
+      'If Claude Code or Codex is not set up — no skills, commands, subagents, CLAUDE.md or AGENTS.md — ' +
+      'this mode is the default: otherwise a run would go without the skills that review, conflicts, tests ' +
+      'and MR delivery rely on.',
     modeOurs: 'Panel kit only',
     modeOursText:
       'Only the kit: personal settings, rules and hooks are not loaded. The account login stays — it does not live in settings.',

@@ -13,6 +13,13 @@ import {
   type HandoffProposal,
 } from '@agentdeck/contracts/chat-handoff';
 import { planStagePrompt } from '@agentdeck/contracts/split-plan';
+import {
+  OWNER_MESSAGE_OPENER,
+  OWNER_MESSAGES_LEFT_OUT,
+  OWNER_PRECEDENCE_LINE,
+  OWNER_REQUEST_HEADER,
+  SKILL_ROUTE_LINE,
+} from '@agentdeck/contracts/quality-floor';
 import { LEGACY_IDENTITY, LEGACY_LEADING, LEGACY_WHOLE } from './panel-preamble-legacy.ts';
 
 /**
@@ -87,6 +94,11 @@ const LEADING = [
     deliveryPreamble({ branch: MARK }),
     mergeRequestWorkPreamble({ url: MARK }),
     buildHandoffPrompt(HANDOFF),
+    // Шапка блока слов владельца (U1) и его служебные строки — панельные; сами
+    // слова владельца под ними и дают чату название.
+    OWNER_REQUEST_HEADER,
+    OWNER_MESSAGE_OPENER,
+    OWNER_MESSAGES_LEFT_OUT,
   ]),
   ...LEGACY_LEADING,
 ];
@@ -97,6 +109,7 @@ const WHOLE = [
     planStagePrompt({ title: MARK, task: MARK, branch: MARK }),
     planStagePrompt({ title: MARK, task: MARK }),
     reviewStagePrompt({ task: MARK, model: MARK, branch: MARK }),
+    reviewStagePrompt({ task: MARK, branch: MARK }),
     reviewStagePrompt({ task: MARK }),
     fixStagePrompt([MARK], { branch: MARK }),
     fixStagePrompt([MARK]),
@@ -131,10 +144,13 @@ const startsWithAny = (line: string, list: readonly string[]): boolean => {
 export function withoutPanelPreamble(text: string): string {
   const lines = text.split('\n');
   if (startsWithAny(lines.find((line) => line.trim()) ?? '', IDENTITY)) return '';
-  if (lines.some((line) => startsWithAny(line, WHOLE))) return '';
   const paragraphs = withoutPanelTail(text).split(/\n[ \t]*\n/);
   let first = 0;
   while (first < paragraphs.length && startsWithAny(paragraphs[first] ?? '', LEADING)) first += 1;
+  // Задание звена начинает реплику — сразу за вводными абзацами панели. Та же
+  // строка ниже, среди слов человека, — его цитата (G1, 12.10.2026): раньше
+  // любая такая строка выбрасывала реплику целиком.
+  if (startsWithAny(paragraphs[first] ?? '', WHOLE)) return '';
   return paragraphs.slice(first).join('\n\n');
 }
 
@@ -142,13 +158,24 @@ export function withoutPanelPreamble(text: string): string {
  * Хвост панели после слов задания. Строка языка ответа приписана к заданиям
  * модели по-английски (решение владельца D-E) и в названии чата стояла бы
  * английской фразой; справка об исходном задании продолжения — тоже: название
- * продолжения — что делать дальше, а не пересказ всей работы.
+ * продолжения — что делать дальше, а не пересказ всей работы. Строка
+ * старшинства (`OWNER_PRECEDENCE_LINE`) и строка навыков (`SKILL_ROUTE_LINE`) — тоже
+ * хвост панели, и стоят они то отдельным абзацем, то строкой сразу под строкой
+ * языка: поэтому отбрасываются построчно, а не абзацами.
  */
 function withoutPanelTail(text: string): string {
   const at = text.indexOf(`\n${HANDOFF_ROOT_TASK_LINE}`);
   const head = at >= 0 ? text.slice(0, at) : text;
   return head
-    .split(/\n[ \t]*\n/)
-    .filter((paragraph) => paragraph.trim() !== ANSWER_LANGUAGE_LINE)
-    .join('\n\n');
+    .split('\n')
+    .filter((line) => {
+      const trimmed = line.trim();
+      return (
+        trimmed !== ANSWER_LANGUAGE_LINE &&
+        trimmed !== OWNER_PRECEDENCE_LINE &&
+        trimmed !== SKILL_ROUTE_LINE
+      );
+    })
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n');
 }

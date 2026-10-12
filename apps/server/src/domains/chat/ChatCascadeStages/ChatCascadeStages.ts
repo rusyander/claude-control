@@ -5,11 +5,17 @@ import {
   loweredWorkPrompt,
   reviewStagePrompt,
   scanReviewBlocks,
+  verifyStagePrompt,
   type CascadeStage,
   type StageContext,
   type TaskKind,
 } from '@agentdeck/contracts/model-cascade';
-import { scanPlanBlocks, workAfterPlanPrompt } from '@agentdeck/contracts/split-plan';
+import { labelledCut, OWNER_TEXT_MAX } from '@agentdeck/contracts/quality-floor';
+import {
+  raisedWorkPrompt,
+  scanPlanBlocks,
+  workAfterPlanPrompt,
+} from '@agentdeck/contracts/split-plan';
 import {
   mergeSieveRows,
   scanSieveBlocks,
@@ -21,12 +27,13 @@ import type { ChatLink } from '../../../lib/app-store/app-store.types.ts';
 import { initiativePrompt } from '../initiative/initiative.ts';
 
 /**
- * Конвейер «работа → ревью → фикс» — решение о СЛЕДУЮЩЕМ звене.
+ * Конвейер «работа → ревью → фикс → проверка» — решение о СЛЕДУЮЩЕМ звене.
  *
- * Зачем он вообще: панель отправила группу на модель ниже потолка, и это надо
- * чем-то оплатить. Плата — вторая пара глаз: после успешной работы та же копия
+ * Зачем он вообще: вторая пара глаз. После успешной работы та же копия
  * читается моделью-потолком, а её замечания возвращаются исполнителю отдельным
- * заданием. Ни одного лишнего ПАРАЛЛЕЛЬНОГО агента при этом не заводится —
+ * заданием. С U6 — после КАЖДОЙ работы, не только понижённой: свежая сессия
+ * видит дифф без истории его написания и на той же модели (раньше работа на
+ * потолке шла без ревью, и «чисто» значило «никто не смотрел»). Ни одного лишнего ПАРАЛЛЕЛЬНОГО агента при этом не заводится —
  * звенья идут друг за другом в одной ветке, как продолжение в чистой сессии.
  *
  * Модуль намеренно ЧИСТЫЙ: ни файловой системы, ни реестра прогонов, ни
@@ -37,9 +44,10 @@ import { initiativePrompt } from '../initiative/initiative.ts';
  * Три вещи, которые здесь важнее всего и легко потерять при правке:
  *
  * 1. ЦЕПОЧКА КОНЕЧНА. Ревью заводится один раз на работу (`reviewedAt`), правки
- *    заводятся только по НЕПУСТОМУ списку замечаний, а после правок (и после
- *    работы, которой ревью не положено) бывает
- *    только доставка группы с доставкой до MR — одна на круг (`deliveredAt`), и
+ *    заводятся только по НЕПУСТОМУ списку замечаний, за правками — ОДИН проход
+ *    проверки (`reviewedAt` связи правок), и его итог правок уже не заводит:
+ *    открытое едет в доставку и в MR как открытое. Дальше бывает только
+ *    доставка группы с доставкой до MR — одна на круг (`deliveredAt`), и
  *    после неё ничего. Иначе пара
  *    «проверил — поправил» крутилась бы, пока не упрётся в потолок цепочки
  *    продолжений, и подписку съела бы вежливость моделей.
@@ -139,7 +147,12 @@ export function stageAppendPrompt(
     // что панель заведёт проверку его диффа. Не заведёт ни разу. У доставки
     // планки нет вовсе: она не пишет код, который надо было бы сдавать.
     plan.stage === 'fix'
-      ? loweredWorkPrompt(plan.link.kind as TaskKind | undefined, { review: false })
+      ? loweredWorkPrompt(plan.link.kind as TaskKind | undefined, {
+          review: false,
+          // Задание правок само называет проверки проекта (TQ-10).
+          checksInTask: true,
+          ...(verifiesFixes(plan.link) ? { verify: true } : {}),
+        })
       : // Работа после плана (Т1) — та же планка сдачи, что у работы, заведённой
         // разделением напрямую: понижение оплачивается ревью, и обещать его надо.
         plan.stage === 'work' && plan.link.lowered
@@ -149,6 +162,14 @@ export function stageAppendPrompt(
   ]
     .filter(Boolean)
     .join(' ');
+}
+
+/**
+ * За правками этой связи панель заведёт проход проверки (U6): есть замечания и
+ * есть кем проверять. Связи правок до U6 замечаний не несут — им проверки нет.
+ */
+function verifiesFixes(link: ChatLink): boolean {
+  return Boolean(link.fixFindings?.length && link.ceilingModel);
 }
 
 /** Стадия связи; пусто читается как «работа»: так выглядят связи до конвейера. */
@@ -180,10 +201,14 @@ export function childAppendPrompt(
   return stageAppendPrompt({ stage: stageOf(link), link }, settings, extra);
 }
 
-/** Знаков задания в связи: столько же, сколько хранит контракт плана. */
-const TASK_MAX = 16_000;
-/** Знаков плана в связи звеньев — выжимка для их задания, а не план целиком. */
-const PLAN_SUMMARY_MAX = 4_000;
+/**
+ * Задание и план в связи звеньев. Раньше 16k и 4k с молчаливой обрезкой: ревью
+ * сверяло работу с огрызком плана без критериев приёмки, а фикс и доставка
+ * получали задание без хвоста. Теперь целиком; потолок — защита от мусора, и
+ * обрезка подписана.
+ */
+const TASK_MAX = OWNER_TEXT_MAX;
+const PLAN_SUMMARY_MAX = OWNER_TEXT_MAX;
 
 /**
  * Контекст следующего звена (аудит 25.09, L238): задание группы, выжимка
@@ -227,7 +252,7 @@ function afterPlan(
   const effort =
     link.workEffort ?? (link.workModel ? '' : (link.ceilingEffort ?? link.effort ?? ''));
   const plan = ok ? scanPlanBlocks(text).plan : undefined;
-  const task = (link.task ?? '').slice(0, TASK_MAX);
+  const task = labelledCut(link.task ?? '', TASK_MAX);
 
   return {
     stage: 'work',
@@ -249,7 +274,44 @@ function afterPlan(
       // становится тем, что читает ревью.
       ...(link.lowered ? { lowered: true } : {}),
       ...(task ? { task } : {}),
-      ...(plan ? { planSummary: plan.slice(0, PLAN_SUMMARY_MAX) } : {}),
+      ...(plan ? { planSummary: labelledCut(plan, PLAN_SUMMARY_MAX) } : {}),
+      ...(link.owns ? { owns: link.owns } : {}),
+      ...(link.notes ? { notes: link.notes } : {}),
+    },
+  };
+}
+
+/**
+ * Понижённая работа кончилась без единой правки — работа идёт заново на
+ * потолке (F4, 12.10.2026). Понижаются только механика, реализация и тесты: их
+ * итог всегда дифф, и ход без правок — это остановка, которой планка сдачи и
+ * обещает «продолжится на модели сильнее». Одноразово по `plannedAt`: тот же
+ * знак, что держит работу после плана, — второе сообщение человека в этот чат
+ * второго подъёма не заведёт.
+ */
+function raisedPlan(link: ChatLink, base: ChatLink, text: string): CascadeStagePlan | undefined {
+  if (!link.lowered || link.plannedAt) return undefined;
+  const model = link.ceilingModel;
+  if (!model) return undefined;
+  const effort = link.ceilingEffort;
+  const task = link.task ?? link.groupTask ?? '';
+
+  return {
+    stage: 'work',
+    model,
+    effort: effort ?? '',
+    prompt: raisedWorkPrompt({
+      task,
+      ...(link.owns ? { owns: link.owns } : {}),
+      ...(link.notes ? { notes: link.notes } : {}),
+      ...(link.planSummary ? { plan: link.planSummary } : {}),
+      report: text,
+    }),
+    link: {
+      ...base,
+      stage: 'work',
+      model,
+      ...(effort ? { effort } : {}),
       ...(link.owns ? { owns: link.owns } : {}),
       ...(link.notes ? { notes: link.notes } : {}),
     },
@@ -291,9 +353,11 @@ function kindOf(link: ChatLink): TaskKind | undefined {
 function deliverPlan(
   link: ChatLink,
   base: ChatLink,
-  after: 'fix' | 'review' | 'work',
+  after: 'fix' | 'verify' | 'review' | 'work',
   context: StageContext,
   sieves?: string,
+  /** Итог прохода проверки (U6): что осталось открытым или что он не отчитался. */
+  verification?: { open?: string[]; unverified?: boolean },
 ): CascadeStagePlan | undefined {
   const model = link.workModel ?? link.model;
   const effort = link.workEffort ?? link.effort;
@@ -308,6 +372,8 @@ function deliverPlan(
       ...(link.branch ? { branch: link.branch } : {}),
       context,
       ...(sieves ? { sieves } : {}),
+      ...(verification?.open?.length ? { open: verification.open } : {}),
+      ...(verification?.unverified ? { unverified: true } : {}),
     }),
     link: {
       ...base,
@@ -343,9 +409,12 @@ export function planCascadeStage(input: CascadeStageInput): CascadeStagePlan | u
     link.sieveRows,
     stampSieveRows(scanSieveBlocks(text).rows, new Date().toISOString()),
   );
-  // Задание группы: записанное в связи (после плана) или промпт самой работы.
+  // Задание группы для звеньев после работы: слова группы без преамбул работы
+  // (TQ-01); связь старше правки — собранное задание или промпт самой работы.
   const groupTask =
-    link.task ?? (stage === 'work' && task.trim() ? task.slice(0, TASK_MAX) : undefined);
+    link.groupTask ??
+    link.task ??
+    (stage === 'work' && task.trim() ? labelledCut(task, TASK_MAX) : undefined);
   const base: ChatLink = {
     parentChatId: link.parentChatId,
     createdAt: now().toISOString(),
@@ -357,7 +426,8 @@ export function planCascadeStage(input: CascadeStageInput): CascadeStagePlan | u
     ...(link.ceilingEffort ? { ceilingEffort: link.ceilingEffort } : {}),
     // Задание и план едут по всей цепочке (аудит 25.09, L238): звено после
     // звена иначе теряло их — у связи ревью задания уже не было.
-    ...(groupTask ? { task: groupTask } : {}),
+    ...(link.task ? { task: link.task } : groupTask ? { task: groupTask } : {}),
+    ...(link.groupTask ? { groupTask: link.groupTask } : {}),
     ...(link.planSummary ? { planSummary: link.planSummary } : {}),
     // Отчёт о ситах едет по цепочке: сделанное ревью доставка не повторяет, а
     // судья доставки видит строки всех звеньев.
@@ -372,11 +442,19 @@ export function planCascadeStage(input: CascadeStageInput): CascadeStagePlan | u
   if (stage === 'plan') return afterPlan(link, ok, text, base, Boolean(input.paused));
   if (!ok) return undefined;
 
-  // Правки кончились: ревью второго круга панель не заводит, а группа с
-  // доставкой идёт в доставку (журнал 59a). Ход, кончившийся вопросом или
-  // фоном, — не конец правок (Д3): доставлять недоделанное рано.
+  // Правки кончились. Ход, кончившийся вопросом или фоном, — не конец правок
+  // (Д3): проверять и доставлять недоделанное рано.
   if (stage === 'fix') {
-    return input.deliver && !input.paused && !deliveredOnce(link, input)
+    if (input.paused) return undefined;
+    // Один проход проверки (U6, deep-review §7): повтор доказательства каждого
+    // замечания — «попытался» не значит «исправил». Ревью второго круга это не
+    // заводит: итог проверки идёт в доставку. Уже заведена — доставку заведёт она.
+    if (verifiesFixes(link)) {
+      if (link.reviewedAt) return undefined;
+      return verifyPlan(link, base, contextAfter(text));
+    }
+    // Связь правок до U6 (замечаний не несёт) — в доставку сразу (журнал 59a).
+    return input.deliver && !deliveredOnce(link, input)
       ? deliverPlan(link, base, 'fix', contextAfter(text), sievesFor('deliver'))
       : undefined;
   }
@@ -395,22 +473,28 @@ export function planCascadeStage(input: CascadeStageInput): CascadeStagePlan | u
       input.deliver && !deliveredOnce(link, input) && hasWork()
         ? deliverPlan(link, base, 'work', contextAfter(text), sievesFor('deliver'))
         : undefined;
-    // Работа на потолке проверкой не усиливается: усиливать нечем.
-    if (!link.lowered) return deliverNow();
     // Ревью на работу заводится ровно один раз. Без отметки второе сообщение
     // человека в тот же чат заводило бы ещё одну проверку — и так на каждый ход.
     // Доставку этого круга заводит само ревью (или правки после него).
     if (link.reviewedAt) return undefined;
-    // Потолок не записан — связь старше конвейера. Завести ревью «на чём
-    // придётся» нельзя: проверка слабее работы это не проверка.
-    if (!link.ceilingModel) return deliverNow();
-    if (!hasWork()) return undefined;
+    // Ревью — после КАЖДОЙ работы (U6). Ревьюер — потолок разговора; работа,
+    // шедшая на потолке без записанного потолка, читается своей же моделью в
+    // свежей сессии. Понижённая работа без потолка — связь старше конвейера:
+    // ревью «на чём придётся» слабее работы, а это не проверка.
+    const reviewer = link.ceilingModel ?? (link.lowered ? undefined : link.model);
+    if (!reviewer) return deliverNow();
+    const reviewerEffort = link.ceilingModel
+      ? link.ceilingEffort
+      : link.lowered
+        ? undefined
+        : link.effort;
+    if (!hasWork()) return raisedPlan(link, base, text);
     const reviewSieves = sievesFor('review');
 
     return {
       stage: 'review',
-      model: link.ceilingModel,
-      effort: link.ceilingEffort ?? '',
+      model: reviewer,
+      effort: reviewerEffort ?? '',
       prompt: reviewStagePrompt({
         task: groupTask ?? task,
         ...(link.model ? { model: link.model } : {}),
@@ -425,13 +509,32 @@ export function planCascadeStage(input: CascadeStageInput): CascadeStagePlan | u
       link: {
         ...base,
         stage: 'review',
-        model: link.ceilingModel,
-        ...(link.ceilingEffort ? { effort: link.ceilingEffort } : {}),
+        model: reviewer,
+        ...(reviewerEffort ? { effort: reviewerEffort } : {}),
+        // Ревьюер записан потолком связи: им же пойдёт проход проверки правок.
+        ceilingModel: reviewer,
+        ...(reviewerEffort ? { ceilingEffort: reviewerEffort } : {}),
         // Чем шла работа — на неё вернутся правки, если замечания найдутся.
         ...(link.model ? { workModel: link.model } : {}),
         ...(link.effort ? { workEffort: link.effort } : {}),
       },
     };
+  }
+
+  // Проход проверки правок кончился (U6): второго круга правок нет. Открытое и
+  // «не отчитался» едут в доставку и в MR — молча доставить «всё исправлено»
+  // нельзя. Без доставки итог остаётся в чате и на карточке группы.
+  if (link.fixFindings) {
+    if (input.paused || !input.deliver || deliveredOnce(link, input)) return undefined;
+    const verified = scanReviewBlocks(text);
+    return deliverPlan(
+      link,
+      base,
+      'verify',
+      contextAfter(verified.text),
+      sievesFor('deliver'),
+      verified.findings ? { open: verified.findings } : { unverified: true },
+    );
   }
 
   // Ревью закончилось. Блока нет вовсе — ревьюер не отчитался в понятном виде, и
@@ -463,6 +566,8 @@ export function planCascadeStage(input: CascadeStageInput): CascadeStagePlan | u
     prompt: fixStagePrompt(findings, {
       ...(link.branch ? { branch: link.branch } : {}),
       ...(input.deliver ? { deliver: true } : {}),
+      // Проход проверки будет, если есть кем проверять — ревьюер этой связи.
+      ...(link.ceilingModel ? { verify: true } : {}),
       context: contextAfter(scanReviewBlocks(text).text),
     }),
     findings,
@@ -474,8 +579,45 @@ export function planCascadeStage(input: CascadeStageInput): CascadeStagePlan | u
       ...(link.workModel ? { workModel: link.workModel } : {}),
       ...(link.workEffort ? { workEffort: link.workEffort } : {}),
       // Правки идут ниже потолка ровно так же, как работа: планка сдачи им нужна
-      // та же самая, а вот ещё одного ревью по ним не будет — стадия конечна.
+      // та же самая. Ревью по ним не будет — будет один проход проверки (U6).
       lowered: true,
+      fixFindings: findings,
+    },
+  };
+}
+
+/**
+ * Проход ПРОВЕРКИ правок (U6): стадия `review` на ревьюере группы, но задание
+ * другое — повтор доказательства каждого замечания, а не новое ревью. Связь
+ * несёт те же замечания: по ним конец прохода отличается от конца ревью работы.
+ */
+function verifyPlan(
+  link: ChatLink,
+  base: ChatLink,
+  context: StageContext,
+): CascadeStagePlan | undefined {
+  const model = link.ceilingModel;
+  const findings = link.fixFindings;
+  if (!model || !findings?.length) return undefined;
+  const effort = link.ceilingEffort;
+
+  return {
+    stage: 'review',
+    model,
+    effort: effort ?? '',
+    prompt: verifyStagePrompt({
+      findings,
+      ...(link.branch ? { branch: link.branch } : {}),
+      context,
+    }),
+    link: {
+      ...base,
+      stage: 'review',
+      model,
+      ...(effort ? { effort } : {}),
+      fixFindings: findings,
+      ...(link.workModel ? { workModel: link.workModel } : {}),
+      ...(link.workEffort ? { workEffort: link.workEffort } : {}),
     },
   };
 }

@@ -535,13 +535,15 @@ export function createHandoffPlanner({
       console.warn('path step did not start', key, decision.step.id);
     });
     const params = { step: stepName(decision.step) };
+    // Напоминание отчитаться блоком (F10) — своей строкой: шаг тот же, не новый.
+    const textCode = decision.nudge ? 'path-gate-nudge-notice' : 'path-step-started-notice';
     return {
       stop: true,
       event: {
         kind: 'notice',
         code: 'pathStep',
-        text: serverText('path-step-started-notice', params),
-        textCode: 'path-step-started-notice',
+        text: serverText(textCode, params),
+        textCode,
         textParams: params,
       },
     };
@@ -701,9 +703,13 @@ export function createHandoffPlanner({
       chains,
       startRun: true,
       // Исходное задание цепочки — задание прогона, который её начал: у ребёнка
-      // разделения это задание группы целиком, у обычного разговора — реплика
-      // человека. Продолжение своё не перебивает: наследство сильнее.
-      ...(finished.options.prompt ? { rootTask: finished.options.prompt } : {}),
+      // разделения это задание группы целиком из связи, у обычного разговора —
+      // реплика человека. Промпт закрытого хода у группы корнем не годится (F6):
+      // на втором ходу это ответ на вопрос («да, вариант A»), и продолжение
+      // теряло задание и право доставки. Продолжение своё не перебивает.
+      ...((link?.task ?? finished.options.prompt)
+        ? { rootTask: link?.task ?? finished.options.prompt }
+        : {}),
       ...(checkpointHash ? { checkpointHash } : {}),
       ...(splitOwnsHandoff(link) ? { group: true } : {}),
       start: ({ chatId, prompt }) => {

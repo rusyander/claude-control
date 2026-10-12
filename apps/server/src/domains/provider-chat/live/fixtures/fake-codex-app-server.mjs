@@ -4,7 +4,10 @@
 // `no-server` (подкоманды нет — процесс сразу выходит), `fail` (ход падает),
 // `permission` (ход спрашивает `item/fileChange/requestApproval` и печатает ответ
 // клиента и права, с которыми открыт поток).
+// С FAKE_STORE потоки живут на «диске» (`fake-session-store.mjs`): `thread/resume`
+// поднимает записанный не-ephemeral поток, `thread/delete` его стирает.
 import { createInterface } from 'node:readline';
+import { change, load, nextId, persistent, remove } from './fake-session-store.mjs';
 import process from 'node:process';
 import { setTimeout } from 'node:timers';
 
@@ -20,6 +23,7 @@ let active = false;
 let release;
 let rights = '';
 let answer;
+let thread = 'thr-1';
 
 createInterface({ input: process.stdin }).on('line', (line) => {
   const message = JSON.parse(line);
@@ -27,11 +31,44 @@ createInterface({ input: process.stdin }).on('line', (line) => {
     case 'initialize':
       send({ id: message.id, result: { userAgent: 'fake' } });
       return;
-    case 'thread/start':
+    case 'thread/start': {
       rights = `${message.params.sandbox ?? 'нет'}/${message.params.approvalPolicy ?? 'нет'}`;
-      send({ id: message.id, result: { thread: { id: 'thr-1' } } });
+      if (persistent) {
+        thread = nextId('thr');
+        const ephemeral = message.params.ephemeral === true;
+        change((state) => {
+          state.sessions[thread] = { prompts: [], ephemeral };
+          state.log.push(`start ${thread} ephemeral=${ephemeral}`);
+        });
+      }
+      send({ id: message.id, result: { thread: { id: thread } } });
+      return;
+    }
+    case 'thread/resume': {
+      const known = load().sessions[message.params.threadId];
+      if (!known || known.ephemeral) {
+        send({
+          id: message.id,
+          error: { code: -32600, message: 'no rollout found for thread id' },
+        });
+        return;
+      }
+      thread = message.params.threadId;
+      rights = `${message.params.sandbox ?? 'нет'}/${message.params.approvalPolicy ?? 'нет'}`;
+      change((state) =>
+        state.log.push(
+          `resume ${thread} cwd=${message.params.cwd ?? ''} ephemeral=${message.params.ephemeral ?? '-'} excludeTurns=${message.params.excludeTurns}`,
+        ),
+      );
+      send({ id: message.id, result: { thread: { id: thread } } });
+      return;
+    }
+    case 'thread/delete':
+      remove(message.params.threadId);
+      send({ id: message.id, result: {} });
       return;
     case 'turn/start':
+      change((state) => state.sessions[thread]?.prompts.push(message.params.input[0].text));
       send({ id: message.id, result: { turn: { id: 'turn-1' } } });
       active = true;
       void runTurn(message.params.input[0].text);

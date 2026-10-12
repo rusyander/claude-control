@@ -11,6 +11,8 @@ import { PACKAGE } from './android-device.mjs';
 import { frame, json, readBody, upstreamJson } from './mobile-device-fixtures.mjs';
 import { runDeskLive } from './mobile-device-desk.mjs';
 import { makeRunReattach } from './mobile-device-reattach.mjs';
+import { runRestart, setupRestart } from './mobile-device-restart.mjs';
+import { runChatLife, setupChatLife } from './mobile-device-chat-life.mjs';
 
 const require = createRequire(
   join(REPO, 'node_modules', '.pnpm', 'pngjs@5.0.0', 'node_modules', 'pngjs', 'package.json'),
@@ -850,5 +852,18 @@ export const SCENARIOS = [
     id: 'f5',
     title: 'отключение снимает статус прежней панели (ревью MPU6 F5)',
     run: runDisconnect,
+  },
+  {
+    id: 'restart',
+    title: '«чистая сессия» в чате Claude: просьба обновить опору и продолжение',
+    setup: setupRestart,
+    run: runRestart,
+  },
+  {
+    id: 'life',
+    title:
+      'прогон чата Claude: очередь и переподхват после перезапуска, тишина 30 с, холодный старт',
+    setup: setupChatLife,
+    run: runChatLife,
   },
 ];

@@ -1,6 +1,11 @@
 import {
   fixStagePrompt,
+  REVIEW_MAX_FINDINGS,
+  reviewPublishPrompt,
   reviewPushPrompt,
+  REVIEW_WITNESS_LINE,
+  reviewDepthGaps,
+  reviewDepthPrompt,
   reviewRetryPrompt,
   scanReviewBlocks,
 } from '@agentdeck/contracts/model-cascade';
@@ -28,8 +33,12 @@ import type { ChatEvent } from '../ChatRunner/ChatRunner.ts';
  *
  * 1. ПУСТОЙ СПИСОК ЗАКРЫВАЕТ ГРУППУ. Карточка «что делать с замечаниями», под
  *    которой замечаний нет, — работа человека на пустом месте.
- * 2. ЗАПИСЬ В MR — ОДНИМ КОММЕНТАРИЕМ. Не по комментарию на замечание: чужой MR
- *    не место для ленты панели, а сводка читается целиком и отвечается один раз.
+ * 2. В MR ПИШЕТ СЕССИЯ РЕВЬЮ (`publishInSession`), а не панель: только она
+ *    знает строки и доказательства каждого замечания и публикует их по правилам
+ *    проекта — тредом на замечание, со сверкой с уже открытыми тредами. Сводный
+ *    комментарий панели — запасной путь, когда сессии нет вовсе. Разрешил
+ *    владелец публикацию в самом задании (`review.publish`) — сессия публикует
+ *    сразу, и карточка второй раз согласия не просит.
  * 3. ОТКАЗ ФОРДЖА НЕ ОТМЕНЯЕТ ПРАВОК. «И то и другое» с упавшей записью всё
  *    равно заводит правки, а причина отказа остаётся на карточке: заново
  *    отписать можно, заново решать — незачем.
@@ -66,6 +75,14 @@ export interface SplitReviewDeps {
    */
   postBlocked?: (url: string) => string | undefined;
   /**
+   * Публикует сессия ревью, а не панель (владелец, 12.10.2026): сводный
+   * комментарий одним списком терял строки, доказательства и сверку с уже
+   * открытыми тредами. Включено — клик «отписать» продолжает сессию ревью
+   * заданием публикации, токен форджа панели не нужен; выключено — старый
+   * сводный комментарий через `post`.
+   */
+  publishInSession?: boolean;
+  /**
    * Завести прогон стадии в копии группы. `started: false` — запустить не
    * вышло (реестр или CLI отказали).
    *
@@ -89,6 +106,8 @@ export interface SplitReviewDeps {
      * сессию правок, которая их и сделала, повтор итога — в сессию ревью.
      */
     resume?: { sessionId: string };
+    /** Вводная на случай, когда разговор продолжить нельзя и ход идёт новым (G3). */
+    fresh?: string;
   }) => { started: boolean; chatId?: string; busy?: boolean };
   /** Заметка в ленту родителя; `false` — родителя никто не слушает. */
   emit?: (parentChatId: string, event: ChatEvent) => boolean;
@@ -104,8 +123,8 @@ export interface SplitReviewDeps {
 /** Что стало с решением — ответ маршруту, панели и телефону; форма в контракте. */
 export type { SplitReviewOutcome };
 
-/** Сколько замечаний уезжает в комментарий: столько же, сколько в задание правок. */
-const MAX_FINDINGS = 40;
+/** Сколько замечаний уезжает в комментарий: столько же, сколько берёт разбор блока ревью. */
+const MAX_FINDINGS = REVIEW_MAX_FINDINGS;
 
 /**
  * Сводный комментарий в MR: только замечания и их число.
@@ -125,8 +144,8 @@ export function reviewSummaryComment(findings: readonly string[]): string {
 /** Что стало с замечаниями по решению человека — словами, по одному на исход. */
 const DECISION_WORDS: Record<TaskSplitReviewDecision, string> = {
   fix: 'заведены правки в копии',
-  post: 'сводка замечаний отписана в MR',
-  both: 'заведены правки в копии, сводка отписана в MR',
+  post: 'замечания публикуются в MR',
+  both: 'заведены правки в копии, замечания публикуются в MR',
   none: 'решено ничего не делать',
 };
 
@@ -153,8 +172,15 @@ export function reviewNoticeText(event: Extract<ChatEvent, { kind: 'review' }>):
     return `${head}: ответ кончился без блока итога — замечания неизвестны. Повторить итог можно кнопкой на карточке.`;
   }
   if (event.decision) {
-    const tail = event.postError ? ` Комментарий не записан: ${event.postError}.` : '';
-    return `${head}: ${DECISION_WORDS[event.decision]}.${tail}`;
+    // Запись сорвалась — «публикуются» было бы неправдой рядом с причиной отказа.
+    if (event.postError && (event.decision === 'post' || event.decision === 'both')) {
+      const fix = event.decision === 'both' ? `${DECISION_WORDS.fix}; ` : '';
+      return `${head}: ${fix}замечания в MR не записаны: ${event.postError}.`;
+    }
+    return `${head}: ${DECISION_WORDS[event.decision]}.`;
+  }
+  if (event.incomplete?.length) {
+    return `${head}: ревью неполное — панель просила дочитать, а пробел остался; замечаний ${event.findings.length}, подробности на карточке.`;
   }
   // «Проверено», а не «сделано»: ревью ничего не меняло (Д5).
   if (event.findings.length === 0) return `${head}: проверено, замечаний нет — правок не было.`;
@@ -185,6 +211,23 @@ function sessionKeyOf(aliases: readonly string[]): string | undefined {
   return aliases.find((key) => !key.startsWith('new-'));
 }
 
+/**
+ * Вводная продолжению сессии ревью на случай, когда её файла на диске нет (G3,
+ * 12.10.2026): новая сессия получает исходное задание звена, а не общую строку
+ * «восстанови по git» — иначе просьба «выдай итог» или «опубликуй» уходила
+ * агенту, не знающему ни MR, ни что в нём проверять. Задания в связи нет —
+ * остаётся общая вводная запускающего.
+ */
+const REVIEW_LOST_LINE =
+  'The panel could not continue your previous conversation for this task: its transcript is gone ' +
+  '(deleted outside the panel). This is a new conversation. The original task of this stage ' +
+  'follows; the request after it continues that task — redo from the code and the merge request ' +
+  'whatever it needs.';
+
+function lostFrame(link: ChatLink): { fresh?: string } {
+  return link.task ? { fresh: `${REVIEW_LOST_LINE}\n\n${link.task}` } : {};
+}
+
 export class SplitReview {
   private readonly deps: SplitReviewDeps;
   private readonly now: () => Date;
@@ -201,8 +244,12 @@ export class SplitReview {
     const findings = review.findings ?? [];
     // Причину недоступности спрашиваем только там, где кнопка вообще нужна:
     // после записи и без замечаний отписывать нечего.
+    // Публикует сессия — токен форджа панели ей не нужен, и причина «токен не
+    // сохранён» прятала бы рабочую кнопку.
     const blocked =
-      findings.length > 0 && !review.postedAt ? this.deps.postBlocked?.(review.url) : undefined;
+      findings.length > 0 && !review.postedAt && !this.deps.publishInSession
+        ? this.deps.postBlocked?.(review.url)
+        : undefined;
     return {
       url: review.url,
       ...(review.branch ? { branch: review.branch } : {}),
@@ -217,6 +264,9 @@ export class SplitReview {
       ...(review.pushedAt ? { pushedAt: review.pushedAt } : {}),
       ...(review.missing ? { missing: true } : {}),
       ...(review.pushBlocked ? { pushBlocked: review.pushBlocked } : {}),
+      ...(review.tier ? { tier: review.tier } : {}),
+      ...(review.incomplete?.length ? { incomplete: review.incomplete } : {}),
+      ...(review.witness ? { witness: true } : {}),
     };
   }
 
@@ -269,22 +319,68 @@ export class SplitReview {
     // Ход с вопросом человеку — тоже ещё не итог: ответ продолжит ревью.
     if (!ok || input.paused) return undefined;
 
-    const scanned = scanReviewBlocks(text).findings;
-    const { missing: _missing, ...rest } = review;
-    // Блока нет — это НЕ «замечаний нет» (Д4): группа ждёт, карточка
-    // предлагает повторить итог в той же сессии.
-    if (!scanned) {
+    const scan = scanReviewBlocks(text);
+    const { missing: _missing, followUp: _followUp, ...rest } = review;
+    // Блока нет — это НЕ «замечаний нет» (Д4). Сначала панель сама просит ту
+    // же сессию повторить итог (A0); не вышло или уже просила — группа ждёт,
+    // карточка предлагает повтор человеку.
+    if (!scan.findings) {
+      if (
+        !review.missingAsked &&
+        this.followUp(input.aliases, link, rest, reviewRetryPrompt(), { missingAsked: at })
+      ) {
+        return undefined;
+      }
       this.save(input.aliases, link, { ...rest, missing: true });
+      if (review.witness) this.releaseOrigin(input.aliases);
       return { kind: 'review', chatId: input.chatId, url: review.url, findings: [], missing: true };
     }
-    const findings = scanned;
-    // Пустой список — законный и лучший ответ: группа закрыта, карточки нет.
+    // Отчёт о глубине судит панель (U4): неполное ревью один раз уходит той же
+    // сессии дочитать; что осталось и после этого — на карточку, а не «чисто».
+    const gaps = reviewDepthGaps(scan.depth);
+    if (
+      gaps.length > 0 &&
+      !review.depthAsked &&
+      this.followUp(input.aliases, link, rest, reviewDepthPrompt(gaps), { depthAsked: at })
+    ) {
+      return undefined;
+    }
+    const findings = scan.findings;
+    const tier = scan.depth?.tier;
+    const depth = {
+      ...(tier ? { tier } : {}),
+      ...(gaps.length > 0 ? { incomplete: gaps } : {}),
+    };
+    // Пустое и полное ревью при T1/T2 — ещё не «чисто» (U5): второй свидетель,
+    // новой сессией с другого входа. Его итог и решает группу.
+    if (findings.length === 0 && gaps.length === 0 && tier !== 'T0' && !review.witness) {
+      const witness = review.witnessChatId ? undefined : this.startWitness(input.aliases, link);
+      if (witness) {
+        this.save(input.aliases, link, {
+          ...rest,
+          ...depth,
+          findings,
+          decision: 'none',
+          decidedAt: at,
+          followUp: true,
+          witnessChatId: witness,
+        });
+        return undefined;
+      }
+    }
+    // Пустой список (с названным покрытием) — группа закрыта, карточки нет.
     const decided = findings.length === 0;
+    // Публикацию владелец разрешил в задании — сессия уже опубликовала сама
+    // (`reviewLinkPrompt` с `publish`): второй записи панель не делает.
+    const published = Boolean(review.publish && this.deps.publishInSession);
     this.save(input.aliases, link, {
       ...rest,
+      ...depth,
       findings,
+      ...(published ? { postedAt: at } : {}),
       ...(decided ? { decision: 'none' as const, decidedAt: at } : {}),
     });
+    if (review.witness) this.releaseOrigin(input.aliases);
 
     return {
       kind: 'review',
@@ -292,7 +388,99 @@ export class SplitReview {
       url: review.url,
       findings,
       ...(decided ? { decided: true } : {}),
+      ...(gaps.length > 0 ? { incomplete: gaps } : {}),
     };
+  }
+
+  /**
+   * Продолжить сессию ревью заданием панели — без человека (A0). Не вышло (нет
+   * сессии, отказ запуска) — `false`, и дыра идёт на карточку, как раньше.
+   */
+  private followUp(
+    aliases: string[],
+    link: ChatLink,
+    review: ChatReviewState,
+    prompt: string,
+    mark: Pick<ChatReviewState, 'missingAsked' | 'depthAsked'>,
+  ): boolean {
+    const session = sessionKeyOf(aliases);
+    if (!session) return false;
+    const outcome = this.deps.start({
+      chatId: session,
+      prompt,
+      cwd: review.path ?? '',
+      ...(link.model ? { model: link.model } : {}),
+      ...(link.effort ? { effort: link.effort } : {}),
+      stage: 'review',
+      fromAliases: aliases,
+      ...(link.title ? { title: link.title } : {}),
+      resume: { sessionId: session },
+      ...lostFrame(link),
+    });
+    if (!outcome.started) {
+      this.deps.log('split review: follow-up run refused', session);
+      return false;
+    }
+    this.save(aliases, link, { ...review, ...mark, followUp: true });
+    return true;
+  }
+
+  /**
+   * Второй свидетель (U5): НОВАЯ сессия в той же копии с тем же заданием
+   * группы, но с другого входа. Связь пишется до запуска — по ней конец хода
+   * находит группу (`groupIndex`). Задания в связи нет — свидетеля не будет:
+   * собирать его заново из обрывков значило бы потерять слова владельца.
+   */
+  private startWitness(aliases: string[], link: ChatLink): string | undefined {
+    const review = link.review;
+    if (!review || !link.task) return undefined;
+    const requested = `new-${this.now().getTime()}-witness`;
+    const {
+      findings: _f,
+      decision: _d,
+      decidedAt: _a,
+      missingAsked: _m,
+      depthAsked: _p,
+      ...base
+    } = review;
+    const { conversation: _c, sieveRows: _s, reviewedAt: _r, ...carried } = link;
+    this.deps.store.set(requested, {
+      ...carried,
+      createdAt: this.now().toISOString(),
+      stage: 'review',
+      review: { ...base, witness: true },
+    });
+    const outcome = this.deps.start({
+      chatId: requested,
+      prompt: `${REVIEW_WITNESS_LINE}\n\n${link.task}`,
+      cwd: review.path ?? '',
+      ...(link.model ? { model: link.model } : {}),
+      ...(link.effort ? { effort: link.effort } : {}),
+      stage: 'review',
+      fromAliases: aliases,
+      ...(link.title ? { title: link.title } : {}),
+    });
+    if (!outcome.started) {
+      this.deps.store.remove(requested);
+      this.deps.log('split review: witness run refused', requested);
+      return undefined;
+    }
+    return this.settle(requested, outcome);
+  }
+
+  /**
+   * Свидетель дал итог — исходное ревью больше не ждёт продолжения: группу
+   * решает итог свидетеля, а исходная карточка не висит в «ревью продолжается».
+   */
+  private releaseOrigin(witnessAliases: readonly string[]): void {
+    const links = this.deps.store.all();
+    for (const [key, origin] of Object.entries(links)) {
+      const witnessChatId = origin.review?.witnessChatId;
+      if (!origin.review?.followUp || !witnessChatId) continue;
+      if (!witnessAliases.includes(witnessChatId)) continue;
+      const { followUp: _followUp, ...review } = origin.review;
+      this.deps.store.set(key, { ...origin, review });
+    }
   }
 
   /**
@@ -394,6 +582,7 @@ export class SplitReview {
       fromAliases: aliases,
       ...(link.title ? { title: link.title } : {}),
       resume: { sessionId: session },
+      ...lostFrame(link),
     });
     if (!outcome.started) {
       this.deps.log('split review: push run refused', input.chatId);
@@ -444,6 +633,7 @@ export class SplitReview {
       fromAliases: aliases,
       ...(link.title ? { title: link.title } : {}),
       resume: { sessionId: session },
+      ...lostFrame(link),
     });
     if (!outcome.started) {
       return {
@@ -460,6 +650,42 @@ export class SplitReview {
     const { missing: _missing, ...rest } = review;
     this.save(aliases, link, rest);
     return { applied: [{ chatId: input.chatId, retryChatId: session }], skipped: [] };
+  }
+
+  /**
+   * «Отписать» — продолжение СЕССИИ РЕВЬЮ заданием публикации. Возвращает
+   * причину отказа словами для карточки; `undefined` — публикация заведена.
+   *
+   * Сессия, а не панель: замечания с их строками и доказательствами знает
+   * только она, и публикует она по правилам проекта — тредом на замечание, со
+   * сверкой с открытыми тредами. Нет сессии — отказ с причиной, а не сводка
+   * одним комментарием: тихий откат к плоской записи и был бы той потерей
+   * качества, ради которой путь заведён.
+   */
+  private publishBySession(
+    link: ChatLink,
+    review: ChatReviewState,
+    aliases: string[],
+  ): string | undefined {
+    const session = sessionKeyOf(aliases);
+    if (!session) return 'публикует только сессия ревью, а её ключа нет';
+    const outcome = this.deps.start({
+      chatId: session,
+      prompt: reviewPublishPrompt({ url: review.url }),
+      cwd: review.path ?? '',
+      ...(link.model ? { model: link.model } : {}),
+      ...(link.effort ? { effort: link.effort } : {}),
+      stage: 'review',
+      fromAliases: aliases,
+      ...(link.title ? { title: link.title } : {}),
+      resume: { sessionId: session },
+      ...lostFrame(link),
+    });
+    if (outcome.started) return undefined;
+    this.deps.log('split review: publish run refused', session);
+    return outcome.busy
+      ? 'сессия ревью сейчас занята — повторите, когда она закончит'
+      : 'сессию ревью не удалось продолжить';
   }
 
   /**
@@ -526,7 +752,22 @@ export class SplitReview {
     // бы на карточке в «только отписать».
     const next: ChatReviewState = retry ? { ...review } : { ...review, decision, decidedAt: at };
 
-    if (decision === 'post' || decision === 'both') {
+    // Уже записано (сессия опубликовала сама по разрешению из задания) —
+    // вторая запись была бы дублем в чужом MR.
+    const alreadyPosted = Boolean(review.postedAt) && !retry;
+    if ((decision === 'post' || decision === 'both') && alreadyPosted) {
+      result.posted = true;
+    } else if ((decision === 'post' || decision === 'both') && this.deps.publishInSession) {
+      const refused = this.publishBySession(link, review, aliases);
+      if (refused) {
+        next.postError = refused;
+        result.postError = refused;
+      } else {
+        next.postedAt = at;
+        delete next.postError;
+        result.posted = true;
+      }
+    } else if (decision === 'post' || decision === 'both') {
       const blocked = this.deps.postBlocked?.(review.url);
       if (blocked || !this.deps.post) {
         next.postError = blocked ?? 'интеграция с форджем не настроена';
@@ -556,9 +797,19 @@ export class SplitReview {
         stage: 'fix',
         review: next,
       });
+      // Правки — новый разговор (F11, 12.10.2026): без задания группы и ссылки
+      // на MR сессия правок знала только список замечаний, а не то, о чём
+      // просил человек и чью ветку она правит.
+      const groupTask = link.groupTask ?? link.task;
+      const fixTask = groupTask?.includes(review.url)
+        ? groupTask
+        : [groupTask, `Merge request under review: ${review.url}`].filter(Boolean).join('\n\n');
       const outcome = this.deps.start({
         chatId: fixChatId,
-        prompt: fixStagePrompt(findings, review.branch ? { branch: review.branch } : {}),
+        prompt: fixStagePrompt(findings, {
+          ...(review.branch ? { branch: review.branch } : {}),
+          context: { task: fixTask, ...(review.branch ? { branch: review.branch } : {}) },
+        }),
         cwd: review.path ?? '',
         ...(link.model ? { model: link.model } : {}),
         ...(link.effort ? { effort: link.effort } : {}),

@@ -6,6 +6,7 @@ import {
 } from '@agentdeck/contracts/model-cascade';
 import type { GroupFlow } from '@agentdeck/contracts';
 import type { PathStep } from '@agentdeck/contracts/group-path';
+import { labelledCut, OWNER_TEXT_MAX } from '@agentdeck/contracts/quality-floor';
 import { groupKeyOf, type GroupScope } from '@agentdeck/contracts/group-sources';
 import type { ChatLink, PathRun } from '../../../lib/app-store/app-store.types.ts';
 import { readJsonBlock } from '../../groups/answer-block.ts';
@@ -28,15 +29,20 @@ import { buildPath } from '../../groups/path/path.ts';
  *    ответу стадии — блоку плана, вердикту ревью; ответ шага их не несёт, и без
  *    отложенного текста ревью с замечаниями кончалось бы ничем.
  * 3. ПРОВАЛ ПРОВЕРКИ ОСТАНАВЛИВАЕТ ЦЕПОЧКУ. Шаг с проверкой, не закрытый моделью,
- *    — это вопрос человеку, а не повод идти в ревью или доставку.
+ *    — это вопрос человеку, а не повод идти в ревью или доставку. Забытый блок —
+ *    не провал: шаг один раз просят отчитаться (`pathRun.nudged`, F10), и только
+ *    без блока и после этого цепочка ждёт человека.
  */
 
 export const GATE_BLOCK_KIND = 'gate';
 
-/** Знаков отложенного ответа стадии: хвост, где лежат блоки, а не весь ответ. */
-const HELD_TEXT_MAX = 24_000;
-/** Столько же, сколько хранит связь для задания группы. */
-const HELD_TASK_MAX = 16_000;
+/**
+ * Отложенный ответ стадии и её задание. Раньше хвост 24k и 16k: длинный план
+ * терял открывающую строку блока и не находился вовсе, а задание шага шло без
+ * хвоста. Теперь целиком; потолок — защита от мусора, задание режется с меткой.
+ */
+const HELD_TEXT_MAX = OWNER_TEXT_MAX;
+const HELD_TASK_MAX = OWNER_TEXT_MAX;
 
 /** Итог проверки шага из блока ответа. */
 export interface PathGate {
@@ -56,6 +62,28 @@ export function scanGateBlock(text: string): PathGate | undefined {
 /** Английская сторона, а пустая — русская: непереведённый шаг лучше пропущенного. */
 function enOf(text: { ru: string; en: string } | undefined): string {
   return (text?.en.trim() || text?.ru.trim()) ?? '';
+}
+
+/**
+ * Текст шага, который модель исполняет: слова владельца как он их написал.
+ * Раньше уезжал только перевод (`enOf`), и перевод тихо подменял задание —
+ * терялись оттенки, оговорки, термины проекта. Теперь оригинал (сторона,
+ * которую владелец правил последней, `source`) идёт всегда, а перевод — только
+ * подсказкой после него, когда он есть и отличается.
+ */
+export function ownerTextOf(
+  text: { ru: string; en: string } | undefined,
+  source: PathStep['source'],
+): string {
+  const ru = text?.ru.trim() ?? '';
+  const en = text?.en.trim() ?? '';
+  const original = source === 'en' ? en || ru : ru || en;
+  const other = original === ru ? en : ru;
+  if (!other || other === original) return original;
+  return (
+    `${original}\n(A rendering of the owner's words above in the other language, for reference ` +
+    `only — where they differ, the owner's original above wins: ${other})`
+  );
 }
 
 function resourceLine(step: PathStep): string | undefined {
@@ -103,25 +131,43 @@ export function stepAnswerLanguageLine(task: string): string {
  */
 export function pathStepPrompt(step: PathStep, anchor: CascadeStage, task = ''): string {
   const title = enOf(step.title);
-  const gate = enOf(step.gate);
+  const gate = ownerTextOf(step.gate, step.source);
   return [
     `Next step of this task's path, after the ${anchor} stage${title ? `: ${title}` : ''}.`,
-    enOf(step.prompt),
+    ownerTextOf(step.prompt, step.source),
     resourceLine(step),
-    gate
-      ? [
-          `This step is closed only when: ${gate}`,
-          'Check it yourself. If it fails and you can fix it, fix it and check again. End your ' +
-            `answer with a code block in the language ${blockLang(GATE_BLOCK_KIND)} with JSON ` +
-            '{"passed": true or false, "note": "one line: what you checked, or what is still ' +
-            'missing"}. Report passed false only when you cannot close it without the owner.',
-        ].join('\n')
-      : undefined,
+    gate ? gateReportLines(gate) : undefined,
     stepAnswerLanguageLine(task),
     ESCALATE_LINE,
   ]
     .filter((part): part is string => Boolean(part?.trim()))
     .join('\n\n');
+}
+
+/** Условие проверки шага и просьба закончить ответ её блоком. */
+function gateReportLines(gate: string): string {
+  return [
+    `This step is closed only when: ${gate}`,
+    'Check it yourself. If it fails and you can fix it, fix it and check again. End your ' +
+      `answer with a code block in the language ${blockLang(GATE_BLOCK_KIND)} with JSON ` +
+      '{"passed": true or false, "note": "what you checked, or what is still ' +
+      'missing"}. Report passed false only when you cannot close it without the owner.',
+  ].join('\n');
+}
+
+/**
+ * Напоминание шагу, закончившему ход без блока проверки (F10, 12.10.2026):
+ * панель не знает, закрыт ли шаг, а человека рядом может не быть. Одно — и
+ * той же сессией: шаг помнит, что сделал, и ему остаётся только отчитаться.
+ */
+export function gateNudgePrompt(step: PathStep, task = ''): string {
+  const title = enOf(step.title);
+  return [
+    `Your answer to the path step${title ? ` "${title}"` : ''} ended without the gate block, so ` +
+      'the panel cannot tell whether the step is closed.',
+    gateReportLines(ownerTextOf(step.gate, step.source)),
+    stepAnswerLanguageLine(task),
+  ].join('\n\n');
 }
 
 export interface PathTurnInput {
@@ -138,8 +184,11 @@ export interface PathTurnInput {
 }
 
 export type PathDecision =
-  /** Завести ход шага; `link` — связь с отметками, записать ДО запуска. */
-  | { kind: 'step'; step: PathStep; prompt: string; link: ChatLink }
+  /**
+   * Завести ход шага; `link` — связь с отметками, записать ДО запуска.
+   * `nudge` — это не новый шаг, а напоминание прежнему отчитаться (F10).
+   */
+  | { kind: 'step'; step: PathStep; prompt: string; link: ChatLink; nudge?: true }
   /** Проверка шага не закрыта: цепочка ждёт человека. */
   | { kind: 'gate-failed'; step: PathStep; note: string }
   /** Ход шага не кончился итогом (сбой, вопрос, фон) — ничего не заводим. */
@@ -169,9 +218,19 @@ export function planPathTurn(input: PathTurnInput): PathDecision {
     if (!input.ok || input.paused) return { kind: 'wait' };
     const step = steps.find((item) => item.id === run.pending);
     // Шаг с проверкой обязан отчитаться блоком. Нет блока — не «прошёл»:
-    // иначе забытый блок молча пропускал бы проверку.
+    // иначе забытый блок молча пропускал бы проверку. Но и не провал: один раз
+    // шаг просят отчитаться, и только потом цепочка ждёт человека.
     if (step && enOf(step.gate)) {
       const gate = scanGateBlock(input.text);
+      if (!gate && !run.nudged) {
+        return {
+          kind: 'step',
+          step,
+          prompt: gateNudgePrompt(step, run.held?.task ?? input.task),
+          link: withRun(link, { ...run, nudged: true }),
+          nudge: true,
+        };
+      }
       if (!gate?.passed) {
         return { kind: 'gate-failed', step, note: gate?.note ?? '' };
       }
@@ -183,7 +242,7 @@ export function planPathTurn(input: PathTurnInput): PathDecision {
 
   const held = run?.held ?? {
     text: input.text.slice(-HELD_TEXT_MAX),
-    task: input.task.slice(0, HELD_TASK_MAX),
+    task: labelledCut(input.task, HELD_TASK_MAX),
   };
   const next = steps.find((step) => !done.includes(step.id));
   if (next) {

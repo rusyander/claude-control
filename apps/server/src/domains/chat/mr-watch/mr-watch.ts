@@ -6,6 +6,7 @@ import type {
 } from '../../../lib/app-store/app-store.types.ts';
 import type {
   MrReview,
+  MrReviewFailedJob,
   MrReviewPipeline,
   MrReviewThread,
 } from '../../integrations/mr-review/mr-review.ts';
@@ -64,12 +65,54 @@ const MAX_RELAYED = 500;
 /** Исход, после которого конвейер уже не изменится сам. */
 const FINISHED = new Set(['success', 'failed', 'canceled', 'skipped', 'manual']);
 
+/**
+ * Причины падения задания GitLab (`failure_reason`), за которыми стоит машина
+ * CI, а не код ветки: умер раннер, не ответил API GitLab, сломался
+ * планировщик. `script_failure` и прочие — дело кода, их читает группа.
+ */
+export const INFRA_FAILURE_REASONS: ReadonlySet<string> = new Set([
+  'runner_system_failure',
+  'api_failure',
+  'scheduler_failure',
+  'data_integrity_failure',
+]);
+
+/**
+ * Задания, которые повторит панель: только если ВСЕ упавшие задания упали на
+ * инфраструктуре. Хоть одно с причиной кода или без причины (GitHub, задания
+ * не прочлись) — `undefined`, и красный судится группой как прежде.
+ */
+export function infraJobs(red: MrReviewPipeline): MrReviewFailedJob[] | undefined {
+  const jobs = red.failedJobs;
+  if (!jobs || jobs.length === 0) return undefined;
+  return jobs.every((job) => job.reason !== undefined && INFRA_FAILURE_REASONS.has(job.reason))
+    ? jobs
+    : undefined;
+}
+
+/** Снимок полей наблюдения до продолжения — вернуть, если продолжить не вышло. */
+type Previous = Pick<SplitMrWatch, 'relayed' | 'pipeline' | 'resumes'>;
+
+function restoreField<K extends 'relayed' | 'pipeline' | 'resumes' | 'infraRetried'>(
+  watch: SplitMrWatch,
+  field: K,
+  value: SplitMrWatch[K],
+): void {
+  if (value === undefined) delete watch[field];
+  else watch[field] = value;
+}
+
 export interface MrWatchDeps {
   store: Pick<SplitConveyorStore, 'get' | 'set' | 'all'>;
   /** MR по ссылке; `undefined` — прочитать нечем (нет токена, не тот фордж). */
   read: (mrUrl: string) => Promise<MrReview | undefined>;
   /** Продолжить доставленную группу словом панели (`SplitConveyor.resumeDelivered`). */
   resume: (parentChatId: string, index: number, prompt: string) => 'sent' | 'queued' | 'refused';
+  /**
+   * Повторить задание конвейера MR (E3). `true` — фордж повтор принял. Нет —
+   * красный конвейер судится группой, как до E3.
+   */
+  retryJob?: (mrUrl: string, jobId: string) => Promise<boolean>;
   schedule?: (run: () => void, ms: number) => unknown;
   now?: () => Date;
   /**
@@ -189,6 +232,12 @@ export function mrWatchPrompt(input: {
         "this work (infrastructure, someone else's flake) — prove it with log lines and tell the " +
         'human, editing nothing.',
     );
+    const jobs = input.red.failedJobs ?? [];
+    if (jobs.length > 0) {
+      lines.push(
+        `Failed jobs: ${jobs.map((job) => `${job.name}${job.reason ? ` (${job.reason})` : ''}`).join(', ')}.`,
+      );
+    }
   }
   lines.push(
     '',
@@ -260,6 +309,7 @@ export class MrWatch {
       if (watch?.relayed) fresh.relayed = watch.relayed;
       if (watch?.pipeline) fresh.pipeline = watch.pipeline;
       if (watch?.resumes) fresh.resumes = watch.resumes;
+      if (watch?.infraRetried) fresh.infraRetried = watch.infraRetried;
       watch = fresh;
       group.mrWatch = watch;
       this.deps.store.set(record);
@@ -337,16 +387,100 @@ export class MrWatch {
       return;
     }
 
-    const threads = pendingThreads(review, watch.relayed ?? []);
     const pipeline = review.pipeline;
     const looked =
       pipeline && FINISHED.has(pipeline.status) && watch.pipeline?.id !== pipeline.id
         ? pipeline
         : undefined;
-    const red = looked?.status === 'failed' ? looked : undefined;
-    const previous = { relayed: watch.relayed, pipeline: watch.pipeline, resumes: watch.resumes };
+    let red = looked?.status === 'failed' ? looked : undefined;
+    const previous: Previous = {
+      relayed: watch.relayed,
+      pipeline: watch.pipeline,
+      resumes: watch.resumes,
+    };
     if (looked) watch.pipeline = { id: looked.id, status: looked.status };
 
+    // Упал раннер, а не код (E3): будить модель незачем — панель повторяет
+    // задания сама, один раз; вторая смерть того же задания — заметка человеку.
+    let state = now;
+    const failed = red;
+    const infra = failed ? infraJobs(failed) : undefined;
+    if (failed && infra) {
+      const keys = infra.map((job) => `${failed.id}:${job.name}`);
+      const retried = watch.infraRetried ?? [];
+      if (keys.some((key) => retried.includes(key))) {
+        this.notifyInfra(parentChatId, 'split-mr-watch-infra-again-notice', group.title, mr, infra);
+        red = undefined;
+      } else if (this.deps.retryJob) {
+        // Повтор оставляет конвейер прежним: взгляд на него не записывается,
+        // иначе исход повтора следующая проверка уже не судила бы.
+        restoreField(watch, 'pipeline', previous.pipeline);
+        watch.infraRetried = [...retried, ...keys].slice(-MAX_RELAYED);
+        this.deps.store.set(record);
+        const retry = this.deps.retryJob;
+        const accepted = await Promise.all(
+          infra.map((job) => retry(mr, job.id).catch(() => false)),
+        );
+        const fresh = this.current(parentChatId, index, cycle);
+        if (!fresh) return;
+        state = fresh;
+        if (accepted.every(Boolean)) {
+          this.notifyInfra(
+            parentChatId,
+            'split-mr-watch-infra-retry-notice',
+            group.title,
+            mr,
+            infra,
+          );
+          red = undefined;
+        } else {
+          // Фордж повтор не принял (нет прав, задание уже не повторить) — красный
+          // судится как прежде: группа прочтёт логи и скажет человеку.
+          restoreField(fresh.watch, 'infraRetried', retried.length > 0 ? retried : undefined);
+          fresh.watch.pipeline = { id: failed.id, status: failed.status };
+        }
+      }
+    }
+
+    const threads = pendingThreads(review, state.watch.relayed ?? []);
+    this.relay(parentChatId, index, cycle, state, threads, red, previous);
+  }
+
+  /** Заметка в ленту родителя о падении CI на инфраструктуре (E3). */
+  private notifyInfra(
+    parentChatId: string,
+    textCode: 'split-mr-watch-infra-retry-notice' | 'split-mr-watch-infra-again-notice',
+    group: string,
+    mr: string,
+    jobs: readonly MrReviewFailedJob[],
+  ): void {
+    const params = {
+      group,
+      mr,
+      jobs: jobs.map((job) => `${job.name} (${job.reason ?? '?'})`).join(', '),
+    };
+    this.deps.log(`mr watch: group «${group}» — CI infrastructure failure: ${params.jobs}`);
+    this.deps.notify?.(parentChatId, {
+      kind: 'notice',
+      code: 'mrWatchInfra',
+      text: serverText(textCode, params),
+      textCode,
+      textParams: params,
+    });
+  }
+
+  /** Передать группе то, что её ждёт, — или запланировать следующую проверку. */
+  private relay(
+    parentChatId: string,
+    index: number,
+    cycle: string,
+    state: { record: SplitPlanRecord; group: SplitPlanGroupRecord; watch: SplitMrWatch },
+    threads: MrReviewThread[],
+    red: MrReviewPipeline | undefined,
+    previous: Previous,
+  ): void {
+    const { record, group, watch } = state;
+    const mr = group.mr ?? '';
     if (threads.length === 0 && !red) {
       this.deps.store.set(record);
       this.plan(parentChatId, index, cycle, watch.checks);
@@ -386,16 +520,9 @@ export class MrWatch {
     // Продолжить не вышло — ничего не передано: следующая проверка попробует снова.
     const fresh = this.current(parentChatId, index, cycle);
     if (!fresh) return;
-    const restore = <K extends 'relayed' | 'pipeline' | 'resumes'>(
-      field: K,
-      value: SplitMrWatch[K],
-    ): void => {
-      if (value === undefined) delete fresh.watch[field];
-      else fresh.watch[field] = value;
-    };
-    restore('relayed', previous.relayed);
-    restore('pipeline', previous.pipeline);
-    restore('resumes', previous.resumes);
+    restoreField(fresh.watch, 'relayed', previous.relayed);
+    restoreField(fresh.watch, 'pipeline', previous.pipeline);
+    restoreField(fresh.watch, 'resumes', previous.resumes);
     this.deps.store.set(fresh.record);
     this.plan(parentChatId, index, cycle, fresh.watch.checks);
   }

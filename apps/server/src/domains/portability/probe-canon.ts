@@ -188,6 +188,13 @@ export interface ProbeScripts {
    * такой исход как «MCP не доехал», то есть обвиняло бы исправный перенос.
    */
   readonly mcpAskedPath: string;
+  /**
+   * Скрипт для цели, у модели которой инструментов НЕТ (aider): он запускает
+   * оба пробных вызова сам — переменную и запрещённый — с окружением того
+   * процесса, что его позвал, и выходит с ненулевым кодом. Ненулевой — не
+   * случайность: `/test` у aider отдаёт вывод модели только при провале.
+   */
+  readonly selfRunPath: string;
 }
 
 /**
@@ -201,6 +208,7 @@ export function writeProbeScripts(scratchDir: string): ProbeScripts {
   const forbiddenPath = join(scratchDir, `${PROBE_MARKS.forbidden}.mjs`);
   const envPath = join(scratchDir, 'probe-env.mjs');
   const mcpAskedPath = join(scratchDir, 'probe-mcp-asked.txt');
+  const selfRunPath = join(scratchDir, 'probe-self-run.mjs');
   const skillDir = join(scratchDir, 'skills', PROBE_NAME);
   mkdirSync(skillDir, { recursive: true });
   writeFileSync(hookPath, hookScript(), 'utf8');
@@ -215,7 +223,25 @@ export function writeProbeScripts(scratchDir: string): ProbeScripts {
     `process.stdout.write(${JSON.stringify(PROBE_MARKS.envEcho)} + (process.env[${JSON.stringify(PROBE_ENV_NAME)}] ?? ''));`,
     'utf8',
   );
-  return { hookPath, mcpPath, skillDir, forbiddenPath, envPath, mcpAskedPath };
+  writeFileSync(selfRunPath, selfRunScript(envPath, forbiddenPath), 'utf8');
+  return { hookPath, mcpPath, skillDir, forbiddenPath, envPath, mcpAskedPath, selfRunPath };
+}
+
+/**
+ * Самозапуск: оба пробных скрипта отдельными процессами node, окружение —
+ * унаследованное. Отдельными, а не `import`: так переменная проверяется ровно
+ * там же, где у остальных целей, — в дочернем процессе инструмента.
+ */
+function selfRunScript(envPath: string, forbiddenPath: string): string {
+  return [
+    "import { spawnSync } from 'node:child_process';",
+    `for (const path of ${JSON.stringify([envPath, forbiddenPath])}) {`,
+    "  const run = spawnSync(process.execPath, [path], { encoding: 'utf8' });",
+    "  process.stdout.write(`${run.stdout ?? ''}\\n`);",
+    '}',
+    'process.exitCode = 1;',
+    '',
+  ].join('\n');
 }
 
 /**

@@ -50,7 +50,8 @@ export interface SieveScan {
 
 /** Потолки — отчёт уезжает в запись группы и в напоминания. */
 const EVIDENCE_MAX = 600;
-const ROWS_MAX = 30;
+// Строки сит и пунктов задания владельца (U2, `owner-N`) — в одном отчёте.
+const ROWS_MAX = 80;
 const LEARNED_MAX = 20;
 export const LEARNED_TEXT_MIN = 20;
 export const LEARNED_TEXT_MAX = 400;

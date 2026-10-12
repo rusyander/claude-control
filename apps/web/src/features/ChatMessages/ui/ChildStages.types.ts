@@ -3,6 +3,8 @@ import type {
   ChatTreeView,
   SplitGroupCleaned,
   SplitGroupStatusView,
+  SplitGroupTokenFlag,
+  SplitGroupTokenLedger,
   SplitGroupWait,
   SplitPlanView,
 } from '@agentdeck/contracts/chat-handoff';
@@ -128,6 +130,12 @@ export interface ChildStageGroup {
   deliveryNudges?: number;
   /** Чем проверена работа: блок «Тесты» копии группы (решение владельца 29.09). */
   testsVerdict?: { cases: number; passed: number; runId?: string; runAt?: string };
+  /** Счёт токенов закрытой группы (E4) — флаги против медианы проекта. */
+  tokens?: {
+    ledger: SplitGroupTokenLedger;
+    flags: SplitGroupTokenFlag[];
+    median?: number;
+  };
   /**
    * Копия закрытой группы (Д19): её можно убрать кнопкой, адресуясь родителю с
    * номером группы. `cleaned` — уже убрана, и чем кончилось с веткой.
@@ -197,6 +205,11 @@ export interface ChildStagesProps {
    * человеку продолжение сессии там, где её не существует, нельзя.
    */
   foreign?: boolean;
+  /**
+   * Провайдер чужого CLI: карточка собирает из него ключ разговора звена для
+   * «Что получил агент» (U8) — связи чужих чатов живут под `<провайдер>:<id>`.
+   */
+  providerId?: string;
   /**
    * Ответ на вопрос разбора (Т1): уходит родителю с номером группы, а не в чат
    * группы — его ещё нет. Без обработчика форма ответа не показывается.

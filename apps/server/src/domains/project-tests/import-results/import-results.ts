@@ -456,6 +456,8 @@ export interface PreparedRunResults {
   now: string;
   /** Проставить статусы в кейсы — ТОЛЬКО после записи прогона `runId`. Возвращает, сколько легло. */
   apply: () => number;
+  /** Результаты без кейса целиком (по одному на имя) — из них заводятся кейсы. */
+  unmatchedResults: ImportedTestResult[];
 }
 
 /**
@@ -494,11 +496,15 @@ export function prepareResultsForRun(
   const index = buildIndex(groups);
   const matched = new Map<string, { ref: CaseRef; result: ImportedTestResult }>();
   const unmatched: string[] = [];
+  const unmatchedResults: ImportedTestResult[] = [];
 
   for (const result of parsed) {
     const ref = matchCase(result, index);
     if (!ref) {
-      if (result.name && !unmatched.includes(result.name)) unmatched.push(result.name);
+      if (result.name && !unmatched.includes(result.name)) {
+        unmatched.push(result.name);
+        unmatchedResults.push(result);
+      }
       continue;
     }
     const key = `${ref.groupId}/${ref.caseId}`;
@@ -551,6 +557,7 @@ export function prepareResultsForRun(
     points,
     now,
     apply: () => applyResults(root, patches, now),
+    unmatchedResults,
   };
 }
 

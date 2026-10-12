@@ -1,4 +1,13 @@
 import { blockLang, blockLangPattern } from './brand.ts';
+import {
+  DELIVERY_CHECKS_LINE,
+  labelledCut,
+  OWNER_PRECEDENCE_LINE,
+  OWNER_TEXT_MAX,
+  RULE_SOURCES,
+} from './quality-floor.ts';
+
+export { OWNER_PRECEDENCE_LINE } from './quality-floor.ts';
 /**
  * Подбор модели под задачу: какой моделью и с какой глубиной пойдёт каждый
  * ребёнок разделения задач.
@@ -98,10 +107,13 @@ export const KIND_PLAN: Readonly<Record<TaskKind, KindPlan | undefined>> = {
   // Переименования, одна и та же правка во многих файлах, формат, переносы:
   // результат виден проверками проекта сразу и целиком.
   mechanical: { model: 'sonnet', effort: 'medium' },
-  // Понятная правка или фича с готовыми критериями приёмки.
-  implementation: { model: 'sonnet', effort: 'high' },
-  // Тесты по готовой спецификации — та же понятная работа.
-  tests: { model: 'sonnet', effort: 'high' },
+  // Понятная правка или фича с готовыми критериями приёмки. Пол — opus high
+  // (владелец, 12.10.2026: «качество первым, окно вторым»): правка кода по
+  // задаче из трекера на sonnet возвращалась ревью с замечаниями чаще, чем
+  // экономила окно, а исполнение у владельца везде идёт на high.
+  implementation: { model: 'opus', effort: 'high' },
+  // Тесты по готовой спецификации — та же работа с кодом, тот же пол.
+  tests: { model: 'opus', effort: 'high' },
   // Причина неизвестна: плавающий баг, производительность, разбор чужого кода.
   investigation: undefined,
   // Архитектура, контракты, миграции, безопасность — всё необратимое.
@@ -330,22 +342,42 @@ export function loweredWorkPrompt(
      * «модель сильнее» нельзя: чем настроен CLI, панель не знает.
      */
     reviewer?: 'ceiling' | 'cli';
+    /**
+     * За правками панель заведёт один проход проверки (U6): строка «тебя никто
+     * не проверит» была бы враньём, а обещание проверки — новая обязанность.
+     */
+    verify?: boolean;
+    /**
+     * Задание этого прогона уже назвало проверки проекта (TQ-10, 12.10.2026):
+     * правки несут `PROJECT_CHECKS_LINE`, работа с доставкой —
+     * `DELIVERY_CHECKS_LINE`. Определение второй раз — лишние 250 байт в том
+     * же прогоне; остаётся ссылка на задание.
+     */
+    checksInTask?: boolean;
   } = {},
 ): string {
   const named = kind ? `"${kind}"` : 'simple work';
   const review = options.review ?? true;
   const foreign = options.reviewer === 'cli';
+  // Подъём заводит конвейер работы (F4, 12.10.2026): ход понижённой работы без
+  // единой правки идёт заново на потолке. Правкам и ручному вееру его нет — и
+  // обещать его там нельзя: агент рассчитывал бы на продолжение, которого не будет.
+  const stop = review
+    ? 'do not improvise: leave the copy unchanged, describe what you hit and end the turn — the ' +
+      `panel re-runs the task on ${foreign ? 'the model the CLI itself is configured with' : 'the ceiling model'}, ` +
+      'and a turn with half-made changes goes to the review as it is. '
+    : 'do not improvise: describe what you hit and end the turn — the human reads it and decides ' +
+      'how the work continues. ';
   return (
     (foreign
       ? 'This work runs on a model BELOW the one the CLI uses by its own setting: ' +
         'the panel picked it by the kind of task. '
       : 'This work runs on a model BELOW the ceiling of the conversation: the panel picked it by ' +
         'the kind of task. ') +
-    'Before you say "done", run the project checks (types, lint, tests — whatever it has) ' +
-    'and compare what you did with the task point by point. ' +
+    `${options.checksInTask ? CHECKS_NAMED_IN_TASK : PROJECT_CHECKS_LINE} Then compare what you did with the task point by point. ` +
     `If it turns out the task is harder than ${named} — decisions about architecture, ` +
-    'contracts or migrations are needed, or the cause of a failure is unknown — do not improvise: ' +
-    'describe what you hit and end the turn; the work continues on a stronger model. ' +
+    'contracts or migrations are needed, or the cause of a failure is unknown — ' +
+    stop +
     'Call unfinished work unfinished: stopping with an honest list of what is left costs less ' +
     'than a plausible "done" followed by more fixes than there was work.' +
     (review
@@ -356,9 +388,13 @@ export function loweredWorkPrompt(
           'separate task.'
         : ' When you finish, the panel itself starts a review of your diff on the ceiling model; ' +
           'its findings come back here as a separate task.'
-      : // Проверки не будет — значит проверять себя некому, кроме самого агента,
-        // и сказать это надо прямо, а не умолчать про отсутствующее звено.
-        ' The panel will not start a review of this work: nobody checks it but you.')
+      : options.verify
+        ? ' When you finish, the panel starts one verification pass over your fixes: it re-runs ' +
+          'the evidence of every finding, and a point that is not really fixed goes into the MR ' +
+          'as open.'
+        : // Проверки не будет — значит проверять себя некому, кроме самого агента,
+          // и сказать это надо прямо, а не умолчать про отсутствующее звено.
+          ' The panel will not start a review of this work: nobody checks it but you.')
   );
 }
 
@@ -400,12 +436,15 @@ export type CascadeStage = (typeof CASCADE_STAGES)[number];
 export const REVIEW_BLOCK_LANG = blockLang('review');
 
 /**
- * Сколько замечаний и какой длины панель принимает. Ограничение не про формат, а
- * про то, что этот список уезжает ЗАДАНИЕМ в следующий прогон: простыня на сто
- * пунктов там не задание, а новый разговор, который никто не заказывал.
+ * Сколько замечаний и какой длины панель принимает. Замечание — полная карточка
+ * (важность, тезис, место, доказательство, как должно быть), а не заголовок:
+ * прежние 600 знаков и 20 пунктов обрезали доказательства и выбрасывали
+ * хвост списка (владелец, 12.10.2026). Потолки — от мусора; сверх них панель
+ * говорит, сколько не взяла, молча ничего не теряется.
  */
-const MAX_FINDINGS = 20;
-const MAX_FINDING_CHARS = 600;
+export const REVIEW_MAX_FINDINGS = 200;
+const MAX_FINDINGS = REVIEW_MAX_FINDINGS;
+const MAX_FINDING_CHARS = 12_000;
 
 /**
  * Разбор вердикта ревью: `{"findings":[…]}` → список замечаний.
@@ -430,15 +469,106 @@ export function parseReviewFindings(raw: unknown): string[] | undefined {
   if (!Array.isArray(list)) return undefined;
 
   const findings: string[] = [];
+  let over = 0;
   for (const item of list) {
     if (typeof item !== 'string') continue;
     const text = item.trim();
     if (!text) continue;
-    findings.push(text.slice(0, MAX_FINDING_CHARS));
-    if (findings.length >= MAX_FINDINGS) break;
+    if (findings.length >= MAX_FINDINGS) {
+      over += 1;
+      continue;
+    }
+    findings.push(labelledCut(text, MAX_FINDING_CHARS));
+  }
+  if (over > 0) {
+    findings.push(
+      `… ${over} more findings were not taken by the panel (limit ${MAX_FINDINGS}) — they are in the review answer above.`,
+    );
   }
   return findings;
 }
+
+/** Тир риска ревью: T0 — взгляд, T1 — обычная глубина, T2 — жёсткая. */
+export const REVIEW_TIERS = ['T0', 'T1', 'T2'] as const;
+export type ReviewTier = (typeof REVIEW_TIERS)[number];
+
+/**
+ * Отчёт ревьюера о глубине — рядом с замечаниями в том же блоке (U4).
+ *
+ * «Замечаний нет» без него читалось как «чисто», хотя ревью могло пройти одним
+ * входом, без половины радиуса и без документации (живое ревью MR 12.10.2026:
+ * радиус 11 из 169, документация наполовину). Панель не верит тону ответа —
+ * она читает отчёт и судит его сама (`reviewDepthGaps`).
+ */
+export interface ReviewDepth {
+  tier?: ReviewTier;
+  /** Независимые входы, с которых ревьюер прошёл целиком: diff-first, frame-first… */
+  entries: string[];
+  coverage?: 'full' | 'partial';
+  /** Что не прочитано и почему. */
+  uncovered: string[];
+}
+
+function textList(raw: unknown, max: number): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((item): item is string => typeof item === 'string')
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, max);
+}
+
+/** `depth` из JSON блока ревью; нет поля или оно не объект — `undefined`. */
+export function parseReviewDepth(raw: unknown): ReviewDepth | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const value = raw as Record<string, unknown>;
+  const tier = typeof value.tier === 'string' ? value.tier.trim().toUpperCase() : '';
+  const coverage = typeof value.coverage === 'string' ? value.coverage.trim().toLowerCase() : '';
+  return {
+    ...((REVIEW_TIERS as readonly string[]).includes(tier) ? { tier: tier as ReviewTier } : {}),
+    entries: textList(value.entries, 20),
+    ...(coverage === 'full' || coverage === 'partial' ? { coverage } : {}),
+    uncovered: textList(value.uncovered, MAX_FINDINGS),
+  };
+}
+
+/** Чем отчёт о глубине не дотягивает до того, что ревью закрывается как полное. */
+export type ReviewDepthGap = 'unreported' | 'partial' | 'entries';
+
+/**
+ * Судит отчёт панель, а не ревьюер (U4): отчёта нет; покрытие не полное или
+ * названо непрочитанное; T2 пройден меньше чем с двух независимых входов.
+ */
+export function reviewDepthGaps(depth: ReviewDepth | undefined): ReviewDepthGap[] {
+  if (!depth?.tier || !depth.coverage) return ['unreported'];
+  const gaps: ReviewDepthGap[] = [];
+  if (depth.coverage !== 'full' || depth.uncovered.length > 0) gaps.push('partial');
+  const entries = new Set(depth.entries.map((entry) => entry.toLowerCase()));
+  if (depth.tier === 'T2' && entries.size < 2) gaps.push('entries');
+  return gaps;
+}
+
+/**
+ * Строка-требование блока ревью: замечания и отчёт о глубине. Одна на все
+ * задания ревью — по ссылке, своей работы, повтор итога, — иначе формы
+ * разошлись бы и разбор понимал бы одну из них.
+ */
+export const REVIEW_BLOCK_LINE =
+  `End the answer with EXACTLY ONE code block in the language ${REVIEW_BLOCK_LANG} containing ` +
+  'JSON like {"findings":["<finding card>", "…"],"depth":{"tier":"T1","entries":["diff-first"],' +
+  '"coverage":"full","uncovered":[]}}; no findings — an empty "findings" list with the same ' +
+  '"depth" report.';
+
+export const REVIEW_DEPTH_LINE =
+  '"depth" reports how deep the review went: "tier" is the risk tier your review method ' +
+  'computed — without a tier step, T2 when the change touches access or ownership, money or ' +
+  'counters, a schema or contract, concurrency, irreversible writes, or behaviour with no test ' +
+  'beside it, T0 when nothing behaviour-bearing changed, T1 otherwise; "entries" names every ' +
+  'independent entry point you took a full pass from (diff-first, frame-first and so on) — a T2 ' +
+  'review takes at least two; "coverage" is "full" only when nothing in the diff and its radius ' +
+  'was left unread, and "uncovered" names what was not read and why. The panel checks this ' +
+  'report: an incomplete review is sent back to this session once, and what is still missing ' +
+  'stays named on the card.';
 
 /** Что осталось от ответа ревьюера после вырезания блоков и что из них разобрано. */
 export interface ReviewScan {
@@ -449,8 +579,19 @@ export interface ReviewScan {
    * ревьюер не отчитался, и заводить по такому ответу правки нельзя.
    */
   findings?: string[];
+  /** Отчёт о глубине из того же блока, что и `findings`. */
+  depth?: ReviewDepth;
   /** Сколько закрытых блоков разобрать не удалось — иначе отказ не виден. */
   rejected: number;
+}
+
+/** `depth` разобранного блока; JSON уже проверен `parseReviewFindings`. */
+function depthOf(body: string): ReviewDepth | undefined {
+  try {
+    return parseReviewDepth((JSON.parse(body) as { depth?: unknown }).depth);
+  } catch {
+    return undefined;
+  }
 }
 
 /** Начало блока: тройная кавычка в начале строки и наш язык за ней. */
@@ -472,6 +613,7 @@ const REVIEW_OPEN = new RegExp(
  */
 export function scanReviewBlocks(source: string): ReviewScan {
   let findings: string[] | undefined;
+  let depth: ReviewDepth | undefined;
   let rejected = 0;
   let rest = source;
   let out = '';
@@ -494,6 +636,7 @@ export function scanReviewBlocks(source: string): ReviewScan {
     const parsed = parseReviewFindings(body);
     if (parsed) {
       findings = parsed;
+      depth = depthOf(body);
     } else {
       rejected += 1;
       out += rest.slice(open.index + lead, bodyStart + close.index + close[0].length);
@@ -505,14 +648,67 @@ export function scanReviewBlocks(source: string): ReviewScan {
   return {
     text: out.replace(/\n{3,}/g, '\n\n').trim(),
     ...(findings ? { findings } : {}),
+    ...(depth ? { depth } : {}),
     rejected,
   };
 }
 
-/** Сколько знаков задания показываем ревьюеру: дальше он читает код, а не текст. */
-const TASK_EXCERPT = 2_000;
-/** Знаков плана и итога прошлого звена в контексте звена — выжимка, а не пересказ. */
-const CONTEXT_EXCERPT = 2_000;
+/**
+ * Задание и план доходят до звена ЦЕЛИКОМ (владелец, 12.10.2026): ревью,
+ * сверявшее работу с первыми 2 000 знаков задания, не видело его условий и
+ * возвращало «замечаний нет» по невыполненным пунктам. Потолок — от мусора.
+ */
+const TASK_EXCERPT = OWNER_TEXT_MAX;
+const PLAN_EXCERPT = OWNER_TEXT_MAX;
+/**
+ * Итог прошлого звена — хвост его ответа: итог и выводы звено пишет в конце, а
+ * весь ответ с ходом рассуждений следующему звену не нужен. 24 000 знаков
+ * вмещают отчёт ревью или доставки целиком.
+ */
+const PREVIOUS_TAIL = 24_000;
+
+/**
+ * Как выглядит замечание — одно правило для всех заданий ревью (звено ревью,
+ * ревью по ссылке, повтор итога). Все важности, ни одна не отбрасывается
+ * «как мелочь»: решает человек, а не обёртка (владелец, 12.10.2026 — прежнее
+ * «замечание — только то, что надо исправить» выбрасывало вопросы и мелочи, а
+ * «пустой список — лучший ответ» толкало ревью к пустому итогу).
+ */
+export const FINDING_CARD_LINE =
+  'Report EVERY finding at its honest severity — 🔴 blocker, 🟡 should fix, ❓ question, 🟢 optional — ' +
+  'none is dropped for being minor. Each finding is a full card in one string, in the finding-card ' +
+  'format of the deep-review skill: severity marker, number, a bold thesis, the location as ' +
+  'path:start-end, the evidence (the line, the command and its output, or the repro) and what it ' +
+  'should be — written so that someone who has not seen this conversation can act on it.';
+
+/**
+ * Пустой итог — законный, но только с отчётом о покрытии: «замечаний нет» без
+ * сказанного, что прочитано, неотличимо от непрочитанного.
+ */
+/**
+ * Проверки проекта — те, что названы в его правилах, все и по порядку (U7).
+ * «Типы, линт, тесты» вообще пропускали гейт документации проекта и
+ * backend-гейты: стадия говорила «готово», а CI краснел на том, что правила
+ * проекта называли прямо.
+ */
+export const PROJECT_CHECKS_LINE =
+  `Before you say "done", run the project checks its rules name (${RULE_SOURCES}) — all of them,` +
+  ' in the order named, frontend and backend alike; no ' +
+  'rule names them — whatever the project has (types, lint, tests).';
+
+/** Ссылка вместо определения, когда задание прогона проверки уже назвало (TQ-10). */
+const CHECKS_NAMED_IN_TASK =
+  'Before you say "done", run the project checks your task names — all of them, in the order named.';
+
+/** Задание уже несёт определение проверок проекта — планке сдачи его не повторять. */
+export function namesProjectChecks(prompt: string): boolean {
+  return prompt.includes(PROJECT_CHECKS_LINE) || prompt.includes(DELIVERY_CHECKS_LINE);
+}
+
+export const EMPTY_REVIEW_LINE =
+  'An empty list is a valid outcome only together with a coverage statement in your answer: what ' +
+  'you read (code, tests, docs, locales, the callers of what changed) and what you did not read ' +
+  'and why. Partial coverage is reported as partial, never as "no findings".';
 
 /**
  * Что звено знает о группе, не видя прошлых звеньев (аудит 25.09, L238): чат
@@ -565,7 +761,9 @@ const STAGE_NAMES: Record<CascadeStage, string> = {
 function excerpt(text: string, limit: number, fromEnd = false): string {
   const trimmed = text.trim();
   if (trimmed.length <= limit) return trimmed;
-  return fromEnd ? `…${trimmed.slice(-limit)}` : `${trimmed.slice(0, limit)}…`;
+  return fromEnd
+    ? `[the panel shows the last ${limit} of ${trimmed.length} chars]…${trimmed.slice(-limit)}`
+    : labelledCut(trimmed, limit);
 }
 
 /** Блок «контекст группы» последним абзацем задания звена; пусто — нечего сказать. */
@@ -577,13 +775,13 @@ export function stageContextBlock(context: StageContext | undefined): string {
     lines.push('Group task:', excerpt(context.task, TASK_EXCERPT));
   }
   if (context.plan?.trim()) {
-    lines.push('Group plan (summary):', excerpt(context.plan, CONTEXT_EXCERPT));
+    lines.push('Group plan:', excerpt(context.plan, PLAN_EXCERPT));
   }
   if (context.previous?.text.trim()) {
     // Хвост, а не начало: итог и вывод звено пишет в конце ответа.
     lines.push(
       `Outcome of the previous stage (${STAGE_NAMES[context.previous.stage]}):`,
-      excerpt(context.previous.text, CONTEXT_EXCERPT, true),
+      excerpt(context.previous.text, PREVIOUS_TAIL, true),
     );
   }
   if (lines.length === 0) return '';
@@ -620,36 +818,94 @@ export function reviewStagePrompt(input: {
   /** Абзац сит перед MR (`sievePromptBlock` из `@agentdeck/contracts/sieves`). */
   sieves?: string;
 }): string {
-  const task = input.task.trim().slice(0, TASK_EXCERPT);
-  const by = input.model ? ` by the model ${input.model}` : ' by a model weaker than you';
+  const task = labelledCut(input.task.trim(), TASK_EXCERPT);
+  const by = input.model ? ` by the model ${input.model}` : ' by another model';
   const where = input.branch ? ` on the branch ${input.branch}` : ' in this working copy';
 
   return [
     `This is a new session: the work was done${by}${where}; you do not have its context — read ` +
       'the code and the diff.',
     '',
-    'Check what was done against the task. Look at the uncommitted changes and the commits of ' +
-      'this branch (git status, git diff, git log), read the touched files in full, and run the ' +
-      'project checks (types, lint, tests) if needed.',
+    'Review it with the deep-review skill on this branch at the depth its risk tier demands, in ' +
+      'report mode: no fix loop, nothing written into any MR. No such skill — do the same yourself: ' +
+      'git status, git diff and git log of this branch, every touched file read in full together ' +
+      'with its callers, tests, docs and locales, and the project checks run.',
+    'Check the work against EVERY point of the task below, one by one: a point not done or done ' +
+      'differently is a finding.',
+    // U13: план называет критерии приёмки и уровень проверки — ревью сверяет и с
+    // ними; без плана строки нет, чтобы не отсылать к несуществующему.
+    ...(input.context?.plan?.trim()
+      ? [
+          'Check it against the group plan in the context below as well: an acceptance criterion ' +
+            'not met, or a check of its verification level not run (or run without the output ' +
+            'that counts), is a finding.',
+        ]
+      : []),
     'EDIT NOTHING: your job is to read and name. The next stage makes the fixes.',
     '',
     input.kind ? `Class of work according to the panel: ${input.kind}.` : '',
     'The task the work started from:',
     task,
     '',
-    'A finding is only something that must be FIXED: an unmet point of the task, a bug, ' +
-      'a broken check, a dangerous or irreversible action. Taste, "could be prettier" and ' +
-      'rewriting working code are not findings.',
-    `End the answer with EXACTLY ONE code block in the language ${REVIEW_BLOCK_LANG} containing ` +
-      'JSON like {"findings":["what to fix and where, one line", "…"]}. No findings — output ' +
-      '{"findings":[]}: an empty list is a legitimate and the best answer. Write every finding so ' +
-      'it can be carried out without seeing this conversation: file path, what is wrong, what it ' +
-      'should be.',
+    FINDING_CARD_LINE,
+    REVIEW_BLOCK_LINE,
+    REVIEW_DEPTH_LINE,
+    EMPTY_REVIEW_LINE,
     input.sieves ? `\n${input.sieves}` : '',
     ANSWER_LANGUAGE_LINE,
     ESCALATE_LINE,
+    OWNER_PRECEDENCE_LINE,
     '',
     stageContextBlock(input.context),
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+/**
+ * Задание проходу ПРОВЕРКИ правок (U6, deep-review §7): та же стадия ревью, но
+ * не новое ревью, а повтор доказательства каждого замечания на ветке после
+ * правок. «Попытался» — не «исправил»: замечание закрыто, только когда его же
+ * доказательство теперь показывает верное поведение. Итог правок не заводит —
+ * открытое уходит в доставку и в MR как открытое, а не во второй круг.
+ */
+export function verifyStagePrompt(input: {
+  /** Замечания, по которым шли правки. */
+  findings: string[];
+  /** Ветка копии группы. */
+  branch?: string;
+  /** Задание, план и итог правок — проверка прошлых звеньев не видела. */
+  context?: StageContext;
+  /** Абзац сит перед MR. */
+  sieves?: string;
+}): string {
+  const where = input.branch ? ` on the branch ${input.branch}` : ' in this working copy';
+  const context = stageContextBlock(input.context);
+
+  return [
+    `This is a new session: a review of the work${where} found the findings below, and another ` +
+      'session has just made fixes for them. Your stage is VERIFYING those fixes — not a new review ' +
+      'of the whole work.',
+    '',
+    ...input.findings.map((finding, index) => `${index + 1}. ${finding}`),
+    '',
+    'For every finding re-run the evidence it names — the command, the repro, the read of the ' +
+      'lines — on the current state of the branch. Attempted is not fixed: a finding is fixed only ' +
+      'when its own evidence now shows the right behaviour. A ❓ is closed by an answer in the ' +
+      'code or in the fixes report, not by silence.',
+    'Then read the diff of the fixes (the commits or changes made after the review) for ' +
+      'regressions they introduced: each one is a finding too.',
+    'EDIT NOTHING and write nothing into any MR: your job is to check and name.',
+    'The "findings" list of the block holds ONLY what is still not fixed and the regressions of ' +
+      'the fixes; everything verified fixed — an empty list, and the answer says which evidence ' +
+      'you re-ran for each point.',
+    FINDING_CARD_LINE,
+    REVIEW_BLOCK_LINE,
+    input.sieves ? `\n${input.sieves}` : '',
+    ANSWER_LANGUAGE_LINE,
+    ESCALATE_LINE,
+    OWNER_PRECEDENCE_LINE,
+    ...(context ? ['', context] : []),
   ]
     .filter(Boolean)
     .join('\n');
@@ -661,7 +917,8 @@ export function reviewStagePrompt(input: {
  * Правки идут обратно на модели работы, и это не экономия из принципа: список
  * замечаний уже превратил неизвестное в понятное, а понятную правку по готовому
  * перечню слабая модель делает ровно так же, как сильная. Ревью второго круга
- * панель не заводит — здесь цепочка заканчивается.
+ * панель не заводит: за правками идёт ОДИН проход проверки (`verifyStagePrompt`,
+ * U6), и его итог правок уже не заводит.
  */
 export function fixStagePrompt(
   findings: string[],
@@ -681,11 +938,22 @@ export function fixStagePrompt(
      * коммита и MR и кончал грязной копией (журнал 59d, 65).
      */
     deliver?: boolean;
+    /**
+     * За правками панель заведёт проход проверки (U6). Не у правок по ревью
+     * чужого MR (Т7): там за ними идёт только кнопка человека.
+     */
+    verify?: boolean;
     /** Задание, план и итог ревью — звено правок прошлых звеньев не видело. */
     context?: StageContext;
+    /**
+     * Правки ведёт чужой CLI (F8): инструмента вопросов у него нет. Не задано —
+     * судим по ревьюеру: `cli` бывает только у чужого провайдера.
+     */
+    foreign?: boolean;
   } = {},
 ): string {
-  const { branch, reviewer = 'ceiling', deliver = false } = options;
+  const { branch, reviewer = 'ceiling', deliver = false, verify = false } = options;
+  const foreign = options.foreign ?? reviewer === 'cli';
   const context = stageContextBlock(options.context);
   const where = branch ? ` on the branch ${branch}` : ' in this working copy';
   const who = reviewer === 'cli' ? 'another model' : 'a stronger model';
@@ -695,9 +963,19 @@ export function fixStagePrompt(
     '',
     ...findings.map((finding, index) => `${index + 1}. ${finding}`),
     '',
-    'Fix each one. Any order, but go through the whole list and say for every point what you ' +
-      'did; if you disagree with one, do not stay silent — explain why you left it as it was.',
+    'Fix every 🔴 and 🟡; answer every ❓ (fix it if the answer shows a defect); fix a 🟢 when it ' +
+      'lies within the task. Any order, but go through the whole list and say for every point ' +
+      'what you did and how you checked it (attempted is not fixed — re-run the evidence the ' +
+      'finding names); if you disagree with one, do not stay silent — explain why you left it as ' +
+      'it was.',
     'Do not rework code beyond the list: these are review fixes, not a second pass at the task.',
+    ...(verify
+      ? [
+          'After your turn the panel starts one verification pass: it re-runs the evidence of ' +
+            'every finding against the branch, and a point called fixed that is not stays open ' +
+            'and is reported as open.',
+        ]
+      : []),
     ...(deliver
       ? [
           'That limit is about code, not delivery: commit, push and MR are not forbidden by it. ' +
@@ -708,10 +986,11 @@ export function fixStagePrompt(
     // Не воспроизвелось — не повод тянуть инфраструктуру (аудит 25.09, L258).
     'A finding that does not reproduce for you is no reason to change infrastructure: no new ' +
       'dependencies, CI, tsconfig or test harness edits. Say what did not reproduce and how much ' +
-      'would have to be added, and ask the human with the AskUserQuestion tool.',
-    'Before you say "done", run the project checks (types, lint, tests — whatever it has).',
+      `would have to be added, and ask the human ${foreign ? 'in the last line of your answer' : 'with the AskUserQuestion tool'}.`,
+    PROJECT_CHECKS_LINE,
     ANSWER_LANGUAGE_LINE,
     ESCALATE_LINE,
+    OWNER_PRECEDENCE_LINE,
     ...(context ? ['', context] : []),
   ].join('\n');
 }
@@ -739,10 +1018,18 @@ export function deliverStagePrompt(input: {
   /** Ветка копии группы — её и отправлять. */
   branch?: string;
   /**
-   * После чего звено заведено: правки по ревью, ревью без замечаний или работа,
-   * которой ревью не положено (шла на потолке, потолок не записан, — M8).
+   * После чего звено заведено: правки по ревью, проход проверки правок (U6),
+   * ревью без замечаний или работа, ревью которой не завели (связь без модели
+   * ревьюера, работа без изменений, — M8).
    */
-  after: 'fix' | 'review' | 'work';
+  after: 'fix' | 'verify' | 'review' | 'work';
+  /**
+   * Что проход проверки нашёл НЕ исправленным (U6). Едет в MR как открытое —
+   * второго круга правок нет, и молча доставить «всё исправлено» нельзя.
+   */
+  open?: string[];
+  /** Проход проверки не дал блока итога: правки не проверены, и MR говорит это прямо. */
+  unverified?: boolean;
   /**
    * Звено ведёт чужой CLI: инструмента вопросов у него нет, и вопрос человеку —
    * это ход, кончившийся вопросом (панель читает его как паузу, Д3).
@@ -762,12 +1049,16 @@ export function deliverStagePrompt(input: {
   const ask = input.foreign
     ? 'a question to the human as the last line of the answer'
     : 'a question to the human with the AskUserQuestion tool';
+  const open = input.open ?? [];
   const before =
-    input.after === 'fix'
-      ? 'the work of this group was reviewed and the fixes for its findings are done'
-      : input.after === 'review'
-        ? 'the work of this group was reviewed and the review found nothing'
-        : 'the work of this group is finished; it has no separate review';
+    input.after === 'verify'
+      ? 'the work of this group was reviewed, the fixes for its findings are done and a ' +
+        'verification pass re-checked them'
+      : input.after === 'fix'
+        ? 'the work of this group was reviewed and the fixes for its findings are done'
+        : input.after === 'review'
+          ? 'the work of this group was reviewed and the review found nothing'
+          : 'the work of this group is finished; it has no separate review';
 
   return [
     `This is a new session: ${before}. Your stage is delivering ${branch} to a ready MR; ` +
@@ -787,7 +1078,9 @@ export function deliverStagePrompt(input: {
       'recommended option (`git rebase --abort` returns the branch as it was). A decision that ' +
       `belongs to the human or to another group (foreign code, a product choice) — also ${ask}, ` +
       'not a report.',
-    '4. Run the project checks; fix what is red without going beyond the tasks of the group.',
+    `4. Run the project's checks — the ones its rules name (${RULE_SOURCES}), all of them,` +
+      ' in the order named, frontend and backend alike; fix what is red ' +
+      'without going beyond the tasks of the group. Any check still red — no MR.',
     `5. Push the branch: the first time with a plain push (\`git push -u origin ${target}\`); ` +
       `a pushed branch after the rebase — \`git push --force-with-lease origin ${target}\`, and ` +
       "only your own group branch, never the main, a protected or another group's branch. Open " +
@@ -802,9 +1095,27 @@ export function deliverStagePrompt(input: {
     // Автономия группы держится на границе задания (аудит 25.09, L163): без
     // сверки в MR уезжали правки «заодно», которых задание не просило.
     '7. Compare the diff of the branch against main (`git diff --stat origin/<main>...HEAD`) ' +
-      'with the task of the group: every change must follow from its tasks. Revert the extra; a ' +
-      'step beyond the tasks of the group (a foreign module, a migration, infrastructure) — do ' +
-      `not do it, ${ask}.`,
+      'with the task of the group: every change must follow from its tasks. What the project ' +
+      'rules require for such a change (docs updated with it, tests beside the code, every locale, ' +
+      'the API contract first) follows from the task too — keep it. Revert the rest; a step beyond ' +
+      'the tasks of the group (a foreign module, a migration, infrastructure) — do not do it, ' +
+      `${ask}.`,
+    ...(open.length > 0
+      ? [
+          '',
+          'The verification pass found these findings NOT fixed. Do not fix them in this stage; ' +
+            'list them in the MR description under "Open after verification", each as it is ' +
+            'written here, and name them in your answer:',
+          ...open.map((finding, index) => `${index + 1}. ${finding}`),
+        ]
+      : []),
+    ...(input.unverified
+      ? [
+          '',
+          'The verification pass gave no machine-readable result: say in the MR description that ' +
+            'the review fixes were NOT verified, so nobody reads them as checked.',
+        ]
+      : []),
     ...(input.sieves ? ['', input.sieves] : []),
     '',
     'Do not change code beyond what delivery needs. Merging the MR and deleting branches are ' +
@@ -812,6 +1123,7 @@ export function deliverStagePrompt(input: {
       'the answer is the link to the MR.',
     ANSWER_LANGUAGE_LINE,
     ESCALATE_LINE,
+    OWNER_PRECEDENCE_LINE,
     ...(context ? ['', context] : []),
   ].join('\n');
 }
@@ -860,8 +1172,15 @@ export function reviewLinkPrompt(input: {
   tasks?: string[];
   /** Общий контекст разделения. */
   shared?: string;
+  /**
+   * Владелец сам разрешил опубликовать ревью в MR (`grantsReviewPublish` по его
+   * словам). Тогда публикует САМА сессия ревью по навыку — тредами на строках,
+   * — а панель ничего не постит. Нет разрешения — в MR ни слова, решение на
+   * карточке, и по клику публикует та же сессия (`reviewPublishPrompt`).
+   */
+  publish?: boolean;
 }): string {
-  const { url, branch, onMrBranch = true, tasks = [], shared, detached, remote } = input;
+  const { url, branch, onMrBranch = true, tasks = [], shared, detached, remote, publish } = input;
 
   return [
     // Пустые строки здесь не разделители, а мусор: `filter(Boolean)` их
@@ -875,28 +1194,61 @@ export function reviewLinkPrompt(input: {
         ? `The working copy is already on its branch ${branch} — read the diff right here.`
         : '⚠ A copy on the branch of this MR could not be made: it is branched from the base. ' +
           'Take the diff from the MR itself by the link, not from this copy.',
-    'Use the deep-review skill on this link: it is the way to read the MR in full. ' +
-      'No such skill — read the MR diff and the touched files yourself, in the same order.',
-    'EDIT NOTHING and write nothing into the MR: whether to fix or reply is decided by the human ' +
-      'on the panel card.',
+    // Живое ревью MR (12.10.2026): одним проходом, радиус 11 из 169, документация
+    // наполовину — и «быстро» прочитано как «не глубоко». Глубину задаёт тир
+    // риска навыка, а не тон просьбы; документацию и локали не отрезают никогда.
+    'Use the deep-review skill on this link at the FULL depth its risk tier demands: run its tier ' +
+      'step, take every lane and entry point the tier mandates, read the whole diff — code, ' +
+      'tests, docs, locales — and never exclude docs ' +
+      'or locales from the diff. No such skill — read the MR diff and every touched file yourself, ' +
+      'with their callers and the product docs that describe them.',
+    'EDIT NOTHING: this group reads and names; it does not change the code.',
+    publish
+      ? 'The owner granted publishing this review into the MR. Publish it yourself as the ' +
+        'deep-review skill publishes: re-read the MR discussions right before writing and skip ' +
+        'what is already raised there, one inline thread per finding on its line range in the ' +
+        'finding-card format, then one index note grouped by severity. Never approve, resolve or ' +
+        'merge. End the answer with the links to what you posted.'
+      : 'Write nothing into the MR: whether to fix or publish is decided by the human on the panel ' +
+        'card, and on "Post" the panel asks this same session to publish.',
     // Задачи группы пишет агент родителя, и в них попадает «закоммить и
     // запушь» (инцидент 23.09). Без этой оговорки задание спорило само с собой.
     tasks.length > 0
-      ? 'What you were asked to look at especially (these are points to CHECK: read "fix", ' +
-        '"commit", "push" in them as "check whether this is needed", and do nothing):'
+      ? 'What you were asked to look at especially — points to CHECK, every one of them: a ' +
+        'request in them to change code, commit or push means "check whether this is needed", ' +
+        'because this group edits nothing.'
       : '',
     ...tasks.map((task, index) => `${index + 1}. ${task}`),
-    'A finding is only something that must be FIXED: a bug, an unmet requirement, a broken ' +
-      'check, a dangerous or irreversible action. Taste and "could be prettier" are not findings.',
-    `End the answer with EXACTLY ONE code block in the language ${REVIEW_BLOCK_LANG} containing ` +
-      'JSON like {"findings":["file:line — what is wrong and what it should be", "…"]}. No ' +
-      'findings — output {"findings":[]}: an empty list is a legitimate and the best answer. Write ' +
-      'every finding so that someone who has not seen this conversation understands it: the panel ' +
-      'posts them into the MR as they are.',
+    FINDING_CARD_LINE,
+    REVIEW_BLOCK_LINE,
+    REVIEW_DEPTH_LINE,
+    EMPTY_REVIEW_LINE,
     ANSWER_LANGUAGE_LINE,
+    OWNER_PRECEDENCE_LINE,
   ]
     .filter(Boolean)
     .join('\n');
+}
+
+/**
+ * Сообщение в ТУ ЖЕ сессию ревью по клику «Опубликовать» на карточке.
+ *
+ * Публикует сессия, а не панель (владелец, 12.10.2026): плоская
+ * пронумерованная заметка от панели — ровно та форма, которую владелец
+ * запретил; сессия уже прочитала MR и знает строки каждого замечания, а
+ * публикует по навыку — тредом на строках с карточкой замечания.
+ */
+export function reviewPublishPrompt(input: { url: string }): string {
+  return [
+    `The human pressed "Post" on the panel card — this is explicit consent to publish this ` +
+      `review into ${input.url}.`,
+    'Publish it as the deep-review skill publishes: re-read the MR discussions right before ' +
+      'writing and skip what is already raised there, one inline thread per finding on its line ' +
+      'range in the finding-card format, then one index note grouped by severity.',
+    'Edit no code and commit nothing. Never approve, resolve threads or merge.',
+    'End the answer with the links to what you posted.',
+    ANSWER_LANGUAGE_LINE,
+  ].join('\n');
 }
 
 /**
@@ -924,8 +1276,12 @@ export function mergeRequestWorkPreamble(input: {
         ? `The working copy is already on its branch ${branch}: edit here and commit into it.`
         : '⚠ A copy on the branch of this MR could not be made: it is branched from the base. ' +
           'First switch to the MR branch (find it by the link) and only then edit.',
-    'Push, comments and editing the MR description — only after the explicit consent of the ' +
-      'human: ask with a question with options when you reach that step.',
+    // Согласие, уже данное владельцем, не переспрашивается (U11): группа с
+    // «доведи до MR и отпиши в треды» вставала на вопросе, на который владелец
+    // ответил в задании, — а его самого у панели уже не было.
+    'Push, comments and editing the MR description need the consent of the human: if the task ' +
+      'below or the project rules already grant it, that is the consent — go ahead; otherwise ask ' +
+      'with a question with options when you reach that step.',
   ]
     .filter(Boolean)
     .join('\n');
@@ -959,8 +1315,9 @@ export function reviewPushPrompt(input: {
       `— that is the branch of ${input.url}. Do not push to another branch and do not create ` +
       'new branches.',
     'Merge nothing and do not close the MR: merging stays with the human.',
-    'Before committing, run the project checks (types, lint, tests — whatever it has) and say ' +
-      'what went into the MR.',
+    `Before committing, run the project checks its rules name (${RULE_SOURCES}) — all of them,` +
+      ' in the order named; no rule names them — whatever ' +
+      'the project has (types, lint, tests). Then say what went into the MR.',
     ANSWER_LANGUAGE_LINE,
   ].join('\n');
 }
@@ -975,14 +1332,56 @@ export function reviewRetryPrompt(): string {
   return [
     `Your previous answer ended without the outcome block ${REVIEW_BLOCK_LANG} — the panel ` +
       'does not know whether there are findings, and the human sees "no outcome".',
-    'Do not start the review again: from what you have already read, output the outcome as ' +
-      `EXACTLY ONE code block in the language ${REVIEW_BLOCK_LANG} containing JSON like ` +
-      '{"findings":["file:line — what is wrong and what it should be", "…"]}. No findings — ' +
-      '{"findings":[]}. Not finished reading — finish, but end the answer with this block.',
-    'EDIT NOTHING and write nothing into the MR.',
+    'Do not start the review again: from what you have already read, output the outcome. Not ' +
+      'finished reading — finish, but end the answer with the block.',
+    REVIEW_BLOCK_LINE,
+    REVIEW_DEPTH_LINE,
+    FINDING_CARD_LINE,
+    EMPTY_REVIEW_LINE,
+    'EDIT NOTHING. Write into the MR only what the first message of this session allowed.',
     ANSWER_LANGUAGE_LINE,
   ].join('\n');
 }
+
+const DEPTH_GAP_TEXT: Record<ReviewDepthGap, string> = {
+  unreported: 'the outcome block carries no "depth" report with a tier and a coverage',
+  partial: 'the coverage is partial — the "uncovered" part was left unread',
+  entries: 'a T2 review was taken from fewer than two independent entry points',
+};
+
+/**
+ * Сообщение в ТУ ЖЕ сессию ревью, чей отчёт о глубине панель сочла неполным
+ * (U4). Один раз и без человека (A0): ревьюер уже прочитал MR и дочитывает
+ * недостающее, а не начинает заново.
+ */
+export function reviewDepthPrompt(gaps: readonly ReviewDepthGap[]): string {
+  return [
+    'The panel checked the depth report of your review and it is incomplete: ' +
+      `${gaps.map((gap) => DEPTH_GAP_TEXT[gap]).join('; ')}.`,
+    'Finish the review now in this session: take the missing entry point, read what was left ' +
+      'unread, and judge it with the same care. Do not start over and do not drop what you ' +
+      'already found.',
+    'End the answer again with the block: the FULL findings list, the earlier findings ' +
+      'included, and the updated "depth" report.',
+    REVIEW_BLOCK_LINE,
+    REVIEW_DEPTH_LINE,
+    FINDING_CARD_LINE,
+    EMPTY_REVIEW_LINE,
+    'EDIT NOTHING. Write into the MR only what the first message of this session allowed.',
+    ANSWER_LANGUAGE_LINE,
+  ].join('\n');
+}
+
+/**
+ * Первая строка второго свидетеля (U5): ревью, кончившееся без замечаний при
+ * T1/T2, проходит ещё раз НОВОЙ сессией с другого входа. Исход первого прохода
+ * ей не называется — свидетель, которому сказали «там чисто», уже не независим.
+ */
+export const REVIEW_WITNESS_LINE =
+  'Independent pass: start from the frame — the product behaviour, the callers and entry ' +
+  'points, the docs that describe them — and only then read the diff; the diff-first pass has ' +
+  'already been taken by another session. Reach your own verdict and report "frame-first" ' +
+  'among your entries.';
 
 /** Группа глазами подбора: класс от агента и факты, которые панель видит сама. */
 export interface CascadeGroup {
@@ -1018,14 +1417,19 @@ export interface CascadePlan extends CascadeChoice {
 }
 
 /**
- * Сколько прогонов заведёт разделение В ХУДШЕМ случае: у группы на потолке он
- * один, у понижённой — до трёх (работа, ревью, правки по его замечаниям).
+ * Сколько прогонов заведёт разделение В ХУДШЕМ случае: до четырёх на группу —
+ * работа, ревью, правки по его замечаниям и проход их проверки. С U6 ревью идёт
+ * после КАЖДОЙ работы, на потолке тоже: свежая сессия — вторая пара глаз и на
+ * той же модели (раньше группа на потолке шла одним прогоном).
  *
  * Считается ДО запуска и показывается на карточке, потому что это и есть цена
  * согласия: человек, нажимающий «Разделить», обязан видеть, сколько агентов
  * панель заведёт сама. «До» здесь не осторожность — ревью без замечаний
  * заканчивает цепочку на двух прогонах, и так бывает чаще всего.
  */
+/** Работа, ревью, правки, проверка правок — худший случай группы (U6). */
+const RUNS_PER_GROUP = 4;
+
 export function plannedRunCount(
   plans: Array<Pick<CascadePlan, 'lowered'>>,
   options: {
@@ -1037,10 +1441,7 @@ export function plannedRunCount(
     planned?: boolean;
   } = {},
 ): number {
-  const runs = plans.reduce(
-    (total, plan) => total + (plan.lowered ? 3 : 1) + (options.planned ? 1 : 0),
-    0,
-  );
+  const runs = plans.reduce((total) => total + RUNS_PER_GROUP + (options.planned ? 1 : 0), 0);
   return options.planned && plans.length > 0 ? runs + 1 : runs;
 }
 
@@ -1113,9 +1514,11 @@ export function manualAssignment(
  * Сколько групп вообще может быть в предложении. Дубль потолка из `task-split`
  * намеренный: сабпаты контрактов друг друга не импортируют (условие работы
  * сервера без сборки), а здесь это не формат разделения, а граница разумного для
- * ключей карты — расходиться этим числам нечем.
+ * ключей карты — расходиться этим числам нечем. Было 8 при 30 группах: замены
+ * девятой группы и дальше пропадали молча (G4, 12.10.2026); равенство держит
+ * тест разбора замен.
  */
-const MAX_ASSIGNMENT_KEYS = 8;
+const MAX_ASSIGNMENT_KEYS = 30;
 
 /**
  * Ручные замены с карточки: номер группы → чего человек для неё хочет.

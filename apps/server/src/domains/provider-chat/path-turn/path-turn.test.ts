@@ -171,14 +171,23 @@ ${JSON.stringify({ findings: ['src/a.ts: не переименован bar'] })}
     expect(input.text).toContain('src/a.ts: не переименован bar');
   });
 
-  it('шаг с проверкой без блока — цепочка ждёт человека, ревью не заводится', async () => {
+  it('шаг с проверкой без блока — одно напоминание, без блока и после него — ждёт человека (F10)', async () => {
     withGroup([step('s1', { gate: { ru: 'Тесты зелёные', en: 'Tests green' } })]);
     const send = vi.fn().mockReturnValue({ ok: true });
     const ended = vi.fn();
     await planner(send, ended)(finish('сделал работу'));
     await planner(send, ended)(finish('вроде всё'));
 
-    expect(send).toHaveBeenCalledTimes(1);
+    // Забытый блок — не провал: шаг просят отчитаться тем же разговором.
+    expect(send).toHaveBeenCalledTimes(2);
+    const [, , nudgeChat, nudge] = send.mock.calls[1] as [string, string, string, { text: string }];
+    expect(nudgeChat).toBe('work');
+    expect(nudge.text).toContain('ended without the gate block');
+    expect(notices().at(-1)).toContain('попросила');
+    expect(ended).not.toHaveBeenCalled();
+
+    await planner(send, ended)(finish('всё ещё без блока'));
+    expect(send).toHaveBeenCalledTimes(2);
     expect(notices().at(-1)).toContain('не прошёл проверку');
     expect(ended).toHaveBeenCalledWith(
       expect.objectContaining({ parentChatId: 'qwen:parent' }),

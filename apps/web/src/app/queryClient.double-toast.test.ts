@@ -80,8 +80,16 @@ describe('один отказ — один тост', () => {
           (call) => text.slice(call.index, (call.index ?? 0) + 700),
         );
         const where = `${hook} (${file.slice(SRC.length + 1)})`;
-        // Обратная сторона: тихий хук без своего onError у вызова теряет отказ совсем.
-        if (quiet && !MUTE_BY_DESIGN.has(hook) && calls.some((call) => !/onError/.test(call))) {
+        // Обратная сторона: тихий хук без своего onError у вызова теряет отказ совсем —
+        // если компонент не выводит его сам: текст `check.error` в строке с role="alert"
+        // (одно `isError` не в счёт — им же прячут вердикт).
+        const shownInline = new RegExp(`\\b${variable}\\.error\\b`).test(text);
+        if (
+          quiet &&
+          !MUTE_BY_DESIGN.has(hook) &&
+          !shownInline &&
+          calls.some((call) => !/onError/.test(call))
+        ) {
           mute.push(where);
         }
         if (!calls.some((call) => /onError[^]*?toast\.error/.test(call))) continue;

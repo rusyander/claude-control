@@ -284,7 +284,9 @@ export const claudeMdEn: typeof claudeMdRu = {
       'A LIST OF LINKS: Aider has no single instructions file, ' +
       'context files are listed by the read option in .aider.conf.yml, and the section ' +
       'edits exactly that list (add, remove, reorder); the contents of a listed file ' +
-      'can be opened separately — if it already exists. A DIRECTORY OF RULES: Cursor ' +
+      'can be opened separately — if it already exists. Aider resolves a relative entry ' +
+      'from the directory it was started in, so the global list needs a path from home ' +
+      '(~/file.md) or a full one. A DIRECTORY OF RULES: Cursor ' +
       'keeps rules in ~/.cursor/rules (and <project>/.cursor/rules), where every .mdc ' +
       'file is a separate rule: frontmatter on top with a description, file globs and ' +
       'an “always attach” flag, markdown below. There the section becomes a directory ' +

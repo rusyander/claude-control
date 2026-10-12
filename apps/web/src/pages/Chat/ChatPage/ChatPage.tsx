@@ -10,7 +10,7 @@ import {
   useTotalTokens,
 } from '@shared/lib/agent-runs';
 import { useChatPrefs } from '@shared/lib/chat-prefs';
-import { useDraft } from '@shared/lib/draft';
+import { useDraftBox } from '@shared/lib/draft';
 import { WorkspaceTabs } from '@features/WorkspaceTabs';
 import { AssistantKeyGate } from '@features/AssistantKeyGate';
 import { ProjectGitControls } from '@features/ProjectGit';
@@ -110,7 +110,7 @@ export function ChatPage() {
   const isRunning = run.status === 'running';
   const stream = useStreamState(run, isRunning);
 
-  const [input, setInput] = useDraft(draftKey);
+  const draft = useDraftBox(draftKey);
 
   // Модель и глубина продумывания: общий дефолт из настроек, глубина, назначенная
   // разговору панелью, и выбор этого разговора (подробности — в хуке).
@@ -201,8 +201,7 @@ export function ChatPage() {
     sessionId: run.sessionId,
     projectPath,
     isRunning,
-    input,
-    setInput,
+    draft,
     setDraftId: session.setDraftId,
     setPending: session.setPending,
     allowEdits,
@@ -266,8 +265,8 @@ export function ChatPage() {
    * что панель уже рисует, и не знал, ушло ли то, что осталось на экране.
    */
   const sendMedia = async (): Promise<boolean> => {
-    const accepted = await media.submit(input);
-    if (accepted) setInput('');
+    const accepted = await media.submit(draft.get());
+    if (accepted) draft.set('');
     return accepted;
   };
 
@@ -443,7 +442,7 @@ export function ChatPage() {
             projectName={ws.activeProject?.name}
             projectPath={projectPath}
             onOpenEditor={(path) => openEditor.mutate(path)}
-            onPickPrompt={setInput}
+            onPickPrompt={draft.set}
             // Тема и правка колоды: карточка в ленте подписывается темой
             // человека и она же начинает правку — у блока агента другого места
             // для этого нет.
@@ -464,8 +463,7 @@ export function ChatPage() {
             awaiting={run.status === 'waiting' || Boolean(activeChat?.awaitingReply)}
             queued={run.queued}
             onCancelQueued={(queuedId) => chatId && agentRuns.cancelQueued(chatId, queuedId)}
-            value={input}
-            onChange={setInput}
+            draft={draft}
             // В неттекстовом режиме отправка делает, а не пишет агенту: на
             // дорогах панели запрос в транскрипт не попадает вовсе, а на дороге
             // агента он уходит обычным сообщением — просьбой ответить блоком.

@@ -492,6 +492,28 @@ export async function commentMergeRequestByUrl(
   await commentMergeRequest(access, ref.number, body);
 }
 
+/**
+ * Повторить задание конвейера MR по ссылке (E3): умерший раннер — не повод
+ * будить модель. Только GitLab — у GitHub причины падения задания нет, и
+ * панель там ничего не повторяет. `false` — ссылка не про MR GitLab; отказ
+ * форджа бросается.
+ */
+export async function retryMergeRequestJob(
+  url: string,
+  token: string,
+  jobId: string,
+): Promise<boolean> {
+  const ref = parseMergeRequestUrl(url);
+  const access = forgeAccessForUrl(url, token);
+  if (!ref || !access || access.kind !== 'gitlab') return false;
+  await post<unknown>(
+    access,
+    `/projects/${projectRef(access)}/jobs/${encodeURIComponent(jobId)}/retry`,
+    {},
+  );
+  return true;
+}
+
 /** Кто мы для форджа — то же «представились», что и у Atlassian. */
 export async function whoAmI(access: ForgeIdentity): Promise<string> {
   // Ручка называется одинаково у обоих: `/user` отдаёт владельца токена.

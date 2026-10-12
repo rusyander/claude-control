@@ -409,6 +409,32 @@ describe('предохранитель «чекпойнт не изменилс�
 });
 
 describe('заведение продолжения', () => {
+  /**
+   * Два звена в одну миллисекунду (12.10.2026): заглушка прогона кончает
+   * работу мгновенно, и подъём на потолок получал тот же ключ `new-<мс>`, что
+   * и работа, — связь работы затиралась связью подъёма.
+   */
+  it('два продолжения в одну миллисекунду получают разные ключи', () => {
+    const chains = new HandoffChains();
+    const once = () =>
+      startHandoff({
+        proposal: PROPOSAL,
+        cwd: 'C:/work/проект',
+        fromAliases: ['sess-7'],
+        chains,
+        startRun: false,
+        start: () => true,
+        now: () => 7,
+      }).chatId;
+
+    const first = once();
+    const second = once();
+
+    expect(first).toBe('new-7');
+    expect(second).not.toBe(first);
+    expect(second.startsWith('new-7')).toBe(true);
+  });
+
   it('исходное задание уезжает в промпт и запоминается цепочкой', () => {
     const chains = new HandoffChains();
     const started = startHandoff({

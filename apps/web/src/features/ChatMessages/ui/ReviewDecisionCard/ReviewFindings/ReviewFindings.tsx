@@ -39,22 +39,54 @@ export function ReviewFindings({
       </Stack>
     );
   }
+  // Ревью неполное и после просьбы дочитать (U4): пустой список тут — не «чисто».
+  const incomplete = review.incomplete?.length ? (
+    <Typography variant="body-sm" as="div" className={styles.warning}>
+      {t('chat.review.incomplete')}
+      <ul className={styles.gaps}>
+        {review.incomplete.map((gap) => (
+          <li key={gap}>{t(`chat.review.depthGap.${gap}`)}</li>
+        ))}
+      </ul>
+    </Typography>
+  ) : null;
+  const witness = review.witness ? (
+    <Typography variant="caption" color="subtle" as="div" className={styles.clean}>
+      {t('chat.review.witness')}
+    </Typography>
+  ) : null;
+
   if (review.findings.length === 0) {
+    if (incomplete) {
+      return (
+        <>
+          {witness}
+          {incomplete}
+        </>
+      );
+    }
     return (
-      <Typography variant="body-sm" color="subtle" className={styles.clean}>
-        {t('chat.review.clean')}
-      </Typography>
+      <>
+        {witness}
+        <Typography variant="body-sm" color="subtle" className={styles.clean}>
+          {t('chat.review.clean')}
+        </Typography>
+      </>
     );
   }
   return (
-    <ol className={styles.list}>
-      {review.findings.map((finding, index) => (
-        <li key={index}>
-          <Typography variant="body-sm" as="div" className={styles.item}>
-            {finding}
-          </Typography>
-        </li>
-      ))}
-    </ol>
+    <>
+      {witness}
+      {incomplete}
+      <ol className={styles.list}>
+        {review.findings.map((finding, index) => (
+          <li key={index}>
+            <Typography variant="body-sm" as="div" className={styles.item}>
+              {finding}
+            </Typography>
+          </li>
+        ))}
+      </ol>
+    </>
   );
 }

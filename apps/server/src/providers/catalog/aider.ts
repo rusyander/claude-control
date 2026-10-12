@@ -93,6 +93,9 @@ export const aiderProvider: ConfigProvider = {
     'openai-compat': {
       baseUrlEnv: 'AIDER_OPENAI_API_BASE',
       modelEnv: 'AIDER_MODEL',
+      // Без приставки litellm внутри Aider не знает, куда слать запрос, и
+      // падает до модели (живая проба 12.10.2026, aider 0.86.2).
+      modelPrefix: 'openai/',
       credentialEnv: 'AIDER_OPENAI_API_KEY',
     },
   },

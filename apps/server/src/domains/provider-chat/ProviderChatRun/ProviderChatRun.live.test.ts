@@ -5,7 +5,9 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { getProvider } from '../../../providers/registry.ts';
 import { ProviderChatRun, type ProviderChatRunEvent } from './ProviderChatRun.ts';
+import type { ProviderChatMessage } from '@agentdeck/contracts';
 import type { LiveTurn, LiveTurnOptions, LiveTurnResult } from '../live/types.ts';
+import { MAX_PROMPT_CHARS } from '../prompt/prompt.ts';
 
 /**
  * Живой путь прогона (В1): серверный режим CLI идёт первым, его `unavailable`
@@ -85,14 +87,20 @@ describe('ProviderChatRun: живой ход', () => {
     rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   });
 
-  function start(turn: ScriptedTurn, spawnImpl?: LiveTurnOptions['spawnImpl']) {
+  function start(
+    turn: ScriptedTurn,
+    spawnImpl?: LiveTurnOptions['spawnImpl'],
+    history: ProviderChatMessage[] = [
+      { id: 'm1', role: 'user', content: 'Вопрос', at: '2026-01-01T00:00:00.000Z' },
+    ],
+  ) {
     const run = new ProviderChatRun();
     const events: ProviderChatRunEvent[] = [];
     const kinds: unknown[] = [];
     const done = run.start(
       {
         provider: getProvider('codex'),
-        history: [{ id: 'm1', role: 'user', content: 'Вопрос', at: '2026-01-01T00:00:00.000Z' }],
+        history,
         chatId: 'chat',
         appDataDir: dir,
         detect: () => true,
@@ -106,6 +114,19 @@ describe('ProviderChatRun: живой ход', () => {
     );
     return { run, events, kinds, done };
   }
+
+  it('длинный разговор доезжает до хода целиком: предела argv у запроса нет', async () => {
+    const at = '2026-01-01T00:00:00.000Z';
+    const turn = new ScriptedTurn(() => ({ kind: 'done', reply: 'ок' }));
+    const { done } = start(turn, undefined, [
+      { id: 'm1', role: 'user', content: 'Первое условие задачи', at },
+      { id: 'm2', role: 'assistant', content: 'x'.repeat(MAX_PROMPT_CHARS + 1_000), at },
+      { id: 'm3', role: 'user', content: 'Вопрос', at },
+    ]);
+    await done;
+    expect(turn.seen?.prompt).toContain('Первое условие задачи');
+    expect(turn.seen?.prompt).toContain('Вопрос');
+  });
 
   it('ход принимает сообщение посреди ответа и кончается ответом транспорта live', async () => {
     const turn = new ScriptedTurn(() => undefined);
@@ -159,6 +180,58 @@ describe('ProviderChatRun: живой ход', () => {
     expect(turn.stopped).toBe(true);
     expect(events.at(-1)).toEqual({ type: 'done', reply: 'печатаю', transport: 'live' });
     expect(await run.steer('после стопа')).toBe(false);
+  });
+
+  /**
+   * «Что получил агент» (TQ-09) нужен и посреди долгого хода: вход пишется,
+   * когда ход начат, а не когда он кончился.
+   */
+  it('вход хода записан, как только ход начат, — до его конца (TQ-09)', async () => {
+    const turn = new ScriptedTurn(() => undefined);
+    const inputs: string[] = [];
+    const done = new ProviderChatRun().start(
+      {
+        provider: getProvider('codex'),
+        history: [{ id: 'm1', role: 'user', content: 'Вопрос', at: '2026-01-01T00:00:00.000Z' }],
+        chatId: 'chat',
+        appDataDir: dir,
+        detect: () => true,
+        liveTurn: () => turn,
+        systemPrefix: 'УКАЗАНИЕ ПАНЕЛИ',
+        onInput: (text: string) => inputs.push(text),
+      } as Parameters<ProviderChatRun['start']>[0],
+      () => undefined,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(inputs).toEqual([turn.seen?.prompt]);
+    expect(inputs[0]).toContain('УКАЗАНИЕ ПАНЕЛИ');
+
+    turn.end({ kind: 'done', reply: 'ответ' });
+    await done;
+    expect(inputs).toHaveLength(1);
+  });
+
+  it('не поднявшийся ход входа не пишет — его пишет одиночный запуск, который ход сменил (TQ-09)', async () => {
+    const turn = new ScriptedTurn(() => ({ kind: 'unavailable', why: 'нет подкоманды' }));
+    const cli = oneShot([
+      '{"type":"item.completed","item":{"type":"agent_message","text":"по-старому"}}\n',
+    ]);
+    const inputs: string[] = [];
+    await new ProviderChatRun().start(
+      {
+        provider: getProvider('codex'),
+        history: [{ id: 'm1', role: 'user', content: 'Вопрос', at: '2026-01-01T00:00:00.000Z' }],
+        chatId: 'chat',
+        appDataDir: dir,
+        detect: () => true,
+        liveTurn: () => turn,
+        spawnImpl: cli.fn,
+        onInput: (text: string) => inputs.push(text),
+      } as Parameters<ProviderChatRun['start']>[0],
+      () => undefined,
+    );
+    expect(cli.calls()).toBe(1);
+    expect(inputs).toHaveLength(1);
   });
 
   it('подменённый процесс без подмены хода живой путь не включает', async () => {

@@ -14,6 +14,7 @@ import {
   type RunNotice,
 } from '../../domains/chat/ChatRunRegistry/ChatRunRegistry.ts';
 import { appendLoweredRun } from '../../domains/chat/lowered-journal/lowered-journal.ts';
+import { appendRunInput, moveRunInputs } from '../../domains/chat/run-input/run-input.ts';
 import {
   adoptableEntries,
   isPidAlive,
@@ -100,6 +101,7 @@ import {
   resolveProjectDelivery,
 } from '../../domains/project-git/project-git.ts';
 import { readLastAssistantTurn } from '../../domains/chat/ChatHistory/ChatHistory.ts';
+import { groupTokenLedger } from '../../domains/chat/token-ledger/group-ledger.ts';
 import { createHandoffPlanner } from '../../routes/chat/handoff-routes.ts';
 import { projectsDir } from '../../routes/chat/paths.ts';
 import { syncRelayHooks } from '../../routes/chat/outside-relay-routes/outside-relay-routes.ts';
@@ -134,6 +136,7 @@ import {
   commentMergeRequestByUrl,
   parseMergeRequestUrl,
   readMergeRequestByUrl,
+  retryMergeRequestJob,
 } from '../../domains/integrations/forge.ts';
 import { readIntegrations, readToken } from '../../domains/integrations/store/store.ts';
 import { forgeTokenForUrl } from '../../domains/integrations/forge-pick.ts';
@@ -361,9 +364,15 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
    * и в списке чат появляется под ним. Без переноса связи ветвь дерева обрывалась
    * бы ровно в момент, когда чат становится настоящим.
    */
-  chatRuns.setSessionListener((chatId, sessionId, from) =>
-    ctx.store.linkChatSession(chatId, sessionId, from),
-  );
+  chatRuns.setSessionListener((chatId, sessionId, from) => {
+    ctx.store.linkChatSession(chatId, sessionId, from);
+    // Вход первого хода записан под временным ключом — едет за настоящим (U8).
+    try {
+      moveRunInputs(ctx.location.paths.appData, chatId, sessionId);
+    } catch {
+      // Сверка входа не главнее связи разговора.
+    }
+  });
   // Ребёнок разделения — у кого есть связь с родителем (Д16, Д18).
   chatRuns.setChildResolver((keys) =>
     keys.some((key) => Boolean(ctx.store.getChatLink(key)?.parentChatId)),
@@ -382,6 +391,10 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
    * уведомления.
    */
   chatRuns.setLoweredJournal((record) => appendLoweredRun(ctx.location.paths.appData, record));
+  // «Что получил агент» (U8): под настоящим ключом, если он уже известен.
+  chatRuns.setInputJournal((keys, record) =>
+    appendRunInput(ctx.location.paths.appData, keys.at(-1) ?? '', record),
+  );
   /**
    * Цепочки продолжений в чистой сессии: тумблер автомата и номер шага. Объект
    * переживает запрос — тумблер ставится в одном обращении, а срабатывает при
@@ -573,6 +586,9 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
       return forgeToken(url) ? undefined : `токен ${title} не сохранён в настройках панели`;
     },
     start: createReviewStarter(ctx, launchDeps),
+    // Публикует сессия ревью — тредами по правилам проекта; сводный комментарий
+    // выше остаётся запасным путём только для тестов и выключенного флага.
+    publishInSession: true,
     // Заметка — в ленту родителя: карточку решения человек ищет в хабе. У
     // чужого родителя прогона в реестре нет, и та же заметка ложится репликой
     // его хранилища — развилка одна на всех (Т4).
@@ -663,6 +679,11 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
       // `mrWatch` объявлен ниже: к первому концу цепочки он уже есть.
       mrWatch.sync(parentChatId);
     },
+    // Счёт токенов закрытой группы (E4): транскрипты её звеньев.
+    tokenLedger: groupTokenLedger({
+      links: () => ctx.store.getChatLinks(),
+      projectsDir: () => projectsDir(ctx),
+    }),
     launch: (record, groups, context, claimBranch, startable) =>
       launchFromRecord(ctx, launchDeps, record, groups, context, claimBranch, startable),
     startTriage: (record, prompt, claim) =>
@@ -804,6 +825,10 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
     read: readMr,
     resume: (parentChatId, index, prompt) =>
       splitConveyor.resumeDelivered(parentChatId, index, prompt),
+    retryJob: async (url, jobId) => {
+      const token = forgeToken(url);
+      return token ? retryMergeRequestJob(url, token, jobId) : false;
+    },
     schedule: (run, ms) => setTimeout(run, ms).unref(),
     notify: (parentChatId, event) => void sayToParent(parentChatId, event),
     log: (message, error) => console.warn(message, error),
@@ -852,6 +877,10 @@ export function createRuntime(ctx: ServerContext, selfBaseUrl: string): Runtime 
       }
     }
   });
+  // «Что получил агент» у чужого CLI (U8) — тем же хранилищем, что у Claude.
+  providerChats.setInputJournal((key, record) =>
+    appendRunInput(ctx.location.paths.appData, key, record),
+  );
   // Родитель в чужом CLI знает о детях так же, как в Claude (Д6).
   providerChats.setChildrenBrief((providerId, chatId) =>
     childrenBrief(splitConveyor.view([foreignChatKey(providerId, chatId)])),

@@ -9,7 +9,9 @@
 // - At most 2 candidates. A menu is as useless as no menu.
 // - Silent where another hook already owns the domain (figma-hint on a figma.com link, docs-order-hint
 //   on "docs + tidy") — two hints on one prompt is duplication.
-// - Silent when the user asked for the fast lane. "just do it" (either language) outranks every suggestion.
+// - Silent when the user asked for the fast lane. "just do it" (either language) outranks every suggestion —
+//   except deep-review: a review has no mechanical form, "quick" only sets its depth (a quick review once
+//   skipped the skill and the docs, and reported clean over two docs blockers).
 // - Advisory, never a deny: the model still decides, and mechanical work takes no skill at all.
 // Kill switch: AGENTDECK_KIT_SKILL_HINT=0 (CLAUDE_SKILL_HINT=0 too).
 //
@@ -75,7 +77,7 @@ export default function skillHint(input, prompt) {
     {
       skill: 'deep-review',
       what: 'three-axis review of any scope — MR, branch, working tree or whole repo — every finding proved by a run, a line or a grep',
-      re: /(?<![а-яё])(?:(?:от|про|за)?ревьюй?|ревьюшн)(?![а-яё])|код[-\s]?ревью|(?:посмотри|глянь|проверь|пройдись\s+по)\s+(?:(?:мо[йиюе][а-яё]*|чуж[а-яё]+|вес[ьс]|всему?)\s+)?(?:ветк[уеи]|мр(?![а-яё])|mr|пр(?![а-яё])|pr|пулл[а-яё]*|правк[аиу][а-яё]*|дифф?|diff|код[уа]?(?![а-яё])|проект[уа]?(?![а-яё]))|review\s+(?:this\s+|my\s+|the\s+)?(?:pr|mr|branch|diff|code|changes)|code\s*review/i,
+      re: /(?<![а-яё])(?:(?:от|про|за)?ревьюй?|ревьюшн)(?![а-яё])|код[-\s]?ревью|(?:посмотри|глянь|проверь|пройдись\s+по)\s+(?:(?:мо[йиюе][а-яё]*|чуж[а-яё]+|вес[ьс]|всему?)\s+)?(?:ветк[уеи]|мр(?![а-яё])|mr|пр(?![а-яё])|pr|пулл[а-яё]*|правк[аиу][а-яё]*|дифф?|diff|код[уа]?(?![а-яё])|проект[уа]?(?![а-яё]))|review\s+(?:this\s+|my\s+|the\s+)?(?:pr|mr|branch|diff|code|changes)|code\s*review|посмотри\s+задачу[^\n]{0,120}?замечани[а-яё]*\s+(?:в|к)\s+(?:мр|mr)(?![а-яё])|look\s+at\s+the\s+(?:task|ticket)[^\n]{0,120}?(?:remarks|comments|findings)\s+(?:in|on|to)\s+the\s+(?:mr|pr)\b/i,
       // Remarks FROM a finished review are intake for task-spec-builder, not a request for a new review.
       not: [
         /(?<![а-яё])(?:замечани|комментари|коммент)[а-яё]*\s+(?:с|из|по)\s+ревью|ревьюер[а-яё]*\s+(?:написал|оставил|накидал)/i,
@@ -225,13 +227,17 @@ export default function skillHint(input, prompt) {
     },
   ];
 
-  if (FAST_LANE.test(prompt)) return null;
   if (ownedElsewhere(prompt)) return null;
+  const fast = FAST_LANE.test(prompt);
 
   // `not` is how a candidate whose trigger words carry a second, unrelated meaning stays silent on it —
   // an exclusion list per candidate, never a global one, so it cannot mute its neighbours.
   const hits = CANDIDATES.filter(
-    (c) => c.re.test(prompt) && !(c.not ?? []).some((r) => r.test(prompt)) && !c.unless?.(prompt),
+    (c) =>
+      (!fast || c.skill === 'deep-review') &&
+      c.re.test(prompt) &&
+      !(c.not ?? []).some((r) => r.test(prompt)) &&
+      !c.unless?.(prompt),
   );
   if (!hits.length) return null;
 
@@ -243,7 +249,10 @@ export default function skillHint(input, prompt) {
         'pick blind. Consult the router skill `agentdeck-kit:skill-map` for the flow they belong to, then take the one ' +
         'that fits the actual next step.'
       : 'Situation match — skills that fit this prompt:\n' +
-        hits.map((c) => `- \`agentdeck-kit:${c.skill}\` — ${c.what}`).join('\n');
+        hits.map((c) => `- \`agentdeck-kit:${c.skill}\` — ${c.what}`).join('\n') +
+        (hits.some((c) => c.skill === 'deep-review')
+          ? '\n`agentdeck-kit:deep-review` is not optional for a review: "quick" / the fast lane sets its depth, never whether it runs.'
+          : '');
 
   return (
     `${body}\n` +

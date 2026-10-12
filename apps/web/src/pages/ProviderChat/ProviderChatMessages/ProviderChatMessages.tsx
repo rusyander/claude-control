@@ -52,6 +52,7 @@ export function ProviderChatMessages({
   stages,
   tree,
   onOpenChild,
+  providerId,
   onPauseAll,
   onResumeAll,
   treeBusy,
@@ -277,6 +278,7 @@ export function ProviderChatMessages({
               {...(onCheckOverlap ? { onCheckOverlap } : {})}
               {...(overlapBusy !== undefined ? { overlapBusy } : {})}
               foreign
+              {...(providerId ? { providerId } : {})}
             />
           )}
           {messages.map((message) =>

@@ -112,6 +112,8 @@ export function foreignPathTurn(
   }
   return {
     stop: true,
-    notice: serverText('path-step-started-notice', { step: stepName(decision.step) }),
+    notice: serverText(decision.nudge ? 'path-gate-nudge-notice' : 'path-step-started-notice', {
+      step: stepName(decision.step),
+    }),
   };
 }

@@ -325,6 +325,44 @@ describe('ProviderChatService', () => {
     ]);
   });
 
+  /**
+   * E6. Системная строка — одна на разговор, как у Claude: строка, пересчитанная
+   * на каждом ходе, меняла системный промпт посреди разговора и сбивала кэш.
+   * Перемена уходит блоком в реплике — один раз.
+   */
+  it('системная строка одна на разговор, перемена — в реплике один раз', () => {
+    createChat(dir, 'codex', { id: 'wd', workdir: dir });
+    let note = 'QA workspace: no e2e folder';
+    const seen: string[] = [];
+    service.setWorkspaceNote(() => note);
+    service.setSystemNote((_providerId, text) => {
+      seen.push(text);
+      return { QWEN_CODE_SYSTEM_SETTINGS_PATH: '/note.json' };
+    });
+    const turn = (text: string): string => {
+      service.send(dir, 'codex', 'wd', { text }, { provider: PROVIDER });
+      const last = (run.options as { history: { content: string }[] }).history.at(-1)?.content;
+      run.emit?.({ type: 'done', reply: 'ok', transport: 'stream' });
+      run.finish();
+      run = new FakeRun();
+      return last ?? '';
+    };
+
+    expect(turn('раз')).toBe('раз');
+    note = 'QA workspace: e2e folder "e2e" (playwright, 2 spec files)';
+    expect(turn('два')).toBe(
+      '<agentdeck-workspace>The QA workspace changed since this conversation started; this ' +
+        'replaces the QA workspace line in your instructions: QA workspace: e2e folder "e2e" ' +
+        '(playwright, 2 spec files)</agentdeck-workspace>\n\nдва',
+    );
+    expect(turn('три')).toBe('три');
+    expect(seen).toEqual([
+      'QA workspace: no e2e folder',
+      'QA workspace: no e2e folder',
+      'QA workspace: no e2e folder',
+    ]);
+  });
+
   it('нет канала у CLI или осечка канала — строка остаётся перед словами человека', () => {
     createChat(dir, 'codex', { id: 'wd', workdir: dir });
     service.setWorkspaceNote(() => 'QA workspace: e2e');

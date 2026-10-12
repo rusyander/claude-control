@@ -74,6 +74,26 @@ export const ЧистоеРевью: Story = {
   },
 };
 
+/** U4: ревью не дочитало и после просьбы — пустой список не выдаётся за «чисто». */
+export const РевьюНеполное: Story = {
+  args: {
+    item: {
+      chatId: 'group-1',
+      review: { url: URL, findings: [], tier: 'T2', incomplete: ['partial', 'entries'] },
+    },
+  },
+};
+
+/** U5: пустое ревью перепроверил второй, независимый проход. */
+export const ВторойПроход: Story = {
+  args: {
+    item: {
+      chatId: 'group-1',
+      review: { url: URL, findings: ['Сброс фильтра не очищает страницу'], witness: true },
+    },
+  },
+};
+
 export const ПравкиГотовы: Story = {
   args: {
     item: {

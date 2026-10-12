@@ -297,32 +297,29 @@ describe('звено доставки группы разделения', () => 
     expect(ended).toEqual([{ stage: 'deliver', status: 'done' }]);
   });
 
-  // M8 (финальное ревью 25.09): работа, которой ревью не положено (шла на
-  // потолке), кончала цепочку — до MR группу доводили только напоминания
-  // конвейера по фактам git. Теперь за ней сразу звено доставки.
-  it('работа на потолке группы с доставкой заводит доставку, без ревью', async () => {
-    const { registry, links, runs, ended, saved } = build('Сделал.', { delivers: true });
+  // U6 (владелец, 12.10.2026): ревью — после КАЖДОЙ работы. Раньше работа на
+  // потолке шла сразу в доставку (M8), и «готово» значило «никто не смотрел».
+  it('работа на потолке группы с доставкой идёт в ревью, а не сразу в доставку', async () => {
+    const { registry, links, runs, saved } = build('Сделал.', { delivers: true });
     links.set('чат-работы', { ...WORK_LINK, lowered: false });
 
     await run(registry, 'чат-работы');
 
-    const deliver = stageRuns(runs)[0];
-    // Звено — доставка, не ревью; сама работа помечена «доставка этого круга заведена».
-    expect(saved[0]?.stage).toBe('deliver');
-    expect(links.get('чат-работы')?.deliveredAt).toBeTruthy();
-    expect(links.get(deliver?.chatId ?? '')).toMatchObject({ stage: 'deliver', model: 'sonnet' });
-    expect(deliver?.prompt).toContain('it has no separate review');
-    expect(ended).toEqual([{ stage: 'deliver', status: 'done' }]);
+    const review = stageRuns(runs)[0];
+    expect(saved[0]?.stage).toBe('review');
+    expect(links.get('чат-работы')?.deliveredAt).toBeUndefined();
+    expect(links.get(review?.chatId ?? '')).toMatchObject({ stage: 'review' });
   });
 
-  it('работа на потолке группы без доставки кончается, как раньше', async () => {
+  it('работа на потолке группы без доставки тоже получает ревью', async () => {
     const { registry, links, runs, ended } = build('Сделал.', { delivers: false });
     links.set('чат-работы', { ...WORK_LINK, lowered: false });
 
     await run(registry, 'чат-работы');
 
-    expect(stageRuns(runs)).toEqual([]);
-    expect(ended).toEqual([{ stage: 'work', status: 'done' }]);
+    expect(stageRuns(runs)).toHaveLength(1);
+    // Ревью ответило без блока итога: своя работа группу этим не держит (L110).
+    expect(ended).toEqual([{ stage: 'review', status: 'done' }]);
   });
 
   it('группа без доставки после правок кончается, как раньше', async () => {
@@ -350,9 +347,11 @@ describe('собственный блок продолжения группы (�
     // Продолжение идёт авторежимом группы, даже если прогон режим потерял.
     expect(next?.permissionMode).toBe(AUTONOMOUS_PERMISSION_MODE);
     expect(links.get(next?.chatId ?? '')?.parentChatId).toBe('родитель');
-    // Цепочку закрыл конец продолжения — ровно один раз.
-    expect(stageRuns(runs)).toHaveLength(1);
-    expect(ended).toEqual([{ stage: 'work', status: 'done' }]);
+    // Конец продолжения — конец работы: за ним ревью (U6), и цепочку закрывает
+    // уже оно — ровно один раз.
+    expect(stageRuns(runs)).toHaveLength(2);
+    expect(links.get(stageRuns(runs)[1]?.chatId ?? '')?.stage).toBe('review');
+    expect(ended).toEqual([{ stage: 'review', status: 'done' }]);
   });
 
   it('план группы с блоком продолжения — всё равно работа, а не продолжение плана', async () => {
@@ -387,7 +386,9 @@ ${handoffBlock()}`,
     await new Promise((done) => setTimeout(done, 100));
 
     const hops = stageRuns(runs);
-    expect(hops).toHaveLength(HANDOFF_GROUP_MAX_CHAIN);
+    // Продолжения до потолка группы, за ними — ревью работы (U6).
+    expect(hops).toHaveLength(HANDOFF_GROUP_MAX_CHAIN + 1);
+    expect(links.get(hops.at(-1)?.chatId ?? '')?.stage).toBe('review');
     const prompt = hops[0]?.prompt ?? '';
     expect(prompt.startsWith('This is a new session of a split group')).toBe(true);
     expect(prompt).toContain('do not take tasks of other groups');

@@ -546,12 +546,16 @@ async function applyFlags(copyDir: string, flagged: FlaggedEntry[]): Promise<str
  * закоммиченная версия файла с флагом, и по времени она «свежее» рабочей).
  * Время файла переносится вместе с ним — так повторное зеркало сразу после
  * первого ничего не переписывает.
+ *
+ * `force` — пути, которые переписываются при `newerOnly` поверх времени: сверка
+ * копии нашла их неверными по СОДЕРЖИМОМУ (см. `checkCopyReady`), а время
+ * откаченного файла говорит «свежее» и сохранило бы дыру.
  */
 export async function mirrorLocalLayer(
   mainDir: string,
   copyDir: string,
   settings: WorktreeMirrorSettings | undefined,
-  options: { newerOnly?: boolean } = {},
+  options: { newerOnly?: boolean; force?: readonly string[] } = {},
 ): Promise<WorktreeMirrorReport> {
   const [flaggedOut, ignoredOut, othersOut, modifiedOut] = await Promise.all([
     git(mainDir, ['ls-files', '-v', '-z']),
@@ -590,6 +594,7 @@ export async function mirrorLocalLayer(
     ...(links.linked.length > 0 ? { linked: links.linked } : {}),
   };
   const copied = new Set<string>();
+  const forced = new Set((options.force ?? []).map(normalize));
   const linkedPrefixes = links.linked.map((rel) => `${rel}/`);
 
   for (const relPath of plan.files) {
@@ -627,7 +632,7 @@ export async function mirrorLocalLayer(
       });
       continue;
     }
-    if (options.newerOnly && existsSync(dst)) {
+    if (options.newerOnly && existsSync(dst) && !forced.has(normalize(relPath))) {
       const current = statSync(dst);
       if (current.mtimeMs + 1000 >= info.mtimeMs) {
         report.kept += 1;

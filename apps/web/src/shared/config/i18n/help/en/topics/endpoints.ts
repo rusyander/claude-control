@@ -95,7 +95,8 @@ export const endpointsEn: typeof endpointsRu = {
       'Code takes both kinds. Into ~/.qwen/.env.',
     targetAider:
       'AIDER_OPENAI_API_BASE, AIDER_MODEL, AIDER_OPENAI_API_KEY — into ~/.aider.conf.yml, ' +
-      'the set-env key.',
+      'the set-env key. The model name is written with the openai/ prefix: without it ' +
+      'Aider never reaches a compatible endpoint.',
     targetAssistant: 'Panel assistant',
     targetAssistantText:
       'A separate choice in the same block. It writes nothing: the panel calls the ' +

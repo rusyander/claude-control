@@ -4,7 +4,7 @@
     {
       "topic": "platform",
       "document": "apps/web/src/pages/Help/topics/PlatformTopic/PlatformTopic.tsx",
-      "confirmedAt": "2026-10-08T12:34:14.961Z",
+      "confirmedAt": "2026-10-12T17:07:29.304Z",
       "sources": [
         {
           "path": "packages/contracts/src/compromises.ts",
@@ -219,7 +219,7 @@
         {
           "path": "apps/server/src/domains/platform/layers/layers.ts",
           "why": "«Наши слои»: какой флаг снимает какой слой и почему личные правила, хуки и права уходят вместе",
-          "sha": "2b8480d9a0b23431"
+          "sha": "a4f2031dd2e7070a"
         },
         {
           "path": "apps/server/src/domains/platform/spend/spend.ts",
@@ -485,7 +485,7 @@
         {
           "path": "apps/server/src/domains/chat/ChatRunner/ChatRunner.ts",
           "why": "«Путь одного сообщения»: как панель запускает процесс CLI и откуда читает ответ",
-          "sha": "c9d67c7e1c5abcb4"
+          "sha": "751a3d9e8172492b"
         },
         {
           "path": "apps/server/src/domains/chat/ChatPermissions/ChatPermissions.ts",
@@ -500,17 +500,17 @@
         {
           "path": "apps/server/src/domains/chat/ChatHandoff/ChatHandoff.ts",
           "why": "«Чистая сессия»: предложение прозой или блоком, потолок цепочки, зацикливание",
-          "sha": "4f41179b4426b358"
+          "sha": "7ede10fcb038dd4c"
         },
         {
           "path": "apps/server/src/domains/chat/ChatSplit/ChatSplit.ts",
           "why": "«Разделить»: карточка предложения, дерево, группы",
-          "sha": "54a864f815d77b4b"
+          "sha": "670a369e6a8e9925"
         },
         {
           "path": "apps/server/src/domains/chat/split-conveyor/split-conveyor.ts",
           "why": "«Что запускает „Разделить“»: разбор в корне, план в копии, порядок after и hold",
-          "sha": "30c3fc60293560a6"
+          "sha": "e89af64b9b9353f0"
         },
         {
           "path": "apps/server/src/domains/chat/split-recheck/split-recheck.ts",
@@ -545,7 +545,7 @@
         {
           "path": "apps/server/src/domains/project-git/mirror-local.ts",
           "why": "«Местный слой копии»: что переносится в новую копию, что никогда, и что остаётся «за бортом»",
-          "sha": "a2e316d0d17c8635"
+          "sha": "23c8b42d58a5ab4e"
         },
         {
           "path": "apps/server/src/domains/project-git/copy-access.ts",
@@ -555,7 +555,7 @@
         {
           "path": "apps/server/src/domains/project-git/copy-readiness.ts",
           "why": "«Полнота копии»: чем меряется полная/неполная и что показывает карточка",
-          "sha": "e97860a0c3aaae95"
+          "sha": "e5532d68f9558607"
         },
         {
           "path": "apps/server/src/routes/project-git-routes/project-git-routes.ts",
@@ -595,7 +595,7 @@
         {
           "path": "apps/server/src/domains/provider-chat/live/codex-app-server.ts",
           "why": "«Правки в чате другого CLI»: права потока Codex по переключателю и ответ на его просьбы о разрешении",
-          "sha": "8d4041939a9e998a"
+          "sha": "4cb3e57d0b599698"
         },
         {
           "path": "apps/server/src/domains/chat/split-tasks/split-tasks.ts",
@@ -658,7 +658,7 @@
           "sha": "bb23d4b9ff80b8e5"
         }
       ],
-      "confirmedAt": "2026-10-10T11:13:53.197Z"
+      "confirmedAt": "2026-10-12T17:06:32.005Z"
     },
     {
       "topic": "tests",
@@ -697,7 +697,7 @@
         {
           "path": "apps/server/src/domains/project-tests/import-results/import-results.ts",
           "why": "«Импорт из CI»: отчёт junit становится записью прогона",
-          "sha": "55ab9c82ce319461"
+          "sha": "c1398eb04b9c2dca"
         },
         {
           "path": "apps/server/src/domains/project-tests/coverage-matrix/coverage-matrix.ts",
@@ -727,12 +727,12 @@
         {
           "path": "apps/server/src/domains/project-tests/e2e-chat.ts",
           "why": "«Агент чата знает о папке»: что агент чата узнаёт и о чём спрашивает",
-          "sha": "3e987f9bd2925044"
+          "sha": "8d4dbc21172f930b"
         },
         {
           "path": "apps/web/src/features/ProjectTests/ui/TestE2eCard/TestE2eCard.tsx",
           "why": "«Папка автотестов (e2e)»: состояния карточки, кнопки и подтверждение уборки",
-          "sha": "d33169469e4a0023"
+          "sha": "d21bc21576889c10"
         },
         {
           "path": "apps/web/src/features/ProjectTests/lib/automatedFiles.ts",
@@ -742,7 +742,7 @@
         {
           "path": "apps/server/src/domains/project-tests/e2e-run/e2e-run.ts",
           "why": "«Прогнать автотесты», «Прогон лёг в историю»: команда фреймворка, junit в каталоге панели, одна запись истории, отказ при прогоне агента",
-          "sha": "26f570640d7de8e2"
+          "sha": "99b601d75d2ae947"
         },
         {
           "path": "apps/server/src/domains/project-tests/e2e-parse-pytest.ts",
@@ -820,7 +820,7 @@
           "sha": "fa4b9ad2f98e961d"
         }
       ],
-      "confirmedAt": "2026-10-11T08:55:21.576Z"
+      "confirmedAt": "2026-10-12T14:04:16.452Z"
     },
     {
       "topic": "rules",
@@ -1513,7 +1513,7 @@
     {
       "topic": "history",
       "document": "apps/web/src/pages/Help/topics/HistoryTopic/HistoryTopic.tsx",
-      "confirmedAt": "2026-10-08T12:34:14.042Z",
+      "confirmedAt": "2026-10-12T18:37:10.669Z",
       "sources": [
         {
           "path": "apps/server/src/domains/history/feed.ts",
@@ -1748,7 +1748,7 @@
     {
       "topic": "endpoints",
       "document": "apps/web/src/pages/Help/topics/EndpointsTopic/EndpointsTopic.tsx",
-      "confirmedAt": "2026-10-08T12:34:13.757Z",
+      "confirmedAt": "2026-10-12T08:59:44.565Z",
       "sources": [
         {
           "path": "apps/server/src/domains/endpoints/endpoint-apply.ts",
@@ -1758,7 +1758,7 @@
         {
           "path": "apps/server/src/domains/endpoints/endpoint-plan.ts",
           "why": "«Кто принимает профиль»: кто может его принять и почему кнопка гаснет",
-          "sha": "15f563f253be88b5"
+          "sha": "8602ee7ce697bc42"
         },
         {
           "path": "apps/server/src/domains/endpoints/endpoint-probe.ts",
@@ -2309,7 +2309,7 @@
         {
           "path": "packages/contracts/src/group-path.ts",
           "why": "«Путь»: шаг после стадии, две стороны текста, перенос старого «Порядка работы» после «Работы»",
-          "sha": "baae19d6ce397829"
+          "sha": "7850cb7036160769"
         },
         {
           "path": "packages/contracts/src/group-sources.ts",
@@ -2687,7 +2687,7 @@
           "sha": "b280d6dc187cf339"
         }
       ],
-      "confirmedAt": "2026-10-11T08:55:21.682Z"
+      "confirmedAt": "2026-10-12T12:23:00.648Z"
     },
     {
       "topic": "phone",
@@ -2789,7 +2789,7 @@
     {
       "topic": "localModels",
       "document": "apps/web/src/pages/Help/topics/LocalModelsTopic/LocalModelsTopic.tsx",
-      "confirmedAt": "2026-10-10T11:13:52.985Z",
+      "confirmedAt": "2026-10-12T18:01:56.900Z",
       "sources": [
         {
           "path": "packages/contracts/src/local-models.ts",
@@ -2804,7 +2804,7 @@
         {
           "path": "apps/server/src/domains/kit/service.ts",
           "why": "«Чей набор у агента»: что каждый режим добавляет или снимает у Claude Code и Qwen Code (runExtras)",
-          "sha": "cd6994f7ac75c74e"
+          "sha": "36f2f6204b1cf036"
         },
         {
           "path": "apps/server/src/domains/local-models/connect.ts",
@@ -2836,12 +2836,12 @@
     {
       "topic": "kit",
       "document": "apps/web/src/pages/Help/topics/KitTopic/KitTopic.tsx",
-      "confirmedAt": "2026-10-11T17:28:57.384Z",
+      "confirmedAt": "2026-10-12T18:01:56.788Z",
       "sources": [
         {
           "path": "apps/server/src/domains/kit/service.ts",
           "why": "«Как набор доезжает до прогона», «Режимы», «Какой CLI что умеет»: runExtras, отказы, сброс в архив",
-          "sha": "cd6994f7ac75c74e"
+          "sha": "36f2f6204b1cf036"
         },
         {
           "path": "apps/server/src/domains/kit/compose.ts",
@@ -2856,7 +2856,7 @@
         {
           "path": "apps/server/src/bootstrap/runtime/runtime.ts",
           "why": "«Не собралось — прогон не запускается»: отказ при сбое сборки набора",
-          "sha": "8ca5d6aae080c77f"
+          "sha": "8b70fe1fbdaa9048"
         },
         {
           "path": "apps/web/src/pages/Kit/KitGlobalActions/KitGlobalActions.tsx",

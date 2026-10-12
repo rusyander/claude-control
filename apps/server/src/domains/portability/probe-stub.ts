@@ -52,7 +52,17 @@ export interface ProbeStub {
  * процессом ровно тогда, когда проба идёт не одна, и красный получился бы про
  * порт, а не про перенос.
  */
-export async function startProbeStub(script: StubScript): Promise<ProbeStub> {
+export async function startProbeStub(
+  script: StubScript,
+  options: {
+    /**
+     * Цель, модель которой инструментов не получает вовсе (aider): у неё КАЖДЫЙ
+     * запрос — ход, и отсеивать их как реплики в сторону значило бы записать
+     * ноль ходов при настоящем разговоре.
+     */
+    readonly toolless?: boolean;
+  } = {},
+): Promise<ProbeStub> {
   const requests: Record<string, unknown>[] = [];
 
   const server: Server = createServer((request, response) => {
@@ -122,7 +132,7 @@ export async function startProbeStub(script: StubScript): Promise<ProbeStub> {
       // встал нулевым ходом, вызовы ушли в него и не исполнились, настоящий ход
       // получил «завершено» — и право по негативу вышло ЗЕЛЁНЫМ без единого
       // вызова. Ответ — короткий текст, в запись не идёт.
-      if (!Array.isArray(body.tools) || body.tools.length === 0) {
+      if (!options.toolless && (!Array.isArray(body.tools) || body.tools.length === 0)) {
         const aside: StubBlock[] = [{ type: 'text', text: 'agentdeck probe' }];
         if (dialect === 'responses') return sendResponsesStream(response, aside);
         if (dialect === 'chat') return sendChat(response, aside, body.stream === true);

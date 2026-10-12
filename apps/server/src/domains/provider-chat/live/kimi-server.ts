@@ -25,7 +25,13 @@ import type { LivePermissionPolicy, LiveTurn, LiveTurnOptions, LiveTurnResult } 
  * (свежей) сессии по порядку. Права — по переключателю чата (`permission`):
  * ждущее разрешение (`pending_interaction: approval`) получает `approved`, если
  * правки разрешены, иначе ответ человека; без политики — `rejected`, как у
- * неинтерактивного запуска. Сессия по концу удаляется — переписку держит панель.
+ * неинтерактивного запуска.
+ *
+ * Без `session` сессия по концу удаляется — переписку держит панель. С `session`
+ * (E2b) она остаётся на диске Kimi, и следующий ход находит её по id
+ * (`GET /sessions/:id`) уже другим процессом `kimi web`. Ответы, которые в ней
+ * были до хода, помечаются виденными: ответ хода — только новые. Ход, кончившийся
+ * не ответом, сессию удаляет, как и сменённую (`discard`, не найденный `resume`).
  */
 
 const READY_MS = 30_000;
@@ -58,6 +64,11 @@ export class KimiServerTurn implements LiveTurn {
   private inflight = 0;
   /** Тексты ассистента по id сообщения — в порядке появления. */
   private readonly texts = new Map<string, string>();
+  /** Ответы продолженной сессии, данные до этого хода: в его ответ они не входят. */
+  private readonly before = new Set<string>();
+  private resumed = false;
+  /** Сессию оставить по концу хода: её продолжит следующий ход разговора (E2b). */
+  private keep = false;
   private readonly abort = new AbortController();
   private fetchImpl: typeof fetch = fetch;
   private readonly pollMs: number;
@@ -124,12 +135,21 @@ export class KimiServerTurn implements LiveTurn {
       if (!this.model) {
         return await this.close({ kind: 'unavailable', why: 'в конфиге Kimi нет default_model' });
       }
-      const created = await this.call('POST', '/sessions', { metadata: { cwd: workspace } });
-      const sessionId = typeof created?.id === 'string' ? created.id : undefined;
-      if (!sessionId) return await this.close({ kind: 'unavailable', why: 'сессия без id' });
-      this.sessionId = sessionId;
+      const request = options.session;
+      if (request?.resume && (await this.resume(request.resume.id))) {
+        this.resumed = true;
+      } else {
+        const created = await this.call('POST', '/sessions', { metadata: { cwd: workspace } });
+        const sessionId = typeof created?.id === 'string' ? created.id : undefined;
+        if (!sessionId) return await this.close({ kind: 'unavailable', why: 'сессия без id' });
+        this.sessionId = sessionId;
+        // Сменённую сессию разговора больше никто не продолжит — удаляем, не дожидаясь.
+        const stale = request?.resume?.id ?? request?.discard;
+        if (stale && stale !== sessionId) void this.remove(stale);
+      }
+      this.keep = request !== undefined;
 
-      await this.prompt(options.prompt);
+      await this.prompt(this.resumed && request?.resume ? request.resume.prompt : options.prompt);
       this.active = true;
       onSteerable?.();
 
@@ -223,7 +243,7 @@ export class KimiServerTurn implements LiveTurn {
     const items = Array.isArray(data?.items) ? (data.items as KimiMessage[]) : [];
     // Сервер отдаёт новые первыми.
     for (const message of [...items].reverse()) {
-      if (!message.id) continue;
+      if (!message.id || this.before.has(message.id)) continue;
       const text = (message.content ?? [])
         .filter((part) => part.type === 'text' && part.text)
         .map((part) => part.text)
@@ -239,6 +259,34 @@ export class KimiServerTurn implements LiveTurn {
         onDelta(text.slice(before.length));
       }
     }
+  }
+
+  /**
+   * Найти сессию разговора и запомнить её прежние ответы. `false` — сессии нет
+   * (удалена, другой дом Kimi) или сервер отказал: ход откроет новую.
+   */
+  private async resume(id: string): Promise<boolean> {
+    try {
+      const found = await this.call('GET', `/sessions/${id}`);
+      if (!found) return false;
+      this.sessionId = id;
+      const data = await this.call('GET', `/sessions/${id}/messages?role=assistant&page_size=100`);
+      const items = Array.isArray(data?.items) ? (data.items as KimiMessage[]) : [];
+      for (const message of items) if (message.id) this.before.add(message.id);
+      return true;
+    } catch {
+      this.sessionId = undefined;
+      return false;
+    }
+  }
+
+  private async remove(id: string): Promise<void> {
+    await this.call(
+      'POST',
+      `/sessions/${id}:delete`,
+      undefined,
+      AbortSignal.timeout(DELETE_MS),
+    ).catch(() => undefined);
   }
 
   private reply(): string {
@@ -348,19 +396,17 @@ export class KimiServerTurn implements LiveTurn {
     });
   }
 
-  /** Сессию удаляем (переписку держит панель), сервер гасим — ответ уже собран. */
+  /**
+   * Сессию удаляем (переписку держит панель) — кроме той, что продолжит следующий
+   * ход разговора; сервер гасим — ответ уже собран.
+   */
   private async close(result: LiveTurnResult): Promise<LiveTurnResult> {
     this.active = false;
     this.abort.abort();
-    if (this.sessionId) {
-      await this.call(
-        'POST',
-        `/sessions/${this.sessionId}:delete`,
-        undefined,
-        AbortSignal.timeout(DELETE_MS),
-      ).catch(() => undefined);
-    }
+    const sessionId = this.sessionId;
+    const kept = this.keep && sessionId !== undefined && result.kind === 'done';
+    if (sessionId && !kept) await this.remove(sessionId);
     if (this.child) killChildTree(this.child);
-    return result;
+    return kept ? { ...result, session: sessionId, resumed: this.resumed } : result;
   }
 }

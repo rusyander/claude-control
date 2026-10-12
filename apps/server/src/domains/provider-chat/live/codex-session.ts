@@ -20,17 +20,23 @@ export const CODEX_EFFORTS: ReadonlySet<string> = new Set([
   'xhigh',
 ]);
 
-export type CodexThreadOpening = { ok: true; threadId: string } | { ok: false; why: string };
+export type CodexThreadOpening =
+  { ok: true; threadId: string; resumed: boolean } | { ok: false; why: string };
 
 /**
- * Поднять поток: рукопожатие и `thread/start` с параметрами вызывающего.
- * Отказ — `why` для человека или для запасного одиночного запуска.
+ * Поднять поток: рукопожатие и `thread/start` с параметрами вызывающего — или
+ * `thread/resume` прежнего потока (E2b). Поток, который CLI не поднял (удалён,
+ * был ephemeral, другой `CODEX_HOME`), сменяется новым: `resumed: false`, и
+ * вызывающий шлёт полный промпт. Отказ — `why` для человека или для запасного
+ * одиночного запуска.
  */
 export async function openCodexThread(
   rpc: StdioRpc,
   options: {
     /** Параметры `thread/start` целиком: каталог, модель, права, ephemeral. */
     thread: Record<string, unknown>;
+    /** Продолжить этот поток; те же каталог, модель и права едут и в `thread/resume`. */
+    resumeThreadId?: string;
     /** Корни навыков набора панели; пусто — вызов не делается. */
     skillRoots?: readonly string[];
     handshakeMs?: number;
@@ -57,10 +63,31 @@ export async function openCodexThread(
       return { ok: false, why: roots?.error?.message ?? 'skills/extraRoots/set gave no result' };
     }
   }
+  if (options.resumeThreadId) {
+    // `ephemeral` у `thread/resume` нет: продолжаемый поток уже записан на диск.
+    // Ходы потока в ответ не нужны — их видела модель, а не панель.
+    const { ephemeral: _ephemeral, ...overrides } = options.thread;
+    const resumed = await rpc.call('thread/resume', {
+      ...overrides,
+      threadId: options.resumeThreadId,
+      excludeTurns: true,
+    });
+    const resumedId = (resumed?.result?.thread as { id?: string } | undefined)?.id;
+    if (resumedId) return { ok: true, threadId: resumedId, resumed: true };
+  }
   const thread = await rpc.call('thread/start', options.thread);
   const threadId = (thread?.result?.thread as { id?: string } | undefined)?.id;
   if (!threadId) return { ok: false, why: thread?.error?.message ?? 'thread/start без id' };
-  return { ok: true, threadId };
+  return { ok: true, threadId, resumed: false };
+}
+
+/** Удалить поток с диска CLI; ответа ждём не дольше `timeoutMs` — удаление не главнее хода. */
+export async function deleteCodexThread(
+  rpc: StdioRpc,
+  threadId: string,
+  timeoutMs: number,
+): Promise<void> {
+  await rpc.call('thread/delete', { threadId }, timeoutMs);
 }
 
 /** Начать ход; отказ CLI (модель, вход) — `error` как есть. */

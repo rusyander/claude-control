@@ -61,6 +61,8 @@ beforeEach(() => {
   appData = join(root, 'app-data');
   claudeDir = join(root, 'claude');
   mkdirSync(claudeDir, { recursive: true });
+  // Человек со своим слоем: без выбора режима у него «глобальные».
+  writeFileSync(join(claudeDir, 'CLAUDE.md'), 'мои правила');
   legacy = {};
 });
 
@@ -118,6 +120,68 @@ describe('режимы по провайдерам', () => {
     writeFileSync(statePath(), JSON.stringify({ modes: { codex: 'ours', qwen: 'hybrid' } }));
     expect(service().modeOf('codex')).toBe('global');
     expect(service().modeOf('qwen')).toBe('global');
+  });
+});
+
+describe('режим по умолчанию у человека без своего слоя', () => {
+  let codexHome: string;
+  const bare = () =>
+    new KitService({
+      appDataDir: appData,
+      claudeDir: () => claudeDir,
+      codexHome: () => codexHome,
+      providers: () => [
+        { id: 'claude', name: 'Claude Code' },
+        { id: 'codex', name: 'Codex' },
+      ],
+    });
+
+  beforeEach(() => {
+    rmSync(join(claudeDir, 'CLAUDE.md'));
+    codexHome = join(root, 'codex');
+    mkdirSync(codexHome, { recursive: true });
+  });
+
+  it('пустой слой — набор встаёт рядом («оба набора») и уходит в прогон', () => {
+    expect(bare().modeOf('claude')).toBe('hybrid');
+    expect(bare().modeOf('codex')).toBe('hybrid');
+    expect(
+      bare().runExtras({ provider: 'claude', local: false, hasSources: false }).args,
+    ).toContain('--plugin-dir');
+  });
+
+  it('каталога CLI нет вовсе — тоже набор', () => {
+    rmSync(claudeDir, { recursive: true });
+    expect(bare().modeOf('claude')).toBe('hybrid');
+  });
+
+  it('любой признак своего слоя возвращает «глобальные»', () => {
+    for (const make of [
+      () => writeFileSync(join(claudeDir, 'CLAUDE.md'), 'x'),
+      () => writeFileSync(join(claudeDir, 'AGENTS.md'), 'x'),
+      () => mkdirSync(join(claudeDir, 'skills', 'mine'), { recursive: true }),
+      () => mkdirSync(join(claudeDir, 'agents', 'mine'), { recursive: true }),
+    ]) {
+      rmSync(claudeDir, { recursive: true, force: true });
+      mkdirSync(claudeDir, { recursive: true });
+      make();
+      expect(bare().modeOf('claude')).toBe('global');
+    }
+  });
+
+  it('пустая папка навыков слоем не считается', () => {
+    mkdirSync(join(claudeDir, 'skills'), { recursive: true });
+    expect(bare().modeOf('claude')).toBe('hybrid');
+  });
+
+  it('выбор человека сильнее умолчания', () => {
+    bare().setMode('claude', 'global');
+    expect(bare().modeOf('claude')).toBe('global');
+  });
+
+  it('Codex без известного дома и CLI без набора остаются на «глобальных»', () => {
+    expect(service().modeOf('codex')).toBe('global');
+    expect(bare().modeOf('qwen')).toBe('global');
   });
 });
 

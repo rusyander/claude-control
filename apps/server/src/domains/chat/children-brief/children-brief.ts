@@ -1,5 +1,6 @@
 import type { SplitPlanView } from '@agentdeck/contracts/chat-handoff';
 import { localizeText } from '../../../lib/server-texts/server-texts.ts';
+import { WORKSPACE_TAG } from '../workspace-note/workspace-note.ts';
 
 /**
  * Сводка детей для хода родителя (Д6).
@@ -17,6 +18,7 @@ import { localizeText } from '../../../lib/server-texts/server-texts.ts';
 const TAG = 'agentdeck-children';
 const BLOCK = new RegExp(`^\\s*<${TAG}>[\\s\\S]*?</${TAG}>\\s*`);
 const ANY_BLOCK = new RegExp(`<${TAG}>[\\s\\S]*?</${TAG}>\\s*`, 'g');
+const WORKSPACE_BLOCK = new RegExp(`<${WORKSPACE_TAG}>[\\s\\S]*?</${WORKSPACE_TAG}>\\s*`, 'g');
 
 /** Хвост ответа ребёнка в сводке — чтобы понять, о чём он, а не пересказ целиком. */
 const TAIL_LIMIT = 240;
@@ -37,6 +39,7 @@ const WAIT: Record<NonNullable<SplitPlanView['groups'][number]['waitingFor']>, s
   question: 'asked a question and waits for the answer',
   decision: 'waits for a decision on the review',
   'review-missing': 'the review ended without a summary',
+  'review-follow-up': 'the panel sent the review back to finish its outcome',
   background: 'waits for a background command',
   retry: 'waits for a retry after a failure',
   delivery: 'the panel is checking the delivery against git (branch, MR)',
@@ -100,9 +103,13 @@ export function withChildrenBrief(prompt: string, brief: string | undefined): st
   return brief ? `${brief}\n\n${bare}` : bare;
 }
 
-/** Текст реплики без сводки — то, что человек на самом деле написал. */
+/**
+ * Текст реплики без блоков панели — то, что человек на самом деле написал: без
+ * сводки детей и без перемены строки о тестах (`workspace-note.ts`).
+ */
 export function stripChildrenBrief(text: string): string {
-  return text.includes(`<${TAG}>`) ? text.replace(ANY_BLOCK, '') : text;
+  const own = text.includes(`<${TAG}>`) ? text.replace(ANY_BLOCK, '') : text;
+  return own.includes(`<${WORKSPACE_TAG}>`) ? own.replace(WORKSPACE_BLOCK, '') : own;
 }
 
 function clip(text: string): string {

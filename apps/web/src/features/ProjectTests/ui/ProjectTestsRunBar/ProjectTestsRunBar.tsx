@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useDraftValue } from '@shared/lib/draft';
 import { Stack } from '@shared/ui/stack';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
@@ -27,12 +28,12 @@ import { badgeTone } from '../../lib/badgeTone';
  */
 export function ProjectTestsRunBar({
   board,
-  scope,
-  onScopeChange,
+  scope: scopeBox,
   environmentId,
   onEnvironmentChange,
 }: ProjectTestsRunBarProps) {
   const { t } = useTranslation();
+  const scope = useDraftValue(scopeBox);
   const run = board.run;
   const isRunning = run?.status === 'running';
   const cases = board.active?.cases ?? [];
@@ -96,7 +97,7 @@ export function ProjectTestsRunBar({
           title={t('projectTests.scopeHint')}
           placeholder={t('projectTests.scopeHint')}
           value={scope}
-          onChange={(event) => onScopeChange(event.target.value)}
+          onChange={(event) => scopeBox.set(event.target.value)}
         />
 
         {/* Веха прогона: `v1.4`, «спринт 12». Пусто — сервер подставит

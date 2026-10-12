@@ -99,6 +99,7 @@ export const composedEn: Record<ComposedMessageCode, string> = {
   'tests-lint-checklist-with-expected': 'A checklist with an expectation',
   'worktree-copy-gap-files': 'missing files: {{files}}',
   'worktree-copy-gap-links': 'missing links: {{links}}',
+  'worktree-copy-gap-mcp': 'the copy .mcp.json lacks the original servers: {{names}}',
   'worktree-copy-gap-access': 'no access entry — the agent will ask about trust and MCP',
   'worktree-mirror-moved': 'Local layer: {{count}} copied',
   'worktree-mirror-linked': 'by link: {{paths}}',
@@ -125,6 +126,8 @@ export const composedEn: Record<ComposedMessageCode, string> = {
     'The parent wrote to its groups. Delivered: {{sent}} · queued until their turn ends: {{queued}} · not delivered (the group has no chat or copy): {{refused}}.',
   'split-triage-groups-picked-notice': 'The triage picked panel groups: {{picks}}.',
   'path-step-started-notice': 'Group path step “{{step}}” runs in this chat.',
+  'path-gate-nudge-notice':
+    'Path step “{{step}}” ended its turn without a check result — the panel asked it once to report. Without a result after that, the chain waits for an answer in this chat.',
   'path-gate-failed-notice':
     'Path step “{{step}}” did not pass its check: {{note}}. The chain waits for an answer in this chat.',
   'split-limit-wait-notice':
@@ -135,6 +138,10 @@ export const composedEn: Record<ComposedMessageCode, string> = {
     'Group «{{group}}»: the panel did not check the description of MR {{mr}} — the MR cannot be read (the forge integration is off or there is no token). Check the description yourself.',
   'split-mr-watch-limit-notice':
     'Group «{{group}}»: the MR watcher for {{mr}} has resumed it {{resumes}} times and stops resuming it by itself — new reviewer threads and pipeline failures wait for you.',
+  'split-mr-watch-infra-retry-notice':
+    'Group «{{group}}»: the MR {{mr}} pipeline failed on CI infrastructure, not on the code — {{jobs}}. The panel retried those jobs once by itself and did not wake the group.',
+  'split-mr-watch-infra-again-notice':
+    'Group «{{group}}»: after the retry the MR {{mr}} pipeline failed on CI infrastructure again — {{jobs}}. The panel retries no more and does not wake the group: check the runner.',
   'chat-conversation-lost-notice':
     "The group's previous conversation cannot be continued: its file ({{lost}}) is not on disk. The turn went on as a new conversation in the same copy — the branch, MR and tasks were handed to it in the brief.",
   'split-default-drift-notice':
@@ -144,6 +151,7 @@ export const composedEn: Record<ComposedMessageCode, string> = {
   'chat-stop-unconfirmed-notice':
     "The agent process ({{pid}}) could not be stopped: without a process snapshot the panel cannot verify that this number is still the agent's, and it never touches a foreign process. The run stays running — press Stop again; after a panel restart it is picked up again.",
   'split-group-run-not-started': 'the run did not start',
+  'split-group-copy-not-ready': 'the copy is incomplete, the group did not start: {{gaps}}',
   'split-group-dropped': 'the group was removed by a human',
   'split-group-chain-failed': 'the chain ended with an error or a stop',
   'split-group-plan-cancelled': 'the plan was cancelled by a human',
@@ -165,6 +173,11 @@ export const composedEn: Record<ComposedMessageCode, string> = {
   'delivery-gap-review-unfinished': 'the work review is not finished: there is no reviewer verdict',
   'delivery-gap-fix-missing':
     'review findings ({{count}}) are not fixed: the fix stage did not run after the review',
+  'delivery-gap-owner-unreported':
+    'the points of the owner’s request are not reported: rows owner-1, owner-2, … are needed in a {{lang}} block — {"sieves":[{"id":"owner-1","status":"pass|fail|n/a","evidence":"the point in a few words — file:line, the command and a line of its output, or the reason"}]}',
+  'delivery-gap-owner-failed': 'owner’s point {{point}} is not done: {{evidence}}',
+  'delivery-gap-owner-no-evidence':
+    'owner’s point {{point}} is marked without evidence: file:line, the command and a line of its output, or the reason, are needed',
   'delivery-gap-mr-description': 'MR {{mr}} has an empty description',
   'delivery-gap-mr-na-reason':
     'the description of MR {{mr}} does not give the n/a reason of the live check ({{sieves}}) — add the sieve id and why it does not apply',

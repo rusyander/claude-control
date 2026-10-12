@@ -24,8 +24,12 @@ import { blockLang, blockLangPattern } from './brand.ts';
 /** Язык блока — тот же, что `ESCALATE_BLOCK_LANG`. */
 export const ESCALATE_LANG = blockLang('escalate');
 
-/** Потолок текста замечания — как у `escalationSchema`. */
-export const ESCALATE_TEXT_MAX = 2_000;
+/**
+ * Потолок текста замечания — как у `escalationSchema`. Раньше 2k: длиннее
+ * блок отвергался целиком, и критическое замечание оставалось сырым JSON в
+ * ленте без карточки. Теперь потолок — защита от мусора.
+ */
+export const ESCALATE_TEXT_MAX = 20_000;
 
 export interface EscalateBlock {
   severity: 'critical';

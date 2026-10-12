@@ -54,7 +54,7 @@ export function TestsOnboarding({ board, scope, environmentId }: TestsOnboarding
       onAction: () =>
         board.start({
           mode: 'generate',
-          scope,
+          scope: scope.get(),
           environmentId: environmentId || undefined,
           autoAccept: board.autoAcceptDrafts,
           e2e: true,

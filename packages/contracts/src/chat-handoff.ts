@@ -6,6 +6,13 @@ import type { CodedFields, CodedList } from './server-messages';
 import type { SplitHumanStepView, SplitTicketView } from './split-tickets';
 import { blockLang, blockLangPattern } from './brand.ts';
 import { ANSWER_LANGUAGE_LINE } from './model-cascade.ts';
+import type { ReviewDepthGap, ReviewTier } from './model-cascade.ts';
+import {
+  labelledCut,
+  OWNER_PRECEDENCE_LINE,
+  OWNER_TEXT_MAX,
+  withoutPrecedence,
+} from './quality-floor.ts';
 
 /**
  * Передача работы в чистую сессию («автоклир») — формат канала и его разбор.
@@ -72,11 +79,12 @@ export const HANDOFF_MAX_CHAIN = 8;
 export const HANDOFF_GROUP_MAX_CHAIN = 3;
 
 /**
- * Сколько исходного задания уезжает в каждое продолжение. Хватает на задание
- * группы разделения целиком (с границами и заметками); длиннее — обрезается:
- * новая сессия читает файл-опору, а задание нужно ей как ориентир, не как текст.
+ * Сколько исходного задания уезжает в каждое продолжение. Раньше 8k: группе
+ * разделения задание — граница работы, и продолжение теряло её хвост (шаги,
+ * критерии приёмки) посреди слова. Теперь потолок — защита от мусора, обрезка
+ * подписана (`labelledCut`).
  */
-export const HANDOFF_ROOT_TASK_MAX = 8_000;
+export const HANDOFF_ROOT_TASK_MAX = OWNER_TEXT_MAX;
 
 /**
  * Заголовок исходного задания в продолжении. Экспортирован для названия чата:
@@ -85,8 +93,12 @@ export const HANDOFF_ROOT_TASK_MAX = 8_000;
 export const HANDOFF_ROOT_TASK_LINE =
   'The original task of the whole work — for orientation; do not redo what is already done by it:';
 
+/**
+ * «Сделано» — подпись карточки, а не инструкция; «дальше» — задание новой
+ * сессии. Оба режутся только с меткой.
+ */
 const MAX_DONE = 400;
-const MAX_NEXT = 4_000;
+const MAX_NEXT = OWNER_TEXT_MAX;
 const MAX_PRUNED = 400;
 const MAX_CHECKPOINT = 200;
 
@@ -230,6 +242,13 @@ function text(value: unknown, limit: number): string | undefined {
   return trimmed ? trimmed.slice(0, limit) : undefined;
 }
 
+/** Текст, который новая сессия читает как задание: обрезка только с меткой. */
+function prose(value: unknown, limit: number): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed ? labelledCut(trimmed, limit) : undefined;
+}
+
 /**
  * Путь файла-опоры, пригодный для проверки. Наружу проекта не выпускаем: по
  * этому пути сервер потом смотрит время правки, и `..\..\Windows\System32` или
@@ -270,8 +289,8 @@ export function parseHandoffProposal(raw: unknown): HandoffProposal | undefined 
     pruned?: unknown;
   };
 
-  const done = text(source.done, MAX_DONE);
-  const next = text(source.next, MAX_NEXT);
+  const done = prose(source.done, MAX_DONE);
+  const next = prose(source.next, MAX_NEXT);
   if (!done || !next) return undefined;
 
   const checkpoint = checkpointPath(source.checkpoint) ?? HANDOFF_DEFAULT_CHECKPOINT;
@@ -423,7 +442,9 @@ export function buildHandoffPrompt(
   rootTask?: string,
   options: { group?: boolean } = {},
 ): string {
-  const task = rootTask?.trim();
+  const task = rootTask
+    ? labelledCut(withoutPrecedence(rootTask), HANDOFF_ROOT_TASK_MAX)
+    : undefined;
   // Группе разделения задание — не ориентир, а граница: «перейти к группам sum
   // и isWeekend» из прошлого блока иначе читалось главной командой, и группа
   // чинила чужие файлы (живой прогон 25.09.2026). Предложение прошлой сессии
@@ -441,9 +462,10 @@ export function buildHandoffPrompt(
       proposal.next,
       '',
       'Group task:',
-      task.slice(0, HANDOFF_ROOT_TASK_MAX),
+      task,
       '',
       ANSWER_LANGUAGE_LINE,
+      OWNER_PRECEDENCE_LINE,
     ].join('\n');
   }
   const lines = [
@@ -453,9 +475,9 @@ export function buildHandoffPrompt(
     proposal.next,
   ];
   if (task) {
-    lines.push('', HANDOFF_ROOT_TASK_LINE, task.slice(0, HANDOFF_ROOT_TASK_MAX));
+    lines.push('', HANDOFF_ROOT_TASK_LINE, task);
   }
-  lines.push('', ANSWER_LANGUAGE_LINE);
+  lines.push('', ANSWER_LANGUAGE_LINE, OWNER_PRECEDENCE_LINE);
   return lines.join('\n');
 }
 
@@ -622,6 +644,15 @@ export interface SplitReviewView {
   pushBlocked?: 'branch-unknown';
   /** Согласие на коммит и push отдано агенту (ISO). */
   pushedAt?: string;
+  /** Тир риска из отчёта ревьюера о глубине (U4). */
+  tier?: ReviewTier;
+  /**
+   * Чем ревью осталось неполным и после того, как панель попросила дочитать:
+   * карточка говорит «ревью неполное», а не «замечаний нет».
+   */
+  incomplete?: ReviewDepthGap[];
+  /** Второй независимый проход по пустому ревью (U5). */
+  witness?: boolean;
 }
 
 /**
@@ -708,6 +739,31 @@ export interface SplitOverlapView {
   /** Ветки, которые прочитать не удалось, и почему. */
   unread: { index: number; reason: string }[];
 }
+
+/** Счёт токенов группы (E4) — форма записи сервера, `SplitTokenLedger`. */
+export interface SplitGroupTokenLedger {
+  at: string;
+  usage?: {
+    sessions: number;
+    turns: number;
+    /** Контекст первого хода — самый тяжёлый из стартов её сессий. */
+    coldStart: number;
+    avgCtx: number;
+    compactions: number;
+    /** Доля контекста из кэша, %. */
+    cacheHitPct: number;
+    /** Доля контекста под инструкциями, % (оценка по символам). */
+    instructionPct: number;
+  };
+  duplicates?: string[];
+}
+
+/**
+ * `cold-start` — старт тяжелее медианы проекта в полтора раза; `compactions` —
+ * три сжатия и больше; `instructions` — инструкции больше четверти контекста;
+ * `duplicate` — один текст инструкций загружен под двумя путями.
+ */
+export type SplitGroupTokenFlag = 'cold-start' | 'compactions' | 'instructions' | 'duplicate';
 
 export interface SplitPlanView {
   parentChatId: string;
@@ -803,6 +859,16 @@ export interface SplitPlanView {
        * кейсов, задетых диффом, из них зелёных в прогонах группы и последний прогон.
        */
       testsVerdict?: { cases: number; passed: number; runId?: string; runAt?: string };
+      /**
+       * Счёт токенов закрытой группы (E4): `usage` — по транскриптам Claude её
+       * звеньев (у чужого CLI нет), `duplicates` — файлы инструкций с одинаковым
+       * содержимым под разными путями.
+       */
+      tokenLedger?: SplitGroupTokenLedger;
+      /** Что в счёте похоже на утечку — подсветка карточки. */
+      tokenFlags?: SplitGroupTokenFlag[];
+      /** Медиана холодного старта по группам проекта; мало групп — нет. */
+      tokenMedian?: number;
       /**
        * Группа доводит работу до MR — решение, принятое при разделении. Шапка
        * чата группы показывает его, а не настройку проекта по пути копии: они
@@ -1015,12 +1081,14 @@ export function splitPlanRunning(groups: readonly { status: SplitGroupStatusView
 /**
  * Чего ждёт группа: вопрос текстом, решение по ревью, итог ревью, фоновую команду,
  * повтор, проверку доставки по фактам git, продолжение после обрыва процесса,
- * сброс лимита подписки.
+ * сброс лимита подписки, ход ревью, который панель заказала сама (итог без
+ * блока, дочитать по отчёту о глубине, второй свидетель).
  */
 export type SplitGroupWait =
   | 'question'
   | 'decision'
   | 'review-missing'
+  | 'review-follow-up'
   | 'background'
   | 'retry'
   | 'delivery'

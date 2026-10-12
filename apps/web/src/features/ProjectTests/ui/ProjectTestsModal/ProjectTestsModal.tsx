@@ -1,5 +1,5 @@
-import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useDraftBox } from '@shared/lib/draft';
 import { Modal } from '@shared/ui/modal';
 import { useTestsBoard } from '../../model/useTestsBoard';
 import { TestLibrary } from '../TestLibrary/TestLibrary';
@@ -18,7 +18,7 @@ import styles from './ProjectTestsModal.module.scss';
 export function ProjectTestsModal({ isOpen, onOpenChange, projectPath }: ProjectTestsModalProps) {
   const { t } = useTranslation();
   const board = useTestsBoard(projectPath, isOpen);
-  const [scope, setScope] = useState('');
+  const scope = useDraftBox(undefined);
 
   return (
     <Modal
@@ -30,7 +30,7 @@ export function ProjectTestsModal({ isOpen, onOpenChange, projectPath }: Project
       bodyFill
     >
       <div className={styles.layout}>
-        <ProjectTestsRunBar board={board} scope={scope} onScopeChange={setScope} />
+        <ProjectTestsRunBar board={board} scope={scope} />
         <div className={styles.list}>
           <TestLibrary board={board} />
         </div>

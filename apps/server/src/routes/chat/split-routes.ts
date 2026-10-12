@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import {
   parseSplitProposal,
+  SPLIT_REQUEST_LINE,
   SPLIT_SYSTEM_PROMPT,
   type TaskSplitResult,
 } from '@agentdeck/contracts/task-split';
@@ -16,6 +17,9 @@ import {
   type SplitReviewRefusal,
 } from '@agentdeck/contracts/chat-handoff';
 import { checkProjectDir } from '../../domains/projects/projects.ts';
+import { withOwnerRequest } from '@agentdeck/contracts/quality-floor';
+import { readOwnerRequest } from '../../domains/chat/owner-request/owner-request.ts';
+import { projectsDir } from './paths.ts';
 import { createSplitLauncher, splitChatRefusal, type SplitLaunchDeps } from './split-launch.ts';
 import { registerSplitControlRoutes, stopChatKey } from './split-control-routes.ts';
 import { codeOf, coded } from '../../lib/server-text/server-text.ts';
@@ -131,8 +135,8 @@ export function registerChatSplitRoutes(
 
     // Разбор тот же самый, которым панель узнаёт блок в ответе: два понимания
     // формата — два разных набора заведённых веток при одном и том же тексте.
-    const proposal = parseSplitProposal(request.body?.proposal);
-    if (!proposal) {
+    const parsed = parseSplitProposal(request.body?.proposal);
+    if (!parsed) {
       return reply.code(400).send({
         message: 'Разделение не разобрано: нужны минимум две группы с задачами',
         messageCode: 'split-proposal-invalid',
@@ -159,6 +163,18 @@ export function registerChatSplitRoutes(
           : {}),
       },
     );
+
+    // Слова владельца дословно (U1) — первым абзацем общего контекста, ОДИН раз
+    // здесь: дальше предложение живёт в записи конвейера, и порции групп, разбор
+    // и ревью-группы читают одно и то же, даже если человек пишет родителю ещё.
+    const shared = withOwnerRequest(
+      parsed.shared,
+      readOwnerRequest(
+        { projectsDir: projectsDir(ctx), appData: ctx.location.paths.appData },
+        launcher.parentKey,
+      ),
+    );
+    const proposal = shared ? { ...parsed, shared } : parsed;
 
     // Разделение этого разговора ещё идёт — новое «Разделить» его молча не
     // перекрывает (находка 12, решение владельца 25.09.2026): ни вторым разбором
@@ -240,13 +256,7 @@ export function registerChatSplitRoutes(
       const cascade = ceiling ? cascadeSystemPrompt(ceiling) : '';
 
       return {
-        prompt: [
-          'Split the tasks of this conversation into independent groups and propose the split.',
-          SPLIT_SYSTEM_PROMPT,
-          cascade,
-        ]
-          .filter(Boolean)
-          .join(' '),
+        prompt: [SPLIT_REQUEST_LINE, SPLIT_SYSTEM_PROMPT, cascade].filter(Boolean).join(' '),
       };
     },
   );

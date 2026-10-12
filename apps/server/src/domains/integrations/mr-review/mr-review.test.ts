@@ -1,4 +1,5 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
+import { retryMergeRequestJob } from '../forge.ts';
 import { isBotName, readMergeRequestReview } from './mr-review.ts';
 
 /**
@@ -11,8 +12,8 @@ const MR = 'https://git.acme.local/team/app/-/merge_requests/810';
 
 function stubApi(routes: [RegExp, unknown][]): string[] {
   const calls: string[] = [];
-  vi.stubGlobal('fetch', (url: string) => {
-    calls.push(String(url));
+  vi.stubGlobal('fetch', (url: string, init?: RequestInit) => {
+    calls.push(`${init?.method && init.method !== 'GET' ? `${init.method} ` : ''}${String(url)}`);
     const found = routes.find(([pattern]) => pattern.test(String(url)));
     return Promise.resolve(
       found
@@ -133,6 +134,39 @@ describe('readMergeRequestReview (GitLab)', () => {
     });
   });
 
+  it('красный конвейер — упавшие задания с причиной GitLab; allow_failure не считается', async () => {
+    const calls = stubApi([
+      [/discussions\?per_page=100&page=1$/, []],
+      [
+        /pipelines\/7763\/jobs\?scope\[\]=failed&per_page=100$/,
+        [
+          {
+            id: 51,
+            name: 'lint-frontend',
+            failure_reason: 'runner_system_failure',
+            web_url: 'https://git.acme.local/j/51',
+          },
+          { id: 52, name: 'docs-gate', failure_reason: 'script_failure' },
+          { id: 53, name: 'optional', failure_reason: 'script_failure', allow_failure: true },
+        ],
+      ],
+      [/merge_requests\/810$/, { state: 'opened', head_pipeline: { id: 7763, status: 'failed' } }],
+    ]);
+
+    const got = await readMergeRequestReview(MR, 'T');
+
+    expect(calls.some((url) => url.includes('/pipelines/7763/jobs?scope[]=failed'))).toBe(true);
+    expect(got?.pipeline?.failedJobs).toEqual([
+      {
+        id: '51',
+        name: 'lint-frontend',
+        reason: 'runner_system_failure',
+        url: 'https://git.acme.local/j/51',
+      },
+      { id: '52', name: 'docs-gate', reason: 'script_failure' },
+    ]);
+  });
+
   it('влитой MR и MR без конвейера; обсуждения читаются постранично', async () => {
     const page = (from: number, count: number) =>
       Array.from({ length: count }, (_, i) => ({
@@ -162,6 +196,23 @@ describe('readMergeRequestReview (GitLab)', () => {
   it('не-ссылка — читать нечем, в сеть не ходим', async () => {
     const calls = stubApi([]);
     await expect(readMergeRequestReview('https://example.com/x', 'T')).resolves.toBeUndefined();
+    expect(calls).toEqual([]);
+  });
+});
+
+describe('retryMergeRequestJob', () => {
+  it('GitLab: POST повтора задания в проект MR', async () => {
+    const calls = stubApi([[/jobs\/51\/retry$/, { id: 54 }]]);
+    await expect(retryMergeRequestJob(MR, 'T', '51')).resolves.toBe(true);
+    expect(calls).toEqual(['POST https://git.acme.local/api/v4/projects/team%2Fapp/jobs/51/retry']);
+  });
+
+  it('GitHub и не-ссылка — повторять нечем, в сеть не ходим', async () => {
+    const calls = stubApi([]);
+    await expect(retryMergeRequestJob('https://github.com/o/r/pull/3', 'T', '51')).resolves.toBe(
+      false,
+    );
+    await expect(retryMergeRequestJob('https://example.com/x', 'T', '51')).resolves.toBe(false);
     expect(calls).toEqual([]);
   });
 });

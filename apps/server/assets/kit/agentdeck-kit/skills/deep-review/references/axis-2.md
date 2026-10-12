@@ -78,6 +78,12 @@ because the diff looked right. Mandatory at every tier; it needs no ticket.
    "uncheckable — <why no stand>", never "met".
 4. **Both directions**: doc says X, service does Y → finding; behaviour changed and the doc still
    describes the old → finding, the doc now lies. A broken public contract is 🔴 (SKILL §5).
+5. **Product-docs sweep**: the diff's docs are not the only docs. Grep the feature's user-visible name
+   and its identifier (route, flag, setting key) across every docs tree (site content, in-app help,
+   README) in all locales; each hit OUTSIDE the diff gets a row: still true · now lies · not checkable.
+   A claim that depends on a mode (form vs chat, with vs without a flag) is checked per mode, and two
+   pages describing one behaviour must agree with each other as well as with the code. Docs ≠ code is
+   🔴. Why: a review once missed both blockers of an MR — they sat in pages the diff never touched.
 
 The `Acceptance` line carries its count: `… · contract 7 claims — by request 6, uncheckable 1`; none
 found → `contract: none — <what was searched>`.

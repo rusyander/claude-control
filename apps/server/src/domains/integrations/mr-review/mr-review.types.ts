@@ -21,11 +21,24 @@ export interface MrReviewThread {
   line?: number;
 }
 
+export interface MrReviewFailedJob {
+  id: string;
+  name: string;
+  /** `failure_reason` GitLab: `script_failure`, `runner_system_failure`… */
+  reason?: string;
+  url?: string;
+}
+
 export interface MrReviewPipeline {
   id: string;
   /** Как назвал фордж: `running`, `success`, `failed`, `canceled`, `manual`… */
   status: string;
   url?: string;
+  /**
+   * Упавшие задания красного конвейера (только GitLab). Нет поля — причины
+   * неизвестны (GitHub, задания не прочлись), а не «заданий нет».
+   */
+  failedJobs?: MrReviewFailedJob[];
 }
 
 export interface MrReview {

@@ -25,6 +25,13 @@ import type { WorktreeBootstrapState } from './project-git';
 import type { GroupPermissionLevel, GroupRequestId } from './split-groups.ts';
 import { blockLang, blockLangPattern } from './brand.ts';
 import { SPLIT_HUMAN_TAG, SPLIT_TICKET_TAG } from './split-tickets.ts';
+import {
+  DELIVERY_CHECKS_LINE,
+  labelledCut,
+  OWNER_PRECEDENCE_LINE,
+  OWNER_TEXT_MAX,
+  SKILL_ROUTE_LINE,
+} from './quality-floor.ts';
 
 /** Язык блока: он же признак, по которому панель узнаёт предложение. */
 export const SPLIT_BLOCK_LANG = blockLang('split');
@@ -119,9 +126,15 @@ export interface SplitSettingsView extends SplitSettings {
 }
 const MAX_TITLE = 120;
 const MAX_BRANCH = 120;
-const MAX_TASK = 2_000;
-const MAX_BRIEF = 4_000;
-const MAX_SHARED = 4_000;
+/**
+ * Задача, памятка и общий контекст — слова владельца или его агента, и до
+ * группы они доходят целиком (владелец, 12.10.2026: прежние 2 000 / 4 000 знаков
+ * резали задания из трекера посреди условий). Потолок — защита от мусора, а не
+ * формат; дорос — режется с меткой (`longText`), молча никогда.
+ */
+const MAX_TASK = OWNER_TEXT_MAX;
+const MAX_BRIEF = OWNER_TEXT_MAX;
+const MAX_SHARED = OWNER_TEXT_MAX;
 /** Имя модели и уровень глубины — короткие слова; всё длиннее просто мусор. */
 const MAX_ASSIGNMENT = 40;
 /** Ссылка на запрос на слияние: длиннее бывает только мусор с якорями. */
@@ -278,6 +291,14 @@ export interface TaskSplitResult {
 }
 
 /**
+ * Начало просьбы «Разделить задачи», посланной кнопкой: реплика пишется в
+ * разговор от имени человека, но это текст панели — в слова владельца (U1) она
+ * не идёт.
+ */
+export const SPLIT_REQUEST_LINE =
+  'Split the tasks of this conversation into independent groups and propose the split.';
+
+/**
  * Одна строка, которая дописывается к системному промпту прогона (у чужих CLI —
  * приписывается к промпту сверху). Именно ОДНА: на Windows аргумент уезжает через
  * оболочку, а перевод строки внутри аргумента cmd.exe разрывает командную строку.
@@ -310,9 +331,18 @@ export const SPLIT_SYSTEM_PROMPT =
   // видит вовсе. Живой прогон показал, чем это кончается: модель складывает
   // смысл в заголовок («Тесты: src/index.test.js»), tasks не пишет, и агент в
   // новой ветке получает вместо задания название колонки.
-  'Write each task in tasks IN FULL, in your own words and with all its conditions: the new chat ' +
-  'is a clean session in its own copy of the repository, it will not see this conversation, and ' +
-  'apart from shared and tasks it will have nothing. A group name is not a task. ' +
+  // Пересказ терял условия владельца (живое ревью MR, 12.10.2026: просьба о двух
+  // входах ревью и разрешение публиковать не дошли до группы). Слова владельца
+  // дословно над shared ставит сама панель (U1); агент их больше не переписывает
+  // — копия шла в задание второй раз (TQ-07). Задача хранит формулировку
+  // владельца целиком — пересказ только ДОБАВЛЯЕТСЯ к ней, никогда её не заменяет.
+  "The panel puts the owner's messages of this conversation above shared by itself, word for word — " +
+  "do not copy them into shared; shared holds only what they lack. Write each task in tasks IN FULL: the owner's " +
+  'wording and every condition kept as they are, your clarifications added after them, never in ' +
+  'place of them. Add, never drop: what the owner asked for (depth, skills, checks, publishing) ' +
+  'reaches the group even if it looks secondary to you. The new chat is a clean session in its own ' +
+  'copy of the repository, it will not see this conversation, and apart from shared and tasks it ' +
+  'will have nothing. A group name is not a task. ' +
   'Name the branch in short Latin characters; write group names, tasks and shared in the ' +
   'language the human uses. ' +
   'The panel shows the human a choice card instead of this block, so do not retell the JSON in words. ' +
@@ -358,8 +388,7 @@ function text(value: unknown, limit: number): string | undefined {
  */
 function longText(value: unknown, limit: number): string | undefined {
   const whole = text(value, Number.POSITIVE_INFINITY);
-  if (!whole || whole.length <= limit) return whole;
-  return `${whole.slice(0, limit)}… [cut by the panel at ${limit} of ${whole.length} chars — ask the human for the rest]`;
+  return whole ? labelledCut(whole, limit) : undefined;
 }
 
 /**
@@ -471,11 +500,11 @@ function briefOf(group: Record<string, unknown>): string | undefined {
   const raw = group.files;
   const files = Array.isArray(raw)
     ? raw.map((file) => text(file, MAX_TITLE)).filter((file): file is string => Boolean(file))
-    : [text(raw, MAX_BRIEF)].filter((file): file is string => Boolean(file));
+    : [longText(raw, MAX_BRIEF)].filter((file): file is string => Boolean(file));
 
   const scope = files.length > 0 ? `Group scope: ${files.join(', ')}` : undefined;
   const parts = [own, scope].filter(Boolean);
-  return parts.length > 0 ? parts.join('\n\n').slice(0, MAX_BRIEF) : undefined;
+  return parts.length > 0 ? longText(parts.join('\n\n'), MAX_BRIEF) : undefined;
 }
 
 /**
@@ -784,9 +813,15 @@ export function environmentPreamble(input: EnvironmentPreambleInput): string {
       }`,
     );
   }
+  // «Не проверяй MCP» стоило ревью MR без форджа: сервер не поднялся, а агент,
+  // которому сказали «всё готово», молча обходил его (12.10.2026). Готовое не
+  // настраивают заново, но отсутствующий инструмент называют, а не обходят.
+  const missingTool =
+    'If a tool the task needs is missing (an MCP server, a skill, a CLI), say so in the first lines of your answer and name what it blocks — never work around it silently.';
   if (boot?.status === 'ok') {
     lines.push(
-      'The environment is ready — do not check or set it up (MCP, local layer, dependencies), start with the task right away.',
+      'The environment is ready — do not set it up again (MCP, local layer, dependencies), start with the task right away.',
+      missingTool,
     );
   } else {
     if (!boot) {
@@ -798,6 +833,7 @@ export function environmentPreamble(input: EnvironmentPreambleInput): string {
       input.mirror
         ? 'Do not set up MCP or the local layer — start with the task.'
         : 'Do not set up MCP — start with the task.',
+      missingTool,
     );
   }
   return lines.join('\n');
@@ -809,11 +845,19 @@ export function environmentPreamble(input: EnvironmentPreambleInput): string {
  * (`CHILD_PROMPT`): оно дописывается к каждому ходу, и без прямого «главнее»
  * агент выбирал бы между двумя правилами сам.
  */
-export const GROUP_QUESTIONS_HUMAN_LINE =
-  'The human decides the forks of this group (chosen in the panel settings, and this overrides the ' +
-  '"work autonomously" rule): take every fork — even one with a recommended option — to the human ' +
-  'as a question with the AskUserQuestion tool, with options and your recommendation, wait for the ' +
-  'answer and continue from the same stage.';
+export function groupQuestionsHumanLine(foreign = false): string {
+  return (
+    'The human decides the forks of this group (chosen in the panel settings, and this overrides ' +
+    'the "work autonomously" rule): take every fork — even one with a recommended option — to the ' +
+    (foreign
+      ? 'human as a question in the last line of your answer, with options and your ' +
+        'recommendation, end the turn there and continue from the same stage when the answer comes.'
+      : 'human as a question with the AskUserQuestion tool, with options and your recommendation, ' +
+        'wait for the answer and continue from the same stage.')
+  );
+}
+
+export const GROUP_QUESTIONS_HUMAN_LINE = groupQuestionsHumanLine();
 
 /**
  * Находка, которая не воспроизвелась (аудит 25.09, L258): группа, получив
@@ -821,10 +865,15 @@ export const GROUP_QUESTIONS_HUMAN_LINE =
  * зависимости, CI и тестовую обвязку «чтобы проверить наверняка». Такая
  * инфраструктура — решение человека: сперва объём и вопрос.
  */
-export const UNCONFIRMED_FINDING_LINE =
-  'A finding you could not reproduce is no reason to change the infrastructure: no new ' +
-  'dependencies, no CI, tsconfig or test-harness edits. First say what did not reproduce and how ' +
-  'much would have to be added, and ask the human with the AskUserQuestion tool.';
+export function unconfirmedFindingLine(foreign = false): string {
+  return (
+    'A finding you could not reproduce is no reason to change the infrastructure: no new ' +
+    'dependencies, no CI, tsconfig or test-harness edits. First say what did not reproduce and how ' +
+    `much would have to be added, and ask the human ${foreign ? 'in the last line of your answer' : 'with the AskUserQuestion tool'}.`
+  );
+}
+
+export const UNCONFIRMED_FINDING_LINE = unconfirmedFindingLine();
 
 /**
  * Доставка группы до готового MR (настройка проекта `SplitSettings.deliver`).
@@ -843,7 +892,13 @@ export function deliveryPreamble(input: {
   mergeRequest?: string;
   /** Развилки группы (вкладка «Группы»): `human` — вопросом человеку, иначе по плану. */
   questions?: 'plan' | 'human';
+  /**
+   * Группа чужого CLI (F8, 12.10.2026): инструмента вопросов у него нет, вопрос
+   * человеку — последняя строка ответа и конец хода.
+   */
+  foreign?: boolean;
 }): string {
+  const foreign = input.foreign === true;
   return [
     "Delivering a ready MR is this group's duty: the human enabled it on the project, and that is " +
       'their permission to commit, push, create and update the MR and to move the tracker tasks of ' +
@@ -854,6 +909,10 @@ export function deliveryPreamble(input: {
       "the same stages yourself): tracker tasks into work on yourself, the change, the project's " +
       'checks, commit, push, draft MR, review, live check, design comparison if a mockup is attached ' +
       'to the task, fixing what was found, the MR description — and take the draft off when all is clean.',
+    // Проверки проекта — те, что названы в его правилах, все и по порядку (U7):
+    // «типы, линт, тесты» вообще пропускали гейт документации проекта и
+    // backend-гейты, и MR уезжал с красным CI.
+    DELIVERY_CHECKS_LINE,
     'All tasks of the group are ONE branch and ONE MR: task keys go into the MR description, and ' +
       'each task links to the MR.',
     input.mergeRequest
@@ -874,13 +933,13 @@ export function deliveryPreamble(input: {
     // которой сама назвала рекомендацию, пока человека не было у панели. Кто
     // решает развилки, выбирает человек во вкладке «Группы» (аудит 25.09, L40).
     input.questions === 'human'
-      ? GROUP_QUESTIONS_HUMAN_LINE
+      ? groupQuestionsHumanLine(foreign)
       : 'Decide a fork for which you have a recommended option yourself: take it and record it in ' +
-        'the MR description as a decision for the review. A question to the human with the ' +
-        "AskUserQuestion tool — only when the step is irreversible or goes beyond the group's tasks " +
+        `the MR description as a decision for the review. A question to the human ${foreign ? 'in the last line of your answer' : 'with the AskUserQuestion tool'} ` +
+        "— only when the step is irreversible or goes beyond the group's tasks " +
         "(someone else's task, a DB migration is needed, nothing to recommend); once answered, " +
         'continue from the same stage.',
-    UNCONFIRMED_FINDING_LINE,
+    unconfirmedFindingLine(foreign),
     'The last line of your answer is the MR link.',
     'The plan stage only takes this section into account in the plan; the work stage carries it out.',
   ].join('\n');
@@ -894,9 +953,14 @@ export function deliveryPreamble(input: {
  * потерять находку: до блока она оставалась в середине отчёта, который никто
  * не дочитывал. Сервер вынимает блок из текста хода (`split-tickets.ts`), хаб
  * показывает список «Предложить тикет» с кнопкой «копировать».
+ *
+ * `readOnly` — ревью по ссылке (TQ-10, 12.10.2026): группа ничего не правит и
+ * не доставляет, а строки «свои дефекты чини сам» и «шаг, нужный для доставки»
+ * ей противоречили. Ей остаётся только блок тикета; дефект проверяемого MR — её
+ * замечание ревью, а не блок.
  */
-export function splitTicketPreamble(): string {
-  return [
+export function splitTicketPreamble(input: { readOnly?: boolean } = {}): string {
+  const ticket = [
     "A defect outside this group's tasks, noticed along the way: do not fix it and do not file a " +
       'tracker ticket — describe it in your answer as a block, and the panel shows it to the human ' +
       'in the "Suggested tickets" list:',
@@ -905,6 +969,16 @@ export function splitTicketPreamble(): string {
     'where: file with line, screen or route',
     'why: why it is bad and how to reproduce it',
     `</${SPLIT_TICKET_TAG}>`,
+  ];
+  if (input.readOnly) {
+    return [
+      ...ticket,
+      'One block — one defect. A defect of the merge request you review is a finding of your review, ' +
+        'not a block. Write the block values in the language of the task text: the human reads them.',
+    ].join('\n');
+  }
+  return [
+    ...ticket,
     'One block — one defect. Fix defects of your own tasks yourself, do not describe them as a block. ' +
       'Write the values of both blocks in the language of the task text: the human reads them.',
     'A step needed for delivery that you cannot do (a dependency between MRs, access, the setup of ' +
@@ -959,5 +1033,10 @@ export function buildGroupPrompt(group: TaskSplitGroup, shared?: string): string
       ? group.tasks.map((task, index) => `${index + 1}. ${task}`).join('\n')
       : (group.tasks[0] ?? ''),
   );
+  // Строка приоритета — последним абзацем: задание выше написано владельцем
+  // или его агентом, и всё, что панель допишет к прогону потом (преамбулы,
+  // стадии), читается под ней, а не поверх неё. Навык по роду работы (U12) —
+  // над ней: это добавка панели, и старшинство накрывает и её.
+  parts.push(SKILL_ROUTE_LINE, OWNER_PRECEDENCE_LINE);
   return parts.join('\n\n').trim();
 }

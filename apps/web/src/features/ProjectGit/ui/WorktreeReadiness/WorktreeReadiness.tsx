@@ -34,7 +34,9 @@ export function WorktreeReadiness({ state, disabled, onRepair }: WorktreeReadine
         <>
           <ul className={styles.gaps}>
             {state.gaps.map((gap) => (
-              <li key={`${gap.kind}:${gap.path}`}>{t(GAP_KEY[gap.kind], { path: gap.path })}</li>
+              <li key={`${gap.kind}:${gap.path}`}>
+                {t(GAP_KEY[gap.kind], { path: gap.path, names: gap.names?.join(', ') ?? '' })}
+              </li>
             ))}
           </ul>
           <Typography variant="caption" color="subtle">

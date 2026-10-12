@@ -174,8 +174,17 @@ function asListedFile(context: EmitContext, items: readonly EnvItem[]): StageRes
 
   const block = blockOf(carried.map((item) => textOf(item)));
   const entries = readProviderInstructionsEntries(target).map((entry) => entry.raw);
-  const reference = relative(target.baseDir, filePath).replace(/\\/g, '/');
-  const nextEntries = entries.includes(reference) ? entries : [...entries, reference];
+  const local = relative(target.baseDir, filePath).replace(/\\/g, '/');
+  // Относительную запись `read` Aider разрешает от РАБОЧЕГО каталога, а не от
+  // каталога конфига (`Path(fn).expanduser().resolve()`, aider 0.86.2): из
+  // глобального конфига она искалась в каждом проекте и не находилась, и
+  // перенесённые инструкции до модели не доезжали (живая проба 12.10.2026).
+  // Глобальная ссылка поэтому идёт от дома — `~` он разворачивает сам; прежняя
+  // относительная заменяется, а не остаётся рядом мёртвой.
+  const reference = target.scope === 'global' && local === CARRIED_FILE_NAME ? `~/${local}` : local;
+  const nextEntries = entries.includes(reference)
+    ? entries
+    : [...entries.filter((entry) => entry !== local), reference];
 
   // ДВЕ правки, а не одна на два файла: своим файлом запись не действует, пока
   // на него нет ссылки, и соблазн записать оба из одного места велик. Но правка

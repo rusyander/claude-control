@@ -64,7 +64,9 @@ export function Worktrees({ projectPath }: { projectPath: string }) {
           {copy.copy && !copy.copy.ready
             ? copy.copy.gaps.map((gap) => (
                 <Mono key={`${gap.kind}:${gap.path}`} style={styles.gap} numberOfLines={1}>
-                  {t.worktrees.gap[gap.kind](gap.path)}
+                  {gap.kind === 'mcp'
+                    ? t.worktrees.gap.mcp(gap.path, gap.names?.join(', ') ?? '')
+                    : t.worktrees.gap[gap.kind](gap.path)}
                 </Mono>
               ))
             : null}

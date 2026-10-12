@@ -18,6 +18,7 @@ import { SearchField } from '@shared/ui/search-field';
 import { SelectField } from '@shared/ui/select-field';
 import { TextField } from '@shared/ui/text-field';
 import { Modal } from '@shared/ui/modal';
+import { useDeferredQuery } from './useDeferredQuery';
 import { filterChips } from '../../model/filterChips';
 import type { TestFilterBarProps } from './TestFilterBar.types';
 import styles from './TestFilterBar.module.scss';
@@ -56,6 +57,9 @@ export function TestFilterBar({
   const [isPanelOpen, setPanelOpen] = useState(false);
 
   const { filter, patch, facets } = filters;
+  const [query, setQuery] = useDeferredQuery(filter.query ?? '', (value) =>
+    patch({ query: value }),
+  );
   // Счётчик — ровно число плашек: условие, которого в свёрнутой строке не
   // видно, не должно и считаться.
   const chips = filterChips(filter, { withFindings: filters.withFindings, sort: filters.sort });
@@ -101,8 +105,8 @@ export function TestFilterBar({
           <SearchField
             label={t('tests.library.query')}
             placeholder={t('tests.library.queryHint')}
-            value={filter.query ?? ''}
-            onChange={(value) => patch({ query: value })}
+            value={query}
+            onChange={setQuery}
           />
         </div>
 

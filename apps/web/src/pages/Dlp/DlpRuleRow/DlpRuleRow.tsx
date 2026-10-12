@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { DlpAction, DlpBuiltinPattern } from '@agentdeck/contracts';
 import { Card } from '@shared/ui/card';
@@ -20,8 +21,11 @@ import { ACTIONS } from './DlpRuleRow.constants';
  * Словарь вводится строками — по одному значению в строке. Разделитель запятой
  * не годится: в названиях компаний и адресах запятая встречается сама по себе,
  * и правило молча разъехалось бы на куски.
+ *
+ * `memo`: черновик правил живёт на странице, и без него буква в одном правиле
+ * перерисовывала все строки списка.
  */
-export function DlpRuleRow({
+export const DlpRuleRow = memo(function DlpRuleRow({
   rule,
   builtins,
   builtinNames,
@@ -165,4 +169,4 @@ export function DlpRuleRow({
       </Stack>
     </Card>
   );
-}
+});

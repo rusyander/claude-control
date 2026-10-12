@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { stringify as stringifyToml } from 'smol-toml';
 import { spliceCodexTableRegion, upsertCodexRootScalar } from '../../lib/codex-toml/codex-toml.ts';
+import { aiderOneShotArgs, aiderOneShotEnv } from '../../providers/catalog/aider-run.ts';
 import type { ProviderEndpointApiKind } from '../../providers/types/assistant.ts';
 import type { EnvScope } from '@agentdeck/contracts/portable-env';
 import type { ProbeLayer } from '@agentdeck/contracts/portable-probe';
@@ -23,15 +24,36 @@ import type { ProbeLayer } from '@agentdeck/contracts/portable-probe';
  * несуществующий инструмент, покрасит пробу про себя, а не про перенос. Поэтому
  * цель без рецепта честно «не проверена», а список сокращается правкой кода.
  */
-export interface ProbeRecipe {
-  /** Диалект заглушки; он же ключ в `endpointConfig` каталога. */
-  readonly apiKind: ProviderEndpointApiKind;
-  /** Неинтерактивный запуск с готовым промптом. */
-  args(prompt: string): readonly string[];
+export type ProbeRecipe = ToolProbeRecipe | SelfRunProbeRecipe;
+
+/** Цель, модель которой зовёт инструменты: пробные вызовы делает заглушка. */
+interface ToolProbeRecipe extends ProbeRecipeBase {
   /** Вызов оболочки: имя инструмента цели и ЕГО форма аргументов. */
   readonly shellTool: ProbeTool;
   /** Вызов чтения файла. У цели без своего инструмента чтения — та же оболочка. */
   readonly readTool: ProbeTool;
+  readonly selfRun?: undefined;
+}
+
+/**
+ * Цель, модель которой инструментов НЕ зовёт (aider): пробные скрипты
+ * запускает сама цель своей командой, и их вывод приходит к модели уже ПЕРВЫМ
+ * запросом. Так меряются слои, которые обязаны подействовать в процессе цели
+ * (переменная, хук); чтение запрещённого файла так не измерить — строка
+ * «нативного» права у такой цели остаётся «нет рецепта».
+ */
+interface SelfRunProbeRecipe extends ProbeRecipeBase {
+  /** Запрос, которым цель сама исполняет `command` и отдаёт вывод модели. */
+  selfRun(command: string): string;
+  readonly shellTool?: undefined;
+  readonly readTool?: undefined;
+}
+
+interface ProbeRecipeBase {
+  /** Диалект заглушки; он же ключ в `endpointConfig` каталога. */
+  readonly apiKind: ProviderEndpointApiKind;
+  /** Неинтерактивный запуск с готовым промптом. */
+  args(prompt: string): readonly string[];
   /** Чем запрос вызывает пробную слэш-команду. */
   readonly commandPrompt: string;
   /**
@@ -72,13 +94,21 @@ export interface ProbeTool {
   call(argument: string, workdir: string): Record<string, unknown>;
 }
 
-// Aider рецепта не имеет и без перемены в нём иметь не может: модель у него
-// инструментов не зовёт (правки — текстом по формату), а команду оболочки из
-// ответа он под `--yes-always` отклоняет сам — `handle_shell_commands` просит
-// `explicit_yes_required`, и `confirm_ask` отвечает «n» (исходник 0.86.2,
-// проверено 09.10.2026). Слои пробы меряются вызовами, вызвать нечего — его
-// строки остаются честным «нет рецепта».
 export const PROBE_RECIPES: Readonly<Record<string, ProbeRecipe>> = {
+  aider: {
+    // Модель у aider инструментов не зовёт (правки — текстом по формату), а
+    // команду оболочки из ответа он под `--yes-always` отклоняет сам —
+    // `explicit_yes_required` (исходник 0.86.2, 09.10.2026). Зато `/test <команда>`
+    // в `--message` исполняется ДО модели его же процессом (`cmd_run`, окружение —
+    // уже с подгруженным `.env`) и при ненулевом коде уходит модели текстом
+    // первого запроса. Адрес и модель — тремя переменными `endpointConfig`, как
+    // у контура; argv — тот же, что у одиночного запуска панели.
+    apiKind: 'openai-compat',
+    args: (prompt) => aiderOneShotArgs(prompt),
+    selfRun: (command) => `/test ${command}`,
+    env: aiderOneShotEnv(),
+    commandPrompt: '/agentdeck-probe-command',
+  },
   claude: {
     apiKind: 'anthropic',
     // `--allowedTools` разрешает ДВА инструмента, без которых проба слепа: без

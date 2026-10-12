@@ -16,7 +16,8 @@ import {
 import { killChildTree } from '../../../lib/process-tree/process-tree.ts';
 import { defaultCliCommand } from '../../../providers/cli/cli.ts';
 import { TurnTracker } from '../stream-usage/stream-usage.ts';
-import { userMemorySettings } from '../../platform/layers/layers.ts';
+import { userMemoryExcludes } from '../../platform/layers/layers.ts';
+import { copyParityExcludes } from '../copy-parity/copy-parity.ts';
 import {
   LiveSession,
   SIGNATURE_DEFERRABLE,
@@ -31,6 +32,7 @@ import { CHILD_DENIED_TOOLS, childAppend } from '../initiative/initiative.ts';
 import { SyntheticGate } from '../synthetic-gate.ts';
 import { autoPickResults, picksFor } from '../auto-pick/auto-pick.ts';
 import { AUTONOMOUS_ENV } from '@agentdeck/contracts/chat-group-settings';
+import type { RunInputRecord } from '@agentdeck/contracts/run-input';
 
 /** Путь к мини-MCP-серверу прав рядом с этим модулем. */
 const PERMISSION_SERVER = fileURLToPath(
@@ -63,6 +65,29 @@ function appendedOf(options: RunOptions): string {
     .filter((part) => part.trim())
     .join('\n\n')
     .trim();
+}
+
+/**
+ * Вход прогона ровно в том виде, в каком его получит CLI (U8): та же дописка,
+ * что уедет `--append-system-prompt`, те же модель и глубина, что пройдут
+ * проверку грамматики, и промпт контура. Собирается здесь, рядом со сборкой
+ * флагов, — чтобы «что получил агент» не разошлось с тем, что он получил.
+ */
+export function receivedInputOf(options: RunOptions, startedAt: number): RunInputRecord {
+  const model = safeModel(options.model);
+  const effort = safeEffort(options.effort);
+  const appended = appendedOf(options);
+  const contour = options.platformSystemPrompt?.trim();
+  return {
+    startedAt,
+    ...(model ? { model } : {}),
+    ...(effort ? { effort } : {}),
+    permissionMode: options.permissionMode ?? 'acceptEdits',
+    prompt: options.prompt,
+    ...(appended ? { appendSystemPrompt: appended } : {}),
+    ...(contour ? { systemPrompt: contour } : {}),
+    ...(options.platformArgs?.length ? { platformArgs: [...options.platformArgs] } : {}),
+  };
 }
 
 /** Подпись запуска живой сессии — отпечатком (см. `ChatRun.prepareSignature`). */
@@ -459,17 +484,19 @@ export class ChatRun {
 
     // Снятые личные настройки обязаны снять и `~/.claude/CLAUDE.md`, который CLI
     // находит поиском вверх у проекта под домом и читает как проектный
-    // (`userMemorySettings`). Дом и каталог конфигурации — из окружения САМОГО
+    // (`userMemoryExcludes`). Дом и каталог конфигурации — из окружения САМОГО
     // процесса: CLI берёт их оттуда же, и другой ответ исключил бы не тот файл.
-    const memory = userMemorySettings(options.platformArgs ?? [], {
-      cwd: options.cwd,
-      env,
-      platform: process.platform,
-      fallbackHome: homedir(),
-    });
-    if (memory) {
+    // В копии к ним добавляются исключения источника, переписанные на её корень
+    // (`copyParityExcludes`, E1): копия грузит ровно то, что источник. Файл один —
+    // массив из `--settings` сливается с личным, а не заменяет его.
+    const place = { cwd: options.cwd, env, platform: process.platform, fallbackHome: homedir() };
+    const excludes = [
+      ...(userMemoryExcludes(options.platformArgs ?? [], place) ?? []),
+      ...copyParityExcludes(options.platformArgs ?? [], place),
+    ];
+    if (excludes.length > 0) {
       const file = join(this.ensureTempDir(), 'layers-settings.json');
-      writeFileSync(file, memory, 'utf8');
+      writeFileSync(file, JSON.stringify({ claudeMdExcludes: excludes }), 'utf8');
       args.push('--settings', file);
     }
 

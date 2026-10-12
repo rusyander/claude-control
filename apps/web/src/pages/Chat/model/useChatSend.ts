@@ -3,6 +3,7 @@ import type { Dispatch, SetStateAction } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ChatMessage } from '@agentdeck/contracts';
 import { agentRuns, type SendOutcome } from '@shared/lib/agent-runs';
+import type { DraftBox } from '@shared/lib/draft';
 import { toast } from '@shared/lib/toast';
 import { SUPPORTED_UPLOAD_EXTENSIONS } from '../lib/uploads';
 import { planSend } from '../lib/send';
@@ -17,8 +18,8 @@ export interface ChatSendInput {
   sessionId?: string;
   projectPath?: string;
   isRunning: boolean;
-  input: string;
-  setInput: (value: string) => void;
+  /** Черновик поля: читается в момент отправки, а не подпиской — странице незачем перерисовываться на каждую букву. */
+  draft: DraftBox;
   setDraftId: Dispatch<SetStateAction<string | undefined>>;
   setPending: Dispatch<SetStateAction<ChatMessage[]>>;
   allowEdits: boolean;
@@ -53,8 +54,7 @@ export function useChatSend({
   sessionId,
   projectPath,
   isRunning,
-  input,
-  setInput,
+  draft,
   setDraftId,
   setPending,
   allowEdits,
@@ -68,7 +68,7 @@ export function useChatSend({
   const forkNextRef = useRef(false);
   const editMessage = (text: string): void => {
     forkNextRef.current = true;
-    setInput(text);
+    draft.set(text);
   };
 
   /** Текст отказа — по структурному коду сервера, а не по разбору сообщения. */
@@ -154,7 +154,7 @@ export function useChatSend({
     // Неподдерживаемое вложение отсеиваем здесь, а не ответом сервера: только
     // так отказ приходит до того, как композер снял чипы, и человеку не нужно
     // прикладывать файлы заново. Сервер всё равно проверит ещё раз.
-    const plan = planSend(input, files);
+    const plan = planSend(draft.get(), files);
     if (plan.action === 'ignore') return false;
     if (plan.action === 'reject') {
       toast.error(
@@ -178,12 +178,12 @@ export function useChatSend({
         model,
         effort,
       });
-      setInput('');
+      draft.set('');
       return true;
     }
 
     const accepted = await dispatch(plan.prompt, files);
-    if (accepted) setInput('');
+    if (accepted) draft.set('');
     return accepted;
   };
 

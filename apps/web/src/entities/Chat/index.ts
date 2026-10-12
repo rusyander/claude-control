@@ -6,6 +6,7 @@ export { MIN_CHAT_SEARCH_LENGTH } from './api/useChatBodySearch';
 export { useRefreshChat } from './api/useRefreshChat';
 export { useDeleteArtifact } from './api/useDeleteArtifact';
 export { useChatProgress } from './api/useChatProgress';
+export { useRunInputs } from './api/useRunInputs';
 export { useArtifacts } from './api/useArtifacts';
 export { useChats } from './api/useChats';
 export { chatKeys } from './api/ChatApi.constants';

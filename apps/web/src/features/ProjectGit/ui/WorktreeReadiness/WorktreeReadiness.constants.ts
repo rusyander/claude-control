@@ -16,11 +16,15 @@
  * неоткуда — чинить тут нечего.
  */
 
-/** Строка про дыру: файла нет, общий каталог не связан, записи доступа нет. */
+/**
+ * Строка про дыру: файла нет, общий каталог не связан, записи доступа нет,
+ * в `.mcp.json` копии нет серверов оригинала.
+ */
 export const GAP_KEY = {
   file: 'git.worktrees.copyGapFile',
   link: 'git.worktrees.copyGapLink',
   access: 'git.worktrees.copyGapAccess',
+  mcp: 'git.worktrees.copyGapMcp',
 } as const;
 
 export const ACCESS_KEY = {

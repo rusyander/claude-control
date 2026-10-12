@@ -80,12 +80,49 @@ describe('planPathTurn', () => {
     expect(decision).toEqual({ kind: 'gate-failed', step: GATED, note: 'two tests red' });
   });
 
-  it('a gated step without a gate block counts as failed, not passed', () => {
+  /**
+   * Забытый блок — не провал (F10, 12.10.2026): без человека рядом группа
+   * ждала бы его зря. Один раз шаг просят отчитаться тем же разговором; без
+   * блока и во второй раз — ждёт человека. Блок с `passed: false` — сразу.
+   */
+  it('a gated step without a gate block is asked to report once, not passed and not parked', () => {
+    const run = { done: ['a'], pending: 'a', held: { text: 'S', task: 'Задание стадии' } };
+    const decision = turn({ link: { ...LINK, pathRun: run }, text: 'I did it, trust me.' });
+    expect(decision.kind).toBe('step');
+    if (decision.kind !== 'step') return;
+    expect(decision.nudge).toBe(true);
+    expect(decision.step).toBe(GATED);
+    expect(decision.link.pathRun).toEqual({ ...run, nudged: true });
+    expect(decision.prompt).toContain('ended without the gate block');
+    expect(decision.prompt).toContain('tests are green');
+    expect(decision.prompt).toContain('agentdeck:gate');
+    expect(decision.prompt).toContain('Задание стадии');
+  });
+
+  it('a second turn without the gate block parks the chain', () => {
     const decision = turn({
-      link: { ...LINK, pathRun: { done: ['a'], pending: 'a', held: { text: 'S', task: 'T' } } },
-      text: 'I did it, trust me.',
+      link: {
+        ...LINK,
+        pathRun: { done: ['a'], pending: 'a', held: { text: 'S', task: 'T' }, nudged: true },
+      },
+      text: 'Still no block.',
     });
-    expect(decision.kind).toBe('gate-failed');
+    expect(decision).toEqual({ kind: 'gate-failed', step: GATED, note: '' });
+  });
+
+  it('the reminder belongs to its step: the next step starts without it', () => {
+    const decision = turn({
+      link: {
+        ...LINK,
+        pathRun: { done: ['a'], pending: 'a', held: { text: 'S', task: 'T' }, nudged: true },
+      },
+      text: gateBlock(true),
+    });
+    expect(decision.kind).toBe('step');
+    if (decision.kind !== 'step') return;
+    expect(decision.step.id).toBe('b');
+    expect(decision.nudge).toBeUndefined();
+    expect(decision.link.pathRun?.nudged).toBeUndefined();
   });
 
   it('a step turn that paused or failed waits, starting nothing', () => {
@@ -139,13 +176,26 @@ describe('scanGateBlock', () => {
 });
 
 describe('pathStepPrompt', () => {
-  it('uses the English side and asks for the gate block', () => {
+  // Владелец 12.10.2026: перевод не подменяет слова владельца — оригинал идёт
+  // всегда, перевод только подсказкой после него.
+  it("sends the owner's original first, the translation only as an aid, and asks for the gate block", () => {
     const prompt = pathStepPrompt(GATED, 'work');
     expect(prompt).toContain('after the work stage: Step a');
-    expect(prompt).toContain('Do a');
-    expect(prompt).not.toContain('Сделай a');
-    expect(prompt).toContain('This step is closed only when: tests are green');
+    expect(prompt).toContain('Сделай a');
+    expect(prompt.indexOf('Сделай a')).toBeLessThan(prompt.indexOf('Do a'));
+    expect(prompt).toContain("the owner's original above wins: Do a");
+    expect(prompt).toContain('This step is closed only when: тесты зелёные');
     expect(prompt).toContain('agentdeck:gate');
+  });
+
+  it('a step written in English goes as is, without the Russian side as its original', () => {
+    const prompt = pathStepPrompt(step('e', { source: 'en' }), 'work');
+    expect(prompt.indexOf('Do e')).toBeLessThan(prompt.indexOf('Сделай e'));
+  });
+
+  it('one side only, or both equal — no aid line', () => {
+    const same = pathStepPrompt(step('s', { prompt: { ru: 'Run it', en: 'Run it' } }), 'work');
+    expect(same).not.toContain('for reference only');
   });
 
   it('falls back to the Russian side when English is empty', () => {

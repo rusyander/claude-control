@@ -44,6 +44,8 @@ function stand(
     started?: boolean;
     /** Запуск отказал, потому что разговор ещё идёт. */
     busy?: boolean;
+    /** Публикует сессия ревью, а не сводный комментарий панели. */
+    publishInSession?: boolean;
   } = {},
 ) {
   const links: Record<string, ChatLink> = {};
@@ -53,6 +55,7 @@ function stand(
     cwd: string;
     stage: string;
     resume?: string;
+    fresh?: string;
   }[] = [];
   const closed: ChatLink[] = [];
   const posted: { url: string; body: string }[] = [];
@@ -70,6 +73,7 @@ function stand(
         posted.push({ url, body });
       }),
     ...(options.blocked ? { postBlocked: () => options.blocked } : {}),
+    ...(options.publishInSession ? { publishInSession: true } : {}),
     start: (input) => {
       started.push({
         chatId: input.chatId,
@@ -77,6 +81,7 @@ function stand(
         cwd: input.cwd,
         stage: input.stage,
         ...(input.resume ? { resume: input.resume.sessionId } : {}),
+        ...(input.fresh ? { fresh: input.fresh } : {}),
       });
       if (options.busy) return { started: false, busy: true };
       return {
@@ -96,9 +101,13 @@ function stand(
   return { review, links, started, posted, events, closed };
 }
 
-/** Ответ ревьюера в том виде, в каком его печатает модель. */
-function answer(findings: string[]): string {
-  return ['Посмотрел дифф.', '```agentdeck:review', JSON.stringify({ findings }), '```'].join('\n');
+/** Полный отчёт о глубине при T0: ни дочитывать, ни звать свидетеля не за чем. */
+const FULL_T0 = { tier: 'T0', entries: ['diff-first'], coverage: 'full', uncovered: [] };
+
+/** Ответ ревьюера в том виде, в каком его печатает модель; `null` — без отчёта о глубине. */
+function answer(findings: string[], depth: object | null = FULL_T0): string {
+  const block = depth ? { findings, depth } : { findings };
+  return ['Посмотрел дифф.', '```agentdeck:review', JSON.stringify(block), '```'].join('\n');
 }
 
 describe('конец прогона ревью', () => {
@@ -236,6 +245,16 @@ describe('решение человека', () => {
     const fixLink = links[started[0]?.chatId ?? ''];
     expect(fixLink?.stage).toBe('fix');
     expect(fixLink?.review?.url).toBe(URL);
+  });
+
+  it('правки по ревью знают, что просил человек и какой это MR (F11)', async () => {
+    const { review, links, started } = stand();
+    links.c1 = { ...waiting(), groupTask: 'Посмотри этот MR, особенно миграции' };
+
+    await review.decide({ chatId: 'c1', decision: 'fix' });
+
+    expect(started[0]?.prompt).toContain('Посмотри этот MR, особенно миграции');
+    expect(started[0]?.prompt).toContain(URL);
   });
 
   it('чат правок — другой разговор: ключа разговора группы он не наследует (Д11)', async () => {
@@ -694,8 +713,8 @@ describe('звено у чужого CLI', () => {
 });
 
 describe('ревью без блока итога (Д4)', () => {
-  it('нет блока — это не «замечаний нет»: группа ждёт, карточка предлагает повтор', () => {
-    const { review, links } = stand();
+  it('нет блока — панель сама просит ту же сессию выдать итог, человека не зовёт (A0)', () => {
+    const { review, links, started } = stand();
     links.c1 = reviewLink();
 
     const event = review.finished({
@@ -706,6 +725,39 @@ describe('ревью без блока итога (Д4)', () => {
       text: 'Посмотрел, в целом нормально.',
     });
 
+    expect(event).toBeUndefined();
+    expect(started).toHaveLength(1);
+    expect(started[0]?.resume).toBe('c1');
+    expect(started[0]?.stage).toBe('review');
+    expect(started[0]?.prompt).toContain('agentdeck:review');
+    expect(links.c1?.review?.followUp).toBe(true);
+    expect(links.c1?.review?.missingAsked).toBeDefined();
+    expect(links.c1?.review?.missing).toBeUndefined();
+    expect(links.c1?.review?.findings).toBeUndefined();
+  });
+
+  it('блока нет и после просьбы — это не «замечаний нет»: группа ждёт, карточка предлагает повтор', () => {
+    const { review, links, started } = stand();
+    links.c1 = reviewLink({
+      review: {
+        url: URL,
+        branch: 'feature/login',
+        path: '/copy',
+        missingAsked: '2026-09-09T11:00:00.000Z',
+        followUp: true,
+      },
+    });
+
+    const event = review.finished({
+      chatId: 'c1',
+      aliases: ['c1'],
+      link: links.c1 as ChatLink,
+      ok: true,
+      text: 'Посмотрел, в целом нормально.',
+    });
+
+    expect(started).toEqual([]);
+    expect(links.c1?.review?.followUp).toBeUndefined();
     expect(event).toMatchObject({ kind: 'review', missing: true, findings: [] });
     expect(links.c1?.review?.missing).toBe(true);
     expect(links.c1?.review?.decidedAt).toBeUndefined();
@@ -755,12 +807,391 @@ describe('ревью без блока итога (Д4)', () => {
     expect(event).toMatchObject({ findings: ['src/a.ts:1 — ошибка'] });
   });
 
+  /**
+   * G3 (12.10.2026): продолжение сессии ревью несёт вводную на случай, когда
+   * её файла на диске уже нет. Раньше там была общая строка «восстанови по git»,
+   * и новая сессия получала «опубликуй ревью» или «выдай итог», не зная, какой
+   * MR и что в нём проверять.
+   */
+  it('сессия ревью потеряна — новая получает исходное задание ревью, а не голую просьбу (G3)', async () => {
+    const TASK = 'Проверь MR 42: валидация формы входа';
+    const { review, links, started } = stand({ publishInSession: true });
+
+    links.c1 = reviewLink({ task: TASK });
+    review.finished({
+      chatId: 'c1',
+      aliases: ['c1'],
+      link: links.c1 as ChatLink,
+      ok: true,
+      text: 'Посмотрел, в целом нормально.',
+    });
+    links.c2 = reviewLink({
+      task: TASK,
+      review: { url: URL, branch: 'feature/login', path: '/copy', missing: true },
+    });
+    review.retryReview({ chatId: 'c2' });
+    links.c3 = reviewLink({
+      task: TASK,
+      review: { url: URL, branch: 'feature/login', path: '/copy', findings: ['одно'] },
+    });
+    await review.decide({ chatId: 'c3', decision: 'post' });
+    links.c4 = reviewLink({
+      stage: 'fix',
+      task: TASK,
+      review: {
+        url: URL,
+        branch: 'feature/login',
+        path: '/copy',
+        findings: ['одно'],
+        pushOffer: true,
+      },
+    });
+    review.push({ chatId: 'c4' });
+
+    expect(started.map((run) => run.chatId)).toEqual(['c1', 'c2', 'c3', 'c4']);
+    for (const run of started) {
+      expect(run.fresh).toContain('transcript is gone');
+      expect(run.fresh).toContain(TASK);
+    }
+  });
+
   it('повтор без отметки «нет блока» не запускается', () => {
     const { review, links, started } = stand();
     links.c1 = reviewLink();
 
     expect(review.retryReview({ chatId: 'c1' }).applied).toEqual([]);
     expect(started).toEqual([]);
+  });
+
+  it('сессия не продолжилась — дыра сразу на карточку, а не тихое ожидание', () => {
+    const { review, links } = stand({ started: false });
+    links.c1 = reviewLink();
+
+    const event = review.finished({
+      chatId: 'c1',
+      aliases: ['c1'],
+      link: links.c1 as ChatLink,
+      ok: true,
+      text: 'Посмотрел, в целом нормально.',
+    });
+
+    expect(event).toMatchObject({ kind: 'review', missing: true });
+    expect(links.c1?.review?.followUp).toBeUndefined();
+  });
+});
+
+/** Задание группы, с которым ревью стартовало: свидетель получает его же. */
+const TASK = 'Проверь MR !42: вход по SSO и сброс сессии.';
+
+function finishReview(
+  review: SplitReview,
+  links: Record<string, ChatLink>,
+  key: string,
+  text: string,
+): ReturnType<SplitReview['finished']> {
+  return review.finished({
+    chatId: key,
+    aliases: [key],
+    link: links[key] as ChatLink,
+    ok: true,
+    text,
+  });
+}
+
+describe('глубина ревью судится панелью (U4)', () => {
+  it('отчёта о глубине нет — та же сессия один раз дочитывает, замечания не пишутся', () => {
+    const { review, links, started } = stand();
+    links.c1 = reviewLink();
+
+    const event = finishReview(review, links, 'c1', answer([], null));
+
+    expect(event).toBeUndefined();
+    expect(started).toHaveLength(1);
+    expect(started[0]?.resume).toBe('c1');
+    expect(started[0]?.prompt).toContain('no "depth" report');
+    expect(links.c1?.review?.findings).toBeUndefined();
+    expect(links.c1?.review?.depthAsked).toBeDefined();
+    expect(links.c1?.review?.followUp).toBe(true);
+  });
+
+  it('T2 с одного входа — неполное, хотя покрытие названо полным', () => {
+    const { review, links, started } = stand();
+    links.c1 = reviewLink();
+
+    finishReview(
+      review,
+      links,
+      'c1',
+      answer([], { tier: 'T2', entries: ['diff-first'], coverage: 'full', uncovered: [] }),
+    );
+
+    expect(started).toHaveLength(1);
+    expect(started[0]?.prompt).toContain('fewer than two independent entry points');
+    expect(started[0]?.prompt).not.toContain('coverage is partial');
+  });
+
+  it('и после просьбы неполное — на карточку как «неполное», а не «замечаний нет»', () => {
+    const { review, links, started } = stand();
+    links.c1 = reviewLink({
+      review: {
+        url: URL,
+        path: '/copy',
+        depthAsked: '2026-09-09T11:00:00.000Z',
+        followUp: true,
+      },
+    });
+
+    const event = finishReview(
+      review,
+      links,
+      'c1',
+      answer([], { tier: 'T1', entries: ['diff-first'], coverage: 'partial', uncovered: ['docs'] }),
+    );
+
+    expect(started).toEqual([]);
+    expect(event).toMatchObject({ kind: 'review', findings: [], incomplete: ['partial'] });
+    expect(links.c1?.review?.incomplete).toEqual(['partial']);
+    expect(links.c1?.review?.tier).toBe('T1');
+    expect(links.c1?.review?.followUp).toBeUndefined();
+    expect(review.view(links.c1 as ChatLink)?.incomplete).toEqual(['partial']);
+    expect(reviewNoticeText(event as never)).not.toContain('замечаний нет');
+  });
+
+  it('полный отчёт с замечаниями — карточка сразу, без дочитывания и свидетеля', () => {
+    const { review, links, started } = stand();
+    links.c1 = reviewLink({ task: TASK });
+
+    const event = finishReview(
+      review,
+      links,
+      'c1',
+      answer(['src/a.ts:1 — ошибка'], {
+        tier: 'T2',
+        entries: ['diff-first', 'frame-first'],
+        coverage: 'full',
+        uncovered: [],
+      }),
+    );
+
+    expect(started).toEqual([]);
+    expect(event).toMatchObject({ findings: ['src/a.ts:1 — ошибка'] });
+    expect(links.c1?.review?.tier).toBe('T2');
+    expect(links.c1?.review?.incomplete).toBeUndefined();
+  });
+});
+
+describe('второй свидетель пустого ревью (U5)', () => {
+  const FULL_T1 = { tier: 'T1', entries: ['diff-first'], coverage: 'full', uncovered: [] };
+
+  it('пустое полное ревью при T1 — новая сессия с тем же заданием, группа ещё не закрыта', () => {
+    const { review, links, started, events } = stand();
+    links.c1 = reviewLink({ task: TASK, groupIndex: 2 });
+
+    const event = finishReview(review, links, 'c1', answer([], FULL_T1));
+
+    expect(event).toBeUndefined();
+    expect(started).toHaveLength(1);
+    expect(started[0]?.resume).toBeUndefined();
+    expect(started[0]?.cwd).toBe('/copies/feature-login');
+    expect(started[0]?.prompt).toContain(TASK);
+    const witnessKey = started[0]?.chatId as string;
+    expect(witnessKey).not.toBe('c1');
+    expect(links[witnessKey]?.groupIndex).toBe(2);
+    expect(links[witnessKey]?.review?.witness).toBe(true);
+    expect(links[witnessKey]?.review?.findings).toBeUndefined();
+    expect(links.c1?.review).toMatchObject({
+      findings: [],
+      decision: 'none',
+      followUp: true,
+      witnessChatId: witnessKey,
+    });
+    expect(events).toEqual([]);
+  });
+
+  it('итог свидетеля решает группу, исходное ревью перестаёт ждать, второго свидетеля нет', () => {
+    const { review, links, started } = stand();
+    links.c1 = reviewLink({ task: TASK });
+    finishReview(review, links, 'c1', answer([], FULL_T1));
+    const witnessKey = started[0]?.chatId as string;
+
+    const event = finishReview(review, links, witnessKey, answer(['src/b.ts:4 — гонка'], FULL_T1));
+
+    expect(started).toHaveLength(1);
+    expect(event).toMatchObject({ chatId: witnessKey, findings: ['src/b.ts:4 — гонка'] });
+    expect(review.view(links[witnessKey] as ChatLink)?.witness).toBe(true);
+    expect(links.c1?.review?.followUp).toBeUndefined();
+  });
+
+  it('пустой итог свидетеля закрывает группу и свидетеля не плодит', () => {
+    const { review, links, started } = stand();
+    links.c1 = reviewLink({ task: TASK });
+    finishReview(review, links, 'c1', answer([], FULL_T1));
+    const witnessKey = started[0]?.chatId as string;
+
+    const event = finishReview(review, links, witnessKey, answer([], FULL_T1));
+
+    expect(started).toHaveLength(1);
+    expect(event).toMatchObject({ findings: [], decided: true });
+    expect(links.c1?.review?.followUp).toBeUndefined();
+  });
+
+  it('свидетель на настоящем ключе чужого CLI — связь переезжает, исходное знает новый ключ', () => {
+    const { review, links, started } = stand({ realKey: 'real-witness' });
+    links.c1 = reviewLink({ task: TASK });
+
+    finishReview(review, links, 'c1', answer([], FULL_T1));
+
+    expect(started).toHaveLength(1);
+    expect(links['real-witness']?.review?.witness).toBe(true);
+    expect(links[started[0]?.chatId as string]).toBeUndefined();
+    expect(links.c1?.review?.witnessChatId).toBe('real-witness');
+  });
+
+  it('T0 свидетеля не зовёт: взгляд и есть вся глубина', () => {
+    const { review, links, started } = stand();
+    links.c1 = reviewLink({ task: TASK });
+
+    const event = finishReview(review, links, 'c1', answer([]));
+
+    expect(started).toEqual([]);
+    expect(event).toMatchObject({ decided: true });
+  });
+
+  it('без задания в связи свидетеля нет — группа закрывается, как раньше', () => {
+    const { review, links, started } = stand();
+    links.c1 = reviewLink();
+
+    const event = finishReview(review, links, 'c1', answer([], FULL_T1));
+
+    expect(started).toEqual([]);
+    expect(event).toMatchObject({ decided: true });
+    expect(links.c1?.review?.followUp).toBeUndefined();
+  });
+
+  it('запуск свидетеля отказан — временной связи не остаётся, группа закрывается', () => {
+    const { review, links, started } = stand({ started: false });
+    links.c1 = reviewLink({ task: TASK });
+
+    const event = finishReview(review, links, 'c1', answer([], FULL_T1));
+
+    expect(started).toHaveLength(1);
+    expect(Object.keys(links)).toEqual(['c1']);
+    expect(event).toMatchObject({ decided: true });
+  });
+});
+
+/**
+ * Публикует сессия ревью (владелец, 12.10.2026): сводный комментарий панели
+ * одним списком терял строки, доказательства и сверку с открытыми тредами, а
+ * разрешение на публикацию, данное в самом задании, панель не слышала.
+ */
+describe('публикация сессией ревью', () => {
+  const card = '🟡 F-01 **Забыт await** — Где: src/a.ts:10-12';
+  const pending = (review: Partial<NonNullable<ChatLink['review']>> = {}): ChatLink =>
+    reviewLink({
+      review: { url: URL, branch: 'feature/login', path: '/copy', findings: [card], ...review },
+    });
+
+  it('«отписать» продолжает сессию ревью заданием публикации; панель сама в MR не пишет', async () => {
+    const { review, links, started, posted } = stand({ publishInSession: true });
+    links.c1 = pending();
+
+    const outcome = await review.decide({ chatId: 'c1', decision: 'post' });
+
+    expect(posted).toEqual([]);
+    expect(started).toHaveLength(1);
+    expect(started[0]).toMatchObject({ chatId: 'c1', stage: 'review', resume: 'c1', cwd: '/copy' });
+    expect(started[0]?.prompt).toContain(URL);
+    expect(started[0]?.prompt).toContain('consent');
+    expect(outcome.applied[0]?.posted).toBe(true);
+    expect(links.c1?.review?.postedAt).toBe('2026-09-09T12:00:00.000Z');
+  });
+
+  it('«и то и другое» — публикация сессией и правки отдельным чатом', async () => {
+    const { review, links, started } = stand({ publishInSession: true });
+    links.c1 = pending();
+
+    await review.decide({ chatId: 'c1', decision: 'both' });
+
+    expect(started.map((run) => run.stage)).toEqual(['review', 'fix']);
+    expect(started[0]?.resume).toBe('c1');
+  });
+
+  it('сессия занята — отказ с причиной, отметки записи нет, повтор доступен', async () => {
+    const { review, links, posted } = stand({ publishInSession: true, busy: true });
+    links.c1 = pending();
+
+    const outcome = await review.decide({ chatId: 'c1', decision: 'post' });
+
+    expect(posted).toEqual([]);
+    expect(outcome.applied[0]?.postError).toMatch(/занята/);
+    expect(links.c1?.review?.postedAt).toBeUndefined();
+    // Повтор записи не перерешивает: причина есть, записи нет — клик снова работает.
+    const again = await review.decide({ chatId: 'c1', decision: 'post' });
+    expect(again.applied).toHaveLength(1);
+  });
+
+  it('без ключа сессии — отказ с причиной, а не тихий откат к сводному комментарию', async () => {
+    const { review, links, posted, started } = stand({ publishInSession: true });
+    links['new-1'] = pending();
+
+    const outcome = await review.decide({ chatId: 'new-1', decision: 'post' });
+
+    expect(posted).toEqual([]);
+    expect(started).toEqual([]);
+    expect(outcome.applied[0]?.postError).toMatch(/сессия ревью/);
+  });
+
+  it('разрешение в задании: сессия уже опубликовала — отметка ставится по итогу ревью', () => {
+    const { review, links, started, posted } = stand({ publishInSession: true });
+    links.c1 = reviewLink({
+      review: { url: URL, branch: 'feature/login', path: '/copy', publish: true },
+    });
+
+    review.finished({
+      chatId: 'c1',
+      aliases: ['c1'],
+      link: links.c1 as ChatLink,
+      ok: true,
+      text: answer([card]),
+    });
+
+    expect(links.c1?.review?.postedAt).toBe('2026-09-09T12:00:00.000Z');
+    expect(started).toEqual([]);
+    expect(posted).toEqual([]);
+  });
+
+  it('уже опубликованное повторно не пишется: клик «и то и другое» заводит только правки', async () => {
+    const { review, links, started, posted } = stand({ publishInSession: true });
+    links.c1 = pending({ publish: true, postedAt: '2026-09-09T11:00:00.000Z' });
+
+    const outcome = await review.decide({ chatId: 'c1', decision: 'both' });
+
+    expect(posted).toEqual([]);
+    expect(started.map((run) => run.stage)).toEqual(['fix']);
+    expect(outcome.applied[0]?.posted).toBe(true);
+  });
+
+  it('без разрешения в задании итог ревью ничего не отмечает записанным', () => {
+    const { review, links } = stand({ publishInSession: true });
+    links.c1 = reviewLink();
+
+    review.finished({
+      chatId: 'c1',
+      aliases: ['c1'],
+      link: links.c1 as ChatLink,
+      ok: true,
+      text: answer([card]),
+    });
+
+    expect(links.c1?.review?.postedAt).toBeUndefined();
+  });
+
+  it('публикует сессия — токен форджа панели кнопку не прячет', () => {
+    const { review, links } = stand({ publishInSession: true, blocked: 'токен не сохранён' });
+    links.c1 = pending();
+
+    expect(review.view(links.c1 as ChatLink)?.postBlocked).toBeUndefined();
   });
 });
 
@@ -833,7 +1264,8 @@ describe('событие ревью словами', () => {
     });
 
     expect(text).toContain('заведены правки');
-    expect(text).toContain('отписана в MR');
+    expect(text).toContain('замечания в MR не записаны');
+    expect(text).not.toContain('публикуются');
     expect(text).toContain('токен форджа не сохранён');
   });
 

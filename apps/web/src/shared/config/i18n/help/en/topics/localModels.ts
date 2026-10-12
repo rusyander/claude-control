@@ -173,8 +173,9 @@ export const localModelsEn: typeof localModelsRu = {
       'editing and the check against the global layer live in the «Panel kit» section.',
     kitHeader: 'Mode',
     kitWhat: 'What the agent gets',
-    kitGlobal: 'Yours (default)',
-    kitGlobalText: 'Your skills, hooks and rules — exactly as in normal work.',
+    kitGlobal: 'Yours',
+    kitGlobalText:
+      'Your skills, hooks and rules — exactly as in normal work. The default when you have a layer of your own.',
     kitOurs: 'Panel kit only',
     kitOursText:
       'The panel’s rules and skills; your personal settings are not loaded. Project files (.claude ' +
@@ -182,7 +183,8 @@ export const localModelsEn: typeof localModelsRu = {
     kitHybrid: 'Yours plus the panel kit',
     kitHybridText:
       'Your kit with the panel’s on top. For Claude Code and Codex (Codex gets the rules and ' +
-      'skills only); Qwen Code has no way to add a kit for a single run.',
+      'skills only); Qwen Code has no way to add a kit for a single run. The default for Claude Code and ' +
+      'Codex while you have no layer of your own: no skills, commands, subagents, CLAUDE.md or AGENTS.md.',
 
     filesTitle: 'Where things live',
     filesCaption:

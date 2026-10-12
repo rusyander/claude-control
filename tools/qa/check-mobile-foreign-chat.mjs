@@ -2,8 +2,11 @@
  * Разговор с чужим CLI на телефоне (эмулятор Android, собранный APK) — путь
  * человека целиком: список разговоров → новый разговор с Codex → вопрос →
  * телефон в фоне → уведомление «Работа закончена» → нажатие → тот же разговор
- * с ответом. Вторая половина — уведомление после того, как на компьютере
- * переключили CLI: разговор открывается только для чтения.
+ * с ответом. Середина — «чистая сессия» с телефона, оба ответа сервера:
+ * опоры нет — просьба её обновить уходит в этот же разговор; опора свежая —
+ * заведён новый разговор в том же каталоге, и телефон переходит в него.
+ * Последняя часть — уведомление после того, как на компьютере переключили CLI:
+ * разговор открывается только для чтения.
  *
  * Что подменено. Панель — одноразовая (`throwaway-stand.mjs`), Codex — настоящий
  * `codex app-server` из `STEER_CLI_DIR` или PATH с временным `CODEX_HOME`;
@@ -18,13 +21,21 @@
  * Запуск: STEER_CLI_DIR=<каталог с codex> node tools/qa/check-mobile-foreign-chat.mjs
  *   [--apk agentdeck.apk] [--shots <каталог>]
  */
-import { existsSync, mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
 import { REPO, reporter, startStand, wait } from './throwaway-stand.mjs';
 import { PACKAGE, device, firstDevice } from './android-device.mjs';
-import { startProxy } from './mobile-device-fixtures.mjs';
+import { startProxy, transcriptDir } from './mobile-device-fixtures.mjs';
 
 const IS_WIN = process.platform === 'win32';
 // Модель держит ответ, пока проверка его не отпустит (через RELEASE_MS после ухода
@@ -47,6 +58,10 @@ const apk = option('--apk');
 const DONE_TITLE = /^(Работа закончена|Work is finished)$/;
 const SEND = /^(Отправить|Send)$/;
 const READ_ONLY = /^(Это разговор|This is a) Codex/;
+const RESTART = /^(Перезапустить в чистой сессии|Restart in a clean session)$/;
+const RESTART_YES = /^(Перезапустить|Restart)$/;
+/** Файл-опора по умолчанию (`HANDOFF_DEFAULT_CHECKPOINT`) — от каталога разговора. */
+const CHECKPOINT = ['.agent', 'PROGRESS.md'];
 
 function notChecked(reason) {
   console.log(`Не проверено: ${reason}`);
@@ -250,6 +265,20 @@ async function askAndLeave(text) {
   return before;
 }
 
+/**
+ * «Чистая сессия» с телефона: ссылка в ленте, подтверждение на месте. Ход,
+ * который она вызвала, доходит до модели, и ответ отпускается сразу — телефон
+ * здесь на переднем плане.
+ */
+async function restartFromPhone() {
+  const turnsBefore = model.turns();
+  await phone.tap(RESTART, 20_000);
+  await phone.tap(RESTART_YES, 10_000);
+  for (let i = 0; i < 60 && model.turns() === turnsBefore; i += 1) await wait(500);
+  model.release();
+  return model.turns() > turnsBefore;
+}
+
 /** Нажать «Работа закончена» в шторке. */
 async function tapNotification() {
   phone.shell('cmd statusbar expand-notifications');
@@ -321,15 +350,48 @@ try {
   const project = join(stand.root, 'proj');
   proxy = await startProxy(stand.apiUrl);
   console.log(`Одноразовая панель ${stand.apiUrl}, прокси :${proxy.port}, устройство ${serial}\n`);
+  // В «Недавних» телефона проект попадает по транскрипту Claude в нём — один
+  // законченный разговор, иначе выбрать его можно только обходом дисков.
+  const seeded = transcriptDir(stand.cfg, project);
+  mkdirSync(seeded, { recursive: true });
+  const seedSession = '5e551011-0000-4000-8000-0000000f0e19';
+  writeFileSync(
+    join(seeded, `${seedSession}.jsonl`),
+    [
+      { type: 'user', uuid: 's1', message: { role: 'user', content: 'seed' } },
+      {
+        type: 'assistant',
+        uuid: 's2',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'text', text: 'ok' }],
+          stop_reason: 'end_turn',
+        },
+      },
+    ]
+      .map((line) =>
+        JSON.stringify({
+          ...line,
+          sessionId: seedSession,
+          cwd: project,
+          timestamp: new Date().toISOString(),
+        }),
+      )
+      .join('\n') + '\n',
+  );
   const registered = await stand.api('/projects', { method: 'POST', body: { path: project } });
   check('проект заведён в реестр одноразовой панели', registered.status === 200, registered.text);
   check('телефон сопряжён с одноразовой панелью', await pair(`http://10.0.2.2:${proxy.port}`));
 
   // — 1. Активен Codex: новый разговор с телефона, ответ в фоне, уведомление ведёт в него.
   console.log('\n— активен Codex');
-  // После сопряжения приложение остаётся в «Настройках».
+  // После сопряжения приложение остаётся в «Настройках». Проект выбирается
+  // первым, как у человека: разговор без него заводится без каталога, и
+  // «чистой сессии» во втором шаге опираться не на что.
   await phone.tap(/^(Home|Главная)$/, 20_000);
-  await phone.tap(/^(Все разговоры|All conversations)$/, 20_000);
+  await phone.tap(/^(Projects|Проекты)$/, 20_000);
+  await phone.tap(/\/proj$/, 20_000);
+  phone.shell(`am start -a android.intent.action.VIEW -d agentdeck://chats ${PACKAGE}`);
   await phone.tap(/^(Новый разговор с|New conversation with) Codex/, 20_000);
   const opened = await phone.waitFor(SEND, 20_000);
   check('кнопка «Новый разговор с Codex» открыла разговор с полем ввода', Boolean(opened));
@@ -354,7 +416,57 @@ try {
     check('баннера «только чтение» нет', (await phone.find(READ_ONLY)).length === 0);
   }
 
-  // — 2. Пока телефон в фоне, на компьютере включили Claude: уведомление открывает
+  // — 2. «Чистая сессия» с телефона: сначала опоры нет, потом она свежая.
+  console.log('\n— чистая сессия с телефона');
+  const [first] = (await stand.api('/provider-chat/chats')).body ?? [];
+  check(
+    'разговор с телефона заведён в каталоге проекта',
+    first?.workdir === project,
+    JSON.stringify(first),
+  );
+  const asked = await restartFromPhone();
+  check('опоры нет — просьба её обновить ушла модели', asked, `запросов к модели ${model.turns()}`);
+  const askedChats = (await stand.api('/provider-chat/chats')).body ?? [];
+  const askedChat = (await stand.api(`/provider-chat/chats/${first?.id}`)).body;
+  const lastHuman = askedChat?.messages?.filter((message) => message.role === 'user').at(-1);
+  check(
+    'просьба ушла в ЭТОТ разговор, нового не заведено',
+    askedChats.length === 1 && /PROGRESS\.md/.test(lastHuman?.content ?? ''),
+    `разговоров ${askedChats.length}; последняя реплика: ${(lastHuman?.content ?? '').slice(0, 160)}`,
+  );
+  await phone.waitFor(new RegExp(ANSWER(model.turns())), 20_000);
+  shot('3-restart-requested');
+
+  // Агент «дописал» опору после последней реплики — продолжение заводится сразу.
+  mkdirSync(join(project, CHECKPOINT[0]), { recursive: true });
+  writeFileSync(join(project, ...CHECKPOINT), `# PROGRESS\n\ncheckpoint ${tag}\n`);
+  // Кнопка снова на месте, только когда ход закончился и экран это увидел.
+  await phone.waitFor(RESTART, 20_000);
+  const started = await restartFromPhone();
+  const startedChats = (await stand.api('/provider-chat/chats')).body ?? [];
+  const next = startedChats.find((chat) => chat.id !== first?.id);
+  check(
+    'опора свежая — заведён новый разговор в том же каталоге, и ход в нём пошёл',
+    started && startedChats.length === 2 && next?.workdir === project,
+    `запросов к модели ${model.turns()}; разговоры: ${JSON.stringify(startedChats.map((chat) => [chat.id, chat.workdir]))}`,
+  );
+  const continuation = await phone.waitFor(new RegExp(ANSWER(model.turns())), 20_000);
+  shot('4-restart-started');
+  check(
+    'телефон перешёл в новый разговор: в ленте ответ продолжения, ответа первого хода нет',
+    Boolean(continuation) && (await phone.find(new RegExp(ANSWER(1)))).length === 0,
+  );
+  check(
+    'на опору сослались в первой реплике нового разговора',
+    readFileSync(join(project, ...CHECKPOINT), 'utf8').includes(tag) &&
+      /PROGRESS\.md/.test(
+        (await stand.api(`/provider-chat/chats/${next?.id}`)).body?.messages?.find(
+          (message) => message.role === 'user',
+        )?.content ?? '',
+      ),
+  );
+
+  // — 3. Пока телефон в фоне, на компьютере включили Claude: уведомление открывает
   // разговор Codex только для чтения, ответ виден.
   console.log('\n— CLI переключён на компьютере, пока телефон в фоне');
   const before2 = await askAndLeave('second question');
@@ -365,11 +477,11 @@ try {
   if (secondPosted) {
     await tapNotification();
     const readOnly = await phone.waitFor(READ_ONLY, 20_000);
-    shot('3-read-only');
+    shot('5-read-only');
     check('разговор Codex открыт с объяснением, почему ответить нельзя', Boolean(readOnly));
     check(
-      'ответ второго хода виден (чтение разговора неактивного CLI)',
-      (await phone.find(new RegExp(ANSWER(2)))).length > 0,
+      'ответ последнего хода виден (чтение разговора неактивного CLI)',
+      (await phone.find(new RegExp(ANSWER(model.turns())))).length > 0,
     );
     check('поля ввода нет', (await phone.find(SEND)).length === 0);
   }

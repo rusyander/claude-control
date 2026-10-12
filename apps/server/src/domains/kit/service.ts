@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, renameSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -70,6 +70,24 @@ const SUPPORT: Record<string, { modes: KitMode[]; localOnly?: boolean; carries?:
     // хук без одобрения в `/hooks` самого Codex не сработает.
     codex: { modes: ['global', 'hybrid'], carries: ['rule', 'skill'] },
   };
+
+/** Каталоги и файлы, по которым видно, что человек настроил CLI сам. */
+const OWN_LAYER_DIRS = ['skills', 'commands', 'agents', 'prompts'];
+const OWN_LAYER_FILES = ['CLAUDE.md', 'AGENTS.md'];
+
+/** У человека есть свой слой в этом доме CLI; недоступный каталог считается своим — не трогаем. */
+function hasOwnLayer(home: string): boolean {
+  try {
+    if (!existsSync(home)) return false;
+    if (OWN_LAYER_FILES.some((name) => existsSync(join(home, name)))) return true;
+    return OWN_LAYER_DIRS.some((name) => {
+      const dir = join(home, name);
+      return existsSync(dir) && readdirSync(dir).length > 0;
+    });
+  } catch {
+    return true;
+  }
+}
 
 interface KitState {
   modes: Record<string, KitMode>;
@@ -171,8 +189,22 @@ export class KitService {
   }
 
   modeOf(provider: string): KitMode {
-    const mode = this.readState().modes[provider] ?? 'global';
+    const mode = this.readState().modes[provider] ?? this.defaultMode(provider);
     return SUPPORT[provider]?.modes.includes(mode) ? mode : 'global';
+  }
+
+  /**
+   * Режим, пока человек его не выбирал. Свой слой есть — работает он, как и
+   * прежде. Слоя нет — ни навыков, ни команд, ни субагентов, ни файла
+   * инструкций — тогда «Глобальные» значили бы прогон вовсе без навыков, на
+   * которые ссылаются строки панели (ревью, конфликт, тесты, сдача MR), и набор
+   * встаёт рядом с пустым слоем («оба набора»).
+   */
+  private defaultMode(provider: string): KitMode {
+    if (provider === 'claude') return hasOwnLayer(this.deps.claudeDir()) ? 'global' : 'hybrid';
+    const codexHome = this.deps.codexHome?.();
+    if (provider === 'codex' && codexHome) return hasOwnLayer(codexHome) ? 'global' : 'hybrid';
+    return 'global';
   }
 
   /**

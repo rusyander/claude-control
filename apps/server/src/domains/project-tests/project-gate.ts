@@ -40,7 +40,7 @@ export function isProjectOrCopy(dir: string, projectPaths: readonly string[]): b
  * `<основная>/apps/web`. Не под git, голый репозиторий или git не ответил —
  * `undefined`: отказ честнее догадки.
  */
-function mainCheckoutOf(dir: string): string | undefined {
+export function mainCheckoutOf(dir: string): string | undefined {
   const top = gitSync(dir, ['rev-parse', '--show-toplevel'])?.trim();
   const common = gitSync(dir, ['rev-parse', '--git-common-dir'])?.trim();
   if (!top || !common) return undefined;

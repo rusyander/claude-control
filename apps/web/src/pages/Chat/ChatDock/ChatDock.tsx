@@ -1,4 +1,6 @@
+import type { ComponentProps } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useDraftValue, type DraftBox } from '@shared/lib/draft';
 import { toast } from '@shared/lib/toast';
 import { formatBytesIn } from '@shared/lib/format';
 import { ChatComposer, MAX_FILE_BYTES, type AttachRejection } from '@features/ChatComposer';
@@ -6,6 +8,19 @@ import { SUPPORTED_UPLOAD_EXTENSIONS } from '../lib/uploads';
 import { ChatQueue } from '@features/ChatQueue';
 import { ChatProgressSheet } from '@features/ChatProgress';
 import type { ChatDockProps } from './ChatDock.types';
+
+type DraftComposerProps = Omit<ComponentProps<typeof ChatComposer>, 'value' | 'onChange'> & {
+  draft: DraftBox;
+};
+
+/**
+ * Поле ввода с подпиской на черновик. Отдельным компонентом, чтобы буква
+ * перерисовывала только его, а не прогресс и очередь рядом.
+ */
+function DraftComposer({ draft, ...rest }: DraftComposerProps) {
+  const value = useDraftValue(draft);
+  return <ChatComposer {...rest} value={value} onChange={draft.set} />;
+}
 
 /**
  * Нижняя часть чата: прогресс агента, очередь дописанного и поле ввода. Всё
@@ -19,8 +34,7 @@ export function ChatDock({
   awaiting,
   queued,
   onCancelQueued,
-  value,
-  onChange,
+  draft,
   onSend,
   onStop,
   onSplitTasks,
@@ -74,10 +88,9 @@ export function ChatDock({
           передумать до отправки. */}
       <ChatQueue items={queued} onCancel={onCancelQueued} />
 
-      <ChatComposer
+      <DraftComposer
         {...(focusKey ? { focusKey } : {})}
-        value={value}
-        onChange={onChange}
+        draft={draft}
         onSend={onSend}
         onStop={onStop}
         // Отказ при вложении — из того же семейства notSent, что и отказ при

@@ -5,12 +5,8 @@ import type { ServerMessageCode, ServerMessageParams } from '@agentdeck/contract
 import { initiativePrompt, QUESTION_DENIED } from '../../../domains/chat/initiative/initiative.ts';
 import { autonomousPickMessage, pickRecommended } from '@agentdeck/contracts/chat-group-settings';
 import {
-  childAppendPrompt,
-  stageOf,
-} from '../../../domains/chat/ChatCascadeStages/ChatCascadeStages.ts';
-import {
   chatKnobsLine,
-  childStageExtra,
+  linkedChildAppend,
   runGroupChoice,
 } from '../../../domains/chat/group-run-lines/group-run-lines.ts';
 import { chatPathHint } from '../../../domains/chat/path-steps/path-steps.ts';
@@ -565,10 +561,15 @@ export function registerChatRunRoutes(
           );
       const appendSystemPrompt =
         (assigned && !workspace.isSandbox
-          ? childAppendPrompt(
-              assigned,
+          ? // Та же сборка, что у продолжения сессии панелью (`review-starter.ts`):
+            // разойдись они, ход менял бы системный промпт сессии (E6).
+            linkedChildAppend(
+              ctx.store,
+              ctx.location.paths.appData,
               ctx.store.getSettings(),
-              childStageExtra(stageOf(assigned), knobsLine),
+              sessionId ? [chatId, sessionId] : [chatId],
+              cwd,
+              parentChatId && parentChatId !== chatId ? parentChatId : undefined,
             )
           : [
               initiative ?? '',

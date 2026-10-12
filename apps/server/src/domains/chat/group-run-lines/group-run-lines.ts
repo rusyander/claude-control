@@ -7,9 +7,10 @@ import { parseForeignChatKey } from '@agentdeck/contracts/foreign-chat-key';
 import { knobsLineForChoice } from '../../groups/knobs/knobs.ts';
 import { readChat } from '../../provider-chat/store/store.ts';
 import { chatPathSteps, scenarioLine, skillInsertsLine } from '../path-steps/path-steps.ts';
-import { stageOf } from '../ChatCascadeStages/ChatCascadeStages.ts';
+import { childAppendPrompt, stageOf } from '../ChatCascadeStages/ChatCascadeStages.ts';
 import { chatGroupSettingsView, storeTreeReader } from '../chat-autonomy/chat-autonomy.ts';
 import { pinnedChoiceAt } from '../group-auto-pick/group-auto-pick.ts';
+import { FOREIGN_CHILD_PROMPT } from '../initiative/initiative.ts';
 
 /**
  * Строки группы в системной дописке прогона: «числа» группы, выбранной в чате
@@ -116,6 +117,30 @@ export function childStageExtra(stage: CascadeStage, knobs: string | undefined):
 }
 
 /**
+ * Системная дописка хода в разговор звена Claude — по его связи, одна на все
+ * входы: ответ человека (`run-routes.ts`) и продолжение той же сессии панелью
+ * — после лимита, паузы, обрыва, слово родителя, публикация ревью
+ * (`review-starter.ts`). Дописка входит в системный промпт, а он у сессии
+ * обязан совпадать байт в байт от хода к ходу: иначе кэш разговора пишется
+ * заново целиком (E6, замер 12.10.2026 по 36 сессиям копий: в 8 продолжение
+ * панелью теряло строку эскалации, которую старт работы дописал). Связи под
+ * ключами разговора нет — разговор не звено, `undefined`.
+ */
+export function linkedChildAppend(
+  store: GroupStore,
+  appData: string,
+  settings: Parameters<typeof childAppendPrompt>[1],
+  keys: readonly string[],
+  cwd: string | undefined,
+  pendingParent?: string,
+): string | undefined {
+  const link = keys.map((key) => store.getChatLink(key)).find(Boolean);
+  if (!link) return undefined;
+  const knobs = chatKnobsLine(store, appData, keys, cwd, pendingParent);
+  return childAppendPrompt(link, settings, childStageExtra(stageOf(link), knobs)) || undefined;
+}
+
+/**
  * Дополнение звена ЧУЖОГО CLI — по его связи (`codex:…`), тем же
  * `childStageExtra`, что у ребёнка Claude. Собирается из одних связи и групп,
  * поэтому совпадает у всех, кто его строит: старт ребёнка, переход стадии,
@@ -138,5 +163,13 @@ export function foreignChildExtra(
   if (!link) return undefined;
   const parsed = parseForeignChatKey(chatKey);
   const cwd = parsed ? readChat(appData, parsed.providerId, parsed.chatId)?.workdir : undefined;
-  return childStageExtra(stageOf(link), chatKnobsLine(store, appData, [chatKey], cwd)) || undefined;
+  const stage = stageOf(link);
+  // Правила ребёнка — всем звеньям группы, кроме разбора: он не группа, а
+  // общий прогон до них (TQ-06).
+  const child = link.parentChatId && stage !== 'triage' ? FOREIGN_CHILD_PROMPT : '';
+  return (
+    [child, childStageExtra(stage, chatKnobsLine(store, appData, [chatKey], cwd))]
+      .filter(Boolean)
+      .join(' ') || undefined
+  );
 }

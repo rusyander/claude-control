@@ -141,6 +141,25 @@ describe('buildEndpointPlan: токен без галочки не попада�
     expect(plan.map((item) => item.key)).toEqual(['OPENAI_BASE_URL', 'OPENAI_MODEL']);
   });
 
+  it('aider получает модель с приставкой `openai/` — без неё litellm до модели не дойдёт', () => {
+    const aider = resolveEndpointVars(getProvider('aider'), 'openai-compat');
+    if (!aider || !('vars' in aider)) throw new Error('у aider пропал совместимый адрес');
+    const model = (name: string) =>
+      buildEndpointPlan(profileOf({ model: name }), aider.vars, undefined, false).find(
+        (item) => item.key === 'AIDER_MODEL',
+      )?.value;
+
+    expect(model('qwen2.5-coder')).toBe('openai/qwen2.5-coder');
+    // Уже с приставкой — второй раз не ставится; имя со своим слэшем её получает.
+    expect(model('openai/gpt-4o')).toBe('openai/gpt-4o');
+    expect(model('qwen/qwen3-coder')).toBe('openai/qwen/qwen3-coder');
+  });
+
+  it('у CLI без приставки имя модели остаётся как есть', () => {
+    const plan = buildEndpointPlan(profileOf({ model: 'qwen2.5' }), vars, undefined, false);
+    expect(plan).toContainEqual({ key: 'OPENAI_MODEL', value: 'qwen2.5', secret: false });
+  });
+
   it('пустая модель не пишется — переменную модели не трогаем', () => {
     const plan = buildEndpointPlan(profileOf({ model: '  ' }), vars, undefined, false);
     expect(plan.map((item) => item.key)).toEqual(['OPENAI_BASE_URL']);

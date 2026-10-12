@@ -1,0 +1,96 @@
+{
+  "title": {
+    "ru": "Группы разделения держат задание владельца, «чистая сессия» на телефоне, ввод без мерцания",
+    "en": "Split groups keep the owner's request, a clean session on the phone, typing without flicker"
+  },
+  "summary": {
+    "ru": "Группы разделения получают слова владельца дословно и сдают работу по их пунктам; на карточке группы видно, что получил агент и сколько ушло токенов. На телефоне появился перезапуск «чистой сессией», а набор текста больше не перерисовывает всю страницу.",
+    "en": "Split groups receive the owner's words verbatim and report against each point; the group card shows what the agent received and where the tokens went. The phone gets a clean-session restart, and typing no longer re-renders the whole page."
+  },
+  "items": [
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Каждая группа разделения получает задание владельца дословно, из всего разговора, а «готово» без отчёта по каждому пункту задания не принимается: панель сначала напоминает той же сессии, а оставшиеся пробелы выносит на карточку.",
+        "en": "Every split group receives the owner's request verbatim, from the whole conversation, and “done” is not accepted without a report on each point: the panel first reminds the same session, and only the remaining gaps reach the card."
+      },
+      "area": { "ru": "Чат", "en": "Chat" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Кнопка «Что получил агент» на карточке группы: дословный вход каждого прогона — реплика, дописка к системному промпту, модель, глубина и флаги слоёв.",
+        "en": "A “What the agent received” button on the group card: the verbatim input of each run — the message, the system prompt addition, model, depth and layer flags."
+      },
+      "area": { "ru": "Чат", "en": "Chat" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Счёт токенов группы на карточке: тяжесть старта, ходы, доля кэша, сжатия и инструкции, загруженные дважды.",
+        "en": "A token count on the group card: start weight, turns, cache share, compactions and instructions loaded twice."
+      },
+      "area": { "ru": "Чат", "en": "Chat" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Копия для группы загружает ровно те инструкции, что и оригинал: исключения CLAUDE.md переписываются на каталог копии, и командные правила больше не грузятся поверх личного слоя.",
+        "en": "A group's copy loads exactly the instructions of the original: CLAUDE.md exclusions are rewritten for the copy's directory, so team rules no longer load on top of the personal layer."
+      },
+      "how": {
+        "ru": "Замер на 36 сессиях групп: около пятой части входа уходило на дубли инструкций, контекст на первом чтении прыгал с 78k до 152k.",
+        "en": "Measured over 36 group sessions: about a fifth of the input went to duplicate instructions, and the context jumped from 78k to 152k on the first read."
+      },
+      "area": { "ru": "Чат", "en": "Chat" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Строка о тестах проекта в системном промпте фиксируется на первом ходе сессии, а перемены приходят в сообщении: кэш разговора не пересобирается посреди работы.",
+        "en": "The project-tests line in the system prompt is fixed on the session's first turn and changes arrive in the message, so the conversation cache is not rebuilt mid-work."
+      },
+      "area": { "ru": "Чат", "en": "Chat" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Наблюдение за MR отличает падение CI на инфраструктуре от падения на коде и один раз повторяет задания само; неполное ревью и после просьбы дочитать не считается «замечаний нет».",
+        "en": "MR watching tells a CI infrastructure failure from a code failure and retries the jobs once by itself; a review left incomplete after a follow-up no longer counts as “no findings”."
+      },
+      "area": { "ru": "Чат", "en": "Chat" }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Чужой CLI продолжает свою сессию между ходами и получает только новые реплики, пока переписка совпадает с тем, что он видел; любое расхождение открывает новую сессию.",
+        "en": "A foreign CLI continues its session between turns and receives only new messages while the conversation matches what it saw; any divergence opens a new session."
+      },
+      "area": { "ru": "Чужие CLI", "en": "Foreign CLIs" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Перезапуск «чистой сессией» на телефоне — у чата Claude и у чата чужого CLI; чат чужого CLI на телефоне идёт маршрутом чужих CLI.",
+        "en": "A clean-session restart on the phone — for Claude chats and for foreign CLI chats; a foreign CLI chat on the phone goes through the foreign CLI route."
+      },
+      "area": { "ru": "Телефон", "en": "Phone" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Набор текста в поле чата, в «Пожелании агенту» тестов, в поиске кейсов и в правилах DLP больше не перерисовывает всю страницу: интерфейс не мерцает при вводе.",
+        "en": "Typing in the chat field, in the tests' “Note to the agent”, in case search and in DLP rules no longer re-renders the whole page, so the interface does not flicker while typing."
+      },
+      "area": { "ru": "Интерфейс", "en": "Interface" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Перенос среды для Aider проверен на настоящем CLI; модель эндпоинта передаётся ему с нужным префиксом.",
+        "en": "Environment transfer for Aider is verified against the real CLI; the endpoint model is passed to it with the prefix it expects."
+      },
+      "area": { "ru": "Перенос среды", "en": "Portability" }
+    }
+  ]
+}

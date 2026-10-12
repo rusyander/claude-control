@@ -49,6 +49,8 @@ const FIX_LINK: ChatLink = {
 };
 
 const STEP_EN = 'Run the whole test suite and paste the summary line.';
+/** Напоминание шагу отчитаться блоком проверки (F10). */
+const NUDGE_MARK = 'ended without the gate block';
 
 describe('шаги пути группы — после стадии, в её чате, с проверкой', () => {
   let root: string;
@@ -58,9 +60,14 @@ describe('шаги пути группы — после стадии, в её ч
   let registry: ChatRunRegistry;
   let runs: { prompt: string; sessionId?: string; model?: string; append?: string }[];
   let ended: { stage?: string; status: string; waitingFor?: string }[];
+  /** Строки ленты, которые планировщик вернул на концы ходов (`textCode`). */
+  let notices: string[];
   let gatePassed: boolean;
-  /** Чем кончается ход шага: блоком проверки, сбоем CLI или вопросом человеку. */
-  let stepEnds: 'gate' | 'error' | 'question';
+  /**
+   * Чем кончается ход шага: блоком проверки, сбоем CLI, вопросом человеку или
+   * без блока (`forgot` — блок приходит на напоминание, `forgot-twice` — нет).
+   */
+  let stepEnds: 'gate' | 'error' | 'question' | 'forgot' | 'forgot-twice';
 
   beforeEach(async () => {
     root = mkdtempSync(join(tmpdir(), 'cc-path-steps-'));
@@ -71,6 +78,7 @@ describe('шаги пути группы — после стадии, в её ч
     store = new AppStore(join(root, 'agentdeck'));
     runs = [];
     ended = [];
+    notices = [];
     gatePassed = true;
     stepEnds = 'gate';
     registry = new ChatRunRegistry((): RunLike => ({
@@ -81,57 +89,72 @@ describe('шаги пути группы — после стадии, в её ч
           ...(options.model ? { model: options.model } : {}),
           ...(options.appendSystemPrompt ? { append: options.appendSystemPrompt } : {}),
         });
+        const nudged = options.prompt.includes(NUDGE_MARK);
+        if (options.prompt.includes(STEP_EN) && stepEnds.startsWith('forgot')) {
+          onEvent({ kind: 'text', text: 'Tests: 12 passed.' });
+          onEvent({ kind: 'done', costUsd: 0, durationMs: 1, sessionId: SESSION });
+          return;
+        }
+        if (nudged && stepEnds === 'forgot-twice') {
+          onEvent({ kind: 'text', text: 'All good, I checked.' });
+          onEvent({ kind: 'done', costUsd: 0, durationMs: 1, sessionId: SESSION });
+          return;
+        }
         if (options.prompt.includes(STEP_EN) && stepEnds !== 'gate') {
           if (stepEnds === 'error') onEvent({ kind: 'error', message: 'API Error 529 overloaded' });
           else onEvent({ kind: 'text', text: 'Which test runner should I use?' });
           onEvent({ kind: 'done', costUsd: 0, durationMs: 1, sessionId: SESSION });
           return;
         }
-        const text = options.prompt.includes(STEP_EN)
-          ? `Tests: 12 passed.\n\n\`\`\`agentdeck:gate\n${JSON.stringify({
-              passed: gatePassed,
-              note: gatePassed ? '12 passed' : '2 tests red',
-            })}\n\`\`\``
-          : 'Правки готовы.';
+        const text =
+          options.prompt.includes(STEP_EN) || nudged
+            ? `Tests: 12 passed.\n\n\`\`\`agentdeck:gate\n${JSON.stringify({
+                passed: gatePassed,
+                note: gatePassed ? '12 passed' : '2 tests red',
+              })}\n\`\`\``
+            : 'Правки готовы.';
         onEvent({ kind: 'text', text });
         onEvent({ kind: 'done', costUsd: 0, durationMs: 1, sessionId: SESSION });
       },
       stop: () => undefined,
     }));
-    registry.setHandoffPlanner(
-      createHandoffPlanner({
-        runs: registry,
-        chains: new HandoffChains(),
-        session: new ChatSession(registry),
-        selfBaseUrl: 'http://127.0.0.1:5178',
-        cascade: {
-          linkOf: (aliases) => aliases.map((key) => store.getChatLink(key)).find(Boolean),
-          saveLink: (chatId, link) => store.setChatLink(chatId, link),
-          markReviewed: () => undefined,
-          hasWork: () => true,
-          settings: () => ({ taskSplitInitiative: true, handoffInitiative: false }),
-        },
-        split: {
-          onTriageFinished: () => undefined,
-          onChainEnded: (link, outcome) =>
-            void ended.push({
-              ...(link.stage ? { stage: link.stage } : {}),
-              status: outcome.status,
-              ...(outcome.waitingFor ? { waitingFor: outcome.waitingFor } : {}),
-            }),
-          delivers: () => true,
-        },
-        // Та же сборка, что в `bootstrap/runtime/runtime.ts`.
-        pathSteps: {
-          stepsAt: (aliases, stage) =>
-            chatPathSteps(
-              store.getGroups(),
-              chatGroupSettingsView(storeTreeReader(store), aliases).groupChoice,
-              stage,
-            ),
-        },
-      }),
-    );
+    const planner = createHandoffPlanner({
+      runs: registry,
+      chains: new HandoffChains(),
+      session: new ChatSession(registry),
+      selfBaseUrl: 'http://127.0.0.1:5178',
+      cascade: {
+        linkOf: (aliases) => aliases.map((key) => store.getChatLink(key)).find(Boolean),
+        saveLink: (chatId, link) => store.setChatLink(chatId, link),
+        markReviewed: () => undefined,
+        hasWork: () => true,
+        settings: () => ({ taskSplitInitiative: true, handoffInitiative: false }),
+      },
+      split: {
+        onTriageFinished: () => undefined,
+        onChainEnded: (link, outcome) =>
+          void ended.push({
+            ...(link.stage ? { stage: link.stage } : {}),
+            status: outcome.status,
+            ...(outcome.waitingFor ? { waitingFor: outcome.waitingFor } : {}),
+          }),
+        delivers: () => true,
+      },
+      // Та же сборка, что в `bootstrap/runtime/runtime.ts`.
+      pathSteps: {
+        stepsAt: (aliases, stage) =>
+          chatPathSteps(
+            store.getGroups(),
+            chatGroupSettingsView(storeTreeReader(store), aliases).groupChoice,
+            stage,
+          ),
+      },
+    });
+    registry.setHandoffPlanner((finished) => {
+      const event = planner(finished);
+      if (event?.kind === 'notice' && event.textCode) notices.push(event.textCode);
+      return event;
+    });
     const ctx = {
       store,
       location: {
@@ -202,10 +225,13 @@ describe('шаги пути группы — после стадии, в её ч
     store.setChatGroupSettings(CHAT, { groupChoice: 'global:tests-first' });
     await say('Поправь по замечаниям ревью');
 
-    // Второй прогон — шаг: английский текст, та же сессия, та же модель.
-    expect(runs[1]?.prompt).toContain(STEP_EN);
-    expect(runs[1]?.prompt).toContain('every test is green');
-    expect(runs[1]?.prompt).not.toContain('Прогони все тесты.');
+    // Второй прогон — шаг: слова владельца как написаны, перевод — подсказкой
+    // после них (владелец, 12.10.2026); та же сессия, та же модель.
+    const stepPrompt = runs[1]?.prompt ?? '';
+    expect(stepPrompt).toContain('Прогони все тесты.');
+    expect(stepPrompt.indexOf('Прогони все тесты.')).toBeLessThan(stepPrompt.indexOf(STEP_EN));
+    expect(stepPrompt).toContain('все тесты зелёные');
+    expect(stepPrompt).toContain('every test is green');
     expect(runs[1]?.sessionId).toBe(SESSION);
     // Третий — доставка, заведённая по ответу стадии, а не шага.
     expect(delivers()).toHaveLength(1);
@@ -247,6 +273,32 @@ describe('шаги пути группы — после стадии, в её ч
     expect(runs).toHaveLength(2);
     expect(ended.at(-1)).toEqual({ stage: 'fix', status: 'awaiting', waitingFor: 'question' });
     expect(store.getChatLink(CHAT)?.pathRun?.pending).toBe('suite');
+  });
+
+  // F10 (12.10.2026): забытый блок проверки — не провал. Без человека рядом
+  // группа ждала бы его зря; шаг один раз просят отчитаться той же сессией.
+  it('шаг без блока проверки просят отчитаться — блок пришёл, доставка идёт', async () => {
+    store.setChatGroupSettings(CHAT, { groupChoice: 'global:tests-first' });
+    stepEnds = 'forgot';
+    await say('Поправь по замечаниям ревью');
+
+    expect(runs[2]?.prompt).toContain(NUDGE_MARK);
+    expect(runs[2]?.sessionId).toBe(SESSION);
+    expect(delivers()).toHaveLength(1);
+    expect(runs).toHaveLength(4);
+    expect(ended.filter((outcome) => outcome.status === 'awaiting')).toEqual([]);
+    // В ленте — напоминание, а не «шаг идёт»: шаг тот же, не новый.
+    expect(notices).toEqual(['path-step-started-notice', 'path-gate-nudge-notice']);
+  });
+
+  it('и на напоминание без блока — цепочка ждёт человека', async () => {
+    store.setChatGroupSettings(CHAT, { groupChoice: 'global:tests-first' });
+    stepEnds = 'forgot-twice';
+    await say('Поправь по замечаниям ревью');
+
+    expect(runs).toHaveLength(3);
+    expect(delivers()).toHaveLength(0);
+    expect(ended.at(-1)).toEqual({ stage: 'fix', status: 'awaiting', waitingFor: 'question' });
   });
 
   it('шаг не заводится второй раз на следующем ходу человека', async () => {

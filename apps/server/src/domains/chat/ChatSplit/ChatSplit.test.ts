@@ -12,6 +12,11 @@ import {
   type TaskSplitProposal,
   UNCONFIRMED_FINDING_LINE,
 } from '@agentdeck/contracts/task-split';
+import {
+  OWNER_PRECEDENCE_LINE,
+  OWNER_TEXT_MAX,
+  SKILL_ROUTE_LINE,
+} from '@agentdeck/contracts/quality-floor';
 import { splitTasks, type SplitGit, type SplitTasksInput } from './ChatSplit.ts';
 
 /**
@@ -103,13 +108,15 @@ describe('блок предложения в ответе агента', () => {
       'Общее',
     );
 
-    expect(prompt).toBe('Общее\n\n1. убрать лишний отступ\n2. выровнять');
+    expect(prompt).toBe(
+      `Общее\n\n1. убрать лишний отступ\n2. выровнять\n\n${SKILL_ROUTE_LINE}\n\n${OWNER_PRECEDENCE_LINE}`,
+    );
   });
 
   it('единственную задачу не нумерует: это готовое задание, а не список', () => {
     const prompt = buildGroupPrompt({ title: 'Раз', branch: 'a', tasks: ['Сделай папку A'] });
 
-    expect(prompt).toBe('Сделай папку A');
+    expect(prompt).toBe(`Сделай папку A\n\n${SKILL_ROUTE_LINE}\n\n${OWNER_PRECEDENCE_LINE}`);
   });
 });
 
@@ -209,22 +216,23 @@ describe('терпимость разбора к именам полей', () =>
 
   // Живая проверка сит 08.10: задача в 3,1 тыс. знаков дошла до группы обрубком
   // «2) После ПЕРВОГО напомин» — без следа, и группа гадала, где остальное.
-  it('длинная задача обрезается с меткой, а не молча', () => {
-    const long = `${'а'.repeat(2_500)} КОНЕЦ`;
+  // Владелец 12.10.2026: текст задания доходит целиком. Потолок — защита от
+  // мусора на сотни тысяч знаков, и обрезка за ним подписана.
+  it('длинная задача доходит целиком; сверх потолка — обрезка с меткой', () => {
+    const long = `${'а'.repeat(50_000)} КОНЕЦ`;
     const parsed = parseSplitProposal({
-      shared: 'б'.repeat(5_000),
+      shared: `${'б'.repeat(50_000)} ХВОСТ`,
       groups: [
         { title: 'Раз', tasks: [long, 'коротко'] },
-        { title: 'Два', prompt: 'в'.repeat(5_000) },
+        { title: 'Два', prompt: 'в'.repeat(OWNER_TEXT_MAX + 10) },
       ],
     });
 
-    const [cut, short] = parsed?.groups[0]?.tasks ?? [];
-    expect(cut).not.toContain('КОНЕЦ');
-    expect(cut).toMatch(/cut by the panel/);
+    const [whole, short] = parsed?.groups[0]?.tasks ?? [];
+    expect(whole).toBe(long);
     expect(short).toBe('коротко');
+    expect(parsed?.shared).toContain('ХВОСТ');
     expect(parsed?.groups[1]?.tasks[0]).toMatch(/cut by the panel/);
-    expect(parsed?.shared).toMatch(/cut by the panel/);
   });
 
   it('терпимость не превращает пустое в предложение', () => {
@@ -440,6 +448,38 @@ describe('разделение задач по чатам', () => {
     expect(byPlan).toContain(UNCONFIRMED_FINDING_LINE);
   });
 
+  /**
+   * У чужого CLI инструмента вопросов нет (F8, 12.10.2026): задание группы
+   * велело ему спрашивать «инструментом AskUserQuestion», и правило было
+   * невыполнимо. Вопрос у него — последняя строка ответа, конец хода.
+   */
+  it('группа чужого CLI спрашивает последней строкой ответа, а не инструментом (F8)', async () => {
+    const run = async (options: { deliver?: boolean; groupQuestions?: 'plan' | 'human' }) => {
+      const prompts: string[] = [];
+      await splitTasks({
+        projectPath: '/repo',
+        proposal: PROPOSAL,
+        startRuns: true,
+        git: fakeGit(),
+        foreign: true,
+        ...options,
+        start: ({ prompt }) => {
+          prompts.push(prompt);
+          return true;
+        },
+      });
+      return prompts[0] ?? '';
+    };
+    for (const prompt of [
+      await run({ deliver: true, groupQuestions: 'human' }),
+      await run({ groupQuestions: 'human' }),
+      await run({ deliver: true }),
+    ]) {
+      expect(prompt).not.toContain('AskUserQuestion');
+      expect(prompt).toContain('last line of your answer');
+    }
+  });
+
   it('доставка выключена — задание как раньше, без слова о MR', async () => {
     const prompts: string[] = [];
 
@@ -637,7 +677,10 @@ describe('разделение задач по чатам', () => {
     expect(first?.startsWith('The panel prepared this copy: Local layer: 3 copied;')).toBe(true);
     expect(first).toContain('dependencies installed with "pnpm install --frozen-lockfile"');
     expect(first).toContain('lock files rewritten by the install were reverted: pnpm-lock.yaml');
-    expect(first).toContain('The environment is ready — do not check or set it up');
+    expect(first).toContain('The environment is ready — do not set it up again');
+    // Готовое не настраивают заново, но отсутствующий инструмент называют.
+    expect(first).toContain('never work around it silently');
+    expect(first).not.toContain('do not check');
     // Само задание — после преамбулы, целиком.
     const task = PROPOSAL.groups[0]?.tasks[0] ?? '';
     expect(task).not.toBe('');

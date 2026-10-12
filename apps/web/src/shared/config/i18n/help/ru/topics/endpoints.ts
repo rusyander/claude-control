@@ -91,7 +91,8 @@ export const endpointsRu = {
       'принимает оба вида. В ~/.qwen/.env.',
     targetAider:
       'AIDER_OPENAI_API_BASE, AIDER_MODEL, AIDER_OPENAI_API_KEY — в ~/.aider.conf.yml, ключ ' +
-      'set-env.',
+      'set-env. Имя модели пишется с приставкой openai/: без неё Aider до совместимого ' +
+      'адреса не доходит.',
     targetAssistant: 'Помощник панели',
     targetAssistantText:
       'Отдельный выбор в том же блоке. Ничего не записывает: панель ходит по адресу ' +

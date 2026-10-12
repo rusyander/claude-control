@@ -25,7 +25,6 @@ import styles from './TestsLibraryTab.module.scss';
 export function TestsLibraryTab({
   board,
   scope,
-  onScopeChange,
   environmentId,
   onEnvironmentChange,
   onStartManual,
@@ -77,7 +76,6 @@ export function TestsLibraryTab({
       <ProjectTestsRunBar
         board={board}
         scope={scope}
-        onScopeChange={onScopeChange}
         environmentId={environmentId}
         onEnvironmentChange={onEnvironmentChange}
       />

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { defaultOurRules, defaultPlatformRules } from '@agentdeck/contracts/platform';
 import type { OurRules, Platform } from '@agentdeck/contracts';
-import { layerOn, lightWindowLayers, runLayers, userMemorySettings } from './layers.ts';
+import { layerOn, lightWindowLayers, runLayers, userMemoryExcludes } from './layers.ts';
 import { defaultPlatformTransport } from '@agentdeck/contracts/platform-transport';
 
 /**
@@ -109,12 +109,7 @@ describe('наши слои в прогоне через контур', () => {
  * `check-run-layers.mjs`, случай 8; здесь — что панель просит ровно нужные файлы.
  */
 describe('исключение личного CLAUDE.md при снятых настройках', () => {
-  const excludes = (args: readonly string[], place: Parameters<typeof userMemorySettings>[1]) => {
-    const text = userMemorySettings(args, place);
-    return text === undefined
-      ? undefined
-      : (JSON.parse(text) as { claudeMdExcludes: string[] }).claudeMdExcludes;
-  };
+  const excludes = userMemoryExcludes;
   const settingsOff = runLayers(withOurs({ settings: false })).args;
 
   it('слой настроек на месте или проекта нет вовсе — исключать нечего', () => {
@@ -124,10 +119,10 @@ describe('исключение личного CLAUDE.md при снятых на
       platform: 'linux' as const,
       fallbackHome: '/home/u',
     };
-    expect(userMemorySettings(runLayers(PLATFORM).args, place)).toBeUndefined();
-    expect(userMemorySettings(runLayers(withOurs({ skills: false })).args, place)).toBeUndefined();
+    expect(userMemoryExcludes(runLayers(PLATFORM).args, place)).toBeUndefined();
+    expect(userMemoryExcludes(runLayers(withOurs({ skills: false })).args, place)).toBeUndefined();
     // Лёгкое окно агента панели снимает `project` целиком — то же правило, ответ «нечего».
-    expect(userMemorySettings(lightWindowLayers().args, place)).toBeUndefined();
+    expect(userMemoryExcludes(lightWindowLayers().args, place)).toBeUndefined();
   });
 
   it('linux: дом и каталог конфигурации, CLAUDE.md монорепозитория не задет', () => {

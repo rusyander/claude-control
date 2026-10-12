@@ -1,0 +1,49 @@
+// Окно «Что получил агент»: прогоны столбцом, у каждого — шапка (когда, чем
+// вели) и разделы входа дословно. Текст — моноширинным блоком со своей
+// прокруткой: вход бывает в сотни килобайт, и окно не должно расти до него.
+.runs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.run {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-3xs) var(--spacing-sm);
+  align-items: baseline;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3xs);
+}
+
+.sectionHead {
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: baseline;
+}
+
+.text {
+  max-height: 320px;
+  margin: 0;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  overflow: auto;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--color-surface-sunken);
+  border-radius: 6px;
+}

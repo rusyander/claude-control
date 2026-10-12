@@ -9,6 +9,7 @@ import { GroupMeta } from '../GroupMeta/GroupMeta';
 import type { ChildStageGroup } from '../ChildStages.types';
 import styles from './GroupText.module.scss';
 import { pendingText } from '../../lib/pendingText';
+import { tokenLedgerText } from '../../lib/tokenLedgerText';
 
 /** Название группы и строка её состояния — одна и та же у строки с чатом и без. */
 export function GroupText({ group, step }: { group: ChildStageGroup; step?: ReactNode }) {
@@ -62,6 +63,7 @@ export function GroupText({ group, step }: { group: ChildStageGroup; step?: Reac
       parts.push(t('chat.cascade.hub.result.commits', { count: group.result.commits }));
     }
   }
+  const tokens = group.tokens ? tokenLedgerText(group.tokens, t, i18n.language) : undefined;
   const branch = [
     group.branch,
     group.base ? t('chat.cascade.hub.base', { branch: group.base }) : undefined,
@@ -146,6 +148,31 @@ export function GroupText({ group, step }: { group: ChildStageGroup; step?: Reac
         >
           {t('chat.cascade.hub.deliveryMissing', { list: missing.join('; ') })}
         </Typography>
+      )}
+      {/* Счёт токенов закрытой группы (E4): утечка инструкций или тяжёлый старт
+          видны на карточке, а не находятся разбором транскриптов руками. */}
+      {tokens && (
+        <span className={styles.titleLine} data-hub-tokens>
+          {tokens.flags.map((flag) => (
+            <Typography
+              key={flag}
+              variant="caption"
+              as="span"
+              className={cn(styles.chip, styles.chipAsk)}
+            >
+              {flag}
+            </Typography>
+          ))}
+          <Typography
+            variant="caption"
+            color="subtle"
+            as="span"
+            className={styles.wrap}
+            title={tokens.median}
+          >
+            {[tokens.usage, tokens.duplicates].filter(Boolean).join(' · ')}
+          </Typography>
+        </span>
       )}
       {/* Хвост последнего ответа (Д16): вопрос, заданный текстом, иначе не видно
           из родителя. Целиком — по наведению. */}

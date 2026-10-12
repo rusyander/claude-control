@@ -52,6 +52,50 @@ function fakeSpawn(seen: Spawned[]) {
   }) as unknown as Parameters<ProviderChatRun['start']>[0]['spawnImpl'];
 }
 
+describe('ProviderChatRun: вход одиночного запуска (TQ-09)', () => {
+  let dir: string;
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'cc-pchat-input-'));
+  });
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  });
+
+  it('вход — промпт, ушедший в argv: указание панели и вся переписка, а не последняя реплика', async () => {
+    const seen: Spawned[] = [];
+    const inputs: string[] = [];
+    const at = '2026-01-01T00:00:00.000Z';
+    // Промпт многострочный, а через обёртку `.cmd` такой не идёт вовсе (отказ
+    // `cmdWouldTruncate`): CLI здесь — нативный исполняемый файл, путь которого
+    // есть на любой машине, и запуск не зависит от того, как стоит goose.
+    const goose = getProvider('goose');
+    const native = { command: process.execPath, windowsCommand: process.execPath };
+    await new ProviderChatRun().start(
+      {
+        provider: { ...goose, cli: { ...goose.cli, ...native } },
+        history: [
+          { id: 'm1', role: 'user', content: 'Первый вопрос', at },
+          { id: 'm2', role: 'assistant', content: 'Первый ответ', at },
+          { id: 'm3', role: 'user', content: 'Второй вопрос', at },
+        ],
+        chatId: 'chat',
+        appDataDir: dir,
+        detect: () => true,
+        spawnImpl: fakeSpawn(seen),
+        systemPrefix: 'УКАЗАНИЕ ПАНЕЛИ',
+        onInput: (text: string) => inputs.push(text),
+      } as Parameters<ProviderChatRun['start']>[0],
+      () => undefined,
+    );
+
+    expect(inputs).toHaveLength(1);
+    expect(seen[0]?.args).toContain(inputs[0]);
+    expect(inputs[0]).toContain('УКАЗАНИЕ ПАНЕЛИ');
+    expect(inputs[0]).toContain('Первый вопрос');
+    expect(inputs[0]).toContain('Второй вопрос');
+  });
+});
+
 describe('ProviderChatRun: одиночный запуск Goose', () => {
   let dir: string;
   beforeEach(() => {

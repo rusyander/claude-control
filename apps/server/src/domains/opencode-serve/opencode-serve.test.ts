@@ -172,6 +172,27 @@ describe('OpencodeServe: локальный сервер и сессии', () =>
     expect(serve.currentBaseUrl()).toBeUndefined();
   });
 
+  it('новая сессия получает вступление разговора, живая — только новое (TQ-04)', async () => {
+    const { fetchImpl, calls } = fakeServer();
+    const serve = new OpencodeServe();
+    // «Что получил агент» (TQ-09) пишется тем, что ушло, а не тем, что предложили.
+    const sent: string[] = [];
+    const deps = {
+      ...depsOf(fetchImpl, { spawnImpl: vi.fn(() => fakeChild()) }),
+      onSent: (text: string) => void sent.push(text),
+    };
+
+    await serve.ask('conv-1', 'второй ход', { ...deps, opening: 'ВСТУПЛЕНИЕ\n\nпервый ход' });
+    await serve.ask('conv-1', 'третий ход', { ...deps, opening: 'ВСТУПЛЕНИЕ\n\nвсё сначала' });
+
+    const texts = calls
+      .filter((call) => call.url.includes('/message'))
+      .map((call) => (call.body as { parts: { text: string }[] }).parts[0]?.text);
+    expect(texts).toEqual(['ВСТУПЛЕНИЕ\n\nпервый ход', 'третий ход']);
+    expect(sent).toEqual(texts);
+    serve.dispose();
+  });
+
   it('снятие посреди старта снимает и поднимающийся процесс, а не оставляет его сиротой', async () => {
     const child = fakeChild();
     const kill = vi.spyOn(child, 'kill');

@@ -560,6 +560,45 @@ describe.skipIf(!GIT_AVAILABLE)('дыры зеркала, закрытые 17.09
     expect(after.ready).toBe(true);
     expect(existsSync(join(created.path, '.mcp.json'))).toBe(true);
   });
+
+  it('откаченный в копии .mcp.json — дыра по серверам, добор пишет его поверх времени', async () => {
+    // Отслеживаемый `.mcp.json` с локальной правкой под `skip-worktree` в
+    // оригинале: ровно та раскладка, где копия после операции с индексом
+    // остаётся с файлом, но без серверов.
+    writeFileSync(join(dir, '.mcp.json'), '{"mcpServers":{"design":{}}}\n');
+    gitIn(dir, 'add', '.mcp.json');
+    gitIn(dir, 'commit', '-m', 'mcp');
+    writeFileSync(join(dir, '.mcp.json'), '{"mcpServers":{"design":{},"forge":{},"tracker":{}}}\n');
+    gitIn(dir, 'update-index', '--skip-worktree', '.mcp.json');
+    const past = new Date(Date.now() - 3_600_000);
+    utimesSync(join(dir, '.mcp.json'), past, past);
+    const created = await addWorktree(dir, 'feature/mcp-revert');
+    expect(checkCopyReady({ mainDir: dir, copyDir: created.path }).ready).toBe(true);
+
+    // Агент копии откатил файл: флаг снят, в рабочем дереве — версия коммита,
+    // и по времени она свежее рабочей версии оригинала.
+    gitIn(created.path, 'update-index', '--no-skip-worktree', '.mcp.json');
+    gitIn(created.path, 'checkout', '--', '.mcp.json');
+
+    const before = checkCopyReady({ mainDir: dir, copyDir: created.path });
+    expect(before.ready).toBe(false);
+    expect(before.gaps).toEqual([{ kind: 'mcp', path: '.mcp.json', names: ['forge', 'tracker'] }]);
+    expect(describeGaps(before.gaps)).toContain('forge, tracker');
+
+    const after = await repairCopy({ mainDir: dir, copyDir: created.path });
+    expect(after).toMatchObject({ ready: true, gaps: [] });
+    expect(readFileSync(join(created.path, '.mcp.json'), 'utf8')).toContain('"tracker"');
+    // Флаг вернулся: правка не видна git копии и в коммит группы не уедет.
+    expect(gitIn(created.path, 'ls-files', '-v', '.mcp.json').startsWith('S ')).toBe(true);
+    expect(gitIn(created.path, 'status', '--porcelain', '--', '.mcp.json')).toBe('');
+  });
+
+  it('лишний сервер копии — не дыра: его мог завести сам агент', async () => {
+    writeFileSync(join(dir, '.mcp.json'), '{"mcpServers":{"design":{}}}\n');
+    const created = await addWorktree(dir, 'feature/mcp-extra');
+    writeFileSync(join(created.path, '.mcp.json'), '{"mcpServers":{"design":{},"scratch":{}}}\n');
+    expect(checkCopyReady({ mainDir: dir, copyDir: created.path }).ready).toBe(true);
+  });
 });
 
 describe('запись доступа: спрашиваем только там, где можем ответить', () => {

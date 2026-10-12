@@ -150,6 +150,23 @@ describe('chainOutcomeOf', () => {
     });
   });
 
+  it('ревью, которое панель сама продолжила (A0, свидетель), ждёт своего хода, а не «проверено»', () => {
+    const followUp = {
+      ...REVIEW,
+      review: {
+        ...REVIEW.review!,
+        findings: [],
+        decision: 'none' as const,
+        decidedAt: 'now',
+        followUp: true,
+      },
+    };
+    expect(chainOutcomeOf({ link: followUp, ok: true, text: 'Чисто.' })).toMatchObject({
+      status: 'awaiting',
+      waitingFor: 'review-follow-up',
+    });
+  });
+
   it('ревью без замечаний — «проверено», а не «сделано»; отправленные правки — pushed', () => {
     const clean = {
       ...REVIEW,

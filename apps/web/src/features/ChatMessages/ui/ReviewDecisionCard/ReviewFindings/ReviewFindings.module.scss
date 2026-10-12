@@ -9,6 +9,11 @@
   color: var(--color-fg);
 }
 
+.gaps {
+  margin: var(--spacing-3xs) 0 0;
+  padding-left: var(--spacing-md);
+}
+
 .list {
   margin: 0 0 var(--spacing-sm);
   padding-left: var(--spacing-md);

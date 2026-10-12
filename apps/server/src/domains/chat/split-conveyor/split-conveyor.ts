@@ -31,7 +31,10 @@ import type {
   ChatLink,
   SplitPlanGroupRecord,
   SplitPlanRecord,
+  SplitTokenFlag,
+  SplitTokenLedger,
 } from '../../../lib/app-store/app-store.types.ts';
+import { coldStartMedian, tokenFlags } from '../token-ledger/token-ledger.ts';
 import type { ChatEvent } from '../ChatRunner/ChatRunner.ts';
 import type { RunFinished } from '../ChatRunRegistry/ChatRunRegistry.ts';
 import type { SplitGroupContext } from '../ChatSplit/ChatSplit.ts';
@@ -39,6 +42,8 @@ import { coded } from '../../../lib/server-text/server-text.ts';
 import type { GroupTestsVerdict } from '../tests-gate/tests-gate.ts';
 import { normalizePath } from '../../project-runner/targets.ts';
 import { localizeText, matchText, serverText } from '../../../lib/server-texts/server-texts.ts';
+import { ownerCoverageGaps } from '../owner-coverage/owner-coverage.ts';
+import { hasOwnerRequest } from '@agentdeck/contracts/quality-floor';
 import {
   deliveryIncompleteText,
   deliveryMissingCodesOf,
@@ -130,6 +135,15 @@ export interface SplitConveyorDeps {
    * остальное работает как раньше.
    */
   watchOverlap?: (parentChatId: string) => void;
+  /**
+   * Счёт токенов группы (E4): цепочка кончилась, транскрипты её звеньев полны.
+   * Не задан — карточки нет, всё остальное как раньше.
+   */
+  tokenLedger?: (
+    record: SplitPlanRecord,
+    group: SplitPlanGroupRecord,
+    provider: string,
+  ) => Promise<SplitTokenLedger | undefined>;
   /**
    * Сколько групп разделения работает одновременно (настройка проекта). Не
    * задан — без ограничения. Сверх него готовые группы ждут в очереди
@@ -923,10 +937,60 @@ export class SplitConveyor {
     // считать её пересечения можно прямо сейчас. Оно асинхронное и отдельное:
     // ни один отказ git не должен помешать соседям стартовать.
     this.deps.watchOverlap?.(record.parentChatId);
+    this.measureTokens(record, group);
 
     void this.launchNext(record).catch((error) => {
       this.deps.log('split conveyor: launch after chain end failed', error);
     });
+  }
+
+  /**
+   * Счёт токенов закрытой группы (E4). Асинхронный — транскрипты бывают в
+   * десятки мегабайт; запись перечитывается после ответа, сбой счёта группу
+   * не трогает.
+   */
+  private measureTokens(record: SplitPlanRecord, group: SplitPlanGroupRecord): void {
+    const measure = this.deps.tokenLedger;
+    if (!measure) return;
+    const { parentChatId } = record;
+    const { index } = group;
+    void measure(record, group, providerOf(record))
+      .then((ledger) => {
+        if (!ledger) return;
+        const fresh = this.deps.store.get(parentChatId);
+        const same = fresh?.groups[index];
+        if (!fresh || !same) return;
+        same.tokenLedger = ledger;
+        this.deps.store.set(fresh);
+      })
+      .catch((error: unknown) => {
+        this.deps.log('split conveyor: token ledger failed', error);
+      });
+  }
+
+  /**
+   * Счёт группы для хаба — с медианой холодного старта по всем группам того
+   * же проекта: «тяжёлый старт» значит тяжелее, чем обычно здесь.
+   */
+  private tokenView(
+    record: SplitPlanRecord,
+    ledger: SplitTokenLedger,
+  ): { tokenLedger: SplitTokenLedger; tokenFlags?: SplitTokenFlag[]; tokenMedian?: number } {
+    const project = record.projectPath ? normalizePath(record.projectPath) : undefined;
+    const peers = Object.values(this.deps.store.all())
+      .filter((other) =>
+        project
+          ? other.projectPath !== undefined && normalizePath(other.projectPath) === project
+          : other.parentChatId === record.parentChatId,
+      )
+      .flatMap((other) => other.groups.flatMap((group) => group.tokenLedger ?? []));
+    const median = coldStartMedian(peers);
+    const flags = tokenFlags(ledger, median);
+    return {
+      tokenLedger: ledger,
+      ...(flags.length > 0 ? { tokenFlags: flags } : {}),
+      ...(median !== undefined ? { tokenMedian: median } : {}),
+    };
   }
 
   /**
@@ -1065,7 +1129,16 @@ export class SplitConveyor {
       this.deps.store.set(record);
     }
     // Готовность по следам звеньев — вместе с фактами git (аудит 25.09, L110).
-    verdict = { ...verdict, missing: [...verdict.missing, ...stageTraceGaps(group.stageTrace)] };
+    // След требований (U2): пункт слов владельца без отчёта или с «fail» держит
+    // группу так же, как незапушенная ветка, — досдаёт его напоминание.
+    verdict = {
+      ...verdict,
+      missing: [
+        ...verdict.missing,
+        ...stageTraceGaps(group.stageTrace),
+        ...ownerCoverageGaps(group.sieveRows, hasOwnerRequest(record.proposal.shared)),
+      ],
+    };
     // Сработавшее сито — блокер, пойманный до MR: в счёт панели раз на группу
     // и класс, сколько бы напоминаний ни понадобилось.
     const fresh = (verdict.sieveClasses ?? []).filter(
@@ -1726,6 +1799,7 @@ export class SplitConveyor {
           : {}),
         ...(group.deliveryNudges ? { deliveryNudges: group.deliveryNudges } : {}),
         ...(group.testsVerdict ? { testsVerdict: group.testsVerdict } : {}),
+        ...(group.tokenLedger ? this.tokenView(record, group.tokenLedger) : {}),
         ...(group.deliver !== undefined ? { deliver: group.deliver } : {}),
         ...(group.interruptedAt ? { interruptedAt: group.interruptedAt } : {}),
         ...(group.interruptResumes ? { interruptResumes: group.interruptResumes } : {}),

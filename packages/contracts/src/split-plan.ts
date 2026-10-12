@@ -1,5 +1,11 @@
 import { blockLang, blockLangPattern } from './brand.ts';
 import { ANSWER_LANGUAGE_LINE } from './model-cascade.ts';
+import {
+  labelledCut,
+  OWNER_PRECEDENCE_LINE,
+  OWNER_TEXT_MAX,
+  withoutPrecedence,
+} from './quality-floor.ts';
 import { SPLIT_MAX_GROUPS } from './task-split.ts';
 /**
  * Два уровня плана ПЕРЕД работой групп разделения (Т1, 09.09.2026).
@@ -25,10 +31,11 @@ export const PLAN_BLOCK_LANG = blockLang('plan');
 /** Потолки разбора: всё сверх них — не план, а простыня. */
 const MAX_GROUPS = SPLIT_MAX_GROUPS;
 const MAX_TASKS = 50;
-const MAX_TASK = 2_000;
+/** Задача и заметки — текст владельца и разбора: режется только с меткой (`labelledCut`). */
+const MAX_TASK = OWNER_TEXT_MAX;
 const MAX_OWNS = 40;
 const MAX_OWN = 200;
-const MAX_NOTES = 2_000;
+const MAX_NOTES = OWNER_TEXT_MAX;
 const MAX_QUESTION = 600;
 const MAX_CONFLICTS = 40;
 const MAX_WHY = 400;
@@ -36,10 +43,14 @@ const MAX_WHY = 400;
 const MAX_GROUP_KEY = 200;
 /** Сколько групп панели разбор видит в каталоге: дальше это уже не выбор, а простыня. */
 export const TRIAGE_CATALOG_MAX = 40;
-/** План группы: 12k знаков — дальше это не план, а второй разговор. */
-export const PLAN_MAX_CHARS = 12_000;
+/**
+ * План группы. Раньше 12k с молчаливой обрезкой: длинный план терял шаги и
+ * критерии приёмки посреди слова, а работа считала его целым. Теперь потолок —
+ * защита от мусора, и обрезка подписана.
+ */
+export const PLAN_MAX_CHARS = OWNER_TEXT_MAX;
 /** Задание в связи: столько панель хранит, чтобы собрать первое сообщение работе. */
-export const TASK_MAX_CHARS = 16_000;
+export const TASK_MAX_CHARS = OWNER_TEXT_MAX;
 
 /** Что разбор сказал про одну группу. Индексы — с нуля, как в предложении. */
 export interface SplitPlanGroup {
@@ -83,11 +94,23 @@ function text(value: unknown, limit: number): string | undefined {
   return trimmed ? trimmed.slice(0, limit) : undefined;
 }
 
-function list(value: unknown, limit: number, itemLimit: number): string[] {
+/** Текст, который читает агент как инструкцию: обрезка только с меткой. */
+function prose(value: unknown, limit: number): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed ? labelledCut(trimmed, limit) : undefined;
+}
+
+function list(
+  value: unknown,
+  limit: number,
+  itemLimit: number,
+  cut: (value: unknown, limit: number) => string | undefined = text,
+): string[] {
   const raw = Array.isArray(value) ? value : typeof value === 'string' ? [value] : [];
   return raw
     .slice(0, limit)
-    .map((item) => text(item, itemLimit))
+    .map((item) => cut(item, itemLimit))
     .filter((item): item is string => Boolean(item));
 }
 
@@ -167,13 +190,13 @@ export function parseSplitPlan(raw: unknown, titles?: readonly string[]): SplitP
         : holdRaw && typeof holdRaw === 'object'
           ? text((holdRaw as { question?: unknown }).question, MAX_QUESTION)
           : undefined;
-    const notes = text(group.notes ?? group.note, MAX_NOTES);
+    const notes = prose(group.notes ?? group.note, MAX_NOTES);
     const groupKey = text(group.groupKey, MAX_GROUP_KEY);
 
     groups.push({
       index,
       owns: list(group.owns ?? group.files, MAX_OWNS, MAX_OWN),
-      tasks: list(group.tasks, MAX_TASKS, MAX_TASK),
+      tasks: list(group.tasks, MAX_TASKS, MAX_TASK, prose),
       ...(notes ? { notes } : {}),
       after: refList(group.after ?? group.dependsOn, titles).filter((ref) => ref !== index),
       ...(hold ? { hold } : {}),
@@ -289,7 +312,7 @@ export function scanPlanBlocks(source: string): PlanScan {
   }
   if (closeAt < 0) return { text: before.trim() };
 
-  const plan = rest.slice(0, closeAt).trim().slice(0, PLAN_MAX_CHARS);
+  const plan = labelledCut(rest.slice(0, closeAt).trim(), PLAN_MAX_CHARS);
   const after = rest.slice(closeAt + closeLen);
   const textOut = `${before}${after}`.replace(/\n{3,}/g, '\n\n').trim();
   return { text: textOut, ...(plan ? { plan } : {}) };
@@ -329,12 +352,18 @@ function keyOf(task: string): string {
     .trim();
 }
 
+/** Короче — слишком общее начало («починить»), чтобы считать задачи одной. */
+const SAME_TASK_PREFIX_MIN = 24;
+
 /** Одна и та же задача, если нормализованные тексты совпадают или один начинается другим (60 знаков). */
 function sameTask(a: string, b: string): boolean {
   const ka = keyOf(a);
   const kb = keyOf(b);
   if (!ka || !kb) return false;
   if (ka === kb) return true;
+  // Обрезанная копия короче 60 знаков — та же задача, а не новая (F7).
+  const [shorter, longer] = ka.length <= kb.length ? [ka, kb] : [kb, ka];
+  if (shorter.length >= SAME_TASK_PREFIX_MIN && longer.startsWith(shorter)) return true;
   const head = 60;
   return ka.slice(0, head) === kb.slice(0, head);
 }
@@ -358,11 +387,22 @@ export function applySplitPlan(
   const repairs: string[] = [];
   const byIndex = new Map(plan.groups.map((group) => [group.index, group]));
 
+  // Задача разбора, похожая на исходную, но не равная ей, — пересказ: в работу
+  // уходят слова исходной задачи (F7, 12.10.2026: разбор обрезал «…и при этом
+  // ОБЯЗАТЕЛЬНО добавить тест», и хвост пропадал молча).
+  const originals = groups.flatMap((group) => group.tasks);
+  const verbatim = (task: string): string => {
+    const original = originals.find((known) => sameTask(known, task));
+    if (!original || keyOf(original) === keyOf(task)) return task;
+    repairs.push(`задача «${task.slice(0, 60)}» в разборе сокращена — оставлен исходный текст`);
+    return original;
+  };
+
   // Задачи: сперва то, что назначил разбор, с вычетом повторов между группами.
   const seen: string[] = [];
   const tasksOf = groups.map((group, index) => {
     const planned = byIndex.get(index);
-    const source = planned && planned.tasks.length > 0 ? planned.tasks : group.tasks;
+    const source = planned && planned.tasks.length > 0 ? planned.tasks.map(verbatim) : group.tasks;
     const own: string[] = [];
     for (const task of source) {
       if (own.some((known) => sameTask(known, task))) continue;
@@ -556,6 +596,7 @@ export function triageStagePrompt(input: {
     ...catalogLines(input.catalog ?? []),
     'Before the block, briefly tell the human what overlapped and how it was separated. Nothing after the block.',
     ANSWER_LANGUAGE_LINE,
+    OWNER_PRECEDENCE_LINE,
   ]
     .filter((line) => line !== undefined)
     .join('\n');
@@ -678,7 +719,7 @@ export function planStagePrompt(input: {
     'EDIT NOTHING: read code, search, run read-only checks. Edits are not your stage.',
     '',
     "The group's task:",
-    input.task,
+    withoutPrecedence(input.task),
     '',
     ...boundaries(input),
     input.kind ? `Class of work in the panel's view: ${input.kind}.` : '',
@@ -688,14 +729,19 @@ export function planStagePrompt(input: {
     '2. References in the repository: how similar things are already done here (files, patterns) — the work copies them rather than inventing.',
     '3. At least two approaches with their strengths and weaknesses, and the choice of the strong one with the reasoning.',
     '4. Steps in order, each with the files it touches and a check after it (a command or what to look at).',
-    '5. Acceptance criteria — what counts as done.',
-    '6. "Do not touch": the boundaries from the triage and everything you found yourself.',
-    '7. Open questions, if any remain — with your recommended answer.',
+    // U13: критерии — по пунктам владельца, иначе ревью сверяет работу с
+    // пересказом плана, а не с тем, что просили; уровень проверки называется до
+    // первой правки (глобальное правило владельца), а не подбирается под итог.
+    "5. Acceptance criteria — what counts as done, one for every point of the task (when it carries the owner's request, every point of it: a condition, a check, a depth, a format or a permission the owner named is a point too).",
+    '6. Verification level, named before the first edit: which check proves each criterion (a unit or integration test, a live run on the stand, a command and the output that counts) and what would make it go red.',
+    '7. "Do not touch": the boundaries from the triage and everything you found yourself.',
+    '8. Open questions, if any remain — with your recommended answer.',
     '',
     `End your answer with EXACTLY ONE code block in the language ${PLAN_BLOCK_LANG} containing the plan in markdown, ` +
-      `no longer than ${Math.round(PLAN_MAX_CHARS / 1000)} thousand characters. Do not use triple backticks inside the plan ` +
+      'as long as the work needs and no longer. Do not use triple backticks inside the plan ' +
       '(commands in single ones). Nothing after the block.',
     ANSWER_LANGUAGE_LINE,
+    OWNER_PRECEDENCE_LINE,
   ]
     .filter((line) => line !== undefined)
     .join('\n');
@@ -712,7 +758,7 @@ export function workAfterPlanPrompt(input: {
   plan?: string;
 }): string {
   return [
-    input.task,
+    withoutPrecedence(input.task),
     '',
     ...boundaries(input),
     '',
@@ -723,6 +769,46 @@ export function workAfterPlanPrompt(input: {
         `Plan:\n${input.plan}`
       : "The panel did not receive this group's plan (the plan run gave no block or did not finish) — " +
         'plan yourself: first the code analysis and references, then steps with a check after each.',
+    '',
+    OWNER_PRECEDENCE_LINE,
+  ]
+    .filter((line) => line !== undefined)
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+/**
+ * Первое сообщение РАБОТЕ, поднятой на потолок (F4, 12.10.2026). Понижённой
+ * работе обещано: упрёшься — остановись, работа продолжится на модели сильнее.
+ * Вот это продолжение: то же задание и границы, а ответ остановившейся работы —
+ * подсказка, а не приговор: остановить её могла и слабость модели, и настоящая
+ * развилка, которую решает владелец.
+ */
+export function raisedWorkPrompt(input: {
+  task: string;
+  owns?: string[];
+  notes?: string;
+  plan?: string;
+  /** Ответ остановившейся понижённой работы. */
+  report: string;
+}): string {
+  const report = input.report.trim();
+  return [
+    withoutPrecedence(input.task),
+    '',
+    ...boundaries(input),
+    '',
+    input.plan ? `Plan written in advance for this group:\n${input.plan}` : undefined,
+    '',
+    'A model below this one was given this task in this same copy and stopped without changing ' +
+      'anything. Do the task yourself at full strength. Read its report as a lead, not as a ' +
+      'verdict: what it called too hard may be within reach, and what it called blocked has to be ' +
+      'checked, not repeated. A decision only the owner can take — name it with the evidence and ' +
+      'end the turn.',
+    ...(report ? ['', `Report of the stopped run:\n${labelledCut(report, TASK_MAX_CHARS)}`] : []),
+    '',
+    OWNER_PRECEDENCE_LINE,
   ]
     .filter((line) => line !== undefined)
     .join('\n')

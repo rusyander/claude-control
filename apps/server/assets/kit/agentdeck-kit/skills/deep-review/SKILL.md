@@ -60,6 +60,12 @@ that covered it; with lanes, `review-plan check` computes it and prints the `**L
 "No blocking" and "clean" are earned only by a ledger with no unread zone and a
 radius that was not truncated; short of that, the verdict names what stayed uncovered.
 
+**Quick request** ("quick", "just glance", «быстро», «глянь») sets the depth, never whether the review
+runs: no lanes and no stand, but every changed file is read or named unread in the ledger, and docs,
+i18n and help are never cut to save time. T2, a single pass, a partial zone or a truncated radius → the
+verdict is "not fully checked" naming what stayed uncovered, never "no findings". Why: a quick pass
+that skipped the docs once reported clean over two docs blockers.
+
 **Lanes** — `node <kit>/tools/review-plan.mjs plan --base <sha> --out <dir>` cuts the zones into
 chunks and sizes the fleet: T0 none; ≤100 files → 2 lane agents, over 100 → 4. No question before the
 spawn (review agents run unasked, per the kit delegation rule) — one line names the plan's `grant:` numbers and
@@ -197,8 +203,9 @@ finding stands alone under a stable id (`F-01`) with a `Status` line and carries
 — thesis, evidence, fix direction — and the report ends where the findings do. A second review of the
 scope opens with `review-sync --write` and updates the same file in place. Header lines, section order,
 fields, `Coverage` / `Passes` / `Acceptance` / `Classes` / `Live`, computed counts:
-[references/report-shape.md](references/report-shape.md). Chat gets the digest — scope, blocking
-theses, path, **raised · published · confirmed**; candidates killed under proof are a result. The
+[references/report-shape.md](references/report-shape.md). Chat gets the digest — scope, **raised ·
+published · confirmed**, every 🔴/🟡/❓ as a references/finding-card.md card, never a list item; 🟢 as a
+count; candidates killed under proof are a result. The
 finished review then runs against [references/red-flags.md](references/red-flags.md).
 
 ## 7. Own code — the fix loop

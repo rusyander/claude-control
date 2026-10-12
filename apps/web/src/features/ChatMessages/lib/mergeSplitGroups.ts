@@ -79,6 +79,15 @@ export function mergeSplitGroups(
         ...deliveryMissingOf(group),
         ...(group.deliveryNudges ? { deliveryNudges: group.deliveryNudges } : {}),
         ...(group.testsVerdict ? { testsVerdict: group.testsVerdict } : {}),
+        ...(group.tokenLedger
+          ? {
+              tokens: {
+                ledger: group.tokenLedger,
+                flags: group.tokenFlags ?? [],
+                ...(group.tokenMedian !== undefined ? { median: group.tokenMedian } : {}),
+              },
+            }
+          : {}),
         // Оборванная группа (WP1c): идущему звену кнопка не нужна — его уже
         // продолжили.
         ...(!found.row.isRunning && group.waitingFor === 'interrupted' && group.interruptedAt

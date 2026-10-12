@@ -97,6 +97,25 @@ describe('название чата мимо преамбулы панели', (
     expect(chatTitleText([user(review), user('Почему упал линт?')])).toBe('Почему упал линт?');
   });
 
+  it('звено за преамбулой панели — тоже целиком панель', () => {
+    const review = reviewStagePrompt({ task: 'x', branch: 'fix/login' });
+    const prompt = `${environmentPreamble({})}\n\n${deliveryPreamble({ branch: 'fix/login' })}\n\n${review}`;
+
+    expect(chatTitleText([user(prompt)])).toBe('');
+  });
+
+  /**
+   * G1 (12.10.2026): строка звена В СЕРЕДИНЕ слов человека — цитата, а не
+   * задание панели. Раньше любая такая строка выбрасывала реплику целиком, и
+   * человек, спросивший о присланном агенту тексте, оставался без названия чата.
+   */
+  it('человек цитирует строку звена — его реплика остаётся его словами', () => {
+    const quoted = reviewStagePrompt({ task: 'x', branch: 'fix/login' }).split('\n')[0] ?? '';
+    const said = `Почему ревью получило вот это?\n${quoted}\nОно же ничего не правит.`;
+
+    expect(chatTitleText([user(said)]).startsWith('Почему ревью получило вот это?')).toBe(true);
+  });
+
   it('реплика человека, начатая теми же словами не с начала строки, не пропускается', () => {
     expect(chatTitleText([user('Объясни, что значит «Это новая сессия: …» в чате')])).toBe(
       'Объясни, что значит «Это новая сессия: …» в чате',

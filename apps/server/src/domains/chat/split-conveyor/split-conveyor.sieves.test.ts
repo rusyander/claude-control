@@ -4,6 +4,7 @@ import type { LearnedSieveRow, SieveClass } from '@agentdeck/contracts/sieves';
 import type { ChatLink, SplitPlanRecord } from '../../../lib/app-store/app-store.types.ts';
 import { localizeText, serverText } from '../../../lib/server-texts/server-texts.ts';
 import { chainOutcomeOf } from '../chain-outcome/chain-outcome.ts';
+import { ownerRequestBlock, withOwnerRequest } from '@agentdeck/contracts/quality-floor';
 import { SplitConveyor, type SplitConveyorDeps, type SplitDeliveryDeps } from './split-conveyor.ts';
 
 /**
@@ -19,7 +20,10 @@ const MR = 'https://tracker.example.com/app/-/merge_requests/7';
 const PROPOSAL = { groups: [{ title: 'Раз', branch: 'feature/one', tasks: ['PROJ-1 первая'] }] };
 const LANG = 'agentdeck:sieves';
 
-function build(verdicts: Awaited<ReturnType<SplitDeliveryDeps['facts']>>[]) {
+function build(
+  verdicts: Awaited<ReturnType<SplitDeliveryDeps['facts']>>[],
+  proposal: SplitPlanRecord['proposal'] = PROPOSAL,
+) {
   const records = new Map<string, SplitPlanRecord>();
   const nudges: string[] = [];
   const scheduled: (() => void)[] = [];
@@ -101,7 +105,7 @@ function build(verdicts: Awaited<ReturnType<SplitDeliveryDeps['facts']>>[]) {
     await conveyor.begin({
       parentChatId: PARENT,
       projectPath: 'C:/repo',
-      proposal: PROPOSAL,
+      proposal,
       request: {},
     });
     conveyor.onTriageFinished({ ok: true, text: 'без блока' }, ['triage']);
@@ -181,5 +185,65 @@ describe('SplitConveyor: сита перед MR', () => {
     // Задание группе — по-английски: строка пробела сита переведена, не русская.
     expect(localizeText(gap, 'en')).not.toBe(gap);
     expect(t.nudges[0]).toContain(localizeText(gap, 'en'));
+  });
+});
+
+/**
+ * След требований (U2): у группы со словами владельца «готово» — только с
+ * отчётом по каждому пункту. Пропуск досдаёт напоминание той же сессии (A0:
+ * без клика человека), карточке остаётся лишь то, что не досдано и после него.
+ */
+describe('SplitConveyor: след требований владельца', () => {
+  const OWNED = {
+    ...PROPOSAL,
+    shared: withOwnerRequest(undefined, ownerRequestBlock(['почини логин и добавь тест'])),
+  };
+  const row = (status: string, evidence: string) =>
+    `\`\`\`${LANG}\n{"sieves":[{"id":"owner-1","status":"${status}","evidence":"${evidence}"}]}\n\`\`\``;
+
+  it('нет отчёта по пунктам — группа не готова, напоминание той же сессии просит строки', async () => {
+    const t = build([{ missing: [], mr: MR }]);
+    // Тот же конвейер без слов владельца пунктов не требует — сравнение ниже.
+    await t.begin();
+    const plain = t.link('deliver');
+    t.conveyor.onChainResumed(plain);
+    t.conveyor.onChainEnded(plain, outcomeOf(plain, `Готово. ${MR}`));
+    await t.settle();
+    expect(t.group()?.status).toBe('done');
+
+    const owned = build([{ missing: [], mr: MR }], OWNED);
+    await owned.begin();
+    const deliver = owned.link('deliver');
+    owned.conveyor.onChainResumed(deliver);
+    owned.conveyor.onChainEnded(deliver, outcomeOf(deliver, `Готово. ${MR}`));
+    await owned.settle();
+    expect(owned.group()?.status).toBe('awaiting');
+    expect(owned.nudges).toHaveLength(1);
+    expect(owned.nudges[0]).toContain('owner-1');
+  });
+
+  it('пункт с «fail» держит группу; досдан с доказательством — группа готова', async () => {
+    const t = build([{ missing: [], mr: MR }], OWNED);
+    await t.begin();
+    const deliver = t.link('deliver');
+    t.conveyor.onChainResumed(deliver);
+    t.conveyor.onChainEnded(
+      deliver,
+      outcomeOf(deliver, `Тест не написал.\n${row('fail', 'тест логина не написан')}\n${MR}`),
+    );
+    await t.settle();
+    expect(t.group()?.status).toBe('awaiting');
+    expect(t.nudges[0]).toContain('тест логина не написан');
+
+    t.conveyor.onChainResumed(deliver);
+    t.conveyor.onChainEnded(
+      deliver,
+      outcomeOf(
+        deliver,
+        `Дописал.\n${row('pass', 'src/login.test.ts:12 — npm test → 1 passed')}\n${MR}`,
+      ),
+    );
+    await t.settle();
+    expect(t.group()?.status).toBe('done');
   });
 });

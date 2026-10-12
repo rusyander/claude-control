@@ -8,7 +8,15 @@ import {
 } from '../../providers/registry.ts';
 import { parseForeignChatKey, foreignChatKey } from '@agentdeck/contracts/foreign-chat-key';
 import { initiativePrompt } from '../../domains/chat/initiative/initiative.ts';
-import { createChat } from '../../domains/provider-chat/provider-chat.ts';
+import {
+  createChat,
+  foreignChatPrefix,
+  readChatCascade,
+} from '../../domains/provider-chat/provider-chat.ts';
+import {
+  foreignChildExtra,
+  linkedChildAppend,
+} from '../../domains/chat/group-run-lines/group-run-lines.ts';
 import type { RunOptions } from '../../domains/chat/ChatRunner/ChatRunner.ts';
 import type { RunMeta } from '../../domains/chat/ChatRunRegistry/ChatRunRegistry.ts';
 import type { SplitLaunchDeps } from './split-launch.ts';
@@ -107,10 +115,13 @@ export function startForeignReviewStage(
   // Продолжение того же разговора (Д8, Д4): чат уже есть в хранилище.
   const resumed = input.resume ? parseForeignChatKey(input.resume.sessionId) : undefined;
   if (resumed) {
-    const initiative = initiativePrompt(ctx.store.getSettings(), {
-      splitMuted: true,
-      foreign: true,
-    });
+    // Шапка продолженного разговора — та же, что у любого его хода (`systemPrefix`
+    // в `runtime.ts`): по стадии и строкам звена, а не голые инициативы (E6).
+    const initiative = foreignChatPrefix(
+      readChatCascade(appData, providerId, resumed.chatId),
+      ctx.store.getSettings(),
+      foreignChildExtra(ctx.store, appData, foreignChatKey(providerId, resumed.chatId)),
+    );
     const sent = deps.providerChats.send(
       appData,
       providerId,
@@ -224,7 +235,16 @@ export function createReviewStarter(
       deps.session.inherit(input.fromAliases, input.chatId);
     }
 
-    const initiative = initiativePrompt(settings, { splitMuted: true });
+    // Дописка звена — та же, с которой его сессия заведена и которую получит
+    // ответ человека (`linkedChildAppend`): продолжение сессии с голыми
+    // инициативами меняло её системный промпт посреди разговора, и кэш всего
+    // разговора писался заново (E6). Связь ищется и под продолжаемой сессией:
+    // она переезжает на настоящий ключ, а вкладка помнит временный. Связи нет
+    // — разговор не звено.
+    const keys = sessionId ? [input.chatId, sessionId] : [input.chatId];
+    const initiative =
+      linkedChildAppend(ctx.store, ctx.location.paths.appData, settings, keys, input.cwd) ??
+      initiativePrompt(settings, { splitMuted: true });
     const options = {
       prompt: lost
         ? `${input.fresh ?? LOST_FALLBACK}

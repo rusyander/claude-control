@@ -9,7 +9,11 @@
 // Запрос хода без модели — отказ: сервер `default_model` сам не подставляет.
 // Невлитое сообщение из очереди, как у CLI, начинается следующим ходом — его
 // ответ «следом: …», влитое отвечено в том же ходе «учёл: …».
+// С FAKE_STORE сессии живут на «диске» (`fake-session-store.mjs`) вместе с
+// сообщениями: новый процесс находит сессию по `GET /sessions/:id`, и её прежние
+// ответы отдаются в списке сообщений, как у настоящего CLI.
 import { createServer } from 'node:http';
+import { change, load, nextId, persistent, remove } from './fake-session-store.mjs';
 import process from 'node:process';
 import { URL } from 'node:url';
 import { setTimeout } from 'node:timers';
@@ -31,6 +35,13 @@ let release;
 let lastReason;
 let seq = 0;
 let prompts = 0;
+// С диском своей сессии у нового процесса ещё нет: id `ses-1` там — чужая,
+// записанная прошлым процессом, и её сообщения грузятся с диска.
+let current = persistent ? '' : 'ses-1';
+const keep = () =>
+  change((state) => {
+    if (state.sessions[current]) state.sessions[current].messages = messages;
+  });
 
 const ok = (res, data) => {
   res.writeHead(200, { 'content-type': 'application/json' });
@@ -47,8 +58,10 @@ const body = (req) =>
     req.on('end', () => resolve(raw ? JSON.parse(raw) : {}));
   });
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-const say = (role, promptId, text) =>
+const say = (role, promptId, text) => {
   messages.push({ id: `m${++seq}`, role, prompt_id: promptId, content: [{ type: 'text', text }] });
+  keep();
+};
 
 createServer(async (req, res) => {
   const url = new URL(req.url ?? '/', 'http://x');
@@ -59,20 +72,44 @@ createServer(async (req, res) => {
   if (req.method === 'POST' && path === '/api/v1/sessions') {
     const { metadata } = await body(req);
     if (!metadata?.cwd) return fail(res, 40000, 'cwd required');
-    return ok(res, { id: 'ses-1' });
+    if (persistent) {
+      current = nextId('ses');
+      change((state) => {
+        state.sessions[current] = { prompts: [], messages: [] };
+        state.log.push(`new ${current}`);
+      });
+    }
+    return ok(res, { id: current });
   }
-  if (path === '/api/v1/sessions/ses-1') {
+  const deleting = /^\/api\/v1\/sessions\/([^/:]+):delete$/.exec(path);
+  if (deleting) {
+    remove(deleting[1]);
+    process.stderr.write('session deleted\n');
+    return ok(res, { deleted: true });
+  }
+  const other = /^\/api\/v1\/sessions\/([^/:]+)/.exec(path)?.[1];
+  if (other && other !== current) {
+    // Другой процесс записал её на диск: подхватываем вместе с сообщениями.
+    const known = load().sessions[other];
+    if (!known) return fail(res, 40400, 'session not found');
+    current = other;
+    messages.push(...known.messages);
+    seq = messages.length;
+    change((state) => state.log.push(`open ${current}`));
+  }
+  if (path === `/api/v1/sessions/${current}`) {
     return ok(res, {
-      id: 'ses-1',
+      id: current,
       busy: Boolean(active),
       pending_interaction: approvals.length > 0 ? 'approval' : 'none',
       ...(lastReason ? { last_turn_reason: lastReason } : {}),
     });
   }
-  if (req.method === 'POST' && path === '/api/v1/sessions/ses-1/prompts') {
+  if (req.method === 'POST' && path === `/api/v1/sessions/${current}/prompts`) {
     const { content, model } = await body(req);
     if (model !== 'stub') return fail(res, 40001, 'model required');
     const prompt = { prompt_id: `p${++prompts}`, text: content[0].text };
+    change((state) => state.sessions[current]?.prompts.push(prompt.text));
     if (active) {
       queued.push(prompt);
       return ok(res, { prompt_id: prompt.prompt_id, status: 'queued' });
@@ -86,7 +123,7 @@ createServer(async (req, res) => {
     }
     return ok(res, { prompt_id: prompt.prompt_id, status: 'running' });
   }
-  if (path === '/api/v1/sessions/ses-1/prompts:steer') {
+  if (path === `/api/v1/sessions/${current}/prompts:steer`) {
     const { prompt_ids: ids } = await body(req);
     const index = queued.findIndex((prompt) => prompt.prompt_id === ids[0]);
     if (!active || !release || index < 0) return fail(res, 40402, 'no active prompt to steer into');
@@ -94,16 +131,16 @@ createServer(async (req, res) => {
     release(prompt.text);
     return ok(res, { steered: true, prompt_ids: ids });
   }
-  if (path === '/api/v1/sessions/ses-1/prompts') {
+  if (path === `/api/v1/sessions/${current}/prompts`) {
     return ok(res, { active: active ?? null, queued });
   }
-  if (path === '/api/v1/sessions/ses-1/messages') {
+  if (path === `/api/v1/sessions/${current}/messages`) {
     const role = url.searchParams.get('role');
     const size = Number(url.searchParams.get('page_size') ?? 100);
     const items = messages.filter((message) => !role || message.role === role).reverse();
     return ok(res, { items: items.slice(0, size) });
   }
-  if (path === '/api/v1/sessions/ses-1/approvals') {
+  if (path === `/api/v1/sessions/${current}/approvals`) {
     // Как настоящий 2.1.1: без `status=pending` — отказ конвертом (Server API:
     // «`status=pending` is required»), а не пустой список.
     if (url.searchParams.get('status') !== 'pending') {
@@ -111,13 +148,13 @@ createServer(async (req, res) => {
     }
     return ok(res, { items: approvals });
   }
-  if (path.startsWith('/api/v1/sessions/ses-1/approvals/')) {
+  if (path.startsWith(`/api/v1/sessions/${current}/approvals/`)) {
     const { decision } = await body(req);
     approvals.length = 0;
     release?.(`разрешение: ${decision}`);
     return ok(res, { resolved: true, resolved_at: Date.now() });
   }
-  if (path === '/api/v1/sessions/ses-1:delete') {
+  if (path === `/api/v1/sessions/${current}:delete`) {
     process.stderr.write('session deleted\n');
     return ok(res, { deleted: true });
   }

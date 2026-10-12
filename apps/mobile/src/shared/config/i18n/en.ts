@@ -55,6 +55,14 @@ export const en: Dictionary = {
     outsideUnhooked:
       'The agent has finished a step, but the panel hooks did not answer from this session — it was probably started before they were added. The message arrives only after the session restarts.',
     outsideOff: '«The agent on the computer» is off in Settings — the message will not arrive.',
+    restart: {
+      action: 'Restart in a clean session',
+      confirm:
+        'The agent saves the summary to the checkpoint file and carries on in a new session — the long history stops riding along with every turn. If the checkpoint is stale, the agent is first asked to update it.',
+      yes: 'Restart',
+      cancel: 'Cancel',
+      failed: 'Restart failed',
+    },
     queued: (prompt: string) => `Queued: ${prompt} ✕`,
     steered: (prompt: string) => `Passed to the agent: ${prompt}`,
     image: '[image]',
@@ -278,6 +286,8 @@ export const en: Dictionary = {
       file: (path: string) => `file ${path} is missing`,
       link: (path: string) => `shared directory ${path} is not linked`,
       access: (path: string) => `no ${path} entry in .claude.json`,
+      mcp: (path: string, names: string) =>
+        `${path} of the copy lacks the original servers: ${names}`,
     },
     bootstrapRunning: (command: string) => `install running: ${command}`,
     bootstrapFailed: (command: string) => `install failed: ${command}`,

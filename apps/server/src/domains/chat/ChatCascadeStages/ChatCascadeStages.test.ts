@@ -58,8 +58,25 @@ describe('planCascadeStage: после работы', () => {
     expect(staged?.link.branch).toBe('split/rename');
   });
 
-  it('работа на потолке ревью не получает: усиливать нечем', () => {
-    expect(plan({ link: workLink({ lowered: false }) })).toBeUndefined();
+  it('работа на потолке тоже получает ревью (U6): свежая сессия на той же модели', () => {
+    const staged = plan({ link: workLink({ lowered: false }) });
+
+    expect(staged?.stage).toBe('review');
+    expect(staged?.model).toBe('claude-opus-5');
+    expect(staged?.link.ceilingModel).toBe('claude-opus-5');
+  });
+
+  it('работа на потолке без записанного потолка читается своей же моделью', () => {
+    const ceiling = workLink({ lowered: false, model: 'claude-opus-5', effort: 'xhigh' });
+    delete ceiling.ceilingModel;
+    delete ceiling.ceilingEffort;
+    const staged = plan({ link: ceiling });
+
+    expect(staged?.stage).toBe('review');
+    expect(staged?.model).toBe('claude-opus-5');
+    expect(staged?.effort).toBe('xhigh');
+    // Записан потолком связи ревью: им же пойдёт проход проверки правок.
+    expect(staged?.link).toMatchObject({ ceilingModel: 'claude-opus-5', ceilingEffort: 'xhigh' });
   });
 
   /**
@@ -70,8 +87,37 @@ describe('planCascadeStage: после работы', () => {
     expect(plan({ link: workLink({ reviewedAt: '2026-09-07T11:00:00.000Z' }) })).toBeUndefined();
   });
 
-  it('пустой дифф проверять незачем', () => {
-    expect(plan({ hasWork: () => false })).toBeUndefined();
+  it('пустой дифф работы на потолке проверять незачем', () => {
+    expect(plan({ link: workLink({ lowered: false }), hasWork: () => false })).toBeUndefined();
+  });
+
+  /**
+   * Понижённой работе обещано: упрёшься — остановись, работа продолжится на
+   * модели сильнее (F4, 12.10.2026). Продолжения не было: пустой дифф кончал
+   * цепочку «готово». Понижаются только механика, реализация и тесты — их итог
+   * всегда дифф, и ход без единой правки и есть остановка.
+   */
+  it('понижённая работа без единой правки поднимается на потолок — один раз (F4)', () => {
+    const staged = plan({
+      link: workLink({ groupTask: 'Переименуй foo в bar по всем файлам' }),
+      hasWork: () => false,
+      text: 'Нужна миграция БД — это не механика, останавливаюсь.',
+    });
+
+    expect(staged?.stage).toBe('work');
+    expect(staged?.model).toBe('claude-opus-5');
+    expect(staged?.effort).toBe('high');
+    expect(staged?.prompt).toContain('Переименуй foo в bar по всем файлам');
+    expect(staged?.prompt).toContain('Нужна миграция БД');
+    // Поднятая работа идёт на потолке: «ниже» и планка сдачи к ней не относятся.
+    expect(staged?.link.lowered).toBeUndefined();
+    expect(staged?.link.model).toBe('claude-opus-5');
+    expect(staged?.link.stage).toBe('work');
+
+    // Отметка «заведено» держит подъём одноразовым.
+    expect(
+      plan({ link: workLink({ plannedAt: '2026-09-07T11:00:00.000Z' }), hasWork: () => false }),
+    ).toBeUndefined();
   });
 
   it('прогон кончился ошибкой — проверять нечего', () => {
@@ -89,28 +135,30 @@ describe('planCascadeStage: после работы', () => {
     expect(plan({ link: older })).toBeUndefined();
   });
 
-  // M8: ревью этой работе не положено — группа с доставкой идёт в доставку сразу.
-  it('работа на потолке группы с доставкой заводит доставку на модели работы', () => {
+  // U6: работа на потолке группы с доставкой идёт в ревью, доставку заводит его круг.
+  it('работа на потолке группы с доставкой идёт в ревью, а не мимо него', () => {
     const staged = plan({ link: workLink({ lowered: false }), deliver: true });
 
-    expect(staged?.stage).toBe('deliver');
-    expect(staged?.model).toBe('sonnet');
-    expect(staged?.prompt).toContain('it has no separate review');
-    expect(staged?.link).toMatchObject({ stage: 'deliver', parentChatId: 'parent' });
+    expect(staged?.stage).toBe('review');
+    expect(staged?.link).toMatchObject({ stage: 'review', parentChatId: 'parent' });
   });
 
   it('связь без потолка у группы с доставкой тоже идёт в доставку', () => {
     const older = workLink();
     delete older.ceilingModel;
+    const staged = plan({ link: older, deliver: true });
 
-    expect(plan({ link: older, deliver: true })?.stage).toBe('deliver');
+    expect(staged?.stage).toBe('deliver');
+    expect(staged?.model).toBe('sonnet');
+    expect(staged?.prompt).toContain('it has no separate review');
   });
 
   it('пустую работу, паузу и второй круг без просьбы не доставляем; ревью — само доведёт', () => {
-    const ceiling = workLink({ lowered: false });
+    const ceiling = workLink();
+    delete ceiling.ceilingModel;
     expect(plan({ link: ceiling, deliver: true, hasWork: () => false })).toBeUndefined();
     expect(plan({ link: ceiling, deliver: true, paused: true })).toBeUndefined();
-    const delivered = workLink({ lowered: false, deliveredAt: '2026-09-07T11:00:00.000Z' });
+    const delivered = { ...ceiling, deliveredAt: '2026-09-07T11:00:00.000Z' };
     expect(plan({ link: delivered, deliver: true })).toBeUndefined();
     expect(plan({ link: delivered, deliver: true, redeliver: true })?.stage).toBe('deliver');
     // Ревью уже заведено на эту работу — доставку заводит его круг, не работа.
@@ -186,6 +234,140 @@ describe('planCascadeStage: после ревью', () => {
   });
 });
 
+/**
+ * Проход проверки правок (U6, deep-review §7): один на круг, повтор
+ * доказательства каждого замечания; его итог правок не заводит — открытое едет
+ * в доставку и в MR.
+ */
+describe('planCascadeStage: проверка правок (U6)', () => {
+  const FINDINGS = ['a.ts:3 — off by one', 'b.ts:9 — забыт await'];
+  const fixLink = (patch: Partial<ChatLink> = {}): ChatLink =>
+    workLink({
+      stage: 'fix',
+      workModel: 'sonnet',
+      workEffort: 'medium',
+      fixFindings: FINDINGS,
+      ...patch,
+    });
+
+  it('правки несут замечания в связь — по ним пойдёт проверка', () => {
+    const fix = plan({
+      link: workLink({ stage: 'review', model: 'claude-opus-5', workModel: 'sonnet' }),
+      text: REVIEW_BLOCK(JSON.stringify({ findings: FINDINGS })),
+    });
+
+    expect(fix?.stage).toBe('fix');
+    expect(fix?.link.fixFindings).toEqual(FINDINGS);
+    expect(fix?.link.ceilingModel).toBe('claude-opus-5');
+  });
+
+  it('конец правок заводит ОДИН проход проверки на ревьюере, а не доставку', () => {
+    const verify = plan({ link: fixLink(), text: 'Поправил оба.', deliver: true });
+
+    expect(verify?.stage).toBe('review');
+    expect(verify?.model).toBe('claude-opus-5');
+    expect(verify?.effort).toBe('high');
+    expect(verify?.prompt).toContain('VERIFYING those fixes');
+    expect(verify?.prompt).toContain('Attempted is not fixed');
+    expect(verify?.prompt).toContain('1. a.ts:3 — off by one');
+    expect(verify?.prompt).toContain('2. b.ts:9 — забыт await');
+    expect(verify?.prompt).toContain('Поправил оба.');
+    expect(verify?.link).toMatchObject({
+      stage: 'review',
+      fixFindings: FINDINGS,
+      workModel: 'sonnet',
+      parentChatId: 'parent',
+    });
+  });
+
+  it('проверка уже заведена — второй не будет, и доставку правки не заводят', () => {
+    const reviewed = fixLink({ reviewedAt: '2026-09-07T11:00:00.000Z' });
+
+    expect(plan({ link: reviewed, deliver: true })).toBeUndefined();
+  });
+
+  it('ход правок с вопросом — ни проверки, ни доставки', () => {
+    expect(plan({ link: fixLink(), deliver: true, paused: true })).toBeUndefined();
+  });
+
+  it('связь правок до U6 (без замечаний) — в доставку, как раньше', () => {
+    const legacy = fixLink();
+    delete legacy.fixFindings;
+
+    expect(plan({ link: legacy, deliver: true })?.stage).toBe('deliver');
+  });
+
+  it('замечания без записанного ревьюера — проверять некем: сразу в доставку', () => {
+    const orphan = fixLink();
+    delete orphan.ceilingModel;
+    delete orphan.ceilingEffort;
+
+    expect(plan({ link: orphan, deliver: true })?.stage).toBe('deliver');
+  });
+
+  const verifyLink = (): ChatLink =>
+    workLink({
+      stage: 'review',
+      model: 'claude-opus-5',
+      lowered: false,
+      workModel: 'sonnet',
+      fixFindings: FINDINGS,
+    });
+
+  it('открытое после проверки едет в доставку как открытое, правок не заводит', () => {
+    const staged = plan({
+      link: verifyLink(),
+      text: REVIEW_BLOCK('{"findings":["b.ts:9 — await всё ещё забыт"]}'),
+      deliver: true,
+    });
+
+    expect(staged?.stage).toBe('deliver');
+    expect(staged?.model).toBe('sonnet');
+    expect(staged?.prompt).toContain('verification pass re-checked them');
+    expect(staged?.prompt).toContain('Open after verification');
+    expect(staged?.prompt).toContain('1. b.ts:9 — await всё ещё забыт');
+  });
+
+  it('всё подтверждено — доставка без раздела открытого', () => {
+    const staged = plan({
+      link: verifyLink(),
+      text: REVIEW_BLOCK('{"findings":[]}'),
+      deliver: true,
+    });
+
+    expect(staged?.stage).toBe('deliver');
+    expect(staged?.prompt).toContain('verification pass re-checked them');
+    expect(staged?.prompt).not.toContain('Open after verification');
+    expect(staged?.prompt).not.toContain('NOT verified');
+  });
+
+  it('проверка без блока итога — доставка говорит в MR, что правки не проверены', () => {
+    const staged = plan({ link: verifyLink(), text: 'Вроде всё ок.', deliver: true });
+
+    expect(staged?.stage).toBe('deliver');
+    expect(staged?.prompt).toContain('the review fixes were NOT verified');
+  });
+
+  it('без доставки проверка кончает цепочку: второго круга правок нет', () => {
+    expect(
+      plan({ link: verifyLink(), text: REVIEW_BLOCK('{"findings":["ещё открыто"]}') }),
+    ).toBeUndefined();
+  });
+
+  it('правкам обещана проверка, а не «тебя никто не проверит»', () => {
+    const settings = { taskSplitInitiative: true, handoffInitiative: true };
+    const fix = plan({
+      link: workLink({ stage: 'review', model: 'claude-opus-5', workModel: 'sonnet' }),
+      text: REVIEW_BLOCK(JSON.stringify({ findings: FINDINGS })),
+    });
+    const append = fix ? stageAppendPrompt(fix, settings) : '';
+
+    expect(append).toContain('one verification pass over your fixes');
+    expect(append).not.toContain('nobody checks it but you');
+    expect(fix?.prompt).toContain('the panel starts one verification pass');
+  });
+});
+
 describe('stageAppendPrompt', () => {
   const settings = { taskSplitInitiative: true, handoffInitiative: true };
 
@@ -203,6 +385,21 @@ describe('stageAppendPrompt', () => {
 
     expect(review && stageAppendPrompt(review, settings)).not.toContain('BELOW the ceiling');
     expect(fix && stageAppendPrompt(fix, settings)).toContain('BELOW the ceiling');
+  });
+
+  /**
+   * TQ-10 (12.10.2026): задание правок само определяет проверки проекта, и
+   * планка сдачи того же прогона повторяла определение слово в слово.
+   */
+  it('правки: определение проверок проекта в прогоне один раз, планка ссылается на задание', () => {
+    const fix = plan({
+      link: workLink({ stage: 'review', workModel: 'sonnet', workEffort: 'medium' }),
+      text: REVIEW_BLOCK('{"findings":["поправь"]}'),
+    });
+    const run = `${fix ? stageAppendPrompt(fix, settings) : ''}\n${fix?.prompt ?? ''}`;
+
+    expect(run.split('run the project checks its rules name').length - 1).toBe(1);
+    expect(run).toContain('run the project checks your task names');
   });
 
   it('делить звено дальше не предлагается: чат уже выделен под одну группу', () => {
@@ -233,6 +430,19 @@ describe('planCascadeStage: после плана и разбора', () => {
       notes: 'api.ts — у соседей',
       ...patch,
     });
+
+  // Владелец 12.10.2026: ревью, правки и доставка сверяют работу с планом и
+  // заданием — огрызок в 4k без критериев приёмки сверять не с чем.
+  it('длинный план и задание доходят до следующих звеньев целиком', () => {
+    const longPlan = `${'1. Шаг с проверкой после него.\n'.repeat(400)}## Критерии приёмки\n- всё зелёное`;
+    const longTask = `${'Переименуй foo в bar везде. '.repeat(1_000)}ХВОСТ ЗАДАНИЯ`;
+    const staged = plan({ link: planLink({ task: longTask }), text: PLAN_BLOCK(longPlan) });
+
+    expect(staged?.link.planSummary).toBe(longPlan);
+    expect(staged?.link.task).toBe(longTask);
+    expect(staged?.prompt).toContain('## Критерии приёмки');
+    expect(staged?.prompt).toContain('ХВОСТ ЗАДАНИЯ');
+  });
 
   it('план кончился — работа на подобранной модели с планом, границами и заметками', () => {
     const staged = plan({ link: planLink(), text: PLAN_BLOCK('## Шаги\n1. Найти foo') });
@@ -422,7 +632,17 @@ describe('planCascadeStage: сита перед MR', () => {
       'contract-by-request',
     ]);
     if (!fix) return;
-    const deliver = plan({ link: fix.link, text: 'Поправил a.ts.', deliver: true, sieves });
+    // За правками — проход проверки (U6); строки едут и через него.
+    const verify = plan({ link: fix.link, text: 'Поправил a.ts.', deliver: true, sieves });
+    expect(verify?.stage).toBe('review');
+    expect(verify?.link.sieveRows).toHaveLength(2);
+    if (!verify) return;
+    const deliver = plan({
+      link: verify.link,
+      text: REVIEW_BLOCK('{"findings":[]}'),
+      deliver: true,
+      sieves,
+    });
     expect(deliver?.stage).toBe('deliver');
     expect(deliver?.prompt).toContain('SIEVES-DELIVER');
     expect(calls.at(-1)).toEqual({

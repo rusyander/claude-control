@@ -53,6 +53,9 @@ import { shortModel } from '../src/shared/lib/shortModel';
 import { formatSpend } from '../src/shared/lib/formatSpend';
 import type { ComposerValue } from '../src/features/chat/Composer/Composer.types';
 import { UserBubble } from '../src/features/chat/UserBubble/UserBubble';
+import { RestartSession } from '../src/features/chat/RestartSession/RestartSession';
+import { restartChat } from '../src/entities/chat/restartChat';
+import { applyRestart } from '../src/features/chat/RestartSession/applyRestart';
 
 /**
  * Разговор — то, ради чего приложение существует: видеть, что делает агент,
@@ -247,6 +250,27 @@ export default function ChatScreen() {
       .finally(() => setBusy(false));
   }, [value.text, dispatch, image]);
 
+  /**
+   * «Чистая сессия»: сервер сам решает, чем продолжить (активный CLI). Опора
+   * свежая — продолжение уже запущено, открываем его; устарела — агента просят её
+   * обновить обычным сообщением, как это делает панель.
+   */
+  const onRestart = useCallback(async (): Promise<void> => {
+    const outcome = await restartChat(transcriptId, {
+      projectPath: workspace.projectPath,
+      ...(isDraft(transcriptId) ? {} : { sessionId: transcriptId }),
+      allowEdits: value.allowEdits,
+      ...(value.model ? { model: value.model } : {}),
+      ...(value.effort ? { effort: value.effort } : {}),
+    });
+    setFailed('');
+    await applyRestart(
+      outcome,
+      { send: dispatch, open: (started) => openChat(started.chatId, started.path) },
+      t.chat.restart.failed,
+    );
+  }, [transcriptId, workspace.projectPath, value, dispatch, t]);
+
   const projectName = useMemo(() => {
     if (!workspace.projectPath) return t.chat.homeChat;
     return workspace.projectPath.split(/[\\/]/).filter(Boolean).pop() ?? workspace.projectPath;
@@ -386,6 +410,11 @@ export default function ChatScreen() {
           {failed ? <Text style={styles.error}>{failed}</Text> : null}
 
           {isBlank ? <Empty text={t.chat.blank} /> : null}
+          {/* Перезапускать есть что только у начатого разговора в проекте, пока
+              агент свободен и ход идёт не в окне на компьютере. */}
+          {!isRunning && !outside && workspace.projectPath && history.length > 0 ? (
+            <RestartSession onRestart={onRestart} />
+          ) : null}
         </ScrollView>
 
         {(run.steered?.length ?? 0) > 0 || run.queued.length > 0 ? (

@@ -212,6 +212,8 @@ export function chainOutcomeOf(input: ChainOutcomeInput): ChainOutcome {
 
   const review = link.review;
   if (review) {
+    // Панель сама продолжила ревью (A0) — ход ещё впереди, итога у группы нет.
+    if (review.followUp) return { status: 'awaiting', waitingFor: 'review-follow-up', ...withTail };
     if (review.missing) return { status: 'awaiting', waitingFor: 'review-missing', ...withTail };
     // Замечания есть, решения нет — ждёт человека, а не «готово».
     if ((review.findings ?? []).length > 0 && !review.decidedAt) {

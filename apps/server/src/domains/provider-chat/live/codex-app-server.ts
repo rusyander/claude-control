@@ -3,7 +3,12 @@ import { spawnCliProcess } from '../../../lib/cli-spawn/cli-spawn.ts';
 import { killChildTree } from '../../../lib/process-tree/process-tree.ts';
 import { serverText } from '../../../lib/server-texts/server-texts.ts';
 import { withCodexKit } from '../../kit/codex.ts';
-import { openCodexThread, startCodexTurn, steerCodexTurn } from './codex-session.ts';
+import {
+  deleteCodexThread,
+  openCodexThread,
+  startCodexTurn,
+  steerCodexTurn,
+} from './codex-session.ts';
 import { decidePermission } from './permission.ts';
 import { StdioRpc, type RpcIncoming } from './stdio-rpc.ts';
 import type { LivePermissionPolicy, LiveTurn, LiveTurnOptions, LiveTurnResult } from './types.ts';
@@ -25,8 +30,16 @@ import type { LivePermissionPolicy, LiveTurn, LiveTurnOptions, LiveTurnResult } 
  * панель, см. `codexThreadRights`); выключено — `read-only` + `untrusted`, и
  * каждая просьба сервера (`item/commandExecution|fileChange|permissions/
  * requestApproval`) идёт человеку. Без политики — как `codex exec`: песочница
- * из настроек, вопросов нет. Поток ephemeral — на диск Codex разговор не пишет.
+ * из настроек, вопросов нет.
+ *
+ * Поток без `session` — ephemeral: на диск Codex разговор не пишет. С `session`
+ * (E2b) поток пишется и следующим ходом поднимается `thread/resume` с теми же
+ * каталогом, моделью и правами; ход, кончившийся не ответом, поток удаляет
+ * (`thread/delete`), как и сменённый (`discard`, не поднявшийся `resume`).
  */
+
+/** Сколько ждать удаления потока, прежде чем снять процесс. */
+const DELETE_MS = 3_000;
 
 /** Параметры прав `thread/start` под политику хода; без политики — `never`, как раньше. */
 export function codexThreadRights(
@@ -139,13 +152,29 @@ export class CodexAppServerTurn implements LiveTurn {
       let started = false;
       let lastError = '';
       let stderr = '';
+      let resumed = false;
+      const persistent = options.session !== undefined;
       const finish = (result: LiveTurnResult): void => {
         if (settled) return;
         settled = true;
         this.active = false;
         clearTimeout(timer);
-        killChildTree(child);
-        resolve(result);
+        const threadId = this.threadId;
+        if (persistent && threadId && result.kind === 'done') {
+          killChildTree(child);
+          resolve({ ...result, session: threadId, resumed });
+          return;
+        }
+        // Ход без ответа: что в потоке осталось, панели неизвестно — поток
+        // удаляется, и следующий ход начнёт новый со всей перепиской.
+        const drop =
+          persistent && threadId && this.rpc && child.exitCode === null
+            ? deleteCodexThread(this.rpc, threadId, DELETE_MS)
+            : Promise.resolve();
+        void drop.then(() => {
+          killChildTree(child);
+          resolve(result);
+        });
       };
       const timer = setTimeout(
         () => finish({ kind: 'error', error: 'CLI не ответил за отведённое время' }),
@@ -239,13 +268,15 @@ export class CodexAppServerTurn implements LiveTurn {
       this.rpc = rpc;
 
       void (async () => {
+        const session = options.session;
         const opened = await openCodexThread(rpc, {
           skillRoots: kit.skillRoots,
+          ...(session?.resume ? { resumeThreadId: session.resume.id } : {}),
           thread: {
             ...(options.workdir ? { cwd: options.workdir } : {}),
             ...(options.model ? { model: options.model } : {}),
             ...codexThreadRights(options.permission),
-            ephemeral: true,
+            ephemeral: !session,
           },
         });
         // Не поднялся поток или не приняты корни навыков — уходим на одиночный
@@ -257,7 +288,12 @@ export class CodexAppServerTurn implements LiveTurn {
         }
         const threadId = opened.threadId;
         this.threadId = threadId;
-        const turn = await startCodexTurn(rpc, threadId, options.prompt, options.effort);
+        resumed = opened.resumed;
+        // Сменённый поток разговора больше никто не продолжит — удаляем, не дожидаясь.
+        const stale = resumed ? undefined : (session?.resume?.id ?? session?.discard);
+        if (stale && stale !== threadId) void deleteCodexThread(rpc, stale, DELETE_MS);
+        const text = resumed && session?.resume ? session.resume.prompt : options.prompt;
+        const turn = await startCodexTurn(rpc, threadId, text, options.effort);
         if (!turn.ok) {
           // Ход отказан самим CLI (модель, вход) — это ответ человеку, а не повод
           // молча перезапускать одиночным запуском с той же ошибкой.

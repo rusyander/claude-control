@@ -74,13 +74,18 @@ can name which findings block precisely because it is read first. It carries wha
 run), the verdict on the claimed change, what blocks, what is at the author's discretion, anything
 outside the diff — and the praise, in one paragraph. Praise inside threads gets in the way of reading.
 
-A thread is three short parts: **fact → consequence → proposal.**
+A thread is a **finding card** — template [finding-card.md](finding-card.md): severity + id + bold
+one-line thesis · `Where` path:start-end · the lines quoted · cause · how found (numbered steps) · how
+to reproduce (command, expected vs actual, run/mutant table) · fix as code + a test that goes red
+without it. Why: a one-line list item is not a finding — the author cannot act on it — and the best
+human reviewers write this shape. Same card in the findings file and the chat digest; only 🟢 may
+shrink to thesis + `Where` + cause.
 
-> `setBlobs([])` clears the list here, but the blob URLs are never revoked — `revokeFileItemUrl` runs
-> only on manual removal. After every send with attachments the files stay in the tab's memory until a
-> reload.
->
-> Suggest closing it inside `useAttachments` — that fixes every composer, not just this one.
+- The quote is copied from `git show <head>:<path> | sed -n '<start>,<end>p'`, never retyped; its range
+  is the thread's `line_range`.
+- No run behind it → "how to reproduce" says it was not confirmed by a run and names the path to walk;
+  the table goes.
+- ❓ keeps the card: the question replaces the cause, what would close it replaces the fix.
 
 Describe the code, never the author: no "wrong", no "why did you". A ❓ finding is published as a
 genuine question — the author's answer closing it is a normal outcome. What the author does not decide
@@ -90,22 +95,6 @@ to be listed.
 
 In the language the team writes its MRs in (the user's, unless told otherwise). The finding ids from the findings file stay in the comments — the
 same `F-01` in the file, in the chat digest and on the forge.
-
-One finding per comment, self-contained:
-
-````markdown
-**<Thesis in one line, bold.>**
-
-<Analysis with evidence: run output or file:line.>
-
-```ts
-<fix>
-```
-````
-
-<Optional: what is common to all N files.>
-
-```
 
 ## 6. After publishing — read it back
 
@@ -128,4 +117,7 @@ author**. The gap between the first two is the review's own kill rate and is the
 it produces — a pass that drops four candidates under proof for three published is working correctly,
 and one that has never dropped anything is not verifying. The third arrives later, from the threads,
 and is what says whether the bar is set where the team can use it.
+
+```
+
 ```

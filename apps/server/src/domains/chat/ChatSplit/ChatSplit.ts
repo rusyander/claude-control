@@ -1,8 +1,9 @@
 import { mergeRequestWorkPreamble, reviewLinkPrompt } from '@agentdeck/contracts/model-cascade';
+import { reviewPublishGranted, withoutPrecedence } from '@agentdeck/contracts/quality-floor';
 import {
   buildGroupPrompt,
   deliveryPreamble,
-  GROUP_QUESTIONS_HUMAN_LINE,
+  groupQuestionsHumanLine,
   environmentPreamble,
   splitTicketPreamble,
   // Приведение имени ветки живёт в контрактах: по нему же панель узнаёт, что
@@ -28,6 +29,8 @@ import {
   resolveMergeRequestBranch,
   type MergeRequestBranch,
 } from '../../project-git/project-git.ts';
+import { describeGaps, readinessForCwd, repairCopy } from '../../project-git/copy-readiness.ts';
+import { serverText } from '../../../lib/server-texts/server-texts.ts';
 
 /**
  * Разделение списка задач по нескольким чатам: под каждую группу — своя ветка,
@@ -75,6 +78,13 @@ export interface SplitGit {
    */
   bootstrap?(dir: string, copy: string): Promise<WorktreeBootstrapState | undefined>;
   /**
+   * Сверить копию с оригиналом прямо перед стартом группы и добрать то, что
+   * можно добрать: локальный слой, `.mcp.json` с серверами оригинала, запись
+   * доступа. Ответ — чего не хватает и после добора (строка для карточки);
+   * `undefined` — копия готова. Нет метода — сверять нечем (тест без git).
+   */
+  preflight?(copy: string): Promise<string | undefined>;
+  /**
    * Ветка MR у самого git, без форджа (Д2): голова MR и ветки удалённого.
    * Нет метода — такого git нет (тест), и в дело идёт ветка из блока как есть.
    */
@@ -121,6 +131,22 @@ export function makeSplitGit(
         ...(created.mirror ? { mirror: describeMirror(created.mirror) } : {}),
       };
     },
+    // Группа стартует мимо маршрута прогона, где та же сверка стоит для
+    // разговоров человека, — поэтому повторяем её здесь. Чинить молча, держать
+    // громко: недобранное не даёт группе начать работу, а не всплывает посреди
+    // неё вопросом «где инструмент».
+    async preflight(copy) {
+      const state = await readinessForCwd(copy, claudeJsonPath);
+      if (state.ready || !state.mainDir) return undefined;
+      const mirror = mirrorFor(state.mainDir);
+      const repaired = await repairCopy({
+        mainDir: state.mainDir,
+        copyDir: copy,
+        ...(mirror ? { mirror } : {}),
+        ...(claudeJsonPath ? { claudeJsonPath } : {}),
+      });
+      return repaired.ready ? undefined : describeGaps(repaired.gaps);
+    },
     resolveMergeRequest: resolveMergeRequestBranch,
     async addMergeRequestWorktree(dir, target) {
       const created = await addMergeRequestWorktree(dir, target, mirrorFor(dir), claudeJsonPath);
@@ -145,6 +171,8 @@ export type SplitStart = (input: {
    */
   title: string;
   prompt: string;
+  /** Задание группы без преамбул работы — для звеньев после неё (`ChatLink.groupTask`). */
+  groupTask: string;
   cwd: string;
   /**
    * Ветка копии. Нужна конвейеру у чужого провайдера: связей панели у его
@@ -184,6 +212,11 @@ export interface SplitReviewTarget {
    * `<remote>/<branch>`: коммитить можно, отправлять — `HEAD:<branch>`.
    */
   detached?: boolean;
+  /**
+   * Владелец в задании сам разрешил публикацию ревью (`reviewPublishGranted` по
+   * общему контексту и задачам группы): сессия публикует сразу, без клика.
+   */
+  publish?: boolean;
 }
 
 /** Что группа, ждавшая своей очереди, знает о тех, кто работал раньше (Т1). */
@@ -238,6 +271,8 @@ export type SplitLink = (chat: {
   index: number;
   /** Задание группы целиком — в связь: из него после плана собирается работа. */
   prompt: string;
+  /** Задание группы без преамбул работы — для звеньев после неё (`ChatLink.groupTask`). */
+  groupTask: string;
   context?: SplitGroupContext;
   /** Ревью по ссылке (Т7): уезжает в связь — по ней рисуется карточка решения. */
   review?: SplitReviewTarget;
@@ -299,6 +334,11 @@ export interface SplitTasksInput {
    * человеку и ждать, иначе по плану сама.
    */
   groupQuestions?: 'plan' | 'human';
+  /**
+   * Группы ведёт чужой CLI (F8): вопрос человеку — последней строкой ответа,
+   * инструмента вопросов у него нет.
+   */
+  foreign?: boolean;
 }
 
 /**
@@ -384,6 +424,7 @@ export async function splitTasks({
   startable,
   deliver = false,
   groupQuestions = 'plan',
+  foreign = false,
 }: SplitTasksInput): Promise<TaskSplitResult> {
   const chats: TaskSplitStarted[] = [];
   const failures: TaskSplitFailure[] = [];
@@ -501,12 +542,41 @@ export async function splitTasks({
     }),
   );
 
+  // Сверка ПОСЛЕ подготовки: установка зависимостей тоже пишет в копию.
+  // Собственная ошибка сверки группу не держит — держит только названная дыра.
+  const unready = await Promise.all(
+    prepared.map(async (item) => {
+      if (!item.isWorktree || !git.preflight) return undefined;
+      try {
+        return await git.preflight(item.cwd);
+      } catch {
+        return undefined;
+      }
+    }),
+  );
+
   for (const [position, item] of prepared.entries()) {
     const { index, group, branch, cwd, isWorktree, mirror, review: target } = item;
     const bootstrap = bootstraps[position];
+    const gaps = unready[position];
+    if (gaps) {
+      failures.push({
+        index,
+        title: group.title,
+        branch,
+        message: serverText('split-group-copy-not-ready', { gaps }),
+      });
+      continue;
+    }
     // Работа в MR (конфликты, замечания) ветку берёт у MR, а дальше — обычная
     // группа: своё задание, свои стадии, без карточки решения по замечаниям.
-    const review = target && !group.review?.work ? target : undefined;
+    const review =
+      target && !group.review?.work
+        ? {
+            ...target,
+            ...(reviewPublishGranted(proposal.shared, group.tasks) ? { publish: true } : {}),
+          }
+        : undefined;
     // Ревью по ссылке (Т7) — другое задание и другая стадия: план группе,
     // которая ничего не делает, не нужен, а понижать её нечем (класс `review`
     // держится на потолке).
@@ -519,6 +589,7 @@ export async function splitTasks({
           ...(review.remote ? { remote: review.remote } : {}),
           tasks: group.tasks,
           ...(proposal.shared ? { shared: proposal.shared } : {}),
+          ...(review.publish ? { publish: true } : {}),
         })
       : target
         ? `${mergeRequestWorkPreamble({
@@ -538,15 +609,22 @@ export async function splitTasks({
             branch,
             ...(target ? { mergeRequest: target.url } : {}),
             questions: groupQuestions,
+            ...(foreign ? { foreign } : {}),
           })}\n\n${base}`
         : asksHuman
-          ? `${GROUP_QUESTIONS_HUMAN_LINE}\n\n${base}`
+          ? `${groupQuestionsHumanLine(foreign)}\n\n${base}`
           : base;
     // Дефекты вне задач — блоком тикета (95b), последним абзацем задания. Только
     // там, где запись разделения ведёт конвейер (`claimBranch`): без записи блок
     // некуда положить, и обещание «панель покажет» было бы неправдой.
-    const withTickets = claimBranch ? `${delivered}\n\n${splitTicketPreamble()}` : delivered;
+    // Ревью по ссылке ничего не правит и не доставляет — ему вариант без
+    // «чини своё» и без шага доставки (TQ-10).
+    const withTickets = claimBranch
+      ? `${delivered}\n\n${splitTicketPreamble(review ? { readOnly: true } : {})}`
+      : delivered;
     const groupStage = review ? 'work' : stage;
+    // Слова группы без преамбул работы: их вкладывают звенья после неё (TQ-01).
+    const groupTask = withoutPrecedence(base);
     // Копии — преамбула панели первым абзацем: что зазеркалено и установлено,
     // провал подготовки (с хвостом лога) и прямое «начинай с задачи». Группа в
     // общем каталоге работает в окружении человека — ей преамбула не нужна.
@@ -592,6 +670,7 @@ export async function splitTasks({
       group,
       index,
       prompt,
+      groupTask,
       ...(context ? { context } : {}),
       ...(review ? { review } : {}),
     });
@@ -600,6 +679,7 @@ export async function splitTasks({
           chatId,
           title: group.title,
           prompt,
+          groupTask,
           cwd,
           branch,
           ...(assignment ? { assignment } : {}),

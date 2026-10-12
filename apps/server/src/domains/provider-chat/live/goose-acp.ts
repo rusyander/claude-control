@@ -1,7 +1,7 @@
 import type { ChildProcessWithoutNullStreams } from 'node:child_process';
 import { spawnCliProcess } from '../../../lib/cli-spawn/cli-spawn.ts';
 import { killChildTree } from '../../../lib/process-tree/process-tree.ts';
-import { StdioRpc, type RpcIncoming } from './stdio-rpc.ts';
+import { StdioRpc, type RpcIncoming, type RpcReply } from './stdio-rpc.ts';
 import { decidePermission, pickOption, type PermissionOption } from './permission.ts';
 import type { LiveTurn, LiveTurnOptions, LiveTurnResult } from './types.ts';
 
@@ -17,8 +17,12 @@ import type { LiveTurn, LiveTurnOptions, LiveTurnResult } from './types.ts';
  * последнего ответа модели; устаревший id — отказ, и сообщение уходит в очередь.
  * Метод помечен unstable: пропал — `steer` отвечает `false`, ответ не страдает.
  *
- * Как у `goose run --no-session`: разговор держит панель, поэтому сессия Goose
- * по концу хода удаляется (`session/delete`) и в его списке не копится. Права —
+ * Без `session` — как у `goose run --no-session`: разговор держит панель, и
+ * сессия Goose по концу хода удаляется (`session/delete`). С `session` (E2b)
+ * сессия остаётся, и следующий ход поднимает её `session/load` — если агент
+ * объявил `loadSession`. Историю, которую Goose при загрузке проигрывает
+ * уведомлениями, ход пропускает: это не ответ. Ход, кончившийся не ответом,
+ * сессию удаляет, как и сменённую (`discard`, не поднявшийся `resume`). Права —
  * режим из настроек самого Goose; его просьба `session/request_permission`
  * решается переключателем чата (`permission`): правки разрешены — «да», нет —
  * вопрос человеку. Без политики — отказ, как у неинтерактивного запуска.
@@ -45,6 +49,8 @@ export class GooseAcpTurn implements LiveTurn {
   private runId?: string;
   private active = false;
   private stopped = false;
+  /** Сессию оставить по концу хода: её продолжит следующий ход разговора (E2b). */
+  private keep = false;
 
   run(
     options: LiveTurnOptions,
@@ -69,11 +75,20 @@ export class GooseAcpTurn implements LiveTurn {
       // Подхваченное сообщение человека: ответ на него — с новой строки.
       let separate = false;
       let stderr = '';
+      let resumed = false;
+      // Идёт `session/load`: Goose проигрывает историю сессии теми же уведомлениями.
+      let replaying = false;
       const finish = (result: LiveTurnResult): void => {
         if (settled) return;
         settled = true;
         this.active = false;
         clearTimeout(timer);
+        const sessionId = this.sessionId;
+        if (options.session && sessionId && result.kind === 'done') {
+          this.keep = true;
+          void this.close(child).then(() => resolve({ ...result, session: sessionId, resumed }));
+          return;
+        }
         void this.close(child).then(() => resolve(result));
       };
       const timer = setTimeout(
@@ -107,7 +122,7 @@ export class GooseAcpTurn implements LiveTurn {
       });
 
       const onNotification = (message: RpcIncoming): void => {
-        if (message.method !== 'session/update') return;
+        if (message.method !== 'session/update' || replaying) return;
         const update = message.params?.update as
           | {
               sessionUpdate?: string;
@@ -196,11 +211,39 @@ export class GooseAcpTurn implements LiveTurn {
           finish({ kind: 'unavailable', why: init?.error?.message ?? 'initialize не ответил' });
           return;
         }
-        const session = await rpc.call('session/new', { cwd: workdir, mcpServers: [] });
-        const sessionId = session?.result?.sessionId;
-        if (typeof sessionId !== 'string') {
-          finish({ kind: 'unavailable', why: session?.error?.message ?? 'session/new без id' });
-          return;
+        const request = options.session;
+        const canLoad =
+          (init.result.agentCapabilities as { loadSession?: unknown } | undefined)?.loadSession ===
+          true;
+        let session: RpcReply | undefined;
+        let sessionId: string | undefined;
+        if (request?.resume && canLoad) {
+          replaying = true;
+          const loaded = await rpc.call('session/load', {
+            sessionId: request.resume.id,
+            cwd: workdir,
+            mcpServers: [],
+          });
+          replaying = false;
+          if (loaded?.result) {
+            session = loaded;
+            sessionId = request.resume.id;
+            resumed = true;
+          }
+        }
+        if (!sessionId) {
+          session = await rpc.call('session/new', { cwd: workdir, mcpServers: [] });
+          const created = session?.result?.sessionId;
+          if (typeof created !== 'string') {
+            finish({ kind: 'unavailable', why: session?.error?.message ?? 'session/new без id' });
+            return;
+          }
+          sessionId = created;
+          // Сменённую сессию разговора больше никто не продолжит — удаляем, не дожидаясь.
+          const stale = request?.resume?.id ?? request?.discard;
+          if (stale && stale !== sessionId) {
+            void rpc.call('session/delete', { sessionId: stale }, CLOSE_MS);
+          }
         }
         this.sessionId = sessionId;
         if (!options.permission?.allowEdits) {
@@ -225,7 +268,15 @@ export class GooseAcpTurn implements LiveTurn {
         }
         const prompt = await rpc.call(
           'session/prompt',
-          { sessionId, prompt: [{ type: 'text', text: options.prompt }] },
+          {
+            sessionId,
+            prompt: [
+              {
+                type: 'text',
+                text: resumed && request?.resume ? request.resume.prompt : options.prompt,
+              },
+            ],
+          },
           options.timeoutMs,
         );
         if (prompt?.error) {
@@ -263,7 +314,7 @@ export class GooseAcpTurn implements LiveTurn {
   }
 
   private async close(child: ChildProcessWithoutNullStreams): Promise<void> {
-    if (this.sessionId && this.rpc && child.exitCode === null) {
+    if (!this.keep && this.sessionId && this.rpc && child.exitCode === null) {
       await this.rpc.call('session/delete', { sessionId: this.sessionId }, CLOSE_MS);
     }
     killChildTree(child);

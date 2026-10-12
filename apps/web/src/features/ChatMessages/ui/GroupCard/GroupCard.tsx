@@ -19,6 +19,8 @@ import { hubBucket } from '../../lib/hubBucket';
 import { statusTone } from '../../lib/statusTone';
 import { HoldAnswer } from './HoldAnswer/HoldAnswer';
 import { GroupStepLine } from '../GroupStepLine/GroupStepLine';
+import { RunInputs } from '../RunInputs/RunInputs';
+import { foreignChatKey } from '@agentdeck/contracts/foreign-chat-key';
 
 /**
  * Карточка группы в хабе родителя (владелец 05.10.2026): текст слева, все
@@ -30,6 +32,7 @@ import { GroupStepLine } from '../GroupStepLine/GroupStepLine';
 export function GroupCard({
   group,
   parentChatId,
+  providerId,
   onOpen,
   onAnswerHold,
   holdBusy,
@@ -162,6 +165,10 @@ export function GroupCard({
             </div>
           )}
           {group.control && <GroupControl control={group.control} />}
+          {/* Что получил агент звена (U8) — у группы с чатом: у ждущей прогонов нет. */}
+          {chatId && (
+            <RunInputs inputKey={providerId ? foreignChatKey(providerId, chatId) : chatId} />
+          )}
         </div>
       </div>
 

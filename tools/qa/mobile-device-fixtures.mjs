@@ -88,6 +88,9 @@ export function seedTranscript(cfg, project) {
       message: {
         role: 'assistant',
         content: [{ type: 'text', text: 'Waiting for your answers.' }],
+        // Ход кончен, как у настоящего CLI. Без `stop_reason` сводка считает ход
+        // открытым и видит в нём работу вне панели — вопрос тогда только читается.
+        stop_reason: 'end_turn',
       },
     },
   ];
@@ -236,12 +239,30 @@ async function bgTurn() {
     num_turns: 1, total_cost_usd: 0, usage: { input_tokens: 1, output_tokens: 1 } });
   appendFileSync(LOG, JSON.stringify({ at: Date.now(), sid, done: 'BGTURN' }) + '\n');
 }
+// Ход STREAMHOLD — долгий ход, как его ведёт настоящий CLI в панели: реплика
+// человека в транскрипте сразу, текст ответа потоком (text_delta — только из
+// него сервер берёт текст хода, --include-partial-messages), конец через
+// FAKE_HOLD_MS. Ход HOLD так не умеет: его текст виден лишь после конца.
+async function streamHold(text) {
+  record('user', text);
+  out({ type: 'system', subtype: 'init', session_id: sid, model: 'fake-dev', cwd: process.cwd(), tools: [] });
+  const reply = 'STREAMING the turn';
+  out({ type: 'stream_event', session_id: sid, event: { type: 'content_block_delta', index: 0,
+    delta: { type: 'text_delta', text: reply } } });
+  out({ type: 'assistant', session_id: sid, message: { role: 'assistant', content: [{ type: 'text', text: reply }] } });
+  await pause(HOLD_MS);
+  record('assistant', [{ type: 'text', text: reply }]);
+  out({ type: 'result', subtype: 'success', is_error: false, session_id: sid, result: reply, num_turns: 1,
+    total_cost_usd: 0, usage: { input_tokens: 1, output_tokens: 1 } });
+  appendFileSync(LOG, JSON.stringify({ at: Date.now(), sid, done: text.slice(0, 40) }) + '\n');
+}
 const DESK_QUESTIONS = [{ question: 'Which stack for the desk task?', header: 'Stack', multiSelect: false,
   options: [{ label: 'Keep React' }, { label: 'Try Svelte' }] }];
 async function turn(text) {
   appendFileSync(LOG, JSON.stringify({ at: Date.now(), sid, text }) + '\n');
   if (text.includes('ASKTASK')) return askTask(text);
   if (text.includes('BGTURN')) return bgTurn();
+  if (text.includes('STREAMHOLD')) return streamHold(text);
   const hold = text.includes('HOLD');
   // Ход HOLD изображает работу с компьютера, которая вопрос НЕ отвечает: его
   // реплика в транскрипт не пишется, иначе сервер закрыл бы вопрос сам.

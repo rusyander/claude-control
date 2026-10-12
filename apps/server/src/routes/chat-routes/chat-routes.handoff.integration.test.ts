@@ -772,7 +772,13 @@ describe('планировщик конвейера подбора модели'
 
   function build(
     text: string,
-    options: { hasWork?: boolean; tools?: readonly string[]; store?: AppStore; dir?: string } = {},
+    options: {
+      hasWork?: boolean;
+      tools?: readonly string[];
+      store?: AppStore;
+      dir?: string;
+      stat?: () => number | undefined;
+    } = {},
   ) {
     const chains = new HandoffChains();
     const { store } = options;
@@ -804,6 +810,7 @@ describe('планировщик конвейера подбора модели'
       effort?: string;
       append?: string;
       permissionMode?: string;
+      prompt?: string;
     }[] = [];
     // Реестр подменён не полностью: прогоны настоящие, а вот с чем их запустили
     // — видно только отсюда, поэтому старт перехватывается обёрткой.
@@ -815,6 +822,7 @@ describe('планировщик конвейера подбора модели'
         ...(opts.effort ? { effort: opts.effort } : {}),
         ...(opts.appendSystemPrompt ? { append: opts.appendSystemPrompt } : {}),
         ...(opts.permissionMode ? { permissionMode: opts.permissionMode } : {}),
+        ...(opts.prompt ? { prompt: opts.prompt } : {}),
       });
       return start(chatId, opts, meta);
     };
@@ -825,6 +833,7 @@ describe('планировщик конвейера подбора модели'
         chains,
         session: new ChatSession(registry),
         selfBaseUrl: 'http://127.0.0.1:5178',
+        ...(options.stat ? { stat: options.stat } : {}),
         cascade: {
           linkOf: (aliases) => aliases.map(readLink).find(Boolean),
           saveLink: (chatId, link) => void writeLink(chatId, link),
@@ -869,6 +878,26 @@ describe('планировщик конвейера подбора модели'
     );
     await new Promise((done) => setTimeout(done, 20));
   }
+
+  it('продолжение группы с чистого листа несёт задание группы, а не реплику закрытого хода (F6)', async () => {
+    const { chains, registry, links } = build(`Этап закрыт.\n\n${block(PROPOSAL)}`, {
+      stat: () => Date.now() + 10_000,
+    });
+    const task = 'ЗАДАНИЕ ГРУППЫ ЦЕЛИКОМ: переименовать foo в bar, тесты зелёные, MR.';
+    links.set('чат-группа', { ...WORK_LINK, task });
+    chains.setAuto(['чат-группа'], true);
+
+    registry.start(
+      'чат-группа',
+      { prompt: 'Ответ на твой вопрос: да, вариант A.', cwd: CWD },
+      { projectPath: CWD },
+    );
+    await new Promise((done) => setTimeout(done, 20));
+
+    const next = registry.active().find((one) => one.chatId.startsWith('new-'));
+    expect(next).toBeDefined();
+    expect(chains.rootTaskOf([next?.chatId ?? ''])).toBe(task);
+  });
 
   it('звено группы идёт в авторежиме, даже если прогон работы режим потерял', async () => {
     // Усыновлённый после перезапуска прогон приходит без режима — живой прогон
@@ -947,7 +976,14 @@ describe('планировщик конвейера подбора модели'
 
   it('пустой дифф не стоит прогона на потолке', async () => {
     const { registry, links, runs } = build('Ничего не понадобилось.', { hasWork: false });
-    links.set('чат-работа', WORK_LINK);
+    // Работа на потолке: понижённая без правок идёт заново на потолке (F4) —
+    // здесь речь только о ревью пустого диффа.
+    links.set('чат-работа', {
+      ...WORK_LINK,
+      lowered: false,
+      model: 'claude-opus-5',
+      effort: 'high',
+    });
 
     await run(registry, 'чат-работа');
 
@@ -957,7 +993,10 @@ describe('планировщик конвейера подбора модели'
   it('замечания ревью заводят правки обратно на модели работы', async () => {
     const verdict = ['```agentdeck:review', '{"findings":["поправь ChatSplit.ts:88"]}', '```'];
     const { registry, links, runs } = build(`Проверил.\n${verdict.join('\n')}`);
-    links.set('чат-ревью', {
+    // Без ревьюера в связи прохода проверки за правками нет: тест — про модель
+    // правок, а заглушка отвечает правкам тем же вердиктом, и проверка, начатая
+    // в ту же миллисекунду, перезаписала бы связь правок своим ключом `new-<ms>`.
+    const reviewLink: ChatLink = {
       ...WORK_LINK,
       stage: 'review',
       model: 'claude-opus-5',
@@ -965,7 +1004,9 @@ describe('планировщик конвейера подбора модели'
       lowered: false,
       workModel: 'sonnet',
       workEffort: 'medium',
-    });
+    };
+    delete reviewLink.ceilingModel;
+    links.set('чат-ревью', reviewLink);
 
     await run(registry, 'чат-ревью');
 
@@ -975,6 +1016,32 @@ describe('планировщик конвейера подбора модели'
     // Правки идут ниже потолка — планка сдачи им нужна.
     expect(fix?.append ?? '').toContain('BELOW the ceiling');
     expect(links.get(fix?.chatId ?? '')?.stage).toBe('fix');
+  });
+
+  it('конец правок заводит проход проверки на ревьюере группы (U6)', async () => {
+    const { registry, links, runs } = build('Поправил ChatSplit.ts:88, тест зелёный.');
+    links.set('чат-правки', {
+      ...WORK_LINK,
+      stage: 'fix',
+      model: 'sonnet',
+      effort: 'medium',
+      workModel: 'sonnet',
+      workEffort: 'medium',
+      fixFindings: ['поправь ChatSplit.ts:88'],
+    });
+
+    await run(registry, 'чат-правки');
+
+    const verify = runs.filter((item) => item.chatId.startsWith('new-'));
+    expect(verify).toHaveLength(1);
+    expect(verify[0]?.model).toBe(WORK_LINK.ceilingModel);
+    expect(verify[0]?.prompt).toContain('VERIFYING those fixes');
+    // У проверки нет планки сдачи: она не пишет код.
+    expect(verify[0]?.append ?? '').not.toContain('BELOW the ceiling');
+    expect(links.get(verify[0]?.chatId ?? '')).toMatchObject({
+      stage: 'review',
+      fixFindings: ['поправь ChatSplit.ts:88'],
+    });
   });
 
   it('ревью без замечаний закрывает цепочку', async () => {

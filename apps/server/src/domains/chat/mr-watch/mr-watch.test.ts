@@ -88,6 +88,8 @@ function build(
     reviews?: (MrReview | Error | undefined)[];
     resume?: 'sent' | 'queued' | 'refused';
     now?: string;
+    /** Ответ форджа на повтор задания; нет — повторять нечем (GitHub, нет токена). */
+    retry?: (jobId: string) => Promise<boolean>;
   } = {},
 ) {
   const records = new Map<string, SplitPlanRecord>();
@@ -115,7 +117,17 @@ function build(
   const queue = [...(options.reviews ?? [])];
   const logs: string[] = [];
   const notices: { parent: string; event: ChatEvent }[] = [];
+  const retried: string[] = [];
+  const retry = options.retry;
   const watch = new MrWatch({
+    ...(retry
+      ? {
+          retryJob: (_url: string, jobId: string) => {
+            retried.push(jobId);
+            return retry(jobId);
+          },
+        }
+      : {}),
     store,
     read: async (url) => {
       reads.push(url);
@@ -137,7 +149,7 @@ function build(
     timer!.run();
     await new Promise((resolve) => setTimeout(resolve, 0));
   };
-  return { watch, conveyor, timers, reads, resumed, group, fire, logs, records, notices };
+  return { watch, conveyor, timers, reads, resumed, group, fire, logs, records, notices, retried };
 }
 
 describe('pendingThreads: что считается замечанием группе', () => {
@@ -298,6 +310,144 @@ describe('MrWatch: один взгляд на конвейер', () => {
     t.watch.sync('parent');
     await t.fire();
     expect(t.resumed).toHaveLength(1);
+  });
+
+  describe('E3: CI упал на инфраструктуре — модель не будится', () => {
+    const job = (id: string, name: string, reason?: string) => ({
+      id,
+      name,
+      ...(reason ? { reason } : {}),
+    });
+    const red = (...failedJobs: ReturnType<typeof job>[]) =>
+      review({ pipeline: { id: '7763', status: 'failed', failedJobs } });
+    const infraNotices = (t: ReturnType<typeof build>) =>
+      t.notices.filter(({ event }) => event.kind === 'notice' && event.code === 'mrWatchInfra');
+
+    it('умер раннер — панель повторяет задание сама; повтор упал так же — заметка, без второго повтора', async () => {
+      const t = build({
+        reviews: [
+          red(job('51', 'lint-frontend', 'runner_system_failure')),
+          red(job('54', 'lint-frontend', 'runner_system_failure')),
+          red(job('54', 'lint-frontend', 'runner_system_failure')),
+        ],
+        retry: async () => true,
+      });
+      t.watch.sync('parent');
+
+      await t.fire();
+      expect(t.resumed).toHaveLength(0);
+      expect(t.retried).toEqual(['51']);
+      // Взгляд на конвейер не записан: исход повтора судится следующей проверкой.
+      expect(t.group().mrWatch?.pipeline).toBeUndefined();
+      expect(t.group().mrWatch?.infraRetried).toEqual(['7763:lint-frontend']);
+      const first = infraNotices(t);
+      expect(first).toHaveLength(1);
+      expect(first[0]!.event).toMatchObject({
+        textCode: 'split-mr-watch-infra-retry-notice',
+        textParams: { jobs: 'lint-frontend (runner_system_failure)' },
+      });
+
+      await t.fire();
+      expect(t.resumed).toHaveLength(0);
+      expect(t.retried).toEqual(['51']);
+      expect(infraNotices(t).at(-1)!.event).toMatchObject({
+        textCode: 'split-mr-watch-infra-again-notice',
+      });
+      expect(t.group().mrWatch?.pipeline).toEqual({ id: '7763', status: 'failed' });
+
+      // Тот же конвейер третий раз не судится вовсе.
+      await t.fire();
+      expect(infraNotices(t)).toHaveLength(2);
+      expect(t.resumed).toHaveLength(0);
+    });
+
+    it('хоть одно задание упало на коде — будится группа, причины заданий в слове, повтора нет', async () => {
+      const t = build({
+        reviews: [
+          red(
+            job('51', 'lint-frontend', 'runner_system_failure'),
+            job('52', 'docs-gate', 'script_failure'),
+          ),
+        ],
+        retry: async () => true,
+      });
+      t.watch.sync('parent');
+      await t.fire();
+      expect(t.retried).toEqual([]);
+      expect(t.resumed).toHaveLength(1);
+      expect(t.resumed[0]!.prompt).toContain(
+        'Failed jobs: lint-frontend (runner_system_failure), docs-gate (script_failure).',
+      );
+    });
+
+    it('причина неизвестна у одного задания — судит группа', async () => {
+      const t = build({
+        reviews: [red(job('51', 'lint', 'runner_system_failure'), job('52', 'test'))],
+        retry: async () => true,
+      });
+      t.watch.sync('parent');
+      await t.fire();
+      expect(t.retried).toEqual([]);
+      expect(t.resumed).toHaveLength(1);
+    });
+
+    it('фордж повтор не принял — красный судится группой, как до E3', async () => {
+      const t = build({
+        reviews: [red(job('51', 'lint-frontend', 'runner_system_failure'))],
+        retry: async () => {
+          throw new Error('403 Forbidden');
+        },
+      });
+      t.watch.sync('parent');
+      await t.fire();
+      expect(t.retried).toEqual(['51']);
+      expect(t.resumed).toHaveLength(1);
+      expect(t.resumed[0]!.prompt).toContain('The MR pipeline failed: #7763');
+      expect(t.group().mrWatch?.infraRetried).toBeUndefined();
+      expect(t.group().mrWatch?.pipeline).toEqual({ id: '7763', status: 'failed' });
+      expect(infraNotices(t)).toHaveLength(0);
+    });
+
+    it('повторять нечем (GitHub, нет токена) — красный судится группой', async () => {
+      const t = build({ reviews: [red(job('51', 'lint', 'runner_system_failure'))] });
+      t.watch.sync('parent');
+      await t.fire();
+      expect(t.resumed).toHaveLength(1);
+    });
+
+    it('ветки ревьюера и умерший раннер — группа будится ради веток, красного в слове нет', async () => {
+      const t = build({
+        reviews: [
+          review({
+            threads: [thread('d1', [['simonenko', 'Поправь', 'n1']])],
+            pipeline: {
+              id: '7763',
+              status: 'failed',
+              failedJobs: [job('51', 'lint', 'runner_system_failure')],
+            },
+          }),
+          red(job('54', 'lint', 'runner_system_failure')),
+        ],
+        retry: async () => true,
+      });
+      t.watch.sync('parent');
+      await t.fire();
+      expect(t.retried).toEqual(['51']);
+      expect(t.resumed).toHaveLength(1);
+      expect(t.resumed[0]!.prompt).toContain('Поправь');
+      expect(t.resumed[0]!.prompt).not.toContain('The MR pipeline failed');
+
+      // Группа ответила и закрылась снова — новый круг помнит повтор: вторая
+      // смерть того же задания — заметка, а не второй повтор.
+      t.group().status = 'done';
+      t.group().doneAt = '2026-09-24T20:00:00.000Z';
+      t.watch.sync('parent');
+      await t.fire();
+      expect(t.retried).toEqual(['51']);
+      expect(infraNotices(t).at(-1)!.event).toMatchObject({
+        textCode: 'split-mr-watch-infra-again-notice',
+      });
+    });
   });
 
   it('зелёный конвейер записывается и группу не трогает', async () => {

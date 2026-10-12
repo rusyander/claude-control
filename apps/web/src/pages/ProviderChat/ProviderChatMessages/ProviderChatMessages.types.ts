@@ -7,6 +7,8 @@ import type { MediaRevision } from '@entities/Media';
 export interface ProviderChatMessagesProps {
   messages: ProviderChatMessage[];
   providerName: string;
+  /** Провайдер разговора — ключ «Что получил агент» у карточек групп (U8). */
+  providerId?: string;
   /** Текст, напечатанный к этому моменту: показывается отдельной репликой. */
   partial: string;
   isRunning: boolean;

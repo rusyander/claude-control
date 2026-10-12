@@ -271,9 +271,12 @@ export const chatEn: typeof chatRu = {
     diffForeign: 'Chat versus a foreign CLI',
     diffForeignText:
       'This section drives claude only. Codex, Gemini, Qwen and the rest live in ' +
-      'Providers: they keep their own list of conversations and have no session at ' +
-      'all — which is why a restart there opens a new chat instead of clearing this ' +
-      'one.',
+      'Providers: they keep their own list of conversations, which is why a restart ' +
+      'there opens a new chat instead of clearing this one. Codex, Qwen, Goose and ' +
+      'Kimi Code keep the CLI session between turns and receive only new messages; an ' +
+      'edited or deleted message, another model or another directory opens a new ' +
+      'session with the whole transcript. The other CLIs receive the whole transcript ' +
+      'on every turn.',
     diffSandbox: 'A project versus the sandbox',
     diffSandboxText:
       'A conversation on a project tab runs in its folder and sees git. The home ' +
@@ -425,7 +428,7 @@ export const chatEn: typeof chatRu = {
         'on feature/orders-export, List filters on feature/orders-filters, Returns ' +
         'report on feature/returns-report. Every group carries its kind of work, a ' +
         'model and a "below the ceiling" mark. The line at the bottom counts the ' +
-        'price: 3 chats, 3 runs now, 2 below the ceiling, up to 11 runs including ' +
+        'price: 3 chats, 3 runs now, 2 below the ceiling, up to 16 runs including ' +
         'triage, plans, work and reviews.',
       sTree: 'Agree — and see what happened',
       sTreeText:
@@ -706,10 +709,14 @@ export const chatEn: typeof chatRu = {
     parallelReadyText:
       'Before EVERY agent start the copy is checked against the original: are .mcp.json, ' +
       '.claude/settings.json and .claude/settings.local.json, CLAUDE.local.md and .env in ' +
-      'place, are the shared directories linked, is there an access entry. If something is ' +
-      'missing the panel first fills it in ITSELF and only then, if that failed, refuses ' +
-      'and names the gaps: an agent in an incomplete copy does not crash, it silently does ' +
-      'the work with the wrong environment, which is worse than a refusal. The same state ' +
+      'place, does the copy’s .mcp.json carry every server of the original (a file reverted ' +
+      'in the copy to its committed version is present but lacks the servers), are the ' +
+      'shared directories linked, is there an access entry. If something is missing the ' +
+      'panel first fills it in ITSELF and only then, if that failed, refuses and names the ' +
+      'gaps: an agent in an incomplete copy does not crash, it silently does the work with ' +
+      'the wrong environment, which is worse than a refusal. A split group passes the same ' +
+      'check before it starts: a copy that could not be filled in does not start, the ' +
+      'reason is on its card, the other groups go on. The same state ' +
       'is always visible on the copy’s card — “copy is complete” or “copy is incomplete” ' +
       'with the list of what is missing and the “Fill in” button (a fresh transfer of the ' +
       'local layer plus the access entry). About access the card knows three answers, not ' +
@@ -783,8 +790,13 @@ export const chatEn: typeof chatRu = {
     splitWhat: 'What happens when you agree',
     splitWhatText:
       'Each group gets its own copy of the repository on its own branch (as in ' +
-      '“Parallel branches”), its own chat inside it and its own running agent; the ' +
-      'task given to it is the shared context plus that group’s tasks. No new tabs ' +
+      '“Parallel branches”), its own chat inside it and its own running agent. The ' +
+      'task opens with your own messages from this conversation, word for word: the ' +
+      'panel takes them itself rather than from the agent’s retelling, and the shared ' +
+      'context and the group’s tasks follow below. The group breaks your words into ' +
+      'points and reports on each; with delivery on, “done” does not come while a point ' +
+      'is unreported or marked not done — the panel reminds the group itself, and only ' +
+      'what is still missing after the reminders reaches the card. No new tabs ' +
       'appear: the project stays one, and the groups’ chats stand as a tree under ' +
       'the conversation the proposal came from. A branch name already taken gets a ' +
       'suffix rather than a refusal — except for MR groups: their copy sits on the ' +
@@ -884,17 +896,34 @@ export const chatEn: typeof chatRu = {
       'without a branch of its own (detached HEAD) rather than a “branch-2” cut from ' +
       'main. If the branch cannot be found, the copy is cut from the base branch and ' +
       'the card says so outright: the findings may have been read from the wrong ' +
-      'diff. The review runs on the ceiling model, with no ' +
-      'plan and no fixes: the agent is told to change nothing and to write nothing ' +
-      'into the MR. It returns a list of findings, and the decision is yours — the ' +
-      'card shows up both in the parent summary and in the group chat, sharing one ' +
-      'state. Four answers: “Fix in the copy” (a separate run works through the ' +
-      'list), “Post to the MR” (the panel writes ONE summary comment; without the ' +
-      'integration the button is disabled and says why), “Both” and “Do nothing”. A ' +
-      'refusal from the forge does not cancel the fixes — the reason stays on the ' +
+      'diff. The review runs on the ceiling model, with no plan and no fixes, through ' +
+      'the deep review skill at the full depth of its risk tier: the whole diff, docs, ' +
+      'locales and tests included. Every finding comes back at its honest severity ' +
+      '(blocker, should fix, question, optional), each as a full card: where, the ' +
+      'evidence, what it should be. Next to the findings the reviewer reports its depth — ' +
+      'the risk tier, the entry points it read from (diff, frame) and what was left ' +
+      'unread — and the panel judges that report, not the tone of the answer. No report, ' +
+      'not everything read, or a high-risk review taken from one entry point — the panel ' +
+      'itself, without you, asks the same session once to finish; still incomplete after ' +
+      'that — the card says “review incomplete” and what was missing, not “no findings”. ' +
+      'An empty, complete review of normal or high risk gets a second, independent pass: ' +
+      'a new session with the same task, starting from the frame rather than the diff — ' +
+      'its result decides the group. ' +
+      'The review session itself publishes into the MR — one thread on ' +
+      'the lines of each finding, checked against the threads already open — not the ' +
+      'panel. If your request already allowed publishing (“post the review to the ' +
+      'MR”), the session publishes at once and the card does not ask for consent a ' +
+      'second time; otherwise nothing is written into the MR and the decision is ' +
+      'yours — the card shows up both in the parent summary and in the group chat, ' +
+      'sharing one state. Four answers: “Fix in the copy” (a separate run works ' +
+      'through the list), “Post to the MR” (the same review session is asked to ' +
+      'publish; when it is busy or unavailable the card says why and the click can be ' +
+      'repeated), “Both” and “Do nothing”. What is already published is never posted ' +
+      'again. A failed publish does not cancel the fixes — the reason stays on the ' +
       'card. No findings at all closes the group by itself, with no card. A review ' +
-      'answer without the summary block is not “no findings”: the group waits, and ' +
-      'the card offers to repeat the summary in the same session. With several ' +
+      'answer without the summary block is not “no findings”: the panel itself asks the ' +
+      'same session once for the summary; if that fails, the group waits and the card ' +
+      'offers you to repeat it. With several ' +
       'groups, the “same decision for the rest” toggle clears them at once. After ' +
       'the fixes a separate “Commit and push to the MR” button appears — the only ' +
       'write into someone else’s branch, and only on your click. It is absent while ' +
@@ -1007,7 +1036,7 @@ export const chatEn: typeof chatRu = {
       'is not visible right away. A large group does not count as mechanical — the ' +
       'panel raises its rank itself, by task count and task length, without asking ' +
       'the agent.',
-    cascadeReview: 'Going lower is paid for by a review: work → review → fixes',
+    cascadeReview: 'Every piece of work is checked: work → review → fixes → verification',
     cascadeReviewText:
       'A group sent below the ceiling gets two obligations added to its task: ' +
       'before saying “done”, run the project’s checks and match the result against ' +
@@ -1015,13 +1044,19 @@ export const chatEn: typeof chatRu = {
       'its kind, instead of muddling through. Then the pipeline starts: as soon as ' +
       'the work ends successfully, the panel opens a REVIEW at the ceiling — same ' +
       'copy, same branch — told to read the diff against the task, list the ' +
-      'findings and change nothing. Findings exist → a third link, FIXES by that ' +
-      'list, back on the work model; no findings → the chain is closed. In the ' +
+      'findings and change nothing. The review follows EVERY piece of work, the one ' +
+      'that ran at the ceiling itself too: a fresh session reads the diff without ' +
+      'the history of writing it, and on the same model that is a second pair of ' +
+      'eyes. Findings exist → a third link, FIXES by that list, back on the work ' +
+      'model, and after them one VERIFICATION PASS on the reviewer: it re-runs the ' +
+      'evidence of every finding on the branch (attempted is not fixed) and reads ' +
+      'the fix diff for new breakage. It starts no second round of fixes: what is ' +
+      'still open, delivery writes into the MR description as open, and a pass ' +
+      'without a result as “fixes not verified”. No findings → the chain is closed. In the ' +
       'chat list the links are labelled “review” and “fixes”, each with its own ' +
       'model, and the review feed carries a card with what was found. No new ' +
       'parallel agents appear: the links run one after another, and the split card ' +
-      'states before the button how many runs that is at worst. Work that ran at ' +
-      'the ceiling itself gets no review — there is nothing to strengthen it with.',
+      'states before the button how many runs that is at worst: up to four per group.',
     cascadeLevels: 'Levels: one triage for the whole split and a plan per group',
     cascadeLevelsText:
       'With model selection on, the groups do not start at once. First a TRIAGE ' +
@@ -1068,7 +1103,12 @@ export const chatEn: typeof chatRu = {
       'long one is cut, the full name is in the hint), the path it has ' +
       'walked (“work › review › fixes”) and the model of the current stage; a ' +
       'running stage carries a pulsing dot. A click on the card opens the group’s ' +
-      'chat, and the group’s buttons sit in its top right corner. Groups still in ' +
+      'chat, and the group’s buttons sit in its top right corner. Among them is ' +
+      '“What the agent got”: a window with the verbatim input of the stage’s latest ' +
+      'runs — the message with the children summary, the panel appendix to the ' +
+      'system prompt, the contour prompt, the model and the depth — in full, ' +
+      'uncut, so you can check nothing was lost; the last 30 runs of the chat are ' +
+      'kept. Groups still in ' +
       'progress (running, waiting for you, paused, queued) sit on top; below them, ' +
       'delivered groups waiting for your acceptance; under those, groups you ' +
       'accepted that are not merged yet; at the very bottom, closed ones: MR merged ' +
@@ -1084,7 +1124,7 @@ export const chatEn: typeof chatRu = {
       'for and the one whose branch its copy was cut from; the hint names them. ' +
       'There is no number while a predecessor has nothing to merge yet, on a merged ' +
       'or closed MR, and when the plan yields no order (a dependency loop). The chat list ' +
-      'shows CONVERSATIONS, and the pipeline adds up to three per group — nine rows ' +
+      'shows CONVERSATIONS, and the pipeline adds up to four per group — twelve rows ' +
       'do not tell you the state of three groups. So under the parent the list shows ' +
       'only the stages where something is happening now — a green, yellow or red dot — and ' +
       'the rest fold into one “N more” row per branch: a grey dot (silent for over five ' +
@@ -1307,8 +1347,8 @@ export const chatEn: typeof chatRu = {
       'parent’s own feed. The whole ' +
       'tree is stopped and resumed from there too (“Остановить всё” / “Продолжить всё”): ' +
       'the pause lives on the server and mutes auto-starts, so a stage created while it ' +
-      'holds waits in the queue. One difference is stated on the button itself: a foreign ' +
-      'CLI has no session, so continuing means asking the same thing again rather than ' +
+      'holds waits in the queue. One difference is stated on the button itself: a stopped ' +
+      'turn of a foreign CLI does not keep its session, so continuing means asking the same thing again rather than ' +
       'returning to the same place. Clean-session continuation follows from that: ' +
       'with a foreign CLI the panel reads “restart the session” in the tail of an ' +
       'answer just as it reads the block, and opens a NEW conversation in the same ' +

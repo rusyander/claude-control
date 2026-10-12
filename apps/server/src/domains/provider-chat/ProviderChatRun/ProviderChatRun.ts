@@ -29,9 +29,10 @@ import {
   type SkillCatalogEntry,
   type SkillBodySource,
 } from '../../portability/supervisor/skills-router.ts';
-import { buildPrompt } from '../prompt/prompt.ts';
+import { MAX_PROMPT_CHARS, buildPrompt } from '../prompt/prompt.ts';
 import { createLiveTurn } from '../live/index.ts';
-import type { LivePermissionPolicy, LiveTurn } from '../live/types.ts';
+import type { LivePermissionPolicy, LiveSessionRequest, LiveTurn } from '../live/types.ts';
+import { digestPreamble, type LiveSessionPrevious } from '../live-session/live-session.ts';
 
 /** У прогона есть своё окружение (контур, набор, слой группы). */
 /**
@@ -81,7 +82,16 @@ export type ProviderChatRunEvent =
   | { type: 'delta'; text: string }
   /** Ход начат и принимает сообщения посреди ответа (В1). */
   | { type: 'steerable' }
-  | { type: 'done'; reply: string; transport: ProviderChatTransport }
+  | {
+      type: 'done';
+      reply: string;
+      transport: ProviderChatTransport;
+      /**
+       * Сессия CLI, которую продолжит следующий ход (E2b): только живой путь и
+       * только когда вызывающий попросил её держать (`liveSession`).
+       */
+      liveSession?: { kind: string; id: string; preamble: string };
+    }
   | { type: 'error'; error: string; reason: AssistantRunReason };
 
 export interface ProviderChatRunOptions {
@@ -181,6 +191,21 @@ export interface ProviderChatRunOptions {
    * серверного режима, и иначе её бы спросили не тем языком.
    */
   liveTurn?: (kind: NonNullable<ConfigProvider['assistant']>['liveServer']) => LiveTurn | undefined;
+  /**
+   * Держать сессию CLI между ходами (E2b). Поле есть — живой ход оставит свою
+   * сессию и вернёт её в `done.liveSession`; `previous` — сессия прошлых ходов,
+   * которую служба уже сверила с перепиской (`planLiveSession`). Нет поля —
+   * сессия одноразовая: её некому было бы продолжить или удалить.
+   */
+  liveSession?: { previous?: LiveSessionPrevious };
+  /**
+   * Текст, ушедший CLI, — для «Что получил агент» (TQ-09, 12.10.2026). Запись
+   * была последней репликой, а CLI получал указание панели, блоки навыков и
+   * хуков и всю переписку. Зовётся, когда путь ход принял, ровно с тем, что он
+   * отправил; путь, уступивший следующему, зовёт ещё раз — запись того же
+   * прогона заменяется (`appendRunInput`). Отказ до запуска — не зовётся.
+   */
+  onInput?: (text: string) => void;
 }
 
 export interface ProviderChatRunLike {
@@ -209,6 +234,14 @@ export class ProviderChatRun implements ProviderChatRunLike {
   private readonly abort = new AbortController();
   /** Куда идёт сообщение посреди хода: живой ход или сессия OpenCode. */
   private steerTarget?: (text: string) => Promise<boolean>;
+  /**
+   * Блоки, подмешанные перед перепиской (E2b). Постоянные — системное указание
+   * и каталог скиллов: их сессия CLI уже видела, и смена их — новая сессия.
+   * Блоки хода — тело названного скилла и контекст хука: они идут и в
+   * продолженную сессию, как шли бы в полный промпт.
+   */
+  private readonly preamble: string[] = [];
+  private readonly turnBlocks: string[] = [];
 
   async start(
     options: ProviderChatRunOptions,
@@ -229,7 +262,11 @@ export class ProviderChatRun implements ProviderChatRunLike {
     // и РАНЬШЕ него: первой репликой цель должна прочитать свою роль, а список
     // доступных ей скиллов уже после. Порядок наложения обратный порядку строк:
     // каждый блок дописывается в начало, поэтому последний из них окажется первым.
-    const skillPrefixes = this.planSkills(options);
+    const skillPlan = this.planSkills(options);
+    const skillPrefixes = skillPlan.prefixes;
+    // Тело названного скилла — последний блок плана (`planSkillTurn`), каталог — до него.
+    const skillBody = skillPlan.used ? skillPrefixes.slice(-1) : [];
+    this.turnBlocks.push(...skillBody);
     if (skillPrefixes.length > 0) {
       options = { ...options, history: [...skillPrefixes.map(prefixMessage), ...options.history] };
     }
@@ -240,6 +277,10 @@ export class ProviderChatRun implements ProviderChatRunLike {
     if (options.systemPrefix) {
       options = { ...options, history: [prefixMessage(options.systemPrefix), ...options.history] };
     }
+    this.preamble.push(
+      ...(options.systemPrefix ? [options.systemPrefix] : []),
+      ...skillPrefixes.slice(0, skillPrefixes.length - skillBody.length),
+    );
 
     // Надзиратель рантайма отыгрывает события ПЕРЕД выбором раннера: отказ
     // блокирующего хука обязан остановить прогон до того, как чужой CLI будет
@@ -250,6 +291,7 @@ export class ProviderChatRun implements ProviderChatRunLike {
     // Контекст, дописанный хуком, встаёт перед перепиской тем же способом, что и
     // `systemPrefix`: у чужого CLI другого канала для этого нет.
     if (supervised.addedContext.length > 0) {
+      this.turnBlocks.unshift(...supervised.addedContext);
       options = {
         ...options,
         history: [...supervised.addedContext.map(prefixMessage), ...options.history],
@@ -277,9 +319,12 @@ export class ProviderChatRun implements ProviderChatRunLike {
    * инструкций цели прогон не распоряжается — он её не переписывает, поэтому
    * `instructionsBudget` здесь не задаётся и канал остаётся один.
    */
-  private planSkills(options: ProviderChatRunOptions): readonly string[] {
+  private planSkills(options: ProviderChatRunOptions): {
+    prefixes: readonly string[];
+    used?: string;
+  } {
     const source = options.skills;
-    if (!source) return [];
+    if (!source) return { prefixes: [] };
 
     const lastUser = [...options.history].reverse().find((message) => message.role === 'user');
     return planSkillTurn({
@@ -287,7 +332,7 @@ export class ProviderChatRun implements ProviderChatRunLike {
       budgetChars: source.budgetChars,
       ...(lastUser ? { prompt: lastUser.content } : {}),
       readBody: source.readBody,
-    }).prefixes;
+    });
   }
 
   /** Выбор пути и сам прогон. Вынесено, чтобы события конца отыграл один `finally`. */
@@ -336,11 +381,29 @@ export class ProviderChatRun implements ProviderChatRunLike {
         ...(options.permission ? { allowEdits: options.permission.allowEdits } : {}),
         ...(options.workdir ? { workdir: options.workdir } : {}),
       };
-      const args = provider.assistant?.oneShotArgs?.(buildPrompt(options.history).text, run);
+      const built = buildPrompt(options.history);
+      if (built.overflow !== undefined && provider.assistant?.oneShotArgs) {
+        onEvent({
+          type: 'error',
+          reason: 'cli_error',
+          error:
+            `Задание длиннее, чем ${provider.name} принимает одним запуском: ${built.overflow} знаков при пределе ${MAX_PROMPT_CHARS}. ` +
+            'Обрезанным оно не отправлено — сократите задание или вынесите длинный текст в файл и дайте на него ссылку.',
+        });
+        return;
+      }
+      const args = provider.assistant?.oneShotArgs?.(built.text, run);
       if (args) {
         // Режим прогона окружением — у CLI без флага режима (Goose: `GOOSE_MODE`).
         const runEnv = provider.assistant?.oneShotEnv?.(run);
-        await this.runStreaming(options, args, resolution.cliCommandFound, onEvent, runEnv);
+        await this.runStreaming(
+          options,
+          args,
+          resolution.cliCommandFound,
+          onEvent,
+          runEnv,
+          built.text,
+        );
         return;
       }
       // CLI есть, но неинтерактивный флаг не задокументирован — придумывать его
@@ -497,8 +560,15 @@ export class ProviderChatRun implements ProviderChatRunLike {
     if (hasEnv(options.platformEnv)) return undefined;
 
     const lastUser = [...options.history].reverse().find((message) => message.role === 'user');
-    const text = lastUser?.content.trim();
-    if (!text) return undefined;
+    if (!lastUser?.content.trim()) return undefined;
+    // Живой сессии — блоки этого хода и реплика; новой — весь разговор с
+    // указанием панели первым (TQ-04: указание, навыки и хуки до OpenCode в
+    // сессии не доходили вовсе). Предела argv тут нет — запрос идёт по HTTP.
+    const text = buildPrompt(
+      [...this.turnBlocks.map(prefixMessage), lastUser],
+      Number.POSITIVE_INFINITY,
+    ).text;
+    const opening = buildPrompt(options.history, Number.POSITIVE_INFINITY).text;
 
     const serve = options.sessionServe ?? opencodeServe;
     this.steerTarget = (steered) =>
@@ -515,6 +585,8 @@ export class ProviderChatRun implements ProviderChatRunLike {
       ...(options.workdir ? { workdir: options.workdir } : {}),
       ...(options.permission ? { permission: options.permission } : {}),
       ...(onDelta ? { onDelta } : {}),
+      ...(options.onInput ? { onSent: options.onInput } : {}),
+      opening,
     });
 
     this.steerTarget = undefined;
@@ -544,10 +616,23 @@ export class ProviderChatRun implements ProviderChatRunLike {
 
     this.liveTurn = turn;
     this.steerTarget = (text) => turn.steer(text);
+    const preamble = digestPreamble(this.preamble);
+    const session = this.liveSessionRequest(options, kind, preamble);
+    // Живой ход везёт текст запросом, а не аргументом командной строки, —
+    // предел argv (`MAX_PROMPT_CHARS`) ему не нужен, и ранние реплики,
+    // отброшенные ради него, были бы потерянным контекстом без всякой причины.
+    const prompt = buildPrompt(options.history, Number.POSITIVE_INFINITY).text;
+    let told: string | undefined;
+    const tell = (text: string) => {
+      if (text === told) return;
+      told = text;
+      options.onInput?.(text);
+    };
     const result = await turn.run(
       {
         command: cliCommand ?? providerCliCommand(options.provider),
-        prompt: buildPrompt(options.history).text,
+        ...(session ? { session } : {}),
+        prompt,
         timeoutMs: options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
         ...(options.workdir ? { workdir: options.workdir } : {}),
         ...(options.platformEnv && Object.keys(options.platformEnv).length > 0
@@ -560,16 +645,31 @@ export class ProviderChatRun implements ProviderChatRunLike {
         ...(options.permission ? { permission: options.permission } : {}),
       },
       (text) => onEvent({ type: 'delta', text }),
-      () => onEvent({ type: 'steerable' }),
+      () => {
+        // Ход начат: продолженной сессии ушёл её хвост. Не поднял её CLI —
+        // это видно только по итогу, и запись ниже заменится полным промптом.
+        tell(session?.resume?.prompt ?? prompt);
+        onEvent({ type: 'steerable' });
+      },
     );
     this.liveTurn = undefined;
     this.steerTarget = undefined;
+    // Не поднявшийся ход ничего не отправил — вход запишет путь, который его сменит.
+    if (result.kind !== 'unavailable') {
+      const reopened = session?.resume && result.kind === 'done' && result.resumed === false;
+      tell(reopened ? prompt : (session?.resume?.prompt ?? prompt));
+    }
+    const kept =
+      session && result.kind === 'done' && result.session
+        ? { liveSession: { kind, id: result.session, preamble } }
+        : {};
 
     if (this.stopped) {
       onEvent({
         type: 'done',
         reply: result.kind === 'done' ? result.reply : '',
         transport: 'live',
+        ...kept,
       });
       return true;
     }
@@ -582,8 +682,39 @@ export class ProviderChatRun implements ProviderChatRunLike {
       onEvent({ type: 'error', error: 'CLI закончил ход без ответа', reason: 'cli_error' });
       return true;
     }
-    onEvent({ type: 'done', reply: result.reply, transport: 'live' });
+    onEvent({ type: 'done', reply: result.reply, transport: 'live', ...kept });
     return true;
+  }
+
+  /**
+   * Что ход делает с сессией разговора (E2b). Прежняя сессия того же CLI, чью
+   * переписку служба сверила, а постоянную часть промпта — здесь, продолжается:
+   * ей уходят блоки этого хода и реплики после увиденных. Иначе — новая сессия
+   * с полным промптом, а прежняя удаляется. `undefined` — сессию не держим.
+   */
+  private liveSessionRequest(
+    options: ProviderChatRunOptions,
+    kind: string,
+    preamble: string,
+  ): LiveSessionRequest | undefined {
+    if (!options.liveSession) return undefined;
+    const previous = options.liveSession.previous;
+    // Сессию другого CLI этот не поднимет и не удалит — она просто забывается.
+    if (!previous || previous.kind !== kind) return {};
+    if (previous.covered === undefined || previous.preamble !== preamble) {
+      return { discard: previous.id };
+    }
+    const blocks = this.preamble.length + this.turnBlocks.length;
+    const unseen = options.history.slice(blocks + previous.covered);
+    // Новой реплики человека сессия не получила бы — продолжать не с чем.
+    if (!unseen.some((message) => message.role === 'user' && !message.failed)) {
+      return { discard: previous.id };
+    }
+    const prompt = buildPrompt(
+      [...this.turnBlocks.map(prefixMessage), ...unseen],
+      Number.POSITIVE_INFINITY,
+    ).text;
+    return { resume: { id: previous.id, prompt } };
   }
 
   /** Прямой вызов модельного API: ответ приходит целиком, поток эмулируется одним куском. */
@@ -592,6 +723,9 @@ export class ProviderChatRun implements ProviderChatRunLike {
     key: string,
     onEvent: (event: ProviderChatRunEvent) => void,
   ): Promise<void> {
+    // API получает реплики списком, а не текстом; запись — те же реплики,
+    // собранные так же, как для CLI (заметки панели отброшены и там, и там).
+    options.onInput?.(buildPrompt(options.history, Number.POSITIVE_INFINITY).text);
     const result = await runProviderApi(
       options.provider,
       options.history
@@ -643,6 +777,7 @@ export class ProviderChatRun implements ProviderChatRunLike {
     cliCommand: string | undefined,
     onEvent: (event: ProviderChatRunEvent) => void,
     runEnv?: Record<string, string>,
+    input?: string,
   ): Promise<void> {
     // Остановили раньше, чем процесс успел стартовать, — стартовать уже незачем.
     if (this.stopped) {
@@ -684,6 +819,9 @@ export class ProviderChatRun implements ProviderChatRunLike {
       onEvent({ type: 'error', error: spawned.error.message, reason: 'cli_error' });
       return Promise.resolve();
     }
+    // Вход — только у запущенного процесса: отказ обёртки `.cmd` или набора
+    // панели выше не отправил CLI ничего (TQ-09).
+    if (input !== undefined) options.onInput?.(input);
 
     const child = spawned.child;
     this.child = child;

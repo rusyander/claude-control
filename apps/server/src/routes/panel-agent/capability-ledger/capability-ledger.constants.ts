@@ -50,6 +50,8 @@ export const ROUTE_LEDGER: RouteLedger = {
   // chat/cascade-routes.ts
   'GET /api/chat/cascade': 'action:read_model_cascade',
   'GET /api/chat/lowered-runs': 'action:list_lowered_runs',
+  // «Что получил агент» (U8): кнопка карточки группы; агенту панели пока не нужна.
+  'GET /api/chat/:chatId/received': 'gap:P3',
   'PUT /api/chat/cascade': 'action:set_model_cascade',
   // chat/cli-routes.ts
   'GET /api/chat/cli': 'action:cli_version',

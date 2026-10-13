@@ -500,12 +500,12 @@
         {
           "path": "apps/server/src/domains/chat/ChatHandoff/ChatHandoff.ts",
           "why": "«Чистая сессия»: предложение прозой или блоком, потолок цепочки, зацикливание",
-          "sha": "7ede10fcb038dd4c"
+          "sha": "95cd9d347935a6c3"
         },
         {
           "path": "apps/server/src/domains/chat/ChatSplit/ChatSplit.ts",
           "why": "«Разделить»: карточка предложения, дерево, группы",
-          "sha": "670a369e6a8e9925"
+          "sha": "55e720161f033540"
         },
         {
           "path": "apps/server/src/domains/chat/split-conveyor/split-conveyor.ts",
@@ -658,7 +658,7 @@
           "sha": "bb23d4b9ff80b8e5"
         }
       ],
-      "confirmedAt": "2026-10-12T17:06:32.005Z"
+      "confirmedAt": "2026-10-13T06:42:54.635Z"
     },
     {
       "topic": "tests",
@@ -2709,7 +2709,7 @@
         {
           "path": "apps/server/src/domains/provider-chat/path-turn/path-turn.ts",
           "why": "«Порядок работы»: шаг после стадии у звена другого CLI — ходом того же разговора, ревью после него",
-          "sha": "cc62135b462b2c44"
+          "sha": "2dc29a01e97b8ad6"
         },
         {
           "path": "apps/server/src/domains/groups/codex-layer/codex-layer.ts",
@@ -2727,7 +2727,7 @@
           "sha": "b280d6dc187cf339"
         }
       ],
-      "confirmedAt": "2026-10-12T12:23:00.648Z"
+      "confirmedAt": "2026-10-13T06:42:54.890Z"
     },
     {
       "topic": "phone",

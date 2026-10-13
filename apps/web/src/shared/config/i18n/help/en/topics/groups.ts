@@ -194,7 +194,9 @@ export const groupsEn: typeof groupsRu = {
         'rows is where a new step goes: inside an open skill block the step runs in the same ' +
         'turn as the skill, and a step after a stage runs as its own checked turn after it; in ' +
         'a link run by another CLI (Qwen Code, Codex) it is the same, a turn of that same ' +
-        'conversation, and the review starts only after it. At ' +
+        'conversation, and the review starts only after it. If such a step ends its turn without ' +
+        'a check result, the panel asks it once to report and says so in the chat; still ' +
+        'without a result, the chain waits for an answer in that same chat. At ' +
         'the top are a search by title and description and Collapse all, and that bar stays ' +
         'above the list while it scrolls — no step shows through under it; while the search is not ' +
         'empty the list is flat, with no “+” and no dragging. Your own steps move by their ' +

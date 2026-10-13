@@ -12,6 +12,7 @@ import {
   mergeSieveRows,
   scanSieveBlocks,
   SIEVE_LANG,
+  SIEVE_ROWS_MAX,
   sievePromptBlock,
   touchKinds,
   withoutSieveBlocks,
@@ -159,16 +160,16 @@ describe('блок отчёта о ситах', () => {
 
   // Ревью PR #1: обновлённая строка держала старое место и первой уходила под обрезку.
   it('при обрезке до предела теряется самая старая строка, а не свежий вердикт', () => {
-    const previous = Array.from({ length: 30 }, (_, index) => ({
+    const previous = Array.from({ length: SIEVE_ROWS_MAX }, (_, index) => ({
       id: `s${index}`,
       status: 'fail' as const,
       evidence: 'old',
     }));
     const merged = mergeSieveRows(previous, [
       { id: 's0', status: 'pass', evidence: 'fresh' },
-      { id: 's30', status: 'pass', evidence: 'new' },
+      { id: `s${SIEVE_ROWS_MAX}`, status: 'pass', evidence: 'new' },
     ]);
-    expect(merged).toHaveLength(30);
+    expect(merged).toHaveLength(SIEVE_ROWS_MAX);
     expect(merged.find((row) => row.id === 's0')).toMatchObject({ evidence: 'fresh' });
     expect(merged.some((row) => row.id === 's1')).toBe(false);
   });

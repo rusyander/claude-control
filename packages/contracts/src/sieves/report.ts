@@ -51,7 +51,7 @@ export interface SieveScan {
 /** Потолки — отчёт уезжает в запись группы и в напоминания. */
 const EVIDENCE_MAX = 600;
 // Строки сит и пунктов задания владельца (U2, `owner-N`) — в одном отчёте.
-const ROWS_MAX = 80;
+export const SIEVE_ROWS_MAX = 80;
 const LEARNED_MAX = 20;
 export const LEARNED_TEXT_MIN = 20;
 export const LEARNED_TEXT_MAX = 400;
@@ -99,7 +99,7 @@ export function parseSieveBody(
       status: status as SieveStatus,
       evidence: text(row.evidence, EVIDENCE_MAX) ?? '',
     });
-    if (rows.length >= ROWS_MAX) break;
+    if (rows.length >= SIEVE_ROWS_MAX) break;
   }
 
   const lessons: LearnedSieveRow[] = [];
@@ -190,5 +190,5 @@ export function mergeSieveRows(
     byId.delete(row.id);
     byId.set(row.id, row);
   }
-  return [...byId.values()].slice(-ROWS_MAX);
+  return [...byId.values()].slice(-SIEVE_ROWS_MAX);
 }

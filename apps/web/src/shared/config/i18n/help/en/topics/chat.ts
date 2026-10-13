@@ -1217,7 +1217,10 @@ export const chatEn: typeof chatRu = {
       '“What a group decides on its own”); an auto-approval toggle you switched on in ' +
       'the group’s chat yourself beats the rows, while one inherited from the parent ' +
       'does not get in their way. A child asks only through the card: a question typed at the ' +
-      'end of its answer is invisible from the parent, and it is told so. Children ' +
+      'end of its answer is invisible from the parent, and it is told so. A group run by ' +
+      'another CLI has no question tool, so it asks in the last line of its answer — with ' +
+      'options and its recommendation — ends the turn and continues from the same stage ' +
+      'once the answer arrives. Children ' +
       'cannot strike deals with each other — the session messaging tools are closed ' +
       'to them, and a fork becomes a question to you. The parent, in turn, knows its ' +
       'children: every turn of it carries a summary of the groups (branch, copy, ' +
@@ -1420,7 +1423,9 @@ export const chatEn: typeof chatRu = {
       'collect in “Suggested tickets: N” — copy them, or “File in ‹project›” through ' +
       'the tracker integration, only after you confirm. Steps a group cannot take (a ' +
       'dependency between MRs, access, someone else’s service) collect in “For you to ' +
-      'do: N” — the panel does not carry them out. A delivered group has “Recheck ' +
+      'do: N” — the panel does not carry them out. A review-by-link group delivers ' +
+      'nothing: it collects no steps for you, and a defect of the MR it reviews is a ' +
+      'review finding, not a ticket. A delivered group has “Recheck ' +
       'MR”: the panel reads the MR — conflicts with the target branch, every pending ' +
       'reviewer comment, a red pipeline — and hands that to the group’s own ' +
       'conversation together with a request to check every task is done; what is ' +
@@ -1681,7 +1686,8 @@ export const chatEn: typeof chatRu = {
       'mode, not an exception. The decision is made by the server, not by the ' +
       'tab: the chain survives a closed browser — the agent works at night, you ' +
       'look in the morning. Every continuation gets the original task of the whole ' +
-      'job along with the checkpoint, so the third session in a row still knows ' +
+      'job along with the checkpoint — in full; a task longer than 200,000 characters is ' +
+      'cut with a visible label, never silently — so the third session in a row still knows ' +
       'the bounds of its group. A conversation continues at most eight times in a ' +
       'row (review and fix stages do not count), and if the checkpoint is word for ' +
       'word the same as at the previous move — or as when this work was carried to ' +

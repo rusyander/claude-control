@@ -1,0 +1,32 @@
+{
+  "title": {
+    "ru": "Справка чата и групп догнала поведение панели",
+    "en": "Chat and group help catches up with the panel"
+  },
+  "items": [
+    {
+      "kind": "docs",
+      "text": {
+        "ru": "«Порядок работы»: шаг у звена другого CLI, закончивший ход без итога проверки, один раз получает просьбу отчитаться; без итога и после неё цепочка ждёт ответа в том же чате.",
+        "en": "Work order: a step in a link run by another CLI that ends its turn without a check result is asked once to report; still without one, the chain waits for an answer in that same chat."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "docs",
+      "text": {
+        "ru": "Группа чужого CLI задаёт вопрос последней строкой ответа — с вариантами и рекомендацией — и продолжает с той же стадии, когда придёт ответ.",
+        "en": "A group run by another CLI asks in the last line of its answer — with options and a recommendation — and continues from the same stage once the answer arrives."
+      },
+      "area": { "ru": "Чат", "en": "Chat" }
+    },
+    {
+      "kind": "docs",
+      "text": {
+        "ru": "«Чистая сессия»: исходное задание передаётся продолжению целиком, а длиннее 200 000 знаков обрезается с видимой меткой, не молча.",
+        "en": "Clean session: the original task reaches each continuation in full, and past 200,000 characters it is cut with a visible label, never silently."
+      },
+      "area": { "ru": "Чат", "en": "Chat" }
+    }
+  ]
+}

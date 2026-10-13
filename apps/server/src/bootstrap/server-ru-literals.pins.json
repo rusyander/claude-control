@@ -456,7 +456,7 @@
     "why": "path-rejection detail composed inside an error class"
   },
   "domains/project-git/bootstrap.ts": {
-    "n": 8,
+    "n": 12,
     "why": "log lines appended to the copy-preparation log the human opens"
   },
   "domains/project-runner/registry.ts": {

@@ -498,7 +498,9 @@ export const chatEn: typeof chatRu = {
     tabAdd: 'Add a folder',
     tabAddText:
       'The button in the project list opens a directory picker across your drives. ' +
-      'That is how you start in a folder Claude has never run in.',
+      'That is how you start in a folder Claude has never run in. “Open several” ' +
+      'opens every project ticked in its list as tabs at once; projects already open ' +
+      'stand there ticked and disabled.',
     tabOrder: 'Your own tab order',
     tabOrderText:
       'Drag a project tab to the place you want it, or move it a step at a time ' +
@@ -506,13 +508,18 @@ export const chatEn: typeof chatRu = {
       'home tab takes no part in the reordering and always stays first.',
     tabsNote:
       'Tabs and their order survive a page reload, and closing a tab closes only ' +
-      'the tab — neither chats nor files are touched.',
+      'the tab — neither chats nor files are touched. Projects from the “Projects” ' +
+      'page come first in the list with a pin, even without a single conversation, so ' +
+      'closing such a project’s tab does not lose it. Any other project is added there ' +
+      'with the “+” button in its row.',
 
     toolsTitle: 'The project row: dev server and git',
     toolsCaption:
       'The project tab header has two rows. The top one is the conversation: model and ' +
       'effort, “Agents”, “Chat settings”. The bottom one is the project: “To MR”, ' +
-      '“Project code”, “Tests”, “Environment”, “Editor” and “Dev server”. All of it works against the ' +
+      '“Project code”, “Tests”, “Environment”, “Editor”, “Dev server” and, last, whether the ' +
+      'project is on the “Projects” page: “In Projects” leads to its settings, “To Projects” ' +
+      'adds it there in one click. All of it works against the ' +
       'real directory on disk — the panel keeps no copy of the state. In a narrow ' +
       'column the buttons whose icon speaks for itself drop their label and keep the ' +
       'icon and a hover hint.',
@@ -981,7 +988,17 @@ export const chatEn: typeof chatRu = {
       'creating a copy” field in “Copy settings”; empty — the panel decides by the ' +
       'lockfiles. In the copy root: pnpm-lock.yaml → pnpm install --frozen-lockfile ' +
       '--prefer-offline, package-lock.json → npm ci --prefer-offline --no-audit ' +
-      '--no-fund, yarn.lock → yarn install --immutable. None in the root — the same in ' +
+      '--no-fund, yarn.lock → yarn install --immutable. When a folder’s package.json ' +
+      'and lockfile in the copy match the original, nothing is installed again. A ' +
+      'folder without local packages (no workspace, no file: to a sibling folder) gets ' +
+      'node_modules as a link to the original’s node_modules: no disk space, no ' +
+      'install; a package the agent installs in the copy lands in the original too. ' +
+      'Removing the copy removes only the link. A folder with local packages is not ' +
+      'linked — the copy would load them from the original instead of its own: with ' +
+      'npm its node_modules is built from hard links to the original’s files (no extra ' +
+      'disk space) and npm install --no-save runs instead of npm ci, delivering only ' +
+      'the difference; bundler caches are not carried over, service folders such as ' +
+      '.prisma are copied. None in the root — the same in ' +
       'each first-level folder (frontend/, web/…), up to four at once; a local library ' +
       'its neighbours depend on through file:, whose entry (dist) is not built in a ' +
       'fresh copy, is built with its build script after the install. Without a lockfile ' +

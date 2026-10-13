@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { existsSync, renameSync } from 'node:fs';
+import { lstat, readdir, rmdir, unlink } from 'node:fs/promises';
 import { basename, dirname, join, resolve } from 'node:path';
 import type {
   ProjectWorktree,
@@ -564,6 +565,37 @@ async function assertCopyUnlocked(dir: string): Promise<void> {
  * сделает: это чужая работа, а не мусор. Его отказ уходит человеку кодом
  * `worktree-copy-dirty`.
  */
+/**
+ * Что `git worktree remove` оставил на Windows: каталоги, в которых лежит
+ * junction (npm кладёт так `file:`-зависимость — `node_modules/@scope/lib` на
+ * соседний каталог копии). Git стирает цель и все файлы, а каталоги со ссылкой
+ * внутри не трогает: копия «убрана», папка цела, и ту же ветку не завести.
+ *
+ * Ссылку снимаем, не заходя в неё; пустые каталоги убираем. Обычный файл —
+ * значит, это не остатки git, а чья-то работа: такой каталог остаётся как есть.
+ */
+async function sweepLinkShell(dir: string): Promise<boolean> {
+  let stats;
+  try {
+    stats = await lstat(dir);
+  } catch {
+    return true;
+  }
+  if (stats.isSymbolicLink()) {
+    // Junction и ссылка на каталог на Windows снимаются как каталог.
+    await unlink(dir).catch(() => rmdir(dir));
+    return true;
+  }
+  if (!stats.isDirectory()) return false;
+  let empty = true;
+  for (const name of await readdir(dir)) {
+    if (!(await sweepLinkShell(join(dir, name)))) empty = false;
+  }
+  if (!empty) return false;
+  await rmdir(dir);
+  return true;
+}
+
 export async function removeWorktree(
   projectDir: string,
   target: string,
@@ -647,6 +679,7 @@ export async function removeWorktree(
     }
     throw error;
   }
+  await sweepLinkShell(entry.path);
   if (carried.runs > 0)
     return {
       output: `Копия ${entry.path} убрана, её прогоны блока «Тесты» (${carried.runs}) перенесены в историю проекта`,

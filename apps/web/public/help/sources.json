@@ -1538,7 +1538,7 @@
     {
       "topic": "history",
       "document": "apps/web/src/pages/Help/topics/HistoryTopic/HistoryTopic.tsx",
-      "confirmedAt": "2026-10-13T07:57:41.799Z",
+      "confirmedAt": "2026-10-13T10:58:05.851Z",
       "sources": [
         {
           "path": "apps/server/src/domains/history/feed.ts",
@@ -1583,7 +1583,7 @@
         {
           "path": "apps/server/src/domains/panel-update/panel-update.ts",
           "why": "«Вышла новая версия»: только перемотка, отказ при своих правках и разошедшейся ветке, pnpm install при новом lock-файле, проверка раз в 10 минут",
-          "sha": "6b85a05085927eb3"
+          "sha": "79297b225f08cc02"
         },
         {
           "path": "apps/web/src/pages/History/PanelUpdateCard/PanelUpdateCard.tsx",

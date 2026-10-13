@@ -4,6 +4,7 @@ import { promisify } from 'node:util';
 import { GIT_MAX_BUFFER, GIT_TIMEOUT_MS } from '../constants.ts';
 import { coded } from '../../../lib/server-text/server-text.ts';
 import { serverText } from '../../../lib/server-texts/server-texts.ts';
+import { fetchesPack, sweepStalePacks } from './stale-packs.ts';
 import type { ServerMessageCode, ServerMessageParams } from '@agentdeck/contracts/server-messages';
 
 /**
@@ -64,6 +65,7 @@ export async function git(
   args: string[],
   timeout = GIT_TIMEOUT_MS,
 ): Promise<string> {
+  if (fetchesPack(args)) await sweepStalePacks(projectDir);
   try {
     const { stdout } = await execFileAsync('git', [...LONG_PATHS_ARGS, ...args], {
       cwd: resolve(projectDir),

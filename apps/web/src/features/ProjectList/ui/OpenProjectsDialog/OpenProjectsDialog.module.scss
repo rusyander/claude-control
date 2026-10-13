@@ -1,0 +1,45 @@
+.list {
+  max-height: min(420px, 55vh);
+  overflow-y: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: var(--spacing-2xs);
+  scrollbar-width: thin;
+}
+
+.option {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-2xs) var(--spacing-xs);
+  border-radius: 6px;
+  cursor: pointer;
+
+  &:hover {
+    background-color: var(--color-surface-sunken);
+  }
+
+  input {
+    flex-shrink: 0;
+    margin-top: 3px;
+  }
+}
+
+.optionOpen {
+  cursor: default;
+  opacity: 0.7;
+
+  &:hover {
+    background-color: transparent;
+  }
+}
+
+.text {
+  min-width: 0;
+}
+
+.mark {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--color-accent);
+}

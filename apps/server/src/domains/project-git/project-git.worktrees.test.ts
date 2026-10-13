@@ -1,6 +1,15 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { dirname, join, basename, sep } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
@@ -286,6 +295,29 @@ describe.skipIf(!GIT_AVAILABLE)('копии на настоящем репози
     expect(existsSync(created.path)).toBe(false);
     const info = await listWorktrees(dir);
     expect(info.worktrees).toHaveLength(1);
+  });
+
+  it('ссылка npm на `file:`-соседа не оставляет каталог копии после удаления', async () => {
+    // npm кладёт `file:`-зависимость junction'ом; git сносит её цель и файлы,
+    // а сами каталоги со ссылкой внутри оставлял — «копия убрана», папка цела.
+    appendFileSync(join(dir, '.git', 'info', 'exclude'), 'node_modules/\nshared/\n');
+    const created = await addWorktree(dir, 'feature/x');
+    mkdirSync(join(created.path, 'shared'));
+    writeFileSync(join(created.path, 'shared', 'index.js'), 'x');
+    mkdirSync(join(created.path, 'app', 'node_modules', '@scope'), { recursive: true });
+    writeFileSync(join(created.path, 'app', 'node_modules', 'dep.js'), 'x');
+    symlinkSync(
+      join(created.path, 'shared'),
+      join(created.path, 'app', 'node_modules', '@scope', 'shared'),
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
+    const outside = join(dir, 'снаружи.txt');
+    writeFileSync(outside, 'живой');
+
+    await removeWorktree(dir, created.path);
+
+    expect(existsSync(created.path)).toBe(false);
+    expect(existsSync(outside)).toBe(true);
   });
 
   it('незакоммиченная работа внутри копии удаляется только с force', async () => {

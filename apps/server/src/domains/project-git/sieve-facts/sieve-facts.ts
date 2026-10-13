@@ -7,6 +7,7 @@ import {
   GIT_READ_TIMEOUT_MS,
   GIT_TIMEOUT_MS,
 } from '../constants.ts';
+import { fetchesPack, sweepStalePacks } from '../exec/stale-packs.ts';
 import { pickRemote } from '../parse.ts';
 import type { Addition } from '../sieve-scan/sieve-scan.ts';
 import { commitsOf, scanMechanics, type BranchCommit } from '../sieve-facts-scan.ts';
@@ -50,8 +51,9 @@ export interface Run {
  * Запуск git с кодом выхода: у `merge-tree` и `merge-base --is-ancestor` код 1 —
  * это ответ, а не сбой, и общий `git()` его бы выбросил.
  */
-export function run(cwd: string, args: string[], timeout = GIT_TIMEOUT_MS): Promise<Run> {
+export async function run(cwd: string, args: string[], timeout = GIT_TIMEOUT_MS): Promise<Run> {
   const long = process.platform === 'win32' ? ['-c', 'core.longpaths=true'] : [];
+  if (fetchesPack(args)) await sweepStalePacks(cwd);
   return new Promise((done) => {
     execFile(
       'git',

@@ -25,6 +25,7 @@ export function ChatSidebar({
   onOpenProject,
   onAddFolder,
   onParallelLaunch,
+  shelf,
   className,
 }: ChatSidebarProps) {
   const { t } = useTranslation();
@@ -72,6 +73,15 @@ export function ChatSidebar({
             onOpen={onOpenProject}
             onAddFolder={onAddFolder}
             onParallelLaunch={onParallelLaunch}
+            {...(shelf
+              ? {
+                  registry: shelf.registry,
+                  onRegister: shelf.register,
+                  registeringPath: shelf.registeringPath,
+                  openIds: shelf.openIds,
+                  onOpenMany: shelf.openMany,
+                }
+              : {})}
           />
         ) : (
           <ChatList

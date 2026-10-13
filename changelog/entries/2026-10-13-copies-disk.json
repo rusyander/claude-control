@@ -1,0 +1,60 @@
+{
+  "title": {
+    "ru": "Копии проектов не ставят node_modules заново, git не копит обрывки загрузок",
+    "en": "Project copies no longer reinstall node_modules, git no longer piles up broken downloads"
+  },
+  "summary": {
+    "ru": "Копия с теми же зависимостями, что у оригинала, получает node_modules ссылкой на оригинал или жёсткими ссылками на его файлы вместо установки, удалённая копия больше не оставляет папку, а прерванные загрузки git убираются сами.",
+    "en": "A copy whose dependencies match the original gets node_modules as a link to the original or as hard links to its files instead of an install, a removed copy no longer leaves its folder behind, and interrupted git downloads are cleaned up automatically."
+  },
+  "items": [
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Подготовка копии проекта: если package.json и lock-файл каталога совпадают с оригиналом, зависимости заново не ставятся. Каталог без локальных пакетов получает node_modules ссылкой на node_modules оригинала — копия готова сразу и места не занимает. Каталог с workspace или file:-зависимостью на соседнюю папку у npm собирается жёсткими ссылками на файлы оригинала с доставкой расхождения через npm install --no-save.",
+        "en": "Preparing a project copy: when a folder’s package.json and lockfile match the original, dependencies are not installed again. A folder without local packages gets node_modules as a link to the original’s node_modules — the copy is ready at once and takes no space. A folder with a workspace or a file: dependency on a sibling folder is built, under npm, from hard links to the original’s files, with npm install --no-save delivering the difference."
+      },
+      "how": {
+        "ru": "Ссылка не ставится каталогу с локальными пакетами: копия брала бы их исходники из оригинала, а не свои. Пакет, поставленный агентом в копии со ссылкой, попадает и в оригинал; удаление копии снимает только ссылку. Кэши сборщиков при жёстких ссылках не переносятся; не вышло — обычная установка.",
+        "en": "A folder with local packages is never linked: the copy would load their sources from the original instead of its own. A package the agent installs in a linked copy lands in the original too; removing the copy removes only the link. Hard-linked copies skip bundler caches; on any failure the usual install runs."
+      },
+      "area": {
+        "ru": "Копии",
+        "en": "Copies"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Удаление копии на Windows оставляло её папку, если внутри были ссылки npm на соседние каталоги: панель отвечала «копия убрана», а ту же ветку нельзя было завести снова.",
+        "en": "Removing a copy on Windows left its folder behind when it held npm links to sibling folders: the panel said the copy was removed, yet the same branch could not be set up again."
+      },
+      "area": {
+        "ru": "Копии",
+        "en": "Copies"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Загрузка из удалённого репозитория, прерванная по сроку, оставляла недокачанный пакет в .git навсегда — у одного проекта за полдня набралось 2,3 ГБ. Перед каждой загрузкой такие остатки старше часа убираются, а срок загрузки ветки MR увеличен с 30 секунд до трёх минут.",
+        "en": "A fetch interrupted by its time limit left a partial pack in .git forever — one project gathered 2.3 GB in half a day. Such leftovers older than an hour are removed before every fetch, and the MR branch fetch limit is raised from 30 seconds to three minutes."
+      },
+      "area": {
+        "ru": "Git",
+        "en": "Git"
+      }
+    },
+    {
+      "kind": "docs",
+      "text": {
+        "ru": "Справка чата, раздел о подготовке копий, — про ссылку на node_modules оригинала и жёсткие ссылки у npm.",
+        "en": "Chat help, the copy preparation section, now covers linking the original’s node_modules and hard links under npm."
+      },
+      "area": {
+        "ru": "Справка",
+        "en": "Help"
+      }
+    }
+  ]
+}

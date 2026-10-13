@@ -8,16 +8,24 @@ import { SearchField } from '@shared/ui/search-field';
 import { SkeletonList } from '@shared/ui/skeleton';
 import { EmptyState } from '@shared/ui/empty-state';
 import { normalizeProjectPath } from '@shared/lib/workspace';
+import { withRegistry } from '../../lib/withRegistry';
+import { OpenProjectsDialog } from '../OpenProjectsDialog/OpenProjectsDialog';
 import { ProjectRow } from '../ProjectRow/ProjectRow';
 import type { ProjectListProps } from './ProjectList.types';
 import styles from './ProjectList.module.scss';
 
+const NO_OPEN_TABS: ReadonlySet<string> = new Set();
+
 /**
- * Список проектов, с которыми работал Claude Code. Клик открывает проект табом
- * и начинает в нём новый разговор. Цветная точка показывает, работает ли в
- * проекте агент прямо сейчас.
+ * Список проектов чата: история Claude Code плюс страница «Проекты». Клик
+ * открывает проект табом и начинает в нём новый разговор. Цветная точка
+ * показывает, работает ли в проекте агент прямо сейчас.
  *
- * Каталогов, которых на диске уже нет, в списке нет вовсе: работать в
+ * Проекты со страницы «Проекты» стоят первыми и с меткой — их можно вернуть в
+ * чат, даже если вкладку закрыли до первого сообщения и в истории их нет.
+ * Остальные одним нажатием добавляются туда же кнопкой в строке.
+ *
+ * Каталогов истории, которых на диске уже нет, в списке нет вовсе: работать в
  * несуществующей папке негде, а строка, по которой нельзя кликнуть, — просто
  * мусор в списке. Копятся они быстро: каждая временная папка проверки остаётся
  * в истории Claude Code навсегда. Переписка при этом не пропадает — разговор
@@ -31,18 +39,24 @@ export function ProjectList({
   onOpen,
   onAddFolder,
   onParallelLaunch,
+  registry,
+  onRegister,
+  registeringPath,
+  openIds = NO_OPEN_TABS,
+  onOpenMany,
 }: ProjectListProps) {
   const { t, i18n } = useTranslation();
   const [query, setQuery] = useState('');
+  const [isPickOpen, setPickOpen] = useState(false);
 
-  const present = useMemo(() => projects.filter((project) => project.exists), [projects]);
+  const present = useMemo(() => withRegistry(projects, registry ?? []), [projects, registry]);
 
   const found = useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (!needle) return present;
     return present.filter(
-      (project) =>
-        project.name.toLowerCase().includes(needle) || project.path.toLowerCase().includes(needle),
+      ({ info }) =>
+        info.name.toLowerCase().includes(needle) || info.path.toLowerCase().includes(needle),
     );
   }, [present, query]);
 
@@ -65,6 +79,19 @@ export function ProjectList({
               fullWidth
             >
               {t('projects.addFolder')}
+            </Button>
+          )}
+          {onOpenMany && (
+            <Button
+              variant="secondary"
+              size="sm"
+              leftIcon={<Icon name="folder" size={20} />}
+              onClick={() => setPickOpen(true)}
+              disabled={present.length === 0}
+              title={t('chatProjects.openManyHint')}
+              fullWidth
+            >
+              {t('chatProjects.openMany')}
             </Button>
           )}
           {/*
@@ -110,17 +137,30 @@ export function ProjectList({
           />
         )}
 
-        {found.map((project) => (
+        {found.map(({ info, registered }) => (
           <ProjectRow
-            key={project.path}
-            project={project}
-            isActive={normalizeProjectPath(project.path) === activeId}
-            status={statuses?.get(normalizeProjectPath(project.path)) ?? 'idle'}
+            key={info.path}
+            project={info}
+            isActive={normalizeProjectPath(info.path) === activeId}
+            status={statuses?.get(normalizeProjectPath(info.path)) ?? 'idle'}
             language={i18n.language}
-            onOpen={() => onOpen(project)}
+            onOpen={() => onOpen(info)}
+            isRegistered={registered !== undefined}
+            {...(onRegister ? { onRegister: () => onRegister(info) } : {})}
+            isRegistering={registeringPath === info.path}
           />
         ))}
       </div>
+
+      {onOpenMany && (
+        <OpenProjectsDialog
+          isOpen={isPickOpen}
+          onOpenChange={setPickOpen}
+          projects={present}
+          openIds={openIds}
+          onOpen={onOpenMany}
+        />
+      )}
     </Stack>
   );
 }

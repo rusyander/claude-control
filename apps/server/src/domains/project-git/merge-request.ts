@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs';
 import type { WorktreeMirrorReport, WorktreeMirrorSettings } from '@agentdeck/contracts';
+import { GIT_NETWORK_TIMEOUT_MS } from './constants.ts';
 import { git } from './exec/exec.ts';
 import { requireRepo } from './read.ts';
 import { addWorktree, worktreeDirFor } from './worktrees.ts';
@@ -103,7 +104,9 @@ export async function resolveMergeRequestBranch(
         await git(
           projectDir,
           ['fetch', remote, `+refs/heads/${branch}:refs/remotes/${remote}/${branch}`],
-          LS_REMOTE_TIMEOUT_MS,
+          // Не срок ls-remote: обрыв на полпути оставляет недокачанный пакет
+          // (`exec/stale-packs.ts`), а повтор качает его заново с нуля.
+          GIT_NETWORK_TIMEOUT_MS,
         );
         return { branch, remote };
       }

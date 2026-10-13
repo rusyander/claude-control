@@ -17,6 +17,14 @@ import {
 } from '@agentdeck/contracts/split-groups';
 import { killChildTree } from '../../lib/process-tree/process-tree.ts';
 import { gitSync } from './exec/exec.ts';
+import {
+  LOCKFILES,
+  NPM_SEEDED_INSTALL,
+  seedNodeModules,
+  seedSourceFor,
+  selfContained,
+  shareNodeModules,
+} from './seed-node-modules.ts';
 
 /**
  * Бутстрап копии: команда, которая идёт в новой копии ДО того, как в ней
@@ -335,6 +343,54 @@ function spawnShell(command: string, cwd: string): ChildProcess {
       });
 }
 
+/** Установка плана → её менеджер: только её шаг заменяется ссылкой или посевом. */
+const MANAGER_OF_INSTALL = new Map(
+  (Object.keys(INSTALL) as PackageManager[]).map((manager) => [INSTALL[manager], manager]),
+);
+
+/**
+ * Установка копии, у которой манифест и lock-файл каталога совпали с оригиналом
+ * (`seed-node-modules.ts`). Самодостаточный каталог — `node_modules` ссылкой на
+ * оригинал, ставить нечего (`undefined`). Иначе у npm — посев жёсткими ссылками
+ * и установка, доставляющая только расхождение; у pnpm и yarn — их обычная
+ * установка. Не вышло — тоже она.
+ */
+async function preparedInstall(
+  dir: string,
+  cwd: string,
+  manager: PackageManager,
+  tag: string,
+  write: (text: string) => void,
+): Promise<string | undefined> {
+  const source = await seedSourceFor(dir, cwd, LOCKFILES[manager]);
+  if (!source) return INSTALL[manager];
+  const target = join(dir, cwd, 'node_modules');
+  if (await selfContained(source)) {
+    try {
+      await shareNodeModules(source, target);
+      write(`${tag}node_modules — ссылка на каталог оригинала, установка не нужна\n`);
+      return undefined;
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      write(`${tag}ссылка на node_modules оригинала не вышла (${reason})\n`);
+    }
+  }
+  if (manager !== 'npm') return INSTALL[manager];
+  const started = Date.now();
+  try {
+    const report = await seedNodeModules(join(source, 'node_modules'), target);
+    const seconds = Math.round((Date.now() - started) / 1000);
+    write(
+      `${tag}node_modules из оригинала ссылками: файлов ${report.linked}, копией ${report.copied}, пропущено ${report.skipped.length} (${seconds} с)\n`,
+    );
+    return NPM_SEEDED_INSTALL;
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    write(`${tag}node_modules из оригинала не вышли (${reason}) — ставим заново\n`);
+    return INSTALL.npm;
+  }
+}
+
 export interface BootstrapOptions {
   timeoutMs?: number;
   /** Часы — в тесте фиксируются. */
@@ -501,11 +557,16 @@ export class WorktreeBootstraps {
       for (const child of children) killChildTree(child, { group: process.platform !== 'win32' });
     }, this.timeoutMs);
 
-    const runStep = (step: BootstrapStep): Promise<number | undefined> => {
+    const runStep = async (step: BootstrapStep): Promise<number | undefined> => {
       const tag = tagged ? `[${step.cwd || '.'}] ` : '';
-      if (tagged) write(`${tag}$ ${step.command}\n`);
+      const manager = MANAGER_OF_INSTALL.get(step.command);
+      const command = manager
+        ? await preparedInstall(dir, step.cwd, manager, tag, write)
+        : step.command;
+      if (command === undefined) return 0;
+      if (tagged || command !== step.command) write(`${tag}$ ${command}\n`);
       return new Promise((resolveStep) => {
-        const child = spawnShell(step.command, step.cwd ? join(dir, step.cwd) : dir);
+        const child = spawnShell(command, step.cwd ? join(dir, step.cwd) : dir);
         children.add(child);
         let pending = '';
         const onData = (chunk: Buffer): void => {

@@ -1,0 +1,44 @@
+{
+  "title": {
+    "ru": "Чат и страница «Проекты» — один список: видно, что добавлено, добавить можно из чата",
+    "en": "Chat and the Projects page share one list: what is added is visible, and adding works from the chat"
+  },
+  "summary": {
+    "ru": "Проекты со страницы «Проекты» стоят в списке чата первыми и не теряются после закрытия вкладки, любой проект добавляется туда одним нажатием, а несколько проектов открываются вкладками разом.",
+    "en": "Projects from the Projects page come first in the chat list and are not lost when their tab is closed, any project is added there in one click, and several projects open as tabs at once."
+  },
+  "items": [
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Список «Проекты» в чате показывает проекты страницы «Проекты» первыми и с булавкой — даже без единого разговора. Раньше проект, чью вкладку закрыли до первого сообщения, из списка пропадал, и вернуть его можно было только повторным выбором папки на диске.",
+        "en": "The Projects list in the chat shows projects from the Projects page first and with a pin, even without a single conversation. Before, a project whose tab was closed before the first message vanished from the list and could only come back by picking its folder on disk again."
+      },
+      "area": { "ru": "Чат", "en": "Chat" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Кнопка «+» в строке списка и кнопка в ряду проекта добавляют проект на страницу «Проекты» одним нажатием; у уже добавленного кнопка «В «Проектах»» ведёт к его настройкам.",
+        "en": "A “+” button in the list row and a button in the project row add the project to the Projects page in one click; for a project already there, “In Projects” leads to its settings."
+      },
+      "area": { "ru": "Чат", "en": "Chat" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "«Открыть несколько»: проекты отмечаются списком с поиском и открываются вкладками разом, уже открытые стоят в нём отмеченными и выключенными.",
+        "en": "“Open several”: projects are ticked in a searchable list and open as tabs at once; those already open stand there ticked and disabled."
+      },
+      "area": { "ru": "Чат", "en": "Chat" }
+    },
+    {
+      "kind": "docs",
+      "text": {
+        "ru": "Справка чата — про булавку, «Открыть несколько» и кнопку проекта в шапке.",
+        "en": "Chat help covers the pin, “Open several” and the project button in the header."
+      },
+      "area": { "ru": "Справка", "en": "Help" }
+    }
+  ]
+}

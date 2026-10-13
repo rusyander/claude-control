@@ -52,6 +52,7 @@ import { usePreviewWidth } from '../model/usePreviewWidth';
 import { visibleChats } from '../lib/visibleChats';
 import { useChildHub } from '../model/useChildHub';
 import { useChatDots } from '../model/useChatDots';
+import { useProjectShelf } from '../model/useProjectShelf';
 import { useChatModelPrefs } from '../model/useChatModelPrefs';
 import { useStreamState } from '../model/useStreamState';
 import { downloadChatExport } from '../lib/downloadChatExport';
@@ -85,6 +86,7 @@ export function ChatPage() {
 
   const chats = useChats();
   const projects = useProjects();
+  const shelf = useProjectShelf();
   const ws = useWorkspace();
   // Цветные точки по разговорам и проектам — живые прогоны плюс те, что стоят
   // на вопросе мимо панели (подробности и почему их два источника — в хуке).
@@ -325,6 +327,7 @@ export function ChatPage() {
           onOpenProject={session.openProject}
           onAddFolder={() => setFolderPickerOpen(true)}
           onParallelLaunch={() => setParallelOpen(true)}
+          shelf={shelf}
         />
 
         <div className={styles.main}>

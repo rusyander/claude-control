@@ -9,6 +9,7 @@ import { ChatModelPicker } from '@features/ChatModelPicker';
 import { ProjectRunnerControls } from '@features/ProjectRunner';
 import { DeliveryControl } from '@features/ProjectGit';
 import { ChatHeaderMenu } from '../ChatHeaderMenu/ChatHeaderMenu';
+import { ProjectShelfButton } from './ProjectShelfButton/ProjectShelfButton';
 import { useLineStarts } from '../model/useLineStarts';
 import { formatTime } from '../lib/formatTime';
 import type { ChatHeaderProps } from './ChatHeader.types';
@@ -245,6 +246,11 @@ export function ChatHeader({
           {/* Dev-сервер: подписанная кнопка настроек, запуск, ссылка «Перейти». */}
           <div className={styles.group}>
             <ProjectRunnerControls path={projectPath} />
+          </div>
+
+          {/* Есть ли проект на странице «Проекты» — и добавить туда одним нажатием. */}
+          <div className={styles.group}>
+            <ProjectShelfButton path={projectPath} name={projectName} />
           </div>
         </div>
       )}

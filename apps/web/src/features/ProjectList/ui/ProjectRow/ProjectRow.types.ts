@@ -7,4 +7,9 @@ export interface ProjectRowProps {
   status: RunStatus;
   language: string;
   onOpen: () => void;
+  /** Проект есть на странице «Проекты» — у строки метка вместо кнопки добавления. */
+  isRegistered?: boolean;
+  /** Добавить проект на страницу «Проекты»; не задано — кнопки нет. */
+  onRegister?: () => void;
+  isRegistering?: boolean;
 }

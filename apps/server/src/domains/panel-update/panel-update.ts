@@ -7,6 +7,7 @@ import {
   type PanelUpdateStatus,
 } from '@agentdeck/contracts/changelog';
 import { ENTRY_ID } from '../changelog/entries.ts';
+import { fetchesPack, sweepStalePacks } from '../project-git/exec/stale-packs.ts';
 
 /**
  * Обновление панели из её собственного репозитория. Панель — клон git: новые
@@ -33,7 +34,12 @@ export interface GitResult {
 }
 
 /** Запуск git; подменяется в тестах только вместе с настоящим репозиторием. */
-export function runGit(repoRoot: string, args: string[], timeout = 30_000): Promise<GitResult> {
+export async function runGit(
+  repoRoot: string,
+  args: string[],
+  timeout = 30_000,
+): Promise<GitResult> {
+  if (fetchesPack(args)) await sweepStalePacks(repoRoot);
   return new Promise((resolve) => {
     execFile(
       'git',

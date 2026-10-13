@@ -1,8 +1,59 @@
+// Обёртка строки: метка «в Проектах» или кнопка добавления лежат поверх
+// правого верхнего угла основной кнопки, а под них у неё оставлено место.
+.row {
+  position: relative;
+  margin-bottom: var(--spacing-3xs);
+}
+
+.mark,
+.register {
+  position: absolute;
+  top: var(--spacing-2xs);
+  right: var(--spacing-2xs);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+}
+
+.mark {
+  color: var(--color-accent);
+}
+
+.register {
+  padding: 0;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-fg-subtle);
+  cursor: pointer;
+  // Кнопка видна всегда, а не только при наведении: на телефоне наведения нет,
+  // а клавиатура должна видеть, куда пришёл фокус.
+  opacity: 0.7;
+  transition:
+    opacity var(--duration-fast),
+    background var(--duration-fast),
+    border-color var(--duration-fast);
+
+  &:hover,
+  &:focus-visible {
+    opacity: 1;
+    background: var(--color-bg);
+    border-color: var(--color-border);
+    color: var(--color-fg);
+  }
+
+  &:disabled {
+    cursor: progress;
+    opacity: 0.4;
+  }
+}
+
 .item {
   display: block;
   width: 100%;
-  padding: var(--spacing-xs) var(--spacing-sm);
-  margin-bottom: var(--spacing-3xs);
+  padding: var(--spacing-xs) calc(var(--spacing-sm) + 24px) var(--spacing-xs) var(--spacing-sm);
   border: 1px solid transparent;
   border-radius: var(--radius-md);
   background: transparent;

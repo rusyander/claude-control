@@ -9,6 +9,7 @@ import { testsE2eEn } from './tests-e2e/en.ts';
 import { pageTabsEn } from './page-tabs/en.ts';
 import { changelogEn } from './changelog/en.ts';
 import { panelUpdateEn } from './panel-update/en.ts';
+import { chatProjectsEn } from './chat-projects/en.ts';
 import { watcherEn } from './watcher/en.ts';
 import { devRestartEn } from './dev-restart/en.ts';
 import { environmentEn } from './environment/en.ts';
@@ -35,6 +36,8 @@ export const en: TranslationSchema = {
   pageTabs: pageTabsEn,
   changelog: changelogEn,
   panelUpdate: panelUpdateEn,
+  /** Проекты чата и страница «Проекты» — `chat-projects/en.ts`. */
+  chatProjects: chatProjectsEn,
   watcher: watcherEn,
   devRestart: devRestartEn,
   environment: environmentEn,

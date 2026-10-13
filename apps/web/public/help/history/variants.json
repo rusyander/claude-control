@@ -67,6 +67,28 @@
         "height": 1000
       }
     },
+    "changelog/04-update": {
+      "light-ru": {
+        "file": "04-update.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "light-en": {
+        "file": "04-update.en.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-ru": {
+        "file": "04-update.dark.png",
+        "width": 1440,
+        "height": 1000
+      },
+      "dark-en": {
+        "file": "04-update.dark.en.png",
+        "width": 1440,
+        "height": 1000
+      }
+    },
     "trace/01-feed": {
       "light-ru": {
         "file": "01-feed.png",

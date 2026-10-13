@@ -21,6 +21,9 @@ export function HistoryChangelogSections({ tr }: SectionProps) {
           <GuideStep title={c('filter')} text={c('filterText')}>
             <HelpShot topic="history" scenario="changelog" frame="03-filter" side="panel" />
           </GuideStep>
+          <GuideStep title={c('update')} text={c('updateText')}>
+            <HelpShot topic="history" scenario="changelog" frame="04-update" side="panel" />
+          </GuideStep>
         </GuideSteps>
       </HelpSection>
 

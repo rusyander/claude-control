@@ -509,7 +509,7 @@ export interface StartHandoffInput {
 let lastStamp = -1;
 let sameStamp = 0;
 
-function uniqueNewChatId(stamp: number): string {
+export function uniqueNewChatId(stamp: number): string {
   sameStamp = stamp === lastStamp ? sameStamp + 1 : 0;
   lastStamp = stamp;
   return sameStamp === 0 ? `new-${stamp}` : `new-${stamp}-${sameStamp}`;

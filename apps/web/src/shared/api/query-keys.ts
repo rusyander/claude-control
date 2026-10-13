@@ -197,6 +197,7 @@ export const queryKeys = {
   history: ['history'] as const,
   /** Лента «Что нового»: описания из репозитория и git; меняется с коммитом, а не с записью в конфиг. */
   changelog: ['changelog'] as const,
+  panelUpdate: ['panel-update'] as const,
   /** Полный дифф одной копии: ключ зависит от её имени. */
   historyDiff: (name: string) => ['history', name, 'diff'] as const,
   /** Сырой глобальный CLAUDE.md — для страницы просмотра/правки целиком. */

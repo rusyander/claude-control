@@ -34,6 +34,8 @@ const finish = (code) => {
     startedAt,
     finishedAt: new Date().toISOString(),
     code,
+    // Pid остаётся и в итоге: ждущему (тесту) видно, когда этот процесс отпустит каталог.
+    pid: process.pid,
   });
   log.end();
 };

@@ -86,6 +86,24 @@
   white-space: nowrap;
 }
 
+.navIcon {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}
+
+// Новость у пункта (вышла новая версия панели): зелёная точка в углу значка.
+.navDot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--color-surface);
+  border-radius: 999px;
+  background: var(--color-success);
+}
+
 .navCount {
   margin-left: auto;
   font-size: var(--font-size-caption);

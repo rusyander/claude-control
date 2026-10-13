@@ -100,8 +100,10 @@ describe.each(CLIS)('$name: сессия между ходами разгово�
     dir = mkdtempSync(join(tmpdir(), `cc-live-session-${cli.name}-`));
     store = join(dir, 'store.json');
   });
+  // Сервер-заглушка стоит в каталоге и под нагрузкой полного прогона гаснет дольше
+  // секунды после конца хода (Windows держит cwd живого процесса) — ждём до 4 с.
   afterEach(() => {
-    rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+    rmSync(dir, { recursive: true, force: true, maxRetries: 40, retryDelay: 100 });
   });
 
   const disk = (): Disk =>

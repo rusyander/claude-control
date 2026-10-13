@@ -1,0 +1,91 @@
+// Вышла новая версия — карточка с тоном успеха: это новость, а не тревога.
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  border: 1px solid var(--color-success);
+  border-radius: 12px;
+  background-color: var(--color-success-subtle);
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-sm) var(--spacing-md);
+}
+
+.headText {
+  display: flex;
+  flex: 1 1 240px;
+  flex-direction: column;
+  gap: var(--spacing-3xs);
+  min-width: 0;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+}
+
+.incoming {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3xs);
+}
+
+.list,
+.files {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3xs);
+  margin: 0;
+  padding-left: var(--spacing-lg);
+}
+
+.files {
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+// Свои правки мешают обновлению — предупреждение внутри карточки.
+.dirty {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3xs);
+  padding: var(--spacing-sm);
+  border: 1px solid var(--color-warning);
+  border-radius: 8px;
+  background-color: var(--color-warning-subtle);
+}
+
+.detail {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+// «Последняя версия» — тихая строка, а не карточка: ничего не случилось.
+.quiet {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.quietRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.done {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3xs);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--color-success);
+  border-radius: 12px;
+  background-color: var(--color-success-subtle);
+}

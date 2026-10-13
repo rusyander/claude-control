@@ -4,6 +4,7 @@ import { join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { FastifyInstance } from 'fastify';
 import { getChangelog } from '../../domains/changelog/changelog.ts';
+import { applyPanelUpdate, readPanelUpdate } from '../../domains/panel-update/panel-update.ts';
 
 const REPO_ROOT = fileURLToPath(new URL('../../../../../', import.meta.url));
 
@@ -19,9 +20,17 @@ const MIME: Record<string, string> = {
  * Лента «Что нового» и снимки к описаниям. Снимки отдаются только растровые и
  * только из `changelog/assets`: имя проверяется по шаблону, а итоговый путь —
  * на выход за каталог (SVG не отдаётся совсем: в нём может быть сценарий).
+ *
+ * Обновление самой панели: `GET /api/panel-update` (`?refresh=1` — fetch сейчас)
+ * и `POST /api/panel-update` — перемотка на вышедшие коммиты.
  */
 export function registerChangelogRoutes(app: FastifyInstance, repoRoot: string = REPO_ROOT): void {
   app.get('/api/changelog', () => getChangelog(repoRoot));
+
+  app.get<{ Querystring: { refresh?: string } }>('/api/panel-update', (req) =>
+    readPanelUpdate(repoRoot, { refresh: req.query.refresh === '1' }),
+  );
+  app.post('/api/panel-update', () => applyPanelUpdate(repoRoot));
 
   app.get<{ Params: { id: string; file: string } }>(
     '/api/changelog/assets/:id/:file',

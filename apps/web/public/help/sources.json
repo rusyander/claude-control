@@ -500,7 +500,7 @@
         {
           "path": "apps/server/src/domains/chat/ChatHandoff/ChatHandoff.ts",
           "why": "«Чистая сессия»: предложение прозой или блоком, потолок цепочки, зацикливание",
-          "sha": "95cd9d347935a6c3"
+          "sha": "53dd2e0d73968293"
         },
         {
           "path": "apps/server/src/domains/chat/ChatSplit/ChatSplit.ts",
@@ -658,7 +658,7 @@
           "sha": "bb23d4b9ff80b8e5"
         }
       ],
-      "confirmedAt": "2026-10-13T06:42:54.635Z"
+      "confirmedAt": "2026-10-13T08:33:44.177Z"
     },
     {
       "topic": "tests",
@@ -1538,7 +1538,7 @@
     {
       "topic": "history",
       "document": "apps/web/src/pages/Help/topics/HistoryTopic/HistoryTopic.tsx",
-      "confirmedAt": "2026-10-12T18:37:10.669Z",
+      "confirmedAt": "2026-10-13T07:57:41.799Z",
       "sources": [
         {
           "path": "apps/server/src/domains/history/feed.ts",
@@ -1579,6 +1579,16 @@
           "path": "apps/web/src/pages/History/model/tabs.ts",
           "why": "Две вкладки раздела, «Что нового» по умолчанию и адрес ?tab=",
           "sha": "be076c5c3ea97d72"
+        },
+        {
+          "path": "apps/server/src/domains/panel-update/panel-update.ts",
+          "why": "«Вышла новая версия»: только перемотка, отказ при своих правках и разошедшейся ветке, pnpm install при новом lock-файле, проверка раз в 10 минут",
+          "sha": "6b85a05085927eb3"
+        },
+        {
+          "path": "apps/web/src/pages/History/PanelUpdateCard/PanelUpdateCard.tsx",
+          "why": "«Вышла новая версия»: карточка, что придёт, тихая строка «последняя версия», итог обновления",
+          "sha": "49a55ae2eb438613"
         }
       ]
     },

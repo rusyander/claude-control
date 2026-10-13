@@ -11,6 +11,7 @@ import { Badge } from '@shared/ui/badge';
 import { PanelAgentLauncher } from '@features/PanelAgentWindow';
 import { WatcherIndicator } from '@features/WatcherIndicator';
 import { useOverview } from '@entities/AppConfig';
+import { usePanelUpdate } from '@entities/Changelog';
 import {
   useProviders,
   activeProvider,
@@ -38,6 +39,7 @@ export function Sidebar({ isCollapsed, onToggle, isNarrow = false }: SidebarProp
   const { t } = useTranslation();
   const { data: overview } = useOverview();
   const { data: providers } = useProviders();
+  const { data: update } = usePanelUpdate();
 
   // Навигация гейтится возможностями активного провайдера: `unsupported`-разделы
   // убраны, `planned` помечены. Пока данные не загружены — показываем всё (для
@@ -57,6 +59,13 @@ export function Sidebar({ isCollapsed, onToggle, isNarrow = false }: SidebarProp
       ? overview.permissions.allow + overview.permissions.ask + overview.permissions.deny
       : undefined,
     groups: overview?.groups.total,
+  };
+
+  // Точка у пункта: там есть новость. Сейчас одна — вышла новая версия панели
+  // (вкладка «Что нового» в «Истории изменений»). Стоит на значке, а не у подписи:
+  // так её видно и в свёрнутой панели.
+  const dots: Record<string, string | undefined> = {
+    history: update?.state === 'behind' ? t('panelUpdate.dotTitle') : undefined,
   };
 
   const isReduced = useReducedMotion();
@@ -148,7 +157,18 @@ export function Sidebar({ isCollapsed, onToggle, isNarrow = false }: SidebarProp
                 // В свёрнутом виде подписи не видно — подсказка браузера её заменяет.
                 title={navItemTitle(item, navItemLabel(item, active, t), isCollapsed, t)}
               >
-                <Icon name={item.icon} size={24} />
+                <span className={styles.navIcon}>
+                  <Icon name={item.icon} size={24} />
+                  {dots[item.key] && (
+                    <span
+                      className={styles.navDot}
+                      role="img"
+                      aria-label={dots[item.key]}
+                      title={dots[item.key]}
+                      data-nav-dot={item.key}
+                    />
+                  )}
+                </span>
 
                 {label(
                   <>

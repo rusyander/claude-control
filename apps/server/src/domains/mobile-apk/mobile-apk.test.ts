@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -42,7 +42,30 @@ beforeEach(() => {
   paths = { repoRoot: join(root, 'repo'), stateDir: join(root, 'state'), script: FAKE_BUILD };
 });
 
-afterEach(() => rmSync(root, { recursive: true, force: true }));
+/** Жив ли процесс: сигнал 0 ничего не шлёт, только проверяет. */
+function running(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Windows не удаляет каталог, пока в нём стоит живой процесс: отвязанный запуск
+// сборки записал итог, но под нагрузкой полного прогона гаснет секундами позже.
+// Его pid лежит в файле состояния — ждём именно его, а не угаданную паузу.
+afterEach(async () => {
+  const statePath = join(paths.stateDir, 'apk-build.json');
+  const pid = existsSync(statePath)
+    ? (JSON.parse(readFileSync(statePath, 'utf8')) as { pid?: number }).pid
+    : undefined;
+  const deadline = Date.now() + 15_000;
+  while (pid && running(pid) && Date.now() < deadline) {
+    await new Promise((done) => setTimeout(done, 50));
+  }
+  rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+});
 
 describe('mobile-apk', () => {
   it('до первой сборки — idle, без лога и файла; без adb — adbMissing', async () => {

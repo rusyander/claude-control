@@ -1,0 +1,48 @@
+{
+  "title": {
+    "ru": "Обновление панели одной кнопкой",
+    "en": "Update the panel with one button"
+  },
+  "summary": {
+    "ru": "Панель сама замечает новые коммиты на отслеживаемой ветке и обновляется по кнопке «Обновить» без потери своих правок и идущих разговоров.",
+    "en": "The panel notices new commits on its tracked branch by itself and updates with the Update button, keeping local changes and running conversations."
+  },
+  "items": [
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Зелёная точка у «Истории изменений» и карточка «Вышла новая версия панели» вверху «Что нового»: число коммитов, выпуски, которые придут, и новые зависимости.",
+        "en": "A green dot on Change history and a “A new panel version is out” card at the top of What's new: the number of commits, the releases that are coming, and new dependencies."
+      },
+      "area": { "ru": "История изменений", "en": "Change history" }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "«Обновить» подтягивает коммиты только перемоткой и при новом pnpm-lock.yaml выполняет pnpm install; сервер перезапускается, когда закончатся идущие ходы чатов.",
+        "en": "Update pulls commits by fast-forward only and runs pnpm install when pnpm-lock.yaml changed; the server restarts once running chat turns finish."
+      },
+      "how": {
+        "ru": "Незакоммиченные правки закрывают кнопку и перечислены на карточке; разошедшаяся ветка объясняется без кнопки.",
+        "en": "Uncommitted changes disable the button and are listed on the card; a diverged branch is explained without a button."
+      },
+      "area": { "ru": "История изменений", "en": "Change history" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Два звена группы, запущенные в одну миллисекунду (работа и её подъём на модель сильнее), больше не получают один временный ключ: связь первого звена не затирается.",
+        "en": "Two group links started in the same millisecond (the work and its raise to a stronger model) no longer share one temporary key, so the first link is not overwritten."
+      },
+      "area": { "ru": "Группы", "en": "Groups" }
+    },
+    {
+      "kind": "docs",
+      "text": {
+        "ru": "Справка «Что нового» — раздел «Вышла новая версия — «Обновить»» с кадром карточки.",
+        "en": "What's new help: a section on the new-version card with its frame."
+      },
+      "area": { "ru": "Справка", "en": "Help" }
+    }
+  ]
+}

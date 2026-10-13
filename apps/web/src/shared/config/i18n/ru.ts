@@ -7,6 +7,7 @@ import { groupBuilderRu } from './groups/builder-ru.ts';
 import { testsE2eRu } from './tests-e2e/ru.ts';
 import { pageTabsRu } from './page-tabs/ru.ts';
 import { changelogRu } from './changelog/ru.ts';
+import { panelUpdateRu } from './panel-update/ru.ts';
 import { watcherRu } from './watcher/ru.ts';
 import { devRestartRu } from './dev-restart/ru.ts';
 import { environmentRu } from './environment/ru.ts';
@@ -39,6 +40,8 @@ export const ru = {
   pageTabs: pageTabsRu,
   /** Вкладка «Что нового» в «Истории изменений» — `changelog/ru.ts`. */
   changelog: changelogRu,
+  /** Обновление самой панели из её репозитория — `panel-update/ru.ts`. */
+  panelUpdate: panelUpdateRu,
   /** Фоновый наблюдатель: его страница и строка в боковой панели — `watcher/ru.ts`. */
   watcher: watcherRu,
   /** Плашка «правки сервера ждут перезапуска» — `dev-restart/ru.ts`. */

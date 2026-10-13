@@ -34,7 +34,7 @@ afterEach(async () => {
   if (relay && relay.exitCode === null && relay.signalCode === null) relay.kill();
   relay = undefined;
   await new Promise((resolve) => setTimeout(resolve, 200));
-  if (dir) rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  if (dir) rmSync(dir, { recursive: true, force: true, maxRetries: 40, retryDelay: 100 });
   dir = undefined;
 });
 

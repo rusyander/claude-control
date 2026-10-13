@@ -135,3 +135,75 @@ export const changelogResponseSchema = object({
   invalid: array(object({ file: string(), error: string() })),
 });
 export type ChangelogResponse = Infer<typeof changelogResponseSchema>;
+
+/**
+ * Обновление самой панели из её репозитория (`GET/POST /api/panel-update`).
+ * Панель живёт клоном git: вышли новые коммиты на ветке, за которой следит
+ * клон, — вкладка «Что нового» говорит об этом и подтягивает их одной кнопкой,
+ * только перемоткой (`--ff-only`) и только при чистой рабочей копии.
+ *
+ * - `not-git` — панель запущена не из клона git;
+ * - `no-upstream` — у ветки нет отслеживаемой ветки (или HEAD отсоединён);
+ * - `current` — новых коммитов нет (свои неотправленные коммиты не мешают);
+ * - `behind` — вышли новые коммиты, перемотка возможна;
+ * - `diverged` — и свои коммиты, и чужие: перемоткой не обновить.
+ */
+export type PanelUpdateState = 'not-git' | 'no-upstream' | 'current' | 'behind' | 'diverged';
+
+export interface PanelUpdateCommit {
+  hash: string;
+  /** ISO-время коммита. */
+  date: string;
+  subject: string;
+}
+
+export interface PanelUpdateStatus {
+  state: PanelUpdateState;
+  branch?: string;
+  /** Отслеживаемая ветка, `origin/main`. */
+  upstream?: string;
+  /** Коммитов на отслеживаемой ветке, которых нет здесь. */
+  behind: number;
+  /** Своих коммитов, которых нет на отслеживаемой ветке. */
+  ahead: number;
+  /** Входящие коммиты, новые сверху (не больше 30). */
+  incoming: PanelUpdateCommit[];
+  /** Описания «Что нового», которые придут с обновлением: id и заголовок. */
+  entries: { id: string; title: ChangelogText }[];
+  /** Изменённые отслеживаемые файлы: пока список не пуст, обновление не запускается. */
+  dirty: string[];
+  /** Придёт новый `pnpm-lock.yaml` — после перемотки нужна установка зависимостей. */
+  lockChanged: boolean;
+  /** Время последнего удачного `git fetch` (ISO). */
+  fetchedAt?: string;
+  /** Первая строка ошибки последнего `git fetch`: сравнение идёт с прежним снимком. */
+  fetchError?: string;
+}
+
+/**
+ * Почему обновление не выполнено: `busy` — обновление уже идёт; `dirty` и
+ * состояния — предусловие не выполнено; `pull-failed` — git отказал при
+ * перемотке (текст в `detail`).
+ */
+export type PanelUpdateError =
+  'busy' | 'dirty' | 'current' | 'not-git' | 'no-upstream' | 'diverged' | 'pull-failed';
+
+export interface PanelUpdateResult {
+  ok: boolean;
+  error?: PanelUpdateError;
+  /** Сырой вывод git или pnpm — показывается как есть. */
+  detail?: string;
+  /** HEAD до и после перемотки. */
+  from?: string;
+  to?: string;
+  /** Зависимости переустановлены (`pnpm install`); `false` при `installError`. */
+  installed?: boolean;
+  /** Код обновлён, а установка зависимостей упала — что сказал pnpm. */
+  installError?: string;
+  /**
+   * Сервер запущен dev-сторожем: правки кода сервера он подхватит сам, отложив
+   * перезапуск до конца идущих ходов. `false` — перезапускать панель вручную.
+   */
+  watched: boolean;
+  status: PanelUpdateStatus;
+}

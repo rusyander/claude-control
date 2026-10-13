@@ -12,6 +12,7 @@ import { Typography } from '@shared/ui/typography';
 import { cn } from '@shared/lib/cn';
 import { useChangelog } from '@entities/Changelog';
 import { ChangelogEntryCard } from '../ChangelogEntryCard/ChangelogEntryCard';
+import { PanelUpdateCard } from '../PanelUpdateCard/PanelUpdateCard';
 import { filterEntries, kindCounts, SOURCE_FILTERS, type SourceFilter } from '../model/filter';
 import { KIND_COLOR, KIND_ORDER } from '../model/kinds';
 import styles from './ChangelogTab.module.scss';
@@ -88,6 +89,8 @@ export function ChangelogTab() {
 
   return (
     <Stack gap="var(--spacing-md)">
+      <PanelUpdateCard />
+
       {!data.gitAvailable && <p className={styles.note}>{t('changelog.gitMissing')}</p>}
 
       {data.invalid.length > 0 && (

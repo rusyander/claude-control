@@ -82,3 +82,19 @@ describe('GET /api/changelog/assets/:id/:file', () => {
     expect(res.statusCode).toBe(404);
   });
 });
+
+// Перемотку настоящим git проверяет panel-update.git.test.ts; здесь — что маршрут
+// доходит до домена с каталогом панели и не обновляет то, что не клон.
+describe('/api/panel-update', () => {
+  it('GET вне клона git — состояние not-git', async () => {
+    const res = await app.inject('/api/panel-update?refresh=1');
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ state: 'not-git', behind: 0, dirty: [] });
+  });
+
+  it('POST вне клона git — отказ с причиной, без обновления', async () => {
+    const res = await app.inject({ method: 'POST', url: '/api/panel-update' });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ ok: false, error: 'not-git' });
+  });
+});

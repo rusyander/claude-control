@@ -78,6 +78,19 @@ export const historyEn: typeof historyRu = {
         'The number on a kind chip is how many entries it gives for the chosen source. If nothing ' +
         'matches, the feed says so and offers “Reset filters”. The feed shows 20 releases at a ' +
         'time; the address /history?id=… opens the release you need even beyond the first page.',
+      update: 'A new version is out — Update',
+      updateText:
+        'The panel is a git clone, and every 10 minutes it checks by itself whether new commits ' +
+        'came out on the tracked branch (usually origin/main); Check now does it at once. When ' +
+        'they have, a green dot lights up at History in the sidebar and a card appears at the top ' +
+        'of the tab: how many commits, which releases are coming and whether new dependencies ' +
+        'come with them. Update pulls them only by fast-forward: your own commits and edits are ' +
+        'never touched. With uncommitted edits the button is closed and the card names the files; ' +
+        'a branch that has diverged from the server gets an explanation of how to pull by hand. ' +
+        'A new pnpm-lock.yaml makes the panel run pnpm install itself. The interface refreshes ' +
+        'at once, and the dev watcher restarts the server once the running chat turns finish: ' +
+        'conversations continue where they were. A server run without the watcher makes the ' +
+        'card ask you to restart the panel yourself.',
       cardTitle: 'How to read a feed entry',
       cardCaption: 'What each mark and number in a release header means.',
       cardColumn: 'Element',
@@ -310,11 +323,13 @@ export const historyEn: typeof historyRu = {
   shots: {
     changelog: {
       '01-feed':
-        'The “What’s new” tab: on top the entry “Search across window tabs” marked “Unpublished” with two kinds of change, below the “Uncommitted changes” card marked “Working tree” with numbers, then the released “The project list opens faster” and entries from git; source and kind chips above the feed',
+        'The “What’s new” tab: on top the line “The latest version is installed” with a Check now button, below it the entry “Search across window tabs” marked “Unpublished” with two kinds of change, below the “Uncommitted changes” card marked “Working tree” with numbers, then the released “The project list opens faster” and entries from git; source and kind chips above the feed',
       '02-entry':
         'The opened release “The project list opens faster”: items by kind, a “What was touched” bar across three areas with line numbers, and two expanded commits with a hash and a “Copy” button',
       '03-filter':
         'The source “From git” and the kind “Fixed” leave two entries in the feed; the kind chips show recounted numbers',
+      '04-update':
+        'The green “A new panel version is out” card: “3 new commits on origin/main”, the release “Search across window tabs” under What is coming, a line about new dependencies and pnpm install, and Check now and Update buttons on the right',
     },
     trace: {
       '01-feed':

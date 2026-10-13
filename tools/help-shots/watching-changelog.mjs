@@ -2,10 +2,13 @@
  * Сценарий «Что нового»: как читать ленту выпусков панели.
  *
  * Вход один: человек открывает «История изменений» и хочет понять, что в панели
- * поменялось. Три кадра: лента с записями «в работе» и выпущенными, раскрытый
- * выпуск с полосой областей и коммитами, отбор по источнику и виду.
+ * поменялось. Четыре кадра: лента с записями «в работе» и выпущенными, раскрытый
+ * выпуск с полосой областей и коммитами, отбор по источнику и виду и карточка
+ * «вышла новая версия» с кнопкой «Обновить».
  *
- * Интерфейс настоящий, подменён один ответ — `/api/changelog`. Лента настоящей
+ * Интерфейс настоящий, подменены два ответа — `/api/changelog` и
+ * `/api/panel-update` (состояние клона машины съёмки — её правки и время fetch —
+ * в кадр попадать не должно). Лента настоящей
  * панели описывает её собственный репозиторий: её содержимое менялось бы с каждым
  * коммитом, а числа записи «в работе» — это правки машины съёмки. Поэтому записи
  * здесь образцовые, но устроены как настоящие ответы сервера: у описания без
@@ -28,6 +31,39 @@ const commit = (n, subject, date, body) => ({
   ...(body ? { body } : {}),
   ...counts(4, 60, 8),
 });
+
+/** «Последняя версия», проверено в фиксированный момент — кадры не дрожат от часов. */
+const UP_TO_DATE = {
+  state: 'current',
+  branch: 'main',
+  upstream: 'origin/main',
+  behind: 0,
+  ahead: 0,
+  incoming: [],
+  entries: [],
+  dirty: [],
+  lockChanged: false,
+  fetchedAt: '2026-10-14T07:00:00.000Z',
+};
+
+/** Вышли три коммита с описанием выпуска и новым lock-файлом. */
+const BEHIND = {
+  ...UP_TO_DATE,
+  state: 'behind',
+  behind: 3,
+  incoming: [1, 2, 3].map((n) => ({
+    hash: `${n}`.padStart(40, 'd'),
+    date: '2026-10-14T09:30:00+05:00',
+    subject: `feat: ${n}`,
+  })),
+  entries: [
+    {
+      id: '2026-10-14-sample-pending',
+      title: text('Поиск по вкладкам окна', 'Search across window tabs'),
+    },
+  ],
+  lockChanged: true,
+};
 
 function sampleResponse() {
   const entries = [
@@ -201,6 +237,8 @@ export async function shootChangelog(browser, web, scenario) {
     await settings(page);
     await location(page);
     await page.route('**/api/changelog', (route) => route.fulfill({ json: sampleResponse() }));
+    let update = UP_TO_DATE;
+    await page.route(/\/api\/panel-update(\?.*)?$/, (route) => route.fulfill({ json: update }));
 
     // ── 01. Лента: в работе — сверху, выпущенное — ниже ──────────────────────
     await open(page, web, '/history', 1500);
@@ -219,6 +257,12 @@ export async function shootChangelog(browser, web, scenario) {
     await page.getByRole('button', { name: /^(Исправлено|Fixed)/ }).click();
     await page.waitForTimeout(600);
     await frame(scenario, page, '03-filter');
+
+    // ── 04. Вышла новая версия: что придёт и «Обновить» ──────────────────────
+    update = BEHIND;
+    await open(page, web, '/history', 1500);
+    await page.waitForSelector('[data-panel-update="behind"]');
+    await frame(scenario, page, '04-update');
   } finally {
     await page.close();
   }

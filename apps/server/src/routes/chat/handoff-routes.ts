@@ -34,6 +34,7 @@ import {
   splitOwnsHandoff,
   startHandoff,
   statMtime,
+  uniqueNewChatId,
   type HandoffChains,
   type HandoffStart,
   type HashFile,
@@ -302,7 +303,9 @@ export function createHandoffPlanner({
     });
     if (!plan) return undefined;
 
-    const chatId = `new-${Date.now()}`;
+    // Ключ — общим счётчиком с переносом: работа и её подъём на потолок могут
+    // стартовать в одну миллисекунду, и второй затёр бы связь первого.
+    const chatId = uniqueNewChatId(Date.now());
     // Связь и отметка «проверено» пишутся ДО запуска. Связь — потому что перенос
     // на настоящий `sessionId` ищет запись по временному ключу и, не найдя, молча
     // ничего не делает; отметка — потому что упавший запуск не повод завести

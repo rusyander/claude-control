@@ -8,6 +8,7 @@ import { groupBuilderEn } from './groups/builder-en.ts';
 import { testsE2eEn } from './tests-e2e/en.ts';
 import { pageTabsEn } from './page-tabs/en.ts';
 import { changelogEn } from './changelog/en.ts';
+import { panelUpdateEn } from './panel-update/en.ts';
 import { watcherEn } from './watcher/en.ts';
 import { devRestartEn } from './dev-restart/en.ts';
 import { environmentEn } from './environment/en.ts';
@@ -33,6 +34,7 @@ export const en: TranslationSchema = {
   testsE2e: testsE2eEn,
   pageTabs: pageTabsEn,
   changelog: changelogEn,
+  panelUpdate: panelUpdateEn,
   watcher: watcherEn,
   devRestart: devRestartEn,
   environment: environmentEn,

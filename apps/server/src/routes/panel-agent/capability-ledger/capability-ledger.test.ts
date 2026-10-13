@@ -43,6 +43,9 @@ const PINNED_HUMAN: Readonly<Record<string, RouteClass>> = {
   'POST /api/dev-restart': 'human:dev-restart',
   // Решение владельца 30.09: проверка поломкой правит код в копии и тратит время.
   'POST /api/project-tests/mutation': 'human:code-write',
+  // Решение владельца 13.10: обновление панели — кнопка человека; оно перематывает код
+  // самой панели и ведёт к перезапуску сервера.
+  'POST /api/panel-update': 'human:code-write',
   'DELETE /api/credentials': 'human:secret',
   'DELETE /api/endpoints/:id/token': 'human:secret',
   'DELETE /api/mcp/:id/oauth': 'human:consent',
